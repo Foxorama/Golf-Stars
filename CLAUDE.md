@@ -96,6 +96,18 @@ This game lives or dies on three axes — put every change through all three bef
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside
   `src/sim/` (pure) so it's reachable from tests.
 
+## Render layer (locked in GS-3)
+- **One pure projector** (`render/project.ts`) does the course-space→screen mapping (tee→green
+  up, fit-to-view). BOTH renderers use it so they agree pixel-for-pixel — never reimplement the
+  transform. `render/palette.ts` is the shared surface/biome colour table (render-only; the sim
+  never sees colour).
+- **SVG = the static map** (`holeView.ts`, pure string builder, testable). **Canvas2D = the
+  animated play view** (`playView.ts`), driven off the `ShotLog[]` the round sim already emits —
+  arc/shadow/trail/impact/screen-shake. Keep the pure flight math in `trajectory.ts` (tested) and
+  the imperative drawing thin.
+- **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
+  A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
+
 ## Art pipeline (Flux)
 - Biome / boss-planet / course / item art is Flux-generated (`flux2_max`), text-to-image with
   styled prompts; downloaded into `art/`, lazy-loaded, runtime-cached. Same flow golf-finder used

@@ -1,0 +1,63 @@
+/**
+ * Ball-flight trajectory math — PURE (no DOM, no time), so it's unit-tested. The Canvas2D
+ * play view feeds it a normalised progress `t` and gets back the ball's ground position
+ * and arc height; all the imperative drawing/timing lives in `playView`.
+ *
+ * Arcade, not sim: the arc is a simple parabola whose peak scales with carry (longer shots
+ * fly higher), capped so a chip stays low and a drive soars without leaving the frame.
+ */
+
+import type { Vec } from '../sim/course/contract';
+
+export interface FlightFeel {
+  /** Min/max flight animation duration (ms). */
+  minMs: number;
+  maxMs: number;
+  /** Animation ms per yard of carry (between the min/max clamps). */
+  msPerYard: number;
+  /** Arc peak height as a fraction of carry. */
+  peakFrac: number;
+  /** Arc peak clamp (yards). */
+  peakMin: number;
+  peakMax: number;
+}
+
+export const DEFAULT_FLIGHT_FEEL: FlightFeel = {
+  minMs: 380,
+  maxMs: 1100,
+  msPerYard: 3,
+  peakFrac: 0.13,
+  peakMin: 4,
+  peakMax: 60,
+};
+
+/** Arc peak height (yards) for a given carry. */
+export function arcPeak(carry: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+  return Math.max(feel.peakMin, Math.min(feel.peakMax, Math.abs(carry) * feel.peakFrac));
+}
+
+/** Flight animation duration (ms) for a given carry. */
+export function flightDurationMs(carry: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+  return Math.max(feel.minMs, Math.min(feel.maxMs, Math.abs(carry) * feel.msPerYard));
+}
+
+export interface FlightSample {
+  /** Ground position in course-space (yards), linear from→landing. */
+  ground: Vec;
+  /** Height above the ground (yards), a sine parabola peaking at t=0.5. */
+  height: number;
+}
+
+/** Sample the flight at normalised progress `t` ∈ [0,1]. */
+export function sampleFlight(from: Vec, landing: Vec, t: number, peak: number): FlightSample {
+  const tt = Math.max(0, Math.min(1, t));
+  return {
+    ground: [from[0] + (landing[0] - from[0]) * tt, from[1] + (landing[1] - from[1]) * tt],
+    height: Math.sin(Math.PI * tt) * peak,
+  };
+}
+
+export function easeOutCubic(t: number): number {
+  const u = 1 - Math.max(0, Math.min(1, t));
+  return 1 - u * u * u;
+}
