@@ -14,12 +14,21 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Probe: does ANY ES module execute in this browser? If modules are unsupported or
+         the bundle fails to parse, this never sets the flag and the watchdog reports it. -->
+    <script type="module">
+      window.__gsModuleRan = true;
+    </script>
+    <!-- Fallback that runs ONLY in browsers without ES-module support. -->
+    <script nomodule>
+      window.__gsNoModule = true;
+    </script>
     <!-- Boot watchdog: turn a blank page into a visible error. Runs before the deferred
          module, so it catches asset-load failures, module-eval throws, and async errors
          that the app's own try/catch can't reach. Cleared once the app paints. -->
     <script>
       (function () {
-        var BUILD = 'inline-16'; // bump each deploy; proves which HTML you actually loaded
+        var BUILD = 'inline-17'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
         // Immediate visible marker so you can tell the NEW page loaded at all.
         if (app) {
@@ -59,7 +68,15 @@
           show('boot promise rejection:\n' + ((r && (r.stack || r.message)) || r || 'unknown'));
         });
         setTimeout(function () {
-          show('the inlined app did not run within 5s (unexpected for this build).\nURL: ' + location.href);
+          var hasMod = 'noModule' in HTMLScriptElement.prototype;
+          show(
+            'app did not run within 5s.\n' +
+            '• ES modules supported: ' + hasMod + '\n' +
+            '• test module ran: ' + (!!window.__gsModuleRan) + '\n' +
+            '• nomodule fired: ' + (!!window.__gsNoModule) + '\n' +
+            '• UA: ' + navigator.userAgent + '\n' +
+            'URL: ' + location.href
+          );
         }, 5000);
       })();
     </script>
