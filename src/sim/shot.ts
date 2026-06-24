@@ -144,6 +144,8 @@ export interface ShotInput {
   wind?: Wind;
   /** Per-hole biome modifiers (e.g. low-gravity carry multiplier). */
   carryMult?: number;
+  /** Player dispersion multiplier (<1 = a forgiveness/stability perk). */
+  dispersionMult?: number;
   stats?: ClubStats;
   rng: Rng;
 }
@@ -174,8 +176,9 @@ export function resolveShot(input: ShotInput): ShotResult {
 
   const w = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
 
-  const carrySd = intended * TUNABLES.carryDispersionFrac * li.dispersionMult;
-  const lateralSd = intended * TUNABLES.lateralDispersionFrac * li.dispersionMult;
+  const dispMult = li.dispersionMult * (input.dispersionMult ?? 1);
+  const carrySd = intended * TUNABLES.carryDispersionFrac * dispMult;
+  const lateralSd = intended * TUNABLES.lateralDispersionFrac * dispMult;
 
   const carry = Math.max(
     0,

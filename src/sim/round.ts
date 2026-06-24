@@ -48,6 +48,8 @@ export interface PlayHoleOptions {
   stats?: ClubStats;
   /** Carry multiplier from biome mods (e.g. low gravity). */
   carryMult?: number;
+  /** Player dispersion multiplier (<1 = a forgiveness perk). */
+  dispersionMult?: number;
 }
 
 /** Pin location. For the stub that's the green centroid (its generated centre). */
@@ -137,6 +139,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       lie,
       wind: hole.wind,
       carryMult,
+      dispersionMult: opts.dispersionMult,
       stats: opts.stats,
       rng,
     });

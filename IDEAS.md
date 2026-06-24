@@ -5,9 +5,10 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
-- **GS-2 — RPG meta-loop.** `src/sim/rpg/run.ts` + `economy.ts`: travel → arrive (rarity-graded) →
-  play → reward → spend on clubs/perks → travel further, difficulty scales. Define currency, what
-  persists vs resets, and the fail/end state before building screens. Wire it through the save.
+- **GS-8 — Interactive meta-loop UI.** The sim spine (GS-2) is headless; build the screens —
+  click a route, open the shop, play a stop, see the cut result — driven by `startRun`/`playStop`/
+  `travel`/`buy`. Wire it through the save (`snapshotRun`/`resumeRun`, the v2 schema). Also: smarter
+  auto-pilot route choice (currently always route 0) for balancing.
 - **GS-3 — Canvas2D play view + ball flight.** The static map is SVG (`holeView.ts`); the *animated*
   swing/ball-flight/juice layer is Canvas2D per the architecture decision. Drive it off the same
   `ShotLog[]` the round sim already produces.
@@ -26,7 +27,10 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
-- _none yet_
+- **GS-1 — Wildness & biome system.** Biomes as data, fantasy lies, fairness-by-construction,
+  wind-reading sim. (PR #2)
+- **GS-2 — RPG meta-loop (sim layer).** Run state machine, cut-line fail gate, credits + shop
+  perks, save v2 with run snapshot/resume + v1→v2 migration. Headless + fully tested. (PR #3)
 
 ## Dropped
 - _none yet_
