@@ -19,7 +19,15 @@
          that the app's own try/catch can't reach. Cleared once the app paints. -->
     <script>
       (function () {
+        var BUILD = 'inline-16'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
+        // Immediate visible marker so you can tell the NEW page loaded at all.
+        if (app) {
+          app.innerHTML =
+            '<pre style="color:#9fd8e6;white-space:pre-wrap;padding:16px;margin:0;' +
+            'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars — loading… (build ' +
+            BUILD + ')</pre>';
+        }
         // Defensive: this is NOT a PWA, but another project on the same origin
         // (e.g. a golf-finder PWA) may have registered a root-scoped service worker
         // that intercepts and blanks this page. Nuke any worker controlling us, and
@@ -38,8 +46,8 @@
           if (app && app.getAttribute('data-booted') !== '1') {
             app.innerHTML =
               '<pre style="color:#ff8a8a;white-space:pre-wrap;padding:16px;margin:0;' +
-              'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars — ' +
-              msg + '</pre>';
+              'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars (build ' +
+              BUILD + ') — ' + msg + '</pre>';
           }
         }
         window.addEventListener('error', function (e) {
@@ -51,10 +59,7 @@
           show('boot promise rejection:\n' + ((r && (r.stack || r.message)) || r || 'unknown'));
         });
         setTimeout(function () {
-          show(
-            'did not start within 5s.\nThe script likely failed to load (404 / wrong path / MIME).\n' +
-            'URL: ' + location.href
-          );
+          show('the inlined app did not run within 5s (unexpected for this build).\nURL: ' + location.href);
         }, 5000);
       })();
     </script>
