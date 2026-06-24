@@ -7,8 +7,8 @@
  */
 
 import { scoreName } from './sim/score';
-import { renderHoleSVG } from './render/holeView';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
+import { courseCardHTML, itemCardHTML } from './render/cards';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
@@ -103,16 +103,13 @@ function titleScreen(): string {
 function introScreen(): string {
   const c = state.course;
   const cut = cutLine(c.meta.distanceFromStart, c.holes.length);
-  const par = c.holes.reduce((s, h) => s + h.par, 0);
-  const preview = renderHoleSVG(c.holes[0]!, { width: 320, height: 460, biome: c.biome });
   return `
     ${header()}
-    <p style="opacity:.8;">Arrived at <b>${c.meta.name}</b> — <span style="color:${rarCol(c.rarity)};text-transform:uppercase;">${c.rarity}</span>
-      · biome <b>${c.biome}</b> · wildness ${c.meta.wildness.toFixed(2)}</p>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;">
-      <div style="border:1px solid #222;border-radius:10px;overflow:hidden;">${preview}</div>
-      <section style="flex:1 1 240px;">
-        <p style="font-size:15px;">${c.holes.length} holes · Par ${par} · make <b>${cut}</b> Stableford to survive the cut.</p>
+    <p style="opacity:.8;">A new world rises from the void…</p>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+      ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
+      <section style="flex:1 1 220px;">
+        <p style="font-size:15px;">Make <b>${cut}</b> Stableford across the ${c.holes.length} holes to survive the cut and travel on.</p>
         ${btn('▶ Play this stop', { type: 'play' })}
       </section>
     </div>`;
@@ -160,12 +157,17 @@ function shopScreen(): string {
   const items = SHOP_ITEMS.map((it) => {
     const have = owned.has(it.id);
     const afford = state.run.credits >= it.cost;
-    const label = `${it.name} — ${it.cost}c<br><span style="font-size:12px;opacity:.7;">${it.desc}${have ? ' (owned)' : ''}</span>`;
-    return btn(label, { type: 'buy', id: it.id }, { disabled: have || !afford });
+    const card = itemCardHTML(it, { owned: have, affordable: afford });
+    const buyable = !have && afford;
+    // Wrap the card so the whole thing is the buy button when purchasable.
+    return buyable
+      ? `<div data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+      : `<div style="margin:4px;">${card}</div>`;
   }).join('');
   return `
     ${header()}
     <h2 style="font-size:16px;">Outfitter · ${state.run.credits} credits</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Each perk once per run.</p>
     <div style="display:flex;flex-wrap:wrap;">${items}</div>
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' })}</div>`;
 }
