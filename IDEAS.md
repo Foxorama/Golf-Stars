@@ -5,10 +5,12 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
-- **GS-4 — Real putting + short-game model.** `round.ts` currently lags+holes with a coarse
-  distance model, and the recovery AI can still post rare blow-up holes at max wildness. Replace
-  with green slope/break (once greens carry contour data) and a smarter short game (controlled
-  shots from bad lies) to shrink the blow-up tail. Keep it pure + seeded.
+- **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
+  shipped (PR #7). Still open: a smarter recovery/short game to shrink the rare max-wildness blow-up
+  tail, and green slope/break once greens carry contour data. NOTE: a naive "club for nearest carry
+  on reachable shots" was tried and REVERTED — it worsened high-wildness scoring and didn't shrink
+  the tail (the cut is chaotic; perturbing club choice just reshuffles the RNG stream). The tail is
+  Stableford-absorbed by design, so this is polish, not a blocker. Keep it pure + seeded.
 
 ## Later
 
