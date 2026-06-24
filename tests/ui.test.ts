@@ -84,6 +84,33 @@ describe('ui reducer', () => {
     expect(restarted.bestDistance).toBe(s.bestDistance); // meta carried over
   });
 
+  it('offers Continue when a saved run is present, and resume enters it', () => {
+    // A saved run snapshot (e.g. from localStorage) is offered on the title screen.
+    const snap = {
+      seed: 42,
+      formatId: 'ladder',
+      stopIndex: 2,
+      distanceFromStart: 5,
+      credits: 90,
+      perks: ['gyro'],
+    };
+    const title = initState(1, {}, snap);
+    expect(title.screen).toBe('title');
+    expect(title.resumable).toEqual(snap);
+
+    const resumed = reduce(title, { type: 'resume' });
+    expect(resumed.screen).toBe('intro');
+    expect(resumed.run.formatId).toBe('ladder');
+    expect(resumed.run.stopIndex).toBe(2);
+    expect(resumed.run.loadout.perks).toEqual(['gyro']);
+    expect(resumed.resumable).toBeUndefined();
+  });
+
+  it('resume is a no-op when there is nothing to resume', () => {
+    const title = initState(1);
+    expect(reduce(title, { type: 'resume' })).toBe(title);
+  });
+
   it('the ladder format escalates hole counts across stops', () => {
     let s = started(7, 'ladder');
     const counts: number[] = [];

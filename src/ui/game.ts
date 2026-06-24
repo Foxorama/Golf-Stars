@@ -13,11 +13,13 @@ import {
   buy,
   currentCourse,
   playStop,
+  resumeRun,
   routeOptions,
   startRun,
   travel,
   type Route,
   type Run,
+  type RunSnapshot,
   type StopResult,
 } from '../sim/rpg/run';
 
@@ -35,6 +37,8 @@ export interface UiState {
   routes?: Route[];
   /** Which hole the play view is showing (0-based). */
   viewHole: number;
+  /** A saved in-progress run that the title screen can resume, if any. */
+  resumable?: RunSnapshot;
   // Meta-progression (persisted across runs).
   bestStableford: number;
   bestDistance: number;
@@ -42,6 +46,7 @@ export interface UiState {
 
 export type Action =
   | { type: 'start'; format: string }
+  | { type: 'resume' }
   | { type: 'play' }
   | { type: 'continue' }
   | { type: 'buy'; id: string }
@@ -56,17 +61,23 @@ export interface MetaProgress {
 }
 
 /**
- * Build the initial UI state. A resumed `Run` lands on the intro screen; a fresh seed
- * lands on the title screen (pick a run format first) with a placeholder run.
+ * Build the initial UI state. Always lands on the TITLE screen (pick a format, or resume
+ * a saved run if one is offered). A placeholder run backs the title until a format is
+ * chosen. Starting at the title — never auto-resuming — guarantees the format choice is
+ * always reachable and keeps a stale save from booting straight into a bad state.
  */
-export function initState(seedOrRun: number | string | Run, meta: MetaProgress = {}): UiState {
-  const resuming = typeof seedOrRun === 'object';
-  const run = resuming ? seedOrRun : startRun(seedOrRun);
+export function initState(
+  seed: number | string,
+  meta: MetaProgress = {},
+  resumable?: RunSnapshot,
+): UiState {
+  const run = startRun(seed);
   return {
     run,
-    screen: resuming ? 'intro' : 'title',
+    screen: 'title',
     course: currentCourse(run),
     viewHole: 0,
+    resumable,
     bestStableford: meta.bestStableford ?? 0,
     bestDistance: meta.bestDistance ?? 0,
   };
@@ -85,6 +96,23 @@ export function reduce(state: UiState, action: Action): UiState {
         played: undefined,
         lastResult: undefined,
         routes: undefined,
+        resumable: undefined,
+        viewHole: 0,
+      };
+    }
+
+    case 'resume': {
+      if (state.screen !== 'title' || !state.resumable) return state;
+      const run = resumeRun(state.resumable);
+      return {
+        ...state,
+        run,
+        course: currentCourse(run),
+        screen: 'intro',
+        played: undefined,
+        lastResult: undefined,
+        routes: undefined,
+        resumable: undefined,
         viewHole: 0,
       };
     }

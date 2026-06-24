@@ -96,10 +96,11 @@ export function shopItem(id: string): ShopItem | undefined {
 /** Rebuild a loadout from a set of owned perks (used to resume a saved run). */
 export function loadoutFromPerks(perks: string[]): PlayerLoadout {
   let m = startingLoadout();
-  for (const id of perks) {
+  const owned = perks ?? [];
+  for (const id of owned) {
     const item = shopItem(id);
     if (item) m = item.apply(m);
   }
   // apply() re-appends ids; pin the canonical owned set to avoid duplicates.
-  return { ...m, perks: [...perks] };
+  return { ...m, perks: [...owned] };
 }
