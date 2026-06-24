@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+
+# Art: keep regenerable prompt logs, ignore the heavy generated source images.
+art/generated/
