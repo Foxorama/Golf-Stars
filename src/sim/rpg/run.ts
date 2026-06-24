@@ -15,7 +15,6 @@ import { playCourse, type PlayedHole } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
-  HOLES_PER_STOP,
   STARTING_CREDITS,
   creditsForStop,
   cutLine,
@@ -24,6 +23,7 @@ import {
   startingLoadout,
   type PlayerLoadout,
 } from './economy';
+import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked';
@@ -50,6 +50,8 @@ export interface Route {
 
 export interface Run {
   seed: number;
+  /** Run format id (run shape). See formats.ts. */
+  formatId: string;
   /** Which stop we're at (0-based). */
   stopIndex: number;
   distanceFromStart: number;
@@ -60,10 +62,11 @@ export interface Run {
   history: StopResult[];
 }
 
-export function startRun(seed: number | string): Run {
+export function startRun(seed: number | string, formatId: string = DEFAULT_FORMAT): Run {
   const rng = new Rng(seed);
   return {
     seed: rng.seed,
+    formatId,
     stopIndex: 0,
     distanceFromStart: 0,
     credits: STARTING_CREDITS,
@@ -78,10 +81,12 @@ export function stopSeed(run: Run): string {
   return `${run.seed}:stop:${run.stopIndex}`;
 }
 
-/** The course awaiting the player at the current stop. */
+/** The course awaiting the player at the current stop (shaped by the run format). */
 export function currentCourse(run: Run): Course {
+  const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
   return generateCourse(stopSeed(run), {
-    holes: HOLES_PER_STOP,
+    holes: spec.holes,
+    parCap: spec.parCap,
     distanceFromStart: run.distanceFromStart,
   });
 }
@@ -163,6 +168,8 @@ export function bank(run: Run): Run {
 
 export interface RunSnapshot {
   seed: number;
+  /** Run format id (optional for back-compat with v1-era snapshots → flat). */
+  formatId?: string;
   stopIndex: number;
   distanceFromStart: number;
   credits: number;
@@ -173,6 +180,7 @@ export interface RunSnapshot {
 export function snapshotRun(run: Run): RunSnapshot {
   return {
     seed: run.seed,
+    formatId: run.formatId,
     stopIndex: run.stopIndex,
     distanceFromStart: run.distanceFromStart,
     credits: run.credits,
@@ -183,6 +191,7 @@ export function snapshotRun(run: Run): RunSnapshot {
 export function resumeRun(snap: RunSnapshot): Run {
   return {
     seed: snap.seed,
+    formatId: snap.formatId ?? DEFAULT_FORMAT,
     stopIndex: snap.stopIndex,
     distanceFromStart: snap.distanceFromStart,
     credits: snap.credits,
@@ -199,6 +208,8 @@ export interface RunStrategy {
   pickRoute?(run: Run, routes: Route[]): Route;
   /** Item ids to attempt buying after a stop; default = none. */
   shop?(run: Run): string[];
+  /** Run format id; default = the engine default ('flat'). */
+  formatId?: string;
 }
 
 export interface RunOutcome {
@@ -212,7 +223,7 @@ export function simulateRun(
   strategy: RunStrategy = {},
   maxStops = 100,
 ): RunOutcome {
-  let run = startRun(seed);
+  let run = startRun(seed, strategy.formatId);
   const stops: StopResult[] = [];
   for (let i = 0; i < maxStops && run.status === 'active'; i++) {
     const played = playStop(run);

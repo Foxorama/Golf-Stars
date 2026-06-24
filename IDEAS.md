@@ -3,6 +3,16 @@
 Living doc (per CLAUDE.md): scan, rerank, merge, retire — not append-only. Stable IDs, never
 reused. Shipped → Done (link PR); bad → Dropped (say why).
 
+## Avenue decision (open — building to keep all three viable)
+The big open question is what wraps the golf. Three avenues, NOT mutually exclusive:
+1. **Full top-down RPG** ("play golf to save the galaxy") — overworld/narrative shell *around* a
+   validated golf loop. Biggest divergence; **deferred** until the golf + run shape are chosen
+   (it wraps the loop, doesn't replace it).
+2. **Roguelite** (the `flat` format) — current.
+3. **Escalating ladder** (the `ladder` format) — 3 par-3s → 6 → 9 → 18. Shipped as a selectable
+   run format (GS-9) so 2 vs 3 can be *played*, not guessed.
+Everything below serves whichever avenue wins.
+
 ## Now / next (the slice is done — these are the natural follow-ons)
 
 - **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
@@ -29,6 +39,9 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
 - **GS-3 — Canvas2D play view + ball flight.** Animated arc/shadow/trail/impact/screen-shake off
   `ShotLog[]`; shared pure projector with the SVG map; pure trajectory math tested. Feel needs
   eyes-on play. (PR #4)
+- **GS-9 — Run formats.** Data-driven run shape (`sim/rpg/formats.ts`): `flat` roguelite (6-hole
+  stops, reproduces the original exactly) and `ladder` escalating ascent (3 par-3s → 6 → 9 → 18),
+  selectable on a new title screen. The lever to play Avenue 2 vs 3. (PR #8)
 - **GS-8 — Interactive meta-loop UI.** Pure screen-flow reducer (`ui/game.ts`) over the run API:
   intro → play → result (animated + scorecard) → shop → travel → repeat → gameover. Save/resume
   via the v2 schema. Reducer fully tested through a playthrough; click-through feel needs eyes-on.
