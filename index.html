@@ -20,6 +20,20 @@
     <script>
       (function () {
         var app = document.getElementById('app');
+        // Defensive: this is NOT a PWA, but another project on the same origin
+        // (e.g. a golf-finder PWA) may have registered a root-scoped service worker
+        // that intercepts and blanks this page. Nuke any worker controlling us, and
+        // drop its caches, the moment we load — so we can't be hijacked again.
+        try {
+          if (navigator.serviceWorker) {
+            navigator.serviceWorker.getRegistrations().then(function (rs) {
+              rs.forEach(function (r) { r.unregister(); });
+            }).catch(function () {});
+          }
+          if (window.caches && caches.keys) {
+            caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {});
+          }
+        } catch (e) {}
         function show(msg) {
           if (app && app.getAttribute('data-booted') !== '1') {
             app.innerHTML =
