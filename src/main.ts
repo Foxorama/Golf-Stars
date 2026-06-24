@@ -194,7 +194,7 @@ function render(): void {
     const holePlay = state.played[state.viewHole];
     const hole = state.course.holes[state.viewHole];
     if (playEl && holePlay && hole) {
-      view = mountPlayView(playEl, hole, holePlay.shots, {
+      view = mountPlayView(playEl, hole, holePlay.shots, holePlay.putts, {
         width: 340,
         height: 520,
         biome: state.course.biome,

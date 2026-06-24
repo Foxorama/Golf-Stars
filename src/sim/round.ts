@@ -36,10 +36,19 @@ export interface ShotLog {
   penalty?: string;
 }
 
+/** A single putt's roll on the green, for the play view to animate (flat, no arc). */
+export interface PuttLog {
+  from: Vec;
+  to: Vec;
+  holed: boolean;
+}
+
 export interface PlayedHole {
   record: HoleRecord;
   stat: HoleStat;
   shots: ShotLog[];
+  /** Putts on the green, in order; the last one is holed. */
+  putts: PuttLog[];
   holed: boolean;
 }
 
@@ -66,21 +75,45 @@ function dropPoint(hole: Hole, from: Vec, landing: Vec): Vec {
   return from;
 }
 
-/** Putt out from a distance, returning putts taken. Deterministic via `rng`. */
-function puttOut(rng: Rng, distToPin: number): number {
-  let d = distToPin;
+/**
+ * Putt out from `from` toward `pin`, returning the putt count and the roll path (for
+ * animation). Deterministic via `rng`. The model is distance-based (no slope yet — that's
+ * a later refinement): short putts usually drop, long putts lag close, with a small
+ * lateral miss so a missed putt visibly slides past the hole rather than through it.
+ */
+function puttOut(rng: Rng, from: Vec, pinPt: Vec): { putts: number; log: PuttLog[] } {
+  const log: PuttLog[] = [];
+  let pos: Vec = from;
+  let d = dist(pos, pinPt);
   let putts = 0;
   while (d > HOLE_OUT_RADIUS && putts < 6) {
     putts++;
+    let newD: number;
     if (d <= 2.2) {
-      // Makeable: usually holed, occasionally a tap-in remains.
-      d = rng.bool(0.85) ? 0 : rng.range(0.4, 1.0);
+      newD = rng.bool(0.85) ? 0 : rng.range(0.4, 1.0); // makeable: usually drops
     } else {
-      // Lag: leave it close, proportional to length, never negative.
-      d = Math.abs(rng.gaussian(d * 0.07, d * 0.05));
+      newD = Math.abs(rng.gaussian(d * 0.07, d * 0.05)); // lag close
     }
+    const holed = newD <= HOLE_OUT_RADIUS;
+    let to: Vec;
+    if (holed) {
+      to = pinPt;
+    } else {
+      // Place the ball `newD` from the pin along the pin→ball line, nudged laterally so
+      // the miss reads as sliding past the hole.
+      let dx = pos[0] - pinPt[0];
+      let dy = pos[1] - pinPt[1];
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+      const lateral = rng.gaussian(0, newD * 0.3);
+      to = [pinPt[0] + dx * newD - dy * lateral, pinPt[1] + dy * newD + dx * lateral];
+    }
+    log.push({ from: pos, to, holed });
+    pos = to;
+    d = holed ? 0 : dist(pos, pinPt);
   }
-  return putts;
+  return { putts, log };
 }
 
 /**
@@ -176,18 +209,21 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
   }
 
   // Putt out.
+  const puttLog: PuttLog[] = [];
   const remaining = dist(ball, target);
   if (remaining <= HOLE_OUT_RADIUS) {
     holed = true;
   } else {
-    putts = puttOut(rng, remaining);
+    const out = puttOut(rng, ball, target);
+    putts = out.putts;
+    puttLog.push(...out.log);
     strokes += putts;
     holed = true;
   }
 
   const record: HoleRecord = { par: hole.par, strokes };
   const stat: HoleStat = { par: hole.par, strokes, putts, penalties, fairwayHit };
-  return { record, stat, shots, holed };
+  return { record, stat, shots, putts: puttLog, holed };
 }
 
 /** Play every hole of a course in order; returns per-hole results. */

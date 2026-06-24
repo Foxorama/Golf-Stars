@@ -12,11 +12,12 @@
  */
 
 import type { Hole, Vec } from '../sim/course/contract';
-import type { ShotLog } from '../sim/round';
+import type { PuttLog, ShotLog } from '../sim/round';
 import { holeProjector } from './project';
 import { fillFor, roughFor } from './palette';
 import {
   arcPeak,
+  easeOutCubic,
   flightDurationMs,
   sampleFlight,
   DEFAULT_FLIGHT_FEEL,
@@ -71,6 +72,7 @@ export function mountPlayView(
   container: HTMLElement,
   hole: Hole,
   shots: ShotLog[],
+  putts: PuttLog[] = [],
   opts: PlayViewOptions = {},
 ): PlayViewHandle {
   const F = feel();
@@ -93,7 +95,8 @@ export function mountPlayView(
 
   // --- animation state ---
   let shotIndex = 0;
-  let shotStart = 0;
+  let puttIndex = 0;
+  let segStart = 0; // start time of the current shot or putt
   let raf = 0;
   let trail: Vec[] = [];
   let particles: Particle[] = [];
@@ -102,7 +105,8 @@ export function mountPlayView(
 
   function reset(now: number): void {
     shotIndex = 0;
-    shotStart = now;
+    puttIndex = 0;
+    segStart = now;
     trail = [];
     particles = [];
     shake = 0;
@@ -188,7 +192,7 @@ export function mountPlayView(
   }
 
   function frame(now: number): void {
-    if (!shotStart) shotStart = now;
+    if (!segStart) segStart = now;
 
     // Screen-shake offset (deterministic decay).
     ctx.save();
@@ -206,7 +210,7 @@ export function mountPlayView(
       const shot = shots[shotIndex]!;
       const carry = shot.result.carry;
       const dur = flightDurationMs(carry);
-      const t = (now - shotStart) / dur;
+      const t = (now - segStart) / dur;
       const peak = arcPeak(carry);
       const s = sampleFlight(shot.from, shot.result.landing, t, peak);
 
@@ -244,7 +248,42 @@ export function mountPlayView(
         spawnImpact([gx, gy], Math.min(1, carry / 240));
         trail = [];
         shotIndex++;
-        shotStart = now + F.gapMs;
+        segStart = now + F.gapMs;
+      }
+    } else if (puttIndex < putts.length) {
+      // Putt phase: flat roll across the green, eased to a stop, into the cup.
+      const putt = putts[puttIndex]!;
+      const len = Math.hypot(putt.to[0] - putt.from[0], putt.to[1] - putt.from[1]);
+      const dur = Math.max(300, Math.min(750, len * proj.scale * 12));
+      const t = Math.max(0, Math.min(1, (now - segStart) / dur));
+      const e = easeOutCubic(t);
+      const gx = proj.project([
+        putt.from[0] + (putt.to[0] - putt.from[0]) * e,
+        putt.from[1] + (putt.to[1] - putt.from[1]) * e,
+      ] as Vec);
+
+      // Putt line (aim guide) + rolling ball, both flat on the green.
+      const [fx, fy] = proj.project(putt.from);
+      const [tx, ty] = proj.project(putt.to);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath();
+      ctx.arc(gx[0], gx[1], 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      hudText = `Putt ${puttIndex + 1}${putt.holed ? ' — in!' : ''}`;
+
+      if (t >= 1) {
+        if (putt.holed) spawnImpact([tx, ty], 0.5);
+        puttIndex++;
+        segStart = now + F.gapMs;
       }
     } else if (!done) {
       done = true;
