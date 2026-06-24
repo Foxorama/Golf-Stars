@@ -7,6 +7,7 @@
  */
 
 import { CLUBS, type Club } from '../clubs';
+import type { Rarity } from '../course/contract';
 
 export const HOLES_PER_STOP = 6;
 export const CREDIT_PER_POINT = 12;
@@ -56,6 +57,8 @@ export interface ShopItem {
   name: string;
   cost: number;
   desc: string;
+  /** Loot grade — tints the item card (see render/cards.ts). */
+  rarity: Rarity;
   apply(loadout: PlayerLoadout): PlayerLoadout;
 }
 
@@ -65,6 +68,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Power Cell',
     cost: 120,
     desc: '+12 yds carry on your distance clubs',
+    rarity: 'common',
     apply: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 12), perks: [...m.perks, 'power-cell'] }),
   },
   {
@@ -72,6 +76,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Gyro Stabiliser',
     cost: 150,
     desc: '15% tighter dispersion',
+    rarity: 'rare',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.85, perks: [...m.perks, 'gyro'] }),
   },
   {
@@ -79,6 +84,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Lucky Coin',
     cost: 100,
     desc: '+20% credits earned',
+    rarity: 'rare',
     apply: (m) => ({ ...m, creditMult: m.creditMult * 1.2, perks: [...m.perks, 'lucky-coin'] }),
   },
 ];

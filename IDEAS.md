@@ -24,8 +24,10 @@ Everything below serves whichever avenue wins.
 
 ## Later
 
-- **GS-5 — Course/item cards.** Port `buildCard` + rarity tint (`RARITY_C`) for "course discovered"
-  and loot cards. Flux art pipeline for biome/boss art (CLAUDE.md "Art pipeline").
+- **GS-5b — Flux biome/boss art.** The card system + art hook shipped (PR #9); cards fall back to
+  a rarity gradient + hole thumbnail. Generating the actual Flux art needs the image-gen tooling
+  (absent in the coding session) — see `reports/art-pipeline-2026-06-24.md` for the hook + prompt
+  log. Pass `artUrl` to `courseCardHTML` once images exist.
 - **GS-6 — Pin ≠ green centroid.** Generate a real pin position within the green polygon; the round
   sim already targets `pin(hole)`, so it's a one-function change.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
@@ -42,6 +44,9 @@ Everything below serves whichever avenue wins.
 - **GS-9 — Run formats.** Data-driven run shape (`sim/rpg/formats.ts`): `flat` roguelite (6-hole
   stops, reproduces the original exactly) and `ladder` escalating ascent (3 par-3s → 6 → 9 → 18),
   selectable on a new title screen. The lever to play Avenue 2 vs 3. (PR #8)
+- **GS-5 — Course/item cards.** Rarity-tinted card layer (`render/cards.ts`): course-discovered
+  cards on the intro screen, clickable shop item cards. Pure HTML builders, tested. Art hook
+  (`artUrl`) ready; actual Flux art is GS-5b. (PR #9)
 - **GS-8 — Interactive meta-loop UI.** Pure screen-flow reducer (`ui/game.ts`) over the run API:
   intro → play → result (animated + scorecard) → shop → travel → repeat → gameover. Save/resume
   via the v2 schema. Reducer fully tested through a playthrough; click-through feel needs eyes-on.
