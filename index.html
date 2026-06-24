@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Always revalidate index.html so a new deploy never serves a stale page that
+         points at a content-hashed asset that no longer exists (the assets themselves
+         are safe to cache forever). Best-effort on GitHub Pages, where we don't control
+         HTTP headers. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Golf Stars</title>
   </head>
   <body>
