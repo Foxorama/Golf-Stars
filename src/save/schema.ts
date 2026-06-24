@@ -1,66 +1,89 @@
 /**
- * Versioned save schema — from v1, on purpose.
- *
- * golf-finder learned the hard way that retrofitting schema versioning is painful, so
- * every persisted blob carries a `version` and goes through `migrate()` on load, even
- * though there's nothing to migrate yet. When the shape changes, add a step here — the
- * loader never assumes the current shape.
+ * Versioned save schema. Every persisted blob carries a `version` and passes through
+ * `migrate()` on load. v2 adds the RPG meta-loop (a resumable run snapshot + furthest
+ * distance) and migrates v1 blobs forward — the first real exercise of the chain the
+ * kit insisted on from day one.
  */
 
-export const SAVE_VERSION = 1;
+import type { RunSnapshot } from '../sim/rpg/run';
 
-/** The persisted game state. Grows over time; always behind a version + migrate(). */
+export const SAVE_VERSION = 2;
+
+/** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
   version: 1;
-  /** Active run seed, if a run is in progress. */
   runSeed?: number;
-  /** Galaxy distance travelled this run. */
   distanceFromStart: number;
-  /** Soft currency earned across the run. */
   credits: number;
-  /** Best Stableford total ever recorded (meta-progression hook). */
   bestStableford: number;
-  /** ISO-ish timestamp the save was written (filled by the storage layer). */
+  savedAt?: string;
+}
+
+/** v2 — adds the meta-loop. */
+export interface SaveV2 {
+  version: 2;
+  /** Banked meta-currency. */
+  credits: number;
+  bestStableford: number;
+  /** Furthest galaxy distance ever reached. */
+  bestDistance: number;
+  /** In-progress run, if any (loadout rebuilt from its perks on resume). */
+  activeRun?: RunSnapshot;
   savedAt?: string;
 }
 
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV1;
+export type Save = SaveV2;
 
 export function defaultSave(): Save {
+  return { version: SAVE_VERSION, credits: 0, bestStableford: 0, bestDistance: 0 };
+}
+
+/** v1 → v2: fold the loose run fields into the new shape. */
+function v1ToV2(s: SaveV1): SaveV2 {
   return {
-    version: SAVE_VERSION,
-    distanceFromStart: 0,
-    credits: 0,
-    bestStableford: 0,
+    version: 2,
+    credits: s.credits ?? 0,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.distanceFromStart ?? 0,
+    activeRun:
+      s.runSeed !== undefined
+        ? {
+            seed: s.runSeed,
+            stopIndex: 0,
+            distanceFromStart: s.distanceFromStart ?? 0,
+            credits: s.credits ?? 0,
+            perks: [],
+          }
+        : undefined,
+    savedAt: s.savedAt,
   };
 }
 
 /**
- * Migrate an unknown persisted blob up to the current version. Today it's a no-op for
- * v1 and a reset-to-default for anything unrecognised; tomorrow each version bump adds
- * one `if (s.version === N) { ...; s.version = N+1 }` step in sequence.
+ * Migrate an unknown persisted blob up to the current version, one step at a time. Each
+ * future version bump adds another `if (s.version === N)` step in sequence.
  */
 export function migrate(raw: unknown): Save {
   if (!raw || typeof raw !== 'object') return defaultSave();
-  const s = raw as Partial<SaveV1> & { version?: number };
+  let s = raw as { version?: number } & Record<string, unknown>;
 
-  // Future migrations chain here, e.g.:
-  //   if (s.version === 1) { /* transform to v2 */ s.version = 2; }
+  if (s.version === 1) s = v1ToV2(s as unknown as SaveV1) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
-    // Unknown/older-than-supported: start clean rather than guess at a shape.
+    // Unknown / unsupported version: start clean rather than guess at a shape.
     return defaultSave();
   }
 
-  // Fill any missing fields defensively (a partial blob shouldn't crash the loader).
+  // Defensive backfill so a partial blob can't crash the loader.
+  const v2 = s as unknown as Partial<SaveV2>;
   return {
     version: SAVE_VERSION,
-    runSeed: s.runSeed,
-    distanceFromStart: s.distanceFromStart ?? 0,
-    credits: s.credits ?? 0,
-    bestStableford: s.bestStableford ?? 0,
-    savedAt: s.savedAt,
+    credits: v2.credits ?? 0,
+    bestStableford: v2.bestStableford ?? 0,
+    bestDistance: v2.bestDistance ?? 0,
+    activeRun: v2.activeRun,
+    savedAt: v2.savedAt,
   };
 }
 

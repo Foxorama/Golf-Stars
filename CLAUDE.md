@@ -74,6 +74,23 @@ This game lives or dies on three axes — put every change through all three bef
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a
   hard per-hole cap. Tightening the short-game AI to shrink the tail is GS-4.
 
+## RPG meta-loop (locked in GS-2)
+- **The spine** (`src/sim/rpg/run.ts`): `startRun → [playStop → buy* → travel]*` until a cut
+  is missed. Pure/deterministic — a seed plays the same run; `simulateRun()` drives a whole run
+  headlessly for tests.
+- **Fail gate = the cut line** (`economy.ts`): each stop needs a minimum Stableford that ramps
+  with galaxy distance. Beat it to travel on; miss it and the run ends. Reuses the score we already
+  compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.
+- **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
+  the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
+- **Balance/test on mean per-stop Stableford, NOT full-run distance.** Distance is chaotic: a
+  loadout change perturbs the whole downstream seeded-RNG stream and the cut is a hard threshold,
+  so "travels further" isn't monotonic even when a perk clearly helps. Averaged per-stop score is
+  the stable signal.
+- **A power-up must improve scoring** (game-feel). `power-cell` boosts *distance clubs only* —
+  boosting every club made the "reach" approach AI overshoot greens and score *worse*. Verify any
+  new perk raises mean per-stop Stableford before shipping it.
+
 ## Testing (regression guard)
 - `tests/` (vitest) imports the pure `src/sim/` modules directly and asserts on seeded runs.
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside
