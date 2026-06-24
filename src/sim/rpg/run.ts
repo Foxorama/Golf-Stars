@@ -11,7 +11,7 @@
 
 import { Rng } from '../rng';
 import { generateCourse } from '../course/generate';
-import { playCourse } from '../round';
+import { playCourse, type PlayedHole } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
@@ -90,7 +90,7 @@ export function currentCourse(run: Run): Course {
  * Play the current stop's course with the run's loadout. Adds credits if the cut is
  * made; ends the run (reason 'cut') if it's missed.
  */
-export function playStop(run: Run): { run: Run; result: StopResult } {
+export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
   if (run.status !== 'active') throw new Error('playStop: run is not active');
   const course = currentCourse(run);
   const rng = new Rng(`${course.seed}:play`);
@@ -122,7 +122,7 @@ export function playStop(run: Run): { run: Run; result: StopResult } {
     status: passed ? 'active' : 'ended',
     ...(passed ? {} : { endedReason: 'cut' as const }),
   };
-  return { run: next, result };
+  return { run: next, result, played };
 }
 
 /** The onward routes offered after a stop. Deterministic from the run + stop. */

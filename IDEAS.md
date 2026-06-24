@@ -5,10 +5,6 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
-- **GS-8 — Interactive meta-loop UI.** The sim spine (GS-2) is headless; build the screens —
-  click a route, open the shop, play a stop, see the cut result — driven by `startRun`/`playStop`/
-  `travel`/`buy`. Wire it through the save (`snapshotRun`/`resumeRun`, the v2 schema). Also: smarter
-  auto-pilot route choice (currently always route 0) for balancing.
 - **GS-4 — Real putting + short-game model.** `round.ts` currently lags+holes with a coarse
   distance model, and the recovery AI can still post rare blow-up holes at max wildness. Replace
   with green slope/break (once greens carry contour data) and a smarter short game (controlled
@@ -31,6 +27,10 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
 - **GS-3 — Canvas2D play view + ball flight.** Animated arc/shadow/trail/impact/screen-shake off
   `ShotLog[]`; shared pure projector with the SVG map; pure trajectory math tested. Feel needs
   eyes-on play. (PR #4)
+- **GS-8 — Interactive meta-loop UI.** Pure screen-flow reducer (`ui/game.ts`) over the run API:
+  intro → play → result (animated + scorecard) → shop → travel → repeat → gameover. Save/resume
+  via the v2 schema. Reducer fully tested through a playthrough; click-through feel needs eyes-on.
+  (PR #5). Follow-on left open: smarter auto-pilot route choice for balancing.
 
 ## Dropped
 - _none yet_

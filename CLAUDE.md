@@ -108,6 +108,15 @@ This game lives or dies on three axes — put every change through all three bef
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
 
+## UI layer (locked in GS-8)
+- **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the
+  run API — intro → play → result → shop → travel → … → gameover. No DOM, no time, so the whole
+  interactive flow is unit-tested. `main.ts` renders `UiState` and dispatches actions on clicks.
+- **Save persistence is a side-effect in `main.ts`**, never in the reducer. Resume rebuilds the run
+  from the v2 `activeRun` snapshot (`resumeRun`); `?seed=` in the URL forces a fresh run.
+- New screens/actions: add an `Action` variant + a guarded `case` (return state unchanged when the
+  action doesn't apply to the current screen) and a render branch. Keep logic in the reducer.
+
 ## Art pipeline (Flux)
 - Biome / boss-planet / course / item art is Flux-generated (`flux2_max`), text-to-image with
   styled prompts; downloaded into `art/`, lazy-loaded, runtime-cached. Same flow golf-finder used
