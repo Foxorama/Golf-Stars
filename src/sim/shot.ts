@@ -41,7 +41,7 @@ export interface LieInfo {
   label: string;
 }
 
-export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable';
+export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void';
 
 /**
  * Surface → playing characteristics. Open table (content-as-data): fantasy surfaces
@@ -56,9 +56,11 @@ export const LIE_INFO: Record<string, LieInfo> = {
   waste: { carryMult: 0.9, dispersionMult: 1.2, label: 'Waste' },
   bunker: { carryMult: 0.7, dispersionMult: 1.6, label: 'Bunker' },
   water: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'water', label: 'Water' },
-  // Fantasy examples:
-  lava: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'water', label: 'Lava' },
-  crystal: { carryMult: 1.05, dispersionMult: 0.9, label: 'Crystal' },
+  // Fantasy examples (each biome that uses one references it by this key):
+  lava: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'lava', label: 'Lava' },
+  void: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'void', label: 'The Void' },
+  ice: { carryMult: 1.02, dispersionMult: 1.5, label: 'Ice' }, // slick: hard to control
+  crystal: { carryMult: 1.05, dispersionMult: 0.85, label: 'Crystal' }, // true & fast
 };
 
 /** Default lie when a point is off every polygon (native / out-of-frame): rough. */
@@ -82,6 +84,8 @@ export const PEN_INFO: Record<PenaltyKind, PenaltyInfo> = {
   ob: { strokes: 1, replay: true, label: 'Out of bounds' },
   lost: { strokes: 1, replay: true, label: 'Lost ball' },
   unplayable: { strokes: 1, replay: false, label: 'Unplayable' },
+  lava: { strokes: 1, replay: false, label: 'Lava' },
+  void: { strokes: 1, replay: true, label: 'Lost to the void' },
 };
 
 // --- Lie lookup against a hole ----------------------------------------------

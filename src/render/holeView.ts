@@ -26,7 +26,22 @@ const FILL: Record<string, string> = {
   water: '#3f8fe0',
   waste: '#c2b280',
   lava: '#d2451e',
+  void: '#160a26',
+  ice: '#bfe6f0',
   crystal: '#9fd8e6',
+};
+
+/**
+ * Per-biome rough (background) tint — a render-layer concern, keyed by biome id (the
+ * sim's biome table stays physics-only). Fairway/green keep their canonical colours so
+ * the playable surfaces always read; the surround sells the world.
+ */
+const BIOME_ROUGH: Record<string, string> = {
+  'verdant-station': '#274d27',
+  'dust-belt': '#6b5230',
+  'ice-ring': '#3a4a55',
+  'ember-world': '#3a1410',
+  'void-garden': '#120a22',
 };
 
 function fillFor(kind: FeatureKind): string {
@@ -41,6 +56,8 @@ export interface RenderOptions {
   shots?: ShotLog[];
   /** Show the centreline play-line. */
   showCentreline?: boolean;
+  /** Biome id — tints the rough/background to sell the world. */
+  biome?: string;
 }
 
 /** uv() transform: rotate course-space so tee→green points up, then map to SVG (y-down). */
@@ -117,10 +134,11 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const featureSvg = (f: Feature) =>
     `<polygon points="${pts(f.poly)}" fill="${fillFor(f.kind)}" stroke="rgba(0,0,0,0.25)" stroke-width="1" />`;
 
-  // Background = native rough behind everything.
+  // Background = native rough behind everything, tinted by biome when known.
+  const roughFill = (opts.biome && BIOME_ROUGH[opts.biome]) || FILL.rough;
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
-    `<rect x="0" y="0" width="${width}" height="${height}" fill="${FILL.rough}" />`,
+    `<rect x="0" y="0" width="${width}" height="${height}" fill="${roughFill}" />`,
   ];
 
   // Terrain features first…

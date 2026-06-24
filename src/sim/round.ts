@@ -12,8 +12,10 @@ import {
   lieAt,
   lieInfo,
   playsLike,
+  playWind,
   PEN_INFO,
   resolveShot,
+  TUNABLES,
   type ShotResult,
 } from './shot';
 import type { HoleRecord } from './score';
@@ -83,9 +85,19 @@ function puttOut(rng: Rng, distToPin: number): number {
  * Play a single hole. Strategy: aim at the pin, choose the club that just reaches the
  * plays-like distance, take recoveries from wherever the ball ends up, then putt out.
  */
+/** Net carry multiplier from a hole's biome mods (gravity), unless overridden. */
+export function biomeCarryMult(hole: Hole): number {
+  let m = 1;
+  for (const mod of hole.biomeMods ?? []) {
+    if (mod.kind === 'carry' && typeof mod.value === 'number') m *= mod.value;
+  }
+  return m;
+}
+
 export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): PlayedHole {
   const bag = opts.bag ?? CLUBS;
   const target = pin(hole);
+  const carryMult = opts.carryMult ?? biomeCarryMult(hole);
 
   let ball: Vec = [...hole.tee] as Vec;
   let lie: FeatureKind = 'tee';
@@ -102,16 +114,29 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     // On the green (or effectively there) → switch to putting.
     if (lie === 'green' || remaining <= HOLE_OUT_RADIUS) break;
 
-    const playLike = playsLike(remaining, hole.wind, bearingDeg(ball, target));
-    const club = suggestClub(playLike, 'reach', bag, opts.stats);
+    // If the line to the pin is blocked by a penalty hazard, don't fire over it — lay
+    // up to the centreline corridor (penalty-free by the fairness invariant). A player
+    // reads the trouble and pitches back into play rather than spiralling.
+    const tgt = safeTarget(hole, ball, target);
+    const aimDist = dist(ball, tgt);
+    const shotBearing = bearingDeg(ball, tgt);
+    const playLike = playsLike(aimDist, hole.wind, shotBearing);
+    // Club for the EFFECTIVE carry: gravity scales how far a club flies, so divide the
+    // target by the carry multiplier before picking (low-grav → club down).
+    const club = suggestClub(playLike / carryMult, 'reach', bag, opts.stats);
+
+    // Read the wind: aim UPWIND so the crosswind drifts the ball back to target. This
+    // is the "wind reads true off the shot bearing" promise — a played shot compensates
+    // for known wind rather than spraying into trouble.
+    const aim = aimWithWind(ball, tgt, hole.wind, shotBearing, club.carry * carryMult);
 
     const result = resolveShot({
       from: ball,
-      aim: target,
+      aim,
       club,
       lie,
       wind: hole.wind,
-      carryMult: opts.carryMult,
+      carryMult,
       stats: opts.stats,
       rng,
     });
@@ -169,6 +194,84 @@ export function playCourse(
   opts: PlayHoleOptions = {},
 ): PlayedHole[] {
   return holes.map((h) => playHole(h, rng, opts));
+}
+
+/** True if the straight line from→to is free of penalty surfaces (sampled). */
+function clearLine(hole: Hole, from: Vec, to: Vec): boolean {
+  const steps = 20;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const p: Vec = [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
+    if (lieInfo(lieAt(hole, p)).penalty) return false;
+  }
+  return true;
+}
+
+/** A point a fraction `t` (by arc length) along a polyline. */
+function pointAlong(line: Vec[], t: number): Vec {
+  if (line.length === 1) return line[0]!;
+  const total = dist(line[0]!, line[1]!) + (line[2] ? dist(line[1]!, line[2]!) : 0);
+  let want = total * Math.max(0, Math.min(1, t));
+  for (let i = 1; i < line.length; i++) {
+    const segLen = dist(line[i - 1]!, line[i]!);
+    if (want <= segLen || i === line.length - 1) {
+      const u = segLen ? want / segLen : 0;
+      const a = line[i - 1]!;
+      const b = line[i]!;
+      return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    }
+    want -= segLen;
+  }
+  return line[line.length - 1]!;
+}
+
+/**
+ * Choose where to aim: the pin if the line is clear, else a layup point on the
+ * centreline corridor ahead of the ball (guaranteed penalty-free), so a ball in trouble
+ * pitches back into play instead of repeatedly firing over a hazard.
+ */
+function safeTarget(hole: Hole, ball: Vec, pinPt: Vec): Vec {
+  if (clearLine(hole, ball, pinPt)) return pinPt;
+  // Project the ball onto the centreline (sampled), then advance toward the green.
+  let bestT = 0;
+  let bestD = Infinity;
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40;
+    const p = pointAlong(hole.centreline, t);
+    const d = dist(p, ball);
+    if (d < bestD) {
+      bestD = d;
+      bestT = t;
+    }
+  }
+  return pointAlong(hole.centreline, Math.min(1, bestT + 0.2));
+}
+
+/**
+ * Offset the aim point upwind so the expected crosswind drift lands the ball on target.
+ * `carry` is the effective (gravity-scaled) carry the shot is expected to fly.
+ */
+function aimWithWind(
+  from: Vec,
+  target: Vec,
+  wind: Hole['wind'],
+  shotBearingDeg: number,
+  carry: number,
+): Vec {
+  if (!wind) return target;
+  const { cross } = playWind(wind, shotBearingDeg);
+  const drift = cross * TUNABLES.windLateralPerMph; // +drift pushes to the shot's right
+  if (drift === 0) return target;
+  // Right-perpendicular of the shot bearing (matches resolveShot's lateral convention).
+  const br = (shotBearingDeg * Math.PI) / 180;
+  const fx = Math.sin(br);
+  const fy = Math.cos(br);
+  const rx = fy;
+  const ry = -fx;
+  // Aim opposite the drift, scaled to the fraction of the carry this shot covers.
+  const frac = carry > 0 ? Math.min(1, Math.hypot(target[0] - from[0], target[1] - from[1]) / carry) : 1;
+  const comp = -drift * frac;
+  return [target[0] + rx * comp, target[1] + ry * comp];
 }
 
 // Local copy of the up-screen bearing in degrees (avoids importing for one call site).
