@@ -21,7 +21,7 @@ import {
   type StopResult,
 } from '../sim/rpg/run';
 
-export type Screen = 'intro' | 'result' | 'shop' | 'travel' | 'gameover';
+export type Screen = 'title' | 'intro' | 'result' | 'shop' | 'travel' | 'gameover';
 
 export interface UiState {
   run: Run;
@@ -41,6 +41,7 @@ export interface UiState {
 }
 
 export type Action =
+  | { type: 'start'; format: string }
   | { type: 'play' }
   | { type: 'continue' }
   | { type: 'buy'; id: string }
@@ -54,12 +55,16 @@ export interface MetaProgress {
   bestDistance?: number;
 }
 
-/** Build the initial UI state from a seed or a resumed run. */
+/**
+ * Build the initial UI state. A resumed `Run` lands on the intro screen; a fresh seed
+ * lands on the title screen (pick a run format first) with a placeholder run.
+ */
 export function initState(seedOrRun: number | string | Run, meta: MetaProgress = {}): UiState {
-  const run = typeof seedOrRun === 'object' ? seedOrRun : startRun(seedOrRun);
+  const resuming = typeof seedOrRun === 'object';
+  const run = resuming ? seedOrRun : startRun(seedOrRun);
   return {
     run,
-    screen: 'intro',
+    screen: resuming ? 'intro' : 'title',
     course: currentCourse(run),
     viewHole: 0,
     bestStableford: meta.bestStableford ?? 0,
@@ -69,6 +74,21 @@ export function initState(seedOrRun: number | string | Run, meta: MetaProgress =
 
 export function reduce(state: UiState, action: Action): UiState {
   switch (action.type) {
+    case 'start': {
+      if (state.screen !== 'title') return state;
+      const run = startRun(state.run.seed, action.format);
+      return {
+        ...state,
+        run,
+        course: currentCourse(run),
+        screen: 'intro',
+        played: undefined,
+        lastResult: undefined,
+        routes: undefined,
+        viewHole: 0,
+      };
+    }
+
     case 'play': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       const { run, result, played } = playStop(state.run);

@@ -45,6 +45,8 @@ export interface GenerateOptions {
   wildness?: number;
   /** Force a specific biome by id (otherwise weighted-random). */
   biome?: string;
+  /** Cap every hole's par (3 = all par-3s). Omit for the normal 3/4/5 mix. */
+  parCap?: 3 | 4 | 5;
 }
 
 const NAME_PREFIX = ['Kepler', 'Vega', 'Lyra', 'Orion', 'Cygnus', 'Helix', 'Pulsar', 'Nyx'];
@@ -110,9 +112,11 @@ function clearsPlayCorridor(
   return polylineDist(c, centreline) > margin && segDist(c, tee, green) > margin;
 }
 
-function generateHole(rng: Rng, biome: Biome, wildness: number): Hole {
+function generateHole(rng: Rng, biome: Biome, wildness: number, parCap?: 3 | 4 | 5): Hole {
   const parRoll = rng.float();
-  const par = parRoll < 0.25 ? 3 : parRoll < 0.8 ? 4 : 5;
+  // Always draw parRoll (keeps the RNG stream identical whether or not a cap is set),
+  // then clamp to the cap so an all-par-3 ladder stop is just min(par, 3).
+  const par = Math.min(parRoll < 0.25 ? 3 : parRoll < 0.8 ? 4 : 5, parCap ?? 5);
 
   // Hole length (yards) by par. Low gravity (carryMult > 1) lengthens holes so they
   // stay challenging despite longer carries.
@@ -256,7 +260,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
   const name = `${rng.pick(NAME_PREFIX)} ${rng.pick(NAME_SUFFIX)}`;
 
   const holes: Hole[] = [];
-  for (let i = 0; i < holeCount; i++) holes.push(generateHole(rng, biome, wildness));
+  for (let i = 0; i < holeCount; i++) holes.push(generateHole(rng, biome, wildness, opts.parCap));
 
   const course: Course = {
     seed: rng.seed,

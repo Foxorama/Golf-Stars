@@ -11,6 +11,7 @@ import { renderHoleSVG } from './render/holeView';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
+import { FORMATS } from './sim/rpg/formats';
 import { snapshotRun, resumeRun } from './sim/rpg/run';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -74,6 +75,29 @@ function header(): string {
         · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
       </span>
     </header>`;
+}
+
+function titleScreen(): string {
+  const formats = Object.values(FORMATS)
+    .map(
+      (f) => `
+      <div style="border:1px solid #2a2f3a;border-radius:10px;padding:12px;margin:8px 0;background:#11141b;">
+        <div style="display:flex;align-items:baseline;gap:10px;">
+          <b style="font-size:16px;">${f.name}</b>
+          <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
+        </div>
+        <p style="font-size:13px;opacity:.8;margin:.4em 0;">${f.blurb}</p>
+        ${btn(`Start — ${f.name}`, { type: 'start', format: f.id })}
+      </div>`,
+    )
+    .join('');
+  return `
+    <header style="border-left:4px solid #5fd45a;padding-left:10px;">
+      <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
+    </header>
+    <h2 style="font-size:15px;margin-top:1em;">Choose a run format</h2>
+    ${formats}`;
 }
 
 function introScreen(): string {
@@ -171,7 +195,9 @@ function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
   const body =
-    state.screen === 'intro'
+    state.screen === 'title'
+      ? titleScreen()
+      : state.screen === 'intro'
       ? introScreen()
       : state.screen === 'result'
         ? resultScreen()
