@@ -12,7 +12,7 @@ import { courseCardHTML, itemCardHTML } from './render/cards';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
-import { snapshotRun, resumeRun } from './sim/rpg/run';
+import { snapshotRun } from './sim/rpg/run';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
 
@@ -27,17 +27,40 @@ let state: UiState;
 let view: PlayViewHandle | null = null;
 
 function boot(): void {
-  const save = loadSave();
-  const meta = { bestStableford: save.bestStableford, bestDistance: save.bestDistance };
-  const urlSeed = seedFromUrl();
-  if (urlSeed !== null) {
-    state = initState(urlSeed, meta);
-  } else if (save.activeRun) {
-    state = initState(resumeRun(save.activeRun), meta);
-  } else {
-    state = initState(1234, meta);
+  try {
+    const save = loadSave();
+    const meta = { bestStableford: save.bestStableford, bestDistance: save.bestDistance };
+    const seed = seedFromUrl() ?? 1234;
+    // Always land on the title screen; a saved run is offered as "Continue", never
+    // auto-resumed — so the format choice is always reachable.
+    state = initState(seed, meta, save.activeRun);
+    render();
+  } catch (err) {
+    recover(err);
   }
-  render();
+}
+
+/**
+ * Last-resort guard: a stale/corrupt save or a render fault must never leave a blank
+ * page. Clear the active run and fall back to a fresh title screen.
+ */
+function recover(err: unknown): void {
+  console.error('Golf Stars recovered from an error:', err);
+  try {
+    writeSave({ version: 2, credits: 0, bestStableford: 0, bestDistance: 0 });
+  } catch {
+    /* ignore */
+  }
+  try {
+    state = initState(1234, {});
+    render();
+  } catch {
+    const app = document.getElementById('app');
+    if (app) {
+      app.innerHTML =
+        '<main style="font-family:system-ui;color:#e8e8ea;background:#0b0d12;padding:24px;min-height:100vh;">⛳ Something went wrong and the save was reset. Refresh to start fresh.</main>';
+    }
+  }
 }
 
 function persist(): void {
@@ -55,9 +78,13 @@ function dispatch(action: Action): void {
     view.destroy();
     view = null;
   }
-  state = reduce(state, action);
-  persist();
-  render();
+  try {
+    state = reduce(state, action);
+    persist();
+    render();
+  } catch (err) {
+    recover(err);
+  }
 }
 
 const btn = (label: string, action: Action, opts: { disabled?: boolean } = {}): string =>
@@ -96,7 +123,15 @@ function titleScreen(): string {
       <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
     </header>
-    <h2 style="font-size:15px;margin-top:1em;">Choose a run format</h2>
+    ${
+      state.resumable
+        ? `<div style="margin:1em 0;padding:10px 12px;border:1px solid #2bb673;border-radius:10px;background:#11181400;">
+             <b style="font-size:14px;">Run in progress</b> — stop ${state.resumable.stopIndex + 1}, distance ${state.resumable.distanceFromStart}, ${state.resumable.credits} credits.
+             <div style="margin-top:6px;">${btn('▶ Continue run', { type: 'resume' })}</div>
+           </div>`
+        : ''
+    }
+    <h2 style="font-size:15px;margin-top:1em;">${state.resumable ? 'Or start a new run' : 'Choose a run format'}</h2>
     ${formats}`;
 }
 

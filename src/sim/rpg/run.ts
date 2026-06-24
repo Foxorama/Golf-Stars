@@ -195,7 +195,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     stopIndex: snap.stopIndex,
     distanceFromStart: snap.distanceFromStart,
     credits: snap.credits,
-    loadout: loadoutFromPerks(snap.perks),
+    loadout: loadoutFromPerks(snap.perks ?? []),
     status: 'active',
     history: [],
   };
