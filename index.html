@@ -14,6 +14,36 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Boot watchdog: turn a blank page into a visible error. Runs before the deferred
+         module, so it catches asset-load failures, module-eval throws, and async errors
+         that the app's own try/catch can't reach. Cleared once the app paints. -->
+    <script>
+      (function () {
+        var app = document.getElementById('app');
+        function show(msg) {
+          if (app && app.getAttribute('data-booted') !== '1') {
+            app.innerHTML =
+              '<pre style="color:#ff8a8a;white-space:pre-wrap;padding:16px;margin:0;' +
+              'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars — ' +
+              msg + '</pre>';
+          }
+        }
+        window.addEventListener('error', function (e) {
+          var m = (e && (e.message || (e.error && e.error.message))) || 'unknown error';
+          show('boot error:\n' + m + '\n' + ((e && e.filename) || '') + ':' + ((e && e.lineno) || ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          show('boot promise rejection:\n' + ((r && (r.stack || r.message)) || r || 'unknown'));
+        });
+        setTimeout(function () {
+          show(
+            'did not start within 5s.\nThe script likely failed to load (404 / wrong path / MIME).\n' +
+            'URL: ' + location.href
+          );
+        }, 5000);
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
