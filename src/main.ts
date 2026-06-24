@@ -245,6 +245,7 @@ function render(): void {
             : gameoverScreen();
 
   app.innerHTML = `<main style="font-family:system-ui,sans-serif;max-width:820px;margin:0 auto;padding:16px;color:#e8e8ea;background:#0b0d12;min-height:100vh;">${body}</main>`;
+  app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
   app.querySelectorAll<HTMLElement>('[data-action]').forEach((el) => {
