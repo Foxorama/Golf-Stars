@@ -110,6 +110,24 @@ export function bearing(from: Vec, to: Vec): number {
   return (deg + 360) % 360;
 }
 
+/** Shortest distance from point `p` to the segment a→b. */
+export function segDist(p: Vec, a: Vec, b: Vec): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return dist(p, a);
+  let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return dist(p, [a[0] + t * dx, a[1] + t * dy]);
+}
+
+/** Shortest distance from point `p` to a polyline (min over its segments). */
+export function polylineDist(p: Vec, line: Vec[]): number {
+  let min = Infinity;
+  for (let i = 1; i < line.length; i++) min = Math.min(min, segDist(p, line[i - 1]!, line[i]!));
+  return min;
+}
+
 /** Standard ray-casting point-in-polygon. Used by the lie read. */
 export function pointInPoly(p: Vec, poly: Vec[]): boolean {
   let inside = false;

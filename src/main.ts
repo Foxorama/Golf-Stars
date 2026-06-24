@@ -34,7 +34,7 @@ function boot(): void {
   const totals = playTotals([played.record]);
 
   const accent = rarCol(course.rarity);
-  const svg = renderHoleSVG(hole, { shots: played.shots });
+  const svg = renderHoleSVG(hole, { shots: played.shots, biome: course.biome });
 
   app.innerHTML = `
     <main style="font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px;color:#e8e8ea;background:#0b0d12;min-height:100vh;">

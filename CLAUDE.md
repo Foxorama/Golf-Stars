@@ -58,6 +58,22 @@ This game lives or dies on three axes — put every change through all three bef
 - **Content as data, not code:** clubs, lies, biomes, items, economy are tables the sim reads.
   New biome = new row, not an engine edit.
 
+## Generator & sim invariants (locked in GS-1)
+- **Biomes are data** (`src/sim/course/biomes.ts`): a biome row sets gravity (carry mult),
+  wind, hazard kinds, scatter surfaces, corridor tightness, dogleg bias. New world = new row.
+  Render palette is keyed by biome id in the render layer (the sim biome table is physics-only).
+- **Fairness by construction:** penalty hazards (water/lava/void) are kept CLEAR of the tee→green
+  play corridor — `validateFairness()` proves it and `generateCourse` throws if violated. The
+  *spice* is in-play non-penalty lies (ice = slick/high-dispersion, crystal = true/low, low-grav =
+  longer carry) plus tighter corridors, doglegs, and wind. "Wild but fair."
+- **Wind reads true:** the round sim aims UPWIND to compensate for the known crosswind, and lays
+  up to the (penalty-free) centreline when the line to the pin is blocked — a played shot reads
+  trouble instead of spiralling.
+- **Blow-ups are absorbed, not eliminated:** at max wildness rare disaster holes still happen;
+  Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
+  headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a
+  hard per-hole cap. Tightening the short-game AI to shrink the tail is GS-4.
+
 ## Testing (regression guard)
 - `tests/` (vitest) imports the pure `src/sim/` modules directly and asserts on seeded runs.
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside

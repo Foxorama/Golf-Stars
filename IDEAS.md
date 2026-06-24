@@ -5,18 +5,16 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
-- **GS-1 — Wildness & biome system.** Turn the generator's `wildness`/`biome` knobs into real
-  content: biome-specific surfaces (lava/crystal/void/antigrav as `Feature.kind` + a `LIE_INFO`
-  row + a `biomeMods` carry/dispersion modifier). The contract already carries `biomeMods`; nothing
-  in the engine changes, only data rows. *(The kit's "then start the real work" item.)*
 - **GS-2 — RPG meta-loop.** `src/sim/rpg/run.ts` + `economy.ts`: travel → arrive (rarity-graded) →
   play → reward → spend on clubs/perks → travel further, difficulty scales. Define currency, what
   persists vs resets, and the fail/end state before building screens. Wire it through the save.
 - **GS-3 — Canvas2D play view + ball flight.** The static map is SVG (`holeView.ts`); the *animated*
   swing/ball-flight/juice layer is Canvas2D per the architecture decision. Drive it off the same
   `ShotLog[]` the round sim already produces.
-- **GS-4 — Real putting model.** `round.ts` currently lags+holes with a coarse distance model.
-  Replace with green slope/break once greens carry contour data; keep it pure + seeded.
+- **GS-4 — Real putting + short-game model.** `round.ts` currently lags+holes with a coarse
+  distance model, and the recovery AI can still post rare blow-up holes at max wildness. Replace
+  with green slope/break (once greens carry contour data) and a smarter short game (controlled
+  shots from bad lies) to shrink the blow-up tail. Keep it pure + seeded.
 
 ## Later
 
