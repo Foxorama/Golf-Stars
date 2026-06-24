@@ -9,9 +9,6 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
   click a route, open the shop, play a stop, see the cut result — driven by `startRun`/`playStop`/
   `travel`/`buy`. Wire it through the save (`snapshotRun`/`resumeRun`, the v2 schema). Also: smarter
   auto-pilot route choice (currently always route 0) for balancing.
-- **GS-3 — Canvas2D play view + ball flight.** The static map is SVG (`holeView.ts`); the *animated*
-  swing/ball-flight/juice layer is Canvas2D per the architecture decision. Drive it off the same
-  `ShotLog[]` the round sim already produces.
 - **GS-4 — Real putting + short-game model.** `round.ts` currently lags+holes with a coarse
   distance model, and the recovery AI can still post rare blow-up holes at max wildness. Replace
   with green slope/break (once greens carry contour data) and a smarter short game (controlled
@@ -31,6 +28,9 @@ reused. Shipped → Done (link PR); bad → Dropped (say why).
   wind-reading sim. (PR #2)
 - **GS-2 — RPG meta-loop (sim layer).** Run state machine, cut-line fail gate, credits + shop
   perks, save v2 with run snapshot/resume + v1→v2 migration. Headless + fully tested. (PR #3)
+- **GS-3 — Canvas2D play view + ball flight.** Animated arc/shadow/trail/impact/screen-shake off
+  `ShotLog[]`; shared pure projector with the SVG map; pure trajectory math tested. Feel needs
+  eyes-on play. (PR #4)
 
 ## Dropped
 - _none yet_

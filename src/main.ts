@@ -1,17 +1,16 @@
 /**
  * App entry — the thin render/orchestration layer over the pure sim.
  *
- * Shows the RPG meta-loop: the current stop's course + scorecard vs the cut line, the
- * run state (distance/credits), the onward routes, and where this seed's run ends under
- * a simple "buy nothing, take the first route" auto-pilot. Interactivity (clicking
- * routes / shopping) is a later UI task; everything here just reads pure sim state.
+ * Plays the first hole of the current stop with the animated Canvas2D ball-flight view,
+ * alongside the run/scorecard state. Everything interesting happens in `src/sim/`; this
+ * file just wires pure state into the renderers. Interactive route/shop screens are GS-8.
  */
 
 import { Rng } from './sim/rng';
 import { holeYardage } from './sim/course/generate';
 import { playCourse } from './sim/round';
-import { playTotals } from './sim/score';
-import { renderHoleSVG } from './render/holeView';
+import { playTotals, scoreName } from './sim/score';
+import { mountPlayView } from './render/playView';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine } from './sim/rpg/economy';
 import { currentCourse, routeOptions, simulateRun, startRun } from './sim/rpg/run';
@@ -32,18 +31,14 @@ function boot(): void {
   const course = currentCourse(run);
   const hole = course.holes[0]!;
 
-  // Play the stop's course headlessly (deterministic).
   const played = playCourse(course.holes, new Rng(`${course.seed}:play`));
+  const holePlay = played[0]!;
   const totals = playTotals(played.map((p) => p.record));
   const cut = cutLine(run.distanceFromStart, course.holes.length);
   const passed = totals.stableford >= cut;
-
-  // Auto-pilot the rest of the run to show where this seed ends.
   const outcome = simulateRun(seed);
-  const routes = routeOptions({ ...run });
-
+  const routes = routeOptions(run);
   const accent = rarCol(course.rarity);
-  const svg = renderHoleSVG(hole, { shots: played[0]!.shots, biome: course.biome });
 
   app.innerHTML = `
     <main style="font-family:system-ui,sans-serif;max-width:820px;margin:0 auto;padding:16px;color:#e8e8ea;background:#0b0d12;min-height:100vh;">
@@ -57,29 +52,34 @@ function boot(): void {
         · Wildness ${course.meta.wildness.toFixed(2)} · Credits <b>${run.credits}</b>
       </p>
       <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-        <div style="flex:0 0 auto;border-radius:10px;overflow:hidden;border:1px solid #222;">${svg}</div>
+        <div>
+          <div id="play" style="border:1px solid #222;border-radius:10px;overflow:hidden;width:360px;height:640px;"></div>
+          <button id="replay" style="margin-top:8px;width:100%;padding:8px;border-radius:8px;border:1px solid #333;background:#1a1d26;color:#e8e8ea;font-size:14px;cursor:pointer;">↻ Replay hole 1</button>
+        </div>
         <section style="flex:1 1 260px;min-width:260px;">
           <h2 style="font-size:16px;margin:.2em 0;">${course.holes.length}-hole course · Hole 1 (Par ${hole.par}, ${holeYardage(hole)} yds)</h2>
           <ul style="list-style:none;padding:0;line-height:1.8;font-size:15px;">
-            <li>Stableford: <b>${totals.stableford}</b> pts vs cut <b>${cut}</b>
+            <li>Hole 1: <b>${holePlay.record.strokes}</b> (${scoreName(hole.par, holePlay.record.strokes)})</li>
+            <li>Course Stableford: <b>${totals.stableford}</b> vs cut <b>${cut}</b>
               — <b style="color:${passed ? '#5fd45a' : '#ff6b6b'}">${passed ? 'MADE THE CUT' : 'MISSED CUT'}</b></li>
-            <li>Gross: <b>${totals.gross}</b> (to par ${totals.toPar >= 0 ? '+' : ''}${totals.toPar})</li>
-            <li>Credits this stop: <b>${passed ? totals.stableford * 12 : 0}</b></li>
+            <li>Wind: <b>${hole.wind?.spd.toFixed(0) ?? 0} mph</b> @ ${hole.wind?.dir.toFixed(0) ?? 0}°</li>
           </ul>
           <h3 style="font-size:14px;margin:.6em 0 .2em;">Onward routes</h3>
           <ul style="list-style:none;padding:0;line-height:1.6;font-size:14px;opacity:.9;">
             ${routes.map((r) => `<li>↗ ${r.label} (+${r.distanceJump} distance)</li>`).join('')}
           </ul>
           <p style="opacity:.65;font-size:13px;margin-top:1em;">
-            Auto-pilot (no upgrades, first route) reaches
-            <b>stop ${outcome.run.stopIndex + 1}</b>, distance <b>${outcome.run.distanceFromStart}</b>,
-            then <b>${outcome.run.endedReason === 'cut' ? 'misses a cut' : 'banks'}</b>.
-            Reproducible from the seed — try <code>?seed=42</code>.
+            Auto-pilot reaches <b>stop ${outcome.run.stopIndex + 1}</b>, distance
+            <b>${outcome.run.distanceFromStart}</b>. Reproducible — try <code>?seed=42</code>.
           </p>
         </section>
       </div>
     </main>
   `;
+
+  const playEl = document.getElementById('play')!;
+  const view = mountPlayView(playEl, hole, holePlay.shots, { biome: course.biome });
+  document.getElementById('replay')!.addEventListener('click', () => view.replay());
 }
 
 boot();
