@@ -257,7 +257,10 @@ function weightedSample(rng: Rng, items: readonly ShopItem[], n: number): ShopIt
  */
 export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   const perks = run.loadout.perks;
-  const pool = SHOP_ITEMS.filter((it) => ownedCount(perks, it.id) < itemCap(it));
+  // Hide maxed items, and gate tier-ladder items (Driver on Deck) behind their prerequisite.
+  const pool = SHOP_ITEMS.filter(
+    (it) => ownedCount(perks, it.id) < itemCap(it) && (!it.prereq || perks.includes(it.prereq)),
+  );
   const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
   return weightedSample(rng, pool, Math.min(size, pool.length)).map((item) => {
     const owned = ownedCount(perks, item.id);

@@ -32,6 +32,22 @@ Everything below serves whichever avenue wins.
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-15 — Play-loop UX + mechanics overhaul** (branch `claude/golf-ui-mechanics-x3s54o`). A batch
+  of feel/fairness/UX fixes from eyes-on mobile play, staged on one branch:
+  - **Angular dispersion** — random spray is now an ANGLE about the bearing, so the spray cone is a
+    true ARC SECTOR and a wide miss never exceeds max distance (the "square box" bug). `ShotSpread.
+    angleSd` is the shared truth; rng draw order preserved (auto≡interactive). Rough 10% / bunker 50%
+    lie penalties.
+  - **Zoom + follow-cam map** — projector `focus`/`viewRadius`/`unproject`; decision map zooms to the
+    shot's reach (far green off-screen when unreachable); animation follows the ball; min/max carry
+    labels on the spray arc.
+  - **Green-coverage suggested club** (`suggestPlayerClub`) for the interactive player; auto `aiClub`
+    untouched. **Item rarity** fixed (Power Cell common→rare).
+  - **Hole briefing splash** (wind/hazards/conditions + map), **per-shot result popup** (settle-delayed
+    Continue), **mobile no-scroll layout** (sticky Hit bar).
+  - **Free-aim** — tap/drag the map to aim within max distance (`ShotDecision.target`).
+  - **Driver on Deck** — 4-tier prereq-gated shop ladder unlocking the driver off the deck (tee-only by
+    default), via one shared `usableBag` gate applied by both the auto sim and the player.
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
   differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
   content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression

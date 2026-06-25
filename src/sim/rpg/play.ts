@@ -21,6 +21,7 @@ import {
   pinOf,
   puttOutFrom,
   shotSpread,
+  suggestPlayerClub,
   type ShotSpread,
   type PuttLog,
   type ShotLog,
@@ -28,13 +29,15 @@ import {
 import type { HoleRecord } from '../score';
 import type { HoleStat } from '../stats';
 import type { Rng } from '../rng';
-import { netDispersion, puttSkillOf, type PlayerLoadout } from './economy';
+import { netDispersion, puttSkillOf, usableBag, driverDeckSprayMult, type PlayerLoadout } from './economy';
 
 export type AimMode = 'attack' | 'safe';
 
 export interface ShotDecision {
   clubId: string;
   aim: AimMode;
+  /** Free-aim target (course-space) from tapping/dragging the map; overrides `aim` when set. */
+  target?: Vec;
 }
 
 export interface HolePlay {
@@ -90,12 +93,21 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const pin = pinOf(state.hole);
   const safe = layupTarget(state.hole, state.ball);
   const carryMult = biomeCarryMult(state.hole);
+  // The interactive "attack" suggestion reasons about green coverage (longest club that still
+  // covers the front of the green), using the player's real dispersion so it reads true — see
+  // suggestPlayerClub. The auto sim keeps using aiClub (its balance is tuned around it).
+  const dispersionMult = netDispersion(loadout);
+  // The driver is removed/penalised off the deck unless the Driver-on-Deck level allows it.
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
   return {
     distToPin: Math.round(dist(state.ball, pin)),
     lie: state.lie,
     wind: state.hole.wind,
-    attackClubId: aiClub(state.hole, state.ball, pin, carryMult, loadout.bag).id,
-    safeClubId: aiClub(state.hole, state.ball, safe, carryMult, loadout.bag).id,
+    attackClubId: suggestPlayerClub(state.hole, state.ball, state.lie, bag, {
+      carryMult,
+      dispersionMult,
+    }).id,
+    safeClubId: aiClub(state.hole, state.ball, safe, carryMult, bag).id,
     blocked: dist(safe, pin) > 1,
     strokesSoFar: state.strokes,
   };
@@ -110,13 +122,13 @@ export function previewShot(
 ): ShotSpread {
   const carryMult = biomeCarryMult(state.hole);
   const target =
-    decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball);
+    decision.target ?? (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball));
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
   const club =
-    loadout.bag.find((c) => c.id === decision.clubId) ??
-    aiClub(state.hole, state.ball, target, carryMult, loadout.bag);
+    bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
   return shotSpread(state.hole, state.ball, state.lie, target, club, {
     carryMult,
-    dispersionMult: netDispersion(loadout),
+    dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
   });
 }
 
@@ -138,14 +150,15 @@ export function takeShot(
   if (state.done) return state;
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
-  const target = decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball);
+  const target =
+    decision.target ?? (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball));
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
   const club: Club =
-    loadout.bag.find((c) => c.id === decision.clubId) ??
-    aiClub(state.hole, state.ball, target, carryMult, loadout.bag);
+    bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
 
   const ex = executeShot(state.hole, state.ball, state.lie, target, club, {
     carryMult,
-    dispersionMult: netDispersion(loadout),
+    dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
   }, rng);
 
   const firstShot = state.shots.length === 0;

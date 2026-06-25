@@ -94,6 +94,32 @@ This game lives or dies on three axes — put every change through all three bef
   source both `resolveShot` (samples it) and `shotSpread` (previews it) share, so the on-screen
   spray cone reads EXACTLY true. The mean carry stays near full so the reach-AI still clubs sanely
   (variance, not a mean shift) — that's why max-wildness mean-per-hole stays under the fairness bar.
+- **Dispersion is ANGULAR, not a flat sideways offset (GS-mechanics #5).** The random spray is a
+  small ANGLE about the shot bearing (`angleSd = prof.lateralFrac × dispMult` radians), not a lateral
+  yard offset added to a straight-ahead carry. A rotation preserves length, so the ball's distance
+  from the origin IS the sampled carry in EVERY direction — a wide miss can never finish past the
+  carry window (the old "square box" where a diagonal exceeded max distance). Crosswind stays a
+  SEPARATE deterministic lateral push (the AI aims upwind to cancel it), so wind shifts the cone, not
+  its width. `ShotSpread.angleSd` is the shared truth the render sweeps the spray ARC SECTOR by. The
+  rng draw order is unchanged (carry draw, then the angle draw replaces the old lateral draw) so
+  auto≡interactive stays byte-for-byte. `lateralFracLong` was trimmed 0.20→0.17 because an angled
+  miss now also loses forward distance (carry·cosθ) — re-tune via that, and re-run the no-death-spiral
+  bar, after any dispersion change. Lie penalties: rough `carryMult` 0.90 (10%), bunker 0.50 (50%).
+- **Interactive suggested club = GREEN COVERAGE (`suggestPlayerClub`, GS-mechanics #6).** The player's
+  🎯 suggestion is NOT the auto `aiClub` (shortest-that-reaches, tuned for balance — leave it alone):
+  green unreachable → longest usable club; reachable → the LONGEST club whose spread still reaches the
+  green's FRONT (`carryLow ≤ distToFront` via `greenDepth`), so the whole green stays in the landing
+  window (overshoot allowed, never short). Uses the same `shotSpread` the cone draws, so it reads true.
+- **Driver on Deck (`usableBag`, GS-mechanics #11).** The driver (`id 'D'`) is TEE-ONLY by default
+  (`PlayerLoadout.driverDeck` level 0); a 4-tier shop ladder (`DRIVER_DECK` table, prereq-gated cards)
+  unlocks it off the deck with a shrinking distance penalty + spray surcharge + widening allowed lies.
+  The rule lives in ONE place — `usableBag(bag, lie, level)` removes the driver when locked or returns
+  a reduced-carry copy when unlocked (so club-selection AND distance are right together) — and is
+  applied by BOTH the auto sim (`playHole`/`PlayHoleOptions.driverDeck`) and the interactive player
+  (`shotView`/`previewShot`/`takeShot`/club cycle), so auto≡playHole stays byte-for-byte and the
+  off-deck driver reads true in the cone. `driverDeckSprayMult` adds the spray surcharge. CRITICAL:
+  level 0 means the AUTO sim also can't driver off the deck (it clubs down to a wood) — a deliberate
+  rule change that shifted the seeded balance; it was re-validated against the no-death-spiral bar.
 - **Out of bounds = stroke-and-distance, and now VISIBLE (GS-13).** `playBounds`/`inBounds` derive a
   generous hole-sized box around all terrain (margin `clamp(span*0.25, 40, 90)` — the cap stops a long
   par-5 flinging the boundary miles out); a shot resting beyond it is +1 and replays from the shot's
@@ -191,6 +217,15 @@ This game lives or dies on three axes — put every change through all three bef
   the imperative drawing thin.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
+- **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
+  (centre on a point — the ball) + `viewRadius` (course yards, biased so the ball sits low and you
+  see ahead) instead of fitting the whole hole. The decision map zooms to the contemplated shot's
+  reach (`spray.carryHigh × 0.62`) so a short approach zooms in and an unreachable green legitimately
+  sits off-screen; the play-view animation uses the same focus + an eased follow-cam (rebuilt per
+  frame) so it tracks the ball and matches the decision map's zoom (no jump — also closed the
+  decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
+  powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
+  `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the
@@ -200,6 +235,17 @@ This game lives or dies on three axes — put every change through all three bef
   from the v2 `activeRun` snapshot (`resumeRun`); `?seed=` in the URL forces a fresh run.
 - New screens/actions: add an `Action` variant + a guarded `case` (return state unchanged when the
   action doesn't apply to the current screen) and a render branch. Keep logic in the reducer.
+- **Play-loop UX (GS-mechanics #1/#2/#3).** A per-hole **briefing splash** (`holeSplash` reducer flag,
+  cleared by `startHole` or defensively by `shot`) shows wind/hazards/conditions + a layout map before
+  the first shot — render-only, the `shot` action is never blocked so the headless flow/tests are
+  intact. The **shot-result popup** (a settle-delayed modal card + Continue after each non-terminal
+  shot) and its timer are an `app.ts` VIEW effect (module vars, cleared by any dispatch), NOT reducer
+  state — only `holeSplash` is reducer state. **Free-aim** (`ShotDecision.target`, GS-mechanics #10):
+  tap/drag the map sets a course-space target (overrides attack/safe), unprojected from the pointer
+  via a reconstructed decision projector and clamped to the longest club's reach; pointer move/up
+  listen on `window` so a drag survives the per-frame re-render. **Mobile layout**: a responsive
+  `<style>` block in `index.html` (`.gs-play/.gs-map/.gs-controls/.gs-hitbar`) keeps the map big and
+  pins the Hit/Putt action bar to the viewport bottom so it never needs scrolling.
 
 ## Loading intro cinematic (`render/introView.ts`)
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
