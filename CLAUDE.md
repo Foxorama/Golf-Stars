@@ -215,6 +215,28 @@ This game lives or dies on three axes — put every change through all three bef
   animated play view** (`playView.ts`), driven off the `ShotLog[]` the round sim already emits —
   arc/shadow/trail/impact/screen-shake. Keep the pure flight math in `trajectory.ts` (tested) and
   the imperative drawing thin.
+- **The static WORLD is one shared, cell-shaded scene builder (`render/style.ts`, GS graphic-upscale).**
+  Both renderers used to duplicate a flat draw path (every surface a single solid polygon on a flat
+  rough slab — the "landing strip" look). Now `buildScene(hole, proj, {width,height,biome,art})` is the
+  SINGLE source of truth: it projects the hole into a flat list of screen-space `Prim`s (poly/circle/
+  line/clip) and the two thin interpreters — `scenePrimsToSvg` (pure string) and `drawScenePrims(ctx)`
+  (canvas) — draw them, so the map and the play view agree. The manga/comic language: flat tone BANDS +
+  a bold ink outline per surface (`SHADES` ramps in `palette.ts`, `base` = the original `FILL` value so
+  the SVG still carries `#3f8c3f`/`#5fd45a` and the render tests stay green); mowing **stripes** (clipped
+  horizontal bands — perpendicular-to-play after the projector rotates tee→green up) on fairway/green;
+  a darker **collar** ring + lit dome on greens; lip-shadow + depression + rake lines on bunkers; concentric
+  **depth banding** + shoreline + glints on water; 3-tone **cell-shaded tree canopies** (core/body/lit cap +
+  cast shadow + per-tree colour/size variance); a **textured rough** (soft tone undulation + grass tufts);
+  and seeded "fun/alive" accents — biome-flavoured **wildflowers**, sparkle **motes**, the odd **bird**
+  (`ACCENTS` table). CRITICAL invariants: (1) all randomness is a mulberry32 seeded from `hashHole()` —
+  NEVER `Math.random` — so the SVG is byte-stable (determinism test) and reads the same across reloads;
+  (2) `buildScene` is node-pure — the `window._gsArt` escape-hatch is read through `artFeel()` which guards
+  `typeof window`, so `renderHoleSVG` stays callable in vitest; (3) accents/tufts are placed in COURSE space
+  then projected + culled to the view, so they pan/zoom correctly with the follow-cam (the canvas caches the
+  scene by projector identity — whole-hole fit builds once, follow-cam rebuilds per frame). Tee + flagstick
+  + OB stakes + centreline moved INTO the builder too (de-duped); the interactive overlays (spray cone, live
+  ball, shot lines, HUD, animation) stay per-renderer. Canvas feel is eyes-on, but the SVG path is verified
+  by rasterising a biome×seed gallery — re-shoot one after any `style.ts` change.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
 - **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
