@@ -17,6 +17,7 @@ import {
   HOLE_OUT_RADIUS,
   MAX_OVER_PAR,
   layupTarget,
+  onePutt,
   pinOf,
   puttOutFrom,
   shotSpread,
@@ -27,7 +28,7 @@ import {
 import type { HoleRecord } from '../score';
 import type { HoleStat } from '../stats';
 import type { Rng } from '../rng';
-import { netDispersion, type PlayerLoadout } from './economy';
+import { netDispersion, puttSkillOf, type PlayerLoadout } from './economy';
 
 export type AimMode = 'attack' | 'safe';
 
@@ -124,12 +125,15 @@ export function autoDecision(state: HolePlay, loadout: PlayerLoadout): ShotDecis
   return { aim: 'safe', clubId: shotView(state, loadout).safeClubId };
 }
 
-/** Resolve one player shot (or, if on the green, auto putt-out to finish the hole). */
+/** Resolve one player shot. When the ball comes to rest on the green: if `autoPutt` is on
+ *  the hole is putted out automatically; otherwise it's left on the green for manual
+ *  putting via `takePutt`. */
 export function takeShot(
   state: HolePlay,
   decision: ShotDecision,
   loadout: PlayerLoadout,
   rng: Rng,
+  autoPutt = true,
 ): HolePlay {
   if (state.done) return state;
   const pin = pinOf(state.hole);
@@ -169,9 +173,9 @@ export function takeShot(
     done = true;
     pickedUp = true;
     strokes = maxStrokes;
-  } else if (lie === 'green') {
-    // On the green → auto putt-out within the remaining stroke budget.
-    const out = puttOutFrom(rng, ball, pin, Math.max(1, maxStrokes - strokes));
+  } else if (lie === 'green' && autoPutt) {
+    // On the green with auto-putt → putt-out within the remaining stroke budget.
+    const out = puttOutFrom(rng, ball, pin, Math.max(1, maxStrokes - strokes), puttSkillOf(loadout));
     putts = out.putts;
     puttLogs.push(...out.log);
     strokes += out.putts;
@@ -182,6 +186,7 @@ export function takeShot(
       strokes = maxStrokes;
     }
   }
+  // else: on the green with manual putting → leave done=false; the player calls takePutt.
 
   return {
     ...state,
@@ -196,6 +201,43 @@ export function takeShot(
     fairwayHit,
     done,
     holed,
+  };
+}
+
+/** True when the ball is on the green awaiting a manual putt (not yet done). */
+export function awaitingPutt(state: HolePlay): boolean {
+  return !state.done && state.lie === 'green';
+}
+
+/** Resolve ONE manual putt toward the pin. Holes out, lags, or — if the stroke budget is
+ *  spent — picks up. The interactive counterpart to the auto putt-out. */
+export function takePutt(state: HolePlay, loadout: PlayerLoadout, rng: Rng): HolePlay {
+  if (state.done || state.lie !== 'green') return state;
+  const pin = pinOf(state.hole);
+  const maxStrokes = state.hole.par + MAX_OVER_PAR;
+  const p = onePutt(rng, state.ball, pin, puttSkillOf(loadout));
+  let strokes = state.strokes + 1;
+  let done = false;
+  let holed = false;
+  let pickedUp = false;
+  if (p.holed) {
+    done = true;
+    holed = true;
+  } else if (strokes >= maxStrokes) {
+    done = true;
+    pickedUp = true;
+    strokes = maxStrokes;
+  }
+  return {
+    ...state,
+    ball: p.holed ? pin : p.to,
+    lie: 'green',
+    strokes,
+    putts: state.putts + 1,
+    puttLogs: [...state.puttLogs, p],
+    done,
+    holed,
+    pickedUp,
   };
 }
 

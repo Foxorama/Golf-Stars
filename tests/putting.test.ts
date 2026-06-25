@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/sim/rng';
 import { generateCourse } from '../src/sim/course/generate';
-import { playHole } from '../src/sim/round';
-import { dist } from '../src/sim/course/contract';
+import { playHole, onePutt, puttOutFrom, HOLE_OUT_RADIUS } from '../src/sim/round';
+import { dist, type Vec } from '../src/sim/course/contract';
+import { loadoutFromPerks, puttSkillOf, startingLoadout } from '../src/sim/rpg/economy';
 
 describe('putting path (GS-4)', () => {
   it('putt log is continuous, ends holed, and matches the putt count', () => {
@@ -45,5 +46,51 @@ describe('putting path (GS-4)', () => {
       const here = dist(putts[i]!.from, hole.green);
       expect(here).toBeLessThanOrEqual(prev + 0.001);
     }
+  });
+});
+
+describe('manual vs auto putting (shared model)', () => {
+  const pin: Vec = [0, 0];
+  const from: Vec = [0, 9]; // 9 yds out
+
+  it('stepping onePutt by hand reproduces the auto putt-out exactly', () => {
+    const auto = puttOutFrom(new Rng('putt'), from, pin, 6);
+    // Manual: same seed, step onePutt until holed or budget spent.
+    const rng = new Rng('putt');
+    const log = [];
+    let pos: Vec = from;
+    let n = 0;
+    while (dist(pos, pin) > HOLE_OUT_RADIUS && n < 6) {
+      n++;
+      const p = onePutt(rng, pos, pin);
+      log.push(p);
+      pos = p.to;
+      if (p.holed) break;
+    }
+    expect(log).toEqual(auto.log);
+    expect(n).toBe(auto.putts);
+  });
+});
+
+describe('Auto-Caddie (legendary auto-putt perk)', () => {
+  it('grants autoPutt and a steadier stroke', () => {
+    const base = startingLoadout();
+    expect(base.autoPutt).toBeFalsy();
+    expect(puttSkillOf(base)).toEqual({});
+
+    const caddie = loadoutFromPerks(['auto-caddie']);
+    expect(caddie.autoPutt).toBe(true);
+    expect(puttSkillOf(caddie).makeChance).toBeGreaterThan(0.85);
+  });
+
+  it('sinks putts in fewer strokes on average than the base stroke', () => {
+    const tally = (skill: ReturnType<typeof puttSkillOf>): number => {
+      let total = 0;
+      for (let s = 0; s < 200; s++) {
+        total += puttOutFrom(new Rng(`${s}:putt`), [0, 7] as Vec, [0, 0] as Vec, 6, skill).putts;
+      }
+      return total;
+    };
+    expect(tally(puttSkillOf(loadoutFromPerks(['auto-caddie'])))).toBeLessThan(tally(puttSkillOf(startingLoadout())));
   });
 });

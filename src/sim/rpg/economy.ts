@@ -39,6 +39,8 @@ export interface PlayerLoadout {
   dispersionMult: number;
   /** Multiplies credits earned. */
   creditMult: number;
+  /** Auto-putt: the green is putted out for you (and better). Granted by a legendary perk. */
+  autoPutt?: boolean;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
 }
@@ -127,7 +129,21 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     rarity: 'epic',
     apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 6), perks: [...m.perks, 'pro-coach'] }),
   },
+  {
+    id: 'auto-caddie',
+    name: 'Auto-Caddie',
+    cost: 280,
+    desc: 'Reads & sinks your putts for you — auto-putt with a steadier stroke',
+    rarity: 'legendary',
+    apply: (m) => ({ ...m, autoPutt: true, perks: [...m.perks, 'auto-caddie'] }),
+  },
 ];
+
+/** Putting skill from the loadout: the Auto-Caddie sinks more and lags tighter. */
+export function puttSkillOf(loadout: PlayerLoadout): { makeChance?: number; lagFrac?: number; lagSd?: number } {
+  if (loadout.perks.includes('auto-caddie')) return { makeChance: 0.92, lagFrac: 0.05, lagSd: 0.035 };
+  return {};
+}
 
 export function shopItem(id: string): ShopItem | undefined {
   return SHOP_ITEMS.find((i) => i.id === id);

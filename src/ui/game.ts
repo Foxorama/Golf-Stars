@@ -25,8 +25,10 @@ import {
 } from '../sim/rpg/run';
 import {
   autoDecision,
+  awaitingPutt,
   beginHole,
   holeResult,
+  takePutt,
   takeShot,
   type AimMode,
   type HolePlay,
@@ -59,6 +61,8 @@ export interface UiState {
   // Meta-progression (persisted across runs).
   bestStableford: number;
   bestDistance: number;
+  /** Putting mode toggle: auto putt-out vs manual. The Auto-Caddie legendary forces auto. */
+  autoPutt: boolean;
 }
 
 export type Action =
@@ -67,6 +71,8 @@ export type Action =
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'shot'; clubId: string; aim: AimMode }
+  | { type: 'putt' } // take one manual putt on the green
+  | { type: 'toggleAutoPutt' } // flip auto putt-out vs manual
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
@@ -101,6 +107,7 @@ export function initState(
     resumable,
     bestStableford: meta.bestStableford ?? 0,
     bestDistance: meta.bestDistance ?? 0,
+    autoPutt: true,
   };
 }
 
@@ -166,15 +173,34 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'shot': {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
-      const play = takeShot(state.play, { clubId: action.clubId, aim: action.aim }, state.run.loadout, state.holeRng);
+      if (awaitingPutt(state.play)) return state; // on the green → must putt, not swing
+      const auto = state.autoPutt || !!state.run.loadout.autoPutt;
+      const play = takeShot(state.play, { clubId: action.clubId, aim: action.aim }, state.run.loadout, state.holeRng, auto);
       return { ...state, play };
+    }
+
+    case 'putt': {
+      if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
+      const play = takePutt(state.play, state.run.loadout, state.holeRng);
+      return { ...state, play };
+    }
+
+    case 'toggleAutoPutt': {
+      // The Auto-Caddie legendary locks auto on; otherwise the player chooses.
+      if (state.run.loadout.autoPutt) return state;
+      return { ...state, autoPutt: !state.autoPutt };
     }
 
     case 'autoShotHole': {
       if (state.screen !== 'playing' || !state.play || !state.holeRng) return state;
       let p = state.play;
       let guard = 0;
-      while (!p.done && guard++ < 40) p = takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng);
+      // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
+      while (!p.done && guard++ < 40) {
+        p = awaitingPutt(p)
+          ? takePutt(p, state.run.loadout, state.holeRng)
+          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true);
+      }
       return { ...state, play: p };
     }
 

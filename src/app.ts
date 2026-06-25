@@ -8,9 +8,9 @@
 
 import { scoreName } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
-import { courseCardHTML, itemCardHTML, shotCardHTML } from './render/cards';
+import { courseCardHTML, itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
-import { shotView, previewShot } from './sim/rpg/play';
+import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import type { SprayTiers } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
@@ -175,16 +175,16 @@ function introScreen(): string {
 // --- interactive playing screen ----------------------------------------------
 let animatedShots = 0; // shots of the current hole already animated
 let animHoleIndex = -1;
-let puttsAnimated = false;
+let animatedPutts = 0; // putts of the current hole already animated
 let selClubId: string | null = null;
 let selAim: 'attack' | 'safe' = 'attack';
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
 
 function pendingAnimation(play: NonNullable<UiState['play']>): { shots: typeof play.shots; putts: typeof play.puttLogs } | null {
   const newShots = play.shots.slice(animatedShots);
-  const needPutts = play.done && !puttsAnimated && play.puttLogs.length > 0;
-  if (newShots.length === 0 && !needPutts) return null;
-  return { shots: newShots, putts: needPutts ? play.puttLogs : [] };
+  const newPutts = play.puttLogs.slice(animatedPutts);
+  if (newShots.length === 0 && newPutts.length === 0) return null;
+  return { shots: newShots, putts: newPutts };
 }
 
 function playingBody(animating: boolean): string {
@@ -205,11 +205,38 @@ function playingBody(animating: boolean): string {
   if (play.done) {
     const name = play.pickedUp ? 'Picked up' : scoreName(par, play.strokes);
     const lastCard = play.shots.length ? shotCardHTML(play.shots[play.shots.length - 1]!) : '';
+    const puttCard = play.puttLogs.length
+      ? puttCardHTML(play.puttLogs, { holed: play.holed, pickedUp: play.pickedUp })
+      : '';
     return `
       ${header()}
       <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${play.holed && play.shots.some((s) => s.holed) ? ' 🎉' : ''}</h2>
-      <div style="margin:10px 0;max-width:240px;">${lastCard}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;max-width:420px;">${lastCard}${puttCard}</div>
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' })}</div>`;
+  }
+
+  // Manual putting on the green (auto-putt off): stroke putts one at a time.
+  if (awaitingPutt(play)) {
+    const puttSvg = renderHoleSVG(play.hole, {
+      shots: play.shots,
+      biome: state.course.biome,
+      width: 320,
+      height: 460,
+      ball: play.ball,
+    });
+    return `
+      ${header()}
+      <p style="font-size:14px;opacity:.85;">${scoreLine} · on the green · <b>${v.distToPin}</b> yds to the cup · putt <b>${play.putts + 1}</b></p>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="border:1px solid #222;border-radius:10px;overflow:hidden;">${puttSvg}</div>
+        <section style="flex:1 1 240px;min-width:240px;">
+          <div style="margin-bottom:10px;">${puttToggleBtn()}</div>
+          <div style="margin-top:8px;">
+            ${btn('⛳ Putt', { type: 'putt' })}
+            ${btn('» Auto-finish putts', { type: 'autoShotHole' })}
+          </div>
+        </section>
+      </div>`;
   }
 
   // Decision screen: map with shots so far + ball marker, the aiming spray cone, and controls.
@@ -263,12 +290,20 @@ function playingBody(animating: boolean): string {
         </p>
         <h3 style="font-size:14px;margin:.6em 0 .3em;">Strategy</h3>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>
+        <div style="margin-top:10px;">${puttToggleBtn()}</div>
         <div style="margin-top:12px;">
           ${btn('🏌 Hit', { type: 'shot', clubId: selClubId!, aim: selAim })}
           ${btn('» Auto-finish hole', { type: 'autoShotHole' })}
         </div>
       </section>
     </div>`;
+}
+
+/** Auto-putt toggle button. Locked ON when the Auto-Caddie legendary is owned. */
+function puttToggleBtn(): string {
+  const locked = !!state.run.loadout.autoPutt;
+  const on = state.autoPutt || locked;
+  return btn(`⛳ Auto-putt: ${on ? 'ON' : 'OFF'}${locked ? ' (Caddie)' : ''}`, { type: 'toggleAutoPutt' }, { disabled: locked });
 }
 
 function aimBtnStyle(sel: boolean): string {
@@ -363,7 +398,7 @@ function render(): void {
   if (state.screen === 'playing' && state.play) {
     if (state.play.holeIndex !== animHoleIndex) {
       animatedShots = 0;
-      puttsAnimated = false;
+      animatedPutts = 0;
       animHoleIndex = state.play.holeIndex;
       selClubId = null;
       selAim = 'attack';
@@ -446,14 +481,14 @@ function render(): void {
         biome: state.course.biome,
         onDone: () => {
           animatedShots = play.shots.length;
-          if (play.done) puttsAnimated = true;
+          animatedPutts = play.puttLogs.length;
           render();
         },
       });
     } else {
       // No canvas to animate into — skip ahead so we never get stuck.
       animatedShots = state.play.shots.length;
-      if (state.play.done) puttsAnimated = true;
+      animatedPutts = state.play.puttLogs.length;
     }
   }
 }

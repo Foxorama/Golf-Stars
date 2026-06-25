@@ -105,6 +105,19 @@ This game lives or dies on three axes — put every change through all three bef
   model, raw distance is double-edged (longer club = wider spray), so `power-cell` also carries a
   small −5% dispersion bonus to stay a genuine upgrade. `tests/run.test.ts` guards the invariant.
 
+## Putting (auto vs manual; legendary auto-putt)
+- **`onePutt` is the single putt model**; `puttOut`/`puttOutFrom` step it (auto), `takePutt`
+  strokes ONE (manual). A `PuttSkill` (make%/lag) tunes it — base 0.85, the Auto-Caddie
+  perk 0.92/tighter. Manual stepping reproduces auto putt-out byte-for-byte at a fixed seed
+  (same rng order) — `tests/putting.test.ts` guards this.
+- **Auto-putt is a UiState toggle** (`autoPutt`, default ON). `takeShot(…, autoPutt)` resolves
+  the green automatically when on; otherwise it leaves the ball on the green and the UI shows
+  the manual putt loop (`awaitingPutt` → `putt` action). The toggle is per-session (not saved).
+- **Legendary `auto-caddie`** sets `loadout.autoPutt` (persisted via perks) AND grants the
+  better `puttSkillOf` — so it both automates and *improves* putting (worth a legendary).
+  Owning it locks the toggle ON. Design intent: later, flip the DEFAULT to manual so the
+  perk becomes the real unlock; the toggle is the interim control.
+
 ## Testing (regression guard)
 - `tests/` (vitest) imports the pure `src/sim/` modules directly and asserts on seeded runs.
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside

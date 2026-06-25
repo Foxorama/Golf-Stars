@@ -38,7 +38,7 @@
         // Polyfill globalThis for older module-capable engines that lack it (some mobile
         // WebViews): esbuild does NOT inject it, so any globalThis reference would throw.
         if (typeof globalThis === 'undefined') { try { window.globalThis = window; } catch (e) {} }
-        var BUILD = 'inline-31'; // bump each deploy; proves which HTML you actually loaded
+        var BUILD = 'inline-32'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
         var errorShown = false; // once a REAL error is on screen, the timeout must not clobber it
         // Immediate visible marker so you can tell the NEW page loaded at all.

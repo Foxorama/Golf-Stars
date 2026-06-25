@@ -169,50 +169,59 @@ function dropPoint(hole: Hole, from: Vec, landing: Vec): Vec {
   return from;
 }
 
+/** Putting skill — a lower handicap / a caddie perk tightens these. */
+export interface PuttSkill {
+  /** Make chance inside ~2.2 yds (default 0.85). */
+  makeChance?: number;
+  /** Lag distance left as a fraction of the putt length (default 0.07). */
+  lagFrac?: number;
+  /** Lag std-dev as a fraction of the putt length (default 0.05). */
+  lagSd?: number;
+}
+
 /**
- * Putt out from `from` toward `pin`, returning the putt count and the roll path (for
- * animation). Deterministic via `rng`. The model is distance-based (no slope yet — that's
- * a later refinement): short putts usually drop, long putts lag close, with a small
- * lateral miss so a missed putt visibly slides past the hole rather than through it.
+ * Resolve ONE putt from `from` toward the pin. Pure/deterministic via `rng`. Short putts
+ * usually drop; long putts lag close, with a small lateral miss so a miss reads as sliding
+ * past the hole. The single building block both auto putt-out and manual putting share.
  */
+export function onePutt(rng: Rng, from: Vec, pinPt: Vec, skill: PuttSkill = {}): PuttLog {
+  const d = dist(from, pinPt);
+  let newD: number;
+  if (d <= 2.2) {
+    newD = rng.bool(skill.makeChance ?? 0.85) ? 0 : rng.range(0.4, 1.0);
+  } else {
+    newD = Math.abs(rng.gaussian(d * (skill.lagFrac ?? 0.07), d * (skill.lagSd ?? 0.05)));
+  }
+  if (newD <= HOLE_OUT_RADIUS) return { from, to: pinPt, holed: true };
+  // Place the ball `newD` from the pin along the pin→ball line, nudged laterally.
+  let dx = from[0] - pinPt[0];
+  let dy = from[1] - pinPt[1];
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len;
+  dy /= len;
+  const lateral = rng.gaussian(0, newD * 0.3);
+  return { from, to: [pinPt[0] + dx * newD - dy * lateral, pinPt[1] + dy * newD + dx * lateral], holed: false };
+}
+
+/** Putt out fully (auto), stepping `onePutt` until holed or the budget runs out. */
 function puttOut(
   rng: Rng,
   from: Vec,
   pinPt: Vec,
   maxPutts = 6,
+  skill: PuttSkill = {},
 ): { putts: number; log: PuttLog[]; holed: boolean } {
   const log: PuttLog[] = [];
   let pos: Vec = from;
-  let d = dist(pos, pinPt);
   let putts = 0;
-  while (d > HOLE_OUT_RADIUS && putts < maxPutts) {
+  while (dist(pos, pinPt) > HOLE_OUT_RADIUS && putts < maxPutts) {
     putts++;
-    let newD: number;
-    if (d <= 2.2) {
-      newD = rng.bool(0.85) ? 0 : rng.range(0.4, 1.0); // makeable: usually drops
-    } else {
-      newD = Math.abs(rng.gaussian(d * 0.07, d * 0.05)); // lag close
-    }
-    const holed = newD <= HOLE_OUT_RADIUS;
-    let to: Vec;
-    if (holed) {
-      to = pinPt;
-    } else {
-      // Place the ball `newD` from the pin along the pin→ball line, nudged laterally so
-      // the miss reads as sliding past the hole.
-      let dx = pos[0] - pinPt[0];
-      let dy = pos[1] - pinPt[1];
-      const len = Math.hypot(dx, dy) || 1;
-      dx /= len;
-      dy /= len;
-      const lateral = rng.gaussian(0, newD * 0.3);
-      to = [pinPt[0] + dx * newD - dy * lateral, pinPt[1] + dy * newD + dx * lateral];
-    }
-    log.push({ from: pos, to, holed });
-    pos = to;
-    d = holed ? 0 : dist(pos, pinPt);
+    const p = onePutt(rng, pos, pinPt, skill);
+    log.push(p);
+    pos = p.to;
+    if (p.holed) break;
   }
-  return { putts, log, holed: d <= HOLE_OUT_RADIUS };
+  return { putts, log, holed: dist(pos, pinPt) <= HOLE_OUT_RADIUS };
 }
 
 /**
@@ -498,8 +507,9 @@ export function puttOutFrom(
   from: Vec,
   pinPt: Vec,
   maxPutts = 6,
+  skill: PuttSkill = {},
 ): { putts: number; log: PuttLog[]; holed: boolean } {
-  return puttOut(rng, from, pinPt, maxPutts);
+  return puttOut(rng, from, pinPt, maxPutts, skill);
 }
 
 /** True if the straight line from→to is free of penalty surfaces (sampled). */
