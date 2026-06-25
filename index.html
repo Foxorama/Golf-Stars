@@ -25,16 +25,22 @@
     </script>
     <!-- Boot watchdog: turn a blank page into a visible error. Runs before the deferred
          module, so it catches asset-load failures, module-eval throws, and async errors
-         that the app's own try/catch can't reach. Cleared once the app paints. -->
+         that the app's own try/catch can't reach.
+
+         CRITICAL: a throw during top-level evaluation of ANY imported module aborts the
+         whole bundle *before* the entry's own try/catch runs — so that guard can never
+         catch this class of fault. Only these global handlers can. They MUST record the
+         error into window.__gsErr (so the 5s report includes it) and MUST NOT be clobbered
+         by the timeout. window.onerror is the one that yields source:line:col, which
+         pinpoints the throw inside the single-line minified bundle. -->
     <script>
       (function () {
         // Polyfill globalThis for older module-capable engines that lack it (some mobile
         // WebViews): esbuild does NOT inject it, so any globalThis reference would throw.
-        // Runs before the deferred app module. (A global property is reachable as a bare
-        // identifier, so this makes `globalThis` resolve everywhere.)
         if (typeof globalThis === 'undefined') { try { window.globalThis = window; } catch (e) {} }
-        var BUILD = 'inline-25'; // bump each deploy; proves which HTML you actually loaded
+        var BUILD = 'inline-27'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
+        var errorShown = false; // once a REAL error is on screen, the timeout must not clobber it
         // Immediate visible marker so you can tell the NEW page loaded at all.
         if (app) {
           app.innerHTML =
@@ -56,32 +62,56 @@
             caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {});
           }
         } catch (e) {}
-        function show(msg) {
+        function paint(msg, isError) {
           if (app && app.getAttribute('data-booted') !== '1') {
             app.innerHTML =
-              '<pre style="color:#ff8a8a;white-space:pre-wrap;padding:16px;margin:0;' +
+              '<pre style="color:' + (isError ? '#ff8a8a' : '#9fd8e6') + ';white-space:pre-wrap;padding:16px;margin:0;' +
               'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars (build ' +
               BUILD + ') — ' + msg + '</pre>';
           }
         }
+        // Record + show a real boot error. Persists into __gsErr so the 5s report carries
+        // it too, and latches errorShown so the timeout can't overwrite the real cause.
+        function fail(detail) {
+          if (!window.__gsErr) window.__gsErr = detail; // keep the FIRST (root) error
+          errorShown = true;
+          paint('boot error:\n' + window.__gsErr, true);
+        }
+        // Classic onerror gives source:line:col — the only thing that locates a throw
+        // inside the minified single-line bundle. Keep it first.
+        window.onerror = function (msg, src, line, col, error) {
+          fail(
+            String(msg) + '\n  at ' + (src || '?') + ':' + (line || '?') + ':' + (col || '?') +
+            ((error && error.stack) ? '\n' + error.stack : '')
+          );
+          return false; // don't swallow; let the console see it too
+        };
         window.addEventListener('error', function (e) {
+          // Resource-load errors (e.g. a 404'd asset) have no message but DO have a target.
+          if (e && e.target && e.target !== window && (e.target.src || e.target.href)) {
+            fail('failed to load resource: ' + (e.target.src || e.target.href));
+            return;
+          }
           var m = (e && (e.message || (e.error && e.error.message))) || 'unknown error';
-          show('boot error:\n' + m + '\n' + ((e && e.filename) || '') + ':' + ((e && e.lineno) || ''));
-        });
+          fail(m + '\n  at ' + ((e && e.filename) || '?') + ':' + ((e && e.lineno) || '?') + ':' + ((e && e.colno) || '?') +
+            ((e && e.error && e.error.stack) ? '\n' + e.error.stack : ''));
+        }, true); // capture phase so resource errors (which don't bubble) are seen
         window.addEventListener('unhandledrejection', function (e) {
           var r = e && e.reason;
-          show('boot promise rejection:\n' + ((r && (r.stack || r.message)) || r || 'unknown'));
+          fail('promise rejection: ' + ((r && (r.stack || r.message)) || r || 'unknown'));
         });
         setTimeout(function () {
+          if (errorShown) return; // the real error is already on screen — never clobber it
           var hasMod = 'noModule' in HTMLScriptElement.prototype;
-          show(
+          paint(
             'app did not run within 5s.\n' +
             '• boot stage: ' + (window.__gsStage || '(never started — app module did not run)') + '\n' +
             '• boot error: ' + (window.__gsErr || '(none captured)') + '\n' +
             '• ES modules supported: ' + hasMod + '\n' +
             '• test module ran: ' + (!!window.__gsModuleRan) + '\n' +
             '• UA: ' + navigator.userAgent + '\n' +
-            'URL: ' + location.href
+            'URL: ' + location.href,
+            true
           );
         }, 5000);
       })();
