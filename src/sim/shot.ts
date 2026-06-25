@@ -109,9 +109,9 @@ export const LIE_INFO: Record<string, LieInfo> = {
   tee: { carryMult: 1.0, dispersionMult: 0.85, label: 'Tee' },
   fairway: { carryMult: 1.0, dispersionMult: 1.0, label: 'Fairway' },
   green: { carryMult: 1.0, dispersionMult: 0.8, label: 'Green' },
-  rough: { carryMult: 0.85, dispersionMult: 1.4, label: 'Rough' },
+  rough: { carryMult: 0.9, dispersionMult: 1.4, label: 'Rough' }, // 10% distance penalty
   waste: { carryMult: 0.9, dispersionMult: 1.2, label: 'Waste' },
-  bunker: { carryMult: 0.7, dispersionMult: 1.6, label: 'Bunker' },
+  bunker: { carryMult: 0.5, dispersionMult: 1.6, label: 'Bunker' }, // 50% distance penalty — a real escape tax
   // Trees are a tough non-penalty LIE, not a mid-flight collision: a sprayed ball ends up
   // "in the woods" and has to punch out (short carry, wild line) — fair and readable, since
   // only an offline shot finds them. NOT a penalty, so they may line the corridor edge.
