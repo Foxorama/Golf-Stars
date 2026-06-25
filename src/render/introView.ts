@@ -38,6 +38,8 @@ interface IntroFeel {
   planet: boolean;
   /** How many background shooting stars streak past during the space phase. */
   shootingStars: number;
+  /** Link the title stars with faint constellation lines once they've formed. */
+  constellation: boolean;
 }
 
 const BASE_FEEL: IntroFeel = {
@@ -48,11 +50,12 @@ const BASE_FEEL: IntroFeel = {
   writeMs: 2200,
   holdMs: 1500,
   speed: 1,
-  starCount: 170,
+  starCount: 220,
   shake: 7,
   nebula: true,
   planet: true,
   shootingStars: 4,
+  constellation: true,
 };
 
 function feel(): IntroFeel {
@@ -133,6 +136,107 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
 }
 
 /**
+ * A single star making up the GOLF STARS wordmark. Positions are in TEXT-LOCAL space:
+ * `lx` measured from the text's left edge, `ly` from its vertical centre — so the caller
+ * maps them with the same `tx`/`ty` it lays the title out at. Each star drifts in from a
+ * source point (`sx`,`sy`) high above (the rocket's wake) and settles onto its target.
+ */
+interface TitleStar {
+  lx: number;
+  ly: number;
+  r: number;
+  col: string;
+  tw: number; // twinkle phase
+  order: number; // 0..1 left→right reveal order
+  sx: number; // source x (text-local), where it flies in from
+  sy: number; // source y (text-local), well above the word
+  hero: boolean;
+}
+
+/**
+ * Sample the wordmark into a constellation of stars by rasterising it to an offscreen
+ * canvas and reading back the covered pixels on a grid. Pure-ish (uses the passed RNG for
+ * jitter so it's stable across reloads). Wrapped in try/catch: if a browser denies canvas
+ * pixel read-back we return an empty set and the caller falls back to glowing text — a
+ * cosmetic intro must never throw and strand the boot.
+ */
+function sampleTitleStars(
+  text: string,
+  font: string,
+  rng: () => number,
+): { stars: TitleStar[]; width: number; links: [number, number][] } {
+  try {
+    const cv = document.createElement('canvas');
+    const octx = cv.getContext('2d');
+    if (!octx) return { stars: [], width: 0, links: [] };
+    octx.font = font;
+    const width = octx.measureText(text).width;
+    const H = 132;
+    cv.width = Math.max(1, Math.ceil(width) + 8);
+    cv.height = H;
+    octx.font = font;
+    octx.textAlign = 'left';
+    octx.textBaseline = 'middle';
+    octx.fillStyle = '#fff';
+    octx.fillText(text, 4, H / 2);
+    const data = octx.getImageData(0, 0, cv.width, cv.height).data;
+
+    const golds = ['#fff4cf', '#ffe39a', '#ffd27a'];
+    const step = 9;
+    const stars: TitleStar[] = [];
+    for (let py = 0; py < H; py += step) {
+      for (let px = 0; px < cv.width; px += step) {
+        if ((data[(py * cv.width + px) * 4 + 3] ?? 0) < 130) continue;
+        const lx = px - 4 + (rng() - 0.5) * step * 0.7;
+        const ly = py - H / 2 + (rng() - 0.5) * step * 0.7;
+        const hero = rng() < 0.2;
+        stars.push({
+          lx,
+          ly,
+          r: hero ? 2.4 + rng() * 1.6 : 1.1 + rng() * 1.1,
+          col: rng() < 0.5 ? '#ffffff' : golds[(rng() * golds.length) | 0]!,
+          tw: rng() * Math.PI * 2,
+          order: width > 0 ? lx / width : 0,
+          // Drift in from above, biased toward the rocket's exit column (right of centre),
+          // as if the climbing wagon shed them in its wake.
+          sx: lx + (rng() - 0.5) * width * 0.5 + width * 0.12,
+          sy: -120 - rng() * 170,
+          hero,
+        });
+      }
+    }
+    // Pre-compute a faint constellation web: link each star to its nearest neighbour
+    // within reach. O(n²) once at mount (a few hundred stars), never per frame.
+    const links: [number, number][] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < stars.length; i++) {
+      let best = -1;
+      let bestD = 26 * 26;
+      for (let j = 0; j < stars.length; j++) {
+        if (j === i) continue;
+        const dx = stars[i]!.lx - stars[j]!.lx;
+        const dy = stars[i]!.ly - stars[j]!.ly;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = j;
+        }
+      }
+      if (best >= 0) {
+        const key = i < best ? `${i}:${best}` : `${best}:${i}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          links.push([i, best]);
+        }
+      }
+    }
+    return { stars, width, links };
+  } catch {
+    return { stars: [], width: 0, links: [] };
+  }
+}
+
+/**
  * Mount the intro as a fixed, full-screen overlay on <body>. The host app renders the
  * title screen underneath first (so the page has actually "booted"); this just covers it
  * until the sequence finishes or is skipped, then removes itself.
@@ -142,8 +246,9 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
 
   const overlay = document.createElement('div');
   overlay.setAttribute('data-gs-intro', '1');
+  // Base colour matches the app background (#0b0d12) so the loader→title handoff is seamless.
   overlay.style.cssText =
-    'position:fixed;inset:0;z-index:9999;background:#05060f;overflow:hidden;cursor:pointer;';
+    'position:fixed;inset:0;z-index:9999;background:#0b0d12;overflow:hidden;cursor:pointer;';
 
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'display:block;width:100%;height:100%;';
@@ -174,8 +279,21 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       col: hero ? heroHues[(rng() * heroHues.length) | 0]! : '#eaf2ff',
       // Parallax depth 0..1 — nearer stars streak more during the warp launch.
       depth: rng(),
+      // Fill threshold 0..1 — the star pops in once the takeoff "fill" passes it, so the
+      // sky populates progressively as the wagon climbs (not one global crossfade).
+      pop: rng(),
     };
   });
+
+  // The GOLF STARS wordmark as a constellation, sampled from the rasterised text. The
+  // stars rain in from the rocket's wake (above) and settle into the letters; if pixel
+  // sampling is unavailable, `titleStars` is empty and drawTitle falls back to glowing text.
+  const TITLE_FONT = '800 96px system-ui, "Segoe UI", sans-serif';
+  const { stars: titleStars, width: titleW, links: titleLinks } = sampleTitleStars(
+    'GOLF STARS',
+    TITLE_FONT,
+    rng,
+  );
 
   // Phase boundaries (cumulative ms).
   const t0 = F.driveMs;
@@ -303,11 +421,12 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
 
   function drawSky(dayA: number, spaceA: number, e: number, warp: number): void {
     if (!ctx) return;
-    // Space gradient underneath, always.
+    // Space gradient underneath, always. Resolves to the app background (#0b0d12) at the
+    // bottom so when the overlay lifts, the starfield blends straight into the title screen.
     const sp = ctx.createLinearGradient(0, 0, 0, DH);
-    sp.addColorStop(0, '#0a0f2a');
-    sp.addColorStop(0.6, '#05071a');
-    sp.addColorStop(1, '#02030a');
+    sp.addColorStop(0, '#11141f');
+    sp.addColorStop(0.6, '#0c0f17');
+    sp.addColorStop(1, '#0b0d12');
     ctx.fillStyle = sp;
     ctx.fillRect(-offX / scale, -offY / scale, DW + (offX * 2) / scale, DH + (offY * 2) / scale);
 
@@ -316,8 +435,12 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       ctx.save();
       const now = performance.now();
       for (const s of stars) {
+        // Progressive fill: each star pops in once the takeoff fill (spaceA) passes its
+        // threshold, so the sky fills with stars as the wagon climbs rather than all at once.
+        const fill = clamp01((spaceA - s.pop) / 0.22);
+        if (fill <= 0) continue;
         const tw = 0.55 + 0.45 * Math.sin(now * 0.004 + s.tw);
-        ctx.globalAlpha = spaceA * tw;
+        ctx.globalAlpha = fill * tw;
         // Warp launch: near stars stretch into vertical streaks as the wagon punches up.
         const streak = warp * (8 + s.depth * 46);
         if (streak > 1.5) {
@@ -819,133 +942,119 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.restore();
   }
 
-  /** The little flaming golf-ball that "writes" the title, with a fiery tail. */
-  function drawCometHead(x: number, y: number): void {
-    if (!ctx) return;
-    const now = performance.now();
-    ctx.save();
-    // Fiery tail streaming back to the left.
-    ctx.globalCompositeOperation = 'lighter';
-    const tail = ctx.createLinearGradient(x - 64, y, x, y);
-    tail.addColorStop(0, 'rgba(255,120,40,0)');
-    tail.addColorStop(0.6, 'rgba(255,196,84,0.55)');
-    tail.addColorStop(1, 'rgba(255,244,200,0.95)');
-    ctx.fillStyle = tail;
-    ctx.beginPath();
-    ctx.moveTo(x, y - 8);
-    ctx.quadraticCurveTo(x - 40, y - 3, x - 64, y + Math.sin(now * 0.03) * 2);
-    ctx.quadraticCurveTo(x - 40, y + 3, x, y + 8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // The golf ball itself.
-    ctx.save();
-    ctx.shadowColor = 'rgba(255,236,150,1)';
-    ctx.shadowBlur = 22;
-    const ball = ctx.createRadialGradient(x - 2, y - 3, 1, x, y, 8);
-    ball.addColorStop(0, '#ffffff');
-    ball.addColorStop(1, '#dfe6f2');
-    ctx.fillStyle = ball;
-    ctx.beginPath();
-    ctx.arc(x, y, 7.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // Tiny dimples.
-    ctx.fillStyle = 'rgba(150,160,180,0.5)';
-    for (const [dx, dy] of [[-2, -1], [2, -1], [0, 2], [-3, 2], [3, 1]] as const) {
-      ctx.beginPath();
-      ctx.arc(x + dx, y + dy, 0.9, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  function drawTitle(reveal: number, glow: number, pop: number, shine: number): void {
+  /**
+   * The title, spelled out by the stars the rocket left in its wake. Each star streams
+   * down from above (the trail) and settles onto its letter target, left-to-right, then
+   * twinkles; faint constellation lines web the formed wordmark together. Falls back to a
+   * glowing text wordmark when pixel-sampling wasn't available (`titleStars` empty).
+   */
+  function drawTitle(reveal: number, glow: number): void {
     if (!ctx) return;
     const text = 'GOLF STARS';
-    ctx.save();
-    ctx.font = '800 96px system-ui, "Segoe UI", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const w = ctx.measureText(text).width;
-    const tx = DW / 2 - w / 2;
     const ty = 250;
+    const now = performance.now();
 
-    // Squash-then-stamp pop, scaled about the title's centre.
-    ctx.translate(DW / 2, ty);
-    ctx.scale(pop, pop);
-    ctx.translate(-DW / 2, -ty);
-
-    // Reveal the lettering left-to-right (the comet "writes" it in smoke).
-    const headX = tx + w * reveal;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(tx - 30, 0, headX - (tx - 30), DH);
-    ctx.clip();
-    ctx.shadowColor = 'rgba(255,209,102,0.9)';
-    ctx.shadowBlur = 24 + glow * 18;
-    const grad = ctx.createLinearGradient(tx, ty - 50, tx, ty + 50);
-    grad.addColorStop(0, '#fff1c4');
-    grad.addColorStop(1, '#ffb84d');
-    ctx.fillStyle = grad;
-    ctx.fillText(text, tx, ty);
-    ctx.restore();
-
-    // Shine sweep: a bright diagonal band travels across the finished lettering once.
-    if (shine > 0 && shine < 1) {
+    if (titleStars.length === 0) {
+      // Degrade-safe fallback: draw the glowing wordmark directly so the title is never
+      // missing if a browser denied canvas read-back at mount.
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(tx - 30, 0, w + 60, DH);
-      ctx.clip();
-      ctx.globalCompositeOperation = 'lighter';
-      const sx = lerp(tx - 80, tx + w + 80, shine);
-      const band = ctx.createLinearGradient(sx - 60, 0, sx + 60, 0);
-      band.addColorStop(0, 'rgba(255,255,255,0)');
-      band.addColorStop(0.5, 'rgba(255,255,255,0.55)');
-      band.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = band;
-      ctx.font = '800 96px system-ui, "Segoe UI", sans-serif';
-      ctx.textAlign = 'left';
+      ctx.font = TITLE_FONT;
+      ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, tx, ty);
+      ctx.globalAlpha = clamp01(reveal);
+      ctx.shadowColor = 'rgba(255,209,102,0.9)';
+      ctx.shadowBlur = 24 + glow * 18;
+      const grad = ctx.createLinearGradient(0, ty - 50, 0, ty + 50);
+      grad.addColorStop(0, '#fff1c4');
+      grad.addColorStop(1, '#ffb84d');
+      ctx.fillStyle = grad;
+      ctx.fillText(text, DW / 2, ty);
       ctx.restore();
-    }
+    } else {
+      const tx = DW / 2 - titleW / 2;
+      // Per-star arrival progress: staggered by left→right order so the word forms in the
+      // direction the rocket flew.
+      const apOf = (s: TitleStar): number => clamp01((reveal - s.order * 0.62) / 0.3);
 
-    // The comet write-head riding the reveal edge.
-    if (reveal < 1) {
-      const now = performance.now();
-      // Smoke puffs trailing back from the head.
-      for (let i = 0; i < 6; i++) {
-        const back = headX - i * 9;
-        ctx.globalAlpha = 0.18 * (1 - i / 6);
-        ctx.fillStyle = '#dfe6f2';
-        ctx.beginPath();
-        ctx.arc(back, ty + Math.sin(now * 0.02 + i) * 3, 7 - i, 0, Math.PI * 2);
-        ctx.fill();
+      // Faint constellation web between settled neighbours.
+      if (F.constellation) {
+        ctx.save();
+        ctx.lineWidth = 1;
+        for (const [i, j] of titleLinks) {
+          const a = Math.min(apOf(titleStars[i]!), apOf(titleStars[j]!));
+          if (a < 0.85) continue;
+          ctx.strokeStyle = `rgba(180,205,255,${0.16 * (a - 0.85) / 0.15})`;
+          ctx.beginPath();
+          ctx.moveTo(tx + titleStars[i]!.lx, ty + titleStars[i]!.ly);
+          ctx.lineTo(tx + titleStars[j]!.lx, ty + titleStars[j]!.ly);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
-      ctx.globalAlpha = 1;
-      drawCometHead(headX, ty);
-    } else if (glow > 0.2) {
-      // Sparkle glints popping along the finished lettering.
-      const now = performance.now();
-      const glints: [number, number, number][] = [
-        [tx + w * 0.12, ty - 34, 0],
-        [tx + w * 0.5, ty + 30, 1.6],
-        [tx + w * 0.86, ty - 22, 3.1],
-      ];
-      for (const [gx, gy, ph] of glints) {
-        const tw = Math.max(0, Math.sin(now * 0.005 + ph));
-        if (tw <= 0) continue;
-        sparkle(ctx, gx, gy, 6 + tw * 9, `rgba(255,250,225,${0.7 * tw * glow})`);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const s of titleStars) {
+        const ap = apOf(s);
+        if (ap <= 0) continue;
+        const fly = easeOutBack(ap); // ease in with a tiny settle overshoot
+        const x = lerp(tx + s.sx, tx + s.lx, fly);
+        const y = lerp(ty + s.sy, ty + s.ly, fly);
+        const settled = ap >= 1;
+        const tw = settled ? 0.7 + 0.3 * Math.sin(now * 0.005 + s.tw) : 1;
+
+        // A short motion tail while still flying in, pointing back along its descent.
+        if (ap < 1) {
+          const back = 1 - 0.12;
+          const bx = lerp(tx + s.sx, tx + s.lx, easeOutBack(ap * back));
+          const by = lerp(ty + s.sy, ty + s.ly, easeOutBack(ap * back));
+          const g = ctx.createLinearGradient(bx, by, x, y);
+          g.addColorStop(0, 'rgba(255,236,180,0)');
+          g.addColorStop(1, `rgba(255,242,205,${0.5 * ap})`);
+          ctx.strokeStyle = g;
+          ctx.lineWidth = s.r * 0.9;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+
+        ctx.globalAlpha = clamp01(ap * tw);
+        if (s.hero) {
+          ctx.shadowColor = s.col;
+          ctx.shadowBlur = 9;
+        }
+        ctx.fillStyle = s.col;
+        ctx.beginPath();
+        ctx.arc(x, y, s.r * (settled ? 1 : 1.25), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      ctx.restore();
+
+      // Sparkle glints riding the formed wordmark.
+      if (glow > 0.2) {
+        const glints: [number, number, number][] = [
+          [tx + titleW * 0.12, ty - 30, 0],
+          [tx + titleW * 0.5, ty + 26, 1.6],
+          [tx + titleW * 0.86, ty - 20, 3.1],
+        ];
+        for (const [gx, gy, ph] of glints) {
+          const tw = Math.max(0, Math.sin(now * 0.005 + ph));
+          if (tw <= 0) continue;
+          sparkle(ctx, gx, gy, 6 + tw * 9, `rgba(255,250,225,${0.7 * tw * glow})`);
+        }
       }
     }
 
     // Subtitle, fading in with the glow.
+    ctx.save();
     ctx.shadowBlur = 0;
     ctx.globalAlpha = glow;
     ctx.font = '600 22px system-ui, sans-serif';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = '#9fb2cf';
     ctx.fillText('A space-golf odyssey', DW / 2, ty + 78);
     ctx.restore();
@@ -1040,15 +1149,11 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         drawCar(carX, carY, cs, tilt, wheelRetract, jet, flame, bootOpen);
       }
 
-      // Title written into the smoke, then held.
+      // Title formed by the stars left in the rocket's wake, then held.
       if (e >= t3) {
         const reveal = easeInOut(clamp01((e - t3) / F.writeMs));
         const glow = clamp01((e - t3 - F.writeMs * 0.4) / (F.writeMs * 0.6));
-        // Squash-then-stamp the moment the writing completes (at t4).
-        const pop = e >= t4 ? 0.82 + 0.18 * easeOutBack(clamp01((e - t4) / 360)) : 1;
-        // One-shot shine sweep just after the stamp.
-        const shine = clamp01((e - t4 - 160) / 620);
-        drawTitle(reveal, glow, pop, shine);
+        drawTitle(reveal, glow);
       }
 
       ctx.restore();

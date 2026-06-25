@@ -206,11 +206,21 @@ This game lives or dies on three axes — put every change through all three bef
   pitch their bags into a woody station wagon in a suburban driveway → wheels fold up, it hovers,
   jets extend → it rockets nose-up into a starfield (ignition flash + exhaust plume + warp-streak
   stars + decaying screen-shake) past a dimpled **golf-ball planet**, through nebula clouds and
-  shooting stars → a flaming golf-ball **comet writes GOLF STARS**, which stamp in (squash→pop) with
-  a shine sweep + sparkle glints → hands off to the title. Timings/feel read from `window._gsIntro`
-  (escape-hatch rule: `shake`, `nebula`, `planet`, `shootingStars`, `starCount`, phase durations,
-  `speed`); it's skippable (Skip button / click / Esc-Enter-Space), respects `prefers-reduced-motion`,
-  and is gated by `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
+  shooting stars → **the stars left in the rocket's wake stream down and settle into GOLF STARS**
+  (a constellation wordmark with faint linking lines + sparkle glints) → hands off to the title.
+  Timings/feel read from `window._gsIntro` (escape-hatch rule: `shake`, `nebula`, `planet`,
+  `shootingStars`, `starCount`, `constellation`, phase durations, `speed`); it's skippable (Skip
+  button / click / Esc-Enter-Space), respects `prefers-reduced-motion`, and is gated by
+  `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
+- **The sky is continuous with the game (the three asks of this branch).** (1) The space gradient
+  resolves to the app background `#0b0d12` (and the overlay base is `#0b0d12`) so the loader→title
+  handoff is seamless — no blue-jump when the overlay lifts. (2) The starfield **fills in
+  progressively** as the wagon climbs: each star carries a `pop` threshold and reveals once the
+  takeoff fill passes it, not one global crossfade. (3) **The title IS stars** — `sampleTitleStars`
+  rasterises the wordmark to an offscreen canvas and samples covered pixels into star points; they
+  fly in from above (the wake) left→right and settle (`easeOutBack`) onto the letters. If a browser
+  denies canvas pixel read-back, `titleStars` is empty and `drawTitle` falls back to a glowing-text
+  wordmark — a cosmetic intro must never throw and strand the boot.
 - **All effects degrade safely:** the deterministic mulberry32 RNG seeds stars/shooters/dimples (no
   `Math.random`, stable across reloads); every frame runs inside a try/catch that calls `finish()` on
   throw, so a cosmetic glitch never strands the boot. The golf-ball planet is a shaded sphere with
