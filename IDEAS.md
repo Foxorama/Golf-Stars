@@ -30,6 +30,17 @@ Everything below serves whichever avenue wins.
   log. Pass `artUrl` to `courseCardHTML` once images exist.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
   `new Rng('daily-YYYY-MM-DD')`.
+- **GS-15 — Test/demo hub + sync-guard (meet `standards/TEST-HUB-STANDARD.md`).** The portable
+  standard + a Golf-Stars-tailored guard now live in `standards/`, but no invariant is fully ticked:
+  there's no hub yet. To close it: (1) build one same-origin page that iframes the inlined
+  `dist/index.html` and drives it through the existing hooks (`?seed=`, `?intro=`, `window._gsFeel`
+  /`_gsIntro`/`_gsSpray`) — re-implementing zero sim/UI logic; (2) give each hook BOTH a URL form and
+  a live helper (I2 — the feel flags lack a URL form, the URL params lack a no-reload helper);
+  (3) activate `standards/test-hub-guard.template.mjs` by moving it to `tests/test-hub.test.ts` (vitest
+  `describe/it`), ideally upgrading I3a from text-match to an **imported hook registry** (this is a
+  build project, so that's the stronger source of truth); (4) add the "add hook → add hub control →
+  extend guard → update docs" rule to CLAUDE.md (I4). Keep the hub a render/DOM side-effect, never in
+  the pure reducer or sim — same boundary as the intro cinematic.
 
 ## Done
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
