@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
+import { shotView } from '../src/sim/rpg/play';
+
+/** Drive a whole stop via the interactive reducer flow (attacking every shot). */
+function playStopInteractive(s: UiState): UiState {
+  s = reduce(s, { type: 'playInteractive' });
+  let guard = 0;
+  while (s.screen === 'playing' && guard++ < 400) {
+    if (s.play && !s.play.done) {
+      const v = shotView(s.play, s.run.loadout);
+      s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
+    } else {
+      s = reduce(s, { type: 'holeComplete' });
+    }
+  }
+  return s;
+}
 
 /** A run started from the title screen with the given format. */
 function started(seed: number | string, format = 'flat'): UiState {
@@ -109,6 +125,29 @@ describe('ui reducer', () => {
   it('resume is a no-op when there is nothing to resume', () => {
     const title = initState(1);
     expect(reduce(title, { type: 'resume' })).toBe(title);
+  });
+
+  it('interactive play: shot-by-shot through a stop reaches a scored result', () => {
+    let s = started(1234);
+    s = reduce(s, { type: 'playInteractive' });
+    expect(s.screen).toBe('playing');
+    expect(s.play).toBeDefined();
+    expect(s.play!.holeIndex).toBe(0);
+
+    s = playStopInteractive(started(1234));
+    expect(['result', 'gameover']).toContain(s.screen);
+    expect(s.played).toHaveLength(s.course.holes.length);
+    expect(s.lastResult).toBeDefined();
+    expect(s.play).toBeUndefined(); // cleaned up after the stop
+  });
+
+  it('autoShotHole finishes the current hole', () => {
+    let s = reduce(started(7), { type: 'playInteractive' });
+    s = reduce(s, { type: 'autoShotHole' });
+    expect(s.play!.done).toBe(true);
+    s = reduce(s, { type: 'holeComplete' });
+    // Either onto the next hole (still playing) or the stop is scored.
+    expect(['playing', 'result', 'gameover']).toContain(s.screen);
   });
 
   it('the ladder format escalates hole counts across stops', () => {

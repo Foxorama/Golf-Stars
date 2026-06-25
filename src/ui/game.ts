@@ -12,6 +12,7 @@ import type { PlayedHole } from '../sim/round';
 import {
   buy,
   currentCourse,
+  finishStop,
   playStop,
   resumeRun,
   routeOptions,
@@ -22,8 +23,17 @@ import {
   type RunSnapshot,
   type StopResult,
 } from '../sim/rpg/run';
+import {
+  autoDecision,
+  beginHole,
+  holeResult,
+  takeShot,
+  type AimMode,
+  type HolePlay,
+} from '../sim/rpg/play';
+import { Rng } from '../sim/rng';
 
-export type Screen = 'title' | 'intro' | 'result' | 'shop' | 'travel' | 'gameover';
+export type Screen = 'title' | 'intro' | 'playing' | 'result' | 'shop' | 'travel' | 'gameover';
 
 export interface UiState {
   run: Run;
@@ -39,6 +49,13 @@ export interface UiState {
   viewHole: number;
   /** A saved in-progress run that the title screen can resume, if any. */
   resumable?: RunSnapshot;
+  // --- interactive shot-by-shot play (the 'playing' screen) ---
+  /** Current hole being played interactively. */
+  play?: HolePlay;
+  /** Deterministic RNG for the current stop (mutated as shots resolve). */
+  holeRng?: Rng;
+  /** Holes completed so far this stop. */
+  stopPlayed?: PlayedHole[];
   // Meta-progression (persisted across runs).
   bestStableford: number;
   bestDistance: number;
@@ -47,7 +64,11 @@ export interface UiState {
 export type Action =
   | { type: 'start'; format: string }
   | { type: 'resume' }
-  | { type: 'play' }
+  | { type: 'play' } // auto-play the whole stop (watch)
+  | { type: 'playInteractive' } // play shot-by-shot
+  | { type: 'shot'; clubId: string; aim: AimMode }
+  | { type: 'autoShotHole' } // AI-finish the current hole
+  | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
   | { type: 'buy'; id: string }
   | { type: 'leaveShop' }
@@ -124,6 +145,55 @@ export function reduce(state: UiState, action: Action): UiState {
         ...state,
         run,
         played,
+        lastResult: result,
+        viewHole: 0,
+        screen: result.passed ? 'result' : 'gameover',
+        bestStableford: Math.max(state.bestStableford, result.stableford),
+        bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+      };
+    }
+
+    case 'playInteractive': {
+      if (state.screen !== 'intro' || state.run.status !== 'active') return state;
+      return {
+        ...state,
+        screen: 'playing',
+        holeRng: new Rng(`${state.course.seed}:play`),
+        stopPlayed: [],
+        play: beginHole(state.course.holes[0]!, 0),
+      };
+    }
+
+    case 'shot': {
+      if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
+      const play = takeShot(state.play, { clubId: action.clubId, aim: action.aim }, state.run.loadout, state.holeRng);
+      return { ...state, play };
+    }
+
+    case 'autoShotHole': {
+      if (state.screen !== 'playing' || !state.play || !state.holeRng) return state;
+      let p = state.play;
+      let guard = 0;
+      while (!p.done && guard++ < 40) p = takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng);
+      return { ...state, play: p };
+    }
+
+    case 'holeComplete': {
+      if (state.screen !== 'playing' || !state.play || !state.play.done) return state;
+      const stopPlayed = [...(state.stopPlayed ?? []), holeResult(state.play)];
+      const nextIdx = state.play.holeIndex + 1;
+      if (nextIdx < state.course.holes.length) {
+        return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+      }
+      // Stop complete — score it exactly as the auto path does.
+      const { run, result } = finishStop(state.run, state.course, stopPlayed);
+      return {
+        ...state,
+        run,
+        stopPlayed: undefined,
+        play: undefined,
+        holeRng: undefined,
+        played: stopPlayed,
         lastResult: result,
         viewHole: 0,
         screen: result.passed ? 'result' : 'gameover',

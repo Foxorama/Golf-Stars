@@ -34,6 +34,11 @@ Everything below serves whichever avenue wins.
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-10 — RPG shot model + interactive play.** Handicap stat + cards (reduce randomness /
+  add distance / lower handicap), and shot-by-shot play: per shot you pick a club and Attack vs
+  Safe, the outcome is handicap+RNG via the shared executeShot physics, putting auto-resolves.
+  Auto-play kept as a watch/skip fallback. Bounce/roll-out + hole-out juice (chip-ins/aces).
+  Pure driver tested (auto-play === AI); reducer flow tested. (PRs #18–#21)
 - **GS-1 — Wildness & biome system.** Biomes as data, fantasy lies, fairness-by-construction,
   wind-reading sim. (PR #2)
 - **GS-2 — RPG meta-loop (sim layer).** Run state machine, cut-line fail gate, credits + shop
