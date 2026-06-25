@@ -22,6 +22,7 @@ import {
 import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
+import { usableBag, driverDeckSprayMult } from './rpg/economy';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
@@ -119,6 +120,8 @@ export interface PlayHoleOptions {
   carryMult?: number;
   /** Player dispersion multiplier (<1 = a forgiveness perk). */
   dispersionMult?: number;
+  /** Driver-on-Deck unlock level (0 = driver is tee-only). Gates off-deck driver use + penalty. */
+  driverDeck?: number;
 }
 
 /** Pin location: the generated flag within the green (GS-6), or the centroid if absent. */
@@ -303,11 +306,17 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     // club to leave room for roll-out. The player (interactive driver) makes this choice
     // instead; both then run the SAME executeShot physics.
     const tgt = safeTarget(hole, ball, aim);
-    const club = aiClub(hole, ball, tgt, carryMult, bag, opts.stats);
+    // Club from the lie-appropriate bag: the driver is removed (or carry-penalised) off the deck
+    // unless the Driver-on-Deck level permits it — same rule the interactive player obeys.
+    const level = opts.driverDeck ?? 0;
+    const club = aiClub(hole, ball, tgt, carryMult, usableBag(bag, lie, level), opts.stats);
+    const sprayMult = driverDeckSprayMult(club.id, lie, level);
 
     const ex = executeShot(hole, ball, lie, tgt, club, {
       carryMult,
-      dispersionMult: opts.dispersionMult,
+      // Preserve byte-for-byte behaviour for non-driver shots (undefined stays undefined); only the
+      // off-deck driver carries the spray surcharge.
+      dispersionMult: sprayMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * sprayMult,
       stats: opts.stats,
     }, rng);
     strokes += 1 + ex.penaltyStrokes;

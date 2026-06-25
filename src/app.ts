@@ -17,7 +17,7 @@ import { biomeById } from './sim/course/biomes';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import type { SprayTiers } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { itemCap, itemCost, ownedCount, shopItem } from './sim/rpg/economy';
+import { itemCap, itemCost, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
@@ -441,8 +441,10 @@ function playingBody(animating: boolean): string {
     selAim = 'attack';
     selFreeTarget = null;
   }
-  const suggested = v.lie === 'green' && bag.some((c) => c.id === 'putter') ? 'putter' : v.attackClubId;
-  if (selClubId === null || !bag.some((c) => c.id === selClubId)) selClubId = suggested;
+  // Only lie-legal clubs are selectable (driver hidden off the deck until unlocked).
+  const usable = usableBag(bag, play.lie, state.run.loadout.driverDeck);
+  const suggested = v.lie === 'green' && usable.some((c) => c.id === 'putter') ? 'putter' : v.attackClubId;
+  if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = suggested;
   // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
   const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined };
   const spray = previewShot(play, decision, state.run.loadout);
@@ -469,7 +471,7 @@ function playingBody(animating: boolean): string {
     `<button data-cycle="${dir}" style="padding:9px 12px;border-radius:8px;border:1px solid #333;background:#1d212c;color:#e8e8ea;font-size:14px;cursor:pointer;">${label}</button>`;
   const clubButtons = `
     ${cbtn('◄', -1)}
-    <b style="display:inline-block;min-width:6em;text-align:center;">${bag.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
+    <b style="display:inline-block;min-width:6em;text-align:center;">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
     ${cbtn('►', 1)}
     <button data-suggest="1" title="Use the suggested club" style="padding:9px 10px;border-radius:8px;border:1px solid ${selClubId === suggested ? '#5fd45a' : '#333'};background:#1d212c;color:#e8e8ea;font-size:13px;cursor:pointer;">🎯 Suggested</button>`;
   const aimButtons = `
@@ -710,7 +712,9 @@ function render(): void {
   // Local (non-game) controls on the playing screen: club cycle + aim select.
   app.querySelectorAll<HTMLElement>('[data-cycle]').forEach((el) => {
     el.addEventListener('click', () => {
-      const bag = state.run.loadout.bag;
+      // Cycle through only the lie-legal clubs (the driver is hidden off the deck until unlocked).
+      const lie = state.play?.lie ?? 'tee';
+      const bag = usableBag(state.run.loadout.bag, lie, state.run.loadout.driverDeck);
       const i = bag.findIndex((c) => c.id === selClubId);
       const ni = Math.max(0, Math.min(bag.length - 1, (i < 0 ? 0 : i) + Number(el.dataset.cycle)));
       selClubId = bag[ni]!.id;
