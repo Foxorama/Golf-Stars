@@ -273,11 +273,12 @@ This game lives or dies on three axes — put every change through all three bef
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
   pitch their bags into a woody station wagon in a suburban driveway → wheels fold up, it hovers,
   jets extend → it rockets nose-up into a starfield (ignition flash + exhaust plume + warp-streak
-  stars + decaying screen-shake) past a dimpled **golf-ball planet**, through nebula clouds and
-  shooting stars → **the stars left in the rocket's wake stream down and settle into GOLF STARS**
-  (a constellation wordmark with faint linking lines + sparkle glints) → hands off to the title.
-  Timings/feel read from `window._gsIntro` (escape-hatch rule: `shake`, `nebula`, `planet`,
-  `shootingStars`, `starCount`, `constellation`, phase durations, `speed`); it's skippable (Skip
+  stars + decaying screen-shake), through nebula clouds and shooting stars → a **golf-ball shooting
+  star** streaks across the void in the wagon's wake → **the stars it left behind stream down and
+  settle into GOLF STARS** (a constellation wordmark with faint linking lines + sparkle glints) →
+  hands off to the title. Timings/feel read from `window._gsIntro` (escape-hatch rule: `shake`,
+  `nebula`, `planet`, `ballShooter`, `shootingStars`, `starCount`, `constellation`, phase durations,
+  `speed`); it's skippable (Skip
   button / click / Esc-Enter-Space), respects `prefers-reduced-motion`, and is gated by
   `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
 - **The sky is continuous with the game (the three asks of this branch).** (1) The space gradient
@@ -291,8 +292,12 @@ This game lives or dies on three axes — put every change through all three bef
   wordmark — a cosmetic intro must never throw and strand the boot.
 - **All effects degrade safely:** the deterministic mulberry32 RNG seeds stars/shooters/dimples (no
   `Math.random`, stable across reloads); every frame runs inside a try/catch that calls `finish()` on
-  throw, so a cosmetic glitch never strands the boot. The golf-ball planet is a shaded sphere with
-  foreshortened, light-shaded dimples — on-theme for *space golf*, and no asset to 404.
+  throw, so a cosmetic glitch never strands the boot. The **golf-ball shooting star** (`drawGolfBallShooter`)
+  fires once after launch (`t3`), crossing the upper sky with a dimpled-ball head + tapered glow trail —
+  on-theme for *space golf*, no asset to 404. The old **golf-ball planet** (`drawPlanet`) read as a stray
+  golf ball overlapping the title, so it's now `planet:false` by default (function kept behind the flag as
+  an escape hatch). The wordmark stars all carry a soft glow (heroes glow harder) + a warm underglow band,
+  so the title reads legibly bright against the starfield.
 - **It is NOT in the pure reducer** — it's a time/DOM side-effect, so it lives in `app.ts` like the
   play-view canvas mount and save persistence. **Gotcha that keeps `tests/build.test.ts` green:**
   `start()` runs the normal `boot()` FIRST (the real title actually paints + sets `data-booted`),
