@@ -34,6 +34,16 @@ Everything below serves whichever avenue wins.
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-11 — Deep shop / build progression.** The outfitter was 5 one-shot perks (dead after
+  ~5 stops while the cut-line kept ramping). Now: **stackable upgrades** (Caddie Lesson −2 hcp,
+  Fortune Chip +15% credits, Precision Chip −8% dispersion, Range Booster +8 yd/−3% spray) buyable
+  repeatedly at a geometric cost ramp (`itemCost`, `STACK_COST_GROWTH`) up to a per-item cap — an
+  endless credit sink and a build that scales into the difficulty. Plus a **seeded, rarity-weighted
+  per-stop offer** (`shopOffer`, 4-of-N, deterministic from seed+stop, maxed items drop out) so the
+  shop rotates and presents real choice. Pure/tested: stacking, cost ramp, offer determinism, and
+  the "every upgrade improves (or for economy, doesn't hurt) mean per-stop Stableford" invariant.
+  Perks are a multiset now (dupes in `perks[]`); save v2 unchanged (`loadoutFromPerks` folds them).
+  (PR TBD — branch `claude/golf-stars-improvements-m4ktof`)
 - **GS-10 — RPG shot model + interactive play.** Handicap stat + cards (reduce randomness /
   add distance / lower handicap), and shot-by-shot play: per shot you pick a club and Attack vs
   Safe, the outcome is handicap+RNG via the shared executeShot physics, putting auto-resolves.

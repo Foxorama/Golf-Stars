@@ -78,6 +78,20 @@ describe('ui reducer', () => {
     expect(s.played).toBeUndefined();
   });
 
+  it('entering the shop fixes a rotating offer; leaving clears it', () => {
+    let s = reduce(started(1234), { type: 'play' });
+    expect(s.shopOffer).toBeUndefined();
+    s = reduce(s, { type: 'continue' });
+    expect(s.screen).toBe('shop');
+    expect(s.shopOffer?.length).toBeGreaterThan(0);
+    const offer = s.shopOffer;
+    // Buying does not reshuffle the displayed stock.
+    s = reduce(s, { type: 'buy', id: offer![0]! });
+    expect(s.shopOffer).toEqual(offer);
+    s = reduce(s, { type: 'leaveShop' });
+    expect(s.shopOffer).toBeUndefined();
+  });
+
   it('auto-putt defaults on and the toggle flips it', () => {
     const s = initState(1);
     expect(s.autoPutt).toBe(true);

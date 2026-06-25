@@ -95,6 +95,17 @@ This game lives or dies on three axes — put every change through all three bef
   compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
+- **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
+  (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
+  geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by
+  `maxStacks`). Stacking falls out of `apply()` folding once per owned copy, so `perks[]` is now a
+  **multiset** (dupes allowed) and `loadoutFromPerks` rebuilds the stacked loadout on resume — save
+  v2 is unchanged. The per-stop stock is `shopOffer(run)`: a seeded, rarity-weighted draw (`RARITY_C`
+  weights → rarer = scarcer) of `SHOP_OFFER_SIZE` items, deterministic from `${seed}:shop:${stop}`,
+  with maxed items (owned uniques / capped stackables) filtered out. `buy()` stays the economic
+  primitive (NOT offer-gated, so the headless sim can buy anything); the UI bounds choice to the
+  offer and fixes it on shop entry (`UiState.shopOffer`) so buying never reshuffles the cards. This
+  closes the old "dead shop after ~5 stops while the cut-line keeps ramping" progression hole.
 - **Balance/test on mean per-stop Stableford, NOT full-run distance.** Distance is chaotic: a
   loadout change perturbs the whole downstream seeded-RNG stream and the cut is a hard threshold,
   so "travels further" isn't monotonic even when a perk clearly helps. Averaged per-stop score is
@@ -103,7 +114,11 @@ This game lives or dies on three axes — put every change through all three bef
   boosting every club made the "reach" approach AI overshoot greens and score *worse*. Verify any
   new perk raises mean per-stop Stableford before shipping it. NOTE: under the per-club wildness
   model, raw distance is double-edged (longer club = wider spray), so `power-cell` also carries a
-  small −5% dispersion bonus to stay a genuine upgrade. `tests/run.test.ts` guards the invariant.
+  small −5% dispersion bonus to stay a genuine upgrade. `tests/run.test.ts` guards the invariant
+  (and `tests/shop.test.ts` extends it to the stackables: forgiveness/skill stacks must raise mean
+  per-stop Stableford, `range-booster` must never lower it, `fortune-chip` is pure economy). The
+  scoring harness must club shots with **`netDispersion(loadout)`** (handicap × equipment), not raw
+  `dispersionMult` — else handicap perks like Caddie Lesson are invisible to the test.
 
 ## Putting (auto vs manual; legendary auto-putt)
 - **`onePutt` is the single putt model**; `puttOut`/`puttOutFrom` step it (auto), `takePutt`

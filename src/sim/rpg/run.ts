@@ -16,14 +16,21 @@ import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
   STARTING_CREDITS,
+  SHOP_ITEMS,
+  canBuy,
   creditsForStop,
   cutLine,
+  itemCap,
+  itemCost,
   loadoutFromPerks,
   netDispersion,
+  ownedCount,
   shopItem,
   startingLoadout,
   type PlayerLoadout,
+  type ShopItem,
 } from './economy';
+import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 
 export type RunStatus = 'active' | 'ended';
@@ -164,13 +171,63 @@ export function travel(run: Run, route: Route): Run {
   };
 }
 
-/** Buy a shop item (once each). No-op if unaffordable or already owned. */
+/**
+ * Buy a shop item. Uniques are buyable once; stackables repeatedly at a rising price up
+ * to their cap. No-op (returns the same run) if at the cap or unaffordable at the next
+ * price — the offer constraint is a UI concern, so the headless sim can buy any item.
+ */
 export function buy(run: Run, itemId: string): Run {
   const item = shopItem(itemId);
   if (!item) return run;
-  if (run.credits < item.cost) return run;
-  if (run.loadout.perks.includes(itemId)) return run;
-  return { ...run, credits: run.credits - item.cost, loadout: item.apply(run.loadout) };
+  const owned = ownedCount(run.loadout.perks, itemId);
+  if (!canBuy(item, owned, run.credits)) return run;
+  const cost = itemCost(item, owned);
+  return { ...run, credits: run.credits - cost, loadout: item.apply(run.loadout) };
+}
+
+// --- Shop offer (the rotating outfitter stock) ------------------------------
+
+export interface ShopOffer {
+  item: ShopItem;
+  /** Price of the next copy right now. */
+  cost: number;
+  /** Copies already owned (stack depth; 0 or 1 for a unique). */
+  owned: number;
+}
+
+export const SHOP_OFFER_SIZE = 4;
+
+/** Weighted draw of `n` distinct items (rarer = less likely), without replacement. */
+function weightedSample(rng: Rng, items: readonly ShopItem[], n: number): ShopItem[] {
+  const pool = [...items];
+  const out: ShopItem[] = [];
+  while (out.length < n && pool.length > 0) {
+    const total = pool.reduce((s, it) => s + RARITY_C[it.rarity].weight, 0);
+    let r = rng.float() * total;
+    let idx = 0;
+    for (; idx < pool.length - 1; idx++) {
+      r -= RARITY_C[pool[idx]!.rarity].weight;
+      if (r <= 0) break;
+    }
+    out.push(pool.splice(idx, 1)[0]!);
+  }
+  return out;
+}
+
+/**
+ * The outfitter's stock at the current stop: a seeded, rarity-weighted subset of the
+ * catalogue. Deterministic from the run seed + stop, so the same run shows the same shop
+ * (and a resume reproduces it). Items already maxed (owned uniques / capped stackables)
+ * drop out, so every slot is something you can still pursue. Costs reflect current stacks.
+ */
+export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
+  const perks = run.loadout.perks;
+  const pool = SHOP_ITEMS.filter((it) => ownedCount(perks, it.id) < itemCap(it));
+  const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
+  return weightedSample(rng, pool, Math.min(size, pool.length)).map((item) => {
+    const owned = ownedCount(perks, item.id);
+    return { item, cost: itemCost(item, owned), owned };
+  });
 }
 
 /** Voluntarily bank the run (cash out) — ends it with reason 'banked'. */

@@ -31,7 +31,7 @@ describe('cards (GS-5)', () => {
     expect(buyable).toContain('150c');
     expect(buyable).toContain('opacity:1');
 
-    expect(itemCardHTML(item, { owned: true }).toUpperCase()).toContain('OWNED');
+    expect(itemCardHTML(item, { owned: true }).toUpperCase()).toContain('MAXED');
     expect(itemCardHTML(item, { affordable: false })).toContain('NEED CREDITS');
     expect(itemCardHTML(item, { owned: true })).toContain('opacity:0.5');
     expect(buyable).toContain(rarCol('rare'));

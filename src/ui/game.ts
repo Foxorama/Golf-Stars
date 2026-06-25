@@ -16,6 +16,7 @@ import {
   playStop,
   resumeRun,
   routeOptions,
+  shopOffer,
   startRun,
   travel,
   type Route,
@@ -47,6 +48,11 @@ export interface UiState {
   lastResult?: StopResult;
   /** Onward routes, populated on the travel screen. */
   routes?: Route[];
+  /**
+   * The outfitter's stock for this stop (item ids), fixed on entry so buying doesn't
+   * reshuffle the cards. Live cost/stack state is recomputed from `run` at render time.
+   */
+  shopOffer?: string[];
   /** Which hole the play view is showing (0-based). */
   viewHole: number;
   /** A saved in-progress run that the title screen can resume, if any. */
@@ -230,7 +236,8 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'continue': {
       if (state.screen !== 'result') return state;
-      return { ...state, screen: 'shop' };
+      // Fix the outfitter's stock now (from the post-stop run) so it stays put while shopping.
+      return { ...state, screen: 'shop', shopOffer: shopOffer(state.run).map((o) => o.item.id) };
     }
 
     case 'buy': {
@@ -240,7 +247,7 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'leaveShop': {
       if (state.screen !== 'shop') return state;
-      return { ...state, screen: 'travel', routes: routeOptions(state.run) };
+      return { ...state, screen: 'travel', routes: routeOptions(state.run), shopOffer: undefined };
     }
 
     case 'route': {

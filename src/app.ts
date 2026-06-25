@@ -13,7 +13,7 @@ import { renderHoleSVG } from './render/holeView';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import type { SprayTiers } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
+import { cutLine, itemCap, itemCost, ownedCount, shopItem } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { snapshotRun } from './sim/rpg/run';
 import { initState, reduce, type Action, type UiState } from './ui/game';
@@ -348,21 +348,29 @@ function resultScreen(): string {
 }
 
 function shopScreen(): string {
-  const owned = new Set(state.run.loadout.perks);
-  const items = SHOP_ITEMS.map((it) => {
-    const have = owned.has(it.id);
-    const afford = state.run.credits >= it.cost;
-    const card = itemCardHTML(it, { owned: have, affordable: afford });
-    const buyable = !have && afford;
-    // Wrap the card so the whole thing is the buy button when purchasable.
-    return buyable
-      ? `<div data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
-      : `<div style="margin:4px;">${card}</div>`;
-  }).join('');
+  const perks = state.run.loadout.perks;
+  const credits = state.run.credits;
+  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live.
+  const items = (state.shopOffer ?? [])
+    .map((id) => shopItem(id))
+    .filter((it): it is NonNullable<typeof it> => !!it)
+    .map((it) => {
+      const owned = ownedCount(perks, it.id);
+      const maxed = owned >= itemCap(it);
+      const cost = itemCost(it, owned);
+      const afford = credits >= cost;
+      const buyable = !maxed && afford;
+      const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned });
+      // Wrap the card so the whole thing is the buy button when purchasable.
+      return buyable
+        ? `<div data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+        : `<div style="margin:4px;">${card}</div>`;
+    })
+    .join('');
   return `
     ${header()}
-    <h2 style="font-size:16px;">Outfitter · ${state.run.credits} credits</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Each perk once per run.</p>
+    <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own.</p>
     <div style="display:flex;flex-wrap:wrap;">${items}</div>
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' })}</div>`;
 }

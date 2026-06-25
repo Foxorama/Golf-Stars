@@ -126,22 +126,29 @@ export function puttCardHTML(putts: PuttLog[], opts: { holed?: boolean; pickedUp
 }
 
 export interface ItemCardState {
+  /** Already maxed out — a one-shot unique you own, or a stackable at its cap. */
   owned?: boolean;
   affordable?: boolean;
+  /** Stacks already owned (stackables) — shows a "×N" badge so progress is legible. */
+  count?: number;
 }
 
-/** A shop item / loot card, rarity-tinted, dimmed when owned or unaffordable. */
+/** A shop item / loot card, rarity-tinted, dimmed when maxed or unaffordable. */
 export function itemCardHTML(
   item: { name: string; cost: number; desc: string; rarity: Rarity },
   state: ItemCardState = {},
 ): string {
   const col = rarCol(item.rarity);
   const dim = state.owned || state.affordable === false;
-  const note = state.owned ? 'OWNED' : state.affordable === false ? 'NEED CREDITS' : `${item.cost}c`;
+  const note = state.owned ? 'MAXED' : state.affordable === false ? 'NEED CREDITS' : `${item.cost}c`;
+  const stackBadge =
+    state.count && state.count > 0
+      ? `<span style="margin-left:6px;font-size:11px;color:${col};opacity:.85;">×${state.count}</span>`
+      : '';
   return `
     <article style="width:170px;border:2px solid ${col};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:0 0 12px ${col}22;">
       <div style="display:flex;align-items:baseline;gap:6px;">
-        <b style="font-size:14px;">${item.name}</b>
+        <b style="font-size:14px;">${item.name}</b>${stackBadge}
         <span style="margin-left:auto;">${rarityBadge(item.rarity)}</span>
       </div>
       <p style="font-size:12px;opacity:.8;margin:.5em 0;min-height:2.4em;">${item.desc}</p>
