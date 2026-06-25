@@ -255,6 +255,32 @@ This game lives or dies on three axes — put every change through all three bef
   and latches so the 5s timeout can't clobber the real cause. Keep it; `tests/build.test.ts`
   guards both the inlined-single-file output and this error-capture contract.
 
+## PWA / installable app (offline without the stale-serve bug)
+- **Golf Stars is an installable PWA.** `public/manifest.webmanifest` + `public/icon-{192,512,180}.png`
+  (a golf-ball-planet, regenerable via `node scripts/genicons.mjs public` → Playwright renders an SVG to PNG)
+  + `<head>` links in `index.html` make it install to a home screen / desktop. The manifest and icons
+  are `public/` files copied VERBATIM to `dist/` — they are NOT inlined by `vite-plugin-singlefile`
+  (an install manifest can't be a data-URI), and their hrefs are RELATIVE so they resolve under the
+  Pages subpath (`/golf-stars/`). They contain no "assets" substring, so `tests/build.test.ts`'s
+  no-external-`assets`-link guard stays green.
+- **The service worker is NETWORK-FIRST, never cache-first** (`public/sw.js`). Online → always fetch
+  fresh and refresh the cache as a side effect; offline → fall back to cache (and the cached app shell
+  for navigations). This is the WHOLE point: it buys offline play WITHOUT resurrecting the stale-serve
+  blank-page bug — a fresh deploy always wins the moment the device is online. The cache name is
+  `golf-stars-<VERSION>`; bump `VERSION` per deploy to retire the prior offline snapshot. Registered
+  from `app.ts` (`registerServiceWorker`), guarded to http/https so the `file://` build smoke test
+  never tries (and fails) to register, and fully swallowed so a SW fault can't strand the boot.
+- **Shared-origin coexistence with golf-finder is PRESERVED.** Both apps live on `foxorama.github.io`;
+  a root-scoped sibling SW could hijack/blank this page (the original reason `index.html` nuked ALL
+  workers/caches on load). That guard is now NARROWED to kill only FOREIGN workers (scope ≠ our
+  subpath) and non-`golf-stars-*` caches, so our own offline worker survives while the golf-finder
+  defense stays intact. Our worker registers with a RELATIVE url → scope is `/golf-stars/`, so it can
+  only ever intercept Golf Stars. Verified end-to-end (Playwright over http on a `/golf-stars/` mount):
+  SW controls the page, scope is subpath-confined, and an offline reload still boots + paints the title.
+- This is a deliberate, scoped exception to the "no offline-utility service-worker framing" line under
+  *Do NOT carry from golf-finder*: that rule rejected golf-finder's cache-FIRST offline-utility SW (the
+  stale-serve hazard); a network-first, subpath-scoped SW for an installable game is the opposite trade.
+
 ## Change & versioning flow
 - `main` is branch-protected. Each change: branch → edit → commit → push → PR → merge → sync.
 - **Default to shipping all the way (this project's rule).** When a change is complete and tests are
@@ -266,4 +292,6 @@ This game lives or dies on three axes — put every change through all three bef
 
 ## Do NOT carry from golf-finder
 GPS/geolocation, OSM/Overpass, weather APIs, real astronomy/star catalogs, the day course-finder,
-offline-utility service-worker framing. We deliberately left all of it behind.
+offline-utility service-worker framing. We deliberately left all of it behind. (One scoped exception:
+a NETWORK-first, subpath-scoped SW for the installable PWA — see *PWA / installable app* above. That
+is the inverse of golf-finder's cache-first offline-utility SW, not a re-coupling of the two apps.)

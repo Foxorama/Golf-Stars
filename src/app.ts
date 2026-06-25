@@ -599,9 +599,31 @@ function shouldPlayIntro(): boolean {
   return true;
 }
 
+/**
+ * Register the offline service worker (PWA). Guarded to http/https so it never fires under
+ * the `file://` smoke test (where registration would reject), and fully swallowed so a SW
+ * failure can never strand the boot — the app works identically with no worker. The worker
+ * is network-first (see public/sw.js), so it adds offline play without risking a stale page.
+ */
+function registerServiceWorker(): void {
+  try {
+    if (!('serviceWorker' in navigator)) return;
+    if (location.protocol !== 'https:' && location.protocol !== 'http:') return;
+    // Relative URL → the worker scopes to our own subpath, never a sibling app on the origin.
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {
+        /* offline support is a bonus; never surface or block on its failure */
+      });
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Entry, called from main.ts inside try/catch so any boot fault is visible. */
 export function start(): void {
   boot();
+  registerServiceWorker();
   if (!shouldPlayIntro()) return;
   try {
     sessionStorage.setItem('gs_introSeen', '1');
