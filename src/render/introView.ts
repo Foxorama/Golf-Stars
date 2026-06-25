@@ -175,7 +175,7 @@ function sampleTitleStars(
     if (!octx) return { stars: [], width: 0, links: [] };
     octx.font = font;
     const width = octx.measureText(text).width;
-    const H = 132;
+    const H = 156;
     cv.width = Math.max(1, Math.ceil(width) + 8);
     cv.height = H;
     octx.font = font;
@@ -186,18 +186,20 @@ function sampleTitleStars(
     const data = octx.getImageData(0, 0, cv.width, cv.height).data;
 
     const golds = ['#fff4cf', '#ffe39a', '#ffd27a'];
-    const step = 9;
+    // A denser grid + a narrower hero/normal size gap → an even, readable fill (sparse +
+    // a few blown-out hero stars made the dim letters hard to read).
+    const step = 8;
     const stars: TitleStar[] = [];
     for (let py = 0; py < H; py += step) {
       for (let px = 0; px < cv.width; px += step) {
         if ((data[(py * cv.width + px) * 4 + 3] ?? 0) < 130) continue;
         const lx = px - 4 + (rng() - 0.5) * step * 0.7;
         const ly = py - H / 2 + (rng() - 0.5) * step * 0.7;
-        const hero = rng() < 0.2;
+        const hero = rng() < 0.15;
         stars.push({
           lx,
           ly,
-          r: hero ? 2.4 + rng() * 1.6 : 1.1 + rng() * 1.1,
+          r: hero ? 2.3 + rng() * 1.0 : 1.6 + rng() * 0.9,
           col: rng() < 0.5 ? '#ffffff' : golds[(rng() * golds.length) | 0]!,
           tw: rng() * Math.PI * 2,
           order: width > 0 ? lx / width : 0,
@@ -215,7 +217,7 @@ function sampleTitleStars(
     const seen = new Set<string>();
     for (let i = 0; i < stars.length; i++) {
       let best = -1;
-      let bestD = 26 * 26;
+      let bestD = 28 * 28;
       for (let j = 0; j < stars.length; j++) {
         if (j === i) continue;
         const dx = stars[i]!.lx - stars[j]!.lx;
@@ -340,7 +342,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   // The GOLF STARS wordmark as a constellation, sampled from the rasterised text. The
   // stars rain in from the rocket's wake (above) and settle into the letters; if pixel
   // sampling is unavailable, `titleStars` is empty and drawTitle falls back to glowing text.
-  const TITLE_FONT = '800 96px system-ui, "Segoe UI", sans-serif';
+  const TITLE_FONT = '800 116px system-ui, "Segoe UI", sans-serif';
   const { stars: titleStars, width: titleW, links: titleLinks } = sampleTitleStars(
     'GOLF STARS',
     TITLE_FONT,
@@ -1107,7 +1109,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     // Flame first (behind the body), from the rear nozzles.
     if (flame > 0) {
       const nozX = 150 + jet * 42;
-      for (const ny of [-16, 6]) {
+      for (const ny of [0, 16]) {
         const len = (70 + flame * 80) * (0.85 + 0.15 * Math.sin(performance.now() * 0.05 + ny));
         const g = ctx.createLinearGradient(nozX, ny, nozX + len, ny);
         g.addColorStop(0, 'rgba(255,255,255,0.95)');
@@ -1126,12 +1128,12 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     // Jet nozzles sliding out of the rear.
     if (jet > 0) {
       ctx.fillStyle = '#6b7080';
-      for (const ny of [-16, 6]) {
+      for (const ny of [0, 16]) {
         rr(ctx, 150, ny - 7, jet * 42, 14, 4);
         ctx.fill();
       }
       ctx.fillStyle = '#3a3f4d';
-      for (const ny of [-16, 6]) {
+      for (const ny of [0, 16]) {
         rr(ctx, 150 + jet * 42 - 6, ny - 8, 6, 16, 3);
         ctx.fill();
       }
@@ -1201,12 +1203,18 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     rr(ctx, -40, -2, 150, 22, 5);
     ctx.stroke();
 
-    // Rear hatch / boot lid (lifts open during loading).
+    // Rear hatch / tailgate, hinged at the rear roof corner. Closed (bootOpen 0) it lies flush
+    // along the car's sloped rear so the boot reads SHUT; it swings up and back as it opens for
+    // the bags, then closes again before the jets appear.
     ctx.save();
-    ctx.translate(150, -10);
-    ctx.rotate(-bootOpen * 1.0);
-    ctx.fillStyle = '#356193';
-    rr(ctx, -2, -44, 12, 44, 4);
+    ctx.translate(72, -52); // hinge at the rear of the roofline
+    ctx.rotate(0.8 - bootOpen * 1.55); // closed ≈ down the rear slope; open ≈ lifted up
+    ctx.fillStyle = '#34618f';
+    rr(ctx, 0, -5, 60, 10, 4);
+    ctx.fill();
+    // Rear-window glass on the hatch.
+    ctx.fillStyle = '#bfe6ff';
+    rr(ctx, 9, -3, 34, 6, 3);
     ctx.fill();
     ctx.restore();
 
@@ -1309,7 +1317,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         const gg = ctx.createRadialGradient(DW / 2, ty, 0, DW / 2, ty, titleW * 0.6);
-        const ga = 0.16 * clamp01(reveal);
+        const ga = 0.12 * clamp01(reveal);
         gg.addColorStop(0, `rgba(255,238,190,${ga})`);
         gg.addColorStop(1, 'rgba(255,238,190,0)');
         ctx.fillStyle = gg;
@@ -1362,12 +1370,12 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         }
 
         // Every star carries a soft glow now (not just the heroes) so the wordmark is
-        // legibly bright; heroes glow harder. The halo is a cached sprite stamped via
-        // drawImage (cheap) rather than `shadowBlur` (a per-draw Gaussian that chugged with
-        // hundreds of stars).
+        // legibly bright; heroes glow only a touch harder (a big gap blew out hotspots and
+        // left the dim letters unreadable). The halo is a cached sprite stamped via drawImage
+        // (cheap) rather than `shadowBlur` (a per-draw Gaussian that chugged with hundreds).
         const base = clamp01(ap * tw);
-        const gr = s.r * (s.hero ? 6 : 4);
-        ctx.globalAlpha = base * (s.hero ? 0.75 : 0.5);
+        const gr = s.r * (s.hero ? 5 : 4.2);
+        ctx.globalAlpha = base * (s.hero ? 0.62 : 0.5);
         ctx.drawImage(glowSprite, x - gr, y - gr, gr * 2, gr * 2);
         // Crisp bright core.
         ctx.globalAlpha = base;
