@@ -21,6 +21,7 @@ import {
   pinOf,
   puttOutFrom,
   shotSpread,
+  suggestPlayerClub,
   type ShotSpread,
   type PuttLog,
   type ShotLog,
@@ -90,11 +91,18 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const pin = pinOf(state.hole);
   const safe = layupTarget(state.hole, state.ball);
   const carryMult = biomeCarryMult(state.hole);
+  // The interactive "attack" suggestion reasons about green coverage (longest club that still
+  // covers the front of the green), using the player's real dispersion so it reads true — see
+  // suggestPlayerClub. The auto sim keeps using aiClub (its balance is tuned around it).
+  const dispersionMult = netDispersion(loadout);
   return {
     distToPin: Math.round(dist(state.ball, pin)),
     lie: state.lie,
     wind: state.hole.wind,
-    attackClubId: aiClub(state.hole, state.ball, pin, carryMult, loadout.bag).id,
+    attackClubId: suggestPlayerClub(state.hole, state.ball, state.lie, loadout.bag, {
+      carryMult,
+      dispersionMult,
+    }).id,
     safeClubId: aiClub(state.hole, state.ball, safe, carryMult, loadout.bag).id,
     blocked: dist(safe, pin) > 1,
     strokesSoFar: state.strokes,

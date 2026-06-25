@@ -543,6 +543,73 @@ export function pinOf(hole: Hole): Vec {
   return pin(hole);
 }
 
+/** Near/far extent of the green along the ball→green line (yards from the ball): how far it
+ *  is to the front edge and the back edge of the putting surface on the approach line. Pure. */
+export function greenDepth(hole: Hole, ball: Vec): { front: number; back: number } {
+  const c = hole.green;
+  let ux = c[0] - ball[0];
+  let uy = c[1] - ball[1];
+  const len = Math.hypot(ux, uy) || 1;
+  ux /= len;
+  uy /= len;
+  const greenPoly = hole.features.find((f) => f.kind === 'green')?.poly;
+  if (!greenPoly || greenPoly.length < 3) return { front: len, back: len };
+  let front = Infinity;
+  let back = -Infinity;
+  for (const v of greenPoly) {
+    const d = (v[0] - ball[0]) * ux + (v[1] - ball[1]) * uy; // projection onto the approach line
+    front = Math.min(front, d);
+    back = Math.max(back, d);
+  }
+  return { front: Math.max(0, front), back: Math.max(0, back) };
+}
+
+/**
+ * The club to SUGGEST to an interactive player aiming at the green (GS-mechanics #6). Unlike
+ * the auto `aiClub` (shortest club that just reaches — tuned for the headless balance), this
+ * reasons about green COVERAGE:
+ *   - green unreachable → the longest usable club (give it your best go);
+ *   - green reachable   → the LONGEST club whose spread can still reach the green's FRONT
+ *     (`carryLow ≤ distToFront`), so the whole green stays inside the landing window — you may
+ *     overshoot the back, but you never come up short of the front.
+ * Pure; uses the same `shotSpread` the cone draws so the suggestion reads true. Does NOT touch
+ * the auto sim.
+ */
+export function suggestPlayerClub(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind,
+  bag: readonly Club[],
+  opts: { carryMult?: number; dispersionMult?: number; stats?: ClubStats } = {},
+): Club {
+  // Approach clubs only — the putter/short chip are never an approach suggestion (the UI
+  // swaps to the putter itself once on the green).
+  const cand = bag.filter((c) => c.id !== 'putter');
+  if (cand.length === 0) return bag[0]!;
+  const { front } = greenDepth(hole, ball);
+  const target = hole.green;
+  const spreadOf = (c: Club) =>
+    shotSpread(hole, ball, lie, target, c, {
+      carryMult: opts.carryMult,
+      dispersionMult: opts.dispersionMult,
+      stats: opts.stats,
+    });
+  const longest = cand.reduce((a, b) => (clubDist(b, opts.stats) > clubDist(a, opts.stats) ? b : a));
+
+  // Unreachable: even the longest club's best carry can't get to the front → swing the longest.
+  if (spreadOf(longest).carryHigh < front) return longest;
+
+  // Reachable: longest club that still covers the front (carryLow ≤ front). Walk shortest→longest
+  // and keep the last qualifier; if every club overshoots the front (ball hard by the green),
+  // fall back to the shortest club (least overshoot — basically a chip).
+  const byCarryAsc = [...cand].sort((a, b) => clubDist(a, opts.stats) - clubDist(b, opts.stats));
+  let pick: Club | undefined;
+  for (const c of byCarryAsc) {
+    if (spreadOf(c).carryLow <= front) pick = c;
+  }
+  return pick ?? byCarryAsc[0]!;
+}
+
 /** Lay-up target: the penalty-free corridor point ahead of the ball (exported). */
 export function layupTarget(hole: Hole, ball: Vec): Vec {
   // The "safe" line plays to the fat of the green (centroid), mirroring the auto playHole
