@@ -13,6 +13,9 @@ export interface ProjectOptions {
   width?: number;
   height?: number;
   padding?: number;
+  /** Extra course-space points to include in the fit (e.g. shot landings that fly wide
+   *  of the terrain) so the ball is never clipped off-map. */
+  extra?: Vec[];
 }
 
 export interface Projector {
@@ -55,6 +58,7 @@ export function holeProjector(hole: Hole, opts: ProjectOptions = {}): Projector 
     ...hole.hazards.map((f) => f.poly),
     hole.centreline,
     [hole.tee, hole.green],
+    ...(opts.extra && opts.extra.length ? [opts.extra] : []),
   ];
   let minX = Infinity;
   let minY = Infinity;

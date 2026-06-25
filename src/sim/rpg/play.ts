@@ -19,6 +19,8 @@ import {
   layupTarget,
   pinOf,
   puttOutFrom,
+  shotSpread,
+  type ShotSpread,
   type PuttLog,
   type ShotLog,
 } from '../round';
@@ -96,6 +98,25 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
     blocked: dist(safe, pin) > 1,
     strokesSoFar: state.strokes,
   };
+}
+
+/** The spread the player's contemplated shot would have — for the aiming spray cone.
+ *  Resolves the SAME target/club `takeShot` would, so the preview reads true. Pure. */
+export function previewShot(
+  state: HolePlay,
+  decision: ShotDecision,
+  loadout: PlayerLoadout,
+): ShotSpread {
+  const carryMult = biomeCarryMult(state.hole);
+  const target =
+    decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball);
+  const club =
+    loadout.bag.find((c) => c.id === decision.clubId) ??
+    aiClub(state.hole, state.ball, target, carryMult, loadout.bag);
+  return shotSpread(state.hole, state.ball, state.lie, target, club, {
+    carryMult,
+    dispersionMult: netDispersion(loadout),
+  });
 }
 
 /** The decision the AI would make (mirrors playHole): lay up to the corridor, AI club. */
