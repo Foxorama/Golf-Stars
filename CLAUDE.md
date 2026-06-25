@@ -123,6 +123,20 @@ This game lives or dies on three axes — put every change through all three bef
   for night-sky art (`request_upload_url`→PUT→`generate_image`→`get_history`→download). Keep a
   prompt log so art is regenerable. Rarity tints the card/accent (`RARITY_C`).
 
+## Deploy (GitHub Pages) — the hard-won gotcha
+- **Pages Source MUST be "GitHub Actions"** (Settings → Pages → Build and deployment → Source),
+  NOT "Deploy from a branch". `pages.yml` builds the Vite app and serves `dist/` — a single,
+  fully-inlined `index.html`. If Source is set to a branch instead, Pages serves the repo's RAW
+  `index.html`, whose dev entry `<script type="module" src="/src/main.ts">` 404s in the browser
+  → permanent blank page. This caused a long blank-page hunt: every code fix was correct but
+  **was never the file being served**. Symptom signature: the boot watchdog reports
+  `failed to load resource: …/src/main.ts` (a string a Vite *build* can never emit — it only
+  exists in the un-built source, so seeing it = raw source is being served).
+- The boot watchdog in `index.html` is the safety net: it captures import-time throws AND failed
+  resource loads via `window.onerror` + capture-phase `error`, records the first into `__gsErr`,
+  and latches so the 5s timeout can't clobber the real cause. Keep it; `tests/build.test.ts`
+  guards both the inlined-single-file output and this error-capture contract.
+
 ## Change & versioning flow
 - `main` is branch-protected. Each change: branch → edit → commit → push → PR → merge → sync.
 - Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → sync).
