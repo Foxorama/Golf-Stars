@@ -11,6 +11,10 @@ const base = process.env.VITE_BASE ?? './';
 
 export default defineConfig({
   base,
+  // Down-level modern syntax (??, ?., object spread, …) so the bundle PARSES on older
+  // module-capable engines (some mobile WebViews support ES modules but not 2020-era
+  // syntax). Leaving it raw made the whole module fail to parse → blank page.
+  build: { target: 'es2017' },
   plugins: [viteSingleFile()],
   test: {
     globals: true,
