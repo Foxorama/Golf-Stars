@@ -8,9 +8,10 @@
  *                    nozzles slide out of the rear; the daytime suburb fades to a starfield.
  *   3. LAUNCH      — ignition flash, a roaring exhaust plume kicks in, the wagon tips
  *                    nose-up and rockets off the top of the frame on warp streaks and a
- *                    screen-shake; a dimpled golf-ball planet hangs in the star-dusted void.
- *   4. WRITE       — a flaming golf-ball comet traces the smoke into the words GOLF STARS,
- *                    which stamp in with a pop, a shine sweep and sparkle glints, then hold.
+ *                    screen-shake.
+ *   4. WRITE       — a golf-ball shooting star streaks across the void in the wagon's wake,
+ *                    and the stars it left behind settle into the words GOLF STARS, which
+ *                    form with a pop, faint constellation links and sparkle glints, then hold.
  *
  * Thin/imperative by design (this is the "feel" layer you can't unit-test); everything is
  * vector-drawn so there's no art asset to 404. Timings/feel read from `window._gsIntro` so
@@ -34,8 +35,10 @@ interface IntroFeel {
   shake: number;
   /** Draw the soft nebula clouds behind the starfield. */
   nebula: boolean;
-  /** Draw the dimpled golf-ball planet rising in the corner. */
+  /** Draw the dimpled golf-ball planet rising in the corner (off by default). */
   planet: boolean;
+  /** Streak a hero golf-ball "shooting star" across the void in the wagon's wake. */
+  ballShooter: boolean;
   /** How many background shooting stars streak past during the space phase. */
   shootingStars: number;
   /** Link the title stars with faint constellation lines once they've formed. */
@@ -53,7 +56,8 @@ const BASE_FEEL: IntroFeel = {
   starCount: 220,
   shake: 7,
   nebula: true,
-  planet: true,
+  planet: false,
+  ballShooter: true,
   shootingStars: 4,
   constellation: true,
 };
@@ -457,6 +461,84 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       ctx.globalAlpha = 1;
     }
     ctx.restore();
+  }
+
+  /** A little dimpled golf ball with a soft glow — the head of the hero shooting star. */
+  function drawGolfBall(x: number, y: number, r: number, a: number): void {
+    if (!ctx) return;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.shadowColor = 'rgba(255,248,224,0.9)';
+    ctx.shadowBlur = 16;
+    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.2, x, y, r);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(1, '#cfd6e2');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Dimples (a packed 3×3 disc, foreshortened to a circle).
+    ctx.fillStyle = 'rgba(120,132,154,0.45)';
+    for (let v = -1; v <= 1; v++) {
+      for (let u = -1; u <= 1; u++) {
+        if (u * u + v * v > 2) continue;
+        ctx.beginPath();
+        ctx.arc(x + u * r * 0.42, y + v * r * 0.42, r * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * A hero "shooting star" that streaks across the void once the wagon has launched — but its
+   * head is a little dimpled GOLF BALL instead of a star point (on-theme for space golf). It
+   * fires once during the title phase, fading in/out at the screen edges. Pure vector, no asset.
+   */
+  function drawGolfBallShooter(e: number): void {
+    if (!ctx || !F.ballShooter) return;
+    const startT = t3 + 260;
+    const dur = 1600;
+    const p = (e - startT) / dur;
+    if (p < 0 || p > 1) return;
+    // A straight, gently-descending flight from off the left edge to off the right edge,
+    // crossing the upper sky above the forming wordmark.
+    const ax = vLeft - 90;
+    const ay = 132;
+    const bx = vRight + 90;
+    const by = 196;
+    const x = lerp(ax, bx, p);
+    const y = lerp(ay, by, p);
+    // Constant travel direction (linear path) → the trail points back along it.
+    const dx = bx - ax;
+    const dy = by - ay;
+    const dlen = Math.hypot(dx, dy) || 1;
+    const ux = dx / dlen;
+    const uy = dy / dlen;
+    // Bright through the middle of the crossing, soft fade at both screen edges.
+    const a = clamp01(Math.sin(p * Math.PI) * 1.5);
+    if (a <= 0) return;
+
+    // Tapered glowing trail behind the ball.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const tail = 160;
+    const tx = x - ux * tail;
+    const ty = y - uy * tail;
+    const g = ctx.createLinearGradient(tx, ty, x, y);
+    g.addColorStop(0, 'rgba(255,240,200,0)');
+    g.addColorStop(1, `rgba(255,246,220,${0.7 * a})`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.restore();
+
+    drawGolfBall(x, y, 9, a);
   }
 
   function drawSky(dayA: number, spaceA: number, e: number, warp: number): void {
@@ -1241,6 +1323,19 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       // direction the rocket flew.
       const apOf = (s: TitleStar): number => clamp01((reveal - s.order * 0.62) / 0.3);
 
+      // Warm underglow so the wordmark reads bright against the dark starfield.
+      if (reveal > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const gg = ctx.createRadialGradient(DW / 2, ty, 0, DW / 2, ty, titleW * 0.6);
+        const ga = 0.16 * clamp01(reveal);
+        gg.addColorStop(0, `rgba(255,238,190,${ga})`);
+        gg.addColorStop(1, 'rgba(255,238,190,0)');
+        ctx.fillStyle = gg;
+        ctx.fillRect(DW / 2 - titleW * 0.7, ty - 120, titleW * 1.4, 240);
+        ctx.restore();
+      }
+
       // Faint constellation web between settled neighbours.
       if (F.constellation) {
         ctx.save();
@@ -1248,7 +1343,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         for (const [i, j] of titleLinks) {
           const a = Math.min(apOf(titleStars[i]!), apOf(titleStars[j]!));
           if (a < 0.85) continue;
-          ctx.strokeStyle = `rgba(180,205,255,${0.16 * (a - 0.85) / 0.15})`;
+          ctx.strokeStyle = `rgba(195,215,255,${0.24 * (a - 0.85) / 0.15})`;
           ctx.beginPath();
           ctx.moveTo(tx + titleStars[i]!.lx, ty + titleStars[i]!.ly);
           ctx.lineTo(tx + titleStars[j]!.lx, ty + titleStars[j]!.ly);
@@ -1266,7 +1361,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         const x = lerp(tx + s.sx, tx + s.lx, fly);
         const y = lerp(ty + s.sy, ty + s.ly, fly);
         const settled = ap >= 1;
-        const tw = settled ? 0.7 + 0.3 * Math.sin(now * 0.005 + s.tw) : 1;
+        const tw = settled ? 0.82 + 0.18 * Math.sin(now * 0.005 + s.tw) : 1;
 
         // A short motion tail while still flying in, pointing back along its descent.
         if (ap < 1) {
@@ -1286,13 +1381,13 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         }
 
         ctx.globalAlpha = clamp01(ap * tw);
-        if (s.hero) {
-          ctx.shadowColor = s.col;
-          ctx.shadowBlur = 9;
-        }
+        // Every star carries a soft glow now (not just the heroes) so the wordmark is
+        // legibly bright; heroes glow harder.
+        ctx.shadowColor = s.col;
+        ctx.shadowBlur = s.hero ? 14 : 7;
         ctx.fillStyle = s.col;
         ctx.beginPath();
-        ctx.arc(x, y, s.r * (settled ? 1 : 1.25), 0, Math.PI * 2);
+        ctx.arc(x, y, s.r * (settled ? 1.2 : 1.45), 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -1415,11 +1510,13 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         drawCar(carX, carY, cs, tilt, wheelRetract, jet, flame, bootOpen);
       }
 
-      // Title formed by the stars left in the rocket's wake, then held.
+      // Title formed by the stars left in the rocket's wake, then held — with a golf-ball
+      // shooting star streaking across the void in the wagon's wake.
       if (e >= t3) {
         const reveal = easeInOut(clamp01((e - t3) / F.writeMs));
         const glow = clamp01((e - t3 - F.writeMs * 0.4) / (F.writeMs * 0.6));
         drawTitle(reveal, glow);
+        drawGolfBallShooter(e);
       }
 
       ctx.restore();
