@@ -19,6 +19,7 @@ import {
   creditsForStop,
   cutLine,
   loadoutFromPerks,
+  netDispersion,
   shopItem,
   startingLoadout,
   type PlayerLoadout,
@@ -101,7 +102,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
   const rng = new Rng(`${course.seed}:play`);
   const played = playCourse(course.holes, rng, {
     bag: run.loadout.bag,
-    dispersionMult: run.loadout.dispersionMult,
+    dispersionMult: netDispersion(run.loadout),
   });
   const totals = playTotals(played.map((p) => p.record));
   const cut = cutLine(run.distanceFromStart, course.holes.length);
