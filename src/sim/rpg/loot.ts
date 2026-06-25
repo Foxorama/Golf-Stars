@@ -16,8 +16,8 @@ export interface RarityInfo {
 }
 
 export const RARITY_C: Record<Rarity, RarityInfo> = {
-  common: { col: '#5b8bd0', weight: 60, order: 0 }, // blue
-  rare: { col: '#2bb673', weight: 28, order: 1 }, // green/teal
+  common: { col: '#2bb673', weight: 60, order: 0 }, // green
+  rare: { col: '#5b8bd0', weight: 28, order: 1 }, // blue
   epic: { col: '#9b59d0', weight: 9, order: 2 }, // purple
   legendary: { col: '#e08a2b', weight: 3, order: 3 }, // orange
 };
