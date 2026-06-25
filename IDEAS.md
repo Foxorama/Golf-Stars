@@ -32,6 +32,15 @@ Everything below serves whichever avenue wins.
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-12 — Persistent meta-progression (Star Shards + Outpost).** Runs now leave a mark: each
+  ended run awards **Star Shards** (`shardsForRun` = distance×3 + stops×2, floored at 1 so a brick
+  still pays), banked across runs in **save v3**. The **Outpost** (a between-run screen off the
+  title/gameover) spends shards on PERMANENT, leveled starting upgrades (`meta.ts`: Veteran Hands
+  −2 hcp, Tour Bag +6yd, Steady Grip −4% spray, Deep Pockets +40 credits) at a geometric shard
+  cost. `startRun(seed, fmt, meta)` bakes them into the start; perks rebuild OVER the meta base on
+  resume (the run snapshot carries `meta`). Pure/data-driven; reducer flow + v2→v3 migration tested,
+  and the open→buy loop verified in a real browser. Closes the "credits go dead, nothing persists"
+  gap — now every run feeds the next. (branch `claude/golf-stars-improvements-m4ktof`)
 - **GS-6 — Real pin within the green.** Each hole now generates a flag (`Hole.pin`) offset
   18–55% of the green radius from the centroid, via a SIDE rng keyed by hole index so existing
   course terrain is byte-for-byte unchanged. The flag is where the ball holes/putts (so a tucked

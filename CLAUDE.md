@@ -104,6 +104,15 @@ This game lives or dies on three axes — put every change through all three bef
   compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
+- **Persistent meta-progression (GS-12, `meta.ts`):** runs bank **Star Shards** (`shardsForRun` =
+  distance×3 + stops×2, floored at 1) in **save v3**, spent at the Outpost on PERMANENT, leveled
+  *starting* upgrades (`META_UPGRADES`: Veteran Hands −2 hcp, Tour Bag +6yd, Steady Grip −4% spray,
+  Deep Pockets +40 credits) at a geometric shard cost. `startRun(seed, fmt, meta)` bakes them into
+  the starting loadout/credits (`metaStartingLoadout`/`metaStartingCredits`); shop perks rebuild OVER
+  the meta base (`loadoutFromPerks(perks, base)`), and the run snapshot carries `meta` so resume
+  reconstructs both layers. Two currency layers: **credits** = per-run (reset each run, shop perks);
+  **shards** = cross-run (permanent upgrades). Save v3 migrates v2→v3 (drops the dead always-0
+  `credits` field) via the one-step-at-a-time `migrate` chain.
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by

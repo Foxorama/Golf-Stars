@@ -140,6 +140,36 @@ describe('ui reducer', () => {
     const restarted = reduce(s, { type: 'restart', seed: 7 });
     expect(restarted.screen).toBe('title'); // pick a format again
     expect(restarted.bestDistance).toBe(s.bestDistance); // meta carried over
+    expect(restarted.shards).toBe(s.shards); // shards carry over too
+  });
+
+  it('a missed cut awards Star Shards (GS-12)', () => {
+    const s = reduce(started(1234), { type: 'play' }); // seed 1234 misses the opening cut
+    expect(s.screen).toBe('gameover');
+    expect(s.lastRunShards).toBeGreaterThan(0);
+    expect(s.shards).toBe(s.lastRunShards);
+  });
+
+  it('the Outpost buys permanent upgrades and bakes them into the next run', () => {
+    let s = initState(7, { shards: 100, metaUpgrades: {} });
+    s = reduce(s, { type: 'openOutpost' });
+    expect(s.screen).toBe('outpost');
+    const before = s.shards;
+    s = reduce(s, { type: 'buyUpgrade', id: 'deep-pockets' });
+    expect(s.metaUpgrades['deep-pockets']).toBe(1);
+    expect(s.shards).toBeLessThan(before);
+    s = reduce(s, { type: 'closeOutpost' });
+    expect(s.screen).toBe('title');
+    // Deep Pockets (+40 starting credits) is now baked into a fresh run.
+    s = reduce(s, { type: 'start', format: 'flat' });
+    expect(s.run.credits).toBe(100);
+  });
+
+  it('the Outpost is unreachable mid-run and guards bad buys', () => {
+    const playing = reduce(started(7), { type: 'playInteractive' });
+    expect(reduce(playing, { type: 'openOutpost' })).toBe(playing); // not from a live run
+    const outpost = reduce(initState(7, { shards: 0 }), { type: 'openOutpost' });
+    expect(reduce(outpost, { type: 'buyUpgrade', id: 'vet-hands' })).toBe(outpost); // can't afford
   });
 
   it('offers Continue when a saved run is present, and resume enters it', () => {

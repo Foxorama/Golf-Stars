@@ -16,6 +16,7 @@ import {
   playStop,
   resumeRun,
   routeOptions,
+  shardsForRun,
   shopOffer,
   startRun,
   travel,
@@ -24,6 +25,7 @@ import {
   type RunSnapshot,
   type StopResult,
 } from '../sim/rpg/run';
+import { buyMetaUpgrade, type MetaUpgrades } from '../sim/rpg/meta';
 import {
   autoDecision,
   awaitingPutt,
@@ -36,7 +38,15 @@ import {
 } from '../sim/rpg/play';
 import { Rng } from '../sim/rng';
 
-export type Screen = 'title' | 'intro' | 'playing' | 'result' | 'shop' | 'travel' | 'gameover';
+export type Screen =
+  | 'title'
+  | 'intro'
+  | 'playing'
+  | 'result'
+  | 'shop'
+  | 'travel'
+  | 'gameover'
+  | 'outpost';
 
 export interface UiState {
   run: Run;
@@ -67,6 +77,12 @@ export interface UiState {
   // Meta-progression (persisted across runs).
   bestStableford: number;
   bestDistance: number;
+  /** Persistent currency spent at the Outpost on permanent upgrades (GS-12). */
+  shards: number;
+  /** Owned permanent upgrade levels (id → level). */
+  metaUpgrades: MetaUpgrades;
+  /** Shards earned by the run that just ended — shown on the gameover screen. */
+  lastRunShards?: number;
   /** Putting mode toggle: auto putt-out vs manual. The Auto-Caddie legendary forces auto. */
   autoPutt: boolean;
 }
@@ -86,11 +102,16 @@ export type Action =
   | { type: 'leaveShop' }
   | { type: 'route'; routeId: number }
   | { type: 'viewHole'; hole: number }
+  | { type: 'openOutpost' } // visit the between-run Outpost (from title or gameover)
+  | { type: 'buyUpgrade'; id: string } // buy a permanent upgrade with shards
+  | { type: 'closeOutpost' } // back to the title
   | { type: 'restart'; seed?: number | string };
 
 export interface MetaProgress {
   bestStableford?: number;
   bestDistance?: number;
+  shards?: number;
+  metaUpgrades?: MetaUpgrades;
 }
 
 /**
@@ -104,7 +125,8 @@ export function initState(
   meta: MetaProgress = {},
   resumable?: RunSnapshot,
 ): UiState {
-  const run = startRun(seed);
+  const metaUpgrades = meta.metaUpgrades ?? {};
+  const run = startRun(seed, undefined, metaUpgrades);
   return {
     run,
     screen: 'title',
@@ -113,6 +135,8 @@ export function initState(
     resumable,
     bestStableford: meta.bestStableford ?? 0,
     bestDistance: meta.bestDistance ?? 0,
+    shards: meta.shards ?? 0,
+    metaUpgrades,
     autoPutt: true,
   };
 }
@@ -121,7 +145,8 @@ export function reduce(state: UiState, action: Action): UiState {
   switch (action.type) {
     case 'start': {
       if (state.screen !== 'title') return state;
-      const run = startRun(state.run.seed, action.format);
+      // Bake the player's permanent meta-upgrades into the new run's start.
+      const run = startRun(state.run.seed, action.format, state.metaUpgrades);
       return {
         ...state,
         run,
@@ -154,6 +179,8 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'play': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       const { run, result, played } = playStop(state.run);
+      const ended = !result.passed;
+      const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
         run,
@@ -163,6 +190,8 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: result.passed ? 'result' : 'gameover',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        shards: state.shards + (earned ?? 0),
+        lastRunShards: earned,
       };
     }
 
@@ -219,6 +248,8 @@ export function reduce(state: UiState, action: Action): UiState {
       }
       // Stop complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
+      const ended = !result.passed;
+      const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
         run,
@@ -231,6 +262,8 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: result.passed ? 'result' : 'gameover',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        shards: state.shards + (earned ?? 0),
+        lastRunShards: earned,
       };
     }
 
@@ -273,11 +306,34 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, viewHole: hole };
     }
 
+    case 'openOutpost': {
+      // The Outpost is reachable between runs — from the title or after a run ends.
+      if (state.screen !== 'title' && state.screen !== 'gameover') return state;
+      return { ...state, screen: 'outpost' };
+    }
+
+    case 'buyUpgrade': {
+      if (state.screen !== 'outpost') return state;
+      const { meta, shards } = buyMetaUpgrade(state.metaUpgrades, state.shards, action.id);
+      if (meta === state.metaUpgrades) return state; // no-op: maxed, unaffordable, or bad id
+      return { ...state, metaUpgrades: meta, shards };
+    }
+
+    case 'closeOutpost': {
+      if (state.screen !== 'outpost') return state;
+      // Back to the title; refresh the placeholder run so the new meta shows, but keep any
+      // resumable run and the rest of the meta state intact (don't reset via initState).
+      const run = startRun(state.run.seed, undefined, state.metaUpgrades);
+      return { ...state, run, course: currentCourse(run), screen: 'title' };
+    }
+
     case 'restart': {
       // Fresh run; meta-progression carries over.
       return initState(action.seed ?? state.run.seed, {
         bestStableford: state.bestStableford,
         bestDistance: state.bestDistance,
+        shards: state.shards,
+        metaUpgrades: state.metaUpgrades,
       });
     }
   }

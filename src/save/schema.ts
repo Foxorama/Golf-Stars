@@ -1,13 +1,15 @@
 /**
  * Versioned save schema. Every persisted blob carries a `version` and passes through
- * `migrate()` on load. v2 adds the RPG meta-loop (a resumable run snapshot + furthest
- * distance) and migrates v1 blobs forward — the first real exercise of the chain the
- * kit insisted on from day one.
+ * `migrate()` on load. v2 added the RPG meta-loop (resumable run snapshot + furthest
+ * distance); v3 adds persistent meta-progression (Star Shards + permanent upgrade levels,
+ * GS-12) and drops v2's dead always-zero `credits` field. The migrate chain runs one step
+ * at a time (v1→v2→v3).
  */
 
 import type { RunSnapshot } from '../sim/rpg/run';
+import type { MetaUpgrades } from '../sim/rpg/meta';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -22,7 +24,7 @@ export interface SaveV1 {
 /** v2 — adds the meta-loop. */
 export interface SaveV2 {
   version: 2;
-  /** Banked meta-currency. */
+  /** Banked meta-currency (always 0 in practice — dropped in v3). */
   credits: number;
   bestStableford: number;
   /** Furthest galaxy distance ever reached. */
@@ -32,11 +34,26 @@ export interface SaveV2 {
   savedAt?: string;
 }
 
+/** v3 — adds persistent meta-progression (Star Shards + permanent upgrade levels). */
+export interface SaveV3 {
+  version: 3;
+  bestStableford: number;
+  /** Furthest galaxy distance ever reached. */
+  bestDistance: number;
+  /** Persistent meta-currency, spent at the Outpost on permanent upgrades. */
+  shards: number;
+  /** Owned permanent upgrade levels (id → level). */
+  metaUpgrades: MetaUpgrades;
+  /** In-progress run, if any (loadout rebuilt from its perks + meta on resume). */
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV2;
+export type Save = SaveV3;
 
 export function defaultSave(): Save {
-  return { version: SAVE_VERSION, credits: 0, bestStableford: 0, bestDistance: 0 };
+  return { version: SAVE_VERSION, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {} };
 }
 
 /** v1 → v2: fold the loose run fields into the new shape. */
@@ -60,6 +77,19 @@ function v1ToV2(s: SaveV1): SaveV2 {
   };
 }
 
+/** v2 → v3: drop the dead `credits` field, seed empty meta-progression. */
+function v2ToV3(s: SaveV2): SaveV3 {
+  return {
+    version: 3,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: 0,
+    metaUpgrades: {},
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -69,6 +99,7 @@ export function migrate(raw: unknown): Save {
   let s = raw as { version?: number } & Record<string, unknown>;
 
   if (s.version === 1) s = v1ToV2(s as unknown as SaveV1) as unknown as typeof s;
+  if (s.version === 2) s = v2ToV3(s as unknown as SaveV2) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -76,14 +107,15 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v2 = s as unknown as Partial<SaveV2>;
+  const v3 = s as unknown as Partial<SaveV3>;
   return {
     version: SAVE_VERSION,
-    credits: v2.credits ?? 0,
-    bestStableford: v2.bestStableford ?? 0,
-    bestDistance: v2.bestDistance ?? 0,
-    activeRun: v2.activeRun,
-    savedAt: v2.savedAt,
+    bestStableford: v3.bestStableford ?? 0,
+    bestDistance: v3.bestDistance ?? 0,
+    shards: v3.shards ?? 0,
+    metaUpgrades: v3.metaUpgrades ?? {},
+    activeRun: v3.activeRun,
+    savedAt: v3.savedAt,
   };
 }
 
