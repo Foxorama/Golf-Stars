@@ -411,6 +411,56 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     }
   }
 
+  // --- 3b. Celestial backdrop (spacey flavour, GS) ----------------------------
+  // A travelling space golf course should read as floating in the void — so the rough is
+  // salted with distant stars, a far planet and a comet. A SEPARATE rng stream (so the
+  // existing terrain/tree/mote placement stays byte-identical) keyed off the same hole hash,
+  // gated by the `accents` density. Stars sit in course space (pan/zoom with the cam) and are
+  // culled to the rough; the planet/comet are screen-space "sky" fixtures up toward the top.
+  const crng = mulberry32((hashHole(hole) ^ 0x5747a2) >>> 0);
+  if (art.accents > 0) {
+    // Background stars over the rough (kept off the cut grass so the playable lines stay clean).
+    const starTarget = Math.round(26 * art.accents);
+    let st = 0;
+    for (let i = 0; i < starTarget * 4 && st < starTarget; i++) {
+      const cp = randCoursePt();
+      if (onGrass(cp)) continue;
+      const sp = proj.project(cp);
+      if (!inView(sp, W, H)) continue;
+      st++;
+      const r = 0.5 + crng() * 1.2;
+      const col =
+        crng() < 0.5 ? 'rgba(255,255,255,0.9)' : crng() < 0.6 ? 'rgba(186,214,255,0.9)' : 'rgba(255,224,230,0.85)';
+      prims.push({ t: 'circle', c: sp, r, fill: col });
+      if (crng() < 0.22) {
+        const s = r + 1.6; // a brighter star gets a 4-point twinkle
+        prims.push({ t: 'line', a: [sp[0] - s, sp[1]], b: [sp[0] + s, sp[1]], stroke: col, sw: 0.7, round: true });
+        prims.push({ t: 'line', a: [sp[0], sp[1] - s], b: [sp[0], sp[1] + s], stroke: col, sw: 0.7, round: true });
+      }
+    }
+    // A far planet up in a top corner — ring, shaded disc, lit highlight.
+    const planetCols = ['#caa3ff', '#7be0d0', '#ffb27a', '#9bc2ff', '#ff9bbf'];
+    const pcol = planetCols[(crng() * planetCols.length) | 0]!;
+    const pr = 9 + crng() * 12;
+    const ppx = W * (0.1 + crng() * 0.8);
+    const ppy = H * (0.05 + crng() * 0.13);
+    if (crng() < 0.55) {
+      prims.push({ t: 'circle', c: [ppx, ppy], r: pr * 1.75, fill: 'none', stroke: 'rgba(255,255,255,0.10)', sw: 1.4 });
+    }
+    prims.push({ t: 'circle', c: [ppx, ppy], r: pr, fill: pcol });
+    prims.push({ t: 'circle', c: [ppx + pr * 0.42, ppy + pr * 0.34], r: pr * 0.9, fill: 'rgba(8,10,20,0.34)' });
+    prims.push({ t: 'circle', c: [ppx - pr * 0.34, ppy - pr * 0.38], r: pr * 0.42, fill: 'rgba(255,255,255,0.5)' });
+    // A faint comet streak near the top.
+    if (crng() < 0.7) {
+      const hx = W * (0.2 + crng() * 0.6);
+      const hy = H * (0.06 + crng() * 0.12);
+      const len = 30 + crng() * 50;
+      const ang = 2.35 + crng() * 0.5; // tail down-left
+      prims.push({ t: 'line', a: [hx, hy], b: [hx + Math.cos(ang) * len, hy + Math.sin(ang) * len], stroke: 'rgba(214,230,255,0.4)', sw: 1.4, round: true });
+      prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
+    }
+  }
+
   // --- 4. Terrain features (fairway/green/tee + scatter surfaces) --------------
   for (const f of hole.features) {
     const sp = projPoly(f.poly, proj);
