@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
-import { shotView } from '../src/sim/rpg/play';
+import { shotView, awaitingPutt } from '../src/sim/rpg/play';
 
 /** Drive a whole stop via the interactive reducer flow (attacking every shot). */
 function playStopInteractive(s: UiState): UiState {
@@ -76,6 +76,34 @@ describe('ui reducer', () => {
     expect(s.screen).toBe('intro');
     expect(s.run.stopIndex).toBe(nextStop);
     expect(s.played).toBeUndefined();
+  });
+
+  it('auto-putt defaults on and the toggle flips it', () => {
+    const s = initState(1);
+    expect(s.autoPutt).toBe(true);
+    expect(reduce(s, { type: 'toggleAutoPutt' }).autoPutt).toBe(false);
+  });
+
+  it('manual putting: with auto off, a hole is finished by stroking putts', () => {
+    let s = reduce(started(1234), { type: 'playInteractive' });
+    s = reduce(s, { type: 'toggleAutoPutt' });
+    expect(s.autoPutt).toBe(false);
+    let sawPutt = false;
+    let guard = 0;
+    while (s.screen === 'playing' && guard++ < 800) {
+      if (!s.play) break;
+      if (s.play.done) {
+        s = reduce(s, { type: 'holeComplete' });
+      } else if (awaitingPutt(s.play)) {
+        sawPutt = true;
+        s = reduce(s, { type: 'putt' });
+      } else {
+        const v = shotView(s.play, s.run.loadout);
+        s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
+      }
+    }
+    expect(sawPutt).toBe(true); // manual putts actually happened
+    expect(['result', 'gameover']).toContain(s.screen); // the stop completed
   });
 
   it('viewHole selects and clamps within the played holes', () => {

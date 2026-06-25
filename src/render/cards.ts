@@ -12,7 +12,7 @@
 import { dist } from '../sim/course/contract';
 import type { Course } from '../sim/course/contract';
 import type { Rarity } from '../sim/course/contract';
-import { hasBackspin, type ShotLog } from '../sim/round';
+import { hasBackspin, type PuttLog, type ShotLog } from '../sim/round';
 import { rarCol } from '../sim/rpg/loot';
 import { renderHoleSVG } from './holeView';
 
@@ -100,6 +100,28 @@ export function shotCardHTML(shot: ShotLog): string {
       ${row('Roll', rollText)}
       ${row('Accuracy', `${side} · ${grade}`)}
       ${eligible ? row('Backspin', spinLevel) : ''}
+    </article>`;
+}
+
+/**
+ * Putting summary "splash": how many putts, and the outcome. Used for the auto-putt result
+ * (and the end of a manual putt sequence). Pure HTML string.
+ */
+export function puttCardHTML(putts: PuttLog[], opts: { holed?: boolean; pickedUp?: boolean } = {}): string {
+  const n = putts.length;
+  const accent = opts.holed ? '#5fd45a' : opts.pickedUp ? '#ff6b6b' : '#9fd8e6';
+  const label = opts.pickedUp
+    ? 'Picked up'
+    : n === 0
+    ? '—'
+    : n === 1
+    ? 'One-putt! 🎯'
+    : `${n} putts`;
+  const head = opts.holed ? 'Holed out' : 'Putting';
+  return `
+    <article style="border:2px solid ${accent};border-radius:12px;background:#11141b;padding:8px 12px;box-shadow:0 0 12px ${accent}33;min-width:160px;">
+      <div style="font-size:13px;font-weight:700;color:${accent};">⛳ ${head}</div>
+      <div style="font-size:13px;margin-top:2px;">${label}</div>
     </article>`;
 }
 
