@@ -5,18 +5,22 @@ import { playCourse, playHole, HOLE_OUT_RADIUS } from '../src/sim/round';
 import { dist } from '../src/sim/course/contract';
 
 describe('bounce & roll-out (GS feedback #2)', () => {
-  it('shots record a rest position reached by rolling forward from touchdown', () => {
+  it('shots record a rest position reached by rolling (signed) from touchdown', () => {
     let sawRoll = false;
-    for (let seed = 0; seed < 40 && !sawRoll; seed++) {
+    let sawCheck = false;
+    for (let seed = 0; seed < 60 && (!sawRoll || !sawCheck); seed++) {
       const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
       for (const s of playHole(hole, new Rng(`${seed}:play`)).shots) {
         if (s.penalty) continue;
-        // rest is roll yards beyond touchdown, along the travel direction.
-        expect(dist(s.rest, s.result.landing)).toBeCloseTo(s.roll, 1);
-        if (s.roll > 0) sawRoll = true;
+        // `roll` is SIGNED (long clubs run forward, wedges check back); the rest is that
+        // many yards from touchdown, so the distance equals its magnitude.
+        expect(dist(s.rest, s.result.landing)).toBeCloseTo(Math.abs(s.roll), 1);
+        if (s.roll > 0.5) sawRoll = true;
+        if (s.roll < -0.5) sawCheck = true; // a wedge spun back
       }
     }
     expect(sawRoll).toBe(true);
+    expect(sawCheck).toBe(true); // backspin happens somewhere across these seeds
   });
 
   it('is deterministic (same seed → same roll & rest)', () => {

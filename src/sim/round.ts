@@ -45,23 +45,53 @@ export interface ShotLog {
   holed: boolean;
 }
 
-/** Roll-out as a fraction of carry, by the surface the ball lands on. Slick ice runs;
- *  bunkers kill it; fairway and tee run out the most. */
-const ROLL_FACTOR: Record<string, number> = {
-  fairway: 0.16,
-  tee: 0.16,
-  green: 0.09,
-  rough: 0.05,
-  waste: 0.08,
-  bunker: 0.0,
-  ice: 0.32,
-  crystal: 0.14,
+/** Surface roll MULTIPLIER (around 1): slick ice runs, bunkers kill it, greens hold a
+ *  little, fairway/tee run true. Applied on top of the club's loft-based roll fraction. */
+const SURFACE_ROLL: Record<string, number> = {
+  fairway: 1.0,
+  tee: 1.0,
+  green: 0.7,
+  rough: 0.5,
+  waste: 0.7,
+  bunker: 0.2,
+  ice: 1.8,
+  crystal: 1.1,
 };
+/** Clamp on the run-out (yards): forward roll caps high, backspin checks modestly back. */
 const MAX_ROLL = 42;
+const MAX_CHECK = 18;
 
-function rollYards(lie: FeatureKind, carry: number, rng: Rng): number {
-  const f = ROLL_FACTOR[lie] ?? 0.06;
-  return Math.max(0, Math.min(MAX_ROLL, carry * f * rng.range(0.7, 1.1)));
+/** Carry of the pitching wedge — at/below this, clubs start adding backspin. */
+export const BACKSPIN_CARRY = 106;
+const SHORTEST_CARRY = 38;
+const DRIVER_CARRY = 250;
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
+/**
+ * Loft-based roll fraction of carry, by a club's nominal carry. Long clubs run out a lot
+ * (driver ~+18%); it tapers down through the irons; PW (+5%) and the lofted wedges below
+ * it bite and spin BACK (down to −10% on the shortest). Pure & data-driven. */
+export function clubRollFraction(nominalCarry: number): number {
+  if (nominalCarry >= BACKSPIN_CARRY) {
+    const t = clamp01((nominalCarry - BACKSPIN_CARRY) / (DRIVER_CARRY - BACKSPIN_CARRY));
+    return 0.05 + (0.18 - 0.05) * t; // PW +5% → driver +18%
+  }
+  const t = clamp01((BACKSPIN_CARRY - nominalCarry) / (BACKSPIN_CARRY - SHORTEST_CARRY));
+  return 0.05 + (-0.1 - 0.05) * t; // PW +5% → shortest wedge −10% (backspin)
+}
+
+/** True if a club (by nominal carry) generates meaningful backspin (PW and below). */
+export function hasBackspin(nominalCarry: number): boolean {
+  return nominalCarry <= BACKSPIN_CARRY;
+}
+
+/** Signed run-out (yards) for a shot: + runs forward, − checks/spins back. Combines the
+ *  club's loft (clubRollFraction) with the landing surface and a little variance. */
+function rollYards(nominalCarry: number, lie: FeatureKind, carry: number, rng: Rng): number {
+  const frac = clubRollFraction(nominalCarry);
+  const surf = SURFACE_ROLL[lie] ?? 0.6;
+  const raw = carry * frac * surf * rng.range(0.85, 1.15);
+  return Math.max(-MAX_CHECK, Math.min(MAX_ROLL, raw));
 }
 
 /** A single putt's roll on the green, for the play view to animate (flat, no arc). */
@@ -334,14 +364,16 @@ export function executeShot(
     rng,
   });
 
-  // Touchdown → bounce & roll out (unless it plugs in a penalty surface).
+  // Touchdown → bounce & roll out (unless it plugs in a penalty surface). Roll is signed:
+  // long clubs run forward, lofted wedges check/spin back.
   const touchdown = result.landing;
   const tdLie = lieAt(hole, touchdown);
   let rest: Vec = touchdown;
   let roll = 0;
   if (!lieInfo(tdLie).penalty) {
-    roll = rollYards(tdLie, result.carry, rng);
-    if (roll > 0) {
+    const nominal = clubDist(club, opts.stats);
+    roll = rollYards(nominal, tdLie, result.carry, rng);
+    if (roll !== 0) {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
       const len = Math.hypot(dx, dy) || 1;
