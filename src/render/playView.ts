@@ -33,6 +33,12 @@ interface PlayFeel extends FlightFeel {
   trailLen: number;
   /** Pause between shots (ms). */
   gapMs: number;
+  /** Bounce hop height (course yards) as the ball lands & runs out. */
+  bounceAmp: number;
+  /** Number of decaying bounces during the run-out. */
+  bounces: number;
+  /** Pause (ms) the ball sits at rest so you can read where it finished. */
+  restHoldMs: number;
 }
 
 const BASE_FEEL: PlayFeel = {
@@ -41,6 +47,9 @@ const BASE_FEEL: PlayFeel = {
   shakeAmp: 7,
   trailLen: 18,
   gapMs: 170,
+  bounceAmp: 4,
+  bounces: 2,
+  restHoldMs: 480,
 };
 
 function feel(): PlayFeel {
@@ -107,6 +116,7 @@ export function mountPlayView(
   let particles: Particle[] = [];
   let shake = 0; // 0..1, decays
   let done = false;
+  let lastImpactShot = -1; // shot whose landing impact/hold has already been triggered
 
   function reset(now: number): void {
     shotIndex = 0;
@@ -116,6 +126,7 @@ export function mountPlayView(
     particles = [];
     shake = 0;
     done = false;
+    lastImpactShot = -1;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -222,7 +233,8 @@ export function mountPlayView(
       const [tdx, tdy] = proj.project(touchdown);
       const [rsx, rsy] = proj.project(rest);
       const rollPx = Math.hypot(rsx - tdx, rsy - tdy);
-      const rollDur = (shot.roll ?? 0) > 0 ? Math.max(120, Math.min(450, rollPx * 9)) : 0;
+      // Run-out duration scales with the on-screen roll (forward OR backspin check-back).
+      const rollDur = Math.abs(shot.roll ?? 0) > 0.3 ? Math.max(140, Math.min(480, rollPx * 9)) : 0;
       const elapsed = now - segStart;
 
       let ground: Vec;
@@ -232,10 +244,13 @@ export function mountPlayView(
         ground = s.ground;
         height = s.height;
       } else {
+        // Land → bounce → run/check out → hold at rest. The ball travels touchdown→rest
+        // (rest is BEHIND touchdown for a backspin check) while doing a couple of decaying
+        // hops, then sits still for restHoldMs so you can read the finish.
         const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
         const e = easeOutCubic(rt);
         ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
-        height = 0;
+        height = F.bounceAmp * Math.abs(Math.sin(rt * Math.PI * F.bounces)) * (1 - rt);
       }
 
       const [gx, gy] = proj.project(ground);
@@ -266,11 +281,15 @@ export function mountPlayView(
 
       hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.holed ? ' · IN! 🎉' : ''}${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
 
-      if (elapsed >= flightDur + rollDur) {
-        // Explosion ONLY when the ball is holed (chip-in / hole-in-one) — not on a
-        // normal landing.
+      // At the moment the run-out finishes: fire the hole-out explosion (holed only) once,
+      // and start the rest-hold pause.
+      if (elapsed >= flightDur + rollDur && lastImpactShot !== shotIndex) {
+        lastImpactShot = shotIndex;
         if (shot.holed) spawnImpact([rsx, rsy], 1);
         trail = [];
+      }
+      // Advance to the next shot only after the ball has sat at rest for restHoldMs.
+      if (elapsed >= flightDur + rollDur + F.restHoldMs) {
         shotIndex++;
         segStart = now + F.gapMs;
       }
