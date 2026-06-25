@@ -305,6 +305,16 @@ This game lives or dies on three axes — put every change through all three bef
   draws a long exhaust-plume/smoke column trailing the climbing car (`drawLaunchFX` is just the pad
   ignition flash now) — that plume read as a weird "jet under the car"; the car's own rear-nozzle flame
   is the exhaust. `holdMs` is 3000 (was 1500) so the formed wordmark lingers ~1.5s longer before handoff.
+  CAR GOTCHAS: the rear **tailgate** is hinged at the rear roof corner (`translate(72,-52)`) and rotates
+  `0.8 - bootOpen*1.55` — so at `bootOpen 0` it lies FLUSH along the sloped rear (boot reads SHUT) and
+  swings up/back as it opens; the old version pivoted at the bottom so `bootOpen 0` stuck a vertical panel
+  up and the boot always looked open. The timing (`bootOpen` nonzero only in the load window `t0..t1`)
+  already does closed→open→closed; the bug was purely the closed-state geometry. The twin rear **jet
+  nozzles/flames** sit at local `ny ∈ [0,16]` (inside the body rect `y -10..28`) — they used to be at
+  `[-16,6]`, floating the top one above the roofline. **Title sizing/legibility:** the wordmark samples
+  from a `116px` font (was 96) on a denser `step:8` grid with a NARROW hero/normal size+glow gap — a big
+  gap + additive `'lighter'` blending blew out hotspots and left the dim letters unreadable; keep heroes
+  only a touch brighter so the whole word reads evenly.
 - **It is NOT in the pure reducer** — it's a time/DOM side-effect, so it lives in `app.ts` like the
   play-view canvas mount and save persistence. **Gotcha that keeps `tests/build.test.ts` green:**
   `start()` runs the normal `boot()` FIRST (the real title actually paints + sets `data-booted`),
