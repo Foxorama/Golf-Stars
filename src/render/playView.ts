@@ -209,24 +209,41 @@ export function mountPlayView(
     if (shotIndex < shots.length) {
       const shot = shots[shotIndex]!;
       const carry = shot.result.carry;
-      const dur = flightDurationMs(carry);
-      const t = (now - segStart) / dur;
+      const touchdown = shot.result.landing;
+      const rest = shot.rest ?? touchdown;
       const peak = arcPeak(carry);
-      const s = sampleFlight(shot.from, shot.result.landing, t, peak);
+      const flightDur = flightDurationMs(carry);
+      // Roll-out duration scales with the on-screen roll distance.
+      const [tdx, tdy] = proj.project(touchdown);
+      const [rsx, rsy] = proj.project(rest);
+      const rollPx = Math.hypot(rsx - tdx, rsy - tdy);
+      const rollDur = (shot.roll ?? 0) > 0 ? Math.max(120, Math.min(450, rollPx * 9)) : 0;
+      const elapsed = now - segStart;
 
-      const [gx, gy] = proj.project(s.ground);
-      const lift = s.height * proj.scale * F.heightExaggeration;
-      const ballX = gx;
-      const ballY = gy - lift;
+      let ground: Vec;
+      let height: number;
+      if (elapsed < flightDur) {
+        const s = sampleFlight(shot.from, touchdown, elapsed / flightDur, peak);
+        ground = s.ground;
+        height = s.height;
+      } else {
+        const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
+        const e = easeOutCubic(rt);
+        ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
+        height = 0;
+      }
+
+      const [gx, gy] = proj.project(ground);
+      const ballY = gy - height * proj.scale * F.heightExaggeration;
 
       // Shadow (fades as the ball climbs).
-      ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - s.height / (peak + 1))})`;
+      ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - height / (peak + 1))})`;
       ctx.beginPath();
       ctx.ellipse(gx, gy, 4, 2, 0, 0, Math.PI * 2);
       ctx.fill();
 
       // Trail.
-      trail.push([ballX, ballY]);
+      trail.push([gx, ballY]);
       if (trail.length > F.trailLen) trail.shift();
       ctx.beginPath();
       trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
@@ -238,14 +255,16 @@ export function mountPlayView(
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
       ctx.beginPath();
-      ctx.arc(ballX, ballY, 3 + (s.height / (peak + 1)) * 1.5, 0, Math.PI * 2);
+      ctx.arc(gx, ballY, 3 + (height / (peak + 1)) * 1.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
+      hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.holed ? ' · IN! 🎉' : ''}${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
 
-      if (t >= 1) {
-        spawnImpact([gx, gy], Math.min(1, carry / 240));
+      if (elapsed >= flightDur + rollDur) {
+        // Explosion ONLY when the ball is holed (chip-in / hole-in-one) — not on a
+        // normal landing.
+        if (shot.holed) spawnImpact([rsx, rsy], 1);
         trail = [];
         shotIndex++;
         segStart = now + F.gapMs;

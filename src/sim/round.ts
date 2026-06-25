@@ -34,6 +34,31 @@ export interface ShotLog {
   lieTo: FeatureKind;
   club: Club;
   penalty?: string;
+  /** Final rest position after the ball bounces & rolls out from `result.landing`. */
+  rest: Vec;
+  /** Roll-out distance (yards) from touchdown to rest. */
+  roll: number;
+  /** True if this shot holed the ball (chip-in / hole-in-one). */
+  holed: boolean;
+}
+
+/** Roll-out as a fraction of carry, by the surface the ball lands on. Slick ice runs;
+ *  bunkers kill it; fairway and tee run out the most. */
+const ROLL_FACTOR: Record<string, number> = {
+  fairway: 0.16,
+  tee: 0.16,
+  green: 0.09,
+  rough: 0.05,
+  waste: 0.08,
+  bunker: 0.0,
+  ice: 0.32,
+  crystal: 0.14,
+};
+const MAX_ROLL = 42;
+
+function rollYards(lie: FeatureKind, carry: number, rng: Rng): number {
+  const f = ROLL_FACTOR[lie] ?? 0.06;
+  return Math.max(0, Math.min(MAX_ROLL, carry * f * rng.range(0.7, 1.1)));
 }
 
 /** A single putt's roll on the green, for the play view to animate (flat, no arc). */
@@ -157,8 +182,11 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     const shotBearing = bearingDeg(ball, tgt);
     const playLike = playsLike(aimDist, hole.wind, shotBearing);
     // Club for the EFFECTIVE carry: gravity scales how far a club flies, so divide the
-    // target by the carry multiplier before picking (low-grav → club down).
-    const club = suggestClub(playLike / carryMult, 'reach', bag, opts.stats);
+    // target by the carry multiplier before picking (low-grav → club down). Also leave
+    // room for roll-out — aim to land short so the run finishes near the target instead
+    // of carrying all the way and rolling past it.
+    const rollAllowance = Math.min(MAX_ROLL, playLike * 0.1);
+    const club = suggestClub(Math.max(1, playLike - rollAllowance) / carryMult, 'reach', bag, opts.stats);
 
     // Read the wind: aim UPWIND so the crosswind drifts the ball back to target. This
     // is the "wind reads true off the shot bearing" promise — a played shot compensates
@@ -178,9 +206,34 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     });
     strokes++;
 
-    let landingLie = lieAt(hole, result.landing);
+    // Touchdown (end of carry), then bounce & roll out along the travel direction —
+    // unless the ball plugs in a penalty surface, which kills the roll.
+    const touchdown = result.landing;
+    const tdLie = lieAt(hole, touchdown);
+    let rest: Vec = touchdown;
+    let roll = 0;
+    if (!lieInfo(tdLie).penalty) {
+      roll = rollYards(tdLie, result.carry, rng);
+      if (roll > 0) {
+        let dx = touchdown[0] - ball[0];
+        let dy = touchdown[1] - ball[1];
+        const len = Math.hypot(dx, dy) || 1;
+        rest = [touchdown[0] + (dx / len) * roll, touchdown[1] + (dy / len) * roll];
+      }
+    }
+
+    let landingLie = lieAt(hole, rest);
     const li = lieInfo(landingLie);
-    const log: ShotLog = { from: ball, result, lieFrom: lie, lieTo: landingLie, club };
+    const log: ShotLog = {
+      from: ball,
+      result,
+      lieFrom: lie,
+      lieTo: landingLie,
+      club,
+      rest,
+      roll,
+      holed: false,
+    };
 
     if (li.penalty) {
       const pen = PEN_INFO[li.penalty];
@@ -191,13 +244,18 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
         // Stroke-and-distance: replay from the same spot, lie unchanged.
         landingLie = lie;
       } else {
-        const drop = dropPoint(hole, ball, result.landing);
+        const drop = dropPoint(hole, ball, rest);
         ball = drop;
         lie = lieAt(hole, drop);
       }
     } else {
-      ball = result.landing;
+      ball = rest;
       lie = landingLie;
+      // Holed from a full shot — a chip-in or, off the tee, a hole-in-one.
+      if (dist(rest, target) <= HOLE_OUT_RADIUS) {
+        log.holed = true;
+        holed = true;
+      }
     }
 
     // Tee-shot fairway result (par 4/5 only).
@@ -205,7 +263,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
 
     shots.push(log);
 
-    if (lie === 'green' || dist(ball, target) <= HOLE_OUT_RADIUS) break;
+    if (log.holed || lie === 'green' || dist(ball, target) <= HOLE_OUT_RADIUS) break;
   }
 
   // Putt out.
