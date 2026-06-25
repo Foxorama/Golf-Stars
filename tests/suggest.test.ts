@@ -4,7 +4,6 @@ import { CLUBS } from '../src/sim/clubs';
 import type { Club } from '../src/sim/clubs';
 import type { Hole, Vec } from '../src/sim/course/contract';
 
-const carry = (id: string) => CLUBS.find((c) => c.id === id)!.carry;
 const longer = (a: Club, b: Club) => a.carry > b.carry;
 
 // A short par-3: tee 150 yds from a green that spans ~140..160 along the line. Reachable.

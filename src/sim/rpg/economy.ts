@@ -107,7 +107,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Power Cell',
     cost: 120,
     desc: '+12 yds carry on your distance clubs · steadier tempo (−5% spray)',
-    rarity: 'common',
+    // Rare, not common: a +12yd unique is a stronger first-copy upgrade than the rare,
+    // stackable Range Booster (+8yd) — rarity must track power, so it can't read as common.
+    rarity: 'rare',
     // Under the per-club wildness model, longer clubs spray more — so pure distance is
     // double-edged. The small −5% dispersion keeps the Power Cell a genuine upgrade
     // (a power-up must improve scoring) rather than a wash.
