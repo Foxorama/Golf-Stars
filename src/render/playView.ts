@@ -64,6 +64,14 @@ export interface PlayViewOptions {
   biome?: string;
   /** Called once the final shot has landed. */
   onDone?: () => void;
+  /**
+   * Zoom-and-follow: when set, the camera centres on `focus` (the starting ball) at radius
+   * `viewRadius` (course yards) and — if `follow` — eases to track the ball in flight, so the
+   * animation matches the zoomed decision map (no jarring zoom jump) and keeps up with the ball.
+   */
+  focus?: Vec;
+  viewRadius?: number;
+  follow?: boolean;
 }
 
 export interface PlayViewHandle {
@@ -102,13 +110,22 @@ export function mountPlayView(
   ctx.scale(dpr, dpr);
 
   // Include every shot's flight + rest (and putt endpoints) so a wild shot that flies
-  // off the terrain stays in frame instead of clipping.
+  // off the terrain stays in frame instead of clipping. (Unused in focus/follow mode.)
   const extra: Vec[] = [];
   // Keep the OB boundary (and its stakes) in frame, like the SVG map.
   extra.push(...playBoundsCorners(hole));
   for (const s of shots) extra.push(s.from, s.result.landing, s.rest);
   for (const p of putts) extra.push(p.from, p.to);
-  const proj = holeProjector(hole, { width, height, extra });
+  // The camera: whole-hole fit by default, or a zoom window around `focus` that eases to
+  // track the ball when `follow` is on. `proj` is rebuilt per-frame in follow mode.
+  const followMode = !!opts.focus;
+  let camera: Vec = (opts.focus ? ([...opts.focus] as Vec) : hole.tee);
+  let lastGround: Vec = camera;
+  const buildProj = () =>
+    followMode
+      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius })
+      : holeProjector(hole, { width, height, extra });
+  let proj = buildProj();
 
   // --- animation state ---
   let shotIndex = 0;
@@ -282,6 +299,13 @@ export function mountPlayView(
   function frame(now: number): void {
     if (!segStart) segStart = now;
 
+    // Follow-cam: ease the camera toward the ball's last position and rebuild the projector,
+    // so the view pans to keep up with the ball (one-frame lag is imperceptible).
+    if (followMode && opts.follow) {
+      camera = [camera[0] + (lastGround[0] - camera[0]) * 0.2, camera[1] + (lastGround[1] - camera[1]) * 0.2];
+      proj = buildProj();
+    }
+
     // Screen-shake offset (deterministic decay).
     ctx.save();
     if (shake > 0) {
@@ -325,6 +349,7 @@ export function mountPlayView(
         height = F.bounceAmp * Math.abs(Math.sin(rt * Math.PI * F.bounces)) * (1 - rt);
       }
 
+      lastGround = ground; // feed the follow-cam
       const [gx, gy] = proj.project(ground);
       const ballY = gy - height * proj.scale * F.heightExaggeration;
 
@@ -372,10 +397,12 @@ export function mountPlayView(
       const dur = Math.max(300, Math.min(750, len * proj.scale * 12));
       const t = Math.max(0, Math.min(1, (now - segStart) / dur));
       const e = easeOutCubic(t);
-      const gx = proj.project([
+      const cur: Vec = [
         putt.from[0] + (putt.to[0] - putt.from[0]) * e,
         putt.from[1] + (putt.to[1] - putt.from[1]) * e,
-      ] as Vec);
+      ];
+      lastGround = cur; // feed the follow-cam
+      const gx = proj.project(cur);
 
       // Putt line (aim guide) + rolling ball, both flat on the green.
       const [fx, fy] = proj.project(putt.from);

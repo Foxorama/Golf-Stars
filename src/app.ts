@@ -252,6 +252,9 @@ function playingBody(animating: boolean): string {
       width: 320,
       height: 460,
       ball: play.ball,
+      // Zoom the green in for the putt — follow the ball, frame the cup.
+      focus: play.ball,
+      viewRadius: Math.max(18, v.distToPin * 1.8),
     });
     return `
       ${header()}
@@ -283,6 +286,10 @@ function playingBody(animating: boolean): string {
   const sprayTiers = (window as unknown as { _gsSpray?: SprayTiers })._gsSpray;
   const tierPct = sprayTiers?.centralPct ?? 80;
   const sideePct = Math.round((100 - tierPct) / 2);
+  // Zoom in and follow the ball: frame the CONTEMPLATED shot's reach (the spray's far arc), so a
+  // short approach zooms right in and an unreachable green legitimately sits off-screen (#7). The
+  // 0.62 factor maps the shot's max carry to ~the upper third of the view (see project.ts bias).
+  const reach = Math.max(55, spray.carryHigh * 0.62);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
     biome: state.course.biome,
@@ -291,6 +298,8 @@ function playingBody(animating: boolean): string {
     ball: play.ball,
     spray,
     sprayTiers,
+    focus: play.ball,
+    viewRadius: reach,
   });
   const cbtn = (label: string, dir: number) =>
     `<button data-cycle="${dir}" style="padding:9px 12px;border-radius:8px;border:1px solid #333;background:#1d212c;color:#e8e8ea;font-size:14px;cursor:pointer;">${label}</button>`;
@@ -562,10 +571,20 @@ function render(): void {
     const playEl = document.getElementById('play');
     if (playEl) {
       const play = state.play;
+      // Zoom + follow the ball in flight, framed to the actual shot travel so the camera keeps up
+      // with the ball without clipping it (and matches the decision map's zoom level).
+      const travel = Math.max(
+        20,
+        ...animatingPlay.shots.map((s) => Math.hypot(s.rest[0] - s.from[0], s.rest[1] - s.from[1])),
+      );
+      const focus = animatingPlay.shots[0]?.from ?? animatingPlay.putts[0]?.from ?? play.ball;
       view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
         width: 340,
         height: 520,
         biome: state.course.biome,
+        focus,
+        viewRadius: animatingPlay.shots.length ? Math.max(55, travel * 0.62) : 25,
+        follow: true,
         onDone: () => {
           animatedShots = play.shots.length;
           animatedPutts = play.puttLogs.length;

@@ -61,23 +61,34 @@ export interface RenderOptions {
   spray?: ShotSpread;
   /** Spray tier split (defaults to 80/10/10). */
   sprayTiers?: SprayTiers;
+  /** Zoom-and-follow: centre the map on this point (the ball) instead of fitting the whole hole. */
+  focus?: Vec;
+  /** Visible radius (course yards) around `focus`. */
+  viewRadius?: number;
 }
 
-/** Course-space corners of the spray landing-zone at a given lateral half-width (yards):
- *  a box spanning the carry window [carryLow, carryHigh] along the shot, ±hw across it.
- *  (The model's lateral spread is independent of distance, so the honest region is a
- *  rotated rectangle out at the landing, not a fan from the ball.) */
-function sprayBox(s: ShotSpread, hw: number): Vec[] {
+/** Course-space polygon of the spray landing zone as a true ARC SECTOR: the region swept
+ *  between radii [carryLow, carryHigh] and angles ±`halfAngle` (radians) about the bearing.
+ *  This matches the angular-dispersion physics exactly — a rotation preserves length, so the
+ *  far edge is an arc of constant distance (carryHigh) in every direction, never a square
+ *  corner that reads as exceeding max distance. */
+function sprayArc(s: ShotSpread, halfAngle: number): Vec[] {
   const br = (s.bearing * Math.PI) / 180;
-  const fx = Math.sin(br);
-  const fy = Math.cos(br);
-  const rx = fy; // right-perpendicular (matches resolveShot's lateral axis)
-  const ry = -fx;
-  const at = (d: number, lat: number): Vec => [
-    s.origin[0] + fx * d + rx * lat,
-    s.origin[1] + fy * d + ry * lat,
+  const at = (r: number, a: number): Vec => [
+    s.origin[0] + Math.sin(br + a) * r,
+    s.origin[1] + Math.cos(br + a) * r,
   ];
-  return [at(s.carryLow, -hw), at(s.carryHigh, -hw), at(s.carryHigh, hw), at(s.carryLow, hw)];
+  const N = 10; // samples per arc — smooth enough at map scale
+  const pts: Vec[] = [];
+  for (let i = 0; i <= N; i++) pts.push(at(s.carryHigh, -halfAngle + (2 * halfAngle * i) / N)); // far arc L→R
+  for (let i = 0; i <= N; i++) pts.push(at(s.carryLow, halfAngle - (2 * halfAngle * i) / N)); // near arc R→L
+  return pts;
+}
+
+/** Midpoint of one of the spray arcs (on the bearing, at radius `r`) — where a distance label sits. */
+function arcMid(s: ShotSpread, r: number): Vec {
+  const br = (s.bearing * Math.PI) / 180;
+  return [s.origin[0] + Math.sin(br) * r, s.origin[1] + Math.cos(br) * r];
 }
 
 function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
@@ -96,18 +107,28 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const tiers = opts.sprayTiers ?? SPRAY_80_10_10;
 
   // Points beyond the terrain that must stay in frame: every shot's flight + rest (a wild
-  // shot can land off-map), the current ball, and the spray cone's far edges.
+  // shot can land off-map), the current ball, and the spray cone's far edges. (Ignored in
+  // focus/zoom mode — there the camera follows the ball and a far green may sit off-screen.)
   const extra: Vec[] = [];
-  // Keep the OB boundary in frame so its stakes are always visible (they mark the real
-  // stroke-and-distance edge — see them, aim away from them).
-  extra.push(...playBoundsCorners(hole));
-  if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
-  if (opts.ball) extra.push(opts.ball);
-  if (opts.spray && opts.spray.expectedCarry > 0) {
-    extra.push(...sprayBox(opts.spray, tiers.edgeZ * opts.spray.lateralSd));
+  if (!opts.focus) {
+    // Keep the OB boundary in frame so its stakes are always visible (they mark the real
+    // stroke-and-distance edge — see them, aim away from them).
+    extra.push(...playBoundsCorners(hole));
+    if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
+    if (opts.ball) extra.push(opts.ball);
+    if (opts.spray && opts.spray.expectedCarry > 0) {
+      extra.push(...sprayArc(opts.spray, tiers.edgeZ * opts.spray.angleSd));
+    }
   }
 
-  const proj = holeProjector(hole, { width, height, padding: opts.padding ?? 24, extra });
+  const proj = holeProjector(hole, {
+    width,
+    height,
+    padding: opts.padding ?? 24,
+    extra,
+    focus: opts.focus,
+    viewRadius: opts.viewRadius,
+  });
   const place = (p: Vec) => proj.project(p);
   const pts = (poly: Vec[]) => polyPoints(poly, place);
 
@@ -163,23 +184,36 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     );
   }
 
-  // Aiming spray cone: three tiers (central ~80% likely, two flanking ~10% risk zones)
-  // out to a faint edge. Width scales with club + lie + handicap dispersion, so a wider
-  // cone (or one overlapping trouble) tells the player to club down or play safe.
-  if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.lateralSd > 0) {
+  // Aiming spray cone: three tiers (central ~80% likely, two flanking ~10% risk zones) drawn
+  // as true arc SECTORS (curved near/far edges at the carry-window radii), so the cone reads
+  // EXACTLY true to the angular physics — a wide shot can't finish past the far arc. Width
+  // scales with club + lie + handicap dispersion; min/max carry are labelled on the arcs so
+  // you can read how long the hole plays.
+  if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSd > 0) {
     const s = opts.spray;
-    const outer = sprayBox(s, tiers.edgeZ * s.lateralSd);
-    const inner = sprayBox(s, tiers.centralZ * s.lateralSd);
+    const outer = sprayArc(s, tiers.edgeZ * s.angleSd);
+    const inner = sprayArc(s, tiers.centralZ * s.angleSd);
     parts.push(
       `<polygon points="${pts(outer)}" fill="rgba(255,196,84,0.14)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
       `<polygon points="${pts(inner)}" fill="rgba(95,212,90,0.30)" stroke="rgba(95,212,90,0.7)" stroke-width="1" />`,
     );
     // Aim line to the expected-carry centre.
     const [ox, oy] = place(s.origin);
-    const br = (s.bearing * Math.PI) / 180;
-    const cFar = place([s.origin[0] + Math.sin(br) * s.expectedCarry, s.origin[1] + Math.cos(br) * s.expectedCarry]);
+    const cFar = place(arcMid(s, s.expectedCarry));
     parts.push(
       `<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${cFar[0].toFixed(1)}" y2="${cFar[1].toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1" stroke-dasharray="3 3" />`,
+    );
+    // Min / max carry labels on the near and far arcs (so the player reads the hole length).
+    const label = (r: number, txt: string, dy: number): string => {
+      const [lx, ly] = place(arcMid(s, r));
+      return (
+        `<text x="${lx.toFixed(1)}" y="${(ly + dy).toFixed(1)}" font-family="system-ui,sans-serif" font-size="10" font-weight="700" ` +
+        `fill="#fff" stroke="rgba(0,0,0,0.65)" stroke-width="2.5" paint-order="stroke" text-anchor="middle">${txt}</text>`
+      );
+    };
+    parts.push(
+      label(s.carryHigh, `${Math.round(s.carryHigh)}y`, -3),
+      label(s.carryLow, `${Math.round(s.carryLow)}y`, 11),
     );
   }
 
