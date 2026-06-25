@@ -15,6 +15,7 @@ import {
   biomeCarryMult,
   executeShot,
   HOLE_OUT_RADIUS,
+  MAX_OVER_PAR,
   layupTarget,
   pinOf,
   puttOutFrom,
@@ -46,6 +47,8 @@ export interface HolePlay {
   fairwayHit: boolean | null;
   done: boolean;
   holed: boolean;
+  /** True if the hole was picked up at the max-score cap (par + MAX_OVER_PAR). */
+  pickedUp: boolean;
 }
 
 export function beginHole(hole: Hole, holeIndex = 0): HolePlay {
@@ -62,6 +65,7 @@ export function beginHole(hole: Hole, holeIndex = 0): HolePlay {
     fairwayHit: hole.par >= 4 ? false : null,
     done: false,
     holed: false,
+    pickedUp: false,
   };
 }
 
@@ -123,11 +127,13 @@ export function takeShot(
   let fairwayHit = state.fairwayHit;
   if (firstShot && state.hole.par >= 4) fairwayHit = ex.restLie === 'fairway';
 
+  const maxStrokes = state.hole.par + MAX_OVER_PAR;
   let strokes = state.strokes + 1 + ex.penaltyStrokes;
   let putts = state.putts;
   const puttLogs = [...state.puttLogs];
   let done = false;
   let holed = false;
+  let pickedUp = false;
   const ball = ex.ballAfter;
   const lie = ex.lieAfter;
 
@@ -137,14 +143,23 @@ export function takeShot(
   } else if (dist(ball, pin) <= HOLE_OUT_RADIUS) {
     done = true;
     holed = true;
+  } else if (strokes >= maxStrokes) {
+    // Max-score rule: pick up at par + MAX_OVER_PAR.
+    done = true;
+    pickedUp = true;
+    strokes = maxStrokes;
   } else if (lie === 'green') {
-    // On the green → auto putt-out.
-    const out = puttOutFrom(rng, ball, pin);
+    // On the green → auto putt-out within the remaining stroke budget.
+    const out = puttOutFrom(rng, ball, pin, Math.max(1, maxStrokes - strokes));
     putts = out.putts;
     puttLogs.push(...out.log);
     strokes += out.putts;
     done = true;
-    holed = true;
+    if (out.holed) holed = true;
+    else {
+      pickedUp = true;
+      strokes = maxStrokes;
+    }
   }
 
   return {
@@ -154,6 +169,7 @@ export function takeShot(
     strokes,
     penalties: state.penalties + ex.penaltyStrokes,
     putts,
+    pickedUp,
     shots: [...state.shots, ex.log],
     puttLogs,
     fairwayHit,
@@ -169,6 +185,7 @@ export function holeResult(state: HolePlay): {
   shots: ShotLog[];
   putts: PuttLog[];
   holed: boolean;
+  pickedUp: boolean;
 } {
   return {
     record: { par: state.hole.par, strokes: state.strokes },
@@ -182,5 +199,6 @@ export function holeResult(state: HolePlay): {
     shots: state.shots,
     putts: state.puttLogs,
     holed: state.holed,
+    pickedUp: state.pickedUp,
   };
 }

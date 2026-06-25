@@ -183,7 +183,7 @@ function playingBody(animating: boolean): string {
   }
 
   if (play.done) {
-    const name = scoreName(par, play.strokes);
+    const name = play.pickedUp ? 'Picked up' : scoreName(par, play.strokes);
     return `
       ${header()}
       <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${play.holed && play.shots.some((s) => s.holed) ? ' 🎉' : ''}</h2>
@@ -204,7 +204,7 @@ function playingBody(animating: boolean): string {
     <button data-aim="safe" style="${aimBtnStyle(selAim === 'safe')}">🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}</button>`;
   return `
     ${header()}
-    <p style="font-size:14px;opacity:.85;">${scoreLine} · ${v.distToPin} yds to pin · lie <b>${v.lie}</b> · wind ${v.wind?.spd.toFixed(0) ?? 0}mph</p>
+    <p style="font-size:14px;opacity:.85;">${scoreLine} · ${v.distToPin} yds to pin · lie <b>${v.lie}</b> · wind ${v.wind?.spd.toFixed(0) ?? 0}mph · <span style="opacity:.6;">pick up at +4 (${par + 4})</span></p>
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       <div style="border:1px solid #222;border-radius:10px;overflow:hidden;">${svg}</div>
       <section style="flex:1 1 240px;min-width:240px;">
@@ -232,7 +232,7 @@ function scorecard(): string {
       const sel = i === state.viewHole;
       return `<tr style="cursor:pointer;${sel ? 'background:#1d212c;' : ''}" data-action='${JSON.stringify({ type: 'viewHole', hole: i })}'>
         <td style="padding:2px 8px;">${i + 1}</td><td>${p.record.par}</td>
-        <td><b>${p.record.strokes}</b></td><td style="opacity:.8;">${scoreName(p.record.par, p.record.strokes)}</td></tr>`;
+        <td><b>${p.record.strokes}</b></td><td style="opacity:.8;">${p.pickedUp ? 'Picked up' : scoreName(p.record.par, p.record.strokes)}</td></tr>`;
     })
     .join('');
   return `<table style="border-collapse:collapse;font-size:13px;width:100%;">
