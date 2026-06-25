@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -41,6 +41,18 @@ describe('build output (regression guards)', () => {
   it('still carries the boot watchdog (turns a blank page into a visible error)', () => {
     expect(html).toContain('did not run within 5s');
   });
+
+  it('the watchdog captures import-time throws (the class that blanked real devices)', () => {
+    // A throw during top-level module eval aborts the bundle before the entry's own
+    // try/catch — so ONLY global handlers can see it. These three are mandatory:
+    expect(html).toContain('window.onerror'); // gives source:line:col to locate the throw
+    expect(html).toContain("addEventListener('error'");
+    expect(html).toContain("addEventListener('unhandledrejection'");
+    // And the captured error must survive: persisted to __gsErr, latched so the 5s
+    // timeout can't overwrite the real cause with "(none captured)".
+    expect(html).toContain('window.__gsErr');
+    expect(html).toContain('errorShown'); // the no-clobber latch
+  });
 });
 
 // --- real-browser smoke test (runs when a Chromium binary is available) ----------
@@ -78,6 +90,45 @@ describe('build output (real browser)', () => {
         expect(errors).toEqual([]);
         expect(text).toContain('Golf Stars');
         expect(text).toContain('run format'); // the title screen actually rendered
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
+  // The regression that blanked real devices was an import-time throw the diagnostics
+  // HID (no __gsErr, clobbered by the 5s timeout). This proves the watchdog now surfaces
+  // that exact class: inject a throw at the top of the inlined module, and the page must
+  // show a real boot error carrying the message — never blank, never "(none captured)".
+  it.runIf(chromePath)(
+    'surfaces an import-time module throw instead of blanking',
+    async () => {
+      const marker = 'INJECTED_IMPORT_THROW';
+      // Inject right after the inlined module's opening tag, so it throws before any of
+      // the bundle (or the entry's try/catch) can run — i.e. a true import-time fault.
+      const injected = html.replace(
+        /(<script type="module"[^>]*>)/,
+        `$1throw new Error(${JSON.stringify(marker)});`,
+      );
+      expect(injected).not.toBe(html); // the replace actually matched
+      const tmp = resolve(__dirname, '../dist/__inject.html');
+      writeFileSync(tmp, injected);
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage();
+        await page.goto('file://' + tmp, { waitUntil: 'load' });
+        // Wait for the watchdog to paint the error (it shows immediately on onerror).
+        await page.waitForFunction(
+          (m) => (document.getElementById('app')?.textContent || '').includes(m),
+          marker,
+          { timeout: 8000 },
+        );
+        const text = (await page.textContent('#app')) || '';
+        expect(text).toContain('boot error');
+        expect(text).toContain(marker);
+        expect(text).not.toContain('(none captured)');
       } finally {
         await browser.close();
       }
