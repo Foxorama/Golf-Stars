@@ -9,6 +9,8 @@
 import { scoreName } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { courseCardHTML, itemCardHTML } from './render/cards';
+import { renderHoleSVG } from './render/holeView';
+import { shotView } from './sim/rpg/play';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
@@ -145,9 +147,82 @@ function introScreen(): string {
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
       <section style="flex:1 1 220px;">
         <p style="font-size:15px;">Make <b>${cut}</b> Stableford across the ${c.holes.length} holes to survive the cut and travel on.</p>
-        ${btn('▶ Play this stop', { type: 'play' })}
+        ${btn('🏌 Play shot by shot', { type: 'playInteractive' })}
+        ${btn('» Auto-play (watch)', { type: 'play' })}
       </section>
     </div>`;
+}
+
+// --- interactive playing screen ----------------------------------------------
+let animatedShots = 0; // shots of the current hole already animated
+let animHoleIndex = -1;
+let puttsAnimated = false;
+let selClubId: string | null = null;
+let selAim: 'attack' | 'safe' = 'attack';
+
+function pendingAnimation(play: NonNullable<UiState['play']>): { shots: typeof play.shots; putts: typeof play.puttLogs } | null {
+  const newShots = play.shots.slice(animatedShots);
+  const needPutts = play.done && !puttsAnimated && play.puttLogs.length > 0;
+  if (newShots.length === 0 && !needPutts) return null;
+  return { shots: newShots, putts: needPutts ? play.puttLogs : [] };
+}
+
+function playingBody(animating: boolean): string {
+  const play = state.play!;
+  const v = shotView(play, state.run.loadout);
+  const bag = state.run.loadout.bag;
+  const par = play.hole.par;
+  const scoreLine = `Hole ${play.holeIndex + 1}/${state.course.holes.length} · Par ${par} · Strokes <b>${play.strokes}</b>`;
+
+  if (animating) {
+    return `
+      ${header()}
+      <p style="font-size:14px;opacity:.85;">${scoreLine}</p>
+      <div id="play" style="border:1px solid #222;border-radius:10px;overflow:hidden;width:340px;height:520px;"></div>
+      <p style="opacity:.6;font-size:12px;margin-top:6px;">…watching the shot…</p>`;
+  }
+
+  if (play.done) {
+    const name = scoreName(par, play.strokes);
+    return `
+      ${header()}
+      <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${play.holed && play.shots.some((s) => s.holed) ? ' 🎉' : ''}</h2>
+      <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' })}</div>`;
+  }
+
+  // Decision screen: map with shots so far + ball marker, info, and controls.
+  if (selClubId === null || !bag.some((c) => c.id === selClubId)) selClubId = v.attackClubId;
+  const svg = renderHoleSVG(play.hole, { shots: play.shots, biome: state.course.biome, width: 320, height: 460, ball: play.ball });
+  const cbtn = (label: string, dir: number) =>
+    `<button data-cycle="${dir}" style="padding:9px 12px;border-radius:8px;border:1px solid #333;background:#1d212c;color:#e8e8ea;font-size:14px;cursor:pointer;">${label}</button>`;
+  const clubButtons = `
+    ${cbtn('◄', -1)}
+    <b style="display:inline-block;min-width:6em;text-align:center;">${bag.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
+    ${cbtn('►', 1)}`;
+  const aimButtons = `
+    <button data-aim="attack" style="${aimBtnStyle(selAim === 'attack')}">🎯 Attack pin</button>
+    <button data-aim="safe" style="${aimBtnStyle(selAim === 'safe')}">🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}</button>`;
+  return `
+    ${header()}
+    <p style="font-size:14px;opacity:.85;">${scoreLine} · ${v.distToPin} yds to pin · lie <b>${v.lie}</b> · wind ${v.wind?.spd.toFixed(0) ?? 0}mph</p>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+      <div style="border:1px solid #222;border-radius:10px;overflow:hidden;">${svg}</div>
+      <section style="flex:1 1 240px;min-width:240px;">
+        <h3 style="font-size:14px;margin:.3em 0;">Club</h3>
+        <div style="display:flex;align-items:center;gap:6px;">${clubButtons}</div>
+        <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}</p>
+        <h3 style="font-size:14px;margin:.6em 0 .3em;">Strategy</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>
+        <div style="margin-top:12px;">
+          ${btn('🏌 Hit', { type: 'shot', clubId: selClubId!, aim: selAim })}
+          ${btn('» Auto-finish hole', { type: 'autoShotHole' })}
+        </div>
+      </section>
+    </div>`;
+}
+
+function aimBtnStyle(sel: boolean): string {
+  return `padding:9px 12px;border-radius:8px;border:1px solid ${sel ? '#5fd45a' : '#333'};background:${sel ? '#16331f' : '#1d212c'};color:#e8e8ea;font-size:14px;cursor:pointer;margin:3px 4px 3px 0;`;
 }
 
 function scorecard(): string {
@@ -231,18 +306,35 @@ function gameoverScreen(): string {
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
+
+  // The interactive playing screen interleaves animation with input, so it computes its
+  // own body (controls vs "watching") based on whether shots are pending animation.
+  let animatingPlay: ReturnType<typeof pendingAnimation> = null;
+  if (state.screen === 'playing' && state.play) {
+    if (state.play.holeIndex !== animHoleIndex) {
+      animatedShots = 0;
+      puttsAnimated = false;
+      animHoleIndex = state.play.holeIndex;
+      selClubId = null;
+      selAim = 'attack';
+    }
+    animatingPlay = pendingAnimation(state.play);
+  }
+
   const body =
     state.screen === 'title'
       ? titleScreen()
       : state.screen === 'intro'
       ? introScreen()
+      : state.screen === 'playing'
+      ? playingBody(animatingPlay !== null)
       : state.screen === 'result'
-        ? resultScreen()
-        : state.screen === 'shop'
-          ? shopScreen()
-          : state.screen === 'travel'
-            ? travelScreen()
-            : gameoverScreen();
+      ? resultScreen()
+      : state.screen === 'shop'
+      ? shopScreen()
+      : state.screen === 'travel'
+      ? travelScreen()
+      : gameoverScreen();
 
   app.innerHTML = `<main style="font-family:system-ui,sans-serif;max-width:820px;margin:0 auto;padding:16px;color:#e8e8ea;background:#0b0d12;min-height:100vh;">${body}</main>`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
@@ -250,6 +342,22 @@ function render(): void {
   // Wire actions.
   app.querySelectorAll<HTMLElement>('[data-action]').forEach((el) => {
     el.addEventListener('click', () => dispatch(JSON.parse(el.dataset.action!) as Action));
+  });
+  // Local (non-game) controls on the playing screen: club cycle + aim select.
+  app.querySelectorAll<HTMLElement>('[data-cycle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const bag = state.run.loadout.bag;
+      const i = bag.findIndex((c) => c.id === selClubId);
+      const ni = Math.max(0, Math.min(bag.length - 1, (i < 0 ? 0 : i) + Number(el.dataset.cycle)));
+      selClubId = bag[ni]!.id;
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-aim]').forEach((el) => {
+    el.addEventListener('click', () => {
+      selAim = el.dataset.aim === 'safe' ? 'safe' : 'attack';
+      render();
+    });
   });
 
   // Mount the animated play view on the result screen.
@@ -263,6 +371,28 @@ function render(): void {
         height: 520,
         biome: state.course.biome,
       });
+    }
+  }
+
+  // Animate pending shots on the playing screen, then re-render for the next decision.
+  if (state.screen === 'playing' && state.play && animatingPlay) {
+    const playEl = document.getElementById('play');
+    if (playEl) {
+      const play = state.play;
+      view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
+        width: 340,
+        height: 520,
+        biome: state.course.biome,
+        onDone: () => {
+          animatedShots = play.shots.length;
+          if (play.done) puttsAnimated = true;
+          render();
+        },
+      });
+    } else {
+      // No canvas to animate into — skip ahead so we never get stuck.
+      animatedShots = state.play.shots.length;
+      if (state.play.done) puttsAnimated = true;
     }
   }
 }

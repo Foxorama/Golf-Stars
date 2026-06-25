@@ -28,6 +28,8 @@ export interface RenderOptions {
   showCentreline?: boolean;
   /** Biome id — tints the rough/background to sell the world. */
   biome?: string;
+  /** Draw a ball marker at this course-space position (interactive play). */
+  ball?: Vec;
 }
 
 function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
@@ -88,6 +90,13 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   parts.push(
     `<circle cx="${grX.toFixed(1)}" cy="${grY.toFixed(1)}" r="4" fill="#ff3b3b" stroke="#000" />`,
   );
+
+  if (opts.ball) {
+    const [bx, by] = place(opts.ball);
+    parts.push(
+      `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="4" fill="#fff" stroke="#1a1a1a" stroke-width="1.5" />`,
+    );
+  }
 
   parts.push('</svg>');
   return parts.join('');
