@@ -482,6 +482,12 @@ export interface ShotSpread {
   lateralSd: number;
   /** Along-axis (distance) std-dev (yards). */
   carrySd: number;
+  /**
+   * Angular spray std-dev (radians) about the bearing — the SAME value `resolveShot`
+   * rotates the shot by. The render sweeps the spray arc by `±z·angleSd`, so the cone is a
+   * true sector (carry preserved in every direction) that reads EXACTLY true to the physics.
+   */
+  angleSd: number;
 }
 
 export function shotSpread(
@@ -512,6 +518,7 @@ export function shotSpread(
     carryHigh: high + along,
     lateralSd: intended * prof.lateralFrac * dispMult,
     carrySd: intended * prof.carryFrac * dispMult,
+    angleSd: prof.lateralFrac * dispMult,
   };
 }
 

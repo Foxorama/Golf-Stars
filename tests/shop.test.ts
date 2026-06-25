@@ -159,7 +159,10 @@ describe('stackables hold the "a power-up must improve scoring" invariant', () =
     const lo = loadoutFromPerks(perks);
     let sf = 0;
     let n = 0;
-    for (let s = 0; s < 200; s++) {
+    // 600 stops: enough samples that a genuine +0.1pt/stop distance perk clears the run-to-run
+    // noise floor. (Under the angular-dispersion model the single-item effects are real but
+    // small — verified at large N — so an underpowered sample can flip their sign by chance.)
+    for (let s = 0; s < 600; s++) {
       const c = generateCourse(`${s}:stop`, { holes: 6, distanceFromStart: s % 12 });
       const played = playCourse(c.holes, new Rng(`${c.seed}:play`), {
         bag: lo.bag,
