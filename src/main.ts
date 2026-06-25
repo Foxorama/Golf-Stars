@@ -30,7 +30,7 @@ let view: PlayViewHandle | null = null;
 
 /** Diagnostic breadcrumb the boot watchdog can read if the app never paints. */
 function stage(s: string): void {
-  (globalThis as unknown as { __gsStage?: string }).__gsStage = s;
+  (window as unknown as { __gsStage?: string }).__gsStage = s;
 }
 
 function boot(): void {
@@ -57,7 +57,7 @@ function boot(): void {
  */
 function recover(err: unknown): void {
   console.error('Golf Stars recovered from an error:', err);
-  (globalThis as unknown as { __gsErr?: string }).__gsErr = String(
+  (window as unknown as { __gsErr?: string }).__gsErr = String(
     (err && ((err as Error).stack || (err as Error).message)) || err,
   );
   stage('recover');
