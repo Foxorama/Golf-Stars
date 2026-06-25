@@ -1,0 +1,136 @@
+import { describe, it, expect } from 'vitest';
+import { Rng } from '../src/sim/rng';
+import { generateCourse } from '../src/sim/course/generate';
+import { executeShot, shotSpread, playBounds, inBounds } from '../src/sim/round';
+import { holeProjector } from '../src/render/project';
+import { renderHoleSVG } from '../src/render/holeView';
+import { CLUBS } from '../src/sim/clubs';
+import { startingLoadout, netDispersion } from '../src/sim/rpg/economy';
+import { beginHole, previewShot } from '../src/sim/rpg/play';
+import type { Hole, Vec } from '../src/sim/course/contract';
+
+const driver = CLUBS.find((c) => c.id === 'D')!;
+
+// A tiny, contract-valid hole with a known small boundary, so OB is deterministic.
+const tinyHole: Hole = {
+  par: 4,
+  tee: [0, 0],
+  green: [0, 200],
+  centreline: [
+    [0, 0],
+    [0, 200],
+  ],
+  features: [{ kind: 'fairway', poly: [[-15, 0], [15, 0], [15, 200], [-15, 200]] }],
+  hazards: [],
+};
+
+describe('shotSpread (pure aiming preview)', () => {
+  const hole = generateCourse(1234).holes[0]!;
+  const ball = hole.tee;
+  const pin = hole.green;
+
+  it('points at the target, reaches ~the club carry, and spreads', () => {
+    const s = shotSpread(hole, ball, 'fairway', pin, driver, {});
+    expect(s.expectedCarry).toBeGreaterThan(0);
+    expect(s.lateralSd).toBeGreaterThan(0);
+    expect(s.carrySd).toBeGreaterThan(0);
+    // Lateral spread is wider than along-axis (4% vs 3% of carry in the model).
+    expect(s.lateralSd).toBeGreaterThan(s.carrySd);
+  });
+
+  it('higher handicap = wider spray; a worse lie = wider still', () => {
+    const scratch = shotSpread(hole, ball, 'fairway', pin, driver, { dispersionMult: 0.7 });
+    const hacker = shotSpread(hole, ball, 'fairway', pin, driver, { dispersionMult: 1.6 });
+    expect(hacker.lateralSd).toBeGreaterThan(scratch.lateralSd);
+
+    const fairway = shotSpread(hole, ball, 'fairway', pin, driver, {});
+    const rough = shotSpread(hole, ball, 'rough', pin, driver, {});
+    expect(rough.lateralSd).toBeGreaterThan(fairway.lateralSd);
+  });
+
+  it('matches the dispersion the round sim actually uses (reads true)', () => {
+    // previewShot must use the loadout's net dispersion, not a default of 1.
+    const loadout = startingLoadout();
+    const s = previewShot(beginHole(hole), { clubId: 'D', aim: 'attack' }, loadout);
+    const direct = shotSpread(hole, hole.tee, 'tee', pin, driver, {
+      dispersionMult: netDispersion(loadout),
+    });
+    expect(s.lateralSd).toBeCloseTo(direct.lateralSd, 6);
+  });
+
+  it('is deterministic', () => {
+    expect(shotSpread(hole, ball, 'fairway', pin, driver, {})).toEqual(
+      shotSpread(hole, ball, 'fairway', pin, driver, {}),
+    );
+  });
+});
+
+describe('out of bounds (stroke-and-distance)', () => {
+  it('boundary contains the terrain but a far point is OB', () => {
+    const b = playBounds(tinyHole);
+    expect(inBounds(tinyHole, tinyHole.tee)).toBe(true);
+    expect(inBounds(tinyHole, tinyHole.green)).toBe(true);
+    expect(inBounds(tinyHole, [500, 0])).toBe(false);
+    // A point just outside the fairway (in native rough) is still IN bounds — OB only
+    // catches genuinely wild shots clear of the whole map.
+    expect(inBounds(tinyHole, [20, 100])).toBe(true);
+    expect(b.max[0]).toBeGreaterThan(15);
+  });
+
+  it('a shot sprayed off the map costs +1 and replays from the origin', () => {
+    const from: Vec = [...tinyHole.tee] as Vec;
+    // Aim a driver far sideways: the ~250yd carry lands well beyond the ±65yd boundary.
+    const ex = executeShot(tinyHole, from, 'tee', [10000, 0], driver, { carryMult: 1 }, new Rng('ob'));
+    expect(ex.log.penalty).toBe('ob');
+    expect(ex.penaltyStrokes).toBe(1);
+    expect(ex.ballAfter).toEqual(from); // stroke-and-distance: back to the start
+    expect(ex.lieAfter).toBe('tee');
+    expect(ex.holed).toBe(false);
+  });
+
+  it('a normal shot down the fairway is NOT OB', () => {
+    const ex = executeShot(tinyHole, [0, 0], 'tee', [0, 150], CLUBS.find((c) => c.id === '8i')!, { carryMult: 1 }, new Rng('ok'));
+    expect(ex.log.penalty).toBeUndefined();
+  });
+});
+
+describe('render fit (never clip the ball off-map)', () => {
+  const hole = generateCourse(1234).holes[0]!;
+  // A point deliberately far outside the hole's terrain.
+  const far: Vec = [hole.tee[0] + 800, hole.tee[1] + 800];
+
+  it('including a far point in the fit keeps it on-screen', () => {
+    const W = 320;
+    const H = 460;
+    const withExtra = holeProjector(hole, { width: W, height: H, extra: [far] });
+    const [x, y] = withExtra.project(far);
+    expect(x).toBeGreaterThanOrEqual(0);
+    expect(x).toBeLessThanOrEqual(W);
+    expect(y).toBeGreaterThanOrEqual(0);
+    expect(y).toBeLessThanOrEqual(H);
+  });
+
+  it('without it, the far point projects off-screen (proving the fix matters)', () => {
+    const W = 320;
+    const H = 460;
+    const noExtra = holeProjector(hole, { width: W, height: H });
+    const [x, y] = noExtra.project(far);
+    const off = x < 0 || x > W || y < 0 || y > H;
+    expect(off).toBe(true);
+  });
+});
+
+describe('spray cone render (SVG)', () => {
+  const hole = generateCourse(1234).holes[0]!;
+  it('draws the three-tier cone when a spray is supplied', () => {
+    const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { dispersionMult: 1.2 });
+    const svg = renderHoleSVG(hole, { width: 320, height: 460, spray });
+    // Inner (likely, green) + outer (risk, amber) wedges both present.
+    expect(svg).toContain('rgba(95,212,90,0.30)');
+    expect(svg).toContain('rgba(255,196,84,0.14)');
+  });
+  it('omits the cone when no spray is supplied', () => {
+    const svg = renderHoleSVG(hole, { width: 320, height: 460 });
+    expect(svg).not.toContain('rgba(95,212,90,0.30)');
+  });
+});

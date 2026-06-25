@@ -10,7 +10,8 @@ import { scoreName } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { courseCardHTML, itemCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
-import { shotView } from './sim/rpg/play';
+import { shotView, previewShot } from './sim/rpg/play';
+import type { SprayTiers } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
@@ -164,7 +165,7 @@ function introScreen(): string {
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
       <section style="flex:1 1 220px;">
-        <p style="font-size:15px;">Make <b>${cut}</b> Stableford across the ${c.holes.length} holes to survive the cut and travel on.</p>
+        <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes to make the cut and travel on.</p>
         ${btn('🏌 Play shot by shot', { type: 'playInteractive' })}
         ${btn('» Auto-play (watch)', { type: 'play' })}
       </section>
@@ -208,9 +209,22 @@ function playingBody(animating: boolean): string {
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' })}</div>`;
   }
 
-  // Decision screen: map with shots so far + ball marker, info, and controls.
+  // Decision screen: map with shots so far + ball marker, the aiming spray cone, and controls.
   if (selClubId === null || !bag.some((c) => c.id === selClubId)) selClubId = v.attackClubId;
-  const svg = renderHoleSVG(play.hole, { shots: play.shots, biome: state.course.biome, width: 320, height: 460, ball: play.ball });
+  const spray = previewShot(play, { clubId: selClubId, aim: selAim }, state.run.loadout);
+  // Feel escape-hatch: window._gsSpray lets the tier split be A/B'd live (e.g. 50/25/25).
+  const sprayTiers = (window as unknown as { _gsSpray?: SprayTiers })._gsSpray;
+  const tierPct = sprayTiers?.centralPct ?? 80;
+  const sideePct = Math.round((100 - tierPct) / 2);
+  const svg = renderHoleSVG(play.hole, {
+    shots: play.shots,
+    biome: state.course.biome,
+    width: 320,
+    height: 460,
+    ball: play.ball,
+    spray,
+    sprayTiers,
+  });
   const cbtn = (label: string, dir: number) =>
     `<button data-cycle="${dir}" style="padding:9px 12px;border-radius:8px;border:1px solid #333;background:#1d212c;color:#e8e8ea;font-size:14px;cursor:pointer;">${label}</button>`;
   const clubButtons = `
@@ -229,6 +243,10 @@ function playingBody(animating: boolean): string {
         <h3 style="font-size:14px;margin:.3em 0;">Club</h3>
         <div style="display:flex;align-items:center;gap:6px;">${clubButtons}</div>
         <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}</p>
+        <p style="font-size:12px;margin:.3em 0;line-height:1.5;">
+          <span style="color:#5fd45a;">▮</span> ~${tierPct}% lands here · <span style="color:#ffc454;">▮</span> ${sideePct}% each side ·
+          spread <b>±${Math.round((sprayTiers?.edgeZ ?? 2.5) * spray.lateralSd)} yds</b> · reach <b>${Math.round(spray.expectedCarry)} yds</b>
+        </p>
         <h3 style="font-size:14px;margin:.6em 0 .3em;">Strategy</h3>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>
         <div style="margin-top:12px;">

@@ -14,9 +14,19 @@
  */
 
 import type { Feature, Hole, Vec } from '../sim/course/contract';
-import type { ShotLog } from '../sim/round';
+import type { ShotLog, ShotSpread } from '../sim/round';
 import { holeProjector } from './project';
 import { fillFor, roughFor } from './palette';
+
+/** Spray-cone tier split. Default ≈80/10/10: the central wedge captures ~80% of shots
+ *  (±1.28σ), each flanking wedge ~10%, out to a visible edge at ~2.5σ. Pass {centralZ:
+ *  0.674, edgeZ: 2, centralPct: 50} for a 50/25/25 read instead. */
+export interface SprayTiers {
+  centralZ: number;
+  edgeZ: number;
+  centralPct: number;
+}
+export const SPRAY_80_10_10: SprayTiers = { centralZ: 1.2816, edgeZ: 2.5, centralPct: 80 };
 
 export interface RenderOptions {
   width?: number;
@@ -30,6 +40,30 @@ export interface RenderOptions {
   biome?: string;
   /** Draw a ball marker at this course-space position (interactive play). */
   ball?: Vec;
+  /** Draw the aiming spray cone for the contemplated shot (interactive play). */
+  spray?: ShotSpread;
+  /** Spray tier split (defaults to 80/10/10). */
+  sprayTiers?: SprayTiers;
+}
+
+/** Course-space corners of the spray wedge at a given lateral half-width (yards): the
+ *  fan from the ball out to ±hw at the expected-carry distance, capped with a small
+ *  forward bulge for the carry (distance) uncertainty. */
+function sprayWedge(s: ShotSpread, hw: number): Vec[] {
+  const br = (s.bearing * Math.PI) / 180;
+  const fx = Math.sin(br);
+  const fy = Math.cos(br);
+  const rx = fy; // right-perpendicular (matches resolveShot's lateral axis)
+  const ry = -fx;
+  const cx = s.origin[0] + fx * s.expectedCarry;
+  const cy = s.origin[1] + fy * s.expectedCarry;
+  const tip: Vec = [cx + fx * s.carrySd, cy + fy * s.carrySd];
+  return [
+    s.origin,
+    [cx - rx * hw, cy - ry * hw],
+    tip,
+    [cx + rx * hw, cy + ry * hw],
+  ];
 }
 
 function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
@@ -45,7 +79,18 @@ function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
 export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
-  const proj = holeProjector(hole, { width, height, padding: opts.padding ?? 24 });
+  const tiers = opts.sprayTiers ?? SPRAY_80_10_10;
+
+  // Points beyond the terrain that must stay in frame: every shot's flight + rest (a wild
+  // shot can land off-map), the current ball, and the spray cone's far edges.
+  const extra: Vec[] = [];
+  if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
+  if (opts.ball) extra.push(opts.ball);
+  if (opts.spray && opts.spray.expectedCarry > 0) {
+    extra.push(...sprayWedge(opts.spray, tiers.edgeZ * opts.spray.lateralSd));
+  }
+
+  const proj = holeProjector(hole, { width, height, padding: opts.padding ?? 24, extra });
   const place = (p: Vec) => proj.project(p);
   const pts = (poly: Vec[]) => polyPoints(poly, place);
 
@@ -67,6 +112,26 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   if (opts.showCentreline ?? true) {
     parts.push(
       `<polyline points="${pts(hole.centreline)}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="5 5" />`,
+    );
+  }
+
+  // Aiming spray cone: three tiers (central ~80% likely, two flanking ~10% risk zones)
+  // out to a faint edge. Width scales with club + lie + handicap dispersion, so a wider
+  // cone (or one overlapping trouble) tells the player to club down or play safe.
+  if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.lateralSd > 0) {
+    const s = opts.spray;
+    const outer = sprayWedge(s, tiers.edgeZ * s.lateralSd);
+    const inner = sprayWedge(s, tiers.centralZ * s.lateralSd);
+    parts.push(
+      `<polygon points="${pts(outer)}" fill="rgba(255,196,84,0.14)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
+      `<polygon points="${pts(inner)}" fill="rgba(95,212,90,0.30)" stroke="rgba(95,212,90,0.7)" stroke-width="1" />`,
+    );
+    // Aim line to the expected-carry centre.
+    const [ox, oy] = place(s.origin);
+    const br = (s.bearing * Math.PI) / 180;
+    const cFar = place([s.origin[0] + Math.sin(br) * s.expectedCarry, s.origin[1] + Math.cos(br) * s.expectedCarry]);
+    parts.push(
+      `<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${cFar[0].toFixed(1)}" y2="${cFar[1].toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1" stroke-dasharray="3 3" />`,
     );
   }
 

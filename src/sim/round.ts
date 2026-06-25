@@ -7,7 +7,7 @@
  */
 
 import { dist, type FeatureKind, type Hole, type Vec } from './course/contract';
-import { CLUBS, suggestClub, type Club, type ClubStats } from './clubs';
+import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
   lieAt,
   lieInfo,
@@ -93,6 +93,40 @@ export interface PlayHoleOptions {
 /** Pin location. For the stub that's the green centroid (its generated centre). */
 function pin(hole: Hole): Vec {
   return hole.green;
+}
+
+/**
+ * Out-of-bounds boundary: the course-space box bounding ALL of a hole's terrain
+ * (features, hazards, centreline, tee, green), expanded by a generous, hole-size-scaled
+ * margin so only genuinely wild shots — well clear of any drawn terrain — count as OB.
+ * Pure. (Fairness invariant: penalty surfaces stay off the corridor; OB is the boundary
+ * for shots sprayed off the whole map, where stroke-and-distance is the fair golf rule.)
+ */
+export function playBounds(hole: Hole): { min: Vec; max: Vec } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const eat = (p: Vec): void => {
+    minX = Math.min(minX, p[0]);
+    minY = Math.min(minY, p[1]);
+    maxX = Math.max(maxX, p[0]);
+    maxY = Math.max(maxY, p[1]);
+  };
+  for (const f of hole.features) for (const p of f.poly) eat(p);
+  for (const f of hole.hazards) for (const p of f.poly) eat(p);
+  for (const p of hole.centreline) eat(p);
+  eat(hole.tee);
+  eat(hole.green);
+  const span = Math.max(maxX - minX, maxY - minY, dist(hole.tee, hole.green));
+  const m = Math.max(40, span * 0.25);
+  return { min: [minX - m, minY - m], max: [maxX + m, maxY + m] };
+}
+
+/** True if a point is inside the hole's out-of-bounds boundary. */
+export function inBounds(hole: Hole, p: Vec): boolean {
+  const b = playBounds(hole);
+  return p[0] >= b.min[0] && p[0] <= b.max[0] && p[1] >= b.min[1] && p[1] <= b.max[1];
 }
 
 /** Find a legal drop after a no-replay penalty: walk back toward the prior spot. */
@@ -334,12 +368,57 @@ export function executeShot(
       ballAfter = drop;
       lieAfter = lieAt(hole, drop);
     }
+  } else if (!inBounds(hole, rest)) {
+    // Out of bounds: stroke-and-distance — +1 penalty and replay from the shot's origin.
+    penaltyStrokes = PEN_INFO.ob.strokes;
+    log.penalty = 'ob';
+    ballAfter = from;
+    lieAfter = lie;
   } else if (dist(rest, pin(hole)) <= HOLE_OUT_RADIUS) {
     log.holed = true;
     holed = true;
   }
 
   return { log, ballAfter, lieAfter, restLie, penaltyStrokes, holed };
+}
+
+/** Deterministic spread of a contemplated shot — the mean + std-devs `resolveShot`
+ *  samples from, computed WITHOUT consuming rng. Lets the UI draw an honest "where can
+ *  it go" spray cone before the player commits. Pure. */
+export interface ShotSpread {
+  /** Ball position (course space). */
+  origin: Vec;
+  /** Shot bearing toward the target (deg, cw from up). */
+  bearing: number;
+  /** Mean carry (yards), after lie, biome and wind — the cone's reach. */
+  expectedCarry: number;
+  /** Lateral std-dev (yards) at landing — half the cone's spread per σ. */
+  lateralSd: number;
+  /** Along-axis (distance) std-dev (yards). */
+  carrySd: number;
+}
+
+export function shotSpread(
+  hole: Hole,
+  from: Vec,
+  lie: FeatureKind,
+  target: Vec,
+  club: Club,
+  opts: { carryMult?: number; dispersionMult?: number; stats?: ClubStats } = {},
+): ShotSpread {
+  const carryMult = opts.carryMult ?? biomeCarryMult(hole);
+  const li = lieInfo(lie);
+  const shotBearing = bearingDeg(from, target);
+  const intended = clubDist(club, opts.stats) * li.carryMult * carryMult;
+  const w = hole.wind ? playWind(hole.wind, shotBearing) : { along: 0, cross: 0 };
+  const dispMult = li.dispersionMult * (opts.dispersionMult ?? 1);
+  return {
+    origin: from,
+    bearing: shotBearing,
+    expectedCarry: Math.max(0, intended + w.along * TUNABLES.windCarryPerMph),
+    lateralSd: intended * TUNABLES.lateralDispersionFrac * dispMult,
+    carrySd: intended * TUNABLES.carryDispersionFrac * dispMult,
+  };
 }
 
 /** The club the AI would choose for a target: reach the plays-like distance, minus a

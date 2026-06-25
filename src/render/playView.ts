@@ -91,7 +91,12 @@ export function mountPlayView(
   const ctx = canvas.getContext('2d')!;
   ctx.scale(dpr, dpr);
 
-  const proj = holeProjector(hole, { width, height });
+  // Include every shot's flight + rest (and putt endpoints) so a wild shot that flies
+  // off the terrain stays in frame instead of clipping.
+  const extra: Vec[] = [];
+  for (const s of shots) extra.push(s.from, s.result.landing, s.rest);
+  for (const p of putts) extra.push(p.from, p.to);
+  const proj = holeProjector(hole, { width, height, extra });
 
   // --- animation state ---
   let shotIndex = 0;
