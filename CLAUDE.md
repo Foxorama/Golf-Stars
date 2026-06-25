@@ -287,6 +287,18 @@ This game lives or dies on three axes — put every change through all three bef
   green, take it to done without waiting to be asked: open the PR, merge it (once CI passes), then
   clean up — delete the merged feature branch (local + remote) and sync `main`. Only stop short of
   merging if the work is explicitly WIP, the user says not to, or CI is red/unresolved.
+- **Prefer auto-merge over a blocking wait.** Once a PR is open and CI is running, enable auto-merge
+  (`enable_pr_auto_merge`) instead of polling for green then merging by hand — GitHub merges it the
+  moment the required `test` check (from `tests.yml`) passes, and the head branch deletes itself. The
+  bot only needs to land the PR; it doesn't babysit the run. (If CI is already green and there's no
+  pending required check, auto-merge "fails gracefully" — just call `merge_pull_request` directly.)
+  `tests.yml` has `concurrency: cancel-in-progress` so a newer push supersedes an older run and a
+  stale pass can't merge over fresh red.
+- **Repo settings auto-merge depends on are admin-UI only (no API tool in this env):** Settings →
+  General → Pull Requests → *Allow auto-merge* and *Automatically delete head branches*, plus a
+  branch-protection rule on `main` that **requires the `test` status check** (without a required
+  check, enabling auto-merge merges immediately — no CI gate). Set these once by hand; they're not
+  in the repo. The `tests.yml` workflow is the check the rule should require.
 - Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → cleanup).
 - Commit messages explain the *why*; end with the Co-Authored-By: Claude trailer.
 
