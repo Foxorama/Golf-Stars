@@ -2,15 +2,16 @@
 // TEST-HUB SYNC GUARD — Golf Stars adaptation (invariant #3 of TEST-HUB-STANDARD.md)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// STATUS: TEMPLATE. Golf Stars does NOT have a test/demo hub yet (see IDEAS.md → "GS-15 —
-// Test hub + sync-guard"). This file is the ready-to-wire guard for the day it gets one. It
-// is deliberately named `*.template.mjs`, NOT `*.test.ts`, so vitest's `tests/**/*.test.ts`
-// include pattern (vite.config.ts) never collects it — a guard that points at a hub that
-// doesn't exist yet must not red the build. To ACTIVATE it once the hub lands:
-//   1. Build the hub (a same-origin page that iframes the real `dist/index.html` and drives
-//      it through the public hooks listed in HOOKS below).
-//   2. Move this file to `tests/test-hub.test.ts` and swap the `export const tests` block at
-//      the bottom for vitest's `describe/it` (this repo's runner — see any tests/*.test.ts).
+// STATUS: PORTABLE TEMPLATE. Golf Stars ALREADY activated its own guard at
+// `tests/test-hub.test.ts` (driving the shipped hub, src/test/hub.ts → test.html) — this file
+// stays as the fill-in-the-blanks version to copy into OTHER projects. It is deliberately named
+// `*.template.mjs`, NOT `*.test.ts`, so vitest's `tests/**/*.test.ts` include pattern never
+// collects it. To adapt it in a new project:
+//   1. Build the hub (a same-origin page that iframes the real built app and drives it through
+//      the public hooks listed in HOOKS below).
+//   2. Move this file to your test folder (`tests/test-hub.test.ts`) and, for a vitest project,
+//      swap the `export const tests` block at the bottom for `describe/it` (see Golf Stars'
+//      tests/test-hub.test.ts for the worked example).
 //   3. Point `readHub()` at the hub file and fill each HOOK's `hub` token.
 //   4. Tick I3/I3a in standards/TEST-HUB-STANDARD.md.
 //

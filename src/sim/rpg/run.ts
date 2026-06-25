@@ -343,6 +343,8 @@ export interface RunStrategy {
   shop?(run: Run): string[];
   /** Run format id; default = the engine default ('flat'). */
   formatId?: string;
+  /** Permanent meta-upgrades baked into the starting loadout/credits; default = none. */
+  meta?: MetaUpgrades;
 }
 
 export interface RunOutcome {
@@ -356,7 +358,7 @@ export function simulateRun(
   strategy: RunStrategy = {},
   maxStops = 100,
 ): RunOutcome {
-  let run = startRun(seed, strategy.formatId);
+  let run = startRun(seed, strategy.formatId, strategy.meta);
   const stops: StopResult[] = [];
   for (let i = 0; i < maxStops && run.status === 'active'; i++) {
     const played = playStop(run);

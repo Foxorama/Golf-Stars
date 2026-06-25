@@ -30,19 +30,29 @@ Everything below serves whichever avenue wins.
   log. Pass `artUrl` to `courseCardHTML` once images exist.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
   `new Rng('daily-YYYY-MM-DD')`.
-- **GS-15 — Test/demo hub + sync-guard (meet `standards/TEST-HUB-STANDARD.md`).** The portable
-  standard + a Golf-Stars-tailored guard now live in `standards/`, but no invariant is fully ticked:
-  there's no hub yet. To close it: (1) build one same-origin page that iframes the inlined
-  `dist/index.html` and drives it through the existing hooks (`?seed=`, `?intro=`, `window._gsFeel`
-  /`_gsIntro`/`_gsSpray`) — re-implementing zero sim/UI logic; (2) give each hook BOTH a URL form and
-  a live helper (I2 — the feel flags lack a URL form, the URL params lack a no-reload helper);
-  (3) activate `standards/test-hub-guard.template.mjs` by moving it to `tests/test-hub.test.ts` (vitest
-  `describe/it`), ideally upgrading I3a from text-match to an **imported hook registry** (this is a
-  build project, so that's the stronger source of truth); (4) add the "add hook → add hub control →
-  extend guard → update docs" rule to CLAUDE.md (I4). Keep the hub a render/DOM side-effect, never in
-  the pure reducer or sim — same boundary as the intro cinematic.
+- **GS-15b — Finish I2 parity on the hub.** Each hook should have BOTH a URL form and a live form.
+  Remaining: a URL form for the feel flags (`?feel=`/`?spray=` seeding `window._gs*` at first paint)
+  and a live no-reload helper for seed/intro (drive the iframe without a full reload). Small; the
+  hub + guard + four other hooks already shipped in GS-15.
 
 ## Done
+- **GS-15 — Test & demo hub + Sim Lab + CI sync-guard.** A second built page (`test.html` →
+  `src/test/hub.ts`, served at `dist/test.html` beside the game) to demo features and stress-test
+  the sim. Two faces: a **Demo** that drives the REAL game in an iframe via its public hooks
+  (`?seed=`, `?intro=`, and live `window._gsFeel`/`_gsIntro`/`_gsSpray` flags on the same-origin
+  frame — zero re-implemented logic), and a **Sim Lab** that imports the pure sim for the batch
+  experiments the headless engine was built for. `src/test/lab.ts` (pure, DOM-free, tested in
+  `tests/lab.test.ts`): `dispersionStudy()` fires a club N times through the real `resolveShot`
+  ("hit the driver 1000×" → scatter + carry histogram + σ/percentiles, reading the per-club
+  wildness model true); `buildLoadout()` composes a real loadout from handicap + meta upgrades +
+  shop perks; `scoreHarness()` runs N seeded `simulateRun`s reporting **mean per-stop Stableford**
+  (the balance metric). `src/test/charts.ts` is render-only Canvas2D. Tiny sim addition: `meta` on
+  `RunStrategy`/`simulateRun` so the permanent layer is headlessly simulatable (backward-compatible).
+  Build: singlefile forbids multi-input, so `npm run build` runs vite twice (game, then `VITE_HUB=1`
+  appending the hub) — `pages.yml` unchanged. The standard + portable guard template live in
+  `standards/`; `tests/test-hub.test.ts` is the live CI sync-guard (hub↔app hook parity both ways +
+  imports-not-copies). I4 process rule added to CLAUDE.md. Verified eyes-on (Playwright). I2 is the
+  one partial invariant → GS-15b.
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
   differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
   content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression

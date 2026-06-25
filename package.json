@@ -6,7 +6,7 @@
   "description": "A travelling space golf RPG — voyage the galaxy playing procedurally-generated golf courses.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && VITE_HUB=1 vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

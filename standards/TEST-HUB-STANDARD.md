@@ -119,13 +119,13 @@ with an import of your app's hook registry — the assertions (parity both ways)
 
 ## Golf Stars — where this project stands (read this part first)
 
-Golf Stars is a **build/module project** (Vite + TypeScript + vitest), so it should adopt the
-**stronger** I3a source of truth — an imported hook registry — rather than golf-finder's
-text-match. Today there is **no test hub**, so the standard is documented and the guard is
-staged but no invariant is fully ticked yet. This section is the honest current state and the
-gap to close (tracked as **GS-15** in `IDEAS.md`).
+Golf Stars is a **build/module project** (Vite + TypeScript + vitest). The hub is **shipped**
+(GS-15): `test.html` → `src/test/hub.ts`, built into `dist/test.html` and served beside the game
+on the same origin. It has two faces — a DEMO that drives the real game in an iframe, and a SIM
+LAB that imports the pure sim for batch experiments (shot dispersion, loadout/upgrade builder,
+scoring harness). The pure experiment engine is `src/test/lab.ts` (DOM-free, unit-tested).
 
-**Hooks the app already exposes** (the seed of the hub's control rail):
+**Hooks the app exposes** (the hub's control rail drives these):
 
 | Hook | Flavour | Form | Defined in |
 | --- | --- | --- | --- |
@@ -136,24 +136,29 @@ gap to close (tracked as **GS-15** in `IDEAS.md`).
 | Spray tiers | live (escape-hatch) | `window._gsSpray` | `src/app.ts` |
 
 **Conformance status:**
-- **I1** — n/a yet (no hub). When built, iframe the inlined `dist/index.html` (the single-file
-  build) same-origin; re-implement zero sim/UI logic — the hub pokes, the pure `src/sim` scores.
-- **I2** — *Partial.* Both feel hooks above have a live form; `seed`/`intro` have a declarative
-  form. The live escape-hatches lack a URL form and the URL params lack a no-reload helper — the
-  standard wants **both** per hook. Closing that is part of GS-15.
-- **I3 / I3a** — *Staged, not active.* `standards/test-hub-guard.template.mjs` holds the parity
-  guard pre-filled with the five real hooks above; its app-side (direction A) already asserts
-  against the real source. It is a `*.template.mjs` so vitest (`include: tests/**/*.test.ts`)
-  does **not** run it — activate by moving it to `tests/test-hub.test.ts` (vitest `describe/it`)
-  once the hub exists. Prefer upgrading I3a to an imported registry while you're there.
-- **I4** — When GS-15 ships, add the four-step atomic-change rule to `CLAUDE.md` (the project's
-  shared record), mirroring the escape-hatch and versioned-save rules already there.
+- **I1 ✅** — The hub iframes the real, inlined `dist/index.html` same-origin and pokes it. The
+  Sim Lab imports the REAL sim (`resolveShot`, `loadoutFromPerks`, `simulateRun`, …) and only
+  *measures* it (mean/σ/percentiles) — zero re-implemented game logic. Its option lists (clubs,
+  perks, meta upgrades, lies, formats) are read from the sim's own tables, so they can't fork.
+- **I2 — Partial.** `seed`/`intro` have a declarative URL form; the feel flags have a live form.
+  Each hook ideally gets BOTH; adding a URL form for the feel flags and a live helper for seed/
+  intro is the remaining I2 gap (a small follow-on, noted in IDEAS GS-15).
+- **I3 / I3a ✅** — `tests/test-hub.test.ts` is the live CI guard: it text-matches the real source
+  both directions (app defines every hook / hub drives every hook) and asserts the hub imports the
+  sim tables (so its lists share one source of truth, not a copy). The portable fill-in version
+  remains at `standards/test-hub-guard.template.mjs` for other projects.
+- **I4 ✅** — The atomic-change rule lives in `CLAUDE.md` (*Test & demo hub* section): add hook →
+  add hub control → extend the guard → update docs, all in one PR.
 
 **Golf Stars-specific notes:**
-- The enumerated-set check in the guard (FILL #3) is wired to the closed **biome** list
-  (`src/sim/course/biomes.ts`) — a natural hub control (a biome picker) and a real both-ways
-  parity target. Rarity tiers (`RARITY_C`) and run formats (`src/sim/rpg/formats.ts`) are other
-  closed sets a hub would surface.
+- The Sim Lab is the project's QA-lens tool made interactive: the sim is pure/headless *precisely*
+  so you can simulate from a seed and assert outcomes — the hub just puts a dial and a chart on
+  that. "Hit the driver 1000×" is `dispersionStudy()`; "does this upgrade score better?" is
+  `scoreHarness()` over N seeded `simulateRun`s, judged on **mean per-stop Stableford** (the
+  project's balance metric — distance is chaotic, see CLAUDE.md).
 - Keep the hub a **render/DOM side-effect**, never inside the pure reducer (`src/ui/game.ts`) or
-  the sim — same boundary as the intro cinematic and save persistence (see CLAUDE.md). Driving
-  the app by URL param + `window._gs*` flag respects that: the hub touches the shell, not the sim.
+  the sim — same boundary as the intro cinematic and save persistence. Driving the app by URL
+  param + `window._gs*` flag respects that: the hub touches the shell, not the sim.
+- Build/deploy: `vite-plugin-singlefile` forbids multiple inputs, so `npm run build` runs vite
+  **twice** (the game, then `VITE_HUB=1` for the hub with `emptyOutDir:false`) → two inlined files
+  in `dist/`. `pages.yml` already runs `npm run build`, so the hub deploys with the game.
