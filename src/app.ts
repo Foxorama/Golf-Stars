@@ -10,8 +10,9 @@ import { scoreName } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { courseCardHTML, itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
+import { holeProjector } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
-import { biomeCarryMult } from './sim/round';
+import { biomeCarryMult, pinOf } from './sim/round';
 import { biomeById } from './sim/course/biomes';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import type { SprayTiers } from './render/holeView';
@@ -217,6 +218,8 @@ let animatedPutts = 0; // putts of the current hole already animated
 let selClubId: string | null = null;
 let selAim: 'attack' | 'safe' = 'attack';
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
+// Free-aim target (course-space) from tapping/dragging the map; overrides attack/safe when set.
+let selFreeTarget: [number, number] | null = null;
 // Shot-result popup: after a non-terminal shot settles, freeze on a result card + Continue
 // before the next decision, so each shot gets its own beat. Module-level (a timed view
 // effect, not reducer state — like animatedShots above).
@@ -228,6 +231,79 @@ function pendingAnimation(play: NonNullable<UiState['play']>): { shots: typeof p
   const newPutts = play.puttLogs.slice(animatedPutts);
   if (newShots.length === 0 && newPutts.length === 0) return null;
   return { shots: newShots, putts: newPutts };
+}
+
+/** Clamp a free-aim target so you can never aim BEYOND your longest club's reach (#10). */
+function clampToReach(play: NonNullable<UiState['play']>, target: [number, number]): [number, number] {
+  const bag = state.run.loadout.bag;
+  const maxReach = Math.max(...bag.filter((c) => c.id !== 'putter').map((c) => c.carry)) * biomeCarryMult(play.hole);
+  const dx = target[0] - play.ball[0];
+  const dy = target[1] - play.ball[1];
+  const d = Math.hypot(dx, dy);
+  if (d <= maxReach || d === 0) return [target[0], target[1]];
+  return [play.ball[0] + (dx / d) * maxReach, play.ball[1] + (dy / d) * maxReach];
+}
+
+let renderScheduled = false;
+/** rAF-throttle re-render so a fast drag doesn't rebuild the DOM faster than the screen refreshes. */
+function scheduleRender(): void {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  requestAnimationFrame(() => {
+    renderScheduled = false;
+    render();
+  });
+}
+
+/**
+ * Wire tap/drag-to-aim on the decision map. The map SVG is the same size the projector rendered
+ * (320×460 viewBox), so we reconstruct that exact projector and `unproject` the pointer into
+ * course-space, clamped to the player's reach. Pointer-move/up listen on `window` so a drag
+ * survives the per-frame re-render that replaces the map element.
+ */
+function wireMapAiming(app: HTMLElement): void {
+  if (state.screen !== 'playing' || !state.play || state.holeSplash || awaitingShotPopup) return;
+  if (state.play.done || awaitingPutt(state.play)) return; // only the full-shot decision screen
+  const svg = app.querySelector<SVGSVGElement>('[data-map] svg');
+  if (!svg) return;
+  let dragging = false;
+  const toTarget = (clientX: number, clientY: number): void => {
+    const cur = document.querySelector<SVGSVGElement>('[data-map] svg');
+    if (!cur || !state.play) return;
+    const rect = cur.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const vbX = ((clientX - rect.left) / rect.width) * 320;
+    const vbY = ((clientY - rect.top) / rect.height) * 460;
+    // Reconstruct the EXACT decision-map projector (same params as the render), then unproject.
+    const spray = previewShot(
+      state.play,
+      { clubId: selClubId!, aim: selAim, target: selFreeTarget ?? undefined },
+      state.run.loadout,
+    );
+    const reach = Math.max(55, spray.carryHigh * 0.62);
+    const proj = holeProjector(state.play.hole, { width: 320, height: 460, focus: state.play.ball, viewRadius: reach });
+    const t = proj.unproject(vbX, vbY);
+    selFreeTarget = clampToReach(state.play, [t[0], t[1]]);
+    scheduleRender();
+  };
+  const move = (e: PointerEvent): void => {
+    if (dragging) {
+      e.preventDefault();
+      toTarget(e.clientX, e.clientY);
+    }
+  };
+  const up = (): void => {
+    dragging = false;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+  };
+  svg.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    e.preventDefault();
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    toTarget(e.clientX, e.clientY);
+  });
 }
 
 const HAZARD_LABEL: Record<string, string> = {
@@ -363,10 +439,13 @@ function playingBody(animating: boolean): string {
     decisionShotCount = play.shots.length;
     selClubId = null;
     selAim = 'attack';
+    selFreeTarget = null;
   }
   const suggested = v.lie === 'green' && bag.some((c) => c.id === 'putter') ? 'putter' : v.attackClubId;
   if (selClubId === null || !bag.some((c) => c.id === selClubId)) selClubId = suggested;
-  const spray = previewShot(play, { clubId: selClubId, aim: selAim }, state.run.loadout);
+  // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
+  const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined };
+  const spray = previewShot(play, decision, state.run.loadout);
   // Feel escape-hatch: window._gsSpray lets the tier split be A/B'd live (e.g. 50/25/25).
   const sprayTiers = (window as unknown as { _gsSpray?: SprayTiers })._gsSpray;
   const tierPct = sprayTiers?.centralPct ?? 80;
@@ -394,17 +473,20 @@ function playingBody(animating: boolean): string {
     ${cbtn('►', 1)}
     <button data-suggest="1" title="Use the suggested club" style="padding:9px 10px;border-radius:8px;border:1px solid ${selClubId === suggested ? '#5fd45a' : '#333'};background:#1d212c;color:#e8e8ea;font-size:13px;cursor:pointer;">🎯 Suggested</button>`;
   const aimButtons = `
-    <button data-aim="attack" style="${aimBtnStyle(selAim === 'attack')}">🎯 Attack pin</button>
-    <button data-aim="safe" style="${aimBtnStyle(selAim === 'safe')}">🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}</button>`;
+    <button data-aim="attack" style="${aimBtnStyle(selAim === 'attack' && !selFreeTarget)}">🎯 Attack pin</button>
+    <button data-aim="safe" style="${aimBtnStyle(selAim === 'safe' && !selFreeTarget)}">🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}</button>
+    <button data-aim="free" style="${aimBtnStyle(!!selFreeTarget)}" title="Tap or drag the map to aim">✋ Free aim</button>`;
+  const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
   return `
     ${header()}
     <p style="font-size:14px;opacity:.85;">${scoreLine} · ${v.distToPin} yds to pin · lie <b>${v.lie}</b> · wind ${v.wind?.spd.toFixed(0) ?? 0}mph · <span style="opacity:.6;">pick up at +4 (${par + 4})</span></p>
     <div class="gs-play">
-      <div class="gs-map" data-map="1" style="border:1px solid #222;border-radius:10px;overflow:hidden;">${svg}</div>
+      <div class="gs-map" data-map="1" style="border:1px solid #222;border-radius:10px;overflow:hidden;touch-action:none;">${svg}</div>
       <section class="gs-controls">
+        <p style="font-size:11px;opacity:.55;margin:.1em 0 .4em;">Tap or drag the map to aim freely (within max distance).</p>
         <h3 style="font-size:14px;margin:.3em 0;">Club</h3>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${clubButtons}</div>
-        <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}</p>
+        <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}${selFreeTarget ? ' · ✋ free aim' : ''}</p>
         <p style="font-size:12px;margin:.3em 0;line-height:1.5;">
           <span style="color:#5fd45a;">▮</span> ~${tierPct}% lands here · <span style="color:#ffc454;">▮</span> ${sideePct}% each side ·
           width <b>±${Math.round((sprayTiers?.edgeZ ?? 2.5) * spray.lateralSd)} yds</b> · carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
@@ -413,7 +495,7 @@ function playingBody(animating: boolean): string {
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>
         <div style="margin-top:10px;">${puttToggleBtn()}</div>
         <div class="gs-hitbar" style="margin-top:12px;">
-          ${btn('🏌 Hit', { type: 'shot', clubId: selClubId!, aim: selAim })}
+          ${btn('🏌 Hit', hitAction)}
           ${btn('» Auto-finish hole', { type: 'autoShotHole' })}
         </div>
       </section>
@@ -637,10 +719,20 @@ function render(): void {
   });
   app.querySelectorAll<HTMLElement>('[data-aim]').forEach((el) => {
     el.addEventListener('click', () => {
-      selAim = el.dataset.aim === 'safe' ? 'safe' : 'attack';
+      const a = el.dataset.aim;
+      if (a === 'free') {
+        // Seed the free target at the pin (clamped to reach) so it's there to nudge/drag.
+        if (state.play) selFreeTarget = clampToReach(state.play, pinOf(state.play.hole));
+      } else {
+        selAim = a === 'safe' ? 'safe' : 'attack';
+        selFreeTarget = null; // an explicit aim choice cancels free aim
+      }
       render();
     });
   });
+  // Tap/drag the map to aim freely. Pointer-move/up listen on window so the drag survives the
+  // per-frame re-render (which replaces the map element); the new element is re-queried each move.
+  wireMapAiming(app);
   // "Use suggested" snaps the club back to the suggestion for this position.
   app.querySelectorAll<HTMLElement>('[data-suggest]').forEach((el) => {
     el.addEventListener('click', () => {

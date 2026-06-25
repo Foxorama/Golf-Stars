@@ -99,7 +99,7 @@ export type Action =
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'startHole' } // dismiss the hole briefing splash, begin playing
-  | { type: 'shot'; clubId: string; aim: AimMode }
+  | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number] }
   | { type: 'putt' } // take one manual putt on the green
   | { type: 'toggleAutoPutt' } // flip auto putt-out vs manual
   | { type: 'autoShotHole' } // AI-finish the current hole
@@ -224,7 +224,13 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
       if (awaitingPutt(state.play)) return state; // on the green → must putt, not swing
       const auto = state.autoPutt || !!state.run.loadout.autoPutt;
-      const play = takeShot(state.play, { clubId: action.clubId, aim: action.aim }, state.run.loadout, state.holeRng, auto);
+      const play = takeShot(
+        state.play,
+        { clubId: action.clubId, aim: action.aim, target: action.target },
+        state.run.loadout,
+        state.holeRng,
+        auto,
+      );
       return { ...state, play, holeSplash: false };
     }
 

@@ -36,6 +36,8 @@ export type AimMode = 'attack' | 'safe';
 export interface ShotDecision {
   clubId: string;
   aim: AimMode;
+  /** Free-aim target (course-space) from tapping/dragging the map; overrides `aim` when set. */
+  target?: Vec;
 }
 
 export interface HolePlay {
@@ -118,7 +120,7 @@ export function previewShot(
 ): ShotSpread {
   const carryMult = biomeCarryMult(state.hole);
   const target =
-    decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball);
+    decision.target ?? (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball));
   const club =
     loadout.bag.find((c) => c.id === decision.clubId) ??
     aiClub(state.hole, state.ball, target, carryMult, loadout.bag);
@@ -146,7 +148,8 @@ export function takeShot(
   if (state.done) return state;
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
-  const target = decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball);
+  const target =
+    decision.target ?? (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball));
   const club: Club =
     loadout.bag.find((c) => c.id === decision.clubId) ??
     aiClub(state.hole, state.ball, target, carryMult, loadout.bag);
