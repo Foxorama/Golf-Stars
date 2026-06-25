@@ -236,7 +236,11 @@ This game lives or dies on three axes — put every change through all three bef
 
 ## Change & versioning flow
 - `main` is branch-protected. Each change: branch → edit → commit → push → PR → merge → sync.
-- Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → sync).
+- **Default to shipping all the way (this project's rule).** When a change is complete and tests are
+  green, take it to done without waiting to be asked: open the PR, merge it (once CI passes), then
+  clean up — delete the merged feature branch (local + remote) and sync `main`. Only stop short of
+  merging if the work is explicitly WIP, the user says not to, or CI is red/unresolved.
+- Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → cleanup).
 - Commit messages explain the *why*; end with the Co-Authored-By: Claude trailer.
 
 ## Do NOT carry from golf-finder
