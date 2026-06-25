@@ -19,10 +19,13 @@ describe('putting path (GS-4)', () => {
       for (let i = 1; i < putts.length; i++) {
         expect(putts[i]!.from).toEqual(putts[i - 1]!.to);
       }
-      // Exactly the last putt is holed, and it finishes at the pin.
-      expect(putts[putts.length - 1]!.holed).toBe(true);
-      expect(putts.slice(0, -1).every((p) => !p.holed)).toBe(true);
-      expect(dist(putts[putts.length - 1]!.to, hole.green)).toBeLessThanOrEqual(0.001);
+      // When the hole is actually holed (not picked up at the cap), the last putt drops
+      // at the pin and no earlier putt does.
+      if (!played.pickedUp) {
+        expect(putts[putts.length - 1]!.holed).toBe(true);
+        expect(putts.slice(0, -1).every((p) => !p.holed)).toBe(true);
+        expect(dist(putts[putts.length - 1]!.to, hole.green)).toBeLessThanOrEqual(0.001);
+      }
     }
     expect(checked).toBeGreaterThan(0);
   });

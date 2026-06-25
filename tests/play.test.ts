@@ -74,7 +74,7 @@ describe('interactive play driver', () => {
     for (let seed = 0; seed < 60; seed++) {
       const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
       const s = driveAuto(beginHole(hole), startingLoadout(), new Rng(`${seed}:p`));
-      if (s.done) expect(s.holed).toBe(true);
+      if (s.done) expect(s.holed || s.pickedUp).toBe(true);
     }
   });
 });

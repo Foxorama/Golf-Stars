@@ -24,6 +24,8 @@ import type { Rng } from './rng';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
+/** Max strokes over par before you pick up (max-score rule). Hole ends, score = par + this. */
+export const MAX_OVER_PAR = 4;
 /** Hard cap on full swings so a pathological hole can't loop forever. */
 const MAX_FULL_SWINGS = 20;
 
@@ -75,6 +77,8 @@ export interface PlayedHole {
   /** Putts on the green, in order; the last one is holed. */
   putts: PuttLog[];
   holed: boolean;
+  /** True if the hole was picked up at the max-score cap (par + MAX_OVER_PAR). */
+  pickedUp: boolean;
 }
 
 export interface PlayHoleOptions {
@@ -106,12 +110,17 @@ function dropPoint(hole: Hole, from: Vec, landing: Vec): Vec {
  * a later refinement): short putts usually drop, long putts lag close, with a small
  * lateral miss so a missed putt visibly slides past the hole rather than through it.
  */
-function puttOut(rng: Rng, from: Vec, pinPt: Vec): { putts: number; log: PuttLog[] } {
+function puttOut(
+  rng: Rng,
+  from: Vec,
+  pinPt: Vec,
+  maxPutts = 6,
+): { putts: number; log: PuttLog[]; holed: boolean } {
   const log: PuttLog[] = [];
   let pos: Vec = from;
   let d = dist(pos, pinPt);
   let putts = 0;
-  while (d > HOLE_OUT_RADIUS && putts < 6) {
+  while (d > HOLE_OUT_RADIUS && putts < maxPutts) {
     putts++;
     let newD: number;
     if (d <= 2.2) {
@@ -138,7 +147,7 @@ function puttOut(rng: Rng, from: Vec, pinPt: Vec): { putts: number; log: PuttLog
     pos = to;
     d = holed ? 0 : dist(pos, pinPt);
   }
-  return { putts, log };
+  return { putts, log, holed: d <= HOLE_OUT_RADIUS };
 }
 
 /**
@@ -167,6 +176,8 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
   let fairwayHit: boolean | null = hole.par >= 4 ? false : null;
   const shots: ShotLog[] = [];
   let holed = false;
+  let pickedUp = false;
+  const maxStrokes = hole.par + MAX_OVER_PAR;
 
   for (let swing = 0; swing < MAX_FULL_SWINGS; swing++) {
     const remaining = dist(ball, target);
@@ -200,25 +211,37 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       holed = true;
       break;
     }
+    // Max-score rule: at par + MAX_OVER_PAR strokes, pick up.
+    if (strokes >= maxStrokes) {
+      pickedUp = true;
+      strokes = maxStrokes;
+      break;
+    }
     if (lie === 'green' || dist(ball, target) <= HOLE_OUT_RADIUS) break;
   }
 
-  // Putt out.
+  // Putt out (unless already holed or picked up), within the remaining stroke budget.
   const puttLog: PuttLog[] = [];
-  const remaining = dist(ball, target);
-  if (remaining <= HOLE_OUT_RADIUS) {
-    holed = true;
-  } else {
-    const out = puttOut(rng, ball, target);
-    putts = out.putts;
-    puttLog.push(...out.log);
-    strokes += putts;
-    holed = true;
+  if (!holed && !pickedUp) {
+    const remaining = dist(ball, target);
+    if (remaining <= HOLE_OUT_RADIUS) {
+      holed = true;
+    } else {
+      const out = puttOut(rng, ball, target, Math.max(1, maxStrokes - strokes));
+      putts = out.putts;
+      puttLog.push(...out.log);
+      strokes += putts;
+      if (out.holed) holed = true;
+      else {
+        pickedUp = true;
+        strokes = maxStrokes;
+      }
+    }
   }
 
   const record: HoleRecord = { par: hole.par, strokes };
   const stat: HoleStat = { par: hole.par, strokes, putts, penalties, fairwayHit };
-  return { record, stat, shots, putts: puttLog, holed };
+  return { record, stat, shots, putts: puttLog, holed, pickedUp };
 }
 
 /** Play every hole of a course in order; returns per-hole results. */
@@ -346,8 +369,13 @@ export function layupTarget(hole: Hole, ball: Vec): Vec {
 }
 
 /** Auto putt-out from a position (exported for the interactive driver). */
-export function puttOutFrom(rng: Rng, from: Vec, pinPt: Vec): { putts: number; log: PuttLog[] } {
-  return puttOut(rng, from, pinPt);
+export function puttOutFrom(
+  rng: Rng,
+  from: Vec,
+  pinPt: Vec,
+  maxPutts = 6,
+): { putts: number; log: PuttLog[]; holed: boolean } {
+  return puttOut(rng, from, pinPt, maxPutts);
 }
 
 /** True if the straight line from→to is free of penalty surfaces (sampled). */

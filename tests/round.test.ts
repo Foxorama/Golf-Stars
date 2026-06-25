@@ -18,7 +18,7 @@ describe('round simulation (the vertical slice)', () => {
     expect(a.shots.length).toBe(b.shots.length);
 
     // The ball is always holed and the score is sane.
-    expect(a.holed).toBe(true);
+    expect(a.holed || a.pickedUp).toBe(true);
     expect(a.record.strokes).toBeGreaterThanOrEqual(1);
     expect(a.record.strokes).toBeLessThanOrEqual(12);
     expect(a.stat.putts).toBeGreaterThanOrEqual(0);
@@ -31,7 +31,7 @@ describe('round simulation (the vertical slice)', () => {
 
       expect(played).toHaveLength(3);
       for (const p of played) {
-        expect(p.holed).toBe(true);
+        expect(p.holed || p.pickedUp).toBe(true);
         expect(p.record.strokes).toBeGreaterThanOrEqual(1);
         expect(p.record.strokes).toBeLessThan(20);
       }
