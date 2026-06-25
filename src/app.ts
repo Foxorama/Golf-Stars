@@ -126,25 +126,29 @@ function dispatch(action: Action): void {
   }
 }
 
+type BtnVariant = 'primary' | 'ghost' | 'on';
+
 const btn = (
   label: string,
   action: Action,
-  opts: { disabled?: boolean; borderColor?: string; block?: boolean } = {},
-): string =>
-  `<button data-action='${JSON.stringify(action)}'${opts.disabled ? ' disabled' : ''}
-     style="padding:9px 12px;border-radius:8px;border:1px solid ${opts.borderColor ?? '#333'};background:${opts.disabled ? '#15171d' : '#1d212c'};
-     color:${opts.disabled ? '#666' : '#e8e8ea'};font-size:14px;cursor:${opts.disabled ? 'default' : 'pointer'};margin:3px 4px 3px 0;${
-       opts.block ? 'display:block;width:100%;' : ''
-     }">${label}</button>`;
+  opts: { disabled?: boolean; borderColor?: string; block?: boolean; variant?: BtnVariant } = {},
+): string => {
+  const cls = ['gs-btn'];
+  if (opts.variant) cls.push(`gs-btn--${opts.variant}`);
+  if (opts.block) cls.push('gs-btn--block');
+  // A rarity/accent border (e.g. travel routes) overrides the class default and its hover tint.
+  const style = opts.borderColor ? ` style="--btn-border:${opts.borderColor};--btn-hover:${opts.borderColor};"` : '';
+  return `<button class="${cls.join(' ')}" data-action='${JSON.stringify(action)}'${opts.disabled ? ' disabled' : ''}${style}>${label}</button>`;
+};
 
 function header(): string {
   const r = state.run;
   return `
-    <header style="display:flex;align-items:baseline;gap:12px;border-left:4px solid ${rarCol(state.course.rarity)};padding-left:10px;">
+    <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
       <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>
-      <span style="margin-left:auto;font-size:13px;opacity:.8;">
-        Stop ${r.stopIndex + 1} · Dist ${r.distanceFromStart} · Credits <b>${r.credits}</b>
-        · Hcp <b>${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
+      <span style="margin-left:auto;font-size:13px;color:var(--gs-dim);">
+        Stop <b style="color:var(--gs-ink);">${r.stopIndex + 1}</b> · Dist <b style="color:var(--gs-ink);">${r.distanceFromStart}</b> · Credits <b style="color:var(--gs-warn);">${r.credits}</b>
+        · Hcp <b style="color:var(--gs-ink);">${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
       </span>
     </header>`;
 }
@@ -153,13 +157,13 @@ function titleScreen(): string {
   const formats = Object.values(FORMATS)
     .map(
       (f) => `
-      <div style="border:1px solid #2a2f3a;border-radius:10px;padding:12px;margin:8px 0;background:#11141b;">
+      <div class="gs-panel gs-format">
         <div style="display:flex;align-items:baseline;gap:10px;">
           <b style="font-size:16px;">${f.name}</b>
           <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
         </div>
         <p style="font-size:13px;opacity:.8;margin:.4em 0;">${f.blurb}</p>
-        ${btn(`Start — ${f.name}`, { type: 'start', format: f.id })}
+        ${btn(`Start — ${f.name}`, { type: 'start', format: f.id }, { variant: 'primary' })}
       </div>`,
     )
     .join('');
@@ -168,15 +172,15 @@ function titleScreen(): string {
       <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
     </header>
-    <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:14px;">✦ <b>${state.shards}</b> Star Shards</span>
-      ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' })}
+    <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
+      ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' }, { variant: 'ghost' })}
     </div>
     ${
       state.resumable
-        ? `<div style="margin:1em 0;padding:10px 12px;border:1px solid #2bb673;border-radius:10px;background:#11181400;">
+        ? `<div class="gs-panel" style="border-color:#2bb673;background:linear-gradient(180deg,#10241a,#0e1a14);">
              <b style="font-size:14px;">Run in progress</b> — stop ${state.resumable.stopIndex + 1}, distance ${state.resumable.distanceFromStart}, ${state.resumable.credits} credits.
-             <div style="margin-top:6px;">${btn('▶ Continue run', { type: 'resume' })}</div>
+             <div style="margin-top:6px;">${btn('▶ Continue run', { type: 'resume' }, { variant: 'primary' })}</div>
            </div>`
         : ''
     }
@@ -205,8 +209,8 @@ function introScreen(): string {
       <section style="flex:1 1 220px;">
         ${evBanner}
         <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes to make the cut and travel on.</p>
-        ${btn('🏌 Play shot by shot', { type: 'playInteractive' })}
-        ${btn('» Auto-play (watch)', { type: 'play' })}
+        ${btn('🏌 Play shot by shot', { type: 'playInteractive' }, { variant: 'primary' })}
+        ${btn('» Auto-play (watch)', { type: 'play' }, { variant: 'ghost' })}
       </section>
     </div>`;
 }
@@ -358,7 +362,7 @@ function holeSplashBody(): string {
   const len = Math.round(dist(hole.tee, hole.green));
   const map = renderHoleSVG(hole, { biome: state.course.biome, width: 320, height: 420 });
   const fact = (label: string, val: string): string =>
-    `<div style="display:flex;justify-content:space-between;gap:14px;font-size:14px;padding:5px 0;border-bottom:1px solid #1c2029;">
+    `<div style="display:flex;justify-content:space-between;gap:14px;font-size:14px;padding:5px 0;border-bottom:1px solid var(--gs-line-2);">
        <span style="opacity:.6;">${label}</span><span style="font-weight:600;text-align:right;">${val}</span></div>`;
   return `
     ${header()}
@@ -369,7 +373,7 @@ function holeSplashBody(): string {
         ${fact('Wind', windDescription(hole))}
         ${fact('Hazards', hazardSummary(hole))}
         ${fact('Conditions', conditionsSummary(hole, state.course.biome))}
-        <div class="gs-hitbar" style="margin-top:14px;">${btn('▶ Play the hole', { type: 'startHole' })}</div>
+        <div class="gs-hitbar" style="margin-top:14px;">${btn('▶ Play the hole', { type: 'startHole' }, { variant: 'primary' })}</div>
       </section>
     </div>`;
 }
@@ -388,7 +392,7 @@ function playingBody(animating: boolean): string {
     return `
       ${header()}
       <p style="font-size:14px;opacity:.85;">${scoreLine}</p>
-      <div id="play" style="border:1px solid #222;border-radius:10px;overflow:hidden;width:340px;height:520px;"></div>
+      <div id="play" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);width:340px;height:520px;"></div>
       <p style="opacity:.6;font-size:12px;margin-top:6px;">…watching the shot…</p>`;
   }
 
@@ -402,7 +406,7 @@ function playingBody(animating: boolean): string {
       ${header()}
       <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${play.holed && play.shots.some((s) => s.holed) ? ' 🎉' : ''}</h2>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;max-width:420px;">${lastCard}${puttCard}</div>
-      <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' })}</div>`;
+      <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
   }
 
   // Manual putting on the green (auto-putt off): stroke putts one at a time.
@@ -421,12 +425,12 @@ function playingBody(animating: boolean): string {
       ${header()}
       <p style="font-size:14px;opacity:.85;">${scoreLine} · on the green · <b>${v.distToPin}</b> yds to the cup · putt <b>${play.putts + 1}</b></p>
       <div class="gs-play">
-        <div class="gs-map" style="border:1px solid #222;border-radius:10px;overflow:hidden;">${puttSvg}</div>
+        <div class="gs-map" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);">${puttSvg}</div>
         <section class="gs-controls">
           <div style="margin-bottom:10px;">${puttToggleBtn()}</div>
           <div class="gs-hitbar" style="margin-top:8px;">
-            ${btn('⛳ Putt', { type: 'putt' })}
-            ${btn('» Auto-finish putts', { type: 'autoShotHole' })}
+            ${btn('⛳ Putt', { type: 'putt' }, { variant: 'primary' })}
+            ${btn('» Auto-finish putts', { type: 'autoShotHole' }, { variant: 'ghost' })}
           </div>
         </section>
       </div>`;
@@ -468,22 +472,24 @@ function playingBody(animating: boolean): string {
     viewRadius: reach,
   });
   const cbtn = (label: string, dir: number) =>
-    `<button data-cycle="${dir}" style="padding:9px 12px;border-radius:8px;border:1px solid #333;background:#1d212c;color:#e8e8ea;font-size:14px;cursor:pointer;">${label}</button>`;
+    `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
   const clubButtons = `
     ${cbtn('◄', -1)}
     <b style="display:inline-block;min-width:6em;text-align:center;">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
     ${cbtn('►', 1)}
-    <button data-suggest="1" title="Use the suggested club" style="padding:9px 10px;border-radius:8px;border:1px solid ${selClubId === suggested ? '#5fd45a' : '#333'};background:#1d212c;color:#e8e8ea;font-size:13px;cursor:pointer;">🎯 Suggested</button>`;
+    <button class="gs-btn${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🎯 Suggested</button>`;
+  const aimBtn = (key: string, label: string, sel: boolean, title = ''): string =>
+    `<button class="gs-btn${sel ? ' gs-btn--on' : ''}" data-aim="${key}"${title ? ` title="${title}"` : ''}>${label}</button>`;
   const aimButtons = `
-    <button data-aim="attack" style="${aimBtnStyle(selAim === 'attack' && !selFreeTarget)}">🎯 Attack pin</button>
-    <button data-aim="safe" style="${aimBtnStyle(selAim === 'safe' && !selFreeTarget)}">🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}</button>
-    <button data-aim="free" style="${aimBtnStyle(!!selFreeTarget)}" title="Tap or drag the map to aim">✋ Free aim</button>`;
+    ${aimBtn('attack', '🎯 Attack pin', selAim === 'attack' && !selFreeTarget)}
+    ${aimBtn('safe', `🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}`, selAim === 'safe' && !selFreeTarget)}
+    ${aimBtn('free', '✋ Free aim', !!selFreeTarget, 'Tap or drag the map to aim')}`;
   const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
   return `
     ${header()}
     <p style="font-size:14px;opacity:.85;">${scoreLine} · ${v.distToPin} yds to pin · lie <b>${v.lie}</b> · wind ${v.wind?.spd.toFixed(0) ?? 0}mph · <span style="opacity:.6;">pick up at +4 (${par + 4})</span></p>
     <div class="gs-play">
-      <div class="gs-map" data-map="1" style="border:1px solid #222;border-radius:10px;overflow:hidden;touch-action:none;">${svg}</div>
+      <div class="gs-map" data-map="1" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);touch-action:none;">${svg}</div>
       <section class="gs-controls">
         <p style="font-size:11px;opacity:.55;margin:.1em 0 .4em;">Tap or drag the map to aim freely (within max distance).</p>
         <h3 style="font-size:14px;margin:.3em 0;">Club</h3>
@@ -497,8 +503,8 @@ function playingBody(animating: boolean): string {
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>
         <div style="margin-top:10px;">${puttToggleBtn()}</div>
         <div class="gs-hitbar" style="margin-top:12px;">
-          ${btn('🏌 Hit', hitAction)}
-          ${btn('» Auto-finish hole', { type: 'autoShotHole' })}
+          ${btn('🏌 Hit', hitAction, { variant: 'primary' })}
+          ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
         </div>
       </section>
     </div>
@@ -515,7 +521,7 @@ function shotPopupOverlay(): string {
     <div style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;">
       <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px;max-width:300px;width:100%;">
         ${shotCardHTML(last)}
-        <button data-popup-continue="1" style="padding:12px;border-radius:10px;border:1px solid #5fd45a;background:#16331f;color:#e8e8ea;font-size:16px;font-weight:600;cursor:pointer;">Continue →</button>
+        <button class="gs-btn gs-btn--primary" data-popup-continue="1" style="text-align:center;font-size:16px;padding:12px;">Continue →</button>
       </div>
     </div>`;
 }
@@ -524,11 +530,7 @@ function shotPopupOverlay(): string {
 function puttToggleBtn(): string {
   const locked = !!state.run.loadout.autoPutt;
   const on = state.autoPutt || locked;
-  return btn(`⛳ Auto-putt: ${on ? 'ON' : 'OFF'}${locked ? ' (Caddie)' : ''}`, { type: 'toggleAutoPutt' }, { disabled: locked });
-}
-
-function aimBtnStyle(sel: boolean): string {
-  return `padding:9px 12px;border-radius:8px;border:1px solid ${sel ? '#5fd45a' : '#333'};background:${sel ? '#16331f' : '#1d212c'};color:#e8e8ea;font-size:14px;cursor:pointer;margin:3px 4px 3px 0;`;
+  return btn(`⛳ Auto-putt: ${on ? 'ON' : 'OFF'}${locked ? ' (Caddie)' : ''}`, { type: 'toggleAutoPutt' }, { disabled: locked, variant: on ? 'on' : undefined });
 }
 
 function scorecard(): string {
@@ -536,13 +538,13 @@ function scorecard(): string {
   const rows = state.played
     .map((p, i) => {
       const sel = i === state.viewHole;
-      return `<tr style="cursor:pointer;${sel ? 'background:#1d212c;' : ''}" data-action='${JSON.stringify({ type: 'viewHole', hole: i })}'>
-        <td style="padding:2px 8px;">${i + 1}</td><td>${p.record.par}</td>
+      return `<tr${sel ? ' style="background:#1d212c;"' : ''} data-action='${JSON.stringify({ type: 'viewHole', hole: i })}'>
+        <td>${i + 1}</td><td>${p.record.par}</td>
         <td><b>${p.record.strokes}</b></td><td style="opacity:.8;">${p.pickedUp ? 'Picked up' : scoreName(p.record.par, p.record.strokes)}</td></tr>`;
     })
     .join('');
-  return `<table style="border-collapse:collapse;font-size:13px;width:100%;">
-    <tr style="opacity:.6;text-align:left;"><th style="padding:2px 8px;">#</th><th>Par</th><th>Score</th><th></th></tr>${rows}</table>`;
+  return `<table class="gs-scorecard">
+    <tr><th>#</th><th>Par</th><th>Score</th><th></th></tr>${rows}</table>`;
 }
 
 function resultScreen(): string {
@@ -551,9 +553,9 @@ function resultScreen(): string {
     ${header()}
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       <div>
-        <div id="play" style="border:1px solid #222;border-radius:10px;overflow:hidden;width:340px;height:520px;"></div>
+        <div id="play" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);width:340px;height:520px;"></div>
         <div style="margin-top:6px;">
-          ${btn('↻ Replay', { type: 'viewHole', hole: state.viewHole })}
+          ${btn('↻ Replay', { type: 'viewHole', hole: state.viewHole }, { variant: 'ghost' })}
           <span style="font-size:12px;opacity:.6;">click a row to watch that hole</span>
         </div>
       </div>
@@ -563,7 +565,7 @@ function resultScreen(): string {
         <p style="font-size:15px;">Stableford <b>${res.stableford}</b> vs cut <b>${res.cut}</b>
           · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>
         ${scorecard()}
-        <div style="margin-top:10px;">${btn('Continue → shop', { type: 'continue' })}</div>
+        <div style="margin-top:10px;">${btn('Continue → shop', { type: 'continue' }, { variant: 'primary' })}</div>
       </section>
     </div>`;
 }
@@ -584,7 +586,7 @@ function shopScreen(): string {
       const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned });
       // Wrap the card so the whole thing is the buy button when purchasable.
       return buyable
-        ? `<div data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+        ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
         : `<div style="margin:4px;">${card}</div>`;
     })
     .join('');
@@ -593,7 +595,7 @@ function shopScreen(): string {
     <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own.</p>
     <div style="display:flex;flex-wrap:wrap;">${items}</div>
-    <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' })}</div>`;
+    <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}</div>`;
 }
 
 function outpostScreen(): string {
@@ -609,7 +611,7 @@ function outpostScreen(): string {
     // Show the level track and use shard pricing (the card's "c" reads as the shard cost).
     const track = `<div style="font-size:11px;opacity:.6;text-align:center;margin-top:-4px;">Lv ${lvl}/${u.maxLevel}${maxed ? '' : ` · ✦${cost}`}</div>`;
     return buyable
-      ? `<div data-action='${JSON.stringify({ type: 'buyUpgrade', id: u.id })}' style="cursor:pointer;margin:4px;">${card}${track}</div>`
+      ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buyUpgrade', id: u.id })}' style="cursor:pointer;margin:4px;">${card}${track}</div>`
       : `<div style="margin:4px;">${card}${track}</div>`;
   }).join('');
   return `
@@ -620,7 +622,7 @@ function outpostScreen(): string {
     <h2 style="font-size:16px;margin:.6em 0 .2em;">✦ ${state.shards} Star Shards</h2>
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy the next level. Shards are earned by how far each run travels.</p>
     <div style="display:flex;flex-wrap:wrap;">${cards}</div>
-    <div style="margin-top:12px;">${btn('← Back to title', { type: 'closeOutpost' })}</div>`;
+    <div style="margin-top:12px;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
 }
 
 function travelScreen(): string {
@@ -660,8 +662,8 @@ function gameoverScreen(): string {
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">
-      ${btn('🛰 Spend at the Outpost', { type: 'openOutpost' })}
-      ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) })}
+      ${btn('🛰 Spend at the Outpost', { type: 'openOutpost' }, { variant: 'ghost' })}
+      ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) }, { variant: 'primary' })}
     </div>`;
 }
 
@@ -702,7 +704,7 @@ function render(): void {
       ? outpostScreen()
       : gameoverScreen();
 
-  app.innerHTML = `<main style="font-family:system-ui,sans-serif;max-width:820px;margin:0 auto;padding:16px;color:#e8e8ea;background:#0b0d12;min-height:100vh;">${body}</main>`;
+  app.innerHTML = `<main class="gs-main">${body}</main>`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.

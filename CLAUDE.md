@@ -286,6 +286,18 @@ This game lives or dies on three axes — put every change through all three bef
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the
   run API — intro → play → result → shop → travel → … → gameover. No DOM, no time, so the whole
   interactive flow is unit-tested. `main.ts` renders `UiState` and dispatches actions on clicks.
+- **Visual theme is a design-token stylesheet** (the `<style>` block in `index.html`, NOT the SVG
+  render layer). CSS custom properties (`--gs-bg/-2/-panel`, `--gs-ink/-dim`, `--gs-line/-2`,
+  `--gs-accent/-info/-danger/-gold/-warn`, `--gs-r/-r-lg`, `--gs-shadow`) are the single palette;
+  component classes carry the hover/active/focus states inline styles can't express:
+  `.gs-btn` (+ `--primary` green CTA / `--ghost` secondary / `--on` selected-toggle / `--block`),
+  `.gs-panel`, `.gs-format` (hover-lift title cards), `.gs-chip`, `.gs-clickcard` (hover-lift shop/
+  outpost cards), `.gs-scorecard`, `.gs-main` (the cosmic-vignette page frame). The `btn()` helper in
+  `app.ts` takes `variant`; a dynamic rarity border is passed as `borderColor` → `--btn-border`/
+  `--btn-hover` inline override (used by the travel route lanes). Adding a screen = reuse these
+  classes, not fresh inline colours. `cards.ts` keeps its rarity-tinted inline borders/`opacity`
+  (the cards tests assert `opacity:1`/`opacity:0.5` + the `rarCol` accent literally) — don't
+  refactor those out. The build test forbids `??` and external assets in the bundle; CSS is fine.
 - **Save persistence is a side-effect in `main.ts`**, never in the reducer. Resume rebuilds the run
   from the v2 `activeRun` snapshot (`resumeRun`); `?seed=` in the URL forces a fresh run.
 - New screens/actions: add an `Action` variant + a guarded `case` (return state unchanged when the
