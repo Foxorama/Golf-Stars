@@ -112,7 +112,13 @@ function clearsPlayCorridor(
   return polylineDist(c, centreline) > margin && segDist(c, tee, green) > margin;
 }
 
-function generateHole(rng: Rng, biome: Biome, wildness: number, parCap?: 3 | 4 | 5): Hole {
+function generateHole(
+  rng: Rng,
+  biome: Biome,
+  wildness: number,
+  holeIndex: number,
+  parCap?: 3 | 4 | 5,
+): Hole {
   const parRoll = rng.float();
   // Always draw parRoll (keeps the RNG stream identical whether or not a cap is set),
   // then clamp to the cap so an all-par-3 ladder stop is just min(par, 3).
@@ -142,6 +148,18 @@ function generateHole(rng: Rng, biome: Biome, wildness: number, parCap?: 3 | 4 |
   const teeBox: Feature = { kind: 'tee', poly: blobPoly(tee, 8, 8, 0, rng) };
   const greenR = rng.range(11, 16);
   const greenF: Feature = { kind: 'green', poly: blobPoly(green, greenR, 14, 0.12, rng) };
+
+  // Flag position within the green (GS-6): offset from the centroid by 18–55% of the green
+  // radius in a random direction, so every flag is a readable front/back/side pin (never a
+  // dead-centre one). The green's min edge distance is ≥ ~0.86·greenR (0.88·greenR min
+  // vertex × the 14-gon chord factor), so 0.55·greenR always lands inside with a puttable
+  // margin. Drawn from a SIDE rng keyed by hole index so the flag is deterministic WITHOUT
+  // perturbing the main stream — every existing course's terrain is byte-for-byte unchanged;
+  // only the flag (where you hole/putt, and the interactive "attack" target) is new.
+  const pinRng = new Rng(`${rng.seed}:pin:${holeIndex}`);
+  const pinAng = pinRng.range(0, Math.PI * 2);
+  const pinMag = greenR * (0.18 + 0.37 * pinRng.float());
+  const pin: Vec = [green[0] + Math.cos(pinAng) * pinMag, green[1] + Math.sin(pinAng) * pinMag];
 
   const features: Feature[] = [fairway, teeBox, greenF];
   const hazards: Feature[] = [];
@@ -212,7 +230,7 @@ function generateHole(rng: Rng, biome: Biome, wildness: number, parCap?: 3 | 4 |
   const carry = biome.carryMult * (biome.carryJitter ? 1 + rng.range(-biome.carryJitter, biome.carryJitter) : 1);
   const biomeMods: BiomeMod[] = [{ kind: 'carry', value: carry, note: `${biome.id} gravity` }];
 
-  return { par, tee, green, centreline, features, hazards, wind, biomeMods };
+  return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods };
 }
 
 /** Point a fraction `t` along a (possibly bent) centreline. */
@@ -260,7 +278,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
   const name = `${rng.pick(NAME_PREFIX)} ${rng.pick(NAME_SUFFIX)}`;
 
   const holes: Hole[] = [];
-  for (let i = 0; i < holeCount; i++) holes.push(generateHole(rng, biome, wildness, opts.parCap));
+  for (let i = 0; i < holeCount; i++) holes.push(generateHole(rng, biome, wildness, i, opts.parCap));
 
   const course: Course = {
     seed: rng.seed,

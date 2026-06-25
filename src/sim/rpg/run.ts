@@ -15,16 +15,22 @@ import { playCourse, type PlayedHole } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
-  STARTING_CREDITS,
+  SHOP_ITEMS,
+  canBuy,
   creditsForStop,
   cutLine,
+  itemCap,
+  itemCost,
   loadoutFromPerks,
   netDispersion,
+  ownedCount,
   shopItem,
-  startingLoadout,
   type PlayerLoadout,
+  type ShopItem,
 } from './economy';
+import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
+import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked';
@@ -58,20 +64,28 @@ export interface Run {
   distanceFromStart: number;
   credits: number;
   loadout: PlayerLoadout;
+  /** Permanent meta-upgrade levels baked into this run's start (GS-12). Kept for resume. */
+  meta: MetaUpgrades;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
 }
 
-export function startRun(seed: number | string, formatId: string = DEFAULT_FORMAT): Run {
+export function startRun(
+  seed: number | string,
+  formatId: string = DEFAULT_FORMAT,
+  meta: MetaUpgrades = {},
+): Run {
   const rng = new Rng(seed);
   return {
     seed: rng.seed,
     formatId,
     stopIndex: 0,
     distanceFromStart: 0,
-    credits: STARTING_CREDITS,
-    loadout: startingLoadout(),
+    // Permanent meta-progression bakes into the starting credits + loadout (GS-12).
+    credits: metaStartingCredits(meta),
+    loadout: metaStartingLoadout(meta),
+    meta,
     status: 'active',
     history: [],
   };
@@ -164,13 +178,63 @@ export function travel(run: Run, route: Route): Run {
   };
 }
 
-/** Buy a shop item (once each). No-op if unaffordable or already owned. */
+/**
+ * Buy a shop item. Uniques are buyable once; stackables repeatedly at a rising price up
+ * to their cap. No-op (returns the same run) if at the cap or unaffordable at the next
+ * price — the offer constraint is a UI concern, so the headless sim can buy any item.
+ */
 export function buy(run: Run, itemId: string): Run {
   const item = shopItem(itemId);
   if (!item) return run;
-  if (run.credits < item.cost) return run;
-  if (run.loadout.perks.includes(itemId)) return run;
-  return { ...run, credits: run.credits - item.cost, loadout: item.apply(run.loadout) };
+  const owned = ownedCount(run.loadout.perks, itemId);
+  if (!canBuy(item, owned, run.credits)) return run;
+  const cost = itemCost(item, owned);
+  return { ...run, credits: run.credits - cost, loadout: item.apply(run.loadout) };
+}
+
+// --- Shop offer (the rotating outfitter stock) ------------------------------
+
+export interface ShopOffer {
+  item: ShopItem;
+  /** Price of the next copy right now. */
+  cost: number;
+  /** Copies already owned (stack depth; 0 or 1 for a unique). */
+  owned: number;
+}
+
+export const SHOP_OFFER_SIZE = 4;
+
+/** Weighted draw of `n` distinct items (rarer = less likely), without replacement. */
+function weightedSample(rng: Rng, items: readonly ShopItem[], n: number): ShopItem[] {
+  const pool = [...items];
+  const out: ShopItem[] = [];
+  while (out.length < n && pool.length > 0) {
+    const total = pool.reduce((s, it) => s + RARITY_C[it.rarity].weight, 0);
+    let r = rng.float() * total;
+    let idx = 0;
+    for (; idx < pool.length - 1; idx++) {
+      r -= RARITY_C[pool[idx]!.rarity].weight;
+      if (r <= 0) break;
+    }
+    out.push(pool.splice(idx, 1)[0]!);
+  }
+  return out;
+}
+
+/**
+ * The outfitter's stock at the current stop: a seeded, rarity-weighted subset of the
+ * catalogue. Deterministic from the run seed + stop, so the same run shows the same shop
+ * (and a resume reproduces it). Items already maxed (owned uniques / capped stackables)
+ * drop out, so every slot is something you can still pursue. Costs reflect current stacks.
+ */
+export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
+  const perks = run.loadout.perks;
+  const pool = SHOP_ITEMS.filter((it) => ownedCount(perks, it.id) < itemCap(it));
+  const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
+  return weightedSample(rng, pool, Math.min(size, pool.length)).map((item) => {
+    const owned = ownedCount(perks, item.id);
+    return { item, cost: itemCost(item, owned), owned };
+  });
 }
 
 /** Voluntarily bank the run (cash out) — ends it with reason 'banked'. */
@@ -187,8 +251,10 @@ export interface RunSnapshot {
   stopIndex: number;
   distanceFromStart: number;
   credits: number;
-  /** Owned perks; the loadout is rebuilt from these on resume. */
+  /** Owned perks; the loadout is rebuilt from these (over the meta base) on resume. */
   perks: string[];
+  /** Permanent meta-upgrade levels (GS-12); the resume base is rebuilt from these. */
+  meta?: MetaUpgrades;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -199,20 +265,41 @@ export function snapshotRun(run: Run): RunSnapshot {
     distanceFromStart: run.distanceFromStart,
     credits: run.credits,
     perks: [...run.loadout.perks],
+    meta: { ...run.meta },
   };
 }
 
 export function resumeRun(snap: RunSnapshot): Run {
+  const meta = snap.meta ?? {};
   return {
     seed: snap.seed,
     formatId: snap.formatId ?? DEFAULT_FORMAT,
     stopIndex: snap.stopIndex,
     distanceFromStart: snap.distanceFromStart,
     credits: snap.credits,
-    loadout: loadoutFromPerks(snap.perks ?? []),
+    // Perks sit on top of the permanent meta base so progression survives a resume.
+    loadout: loadoutFromPerks(snap.perks ?? [], metaStartingLoadout(meta)),
+    meta,
     status: 'active',
     history: [],
   };
+}
+
+// --- Meta-progression: shards earned per run (GS-12) -------------------------
+
+export const SHARD_PER_DISTANCE = 3;
+export const SHARD_PER_STOP = 2;
+
+/**
+ * Star Shards earned by a run — the persistent currency spent at the Outpost. Rewards how
+ * FAR you travelled (the roguelite goal) plus a little per stop cleared, so even a run that
+ * bricks on stop 1 buys some lasting progress. Pure; floored at 1.
+ */
+export function shardsForRun(run: Run): number {
+  return Math.max(
+    1,
+    Math.round(run.distanceFromStart * SHARD_PER_DISTANCE + run.history.length * SHARD_PER_STOP),
+  );
 }
 
 // --- Headless full-run driver (for tests / AI sims) -------------------------

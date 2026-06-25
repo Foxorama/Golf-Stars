@@ -45,7 +45,7 @@ describe('ui reducer', () => {
   });
 
   it('playing a passable stop goes to the result screen with played holes', () => {
-    const s = reduce(started(1234), { type: 'play' });
+    const s = reduce(started(3), { type: 'play' }); // seed 3 clears the opening cut comfortably
     expect(s.screen).toBe('result');
     expect(s.played).toHaveLength(s.course.holes.length);
     expect(s.lastResult!.passed).toBe(true);
@@ -61,7 +61,7 @@ describe('ui reducer', () => {
   });
 
   it('result → shop → buy → travel → next intro', () => {
-    let s = reduce(started(1234), { type: 'play' });
+    let s = reduce(started(3), { type: 'play' }); // passing seed → reaches the result/shop flow
     s = reduce(s, { type: 'continue' });
     expect(s.screen).toBe('shop');
     const before = s.run.credits;
@@ -76,6 +76,20 @@ describe('ui reducer', () => {
     expect(s.screen).toBe('intro');
     expect(s.run.stopIndex).toBe(nextStop);
     expect(s.played).toBeUndefined();
+  });
+
+  it('entering the shop fixes a rotating offer; leaving clears it', () => {
+    let s = reduce(started(3), { type: 'play' }); // passing seed → reaches the shop
+    expect(s.shopOffer).toBeUndefined();
+    s = reduce(s, { type: 'continue' });
+    expect(s.screen).toBe('shop');
+    expect(s.shopOffer?.length).toBeGreaterThan(0);
+    const offer = s.shopOffer;
+    // Buying does not reshuffle the displayed stock.
+    s = reduce(s, { type: 'buy', id: offer![0]! });
+    expect(s.shopOffer).toEqual(offer);
+    s = reduce(s, { type: 'leaveShop' });
+    expect(s.shopOffer).toBeUndefined();
   });
 
   it('auto-putt defaults on and the toggle flips it', () => {
@@ -126,6 +140,36 @@ describe('ui reducer', () => {
     const restarted = reduce(s, { type: 'restart', seed: 7 });
     expect(restarted.screen).toBe('title'); // pick a format again
     expect(restarted.bestDistance).toBe(s.bestDistance); // meta carried over
+    expect(restarted.shards).toBe(s.shards); // shards carry over too
+  });
+
+  it('a missed cut awards Star Shards (GS-12)', () => {
+    const s = reduce(started(1234), { type: 'play' }); // seed 1234 misses the opening cut
+    expect(s.screen).toBe('gameover');
+    expect(s.lastRunShards).toBeGreaterThan(0);
+    expect(s.shards).toBe(s.lastRunShards);
+  });
+
+  it('the Outpost buys permanent upgrades and bakes them into the next run', () => {
+    let s = initState(7, { shards: 100, metaUpgrades: {} });
+    s = reduce(s, { type: 'openOutpost' });
+    expect(s.screen).toBe('outpost');
+    const before = s.shards;
+    s = reduce(s, { type: 'buyUpgrade', id: 'deep-pockets' });
+    expect(s.metaUpgrades['deep-pockets']).toBe(1);
+    expect(s.shards).toBeLessThan(before);
+    s = reduce(s, { type: 'closeOutpost' });
+    expect(s.screen).toBe('title');
+    // Deep Pockets (+40 starting credits) is now baked into a fresh run.
+    s = reduce(s, { type: 'start', format: 'flat' });
+    expect(s.run.credits).toBe(100);
+  });
+
+  it('the Outpost is unreachable mid-run and guards bad buys', () => {
+    const playing = reduce(started(7), { type: 'playInteractive' });
+    expect(reduce(playing, { type: 'openOutpost' })).toBe(playing); // not from a live run
+    const outpost = reduce(initState(7, { shards: 0 }), { type: 'openOutpost' });
+    expect(reduce(outpost, { type: 'buyUpgrade', id: 'vet-hands' })).toBe(outpost); // can't afford
   });
 
   it('offers Continue when a saved run is present, and resume enters it', () => {

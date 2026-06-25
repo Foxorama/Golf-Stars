@@ -174,9 +174,10 @@ export function mountPlayView(
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Tee + pin.
+    // Tee + flagstick. The flag stands at the pin (GS-6) so the ball flies to the real
+    // target; falls back to the centroid for a pin-less hole.
     const [tx, ty] = proj.project(hole.tee);
-    const [gx, gy] = proj.project(hole.green);
+    const [gx, gy] = proj.project(hole.pin ?? hole.green);
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#000';
     ctx.beginPath();

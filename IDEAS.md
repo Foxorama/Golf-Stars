@@ -28,12 +28,38 @@ Everything below serves whichever avenue wins.
   a rarity gradient + hole thumbnail. Generating the actual Flux art needs the image-gen tooling
   (absent in the coding session) — see `reports/art-pipeline-2026-06-24.md` for the hook + prompt
   log. Pass `artUrl` to `courseCardHTML` once images exist.
-- **GS-6 — Pin ≠ green centroid.** Generate a real pin position within the green polygon; the round
-  sim already targets `pin(hole)`, so it's a one-function change.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-12 — Persistent meta-progression (Star Shards + Outpost).** Runs now leave a mark: each
+  ended run awards **Star Shards** (`shardsForRun` = distance×3 + stops×2, floored at 1 so a brick
+  still pays), banked across runs in **save v3**. The **Outpost** (a between-run screen off the
+  title/gameover) spends shards on PERMANENT, leveled starting upgrades (`meta.ts`: Veteran Hands
+  −2 hcp, Tour Bag +6yd, Steady Grip −4% spray, Deep Pockets +40 credits) at a geometric shard
+  cost. `startRun(seed, fmt, meta)` bakes them into the start; perks rebuild OVER the meta base on
+  resume (the run snapshot carries `meta`). Pure/data-driven; reducer flow + v2→v3 migration tested,
+  and the open→buy loop verified in a real browser. Closes the "credits go dead, nothing persists"
+  gap — now every run feeds the next. (branch `claude/golf-stars-improvements-m4ktof`)
+- **GS-6 — Real pin within the green.** Each hole now generates a flag (`Hole.pin`) offset
+  18–55% of the green radius from the centroid, via a SIDE rng keyed by hole index so existing
+  course terrain is byte-for-byte unchanged. The flag is where the ball holes/putts (so a tucked
+  pin = a longer putt) and the interactive *attack* target; the auto/percentage AI still aims at
+  the fat of the green (centroid) — aiming at an off-centre flag spilled shots off the green under
+  max-wildness spray (toPar/hole 1.21 vs the <1.0 fairness bar), so "safe = centre, attack = flag"
+  is both better golf and fairer. Both renderers draw the flag at the pin. Validation rejects an
+  off-green pin. Tested (`tests/pin.test.ts`); putting/roll/round assertions retargeted to the
+  flag. (branch `claude/golf-stars-improvements-m4ktof`)
+- **GS-11 — Deep shop / build progression.** The outfitter was 5 one-shot perks (dead after
+  ~5 stops while the cut-line kept ramping). Now: **stackable upgrades** (Caddie Lesson −2 hcp,
+  Fortune Chip +15% credits, Precision Chip −8% dispersion, Range Booster +8 yd/−3% spray) buyable
+  repeatedly at a geometric cost ramp (`itemCost`, `STACK_COST_GROWTH`) up to a per-item cap — an
+  endless credit sink and a build that scales into the difficulty. Plus a **seeded, rarity-weighted
+  per-stop offer** (`shopOffer`, 4-of-N, deterministic from seed+stop, maxed items drop out) so the
+  shop rotates and presents real choice. Pure/tested: stacking, cost ramp, offer determinism, and
+  the "every upgrade improves (or for economy, doesn't hurt) mean per-stop Stableford" invariant.
+  Perks are a multiset now (dupes in `perks[]`); save v2 unchanged (`loadoutFromPerks` folds them).
+  (PR TBD — branch `claude/golf-stars-improvements-m4ktof`)
 - **GS-10 — RPG shot model + interactive play.** Handicap stat + cards (reduce randomness /
   add distance / lower handicap), and shot-by-shot play: per shot you pick a club and Attack vs
   Safe, the outcome is handicap+RNG via the shared executeShot physics, putting auto-resolves.

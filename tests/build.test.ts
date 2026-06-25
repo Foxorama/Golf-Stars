@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -56,6 +56,11 @@ describe('build output (regression guards)', () => {
 });
 
 // --- real-browser smoke test (runs when a Chromium binary is available) ----------
+// Returns a path ONLY if the actual chrome executable exists — a `chromium-*` cache dir
+// can exist without the binary (a partial/mismatched `playwright install`, e.g. the local
+// playwright-core's expected revision differs from what got downloaded). Checking the
+// directory alone made `runIf` lie and the launch hard-fail in CI; verifying the binary
+// lets the test SKIP cleanly when Chromium isn't genuinely installed, and run when it is.
 function findChromium(): string | null {
   const bases = [
     process.env.PLAYWRIGHT_BROWSERS_PATH,
@@ -63,11 +68,15 @@ function findChromium(): string | null {
     process.env.HOME ? `${process.env.HOME}/.cache/ms-playwright` : undefined,
   ].filter(Boolean) as string[];
   for (const base of bases) {
+    let dirs: string[];
     try {
-      const d = readdirSync(base).find((x) => x.startsWith('chromium-') && !x.includes('headless'));
-      if (d) return `${base}/${d}/chrome-linux/chrome`;
+      dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless'));
     } catch {
-      /* not this dir */
+      continue; // not this dir
+    }
+    for (const d of dirs) {
+      const bin = `${base}/${d}/chrome-linux/chrome`;
+      if (existsSync(bin)) return bin;
     }
   }
   return null;

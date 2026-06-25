@@ -143,9 +143,10 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     }
   }
 
-  // Tee + pin markers.
+  // Tee + flag markers. The flag sits at the pin (GS-6), so a front/back pin reads on the
+  // map; falls back to the green centroid for a hole without a generated pin.
   const [teeX, teeY] = place(hole.tee);
-  const [grX, grY] = place(hole.green);
+  const [grX, grY] = place(hole.pin ?? hole.green);
   parts.push(
     `<circle cx="${teeX.toFixed(1)}" cy="${teeY.toFixed(1)}" r="5" fill="#ffffff" stroke="#000" />`,
   );

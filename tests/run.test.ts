@@ -130,7 +130,11 @@ describe('full run simulation', () => {
       const lo = loadoutFromPerks(perks);
       let sf = 0;
       let n = 0;
-      for (let s = 0; s < 200; s++) {
+      // power-cell is a deliberately SMALL upgrade (distance is double-edged — a longer
+      // club sprays wider — offset by a −5% dispersion bonus). Its true per-stop edge is
+      // ~+0.35 Stableford, but that needs enough samples to clear noise; 200 was underpowered
+      // (a single unlucky draw dipped it below base). 600 makes the positive signal reliable.
+      for (let s = 0; s < 600; s++) {
         const c = generateCourse(`${s}:stop`, { holes: 6, distanceFromStart: s % 12 });
         const played = playCourse(c.holes, new Rng(`${c.seed}:play`), {
           bag: lo.bag,

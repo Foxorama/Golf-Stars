@@ -13,9 +13,10 @@ import { renderHoleSVG } from './render/holeView';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import type { SprayTiers } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { cutLine, SHOP_ITEMS } from './sim/rpg/economy';
+import { cutLine, itemCap, itemCost, ownedCount, shopItem } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { snapshotRun } from './sim/rpg/run';
+import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
 
@@ -44,7 +45,12 @@ function boot(): void {
     stage('boot:start');
     const save = loadSave();
     stage('loaded');
-    const meta = { bestStableford: save.bestStableford, bestDistance: save.bestDistance };
+    const meta = {
+      bestStableford: save.bestStableford,
+      bestDistance: save.bestDistance,
+      shards: save.shards,
+      metaUpgrades: save.metaUpgrades,
+    };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
@@ -68,7 +74,7 @@ function recover(err: unknown): void {
   );
   stage('recover');
   try {
-    writeSave({ version: 2, credits: 0, bestStableford: 0, bestDistance: 0 });
+    writeSave({ version: 3, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {} });
   } catch {
     /* ignore */
   }
@@ -86,10 +92,11 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 2,
-    credits: 0,
+    version: 3,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
+    shards: state.shards,
+    metaUpgrades: state.metaUpgrades,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -144,6 +151,10 @@ function titleScreen(): string {
       <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
     </header>
+    <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:14px;">✦ <b>${state.shards}</b> Star Shards</span>
+      ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' })}
+    </div>
     ${
       state.resumable
         ? `<div style="margin:1em 0;padding:10px 12px;border:1px solid #2bb673;border-radius:10px;background:#11181400;">
@@ -348,23 +359,58 @@ function resultScreen(): string {
 }
 
 function shopScreen(): string {
-  const owned = new Set(state.run.loadout.perks);
-  const items = SHOP_ITEMS.map((it) => {
-    const have = owned.has(it.id);
-    const afford = state.run.credits >= it.cost;
-    const card = itemCardHTML(it, { owned: have, affordable: afford });
-    const buyable = !have && afford;
-    // Wrap the card so the whole thing is the buy button when purchasable.
-    return buyable
-      ? `<div data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
-      : `<div style="margin:4px;">${card}</div>`;
-  }).join('');
+  const perks = state.run.loadout.perks;
+  const credits = state.run.credits;
+  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live.
+  const items = (state.shopOffer ?? [])
+    .map((id) => shopItem(id))
+    .filter((it): it is NonNullable<typeof it> => !!it)
+    .map((it) => {
+      const owned = ownedCount(perks, it.id);
+      const maxed = owned >= itemCap(it);
+      const cost = itemCost(it, owned);
+      const afford = credits >= cost;
+      const buyable = !maxed && afford;
+      const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned });
+      // Wrap the card so the whole thing is the buy button when purchasable.
+      return buyable
+        ? `<div data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+        : `<div style="margin:4px;">${card}</div>`;
+    })
+    .join('');
   return `
     ${header()}
-    <h2 style="font-size:16px;">Outfitter · ${state.run.credits} credits</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Each perk once per run.</p>
+    <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own.</p>
     <div style="display:flex;flex-wrap:wrap;">${items}</div>
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' })}</div>`;
+}
+
+function outpostScreen(): string {
+  const cards = META_UPGRADES.map((u) => {
+    const lvl = metaLevel(state.metaUpgrades, u.id);
+    const maxed = lvl >= u.maxLevel;
+    const cost = metaUpgradeCost(u, lvl);
+    const buyable = canBuyMeta(u, lvl, state.shards);
+    const card = itemCardHTML(
+      { name: u.name, cost, desc: u.desc, rarity: u.rarity },
+      { owned: maxed, affordable: state.shards >= cost, count: lvl },
+    );
+    // Show the level track and use shard pricing (the card's "c" reads as the shard cost).
+    const track = `<div style="font-size:11px;opacity:.6;text-align:center;margin-top:-4px;">Lv ${lvl}/${u.maxLevel}${maxed ? '' : ` · ✦${cost}`}</div>`;
+    return buyable
+      ? `<div data-action='${JSON.stringify({ type: 'buyUpgrade', id: u.id })}' style="cursor:pointer;margin:4px;">${card}${track}</div>`
+      : `<div style="margin:4px;">${card}${track}</div>`;
+  }).join('');
+  return `
+    <header style="border-left:4px solid #e08a2b;padding-left:10px;">
+      <h1 style="margin:0;font-size:22px;">🛰 Outpost</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on PERMANENT upgrades — they bake into the start of every future run.</p>
+    </header>
+    <h2 style="font-size:16px;margin:.6em 0 .2em;">✦ ${state.shards} Star Shards</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy the next level. Shards are earned by how far each run travels.</p>
+    <div style="display:flex;flex-wrap:wrap;">${cards}</div>
+    <div style="margin-top:12px;">${btn('← Back to title', { type: 'closeOutpost' })}</div>`;
 }
 
 function travelScreen(): string {
@@ -380,12 +426,17 @@ function travelScreen(): string {
 
 function gameoverScreen(): string {
   const r = state.run;
+  const earned = state.lastRunShards;
   return `
     ${header()}
     <h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>
     <p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>.</p>
+    ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
-    ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) })}`;
+    <div style="margin-top:8px;">
+      ${btn('🛰 Spend at the Outpost', { type: 'openOutpost' })}
+      ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) })}
+    </div>`;
 }
 
 function render(): void {
@@ -420,6 +471,8 @@ function render(): void {
       ? shopScreen()
       : state.screen === 'travel'
       ? travelScreen()
+      : state.screen === 'outpost'
+      ? outpostScreen()
       : gameoverScreen();
 
   app.innerHTML = `<main style="font-family:system-ui,sans-serif;max-width:820px;margin:0 auto;padding:16px;color:#e8e8ea;background:#0b0d12;min-height:100vh;">${body}</main>`;
