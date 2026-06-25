@@ -1,0 +1,278 @@
+/**
+ * Sim Lab — the pure, headless experiment engine behind the test hub's "Sim Lab" panels.
+ *
+ * It RE-IMPLEMENTS NOTHING (test-hub invariant I1, see standards/TEST-HUB-STANDARD.md): every
+ * number comes from calling the REAL sim — `resolveShot`/`dispersionProfile` for ball flight,
+ * `loadoutFromPerks`/`netDispersion`/`metaStartingLoadout` for builds, `simulateRun` for whole
+ * runs. The lab only ORCHESTRATES: loop a club N times and aggregate the landing points into
+ * stats/bins; average a build's per-stop Stableford across seeds. That aggregation (mean, σ,
+ * percentiles, histogram) is measurement, not game logic — so it lives here, not in the sim.
+ *
+ * Pure & DOM-free (no `window`, no canvas) so `tests/lab.test.ts` can assert it headlessly —
+ * same discipline as `src/sim`. `charts.ts` draws these results; `hub.ts` wires the controls.
+ */
+
+import { CLUBS, clubById, type Club } from '../sim/clubs';
+import { resolveShot } from '../sim/shot';
+import { makeRng } from '../sim/rng';
+import { simulateRun, type RunStrategy } from '../sim/rpg/run';
+import {
+  loadoutFromPerks,
+  netDispersion,
+  handicapDispersion,
+  type PlayerLoadout,
+} from '../sim/rpg/economy';
+import { metaStartingLoadout, type MetaUpgrades } from '../sim/rpg/meta';
+import type { Wind } from '../sim/course/contract';
+
+// ── descriptive statistics (pure helpers) ─────────────────────────────────────────────────
+export interface Stats {
+  n: number;
+  mean: number;
+  sd: number;
+  min: number;
+  max: number;
+  /** 10th / 50th (median) / 90th percentiles. */
+  p10: number;
+  p50: number;
+  p90: number;
+}
+
+const pct = (sorted: number[], p: number): number => {
+  if (sorted.length === 0) return 0;
+  const i = Math.max(0, Math.min(sorted.length - 1, Math.round((p / 100) * (sorted.length - 1))));
+  return sorted[i]!;
+};
+
+export function summary(xs: number[]): Stats {
+  const n = xs.length;
+  if (n === 0) return { n: 0, mean: 0, sd: 0, min: 0, max: 0, p10: 0, p50: 0, p90: 0 };
+  const mean = xs.reduce((a, b) => a + b, 0) / n;
+  const variance = xs.reduce((a, b) => a + (b - mean) * (b - mean), 0) / n;
+  const sorted = [...xs].sort((a, b) => a - b);
+  return {
+    n,
+    mean,
+    sd: Math.sqrt(variance),
+    min: sorted[0]!,
+    max: sorted[n - 1]!,
+    p10: pct(sorted, 10),
+    p50: pct(sorted, 50),
+    p90: pct(sorted, 90),
+  };
+}
+
+export interface Bin {
+  lo: number;
+  hi: number;
+  count: number;
+}
+
+/** Equal-width histogram over [min, max]. `bins` defaults to a Freedman-ish ~sqrt(n). */
+export function histogram(xs: number[], bins?: number): Bin[] {
+  if (xs.length === 0) return [];
+  const k = Math.max(1, bins ?? Math.round(Math.sqrt(xs.length)));
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const x of xs) {
+    if (x < lo) lo = x;
+    if (x > hi) hi = x;
+  }
+  if (hi === lo) hi = lo + 1; // degenerate: one non-empty bin
+  const w = (hi - lo) / k;
+  const out: Bin[] = Array.from({ length: k }, (_, i) => ({ lo: lo + i * w, hi: lo + (i + 1) * w, count: 0 }));
+  for (const x of xs) {
+    const idx = Math.min(k - 1, Math.floor((x - lo) / w));
+    out[idx]!.count++;
+  }
+  return out;
+}
+
+// ── club dispersion study — "hit the driver N times" ───────────────────────────────────────
+// Fire one club N times from the origin straight downrange (+Y, bearing 0) and collect where
+// the ball comes to rest. With bearing 0 the sim's frame makes landing = [lateral, carry], so
+// x is the left/right miss and y is the carry — a true top-down shot pattern.
+
+export interface ShotSample {
+  /** Left(−)/right(+) miss, yards. */
+  lateral: number;
+  /** Downrange carry, yards. */
+  carry: number;
+}
+
+export interface DispersionStudy {
+  clubId: string;
+  clubName: string;
+  n: number;
+  /** Intended (pre-noise) carry for this club on this lie — the bullseye the cone centres on. */
+  intended: number;
+  /** Net dispersion multiplier applied (handicap skill × equipment), 1 = a robot. */
+  dispersionMult: number;
+  lie: string;
+  wind?: Wind;
+  samples: ShotSample[];
+  carry: Stats;
+  lateral: Stats;
+}
+
+export interface DispersionOpts {
+  /** Number of swings. Default 1000. */
+  n?: number;
+  /** Lie to hit from (LIE_INFO key — fairway, rough, bunker, tee, …). Default 'fairway'. */
+  lie?: string;
+  wind?: Wind;
+  /** A built loadout: its bag sets per-club carry (distance perks), its skill sets the spread. */
+  loadout?: PlayerLoadout;
+  /** Biome carry multiplier (low-gravity worlds carry further). Default 1. */
+  carryMult?: number;
+  /** Seed for the swing stream — same seed ⇒ same pattern. Default derives from the club id. */
+  seed?: number | string;
+}
+
+export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): DispersionStudy {
+  const n = Math.max(1, Math.floor(opts.n ?? 1000));
+  const lie = opts.lie ?? 'fairway';
+  const bag = opts.loadout?.bag ?? CLUBS;
+  const club: Club | undefined = clubById(clubId, bag);
+  if (!club) throw new Error(`unknown club "${clubId}"`);
+  const dispersionMult = opts.loadout ? netDispersion(opts.loadout) : 1;
+  const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
+
+  const from: [number, number] = [0, 0];
+  const aim: [number, number] = [0, 100]; // straight downrange (+Y) ⇒ shot bearing 0
+  const samples: ShotSample[] = [];
+  let intended = 0;
+  for (let i = 0; i < n; i++) {
+    const res = resolveShot({
+      from,
+      aim,
+      club,
+      lie: lie as never, // LIE_INFO key; FeatureKind at the type boundary
+      wind: opts.wind,
+      carryMult: opts.carryMult,
+      dispersionMult,
+      rng,
+    });
+    intended = res.intended;
+    samples.push({ lateral: res.landing[0], carry: res.landing[1] });
+  }
+
+  return {
+    clubId,
+    clubName: club.name,
+    n,
+    intended,
+    dispersionMult,
+    lie,
+    wind: opts.wind,
+    samples,
+    carry: summary(samples.map((s) => s.carry)),
+    lateral: summary(samples.map((s) => s.lateral)),
+  };
+}
+
+// ── loadout builder — "test club/path/skill upgrades" ──────────────────────────────────────
+// Compose a real PlayerLoadout from a handicap, the permanent meta layer, and owned shop perks
+// (a multiset — a stackable id repeated buys multiple copies, exactly as the run does). Surface
+// the derived stats the upgrades move so a tweak's effect is legible before you play it.
+
+export interface BuiltLoadout {
+  loadout: PlayerLoadout;
+  /** handicap skill × equipment — what `resolveShot` actually samples. Lower = tighter. */
+  netDispersion: number;
+  handicap: number;
+  /** The handicap-only dispersion factor (~0.7 scratch → ~1.6 at 36). */
+  handicapDispersion: number;
+  autoPutt: boolean;
+  creditMult: number;
+  /** Per-club carries AFTER distance-boost perks (Power Cell, Tour Bag, …). */
+  clubs: { id: string; name: string; carry: number }[];
+}
+
+export interface BuildOpts {
+  /** Explicit handicap override (else taken from the meta-baked starting loadout). */
+  handicap?: number;
+  meta?: MetaUpgrades;
+  /** Owned shop-perk ids; repeat an id to stack it (Caddie Lesson ×3 = [id,id,id]). */
+  perks?: string[];
+}
+
+export function buildLoadout(opts: BuildOpts = {}): BuiltLoadout {
+  let base = metaStartingLoadout(opts.meta ?? {});
+  // The handicap slider sets the STARTING handicap; perks (Pro Coach, Caddie Lesson) then
+  // reduce from it — so the override goes on the base, BEFORE perks fold on top.
+  if (opts.handicap != null) base = { ...base, handicap: Math.max(0, Math.min(36, opts.handicap)) };
+  const loadout = loadoutFromPerks(opts.perks ?? [], base);
+  return {
+    loadout,
+    netDispersion: netDispersion(loadout),
+    handicap: loadout.handicap,
+    handicapDispersion: handicapDispersion(loadout.handicap),
+    autoPutt: !!loadout.autoPutt,
+    creditMult: loadout.creditMult,
+    clubs: loadout.bag.map((c) => ({ id: c.id, name: c.name, carry: c.carry })),
+  };
+}
+
+// ── scoring harness — "does this upgrade actually score better?" ────────────────────────────
+// Run whole seeded runs through the REAL meta-loop (`simulateRun`) and report the project's
+// canonical balance metric: mean per-stop Stableford (NOT full-run distance, which is chaotic —
+// see CLAUDE.md). The meta layer bakes into the start; the chosen perks are bought each stop
+// (`buy()` is a safe no-op when unaffordable or maxed, so just listing them is enough).
+
+export interface ScoreResult {
+  seeds: number;
+  /** The headline balance number. */
+  meanStablefordPerStop: number;
+  /** Average stops survived before the cut (how far the build travels). */
+  meanStops: number;
+  meanDistance: number;
+  /** Share of stops that were blow-ups (0 Stableford) — the death-spiral tail. */
+  blowUpRate: number;
+  perStop: Stats;
+}
+
+export interface ScoreOpts {
+  /** How many seeded runs to average. Default 60. */
+  seeds?: number;
+  /** First seed; runs use baseSeed..baseSeed+seeds-1. Default 1. */
+  baseSeed?: number;
+  formatId?: string;
+  meta?: MetaUpgrades;
+  /** Shop-perk ids to buy each stop (repeat to stack). */
+  perks?: string[];
+}
+
+export function scoreHarness(opts: ScoreOpts = {}): ScoreResult {
+  const seeds = Math.max(1, Math.floor(opts.seeds ?? 60));
+  const baseSeed = opts.baseSeed ?? 1;
+  const perks = opts.perks ?? [];
+  const strategy: RunStrategy = {
+    formatId: opts.formatId,
+    meta: opts.meta,
+    shop: perks.length ? () => perks : undefined,
+  };
+
+  const stablefords: number[] = [];
+  let totalStops = 0;
+  let totalDistance = 0;
+  let blowUps = 0;
+  for (let s = 0; s < seeds; s++) {
+    const { run, stops } = simulateRun(baseSeed + s, strategy);
+    for (const st of stops) {
+      stablefords.push(st.stableford);
+      if (st.stableford <= 0) blowUps++;
+    }
+    totalStops += stops.length;
+    totalDistance += run.distanceFromStart;
+  }
+  const perStop = summary(stablefords);
+  return {
+    seeds,
+    meanStablefordPerStop: perStop.mean,
+    meanStops: totalStops / seeds,
+    meanDistance: totalDistance / seeds,
+    blowUpRate: stablefords.length ? blowUps / stablefords.length : 0,
+    perStop,
+  };
+}

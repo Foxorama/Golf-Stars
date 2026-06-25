@@ -30,8 +30,31 @@ Everything below serves whichever avenue wins.
   log. Pass `artUrl` to `courseCardHTML` once images exist.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
   `new Rng('daily-YYYY-MM-DD')`.
+- **GS-16b — Finish I2 parity on the hub.** Each hook should have BOTH a URL form and a live form.
+  Remaining: a URL form for the feel flags (`?feel=`/`?spray=` seeding `window._gs*` at first paint)
+  and a live no-reload helper for seed/intro (drive the iframe without a full reload). Small; the
+  hub + auto-discovering guard + five hooks already shipped in GS-16.
 
 ## Done
+- **GS-16 — Test & demo hub + Sim Lab + auto-discovering CI sync-guard.** A second built page
+  (`test.html` → `src/test/hub.ts`, served at `dist/test.html` beside the game) to demo features and
+  stress-test the sim. Two faces: a **Demo** that drives the REAL game in an iframe via its public
+  hooks (`?seed=`, `?intro=`, and live `window._gsFeel`/`_gsIntro`/`_gsSpray`/`_gsArt` flags on the
+  same-origin frame — zero re-implemented logic), and a **Sim Lab** that imports the pure sim for the
+  batch experiments the headless engine was built for. `src/test/lab.ts` (pure, DOM-free, tested in
+  `tests/lab.test.ts`): `dispersionStudy()` fires a club N times through the real `resolveShot`
+  ("hit the driver 1000×" → scatter + carry histogram + σ/percentiles, reading the per-club
+  wildness model true); `buildLoadout()` composes a real loadout from handicap + meta upgrades +
+  shop perks; `scoreHarness()` runs N seeded `simulateRun`s reporting **mean per-stop Stableford**
+  (the balance metric). `src/test/charts.ts` is render-only Canvas2D. Tiny sim addition: `meta` on
+  `RunStrategy`/`simulateRun` so the permanent layer is headlessly simulatable (backward-compatible).
+  Build: singlefile forbids multi-input, so `npm run build` runs vite twice (game, then `VITE_HUB=1`
+  appending the hub) — `pages.yml` unchanged. The standard + portable guard template live in
+  `standards/`; `tests/test-hub.test.ts` is the live CI sync-guard that **auto-discovers** hooks from
+  the app source (every `window._gs*` flag + `?param`) and asserts the hub drives exactly that set
+  both ways — so a new hook reds the build (proven when this branch merged main's new `_gsArt` flag).
+  I4 process is the `keep-test-hub-in-sync` skill + a CLAUDE.md section. Verified eyes-on (Playwright).
+  I2 (both forms per hook) is the one partial invariant → GS-16b.
 - **GS-15 — Play-loop UX + mechanics overhaul** (branch `claude/golf-ui-mechanics-x3s54o`). A batch
   of feel/fairness/UX fixes from eyes-on mobile play, staged on one branch:
   - **Angular dispersion** — random spray is now an ANGLE about the bearing, so the spray cone is a

@@ -206,6 +206,39 @@ This game lives or dies on three axes — put every change through all three bef
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside
   `src/sim/` (pure) so it's reachable from tests.
 
+## Test & demo hub (GS-16 — `test.html` / `src/test/`)
+- **A second built page** (`test.html` → `src/test/hub.ts`) served beside the game on the same
+  origin (`dist/test.html`). Two faces: a **Demo** that drives the REAL game in an `<iframe>` via
+  its public hooks (`?seed=`, `?intro=`, and the live `window._gsFeel`/`_gsIntro`/`_gsSpray`/`_gsArt`
+  escape-hatch flags set on the same-origin iframe window), and a **Sim Lab** that imports the
+  pure sim for batch experiments. It re-implements ZERO game logic — it pokes the artifact. The
+  full standard + a portable guard template live in `standards/` (see `TEST-HUB-STANDARD.md`).
+- **The Sim Lab is the QA lens made interactive.** `src/test/lab.ts` is a PURE, DOM-free engine
+  (unit-tested in `tests/lab.test.ts`) that only ORCHESTRATES the real sim and aggregates the
+  result: `dispersionStudy()` fires one club N times through `resolveShot` ("hit the driver
+  1000×" → scatter + carry histogram + σ/percentiles); `buildLoadout()` composes a real loadout
+  from handicap + meta upgrades + shop perks (watch the cone tighten); `scoreHarness()` runs N
+  seeded `simulateRun`s and reports **mean per-stop Stableford** (the balance metric — NOT
+  distance). `src/test/charts.ts` is render-only Canvas2D (verified eyes-on, not unit-tested).
+- **Build/deploy gotcha:** `vite-plugin-singlefile` forces `inlineDynamicImports`, which Rollup
+  forbids with multiple inputs — so the two pages CANNOT build in one pass. `npm run build` runs
+  vite **twice**: the game (`index.html`), then `VITE_HUB=1 vite build` (entry `test.html`,
+  `emptyOutDir:false`) which APPENDS the inlined hub beside the game. `pages.yml` already runs
+  `npm run build`, so the hub deploys automatically. `tests/build.test.ts` builds only the game.
+- **Most changes need NO hub edit — it absorbs them.** New content as data (a club/perk/meta/lie/
+  format/biome row) appears in the Sim Lab automatically (the hub IMPORTS those tables); a sim
+  behaviour change (shot/dispersion/economy/scoring) is reflected because the lab calls the real
+  functions; a new game screen shows in the Demo iframe because it IS the game. The ONLY thing that
+  needs hand-wiring is a brand-new **hook** (a `window._gsX` flag or a `?param`).
+- **The guard auto-discovers hooks, so it can't be out-run.** `tests/test-hub.test.ts` scans the
+  app source for every single-underscore `_gs*` flag and every `URLSearchParams…get('x')` param and
+  asserts the hub drives EXACTLY that set, both directions — add a new flag and CI goes red naming
+  the missing hub control; leave a dead one and it fails too. There is no hand-maintained hook list.
+  (It also asserts the hub IMPORTS the content tables, so a list can't silently fork to a copy.)
+- **Process — keep the hub in sync (the I4 rule, one atomic PR):** when you DO add a hook,
+  **add the hook → add the hub control → confirm the guard is green → update docs**, all in one PR.
+  The `keep-test-hub-in-sync` skill (`.claude/skills/`) walks it (and tells you when you can skip it).
+
 ## Render layer (locked in GS-3)
 - **One pure projector** (`render/project.ts`) does the course-space→screen mapping (tee→green
   up, fit-to-view). BOTH renderers use it so they agree pixel-for-pixel — never reimplement the
