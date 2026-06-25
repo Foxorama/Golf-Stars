@@ -58,7 +58,14 @@ export interface Wind {
 export interface Hole {
   par: number;
   tee: Vec;
+  /** Green centroid (its generated centre) — the geometric anchor, NOT the flag. */
   green: Vec;
+  /**
+   * Flag position within the green polygon (GS-6). The sim aims/holes/putts at this, not
+   * the centroid, so front/back/tucked pins make the approach read differently. Optional
+   * for back-compat: a hole without one falls back to the centroid (see round.ts `pin`).
+   */
+  pin?: Vec;
   /** Play-line, tee→green. The renderer rotates this to point up-screen. >= 2 points. */
   centreline: Vec[];
   /** Generated terrain polygons (the OSM analogue). */
@@ -157,10 +164,13 @@ export function validateCourse(c: Course): string[] {
     const tag = `hole[${i}]`;
     if (!(h.par >= 3 && h.par <= 6)) errs.push(`${tag}: par ${h.par} out of [3,6]`);
     if (h.centreline.length < 2) errs.push(`${tag}: centreline needs >= 2 points`);
-    if (!h.features.some((f) => f.kind === 'green'))
-      errs.push(`${tag}: no green feature`);
+    const greenFeature = h.features.find((f) => f.kind === 'green');
+    if (!greenFeature) errs.push(`${tag}: no green feature`);
     if (!h.features.some((f) => f.kind === 'fairway'))
       errs.push(`${tag}: no fairway feature`);
+    // A pin, if placed, must sit on the green so it's puttable and never tucked off-surface.
+    if (h.pin && greenFeature && !pointInPoly(h.pin, greenFeature.poly))
+      errs.push(`${tag}: pin is outside the green polygon`);
     [...h.features, ...h.hazards].forEach((f, fi) => {
       if (f.poly.length < 3)
         errs.push(`${tag}: feature[${fi}] (${f.kind}) poly needs >= 3 points`);

@@ -121,9 +121,9 @@ export interface PlayHoleOptions {
   dispersionMult?: number;
 }
 
-/** Pin location. For the stub that's the green centroid (its generated centre). */
+/** Pin location: the generated flag within the green (GS-6), or the centroid if absent. */
 function pin(hole: Hole): Vec {
-  return hole.green;
+  return hole.pin ?? hole.green;
 }
 
 /**
@@ -225,8 +225,9 @@ function puttOut(
 }
 
 /**
- * Play a single hole. Strategy: aim at the pin, choose the club that just reaches the
- * plays-like distance, take recoveries from wherever the ball ends up, then putt out.
+ * Play a single hole. Strategy: aim at the fat of the green, choose the club that just
+ * reaches the plays-like distance, take recoveries from wherever the ball ends up, then
+ * putt out to the flag.
  */
 /** Net carry multiplier from a hole's biome mods (gravity), unless overridden. */
 export function biomeCarryMult(hole: Hole): number {
@@ -239,7 +240,13 @@ export function biomeCarryMult(hole: Hole): number {
 
 export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): PlayedHole {
   const bag = opts.bag ?? CLUBS;
-  const target = pin(hole);
+  // Aim at the FAT OF THE GREEN (centroid) — the percentage play. Aiming at an off-centre
+  // flag spills shots off the green under max-wildness spray (more chips, worse scores AND
+  // fairness); the centroid is the sane line. The FLAG (`flag`) is still the real hole: it's
+  // where the ball holes out and putts to, so a back/tucked pin means a longer putt. Flag-
+  // hunting is the interactive "attack" choice (the player's risk), not the auto sim's job.
+  const aim = hole.green;
+  const flag = pin(hole);
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
 
   let ball: Vec = [...hole.tee] as Vec;
@@ -254,15 +261,15 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
   const maxStrokes = hole.par + MAX_OVER_PAR;
 
   for (let swing = 0; swing < MAX_FULL_SWINGS; swing++) {
-    const remaining = dist(ball, target);
-
-    // On the green (or effectively there) → switch to putting.
+    // Hole-out / switch-to-putt keys off the FLAG (not the aim) so the headless sim and the
+    // interactive driver agree on exactly when a hole ends.
+    const remaining = dist(ball, flag);
     if (lie === 'green' || remaining <= HOLE_OUT_RADIUS) break;
 
     // AI decision: lay up to the penalty-free corridor when the line is blocked, and
     // club to leave room for roll-out. The player (interactive driver) makes this choice
     // instead; both then run the SAME executeShot physics.
-    const tgt = safeTarget(hole, ball, target);
+    const tgt = safeTarget(hole, ball, aim);
     const club = aiClub(hole, ball, tgt, carryMult, bag, opts.stats);
 
     const ex = executeShot(hole, ball, lie, tgt, club, {
@@ -291,17 +298,17 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       strokes = maxStrokes;
       break;
     }
-    if (lie === 'green' || dist(ball, target) <= HOLE_OUT_RADIUS) break;
+    if (lie === 'green' || dist(ball, flag) <= HOLE_OUT_RADIUS) break;
   }
 
   // Putt out (unless already holed or picked up), within the remaining stroke budget.
   const puttLog: PuttLog[] = [];
   if (!holed && !pickedUp) {
-    const remaining = dist(ball, target);
+    const remaining = dist(ball, flag);
     if (remaining <= HOLE_OUT_RADIUS) {
       holed = true;
     } else {
-      const out = puttOut(rng, ball, target, Math.max(1, maxStrokes - strokes));
+      const out = puttOut(rng, ball, flag, Math.max(1, maxStrokes - strokes));
       putts = out.putts;
       puttLog.push(...out.log);
       strokes += putts;
@@ -498,7 +505,10 @@ export function pinOf(hole: Hole): Vec {
 
 /** Lay-up target: the penalty-free corridor point ahead of the ball (exported). */
 export function layupTarget(hole: Hole, ball: Vec): Vec {
-  return safeTarget(hole, ball, pin(hole));
+  // The "safe" line plays to the fat of the green (centroid), mirroring the auto playHole
+  // aim EXACTLY so the interactive auto-finish reproduces the headless sim byte-for-byte.
+  // The "attack" choice is what aims at the flag — the player's risk to take.
+  return safeTarget(hole, ball, hole.green);
 }
 
 /** Auto putt-out from a position (exported for the interactive driver). */

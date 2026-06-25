@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/sim/rng';
 import { generateCourse } from '../src/sim/course/generate';
-import { playCourse, playHole, HOLE_OUT_RADIUS } from '../src/sim/round';
+import { playCourse, playHole, pinOf, HOLE_OUT_RADIUS } from '../src/sim/round';
 import { dist } from '../src/sim/course/contract';
 
 describe('bounce & roll-out (GS feedback #2)', () => {
@@ -50,13 +50,13 @@ describe('hole-outs (GS feedback #3)', () => {
     expect(holeouts).toBeGreaterThan(0);
   });
 
-  it('a holed shot leaves the ball within the hole-out radius of the green', () => {
+  it('a holed shot leaves the ball within the hole-out radius of the pin', () => {
     for (let seed = 0; seed < 300; seed++) {
       const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
       const played = playHole(hole, new Rng(`${seed}:play`));
       const holer = played.shots.find((s) => s.holed);
       if (holer) {
-        expect(dist(holer.rest, hole.green)).toBeLessThanOrEqual(HOLE_OUT_RADIUS + 1e-6);
+        expect(dist(holer.rest, pinOf(hole))).toBeLessThanOrEqual(HOLE_OUT_RADIUS + 1e-6);
       }
     }
   });

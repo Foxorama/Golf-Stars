@@ -45,7 +45,7 @@ describe('ui reducer', () => {
   });
 
   it('playing a passable stop goes to the result screen with played holes', () => {
-    const s = reduce(started(1234), { type: 'play' });
+    const s = reduce(started(3), { type: 'play' }); // seed 3 clears the opening cut comfortably
     expect(s.screen).toBe('result');
     expect(s.played).toHaveLength(s.course.holes.length);
     expect(s.lastResult!.passed).toBe(true);
@@ -61,7 +61,7 @@ describe('ui reducer', () => {
   });
 
   it('result → shop → buy → travel → next intro', () => {
-    let s = reduce(started(1234), { type: 'play' });
+    let s = reduce(started(3), { type: 'play' }); // passing seed → reaches the result/shop flow
     s = reduce(s, { type: 'continue' });
     expect(s.screen).toBe('shop');
     const before = s.run.credits;
@@ -79,7 +79,7 @@ describe('ui reducer', () => {
   });
 
   it('entering the shop fixes a rotating offer; leaving clears it', () => {
-    let s = reduce(started(1234), { type: 'play' });
+    let s = reduce(started(3), { type: 'play' }); // passing seed → reaches the shop
     expect(s.shopOffer).toBeUndefined();
     s = reduce(s, { type: 'continue' });
     expect(s.screen).toBe('shop');

@@ -28,12 +28,19 @@ Everything below serves whichever avenue wins.
   a rarity gradient + hole thumbnail. Generating the actual Flux art needs the image-gen tooling
   (absent in the coding session) — see `reports/art-pipeline-2026-06-24.md` for the hook + prompt
   log. Pass `artUrl` to `courseCardHTML` once images exist.
-- **GS-6 — Pin ≠ green centroid.** Generate a real pin position within the green polygon; the round
-  sim already targets `pin(hole)`, so it's a one-function change.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-6 — Real pin within the green.** Each hole now generates a flag (`Hole.pin`) offset
+  18–55% of the green radius from the centroid, via a SIDE rng keyed by hole index so existing
+  course terrain is byte-for-byte unchanged. The flag is where the ball holes/putts (so a tucked
+  pin = a longer putt) and the interactive *attack* target; the auto/percentage AI still aims at
+  the fat of the green (centroid) — aiming at an off-centre flag spilled shots off the green under
+  max-wildness spray (toPar/hole 1.21 vs the <1.0 fairness bar), so "safe = centre, attack = flag"
+  is both better golf and fairer. Both renderers draw the flag at the pin. Validation rejects an
+  off-green pin. Tested (`tests/pin.test.ts`); putting/roll/round assertions retargeted to the
+  flag. (branch `claude/golf-stars-improvements-m4ktof`)
 - **GS-11 — Deep shop / build progression.** The outfitter was 5 one-shot perks (dead after
   ~5 stops while the cut-line kept ramping). Now: **stackable upgrades** (Caddie Lesson −2 hcp,
   Fortune Chip +15% credits, Precision Chip −8% dispersion, Range Booster +8 yd/−3% spray) buyable

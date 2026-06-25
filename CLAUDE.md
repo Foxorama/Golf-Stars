@@ -69,6 +69,15 @@ This game lives or dies on three axes — put every change through all three bef
 - **Wind reads true:** the round sim aims UPWIND to compensate for the known crosswind, and lays
   up to the (penalty-free) centreline when the line to the pin is blocked — a played shot reads
   trouble instead of spiralling.
+- **Pin ≠ green centroid (GS-6):** each hole generates a flag (`Hole.pin`) 18–55% of the green
+  radius off the centroid, from a SIDE rng (`${seed}:pin:${holeIndex}`) so adding it left every
+  existing course's terrain byte-for-byte unchanged. The flag is the hole-out/putt target (a tucked
+  pin = a longer putt) and the interactive **attack** aim. The auto/percentage AI and the **safe**
+  line still aim at the FAT OF THE GREEN (centroid): `playHole` splits `aim = hole.green` (approach)
+  from `flag = pin(hole)` (hole-out + putt), and `layupTarget` aims at the centroid too — aiming at
+  an off-centre flag spilled shots off the green under max-wildness spray (toPar/hole 1.21 vs the
+  <1.0 bar). Hole-out detection keys off the FLAG in BOTH `playHole` and the interactive `takeShot`
+  so auto === interactive byte-for-byte (guarded). `validateCourse` rejects an off-green pin.
 - **Per-club wildness (shot dispersion):** longer clubs spray WILDER in both line and distance;
   short clubs are tight/accurate. A club's `t` ramps 0→1 from `TUNABLES.accurateCarry`→`wildCarry`
   by nominal carry; lateral σ, distance σ, and the carry clamp window all lerp short→long. At the

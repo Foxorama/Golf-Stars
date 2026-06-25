@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/sim/rng';
 import { generateCourse } from '../src/sim/course/generate';
-import { playHole, onePutt, puttOutFrom, HOLE_OUT_RADIUS } from '../src/sim/round';
+import { playHole, onePutt, puttOutFrom, pinOf, HOLE_OUT_RADIUS } from '../src/sim/round';
 import { dist, type Vec } from '../src/sim/course/contract';
 import { loadoutFromPerks, puttSkillOf, startingLoadout } from '../src/sim/rpg/economy';
 
@@ -25,7 +25,7 @@ describe('putting path (GS-4)', () => {
       if (!played.pickedUp) {
         expect(putts[putts.length - 1]!.holed).toBe(true);
         expect(putts.slice(0, -1).every((p) => !p.holed)).toBe(true);
-        expect(dist(putts[putts.length - 1]!.to, hole.green)).toBeLessThanOrEqual(0.001);
+        expect(dist(putts[putts.length - 1]!.to, pinOf(hole))).toBeLessThanOrEqual(0.001);
       }
     }
     expect(checked).toBeGreaterThan(0);
@@ -40,10 +40,11 @@ describe('putting path (GS-4)', () => {
 
   it('putts get monotonically closer to the pin (a lag never overshoots farther)', () => {
     const hole = generateCourse(3, { holes: 1 }).holes[0]!;
+    const flag = pinOf(hole);
     const putts = playHole(hole, new Rng('3:play')).putts;
     for (let i = 1; i < putts.length; i++) {
-      const prev = dist(putts[i - 1]!.from, hole.green);
-      const here = dist(putts[i]!.from, hole.green);
+      const prev = dist(putts[i - 1]!.from, flag);
+      const here = dist(putts[i]!.from, flag);
       expect(here).toBeLessThanOrEqual(prev + 0.001);
     }
   });
