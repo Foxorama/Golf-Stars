@@ -297,7 +297,14 @@ This game lives or dies on three axes — put every change through all three bef
   on-theme for *space golf*, no asset to 404. The old **golf-ball planet** (`drawPlanet`) read as a stray
   golf ball overlapping the title, so it's now `planet:false` by default (function kept behind the flag as
   an escape hatch). The wordmark stars all carry a soft glow (heroes glow harder) + a warm underglow band,
-  so the title reads legibly bright against the starfield.
+  so the title reads legibly bright against the starfield. **PERF GOTCHA:** that glow is a cached
+  warm-white `glowSprite` (a radial-gradient offscreen canvas) stamped per star/ball via `drawImage` —
+  NOT `ctx.shadowBlur`. shadowBlur is a per-draw Gaussian; applying it to the few hundred title stars
+  chugged the framerate to a crawl. drawImage of a cached sprite is ~60fps (verified via a rAF counter).
+  Reach for the sprite, never per-element shadowBlur, for any many-instance glow. The launch no longer
+  draws a long exhaust-plume/smoke column trailing the climbing car (`drawLaunchFX` is just the pad
+  ignition flash now) — that plume read as a weird "jet under the car"; the car's own rear-nozzle flame
+  is the exhaust. `holdMs` is 3000 (was 1500) so the formed wordmark lingers ~1.5s longer before handoff.
 - **It is NOT in the pure reducer** — it's a time/DOM side-effect, so it lives in `app.ts` like the
   play-view canvas mount and save persistence. **Gotcha that keeps `tests/build.test.ts` green:**
   `start()` runs the normal `boot()` FIRST (the real title actually paints + sets `data-booted`),

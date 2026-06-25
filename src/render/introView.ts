@@ -51,7 +51,7 @@ const BASE_FEEL: IntroFeel = {
   transformMs: 1500,
   launchMs: 1500,
   writeMs: 2200,
-  holdMs: 1500,
+  holdMs: 3000,
   speed: 1,
   starCount: 220,
   shake: 7,
@@ -268,6 +268,25 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   document.body.appendChild(overlay);
   const ctx = canvas.getContext('2d');
 
+  // A pre-rendered soft warm-white glow sprite. Stamping this with drawImage is cheap and
+  // GPU-friendly — the title stars + golf-ball head glow through it instead of `shadowBlur`,
+  // which is a per-draw Gaussian and chugs the framerate when hundreds of stars use it.
+  const glowSprite = (() => {
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 64;
+    const g = c.getContext('2d');
+    if (g) {
+      const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, 'rgba(255,250,232,0.95)');
+      grad.addColorStop(0.4, 'rgba(255,240,200,0.36)');
+      grad.addColorStop(1, 'rgba(255,240,200,0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+    }
+    return c;
+  })();
+
   // The starfield is regenerated on every resize to fill the WHOLE viewport — the sky is
   // full-screen, not a letterboxed band — at a constant density, so on a tall phone the top
   // of the frame fills with stars as the scene turns to space instead of showing an empty
@@ -467,9 +486,13 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   function drawGolfBall(x: number, y: number, r: number, a: number): void {
     if (!ctx) return;
     ctx.save();
+    // Soft glow via the cached sprite (cheap; per-draw shadowBlur chugged the framerate).
+    const gr = r * 3;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = a * 0.85;
+    ctx.drawImage(glowSprite, x - gr, y - gr, gr * 2, gr * 2);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = a;
-    ctx.shadowColor = 'rgba(255,248,224,0.9)';
-    ctx.shadowBlur = 16;
     const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.2, x, y, r);
     g.addColorStop(0, '#ffffff');
     g.addColorStop(1, '#cfd6e2');
@@ -477,7 +500,6 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
     // Dimples (a packed 3×3 disc, foreshortened to a circle).
     ctx.fillStyle = 'rgba(120,132,154,0.45)';
     for (let v = -1; v <= 1; v++) {
@@ -1201,68 +1223,27 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
    * Launch effects drawn UNDER the car (in design space, not the car's local frame): a
    * blinding ignition flash, a roaring exhaust plume, and a rising smoke column.
    */
-  function drawLaunchFX(carX: number, carY: number, lp: number): void {
+  function drawLaunchFX(lp: number): void {
     if (!ctx) return;
-    const now = performance.now();
     const padY = GROUND_Y - 28;
 
-    // Ignition flash at the pad, brightest at t=0, gone by ~lp 0.22.
+    // Ignition flash at the pad — a brief blastoff punch at t=0, gone by ~lp 0.22. The long
+    // exhaust plume + smoke column that used to trail the climbing car was removed: it read
+    // as a weird "jet under the car." The car's own rear-nozzle flame is the exhaust now.
     const flash = Math.max(0, 1 - lp / 0.22);
-    if (flash > 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const fr = 120 + (1 - flash) * 220;
-      const g = ctx.createRadialGradient(520, padY, 0, 520, padY, fr);
-      g.addColorStop(0, `rgba(255,255,255,${0.9 * flash})`);
-      g.addColorStop(0.4, `rgba(255,214,120,${0.7 * flash})`);
-      g.addColorStop(1, 'rgba(255,120,40,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(520, padY, fr, 0, Math.PI * 2);
-      ctx.fill();
-      sparkle(ctx, 520, padY, 60 + flash * 70, `rgba(255,248,220,${flash})`);
-      ctx.restore();
-    }
-
-    // Exhaust plume + smoke, hanging straight down off the climbing car.
-    const topY = carY + 18;
+    if (flash <= 0) return;
     ctx.save();
-    // Bright core jet.
     ctx.globalCompositeOperation = 'lighter';
-    const flick = 0.82 + 0.18 * Math.sin(now * 0.06);
-    const plume = ctx.createLinearGradient(carX, topY, carX, DH + 80);
-    plume.addColorStop(0, `rgba(255,255,255,${0.95 * flick})`);
-    plume.addColorStop(0.25, `rgba(255,210,110,${0.8 * flick})`);
-    plume.addColorStop(0.6, 'rgba(255,120,40,0.35)');
-    plume.addColorStop(1, 'rgba(255,80,30,0)');
-    ctx.fillStyle = plume;
+    const fr = 120 + (1 - flash) * 220;
+    const g = ctx.createRadialGradient(520, padY, 0, 520, padY, fr);
+    g.addColorStop(0, `rgba(255,255,255,${0.9 * flash})`);
+    g.addColorStop(0.4, `rgba(255,214,120,${0.7 * flash})`);
+    g.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(carX - 20, topY);
-    ctx.lineTo(carX + 20, topY);
-    ctx.lineTo(carX + 74, DH + 80);
-    ctx.lineTo(carX - 74, DH + 80);
-    ctx.closePath();
+    ctx.arc(520, padY, fr, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
-
-    // Roiling smoke puffs billowing out below.
-    ctx.save();
-    for (let i = 0; i < 7; i++) {
-      const age = ((i / 7 + lp * 1.4) % 1);
-      const py = lerp(topY + 30, DH + 40, age);
-      const spread = 16 + age * 150;
-      const pr = 18 + age * 70;
-      const a = 0.32 * (1 - age);
-      const wob = Math.sin(now * 0.01 + i * 2) * spread * 0.5;
-      ctx.fillStyle = `rgba(206,212,224,${a})`;
-      ctx.beginPath();
-      ctx.arc(carX + wob, py, pr, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = `rgba(120,128,144,${a * 0.7})`;
-      ctx.beginPath();
-      ctx.arc(carX + wob + pr * 0.3, py + pr * 0.2, pr * 0.7, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    sparkle(ctx, 520, padY, 60 + flash * 70, `rgba(255,248,220,${flash})`);
     ctx.restore();
   }
 
@@ -1380,16 +1361,20 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
           ctx.stroke();
         }
 
-        ctx.globalAlpha = clamp01(ap * tw);
         // Every star carries a soft glow now (not just the heroes) so the wordmark is
-        // legibly bright; heroes glow harder.
-        ctx.shadowColor = s.col;
-        ctx.shadowBlur = s.hero ? 14 : 7;
+        // legibly bright; heroes glow harder. The halo is a cached sprite stamped via
+        // drawImage (cheap) rather than `shadowBlur` (a per-draw Gaussian that chugged with
+        // hundreds of stars).
+        const base = clamp01(ap * tw);
+        const gr = s.r * (s.hero ? 6 : 4);
+        ctx.globalAlpha = base * (s.hero ? 0.75 : 0.5);
+        ctx.drawImage(glowSprite, x - gr, y - gr, gr * 2, gr * 2);
+        // Crisp bright core.
+        ctx.globalAlpha = base;
         ctx.fillStyle = s.col;
         ctx.beginPath();
         ctx.arc(x, y, s.r * (settled ? 1.2 : 1.45), 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
       }
       ctx.restore();
 
@@ -1506,7 +1491,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
           cs = 1 - lp * 0.45;
         }
         // Launch FX sit under the car (separate from its local frame).
-        if (e >= t2) drawLaunchFX(carX, carY, lp);
+        if (e >= t2) drawLaunchFX(lp);
         drawCar(carX, carY, cs, tilt, wheelRetract, jet, flame, bootOpen);
       }
 
