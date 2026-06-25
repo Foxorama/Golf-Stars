@@ -174,96 +174,33 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     // On the green (or effectively there) → switch to putting.
     if (lie === 'green' || remaining <= HOLE_OUT_RADIUS) break;
 
-    // If the line to the pin is blocked by a penalty hazard, don't fire over it — lay
-    // up to the centreline corridor (penalty-free by the fairness invariant). A player
-    // reads the trouble and pitches back into play rather than spiralling.
+    // AI decision: lay up to the penalty-free corridor when the line is blocked, and
+    // club to leave room for roll-out. The player (interactive driver) makes this choice
+    // instead; both then run the SAME executeShot physics.
     const tgt = safeTarget(hole, ball, target);
-    const aimDist = dist(ball, tgt);
-    const shotBearing = bearingDeg(ball, tgt);
-    const playLike = playsLike(aimDist, hole.wind, shotBearing);
-    // Club for the EFFECTIVE carry: gravity scales how far a club flies, so divide the
-    // target by the carry multiplier before picking (low-grav → club down). Also leave
-    // room for roll-out — aim to land short so the run finishes near the target instead
-    // of carrying all the way and rolling past it.
-    const rollAllowance = Math.min(MAX_ROLL, playLike * 0.1);
-    const club = suggestClub(Math.max(1, playLike - rollAllowance) / carryMult, 'reach', bag, opts.stats);
+    const club = aiClub(hole, ball, tgt, carryMult, bag, opts.stats);
 
-    // Read the wind: aim UPWIND so the crosswind drifts the ball back to target. This
-    // is the "wind reads true off the shot bearing" promise — a played shot compensates
-    // for known wind rather than spraying into trouble.
-    const aim = aimWithWind(ball, tgt, hole.wind, shotBearing, club.carry * carryMult);
-
-    const result = resolveShot({
-      from: ball,
-      aim,
-      club,
-      lie,
-      wind: hole.wind,
+    const ex = executeShot(hole, ball, lie, tgt, club, {
       carryMult,
       dispersionMult: opts.dispersionMult,
       stats: opts.stats,
-      rng,
-    });
-    strokes++;
+    }, rng);
+    strokes += 1 + ex.penaltyStrokes;
+    penalties += ex.penaltyStrokes;
 
-    // Touchdown (end of carry), then bounce & roll out along the travel direction —
-    // unless the ball plugs in a penalty surface, which kills the roll.
-    const touchdown = result.landing;
-    const tdLie = lieAt(hole, touchdown);
-    let rest: Vec = touchdown;
-    let roll = 0;
-    if (!lieInfo(tdLie).penalty) {
-      roll = rollYards(tdLie, result.carry, rng);
-      if (roll > 0) {
-        let dx = touchdown[0] - ball[0];
-        let dy = touchdown[1] - ball[1];
-        const len = Math.hypot(dx, dy) || 1;
-        rest = [touchdown[0] + (dx / len) * roll, touchdown[1] + (dy / len) * roll];
-      }
+    // Tee-shot fairway result (par 4/5 only) — based on where the ball physically came
+    // to rest, before any penalty drop.
+    if (swing === 0 && hole.par >= 4) fairwayHit = ex.restLie === 'fairway';
+
+    shots.push(ex.log);
+    ball = ex.ballAfter;
+    lie = ex.lieAfter;
+
+    if (ex.holed) {
+      holed = true;
+      break;
     }
-
-    let landingLie = lieAt(hole, rest);
-    const li = lieInfo(landingLie);
-    const log: ShotLog = {
-      from: ball,
-      result,
-      lieFrom: lie,
-      lieTo: landingLie,
-      club,
-      rest,
-      roll,
-      holed: false,
-    };
-
-    if (li.penalty) {
-      const pen = PEN_INFO[li.penalty];
-      penalties += pen.strokes;
-      strokes += pen.strokes;
-      log.penalty = li.penalty;
-      if (pen.replay) {
-        // Stroke-and-distance: replay from the same spot, lie unchanged.
-        landingLie = lie;
-      } else {
-        const drop = dropPoint(hole, ball, rest);
-        ball = drop;
-        lie = lieAt(hole, drop);
-      }
-    } else {
-      ball = rest;
-      lie = landingLie;
-      // Holed from a full shot — a chip-in or, off the tee, a hole-in-one.
-      if (dist(rest, target) <= HOLE_OUT_RADIUS) {
-        log.holed = true;
-        holed = true;
-      }
-    }
-
-    // Tee-shot fairway result (par 4/5 only).
-    if (swing === 0 && hole.par >= 4) fairwayHit = landingLie === 'fairway';
-
-    shots.push(log);
-
-    if (log.holed || lie === 'green' || dist(ball, target) <= HOLE_OUT_RADIUS) break;
+    if (lie === 'green' || dist(ball, target) <= HOLE_OUT_RADIUS) break;
   }
 
   // Putt out.
@@ -291,6 +228,126 @@ export function playCourse(
   opts: PlayHoleOptions = {},
 ): PlayedHole[] {
   return holes.map((h) => playHole(h, rng, opts));
+}
+
+export interface ExecOpts {
+  carryMult: number;
+  dispersionMult?: number;
+  stats?: ClubStats;
+}
+
+export interface ExecResult {
+  log: ShotLog;
+  /** Where the ball ends up for the next shot (after any penalty drop). */
+  ballAfter: Vec;
+  lieAfter: FeatureKind;
+  /** Lie where the ball physically came to rest (before a penalty drop). */
+  restLie: FeatureKind;
+  penaltyStrokes: number;
+  holed: boolean;
+}
+
+/**
+ * Resolve ONE full shot — wind-compensated aim, flight, bounce/roll-out, penalty, and
+ * hole-out — given an explicit `target` and `club`. Shared by the AI (playHole) and the
+ * interactive player driver so both obey identical physics. Pure: randomness from `rng`.
+ */
+export function executeShot(
+  hole: Hole,
+  from: Vec,
+  lie: FeatureKind,
+  target: Vec,
+  club: Club,
+  opts: ExecOpts,
+  rng: Rng,
+): ExecResult {
+  const carryMult = opts.carryMult;
+  const shotBearing = bearingDeg(from, target);
+  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult);
+  const result = resolveShot({
+    from,
+    aim,
+    club,
+    lie,
+    wind: hole.wind,
+    carryMult,
+    dispersionMult: opts.dispersionMult,
+    stats: opts.stats,
+    rng,
+  });
+
+  // Touchdown → bounce & roll out (unless it plugs in a penalty surface).
+  const touchdown = result.landing;
+  const tdLie = lieAt(hole, touchdown);
+  let rest: Vec = touchdown;
+  let roll = 0;
+  if (!lieInfo(tdLie).penalty) {
+    roll = rollYards(tdLie, result.carry, rng);
+    if (roll > 0) {
+      const dx = touchdown[0] - from[0];
+      const dy = touchdown[1] - from[1];
+      const len = Math.hypot(dx, dy) || 1;
+      rest = [touchdown[0] + (dx / len) * roll, touchdown[1] + (dy / len) * roll];
+    }
+  }
+
+  const restLie = lieAt(hole, rest);
+  const li = lieInfo(restLie);
+  const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false };
+
+  let ballAfter: Vec = rest;
+  let lieAfter: FeatureKind = restLie;
+  let penaltyStrokes = 0;
+  let holed = false;
+  if (li.penalty) {
+    const pen = PEN_INFO[li.penalty];
+    penaltyStrokes = pen.strokes;
+    log.penalty = li.penalty;
+    if (pen.replay) {
+      ballAfter = from;
+      lieAfter = lie;
+    } else {
+      const drop = dropPoint(hole, from, rest);
+      ballAfter = drop;
+      lieAfter = lieAt(hole, drop);
+    }
+  } else if (dist(rest, pin(hole)) <= HOLE_OUT_RADIUS) {
+    log.holed = true;
+    holed = true;
+  }
+
+  return { log, ballAfter, lieAfter, restLie, penaltyStrokes, holed };
+}
+
+/** The club the AI would choose for a target: reach the plays-like distance, minus a
+ *  roll allowance, gravity-adjusted. The interactive driver uses this as its suggestion. */
+export function aiClub(
+  hole: Hole,
+  from: Vec,
+  target: Vec,
+  carryMult: number,
+  bag: readonly Club[],
+  stats?: ClubStats,
+): Club {
+  const shotBearing = bearingDeg(from, target);
+  const playLike = playsLike(dist(from, target), hole.wind, shotBearing);
+  const rollAllowance = Math.min(MAX_ROLL, playLike * 0.1);
+  return suggestClub(Math.max(1, playLike - rollAllowance) / carryMult, 'reach', bag, stats);
+}
+
+/** Pin location (exported for the interactive driver). */
+export function pinOf(hole: Hole): Vec {
+  return pin(hole);
+}
+
+/** Lay-up target: the penalty-free corridor point ahead of the ball (exported). */
+export function layupTarget(hole: Hole, ball: Vec): Vec {
+  return safeTarget(hole, ball, pin(hole));
+}
+
+/** Auto putt-out from a position (exported for the interactive driver). */
+export function puttOutFrom(rng: Rng, from: Vec, pinPt: Vec): { putts: number; log: PuttLog[] } {
+  return puttOut(rng, from, pinPt);
 }
 
 /** True if the straight line from→to is free of penalty surfaces (sampled). */
