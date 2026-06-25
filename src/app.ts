@@ -19,6 +19,7 @@ import { snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
+import { mountIntro } from './render/introView';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -546,7 +547,37 @@ function render(): void {
   }
 }
 
+/**
+ * Decide whether to play the loading-intro cinematic. It's cosmetic, so it degrades safely:
+ * we boot the real title FIRST (so the page has genuinely painted), then overlay the intro
+ * on top and remove it when it finishes/skips. Gated so it plays on a fresh session but not
+ * on every in-session reload; `?intro=1` forces it, `?intro=0` (or reduced-motion) skips it.
+ */
+function shouldPlayIntro(): boolean {
+  try {
+    const q = new URLSearchParams(location.search).get('intro');
+    if (q === '1') return true;
+    if (q === '0') return false;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+    if (sessionStorage.getItem('gs_introSeen') === '1') return false;
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 /** Entry, called from main.ts inside try/catch so any boot fault is visible. */
 export function start(): void {
   boot();
+  if (!shouldPlayIntro()) return;
+  try {
+    sessionStorage.setItem('gs_introSeen', '1');
+  } catch {
+    /* ignore */
+  }
+  try {
+    mountIntro({});
+  } catch {
+    /* the title is already painted underneath — losing the intro is harmless */
+  }
 }

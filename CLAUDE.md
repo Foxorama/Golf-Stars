@@ -177,6 +177,23 @@ This game lives or dies on three axes — put every change through all three bef
 - New screens/actions: add an `Action` variant + a guarded `case` (return state unchanged when the
   action doesn't apply to the current screen) and a render branch. Keep logic in the reducer.
 
+## Loading intro cinematic (`render/introView.ts`)
+- A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
+  pitch their bags into a woody station wagon in a suburban driveway → wheels fold up, it hovers,
+  jets extend → it rockets nose-up into a starfield → a comet writes **GOLF STARS** in the sky →
+  hands off to the title. Timings/feel read from `window._gsIntro` (escape-hatch rule); it's
+  skippable (Skip button / click / Esc-Enter-Space), respects `prefers-reduced-motion`, and is
+  gated by `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
+- **It is NOT in the pure reducer** — it's a time/DOM side-effect, so it lives in `app.ts` like the
+  play-view canvas mount and save persistence. **Gotcha that keeps `tests/build.test.ts` green:**
+  `start()` runs the normal `boot()` FIRST (the real title actually paints + sets `data-booted`),
+  THEN overlays the intro as a `position:fixed` element on `document.body`. The title is genuinely
+  in the DOM from t=0, so the real-browser smoke test (waits for `data-booted`, asserts the title
+  text) passes even while the overlay covers the screen. `onDone`/skip removes the overlay,
+  revealing the already-rendered, interactive title. A throw inside the rAF loop calls `finish()`
+  so a cosmetic glitch can never strand the boot. Canvas feel isn't unit-testable — verified
+  eyes-on (Playwright screenshots per phase).
+
 ## Art pipeline (Flux)
 - Biome / boss-planet / course / item art is Flux-generated (`flux2_max`), text-to-image with
   styled prompts; downloaded into `art/`, lazy-loaded, runtime-cached. Same flow golf-finder used
