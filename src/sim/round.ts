@@ -150,7 +150,10 @@ export function playBounds(hole: Hole): { min: Vec; max: Vec } {
   eat(hole.tee);
   eat(hole.green);
   const span = Math.max(maxX - minX, maxY - minY, dist(hole.tee, hole.green));
-  const m = Math.max(40, span * 0.25);
+  // Generous, but CAPPED so a long par-5 doesn't fling the boundary (and its drawn OB
+  // stakes) absurdly far out — the cap keeps OB a real, readable edge you can see and aim
+  // away from, while still only catching genuinely wild shots clear of all the terrain.
+  const m = Math.min(Math.max(40, span * 0.25), 90);
   return { min: [minX - m, minY - m], max: [maxX + m, maxY + m] };
 }
 
@@ -158,6 +161,36 @@ export function playBounds(hole: Hole): { min: Vec; max: Vec } {
 export function inBounds(hole: Hole, p: Vec): boolean {
   const b = playBounds(hole);
   return p[0] >= b.min[0] && p[0] <= b.max[0] && p[1] >= b.min[1] && p[1] <= b.max[1];
+}
+
+/** The four corners of the OB box (course-space), CW from the tee-side min corner. The
+ *  renderers draw white OB stakes along these edges — the boundary the OB penalty uses. */
+export function playBoundsCorners(hole: Hole): [Vec, Vec, Vec, Vec] {
+  const b = playBounds(hole);
+  return [
+    [b.min[0], b.min[1]],
+    [b.max[0], b.min[1]],
+    [b.max[0], b.max[1]],
+    [b.min[0], b.max[1]],
+  ];
+}
+
+/** Evenly-spaced OB stake positions (course-space) around the boundary, ~`spacing` yards
+ *  apart. Render-only marker geometry: the stakes sit EXACTLY where stroke-and-distance
+ *  begins, so seeing them reads true to the penalty. Pure. */
+export function obStakes(hole: Hole, spacing = 28): Vec[] {
+  const corners = playBoundsCorners(hole);
+  const pts: Vec[] = [];
+  for (let e = 0; e < 4; e++) {
+    const p = corners[e]!;
+    const q = corners[(e + 1) % 4]!;
+    const n = Math.max(2, Math.round(dist(p, q) / spacing));
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      pts.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  }
+  return pts;
 }
 
 /** Find a legal drop after a no-replay penalty: walk back toward the prior spot. */

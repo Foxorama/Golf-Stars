@@ -109,6 +109,10 @@ export const LIE_INFO: Record<string, LieInfo> = {
   rough: { carryMult: 0.85, dispersionMult: 1.4, label: 'Rough' },
   waste: { carryMult: 0.9, dispersionMult: 1.2, label: 'Waste' },
   bunker: { carryMult: 0.7, dispersionMult: 1.6, label: 'Bunker' },
+  // Trees are a tough non-penalty LIE, not a mid-flight collision: a sprayed ball ends up
+  // "in the woods" and has to punch out (short carry, wild line) — fair and readable, since
+  // only an offline shot finds them. NOT a penalty, so they may line the corridor edge.
+  trees: { carryMult: 0.6, dispersionMult: 1.7, label: 'Trees' },
   water: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'water', label: 'Water' },
   // Fantasy examples (each biome that uses one references it by this key):
   lava: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'lava', label: 'Lava' },

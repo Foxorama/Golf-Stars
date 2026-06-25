@@ -13,8 +13,9 @@
 
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
+import { obStakes, playBoundsCorners } from '../sim/round';
 import { holeProjector } from './project';
-import { fillFor, roughFor } from './palette';
+import { fillFor, roughFor, OB, TREE } from './palette';
 import {
   arcPeak,
   easeOutCubic,
@@ -103,6 +104,8 @@ export function mountPlayView(
   // Include every shot's flight + rest (and putt endpoints) so a wild shot that flies
   // off the terrain stays in frame instead of clipping.
   const extra: Vec[] = [];
+  // Keep the OB boundary (and its stakes) in frame, like the SVG map.
+  extra.push(...playBoundsCorners(hole));
   for (const s of shots) extra.push(s.from, s.result.landing, s.rest);
   for (const p of putts) extra.push(p.from, p.to);
   const proj = holeProjector(hole, { width, height, extra });
@@ -158,8 +161,76 @@ export function mountPlayView(
       ctx.stroke();
     };
 
+    // A tree draws as a canopy glyph (shaded base, lit top, trunk) so a treeline reads as
+    // woods; every other feature is a filled polygon.
+    const drawTree = (poly: Vec[]): void => {
+      let cx = 0;
+      let cy = 0;
+      for (const p of poly) {
+        cx += p[0];
+        cy += p[1];
+      }
+      cx /= poly.length;
+      cy /= poly.length;
+      let rad = 0;
+      for (const p of poly) rad += Math.hypot(p[0] - cx, p[1] - cy);
+      rad /= poly.length;
+      const [x, y] = proj.project([cx, cy]);
+      const rr = Math.max(3, rad * proj.scale);
+      ctx.strokeStyle = TREE.trunk;
+      ctx.lineWidth = rr * 0.35;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y + rr * 0.9);
+      ctx.lineTo(x, y + rr * 0.2);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      ctx.fillStyle = TREE.shade;
+      ctx.beginPath();
+      ctx.arc(x, y, rr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = TREE.canopy;
+      ctx.beginPath();
+      ctx.arc(x - rr * 0.28, y - rr * 0.28, rr * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
     for (const f of hole.features) drawPoly(f.poly, fillFor(f.kind));
-    for (const f of hole.hazards) drawPoly(f.poly, fillFor(f.kind));
+    for (const f of hole.hazards) {
+      if (f.kind === 'trees') drawTree(f.poly);
+      else drawPoly(f.poly, fillFor(f.kind));
+    }
+
+    // Out-of-bounds stakes: a faint dashed boundary line joining white, red-capped posts
+    // around the OB box — the visible stroke-and-distance edge.
+    const corners = playBoundsCorners(hole);
+    ctx.setLineDash([2, 7]);
+    ctx.strokeStyle = OB.line;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    corners.forEach((p, i) => {
+      const [x, y] = proj.project(p);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (const s of obStakes(hole)) {
+      const [x, y] = proj.project(s);
+      ctx.strokeStyle = OB.post;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y - 7);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      ctx.fillStyle = OB.cap;
+      ctx.beginPath();
+      ctx.arc(x, y - 7, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Centreline.
     ctx.beginPath();

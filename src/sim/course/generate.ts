@@ -34,7 +34,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 2;
+export const GENERATOR_VERSION = 3;
 
 export interface GenerateOptions {
   /** Number of holes (default 1 — the vertical slice). */
@@ -218,6 +218,38 @@ function generateHole(
       // Scatter goes in features (under hazards), so a hazard always wins the lie read.
       features.push({ kind: sc.kind, poly: blobPoly(c, r, 10, 0.2, rng) });
     }
+  }
+
+  // Fairway sand bunkers (non-penalty → ALWAYS fair, so they may bite the corridor edge):
+  // classic risk-reward set just off the landing-zone fairway. They reward an accurate line
+  // without ever killing a card, the way a sprayed shot — not a sensible one — finds sand.
+  const fwBunkers = Math.round((biome.fairwayBunkers ?? 0) * (0.6 + 0.5 * wildness));
+  for (let i = 0; i < fwBunkers; i++) {
+    const t = rng.range(0.32, 0.72); // the driving/approach landing band
+    const side = rng.bool() ? 1 : -1;
+    const r = rng.range(6, 10);
+    const along = centrePoint(centreline, t);
+    const perp = perpAt(centreline, t);
+    // Sit the bunker just OUTSIDE the corridor edge (catches a pushed/pulled shot, not a
+    // centred one) so the auto/safe line stays clean and scoring isn't tanked.
+    const lateral = fairwayHalfWidth + r * 0.3 + rng.range(0, 5);
+    const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+    hazards.push({ kind: 'bunker', poly: blobPoly(c, r, 10, 0.22, rng) });
+  }
+
+  // Treelines (non-penalty LIE): woods lining the rough OUTSIDE the play corridor, so a
+  // sensible shot is always clear and only a sprayed ball ends up punching out of the trees.
+  // Stored as many small blobs so the renderer can draw a believable line of canopies.
+  const treeCount = Math.round((biome.treeDensity ?? 0) * (0.7 + wildness) * (par === 3 ? 2 : 4));
+  for (let i = 0; i < treeCount; i++) {
+    const t = rng.range(0.12, 0.95);
+    const side = rng.bool() ? 1 : -1;
+    const r = rng.range(3, 6);
+    const along = centrePoint(centreline, t);
+    const perp = perpAt(centreline, t);
+    const lateral = fairwayHalfWidth + r + rng.range(3, 20);
+    const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+    hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, rng) });
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.

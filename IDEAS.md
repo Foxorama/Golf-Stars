@@ -32,6 +32,21 @@ Everything below serves whichever avenue wins.
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-13 — Cooler holes: treelines, fairway bunkers, visible out-of-bounds.** Holes now read
+  like real golf. **Trees** are a new non-penalty LIE (`trees` in LIE_INFO: carry 0.6, dispersion
+  1.7) — a sprayed ball ends up "in the woods" and punches out; fair & readable, never a stroke
+  lost. They line the rough OUTSIDE the play corridor (only an offline shot finds them) and are
+  drawn as canopy glyphs (not flat blobs) in both renderers. **Fairway sand bunkers** (`fairwayBunkers`
+  per biome) bite the landing-zone edge — sand is non-penalty so they're always fair risk-reward.
+  Both are content-as-data biome rows (`treeDensity`/`fairwayBunkers`): verdant is tree-lined, dust-belt
+  is bunker-strewn, the void stays barren (crystals, no woods). **Out-of-bounds is now visible**: the
+  existing stroke-and-distance box (margin capped so a long par-5 doesn't fling it miles out) is drawn
+  as a faint dashed boundary line ringed with white, red-capped OB stakes (`obStakes`/`playBoundsCorners`)
+  in both renderers, framed into view so you can see and aim away from the edge. `GENERATOR_VERSION` → 3.
+  All gated by the fairness + no-death-spiral tests (a tighter OB margin was tried and REVERTED — it
+  tipped toPar/hole over the 1.0 bar: more wild shots caught OB). New `tests/hazards.test.ts` guards the
+  trees-stay-off-corridor, sand-is-fair, and OB-stake-on-boundary invariants; both renderers verified
+  eyes-on. (branch `claude/golf-hazards-boundaries-8aud8s`)
 - **GS-12 — Persistent meta-progression (Star Shards + Outpost).** Runs now leave a mark: each
   ended run awards **Star Shards** (`shardsForRun` = distance×3 + stops×2, floored at 1 so a brick
   still pays), banked across runs in **save v3**. The **Outpost** (a between-run screen off the
