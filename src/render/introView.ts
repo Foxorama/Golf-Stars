@@ -264,26 +264,55 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   document.body.appendChild(overlay);
   const ctx = canvas.getContext('2d');
 
-  // Pre-scatter the starfield in design space (deterministic). A tenth of the stars are
-  // bigger, tinted "hero" stars that get a soft glow; the rest are plain white pinpricks.
+  // The starfield is regenerated on every resize to fill the WHOLE viewport — the sky is
+  // full-screen, not a letterboxed band — at a constant density, so on a tall phone the top
+  // of the frame fills with stars as the scene turns to space instead of showing an empty
+  // slab above the 1000×640 stage. (A tenth are bigger, tinted "hero" stars with a soft
+  // glow; the rest are plain pinpricks.) `rng` (seed 0x901f) drives the title + shooters.
   const rng = mulberry32(0x901f);
-  const heroHues = ['#fff4cf', '#bcd6ff', '#ffd0e6', '#cfeaff'];
-  const stars = Array.from({ length: F.starCount }, () => {
-    const hero = rng() < 0.1;
-    return {
-      x: rng() * DW,
-      y: rng() * (DH * 0.82),
-      r: hero ? 1.6 + rng() * 1.8 : 0.5 + rng() * 1.4,
-      tw: rng() * Math.PI * 2, // twinkle phase
-      hero,
-      col: hero ? heroHues[(rng() * heroHues.length) | 0]! : '#eaf2ff',
-      // Parallax depth 0..1 — nearer stars streak more during the warp launch.
-      depth: rng(),
-      // Fill threshold 0..1 — the star pops in once the takeoff "fill" passes it, so the
-      // sky populates progressively as the wagon climbs (not one global crossfade).
-      pop: rng(),
-    };
-  });
+  type Star = { x: number; y: number; r: number; tw: number; hero: boolean; col: string; depth: number; pop: number };
+  let stars: Star[] = [];
+  function scatterStars(): void {
+    const sr = mulberry32(0x901f);
+    const heroHues = ['#fff4cf', '#bcd6ff', '#ffd0e6', '#cfeaff'];
+    const area = Math.max(1, (vRight - vLeft) * (vBot - vTop));
+    // F.starCount is the density reference for one DW×DH stage; scale by the real visible
+    // area so a tall portrait letterbox gets proportionally more stars (capped for sanity).
+    const count = Math.min(1500, Math.max(60, Math.round((F.starCount * area) / (DW * DH))));
+    stars = Array.from({ length: count }, () => {
+      const hero = sr() < 0.1;
+      return {
+        x: lerp(vLeft, vRight, sr()),
+        y: lerp(vTop, vBot, sr()),
+        r: hero ? 1.6 + sr() * 1.8 : 0.5 + sr() * 1.4,
+        tw: sr() * Math.PI * 2, // twinkle phase
+        hero,
+        col: hero ? heroHues[(sr() * heroHues.length) | 0]! : '#eaf2ff',
+        depth: sr(), // parallax 0..1 — nearer stars streak more during the warp launch
+        pop: sr(), // fill threshold 0..1 — pops in once the takeoff fill passes it
+      };
+    });
+  }
+
+  // Drifting day clouds, scattered across the upper sky and well into the top letterbox so
+  // the daytime sky reads "blue and cloudy" right to the top of the frame.
+  const cloudRng = mulberry32(0x0c10);
+  const clouds = Array.from({ length: 10 }, () => ({
+    x: -DW * 0.3 + cloudRng() * DW * 1.6,
+    y: -DH * 1.6 + cloudRng() * (DH * 1.6 + 210),
+    s: 0.65 + cloudRng() * 1.0,
+    a: 0.55 + cloudRng() * 0.35,
+  }));
+
+  // Pebble/grit flecks salting the underground cross-section, pre-scattered over a deep,
+  // wide band (positions are depth below the turf line so they hold across resizes).
+  const pebRng = mulberry32(0x5eed);
+  const pebbles = Array.from({ length: 150 }, () => ({
+    x: -DW * 0.3 + pebRng() * DW * 1.6,
+    dy: pebRng() * DH * 2.6,
+    r: 1 + pebRng() * 3.5,
+    light: pebRng() < 0.45,
+  }));
 
   // The GOLF STARS wordmark as a constellation, sampled from the rasterised text. The
   // stars rain in from the rocket's wake (above) and settle into the letters; if pixel
@@ -322,6 +351,12 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   let scale = 1;
   let offX = 0;
   let offY = 0;
+  // Visible region in design coords (the full viewport, including the letterbox bands) so the
+  // sky/stars/dirt can be drawn full-screen rather than only inside the 1000×640 stage.
+  let vLeft = 0;
+  let vRight = DW;
+  let vTop = 0;
+  let vBot = DH;
 
   function resize(): void {
     if (!ctx) return;
@@ -335,6 +370,11 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     scale = Math.min(cssW / DW, cssH / DH);
     offX = (cssW - DW * scale) / 2;
     offY = (cssH - DH * scale) / 2;
+    vLeft = -offX / scale;
+    vRight = (cssW - offX) / scale;
+    vTop = -offY / scale;
+    vBot = (cssH - offY) / scale;
+    scatterStars();
   }
 
   const onKey = (e: KeyboardEvent): void => {
@@ -428,7 +468,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     sp.addColorStop(0.6, '#0c0f17');
     sp.addColorStop(1, '#0b0d12');
     ctx.fillStyle = sp;
-    ctx.fillRect(-offX / scale, -offY / scale, DW + (offX * 2) / scale, DH + (offY * 2) / scale);
+    ctx.fillRect(vLeft, vTop, vRight - vLeft, vBot - vTop);
 
     if (spaceA > 0) {
       if (F.nebula) drawNebula(spaceA);
@@ -474,27 +514,252 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     if (dayA > 0) {
       ctx.save();
       ctx.globalAlpha = dayA;
-      const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-      sky.addColorStop(0, '#9bdcff');
+      // Blue sky filling the WHOLE frame down to the ground (top letterbox included), so the
+      // top of the screen matches the scene's sky instead of showing an empty slab.
+      const sky = ctx.createLinearGradient(0, vTop, 0, GROUND_Y);
+      sky.addColorStop(0, '#7cc1f4');
+      sky.addColorStop(0.55, '#9bdcff');
       sky.addColorStop(1, '#eaf7ff');
       ctx.fillStyle = sky;
-      ctx.fillRect(-offX / scale, -offY / scale, DW + (offX * 2) / scale, DH);
+      ctx.fillRect(vLeft, vTop, vRight - vLeft, GROUND_Y - vTop);
       // Sun.
       ctx.fillStyle = 'rgba(255,247,214,0.95)';
       ctx.beginPath();
       ctx.arc(840, 96, 34, 0, Math.PI * 2);
       ctx.fill();
-      // A couple of soft clouds.
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      for (const [cx, cy, s] of [[180, 110, 1], [560, 70, 0.8]] as const) {
+      // Soft clouds drifting across the upper sky (into the top letterbox).
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      for (const c of clouds) {
+        ctx.globalAlpha = dayA * c.a;
         ctx.beginPath();
-        ctx.ellipse(cx, cy, 60 * s, 22 * s, 0, 0, Math.PI * 2);
-        ctx.ellipse(cx + 46 * s, cy + 6 * s, 44 * s, 18 * s, 0, 0, Math.PI * 2);
-        ctx.ellipse(cx - 46 * s, cy + 8 * s, 40 * s, 16 * s, 0, 0, Math.PI * 2);
+        ctx.ellipse(c.x, c.y, 60 * c.s, 22 * c.s, 0, 0, Math.PI * 2);
+        ctx.ellipse(c.x + 46 * c.s, c.y + 6 * c.s, 44 * c.s, 18 * c.s, 0, 0, Math.PI * 2);
+        ctx.ellipse(c.x - 46 * c.s, c.y + 8 * c.s, 40 * c.s, 16 * c.s, 0, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
     }
+  }
+
+  // --- underground cross-section --------------------------------------------
+  // Buried treasures, each drawn in design space at (x, y). Kept small + vector so there's
+  // no asset to 404 and they read against the dark soil.
+
+  /** A faceted gemstone (diamond cut) with a bright top facet and a glint. */
+  function drawGem(x: number, y: number, s: number, col: string, rot: number): void {
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.scale(s, s);
+    const w = 14;
+    const top = -10;
+    const mid = -2;
+    const bot = 16;
+    // Body.
+    ctx.beginPath();
+    ctx.moveTo(-w, mid);
+    ctx.lineTo(-w * 0.6, top);
+    ctx.lineTo(w * 0.6, top);
+    ctx.lineTo(w, mid);
+    ctx.lineTo(0, bot);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.fill();
+    // Lighter top crown facet.
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.6, top);
+    ctx.lineTo(w * 0.6, top);
+    ctx.lineTo(w, mid);
+    ctx.lineTo(-w, mid);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fill();
+    // Facet seams.
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-w, mid);
+    ctx.lineTo(0, bot);
+    ctx.moveTo(w, mid);
+    ctx.lineTo(0, bot);
+    ctx.moveTo(0, top);
+    ctx.lineTo(0, bot);
+    ctx.stroke();
+    // Glint.
+    sparkle(ctx, -w * 0.2, top + 1, 5, 'rgba(255,255,255,0.9)');
+    ctx.restore();
+  }
+
+  /** A classic dog-bone (two knuckles + shaft) for the dino-bone vibe. */
+  function drawBone(x: number, y: number, s: number, rot: number): void {
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.scale(s, s);
+    ctx.fillStyle = '#e9e2cf';
+    ctx.strokeStyle = '#b6ab8f';
+    ctx.lineWidth = 1.5;
+    const L = 26;
+    const knuck = 7;
+    for (const ex of [-L, L]) {
+      for (const ey of [-knuck, knuck]) {
+        ctx.beginPath();
+        ctx.arc(ex, ey, knuck, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    rr(ctx, -L, -6, L * 2, 12, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** A cartoon dino skull: a snout, eye socket and a row of teeth. */
+  function drawSkull(x: number, y: number, s: number, rot: number): void {
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.scale(s, s);
+    ctx.fillStyle = '#e9e2cf';
+    ctx.strokeStyle = '#b6ab8f';
+    ctx.lineWidth = 1.5;
+    // Cranium + elongated snout.
+    ctx.beginPath();
+    ctx.moveTo(-34, 4);
+    ctx.quadraticCurveTo(-40, -20, -16, -22);
+    ctx.quadraticCurveTo(6, -24, 16, -14);
+    ctx.lineTo(40, -8);
+    ctx.quadraticCurveTo(46, -2, 38, 2);
+    ctx.lineTo(16, 6);
+    ctx.quadraticCurveTo(2, 16, -16, 14);
+    ctx.quadraticCurveTo(-30, 14, -34, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Eye socket.
+    ctx.fillStyle = '#5a513c';
+    ctx.beginPath();
+    ctx.arc(-12, -8, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // Teeth along the jaw.
+    ctx.fillStyle = '#f3eee0';
+    for (let i = 0; i < 5; i++) {
+      const tx = 6 + i * 7;
+      ctx.beginPath();
+      ctx.moveTo(tx, 4);
+      ctx.lineTo(tx + 3, 4);
+      ctx.lineTo(tx + 1.5, 11);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** A long-lost dimpled golf ball, half-buried treasure. */
+  function drawBuriedBall(x: number, y: number, s: number): void {
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    const g = ctx.createRadialGradient(-4, -5, 2, 0, 0, 14);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(1, '#c7cdd8');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(120,130,150,0.5)';
+    for (let v = -1; v <= 1; v++) {
+      for (let u = -1; u <= 1; u++) {
+        if (u * u + v * v > 2) continue;
+        ctx.beginPath();
+        ctx.arc(u * 6, v * 6, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * A cross-section of earth under the lawn, revealed in the bottom band: stacked soil layers
+   * (topsoil → subsoil → clay → bedrock) salted with grit and buried treasures (dino bones,
+   * gemstones, a lost golf ball). Fades out with the day scene — there's no ground in space.
+   * Drawn from the turf line (DH) down to the bottom of the viewport.
+   */
+  function drawUnderground(a: number): void {
+    if (!ctx || a <= 0 || vBot <= DH) return;
+    ctx.save();
+    ctx.globalAlpha = a;
+    const top = DH;
+    const x = vLeft;
+    const w = vRight - vLeft;
+
+    // Soil base gradient, browns deepening with depth.
+    const g = ctx.createLinearGradient(0, top, 0, vBot);
+    g.addColorStop(0, '#5a3f25');
+    g.addColorStop(0.4, '#46301d');
+    g.addColorStop(0.75, '#341f13');
+    g.addColorStop(1, '#22140b');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, w, vBot - top);
+
+    // Dark topsoil seam right under the turf, with a slightly wavy interface.
+    ctx.fillStyle = '#2c1d10';
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    const seg = Math.max(40, w / 18);
+    for (let sx = x; sx <= x + w; sx += seg) {
+      ctx.lineTo(sx, top + 10 + Math.sin(sx * 0.03) * 6);
+    }
+    ctx.lineTo(x + w, top);
+    ctx.closePath();
+    ctx.fill();
+
+    // Strata divider lines (lighter mineral seams) at a few depths.
+    ctx.strokeStyle = 'rgba(150,120,86,0.25)';
+    ctx.lineWidth = 2;
+    for (const frac of [0.26, 0.52, 0.78]) {
+      const ly = top + (vBot - top) * frac;
+      if (ly > vBot - 4) continue;
+      ctx.beginPath();
+      ctx.moveTo(x, ly + Math.sin(x * 0.02) * 8);
+      for (let sx = x; sx <= x + w; sx += seg) {
+        ctx.lineTo(sx, ly + Math.sin(sx * 0.02) * 8);
+      }
+      ctx.stroke();
+    }
+
+    // Grit / pebbles.
+    for (const p of pebbles) {
+      const py = top + p.dy;
+      if (py > vBot - 2) continue;
+      ctx.fillStyle = p.light ? 'rgba(196,170,128,0.5)' : 'rgba(20,12,6,0.55)';
+      ctx.beginPath();
+      ctx.arc(p.x, py, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Buried treasures (only those that fall inside the visible depth).
+    const items: Array<() => void> = [];
+    const at = (dy: number, fn: (yy: number) => void): void => {
+      const yy = top + dy;
+      if (yy < vBot - 14) items.push(() => fn(yy));
+    };
+    at(150, (yy) => drawSkull(300, yy, 1.0, -0.12));
+    at(120, (yy) => drawBone(660, yy, 0.95, 0.1));
+    at(250, (yy) => drawGem(470, yy, 1.15, '#7be0d0', 0.18));
+    at(300, (yy) => drawGem(150, yy, 0.95, '#c89bff', -0.3));
+    at(280, (yy) => drawGem(845, yy, 1.05, '#ff9bbf', 0.12));
+    at(380, (yy) => drawBone(790, yy, 0.85, 0.95));
+    at(400, (yy) => drawBuriedBall(360, yy, 1.0));
+    at(520, (yy) => drawGem(620, yy, 1.25, '#ffd27a', -0.15));
+    for (const fn of items) fn();
+
+    ctx.restore();
   }
 
   /**
@@ -1091,6 +1356,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
 
       drawSky(dayA, space, e, warp);
       if (F.planet) drawPlanet(space);
+      drawUnderground(dayA);
       drawSuburb(dayA);
 
       // Golfers + bag loading (day scene only).
