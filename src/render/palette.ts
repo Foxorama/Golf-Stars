@@ -10,6 +10,7 @@ export const FILL: Record<string, string> = {
   green: '#5fd45a',
   tee: '#7a9a3a',
   bunker: '#e9d8a6',
+  trees: '#1f6b2e', // canopy green (the renderers draw trees as canopies, not flat blobs)
   water: '#3f8fe0',
   waste: '#c2b280',
   lava: '#d2451e',
@@ -25,6 +26,21 @@ export const BIOME_ROUGH: Record<string, string> = {
   'ice-ring': '#3a4a55',
   'ember-world': '#3a1410',
   'void-garden': '#120a22',
+};
+
+/** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
+ *  shaded under-canopy, and a trunk. Trees are drawn as canopies, not flat polygons. */
+export const TREE = {
+  canopy: '#2c8a3c',
+  shade: '#1c5c28',
+  trunk: '#5a3a22',
+};
+
+/** OB stake look (white post, red cap) + the faint boundary line that joins them. */
+export const OB = {
+  post: '#f4f4f4',
+  cap: '#ff3b3b',
+  line: 'rgba(244,244,244,0.16)',
 };
 
 export function fillFor(kind: string): string {

@@ -60,12 +60,20 @@ This game lives or dies on three axes — put every change through all three bef
 
 ## Generator & sim invariants (locked in GS-1)
 - **Biomes are data** (`src/sim/course/biomes.ts`): a biome row sets gravity (carry mult),
-  wind, hazard kinds, scatter surfaces, corridor tightness, dogleg bias. New world = new row.
-  Render palette is keyed by biome id in the render layer (the sim biome table is physics-only).
+  wind, hazard kinds, scatter surfaces, corridor tightness, dogleg bias, **`treeDensity`** and
+  **`fairwayBunkers`** (GS-13). New world = new row. Render palette is keyed by biome id in the
+  render layer (the sim biome table is physics-only).
 - **Fairness by construction:** penalty hazards (water/lava/void) are kept CLEAR of the tee→green
   play corridor — `validateFairness()` proves it and `generateCourse` throws if violated. The
   *spice* is in-play non-penalty lies (ice = slick/high-dispersion, crystal = true/low, low-grav =
   longer carry) plus tighter corridors, doglegs, and wind. "Wild but fair."
+- **Trees & fairway bunkers are NON-PENALTY (GS-13).** Trees are a tough LIE (`trees`: carry 0.6,
+  dispersion 1.7) — a sprayed ball punches out, never loses a stroke — so they need no corridor
+  clearance; the generator still lines them in the rough OUTSIDE the corridor (only an offline shot
+  finds the woods). Fairway sand bunkers bite the landing-zone edge (sand is always fair). Both are
+  drawn as glyphs/sand, trees as canopies (not flat blobs) in both renderers. Because they're
+  non-penalty `validateFairness` ignores them, but they DO make scoring harder — keep them off the
+  centre line and re-run the no-death-spiral test (`toPar/hole < 1.0`, blow-ups < 5%) after tuning.
 - **Wind reads true:** the round sim aims UPWIND to compensate for the known crosswind, and lays
   up to the (penalty-free) centreline when the line to the pin is blocked — a played shot reads
   trouble instead of spiralling.
@@ -86,10 +94,15 @@ This game lives or dies on three axes — put every change through all three bef
   source both `resolveShot` (samples it) and `shotSpread` (previews it) share, so the on-screen
   spray cone reads EXACTLY true. The mean carry stays near full so the reach-AI still clubs sanely
   (variance, not a mean shift) — that's why max-wildness mean-per-hole stays under the fairness bar.
-- **Out of bounds = stroke-and-distance.** `playBounds`/`inBounds` derive a generous hole-sized box
-  around all terrain; a shot resting beyond it is +1 and replays from the shot's origin. Only
-  genuinely wild shots trigger it (regression seeds unchanged). Both renderers fit the ball into
-  frame (`holeProjector` `extra` points) so a wild shot is seen flying out, not clipped.
+- **Out of bounds = stroke-and-distance, and now VISIBLE (GS-13).** `playBounds`/`inBounds` derive a
+  generous hole-sized box around all terrain (margin `clamp(span*0.25, 40, 90)` — the cap stops a long
+  par-5 flinging the boundary miles out); a shot resting beyond it is +1 and replays from the shot's
+  origin. Only genuinely wild shots trigger it. The box is DRAWN as a faint dashed boundary ringed
+  with white red-capped OB stakes (`obStakes`/`playBoundsCorners`, render-only) in both renderers, and
+  added to the `holeProjector` `extra` fit so the edge is on-screen to aim away from. GOTCHA: the box
+  doubles as the OB *trigger*, so tightening the margin to make the hole bigger on screen directly
+  raises the OB rate — a `64`-cap was tried and REVERTED (tipped `toPar/hole` to 1.03, over the bar).
+  Both renderers fit the ball into frame too, so a wild shot is seen flying out, not clipped.
 - **Blow-ups are absorbed, not eliminated:** at max wildness rare disaster holes still happen;
   Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a
@@ -223,7 +236,11 @@ This game lives or dies on three axes — put every change through all three bef
 
 ## Change & versioning flow
 - `main` is branch-protected. Each change: branch → edit → commit → push → PR → merge → sync.
-- Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → sync).
+- **Default to shipping all the way (this project's rule).** When a change is complete and tests are
+  green, take it to done without waiting to be asked: open the PR, merge it (once CI passes), then
+  clean up — delete the merged feature branch (local + remote) and sync `main`. Only stop short of
+  merging if the work is explicitly WIP, the user says not to, or CI is red/unresolved.
+- Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → cleanup).
 - Commit messages explain the *why*; end with the Co-Authored-By: Claude trailer.
 
 ## Do NOT carry from golf-finder
