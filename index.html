@@ -28,7 +28,7 @@
          that the app's own try/catch can't reach. Cleared once the app paints. -->
     <script>
       (function () {
-        var BUILD = 'inline-22'; // bump each deploy; proves which HTML you actually loaded
+        var BUILD = 'inline-23'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
         // Immediate visible marker so you can tell the NEW page loaded at all.
         if (app) {
@@ -71,9 +71,10 @@
           var hasMod = 'noModule' in HTMLScriptElement.prototype;
           show(
             'app did not run within 5s.\n' +
+            '• boot stage: ' + (window.__gsStage || '(never started — app module did not run)') + '\n' +
+            '• boot error: ' + (window.__gsErr || '(none captured)') + '\n' +
             '• ES modules supported: ' + hasMod + '\n' +
             '• test module ran: ' + (!!window.__gsModuleRan) + '\n' +
-            '• nomodule fired: ' + (!!window.__gsNoModule) + '\n' +
             '• UA: ' + navigator.userAgent + '\n' +
             'URL: ' + location.href
           );

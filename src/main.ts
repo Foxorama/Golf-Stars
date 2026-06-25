@@ -28,15 +28,24 @@ function seedFromUrl(): number | string | null {
 let state: UiState;
 let view: PlayViewHandle | null = null;
 
+/** Diagnostic breadcrumb the boot watchdog can read if the app never paints. */
+function stage(s: string): void {
+  (globalThis as unknown as { __gsStage?: string }).__gsStage = s;
+}
+
 function boot(): void {
   try {
+    stage('boot:start');
     const save = loadSave();
+    stage('loaded');
     const meta = { bestStableford: save.bestStableford, bestDistance: save.bestDistance };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
     state = initState(seed, meta, save.activeRun);
+    stage('init');
     render();
+    stage('rendered');
   } catch (err) {
     recover(err);
   }
@@ -48,6 +57,10 @@ function boot(): void {
  */
 function recover(err: unknown): void {
   console.error('Golf Stars recovered from an error:', err);
+  (globalThis as unknown as { __gsErr?: string }).__gsErr = String(
+    (err && ((err as Error).stack || (err as Error).message)) || err,
+  );
+  stage('recover');
   try {
     writeSave({ version: 2, credits: 0, bestStableford: 0, bestDistance: 0 });
   } catch {
