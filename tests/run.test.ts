@@ -31,7 +31,8 @@ describe('economy', () => {
   it('loadoutFromPerks rebuilds without duplicating perks, and applies effects', () => {
     const m = loadoutFromPerks(['power-cell', 'gyro']);
     expect(m.perks).toEqual(['power-cell', 'gyro']);
-    expect(m.dispersionMult).toBeCloseTo(0.85);
+    // gyro ×0.85, power-cell ×0.95 (its control bonus) → 0.8075.
+    expect(m.dispersionMult).toBeCloseTo(0.85 * 0.95);
     // power-cell adds +12 to distance clubs (driver), leaves scoring clubs untouched.
     expect(m.bag.find((c) => c.id === 'D')!.carry).toBe(262);
     expect(m.bag.find((c) => c.id === 'PW')!.carry).toBe(106); // scoring club unchanged

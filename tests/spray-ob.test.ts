@@ -29,13 +29,36 @@ describe('shotSpread (pure aiming preview)', () => {
   const ball = hole.tee;
   const pin = hole.green;
 
-  it('points at the target, reaches ~the club carry, and spreads', () => {
+  it('points at the target, reaches ~the club carry, and spreads with a carry window', () => {
     const s = shotSpread(hole, ball, 'fairway', pin, driver, {});
     expect(s.expectedCarry).toBeGreaterThan(0);
     expect(s.lateralSd).toBeGreaterThan(0);
     expect(s.carrySd).toBeGreaterThan(0);
-    // Lateral spread is wider than along-axis (4% vs 3% of carry in the model).
+    // Lateral spread is wider than along-axis.
     expect(s.lateralSd).toBeGreaterThan(s.carrySd);
+    // The driver can come up well short and tops out a touch long.
+    expect(s.carryLow).toBeLessThan(s.expectedCarry);
+    expect(s.carryHigh).toBeGreaterThan(s.expectedCarry);
+    expect(s.carryLow).toBeLessThan(s.carryHigh * 0.7); // a wide window for the driver
+  });
+
+  it('the driver sprays ~half the carry sideways at the cone edge (wild, per design)', () => {
+    const s = shotSpread(hole, ball, 'fairway', pin, driver, {});
+    // Edge ≈ 2.5σ; for the driver that should be ~50% of the intended carry.
+    const edge = 2.5 * s.lateralSd;
+    const fullCarry = (s.carryHigh + s.carryLow) / 2 / 0.8; // back out intended-ish
+    expect(edge / s.expectedCarry).toBeGreaterThan(0.35);
+    expect(fullCarry).toBeGreaterThan(0);
+  });
+
+  it('a shorter club is tighter AND has a narrower carry window than the driver', () => {
+    const drv = shotSpread(hole, ball, 'fairway', pin, driver, {});
+    const five = shotSpread(hole, ball, 'fairway', pin, CLUBS.find((c) => c.id === '5i')!, {});
+    // Per-club: the 5-iron sprays a smaller FRACTION of its carry than the driver.
+    expect(five.lateralSd / five.expectedCarry).toBeLessThan(drv.lateralSd / drv.expectedCarry);
+    const drvWindow = (drv.carryHigh - drv.carryLow) / drv.expectedCarry;
+    const fiveWindow = (five.carryHigh - five.carryLow) / five.expectedCarry;
+    expect(fiveWindow).toBeLessThan(drvWindow);
   });
 
   it('higher handicap = wider spray; a worse lie = wider still', () => {

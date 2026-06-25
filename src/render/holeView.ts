@@ -46,24 +46,21 @@ export interface RenderOptions {
   sprayTiers?: SprayTiers;
 }
 
-/** Course-space corners of the spray wedge at a given lateral half-width (yards): the
- *  fan from the ball out to ±hw at the expected-carry distance, capped with a small
- *  forward bulge for the carry (distance) uncertainty. */
-function sprayWedge(s: ShotSpread, hw: number): Vec[] {
+/** Course-space corners of the spray landing-zone at a given lateral half-width (yards):
+ *  a box spanning the carry window [carryLow, carryHigh] along the shot, ±hw across it.
+ *  (The model's lateral spread is independent of distance, so the honest region is a
+ *  rotated rectangle out at the landing, not a fan from the ball.) */
+function sprayBox(s: ShotSpread, hw: number): Vec[] {
   const br = (s.bearing * Math.PI) / 180;
   const fx = Math.sin(br);
   const fy = Math.cos(br);
   const rx = fy; // right-perpendicular (matches resolveShot's lateral axis)
   const ry = -fx;
-  const cx = s.origin[0] + fx * s.expectedCarry;
-  const cy = s.origin[1] + fy * s.expectedCarry;
-  const tip: Vec = [cx + fx * s.carrySd, cy + fy * s.carrySd];
-  return [
-    s.origin,
-    [cx - rx * hw, cy - ry * hw],
-    tip,
-    [cx + rx * hw, cy + ry * hw],
+  const at = (d: number, lat: number): Vec => [
+    s.origin[0] + fx * d + rx * lat,
+    s.origin[1] + fy * d + ry * lat,
   ];
+  return [at(s.carryLow, -hw), at(s.carryHigh, -hw), at(s.carryHigh, hw), at(s.carryLow, hw)];
 }
 
 function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
@@ -87,7 +84,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
   if (opts.ball) extra.push(opts.ball);
   if (opts.spray && opts.spray.expectedCarry > 0) {
-    extra.push(...sprayWedge(opts.spray, tiers.edgeZ * opts.spray.lateralSd));
+    extra.push(...sprayBox(opts.spray, tiers.edgeZ * opts.spray.lateralSd));
   }
 
   const proj = holeProjector(hole, { width, height, padding: opts.padding ?? 24, extra });
@@ -120,8 +117,8 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // cone (or one overlapping trouble) tells the player to club down or play safe.
   if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.lateralSd > 0) {
     const s = opts.spray;
-    const outer = sprayWedge(s, tiers.edgeZ * s.lateralSd);
-    const inner = sprayWedge(s, tiers.centralZ * s.lateralSd);
+    const outer = sprayBox(s, tiers.edgeZ * s.lateralSd);
+    const inner = sprayBox(s, tiers.centralZ * s.lateralSd);
     parts.push(
       `<polygon points="${pts(outer)}" fill="rgba(255,196,84,0.14)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
       `<polygon points="${pts(inner)}" fill="rgba(95,212,90,0.30)" stroke="rgba(95,212,90,0.7)" stroke-width="1" />`,

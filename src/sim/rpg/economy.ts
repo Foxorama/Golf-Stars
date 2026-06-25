@@ -91,9 +91,17 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'power-cell',
     name: 'Power Cell',
     cost: 120,
-    desc: '+12 yds carry on your distance clubs',
+    desc: '+12 yds carry on your distance clubs · steadier tempo (−5% spray)',
     rarity: 'common',
-    apply: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 12), perks: [...m.perks, 'power-cell'] }),
+    // Under the per-club wildness model, longer clubs spray more — so pure distance is
+    // double-edged. The small −5% dispersion keeps the Power Cell a genuine upgrade
+    // (a power-up must improve scoring) rather than a wash.
+    apply: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 12),
+      dispersionMult: m.dispersionMult * 0.95,
+      perks: [...m.perks, 'power-cell'],
+    }),
   },
   {
     id: 'gyro',

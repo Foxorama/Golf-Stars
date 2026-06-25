@@ -69,6 +69,18 @@ This game lives or dies on three axes — put every change through all three bef
 - **Wind reads true:** the round sim aims UPWIND to compensate for the known crosswind, and lays
   up to the (penalty-free) centreline when the line to the pin is blocked — a played shot reads
   trouble instead of spiralling.
+- **Per-club wildness (shot dispersion):** longer clubs spray WILDER in both line and distance;
+  short clubs are tight/accurate. A club's `t` ramps 0→1 from `TUNABLES.accurateCarry`→`wildCarry`
+  by nominal carry; lateral σ, distance σ, and the carry clamp window all lerp short→long. At the
+  driver (player hcp 18): ~±55% of carry sideways at the 2.5σ cone edge, carry 50–110% of full
+  (mean a touch short) — i.e. it *can come up well short*. `dispersionProfile()` is the single
+  source both `resolveShot` (samples it) and `shotSpread` (previews it) share, so the on-screen
+  spray cone reads EXACTLY true. The mean carry stays near full so the reach-AI still clubs sanely
+  (variance, not a mean shift) — that's why max-wildness mean-per-hole stays under the fairness bar.
+- **Out of bounds = stroke-and-distance.** `playBounds`/`inBounds` derive a generous hole-sized box
+  around all terrain; a shot resting beyond it is +1 and replays from the shot's origin. Only
+  genuinely wild shots trigger it (regression seeds unchanged). Both renderers fit the ball into
+  frame (`holeProjector` `extra` points) so a wild shot is seen flying out, not clipped.
 - **Blow-ups are absorbed, not eliminated:** at max wildness rare disaster holes still happen;
   Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a
@@ -89,7 +101,9 @@ This game lives or dies on three axes — put every change through all three bef
   the stable signal.
 - **A power-up must improve scoring** (game-feel). `power-cell` boosts *distance clubs only* —
   boosting every club made the "reach" approach AI overshoot greens and score *worse*. Verify any
-  new perk raises mean per-stop Stableford before shipping it.
+  new perk raises mean per-stop Stableford before shipping it. NOTE: under the per-club wildness
+  model, raw distance is double-edged (longer club = wider spray), so `power-cell` also carries a
+  small −5% dispersion bonus to stay a genuine upgrade. `tests/run.test.ts` guards the invariant.
 
 ## Testing (regression guard)
 - `tests/` (vitest) imports the pure `src/sim/` modules directly and asserts on seeded runs.
