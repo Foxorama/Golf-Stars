@@ -23,11 +23,65 @@ export const TUNABLES = {
   windCarryPerMph: 1.0,
   /** Lateral yards pushed per mph of pure crosswind. */
   windLateralPerMph: 0.8,
-  /** Carry std-dev as a fraction of intended carry (before lie multiplier). */
-  carryDispersionFrac: 0.03,
-  /** Lateral std-dev as a fraction of intended carry (before lie multiplier). */
-  lateralDispersionFrac: 0.04,
+  // Per-club dispersion: longer clubs spray WILDER in both line and distance; shorter
+  // clubs are tighter and more accurate (a 5-iron over a driver). A club's wildness `t`
+  // ramps 0→1 from `accurateCarry` to `wildCarry` by its nominal carry; the *Long values
+  // apply to the driver, the *Short values to the wedges. All fractions are of the
+  // shot's intended carry. (At the driver: lateral σ 20% → ±50% at the 2.5σ cone edge,
+  // distance 50%–110% of full — i.e. "can come up well short", matching the design.)
+  /** Carry at/below which a club is fully accurate (t=0). */
+  accurateCarry: 70,
+  /** Carry at which a club is fully wild (t=1, ~the driver). */
+  wildCarry: 250,
+  /** Lateral std-dev as a fraction of carry — short club → long club. */
+  lateralFracShort: 0.05,
+  lateralFracLong: 0.2,
+  /** Distance std-dev as a fraction of carry — short → long. */
+  carryFracShort: 0.04,
+  carryFracLong: 0.13,
+  /** Mean carry as a fraction of full (long clubs sit a touch short of nominal). */
+  meanFracShort: 0.98,
+  meanFracLong: 0.9,
+  /** Hard lower clamp on carry (fraction of intended) — short → long. */
+  distLowShort: 0.85,
+  distLowLong: 0.5,
+  /** Hard upper clamp on carry (fraction of intended) — short → long. */
+  distHighShort: 1.05,
+  distHighLong: 1.1,
 } as const;
+
+const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
+export interface DispersionProfile {
+  /** Mean carry as a fraction of intended (full) carry. */
+  meanFrac: number;
+  /** Distance std-dev as a fraction of intended carry. */
+  carryFrac: number;
+  /** Lateral std-dev as a fraction of intended carry. */
+  lateralFrac: number;
+  /** Hard lower clamp on carry (fraction of intended). */
+  lowFrac: number;
+  /** Hard upper clamp on carry (fraction of intended). */
+  highFrac: number;
+}
+
+/**
+ * The per-club dispersion profile for a club of the given nominal carry. Pure. Shared by
+ * `resolveShot` (which samples it) and `shotSpread` (which previews it) so the on-screen
+ * spray cone reads EXACTLY true to the physics. Longer clubs = wilder; shorter = tighter.
+ */
+export function dispersionProfile(nominalCarry: number): DispersionProfile {
+  const T = TUNABLES;
+  const t = clamp01((nominalCarry - T.accurateCarry) / (T.wildCarry - T.accurateCarry));
+  const mix = (short: number, long: number): number => short + (long - short) * t;
+  return {
+    meanFrac: mix(T.meanFracShort, T.meanFracLong),
+    carryFrac: mix(T.carryFracShort, T.carryFracLong),
+    lateralFrac: mix(T.lateralFracShort, T.lateralFracLong),
+    lowFrac: mix(T.distLowShort, T.distLowLong),
+    highFrac: mix(T.distHighShort, T.distHighLong),
+  };
+}
 
 // --- Lie model (LIE_INFO analogue) ------------------------------------------
 export interface LieInfo {
@@ -172,17 +226,24 @@ export function resolveShot(input: ShotInput): ShotResult {
 
   const shotBearing = bearing(from, aim);
   const biomeMult = input.carryMult ?? 1;
-  const intended = clubDist(club, input.stats) * li.carryMult * biomeMult;
+  const nominal = clubDist(club, input.stats);
+  const intended = nominal * li.carryMult * biomeMult;
 
   const w = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
 
   const dispMult = li.dispersionMult * (input.dispersionMult ?? 1);
-  const carrySd = intended * TUNABLES.carryDispersionFrac * dispMult;
-  const lateralSd = intended * TUNABLES.lateralDispersionFrac * dispMult;
+  const prof = dispersionProfile(nominal);
+  const carrySd = intended * prof.carryFrac * dispMult;
+  const lateralSd = intended * prof.lateralFrac * dispMult;
 
+  // Distance: a mean a touch short of full (long clubs more so), gaussian noise, then a
+  // hard clamp to the club's [low, high] window so a shot can come up well short (down to
+  // ~50% on the driver) but never absurdly so — and tops out around 110%.
+  const carryMean = intended * prof.meanFrac + w.along * TUNABLES.windCarryPerMph;
+  const carryNoisy = carryMean + rng.gaussian(0, carrySd);
   const carry = Math.max(
-    0,
-    intended + w.along * TUNABLES.windCarryPerMph + rng.gaussian(0, carrySd),
+    intended * prof.lowFrac,
+    Math.min(intended * prof.highFrac, Math.max(0, carryNoisy)),
   );
   const lateral = w.cross * TUNABLES.windLateralPerMph + rng.gaussian(0, lateralSd);
 

@@ -245,7 +245,7 @@ function playingBody(animating: boolean): string {
         <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}</p>
         <p style="font-size:12px;margin:.3em 0;line-height:1.5;">
           <span style="color:#5fd45a;">▮</span> ~${tierPct}% lands here · <span style="color:#ffc454;">▮</span> ${sideePct}% each side ·
-          spread <b>±${Math.round((sprayTiers?.edgeZ ?? 2.5) * spray.lateralSd)} yds</b> · reach <b>${Math.round(spray.expectedCarry)} yds</b>
+          width <b>±${Math.round((sprayTiers?.edgeZ ?? 2.5) * spray.lateralSd)} yds</b> · carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
         </p>
         <h3 style="font-size:14px;margin:.6em 0 .3em;">Strategy</h3>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>

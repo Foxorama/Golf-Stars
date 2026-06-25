@@ -9,6 +9,7 @@
 import { dist, type FeatureKind, type Hole, type Vec } from './course/contract';
 import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
+  dispersionProfile,
   lieAt,
   lieInfo,
   playsLike,
@@ -390,9 +391,13 @@ export interface ShotSpread {
   origin: Vec;
   /** Shot bearing toward the target (deg, cw from up). */
   bearing: number;
-  /** Mean carry (yards), after lie, biome and wind — the cone's reach. */
+  /** Mean carry (yards), after lie, biome and wind — the cone's centre reach. */
   expectedCarry: number;
-  /** Lateral std-dev (yards) at landing — half the cone's spread per σ. */
+  /** Nearest the ball may come up (yards) — the shot can fall well short. */
+  carryLow: number;
+  /** Furthest the ball may carry (yards). */
+  carryHigh: number;
+  /** Lateral std-dev (yards) at landing — the render scales this by its tier z-values. */
   lateralSd: number;
   /** Along-axis (distance) std-dev (yards). */
   carrySd: number;
@@ -409,15 +414,23 @@ export function shotSpread(
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
   const li = lieInfo(lie);
   const shotBearing = bearingDeg(from, target);
-  const intended = clubDist(club, opts.stats) * li.carryMult * carryMult;
+  const nominal = clubDist(club, opts.stats);
+  const intended = nominal * li.carryMult * carryMult;
   const w = hole.wind ? playWind(hole.wind, shotBearing) : { along: 0, cross: 0 };
   const dispMult = li.dispersionMult * (opts.dispersionMult ?? 1);
+  const prof = dispersionProfile(nominal);
+  const along = w.along * TUNABLES.windCarryPerMph;
+  const low = intended * prof.lowFrac;
+  const high = intended * prof.highFrac;
+  const mean = Math.max(low, Math.min(high, intended * prof.meanFrac + along));
   return {
     origin: from,
     bearing: shotBearing,
-    expectedCarry: Math.max(0, intended + w.along * TUNABLES.windCarryPerMph),
-    lateralSd: intended * TUNABLES.lateralDispersionFrac * dispMult,
-    carrySd: intended * TUNABLES.carryDispersionFrac * dispMult,
+    expectedCarry: mean,
+    carryLow: Math.max(0, low + along),
+    carryHigh: high + along,
+    lateralSd: intended * prof.lateralFrac * dispMult,
+    carrySd: intended * prof.carryFrac * dispMult,
   };
 }
 
