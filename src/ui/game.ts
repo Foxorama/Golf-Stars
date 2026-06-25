@@ -85,6 +85,12 @@ export interface UiState {
   lastRunShards?: number;
   /** Putting mode toggle: auto putt-out vs manual. The Auto-Caddie legendary forces auto. */
   autoPutt: boolean;
+  /**
+   * True when a freshly-begun hole should show its briefing splash (wind/hazards/conditions +
+   * a layout map) before the first shot. Render-only gate, cleared by `startHole` (or defensively
+   * by taking a shot) — the `shot` action itself is never blocked, so the headless flow is intact.
+   */
+  holeSplash: boolean;
 }
 
 export type Action =
@@ -92,6 +98,7 @@ export type Action =
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
+  | { type: 'startHole' } // dismiss the hole briefing splash, begin playing
   | { type: 'shot'; clubId: string; aim: AimMode }
   | { type: 'putt' } // take one manual putt on the green
   | { type: 'toggleAutoPutt' } // flip auto putt-out vs manual
@@ -138,6 +145,7 @@ export function initState(
     shards: meta.shards ?? 0,
     metaUpgrades,
     autoPutt: true,
+    holeSplash: false,
   };
 }
 
@@ -203,7 +211,13 @@ export function reduce(state: UiState, action: Action): UiState {
         holeRng: new Rng(`${state.course.seed}:play`),
         stopPlayed: [],
         play: beginHole(state.course.holes[0]!, 0),
+        holeSplash: true,
       };
+    }
+
+    case 'startHole': {
+      if (state.screen !== 'playing' || !state.holeSplash) return state;
+      return { ...state, holeSplash: false };
     }
 
     case 'shot': {
@@ -211,7 +225,7 @@ export function reduce(state: UiState, action: Action): UiState {
       if (awaitingPutt(state.play)) return state; // on the green → must putt, not swing
       const auto = state.autoPutt || !!state.run.loadout.autoPutt;
       const play = takeShot(state.play, { clubId: action.clubId, aim: action.aim }, state.run.loadout, state.holeRng, auto);
-      return { ...state, play };
+      return { ...state, play, holeSplash: false };
     }
 
     case 'putt': {
@@ -236,7 +250,7 @@ export function reduce(state: UiState, action: Action): UiState {
           ? takePutt(p, state.run.loadout, state.holeRng)
           : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true);
       }
-      return { ...state, play: p };
+      return { ...state, play: p, holeSplash: false };
     }
 
     case 'holeComplete': {
@@ -244,7 +258,7 @@ export function reduce(state: UiState, action: Action): UiState {
       const stopPlayed = [...(state.stopPlayed ?? []), holeResult(state.play)];
       const nextIdx = state.play.holeIndex + 1;
       if (nextIdx < state.course.holes.length) {
-        return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+        return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx), holeSplash: true };
       }
       // Stop complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
