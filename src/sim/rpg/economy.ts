@@ -41,8 +41,65 @@ export interface PlayerLoadout {
   creditMult: number;
   /** Auto-putt: the green is putted out for you (and better). Granted by a legendary perk. */
   autoPutt?: boolean;
+  /**
+   * Driver-on-Deck unlock level (GS-mechanics #11). 0 = the driver is tee-only (default); each
+   * tier 1..4 lets you hit it off the deck from more lies, with a shrinking distance penalty and
+   * spray surcharge (see DRIVER_DECK). The restriction is enforced via `usableBag`, applied by
+   * both the auto sim and the interactive player so they stay in lock-step.
+   */
+  driverDeck: number;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
+}
+
+/** The driver club id (off-tee use is gated by the Driver-on-Deck tier). */
+export const DRIVER_ID = 'D';
+
+/** Per-tier off-deck driver rules (index = `driverDeck` level). Content-as-data. */
+export interface DriverDeckTier {
+  /** Distance multiplier on the driver when hit off the tee (1 = full tee power). */
+  distMult: number;
+  /** Extra dispersion multiplier when hit off the tee (1 = no surcharge). */
+  sprayMult: number;
+  /** Lies the off-deck driver is allowed from; '*' = any lie. (The tee is always allowed.) */
+  lies: readonly string[] | '*';
+}
+export const DRIVER_DECK: readonly DriverDeckTier[] = [
+  { distMult: 1.0, sprayMult: 1.0, lies: [] }, // 0: tee only
+  { distMult: 0.5, sprayMult: 1.5, lies: ['fairway'] }, // 1: fairway, −50% / +50%
+  { distMult: 0.7, sprayMult: 1.3, lies: ['fairway'] }, // 2: fairway, −30% / +30%
+  { distMult: 0.85, sprayMult: 1.15, lies: ['fairway', 'rough'] }, // 3: + rough, −15% / +15%
+  { distMult: 0.95, sprayMult: 1.05, lies: '*' }, // 4: any lie, −5% / +5%
+];
+
+function driverTier(level: number): DriverDeckTier {
+  return DRIVER_DECK[Math.max(0, Math.min(DRIVER_DECK.length - 1, level))]!;
+}
+
+/** Is the driver allowed off the deck from `lie` at this unlock level? (The tee always is.) */
+export function driverAllowedOffTee(lie: string, level: number): boolean {
+  if (lie === 'tee') return true;
+  const tier = driverTier(level);
+  return tier.lies === '*' || tier.lies.includes(lie);
+}
+
+/**
+ * The clubs actually selectable from `lie` at this driver-deck level. Off the tee, the driver is
+ * removed when not yet unlocked for that lie, or replaced by a reduced-carry copy (the distance
+ * penalty) when it is — so club-selection AND distance are correct in one place, shared by the
+ * auto sim and the interactive player. On the tee the full bag is returned unchanged.
+ */
+export function usableBag(bag: readonly Club[], lie: string, level: number): readonly Club[] {
+  if (lie === 'tee') return bag;
+  const tier = driverTier(level);
+  if (!driverAllowedOffTee(lie, level)) return bag.filter((c) => c.id !== DRIVER_ID);
+  return bag.map((c) => (c.id === DRIVER_ID ? { ...c, carry: Math.round(c.carry * tier.distMult) } : c));
+}
+
+/** Extra dispersion multiplier when the driver is played off the deck (1 otherwise). */
+export function driverDeckSprayMult(clubId: string, lie: string, level: number): number {
+  if (clubId !== DRIVER_ID || lie === 'tee') return 1;
+  return driverAllowedOffTee(lie, level) ? driverTier(level).sprayMult : 1;
 }
 
 export const STARTING_HANDICAP = 18;
@@ -53,6 +110,7 @@ export function startingLoadout(): PlayerLoadout {
     handicap: STARTING_HANDICAP,
     dispersionMult: 1,
     creditMult: 1,
+    driverDeck: 0,
     perks: [],
   };
 }
@@ -95,6 +153,8 @@ export interface ShopItem {
   maxStacks?: number;
   /** Per-owned-copy cost multiplier for a stackable (defaults to STACK_COST_GROWTH). */
   costGrowth?: number;
+  /** Item id that must already be owned for this one to appear in the shop offer (tier ladders). */
+  prereq?: string;
   apply(loadout: PlayerLoadout): PlayerLoadout;
 }
 
@@ -107,7 +167,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Power Cell',
     cost: 120,
     desc: '+12 yds carry on your distance clubs · steadier tempo (−5% spray)',
-    rarity: 'common',
+    // Rare, not common: a +12yd unique is a stronger first-copy upgrade than the rare,
+    // stackable Range Booster (+8yd) — rarity must track power, so it can't read as common.
+    rarity: 'rare',
     // Under the per-club wildness model, longer clubs spray more — so pure distance is
     // double-edged. The small −5% dispersion keeps the Power Cell a genuine upgrade
     // (a power-up must improve scoring) rather than a wash.
@@ -202,6 +264,45 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       dispersionMult: m.dispersionMult * 0.97,
       perks: [...m.perks, 'range-booster'],
     }),
+  },
+
+  // --- Driver on Deck (GS-mechanics #11): a 4-tier ladder unlocking the driver off the deck.
+  // Each tier appears in the shop only once the previous is owned (prereq). The level drives the
+  // distance penalty / spray surcharge / allowed lies via DRIVER_DECK.
+  {
+    id: 'driver-deck-1',
+    name: 'Driver on Deck',
+    cost: 90,
+    desc: 'Hit driver off the FAIRWAY too — but −50% distance & +50% spray off the deck',
+    rarity: 'common',
+    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 1), perks: [...m.perks, 'driver-deck-1'] }),
+  },
+  {
+    id: 'driver-deck-2',
+    name: 'Tour Driver',
+    cost: 150,
+    desc: 'Off-deck driver eased to −30% distance, +30% spray (fairway)',
+    rarity: 'rare',
+    prereq: 'driver-deck-1',
+    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 2), perks: [...m.perks, 'driver-deck-2'] }),
+  },
+  {
+    id: 'driver-deck-3',
+    name: 'Deck Cannon',
+    cost: 230,
+    desc: 'Off-deck driver −15% / +15% · now playable from the ROUGH too',
+    rarity: 'epic',
+    prereq: 'driver-deck-2',
+    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 3), perks: [...m.perks, 'driver-deck-3'] }),
+  },
+  {
+    id: 'driver-deck-4',
+    name: 'Big Stick',
+    cost: 320,
+    desc: 'Off-deck driver near tee-power (−5% / +5%) · from ANY lie',
+    rarity: 'legendary',
+    prereq: 'driver-deck-3',
+    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 4), perks: [...m.perks, 'driver-deck-4'] }),
   },
 ];
 

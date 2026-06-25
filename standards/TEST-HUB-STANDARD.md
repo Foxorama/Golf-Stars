@@ -120,7 +120,7 @@ with an import of your app's hook registry — the assertions (parity both ways)
 ## Golf Stars — where this project stands (read this part first)
 
 Golf Stars is a **build/module project** (Vite + TypeScript + vitest). The hub is **shipped**
-(GS-15): `test.html` → `src/test/hub.ts`, built into `dist/test.html` and served beside the game
+(GS-16): `test.html` → `src/test/hub.ts`, built into `dist/test.html` and served beside the game
 on the same origin. It has two faces — a DEMO that drives the real game in an iframe, and a SIM
 LAB that imports the pure sim for batch experiments (shot dispersion, loadout/upgrade builder,
 scoring harness). The pure experiment engine is `src/test/lab.ts` (DOM-free, unit-tested).
@@ -134,6 +134,7 @@ scoring harness). The pure experiment engine is `src/test/lab.ts` (DOM-free, uni
 | Flight feel | live (escape-hatch) | `window._gsFeel` | `src/render/playView.ts` |
 | Intro feel | live (escape-hatch) | `window._gsIntro` | `src/render/introView.ts` |
 | Spray tiers | live (escape-hatch) | `window._gsSpray` | `src/app.ts` |
+| Art / cell-shade feel | live (escape-hatch) | `window._gsArt` | `src/render/style.ts` |
 
 **Conformance status:**
 - **I1 ✅** — The hub iframes the real, inlined `dist/index.html` same-origin and pokes it. The
@@ -142,7 +143,7 @@ scoring harness). The pure experiment engine is `src/test/lab.ts` (DOM-free, uni
   perks, meta upgrades, lies, formats) are read from the sim's own tables, so they can't fork.
 - **I2 — Partial.** `seed`/`intro` have a declarative URL form; the feel flags have a live form.
   Each hook ideally gets BOTH; adding a URL form for the feel flags and a live helper for seed/
-  intro is the remaining I2 gap (a small follow-on, noted in IDEAS GS-15).
+  intro is the remaining I2 gap (a small follow-on, noted in IDEAS GS-16).
 - **I3 / I3a ✅ (auto-discovering)** — `tests/test-hub.test.ts` is the live CI guard. It does NOT
   carry a hand-maintained hook list: it SCANS the app source for every `window._gs*` flag and every
   `URLSearchParams…get('x')` param and asserts the hub drives exactly that set, both directions — so

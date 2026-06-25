@@ -136,6 +136,10 @@ function setSprayCentral(pct: number): void {
   const w = gameWin();
   if (w) w._gsSpray = { centralPct: pct }; // hook: _gsSpray
 }
+function setArt(patch: object): void {
+  const w = gameWin();
+  if (w) w._gsArt = { ...(w._gsArt as object), ...patch }; // hook: _gsArt
+}
 
 function demoGroup(): HTMLElement {
   const sprayVal = h('span', { class: 'pill' }, '80%');
@@ -158,7 +162,11 @@ function demoGroup(): HTMLElement {
       h('button', { class: 'ghost', onclick: () => setFeel({ shake: 0 }) }, 'Feel: no shake'),
       h('button', { class: 'ghost', onclick: () => setFeel({ shake: 1.6 }) }, 'Feel: max shake'),
       h('button', { class: 'ghost', onclick: () => setIntroFeel({ speed: 3 }) }, 'Intro 3×')),
-    h('p', { class: 'note' }, 'Live _gsFeel / _gsIntro / _gsSpray flags apply on the game’s next render/shot. Seed & intro reload the frame.'),
+    h('div', { class: 'row' }, h('label', {}, 'Art'),
+      h('button', { class: 'ghost', onclick: () => setArt({ ink: false }) }, 'No ink'),
+      h('button', { class: 'ghost', onclick: () => setArt({ stripes: false, texture: 0, accents: 0 }) }, 'Flat'),
+      h('button', { class: 'ghost', onclick: () => setArt({ stripes: true, ink: true, texture: 2, accents: 2 }) }, 'Lush')),
+    h('p', { class: 'note' }, 'Live _gsFeel / _gsIntro / _gsSpray / _gsArt flags apply on the game’s next render/shot. Seed & intro reload the frame.'),
   ]);
 }
 

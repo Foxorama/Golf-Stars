@@ -13,9 +13,9 @@
 
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
-import { obStakes, playBoundsCorners } from '../sim/round';
+import { playBoundsCorners } from '../sim/round';
 import { holeProjector } from './project';
-import { fillFor, roughFor, OB, TREE } from './palette';
+import { buildScene, drawScenePrims, type Prim } from './style';
 import {
   arcPeak,
   easeOutCubic,
@@ -64,6 +64,14 @@ export interface PlayViewOptions {
   biome?: string;
   /** Called once the final shot has landed. */
   onDone?: () => void;
+  /**
+   * Zoom-and-follow: when set, the camera centres on `focus` (the starting ball) at radius
+   * `viewRadius` (course yards) and — if `follow` — eases to track the ball in flight, so the
+   * animation matches the zoomed decision map (no jarring zoom jump) and keeps up with the ball.
+   */
+  focus?: Vec;
+  viewRadius?: number;
+  follow?: boolean;
 }
 
 export interface PlayViewHandle {
@@ -102,13 +110,22 @@ export function mountPlayView(
   ctx.scale(dpr, dpr);
 
   // Include every shot's flight + rest (and putt endpoints) so a wild shot that flies
-  // off the terrain stays in frame instead of clipping.
+  // off the terrain stays in frame instead of clipping. (Unused in focus/follow mode.)
   const extra: Vec[] = [];
   // Keep the OB boundary (and its stakes) in frame, like the SVG map.
   extra.push(...playBoundsCorners(hole));
   for (const s of shots) extra.push(s.from, s.result.landing, s.rest);
   for (const p of putts) extra.push(p.from, p.to);
-  const proj = holeProjector(hole, { width, height, extra });
+  // The camera: whole-hole fit by default, or a zoom window around `focus` that eases to
+  // track the ball when `follow` is on. `proj` is rebuilt per-frame in follow mode.
+  const followMode = !!opts.focus;
+  let camera: Vec = (opts.focus ? ([...opts.focus] as Vec) : hole.tee);
+  let lastGround: Vec = camera;
+  const buildProj = () =>
+    followMode
+      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius })
+      : holeProjector(hole, { width, height, extra });
+  let proj = buildProj();
 
   // --- animation state ---
   let shotIndex = 0;
@@ -142,132 +159,18 @@ export function mountPlayView(
     shake = Math.min(1, power);
   }
 
+  // The full static world (rough texture, striped/banded surfaces, depth-banded water,
+  // cell-shaded trees, OB, centreline, tee + flag) comes from the SAME shared scene builder
+  // the SVG map uses, so the two renderers agree. Cache by projector identity: a whole-hole
+  // fit builds once; follow-cam rebuilds the projector per frame, so the scene rebuilds too.
+  let cachedProj: typeof proj | null = null;
+  let cachedScene: Prim[] = [];
   function drawStatic(): void {
-    ctx.fillStyle = roughFor(opts.biome);
-    ctx.fillRect(0, 0, width, height);
-
-    const drawPoly = (poly: Vec[], fill: string) => {
-      ctx.beginPath();
-      poly.forEach((p, i) => {
-        const [x, y] = proj.project(p);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.closePath();
-      ctx.fillStyle = fill;
-      ctx.fill();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-      ctx.stroke();
-    };
-
-    // A tree draws as a canopy glyph (shaded base, lit top, trunk) so a treeline reads as
-    // woods; every other feature is a filled polygon.
-    const drawTree = (poly: Vec[]): void => {
-      let cx = 0;
-      let cy = 0;
-      for (const p of poly) {
-        cx += p[0];
-        cy += p[1];
-      }
-      cx /= poly.length;
-      cy /= poly.length;
-      let rad = 0;
-      for (const p of poly) rad += Math.hypot(p[0] - cx, p[1] - cy);
-      rad /= poly.length;
-      const [x, y] = proj.project([cx, cy]);
-      const rr = Math.max(3, rad * proj.scale);
-      ctx.strokeStyle = TREE.trunk;
-      ctx.lineWidth = rr * 0.35;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x, y + rr * 0.9);
-      ctx.lineTo(x, y + rr * 0.2);
-      ctx.stroke();
-      ctx.lineCap = 'butt';
-      ctx.fillStyle = TREE.shade;
-      ctx.beginPath();
-      ctx.arc(x, y, rr, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = TREE.canopy;
-      ctx.beginPath();
-      ctx.arc(x - rr * 0.28, y - rr * 0.28, rr * 0.62, 0, Math.PI * 2);
-      ctx.fill();
-    };
-
-    for (const f of hole.features) drawPoly(f.poly, fillFor(f.kind));
-    for (const f of hole.hazards) {
-      if (f.kind === 'trees') drawTree(f.poly);
-      else drawPoly(f.poly, fillFor(f.kind));
+    if (proj !== cachedProj) {
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome });
+      cachedProj = proj;
     }
-
-    // Out-of-bounds stakes: a faint dashed boundary line joining white, red-capped posts
-    // around the OB box — the visible stroke-and-distance edge.
-    const corners = playBoundsCorners(hole);
-    ctx.setLineDash([2, 7]);
-    ctx.strokeStyle = OB.line;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    corners.forEach((p, i) => {
-      const [x, y] = proj.project(p);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
-    for (const s of obStakes(hole)) {
-      const [x, y] = proj.project(s);
-      ctx.strokeStyle = OB.post;
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x, y - 7);
-      ctx.stroke();
-      ctx.lineCap = 'butt';
-      ctx.fillStyle = OB.cap;
-      ctx.beginPath();
-      ctx.arc(x, y - 7, 1.7, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Centreline.
-    ctx.beginPath();
-    hole.centreline.forEach((p, i) => {
-      const [x, y] = proj.project(p);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Tee + flagstick. The flag stands at the pin (GS-6) so the ball flies to the real
-    // target; falls back to the centroid for a pin-less hole.
-    const [tx, ty] = proj.project(hole.tee);
-    const [gx, gy] = proj.project(hole.pin ?? hole.green);
-    ctx.fillStyle = '#fff';
-    ctx.strokeStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(tx, ty, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    // Flagstick.
-    ctx.strokeStyle = '#000';
-    ctx.beginPath();
-    ctx.moveTo(gx, gy);
-    ctx.lineTo(gx, gy - 14);
-    ctx.stroke();
-    ctx.fillStyle = '#ff3b3b';
-    ctx.beginPath();
-    ctx.moveTo(gx, gy - 14);
-    ctx.lineTo(gx + 9, gy - 11);
-    ctx.lineTo(gx, gy - 8);
-    ctx.closePath();
-    ctx.fill();
+    drawScenePrims(ctx, cachedScene);
   }
 
   function drawHUD(text: string): void {
@@ -281,6 +184,13 @@ export function mountPlayView(
 
   function frame(now: number): void {
     if (!segStart) segStart = now;
+
+    // Follow-cam: ease the camera toward the ball's last position and rebuild the projector,
+    // so the view pans to keep up with the ball (one-frame lag is imperceptible).
+    if (followMode && opts.follow) {
+      camera = [camera[0] + (lastGround[0] - camera[0]) * 0.2, camera[1] + (lastGround[1] - camera[1]) * 0.2];
+      proj = buildProj();
+    }
 
     // Screen-shake offset (deterministic decay).
     ctx.save();
@@ -325,6 +235,7 @@ export function mountPlayView(
         height = F.bounceAmp * Math.abs(Math.sin(rt * Math.PI * F.bounces)) * (1 - rt);
       }
 
+      lastGround = ground; // feed the follow-cam
       const [gx, gy] = proj.project(ground);
       const ballY = gy - height * proj.scale * F.heightExaggeration;
 
@@ -372,10 +283,12 @@ export function mountPlayView(
       const dur = Math.max(300, Math.min(750, len * proj.scale * 12));
       const t = Math.max(0, Math.min(1, (now - segStart) / dur));
       const e = easeOutCubic(t);
-      const gx = proj.project([
+      const cur: Vec = [
         putt.from[0] + (putt.to[0] - putt.from[0]) * e,
         putt.from[1] + (putt.to[1] - putt.from[1]) * e,
-      ] as Vec);
+      ];
+      lastGround = cur; // feed the follow-cam
+      const gx = proj.project(cur);
 
       // Putt line (aim guide) + rolling ball, both flat on the green.
       const [fx, fy] = proj.project(putt.from);

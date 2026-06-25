@@ -30,18 +30,18 @@ Everything below serves whichever avenue wins.
   log. Pass `artUrl` to `courseCardHTML` once images exist.
 - **GS-7 — Daily challenge seed.** RNG already accepts string seeds (`hashSeed`); a daily is just
   `new Rng('daily-YYYY-MM-DD')`.
-- **GS-15b — Finish I2 parity on the hub.** Each hook should have BOTH a URL form and a live form.
+- **GS-16b — Finish I2 parity on the hub.** Each hook should have BOTH a URL form and a live form.
   Remaining: a URL form for the feel flags (`?feel=`/`?spray=` seeding `window._gs*` at first paint)
   and a live no-reload helper for seed/intro (drive the iframe without a full reload). Small; the
-  hub + guard + four other hooks already shipped in GS-15.
+  hub + auto-discovering guard + five hooks already shipped in GS-16.
 
 ## Done
-- **GS-15 — Test & demo hub + Sim Lab + CI sync-guard.** A second built page (`test.html` →
-  `src/test/hub.ts`, served at `dist/test.html` beside the game) to demo features and stress-test
-  the sim. Two faces: a **Demo** that drives the REAL game in an iframe via its public hooks
-  (`?seed=`, `?intro=`, and live `window._gsFeel`/`_gsIntro`/`_gsSpray` flags on the same-origin
-  frame — zero re-implemented logic), and a **Sim Lab** that imports the pure sim for the batch
-  experiments the headless engine was built for. `src/test/lab.ts` (pure, DOM-free, tested in
+- **GS-16 — Test & demo hub + Sim Lab + auto-discovering CI sync-guard.** A second built page
+  (`test.html` → `src/test/hub.ts`, served at `dist/test.html` beside the game) to demo features and
+  stress-test the sim. Two faces: a **Demo** that drives the REAL game in an iframe via its public
+  hooks (`?seed=`, `?intro=`, and live `window._gsFeel`/`_gsIntro`/`_gsSpray`/`_gsArt` flags on the
+  same-origin frame — zero re-implemented logic), and a **Sim Lab** that imports the pure sim for the
+  batch experiments the headless engine was built for. `src/test/lab.ts` (pure, DOM-free, tested in
   `tests/lab.test.ts`): `dispersionStudy()` fires a club N times through the real `resolveShot`
   ("hit the driver 1000×" → scatter + carry histogram + σ/percentiles, reading the per-club
   wildness model true); `buildLoadout()` composes a real loadout from handicap + meta upgrades +
@@ -50,9 +50,27 @@ Everything below serves whichever avenue wins.
   `RunStrategy`/`simulateRun` so the permanent layer is headlessly simulatable (backward-compatible).
   Build: singlefile forbids multi-input, so `npm run build` runs vite twice (game, then `VITE_HUB=1`
   appending the hub) — `pages.yml` unchanged. The standard + portable guard template live in
-  `standards/`; `tests/test-hub.test.ts` is the live CI sync-guard (hub↔app hook parity both ways +
-  imports-not-copies). I4 process rule added to CLAUDE.md. Verified eyes-on (Playwright). I2 is the
-  one partial invariant → GS-15b.
+  `standards/`; `tests/test-hub.test.ts` is the live CI sync-guard that **auto-discovers** hooks from
+  the app source (every `window._gs*` flag + `?param`) and asserts the hub drives exactly that set
+  both ways — so a new hook reds the build (proven when this branch merged main's new `_gsArt` flag).
+  I4 process is the `keep-test-hub-in-sync` skill + a CLAUDE.md section. Verified eyes-on (Playwright).
+  I2 (both forms per hook) is the one partial invariant → GS-16b.
+- **GS-15 — Play-loop UX + mechanics overhaul** (branch `claude/golf-ui-mechanics-x3s54o`). A batch
+  of feel/fairness/UX fixes from eyes-on mobile play, staged on one branch:
+  - **Angular dispersion** — random spray is now an ANGLE about the bearing, so the spray cone is a
+    true ARC SECTOR and a wide miss never exceeds max distance (the "square box" bug). `ShotSpread.
+    angleSd` is the shared truth; rng draw order preserved (auto≡interactive). Rough 10% / bunker 50%
+    lie penalties.
+  - **Zoom + follow-cam map** — projector `focus`/`viewRadius`/`unproject`; decision map zooms to the
+    shot's reach (far green off-screen when unreachable); animation follows the ball; min/max carry
+    labels on the spray arc.
+  - **Green-coverage suggested club** (`suggestPlayerClub`) for the interactive player; auto `aiClub`
+    untouched. **Item rarity** fixed (Power Cell common→rare).
+  - **Hole briefing splash** (wind/hazards/conditions + map), **per-shot result popup** (settle-delayed
+    Continue), **mobile no-scroll layout** (sticky Hit bar).
+  - **Free-aim** — tap/drag the map to aim within max distance (`ShotDecision.target`).
+  - **Driver on Deck** — 4-tier prereq-gated shop ladder unlocking the driver off the deck (tee-only by
+    default), via one shared `usableBag` gate applied by both the auto sim and the player.
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
   differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
   content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression

@@ -12,6 +12,7 @@ import {
   startingLoadout,
 } from '../src/sim/rpg/economy';
 import { buy, shopOffer, snapshotRun, resumeRun, startRun, SHOP_OFFER_SIZE } from '../src/sim/rpg/run';
+import { RARITY_C } from '../src/sim/rpg/loot';
 import { generateCourse } from '../src/sim/course/generate';
 import { playCourse } from '../src/sim/round';
 import { playTotals } from '../src/sim/score';
@@ -26,6 +27,14 @@ describe('stackable economy', () => {
       expect(shopItem(id)!.stackable).toBeFalsy();
     }
     expect(STACKABLES.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('rarity tracks power: the +12yd Power Cell is at least as rare as the +8yd Range Booster', () => {
+    const power = shopItem('power-cell')!;
+    const range = shopItem('range-booster')!;
+    // The stronger first-copy upgrade must not read as the lower rarity (the GS-mechanics #9 bug).
+    expect(RARITY_C[power.rarity].order).toBeGreaterThanOrEqual(RARITY_C[range.rarity].order);
+    expect(power.rarity).not.toBe('common');
   });
 
   it('itemCost ramps geometrically for stackables, flat for uniques', () => {
@@ -159,7 +168,10 @@ describe('stackables hold the "a power-up must improve scoring" invariant', () =
     const lo = loadoutFromPerks(perks);
     let sf = 0;
     let n = 0;
-    for (let s = 0; s < 200; s++) {
+    // 600 stops: enough samples that a genuine +0.1pt/stop distance perk clears the run-to-run
+    // noise floor. (Under the angular-dispersion model the single-item effects are real but
+    // small — verified at large N — so an underpowered sample can flip their sign by chance.)
+    for (let s = 0; s < 600; s++) {
       const c = generateCourse(`${s}:stop`, { holes: 6, distanceFromStart: s % 12 });
       const played = playCourse(c.holes, new Rng(`${c.seed}:play`), {
         bag: lo.bag,

@@ -21,6 +21,26 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Golf Stars" />
+    <style>
+      /* Interactive play layout (GS-mechanics #3): map + controls side-by-side on wide screens;
+         on mobile, a big map with the Hit action bar pinned to the bottom of the viewport so it
+         never needs scrolling to reach. */
+      .gs-play { display: flex; gap: 18px; align-items: flex-start; }
+      .gs-map { flex: 0 1 460px; max-width: 60%; }
+      .gs-map svg { display: block; width: 100%; height: auto; touch-action: none; }
+      .gs-controls { flex: 1 1 250px; min-width: 230px; }
+      @media (max-width: 640px) {
+        .gs-play { flex-direction: column; gap: 10px; }
+        .gs-map { width: 100%; max-width: 100%; flex: none; display: flex; justify-content: center; }
+        .gs-map svg { width: auto; height: auto; max-height: 56vh; max-width: 100%; }
+        .gs-controls { width: 100%; }
+        .gs-hitbar {
+          position: sticky; bottom: 0; z-index: 20; display: flex; gap: 8px;
+          background: #0b0d12; padding: 8px 0; box-shadow: 0 -10px 16px #0b0d12;
+        }
+        .gs-hitbar button { flex: 1; margin: 0; padding: 13px 10px; font-size: 16px; }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

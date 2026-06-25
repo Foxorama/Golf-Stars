@@ -94,6 +94,32 @@ This game lives or dies on three axes — put every change through all three bef
   source both `resolveShot` (samples it) and `shotSpread` (previews it) share, so the on-screen
   spray cone reads EXACTLY true. The mean carry stays near full so the reach-AI still clubs sanely
   (variance, not a mean shift) — that's why max-wildness mean-per-hole stays under the fairness bar.
+- **Dispersion is ANGULAR, not a flat sideways offset (GS-mechanics #5).** The random spray is a
+  small ANGLE about the shot bearing (`angleSd = prof.lateralFrac × dispMult` radians), not a lateral
+  yard offset added to a straight-ahead carry. A rotation preserves length, so the ball's distance
+  from the origin IS the sampled carry in EVERY direction — a wide miss can never finish past the
+  carry window (the old "square box" where a diagonal exceeded max distance). Crosswind stays a
+  SEPARATE deterministic lateral push (the AI aims upwind to cancel it), so wind shifts the cone, not
+  its width. `ShotSpread.angleSd` is the shared truth the render sweeps the spray ARC SECTOR by. The
+  rng draw order is unchanged (carry draw, then the angle draw replaces the old lateral draw) so
+  auto≡interactive stays byte-for-byte. `lateralFracLong` was trimmed 0.20→0.17 because an angled
+  miss now also loses forward distance (carry·cosθ) — re-tune via that, and re-run the no-death-spiral
+  bar, after any dispersion change. Lie penalties: rough `carryMult` 0.90 (10%), bunker 0.50 (50%).
+- **Interactive suggested club = GREEN COVERAGE (`suggestPlayerClub`, GS-mechanics #6).** The player's
+  🎯 suggestion is NOT the auto `aiClub` (shortest-that-reaches, tuned for balance — leave it alone):
+  green unreachable → longest usable club; reachable → the LONGEST club whose spread still reaches the
+  green's FRONT (`carryLow ≤ distToFront` via `greenDepth`), so the whole green stays in the landing
+  window (overshoot allowed, never short). Uses the same `shotSpread` the cone draws, so it reads true.
+- **Driver on Deck (`usableBag`, GS-mechanics #11).** The driver (`id 'D'`) is TEE-ONLY by default
+  (`PlayerLoadout.driverDeck` level 0); a 4-tier shop ladder (`DRIVER_DECK` table, prereq-gated cards)
+  unlocks it off the deck with a shrinking distance penalty + spray surcharge + widening allowed lies.
+  The rule lives in ONE place — `usableBag(bag, lie, level)` removes the driver when locked or returns
+  a reduced-carry copy when unlocked (so club-selection AND distance are right together) — and is
+  applied by BOTH the auto sim (`playHole`/`PlayHoleOptions.driverDeck`) and the interactive player
+  (`shotView`/`previewShot`/`takeShot`/club cycle), so auto≡playHole stays byte-for-byte and the
+  off-deck driver reads true in the cone. `driverDeckSprayMult` adds the spray surcharge. CRITICAL:
+  level 0 means the AUTO sim also can't driver off the deck (it clubs down to a wood) — a deliberate
+  rule change that shifted the seeded balance; it was re-validated against the no-death-spiral bar.
 - **Out of bounds = stroke-and-distance, and now VISIBLE (GS-13).** `playBounds`/`inBounds` derive a
   generous hole-sized box around all terrain (margin `clamp(span*0.25, 40, 90)` — the cap stops a long
   par-5 flinging the boundary miles out); a shot resting beyond it is +1 and replays from the shot's
@@ -180,10 +206,10 @@ This game lives or dies on three axes — put every change through all three bef
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside
   `src/sim/` (pure) so it's reachable from tests.
 
-## Test & demo hub (GS-15 — `test.html` / `src/test/`)
+## Test & demo hub (GS-16 — `test.html` / `src/test/`)
 - **A second built page** (`test.html` → `src/test/hub.ts`) served beside the game on the same
   origin (`dist/test.html`). Two faces: a **Demo** that drives the REAL game in an `<iframe>` via
-  its public hooks (`?seed=`, `?intro=`, and the live `window._gsFeel`/`_gsIntro`/`_gsSpray`
+  its public hooks (`?seed=`, `?intro=`, and the live `window._gsFeel`/`_gsIntro`/`_gsSpray`/`_gsArt`
   escape-hatch flags set on the same-origin iframe window), and a **Sim Lab** that imports the
   pure sim for batch experiments. It re-implements ZERO game logic — it pokes the artifact. The
   full standard + a portable guard template live in `standards/` (see `TEST-HUB-STANDARD.md`).
@@ -222,8 +248,39 @@ This game lives or dies on three axes — put every change through all three bef
   animated play view** (`playView.ts`), driven off the `ShotLog[]` the round sim already emits —
   arc/shadow/trail/impact/screen-shake. Keep the pure flight math in `trajectory.ts` (tested) and
   the imperative drawing thin.
+- **The static WORLD is one shared, cell-shaded scene builder (`render/style.ts`, GS graphic-upscale).**
+  Both renderers used to duplicate a flat draw path (every surface a single solid polygon on a flat
+  rough slab — the "landing strip" look). Now `buildScene(hole, proj, {width,height,biome,art})` is the
+  SINGLE source of truth: it projects the hole into a flat list of screen-space `Prim`s (poly/circle/
+  line/clip) and the two thin interpreters — `scenePrimsToSvg` (pure string) and `drawScenePrims(ctx)`
+  (canvas) — draw them, so the map and the play view agree. The manga/comic language: flat tone BANDS +
+  a bold ink outline per surface (`SHADES` ramps in `palette.ts`, `base` = the original `FILL` value so
+  the SVG still carries `#3f8c3f`/`#5fd45a` and the render tests stay green); mowing **stripes** (clipped
+  horizontal bands — perpendicular-to-play after the projector rotates tee→green up) on fairway/green;
+  a darker **collar** ring + lit dome on greens; lip-shadow + depression + rake lines on bunkers; concentric
+  **depth banding** + shoreline + glints on water; 3-tone **cell-shaded tree canopies** (core/body/lit cap +
+  cast shadow + per-tree colour/size variance); a **textured rough** (soft tone undulation + grass tufts);
+  and seeded "fun/alive" accents — biome-flavoured **wildflowers**, sparkle **motes**, the odd **bird**
+  (`ACCENTS` table). CRITICAL invariants: (1) all randomness is a mulberry32 seeded from `hashHole()` —
+  NEVER `Math.random` — so the SVG is byte-stable (determinism test) and reads the same across reloads;
+  (2) `buildScene` is node-pure — the `window._gsArt` escape-hatch is read through `artFeel()` which guards
+  `typeof window`, so `renderHoleSVG` stays callable in vitest; (3) accents/tufts are placed in COURSE space
+  then projected + culled to the view, so they pan/zoom correctly with the follow-cam (the canvas caches the
+  scene by projector identity — whole-hole fit builds once, follow-cam rebuilds per frame). Tee + flagstick
+  + OB stakes + centreline moved INTO the builder too (de-duped); the interactive overlays (spray cone, live
+  ball, shot lines, HUD, animation) stay per-renderer. Canvas feel is eyes-on, but the SVG path is verified
+  by rasterising a biome×seed gallery — re-shoot one after any `style.ts` change.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
+- **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
+  (centre on a point — the ball) + `viewRadius` (course yards, biased so the ball sits low and you
+  see ahead) instead of fitting the whole hole. The decision map zooms to the contemplated shot's
+  reach (`spray.carryHigh × 0.62`) so a short approach zooms in and an unreachable green legitimately
+  sits off-screen; the play-view animation uses the same focus + an eased follow-cam (rebuilt per
+  frame) so it tracks the ball and matches the decision map's zoom (no jump — also closed the
+  decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
+  powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
+  `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the
@@ -233,16 +290,28 @@ This game lives or dies on three axes — put every change through all three bef
   from the v2 `activeRun` snapshot (`resumeRun`); `?seed=` in the URL forces a fresh run.
 - New screens/actions: add an `Action` variant + a guarded `case` (return state unchanged when the
   action doesn't apply to the current screen) and a render branch. Keep logic in the reducer.
+- **Play-loop UX (GS-mechanics #1/#2/#3).** A per-hole **briefing splash** (`holeSplash` reducer flag,
+  cleared by `startHole` or defensively by `shot`) shows wind/hazards/conditions + a layout map before
+  the first shot — render-only, the `shot` action is never blocked so the headless flow/tests are
+  intact. The **shot-result popup** (a settle-delayed modal card + Continue after each non-terminal
+  shot) and its timer are an `app.ts` VIEW effect (module vars, cleared by any dispatch), NOT reducer
+  state — only `holeSplash` is reducer state. **Free-aim** (`ShotDecision.target`, GS-mechanics #10):
+  tap/drag the map sets a course-space target (overrides attack/safe), unprojected from the pointer
+  via a reconstructed decision projector and clamped to the longest club's reach; pointer move/up
+  listen on `window` so a drag survives the per-frame re-render. **Mobile layout**: a responsive
+  `<style>` block in `index.html` (`.gs-play/.gs-map/.gs-controls/.gs-hitbar`) keeps the map big and
+  pins the Hit/Putt action bar to the viewport bottom so it never needs scrolling.
 
 ## Loading intro cinematic (`render/introView.ts`)
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
   pitch their bags into a woody station wagon in a suburban driveway → wheels fold up, it hovers,
   jets extend → it rockets nose-up into a starfield (ignition flash + exhaust plume + warp-streak
-  stars + decaying screen-shake) past a dimpled **golf-ball planet**, through nebula clouds and
-  shooting stars → **the stars left in the rocket's wake stream down and settle into GOLF STARS**
-  (a constellation wordmark with faint linking lines + sparkle glints) → hands off to the title.
-  Timings/feel read from `window._gsIntro` (escape-hatch rule: `shake`, `nebula`, `planet`,
-  `shootingStars`, `starCount`, `constellation`, phase durations, `speed`); it's skippable (Skip
+  stars + decaying screen-shake), through nebula clouds and shooting stars → a **golf-ball shooting
+  star** streaks across the void in the wagon's wake → **the stars it left behind stream down and
+  settle into GOLF STARS** (a constellation wordmark with faint linking lines + sparkle glints) →
+  hands off to the title. Timings/feel read from `window._gsIntro` (escape-hatch rule: `shake`,
+  `nebula`, `planet`, `ballShooter`, `shootingStars`, `starCount`, `constellation`, phase durations,
+  `speed`); it's skippable (Skip
   button / click / Esc-Enter-Space), respects `prefers-reduced-motion`, and is gated by
   `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
 - **The sky is continuous with the game (the three asks of this branch).** (1) The space gradient
@@ -256,8 +325,29 @@ This game lives or dies on three axes — put every change through all three bef
   wordmark — a cosmetic intro must never throw and strand the boot.
 - **All effects degrade safely:** the deterministic mulberry32 RNG seeds stars/shooters/dimples (no
   `Math.random`, stable across reloads); every frame runs inside a try/catch that calls `finish()` on
-  throw, so a cosmetic glitch never strands the boot. The golf-ball planet is a shaded sphere with
-  foreshortened, light-shaded dimples — on-theme for *space golf*, and no asset to 404.
+  throw, so a cosmetic glitch never strands the boot. The **golf-ball shooting star** (`drawGolfBallShooter`)
+  fires once after launch (`t3`), crossing the upper sky with a dimpled-ball head + tapered glow trail —
+  on-theme for *space golf*, no asset to 404. The old **golf-ball planet** (`drawPlanet`) read as a stray
+  golf ball overlapping the title, so it's now `planet:false` by default (function kept behind the flag as
+  an escape hatch). The wordmark stars all carry a soft glow (heroes glow harder) + a warm underglow band,
+  so the title reads legibly bright against the starfield. **PERF GOTCHA:** that glow is a cached
+  warm-white `glowSprite` (a radial-gradient offscreen canvas) stamped per star/ball via `drawImage` —
+  NOT `ctx.shadowBlur`. shadowBlur is a per-draw Gaussian; applying it to the few hundred title stars
+  chugged the framerate to a crawl. drawImage of a cached sprite is ~60fps (verified via a rAF counter).
+  Reach for the sprite, never per-element shadowBlur, for any many-instance glow. The launch no longer
+  draws a long exhaust-plume/smoke column trailing the climbing car (`drawLaunchFX` is just the pad
+  ignition flash now) — that plume read as a weird "jet under the car"; the car's own rear-nozzle flame
+  is the exhaust. `holdMs` is 3000 (was 1500) so the formed wordmark lingers ~1.5s longer before handoff.
+  CAR GOTCHAS: the rear **tailgate** is hinged at the rear roof corner (`translate(72,-52)`) and rotates
+  `0.8 - bootOpen*1.55` — so at `bootOpen 0` it lies FLUSH along the sloped rear (boot reads SHUT) and
+  swings up/back as it opens; the old version pivoted at the bottom so `bootOpen 0` stuck a vertical panel
+  up and the boot always looked open. The timing (`bootOpen` nonzero only in the load window `t0..t1`)
+  already does closed→open→closed; the bug was purely the closed-state geometry. The twin rear **jet
+  nozzles/flames** sit at local `ny ∈ [0,16]` (inside the body rect `y -10..28`) — they used to be at
+  `[-16,6]`, floating the top one above the roofline. **Title sizing/legibility:** the wordmark samples
+  from a `116px` font (was 96) on a denser `step:8` grid with a NARROW hero/normal size+glow gap — a big
+  gap + additive `'lighter'` blending blew out hotspots and left the dim letters unreadable; keep heroes
+  only a touch brighter so the whole word reads evenly.
 - **It is NOT in the pure reducer** — it's a time/DOM side-effect, so it lives in `app.ts` like the
   play-view canvas mount and save persistence. **Gotcha that keeps `tests/build.test.ts` green:**
   `start()` runs the normal `boot()` FIRST (the real title actually paints + sets `data-booted`),

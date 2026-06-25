@@ -33,9 +33,12 @@ export const TUNABLES = {
   accurateCarry: 70,
   /** Carry at which a club is fully wild (t=1, ~the driver). */
   wildCarry: 250,
-  /** Lateral std-dev as a fraction of carry — short club → long club. */
+  /** Lateral std-dev as a fraction of carry — short club → long club. Under the angular
+   *  dispersion model these are the small-angle σ (radians) about the bearing; the long value
+   *  is trimmed a touch from the old flat-offset model because an angled miss now also loses
+   *  forward distance (carry·cosθ), so the same number sprays slightly harder. */
   lateralFracShort: 0.05,
-  lateralFracLong: 0.2,
+  lateralFracLong: 0.17,
   /** Distance std-dev as a fraction of carry — short → long. */
   carryFracShort: 0.04,
   carryFracLong: 0.13,
@@ -106,9 +109,9 @@ export const LIE_INFO: Record<string, LieInfo> = {
   tee: { carryMult: 1.0, dispersionMult: 0.85, label: 'Tee' },
   fairway: { carryMult: 1.0, dispersionMult: 1.0, label: 'Fairway' },
   green: { carryMult: 1.0, dispersionMult: 0.8, label: 'Green' },
-  rough: { carryMult: 0.85, dispersionMult: 1.4, label: 'Rough' },
+  rough: { carryMult: 0.9, dispersionMult: 1.4, label: 'Rough' }, // 10% distance penalty
   waste: { carryMult: 0.9, dispersionMult: 1.2, label: 'Waste' },
-  bunker: { carryMult: 0.7, dispersionMult: 1.6, label: 'Bunker' },
+  bunker: { carryMult: 0.5, dispersionMult: 1.6, label: 'Bunker' }, // 50% distance penalty — a real escape tax
   // Trees are a tough non-penalty LIE, not a mid-flight collision: a sprayed ball ends up
   // "in the woods" and has to punch out (short carry, wild line) — fair and readable, since
   // only an offline shot finds them. NOT a penalty, so they may line the corridor edge.
@@ -238,7 +241,12 @@ export function resolveShot(input: ShotInput): ShotResult {
   const dispMult = li.dispersionMult * (input.dispersionMult ?? 1);
   const prof = dispersionProfile(nominal);
   const carrySd = intended * prof.carryFrac * dispMult;
-  const lateralSd = intended * prof.lateralFrac * dispMult;
+  // Random spray is ANGULAR, not a flat sideways offset: a fraction-of-carry std-dev becomes
+  // a small-angle std-dev (radians) about the shot bearing. Because a rotation preserves
+  // length, the ball's distance from the tee is the sampled `carry` in EVERY direction — so a
+  // wide miss never finishes farther than the carry window (the old square-box bug). At small
+  // angles carry*sin(θ) ≈ carry*θ ≈ the old lateral spread, so dispersion magnitude is ~unchanged.
+  const angleSd = prof.lateralFrac * dispMult;
 
   // Distance: a mean a touch short of full (long clubs more so), gaussian noise, then a
   // hard clamp to the club's [low, high] window so a shot can come up well short (down to
@@ -249,19 +257,26 @@ export function resolveShot(input: ShotInput): ShotResult {
     intended * prof.lowFrac,
     Math.min(intended * prof.highFrac, Math.max(0, carryNoisy)),
   );
-  const lateral = w.cross * TUNABLES.windLateralPerMph + rng.gaussian(0, lateralSd);
+  // SECOND rng draw (was the lateral offset) — keeps the draw count/order identical so the
+  // headless sim and the interactive driver stay byte-for-byte in step.
+  const thetaRand = rng.gaussian(0, angleSd);
+  // Crosswind is a DETERMINISTIC lateral push (the AI already aims upwind to cancel it), kept
+  // separate from the random angular spray so wind shifts the cone rather than widening it.
+  const windLat = w.cross * TUNABLES.windLateralPerMph;
 
-  // Unit vector along the shot bearing (bearing is cw from +Y).
+  // Forward unit vector along the shot bearing (cw from +Y), rotated by the random angle.
   const br = deg2rad(shotBearing);
-  const fx = Math.sin(br);
-  const fy = Math.cos(br);
-  // Right-perpendicular (for lateral push): rotate forward −90°.
-  const rx = fy;
-  const ry = -fx;
+  // Right-perpendicular of the unrotated bearing — the crosswind push axis (+θ also turns
+  // toward this axis, matching the old "+lateral = right" convention).
+  const rx = Math.cos(br);
+  const ry = -Math.sin(br);
+  const brR = br + thetaRand;
+  const fxR = Math.sin(brR);
+  const fyR = Math.cos(brR);
 
   const landing: Vec = [
-    from[0] + fx * carry + rx * lateral,
-    from[1] + fy * carry + ry * lateral,
+    from[0] + fxR * carry + rx * windLat,
+    from[1] + fyR * carry + ry * windLat,
   ];
 
   return { landing, carry, shotBearing, wind: w, intended };
