@@ -199,12 +199,19 @@ This game lives or dies on three axes — put every change through all three bef
   vite **twice**: the game (`index.html`), then `VITE_HUB=1 vite build` (entry `test.html`,
   `emptyOutDir:false`) which APPENDS the inlined hub beside the game. `pages.yml` already runs
   `npm run build`, so the hub deploys automatically. `tests/build.test.ts` builds only the game.
-- **Process — keep the hub in sync (the I4 rule, one atomic PR):**
-  **add a hook → add the hub control → extend `tests/test-hub.test.ts` → update docs.** The guard
-  (`tests/test-hub.test.ts`) text-matches the real source both directions and fails loudly on
-  drift (rename a hook in the app → red build naming the now-dead hub control). The hub's option
-  LISTS (clubs, perks, meta, lies, formats) are imported from the sim's own tables, so they can't
-  fork — new content appears in the hub automatically; never hardcode a copy.
+- **Most changes need NO hub edit — it absorbs them.** New content as data (a club/perk/meta/lie/
+  format/biome row) appears in the Sim Lab automatically (the hub IMPORTS those tables); a sim
+  behaviour change (shot/dispersion/economy/scoring) is reflected because the lab calls the real
+  functions; a new game screen shows in the Demo iframe because it IS the game. The ONLY thing that
+  needs hand-wiring is a brand-new **hook** (a `window._gsX` flag or a `?param`).
+- **The guard auto-discovers hooks, so it can't be out-run.** `tests/test-hub.test.ts` scans the
+  app source for every single-underscore `_gs*` flag and every `URLSearchParams…get('x')` param and
+  asserts the hub drives EXACTLY that set, both directions — add a new flag and CI goes red naming
+  the missing hub control; leave a dead one and it fails too. There is no hand-maintained hook list.
+  (It also asserts the hub IMPORTS the content tables, so a list can't silently fork to a copy.)
+- **Process — keep the hub in sync (the I4 rule, one atomic PR):** when you DO add a hook,
+  **add the hook → add the hub control → confirm the guard is green → update docs**, all in one PR.
+  The `keep-test-hub-in-sync` skill (`.claude/skills/`) walks it (and tells you when you can skip it).
 
 ## Render layer (locked in GS-3)
 - **One pure projector** (`render/project.ts`) does the course-space→screen mapping (tee→green

@@ -143,12 +143,16 @@ scoring harness). The pure experiment engine is `src/test/lab.ts` (DOM-free, uni
 - **I2 — Partial.** `seed`/`intro` have a declarative URL form; the feel flags have a live form.
   Each hook ideally gets BOTH; adding a URL form for the feel flags and a live helper for seed/
   intro is the remaining I2 gap (a small follow-on, noted in IDEAS GS-15).
-- **I3 / I3a ✅** — `tests/test-hub.test.ts` is the live CI guard: it text-matches the real source
-  both directions (app defines every hook / hub drives every hook) and asserts the hub imports the
-  sim tables (so its lists share one source of truth, not a copy). The portable fill-in version
-  remains at `standards/test-hub-guard.template.mjs` for other projects.
-- **I4 ✅** — The atomic-change rule lives in `CLAUDE.md` (*Test & demo hub* section): add hook →
-  add hub control → extend the guard → update docs, all in one PR.
+- **I3 / I3a ✅ (auto-discovering)** — `tests/test-hub.test.ts` is the live CI guard. It does NOT
+  carry a hand-maintained hook list: it SCANS the app source for every `window._gs*` flag and every
+  `URLSearchParams…get('x')` param and asserts the hub drives exactly that set, both directions — so
+  a brand-new flag reds the build until the hub exposes it, and a dead hub hook fails too. It also
+  asserts the hub imports the sim's content tables (clubs/perks/meta/lies/formats) rather than
+  copying them. The portable fill-in version remains at `standards/test-hub-guard.template.mjs`.
+- **I4 ✅** — The atomic-change rule lives in `CLAUDE.md` (*Test & demo hub* section) AND as the
+  `keep-test-hub-in-sync` skill (`.claude/skills/`): add hook → add hub control → confirm the guard
+  → update docs, one PR. The skill also documents what needs NO hub edit (new content/sim behaviour
+  auto-propagates), so the process only fires when a genuinely new hook is introduced.
 
 **Golf Stars-specific notes:**
 - The Sim Lab is the project's QA-lens tool made interactive: the sim is pure/headless *precisely*
