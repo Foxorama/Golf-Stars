@@ -115,6 +115,17 @@ This game lives or dies on three axes — put every change through all three bef
 - **Fail gate = the cut line** (`economy.ts`): each stop needs a minimum Stableford that ramps
   with galaxy distance. Beat it to travel on; miss it and the run ends. Reuses the score we already
   compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.
+- **Route events make travel a decision (GS-14, `events.ts`).** A jump used to differ only by
+  distance; now each route carries a themed, content-as-data **event** that tilts the stop you fly
+  *into* — two pure levers: `creditMult` (payout) and `cutDelta` (the cut/fail gate). The spread runs
+  from calm (easier cut, modest pay) to high-stakes (credits double, cut +2/+3); `routeOptions` draws
+  3 distinct events seeded + rarity-weighted and **always guarantees one calm option** (an out). The
+  chosen event rides `run.pendingEvent` (set by `travel`), is applied by `finishStop` via
+  `effectiveCut()` + the credit mult, then **cleared** there so a resume can't double-apply it
+  (`RunSnapshot.pendingEventId` round-trips it). Stop 0 / no-event = the neutral `DEFAULT_EVENT`, so
+  existing stop-0 behaviour is byte-for-byte unchanged. CRITICAL: events touch ONLY economy/cut, NEVER
+  course generation — that's what keeps the fairness + no-death-spiral validators untouched. Keep it
+  that way; a "wilder course" event would have to re-clear those bars.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Persistent meta-progression (GS-12, `meta.ts`):** runs bank **Star Shards** (`shardsForRun` =

@@ -32,6 +32,21 @@ Everything below serves whichever avenue wins.
   `new Rng('daily-YYYY-MM-DD')`.
 
 ## Done
+- **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
+  differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
+  content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression
+  currency) and a `cutDelta` (the fail gate — the risk). Spread from **Calm Drift / Stellar
+  Tailwind** (easier cut, modest pay) through **Trade Lane** (pure reward) to **Solar Flare /
+  Pulsar Jackpot** (credits double, cut spikes +2/+3). The draw is seeded + rarity-weighted (rarer
+  = scarcer & juicier) and **always guarantees a calm option** so a jump is never an all-or-nothing
+  trap. Fairness-safe by construction: events touch ONLY economy/cut, never generation, so the
+  no-death-spiral + fairness validators are untouched. `travel` stows the chosen event on
+  `run.pendingEvent`; `finishStop` applies it via `effectiveCut` + the credit mult and then *clears*
+  it (so a resume can't double-apply); `RunSnapshot.pendingEventId` round-trips it. Stop 0 (no jump)
+  uses the neutral `DEFAULT_EVENT`, so every existing stop-0 test is byte-for-byte unchanged. Travel
+  + intro screens render the event (rarity-tinted cards, adjusted cut shown honestly). New
+  `tests/events.test.ts` (10) guards the spread, the calm-guarantee, determinism, the cut/credit
+  application, snapshot round-trip, and that no-upgrade runs still terminate by the cut.
 - **GS-13 — Cooler holes: treelines, fairway bunkers, visible out-of-bounds.** Holes now read
   like real golf. **Trees** are a new non-penalty LIE (`trees` in LIE_INFO: carry 0.6, dispersion
   1.7) — a sprayed ball ends up "in the woods" and punches out; fair & readable, never a stroke

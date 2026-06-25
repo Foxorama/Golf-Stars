@@ -31,6 +31,7 @@ import {
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
+import { DEFAULT_EVENT, drawRouteEvents, routeEvent, type RouteEvent } from './events';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked';
@@ -53,6 +54,8 @@ export interface Route {
   /** How far this route jumps (adds to distanceFromStart → scales difficulty). */
   distanceJump: number;
   label: string;
+  /** The risk/reward event waiting at the stop this route reaches (GS-14). */
+  event: RouteEvent;
 }
 
 export interface Run {
@@ -66,6 +69,11 @@ export interface Run {
   loadout: PlayerLoadout;
   /** Permanent meta-upgrade levels baked into this run's start (GS-12). Kept for resume. */
   meta: MetaUpgrades;
+  /**
+   * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
+   * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
+   */
+  pendingEvent?: RouteEvent;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -120,9 +128,13 @@ export function finishStop(
   played: PlayedHole[],
 ): { run: Run; result: StopResult } {
   const totals = playTotals(played.map((p) => p.record));
-  const cut = cutLine(run.distanceFromStart, course.holes.length);
+  // The pending route event shifts this stop's cut + payout (GS-14); neutral if none.
+  const event = run.pendingEvent ?? DEFAULT_EVENT;
+  const cut = effectiveCut(run, course.holes.length);
   const passed = totals.stableford >= cut;
-  const creditsEarned = passed ? creditsForStop(totals.stableford, run.loadout.creditMult) : 0;
+  const creditsEarned = passed
+    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult)
+    : 0;
 
   const result: StopResult = {
     stopIndex: run.stopIndex,
@@ -140,10 +152,21 @@ export function finishStop(
     ...run,
     credits: run.credits + creditsEarned,
     history: [...run.history, result],
+    // The event is spent — clear it so a resume can't double-apply it next stop.
+    pendingEvent: undefined,
     status: passed ? 'active' : 'ended',
     ...(passed ? {} : { endedReason: 'cut' as const }),
   };
   return { run: next, result };
+}
+
+/**
+ * The Stableford the current stop demands — the distance-ramped cut line plus the pending
+ * route event's `cutDelta` (GS-14). One source of truth for `finishStop` and the UI banner.
+ */
+export function effectiveCut(run: Run, holes: number): number {
+  const event = run.pendingEvent ?? DEFAULT_EVENT;
+  return cutLine(run.distanceFromStart, holes) + event.cutDelta;
 }
 
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
@@ -162,10 +185,13 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
 export function routeOptions(run: Run): Route[] {
   const rng = new Rng(`${run.seed}:routes:${run.stopIndex}`);
   const labels: Record<number, string> = { 1: 'Short hop', 2: 'Cruise', 3: 'Deep jump' };
-  return Array.from({ length: 3 }, (_, i) => {
+  // Draw distances FIRST (unchanged RNG stream), then attach an event to each route.
+  const routes = Array.from({ length: 3 }, (_, i) => {
     const distanceJump = rng.int(1, 3);
     return { id: i, distanceJump, label: labels[distanceJump]! };
   });
+  const events = drawRouteEvents(rng, routes.length);
+  return routes.map((r, i) => ({ ...r, event: events[i]! }));
 }
 
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
@@ -175,6 +201,8 @@ export function travel(run: Run, route: Route): Run {
     ...run,
     stopIndex: run.stopIndex + 1,
     distanceFromStart: run.distanceFromStart + route.distanceJump,
+    // Carry the chosen route's event into the next stop (applied by finishStop).
+    pendingEvent: route.event,
   };
 }
 
@@ -255,6 +283,8 @@ export interface RunSnapshot {
   perks: string[];
   /** Permanent meta-upgrade levels (GS-12); the resume base is rebuilt from these. */
   meta?: MetaUpgrades;
+  /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
+  pendingEventId?: string;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -266,6 +296,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     credits: run.credits,
     perks: [...run.loadout.perks],
     meta: { ...run.meta },
+    pendingEventId: run.pendingEvent?.id,
   };
 }
 
@@ -280,6 +311,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     // Perks sit on top of the permanent meta base so progression survives a resume.
     loadout: loadoutFromPerks(snap.perks ?? [], metaStartingLoadout(meta)),
     meta,
+    pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     status: 'active',
     history: [],
   };
