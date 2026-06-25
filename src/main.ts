@@ -99,7 +99,7 @@ function header(): string {
       <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>
       <span style="margin-left:auto;font-size:13px;opacity:.8;">
         Stop ${r.stopIndex + 1} · Dist ${r.distanceFromStart} · Credits <b>${r.credits}</b>
-        · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
+        · Hcp <b>${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
       </span>
     </header>`;
 }

@@ -30,7 +30,12 @@ export function creditsForStop(stableford: number, creditMult = 1): number {
 /** The mutable player state a shop item modifies. Fully serialisable (data only). */
 export interface PlayerLoadout {
   bag: Club[];
-  /** Multiplies shot dispersion (<1 = tighter). */
+  /**
+   * Golfer handicap — the core skill stat. Higher = wider shot randomness, lower =
+   * tighter. Skills/cards lower it. Maps to a dispersion factor via handicapDispersion().
+   */
+  handicap: number;
+  /** Equipment dispersion multiplier (<1 = tighter), stacked on top of handicap. */
   dispersionMult: number;
   /** Multiplies credits earned. */
   creditMult: number;
@@ -38,8 +43,27 @@ export interface PlayerLoadout {
   perks: string[];
 }
 
+export const STARTING_HANDICAP = 18;
+
 export function startingLoadout(): PlayerLoadout {
-  return { bag: CLUBS.map((c) => ({ ...c })), dispersionMult: 1, creditMult: 1, perks: [] };
+  return {
+    bag: CLUBS.map((c) => ({ ...c })),
+    handicap: STARTING_HANDICAP,
+    dispersionMult: 1,
+    creditMult: 1,
+    perks: [],
+  };
+}
+
+/** Dispersion factor from handicap: ~0.7x at scratch (0) up to ~1.6x at 36. */
+export function handicapDispersion(handicap: number): number {
+  const h = Math.max(0, Math.min(36, handicap));
+  return 0.7 + (h / 36) * 0.9;
+}
+
+/** The player's net shot-dispersion multiplier: handicap skill × equipment. */
+export function netDispersion(loadout: PlayerLoadout): number {
+  return handicapDispersion(loadout.handicap) * loadout.dispersionMult;
 }
 
 /**
@@ -86,6 +110,14 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: '+20% credits earned',
     rarity: 'rare',
     apply: (m) => ({ ...m, creditMult: m.creditMult * 1.2, perks: [...m.perks, 'lucky-coin'] }),
+  },
+  {
+    id: 'pro-coach',
+    name: 'Pro Coach',
+    cost: 170,
+    desc: '−6 handicap (tighter, more accurate shots)',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 6), perks: [...m.perks, 'pro-coach'] }),
   },
 ];
 
