@@ -96,14 +96,15 @@ export function currentCourse(run: Run): Course {
  * Play the current stop's course with the run's loadout. Adds credits if the cut is
  * made; ends the run (reason 'cut') if it's missed.
  */
-export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
-  if (run.status !== 'active') throw new Error('playStop: run is not active');
-  const course = currentCourse(run);
-  const rng = new Rng(`${course.seed}:play`);
-  const played = playCourse(course.holes, rng, {
-    bag: run.loadout.bag,
-    dispersionMult: netDispersion(run.loadout),
-  });
+/**
+ * Compute a stop's result (cut, credits, run status) from the played holes. Shared by
+ * the auto playStop and the interactive driver so both score identically.
+ */
+export function finishStop(
+  run: Run,
+  course: Course,
+  played: PlayedHole[],
+): { run: Run; result: StopResult } {
   const totals = playTotals(played.map((p) => p.record));
   const cut = cutLine(run.distanceFromStart, course.holes.length);
   const passed = totals.stableford >= cut;
@@ -128,6 +129,18 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     status: passed ? 'active' : 'ended',
     ...(passed ? {} : { endedReason: 'cut' as const }),
   };
+  return { run: next, result };
+}
+
+export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
+  if (run.status !== 'active') throw new Error('playStop: run is not active');
+  const course = currentCourse(run);
+  const rng = new Rng(`${course.seed}:play`);
+  const played = playCourse(course.holes, rng, {
+    bag: run.loadout.bag,
+    dispersionMult: netDispersion(run.loadout),
+  });
+  const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };
 }
 
