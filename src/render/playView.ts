@@ -44,7 +44,7 @@ const BASE_FEEL: PlayFeel = {
 };
 
 function feel(): PlayFeel {
-  const override = (globalThis as { _gsFeel?: Partial<PlayFeel> })._gsFeel ?? {};
+  const override = (window as unknown as { _gsFeel?: Partial<PlayFeel> })._gsFeel ?? {};
   return { ...BASE_FEEL, ...override };
 }
 
@@ -78,7 +78,7 @@ export function mountPlayView(
   const F = feel();
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
-  const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
 
   const canvas = document.createElement('canvas');
   canvas.width = width * dpr;

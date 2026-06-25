@@ -15,6 +15,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Install Chromium so the real-browser boot test (tests/build.test.ts) runs in CI —
+      # it's the guard that catches "builds fine but doesn't run in a browser".
+      - run: npx playwright-core install --with-deps chromium
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

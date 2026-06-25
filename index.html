@@ -28,7 +28,12 @@
          that the app's own try/catch can't reach. Cleared once the app paints. -->
     <script>
       (function () {
-        var BUILD = 'inline-24'; // bump each deploy; proves which HTML you actually loaded
+        // Polyfill globalThis for older module-capable engines that lack it (some mobile
+        // WebViews): esbuild does NOT inject it, so any globalThis reference would throw.
+        // Runs before the deferred app module. (A global property is reachable as a bare
+        // identifier, so this makes `globalThis` resolve everywhere.)
+        if (typeof globalThis === 'undefined') { try { window.globalThis = window; } catch (e) {} }
+        var BUILD = 'inline-25'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
         // Immediate visible marker so you can tell the NEW page loaded at all.
         if (app) {
