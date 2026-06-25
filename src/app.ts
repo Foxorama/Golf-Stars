@@ -13,9 +13,9 @@ import { renderHoleSVG } from './render/holeView';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import type { SprayTiers } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { cutLine, itemCap, itemCost, ownedCount, shopItem } from './sim/rpg/economy';
+import { itemCap, itemCost, ownedCount, shopItem } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
-import { snapshotRun } from './sim/rpg/run';
+import { effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -116,10 +116,16 @@ function dispatch(action: Action): void {
   }
 }
 
-const btn = (label: string, action: Action, opts: { disabled?: boolean } = {}): string =>
+const btn = (
+  label: string,
+  action: Action,
+  opts: { disabled?: boolean; borderColor?: string; block?: boolean } = {},
+): string =>
   `<button data-action='${JSON.stringify(action)}'${opts.disabled ? ' disabled' : ''}
-     style="padding:9px 12px;border-radius:8px;border:1px solid #333;background:${opts.disabled ? '#15171d' : '#1d212c'};
-     color:${opts.disabled ? '#666' : '#e8e8ea'};font-size:14px;cursor:${opts.disabled ? 'default' : 'pointer'};margin:3px 4px 3px 0;">${label}</button>`;
+     style="padding:9px 12px;border-radius:8px;border:1px solid ${opts.borderColor ?? '#333'};background:${opts.disabled ? '#15171d' : '#1d212c'};
+     color:${opts.disabled ? '#666' : '#e8e8ea'};font-size:14px;cursor:${opts.disabled ? 'default' : 'pointer'};margin:3px 4px 3px 0;${
+       opts.block ? 'display:block;width:100%;' : ''
+     }">${label}</button>`;
 
 function header(): string {
   const r = state.run;
@@ -170,13 +176,24 @@ function titleScreen(): string {
 
 function introScreen(): string {
   const c = state.course;
-  const cut = cutLine(c.meta.distanceFromStart, c.holes.length);
+  // The cut reflects any pending route event (GS-14), so the banner is honest about the bar.
+  const cut = effectiveCut(state.run, c.holes.length);
+  const ev = state.run.pendingEvent;
+  const evBanner =
+    ev && ev.id !== 'open-space'
+      ? `<div style="margin:.2em 0 .8em;padding:8px 11px;border-left:3px solid ${rarCol(ev.rarity)};
+            border-radius:8px;background:#ffffff08;">
+           <b style="font-size:14px;">${ev.label}</b>
+           <div style="font-size:13px;opacity:.82;margin-top:2px;">${ev.desc}</div>
+         </div>`
+      : '';
   return `
     ${header()}
     <p style="opacity:.8;">A new world rises from the void…</p>
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
       <section style="flex:1 1 220px;">
+        ${evBanner}
         <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes to make the cut and travel on.</p>
         ${btn('🏌 Play shot by shot', { type: 'playInteractive' })}
         ${btn('» Auto-play (watch)', { type: 'play' })}
@@ -416,12 +433,28 @@ function outpostScreen(): string {
 
 function travelScreen(): string {
   const routes = (state.routes ?? [])
-    .map((r) => btn(`↗ ${r.label} (+${r.distanceJump} distance)`, { type: 'route', routeId: r.id }))
+    .map((r) => {
+      const ev = r.event;
+      const credit =
+        ev.creditMult !== 1 ? `${ev.creditMult > 1 ? '+' : ''}${Math.round((ev.creditMult - 1) * 100)}% credits` : '';
+      const cut = ev.cutDelta !== 0 ? `cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}` : '';
+      const tag = [credit, cut].filter(Boolean).join(' · ');
+      // A whole route card is the click target (the shared btn() wraps an action handler).
+      return btn(
+        `<div style="text-align:left;">
+           <div style="font-size:15px;"><b>${ev.label}</b> <span style="opacity:.6;">· ↗ ${r.label} (+${r.distanceJump} distance)</span></div>
+           <div style="font-size:13px;opacity:.82;margin:3px 0;">${ev.desc}</div>
+           ${tag ? `<div style="font-size:12px;opacity:.7;">${tag}</div>` : ''}
+         </div>`,
+        { type: 'route', routeId: r.id },
+        { borderColor: rarCol(ev.rarity), block: true },
+      );
+    })
     .join('');
   return `
     ${header()}
     <h2 style="font-size:16px;">Choose your jump</h2>
-    <p style="opacity:.75;font-size:14px;">Deeper jumps mean a higher cut and wilder courses.</p>
+    <p style="opacity:.75;font-size:14px;">Deeper jumps raise the cut and wildness; each lane's event tilts the risk and the payout. There's always a calm option.</p>
     <div>${routes}</div>`;
 }
 
