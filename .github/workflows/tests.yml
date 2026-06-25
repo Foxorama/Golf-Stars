@@ -5,6 +5,13 @@ on:
     branches: ['**']
   pull_request:
 
+# Supersede an in-flight run when a newer commit lands on the same ref, so a stale PASS from
+# an older commit can never satisfy auto-merge's required check over fresh code. Don't cancel
+# on `main` (group is per-ref) — only redundant feature-branch/PR runs are cancelled.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest

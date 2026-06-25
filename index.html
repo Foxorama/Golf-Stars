@@ -11,6 +11,16 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Golf Stars</title>
+    <!-- PWA: installable as an app. The manifest + icons are external files copied verbatim
+         into dist/ (NOT inlined by vite-plugin-singlefile) — an install manifest can't be a
+         data-URI. Hrefs are relative so they resolve under the Pages subpath (/golf-stars/). -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#0b0d12" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Golf Stars" />
   </head>
   <body>
     <div id="app"></div>
@@ -38,7 +48,7 @@
         // Polyfill globalThis for older module-capable engines that lack it (some mobile
         // WebViews): esbuild does NOT inject it, so any globalThis reference would throw.
         if (typeof globalThis === 'undefined') { try { window.globalThis = window; } catch (e) {} }
-        var BUILD = 'inline-32'; // bump each deploy; proves which HTML you actually loaded
+        var BUILD = 'inline-33'; // bump each deploy; proves which HTML you actually loaded
         var app = document.getElementById('app');
         var errorShown = false; // once a REAL error is on screen, the timeout must not clobber it
         // Immediate visible marker so you can tell the NEW page loaded at all.
@@ -48,18 +58,22 @@
             'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars — loading… (build ' +
             BUILD + ')</pre>';
         }
-        // Defensive: this is NOT a PWA, but another project on the same origin
-        // (e.g. a golf-finder PWA) may have registered a root-scoped service worker
-        // that intercepts and blanks this page. Nuke any worker controlling us, and
-        // drop its caches, the moment we load — so we can't be hijacked again.
+        // Defensive: Golf Stars IS now a PWA, but it shares an origin with other projects
+        // (e.g. a golf-finder PWA) whose root-scoped service worker could intercept and blank
+        // this page. So nuke only FOREIGN workers/caches — anything not scoped to our own
+        // subpath, and any cache not named `golf-stars-*` — while leaving our own offline
+        // worker intact. (Our worker registers from the app module; see app.ts.)
         try {
+          var ourScope = new URL('./', location.href).href; // e.g. https://host/golf-stars/
           if (navigator.serviceWorker) {
             navigator.serviceWorker.getRegistrations().then(function (rs) {
-              rs.forEach(function (r) { r.unregister(); });
+              rs.forEach(function (r) { if (r.scope !== ourScope) r.unregister(); });
             }).catch(function () {});
           }
           if (window.caches && caches.keys) {
-            caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {});
+            caches.keys().then(function (ks) {
+              ks.forEach(function (k) { if (k.indexOf('golf-stars-') !== 0) caches.delete(k); });
+            }).catch(function () {});
           }
         } catch (e) {}
         function paint(msg, isError) {
