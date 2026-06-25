@@ -35,6 +35,9 @@ describe('holeView (pure SVG renderer)', () => {
           lieFrom: 'tee',
           lieTo: 'fairway',
           club: { id: '7i', name: '7-Iron', carry: 134 },
+          rest: [5, 130],
+          roll: 10,
+          holed: false,
         },
       ],
     });
