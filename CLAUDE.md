@@ -180,10 +180,17 @@ This game lives or dies on three axes — put every change through all three bef
 ## Loading intro cinematic (`render/introView.ts`)
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
   pitch their bags into a woody station wagon in a suburban driveway → wheels fold up, it hovers,
-  jets extend → it rockets nose-up into a starfield → a comet writes **GOLF STARS** in the sky →
-  hands off to the title. Timings/feel read from `window._gsIntro` (escape-hatch rule); it's
-  skippable (Skip button / click / Esc-Enter-Space), respects `prefers-reduced-motion`, and is
-  gated by `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
+  jets extend → it rockets nose-up into a starfield (ignition flash + exhaust plume + warp-streak
+  stars + decaying screen-shake) past a dimpled **golf-ball planet**, through nebula clouds and
+  shooting stars → a flaming golf-ball **comet writes GOLF STARS**, which stamp in (squash→pop) with
+  a shine sweep + sparkle glints → hands off to the title. Timings/feel read from `window._gsIntro`
+  (escape-hatch rule: `shake`, `nebula`, `planet`, `shootingStars`, `starCount`, phase durations,
+  `speed`); it's skippable (Skip button / click / Esc-Enter-Space), respects `prefers-reduced-motion`,
+  and is gated by `sessionStorage` so it plays once per session (`?intro=1` forces, `?intro=0` disables).
+- **All effects degrade safely:** the deterministic mulberry32 RNG seeds stars/shooters/dimples (no
+  `Math.random`, stable across reloads); every frame runs inside a try/catch that calls `finish()` on
+  throw, so a cosmetic glitch never strands the boot. The golf-ball planet is a shaded sphere with
+  foreshortened, light-shaded dimples — on-theme for *space golf*, and no asset to 404.
 - **It is NOT in the pure reducer** — it's a time/DOM side-effect, so it lives in `app.ts` like the
   play-view canvas mount and save persistence. **Gotcha that keeps `tests/build.test.ts` green:**
   `start()` runs the normal `boot()` FIRST (the real title actually paints + sets `data-booted`),

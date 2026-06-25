@@ -6,9 +6,11 @@
  *                    the boot of a woody station wagon, then pile in.
  *   2. TRANSFORM   — the wheels fold up into the body, the car lifts into a hover and jet
  *                    nozzles slide out of the rear; the daytime suburb fades to a starfield.
- *   3. LAUNCH      — the wagon tips nose-up and rockets off the top of the frame.
- *   4. WRITE       — a comet traces the rocket's smoke into the words GOLF STARS, glowing
- *                    in the starry sky; a beat to read it, then it hands off to the title.
+ *   3. LAUNCH      — ignition flash, a roaring exhaust plume kicks in, the wagon tips
+ *                    nose-up and rockets off the top of the frame on warp streaks and a
+ *                    screen-shake; a dimpled golf-ball planet hangs in the star-dusted void.
+ *   4. WRITE       — a flaming golf-ball comet traces the smoke into the words GOLF STARS,
+ *                    which stamp in with a pop, a shine sweep and sparkle glints, then hold.
  *
  * Thin/imperative by design (this is the "feel" layer you can't unit-test); everything is
  * vector-drawn so there's no art asset to 404. Timings/feel read from `window._gsIntro` so
@@ -28,17 +30,29 @@ interface IntroFeel {
   speed: number;
   /** Stars scattered across the space sky. */
   starCount: number;
+  /** Launch screen-shake amplitude (design px at the ignition peak). */
+  shake: number;
+  /** Draw the soft nebula clouds behind the starfield. */
+  nebula: boolean;
+  /** Draw the dimpled golf-ball planet rising in the corner. */
+  planet: boolean;
+  /** How many background shooting stars streak past during the space phase. */
+  shootingStars: number;
 }
 
 const BASE_FEEL: IntroFeel = {
   driveMs: 2200,
   loadMs: 1500,
   transformMs: 1500,
-  launchMs: 1300,
+  launchMs: 1500,
   writeMs: 2200,
-  holdMs: 1100,
+  holdMs: 1500,
   speed: 1,
-  starCount: 150,
+  starCount: 170,
+  shake: 7,
+  nebula: true,
+  planet: true,
+  shootingStars: 4,
 };
 
 function feel(): IntroFeel {
@@ -84,6 +98,12 @@ const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
 const easeIn = (t: number): number => t * t * t;
+// Overshoot-and-settle, for the title stamping in past 1.0 then resting at it.
+const easeOutBack = (t: number): number => {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+};
 
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const rad = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
@@ -94,6 +114,22 @@ function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
   ctx.arcTo(x, y + h, x, y, rad);
   ctx.arcTo(x, y, x + w, y, rad);
   ctx.closePath();
+}
+
+/** A crisp 4-point star sparkle (used for title glints + the launch ignition flash core). */
+function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    ctx.rotate(Math.PI / 2);
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(r * 0.16, r * 0.16, 0, -r);
+    ctx.quadraticCurveTo(-r * 0.16, r * 0.16, 0, 0);
+  }
+  ctx.fill();
+  ctx.restore();
 }
 
 /**
@@ -123,14 +159,23 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   document.body.appendChild(overlay);
   const ctx = canvas.getContext('2d');
 
-  // Pre-scatter the starfield in design space (deterministic).
+  // Pre-scatter the starfield in design space (deterministic). A tenth of the stars are
+  // bigger, tinted "hero" stars that get a soft glow; the rest are plain white pinpricks.
   const rng = mulberry32(0x901f);
-  const stars = Array.from({ length: F.starCount }, () => ({
-    x: rng() * DW,
-    y: rng() * (DH * 0.78),
-    r: 0.5 + rng() * 1.6,
-    tw: rng() * Math.PI * 2, // twinkle phase
-  }));
+  const heroHues = ['#fff4cf', '#bcd6ff', '#ffd0e6', '#cfeaff'];
+  const stars = Array.from({ length: F.starCount }, () => {
+    const hero = rng() < 0.1;
+    return {
+      x: rng() * DW,
+      y: rng() * (DH * 0.82),
+      r: hero ? 1.6 + rng() * 1.8 : 0.5 + rng() * 1.4,
+      tw: rng() * Math.PI * 2, // twinkle phase
+      hero,
+      col: hero ? heroHues[(rng() * heroHues.length) | 0]! : '#eaf2ff',
+      // Parallax depth 0..1 — nearer stars streak more during the warp launch.
+      depth: rng(),
+    };
+  });
 
   // Phase boundaries (cumulative ms).
   const t0 = F.driveMs;
@@ -139,6 +184,16 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   const t3 = t2 + F.launchMs;
   const t4 = t3 + F.writeMs;
   const t5 = t4 + F.holdMs;
+
+  // Deterministic shooting stars, each firing once within the space window.
+  const shooters = Array.from({ length: Math.max(0, F.shootingStars) }, () => ({
+    t: t1 + rng() * Math.max(1, t5 - t1 - 900),
+    sx: -60 + rng() * 560,
+    sy: 20 + rng() * 220,
+    ang: 0.42 + rng() * 0.42, // down-and-right
+    dur: 620 + rng() * 320,
+    reach: 360 + rng() * 220,
+  }));
 
   let raf = 0;
   let start = 0;
@@ -187,7 +242,66 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
 
   // --- scene drawing (all in design space) ----------------------------------
 
-  function drawSky(dayA: number, spaceA: number): void {
+  /** Soft, large nebula blobs for depth — screen-blended so they glow over the dark sky. */
+  function drawNebula(a: number): void {
+    if (!ctx || a <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const blobs: [number, number, number, string][] = [
+      [250, 170, 300, '#3b1d72'],
+      [780, 300, 340, '#0f4257'],
+      [540, 70, 240, '#5a1f55'],
+      [120, 470, 260, '#1d2f6b'],
+    ];
+    for (const [bx, by, br, col] of blobs) {
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+      g.addColorStop(0, col);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.55 * a;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** Shooting stars: short tapered streaks crossing the void on a timer. */
+  function drawShooters(spaceA: number, e: number): void {
+    if (!ctx || spaceA <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const sh of shooters) {
+      if (e < sh.t || e > sh.t + sh.dur) continue;
+      const p = (e - sh.t) / sh.dur;
+      const d = easeOut(p) * sh.reach;
+      const hx = sh.sx + Math.cos(sh.ang) * d;
+      const hy = sh.sy + Math.sin(sh.ang) * d;
+      const tailLen = 70 + 40 * Math.sin(p * Math.PI);
+      const tx = hx - Math.cos(sh.ang) * tailLen;
+      const ty = hy - Math.sin(sh.ang) * tailLen;
+      const a = spaceA * Math.sin(p * Math.PI);
+      const g = ctx.createLinearGradient(tx, ty, hx, hy);
+      g.addColorStop(0, 'rgba(180,210,255,0)');
+      g.addColorStop(1, `rgba(235,245,255,${a})`);
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(hx, hy, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  function drawSky(dayA: number, spaceA: number, e: number, warp: number): void {
     if (!ctx) return;
     // Space gradient underneath, always.
     const sp = ctx.createLinearGradient(0, 0, 0, DH);
@@ -198,16 +312,40 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.fillRect(-offX / scale, -offY / scale, DW + (offX * 2) / scale, DH + (offY * 2) / scale);
 
     if (spaceA > 0) {
+      if (F.nebula) drawNebula(spaceA);
       ctx.save();
+      const now = performance.now();
       for (const s of stars) {
-        const tw = 0.55 + 0.45 * Math.sin(performance.now() * 0.004 + s.tw);
+        const tw = 0.55 + 0.45 * Math.sin(now * 0.004 + s.tw);
         ctx.globalAlpha = spaceA * tw;
-        ctx.fillStyle = '#eaf2ff';
+        // Warp launch: near stars stretch into vertical streaks as the wagon punches up.
+        const streak = warp * (8 + s.depth * 46);
+        if (streak > 1.5) {
+          const g = ctx.createLinearGradient(s.x, s.y - streak, s.x, s.y + streak);
+          g.addColorStop(0, 'rgba(234,242,255,0)');
+          g.addColorStop(0.5, s.col);
+          g.addColorStop(1, 'rgba(234,242,255,0)');
+          ctx.strokeStyle = g;
+          ctx.lineWidth = s.r * 1.1;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y - streak);
+          ctx.lineTo(s.x, s.y + streak);
+          ctx.stroke();
+          continue;
+        }
+        if (s.hero) {
+          ctx.shadowColor = s.col;
+          ctx.shadowBlur = 8;
+        }
+        ctx.fillStyle = s.col;
         ctx.beginPath();
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
       ctx.restore();
+      drawShooters(spaceA, e);
     }
 
     if (dayA > 0) {
@@ -234,6 +372,85 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       }
       ctx.restore();
     }
+  }
+
+  /**
+   * A giant dimpled golf-ball planet — the world you're launching off. Drawn as a shaded
+   * sphere with foreshortened dimples, low in the corner, rising as the void fades in.
+   * (On-theme for space golf, and there's no asset to 404.)
+   */
+  function drawPlanet(a: number): void {
+    if (!ctx || a <= 0) return;
+    const cx = 168;
+    const cy = lerp(700, 656, a); // eases up as space settles in
+    const R = 250;
+    // Light from the upper-right (toward the departing rocket).
+    const lx = 0.55;
+    const ly = -0.62;
+    const lz = 0.56;
+
+    ctx.save();
+    ctx.globalAlpha = a;
+
+    // Atmospheric rim glow.
+    const halo = ctx.createRadialGradient(cx, cy, R * 0.86, cx, cy, R * 1.16);
+    halo.addColorStop(0, 'rgba(150,200,255,0.28)');
+    halo.addColorStop(1, 'rgba(150,200,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.16, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sphere body.
+    const body = ctx.createRadialGradient(cx + R * 0.32, cy - R * 0.36, R * 0.1, cx, cy, R);
+    body.addColorStop(0, '#ffffff');
+    body.addColorStop(0.55, '#e7ecf5');
+    body.addColorStop(0.85, '#b9c2d4');
+    body.addColorStop(1, '#727b90');
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dimples, clipped to the sphere, sized by foreshortening and shaded by the light.
+    ctx.save();
+    ctx.clip(); // current path is the sphere
+    const step = 0.13;
+    for (let v = -0.96; v <= 0.96; v += step) {
+      // Offset alternate rows for a honeycomb-ish pack.
+      const rowOff = (Math.round((v + 1) / step) % 2) * (step / 2);
+      for (let u = -0.96 + rowOff; u <= 0.96; u += step) {
+        const d2 = u * u + v * v;
+        if (d2 > 0.9) continue;
+        const z = Math.sqrt(1 - d2);
+        const px = cx + u * R;
+        const py = cy + v * R;
+        const size = (4.2 + 4.8 * z);
+        // Diffuse term toward the light → dimple contrast fades on the dark limb.
+        const ndl = clamp01(u * lx + v * ly + z * lz);
+        const dimA = 0.12 + 0.16 * ndl;
+        // Shadowed half of each dimple + a tiny lit speck for relief.
+        ctx.fillStyle = `rgba(60,72,96,${dimA})`;
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.18 * ndl})`;
+        ctx.beginPath();
+        ctx.arc(px - size * 0.3, py - size * 0.3, size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Terminator: darken the unlit limb with a directional gradient.
+    const term = ctx.createLinearGradient(cx + lx * R, cy + ly * R, cx - lx * R, cy - ly * R);
+    term.addColorStop(0, 'rgba(5,8,20,0)');
+    term.addColorStop(1, 'rgba(5,8,20,0.6)');
+    ctx.fillStyle = term;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
   }
 
   function drawSuburb(dayA: number): void {
@@ -510,6 +727,75 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.restore();
   }
 
+  /**
+   * Launch effects drawn UNDER the car (in design space, not the car's local frame): a
+   * blinding ignition flash, a roaring exhaust plume, and a rising smoke column.
+   */
+  function drawLaunchFX(carX: number, carY: number, lp: number): void {
+    if (!ctx) return;
+    const now = performance.now();
+    const padY = GROUND_Y - 28;
+
+    // Ignition flash at the pad, brightest at t=0, gone by ~lp 0.22.
+    const flash = Math.max(0, 1 - lp / 0.22);
+    if (flash > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const fr = 120 + (1 - flash) * 220;
+      const g = ctx.createRadialGradient(520, padY, 0, 520, padY, fr);
+      g.addColorStop(0, `rgba(255,255,255,${0.9 * flash})`);
+      g.addColorStop(0.4, `rgba(255,214,120,${0.7 * flash})`);
+      g.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(520, padY, fr, 0, Math.PI * 2);
+      ctx.fill();
+      sparkle(ctx, 520, padY, 60 + flash * 70, `rgba(255,248,220,${flash})`);
+      ctx.restore();
+    }
+
+    // Exhaust plume + smoke, hanging straight down off the climbing car.
+    const topY = carY + 18;
+    ctx.save();
+    // Bright core jet.
+    ctx.globalCompositeOperation = 'lighter';
+    const flick = 0.82 + 0.18 * Math.sin(now * 0.06);
+    const plume = ctx.createLinearGradient(carX, topY, carX, DH + 80);
+    plume.addColorStop(0, `rgba(255,255,255,${0.95 * flick})`);
+    plume.addColorStop(0.25, `rgba(255,210,110,${0.8 * flick})`);
+    plume.addColorStop(0.6, 'rgba(255,120,40,0.35)');
+    plume.addColorStop(1, 'rgba(255,80,30,0)');
+    ctx.fillStyle = plume;
+    ctx.beginPath();
+    ctx.moveTo(carX - 20, topY);
+    ctx.lineTo(carX + 20, topY);
+    ctx.lineTo(carX + 74, DH + 80);
+    ctx.lineTo(carX - 74, DH + 80);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Roiling smoke puffs billowing out below.
+    ctx.save();
+    for (let i = 0; i < 7; i++) {
+      const age = ((i / 7 + lp * 1.4) % 1);
+      const py = lerp(topY + 30, DH + 40, age);
+      const spread = 16 + age * 150;
+      const pr = 18 + age * 70;
+      const a = 0.32 * (1 - age);
+      const wob = Math.sin(now * 0.01 + i * 2) * spread * 0.5;
+      ctx.fillStyle = `rgba(206,212,224,${a})`;
+      ctx.beginPath();
+      ctx.arc(carX + wob, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(120,128,144,${a * 0.7})`;
+      ctx.beginPath();
+      ctx.arc(carX + wob + pr * 0.3, py + pr * 0.2, pr * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   /** A golf bag in flight, arcing from a golfer into the boot. */
   function drawFlyingBag(fromX: number, toX: number, p: number): void {
     if (!ctx) return;
@@ -533,7 +819,49 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.restore();
   }
 
-  function drawTitle(reveal: number, glow: number): void {
+  /** The little flaming golf-ball that "writes" the title, with a fiery tail. */
+  function drawCometHead(x: number, y: number): void {
+    if (!ctx) return;
+    const now = performance.now();
+    ctx.save();
+    // Fiery tail streaming back to the left.
+    ctx.globalCompositeOperation = 'lighter';
+    const tail = ctx.createLinearGradient(x - 64, y, x, y);
+    tail.addColorStop(0, 'rgba(255,120,40,0)');
+    tail.addColorStop(0.6, 'rgba(255,196,84,0.55)');
+    tail.addColorStop(1, 'rgba(255,244,200,0.95)');
+    ctx.fillStyle = tail;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 8);
+    ctx.quadraticCurveTo(x - 40, y - 3, x - 64, y + Math.sin(now * 0.03) * 2);
+    ctx.quadraticCurveTo(x - 40, y + 3, x, y + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // The golf ball itself.
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,236,150,1)';
+    ctx.shadowBlur = 22;
+    const ball = ctx.createRadialGradient(x - 2, y - 3, 1, x, y, 8);
+    ball.addColorStop(0, '#ffffff');
+    ball.addColorStop(1, '#dfe6f2');
+    ctx.fillStyle = ball;
+    ctx.beginPath();
+    ctx.arc(x, y, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Tiny dimples.
+    ctx.fillStyle = 'rgba(150,160,180,0.5)';
+    for (const [dx, dy] of [[-2, -1], [2, -1], [0, 2], [-3, 2], [3, 1]] as const) {
+      ctx.beginPath();
+      ctx.arc(x + dx, y + dy, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawTitle(reveal: number, glow: number, pop: number, shine: number): void {
     if (!ctx) return;
     const text = 'GOLF STARS';
     ctx.save();
@@ -544,7 +872,12 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     const tx = DW / 2 - w / 2;
     const ty = 250;
 
-    // Reveal the lettering left-to-right (the rocket "writes" it in smoke).
+    // Squash-then-stamp pop, scaled about the title's centre.
+    ctx.translate(DW / 2, ty);
+    ctx.scale(pop, pop);
+    ctx.translate(-DW / 2, -ty);
+
+    // Reveal the lettering left-to-right (the comet "writes" it in smoke).
     const headX = tx + w * reveal;
     ctx.save();
     ctx.beginPath();
@@ -559,7 +892,27 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.fillText(text, tx, ty);
     ctx.restore();
 
-    // The comet write-head + sparks, riding the reveal edge.
+    // Shine sweep: a bright diagonal band travels across the finished lettering once.
+    if (shine > 0 && shine < 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(tx - 30, 0, w + 60, DH);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'lighter';
+      const sx = lerp(tx - 80, tx + w + 80, shine);
+      const band = ctx.createLinearGradient(sx - 60, 0, sx + 60, 0);
+      band.addColorStop(0, 'rgba(255,255,255,0)');
+      band.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+      band.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = band;
+      ctx.font = '800 96px system-ui, "Segoe UI", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, tx, ty);
+      ctx.restore();
+    }
+
+    // The comet write-head riding the reveal edge.
     if (reveal < 1) {
       const now = performance.now();
       // Smoke puffs trailing back from the head.
@@ -572,19 +925,19 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         ctx.fill();
       }
       ctx.globalAlpha = 1;
-      ctx.shadowColor = 'rgba(255,236,150,1)';
-      ctx.shadowBlur = 26;
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(headX, ty, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      for (let i = 0; i < 5; i++) {
-        const a = now * 0.02 + (i / 5) * Math.PI * 2;
-        ctx.fillStyle = 'rgba(255,206,84,0.9)';
-        ctx.beginPath();
-        ctx.arc(headX + Math.cos(a) * 12, ty + Math.sin(a) * 12, 1.6, 0, Math.PI * 2);
-        ctx.fill();
+      drawCometHead(headX, ty);
+    } else if (glow > 0.2) {
+      // Sparkle glints popping along the finished lettering.
+      const now = performance.now();
+      const glints: [number, number, number][] = [
+        [tx + w * 0.12, ty - 34, 0],
+        [tx + w * 0.5, ty + 30, 1.6],
+        [tx + w * 0.86, ty - 22, 3.1],
+      ];
+      for (const [gx, gy, ph] of glints) {
+        const tw = Math.max(0, Math.sin(now * 0.005 + ph));
+        if (tw <= 0) continue;
+        sparkle(ctx, gx, gy, 6 + tw * 9, `rgba(255,250,225,${0.7 * tw * glow})`);
       }
     }
 
@@ -608,17 +961,27 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       if (!start) start = now;
       const e = now - start;
 
+      // Launch progress drives the warp streaks + screen-shake.
+      const lp = e >= t2 && e < t3 ? clamp01((e - t2) / F.launchMs) : e >= t3 ? 1 : 0;
+      const warp = e >= t2 && e < t3 ? easeIn(lp) * (1 - lp * 0.3) : 0;
+      // Shake spikes at ignition and decays through the climb.
+      const shakeEnv = e >= t2 && e < t3 ? Math.exp(-lp * 3.4) : 0;
+      const shx = shakeEnv * F.shake * Math.sin(now * 0.085);
+      const shy = shakeEnv * F.shake * Math.cos(now * 0.067);
+
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
       ctx.save();
       ctx.translate(offX, offY);
       ctx.scale(scale, scale);
+      if (shakeEnv > 0) ctx.translate(shx, shy);
 
       // Day → space crossfade spans transform + launch.
       const space = clamp01((e - t1) / (t3 - t1));
       const dayA = 1 - space;
 
-      drawSky(dayA, space);
+      drawSky(dayA, space, e, warp);
+      if (F.planet) drawPlanet(space);
       drawSuburb(dayA);
 
       // Golfers + bag loading (day scene only).
@@ -664,7 +1027,6 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
           jet = clamp01(tp * 1.4);
           flame = tp * 0.35;
         } else if (e >= t2) {
-          const lp = clamp01((e - t2) / F.launchMs);
           wheelRetract = 1;
           jet = 1;
           tilt = easeIn(lp) * 1.4;
@@ -673,6 +1035,8 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
           carX = 520 + lp * 130;
           cs = 1 - lp * 0.45;
         }
+        // Launch FX sit under the car (separate from its local frame).
+        if (e >= t2) drawLaunchFX(carX, carY, lp);
         drawCar(carX, carY, cs, tilt, wheelRetract, jet, flame, bootOpen);
       }
 
@@ -680,7 +1044,11 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       if (e >= t3) {
         const reveal = easeInOut(clamp01((e - t3) / F.writeMs));
         const glow = clamp01((e - t3 - F.writeMs * 0.4) / (F.writeMs * 0.6));
-        drawTitle(reveal, glow);
+        // Squash-then-stamp the moment the writing completes (at t4).
+        const pop = e >= t4 ? 0.82 + 0.18 * easeOutBack(clamp01((e - t4) / 360)) : 1;
+        // One-shot shine sweep just after the stamp.
+        const shine = clamp01((e - t4 - 160) / 620);
+        drawTitle(reveal, glow, pop, shine);
       }
 
       ctx.restore();
