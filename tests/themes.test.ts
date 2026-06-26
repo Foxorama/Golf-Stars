@@ -10,10 +10,13 @@ import {
   themeById,
   pickTheme,
   themeForStop,
+  resolveBiome,
   STAR_ARC_BREAKS,
   type BiomeArchetype,
 } from '../src/sim/course/themes';
 import { BIOMES } from '../src/sim/course/biomes';
+import { generateCourse } from '../src/sim/course/generate';
+import { lieInfo } from '../src/sim/shot';
 import { RARITIES } from '../src/sim/rpg/loot';
 import { Rng } from '../src/sim/rng';
 import { simulateRun } from '../src/sim/rpg/run';
@@ -136,6 +139,66 @@ describe('theme selection', () => {
     // Epic showpieces should surface, but far less often than common figures.
     expect(epic).toBeGreaterThan(0);
     expect(common).toBeGreaterThan(epic * 2);
+  });
+});
+
+describe('rarity-tiered, theme-flavoured biomes (GS-17b)', () => {
+  it('resolveBiome keeps the archetype id (palette stays valid) and only known lie kinds', () => {
+    const ids = new Set(BIOMES.map((b) => b.id));
+    for (const t of THEMES) {
+      const b = resolveBiome(t);
+      expect(b.id).toBe(archetypeBiome(t.archetype));
+      expect(ids.has(b.id)).toBe(true);
+      // Scatter kinds are inherited from the archetype, so they must still have LIE_INFO rows.
+      for (const s of b.scatter) expect(() => lieInfo(s.kind)).not.toThrow();
+    }
+  });
+
+  it('every resolved field stays inside the clamped fair range', () => {
+    for (const t of THEMES) {
+      const b = resolveBiome(t);
+      expect(b.carryMult).toBeGreaterThanOrEqual(0.8);
+      expect(b.carryMult).toBeLessThanOrEqual(1.6);
+      expect(b.fairwayWidthMult).toBeGreaterThanOrEqual(0.72);
+      expect(b.windWild).toBeLessThanOrEqual(40);
+      expect(b.doglegBias).toBeLessThanOrEqual(0.6);
+      expect(b.treeDensity ?? 0).toBeLessThanOrEqual(3.2);
+      expect(b.fairwayBunkers ?? 0).toBeLessThanOrEqual(3.5);
+    }
+  });
+
+  it('rarer themes really play more intense than a common one of the same archetype', () => {
+    // A common inferno (Orion) vs an epic inferno (Eta Carinae): the epic reads wilder.
+    const common = resolveBiome(themeById('orion')!);
+    const epic = resolveBiome(themeById('eta-carinae')!);
+    expect(epic.windWild).toBeGreaterThan(common.windWild);
+    // And the void's signature gravity is more extreme for the galactic core than a common void.
+    const pegasus = resolveBiome(themeById('pegasus')!); // common void
+    const core = resolveBiome(themeById('milky-way-core')!); // epic void galaxy
+    expect(core.carryMult).toBeGreaterThan(pegasus.carryMult);
+    expect(core.carryJitter).toBeGreaterThan(pegasus.carryJitter);
+  });
+
+  it('NO systemic death-spiral across EVERY theme at max wildness', () => {
+    // The real guarantee for GS-17b: each theme's resolved biome must clear the fairness bar.
+    let strokes = 0;
+    let par = 0;
+    let holes = 0;
+    let blowups = 0;
+    for (const t of THEMES) {
+      const biomeRow = resolveBiome(t);
+      for (let seed = 0; seed < 25; seed++) {
+        const course = generateCourse(seed + 500, { biomeRow, holes: 3, wildness: 1 });
+        for (const p of playCourse(course.holes, new Rng(`${t.id}:${seed}:p`))) {
+          strokes += p.record.strokes;
+          par += p.record.par;
+          holes++;
+          if (p.record.strokes >= 10) blowups++;
+        }
+      }
+    }
+    expect((strokes - par) / holes).toBeLessThan(1.0);
+    expect(blowups / holes).toBeLessThan(0.05);
   });
 });
 

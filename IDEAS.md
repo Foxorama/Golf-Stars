@@ -21,8 +21,12 @@ Everything below serves whichever avenue wins.
   archetype + rarity + arc. Arcs keyed by star count (≤5 / 6–7 / 8+ → 9/10/9); deep-sky/galaxy gated
   by rarity. `currentCourse` now generates from the stop's theme. See
   `reports/star-travel-theming-2026-06-26.md`. **Remaining slices:**
-  - **GS-17b — Rarity-tiered biomes.** Widen `archetypeBiome` to archetype × rarity (new biome rows;
-    legendary feels legendary). Re-clear the no-death-spiral + fairness bars.
+  - **GS-17b — Rarity-tiered, theme-flavoured biomes. SHIPPED.** `resolveBiome(theme)` composes the
+    archetype baseline × per-theme `BiomeFlavour` × rarity intensity (`RARITY_INTENSITY`), every
+    field clamped fair. Each constellation/galaxy now PLAYS its character (Scorpius's hooking sting,
+    Sagittarius's black-hole gravity, the galactic-core grandeur) and rarer reads wilder. Generator
+    takes a resolved `biomeRow`; biome id stays the archetype so the 5-key palette holds (per-theme
+    VISUALS are GS-17e). No-death-spiral re-proved across every theme at max wildness.
   - **GS-17c — Event split.** One-off dated events → `unique` route events (≤1/run); recurring events
     (showers/moon/oppositions) → themed flavour over the `RouteEvent` levers. Economy/cut-only.
   - **GS-17d — Themed upgrades.** Bias shop/meta draw by the active theme's flavour.

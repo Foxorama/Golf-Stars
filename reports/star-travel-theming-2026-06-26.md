@@ -58,12 +58,23 @@ guard stay green; `tests/themes.test.ts` re-asserts `toPar/hole < 1.0` and blow-
 multi-arc walk. (Knock-on test seeds updated: `ui.test.ts` missed-cut seed 14 → 26; `formats.test.ts`
 flat-stop determinism now compares against the same theme.)
 
-## Roadmap (remaining slices)
+## What shipped next (GS-17b — rarity-tiered, theme-flavoured biomes)
 
-- **GS-17b — Rarity-tiered biomes (the "make legendary feel legendary" work).** Widen the
-  `archetypeBiome` seam into archetype × rarity → a biome whose wind/hazard/dogleg/tightness and
-  render drama scale with the theme's rarity. Add new biome rows where an archetype deserves grander
-  variants. MUST re-clear the no-death-spiral + fairness bars (rarity intensity is a difficulty lever).
+Each theme now resolves to a concrete biome that PLAYS its character, not just its archetype:
+
+- `BiomeFlavour` (bounded multipliers: carry/jitter/wind/tightness/dogleg/trees/bunkers/scatter) on
+  every theme row — Scorpius's hooking sting (dogleg ↑, bunkers ↑), Sagittarius's black-hole gravity
+  (carry ↑, jitter ↑), the Milky Way core's grandeur, a sail's crosswind, a wolf's dense treeline.
+- `RARITY_INTENSITY` amplifies the flavour DEVIATIONS by rarity, so a common inferno plays plain and
+  an epic one reads wilder — "rare feels rare, legendary feels legendary".
+- `resolveBiome(theme)` composes archetype × flavour × rarity and CLAMPS every field to a fair range;
+  the generator consumes it via a new `biomeRow` option. Biome `id` stays the archetype, so the 5-key
+  render palette still resolves (per-theme VISUALS are GS-17e; the course already carries `themeId`).
+- Fairness: flavour only turns up NON-penalty spice; penalty hazards are still kept off the corridor
+  by `validateFairness`. `tests/themes.test.ts` re-proves the no-death-spiral bar across EVERY theme
+  at max wildness, asserts the clamps, and asserts rarer themes are measurably more intense.
+
+## Roadmap (remaining slices)
 - **GS-17c — Event split.** One-off dated events → `unique` route events (≤1 per run, big modifiers);
   recurring events (showers/moon/oppositions) → a themed flavour layer over the existing `RouteEvent`
   `creditMult`/`cutDelta` levers. Keep events economy/cut-only (the fairness boundary).

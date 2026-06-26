@@ -32,7 +32,7 @@ import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
 import { DEFAULT_EVENT, drawRouteEvents, routeEvent, type RouteEvent } from './events';
-import { themeForStop, themeBiome } from '../course/themes';
+import { themeForStop, resolveBiome } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked';
@@ -120,8 +120,8 @@ export function currentCourse(run: Run): Course {
     holes: spec.holes,
     parCap: spec.parCap,
     distanceFromStart: run.distanceFromStart,
-    // The theme selects the biome (its physics/feel) and tags the course for the render/UI layer.
-    biome: themeBiome(theme),
+    // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
+    biomeRow: resolveBiome(theme),
     themeId: theme.id,
   });
 }
