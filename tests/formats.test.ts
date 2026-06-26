@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { FORMATS, getFormat, stopSpecFor } from '../src/sim/rpg/formats';
 import { generateCourse } from '../src/sim/course/generate';
-import { currentCourse, simulateRun, startRun, travel, routeOptions } from '../src/sim/rpg/run';
+import { currentCourse, currentTheme, simulateRun, startRun, travel, routeOptions } from '../src/sim/rpg/run';
+import { themeBiome } from '../src/sim/course/themes';
 
 describe('run formats (GS-9)', () => {
   it('stopSpecFor clamps past the end of the ladder', () => {
@@ -22,12 +23,19 @@ describe('run formats (GS-9)', () => {
     expect(cap4.holes[0]!.tee).toEqual(uncapped.holes[0]!.tee);
   });
 
-  it("the flat format reproduces the original fixed 6-hole stop", () => {
+  it("the flat format reproduces the fixed 6-hole stop (now theme-driven, GS-17)", () => {
     const run = startRun(1234, 'flat');
     const course = currentCourse(run);
     expect(course.holes.length).toBe(6);
-    // Identical to generating that stop directly with 6 holes.
-    const direct = generateCourse(`${run.seed}:stop:0`, { holes: 6, distanceFromStart: 0 });
+    // Identical to generating that stop directly with 6 holes from the SAME theme: the stop's
+    // theme selects the biome + tags the course id, deterministically from the run.
+    const theme = currentTheme(run);
+    const direct = generateCourse(`${run.seed}:stop:0`, {
+      holes: 6,
+      distanceFromStart: 0,
+      biome: themeBiome(theme),
+      themeId: theme.id,
+    });
     expect(course).toEqual(direct);
   });
 

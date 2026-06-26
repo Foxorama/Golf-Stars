@@ -82,6 +82,8 @@ export interface CourseMeta {
   distanceFromStart: number;
   /** 0..1ish knob the generator turns up as you travel further. */
   wildness: number;
+  /** Star-travel theme id (GS-17) the stop flew into; the render layer keys flavour off it. */
+  themeId?: string;
 }
 
 export interface Course {

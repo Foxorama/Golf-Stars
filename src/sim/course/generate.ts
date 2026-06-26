@@ -45,6 +45,8 @@ export interface GenerateOptions {
   wildness?: number;
   /** Force a specific biome by id (otherwise weighted-random). */
   biome?: string;
+  /** Star-travel theme id (GS-17) — recorded on the course meta for the render/UI layer. */
+  themeId?: string;
   /** Cap every hole's par (3 = all par-3s). Omit for the normal 3/4/5 mix. */
   parCap?: 3 | 4 | 5;
 }
@@ -317,7 +319,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     rarity,
     biome: biome.id,
     holes,
-    meta: { name, distanceFromStart, wildness },
+    meta: { name, distanceFromStart, wildness, ...(opts.themeId ? { themeId: opts.themeId } : {}) },
   };
 
   const errs = [...validateCourse(course), ...validateFairness(course)];

@@ -15,6 +15,20 @@ Everything below serves whichever avenue wins.
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
+- **GS-17 — Star-travel themes (constellation/galaxy theming + arcs).** Foundation SHIPPED
+  (`src/sim/course/themes.ts`): golf-finder's night-sky catalogue (`data/night-sky-cards.json`) is
+  curated into a theme table — each constellation/deep-sky/galaxy is a stop theme bundling a biome
+  archetype + rarity + arc. Arcs keyed by star count (≤5 / 6–7 / 8+ → 9/10/9); deep-sky/galaxy gated
+  by rarity. `currentCourse` now generates from the stop's theme. See
+  `reports/star-travel-theming-2026-06-26.md`. **Remaining slices:**
+  - **GS-17b — Rarity-tiered biomes.** Widen `archetypeBiome` to archetype × rarity (new biome rows;
+    legendary feels legendary). Re-clear the no-death-spiral + fairness bars.
+  - **GS-17c — Event split.** One-off dated events → `unique` route events (≤1/run); recurring events
+    (showers/moon/oppositions) → themed flavour over the `RouteEvent` levers. Economy/cut-only.
+  - **GS-17d — Themed upgrades.** Bias shop/meta draw by the active theme's flavour.
+  - **GS-17e — Render the constellation.** Draw the theme's stick figure (catalogue `stars`+`lines`)
+    as the course sky backdrop in `buildScene`; wire the theme into the Sim Lab + Demo hub.
+
 - **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
   shipped (PR #7). Still open: a smarter recovery/short game to shrink the rare max-wildness blow-up
   tail, and green slope/break once greens carry contour data. NOTE: a naive "club for nearest carry
