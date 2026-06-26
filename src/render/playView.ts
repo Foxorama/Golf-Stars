@@ -40,6 +40,16 @@ interface PlayFeel extends FlightFeel {
   bounces: number;
   /** Pause (ms) the ball sits at rest so you can read where it finished. */
   restHoldMs: number;
+  /** Draw the little golfer who addresses + swings before each full shot. */
+  golfer: boolean;
+  /** Golfer figure base height (px); scaled mildly with zoom, clamped readable. */
+  golferPx: number;
+  /** Windup lead-in (ms) before the ball launches — the address + backswing + downswing. */
+  swingLeadMs: number;
+  /** Follow-through window (ms) over which the golfer holds the finish then fades. */
+  followMs: number;
+  /** Animated twinkle/shooting-star space ambience over the field. */
+  spaceFX: boolean;
 }
 
 const BASE_FEEL: PlayFeel = {
@@ -51,7 +61,132 @@ const BASE_FEEL: PlayFeel = {
   bounceAmp: 4,
   bounces: 2,
   restHoldMs: 480,
+  golfer: true,
+  golferPx: 40,
+  swingLeadMs: 520,
+  followMs: 440,
+  spaceFX: true,
 };
+
+// Loader-style cap colours so the play-view golfer reads as one of the intro's crew.
+const GOLFER_COLORS = ['#d23f4f', '#3f78b8', '#e0a83f', '#46a05a'];
+
+/** Tiny deterministic PRNG (mulberry32) — the house style, so the ambient FX are stable. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+/**
+ * A little cartoon golfer mid-swing, in the same silhouette language as the loading intro's
+ * crew (stick legs, blocky torso, round head + cap) but posed side-on over the ball with a
+ * club. The figure is authored in a local frame ~72 units tall (origin at the feet, +x toward
+ * the target, −y up) and scaled to `h` px, then positioned so its LOCAL ball (where the club
+ * sole rests at address) lands exactly on the REAL ball on screen — so figure, club and ball
+ * stay in proportion at any zoom. `swing` 0..1 drives the windup (address → top → contact);
+ * once `follow` > 0 the club sweeps on through to a high finish.
+ */
+function drawGolfer(
+  ctx: CanvasRenderingContext2D,
+  bx: number,
+  by: number,
+  h: number,
+  swing: number,
+  follow: number,
+  alpha: number,
+  color: string,
+): void {
+  const u = h / 72;
+  const S: Vec = [8, -50]; // shoulder pivot
+  const B: Vec = [30, -1]; // local ball (club sole at address)
+  const CL = Math.hypot(B[0] - S[0], B[1] - S[1]);
+  const a0 = Math.atan2(B[1] - S[1], B[0] - S[0]); // address angle (down to the ball)
+  const aTop = a0 - 3.0; // top of the backswing (up and behind)
+  const aFin = a0 - 3.9; // high finish (further round and up)
+  let ang: number;
+  if (follow > 0) {
+    ang = a0 + (aFin - a0) * easeOutCubic(follow);
+  } else if (swing < 0.5) {
+    ang = a0 + (aTop - a0) * easeInOut(swing / 0.5); // takeaway → top
+  } else {
+    const d = (swing - 0.5) / 0.5;
+    ang = aTop + (a0 - aTop) * (d * d); // downswing accelerates into contact
+  }
+  const head: Vec = [S[0] + Math.cos(ang) * CL, S[1] + Math.sin(ang) * CL];
+  const hands: Vec = [S[0] + Math.cos(ang) * CL * 0.34, S[1] + Math.sin(ang) * CL * 0.34];
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(bx - B[0] * u, by - B[1] * u);
+  ctx.scale(u, u);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Soft ground shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.ellipse(6, 1, 16, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Legs (a planted stance).
+  ctx.strokeStyle = '#2c3142';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(2, -30);
+  ctx.lineTo(-7, 0);
+  ctx.moveTo(2, -30);
+  ctx.lineTo(12, 0);
+  ctx.stroke();
+
+  // Torso (hip → shoulders, tilted toward the ball).
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.moveTo(2, -30);
+  ctx.lineTo(S[0], S[1]);
+  ctx.stroke();
+
+  // Club shaft + head (behind the arms).
+  ctx.strokeStyle = '#d9dee8';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(hands[0], hands[1]);
+  ctx.lineTo(head[0], head[1]);
+  ctx.stroke();
+  ctx.fillStyle = '#aeb6c6';
+  ctx.beginPath();
+  ctx.arc(head[0], head[1], 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Arms (shoulders → hands).
+  ctx.strokeStyle = '#f0c49a';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(S[0], S[1]);
+  ctx.lineTo(hands[0], hands[1]);
+  ctx.stroke();
+
+  // Head + cap (brim points down the line).
+  ctx.fillStyle = '#f3c9a0';
+  ctx.beginPath();
+  ctx.arc(12, -58, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(12, -59, 7, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(15, -60, 9, 3); // brim
+
+  ctx.restore();
+}
 
 function feel(): PlayFeel {
   const override = (window as unknown as { _gsFeel?: Partial<PlayFeel> })._gsFeel ?? {};
@@ -182,6 +317,61 @@ export function mountPlayView(
     ctx.fillText(text, 16, 24);
   }
 
+  // Animated space ambience: a fixed far starfield in the upper sky that twinkles, plus a
+  // shooting star that sweeps through on a slow loop. Purely additive "alive" feel on top of
+  // the static (seeded) celestial accents the scene builder already bakes in. Positions are
+  // seeded off the hole so they're stable for the session; only the alpha/sweep animate.
+  const fxRng = mulberry32((Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed);
+  const fxStars = Array.from({ length: 18 }, () => ({
+    x: fxRng() * width,
+    y: fxRng() * height * 0.5, // bias to the upper "sky" band
+    r: 0.5 + fxRng() * 1.2,
+    ph: fxRng() * Math.PI * 2,
+    blue: fxRng() < 0.5,
+  }));
+  const shootPeriod = 5200;
+  const shootDur = 760;
+  const shootOff = fxRng() * shootPeriod;
+  function drawSpaceFX(now: number): void {
+    if (!F.spaceFX) return;
+    ctx.save();
+    for (const s of fxStars) {
+      const a = 0.18 + 0.5 * (0.5 + 0.5 * Math.sin(now * 0.003 + s.ph));
+      ctx.globalAlpha = a;
+      ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Shooting star sweeping down-right across the upper third on a slow loop.
+    const sp = ((now + shootOff) % shootPeriod) / shootDur;
+    if (sp <= 1) {
+      const x0 = -40;
+      const y0 = height * 0.06;
+      const x1 = width + 40;
+      const y1 = height * 0.34;
+      const hx = x0 + (x1 - x0) * sp;
+      const hy = y0 + (y1 - y0) * sp;
+      const ang = Math.atan2(y1 - y0, x1 - x0);
+      const tail = 60;
+      const a = Math.sin(sp * Math.PI);
+      ctx.globalAlpha = a;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(220,235,255,0.9)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hx - Math.cos(ang) * tail, hy - Math.sin(ang) * tail);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(hx, hy, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function frame(now: number): void {
     if (!segStart) segStart = now;
 
@@ -201,6 +391,7 @@ export function mountPlayView(
     }
 
     drawStatic();
+    drawSpaceFX(now);
 
     let hudText = '';
 
@@ -217,64 +408,96 @@ export function mountPlayView(
       const rollPx = Math.hypot(rsx - tdx, rsy - tdy);
       // Run-out duration scales with the on-screen roll (forward OR backspin check-back).
       const rollDur = Math.abs(shot.roll ?? 0) > 0.3 ? Math.max(140, Math.min(480, rollPx * 9)) : 0;
-      const elapsed = now - segStart;
+      // A swing windup leads each full shot: the ball rests at address while the golfer winds
+      // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
+      const lead = F.golfer ? F.swingLeadMs : 0;
+      const flightElapsed = now - segStart - lead;
+      // Golfer size: nudged by zoom but clamped so it always reads next to the ball + flag.
+      const golferH = Math.max(30, Math.min(56, F.golferPx * Math.max(0.85, Math.min(1.5, proj.scale / 2.4))));
+      const gcol = GOLFER_COLORS[shotIndex % GOLFER_COLORS.length]!;
 
-      let ground: Vec;
-      let height: number;
-      if (elapsed < flightDur) {
-        const s = sampleFlight(shot.from, touchdown, elapsed / flightDur, peak);
-        ground = s.ground;
-        height = s.height;
+      if (flightElapsed < 0) {
+        // --- Windup: ball at rest at the address point, golfer addresses → top → contact.
+        lastGround = shot.from; // keep the follow-cam centred on the ball
+        const [bx, by] = proj.project(shot.from);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 4, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (F.golfer) drawGolfer(ctx, bx, by, golferH, clamp01((now - segStart) / lead), 0, 1, gcol);
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.arc(bx, by, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        hudText = `${shot.club.name} · ${Math.round(carry)} yds`;
       } else {
-        // Land → bounce → run/check out → hold at rest. The ball travels touchdown→rest
-        // (rest is BEHIND touchdown for a backspin check) while doing a couple of decaying
-        // hops, then sits still for restHoldMs so you can read the finish.
-        const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
-        const e = easeOutCubic(rt);
-        ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
-        height = F.bounceAmp * Math.abs(Math.sin(rt * Math.PI * F.bounces)) * (1 - rt);
-      }
+        const elapsed = flightElapsed;
+        let ground: Vec;
+        let height: number;
+        if (elapsed < flightDur) {
+          const s = sampleFlight(shot.from, touchdown, elapsed / flightDur, peak);
+          ground = s.ground;
+          height = s.height;
+        } else {
+          // Land → bounce → run/check out → hold at rest. The ball travels touchdown→rest
+          // (rest is BEHIND touchdown for a backspin check) while doing a couple of decaying
+          // hops, then sits still for restHoldMs so you can read the finish.
+          const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
+          const e = easeOutCubic(rt);
+          ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
+          height = F.bounceAmp * Math.abs(Math.sin(rt * Math.PI * F.bounces)) * (1 - rt);
+        }
 
-      lastGround = ground; // feed the follow-cam
-      const [gx, gy] = proj.project(ground);
-      const ballY = gy - height * proj.scale * F.heightExaggeration;
+        lastGround = ground; // feed the follow-cam
+        const [gx, gy] = proj.project(ground);
+        const ballY = gy - height * proj.scale * F.heightExaggeration;
 
-      // Shadow (fades as the ball climbs).
-      ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - height / (peak + 1))})`;
-      ctx.beginPath();
-      ctx.ellipse(gx, gy, 4, 2, 0, 0, Math.PI * 2);
-      ctx.fill();
+        // Golfer holds the follow-through at the address point, fading as the ball flies off.
+        if (F.golfer && elapsed < F.followMs) {
+          const [bx, by] = proj.project(shot.from);
+          const fol = clamp01(elapsed / F.followMs);
+          drawGolfer(ctx, bx, by, golferH, 1, Math.max(0.001, fol), 1 - fol, gcol);
+        }
 
-      // Trail.
-      trail.push([gx, ballY]);
-      if (trail.length > F.trailLen) trail.shift();
-      ctx.beginPath();
-      trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
-      ctx.strokeStyle = 'rgba(255,216,74,0.5)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+        // Shadow (fades as the ball climbs).
+        ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - height / (peak + 1))})`;
+        ctx.beginPath();
+        ctx.ellipse(gx, gy, 4, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Ball (a touch bigger when lofted).
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath();
-      ctx.arc(gx, ballY, 3 + (height / (peak + 1)) * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+        // Trail.
+        trail.push([gx, ballY]);
+        if (trail.length > F.trailLen) trail.shift();
+        ctx.beginPath();
+        trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
+        ctx.strokeStyle = 'rgba(255,216,74,0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-      hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.holed ? ' · IN! 🎉' : ''}${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
+        // Ball (a touch bigger when lofted).
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.arc(gx, ballY, 3 + (height / (peak + 1)) * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
-      // At the moment the run-out finishes: fire the hole-out explosion (holed only) once,
-      // and start the rest-hold pause.
-      if (elapsed >= flightDur + rollDur && lastImpactShot !== shotIndex) {
-        lastImpactShot = shotIndex;
-        if (shot.holed) spawnImpact([rsx, rsy], 1);
-        trail = [];
-      }
-      // Advance to the next shot only after the ball has sat at rest for restHoldMs.
-      if (elapsed >= flightDur + rollDur + F.restHoldMs) {
-        shotIndex++;
-        segStart = now + F.gapMs;
+        hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.holed ? ' · IN! 🎉' : ''}${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
+
+        // At the moment the run-out finishes: fire the hole-out explosion (holed only) once,
+        // and start the rest-hold pause.
+        if (elapsed >= flightDur + rollDur && lastImpactShot !== shotIndex) {
+          lastImpactShot = shotIndex;
+          if (shot.holed) spawnImpact([rsx, rsy], 1);
+          trail = [];
+        }
+        // Advance to the next shot only after the ball has sat at rest for restHoldMs.
+        if (elapsed >= flightDur + rollDur + F.restHoldMs) {
+          shotIndex++;
+          segStart = now + F.gapMs;
+        }
       }
     } else if (puttIndex < putts.length) {
       // Putt phase: flat roll across the green, eased to a stop, into the cup.

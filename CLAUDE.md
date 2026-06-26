@@ -272,6 +272,23 @@ This game lives or dies on three axes — put every change through all three bef
   by rasterising a biome×seed gallery — re-shoot one after any `style.ts` change.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
+- **The swinging golfer + space ambience (play-view "alive" layer).** Each full shot in `playView`
+  now opens with a little loader-style golfer (`drawGolfer` — same stick-figure/cap silhouette as the
+  intro crew) who addresses → backswings → strikes during a `swingLeadMs` WINDUP, then holds a fading
+  follow-through over the first `followMs` of flight. CRITICAL timing change: the flight clock starts at
+  CONTACT (`flightElapsed = now - segStart - lead`), so the existing flight/roll/rest/advance logic is
+  unchanged — it just runs `lead` ms later. The figure is authored in a ~72-unit local frame and placed
+  so its LOCAL ball (club sole at address) lands on the REAL ball, so club/figure/ball stay in proportion
+  at any zoom; its px height is `proj.scale`-nudged but CLAMPED [30,56] so it always reads next to the
+  fixed-size ball (r3) + flag (14) markers (literal realism makes a 2-yard golfer microscopic in a
+  100-yard view — this is arcade proportion, deliberately). All golfer/space knobs live on the EXISTING
+  `_gsFeel` object (`golfer`, `golferPx`, `swingLeadMs`, `followMs`, `spaceFX`) — no NEW `_gs*` flag, so
+  the test-hub guard needs no new control. The spacey BACKDROP (distant stars over the rough, a far
+  ringed planet, a comet) lives in the shared `buildScene` so BOTH renderers + the SVG gallery get it; it
+  draws from a SEPARATE rng stream (`hashHole ^ 0x5747a2`) so existing terrain/tree/mote placement stays
+  byte-identical, is gated by the existing `art.accents` density, and is culled OFF the cut grass so the
+  play corridor stays clean. `playView` adds a thin animated twinkle/shooting-star overlay (`drawSpaceFX`)
+  on top for motion only. Canvas feel — verified eyes-on (Playwright frames per swing phase).
 - **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
   (centre on a point — the ball) + `viewRadius` (course yards, biased so the ball sits low and you
   see ahead) instead of fitting the whole hole. The decision map zooms to the contemplated shot's
