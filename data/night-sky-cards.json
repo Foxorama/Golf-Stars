@@ -1,0 +1,4058 @@
+{
+  "meta": {
+    "title": "Southern-sky night-sky object & event catalogue",
+    "description": "A self-contained reference list of night-sky cards: constellations, deep-sky objects, planets and astronomical events, with positions (equatorial J2000), dates and curation metadata. Project-agnostic — no host-app code or hooks.",
+    "generated": "2026-06-26",
+    "coordinateSystem": "Equatorial J2000. raDeg = right ascension in degrees (0–360); decDeg = declination in degrees (−90..+90).",
+    "hemisphere": "Curated and worded for southern-hemisphere observers (Australia framing), but the coordinates are universal.",
+    "fields": {
+      "rarity": "Optional curation/loot grade: common, rare, epic, legendary (rarest = legendary). Drop it if your project has no rarity concept.",
+      "minAltitudeDeg": "Minimum altitude (degrees above the horizon) of the anchor star/object before it is considered \"up\" / worth surfacing.",
+      "instrument": "\"naked eye\" or \"binoculars\" — the minimum optics to appreciate the object.",
+      "lines": "Constellation stick-figure connections: pairs of zero-based indices into that constellation's `stars` array.",
+      "dateArrays": "Absolute dates are [year, month, day]; recurring annual dates are {month, day} (1-based month)."
+    },
+    "counts": {
+      "constellations": 28,
+      "brightStars": 74,
+      "deepSky": 17,
+      "galaxyFeatures": 2,
+      "planets": 5,
+      "meteorShowers": 9,
+      "comets": 1,
+      "oneOffEvents": 5,
+      "seasonMarkers": 4,
+      "recurringEvents": 11
+    }
+  },
+  "constellations": [
+    {
+      "name": "Crux",
+      "abbreviation": "Cru",
+      "icon": "✚",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Acrux",
+      "meaning": "The Southern Cross — smallest of the 88 constellations, but the most famous in the southern sky.",
+      "culture": "A navigation beacon for thousands of years and a deep presence in First Nations Australian astronomy, where the cross and the dark Coalsack beside it form part of the great Emu in the Sky. It flies on the flags of Australia, New Zealand, Brazil, Samoa and Papua New Guinea.",
+      "howToFind": "The two bright Pointers (Alpha and Beta Centauri) aim straight at it. Extend the long axis of the cross about 4½ times its length and you reach the south celestial pole — true south.",
+      "bestSeen": "Circumpolar from southern latitudes — up every clear night, riding highest on autumn–winter evenings (Apr–Jul).",
+      "brightestStar": "Acrux (Alpha Crucis), a brilliant blue-white double at the foot of the cross.",
+      "funFact": "There is no bright “south star” marking the pole the way Polaris marks the north — which is exactly why generations of southern navigators steered by the Cross instead.",
+      "stars": [
+        {
+          "name": "Acrux",
+          "raDeg": 186.65,
+          "decDeg": -63.099,
+          "mag": 0.8
+        },
+        {
+          "name": "Mimosa",
+          "raDeg": 191.93,
+          "decDeg": -59.689,
+          "mag": 1.3
+        },
+        {
+          "name": "Gacrux",
+          "raDeg": 187.791,
+          "decDeg": -57.113,
+          "mag": 1.6
+        },
+        {
+          "name": "Imai",
+          "raDeg": 183.786,
+          "decDeg": -58.749,
+          "mag": 2.8
+        },
+        {
+          "name": "Ginan",
+          "raDeg": 185.34,
+          "decDeg": -60.401,
+          "mag": 3.6
+        }
+      ],
+      "lines": [
+        [
+          2,
+          0
+        ],
+        [
+          1,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "Centaurus",
+      "abbreviation": "Cen",
+      "icon": "🐎",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Rigil Kent",
+      "meaning": "The Centaur — a vast constellation wrapping around the Southern Cross, home to our nearest neighbouring star.",
+      "culture": "In Greek myth this is Chiron, the wise centaur who tutored heroes like Heracles and Achilles, set among the stars after his death. Its two brightest stars stand guard as the Pointers to the Cross.",
+      "howToFind": "Find the two Pointers just east of the Southern Cross. The nearer one, Alpha Centauri, is the closest star system to the Sun — 4.4 light-years away.",
+      "bestSeen": "Circumpolar from southern latitudes, highest on autumn–winter evenings.",
+      "brightestStar": "Rigil Kentaurus (Alpha Centauri) — our Sun’s nearest stellar neighbour.",
+      "funFact": "Alpha Centauri is really a triple system, and its faintest member — Proxima Centauri — is the closest star to the Sun of all, yet far too dim to see with the naked eye.",
+      "stars": [
+        {
+          "name": "Rigil Kent",
+          "raDeg": 219.902,
+          "decDeg": -60.834,
+          "mag": -0.3
+        },
+        {
+          "name": "Hadar",
+          "raDeg": 210.956,
+          "decDeg": -60.373,
+          "mag": 0.6
+        },
+        {
+          "name": "Epsilon Cen",
+          "raDeg": 204.972,
+          "decDeg": -53.466,
+          "mag": 2.3
+        },
+        {
+          "name": "Zeta Cen",
+          "raDeg": 208.885,
+          "decDeg": -47.288,
+          "mag": 2.5
+        },
+        {
+          "name": "Mu Cen",
+          "raDeg": 207.404,
+          "decDeg": -42.474,
+          "mag": 3.5
+        },
+        {
+          "name": "Nu Cen",
+          "raDeg": 207.376,
+          "decDeg": -41.688,
+          "mag": 3.4
+        },
+        {
+          "name": "d Cen",
+          "raDeg": 202.761,
+          "decDeg": -39.407,
+          "mag": 3.9
+        },
+        {
+          "name": "Iota Cen",
+          "raDeg": 200.149,
+          "decDeg": -36.712,
+          "mag": 2.7
+        },
+        {
+          "name": "Menkent",
+          "raDeg": 211.671,
+          "decDeg": -36.37,
+          "mag": 2.1
+        },
+        {
+          "name": "Eta Cen",
+          "raDeg": 218.877,
+          "decDeg": -42.158,
+          "mag": 2.3
+        },
+        {
+          "name": "Kappa Cen",
+          "raDeg": 224.79,
+          "decDeg": -42.104,
+          "mag": 3.1
+        },
+        {
+          "name": "Muhlifain",
+          "raDeg": 190.379,
+          "decDeg": -48.96,
+          "mag": 2.2
+        },
+        {
+          "name": "Delta Cen",
+          "raDeg": 182.09,
+          "decDeg": -50.722,
+          "mag": 2.6
+        },
+        {
+          "name": "Pi Cen",
+          "raDeg": 170.252,
+          "decDeg": -54.491,
+          "mag": 3.9
+        },
+        {
+          "name": "Lambda Cen",
+          "raDeg": 173.945,
+          "decDeg": -63.02,
+          "mag": 3.1
+        }
+      ],
+      "lines": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          4,
+          11
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          12,
+          14
+        ],
+        [
+          14,
+          13
+        ]
+      ]
+    },
+    {
+      "name": "Orion",
+      "abbreviation": "Ori",
+      "icon": "🗡️",
+      "rarity": "common",
+      "minAltitudeDeg": 5,
+      "anchorStar": "Rigel",
+      "meaning": "The Hunter — the most recognisable constellation on Earth, sitting astride the celestial equator.",
+      "culture": "The Greek hunter Orion, placed in the sky opposite Scorpius — the scorpion that killed him — so the two never share the sky. Seen from Australia he stands “upside down”, and his Belt and Sword make the asterism Aussies call the Saucepan, or the Pot.",
+      "howToFind": "Three evenly spaced stars in a short row form the Belt; blue Rigel and orange Betelgeuse mark opposite corners of his body.",
+      "bestSeen": "Summer evenings from southern latitudes (Dec–Mar), high in the north.",
+      "brightestStar": "Rigel (a blue supergiant) and Betelgeuse (a red supergiant that will one day go supernova).",
+      "funFact": "Betelgeuse is so vast that, dropped where the Sun sits, it would swallow the orbit of Jupiter — and despite being the “alpha” star, it is usually outshone by blue Rigel.",
+      "stars": [
+        {
+          "name": "Betelgeuse",
+          "raDeg": 88.793,
+          "decDeg": 7.407,
+          "mag": 0.5
+        },
+        {
+          "name": "Rigel",
+          "raDeg": 78.634,
+          "decDeg": -8.202,
+          "mag": 0.1
+        },
+        {
+          "name": "Bellatrix",
+          "raDeg": 81.283,
+          "decDeg": 6.35,
+          "mag": 1.6
+        },
+        {
+          "name": "Saiph",
+          "raDeg": 86.939,
+          "decDeg": -9.67,
+          "mag": 2.1
+        },
+        {
+          "name": "Alnitak",
+          "raDeg": 85.19,
+          "decDeg": -1.943,
+          "mag": 1.8
+        },
+        {
+          "name": "Alnilam",
+          "raDeg": 84.053,
+          "decDeg": -1.202,
+          "mag": 1.7
+        },
+        {
+          "name": "Mintaka",
+          "raDeg": 83.002,
+          "decDeg": -0.299,
+          "mag": 2.2
+        },
+        {
+          "name": "Meissa",
+          "raDeg": 83.784,
+          "decDeg": 9.934,
+          "mag": 3.5
+        },
+        {
+          "name": "Hatysa",
+          "raDeg": 83.858,
+          "decDeg": -5.91,
+          "mag": 2.8
+        }
+      ],
+      "lines": [
+        [
+          0,
+          2
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          5,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Canis Major",
+      "abbreviation": "CMa",
+      "icon": "🐕",
+      "rarity": "common",
+      "minAltitudeDeg": 5,
+      "anchorStar": "Sirius",
+      "meaning": "The Greater Dog — home to Sirius, the brightest star in all the night sky.",
+      "culture": "One of Orion’s two hunting dogs, forever at his heels. Its dawn rising in late summer gave the ancient “dog days” their name.",
+      "howToFind": "Run the line of Orion’s Belt down to the dazzling white star Sirius; the dog’s body fans out from there.",
+      "bestSeen": "Summer from southern latitudes (Dec–Mar), passing high overhead.",
+      "brightestStar": "Sirius — just 8.6 light-years away, so close it flashes through every colour as it twinkles low down.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Sirius",
+          "raDeg": 101.287,
+          "decDeg": -16.716,
+          "mag": -1.5
+        },
+        {
+          "name": "Mirzam",
+          "raDeg": 95.674,
+          "decDeg": -17.956,
+          "mag": 2
+        },
+        {
+          "name": "Wezen",
+          "raDeg": 107.098,
+          "decDeg": -26.393,
+          "mag": 1.8
+        },
+        {
+          "name": "Adhara",
+          "raDeg": 104.656,
+          "decDeg": -28.972,
+          "mag": 1.5
+        },
+        {
+          "name": "Aludra",
+          "raDeg": 111.024,
+          "decDeg": -29.303,
+          "mag": 2.4
+        },
+        {
+          "name": "Furud",
+          "raDeg": 95.078,
+          "decDeg": -30.063,
+          "mag": 3
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "Scorpius",
+      "abbreviation": "Sco",
+      "icon": "🦂",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Antares",
+      "meaning": "The Scorpion — one of the rare constellations that genuinely looks like its name.",
+      "culture": "The scorpion that stung Orion; the gods set them at opposite ends of the sky. In Māori and Polynesian tradition its curved tail is Maui’s fish-hook. Its red heart, Antares, means “rival of Mars”.",
+      "howToFind": "A bright fish-hook curving through the southern Milky Way, with ruddy Antares glowing at its heart.",
+      "bestSeen": "Winter (Jun–Aug) from southern latitudes — passes almost overhead, the finest view on Earth.",
+      "brightestStar": "Antares — a red supergiant some 700 times the Sun’s diameter.",
+      "funFact": "Antares is so enormous that, set in the Sun’s place, its surface would reach out past the orbit of Mars — apt for a star whose name means “rival of Mars”.",
+      "stars": [
+        {
+          "name": "Dschubba",
+          "raDeg": 240.083,
+          "decDeg": -22.622,
+          "mag": 2.3
+        },
+        {
+          "name": "Acrab",
+          "raDeg": 241.359,
+          "decDeg": -19.805,
+          "mag": 2.6
+        },
+        {
+          "name": "Pi Sco",
+          "raDeg": 239.713,
+          "decDeg": -26.114,
+          "mag": 2.9
+        },
+        {
+          "name": "Antares",
+          "raDeg": 247.352,
+          "decDeg": -26.432,
+          "mag": 1.1
+        },
+        {
+          "name": "Tau Sco",
+          "raDeg": 248.971,
+          "decDeg": -28.216,
+          "mag": 2.8
+        },
+        {
+          "name": "Epsilon Sco",
+          "raDeg": 252.541,
+          "decDeg": -34.293,
+          "mag": 2.3
+        },
+        {
+          "name": "Mu Sco",
+          "raDeg": 253.084,
+          "decDeg": -38.017,
+          "mag": 3
+        },
+        {
+          "name": "Zeta Sco",
+          "raDeg": 253.648,
+          "decDeg": -42.362,
+          "mag": 3.6
+        },
+        {
+          "name": "Eta Sco",
+          "raDeg": 258.038,
+          "decDeg": -43.239,
+          "mag": 3.3
+        },
+        {
+          "name": "Sargas",
+          "raDeg": 264.33,
+          "decDeg": -42.998,
+          "mag": 1.9
+        },
+        {
+          "name": "Iota Sco",
+          "raDeg": 266.896,
+          "decDeg": -40.127,
+          "mag": 3
+        },
+        {
+          "name": "Girtab",
+          "raDeg": 265.622,
+          "decDeg": -39.03,
+          "mag": 2.4
+        },
+        {
+          "name": "Shaula",
+          "raDeg": 263.402,
+          "decDeg": -37.104,
+          "mag": 1.6
+        },
+        {
+          "name": "Lesath",
+          "raDeg": 262.691,
+          "decDeg": -37.296,
+          "mag": 2.7
+        }
+      ],
+      "lines": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          12,
+          13
+        ]
+      ]
+    },
+    {
+      "name": "Sagittarius",
+      "abbreviation": "Sgr",
+      "icon": "🏹",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Kaus Australis",
+      "meaning": "The Archer — and the direction of the very heart of our galaxy.",
+      "culture": "A centaur drawing his bow at Scorpius. Its central stars form the modern “Teapot”, and on winter nights the Milky Way seems to steam from its spout — that glow is the galactic centre, 26,000 light-years away.",
+      "howToFind": "Look just east of Scorpius for the Teapot shape; the Milky Way is at its thickest and brightest right here.",
+      "bestSeen": "Winter (Jun–Aug) from southern latitudes, high in the sky.",
+      "brightestStar": "Kaus Australis (Epsilon Sagittarii), at the base of the Teapot.",
+      "funFact": "Right where the Milky Way steams from the Teapot’s spout lies Sagittarius A*, our galaxy’s central supermassive black hole — about four million times the mass of the Sun.",
+      "stars": [
+        {
+          "name": "Kaus Australis",
+          "raDeg": 276.043,
+          "decDeg": -34.385,
+          "mag": 1.8
+        },
+        {
+          "name": "Kaus Media",
+          "raDeg": 275.249,
+          "decDeg": -29.828,
+          "mag": 2.7
+        },
+        {
+          "name": "Kaus Borealis",
+          "raDeg": 276.993,
+          "decDeg": -25.421,
+          "mag": 2.8
+        },
+        {
+          "name": "Nunki",
+          "raDeg": 283.816,
+          "decDeg": -26.297,
+          "mag": 2
+        },
+        {
+          "name": "Ascella",
+          "raDeg": 285.653,
+          "decDeg": -29.88,
+          "mag": 2.6
+        },
+        {
+          "name": "Phi Sgr",
+          "raDeg": 281.414,
+          "decDeg": -26.99,
+          "mag": 3.2
+        },
+        {
+          "name": "Alnasl",
+          "raDeg": 271.452,
+          "decDeg": -30.424,
+          "mag": 3
+        },
+        {
+          "name": "Tau Sgr",
+          "raDeg": 286.735,
+          "decDeg": -27.67,
+          "mag": 3.3
+        },
+        {
+          "name": "Polis",
+          "raDeg": 273.441,
+          "decDeg": -21.059,
+          "mag": 3.8
+        },
+        {
+          "name": "Eta Sgr",
+          "raDeg": 274.407,
+          "decDeg": -36.762,
+          "mag": 3.1
+        },
+        {
+          "name": "Albaldah",
+          "raDeg": 287.412,
+          "decDeg": -21.024,
+          "mag": 2.9
+        },
+        {
+          "name": "Xi2 Sgr",
+          "raDeg": 284.432,
+          "decDeg": -21.107,
+          "mag": 3.5
+        },
+        {
+          "name": "Omicron Sgr",
+          "raDeg": 286.17,
+          "decDeg": -21.741,
+          "mag": 3.8
+        },
+        {
+          "name": "Rukbat",
+          "raDeg": 290.972,
+          "decDeg": -40.616,
+          "mag": 4
+        },
+        {
+          "name": "Arkab Prior",
+          "raDeg": 290.659,
+          "decDeg": -44.459,
+          "mag": 4
+        },
+        {
+          "name": "Rho1 Sgr",
+          "raDeg": 290.418,
+          "decDeg": -17.847,
+          "mag": 3.9
+        },
+        {
+          "name": "Arkab Posterior",
+          "raDeg": 290.804,
+          "decDeg": -44.799,
+          "mag": 4.3
+        }
+      ],
+      "lines": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          2
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          0,
+          9
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          12,
+          10
+        ],
+        [
+          10,
+          15
+        ],
+        [
+          4,
+          13
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          14,
+          16
+        ]
+      ]
+    },
+    {
+      "name": "Leo",
+      "abbreviation": "Leo",
+      "icon": "🦁",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Regulus",
+      "meaning": "The Lion — a zodiac constellation that really does look like its namesake.",
+      "culture": "The Nemean Lion slain by Heracles in the first of his twelve labours. The backwards-question-mark “Sickle” traces the lion’s mane and head.",
+      "howToFind": "Spot the Sickle (a reversed question mark) ending at bright Regulus for the head; a triangle to the east marks the hindquarters and the tail star Denebola.",
+      "bestSeen": "Autumn to early-winter evenings from southern latitudes (Mar–Jun), seen to the north.",
+      "brightestStar": "Regulus — “the little king”, sitting right on the ecliptic.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Regulus",
+          "raDeg": 152.093,
+          "decDeg": 11.967,
+          "mag": 1.4
+        },
+        {
+          "name": "Eta Leo",
+          "raDeg": 151.833,
+          "decDeg": 16.763,
+          "mag": 3.5
+        },
+        {
+          "name": "Algieba",
+          "raDeg": 154.993,
+          "decDeg": 19.842,
+          "mag": 2
+        },
+        {
+          "name": "Adhafera",
+          "raDeg": 154.173,
+          "decDeg": 23.417,
+          "mag": 3.4
+        },
+        {
+          "name": "Rasalas",
+          "raDeg": 148.19,
+          "decDeg": 26.007,
+          "mag": 3.9
+        },
+        {
+          "name": "Epsilon Leo",
+          "raDeg": 146.463,
+          "decDeg": 23.774,
+          "mag": 3
+        },
+        {
+          "name": "Denebola",
+          "raDeg": 177.265,
+          "decDeg": 14.572,
+          "mag": 2.1
+        },
+        {
+          "name": "Zosma",
+          "raDeg": 168.527,
+          "decDeg": 20.524,
+          "mag": 2.6
+        },
+        {
+          "name": "Chort",
+          "raDeg": 168.56,
+          "decDeg": 15.43,
+          "mag": 3.3
+        }
+      ],
+      "lines": [
+        [
+          5,
+          4
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          8,
+          0
+        ],
+        [
+          7,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Taurus",
+      "abbreviation": "Tau",
+      "icon": "🐂",
+      "rarity": "common",
+      "minAltitudeDeg": 5,
+      "anchorStar": "Aldebaran",
+      "meaning": "The Bull — charging at Orion, and carrying two of the sky’s most famous star clusters.",
+      "culture": "Zeus disguised as a white bull in Greek myth. Its face is the Hyades, the nearest star cluster to us, and on its shoulder rides the Pleiades — the “Seven Sisters”, one of the oldest recorded star groups, with stories on every inhabited continent, including many across Aboriginal Australia.",
+      "howToFind": "Look for an orange eye (Aldebaran) at the point of a V-shaped face, with the small, glittering knot of the Pleiades nearby.",
+      "bestSeen": "Summer evenings from southern latitudes (Dec–Feb), to the north.",
+      "brightestStar": "Aldebaran — an orange giant that happens to lie in front of the more distant Hyades.",
+      "funFact": "The tip of the bull’s southern horn marks the Crab Nebula, the wreckage of a supernova so brilliant that Chinese and Japanese skywatchers recorded it in broad daylight in 1054 AD.",
+      "stars": [
+        {
+          "name": "Aldebaran",
+          "raDeg": 68.98,
+          "decDeg": 16.509,
+          "mag": 0.9
+        },
+        {
+          "name": "Prima Hyadum",
+          "raDeg": 64.948,
+          "decDeg": 15.627,
+          "mag": 3.7
+        },
+        {
+          "name": "Hyadum II",
+          "raDeg": 65.734,
+          "decDeg": 17.543,
+          "mag": 3.8
+        },
+        {
+          "name": "Ain",
+          "raDeg": 67.154,
+          "decDeg": 19.18,
+          "mag": 3.5
+        },
+        {
+          "name": "Zeta Tauri",
+          "raDeg": 84.411,
+          "decDeg": 21.143,
+          "mag": 3
+        },
+        {
+          "name": "Elnath",
+          "raDeg": 81.573,
+          "decDeg": 28.608,
+          "mag": 1.7
+        },
+        {
+          "name": "Alcyone",
+          "raDeg": 56.871,
+          "decDeg": 24.105,
+          "mag": 2.9
+        }
+      ],
+      "lines": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          3,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Gemini",
+      "abbreviation": "Gem",
+      "icon": "👯",
+      "rarity": "common",
+      "minAltitudeDeg": 5,
+      "anchorStar": "Pollux",
+      "meaning": "The Twins — headed by two bright stars side by side.",
+      "culture": "Castor and Pollux, the inseparable twin brothers of Greek myth — one mortal, one immortal — set together in the heavens and honoured as protectors of sailors.",
+      "howToFind": "Find two bright stars close together (golden Pollux and white Castor); two parallel stick-figure bodies trail from them toward Orion.",
+      "bestSeen": "Summer evenings from southern latitudes (Jan–Mar), to the north.",
+      "brightestStar": "Pollux (an orange giant) and Castor (a remarkable system of six stars).",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Castor",
+          "raDeg": 113.65,
+          "decDeg": 31.888,
+          "mag": 1.6
+        },
+        {
+          "name": "Pollux",
+          "raDeg": 116.329,
+          "decDeg": 28.026,
+          "mag": 1.1
+        },
+        {
+          "name": "Wasat",
+          "raDeg": 110.031,
+          "decDeg": 21.982,
+          "mag": 3.5
+        },
+        {
+          "name": "Mekbuda",
+          "raDeg": 106.027,
+          "decDeg": 20.57,
+          "mag": 3.9
+        },
+        {
+          "name": "Alhena",
+          "raDeg": 99.428,
+          "decDeg": 16.399,
+          "mag": 1.9
+        },
+        {
+          "name": "Mebsuta",
+          "raDeg": 100.983,
+          "decDeg": 25.131,
+          "mag": 3
+        },
+        {
+          "name": "Tejat",
+          "raDeg": 95.74,
+          "decDeg": 22.514,
+          "mag": 2.9
+        },
+        {
+          "name": "Propus",
+          "raDeg": 93.719,
+          "decDeg": 22.507,
+          "mag": 3.3
+        },
+        {
+          "name": "Alzirr",
+          "raDeg": 101.322,
+          "decDeg": 12.896,
+          "mag": 3.4
+        },
+        {
+          "name": "Lambda Gem",
+          "raDeg": 109.523,
+          "decDeg": 16.54,
+          "mag": 3.6
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          5,
+          2
+        ]
+      ]
+    },
+    {
+      "name": "Carina",
+      "abbreviation": "Car",
+      "icon": "⛵",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Canopus",
+      "meaning": "The Keel — the hull of the mythical ship Argo, and home to brilliant Canopus.",
+      "culture": "Once part of the enormous ship Argo Navis that carried Jason and the Argonauts; astronomers later split that unwieldy constellation into the Keel (Carina), the Sails (Vela) and the Stern (Puppis). It hosts the vast, glowing Eta Carinae Nebula.",
+      "howToFind": "Dazzling Canopus, the second-brightest star in the sky, anchors it. Nearby lies the False Cross — often mistaken for the real Southern Cross.",
+      "bestSeen": "Circumpolar from southern latitudes; highest on summer–autumn evenings.",
+      "brightestStar": "Canopus — a white supergiant roughly 10,000 times more luminous than the Sun.",
+      "funFact": "Canopus is such a dependable beacon that spacecraft — from the Apollo missions to deep-space probes — have navigated by it, taking a “star fix” on it to find their bearings.",
+      "stars": [
+        {
+          "name": "Canopus",
+          "raDeg": 95.988,
+          "decDeg": -52.696,
+          "mag": -0.7
+        },
+        {
+          "name": "Avior",
+          "raDeg": 125.628,
+          "decDeg": -59.509,
+          "mag": 1.9
+        },
+        {
+          "name": "Aspidiske",
+          "raDeg": 139.273,
+          "decDeg": -59.275,
+          "mag": 2.2
+        },
+        {
+          "name": "Miaplacidus",
+          "raDeg": 138.3,
+          "decDeg": -69.717,
+          "mag": 1.7
+        },
+        {
+          "name": "Theta Carinae",
+          "raDeg": 160.739,
+          "decDeg": -64.394,
+          "mag": 2.7
+        },
+        {
+          "name": "Upsilon Car",
+          "raDeg": 146.78,
+          "decDeg": -65.072,
+          "mag": 2.9
+        },
+        {
+          "name": "Omega Car",
+          "raDeg": 153.434,
+          "decDeg": -70.038,
+          "mag": 3.3
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          6,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "Triangulum Australe",
+      "abbreviation": "TrA",
+      "icon": "🔺",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Atria",
+      "meaning": "The Southern Triangle — a neat, bright triangle tucked in beside the Pointers.",
+      "culture": "Charted by the Dutch navigators Keyser and de Houtman in the 1590s on voyages to the East Indies — one of a dozen new southern constellations they brought back to the star charts.",
+      "howToFind": "A compact, almost-equilateral triangle of three similar stars, just south of Alpha and Beta Centauri (the Pointers).",
+      "bestSeen": "Circumpolar from southern latitudes; rides high on winter evenings.",
+      "brightestStar": "Atria (Alpha Trianguli Australis), an orange giant.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Atria",
+          "raDeg": 252.166,
+          "decDeg": -69.028,
+          "mag": 1.9
+        },
+        {
+          "name": "Beta TrA",
+          "raDeg": 238.787,
+          "decDeg": -63.431,
+          "mag": 2.8
+        },
+        {
+          "name": "Gamma TrA",
+          "raDeg": 229.726,
+          "decDeg": -68.679,
+          "mag": 2.9
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "Grus",
+      "abbreviation": "Gru",
+      "icon": "🦢",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Alnair",
+      "meaning": "The Crane — a graceful southern water-bird in mid-flight.",
+      "culture": "One of the “southern birds” introduced by Keyser and de Houtman in the 1590s, alongside the Peacock, Phoenix and Toucan. To the ancient Egyptians the crane was an emblem of the star-watcher.",
+      "howToFind": "Look south of bright Fomalhaut for a bent line of stars; the two leaders, Alnair and Tiaki, mark the crane’s body.",
+      "bestSeen": "Spring evenings from southern latitudes (Sep–Nov), to the south.",
+      "brightestStar": "Alnair (Alpha Gruis), a hot blue-white star.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Alnair",
+          "raDeg": 332.058,
+          "decDeg": -46.961,
+          "mag": 1.7
+        },
+        {
+          "name": "Tiaki",
+          "raDeg": 340.667,
+          "decDeg": -46.885,
+          "mag": 2.1
+        },
+        {
+          "name": "Aldhanab",
+          "raDeg": 328.483,
+          "decDeg": -37.365,
+          "mag": 3
+        },
+        {
+          "name": "Delta Gruis",
+          "raDeg": 337.318,
+          "decDeg": -43.495,
+          "mag": 4
+        },
+        {
+          "name": "Epsilon Gruis",
+          "raDeg": 342.139,
+          "decDeg": -51.317,
+          "mag": 3.5
+        }
+      ],
+      "lines": [
+        [
+          2,
+          0
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          1,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "Vela",
+      "abbreviation": "Vel",
+      "icon": "⛵",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Regor",
+      "meaning": "The Sails — the billowing canvas of the great ship Argo, riding the southern Milky Way.",
+      "culture": "Carved with Carina and Puppis out of the unwieldy ancient constellation Argo Navis, the ship of Jason and the Argonauts. Its stars helped southern navigators long before they were formally charted.",
+      "howToFind": "Two of its stars (κ and δ Velorum) join two of Carina’s to make the False Cross — larger and dimmer than the real Southern Cross, and a classic trap for newcomers.",
+      "bestSeen": "Circumpolar-ish from southern latitudes; highest on summer–autumn evenings, high in the south.",
+      "brightestStar": "Regor (Gamma Velorum) — a brilliant multiple star wrapped in a hot Wolf–Rayet wind.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Regor",
+          "raDeg": 122.383,
+          "decDeg": -47.337,
+          "mag": 1.8
+        },
+        {
+          "name": "Delta Vel",
+          "raDeg": 131.176,
+          "decDeg": -54.709,
+          "mag": 1.9
+        },
+        {
+          "name": "Suhail",
+          "raDeg": 136.999,
+          "decDeg": -43.432,
+          "mag": 2.2
+        },
+        {
+          "name": "Markeb",
+          "raDeg": 140.528,
+          "decDeg": -55.011,
+          "mag": 2.5
+        },
+        {
+          "name": "Mu Vel",
+          "raDeg": 161.693,
+          "decDeg": -49.42,
+          "mag": 2.7
+        }
+      ],
+      "lines": [
+        [
+          0,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          3
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "Corvus",
+      "abbreviation": "Crv",
+      "icon": "🐦‍⬛",
+      "rarity": "rare",
+      "minAltitudeDeg": 8,
+      "anchorStar": "Gienah Crv",
+      "meaning": "The Crow — a small, neat quadrilateral that punches above its size.",
+      "culture": "In Greek myth the crow sent by Apollo to fetch water dawdled, eating figs, and was flung into the sky beside the Cup (Crater) and the water-snake (Hydra) — forever thirsty, never able to drink. Sailors knew its box of stars as “Spica’s Spanker”.",
+      "howToFind": "A compact four-star sail just west of bright Spica in Virgo; the line from the cross points the way to Spica.",
+      "bestSeen": "Autumn–early winter evenings from southern latitudes (Apr–Jun), to the north.",
+      "brightestStar": "Gienah (Gamma Corvi), a blue-white giant at the sail’s leading corner.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Minkar",
+          "raDeg": 182.531,
+          "decDeg": -22.62,
+          "mag": 3
+        },
+        {
+          "name": "Gienah Crv",
+          "raDeg": 183.952,
+          "decDeg": -17.542,
+          "mag": 2.6
+        },
+        {
+          "name": "Algorab",
+          "raDeg": 187.466,
+          "decDeg": -16.515,
+          "mag": 2.9
+        },
+        {
+          "name": "Kraz",
+          "raDeg": 188.597,
+          "decDeg": -23.397,
+          "mag": 2.7
+        }
+      ],
+      "lines": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "name": "Cygnus",
+      "abbreviation": "Cyg",
+      "icon": "🦢",
+      "rarity": "rare",
+      "minAltitudeDeg": 8,
+      "anchorStar": "Deneb",
+      "meaning": "The Swan, flying down the Milky Way — its bright stars also form the Northern Cross.",
+      "culture": "Zeus in the guise of a swan in Greek myth. The long axis (Deneb to Albireo) is the swan’s neck; the cross-bar is its outstretched wings. Albireo, at the beak, is a gorgeous gold-and-blue double in any small telescope.",
+      "howToFind": "Low in the north on winter evenings from southern latitudes — look for brilliant Deneb leading a large cross laid over the Milky Way.",
+      "bestSeen": "Winter evenings from southern latitudes (Jun–Aug), low across the northern horizon.",
+      "brightestStar": "Deneb — a blue-white supergiant so luminous it shines at first magnitude from ~1,400 light-years.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Deneb",
+          "raDeg": 310.358,
+          "decDeg": 45.28,
+          "mag": 1.3
+        },
+        {
+          "name": "Sadr",
+          "raDeg": 305.557,
+          "decDeg": 40.257,
+          "mag": 2.2
+        },
+        {
+          "name": "Albireo",
+          "raDeg": 292.68,
+          "decDeg": 27.96,
+          "mag": 3.1
+        },
+        {
+          "name": "Delta Cyg",
+          "raDeg": 296.244,
+          "decDeg": 45.131,
+          "mag": 2.9
+        },
+        {
+          "name": "Gienah Cyg",
+          "raDeg": 311.553,
+          "decDeg": 33.97,
+          "mag": 2.5
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          1,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "Lyra",
+      "abbreviation": "Lyr",
+      "icon": "🎵",
+      "rarity": "rare",
+      "minAltitudeDeg": 8,
+      "anchorStar": "Vega",
+      "meaning": "The Lyre — a tiny constellation crowned by Vega, one of the sky’s brightest stars.",
+      "culture": "The harp of Orpheus, whose music could charm stone and beast. Vega was the northern pole star ~12,000 years ago and will be again — the slow wobble of Earth’s axis carries the pole back to it.",
+      "howToFind": "Spot brilliant blue-white Vega low in the north; a small, neat parallelogram of fainter stars hangs just below it.",
+      "bestSeen": "Winter evenings from southern latitudes (Jun–Aug), low in the north.",
+      "brightestStar": "Vega — the zero-point against which star brightnesses were long measured.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Vega",
+          "raDeg": 279.235,
+          "decDeg": 38.784,
+          "mag": 0
+        },
+        {
+          "name": "Sheliak",
+          "raDeg": 282.52,
+          "decDeg": 33.363,
+          "mag": 3.5
+        },
+        {
+          "name": "Sulafat",
+          "raDeg": 284.736,
+          "decDeg": 32.69,
+          "mag": 3.2
+        },
+        {
+          "name": "Zeta Lyr",
+          "raDeg": 281.193,
+          "decDeg": 37.605,
+          "mag": 4.3
+        },
+        {
+          "name": "Delta Lyr",
+          "raDeg": 283.626,
+          "decDeg": 36.899,
+          "mag": 4.3
+        }
+      ],
+      "lines": [
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "Aquila",
+      "abbreviation": "Aql",
+      "icon": "🦅",
+      "rarity": "rare",
+      "minAltitudeDeg": 7,
+      "anchorStar": "Altair",
+      "meaning": "The Eagle — Zeus’s thunderbolt-bearer, soaring along the Milky Way.",
+      "culture": "The eagle that carried the youth Ganymede up to Olympus. Its brightest star Altair, with Vega and Deneb, forms the Summer Triangle of the north — which rides low here through the winter.",
+      "howToFind": "Look north for Altair, flanked closely by two fainter stars (Tarazed and Alshain) — a distinctive little row that names the eagle’s wingspan.",
+      "bestSeen": "Winter evenings from southern latitudes (Jun–Aug), low to mid in the north.",
+      "brightestStar": "Altair — only 16.7 light-years away and spinning so fast it bulges into an oval.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Altair",
+          "raDeg": 297.696,
+          "decDeg": 8.868,
+          "mag": 0.8
+        },
+        {
+          "name": "Tarazed",
+          "raDeg": 296.565,
+          "decDeg": 10.613,
+          "mag": 2.7
+        },
+        {
+          "name": "Alshain",
+          "raDeg": 298.828,
+          "decDeg": 6.407,
+          "mag": 3.7
+        },
+        {
+          "name": "Delta Aql",
+          "raDeg": 291.375,
+          "decDeg": 3.115,
+          "mag": 3.4
+        },
+        {
+          "name": "Zeta Aql",
+          "raDeg": 286.352,
+          "decDeg": 13.863,
+          "mag": 3
+        },
+        {
+          "name": "Theta Aql",
+          "raDeg": 302.826,
+          "decDeg": -0.821,
+          "mag": 3.2
+        },
+        {
+          "name": "Lambda Aql",
+          "raDeg": 286.562,
+          "decDeg": -4.882,
+          "mag": 3.4
+        }
+      ],
+      "lines": [
+        [
+          4,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Virgo",
+      "abbreviation": "Vir",
+      "icon": "🌾",
+      "rarity": "rare",
+      "minAltitudeDeg": 7,
+      "anchorStar": "Spica",
+      "meaning": "The Maiden — the second-largest constellation, holding a sky full of distant galaxies.",
+      "culture": "Linked to harvest goddesses across cultures; her brightest star Spica means “ear of wheat”. Toward her bowl lies the Virgo Cluster, a swarm of over a thousand galaxies tens of millions of light-years away.",
+      "howToFind": "Find blue-white Spica to the north, then trace the faint Y of stars curving up and west from it.",
+      "bestSeen": "Autumn–winter evenings from southern latitudes (Apr–Jul), to the north.",
+      "brightestStar": "Spica — a close pair of hot blue stars whirling around each other every four days.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Spica",
+          "raDeg": 201.298,
+          "decDeg": -11.161,
+          "mag": 1
+        },
+        {
+          "name": "Porrima",
+          "raDeg": 190.415,
+          "decDeg": -1.449,
+          "mag": 2.7
+        },
+        {
+          "name": "Vindemiatrix",
+          "raDeg": 195.544,
+          "decDeg": 10.959,
+          "mag": 2.8
+        },
+        {
+          "name": "Delta Vir",
+          "raDeg": 193.901,
+          "decDeg": 3.398,
+          "mag": 3.4
+        },
+        {
+          "name": "Zeta Vir",
+          "raDeg": 203.673,
+          "decDeg": -0.596,
+          "mag": 3.4
+        },
+        {
+          "name": "Beta Vir",
+          "raDeg": 177.674,
+          "decDeg": 1.765,
+          "mag": 3.6
+        },
+        {
+          "name": "Zaniah",
+          "raDeg": 184.976,
+          "decDeg": -0.667,
+          "mag": 3.9
+        },
+        {
+          "name": "Syrma",
+          "raDeg": 214.004,
+          "decDeg": -6,
+          "mag": 4.1
+        },
+        {
+          "name": "109 Vir",
+          "raDeg": 221.562,
+          "decDeg": 1.893,
+          "mag": 3.7
+        }
+      ],
+      "lines": [
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          4,
+          7
+        ],
+        [
+          7,
+          8
+        ]
+      ]
+    },
+    {
+      "name": "Musca",
+      "abbreviation": "Mus",
+      "icon": "🪰",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Alpha Mus",
+      "meaning": "The Fly — a small, bright constellation tucked just south of the Southern Cross.",
+      "culture": "One of the dozen southern constellations charted by the Dutch navigators Keyser and de Houtman in the 1590s; first drawn as “Apis” the Bee, it is the only insect among the 88 constellations.",
+      "howToFind": "Look just south of Crux for a compact kite of stars, led by Alpha and Beta Muscae, below the foot of the Southern Cross.",
+      "bestSeen": "Circumpolar from southern latitudes — up every clear night, highest on autumn–winter evenings.",
+      "brightestStar": "Alpha Muscae, a hot blue-white star about 300 light-years away.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Alpha Mus",
+          "raDeg": 189.296,
+          "decDeg": -69.136,
+          "mag": 2.7
+        },
+        {
+          "name": "Beta Mus",
+          "raDeg": 191.57,
+          "decDeg": -68.108,
+          "mag": 3
+        },
+        {
+          "name": "Delta Mus",
+          "raDeg": 195.568,
+          "decDeg": -71.549,
+          "mag": 3.6
+        },
+        {
+          "name": "Gamma Mus",
+          "raDeg": 188.117,
+          "decDeg": -72.133,
+          "mag": 3.8
+        },
+        {
+          "name": "Epsilon Mus",
+          "raDeg": 184.392,
+          "decDeg": -67.961,
+          "mag": 4.1
+        },
+        {
+          "name": "Lambda Mus",
+          "raDeg": 176.4,
+          "decDeg": -66.728,
+          "mag": 3.6
+        }
+      ],
+      "lines": [
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Lupus",
+      "abbreviation": "Lup",
+      "icon": "🐺",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Alpha Lup",
+      "meaning": "The Wolf — a knot of bright stars on the Milky Way, between Centaurus and Scorpius.",
+      "culture": "An ancient constellation the Greeks saw as a wild beast speared by the neighbouring Centaur and carried toward the altar (Ara) just to the south.",
+      "howToFind": "Between the Pointers of Centaurus and the head of Scorpius — a scatter of second- and third-magnitude stars with no single bright leader.",
+      "bestSeen": "Winter evenings from southern latitudes (Jun–Aug), high in the south.",
+      "brightestStar": "Alpha Lupi, a blue giant in the nearby Scorpius–Centaurus stellar association.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Alpha Lup",
+          "raDeg": 220.482,
+          "decDeg": -47.388,
+          "mag": 2.3
+        },
+        {
+          "name": "Beta Lup",
+          "raDeg": 224.633,
+          "decDeg": -43.134,
+          "mag": 2.7
+        },
+        {
+          "name": "Gamma Lup",
+          "raDeg": 233.785,
+          "decDeg": -41.167,
+          "mag": 2.8
+        },
+        {
+          "name": "Delta Lup",
+          "raDeg": 230.343,
+          "decDeg": -40.647,
+          "mag": 3.2
+        },
+        {
+          "name": "Epsilon Lup",
+          "raDeg": 230.67,
+          "decDeg": -44.69,
+          "mag": 3.4
+        },
+        {
+          "name": "Zeta Lup",
+          "raDeg": 228.07,
+          "decDeg": -52.099,
+          "mag": 3.4
+        },
+        {
+          "name": "Eta Lup",
+          "raDeg": 240.03,
+          "decDeg": -38.397,
+          "mag": 3.4
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          5,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "Ara",
+      "abbreviation": "Ara",
+      "icon": "🔥",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Beta Ara",
+      "meaning": "The Altar — two upright rows of stars just below the sting of Scorpius.",
+      "culture": "In Greek myth the altar where the gods swore their alliance before overthrowing the Titans; the rising smoke was said to form the Milky Way. One of Ptolemy’s original 48 constellations.",
+      "howToFind": "Directly south of the curled tail of Scorpius — two short parallel lines of stars marking the altar’s sides.",
+      "bestSeen": "Winter evenings from southern latitudes (Jun–Aug), riding high in the south.",
+      "brightestStar": "Beta Arae, an orange supergiant that just outshines Alpha.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Alpha Ara",
+          "raDeg": 262.96,
+          "decDeg": -49.876,
+          "mag": 2.95
+        },
+        {
+          "name": "Beta Ara",
+          "raDeg": 261.325,
+          "decDeg": -55.53,
+          "mag": 2.85
+        },
+        {
+          "name": "Gamma Ara",
+          "raDeg": 261.349,
+          "decDeg": -56.378,
+          "mag": 3.3
+        },
+        {
+          "name": "Delta Ara",
+          "raDeg": 262.77,
+          "decDeg": -60.684,
+          "mag": 3.6
+        },
+        {
+          "name": "Epsilon Ara",
+          "raDeg": 254.895,
+          "decDeg": -53.16,
+          "mag": 4.1
+        },
+        {
+          "name": "Zeta Ara",
+          "raDeg": 254.654,
+          "decDeg": -55.99,
+          "mag": 3.1
+        },
+        {
+          "name": "Eta Ara",
+          "raDeg": 252.446,
+          "decDeg": -59.041,
+          "mag": 3.8
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Tucana",
+      "abbreviation": "Tuc",
+      "icon": "🐦",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Alpha Tuc",
+      "meaning": "The Toucan — a faint southern bird, but the keeper of two deep-sky treasures.",
+      "culture": "A “southern bird” introduced by Keyser and de Houtman in the 1590s, alongside Grus, Pavo and Phoenix.",
+      "howToFind": "Deep in the south toward the celestial pole. Its real draw is what it holds: the Small Magellanic Cloud and the brilliant globular cluster 47 Tucanae.",
+      "bestSeen": "Circumpolar from southern latitudes; highest on spring evenings.",
+      "brightestStar": "Alpha Tucanae, an orange giant — though 47 Tuc beside the SMC is the real prize.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Alpha Tuc",
+          "raDeg": 334.625,
+          "decDeg": -60.259,
+          "mag": 2.9
+        },
+        {
+          "name": "Gamma Tuc",
+          "raDeg": 349.36,
+          "decDeg": -58.24,
+          "mag": 4
+        },
+        {
+          "name": "Zeta Tuc",
+          "raDeg": 5.013,
+          "decDeg": -64.87,
+          "mag": 4.2
+        },
+        {
+          "name": "Beta Tuc",
+          "raDeg": 7.886,
+          "decDeg": -62.958,
+          "mag": 4.4
+        },
+        {
+          "name": "Epsilon Tuc",
+          "raDeg": 359.978,
+          "decDeg": -65.577,
+          "mag": 4.5
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          4,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "Phoenix",
+      "abbreviation": "Phe",
+      "icon": "🔥",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Ankaa",
+      "meaning": "The Phoenix — the mythical firebird reborn from its ashes, set low in the southern sky.",
+      "culture": "Charted by Keyser and de Houtman in the 1590s; the immortal bird appears in Greek, Egyptian, Persian and Chinese lore alike.",
+      "howToFind": "South of bright Fomalhaut and west of Achernar — a small bird-shape led by Ankaa, its one bright star.",
+      "bestSeen": "Spring–summer evenings from southern latitudes (Oct–Dec), to the south.",
+      "brightestStar": "Ankaa (Alpha Phoenicis), an orange giant about 85 light-years away.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Ankaa",
+          "raDeg": 6.571,
+          "decDeg": -42.306,
+          "mag": 2.4
+        },
+        {
+          "name": "Beta Phe",
+          "raDeg": 16.521,
+          "decDeg": -46.718,
+          "mag": 3.3
+        },
+        {
+          "name": "Gamma Phe",
+          "raDeg": 22.091,
+          "decDeg": -43.318,
+          "mag": 3.4
+        },
+        {
+          "name": "Delta Phe",
+          "raDeg": 22.81,
+          "decDeg": -49.07,
+          "mag": 3.9
+        },
+        {
+          "name": "Epsilon Phe",
+          "raDeg": 2.35,
+          "decDeg": -45.747,
+          "mag": 3.9
+        },
+        {
+          "name": "Kappa Phe",
+          "raDeg": 6.55,
+          "decDeg": -43.68,
+          "mag": 3.9
+        }
+      ],
+      "lines": [
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "Puppis",
+      "abbreviation": "Pup",
+      "icon": "🚢",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Naos",
+      "meaning": "The Stern — the poop deck of the great ship Argo, set in a rich field of the Milky Way.",
+      "culture": "The largest fragment of the ancient ship Argo Navis, which astronomers broke into Carina (Keel), Vela (Sails) and Puppis (Stern). Its stars still carry Greek letters out of order, inherited from the original Argo.",
+      "howToFind": "East of brilliant Canopus and below Sirius — a wide spread led by hot blue Naos, awash with star clusters in binoculars.",
+      "bestSeen": "Summer–autumn evenings from southern latitudes (Jan–Apr), high overhead.",
+      "brightestStar": "Naos (Zeta Puppis), one of the hottest, most luminous stars the naked eye can see.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Naos",
+          "raDeg": 120.896,
+          "decDeg": -40.003,
+          "mag": 2.2
+        },
+        {
+          "name": "Pi Pup",
+          "raDeg": 109.286,
+          "decDeg": -37.097,
+          "mag": 2.7
+        },
+        {
+          "name": "Rho Pup",
+          "raDeg": 121.886,
+          "decDeg": -24.304,
+          "mag": 2.8
+        },
+        {
+          "name": "Xi Pup",
+          "raDeg": 117.323,
+          "decDeg": -24.86,
+          "mag": 3.3
+        },
+        {
+          "name": "Tau Pup",
+          "raDeg": 102.48,
+          "decDeg": -50.61,
+          "mag": 2.9
+        },
+        {
+          "name": "Nu Pup",
+          "raDeg": 99.44,
+          "decDeg": -43.2,
+          "mag": 3.2
+        },
+        {
+          "name": "Sigma Pup",
+          "raDeg": 112.31,
+          "decDeg": -43.3,
+          "mag": 3.3
+        }
+      ],
+      "lines": [
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          0
+        ],
+        [
+          6,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "Columba",
+      "abbreviation": "Col",
+      "icon": "🕊️",
+      "rarity": "rare",
+      "minAltitudeDeg": 7,
+      "anchorStar": "Phact",
+      "meaning": "The Dove — a small, gentle constellation just south of Orion and the Hare.",
+      "culture": "Devised around 1600 for the dove Noah released from the Ark — or the dove that guided Jason’s Argo, fittingly placed near the old ship’s stars.",
+      "howToFind": "Below and right of Orion’s brilliant Rigel: a faint little bird led by Phact, between Canis Major and Eridanus.",
+      "bestSeen": "Summer evenings from southern latitudes (Dec–Mar), passing high overhead.",
+      "brightestStar": "Phact (Alpha Columbae), a hot blue-white “runaway” star flung from the Orion region.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Phact",
+          "raDeg": 84.912,
+          "decDeg": -34.074,
+          "mag": 2.6
+        },
+        {
+          "name": "Wazn",
+          "raDeg": 87.74,
+          "decDeg": -35.769,
+          "mag": 3.1
+        },
+        {
+          "name": "Gamma Col",
+          "raDeg": 89.385,
+          "decDeg": -35.283,
+          "mag": 4.4
+        },
+        {
+          "name": "Delta Col",
+          "raDeg": 95.528,
+          "decDeg": -33.437,
+          "mag": 3.9
+        },
+        {
+          "name": "Epsilon Col",
+          "raDeg": 82.81,
+          "decDeg": -35.47,
+          "mag": 3.9
+        },
+        {
+          "name": "Eta Col",
+          "raDeg": 89.79,
+          "decDeg": -42.82,
+          "mag": 4
+        }
+      ],
+      "lines": [
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "Pegasus",
+      "abbreviation": "Peg",
+      "icon": "🐴",
+      "rarity": "common",
+      "minAltitudeDeg": 7,
+      "anchorStar": "Alpheratz",
+      "meaning": "The Winged Horse — its body marked by the huge, near-empty Great Square.",
+      "culture": "The immortal winged stallion of Greek myth, sprung from the blood of Medusa and tamed by the hero Bellerophon. Seen from Australia the horse hangs upside-down low in the north.",
+      "howToFind": "Look north for the Great Square — four medium stars in a large, conspicuously empty box; the nose star Enif trails off to one side.",
+      "bestSeen": "Spring evenings from southern latitudes (Sep–Nov), low to mid in the north.",
+      "brightestStar": "Enif (Epsilon Pegasi), an orange supergiant marking the horse’s muzzle.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Markab",
+          "raDeg": 346.19,
+          "decDeg": 15.205,
+          "mag": 2.5
+        },
+        {
+          "name": "Scheat",
+          "raDeg": 345.944,
+          "decDeg": 28.083,
+          "mag": 2.4
+        },
+        {
+          "name": "Algenib",
+          "raDeg": 3.309,
+          "decDeg": 15.184,
+          "mag": 2.8
+        },
+        {
+          "name": "Alpheratz",
+          "raDeg": 2.097,
+          "decDeg": 29.09,
+          "mag": 2.1
+        },
+        {
+          "name": "Enif",
+          "raDeg": 326.046,
+          "decDeg": 9.875,
+          "mag": 2.4
+        },
+        {
+          "name": "Zeta Peg",
+          "raDeg": 340.366,
+          "decDeg": 10.831,
+          "mag": 3.4
+        },
+        {
+          "name": "Theta Peg",
+          "raDeg": 332.55,
+          "decDeg": 6.198,
+          "mag": 3.5
+        },
+        {
+          "name": "Eta Peg",
+          "raDeg": 340.75,
+          "decDeg": 30.221,
+          "mag": 2.9
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          3,
+          2
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          1,
+          7
+        ]
+      ]
+    },
+    {
+      "name": "Canis Minor",
+      "abbreviation": "CMi",
+      "icon": "🐶",
+      "rarity": "common",
+      "minAltitudeDeg": 7,
+      "anchorStar": "Procyon",
+      "meaning": "The Lesser Dog — barely more than two stars, but headed by brilliant Procyon.",
+      "culture": "Orion’s smaller hunting hound, trailing Canis Major at the hunter’s heel. Procyon means “before the dog” — it rises just ahead of Sirius, the Dog Star.",
+      "howToFind": "A simple pair: dazzling Procyon and its fainter companion Gomeisa, north-east of Orion and east of Gemini.",
+      "bestSeen": "Summer evenings from southern latitudes (Jan–Mar), to the north.",
+      "brightestStar": "Procyon — the eighth-brightest star in the sky, only 11 light-years away.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Procyon",
+          "raDeg": 114.825,
+          "decDeg": 5.225,
+          "mag": 0.3
+        },
+        {
+          "name": "Gomeisa",
+          "raDeg": 111.788,
+          "decDeg": 8.289,
+          "mag": 2.9
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "name": "Capricornus",
+      "abbreviation": "Cap",
+      "icon": "🐐",
+      "rarity": "rare",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Deneb Algedi",
+      "meaning": "The Sea-Goat — an ancient zodiac figure, half goat and half fish.",
+      "culture": "One of the oldest constellations, tied to the god Pan, who leapt into a river to escape the monster Typhon and grew a fish’s tail. The Sun’s southernmost point — the Tropic of Capricorn — takes its name.",
+      "howToFind": "A large, faint triangle between Sagittarius and Aquarius — best traced as a wide grin under a dark sky.",
+      "bestSeen": "Winter–spring evenings from southern latitudes (Aug–Oct), to the north.",
+      "brightestStar": "Deneb Algedi (Delta Capricorni), an eclipsing binary at the goat’s tail.",
+      "funFact": null,
+      "stars": [
+        {
+          "name": "Deneb Algedi",
+          "raDeg": 326.76,
+          "decDeg": -16.127,
+          "mag": 2.9
+        },
+        {
+          "name": "Dabih",
+          "raDeg": 305.253,
+          "decDeg": -14.781,
+          "mag": 3.1
+        },
+        {
+          "name": "Algedi",
+          "raDeg": 304.514,
+          "decDeg": -12.545,
+          "mag": 3.6
+        },
+        {
+          "name": "Gamma Cap",
+          "raDeg": 325.023,
+          "decDeg": -16.662,
+          "mag": 3.7
+        },
+        {
+          "name": "Zeta Cap",
+          "raDeg": 321.667,
+          "decDeg": -22.411,
+          "mag": 3.8
+        },
+        {
+          "name": "Omega Cap",
+          "raDeg": 312.955,
+          "decDeg": -26.919,
+          "mag": 4.1
+        },
+        {
+          "name": "Psi Cap",
+          "raDeg": 311.523,
+          "decDeg": -25.271,
+          "mag": 4.1
+        },
+        {
+          "name": "Theta Cap",
+          "raDeg": 316.487,
+          "decDeg": -17.232,
+          "mag": 4.1
+        }
+      ],
+      "lines": [
+        [
+          2,
+          1
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          6,
+          5
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          7
+        ],
+        [
+          7,
+          1
+        ]
+      ]
+    }
+  ],
+  "brightStars": [
+    {
+      "name": "Canopus",
+      "raDeg": 95.988,
+      "decDeg": -52.696,
+      "mag": -0.7
+    },
+    {
+      "name": "Achernar",
+      "raDeg": 24.429,
+      "decDeg": -57.237,
+      "mag": 0.5
+    },
+    {
+      "name": "Vega",
+      "raDeg": 279.235,
+      "decDeg": 38.784,
+      "mag": 0
+    },
+    {
+      "name": "Altair",
+      "raDeg": 297.696,
+      "decDeg": 8.868,
+      "mag": 0.8
+    },
+    {
+      "name": "Arcturus",
+      "raDeg": 213.915,
+      "decDeg": 19.182,
+      "mag": 0
+    },
+    {
+      "name": "Spica",
+      "raDeg": 201.298,
+      "decDeg": -11.161,
+      "mag": 1
+    },
+    {
+      "name": "Fomalhaut",
+      "raDeg": 344.413,
+      "decDeg": -29.622,
+      "mag": 1.2
+    },
+    {
+      "name": "Pollux",
+      "raDeg": 116.329,
+      "decDeg": 28.026,
+      "mag": 1.1
+    },
+    {
+      "name": "Castor",
+      "raDeg": 113.65,
+      "decDeg": 31.888,
+      "mag": 1.6
+    },
+    {
+      "name": "Procyon",
+      "raDeg": 114.825,
+      "decDeg": 5.225,
+      "mag": 0.3
+    },
+    {
+      "name": "Capella",
+      "raDeg": 79.172,
+      "decDeg": 45.998,
+      "mag": 0.1
+    },
+    {
+      "name": "Aldebaran",
+      "raDeg": 68.98,
+      "decDeg": 16.509,
+      "mag": 0.9
+    },
+    {
+      "name": "Miaplacidus",
+      "raDeg": 138.3,
+      "decDeg": -69.717,
+      "mag": 1.7
+    },
+    {
+      "name": "Avior",
+      "raDeg": 125.628,
+      "decDeg": -59.509,
+      "mag": 1.9
+    },
+    {
+      "name": "Aspidiske",
+      "raDeg": 139.273,
+      "decDeg": -59.275,
+      "mag": 2.2
+    },
+    {
+      "name": "Atria",
+      "raDeg": 252.166,
+      "decDeg": -69.028,
+      "mag": 1.9
+    },
+    {
+      "name": "Alnair",
+      "raDeg": 332.058,
+      "decDeg": -46.961,
+      "mag": 1.7
+    },
+    {
+      "name": "Peacock",
+      "raDeg": 306.412,
+      "decDeg": -56.735,
+      "mag": 1.9
+    },
+    {
+      "name": "Diphda",
+      "raDeg": 10.897,
+      "decDeg": -17.987,
+      "mag": 2
+    },
+    {
+      "name": "Menkent",
+      "raDeg": 211.671,
+      "decDeg": -36.37,
+      "mag": 2.1
+    },
+    {
+      "name": "Gienah",
+      "raDeg": 183.952,
+      "decDeg": -17.542,
+      "mag": 2.6
+    },
+    {
+      "name": "Suhail",
+      "raDeg": 136.999,
+      "decDeg": -43.432,
+      "mag": 2.2
+    },
+    {
+      "name": "Markeb",
+      "raDeg": 140.528,
+      "decDeg": -55.011,
+      "mag": 2.5
+    },
+    {
+      "name": "Regor",
+      "raDeg": 122.383,
+      "decDeg": -47.337,
+      "mag": 1.8
+    },
+    {
+      "name": "Naos",
+      "raDeg": 120.896,
+      "decDeg": -40.003,
+      "mag": 2.2
+    },
+    {
+      "name": "Alphard",
+      "raDeg": 141.897,
+      "decDeg": -8.659,
+      "mag": 2
+    },
+    {
+      "name": "Deneb",
+      "raDeg": 310.358,
+      "decDeg": 45.28,
+      "mag": 1.3
+    },
+    {
+      "name": "Hamal",
+      "raDeg": 31.793,
+      "decDeg": 23.462,
+      "mag": 2
+    },
+    {
+      "name": "Alcyone",
+      "raDeg": 56.871,
+      "decDeg": 24.105,
+      "mag": 2.9
+    },
+    {
+      "name": "Elnath",
+      "raDeg": 81.573,
+      "decDeg": 28.608,
+      "mag": 1.7
+    },
+    {
+      "name": "Alhena",
+      "raDeg": 99.428,
+      "decDeg": 16.399,
+      "mag": 1.9
+    },
+    {
+      "name": "Gomeisa",
+      "raDeg": 111.788,
+      "decDeg": 8.289,
+      "mag": 2.9
+    },
+    {
+      "name": "Delta Vel",
+      "raDeg": 131.176,
+      "decDeg": -54.709,
+      "mag": 1.9
+    },
+    {
+      "name": "Theta Car",
+      "raDeg": 160.739,
+      "decDeg": -64.394,
+      "mag": 2.7
+    },
+    {
+      "name": "Alpha Mus",
+      "raDeg": 189.296,
+      "decDeg": -69.136,
+      "mag": 2.7
+    },
+    {
+      "name": "Muhlifain",
+      "raDeg": 190.379,
+      "decDeg": -48.96,
+      "mag": 2.2
+    },
+    {
+      "name": "Epsilon Cen",
+      "raDeg": 204.972,
+      "decDeg": -53.466,
+      "mag": 2.3
+    },
+    {
+      "name": "Eta Cen",
+      "raDeg": 218.877,
+      "decDeg": -42.158,
+      "mag": 2.3
+    },
+    {
+      "name": "Alpha Lupi",
+      "raDeg": 220.482,
+      "decDeg": -47.388,
+      "mag": 2.3
+    },
+    {
+      "name": "Beta Lupi",
+      "raDeg": 224.633,
+      "decDeg": -43.134,
+      "mag": 2.7
+    },
+    {
+      "name": "Zubeneschamali",
+      "raDeg": 229.252,
+      "decDeg": -9.383,
+      "mag": 2.6
+    },
+    {
+      "name": "Zubenelgenubi",
+      "raDeg": 222.72,
+      "decDeg": -16.042,
+      "mag": 2.7
+    },
+    {
+      "name": "Alpha Arae",
+      "raDeg": 262.96,
+      "decDeg": -49.876,
+      "mag": 2.8
+    },
+    {
+      "name": "Beta Arae",
+      "raDeg": 261.325,
+      "decDeg": -55.53,
+      "mag": 2.8
+    },
+    {
+      "name": "Rasalhague",
+      "raDeg": 263.734,
+      "decDeg": 12.56,
+      "mag": 2.1
+    },
+    {
+      "name": "Sabik",
+      "raDeg": 257.594,
+      "decDeg": -15.725,
+      "mag": 2.4
+    },
+    {
+      "name": "Tarazed",
+      "raDeg": 296.565,
+      "decDeg": 10.613,
+      "mag": 2.7
+    },
+    {
+      "name": "Sadr",
+      "raDeg": 305.557,
+      "decDeg": 40.257,
+      "mag": 2.2
+    },
+    {
+      "name": "Albireo",
+      "raDeg": 292.68,
+      "decDeg": 27.96,
+      "mag": 3.1
+    },
+    {
+      "name": "Enif",
+      "raDeg": 326.046,
+      "decDeg": 9.875,
+      "mag": 2.4
+    },
+    {
+      "name": "Kraz",
+      "raDeg": 188.597,
+      "decDeg": -23.397,
+      "mag": 2.6
+    },
+    {
+      "name": "Algorab",
+      "raDeg": 187.466,
+      "decDeg": -16.515,
+      "mag": 2.9
+    },
+    {
+      "name": "Epsilon Crv",
+      "raDeg": 182.531,
+      "decDeg": -22.62,
+      "mag": 3
+    },
+    {
+      "name": "Pi Pup",
+      "raDeg": 109.286,
+      "decDeg": -37.097,
+      "mag": 2.7
+    },
+    {
+      "name": "Ankaa",
+      "raDeg": 6.571,
+      "decDeg": -42.306,
+      "mag": 2.4
+    },
+    {
+      "name": "Acamar",
+      "raDeg": 44.565,
+      "decDeg": -40.305,
+      "mag": 2.9
+    },
+    {
+      "name": "Zaurak",
+      "raDeg": 59.507,
+      "decDeg": -13.509,
+      "mag": 2.9
+    },
+    {
+      "name": "Cursa",
+      "raDeg": 76.962,
+      "decDeg": -5.086,
+      "mag": 2.8
+    },
+    {
+      "name": "Menkar",
+      "raDeg": 45.57,
+      "decDeg": 4.09,
+      "mag": 2.5
+    },
+    {
+      "name": "Tiaki",
+      "raDeg": 340.667,
+      "decDeg": -46.885,
+      "mag": 2.1
+    },
+    {
+      "name": "Aldhanab",
+      "raDeg": 328.483,
+      "decDeg": -37.365,
+      "mag": 3
+    },
+    {
+      "name": "Alpha Tuc",
+      "raDeg": 334.625,
+      "decDeg": -60.259,
+      "mag": 2.9
+    },
+    {
+      "name": "Alpha Hyi",
+      "raDeg": 29.692,
+      "decDeg": -61.57,
+      "mag": 2.9
+    },
+    {
+      "name": "Beta Hyi",
+      "raDeg": 6.438,
+      "decDeg": -77.254,
+      "mag": 2.8
+    },
+    {
+      "name": "Markab",
+      "raDeg": 346.19,
+      "decDeg": 15.205,
+      "mag": 2.5
+    },
+    {
+      "name": "Scheat",
+      "raDeg": 345.944,
+      "decDeg": 28.083,
+      "mag": 2.4
+    },
+    {
+      "name": "Algenib",
+      "raDeg": 3.309,
+      "decDeg": 15.184,
+      "mag": 2.8
+    },
+    {
+      "name": "Alpheratz",
+      "raDeg": 2.097,
+      "decDeg": 29.09,
+      "mag": 2.1
+    },
+    {
+      "name": "Mirach",
+      "raDeg": 17.433,
+      "decDeg": 35.621,
+      "mag": 2.1
+    },
+    {
+      "name": "Deneb Algedi",
+      "raDeg": 326.76,
+      "decDeg": -16.127,
+      "mag": 2.8
+    },
+    {
+      "name": "Sadalsuud",
+      "raDeg": 322.89,
+      "decDeg": -5.571,
+      "mag": 2.9
+    },
+    {
+      "name": "Sadalmelik",
+      "raDeg": 331.446,
+      "decDeg": -0.32,
+      "mag": 2.9
+    },
+    {
+      "name": "Kappa Sco",
+      "raDeg": 265.622,
+      "decDeg": -39.03,
+      "mag": 2.4
+    },
+    {
+      "name": "Mu Vel",
+      "raDeg": 161.693,
+      "decDeg": -49.42,
+      "mag": 2.7
+    }
+  ],
+  "deepSky": [
+    {
+      "name": "Eta Carinae Nebula",
+      "type": "Nebula",
+      "icon": "🌫️",
+      "rarity": "epic",
+      "raDeg": 161.265,
+      "decDeg": -59.866,
+      "minAltitudeDeg": 10,
+      "instrument": "naked eye",
+      "blurb": "A vast glowing star-factory four times the size of the Orion Nebula — but a southern-sky secret, riding high over Australia.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "An enormous cloud of gas lit by hot young stars, wrapped around the unstable supergiant Eta Carinae — a doomed star that may go supernova in the astronomically near future."
+        },
+        {
+          "heading": "How to find it",
+          "text": "A bright, distinct patch of the Milky Way in Carina, between the Southern Cross and the False Cross. Naked-eye from a dark site; spectacular in binoculars."
+        },
+        {
+          "heading": "Fun fact",
+          "text": "In the 1840s the unstable star at its heart briefly flared into the second-brightest star in the whole sky — a “supernova impostor” outburst it somehow survived."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Summer–autumn evenings, when Carina rides high in the south."
+        }
+      ]
+    },
+    {
+      "name": "Omega Centauri",
+      "type": "Globular cluster",
+      "icon": "🔆",
+      "rarity": "epic",
+      "raDeg": 201.697,
+      "decDeg": -47.479,
+      "minAltitudeDeg": 10,
+      "instrument": "naked eye",
+      "blurb": "The grandest globular cluster in the sky — ten million ancient stars packed into a ball you can see with the naked eye.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "Around 10 million stars bound by gravity into a sphere ~150 light-years across, 17,000 light-years away. Possibly the stripped core of a galaxy our Milky Way swallowed."
+        },
+        {
+          "heading": "How to find it",
+          "text": "A fuzzy “star” to the naked eye in Centaurus. Binoculars show a round glow; a telescope shatters it into countless pinpoints."
+        },
+        {
+          "heading": "Fun fact",
+          "text": "Near its core the stars crowd a hundred times closer together than they do around the Sun — so close that, on a world there, the night would never truly grow dark."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Autumn–winter evenings, high in the south."
+        }
+      ]
+    },
+    {
+      "name": "Jewel Box Cluster",
+      "type": "Open cluster",
+      "icon": "💎",
+      "rarity": "rare",
+      "raDeg": 193.417,
+      "decDeg": -60.367,
+      "minAltitudeDeg": 10,
+      "instrument": "binoculars",
+      "blurb": "A glittering young star cluster beside the Southern Cross, its suns tinted blue, white and one ruby-red.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A few hundred hot young stars only ~14 million years old (NGC 4755). John Herschel named it for looking like “a casket of variously coloured precious stones”."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Right beside Mimosa (Beta Crucis), the left-hand star of the Southern Cross. A hazy point to the eye; binoculars reveal the colours."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Circumpolar — up every clear night, highest on autumn–winter evenings."
+        }
+      ]
+    },
+    {
+      "name": "47 Tucanae",
+      "type": "Globular cluster",
+      "icon": "✴️",
+      "rarity": "rare",
+      "raDeg": 6.024,
+      "decDeg": -72.081,
+      "minAltitudeDeg": 8,
+      "instrument": "naked eye",
+      "blurb": "The second-finest globular cluster in the sky, a naked-eye glow right next to the Small Magellanic Cloud.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A dense swarm of hundreds of thousands of stars, 13,000 light-years away — close enough to look as big as the full Moon."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Near the Small Magellanic Cloud, deep in the south toward Tucana. Naked-eye from dark skies; a jewel in any telescope."
+        },
+        {
+          "heading": "Fun fact",
+          "text": "At roughly 13 billion years old it is nearly as ancient as the universe itself — its stars were already old when the Sun was born."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Circumpolar; highest on spring–summer evenings."
+        }
+      ]
+    },
+    {
+      "name": "Tarantula Nebula",
+      "type": "Nebula",
+      "icon": "🕷️",
+      "rarity": "epic",
+      "raDeg": 84.679,
+      "decDeg": -69.1,
+      "minAltitudeDeg": 8,
+      "instrument": "binoculars",
+      "blurb": "A monster nebula inside the Large Magellanic Cloud — so luminous that, set where Orion’s nebula is, it would cast shadows.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "The largest, most active star-forming region known (NGC 2070), 160,000 light-years away in a neighbouring galaxy, yet bright enough to glimpse unaided."
+        },
+        {
+          "heading": "How to find it",
+          "text": "A knotted bright spot on the eastern edge of the Large Magellanic Cloud. Binoculars show its tangled, leggy shape."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Circumpolar; highest on summer evenings."
+        }
+      ]
+    },
+    {
+      "name": "Orion Nebula",
+      "type": "Nebula",
+      "icon": "🌫️",
+      "rarity": "epic",
+      "raDeg": 83.822,
+      "decDeg": -5.391,
+      "minAltitudeDeg": 8,
+      "instrument": "naked eye",
+      "blurb": "The middle “star” of Orion’s Sword is no star at all — a glowing nursery of newborn suns, faintly green to the eye.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A cloud of gas 1,300 light-years away where stars are being born right now (M42). The four hot Trapezium stars at its heart light the whole nebula."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Look at the row of stars below Orion’s Belt (the Sword, or the handle of the “Saucepan”); the middle one looks fuzzy. Stunning in binoculars."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Summer evenings (Dec–Mar), high in the north."
+        }
+      ]
+    },
+    {
+      "name": "The Pleiades",
+      "type": "Open cluster",
+      "icon": "✨",
+      "rarity": "rare",
+      "raDeg": 56.871,
+      "decDeg": 24.105,
+      "minAltitudeDeg": 6,
+      "instrument": "naked eye",
+      "blurb": "The Seven Sisters — a tight, icy-blue knot of stars and one of the most storied objects in the sky.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A young open cluster ~440 light-years away (M45). Most people see six or seven stars; binoculars show dozens veiled in faint blue nebulosity."
+        },
+        {
+          "heading": "Origin & culture",
+          "text": "Known on every inhabited continent — the Seven Sisters of Greek myth, and across Aboriginal Australia a group of women pursued by the hunter of Orion."
+        },
+        {
+          "heading": "Fun fact",
+          "text": "Its Japanese name is Subaru — and the six blue stars on the carmaker’s badge are these very Seven Sisters."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Summer evenings (Nov–Mar), to the north."
+        }
+      ]
+    },
+    {
+      "name": "The Coalsack",
+      "type": "Dark nebula",
+      "icon": "🌑",
+      "rarity": "rare",
+      "raDeg": 190.5,
+      "decDeg": -63,
+      "minAltitudeDeg": 8,
+      "instrument": "naked eye",
+      "blurb": "A dark nebula notched into the bright Milky Way beside the Southern Cross — the head of the Emu in the Sky.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A dense cloud of cold dust ~600 light-years away, blotting out the stars behind it — one of the most obvious dark nebulae in the sky."
+        },
+        {
+          "heading": "Origin & culture",
+          "text": "The starting point of the great Emu in the Sky, a dark-cloud constellation central to many First Nations Australian traditions."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Circumpolar; needs a dark sky to show against the Milky Way."
+        }
+      ]
+    },
+    {
+      "name": "Centaurus A",
+      "type": "Galaxy",
+      "icon": "🌀",
+      "rarity": "epic",
+      "raDeg": 201.365,
+      "decDeg": -43.019,
+      "minAltitudeDeg": 10,
+      "instrument": "binoculars",
+      "blurb": "A bright peculiar galaxy split by a dark dust lane — one of the nearest active galaxies, with a supermassive black hole firing jets across space.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "An elliptical galaxy ~12 million light-years away (NGC 5128), crossed by the wreckage of a spiral it is swallowing. Its black hole launches jets millions of light-years long."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Just north of Omega Centauri. A faint round glow in binoculars; a small telescope starts to show the dark lane cutting across it."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Autumn–winter evenings, high in the south."
+        }
+      ]
+    },
+    {
+      "name": "Lagoon Nebula",
+      "type": "Nebula",
+      "icon": "🌫️",
+      "rarity": "rare",
+      "raDeg": 270.924,
+      "decDeg": -24.386,
+      "minAltitudeDeg": 8,
+      "instrument": "binoculars",
+      "blurb": "A big, bright star-forming cloud in Sagittarius, sitting right on the glowing core of the Milky Way.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A vast cloud of glowing hydrogen (M8) ~4,000 light-years away, cradling a newborn star cluster, with a dark “lagoon” channel down the middle."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Just above the spout of the Sagittarius “Teapot”. A misty patch to the naked eye from dark skies; lovely in binoculars."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Winter evenings (Jun–Aug), riding high overhead."
+        }
+      ]
+    },
+    {
+      "name": "Sculptor Galaxy",
+      "type": "Galaxy",
+      "icon": "🌀",
+      "rarity": "epic",
+      "raDeg": 11.888,
+      "decDeg": -25.288,
+      "minAltitudeDeg": 10,
+      "instrument": "binoculars",
+      "blurb": "A bright, dust-streaked starburst galaxy seen nearly edge-on — one of the finest galaxies for binoculars in the southern sky.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A spiral galaxy ~11 million light-years away (NGC 253), bursting with new stars and thick with dust — an elongated silver sliver of light."
+        },
+        {
+          "heading": "How to find it",
+          "text": "In the dim constellation Sculptor, below Cetus. An easy oval glow in binoculars from a dark site."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Spring–summer evenings, high in the south."
+        }
+      ]
+    },
+    {
+      "name": "Southern Pinwheel",
+      "type": "Galaxy",
+      "icon": "🌀",
+      "rarity": "epic",
+      "raDeg": 204.254,
+      "decDeg": -29.866,
+      "minAltitudeDeg": 10,
+      "instrument": "binoculars",
+      "blurb": "A bright, face-on spiral galaxy on the Hydra–Centaurus border — a swirl of star-forming arms.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A grand-design spiral ~15 million light-years away (M83), a prolific maker of supernovae, turned face-on so its pinwheel arms show."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Between Hydra and Centaurus, near the star Menkent. A round, soft glow in binoculars; its arms emerge in a telescope."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Autumn–winter evenings."
+        }
+      ]
+    },
+    {
+      "name": "Ptolemy Cluster",
+      "type": "Open cluster",
+      "icon": "✨",
+      "rarity": "rare",
+      "raDeg": 268.45,
+      "decDeg": -34.79,
+      "minAltitudeDeg": 8,
+      "instrument": "naked eye",
+      "blurb": "A big, bright naked-eye star cluster in the sting of Scorpius — catalogued by Ptolemy almost 2,000 years ago.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A loose swarm of around 80 hot young stars (M7 / NGC 6475), about 980 light-years away, sprawled across nearly the width of the full Moon."
+        },
+        {
+          "heading": "How to find it",
+          "text": "Just off the stinger of Scorpius, in one of the richest parts of the Milky Way. An obvious misty patch to the naked eye; a glittering field in binoculars."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Winter evenings (Jun–Aug), riding high overhead."
+        }
+      ]
+    },
+    {
+      "name": "Southern Pleiades",
+      "type": "Open cluster",
+      "icon": "💫",
+      "rarity": "rare",
+      "raDeg": 160.6,
+      "decDeg": -64.4,
+      "minAltitudeDeg": 8,
+      "instrument": "naked eye",
+      "blurb": "The “Southern Pleiades” — a brilliant naked-eye cluster wrapped around the star Theta Carinae.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A bright young open cluster (IC 2602) about 480 light-years away, its leading star Theta Carinae shining at third magnitude amid a scatter of blue suns."
+        },
+        {
+          "heading": "How to find it",
+          "text": "High in the Carina Milky Way, not far from the Southern Cross and the Eta Carinae Nebula. Easy naked-eye; lovely in binoculars."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Summer–autumn evenings, high in the south."
+        }
+      ]
+    },
+    {
+      "name": "Wishing Well Cluster",
+      "type": "Open cluster",
+      "icon": "🌟",
+      "rarity": "rare",
+      "raDeg": 166.4,
+      "decDeg": -58.75,
+      "minAltitudeDeg": 8,
+      "instrument": "naked eye",
+      "blurb": "A dazzling river of stars in Carina — and the very first object observed by the Hubble Space Telescope.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "One of the finest open clusters in the sky (NGC 3532), around 400 stars some 1,300 light-years away, said to look like silver coins shimmering at the bottom of a wishing well."
+        },
+        {
+          "heading": "How to find it",
+          "text": "In a brilliant stretch of the Carina Milky Way near the Eta Carinae Nebula. A bright elongated glow to the eye; superb in binoculars."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Summer–autumn evenings, high in the south."
+        }
+      ]
+    },
+    {
+      "name": "Helix Nebula",
+      "type": "Nebula",
+      "icon": "👁️",
+      "rarity": "epic",
+      "raDeg": 337.41,
+      "decDeg": -20.84,
+      "minAltitudeDeg": 10,
+      "instrument": "binoculars",
+      "blurb": "The “Eye of God” — one of the closest and largest planetary nebulae, a dying Sun-like star’s last gasp.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "Glowing shells of gas (NGC 7293) thrown off by a dying star ~650 light-years away, with the hot white-dwarf core at the centre — nearly the width of the full Moon, but faint."
+        },
+        {
+          "heading": "How to find it",
+          "text": "In dim Aquarius, below the Capricornus stars. A large, ghostly ring — it needs a dark sky and binoculars or a low-power telescope; tricky but rewarding."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Spring evenings (Sep–Nov), high in the north."
+        }
+      ]
+    },
+    {
+      "name": "Sombrero Galaxy",
+      "type": "Galaxy",
+      "icon": "🌀",
+      "rarity": "epic",
+      "raDeg": 189.998,
+      "decDeg": -11.623,
+      "minAltitudeDeg": 10,
+      "instrument": "binoculars",
+      "blurb": "A bright edge-on galaxy crossed by a dark dust lane — the brim of a cosmic hat.",
+      "details": [
+        {
+          "heading": "What you’re seeing",
+          "text": "A spiral galaxy (M104) about 30 million light-years away, seen nearly edge-on, with a huge glowing bulge, a sharp lane of dust, and a billion-solar-mass black hole at its heart."
+        },
+        {
+          "heading": "How to find it",
+          "text": "On the Virgo–Corvus border, west of bright Spica. A small oval glow in binoculars; the dust lane shows in a telescope under a dark sky."
+        },
+        {
+          "heading": "Best seen",
+          "text": "Autumn–winter evenings, high in the north."
+        }
+      ]
+    }
+  ],
+  "galaxyFeatures": [
+    {
+      "key": "milkyway",
+      "name": "Milky Way core",
+      "icon": "🌠",
+      "rarity": "rare",
+      "anchor": {
+        "raDeg": 266.42,
+        "decDeg": -29.01,
+        "label": "Galactic centre (in Sagittarius)"
+      },
+      "blurb": "The bright centre of our galaxy. Winter (Jun–Aug) is prime season from the southern hemisphere."
+    },
+    {
+      "key": "magellanic",
+      "name": "Magellanic Clouds",
+      "icon": "☁️",
+      "rarity": "rare",
+      "anchor": [
+        {
+          "name": "LMC",
+          "raDeg": 80.89,
+          "decDeg": -69.76,
+          "sizeDeg": 15
+        },
+        {
+          "name": "SMC",
+          "raDeg": 13.16,
+          "decDeg": -72.8,
+          "sizeDeg": 10
+        }
+      ],
+      "blurb": "Two naked-eye companion dwarf galaxies circling the south celestial pole; they look like detached wisps of Milky Way. Southern-hemisphere only."
+    }
+  ],
+  "planets": [
+    {
+      "name": "Mercury",
+      "key": "mercury",
+      "colour": "#b9b3a8",
+      "rarity": "rare",
+      "note": "Low in twilight — hardest naked-eye planet",
+      "positionNote": "Computed at runtime from orbital elements (geocentric alt/az for the observer)."
+    },
+    {
+      "name": "Venus",
+      "key": "venus",
+      "colour": "#f3ecd2",
+      "rarity": "common",
+      "note": "Brightest planet — unmistakable",
+      "positionNote": "Computed at runtime from orbital elements (geocentric alt/az for the observer)."
+    },
+    {
+      "name": "Mars",
+      "key": "mars",
+      "colour": "#e0795a",
+      "rarity": "rare",
+      "note": "Distinctly orange-red to the eye",
+      "positionNote": "Computed at runtime from orbital elements (geocentric alt/az for the observer)."
+    },
+    {
+      "name": "Jupiter",
+      "key": "jupiter",
+      "colour": "#e8d9b8",
+      "rarity": "common",
+      "note": "Second-brightest planet; moons visible in binoculars",
+      "positionNote": "Computed at runtime from orbital elements (geocentric alt/az for the observer)."
+    },
+    {
+      "name": "Saturn",
+      "key": "saturn",
+      "colour": "#ded2a8",
+      "rarity": "rare",
+      "note": "Steady pale-gold point; rings need a small telescope",
+      "positionNote": "Computed at runtime from orbital elements (geocentric alt/az for the observer)."
+    }
+  ],
+  "events": {
+    "meteorShowers": [
+      {
+        "name": "Quadrantids",
+        "rarity": "epic",
+        "peak": {
+          "month": 1,
+          "day": 4
+        },
+        "window": {
+          "start": {
+            "month": 12,
+            "day": 28
+          },
+          "end": {
+            "month": 1,
+            "day": 12
+          }
+        },
+        "zhr": 110,
+        "radiant": {
+          "raDeg": 230,
+          "decDeg": 49
+        },
+        "note": "Radiant too far north — poor from southern latitudes"
+      },
+      {
+        "name": "Lyrids",
+        "rarity": "epic",
+        "peak": {
+          "month": 4,
+          "day": 22
+        },
+        "window": {
+          "start": {
+            "month": 4,
+            "day": 14
+          },
+          "end": {
+            "month": 4,
+            "day": 30
+          }
+        },
+        "zhr": 18,
+        "radiant": {
+          "raDeg": 271,
+          "decDeg": 34
+        },
+        "note": "Low northern radiant — modest from southern latitudes, pre-dawn"
+      },
+      {
+        "name": "η Aquariids",
+        "rarity": "epic",
+        "peak": {
+          "month": 5,
+          "day": 6
+        },
+        "window": {
+          "start": {
+            "month": 4,
+            "day": 19
+          },
+          "end": {
+            "month": 5,
+            "day": 28
+          }
+        },
+        "zhr": 50,
+        "radiant": {
+          "raDeg": 338,
+          "decDeg": -1
+        },
+        "note": "One of the best southern showers — pre-dawn east"
+      },
+      {
+        "name": "δ Aquariids",
+        "rarity": "epic",
+        "peak": {
+          "month": 7,
+          "day": 30
+        },
+        "window": {
+          "start": {
+            "month": 7,
+            "day": 12
+          },
+          "end": {
+            "month": 8,
+            "day": 23
+          }
+        },
+        "zhr": 25,
+        "radiant": {
+          "raDeg": 340,
+          "decDeg": -16
+        },
+        "note": "Good from the south — best after midnight"
+      },
+      {
+        "name": "α Capricornids",
+        "rarity": "epic",
+        "peak": {
+          "month": 7,
+          "day": 31
+        },
+        "window": {
+          "start": {
+            "month": 7,
+            "day": 3
+          },
+          "end": {
+            "month": 8,
+            "day": 15
+          }
+        },
+        "zhr": 5,
+        "radiant": {
+          "raDeg": 307,
+          "decDeg": -10
+        },
+        "note": "Few but famously bright slow fireballs"
+      },
+      {
+        "name": "Perseids",
+        "rarity": "epic",
+        "peak": {
+          "month": 8,
+          "day": 13
+        },
+        "window": {
+          "start": {
+            "month": 7,
+            "day": 17
+          },
+          "end": {
+            "month": 8,
+            "day": 24
+          }
+        },
+        "zhr": 100,
+        "radiant": {
+          "raDeg": 48,
+          "decDeg": 58
+        },
+        "note": "Radiant barely rises from southern latitudes — largely a northern show"
+      },
+      {
+        "name": "Orionids",
+        "rarity": "epic",
+        "peak": {
+          "month": 10,
+          "day": 21
+        },
+        "window": {
+          "start": {
+            "month": 10,
+            "day": 2
+          },
+          "end": {
+            "month": 11,
+            "day": 7
+          }
+        },
+        "zhr": 20,
+        "radiant": {
+          "raDeg": 95,
+          "decDeg": 16
+        },
+        "note": "Halley’s comet debris — pre-dawn, decent from southern latitudes"
+      },
+      {
+        "name": "Leonids",
+        "rarity": "epic",
+        "peak": {
+          "month": 11,
+          "day": 17
+        },
+        "window": {
+          "start": {
+            "month": 11,
+            "day": 6
+          },
+          "end": {
+            "month": 11,
+            "day": 30
+          }
+        },
+        "zhr": 15,
+        "radiant": {
+          "raDeg": 152,
+          "decDeg": 22
+        },
+        "note": "Pre-dawn northeast"
+      },
+      {
+        "name": "Geminids",
+        "rarity": "epic",
+        "peak": {
+          "month": 12,
+          "day": 14
+        },
+        "window": {
+          "start": {
+            "month": 12,
+            "day": 4
+          },
+          "end": {
+            "month": 12,
+            "day": 17
+          }
+        },
+        "zhr": 150,
+        "radiant": {
+          "raDeg": 112,
+          "decDeg": 32
+        },
+        "note": "Best shower of the year, strong even from southern latitudes"
+      }
+    ],
+    "comets": [
+      {
+        "name": "Comet 10P/Tempel 2",
+        "icon": "☄️",
+        "rarity": "epic",
+        "instrument": "binoculars",
+        "start": [
+          2026,
+          7,
+          1
+        ],
+        "peak": [
+          2026,
+          8,
+          3
+        ],
+        "end": [
+          2026,
+          9,
+          20
+        ],
+        "peakMag": 8,
+        "note": "A periodic comet near magnitude 8 — too faint for the naked eye but an easy binocular target, riding high in the evening sky for southern observers"
+      }
+    ],
+    "oneOffEvents": [
+      {
+        "name": "Penumbral Lunar Eclipse",
+        "date": [
+          2027,
+          2,
+          20
+        ],
+        "rarity": "rare",
+        "icon": "🌖",
+        "blurb": "A gentle penumbral eclipse — the full Moon brushing the faint outer edge of Earth’s shadow. Catchable from western Australia in the pre-dawn sky.",
+        "details": [
+          {
+            "heading": "What you’re seeing",
+            "text": "Only Earth’s faint outer shadow touches the Moon, so the disc dims slightly on one side without turning red."
+          },
+          {
+            "heading": "From Australia",
+            "text": "Best from Western Australia, low in the western sky before dawn; the eastern states largely miss it as the Moon sets too early. A very subtle event even at its peak."
+          },
+          {
+            "heading": "Tip",
+            "text": "Photograph the Moon before and during — side by side, the subtle shading is far easier to spot."
+          }
+        ]
+      },
+      {
+        "name": "Penumbral Lunar Eclipse",
+        "date": [
+          2027,
+          8,
+          17
+        ],
+        "rarity": "rare",
+        "icon": "🌖",
+        "blurb": "The full Moon drifts through the soft outer fringe of Earth’s shadow — a faint dusky shading rather than a dark bite. This one is best placed for eastern Australia.",
+        "details": [
+          {
+            "heading": "What you’re seeing",
+            "text": "The Moon passes only through the penumbra, Earth’s pale outer shadow, so one edge of the disc looks faintly smudged and grey — there is no red tint and no chunk missing."
+          },
+          {
+            "heading": "From Australia",
+            "text": "Visible from eastern Australia with the Moon above the horizon. The dimming is gentle, so compare the shaded edge against the bright limb."
+          },
+          {
+            "heading": "Tip",
+            "text": "A penumbral eclipse is subtle — photograph the Moon before and during, and the slight shading shows up far more clearly side by side."
+          }
+        ]
+      },
+      {
+        "name": "Partial Lunar Eclipse",
+        "date": [
+          2028,
+          7,
+          6
+        ],
+        "rarity": "epic",
+        "icon": "🌗",
+        "blurb": "The full Moon dips a third of the way into Earth’s shadow — a clear dark bite, visible across Australia, two weeks before the great solar eclipse.",
+        "details": [
+          {
+            "heading": "What you’re seeing",
+            "text": "About 39% of the Moon’s diameter slides into the umbra at greatest eclipse, giving an obvious shadowed segment along one limb."
+          },
+          {
+            "heading": "From Australia",
+            "text": "Well placed nationwide. The pairing is no accident — this lunar eclipse and the 22 July total solar eclipse are two halves of the same eclipse season, a fortnight apart."
+          },
+          {
+            "heading": "Watch for",
+            "text": "A coppery tint along the shadowed edge as the umbra deepens."
+          }
+        ]
+      },
+      {
+        "name": "Total Solar Eclipse",
+        "date": [
+          2028,
+          7,
+          22
+        ],
+        "rarity": "legendary",
+        "icon": "🌑",
+        "blurb": "The big one — the Moon’s shadow sweeps right across Australia, with up to 5 minutes of totality through the NT, Queensland and New South Wales (Sydney sits in the path). The rest of the country sees a deep partial eclipse.",
+        "details": [
+          {
+            "heading": "What you’re seeing",
+            "text": "For a few minutes inside the path of totality the Moon completely hides the Sun, revealing the pearly corona, planets and stars in a darkened daytime sky. Elsewhere in Australia the Sun becomes a brilliant crescent."
+          },
+          {
+            "heading": "The path",
+            "text": "The umbra crosses the Kimberley coast and tracks south-east through the Northern Territory, Queensland, the corner of South Australia and New South Wales — directly across Sydney in the early afternoon (totality just before 2 pm). Outside that line, the whole continent gets a large partial eclipse."
+          },
+          {
+            "heading": "Stay safe",
+            "text": "Never look at the partial Sun without certified solar-eclipse glasses. Only during the brief total phase, inside the path, is it safe to look with the naked eye."
+          }
+        ]
+      },
+      {
+        "name": "Asteroid Apophis Flyby",
+        "date": [
+          2029,
+          4,
+          13
+        ],
+        "rarity": "legendary",
+        "icon": "🪨",
+        "blurb": "A 375-metre asteroid skims closer than our communications satellites — and briefly reaches naked-eye brightness, drifting across the sky like a slow-moving “star”. The front-row view is from Europe and Africa; from Australia it is a low, marginal catch.",
+        "details": [
+          {
+            "heading": "What you’re seeing",
+            "text": "Asteroid 99942 Apophis passes within about 32,000 km of Earth’s surface — nearer than geostationary satellites — glowing around magnitude 3–4, like a moderately bright star drifting visibly against the constellations over a few minutes."
+          },
+          {
+            "heading": "From Australia",
+            "text": "The naked-eye flyby favours Europe and Africa, where Apophis rides a dark sky at closest approach. Australia is poorly placed — the asteroid is brightest around local daybreak — so realistically it is a binocular target, low in the sky, in the dark hours beforehand."
+          },
+          {
+            "heading": "Why it matters",
+            "text": "The first time in recorded history a known asteroid this large becomes an easy naked-eye object — a once-in-a-lifetime sight, and completely harmless."
+          }
+        ]
+      }
+    ],
+    "seasonMarkers": [
+      {
+        "name": "March Equinox",
+        "icon": "🍂",
+        "rarity": "rare",
+        "date": {
+          "month": 3,
+          "day": 20
+        },
+        "note": "Day and night fall equal as the Sun crosses the equator heading north — the start of autumn in the southern hemisphere.",
+        "stargazerNote": "Nights begin to lengthen again — the slow return of darker, longer skies for stargazing."
+      },
+      {
+        "name": "June Solstice",
+        "icon": "❄️",
+        "rarity": "rare",
+        "date": {
+          "month": 6,
+          "day": 21
+        },
+        "note": "The Sun sits lowest at noon — the longest night of the year in the south, and the very heart of Milky Way season.",
+        "stargazerNote": "The longest nights of the year, with the galactic core riding high — peak deep-sky viewing from Australia."
+      },
+      {
+        "name": "September Equinox",
+        "icon": "🌱",
+        "rarity": "rare",
+        "date": {
+          "month": 9,
+          "day": 22
+        },
+        "note": "The Sun crosses the equator heading south — spring begins in the southern hemisphere.",
+        "stargazerNote": "A balanced 12-hour night; good aurora season as geomagnetic activity tends to pick up around the equinoxes."
+      },
+      {
+        "name": "December Solstice",
+        "icon": "☀️",
+        "rarity": "rare",
+        "date": {
+          "month": 12,
+          "day": 21
+        },
+        "note": "The Sun climbs highest at noon — the longest day and shortest night in the south.",
+        "stargazerNote": "Short nights, but Orion, the Pleiades and brilliant summer stars dominate the evening sky."
+      }
+    ],
+    "recurring": [
+      {
+        "key": "aurora",
+        "name": "Aurora Australis",
+        "icon": "🌌",
+        "rarity": "legendary",
+        "trigger": "Live geomagnetic activity (NOAA Kp index).",
+        "blurb": "The Southern Lights — curtains of colour where solar particles strike the upper atmosphere.",
+        "details": [
+          {
+            "heading": "What causes it",
+            "text": "Charged particles from the Sun funnel down Earth’s magnetic field near the poles and excite oxygen and nitrogen 100–300 km up, which glow green, red and purple."
+          },
+          {
+            "heading": "Where to see it",
+            "text": "From high southern latitudes it is a regular treat on stormy nights; from lower latitudes it takes a strong geomagnetic storm (high Kp) and hugs the southern horizon."
+          },
+          {
+            "heading": "The numbers",
+            "text": "The Kp index (0–9) measures geomagnetic activity; higher Kp is needed to reach lower latitudes."
+          }
+        ]
+      },
+      {
+        "key": "flare",
+        "name": "Solar Flare",
+        "icon": "☀️",
+        "rarity": "epic",
+        "trigger": "Live GOES X-ray flux (M-class and above).",
+        "blurb": "A sudden burst of radiation from a magnetic storm on the Sun; strong flares can disrupt radio and, a day or two later, light up the aurora.",
+        "details": [
+          {
+            "heading": "Classes",
+            "text": "Flares are graded by X-ray brightness: C (minor), M (medium), X (major)."
+          },
+          {
+            "heading": "Effects",
+            "text": "Strong M/X flares ionise the upper atmosphere (radio blackouts) and, via a CME, can trigger geomagnetic storms and aurora 1–3 days later."
+          },
+          {
+            "heading": "Safety",
+            "text": "Never look at the Sun directly or through optics without proper solar filters."
+          }
+        ]
+      },
+      {
+        "key": "iss",
+        "name": "Space Station (ISS) pass",
+        "icon": "🛰",
+        "rarity": "epic",
+        "trigger": "Live orbital position above the observer’s horizon, while sunlit.",
+        "blurb": "The International Space Station — a bright, steadily-moving point that never blinks, visible only while sunlit (within ~2h of dusk or dawn).",
+        "details": [
+          {
+            "heading": "What you’re seeing",
+            "text": "A spacecraft circling Earth every ~90 minutes at 28,000 km/h, shining by reflected sunlight."
+          },
+          {
+            "heading": "Telling it apart",
+            "text": "No flashing lights, no sound; it moves steadily and fades out as it enters Earth’s shadow."
+          }
+        ]
+      },
+      {
+        "key": "fullmoon",
+        "name": "Full Moon",
+        "icon": "🌕",
+        "rarity": "common",
+        "trigger": "Computed next full-moon date (within ~2 weeks).",
+        "blurb": "The Moon stands opposite the Sun and shines all night — brilliant, but it floods out the fainter sky.",
+        "details": []
+      },
+      {
+        "key": "newmoon",
+        "name": "New Moon",
+        "icon": "🌑",
+        "rarity": "rare",
+        "trigger": "Computed next new-moon date (within ~2 weeks).",
+        "blurb": "The Moon rides with the Sun and leaves the night sky truly dark — the best window of the month for stargazing.",
+        "details": []
+      },
+      {
+        "key": "supermoon",
+        "name": "Supermoon",
+        "icon": "🌕",
+        "rarity": "epic",
+        "trigger": "Computed: a full moon near perigee (distance ≤ ~361,500 km).",
+        "blurb": "A full Moon near its closest point to Earth, so it appears up to ~7% wider and ~15% brighter than average.",
+        "details": []
+      },
+      {
+        "key": "conjunction",
+        "name": "Planetary Conjunction",
+        "icon": "🪐",
+        "rarity": "epic",
+        "trigger": "Computed: two planets within a few degrees in the sky (upcoming).",
+        "blurb": "Two worlds drift close together in the sky — a striking naked-eye pairing for a few evenings (a line-of-sight meeting only).",
+        "details": []
+      },
+      {
+        "key": "moon",
+        "name": "The Moon",
+        "icon": "🌙",
+        "rarity": "common",
+        "trigger": "Always present; phase + position computed at runtime.",
+        "blurb": "Earth’s only natural satellite and the brightest thing in the night sky; cycles new → full → new every 29.5 days.",
+        "details": []
+      },
+      {
+        "key": "opp-mars",
+        "name": "Mars at Opposition",
+        "icon": "🪐",
+        "rarity": "legendary",
+        "trigger": "Computed: Earth between the Sun and Mars (±~3-week window).",
+        "blurb": "Earth sweeps past Mars on the inside track — the red planet at its closest and brightest, up all night. Recurs roughly every 26 months.",
+        "details": []
+      },
+      {
+        "key": "opp-jupiter",
+        "name": "Jupiter at Opposition",
+        "icon": "🪐",
+        "rarity": "epic",
+        "trigger": "Computed: Earth between the Sun and Jupiter (±~3-week window).",
+        "blurb": "Jupiter opposite the Sun — biggest, brightest and visible all night long.",
+        "details": []
+      },
+      {
+        "key": "opp-saturn",
+        "name": "Saturn at Opposition",
+        "icon": "🪐",
+        "rarity": "epic",
+        "trigger": "Computed: Earth between the Sun and Saturn (±~3-week window).",
+        "blurb": "The ringed planet at opposition — its brightest, best-placed night of the year.",
+        "details": []
+      }
+    ]
+  }
+}

@@ -45,6 +45,13 @@ export interface GenerateOptions {
   wildness?: number;
   /** Force a specific biome by id (otherwise weighted-random). */
   biome?: string;
+  /**
+   * Use a fully-resolved biome row directly (GS-17b) — a theme-flavoured, rarity-tiered biome
+   * composed by `resolveBiome`. Takes precedence over `biome`. Its `id` still keys the palette.
+   */
+  biomeRow?: Biome;
+  /** Star-travel theme id (GS-17) — recorded on the course meta for the render/UI layer. */
+  themeId?: string;
   /** Cap every hole's par (3 = all par-3s). Omit for the normal 3/4/5 mix. */
   parCap?: 3 | 4 | 5;
 }
@@ -304,9 +311,9 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
 
   const holeCount = Math.max(1, opts.holes ?? 1);
   const rarity = pickRarity(rng);
-  const biome = opts.biome
-    ? BIOMES.find((b) => b.id === opts.biome) ?? pickBiome(rng.float())
-    : pickBiome(rng.float());
+  const biome =
+    opts.biomeRow ??
+    (opts.biome ? BIOMES.find((b) => b.id === opts.biome) ?? pickBiome(rng.float()) : pickBiome(rng.float()));
   const name = `${rng.pick(NAME_PREFIX)} ${rng.pick(NAME_SUFFIX)}`;
 
   const holes: Hole[] = [];
@@ -317,7 +324,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     rarity,
     biome: biome.id,
     holes,
-    meta: { name, distanceFromStart, wildness },
+    meta: { name, distanceFromStart, wildness, ...(opts.themeId ? { themeId: opts.themeId } : {}) },
   };
 
   const errs = [...validateCourse(course), ...validateFairness(course)];

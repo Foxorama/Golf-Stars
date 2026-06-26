@@ -32,6 +32,7 @@ import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
 import { DEFAULT_EVENT, drawRouteEvents, routeEvent, type RouteEvent } from './events';
+import { themeForStop, resolveBiome } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked';
@@ -40,6 +41,8 @@ export interface StopResult {
   stopIndex: number;
   distanceFromStart: number;
   biome: string;
+  /** Star-travel theme id (GS-17) the stop flew into, if any. */
+  themeId?: string;
   rarity: Rarity;
   stableford: number;
   gross: number;
@@ -104,13 +107,22 @@ export function stopSeed(run: Run): string {
   return `${run.seed}:stop:${run.stopIndex}`;
 }
 
-/** The course awaiting the player at the current stop (shaped by the run format). */
+/** The star-travel theme the current stop flies into (GS-17). Deterministic from the run. */
+export function currentTheme(run: Run) {
+  return themeForStop(run.seed, run.stopIndex, run.distanceFromStart);
+}
+
+/** The course awaiting the player at the current stop (shaped by the run format + theme). */
 export function currentCourse(run: Run): Course {
   const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
+  const theme = currentTheme(run);
   return generateCourse(stopSeed(run), {
     holes: spec.holes,
     parCap: spec.parCap,
     distanceFromStart: run.distanceFromStart,
+    // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
+    biomeRow: resolveBiome(theme),
+    themeId: theme.id,
   });
 }
 
@@ -140,6 +152,7 @@ export function finishStop(
     stopIndex: run.stopIndex,
     distanceFromStart: run.distanceFromStart,
     biome: course.biome,
+    themeId: course.meta?.themeId,
     rarity: course.rarity,
     stableford: totals.stableford,
     gross: totals.gross,
