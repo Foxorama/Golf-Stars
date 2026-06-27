@@ -27,8 +27,11 @@ Everything below serves whichever avenue wins.
     Sagittarius's black-hole gravity, the galactic-core grandeur) and rarer reads wilder. Generator
     takes a resolved `biomeRow`; biome id stays the archetype so the 5-key palette holds (per-theme
     VISUALS are GS-17e). No-death-spiral re-proved across every theme at max wildness.
-  - **GS-17c — Event split.** One-off dated events → `unique` route events (≤1/run); recurring events
-    (showers/moon/oppositions) → themed flavour over the `RouteEvent` levers. Economy/cut-only.
+  - **GS-17c — Event split. SHIPPED.** Route events re-themed from the catalogue and split:
+    `ROUTE_EVENTS` (recurring backbone — showers/moon/flares/aurora) are `minArc`-tiered so they
+    ACCENT the arcs (calm early, brutal late); `UNIQUE_EVENTS` (one-off eclipses/Apophis) are deep-arc,
+    high-stakes, and fire ≤1 per run (`run.firedEventIds`, round-tripped in the snapshot). `eventPool`
+    tiers + excludes fired uniques; still economy/cut-only (fairness untouched).
   - **GS-17d — Themed upgrades.** Bias shop/meta draw by the active theme's flavour.
   - **GS-17e — Render the constellation.** Draw the theme's stick figure (catalogue `stars`+`lines`)
     as the course sky backdrop in `buildScene`; wire the theme into the Sim Lab + Demo hub.
