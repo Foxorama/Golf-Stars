@@ -82,8 +82,22 @@ This game lives or dies on three axes — put every change through all three bef
   (`fairwayHalfWidth = max(halfWidths)`, matching `fairwayHalfWidthOf`'s max-lateral recovery), so
   penalty hazards still clear the widest part and stay provably fair. The death-spiral bars run at
   wildness 1 ONLY — keep that case ≥ as easy as the old constant (it is) and the bar holds (verified
-  toPar/hole ≈ 0.12 ≪ 1.0). `hole.centreline` stays 2–3 points (the sim's `pointAlong` only handles
-  that); the densified corridor is internal geometry, not the centreline.
+  toPar/hole ≈ 0.12 ≪ 1.0).
+- **Hole SHAPE is a biome-biased template grammar (GS-shapes, `buildCentreline`).** Layouts stopped
+  feeling identical: the centreline is no longer the old single `[tee, mid, green]` bend but a SMOOTH
+  curve from a drawn template — straight drift / single dogleg L-R / S-curve double-dogleg — picked by
+  biome + wildness (`straightP`/`sP` from `doglegBias`; a calm verdant world leans straight, a chaotic
+  inferno/void bends more), with bend severity `doglegBias × (0.35+0.65·wildness) × length` capped at
+  `0.4·length` so an offset corridor doesn't self-cross. Control points are smoothed (`smoothCurve`,
+  Catmull-Rom) so the corridor follows a real arc. EVERYTHING downstream derives from this centreline
+  (hazards/scatter via `centrePoint`+`perpAt`, the green = its last point), so the old `mid`/`midY`
+  hazard math is gone. CRITICAL: the centreline is now N points (a smoothed curve), so BOTH the
+  generator's `centrePoint` AND the sim's `round.ts` `pointAlong` are arc-length over N points (the old
+  2–3-point hardcode is removed) — keep them in lockstep. EXCEPTION: a lost-ball ISLAND (void, lostRough
+  armed) stays a STRAIGHT honest target — a dogleg over the abyss pushes the AI's line off the island
+  and shreds balls (measured toPar/hole 1.81 ≫ 1.0 with bends; straight keeps it ≤ the old ~0.96). The
+  death-spiral bars held for every OTHER world at max wildness (the doglegs didn't blow them) — re-run
+  after any `buildCentreline` change, and re-shoot the gallery (curves can self-cross if the cap loosens).
 - **Fairness by construction:** penalty hazards (water/lava/void) are kept CLEAR of the tee→green
   play corridor — `validateFairness()` proves it and `generateCourse` throws if violated. The
   *spice* is in-play non-penalty lies (ice = slick/high-dispersion, crystal = true/low, low-grav =
