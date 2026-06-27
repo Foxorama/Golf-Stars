@@ -68,6 +68,13 @@ export interface PlayerLoadout {
    * it can't shift scoring/determinism. Undefined/false = no suggestion.
    */
   clubSuggest?: boolean;
+  /**
+   * Suggestible Sam's "club confidence" boost (GS-caddy): a green-zone ShapeMod applied to a shot ONLY
+   * when the played club is the one Sam suggested (commit to the caddy's club → swing freer). Threaded
+   * into both the auto sim and the interactive driver under the identical rule, so auto≡interactive
+   * holds. Undefined = no caddy → never applied (no shape change, no extra rng → byte-for-byte).
+   */
+  confidenceMod?: ShapeMod;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
@@ -193,6 +200,14 @@ export const SPACE_DUCKS_GUARD: CaddyGuard = { remove: ['duckHookL'], halve: ['h
 /** Convict Sheep's boomerang guard (GS-caddy): no more shanks; a slice has a 50% chance to be
  *  knocked back to the green. Mirrors Space Ducks on the right side. */
 export const CONVICT_SHEEP_GUARD: CaddyGuard = { remove: ['shankR'], halve: ['sliceR'], kind: 'boomerang' };
+
+/**
+ * Suggestible Sam's "club confidence" shape boost (GS-caddy): when you commit to the club Sam hands
+ * you, you swing freer — trim all four miss zones, feeding the freed probability to GREEN (more great
+ * shots, fewer misses, visibly tighter cone). Applied ONLY on the suggested club (override it and you
+ * forfeit the boost). Tuned so it's a clear epic-tier scoring lift without trivialising the spray.
+ */
+export const SAM_CONFIDENCE: ShapeMod = { hookL: -0.03, sliceR: -0.03, duckHookL: -0.015, shankR: -0.015 };
 
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
@@ -351,11 +366,11 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'suggestible-sam',
     name: 'Suggestible Sam',
-    cost: 220,
-    desc: 'A caddy who reads the yardage and hands you the club — club suggestions on the play screen',
+    cost: 240,
+    desc: 'Reads the yardage & hands you the club — commit to his pick and swing freer (more great shots)',
     rarity: 'epic',
     caddy: 'named',
-    apply: (m) => ({ ...m, clubSuggest: true, perks: [...m.perks, 'suggestible-sam'] }),
+    apply: (m) => ({ ...m, clubSuggest: true, confidenceMod: SAM_CONFIDENCE, perks: [...m.perks, 'suggestible-sam'] }),
   },
 
   // --- Stackable upgrades (the endless credit sink + growing build) -----------

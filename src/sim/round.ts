@@ -9,6 +9,7 @@
 import { dist, pathLength, type FeatureKind, type Hole, type Vec } from './course/contract';
 import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
+  combineShapeMods,
   dispersionProfile,
   lieAt,
   lieInfo,
@@ -272,6 +273,9 @@ export interface PlayHoleOptions {
   minCarryBoost?: number;
   /** Wedge distance-control: tighten the wedge carry window toward the mean (point 6). */
   wedgeWindow?: number;
+  /** Suggestible Sam's confidence shape boost (GS-caddy): applied when the AI happens to club the
+   *  same club Sam would suggest, so auto-finish/headless play matches the interactive driver. */
+  confidence?: ShapeMod;
 }
 
 /** Pin location: the generated flag within the green (GS-6), or the centroid if absent. */
@@ -511,6 +515,12 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     const usable = usableBag(bag, lie, opts.driverAnywhere ?? false);
     const tgt = layupTarget(hole, ball, lie, usable, carryMult);
     const club = aiClub(hole, ball, tgt, carryMult, usable, opts.stats);
+    // Sam's confidence boost applies when the played club IS the one he'd suggest. Gate the
+    // suggestion compute on Sam being owned (confidence present) so a non-Sam run is byte-for-byte
+    // unchanged (no extra work, no shape change) — same rule the interactive driver uses.
+    const suggestedClubId = opts.confidence
+      ? suggestPlayerClub(hole, ball, lie, usable, { carryMult, dispersionMult: opts.dispersionMult }).id
+      : undefined;
 
     const ex = executeShot(hole, ball, lie, tgt, club, {
       carryMult,
@@ -522,6 +532,8 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       wedgeWindow: opts.wedgeWindow,
       guard: opts.guard,
       chipIn: opts.chipIn,
+      confidence: opts.confidence,
+      suggestedClubId,
     }, rng);
     strokes += 1 + ex.penaltyStrokes;
     penalties += ex.penaltyStrokes;
@@ -596,6 +608,14 @@ export interface ExecOpts {
   guard?: CaddyGuard;
   /** Wedge-caddy chip-in chance (GS-caddy): drop a PW-or-shorter shot resting near the flag. */
   chipIn?: number;
+  /**
+   * Suggestible Sam's "club confidence" shape boost (GS-caddy): a green-zone bonus ShapeMod applied
+   * ONLY when the played club is the one Sam suggested (`suggestedClubId`) — commit to your caddy's
+   * club and you swing freer. Undefined = no caddy → never applied (no shape change, byte-for-byte).
+   */
+  confidence?: ShapeMod;
+  /** The club id Sam suggested for this position — confidence applies iff the played club matches. */
+  suggestedClubId?: string;
 }
 
 export interface ExecResult {
@@ -634,8 +654,11 @@ export function executeShot(
   const dispersionMult =
     mods.dispMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * mods.dispMult;
   // Final spray SHAPE = the global upgrade mod (suppress duck-hooks, …) folded with this club's
-  // character skew (a hooky driver). Carry-window controls are resolved by club category.
-  const shape = resolveShape(opts.shapeMod, mods.shape);
+  // character skew (a hooky driver) — PLUS Sam's confidence boost when this IS the club he suggested
+  // (commit to the caddy's club → more great shots). A non-Sam shot leaves confidence undefined, so
+  // the combine is a no-op and the shape is byte-for-byte unchanged. Carry-window by club category.
+  const confident = opts.confidence && opts.suggestedClubId === club.id ? opts.confidence : undefined;
+  const shape = resolveShape(combineShapeMods(opts.shapeMod, confident), mods.shape);
   const cw = carryControlFor(nominalCarry, opts);
   const result = resolveShot({
     from,
@@ -780,6 +803,9 @@ export function shotSpread(
     shapeMod?: ShapeMod;
     minCarryBoost?: number;
     wedgeWindow?: number;
+    /** Sam's confidence shape boost — folded into the cone iff `club.id === suggestedClubId`. */
+    confidence?: ShapeMod;
+    suggestedClubId?: string;
   } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
@@ -809,10 +835,12 @@ export function shotSpread(
   const low = intended * lowFrac;
   const high = intended * highFrac;
   const mean = Math.max(low, Math.min(high, intended * prof.meanFrac + along));
-  // The asymmetric zone shape: global upgrade mod + this club's character skew. The renderer draws
-  // each zone straight from it (so the graphic is the landing distribution), and the effective σ is
-  // its RMS so previews/tests read true.
-  const shape = resolveShape(opts.shapeMod, mods.shape);
+  // The asymmetric zone shape: global upgrade mod + this club's character skew (+ Sam's confidence
+  // boost when this is his suggested club, so the cone visibly tightens on the recommended club). The
+  // renderer draws each zone straight from it (so the graphic is the landing distribution), and the
+  // effective σ is its RMS so previews/tests read true.
+  const confident = opts.confidence && opts.suggestedClubId === club.id ? opts.confidence : undefined;
+  const shape = resolveShape(combineShapeMods(opts.shapeMod, confident), mods.shape);
   const angleSpread = prof.lateralFrac * dispMult;
   return {
     origin: from,

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CONVICT_SHEEP_GUARD,
   SPACE_DUCKS_GUARD,
+  SAM_CONFIDENCE,
   NAMED_CADDY_IDS,
   loadoutFromPerks,
   namedCaddyOwned,
@@ -10,6 +11,7 @@ import {
   startingLoadout,
   usableBag,
 } from '../src/sim/rpg/economy';
+import { beginHole, shotView, takeShot } from '../src/sim/rpg/play';
 import {
   buy,
   shopOffer,
@@ -24,7 +26,7 @@ import {
   resolveShot,
   type SprayShape,
 } from '../src/sim/shot';
-import { executeShot, pinOf, playCourse, CHIPIN_RANGE } from '../src/sim/round';
+import { executeShot, pinOf, playCourse, shotSpread, CHIPIN_RANGE } from '../src/sim/round';
 import { CLUBS } from '../src/sim/clubs';
 import { generateCourse } from '../src/sim/course/generate';
 import { playTotals } from '../src/sim/score';
@@ -97,18 +99,7 @@ describe('caddy effects rebuild from perks (resume-safe, no save bump)', () => {
     expect(loadoutFromPerks(['space-ducks']).caddyGuard).toEqual(SPACE_DUCKS_GUARD);
     expect(loadoutFromPerks(['convict-sheep']).caddyGuard).toEqual(CONVICT_SHEEP_GUARD);
     expect(loadoutFromPerks(['suggestible-sam']).clubSuggest).toBe(true);
-  });
-
-  it('Suggestible Sam is a pure interactive QoL caddy — no sim effect, base flow has no suggestion', () => {
-    // The base loadout (no caddy) carries no club-suggestion flag, so the default play flow shows none.
-    expect(startingLoadout().clubSuggest).toBeUndefined();
-    // Sam is interactive-only: he sets no shot/economy field the headless sim reads, so a run with Sam
-    // and a run without him play byte-for-byte identically (the auto sim never reads clubSuggest).
-    const withSam = loadoutFromPerks(['suggestible-sam']);
-    expect(withSam.caddyGuard).toBeUndefined();
-    expect(withSam.chipInBoost).toBeUndefined();
-    expect(withSam.driverAnywhere).toBeUndefined();
-    expect(withSam.autoPutt).toBeUndefined();
+    expect(loadoutFromPerks(['suggestible-sam']).confidenceMod).toEqual(SAM_CONFIDENCE);
   });
 
   it('snapshot/resume reconstructs a hired caddy', () => {
@@ -116,6 +107,85 @@ describe('caddy effects rebuild from perks (resume-safe, no save bump)', () => {
     const resumed = resumeRun(snapshotRun(run));
     expect(resumed.loadout.caddyGuard).toEqual(SPACE_DUCKS_GUARD);
     expect(namedCaddyOwned(resumed.loadout.perks)).toBe('space-ducks');
+  });
+});
+
+describe('Suggestible Sam — club confidence (a real, gated scoring edge)', () => {
+  it('the base flow has no suggestion and no confidence; Sam adds both', () => {
+    expect(startingLoadout().clubSuggest).toBeUndefined();
+    expect(startingLoadout().confidenceMod).toBeUndefined();
+    const sam = loadoutFromPerks(['suggestible-sam']);
+    expect(sam.clubSuggest).toBe(true);
+    expect(sam.confidenceMod).toEqual(SAM_CONFIDENCE);
+  });
+
+  it('the confidence boost lifts the green zone ONLY on the suggested club', () => {
+    const hole = generateCourse('sam:shape', { holes: 6, distanceFromStart: 0 }).holes[0]!;
+    const driver = CLUBS.find((c) => c.id === 'D')!;
+    const tgt = pinOf(hole);
+    const base = shotSpread(hole, hole.tee, 'tee', tgt, driver, { carryMult: 1 });
+    const onClub = shotSpread(hole, hole.tee, 'tee', tgt, driver, {
+      carryMult: 1,
+      confidence: SAM_CONFIDENCE,
+      suggestedClubId: 'D',
+    });
+    const offClub = shotSpread(hole, hole.tee, 'tee', tgt, driver, {
+      carryMult: 1,
+      confidence: SAM_CONFIDENCE,
+      suggestedClubId: '7i', // not the club being played → no boost
+    });
+    expect(onClub.shape.green).toBeGreaterThan(base.shape.green); // committed to Sam's club → more green
+    expect(offClub.shape.green).toBeCloseTo(base.shape.green, 10); // a different club → byte-for-byte base
+  });
+
+  it('an absent confidence mod is byte-for-byte identical (no extra rng, landing unchanged)', () => {
+    const hole = generateCourse('sam:det', { holes: 6, distanceFromStart: 4 }).holes[0]!;
+    const driver = CLUBS.find((c) => c.id === 'D')!;
+    const tgt = pinOf(hole);
+    for (let s = 0; s < 40; s++) {
+      const a = executeShot(hole, hole.tee, 'tee', tgt, driver, { carryMult: 1 }, new Rng(`s:${s}`));
+      // confidence present but for a DIFFERENT club → the gate is closed, so it must match exactly.
+      const b = executeShot(
+        hole,
+        hole.tee,
+        'tee',
+        tgt,
+        driver,
+        { carryMult: 1, confidence: SAM_CONFIDENCE, suggestedClubId: 'PW' },
+        new Rng(`s:${s}`),
+      );
+      expect(b.log.result.landing).toEqual(a.log.result.landing);
+    }
+  });
+
+  // Follow-Sam harness: play every shot with the club Sam suggests, with vs without his confidence.
+  // Both arms make the IDENTICAL decisions on the IDENTICAL rng stream — the only difference is the
+  // shape boost (which adds no rng draws) — so any score gap is the confidence mechanic alone.
+  const followSamStableford = (lo: ReturnType<typeof loadoutFromPerks>): number => {
+    let sf = 0;
+    let n = 0;
+    for (let s = 0; s < 60; s++) {
+      const course = generateCourse(`${s}:sam`, { holes: 6, distanceFromStart: s % 12 });
+      const rng = new Rng(`${course.seed}:sam`);
+      const records = course.holes.map((hole, i) => {
+        let play = beginHole(hole, i);
+        for (let g = 0; g < 40 && !play.done; g++) {
+          const sv = shotView(play, lo);
+          const clubId = sv.lie === 'green' ? 'putter' : sv.attackClubId; // play Sam's club
+          play = takeShot(play, { clubId, aim: 'attack' }, lo, rng);
+        }
+        return { par: hole.par, strokes: play.strokes };
+      });
+      sf += playTotals(records).stableford;
+      n++;
+    }
+    return sf / n;
+  };
+
+  it('following Sam (committing to his club) raises mean per-stop Stableford', () => {
+    const base = followSamStableford(loadoutFromPerks([])); // same clubs, no confidence
+    const withSam = followSamStableford(loadoutFromPerks(['suggestible-sam']));
+    expect(withSam).toBeGreaterThan(base);
   });
 });
 

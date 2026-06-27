@@ -217,6 +217,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     driverAnywhere: run.loadout.driverAnywhere,
     guard: run.loadout.caddyGuard,
     chipIn: run.loadout.chipInBoost,
+    confidence: run.loadout.confidenceMod,
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };

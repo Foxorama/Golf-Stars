@@ -52,14 +52,21 @@ Everything below serves whichever avenue wins.
   tails); `ShotResult.redirect` records the would-be miss so `playView` animates the projectile +
   ground-path kink (`render/caddyArt.ts`, eyes-on). All caddy rng is gated so the base sim stays
   byte-for-byte; threaded into both auto + interactive. `tests/caddies.test.ts` guards it.
-- **GS-caddy-sam — Club suggestions become a caddy perk. SHIPPED.** The interactive 🎯 Suggested
-  button + the legend's suggested-club readout + the green-coverage default club were given to EVERY
-  player for free; they now gate behind hiring **Suggestible Sam** (`suggestible-sam`, epic, named
-  caddy → `loadout.clubSuggest`). The base flow shows no suggestion and defaults to a neutral club
-  (putter on the green, else the longest usable) you read + cycle yourself — club selection is a real
-  read again, and there's now an info caddy worth hiring. `suggestPlayerClub`/`shotView` are unchanged;
-  `app.ts` just gates surfacing them. Sam is pure interactive QoL — no field the headless sim reads, so
-  byte-for-byte determinism + all balance bars are untouched. `tests/caddies.test.ts` guards it.
+- **GS-caddy-sam — Suggestible Sam: club suggestions become a caddy perk + a scoring edge. SHIPPED.**
+  The interactive 🎯 Suggested button + the legend's suggested-club readout + the green-coverage default
+  club were given to EVERY player for free; they now gate behind hiring **Suggestible Sam**
+  (`suggestible-sam`, epic, named caddy → `loadout.clubSuggest`). The base flow shows no suggestion and
+  defaults to a neutral club (putter on the green, else the longest usable) you read + cycle yourself —
+  club selection is a real read again. To make him an actual UPGRADE (not just an un-nerf), Sam also
+  grants **club confidence** (`loadout.confidenceMod` = `SAM_CONFIDENCE`, a green-zone `ShapeMod`):
+  commit to the club he suggests and the spray cone visibly tightens (more great shots); override for a
+  tactical placement and you forfeit it. Folded into the shape in BOTH `executeShot` and `shotSpread`
+  ONLY when the played club is the suggested one, threaded identically through the auto sim
+  (`PlayHoleOptions.confidence`) and the interactive driver, so auto≡interactive holds. It's a SHAPE
+  change (no new rng), so non-Sam play is byte-for-byte unchanged and the gate makes an off-suggestion
+  shot identical too; it only raises green %, so the death-spiral bar can't trip. Value proven by a
+  follow-Sam headless harness (higher mean per-stop Stableford). `tests/caddies.test.ts` guards the
+  gating, determinism, and the scoring lift.
 
 - **GS-19 — Themes & fairways overhaul (per-zone identity + signature mechanics). SHIPPED.** The 5
   worlds now look and PLAY distinct. (1) **Per-archetype turf palettes** (`ARCHETYPE_TURF`) replace
