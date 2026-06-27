@@ -19,6 +19,7 @@ import { resolveTiers, tierPercents, type SprayTiersInput } from './render/holeV
 import { rarCol } from './sim/rpg/loot';
 import { itemCap, itemCost, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
+import { CHARACTERS, getCharacter, type GolferStyle } from './sim/rpg/characters';
 import { effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
@@ -143,9 +144,11 @@ const btn = (
 
 function header(): string {
   const r = state.run;
+  const ch = getCharacter(r.loadout.characterId);
+  const who = ch ? ` <span style="font-size:13px;color:${ch.style.cap};">· ${ch.name}</span>` : '';
   return `
     <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
-      <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>
+      <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>${who}
       <span style="margin-left:auto;font-size:13px;color:var(--gs-dim);">
         Stop <b style="color:var(--gs-ink);">${r.stopIndex + 1}</b> · Dist <b style="color:var(--gs-ink);">${r.distanceFromStart}</b> · Credits <b style="color:var(--gs-warn);">${r.credits}</b>
         · Hcp <b style="color:var(--gs-ink);">${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
@@ -186,6 +189,60 @@ function titleScreen(): string {
     }
     <h2 style="font-size:15px;margin-top:1em;">${state.resumable ? 'Or start a new run' : 'Choose a run format'}</h2>
     ${formats}`;
+}
+
+/** A compact inline-SVG of the play-view golfer silhouette, tinted to a character (GS-18). Static
+ *  preview for the select card — same crew silhouette (legs, shirt torso, skin arms/head, cap +
+ *  club) the on-course figure uses, so the card reads as "this is who you'll see swinging". */
+function golferSVG(style: GolferStyle, w = 78, h = 104): string {
+  const s = style.build;
+  return `
+    <svg viewBox="0 0 78 104" width="${w}" height="${h}" aria-hidden="true" style="display:block;">
+      <ellipse cx="39" cy="99" rx="${20 * s}" ry="4" fill="rgba(0,0,0,0.28)"/>
+      <g transform="translate(39,52) scale(${s}) translate(-39,-52)" stroke-linecap="round" stroke-linejoin="round">
+        <!-- legs -->
+        <path d="M39 64 L31 96 M39 64 L48 96" stroke="#2c3142" stroke-width="7" fill="none"/>
+        <!-- club -->
+        <path d="M44 40 L66 78" stroke="#d9dee8" stroke-width="2.4" fill="none"/>
+        <circle cx="66" cy="78" r="2.6" fill="#aeb6c6"/>
+        <!-- torso -->
+        <path d="M39 64 L44 34" stroke="${style.shirt}" stroke-width="13" fill="none"/>
+        <!-- arms -->
+        <path d="M44 34 L52 50" stroke="${style.skin}" stroke-width="5" fill="none"/>
+        <!-- head + cap -->
+        <circle cx="46" cy="24" r="9" fill="${style.skin}"/>
+        <path d="M37 23 A9 9 0 0 1 55 23 Z" fill="${style.cap}"/>
+        <rect x="50" y="21" width="12" height="4" rx="1.5" fill="${style.cap}"/>
+      </g>
+    </svg>`;
+}
+
+function characterScreen(): string {
+  const cards = CHARACTERS.map((ch) => {
+    const pros = ch.pros.map((p) => `<li style="color:var(--gs-accent);">✓ <span style="color:var(--gs-ink);">${p}</span></li>`).join('');
+    const cons = ch.cons.map((c) => `<li style="color:var(--gs-warn);">▲ <span style="color:var(--gs-dim);">${c}</span></li>`).join('');
+    return `
+      <div class="gs-panel gs-clickcard" style="display:flex;flex-direction:column;gap:8px;border-color:${ch.style.cap}55;">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div style="flex:0 0 auto;background:linear-gradient(180deg,#0e1118,#161b27);border-radius:10px;padding:4px 6px;">${golferSVG(ch.style)}</div>
+          <div style="flex:1 1 auto;">
+            <b style="font-size:16px;color:${ch.style.cap};">${ch.name}</b>
+            <div style="font-size:11.5px;opacity:.7;margin-top:1px;">${ch.origin} · ${ch.identity}</div>
+            <p style="font-size:12.5px;opacity:.85;margin:.4em 0 0;">${ch.blurb}</p>
+          </div>
+        </div>
+        <ul style="list-style:none;padding:0;margin:0;font-size:12px;line-height:1.5;">${pros}${cons}</ul>
+        ${btn(`Choose ${ch.name.split(' ')[0]}`, { type: 'selectCharacter', characterId: ch.id }, { variant: 'primary', block: true })}
+      </div>`;
+  }).join('');
+  return `
+    <header style="border-left:4px solid #5fd45a;padding-left:10px;">
+      <h1 style="margin:0;font-size:22px;">Choose your golfer</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Each plays the galaxy differently — a clear strength, a clear quirk. Pick who you'll voyage as.</p>
+    </header>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:1em;">
+      ${cards}
+    </div>`;
 }
 
 function introScreen(): string {
@@ -669,6 +726,11 @@ function gameoverScreen(): string {
     </div>`;
 }
 
+/** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. */
+function golferLook(): GolferStyle | undefined {
+  return getCharacter(state.run.loadout.characterId)?.style;
+}
+
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -692,6 +754,8 @@ function render(): void {
   const body =
     state.screen === 'title'
       ? titleScreen()
+      : state.screen === 'character'
+      ? characterScreen()
       : state.screen === 'intro'
       ? introScreen()
       : state.screen === 'playing'
@@ -769,6 +833,7 @@ function render(): void {
         width: 340,
         height: 520,
         biome: state.course.biome, themeId: state.course.meta.themeId,
+        golferLook: golferLook(),
       });
     }
   }
@@ -790,6 +855,7 @@ function render(): void {
         width: 340,
         height: 520,
         biome: state.course.biome, themeId: state.course.meta.themeId,
+        golferLook: golferLook(),
         focus,
         viewRadius: animatingPlay.shots.length ? Math.max(55, travel * 0.62) : 25,
         follow: true,

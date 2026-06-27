@@ -50,6 +50,8 @@ export interface PlayerLoadout {
   driverDeck: number;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
+  /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
+  characterId?: string;
 }
 
 /** The driver club id (off-tee use is gated by the Driver-on-Deck tier). */

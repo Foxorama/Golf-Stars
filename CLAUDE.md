@@ -181,6 +181,32 @@ This game lives or dies on three axes — put every change through all three bef
   that way; a "wilder course" event would have to re-clear those bars.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
+- **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen
+  between format pick and intro) lets you choose 1 of 4 golfers, each a clear strength + clear quirk
+  so the loop FEELS different per run. Two pure levers, both CONTENT AS DATA: a `loadout(base)` tweak
+  (bag distance via `boostDistanceClubs`, global `dispersionMult`/`handicap`) and a per-club
+  `clubMods(nominalCarry) → {dispMult, angleBias, rollFracDelta}` SHAPE function. The shape adds the
+  new mechanic — a directional **shot bias**: `angleBias` (radians, + = fade/right, − = hook/left)
+  shifts the MEAN of `resolveShot`'s SAME angular spray draw (not its width, no extra rng → a 0 bias
+  is byte-for-byte identical to before), and `shotSpread` rotates the preview cone by it so the
+  fade/hook READS TRUE (aim left to hold a fade — wind-reads-true philosophy). `dispMult` is per-club
+  (Huang stripes irons but sprays the driver), `rollFracDelta` feeds `rollYards` (Bo back-spins the
+  scoring clubs to hold greens). Roster: **Feather Fade** (tidy fade, tighter overall), **Huang-Woo
+  Hook** (surgical irons, hooky wild driver), **Longshot Larry** (+14yd distance clubs, more
+  orange/red), **Backspin Bo** (backspin from 5-iron down, shorter tee). The `ShotMods` function is
+  resolved from `loadout.characterId` at the run boundary and threaded into BOTH the auto sim
+  (`playStop`→`playHole`→`executeShot`) and the interactive driver (`takeShot`/`previewShot`) so
+  auto≡interactive stays byte-for-byte (guarded). Distance is done via BAG edits (not a carry
+  multiplier) so the reach-AI clubs correctly and never overshoots (the power-cell lesson). The
+  golfer rides `run.loadout.characterId` → `RunSnapshot.characterId` (re-applied on resume by
+  `applyCharacter`, so NO save-version bump). Balance: all 4 stay within ~5% of the characterless
+  mean per-stop Stableford and clear the no-death-spiral bar — `tests/characters.test.ts` guards
+  viability, the cluster band, the shapes are real, byte-for-byte determinism, and snapshot/resume.
+  Render: `style` is render-only metadata (cap/skin/shirt/build); the play-view `drawGolfer` takes a
+  `GolferLook` (so the on-course swinger wears the chosen golfer's colours), the select card draws an
+  inline-SVG silhouette, and the header shows the name. The Sim Lab (`lab.ts`/hub) gained a golfer
+  selector so the shape is demoable (dispersion scatter + scoring harness); `CHARACTERS` is in the
+  test-hub guard's imported-tables list so the roster can't fork.
 - **Persistent meta-progression (GS-12, `meta.ts`):** runs bank **Star Shards** (`shardsForRun` =
   distance×3 + stops×2, floored at 1) in **save v3**, spent at the Outpost on PERMANENT, leveled
   *starting* upgrades (`META_UPGRADES`: Veteran Hands −2 hcp, Tour Bag +6yd, Steady Grip −4% spray,
