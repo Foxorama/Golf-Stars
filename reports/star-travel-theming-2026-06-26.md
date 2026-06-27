@@ -117,11 +117,24 @@ The outfitter now reads on-theme for where you are — the last pillar of the or
   never a filter — every item can still appear, just more/less often. The offer stays deterministic
   and distinct, and item EFFECTS are untouched, so all shop balance invariants hold.
 
+## What shipped next (GS-17f — per-theme turf/ground palette tints)
+
+The turf and ground now read each stop's world, not just the 5 archetype palettes:
+
+- `tintHex` + `Tint` (palette.ts) — a render-only HSL transform (hue rotate + sat/lum scale) applied
+  to the colour-source helpers (`shadeFor`/`roughFor`/`accentFor` gained an optional `tint`).
+- `themeTint` (style.ts) resolves a theme to a GROUND tint (full strength — rough/background/accents)
+  and a gentler TURF tint (fairway/green/tee, kept playable). Direction comes from the archetype
+  (`ARCHETYPE_HUESHIFT`: verdant 0, desert/inferno warm, frost cools, void violet), magnitude is
+  deepened by rarity and nudged per-theme so stops read distinct.
+- Gated on `themeId`: a themeless render is byte-identical (tint passes `rgba()`/`none` through, and a
+  structural prim-count invariant in `tests/constellations.test.ts` proves no extra prims are added).
+- Verified eyes-on (Scorpius/Sagittarius/Phoenix/Crux/Cygnus/Leo/Milky-Way-Core/Eta-Carinae raster).
+
 ## Roadmap — GS-17 complete
 
-All five slices (a themes → b biomes → c events → d upgrades → e render) have shipped. Remaining
-small follow-on: wire the theme into the Sim Lab + Demo hub, and per-theme PALETTE tints (today
-rarity tints the constellation FIGURE; the biome ground still uses the 5 archetype palettes).
+All slices (a themes → b biomes → c events → d upgrades → e render → f turf/ground palette) have
+shipped. The only remaining follow-on: surface the theme in the Sim Lab + Demo hub.
 
 ## Fairness boundary (do not cross)
 

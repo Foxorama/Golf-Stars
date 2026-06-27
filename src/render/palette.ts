@@ -111,22 +111,95 @@ export const ACCENTS: Record<string, Accent> = {
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };
 
-export function accentFor(biome?: string): Accent {
-  return (biome && ACCENTS[biome]) || ACCENT_DEFAULT;
+export function accentFor(biome?: string, tint?: Tint): Accent {
+  const a = (biome && ACCENTS[biome]) || ACCENT_DEFAULT;
+  if (!tint) return a;
+  return { flowers: a.flowers.map((f) => tintHex(f, tint)), mote: tintHex(a.mote, tint) };
 }
 
 /** Shade ramp for a surface kind; unknown fantasy surfaces derive a tint ramp off `fillFor`. */
-export function shadeFor(kind: string): Shade {
+export function shadeFor(kind: string, tint?: Tint): Shade {
   const known = SHADES[kind];
-  if (known) return known;
-  const base = fillFor(kind);
-  return { light: base, base, dark: base, ink: 'rgba(0,0,0,0.45)' };
+  const s: Shade = known ?? { light: fillFor(kind), base: fillFor(kind), dark: fillFor(kind), ink: 'rgba(0,0,0,0.45)' };
+  if (!tint) return s;
+  return {
+    light: tintHex(s.light, tint),
+    base: tintHex(s.base, tint),
+    dark: tintHex(s.dark, tint),
+    ink: tintHex(s.ink, tint),
+  };
 }
 
 export function fillFor(kind: string): string {
   return FILL[kind] ?? '#6a4f8a'; // unknown fantasy surface → purple tint
 }
 
-export function roughFor(biome?: string): string {
-  return (biome && BIOME_ROUGH[biome]) || FILL.rough!;
+export function roughFor(biome?: string, tint?: Tint): string {
+  return tintHex((biome && BIOME_ROUGH[biome]) || FILL.rough!, tint);
+}
+
+// --- Per-theme tinting (GS-17f): shift turf/ground hue toward the stop's world ----------------
+//
+// A render-only colour transform so a stop's TURF and GROUND read its theme (an ember world's
+// fairways scorch warm, a void's go violet), deepened by rarity. Applied only when a theme is
+// active (gated upstream), so a themeless render is byte-identical. `#rrggbb`/`#rgb` only —
+// `rgba()`/`none`/non-hex pass through untouched, so shadows and `fill:'none'` outlines survive.
+
+export interface Tint {
+  /** Hue rotation in degrees. */
+  hueShift: number;
+  /** Saturation multiplier (>1 = richer). */
+  satMul: number;
+  /** Lightness multiplier (<1 = deeper). */
+  lumMul: number;
+}
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+
+/** Apply a hue/sat/lum tint to a `#rrggbb`/`#rgb` colour; pass anything else through unchanged. */
+export function tintHex(hex: string, tint?: Tint): string {
+  if (!tint) return hex;
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return hex; // rgba(), 'none', etc. — leave alone
+  let h = m[1]!;
+  if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const [hh, ss, ll] = rgbToHsl(r, g, b);
+  const nh = (((hh + tint.hueShift) % 360) + 360) % 360;
+  const [nr, ng, nb] = hslToRgb(nh, clamp01(ss * tint.satMul), clamp01(ll * tint.lumMul));
+  const to2 = (v: number) => Math.round(clamp01(v) * 255).toString(16).padStart(2, '0');
+  return `#${to2(nr)}${to2(ng)}${to2(nb)}`;
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let hue = 0;
+  if (max === r) hue = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) hue = (b - r) / d + 2;
+  else hue = (r - g) / d + 4;
+  return [hue * 60, s, l];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  if (s === 0) return [l, l, l];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hk = h / 360;
+  const ch = (n: number): number => {
+    let x = n;
+    if (x < 0) x += 1;
+    if (x > 1) x -= 1;
+    if (x < 1 / 6) return p + (q - p) * 6 * x;
+    if (x < 1 / 2) return q;
+    if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+    return p;
+  };
+  return [ch(hk + 1 / 3), ch(hk), ch(hk - 1 / 3)];
 }

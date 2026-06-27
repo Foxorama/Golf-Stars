@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHoleSVG } from '../src/render/holeView';
+import { buildScene } from '../src/render/style';
+import { holeProjector } from '../src/render/project';
 import { CONSTELLATION_FIGURES, constellationFigure } from '../src/render/constellations';
 import { generateCourse } from '../src/sim/course/generate';
 import { THEMES } from '../src/sim/course/themes';
@@ -35,10 +37,24 @@ describe('constellation backdrop (GS-17e)', () => {
     expect(themed.length).toBeGreaterThan(plain.length); // extra figure prims
   });
 
-  it('deep-sky themes (no stick figure) leave the render byte-identical to un-themed', () => {
+  it('deep-sky themes (no stick figure) add NO figure prims (only the turf/ground tint differs)', () => {
+    // Structural invariant: the per-theme tint (GS-17f) recolours fills but adds no prims, while a
+    // constellation theme adds the figure's line/circle prims. A deep-sky theme has no figure → same
+    // prim COUNT as un-themed; a constellation theme has MORE.
+    const proj = holeProjector(hole, { width: 320, height: 420 });
+    const base = { width: 320, height: 420, biome: 'void-garden' } as const;
+    const plain = buildScene(hole, proj, base).length;
+    const deepSky = buildScene(hole, proj, { ...base, themeId: 'orion-nebula' }).length;
+    const constellation = buildScene(hole, proj, { ...base, themeId: 'sagittarius' }).length;
+    expect(deepSky).toBe(plain); // no figure added
+    expect(constellation).toBeGreaterThan(plain); // figure prims added
+  });
+
+  it('a per-theme tint recolours the turf/ground (GS-17f) without changing structure', () => {
+    // Same hole + theme with vs without the figure-bearing constellation still tints the ground.
     const plain = renderHoleSVG(hole, { biome: 'void-garden' });
-    const deepSky = renderHoleSVG(hole, { biome: 'void-garden', themeId: 'orion-nebula' });
-    expect(deepSky).toBe(plain);
+    const tinted = renderHoleSVG(hole, { biome: 'void-garden', themeId: 'orion-nebula' });
+    expect(tinted).not.toBe(plain); // the turf/ground hue shifted
   });
 
   it('the same theme renders byte-for-byte identically (determinism)', () => {
