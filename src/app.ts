@@ -12,7 +12,9 @@ import { courseCardHTML, itemCardHTML, shotCardHTML, puttCardHTML } from './rend
 import { renderHoleSVG } from './render/holeView';
 import { holeProjector } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
-import { biomeCarryMult, pinOf } from './sim/round';
+import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
+import { biomeCarryMult, pinOf, DEFAULT_MANUAL_BAND } from './sim/round';
+import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { biomeById } from './sim/course/biomes';
 import { archetypeFor, themeById } from './sim/course/themes';
@@ -115,6 +117,10 @@ function dispatch(action: Action): void {
   if (view) {
     view.destroy();
     view = null;
+  }
+  if (puttMeter) {
+    puttMeter.destroy();
+    puttMeter = null;
   }
   // Any reducer action dismisses a pending shot popup and cancels its timer.
   awaitingShotPopup = false;
@@ -290,6 +296,9 @@ let selFreeTarget: [number, number] | null = null;
 // effect, not reducer state — like animatedShots above).
 let awaitingShotPopup = false;
 let popupTimer = 0;
+// The manual-putt pace meter (a time/DOM side-effect, like the play view) — mounted on the putt
+// screen, torn down on any dispatch.
+let puttMeter: PuttMeterHandle | null = null;
 
 function pendingAnimation(play: NonNullable<UiState['play']>): { shots: typeof play.shots; putts: typeof play.puttLogs } | null {
   const newShots = play.shots.slice(animatedShots);
@@ -533,15 +542,21 @@ function playingBody(animating: boolean): string {
       focus: play.ball,
       viewRadius: Math.max(18, v.distToPin * 1.8),
     });
+    // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
+    // Tapping the meter OR the Putt button captures the pace. The band widens with putter upgrades.
+    const meterInstr =
+      '<p style="font-size:12px;opacity:.6;margin:.1em 0 .5em;line-height:1.4;">Tap the meter (or Putt) when the marker is in the green <b>MAKE</b> band. Too soft leaves it short; too firm runs it past.</p>';
     return `
       ${header()}
       <p style="font-size:14px;opacity:.85;">${scoreLine} · on the green · <b>${v.distToPin}</b> yds to the cup · putt <b>${play.putts + 1}</b></p>
       <div class="gs-play">
         <div class="gs-map" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);">${puttSvg}</div>
         <section class="gs-controls">
+          ${meterInstr}
+          <div id="puttmeter" style="margin-bottom:10px;"></div>
           <div style="margin-bottom:10px;">${puttToggleBtn()}</div>
           <div class="gs-hitbar" style="margin-top:8px;">
-            ${btn('⛳ Putt', { type: 'putt' }, { variant: 'primary' })}
+            <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="font-size:16px;">⛳ Putt</button>
             ${btn('» Auto-finish putts', { type: 'autoShotHole' }, { variant: 'ghost' })}
           </div>
         </section>
@@ -632,10 +647,11 @@ function shotPopupOverlay(): string {
   const play = state.play!;
   const last = play.shots[play.shots.length - 1];
   if (!last) return '';
+  const distToPin = last.holed ? undefined : Math.round(dist(play.ball, pinOf(play.hole)));
   return `
-    <div style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;">
+    <div style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto;">
       <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px;max-width:300px;width:100%;">
-        ${shotCardHTML(last)}
+        ${shotCardHTML(last, { distToPin })}
         <button class="gs-btn gs-btn--primary" data-popup-continue="1" style="text-align:center;font-size:16px;padding:12px;">Continue →</button>
       </div>
     </div>`;
@@ -878,6 +894,23 @@ function render(): void {
       render();
     });
   });
+  // The "⛳ Putt" button commits the pace meter at the marker's current position (same as tapping it).
+  app.querySelectorAll<HTMLElement>('[data-putt-commit]').forEach((el) => {
+    el.addEventListener('click', () => puttMeter?.commit());
+  });
+
+  // Mount the manual-putt pace meter when the ball is on the green awaiting a manual putt.
+  if (state.screen === 'playing' && state.play && !animatingPlay && awaitingPutt(state.play) && !state.play.done) {
+    const meterEl = document.getElementById('puttmeter');
+    if (meterEl) {
+      const band = puttSkillOf(state.run.loadout).manualBand ?? DEFAULT_MANUAL_BAND;
+      puttMeter = mountPuttMeter(meterEl, {
+        width: 300,
+        band,
+        onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
+      });
+    }
+  }
 
   // Mount the animated play view on the result screen.
   if (state.screen === 'result' && state.played) {
@@ -918,18 +951,31 @@ function render(): void {
         onDone: () => {
           animatedShots = play.shots.length;
           animatedPutts = play.puttLogs.length;
-          // After a non-terminal full shot, hold a beat (so the landing reads as finished) then
-          // pop the shot-result card. A terminal shot falls through to the done screen, which is
-          // itself the result card + Continue; pure putts skip the popup.
-          if (hadShots && !play.done) {
-            const delay = (window as unknown as { _gsFeel?: { popupDelayMs?: number } })._gsFeel?.popupDelayMs ?? 320;
+          // Hold a beat after the ball settles so the finish reads as finished before the next screen
+          // — chipping/putting used to cut to the follow-up instantly. Three cases:
+          //  • non-terminal full shot → pop the rich shot-result card (with Continue);
+          //  • terminal (holed/picked up/auto putt-out done) → a longer hold, then the done screen;
+          //  • non-terminal putt(s) only (manual lag) → a brief hold, then back to the putt meter.
+          const feelMs = (window as unknown as { _gsFeel?: Record<string, number> })._gsFeel ?? {};
+          if (play.done) {
+            const hold = feelMs.resultHoldMs ?? 700;
+            popupTimer = window.setTimeout(() => {
+              popupTimer = 0;
+              render();
+            }, hold);
+          } else if (hadShots) {
+            const delay = feelMs.popupDelayMs ?? 320;
             popupTimer = window.setTimeout(() => {
               popupTimer = 0;
               awaitingShotPopup = true;
               render();
             }, delay);
           } else {
-            render();
+            const hold = feelMs.puttHoldMs ?? 450;
+            popupTimer = window.setTimeout(() => {
+              popupTimer = 0;
+              render();
+            }, hold);
           }
         },
       });

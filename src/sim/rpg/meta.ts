@@ -76,6 +76,15 @@ export const META_UPGRADES: readonly MetaUpgrade[] = [
     creditBonus: 40,
     applyLevel: (m) => m, // credits are applied via metaStartingCredits, not the loadout
   },
+  {
+    id: 'putting-coach',
+    name: 'Putting Coach',
+    desc: 'Begin each run a steadier putter — a wider make window from the first green',
+    rarity: 'rare',
+    maxLevel: 4,
+    baseCost: 30,
+    applyLevel: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.08 }),
+  },
 ];
 
 export function metaUpgrade(id: string): MetaUpgrade | undefined {

@@ -45,13 +45,12 @@ describe('arc apex (loft-scaled)', () => {
 describe('curved ground path (launch along bearing, bend to landing)', () => {
   const from: Vec = [0, 0];
   const landing: Vec = [40, 200]; // a shot that finishes 40 right (a fade)
-  const carry = dist(from, landing);
   // The bearing is the AIM line (straight up), NOT the line to the offset landing — that offset is
   // the spray angle, and the curve is what the path does between the aim line and that landing.
   const bearing = 0;
 
   it('hits the endpoints exactly', () => {
-    const control = flightControl(from, bearing, carry);
+    const control = flightControl(from, landing, bearing);
     expect(flightGround(from, control, landing, 0)).toEqual(from);
     const end = flightGround(from, control, landing, 1);
     expect(end[0]).toBeCloseTo(landing[0], 6);
@@ -61,7 +60,7 @@ describe('curved ground path (launch along bearing, bend to landing)', () => {
   it('curves: at midflight the ball is less than halfway to the lateral finish (banana)', () => {
     // The control sits straight ahead (no lateral), so a quadratic Bézier hugs the aim line early
     // and swings out late — the classic fade/slice shape, not a straight diagonal.
-    const straightAhead = flightControl(from, bearing, carry);
+    const straightAhead = flightControl(from, landing, bearing);
     expect(Math.abs(straightAhead[0])).toBeLessThan(1); // control is ~on the launch axis
     const mid = flightGround(from, straightAhead, landing, 0.5);
     expect(mid[0]).toBeLessThan(landing[0] / 2); // not yet halfway sideways

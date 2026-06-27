@@ -8,7 +8,7 @@
  */
 
 import type { Course } from '../sim/course/contract';
-import type { PlayedHole } from '../sim/round';
+import type { PlayedHole, PuttControl } from '../sim/round';
 import {
   buy,
   currentCourse,
@@ -84,7 +84,8 @@ export interface UiState {
   metaUpgrades: MetaUpgrades;
   /** Shards earned by the run that just ended — shown on the gameover screen. */
   lastRunShards?: number;
-  /** Putting mode toggle: auto putt-out vs manual. The Auto-Caddie legendary forces auto. */
+  /** Putting mode toggle: manual pace-meter putting (default) vs auto putt-out. The Auto-Caddie
+   *  legendary forces auto on. */
   autoPutt: boolean;
   /**
    * True when a freshly-begun hole should show its briefing splash (wind/hazards/conditions +
@@ -102,7 +103,7 @@ export type Action =
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'startHole' } // dismiss the hole briefing splash, begin playing
   | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number] }
-  | { type: 'putt' } // take one manual putt on the green
+  | { type: 'putt'; control?: PuttControl } // take one putt — with a pace-meter control = manual skill
   | { type: 'toggleAutoPutt' } // flip auto putt-out vs manual
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
@@ -146,7 +147,7 @@ export function initState(
     bestDistance: meta.bestDistance ?? 0,
     shards: meta.shards ?? 0,
     metaUpgrades,
-    autoPutt: true,
+    autoPutt: false, // manual pace-meter putting is the default; Auto-Caddie (or the toggle) flips it
     holeSplash: false,
   };
 }
@@ -247,7 +248,7 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'putt': {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
-      const play = takePutt(state.play, state.run.loadout, state.holeRng);
+      const play = takePutt(state.play, state.run.loadout, state.holeRng, action.control);
       return { ...state, play };
     }
 

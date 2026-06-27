@@ -71,12 +71,11 @@ export function sampleCurvedFlight(
   from: Vec,
   landing: Vec,
   bearingDeg: number,
-  carry: number,
   t: number,
   apex: number,
 ): FlightSample {
   const tt = Math.max(0, Math.min(1, t));
-  const control = flightControl(from, bearingDeg, carry);
+  const control = flightControl(from, landing, bearingDeg);
   return { ground: flightGround(from, control, landing, tt), height: arcHeight(apex, tt) };
 }
 

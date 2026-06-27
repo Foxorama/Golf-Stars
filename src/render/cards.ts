@@ -15,6 +15,9 @@ import type { Rarity } from '../sim/course/contract';
 import { hasBackspin, type PuttLog, type ShotLog } from '../sim/round';
 import { rarCol } from '../sim/rpg/loot';
 import { renderHoleSVG } from './holeView';
+import { restArtSVG, lieLabel } from './restArt';
+
+const cap = (s: string): string => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 
 function rarityBadge(rarity: Rarity): string {
   const col = rarCol(rarity);
@@ -53,16 +56,25 @@ export function courseCardHTML(course: Course, opts: CourseCardOptions = {}): st
     </article>`;
 }
 
+export interface ShotCardOptions {
+  /** Yards remaining to the pin after this shot (shown when the hole isn't over). */
+  distToPin?: number;
+  /** Draw the procedural "ball at rest on the surface" vignette (default true). */
+  showArt?: boolean;
+}
+
 /**
- * Per-shot "splash" card: the stat readout for the shot just played — total distance,
- * carry, accuracy (how far off the aim line it finished), and backspin for the lofted
- * clubs that generate it. Pure HTML string. The geometry (lateral error vs the aim
+ * Per-shot "splash" card: the stat readout for the shot just played — the club used, where it
+ * finished (a procedural vignette of the ball at rest on that surface, or the hazard it found),
+ * total/carry distance, the lie it moved between, distance left to the pin, accuracy, and backspin
+ * for the lofted clubs that generate it. Pure HTML string. The geometry (lateral error vs the aim
  * bearing) is computed here from the ShotLog the sim already emits.
  */
-export function shotCardHTML(shot: ShotLog): string {
+export function shotCardHTML(shot: ShotLog, opts: ShotCardOptions = {}): string {
   const carry = Math.round(shot.result.carry);
   const total = Math.round(dist(shot.from, shot.rest));
   const roll = Math.round(shot.roll);
+  const showArt = opts.showArt !== false;
 
   // Lateral finish error: signed perpendicular distance of the landing from the aim ray.
   const br = (shot.result.shotBearing * Math.PI) / 180;
@@ -92,12 +104,34 @@ export function shotCardHTML(shot: ShotLog): string {
     ? `${shot.penalty.toUpperCase()} — penalty`
     : `${shot.club.name}`;
 
+  // Where it finished: the surface (or hazard) the ball came to rest on/in, as a vignette.
+  const art = showArt
+    ? `<div style="margin:2px 0 8px;">${restArtSVG(shot.lieTo, {
+        penalty: shot.penalty,
+        holed: shot.holed,
+        knockedDown: shot.knockedDown,
+        height: 110,
+      })}</div>`
+    : '';
+  // The lie progression / finish description.
+  const finish = shot.holed
+    ? 'Holed out 🎉'
+    : shot.penalty
+    ? `Found ${lieLabel(shot.lieTo)} (+1)`
+    : `${cap(shot.lieFrom)} → ${cap(shot.lieTo)}${shot.knockedDown ? ' (knocked down)' : ''}`;
+  const toPin =
+    opts.distToPin != null && !shot.holed ? row('To pin', `${Math.round(opts.distToPin)} yd`) : '';
+
   return `
     <article style="border:2px solid ${accent};border-radius:12px;background:#11141b;padding:10px 12px;box-shadow:0 0 14px ${accent}33;min-width:190px;">
       <div style="font-size:14px;font-weight:700;color:${accent};margin-bottom:4px;">${header}</div>
+      ${art}
+      ${row('Club', shot.club.name)}
+      ${row('Finish', finish)}
       ${row('Total', `${total} yd`)}
       ${row('Carry', `${carry} yd`)}
       ${row('Roll', rollText)}
+      ${toPin}
       ${row('Accuracy', `${side} · ${grade}`)}
       ${eligible ? row('Backspin', spinLevel) : ''}
     </article>`;
@@ -118,9 +152,11 @@ export function puttCardHTML(putts: PuttLog[], opts: { holed?: boolean; pickedUp
     ? 'One-putt! 🎯'
     : `${n} putts`;
   const head = opts.holed ? 'Holed out' : 'Putting';
+  const art = `<div style="margin:4px 0 2px;">${restArtSVG('green', { holed: opts.holed, height: 96 })}</div>`;
   return `
     <article style="border:2px solid ${accent};border-radius:12px;background:#11141b;padding:8px 12px;box-shadow:0 0 12px ${accent}33;min-width:160px;">
       <div style="font-size:13px;font-weight:700;color:${accent};">⛳ ${head}</div>
+      ${art}
       <div style="font-size:13px;margin-top:2px;">${label}</div>
     </article>`;
 }

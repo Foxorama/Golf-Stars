@@ -7,11 +7,16 @@ function playStopInteractive(s: UiState): UiState {
   s = reduce(s, { type: 'playInteractive' });
   let guard = 0;
   while (s.screen === 'playing' && guard++ < 400) {
-    if (s.play && !s.play.done) {
+    if (s.play && s.play.done) {
+      s = reduce(s, { type: 'holeComplete' });
+    } else if (s.play && awaitingPutt(s.play)) {
+      // Manual putting is the default now — stroke the putt out (no control = the rng putt model).
+      s = reduce(s, { type: 'putt' });
+    } else if (s.play) {
       const v = shotView(s.play, s.run.loadout);
       s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
     } else {
-      s = reduce(s, { type: 'holeComplete' });
+      break;
     }
   }
   return s;
@@ -110,16 +115,15 @@ describe('ui reducer', () => {
     expect(s.shopOffer).toBeUndefined();
   });
 
-  it('auto-putt defaults on and the toggle flips it', () => {
+  it('manual putting is the default and the toggle flips to auto', () => {
     const s = initState(1);
-    expect(s.autoPutt).toBe(true);
-    expect(reduce(s, { type: 'toggleAutoPutt' }).autoPutt).toBe(false);
+    expect(s.autoPutt).toBe(false);
+    expect(reduce(s, { type: 'toggleAutoPutt' }).autoPutt).toBe(true);
   });
 
-  it('manual putting: with auto off, a hole is finished by stroking putts', () => {
+  it('manual putting: a hole is finished by stroking putts', () => {
     let s = reduce(started(1234), { type: 'playInteractive' });
-    s = reduce(s, { type: 'toggleAutoPutt' });
-    expect(s.autoPutt).toBe(false);
+    expect(s.autoPutt).toBe(false); // manual is the default now
     let sawPutt = false;
     let guard = 0;
     while (s.screen === 'playing' && guard++ < 800) {
