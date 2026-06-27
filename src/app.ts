@@ -23,10 +23,10 @@ import { zoneHeroSVG } from './render/zoneHero';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { itemCap, itemCost, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
+import { itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, type GolferStyle } from './sim/rpg/characters';
-import { effectiveCut, snapshotRun } from './sim/rpg/run';
+import { caddyRoster, effectiveCut, snapshotRun, type CaddyOffer } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -582,8 +582,8 @@ function playingBody(animating: boolean): string {
     selAim = 'attack';
     selFreeTarget = null;
   }
-  // Only lie-legal clubs are selectable (driver hidden off the deck until unlocked).
-  const usable = usableBag(bag, play.lie, state.run.loadout.driverDeck);
+  // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
+  const usable = usableBag(bag, play.lie, state.run.loadout.driverAnywhere ?? false);
   const suggested = v.lie === 'green' && usable.some((c) => c.id === 'putter') ? 'putter' : v.attackClubId;
   if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = suggested;
   // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
@@ -721,12 +721,48 @@ function shopScreen(): string {
         : `<div style="margin:4px;">${card}</div>`;
     })
     .join('');
+  // Caddies: a persistent roster (every named caddy always shown). Hire one — the rest grey out
+  // (you may keep only one caddy). Hiring a caddy also unlocks the generic Caddie Lesson in the stock.
+  const caddies = caddyRoster(state.run)
+    .map((c) => caddyCardHTML(c))
+    .join('');
   return `
     ${header()}
     <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own.</p>
+    <h3 style="font-size:14px;margin:.4em 0 .1em;">🎒 Caddies <span style="opacity:.55;font-weight:400;font-size:12px;">· hire one (unique)</span></h3>
+    <div style="display:flex;flex-wrap:wrap;">${caddies}</div>
+    <h3 style="font-size:14px;margin:.7em 0 .1em;">Outfitter stock</h3>
+    <p style="font-size:12px;opacity:.6;margin:.1em 0 .5em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own.</p>
     <div style="display:flex;flex-wrap:wrap;">${items}</div>
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}</div>`;
+}
+
+/** A named-caddy card for the shop's Caddies section: hired (highlighted), locked (greyed when
+ *  another caddy is already on the bag), or buyable (clickable). */
+function caddyCardHTML(c: CaddyOffer): string {
+  const col = rarCol(c.item.rarity);
+  const buyable = !c.owned && !c.locked && c.affordable;
+  const dim = c.locked || (!c.owned && !c.affordable);
+  const note = c.owned
+    ? '✓ HIRED'
+    : c.locked
+    ? 'LOCKED · one caddy only'
+    : c.affordable
+    ? `${c.cost}c — hire`
+    : 'NEED CREDITS';
+  const border = c.owned ? '#5fd45a' : col;
+  const card = `
+    <article style="width:170px;border:2px solid ${border};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:0 0 12px ${border}22;">
+      <div style="display:flex;align-items:baseline;gap:6px;">
+        <b style="font-size:14px;">${c.item.name}</b>
+        <span style="margin-left:auto;color:${col};border:1px solid ${col};border-radius:6px;padding:1px 7px;font-size:11px;text-transform:uppercase;letter-spacing:1px;">${c.item.rarity}</span>
+      </div>
+      <p style="font-size:12px;opacity:.8;margin:.5em 0;min-height:3.6em;">${c.item.desc}</p>
+      <div style="font-size:13px;color:${c.owned ? '#5fd45a' : col};font-weight:600;">${note}</div>
+    </article>`;
+  return buyable
+    ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: c.item.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+    : `<div style="margin:4px;">${card}</div>`;
 }
 
 function outpostScreen(): string {
@@ -803,6 +839,11 @@ function golferLook(): GolferStyle | undefined {
   return getCharacter(state.run.loadout.characterId)?.style;
 }
 
+/** The hired named caddy's id (GS-caddy), or undefined — drawn in the play-view/putt-meter corner. */
+function caddyId(): string | undefined {
+  return namedCaddyOwned(state.run.loadout.perks);
+}
+
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -852,9 +893,9 @@ function render(): void {
   // Local (non-game) controls on the playing screen: club cycle + aim select.
   app.querySelectorAll<HTMLElement>('[data-cycle]').forEach((el) => {
     el.addEventListener('click', () => {
-      // Cycle through only the lie-legal clubs (the driver is hidden off the deck until unlocked).
+      // Cycle through only the lie-legal clubs (driver tee-only unless the Driver Dan caddy unlocks it).
       const lie = state.play?.lie ?? 'tee';
-      const bag = usableBag(state.run.loadout.bag, lie, state.run.loadout.driverDeck);
+      const bag = usableBag(state.run.loadout.bag, lie, state.run.loadout.driverAnywhere ?? false);
       const i = bag.findIndex((c) => c.id === selClubId);
       const ni = Math.max(0, Math.min(bag.length - 1, (i < 0 ? 0 : i) + Number(el.dataset.cycle)));
       selClubId = bag[ni]!.id;
@@ -907,6 +948,7 @@ function render(): void {
       puttMeter = mountPuttMeter(meterEl, {
         width: 300,
         band,
+        caddyId: caddyId(),
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
       });
     }
@@ -923,6 +965,7 @@ function render(): void {
         height: 520,
         biome: state.course.biome, themeId: state.course.meta.themeId,
         golferLook: golferLook(),
+        caddyId: caddyId(),
       });
     }
   }
@@ -950,6 +993,7 @@ function render(): void {
         height: animH,
         biome: state.course.biome, themeId: state.course.meta.themeId,
         golferLook: golferLook(),
+        caddyId: caddyId(),
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,

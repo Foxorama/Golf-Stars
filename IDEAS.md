@@ -15,6 +15,20 @@ Everything below serves whichever avenue wins.
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
+- **GS-caddy — The named-caddy card set. SHIPPED.** Caddies are a UNIQUE class of shop item
+  (`ShopItem.caddy:'named'`, helpers `NAMED_CADDY_IDS`/`namedCaddyOwned`): hire ONE, shown in a
+  dedicated always-visible shop Caddies section (`caddyRoster`), the rest greyed; `buy()` enforces
+  exclusivity; generic caddy `'service'` perks (Caddie Lesson) gate behind owning a named caddy.
+  Roster: **Penelope Putter** (the renamed `auto-caddie`, auto-putt), **Driver Dan** (`driverAnywhere`
+  — driver from any lie at full stats; *replaces* the removed Driver-on-Deck ladder), **Dr Chipinski**
+  (`chipInBoost` 0.33 — a +33% chip-in chance for PW-or-shorter shots resting within `CHIPIN_RANGE`
+  8yds of the flag), **Space Ducks** (a `CaddyGuard` that laser-zaps duck-hooks + 50% of hooks back to
+  the green mid-flight) and **Convict Sheep** (the right-side mirror: boomerang the shanks + 50% of
+  slices). The guards redirect a SAMPLED miss (they don't reshape the spray — the cone still shows the
+  tails); `ShotResult.redirect` records the would-be miss so `playView` animates the projectile +
+  ground-path kink (`render/caddyArt.ts`, eyes-on). All caddy rng is gated so the base sim stays
+  byte-for-byte; threaded into both auto + interactive. `tests/caddies.test.ts` guards it; 355 green.
+
 - **GS-19 — Themes & fairways overhaul (per-zone identity + signature mechanics). SHIPPED.** The 5
   worlds now look and PLAY distinct. (1) **Per-archetype turf palettes** (`ARCHETYPE_TURF`) replace
   GS-17f's subtle hue-rotation — desert tan, frost teal, inferno scorched, void cosmic; verdant =
@@ -134,8 +148,9 @@ Everything below serves whichever avenue wins.
   - **Hole briefing splash** (wind/hazards/conditions + map), **per-shot result popup** (settle-delayed
     Continue), **mobile no-scroll layout** (sticky Hit bar).
   - **Free-aim** — tap/drag the map to aim within max distance (`ShotDecision.target`).
-  - **Driver on Deck** — 4-tier prereq-gated shop ladder unlocking the driver off the deck (tee-only by
-    default), via one shared `usableBag` gate applied by both the auto sim and the player.
+  - **Driver on Deck** — *superseded by the Driver Dan caddy (GS-caddy)*. The 4-tier prereq-gated
+    ladder was removed; the driver is tee-only by default and unlocked from any lie (full stats) by
+    hiring Driver Dan, via the simplified shared `usableBag(bag, lie, driverAnywhere)` gate.
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
   differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
   content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression

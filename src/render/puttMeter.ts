@@ -9,6 +9,7 @@
  */
 
 import { MANUAL_IDEAL_PACE, MANUAL_PACE_MAX } from '../sim/round';
+import { drawCaddy, hasCaddyArt } from './caddyArt';
 
 export interface PuttMeterOptions {
   width?: number;
@@ -19,6 +20,8 @@ export interface PuttMeterOptions {
   periodMs?: number;
   /** Called with the captured pace when the player taps/commits. */
   onCommit: (pace: number) => void;
+  /** The hired named caddy id (GS-caddy) — drawn beside the meter so the caddy shows while putting. */
+  caddyId?: string;
 }
 
 export interface PuttMeterHandle {
@@ -49,7 +52,9 @@ export function mountPuttMeter(container: HTMLElement, opts: PuttMeterOptions): 
   const padX = 14;
   const barY = height * 0.52;
   const barH = 16;
-  const barW = width - padX * 2;
+  // Reserve a right-hand strip for the hired caddy so it watches over your putt (GS-caddy).
+  const caddyW = hasCaddyArt(opts.caddyId) ? 46 : 0;
+  const barW = width - padX * 2 - caddyW;
   const paceToX = (p: number): number => padX + (p / MANUAL_PACE_MAX) * barW;
 
   let raf = 0;
@@ -120,6 +125,11 @@ export function mountPuttMeter(container: HTMLElement, opts: PuttMeterOptions): 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#7fe486';
     ctx.fillText('MAKE', (x0 + x1) / 2, barY + barH + 16);
+
+    // The hired caddy, watching over the putt.
+    if (caddyW > 0 && opts.caddyId) {
+      drawCaddy(ctx, opts.caddyId, width - caddyW / 2 - 4, height - 6, height * 0.82, now);
+    }
 
     raf = requestAnimationFrame(draw);
   }

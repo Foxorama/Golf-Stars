@@ -169,16 +169,15 @@ This game lives or dies on three axes — put every change through all three bef
   club's WORST-case carry — which handed you the DRIVER for any approach long enough that the driver's
   worst miss could fall short of the front, even though its MEAN flew 60+ yds past. Gate on the expected
   carry, not the minimum.
-- **Driver on Deck (`usableBag`, GS-mechanics #11).** The driver (`id 'D'`) is TEE-ONLY by default
-  (`PlayerLoadout.driverDeck` level 0); a 4-tier shop ladder (`DRIVER_DECK` table, prereq-gated cards)
-  unlocks it off the deck with a shrinking distance penalty + spray surcharge + widening allowed lies.
-  The rule lives in ONE place — `usableBag(bag, lie, level)` removes the driver when locked or returns
-  a reduced-carry copy when unlocked (so club-selection AND distance are right together) — and is
-  applied by BOTH the auto sim (`playHole`/`PlayHoleOptions.driverDeck`) and the interactive player
-  (`shotView`/`previewShot`/`takeShot`/club cycle), so auto≡playHole stays byte-for-byte and the
-  off-deck driver reads true in the cone. `driverDeckSprayMult` adds the spray surcharge. CRITICAL:
-  level 0 means the AUTO sim also can't driver off the deck (it clubs down to a wood) — a deliberate
-  rule change that shifted the seeded balance; it was re-validated against the no-death-spiral bar.
+- **Driver from the deck is a CADDY unlock (`usableBag`, GS-caddy — replaced the old Driver-on-Deck
+  ladder).** The driver (`id 'D'`) is TEE-ONLY by default; the **Driver Dan** caddy
+  (`loadout.driverAnywhere`) unlocks it from ANY lie at FULL driver stats (no distance penalty, no
+  spray surcharge). The rule lives in ONE place — `usableBag(bag, lie, driverAnywhere)` returns the
+  full bag on the tee or with Driver Dan, else drops the driver — applied by BOTH the auto sim
+  (`playHole`/`PlayHoleOptions.driverAnywhere`) and the interactive player
+  (`shotView`/`previewShot`/`takeShot`/club cycle), so auto≡playHole stays byte-for-byte. The old
+  4-tier `DRIVER_DECK` table, `driverDeck` level, `driverDeckSprayMult`, and `driver-deck-1..4` shop
+  cards were all REMOVED; `loadoutFromPerks` skips unknown ids so old saves carrying them resolve fine.
 - **Out of bounds = stroke-and-distance, and now VISIBLE (GS-13).** `playBounds`/`inBounds` derive a
   generous hole-sized box around all terrain (margin `clamp(span*0.25, 40, 90)` — the cap stops a long
   par-5 flinging the boundary miles out); a shot resting beyond it is +1 and replays from the shot's
@@ -364,7 +363,53 @@ This game lives or dies on three axes — put every change through all three bef
   scoring harness must club shots with **`netDispersion(loadout)`** (handicap × equipment), not raw
   `dispersionMult` — else handicap perks like Caddie Lesson are invisible to the test.
 
-## Putting (manual pace-meter by default; auto ONLY via the Auto-Caddie unlock)
+## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
+- **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only
+  ONE at a time. They live in the shop's dedicated **Caddies section** (`caddyRoster(run)`, rendered by
+  `app.ts caddyCardHTML`), NOT the rotating offer (`shopOffer` excludes `caddy === 'named'`): the whole
+  roster is always shown — the hired one flagged `owned`, the rest `locked` (greyed) once one is on the
+  bag. Exclusivity is enforced in `buy()` (a second named caddy is a no-op). The roster, all rare/
+  legendary: **Penelope Putter** (`auto-caddie`, legendary — auto-putt; id kept for save-compat),
+  **Driver Dan** (`driver-dan`, rare — `driverAnywhere`, see the driver bullet), **Dr Chipinski**
+  (`dr-chipinski`, rare — `chipInBoost` 0.33), **Space Ducks** (`space-ducks`, legendary — left-side
+  guard), **Convict Sheep** (`convict-sheep`, legendary — right-side guard). Helpers: `NAMED_CADDY_IDS`,
+  `isNamedCaddy`, `namedCaddyOwned(perks)`.
+- **Generic caddy 'service' perks gate behind hiring a named caddy.** `caddie-lesson` is `caddy:
+  'service'`: `shopOffer` only surfaces a service perk once `namedCaddyOwned(perks)` is set — you need a
+  caddy before they'll give you lessons. (It still stacks/works exactly as before once unlocked.)
+- **The guard caddies redirect a sampled miss to the green MID-FLIGHT — they do NOT reshape the spray
+  (`CaddyGuard` in shot.ts, distinct from `ShapeMod`).** The cone still shows the miss tails; what
+  changes is that a shot already SAMPLED into a tail gets knocked back. `resolveShot` classifies the
+  sampled angle's zone (`classifySprayZone`) and, if a guard is present, `remove` zones are ALWAYS
+  redirected to a fresh green-band angle, `halve` zones with a 50% roll. **Space Ducks** =
+  `{remove:['duckHookL'], halve:['hookL'], kind:'laser'}` (no duck-hooks; 50% of hooks saved);
+  **Convict Sheep** = `{remove:['shankR'], halve:['sliceR'], kind:'boomerang'}` (the right-side mirror).
+  On a redirect, `ShotResult.redirect = {kind, fromZone, originalLanding}` records the would-be miss so
+  the renderer animates it. CRITICAL determinism: the guard's extra rng draws (the 50% roll + the green
+  resample) fire ONLY when a guard is present AND the sampled zone qualifies — a guard-less shot (or an
+  empty guard) draws NOTHING extra, so the base sim is byte-for-byte unchanged (guarded by
+  `tests/caddies.test.ts`). The guard is threaded into BOTH the auto sim (`playStop`→`playHole`→
+  `executeShot`, `PlayHoleOptions.guard`) and the interactive driver (`takeShot`) so auto≡interactive.
+- **Dr Chipinski adds a chip-in chance, not a spray change (`ExecOpts.chipIn`, `CHIPIN_RANGE` 8yds).**
+  After a shot comes to rest, if `chipIn > 0` AND the club is a wedge (`nominalCarry ≤
+  WEDGE_CONTROL_CARRY` 110 — PW and shorter) AND the ball rests within `CHIPIN_RANGE` of the flag but
+  outside the auto hole-out radius, one rng draw `< chipIn` holes it (`log.chipIn = true`, ball moved to
+  the cup). Gated on `chipIn` + proximity + wedge, so a base loadout never reaches the draw → byte-for-
+  byte stable. Lives in `executeShot` so auto≡interactive. (NOT a flat 33% on every wedge — that would
+  break the birdie/eagle balance; it's a chip-in near the pin.)
+- **Render (`render/caddyArt.ts`, eyes-on feel).** The hired caddy is drawn as a self-contained Canvas2D
+  figure (house "no asset" style) in the play-view's bottom-left corner the whole hole, and beside the
+  putt meter while putting (`PlayViewOptions.caddyId` / `PuttMeterOptions.caddyId`, both fed from
+  `namedCaddyOwned`). Figures: Penelope (teal caddy + flag), Driver Dan (burly + big driver), Dr
+  Chipinski (lab coat + wedge), Space Ducks (bubble-helmet duck + top hat + laser rifle), Convict Sheep
+  (striped jumpsuit + boomerang). On a redirect, `playView` flies the ball toward `originalLanding`,
+  fires the caddy's projectile (`drawCaddyProjectile` — laser beam / spinning boomerang) from the
+  figure's muzzle anchor mid-flight, then kinks the GROUND path back to the green (the loft arc is one
+  continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
+  knobs/no new `_gs*` flag, so the test-hub guard needs no new control; the Sim Lab absorbs the new
+  shop items automatically.
+
+## Putting (manual pace-meter by default; auto ONLY via the Penelope Putter caddy)
 - **Two putt models, one shared `PuttSkill`.** AUTO putting is the rng `onePutt` (make%/lag);
   `puttOut`/`puttOutFrom` step it; it's what the headless sim and `takeShot(…, autoPutt)` use.
   MANUAL putting is `manualPutt` — SKILL, not luck: the player controls PACE via an on-screen meter
@@ -378,8 +423,9 @@ This game lives or dies on three axes — put every change through all three bef
   GOTCHA (fixed): the meter's `commit()` MUST read `currentPace()` BEFORE setting `committed = true`
   — `currentPace` short-circuits to the (still-0) `frozenPace` once committed, so the old order struck
   every manual putt at pace 0 (ball never moved, stroke still counted).
-- **Auto-putt is caddie-only — there is NO manual toggle.** Putting is manual UNLESS you own the
-  legendary **`auto-caddie`** (sets `loadout.autoPutt`), which auto-putts out on arrival. The old
+- **Auto-putt is caddy-only — there is NO manual toggle.** Putting is manual UNLESS you hire the
+  legendary **Penelope Putter** caddy (shop id still `auto-caddie` for save-compat; sets
+  `loadout.autoPutt`), which auto-putts out on arrival. The old
   per-session `UiState.autoPutt` toggle + `toggleAutoPutt` action were removed: the `shot` reducer's
   auto gate is just `!!run.loadout.autoPutt`, so owning the caddie is the one and only "automate it"
   switch. (`» Auto-finish hole` on the decision screen still AI-plays the whole hole — that's a
