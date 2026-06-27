@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_EVENT,
   ROUTE_EVENTS,
+  UNIQUE_EVENTS,
   drawRouteEvents,
+  eventPool,
   isCalm,
   routeEvent,
 } from '../src/sim/rpg/events';
@@ -53,6 +55,80 @@ describe('route events — data (GS-14)', () => {
       expect(a.map((e) => e.id)).toEqual(b.map((e) => e.id)); // deterministic
       expect(a).toHaveLength(3);
       expect(a.some(isCalm)).toBe(true); // there's always an out
+    }
+  });
+});
+
+describe('event split — recurring vs unique + accent arcs (GS-17c)', () => {
+  it('unique one-off events are well-formed, deep-arc, high-stakes, and flagged', () => {
+    expect(UNIQUE_EVENTS.length).toBeGreaterThanOrEqual(3);
+    for (const e of UNIQUE_EVENTS) {
+      expect(e.unique).toBe(true);
+      expect(e.minArc).toBe(3); // gated to the deep voyage
+      expect(e.creditMult).toBeGreaterThan(1); // the richest lanes
+      expect(e.cutDelta).toBeGreaterThan(0); // never a free out
+    }
+    // routeEvent resolves uniques too (resume needs it).
+    expect(routeEvent('apophis-flyby')?.unique).toBe(true);
+  });
+
+  it('the pool accents the arcs: gentle early, high-stakes + uniques only deep', () => {
+    const early = eventPool(0); // arc 1
+    expect(early.every((e) => (e.minArc ?? 1) === 1)).toBe(true);
+    expect(early.some((e) => e.cutDelta >= 2)).toBe(false); // no brutal lanes early
+    expect(early.some((e) => e.unique)).toBe(false); // no uniques early
+
+    const deep = eventPool(15); // arc 3
+    expect(deep.some((e) => e.cutDelta >= 3)).toBe(true); // brutal lanes appear
+    expect(deep.some((e) => e.unique)).toBe(true); // uniques are on offer
+  });
+
+  it('the pool excludes uniques that have already fired', () => {
+    const before = eventPool(15);
+    expect(before.some((e) => e.id === 'apophis-flyby')).toBe(true);
+    const after = eventPool(15, ['apophis-flyby']);
+    expect(after.some((e) => e.id === 'apophis-flyby')).toBe(false);
+    // Recurring events are untouched by the fired set.
+    expect(after.some((e) => e.id === 'solar-flare')).toBe(true);
+  });
+
+  it('travel records a unique as fired (once-per-run) but not a recurring event', () => {
+    const base = { ...startRun(5), stopIndex: 3, distanceFromStart: 15 };
+    const intoUnique = travel(base, {
+      id: 0,
+      distanceJump: 1,
+      label: 'Short hop',
+      event: routeEvent('apophis-flyby')!,
+    });
+    expect(intoUnique.firedEventIds).toContain('apophis-flyby');
+
+    const intoRecurring = travel(base, {
+      id: 0,
+      distanceJump: 1,
+      label: 'Short hop',
+      event: routeEvent('solar-flare')!,
+    });
+    expect(intoRecurring.firedEventIds).not.toContain('solar-flare');
+  });
+
+  it('snapshot/resume round-trips the fired-unique set', () => {
+    let run = { ...startRun(8), stopIndex: 3, distanceFromStart: 15 };
+    run = travel(run, {
+      id: 0,
+      distanceJump: 1,
+      label: 'Short hop',
+      event: routeEvent('total-solar-eclipse')!,
+    });
+    const resumed = resumeRun(snapshotRun(run));
+    expect(resumed.firedEventIds).toContain('total-solar-eclipse');
+    // And that resumed run's pool no longer offers it.
+    expect(eventPool(resumed.distanceFromStart, resumed.firedEventIds).some((e) => e.id === 'total-solar-eclipse')).toBe(false);
+  });
+
+  it('a full run never fires the same unique twice', () => {
+    for (const seed of [1, 2, 3, 7, 14, 99]) {
+      const { run } = simulateRun(seed, {}, 200);
+      expect(new Set(run.firedEventIds).size).toBe(run.firedEventIds.length);
     }
   });
 });

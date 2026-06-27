@@ -74,10 +74,22 @@ Each theme now resolves to a concrete biome that PLAYS its character, not just i
   by `validateFairness`. `tests/themes.test.ts` re-proves the no-death-spiral bar across EVERY theme
   at max wildness, asserts the clamps, and asserts rarer themes are measurably more intense.
 
+## What shipped next (GS-17c — event split)
+
+Route events re-themed from the catalogue and split into the two kinds the original vision asked for:
+
+- **Recurring backbone** (`ROUTE_EVENTS`) — meteor showers, moon phases, flares, tailwinds, aurora —
+  now `minArc`-tiered so they **accent the arcs**: calm drifts and full moons early; solar flares,
+  oppositions and the aurora jackpot only in the deep arc.
+- **Unique one-offs** (`UNIQUE_EVENTS`) — the catalogue's dated showpieces (penumbral/partial/total
+  eclipses, a comet apparition, the Apophis flyby): the richest, deadliest lanes, gated to arc 3 and
+  offered **at most once per run**. The run tracks `firedEventIds` (round-tripped in the snapshot);
+  `eventPool(distance, fired)` tiers the recurring events in and drops spent uniques.
+
+Still economy/cut-only — `creditMult` + `cutDelta`, never course generation — so the fairness +
+no-death-spiral validators stay untouched, and every jump still guarantees one calm "out".
+
 ## Roadmap (remaining slices)
-- **GS-17c — Event split.** One-off dated events → `unique` route events (≤1 per run, big modifiers);
-  recurring events (showers/moon/oppositions) → a themed flavour layer over the existing `RouteEvent`
-  `creditMult`/`cutDelta` levers. Keep events economy/cut-only (the fairness boundary).
 - **GS-17d — Themed upgrades.** Bias the shop/meta draw by the active theme's flavour so clubs/perks
   read on-theme for the arc you're in.
 - **GS-17e — Render the constellation.** Draw the theme's actual stick figure (stars + `lines` from

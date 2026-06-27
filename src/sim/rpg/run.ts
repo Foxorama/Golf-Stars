@@ -31,7 +31,7 @@ import {
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
-import { DEFAULT_EVENT, drawRouteEvents, routeEvent, type RouteEvent } from './events';
+import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
@@ -77,6 +77,8 @@ export interface Run {
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
    */
   pendingEvent?: RouteEvent;
+  /** Ids of UNIQUE one-off events already travelled into (GS-17c) — so each fires at most once. */
+  firedEventIds: string[];
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -97,6 +99,7 @@ export function startRun(
     credits: metaStartingCredits(meta),
     loadout: metaStartingLoadout(meta),
     meta,
+    firedEventIds: [],
     status: 'active',
     history: [],
   };
@@ -203,7 +206,9 @@ export function routeOptions(run: Run): Route[] {
     const distanceJump = rng.int(1, 3);
     return { id: i, distanceJump, label: labels[distanceJump]! };
   });
-  const events = drawRouteEvents(rng, routes.length);
+  // Pool is arc-tiered to the run's depth and excludes already-fired uniques (GS-17c).
+  const pool = eventPool(run.distanceFromStart, run.firedEventIds);
+  const events = drawRouteEvents(rng, routes.length, pool);
   return routes.map((r, i) => ({ ...r, event: events[i]! }));
 }
 
@@ -216,6 +221,10 @@ export function travel(run: Run, route: Route): Run {
     distanceFromStart: run.distanceFromStart + route.distanceJump,
     // Carry the chosen route's event into the next stop (applied by finishStop).
     pendingEvent: route.event,
+    // A unique one-off is now spent for the rest of the run (GS-17c).
+    firedEventIds: route.event.unique
+      ? [...run.firedEventIds, route.event.id]
+      : run.firedEventIds,
   };
 }
 
@@ -301,6 +310,8 @@ export interface RunSnapshot {
   meta?: MetaUpgrades;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
+  /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
+  firedEventIds?: string[];
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -313,6 +324,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     perks: [...run.loadout.perks],
     meta: { ...run.meta },
     pendingEventId: run.pendingEvent?.id,
+    firedEventIds: [...run.firedEventIds],
   };
 }
 
@@ -328,6 +340,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     loadout: loadoutFromPerks(snap.perks ?? [], metaStartingLoadout(meta)),
     meta,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
+    firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',
     history: [],
   };
