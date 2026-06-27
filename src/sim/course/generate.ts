@@ -45,6 +45,12 @@ export const GENERATOR_VERSION = 5;
  */
 const LOST_ROUGH_MIN_WILDNESS = 0.55; // below: void plays as ordinary (fair) rough
 const LAVA_RIVER_MIN_WILDNESS = 0.3; // below: a calm ember stop has no river
+const FROZEN_POND_MIN_WILDNESS = 0.3; // below: a calm frost stop has no pond crossing
+
+/** Penalty kinds that are SANCTIONED forced carries on the play corridor (GS-19/GS-mechanics): they
+ *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
+ *  carryable. A river of lava (ember) and a frozen-pond channel (frost) are both crossings. */
+const CROSSING_KINDS = new Set(['lavariver', 'frozenpond']);
 /**
  * Corridor half-width SCALE when the rough is lethal (void islands). Constant (does NOT shrink with
  * wildness like a normal corridor) and generous, so that even max-wildness driver spray usually
@@ -209,11 +215,12 @@ function densifyCentreline(line: Vec[], n: number): Vec[] {
 }
 
 /**
- * A molten river/creek band crossing the corridor at fraction `t` (GS-19). Spans the fairway plus
- * a chunk of rough either side (so it reads as a river running ACROSS the hole), with a meandering
- * thickness for a natural look. Built perpendicular to the play direction so the carry is honest.
+ * A river/channel band crossing the corridor at fraction `t` (GS-19/GS-mechanics) — shared by the
+ * ember lava river and the frost frozen pond. Spans the fairway plus a chunk of rough either side
+ * (so it reads as running ACROSS the hole), with a meandering thickness for a natural look. Built
+ * perpendicular to the play direction so the carry is honest.
  */
-function lavaRiverBand(centreline: Vec[], t: number, halfWidth: number, thickness: number, rng: Rng): Vec[] {
+function crossingBand(centreline: Vec[], t: number, halfWidth: number, thickness: number, rng: Rng): Vec[] {
   const c = centrePoint(centreline, t);
   const a = centrePoint(centreline, Math.max(0, t - 0.02));
   const b = centrePoint(centreline, Math.min(1, t + 0.02));
@@ -440,6 +447,21 @@ function generateHole(
     hazards.push({ kind: 'bunker', poly: blobPoly(c, r, 10, 0.22, rng) });
   }
 
+  // Impact CRATERS (desert signature, GS-mechanics): big round sand bunkers pocking the landing
+  // zones — a navigable crater field. Sand is NON-PENALTY → always fair, so they may sit ON the
+  // corridor (a 50% escape tax, never a lost card). Larger + rounder than a fairway bunker.
+  const craters = Math.round((biome.craters ?? 0) * (0.6 + 0.7 * wildness));
+  for (let i = 0; i < craters; i++) {
+    const t = rng.range(0.25, 0.8);
+    const r = rng.range(12, 22);
+    const along = centrePoint(centreline, t);
+    const perp = perpAt(centreline, t);
+    // Anywhere from on-line to out in the rough — the crater field is something to thread through.
+    const lateral = rng.range(-0.4, 1) * (fairwayHalfWidth + r);
+    const c: Vec = [along[0] + perp[0] * lateral, along[1] + perp[1] * lateral];
+    hazards.push({ kind: 'bunker', poly: blobPoly(c, r, 12, 0.18, rng) });
+  }
+
   // Treelines (non-penalty LIE): DENSE woods lining the rough OUTSIDE the play corridor (GS-wind
   // bumped the count + the lateral spread so the rough reads as real forest with depth, not a thin
   // single line) — a sensible shot is still always clear; only a sprayed ball punches out. Stored as
@@ -467,7 +489,17 @@ function generateHole(
   if (biome.lavaRiver && par >= 4 && wildness >= LAVA_RIVER_MIN_WILDNESS) {
     const t = rng.range(0.34, 0.6);
     const thickness = Math.min(34, length * 0.085, rng.range(8, 13) + wildness * rng.range(6, 16));
-    hazards.push({ kind: 'lavariver', poly: lavaRiverBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+    hazards.push({ kind: 'lavariver', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+  }
+
+  // Frozen-pond crossing (frost signature, GS-mechanics): a meltwater channel crosses the corridor
+  // as a FORCED CARRY — same sanctioned-crossing machinery as the lava river (exempt from
+  // `validateFairness`, proven carryable by `validateCrossings`). Longer holes only (a creek across a
+  // par-3 leaves no approach); a touch narrower than lava since the AI must clear cold water.
+  if (biome.frozenPond && par >= 4 && wildness >= FROZEN_POND_MIN_WILDNESS) {
+    const t = rng.range(0.34, 0.6);
+    const thickness = Math.min(30, length * 0.075, rng.range(7, 12) + wildness * rng.range(5, 14));
+    hazards.push({ kind: 'frozenpond', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
@@ -629,7 +661,7 @@ export function validateFairness(course: Course): string[] {
   course.holes.forEach((h, i) => {
     const half = fairwayHalfWidthOf(h);
     for (const hz of h.hazards) {
-      if (hz.kind === 'lavariver') continue; // sanctioned forced carry — proved by validateCrossings
+      if (CROSSING_KINDS.has(hz.kind)) continue; // sanctioned forced carry — proved by validateCrossings
       if (!lieInfo(hz.kind).penalty) continue; // only penalty surfaces must be avoidable
       for (const p of hz.poly) {
         if (polylineDist(p, h.centreline) < half * 0.5 && segDist(p, h.tee, h.green) < half * 0.5) {
@@ -654,7 +686,8 @@ export function validateCrossings(course: Course): string[] {
   const SAMPLES = 200;
   course.holes.forEach((h, i) => {
     for (const hz of h.hazards) {
-      if (hz.kind !== 'lavariver') continue;
+      if (!CROSSING_KINDS.has(hz.kind)) continue;
+      const what = hz.kind === 'frozenpond' ? 'frozen pond' : 'lava river';
       let tIn = -1;
       let tOut = -1;
       for (let s = 0; s <= SAMPLES; s++) {
@@ -665,15 +698,15 @@ export function validateCrossings(course: Course): string[] {
         }
       }
       if (tIn < 0) {
-        errs.push(`hole[${i}]: lava river does not cross the centreline (not a real forced carry)`);
+        errs.push(`hole[${i}]: ${what} does not cross the centreline (not a real forced carry)`);
         continue;
       }
-      if (tIn < 0.12) errs.push(`hole[${i}]: lava river leaves no room to lay up short (near bank too early)`);
-      if (tOut > 0.82) errs.push(`hole[${i}]: lava river crowds the green (far bank too late)`);
+      if (tIn < 0.12) errs.push(`hole[${i}]: ${what} leaves no room to lay up short (near bank too early)`);
+      if (tOut > 0.82) errs.push(`hole[${i}]: ${what} crowds the green (far bank too late)`);
       // A safe landing must exist just past the far bank (a ~20-yd shelf before the green).
       const total = pathLength(h.centreline) || 1;
       const after = centrePoint(h.centreline, Math.min(0.99, tOut + 20 / total));
-      if (lieInfo(lieAt(h, after)).penalty) errs.push(`hole[${i}]: no safe landing past the lava river`);
+      if (lieInfo(lieAt(h, after)).penalty) errs.push(`hole[${i}]: no safe landing past the ${what}`);
     }
   });
   return errs;

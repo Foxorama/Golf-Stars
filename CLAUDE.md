@@ -283,10 +283,25 @@ This game lives or dies on three axes — put every change through all three bef
   Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a
   hard per-hole cap. Tightening the short-game AI to shrink the tail is GS-4.
-- **Per-world SIGNATURE mechanics, scaled fair→brutal by wildness (GS-19).** Two worlds break the
-  baseline "rough is a safe recovery / no penalty on the corridor" model on purpose — both are pure
-  DATA opt-ins on the biome row (`lostRough`, `lavaRiver`), gated by a wildness threshold so a calm
-  stop plays fair and a deep one bites:
+- **Every world has a SIGNATURE mechanic now (GS-19 + GS-mechanics), pure DATA opt-ins on the biome
+  row, wildness-gated so a calm stop plays fair and a deep one bites:** void `lostRough`, inferno
+  `lavaRiver`, **frost `frozenPond`** (a meltwater crossing), **desert `craters`** (a crater field),
+  verdant tree-lined parkland (its density IS its character). The two CROSSING mechanics (lava river,
+  frozen pond) share one machinery: `CROSSING_KINDS = {lavariver, frozenpond}` are penalty bands that
+  may sit ON the corridor — `validateFairness` EXEMPTS them and `validateCrossings` PROVES each one
+  carryable (centreline enters+exits, with a penalty-free shelf BEFORE the near bank to lay up and
+  just AFTER the far bank to land the carry); both are built by the shared `crossingBand`, and the
+  carry-aware AI flies ANY centreline-crossing penalty (it's generic, never hardcoded to lava). The
+  details:
+  - **Frost = frozen ponds (`ice-ring.frozenPond: true`).** A `frozenpond` band (penalty water, drawn
+    via `styleWater`, `restArt` shows the water scene) crosses a par-4/5 past `FROZEN_POND_MIN_WILDNESS`
+    (0.3) — a touch narrower than the lava river. Guarded by `tests/zones.test.ts` (carryable + under
+    the no-death-spiral bar).
+  - **Desert = impact craters (`dust-belt.craters: 2.2`).** Big (r 12–22) round sand bunkers pock the
+    landing zones — a navigable crater field. Sand is NON-PENALTY so they may sit ON the corridor (a
+    50% escape tax, never a lost card); `validateFairness` ignores them. A real obstacle that bites
+    scoring without unfairness.
+  The original two:
   - **Void = lost rough (`void-garden.lostRough: 'voidrough'`).** There is no rough in the void —
     off the fairway is the abyss. Past `LOST_ROUGH_MIN_WILDNESS` (0.55) the generator (a) arms a
     `roughLie` biomeMod that `lieAt` returns for any OFF-feature point (so a sprayed ball reads as

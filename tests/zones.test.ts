@@ -14,6 +14,13 @@ import { type Vec } from '../src/sim/course/contract';
 
 const ARCHES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void'];
 
+/** Approximate radius of a hazard polygon (max distance from its centroid). */
+function bunkerRadius(poly: Vec[]): number {
+  const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+  const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+  return Math.max(...poly.map((p) => Math.hypot(p[0] - cx, p[1] - cy)));
+}
+
 describe('zone identity (GS-19)', () => {
   it('every archetype has a complete, well-formed profile', () => {
     for (const a of ARCHES) {
@@ -128,6 +135,51 @@ describe('lava rivers (forced carry)', () => {
     }
     expect((strokes - par) / holes).toBeLessThan(1.0);
     expect(penalties).toBeGreaterThan(0); // some shots find the lava
+  });
+});
+
+describe('frozen ponds (frost forced carry, GS-mechanics)', () => {
+  it('cross the centreline on frost par-4/5 stops, and every one is provably carryable', () => {
+    let pondHoles = 0;
+    for (let s = 0; s < 120; s++) {
+      const c = generateCourse(s + 9000, { biome: 'ice-ring', holes: 3, wildness: 1 });
+      expect(validateCrossings(c)).toEqual([]); // carryable: safe shelf before & after each pond
+      expect(validateFairness(c)).toEqual([]); // sanctioned crossing doesn't trip the corridor guard
+      expect(validateCourse(c)).toEqual([]);
+      pondHoles += c.holes.filter((h) => h.hazards.some((hz) => hz.kind === 'frozenpond')).length;
+    }
+    expect(pondHoles).toBeGreaterThan(0); // they actually appear
+  });
+
+  it('the carry-aware AI keeps frost under the no-death-spiral bar (ponds bite but are fair)', () => {
+    let strokes = 0;
+    let par = 0;
+    let holes = 0;
+    for (let s = 0; s < 120; s++) {
+      const c = generateCourse(s + 9000, { biome: 'ice-ring', holes: 3, wildness: 1 });
+      for (const p of playCourse(c.holes, new Rng(`frost:${s}`))) {
+        strokes += p.record.strokes;
+        par += p.record.par;
+        holes++;
+      }
+    }
+    expect((strokes - par) / holes).toBeLessThan(1.0);
+  });
+});
+
+describe('impact craters (desert signature, GS-mechanics)', () => {
+  it('pock desert holes as fair sand and never break the contract', () => {
+    let craterCourses = 0;
+    for (let s = 0; s < 60; s++) {
+      const c = generateCourse(s + 7000, { biome: 'dust-belt', holes: 3, wildness: 0.9 });
+      expect(validateCourse(c)).toEqual([]);
+      expect(validateFairness(c)).toEqual([]); // sand is non-penalty, so even on-line craters stay fair
+      // Craters are big (r ≥ 12) sand bunkers — count holes carrying at least one large bunker.
+      if (c.holes.some((h) => h.hazards.some((hz) => hz.kind === 'bunker' && bunkerRadius(hz.poly) >= 11))) {
+        craterCourses++;
+      }
+    }
+    expect(craterCourses).toBeGreaterThan(0);
   });
 });
 
