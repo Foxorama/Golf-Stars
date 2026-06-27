@@ -80,8 +80,9 @@ const STARTING_BAGS: Record<string, readonly string[]> = {
   'huang-woo-hook': ['3W', '7W', '5i', '7i', 'PW', 'SW', 'LW', '60', 'putter'],
   // Larry: the only golfer who starts with a Driver — bombs it, then long irons (NO hybrids, ever).
   'longshot-larry': ['D', '3i', '5i', '7i', '9i', 'PW', 'SW', 'LW', '60', 'putter'],
-  // Bo: same kit as Feather, but the backspin trait makes the scoring clubs bite.
-  'backspin-bo': ['3W', '4H', '7i', 'PW', 'GW', 'SW', 'LW', '60', 'putter'],
+  // Bo: a short-iron scoring specialist — trades Feather's 7-iron for a denser 8i/9i pair (down in
+  // the ≤150-yd zone where his backspin bites), keeping the hybrid as the long-gap filler.
+  'backspin-bo': ['3W', '4H', '8i', '9i', 'PW', 'GW', 'SW', 'LW', '60', 'putter'],
 };
 
 /** Build a golfer's starting bag from club-type ids, stamping every club as the common 'starter' set. */

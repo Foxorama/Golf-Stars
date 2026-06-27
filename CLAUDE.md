@@ -332,7 +332,7 @@ This game lives or dies on three axes — put every change through all three bef
 - **Per-character starting bags + clubs as rewards (GS-clubs, `characters.ts` + `economy.ts`).** Each
   golfer starts with a SPARSE, SIGNATURE bag (8–10 clubs, NOT the full 27-club taxonomy) from
   `STARTING_BAGS`: their identity clubs (Feather's hybrid+fade kit, Huang's two hooky woods, Larry's
-  Driver+long-irons, Bo's Feather kit) PLUS a fair short-game ladder. **The short-game ladder is
+  Driver+long-irons, Bo's short-iron scoring kit) PLUS a fair short-game ladder. **The short-game ladder is
   non-negotiable for fairness:** a literal "5 signature clubs" bag (one wedge, then a ~98-yard gap to
   the putter) death-spirals — measured toPar/hole **~2.2** at wildness 1 (≫ the old 1.0 bar) and ~halved
   Stableford, because the reach-AI has no touch club and hits a PW that flies 106 at a 60-yard chip.

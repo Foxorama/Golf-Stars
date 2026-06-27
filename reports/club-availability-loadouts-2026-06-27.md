@@ -43,7 +43,8 @@ ranges, toPar 0.85–1.0, **0% blow-ups**):
 - Feather: `3W 4H 7i PW GW SW LW 60 putter`
 - Huang-Woo: `3W 7W 5i 7i PW SW LW 60 putter`
 - Larry: `D 3i 5i 7i 9i PW SW LW 60 putter` (added a 3-iron to the club table; no hybrids ever)
-- Bo: same as Feather (backspin trait differentiates; flagged the identical kit)
+- Bo: `3W 4H 8i 9i PW GW SW LW 60 putter` — a short-iron scoring specialist (denser 8i/9i in the
+  ≤150-yd zone where his backspin bites; trades Feather's 7-iron for it)
 
 **Key reframe:** a sparse bag *legitimately* raises the max-wildness MEAN toward bogey (~0.9–1.0/hole)
 — that's by design, not a spiral (blow-up rate stays ~0%). So the golfer no-death-spiral guard is now
