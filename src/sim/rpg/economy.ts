@@ -271,10 +271,11 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     rarity: 'epic',
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.26, perks: [...m.perks, 'tour-putter'] }),
   },
-  // --- Named caddies (GS-caddy) — UNIQUE: only one may be hired at a time. They live in the shop's
-  // dedicated Caddies section (others grey out once one is on your bag). Penelope keeps the legacy
-  // `auto-caddie` id so existing saves still resolve her. Hiring any named caddy also unlocks the
-  // generic caddy 'service' perks (Caddie Lesson) in the rotating offer.
+  // --- Named caddies (GS-caddy) — UNIQUE: only one may be hired at a time. They appear as random,
+  // rarity-weighted inclusions in the rotating shop offer (epic/legendary, so scarce); once you hire
+  // ANY named caddy, no named caddy appears in the shop again (enforced in shopOffer + buy()).
+  // Penelope keeps the legacy `auto-caddie` id so existing saves still resolve her. Hiring any named
+  // caddy also unlocks the generic caddy 'service' perks (Caddie Lesson) in the offer.
   {
     id: 'auto-caddie',
     name: 'Penelope Putter',
@@ -289,7 +290,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Driver Dan',
     cost: 240,
     desc: 'Hand Dan the big stick anywhere — play your driver from ANY lie at full power',
-    rarity: 'rare',
+    rarity: 'epic',
     caddy: 'named',
     apply: (m) => ({ ...m, driverAnywhere: true, perks: [...m.perks, 'driver-dan'] }),
   },
@@ -298,7 +299,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Dr Chipinski',
     cost: 260,
     desc: 'A wedge wizard: +33% chance to hole out any pitching-wedge-or-shorter chip near the pin',
-    rarity: 'rare',
+    rarity: 'epic',
     caddy: 'named',
     apply: (m) => ({ ...m, chipInBoost: (m.chipInBoost ?? 0) + 0.33, perks: [...m.perks, 'dr-chipinski'] }),
   },

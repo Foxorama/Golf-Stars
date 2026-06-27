@@ -11,7 +11,6 @@ import {
 } from '../src/sim/rpg/economy';
 import {
   buy,
-  caddyRoster,
   shopOffer,
   snapshotRun,
   resumeRun,
@@ -34,11 +33,15 @@ import { Rng } from '../src/sim/rng';
 const richRun = (seed: number) => ({ ...startRun(seed), credits: 1_000_000 });
 
 describe('named caddies — uniqueness & shop gating', () => {
-  it('the five named caddies are all flagged caddy:"named"', () => {
+  it('the five named caddies are all flagged caddy:"named" and are epic/legendary', () => {
     expect(NAMED_CADDY_IDS.slice().sort()).toEqual(
       ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'space-ducks'].sort(),
     );
-    for (const id of NAMED_CADDY_IDS) expect(shopItem(id)!.caddy).toBe('named');
+    for (const id of NAMED_CADDY_IDS) {
+      const it = shopItem(id)!;
+      expect(it.caddy).toBe('named');
+      expect(['epic', 'legendary']).toContain(it.rarity);
+    }
   });
 
   it('you may hire only ONE named caddy — a second is a no-op', () => {
@@ -51,9 +54,20 @@ describe('named caddies — uniqueness & shop gating', () => {
     expect(blocked.loadout.caddyGuard).toBeUndefined();
   });
 
-  it('named caddies never appear in the rotating offer (they live in the Caddies section)', () => {
-    for (let seed = 0; seed < 40; seed++) {
+  it('named caddies are random shop inclusions until one is hired, then never appear again', () => {
+    // No caddy yet → named caddies CAN show up in the rotating offer (rarity-weighted, so scarce —
+    // assert they surface across enough seeds).
+    let surfaced = 0;
+    for (let seed = 0; seed < 120; seed++) {
       const ids = shopOffer(startRun(seed)).map((o) => o.item.id);
+      if (ids.some((id) => NAMED_CADDY_IDS.includes(id))) surfaced++;
+    }
+    expect(surfaced).toBeGreaterThan(0);
+
+    // Once a caddy is hired → NO named caddy ever appears in the offer again.
+    const withCaddy = buy(richRun(0), 'space-ducks');
+    for (let seed = 0; seed < 120; seed++) {
+      const ids = shopOffer({ ...withCaddy, seed }).map((o) => o.item.id);
       for (const c of NAMED_CADDY_IDS) expect(ids).not.toContain(c);
     }
   });
@@ -71,19 +85,6 @@ describe('named caddies — uniqueness & shop gating', () => {
       if (shopOffer(run).some((o) => o.item.id === 'caddie-lesson')) found = true;
     }
     expect(found).toBe(true);
-  });
-
-  it('caddyRoster lists every caddy; hiring one locks the rest', () => {
-    const roster0 = caddyRoster(richRun(2));
-    expect(roster0).toHaveLength(NAMED_CADDY_IDS.length);
-    expect(roster0.every((c) => !c.owned && !c.locked)).toBe(true);
-
-    const run = buy(richRun(2), 'space-ducks');
-    const roster1 = caddyRoster(run);
-    const ducks = roster1.find((c) => c.item.id === 'space-ducks')!;
-    expect(ducks.owned).toBe(true);
-    expect(ducks.locked).toBe(false);
-    for (const c of roster1.filter((x) => x.item.id !== 'space-ducks')) expect(c.locked).toBe(true);
   });
 });
 

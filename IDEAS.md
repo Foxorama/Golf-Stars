@@ -16,9 +16,10 @@ Everything below serves whichever avenue wins.
 ## Now / next (the slice is done — these are the natural follow-ons)
 
 - **GS-caddy — The named-caddy card set. SHIPPED.** Caddies are a UNIQUE class of shop item
-  (`ShopItem.caddy:'named'`, helpers `NAMED_CADDY_IDS`/`namedCaddyOwned`): hire ONE, shown in a
-  dedicated always-visible shop Caddies section (`caddyRoster`), the rest greyed; `buy()` enforces
-  exclusivity; generic caddy `'service'` perks (Caddie Lesson) gate behind owning a named caddy.
+  (`ShopItem.caddy:'named'`, helpers `NAMED_CADDY_IDS`/`namedCaddyOwned`): hire ONE. They're random,
+  rarity-weighted inclusions in the rotating offer (epic/legendary, so scarce); the moment you hire
+  any named caddy, no named caddy appears again (`shopOffer` filter + `buy()` exclusivity). Generic
+  caddy `'service'` perks (Caddie Lesson) gate behind owning a named caddy.
   Roster: **Penelope Putter** (the renamed `auto-caddie`, auto-putt), **Driver Dan** (`driverAnywhere`
   — driver from any lie at full stats; *replaces* the removed Driver-on-Deck ladder), **Dr Chipinski**
   (`chipInBoost` 0.33 — a +33% chip-in chance for PW-or-shorter shots resting within `CHIPIN_RANGE`

@@ -305,14 +305,14 @@ function weightedSample(
 export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   const perks = run.loadout.perks;
   const hasCaddy = !!namedCaddyOwned(perks);
-  // Hide maxed items, gate prereq tier-ladders, exclude named caddies (they live in the dedicated
-  // Caddies section, not the rotating offer), and only surface generic caddy 'service' perks once a
-  // named caddy has been hired (GS-caddy).
+  // Hide maxed items, gate prereq tier-ladders, and handle caddies (GS-caddy): named caddies are
+  // random rarity-weighted inclusions UNTIL you hire one, after which NO named caddy appears again;
+  // generic caddy 'service' perks only surface once a named caddy has been hired.
   const pool = SHOP_ITEMS.filter(
     (it) =>
       ownedCount(perks, it.id) < itemCap(it) &&
       (!it.prereq || perks.includes(it.prereq)) &&
-      it.caddy !== 'named' &&
+      (it.caddy !== 'named' || !hasCaddy) &&
       (it.caddy !== 'service' || hasCaddy),
   );
   const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
@@ -322,32 +322,6 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
-  });
-}
-
-/** A named caddy's state in the shop's dedicated Caddies section (GS-caddy). */
-export interface CaddyOffer {
-  item: ShopItem;
-  cost: number;
-  /** This caddy is currently hired. */
-  owned: boolean;
-  /** A DIFFERENT named caddy is hired, so this one can't be bought (shown greyed). */
-  locked: boolean;
-  /** Affordable at the current credit balance (only meaningful when not owned/locked). */
-  affordable: boolean;
-}
-
-/**
- * The full named-caddy roster for the shop's dedicated Caddies section. Always lists every named
- * caddy: the hired one is flagged `owned`, the rest `locked` once one is hired (so they show greyed
- * but visible). Not part of the rotating offer — a caddy is a once-per-run identity choice.
- */
-export function caddyRoster(run: Run): CaddyOffer[] {
-  const perks = run.loadout.perks;
-  const have = namedCaddyOwned(perks);
-  return SHOP_ITEMS.filter((it) => it.caddy === 'named').map((item) => {
-    const owned = perks.includes(item.id);
-    return { item, cost: item.cost, owned, locked: !!have && !owned, affordable: run.credits >= item.cost };
   });
 }
 

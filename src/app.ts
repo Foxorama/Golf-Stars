@@ -26,7 +26,7 @@ import { rarCol } from './sim/rpg/loot';
 import { itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, type GolferStyle } from './sim/rpg/characters';
-import { caddyRoster, effectiveCut, snapshotRun, type CaddyOffer } from './sim/rpg/run';
+import { effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -704,10 +704,13 @@ function resultScreen(): string {
 function shopScreen(): string {
   const perks = state.run.loadout.perks;
   const credits = state.run.credits;
+  const hasCaddy = !!namedCaddyOwned(perks);
   // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live.
   const items = (state.shopOffer ?? [])
     .map((id) => shopItem(id))
     .filter((it): it is NonNullable<typeof it> => !!it)
+    // Once any named caddy is hired, the others vanish from the offer (you may keep only one).
+    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0)
     .map((it) => {
       const owned = ownedCount(perks, it.id);
       const maxed = owned >= itemCap(it);
@@ -721,48 +724,12 @@ function shopScreen(): string {
         : `<div style="margin:4px;">${card}</div>`;
     })
     .join('');
-  // Caddies: a persistent roster (every named caddy always shown). Hire one — the rest grey out
-  // (you may keep only one caddy). Hiring a caddy also unlocks the generic Caddie Lesson in the stock.
-  const caddies = caddyRoster(state.run)
-    .map((c) => caddyCardHTML(c))
-    .join('');
   return `
     ${header()}
     <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
-    <h3 style="font-size:14px;margin:.4em 0 .1em;">🎒 Caddies <span style="opacity:.55;font-weight:400;font-size:12px;">· hire one (unique)</span></h3>
-    <div style="display:flex;flex-wrap:wrap;">${caddies}</div>
-    <h3 style="font-size:14px;margin:.7em 0 .1em;">Outfitter stock</h3>
-    <p style="font-size:12px;opacity:.6;margin:.1em 0 .5em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own.</p>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own. A rare caddy may turn up in the stock; hire one and the rest stay home.</p>
     <div style="display:flex;flex-wrap:wrap;">${items}</div>
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}</div>`;
-}
-
-/** A named-caddy card for the shop's Caddies section: hired (highlighted), locked (greyed when
- *  another caddy is already on the bag), or buyable (clickable). */
-function caddyCardHTML(c: CaddyOffer): string {
-  const col = rarCol(c.item.rarity);
-  const buyable = !c.owned && !c.locked && c.affordable;
-  const dim = c.locked || (!c.owned && !c.affordable);
-  const note = c.owned
-    ? '✓ HIRED'
-    : c.locked
-    ? 'LOCKED · one caddy only'
-    : c.affordable
-    ? `${c.cost}c — hire`
-    : 'NEED CREDITS';
-  const border = c.owned ? '#5fd45a' : col;
-  const card = `
-    <article style="width:170px;border:2px solid ${border};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:0 0 12px ${border}22;">
-      <div style="display:flex;align-items:baseline;gap:6px;">
-        <b style="font-size:14px;">${c.item.name}</b>
-        <span style="margin-left:auto;color:${col};border:1px solid ${col};border-radius:6px;padding:1px 7px;font-size:11px;text-transform:uppercase;letter-spacing:1px;">${c.item.rarity}</span>
-      </div>
-      <p style="font-size:12px;opacity:.8;margin:.5em 0;min-height:3.6em;">${c.item.desc}</p>
-      <div style="font-size:13px;color:${c.owned ? '#5fd45a' : col};font-weight:600;">${note}</div>
-    </article>`;
-  return buyable
-    ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: c.item.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
-    : `<div style="margin:4px;">${card}</div>`;
 }
 
 function outpostScreen(): string {
