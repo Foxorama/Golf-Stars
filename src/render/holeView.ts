@@ -16,60 +16,37 @@
 import type { Hole, Vec } from '../sim/course/contract';
 import type { ShotLog, ShotSpread } from '../sim/round';
 import { playBoundsCorners } from '../sim/round';
+import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
 import { holeProjector } from './project';
 import { buildScene, scenePrimsToSvg, type ArtFeel } from './style';
 
-/** Spray-cone tier split, expressed as z-scores (σ multiples) about the shot bearing — the
- *  canonical geometry. The drawn cone has THREE bands per side, and the % of shots in each is
- *  DERIVED from these z's via the normal CDF, so the on-screen numbers read EXACTLY true:
- *   - central GREEN zone   |z| < centralZ                  (the likely landing area)
- *   - flanking ORANGE zone  centralZ < |z| < edgeZ          (a risky miss)
- *   - outer RED zone        |z| > edgeZ, drawn to outerZ     (a hook/shank — the wild tail)
- *  Defaults give ≈80% centre, ≈8% each orange, ≈2% each red (the red is the whole tail past
- *  edgeZ; outerZ is only how far it's DRAWN). */
-export interface SprayTiers {
-  centralZ: number;
-  edgeZ: number;
-  outerZ: number;
-}
-/** centralZ 1.2816 → 80% centre; edgeZ 2.0537 → 8% each orange + 2% each red tail. */
-export const SPRAY_TIERS: SprayTiers = { centralZ: 1.2816, edgeZ: 2.0537, outerZ: 3.2 };
+/** Spray-cone display geometry (GS-dispersion-2). The cone is drawn straight from the shot's
+ *  asymmetric `SprayShape`: a fixed-width GREEN centre wedge (±`greenZ·σ0`) and per-side ORANGE/RED
+ *  bands whose widths are PROPORTIONAL to each miss zone's chance (`sideK·σ0·prob`). So a 2% red is
+ *  a quarter the width of an 8% orange, a zone at 0% vanishes, and a one-sided suppression leaves
+ *  the cone visibly lop-sided — the graphic is exactly the landing distribution. */
+export type SprayGeomInput = Partial<SprayGeom> & { centralPct?: number };
 
-/** A partial tier override (the `window._gsSpray` escape hatch). `centralPct` is a convenience
- *  that resizes the green centre by % of shots — converted to centralZ via the inverse normal. */
-export type SprayTiersInput = Partial<SprayTiers> & { centralPct?: number };
+/** Resolve a (possibly partial) geometry override over the defaults. `centralPct` (the `_gsSpray`
+ *  slider) is a convenience that scales the GREEN wedge width — 80 ⇒ unchanged, 96 ⇒ wider, 40 ⇒
+ *  narrower — for live A/B without touching the zone probabilities. */
+export function resolveGeom(o?: SprayGeomInput): SprayGeom {
+  const g: SprayGeom = { ...SPRAY_GEOM, ...o };
+  if (o?.centralPct != null) g.greenZ = SPRAY_GEOM.greenZ * (Math.min(98, Math.max(20, o.centralPct)) / 80);
+  return g;
+}
 
-/** Standard-normal CDF Φ(z) via an erf approximation (Abramowitz & Stegun 7.1.26). */
-function normalCdf(z: number): number {
-  const t = 1 / (1 + 0.2316419 * Math.abs(z));
-  const d = 0.3989422804014327 * Math.exp(-(z * z) / 2);
-  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-  return z >= 0 ? 1 - p : p;
-}
-/** Inverse normal CDF (probit) by bisection — cosmetic precision is plenty for the % slider. */
-function probit(p: number): number {
-  let lo = -6,
-    hi = 6;
-  for (let i = 0; i < 48; i++) {
-    const m = (lo + hi) / 2;
-    if (normalCdf(m) < p) lo = m;
-    else hi = m;
-  }
-  return (lo + hi) / 2;
-}
-/** Resolve a (possibly partial) override over the defaults, applying the `centralPct` shortcut. */
-export function resolveTiers(o?: SprayTiersInput): SprayTiers {
-  const t: SprayTiers = { ...SPRAY_TIERS, ...o };
-  if (o?.centralPct != null) t.centralZ = probit(0.5 + Math.min(98, Math.max(2, o.centralPct)) / 200);
-  return t;
-}
-/** % of shots landing in each band (fractions of 100): central, each orange flank, each red flank. */
-export function tierPercents(t: SprayTiers): { central: number; side: number; red: number } {
-  const central = (2 * normalCdf(t.centralZ) - 1) * 100;
-  const side = (normalCdf(t.edgeZ) - normalCdf(t.centralZ)) * 100;
-  const red = (1 - normalCdf(t.edgeZ)) * 100;
-  return { central, side, red };
-}
+/** Fill/stroke for each band tier. */
+const BAND_FILL: Record<string, string> = {
+  green: 'rgba(95,212,90,0.30)',
+  orange: 'rgba(255,196,84,0.18)',
+  red: 'rgba(255,76,76,0.20)',
+};
+const BAND_STROKE: Record<string, string> = {
+  green: 'rgba(95,212,90,0.7)',
+  orange: 'rgba(255,196,84,0.5)',
+  red: 'rgba(255,76,76,0.6)',
+};
 
 export interface RenderOptions {
   width?: number;
@@ -87,8 +64,8 @@ export interface RenderOptions {
   ball?: Vec;
   /** Draw the aiming spray cone for the contemplated shot (interactive play). */
   spray?: ShotSpread;
-  /** Spray tier split override (defaults to {@link SPRAY_TIERS}). */
-  sprayTiers?: SprayTiersInput;
+  /** Spray cone display-geometry override (the `window._gsSpray` escape hatch). */
+  sprayGeom?: SprayGeomInput;
   /** Zoom-and-follow: centre the map on this point (the ball) instead of fitting the whole hole. */
   focus?: Vec;
   /** Visible radius (course yards) around `focus`. */
@@ -141,7 +118,7 @@ function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
 export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
-  const tiers = resolveTiers(opts.sprayTiers);
+  const geom = resolveGeom(opts.sprayGeom);
 
   // Points beyond the terrain that must stay in frame: every shot's flight + rest (a wild
   // shot can land off-map), the current ball, and the spray cone's far edges. (Ignored in
@@ -154,7 +131,10 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
     if (opts.ball) extra.push(opts.ball);
     if (opts.spray && opts.spray.expectedCarry > 0) {
-      extra.push(...sprayArc(opts.spray, tiers.outerZ * opts.spray.angleSd));
+      const bands = sprayBands(opts.spray.shape, opts.spray.angleSpread, geom);
+      let outer = 0;
+      for (const b of bands) outer = Math.max(outer, Math.abs(b.a0), Math.abs(b.a1));
+      extra.push(...sprayArc(opts.spray, outer));
     }
   }
 
@@ -177,33 +157,24 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art })),
   ];
 
-  // Aiming spray cone: THREE distinct, non-overlapping bands per side, drawn as true arc
+  // Aiming spray cone (GS-dispersion-2): the shot's asymmetric SprayShape, drawn as true arc
   // SECTORS (curved near/far edges at the carry-window radii) so it reads EXACTLY true to the
-  // angular physics — a wide shot can't finish past the far arc. From the centre out: a green
-  // likely zone, an orange risky-miss zone, and a red hook/shank tail. Each band is labelled
-  // with the % of shots that land in it (derived from the tier z's), and the near/far arcs
-  // carry the min/max distance, so the player reads both where it'll go and how far.
-  if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSd > 0) {
+  // angular physics — a wide shot can't finish past the far arc. A fixed-width green centre wedge,
+  // then per-side ORANGE (hook/slice) and RED (duck-hook/shank) bands whose widths are PROPORTIONAL
+  // to each zone's chance — so a 2% red is a quarter of an 8% orange, a 0% zone vanishes, and a
+  // one-sided suppression reads as a lop-sided cone. Each band is labelled with its true % of shots.
+  if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0) {
     const s = opts.spray;
-    const centralA = tiers.centralZ * s.angleSd;
-    const edgeA = tiers.edgeZ * s.angleSd;
-    const outerA = tiers.outerZ * s.angleSd;
-    // Carve the cone into bands that share edges but never stack, so each reads as its own zone.
-    const central = spraySector(s, -centralA, centralA);
-    const orangeL = spraySector(s, -edgeA, -centralA);
-    const orangeR = spraySector(s, centralA, edgeA);
-    const redL = spraySector(s, -outerA, -edgeA);
-    const redR = spraySector(s, edgeA, outerA);
-    parts.push(
-      `<polygon points="${pts(redL)}" fill="rgba(255,76,76,0.20)" stroke="rgba(255,76,76,0.6)" stroke-width="1" />`,
-      `<polygon points="${pts(redR)}" fill="rgba(255,76,76,0.20)" stroke="rgba(255,76,76,0.6)" stroke-width="1" />`,
-      `<polygon points="${pts(orangeL)}" fill="rgba(255,196,84,0.18)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
-      `<polygon points="${pts(orangeR)}" fill="rgba(255,196,84,0.18)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
-      `<polygon points="${pts(central)}" fill="rgba(95,212,90,0.30)" stroke="rgba(95,212,90,0.7)" stroke-width="1" />`,
-    );
-    // Per-zone % labels (what share of shots land there), placed at each band's mid-angle and a
-    // mid-radius so they sit inside their wedge. Derived from the tier z's → reads exactly true.
-    const pct = tierPercents(tiers);
+    const bands = sprayBands(s.shape, s.angleSpread, geom);
+    const drawn = bands.filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
+    // Draw the miss bands first, the green centre last (so its outline sits on top).
+    const ordered = [...drawn.filter((b) => b.tier !== 'green'), ...drawn.filter((b) => b.tier === 'green')];
+    for (const b of ordered) {
+      parts.push(
+        `<polygon points="${pts(spraySector(s, b.a0, b.a1))}" fill="${BAND_FILL[b.tier]}" stroke="${BAND_STROKE[b.tier]}" stroke-width="1" />`,
+      );
+    }
+    // Per-zone % labels (the true share of shots — straight off the shape) at each band's mid-angle.
     const br = (s.bearing * Math.PI) / 180;
     const ptAt = (a: number, r: number): Vec => [s.origin[0] + Math.sin(br + a) * r, s.origin[1] + Math.cos(br + a) * r];
     const rMid = s.carryLow + 0.5 * (s.carryHigh - s.carryLow);
@@ -214,13 +185,11 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
         `fill="#fff" stroke="rgba(0,0,0,0.7)" stroke-width="2.5" paint-order="stroke" text-anchor="middle" dominant-baseline="middle">${txt}</text>`
       );
     };
-    parts.push(
-      zoneLabel(0, rMid, `${Math.round(pct.central)}%`, 13),
-      zoneLabel((centralA + edgeA) / 2, rMid, `${Math.round(pct.side)}%`, 10),
-      zoneLabel(-(centralA + edgeA) / 2, rMid, `${Math.round(pct.side)}%`, 10),
-      zoneLabel((edgeA + outerA) / 2, rMid, `${Math.round(pct.red)}%`, 10),
-      zoneLabel(-(edgeA + outerA) / 2, rMid, `${Math.round(pct.red)}%`, 10),
-    );
+    for (const b of drawn) {
+      // The green % can be a touch noisy at the edges; only label a band wide enough to read.
+      const mid = (b.a0 + b.a1) / 2;
+      parts.push(zoneLabel(mid, rMid, `${Math.round(b.prob * 100)}%`, b.tier === 'green' ? 13 : 10));
+    }
     // Aim line to the expected-carry centre.
     const [ox, oy] = place(s.origin);
     const cFar = place(arcMid(s, s.expectedCarry));

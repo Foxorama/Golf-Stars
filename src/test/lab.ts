@@ -13,8 +13,8 @@
  */
 
 import { CLUBS, clubById, type Club } from '../sim/clubs';
-import { resolveShot } from '../sim/shot';
-import { NEUTRAL_SHOT_MODS } from '../sim/round';
+import { resolveShot, resolveShape } from '../sim/shot';
+import { NEUTRAL_SHOT_MODS, carryControlFor } from '../sim/round';
 import { makeRng } from '../sim/rng';
 import { simulateRun, type RunStrategy } from '../sim/rpg/run';
 import {
@@ -151,6 +151,13 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
   const mods = shotMods ? shotMods(club.carry) : NEUTRAL_SHOT_MODS;
   const baseMult = opts.loadout ? netDispersion(opts.loadout) : 1;
   const dispersionMult = baseMult * mods.dispMult;
+  // The asymmetric spray shape (GS-dispersion-2): the loadout's shaping upgrades folded with this
+  // club's character skew, and the loadout's distance-control carry-window tweaks by club category.
+  const shape = resolveShape(opts.loadout?.shapeMod, mods.shape);
+  const cw = carryControlFor(club.carry, {
+    minCarryBoost: opts.loadout?.minCarryBoost,
+    wedgeWindow: opts.loadout?.wedgeWindow,
+  });
   const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
 
   const from: [number, number] = [0, 0];
@@ -167,6 +174,9 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       carryMult,
       dispersionMult,
       angleBias: mods.angleBias,
+      shape,
+      minCarryFracBoost: cw.minCarryFracBoost,
+      carryWindowTighten: cw.carryWindowTighten,
       rng,
     });
     intended = res.intended;

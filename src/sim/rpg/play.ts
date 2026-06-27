@@ -131,6 +131,9 @@ export function previewShot(
     carryMult,
     dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
     shotMods: characterShotMods(loadout.characterId),
+    shapeMod: loadout.shapeMod,
+    minCarryBoost: loadout.minCarryBoost,
+    wedgeWindow: loadout.wedgeWindow,
   });
 }
 
@@ -162,6 +165,9 @@ export function takeShot(
     carryMult,
     dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
     shotMods: characterShotMods(loadout.characterId),
+    shapeMod: loadout.shapeMod,
+    minCarryBoost: loadout.minCarryBoost,
+    wedgeWindow: loadout.wedgeWindow,
   }, rng);
 
   const firstShot = state.shots.length === 0;

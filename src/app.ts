@@ -15,7 +15,7 @@ import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { biomeCarryMult, pinOf } from './sim/round';
 import { biomeById } from './sim/course/biomes';
 import { bearing, dist, type Hole } from './sim/course/contract';
-import { resolveTiers, tierPercents, type SprayTiersInput } from './render/holeView';
+import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { itemCap, itemCost, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
@@ -509,10 +509,11 @@ function playingBody(animating: boolean): string {
   // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
   const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined };
   const spray = previewShot(play, decision, state.run.loadout);
-  // Feel escape-hatch: window._gsSpray lets the tier split be A/B'd live (e.g. a wider centre).
-  const sprayTiers = (window as unknown as { _gsSpray?: SprayTiersInput })._gsSpray;
-  const tiers = resolveTiers(sprayTiers);
-  const pct = tierPercents(tiers); // % of shots in each zone — derived, reads exactly true.
+  // Feel escape-hatch: window._gsSpray scales the green centre wedge live (A/B the cone geometry).
+  const sprayGeom = (window as unknown as { _gsSpray?: SprayGeomInput })._gsSpray;
+  // % of shots per zone — straight off the shot's asymmetric shape, so the legend reads exactly true.
+  const sh = spray.shape;
+  const pctRound = (x: number) => Math.round(x * 100);
   // Zoom in and follow the ball: frame the CONTEMPLATED shot's reach (the spray's far arc), so a
   // short approach zooms right in and an unreachable green legitimately sits off-screen (#7). The
   // 0.62 factor maps the shot's max carry to ~the upper third of the view (see project.ts bias).
@@ -524,7 +525,7 @@ function playingBody(animating: boolean): string {
     height: 460,
     ball: play.ball,
     spray,
-    sprayTiers,
+    sprayGeom,
     focus: play.ball,
     viewRadius: reach,
   });
@@ -553,10 +554,10 @@ function playingBody(animating: boolean): string {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${clubButtons}</div>
         <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}${selFreeTarget ? ' · ✋ free aim' : ''}</p>
         <p style="font-size:12px;margin:.3em 0;line-height:1.5;">
-          <span style="color:#5fd45a;">▮</span> ${Math.round(pct.central)}% centre ·
-          <span style="color:#ffc454;">▮</span> ${Math.round(pct.side)}% each side ·
-          <span style="color:#ff4c4c;">▮</span> ${Math.round(pct.red)}% hook/shank ·
-          width <b>±${Math.round(tiers.outerZ * spray.lateralSd)} yds</b> · carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
+          <span style="color:#5fd45a;">▮</span> ${pctRound(sh.green)}% great ·
+          <span style="color:#ffc454;">▮</span> ${pctRound(sh.hookL)}% hook / ${pctRound(sh.sliceR)}% slice ·
+          <span style="color:#ff4c4c;">▮</span> ${pctRound(sh.duckHookL)}% duck-hook / ${pctRound(sh.shankR)}% shank ·
+          carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
         </p>
         <h3 style="font-size:14px;margin:.6em 0 .3em;">Strategy</h3>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>

@@ -128,6 +128,33 @@ This game lives or dies on three axes — put every change through all three bef
   auto≡interactive stays byte-for-byte. `lateralFracLong` was trimmed 0.20→0.17 because an angled
   miss now also loses forward distance (carry·cosθ) — re-tune via that, and re-run the no-death-spiral
   bar, after any dispersion change. Lie penalties: rough `carryMult` 0.90 (10%), bunker 0.50 (50%).
+- **Spray is an ASYMMETRIC 5-ZONE shape, not a symmetric gaussian (GS-dispersion-2, `shot.ts`).** The
+  angle off the bearing is sampled from a `SprayShape` — `green` (great shots) + four independent miss
+  zones: `duckHookL`/`shankR` (red tails) and `hookL`/`sliceR` (orange flanks). The base spread `σ0 =
+  prof.lateralFrac × dispMult` only SCALES the cone; the *distribution* is the shape (categorical zone
+  pick → within-band angle, green triangular/centre-peaked, misses uniform). INVARIANT: `green = 1 − Σ
+  misses`, so a `ShapeMod` (additive deltas to the 4 miss zones, `applyShapeMod`/`combineShapeMods`)
+  that cuts a miss feeds the freed % to GREEN, never the opposite side — a sideways move needs an
+  explicit zero-sum trade-off mod. This is what lets upgrades/golfers reshape WHERE a miss goes:
+  **characters** carry a per-club `shape` in `ClubShotMods` (Feather suppresses the left zones + adds
+  right = a baked-in fade; Huang-Woo balloons the LEFT zones on the long sticks but cleans the irons);
+  **upgrades** carry a global `loadout.shapeMod` (Anti-Hook Grip/Shank Guard kill a red zone; Hook/
+  Slice Corrector & Sweet-Spot trim orange/all; Draw Weighting is the trade-off). The two combine via
+  `resolveShape(globalMod, charMod)` in `executeShot`/`shotSpread`. Because the shape is folded the
+  SAME way in the auto sim (`playStop`→`playHole`) and the interactive driver (`takeShot`/`previewShot`),
+  auto≡interactive holds (guarded). The shape sampling keeps the 2-rng-draw angle budget so the draw
+  order is stable. The new model is TIGHTER than the old gaussian (hard angle cap ≈2.8σ0 vs a long
+  tail), which is *safer* for the death-spiral bar — but re-run it after any geometry (`SPRAY_GEOM`)
+  change. `tests/spray-shape.test.ts` guards the redistribution rule, proportional/zero-removal
+  geometry, physics==graphic, and that the new upgrades raise mean per-stop Stableford.
+- **Distance-control upgrades shrink the carry WINDOW (GS-dispersion-2, points 5 & 6).** A shot's carry
+  clamp `[lowFrac, highFrac]` (from `dispersionProfile`) is tweakable per club: **Distance Control**
+  raises `lowFrac` for driver/woods/irons (carry > `WEDGE_CONTROL_CARRY` 110) — less coming-up-short,
+  a smaller min↔max gap; **Wedge Touch** pulls BOTH clamps toward the mean for wedges (≤110) — reliable
+  wedge distance so it lands where you aim (the left/right placement is the existing free-aim). These
+  are loadout fields (`minCarryBoost`/`wedgeWindow`), resolved per club by `carryControlFor` and applied
+  IDENTICALLY in `resolveShot` (the clamp) and `shotSpread` (the previewed `carryLow`/`carryHigh`), so
+  the cone's distance labels read true. They only ever tighten distance → never lower scoring (guarded).
 - **Interactive suggested club = GREEN COVERAGE (`suggestPlayerClub`, GS-mechanics #6).** The player's
   🎯 suggestion is NOT the auto `aiClub` (shortest-that-reaches, tuned for balance — leave it alone):
   green unreachable → longest usable club; reachable → the LONGEST club whose **EXPECTED** carry still
@@ -351,18 +378,22 @@ This game lives or dies on three axes — put every change through all three bef
   decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
   powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
   `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
-- **Spray cone = three DISTINCT bands per side, each labelled with its true % of shots
-  (`holeView.ts`).** From the centre out: GREEN likely zone (`|z|<centralZ`), ORANGE risky-miss
-  (`centralZ<|z|<edgeZ`), RED hook/shank tail (`|z|>edgeZ`, drawn to `outerZ`). The bands share
-  edges but NEVER stack (the orange used to sit *under* the green and read as one muddy blob — fixed
-  by `spraySector(a0,a1)` carving each wedge between two angles). `SprayTiers` is z-scores
-  (`SPRAY_TIERS` default: centralZ 1.2816, edgeZ 2.0537, outerZ 3.2 → 80% / 8% each orange / 2% each
-  red); the on-screen percentages are DERIVED from those z's via the normal CDF (`tierPercents`) so
-  the numbers read EXACTLY true to the geometry — the red is the whole tail past `edgeZ` (2%), and
-  `outerZ` is only how far it's DRAWN. The `window._gsSpray` escape hatch is a *partial* override
-  merged over the defaults by `resolveTiers` (so a `{centralPct}` from the hub no longer leaves
-  `edgeZ` undefined → NaN, the old latent bug); `centralPct` is a convenience that resizes the green
-  centre by % via `probit`. The play-screen legend (`app.ts`) shows the same derived % per colour.
+- **Spray cone = the shot's ASYMMETRIC `SprayShape`, drawn proportional to chance (GS-dispersion-2,
+  `holeView.ts` + `shot.ts`).** The cone is the *landing distribution*: a single `SprayShape`
+  (`green` + 4 miss zones — `hookL`/`sliceR` orange, `duckHookL`/`shankR` red) drives BOTH the physics
+  sampling and the graphic, so they can't disagree. From the centre out per side: a fixed-width GREEN
+  wedge (±`greenZ·σ0`, `σ0` = the base angular spread) then ORANGE then RED bands whose widths are
+  `sideK·σ0·(zone probability)` — **drawn size ∝ the chance of landing there**, so a 2% red is ¼ the
+  width of an 8% orange (the old bug: red drawn WIDER than orange), a 0% zone vanishes, and a one-sided
+  suppression reads as a lop-sided cone. Each band is labelled with its true % (`prob·100`). KEY
+  invariant: `green = 1 − Σ(miss zones)`, so cutting a miss zone raises green's % while its wedge keeps
+  its width ("great shots land where great shots land") — and the freed % flows to GREEN, never to the
+  opposite side (a trade-off mod like `−1% duckHook/+1% shank` is the only way to move mass sideways).
+  `sprayBands()`/`sprayAngleRms()` are the shared truth (renderer draws them; `resolveShot` samples
+  them — categorical zone pick + within-band position, green centre-peaked/triangular, misses uniform,
+  SAME 2-rng-draw budget as the old gaussian angle so auto≡interactive holds). The `window._gsSpray`
+  escape hatch is now a `SprayGeom` override (`resolveGeom`); `centralPct` scales the green wedge width
+  for live A/B. The play-screen legend (`app.ts`) shows the per-zone % straight off `spray.shape`.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the
