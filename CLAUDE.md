@@ -364,7 +364,7 @@ This game lives or dies on three axes — put every change through all three bef
   scoring harness must club shots with **`netDispersion(loadout)`** (handicap × equipment), not raw
   `dispersionMult` — else handicap perks like Caddie Lesson are invisible to the test.
 
-## Putting (manual pace-meter is the default; auto = the Auto-Caddie unlock)
+## Putting (manual pace-meter by default; auto ONLY via the Auto-Caddie unlock)
 - **Two putt models, one shared `PuttSkill`.** AUTO putting is the rng `onePutt` (make%/lag);
   `puttOut`/`puttOutFrom` step it; it's what the headless sim and `takeShot(…, autoPutt)` use.
   MANUAL putting is `manualPutt` — SKILL, not luck: the player controls PACE via an on-screen meter
@@ -373,11 +373,17 @@ This game lives or dies on three axes — put every change through all three bef
   a small distance-scaled lateral wobble (one rng draw) means long putts can lip out on good pace while
   short ones drop reliably. Constants `MANUAL_IDEAL_PACE`/`MANUAL_PACE_MAX`/`DEFAULT_MANUAL_BAND` are
   shared by the resolver and the meter so they agree. `takePutt(state, loadout, rng, control?)`:
-  `control` (the pace) → `manualPutt`; no control → `onePutt` (the "auto-finish putts" path + tests),
+  `control` (the pace) → `manualPutt`; no control → `onePutt` (the AI-finish path + tests),
   so auto stays byte-for-byte. The reducer `putt` action carries `control?: PuttControl`.
-- **Manual is the DEFAULT now** (`UiState.autoPutt` defaults FALSE). Toggle it ON, or own the legendary
-  **`auto-caddie`** (sets `loadout.autoPutt`, locks the toggle ON) — so the perk is the real "automate
-  it" unlock (the design intent finally realised). The toggle is per-session (not saved).
+  GOTCHA (fixed): the meter's `commit()` MUST read `currentPace()` BEFORE setting `committed = true`
+  — `currentPace` short-circuits to the (still-0) `frozenPace` once committed, so the old order struck
+  every manual putt at pace 0 (ball never moved, stroke still counted).
+- **Auto-putt is caddie-only — there is NO manual toggle.** Putting is manual UNLESS you own the
+  legendary **`auto-caddie`** (sets `loadout.autoPutt`), which auto-putts out on arrival. The old
+  per-session `UiState.autoPutt` toggle + `toggleAutoPutt` action were removed: the `shot` reducer's
+  auto gate is just `!!run.loadout.autoPutt`, so owning the caddie is the one and only "automate it"
+  switch. (`» Auto-finish hole` on the decision screen still AI-plays the whole hole — that's a
+  full-hole watch escape, not a putting mode.)
 - **Putting is upgradeable (`loadout.puttBoost`, 0 = base).** `puttSkillOf` derives make%/lag AND the
   manual make-band width from `puttBoost` + auto-caddie; a BASE loadout returns `{}` so auto/headless
   stay byte-for-byte. Shop perks **Pro Putting Grip** (stackable) + **Tour Putter** raise `puttBoost`;

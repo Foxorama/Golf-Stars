@@ -84,9 +84,6 @@ export interface UiState {
   metaUpgrades: MetaUpgrades;
   /** Shards earned by the run that just ended — shown on the gameover screen. */
   lastRunShards?: number;
-  /** Putting mode toggle: manual pace-meter putting (default) vs auto putt-out. The Auto-Caddie
-   *  legendary forces auto on. */
-  autoPutt: boolean;
 }
 
 export type Action =
@@ -97,7 +94,6 @@ export type Action =
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number] }
   | { type: 'putt'; control?: PuttControl } // take one putt — with a pace-meter control = manual skill
-  | { type: 'toggleAutoPutt' } // flip auto putt-out vs manual
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
@@ -140,7 +136,6 @@ export function initState(
     bestDistance: meta.bestDistance ?? 0,
     shards: meta.shards ?? 0,
     metaUpgrades,
-    autoPutt: false, // manual pace-meter putting is the default; Auto-Caddie (or the toggle) flips it
   };
 }
 
@@ -221,7 +216,8 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'shot': {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
       if (awaitingPutt(state.play)) return state; // on the green → must putt, not swing
-      const auto = state.autoPutt || !!state.run.loadout.autoPutt;
+      // Auto putt-out only when the Auto-Caddie legendary is owned; otherwise putting is manual.
+      const auto = !!state.run.loadout.autoPutt;
       const play = takeShot(
         state.play,
         { clubId: action.clubId, aim: action.aim, target: action.target },
@@ -236,12 +232,6 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
       const play = takePutt(state.play, state.run.loadout, state.holeRng, action.control);
       return { ...state, play };
-    }
-
-    case 'toggleAutoPutt': {
-      // The Auto-Caddie legendary locks auto on; otherwise the player chooses.
-      if (state.run.loadout.autoPutt) return state;
-      return { ...state, autoPutt: !state.autoPutt };
     }
 
     case 'autoShotHole': {

@@ -113,15 +113,9 @@ describe('ui reducer', () => {
     expect(s.shopOffer).toBeUndefined();
   });
 
-  it('manual putting is the default and the toggle flips to auto', () => {
-    const s = initState(1);
-    expect(s.autoPutt).toBe(false);
-    expect(reduce(s, { type: 'toggleAutoPutt' }).autoPutt).toBe(true);
-  });
-
   it('manual putting: a hole is finished by stroking putts', () => {
+    // No Auto-Caddie owned, so putting is manual: the ball waits on the green for stroked putts.
     let s = reduce(started(1234), { type: 'playInteractive' });
-    expect(s.autoPutt).toBe(false); // manual is the default now
     let sawPutt = false;
     let guard = 0;
     while (s.screen === 'playing' && guard++ < 800) {
