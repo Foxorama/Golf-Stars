@@ -360,7 +360,7 @@ function holeSplashBody(): string {
   const play = state.play!;
   const hole = play.hole;
   const len = Math.round(dist(hole.tee, hole.green));
-  const map = renderHoleSVG(hole, { biome: state.course.biome, width: 320, height: 420 });
+  const map = renderHoleSVG(hole, { biome: state.course.biome, themeId: state.course.meta.themeId, width: 320, height: 420 });
   const fact = (label: string, val: string): string =>
     `<div style="display:flex;justify-content:space-between;gap:14px;font-size:14px;padding:5px 0;border-bottom:1px solid var(--gs-line-2);">
        <span style="opacity:.6;">${label}</span><span style="font-weight:600;text-align:right;">${val}</span></div>`;
@@ -413,7 +413,7 @@ function playingBody(animating: boolean): string {
   if (awaitingPutt(play)) {
     const puttSvg = renderHoleSVG(play.hole, {
       shots: play.shots,
-      biome: state.course.biome,
+      biome: state.course.biome, themeId: state.course.meta.themeId,
       width: 320,
       height: 460,
       ball: play.ball,
@@ -462,7 +462,7 @@ function playingBody(animating: boolean): string {
   const reach = Math.max(55, spray.carryHigh * 0.62);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
-    biome: state.course.biome,
+    biome: state.course.biome, themeId: state.course.meta.themeId,
     width: 320,
     height: 460,
     ball: play.ball,
@@ -768,7 +768,7 @@ function render(): void {
       view = mountPlayView(playEl, hole, holePlay.shots, holePlay.putts, {
         width: 340,
         height: 520,
-        biome: state.course.biome,
+        biome: state.course.biome, themeId: state.course.meta.themeId,
       });
     }
   }
@@ -789,7 +789,7 @@ function render(): void {
       view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
         width: 340,
         height: 520,
-        biome: state.course.biome,
+        biome: state.course.biome, themeId: state.course.meta.themeId,
         focus,
         viewRadius: animatingPlay.shots.length ? Math.max(55, travel * 0.62) : 25,
         follow: true,

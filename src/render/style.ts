@@ -17,6 +17,9 @@
 import type { Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBoundsCorners } from '../sim/round';
+import { themeById } from '../sim/course/themes';
+import { rarCol } from '../sim/rpg/loot';
+import { constellationFigure } from './constellations';
 import type { Projector } from './project';
 import {
   roughFor,
@@ -54,6 +57,8 @@ export interface SceneOpts {
   width: number;
   height: number;
   biome?: string;
+  /** Star-travel theme id (GS-17e) — draws that constellation in the sky, rarity-tinted. */
+  themeId?: string;
   art?: ArtFeel;
 }
 
@@ -332,8 +337,51 @@ function inView(p: Vec, w: number, h: number, m = 24): boolean {
  * tee + flag. The interactive overlays (spray cone, live ball, shot lines, HUD) stay in each
  * renderer — this is only the world.
  */
+/**
+ * The stop's constellation, laid out in the upper sky (screen-space) and rarity-tinted (GS-17e).
+ * Pure & deterministic — figure geometry comes from the catalogue table, positions are fixed (no
+ * rng), so it's byte-stable. Deep-sky/galaxy themes have no stick figure → nothing drawn (the
+ * ambient starfield carries them). The figure stars sit ON TOP of any ambient stars.
+ */
+function constellationBackdrop(themeId: string, W: number, H: number): Prim[] {
+  const fig = constellationFigure(themeId);
+  if (!fig) return [];
+  const tint = rarCol(themeById(themeId)?.rarity ?? 'common');
+  // Fit the unit-box figure into a sky panel up top, preserving aspect.
+  const boxW = W * 0.46;
+  const boxH = H * 0.2;
+  const ox = W * 0.5 - boxW / 2;
+  const oy = H * 0.06;
+  const at = (s: { x: number; y: number }): Vec => [ox + s.x * boxW, oy + s.y * boxH];
+
+  const prims: Prim[] = [];
+  // Faint connecting lines first (the stick figure).
+  for (const [a, b] of fig.lines) {
+    const sa = fig.stars[a];
+    const sb = fig.stars[b];
+    if (!sa || !sb) continue;
+    prims.push({ t: 'line', a: at(sa), b: at(sb), stroke: hexAlpha(tint, 0.35), sw: 0.8, round: true });
+  }
+  // Then the stars: brighter (lower mag) = bigger, with a soft halo + a tint dot.
+  for (const s of fig.stars) {
+    const p = at(s);
+    const r = Math.max(1, 3.1 - s.m * 0.45);
+    prims.push({ t: 'circle', c: p, r: r * 2.2, fill: hexAlpha(tint, 0.16) }); // halo
+    prims.push({ t: 'circle', c: p, r, fill: 'rgba(255,255,255,0.95)' });
+    prims.push({ t: 'circle', c: p, r: Math.max(0.6, r * 0.55), fill: hexAlpha(tint, 0.85) });
+  }
+  return prims;
+}
+
+/** `#rrggbb` + alpha → an `rgba()` string (render-only helper). */
+function hexAlpha(hex: string, a: number): string {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/(.)/g, '$1$1') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
 export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[] {
-  const { width: W, height: H, biome } = opts;
+  const { width: W, height: H, biome, themeId } = opts;
   const art = artFeel(opts.art);
   const rng = mulberry32(hashHole(hole));
   const prims: Prim[] = [];
@@ -460,6 +508,13 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
     }
   }
+
+  // --- 3c. The course's CONSTELLATION, drawn in the sky (GS-17e) ---------------
+  // The stop's theme isn't just physics + flavour — its actual constellation hangs overhead,
+  // rarity-tinted, so a Scorpius stop LOOKS like Scorpius. Drawn screen-space in the upper sky,
+  // using NO crng (so it never perturbs the planet/comet stream above; a course with no theme
+  // skips this entirely and stays byte-identical to the pre-GS-17e render).
+  if (themeId && art.accents > 0) prims.push(...constellationBackdrop(themeId, W, H));
 
   // --- 4. Terrain features (fairway/green/tee + scatter surfaces) --------------
   for (const f of hole.features) {

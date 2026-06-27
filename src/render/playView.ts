@@ -197,6 +197,8 @@ export interface PlayViewOptions {
   width?: number;
   height?: number;
   biome?: string;
+  /** Star-travel theme id (GS-17e) — draws that constellation in the sky. */
+  themeId?: string;
   /** Called once the final shot has landed. */
   onDone?: () => void;
   /**
@@ -302,7 +304,7 @@ export function mountPlayView(
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);
