@@ -41,15 +41,22 @@ const cases = [
 ];
 const seeds = [7, 4242];
 
+// For each world: a whole-hole MAP (sky around the floating island) and a zoomed PLAY view
+// (focus/follow-cam — the case where the turf used to fill the frame and hide the sky).
 let cells = '';
 for (const c of cases) {
-  for (const seed of seeds) {
-    const hole = generateCourse(seed, { holes: 1 }).holes[0];
-    const svg = renderHoleSVG(hole, { width: 300, height: 420, biome: c.biome, themeId: c.themeId });
-    cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · seed ${seed}</figcaption>${svg}</figure>`;
-  }
+  const seed = seeds[0];
+  const hole = generateCourse(seed, { holes: 1 }).holes[0];
+  const map = renderHoleSVG(hole, { width: 300, height: 420, biome: c.biome, themeId: c.themeId });
+  // Zoom to a tee shot like the decision map (focus the tee, a driver-ish reach, ball low).
+  const zoom = renderHoleSVG(hole, {
+    width: 300, height: 420, biome: c.biome, themeId: c.themeId,
+    focus: hole.tee, viewRadius: 95, focusBias: 0.8,
+  });
+  cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · map</figcaption>${map}</figure>`;
+  cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · zoomed play</figcaption>${zoom}</figure>`;
 }
-const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(${seeds.length * 1},300px) repeat(${seeds.length},300px);gap:10px;padding:12px;grid-auto-flow:row">${cells}</body></html>`;
+const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(4,300px);gap:10px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
 
 const chromePath = await findChromium();
