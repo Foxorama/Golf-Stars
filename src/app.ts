@@ -6,7 +6,7 @@
  * DOM + the canvas play view + localStorage glue.
  */
 
-import { scoreName } from './sim/score';
+import { scoreName, playTotals } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { courseCardHTML, itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
@@ -271,6 +271,7 @@ function introScreen(): string {
   return `
     ${header()}
     <p style="opacity:.8;">A new world rises from the void…</p>
+    ${zoneIdentityHTML()}
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
       <section style="flex:1 1 220px;">
@@ -336,7 +337,7 @@ function scheduleRender(): void {
  * survives the per-frame re-render that replaces the map element.
  */
 function wireMapAiming(app: HTMLElement): void {
-  if (state.screen !== 'playing' || !state.play || state.holeSplash || awaitingShotPopup) return;
+  if (state.screen !== 'playing' || !state.play || awaitingShotPopup) return;
   if (state.play.done || awaitingPutt(state.play)) return; // only the full-shot decision screen
   const svg = app.querySelector<SVGSVGElement>('[data-map] svg');
   if (!svg) return;
@@ -346,16 +347,16 @@ function wireMapAiming(app: HTMLElement): void {
     if (!cur || !state.play) return;
     const rect = cur.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const vbX = ((clientX - rect.left) / rect.width) * 320;
-    const vbY = ((clientY - rect.top) / rect.height) * 460;
+    const vbX = ((clientX - rect.left) / rect.width) * DMAP_W;
+    const vbY = ((clientY - rect.top) / rect.height) * DMAP_H;
     // Reconstruct the EXACT decision-map projector (same params as the render), then unproject.
     const spray = previewShot(
       state.play,
       { clubId: selClubId!, aim: selAim, target: selFreeTarget ?? undefined },
       state.run.loadout,
     );
-    const reach = Math.max(55, spray.carryHigh * 0.62);
-    const proj = holeProjector(state.play.hole, { width: 320, height: 460, focus: state.play.ball, viewRadius: reach });
+    const reach = decisionReach(spray.carryHigh);
+    const proj = holeProjector(state.play.hole, { width: DMAP_W, height: DMAP_H, focus: state.play.ball, viewRadius: reach, focusBias: DMAP_BIAS });
     const t = proj.unproject(vbX, vbY);
     selFreeTarget = clampToReach(state.play, [t[0], t[1]]);
     scheduleRender();
@@ -380,16 +381,6 @@ function wireMapAiming(app: HTMLElement): void {
   });
 }
 
-const HAZARD_LABEL: Record<string, string> = {
-  water: '💧 Water',
-  bunker: '🏖 Bunker',
-  lava: '🌋 Lava',
-  lavariver: '🌋 Lava river',
-  void: '🕳 Void',
-  trees: '🌲 Trees',
-  waste: '🏜 Waste',
-};
-
 /** Plain-language wind read relative to the hole's play direction (up = toward the green). */
 function windDescription(hole: Hole): string {
   const w = hole.wind;
@@ -400,16 +391,6 @@ function windDescription(hole: Hole): string {
   const kind = along > 0.4 ? 'tailwind' : along < -0.4 ? 'headwind' : 'crosswind';
   const arrow = `<span style="display:inline-block;transform:rotate(${delta.toFixed(0)}deg);">⬆</span>`;
   return `🌬 ${Math.round(w.spd)} mph ${kind} ${arrow}`;
-}
-
-/** Hazards in play on the hole, counted by kind (trees are a treeline, not counted). */
-function hazardSummary(hole: Hole): string {
-  const counts: Record<string, number> = {};
-  for (const h of hole.hazards) counts[h.kind] = (counts[h.kind] ?? 0) + 1;
-  const parts = Object.entries(counts).map(([kind, n]) =>
-    kind === 'trees' ? HAZARD_LABEL[kind]! : `${n}× ${HAZARD_LABEL[kind] ?? kind}`,
-  );
-  return parts.length ? parts.join(' · ') : 'none in play';
 }
 
 /** Biome + special conditions (gravity, slick/true scatter surfaces) actually on this hole. */
@@ -443,27 +424,18 @@ function traitList(title: string, accent: string, traits: { icon: string; text: 
     </div>`;
 }
 
-/** Per-hole briefing splash: a thematic zone hero + profile, then the live wind/hazards/conditions
- *  for THIS hole and a layout map. The zone identity (lore + hazards/benefits/difficulty) sells the
- *  world; the live facts + map read the specific hole. Render-only — the `shot` action is never
- *  blocked, so the headless flow/tests are intact. */
-function holeSplashBody(): string {
-  const play = state.play!;
-  const hole = play.hole;
-  const len = Math.round(dist(hole.tee, hole.green));
+/** The zone-identity briefing block (thematic hero + lore + hazards/benefits + difficulty), shown
+ *  ONCE per stop on the starting zone screen (the intro). The zone sells the WORLD; the per-hole
+ *  facts now live on the play screen's top bar (the per-hole briefing splash was retired). */
+function zoneIdentityHTML(): string {
   const themeId = state.course.meta.themeId;
   const arch = archetypeFor(themeId, state.course.biome);
   const zone = zoneProfile(arch);
   const theme = themeId ? themeById(themeId) : undefined;
-  const hero = zoneHeroSVG(arch, { width: 480, height: 168, seed: (hole.par * 131 + len) >>> 0 });
-  const map = renderHoleSVG(hole, { biome: state.course.biome, themeId, width: 320, height: 400 });
-  const fact = (label: string, val: string): string =>
-    `<div style="display:flex;justify-content:space-between;gap:14px;font-size:14px;padding:5px 0;border-bottom:1px solid var(--gs-line-2);">
-       <span style="opacity:.6;">${label}</span><span style="font-weight:600;text-align:right;">${val}</span></div>`;
+  const hero = zoneHeroSVG(arch, { width: 520, height: 176, seed: (state.course.seed * 131 + zone.difficulty) >>> 0 });
   const diffPips = difficultyPips(zone.difficulty);
   return `
-    ${header()}
-    <div class="gs-panel" style="max-width:780px;padding:0;overflow:hidden;margin-bottom:12px;">
+    <div class="gs-panel" style="padding:0;overflow:hidden;margin:0 0 12px;">
       <div style="position:relative;line-height:0;">
         <div style="width:100%;">${hero}</div>
         <div style="position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.72));line-height:1.2;">
@@ -486,16 +458,52 @@ function holeSplashBody(): string {
           ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
         </div>
       </div>
-    </div>
-    <h2 style="font-size:17px;margin:.2em 0 .4em;">Hole ${play.holeIndex + 1} of ${state.course.holes.length} · Par ${hole.par} · ~${len} yds</h2>
-    <div class="gs-play">
-      <div class="gs-map">${map}</div>
-      <section class="gs-controls">
-        ${fact('Wind', windDescription(hole))}
-        ${fact('Hazards', hazardSummary(hole))}
-        ${fact('Conditions', conditionsSummary(hole, state.course.biome))}
-        <div class="gs-hitbar" style="margin-top:14px;">${btn('▶ Play the hole', { type: 'startHole' }, { variant: 'primary' })}</div>
-      </section>
+    </div>`;
+}
+
+// Decision/putt map geometry — portrait so the map fills the screen. The reach factor zooms the
+// follow-cam in on the contemplated shot (smaller = tighter); the playable corridor fills the
+// frame and the rough/OB legitimately stretch off-screen.
+const DMAP_W = 360;
+const DMAP_H = 600;
+// Ball sits LOW in the tall portrait view so most of the frame is the shot AHEAD (a high bias
+// kills the dead space behind the tee that a centred camera leaves).
+const DMAP_BIAS = 0.8;
+/** View radius (course yds) framing a shot of max-carry `carryHigh`. Tuned with DMAP_BIAS so the
+ *  contemplated shot nearly fills the height and the corridor fills the width — the rough/OB
+ *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
+function decisionReach(carryHigh: number): number {
+  return Math.max(30, carryHigh * 0.36);
+}
+
+/** Running stop score vs the cut-to-beat, coloured by how the run is tracking:
+ *  🟢 beating the cut · 🟠 within striking distance · 🔴 well short. */
+function zoneScoreChip(): string {
+  const done = state.stopPlayed ?? [];
+  const sf = playTotals(done.map((p) => p.record)).stableford;
+  const cut = effectiveCut(state.run, state.course.holes.length);
+  const gap = cut - sf;
+  const col = gap <= 0 ? '#5fd45a' : gap <= Math.ceil(cut / 2) ? '#ffc454' : '#ff6b6b';
+  return `<span class="gs-shotscore" style="color:${col};" title="stop Stableford vs the cut to make">${sf}/${cut} pts</span>`;
+}
+
+/** The compact top stat bar for the play screen (replaces the old per-hole briefing splash):
+ *  hole #/total, par + hole length, the live distance, the running zone score, the shot number,
+ *  plus a thin lie/wind/conditions sub-line. */
+function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
+  const play = state.play!;
+  const len = Math.round(dist(play.hole.tee, play.hole.green));
+  const cond = conditionsSummary(play.hole, state.course.biome);
+  return `
+    <div class="gs-topbar">
+      <div class="gs-stats">
+        <span>⛳ Hole <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
+        <span>Par <b>${play.hole.par}</b> · ${len}y</span>
+        <span>${opts.distLabel}</span>
+        <span>Shot <b>${opts.shotNo}</b></span>
+        ${zoneScoreChip()}
+      </div>
+      <div class="gs-sub">lie <b>${v.lie}</b> · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
     </div>`;
 }
 
@@ -504,17 +512,13 @@ function playingBody(animating: boolean): string {
   const v = shotView(play, state.run.loadout);
   const bag = state.run.loadout.bag;
   const par = play.hole.par;
-  const scoreLine = `Hole ${play.holeIndex + 1}/${state.course.holes.length} · Par ${par} · Strokes <b>${play.strokes}</b>`;
-
-  // Per-hole briefing splash before the first shot (render-only; the reducer never blocks play).
-  if (state.holeSplash && !animating) return holeSplashBody();
 
   if (animating) {
     return `
-      ${header()}
-      <p style="font-size:14px;opacity:.85;">${scoreLine}</p>
-      <div id="play" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);width:340px;height:520px;"></div>
-      <p style="opacity:.6;font-size:12px;margin-top:6px;">…watching the shot…</p>`;
+      <div class="gs-shot">
+        ${playTopBar(v, { shotNo: play.strokes, distLabel: '…watching the shot…' })}
+        <div class="gs-bigmap" id="play"></div>
+      </div>`;
   }
 
   if (play.done) {
@@ -535,8 +539,8 @@ function playingBody(animating: boolean): string {
     const puttSvg = renderHoleSVG(play.hole, {
       shots: play.shots,
       biome: state.course.biome, themeId: state.course.meta.themeId,
-      width: 320,
-      height: 460,
+      width: DMAP_W,
+      height: DMAP_H,
       ball: play.ball,
       // Zoom the green in for the putt — follow the ball, frame the cup.
       focus: play.ball,
@@ -545,21 +549,20 @@ function playingBody(animating: boolean): string {
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. The band widens with putter upgrades.
     const meterInstr =
-      '<p style="font-size:12px;opacity:.6;margin:.1em 0 .5em;line-height:1.4;">Tap the meter (or Putt) when the marker is in the green <b>MAKE</b> band. Too soft leaves it short; too firm runs it past.</p>';
+      '<p style="font-size:11.5px;opacity:.6;margin:.1em 0 .4em;line-height:1.4;">Tap the meter (or Putt) when the marker is in the green <b>MAKE</b> band. Too soft leaves it short; too firm runs it past.</p>';
     return `
-      ${header()}
-      <p style="font-size:14px;opacity:.85;">${scoreLine} · on the green · <b>${v.distToPin}</b> yds to the cup · putt <b>${play.putts + 1}</b></p>
-      <div class="gs-play">
-        <div class="gs-map" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);">${puttSvg}</div>
-        <section class="gs-controls">
+      <div class="gs-shot">
+        ${playTopBar(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b> yds to cup · putt <b>${play.putts + 1}</b>` })}
+        <div class="gs-bigmap">${puttSvg}</div>
+        <div class="gs-bottom">
           ${meterInstr}
-          <div id="puttmeter" style="margin-bottom:10px;"></div>
-          <div style="margin-bottom:10px;">${puttToggleBtn()}</div>
-          <div class="gs-hitbar" style="margin-top:8px;">
-            <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="font-size:16px;">⛳ Putt</button>
+          <div id="puttmeter" style="margin:2px 0;"></div>
+          <div class="gs-ctrlrow">${puttToggleBtn()}</div>
+          <div class="gs-hitbar">
+            <button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>
             ${btn('» Auto-finish putts', { type: 'autoShotHole' }, { variant: 'ghost' })}
           </div>
-        </section>
+        </div>
       </div>`;
   }
 
@@ -586,18 +589,20 @@ function playingBody(animating: boolean): string {
   const pctRound = (x: number) => Math.round(x * 100);
   // Zoom in and follow the ball: frame the CONTEMPLATED shot's reach (the spray's far arc), so a
   // short approach zooms right in and an unreachable green legitimately sits off-screen (#7). The
-  // 0.62 factor maps the shot's max carry to ~the upper third of the view (see project.ts bias).
-  const reach = Math.max(55, spray.carryHigh * 0.62);
+  // tight factor (decisionReach) maps max carry near the top of the view so the playable corridor
+  // fills the frame and the rough/OB stretch off-screen (must match wireMapAiming's projector).
+  const reach = decisionReach(spray.carryHigh);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
     biome: state.course.biome, themeId: state.course.meta.themeId,
-    width: 320,
-    height: 460,
+    width: DMAP_W,
+    height: DMAP_H,
     ball: play.ball,
     spray,
     sprayGeom,
     focus: play.ball,
     viewRadius: reach,
+    focusBias: DMAP_BIAS,
   });
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
@@ -614,29 +619,24 @@ function playingBody(animating: boolean): string {
     ${aimBtn('free', '✋ Free aim', !!selFreeTarget, 'Tap or drag the map to aim')}`;
   const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
   return `
-    ${header()}
-    <p style="font-size:14px;opacity:.85;">${scoreLine} · ${v.distToPin} yds to pin · lie <b>${v.lie}</b> · wind ${v.wind?.spd.toFixed(0) ?? 0}mph · <span style="opacity:.6;">pick up at +4 (${par + 4})</span></p>
-    <div class="gs-play">
-      <div class="gs-map" data-map="1" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);touch-action:none;">${svg}</div>
-      <section class="gs-controls">
-        <p style="font-size:11px;opacity:.55;margin:.1em 0 .4em;">Tap or drag the map to aim freely (within max distance).</p>
-        <h3 style="font-size:14px;margin:.3em 0;">Club</h3>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${clubButtons}</div>
-        <p style="font-size:12px;opacity:.6;margin:.3em 0;">Suggested: attack ${v.attackClubId} · safe ${v.safeClubId}${selFreeTarget ? ' · ✋ free aim' : ''}</p>
-        <p style="font-size:12px;margin:.3em 0;line-height:1.5;">
+    <div class="gs-shot">
+      ${playTopBar(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b> yds to pin` })}
+      <div class="gs-bigmap" data-map="1">${svg}</div>
+      <div class="gs-bottom">
+        <div class="gs-ctrlrow">${clubButtons}</div>
+        <p class="gs-legend">
           <span style="color:#5fd45a;">▮</span> ${pctRound(sh.green)}% great ·
           <span style="color:#ffc454;">▮</span> ${pctRound(sh.hookL)}% hook / ${pctRound(sh.sliceR)}% slice ·
           <span style="color:#ff4c4c;">▮</span> ${pctRound(sh.duckHookL)}% duck-hook / ${pctRound(sh.shankR)}% shank ·
           carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
+          <span style="opacity:.6;"> · suggested: attack ${v.attackClubId} · safe ${v.safeClubId}${selFreeTarget ? ' · ✋ free aim' : ''}</span>
         </p>
-        <h3 style="font-size:14px;margin:.6em 0 .3em;">Strategy</h3>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">${aimButtons}</div>
-        <div style="margin-top:10px;">${puttToggleBtn()}</div>
-        <div class="gs-hitbar" style="margin-top:12px;">
+        <div class="gs-ctrlrow">${aimButtons} ${puttToggleBtn()}</div>
+        <div class="gs-hitbar">
           ${btn('🏌 Hit', hitAction, { variant: 'primary' })}
           ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
         </div>
-      </section>
+      </div>
     </div>
     ${awaitingShotPopup ? shotPopupOverlay() : ''}`;
 }
@@ -940,13 +940,19 @@ function render(): void {
       );
       const focus = animatingPlay.shots[0]?.from ?? animatingPlay.putts[0]?.from ?? play.ball;
       const hadShots = animatingPlay.shots.length > 0;
+      // Size the canvas to fill the viewport (it can't aspect-scale via CSS like the SVG map can);
+      // the watch screen has no bottom controls, so it can take most of the height. Keep the
+      // portrait map aspect so the follow-cam framing matches the decision screen.
+      const animH = Math.round((window.innerHeight || 800) * 0.72);
+      const animW = Math.round(animH * (DMAP_W / DMAP_H));
       view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
-        width: 340,
-        height: 520,
+        width: animW,
+        height: animH,
         biome: state.course.biome, themeId: state.course.meta.themeId,
         golferLook: golferLook(),
         focus,
-        viewRadius: animatingPlay.shots.length ? Math.max(55, travel * 0.62) : 25,
+        viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
+        focusBias: DMAP_BIAS,
         follow: true,
         onDone: () => {
           animatedShots = play.shots.length;

@@ -232,6 +232,8 @@ export interface PlayViewOptions {
    */
   focus?: Vec;
   viewRadius?: number;
+  /** Where the focus point sits vertically (0=top..1=bottom); higher = ball lower, more shot ahead. */
+  focusBias?: number;
   follow?: boolean;
   /** The selected golfer's look (GS-18). Absent → the loader-crew cap cycle (result-screen replay). */
   golferLook?: GolferLook;
@@ -290,7 +292,7 @@ export function mountPlayView(
   let lastGround: Vec = camera;
   const buildProj = () =>
     followMode
-      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius })
+      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius, focusBias: opts.focusBias })
       : holeProjector(hole, { width, height, extra });
   let proj = buildProj();
 

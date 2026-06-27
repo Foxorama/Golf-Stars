@@ -71,6 +71,8 @@ export interface RenderOptions {
   focus?: Vec;
   /** Visible radius (course yards) around `focus`. */
   viewRadius?: number;
+  /** Where the focus point sits vertically (0=top..1=bottom); higher = ball lower, more shot ahead. */
+  focusBias?: number;
   /** Cell-shade art tunables (escape-hatch); defaults applied in the scene builder. */
   art?: ArtFeel;
 }
@@ -146,6 +148,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     extra,
     focus: opts.focus,
     viewRadius: opts.viewRadius,
+    focusBias: opts.focusBias,
   });
   const place = (p: Vec) => proj.project(p);
   const pts = (poly: Vec[]) => polyPoints(poly, place);

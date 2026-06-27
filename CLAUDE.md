@@ -461,15 +461,17 @@ This game lives or dies on three axes — put every change through all three bef
   the void's luminous **island glow** under the fairway/green so the platforms read as land in the
   abyss (the off-fairway IS the void). The dark per-biome rough (`roughBaseFor`) + starfield accents
   carry the "space" read. Re-shoot the biome×seed gallery after any palette/`style.ts` change.
-- **Zone splash card + procedural hero art (GS-19, `render/zoneHero.ts` + `app.ts`).** The per-hole
-  briefing splash now leads with a thematic **hero scene** — a self-contained, deterministic SVG
+- **Zone splash card + procedural hero art (GS-19, `render/zoneHero.ts` + `app.ts`).** The zone
+  identity now lives ONCE per stop, on the **starting zone screen** (the `intro` screen,
+  `zoneIdentityHTML`) — NOT repeated per hole (the per-hole briefing splash was retired; see
+  *Play-loop UX*). It leads with a thematic **hero scene** — a self-contained, deterministic SVG
   illustration per archetype (`zoneHeroSVG`: a garden dawn, a Mars dust horizon, a glacier aurora, a
   volcanic lava-flow world, the void's island past a black hole) — NO downloaded asset to 404 (the
   house rule, same as the intro). Below it: the zone NAME + signature + theme, a **difficulty** pip
   rating, the real-space INSPIRATION, a brief, and two columns of HAZARDS / BENEFITS — all pure DATA
   from `src/sim/course/zones.ts` (`ZONES`, archetype-keyed prose/profile; the physics stay in
-  `biomes.ts`). Then the LIVE per-hole facts (wind/hazards/conditions, now flagging an armed void
-  lost-rough) + the layout map. The hero SVG is `width:100%` responsive so it fills the panel.
+  `biomes.ts`). The LIVE per-hole facts (wind/conditions, including an armed void lost-rough warning)
+  moved onto the play screen's top stat bar. The hero SVG is `width:100%` responsive so it fills the panel.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
 - **The swinging golfer + space ambience (play-view "alive" layer).** Each full shot in `playView`
@@ -490,12 +492,17 @@ This game lives or dies on three axes — put every change through all three bef
   play corridor stays clean. `playView` adds a thin animated twinkle/shooting-star overlay (`drawSpaceFX`)
   on top for motion only. Canvas feel — verified eyes-on (Playwright frames per swing phase).
 - **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
-  (centre on a point — the ball) + `viewRadius` (course yards, biased so the ball sits low and you
-  see ahead) instead of fitting the whole hole. The decision map zooms to the contemplated shot's
-  reach (`spray.carryHigh × 0.62`) so a short approach zooms in and an unreachable green legitimately
-  sits off-screen; the play-view animation uses the same focus + an eased follow-cam (rebuilt per
-  frame) so it tracks the ball and matches the decision map's zoom (no jump — also closed the
-  decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
+  (centre on a point — the ball) + `viewRadius` (course yards) + `focusBias` (0..1, how far down
+  the ball sits) instead of fitting the whole hole. The decision map zooms TIGHT to the contemplated
+  shot — `decisionReach = max(30, carryHigh × 0.36)` at `focusBias 0.8` (`DMAP_BIAS`) so the ball
+  sits LOW, the shot ahead nearly fills the tall portrait view, the corridor fills the width, and the
+  rough/OB legitimately stretch off-screen (the "zoom in, let the hole run off the edges" ask). A
+  short approach zooms right in; an unreachable green sits off the top. The reach factor + dims +
+  bias live in `app.ts` (`DMAP_W/DMAP_H/DMAP_BIAS/decisionReach`) and MUST be kept in sync across
+  the three call sites: the decision `renderHoleSVG`, the `wireMapAiming` projector (tap/drag aim
+  unprojects against the SAME params or aiming drifts), and the play-view animation mount. The
+  animation uses the same focus + an eased follow-cam (rebuilt per frame) so it tracks the ball and
+  matches the decision map's zoom (no jump — also closed the decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
   powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
   `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
 - **Spray cone = the shot's ASYMMETRIC `SprayShape`, drawn proportional to chance (GS-dispersion-2,
@@ -535,12 +542,17 @@ This game lives or dies on three axes — put every change through all three bef
   from the v2 `activeRun` snapshot (`resumeRun`); `?seed=` in the URL forces a fresh run.
 - New screens/actions: add an `Action` variant + a guarded `case` (return state unchanged when the
   action doesn't apply to the current screen) and a render branch. Keep logic in the reducer.
-- **Play-loop UX (GS-mechanics #1/#2/#3).** A per-hole **briefing splash** (`holeSplash` reducer flag,
-  cleared by `startHole` or defensively by `shot`) shows wind/hazards/conditions + a layout map before
-  the first shot — render-only, the `shot` action is never blocked so the headless flow/tests are
-  intact. The **shot-result popup** (a settle-delayed modal card + Continue after each non-terminal
-  shot) and its timer are an `app.ts` VIEW effect (module vars, cleared by any dispatch), NOT reducer
-  state — only `holeSplash` is reducer state. The popup card is the RICH `shotCardHTML(shot, {distToPin})`:
+- **Play-loop UX (GS-mechanics #1/#2/#3).** The play screen is **full-bleed: the map IS the screen**
+  (`.gs-shot` is a viewport-height flex column — a compact **top stat bar** (`playTopBar`: hole #/total,
+  par + hole length, live yds-to-pin, the running **zone score vs the cut**, the shot #, plus a thin
+  lie/wind/conditions sub-line), then the map as the flex remainder, then club/strategy/Hit at the
+  bottom — nothing scrolls, nothing overlaps). The zone-score chip is coloured by how the run tracks
+  (`zoneScoreChip`): 🟢 beating the cut · 🟠 within striking distance (gap ≤ ⌈cut/2⌉) · 🔴 well short.
+  There is **no per-hole briefing splash anymore** — the old `holeSplash` reducer flag + `startHole`
+  action were removed; the zone identity moved to the once-per-stop starting zone screen (see *Zone
+  splash card*) and the live per-hole facts moved to the top bar. The **shot-result popup** (a
+  settle-delayed modal card + Continue after each non-terminal shot) and its timer are an `app.ts` VIEW
+  effect (module vars, cleared by any dispatch), NOT reducer state. The popup card is the RICH `shotCardHTML(shot, {distToPin})`:
   it leads with a procedural **ball-at-rest vignette** (`render/restArt.ts` — a self-contained SVG of the
   ball on the surface it finished on, or the HAZARD alone when the ball wouldn't be visible: water/lava/
   void show no ball, OB shows it beyond the stakes, a holed shot drops into the cup — house rule, no 404
@@ -550,9 +562,10 @@ This game lives or dies on three axes — put every change through all three bef
   (all `_gsFeel` sub-fields, no new `_gs*` flag). **Free-aim** (`ShotDecision.target`, GS-mechanics #10):
   tap/drag the map sets a course-space target (overrides attack/safe), unprojected from the pointer
   via a reconstructed decision projector and clamped to the longest club's reach; pointer move/up
-  listen on `window` so a drag survives the per-frame re-render. **Mobile layout**: a responsive
-  `<style>` block in `index.html` (`.gs-play/.gs-map/.gs-controls/.gs-hitbar`) keeps the map big and
-  pins the Hit/Putt action bar to the viewport bottom so it never needs scrolling.
+  listen on `window` so a drag survives the per-frame re-render. **Layout**: a responsive `<style>`
+  block in `index.html` drives the full-bleed shot screen (`.gs-shot/.gs-topbar/.gs-bigmap/.gs-bottom/
+  .gs-shotscore`); the older side-by-side `.gs-play/.gs-map/.gs-controls` classes still back other
+  screens. The map fills the flex remainder and the controls always sit under it without a scroll.
 
 ## Loading intro cinematic (`render/introView.ts`)
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
