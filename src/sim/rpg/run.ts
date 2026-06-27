@@ -21,6 +21,7 @@ import {
   cutLine,
   itemCap,
   itemCost,
+  itemTags,
   loadoutFromPerks,
   netDispersion,
   ownedCount,
@@ -33,7 +34,7 @@ import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods } from './characters';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { themeForStop, resolveBiome } from '../course/themes';
+import { themeForStop, resolveBiome, itemThemeWeight } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked';
@@ -258,16 +259,24 @@ export interface ShopOffer {
 
 export const SHOP_OFFER_SIZE = 4;
 
-/** Weighted draw of `n` distinct items (rarer = less likely), without replacement. */
-function weightedSample(rng: Rng, items: readonly ShopItem[], n: number): ShopItem[] {
+/**
+ * Weighted draw of `n` distinct items (rarer = less likely), without replacement. An optional
+ * `weight` multiplier per item lets the active theme bias the offer toward on-theme gear (GS-17d).
+ */
+function weightedSample(
+  rng: Rng,
+  items: readonly ShopItem[],
+  n: number,
+  weight: (it: ShopItem) => number = () => 1,
+): ShopItem[] {
   const pool = [...items];
   const out: ShopItem[] = [];
   while (out.length < n && pool.length > 0) {
-    const total = pool.reduce((s, it) => s + RARITY_C[it.rarity].weight, 0);
+    const total = pool.reduce((s, it) => s + RARITY_C[it.rarity].weight * weight(it), 0);
     let r = rng.float() * total;
     let idx = 0;
     for (; idx < pool.length - 1; idx++) {
-      r -= RARITY_C[pool[idx]!.rarity].weight;
+      r -= RARITY_C[pool[idx]!.rarity].weight * weight(pool[idx]!);
       if (r <= 0) break;
     }
     out.push(pool.splice(idx, 1)[0]!);
@@ -288,7 +297,10 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
     (it) => ownedCount(perks, it.id) < itemCap(it) && (!it.prereq || perks.includes(it.prereq)),
   );
   const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
-  return weightedSample(rng, pool, Math.min(size, pool.length)).map((item) => {
+  // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
+  const archetype = currentTheme(run).archetype;
+  const weight = (it: ShopItem) => itemThemeWeight(itemTags(it.id), archetype);
+  return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
   });

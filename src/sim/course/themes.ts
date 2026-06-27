@@ -139,6 +139,32 @@ export const RARITY_INTENSITY: Record<Rarity, number> = {
   legendary: 1.5,
 };
 
+// --- Themed upgrades: which gear an archetype's outpost favours (GS-17d) ------
+
+/**
+ * Each biome archetype's outpost leans toward gear that SUITS its courses — so the shop reads
+ * on-theme for where you are: a fiery inferno stocks aggression (distance), a chaotic void/desert
+ * stocks control, an icy world stocks control + putting, a gentle verdant stop stocks growth
+ * (economy/skill). Content-as-data; the bias is a soft weight (`ITEM_AFFINITY_BOOST`), never a
+ * filter — every item can still appear, just more or less often. (Maps to `ITEM_TAGS` in economy.)
+ */
+export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
+  inferno: ['distance'],
+  void: ['control', 'skill'],
+  frost: ['control', 'putting'],
+  desert: ['control'],
+  verdant: ['economy', 'skill'],
+};
+
+/** How much an on-theme item's shop weight is multiplied (soft bias, not a filter). */
+export const ITEM_AFFINITY_BOOST = 2.2;
+
+/** The shop-weight multiplier for an item's tags at a given archetype (1 = no bias). */
+export function itemThemeWeight(tags: readonly string[], archetype: BiomeArchetype): number {
+  const pref = ARCHETYPE_AFFINITY[archetype];
+  return tags.some((t) => pref.includes(t)) ? ITEM_AFFINITY_BOOST : 1;
+}
+
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** A multiplier's deviation from 1, scaled by rarity intensity, re-centred on 1. */

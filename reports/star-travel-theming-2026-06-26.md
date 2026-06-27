@@ -104,12 +104,24 @@ The stop's actual constellation now hangs in the sky, so a Scorpius stop LOOKS l
   is untouched. Deep-sky/galaxy themes (no stick figure) fall back to the ambient starfield.
 - Verified eyes-on (Playwright raster of Scorpius/ember, Sagittarius/void, Crux/verdant, Cygnus/ice).
 
-## Roadmap (remaining slices)
-- **GS-17d — Themed upgrades.** Bias the shop/meta draw by the active theme's flavour so clubs/perks
-  read on-theme for the arc you're in.
-- **GS-17e — Render the constellation.** Draw the theme's actual stick figure (stars + `lines` from
-  the catalogue) as the course sky backdrop in `buildScene`, rarity-tinted; wire the theme into the
-  Sim Lab + Demo hub (the only piece the test-hub guard will want once a hook appears).
+## What shipped next (GS-17d — themed upgrades)
+
+The outfitter now reads on-theme for where you are — the last pillar of the original vision
+("...thematic basis for skill/club and other upgrades"):
+
+- `ITEM_TAGS` (economy) tags each shop item by category — distance / control / skill / economy /
+  putting — as a side map, so the catalogue is untouched.
+- `ARCHETYPE_AFFINITY` (themes) says which categories each archetype's outpost favours: inferno→
+  distance, void→control+skill, frost→control+putting, desert→control, verdant→economy+skill.
+- `shopOffer` biases the draw by the current stop's theme via a soft weight (`ITEM_AFFINITY_BOOST`),
+  never a filter — every item can still appear, just more/less often. The offer stays deterministic
+  and distinct, and item EFFECTS are untouched, so all shop balance invariants hold.
+
+## Roadmap — GS-17 complete
+
+All five slices (a themes → b biomes → c events → d upgrades → e render) have shipped. Remaining
+small follow-on: wire the theme into the Sim Lab + Demo hub, and per-theme PALETTE tints (today
+rarity tints the constellation FIGURE; the biome ground still uses the 5 archetype palettes).
 
 ## Fairness boundary (do not cross)
 
