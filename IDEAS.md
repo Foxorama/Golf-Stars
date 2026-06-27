@@ -32,9 +32,13 @@ Everything below serves whichever avenue wins.
     ACCENT the arcs (calm early, brutal late); `UNIQUE_EVENTS` (one-off eclipses/Apophis) are deep-arc,
     high-stakes, and fire ≤1 per run (`run.firedEventIds`, round-tripped in the snapshot). `eventPool`
     tiers + excludes fired uniques; still economy/cut-only (fairness untouched).
-  - **GS-17d — Themed upgrades.** Bias shop/meta draw by the active theme's flavour.
-  - **GS-17e — Render the constellation.** Draw the theme's stick figure (catalogue `stars`+`lines`)
-    as the course sky backdrop in `buildScene`; wire the theme into the Sim Lab + Demo hub.
+  - **GS-17e — Render the constellation. SHIPPED.** The stop's actual stick figure (catalogue
+    `stars`+`lines`, extracted to `src/render/constellations.ts` by `scripts/gen-constellations.mjs`)
+    now hangs in the sky via `buildScene` (`SceneOpts.themeId`), rarity-tinted, in both renderers.
+    Byte-stable when no theme is passed (render tests untouched); deep-sky/galaxy themes (no figure)
+    fall back to the ambient starfield. Still open: wire the theme into the Sim Lab + Demo hub, and
+    per-theme palette tints beyond the figure.
+  - **GS-17d — Themed upgrades.** Bias shop/meta draw by the active theme's flavour (next).
 
 - **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
   shipped (PR #7). Still open: a smarter recovery/short game to shrink the rare max-wildness blow-up

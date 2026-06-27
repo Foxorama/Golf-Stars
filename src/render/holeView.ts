@@ -81,6 +81,8 @@ export interface RenderOptions {
   showCentreline?: boolean;
   /** Biome id — tints the rough/background to sell the world. */
   biome?: string;
+  /** Star-travel theme id (GS-17e) — draws that constellation in the sky. */
+  themeId?: string;
   /** Draw a ball marker at this course-space position (interactive play). */
   ball?: Vec;
   /** Draw the aiming spray cone for the contemplated shot (interactive play). */
@@ -172,7 +174,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // scene builder (so the SVG map and the Canvas play view look identical) and serialised.
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
-    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, art: opts.art })),
+    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art })),
   ];
 
   // Aiming spray cone: THREE distinct, non-overlapping bands per side, drawn as true arc

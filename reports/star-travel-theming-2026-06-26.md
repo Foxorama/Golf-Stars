@@ -89,6 +89,21 @@ Route events re-themed from the catalogue and split into the two kinds the origi
 Still economy/cut-only — `creditMult` + `cutDelta`, never course generation — so the fairness +
 no-death-spiral validators stay untouched, and every jump still guarantees one calm "out".
 
+## What shipped next (GS-17e — render the constellation)
+
+The stop's actual constellation now hangs in the sky, so a Scorpius stop LOOKS like Scorpius:
+
+- `scripts/gen-constellations.mjs` extracts each constellation's stars (normalized to a unit box,
+  north-up) + stick-figure `lines` from `data/night-sky-cards.json` into `src/render/constellations.ts`
+  (generated, keyed by theme slug).
+- `buildScene` gained `SceneOpts.themeId`; when set, `constellationBackdrop` draws the figure in the
+  upper sky — faint tinted connecting lines + white-cored, rarity-tinted, magnitude-sized stars. Both
+  renderers (`holeView` SVG + `playView` canvas) and the `app.ts` call sites thread `course.meta.themeId`.
+- Pure/deterministic and **byte-stable when no theme is passed** — it uses no `crng` and is gated on
+  `themeId`, so every existing render/determinism test (which passes a hole + biome, never a theme)
+  is untouched. Deep-sky/galaxy themes (no stick figure) fall back to the ambient starfield.
+- Verified eyes-on (Playwright raster of Scorpius/ember, Sagittarius/void, Crux/verdant, Cygnus/ice).
+
 ## Roadmap (remaining slices)
 - **GS-17d — Themed upgrades.** Bias the shop/meta draw by the active theme's flavour so clubs/perks
   read on-theme for the arc you're in.
