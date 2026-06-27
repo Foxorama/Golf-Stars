@@ -48,7 +48,11 @@ Everything below serves whichever avenue wins.
     accents, full) toward the stop's world — verdant stays green, desert/inferno warm, frost cools,
     void goes violet — deepened by rarity + nudged per-theme. Gated on `themeId` so a themeless render
     is byte-identical (structural prim-count invariant guards it). Verified eyes-on.
-  - **GS-17 follow-on (small):** wire the theme into the Sim Lab + Demo hub (the only remaining piece).
+  - **GS-17g — Sim Lab theme browser + theme-driven dispersion. SHIPPED.** The hub now imports
+    `THEMES` and (via `lab.themeStudy`/`allThemeStudies`, real `resolveBiome`) browses all 47 themes
+    with their resolved biome physics, and the dispersion panel's "World" selector fires a club under
+    a theme's gravity. Guard's `IMPORTED_TABLES` extended with `THEMES` so the list can't fork.
+    **GS-17 is now complete end to end.**
 
 - **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
   shipped (PR #7). Still open: a smarter recovery/short game to shrink the rare max-wildness blow-up

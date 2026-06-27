@@ -22,7 +22,15 @@ import { SHOP_ITEMS, ownedCount, itemCap, type ShopItem } from '../sim/rpg/econo
 import { META_UPGRADES, type MetaUpgrades } from '../sim/rpg/meta';
 import { FORMATS } from '../sim/rpg/formats';
 import { CHARACTERS } from '../sim/rpg/characters';
-import { dispersionStudy, buildLoadout, scoreHarness, histogram, type DispersionStudy } from './lab';
+import { THEMES } from '../sim/course/themes';
+import {
+  dispersionStudy,
+  buildLoadout,
+  scoreHarness,
+  histogram,
+  allThemeStudies,
+  type DispersionStudy,
+} from './lab';
 import { drawScatter, drawHistogram } from './charts';
 
 // ── tiny DOM helpers ───────────────────────────────────────────────────────────────────────
@@ -232,6 +240,11 @@ function loadoutGroup(): HTMLElement {
 // ── DISPERSION study panel ────────────────────────────────────────────────────────────────
 const clubSel = selectFrom(CLUBS.map((c) => [c.id, `${c.name} (${c.carry})`]), 'D');
 const lieSel = selectFrom(Object.keys(LIE_INFO).filter((k) => !LIE_INFO[k]!.penalty).map((k) => [k, LIE_INFO[k]!.label]), 'fairway');
+// Pick a star-travel theme (GS-17) to fire under its world's gravity (its resolved biome carry).
+const themeSel = selectFrom(
+  [['', 'None (earth-g)'], ...THEMES.map((t): [string, string] => [t.id, `${t.name} · ${t.archetype} ${t.rarity}`])],
+  '',
+);
 const nSel = selectFrom([['100', '100'], ['1000', '1000'], ['5000', '5000'], ['20000', '20000']], '1000');
 const windSpd = h('input', { type: 'number', value: 0, style: 'width:64px', title: 'wind mph' });
 const windDir = h('input', { type: 'number', value: 0, style: 'width:64px', title: 'wind dir°' });
@@ -243,6 +256,8 @@ function runDispersion(): void {
     n: +nSel.value,
     lie: String(lieSel.value),
     wind: spd ? { spd, dir: +windDir.value || 0 } : undefined,
+    // The chosen theme sets the world's gravity (its resolved biome carry) — GS-17.
+    themeId: String(themeSel.value) || undefined,
     loadout: (useBuild as HTMLInputElement).checked ? buildLoadout(build).loadout : undefined,
     // Apply the golfer's per-club SHAPE (fade/hook + spread) only when using the built loadout.
     characterId: (useBuild as HTMLInputElement).checked ? build.characterId : undefined,
@@ -253,6 +268,7 @@ function dispersionGroup(): HTMLElement {
   return group('Sim Lab · shot dispersion', [
     h('div', { class: 'row' }, h('label', {}, 'Club'), clubSel),
     h('div', { class: 'row' }, h('label', {}, 'Swings'), nSel, h('label', { style: 'min-width:auto' }, 'Lie'), lieSel),
+    h('div', { class: 'row' }, h('label', {}, 'World'), themeSel),
     h('div', { class: 'row' }, h('label', {}, 'Wind'), windSpd, h('span', { class: 'muted' }, 'mph @'), windDir, h('span', { class: 'muted' }, 'deg')),
     h('div', { class: 'row' }, h('label', { style: 'min-width:auto' }, useBuild, ' use built loadout')),
     h('div', { class: 'row' }, h('button', { class: 'act', onclick: runDispersion }, 'Fire ▶')),
@@ -275,6 +291,45 @@ function scoringGroup(): HTMLElement {
     h('div', { class: 'row' }, h('label', {}, 'Seeds'), seedsSel, h('label', { style: 'min-width:auto' }, 'Format'), formatSel),
     h('div', { class: 'row' }, h('button', { class: 'act', onclick: runScoring }, 'Simulate ▶')),
     h('p', { class: 'note' }, 'Runs N seeded runs through the real simulateRun with your built loadout, vs a baseline. Headline = mean per-stop Stableford (the project’s balance metric).'),
+  ]);
+}
+
+// ── THEME browser panel (GS-17) ─────────────────────────────────────────────────────────────
+// Browse every star-travel theme and the rarity-tiered, flavoured biome it resolves to — the real
+// `resolveBiome` via lab.allThemeStudies(), so the table can't drift from what the game generates.
+function showThemes(): void {
+  setView('lab');
+  const studies = allThemeStudies();
+  const rarOrder: Record<string, number> = { common: 0, rare: 1, epic: 2, legendary: 3 };
+  studies.sort((a, b) => a.arc - b.arc || rarOrder[a.rarity]! - rarOrder[b.rarity]! || a.name.localeCompare(b.name));
+  const head = ['Theme', 'arc', 'rarity', 'world', 'carry', 'windB', 'windW', 'fairway', 'dogleg', 'trees', 'sand', 'sky'];
+  stageEl.replaceChildren(
+    h('h2', { style: 'color:#9fd8e6;font-size:14px;margin:0 0 10px' },
+      `${studies.length} star-travel themes · resolved biome physics (real resolveBiome)`),
+    h('table', {},
+      h('tr', {}, ...head.map((c) => h('th', {}, c))),
+      ...studies.map((t) =>
+        h('tr', {},
+          h('td', {}, t.name),
+          h('td', {}, String(t.arc)),
+          h('td', {}, t.rarity),
+          h('td', {}, t.archetype),
+          h('td', {}, fmt(t.biome.carryMult, 2)),
+          h('td', {}, fmt(t.biome.windBase, 0)),
+          h('td', {}, fmt(t.biome.windWild, 0)),
+          h('td', {}, fmt(t.biome.fairwayWidthMult, 2)),
+          h('td', {}, fmt(t.biome.doglegBias, 2)),
+          h('td', {}, fmt(t.biome.treeDensity, 1)),
+          h('td', {}, fmt(t.biome.fairwayBunkers, 1)),
+          h('td', {}, t.hasFigure ? '✦' : '·'))),
+    ),
+    h('p', { class: 'note' }, 'Arc by constellation star count (deep-sky/galaxy by rarity). carry = gravity; windB/W = base/wild wind; fairway = corridor width mult; ✦ = draws a constellation in the sky.'),
+  );
+}
+function themeGroup(): HTMLElement {
+  return group('Sim Lab · theme browser', [
+    h('div', { class: 'row' }, h('button', { class: 'act', onclick: showThemes }, 'Browse themes ▶')),
+    h('p', { class: 'note' }, 'Every constellation/galaxy theme and the flavoured, rarity-tiered biome it generates — straight from the real resolveBiome.'),
   ]);
 }
 
@@ -373,7 +428,7 @@ function mount(): void {
   segGame = h('button', { class: 'on', onclick: () => setView('game') }, 'Game');
   segLab = h('button', { onclick: () => setView('lab') }, 'Sim Lab');
 
-  const rail = h('div', { class: 'rail' }, demoGroup(), loadoutGroup(), dispersionGroup(), scoringGroup());
+  const rail = h('div', { class: 'rail' }, demoGroup(), loadoutGroup(), dispersionGroup(), scoringGroup(), themeGroup());
   stageEl = h('div', { class: 'stage' }, frame);
 
   document.body.append(

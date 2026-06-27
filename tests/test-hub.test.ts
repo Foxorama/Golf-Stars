@@ -16,7 +16,7 @@ import { resolve, join } from 'node:path';
  *   • live escape-hatch flags — `window._gsX` (single-underscore; the `__gs*` boot-watchdog
  *     internals are excluded). Added often per the escape-hatch rule, so this is the main guard.
  *   • declarative URL params — `new URLSearchParams(location.search).get('x')`.
- * Plus: the hub must IMPORT the sim's content tables (clubs/perks/meta/lies/formats) rather than
+ * Plus: the hub must IMPORT the sim's content tables (clubs/perks/meta/lies/formats/characters/themes) rather than
  * copy them, so those lists can't fork — new content appears in the hub automatically (I1/I3a).
  *
  * The portable, fill-in-the-blanks version lives at standards/test-hub-guard.template.mjs.
@@ -59,7 +59,7 @@ const appParams = uniq(matchAll(APP_SRC, PARAM_RE));
 const hubParams = uniq(matchAll(HUB_SRC, /\bset\('([a-z]+)'/g));
 
 // Sim tables the hub MUST import (not copy) so its control lists share one source of truth (I3a).
-const IMPORTED_TABLES = ['CLUBS', 'SHOP_ITEMS', 'META_UPGRADES', 'FORMATS', 'LIE_INFO', 'CHARACTERS'];
+const IMPORTED_TABLES = ['CLUBS', 'SHOP_ITEMS', 'META_UPGRADES', 'FORMATS', 'LIE_INFO', 'CHARACTERS', 'THEMES'];
 
 describe('test hub ↔ app hook parity (standards/TEST-HUB-STANDARD.md I3 — auto-discovered)', () => {
   it('found the known hooks (discovery regexes still match the app)', () => {
