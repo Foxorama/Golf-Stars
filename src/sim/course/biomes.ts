@@ -54,6 +54,16 @@ export interface Biome {
   /** Fairway sand bunkers per hole (base, scaled by wildness). Sand is non-penalty → always
    *  fair, so these bite the landing-zone edge as risk-reward without ever killing a card. */
   fairwayBunkers?: number;
+  /**
+   * Signature mechanic flags (GS-19), scaled fair→brutal by wildness at generation time:
+   *  • `lostRough` — off-fairway is the named PENALTY lie (the void: "play to the fairway or it's
+   *    lost"). The generator widens the corridor into a fair island and only arms the penalty on
+   *    the wilder/deeper stops; the lie is returned by `lieAt` via a `roughLie` biomeMod.
+   *  • `lavaRiver` — a molten river/creek crosses the fairway as a forced carry (the ember world).
+   * Both are pure data: a world opts in, the generator + sim do the rest.
+   */
+  lostRough?: string;
+  lavaRiver?: boolean;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -120,6 +130,7 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.4,
     treeDensity: 0.35, // charred snags
     fairwayBunkers: 1.2,
+    lavaRiver: true, // signature: molten rivers cross the fairway (forced carry)
   },
   {
     id: 'void-garden',
@@ -136,6 +147,7 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.45,
     treeDensity: 0, // nothing grows in the void — crystals are the spice
     fairwayBunkers: 0.5,
+    lostRough: 'voidrough', // signature: there is no rough — off the fairway is lost to the void
   },
 ];
 

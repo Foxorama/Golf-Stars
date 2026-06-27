@@ -255,7 +255,7 @@ export interface LieInfo {
   label: string;
 }
 
-export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void';
+export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void' | 'voidlost';
 
 /**
  * Surface → playing characteristics. Open table (content-as-data): fantasy surfaces
@@ -276,13 +276,30 @@ export const LIE_INFO: Record<string, LieInfo> = {
   water: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'water', label: 'Water' },
   // Fantasy examples (each biome that uses one references it by this key):
   lava: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'lava', label: 'Lava' },
+  // A lava river/creek crossing the fairway (GS-19): plays like lava (penalty), but the generator
+  // sanctions it as a forced carry (`validateCrossings`) so it may sit on the corridor.
+  lavariver: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'lava', label: 'Lava river' },
   void: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'void', label: 'The Void' },
+  // The void's "lost rough" (GS-19): off the fairway is the abyss. A penalty, but a NON-replay
+  // drop-back-on-the-island (`voidlost`) — a stroke-and-distance cascade made max-wildness void
+  // stops a ball-shredder; a +1 drop keeps it brutal-but-fair (the miss still costs, no death loop).
+  voidrough: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'voidlost', label: 'Lost to the void' },
   ice: { carryMult: 1.02, dispersionMult: 1.5, label: 'Ice' }, // slick: hard to control
   crystal: { carryMult: 1.05, dispersionMult: 0.85, label: 'Crystal' }, // true & fast
 };
 
 /** Default lie when a point is off every polygon (native / out-of-frame): rough. */
 export const DEFAULT_LIE = 'rough';
+
+/**
+ * The lie a point OFF every feature reads as for this hole. Normally `rough`, but a world can
+ * arm a `roughLie` biomeMod (GS-19) so off-fairway is something else — the void's "lost rough"
+ * sets it to the `void` penalty so a sprayed ball is lost (stroke-and-distance). Pure.
+ */
+export function roughLieOf(hole: Hole): string {
+  const mod = hole.biomeMods?.find((m) => m.kind === 'roughLie');
+  return mod?.note ?? DEFAULT_LIE;
+}
 
 export function lieInfo(kind: string): LieInfo {
   return LIE_INFO[kind] ?? LIE_INFO[DEFAULT_LIE]!;
@@ -304,6 +321,7 @@ export const PEN_INFO: Record<PenaltyKind, PenaltyInfo> = {
   unplayable: { strokes: 1, replay: false, label: 'Unplayable' },
   lava: { strokes: 1, replay: false, label: 'Lava' },
   void: { strokes: 1, replay: true, label: 'Lost to the void' },
+  voidlost: { strokes: 1, replay: false, label: 'Lost to the void' },
 };
 
 // --- Lie lookup against a hole ----------------------------------------------
@@ -343,7 +361,7 @@ export function lieAt(hole: Hole, p: Vec): FeatureKind {
       best = f.kind;
     }
   }
-  return best ?? DEFAULT_LIE;
+  return best ?? roughLieOf(hole);
 }
 
 // --- Wind --------------------------------------------------------------------

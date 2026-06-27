@@ -17,18 +17,17 @@
 import type { Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBoundsCorners } from '../sim/round';
-import { themeById, RARITY_INTENSITY, type BiomeArchetype } from '../sim/course/themes';
+import { themeById, archetypeFor, RARITY_INTENSITY, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
 import type { Projector } from './project';
 import {
-  roughFor,
-  shadeFor,
   accentFor,
   fillFor,
-  tintHex,
-  type Tint,
-  GREEN_COLLAR,
+  turfShade,
+  collarFor,
+  roughBaseFor,
+  type Shade,
   SAND,
   WATER,
   CANOPY,
@@ -171,20 +170,18 @@ function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
   return { t: 'clip', clip: poly, children };
 }
 
-function styleFairway(poly: Vec[], art: ArtFeel, tint?: Tint): Prim[] {
-  const s = shadeFor('fairway', tint);
+function styleFairway(poly: Vec[], art: ArtFeel, s: Shade): Prim[] {
   const out: Prim[] = [{ t: 'poly', pts: poly, fill: s.base }];
   if (art.stripes) out.push(stripes(poly, s.light, s.dark, 7));
   if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: s.ink, sw: 1.6 });
   return out;
 }
 
-function styleGreen(poly: Vec[], art: ArtFeel, tint?: Tint): Prim[] {
-  const s = shadeFor('green', tint);
+function styleGreen(poly: Vec[], art: ArtFeel, s: Shade, collar: string): Prim[] {
   const c = centroidOf(poly);
   const out: Prim[] = [
     // Collar/apron: a darker outset ring so the green sits ON the land, with depth.
-    { t: 'poly', pts: scalePoly(poly, c, 1.18), fill: tintHex(GREEN_COLLAR, tint), stroke: s.ink, sw: 1.4 },
+    { t: 'poly', pts: scalePoly(poly, c, 1.18), fill: collar, stroke: s.ink, sw: 1.4 },
     { t: 'poly', pts: poly, fill: s.base },
   ];
   if (art.stripes) out.push(stripes(poly, s.light, s.dark, 6));
@@ -206,8 +203,7 @@ function styleGreen(poly: Vec[], art: ArtFeel, tint?: Tint): Prim[] {
   return out;
 }
 
-function styleTee(poly: Vec[], art: ArtFeel, tint?: Tint): Prim[] {
-  const s = shadeFor('tee', tint);
+function styleTee(poly: Vec[], art: ArtFeel, s: Shade): Prim[] {
   const out: Prim[] = [{ t: 'poly', pts: poly, fill: s.base }];
   if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: s.ink, sw: 1.3 });
   return out;
@@ -340,41 +336,15 @@ function inView(p: Vec, w: number, h: number, m = 24): boolean {
  * renderer — this is only the world.
  */
 /**
- * Per-archetype turf/ground hue rotation (degrees) — the direction a stop's world pulls its grass:
- * verdant stays green, desert/inferno warm toward khaki/scorch, frost cools to teal, void goes
- * violet. Magnitude is deepened by rarity + nudged per-theme so stops read distinct (GS-17f).
+ * Resolve a stop's WORLD identity for the render: which archetype's explicit turf palette to paint
+ * (GS-19, replacing the old subtle hue-rotation) and how much rarity should deepen it. Archetype is
+ * keyed off the theme id when present, else the biome id, so a biome-only render (the Sim Lab) still
+ * reads on-world. A themeless verdant render uses `verdant` + deepen 1 → byte-identical to before.
  */
-const ARCHETYPE_HUESHIFT: Record<BiomeArchetype, number> = {
-  verdant: 0,
-  desert: -22,
-  inferno: -34,
-  frost: 48,
-  void: 80,
-};
-
-function hashStr(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) % 1000;
-}
-
-/**
- * Resolve a theme to a GROUND tint (full strength — rough/background/accents) and a gentler TURF
- * tint (fairway/green/tee, kept playable). Returns undefined for no/unknown theme so the render
- * stays byte-identical (GS-17f). Rarity deepens the shift; a per-theme nudge keeps stops distinct.
- */
-function themeTint(themeId?: string): { ground: Tint; turf: Tint } | undefined {
-  if (!themeId) return undefined;
-  const t = themeById(themeId);
-  if (!t) return undefined;
-  const k = RARITY_INTENSITY[t.rarity]; // 1 .. 1.5
-  const hue = ARCHETYPE_HUESHIFT[t.archetype] + ((hashStr(themeId) % 17) - 8);
-  const ground: Tint = { hueShift: hue, satMul: 1 + (k - 1) * 0.5, lumMul: 1 - (k - 1) * 0.12 };
-  const turf: Tint = { hueShift: hue * 0.5, satMul: 1 + (k - 1) * 0.3, lumMul: 1 - (k - 1) * 0.06 };
-  return { ground, turf };
+function worldLook(themeId: string | undefined, biome: string | undefined): { arch: BiomeArchetype; deepen: number } {
+  const arch = archetypeFor(themeId, biome ?? '');
+  const deepen = themeId ? RARITY_INTENSITY[themeById(themeId)?.rarity ?? 'common'] : 1;
+  return { arch, deepen };
 }
 
 /**
@@ -425,12 +395,16 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const art = artFeel(opts.art);
   const rng = mulberry32(hashHole(hole));
   const prims: Prim[] = [];
-  // Per-theme turf/ground tint (GS-17f) — undefined for a themeless render → byte-identical.
-  const tint = themeTint(themeId);
+  // The stop's world identity → explicit per-archetype turf palette (GS-19), rarity-deepened.
+  // verdant + deepen 1 (themeless) reproduces the original SHADES byte-for-byte.
+  const { arch, deepen } = worldLook(themeId, biome);
+  const fwShade = turfShade('fairway', arch, deepen);
+  const grShade = turfShade('green', arch, deepen);
+  const teeShade = turfShade('tee', arch, deepen);
 
   // --- 1. Rough background + soft tone variance --------------------------------
-  prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: roughFor(biome, tint?.ground) });
-  const rs = shadeFor('rough', tint?.ground);
+  prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: roughBaseFor(arch, deepen) });
+  const rs = turfShade('rough', arch, deepen);
   // A few large, soft tonal patches so the rough isn't a flat slab — gentle undulation, not
   // spotlights, so they stay low-alpha and lean dark (lit terrain is the exception).
   const patches = Math.round(5 * art.texture);
@@ -480,7 +454,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   }
 
   // --- 3. Wildflowers (biome-flavoured dot clusters in the rough) --------------
-  const ac = accentFor(biome, tint?.ground);
+  const ac = accentFor(biome);
   const flowerTarget = Math.round(5 * art.accents);
   let flowers = 0;
   for (let i = 0; i < flowerTarget * 4 && flowers < flowerTarget; i++) {
@@ -559,11 +533,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   if (themeId && art.accents > 0) prims.push(...constellationBackdrop(themeId, W, H));
 
   // --- 4. Terrain features (fairway/green/tee + scatter surfaces) --------------
+  const collar = collarFor(arch, deepen);
   for (const f of hole.features) {
     const sp = projPoly(f.poly, proj);
-    if (f.kind === 'fairway') prims.push(...styleFairway(sp, art, tint?.turf));
-    else if (f.kind === 'green') prims.push(...styleGreen(sp, art, tint?.turf));
-    else if (f.kind === 'tee') prims.push(...styleTee(sp, art, tint?.turf));
+    if (f.kind === 'fairway') prims.push(...styleFairway(sp, art, fwShade));
+    else if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar));
+    else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade));
     else prims.push(...styleScatter(f.kind, sp, art));
   }
 

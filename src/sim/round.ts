@@ -6,7 +6,7 @@
  * any bug reproduces by its seed. The renderer will later animate exactly these shots.
  */
 
-import { dist, type FeatureKind, type Hole, type Vec } from './course/contract';
+import { dist, pathLength, type FeatureKind, type Hole, type Vec } from './course/contract';
 import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
   dispersionProfile,
@@ -419,7 +419,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
   // fairness); the centroid is the sane line. The FLAG (`flag`) is still the real hole: it's
   // where the ball holes out and putts to, so a back/tucked pin means a longer putt. Flag-
   // hunting is the interactive "attack" choice (the player's risk), not the auto sim's job.
-  const aim = hole.green;
+  // (`layupTarget` aims at the green centroid internally — the percentage play.)
   const flag = pin(hole);
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
 
@@ -440,14 +440,15 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     const remaining = dist(ball, flag);
     if (lie === 'green' || remaining <= HOLE_OUT_RADIUS) break;
 
-    // AI decision: lay up to the penalty-free corridor when the line is blocked, and
-    // club to leave room for roll-out. The player (interactive driver) makes this choice
-    // instead; both then run the SAME executeShot physics.
-    const tgt = safeTarget(hole, ball, aim);
+    // AI decision: lay up to the penalty-free corridor when the line is blocked, carry a lava
+    // river when it's reachable, and club to leave room for roll-out. The player (interactive
+    // driver) makes this choice instead; both then run the SAME executeShot physics.
     // Club from the lie-appropriate bag: the driver is removed (or carry-penalised) off the deck
     // unless the Driver-on-Deck level permits it — same rule the interactive player obeys.
     const level = opts.driverDeck ?? 0;
-    const club = aiClub(hole, ball, tgt, carryMult, usableBag(bag, lie, level), opts.stats);
+    const usable = usableBag(bag, lie, level);
+    const tgt = layupTarget(hole, ball, lie, usable, carryMult);
+    const club = aiClub(hole, ball, tgt, carryMult, usable, opts.stats);
     const sprayMult = driverDeckSprayMult(club.id, lie, level);
 
     const ex = executeShot(hole, ball, lie, tgt, club, {
@@ -844,11 +845,26 @@ export function suggestPlayerClub(
 }
 
 /** Lay-up target: the penalty-free corridor point ahead of the ball (exported). */
-export function layupTarget(hole: Hole, ball: Vec): Vec {
+export function layupTarget(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind = 'fairway',
+  bag: readonly Club[] = CLUBS,
+  carryMult: number = biomeCarryMult(hole),
+): Vec {
   // The "safe" line plays to the fat of the green (centroid), mirroring the auto playHole
   // aim EXACTLY so the interactive auto-finish reproduces the headless sim byte-for-byte.
-  // The "attack" choice is what aims at the flag — the player's risk to take.
-  return safeTarget(hole, ball, hole.green);
+  // The "attack" choice is what aims at the flag — the player's risk to take. `maxReach` is
+  // derived deterministically from (bag, lie, carryMult) so a forced-carry decision (lava
+  // rivers) is identical on both the auto and interactive paths.
+  return safeTarget(hole, ball, hole.green, maxReachOf(bag, carryMult, lie));
+}
+
+/** Effective max carry (yards) the bag can fly from this lie — the reach a forced carry needs. */
+function maxReachOf(bag: readonly Club[], carryMult: number, lie: FeatureKind): number {
+  let max = 0;
+  for (const c of bag) if (c.id !== 'putter') max = Math.max(max, c.carry);
+  return max * carryMult * lieInfo(lie).carryMult;
 }
 
 /** Auto putt-out from a position (exported for the interactive driver). */
@@ -891,26 +907,104 @@ function pointAlong(line: Vec[], t: number): Vec {
   return line[line.length - 1]!;
 }
 
-/**
- * Choose where to aim: the pin if the line is clear, else a layup point on the
- * centreline corridor ahead of the ball (guaranteed penalty-free), so a ball in trouble
- * pitches back into play instead of repeatedly firing over a hazard.
- */
-function safeTarget(hole: Hole, ball: Vec, pinPt: Vec): Vec {
-  if (clearLine(hole, ball, pinPt)) return pinPt;
-  // Project the ball onto the centreline (sampled), then advance toward the green.
+/** Fraction along the centreline nearest the ball (sampled) — the ball's progress down the hole. */
+function nearestCentrelineT(hole: Hole, ball: Vec): number {
   let bestT = 0;
   let bestD = Infinity;
   for (let i = 0; i <= 40; i++) {
     const t = i / 40;
-    const p = pointAlong(hole.centreline, t);
-    const d = dist(p, ball);
+    const d = dist(pointAlong(hole.centreline, t), ball);
     if (d < bestD) {
       bestD = d;
       bestT = t;
     }
   }
-  return pointAlong(hole.centreline, Math.min(1, bestT + 0.2));
+  return bestT;
+}
+
+/**
+ * The first PENALTY band the centreline itself crosses ahead of the ball — a lava river / creek
+ * spanning the corridor (GS-19). Returns the entry/exit fractions, or null if the centreline is
+ * penalty-free ahead (the normal case, and every void hole — its centreline is on the island).
+ */
+function firstCentrelineCrossing(hole: Hole, fromT: number): { nearT: number; farT: number } | null {
+  const STEPS = 120;
+  let nearT: number | null = null;
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    if (t <= fromT + 1e-6) continue;
+    const pen = !!lieInfo(lieAt(hole, pointAlong(hole.centreline, t))).penalty;
+    if (pen && nearT === null) nearT = t;
+    if (!pen && nearT !== null) return { nearT, farT: t };
+  }
+  if (nearT !== null) return { nearT, farT: 1 };
+  return null;
+}
+
+/**
+ * Choose where to aim. The pin if the line is clear; if a lava RIVER crosses the centreline
+ * ahead, either CARRY it (aim at the furthest penalty-free point past the far bank that's within
+ * reach — flying over a hazard is fair) or, if it's too far to clear in one, lay up SHORT of the
+ * near bank; otherwise (a side hazard clipping the chord) lay up onto the penalty-free centreline.
+ */
+function safeTarget(hole: Hole, ball: Vec, pinPt: Vec, maxReach: number): Vec {
+  if (clearLine(hole, ball, pinPt)) return pinPt;
+  const t0 = nearestCentrelineT(hole, ball);
+  const cross = firstCentrelineCrossing(hole, t0);
+  if (cross) {
+    const carry = carryTarget(hole, ball, pinPt, cross, maxReach);
+    if (carry) return carry;
+    return layupShortTarget(hole, cross, t0);
+  }
+  // Side hazard → advance along the (penalty-free) centreline toward the green.
+  return pointAlong(hole.centreline, Math.min(1, t0 + 0.2));
+}
+
+/** Push a fraction `t` further along the centreline by ~`yards` (toward the green). */
+function advanceAlong(hole: Hole, t: number, yards: number): number {
+  const total = pathLength(hole.centreline) || 1;
+  return Math.min(1, t + yards / total);
+}
+
+/**
+ * Aim to CARRY a river: the furthest penalty-free centreline point past the far bank that the
+ * bag can reach (so a played shot flies over the molten band and lands on the fairway beyond).
+ * Returns null when even just-past-the-bank is out of reach — then the AI lays up short instead.
+ */
+function carryTarget(
+  hole: Hole,
+  ball: Vec,
+  pinPt: Vec,
+  cross: { nearT: number; farT: number },
+  maxReach: number,
+): Vec | null {
+  const reach = maxReach * 0.97; // small safety so the MEAN shot clears, not just the max
+  // The nearest safe landing past the far bank (a margin clear of the lava).
+  const landT = advanceAlong(hole, cross.farT, 10);
+  const mustReach = pointAlong(hole.centreline, landT);
+  if (dist(ball, mustReach) > reach) return null; // can't clear it yet
+  // The green itself, if it's past the river and reachable, is the best carry.
+  if (dist(ball, pinPt) <= reach) return pinPt;
+  // Otherwise the furthest reachable, penalty-free centreline point beyond the far bank.
+  for (let i = 40; i >= 0; i--) {
+    const t = landT + ((1 - landT) * i) / 40;
+    const p = pointAlong(hole.centreline, t);
+    if (dist(ball, p) <= reach && !lieInfo(lieAt(hole, p)).penalty) return p;
+  }
+  return mustReach;
+}
+
+/** Lay up SHORT of a river's near bank: a penalty-free centreline point a margin before it,
+ *  never aimed behind the ball (so a ball already at the bank just nudges up to set the carry). */
+function layupShortTarget(hole: Hole, cross: { nearT: number; farT: number }, t0: number): Vec {
+  const total = pathLength(hole.centreline) || 1;
+  const margin = 14 / total; // ~14 yds short of the near bank
+  let t = Math.max(t0, cross.nearT - margin);
+  // Back off if the chosen point somehow still reads as penalty (thin safe shelf).
+  for (let i = 0; i < 8 && lieInfo(lieAt(hole, pointAlong(hole.centreline, t))).penalty; i++) {
+    t = Math.max(t0, t - margin);
+  }
+  return pointAlong(hole.centreline, t);
 }
 
 /**
