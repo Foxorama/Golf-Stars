@@ -183,6 +183,33 @@ This game lives or dies on three axes — put every change through all three bef
   doubles as the OB *trigger*, so tightening the margin to make the hole bigger on screen directly
   raises the OB rate — a `64`-cap was tried and REVERTED (tipped `toPar/hole` to 1.03, over the bar).
   Both renderers fit the ball into frame too, so a wild shot is seen flying out, not clipped.
+- **Curved flight, arc height, tree-knockdown & hazard-aware roll (GS-flight, `src/sim/flight.ts`).**
+  `flight.ts` is the ONE pure source of truth for ball-path geometry, shared by the sim (decides where
+  the ball goes) AND the renderer (draws it) so the graphic IS the physics — a ball drawn clearing a
+  tree is a ball the sim let through. Three coupled pieces: (1) **Curved path** — the flight LAUNCHES
+  along the shot bearing (the aim line) and curves to the offset landing via a quadratic Bézier whose
+  control sits straight ahead at full carry (`flightControl`/`flightGround`); a straight shot barely
+  bows, a fade/hook/slice bows toward its finish (the banana). The lateral offset is still
+  `resolveShot`'s angular spray — this only shapes the PATH between aim and landing, so determinism is
+  untouched. The play view (`sampleCurvedFlight`) and the SVG map shot-lines (`M…Q…` paths) both draw
+  it. (2) **Loft-scaled apex** — `arcApex(carry, nominalCarry)`: short/lofted clubs balloon (higher
+  peakFrac), long clubs bore. Stored on `ShotResult.apex` so render + sim use the EXACT same arc. (3)
+  **Tree knockdown** — a low ball that crosses a treeline below its canopy (`canopyHeight` ∝ blob size,
+  `OBSTACLE_KINDS`) is knocked into the woods: `flightKnockdown` walks the curved path checking arc
+  height vs canopy and returns the earliest clip, so ARC HEIGHT decides it (a high wedge drops over a
+  guarding tree a flat borer clips). Trees are NON-PENALTY, so a knockdown costs distance (a punch-out
+  from the `trees` lie), never a stroke — fair, and the ball-already-in-trees case is guarded
+  (outside→inside crossing only). CRITICAL: the knockdown + the **hazard-aware roll** (`rollStop`:
+  the run-out settles where it first trickles into water/lava/void or plugs in a bunker it reached,
+  instead of magically rolling through) are PURE geometry done in the shared `executeShot` AFTER the
+  rng draws — NO new draws — so auto≡interactive stays byte-for-byte and the rng stream is unchanged.
+  `roll` is updated to the distance ACTUALLY travelled, so `dist(rest,touchdown) === |roll|` still
+  holds (the roll-invariant test). These shift the seeded balance (harder: more offline shots find the
+  woods/water) — re-validated against the no-death-spiral bar (`toPar/hole` 0.063 → 0.103 ≪ 1.0,
+  blow-ups still 0%). `tests/flight.test.ts` guards the curve endpoints/banana, apex loft-scaling,
+  canopy/knockdown arc-height logic, the broad-phase prune, and the executeShot integration. NB: these
+  are pure module constants (`ARC_FEEL`/`CANOPY_FEEL`), NOT `_gs*` window flags, so the test-hub guard
+  needs no new control; the play-view feel reuses the existing `_gsFeel` (apex now off `result.apex`).
 - **Blow-ups are absorbed, not eliminated:** at max wildness rare disaster holes still happen;
   Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a

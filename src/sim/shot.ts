@@ -15,6 +15,7 @@ import type { FeatureKind, Hole, Vec, Wind } from './course/contract';
 import { bearing, pointInPoly } from './course/contract';
 import type { Club } from './clubs';
 import { clubDist, type ClubStats } from './clubs';
+import { arcApex } from './flight';
 import type { Rng } from './rng';
 
 // --- Feel tunables -----------------------------------------------------------
@@ -425,6 +426,10 @@ export interface ShotResult {
   wind: WindBreakdown;
   /** Intended (pre-noise) carry, for HUD / debugging. */
   intended: number;
+  /** Aerial arc apex height (yards) for this carry+club — the loft-scaled parabola peak. Shared
+   *  with the renderer (it draws this exact arc) and the sim's tree-knockdown check, so the ball
+   *  the player SEES clear/clip a tree is the ball the sim let through/knocked down. */
+  apex: number;
 }
 
 /**
@@ -497,5 +502,5 @@ export function resolveShot(input: ShotInput): ShotResult {
     from[1] + fyR * carry + ry * windLat,
   ];
 
-  return { landing, carry, shotBearing, wind: w, intended };
+  return { landing, carry, shotBearing, wind: w, intended, apex: arcApex(carry, nominal) };
 }

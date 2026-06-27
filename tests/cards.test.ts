@@ -51,7 +51,7 @@ describe('cards (GS-5)', () => {
   it('shot card shows a backspin row only for the lofted clubs that generate it', () => {
     const base = {
       from: [0, 0] as [number, number],
-      result: { landing: [0, 100] as [number, number], carry: 100, shotBearing: 0, wind: { along: 0, cross: 0 }, intended: 100 },
+      result: { landing: [0, 100] as [number, number], carry: 100, shotBearing: 0, wind: { along: 0, cross: 0 }, intended: 100, apex: 20 },
       lieFrom: 'tee' as const,
       lieTo: 'fairway' as const,
       rest: [0, 102] as [number, number],

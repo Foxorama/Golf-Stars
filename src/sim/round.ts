@@ -27,6 +27,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag, driverDeckSprayMult } from './rpg/economy';
+import { arcApex, flightKnockdown } from './flight';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
@@ -48,6 +49,9 @@ export interface ShotLog {
   roll: number;
   /** True if this shot holed the ball (chip-in / hole-in-one). */
   holed: boolean;
+  /** True if the ball was knocked out of the air by a tree (its `result.landing` is the clip
+   *  point, lie = trees). Render-only flavour (a leaf puff); the trees lie is the real cost. */
+  knockedDown?: boolean;
 }
 
 /** Surface roll MULTIPLIER (around 1): slick ice runs, bunkers kill it, greens hold a
@@ -59,6 +63,7 @@ const SURFACE_ROLL: Record<string, number> = {
   rough: 0.5,
   waste: 0.7,
   bunker: 0.2,
+  trees: 0.25, // knocked into the woods → drops nearly dead, barely trickles
   ice: 1.8,
   crystal: 1.1,
 };
@@ -99,6 +104,41 @@ function rollYards(nominalCarry: number, lie: FeatureKind, carry: number, rng: R
   const surf = SURFACE_ROLL[lie] ?? 0.6;
   const raw = carry * frac * surf * rng.range(0.85, 1.15);
   return Math.max(-MAX_CHECK, Math.min(MAX_ROLL, raw));
+}
+
+/**
+ * Walk the run-out from `touchdown` along `dir` for up to |budget| yards, settling the ball where it
+ * first runs INTO trouble: a penalty surface (water/lava/void — it's swallowed) or a BUNKER it
+ * wasn't already sitting in (sand plugs a running ball). Otherwise it rolls the full budget. Returns
+ * the SIGNED roll actually travelled (so `dist(rest,touchdown) === |roll|`, preserving the roll
+ * invariant) and the rest point. Pure: no rng — a deterministic geometry pass after the roll draw,
+ * so auto≡interactive is untouched. This is the "affected by hazards while running" half of the ask. */
+function rollStop(
+  hole: Hole,
+  touchdown: Vec,
+  dir: Vec,
+  budget: number,
+  tdLie: FeatureKind,
+): { roll: number; rest: Vec } {
+  const sign = budget < 0 ? -1 : 1;
+  const total = Math.abs(budget);
+  const startBunker = tdLie === 'bunker';
+  const STEP = 2; // yards between samples — fine enough at hazard scale, cheap enough per shot
+  let travelled = total;
+  for (let d = STEP; d <= total; d += STEP) {
+    const p: Vec = [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
+    const k = lieAt(hole, p);
+    if (lieInfo(k).penalty) {
+      travelled = d; // trickled into a penalty hazard → it settles there (+stroke downstream)
+      break;
+    }
+    if (k === 'bunker' && !startBunker) {
+      travelled = d; // ran into sand → plugs
+      break;
+    }
+  }
+  const roll = sign * travelled;
+  return { roll, rest: [touchdown[0] + dir[0] * roll, touchdown[1] + dir[1] * roll] };
 }
 
 /**
@@ -509,26 +549,41 @@ export function executeShot(
     rng,
   });
 
-  // Touchdown → bounce & roll out (unless it plugs in a penalty surface). Roll is signed:
-  // long clubs run forward, lofted wedges check/spin back.
+  // Aerial obstacle (tree) knockdown — the "affected by hazards based on arc height" half of the
+  // ask. A low ball that crosses a treeline below its canopy is knocked out of the air into the
+  // woods (a tough non-penalty lie); a high one drops over. Pure geometry on the SAME curved path
+  // the renderer draws, off the already-resolved endpoints — no rng, so auto≡interactive holds.
+  const kd = flightKnockdown(hole, from, result.landing, result.shotBearing, result.carry, nominalCarry);
+  let knockedDown = false;
+  if (kd) {
+    knockedDown = true;
+    result.landing = kd.point;
+    result.carry = kd.carry;
+    result.apex = arcApex(kd.carry, nominalCarry);
+  }
+
+  // Touchdown → bounce & roll out (unless it plugs in a penalty surface). Roll is signed (long
+  // clubs run forward, lofted wedges check/spin back) and hazard-aware: it settles where it first
+  // runs into water or a bunker instead of rolling through.
   const touchdown = result.landing;
   const tdLie = lieAt(hole, touchdown);
   let rest: Vec = touchdown;
   let roll = 0;
   if (!lieInfo(tdLie).penalty) {
-    const nominal = clubDist(club, opts.stats);
-    roll = rollYards(nominal, tdLie, result.carry, rng, mods.rollFracDelta);
-    if (roll !== 0) {
+    const rolled = rollYards(nominalCarry, tdLie, result.carry, rng, mods.rollFracDelta);
+    if (rolled !== 0) {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
       const len = Math.hypot(dx, dy) || 1;
-      rest = [touchdown[0] + (dx / len) * roll, touchdown[1] + (dy / len) * roll];
+      const stop = rollStop(hole, touchdown, [dx / len, dy / len], rolled, tdLie);
+      roll = stop.roll;
+      rest = stop.rest;
     }
   }
 
   const restLie = lieAt(hole, rest);
   const li = lieInfo(restLie);
-  const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false };
+  const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown };
 
   let ballAfter: Vec = rest;
   let lieAfter: FeatureKind = restLie;
