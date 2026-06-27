@@ -43,8 +43,12 @@ Everything below serves whichever avenue wins.
     control/skill, frost→control/putting, desert→control, verdant→economy/skill — so the shop reads
     on-theme for where you are. A soft weight (`ITEM_AFFINITY_BOOST`), never a filter; offer stays
     deterministic + distinct; item effects/balance untouched (shop invariants hold).
-  - **GS-17 follow-on (small):** wire the theme into the Sim Lab + Demo hub, and per-theme PALETTE
-    tints (rarity tints the figure today; the biome ground still uses the 5 archetype palettes).
+  - **GS-17f — Per-theme turf/ground palette tints. SHIPPED.** A render-only HSL tint (`tintHex`/
+    `Tint` in palette.ts) shifts the TURF (fairway/green/tee, gentle) and GROUND (rough/background/
+    accents, full) toward the stop's world — verdant stays green, desert/inferno warm, frost cools,
+    void goes violet — deepened by rarity + nudged per-theme. Gated on `themeId` so a themeless render
+    is byte-identical (structural prim-count invariant guards it). Verified eyes-on.
+  - **GS-17 follow-on (small):** wire the theme into the Sim Lab + Demo hub (the only remaining piece).
 
 - **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
   shipped (PR #7). Still open: a smarter recovery/short game to shrink the rare max-wildness blow-up
