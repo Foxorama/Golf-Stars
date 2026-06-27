@@ -127,8 +127,10 @@ export function mountPuttMeter(container: HTMLElement, opts: PuttMeterOptions): 
 
   function commit(): void {
     if (committed) return;
-    committed = true;
+    // Capture the marker's live pace BEFORE freezing — `currentPace` short-circuits to the
+    // (still-zero) `frozenPace` once `committed` is set, so order matters here.
     frozenPace = currentPace(performance.now());
+    committed = true;
     opts.onCommit(frozenPace);
   }
 

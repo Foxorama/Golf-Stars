@@ -536,15 +536,24 @@ function playingBody(animating: boolean): string {
 
   // Manual putting on the green (auto-putt off): stroke putts one at a time.
   if (awaitingPutt(play)) {
+    // Frame the putt on the ball→cup line: centre the view on the MIDPOINT of the two and size it
+    // to the putt length, so the cup and ball both sit on-screen with even margin — not the ball
+    // dead-centre with the green (and a lot of dead rough) shoved to one edge.
+    const puttPin = pinOf(play.hole);
+    const puttMid: [number, number] = [
+      (play.ball[0] + puttPin[0]) / 2,
+      (play.ball[1] + puttPin[1]) / 2,
+    ];
     const puttSvg = renderHoleSVG(play.hole, {
       shots: play.shots,
       biome: state.course.biome, themeId: state.course.meta.themeId,
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
-      // Zoom the green in for the putt — follow the ball, frame the cup.
-      focus: play.ball,
-      viewRadius: Math.max(18, v.distToPin * 1.8),
+      // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin.
+      focus: puttMid,
+      viewRadius: Math.max(9, v.distToPin * 0.62),
+      focusBias: 0.5,
     });
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. The band widens with putter upgrades.
@@ -557,7 +566,6 @@ function playingBody(animating: boolean): string {
         <div class="gs-bottom">
           ${meterInstr}
           <div id="puttmeter" style="margin:2px 0;"></div>
-          <div class="gs-ctrlrow">${puttToggleBtn()}</div>
           <div class="gs-hitbar">
             <button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>
             ${btn('» Auto-finish putts', { type: 'autoShotHole' }, { variant: 'ghost' })}
