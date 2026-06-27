@@ -45,6 +45,12 @@ interface PlayFeel extends FlightFeel {
   rollMaxMs: number;
   /** Roll distance (course yards) at which the bounce reaches full amplitude / hop count. */
   bounceRefRun: number;
+  /** Backspin run-out: forward skid on the bounce as a fraction of the eventual check-back distance. */
+  backspinSkidFrac: number;
+  /** Backspin run-out: cap (course yards) on that forward skid. */
+  backspinSkidMax: number;
+  /** Backspin run-out: fraction of the run-out spent skidding forward before the spin grabs & zips back. */
+  backspinSkidPortion: number;
   /** Pause (ms) the ball sits at rest so you can read where it finished. */
   restHoldMs: number;
   /** Draw the little golfer who addresses + swings before each full shot. */
@@ -71,6 +77,9 @@ const BASE_FEEL: PlayFeel = {
   rollMinMs: 150,
   rollMaxMs: 900,
   bounceRefRun: 32,
+  backspinSkidFrac: 0.55,
+  backspinSkidMax: 7,
+  backspinSkidPortion: 0.32,
   restHoldMs: 480,
   golfer: true,
   golferPx: 40,
@@ -576,8 +585,29 @@ export function mountPlayView(
             trail = [];
           }
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
-          const e = easeOutCubic(rt);
-          ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
+          if ((shot.roll ?? 0) < -0.3) {
+            // Backspin is a TWO-BEAT run-out, not a smooth slide back to rest. The old monotonic
+            // ease yanked the ball straight backward the instant it touched down — it read as a
+            // "rubber band" snap, not spin. Real backspin: the ball SKIDS forward on the bounce
+            // (carrying its forward momentum), THEN the spin grabs and zips it back past touchdown
+            // to rest. Render-only feel — the sim already resolved `rest` (behind touchdown).
+            const br = (bearing * Math.PI) / 180;
+            const fwd: Vec = [Math.sin(br), Math.cos(br)]; // forward unit (flight.ts bearing convention)
+            const checkDist = Math.hypot(rest[0] - touchdown[0], rest[1] - touchdown[1]);
+            const skid = Math.min(checkDist * F.backspinSkidFrac, F.backspinSkidMax);
+            const peakPt: Vec = [touchdown[0] + fwd[0] * skid, touchdown[1] + fwd[1] * skid];
+            const p = F.backspinSkidPortion;
+            if (rt < p) {
+              const e1 = easeOutCubic(rt / p); // forward skid, decelerating as the spin bites
+              ground = [touchdown[0] + (peakPt[0] - touchdown[0]) * e1, touchdown[1] + (peakPt[1] - touchdown[1]) * e1];
+            } else {
+              const e2 = easeInOut((rt - p) / (1 - p)); // spin grabs → accelerates back, eases into rest
+              ground = [peakPt[0] + (rest[0] - peakPt[0]) * e2, peakPt[1] + (rest[1] - peakPt[1]) * e2];
+            }
+          } else {
+            const e = easeOutCubic(rt);
+            ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
+          }
           const firm = surfaceFirmness(shot.landLie ?? shot.lieTo);
           // Bounce reads BOTH the landing surface's firmness AND how far the ball runs: a long firm
           // run skips tall and hops several times; a short soft check plops once and dies. Hop count
