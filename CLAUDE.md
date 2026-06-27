@@ -95,6 +95,25 @@ This game lives or dies on three axes — put every change through all three bef
   drawn as glyphs/sand, trees as canopies (not flat blobs) in both renderers. Because they're
   non-penalty `validateFairness` ignores them, but they DO make scoring harder — keep them off the
   centre line and re-run the no-death-spiral test (`toPar/hole < 1.0`, blow-ups < 5%) after tuning.
+- **Greens are VARIED organic shapes, NOT circles (GS-greens, `generate.ts`).** `greenPoly` builds the
+  putting surface from a few seeded harmonics + an optional kidney lobe, stretched along a random long
+  axis — so greens come as blobs, kidneys, long shelves, pears and punchbowls. The per-biome row sets
+  the CHARACTER (`greenSize`/`greenAspect`/`greenIrregular`): desert oasis greens big & smooth, frost
+  ice-SHELVES long & narrow (aspect leaned toward the max so it reads reliably), inferno greens jagged,
+  void asteroid greens small & angular, verdant classic. The green stays a STAR shape about its centre
+  `green` (single-valued r(θ)), which `pinInGreen` relies on: it ray-marches from the centre out to
+  22–62% of the edge distance, so the flag is always genuinely inside (never on the lip) yet off-centre
+  for ANY shape — `rayPolyDist` is the shared ray↔polygon helper (GOTCHA: its edge-parameter `s` divides
+  by `denom`, NOT `-denom` — the sign error placed a bunker on the pin). Greenside hazards also ray-march
+  to the real green edge so they hug any shape. `validateCourse` still proves the pin is in the green.
+- **The fairway WRAPS past the green, no hard flat cap (GS-greens).** Besides the main corridor, the
+  generator adds a SECOND `fairway` feature — a tapering apron strip running from just before the green,
+  through it, and out the back (`apronLine` along the final play direction, half-widths tapering to ~0.4)
+  — so the fairway flows around/past the green instead of ending at a perpendicular line. SKIPPED for void
+  ISLAND greens (lostRough armed — the green floats over the abyss). CRITICAL: it's a separate feature so
+  it never widens the corridor's fairness half-width — `validateFairness`/`fairwayHalfWidthOf` key off the
+  FIRST `fairway` feature (the main corridor). `lieAt` precedence (green > fairway) keeps a ball on the
+  green reading green even though the apron overlaps it.
 - **Wind reads true:** the round sim aims UPWIND to compensate for the known crosswind, and lays
   up to the (penalty-free) centreline when the line to the pin is blocked — a played shot reads
   trouble instead of spiralling.
