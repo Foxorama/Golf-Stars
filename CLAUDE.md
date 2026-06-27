@@ -325,6 +325,18 @@ This game lives or dies on three axes — put every change through all three bef
   decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
   powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
   `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
+- **Spray cone = three DISTINCT bands per side, each labelled with its true % of shots
+  (`holeView.ts`).** From the centre out: GREEN likely zone (`|z|<centralZ`), ORANGE risky-miss
+  (`centralZ<|z|<edgeZ`), RED hook/shank tail (`|z|>edgeZ`, drawn to `outerZ`). The bands share
+  edges but NEVER stack (the orange used to sit *under* the green and read as one muddy blob — fixed
+  by `spraySector(a0,a1)` carving each wedge between two angles). `SprayTiers` is z-scores
+  (`SPRAY_TIERS` default: centralZ 1.2816, edgeZ 2.0537, outerZ 3.2 → 80% / 8% each orange / 2% each
+  red); the on-screen percentages are DERIVED from those z's via the normal CDF (`tierPercents`) so
+  the numbers read EXACTLY true to the geometry — the red is the whole tail past `edgeZ` (2%), and
+  `outerZ` is only how far it's DRAWN. The `window._gsSpray` escape hatch is a *partial* override
+  merged over the defaults by `resolveTiers` (so a `{centralPct}` from the hub no longer leaves
+  `edgeZ` undefined → NaN, the old latent bug); `centralPct` is a convenience that resizes the green
+  centre by % via `probit`. The play-screen legend (`app.ts`) shows the same derived % per colour.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the

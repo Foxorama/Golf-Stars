@@ -145,13 +145,22 @@ describe('render fit (never clip the ball off-map)', () => {
 
 describe('spray cone render (SVG)', () => {
   const hole = generateCourse(1234).holes[0]!;
-  it('draws the three-tier cone when a spray is supplied', () => {
+  it('draws the three-tier cone (green / orange / red) when a spray is supplied', () => {
     const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { dispersionMult: 1.2 });
     const svg = renderHoleSVG(hole, { width: 320, height: 460, spray });
-    // Central likely wedge (green) + two SEPARATE flanking risk wedges (amber) — the amber no
-    // longer sits under the green, so both side flanks are drawn as their own polygons.
+    // Central likely wedge (green) + two SEPARATE orange flanks + two SEPARATE red hook/shank
+    // flanks — none stacked under another, so each side band is its own polygon.
     expect(svg).toContain('rgba(95,212,90,0.30)');
     expect(svg.match(/rgba\(255,196,84,0\.18\)/g)!.length).toBe(2);
+    expect(svg.match(/rgba\(255,76,76,0\.20\)/g)!.length).toBe(2);
+  });
+  it('labels each zone with an easy-to-read % of shots (≈80 / 8 / 2)', () => {
+    const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { dispersionMult: 1.2 });
+    const svg = renderHoleSVG(hole, { width: 320, height: 460, spray });
+    // Defaults: 80% centre, 8% each orange flank, 2% each red flank (the hook/shank tail).
+    expect(svg).toContain('>80%<');
+    expect(svg.match(/>8%</g)!.length).toBe(2);
+    expect(svg.match(/>2%</g)!.length).toBe(2);
   });
   it('omits the cone when no spray is supplied', () => {
     const svg = renderHoleSVG(hole, { width: 320, height: 460 });
