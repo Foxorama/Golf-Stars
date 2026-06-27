@@ -121,6 +121,24 @@ export function archetypeBiome(a: BiomeArchetype): string {
   return ARCHETYPE_BIOME[a];
 }
 
+/** Inverse: the archetype a biome id belongs to (verdant if unknown). The render/zone layers key
+ *  zone identity off this so a biome-only course (no theme — e.g. the Sim Lab) still reads on-world. */
+export function archetypeForBiome(biomeId: string): BiomeArchetype {
+  for (const a of Object.keys(ARCHETYPE_BIOME) as BiomeArchetype[]) {
+    if (ARCHETYPE_BIOME[a] === biomeId) return a;
+  }
+  return 'verdant';
+}
+
+/** Resolve a stop's archetype from its theme id if present, else its biome id. */
+export function archetypeFor(themeId: string | undefined, biomeId: string): BiomeArchetype {
+  if (themeId) {
+    const t = themeById(themeId);
+    if (t) return t.archetype;
+  }
+  return archetypeForBiome(biomeId);
+}
+
 export function themeBiome(t: Theme): string {
   return archetypeBiome(t.archetype);
 }

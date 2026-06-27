@@ -92,7 +92,6 @@ export interface ShotView {
 /** Info the UI shows the player before they choose a shot. */
 export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const pin = pinOf(state.hole);
-  const safe = layupTarget(state.hole, state.ball);
   const carryMult = biomeCarryMult(state.hole);
   // The interactive "attack" suggestion reasons about green coverage (longest club that still
   // covers the front of the green), using the player's real dispersion so it reads true — see
@@ -100,6 +99,8 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const dispersionMult = netDispersion(loadout);
   // The driver is removed/penalised off the deck unless the Driver-on-Deck level allows it.
   const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
+  // Same forced-carry-aware layup the auto sim uses (same bag/lie/carryMult → byte-for-byte).
+  const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
   return {
     distToPin: Math.round(dist(state.ball, pin)),
     lie: state.lie,
@@ -122,9 +123,10 @@ export function previewShot(
   loadout: PlayerLoadout,
 ): ShotSpread {
   const carryMult = biomeCarryMult(state.hole);
-  const target =
-    decision.target ?? (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball));
   const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
+  const target =
+    decision.target ??
+    (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
   const club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
   return shotSpread(state.hole, state.ball, state.lie, target, club, {
@@ -155,9 +157,10 @@ export function takeShot(
   if (state.done) return state;
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
-  const target =
-    decision.target ?? (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball));
   const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
+  const target =
+    decision.target ??
+    (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
   const club: Club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
 

@@ -14,7 +14,9 @@ export const FILL: Record<string, string> = {
   water: '#3f8fe0',
   waste: '#c2b280',
   lava: '#d2451e',
+  lavariver: '#e2541a',
   void: '#160a26',
+  voidrough: '#0a0518',
   ice: '#bfe6f0',
   crystal: '#9fd8e6',
 };
@@ -68,6 +70,93 @@ export const SHADES: Record<string, Shade> = {
 /** The darker fringe/apron ring drawn just outside a green so it sits ON the land, not floating. */
 export const GREEN_COLLAR = '#3c9a3a';
 
+// --- Per-zone (archetype) turf palettes (GS-19) -------------------------------
+//
+// The old per-theme look only HUE-ROTATED the green turf, which barely read ("green fairways in no
+// way match the themes"). Instead each of the 5 worlds gets an EXPLICIT, designed turf palette so a
+// desert fairway is firm tan, a frost world frosted teal, an ember world scorched ash-olive, a void
+// stop a cosmic indigo platform. `verdant` keeps the original SHADES values byte-for-byte, so a
+// themeless / verdant render is unchanged (the render tests still see #3f8c3f / #5fd45a).
+
+import type { BiomeArchetype } from '../sim/course/themes';
+
+export interface TurfPalette {
+  fairway: Shade;
+  green: Shade;
+  tee: Shade;
+  /** Darker apron ring drawn just outside the green. */
+  collar: string;
+  /** Rough tone ramp (tufts / soft patches) for this world. */
+  rough: Shade;
+}
+
+export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
+  // Verdant = the original SHADES, verbatim (keeps themeless/verdant renders byte-identical).
+  verdant: {
+    fairway: { light: '#56a850', base: '#3f8c3f', dark: '#347834', ink: '#16361a' },
+    green: { light: '#79e86a', base: '#5fd45a', dark: '#49b446', ink: '#1d4d22' },
+    tee: { light: '#8cae46', base: '#7a9a3a', dark: '#62802c', ink: '#2c3a14' },
+    collar: '#3c9a3a',
+    rough: { light: '#315c31', base: '#274d27', dark: '#1b3a1b', ink: '#0f240f' },
+  },
+  // Desert — firm, dry Bermuda tan with an oasis-green putting surface.
+  desert: {
+    fairway: { light: '#ccae64', base: '#b89a52', dark: '#9a7f3e', ink: '#5e4a22' },
+    green: { light: '#b6d676', base: '#9bbf5a', dark: '#7e9e44', ink: '#46591f' },
+    tee: { light: '#c0a563', base: '#a98f4e', dark: '#8c7338', ink: '#4e3f1d' },
+    collar: '#86a046',
+    rough: { light: '#7d6034', base: '#6b5230', dark: '#523f24', ink: '#2e2413' },
+  },
+  // Frost — snow-dusted, frosted teal-green turf and pale mint ice-greens.
+  frost: {
+    fairway: { light: '#bfe0da', base: '#9cc3bf', dark: '#7ba39e', ink: '#3a5a59' },
+    green: { light: '#dcf3ec', base: '#c2e6dd', dark: '#9fcabf', ink: '#4d716b' },
+    tee: { light: '#abccc7', base: '#8fb0ac', dark: '#728e8a', ink: '#3a504e' },
+    collar: '#7fb0a6',
+    rough: { light: '#4a5e6a', base: '#3a4a55', dark: '#2b3842', ink: '#19232b' },
+  },
+  // Inferno — scorched ash-earth fairways, heat-stressed olive greens.
+  inferno: {
+    fairway: { light: '#8a6a4e', base: '#6e5340', dark: '#523c2c', ink: '#2a1c12' },
+    green: { light: '#97a653', base: '#7c8a3e', dark: '#62702f', ink: '#333a16' },
+    tee: { light: '#82643f', base: '#6a5036', dark: '#523c28', ink: '#291c10' },
+    collar: '#5e6b2e',
+    rough: { light: '#4a1d16', base: '#3a1410', dark: '#280c0a', ink: '#160605' },
+  },
+  // Void — cosmic indigo "astroturf" islands, luminous violet-blue greens.
+  void: {
+    fairway: { light: '#4f4691', base: '#3a3270', dark: '#2a2452', ink: '#15102e' },
+    green: { light: '#909aec', base: '#6f7ad6', dark: '#5460b4', ink: '#23284f' },
+    tee: { light: '#473f88', base: '#34306a', dark: '#28244e', ink: '#14102b' },
+    collar: '#5a64c0',
+    rough: { light: '#1d1336', base: '#120a22', dark: '#0b0617', ink: '#05030c' },
+  },
+};
+
+/** Lum-only deepen tint so a rarer stop reads a touch richer (1 = neutral). */
+function deepenTint(deepen: number): Tint | undefined {
+  if (!deepen || Math.abs(deepen - 1) < 1e-6) return undefined;
+  return { hueShift: 0, satMul: 1 + (deepen - 1) * 0.18, lumMul: 1 - (deepen - 1) * 0.06 };
+}
+
+/** Resolve a world's turf Shade for a surface kind, optionally rarity-deepened. */
+export function turfShade(kind: 'fairway' | 'green' | 'tee' | 'rough', archetype: BiomeArchetype, deepen = 1): Shade {
+  const s = ARCHETYPE_TURF[archetype][kind];
+  const t = deepenTint(deepen);
+  if (!t) return s;
+  return { light: tintHex(s.light, t), base: tintHex(s.base, t), dark: tintHex(s.dark, t), ink: tintHex(s.ink, t) };
+}
+
+/** A world's green-collar colour (rarity-deepened). */
+export function collarFor(archetype: BiomeArchetype, deepen = 1): string {
+  return tintHex(ARCHETYPE_TURF[archetype].collar, deepenTint(deepen));
+}
+
+/** A world's rough BACKGROUND base colour (the slab behind everything). */
+export function roughBaseFor(archetype: BiomeArchetype, deepen = 1): string {
+  return tintHex(ARCHETYPE_TURF[archetype].rough.base, deepenTint(deepen));
+}
+
 /** Sand: a lit base, a lip-shadow rim, a depression crescent and pale rake lines. */
 export const SAND = {
   base: '#e9d8a6', // keep the FILL.bunker value
@@ -85,6 +174,16 @@ export const WATER = {
   deepest: '#1d4f96',
   glint: 'rgba(255,255,255,0.85)',
   ink: '#163b6b',
+};
+
+/** Molten lava (lakes + rivers): a charred crust rim, a glowing body, a hot core + bright cracks. */
+export const LAVA = {
+  crust: '#3a1008',
+  body: '#d2451e',
+  hot: '#ff8a2a',
+  core: '#ffd24a',
+  crack: '#ffb24a',
+  ink: '#651a0a',
 };
 
 /** Cell-shaded canopy: a core shadow, a mid body, a lit cap, a trunk + ground shadow + ink. */

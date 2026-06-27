@@ -17,10 +17,11 @@
 import { Rng } from '../rng';
 import { RARITIES, RARITY_C } from '../rpg/loot';
 import { BIOMES, pickBiome, type Biome } from './biomes';
-import { lieInfo } from '../shot';
+import { lieInfo, lieAt } from '../shot';
 import {
   bearing,
   pathLength,
+  pointInPoly,
   polylineDist,
   segDist,
   validateCourse,
@@ -34,7 +35,21 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 4;
+export const GENERATOR_VERSION = 5;
+
+/**
+ * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
+ * and lava-river (ember) only ARM past a wildness threshold; below it the stop plays fair (normal
+ * rough, no river), and the severity (island width / river width) ramps with wildness above it.
+ */
+const LOST_ROUGH_MIN_WILDNESS = 0.55; // below: void plays as ordinary (fair) rough
+const LAVA_RIVER_MIN_WILDNESS = 0.3; // below: a calm ember stop has no river
+/**
+ * Corridor half-width SCALE when the rough is lethal (void islands). Constant (does NOT shrink with
+ * wildness like a normal corridor) and generous, so that even max-wildness driver spray usually
+ * finds the island — "brutal but fair": a miss is genuinely lost, but the target is honest and big.
+ */
+const VOID_ISLAND_SCALE = 2.4;
 
 export interface GenerateOptions {
   /** Number of holes (default 1 — the vertical slice). */
@@ -115,6 +130,39 @@ function densifyCentreline(line: Vec[], n: number): Vec[] {
 }
 
 /**
+ * A molten river/creek band crossing the corridor at fraction `t` (GS-19). Spans the fairway plus
+ * a chunk of rough either side (so it reads as a river running ACROSS the hole), with a meandering
+ * thickness for a natural look. Built perpendicular to the play direction so the carry is honest.
+ */
+function lavaRiverBand(centreline: Vec[], t: number, halfWidth: number, thickness: number, rng: Rng): Vec[] {
+  const c = centrePoint(centreline, t);
+  const a = centrePoint(centreline, Math.max(0, t - 0.02));
+  const b = centrePoint(centreline, Math.min(1, t + 0.02));
+  let tx = b[0] - a[0];
+  let ty = b[1] - a[1];
+  const tl = Math.hypot(tx, ty) || 1;
+  tx /= tl;
+  ty /= tl; // unit play direction (tangent)
+  const px = -ty;
+  const py = tx; // unit lateral (perp)
+  const halfSpan = halfWidth + rng.range(16, 38); // spill into the rough either side
+  const N = 6;
+  const top: Vec[] = [];
+  const bot: Vec[] = [];
+  for (let i = 0; i <= N; i++) {
+    const s = -halfSpan + (2 * halfSpan * i) / N; // lateral position across the hole
+    const meander = (rng.float() - 0.5) * thickness * 0.5; // shift the band centre along play
+    const cx = c[0] + px * s + tx * meander;
+    const cy = c[1] + py * s + ty * meander;
+    const htTop = thickness * (0.5 + rng.range(0, 0.18));
+    const htBot = thickness * (0.5 + rng.range(0, 0.18));
+    top.push([cx + tx * htTop, cy + ty * htTop]);
+    bot.push([cx - tx * htBot, cy - ty * htBot]);
+  }
+  return [...top, ...bot.reverse()];
+}
+
+/**
  * Clearance a point of radius `r` must keep from the play corridor for a *penalty*
  * hazard to be fair. The corridor here is both the centreline AND the direct tee→green
  * chord (the line the greedy sim actually plays).
@@ -168,7 +216,11 @@ function generateHole(
   // bar is unchanged while early holes become much more forgiving. The thickness also UNDULATES
   // along the hole (wide landing zones, the odd pinched neck), most dramatically early. The
   // corridor is built from a densified centreline so its edge can vary smoothly.
-  const widthScale = 1.6 - 0.85 * wildness;
+  // Lost rough (void signature): off the fairway is a PENALTY lie on the wilder/deeper stops.
+  // When armed, widen the corridor into a fair "island" so a sensible shot still has somewhere
+  // to land — you play TO the fairway or lose the ball, but the target is honest.
+  const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
+  const widthScale = lostRough ? VOID_ISLAND_SCALE : 1.6 - 0.85 * wildness;
   const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
   const segs = par === 3 ? 9 : 15;
   const dense = densifyCentreline(centreline, segs);
@@ -299,6 +351,20 @@ function generateHole(
     hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, rng) });
   }
 
+  // Lava rivers (ember signature, GS-19): one (two on the wildest stops) molten band crosses the
+  // corridor as a FORCED CARRY. Tagged 'lavariver' so `validateFairness` treats it as a sanctioned
+  // crossing (a played shot flies OVER it; the carry-aware AI lays up short or carries it), while
+  // `validateCrossings` proves there's fair fairway before AND after each one. Thickness ramps with
+  // wildness (a creek early → a wide river late) but stays well inside a standard carry.
+  // Rivers only cross the longer holes (a creek across a 150-yd par-3 leaves no approach); par-3
+  // ember stops keep their flanking lava lakes. Thickness is capped relative to the hole so there's
+  // always fairway to lay up short and land the carry.
+  if (biome.lavaRiver && par >= 4 && wildness >= LAVA_RIVER_MIN_WILDNESS) {
+    const t = rng.range(0.34, 0.6);
+    const thickness = Math.min(34, length * 0.085, rng.range(8, 13) + wildness * rng.range(6, 16));
+    hazards.push({ kind: 'lavariver', poly: lavaRiverBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+  }
+
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
   const wind: Wind = {
     dir: rng.range(0, 360),
@@ -308,6 +374,9 @@ function generateHole(
   // Carry modifier (gravity), with optional per-hole jitter (antigrav pockets).
   const carry = biome.carryMult * (biome.carryJitter ? 1 + rng.range(-biome.carryJitter, biome.carryJitter) : 1);
   const biomeMods: BiomeMod[] = [{ kind: 'carry', value: carry, note: `${biome.id} gravity` }];
+  // Arm the lost-rough lie for this hole (read by `lieAt` off-feature). Visual stays "space"
+  // either way; only the penalty is gated, so calm void stops are forgiving and deep ones bite.
+  if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
   return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods };
 }
@@ -367,7 +436,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     meta: { name, distanceFromStart, wildness, ...(opts.themeId ? { themeId: opts.themeId } : {}) },
   };
 
-  const errs = [...validateCourse(course), ...validateFairness(course)];
+  const errs = [...validateCourse(course), ...validateFairness(course), ...validateCrossings(course)];
   if (errs.length) {
     throw new Error(`generateCourse produced an invalid course:\n  ${errs.join('\n  ')}`);
   }
@@ -384,6 +453,7 @@ export function validateFairness(course: Course): string[] {
   course.holes.forEach((h, i) => {
     const half = fairwayHalfWidthOf(h);
     for (const hz of h.hazards) {
+      if (hz.kind === 'lavariver') continue; // sanctioned forced carry — proved by validateCrossings
       if (!lieInfo(hz.kind).penalty) continue; // only penalty surfaces must be avoidable
       for (const p of hz.poly) {
         if (polylineDist(p, h.centreline) < half * 0.5 && segDist(p, h.tee, h.green) < half * 0.5) {
@@ -391,6 +461,43 @@ export function validateFairness(course: Course): string[] {
           break;
         }
       }
+    }
+  });
+  return errs;
+}
+
+/**
+ * Crossing fairness (GS-19): a lava river is a SANCTIONED penalty on the play corridor (you carry
+ * it), so it's exempt from `validateFairness` — but it must be CARRYABLE: the centreline has to
+ * enter and exit the river (it genuinely crosses), with a penalty-free landing both BEFORE the near
+ * bank (room to lay up short) and just AFTER the far bank (somewhere to land the carry). Proven on
+ * every generated course; the carry-aware AI relies on exactly these two safe shelves existing.
+ */
+export function validateCrossings(course: Course): string[] {
+  const errs: string[] = [];
+  const SAMPLES = 200;
+  course.holes.forEach((h, i) => {
+    for (const hz of h.hazards) {
+      if (hz.kind !== 'lavariver') continue;
+      let tIn = -1;
+      let tOut = -1;
+      for (let s = 0; s <= SAMPLES; s++) {
+        const t = s / SAMPLES;
+        if (pointInPoly(centrePoint(h.centreline, t), hz.poly)) {
+          if (tIn < 0) tIn = t;
+          tOut = t;
+        }
+      }
+      if (tIn < 0) {
+        errs.push(`hole[${i}]: lava river does not cross the centreline (not a real forced carry)`);
+        continue;
+      }
+      if (tIn < 0.12) errs.push(`hole[${i}]: lava river leaves no room to lay up short (near bank too early)`);
+      if (tOut > 0.82) errs.push(`hole[${i}]: lava river crowds the green (far bank too late)`);
+      // A safe landing must exist just past the far bank (a ~20-yd shelf before the green).
+      const total = pathLength(h.centreline) || 1;
+      const after = centrePoint(h.centreline, Math.min(0.99, tOut + 20 / total));
+      if (lieInfo(lieAt(h, after)).penalty) errs.push(`hole[${i}]: no safe landing past the lava river`);
     }
   });
   return errs;

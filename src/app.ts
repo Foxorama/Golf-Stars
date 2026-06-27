@@ -13,7 +13,11 @@ import { renderHoleSVG } from './render/holeView';
 import { holeProjector } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { biomeCarryMult, pinOf } from './sim/round';
+import { lieInfo, roughLieOf } from './sim/shot';
 import { biomeById } from './sim/course/biomes';
+import { archetypeFor, themeById } from './sim/course/themes';
+import { zoneProfile, difficultyPips } from './sim/course/zones';
+import { zoneHeroSVG } from './render/zoneHero';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
@@ -371,6 +375,7 @@ const HAZARD_LABEL: Record<string, string> = {
   water: '💧 Water',
   bunker: '🏖 Bunker',
   lava: '🌋 Lava',
+  lavariver: '🌋 Lava river',
   void: '🕳 Void',
   trees: '🌲 Trees',
   waste: '🏜 Waste',
@@ -409,21 +414,71 @@ function conditionsSummary(hole: Hole, biomeId: string): string {
   const surfaces = new Set(hole.features.map((f) => f.kind));
   const SCAT: Record<string, string> = { ice: '❄ slick ice', crystal: '💎 true crystal', waste: '🏜 waste sand' };
   for (const [k, label] of Object.entries(SCAT)) if (surfaces.has(k)) parts.push(label);
+  // Per-hole warning when the void's lost-rough is actually ARMED here (deep stops): miss = lost ball.
+  if (lieInfo(roughLieOf(hole)).penalty) parts.push('🕳 lost rough — miss the fairway = lost ball');
   return parts.join(' · ');
 }
 
-/** Per-hole briefing splash: wind, hazards, special conditions + a layout map, then a Continue. */
+/** A list of zone traits (hazards/benefits), each an icon + line. */
+function traitList(title: string, accent: string, traits: { icon: string; text: string }[]): string {
+  const rows = traits
+    .map(
+      (t) =>
+        `<li style="display:flex;gap:7px;align-items:flex-start;margin:3px 0;font-size:12.5px;line-height:1.3;">
+           <span style="flex:0 0 auto;">${t.icon}</span><span style="opacity:.9;">${t.text}</span></li>`,
+    )
+    .join('');
+  return `<div style="flex:1 1 0;min-width:140px;">
+      <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${accent};font-weight:700;margin-bottom:2px;">${title}</div>
+      <ul style="list-style:none;padding:0;margin:0;">${rows}</ul>
+    </div>`;
+}
+
+/** Per-hole briefing splash: a thematic zone hero + profile, then the live wind/hazards/conditions
+ *  for THIS hole and a layout map. The zone identity (lore + hazards/benefits/difficulty) sells the
+ *  world; the live facts + map read the specific hole. Render-only — the `shot` action is never
+ *  blocked, so the headless flow/tests are intact. */
 function holeSplashBody(): string {
   const play = state.play!;
   const hole = play.hole;
   const len = Math.round(dist(hole.tee, hole.green));
-  const map = renderHoleSVG(hole, { biome: state.course.biome, themeId: state.course.meta.themeId, width: 320, height: 420 });
+  const themeId = state.course.meta.themeId;
+  const arch = archetypeFor(themeId, state.course.biome);
+  const zone = zoneProfile(arch);
+  const theme = themeId ? themeById(themeId) : undefined;
+  const hero = zoneHeroSVG(arch, { width: 480, height: 168, seed: (hole.par * 131 + len) >>> 0 });
+  const map = renderHoleSVG(hole, { biome: state.course.biome, themeId, width: 320, height: 400 });
   const fact = (label: string, val: string): string =>
     `<div style="display:flex;justify-content:space-between;gap:14px;font-size:14px;padding:5px 0;border-bottom:1px solid var(--gs-line-2);">
        <span style="opacity:.6;">${label}</span><span style="font-weight:600;text-align:right;">${val}</span></div>`;
+  const diffPips = difficultyPips(zone.difficulty);
   return `
     ${header()}
-    <h2 style="font-size:18px;margin:.3em 0;">Hole ${play.holeIndex + 1} of ${state.course.holes.length} · Par ${hole.par} · ~${len} yds</h2>
+    <div class="gs-panel" style="max-width:780px;padding:0;overflow:hidden;margin-bottom:12px;">
+      <div style="position:relative;line-height:0;">
+        <div style="width:100%;">${hero}</div>
+        <div style="position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.72));line-height:1.2;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:19px;font-weight:800;color:#fff;text-shadow:0 1px 4px #000;">${zone.name}</div>
+              <div style="font-size:12.5px;color:var(--gs-accent);">${zone.signature}${theme ? ` · ${theme.name}` : ''}</div>
+            </div>
+            <div style="text-align:right;font-size:12px;color:#eee;text-shadow:0 1px 3px #000;">
+              Difficulty<br><span style="font-size:15px;letter-spacing:1px;color:var(--gs-danger);">${diffPips}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:11px 14px;">
+        <p style="font-size:12px;font-style:italic;opacity:.7;margin:0 0 5px;">${zone.inspiration}</p>
+        <p style="font-size:13px;opacity:.92;margin:0 0 10px;line-height:1.4;">${zone.brief}</p>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;">
+          ${traitList('Hazards', 'var(--gs-danger)', zone.hazards)}
+          ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
+        </div>
+      </div>
+    </div>
+    <h2 style="font-size:17px;margin:.2em 0 .4em;">Hole ${play.holeIndex + 1} of ${state.course.holes.length} · Par ${hole.par} · ~${len} yds</h2>
     <div class="gs-play">
       <div class="gs-map">${map}</div>
       <section class="gs-controls">
