@@ -8,6 +8,9 @@
  */
 
 import type { Vec } from '../sim/course/contract';
+import { flightControl, flightGround, arcHeight } from '../sim/flight';
+
+export { flightControl, flightGround, arcHeight } from '../sim/flight';
 
 export interface FlightFeel {
   /** Min/max flight animation duration (ms). */
@@ -48,13 +51,33 @@ export interface FlightSample {
   height: number;
 }
 
-/** Sample the flight at normalised progress `t` ∈ [0,1]. */
+/** Sample the flight at normalised progress `t` ∈ [0,1] (straight ground line — putts/legacy). */
 export function sampleFlight(from: Vec, landing: Vec, t: number, peak: number): FlightSample {
   const tt = Math.max(0, Math.min(1, t));
   return {
     ground: [from[0] + (landing[0] - from[0]) * tt, from[1] + (landing[1] - from[1]) * tt],
     height: Math.sin(Math.PI * tt) * peak,
   };
+}
+
+/**
+ * Sample the CURVED flight at progress `t`: the ground follows a quadratic Bézier that launches
+ * along the shot bearing and curves to the landing (the fade/hook banana), and the height follows
+ * the loft-scaled arc whose apex the SIM resolved (`shot.result.apex`). Both come from the shared
+ * `sim/flight` geometry, so the ball the player watches curve + clear/clip a tree is exactly the
+ * ball the sim computed. Pure.
+ */
+export function sampleCurvedFlight(
+  from: Vec,
+  landing: Vec,
+  bearingDeg: number,
+  carry: number,
+  t: number,
+  apex: number,
+): FlightSample {
+  const tt = Math.max(0, Math.min(1, t));
+  const control = flightControl(from, bearingDeg, carry);
+  return { ground: flightGround(from, control, landing, tt), height: arcHeight(apex, tt) };
 }
 
 export function easeOutCubic(t: number): number {

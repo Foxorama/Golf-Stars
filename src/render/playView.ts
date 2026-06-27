@@ -17,10 +17,9 @@ import { playBoundsCorners } from '../sim/round';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
 import {
-  arcPeak,
   easeOutCubic,
   flightDurationMs,
-  sampleFlight,
+  sampleCurvedFlight,
   DEFAULT_FLIGHT_FEEL,
   type FlightFeel,
 } from './trajectory';
@@ -236,6 +235,10 @@ interface Particle {
   pos: Vec; // screen px
   vel: Vec;
   life: number; // 1 → 0
+  /** RGB triplet for the particle fill (defaults to the warm impact spark). */
+  rgb?: string;
+  /** Gravity per frame (px) — leaves flutter down; sparks float. */
+  grav?: number;
 }
 
 /** Mount an animated play view of a hole's shots. Browser only. */
@@ -310,6 +313,24 @@ export function mountPlayView(
       particles.push({ pos: [...at] as Vec, vel: [Math.cos(a) * sp, Math.sin(a) * sp], life: 1 });
     }
     shake = Math.min(1, power);
+  }
+
+  // A knocked-down ball rattles the canopy: a little green leaf-fall at the clip point, so the
+  // player SEES the tree stop the ball (the trees lie is the real cost — see flight.ts).
+  function spawnLeaves(at: Vec): void {
+    const greens = ['46,120,60', '90,168,84', '60,140,70'];
+    for (let i = 0; i < 10; i++) {
+      const a = Math.PI + (i / 10) * Math.PI; // spray downward-ish
+      const sp = 0.5 + (i % 3) * 0.4;
+      particles.push({
+        pos: [at[0] + (i - 5), at[1]] as Vec,
+        vel: [Math.cos(a) * sp, Math.abs(Math.sin(a)) * sp * 0.4],
+        life: 1,
+        rgb: greens[i % greens.length],
+        grav: 0.08,
+      });
+    }
+    shake = Math.max(shake, 0.3);
   }
 
   // The full static world (rough texture, striped/banded surfaces, depth-banded water,
@@ -418,7 +439,11 @@ export function mountPlayView(
       const carry = shot.result.carry;
       const touchdown = shot.result.landing;
       const rest = shot.rest ?? touchdown;
-      const peak = arcPeak(carry);
+      // The arc apex the SIM resolved (loft-scaled), so the drawn height matches the physics that
+      // decided whether a tree knocked the ball down. The curved ground path launches along the
+      // shot bearing and bends to the landing (the fade/hook banana).
+      const peak = shot.result.apex;
+      const bearing = shot.result.shotBearing;
       const flightDur = flightDurationMs(carry);
       // Roll-out duration scales with the on-screen roll distance.
       const [tdx, tdy] = proj.project(touchdown);
@@ -457,7 +482,7 @@ export function mountPlayView(
         let ground: Vec;
         let height: number;
         if (elapsed < flightDur) {
-          const s = sampleFlight(shot.from, touchdown, elapsed / flightDur, peak);
+          const s = sampleCurvedFlight(shot.from, touchdown, bearing, carry, elapsed / flightDur, peak);
           ground = s.ground;
           height = s.height;
         } else {
@@ -511,6 +536,7 @@ export function mountPlayView(
         if (elapsed >= flightDur + rollDur && lastImpactShot !== shotIndex) {
           lastImpactShot = shotIndex;
           if (shot.holed) spawnImpact([rsx, rsy], 1);
+          else if (shot.knockedDown) spawnLeaves([tdx, tdy]);
           trail = [];
         }
         // Advance to the next shot only after the ball has sat at rest for restHoldMs.
@@ -564,10 +590,11 @@ export function mountPlayView(
     // Particles.
     particles = particles.filter((p) => p.life > 0);
     for (const p of particles) {
+      if (p.grav) p.vel[1] += p.grav;
       p.pos[0] += p.vel[0];
       p.pos[1] += p.vel[1];
       p.life -= 0.04;
-      ctx.fillStyle = `rgba(255,235,180,${p.life})`;
+      ctx.fillStyle = `rgba(${p.rgb ?? '255,235,180'},${p.life})`;
       ctx.beginPath();
       ctx.arc(p.pos[0], p.pos[1], 2.5 * p.life + 0.5, 0, Math.PI * 2);
       ctx.fill();

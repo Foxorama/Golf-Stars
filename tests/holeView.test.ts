@@ -31,6 +31,7 @@ describe('holeView (pure SVG renderer)', () => {
             shotBearing: 0,
             wind: { along: 0, cross: 0 },
             intended: 120,
+            apex: 22,
           },
           lieFrom: 'tee',
           lieTo: 'fairway',

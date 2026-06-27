@@ -17,6 +17,7 @@ import type { Hole, Vec } from '../sim/course/contract';
 import type { ShotLog, ShotSpread } from '../sim/round';
 import { playBoundsCorners } from '../sim/round';
 import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
+import { flightControl } from '../sim/flight';
 import { holeProjector } from './project';
 import { buildScene, scenePrimsToSvg, type ArtFeel } from './style';
 
@@ -210,14 +211,29 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     );
   }
 
-  // Shot flight lines (optional).
+  // Shot flight lines (optional): CURVED — a quadratic Bézier that launches along the shot bearing
+  // and bends to the landing, so a fade/hook/slice reads as a banana on the map exactly as it
+  // animates in the play view (they share `flightControl`). A roll tail (landing→rest) is added so
+  // the bounce-and-run is visible, with a small marker where a tree knocked the ball down.
   if (opts.shots) {
     for (const s of opts.shots) {
       const [fx, fy] = place(s.from);
       const [tx, ty] = place(s.result.landing);
+      const [cx, cy] = place(flightControl(s.from, s.result.shotBearing, s.result.carry));
       parts.push(
-        `<line x1="${fx.toFixed(1)}" y1="${fy.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}" stroke="#ffd84a" stroke-width="2" />`,
+        `<path d="M ${fx.toFixed(1)} ${fy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}" fill="none" stroke="#ffd84a" stroke-width="2" />`,
       );
+      if (Math.abs(s.roll) > 0.5) {
+        const [rx, ry] = place(s.rest);
+        parts.push(
+          `<line x1="${tx.toFixed(1)}" y1="${ty.toFixed(1)}" x2="${rx.toFixed(1)}" y2="${ry.toFixed(1)}" stroke="#ffd84a" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.7" />`,
+        );
+      }
+      if (s.knockedDown) {
+        parts.push(
+          `<circle cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" r="3" fill="none" stroke="#6fae5e" stroke-width="1.5" />`,
+        );
+      }
     }
   }
 
