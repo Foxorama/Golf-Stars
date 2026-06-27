@@ -46,11 +46,20 @@ Everything below serves whichever avenue wins.
   — driver from any lie at full stats; *replaces* the removed Driver-on-Deck ladder), **Dr Chipinski**
   (`chipInBoost` 0.33 — a +33% chip-in chance for PW-or-shorter shots resting within `CHIPIN_RANGE`
   8yds of the flag), **Space Ducks** (a `CaddyGuard` that laser-zaps duck-hooks + 50% of hooks back to
-  the green mid-flight) and **Convict Sheep** (the right-side mirror: boomerang the shanks + 50% of
-  slices). The guards redirect a SAMPLED miss (they don't reshape the spray — the cone still shows the
+  the green mid-flight), **Convict Sheep** (the right-side mirror: boomerang the shanks + 50% of
+  slices) and **Suggestible Sam** (`clubSuggest` — the only source of the 🎯 club suggestion; see
+  below). The guards redirect a SAMPLED miss (they don't reshape the spray — the cone still shows the
   tails); `ShotResult.redirect` records the would-be miss so `playView` animates the projectile +
   ground-path kink (`render/caddyArt.ts`, eyes-on). All caddy rng is gated so the base sim stays
-  byte-for-byte; threaded into both auto + interactive. `tests/caddies.test.ts` guards it; 355 green.
+  byte-for-byte; threaded into both auto + interactive. `tests/caddies.test.ts` guards it.
+- **GS-caddy-sam — Club suggestions become a caddy perk. SHIPPED.** The interactive 🎯 Suggested
+  button + the legend's suggested-club readout + the green-coverage default club were given to EVERY
+  player for free; they now gate behind hiring **Suggestible Sam** (`suggestible-sam`, epic, named
+  caddy → `loadout.clubSuggest`). The base flow shows no suggestion and defaults to a neutral club
+  (putter on the green, else the longest usable) you read + cycle yourself — club selection is a real
+  read again, and there's now an info caddy worth hiring. `suggestPlayerClub`/`shotView` are unchanged;
+  `app.ts` just gates surfacing them. Sam is pure interactive QoL — no field the headless sim reads, so
+  byte-for-byte determinism + all balance bars are untouched. `tests/caddies.test.ts` guards it.
 
 - **GS-19 — Themes & fairways overhaul (per-zone identity + signature mechanics). SHIPPED.** The 5
   worlds now look and PLAY distinct. (1) **Per-archetype turf palettes** (`ARCHETYPE_TURF`) replace

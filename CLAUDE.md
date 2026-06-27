@@ -461,8 +461,20 @@ This game lives or dies on three axes — put every change through all three bef
   strength: **Penelope Putter** (`auto-caddie`, legendary — auto-putt; id kept for save-compat),
   **Driver Dan** (`driver-dan`, epic — `driverAnywhere`, see the driver bullet), **Dr Chipinski**
   (`dr-chipinski`, epic — `chipInBoost` 0.33), **Space Ducks** (`space-ducks`, legendary — left-side
-  guard), **Convict Sheep** (`convict-sheep`, legendary — right-side guard). Helpers: `NAMED_CADDY_IDS`,
+  guard), **Convict Sheep** (`convict-sheep`, legendary — right-side guard), **Suggestible Sam**
+  (`suggestible-sam`, epic — `clubSuggest`, see below). Helpers: `NAMED_CADDY_IDS`,
   `isNamedCaddy`, `namedCaddyOwned(perks)`.
+- **Suggestible Sam = club suggestions are now a caddy perk, NOT the default flow (`clubSuggest`).**
+  The interactive 🎯 Suggested button, the legend's `suggested: attack X · safe Y` readout, AND the
+  default-selected club (the green-coverage `suggestPlayerClub` pick) only appear once you hire Sam. The
+  BASE flow has no caddy reading the yardage: the play screen surfaces no suggestion and the default
+  club is a NEUTRAL pick (putter on the green, else the longest usable club) you read the distance +
+  carry labels and cycle to yourself. `suggestPlayerClub`/`shotView.attackClubId` are unchanged and
+  still computed — `app.ts` just GATES surfacing them on `loadout.clubSuggest`. CRITICAL: Sam is purely
+  INTERACTIVE QoL — he sets no field the headless sim reads (no shot/economy/putt effect), so a run with
+  or without him is byte-for-byte identical and no balance/death-spiral bar moves (the auto sim uses
+  `aiClub`, never the suggestion). It's a new loadout flag rebuilt from perks on resume (no save bump);
+  its caddy figure (`drawSuggestibleSam`) offers a club aloft with a yardage thought-bubble.
 - **Generic caddy 'service' perks gate behind hiring a named caddy.** `caddie-lesson` is `caddy:
   'service'`: `shopOffer` only surfaces a service perk once `namedCaddyOwned(perks)` is set — you need a
   caddy before they'll give you lessons. (It still stacks/works exactly as before once unlocked.)

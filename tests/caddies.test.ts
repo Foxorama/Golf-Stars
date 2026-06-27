@@ -7,6 +7,7 @@ import {
   namedCaddyOwned,
   netDispersion,
   shopItem,
+  startingLoadout,
   usableBag,
 } from '../src/sim/rpg/economy';
 import {
@@ -33,9 +34,9 @@ import { Rng } from '../src/sim/rng';
 const richRun = (seed: number) => ({ ...startRun(seed), credits: 1_000_000 });
 
 describe('named caddies — uniqueness & shop gating', () => {
-  it('the five named caddies are all flagged caddy:"named" and are epic/legendary', () => {
+  it('the named caddies are all flagged caddy:"named" and are epic/legendary', () => {
     expect(NAMED_CADDY_IDS.slice().sort()).toEqual(
-      ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'space-ducks'].sort(),
+      ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'space-ducks', 'suggestible-sam'].sort(),
     );
     for (const id of NAMED_CADDY_IDS) {
       const it = shopItem(id)!;
@@ -95,6 +96,19 @@ describe('caddy effects rebuild from perks (resume-safe, no save bump)', () => {
     expect(loadoutFromPerks(['dr-chipinski']).chipInBoost).toBeCloseTo(0.33);
     expect(loadoutFromPerks(['space-ducks']).caddyGuard).toEqual(SPACE_DUCKS_GUARD);
     expect(loadoutFromPerks(['convict-sheep']).caddyGuard).toEqual(CONVICT_SHEEP_GUARD);
+    expect(loadoutFromPerks(['suggestible-sam']).clubSuggest).toBe(true);
+  });
+
+  it('Suggestible Sam is a pure interactive QoL caddy — no sim effect, base flow has no suggestion', () => {
+    // The base loadout (no caddy) carries no club-suggestion flag, so the default play flow shows none.
+    expect(startingLoadout().clubSuggest).toBeUndefined();
+    // Sam is interactive-only: he sets no shot/economy field the headless sim reads, so a run with Sam
+    // and a run without him play byte-for-byte identically (the auto sim never reads clubSuggest).
+    const withSam = loadoutFromPerks(['suggestible-sam']);
+    expect(withSam.caddyGuard).toBeUndefined();
+    expect(withSam.chipInBoost).toBeUndefined();
+    expect(withSam.driverAnywhere).toBeUndefined();
+    expect(withSam.autoPutt).toBeUndefined();
   });
 
   it('snapshot/resume reconstructs a hired caddy', () => {

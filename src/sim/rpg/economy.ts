@@ -60,6 +60,14 @@ export interface PlayerLoadout {
    * miss tail back to the green mid-flight. Undefined = no guard.
    */
   caddyGuard?: CaddyGuard;
+  /**
+   * Suggestible Sam caddy (GS-caddy): hands you a club recommendation on the play screen — the 🎯
+   * Suggested button + the suggested-club readout, and the default-selected club becomes the
+   * green-coverage pick. Without a caddy reading the yardage there is NO suggestion: the default flow
+   * starts on a neutral club and you pick your own. INTERACTIVE-ONLY — the auto sim never reads it, so
+   * it can't shift scoring/determinism. Undefined/false = no suggestion.
+   */
+  clubSuggest?: boolean;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
@@ -212,6 +220,7 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'dr-chipinski': ['skill'],
   'space-ducks': ['control'],
   'convict-sheep': ['control'],
+  'suggestible-sam': ['skill'],
   // Spray-zone shapers (GS-dispersion-2) — accuracy/forgiveness, so 'control'.
   'sweet-spot': ['control'],
   'anti-duck-hook': ['control'],
@@ -338,6 +347,15 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, caddyGuard: CONVICT_SHEEP_GUARD, perks: [...m.perks, 'convict-sheep'] }),
+  },
+  {
+    id: 'suggestible-sam',
+    name: 'Suggestible Sam',
+    cost: 220,
+    desc: 'A caddy who reads the yardage and hands you the club — club suggestions on the play screen',
+    rarity: 'epic',
+    caddy: 'named',
+    apply: (m) => ({ ...m, clubSuggest: true, perks: [...m.perks, 'suggestible-sam'] }),
   },
 
   // --- Stackable upgrades (the endless credit sink + growing build) -----------

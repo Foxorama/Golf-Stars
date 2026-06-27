@@ -584,8 +584,18 @@ function playingBody(animating: boolean): string {
   }
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
   const usable = usableBag(bag, play.lie, state.run.loadout.driverAnywhere ?? false);
-  const suggested = v.lie === 'green' && usable.some((c) => c.id === 'putter') ? 'putter' : v.attackClubId;
-  if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = suggested;
+  // Club suggestions are a Suggestible Sam caddy perk (GS-caddy): without a caddy reading the yardage
+  // there is no 🎯 suggestion and the default-selected club is a neutral pick you override yourself.
+  const hasSuggest = !!state.run.loadout.clubSuggest;
+  const onGreenPutter = v.lie === 'green' && usable.some((c) => c.id === 'putter');
+  // The green-coverage suggestion (only surfaced/used with Sam). Putter is the obvious green default
+  // for everyone — that's not a "suggestion", just the only sensible flat-stick choice.
+  const suggested = onGreenPutter ? 'putter' : v.attackClubId;
+  // Default selection: putter on the green; with Sam the suggested club; otherwise the longest usable
+  // club (you read the distance + carry labels and cycle to the club you want).
+  const longestUsable = usable.filter((c) => c.id !== 'putter').reduce((a, b) => (b.carry > a.carry ? b : a), usable[0]!);
+  const defaultClubId = onGreenPutter ? 'putter' : hasSuggest ? v.attackClubId : longestUsable.id;
+  if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = defaultClubId;
   // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
   const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined };
   const spray = previewShot(play, decision, state.run.loadout);
@@ -617,7 +627,7 @@ function playingBody(animating: boolean): string {
     ${cbtn('◄', -1)}
     <b style="display:inline-block;min-width:6em;text-align:center;">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
     ${cbtn('►', 1)}
-    <button class="gs-btn${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🎯 Suggested</button>`;
+    ${hasSuggest ? `<button class="gs-btn${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🎯 Suggested</button>` : ''}`;
   const aimBtn = (key: string, label: string, sel: boolean, title = ''): string =>
     `<button class="gs-btn${sel ? ' gs-btn--on' : ''}" data-aim="${key}"${title ? ` title="${title}"` : ''}>${label}</button>`;
   const aimButtons = `
@@ -636,7 +646,7 @@ function playingBody(animating: boolean): string {
           <span style="color:#ffc454;">▮</span> ${pctRound(sh.hookL)}% hook / ${pctRound(sh.sliceR)}% slice ·
           <span style="color:#ff4c4c;">▮</span> ${pctRound(sh.duckHookL)}% duck-hook / ${pctRound(sh.shankR)}% shank ·
           carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
-          <span style="opacity:.6;"> · suggested: attack ${v.attackClubId} · safe ${v.safeClubId}${selFreeTarget ? ' · ✋ free aim' : ''}</span>
+          <span style="opacity:.6;">${hasSuggest ? ` · suggested: attack ${v.attackClubId} · safe ${v.safeClubId}` : ''}${selFreeTarget ? ' · ✋ free aim' : ''}</span>
         </p>
         <div class="gs-ctrlrow">${aimButtons}</div>
         <div class="gs-hitbar">
