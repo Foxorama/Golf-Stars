@@ -87,13 +87,34 @@ export function hasBackspin(nominalCarry: number): boolean {
 }
 
 /** Signed run-out (yards) for a shot: + runs forward, − checks/spins back. Combines the
- *  club's loft (clubRollFraction) with the landing surface and a little variance. */
-function rollYards(nominalCarry: number, lie: FeatureKind, carry: number, rng: Rng): number {
-  const frac = clubRollFraction(nominalCarry);
+ *  club's loft (clubRollFraction) with the landing surface and a little variance. A character's
+ *  `rollFracDelta` (GS-18) shifts the loft fraction — a negative delta adds backspin so the ball
+ *  checks/holds rather than running out. The rng draw is unchanged so a 0 delta is byte-for-byte. */
+function rollYards(nominalCarry: number, lie: FeatureKind, carry: number, rng: Rng, rollFracDelta = 0): number {
+  const frac = clubRollFraction(nominalCarry) + rollFracDelta;
   const surf = SURFACE_ROLL[lie] ?? 0.6;
   const raw = carry * frac * surf * rng.range(0.85, 1.15);
   return Math.max(-MAX_CHECK, Math.min(MAX_ROLL, raw));
 }
+
+/**
+ * A character's per-club shot modifiers (GS-18). Pure: a function of a club's nominal carry, so a
+ * golfer can hook the long clubs but stripe the irons, or back-spin the wedges. Shared by the auto
+ * sim (`executeShot`), the spray preview (`shotSpread`) and the interactive driver so all three
+ * agree. Resolved from the loadout's `characterId` at the run boundary — see rpg/characters.ts.
+ */
+export interface ClubShotMods {
+  /** Multiplies dispersion (lateral + distance) for this club. 1 = unchanged. */
+  dispMult: number;
+  /** Directional shot-shape bias (radians): + = fade (right), − = hook (left). 0 = straight. */
+  angleBias: number;
+  /** Added to the club's roll fraction: − = more backspin/check, + = more run-out. 0 = unchanged. */
+  rollFracDelta: number;
+}
+/** A per-club shot-mod function (nominal carry → mods). */
+export type ShotMods = (nominalCarry: number) => ClubShotMods;
+/** The neutral shot mods (no character / no shape) — every field a no-op. */
+export const NEUTRAL_SHOT_MODS: ClubShotMods = { dispMult: 1, angleBias: 0, rollFracDelta: 0 };
 
 /** A single putt's roll on the green, for the play view to animate (flat, no arc). */
 export interface PuttLog {
@@ -122,6 +143,8 @@ export interface PlayHoleOptions {
   dispersionMult?: number;
   /** Driver-on-Deck unlock level (0 = driver is tee-only). Gates off-deck driver use + penalty. */
   driverDeck?: number;
+  /** Character per-club shot modifiers (GS-18): shape bias, per-club dispersion, backspin. */
+  shotMods?: ShotMods;
 }
 
 /** Pin location: the generated flag within the green (GS-6), or the centroid if absent. */
@@ -318,6 +341,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       // off-deck driver carries the spray surcharge.
       dispersionMult: sprayMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * sprayMult,
       stats: opts.stats,
+      shotMods: opts.shotMods,
     }, rng);
     strokes += 1 + ex.penaltyStrokes;
     penalties += ex.penaltyStrokes;
@@ -380,6 +404,8 @@ export interface ExecOpts {
   carryMult: number;
   dispersionMult?: number;
   stats?: ClubStats;
+  /** Character per-club shot modifiers (GS-18): shape bias, per-club dispersion, backspin. */
+  shotMods?: ShotMods;
 }
 
 export interface ExecResult {
@@ -410,6 +436,12 @@ export function executeShot(
   const carryMult = opts.carryMult;
   const shotBearing = bearingDeg(from, target);
   const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult);
+  // Character per-club shape: keyed by the club's nominal carry (a hooky driver, striped irons,
+  // back-spun wedges). `dispMult === 1` passes the original dispersionMult through UNTOUCHED so a
+  // characterless shot stays byte-for-byte (undefined stays undefined, never `undefined * 1`).
+  const mods = opts.shotMods ? opts.shotMods(clubDist(club, opts.stats)) : NEUTRAL_SHOT_MODS;
+  const dispersionMult =
+    mods.dispMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * mods.dispMult;
   const result = resolveShot({
     from,
     aim,
@@ -417,7 +449,8 @@ export function executeShot(
     lie,
     wind: hole.wind,
     carryMult,
-    dispersionMult: opts.dispersionMult,
+    dispersionMult,
+    angleBias: mods.angleBias,
     stats: opts.stats,
     rng,
   });
@@ -430,7 +463,7 @@ export function executeShot(
   let roll = 0;
   if (!lieInfo(tdLie).penalty) {
     const nominal = clubDist(club, opts.stats);
-    roll = rollYards(nominal, tdLie, result.carry, rng);
+    roll = rollYards(nominal, tdLie, result.carry, rng, mods.rollFracDelta);
     if (roll !== 0) {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
@@ -505,7 +538,7 @@ export function shotSpread(
   lie: FeatureKind,
   target: Vec,
   club: Club,
-  opts: { carryMult?: number; dispersionMult?: number; stats?: ClubStats } = {},
+  opts: { carryMult?: number; dispersionMult?: number; stats?: ClubStats; shotMods?: ShotMods } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
   const li = lieInfo(lie);
@@ -513,7 +546,11 @@ export function shotSpread(
   const nominal = clubDist(club, opts.stats);
   const intended = nominal * li.carryMult * carryMult;
   const w = hole.wind ? playWind(hole.wind, shotBearing) : { along: 0, cross: 0 };
-  const dispMult = li.dispersionMult * (opts.dispersionMult ?? 1);
+  // The character's per-club shape (GS-18): its dispersion folds into the cone's width and its
+  // shot-shape bias ROTATES the cone's centre line, so a fade/hook is visible in the preview and
+  // the player can aim to compensate — wind reads true, and so does shape.
+  const mods = opts.shotMods ? opts.shotMods(nominal) : NEUTRAL_SHOT_MODS;
+  const dispMult = li.dispersionMult * (opts.dispersionMult ?? 1) * mods.dispMult;
   const prof = dispersionProfile(nominal);
   const along = w.along * TUNABLES.windCarryPerMph;
   const low = intended * prof.lowFrac;
@@ -521,7 +558,7 @@ export function shotSpread(
   const mean = Math.max(low, Math.min(high, intended * prof.meanFrac + along));
   return {
     origin: from,
-    bearing: shotBearing,
+    bearing: shotBearing + (mods.angleBias * 180) / Math.PI,
     expectedCarry: mean,
     carryLow: Math.max(0, low + along),
     carryHigh: high + along,

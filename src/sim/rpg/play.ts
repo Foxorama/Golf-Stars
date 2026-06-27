@@ -30,6 +30,7 @@ import type { HoleRecord } from '../score';
 import type { HoleStat } from '../stats';
 import type { Rng } from '../rng';
 import { netDispersion, puttSkillOf, usableBag, driverDeckSprayMult, type PlayerLoadout } from './economy';
+import { characterShotMods } from './characters';
 
 export type AimMode = 'attack' | 'safe';
 
@@ -129,6 +130,7 @@ export function previewShot(
   return shotSpread(state.hole, state.ball, state.lie, target, club, {
     carryMult,
     dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
+    shotMods: characterShotMods(loadout.characterId),
   });
 }
 
@@ -159,6 +161,7 @@ export function takeShot(
   const ex = executeShot(state.hole, state.ball, state.lie, target, club, {
     carryMult,
     dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
+    shotMods: characterShotMods(loadout.characterId),
   }, rng);
 
   const firstShot = state.shots.length === 0;

@@ -68,8 +68,22 @@ const BASE_FEEL: PlayFeel = {
   spaceFX: true,
 };
 
-// Loader-style cap colours so the play-view golfer reads as one of the intro's crew.
+// Loader-style cap colours so the play-view golfer reads as one of the intro's crew (the fallback
+// when no specific golfer is selected — the result-screen replay cycles them by shot).
 const GOLFER_COLORS = ['#d23f4f', '#3f78b8', '#e0a83f', '#46a05a'];
+
+/** The on-course golfer's look — cap/shirt/skin + a build scale (GS-18 character identity). */
+export interface GolferLook {
+  cap: string;
+  shirt: string;
+  skin: string;
+  /** Figure size scale (1 = default). */
+  build: number;
+}
+/** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
+function lookFromColor(color: string): GolferLook {
+  return { cap: color, shirt: color, skin: '#f0c49a', build: 1 };
+}
 
 /** Tiny deterministic PRNG (mulberry32) — the house style, so the ambient FX are stable. */
 function mulberry32(seed: number): () => number {
@@ -102,7 +116,7 @@ function drawGolfer(
   swing: number,
   follow: number,
   alpha: number,
-  color: string,
+  look: GolferLook,
 ): void {
   const u = h / 72;
   const S: Vec = [8, -50]; // shoulder pivot
@@ -147,7 +161,7 @@ function drawGolfer(
   ctx.stroke();
 
   // Torso (hip → shoulders, tilted toward the ball).
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = look.shirt;
   ctx.lineWidth = 12;
   ctx.beginPath();
   ctx.moveTo(2, -30);
@@ -167,7 +181,7 @@ function drawGolfer(
   ctx.fill();
 
   // Arms (shoulders → hands).
-  ctx.strokeStyle = '#f0c49a';
+  ctx.strokeStyle = look.skin;
   ctx.lineWidth = 4.5;
   ctx.beginPath();
   ctx.moveTo(S[0], S[1]);
@@ -175,11 +189,11 @@ function drawGolfer(
   ctx.stroke();
 
   // Head + cap (brim points down the line).
-  ctx.fillStyle = '#f3c9a0';
+  ctx.fillStyle = look.skin;
   ctx.beginPath();
   ctx.arc(12, -58, 7, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = color;
+  ctx.fillStyle = look.cap;
   ctx.beginPath();
   ctx.arc(12, -59, 7, Math.PI, Math.PI * 2);
   ctx.fill();
@@ -209,6 +223,8 @@ export interface PlayViewOptions {
   focus?: Vec;
   viewRadius?: number;
   follow?: boolean;
+  /** The selected golfer's look (GS-18). Absent → the loader-crew cap cycle (result-screen replay). */
+  golferLook?: GolferLook;
 }
 
 export interface PlayViewHandle {
@@ -414,9 +430,11 @@ export function mountPlayView(
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
       const lead = F.golfer ? F.swingLeadMs : 0;
       const flightElapsed = now - segStart - lead;
-      // Golfer size: nudged by zoom but clamped so it always reads next to the ball + flag.
-      const golferH = Math.max(30, Math.min(56, F.golferPx * Math.max(0.85, Math.min(1.5, proj.scale / 2.4))));
-      const gcol = GOLFER_COLORS[shotIndex % GOLFER_COLORS.length]!;
+      // The selected golfer's look (GS-18), or the loader-crew cap cycle when none is set.
+      const look = opts.golferLook ?? lookFromColor(GOLFER_COLORS[shotIndex % GOLFER_COLORS.length]!);
+      // Golfer size: nudged by zoom but clamped so it always reads next to the ball + flag; a
+      // bigger-built golfer stands a touch taller.
+      const golferH = Math.max(30, Math.min(60, F.golferPx * look.build * Math.max(0.85, Math.min(1.5, proj.scale / 2.4))));
 
       if (flightElapsed < 0) {
         // --- Windup: ball at rest at the address point, golfer addresses → top → contact.
@@ -426,7 +444,7 @@ export function mountPlayView(
         ctx.beginPath();
         ctx.ellipse(bx, by, 4, 2, 0, 0, Math.PI * 2);
         ctx.fill();
-        if (F.golfer) drawGolfer(ctx, bx, by, golferH, clamp01((now - segStart) / lead), 0, 1, gcol);
+        if (F.golfer) drawGolfer(ctx, bx, by, golferH, clamp01((now - segStart) / lead), 0, 1, look);
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = 'rgba(0,0,0,0.5)';
         ctx.beginPath();
@@ -460,7 +478,7 @@ export function mountPlayView(
         if (F.golfer && elapsed < F.followMs) {
           const [bx, by] = proj.project(shot.from);
           const fol = clamp01(elapsed / F.followMs);
-          drawGolfer(ctx, bx, by, golferH, 1, Math.max(0.001, fol), 1 - fol, gcol);
+          drawGolfer(ctx, bx, by, golferH, 1, Math.max(0.001, fol), 1 - fol, look);
         }
 
         // Shadow (fades as the ball climbs).

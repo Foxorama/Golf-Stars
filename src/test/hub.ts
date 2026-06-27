@@ -10,9 +10,10 @@
  *     from handicap + permanent meta-upgrades + shop perks and watch the cone tighten; run dozens
  *     of seeded runs to prove an upgrade raises mean per-stop Stableford.
  *
- * The upgrade / club / lie / format lists are read straight from the sim's own tables (CLUBS,
- * SHOP_ITEMS, META_UPGRADES, LIE_INFO, FORMATS), so new content shows up here automatically and
- * can't drift. This file is the imperative DOM/canvas shell; all maths lives in lab.ts (tested).
+ * The upgrade / club / lie / format / golfer lists are read straight from the sim's own tables
+ * (CLUBS, SHOP_ITEMS, META_UPGRADES, LIE_INFO, FORMATS, CHARACTERS), so new content shows up here
+ * automatically and can't drift. This file is the imperative DOM/canvas shell; all maths lives in
+ * lab.ts (tested).
  */
 
 import { CLUBS } from '../sim/clubs';
@@ -20,6 +21,7 @@ import { LIE_INFO } from '../sim/shot';
 import { SHOP_ITEMS, ownedCount, itemCap, type ShopItem } from '../sim/rpg/economy';
 import { META_UPGRADES, type MetaUpgrades } from '../sim/rpg/meta';
 import { FORMATS } from '../sim/rpg/formats';
+import { CHARACTERS } from '../sim/rpg/characters';
 import { dispersionStudy, buildLoadout, scoreHarness, histogram, type DispersionStudy } from './lab';
 import { drawScatter, drawHistogram } from './charts';
 
@@ -88,7 +90,7 @@ th{color:#9fb3bf;font-weight:500}
 `;
 
 // ── app state ──────────────────────────────────────────────────────────────────────────────
-const build = { handicap: 18, meta: {} as MetaUpgrades, perks: [] as string[] };
+const build = { handicap: 18, meta: {} as MetaUpgrades, perks: [] as string[], characterId: '' as string };
 
 // DOM handles filled on mount
 let stageEl: HTMLElement;
@@ -189,6 +191,11 @@ function loadoutGroup(): HTMLElement {
     oninput: (e) => { build.handicap = +(e.target as HTMLInputElement).value; hcapVal.textContent = String(build.handicap); refreshStats(); },
   });
 
+  // Selected golfer (GS-18) — bakes its bag/dispersion tweak into the build, and (in the dispersion
+  // study) its per-club fade/hook + spread shape, all read straight from the CHARACTERS table.
+  const charSel = selectFrom([['', 'None (neutral)'], ...CHARACTERS.map((c): [string, string] => [c.id, c.name])], '');
+  charSel.onchange = () => { build.characterId = charSel.value; refreshStats(); };
+
   // permanent meta-upgrade steppers (0..maxLevel) — derived from META_UPGRADES
   const metaRows = META_UPGRADES.map((u) =>
     stepper(u.name, u.desc, u.maxLevel, () => build.meta[u.id] ?? 0, (n) => { build.meta = { ...build.meta, [u.id]: n }; refreshStats(); }));
@@ -212,6 +219,7 @@ function loadoutGroup(): HTMLElement {
 
   statsBox = h('div', {});
   return group('Loadout · clubs / path / skill upgrades', [
+    h('div', { class: 'row' }, h('label', {}, 'Golfer'), charSel),
     h('div', { class: 'row' }, h('label', {}, 'Handicap'), hcap, hcapVal),
     h('div', { class: 'subhead' }, 'Permanent (meta · shards)'),
     ...metaRows,
@@ -236,6 +244,8 @@ function runDispersion(): void {
     lie: String(lieSel.value),
     wind: spd ? { spd, dir: +windDir.value || 0 } : undefined,
     loadout: (useBuild as HTMLInputElement).checked ? buildLoadout(build).loadout : undefined,
+    // Apply the golfer's per-club SHAPE (fade/hook + spread) only when using the built loadout.
+    characterId: (useBuild as HTMLInputElement).checked ? build.characterId : undefined,
   });
   showDispersion(study);
 }
@@ -257,7 +267,7 @@ function runScoring(): void {
   const seeds = +seedsSel.value;
   const formatId = String(formatSel.value);
   const base = scoreHarness({ seeds, formatId });
-  const withBuild = scoreHarness({ seeds, formatId, meta: build.meta, perks: build.perks });
+  const withBuild = scoreHarness({ seeds, formatId, meta: build.meta, perks: build.perks, characterId: build.characterId });
   showScoring(base, withBuild);
 }
 function scoringGroup(): HTMLElement {

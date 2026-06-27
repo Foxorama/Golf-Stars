@@ -17,9 +17,10 @@ function playStopInteractive(s: UiState): UiState {
   return s;
 }
 
-/** A run started from the title screen with the given format. */
+/** A run started from the title screen with the given format (and a golfer picked, GS-18). */
 function started(seed: number | string, format = 'flat'): UiState {
-  return reduce(initState(seed), { type: 'start', format });
+  const picked = reduce(initState(seed), { type: 'start', format });
+  return reduce(picked, { type: 'selectCharacter', characterId: 'feather-fade' });
 }
 
 /** Drive the reducer through one full stop (play → continue → shop → travel → next). */
@@ -34,12 +35,16 @@ function advanceStop(s: UiState, buys: string[] = []): UiState {
 }
 
 describe('ui reducer', () => {
-  it('a fresh seed opens on the title screen; start picks a format', () => {
+  it('a fresh seed opens on the title screen; start picks a format then a golfer', () => {
     const title = initState(1234);
     expect(title.screen).toBe('title');
-    const s = reduce(title, { type: 'start', format: 'ladder' });
+    const picked = reduce(title, { type: 'start', format: 'ladder' });
+    expect(picked.screen).toBe('character'); // GS-18: choose a golfer before the run begins
+    expect(picked.run.formatId).toBe('ladder');
+    const s = reduce(picked, { type: 'selectCharacter', characterId: 'longshot-larry' });
     expect(s.screen).toBe('intro');
     expect(s.run.formatId).toBe('ladder');
+    expect(s.run.loadout.characterId).toBe('longshot-larry');
     expect(s.course.holes.length).toBe(3); // ladder stop 0 = 3 par-3s
     expect(s.course.holes.every((h) => h.par === 3)).toBe(true);
   });

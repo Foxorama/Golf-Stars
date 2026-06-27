@@ -14,6 +14,7 @@
 
 import { CLUBS, clubById, type Club } from '../sim/clubs';
 import { resolveShot } from '../sim/shot';
+import { NEUTRAL_SHOT_MODS } from '../sim/round';
 import { makeRng } from '../sim/rng';
 import { simulateRun, type RunStrategy } from '../sim/rpg/run';
 import {
@@ -22,6 +23,7 @@ import {
   handicapDispersion,
   type PlayerLoadout,
 } from '../sim/rpg/economy';
+import { applyCharacter, characterShotMods } from '../sim/rpg/characters';
 import { metaStartingLoadout, type MetaUpgrades } from '../sim/rpg/meta';
 import type { Wind } from '../sim/course/contract';
 
@@ -125,6 +127,8 @@ export interface DispersionOpts {
   loadout?: PlayerLoadout;
   /** Biome carry multiplier (low-gravity worlds carry further). Default 1. */
   carryMult?: number;
+  /** Selected golfer (GS-18): its per-club shot SHAPE (fade/hook bias + per-club spread) is applied. */
+  characterId?: string;
   /** Seed for the swing stream — same seed ⇒ same pattern. Default derives from the club id. */
   seed?: number | string;
 }
@@ -135,7 +139,12 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
   const bag = opts.loadout?.bag ?? CLUBS;
   const club: Club | undefined = clubById(clubId, bag);
   if (!club) throw new Error(`unknown club "${clubId}"`);
-  const dispersionMult = opts.loadout ? netDispersion(opts.loadout) : 1;
+  // The golfer's per-club shape (GS-18): folds its dispersion into the spread and rotates the
+  // pattern by its fade/hook bias — exactly as executeShot does in the real round.
+  const shotMods = characterShotMods(opts.characterId);
+  const mods = shotMods ? shotMods(club.carry) : NEUTRAL_SHOT_MODS;
+  const baseMult = opts.loadout ? netDispersion(opts.loadout) : 1;
+  const dispersionMult = baseMult * mods.dispMult;
   const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
 
   const from: [number, number] = [0, 0];
@@ -151,6 +160,7 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       wind: opts.wind,
       carryMult: opts.carryMult,
       dispersionMult,
+      angleBias: mods.angleBias,
       rng,
     });
     intended = res.intended;
@@ -193,12 +203,15 @@ export interface BuildOpts {
   /** Explicit handicap override (else taken from the meta-baked starting loadout). */
   handicap?: number;
   meta?: MetaUpgrades;
+  /** Selected golfer (GS-18): its bag/dispersion tweak layers on the meta base, under the perks. */
+  characterId?: string;
   /** Owned shop-perk ids; repeat an id to stack it (Caddie Lesson ×3 = [id,id,id]). */
   perks?: string[];
 }
 
 export function buildLoadout(opts: BuildOpts = {}): BuiltLoadout {
-  let base = metaStartingLoadout(opts.meta ?? {});
+  // Meta base → the chosen golfer's starting tweak → handicap override → shop perks on top.
+  let base = applyCharacter(opts.characterId, metaStartingLoadout(opts.meta ?? {}));
   // The handicap slider sets the STARTING handicap; perks (Pro Coach, Caddie Lesson) then
   // reduce from it — so the override goes on the base, BEFORE perks fold on top.
   if (opts.handicap != null) base = { ...base, handicap: Math.max(0, Math.min(36, opts.handicap)) };
@@ -239,6 +252,8 @@ export interface ScoreOpts {
   baseSeed?: number;
   formatId?: string;
   meta?: MetaUpgrades;
+  /** Selected golfer (GS-18) baked into the simulated runs. */
+  characterId?: string;
   /** Shop-perk ids to buy each stop (repeat to stack). */
   perks?: string[];
 }
@@ -250,6 +265,7 @@ export function scoreHarness(opts: ScoreOpts = {}): ScoreResult {
   const strategy: RunStrategy = {
     formatId: opts.formatId,
     meta: opts.meta,
+    characterId: opts.characterId,
     shop: perks.length ? () => perks : undefined,
   };
 

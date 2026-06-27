@@ -237,6 +237,14 @@ export interface ShotInput {
   /** Player dispersion multiplier (<1 = a forgiveness/stability perk). */
   dispersionMult?: number;
   stats?: ClubStats;
+  /**
+   * Deterministic directional bias (radians) added to the random spray angle — a character's
+   * shot SHAPE (GS-18). + curves the ball toward the bearing's right (a fade), − toward the left
+   * (a hook). It shifts the MEAN of the angular draw, not its width, so a biased player still
+   * sprays the same amount around a curved mean line. Added to the SAME gaussian draw the
+   * unbiased shot uses (no extra rng), so a 0 bias is byte-for-byte identical to before.
+   */
+  angleBias?: number;
   rng: Rng;
 }
 
@@ -287,8 +295,10 @@ export function resolveShot(input: ShotInput): ShotResult {
     Math.min(intended * prof.highFrac, Math.max(0, carryNoisy)),
   );
   // SECOND rng draw (was the lateral offset) — keeps the draw count/order identical so the
-  // headless sim and the interactive driver stay byte-for-byte in step.
-  const thetaRand = rng.gaussian(0, angleSd);
+  // headless sim and the interactive driver stay byte-for-byte in step. A character's shot-shape
+  // bias (fade +, hook −) shifts the MEAN of this angle, not its spread, so the same draw still
+  // covers the spray and a 0 bias reproduces the unbiased shot exactly.
+  const thetaRand = (input.angleBias ?? 0) + rng.gaussian(0, angleSd);
   // Crosswind is a DETERMINISTIC lateral push (the AI already aims upwind to cancel it), kept
   // separate from the random angular spray so wind shifts the cone rather than widening it.
   const windLat = w.cross * TUNABLES.windLateralPerMph;

@@ -40,6 +40,7 @@ import { Rng } from '../sim/rng';
 
 export type Screen =
   | 'title'
+  | 'character'
   | 'intro'
   | 'playing'
   | 'result'
@@ -95,6 +96,7 @@ export interface UiState {
 
 export type Action =
   | { type: 'start'; format: string }
+  | { type: 'selectCharacter'; characterId: string } // pick a golfer, then begin the run
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
@@ -153,19 +155,28 @@ export function reduce(state: UiState, action: Action): UiState {
   switch (action.type) {
     case 'start': {
       if (state.screen !== 'title') return state;
-      // Bake the player's permanent meta-upgrades into the new run's start.
+      // Lock in the chosen format, then pick a golfer before the run begins (GS-18). The run is
+      // (re)built with the format now so the course preview works; the character layers on at
+      // `selectCharacter`. `run.formatId` carries the pending choice — no extra state needed.
       const run = startRun(state.run.seed, action.format, state.metaUpgrades);
       return {
         ...state,
         run,
         course: currentCourse(run),
-        screen: 'intro',
+        screen: 'character',
         played: undefined,
         lastResult: undefined,
         routes: undefined,
         resumable: undefined,
         viewHole: 0,
       };
+    }
+
+    case 'selectCharacter': {
+      if (state.screen !== 'character') return state;
+      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format chosen at 'start'.
+      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId);
+      return { ...state, run, course: currentCourse(run), screen: 'intro' };
     }
 
     case 'resume': {

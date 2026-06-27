@@ -31,6 +31,7 @@ import {
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
 import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
+import { applyCharacter, characterShotMods } from './characters';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome } from '../course/themes';
 
@@ -88,6 +89,7 @@ export function startRun(
   seed: number | string,
   formatId: string = DEFAULT_FORMAT,
   meta: MetaUpgrades = {},
+  characterId?: string,
 ): Run {
   const rng = new Rng(seed);
   return {
@@ -95,9 +97,10 @@ export function startRun(
     formatId,
     stopIndex: 0,
     distanceFromStart: 0,
-    // Permanent meta-progression bakes into the starting credits + loadout (GS-12).
+    // Permanent meta-progression bakes into the starting credits + loadout (GS-12); the chosen
+    // golfer's shape/bag tweak (GS-18) layers on top (and stamps its id for resume).
     credits: metaStartingCredits(meta),
-    loadout: metaStartingLoadout(meta),
+    loadout: applyCharacter(characterId, metaStartingLoadout(meta)),
     meta,
     firedEventIds: [],
     status: 'active',
@@ -192,6 +195,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
   const played = playCourse(course.holes, rng, {
     bag: run.loadout.bag,
     dispersionMult: netDispersion(run.loadout),
+    shotMods: characterShotMods(run.loadout.characterId),
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };
@@ -312,6 +316,8 @@ export interface RunSnapshot {
   pendingEventId?: string;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
   firedEventIds?: string[];
+  /** The selected golfer (GS-18) — re-applied to the loadout on resume. */
+  characterId?: string;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -325,6 +331,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     meta: { ...run.meta },
     pendingEventId: run.pendingEvent?.id,
     firedEventIds: [...run.firedEventIds],
+    characterId: run.loadout.characterId,
   };
 }
 
@@ -336,8 +343,9 @@ export function resumeRun(snap: RunSnapshot): Run {
     stopIndex: snap.stopIndex,
     distanceFromStart: snap.distanceFromStart,
     credits: snap.credits,
-    // Perks sit on top of the permanent meta base so progression survives a resume.
-    loadout: loadoutFromPerks(snap.perks ?? [], metaStartingLoadout(meta)),
+    // Perks sit on top of the permanent meta base, which already carries the chosen golfer's tweak
+    // (GS-18), so both layers survive a resume.
+    loadout: loadoutFromPerks(snap.perks ?? [], applyCharacter(snap.characterId, metaStartingLoadout(meta))),
     meta,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
@@ -374,6 +382,8 @@ export interface RunStrategy {
   formatId?: string;
   /** Permanent meta-upgrades baked into the starting loadout/credits; default = none. */
   meta?: MetaUpgrades;
+  /** Selected golfer id (GS-18); default = none (a neutral straight golfer). */
+  characterId?: string;
 }
 
 export interface RunOutcome {
@@ -387,7 +397,7 @@ export function simulateRun(
   strategy: RunStrategy = {},
   maxStops = 100,
 ): RunOutcome {
-  let run = startRun(seed, strategy.formatId, strategy.meta);
+  let run = startRun(seed, strategy.formatId, strategy.meta, strategy.characterId);
   const stops: StopResult[] = [];
   for (let i = 0; i < maxStops && run.status === 'active'; i++) {
     const played = playStop(run);
