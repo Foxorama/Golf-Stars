@@ -157,6 +157,42 @@ export function roughBaseFor(archetype: BiomeArchetype, deepen = 1): string {
   return tintHex(ARCHETYPE_TURF[archetype].rough.base, deepenTint(deepen));
 }
 
+// --- Deep-space backdrop per world (GS — "golf amongst the stars") ------------
+//
+// A travelling space golf course should read as a landmass floating in the void, not a green
+// rectangle. Each world gets a deep-space sky for the region BEYOND its play boundary: an opaque
+// near-black base (tinted toward the world), a soft nebula glow, and an atmospheric RIM where the
+// land meets space. The void already did this for its islands; this generalises it to all five so
+// every stop floats among its own constellation. Render-only — the sim never sees these.
+
+export interface SpaceLook {
+  /** Opaque deep base of space (very dark, world-tinted) — covers the whole view first. */
+  base: string;
+  /** A large soft nebula glow drifting over the base (rgba). */
+  nebula: string;
+  /** Atmospheric rim glow where the floating landmass meets the void (rgba). */
+  edge: string;
+}
+
+export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
+  // Verdant — a temperate night sky, faint blue nebula, soft green-lit shore.
+  verdant: { base: '#05101e', nebula: 'rgba(70,130,210,0.10)', edge: 'rgba(120,205,140,0.18)' },
+  // Desert — a dusty rust dusk over deep dark, warm tan shore.
+  desert: { base: '#130b07', nebula: 'rgba(205,120,55,0.11)', edge: 'rgba(225,165,95,0.18)' },
+  // Frost — an icy deep-blue void with a teal aurora smear, frosted shore.
+  frost: { base: '#040d17', nebula: 'rgba(80,205,205,0.10)', edge: 'rgba(155,235,228,0.18)' },
+  // Inferno — a near-black volcanic void lit by an ember-red nebula, molten-lit shore.
+  inferno: { base: '#0f0403', nebula: 'rgba(205,60,30,0.13)', edge: 'rgba(255,125,65,0.20)' },
+  // Void — the abyss: deepest base, violet nebula, luminous indigo shore.
+  void: { base: '#03020a', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(125,135,245,0.20)' },
+};
+
+/** A world's deep-space look, rarity-deepened (the hex base only; the rgba glows pass through). */
+export function spaceLookFor(archetype: BiomeArchetype, deepen = 1): SpaceLook {
+  const s = ARCHETYPE_SPACE[archetype];
+  return { base: tintHex(s.base, deepenTint(deepen)), nebula: s.nebula, edge: s.edge };
+}
+
 /** Sand: a lit base, a lip-shadow rim, a depression crescent and pale rake lines. */
 export const SAND = {
   base: '#e9d8a6', // keep the FILL.bunker value
