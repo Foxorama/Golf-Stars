@@ -62,17 +62,15 @@ describe('ui reducer', () => {
     expect(s.bestStableford).toBe(s.lastResult!.stableford);
   });
 
-  it('a freshly-begun hole shows the briefing splash; startHole (or a shot) dismisses it', () => {
+  it('playInteractive drops straight into the first hole (no briefing splash)', () => {
     let s = reduce(started(3), { type: 'playInteractive' });
     expect(s.screen).toBe('playing');
-    expect(s.holeSplash).toBe(true); // briefing shown before the first shot
-    // startHole clears it…
-    const started2 = reduce(s, { type: 'startHole' });
-    expect(started2.holeSplash).toBe(false);
-    // …and taking a shot also clears it (the headless flow is never blocked by the splash).
+    expect(s.play!.holeIndex).toBe(0);
+    expect(s.play!.strokes).toBe(0);
+    // The shot-by-shot flow plays immediately — taking a shot advances the hole.
     const v = shotView(s.play!, s.run.loadout);
     s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
-    expect(s.holeSplash).toBe(false);
+    expect(s.play!.strokes).toBeGreaterThan(0);
   });
 
   it('ignores actions that do not apply to the current screen', () => {
