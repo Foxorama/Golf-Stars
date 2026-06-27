@@ -219,7 +219,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     for (const s of opts.shots) {
       const [fx, fy] = place(s.from);
       const [tx, ty] = place(s.result.landing);
-      const [cx, cy] = place(flightControl(s.from, s.result.shotBearing, s.result.carry));
+      const [cx, cy] = place(flightControl(s.from, s.result.landing, s.result.shotBearing));
       parts.push(
         `<path d="M ${fx.toFixed(1)} ${fy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}" fill="none" stroke="#ffd84a" stroke-width="2" />`,
       );

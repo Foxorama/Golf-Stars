@@ -17,11 +17,13 @@ import {
   HOLE_OUT_RADIUS,
   MAX_OVER_PAR,
   layupTarget,
+  manualPutt,
   onePutt,
   pinOf,
   puttOutFrom,
   shotSpread,
   suggestPlayerClub,
+  type PuttControl,
   type ShotSpread,
   type PuttLog,
   type ShotLog,
@@ -235,12 +237,20 @@ export function awaitingPutt(state: HolePlay): boolean {
 }
 
 /** Resolve ONE manual putt toward the pin. Holes out, lags, or — if the stroke budget is
- *  spent — picks up. The interactive counterpart to the auto putt-out. */
-export function takePutt(state: HolePlay, loadout: PlayerLoadout, rng: Rng): HolePlay {
+ *  spent — picks up. The interactive counterpart to the auto putt-out. With a `control` (the
+ *  player's pace-meter input) it resolves by SKILL via `manualPutt`; without one it falls back to
+ *  the rng `onePutt` (used by the headless "auto-finish putts" path), keeping that byte-for-byte. */
+export function takePutt(
+  state: HolePlay,
+  loadout: PlayerLoadout,
+  rng: Rng,
+  control?: PuttControl,
+): HolePlay {
   if (state.done || state.lie !== 'green') return state;
   const pin = pinOf(state.hole);
   const maxStrokes = state.hole.par + MAX_OVER_PAR;
-  const p = onePutt(rng, state.ball, pin, puttSkillOf(loadout));
+  const skill = puttSkillOf(loadout);
+  const p = control ? manualPutt(rng, state.ball, pin, control, skill) : onePutt(rng, state.ball, pin, skill);
   let strokes = state.strokes + 1;
   let done = false;
   let holed = false;

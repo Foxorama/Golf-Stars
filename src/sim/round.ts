@@ -343,7 +343,7 @@ function dropPoint(hole: Hole, from: Vec, landing: Vec): Vec {
   return from;
 }
 
-/** Putting skill — a lower handicap / a caddie perk tightens these. */
+/** Putting skill — a lower handicap / a caddie / putter perk tightens these. */
 export interface PuttSkill {
   /** Make chance inside ~2.2 yds (default 0.85). */
   makeChance?: number;
@@ -351,6 +351,57 @@ export interface PuttSkill {
   lagFrac?: number;
   /** Lag std-dev as a fraction of the putt length (default 0.05). */
   lagSd?: number;
+  /** MANUAL putting only: half-width of the pace-meter "make" band, as a pace fraction (default
+   *  DEFAULT_MANUAL_BAND). Wider = more forgiving timing window. Putter upgrades raise it. */
+  manualBand?: number;
+}
+
+/** Manual-putt pace-meter tuning (shared by the resolver and the on-screen meter so they agree). */
+export const MANUAL_IDEAL_PACE = 1.06; // perfect pace: firm enough to reach the cup and drop just past
+export const MANUAL_PACE_MAX = 1.7; // top of the meter (a bold, runs-well-past stroke)
+export const DEFAULT_MANUAL_BAND = 0.13; // base make-band half-width (pace fraction)
+
+/** The player's manual-putt input from the pace meter. */
+export interface PuttControl {
+  /** Struck pace as a fraction of the distance to the cup: 1 ≈ dies at the hole, MANUAL_IDEAL_PACE
+   *  drops it, <1 leaves it short, >1 runs it past. Captured when the sweeping marker is tapped. */
+  pace: number;
+}
+
+/**
+ * Resolve ONE manual putt from the player's PACE input (skill, not pure luck). Auto-aimed at the cup;
+ * the player controls speed via the meter. Holing needs the pace inside the make-band AND the ball
+ * staying on-line — a small lateral wobble (one rng draw, scaled by distance and reduced by putter
+ * skill) means long putts can slide by even on good pace, while short putts drop reliably. A missed
+ * pace finishes short or long by the pace error; the lateral makes a miss read as sliding past. Pure
+ * given (from, pin, control, skill, rng).
+ */
+export function manualPutt(
+  rng: Rng,
+  from: Vec,
+  pinPt: Vec,
+  control: PuttControl,
+  skill: PuttSkill = {},
+): PuttLog {
+  const d = dist(from, pinPt) || 1e-6;
+  const band = skill.manualBand ?? DEFAULT_MANUAL_BAND;
+  const pace = Math.max(0, control.pace);
+  const paceErr = pace - MANUAL_IDEAL_PACE; // <0 short, >0 long (in pace units)
+  // Unit vector to the cup + its right-perpendicular (the wobble axis).
+  const ux = (pinPt[0] - from[0]) / d;
+  const uy = (pinPt[1] - from[1]) / d;
+  // Skill 0..1: a better putter (bigger band) wobbles less off-line.
+  const skillF = clamp01((band - DEFAULT_MANUAL_BAND) / 0.3);
+  const wobble = rng.gaussian(0, d * 0.05 * (1 - 0.6 * skillF));
+  // A make: pace inside the band AND the line holds (wobble within the cup). Short putts barely
+  // wobble, so a good pace drops; long putts wobble more, so good pace can still lip out.
+  if (Math.abs(paceErr) <= band && Math.abs(wobble) <= HOLE_OUT_RADIUS) {
+    return { from, to: pinPt, holed: true };
+  }
+  // Missed: it travels `pace × d` along the line (short or long) with the lateral wobble.
+  const travel = pace * d;
+  const to: Vec = [from[0] + ux * travel - uy * wobble, from[1] + uy * travel + ux * wobble];
+  return { from, to, holed: dist(to, pinPt) <= HOLE_OUT_RADIUS };
 }
 
 /**

@@ -9,6 +9,7 @@
 import { CLUBS, type Club } from '../clubs';
 import type { Rarity } from '../course/contract';
 import { combineShapeMods, type ShapeMod } from '../shot';
+import { DEFAULT_MANUAL_BAND } from '../round';
 
 export const HOLES_PER_STOP = 6;
 export const CREDIT_PER_POINT = 12;
@@ -63,6 +64,12 @@ export interface PlayerLoadout {
   minCarryBoost: number;
   /** Wedge distance-control: fraction the wedge carry window is tightened toward the mean (point 6). */
   wedgeWindow: number;
+  /**
+   * Putting skill (0 = base). Putter shop perks + the Putting Coach meta upgrade raise it; it widens
+   * the manual pace-meter make-band AND tightens auto-putt make%/lag (see puttSkillOf). Rebuilt from
+   * perks/meta on resume, so it needs no save bump.
+   */
+  puttBoost: number;
 }
 
 /** The driver club id (off-tee use is gated by the Driver-on-Deck tier). */
@@ -128,6 +135,7 @@ export function startingLoadout(): PlayerLoadout {
     shapeMod: {},
     minCarryBoost: 0,
     wedgeWindow: 0,
+    puttBoost: 0,
   };
 }
 
@@ -193,6 +201,8 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'lucky-coin': ['economy'],
   'fortune-chip': ['economy'],
   'auto-caddie': ['putting'],
+  'putting-grip': ['putting'],
+  'tour-putter': ['putting'],
   'driver-deck-1': ['distance'],
   'driver-deck-2': ['distance'],
   'driver-deck-3': ['distance'],
@@ -255,6 +265,24 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: '−6 handicap (tighter, more accurate shots)',
     rarity: 'epic',
     apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 6), perks: [...m.perks, 'pro-coach'] }),
+  },
+  {
+    id: 'putting-grip',
+    name: 'Pro Putting Grip',
+    cost: 90,
+    desc: 'Steadier stroke — widens the make window & tightens your lag · stacks',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 4,
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.12, perks: [...m.perks, 'putting-grip'] }),
+  },
+  {
+    id: 'tour-putter',
+    name: 'Tour Putter',
+    cost: 170,
+    desc: 'A precision flat-stick — a big lift to your putting make window & lag',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.26, perks: [...m.perks, 'tour-putter'] }),
   },
   {
     id: 'auto-caddie',
@@ -474,10 +502,25 @@ export function canBuy(item: ShopItem, owned: number, credits: number): boolean 
   return owned < itemCap(item) && credits >= itemCost(item, owned);
 }
 
-/** Putting skill from the loadout: the Auto-Caddie sinks more and lags tighter. */
-export function puttSkillOf(loadout: PlayerLoadout): { makeChance?: number; lagFrac?: number; lagSd?: number } {
-  if (loadout.perks.includes('auto-caddie')) return { makeChance: 0.92, lagFrac: 0.05, lagSd: 0.035 };
-  return {};
+/**
+ * Putting skill from the loadout. A base loadout (no putter perks, no caddie) returns `{}` so the
+ * headless sim + auto-putt stay byte-for-byte. Putter upgrades (`puttBoost`) and the Auto-Caddie both
+ * sink more and lag tighter (auto-putt) AND widen the manual pace-meter make-band (`manualBand`).
+ */
+export function puttSkillOf(
+  loadout: PlayerLoadout,
+): { makeChance?: number; lagFrac?: number; lagSd?: number; manualBand?: number } {
+  const boost = loadout.puttBoost ?? 0;
+  const caddie = loadout.perks.includes('auto-caddie');
+  if (boost === 0 && !caddie) return {};
+  // Auto-Caddie is a solid baseline on top of any putter upgrades (preserves its ~0.92 make).
+  const b = caddie ? Math.max(boost, 0.6) : boost;
+  return {
+    makeChance: Math.min(0.98, 0.85 + b * 0.13),
+    lagFrac: Math.max(0.03, 0.07 - b * 0.035),
+    lagSd: Math.max(0.02, 0.05 - b * 0.03),
+    manualBand: Math.min(0.4, DEFAULT_MANUAL_BAND + b * 0.18),
+  };
 }
 
 export function shopItem(id: string): ShopItem | undefined {

@@ -188,11 +188,23 @@ This game lives or dies on three axes — put every change through all three bef
   the ball goes) AND the renderer (draws it) so the graphic IS the physics — a ball drawn clearing a
   tree is a ball the sim let through. Three coupled pieces: (1) **Curved path** — the flight LAUNCHES
   along the shot bearing (the aim line) and curves to the offset landing via a quadratic Bézier whose
-  control sits straight ahead at full carry (`flightControl`/`flightGround`); a straight shot barely
-  bows, a fade/hook/slice bows toward its finish (the banana). The lateral offset is still
-  `resolveShot`'s angular spray — this only shapes the PATH between aim and landing, so determinism is
-  untouched. The play view (`sampleCurvedFlight`) and the SVG map shot-lines (`M…Q…` paths) both draw
-  it. (2) **Loft-scaled apex** — `arcApex(carry, nominalCarry)`: short/lofted clubs balloon (higher
+  control sits straight ahead at the landing's FORWARD DEPTH — its projection onto the aim line, NOT
+  the full carry (`flightControl(from, landing, bearingDeg)`/`flightGround`); a straight shot barely
+  bows, a fade/hook/slice bows toward its finish (the banana). GOTCHA (fixed): the control USED to sit
+  at full carry straight ahead, but an angled miss's landing is SHORTER in depth than its carry
+  (carry·cosθ), so the control sat BEYOND the landing and the curve overshot forward then pulled back —
+  the ball "slid out to the side / did a loop-de-loop" near touchdown. Projecting the control onto the
+  aim line makes forward progress MONOTONIC (the lateral t² banana is identical), killing the loop. The
+  lateral offset is still `resolveShot`'s angular spray — this only shapes the PATH between aim and
+  landing, so determinism is untouched, BUT it changes the curve the tree-knockdown walk follows, so it
+  was re-validated against the no-death-spiral bar (lateral profile unchanged → knockdown ≈ unchanged).
+  The play view (`sampleCurvedFlight`) and the SVG map shot-lines (`M…Q…` paths) both draw it; the play
+  view also CLEARS the aerial trail at touchdown so the banana doesn't visually kink into the diagonal
+  run-out. (4) **Bounce/run-out animation (`playView`)** scales with the actual COURSE-YARD roll, not
+  screen px: `rollDur = roll·rollMsPerYard` (zoom-independent) and the bounce amplitude + hop count
+  scale with the run AND surface firmness (a long firm run skips tall and several times; a short soft
+  check plops once) — so "landing & run match the distance travelled". Pure feel on `_gsFeel` (no new
+  `_gs*` flag). (2) **Loft-scaled apex** — `arcApex(carry, nominalCarry)`: short/lofted clubs balloon (higher
   peakFrac), long clubs bore. Stored on `ShotResult.apex` so render + sim use the EXACT same arc. (3)
   **Tree knockdown** — a low ball that crosses a treeline below its canopy (`canopyHeight` ∝ blob size,
   `OBSTACLE_KINDS`) is knocked into the woods: `flightKnockdown` walks the curved path checking arc
@@ -347,18 +359,26 @@ This game lives or dies on three axes — put every change through all three bef
   scoring harness must club shots with **`netDispersion(loadout)`** (handicap × equipment), not raw
   `dispersionMult` — else handicap perks like Caddie Lesson are invisible to the test.
 
-## Putting (auto vs manual; legendary auto-putt)
-- **`onePutt` is the single putt model**; `puttOut`/`puttOutFrom` step it (auto), `takePutt`
-  strokes ONE (manual). A `PuttSkill` (make%/lag) tunes it — base 0.85, the Auto-Caddie
-  perk 0.92/tighter. Manual stepping reproduces auto putt-out byte-for-byte at a fixed seed
-  (same rng order) — `tests/putting.test.ts` guards this.
-- **Auto-putt is a UiState toggle** (`autoPutt`, default ON). `takeShot(…, autoPutt)` resolves
-  the green automatically when on; otherwise it leaves the ball on the green and the UI shows
-  the manual putt loop (`awaitingPutt` → `putt` action). The toggle is per-session (not saved).
-- **Legendary `auto-caddie`** sets `loadout.autoPutt` (persisted via perks) AND grants the
-  better `puttSkillOf` — so it both automates and *improves* putting (worth a legendary).
-  Owning it locks the toggle ON. Design intent: later, flip the DEFAULT to manual so the
-  perk becomes the real unlock; the toggle is the interim control.
+## Putting (manual pace-meter is the default; auto = the Auto-Caddie unlock)
+- **Two putt models, one shared `PuttSkill`.** AUTO putting is the rng `onePutt` (make%/lag);
+  `puttOut`/`puttOutFrom` step it; it's what the headless sim and `takeShot(…, autoPutt)` use.
+  MANUAL putting is `manualPutt` — SKILL, not luck: the player controls PACE via an on-screen meter
+  (`render/puttMeter.ts`, a Canvas2D side-effect like the play view), auto-aimed at the cup. Stop the
+  sweeping marker inside the green MAKE band to drop it; too soft leaves it short, too firm runs past;
+  a small distance-scaled lateral wobble (one rng draw) means long putts can lip out on good pace while
+  short ones drop reliably. Constants `MANUAL_IDEAL_PACE`/`MANUAL_PACE_MAX`/`DEFAULT_MANUAL_BAND` are
+  shared by the resolver and the meter so they agree. `takePutt(state, loadout, rng, control?)`:
+  `control` (the pace) → `manualPutt`; no control → `onePutt` (the "auto-finish putts" path + tests),
+  so auto stays byte-for-byte. The reducer `putt` action carries `control?: PuttControl`.
+- **Manual is the DEFAULT now** (`UiState.autoPutt` defaults FALSE). Toggle it ON, or own the legendary
+  **`auto-caddie`** (sets `loadout.autoPutt`, locks the toggle ON) — so the perk is the real "automate
+  it" unlock (the design intent finally realised). The toggle is per-session (not saved).
+- **Putting is upgradeable (`loadout.puttBoost`, 0 = base).** `puttSkillOf` derives make%/lag AND the
+  manual make-band width from `puttBoost` + auto-caddie; a BASE loadout returns `{}` so auto/headless
+  stay byte-for-byte. Shop perks **Pro Putting Grip** (stackable) + **Tour Putter** raise `puttBoost`;
+  the meta upgrade **Putting Coach** bakes it into the starting loadout. `puttBoost` is rebuilt from
+  perks/meta on resume, so NO save bump. `tests/manual-putt.test.ts` guards the pace model + that the
+  upgrades widen the band and sink more putts; `tests/putting.test.ts` still guards the auto model.
 
 ## Testing (regression guard)
 - `tests/` (vitest) imports the pure `src/sim/` modules directly and asserts on seeded runs.
@@ -520,7 +540,14 @@ This game lives or dies on three axes — put every change through all three bef
   the first shot — render-only, the `shot` action is never blocked so the headless flow/tests are
   intact. The **shot-result popup** (a settle-delayed modal card + Continue after each non-terminal
   shot) and its timer are an `app.ts` VIEW effect (module vars, cleared by any dispatch), NOT reducer
-  state — only `holeSplash` is reducer state. **Free-aim** (`ShotDecision.target`, GS-mechanics #10):
+  state — only `holeSplash` is reducer state. The popup card is the RICH `shotCardHTML(shot, {distToPin})`:
+  it leads with a procedural **ball-at-rest vignette** (`render/restArt.ts` — a self-contained SVG of the
+  ball on the surface it finished on, or the HAZARD alone when the ball wouldn't be visible: water/lava/
+  void show no ball, OB shows it beyond the stakes, a holed shot drops into the cup — house rule, no 404
+  asset) + club, finish (lie→lie), total/carry/roll, distance left, accuracy. To stop chipping/putting
+  cutting to the follow-up too fast, `onDone` HOLDS a beat: a terminal shot waits `resultHoldMs` before
+  the hole-complete screen; a non-terminal full shot pops the card; a mid-hole putt waits `puttHoldMs`
+  (all `_gsFeel` sub-fields, no new `_gs*` flag). **Free-aim** (`ShotDecision.target`, GS-mechanics #10):
   tap/drag the map sets a course-space target (overrides attack/safe), unprojected from the pointer
   via a reconstructed decision projector and clamped to the longest club's reach; pointer move/up
   listen on `window` so a drag survives the per-frame re-render. **Mobile layout**: a responsive

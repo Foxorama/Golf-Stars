@@ -33,10 +33,17 @@ interface PlayFeel extends FlightFeel {
   trailLen: number;
   /** Pause between shots (ms). */
   gapMs: number;
-  /** Bounce hop height (course yards) as the ball lands & runs out. */
+  /** Bounce hop height (course yards) at a full-energy run-out (scaled down for short rolls). */
   bounceAmp: number;
-  /** Number of decaying bounces during the run-out. */
+  /** Max number of decaying bounces during a long, firm run-out (short rolls get fewer). */
   bounces: number;
+  /** Run-out animation ms per course-yard of roll (so a long run genuinely takes longer to settle). */
+  rollMsPerYard: number;
+  /** Clamp on the run-out animation duration (ms). */
+  rollMinMs: number;
+  rollMaxMs: number;
+  /** Roll distance (course yards) at which the bounce reaches full amplitude / hop count. */
+  bounceRefRun: number;
   /** Pause (ms) the ball sits at rest so you can read where it finished. */
   restHoldMs: number;
   /** Draw the little golfer who addresses + swings before each full shot. */
@@ -57,8 +64,12 @@ const BASE_FEEL: PlayFeel = {
   shakeAmp: 7,
   trailLen: 18,
   gapMs: 170,
-  bounceAmp: 4,
-  bounces: 2,
+  bounceAmp: 5,
+  bounces: 4,
+  rollMsPerYard: 20,
+  rollMinMs: 150,
+  rollMaxMs: 900,
+  bounceRefRun: 32,
   restHoldMs: 480,
   golfer: true,
   golferPx: 40,
@@ -293,6 +304,7 @@ export function mountPlayView(
   let shake = 0; // 0..1, decays
   let done = false;
   let lastImpactShot = -1; // shot whose landing impact/hold has already been triggered
+  let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
 
   function reset(now: number): void {
     shotIndex = 0;
@@ -303,6 +315,7 @@ export function mountPlayView(
     shake = 0;
     done = false;
     lastImpactShot = -1;
+    lastRollClearShot = -1;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -445,12 +458,16 @@ export function mountPlayView(
       const peak = shot.result.apex;
       const bearing = shot.result.shotBearing;
       const flightDur = flightDurationMs(carry);
-      // Roll-out duration scales with the on-screen roll distance.
       const [tdx, tdy] = proj.project(touchdown);
       const [rsx, rsy] = proj.project(rest);
-      const rollPx = Math.hypot(rsx - tdx, rsy - tdy);
-      // Run-out duration scales with the on-screen roll (forward OR backspin check-back).
-      const rollDur = Math.abs(shot.roll ?? 0) > 0.3 ? Math.max(140, Math.min(480, rollPx * 9)) : 0;
+      // Run-out duration scales with the actual COURSE-YARD roll (zoom-independent), so a long run
+      // genuinely takes longer to settle than a short check — the "landing & run match the distance"
+      // ask. (The old screen-px scaling ran a 20yd roll at wildly different speeds at different zoom.)
+      const rollYds = Math.abs(shot.roll ?? 0);
+      const rollDur = rollYds > 0.3 ? Math.max(F.rollMinMs, Math.min(F.rollMaxMs, rollYds * F.rollMsPerYard)) : 0;
+      // How energetic the run-out is, 0..~1.4: a long run bounces bigger and more often than a short
+      // plop. Combined with surface firmness below.
+      const runScale = clamp01(rollYds / F.bounceRefRun) * 1.4;
       // A swing windup leads each full shot: the ball rests at address while the golfer winds
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
       const lead = F.golfer ? F.swingLeadMs : 0;
@@ -482,7 +499,7 @@ export function mountPlayView(
         let ground: Vec;
         let height: number;
         if (elapsed < flightDur) {
-          const s = sampleCurvedFlight(shot.from, touchdown, bearing, carry, elapsed / flightDur, peak);
+          const s = sampleCurvedFlight(shot.from, touchdown, bearing, elapsed / flightDur, peak);
           ground = s.ground;
           height = s.height;
         } else {
@@ -491,13 +508,24 @@ export function mountPlayView(
           // still for restHoldMs so you can read the finish. The bounce reads the LANDING surface's
           // firmness: a firm fairway/ice skips high and runs (taller hop, an extra bounce), thick
           // rough or a bunker plops dead (a low, quickly-damped hop).
+          // Reset the trail once as the ball touches down: the aerial banana trail stays where it
+          // landed and the run-out draws its own short ground trail, so the curve never appears to
+          // kink sideways into the diagonal roll (the "loop-de-loop" read).
+          if (lastRollClearShot !== shotIndex) {
+            lastRollClearShot = shotIndex;
+            trail = [];
+          }
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
           const e = easeOutCubic(rt);
           ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
           const firm = surfaceFirmness(shot.landLie ?? shot.lieTo);
-          const hops = F.bounces * (0.6 + 0.8 * firm); // firm → more, distinct hops; soft → ~one plop
-          const amp = F.bounceAmp * (0.35 + 1.15 * firm); // firm → tall skip; soft → low
-          const damp = Math.pow(1 - rt, 1.6 - 0.7 * firm); // soft decays faster (a dead plop)
+          // Bounce reads BOTH the landing surface's firmness AND how far the ball runs: a long firm
+          // run skips tall and hops several times; a short soft check plops once and dies. Hop count
+          // and amplitude both scale with the run, and the (1−rt) envelope makes the FIRST hop the
+          // biggest so it visibly decays into the roll (not a static, uniform jitter).
+          const hops = Math.max(1, Math.round(1 + runScale * F.bounces * (0.45 + 0.7 * firm)));
+          const amp = F.bounceAmp * (0.28 + 1.1 * firm) * (0.3 + 0.85 * runScale);
+          const damp = Math.pow(1 - rt, 1.5 - 0.7 * firm); // soft decays faster (a dead plop)
           height = amp * Math.abs(Math.sin(rt * Math.PI * hops)) * damp;
         }
 

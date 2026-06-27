@@ -70,13 +70,21 @@ export function arcHeight(apex: number, t: number): number {
 const deg2rad = (d: number): number => (d * Math.PI) / 180;
 
 /**
- * The Bézier CONTROL point: straight ahead of the ball, down the shot bearing, at the full carry
- * distance. With P0=from and P2=landing, a quadratic Bézier through this control launches along
- * the bearing (the aim line) and curves to the offset landing — the fade/hook banana. Pure.
- */
-export function flightControl(from: Vec, bearingDeg: number, carry: number): Vec {
+ * The Bézier CONTROL point: straight ahead of the ball, down the shot bearing, at the landing's
+ * FORWARD DEPTH (its projection onto the aim line) — NOT the full carry. With P0=from and P2=landing,
+ * a quadratic Bézier through this control launches along the bearing (the aim line) and curves to the
+ * offset landing — the fade/hook banana. Putting the control at the landing's depth (rather than full
+ * carry) makes the path's forward progress MONOTONIC: an angled miss's landing is shorter in depth
+ * than its carry, so a full-carry control sat BEYOND the landing and the curve overshot then pulled
+ * back — the ball "slid out to the side / looped" near touchdown. The projected control removes that
+ * overshoot while keeping the identical lateral (t²) banana. Clamp the depth ≥ 0 so a freak backward
+ * landing can't invert the control. Pure. */
+export function flightControl(from: Vec, landing: Vec, bearingDeg: number): Vec {
   const br = deg2rad(bearingDeg);
-  return [from[0] + Math.sin(br) * carry, from[1] + Math.cos(br) * carry];
+  const ux = Math.sin(br);
+  const uy = Math.cos(br);
+  const fwd = Math.max(0, (landing[0] - from[0]) * ux + (landing[1] - from[1]) * uy);
+  return [from[0] + ux * fwd, from[1] + uy * fwd];
 }
 
 /** Quadratic Bézier point at `t` ∈ [0,1] through (from → control → landing). Pure. */
@@ -173,7 +181,7 @@ export function flightKnockdown(
   }
   if (candidates.length === 0) return null;
 
-  const control = flightControl(from, bearingDeg, carry);
+  const control = flightControl(from, landing, bearingDeg);
   const apex = arcApex(carry, nominalCarry);
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
