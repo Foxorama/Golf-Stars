@@ -34,7 +34,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 3;
+export const GENERATOR_VERSION = 4;
 
 export interface GenerateOptions {
   /** Number of holes (default 1 — the vertical slice). */
@@ -81,8 +81,12 @@ function blobPoly(center: Vec, radius: number, n: number, jitter: number, rng: R
   return pts;
 }
 
-/** Build a corridor polygon of given half-width around a centreline polyline. */
-function corridorPoly(line: Vec[], halfWidth: number): Vec[] {
+/**
+ * Build a corridor polygon around a centreline polyline. `halfWidth` is either a single
+ * value (a constant-thickness corridor) or one value PER centreline point (a variable-
+ * thickness corridor — wide landing zones pinched by the odd neck).
+ */
+function corridorPoly(line: Vec[], halfWidth: number | number[]): Vec[] {
   const left: Vec[] = [];
   const right: Vec[] = [];
   for (let i = 0; i < line.length; i++) {
@@ -96,10 +100,18 @@ function corridorPoly(line: Vec[], halfWidth: number): Vec[] {
     const nx = -dy; // left normal
     const ny = dx;
     const p = line[i]!;
-    left.push([p[0] + nx * halfWidth, p[1] + ny * halfWidth]);
-    right.push([p[0] - nx * halfWidth, p[1] - ny * halfWidth]);
+    const hw = typeof halfWidth === 'number' ? halfWidth : halfWidth[i]!;
+    left.push([p[0] + nx * hw, p[1] + ny * hw]);
+    right.push([p[0] - nx * hw, p[1] - ny * hw]);
   }
   return [...left, ...right.reverse()];
+}
+
+/** Resample a centreline into `n` parametric-evenly-spaced points (via `centrePoint`). */
+function densifyCentreline(line: Vec[], n: number): Vec[] {
+  const pts: Vec[] = [];
+  for (let i = 0; i < n; i++) pts.push(centrePoint(line, n === 1 ? 0 : i / (n - 1)));
+  return pts;
 }
 
 /**
@@ -138,8 +150,12 @@ function generateHole(
 
   const tee: Vec = [0, 0];
 
-  // Dogleg severity scales with biome bias × wildness.
-  const doglegMag = biome.doglegBias * wildness * rng.range(0.1, 0.5) * length;
+  // Dogleg severity scales with biome bias, but with a floor so the hole BENDS (left or
+  // right — `bendSide`) even on calm early stops: the old `× wildness` made every low-wildness
+  // hole dead straight. The floor is 35% of full at wildness 0, ramping to the same full
+  // severity at wildness 1 (so max-wildness balance is unchanged).
+  const doglegFactor = 0.35 + 0.65 * wildness;
+  const doglegMag = biome.doglegBias * doglegFactor * rng.range(0.1, 0.5) * length;
   const bendSide = rng.bool() ? 1 : -1;
   const midY = length * rng.range(0.45, 0.6);
   const mid: Vec = [bendSide * doglegMag, midY];
@@ -147,10 +163,34 @@ function generateHole(
 
   const centreline: Vec[] = par === 3 ? [tee, green] : [tee, mid, green];
 
-  // Corridor tightens with biome width mult and wildness.
-  const widthMult = biome.fairwayWidthMult * (1 - wildness * 0.25);
-  const fairwayHalfWidth = (par === 3 ? 16 : 22) * widthMult * rng.range(0.9, 1.2);
-  const fairway: Feature = { kind: 'fairway', poly: corridorPoly(centreline, fairwayHalfWidth) };
+  // Fairway corridor: WIDE and generous on early/easy stops, tightening as wildness climbs —
+  // `widthScale` lerps 1.6 (early) → 0.75 (far, = the old constant), so the late-game balance
+  // bar is unchanged while early holes become much more forgiving. The thickness also UNDULATES
+  // along the hole (wide landing zones, the odd pinched neck), most dramatically early. The
+  // corridor is built from a densified centreline so its edge can vary smoothly.
+  const widthScale = 1.6 - 0.85 * wildness;
+  const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
+  const segs = par === 3 ? 9 : 15;
+  const dense = densifyCentreline(centreline, segs);
+  // Seeded thickness wave + one localized pinch; amplitude is early-heavy (calm holes get the
+  // wildest variation, brutal holes flatten toward a uniform — but tight — corridor).
+  const ampFrac = 0.18 + 0.32 * (1 - wildness);
+  const wavePhase = rng.range(0, Math.PI * 2);
+  const waveLobes = rng.range(1.3, 2.7);
+  const pinchAt = rng.float();
+  const pinchDepth = 0.3 * (1 - 0.5 * wildness) * rng.float();
+  const halfWidths = dense.map((_, i) => {
+    const u = i / (segs - 1);
+    const wave = Math.sin(wavePhase + u * Math.PI * waveLobes);
+    const pinch = Math.exp(-((u - pinchAt) ** 2) / 0.012) * pinchDepth;
+    // Never collapse the corridor: clamp the local half-width to ≥ 55% of base.
+    return Math.max(baseHalf * 0.55, baseHalf * (1 + wave * ampFrac - pinch));
+  });
+  const fairway: Feature = { kind: 'fairway', poly: corridorPoly(dense, halfWidths) };
+  // Hazard placement + the fairness validator both reason about the corridor's WIDEST point
+  // (validateFairness recovers the max lateral extent of the fairway poly), so use that here —
+  // penalty hazards then clear the widest part and stay provably fair.
+  const fairwayHalfWidth = Math.max(...halfWidths);
 
   const teeBox: Feature = { kind: 'tee', poly: blobPoly(tee, 8, 8, 0, rng) };
   const greenR = rng.range(11, 16);

@@ -157,7 +157,10 @@ describe('ui reducer', () => {
   });
 
   it('a missed cut awards Star Shards (GS-12)', () => {
-    const s = reduce(started(9), { type: 'play' }); // seed 9 misses the opening cut
+    // Walk the run until a cut is missed (the gentle opening cut is now reliably cleared, so
+    // failure comes a few stops deep as the cut ramps) — the missed cut must award shards.
+    let s = started(9);
+    for (let i = 0; i < 100 && s.screen !== 'gameover'; i++) s = advanceStop(s);
     expect(s.screen).toBe('gameover');
     expect(s.lastRunShards).toBeGreaterThan(0);
     expect(s.shards).toBe(s.lastRunShards);

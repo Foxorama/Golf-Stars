@@ -578,9 +578,17 @@ export function greenDepth(hole: Hole, ball: Vec): { front: number; back: number
  * the auto `aiClub` (shortest club that just reaches — tuned for the headless balance), this
  * reasons about green COVERAGE:
  *   - green unreachable → the longest usable club (give it your best go);
- *   - green reachable   → the LONGEST club whose spread can still reach the green's FRONT
- *     (`carryLow ≤ distToFront`), so the whole green stays inside the landing window — you may
- *     overshoot the back, but you never come up short of the front.
+ *   - green reachable   → the LONGEST club whose EXPECTED carry still lands on the green
+ *     (`expectedCarry ≤ distToBack`), so you take the most club you can without flying the
+ *     green on a normal strike — overshooting the front is fine, but the typical shot won't
+ *     sail the back.
+ *
+ * The earlier rule gated on `carryLow ≤ distToFront` (the club's WORST-case carry). That let
+ * the driver in for any approach long enough that the driver's worst miss could still come up
+ * short of the front — even though the driver's MEAN carry flew 60+ yards past the green. The
+ * symptom was "the suggestion keeps handing me the driver": it was clubbing off the minimum
+ * carry instead of the expected one. Gating on the expected carry fixes it.
+ *
  * Pure; uses the same `shotSpread` the cone draws so the suggestion reads true. Does NOT touch
  * the auto sim.
  */
@@ -595,7 +603,7 @@ export function suggestPlayerClub(
   // swaps to the putter itself once on the green).
   const cand = bag.filter((c) => c.id !== 'putter');
   if (cand.length === 0) return bag[0]!;
-  const { front } = greenDepth(hole, ball);
+  const { front, back } = greenDepth(hole, ball);
   const target = hole.green;
   const spreadOf = (c: Club) =>
     shotSpread(hole, ball, lie, target, c, {
@@ -608,13 +616,13 @@ export function suggestPlayerClub(
   // Unreachable: even the longest club's best carry can't get to the front → swing the longest.
   if (spreadOf(longest).carryHigh < front) return longest;
 
-  // Reachable: longest club that still covers the front (carryLow ≤ front). Walk shortest→longest
-  // and keep the last qualifier; if every club overshoots the front (ball hard by the green),
-  // fall back to the shortest club (least overshoot — basically a chip).
+  // Reachable: the LONGEST club whose EXPECTED carry still stops on the green (≤ the back edge).
+  // Walk shortest→longest and keep the last qualifier; if even the shortest club's expected carry
+  // flies the back (the ball is right next to the green), fall back to the shortest (a chip).
   const byCarryAsc = [...cand].sort((a, b) => clubDist(a, opts.stats) - clubDist(b, opts.stats));
   let pick: Club | undefined;
   for (const c of byCarryAsc) {
-    if (spreadOf(c).carryLow <= front) pick = c;
+    if (spreadOf(c).expectedCarry <= back) pick = c;
   }
   return pick ?? byCarryAsc[0]!;
 }

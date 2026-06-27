@@ -151,13 +151,42 @@ export const PEN_INFO: Record<PenaltyKind, PenaltyInfo> = {
 
 // --- Lie lookup against a hole ----------------------------------------------
 /**
+ * Surface precedence for OVERLAPPING features (higher wins). Features are emitted in
+ * draw order (fairway first, then tee, green, scatter), so a naive first-match read lets
+ * the broad fairway slab override the green/tee/scatter that sit ON it — the classic "it
+ * thinks you're on the fairway when you're on the green" bug. Instead we pick the
+ * most-specific surface under the point: the green (and tee) win over the fairway base,
+ * and the in-play scatter spice (ice/crystal/waste) wins over plain fairway/rough too.
+ * Unlisted features fall back to 1 (the rough/fairway base level).
+ */
+const SURFACE_PRIORITY: Record<string, number> = {
+  green: 5,
+  tee: 4,
+  ice: 3,
+  crystal: 3,
+  waste: 3,
+  fairway: 2,
+};
+
+/**
  * Read the lie at a point. Hazards are checked first (they're drawn on top and they
- * dominate play), then features. Off everything → DEFAULT_LIE.
+ * dominate play). Among the underlying features we pick the HIGHEST-precedence surface
+ * containing the point (see `SURFACE_PRIORITY`) so a green that overlaps the fairway reads
+ * as green, not fairway. Off everything → DEFAULT_LIE.
  */
 export function lieAt(hole: Hole, p: Vec): FeatureKind {
   for (const f of hole.hazards) if (pointInPoly(p, f.poly)) return f.kind;
-  for (const f of hole.features) if (pointInPoly(p, f.poly)) return f.kind;
-  return DEFAULT_LIE;
+  let best: FeatureKind | undefined;
+  let bestPri = -Infinity;
+  for (const f of hole.features) {
+    if (!pointInPoly(p, f.poly)) continue;
+    const pri = SURFACE_PRIORITY[f.kind] ?? 1;
+    if (pri > bestPri) {
+      bestPri = pri;
+      best = f.kind;
+    }
+  }
+  return best ?? DEFAULT_LIE;
 }
 
 // --- Wind --------------------------------------------------------------------
