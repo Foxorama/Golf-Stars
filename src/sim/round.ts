@@ -969,10 +969,10 @@ function clearLine(hole: Hole, from: Vec, to: Vec): boolean {
   return true;
 }
 
-/** A point a fraction `t` (by arc length) along a polyline. */
+/** A point a fraction `t` (by arc length) along an N-point polyline (GS-shapes). */
 function pointAlong(line: Vec[], t: number): Vec {
   if (line.length === 1) return line[0]!;
-  const total = dist(line[0]!, line[1]!) + (line[2] ? dist(line[1]!, line[2]!) : 0);
+  const total = pathLength(line);
   let want = total * Math.max(0, Math.min(1, t));
   for (let i = 1; i < line.length; i++) {
     const segLen = dist(line[i - 1]!, line[i]!);

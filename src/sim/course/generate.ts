@@ -20,6 +20,7 @@ import { BIOMES, pickBiome, type Biome } from './biomes';
 import { lieInfo, lieAt } from '../shot';
 import {
   bearing,
+  dist,
   pathLength,
   pointInPoly,
   polylineDist,
@@ -276,18 +277,17 @@ function generateHole(
 
   const tee: Vec = [0, 0];
 
-  // Dogleg severity scales with biome bias, but with a floor so the hole BENDS (left or
-  // right — `bendSide`) even on calm early stops: the old `× wildness` made every low-wildness
-  // hole dead straight. The floor is 35% of full at wildness 0, ramping to the same full
-  // severity at wildness 1 (so max-wildness balance is unchanged).
-  const doglegFactor = 0.35 + 0.65 * wildness;
-  const doglegMag = biome.doglegBias * doglegFactor * rng.range(0.1, 0.5) * length;
-  const bendSide = rng.bool() ? 1 : -1;
-  const midY = length * rng.range(0.45, 0.6);
-  const mid: Vec = [bendSide * doglegMag, midY];
-  const green: Vec = [bendSide * doglegMag * rng.range(0.3, 0.8), length];
+  // Lost rough (void signature): off the fairway is a PENALTY lie on the wilder/deeper stops.
+  // Computed up-front because it ALSO keeps the hole straight: a bending lost-ball ISLAND is a ball
+  // shredder (a dogleg pushes the AI's line off the island into the void), so void island holes stay
+  // an honest straight target — their challenge is the abyss off the fairway, not the shape.
+  const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
 
-  const centreline: Vec[] = par === 3 ? [tee, green] : [tee, mid, green];
+  // Hole SHAPE (GS-shapes): a varied, smooth centreline from the template builder — straight drift,
+  // single dogleg L/R, or an S-curve — biome- and wildness-biased, so layouts stop feeling identical.
+  // Everything downstream (corridor, hazards, scatter, green, apron) derives from this centreline.
+  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, !!lostRough);
+  const green: Vec = centreline[centreline.length - 1]!;
 
   // Fairway corridor: WIDE and generous on early/easy stops, tightening as wildness climbs —
   // `widthScale` lerps 2.0 (early) → 0.75 (far, = the old constant), so the late-game balance
@@ -299,10 +299,8 @@ function generateHole(
   // wildness=1 slope is unchanged so the death-spiral bar still holds at 0.75.) The thickness also UNDULATES
   // along the hole (wide landing zones, the odd pinched neck), most dramatically early. The
   // corridor is built from a densified centreline so its edge can vary smoothly.
-  // Lost rough (void signature): off the fairway is a PENALTY lie on the wilder/deeper stops.
-  // When armed, widen the corridor into a fair "island" so a sensible shot still has somewhere
-  // to land — you play TO the fairway or lose the ball, but the target is honest.
-  const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
+  // When lost-rough is armed, widen the corridor into a fair "island" so a sensible shot still has
+  // somewhere to land — you play TO the fairway or lose the ball, but the target is honest.
   const widthScale = lostRough ? VOID_ISLAND_SCALE : 2.0 - 1.25 * wildness;
   const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
   const segs = par === 3 ? 9 : 15;
@@ -400,9 +398,10 @@ function generateHole(
     const r = rng.range(10, 14 + wildness * 12);
     const t = rng.range(0.25, 0.85);
     const side = rng.bool() ? 1 : -1;
-    const along: Vec = [mid[0] * t, midY * (t / 0.55)]; // rough point along the hole
+    const along = centrePoint(centreline, t); // a point along the (curvy) hole
+    const perp = perpAt(centreline, t);
     const lateral = fairwayHalfWidth + r + rng.range(4, 22);
-    const c: Vec = [along[0] + side * lateral, along[1]];
+    const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
     if (clearsPlayCorridor(c, r, centreline, tee, green, fairwayHalfWidth)) {
       hazards.push({ kind, poly: blobPoly(c, r, 12, 0.25, rng) });
     }
@@ -486,23 +485,94 @@ function generateHole(
   return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods };
 }
 
-/** Point a fraction `t` along a (possibly bent) centreline. */
+/** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */
 function centrePoint(line: Vec[], t: number): Vec {
-  if (line.length === 2) {
-    const a = line[0]!;
-    const b = line[1]!;
-    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  if (line.length === 1) return line[0]!;
+  const total = pathLength(line);
+  if (total === 0) return line[0]!;
+  let want = total * Math.max(0, Math.min(1, t));
+  for (let i = 1; i < line.length; i++) {
+    const seg = dist(line[i - 1]!, line[i]!);
+    if (want <= seg || i === line.length - 1) {
+      const u = seg ? want / seg : 0;
+      const a = line[i - 1]!;
+      const b = line[i]!;
+      return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    }
+    want -= seg;
   }
-  // Two-segment dogleg: split at the bend.
-  const a = line[0]!;
-  const m = line[1]!;
-  const b = line[2]!;
-  if (t < 0.5) {
-    const u = t / 0.5;
-    return [a[0] + (m[0] - a[0]) * u, a[1] + (m[1] - a[1]) * u];
+  return line[line.length - 1]!;
+}
+
+/** Catmull-Rom spline point for the segment p1→p2 at local u∈[0,1] (p0/p3 are the neighbours). */
+function crPoint(p0: Vec, p1: Vec, p2: Vec, p3: Vec, u: number): Vec {
+  const u2 = u * u;
+  const u3 = u2 * u;
+  const f = (a: number, b: number, c: number, d: number) =>
+    0.5 * (2 * b + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (-a + 3 * b - 3 * c + d) * u3);
+  return [f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])];
+}
+
+/** Resample control points into a SMOOTH curve (Catmull-Rom), so a dogleg/S-curve corridor bends
+ *  cleanly instead of kinking. `per` samples per control segment. */
+function smoothCurve(ctrl: Vec[], per: number): Vec[] {
+  if (ctrl.length <= 2) return ctrl.slice();
+  const n = ctrl.length;
+  const get = (i: number) => ctrl[Math.max(0, Math.min(n - 1, i))]!;
+  const out: Vec[] = [];
+  for (let s = 0; s < n - 1; s++) {
+    for (let k = 0; k < per; k++) out.push(crPoint(get(s - 1), get(s), get(s + 1), get(s + 2), k / per));
   }
-  const u = (t - 0.5) / 0.5;
-  return [m[0] + (b[0] - m[0]) * u, m[1] + (b[1] - m[1]) * u];
+  out.push(get(n - 1));
+  return out;
+}
+
+/**
+ * Build a hole's centreline as a varied, SMOOTH shape (GS-shapes) — the lever that makes layouts
+ * stop feeling identical. A template (straight drift / single dogleg L-R / S-curve double-dogleg) is
+ * drawn, biome-biased (a calm verdant world leans straight; a chaotic void/inferno world bends more),
+ * with the bend severity scaling by `doglegBias × wildness × length`. Control points are smoothed
+ * into a curve so the corridor follows a real arc. Capped so an offset corridor doesn't self-cross.
+ */
+function buildCentreline(length: number, wildness: number, biome: Biome, rng: Rng, par: number, island = false): Vec[] {
+  const tee: Vec = [0, 0];
+  const dogFac = 0.35 + 0.65 * wildness;
+  const baseMag = biome.doglegBias * dogFac * length;
+  const cap = 0.4 * length; // keep bends smooth enough that the corridor offset stays clean
+  const endDrift = (): Vec => [rng.range(-0.06, 0.06) * length, length];
+
+  // A lost-ball island stays a straight, honest target (a dogleg over the abyss is unfair).
+  if (island) return [tee, endDrift()];
+
+  if (par === 3) {
+    // Short holes: usually straight, occasionally a gentle single kink.
+    if (rng.float() < 0.6) return [tee, endDrift()];
+    const side = rng.bool() ? 1 : -1;
+    const mag = Math.min(0.16 * length, baseMag * rng.range(0.25, 0.55));
+    return smoothCurve([tee, [side * mag, length * 0.55], endDrift()], 4);
+  }
+
+  const bendAt = (f: number, side: number, scale: number): Vec => [
+    side * Math.min(cap, baseMag * scale * rng.range(0.5, 1.0)),
+    length * f,
+  ];
+  // Template probabilities, biome- + wildness-biased.
+  const straightP = Math.max(0.12, 0.5 - biome.doglegBias * 0.8 - wildness * 0.18);
+  const sP = Math.min(0.42, 0.1 + biome.doglegBias * 0.55 + wildness * 0.28); // double-dogleg share
+  const roll = rng.float();
+  const side = rng.bool() ? 1 : -1;
+  let ctrl: Vec[];
+  if (roll < straightP) {
+    // Gentle landing-zone drift — visually straight, a touch of movement.
+    ctrl = [tee, bendAt(0.5, side, 0.28), endDrift()];
+  } else if (roll < 1 - sP) {
+    // Single dogleg, left or right; the green sits to the inside of the bend.
+    ctrl = [tee, bendAt(rng.range(0.42, 0.58), side, 1.0), [side * 0.12 * length * rng.float(), length]];
+  } else {
+    // S-curve: two opposite bends — the real shot-shaping test.
+    ctrl = [tee, bendAt(0.33, side, 0.8), bendAt(0.66, -side, 0.8), endDrift()];
+  }
+  return smoothCurve(ctrl, 5);
 }
 
 /** Unit perpendicular to the centreline near fraction `t`. */

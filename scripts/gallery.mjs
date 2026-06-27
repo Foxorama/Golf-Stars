@@ -41,22 +41,18 @@ const cases = [
 ];
 const seeds = [7, 4242];
 
-// For each world: a whole-hole MAP, and a GREEN close-up (so the new green shapes + the fairway
-// wrap-around read clearly). Pick a par-4/5 hole so there's a real corridor running into the green.
+// Showcase hole SHAPE variety: for each world, render several whole-hole maps (different holes) so
+// the doglegs / S-curves / straights and the curved corridors read.
 let cells = '';
 for (const c of cases) {
-  const holes = generateCourse(seeds[0], { holes: 6, distanceFromStart: 6 }).holes;
-  const hole = holes.find((h) => h.par >= 4) ?? holes[0];
-  const map = renderHoleSVG(hole, { width: 300, height: 420, biome: c.biome, themeId: c.themeId });
-  // Close-up on the green: see the shape + how the fairway wraps/tapers past it.
-  const green = renderHoleSVG(hole, {
-    width: 300, height: 420, biome: c.biome, themeId: c.themeId,
-    focus: hole.green, viewRadius: 42, focusBias: 0.52,
-  });
-  cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · map</figcaption>${map}</figure>`;
-  cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · green close-up</figcaption>${green}</figure>`;
+  const holes = generateCourse(20260627, { holes: 24, distanceFromStart: 14, biome: c.biome }).holes;
+  const picks = holes.filter((h) => h.par >= 4).slice(0, 4);
+  for (const hole of picks) {
+    const map = renderHoleSVG(hole, { width: 240, height: 380, biome: c.biome, themeId: c.themeId });
+    cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 11px system-ui;padding:3px 0">${c.label} · par ${hole.par}</figcaption>${map}</figure>`;
+  }
 }
-const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(4,300px);gap:10px;padding:12px">${cells}</body></html>`;
+const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(4,240px);gap:8px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
 
 const chromePath = await findChromium();
