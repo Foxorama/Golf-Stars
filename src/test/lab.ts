@@ -25,7 +25,8 @@ import {
 } from '../sim/rpg/economy';
 import { applyCharacter, characterShotMods } from '../sim/rpg/characters';
 import { metaStartingLoadout, type MetaUpgrades } from '../sim/rpg/meta';
-import type { Wind } from '../sim/course/contract';
+import { THEMES, themeById, resolveBiome, type Arc } from '../sim/course/themes';
+import type { Rarity, Wind } from '../sim/course/contract';
 
 // ── descriptive statistics (pure helpers) ─────────────────────────────────────────────────
 export interface Stats {
@@ -127,6 +128,8 @@ export interface DispersionOpts {
   loadout?: PlayerLoadout;
   /** Biome carry multiplier (low-gravity worlds carry further). Default 1. */
   carryMult?: number;
+  /** Star-travel theme (GS-17): its resolved biome sets carryMult unless one is given explicitly. */
+  themeId?: string;
   /** Selected golfer (GS-18): its per-club shot SHAPE (fade/hook bias + per-club spread) is applied. */
   characterId?: string;
   /** Seed for the swing stream — same seed ⇒ same pattern. Default derives from the club id. */
@@ -136,6 +139,9 @@ export interface DispersionOpts {
 export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): DispersionStudy {
   const n = Math.max(1, Math.floor(opts.n ?? 1000));
   const lie = opts.lie ?? 'fairway';
+  // A chosen theme (GS-17) sets the world's gravity (carry) unless an explicit carryMult overrides.
+  const carryMult =
+    opts.carryMult ?? (opts.themeId ? resolveBiome(themeById(opts.themeId)!).carryMult : undefined);
   const bag = opts.loadout?.bag ?? CLUBS;
   const club: Club | undefined = clubById(clubId, bag);
   if (!club) throw new Error(`unknown club "${clubId}"`);
@@ -158,7 +164,7 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       club,
       lie: lie as never, // LIE_INFO key; FeatureKind at the type boundary
       wind: opts.wind,
-      carryMult: opts.carryMult,
+      carryMult,
       dispersionMult,
       angleBias: mods.angleBias,
       rng,
@@ -291,4 +297,65 @@ export function scoreHarness(opts: ScoreOpts = {}): ScoreResult {
     blowUpRate: stablefords.length ? blowUps / stablefords.length : 0,
     perStop,
   };
+}
+
+// ── theme browser — "what does each star-travel theme DO?" (GS-17) ──────────────────────────
+// Resolve a theme to its rarity-tiered, flavoured biome (the REAL `resolveBiome`) and report the
+// physics it produces, so the Sim Lab can browse every constellation/galaxy and see how its world
+// plays. Pure: it only reads the content tables + the real resolver — re-implements nothing.
+
+export interface ThemeStudy {
+  id: string;
+  name: string;
+  kind: string;
+  arc: Arc;
+  rarity: Rarity;
+  archetype: string;
+  anchor: string;
+  blurb: string;
+  /** True for constellations (they draw a sky figure); deep-sky/galaxies fall back to the starfield. */
+  hasFigure: boolean;
+  /** The resolved biome physics this theme generates its course from. */
+  biome: {
+    id: string;
+    carryMult: number;
+    windBase: number;
+    windWild: number;
+    fairwayWidthMult: number;
+    doglegBias: number;
+    treeDensity: number;
+    fairwayBunkers: number;
+  };
+}
+
+export function themeStudy(themeId: string): ThemeStudy {
+  const t = themeById(themeId);
+  if (!t) throw new Error(`unknown theme "${themeId}"`);
+  const b = resolveBiome(t);
+  return {
+    id: t.id,
+    name: t.name,
+    kind: t.kind,
+    arc: t.arc,
+    rarity: t.rarity,
+    archetype: t.archetype,
+    anchor: t.anchor,
+    blurb: t.blurb,
+    hasFigure: t.kind === 'constellation',
+    biome: {
+      id: b.id,
+      carryMult: b.carryMult,
+      windBase: b.windBase,
+      windWild: b.windWild,
+      fairwayWidthMult: b.fairwayWidthMult,
+      doglegBias: b.doglegBias,
+      treeDensity: b.treeDensity ?? 0,
+      fairwayBunkers: b.fairwayBunkers ?? 0,
+    },
+  };
+}
+
+/** Every theme's study, ordered by arc then rarity — the Sim Lab's theme browser list. */
+export function allThemeStudies(): ThemeStudy[] {
+  return THEMES.map((t) => themeStudy(t.id));
 }

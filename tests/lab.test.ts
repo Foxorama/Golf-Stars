@@ -5,7 +5,10 @@ import {
   dispersionStudy,
   buildLoadout,
   scoreHarness,
+  themeStudy,
+  allThemeStudies,
 } from '../src/test/lab';
+import { THEMES, resolveBiome, themeById } from '../src/sim/course/themes';
 
 /**
  * Guards the Sim Lab engine that powers the test hub (standards/TEST-HUB-STANDARD.md). The lab
@@ -96,5 +99,30 @@ describe('scoring harness (real simulateRun)', () => {
     const base = scoreHarness({ seeds: 50 });
     const upgraded = scoreHarness({ seeds: 50, meta: { 'steady-grip': 2 }, perks: ['pro-coach'] });
     expect(upgraded.meanStablefordPerStop).toBeGreaterThan(base.meanStablefordPerStop);
+  });
+});
+
+describe('theme browser (real resolveBiome)', () => {
+  it('themeStudy reports the resolved biome physics for a theme', () => {
+    const t = themeById('sagittarius')!;
+    const study = themeStudy('sagittarius');
+    const biome = resolveBiome(t);
+    expect(study.name).toBe(t.name);
+    expect(study.arc).toBe(t.arc);
+    expect(study.rarity).toBe(t.rarity);
+    expect(study.hasFigure).toBe(true); // a constellation draws a sky figure
+    expect(study.biome.carryMult).toBeCloseTo(biome.carryMult);
+    expect(study.biome.windWild).toBeCloseTo(biome.windWild);
+  });
+
+  it('allThemeStudies covers every theme; deep-sky/galaxy have no figure', () => {
+    const all = allThemeStudies();
+    expect(all.length).toBe(THEMES.length);
+    const deepSky = all.find((s) => s.id === 'orion-nebula')!;
+    expect(deepSky.hasFigure).toBe(false);
+  });
+
+  it('themeStudy throws on an unknown theme', () => {
+    expect(() => themeStudy('not-a-theme')).toThrow();
   });
 });
