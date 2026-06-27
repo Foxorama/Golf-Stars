@@ -75,6 +75,18 @@ Everything below serves whichever avenue wins.
   hub + auto-discovering guard + five hooks already shipped in GS-16.
 
 ## Done
+- **GS-dispersion-2 — Asymmetric spray-zone model + zone/distance upgrades.** Replaced the symmetric
+  z-score spray with a `SprayShape` (green + 4 independent miss zones: duck-hook/shank red, hook/slice
+  orange) that drives BOTH the physics sampling and the graphic, so the cone IS the landing
+  distribution. Graphic: bands sized PROPORTIONAL to chance (a 2% red is ¼ an 8% orange; the old red
+  was drawn wider than orange), a 0% zone vanishes, one-sided suppression reads lop-sided, green wedge
+  keeps its width as its % climbs. Characters got per-club shape skew (Feather bakes in a right-fade,
+  Huang-Woo balloons the LEFT zones on the long sticks). New upgrades: Anti-Hook Grip/Shank Guard
+  (kill a red zone), Hook/Slice Corrector, Sweet-Spot Forging (more green), Draw Weighting (trade-off),
+  Distance Control (raise min carry of big clubs), Wedge Touch (tighten the wedge window). All folded
+  identically in auto + interactive; `tests/spray-shape.test.ts` guards redistribution, geometry,
+  physics==graphic, and that the upgrades raise mean per-stop Stableford. See
+  `reports/dispersion-graphic-upgrades-2026-06-27.md`.
 - **GS-16 — Test & demo hub + Sim Lab + auto-discovering CI sync-guard.** A second built page
   (`test.html` → `src/test/hub.ts`, served at `dist/test.html` beside the game) to demo features and
   stress-test the sim. Two faces: a **Demo** that drives the REAL game in an iframe via its public

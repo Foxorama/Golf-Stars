@@ -197,6 +197,9 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     bag: run.loadout.bag,
     dispersionMult: netDispersion(run.loadout),
     shotMods: characterShotMods(run.loadout.characterId),
+    shapeMod: run.loadout.shapeMod,
+    minCarryBoost: run.loadout.minCarryBoost,
+    wedgeWindow: run.loadout.wedgeWindow,
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };

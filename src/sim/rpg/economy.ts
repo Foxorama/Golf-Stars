@@ -8,6 +8,7 @@
 
 import { CLUBS, type Club } from '../clubs';
 import type { Rarity } from '../course/contract';
+import { combineShapeMods, type ShapeMod } from '../shot';
 
 export const HOLES_PER_STOP = 6;
 export const CREDIT_PER_POINT = 12;
@@ -52,6 +53,16 @@ export interface PlayerLoadout {
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
   characterId?: string;
+  /**
+   * Accumulated spray-zone shape mod from shaping upgrades (GS-dispersion-2): suppresses or skews
+   * the duck-hook/hook/slice/shank miss zones. Folded into every shot's shape (under the golfer's
+   * per-club skew). Defaults to no change.
+   */
+  shapeMod: ShapeMod;
+  /** Distance-control: fraction added to the min carry of driver/woods/irons (point 5). 0 = none. */
+  minCarryBoost: number;
+  /** Wedge distance-control: fraction the wedge carry window is tightened toward the mean (point 6). */
+  wedgeWindow: number;
 }
 
 /** The driver club id (off-tee use is gated by the Driver-on-Deck tier). */
@@ -114,6 +125,9 @@ export function startingLoadout(): PlayerLoadout {
     creditMult: 1,
     driverDeck: 0,
     perks: [],
+    shapeMod: {},
+    minCarryBoost: 0,
+    wedgeWindow: 0,
   };
 }
 
@@ -183,6 +197,16 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'driver-deck-2': ['distance'],
   'driver-deck-3': ['distance'],
   'driver-deck-4': ['distance'],
+  // Spray-zone shapers (GS-dispersion-2) — accuracy/forgiveness, so 'control'.
+  'sweet-spot': ['control'],
+  'anti-duck-hook': ['control'],
+  'shank-guard': ['control'],
+  'hook-corrector': ['control'],
+  'slice-corrector': ['control'],
+  'draw-weighting': ['control'],
+  // Distance-control (carry-window) upgrades — 'distance'.
+  'distance-control': ['distance'],
+  'wedge-touch': ['control'],
 };
 
 export function itemTags(id: string): readonly string[] {
@@ -291,6 +315,100 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       bag: boostDistanceClubs(m.bag, 8),
       dispersionMult: m.dispersionMult * 0.97,
       perks: [...m.perks, 'range-booster'],
+    }),
+  },
+
+  // --- Spray-zone shapers (GS-dispersion-2) ------------------------------------
+  // These re-shape WHERE a miss goes by editing the duck-hook/hook/slice/shank zone probabilities.
+  // Cutting a miss zone feeds the freed % straight to GREEN (great shots) — the central band keeps
+  // its width but its % climbs, and a zone cut to 0 vanishes from the spray graphic entirely. Pure
+  // upgrades (only reduce misses) strictly raise scoring; the trade-off card is a sidegrade.
+  {
+    id: 'sweet-spot',
+    name: 'Sweet-Spot Forging',
+    cost: 130,
+    desc: 'Find the centre more often — trims every miss, more GREAT shots · stacks',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 5,
+    // Shave a little off all four miss zones → green % rises across the board (display tightens).
+    apply: (m) => ({
+      ...m,
+      shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.012, sliceR: -0.012, duckHookL: -0.006, shankR: -0.006 }),
+      perks: [...m.perks, 'sweet-spot'],
+    }),
+  },
+  {
+    id: 'anti-duck-hook',
+    name: 'Anti-Hook Grip',
+    cost: 110,
+    desc: 'Kills the DUCK-HOOK (left red zone) — that wild left tail is gone',
+    rarity: 'rare',
+    // −100% duck-hooks: the whole left red zone disappears; its 2% flows to green.
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { duckHookL: -1 }), perks: [...m.perks, 'anti-duck-hook'] }),
+  },
+  {
+    id: 'shank-guard',
+    name: 'Shank Guard',
+    cost: 110,
+    desc: 'Kills the SHANK (right red zone) — no more wild blocks right',
+    rarity: 'rare',
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { shankR: -1 }), perks: [...m.perks, 'shank-guard'] }),
+  },
+  {
+    id: 'hook-corrector',
+    name: 'Hook Corrector',
+    cost: 90,
+    desc: 'Halves the HOOK (left orange zone) → more centre · stacks',
+    rarity: 'common',
+    stackable: true,
+    maxStacks: 3,
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.04 }), perks: [...m.perks, 'hook-corrector'] }),
+  },
+  {
+    id: 'slice-corrector',
+    name: 'Slice Corrector',
+    cost: 90,
+    desc: 'Halves the SLICE (right orange zone) → more centre · stacks',
+    rarity: 'common',
+    stackable: true,
+    maxStacks: 3,
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.04 }), perks: [...m.perks, 'slice-corrector'] }),
+  },
+  {
+    id: 'draw-weighting',
+    name: 'Draw Weighting',
+    cost: 80,
+    desc: 'Trade-off: −4% slice for +2% hook — swaps right misses for fewer, left ones',
+    rarity: 'common',
+    // A pure trade-off (does NOT feed green): drops the right orange but adds a little left orange.
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.04, hookL: 0.02 }), perks: [...m.perks, 'draw-weighting'] }),
+  },
+
+  // --- Distance-control (carry-window) upgrades (GS-dispersion-2, points 5 & 6) ---
+  {
+    id: 'distance-control',
+    name: 'Distance Control',
+    cost: 120,
+    desc: 'Tighter distances on driver/woods/irons — raises the min carry, smaller gap · stacks',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 4,
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.05, perks: [...m.perks, 'distance-control'] }),
+  },
+  {
+    id: 'wedge-touch',
+    name: 'Wedge Touch',
+    cost: 110,
+    desc: 'Pin-point wedges: tightens the wedge carry window so it lands where you aim · stacks',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 3,
+    // Tighten the wedge window AND its line a touch — forward/back AND left/right precision.
+    apply: (m) => ({
+      ...m,
+      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.18),
+      perks: [...m.perks, 'wedge-touch'],
     }),
   },
 

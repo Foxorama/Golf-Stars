@@ -81,10 +81,15 @@ export const CHARACTERS: readonly Character[] = [
     style: { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 0.98 },
     // A shot-maker: a touch tighter across the bag because her ball flight is so repeatable.
     loadout: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.94 }),
-    // A slight-to-medium fade that grows with club length (the driver curves most), in radians.
+    // A slight-to-medium fade that grows with club length (the driver curves most), in radians, PLUS
+    // a spray-zone skew that bakes the fade in: far fewer LEFT misses (her duck-hook/hook nearly
+    // vanish), a few more RIGHT (the slice) — so the cone leans right exactly as a fader's does.
     clubMods: (carry) => {
       const t = Math.max(0, Math.min(1, (carry - 70) / (250 - 70)));
-      return mods({ angleBias: 0.018 + 0.042 * t });
+      return mods({
+        angleBias: 0.018 + 0.042 * t,
+        shape: { duckHookL: -0.015, hookL: -0.04, sliceR: 0.035 },
+      });
     },
   },
   {
@@ -97,10 +102,13 @@ export const CHARACTERS: readonly Character[] = [
     cons: ['Drives & woods hook left and spray wider'],
     style: { cap: '#d23f4f', shirt: '#b23140', skin: '#e8c6a0', build: 1.0 },
     loadout: (m) => m,
+    // The big sticks fight a snap-hook: their LEFT zones balloon (a real chance of a duck-hook),
+    // while the surgical irons not only spray tighter but also clean up their miss zones (more
+    // green, fewer side misses) — so his shape is genuinely two-faced, club to club.
     clubMods: (carry) => {
-      if (carry >= LONG_CARRY) return mods({ angleBias: -0.06, dispMult: 1.18 });
-      if (carry >= WEDGE_CARRY) return mods({ angleBias: -0.01, dispMult: 0.78 }); // striped irons
-      return mods({ dispMult: 0.9 });
+      if (carry >= LONG_CARRY) return mods({ angleBias: -0.06, dispMult: 1.18, shape: { hookL: 0.05, duckHookL: 0.03 } });
+      if (carry >= WEDGE_CARRY) return mods({ angleBias: -0.01, dispMult: 0.78, shape: { hookL: -0.03, sliceR: -0.03 } }); // striped irons
+      return mods({ dispMult: 0.9, shape: { hookL: -0.02, sliceR: -0.02 } });
     },
   },
   {

@@ -86,6 +86,162 @@ export function dispersionProfile(nominalCarry: number): DispersionProfile {
   };
 }
 
+// --- Spray shape: the asymmetric 5-zone dispersion model (GS-dispersion-2) ---
+/**
+ * The angular spray is modelled as FIVE zones whose probabilities sum to 1. The graphic and the
+ * physics BOTH derive from this single object, so the cone reads exactly true to where the ball
+ * actually lands — and a zone reduced to 0 simply vanishes (no shots, no band). Left/right are
+ * independent, so a golfer/upgrade can suppress one miss without touching its mirror.
+ *
+ *   green     — the central "great shot" cluster (the good outcome)
+ *   hookL     — left ORANGE: a hook (a moderate pull left)
+ *   sliceR    — right ORANGE: a slice (a moderate push right)
+ *   duckHookL — left RED: a duck-hook (the wild left tail)
+ *   shankR    — right RED: a shank (the wild right tail)
+ *
+ * INVARIANT: `green = 1 − (hookL+sliceR+duckHookL+shankR)` — green is the derived remainder. So
+ * reducing ANY miss zone raises green's % (its band stays the same width — "great shots land where
+ * great shots land"); a trade-off between two miss zones leaves green untouched.
+ */
+export interface SprayShape {
+  green: number;
+  hookL: number;
+  sliceR: number;
+  duckHookL: number;
+  shankR: number;
+}
+
+/** The neutral shape: 80% centre, 8% each orange flank, 2% each red tail. */
+export const DEFAULT_SHAPE: SprayShape = { green: 0.8, hookL: 0.08, sliceR: 0.08, duckHookL: 0.02, shankR: 0.02 };
+
+/** Additive deltas to the four MISS zones (green is derived). A character or an upgrade contributes
+ *  one of these; combine many then `applyShapeMod` once. A negative drops misses → more green; a
+ *  pair that sums to zero (e.g. −duckHookL/+shankR) is a pure trade-off that doesn't feed green. */
+export interface ShapeMod {
+  hookL?: number;
+  sliceR?: number;
+  duckHookL?: number;
+  shankR?: number;
+}
+
+/** Total miss probability is capped so green can never go negative (a wild golfer still has a core). */
+const MAX_MISS = 0.6;
+
+/** Sum two shape mods (additive deltas), so a global upgrade and a per-club character shape combine. */
+export function combineShapeMods(a?: ShapeMod, b?: ShapeMod): ShapeMod {
+  return {
+    hookL: (a?.hookL ?? 0) + (b?.hookL ?? 0),
+    sliceR: (a?.sliceR ?? 0) + (b?.sliceR ?? 0),
+    duckHookL: (a?.duckHookL ?? 0) + (b?.duckHookL ?? 0),
+    shankR: (a?.shankR ?? 0) + (b?.shankR ?? 0),
+  };
+}
+
+/** Apply a shape mod to a base shape: clamp each miss zone ≥0, cap the total miss mass, then derive
+ *  green as the remainder. The freed probability of a reduced miss zone flows to GREEN, never to the
+ *  opposite side — exactly the redistribution rule the design asks for. Pure. */
+export function applyShapeMod(base: SprayShape, mod?: ShapeMod): SprayShape {
+  const pos = (x: number) => (x > 0 ? x : 0);
+  let hookL = pos(base.hookL + (mod?.hookL ?? 0));
+  let sliceR = pos(base.sliceR + (mod?.sliceR ?? 0));
+  let duckHookL = pos(base.duckHookL + (mod?.duckHookL ?? 0));
+  let shankR = pos(base.shankR + (mod?.shankR ?? 0));
+  let miss = hookL + sliceR + duckHookL + shankR;
+  if (miss > MAX_MISS) {
+    const k = MAX_MISS / miss;
+    hookL *= k;
+    sliceR *= k;
+    duckHookL *= k;
+    shankR *= k;
+    miss = MAX_MISS;
+  }
+  return { green: 1 - miss, hookL, sliceR, duckHookL, shankR };
+}
+
+/** Resolve the final per-shot shape from a global upgrade mod and a per-club character mod. */
+export function resolveShape(globalMod?: ShapeMod, charMod?: ShapeMod): SprayShape {
+  return applyShapeMod(DEFAULT_SHAPE, combineShapeMods(globalMod, charMod));
+}
+
+/**
+ * Spray geometry constants (escape-hatch overridable via `_gsSpray`). They turn a shape + a base
+ * angular spread (σ0, radians) into the drawn/sampled angular bands:
+ *   - the GREEN band is a fixed ±`greenZ·σ0` wedge (its width does NOT track its %, so boosting
+ *     great-shots raises the number without fattening the wedge);
+ *   - each orange/red band's width is `sideK·σ0·(zone probability)` — so the drawn size is exactly
+ *     proportional to the chance of landing there (a 2% red is ¼ the width of an 8% orange).
+ */
+export interface SprayGeom {
+  greenZ: number;
+  sideK: number;
+}
+export const SPRAY_GEOM: SprayGeom = { greenZ: 1.0, sideK: 18 };
+
+export type BandTier = 'green' | 'orange' | 'red';
+/** One drawn/sampled angular band: [a0,a1] radians off the bearing, its tier, its probability, and
+ *  whether its within-band angle is triangular (green, centre-peaked) or uniform (a miss is a miss). */
+export interface SprayBand {
+  tier: BandTier;
+  a0: number;
+  a1: number;
+  prob: number;
+  tri: boolean;
+}
+
+/** The five angular bands (left→right) for a shape at a base spread σ0. Zero-probability zones get a
+ *  zero-width band (omitted by the renderer, never sampled). Shared by `resolveShot` (sampling) and
+ *  the renderer (drawing) so the cone is exactly the landing distribution. Pure. */
+export function sprayBands(shape: SprayShape, baseSpread: number, geom: SprayGeom = SPRAY_GEOM): SprayBand[] {
+  const g = geom.greenZ * baseSpread;
+  const oL = geom.sideK * baseSpread * shape.hookL;
+  const oR = geom.sideK * baseSpread * shape.sliceR;
+  const rL = geom.sideK * baseSpread * shape.duckHookL;
+  const rR = geom.sideK * baseSpread * shape.shankR;
+  return [
+    { tier: 'red', a0: -(g + oL + rL), a1: -(g + oL), prob: shape.duckHookL, tri: false },
+    { tier: 'orange', a0: -(g + oL), a1: -g, prob: shape.hookL, tri: false },
+    { tier: 'green', a0: -g, a1: g, prob: shape.green, tri: true },
+    { tier: 'orange', a0: g, a1: g + oR, prob: shape.sliceR, tri: false },
+    { tier: 'red', a0: g + oR, a1: g + oR + rR, prob: shape.shankR, tri: false },
+  ];
+}
+
+/** RMS of the spray angle (radians) for a shape — the effective σ the cone "reads as", exposed so
+ *  the preview and the dispersion test agree with the sampled scatter. Pure. */
+export function sprayAngleRms(shape: SprayShape, baseSpread: number, geom: SprayGeom = SPRAY_GEOM): number {
+  let m2 = 0;
+  for (const b of sprayBands(shape, baseSpread, geom)) {
+    if (b.prob <= 0) continue;
+    // E[x²]: triangular on [−h,h] → h²/6; uniform on [a,b] → (a²+ab+b²)/3.
+    const e2 = b.tri ? (b.a1 * b.a1) / 6 : (b.a0 * b.a0 + b.a0 * b.a1 + b.a1 * b.a1) / 3;
+    m2 += b.prob * e2;
+  }
+  return Math.sqrt(Math.max(0, m2));
+}
+
+/** Sample a spray angle (radians, off the bearing) from a shape, consuming EXACTLY two rng draws
+ *  (zone pick + within-band position) so the per-shot draw count matches the old gaussian angle. */
+function sampleShapeAngle(shape: SprayShape, baseSpread: number, rng: Rng): number {
+  const bands = sprayBands(shape, baseSpread);
+  const u = rng.float();
+  let acc = 0;
+  let chosen = bands[bands.length - 1]!;
+  for (const b of bands) {
+    acc += b.prob;
+    if (u < acc) {
+      chosen = b;
+      break;
+    }
+  }
+  const v = rng.float();
+  if (chosen.tri) {
+    // Symmetric triangular (centre-peaked) on [−h,h] via a single uniform draw — great shots cluster.
+    const h = chosen.a1;
+    return v < 0.5 ? h * (Math.sqrt(2 * v) - 1) : h * (1 - Math.sqrt(2 * (1 - v)));
+  }
+  return chosen.a0 + v * (chosen.a1 - chosen.a0);
+}
+
 // --- Lie model (LIE_INFO analogue) ------------------------------------------
 export interface LieInfo {
   /** Multiplies intended carry — a buried bunker lie robs distance. */
@@ -245,6 +401,18 @@ export interface ShotInput {
    * unbiased shot uses (no extra rng), so a 0 bias is byte-for-byte identical to before.
    */
   angleBias?: number;
+  /**
+   * The asymmetric spray-zone shape (GS-dispersion-2). When given, the random angle is sampled from
+   * these zones (so a duck-hook/shank can be suppressed or skewed per side); defaults to the
+   * symmetric `DEFAULT_SHAPE`. The display derives from the same shape, so it reads exactly true.
+   */
+  shape?: SprayShape;
+  /** Distance-control upgrade (point 5): raise the LOWER carry clamp by this fraction of intended,
+   *  shrinking the gap between a club's min and max carry from below (more reliable distance). */
+  minCarryFracBoost?: number;
+  /** Wedge distance-control (point 6): pull BOTH carry clamps toward the mean by this fraction
+   *  (0..1), tightening the wedge's carry window so it lands the chosen distance. */
+  carryWindowTighten?: number;
   rng: Rng;
 }
 
@@ -278,27 +446,38 @@ export function resolveShot(input: ShotInput): ShotResult {
   const dispMult = li.dispersionMult * (input.dispersionMult ?? 1);
   const prof = dispersionProfile(nominal);
   const carrySd = intended * prof.carryFrac * dispMult;
-  // Random spray is ANGULAR, not a flat sideways offset: a fraction-of-carry std-dev becomes
-  // a small-angle std-dev (radians) about the shot bearing. Because a rotation preserves
-  // length, the ball's distance from the tee is the sampled `carry` in EVERY direction — so a
-  // wide miss never finishes farther than the carry window (the old square-box bug). At small
-  // angles carry*sin(θ) ≈ carry*θ ≈ the old lateral spread, so dispersion magnitude is ~unchanged.
+  // Random spray is ANGULAR, not a flat sideways offset: a fraction-of-carry std-dev becomes the
+  // base angular spread σ0 (radians) about the shot bearing. Because a rotation preserves length,
+  // the ball's distance from the tee is the sampled `carry` in EVERY direction — so a wide miss
+  // never finishes farther than the carry window (the old square-box bug).
   const angleSd = prof.lateralFrac * dispMult;
 
-  // Distance: a mean a touch short of full (long clubs more so), gaussian noise, then a
-  // hard clamp to the club's [low, high] window so a shot can come up well short (down to
-  // ~50% on the driver) but never absurdly so — and tops out around 110%.
+  // Carry window: distance-control upgrades raise the lower clamp (less coming-up-short) and the
+  // wedge window-tighten pulls both clamps toward the mean (reliable wedge distance). Pure number
+  // tweaks on the club's [low, high] fractions — the AUTO sim and the preview apply the same ones.
+  let lowFrac = prof.lowFrac;
+  let highFrac = prof.highFrac;
+  if (input.minCarryFracBoost) lowFrac = Math.min(highFrac, lowFrac + input.minCarryFracBoost);
+  if (input.carryWindowTighten) {
+    const t = clamp01(input.carryWindowTighten);
+    lowFrac = lowFrac + (prof.meanFrac - lowFrac) * t;
+    highFrac = highFrac - (highFrac - prof.meanFrac) * t;
+  }
+
+  // Distance: a mean a touch short of full (long clubs more so), gaussian noise, then a hard clamp
+  // to the (possibly tightened) [low, high] window so a shot can come up short but never absurdly so.
   const carryMean = intended * prof.meanFrac + w.along * TUNABLES.windCarryPerMph;
   const carryNoisy = carryMean + rng.gaussian(0, carrySd);
   const carry = Math.max(
-    intended * prof.lowFrac,
-    Math.min(intended * prof.highFrac, Math.max(0, carryNoisy)),
+    intended * lowFrac,
+    Math.min(intended * highFrac, Math.max(0, carryNoisy)),
   );
-  // SECOND rng draw (was the lateral offset) — keeps the draw count/order identical so the
-  // headless sim and the interactive driver stay byte-for-byte in step. A character's shot-shape
-  // bias (fade +, hook −) shifts the MEAN of this angle, not its spread, so the same draw still
-  // covers the spray and a 0 bias reproduces the unbiased shot exactly.
-  const thetaRand = (input.angleBias ?? 0) + rng.gaussian(0, angleSd);
+  // SECOND + THIRD rng draws (replace the old single gaussian-angle draw, same 2-draw budget so the
+  // headless sim and the interactive driver stay in step): a categorical zone pick + a within-band
+  // position, sampled from the spray SHAPE. A character/upgrade shot-shape bias (fade +, hook −)
+  // shifts the MEAN of the resulting angle; the shape skews which side misses, never the bias.
+  const shape = input.shape ?? DEFAULT_SHAPE;
+  const thetaRand = (input.angleBias ?? 0) + sampleShapeAngle(shape, angleSd, rng);
   // Crosswind is a DETERMINISTIC lateral push (the AI already aims upwind to cancel it), kept
   // separate from the random angular spray so wind shifts the cone rather than widening it.
   const windLat = w.cross * TUNABLES.windLateralPerMph;

@@ -15,9 +15,13 @@ import {
   playsLike,
   playWind,
   PEN_INFO,
+  resolveShape,
   resolveShot,
+  sprayAngleRms,
   TUNABLES,
+  type ShapeMod,
   type ShotResult,
+  type SprayShape,
 } from './shot';
 import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
@@ -110,11 +114,38 @@ export interface ClubShotMods {
   angleBias: number;
   /** Added to the club's roll fraction: − = more backspin/check, + = more run-out. 0 = unchanged. */
   rollFracDelta: number;
+  /** Per-club spray-zone skew (GS-dispersion-2): shifts duck-hook/hook/slice/shank probabilities for
+   *  this club only — a golfer can hook the long sticks (more left zones) but stripe the irons. */
+  shape?: ShapeMod;
 }
 /** A per-club shot-mod function (nominal carry → mods). */
 export type ShotMods = (nominalCarry: number) => ClubShotMods;
 /** The neutral shot mods (no character / no shape) — every field a no-op. */
 export const NEUTRAL_SHOT_MODS: ClubShotMods = { dispMult: 1, angleBias: 0, rollFracDelta: 0 };
+
+/** Carry below which a club counts as a WEDGE for distance-control (PW 106 and shorter). The
+ *  distance-control upgrade raises the min carry of everything ABOVE this; the wedge window-tighten
+ *  applies to clubs at/below it. */
+export const WEDGE_CONTROL_CARRY = 110;
+
+/** Loadout-level distance-control settings (GS-dispersion-2, points 5 & 6), resolved per club. */
+export interface CarryControlOpts {
+  /** Raise the lower carry clamp of NON-wedge clubs by this fraction (driver/woods/irons). */
+  minCarryBoost?: number;
+  /** Tighten the carry window of WEDGES toward the mean by this fraction (0..1). */
+  wedgeWindow?: number;
+}
+
+/** Resolve the per-club carry-window tweaks from the loadout-level controls + the club's carry. */
+export function carryControlFor(
+  nominalCarry: number,
+  opts: CarryControlOpts,
+): { minCarryFracBoost?: number; carryWindowTighten?: number } {
+  if (nominalCarry <= WEDGE_CONTROL_CARRY) {
+    return opts.wedgeWindow ? { carryWindowTighten: opts.wedgeWindow } : {};
+  }
+  return opts.minCarryBoost ? { minCarryFracBoost: opts.minCarryBoost } : {};
+}
 
 /** A single putt's roll on the green, for the play view to animate (flat, no arc). */
 export interface PuttLog {
@@ -145,6 +176,12 @@ export interface PlayHoleOptions {
   driverDeck?: number;
   /** Character per-club shot modifiers (GS-18): shape bias, per-club dispersion, backspin. */
   shotMods?: ShotMods;
+  /** Global spray-zone shape mod from upgrades (GS-dispersion-2): suppress/skew miss zones. */
+  shapeMod?: ShapeMod;
+  /** Distance-control: raise the min carry of driver/woods/irons by this fraction (point 5). */
+  minCarryBoost?: number;
+  /** Wedge distance-control: tighten the wedge carry window toward the mean (point 6). */
+  wedgeWindow?: number;
 }
 
 /** Pin location: the generated flag within the green (GS-6), or the centroid if absent. */
@@ -342,6 +379,9 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       dispersionMult: sprayMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * sprayMult,
       stats: opts.stats,
       shotMods: opts.shotMods,
+      shapeMod: opts.shapeMod,
+      minCarryBoost: opts.minCarryBoost,
+      wedgeWindow: opts.wedgeWindow,
     }, rng);
     strokes += 1 + ex.penaltyStrokes;
     penalties += ex.penaltyStrokes;
@@ -406,6 +446,12 @@ export interface ExecOpts {
   stats?: ClubStats;
   /** Character per-club shot modifiers (GS-18): shape bias, per-club dispersion, backspin. */
   shotMods?: ShotMods;
+  /** Global spray-zone shape mod from upgrades (GS-dispersion-2). */
+  shapeMod?: ShapeMod;
+  /** Distance-control: raise min carry of driver/woods/irons (point 5). */
+  minCarryBoost?: number;
+  /** Wedge distance-control: tighten the wedge carry window (point 6). */
+  wedgeWindow?: number;
 }
 
 export interface ExecResult {
@@ -439,9 +485,14 @@ export function executeShot(
   // Character per-club shape: keyed by the club's nominal carry (a hooky driver, striped irons,
   // back-spun wedges). `dispMult === 1` passes the original dispersionMult through UNTOUCHED so a
   // characterless shot stays byte-for-byte (undefined stays undefined, never `undefined * 1`).
-  const mods = opts.shotMods ? opts.shotMods(clubDist(club, opts.stats)) : NEUTRAL_SHOT_MODS;
+  const nominalCarry = clubDist(club, opts.stats);
+  const mods = opts.shotMods ? opts.shotMods(nominalCarry) : NEUTRAL_SHOT_MODS;
   const dispersionMult =
     mods.dispMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * mods.dispMult;
+  // Final spray SHAPE = the global upgrade mod (suppress duck-hooks, …) folded with this club's
+  // character skew (a hooky driver). Carry-window controls are resolved by club category.
+  const shape = resolveShape(opts.shapeMod, mods.shape);
+  const cw = carryControlFor(nominalCarry, opts);
   const result = resolveShot({
     from,
     aim,
@@ -451,6 +502,9 @@ export function executeShot(
     carryMult,
     dispersionMult,
     angleBias: mods.angleBias,
+    shape,
+    minCarryFracBoost: cw.minCarryFracBoost,
+    carryWindowTighten: cw.carryWindowTighten,
     stats: opts.stats,
     rng,
   });
@@ -525,11 +579,16 @@ export interface ShotSpread {
   /** Along-axis (distance) std-dev (yards). */
   carrySd: number;
   /**
-   * Angular spray std-dev (radians) about the bearing — the SAME value `resolveShot`
-   * rotates the shot by. The render sweeps the spray arc by `±z·angleSd`, so the cone is a
-   * true sector (carry preserved in every direction) that reads EXACTLY true to the physics.
+   * Effective angular spray σ (radians, RMS) — the spread the cone "reads as", matching the sampled
+   * scatter so the dispersion preview stays honest under any shape.
    */
   angleSd: number;
+  /** Base angular spread σ0 (radians) the bands scale from — the renderer turns this + `shape`
+   *  into the drawn zone wedges (`sprayBands`). */
+  angleSpread: number;
+  /** The asymmetric spray-zone shape (GS-dispersion-2) — the renderer draws each zone's band &
+   *  % straight from this, so the graphic IS the landing distribution. */
+  shape: SprayShape;
 }
 
 export function shotSpread(
@@ -538,7 +597,15 @@ export function shotSpread(
   lie: FeatureKind,
   target: Vec,
   club: Club,
-  opts: { carryMult?: number; dispersionMult?: number; stats?: ClubStats; shotMods?: ShotMods } = {},
+  opts: {
+    carryMult?: number;
+    dispersionMult?: number;
+    stats?: ClubStats;
+    shotMods?: ShotMods;
+    shapeMod?: ShapeMod;
+    minCarryBoost?: number;
+    wedgeWindow?: number;
+  } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
   const li = lieInfo(lie);
@@ -553,9 +620,25 @@ export function shotSpread(
   const dispMult = li.dispersionMult * (opts.dispersionMult ?? 1) * mods.dispMult;
   const prof = dispersionProfile(nominal);
   const along = w.along * TUNABLES.windCarryPerMph;
-  const low = intended * prof.lowFrac;
-  const high = intended * prof.highFrac;
+  // Carry window mirrors resolveShot's clamp (distance-control / wedge-window), so the preview's
+  // min/max carry read exactly what the shot will do.
+  const cw = carryControlFor(nominal, opts);
+  let lowFrac = prof.lowFrac;
+  let highFrac = prof.highFrac;
+  if (cw.minCarryFracBoost) lowFrac = Math.min(highFrac, lowFrac + cw.minCarryFracBoost);
+  if (cw.carryWindowTighten) {
+    const t = Math.max(0, Math.min(1, cw.carryWindowTighten));
+    lowFrac = lowFrac + (prof.meanFrac - lowFrac) * t;
+    highFrac = highFrac - (highFrac - prof.meanFrac) * t;
+  }
+  const low = intended * lowFrac;
+  const high = intended * highFrac;
   const mean = Math.max(low, Math.min(high, intended * prof.meanFrac + along));
+  // The asymmetric zone shape: global upgrade mod + this club's character skew. The renderer draws
+  // each zone straight from it (so the graphic is the landing distribution), and the effective σ is
+  // its RMS so previews/tests read true.
+  const shape = resolveShape(opts.shapeMod, mods.shape);
+  const angleSpread = prof.lateralFrac * dispMult;
   return {
     origin: from,
     bearing: shotBearing + (mods.angleBias * 180) / Math.PI,
@@ -564,7 +647,9 @@ export function shotSpread(
     carryHigh: high + along,
     lateralSd: intended * prof.lateralFrac * dispMult,
     carrySd: intended * prof.carryFrac * dispMult,
-    angleSd: prof.lateralFrac * dispMult,
+    angleSd: sprayAngleRms(shape, angleSpread),
+    angleSpread,
+    shape,
   };
 }
 
