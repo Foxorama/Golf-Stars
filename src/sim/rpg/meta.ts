@@ -55,7 +55,13 @@ export const META_UPGRADES: readonly MetaUpgrade[] = [
     rarity: 'rare',
     maxLevel: 4,
     baseCost: 35,
-    applyLevel: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 6) }),
+    // Bake +6 into the current distance clubs AND record it on distanceClubBonus, so a reward
+    // distance club bought later in the run inherits the same bonus (GS-clubs).
+    applyLevel: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 6),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 6,
+    }),
   },
   {
     id: 'steady-grip',
@@ -119,14 +125,23 @@ export function buyMetaUpgrade(
   return { meta: { ...meta, [id]: lvl + 1 }, shards: shards - metaUpgradeCost(u, lvl) };
 }
 
-/** The starting loadout with every owned meta-upgrade level baked in. Pure. */
-export function metaStartingLoadout(meta: MetaUpgrades = {}): PlayerLoadout {
-  let m = startingLoadout();
+/**
+ * Fold every owned meta-upgrade level onto a given base loadout. Pure. Used both for the neutral
+ * starting loadout AND on top of a chosen golfer's loadout (GS-clubs), so meta (e.g. Tour Bag) bakes
+ * into the character's own starting bag rather than a discarded default one.
+ */
+export function applyMeta(meta: MetaUpgrades, base: PlayerLoadout): PlayerLoadout {
+  let m = base;
   for (const u of META_UPGRADES) {
     const lvl = metaLevel(meta, u.id);
     for (let i = 0; i < lvl; i++) m = u.applyLevel(m);
   }
   return m;
+}
+
+/** The (neutral) starting loadout with every owned meta-upgrade level baked in. Pure. */
+export function metaStartingLoadout(meta: MetaUpgrades = {}): PlayerLoadout {
+  return applyMeta(meta, startingLoadout());
 }
 
 /** Starting credits including any Deep Pockets bonus. Pure. */

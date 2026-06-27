@@ -18,7 +18,7 @@
 
 import { CLUBS } from '../sim/clubs';
 import { LIE_INFO } from '../sim/shot';
-import { SHOP_ITEMS, ownedCount, itemCap, type ShopItem } from '../sim/rpg/economy';
+import { SHOP_ITEMS, CLUB_ITEMS, ownedCount, itemCap, type ShopItem } from '../sim/rpg/economy';
 import { META_UPGRADES, type MetaUpgrades } from '../sim/rpg/meta';
 import { FORMATS } from '../sim/rpg/formats';
 import { CHARACTERS } from '../sim/rpg/characters';
@@ -225,6 +225,22 @@ function loadoutGroup(): HTMLElement {
     );
   });
 
+  // reward clubs (GS-clubs) — toggle a club into the built bag (it equips/replaces its type). Read
+  // straight from the CLUB_ITEMS table so the catalogue can't fork from the game.
+  const clubRows = CLUB_ITEMS.map((it: ShopItem) =>
+    stepper(
+      it.name,
+      it.desc,
+      1,
+      () => ownedCount(build.perks, it.id),
+      (n) => {
+        build.perks = build.perks.filter((p) => p !== it.id);
+        for (let i = 0; i < n; i++) build.perks.push(it.id);
+        refreshStats();
+      },
+    ),
+  );
+
   statsBox = h('div', {});
   return group('Loadout · clubs / path / skill upgrades', [
     h('div', { class: 'row' }, h('label', {}, 'Golfer'), charSel),
@@ -233,6 +249,8 @@ function loadoutGroup(): HTMLElement {
     ...metaRows,
     h('div', { class: 'subhead' }, 'Run perks (✦ = stackable)'),
     ...perkRows,
+    h('div', { class: 'subhead' }, 'Reward clubs (equip into the bag)'),
+    ...clubRows,
     h('div', { class: 'grp', style: 'margin-top:10px' }, h('div', { class: 'body' }, statsBox)),
   ]);
 }

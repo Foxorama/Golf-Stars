@@ -15,6 +15,7 @@ import { playCourse, type PlayedHole } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
+  DRIVER_ID,
   SHOP_ITEMS,
   canBuy,
   creditsForStop,
@@ -25,14 +26,16 @@ import {
   loadoutFromPerks,
   namedCaddyOwned,
   netDispersion,
+  offerableClubs,
   ownedCount,
   shopItem,
+  startingLoadout,
   type PlayerLoadout,
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
-import { metaStartingCredits, metaStartingLoadout, type MetaUpgrades } from './meta';
+import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods } from './characters';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome, itemThemeWeight } from '../course/themes';
@@ -87,6 +90,16 @@ export interface Run {
   history: StopResult[];
 }
 
+/**
+ * The starting loadout for a run: the chosen golfer's signature bag/shape (GS-18, GS-clubs) FIRST,
+ * then the permanent meta-upgrades baked ON TOP — so Tour Bag (+yds) lands on the character's own
+ * sparse starting bag rather than a discarded default one, and the meta order is identical on resume.
+ * One source of truth for `startRun` + `resumeRun` (and the Sim Lab) so they reconstruct it the same.
+ */
+export function startingLoadoutFor(meta: MetaUpgrades, characterId?: string): PlayerLoadout {
+  return applyMeta(meta, applyCharacter(characterId, startingLoadout()));
+}
+
 export function startRun(
   seed: number | string,
   formatId: string = DEFAULT_FORMAT,
@@ -100,9 +113,9 @@ export function startRun(
     stopIndex: 0,
     distanceFromStart: 0,
     // Permanent meta-progression bakes into the starting credits + loadout (GS-12); the chosen
-    // golfer's shape/bag tweak (GS-18) layers on top (and stamps its id for resume).
+    // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor).
     credits: metaStartingCredits(meta),
-    loadout: applyCharacter(characterId, metaStartingLoadout(meta)),
+    loadout: startingLoadoutFor(meta, characterId),
     meta,
     firedEventIds: [],
     status: 'active',
@@ -305,6 +318,10 @@ function weightedSample(
 export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   const perks = run.loadout.perks;
   const hasCaddy = !!namedCaddyOwned(perks);
+  // Driver Dan (GS-clubs) only turns up once the golfer actually OWNS a driver — so Larry (who starts
+  // with one) is eligible from the off, but everyone else must first find a Driver club. He still only
+  // appears at his epic rarity in the rotation; owning a driver is a gate, not a guaranteed early show.
+  const ownsDriver = run.loadout.bag.some((c) => c.id === DRIVER_ID);
   // Hide maxed items, gate prereq tier-ladders, and handle caddies (GS-caddy): named caddies are
   // random rarity-weighted inclusions UNTIL you hire one, after which NO named caddy appears again;
   // generic caddy 'service' perks only surface once a named caddy has been hired.
@@ -313,7 +330,8 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
       ownedCount(perks, it.id) < itemCap(it) &&
       (!it.prereq || perks.includes(it.prereq)) &&
       (it.caddy !== 'named' || !hasCaddy) &&
-      (it.caddy !== 'service' || hasCaddy),
+      (it.caddy !== 'service' || hasCaddy) &&
+      (it.id !== 'driver-dan' || ownsDriver),
   );
   const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
   // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
@@ -323,6 +341,25 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
   });
+}
+
+export const CLUB_OFFER_SIZE = 3;
+
+/**
+ * The reward CLUBS on offer at the current stop (GS-clubs), shown alongside the perk shop. A seeded,
+ * rarity-weighted draw of the clubs this golfer can still pursue: types they lack (fill a gap), or
+ * higher-tier / different-set versions of clubs they hold (upgrade / side-grade). Larry never sees
+ * hybrids; a club you already own at that tier never reappears (see offerableClubs). Deterministic
+ * from the run seed + stop (its own RNG stream, so it doesn't perturb the perk offer).
+ */
+export function clubOffer(run: Run, size = CLUB_OFFER_SIZE): ShopOffer[] {
+  const pool = offerableClubs(run.loadout);
+  const rng = new Rng(`${run.seed}:clubs:${run.stopIndex}`);
+  return weightedSample(rng, pool, Math.min(size, pool.length)).map((item) => ({
+    item,
+    cost: item.cost,
+    owned: ownedCount(run.loadout.perks, item.id),
+  }));
 }
 
 /** Voluntarily bank the run (cash out) — ends it with reason 'banked'. */
@@ -374,9 +411,9 @@ export function resumeRun(snap: RunSnapshot): Run {
     stopIndex: snap.stopIndex,
     distanceFromStart: snap.distanceFromStart,
     credits: snap.credits,
-    // Perks sit on top of the permanent meta base, which already carries the chosen golfer's tweak
-    // (GS-18), so both layers survive a resume.
-    loadout: loadoutFromPerks(snap.perks ?? [], applyCharacter(snap.characterId, metaStartingLoadout(meta))),
+    // Perks (incl. reward clubs, GS-clubs) sit on top of the golfer+meta starting loadout, rebuilt the
+    // SAME way `startRun` builds it, so the bag (starting clubs + bought/upgraded clubs) reconstructs.
+    loadout: loadoutFromPerks(snap.perks ?? [], startingLoadoutFor(meta, snap.characterId)),
     meta,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],

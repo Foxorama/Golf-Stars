@@ -11,15 +11,25 @@
  * the player's bag rows — the engine never hardcodes a club.
  */
 
+import type { Rarity } from './course/contract';
+
 export interface Club {
   id: string;
   name: string;
   /** Nominal carry in yards. A player's bag may override this (upgrades/loot). */
   carry: number;
+  /**
+   * Loot SET/style this club came from (GS-clubs): 'starter' for the clubs you begin a run with,
+   * a named set (e.g. 'tour') for a reward club. Absent ⇒ treated as the common 'starter' set. The
+   * sim ignores this (carry is all it reads); it drives the reward-offer ownership rules + UI tint.
+   */
+  set?: string;
+  /** Loot grade of this club (GS-clubs): a reward club may be rarer/better. Absent ⇒ 'common'. */
+  rarity?: Rarity;
 }
 
 /**
- * Default 26-club starting bag, ordered longest→shortest carry. Idealised (a real
+ * Default 27-club taxonomy, ordered longest→shortest carry. Idealised (a real
  * bag holds 14) but this is a *taxonomy* the suggester maps distances onto; loot
  * trims/upgrades it later. Carries are strictly descending for a clean mapping.
  */
@@ -34,6 +44,7 @@ export const CLUBS: readonly Club[] = [
   { id: '3H', name: '3-Hybrid', carry: 181 },
   { id: '4H', name: '4-Hybrid', carry: 173 },
   { id: '5H', name: '5-Hybrid', carry: 165 },
+  { id: '3i', name: '3-Iron', carry: 162 },
   { id: '4i', name: '4-Iron', carry: 158 },
   { id: '5i', name: '5-Iron', carry: 150 },
   { id: '6i', name: '6-Iron', carry: 142 },

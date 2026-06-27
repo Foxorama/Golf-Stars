@@ -23,8 +23,9 @@ import {
   handicapDispersion,
   type PlayerLoadout,
 } from '../sim/rpg/economy';
-import { applyCharacter, characterShotMods } from '../sim/rpg/characters';
-import { metaStartingLoadout, type MetaUpgrades } from '../sim/rpg/meta';
+import { characterShotMods } from '../sim/rpg/characters';
+import { startingLoadoutFor } from '../sim/rpg/run';
+import { type MetaUpgrades } from '../sim/rpg/meta';
 import { THEMES, themeById, resolveBiome, type Arc } from '../sim/course/themes';
 import type { Rarity, Wind } from '../sim/course/contract';
 
@@ -226,8 +227,9 @@ export interface BuildOpts {
 }
 
 export function buildLoadout(opts: BuildOpts = {}): BuiltLoadout {
-  // Meta base → the chosen golfer's starting tweak → handicap override → shop perks on top.
-  let base = applyCharacter(opts.characterId, metaStartingLoadout(opts.meta ?? {}));
+  // Golfer's signature bag → meta upgrades baked on top → handicap override → shop perks (incl. reward
+  // clubs) — the SAME construction the run uses (startingLoadoutFor), so the lab matches play exactly.
+  let base = startingLoadoutFor(opts.meta ?? {}, opts.characterId);
   // The handicap slider sets the STARTING handicap; perks (Pro Coach, Caddie Lesson) then
   // reduce from it — so the override goes on the base, BEFORE perks fold on top.
   if (opts.handicap != null) base = { ...base, handicap: Math.max(0, Math.min(36, opts.handicap)) };
