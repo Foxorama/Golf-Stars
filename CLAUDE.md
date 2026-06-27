@@ -365,13 +365,14 @@ This game lives or dies on three axes — put every change through all three bef
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only
-  ONE at a time. They live in the shop's dedicated **Caddies section** (`caddyRoster(run)`, rendered by
-  `app.ts caddyCardHTML`), NOT the rotating offer (`shopOffer` excludes `caddy === 'named'`): the whole
-  roster is always shown — the hired one flagged `owned`, the rest `locked` (greyed) once one is on the
-  bag. Exclusivity is enforced in `buy()` (a second named caddy is a no-op). The roster, all rare/
-  legendary: **Penelope Putter** (`auto-caddie`, legendary — auto-putt; id kept for save-compat),
-  **Driver Dan** (`driver-dan`, rare — `driverAnywhere`, see the driver bullet), **Dr Chipinski**
-  (`dr-chipinski`, rare — `chipInBoost` 0.33), **Space Ducks** (`space-ducks`, legendary — left-side
+  ONE. They are RANDOM, rarity-weighted inclusions in the rotating offer (`shopOffer`) — NOT a
+  dedicated row — and because they're epic/legendary they're scarce. The moment you hire ANY named
+  caddy, NO named caddy appears in the shop again: `shopOffer` filters `caddy === 'named' && hasCaddy`,
+  and `app.ts` also drops the others from the already-fixed offer on the next render. Exclusivity is
+  also enforced in `buy()` (a second named caddy is a no-op). Rarity is epic or legendary by ability
+  strength: **Penelope Putter** (`auto-caddie`, legendary — auto-putt; id kept for save-compat),
+  **Driver Dan** (`driver-dan`, epic — `driverAnywhere`, see the driver bullet), **Dr Chipinski**
+  (`dr-chipinski`, epic — `chipInBoost` 0.33), **Space Ducks** (`space-ducks`, legendary — left-side
   guard), **Convict Sheep** (`convict-sheep`, legendary — right-side guard). Helpers: `NAMED_CADDY_IDS`,
   `isNamedCaddy`, `namedCaddyOwned(perks)`.
 - **Generic caddy 'service' perks gate behind hiring a named caddy.** `caddie-lesson` is `caddy:
