@@ -234,6 +234,38 @@ This game lives or dies on three axes — put every change through all three bef
   Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a
   hard per-hole cap. Tightening the short-game AI to shrink the tail is GS-4.
+- **Per-world SIGNATURE mechanics, scaled fair→brutal by wildness (GS-19).** Two worlds break the
+  baseline "rough is a safe recovery / no penalty on the corridor" model on purpose — both are pure
+  DATA opt-ins on the biome row (`lostRough`, `lavaRiver`), gated by a wildness threshold so a calm
+  stop plays fair and a deep one bites:
+  - **Void = lost rough (`void-garden.lostRough: 'voidrough'`).** There is no rough in the void —
+    off the fairway is the abyss. Past `LOST_ROUGH_MIN_WILDNESS` (0.55) the generator (a) arms a
+    `roughLie` biomeMod that `lieAt` returns for any OFF-feature point (so a sprayed ball reads as
+    the `voidrough` PENALTY) and (b) widens the corridor to a generous `VOID_ISLAND_SCALE` (2.4×,
+    constant — does NOT shrink with wildness) so the island is an honest, big target. The penalty is
+    a NON-replay drop-back-on-the-island (`voidlost`), NOT stroke-and-distance: a true s-and-d
+    cascade made max-wildness void a ball-shredder (toPar/hole 2.1, ~1 lost ball/hole); the +1 drop
+    keeps it brutal-but-FAIR (toPar 0.96, ~0.5 lost/hole — the hardest world, still under the bar).
+    Below the threshold the void renders as space but plays as ordinary rough (fair early). The
+    visual is "space" either way; only the penalty is gated.
+  - **Inferno = lava rivers (`ember-world.lavaRiver: true`).** One molten band (`kind: 'lavariver'`)
+    crosses the corridor on a par-4/5 as a FORCED CARRY, past `LAVA_RIVER_MIN_WILDNESS` (0.3),
+    thickness ramping with wildness but capped relative to the hole. It's a PENALTY on the play
+    corridor, so `validateFairness` EXEMPTS `lavariver` and a separate `validateCrossings` PROVES
+    each one carryable: the centreline genuinely enters+exits it, with a penalty-free shelf BEFORE
+    the near bank (lay up short) and just AFTER the far bank (land the carry). One river per hole
+    (two close ones leave no safe shelf between).
+- **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
+  When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
+  river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
+  far bank within reach — flying over a hazard is fair, only RESTING in it costs) or, if it can't
+  clear it in one, lays up SHORT of the near bank; a side hazard still lays up onto the centreline
+  (unchanged). `maxReach` is derived deterministically from `(bag, lie, carryMult)` and threaded
+  IDENTICALLY through `playHole` and the interactive `layupTarget` (play.ts), so auto≡interactive
+  stays byte-for-byte (guarded on ember+void at wildness 1). For every non-river/non-void hole the
+  logic is unchanged — `cross` is null, so it's the OLD layup-to-centreline (all existing tests are
+  byte-identical). NB: penalties apply where the ball RESTS (touchdown/roll), never mid-flight, so a
+  river is automatically a forced carry the moment the AI stops laying up into it.
 
 ## RPG meta-loop (locked in GS-2)
 - **The spine** (`src/sim/rpg/run.ts`): `startRun → [playStop → buy* → travel]*` until a cut
@@ -397,6 +429,27 @@ This game lives or dies on three axes — put every change through all three bef
   + OB stakes + centreline moved INTO the builder too (de-duped); the interactive overlays (spray cone, live
   ball, shot lines, HUD, animation) stay per-renderer. Canvas feel is eyes-on, but the SVG path is verified
   by rasterising a biome×seed gallery — re-shoot one after any `style.ts` change.
+- **Per-ZONE turf palettes + signature visuals (GS-19, `palette.ts`/`style.ts`).** The old per-theme
+  look only HUE-ROTATED the green turf — barely readable ("green fairways in no way match the themes").
+  Now each of the 5 archetypes has an EXPLICIT designed turf palette (`ARCHETYPE_TURF`): desert firm
+  tan, frost frosted teal/mint, inferno scorched ash-olive, void cosmic indigo, **verdant = the
+  original `SHADES` values byte-for-byte** (so a themeless / verdant render is unchanged and the
+  render tests still see `#3f8c3f`/`#5fd45a`). `buildScene` resolves the archetype from the theme id
+  (else the biome id, via `archetypeFor`) and rarity-deepens it (`worldLook`); the stylers now take a
+  resolved `Shade` instead of computing from a hue tint. Signature surfaces: lava (`styleLava` — a
+  charred crust → glowing body → hot core + cracks, shared by flanking lakes AND crossing rivers) and
+  the void's luminous **island glow** under the fairway/green so the platforms read as land in the
+  abyss (the off-fairway IS the void). The dark per-biome rough (`roughBaseFor`) + starfield accents
+  carry the "space" read. Re-shoot the biome×seed gallery after any palette/`style.ts` change.
+- **Zone splash card + procedural hero art (GS-19, `render/zoneHero.ts` + `app.ts`).** The per-hole
+  briefing splash now leads with a thematic **hero scene** — a self-contained, deterministic SVG
+  illustration per archetype (`zoneHeroSVG`: a garden dawn, a Mars dust horizon, a glacier aurora, a
+  volcanic lava-flow world, the void's island past a black hole) — NO downloaded asset to 404 (the
+  house rule, same as the intro). Below it: the zone NAME + signature + theme, a **difficulty** pip
+  rating, the real-space INSPIRATION, a brief, and two columns of HAZARDS / BENEFITS — all pure DATA
+  from `src/sim/course/zones.ts` (`ZONES`, archetype-keyed prose/profile; the physics stay in
+  `biomes.ts`). Then the LIVE per-hole facts (wind/hazards/conditions, now flagging an armed void
+  lost-rough) + the layout map. The hero SVG is `width:100%` responsive so it fills the panel.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
 - **The swinging golfer + space ambience (play-view "alive" layer).** Each full shot in `playView`

@@ -15,6 +15,19 @@ Everything below serves whichever avenue wins.
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
+- **GS-19 — Themes & fairways overhaul (per-zone identity + signature mechanics). SHIPPED.** The 5
+  worlds now look and PLAY distinct. (1) **Per-archetype turf palettes** (`ARCHETYPE_TURF`) replace
+  GS-17f's subtle hue-rotation — desert tan, frost teal, inferno scorched, void cosmic; verdant =
+  the original `SHADES` byte-for-byte (themeless render unchanged). (2) **Void lost-rough**: off the
+  fairway is the void (non-replay `voidlost` penalty), armed by wildness with widened island
+  fairways — fair early, brutal late (toPar/hole 0.96 at max, the hardest world). (3) **Lava rivers**:
+  a molten band crosses the fairway as a forced carry on ember par-4/5, exempt from
+  `validateFairness` but proved carryable by `validateCrossings`, with a new carry-aware AI (lay up
+  short / carry it) shared by auto + interactive (byte-for-byte). (4) **Zone splash card**: a
+  procedural vector hero scene per world (`zoneHero.ts`) + real-space inspiration + difficulty pips +
+  hazards/benefits, all data in `zones.ts`. Lava/void visuals (`styleLava`, void island glow). 338
+  tests green; death-spiral bar holds across every biome.
+
 - **GS-17 — Star-travel themes (constellation/galaxy theming + arcs).** Foundation SHIPPED
   (`src/sim/course/themes.ts`): golf-finder's night-sky catalogue (`data/night-sky-cards.json`) is
   curated into a theme table — each constellation/deep-sky/galaxy is a stop theme bundling a biome
@@ -43,7 +56,8 @@ Everything below serves whichever avenue wins.
     control/skill, frost→control/putting, desert→control, verdant→economy/skill — so the shop reads
     on-theme for where you are. A soft weight (`ITEM_AFFINITY_BOOST`), never a filter; offer stays
     deterministic + distinct; item effects/balance untouched (shop invariants hold).
-  - **GS-17f — Per-theme turf/ground palette tints. SHIPPED.** A render-only HSL tint (`tintHex`/
+  - **GS-17f — Per-theme turf/ground palette tints. SHIPPED (superseded by GS-19's explicit
+    `ARCHETYPE_TURF` palettes — the hue-tint read too subtle).** A render-only HSL tint (`tintHex`/
     `Tint` in palette.ts) shifts the TURF (fairway/green/tee, gentle) and GROUND (rough/background/
     accents, full) toward the stop's world — verdant stays green, desert/inferno warm, frost cools,
     void goes violet — deepened by rarity + nudged per-theme. Gated on `themeId` so a themeless render

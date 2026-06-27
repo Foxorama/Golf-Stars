@@ -14,7 +14,9 @@ export const FILL: Record<string, string> = {
   water: '#3f8fe0',
   waste: '#c2b280',
   lava: '#d2451e',
+  lavariver: '#e2541a',
   void: '#160a26',
+  voidrough: '#0a0518',
   ice: '#bfe6f0',
   crystal: '#9fd8e6',
 };
@@ -172,6 +174,16 @@ export const WATER = {
   deepest: '#1d4f96',
   glint: 'rgba(255,255,255,0.85)',
   ink: '#163b6b',
+};
+
+/** Molten lava (lakes + rivers): a charred crust rim, a glowing body, a hot core + bright cracks. */
+export const LAVA = {
+  crust: '#3a1008',
+  body: '#d2451e',
+  hot: '#ff8a2a',
+  core: '#ffd24a',
+  crack: '#ffb24a',
+  ink: '#651a0a',
 };
 
 /** Cell-shaded canopy: a core shadow, a mid body, a lit cap, a trunk + ground shadow + ink. */

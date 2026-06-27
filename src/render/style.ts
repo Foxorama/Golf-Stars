@@ -30,6 +30,7 @@ import {
   type Shade,
   SAND,
   WATER,
+  LAVA,
   CANOPY,
   OB,
 } from './palette';
@@ -261,6 +262,38 @@ function styleWater(poly: Vec[], rng: () => number, art: ArtFeel): Prim[] {
     out.push({ t: 'line', a: [gx, gy - r], b: [gx, gy + r], stroke: WATER.glint, sw: 1, round: true });
   }
   if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: WATER.ink, sw: 1.6 });
+  return out;
+}
+
+/** Molten lava (lake or river band): charred crust rim → glowing body → hot core + cracks. The
+ *  same styler draws a flanking lava lake and a crossing river, so both read as the same magma. */
+function styleLava(poly: Vec[], rng: () => number): Prim[] {
+  const c = centroidOf(poly);
+  const b = bboxOf(poly);
+  const out: Prim[] = [
+    { t: 'poly', pts: scalePoly(poly, c, 1.08), fill: LAVA.crust }, // charred crust rim (outset)
+    { t: 'poly', pts: poly, fill: LAVA.body, stroke: LAVA.ink, sw: 1.4 },
+    { t: 'poly', pts: scalePoly(poly, c, 0.74), fill: LAVA.hot }, // glowing inner
+    { t: 'poly', pts: scalePoly(poly, c, 0.4), fill: LAVA.core }, // hot core
+  ];
+  // A few bright cracks/flow lines through the magma (clipped to the shape).
+  const cracks = 3 + Math.floor(rng() * 3);
+  const children: Prim[] = [];
+  for (let i = 0; i < cracks; i++) {
+    const ax = b.minX + (b.maxX - b.minX) * rng();
+    const ay = b.minY + (b.maxY - b.minY) * rng();
+    const len = 4 + rng() * 10;
+    const ang = rng() * Math.PI * 2;
+    children.push({
+      t: 'line',
+      a: [ax, ay],
+      b: [ax + Math.cos(ang) * len, ay + Math.sin(ang) * len],
+      stroke: LAVA.crack,
+      sw: 1,
+      round: true,
+    });
+  }
+  out.push({ t: 'clip', clip: poly, children });
   return out;
 }
 
@@ -534,8 +567,16 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
 
   // --- 4. Terrain features (fairway/green/tee + scatter surfaces) --------------
   const collar = collarFor(arch, deepen);
+  // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
+  // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
+  const voidGlow = arch === 'void';
   for (const f of hole.features) {
     const sp = projPoly(f.poly, proj);
+    if (voidGlow && (f.kind === 'fairway' || f.kind === 'green')) {
+      const gc = centroidOf(sp);
+      prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.34), fill: 'rgba(120,130,240,0.10)' });
+      prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.16), fill: 'rgba(120,130,240,0.14)' });
+    }
     if (f.kind === 'fairway') prims.push(...styleFairway(sp, art, fwShade));
     else if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade));
@@ -553,6 +594,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push(...styleBunker(sp, art, proj.scale));
     } else if (f.kind === 'water') {
       prims.push(...styleWater(sp, rng, art));
+    } else if (f.kind === 'lava' || f.kind === 'lavariver') {
+      prims.push(...styleLava(sp, rng));
     } else {
       prims.push(...styleScatter(f.kind, sp, art));
     }
