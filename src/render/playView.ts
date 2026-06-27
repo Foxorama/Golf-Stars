@@ -14,6 +14,7 @@
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
+import { archetypeFor } from '../sim/course/themes';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
 import { drawCaddy, drawCaddyProjectile, hasCaddyArt, CADDY_LABEL, type CaddyArtId } from './caddyArt';
@@ -63,6 +64,8 @@ interface PlayFeel extends FlightFeel {
   followMs: number;
   /** Animated twinkle/shooting-star space ambience over the field. */
   spaceFX: boolean;
+  /** Animated wind streaks drifting across the hole (GS-wind), themed + scaled by wind speed. */
+  wind: boolean;
 }
 
 const BASE_FEEL: PlayFeel = {
@@ -86,6 +89,7 @@ const BASE_FEEL: PlayFeel = {
   swingLeadMs: 520,
   followMs: 440,
   spaceFX: true,
+  wind: true,
 };
 
 // Loader-style cap colours so the play-view golfer reads as one of the intro's crew (the fallback
@@ -454,6 +458,56 @@ export function mountPlayView(
     ctx.restore();
   }
 
+  // Animated WIND (GS-wind): streaks drifting across the hole in the wind's screen direction,
+  // themed per world and scaled by `Wind.spd`, so you can SEE which way and how hard it blows (the
+  // shot-bearing wind the AI aims upwind into). Toroidal drift off the seeded fxRng — pure feel on
+  // the existing `_gsFeel.wind` knob; the static map gets matching streaks from the scene builder.
+  const windArch = archetypeFor(opts.themeId, opts.biome ?? '');
+  const windSpd = hole.wind?.spd ?? 0;
+  const windDirRad = ((hole.wind?.dir ?? 0) * Math.PI) / 180;
+  const WIND_RGBA: Record<string, string> = {
+    inferno: '255,150,70', frost: '222,243,255', desert: '226,196,140', verdant: '208,236,206', void: '200,170,255',
+  };
+  const windDots = Array.from({ length: 90 }, () => ({ x: fxRng() * (width + 40), y: fxRng() * (height + 40), s: 0.6 + fxRng() * 0.9, ph: fxRng() * 6.28 }));
+  function windScreenDir(): Vec {
+    const c0 = hole.tee;
+    const c1: Vec = [c0[0] + Math.sin(windDirRad), c0[1] + Math.cos(windDirRad)];
+    const a = proj.project(c0);
+    const b = proj.project(c1);
+    let dx = b[0] - a[0];
+    let dy = b[1] - a[1];
+    const l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l];
+  }
+  const wrap = (v: number, m: number): number => ((v % m) + m) % m;
+  function drawWind(now: number): void {
+    if (!F.wind || windSpd < 2) return;
+    const [dx, dy] = windScreenDir();
+    const intensity = Math.min(1, (windSpd - 2) / 26);
+    const count = Math.round(14 + intensity * 66);
+    const drift = now * 0.001 * (20 + intensity * 130);
+    const col = WIND_RGBA[windArch] ?? WIND_RGBA.verdant;
+    const wW = width + 40;
+    const wH = height + 40;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < count; i++) {
+      const p = windDots[i]!;
+      const t = drift * p.s;
+      const x = wrap(p.x + dx * t, wW) - 20;
+      const y = wrap(p.y + dy * t, wH) - 20;
+      const a = (0.08 + intensity * 0.18) * (0.6 + 0.4 * Math.sin(now * 0.004 + p.ph));
+      const L = (3 + intensity * 13) * (0.6 + p.s);
+      ctx.strokeStyle = `rgba(${col},${a.toFixed(3)})`;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - dx * L, y - dy * L);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function frame(now: number): void {
     if (!segStart) segStart = now;
 
@@ -474,6 +528,7 @@ export function mountPlayView(
 
     drawStatic();
     drawSpaceFX(now);
+    drawWind(now);
 
     // The hired caddy stands in the bottom-left corner the whole hole (GS-caddy). Its muzzle anchor
     // is where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect.
