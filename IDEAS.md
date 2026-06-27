@@ -38,7 +38,13 @@ Everything below serves whichever avenue wins.
     Byte-stable when no theme is passed (render tests untouched); deep-sky/galaxy themes (no figure)
     fall back to the ambient starfield. Still open: wire the theme into the Sim Lab + Demo hub, and
     per-theme palette tints beyond the figure.
-  - **GS-17d — Themed upgrades.** Bias shop/meta draw by the active theme's flavour (next).
+  - **GS-17d — Themed upgrades. SHIPPED.** The outfitter is biased toward on-theme gear: each
+    archetype favours a category (`ARCHETYPE_AFFINITY` → `ITEM_TAGS`) — inferno→distance, void→
+    control/skill, frost→control/putting, desert→control, verdant→economy/skill — so the shop reads
+    on-theme for where you are. A soft weight (`ITEM_AFFINITY_BOOST`), never a filter; offer stays
+    deterministic + distinct; item effects/balance untouched (shop invariants hold).
+  - **GS-17 follow-on (small):** wire the theme into the Sim Lab + Demo hub, and per-theme PALETTE
+    tints (rarity tints the figure today; the biome ground still uses the 5 archetype palettes).
 
 - **GS-4b — Short-game AI + green slope (the rest of GS-4).** Putt *visuals* + a putt-path model
   shipped (PR #7). Still open: a smarter recovery/short game to shrink the rare max-wildness blow-up

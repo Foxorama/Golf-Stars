@@ -163,6 +163,32 @@ export interface ShopItem {
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
 
+/**
+ * Upgrade CATEGORIES (GS-17d) — the thematic vocabulary the star-travel theme biases the shop by.
+ * Kept as a side map (not on each ShopItem) so the catalogue stays untouched. An item with no entry
+ * has no category and is never theme-boosted. Categories: `distance` (carry/driver), `control`
+ * (dispersion/handicap forgiveness), `skill` (handicap mastery), `economy` (credits), `putting`.
+ */
+export const ITEM_TAGS: Record<string, readonly string[]> = {
+  'power-cell': ['distance'],
+  'range-booster': ['distance'],
+  gyro: ['control'],
+  'precision-chip': ['control'],
+  'caddie-lesson': ['skill'],
+  'pro-coach': ['skill'],
+  'lucky-coin': ['economy'],
+  'fortune-chip': ['economy'],
+  'auto-caddie': ['putting'],
+  'driver-deck-1': ['distance'],
+  'driver-deck-2': ['distance'],
+  'driver-deck-3': ['distance'],
+  'driver-deck-4': ['distance'],
+};
+
+export function itemTags(id: string): readonly string[] {
+  return ITEM_TAGS[id] ?? [];
+}
+
 export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'power-cell',
