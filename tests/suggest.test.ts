@@ -44,11 +44,20 @@ describe('suggestPlayerClub (green coverage)', () => {
     const suggested = suggestPlayerClub(par3, par3.tee, 'tee', CLUBS, { carryMult: cm });
     const auto = aiClub(par3, par3.tee, par3.green, cm, CLUBS);
     expect(longer(suggested, auto) || suggested.id === auto.id).toBe(true);
-    // The suggested club's spread can still reach the FRONT of the green (carryLow ≤ front).
+    const { front, back } = greenDepth(par3, par3.tee);
     const s = shotSpread(par3, par3.tee, 'tee', par3.green, suggested, { carryMult: cm });
-    expect(s.carryLow).toBeLessThanOrEqual(greenDepth(par3, par3.tee).front + 1e-6);
-    // …and it can reach (carryHigh covers the front).
-    expect(s.carryHigh).toBeGreaterThanOrEqual(greenDepth(par3, par3.tee).front);
+    // The EXPECTED carry stops on the green (≤ the back) — it does NOT fly the green…
+    expect(s.expectedCarry).toBeLessThanOrEqual(back + 1e-6);
+    // …and it still reaches (max carry covers the front).
+    expect(s.carryHigh).toBeGreaterThanOrEqual(front);
+  });
+
+  it('does NOT hand the driver to a mid-iron approach (regression: gated on min carry)', () => {
+    // The driver's worst-case carry could fall short of a far-ish front, but its MEAN flies
+    // way past — it must never be the suggestion for a green a 5-iron reaches.
+    const cm = biomeCarryMult(par3);
+    const suggested = suggestPlayerClub(par3, par3.tee, 'tee', CLUBS, { carryMult: cm });
+    expect(suggested.id).not.toBe('D');
   });
 
   it('on an unreachable par-5, suggests the longest club in the bag', () => {

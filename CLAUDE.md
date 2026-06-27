@@ -63,6 +63,22 @@ This game lives or dies on three axes — put every change through all three bef
   wind, hazard kinds, scatter surfaces, corridor tightness, dogleg bias, **`treeDensity`** and
   **`fairwayBunkers`** (GS-13). New world = new row. Render palette is keyed by biome id in the
   render layer (the sim biome table is physics-only).
+- **Fairway shape = wide-and-wild early → tight late, with variable thickness + doglegs (generator v4).**
+  Three coupled levers in `generateHole`: (1) `widthScale = 1.6 − 0.85·wildness` lerps the corridor
+  half-width from generous early (≈1.6×) to the OLD constant (0.75×) at wildness 1 — so early stops
+  are far more forgiving while the max-wildness balance scale is unchanged. (2) The corridor is built
+  from a **densified** centreline with a per-point half-width (`corridorPoly` now takes a number OR a
+  per-point array): a seeded sine wave + one localized pinch undulate the thickness (wide landing
+  zones, the odd neck), amplitude early-heavy (`ampFrac = 0.18 + 0.32·(1−wildness)`) so calm holes get
+  the wildest variation and brutal holes flatten toward a uniform-but-tight strip. (3) Doglegs bend
+  left/right (`bendSide`) even on calm stops via a wildness floor (`doglegFactor = 0.35 + 0.65·wildness`)
+  — the old `×wildness` made every early hole dead straight; at wildness 1 the severity is unchanged.
+  CRITICAL: hazard placement + `validateFairness` both reason about the corridor's WIDEST point
+  (`fairwayHalfWidth = max(halfWidths)`, matching `fairwayHalfWidthOf`'s max-lateral recovery), so
+  penalty hazards still clear the widest part and stay provably fair. The death-spiral bars run at
+  wildness 1 ONLY — keep that case ≥ as easy as the old constant (it is) and the bar holds (verified
+  toPar/hole ≈ 0.12 ≪ 1.0). `hole.centreline` stays 2–3 points (the sim's `pointAlong` only handles
+  that); the densified corridor is internal geometry, not the centreline.
 - **Fairness by construction:** penalty hazards (water/lava/void) are kept CLEAR of the tee→green
   play corridor — `validateFairness()` proves it and `generateCourse` throws if violated. The
   *spice* is in-play non-penalty lies (ice = slick/high-dispersion, crystal = true/low, low-grav =
@@ -86,6 +102,13 @@ This game lives or dies on three axes — put every change through all three bef
   an off-centre flag spilled shots off the green under max-wildness spray (toPar/hole 1.21 vs the
   <1.0 bar). Hole-out detection keys off the FLAG in BOTH `playHole` and the interactive `takeShot`
   so auto === interactive byte-for-byte (guarded). `validateCourse` rejects an off-green pin.
+- **Lie read is by SURFACE PRECEDENCE, not feature draw-order (`lieAt`).** Features are emitted in
+  draw order (fairway slab first, then tee/green/scatter on top), so the old first-match read let the
+  broad fairway override the green that overlaps it — "it thinks you're on the fairway when you're on
+  the green." `lieAt` now picks the HIGHEST-precedence feature under the point (`SURFACE_PRIORITY`:
+  green 5 > tee 4 > scatter ice/crystal/waste 3 > fairway 2 > rough/default 1); hazards are still
+  checked first (they dominate). This also makes scatter spice (ice/crystal) on the fairway actually
+  read as that lie. Fixing it shifts the seeded balance slightly (re-validated; bars green).
 - **Per-club wildness (shot dispersion):** longer clubs spray WILDER in both line and distance;
   short clubs are tight/accurate. A club's `t` ramps 0→1 from `TUNABLES.accurateCarry`→`wildCarry`
   by nominal carry; lateral σ, distance σ, and the carry clamp window all lerp short→long. At the
@@ -107,9 +130,13 @@ This game lives or dies on three axes — put every change through all three bef
   bar, after any dispersion change. Lie penalties: rough `carryMult` 0.90 (10%), bunker 0.50 (50%).
 - **Interactive suggested club = GREEN COVERAGE (`suggestPlayerClub`, GS-mechanics #6).** The player's
   🎯 suggestion is NOT the auto `aiClub` (shortest-that-reaches, tuned for balance — leave it alone):
-  green unreachable → longest usable club; reachable → the LONGEST club whose spread still reaches the
-  green's FRONT (`carryLow ≤ distToFront` via `greenDepth`), so the whole green stays in the landing
-  window (overshoot allowed, never short). Uses the same `shotSpread` the cone draws, so it reads true.
+  green unreachable → longest usable club; reachable → the LONGEST club whose **EXPECTED** carry still
+  stops on the green (`expectedCarry ≤ distToBack` via `greenDepth`), so you take the most club you can
+  without flying the green on a normal strike (overshoot the front is fine). Uses the same `shotSpread`
+  the cone draws, so it reads true. GOTCHA (fixed): the old gate was `carryLow ≤ distToFront` — the
+  club's WORST-case carry — which handed you the DRIVER for any approach long enough that the driver's
+  worst miss could fall short of the front, even though its MEAN flew 60+ yds past. Gate on the expected
+  carry, not the minimum.
 - **Driver on Deck (`usableBag`, GS-mechanics #11).** The driver (`id 'D'`) is TEE-ONLY by default
   (`PlayerLoadout.driverDeck` level 0); a 4-tier shop ladder (`DRIVER_DECK` table, prereq-gated cards)
   unlocks it off the deck with a shrinking distance penalty + spray surcharge + widening allowed lies.
