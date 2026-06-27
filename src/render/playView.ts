@@ -395,10 +395,10 @@ export function mountPlayView(
   // the static (seeded) celestial accents the scene builder already bakes in. Positions are
   // seeded off the hole so they're stable for the session; only the alpha/sweep animate.
   const fxRng = mulberry32((Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed);
-  const fxStars = Array.from({ length: 18 }, () => ({
+  const fxStars = Array.from({ length: 40 }, () => ({
     x: fxRng() * width,
-    y: fxRng() * height * 0.5, // bias to the upper "sky" band
-    r: 0.5 + fxRng() * 1.2,
+    y: fxRng() * height * 0.72, // bias to the upper "sky" band, but salt most of the view
+    r: 0.5 + fxRng() * 1.4,
     ph: fxRng() * Math.PI * 2,
     blue: fxRng() < 0.5,
   }));
@@ -410,6 +410,15 @@ export function mountPlayView(
     ctx.save();
     for (const s of fxStars) {
       const a = 0.18 + 0.5 * (0.5 + 0.5 * Math.sin(now * 0.003 + s.ph));
+      // A soft glow halo on the brighter stars (cheap at this count — a single extra arc, not
+      // shadowBlur). Sells the deep-field twinkle the intro ends on, now over the live hole.
+      if (s.r > 1) {
+        ctx.globalAlpha = a * 0.22;
+        ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.globalAlpha = a;
       ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
       ctx.beginPath();

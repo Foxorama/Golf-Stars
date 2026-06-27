@@ -558,7 +558,33 @@ This game lives or dies on three axes — put every change through all three bef
   charred crust → glowing body → hot core + cracks, shared by flanking lakes AND crossing rivers) and
   the void's luminous **island glow** under the fairway/green so the platforms read as land in the
   abyss (the off-fairway IS the void). The dark per-biome rough (`roughBaseFor`) + starfield accents
-  carry the "space" read. Re-shoot the biome×seed gallery after any palette/`style.ts` change.
+  carry the "space" read. Re-shoot the biome×seed gallery (`node scripts/gallery.mjs`) after any
+  palette/`style.ts` change.
+- **Every course FLOATS as a landmass in a per-world deep-space sky (GS-stellar — "golf amongst the
+  stars", `palette.ts`/`style.ts`).** The old look filled the whole viewport with the rough slab, so a
+  stop read as a recoloured golf hole on a coloured rectangle — "samey, just a different palette". Now
+  `buildScene` paints, in order: (1) an opaque world-tinted **deep-space base** + soft nebula smears
+  (`ARCHETYPE_SPACE`/`spaceLookFor` — verdant blue-night, desert rust dusk, frost teal void, inferno
+  ember-black, void violet abyss); (2) a **starfield** (90·`accents` screen-space stars w/ haloed
+  twinkles) + the existing far planet/comet, ALL off the independent `crng` stream; (3) the **landmass**
+  = the projected OB **play-bounds box** (`playBoundsCorners`) filled with `roughBaseFor` and ringed by
+  an atmospheric **edge glow** (`SpaceLook.edge`, the void's island treatment generalised to all five
+  worlds), so beyond the OB shoreline you see SPACE, not green; (4) the rough tone/tufts/flowers + a
+  faint ground-star salt, **clipped to the island**. On the whole-hole map the course floats among its
+  stars; in the zoomed follow-cam the land fills the frame (you're "on the ground" under the same sky).
+  CRITICAL determinism: the main `rng` is still consumed in the SAME order (patches→tufts→flowers) BEFORE
+  the terrain/tree/water/lava draws that read off it, so their look is byte-for-byte unchanged — only the
+  PAINT position moved (into the island clip); all NEW celestial scatter uses `crng`. The render tests
+  hold: the background additions are theme-independent + archetype-equal, so the constellation test's
+  `deepSky == plain` / `constellation > plain` count invariants and the `#3f8c3f`/`#5fd45a` turf checks
+  are untouched. The stop's **constellation** (`constellationBackdrop`) was promoted from a faint corner
+  motif to a large overhead **sky** drawn ON TOP of the terrain (so it's the stop's identity in BOTH the
+  map and play), with the brightest star as a glowing **anchor** (Antares, Rigel…); still gated by
+  `themeId` + a real figure, no rng, so a deep-sky/themeless render stays byte-identical. The play view's
+  `drawSpaceFX` was enriched (40 haloed twinkling stars + the sweeping shooting star) to carry the intro's
+  starfield into live play — all on the existing `_gsFeel.spaceFX` knob, no new `_gs*` flag. NB: the
+  aiming overlays (spray cone, flight lines, live ball) draw AFTER `buildScene`, so the busy sky never
+  occludes the shot UI. Re-shoot the gallery after touching any of this.
 - **Zone splash card + procedural hero art (GS-19, `render/zoneHero.ts` + `app.ts`).** The zone
   identity now lives ONCE per stop, on the **starting zone screen** (the `intro` screen,
   `zoneIdentityHTML`) — NOT repeated per hole (the per-hole briefing splash was retired; see

@@ -27,6 +27,7 @@ import {
   turfShade,
   collarFor,
   roughBaseFor,
+  spaceLookFor,
   type Shade,
   SAND,
   WATER,
@@ -381,37 +382,49 @@ function worldLook(themeId: string | undefined, biome: string | undefined): { ar
 }
 
 /**
- * The stop's constellation, laid out in the upper sky (screen-space) and rarity-tinted (GS-17e).
- * Pure & deterministic — figure geometry comes from the catalogue table, positions are fixed (no
- * rng), so it's byte-stable. Deep-sky/galaxy themes have no stick figure → nothing drawn (the
- * ambient starfield carries them). The figure stars sit ON TOP of any ambient stars.
+ * The stop's constellation, hung large across the upper sky (screen-space) and rarity-tinted
+ * (GS-17e). Pure & deterministic — figure geometry comes from the catalogue table, positions are
+ * fixed (no rng), so it's byte-stable. Deep-sky/galaxy themes have no stick figure → nothing drawn
+ * (the ambient starfield carries them). The figure stars sit ON TOP of the terrain (it's the sky),
+ * so the constellation is the stop's identity in BOTH the map and the zoomed play view — not a
+ * faint corner motif. The brightest star (lowest magnitude) is the ANCHOR: it gets an extra glow
+ * + a fine ring so a Scorpius reads off its Antares, an Orion off its Rigel.
  */
 function constellationBackdrop(themeId: string, W: number, H: number): Prim[] {
   const fig = constellationFigure(themeId);
   if (!fig) return [];
   const tint = rarCol(themeById(themeId)?.rarity ?? 'common');
-  // Fit the unit-box figure into a sky panel up top, preserving aspect.
-  const boxW = W * 0.46;
-  const boxH = H * 0.2;
+  // Fit the unit-box figure into a generous sky panel across the top, preserving aspect.
+  const boxW = W * 0.62;
+  const boxH = H * 0.26;
   const ox = W * 0.5 - boxW / 2;
-  const oy = H * 0.06;
+  const oy = H * 0.045;
   const at = (s: { x: number; y: number }): Vec => [ox + s.x * boxW, oy + s.y * boxH];
+  // The anchor = the figure's brightest star (lowest magnitude).
+  let anchor = 0;
+  for (let i = 1; i < fig.stars.length; i++) if (fig.stars[i]!.m < fig.stars[anchor]!.m) anchor = i;
 
   const prims: Prim[] = [];
-  // Faint connecting lines first (the stick figure).
+  // Faint connecting lines first (the stick figure) — a touch brighter than the corner motif was.
   for (const [a, b] of fig.lines) {
     const sa = fig.stars[a];
     const sb = fig.stars[b];
     if (!sa || !sb) continue;
-    prims.push({ t: 'line', a: at(sa), b: at(sb), stroke: hexAlpha(tint, 0.35), sw: 0.8, round: true });
+    prims.push({ t: 'line', a: at(sa), b: at(sb), stroke: hexAlpha(tint, 0.42), sw: 0.9, round: true });
   }
   // Then the stars: brighter (lower mag) = bigger, with a soft halo + a tint dot.
-  for (const s of fig.stars) {
+  for (let i = 0; i < fig.stars.length; i++) {
+    const s = fig.stars[i]!;
     const p = at(s);
-    const r = Math.max(1, 3.1 - s.m * 0.45);
-    prims.push({ t: 'circle', c: p, r: r * 2.2, fill: hexAlpha(tint, 0.16) }); // halo
-    prims.push({ t: 'circle', c: p, r, fill: 'rgba(255,255,255,0.95)' });
-    prims.push({ t: 'circle', c: p, r: Math.max(0.6, r * 0.55), fill: hexAlpha(tint, 0.85) });
+    const r = Math.max(1.2, 3.6 - s.m * 0.5);
+    if (i === anchor) {
+      // The anchor star: a wide warm glow + a fine tinted ring, so it reads as the hero.
+      prims.push({ t: 'circle', c: p, r: r * 4.2, fill: hexAlpha(tint, 0.12) });
+      prims.push({ t: 'circle', c: p, r: r * 2.1, fill: 'none', stroke: hexAlpha(tint, 0.5), sw: 0.8 });
+    }
+    prims.push({ t: 'circle', c: p, r: r * 2.4, fill: hexAlpha(tint, 0.18) }); // halo
+    prims.push({ t: 'circle', c: p, r, fill: 'rgba(255,255,255,0.97)' });
+    prims.push({ t: 'circle', c: p, r: Math.max(0.7, r * 0.55), fill: hexAlpha(tint, 0.9) });
   }
   return prims;
 }
@@ -435,19 +448,6 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const grShade = turfShade('green', arch, deepen);
   const teeShade = turfShade('tee', arch, deepen);
 
-  // --- 1. Rough background + soft tone variance --------------------------------
-  prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: roughBaseFor(arch, deepen) });
-  const rs = turfShade('rough', arch, deepen);
-  // A few large, soft tonal patches so the rough isn't a flat slab — gentle undulation, not
-  // spotlights, so they stay low-alpha and lean dark (lit terrain is the exception).
-  const patches = Math.round(5 * art.texture);
-  for (let i = 0; i < patches; i++) {
-    const px = rng() * W;
-    const py = rng() * H;
-    const pr = (0.13 + rng() * 0.16) * Math.min(W, H);
-    prims.push({ t: 'circle', c: [px, py], r: pr, fill: rng() < 0.33 ? 'rgba(220,255,210,0.035)' : 'rgba(0,0,0,0.09)' });
-  }
-
   // Geometry we reject rough texture / flowers from (keep them out of the cut grass).
   const fairwayPoly = hole.features.find((f) => f.kind === 'fairway')?.poly;
   const greenPoly = hole.features.find((f) => f.kind === 'green')?.poly;
@@ -465,7 +465,87 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     cb.minY + (cb.maxY - cb.minY) * rng(),
   ];
 
-  // --- 2. Rough tufts (short dark/light strokes in the rough only) -------------
+  // The floating landmass (GS — "golf amongst the stars"): the projected OB play-bounds box IS the
+  // land; everything beyond it is open space. We paint the void + starfield FIRST, then the land on
+  // top, so the whole-hole map shows the course floating among its constellation while the zoomed
+  // play view (land fills the frame) reads as standing on the ground beneath that same sky.
+  const islandPts = projPoly(playBoundsCorners(hole), proj);
+  const islandC = centroidOf(islandPts);
+  const space = spaceLookFor(arch, deepen);
+  // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that
+  // reads off the main `rng` stays byte-identical) keyed off the same hole hash.
+  const crng = mulberry32((hashHole(hole) ^ 0x5747a2) >>> 0);
+
+  // --- 1. Deep space: an opaque world-tinted base + soft nebula smears ---------
+  prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: space.base });
+  for (let i = 0; i < 2; i++) {
+    prims.push({
+      t: 'circle',
+      c: [W * (0.12 + crng() * 0.72), H * (0.06 + crng() * 0.42)],
+      r: (0.28 + crng() * 0.26) * Math.max(W, H),
+      fill: space.nebula,
+    });
+  }
+
+  // --- 2. Starfield in the void — the intro's sky, carried in-game -------------
+  if (art.accents > 0) {
+    const starTarget = Math.round(90 * art.accents);
+    for (let i = 0; i < starTarget; i++) {
+      const sx = crng() * W;
+      const sy = crng() * H;
+      const r = 0.4 + crng() * 1.3;
+      const tone = crng();
+      const col =
+        tone < 0.6 ? 'rgba(255,255,255,0.92)' : tone < 0.8 ? 'rgba(186,214,255,0.9)' : 'rgba(255,222,228,0.85)';
+      prims.push({ t: 'circle', c: [sx, sy], r, fill: col });
+      if (crng() < 0.16) {
+        // A brighter star: a soft halo + a 4-point twinkle.
+        prims.push({ t: 'circle', c: [sx, sy], r: r * 2.6, fill: 'rgba(255,255,255,0.10)' });
+        const s = r + 1.8;
+        prims.push({ t: 'line', a: [sx - s, sy], b: [sx + s, sy], stroke: col, sw: 0.7, round: true });
+        prims.push({ t: 'line', a: [sx, sy - s], b: [sx, sy + s], stroke: col, sw: 0.7, round: true });
+      }
+    }
+    // A far planet (ring + shaded disc + lit highlight) and a faint comet up in the sky.
+    const planetCols = ['#caa3ff', '#7be0d0', '#ffb27a', '#9bc2ff', '#ff9bbf'];
+    const pcol = planetCols[(crng() * planetCols.length) | 0]!;
+    const pr = 10 + crng() * 14;
+    const ppx = W * (0.1 + crng() * 0.8);
+    const ppy = H * (0.05 + crng() * 0.16);
+    if (crng() < 0.6) {
+      prims.push({ t: 'circle', c: [ppx, ppy], r: pr * 1.75, fill: 'none', stroke: 'rgba(255,255,255,0.10)', sw: 1.4 });
+    }
+    prims.push({ t: 'circle', c: [ppx, ppy], r: pr, fill: pcol });
+    prims.push({ t: 'circle', c: [ppx + pr * 0.42, ppy + pr * 0.34], r: pr * 0.9, fill: 'rgba(8,10,20,0.34)' });
+    prims.push({ t: 'circle', c: [ppx - pr * 0.34, ppy - pr * 0.38], r: pr * 0.42, fill: 'rgba(255,255,255,0.5)' });
+    if (crng() < 0.7) {
+      const hx = W * (0.2 + crng() * 0.6);
+      const hy = H * (0.06 + crng() * 0.12);
+      const len = 34 + crng() * 56;
+      const ang = 2.35 + crng() * 0.5; // tail down-left
+      prims.push({ t: 'line', a: [hx, hy], b: [hx + Math.cos(ang) * len, hy + Math.sin(ang) * len], stroke: 'rgba(214,230,255,0.4)', sw: 1.4, round: true });
+      prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
+    }
+  }
+
+  // --- 3. The floating landmass: an atmospheric rim feathering into the void ---
+  prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.05), fill: space.edge });
+  prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.025), fill: space.edge });
+  prims.push({ t: 'poly', pts: islandPts, fill: roughBaseFor(arch, deepen), stroke: space.edge, sw: 1.2 });
+
+  // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
+  // The main `rng` is consumed here in the SAME order as before (patches → tufts → flowers) so the
+  // downstream terrain/tree/water/lava draws that read off it stay byte-for-byte unchanged; only the
+  // PAINT position (clipped onto the island) moved. Ground sparkle uses the independent `crng`.
+  const land: Prim[] = [];
+  const rs = turfShade('rough', arch, deepen);
+  const patches = Math.round(5 * art.texture);
+  for (let i = 0; i < patches; i++) {
+    const px = rng() * W;
+    const py = rng() * H;
+    const pr = (0.13 + rng() * 0.16) * Math.min(W, H);
+    land.push({ t: 'circle', c: [px, py], r: pr, fill: rng() < 0.33 ? 'rgba(220,255,210,0.04)' : 'rgba(0,0,0,0.12)' });
+  }
   const tuftTarget = Math.min(64, Math.round((span / 14) * art.texture));
   let placed = 0;
   for (let i = 0; i < tuftTarget * 3 && placed < tuftTarget; i++) {
@@ -476,17 +556,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     placed++;
     const len = 2 + rng() * 2.5;
     const dark = rng() < 0.55;
-    prims.push({
-      t: 'line',
-      a: [sp[0], sp[1]],
-      b: [sp[0] + (rng() - 0.5) * 2, sp[1] - len],
-      stroke: dark ? rs.dark : rs.light,
-      sw: 1,
-      round: true,
-    });
+    land.push({ t: 'line', a: [sp[0], sp[1]], b: [sp[0] + (rng() - 0.5) * 2, sp[1] - len], stroke: dark ? rs.dark : rs.light, sw: 1, round: true });
   }
-
-  // --- 3. Wildflowers (biome-flavoured dot clusters in the rough) --------------
   const ac = accentFor(biome);
   const flowerTarget = Math.round(5 * art.accents);
   let flowers = 0;
@@ -499,73 +570,24 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     const col = ac.flowers[Math.floor(rng() * ac.flowers.length)]!;
     const dots = 3 + Math.floor(rng() * 2);
     for (let d = 0; d < dots; d++) {
-      prims.push({
-        t: 'circle',
-        c: [sp[0] + (rng() - 0.5) * 6, sp[1] + (rng() - 0.5) * 6],
-        r: 0.9 + rng() * 0.8,
-        fill: col,
-      });
+      land.push({ t: 'circle', c: [sp[0] + (rng() - 0.5) * 6, sp[1] + (rng() - 0.5) * 6], r: 0.9 + rng() * 0.8, fill: col });
     }
   }
-
-  // --- 3b. Celestial backdrop (spacey flavour, GS) ----------------------------
-  // A travelling space golf course should read as floating in the void — so the rough is
-  // salted with distant stars, a far planet and a comet. A SEPARATE rng stream (so the
-  // existing terrain/tree/mote placement stays byte-identical) keyed off the same hole hash,
-  // gated by the `accents` density. Stars sit in course space (pan/zoom with the cam) and are
-  // culled to the rough; the planet/comet are screen-space "sky" fixtures up toward the top.
-  const crng = mulberry32((hashHole(hole) ^ 0x5747a2) >>> 0);
+  // Faint stars salt the dark land too (crng — does NOT perturb the terrain rng), so even the
+  // zoomed-in "on the ground" view reads as golf amongst the stars.
   if (art.accents > 0) {
-    // Background stars over the rough (kept off the cut grass so the playable lines stay clean).
-    const starTarget = Math.round(26 * art.accents);
-    let st = 0;
-    for (let i = 0; i < starTarget * 4 && st < starTarget; i++) {
-      const cp = randCoursePt();
+    const groundStars = Math.round(20 * art.accents);
+    for (let i = 0; i < groundStars; i++) {
+      const cp: Vec = [cb.minX + (cb.maxX - cb.minX) * crng(), cb.minY + (cb.maxY - cb.minY) * crng()];
       if (onGrass(cp)) continue;
       const sp = proj.project(cp);
       if (!inView(sp, W, H)) continue;
-      st++;
-      const r = 0.5 + crng() * 1.2;
-      const col =
-        crng() < 0.5 ? 'rgba(255,255,255,0.9)' : crng() < 0.6 ? 'rgba(186,214,255,0.9)' : 'rgba(255,224,230,0.85)';
-      prims.push({ t: 'circle', c: sp, r, fill: col });
-      if (crng() < 0.22) {
-        const s = r + 1.6; // a brighter star gets a 4-point twinkle
-        prims.push({ t: 'line', a: [sp[0] - s, sp[1]], b: [sp[0] + s, sp[1]], stroke: col, sw: 0.7, round: true });
-        prims.push({ t: 'line', a: [sp[0], sp[1] - s], b: [sp[0], sp[1] + s], stroke: col, sw: 0.7, round: true });
-      }
-    }
-    // A far planet up in a top corner — ring, shaded disc, lit highlight.
-    const planetCols = ['#caa3ff', '#7be0d0', '#ffb27a', '#9bc2ff', '#ff9bbf'];
-    const pcol = planetCols[(crng() * planetCols.length) | 0]!;
-    const pr = 9 + crng() * 12;
-    const ppx = W * (0.1 + crng() * 0.8);
-    const ppy = H * (0.05 + crng() * 0.13);
-    if (crng() < 0.55) {
-      prims.push({ t: 'circle', c: [ppx, ppy], r: pr * 1.75, fill: 'none', stroke: 'rgba(255,255,255,0.10)', sw: 1.4 });
-    }
-    prims.push({ t: 'circle', c: [ppx, ppy], r: pr, fill: pcol });
-    prims.push({ t: 'circle', c: [ppx + pr * 0.42, ppy + pr * 0.34], r: pr * 0.9, fill: 'rgba(8,10,20,0.34)' });
-    prims.push({ t: 'circle', c: [ppx - pr * 0.34, ppy - pr * 0.38], r: pr * 0.42, fill: 'rgba(255,255,255,0.5)' });
-    // A faint comet streak near the top.
-    if (crng() < 0.7) {
-      const hx = W * (0.2 + crng() * 0.6);
-      const hy = H * (0.06 + crng() * 0.12);
-      const len = 30 + crng() * 50;
-      const ang = 2.35 + crng() * 0.5; // tail down-left
-      prims.push({ t: 'line', a: [hx, hy], b: [hx + Math.cos(ang) * len, hy + Math.sin(ang) * len], stroke: 'rgba(214,230,255,0.4)', sw: 1.4, round: true });
-      prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
+      land.push({ t: 'circle', c: sp, r: 0.5 + crng() * 0.9, fill: 'rgba(220,232,255,0.5)' });
     }
   }
+  prims.push({ t: 'clip', clip: islandPts, children: land });
 
-  // --- 3c. The course's CONSTELLATION, drawn in the sky (GS-17e) ---------------
-  // The stop's theme isn't just physics + flavour — its actual constellation hangs overhead,
-  // rarity-tinted, so a Scorpius stop LOOKS like Scorpius. Drawn screen-space in the upper sky,
-  // using NO crng (so it never perturbs the planet/comet stream above; a course with no theme
-  // skips this entirely and stays byte-identical to the pre-GS-17e render).
-  if (themeId && art.accents > 0) prims.push(...constellationBackdrop(themeId, W, H));
-
-  // --- 4. Terrain features (fairway/green/tee + scatter surfaces) --------------
+  // --- 5. Terrain features (fairway/green/tee + scatter surfaces) --------------
   const collar = collarFor(arch, deepen);
   // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
   // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
@@ -583,7 +605,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     else prims.push(...styleScatter(f.kind, sp, art));
   }
 
-  // --- 5. Hazards (drawn on top, per the layer rule) --------------------------
+  // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
   for (const f of hole.hazards) {
     if (f.kind === 'trees') {
       prims.push(...styleTree(f.poly, proj, rng));
@@ -601,7 +623,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     }
   }
 
-  // --- 6. Sparkle motes (a little life over the whole hole) -------------------
+  // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);
   for (let i = 0; i < motes; i++) {
     const sx = rng() * W;
@@ -619,7 +641,15 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push({ t: 'line', a: [bx, by], b: [bx + 4, by + 2], stroke: 'rgba(20,24,30,0.55)', sw: 1.2, round: true });
   }
 
-  // --- 7. Out-of-bounds boundary + stakes -------------------------------------
+  // --- 8. The stop's CONSTELLATION, hung over the hole as its sky (GS-17e) -----
+  // The stop's theme isn't just physics + flavour — its actual constellation hangs overhead,
+  // rarity-tinted, so a Scorpius stop LOOKS like Scorpius. Drawn AFTER the terrain (on top, as the
+  // sky) so it stays visible in the zoomed-in play view as well as the whole-hole map. Uses NO rng/
+  // crng, and is gated by themeId + a real figure, so a deep-sky/themeless render is byte-identical
+  // to before (the constellation-backdrop test relies on that count invariant).
+  if (themeId && art.accents > 0) prims.push(...constellationBackdrop(themeId, W, H));
+
+  // --- 9. Out-of-bounds boundary + stakes -------------------------------------
   const corners = projPoly(playBoundsCorners(hole), proj);
   prims.push({ t: 'poly', pts: corners, fill: 'none', stroke: OB.line, sw: 1.5, dash: [2, 7] });
   for (const s of obStakes(hole)) {
@@ -628,13 +658,13 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push({ t: 'circle', c: [x, y - 7], r: 1.7, fill: OB.cap });
   }
 
-  // --- 8. Centreline ----------------------------------------------------------
+  // --- 10. Centreline ---------------------------------------------------------
   const cl = projPoly(hole.centreline, proj);
   for (let i = 1; i < cl.length; i++) {
     prims.push({ t: 'line', a: cl[i - 1]!, b: cl[i]!, stroke: 'rgba(255,255,255,0.38)', sw: 1.5, dash: [5, 5] });
   }
 
-  // --- 9. Tee marker + flagstick ----------------------------------------------
+  // --- 11. Tee marker + flagstick ---------------------------------------------
   const [tx, ty] = proj.project(hole.tee);
   prims.push({ t: 'circle', c: [tx, ty], r: 5, fill: '#ffffff', stroke: '#000', sw: 1 });
   const [gx, gy] = proj.project(hole.pin ?? hole.green);
