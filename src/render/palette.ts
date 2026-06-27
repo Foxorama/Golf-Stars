@@ -15,6 +15,7 @@ export const FILL: Record<string, string> = {
   waste: '#c2b280',
   lava: '#d2451e',
   lavariver: '#e2541a',
+  frozenpond: '#5aa6d8',
   void: '#160a26',
   voidrough: '#0a0518',
   ice: '#bfe6f0',

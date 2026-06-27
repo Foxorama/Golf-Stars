@@ -72,10 +72,17 @@ export interface Biome {
    *    lost"). The generator widens the corridor into a fair island and only arms the penalty on
    *    the wilder/deeper stops; the lie is returned by `lieAt` via a `roughLie` biomeMod.
    *  • `lavaRiver` — a molten river/creek crosses the fairway as a forced carry (the ember world).
-   * Both are pure data: a world opts in, the generator + sim do the rest.
+   *  • `frozenPond` — a meltwater channel crosses the fairway as a forced carry (the frost world);
+   *    a `frozenpond` penalty band, sanctioned + proven carryable exactly like the lava river.
+   *  • `craters`   — impact-crater sand bunkers scattered through the landing zones (the desert
+   *    world); non-penalty sand, so they bite the corridor as a navigable crater field.
+   * All pure data: a world opts in, the generator + sim do the rest.
    */
   lostRough?: string;
   lavaRiver?: boolean;
+  frozenPond?: boolean;
+  /** Impact-crater bunkers per hole (base, scaled by wildness). Sand → always fair. */
+  craters?: number;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -113,6 +120,7 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.25,
     treeDensity: 0.2, // sparse desert scrub
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
+    craters: 2.2, // signature: impact-crater bunkers pock the landing zones
     greenSize: 1.3, // big, smooth oasis greens against the dunes
     greenAspect: 1.6,
     greenIrregular: 0.7,
@@ -132,6 +140,7 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.3,
     treeDensity: 0.8, // frosted pines ring the fairways
     fairwayBunkers: 1,
+    frozenPond: true, // signature: a meltwater channel crosses the fairway (forced carry)
     greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
     greenAspect: 2.5,
     greenIrregular: 0.95,

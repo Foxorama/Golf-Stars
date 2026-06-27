@@ -682,7 +682,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     const sp = projPoly(f.poly, proj);
     if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand') {
       prims.push(...styleBunker(sp, art, proj.scale));
-    } else if (f.kind === 'water') {
+    } else if (f.kind === 'water' || f.kind === 'frozenpond') {
       prims.push(...styleWater(sp, rng, art));
     } else if (f.kind === 'lava' || f.kind === 'lavariver') {
       prims.push(...styleLava(sp, rng));

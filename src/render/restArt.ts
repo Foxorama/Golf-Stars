@@ -320,6 +320,7 @@ export function restArtSVG(lie: string, opts: RestArtOpts = {}): string {
     case 'waste':
       return wasteScene();
     case 'water':
+    case 'frozenpond':
       return waterScene();
     case 'lava':
     case 'lavariver':
@@ -345,6 +346,7 @@ export function lieLabel(lie: string): string {
     crystal: 'the crystal',
     waste: 'the waste',
     water: 'the water',
+    frozenpond: 'the frozen pond',
     lava: 'the lava',
     lavariver: 'the lava river',
     void: 'the void',

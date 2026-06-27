@@ -334,6 +334,9 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // A lava river/creek crossing the fairway (GS-19): plays like lava (penalty), but the generator
   // sanctions it as a forced carry (`validateCrossings`) so it may sit on the corridor.
   lavariver: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'lava', label: 'Lava river' },
+  // The frost world's frozen-pond crossing (GS-mechanics): a meltwater channel across the fairway —
+  // plays as water (penalty), sanctioned as a forced carry exactly like the lava river.
+  frozenpond: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'water', label: 'Frozen pond' },
   void: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'void', label: 'The Void' },
   // The void's "lost rough" (GS-19): off the fairway is the abyss. A penalty, but a NON-replay
   // drop-back-on-the-island (`voidlost`) — a stroke-and-distance cascade made max-wildness void
