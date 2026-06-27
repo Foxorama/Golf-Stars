@@ -55,6 +55,18 @@ export interface Biome {
    *  fair, so these bite the landing-zone edge as risk-reward without ever killing a card. */
   fairwayBunkers?: number;
   /**
+   * Green character (GS-greens) — gives each world a distinct putting-surface shape so greens stop
+   * being identical circles. All optional with sane defaults:
+   *  • `greenSize`     — radius multiplier (1 = baseline). Desert oasis greens run big, void asteroid
+   *                      greens small.
+   *  • `greenAspect`   — MAX long-axis stretch (1 = round). Frost ice-shelves run long and narrow.
+   *  • `greenIrregular`— 0..~1.5 shape roughness (harmonics + kidney lobes). Inferno greens are jagged,
+   *                      desert greens smooth.
+   */
+  greenSize?: number;
+  greenAspect?: number;
+  greenIrregular?: number;
+  /**
    * Signature mechanic flags (GS-19), scaled fair→brutal by wildness at generation time:
    *  • `lostRough` — off-fairway is the named PENALTY lie (the void: "play to the fairway or it's
    *    lost"). The generator widens the corridor into a fair island and only arms the penalty on
@@ -82,6 +94,9 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.35,
     treeDensity: 1.6, // lush, tree-lined parkland
     fairwayBunkers: 1.5,
+    greenSize: 1.05, // classic parkland greens — gently rolling, moderate variety
+    greenAspect: 1.8,
+    greenIrregular: 1.05,
   },
   {
     id: 'dust-belt',
@@ -98,6 +113,9 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.25,
     treeDensity: 0.2, // sparse desert scrub
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
+    greenSize: 1.3, // big, smooth oasis greens against the dunes
+    greenAspect: 1.6,
+    greenIrregular: 0.7,
   },
   {
     id: 'ice-ring',
@@ -114,6 +132,9 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.3,
     treeDensity: 0.8, // frosted pines ring the fairways
     fairwayBunkers: 1,
+    greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
+    greenAspect: 2.5,
+    greenIrregular: 0.95,
   },
   {
     id: 'ember-world',
@@ -131,6 +152,9 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0.35, // charred snags
     fairwayBunkers: 1.2,
     lavaRiver: true, // signature: molten rivers cross the fairway (forced carry)
+    greenSize: 0.95, // jagged, broken basalt greens
+    greenAspect: 1.9,
+    greenIrregular: 1.45,
   },
   {
     id: 'void-garden',
@@ -148,6 +172,9 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0, // nothing grows in the void — crystals are the spice
     fairwayBunkers: 0.5,
     lostRough: 'voidrough', // signature: there is no rough — off the fairway is lost to the void
+    greenSize: 0.85, // small, angular asteroid greens adrift in the abyss
+    greenAspect: 1.7,
+    greenIrregular: 1.25,
   },
 ];
 

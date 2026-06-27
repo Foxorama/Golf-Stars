@@ -41,20 +41,20 @@ const cases = [
 ];
 const seeds = [7, 4242];
 
-// For each world: a whole-hole MAP (sky around the floating island) and a zoomed PLAY view
-// (focus/follow-cam — the case where the turf used to fill the frame and hide the sky).
+// For each world: a whole-hole MAP, and a GREEN close-up (so the new green shapes + the fairway
+// wrap-around read clearly). Pick a par-4/5 hole so there's a real corridor running into the green.
 let cells = '';
 for (const c of cases) {
-  const seed = seeds[0];
-  const hole = generateCourse(seed, { holes: 1 }).holes[0];
+  const holes = generateCourse(seeds[0], { holes: 6, distanceFromStart: 6 }).holes;
+  const hole = holes.find((h) => h.par >= 4) ?? holes[0];
   const map = renderHoleSVG(hole, { width: 300, height: 420, biome: c.biome, themeId: c.themeId });
-  // Zoom to a tee shot like the decision map (focus the tee, a driver-ish reach, ball low).
-  const zoom = renderHoleSVG(hole, {
+  // Close-up on the green: see the shape + how the fairway wraps/tapers past it.
+  const green = renderHoleSVG(hole, {
     width: 300, height: 420, biome: c.biome, themeId: c.themeId,
-    focus: hole.tee, viewRadius: 95, focusBias: 0.8,
+    focus: hole.green, viewRadius: 42, focusBias: 0.52,
   });
   cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · map</figcaption>${map}</figure>`;
-  cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · zoomed play</figcaption>${zoom}</figure>`;
+  cells += `<figure style="margin:0"><figcaption style="color:#ccd;font:600 12px system-ui;padding:4px 0">${c.label} · green close-up</figcaption>${green}</figure>`;
 }
 const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(4,300px);gap:10px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);

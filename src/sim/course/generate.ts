@@ -97,6 +97,84 @@ function blobPoly(center: Vec, radius: number, n: number, jitter: number, rng: R
 }
 
 /**
+ * A varied, organic GREEN shape (GS-greens) — so greens stop being identical circles. The radius is
+ * modulated by a few seeded harmonics + an optional kidney lobe and stretched along a random long
+ * axis, yielding blobs, kidneys, long shelves, pears and punchbowls. `aspectMax`/`irregular` come
+ * from the biome row, so each world has a green character (frost shelves run long, inferno greens
+ * jagged, desert greens big and smooth). Centre = `c`; the polygon stays a simple star shape about
+ * `c` (so a ray from `c` hits the edge exactly once — the pin placer relies on that).
+ */
+function greenPoly(c: Vec, baseR: number, aspectMax: number, irregular: number, rng: Rng): Vec[] {
+  const n = 20;
+  const axis = rng.range(0, Math.PI); // long-axis orientation
+  // Lean the stretch toward the world's max so the green CHARACTER reads (a frost shelf is reliably
+  // long, not occasionally) — at least ~45% of the way to the biome's max aspect.
+  const aspect = 1 + (Math.max(1, aspectMax) - 1) * (0.45 + 0.55 * rng.float());
+  const a1 = rng.range(-0.16, 0.16) * irregular;
+  const a2 = rng.range(-0.13, 0.13) * irregular;
+  const a3 = rng.range(-0.09, 0.09) * irregular;
+  const p1 = rng.range(0, Math.PI * 2);
+  const p2 = rng.range(0, Math.PI * 2);
+  const p3 = rng.range(0, Math.PI * 2);
+  // An occasional kidney indent (one soft bite out of the rim) for a real green-complex shape.
+  const lobeDepth = rng.float() < 0.45 * irregular ? rng.range(0.18, 0.42) : 0;
+  const lobeAng = rng.range(0, Math.PI * 2);
+  const lobeW = rng.range(0.12, 0.32);
+  const ca = Math.cos(axis);
+  const sa = Math.sin(axis);
+  const pts: Vec[] = [];
+  for (let i = 0; i < n; i++) {
+    const th = (i / n) * Math.PI * 2;
+    let rr = baseR * (1 + a1 * Math.sin(th + p1) + a2 * Math.sin(2 * th + p2) + a3 * Math.sin(3 * th + p3));
+    if (lobeDepth) {
+      const d = Math.abs((((th - lobeAng + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI);
+      rr -= baseR * lobeDepth * Math.exp(-(d * d) / (lobeW * 2));
+    }
+    rr = Math.max(baseR * 0.42, rr);
+    // Local point, then stretch along `axis`: decompose into along/perp, scale the along part.
+    const x = Math.cos(th) * rr;
+    const y = Math.sin(th) * rr;
+    const u = (x * ca + y * sa) * aspect; // along-axis component, stretched
+    const v = -x * sa + y * ca; // perpendicular component
+    pts.push([c[0] + u * ca - v * sa, c[1] + u * sa + v * ca]);
+  }
+  return pts;
+}
+
+/** Distance from interior point `c` to the polygon edge along unit direction `dir` (first hit). */
+function rayPolyDist(c: Vec, dir: Vec, poly: Vec[]): number {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const ax = poly[j]![0];
+    const ay = poly[j]![1];
+    const bx = poly[i]![0];
+    const by = poly[i]![1];
+    const ex = bx - ax;
+    const ey = by - ay;
+    const denom = dir[0] * ey - dir[1] * ex;
+    if (Math.abs(denom) < 1e-9) continue; // parallel
+    const t = ((ax - c[0]) * ey - (ay - c[1]) * ex) / denom; // distance along the ray
+    const s = ((ax - c[0]) * dir[1] - (ay - c[1]) * dir[0]) / denom; // position along the edge
+    if (t > 0 && s >= 0 && s <= 1 && t < best) best = t;
+  }
+  return Number.isFinite(best) ? best : 0;
+}
+
+/**
+ * Place the flag (GS-6) inside an arbitrary green shape: a ray from the green centre in a random
+ * direction, out to 22–62% of the distance to that edge — so the pin is always genuinely inside
+ * (never on the lip) yet meaningfully off-centre (front/back/tucked), for any green shape. Drawn
+ * from a SIDE rng so it never perturbs the main terrain stream.
+ */
+function pinInGreen(c: Vec, poly: Vec[], rng: Rng): Vec {
+  const ang = rng.range(0, Math.PI * 2);
+  const dir: Vec = [Math.cos(ang), Math.sin(ang)];
+  const edge = rayPolyDist(c, dir, poly);
+  const frac = 0.22 + 0.4 * rng.float();
+  return [c[0] + dir[0] * edge * frac, c[1] + dir[1] * edge * frac];
+}
+
+/**
  * Build a corridor polygon around a centreline polyline. `halfWidth` is either a single
  * value (a constant-thickness corridor) or one value PER centreline point (a variable-
  * thickness corridor — wide landing zones pinched by the odd neck).
@@ -250,35 +328,59 @@ function generateHole(
   const fairwayHalfWidth = Math.max(...halfWidths);
 
   const teeBox: Feature = { kind: 'tee', poly: blobPoly(tee, 8, 8, 0, rng) };
-  const greenR = rng.range(11, 16);
-  const greenF: Feature = { kind: 'green', poly: blobPoly(green, greenR, 14, 0.12, rng) };
+  // Varied GREEN shape (GS-greens), per-biome character. baseR scaled by the biome's greenSize.
+  const greenR = rng.range(11, 16) * (biome.greenSize ?? 1);
+  const greenPolygon = greenPoly(green, greenR, biome.greenAspect ?? 1.8, biome.greenIrregular ?? 1, rng);
+  const greenF: Feature = { kind: 'green', poly: greenPolygon };
 
-  // Flag position within the green (GS-6): offset from the centroid by 18–55% of the green
-  // radius in a random direction, so every flag is a readable front/back/side pin (never a
-  // dead-centre one). The green's min edge distance is ≥ ~0.86·greenR (0.88·greenR min
-  // vertex × the 14-gon chord factor), so 0.55·greenR always lands inside with a puttable
-  // margin. Drawn from a SIDE rng keyed by hole index so the flag is deterministic WITHOUT
-  // perturbing the main stream — every existing course's terrain is byte-for-byte unchanged;
-  // only the flag (where you hole/putt, and the interactive "attack" target) is new.
+  // Flag inside the (arbitrary-shape) green via ray-march from the centre (GS-6/GS-greens): always
+  // genuinely inside (never on the lip) yet off-centre, for ANY shape. Drawn from a SIDE rng keyed
+  // by hole index so the flag is deterministic without perturbing the main terrain stream.
   const pinRng = new Rng(`${rng.seed}:pin:${holeIndex}`);
-  const pinAng = pinRng.range(0, Math.PI * 2);
-  const pinMag = greenR * (0.18 + 0.37 * pinRng.float());
-  const pin: Vec = [green[0] + Math.cos(pinAng) * pinMag, green[1] + Math.sin(pinAng) * pinMag];
+  const pin: Vec = pinInGreen(green, greenPolygon, pinRng);
 
-  const features: Feature[] = [fairway, teeBox, greenF];
+  // Fairway APRON (GS-greens): a tapering strip that runs THROUGH and PAST the green so the fairway
+  // wraps around it instead of ending at a hard flat line. Skipped for void island greens (the green
+  // floats over the abyss — nothing behind it). A SEPARATE fairway feature so it never widens the
+  // corridor's fairness half-width (validateFairness keys off the FIRST fairway feature).
+  const features: Feature[] = [fairway];
+  if (!lostRough) {
+    const pa = dense[dense.length - 2] ?? tee;
+    const pb = dense[dense.length - 1] ?? green;
+    let dx = pb[0] - pa[0];
+    let dy = pb[1] - pa[1];
+    const dl = Math.hypot(dx, dy) || 1;
+    dx /= dl;
+    dy /= dl;
+    const back = greenR + 12;
+    const tail = greenR * 1.5 + 14;
+    const aw = Math.max(baseHalf * 0.45, greenR + 9);
+    const apronLine: Vec[] = [
+      [green[0] - dx * back, green[1] - dy * back],
+      green,
+      [green[0] + dx * tail, green[1] + dy * tail],
+    ];
+    features.push({ kind: 'fairway', poly: corridorPoly(apronLine, [aw, aw, aw * 0.4]) });
+  }
+  features.push(teeBox, greenF);
   const hazards: Feature[] = [];
 
-  // Greenside hazards (1–2), just off the green. A penalty-kind greenside hazard must
-  // still clear the approach line (fairness) — retry placement, else fall back to sand.
+  // Greenside hazards (1–2), hugging the ACTUAL green edge (ray-march, so they sit just off any
+  // shape — a long shelf or kidney). A penalty-kind greenside hazard must still clear the approach
+  // line (fairness) — retry placement, else fall back to sand.
   const greensidePenalty = !!lieInfo(biome.greensideKind).penalty;
   const greensideCount = rng.int(1, 2);
   for (let b = 0; b < greensideCount; b++) {
     const r = rng.range(5, 9);
-    const d = greenR + r + rng.range(3, 9);
+    const gap = rng.range(3, 9);
+    const place = (ang: number): Vec => {
+      const dir: Vec = [Math.cos(ang), Math.sin(ang)];
+      const d = rayPolyDist(green, dir, greenPolygon) + r + gap;
+      return [green[0] + dir[0] * d, green[1] + dir[1] * d];
+    };
     let placed = false;
     for (let attempt = 0; attempt < 8 && !placed; attempt++) {
-      const ang = rng.range(0, Math.PI * 2);
-      const c: Vec = [green[0] + Math.cos(ang) * d, green[1] + Math.sin(ang) * d];
+      const c = place(rng.range(0, Math.PI * 2));
       if (!greensidePenalty || clearsPlayCorridor(c, r, centreline, tee, green, fairwayHalfWidth)) {
         hazards.push({ kind: biome.greensideKind, poly: blobPoly(c, r, 9, 0.2, rng) });
         placed = true;
@@ -286,9 +388,7 @@ function generateHole(
     }
     if (!placed) {
       // Couldn't find a fair spot for the penalty kind — a sand bunker is always fair.
-      const ang = rng.range(0, Math.PI * 2);
-      const c: Vec = [green[0] + Math.cos(ang) * d, green[1] + Math.sin(ang) * d];
-      hazards.push({ kind: 'bunker', poly: blobPoly(c, r, 9, 0.2, rng) });
+      hazards.push({ kind: 'bunker', poly: blobPoly(place(rng.range(0, Math.PI * 2)), r, 9, 0.2, rng) });
     }
   }
 
