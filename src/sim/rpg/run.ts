@@ -23,6 +23,7 @@ import {
   itemCost,
   itemTags,
   loadoutFromPerks,
+  namedCaddyOwned,
   netDispersion,
   ownedCount,
   shopItem,
@@ -200,6 +201,9 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     shapeMod: run.loadout.shapeMod,
     minCarryBoost: run.loadout.minCarryBoost,
     wedgeWindow: run.loadout.wedgeWindow,
+    driverAnywhere: run.loadout.driverAnywhere,
+    guard: run.loadout.caddyGuard,
+    chipIn: run.loadout.chipInBoost,
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };
@@ -246,6 +250,11 @@ export function buy(run: Run, itemId: string): Run {
   if (!item) return run;
   const owned = ownedCount(run.loadout.perks, itemId);
   if (!canBuy(item, owned, run.credits)) return run;
+  // Named caddies are mutually exclusive (GS-caddy): you may hire only one. A second is a no-op.
+  if (item.caddy === 'named') {
+    const have = namedCaddyOwned(run.loadout.perks);
+    if (have && have !== itemId) return run;
+  }
   const cost = itemCost(item, owned);
   return { ...run, credits: run.credits - cost, loadout: item.apply(run.loadout) };
 }
@@ -295,9 +304,16 @@ function weightedSample(
  */
 export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   const perks = run.loadout.perks;
-  // Hide maxed items, and gate tier-ladder items (Driver on Deck) behind their prerequisite.
+  const hasCaddy = !!namedCaddyOwned(perks);
+  // Hide maxed items, gate prereq tier-ladders, exclude named caddies (they live in the dedicated
+  // Caddies section, not the rotating offer), and only surface generic caddy 'service' perks once a
+  // named caddy has been hired (GS-caddy).
   const pool = SHOP_ITEMS.filter(
-    (it) => ownedCount(perks, it.id) < itemCap(it) && (!it.prereq || perks.includes(it.prereq)),
+    (it) =>
+      ownedCount(perks, it.id) < itemCap(it) &&
+      (!it.prereq || perks.includes(it.prereq)) &&
+      it.caddy !== 'named' &&
+      (it.caddy !== 'service' || hasCaddy),
   );
   const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
   // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
@@ -306,6 +322,32 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
+  });
+}
+
+/** A named caddy's state in the shop's dedicated Caddies section (GS-caddy). */
+export interface CaddyOffer {
+  item: ShopItem;
+  cost: number;
+  /** This caddy is currently hired. */
+  owned: boolean;
+  /** A DIFFERENT named caddy is hired, so this one can't be bought (shown greyed). */
+  locked: boolean;
+  /** Affordable at the current credit balance (only meaningful when not owned/locked). */
+  affordable: boolean;
+}
+
+/**
+ * The full named-caddy roster for the shop's dedicated Caddies section. Always lists every named
+ * caddy: the hired one is flagged `owned`, the rest `locked` once one is hired (so they show greyed
+ * but visible). Not part of the rotating offer — a caddy is a once-per-run identity choice.
+ */
+export function caddyRoster(run: Run): CaddyOffer[] {
+  const perks = run.loadout.perks;
+  const have = namedCaddyOwned(perks);
+  return SHOP_ITEMS.filter((it) => it.caddy === 'named').map((item) => {
+    const owned = perks.includes(item.id);
+    return { item, cost: item.cost, owned, locked: !!have && !owned, affordable: run.credits >= item.cost };
   });
 }
 

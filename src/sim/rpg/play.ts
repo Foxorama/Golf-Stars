@@ -31,7 +31,7 @@ import {
 import type { HoleRecord } from '../score';
 import type { HoleStat } from '../stats';
 import type { Rng } from '../rng';
-import { netDispersion, puttSkillOf, usableBag, driverDeckSprayMult, type PlayerLoadout } from './economy';
+import { netDispersion, puttSkillOf, usableBag, type PlayerLoadout } from './economy';
 import { characterShotMods } from './characters';
 
 export type AimMode = 'attack' | 'safe';
@@ -99,8 +99,8 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   // covers the front of the green), using the player's real dispersion so it reads true — see
   // suggestPlayerClub. The auto sim keeps using aiClub (its balance is tuned around it).
   const dispersionMult = netDispersion(loadout);
-  // The driver is removed/penalised off the deck unless the Driver-on-Deck level allows it.
-  const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
+  // The driver is tee-only unless the Driver Dan caddy unlocks it from any lie (GS-caddy).
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
   // Same forced-carry-aware layup the auto sim uses (same bag/lie/carryMult → byte-for-byte).
   const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
   return {
@@ -125,7 +125,7 @@ export function previewShot(
   loadout: PlayerLoadout,
 ): ShotSpread {
   const carryMult = biomeCarryMult(state.hole);
-  const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
   const target =
     decision.target ??
     (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
@@ -133,7 +133,7 @@ export function previewShot(
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
   return shotSpread(state.hole, state.ball, state.lie, target, club, {
     carryMult,
-    dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
+    dispersionMult: netDispersion(loadout),
     shotMods: characterShotMods(loadout.characterId),
     shapeMod: loadout.shapeMod,
     minCarryBoost: loadout.minCarryBoost,
@@ -159,7 +159,7 @@ export function takeShot(
   if (state.done) return state;
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
-  const bag = usableBag(loadout.bag, state.lie, loadout.driverDeck);
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
   const target =
     decision.target ??
     (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
@@ -168,11 +168,13 @@ export function takeShot(
 
   const ex = executeShot(state.hole, state.ball, state.lie, target, club, {
     carryMult,
-    dispersionMult: netDispersion(loadout) * driverDeckSprayMult(club.id, state.lie, loadout.driverDeck),
+    dispersionMult: netDispersion(loadout),
     shotMods: characterShotMods(loadout.characterId),
     shapeMod: loadout.shapeMod,
     minCarryBoost: loadout.minCarryBoost,
     wedgeWindow: loadout.wedgeWindow,
+    guard: loadout.caddyGuard,
+    chipIn: loadout.chipInBoost,
   }, rng);
 
   const firstShot = state.shots.length === 0;

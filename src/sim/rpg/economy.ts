@@ -8,7 +8,7 @@
 
 import { CLUBS, type Club } from '../clubs';
 import type { Rarity } from '../course/contract';
-import { combineShapeMods, type ShapeMod } from '../shot';
+import { combineShapeMods, type CaddyGuard, type ShapeMod } from '../shot';
 import { DEFAULT_MANUAL_BAND } from '../round';
 
 export const HOLES_PER_STOP = 6;
@@ -41,15 +41,24 @@ export interface PlayerLoadout {
   dispersionMult: number;
   /** Multiplies credits earned. */
   creditMult: number;
-  /** Auto-putt: the green is putted out for you (and better). Granted by a legendary perk. */
+  /** Auto-putt: the green is putted out for you (and better). Granted by the Penelope Putter caddy. */
   autoPutt?: boolean;
   /**
-   * Driver-on-Deck unlock level (GS-mechanics #11). 0 = the driver is tee-only (default); each
-   * tier 1..4 lets you hit it off the deck from more lies, with a shrinking distance penalty and
-   * spray surcharge (see DRIVER_DECK). The restriction is enforced via `usableBag`, applied by
-   * both the auto sim and the interactive player so they stay in lock-step.
+   * Driver Dan caddy (GS-caddy): the driver is usable from ANY lie at full stats (not just the tee).
+   * Default (undefined/false) keeps the driver tee-only. Replaces the removed Driver-on-Deck system;
+   * enforced via `usableBag`, applied by both the auto sim and interactive player in lock-step.
    */
-  driverDeck: number;
+  driverAnywhere?: boolean;
+  /**
+   * Wedge-caddy chip-in chance (GS-caddy, Dr Chipinski): added probability that a PW-or-shorter shot
+   * resting in the makeable chip range drops for a hole-out. 0/undefined = none.
+   */
+  chipInBoost?: number;
+  /**
+   * A named caddy's in-flight ball guard (GS-caddy, Space Ducks / Convict Sheep): redirects a sampled
+   * miss tail back to the green mid-flight. Undefined = no guard.
+   */
+  caddyGuard?: CaddyGuard;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
@@ -72,54 +81,18 @@ export interface PlayerLoadout {
   puttBoost: number;
 }
 
-/** The driver club id (off-tee use is gated by the Driver-on-Deck tier). */
+/** The driver club id (off-tee use is gated unless the Driver Dan caddy is owned). */
 export const DRIVER_ID = 'D';
 
-/** Per-tier off-deck driver rules (index = `driverDeck` level). Content-as-data. */
-export interface DriverDeckTier {
-  /** Distance multiplier on the driver when hit off the tee (1 = full tee power). */
-  distMult: number;
-  /** Extra dispersion multiplier when hit off the tee (1 = no surcharge). */
-  sprayMult: number;
-  /** Lies the off-deck driver is allowed from; '*' = any lie. (The tee is always allowed.) */
-  lies: readonly string[] | '*';
-}
-export const DRIVER_DECK: readonly DriverDeckTier[] = [
-  { distMult: 1.0, sprayMult: 1.0, lies: [] }, // 0: tee only
-  { distMult: 0.5, sprayMult: 1.5, lies: ['fairway'] }, // 1: fairway, −50% / +50%
-  { distMult: 0.7, sprayMult: 1.3, lies: ['fairway'] }, // 2: fairway, −30% / +30%
-  { distMult: 0.85, sprayMult: 1.15, lies: ['fairway', 'rough'] }, // 3: + rough, −15% / +15%
-  { distMult: 0.95, sprayMult: 1.05, lies: '*' }, // 4: any lie, −5% / +5%
-];
-
-function driverTier(level: number): DriverDeckTier {
-  return DRIVER_DECK[Math.max(0, Math.min(DRIVER_DECK.length - 1, level))]!;
-}
-
-/** Is the driver allowed off the deck from `lie` at this unlock level? (The tee always is.) */
-export function driverAllowedOffTee(lie: string, level: number): boolean {
-  if (lie === 'tee') return true;
-  const tier = driverTier(level);
-  return tier.lies === '*' || tier.lies.includes(lie);
-}
-
 /**
- * The clubs actually selectable from `lie` at this driver-deck level. Off the tee, the driver is
- * removed when not yet unlocked for that lie, or replaced by a reduced-carry copy (the distance
- * penalty) when it is — so club-selection AND distance are correct in one place, shared by the
- * auto sim and the interactive player. On the tee the full bag is returned unchanged.
+ * The clubs selectable from `lie`. The driver is TEE-ONLY by default; the Driver Dan caddy
+ * (`driverAnywhere`) unlocks it from any lie at full driver stats. One source of truth, applied by
+ * BOTH the auto sim and the interactive player so they stay in lock-step. On the tee, or with Driver
+ * Dan, the full bag is returned unchanged; otherwise the driver is dropped off the tee.
  */
-export function usableBag(bag: readonly Club[], lie: string, level: number): readonly Club[] {
-  if (lie === 'tee') return bag;
-  const tier = driverTier(level);
-  if (!driverAllowedOffTee(lie, level)) return bag.filter((c) => c.id !== DRIVER_ID);
-  return bag.map((c) => (c.id === DRIVER_ID ? { ...c, carry: Math.round(c.carry * tier.distMult) } : c));
-}
-
-/** Extra dispersion multiplier when the driver is played off the deck (1 otherwise). */
-export function driverDeckSprayMult(clubId: string, lie: string, level: number): number {
-  if (clubId !== DRIVER_ID || lie === 'tee') return 1;
-  return driverAllowedOffTee(lie, level) ? driverTier(level).sprayMult : 1;
+export function usableBag(bag: readonly Club[], lie: string, driverAnywhere: boolean): readonly Club[] {
+  if (lie === 'tee' || driverAnywhere) return bag;
+  return bag.filter((c) => c.id !== DRIVER_ID);
 }
 
 export const STARTING_HANDICAP = 18;
@@ -130,7 +103,6 @@ export function startingLoadout(): PlayerLoadout {
     handicap: STARTING_HANDICAP,
     dispersionMult: 1,
     creditMult: 1,
-    driverDeck: 0,
     perks: [],
     shapeMod: {},
     minCarryBoost: 0,
@@ -179,8 +151,22 @@ export interface ShopItem {
   costGrowth?: number;
   /** Item id that must already be owned for this one to appear in the shop offer (tier ladders). */
   prereq?: string;
+  /**
+   * Caddy classification (GS-caddy). `'named'` = a unique named caddy (Penelope Putter, Driver Dan,
+   * …): you may own only ONE; they show in the dedicated shop Caddies section (the rest greyed once
+   * one is hired). `'service'` = a generic caddy perk (Caddie Lesson) that only appears in the
+   * rotating offer once you've hired a named caddy. Absent = an ordinary item.
+   */
+  caddy?: 'named' | 'service';
   apply(loadout: PlayerLoadout): PlayerLoadout;
 }
+
+/** Space Ducks' laser guard (GS-caddy): no more duck-hooks; a hook has a 50% chance to be zapped
+ *  back to the green. The cone still shows the left tails — the duck intercepts a sampled miss. */
+export const SPACE_DUCKS_GUARD: CaddyGuard = { remove: ['duckHookL'], halve: ['hookL'], kind: 'laser' };
+/** Convict Sheep's boomerang guard (GS-caddy): no more shanks; a slice has a 50% chance to be
+ *  knocked back to the green. Mirrors Space Ducks on the right side. */
+export const CONVICT_SHEEP_GUARD: CaddyGuard = { remove: ['shankR'], halve: ['sliceR'], kind: 'boomerang' };
 
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
@@ -203,10 +189,11 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'auto-caddie': ['putting'],
   'putting-grip': ['putting'],
   'tour-putter': ['putting'],
-  'driver-deck-1': ['distance'],
-  'driver-deck-2': ['distance'],
-  'driver-deck-3': ['distance'],
-  'driver-deck-4': ['distance'],
+  // Named caddies (GS-caddy) — tagged by their flavour so the theme bias still nudges them.
+  'driver-dan': ['distance'],
+  'dr-chipinski': ['skill'],
+  'space-ducks': ['control'],
+  'convict-sheep': ['control'],
   // Spray-zone shapers (GS-dispersion-2) — accuracy/forgiveness, so 'control'.
   'sweet-spot': ['control'],
   'anti-duck-hook': ['control'],
@@ -284,13 +271,54 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     rarity: 'epic',
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.26, perks: [...m.perks, 'tour-putter'] }),
   },
+  // --- Named caddies (GS-caddy) — UNIQUE: only one may be hired at a time. They live in the shop's
+  // dedicated Caddies section (others grey out once one is on your bag). Penelope keeps the legacy
+  // `auto-caddie` id so existing saves still resolve her. Hiring any named caddy also unlocks the
+  // generic caddy 'service' perks (Caddie Lesson) in the rotating offer.
   {
     id: 'auto-caddie',
-    name: 'Auto-Caddie',
+    name: 'Penelope Putter',
     cost: 280,
-    desc: 'Reads & sinks your putts for you — auto-putt with a steadier stroke',
+    desc: 'Your caddy reads & sinks your putts — auto-putt with a steadier stroke',
     rarity: 'legendary',
+    caddy: 'named',
     apply: (m) => ({ ...m, autoPutt: true, perks: [...m.perks, 'auto-caddie'] }),
+  },
+  {
+    id: 'driver-dan',
+    name: 'Driver Dan',
+    cost: 240,
+    desc: 'Hand Dan the big stick anywhere — play your driver from ANY lie at full power',
+    rarity: 'rare',
+    caddy: 'named',
+    apply: (m) => ({ ...m, driverAnywhere: true, perks: [...m.perks, 'driver-dan'] }),
+  },
+  {
+    id: 'dr-chipinski',
+    name: 'Dr Chipinski',
+    cost: 260,
+    desc: 'A wedge wizard: +33% chance to hole out any pitching-wedge-or-shorter chip near the pin',
+    rarity: 'rare',
+    caddy: 'named',
+    apply: (m) => ({ ...m, chipInBoost: (m.chipInBoost ?? 0) + 0.33, perks: [...m.perks, 'dr-chipinski'] }),
+  },
+  {
+    id: 'space-ducks',
+    name: 'Space Ducks',
+    cost: 300,
+    desc: 'Laser-toting space ducks zap your duck-hooks (gone) & blast 50% of hooks back to the green',
+    rarity: 'legendary',
+    caddy: 'named',
+    apply: (m) => ({ ...m, caddyGuard: SPACE_DUCKS_GUARD, perks: [...m.perks, 'space-ducks'] }),
+  },
+  {
+    id: 'convict-sheep',
+    name: 'Convict Sheep',
+    cost: 300,
+    desc: 'Boomerang-slinging convict sheep end your shanks & knock 50% of slices back to the green',
+    rarity: 'legendary',
+    caddy: 'named',
+    apply: (m) => ({ ...m, caddyGuard: CONVICT_SHEEP_GUARD, perks: [...m.perks, 'convict-sheep'] }),
   },
 
   // --- Stackable upgrades (the endless credit sink + growing build) -----------
@@ -301,10 +329,12 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'caddie-lesson',
     name: 'Caddie Lesson',
     cost: 70,
-    desc: '−2 handicap, tighter shots · stacks down to scratch',
+    desc: '−2 handicap, tighter shots · stacks down to scratch · (needs a hired caddy)',
     rarity: 'common',
     stackable: true,
     maxStacks: 9, // 18 handicap → 0 (scratch); past that the −handicap clamp wastes credits
+    // A generic caddy 'service' — only offered once you've hired a named caddy (GS-caddy).
+    caddy: 'service',
     apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 2), perks: [...m.perks, 'caddie-lesson'] }),
   },
   {
@@ -439,46 +469,20 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       perks: [...m.perks, 'wedge-touch'],
     }),
   },
-
-  // --- Driver on Deck (GS-mechanics #11): a 4-tier ladder unlocking the driver off the deck.
-  // Each tier appears in the shop only once the previous is owned (prereq). The level drives the
-  // distance penalty / spray surcharge / allowed lies via DRIVER_DECK.
-  {
-    id: 'driver-deck-1',
-    name: 'Driver on Deck',
-    cost: 90,
-    desc: 'Hit driver off the FAIRWAY too — but −50% distance & +50% spray off the deck',
-    rarity: 'common',
-    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 1), perks: [...m.perks, 'driver-deck-1'] }),
-  },
-  {
-    id: 'driver-deck-2',
-    name: 'Tour Driver',
-    cost: 150,
-    desc: 'Off-deck driver eased to −30% distance, +30% spray (fairway)',
-    rarity: 'rare',
-    prereq: 'driver-deck-1',
-    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 2), perks: [...m.perks, 'driver-deck-2'] }),
-  },
-  {
-    id: 'driver-deck-3',
-    name: 'Deck Cannon',
-    cost: 230,
-    desc: 'Off-deck driver −15% / +15% · now playable from the ROUGH too',
-    rarity: 'epic',
-    prereq: 'driver-deck-2',
-    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 3), perks: [...m.perks, 'driver-deck-3'] }),
-  },
-  {
-    id: 'driver-deck-4',
-    name: 'Big Stick',
-    cost: 320,
-    desc: 'Off-deck driver near tee-power (−5% / +5%) · from ANY lie',
-    rarity: 'legendary',
-    prereq: 'driver-deck-3',
-    apply: (m) => ({ ...m, driverDeck: Math.max(m.driverDeck, 4), perks: [...m.perks, 'driver-deck-4'] }),
-  },
 ];
+
+/** All named-caddy shop-item ids (GS-caddy) — the unique, mutually-exclusive caddies. */
+export const NAMED_CADDY_IDS: readonly string[] = SHOP_ITEMS.filter((i) => i.caddy === 'named').map((i) => i.id);
+
+/** Is this a unique named caddy (only one ownable at a time)? */
+export function isNamedCaddy(id: string): boolean {
+  return NAMED_CADDY_IDS.includes(id);
+}
+
+/** The named caddy currently on the bag, if any (you may hire only one). */
+export function namedCaddyOwned(perks: readonly string[]): string | undefined {
+  return perks.find((p) => isNamedCaddy(p));
+}
 
 /** How many copies of an item the loadout owns (a unique is 0 or 1; a stackable, 0..cap). */
 export function ownedCount(perks: string[], id: string): number {

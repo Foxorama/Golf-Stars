@@ -19,6 +19,7 @@ import {
   resolveShot,
   sprayAngleRms,
   TUNABLES,
+  type CaddyGuard,
   type ShapeMod,
   type ShotResult,
   type SprayShape,
@@ -26,11 +27,14 @@ import {
 import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
-import { usableBag, driverDeckSprayMult } from './rpg/economy';
+import { usableBag } from './rpg/economy';
 import { arcApex, flightKnockdown } from './flight';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
+/** Chip-in range (yards): a PW-or-shorter shot that comes to rest within this of the flag — but
+ *  outside the auto hole-out radius — is a "makeable" chip the wedge caddy (Dr Chipinski) can drop. */
+export const CHIPIN_RANGE = 8;
 /** Max strokes over par before you pick up (max-score rule). Hole ends, score = par + this. */
 export const MAX_OVER_PAR = 4;
 /** Hard cap on full swings so a pathological hole can't loop forever. */
@@ -49,6 +53,8 @@ export interface ShotLog {
   roll: number;
   /** True if this shot holed the ball (chip-in / hole-in-one). */
   holed: boolean;
+  /** True when a wedge caddy (Dr Chipinski) dropped this approach for a chip-in. Render flavour. */
+  chipIn?: boolean;
   /** True if the ball was knocked out of the air by a tree (its `result.landing` is the clip
    *  point, lie = trees). Render-only flavour (a leaf puff); the trees lie is the real cost. */
   knockedDown?: boolean;
@@ -250,8 +256,14 @@ export interface PlayHoleOptions {
   carryMult?: number;
   /** Player dispersion multiplier (<1 = a forgiveness perk). */
   dispersionMult?: number;
-  /** Driver-on-Deck unlock level (0 = driver is tee-only). Gates off-deck driver use + penalty. */
-  driverDeck?: number;
+  /** Driver Dan caddy (GS-caddy): when true the driver is usable from ANY lie at full stats; the
+   *  default keeps the driver tee-only. (Replaces the removed Driver-on-Deck level system.) */
+  driverAnywhere?: boolean;
+  /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail to the green. */
+  guard?: CaddyGuard;
+  /** Wedge caddy chip-in chance (GS-caddy, Dr Chipinski): probability a PW-or-shorter shot resting
+   *  within CHIPIN_RANGE of the flag drops for a chip-in. 0/undefined = off (no extra rng). */
+  chipIn?: number;
   /** Character per-club shot modifiers (GS-18): shape bias, per-club dispersion, backspin. */
   shotMods?: ShotMods;
   /** Global spray-zone shape mod from upgrades (GS-dispersion-2): suppress/skew miss zones. */
@@ -494,24 +506,22 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     // AI decision: lay up to the penalty-free corridor when the line is blocked, carry a lava
     // river when it's reachable, and club to leave room for roll-out. The player (interactive
     // driver) makes this choice instead; both then run the SAME executeShot physics.
-    // Club from the lie-appropriate bag: the driver is removed (or carry-penalised) off the deck
-    // unless the Driver-on-Deck level permits it — same rule the interactive player obeys.
-    const level = opts.driverDeck ?? 0;
-    const usable = usableBag(bag, lie, level);
+    // Club from the lie-appropriate bag: the driver is tee-only unless the Driver Dan caddy unlocks
+    // it from any lie at full stats — same rule the interactive player obeys.
+    const usable = usableBag(bag, lie, opts.driverAnywhere ?? false);
     const tgt = layupTarget(hole, ball, lie, usable, carryMult);
     const club = aiClub(hole, ball, tgt, carryMult, usable, opts.stats);
-    const sprayMult = driverDeckSprayMult(club.id, lie, level);
 
     const ex = executeShot(hole, ball, lie, tgt, club, {
       carryMult,
-      // Preserve byte-for-byte behaviour for non-driver shots (undefined stays undefined); only the
-      // off-deck driver carries the spray surcharge.
-      dispersionMult: sprayMult === 1 ? opts.dispersionMult : (opts.dispersionMult ?? 1) * sprayMult,
+      dispersionMult: opts.dispersionMult,
       stats: opts.stats,
       shotMods: opts.shotMods,
       shapeMod: opts.shapeMod,
       minCarryBoost: opts.minCarryBoost,
       wedgeWindow: opts.wedgeWindow,
+      guard: opts.guard,
+      chipIn: opts.chipIn,
     }, rng);
     strokes += 1 + ex.penaltyStrokes;
     penalties += ex.penaltyStrokes;
@@ -582,6 +592,10 @@ export interface ExecOpts {
   minCarryBoost?: number;
   /** Wedge distance-control: tighten the wedge carry window (point 6). */
   wedgeWindow?: number;
+  /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail to the green. */
+  guard?: CaddyGuard;
+  /** Wedge-caddy chip-in chance (GS-caddy): drop a PW-or-shorter shot resting near the flag. */
+  chipIn?: number;
 }
 
 export interface ExecResult {
@@ -635,6 +649,7 @@ export function executeShot(
     shape,
     minCarryFracBoost: cw.minCarryFracBoost,
     carryWindowTighten: cw.carryWindowTighten,
+    guard: opts.guard,
     stats: opts.stats,
     rng,
   });
@@ -701,6 +716,20 @@ export function executeShot(
   } else if (dist(rest, pin(hole)) <= HOLE_OUT_RADIUS) {
     log.holed = true;
     holed = true;
+  } else if (
+    // Wedge-caddy chip-in (GS-caddy, Dr Chipinski): a PW-or-shorter shot resting in the makeable
+    // chip range gets a `chipIn` chance to drop. Gated behind `opts.chipIn` (caddy owned) AND the
+    // proximity + wedge checks, so a base loadout never reaches the rng draw → byte-for-byte stable.
+    opts.chipIn &&
+    nominalCarry <= WEDGE_CONTROL_CARRY &&
+    dist(rest, pin(hole)) <= CHIPIN_RANGE &&
+    rng.float() < opts.chipIn
+  ) {
+    log.holed = true;
+    log.chipIn = true;
+    holed = true;
+    ballAfter = pin(hole);
+    lieAfter = 'green';
   }
 
   return { log, ballAfter, lieAfter, restLie, penaltyStrokes, holed };

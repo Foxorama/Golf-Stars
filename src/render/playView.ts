@@ -16,6 +16,7 @@ import type { PuttLog, ShotLog } from '../sim/round';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
+import { drawCaddy, drawCaddyProjectile, hasCaddyArt, CADDY_LABEL, type CaddyArtId } from './caddyArt';
 import {
   easeOutCubic,
   flightDurationMs,
@@ -237,6 +238,9 @@ export interface PlayViewOptions {
   follow?: boolean;
   /** The selected golfer's look (GS-18). Absent → the loader-crew cap cycle (result-screen replay). */
   golferLook?: GolferLook;
+  /** The hired named caddy id (GS-caddy) — draws that caddy in the corner and powers the laser/
+   *  boomerang redirect effect. Absent → no caddy figure. */
+  caddyId?: string;
 }
 
 export interface PlayViewHandle {
@@ -307,6 +311,10 @@ export function mountPlayView(
   let done = false;
   let lastImpactShot = -1; // shot whose landing impact/hold has already been triggered
   let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
+  // Caddy-guard redirect (GS-caddy): the projectile fired for the current shot, if any.
+  let redirectFiredShot = -1;
+  let redirectFx: { kind: 'laser' | 'boomerang'; t0: number; from: Vec; to: Vec } | null = null;
+  let caddyAnchor: Vec = [0, 0]; // the corner caddy's muzzle (screen px), refreshed each frame
 
   function reset(now: number): void {
     shotIndex = 0;
@@ -318,6 +326,8 @@ export function mountPlayView(
     done = false;
     lastImpactShot = -1;
     lastRollClearShot = -1;
+    redirectFiredShot = -1;
+    redirectFx = null;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -447,6 +457,20 @@ export function mountPlayView(
     drawStatic();
     drawSpaceFX(now);
 
+    // The hired caddy stands in the bottom-left corner the whole hole (GS-caddy). Its muzzle anchor
+    // is where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect.
+    if (hasCaddyArt(opts.caddyId)) {
+      const ch = Math.max(40, Math.min(56, height * 0.085));
+      const cx = ch * 0.7 + 6;
+      const cy = height - 14;
+      caddyAnchor = drawCaddy(ctx, opts.caddyId, cx, cy, ch, now);
+      ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.textAlign = 'center';
+      ctx.fillText(CADDY_LABEL[opts.caddyId as CaddyArtId], cx, cy + 9);
+      ctx.textAlign = 'left';
+    }
+
     let hudText = '';
 
     if (shotIndex < shots.length) {
@@ -501,9 +525,43 @@ export function mountPlayView(
         let ground: Vec;
         let height: number;
         if (elapsed < flightDur) {
-          const s = sampleCurvedFlight(shot.from, touchdown, bearing, elapsed / flightDur, peak);
-          ground = s.ground;
-          height = s.height;
+          const tg = elapsed / flightDur;
+          const rd = shot.result.redirect;
+          if (rd) {
+            // Caddy-guard redirect (GS-caddy): the ball curves toward the would-be miss
+            // (originalLanding), the caddy fires mid-flight, then it's knocked back to the green
+            // (touchdown). Height is the single loft arc over the whole flight (it ignores the
+            // landing point), so only the GROUND path kinks at the intercept — exactly the "zapped"
+            // read. Eyes-on feel; the SCORE already used the redirected landing.
+            const interceptFrac = 0.5;
+            const fireFrac = 0.4;
+            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, interceptFrac, peak);
+            if (tg >= fireFrac && redirectFiredShot !== shotIndex) {
+              redirectFiredShot = shotIndex;
+              const [ipx, ipy] = proj.project(sI.ground);
+              redirectFx = {
+                kind: rd.kind,
+                t0: now,
+                from: caddyAnchor,
+                to: [ipx, ipy - sI.height * proj.scale * F.heightExaggeration],
+              };
+              shake = Math.max(shake, 0.4);
+            }
+            height = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak).height;
+            if (tg < interceptFrac) {
+              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tg, peak).ground;
+            } else {
+              const e = easeInOut((tg - interceptFrac) / (1 - interceptFrac));
+              ground = [
+                sI.ground[0] + (touchdown[0] - sI.ground[0]) * e,
+                sI.ground[1] + (touchdown[1] - sI.ground[1]) * e,
+              ];
+            }
+          } else {
+            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak);
+            ground = s.ground;
+            height = s.height;
+          }
         } else {
           // Land → bounce → run/check out → hold at rest. The ball travels touchdown→rest
           // (rest is BEHIND touchdown for a backspin check) while doing decaying hops, then sits
@@ -621,6 +679,17 @@ export function mountPlayView(
     } else if (!done) {
       done = true;
       opts.onDone?.();
+    }
+
+    // Caddy-guard projectile (laser/boomerang) flying from the caddy to the ball mid-flight.
+    if (redirectFx) {
+      const dur = redirectFx.kind === 'laser' ? 150 : 300;
+      const age = now - redirectFx.t0;
+      drawCaddyProjectile(ctx, redirectFx.kind, redirectFx.from, redirectFx.to, clamp01(age / dur), now);
+      if (age >= dur) {
+        spawnImpact(redirectFx.to, 0.45);
+        redirectFx = null;
+      }
     }
 
     // Particles.

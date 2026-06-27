@@ -207,6 +207,61 @@ export function sprayBands(shape: SprayShape, baseSpread: number, geom: SprayGeo
   ];
 }
 
+/** One of the five spray zones a sampled shot can fall in (the green plus the four miss tails). */
+export type SprayZone = 'green' | 'hookL' | 'sliceR' | 'duckHookL' | 'shankR';
+
+/**
+ * Which zone a sampled spray ANGLE (radians off the bearing, PRE-bias) falls in, by the same band
+ * boundaries `sprayBands` draws. Pure — no rng. Used by the caddy-guard interception (Space Ducks /
+ * Convict Sheep): a ball sampled into a left/right miss tail can be knocked back to the green.
+ */
+export function classifySprayZone(
+  angle: number,
+  shape: SprayShape,
+  baseSpread: number,
+  geom: SprayGeom = SPRAY_GEOM,
+): SprayZone {
+  const g = geom.greenZ * baseSpread;
+  const oL = geom.sideK * baseSpread * shape.hookL;
+  const oR = geom.sideK * baseSpread * shape.sliceR;
+  if (angle < -(g + oL)) return 'duckHookL';
+  if (angle < -g) return 'hookL';
+  if (angle <= g) return 'green';
+  if (angle <= g + oR) return 'sliceR';
+  return 'shankR';
+}
+
+/**
+ * A caddy's in-flight ball guard (GS-caddy): the named caddy that watches your misses and knocks the
+ * ball back to the green mid-flight. `remove` zones are ALWAYS redirected to the green; `halve` zones
+ * are redirected with 50% chance. `kind` is the render flavour (a Space Duck's laser, a Convict
+ * Sheep's boomerang). Unlike a `ShapeMod`, this does NOT change the spray distribution (the cone still
+ * shows the tails) — it intercepts a shot that was already sampled into a tail, so the renderer can
+ * play the projectile redirect. Resolved identically in the auto sim and interactive driver.
+ */
+export interface CaddyGuard {
+  remove: readonly SprayZone[];
+  halve: readonly SprayZone[];
+  kind: 'laser' | 'boomerang';
+}
+
+/** A mid-flight redirect record — the caddy zapped a miss back to the green (render-only flavour). */
+export interface ShotRedirect {
+  kind: 'laser' | 'boomerang';
+  /** The miss zone the shot was sampled into before being knocked back. */
+  fromZone: SprayZone;
+  /** Where the ball WOULD have come down (the hook/shank) had the caddy not intervened. */
+  originalLanding: Vec;
+}
+
+/** Sample a green-band angle (centre-peaked triangular on [−g, g]) with a single rng draw — the
+ *  landing a caddy-guard redirect knocks a miss back to. Mirrors the green branch of sampleShapeAngle. */
+function sampleGreenAngle(baseSpread: number, rng: Rng, geom: SprayGeom = SPRAY_GEOM): number {
+  const h = geom.greenZ * baseSpread;
+  const v = rng.float();
+  return v < 0.5 ? h * (Math.sqrt(2 * v) - 1) : h * (1 - Math.sqrt(2 * (1 - v)));
+}
+
 /** RMS of the spray angle (radians) for a shape — the effective σ the cone "reads as", exposed so
  *  the preview and the dispersion test agree with the sampled scatter. Pure. */
 export function sprayAngleRms(shape: SprayShape, baseSpread: number, geom: SprayGeom = SPRAY_GEOM): number {
@@ -432,6 +487,10 @@ export interface ShotInput {
   /** Wedge distance-control (point 6): pull BOTH carry clamps toward the mean by this fraction
    *  (0..1), tightening the wedge's carry window so it lands the chosen distance. */
   carryWindowTighten?: number;
+  /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail back to the
+   *  green. Absent (the default) consumes NO extra rng, so a guard-less shot is byte-for-byte the
+   *  same — the interception draws only fire when a caddy is actually watching. */
+  guard?: CaddyGuard;
   rng: Rng;
 }
 
@@ -448,6 +507,9 @@ export interface ShotResult {
    *  with the renderer (it draws this exact arc) and the sim's tree-knockdown check, so the ball
    *  the player SEES clear/clip a tree is the ball the sim let through/knocked down. */
   apex: number;
+  /** Set when a named caddy knocked a miss back to the green mid-flight (GS-caddy). The `landing`
+   *  above is already the redirected (green) finish; this carries the would-be miss for the render. */
+  redirect?: ShotRedirect;
 }
 
 /**
@@ -500,7 +562,24 @@ export function resolveShot(input: ShotInput): ShotResult {
   // position, sampled from the spray SHAPE. A character/upgrade shot-shape bias (fade +, hook −)
   // shifts the MEAN of the resulting angle; the shape skews which side misses, never the bias.
   const shape = input.shape ?? DEFAULT_SHAPE;
-  const thetaRand = (input.angleBias ?? 0) + sampleShapeAngle(shape, angleSd, rng);
+  let sprayAngle = sampleShapeAngle(shape, angleSd, rng);
+  // Caddy-guard interception (GS-caddy): a named caddy that watches a sampled miss tail and knocks
+  // the ball back to the green mid-flight. Only runs when a guard is present (a caddy is owned), so a
+  // guard-less shot draws NO extra rng and stays byte-for-byte identical. The 50%-roll + green
+  // resample are the only added draws, both gated behind the guard.
+  let knockedFrom: SprayZone | undefined;
+  let origTheta = 0;
+  if (input.guard) {
+    const zone = classifySprayZone(sprayAngle, shape, angleSd);
+    let knockBack = input.guard.remove.includes(zone);
+    if (!knockBack && input.guard.halve.includes(zone)) knockBack = rng.float() < 0.5;
+    if (knockBack && zone !== 'green') {
+      origTheta = (input.angleBias ?? 0) + sprayAngle;
+      sprayAngle = sampleGreenAngle(angleSd, rng);
+      knockedFrom = zone;
+    }
+  }
+  const thetaRand = (input.angleBias ?? 0) + sprayAngle;
   // Crosswind is a DETERMINISTIC lateral push (the AI already aims upwind to cancel it), kept
   // separate from the random angular spray so wind shifts the cone rather than widening it.
   const windLat = w.cross * TUNABLES.windLateralPerMph;
@@ -511,14 +590,15 @@ export function resolveShot(input: ShotInput): ShotResult {
   // toward this axis, matching the old "+lateral = right" convention).
   const rx = Math.cos(br);
   const ry = -Math.sin(br);
-  const brR = br + thetaRand;
-  const fxR = Math.sin(brR);
-  const fyR = Math.cos(brR);
+  const landAt = (theta: number): Vec => {
+    const brR = br + theta;
+    return [from[0] + Math.sin(brR) * carry + rx * windLat, from[1] + Math.cos(brR) * carry + ry * windLat];
+  };
+  const landing = landAt(thetaRand);
+  const redirect: ShotRedirect | undefined =
+    knockedFrom && input.guard
+      ? { kind: input.guard.kind, fromZone: knockedFrom, originalLanding: landAt(origTheta) }
+      : undefined;
 
-  const landing: Vec = [
-    from[0] + fxR * carry + rx * windLat,
-    from[1] + fyR * carry + ry * windLat,
-  ];
-
-  return { landing, carry, shotBearing, wind: w, intended, apex: arcApex(carry, nominal) };
+  return { landing, carry, shotBearing, wind: w, intended, apex: arcApex(carry, nominal), redirect };
 }
