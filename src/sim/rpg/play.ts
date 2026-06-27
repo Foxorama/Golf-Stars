@@ -131,13 +131,19 @@ export function previewShot(
     (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
   const club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
+  const dispersionMult = netDispersion(loadout);
   return shotSpread(state.hole, state.ball, state.lie, target, club, {
     carryMult,
-    dispersionMult: netDispersion(loadout),
+    dispersionMult,
     shotMods: characterShotMods(loadout.characterId),
     shapeMod: loadout.shapeMod,
     minCarryBoost: loadout.minCarryBoost,
     wedgeWindow: loadout.wedgeWindow,
+    // Suggestible Sam: the cone visibly tightens on the club he'd suggest (his confidence boost).
+    confidence: loadout.confidenceMod,
+    suggestedClubId: loadout.confidenceMod
+      ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id
+      : undefined,
   });
 }
 
@@ -166,15 +172,21 @@ export function takeShot(
   const club: Club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
 
+  const dispersionMult = netDispersion(loadout);
   const ex = executeShot(state.hole, state.ball, state.lie, target, club, {
     carryMult,
-    dispersionMult: netDispersion(loadout),
+    dispersionMult,
     shotMods: characterShotMods(loadout.characterId),
     shapeMod: loadout.shapeMod,
     minCarryBoost: loadout.minCarryBoost,
     wedgeWindow: loadout.wedgeWindow,
     guard: loadout.caddyGuard,
     chipIn: loadout.chipInBoost,
+    // Suggestible Sam: commit to his suggested club and the confidence boost folds into this shot.
+    confidence: loadout.confidenceMod,
+    suggestedClubId: loadout.confidenceMod
+      ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id
+      : undefined,
   }, rng);
 
   const firstShot = state.shots.length === 0;

@@ -60,6 +60,21 @@ export interface PlayerLoadout {
    * miss tail back to the green mid-flight. Undefined = no guard.
    */
   caddyGuard?: CaddyGuard;
+  /**
+   * Suggestible Sam caddy (GS-caddy): hands you a club recommendation on the play screen — the 🎯
+   * Suggested button + the suggested-club readout, and the default-selected club becomes the
+   * green-coverage pick. Without a caddy reading the yardage there is NO suggestion: the default flow
+   * starts on a neutral club and you pick your own. INTERACTIVE-ONLY — the auto sim never reads it, so
+   * it can't shift scoring/determinism. Undefined/false = no suggestion.
+   */
+  clubSuggest?: boolean;
+  /**
+   * Suggestible Sam's "club confidence" boost (GS-caddy): a green-zone ShapeMod applied to a shot ONLY
+   * when the played club is the one Sam suggested (commit to the caddy's club → swing freer). Threaded
+   * into both the auto sim and the interactive driver under the identical rule, so auto≡interactive
+   * holds. Undefined = no caddy → never applied (no shape change, no extra rng → byte-for-byte).
+   */
+  confidenceMod?: ShapeMod;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
@@ -186,6 +201,14 @@ export const SPACE_DUCKS_GUARD: CaddyGuard = { remove: ['duckHookL'], halve: ['h
  *  knocked back to the green. Mirrors Space Ducks on the right side. */
 export const CONVICT_SHEEP_GUARD: CaddyGuard = { remove: ['shankR'], halve: ['sliceR'], kind: 'boomerang' };
 
+/**
+ * Suggestible Sam's "club confidence" shape boost (GS-caddy): when you commit to the club Sam hands
+ * you, you swing freer — trim all four miss zones, feeding the freed probability to GREEN (more great
+ * shots, fewer misses, visibly tighter cone). Applied ONLY on the suggested club (override it and you
+ * forfeit the boost). Tuned so it's a clear epic-tier scoring lift without trivialising the spray.
+ */
+export const SAM_CONFIDENCE: ShapeMod = { hookL: -0.03, sliceR: -0.03, duckHookL: -0.015, shankR: -0.015 };
+
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
 
@@ -212,6 +235,7 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'dr-chipinski': ['skill'],
   'space-ducks': ['control'],
   'convict-sheep': ['control'],
+  'suggestible-sam': ['skill'],
   // Spray-zone shapers (GS-dispersion-2) — accuracy/forgiveness, so 'control'.
   'sweet-spot': ['control'],
   'anti-duck-hook': ['control'],
@@ -338,6 +362,15 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, caddyGuard: CONVICT_SHEEP_GUARD, perks: [...m.perks, 'convict-sheep'] }),
+  },
+  {
+    id: 'suggestible-sam',
+    name: 'Suggestible Sam',
+    cost: 240,
+    desc: 'Reads the yardage & hands you the club — commit to his pick and swing freer (more great shots)',
+    rarity: 'epic',
+    caddy: 'named',
+    apply: (m) => ({ ...m, clubSuggest: true, confidenceMod: SAM_CONFIDENCE, perks: [...m.perks, 'suggestible-sam'] }),
   },
 
   // --- Stackable upgrades (the endless credit sink + growing build) -----------

@@ -12,9 +12,22 @@
 import type { Vec } from '../sim/course/contract';
 
 /** The named-caddy ids that have a figure (mirrors the shop-item ids). */
-export type CaddyArtId = 'auto-caddie' | 'driver-dan' | 'dr-chipinski' | 'space-ducks' | 'convict-sheep';
+export type CaddyArtId =
+  | 'auto-caddie'
+  | 'driver-dan'
+  | 'dr-chipinski'
+  | 'space-ducks'
+  | 'convict-sheep'
+  | 'suggestible-sam';
 
-const ART_IDS: readonly string[] = ['auto-caddie', 'driver-dan', 'dr-chipinski', 'space-ducks', 'convict-sheep'];
+const ART_IDS: readonly string[] = [
+  'auto-caddie',
+  'driver-dan',
+  'dr-chipinski',
+  'space-ducks',
+  'convict-sheep',
+  'suggestible-sam',
+];
 
 /** Does this caddy id have a drawable figure? */
 export function hasCaddyArt(id: string | undefined): id is CaddyArtId {
@@ -28,6 +41,7 @@ export const CADDY_LABEL: Record<CaddyArtId, string> = {
   'dr-chipinski': 'Dr Chipinski',
   'space-ducks': 'Space Ducks',
   'convict-sheep': 'Convict Sheep',
+  'suggestible-sam': 'Suggestible Sam',
 };
 
 /** Which caddies actively fire a projectile mid-flight (Space Ducks laser, Convict Sheep boomerang). */
@@ -76,6 +90,9 @@ export function drawCaddy(
       break;
     case 'convict-sheep':
       anchorLocal = drawConvictSheep(ctx, t);
+      break;
+    case 'suggestible-sam':
+      anchorLocal = drawSuggestibleSam(ctx, t);
       break;
     case 'auto-caddie':
     default:
@@ -366,6 +383,64 @@ function drawConvictSheep(ctx: CanvasRenderingContext2D, t: number): Vec {
   ctx.stroke();
   ctx.restore();
   return [ax, ay];
+}
+
+// --- Suggestible Sam (reads the yardage, hands you the club) -----------------
+function drawSuggestibleSam(ctx: CanvasRenderingContext2D, t: number): Vec {
+  legs(ctx, '#2f3a33');
+  // Green caddy vest.
+  ctx.strokeStyle = '#3fae5c';
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.moveTo(0, -22);
+  ctx.lineTo(-1, -44);
+  ctx.stroke();
+  // Near arm offering a club UP (the "here's your club" gesture).
+  ctx.strokeStyle = '#e8c6a0';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(-1, -40);
+  ctx.lineTo(13, -46);
+  ctx.stroke();
+  // The offered club (shaft + small head), held aloft.
+  ctx.strokeStyle = '#c8ccd6';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(13, -46);
+  ctx.lineTo(18, -64);
+  ctx.stroke();
+  ctx.fillStyle = '#aeb6c6';
+  ctx.beginPath();
+  ctx.ellipse(18, -64, 3.4, 2.2, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  // A little "thinking" bubble with a club glyph — the yardage read.
+  const pulse = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.006));
+  ctx.fillStyle = `rgba(255,255,255,${0.18 + 0.12 * pulse})`;
+  ctx.beginPath();
+  ctx.arc(-15, -52, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.25 * pulse})`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(95,212,90,${0.7 + 0.3 * pulse})`;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-15, -56);
+  ctx.lineTo(-15, -49);
+  ctx.lineTo(-12.5, -48);
+  ctx.stroke();
+  // Head.
+  ctx.fillStyle = '#e8c6a0';
+  ctx.beginPath();
+  ctx.arc(-1, -50, 6, 0, Math.PI * 2);
+  ctx.fill();
+  // Peaked caddy cap.
+  ctx.fillStyle = '#2f8f47';
+  ctx.beginPath();
+  ctx.arc(-1, -52, 6, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(-1, -53, 9, 2.4); // brim
+  return [13, -46];
 }
 
 /**

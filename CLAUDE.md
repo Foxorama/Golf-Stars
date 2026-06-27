@@ -461,8 +461,37 @@ This game lives or dies on three axes — put every change through all three bef
   strength: **Penelope Putter** (`auto-caddie`, legendary — auto-putt; id kept for save-compat),
   **Driver Dan** (`driver-dan`, epic — `driverAnywhere`, see the driver bullet), **Dr Chipinski**
   (`dr-chipinski`, epic — `chipInBoost` 0.33), **Space Ducks** (`space-ducks`, legendary — left-side
-  guard), **Convict Sheep** (`convict-sheep`, legendary — right-side guard). Helpers: `NAMED_CADDY_IDS`,
+  guard), **Convict Sheep** (`convict-sheep`, legendary — right-side guard), **Suggestible Sam**
+  (`suggestible-sam`, epic — `clubSuggest`, see below). Helpers: `NAMED_CADDY_IDS`,
   `isNamedCaddy`, `namedCaddyOwned(perks)`.
+- **Suggestible Sam — club suggestions are a caddy perk (`clubSuggest`) AND a real scoring edge
+  (`confidenceMod`).** Two coupled effects, both off hiring Sam:
+  - **(1) Suggestions are no longer the default flow.** The interactive 🎯 Suggested button, the
+    legend's `suggested: attack X · safe Y` readout, AND the default-selected club (the green-coverage
+    `suggestPlayerClub` pick) only appear with Sam. The BASE flow has no caddy reading the yardage: the
+    play screen surfaces no suggestion and the default club is a NEUTRAL pick (putter on the green, else
+    the longest usable club) you read the distance + carry labels and cycle to yourself.
+    `suggestPlayerClub`/`shotView.attackClubId` are unchanged and still computed — `app.ts` just GATES
+    surfacing them on `loadout.clubSuggest`. Sam also surfaces a **caddy yardage read** (a 🎒 Sam line
+    on the play screen): precise front/middle/back green distances (`greenDepth` + centroid dist) and
+    the carry to clear the nearest forced penalty on the line to the pin (`forcedCarry`, a pure
+    line-vs-penalty sampler in `round.ts` — info only, never feeds fairness/scoring).
+  - **(2) Club confidence — commit to Sam's club and swing freer.** `loadout.confidenceMod`
+    (`SAM_CONFIDENCE`, a green-zone `ShapeMod` trimming all four miss zones) is folded into a shot's
+    spray shape ONLY when the played club is the one Sam suggested — so the cone VISIBLY tightens on the
+    recommended club and you forfeit the boost if you override for a tactical placement (a real
+    decision). It's threaded into BOTH the auto sim (`PlayHoleOptions.confidence` → `playHole` computes
+    `suggestPlayerClub` and applies iff `aiClub === suggested`) and the interactive driver
+    (`takeShot`/`previewShot` compute the same and apply iff the chosen club matches) under the
+    IDENTICAL rule, so auto≡interactive holds. The fold is `resolveShape(combineShapeMods(shapeMod,
+    confidence), charShape)` in `executeShot` AND `shotSpread` (so physics == the previewed cone).
+  CRITICAL determinism: confidence is a SHAPE change (no new rng draws — it just re-weights the
+  categorical zone pick), so a NON-Sam shot (confidence undefined) is byte-for-byte unchanged, and the
+  gate (`confidence && suggestedClubId === club.id`) means an off-suggestion shot is identical too
+  (guarded in `tests/caddies.test.ts`). Because it only ever raises green %, it can't trip the
+  death-spiral bar; its value is proven by a FOLLOW-SAM headless harness (play `shotView.attackClubId`
+  each shot via `takeShot`) showing higher mean per-stop Stableford. Both fields rebuild from perks on
+  resume (no save bump). Render: `drawSuggestibleSam` offers a club aloft with a yardage thought-bubble.
 - **Generic caddy 'service' perks gate behind hiring a named caddy.** `caddie-lesson` is `caddy:
   'service'`: `shopOffer` only surfaces a service perk once `namedCaddyOwned(perks)` is set — you need a
   caddy before they'll give you lessons. (It still stacks/works exactly as before once unlocked.)
