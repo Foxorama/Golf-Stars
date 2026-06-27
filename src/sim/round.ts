@@ -52,21 +52,46 @@ export interface ShotLog {
   /** True if the ball was knocked out of the air by a tree (its `result.landing` is the clip
    *  point, lie = trees). Render-only flavour (a leaf puff); the trees lie is the real cost. */
   knockedDown?: boolean;
+  /** Surface the ball first touched down on (BEFORE the bounce & roll-out). Drives the renderer's
+   *  firmness-based bounce (firm → skip & run, soft → plop) and is honest HUD data. */
+  landLie: FeatureKind;
 }
 
-/** Surface roll MULTIPLIER (around 1): slick ice runs, bunkers kill it, greens hold a
- *  little, fairway/tee run true. Applied on top of the club's loft-based roll fraction. */
+/** Per-yard roll MULTIPLIER of each surface (its "run"): how far the ball travels per unit of roll
+ *  energy while it's ON that surface. Slick ice/crystal run free (>1), fairway/tee run true (1),
+ *  the green and rough drag, sand/woods kill it. The run-out integrates this surface-by-surface
+ *  ALONG the path (`rollOut`), so a ball that lands in the rough and trickles onto the fairway keeps
+ *  running, and one that runs off the fairway into rough brakes hard — "running into the fairway, or
+ *  vice versa". (Was a single touchdown-surface multiply; now it's a friction integral.) */
 const SURFACE_ROLL: Record<string, number> = {
   fairway: 1.0,
   tee: 1.0,
   green: 0.7,
-  rough: 0.5,
+  rough: 0.42, // thick stuff grabs the ball — a touch draggier than the old 0.5 now it's per-step
   waste: 0.7,
   bunker: 0.2,
   trees: 0.25, // knocked into the woods → drops nearly dead, barely trickles
   ice: 1.8,
   crystal: 1.1,
 };
+/** Firmness (bounciness) of a landing surface, 0..1 — fed to the renderer so a ball plops on soft
+ *  ground (rough/sand) and skips/runs off firm ground (fairway/ice). Render-only feel; the roll
+ *  distance itself comes from the friction integral. */
+export const SURFACE_FIRMNESS: Record<string, number> = {
+  fairway: 0.85,
+  tee: 0.9,
+  green: 0.65,
+  rough: 0.3,
+  waste: 0.6,
+  bunker: 0.12,
+  trees: 0.15,
+  ice: 1.0,
+  crystal: 0.95,
+};
+/** Firmness of a touchdown lie (default a mid value for unknown surfaces). */
+export function surfaceFirmness(lie: FeatureKind): number {
+  return SURFACE_FIRMNESS[lie] ?? 0.5;
+}
 /** Clamp on the run-out (yards): forward roll caps high, backspin checks modestly back. */
 const MAX_ROLL = 42;
 const MAX_CHECK = 18;
@@ -95,49 +120,62 @@ export function hasBackspin(nominalCarry: number): boolean {
   return nominalCarry <= BACKSPIN_CARRY;
 }
 
-/** Signed run-out (yards) for a shot: + runs forward, − checks/spins back. Combines the
- *  club's loft (clubRollFraction) with the landing surface and a little variance. A character's
- *  `rollFracDelta` (GS-18) shifts the loft fraction — a negative delta adds backspin so the ball
- *  checks/holds rather than running out. The rng draw is unchanged so a 0 delta is byte-for-byte. */
-function rollYards(nominalCarry: number, lie: FeatureKind, carry: number, rng: Rng, rollFracDelta = 0): number {
+/**
+ * The ball's reference run-out ENERGY (signed yards) — how far it would roll on a flat, true (mult 1,
+ * fairway) surface. + runs forward, − is backspin checking it back. Loft (`clubRollFraction`) + a
+ * character's `rollFracDelta` + a little variance. This is surface-FREE; the surface is applied along
+ * the path by `rollOut`. Consumes EXACTLY one rng draw (same as the old `rollYards`), so a 0-delta
+ * shot keeps the same rng budget and auto≡interactive holds. */
+function rollPotential(nominalCarry: number, carry: number, rng: Rng, rollFracDelta = 0): number {
   const frac = clubRollFraction(nominalCarry) + rollFracDelta;
-  const surf = SURFACE_ROLL[lie] ?? 0.6;
-  const raw = carry * frac * surf * rng.range(0.85, 1.15);
+  const raw = carry * frac * rng.range(0.85, 1.15);
   return Math.max(-MAX_CHECK, Math.min(MAX_ROLL, raw));
 }
 
 /**
- * Walk the run-out from `touchdown` along `dir` for up to |budget| yards, settling the ball where it
- * first runs INTO trouble: a penalty surface (water/lava/void — it's swallowed) or a BUNKER it
- * wasn't already sitting in (sand plugs a running ball). Otherwise it rolls the full budget. Returns
- * the SIGNED roll actually travelled (so `dist(rest,touchdown) === |roll|`, preserving the roll
- * invariant) and the rest point. Pure: no rng — a deterministic geometry pass after the roll draw,
- * so auto≡interactive is untouched. This is the "affected by hazards while running" half of the ask. */
-function rollStop(
+ * Roll the ball out from `touchdown` along `dir`, integrating each surface's "run" (`SURFACE_ROLL`)
+ * step-by-step until the reference energy `K` (signed, from `rollPotential`) is spent — so the SAME
+ * energy carries far across slick fairway/ice and dies quickly in thick rough, and a roll that
+ * CROSSES surfaces blends them (land rough → reach fairway → keep running, or vice versa). Hard
+ * stops: it settles where it first trickles into a penalty (water/lava/void), or plugs in a bunker /
+ * is caught by trees it ROLLS into (object interaction on the ground). Returns the SIGNED distance
+ * actually travelled (so `dist(rest,touchdown) === |roll|`) + the rest point. Pure, no rng — a
+ * deterministic geometry pass after the energy draw, so auto≡interactive is untouched. */
+export function rollOut(
   hole: Hole,
   touchdown: Vec,
   dir: Vec,
-  budget: number,
+  K: number,
   tdLie: FeatureKind,
 ): { roll: number; rest: Vec } {
-  const sign = budget < 0 ? -1 : 1;
-  const total = Math.abs(budget);
-  const startBunker = tdLie === 'bunker';
-  const STEP = 2; // yards between samples — fine enough at hazard scale, cheap enough per shot
-  let travelled = total;
-  for (let d = STEP; d <= total; d += STEP) {
-    const p: Vec = [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
-    const k = lieAt(hole, p);
+  const sign = K < 0 ? -1 : 1;
+  const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
+  const at = (d: number): Vec => [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
+  const STEP = 1.5; // yards per integration step
+  let budget = Math.abs(K); // remaining energy, in fairway-equivalent yards
+  let dist = 0;
+  let guard = 0;
+  while (budget > 1e-3 && dist < cap && guard++ < 400) {
+    const k = lieAt(hole, at(dist + STEP * 0.5)); // the surface we're rolling onto
     if (lieInfo(k).penalty) {
-      travelled = d; // trickled into a penalty hazard → it settles there (+stroke downstream)
+      dist += STEP; // trickled into a penalty hazard → settles there (+stroke downstream)
       break;
     }
-    if (k === 'bunker' && !startBunker) {
-      travelled = d; // ran into sand → plugs
+    if (k !== tdLie && (k === 'bunker' || k === 'trees')) {
+      dist += STEP; // ran into sand / caught by the woods → stops
       break;
     }
+    const m = SURFACE_ROLL[k] ?? 0.6; // this surface's run per yard
+    if (m <= 0) break;
+    const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
+    if (need >= budget) {
+      dist += budget * m; // spend the last of the energy
+      break;
+    }
+    dist += STEP;
+    budget -= need;
   }
-  const roll = sign * travelled;
+  const roll = sign * Math.min(dist, cap);
   return { roll, rest: [touchdown[0] + dir[0] * roll, touchdown[1] + dir[1] * roll] };
 }
 
@@ -562,28 +600,29 @@ export function executeShot(
     result.apex = arcApex(kd.carry, nominalCarry);
   }
 
-  // Touchdown → bounce & roll out (unless it plugs in a penalty surface). Roll is signed (long
-  // clubs run forward, lofted wedges check/spin back) and hazard-aware: it settles where it first
-  // runs into water or a bunker instead of rolling through.
+  // Touchdown → bounce & roll out (unless it plugs in a penalty surface). The run-out integrates
+  // the surfaces it crosses: the ball keeps the same roll ENERGY but spends it fast in rough and
+  // slowly on fairway/ice, so landing in the rough and trickling onto the fairway (or running off
+  // the fairway into rough) reads physically, and it settles where it first finds water/sand/woods.
   const touchdown = result.landing;
   const tdLie = lieAt(hole, touchdown);
   let rest: Vec = touchdown;
   let roll = 0;
   if (!lieInfo(tdLie).penalty) {
-    const rolled = rollYards(nominalCarry, tdLie, result.carry, rng, mods.rollFracDelta);
-    if (rolled !== 0) {
+    const energy = rollPotential(nominalCarry, result.carry, rng, mods.rollFracDelta);
+    if (energy !== 0) {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
       const len = Math.hypot(dx, dy) || 1;
-      const stop = rollStop(hole, touchdown, [dx / len, dy / len], rolled, tdLie);
-      roll = stop.roll;
-      rest = stop.rest;
+      const out = rollOut(hole, touchdown, [dx / len, dy / len], energy, tdLie);
+      roll = out.roll;
+      rest = out.rest;
     }
   }
 
   const restLie = lieAt(hole, rest);
   const li = lieInfo(restLie);
-  const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown };
+  const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };
 
   let ballAfter: Vec = rest;
   let lieAfter: FeatureKind = restLie;

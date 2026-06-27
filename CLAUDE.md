@@ -210,6 +210,26 @@ This game lives or dies on three axes — put every change through all three bef
   canopy/knockdown arc-height logic, the broad-phase prune, and the executeShot integration. NB: these
   are pure module constants (`ARC_FEEL`/`CANOPY_FEEL`), NOT `_gs*` window flags, so the test-hub guard
   needs no new control; the play-view feel reuses the existing `_gsFeel` (apex now off `result.apex`).
+- **Run-out is a SURFACE-FRICTION INTEGRAL, not a single multiply (GS-flight-2, `rollOut`).** The roll
+  used to be `carry·loftFrac·SURFACE_ROLL[touchdownLie]·variance` — one surface, applied once. Now the
+  ball carries a surface-FREE roll ENERGY (`rollPotential` = `carry·loftFrac·variance`, the *one* rng
+  draw, signed: + runs, − is backspin check-back) and `rollOut` spends it step-by-step ALONG the path,
+  consuming `STEP / SURFACE_ROLL[localLie]` energy per step — so the SAME energy runs far on
+  fairway/ice and dies fast in rough, and a roll that CROSSES surfaces blends them: land in the rough
+  and trickle onto the fairway and it keeps running; run off the fairway into rough and it brakes
+  short. This is the "landing in the rough and running into the fairway, or vice versa" ask, and it's
+  what makes a DOGLEG real — a straight over-carry that lands fairway near the bend runs straight off
+  the outside into rough (emergent, not special-cased). Hard stops: it settles where it first trickles
+  into a penalty (water/lava/void), or plugs in a bunker / is caught by trees it ROLLS into (ground
+  object-interaction). `SURFACE_ROLL` is now a per-yard run multiplier (rough trimmed 0.5→0.42 for the
+  per-step model); the forward/back caps (`MAX_ROLL`/`MAX_CHECK`) clamp the final distance. CRITICAL:
+  `rollOut` is PURE geometry after the single energy draw — no new rng — so auto≡interactive stays
+  byte-for-byte and `dist(rest,touchdown) === |roll|` still holds (roll = the distance ACTUALLY
+  travelled). Balance-neutral (re-measured `toPar/hole` 0.103 → 0.1025). The renderer reads the
+  TOUCHDOWN surface (new `ShotLog.landLie`) for a FIRMNESS-scaled bounce (`SURFACE_FIRMNESS`): a firm
+  fairway/ice skips tall and runs (more, higher hops), thick rough/sand plops dead (a low, fast-damped
+  hop). `tests/roll-surface.test.ts` guards the run-on/brake asymmetry, the transition blend, the
+  bunker catch, the roll invariant, and the firmness ordering; firmness/`rollOut` are pure (no `_gs*`).
 - **Blow-ups are absorbed, not eliminated:** at max wildness rare disaster holes still happen;
   Stableford caps them at 0 points so they don't wreck a run (that's *why* Stableford is the
   headline metric). Tests assert no *systemic* death-spiral (sane average, <5% blow-ups), not a

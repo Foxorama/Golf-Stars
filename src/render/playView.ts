@@ -13,7 +13,7 @@
 
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
-import { playBoundsCorners } from '../sim/round';
+import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
 import {
@@ -487,12 +487,18 @@ export function mountPlayView(
           height = s.height;
         } else {
           // Land → bounce → run/check out → hold at rest. The ball travels touchdown→rest
-          // (rest is BEHIND touchdown for a backspin check) while doing a couple of decaying
-          // hops, then sits still for restHoldMs so you can read the finish.
+          // (rest is BEHIND touchdown for a backspin check) while doing decaying hops, then sits
+          // still for restHoldMs so you can read the finish. The bounce reads the LANDING surface's
+          // firmness: a firm fairway/ice skips high and runs (taller hop, an extra bounce), thick
+          // rough or a bunker plops dead (a low, quickly-damped hop).
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
           const e = easeOutCubic(rt);
           ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
-          height = F.bounceAmp * Math.abs(Math.sin(rt * Math.PI * F.bounces)) * (1 - rt);
+          const firm = surfaceFirmness(shot.landLie ?? shot.lieTo);
+          const hops = F.bounces * (0.6 + 0.8 * firm); // firm → more, distinct hops; soft → ~one plop
+          const amp = F.bounceAmp * (0.35 + 1.15 * firm); // firm → tall skip; soft → low
+          const damp = Math.pow(1 - rt, 1.6 - 0.7 * firm); // soft decays faster (a dead plop)
+          height = amp * Math.abs(Math.sin(rt * Math.PI * hops)) * damp;
         }
 
         lastGround = ground; // feed the follow-cam

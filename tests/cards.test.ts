@@ -54,6 +54,7 @@ describe('cards (GS-5)', () => {
       result: { landing: [0, 100] as [number, number], carry: 100, shotBearing: 0, wind: { along: 0, cross: 0 }, intended: 100, apex: 20 },
       lieFrom: 'tee' as const,
       lieTo: 'fairway' as const,
+      landLie: 'fairway' as const,
       rest: [0, 102] as [number, number],
       roll: 2,
       holed: false,
