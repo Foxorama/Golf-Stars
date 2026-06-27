@@ -15,6 +15,28 @@ Everything below serves whichever avenue wins.
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
+- **GS-clubs — Per-character starting bags + clubs as rewards. SHIPPED.** Each golfer now starts with
+  a SPARSE, signature bag (8–10 clubs, not the full taxonomy) defined in `characters.ts` `STARTING_BAGS`
+  — the signature long/mid clubs that read as their identity + a fair short-game ladder so they can
+  actually score (a 5-club bag with one wedge and a 98-yd gap to the putter death-spirals at toPar ~2.2;
+  measured). Clubs are then LOOT: a reward club is a `ShopItem` (`CLUB_ITEMS`, generated from a `CLUB_SETS`
+  × `REWARD_CLUB_TYPES` table) whose `apply()` `equipClub`s it into the bag — replacing your club of that
+  TYPE, or adding it (the bag holds one per type). Ownership rules (`offerableClubs`): a type you LACK is
+  offered (fill a gap), a type you own is offered only as a HIGHER tier (upgrade) or a same-tier DIFFERENT
+  set (side-grade) — never the one you hold. Starting clubs are the common `starter` set, so the offer
+  never re-sells one you have (Larry sees no common Driver but a common 3-Wood; Bo the mirror). The `tour`
+  rare tier is DISTANCE-club only (extra carry only helps on the woods — on a scoring club it overshoots
+  the green, the power-cell lesson; scoring-club upgrades need a different stat/effect, deferred). Larry
+  never sees hybrids (`loadout.noHybrids`); Driver Dan now gates on actually OWNING a driver. `clubOffer`
+  draws the reward clubs into the shop alongside the perk offer (its own RNG stream); the bag is rebuilt
+  from perks on resume (no save bump). `distanceClubBonus` carries the golfer (+14/−8) + Tour Bag (+6)
+  flat bonus onto any reward distance club. Verified: roster clusters (~9 SF, 0% blow-ups), club coverage
+  + distance upgrades raise the roster mean (`tests/club-rewards.test.ts`). **Deferred follow-ups:**
+  (1) higher-tier / location-specific sets with game EFFECTS, not just carry (the Tarantula Network's
+  Spyder putter etc. — one `CLUB_SETS` row each); (2) scoring-club upgrade tiers via per-club dispersion/
+  shape (so a "tour wedge" is a real upgrade without overshoot); (3) wire reward-club acquisition into the
+  cut-line/credit economy curve (today most runs end before the bag fills — the loop pays off late).
+
 - **GS-caddy — The named-caddy card set. SHIPPED.** Caddies are a UNIQUE class of shop item
   (`ShopItem.caddy:'named'`, helpers `NAMED_CADDY_IDS`/`namedCaddyOwned`): hire ONE. They're random,
   rarity-weighted inclusions in the rotating offer (epic/legendary, so scarce); the moment you hire

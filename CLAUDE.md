@@ -329,6 +329,46 @@ This game lives or dies on three axes — put every change through all three bef
   inline-SVG silhouette, and the header shows the name. The Sim Lab (`lab.ts`/hub) gained a golfer
   selector so the shape is demoable (dispersion scatter + scoring harness); `CHARACTERS` is in the
   test-hub guard's imported-tables list so the roster can't fork.
+- **Per-character starting bags + clubs as rewards (GS-clubs, `characters.ts` + `economy.ts`).** Each
+  golfer starts with a SPARSE, SIGNATURE bag (8–10 clubs, NOT the full 27-club taxonomy) from
+  `STARTING_BAGS`: their identity clubs (Feather's hybrid+fade kit, Huang's two hooky woods, Larry's
+  Driver+long-irons, Bo's short-iron scoring kit) PLUS a fair short-game ladder. **The short-game ladder is
+  non-negotiable for fairness:** a literal "5 signature clubs" bag (one wedge, then a ~98-yard gap to
+  the putter) death-spirals — measured toPar/hole **~2.2** at wildness 1 (≫ the old 1.0 bar) and ~halved
+  Stableford, because the reach-AI has no touch club and hits a PW that flies 106 at a 60-yard chip.
+  Adding the wedge ladder (SW/LW/60) drops toPar to ~0.9 and restores scoring — the short game, not the
+  long clubs, is the dominant lever (long sparseness just costs a lay-up). **The sparse bag legitimately
+  raises the max-wildness MEAN toward bogey (~0.9–1.0/hole) — that is BY DESIGN, not a death spiral:**
+  the blow-up (≥+5) rate stays ~0%. So the no-death-spiral guard for golfers is now a relaxed toPar bar
+  (< 1.15) PLUS a strict blow-up bar (< 5%), and the balance test baselines against the ROSTER mean (the
+  neutral full bag is a different game). Collecting clubs over a run closes the gap. **Clubs are LOOT.** A
+  reward club is a `ShopItem` (`CLUB_ITEMS`, GENERATED from `CLUB_SETS` × `REWARD_CLUB_TYPES`) whose
+  `apply()` `equipClub`s it into the bag — replacing the club of that TYPE, or adding it (bag holds ONE
+  per type, kept sorted longest→shortest). Each bag `Club` now carries optional `set`/`rarity`. Ownership
+  rules (`offerableClubs`): a type you LACK → offered (fill a gap); a type you OWN → offered only as a
+  HIGHER tier (upgrade) or a same-tier DIFFERENT set (side-grade), never the one you hold. Starting clubs
+  are the common `starter` set, so the offer never re-sells one you have — Larry (starts with a Driver) is
+  offered no common Driver but a common 3-Wood; Bo (starts with a 3-Wood) the mirror. The `tour` rare tier
+  is **DISTANCE-club ONLY** (`distanceOnly`): extra carry only HELPS on the woods (reach); on a scoring
+  club it OVERSHOOTS the green and scores worse (the power-cell lesson — verified, so `buildRewardClub`
+  suppresses the carry bonus on scoring clubs AND the tour set skips them). Scoring-club upgrades need a
+  different stat (per-club dispersion/effect) and are a documented follow-up. **Larry never sees hybrids**
+  (`loadout.noHybrids`, the offer filters `isHybridType`). **Driver Dan gates on OWNING a driver** (not
+  on being Larry — he qualifies from the start but Dan still only shows at his epic rarity): `shopOffer`
+  drops `driver-dan` unless the bag has a `DRIVER_ID` club. **Save-stable:** the bag is NOT serialised —
+  `loadoutFromPerks` rebuilds it from the character's starting bag (via `startingLoadoutFor`) + the bought
+  club perk ids, applied in purchase order so the latest tier wins. **`distanceClubBonus`** on the loadout
+  is the running flat carry bonus on distance clubs (character ±, set by the golfer; Tour Bag +6/level,
+  set by meta) so a reward distance club bought mid-run inherits the same bonus the starting distance
+  clubs carry. CRITICAL ORDERING: `startingLoadoutFor(meta, characterId) = applyMeta(meta,
+  applyCharacter(characterId, startingLoadout()))` — character FIRST (sets the sparse bag), meta SECOND
+  (Tour Bag boosts THAT bag, not a discarded default); `startRun`/`resumeRun`/the Sim Lab all use this one
+  helper so they reconstruct identically. The shop screen (`app.ts`) renders the reward clubs under a
+  "Reward Clubs" sub-section (`clubOffer` drawn alongside `shopOffer` from its own RNG stream). The Sim
+  Lab gained a "Reward clubs" toggle group so club builds are demoable. `tests/club-rewards.test.ts`
+  guards ownership/hybrid/driver rules, equip/replace, the distance-bonus inheritance, snapshot/resume,
+  and that coverage + distance upgrades raise the roster mean Stableford. **Deferred:** location-specific
+  legendary sets with game effects (the Tarantula Network's Spyder putter — one `CLUB_SETS` row each).
 - **Persistent meta-progression (GS-12, `meta.ts`):** runs bank **Star Shards** (`shardsForRun` =
   distance×3 + stops×2, floored at 1) in **save v3**, spent at the Outpost on PERMANENT, leveled
   *starting* upgrades (`META_UPGRADES`: Veteran Hands −2 hcp, Tour Bag +6yd, Steady Grip −4% spray,

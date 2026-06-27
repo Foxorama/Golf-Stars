@@ -9,11 +9,13 @@ import {
 } from '../src/sim/clubs';
 
 describe('clubs', () => {
-  it('ships a 26-club bag ordered longest→shortest', () => {
-    expect(CLUBS).toHaveLength(26);
+  it('ships a 27-club taxonomy ordered longest→shortest', () => {
+    expect(CLUBS).toHaveLength(27);
     for (let i = 1; i < CLUBS.length; i++) {
       expect(CLUBS[i]!.carry).toBeLessThan(CLUBS[i - 1]!.carry);
     }
+    // The 3-iron (added for Larry's long-iron bag, GS-clubs) sits between the 4-iron and the hybrids.
+    expect(CLUBS.find((c) => c.id === '3i')!.carry).toBeGreaterThan(CLUBS.find((c) => c.id === '4i')!.carry);
   });
 
   it("'reach' picks the shortest club that still carries the distance", () => {

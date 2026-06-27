@@ -73,6 +73,24 @@ describe('ui reducer', () => {
     expect(s.play!.strokes).toBeGreaterThan(0);
   });
 
+  it('the shop offer includes reward clubs, and buying one equips it (GS-clubs)', () => {
+    // seed 3 / Feather clears the opening cut → reaches the shop.
+    let s = reduce(started(3), { type: 'play' });
+    expect(s.screen).toBe('result');
+    s = reduce(s, { type: 'continue' });
+    expect(s.screen).toBe('shop');
+    const clubIds = (s.shopOffer ?? []).filter((id) => id.startsWith('club:'));
+    expect(clubIds.length).toBeGreaterThan(0); // reward clubs are on the rack alongside the perks
+    // Buying a gap club through the reducer grows the bag (Feather starts without these types).
+    const gap = clubIds.find((id) => !s.run.loadout.bag.some((c) => c.id === id.split(':')[2]));
+    if (gap) {
+      const before = s.run.loadout.bag.length;
+      const rich = { ...s, run: { ...s.run, credits: 100000 } };
+      const after = reduce(rich, { type: 'buy', id: gap });
+      expect(after.run.loadout.bag.length).toBe(before + 1);
+    }
+  });
+
   it('ignores actions that do not apply to the current screen', () => {
     const s = started(1234);
     expect(reduce(s, { type: 'continue' })).toBe(s); // can't continue from intro

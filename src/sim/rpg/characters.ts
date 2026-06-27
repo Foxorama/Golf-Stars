@@ -17,6 +17,7 @@
  */
 
 import { boostDistanceClubs, type PlayerLoadout } from './economy';
+import { CLUBS, clubById, type Club } from '../clubs';
 import type { ClubShotMods, ShotMods } from '../round';
 
 /** Render-only visual identity for a golfer (cap/skin/shirt + a build scale). */
@@ -66,6 +67,36 @@ const mods = (m: Partial<ClubShotMods>): ClubShotMods => ({
 });
 
 /**
+ * Each golfer starts with a SPARSE, signature bag (GS-clubs) — not the full taxonomy. The first
+ * clubs define their identity; the rest is a fair short-game ladder so they can actually score (a
+ * 5-club bag with one wedge and a 98-yard gap to the putter death-spirals — measured). Clubs are then
+ * acquired/upgraded as shop rewards over a run (the collection loop), bringing the bag toward full.
+ * Every starting club is the common 'starter' set, so the reward offer never re-sells one you have.
+ */
+const STARTING_BAGS: Record<string, readonly string[]> = {
+  // Feather: a tidy fader — 3-wood off the tee, a hybrid + mid-iron, full short-game ladder.
+  'feather-fade': ['3W', '4H', '7i', 'PW', 'GW', 'SW', 'LW', '60', 'putter'],
+  // Huang-Woo: two woods (the hooky big sticks), a mid-iron pair, wedges to the 60°.
+  'huang-woo-hook': ['3W', '7W', '5i', '7i', 'PW', 'SW', 'LW', '60', 'putter'],
+  // Larry: the only golfer who starts with a Driver — bombs it, then long irons (NO hybrids, ever).
+  'longshot-larry': ['D', '3i', '5i', '7i', '9i', 'PW', 'SW', 'LW', '60', 'putter'],
+  // Bo: a short-iron scoring specialist — trades Feather's 7-iron for a denser 8i/9i pair (down in
+  // the ≤150-yd zone where his backspin bites), keeping the hybrid as the long-gap filler.
+  'backspin-bo': ['3W', '4H', '8i', '9i', 'PW', 'GW', 'SW', 'LW', '60', 'putter'],
+};
+
+/** Build a golfer's starting bag from club-type ids, stamping every club as the common 'starter' set. */
+function buildStartBag(ids: readonly string[]): Club[] {
+  return ids
+    .map((id) => {
+      const base = clubById(id, CLUBS);
+      if (!base) throw new Error(`buildStartBag: unknown club "${id}"`);
+      return { id: base.id, name: base.name, carry: base.carry, set: 'starter', rarity: 'common' as const };
+    })
+    .sort((a, b) => b.carry - a.carry);
+}
+
+/**
  * The roster. Order is the select-screen order. Ids are stable (persisted in the run snapshot), so
  * never reuse one.
  */
@@ -80,7 +111,7 @@ export const CHARACTERS: readonly Character[] = [
     cons: ['Everything drifts right — aim left to hold the line'],
     style: { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 0.98 },
     // A shot-maker: a touch tighter across the bag because her ball flight is so repeatable.
-    loadout: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.94 }),
+    loadout: (m) => ({ ...m, bag: buildStartBag(STARTING_BAGS['feather-fade']!), dispersionMult: m.dispersionMult * 0.94 }),
     // A slight-to-medium fade that grows with club length (the driver curves most), in radians, PLUS
     // a spray-zone skew that bakes the fade in: far fewer LEFT misses (her duck-hook/hook nearly
     // vanish), a few more RIGHT (the slice) — so the cone leans right exactly as a fader's does.
@@ -101,7 +132,7 @@ export const CHARACTERS: readonly Character[] = [
     pros: ['Pinpoint irons — far fewer wild misses', 'Deadly approach play'],
     cons: ['Drives & woods hook left and spray wider'],
     style: { cap: '#d23f4f', shirt: '#b23140', skin: '#e8c6a0', build: 1.0 },
-    loadout: (m) => m,
+    loadout: (m) => ({ ...m, bag: buildStartBag(STARTING_BAGS['huang-woo-hook']!) }),
     // The big sticks fight a snap-hook: their LEFT zones balloon (a real chance of a duck-hook),
     // while the surgical irons not only spray tighter but also clean up their miss zones (more
     // green, fewer side misses) — so his shape is genuinely two-faced, club to club.
@@ -117,10 +148,19 @@ export const CHARACTERS: readonly Character[] = [
     origin: 'Perth, Australia',
     identity: 'he / him',
     blurb: 'Bombs it off the tee. Where it ends up is anyone’s guess.',
-    pros: ['+14 yds on the distance clubs', 'Reaches par-5s in two'],
-    cons: ['Wider dispersion — more orange & red misses, big clubs worst'],
+    pros: ['+14 yds on the distance clubs', 'Starts with the Driver', 'Reaches par-5s in two'],
+    cons: ['Wider dispersion — more orange & red misses, big clubs worst', 'Refuses to carry hybrids'],
     style: { cap: '#e0a83f', shirt: '#c4882a', skin: '#d8a878', build: 1.08 },
-    loadout: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 14), dispersionMult: m.dispersionMult * 1.1 }),
+    // The only golfer who starts with a Driver, +14 on the distance clubs, and NEVER carries a hybrid
+    // (so they never show up in his reward offer). distanceClubBonus carries the +14 onto any reward
+    // distance club he buys later.
+    loadout: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(buildStartBag(STARTING_BAGS['longshot-larry']!), 14),
+      dispersionMult: m.dispersionMult * 1.1,
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 14,
+      noHybrids: true,
+    }),
     // The booming long clubs spray the most; the scoring clubs are merely a touch loose.
     clubMods: (carry) => (carry >= LONG_CARRY ? mods({ dispMult: 1.12 }) : mods({})),
   },
@@ -133,7 +173,12 @@ export const CHARACTERS: readonly Character[] = [
     pros: ['Heavy backspin from 5-iron down — approaches stop dead', 'Tighter scoring clubs'],
     cons: ['Slightly shorter off the tee'],
     style: { cap: '#9b5fd4', shirt: '#7d46b8', skin: '#caa182', build: 1.0 },
-    loadout: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, -8) }),
+    // Same kit as Feather but −8 off the tee; distanceClubBonus carries the −8 onto reward distance clubs.
+    loadout: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(buildStartBag(STARTING_BAGS['backspin-bo']!), -8),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) - 8,
+    }),
     clubMods: (carry) =>
       carry <= FIVE_IRON_CARRY ? mods({ rollFracDelta: -0.05, dispMult: 0.95 }) : mods({}),
   },

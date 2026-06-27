@@ -705,30 +705,38 @@ function shopScreen(): string {
   const perks = state.run.loadout.perks;
   const credits = state.run.credits;
   const hasCaddy = !!namedCaddyOwned(perks);
-  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live.
-  const items = (state.shopOffer ?? [])
+  const renderCard = (it: NonNullable<ReturnType<typeof shopItem>>): string => {
+    const owned = ownedCount(perks, it.id);
+    const maxed = owned >= itemCap(it);
+    const cost = itemCost(it, owned);
+    const afford = credits >= cost;
+    const buyable = !maxed && afford;
+    const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned });
+    // Wrap the card so the whole thing is the buy button when purchasable.
+    return buyable
+      ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+      : `<div style="margin:4px;">${card}</div>`;
+  };
+  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live. Split the offer
+  // into perk GEAR and reward CLUBS (GS-clubs) so each gets its own labelled row.
+  const stock = (state.shopOffer ?? [])
     .map((id) => shopItem(id))
     .filter((it): it is NonNullable<typeof it> => !!it)
     // Once any named caddy is hired, the others vanish from the offer (you may keep only one).
-    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0)
-    .map((it) => {
-      const owned = ownedCount(perks, it.id);
-      const maxed = owned >= itemCap(it);
-      const cost = itemCost(it, owned);
-      const afford = credits >= cost;
-      const buyable = !maxed && afford;
-      const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned });
-      // Wrap the card so the whole thing is the buy button when purchasable.
-      return buyable
-        ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
-        : `<div style="margin:4px;">${card}</div>`;
-    })
-    .join('');
+    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0);
+  const gear = stock.filter((it) => !it.clubType).map(renderCard).join('');
+  const clubs = stock.filter((it) => it.clubType).map(renderCard).join('');
+  const clubsSection = clubs
+    ? `<h3 style="font-size:13px;margin:.8em 0 .2em;opacity:.85;">🏌 Reward Clubs</h3>
+       <p style="font-size:12px;opacity:.6;margin:.1em 0 .4em;">Buy a club to slot it into your bag — a higher-tier club replaces the one you carry.</p>
+       <div style="display:flex;flex-wrap:wrap;">${clubs}</div>`
+    : '';
   return `
     ${header()}
     <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own. A rare caddy may turn up in the stock; hire one and the rest stay home.</p>
-    <div style="display:flex;flex-wrap:wrap;">${items}</div>
+    <div style="display:flex;flex-wrap:wrap;">${gear}</div>
+    ${clubsSection}
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}</div>`;
 }
 

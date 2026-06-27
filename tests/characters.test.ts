@@ -34,12 +34,19 @@ function meanStableford(characterId: string | undefined, n = 400): number {
   return sf / n;
 }
 
-/** Mean strokes-over-par per hole over many wild stops — the no-death-spiral bar (< 1.0). */
-function meanToParPerHole(characterId: string | undefined, n = 300): number {
+/**
+ * Mean strokes-over-par per hole AND blow-up rate over many wild (max-wildness) stops. With the
+ * sparse signature starting bags (GS-clubs), the max-wildness MEAN sits near bogey (~0.85–1.0/hole) —
+ * higher than the full-bag baseline (~0.34) because a ~15-yd club gap misses more greens — but the
+ * true death-spiral signal, the blow-up (≥+5) rate, stays ~0%. So the no-death-spiral guard here is
+ * a relaxed toPar bar PLUS a strict blow-up bar. Collecting reward clubs over a run closes the gap.
+ */
+function wildStats(characterId: string | undefined, n = 300): { toPar: number; blow: number } {
   const lo = applyCharacter(characterId, startingLoadout());
   const shotMods = characterShotMods(characterId);
   let over = 0;
   let holes = 0;
+  let blow = 0;
   for (let s = 0; s < n; s++) {
     const c = generateCourse(`${s}:wild`, { holes: 6, wildness: 1 });
     const played = playCourse(c.holes, new Rng(`${c.seed}:play`), {
@@ -48,11 +55,13 @@ function meanToParPerHole(characterId: string | undefined, n = 300): number {
       shotMods,
     });
     for (const p of played) {
-      over += p.record.strokes - p.record.par;
+      const d = p.record.strokes - p.record.par;
+      over += d;
       holes++;
+      if (d >= 5) blow++;
     }
   }
-  return over / holes;
+  return { toPar: over / holes, blow: blow / holes };
 }
 
 const carryOf = (bag: { id: string; carry: number }[], id: string): number =>
@@ -88,28 +97,36 @@ describe('character roster (GS-18)', () => {
 });
 
 describe('character balance — each viable, none dominant (CLAUDE.md balance rule)', () => {
-  const base = meanStableford(undefined);
   const perChar = CHARACTERS.map((ch) => ({ id: ch.id, mean: meanStableford(ch.id) }));
+  // The roster's own mean is the reference now: with character-defined sparse bags there is no single
+  // "characterless" baseline to measure against (the neutral full bag is a different game entirely).
+  const rosterMean = perChar.reduce((a, b) => a + b.mean, 0) / perChar.length;
 
-  it('no golfer death-spirals: every one beats the no-death bar on wild courses', () => {
+  it('no golfer death-spirals: relaxed toPar bar + ~0 blow-ups on max-wildness courses', () => {
     for (const ch of CHARACTERS) {
-      const toPar = meanToParPerHole(ch.id);
-      expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.0);
+      const { toPar, blow } = wildStats(ch.id);
+      // Sparse starting bags raise the max-wildness mean toward bogey, but never to a spiral — the
+      // bar is a comfortable margin over the observed ~1.0 ceiling, with the real guard on blow-ups.
+      expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.15);
+      expect(blow, `${ch.id} blow-up rate ${(blow * 100).toFixed(1)}%`).toBeLessThan(0.05);
     }
   });
 
-  it('every golfer scores in a viable band around the neutral baseline', () => {
+  it('every golfer is viable: scores in a band around the roster mean', () => {
     for (const { id, mean } of perChar) {
-      // Within ±18% of the characterless baseline — a clear identity, never a trap or an "easy mode".
-      expect(Math.abs(mean - base) / base, `${id} mean ${mean.toFixed(2)} vs base ${base.toFixed(2)}`).toBeLessThan(
-        0.18,
-      );
+      // Within ±18% of the ROSTER mean — a clear identity, never a trap or an "easy mode".
+      expect(
+        Math.abs(mean - rosterMean) / rosterMean,
+        `${id} mean ${mean.toFixed(2)} vs roster ${rosterMean.toFixed(2)}`,
+      ).toBeLessThan(0.18);
+      // And an absolute floor so "viable" means genuinely playable, not merely clustered-but-weak.
+      expect(mean, `${id} mean ${mean.toFixed(2)}`).toBeGreaterThan(7);
     }
   });
 
   it('the roster clusters: best and worst golfer are close in mean Stableford', () => {
     const means = perChar.map((p) => p.mean);
-    const spread = (Math.max(...means) - Math.min(...means)) / base;
+    const spread = (Math.max(...means) - Math.min(...means)) / rosterMean;
     expect(spread, `roster spread ${(spread * 100).toFixed(1)}% — ${JSON.stringify(perChar)}`).toBeLessThan(0.2);
   });
 });
@@ -120,11 +137,31 @@ describe('characters actually play differently (the shapes are real)', () => {
   it('Longshot Larry bombs the distance clubs; Backspin Bo is shorter off the tee', () => {
     const larry = applyCharacter('longshot-larry', startingLoadout()).bag;
     const bo = applyCharacter('backspin-bo', startingLoadout()).bag;
+    // Larry starts with a boosted Driver (only he carries one); Bo's longest is a SHORTENED 3-wood.
     expect(carryOf(larry, 'D')).toBeGreaterThan(carryOf(neutralBag, 'D'));
-    expect(carryOf(larry, '3W')).toBeGreaterThan(carryOf(neutralBag, '3W'));
-    expect(carryOf(bo, 'D')).toBeLessThan(carryOf(neutralBag, 'D'));
+    expect(carryOf(bo, '3W')).toBeLessThan(carryOf(neutralBag, '3W'));
     // Bo's scoring irons/wedges are untouched in length — only the big sticks shrink.
     expect(carryOf(bo, 'PW')).toBe(carryOf(neutralBag, 'PW'));
+  });
+
+  it('the starting bags are sparse, signature, and well-formed (GS-clubs)', () => {
+    for (const ch of CHARACTERS) {
+      const bag = applyCharacter(ch.id, startingLoadout()).bag;
+      // Sparse (not the full taxonomy), descending, always with a putter, all the common 'starter' set.
+      expect(bag.length, `${ch.id} bag size`).toBeGreaterThanOrEqual(8);
+      expect(bag.length, `${ch.id} bag size`).toBeLessThan(CLUBS.length);
+      expect(bag.some((c) => c.id === 'putter')).toBe(true);
+      for (const c of bag) expect(c.set).toBe('starter');
+      for (let i = 1; i < bag.length; i++) expect(bag[i]!.carry).toBeLessThanOrEqual(bag[i - 1]!.carry);
+    }
+    // Larry refuses hybrids — his bag (and trait) carry none; he's the only one who starts with a Driver.
+    const larry = applyCharacter('longshot-larry', startingLoadout());
+    expect(larry.bag.some((c) => /H$/.test(c.id))).toBe(false);
+    expect(larry.noHybrids).toBe(true);
+    expect(larry.bag.some((c) => c.id === 'D')).toBe(true);
+    for (const other of ['feather-fade', 'huang-woo-hook', 'backspin-bo']) {
+      expect(applyCharacter(other, startingLoadout()).bag.some((c) => c.id === 'D'), `${other} no driver`).toBe(false);
+    }
   });
 
   it('Feather Fade pushes the ball RIGHT of a straight shot (a fade)', () => {
