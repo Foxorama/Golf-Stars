@@ -568,7 +568,6 @@ function playingBody(animating: boolean): string {
           <div id="puttmeter" style="margin:2px 0;"></div>
           <div class="gs-hitbar">
             <button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>
-            ${btn('» Auto-finish putts', { type: 'autoShotHole' }, { variant: 'ghost' })}
           </div>
         </div>
       </div>`;
@@ -639,7 +638,7 @@ function playingBody(animating: boolean): string {
           carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
           <span style="opacity:.6;"> · suggested: attack ${v.attackClubId} · safe ${v.safeClubId}${selFreeTarget ? ' · ✋ free aim' : ''}</span>
         </p>
-        <div class="gs-ctrlrow">${aimButtons} ${puttToggleBtn()}</div>
+        <div class="gs-ctrlrow">${aimButtons}</div>
         <div class="gs-hitbar">
           ${btn('🏌 Hit', hitAction, { variant: 'primary' })}
           ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
@@ -663,13 +662,6 @@ function shotPopupOverlay(): string {
         <button class="gs-btn gs-btn--primary" data-popup-continue="1" style="text-align:center;font-size:16px;padding:12px;">Continue →</button>
       </div>
     </div>`;
-}
-
-/** Auto-putt toggle button. Locked ON when the Auto-Caddie legendary is owned. */
-function puttToggleBtn(): string {
-  const locked = !!state.run.loadout.autoPutt;
-  const on = state.autoPutt || locked;
-  return btn(`⛳ Auto-putt: ${on ? 'ON' : 'OFF'}${locked ? ' (Caddie)' : ''}`, { type: 'toggleAutoPutt' }, { disabled: locked, variant: on ? 'on' : undefined });
 }
 
 function scorecard(): string {
