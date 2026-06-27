@@ -440,17 +440,18 @@ function generateHole(
     hazards.push({ kind: 'bunker', poly: blobPoly(c, r, 10, 0.22, rng) });
   }
 
-  // Treelines (non-penalty LIE): woods lining the rough OUTSIDE the play corridor, so a
-  // sensible shot is always clear and only a sprayed ball ends up punching out of the trees.
-  // Stored as many small blobs so the renderer can draw a believable line of canopies.
-  const treeCount = Math.round((biome.treeDensity ?? 0) * (0.7 + wildness) * (par === 3 ? 2 : 4));
+  // Treelines (non-penalty LIE): DENSE woods lining the rough OUTSIDE the play corridor (GS-wind
+  // bumped the count + the lateral spread so the rough reads as real forest with depth, not a thin
+  // single line) — a sensible shot is still always clear; only a sprayed ball punches out. Stored as
+  // many small blobs so the renderer draws a believable wall of canopies.
+  const treeCount = Math.round((biome.treeDensity ?? 0) * (1.1 + wildness * 1.3) * (par === 3 ? 3 : 6));
   for (let i = 0; i < treeCount; i++) {
-    const t = rng.range(0.12, 0.95);
+    const t = rng.range(0.1, 0.96);
     const side = rng.bool() ? 1 : -1;
     const r = rng.range(3, 6);
     const along = centrePoint(centreline, t);
     const perp = perpAt(centreline, t);
-    const lateral = fairwayHalfWidth + r + rng.range(3, 20);
+    const lateral = fairwayHalfWidth + r + rng.range(3, 46); // deeper woods filling the rough
     const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
     hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, rng) });
   }

@@ -639,6 +639,18 @@ This game lives or dies on three axes — put every change through all three bef
   moved onto the play screen's top stat bar. The hero SVG is `width:100%` responsive so it fills the panel.
 - **Feel tunables read from `window._gsFeel`** (the escape-hatch rule) so loft/shake/trail/timing
   A/B live without touching the sim. Canvas feel can't be unit-tested — say "needs eyes-on play".
+- **On-screen WIND + denser woods (GS-wind, `style.ts`/`playView.ts`/`generate.ts`).** The wind you
+  read off the shot bearing is now VISIBLE: streaks blow across the hole in the wind's screen direction
+  (`windScreenDir` projects `Wind.dir` through the tee→green-up projector so it reads true), themed per
+  world (`WIND_COL`: inferno solar wind/embers, frost driven snow, desert dust, verdant pollen, void
+  cosmic dust), with count + length scaling by `Wind.spd`. TWO layers, both off seeded streams so they
+  never perturb determinism: a STATIC pass in the shared `buildScene` (`windStreaks`, off `crng`, so the
+  SVG map + gallery read the weather and the constellation count invariants still hold — streaks are
+  theme-independent + archetype-equal) and an ANIMATED toroidal drift in `playView` (`drawWind`, off the
+  `fxRng`, on the existing `_gsFeel.wind` knob — no new `_gs*` flag, so the test-hub guard needs none).
+  Treelines are also DENSER and deeper (the `treeCount` multiplier + lateral spread bumped) so the rough
+  reads as real forest, not a thin line — still non-penalty, still OUTSIDE the corridor (the death-spiral
+  bars held). Animated wind is canvas feel → verified eyes-on; the static streaks are gallery-checked.
 - **The swinging golfer + space ambience (play-view "alive" layer).** Each full shot in `playView`
   now opens with a little loader-style golfer (`drawGolfer` — same stick-figure/cap silhouette as the
   intro crew) who addresses → backswings → strikes during a `swingLeadMs` WINDUP, then holds a fading

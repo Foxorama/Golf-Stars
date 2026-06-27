@@ -429,6 +429,63 @@ function constellationBackdrop(themeId: string, W: number, H: number): Prim[] {
   return prims;
 }
 
+/** Per-world WIND look (GS-wind): the colour of the weather streaking across the hole. */
+const WIND_COL: Record<BiomeArchetype, string> = {
+  inferno: 'rgba(255,150,70,', // solar wind / embers
+  frost: 'rgba(222,243,255,', // driven snow
+  desert: 'rgba(226,196,140,', // blown dust
+  verdant: 'rgba(208,236,206,', // pollen / leaf drift
+  void: 'rgba(200,170,255,', // cosmic dust
+};
+
+/** Unit SCREEN direction the wind blows, from a hole's `Wind.dir` (course bearing) through the
+ *  projector (which has rotated tee→green up) — so the streaks read true to the shot bearing. */
+function windScreenDir(hole: Hole, proj: Projector): Vec {
+  const w = hole.wind;
+  if (!w) return [0, 0];
+  const r = (w.dir * Math.PI) / 180;
+  const c0 = hole.tee;
+  const c1: Vec = [c0[0] + Math.sin(r), c0[1] + Math.cos(r)];
+  const a = proj.project(c0);
+  const b = proj.project(c1);
+  let dx = b[0] - a[0];
+  let dy = b[1] - a[1];
+  const l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+/**
+ * Static wind streaks blowing across the hole (GS-wind) — the on-screen "solar wind" that shows
+ * which way and how hard it's blowing, themed per world. Screen-space, off the independent `crng`
+ * (so it never perturbs the terrain stream), count + length scaling with `Wind.spd`. The play view
+ * layers an animated drift on top; this static pass makes the map + SVG read the weather too.
+ */
+function windStreaks(hole: Hole, proj: Projector, arch: BiomeArchetype, W: number, H: number, crng: () => number): Prim[] {
+  const spd = hole.wind?.spd ?? 0;
+  if (spd < 2) return [];
+  const [dx, dy] = windScreenDir(hole, proj);
+  if (dx === 0 && dy === 0) return [];
+  const intensity = Math.min(1, (spd - 2) / 26);
+  const count = Math.round(8 + intensity * 34);
+  const colBase = WIND_COL[arch];
+  const prims: Prim[] = [];
+  for (let i = 0; i < count; i++) {
+    const x = crng() * W;
+    const y = crng() * H;
+    const len = (6 + intensity * 20) * (0.6 + crng() * 0.8);
+    const a = (0.06 + intensity * 0.16) * (0.6 + crng() * 0.4);
+    prims.push({
+      t: 'line',
+      a: [x, y],
+      b: [x - dx * len, y - dy * len],
+      stroke: colBase + a.toFixed(3) + ')',
+      sw: 1,
+      round: true,
+    });
+  }
+  return prims;
+}
+
 /** `#rrggbb` + alpha → an `rgba()` string (render-only helper). */
 function hexAlpha(hex: string, a: number): string {
   const h = hex.replace('#', '');
@@ -651,6 +708,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push({ t: 'line', a: [bx - 4, by + 2], b: [bx, by], stroke: 'rgba(20,24,30,0.55)', sw: 1.2, round: true });
     prims.push({ t: 'line', a: [bx, by], b: [bx + 4, by + 2], stroke: 'rgba(20,24,30,0.55)', sw: 1.2, round: true });
   }
+
+  // --- 7b. Wind streaks blowing across the hole (GS-wind), themed + off `crng` ---
+  if (art.accents > 0) prims.push(...windStreaks(hole, proj, arch, W, H, crng));
 
   // --- 8. The stop's CONSTELLATION, hung over the hole as its sky (GS-17e) -----
   // The stop's theme isn't just physics + flavour — its actual constellation hangs overhead,
