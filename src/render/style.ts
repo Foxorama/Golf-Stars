@@ -26,7 +26,7 @@ import {
   fillFor,
   turfShade,
   collarFor,
-  roughBaseFor,
+  landFillFor,
   spaceLookFor,
   type Shade,
   SAND,
@@ -465,11 +465,21 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     cb.minY + (cb.maxY - cb.minY) * rng(),
   ];
 
-  // The floating landmass (GS — "golf amongst the stars"): the projected OB play-bounds box IS the
-  // land; everything beyond it is open space. We paint the void + starfield FIRST, then the land on
-  // top, so the whole-hole map shows the course floating among its constellation while the zoomed
-  // play view (land fills the frame) reads as standing on the ground beneath that same sky.
-  const islandPts = projPoly(playBoundsCorners(hole), proj);
+  // The floating landmass (GS — "golf amongst the stars") hugs the hole GEOMETRY (a tight margin),
+  // NOT the full OB play-bounds box. The OB box is a deliberately GENEROUS fairness boundary
+  // (`clamp(span*0.25,40,90)`); filling it with rough sprawled the turf to the screen edges, so the
+  // zoomed play view was wall-to-wall green with no sky. We draw a tighter land hull (the geometry
+  // bbox + a small margin) and let SPACE show beyond it, so the starfield reads DURING play; the real
+  // OB box stays the (invisible) trigger and its stakes float out in the void. Purely visual — OB /
+  // fairness is untouched. (This generalises the void's "island in the abyss" look to all worlds.)
+  const landMargin = Math.max(14, Math.min(36, span * 0.08));
+  const landBox: Vec[] = [
+    [cb.minX - landMargin, cb.minY - landMargin],
+    [cb.maxX + landMargin, cb.minY - landMargin],
+    [cb.maxX + landMargin, cb.maxY + landMargin],
+    [cb.minX - landMargin, cb.maxY + landMargin],
+  ];
+  const islandPts = projPoly(landBox, proj);
   const islandC = centroidOf(islandPts);
   const space = spaceLookFor(arch, deepen);
   // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that
@@ -531,7 +541,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // --- 3. The floating landmass: an atmospheric rim feathering into the void ---
   prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.05), fill: space.edge });
   prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.025), fill: space.edge });
-  prims.push({ t: 'poly', pts: islandPts, fill: roughBaseFor(arch, deepen), stroke: space.edge, sw: 1.2 });
+  prims.push({ t: 'poly', pts: islandPts, fill: landFillFor(arch, deepen), stroke: space.edge, sw: 1.2 });
 
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
   // The main `rng` is consumed here in the SAME order as before (patches → tufts → flowers) so the
@@ -576,13 +586,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // Faint stars salt the dark land too (crng — does NOT perturb the terrain rng), so even the
   // zoomed-in "on the ground" view reads as golf amongst the stars.
   if (art.accents > 0) {
-    const groundStars = Math.round(20 * art.accents);
+    const groundStars = Math.round(34 * art.accents);
     for (let i = 0; i < groundStars; i++) {
       const cp: Vec = [cb.minX + (cb.maxX - cb.minX) * crng(), cb.minY + (cb.maxY - cb.minY) * crng()];
       if (onGrass(cp)) continue;
       const sp = proj.project(cp);
       if (!inView(sp, W, H)) continue;
-      land.push({ t: 'circle', c: sp, r: 0.5 + crng() * 0.9, fill: 'rgba(220,232,255,0.5)' });
+      const r = 0.5 + crng() * 1.1;
+      land.push({ t: 'circle', c: sp, r, fill: crng() < 0.5 ? 'rgba(235,242,255,0.75)' : 'rgba(190,214,255,0.62)' });
     }
   }
   prims.push({ t: 'clip', clip: islandPts, children: land });

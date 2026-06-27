@@ -567,11 +567,19 @@ This game lives or dies on three axes — put every change through all three bef
   (`ARCHETYPE_SPACE`/`spaceLookFor` — verdant blue-night, desert rust dusk, frost teal void, inferno
   ember-black, void violet abyss); (2) a **starfield** (90·`accents` screen-space stars w/ haloed
   twinkles) + the existing far planet/comet, ALL off the independent `crng` stream; (3) the **landmass**
-  = the projected OB **play-bounds box** (`playBoundsCorners`) filled with `roughBaseFor` and ringed by
-  an atmospheric **edge glow** (`SpaceLook.edge`, the void's island treatment generalised to all five
-  worlds), so beyond the OB shoreline you see SPACE, not green; (4) the rough tone/tufts/flowers + a
-  faint ground-star salt, **clipped to the island**. On the whole-hole map the course floats among its
-  stars; in the zoomed follow-cam the land fills the frame (you're "on the ground" under the same sky).
+  = a TIGHT hull around the hole geometry (the feature/hazard bbox `cb` + a small `landMargin`, NOT the
+  full OB box) filled with `landFillFor` and ringed by an atmospheric **edge glow** (`SpaceLook.edge`,
+  the void's island treatment generalised to all five worlds), so beyond the shoreline you see SPACE,
+  not green; (4) the rough tone/tufts/flowers + a ground-star salt, **clipped to the island**. CRITICAL
+  (the "too much in-bounds rough" fix): the drawn land is DECOUPLED from the OB **play-bounds box** —
+  the OB box stays a deliberately GENEROUS fairness boundary (`clamp(span*0.25,40,90)`) that filling
+  with rough sprawled turf to the screen edges so the zoomed play view was wall-to-wall green; the
+  tighter hull lets the starfield read DURING play while the real OB box remains the (invisible) trigger
+  and its stakes float out in the void (purely visual — OB/fairness untouched). And `landFillFor` blends
+  the rough base 0.62 toward the space base (`LAND_SPACE_BLEND`), so the in-bounds ground is a dark,
+  star-salted NIGHTSCAPE (golf amongst the stars) and the bright mown fairway/green pop against it — NOT
+  a bright slab. On the whole-hole map the course floats among its stars; in the zoomed follow-cam you're
+  on the dark starry ground under the same sky.
   CRITICAL determinism: the main `rng` is still consumed in the SAME order (patches→tufts→flowers) BEFORE
   the terrain/tree/water/lava draws that read off it, so their look is byte-for-byte unchanged — only the
   PAINT position moved (into the island clip); all NEW celestial scatter uses `crng`. The render tests

@@ -193,6 +193,35 @@ export function spaceLookFor(archetype: BiomeArchetype, deepen = 1): SpaceLook {
   return { base: tintHex(s.base, deepenTint(deepen)), nebula: s.nebula, edge: s.edge };
 }
 
+/** Linear blend of two `#rrggbb` colours (`t`=0 → a, 1 → b); non-hex passes through as `a`. */
+export function mixHex(a: string, b: string, t: number): string {
+  const pa = parseHex(a);
+  const pb = parseHex(b);
+  if (!pa || !pb) return a;
+  const m = (x: number, y: number) => Math.round(x + (y - x) * Math.max(0, Math.min(1, t)));
+  const to2 = (v: number) => v.toString(16).padStart(2, '0');
+  return `#${to2(m(pa[0], pb[0]))}${to2(m(pa[1], pb[1]))}${to2(m(pa[2], pb[2]))}`;
+}
+
+function parseHex(hex: string): [number, number, number] | null {
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return null;
+  let h = m[1]!;
+  if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/**
+ * The drawn LAND fill: the world's rough base blended toward its deep-space base, so the in-bounds
+ * ground reads as a dark, star-salted nightscape (golf amongst the stars) rather than a bright slab
+ * that walls off the sky in the zoomed play view. The mown fairway/green keep their bright turf
+ * palette, so the corridor pops against the dark ground. `LAND_SPACE_BLEND` = how far toward space.
+ */
+export const LAND_SPACE_BLEND = 0.62;
+export function landFillFor(archetype: BiomeArchetype, deepen = 1): string {
+  return mixHex(roughBaseFor(archetype, deepen), spaceLookFor(archetype, deepen).base, LAND_SPACE_BLEND);
+}
+
 /** Sand: a lit base, a lip-shadow rim, a depression crescent and pale rake lines. */
 export const SAND = {
   base: '#e9d8a6', // keep the FILL.bunker value
