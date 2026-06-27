@@ -148,9 +148,10 @@ describe('spray cone render (SVG)', () => {
   it('draws the three-tier cone when a spray is supplied', () => {
     const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { dispersionMult: 1.2 });
     const svg = renderHoleSVG(hole, { width: 320, height: 460, spray });
-    // Inner (likely, green) + outer (risk, amber) wedges both present.
+    // Central likely wedge (green) + two SEPARATE flanking risk wedges (amber) — the amber no
+    // longer sits under the green, so both side flanks are drawn as their own polygons.
     expect(svg).toContain('rgba(95,212,90,0.30)');
-    expect(svg).toContain('rgba(255,196,84,0.14)');
+    expect(svg.match(/rgba\(255,196,84,0\.18\)/g)!.length).toBe(2);
   });
   it('omits the cone when no spray is supplied', () => {
     const svg = renderHoleSVG(hole, { width: 320, height: 460 });

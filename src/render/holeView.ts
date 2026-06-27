@@ -53,22 +53,29 @@ export interface RenderOptions {
   art?: ArtFeel;
 }
 
-/** Course-space polygon of the spray landing zone as a true ARC SECTOR: the region swept
- *  between radii [carryLow, carryHigh] and angles ±`halfAngle` (radians) about the bearing.
- *  This matches the angular-dispersion physics exactly — a rotation preserves length, so the
- *  far edge is an arc of constant distance (carryHigh) in every direction, never a square
- *  corner that reads as exceeding max distance. */
-function sprayArc(s: ShotSpread, halfAngle: number): Vec[] {
+/** Course-space polygon of a spray landing SECTOR: the region swept between radii
+ *  [carryLow, carryHigh] and angles [a0, a1] (radians) about the bearing. Matches the
+ *  angular-dispersion physics exactly — a rotation preserves length, so the far edge is an
+ *  arc of constant distance (carryHigh) in every direction, never a square corner that reads
+ *  as exceeding max distance. Use a symmetric ±halfAngle via `sprayArc`, or an off-centre
+ *  [a0,a1] to carve out the flanking risk wedges separately from the central likely zone. */
+function spraySector(s: ShotSpread, a0: number, a1: number): Vec[] {
   const br = (s.bearing * Math.PI) / 180;
   const at = (r: number, a: number): Vec => [
     s.origin[0] + Math.sin(br + a) * r,
     s.origin[1] + Math.cos(br + a) * r,
   ];
   const N = 10; // samples per arc — smooth enough at map scale
+  const span = a1 - a0;
   const pts: Vec[] = [];
-  for (let i = 0; i <= N; i++) pts.push(at(s.carryHigh, -halfAngle + (2 * halfAngle * i) / N)); // far arc L→R
-  for (let i = 0; i <= N; i++) pts.push(at(s.carryLow, halfAngle - (2 * halfAngle * i) / N)); // near arc R→L
+  for (let i = 0; i <= N; i++) pts.push(at(s.carryHigh, a0 + (span * i) / N)); // far arc a0→a1
+  for (let i = 0; i <= N; i++) pts.push(at(s.carryLow, a1 - (span * i) / N)); // near arc a1→a0
   return pts;
+}
+
+/** Symmetric full sector ±`halfAngle` about the bearing (used for the view-fit extent). */
+function sprayArc(s: ShotSpread, halfAngle: number): Vec[] {
+  return spraySector(s, -halfAngle, halfAngle);
 }
 
 /** Midpoint of one of the spray arcs (on the bearing, at radius `r`) — where a distance label sits. */
@@ -133,11 +140,18 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // you can read how long the hole plays.
   if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSd > 0) {
     const s = opts.spray;
-    const outer = sprayArc(s, tiers.edgeZ * s.angleSd);
-    const inner = sprayArc(s, tiers.centralZ * s.angleSd);
+    const edgeA = tiers.edgeZ * s.angleSd;
+    const centralA = tiers.centralZ * s.angleSd;
+    // Two distinct, NON-overlapping zones (the orange no longer sits under the green): the
+    // central likely wedge (green) and the two flanking risk wedges (orange) carved out either
+    // side of it. They share an edge but don't stack, so each reads as its own band.
+    const central = spraySector(s, -centralA, centralA);
+    const flankL = spraySector(s, -edgeA, -centralA);
+    const flankR = spraySector(s, centralA, edgeA);
     parts.push(
-      `<polygon points="${pts(outer)}" fill="rgba(255,196,84,0.14)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
-      `<polygon points="${pts(inner)}" fill="rgba(95,212,90,0.30)" stroke="rgba(95,212,90,0.7)" stroke-width="1" />`,
+      `<polygon points="${pts(flankL)}" fill="rgba(255,196,84,0.18)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
+      `<polygon points="${pts(flankR)}" fill="rgba(255,196,84,0.18)" stroke="rgba(255,196,84,0.5)" stroke-width="1" />`,
+      `<polygon points="${pts(central)}" fill="rgba(95,212,90,0.30)" stroke="rgba(95,212,90,0.7)" stroke-width="1" />`,
     );
     // Aim line to the expected-carry centre.
     const [ox, oy] = place(s.origin);
