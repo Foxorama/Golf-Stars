@@ -64,9 +64,14 @@ This game lives or dies on three axes — put every change through all three bef
   **`fairwayBunkers`** (GS-13). New world = new row. Render palette is keyed by biome id in the
   render layer (the sim biome table is physics-only).
 - **Fairway shape = wide-and-wild early → tight late, with variable thickness + doglegs (generator v4).**
-  Three coupled levers in `generateHole`: (1) `widthScale = 1.6 − 0.85·wildness` lerps the corridor
-  half-width from generous early (≈1.6×) to the OLD constant (0.75×) at wildness 1 — so early stops
-  are far more forgiving while the max-wildness balance scale is unchanged. (2) The corridor is built
+  Three coupled levers in `generateHole`: (1) `widthScale = 2.0 − 1.25·wildness` lerps the corridor
+  half-width from generous early (2.0×) to the OLD constant (0.75×) at wildness 1 — so early stops
+  are far more forgiving while the max-wildness balance scale is unchanged. (The intercept was raised
+  1.6→2.0 after a spray-feel check: even a beginner driver's cone is an honest ±80% "green zone" ~38yd
+  wide, which overflowed the old ~33yd early fairway — a centre-aimed beginner tee shot held the
+  fairway only ~60% of the time, so a green-zone shot still felt like a miss. The wider early corridor
+  lifts stop-1 fairway-hold to ~67% so the green zone reads true on grass; the wildness=1 slope is
+  unchanged at 0.75 so the death-spiral bar still holds.) (2) The corridor is built
   from a **densified** centreline with a per-point half-width (`corridorPoly` now takes a number OR a
   per-point array): a seeded sine wave + one localized pinch undulate the thickness (wide landing
   zones, the odd neck), amplitude early-heavy (`ampFrac = 0.18 + 0.32·(1−wildness)`) so calm holes get

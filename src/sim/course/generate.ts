@@ -212,15 +212,20 @@ function generateHole(
   const centreline: Vec[] = par === 3 ? [tee, green] : [tee, mid, green];
 
   // Fairway corridor: WIDE and generous on early/easy stops, tightening as wildness climbs —
-  // `widthScale` lerps 1.6 (early) → 0.75 (far, = the old constant), so the late-game balance
-  // bar is unchanged while early holes become much more forgiving. The thickness also UNDULATES
+  // `widthScale` lerps 2.0 (early) → 0.75 (far, = the old constant), so the late-game balance
+  // bar is unchanged while early holes are very forgiving. (The intercept was raised 1.6→2.0:
+  // even a beginner driver's spray cone is honestly an ±80% "green zone" ~38yd wide, which
+  // overflowed the old ~33yd early fairway — a centre-aimed beginner tee shot only held the
+  // fairway ~60% of the time, so a green-zone shot still felt like a miss. Widening the EARLY
+  // corridor lifts that to ~67% on stop 1 so the green zone reads true on grass, while the
+  // wildness=1 slope is unchanged so the death-spiral bar still holds at 0.75.) The thickness also UNDULATES
   // along the hole (wide landing zones, the odd pinched neck), most dramatically early. The
   // corridor is built from a densified centreline so its edge can vary smoothly.
   // Lost rough (void signature): off the fairway is a PENALTY lie on the wilder/deeper stops.
   // When armed, widen the corridor into a fair "island" so a sensible shot still has somewhere
   // to land — you play TO the fairway or lose the ball, but the target is honest.
   const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
-  const widthScale = lostRough ? VOID_ISLAND_SCALE : 1.6 - 0.85 * wildness;
+  const widthScale = lostRough ? VOID_ISLAND_SCALE : 2.0 - 1.25 * wildness;
   const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
   const segs = par === 3 ? 9 : 15;
   const dense = densifyCentreline(centreline, segs);
