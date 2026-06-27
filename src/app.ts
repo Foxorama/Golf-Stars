@@ -13,7 +13,7 @@ import { renderHoleSVG } from './render/holeView';
 import { holeProjector } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
-import { biomeCarryMult, pinOf, DEFAULT_MANUAL_BAND } from './sim/round';
+import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { biomeById } from './sim/course/biomes';
@@ -478,6 +478,15 @@ function decisionReach(carryHigh: number): number {
 
 /** Running stop score vs the cut-to-beat, coloured by how the run is tracking:
  *  🟢 beating the cut · 🟠 within striking distance · 🔴 well short. */
+/** Friendly name for a penalty surface in Sam's hazard read (the carry-to-clear callout). */
+function hazardLabel(kind: string): string {
+  if (kind === 'water') return 'the water';
+  if (kind === 'lava' || kind === 'lavariver') return 'the lava';
+  if (kind === 'void' || kind === 'voidrough') return 'the void';
+  if (kind === 'frozenpond') return 'the pond';
+  return 'the hazard';
+}
+
 function zoneScoreChip(): string {
   const done = state.stopPlayed ?? [];
   const sf = playTotals(done.map((p) => p.record)).stableford;
@@ -635,12 +644,25 @@ function playingBody(animating: boolean): string {
     ${aimBtn('safe', `🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}`, selAim === 'safe' && !selFreeTarget)}
     ${aimBtn('free', '✋ Free aim', !!selFreeTarget, 'Tap or drag the map to aim')}`;
   const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
+  // Suggestible Sam's caddy read: precise front/middle/back green yardages + the carry to clear the
+  // nearest forced hazard on the line to the pin. Pure info off the sim — only shown once Sam is hired.
+  let samRead = '';
+  if (hasSuggest && play.lie !== 'green') {
+    const gd = greenDepth(play.hole, play.ball);
+    const mid = Math.round(dist(play.ball, play.hole.green));
+    const fc = forcedCarry(play.hole, play.ball, pinOf(play.hole));
+    const carryTxt = fc
+      ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> to clear ${hazardLabel(fc.kind)}</span>`
+      : '';
+    samRead = `<p class="gs-legend" style="opacity:.9;">🎒 <b>Sam:</b> front <b>${Math.round(gd.front)}</b> · middle <b>${mid}</b> · back <b>${Math.round(gd.back)}</b> yds${carryTxt}</p>`;
+  }
   return `
     <div class="gs-shot">
       ${playTopBar(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b> yds to pin` })}
       <div class="gs-bigmap" data-map="1">${svg}</div>
       <div class="gs-bottom">
         <div class="gs-ctrlrow">${clubButtons}</div>
+        ${samRead}
         <p class="gs-legend">
           <span style="color:#5fd45a;">▮</span> ${pctRound(sh.green)}% great ·
           <span style="color:#ffc454;">▮</span> ${pctRound(sh.hookL)}% hook / ${pctRound(sh.sliceR)}% slice ·

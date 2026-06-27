@@ -472,7 +472,10 @@ This game lives or dies on three axes — put every change through all three bef
     play screen surfaces no suggestion and the default club is a NEUTRAL pick (putter on the green, else
     the longest usable club) you read the distance + carry labels and cycle to yourself.
     `suggestPlayerClub`/`shotView.attackClubId` are unchanged and still computed — `app.ts` just GATES
-    surfacing them on `loadout.clubSuggest`.
+    surfacing them on `loadout.clubSuggest`. Sam also surfaces a **caddy yardage read** (a 🎒 Sam line
+    on the play screen): precise front/middle/back green distances (`greenDepth` + centroid dist) and
+    the carry to clear the nearest forced penalty on the line to the pin (`forcedCarry`, a pure
+    line-vs-penalty sampler in `round.ts` — info only, never feeds fairness/scoring).
   - **(2) Club confidence — commit to Sam's club and swing freer.** `loadout.confidenceMod`
     (`SAM_CONFIDENCE`, a green-zone `ShapeMod` trimming all four miss zones) is folded into a shot's
     spray shape ONLY when the played club is the one Sam suggested — so the cone VISIBLY tightens on the

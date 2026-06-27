@@ -26,11 +26,11 @@ import {
   resolveShot,
   type SprayShape,
 } from '../src/sim/shot';
-import { executeShot, pinOf, playCourse, shotSpread, CHIPIN_RANGE } from '../src/sim/round';
+import { executeShot, forcedCarry, pinOf, playCourse, shotSpread, CHIPIN_RANGE } from '../src/sim/round';
 import { CLUBS } from '../src/sim/clubs';
 import { generateCourse } from '../src/sim/course/generate';
 import { playTotals } from '../src/sim/score';
-import { type Vec } from '../src/sim/course/contract';
+import { type Hole, type Vec } from '../src/sim/course/contract';
 import { Rng } from '../src/sim/rng';
 
 const richRun = (seed: number) => ({ ...startRun(seed), credits: 1_000_000 });
@@ -186,6 +186,29 @@ describe('Suggestible Sam — club confidence (a real, gated scoring edge)', () 
     const base = followSamStableford(loadoutFromPerks([])); // same clubs, no confidence
     const withSam = followSamStableford(loadoutFromPerks(['suggestible-sam']));
     expect(withSam).toBeGreaterThan(base);
+  });
+
+  // Sam's hazard read (richer info): the carry needed to clear a forced penalty on the line.
+  it('forcedCarry reports the carry to clear a penalty band on the line (null when clear)', () => {
+    const withWater: Hole = {
+      par: 4,
+      tee: [0, 0],
+      green: [0, 300],
+      centreline: [[0, 0], [0, 300]],
+      features: [
+        { kind: 'fairway', poly: [[-15, 0], [15, 0], [15, 280], [-15, 280]] },
+        { kind: 'green', poly: [[-10, 290], [10, 290], [10, 310], [-10, 310]] },
+      ],
+      hazards: [{ kind: 'water', poly: [[-40, 120], [40, 120], [40, 150], [-40, 150]] }],
+    };
+    const fc = forcedCarry(withWater, [0, 0], [0, 300]);
+    expect(fc?.kind).toBe('water');
+    // Far edge of the water is at y≈150 — the carry to clear it lands just past it.
+    expect(fc!.carry).toBeGreaterThanOrEqual(145);
+    expect(fc!.carry).toBeLessThanOrEqual(162);
+    // A line with no penalty crossing reads clear.
+    const clear: Hole = { ...withWater, hazards: [] };
+    expect(forcedCarry(clear, [0, 0], [0, 300])).toBeNull();
   });
 });
 

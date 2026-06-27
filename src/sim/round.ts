@@ -899,6 +899,38 @@ export function greenDepth(hole: Hole, ball: Vec): { front: number; back: number
 }
 
 /**
+ * The nearest PENALTY carry on the straight line from `from` to `target`: the first penalty band
+ * (water/lava/void/crossing) the line crosses, and the carry needed to reach just past its far edge
+ * (i.e. to clear it). Sampled along the line — info only (Suggestible Sam's hazard read), so a few
+ * yards of sampling slop is fine; it never feeds fairness/scoring. Returns null if the line is clear.
+ * Pure.
+ */
+export function forcedCarry(hole: Hole, from: Vec, target: Vec): { carry: number; kind: FeatureKind } | null {
+  const total = dist(from, target);
+  if (total < 1) return null;
+  const ux = (target[0] - from[0]) / total;
+  const uy = (target[1] - from[1]) / total;
+  const step = 3;
+  let entry = -1;
+  let kind: FeatureKind | null = null;
+  for (let d = step; d <= total; d += step) {
+    const p: Vec = [from[0] + ux * d, from[1] + uy * d];
+    const lk = lieAt(hole, p);
+    if (lieInfo(lk).penalty) {
+      if (entry < 0) {
+        entry = d;
+        kind = lk;
+      }
+    } else if (entry >= 0) {
+      // Exited the first penalty band — carrying to here clears it.
+      return { carry: Math.round(d), kind: kind! };
+    }
+  }
+  // The line ends inside a penalty band (you'd have to fly the whole way), or never crossed one.
+  return entry >= 0 ? { carry: Math.round(total), kind: kind! } : null;
+}
+
+/**
  * The club to SUGGEST to an interactive player aiming at the green (GS-mechanics #6). Unlike
  * the auto `aiClub` (shortest club that just reaches — tuned for the headless balance), this
  * reasons about green COVERAGE:
