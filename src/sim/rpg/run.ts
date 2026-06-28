@@ -11,7 +11,7 @@
 
 import { Rng } from '../rng';
 import { generateCourse } from '../course/generate';
-import { playCourse, type PlayedHole } from '../round';
+import { playCourse, type PlayedHole, type PlayHoleOptions } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
@@ -234,12 +234,15 @@ export function finishStop(
   run: Run,
   course: Course,
   played: PlayedHole[],
+  opts: { matchWon?: boolean } = {},
 ): { run: Run; result: StopResult } {
   const totals = playTotals(played.map((p) => p.record));
   // The pending route event shifts this stop's cut + payout (GS-14); neutral if none.
   const event = run.pendingEvent ?? DEFAULT_EVENT;
   const cut = effectiveCut(run, course.holes.length);
-  const passed = totals.stableford >= cut;
+  // A matchplay boss stop (GS-100) passes on the DUEL result, not Stableford-vs-cut; credits still
+  // come from the player's own Stableford. `matchWon` undefined ⇒ the ordinary gate (unchanged).
+  const passed = opts.matchWon !== undefined ? opts.matchWon : totals.stableford >= cut;
   // Trigger-relic payouts (GS-synergy) add to the base before the credit multiplier, so they
   // synergise with credit perks/events. Zero for a base loadout (no relics).
   const relicBonus = relicCreditBonus(run.loadout, played, passed);
@@ -311,11 +314,10 @@ export function scrambleOptsFor(run: Run): ScrambleOpts | undefined {
   return { partnerMods: characterShotMods(partnerId) };
 }
 
-export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
-  if (run.status !== 'active') throw new Error('playStop: run is not active');
-  const course = currentCourse(run);
-  const rng = new Rng(`${course.seed}:play`);
-  const played = playCourse(course.holes, rng, {
+/** The player's `playHole`/`playCourse` options from their loadout — shared by the auto sim and the
+ *  matchplay duel so the player's own ball plays identically with or without a boss alongside. */
+export function playerHoleOpts(run: Run): PlayHoleOptions {
+  return {
     bag: run.loadout.bag,
     dispersionMult: netDispersion(run.loadout),
     shotMods: characterShotMods(run.loadout.characterId),
@@ -329,7 +331,14 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     lieRelief: run.loadout.lieRelief,
     lefty: run.loadout.lefty,
     scramble: scrambleOptsFor(run),
-  });
+  };
+}
+
+export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
+  if (run.status !== 'active') throw new Error('playStop: run is not active');
+  const course = currentCourse(run);
+  const rng = new Rng(`${course.seed}:play`);
+  const played = playCourse(course.holes, rng, playerHoleOpts(run));
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };
 }
