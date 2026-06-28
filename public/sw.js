@@ -12,7 +12,7 @@
  * touch Golf Stars — it cannot intercept a sibling app (e.g. golf-finder) on the shared origin.
  * The cache name is prefixed `golf-stars-` so the page's foreign-worker guard leaves it alone.
  */
-var VERSION = 'gs-pwa-2'; // bump per deploy to retire the previous offline snapshot
+var VERSION = 'gs-pwa-3'; // bump per deploy to retire the previous offline snapshot
 var CACHE = 'golf-stars-' + VERSION;
 
 // The app is a single inlined index.html plus the install assets — precache the shell so a

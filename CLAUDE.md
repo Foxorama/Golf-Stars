@@ -730,6 +730,27 @@ This game lives or dies on three axes — put every change through all three bef
   matches the decision map's zoom (no jump — also closed the decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
   powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
   `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
+- **Map navigation — overview / zoom / pan (GS-mapnav).** The follow-cam frames only the contemplated
+  shot, so on a long hole the green sits off-screen and "you have no idea what the full hole looks like".
+  Three controls floating ON the map (a `.gs-mapctrl` overlay, top-right — NO scrolling to reach them)
+  fix that: a **🗺/🎯 overview toggle** (`mapView 'follow'|'whole'` — `whole` drops `focus` so the
+  projector fits the ENTIRE hole, green + OB + all hazards in frame), **＋/− zoom** (`mapZoom`, divides
+  `viewRadius`; disabled in `whole`), and a **⌖ recenter** (shown only when moved). PAN: the projector
+  `focus` is offset by a course-space `mapPan`, and in `follow` mode a map DRAG pans (drag-the-world-
+  under-the-finger via a projector frozen at gesture start). GESTURE DISAMBIGUATION: drag PANS by
+  default; it only AIMS when free-aim is active (`selFreeTarget` set, via the ✋ button) — so "move the
+  map around" is the default touch and a still tap no longer silently sets a free target. CRITICAL: the
+  decision render AND `wireMapAiming`'s unproject both build the projector from ONE shared helper
+  `decisionView(play, spray)`, so tap/drag aiming can't drift from what's drawn (the projector-sync
+  gotcha). `mapView/mapZoom/mapPan` are module UI state (like `selClubId`), reset by `resetMapView()` on
+  every new shot AND new hole — NOT save/reducer state, NOT a `_gs*` flag (so no test-hub sync needed).
+  Verified eyes-on (Playwright): the whole-hole toggle reveals the green on a 532y par-4, pan/zoom work,
+  free-aim still aims, and the page does not scroll.
+- **The play screen NEVER scrolls (GS-mapnav).** `.gs-shot` is a FIXED-height flex column
+  (`height: calc(100dvh − 46px)` + `overflow:hidden`, not the old `min-height`), and `.gs-bigmap` is
+  `flex:1 1 0; min-height:0` so the MAP absorbs all the slack — the topbar and the club/aim/Hit
+  controls always sit on screen without scrolling down to reach them (the "adjust aim, then scroll to
+  hit the ball" complaint). `.gs-bigmap` is `position:relative` to anchor the nav overlay.
 - **Spray cone = the shot's ASYMMETRIC `SprayShape`, drawn proportional to chance (GS-dispersion-2,
   `holeView.ts` + `shot.ts`).** The cone is the *landing distribution*: a single `SprayShape`
   (`green` + 4 miss zones — `hookL`/`sliceR` orange, `duckHookL`/`shankR` red) drives BOTH the physics
