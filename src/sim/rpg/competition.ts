@@ -1,0 +1,314 @@
+/**
+ * The competition field & ghost leaderboard (GS-100).
+ *
+ * You travel the galaxy in a FIELD. Each arc, 20 golfers compete; a live leaderboard with a tightening
+ * cut line replaces the old stop splash; the arc boss is whoever tops that leaderboard. This module is
+ * the pure ENGINE: it builds the arc field and produces a deterministic, statistical "ghost" score for
+ * every AI golfer per hole. (The chosen call, see the design report: simulating real ball-physics for
+ * 20 golfers every hole would be slow and untunable — only the matchplay BOSS, in `match.ts`, plays
+ * real shots.)
+ *
+ * Calibration (why the cut bites harder over time): a golfer's per-hole Stableford is centred on a
+ * FIXED quality band keyed off their rating (`golferBaseline`), NOT on distance. The cut line
+ * (`effectiveCut`, unchanged) RISES with galaxy distance — so early it sweeps only the weak tail of a
+ * fixed-quality field, and deep it scythes most of it. The player keeps pace via upgrades (existing
+ * balance). Constellation champions sit near the top of the band and get a strong HOME boost in their
+ * own zone, so the zone's champion "generally comes out on top" and becomes the boss.
+ *
+ * Pure & deterministic: seeded `Rng` only, no DOM, no `Math.random`. Standings are a pure function of
+ * (seed, arc, holes played, the player's REAL per-hole scores), so nothing new needs persisting beyond
+ * the run seed.
+ */
+
+import { Rng } from '../rng';
+import type { BiomeArchetype, Arc } from '../course/themes';
+import { themesForArc } from '../course/themes';
+import {
+  GOLFERS,
+  getGolfer,
+  golferProfile,
+  championFor,
+  type Golfer,
+  type GolferTier,
+  type GolferLook,
+} from './golfers';
+
+/** The sentinel id for the human player's row in a field/standings. */
+export const PLAYER_ID = 'player';
+
+/** Golfers in a field (20: the player + 19 AI). */
+export const FIELD_SIZE = 20;
+
+/** A golfer entry in an arc's field (lighter than a full Golfer; the player carries no archetype). */
+export interface FieldGolfer {
+  id: string;
+  name: string;
+  shortName: string;
+  tier: GolferTier | 'player';
+  look: GolferLook;
+  isPlayer: boolean;
+  /** Champion's home constellation theme (so per-hole home boosts can match). */
+  home?: string;
+  homeArchetype?: BiomeArchetype;
+  /** The playable-character id this golfer mirrors, if any. */
+  mirrorsCharacter?: string;
+}
+
+export interface Field {
+  arcIndex: number;
+  arc: Arc;
+  playerId: string;
+  golfers: FieldGolfer[];
+}
+
+function toFieldGolfer(g: Golfer): FieldGolfer {
+  return {
+    id: g.id,
+    name: g.name,
+    shortName: g.shortName,
+    tier: g.tier,
+    look: g.look,
+    isPlayer: false,
+    home: g.home,
+    homeArchetype: g.homeArchetype,
+    mirrorsCharacter: g.mirrorsCharacter,
+  };
+}
+
+export interface PlayerInfo {
+  name?: string;
+  look: GolferLook;
+  /** The character the human picked — so we DON'T also drop their mirror into the field as a rival. */
+  characterId?: string;
+}
+
+/**
+ * Build the deterministic 20-golfer field for an arc. Always includes: the player; a seeded sample of
+ * the arc's constellation CHAMPIONS (so a champion can win & boss in their zone); the unchosen playable
+ * characters as rivals; then field golfers to fill to 20, weighted toward the arc's home archetypes.
+ * Seed-stable → recomputable, nothing new to persist.
+ */
+export function buildField(seed: number | string, arcIndex: number, arc: Arc, player: PlayerInfo): Field {
+  const rng = new Rng(`${seed}:field:${arcIndex}`);
+  const chosen: FieldGolfer[] = [];
+  const used = new Set<string>([PLAYER_ID]);
+
+  const add = (g: Golfer | undefined): void => {
+    if (!g || used.has(g.id)) return;
+    used.add(g.id);
+    chosen.push(toFieldGolfer(g));
+  };
+
+  // 1) The player.
+  chosen.push({
+    id: PLAYER_ID,
+    name: player.name?.trim() || 'You',
+    shortName: player.name?.trim() || 'You',
+    tier: 'player',
+    look: player.look,
+    isPlayer: true,
+  });
+
+  // 2) Champions of this arc's constellations (a seeded sample, up to ~9 — enough that the favourite is
+  //    present, not so many the field is all champions).
+  const arcChampions = shuffle(
+    themesForArc(arc)
+      .filter((t) => t.kind === 'constellation')
+      .map((t) => championFor(t.id))
+      .filter((g): g is Golfer => !!g),
+    rng,
+  );
+  const champTarget = Math.min(9, arcChampions.length);
+  for (let i = 0; i < champTarget; i++) add(arcChampions[i]);
+
+  // 3) Unchosen playable characters as rivals (they can boss when you don't pick them).
+  for (const g of GOLFERS.filter((x) => x.mirrorsCharacter && x.mirrorsCharacter !== player.characterId)) {
+    if (chosen.length >= FIELD_SIZE) break;
+    add(g);
+  }
+
+  // 4) Fill to 20 from the field pool, weighted toward this arc's home archetypes.
+  const arcArchetypes = new Set(themesForArc(arc).map((t) => t.archetype));
+  const pool = shuffle(
+    GOLFERS.filter((g) => !used.has(g.id) && g.tier !== 'champion'),
+    rng,
+  ).sort((a, b) => weightFor(b, arcArchetypes) - weightFor(a, arcArchetypes));
+  for (const g of pool) {
+    if (chosen.length >= FIELD_SIZE) break;
+    add(g);
+  }
+
+  return { arcIndex, arc, playerId: PLAYER_ID, golfers: chosen.slice(0, FIELD_SIZE) };
+}
+
+/** A soft sort weight: a golfer whose home matches the arc floats up; field golfers stay neutral. */
+function weightFor(g: Golfer, arcArchetypes: Set<BiomeArchetype>): number {
+  let w = golferProfile(g.id).skill; // stronger golfers preferred slightly
+  if (g.homeArchetype && arcArchetypes.has(g.homeArchetype)) w += 0.5;
+  return w;
+}
+
+/** Fisher–Yates with a seeded Rng (pure). */
+function shuffle<T>(arr: readonly T[], rng: Rng): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
+// --- Ghost scoring ------------------------------------------------------------
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** Fixed quality band: a rating-0 golfer averages ~0.6 SF/hole (bogey-ish), a rating-1 ~2.6 (birdie-ish). */
+export function golferBaseline(rating: number): number {
+  return 0.6 + 2.0 * clamp(rating, 0, 1);
+}
+
+/** Strong home lift so a constellation champion tops the board in their own zone. */
+export const HOME_BOOST = 0.6;
+
+/**
+ * One golfer's ghost Stableford for one hole. Deterministic from `holeKey`+golfer. `homeMatch` lifts a
+ * champion in their zone; `pressure` (0..1, ramps toward a boss) lifts the clutch and sinks the chokers.
+ * The spread widens for inconsistent/streaky golfers, so they bounce around the board.
+ */
+export function ghostHoleStableford(
+  golferId: string,
+  holeKey: string,
+  homeMatch: boolean,
+  pressure = 0,
+): number {
+  const p = golferProfile(golferId);
+  let base = golferBaseline(p.skill);
+  if (homeMatch) base += HOME_BOOST;
+  base += (p.nerve - 0.5) * pressure * 0.8;
+  const vol = 0.35 + (1 - p.consistency) * 0.7 - (homeMatch ? 0.1 : 0);
+  const rng = new Rng(`${holeKey}:${golferId}`);
+  // Sum of three uniforms ≈ a bell, mean 0, scaled by volatility.
+  const noise = (rng.float() + rng.float() + rng.float() - 1.5) * vol * 2;
+  return Math.round(clamp(base + noise, 0, 5));
+}
+
+/** Does a golfer's home zone match this hole's theme/archetype? */
+export function homeMatches(g: FieldGolfer, themeId: string | undefined, archetype: BiomeArchetype): boolean {
+  if (g.home && themeId && g.home === themeId) return true;
+  // A champion also feels at home in any zone of their archetype (softer, but still their world).
+  return !!g.homeArchetype && g.homeArchetype === archetype;
+}
+
+export interface HoleContext {
+  /** A deterministic, stable key for this hole (e.g. `${stopSeed}:${holeIndex}`). */
+  key: string;
+  themeId?: string;
+  archetype: BiomeArchetype;
+  /** Pressure 0..1 (ramps as a boss stop nears). */
+  pressure?: number;
+}
+
+/**
+ * Ghost per-hole Stableford for every NON-player golfer in the field, over a list of holes (one stop or
+ * a whole arc). Returns id → per-hole SF array (same length/order as `holes`).
+ */
+export function ghostScores(field: Field, holes: HoleContext[]): Map<string, number[]> {
+  const out = new Map<string, number[]>();
+  for (const g of field.golfers) {
+    if (g.isPlayer) continue;
+    out.set(
+      g.id,
+      holes.map((h) => ghostHoleStableford(g.id, h.key, homeMatches(g, h.themeId, h.archetype), h.pressure ?? 0)),
+    );
+  }
+  return out;
+}
+
+// --- Standings ----------------------------------------------------------------
+
+export interface Standing {
+  golferId: string;
+  name: string;
+  shortName: string;
+  tier: GolferTier | 'player';
+  look: GolferLook;
+  isPlayer: boolean;
+  /** Cumulative arc Stableford. */
+  total: number;
+  /** Holes completed. */
+  thru: number;
+  /** This-stop Stableford (for the cut), if a stop slice was supplied. */
+  stopScore?: number;
+  /** 1-based leaderboard position (after sort). */
+  position: number;
+  /** Below this stop's cut line (eliminated) — set by `applyCut`. */
+  cut?: boolean;
+}
+
+/**
+ * Build sorted standings. `scores` maps every golfer (player included) to their per-hole SF array
+ * across the arc so far. `stopHoles` (optional) is how many of the trailing holes belong to the CURRENT
+ * stop, so `stopScore` can be computed for the cut. Sort: total desc, then tier, then name (stable).
+ */
+export function arcStandings(
+  field: Field,
+  scores: Map<string, number[]>,
+  stopHoles?: number,
+): Standing[] {
+  const tierRank: Record<string, number> = { player: 0, champion: 1, star: 2, contender: 3, field: 4 };
+  const rows: Standing[] = field.golfers.map((g) => {
+    const arr = scores.get(g.id) ?? [];
+    const total = arr.reduce((s, x) => s + x, 0);
+    const stopScore = stopHoles !== undefined ? arr.slice(arr.length - stopHoles).reduce((s, x) => s + x, 0) : undefined;
+    return {
+      golferId: g.id,
+      name: g.name,
+      shortName: g.shortName,
+      tier: g.tier,
+      look: g.look,
+      isPlayer: g.isPlayer,
+      total,
+      thru: arr.length,
+      stopScore,
+      position: 0,
+    };
+  });
+  rows.sort(
+    (a, b) =>
+      b.total - a.total ||
+      (tierRank[a.tier] ?? 9) - (tierRank[b.tier] ?? 9) ||
+      a.name.localeCompare(b.name),
+  );
+  rows.forEach((r, i) => (r.position = i + 1));
+  return rows;
+}
+
+/** Flag every golfer whose THIS-STOP score missed the cut (eliminated). Pure; needs `stopScore` set. */
+export function applyCut(standings: Standing[], cut: number): Standing[] {
+  return standings.map((s) => ({ ...s, cut: s.stopScore !== undefined ? s.stopScore < cut : false }));
+}
+
+/** How many AI golfers survived this stop's cut. */
+export function survivorCount(standings: Standing[]): number {
+  return standings.filter((s) => !s.cut).length;
+}
+
+/**
+ * The boss for an arc's final stop: the top-ranked NON-player on the cumulative leaderboard — i.e. the
+ * leader, or #2 if the player is #1 (the request's rule, which reduces to "the best golfer who isn't
+ * you"). Skips eliminated golfers if the cut has been applied. Returns undefined for an all-player field.
+ */
+export function bossPick(standings: Standing[]): string | undefined {
+  for (const s of standings) {
+    if (!s.isPlayer && !s.cut) return s.golferId;
+  }
+  // Fallback: ignore cut flags if everyone non-player was cut.
+  for (const s of standings) if (!s.isPlayer) return s.golferId;
+  return undefined;
+}
+
+/** Resolve the boss pick to its full Golfer (for avatar + shot mods). */
+export function bossGolfer(standings: Standing[]): Golfer | undefined {
+  const id = bossPick(standings);
+  return id ? getGolfer(id) : undefined;
+}
