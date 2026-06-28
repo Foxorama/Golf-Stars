@@ -474,10 +474,15 @@
         transition: transform .16s ease, box-shadow .2s ease, border-color .2s ease;
       }
       @keyframes gs-char-in { to { opacity: 1; transform: none; } }
-      .gs-charcard:hover {
-        transform: translateY(-4px);
-        border-color: var(--cc);
-        box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--cc) 60%, transparent), 0 0 0 1px color-mix(in srgb, var(--cc) 50%, transparent) inset;
+      /* Hover effects are gated to pointers that actually hover — on touch devices :hover
+         LATCHES after a tap, which left the last-tapped card (e.g. Bo) stuck with the solid
+         CTA fill while the others showed the gentle resting tint. */
+      @media (hover: hover) {
+        .gs-charcard:hover {
+          transform: translateY(-4px);
+          border-color: var(--cc);
+          box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--cc) 60%, transparent), 0 0 0 1px color-mix(in srgb, var(--cc) 50%, transparent) inset;
+        }
       }
       .gs-charcard:active { transform: translateY(-1px); }
       .gs-charcard:focus-visible { outline: 2px solid var(--cc); outline-offset: 2px; }
@@ -487,7 +492,7 @@
         background: linear-gradient(115deg, transparent 30%, color-mix(in srgb, var(--cc) 30%, #fff) 50%, transparent 70%);
         opacity: 0; transform: translateX(-120%); mix-blend-mode: screen;
       }
-      .gs-charcard:hover .gs-charcard-sheen { animation: gs-char-sheen .7s ease; }
+      @media (hover: hover) { .gs-charcard:hover .gs-charcard-sheen { animation: gs-char-sheen .7s ease; } }
       @keyframes gs-char-sheen { 0% { opacity: 0; transform: translateX(-120%); } 35% { opacity: .8; } 100% { opacity: 0; transform: translateX(120%); } }
       .gs-charcard > * { position: relative; z-index: 2; }
       .gs-charcard-top { display: flex; gap: 12px; align-items: center; }
@@ -519,9 +524,11 @@
         background: color-mix(in srgb, var(--cc) 12%, transparent);
         transition: background .16s ease, color .16s ease, box-shadow .16s ease;
       }
-      .gs-charcard:hover .gs-charcard-cta {
-        color: #0b0d12; background: var(--cc);
-        box-shadow: 0 0 18px -2px color-mix(in srgb, var(--cc) 70%, transparent);
+      @media (hover: hover) {
+        .gs-charcard:hover .gs-charcard-cta {
+          color: #0b0d12; background: var(--cc);
+          box-shadow: 0 0 18px -2px color-mix(in srgb, var(--cc) 70%, transparent);
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         .gs-charcard, .gs-stat-fill { animation: none; opacity: 1; transform: none; }
