@@ -8,7 +8,7 @@
 
 import { scoreName, playTotals } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
-import { courseCardHTML, itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
+import { itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
 import { holeProjector, type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
@@ -19,7 +19,6 @@ import { lieInfo, roughLieOf } from './sim/shot';
 import { biomeById } from './sim/course/biomes';
 import { archetypeFor, themeById } from './sim/course/themes';
 import { zoneProfile, difficultyPips } from './sim/course/zones';
-import { zoneHeroSVG } from './render/zoneHero';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
@@ -348,54 +347,97 @@ function characterScreen(): string {
     </div>`;
 }
 
+/**
+ * The "arrival at a new world" screen — ONE consolidated card (GS-ui-intro). It used to stack two
+ * big visuals (a generic per-archetype hero banner AND a separate course/loot card) plus a bottom
+ * action section, so the player had to scroll past ~600px of art to reach Play. Now a single panel
+ * leads with identity + the cut + the CTAs (reachable without scrolling), then reveals the ACTUAL
+ * first hole (the loot) + lore/hazards below. The generic zoneHero art was dropped as redundant —
+ * the real generated hole is the more exciting, more informative visual and carries the theme too.
+ */
 function introScreen(): string {
   const c = state.course;
-  // The cut reflects any pending route event (GS-14), so the banner is honest about the bar.
+  // The cut reflects any pending route event (GS-14), so the line is honest about the bar.
   const cut = effectiveCut(state.run, c.holes.length);
+  const par = c.holes.reduce((s, h) => s + h.par, 0);
   const ev = state.run.pendingEvent;
-  const evBanner =
-    ev && ev.id !== 'open-space'
-      ? `<div style="margin:.2em 0 .8em;padding:8px 11px;border-left:3px solid ${rarCol(ev.rarity)};
-            border-radius:8px;background:#ffffff08;">
-           <b style="font-size:14px;">${ev.label}</b>
-           <div style="font-size:13px;opacity:.82;margin-top:2px;">${ev.desc}</div>
-         </div>`
-      : '';
-  // Boss stop (GS-voyage): a louder, harder splash — and a co-op partner read for a scramble boss.
+  // Boss stop (GS-voyage): a louder note — and a co-op partner read for a scramble boss.
   const boss = currentBoss(state.run);
   const partner = boss?.partner ? scramblePartner(state.run) : undefined;
-  const bossBanner = boss
-    ? `<div style="margin:.2em 0 .8em;padding:11px 13px;border:1px solid ${boss.final ? '#ffce54' : '#c0392b'};
-          border-radius:10px;background:linear-gradient(180deg,#1a0e12,#120b10);">
-         <div style="font-size:12px;letter-spacing:.12em;color:${boss.final ? '#ffce54' : '#ff6b6b'};">
-           ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${boss.partner ? ' · SCRAMBLE' : ''}</div>
-         <b style="font-size:18px;">${boss.name}</b>
-         <div style="font-size:13px;opacity:.85;margin-top:3px;">${boss.blurb}</div>
-         ${partner ? `<div style="font-size:12.5px;margin-top:6px;color:${partner.style.cap};">🤝 Partner: <b>${partner.name}</b> — two balls a shot, the better one counts.</div>` : ''}
-       </div>`
-    : '';
-  // Two-world split stop (GS-variation): tell the player the back nine crosses into another world.
   const split = state.course.meta.split;
-  const splitNote = split
-    ? `<div style="margin:.2em 0 .6em;padding:7px 11px;border-left:3px solid #7aa2ff;border-radius:8px;background:#ffffff08;">
-         🌗 <b>Two worlds</b> — the first ${split.frontHoles} holes play one world, then you cross into another for the run home.</div>`
-    : '';
+
+  // World identity (GS-19): the archetype's lore/profile, the per-stop theme name, difficulty.
+  const themeId = c.meta.themeId;
+  const zone = zoneProfile(archetypeFor(themeId, c.biome));
+  const theme = themeId ? themeById(themeId) : undefined;
+  const col = rarCol(c.rarity);
+  const diffPips = difficultyPips(zone.difficulty);
+
+  // Contextual notes (boss / split / route event) — only when they apply, kept compact and ABOVE
+  // the CTA so a decision is never buried under the hole art.
+  const notes: string[] = [];
+  if (boss)
+    notes.push(`<div style="margin-top:10px;padding:9px 11px;border:1px solid ${boss.final ? '#ffce54' : '#c0392b'};
+        border-radius:9px;background:linear-gradient(180deg,#1a0e12,#120b10);">
+       <div style="font-size:11px;letter-spacing:.12em;color:${boss.final ? '#ffce54' : '#ff6b6b'};">
+         ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${boss.partner ? ' · SCRAMBLE' : ''}</div>
+       <b style="font-size:16px;">${boss.name}</b>
+       <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${boss.blurb}</div>
+       ${partner ? `<div style="font-size:12px;margin-top:5px;color:${partner.style.cap};">🤝 Partner: <b>${partner.name}</b> — two balls a shot, the better one counts.</div>` : ''}
+     </div>`);
+  if (split)
+    notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #7aa2ff;border-radius:8px;background:#ffffff08;font-size:12.5px;">
+       🌗 <b>Two worlds</b> — the first ${split.frontHoles} holes play one world, then you cross into another for the run home.</div>`);
+  if (ev && ev.id !== 'open-space')
+    notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid ${rarCol(ev.rarity)};border-radius:8px;background:#ffffff08;">
+       <b style="font-size:13px;">${ev.label}</b>
+       <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${ev.desc}</div>
+     </div>`);
+
+  const thumb = renderHoleSVG(c.holes[0]!, {
+    width: 300,
+    height: 360,
+    biome: holeBiome(c.holes[0]!),
+    themeId: holeThemeId(c.holes[0]!),
+  });
+
   return `
     ${header()}
-    <p style="opacity:.8;">${boss ? 'The course of legend awaits…' : 'A new world rises from the void…'}</p>
-    ${bossBanner}
-    ${splitNote}
-    ${zoneIdentityHTML()}
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-      ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
-      <section style="flex:1 1 220px;">
-        ${evBanner}
-        ${state.run.ascension > 0 ? `<p style="font-size:12px;color:#ffce54;margin:.1em 0;">⚔ Ascension A${state.run.ascension} — a tougher cut, a leaner purse.</p>` : ''}
-        <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes${boss ? ' to beat the boss' : ' to make the cut and travel on'}.</p>
-        ${btn('🏌 Play shot by shot', { type: 'playInteractive' }, { variant: 'primary' })}
-        ${btn('» Auto-play (watch)', { type: 'play' }, { variant: 'ghost' })}
-      </section>
-    </div>`;
+    <article class="gs-panel" style="border-color:${col}66;box-shadow:0 0 18px ${col}22;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div style="min-width:0;">
+          <div style="font-size:21px;font-weight:800;line-height:1.1;">${zone.name}</div>
+          <div style="font-size:13px;color:var(--gs-accent);margin-top:2px;">${zone.signature}${theme ? ` · ${theme.name}` : ''}</div>
+          <div style="font-size:12.5px;opacity:.7;margin-top:3px;">${c.meta.name} · ${c.holes.length} holes · par ${par} · 🌪 ${c.meta.wildness.toFixed(2)}</div>
+        </div>
+        <div style="text-align:right;flex:0 0 auto;">
+          <span style="color:${col};border:1px solid ${col};border-radius:6px;padding:1px 7px;font-size:11px;text-transform:uppercase;letter-spacing:1px;">${c.rarity}</span>
+          <div style="font-size:10.5px;opacity:.65;margin-top:7px;letter-spacing:.06em;text-transform:uppercase;">Difficulty</div>
+          <div style="font-size:15px;letter-spacing:1px;color:var(--gs-danger);">${diffPips}</div>
+        </div>
+      </div>
+      ${notes.join('')}
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gs-line-2);">
+        <p style="font-size:14px;margin:0 0 10px;">🎯 <b>${cut} pts</b> over ${c.holes.length} holes ${boss ? 'to beat the boss' : 'to make the cut and travel on'}.${
+          state.run.ascension > 0 ? `<span style="color:#ffce54;"> · ⚔ Ascension A${state.run.ascension} (tougher cut, leaner purse)</span>` : ''
+        }</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          ${btn('🏌 Play shot by shot', { type: 'playInteractive' }, { variant: 'primary' })}
+          ${btn('» Watch the AI play', { type: 'play' }, { variant: 'ghost' })}
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;padding-top:14px;border-top:1px solid var(--gs-line-2);">
+        <div style="flex:0 0 auto;border-radius:10px;overflow:hidden;border:1px solid var(--gs-line-2);line-height:0;">${thumb}</div>
+        <div style="flex:1 1 240px;min-width:0;">
+          <p style="font-size:12px;font-style:italic;opacity:.7;margin:0 0 6px;line-height:1.4;">${zone.inspiration}</p>
+          <p style="font-size:13px;opacity:.92;margin:0 0 12px;line-height:1.4;">${zone.brief}</p>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;">
+            ${traitList('Hazards', 'var(--gs-danger)', zone.hazards)}
+            ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
+          </div>
+        </div>
+      </div>
+    </article>`;
 }
 
 // --- interactive playing screen ----------------------------------------------
@@ -703,43 +745,6 @@ function traitList(title: string, accent: string, traits: { icon: string; text: 
   return `<div style="flex:1 1 0;min-width:140px;">
       <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${accent};font-weight:700;margin-bottom:2px;">${title}</div>
       <ul style="list-style:none;padding:0;margin:0;">${rows}</ul>
-    </div>`;
-}
-
-/** The zone-identity briefing block (thematic hero + lore + hazards/benefits + difficulty), shown
- *  ONCE per stop on the starting zone screen (the intro). The zone sells the WORLD; the per-hole
- *  facts now live on the play screen's top bar (the per-hole briefing splash was retired). */
-function zoneIdentityHTML(): string {
-  const themeId = state.course.meta.themeId;
-  const arch = archetypeFor(themeId, state.course.biome);
-  const zone = zoneProfile(arch);
-  const theme = themeId ? themeById(themeId) : undefined;
-  const hero = zoneHeroSVG(arch, { width: 520, height: 176, seed: (state.course.seed * 131 + zone.difficulty) >>> 0 });
-  const diffPips = difficultyPips(zone.difficulty);
-  return `
-    <div class="gs-panel" style="padding:0;overflow:hidden;margin:0 0 12px;">
-      <div style="position:relative;line-height:0;">
-        <div style="width:100%;">${hero}</div>
-        <div style="position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.72));line-height:1.2;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;">
-            <div>
-              <div style="font-size:19px;font-weight:800;color:#fff;text-shadow:0 1px 4px #000;">${zone.name}</div>
-              <div style="font-size:12.5px;color:var(--gs-accent);">${zone.signature}${theme ? ` · ${theme.name}` : ''}</div>
-            </div>
-            <div style="text-align:right;font-size:12px;color:#eee;text-shadow:0 1px 3px #000;">
-              Difficulty<br><span style="font-size:15px;letter-spacing:1px;color:var(--gs-danger);">${diffPips}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style="padding:11px 14px;">
-        <p style="font-size:12px;font-style:italic;opacity:.7;margin:0 0 5px;">${zone.inspiration}</p>
-        <p style="font-size:13px;opacity:.92;margin:0 0 10px;line-height:1.4;">${zone.brief}</p>
-        <div style="display:flex;gap:18px;flex-wrap:wrap;">
-          ${traitList('Hazards', 'var(--gs-danger)', zone.hazards)}
-          ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
-        </div>
-      </div>
     </div>`;
 }
 
