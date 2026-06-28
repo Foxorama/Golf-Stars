@@ -192,3 +192,24 @@ already headless and deterministic), huge for stakes and identity.
 Each is content-as-data within the existing architecture. None requires re-clearing the fairness or
 no-death-spiral bars *unless* it touches course generation — keep new systems on the economy / node
 / scoring side (as GS-14 events already do) and those bars stay green by construction.
+
+---
+
+## UPDATE (2026-06-28) — built end to end (PR #82)
+
+The review was implemented in one push (tested, 422 green; fairness/determinism bars untouched):
+
+- **GS-bank** — push-your-luck cash-out (the obvious fix).
+- **GS-voyage** — the winnable campaign: 3 arcs, bosses, a final Galactic Major = **win**, a bounded/
+  plateauing difficulty curve, and the **harder-path (elite)** lane. (S+ #1 + the harder-path ask.)
+- **GS-scramble** — co-op showdown bosses: an unchosen golfer partners you best-ball on the Arc-II +
+  final bosses (two balls a shot, keep the better). (The co-op ask + S+ #4 flavour.)
+- **GS-variation** — multi-biome SPLIT stops (front world → back world) + varied 6/7/9 stop sizes.
+  (The "more than 6/6/6" ask — both interpretations.)
+- **GS-ascension** — an 8-tier difficulty ladder unlocked by winning, persisted in save v4. (S+ #3.)
+- **GS-synergy** — trigger relics (Birdie Hunter / Eagle Eye / Comeback Kid) that compound with credit
+  perks, a Glass Cannon **curse** gamble, and a shop **reroll**. (S+ #2 + GS-curses + GS-shop-reroll.)
+
+Still open (documented in IDEAS.md): **GS-rival** (named AI rival), **GS-encounters** (full branching
+node map — the voyage is a fixed track today), **GS-contracts** (per-stop objectives), **GS-meta-unlocks**
+(spend shards on content, not just stats), and the small GS-risk-shards / GS-bag-cap tweaks.

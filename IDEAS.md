@@ -15,54 +15,39 @@ Everything below serves whichever avenue wins.
 
 ## Gameplay-loop review (2026-06-28 — `reports/gameplay-loop-review-2026-06-28.md`)
 A roguelike-designer pass over the whole loop. Verdict: AAA "verb" (swing/flight/courses/caddies),
-thin roguelike "sentence." The replayability ceiling is STRUCTURAL — ranked items below. None touch
-the fairness/no-death-spiral bars (keep new systems on the economy/node/scoring side, as GS-14 did).
+thin roguelike "sentence." The structural gaps were closed in one PR (the "full auto" build below);
+none touched the fairness/no-death-spiral bars (new systems live on the economy/node/scoring side).
 
-**S+ tier (drastically improve fun & replayability):**
-- **GS-boss — Arcs with bosses + a WIN condition.** The run is an infinite attrition treadmill that
-  can only end in failure: no climax, no victory. Structure the voyage into 3 arcs (the `arcForDistance`
-  tiers exist), each ending in a named "Galactic Major" boss stop with a special victory condition;
-  clearing the final boss WINS the run (victory screen + payout/unlock). The keystone — everything
-  else (Ascension, contracts, rival) hangs off having something to *beat*.
-- **GS-synergy — Build synergy & archetypes (the Balatro lesson).** The shop is ~20 flat stat-stackers
-  that add up but never COMBINE. Re-tier around a few *engine relics* with triggers ("on birdie: +X",
-  "on made cut: −1% dispersion permanently") + loud archetype signposting (bomber/sniper/scrambler/
-  snowball) so caddies, club sets, shapers and relics interlock into a run identity. Caddies already
-  prove the engine does triggered effects cleanly. Turns "stat shopping" into "deck-building."
-- **GS-ascension — Ascension/Heat difficulty ladder.** Once a run is winnable (GS-boss), stacking
-  modifiers unlocked by winning (tighter cuts, wilder courses, costlier shops, nerfed start). The
-  genre's highest-ROI replayability lever (StS 1–20, Hades Heat): one win → 20+ distinct challenges.
-  Pair with shifting meta-shard spend from pure stat-creep toward CONTENT UNLOCKS (new golfers/caddies/
-  biomes/formats/modifiers) so the meta adds variety, not just power.
-- **GS-rival — Named AI rival / versus pulse.** A recurring deterministic rival raced down the galaxy
-  (score on the cut banner; beating them = the boss win condition). Cheap to sim (headless+deterministic
-  already), big for stakes & personality. Gives the solitaire loop a pulse.
+**SHIPPED (PR #82 — the roguelike loop overhaul):**
+- **GS-boss / GS-voyage — Arcs with bosses + a WIN condition. SHIPPED.** New winnable headline format
+  "The Voyage": three arcs, each two ordinary stops then a boss; clearing the final Galactic Major wins
+  the run (`EndReason 'won'`, victory screen, champion shard bonus). Bounded/plateauing difficulty
+  (`cutMult`/`maxJump`), boss `cutBonus`, the **harder-path (elite)** route flag + boss-ahead previews.
+  Auto reach-AI wins ~7.5% no-meta → ~40% maxed; flat/ladder stay endless. `tests/voyage.test.ts`.
+- **GS-scramble — Co-op showdown bosses. SHIPPED.** The Arc-II + final bosses are best-ball scrambles:
+  an unchosen golfer partners you, hits a second ball each shot, the team keeps the better. Lifts a boss
+  course ~17.9 → ~21.7 mean SF. Pure `pickBetterExec`; byte-for-byte off; auto≡interactive. `tests/scramble.test.ts`.
+- **GS-variation — Multi-biome split stops + varied sizes. SHIPPED.** Stops vary 6/7/9; three mid-arc
+  stops CROSS TWO WORLDS (front theme + a distinct back theme, stitched, per-hole biome/theme). Each half
+  goes through the normal validators → provably fair. `tests/variation.test.ts`.
+- **GS-ascension — Difficulty ladder. SHIPPED.** Win a voyage to unlock the next of 8 Ascension tiers
+  (flat per-stop cut + leaner purse). Persisted in **save v4** (v3→v4 migration). `tests/ascension.test.ts`.
+- **GS-synergy / GS-curses / GS-shop-reroll — SHIPPED.** Trigger relics (Birdie Hunter / Eagle Eye /
+  Comeback Kid — economy payouts that compound with credit perks → snowball builds), the Glass Cannon
+  CURSE (wider misses for +60% credits), and an escalating-cost shop **reroll**. `tests/synergy.test.ts`.
 
-**A-tier (real design work, high value):**
-- **GS-encounters — Branching node map with encounter TYPES.** Replace "pick 1 of 3 routes by
-  distance+event" with a short StS-style map of node KINDS: normal course, ELITE (harder, guaranteed
-  rare+ loot), driving range (buff node), treasure (free club/relic), shop, arc boss. The format system
-  already abstracts "what a stop is" — a node type is the natural extension. Do this WITH GS-boss (same
-  change). Arguably itself S+.
-- **GS-contracts — Optional per-stop objectives.** "Eagle a hole → free relic", "4 GIR → +50% credits",
-  "no penalties → bonus shards." Texture for the 6 holes + a reason to play differently. Pure scoring
-  read over `PlayedHole[]`; a card on the intro splash.
-- **GS-curses — Genuine downside gambles.** Every event today is upside-with-a-cut-tax. Add curse
-  relics/lanes you OPT INTO ("shank zone doubled, but green holes pay double", "−1 club, +2 reward
-  rarity"). Real risk-you-choose is the heart of build-defining gambling (Hades Pacts, Balatro
-  vouchers). Fits the spray-shape/loadout model.
-
-**Obvious (small, safe):**
-- **GS-risk-shards — reward risk in the shard payout.** Shards = `distance×3 + stops×2` today; surviving
-  a high-`cutDelta` lane or a rarer course pays the same as a calm drift. Add a small shard bonus scaled
-  by `cutDelta` survived / course rarity. Pure tuning on `shardsForRun`/`finishStop`.
-- **GS-streak — birdie/eagle streak micro-reward.** Consecutive birdies-or-better add a small credit
-  bonus → an internal arc to the 6 holes, rewards aggression. Pure economy upside (Stableford already
-  caps the downside).
-- **GS-shop-reroll — a reroll button.** Cheap, escalating-cost reroll of the 4-card offer (StS/Hades
-  staple). Redraw `shopOffer` with a salted seed, charge credits. Turns "take what's shown" into agency.
-- **GS-bag-cap — bag pressure.** One-per-type with no size limit makes reward clubs pure accretion, never
-  a choice. A soft cap / swap-out decision makes club loot a real draft. (May grow to A-tier.)
+**Still open (next natural follow-ons):**
+- **GS-rival — Named AI rival / versus pulse.** A deterministic rival raced down the galaxy (score on the
+  cut banner; beating them at a boss = a richer win). Cheap to sim, big for stakes & personality.
+- **GS-encounters — Full branching node map.** The voyage is a fixed track today; a StS-style map of node
+  KINDS (elite / driving-range buff / treasure / shop / boss) is the richer version. The format + boss
+  layer is the foundation it builds on.
+- **GS-contracts — Optional per-stop objectives.** "Eagle a hole → free relic", "4 GIR → +50% credits".
+  Pure scoring read over `PlayedHole[]`; a card on the intro splash. (Relics already read the played holes.)
+- **GS-meta-unlocks — Spend shards on CONTENT, not just stats.** Unlock new golfers/caddies/club sets/
+  biomes/relics so the meta adds variety, not only power.
+- **GS-risk-shards / GS-bag-cap — small.** Reward `cutDelta`/rarity survived in shards; a soft bag cap so
+  club loot is a draft not pure accretion.
 
 ## Now / next (the slice is done — these are the natural follow-ons)
 
