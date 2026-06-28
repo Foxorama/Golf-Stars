@@ -13,7 +13,7 @@ import { renderHoleSVG } from './render/holeView';
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
-import { drawCaddy, hasCaddyArt, CADDY_LABEL } from './render/caddyArt';
+import { drawCaddy, hasCaddyArt, caddyProjectile, CADDY_LABEL } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
@@ -23,7 +23,7 @@ import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { clubOfferNote, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
+import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
@@ -922,6 +922,7 @@ function playingBody(animating: boolean): string {
         <div class="gs-bigmap">${puttSvg}</div>
         ${mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` })}
         <div class="gs-hud gs-hud-bottom">
+          ${caddyBadgeHTML(puttCaddyId())}
           <div class="gs-hud-controls gs-glass">
             <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">Tap the meter (or Putt) in the green <b>MAKE</b> band — too soft is short, too firm runs past.</p>
             <div id="puttmeter"></div>
@@ -1031,10 +1032,7 @@ function playingBody(animating: boolean): string {
     </div>`;
   // The hired caddy, framed in the bottom-left so it stands out (GS-fullmap). The figure is drawn to
   // the canvas in the render wiring. Absent when no caddy is hired.
-  const cid = caddyId();
-  const caddyBadge = hasCaddyArt(cid)
-    ? `<div class="gs-caddybadge"><canvas id="caddybadge" width="128" height="120"></canvas><span class="gs-caddyname">${CADDY_LABEL[cid]}</span></div>`
-    : '';
+  const caddyBadge = caddyBadgeHTML(caddyId());
   const autoFinish = `<button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole">»</button>`;
   return `
     <div class="gs-shot gs-shot--full${lefty() ? ' gs-shot--lefty' : ''}">
@@ -1332,6 +1330,30 @@ function caddyId(): string | undefined {
   return namedCaddyOwned(state.run.loadout.perks);
 }
 
+/** The caddy to draw in the LIVE play view's corner (the ball-in-flight screen). Only a guard caddy
+ *  has a flight-time role there — it fires the redirect laser/boomerang — so it's the only one shown;
+ *  any other hired caddy is already on the decision screen's framed badge, and looming it over the
+ *  flight just clutters the screen (the dead-space complaint). */
+function flightCaddyId(): string | undefined {
+  const id = caddyId();
+  return caddyProjectile(id) ? id : undefined;
+}
+
+/** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A
+ *  distance/guard caddy like Driver Dan has no role on the green, so it doesn't appear there. */
+function puttCaddyId(): string | undefined {
+  const id = caddyId();
+  return isPuttingCaddy(id) ? id : undefined;
+}
+
+/** The framed gold caddy badge (the "cool outline") — shared by the decision and putting screens.
+ *  The figure is drawn to the canvas in the render wiring (keyed off `data-caddy`). '' when none. */
+function caddyBadgeHTML(id: string | undefined): string {
+  return hasCaddyArt(id)
+    ? `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`
+    : '';
+}
+
 /** Left-handed mode (GS-lefty) — the live player setting. The sim reads it off `loadout.lefty`
  *  (synced from this in `render`), the renderers take it as an option, the CSS keys a modifier. */
 function lefty(): boolean {
@@ -1532,28 +1554,28 @@ function render(): void {
       puttMeter = mountPuttMeter(meterEl, {
         width: meterW,
         band,
-        caddyId: caddyId(),
-        lefty: lefty(),
+        // The caddy now stands in the framed badge beside the meter (only a putting specialist), so
+        // the meter itself draws no figure and uses its full width.
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
       });
     }
   }
 
-  // Draw the hired caddy into its framed bottom-left badge on the decision screen (GS-fullmap). The
-  // play view / putt meter draw the caddy themselves while animating / putting; this covers the
-  // aim-and-charge screen, where the player spends most of the hole. A one-shot draw per render (the
-  // idle bob updates whenever the screen re-renders — i.e. live while charging), so no rAF to leak.
-  const cbCanvas = document.getElementById('caddybadge') as HTMLCanvasElement | null;
-  const cbId = caddyId();
-  if (cbCanvas && hasCaddyArt(cbId)) {
-    const ctx = cbCanvas.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, cbCanvas.width, cbCanvas.height);
-      // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
-      // Mirror the portrait in left-handed mode (GS-lefty) so the caddy faces with the flipped cast.
-      drawCaddy(ctx, cbId, cbCanvas.width / 2, cbCanvas.height - 8, cbCanvas.height * 0.92, performance.now(), lefty());
-    }
-  }
+  // Draw the hired caddy into each framed gold badge on screen (the decision screen's bottom-left
+  // figure and the putting screen's, GS-fullmap). The play view draws its own corner guard while
+  // animating; these badges cover the aim-and-charge and putting screens. Each badge canvas carries
+  // its caddy id in `data-caddy`, so this one generic pass serves every screen. A one-shot draw per
+  // render (the idle bob updates whenever the screen re-renders — live while charging), so no rAF.
+  document.querySelectorAll<HTMLCanvasElement>('canvas.gs-caddycv[data-caddy]').forEach((cv) => {
+    const id = cv.dataset.caddy;
+    if (!hasCaddyArt(id)) return;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
+    // Mirror the portrait in left-handed mode (GS-lefty) so the caddy faces with the flipped cast.
+    drawCaddy(ctx, id, cv.width / 2, cv.height - 8, cv.height * 0.92, performance.now(), lefty());
+  });
 
   // Mount the animated play view on the result screen.
   if (state.screen === 'result' && state.played) {
@@ -1566,7 +1588,7 @@ function render(): void {
         height: 520,
         biome: holeBiome(hole), themeId: holeThemeId(hole),
         golferLook: golferLook(),
-        caddyId: caddyId(),
+        caddyId: flightCaddyId(),
         lefty: lefty(),
         onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
       });
@@ -1590,17 +1612,19 @@ function render(): void {
       const animPin = pinOf(play.hole);
       const animUp: [number, number] = [animPin[0] - focus[0], animPin[1] - focus[1]];
       const hadShots = animatingPlay.shots.length > 0;
-      // Size the canvas to fill the viewport (it can't aspect-scale via CSS like the SVG map can);
-      // the watch screen has no bottom controls, so it can take most of the height. Keep the
-      // portrait map aspect so the follow-cam framing matches the decision screen.
-      const animH = Math.round((window.innerHeight || 800) * 0.72);
-      const animW = Math.round(animH * (DMAP_W / DMAP_H));
+      // Fill the WHOLE full-bleed map (the `.gs-bigmap` is absolute inset:0 = the viewport), so the
+      // watch screen has no letterboxed dead space below the canvas. The canvas can't aspect-scale
+      // via CSS like the SVG map can, so we size it to the container's real pixels and let the
+      // follow-cam show a little more vertically; the corridor framing (width-limited on viewRadius)
+      // still matches the decision map.
+      const animW = Math.round(playEl.clientWidth || (window.innerWidth || 400));
+      const animH = Math.round(playEl.clientHeight || (window.innerHeight || 800));
       view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
         width: animW,
         height: animH,
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
         golferLook: golferLook(),
-        caddyId: caddyId(),
+        caddyId: flightCaddyId(),
         lefty: lefty(),
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
