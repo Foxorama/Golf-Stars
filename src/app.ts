@@ -712,10 +712,15 @@ function mapViewMoved(): boolean {
  */
 function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread): ProjectOptions {
   const base: ProjectOptions = { width: DMAP_W, height: DMAP_H };
-  if (mapView === 'whole') return base; // whole-hole fit — see the green + full layout
+  if (mapView === 'whole') return base; // whole-hole fit — see the green + full layout (tee→green up)
   const reach = decisionReach(spray.carryHigh) / mapZoom;
   const focus: [number, number] = [play.ball[0] + mapPan[0], play.ball[1] + mapPan[1]];
-  return { ...base, focus, viewRadius: reach, focusBias: DMAP_BIAS };
+  // Reorient so the PIN is up-screen — keeps the contemplated shot pointing UP even when the ball
+  // is long of the green (so the pull-to-aim gesture never feels backwards). Degenerate near the
+  // hole falls back to tee→green inside the projector.
+  const pin = pinOf(play.hole);
+  const up: [number, number] = [pin[0] - play.ball[0], pin[1] - play.ball[1]];
+  return { ...base, focus, viewRadius: reach, focusBias: DMAP_BIAS, up };
 }
 
 /** Running stop score vs the cut-to-beat, coloured by how the run is tracking:
@@ -855,6 +860,8 @@ function playingBody(animating: boolean): string {
       focus: puttMid,
       viewRadius: Math.max(9, v.distToPin * 0.62),
       focusBias: 0.5,
+      // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
+      up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
     });
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
@@ -1508,6 +1515,10 @@ function render(): void {
         ...animatingPlay.shots.map((s) => Math.hypot(s.rest[0] - s.from[0], s.rest[1] - s.from[1])),
       );
       const focus = animatingPlay.shots[0]?.from ?? animatingPlay.putts[0]?.from ?? play.ball;
+      // Orient pin-up from the shot's origin (fixed for the whole animation so the world doesn't
+      // spin mid-flight) — matches the decision map the player just aimed on (origin→pin up).
+      const animPin = pinOf(play.hole);
+      const animUp: [number, number] = [animPin[0] - focus[0], animPin[1] - focus[1]];
       const hadShots = animatingPlay.shots.length > 0;
       // Size the canvas to fill the viewport (it can't aspect-scale via CSS like the SVG map can);
       // the watch screen has no bottom controls, so it can take most of the height. Keep the
@@ -1524,6 +1535,7 @@ function render(): void {
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,
+        up: animUp,
         follow: true,
         onImpact: (kind, quality) => {
           // Contact cue — fires at the strike moment (the windup has already played).

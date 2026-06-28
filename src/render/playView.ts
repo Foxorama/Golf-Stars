@@ -258,6 +258,9 @@ export interface PlayViewOptions {
   viewRadius?: number;
   /** Where the focus point sits vertically (0=top..1=bottom); higher = ball lower, more shot ahead. */
   focusBias?: number;
+  /** Override the up-screen direction (default tee→green) — the follow-cam passes the shot's
+   *  origin→pin so the pin stays at the top even on a shot played back toward the green. */
+  up?: Vec;
   follow?: boolean;
   /** The selected golfer's look (GS-18). Absent → the loader-crew cap cycle (result-screen replay). */
   golferLook?: GolferLook;
@@ -322,7 +325,7 @@ export function mountPlayView(
   let lastGround: Vec = camera;
   const buildProj = () =>
     followMode
-      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius, focusBias: opts.focusBias })
+      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius, focusBias: opts.focusBias, up: opts.up })
       : holeProjector(hole, { width, height, extra });
   let proj = buildProj();
 

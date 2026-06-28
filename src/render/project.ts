@@ -5,6 +5,8 @@
  *
  * Convention (kept from golf-finder's playHoleSvg): rotate so the tee→green play-line
  * points up-screen (a uv() transform), then fit-to-view with uniform scale (no stretch).
+ * The `up` option overrides that rotation (the follow-cam passes ball→pin so the PIN stays at
+ * the top of the screen even when the ball is long of the green — keeps aiming intuitive).
  *
  * Two fit modes:
  *  - whole-hole (default): the bounding box of all terrain (+extra) fills the view.
@@ -29,6 +31,11 @@ export interface ProjectOptions {
   /** Where the focus point sits vertically, 0=top .. 1=bottom (default 0.62 → ball low,
    *  more of the hole ahead is visible). Only used with `focus`. */
   focusBias?: number;
+  /** Override the "up" course-space direction (default: tee→green). When set, the view rotates so
+   *  this vector points up-screen — used by the follow-cam to keep the current target (the pin) at
+   *  the TOP even when the ball is long of the green, so aiming/pulling never feels backwards.
+   *  A near-zero vector falls back to tee→green. */
+  up?: Vec;
 }
 
 export interface Projector {
@@ -42,11 +49,19 @@ export interface Projector {
   scale: number;
 }
 
-/** The tee→green-up orthonormal axes: `dir` points tee→green, `perp` is its right side. */
-function axes(hole: Hole): { t: Vec; dir: Vec; perp: Vec } {
+/** The "up"-pointing orthonormal axes: `dir` points up-screen, `perp` is its right side. Defaults to
+ *  tee→green; an `up` override (e.g. ball→pin) rotates the whole view so that direction is up. */
+function axes(hole: Hole, up?: Vec): { t: Vec; dir: Vec; perp: Vec } {
   const t = hole.tee;
-  let dx = hole.green[0] - t[0];
-  let dy = hole.green[1] - t[1];
+  let dx: number;
+  let dy: number;
+  if (up && (up[0] || up[1])) {
+    dx = up[0];
+    dy = up[1];
+  } else {
+    dx = hole.green[0] - t[0];
+    dy = hole.green[1] - t[1];
+  }
   const len = Math.hypot(dx, dy) || 1;
   dx /= len;
   dy /= len;
@@ -58,7 +73,7 @@ export function holeProjector(hole: Hole, opts: ProjectOptions = {}): Projector 
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
   const padding = opts.padding ?? 24;
-  const { t, dir, perp } = axes(hole);
+  const { t, dir, perp } = axes(hole, opts.up);
   // uv: rotate course-space so tee→green points up; negate v so the green (large v) is at top.
   const uv = (p: Vec): Vec => {
     const rx = p[0] - t[0];

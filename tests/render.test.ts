@@ -38,6 +38,32 @@ describe('holeProjector (pure)', () => {
     const b = holeProjector(hole).project(hole.green);
     expect(a).toEqual(b);
   });
+
+  it('reorients with `up` so the target sits above the ball even when long of the green', () => {
+    // Ball BEYOND the green: project past it along the tee→green line. With tee→green-up the pin
+    // would be BELOW the ball on screen; the follow-cam passes ball→pin as `up` to keep it above.
+    const pin = hole.green;
+    const beyond: Vec = [pin[0] + (pin[0] - hole.tee[0]), pin[1] + (pin[1] - hole.tee[1])];
+    const up: Vec = [pin[0] - beyond[0], pin[1] - beyond[1]];
+
+    const fixed = holeProjector(hole, { focus: beyond, viewRadius: 120 });
+    // Tee→green-up: the pin is below the (lower-biased) ball — backwards to aim at.
+    expect(fixed.project(pin)[1]).toBeGreaterThan(fixed.project(beyond)[1]);
+
+    const reoriented = holeProjector(hole, { focus: beyond, viewRadius: 120, up });
+    // Pin-up: the pin is now ABOVE the ball on screen (smaller y), so the shot points up.
+    expect(reoriented.project(pin)[1]).toBeLessThan(reoriented.project(beyond)[1]);
+    // unproject stays the exact inverse under the rotated frame.
+    const back = reoriented.unproject(...reoriented.project(pin));
+    expect(back[0]).toBeCloseTo(pin[0], 6);
+    expect(back[1]).toBeCloseTo(pin[1], 6);
+  });
+
+  it('falls back to tee→green when `up` is degenerate (ball at the pin)', () => {
+    const a = holeProjector(hole, { focus: hole.green, viewRadius: 80 }).project(hole.tee);
+    const b = holeProjector(hole, { focus: hole.green, viewRadius: 80, up: [0, 0] }).project(hole.tee);
+    expect(b).toEqual(a);
+  });
 });
 
 describe('trajectory (pure)', () => {

@@ -73,6 +73,9 @@ export interface RenderOptions {
   viewRadius?: number;
   /** Where the focus point sits vertically (0=top..1=bottom); higher = ball lower, more shot ahead. */
   focusBias?: number;
+  /** Override the up-screen direction (default tee→green) — the follow-cam passes ball→pin so the
+   *  pin stays at the top even when the ball is long of the green. */
+  up?: Vec;
   /** Cell-shade art tunables (escape-hatch); defaults applied in the scene builder. */
   art?: ArtFeel;
 }
@@ -153,6 +156,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     focus: opts.focus,
     viewRadius: opts.viewRadius,
     focusBias: opts.focusBias,
+    up: opts.up,
   });
   const place = (p: Vec) => proj.project(p);
   const pts = (poly: Vec[]) => polyPoints(poly, place);
