@@ -551,6 +551,30 @@ This game lives or dies on three axes — put every change through all three bef
   primitive (NOT offer-gated, so the headless sim can buy anything); the UI bounds choice to the
   offer and fixes it on shop entry (`UiState.shopOffer`) so buying never reshuffles the cards. This
   closes the old "dead shop after ~5 stops while the cut-line keeps ramping" progression hole.
+- **The shop is the PRO SHOP, staffed by a per-world Pro, with a DEPTH-RAMPED rarity mix
+  (GS-proshop).** Two coupled changes:
+  - **Rarity now RAMPS with galaxy distance.** The catalogue is count-skewed toward rare/epic (≈6
+    common / 15 rare / 11 epic / 3 legendary in `SHOP_ITEMS`, plus rare+ reward clubs), so the old
+    flat `RARITY_C`-weighted draw front-loaded rare/epic and only dribbled commons in LATE as the
+    rare/epic uniques sold out — backwards from how loot should feel. `rarityDepthBias(rarity,
+    distanceFromStart)` (run.ts) multiplies each rarity's base drop weight by `b^order`, where `b`
+    lerps `RARITY_TILT_EARLY 0.5 → RARITY_TILT_DEEP 1.9` over `RARITY_RAMP_DEPTH 18` (the same depth
+    signal the cut ramps off): commons (order 0) stay ×1; rare/epic/legendary start <1 (scarce early)
+    and rise >1 deep. So early stops stock cheap foundational COMMONS, deep stops stock rare/epic/
+    legendary POWER. CRITICAL: this only changes WHICH items the `weightedSample` picks (folded into
+    `shopOffer`'s per-item `weight` alongside `itemThemeWeight`), NOT the rng draw COUNT (one
+    `rng.float()` per pick regardless), so the offer stays deterministic + resume-stable and every
+    existing shop/club/caddy seed-scan test passes byte-for-byte.
+  - **Each WORLD has its own named Pro (`PROS` in `zones.ts`, content-as-data).** One Pro per
+    archetype (Birdie Bellamy/verdant, Sandy Dunes/desert, Hailey Frost/frost, Ember Stokes/inferno,
+    Orbit Vance/void), each with a name, title, and pithy greetings keyed by `ProMood`. You only reach
+    a shop after PASSING the cut, so `proMood(stableford, cut)` grades degrees of SUCCESS by the
+    Stableford/cut ratio (`scraped <1.25 · solid <1.7 · great <2.2 · stellar`) — a nervy scrape up to
+    a romp, never a failure. `app.ts` `proGreetingHTML` reads `state.lastResult` (the just-played
+    stop), resolves the Pro via `archetypeFor`, and draws an assetless inline-SVG bust
+    (`proAvatarSVG`, per-archetype palette) + name + `proQuip` line (salted by `stopIndex` so it
+    varies). Pure data + view-only render → no new `_gs*` hook, no save bump; `tests/pro-shop.test.ts`
+    guards the roster/moods/quip determinism, the depth-bias curve, and the early>deep common-count fix.
 - **Balance/test on mean per-stop Stableford, NOT full-run distance.** Distance is chaotic: a
   loadout change perturbs the whole downstream seeded-RNG stream and the cut is a hard threshold,
   so "travels further" isn't monotonic even when a perk clearly helps. Averaged per-stop score is

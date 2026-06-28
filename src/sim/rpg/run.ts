@@ -421,6 +421,24 @@ export interface ShopOffer {
 
 export const SHOP_OFFER_SIZE = 4;
 
+// Rarity RAMPS with the voyage (GS-proshop). The catalogue is count-skewed toward rare/epic, so a
+// flat rarity-weighted draw showed lots of rare/epic up front and only dribbled commons in later as
+// the rare/epic uniques sold out — exactly backwards from how loot should feel. Now each rarity's
+// base drop weight (RARITY_C) is multiplied by `b^order`, where `b` lerps from <1 EARLY (commons-
+// heavy foundational kit, epics/legendaries scarce) to >1 DEEP (rare/epic/legendary power), keyed
+// off galaxy distance — the same depth signal the cut line ramps off. This shifts WHICH items are
+// drawn, not the rng draw count, so the offer stays deterministic and resume-stable.
+const RARITY_RAMP_DEPTH = 18; // galaxy distance at which the rarity tilt reaches its deep extreme
+const RARITY_TILT_EARLY = 0.5; // tilt base at the start — strongly favours commons
+const RARITY_TILT_DEEP = 1.9; // tilt base deep in the run — favours rare/epic/legendary
+
+/** Depth-scaled rarity multiplier for the shop draw (early → commons, deep → rare/epic). */
+export function rarityDepthBias(rarity: Rarity, distanceFromStart: number): number {
+  const p = Math.max(0, Math.min(1, distanceFromStart / RARITY_RAMP_DEPTH));
+  const b = RARITY_TILT_EARLY + (RARITY_TILT_DEEP - RARITY_TILT_EARLY) * p;
+  return Math.pow(b, RARITY_C[rarity].order);
+}
+
 /**
  * Weighted draw of `n` distinct items (rarer = less likely), without replacement. An optional
  * `weight` multiplier per item lets the active theme bias the offer toward on-theme gear (GS-17d).
@@ -477,9 +495,11 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
   // A reroll (GS-shop-reroll) salts the seed so the draw changes; salt 0 keeps the original stock
   // byte-for-byte (so existing tests + a fresh shop entry are unchanged).
   const rng = new Rng(salt ? `${run.seed}:shop:${run.stopIndex}:r${salt}` : `${run.seed}:shop:${run.stopIndex}`);
-  // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
+  // The current stop's theme biases the outfitter toward on-theme gear (GS-17d), and the rarity mix
+  // RAMPS with galaxy distance (GS-proshop): commons early, rare/epic/legendary deep.
   const archetype = currentTheme(run).archetype;
-  const weight = (it: ShopItem) => itemThemeWeight(itemTags(it.id), archetype);
+  const weight = (it: ShopItem) =>
+    itemThemeWeight(itemTags(it.id), archetype) * rarityDepthBias(it.rarity, run.distanceFromStart);
   return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
