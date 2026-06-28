@@ -27,7 +27,7 @@ import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCadd
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
-import { leaderboard, runField, arcBossId, type Leaderboard } from './sim/rpg/league';
+import { leaderboard, runField, arcBossId, livePosition, type Leaderboard } from './sim/rpg/league';
 import { PLAYER_ID, type Field } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss } from './sim/rpg/formats';
@@ -542,6 +542,17 @@ function leaderboardHTML(board: Leaderboard): string {
       </div>
       ${rows}
     </div>`;
+}
+
+/** A compact LIVE arc-leaderboard chip for the play HUD — updates the moment a hole is finished. */
+function liveLeaderChip(): string {
+  if (state.match) return ''; // a matchplay stop shows its duel HUD instead
+  const played = state.stopPlayed ?? [];
+  const sf = playTotals(played.map((p) => p.record)).stableford;
+  const lp = livePosition(state.run, played.length, sf);
+  const col = lp.position <= 3 ? '#5fd45a' : lp.position <= lp.of / 2 ? '#ffce54' : '#ff6b6b';
+  const gap = lp.gapToLead > 0 ? ` · ${lp.gapToLead} back` : ' · leading';
+  return `<span title="Live arc leaderboard">🏆 <b style="color:${col};">${ordinal(lp.position)}</b>/${lp.of}${gap}</span>`;
 }
 
 /** The matchplay opponent id for the current boss stop (the leaderboard leader, with a fallback). */
@@ -1095,6 +1106,7 @@ function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
         <span>Par <b>${play.hole.par}</b>·${len}y</span>
         <span>${opts.distLabel}</span>
         ${zoneScoreChip()}
+        ${liveLeaderChip()}
       </div>
       <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}

@@ -12,7 +12,7 @@
  */
 
 import type { Run } from './run';
-import { effectiveCut } from './run';
+import { effectiveCut, currentCourse } from './run';
 import { getFormat, stopSpecFor, bossAt } from './formats';
 import { arcForDistance, archetypeFor } from '../course/themes';
 import { getCharacter } from './characters';
@@ -178,4 +178,48 @@ export function arcBossId(run: Run): string | undefined {
 /** Is the run currently AT (or about to play) an arc's boss stop? */
 export function isBossStop(run: Run): boolean {
   return !!bossAt(getFormat(run.formatId), run.stopIndex);
+}
+
+export interface LivePosition {
+  /** 1-based live leaderboard position (arc total + the in-progress stop so far). */
+  position: number;
+  /** The player's live cumulative arc Stableford. */
+  total: number;
+  /** Field size. */
+  of: number;
+  /** Points behind the live leader (0 if leading). */
+  gapToLead: number;
+}
+
+/**
+ * The player's LIVE leaderboard position mid-stop (GS-100) — the arc total from completed stops plus
+ * the in-progress stop's partial: the player's `playerStopSF` over `holesPlayed` holes, and each
+ * ghost's score over the SAME holes. Drives the per-hole "you're Nth" chip on the play screen, so the
+ * board updates the moment a hole is finished. Pure/deterministic.
+ */
+export function livePosition(run: Run, holesPlayed: number, playerStopSF: number): LivePosition {
+  const board = leaderboard(run); // completed arc stops
+  const field = board.field;
+  const course = currentCourse(run);
+  const themeId = course.meta?.themeId;
+  const archetype = archetypeFor(themeId, course.biome);
+  const pressure = stopPressure(run.stopIndex);
+
+  const totals = new Map<string, number>();
+  for (const s of board.standings) totals.set(s.golferId, s.total);
+  totals.set(PLAYER_ID, (totals.get(PLAYER_ID) ?? 0) + playerStopSF);
+  for (const g of field.golfers) {
+    if (g.isPlayer) continue;
+    let sf = 0;
+    for (let i = 0; i < holesPlayed; i++) {
+      sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure);
+    }
+    totals.set(g.id, (totals.get(g.id) ?? 0) + sf);
+  }
+
+  const rows = field.golfers.map((g) => ({ id: g.id, total: totals.get(g.id) ?? 0 }));
+  rows.sort((a, b) => b.total - a.total);
+  const position = rows.findIndex((r) => r.id === PLAYER_ID) + 1;
+  const total = rows.find((r) => r.id === PLAYER_ID)?.total ?? 0;
+  return { position, total, of: rows.length, gapToLead: (rows[0]?.total ?? 0) - total };
 }
