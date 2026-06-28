@@ -563,8 +563,28 @@ function wireShotGesture(app: HTMLElement): void {
   const detach = (): void => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
-    window.removeEventListener('pointercancel', up);
+    window.removeEventListener('pointercancel', cancel);
+    document.removeEventListener('visibilitychange', onHide);
   };
+  // Belt-and-braces for a screen-sleep that drops the pointer events entirely: if the tab goes
+  // hidden mid-charge, abandon the gesture so we come back to a clean slate (some browsers don't
+  // fire pointercancel on background). Attached only while a gesture is live, removed in detach.
+  const onHide = (): void => {
+    if (document.visibilityState === 'hidden') cancel();
+  };
+  // Abandon the gesture WITHOUT firing — used by pointercancel and tab-hide. The browser fires
+  // pointercancel when the screen sleeps / the touch is interrupted mid-charge; routing that to
+  // `up` (which fires when selPower ≥ COMMIT) shot the ball off on its own — the "accidental tiny
+  // power shot" on reopen. A cancel always resets and restores the resting full-swing cone.
+  function cancel(): void {
+    pointers.clear();
+    pinch = null;
+    active = false;
+    charging = false;
+    selPower = 1;
+    detach();
+    scheduleRender();
+  }
   const move = (e: PointerEvent): void => {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -607,6 +627,11 @@ function wireShotGesture(app: HTMLElement): void {
   }
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    // Clear any stale pointers left by a gesture whose up/cancel never arrived (e.g. the screen
+    // slept mid-touch and the OS dropped the release). Without this, a leftover entry made the
+    // first fresh tap read as a second finger → a spurious pinch, so "the first tap doesn't
+    // register". A genuine multi-touch keeps its pointers because `active`/`pinch` is set.
+    if (!active && !pinch) pointers.clear();
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) {
       startX = e.clientX;
@@ -628,7 +653,8 @@ function wireShotGesture(app: HTMLElement): void {
     // Same fn refs each time → addEventListener de-dupes, so multiple pointers don't stack handlers.
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
+    window.addEventListener('pointercancel', cancel);
+    document.addEventListener('visibilitychange', onHide);
   });
 }
 
@@ -1290,6 +1316,23 @@ function lefty(): boolean {
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
+  // Tear down the previous canvas mounts BEFORE we wipe the DOM and (maybe) mount fresh ones.
+  // render() replaces `app.innerHTML`, which detaches the old play-view / putt-meter canvases —
+  // but their self-perpetuating rAF loops (playView re-requests every frame even after `done`,
+  // see playView.ts) keep running forever unless `destroy()` is called. dispatch() destroys them,
+  // but render() is invoked DIRECTLY all over (scheduleRender during the power-pull, the onDone
+  // hold timers, popup-continue, the settings toggle) — so each shot used to leak one orphaned
+  // 60fps loop drawing into a detached canvas, piling up until the power-pull and manual putting
+  // went unusably laggy. Destroying here makes every re-render reclaim the prior mount; the
+  // conditional blocks below re-mount fresh handles as the screen needs them.
+  if (view) {
+    view.destroy();
+    view = null;
+  }
+  if (puttMeter) {
+    puttMeter.destroy();
+    puttMeter = null;
+  }
   // Settings → sim bridge (GS-lefty): the pure sim can't read localStorage, so bake the live
   // left-handed setting onto the loadout here. render() runs after every dispatch and after the
   // settings toggle's direct render(), so `loadout.lefty` is always current before the next shot
