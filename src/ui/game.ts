@@ -11,7 +11,6 @@ import type { Course } from '../sim/course/contract';
 import type { PlayedHole, PuttControl } from '../sim/round';
 import {
   buy,
-  clubOffer,
   currentCourse,
   finishStop,
   playStop,
@@ -278,15 +277,12 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'continue': {
       if (state.screen !== 'result') return state;
-      // Fix the outfitter's stock now (from the post-stop run) so it stays put while shopping —
-      // perk gear PLUS the rotating reward CLUBS (GS-clubs), drawn from their own seeded stream.
+      // Fix the outfitter's stock now (from the post-stop run) so it stays put while shopping. The
+      // single 4-card offer now mixes perk gear AND rare+ reward CLUBS (GS-clubs-2) from one draw.
       return {
         ...state,
         screen: 'shop',
-        shopOffer: [
-          ...shopOffer(state.run).map((o) => o.item.id),
-          ...clubOffer(state.run).map((o) => o.item.id),
-        ],
+        shopOffer: shopOffer(state.run).map((o) => o.item.id),
       };
     }
 

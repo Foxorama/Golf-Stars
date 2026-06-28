@@ -319,14 +319,14 @@ function weightedSample(
 export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   const perks = run.loadout.perks;
   const hasCaddy = !!namedCaddyOwned(perks);
-  // Driver Dan (GS-clubs) only turns up once the golfer actually OWNS a driver — so Larry (who starts
-  // with one) is eligible from the off, but everyone else must first find a Driver club. He still only
-  // appears at his epic rarity in the rotation; owning a driver is a gate, not a guaranteed early show.
+  // Driver Dan (GS-clubs) only turns up once the golfer actually OWNS a driver. Everyone now starts
+  // with one (the balanced bag), so he's eligible from the off; he still only appears at his epic
+  // rarity in the rotation, so owning a driver is a gate, not a guaranteed early show.
   const ownsDriver = run.loadout.bag.some((c) => c.id === DRIVER_ID);
   // Hide maxed items, gate prereq tier-ladders, and handle caddies (GS-caddy): named caddies are
   // random rarity-weighted inclusions UNTIL you hire one, after which NO named caddy appears again;
   // generic caddy 'service' perks only surface once a named caddy has been hired.
-  const pool = SHOP_ITEMS.filter(
+  const gear = SHOP_ITEMS.filter(
     (it) =>
       ownedCount(perks, it.id) < itemCap(it) &&
       (!it.prereq || perks.includes(it.prereq)) &&
@@ -334,6 +334,10 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
       (it.caddy !== 'service' || hasCaddy) &&
       (it.id !== 'driver-dan' || ownsDriver),
   );
+  // Reward CLUBS (GS-clubs-2) share the SAME 4-card offer now — no separate row. They're rare+
+  // improvements (a distance upgrade, or a new club that fills a gap in the balanced bag), drawn
+  // from the same rarity-weighted pool as the gear so they're appropriately scarce.
+  const pool = [...gear, ...offerableClubs(run.loadout)];
   const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
   // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
   const archetype = currentTheme(run).archetype;
@@ -342,25 +346,6 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
   });
-}
-
-export const CLUB_OFFER_SIZE = 3;
-
-/**
- * The reward CLUBS on offer at the current stop (GS-clubs), shown alongside the perk shop. A seeded,
- * rarity-weighted draw of the clubs this golfer can still pursue: types they lack (fill a gap), or
- * higher-tier / different-set versions of clubs they hold (upgrade / side-grade). Larry never sees
- * hybrids; a club you already own at that tier never reappears (see offerableClubs). Deterministic
- * from the run seed + stop (its own RNG stream, so it doesn't perturb the perk offer).
- */
-export function clubOffer(run: Run, size = CLUB_OFFER_SIZE): ShopOffer[] {
-  const pool = offerableClubs(run.loadout);
-  const rng = new Rng(`${run.seed}:clubs:${run.stopIndex}`);
-  return weightedSample(rng, pool, Math.min(size, pool.length)).map((item) => ({
-    item,
-    cost: item.cost,
-    owned: ownedCount(run.loadout.perks, item.id),
-  }));
 }
 
 /** Voluntarily bank the run (cash out) — ends it with reason 'banked'. */
