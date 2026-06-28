@@ -140,6 +140,15 @@ Everything below serves whichever avenue wins.
   Remaining: a URL form for the feel flags (`?feel=`/`?spray=` seeding `window._gs*` at first paint)
   and a live no-reload helper for seed/intro (drive the iframe without a full reload). Small; the
   hub + auto-discovering guard + five hooks already shipped in GS-16.
+- **GS-mux — Mobile UX deep cuts.** First pass of immediate fixes SHIPPED (safe-area, touch targets,
+  haptic tick, no h-scroll, Hit/Auto-finish mis-tap, tap-to-dismiss popup). Backlog of the bigger
+  swings lives in `reports/mobile-ux-review-2026-06-28.md`: **(audio + graded haptics on contact —
+  the single biggest perceived-quality jump, the game has NO sound today)**, pinch-to-zoom + tap-to-
+  aim-by-default on the map, a drag-back-flick swing input, segmented one-row aim controls, first-run
+  coaching, a landscape/tablet layout, an opt-in/auto-advance shot popup (loop friction), reward
+  celebrations on the big beats, a settings sheet (sound/haptics/reduced-motion/left-handed/fast),
+  and an install nudge + daily-seed challenge (the deterministic RNG already supports it, cf. GS-7).
+  Any new feel knob must add its test-hub control in the same PR (I4 rule).
 
 ## Done
 - **GS-dispersion-2 — Asymmetric spray-zone model + zone/distance upgrades.** Replaced the symmetric
