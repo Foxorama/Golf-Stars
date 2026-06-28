@@ -10,7 +10,7 @@ import { scoreName, playTotals } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { courseCardHTML, itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
-import { holeProjector } from './render/project';
+import { holeProjector, type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
@@ -21,6 +21,7 @@ import { archetypeFor, themeById } from './sim/course/themes';
 import { zoneProfile, difficultyPips } from './sim/course/zones';
 import { zoneHeroSVG } from './render/zoneHero';
 import { bearing, dist, type Hole } from './sim/course/contract';
+import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
@@ -292,6 +293,14 @@ let selAim: 'attack' | 'safe' = 'attack';
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
 // Free-aim target (course-space) from tapping/dragging the map; overrides attack/safe when set.
 let selFreeTarget: [number, number] | null = null;
+// Map navigation (local view state, reset per shot). `follow` zooms the camera onto the
+// contemplated shot (the default); `whole` fits the ENTIRE hole so you can read the green and
+// the full layout on a long hole. `mapZoom` (>1 = closer) and `mapPan` (a course-space offset
+// added to the focus) let you zoom and drag the follow-cam around to look ahead. Drag pans the
+// map UNLESS free-aim is active (then drag aims) — so "move the map around" is the default touch.
+let mapView: 'follow' | 'whole' = 'follow';
+let mapZoom = 1;
+let mapPan: [number, number] = [0, 0];
 // Shot-result popup: after a non-terminal shot settles, freeze on a result card + Continue
 // before the next decision, so each shot gets its own beat. Module-level (a timed view
 // effect, not reducer state — like animatedShots above).
@@ -331,53 +340,89 @@ function scheduleRender(): void {
 }
 
 /**
- * Wire tap/drag-to-aim on the decision map. The map SVG is the same size the projector rendered
- * (320×460 viewBox), so we reconstruct that exact projector and `unproject` the pointer into
- * course-space, clamped to the player's reach. Pointer-move/up listen on `window` so a drag
- * survives the per-frame re-render that replaces the map element.
+ * Wire pointer interaction on the decision map. Two gestures, disambiguated by mode:
+ *  - FREE-AIM mode (the ✋ button is active, `selFreeTarget` set): tap/drag sets the aim target.
+ *  - otherwise: drag PANS the map (moves the follow-cam's focus) so you can look ahead — "move the
+ *    map around". A still tap does nothing.
+ * Both reconstruct the EXACT decision-map projector via the shared `decisionView` helper so they
+ * agree pixel-for-pixel with what's drawn. Pointer-move/up listen on `window` so a drag survives
+ * the per-frame re-render that replaces the map element.
  */
 function wireMapAiming(app: HTMLElement): void {
   if (state.screen !== 'playing' || !state.play || awaitingShotPopup) return;
   if (state.play.done || awaitingPutt(state.play)) return; // only the full-shot decision screen
   const svg = app.querySelector<SVGSVGElement>('[data-map] svg');
   if (!svg) return;
-  let dragging = false;
-  const toTarget = (clientX: number, clientY: number): void => {
-    const cur = document.querySelector<SVGSVGElement>('[data-map] svg');
-    if (!cur || !state.play) return;
-    const rect = cur.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const vbX = ((clientX - rect.left) / rect.width) * DMAP_W;
-    const vbY = ((clientY - rect.top) / rect.height) * DMAP_H;
-    // Reconstruct the EXACT decision-map projector (same params as the render), then unproject.
+  // Reconstruct the projector the render used (same shape, frozen for the whole gesture so pan
+  // math stays consistent even as the focus shifts mid-drag).
+  const buildProj = () => {
     const spray = previewShot(
-      state.play,
+      state.play!,
       { clubId: selClubId!, aim: selAim, target: selFreeTarget ?? undefined },
       state.run.loadout,
     );
-    const reach = decisionReach(spray.carryHigh);
-    const proj = holeProjector(state.play.hole, { width: DMAP_W, height: DMAP_H, focus: state.play.ball, viewRadius: reach, focusBias: DMAP_BIAS });
-    const t = proj.unproject(vbX, vbY);
+    return holeProjector(state.play!.hole, decisionView(state.play!, spray));
+  };
+  // Pointer → viewBox coords against the live SVG element.
+  const toViewBox = (clientX: number, clientY: number): [number, number] | null => {
+    const cur = document.querySelector<SVGSVGElement>('[data-map] svg');
+    if (!cur) return null;
+    const rect = cur.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return [((clientX - rect.left) / rect.width) * DMAP_W, ((clientY - rect.top) / rect.height) * DMAP_H];
+  };
+
+  let mode: 'aim' | 'pan' | null = null;
+  let panProj: ReturnType<typeof holeProjector> | null = null;
+  let panStartCourse: [number, number] | null = null;
+  let panStartOffset: [number, number] = [0, 0];
+
+  const aimTo = (clientX: number, clientY: number): void => {
+    const vb = toViewBox(clientX, clientY);
+    if (!vb || !state.play) return;
+    const t = buildProj().unproject(vb[0], vb[1]);
     selFreeTarget = clampToReach(state.play, [t[0], t[1]]);
     scheduleRender();
   };
+  const panTo = (clientX: number, clientY: number): void => {
+    const vb = toViewBox(clientX, clientY);
+    if (!vb || !panProj || !panStartCourse) return;
+    // Drag the world under the finger: where the pointer started should stay under the pointer, so
+    // the focus moves by (start − now) in course space. Frozen projector ⇒ a stable mapping.
+    const now = panProj.unproject(vb[0], vb[1]);
+    mapPan = [panStartOffset[0] + (panStartCourse[0] - now[0]), panStartOffset[1] + (panStartCourse[1] - now[1])];
+    scheduleRender();
+  };
   const move = (e: PointerEvent): void => {
-    if (dragging) {
-      e.preventDefault();
-      toTarget(e.clientX, e.clientY);
-    }
+    if (!mode) return;
+    e.preventDefault();
+    if (mode === 'aim') aimTo(e.clientX, e.clientY);
+    else panTo(e.clientX, e.clientY);
   };
   const up = (): void => {
-    dragging = false;
+    mode = null;
+    panProj = null;
+    panStartCourse = null;
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
   };
   svg.addEventListener('pointerdown', (e) => {
-    dragging = true;
     e.preventDefault();
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
-    toTarget(e.clientX, e.clientY);
+    if (selFreeTarget) {
+      // Free-aim mode: tap/drag aims.
+      mode = 'aim';
+      aimTo(e.clientX, e.clientY);
+    } else {
+      // Default: drag pans the follow-cam (no pan in whole-hole mode — you already see it all).
+      if (mapView === 'whole') { up(); return; }
+      const vb = toViewBox(e.clientX, e.clientY);
+      panProj = buildProj();
+      panStartCourse = vb ? (panProj.unproject(vb[0], vb[1]) as [number, number]) : null;
+      panStartOffset = [mapPan[0], mapPan[1]];
+      mode = 'pan';
+    }
   });
 }
 
@@ -474,6 +519,32 @@ const DMAP_BIAS = 0.8;
  *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
 function decisionReach(carryHigh: number): number {
   return Math.max(30, carryHigh * 0.36);
+}
+
+/** Reset the map view to the default follow-cam (called on a new shot / new hole). */
+function resetMapView(): void {
+  mapView = 'follow';
+  mapZoom = 1;
+  mapPan = [0, 0];
+}
+
+/** Whether the view has been moved off the default follow-cam (so we offer a Recenter button). */
+function mapViewMoved(): boolean {
+  return mapView !== 'follow' || mapZoom !== 1 || mapPan[0] !== 0 || mapPan[1] !== 0;
+}
+
+/**
+ * The decision/aim map projector options, derived from the current map-nav state. SHARED by the
+ * decision render AND `wireMapAiming`'s unproject so tap/drag aiming can never drift from what's
+ * drawn (the projector-sync gotcha). `whole` mode fits the entire hole; `follow` zooms the camera
+ * onto the contemplated shot, offset by `mapPan` and scaled by `mapZoom`.
+ */
+function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread): ProjectOptions {
+  const base: ProjectOptions = { width: DMAP_W, height: DMAP_H };
+  if (mapView === 'whole') return base; // whole-hole fit — see the green + full layout
+  const reach = decisionReach(spray.carryHigh) / mapZoom;
+  const focus: [number, number] = [play.ball[0] + mapPan[0], play.ball[1] + mapPan[1]];
+  return { ...base, focus, viewRadius: reach, focusBias: DMAP_BIAS };
 }
 
 /** Running stop score vs the cut-to-beat, coloured by how the run is tracking:
@@ -590,6 +661,7 @@ function playingBody(animating: boolean): string {
     selClubId = null;
     selAim = 'attack';
     selFreeTarget = null;
+    resetMapView();
   }
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
   const usable = usableBag(bag, play.lie, state.run.loadout.driverAnywhere ?? false);
@@ -617,21 +689,27 @@ function playingBody(animating: boolean): string {
   const pctRound = (x: number) => Math.round(x * 100);
   // Zoom in and follow the ball: frame the CONTEMPLATED shot's reach (the spray's far arc), so a
   // short approach zooms right in and an unreachable green legitimately sits off-screen (#7). The
-  // tight factor (decisionReach) maps max carry near the top of the view so the playable corridor
-  // fills the frame and the rough/OB stretch off-screen (must match wireMapAiming's projector).
-  const reach = decisionReach(spray.carryHigh);
+  // map-nav controls (overview/zoom/pan) drive the projector through the SHARED `decisionView`
+  // helper so `wireMapAiming`'s unproject stays in lockstep with what's drawn.
+  const mapOpts = decisionView(play, spray);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
     biome: state.course.biome, themeId: state.course.meta.themeId,
-    width: DMAP_W,
-    height: DMAP_H,
     ball: play.ball,
     spray,
     sprayGeom,
-    focus: play.ball,
-    viewRadius: reach,
-    focusBias: DMAP_BIAS,
+    ...mapOpts,
   });
+  // Map-nav overlay (floats ON the map so it needs no scrolling): overview/follow toggle, zoom
+  // in/out, and a recenter that snaps back to the default follow-cam. Solves "can't see the green
+  // / full hole on a long hole" (overview) and "move the map around" (zoom + drag-to-pan).
+  const mapCtrls = `
+    <div class="gs-mapctrl">
+      <button class="gs-mapbtn${mapView === 'whole' ? ' gs-mapbtn--on' : ''}" data-mapview="toggle" title="${mapView === 'whole' ? 'Follow the ball' : 'See the whole hole'}">${mapView === 'whole' ? '🎯' : '🗺'}</button>
+      <button class="gs-mapbtn" data-mapzoom="in" title="Zoom in"${mapView === 'whole' ? ' disabled' : ''}>＋</button>
+      <button class="gs-mapbtn" data-mapzoom="out" title="Zoom out"${mapView === 'whole' ? ' disabled' : ''}>－</button>
+      ${mapViewMoved() ? `<button class="gs-mapbtn" data-mapview="reset" title="Recenter on the ball">⌖</button>` : ''}
+    </div>`;
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
   const clubButtons = `
@@ -644,7 +722,7 @@ function playingBody(animating: boolean): string {
   const aimButtons = `
     ${aimBtn('attack', '🎯 Attack pin', selAim === 'attack' && !selFreeTarget)}
     ${aimBtn('safe', `🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}`, selAim === 'safe' && !selFreeTarget)}
-    ${aimBtn('free', '✋ Free aim', !!selFreeTarget, 'Tap or drag the map to aim')}`;
+    ${aimBtn('free', '✋ Free aim', !!selFreeTarget, 'Tap or drag the map to aim (otherwise drag pans the map)')}`;
   const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
   // Suggestible Sam's caddy read: precise front/middle/back green yardages + the carry to clear the
   // nearest forced hazard on the line to the pin. Pure info off the sim — only shown once Sam is hired.
@@ -661,7 +739,7 @@ function playingBody(animating: boolean): string {
   return `
     <div class="gs-shot">
       ${playTopBar(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b> yds to pin` })}
-      <div class="gs-bigmap" data-map="1">${svg}</div>
+      <div class="gs-bigmap" data-map="1">${svg}${mapCtrls}</div>
       <div class="gs-bottom">
         <div class="gs-ctrlrow">${clubButtons}</div>
         ${samRead}
@@ -869,6 +947,7 @@ function render(): void {
       selAim = 'attack';
       decisionShotCount = -1;
       awaitingShotPopup = false;
+      resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
   }
@@ -924,8 +1003,26 @@ function render(): void {
       render();
     });
   });
-  // Tap/drag the map to aim freely. Pointer-move/up listen on window so the drag survives the
-  // per-frame re-render (which replaces the map element); the new element is re-queried each move.
+  // Map-nav: overview/follow toggle + recenter.
+  app.querySelectorAll<HTMLElement>('[data-mapview]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const a = el.dataset.mapview;
+      if (a === 'reset') resetMapView();
+      else mapView = mapView === 'whole' ? 'follow' : 'whole';
+      render();
+    });
+  });
+  // Map-nav: zoom the follow-cam in/out (no-op in whole-hole mode).
+  app.querySelectorAll<HTMLElement>('[data-mapzoom]').forEach((el) => {
+    el.addEventListener('click', () => {
+      if (mapView === 'whole') return;
+      const factor = el.dataset.mapzoom === 'in' ? 1.4 : 1 / 1.4;
+      mapZoom = Math.min(4, Math.max(0.4, mapZoom * factor));
+      render();
+    });
+  });
+  // Tap/drag the map to aim (free-aim mode) or pan it (default). Pointer-move/up listen on window
+  // so the drag survives the per-frame re-render (which replaces the map element).
   wireMapAiming(app);
   // "Use suggested" snaps the club back to the suggestion for this position.
   app.querySelectorAll<HTMLElement>('[data-suggest]').forEach((el) => {
