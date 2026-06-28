@@ -99,7 +99,7 @@ export type Action =
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
-  | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number] }
+  | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number]; power?: number }
   | { type: 'putt'; control?: PuttControl } // take one putt — with a pace-meter control = manual skill
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
@@ -248,7 +248,7 @@ export function reduce(state: UiState, action: Action): UiState {
       const auto = !!state.run.loadout.autoPutt;
       const play = takeShot(
         state.play,
-        { clubId: action.clubId, aim: action.aim, target: action.target },
+        { clubId: action.clubId, aim: action.aim, target: action.target, power: action.power },
         state.run.loadout,
         state.holeRng,
         auto,

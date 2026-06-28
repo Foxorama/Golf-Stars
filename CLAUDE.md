@@ -942,6 +942,40 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   SAME 2-rng-draw budget as the old gaussian angle so auto≡interactive holds). The `window._gsSpray`
   escape hatch is now a `SprayGeom` override (`resolveGeom`); `centralPct` scales the green wedge width
   for live A/B. The play-screen legend (`app.ts`) shows the per-zone % straight off `spray.shape`.
+- **Shot POWER + the pull-to-power gesture (GS-power).** Distance is now POWER-dependent: a shot's
+  intended carry is `clubDist(club) × carryMult × power`, where `power` is a fraction of the club's
+  full carry — 1 a full swing, down to a soft tap, and (with Overdrive) PAST 100%. It's a SINGLE pure
+  scalar threaded `ShotInput.power → resolveShot` (multiplies `intended`), `ExecOpts.power →
+  executeShot` (also scales the wind-comp carry), `shotSpread(opts.power)` (the preview cone), and
+  `ShotDecision.power → takeShot/previewShot` and the `shot` reducer action. CRITICAL determinism:
+  power adds NO rng draws and the angular spread (`prof.lateralFrac`) is keyed off the club's NOMINAL
+  carry, NOT `intended` — so the *angle* is power-independent and the cone scales in YARDS with power
+  (a soft shot's cone is small, a full swing's is the full cone — "draw on the power to expand the
+  cone"). Default `power = 1` everywhere, and the AUTO sim ALWAYS plays full swings (never sets power),
+  so `playHole`/`simulateRun` and every existing test are byte-for-byte unchanged — the whole 435-test
+  suite stays green, and a windless half-power shot lands EXACTLY half as far per-sample (same rng,
+  everything scales linearly). Power is INTERACTIVE-only: the player dials it with the gesture below.
+  **Overdrive** (`loadout.overpower`, a stackable epic shop perk, +0.1 ceiling/copy to 1.2; helper
+  `maxPowerOf(loadout)`) raises the UI's power ceiling past 100% for overpowered shots — the sim
+  accepts any power, the loadout just sets the clamp. Rebuilt from perks on resume (no save bump).
+- **The unified pull-to-power shot gesture (`wireShotGesture`, app.ts) — aim+power as ONE action.**
+  Replaced the old aim-then-pull-the-button flow (the segmented Attack/Safe/✋ control + the swing-pad
+  over the Hit button + drag-to-pan, all REMOVED). On the decision map: press anywhere, drag DOWN to
+  charge POWER (the spray cone grows live via `previewShot(power: selPower)`), slide sideways to AIM
+  (nudges `selAimBearing` by `AIM_SENS` deg/px; `selFreeTarget` is a point along that bearing — only
+  the BEARING feeds the sim now, distance comes from club×power, so no unproject is needed), then
+  release to FIRE. `selPower` starts at 0 on press, so releasing with power < `COMMIT` (a plain TAP,
+  or a charge pulled back up) CANCELS — a stray touch never fires, and "slide back to reset" works.
+  Two fingers PINCH-zoom (kept); overview toggle + ＋/− zoom buttons kept. The map framing uses a
+  STABLE full-power spread (`frameSpray`, `power: 1`) so the camera holds steady while the cone
+  grows/shrinks within it (no zoom-while-charging). A `.gs-power` HUD shows the live %/aim; the Hit
+  button still fires at the current charge (1 at rest) for desktop/accessibility. Pure feel — the sim
+  is untouched (the gesture only chooses club+target+power), so determinism + all sim tests are
+  unaffected; verified eyes-on (Playwright: a tap doesn't fire, slide-back cancels, a full pull fires,
+  the 40%-charge cone is carry 53–116 vs the full 132–290). The `swingGesture` setting is GONE (the
+  pull is the core input now). NB: no new `_gs*` flag or `?param` — gesture tunables (`PULL_RANGE`/
+  `AIM_SENS`/`COMMIT`) are plain consts and Overdrive/power are loadout/decision fields — so the
+  test-hub guard needs no new control (the new perk appears in the Sim Lab automatically).
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the
