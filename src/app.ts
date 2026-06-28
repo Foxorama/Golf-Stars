@@ -114,7 +114,20 @@ function persist(): void {
   });
 }
 
+/** A tiny tactile tick on supported phones — confirms a swing/putt the instant you commit it.
+ *  Guarded + swallowed: vibration is a pure cosmetic side-effect, absent on desktop/iOS Safari. */
+function haptic(pattern: number | number[]): void {
+  try {
+    (navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }).vibrate?.(pattern);
+  } catch {
+    /* unsupported — never let a feel-only effect throw */
+  }
+}
+
 function dispatch(action: Action): void {
+  // Tactile confirmation the moment a stroke is committed (swing a touch firmer than a putt).
+  if (action.type === 'shot') haptic(14);
+  else if (action.type === 'putt') haptic(9);
   if (view) {
     view.destroy();
     view = null;
@@ -768,8 +781,10 @@ function shotPopupOverlay(): string {
   const last = play.shots[play.shots.length - 1];
   if (!last) return '';
   const distToPin = last.holed ? undefined : Math.round(dist(play.ball, pinOf(play.hole)));
+  // The whole backdrop is a dismiss target so a tap anywhere advances — one less precise tap
+  // per shot on a phone. The card itself sits above it with the explicit Continue button.
   return `
-    <div style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto;">
+    <div data-popup-continue="1" style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto;cursor:pointer;">
       <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px;max-width:300px;width:100%;">
         ${shotCardHTML(last, { distToPin })}
         <button class="gs-btn gs-btn--primary" data-popup-continue="1" style="text-align:center;font-size:16px;padding:12px;">Continue →</button>
@@ -797,7 +812,7 @@ function resultScreen(): string {
     ${header()}
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       <div>
-        <div id="play" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);width:340px;height:520px;"></div>
+        <div id="play" class="gs-replay" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);"></div>
         <div style="margin-top:6px;">
           ${btn('↻ Replay', { type: 'viewHole', hole: state.viewHole }, { variant: 'ghost' })}
           <span style="font-size:12px;opacity:.6;">click a row to watch that hole</span>
@@ -1065,8 +1080,11 @@ function render(): void {
     const meterEl = document.getElementById('puttmeter');
     if (meterEl) {
       const band = puttSkillOf(state.run.loadout).manualBand ?? DEFAULT_MANUAL_BAND;
+      // Fit the meter to its container so it never overflows a narrow phone (it mounts at a
+      // fixed px width); clamp so it stays usable on tiny and tablet-wide screens alike.
+      const meterW = Math.max(240, Math.min(420, meterEl.clientWidth || 300));
       puttMeter = mountPuttMeter(meterEl, {
-        width: 300,
+        width: meterW,
         band,
         caddyId: caddyId(),
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
