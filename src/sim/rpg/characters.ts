@@ -32,6 +32,22 @@ export interface GolferStyle {
   build: number;
 }
 
+/**
+ * Render-only stat ratings for the select card (GS-18, like `style` — the sim never reads these).
+ * A 0–5 visual summary of how a golfer PLAYS, drawn as bars on the flashy character-select cards.
+ * These mirror the prose blurb/pros/cons; they're flavour, not a sim input.
+ */
+export interface GolferStats {
+  /** Raw distance off the tee. */
+  power: number;
+  /** Line control — how often it starts on target. */
+  accuracy: number;
+  /** Short game / scoring touch around the green. */
+  touch: number;
+  /** Shot-to-shot repeatability (the tail). */
+  consistency: number;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -46,6 +62,8 @@ export interface Character {
   cons: string[];
   /** Render-only look (the sim ignores this). */
   style: GolferStyle;
+  /** Render-only 0–5 stat ratings for the select card (the sim ignores these). */
+  stats: GolferStats;
   /** Tweak the (meta-baked) starting loadout — bag/handicap/dispersion. Pure. */
   loadout(base: PlayerLoadout): PlayerLoadout;
   /** Per-club shot shape: dispersion, fade/hook bias, backspin, by nominal carry. Pure. */
@@ -110,6 +128,7 @@ export const CHARACTERS: readonly Character[] = [
     pros: ['Tighter overall dispersion', 'Same shape every time'],
     cons: ['Everything drifts right — aim left to hold the line'],
     style: { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 0.98 },
+    stats: { power: 2, accuracy: 5, touch: 4, consistency: 5 },
     // A shot-maker: a touch tighter across the bag because her ball flight is so repeatable.
     loadout: (m) => ({ ...m, bag: buildStartBag(BALANCED_BAG), dispersionMult: m.dispersionMult * 0.94 }),
     // A slight-to-medium fade that grows with club length (the driver curves most), in radians, PLUS
@@ -132,6 +151,7 @@ export const CHARACTERS: readonly Character[] = [
     pros: ['Pinpoint irons — far fewer wild misses', 'Deadly approach play'],
     cons: ['Drives & woods hook left and spray wider'],
     style: { cap: '#d23f4f', shirt: '#b23140', skin: '#e8c6a0', build: 1.0 },
+    stats: { power: 3, accuracy: 4, touch: 4, consistency: 3 },
     loadout: (m) => ({ ...m, bag: buildStartBag(BALANCED_BAG) }),
     // The big sticks fight a snap-hook: their LEFT zones balloon (a real chance of a duck-hook),
     // while the surgical irons not only spray tighter but also clean up their miss zones (more
@@ -151,6 +171,7 @@ export const CHARACTERS: readonly Character[] = [
     pros: ['+14 yds on the distance clubs', 'Reaches par-5s in two'],
     cons: ['Wider dispersion — more orange & red misses, big clubs worst', 'Refuses to carry hybrids'],
     style: { cap: '#e0a83f', shirt: '#c4882a', skin: '#d8a878', build: 1.08 },
+    stats: { power: 5, accuracy: 1, touch: 2, consistency: 2 },
     // +14 on the distance clubs, and NEVER carries a hybrid (so they never show up in his reward
     // offer) — his bag swaps the 3-Hybrid for a 3-Iron. distanceClubBonus carries the +14 onto any
     // reward distance club he buys later.
@@ -173,6 +194,7 @@ export const CHARACTERS: readonly Character[] = [
     pros: ['Heavy backspin from 5-iron down — approaches stop dead', 'Tighter scoring clubs'],
     cons: ['Slightly shorter off the tee'],
     style: { cap: '#9b5fd4', shirt: '#7d46b8', skin: '#caa182', build: 1.0 },
+    stats: { power: 2, accuracy: 4, touch: 5, consistency: 4 },
     // The balanced bag but −8 off the tee; distanceClubBonus carries the −8 onto reward distance clubs.
     loadout: (m) => ({
       ...m,
