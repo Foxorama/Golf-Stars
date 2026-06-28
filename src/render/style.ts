@@ -260,13 +260,15 @@ function n1(x: number): number {
 
 /** Horizontal mowing bands clipped to a (screen-space) polygon. After the projector rotates
  *  tee→green up-screen, horizontal bands run perpendicular to play — i.e. real mowing stripes. */
-function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
+/** Mowing bands on an EXPLICIT grid (phase origin + band height). Sharing one grid across several
+ *  polygons keeps their stripes continuous — what lets the green apron line up with the corridor. */
+function stripesAt(poly: Vec[], colA: string, colB: string, phaseY: number, bandH: number): Prim {
   const b = bboxOf(poly);
   const children: Prim[] = [];
-  const h = (b.maxY - b.minY) / bands;
-  for (let i = 0; i < bands; i++) {
-    const y0 = b.minY + i * h;
-    const y1 = y0 + h + 0.5; // overlap a hair so no seam shows
+  const i0 = Math.floor((b.minY - phaseY) / bandH);
+  for (let i = i0; phaseY + i * bandH < b.maxY; i++) {
+    const y0 = phaseY + i * bandH;
+    const y1 = y0 + bandH + 0.5; // overlap a hair so no seam shows
     children.push({
       t: 'poly',
       pts: [
@@ -275,23 +277,40 @@ function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
         [b.maxX, y1],
         [b.minX, y1],
       ],
-      fill: i % 2 === 0 ? colA : colB,
+      fill: ((i % 2) + 2) % 2 === 0 ? colA : colB,
     });
   }
   return { t: 'clip', clip: poly, children };
 }
 
-function styleFairway(poly: Vec[], art: ArtFeel, s: Shade, fringe: string): Prim[] {
-  const out: Prim[] = [
-    // A soft "first-cut" fringe (a tone blended fairway↔rough) outset around the edge, so the cut
-    // grass eases into the rough instead of meeting the dark land on a hard sticker outline.
-    { t: 'poly', pts: offsetPoly(poly, -3), fill: fringe },
-    { t: 'poly', pts: poly, fill: s.base },
-  ];
-  if (art.stripes) out.push(stripes(poly, s.light, s.dark, 7));
-  // A mowing edge, not a bold black outline — a soft, translucent ink so the surface reads as part
-  // of the terrain rather than a cut-out pasted on top.
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
+function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
+  const b = bboxOf(poly);
+  return stripesAt(poly, colA, colB, b.minY, (b.maxY - b.minY) / bands);
+}
+
+/** All the hole's fairway polygons drawn as ONE grouped pass (GS-blend, same idea as the liquid
+ *  families). A hole has the main corridor plus, near the green, a second `fairway` feature — the
+ *  apron that wraps THROUGH and PAST the green. Drawn per-poly it stamped its own dark fringe ring,
+ *  ink outline and finer/out-of-phase stripes across the bright corridor (the "section around the
+ *  green that doesn't fit"). Grouped, the apron melts into the corridor: every fringe goes UNDER
+ *  every base, the stripes share the corridor's band grid, and only the corridor carries the ink
+ *  edge, so the apron eases out on its soft fringe alone. With a single fairway (no apron — void
+ *  islands) this is byte-for-byte the old per-poly output. */
+function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string): Prim[] {
+  const out: Prim[] = [];
+  // First-cut fringes UNDER all the bases, so the apron's fringe never paints over the corridor —
+  // only the outermost edge (past the green) shows it, easing the cut grass into the rough.
+  for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: fringe });
+  for (const sp of sps) out.push({ t: 'poly', pts: sp, fill: s.base });
+  // Continuous stripes: every fairway poly rides the MAIN corridor's band grid (phase + height), so
+  // the apron's mowing bands line up with the corridor instead of running finer and out of phase.
+  if (art.stripes && sps[0]) {
+    const b0 = bboxOf(sps[0]);
+    const bandH = (b0.maxY - b0.minY) / 7;
+    for (const sp of sps) out.push(stripesAt(sp, s.light, s.dark, b0.minY, bandH));
+  }
+  // ONE soft ink edge, on the main corridor only — no hard outline cuts back across it near the green.
+  if (art.ink && sps[0]) out.push({ t: 'poly', pts: sps[0], fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
   return out;
 }
 
@@ -838,15 +857,21 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
   // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
   const voidGlow = arch === 'void';
+  const glowRings = (sp: Vec[]) => {
+    const gc = centroidOf(sp);
+    prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.34), fill: 'rgba(120,130,240,0.10)' });
+    prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.16), fill: 'rgba(120,130,240,0.14)' });
+  };
+  // Fairways draw as ONE grouped pass FIRST (under tee/green/scatter) so the green apron blends into
+  // the main corridor — see `styleFairways`. Everything else keeps its original per-feature order.
+  const fairwaySps = hole.features.filter((f) => f.kind === 'fairway').map((f) => projPoly(f.poly, proj));
+  if (voidGlow) for (const sp of fairwaySps) glowRings(sp);
+  prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe));
   for (const f of hole.features) {
+    if (f.kind === 'fairway') continue; // drawn in the grouped pass above
     const sp = projPoly(f.poly, proj);
-    if (voidGlow && (f.kind === 'fairway' || f.kind === 'green')) {
-      const gc = centroidOf(sp);
-      prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.34), fill: 'rgba(120,130,240,0.10)' });
-      prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.16), fill: 'rgba(120,130,240,0.14)' });
-    }
-    if (f.kind === 'fairway') prims.push(...styleFairway(sp, art, fwShade, fwFringe));
-    else if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe));
+    if (voidGlow && f.kind === 'green') glowRings(sp);
+    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art));
   }
