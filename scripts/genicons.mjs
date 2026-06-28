@@ -1,7 +1,9 @@
 /*
- * Regenerate the PWA app icons (public/icon-{192,512,180}.png) from a vector golf-ball-planet.
- * Renders an on-theme SVG (white dimpled sphere on the app's deep-space bg) to PNG via the
- * already-installed Playwright/Chromium — no asset to 404, no extra dependency, deterministic.
+ * Regenerate the PWA app icons (public/icon-{192,512,180}.png) from a vector CONSTELLATION
+ * golf ball. Renders an on-theme SVG (glowing star nodes + faint constellation lines tracing a
+ * golf ball's dimple lattice, on the app's deep-space bg) to PNG via the already-installed
+ * Playwright/Chromium — no asset to 404, no extra dependency, deterministic. On-theme for
+ * "golf amongst the stars" and consistent with the intro's star-traced wordmark.
  *
  *   node scripts/genicons.mjs public
  */
@@ -27,46 +29,81 @@ function findChromium() {
   return null;
 }
 
-// Build a golf-ball-planet SVG: a shaded white sphere on the app's deep-space bg, with
-// foreshortened dimples clipped to the sphere. On-theme for "space golf"; no asset to 404.
-function ballSVG(size, { bleed = 0.72 } = {}) {
+// Deterministic seeded RNG (mulberry32) so the background starfield is byte-stable across runs —
+// same discipline as the render layer (never Math.random for anything drawn).
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A glowing star node: a soft warm-white halo sprite (radial gradient) + a bright core. Matches the
+// intro wordmark's "heroes glow harder" look; heroes get a fatter halo.
+function star(x, y, r, hero = false) {
+  const g = r * (hero ? 5.2 : 3.0);
+  return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${g.toFixed(1)}" fill="url(#glow)"/>` +
+    `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#ffffff"/>`;
+}
+
+// Build the CONSTELLATION golf-ball SVG: glowing star nodes tracing a golf ball's dimple lattice
+// (12 stars round the circumference + a 6-star inner ring + spokes), faint linking lines, all on a
+// deep-space bg with a seeded faint starfield. On-theme for "golf amongst the stars".
+function ballSVG(size) {
   const cx = size / 2, cy = size / 2;
-  const R = (size * bleed) / 2;
-  const dimples = [];
-  // Hex-ish grid of dimples across the ball, faded + shrunk near the limb (foreshorten).
-  const step = R / 4.2;
-  for (let gy = -5; gy <= 5; gy++) {
-    for (let gx = -5; gx <= 5; gx++) {
-      const x = cx + gx * step + (gy % 2 ? step / 2 : 0);
-      const y = cy + gy * step * 0.92;
-      const dx = (x - cx) / R, dy = (y - cy) / R;
-      const r2 = dx * dx + dy * dy;
-      if (r2 > 0.86) continue; // inside the sphere only
-      const fore = Math.sqrt(Math.max(0, 1 - r2)); // foreshorten toward the limb
-      const rr = step * 0.34 * (0.5 + 0.5 * fore);
-      const op = 0.10 + 0.16 * fore;
-      dimples.push(
-        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr.toFixed(1)}" fill="#0b0d12" opacity="${op.toFixed(2)}"/>`,
-      );
-    }
+  const R = size * 0.30;          // constellation radius (leaves a safe margin for masked icons)
+  const hr = R * 0.42;            // inner ring radius
+  const sw = Math.max(1, size / 200); // base scale unit (stroke + star size)
+  const N = 12, HN = 6;
+
+  // outer ring (the ball's circumference) + inner hex ring (the dimple-pattern hint)
+  const ring = [], hex = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    ring.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R]);
   }
+  for (let i = 0; i < HN; i++) {
+    const a = (i / HN) * Math.PI * 2 - Math.PI / 2;
+    hex.push([cx + Math.cos(a) * hr, cy + Math.sin(a) * hr]);
+  }
+
+  const line = (p, q, op) =>
+    `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${q[0].toFixed(1)}" y2="${q[1].toFixed(1)}" stroke="#bcd0ff" stroke-opacity="${op}" stroke-width="${sw.toFixed(2)}"/>`;
+  const lines = [];
+  for (let i = 0; i < N; i++) lines.push(line(ring[i], ring[(i + 1) % N], 0.32));        // circumference
+  for (let i = 0; i < HN; i++) lines.push(line(hex[i], hex[(i + 1) % HN], 0.32));        // inner ring
+  for (let i = 0; i < HN; i++) lines.push(line(hex[i], ring[i * 2], 0.28));              // spokes
+
+  // faint background starfield (seeded, stable)
+  const rng = mulberry32(0x90105 + size);
+  const field = [];
+  for (let i = 0; i < 60; i++) {
+    const x = rng() * size, y = rng() * size, rad = 0.4 + rng() * 1.2, op = 0.12 + rng() * 0.42;
+    field.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(2)}" fill="#cdd7ea" opacity="${op.toFixed(2)}"/>`);
+  }
+
+  const ringStars = ring.map((p, i) => star(p[0], p[1], sw * 2.2, i % 3 === 0)).join('');
+  const hexStars = hex.map((p) => star(p[0], p[1], sw * 1.7)).join('');
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
       <stop offset="0%" stop-color="#161a24"/>
+      <stop offset="60%" stop-color="#0e1118"/>
       <stop offset="100%" stop-color="#0b0d12"/>
     </radialGradient>
-    <radialGradient id="ball" cx="38%" cy="32%" r="72%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="55%" stop-color="#e8edf4"/>
-      <stop offset="100%" stop-color="#9aa7bd"/>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff8e6" stop-opacity="0.95"/>
+      <stop offset="35%" stop-color="#ffe9b0" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#ffe9b0" stop-opacity="0"/>
     </radialGradient>
-    <clipPath id="sphere"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>
   </defs>
   <rect width="${size}" height="${size}" fill="url(#bg)"/>
-  <circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#ball)"/>
-  <g clip-path="url(#sphere)">${dimples.join('')}</g>
-  <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="${Math.max(1, size / 256)}"/>
+  ${field.join('')}
+  ${lines.join('')}
+  ${ringStars}${hexStars}
 </svg>`;
 }
 
