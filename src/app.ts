@@ -17,8 +17,8 @@ import { drawCaddy, hasCaddyArt, caddyProjectile, CADDY_LABEL } from './render/c
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
-import { archetypeFor, themeById } from './sim/course/themes';
-import { zoneProfile, difficultyPips } from './sim/course/zones';
+import { archetypeFor, themeById, type BiomeArchetype } from './sim/course/themes';
+import { zoneProfile, difficultyPips, shopPro, proMood, proLine, sectionEvents } from './sim/course/zones';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
@@ -326,6 +326,81 @@ function golferSVG(style: GolferStyle, w = 104, h = 132): string {
         <rect x="50" y="21" width="12" height="4" rx="1.5" fill="${style.cap}"/>
       </g>
     </svg>`;
+}
+
+/** Per-archetype colour kit for the Pro Shop staff portrait (cap / shirt / aura / skin). */
+const PRO_LOOK: Record<BiomeArchetype, { cap: string; shirt: string; aura: string; skin: string }> = {
+  verdant: { cap: '#3fae5a', shirt: '#2e8b57', aura: '#5fd45a', skin: '#e7b894' },
+  desert: { cap: '#d9a441', shirt: '#c2702e', aura: '#e8c06a', skin: '#d8a06a' },
+  frost: { cap: '#7fd0e8', shirt: '#4a90c2', aura: '#bfe9f5', skin: '#e8c4a8' },
+  inferno: { cap: '#e0622b', shirt: '#9b2d1f', aura: '#ff8a3b', skin: '#cf8f63' },
+  void: { cap: '#9b6fd0', shirt: '#5b3da0', aura: '#b88aff', skin: '#cdb8e0' },
+};
+
+/** A compact inline-SVG bust of a world's club pro — assetless house style, tinted per archetype. */
+function proAvatarSVG(archetype: BiomeArchetype, w = 72, h = 84): string {
+  const c = PRO_LOOK[archetype];
+  const id = archetype;
+  return `
+    <svg viewBox="0 0 72 84" width="${w}" height="${h}" aria-hidden="true" style="display:block;overflow:visible;">
+      <defs>
+        <radialGradient id="pa-${id}" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stop-color="${c.aura}" stop-opacity="0.5"/>
+          <stop offset="60%" stop-color="${c.aura}" stop-opacity="0.14"/>
+          <stop offset="100%" stop-color="${c.aura}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="36" cy="40" rx="34" ry="38" fill="url(#pa-${id})"/>
+      <g stroke-linecap="round" stroke-linejoin="round">
+        <!-- shoulders / polo -->
+        <path d="M14 84 Q36 56 58 84 Z" fill="${c.shirt}"/>
+        <path d="M33 60 L36 70 L39 60" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.6"/>
+        <!-- collar -->
+        <path d="M30 58 L36 64 L42 58" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
+        <!-- neck -->
+        <rect x="32" y="50" width="8" height="10" rx="3" fill="${c.skin}"/>
+        <!-- head -->
+        <circle cx="36" cy="40" r="13" fill="${c.skin}"/>
+        <!-- shades -->
+        <rect x="26" y="37" width="9" height="5" rx="2.2" fill="#1b1f2a"/>
+        <rect x="37" y="37" width="9" height="5" rx="2.2" fill="#1b1f2a"/>
+        <line x1="35" y1="39" x2="37" y2="39" stroke="#1b1f2a" stroke-width="1.4"/>
+        <!-- smile -->
+        <path d="M31 46 Q36 50 41 46" fill="none" stroke="#7a4a2a" stroke-width="1.6"/>
+        <!-- cap -->
+        <path d="M22 35 A14 14 0 0 1 50 35 Z" fill="${c.cap}"/>
+        <path d="M22 35 Q14 36 12 39 L24 38 Z" fill="${c.cap}"/>
+        <rect x="33" y="22" width="6" height="4" rx="2" fill="${c.cap}"/>
+      </g>
+    </svg>`;
+}
+
+/** The Pro Shop greeting block: the world's club pro + a pithy line on how the last section went. */
+function proGreetingHTML(): string {
+  const last = state.lastResult;
+  if (!last) return '';
+  const archetype = archetypeFor(last.themeId, last.biome);
+  const pro = shopPro(archetype);
+  const mood = proMood(last.stableford, last.cut);
+  // React to the section's drama (an ace, a blow-up, a birdie blitz) over the generic grade.
+  const events = sectionEvents(
+    (state.played ?? []).map((p) => ({
+      par: p.stat.par,
+      strokes: p.stat.strokes,
+      pickedUp: p.pickedUp,
+      holed: p.holed,
+    })),
+  );
+  const line = proLine(pro, mood, events, state.run.stopIndex);
+  return `
+    <div class="gs-panel" style="display:flex;gap:12px;align-items:center;margin:0 0 10px;">
+      <div style="flex:0 0 auto;">${proAvatarSVG(archetype)}</div>
+      <div style="flex:1 1 auto;min-width:0;">
+        <div style="font-weight:600;font-size:14px;">${pro.name}</div>
+        <div style="font-size:11px;opacity:.6;margin-bottom:6px;">${pro.title}</div>
+        <div style="font-size:13px;font-style:italic;opacity:.92;">&ldquo;${line}&rdquo;</div>
+      </div>
+    </div>`;
 }
 
 /** A flashy 0–5 stat bar for the select card — `n` lit pips in the character colour over a dark rail,
@@ -1186,8 +1261,9 @@ function shopScreen(): string {
     .join('');
   return `
     ${header()}
-    <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own. Rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up; hire one caddy and the rest stay home.</p>
+    <h2 style="font-size:16px;">🏌 Pro Shop · ${credits} credits</h2>
+    ${proGreetingHTML()}
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — early stops stock cheap commons, deeper stops stock rare/epic power. Stackable upgrades cost more the more you own; rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up. Hire one caddy and the rest stay home.</p>
     <div style="display:flex;flex-wrap:wrap;">${stock}</div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       ${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}
