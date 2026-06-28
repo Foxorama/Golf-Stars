@@ -321,6 +321,7 @@ export function restArtSVG(lie: string, opts: RestArtOpts = {}): string {
       return wasteScene();
     case 'water':
     case 'frozenpond':
+    case 'creek':
       return waterScene();
     case 'lava':
     case 'lavariver':

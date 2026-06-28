@@ -555,6 +555,7 @@ function hazardLabel(kind: string): string {
   if (kind === 'lava' || kind === 'lavariver') return 'the lava';
   if (kind === 'void' || kind === 'voidrough') return 'the void';
   if (kind === 'frozenpond') return 'the pond';
+  if (kind === 'creek') return 'the creek';
   return 'the hazard';
 }
 

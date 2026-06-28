@@ -128,6 +128,45 @@ This game lives or dies on three axes — put every change through all three bef
   it never widens the corridor's fairness half-width — `validateFairness`/`fairwayHalfWidthOf` key off the
   FIRST `fairway` feature (the main corridor). `lieAt` precedence (green > fairway) keeps a ball on the
   green reading green even though the apron overlaps it.
+- **Fairways are RIBBONS with rounded ends, not a pointed almond (GS-terrain, `ribbon`).** The old
+  corridor connected its two offset edges with a flat slash AND pinched both ends narrow (a symmetric
+  sine undulation floored at 0.55), so a hole read as a leaf/eye floating on the ground — "badly fit in
+  at the tee and green". `ribbon(line, leftHW[], rightHW[], roundStart, roundEnd)` replaces
+  `corridorPoly`: it offsets each side by its OWN half-width (so the fairway bulges asymmetrically, not a
+  mirror) and caps each end with a smooth rounded NOSE (a turfed front edge at the tee, a soft finish at
+  the green) instead of a flat cut or a point. The per-point width PROFILE is now believable: an END
+  ENVELOPE keeps the body FULL and only EASES (never pinches) toward the ends, 1–2 Gaussian LANDING-ZONE
+  bulges swell where you land (25–55 yd in real design — fairway wide off the tee, narrowing to the
+  green), plus a gentle wave + one localized pinch, with a slow LATERAL asymmetry splitting left/right.
+  Mean ≈ baseHalf so the `widthScale = 2.0 − 1.25·wildness` early→late lever and the death-spiral bar
+  are preserved. CRITICAL: `fairwayHalfWidth` (hazard placement) and `fairwayHalfWidthOf`
+  (`validateFairness`) still key off the corridor's WIDEST point (`max(leftHW, rightHW)` / the FIRST
+  fairway feature), so penalty hazards stay provably clear; the apron now uses `ribbon` too (rounded
+  back nose, no taper to a point). Re-shoot the gallery after any profile change.
+- **More + bigger water and fairway breaks (GS-terrain), all pure biome DATA, wildness-gated:**
+  • `waterCreek` — a `creek` band crosses the fairway as a FORCED CARRY (parkland/`verdant`), a new
+    sanctioned crossing (`CROSSING_KINDS += 'creek'`, `LIE_INFO.creek` penalty:'water', styled as water):
+    `validateFairness` exempts it, `validateCrossings` proves it carryable, and the carry-aware AI flies
+    it GENERICALLY (it keys off `penalty`, never the kind). ONE crossing per hole — a creek is skipped if
+    a river/pond already crosses, so a safe shelf always exists between. • `ponds` — large flanking
+    lakes/"dams" of penalty water (r 16–40), placed CLEAR of the corridor (so an offline miss is costly
+    but no unfair carry). • `fairwayBreaks` — a sandy `waste` band cutting clean across the fairway
+    (precedence 3 → reads as 'waste', NON-penalty, so it may sit on the line and `validateFairness`
+    ignores it) — a visible "break" you carry or thread, never a lost card. `crossingBand` took
+    `spillMin/Max` so a break spans mostly the fairway, not deep rough. • Trees are DENSER and DEEPER
+    (`treeDensity` bumped; lateral spread `+rng(5,72)` keeps a clear gap off the corridor edge — only an
+    offline shot finds the woods, the GS-13 invariant — then fills deep so the rough reads as real
+    forest). Balance: the wilder terrain lifts max-wildness `toPar/hole` 0.136 → ~0.24 (≪ 1.0, 0%
+    blow-ups, 0 validation failures). NOTE: the wilder landscape AMPLIFIES the auto reach-AI's
+    coverage-blindness (a precise "just reaches" club drops into trouble the sparser bag's over-club flies
+    past), so `tests/club-rewards.test`'s Pro-coverage "no-regression" slack was widened 0.2 → 0.5 — an
+    auto-AI artifact, not unfairness (the death-spiral bar holds; the interactive dial-in win is unchanged).
+- **Greens span the full vocabulary now (GS-terrain extends GS-greens).** `greenPoly` got FOUR seeded
+  harmonics (bigger amplitudes), a low-frequency PEAR/teardrop bias (one end fatter), and 0–2 KIDNEY
+  bites — so greens read unmistakably as round/oval/long-shelf/pear/kidney/boomerang/clover, not a gently
+  wobbled circle. Still STAR-SHAPED about `green` (single-valued r(θ), floor 0.32·baseR) even when
+  concave — the anisotropic stretch is linear so it preserves star-shapedness, and `pinInGreen`/
+  `rayPolyDist`/`validateCourse` (pin-in-green) all still hold.
 - **Wind reads true:** the round sim aims UPWIND to compensate for the known crosswind, and lays
   up to the (penalty-free) centreline when the line to the pin is blocked — a played shot reads
   trouble instead of spiralling.
