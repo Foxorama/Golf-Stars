@@ -10,6 +10,7 @@ import {
   leaderboard,
   arcBossId,
   playerInfoFor,
+  livePosition,
 } from '../src/sim/rpg/league';
 import { FIELD_SIZE, PLAYER_ID } from '../src/sim/rpg/competition';
 
@@ -91,6 +92,26 @@ describe('leaderboard', () => {
     const board = leaderboard(playN('seedC', 1));
     expect(board.survivors).toBeGreaterThanOrEqual(1);
     expect(board.survivors).toBeLessThanOrEqual(FIELD_SIZE);
+  });
+});
+
+describe('livePosition', () => {
+  it('ranks the player mid-stop and improves as they score better', () => {
+    const run = startRun('live', 'voyage', {}, 'feather-fade');
+    const of = runField(run).golfers.length;
+    const weak = livePosition(run, 6, 3); // 6 holes, only 3 pts (poor)
+    const strong = livePosition(run, 6, 18); // 6 holes, 18 pts (stellar)
+    expect(weak.position).toBeGreaterThanOrEqual(1);
+    expect(weak.position).toBeLessThanOrEqual(of);
+    expect(strong.of).toBe(of);
+    // A much better partial run ranks you higher (lower position number).
+    expect(strong.position).toBeLessThan(weak.position);
+    expect(strong.total).toBeGreaterThan(weak.total);
+  });
+
+  it('is deterministic', () => {
+    const run = startRun('live2', 'voyage', {}, 'feather-fade');
+    expect(livePosition(run, 4, 8)).toEqual(livePosition(run, 4, 8));
   });
 });
 

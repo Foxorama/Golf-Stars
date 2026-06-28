@@ -37,8 +37,9 @@ none touched the fairness/no-death-spiral bars (new systems live on the economy/
   CURSE (wider misses for +60% credits), and an escalating-cost shop **reroll**. `tests/synergy.test.ts`.
 
 **Still open (next natural follow-ons):**
-- **GS-100 / GS-competition — A FIELD of golfers, leaderboards & matchplay bosses. IN PROGRESS (the
-  100th-PR feature; `reports/competition-golfers-leaderboard-2026-06-28.md`).** Supersedes GS-rival:
+- **GS-100 / GS-competition — A FIELD of golfers, leaderboards & matchplay bosses. SHIPPED (the
+  100th-PR feature, PRs #100–#104; `reports/competition-golfers-leaderboard-2026-06-28.md`, CLAUDE.md
+  "Competition field…").** Supersedes GS-rival:
   not one rival but a 100–200-strong roster of styled AI golfers. A field of 20 competes each arc (shown
   on the arc intro); a live leaderboard + tightening cut line replaces the stop splash; constellation
   **champions** (one per constellation theme, named off its anchor star) dominate their home zones and
@@ -47,8 +48,13 @@ none touched the fairness/no-death-spiral bars (new systems live on the economy/
   honour-system shot order (winner-of-last-hole tees off; farthest-from-pin plays through). The unchosen
   playable characters join the field and can boss. Field scoring is a deterministic statistical GHOST
   (cheap, tunable); only the boss plays real physics (reusing the scramble second-golfer machinery).
-  Shipping in 5 PRs: (1) roster `golfers.ts`, (2) ghost `competition.ts`, (3) leaderboard UI, (4)
-  matchplay bosses, (5) per-mode glue + balance.
+  Shipped in 5 PRs: (1) roster `golfers.ts`, (2) ghost `competition.ts`, (3) leaderboard UI + arc field
+  card, (4) matchplay bosses on the hole, (5) live per-hole leaderboard chip + balance + docs.
+  **Deferred follow-ons:** strict honour-gated, shot-by-shot boss ANIMATION on the map (the boss's ball
+  flying, away-player-plays sequencing — today the boss ball is pre-computed and the duel revealed per
+  hole); matchplay/boss cadence for the endless `flat` + `ladder` formats (they get the leaderboard race
+  + cut today, bosses are voyage-only); the headless `simulateRun` playing the real duel (it keeps
+  stroke-play for balance/tests).
 - **GS-rival — Named AI rival / versus pulse. MERGED into GS-100** (the field IS the rival, at scale).
 - **GS-encounters — Full branching node map.** The voyage is a fixed track today; a StS-style map of node
   KINDS (elite / driving-range buff / treasure / shop / boss) is the richer version. The format + boss

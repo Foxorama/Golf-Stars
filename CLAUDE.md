@@ -594,6 +594,47 @@ This game lives or dies on three axes — put every change through all three bef
   scoring harness must club shots with **`netDispersion(loadout)`** (handicap × equipment), not raw
   `dispersionMult` — else handicap perks like Caddie Lesson are invisible to the test.
 
+## Competition field, leaderboards & matchplay bosses (GS-100)
+You travel the galaxy in a **field** of golfers, not alone. Three layers, all pure/deterministic.
+- **The roster (`src/sim/rpg/golfers.ts`).** ~18 `GOLFER_ARCHETYPES` (style templates grounded in real
+  golf — bomber/plotter/fader/drawer/iron-surgeon/wedge-wizard/putting-magician/sand-saver/escape-artist/
+  iceman/streaky/wind-master/power-athlete/metronome/flop/grinder/maverick/all-rounder), each a 0–1
+  `GolferProfile` (skill/power/accuracy/shortGame/nerve/consistency/wind/shapeBias/flight) + an avatar
+  palette. ~152 `GOLFERS`: **28 constellation champions** (one per constellation theme, named off its
+  anchor star, `home` = that theme), the 4 playable characters mirrored in as rivals (`mirrorsCharacter`,
+  can boss when unchosen), and a deterministically-built field of 120 (FNV-1a `golferHash`, no
+  `Math.random`). `golferProfile(id)` = archetype base ± per-golfer jitter; `bossShotMods(id)` /
+  `golferDistanceBonus(id)` derive a golfer's REAL shot behaviour for boss play; `championFor(themeId)`.
+  A new golfer is a new row.
+- **The ghost leaderboard (`src/sim/rpg/competition.ts`).** THE DESIGN CALL: the field is a deterministic
+  STATISTICAL ghost, not 20 real ball-sims per hole (slow + untunable). `ghostHoleStableford` centres a
+  golfer's per-hole Stableford on a FIXED quality band (`golferBaseline`, rating 0→0.6 … 1→2.6 SF/hole),
+  widened for inconsistent/streaky golfers, lifted by a strong `HOME_BOOST` in a champion's own zone and
+  by clutch under boss `pressure`. The cut (`effectiveCut`, unchanged) RISES with distance, so it scythes
+  more of a fixed-quality field over time — "harder and harder" for free, WITHOUT touching course
+  generation (the fairness/no-death-spiral validators are untouched). `buildField(seed,arcIndex,arc,player)`
+  = 20 golfers (you + arc champions + unchosen characters + home-weighted fill), seed-stable so nothing new
+  persists. `arcStandings`/`applyCut`/`bossPick` (the boss = the top non-player, i.e. #2 if you lead).
+- **The run glue (`src/sim/rpg/league.ts`).** Groups stops into ARCS (`ARC_LEN` 3), builds the arc field,
+  and computes the cumulative `leaderboard(run)` from the player's REAL per-stop Stableford (`run.history`)
+  + ghost scores. `livePosition(run, holesPlayed, playerStopSF)` feeds the per-hole "you're Nth" play-HUD
+  chip (updates as each hole finishes). `arcBossId(run)` = the leader going into the boss slot.
+  CRITICAL: league imports `run.ts`; `run.ts` NEVER imports league (no cycle). The matchplay boss-id is
+  resolved in the UI REDUCER (which can see the leaderboard), passed into the pure match engine.
+- **Matchplay bosses (`src/sim/rpg/match.ts`).** A boss `mode: 'matchplay'` (voyage Arc-I + FINAL; the
+  Arc-II boss stays co-op scramble for variety) is a 1-on-1 DUEL vs the leaderboard leader on the actual
+  course. The boss is a REAL ball: `bossLoadout`/`bossPlayOpts` give it the balanced bag + a power-derived
+  distance bonus + a skill-derived handicap + its own `bossShotMods` shape, played through `playHole` on a
+  SEPARATE rng stream — so the player's own ball is byte-for-byte identical to a non-boss stop (the
+  no-death-spiral bar is untouched; matchplay only changes the PASS gate, not the player's shots).
+  `matchState` rolls hole-by-hole duels into "2 UP / 3 & 2 / halved", decided the moment one side is up by
+  more than remain; `finishStop(run, course, played, { matchWon })` passes on the duel (credits still from
+  your Stableford). The reducer pre-plays the boss's stop and scores each hole on `holeComplete`, finishing
+  early when decided. Render: opponent badge on the boss intro, a live match HUD, a duel result panel
+  (verdict + W/L/½ pips). DEFERRED: strict honour-gated, shot-by-shot boss animation on the map (today the
+  boss's ball is pre-computed and the duel revealed per hole; the headless `playStop`/`simulateRun` keep
+  stroke-play for balance/tests). Tests: `tests/golfers|competition|league|match.test.ts`.
+
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only
   ONE. They are RANDOM, rarity-weighted inclusions in the rotating offer (`shopOffer`) — NOT a
