@@ -160,6 +160,21 @@ export function zoneProfile(archetype: BiomeArchetype): ZoneProfile {
 /** How the player's last section graded out, used to pick the Pro's greeting. */
 export type ProMood = 'scraped' | 'solid' | 'great' | 'stellar';
 
+/**
+ * A notable thing that happened in the section before the shop — the drama the Pro reacts to in
+ * preference to the generic success grade. A standout shot (ace/eagle), a disaster (a blow-up hole),
+ * or a hot streak (a flurry of birdies).
+ */
+export type ProEvent = 'ace' | 'eagle' | 'blowup' | 'birdieBlitz';
+
+/** The minimal per-hole shape `sectionEvents` reasons over (a slice of the sim's PlayedHole). */
+export interface HoleOutcome {
+  par: number;
+  strokes: number;
+  pickedUp: boolean;
+  holed: boolean;
+}
+
 export interface ShopPro {
   /** The pro's name. */
   name: string;
@@ -167,6 +182,8 @@ export interface ShopPro {
   title: string;
   /** Pithy greetings keyed by how the section before the shop went (each ≥1 line). */
   quips: Record<ProMood, string[]>;
+  /** Event-driven reactions (an ace, a blow-up…) preferred over the mood line when one fired. */
+  reactions: Partial<Record<ProEvent, string[]>>;
 }
 
 export const PROS: Record<BiomeArchetype, ShopPro> = {
@@ -195,6 +212,24 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
         'Flawless. The trees are filing a formal complaint.',
       ],
     },
+    reactions: {
+      ace: [
+        'A hole-in-one?! On MY station? The trees will tell that one for years.',
+        'An ACE! Drinks are on you, legend — well, full price, but still.',
+      ],
+      eagle: [
+        'An eagle — soaring stuff! The parkland approves.',
+        'Two under on one hole? Show-off. I love it.',
+      ],
+      blowup: [
+        'One hole tried to eat you alive back there — even the squirrels winced. Shake it off.',
+        'Ouch, that blow-up. Happens to everyone on the green stuff. Onward.',
+      ],
+      birdieBlitz: [
+        'Birdies raining down out there — the whole flock is jealous.',
+        'A flurry of birdies! Magnificent little run.',
+      ],
+    },
   },
   desert: {
     name: 'Sandy Dunes',
@@ -219,6 +254,24 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
         'Forty years on these dunes and I rarely see a round like that.',
         'Stellar. Even the sandstorms stopped to watch.',
         'You made the desert look easy. It is NOT easy.',
+      ],
+    },
+    reactions: {
+      ace: [
+        "A hole-in-one in THIS wind? I don't believe it. I love it.",
+        "Ace! Forty years of sand and I'm still grinning.",
+      ],
+      eagle: [
+        "An eagle out on the dunes? Now THAT'S desert golf.",
+        'Two under in a sandstorm. Respect, traveller.',
+      ],
+      blowup: [
+        'The desert buried you on one hole back there. It does that. Dust yourself off.',
+        'One hole swallowed you whole. Happens to the best of us. Move on.',
+      ],
+      birdieBlitz: [
+        'Birdie after birdie in the dust? Unheard of out here.',
+        'A run of birdies in the waste? The dunes are speechless.',
       ],
     },
   },
@@ -247,6 +300,24 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
         'Flawless on the frost. Pick your prize, champion.',
       ],
     },
+    reactions: {
+      ace: [
+        'A hole-in-one on the ice? Be still my frozen heart.',
+        'An ACE in this crosswind. Genuinely, properly impressive.',
+      ],
+      eagle: [
+        'An eagle on the glacier — ice cold and brilliant.',
+        'Two under on one hole? The ponds are sulking.',
+      ],
+      blowup: [
+        'The ice claimed one hole back there. Slippery business. Chin up.',
+        "One blow-up on the frost — don't let it freeze you. Keep going.",
+      ],
+      birdieBlitz: [
+        "Birdies all over the ice? You're on fire — figuratively.",
+        'A flurry of birdies in the snow. Lovely to watch.',
+      ],
+    },
   },
   inferno: {
     name: 'Ember Stokes',
@@ -271,6 +342,24 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
         'Blazing! The volcanoes are taking notes.',
         "Stellar round in the inferno. You're forged for this.",
         'Untouchable over the lava. Magnificent.',
+      ],
+    },
+    reactions: {
+      ace: [
+        'A hole-in-one over LAVA?! You magnificent maniac.',
+        'An ace in the inferno! The volcanoes salute you.',
+      ],
+      eagle: [
+        'An eagle across the molten rivers — blazing stuff.',
+        "Two under in the fire. You're forged for this.",
+      ],
+      blowup: [
+        'The lava swallowed one whole back there. Brutal. Rise from the ashes.',
+        'One hole went up in flames. Phoenix it — keep moving.',
+      ],
+      birdieBlitz: [
+        "Birdies through the fire? You're unstoppable.",
+        'A run of birdies in the furnace. Incredible.',
       ],
     },
   },
@@ -299,6 +388,24 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
         'Perfection over the void. The universe approves.',
       ],
     },
+    reactions: {
+      ace: [
+        'A hole-in-one over the abyss? The universe just blinked.',
+        'An ACE in the void. Statistically impossible. Beautiful.',
+      ],
+      eagle: [
+        'An eagle across the islands — defying the dark.',
+        'Two under over nothing at all. Sublime.',
+      ],
+      blowup: [
+        "The void ate a whole hole back there. It's hungry out here. Onward.",
+        'One hole vanished into the abyss. Let it go — literally.',
+      ],
+      birdieBlitz: [
+        'Birdies in the emptiness? You bend space itself.',
+        'A constellation of birdies. Fitting, out here.',
+      ],
+    },
   },
 };
 
@@ -320,11 +427,53 @@ export function proMood(stableford: number, cut: number): ProMood {
   return 'stellar';
 }
 
-/** Pick one of the Pro's mood lines, deterministically from a salt (e.g. the stop index). */
-export function proQuip(pro: ShopPro, mood: ProMood, salt: number): string {
-  const lines = pro.quips[mood];
+/** Pick a deterministic line from a non-empty list by a salt (e.g. the stop index). */
+function pickLine(lines: readonly string[], salt: number): string {
   const i = ((Math.trunc(salt) % lines.length) + lines.length) % lines.length;
   return lines[i]!;
+}
+
+/** Pick one of the Pro's mood lines, deterministically from a salt (e.g. the stop index). */
+export function proQuip(pro: ShopPro, mood: ProMood, salt: number): string {
+  return pickLine(pro.quips[mood], salt);
+}
+
+/** When several events fire, the Pro reacts to the most striking first. */
+export const PRO_EVENT_PRIORITY: readonly ProEvent[] = ['ace', 'eagle', 'blowup', 'birdieBlitz'];
+
+/**
+ * Detect the notable events in a section (the per-hole outcomes). An ace (holed in one), an eagle or
+ * better (≥2 under), a blow-up (a picked-up hole or ≥4 over par), and a birdie blitz (≥3 birdies).
+ * Pure — reasons over the minimal `HoleOutcome` shape, so it never imports the sim's heavy types.
+ */
+export function sectionEvents(holes: readonly HoleOutcome[]): ProEvent[] {
+  let ace = false;
+  let eagle = false;
+  let blowup = false;
+  let birdies = 0;
+  for (const h of holes) {
+    const over = h.strokes - h.par;
+    if (h.holed && h.strokes === 1) ace = true;
+    if (over <= -2) eagle = true;
+    if (over === -1) birdies++;
+    if (h.pickedUp || over >= 4) blowup = true;
+  }
+  return PRO_EVENT_PRIORITY.filter((e) =>
+    e === 'ace' ? ace : e === 'eagle' ? eagle : e === 'blowup' ? blowup : birdies >= 3,
+  );
+}
+
+/**
+ * The Pro's greeting line: react to the most striking EVENT the section produced (an ace, a blow-up…)
+ * if the Pro has a line for it, otherwise fall back to the success-grade MOOD line. Deterministic
+ * from the salt (e.g. the stop index), so a given section always greets the same way.
+ */
+export function proLine(pro: ShopPro, mood: ProMood, events: readonly ProEvent[], salt: number): string {
+  for (const e of PRO_EVENT_PRIORITY) {
+    const lines = pro.reactions[e];
+    if (lines && lines.length && events.includes(e)) return pickLine(lines, salt);
+  }
+  return proQuip(pro, mood, salt);
 }
 
 /** Difficulty as filled/empty pips (e.g. ●●●○○ for 3) for a compact card display. */

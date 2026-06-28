@@ -4,7 +4,12 @@ import {
   shopPro,
   proMood,
   proQuip,
+  proLine,
+  sectionEvents,
+  PRO_EVENT_PRIORITY,
   type ProMood,
+  type ProEvent,
+  type HoleOutcome,
 } from '../src/sim/course/zones';
 import type { BiomeArchetype } from '../src/sim/course/themes';
 import { rarityDepthBias, shopOffer, startRun } from '../src/sim/rpg/run';
@@ -66,6 +71,60 @@ describe('Pro Shop staff (GS-proshop)', () => {
         }
       }
     }
+  });
+});
+
+describe('Pro event reactions (GS-proshop)', () => {
+  const hole = (par: number, strokes: number, extra: Partial<HoleOutcome> = {}): HoleOutcome => ({
+    par,
+    strokes,
+    pickedUp: false,
+    holed: strokes <= par + 4,
+    ...extra,
+  });
+
+  it('every Pro has at least one line for every reactable event', () => {
+    for (const a of ARCHES) {
+      const pro = shopPro(a);
+      for (const e of PRO_EVENT_PRIORITY) {
+        const lines = pro.reactions[e];
+        expect(lines, `${a} ${e}`).toBeDefined();
+        expect(lines!.length).toBeGreaterThanOrEqual(1);
+        for (const l of lines!) expect(l.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('detects ace, eagle, blow-up and birdie-blitz from per-hole outcomes', () => {
+    expect(sectionEvents([hole(3, 1, { holed: true })])).toContain('ace');
+    expect(sectionEvents([hole(5, 3)])).toContain('eagle'); // 2 under
+    expect(sectionEvents([hole(4, 8, { holed: false })])).toContain('blowup'); // 4 over
+    expect(sectionEvents([hole(4, 4, { pickedUp: true, holed: false })])).toContain('blowup');
+    expect(sectionEvents([hole(4, 3), hole(4, 3), hole(4, 3)])).toContain('birdieBlitz'); // 3 birdies
+    // A clean par round fires nothing → the greeting falls back to the mood line.
+    expect(sectionEvents([hole(4, 4), hole(4, 4)])).toEqual([]);
+  });
+
+  it('an ace is reported even though it is also technically an eagle, and priority orders them', () => {
+    const evs = sectionEvents([hole(3, 1, { holed: true })]);
+    // Both fire; ace must sort ahead of eagle in the priority list.
+    expect(evs).toContain('ace');
+    expect(evs.indexOf('ace')).toBeLessThan(evs.indexOf('eagle') === -1 ? Infinity : evs.indexOf('eagle'));
+  });
+
+  it('proLine prefers the highest-priority event line, else the mood line', () => {
+    const pro = shopPro('inferno');
+    // An ace present → an ace reaction (not a mood line).
+    const aceLine = proLine(pro, 'solid', ['ace', 'eagle'] as ProEvent[], 0);
+    expect(pro.reactions.ace).toContain(aceLine);
+    // Blow-up present, no ace/eagle → the blow-up line.
+    const blow = proLine(pro, 'stellar', ['blowup'] as ProEvent[], 0);
+    expect(pro.reactions.blowup).toContain(blow);
+    // No events → the mood line.
+    const moodLine = proLine(pro, 'great', [], 0);
+    expect(pro.quips.great).toContain(moodLine);
+    // Deterministic.
+    expect(proLine(pro, 'great', [], 0)).toBe(moodLine);
   });
 });
 

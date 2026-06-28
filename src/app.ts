@@ -18,7 +18,7 @@ import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } f
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById, type BiomeArchetype } from './sim/course/themes';
-import { zoneProfile, difficultyPips, shopPro, proMood, proQuip } from './sim/course/zones';
+import { zoneProfile, difficultyPips, shopPro, proMood, proLine, sectionEvents } from './sim/course/zones';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
@@ -382,7 +382,16 @@ function proGreetingHTML(): string {
   const archetype = archetypeFor(last.themeId, last.biome);
   const pro = shopPro(archetype);
   const mood = proMood(last.stableford, last.cut);
-  const line = proQuip(pro, mood, state.run.stopIndex);
+  // React to the section's drama (an ace, a blow-up, a birdie blitz) over the generic grade.
+  const events = sectionEvents(
+    (state.played ?? []).map((p) => ({
+      par: p.stat.par,
+      strokes: p.stat.strokes,
+      pickedUp: p.pickedUp,
+      holed: p.holed,
+    })),
+  );
+  const line = proLine(pro, mood, events, state.run.stopIndex);
   return `
     <div class="gs-panel" style="display:flex;gap:12px;align-items:center;margin:0 0 10px;">
       <div style="flex:0 0 auto;">${proAvatarSVG(archetype)}</div>

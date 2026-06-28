@@ -570,11 +570,16 @@ This game lives or dies on three axes — put every change through all three bef
     Orbit Vance/void), each with a name, title, and pithy greetings keyed by `ProMood`. You only reach
     a shop after PASSING the cut, so `proMood(stableford, cut)` grades degrees of SUCCESS by the
     Stableford/cut ratio (`scraped <1.25 · solid <1.7 · great <2.2 · stellar`) — a nervy scrape up to
-    a romp, never a failure. `app.ts` `proGreetingHTML` reads `state.lastResult` (the just-played
-    stop), resolves the Pro via `archetypeFor`, and draws an assetless inline-SVG bust
-    (`proAvatarSVG`, per-archetype palette) + name + `proQuip` line (salted by `stopIndex` so it
-    varies). Pure data + view-only render → no new `_gs*` hook, no save bump; `tests/pro-shop.test.ts`
-    guards the roster/moods/quip determinism, the depth-bias curve, and the early>deep common-count fix.
+    a romp, never a failure. On top of the grade, the Pro reacts to the section's DRAMA: `sectionEvents`
+    (pure, over a minimal `HoleOutcome` slice of the played holes) detects an `ace`/`eagle`/`blowup`
+    (picked-up or ≥4 over)/`birdieBlitz` (≥3 birdies), and `proLine` prefers the highest-priority event
+    line (`PRO_EVENT_PRIORITY`) the Pro has, else the mood line — so a hole-in-one or a disaster gets a
+    bespoke, world-flavoured callout. `app.ts` `proGreetingHTML` reads `state.lastResult` + `state.played`,
+    resolves the Pro via `archetypeFor`, and draws an assetless inline-SVG bust (`proAvatarSVG`,
+    per-archetype palette) + name + `proLine` line (salted by `stopIndex` so it varies). Pure data +
+    view-only render → no new `_gs*` hook, no save bump; `tests/pro-shop.test.ts` guards the
+    roster/moods/quip+reaction determinism, event detection, the depth-bias curve, and the early>deep
+    common-count fix.
 - **Balance/test on mean per-stop Stableford, NOT full-run distance.** Distance is chaotic: a
   loadout change perturbs the whole downstream seeded-RNG stream and the cut is a hard threshold,
   so "travels further" isn't monotonic even when a perk clearly helps. Averaged per-stop score is
