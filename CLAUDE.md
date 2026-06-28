@@ -773,6 +773,31 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   + OB stakes + centreline moved INTO the builder too (de-duped); the interactive overlays (spray cone, live
   ball, shot lines, HUD, animation) stay per-renderer. Canvas feel is eyes-on, but the SVG path is verified
   by rasterising a biome×seed gallery — re-shoot one after any `style.ts` change.
+- **Surfaces BLEND into a cohesive environment, they aren't stickers on a slab (GS-blend, `style.ts`).**
+  The complaint: tees/greens/fairways "just on/next to each other", and rivers that don't read as rivers
+  with lakes that don't blend into them. Four coupled fixes, all pure render, all off the art `rng`/`crng`
+  (no sim touch, byte-stable): (1) **`offsetPoly(poly, d)`** — a true uniform polygon inset (`d>0`)/outset
+  (`d<0`) by mitring each vertex along its edge-normal bisector. Unlike the old `scalePoly`-toward-centroid
+  (which crushes a long thin band into a centred sliver) it HUGS the shape, so a river band gets
+  channel-following depth rings and a fringe is even-width on a kidney green or long fairway. (2) **First-cut
+  fringes** — fairway/green/tee are drawn nested in a soft outset ring blended halfway toward this world's
+  rough (`mixHex(base, rough.base, ~0.5)`), and the turf ink edges are softened to translucent (`hexAlpha`)
+  mowing lines, so the cut grass EASES into the land instead of a hard cut-out outline. (3) **Grouped liquid
+  FAMILIES** — `styleLiquidFamily(polys, palette, rng)` draws ALL the water (water/frozenpond/creek), then
+  ALL the lava (lava/lavariver), in shared layered passes: every shore/crust UNDER every body, then bodies
+  (overlaps MERGE into one surface — no seam), then `offsetPoly` depth rings + detail. An elongated body
+  (long chord ≫ ⟂ width via `longAxis`/`extentAlong`) gets lengthwise FLOW streaks so a river reads as
+  flowing current/molten lava; a roundish lake keeps glints. NO per-body ink outline (it would redraw a
+  seam through an overlap) — the shore IS the edge. This is what makes a lake and a crossing river of the
+  same liquid read as ONE connected body (the "lake and river don't blend" fix). (4) **The landmass is a
+  ROUNDED, gently-irregular island hull** (`roundedHull`, off its own `hrng`), not a hard rectangle frame,
+  so a stop reads as ground floating in space. CRITICAL invariants kept: `#3f8c3f`/`#5fd45a` turf bases
+  still emitted (the holeView fill test), the constellation prim-COUNT invariants (the blend prims are
+  theme-independent), and determinism (all extra randomness is the existing art streams). The grouped-pass
+  reorder shifts the art `rng` stream slightly → mote/bird/flow positions move (visual only, deterministic).
+  `tests/render-blend.test.ts` guards `offsetPoly` (shrink/grow + river-hugging) and that a lava river /
+  water creek render through the family drawer. Re-shoot the gallery (`node scripts/gallery.mjs`) after any
+  `style.ts` change.
 - **Per-ZONE turf palettes + signature visuals (GS-19, `palette.ts`/`style.ts`).** The old per-theme
   look only HUE-ROTATED the green turf — barely readable ("green fairways in no way match the themes").
   Now each of the 5 archetypes has an EXPLICIT designed turf palette (`ARCHETYPE_TURF`): desert firm
@@ -780,8 +805,9 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   original `SHADES` values byte-for-byte** (so a themeless / verdant render is unchanged and the
   render tests still see `#3f8c3f`/`#5fd45a`). `buildScene` resolves the archetype from the theme id
   (else the biome id, via `archetypeFor`) and rarity-deepens it (`worldLook`); the stylers now take a
-  resolved `Shade` instead of computing from a hue tint. Signature surfaces: lava (`styleLava` — a
-  charred crust → glowing body → hot core + cracks, shared by flanking lakes AND crossing rivers) and
+  resolved `Shade` instead of computing from a hue tint. Signature surfaces: lava (the `LAVA_LIQ` palette
+  fed to the GS-blend `styleLiquidFamily` — charred crust shore → glowing body → hot core + flow streaks,
+  the SAME drawer as water so flanking lakes AND crossing rivers read as one connected magma) and
   the void's luminous **island glow** under the fairway/green so the platforms read as land in the
   abyss (the off-fairway IS the void). The dark per-biome rough (`roughBaseFor`) + starfield accents
   carry the "space" read. Re-shoot the biome×seed gallery (`node scripts/gallery.mjs`) after any

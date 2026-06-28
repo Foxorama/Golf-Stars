@@ -28,6 +28,7 @@ import {
   collarFor,
   landFillFor,
   spaceLookFor,
+  mixHex,
   type Shade,
   SAND,
   WATER,
@@ -141,6 +142,114 @@ function scalePoly(pts: Vec[], c: Vec, k: number): Vec[] {
   return pts.map((p) => [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k] as Vec);
 }
 
+/** Signed area (screen space) — its sign is the winding, so an offset knows which way is inward. */
+function signedArea(pts: Vec[]): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a / 2;
+}
+
+/**
+ * Offset a polygon by a UNIFORM perpendicular distance — positive `d` shrinks it inward, negative
+ * grows it outward — by mitring each vertex along its edge-normal bisector. Unlike scaling toward
+ * the centroid (which collapses a long thin band into a centred sliver), this hugs the actual shape:
+ * a RIVER band gets channel-following depth rings, and a turf fringe is uniform-width on a kidney
+ * green or a long fairway alike. The miter is clamped so a reflex vertex can't spike; depth bands
+ * are drawn filled on top so the rare self-touch on a very thin neck is hidden.
+ */
+function offsetPoly(pts: Vec[], d: number): Vec[] {
+  const n = pts.length;
+  if (n < 3) return pts.slice();
+  const sign = signedArea(pts) >= 0 ? 1 : -1; // winding → which bisector direction is interior
+  const out: Vec[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n]!;
+    const cur = pts[i]!;
+    const next = pts[(i + 1) % n]!;
+    let e1x = cur[0] - prev[0];
+    let e1y = cur[1] - prev[1];
+    let e2x = next[0] - cur[0];
+    let e2y = next[1] - cur[1];
+    const l1 = Math.hypot(e1x, e1y) || 1;
+    const l2 = Math.hypot(e2x, e2y) || 1;
+    e1x /= l1; e1y /= l1; e2x /= l2; e2y /= l2;
+    const n1x = -e1y; const n1y = e1x; // left normals of the two edges
+    const n2x = -e2y; const n2y = e2x;
+    let bx = n1x + n2x;
+    let by = n1y + n2y;
+    const bl = Math.hypot(bx, by) || 1;
+    bx /= bl; by /= bl;
+    const cos = bx * n1x + by * n1y || 1; // half-angle cosine → miter length
+    let m = (d * sign) / cos;
+    const cap = 4 * Math.abs(d);
+    if (m > cap) m = cap;
+    else if (m < -cap) m = -cap;
+    out.push([cur[0] + bx * m, cur[1] + by * m]);
+  }
+  return out;
+}
+
+/** The polygon's longest chord (the two farthest-apart vertices) → a channel's flow direction +
+ *  rough length. `n` is small (≤~20 here) so the O(n²) scan is cheap. */
+function longAxis(pts: Vec[]): { len: number; dir: Vec; a: Vec; b: Vec } {
+  let best = 0;
+  let ai = 0;
+  let bi = pts.length > 1 ? 1 : 0;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const d = dist(pts[i]!, pts[j]!);
+      if (d > best) { best = d; ai = i; bi = j; }
+    }
+  }
+  const a = pts[ai]!;
+  const b = pts[bi]!;
+  const l = best || 1;
+  return { len: best, dir: [(b[0] - a[0]) / l, (b[1] - a[1]) / l], a, b };
+}
+
+/** Extent of a polygon measured ALONG a unit direction (max − min projection). */
+function extentAlong(pts: Vec[], dx: number, dy: number): number {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const p of pts) {
+    const t = p[0] * dx + p[1] * dy;
+    if (t < lo) lo = t;
+    if (t > hi) hi = t;
+  }
+  return hi - lo;
+}
+
+/** A rounded, gently-irregular rectangle hull (course space) — the floating LANDMASS reads as an
+ *  island, not a picture frame. Each corner sweeps a 90° arc with a small seeded radius wobble; the
+ *  straight runs between corners keep the hole comfortably inside. Off its own rng so it never
+ *  perturbs the terrain or celestial streams. */
+function roundedHull(box: Box, r: number, jit: number, rng: () => number): Vec[] {
+  const w = box.maxX - box.minX;
+  const h = box.maxY - box.minY;
+  const rr = Math.max(1, Math.min(r, w / 2, h / 2));
+  const cc: Vec[] = [
+    [box.maxX - rr, box.minY + rr], // top-right
+    [box.maxX - rr, box.maxY - rr], // bottom-right
+    [box.minX + rr, box.maxY - rr], // bottom-left
+    [box.minX + rr, box.minY + rr], // top-left
+  ];
+  const startAng = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
+  const per = 5;
+  const pts: Vec[] = [];
+  for (let i = 0; i < 4; i++) {
+    for (let k = 0; k <= per; k++) {
+      const a = startAng[i]! + (Math.PI / 2) * (k / per);
+      const wob = 1 + (rng() - 0.5) * jit;
+      pts.push([cc[i]![0] + Math.cos(a) * rr * wob, cc[i]![1] + Math.sin(a) * rr * wob]);
+    }
+  }
+  return pts;
+}
+
 function n1(x: number): number {
   return Number.isFinite(x) ? Math.round(x * 10) / 10 : 0;
 }
@@ -172,22 +281,32 @@ function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
   return { t: 'clip', clip: poly, children };
 }
 
-function styleFairway(poly: Vec[], art: ArtFeel, s: Shade): Prim[] {
-  const out: Prim[] = [{ t: 'poly', pts: poly, fill: s.base }];
+function styleFairway(poly: Vec[], art: ArtFeel, s: Shade, fringe: string): Prim[] {
+  const out: Prim[] = [
+    // A soft "first-cut" fringe (a tone blended fairway↔rough) outset around the edge, so the cut
+    // grass eases into the rough instead of meeting the dark land on a hard sticker outline.
+    { t: 'poly', pts: offsetPoly(poly, -3), fill: fringe },
+    { t: 'poly', pts: poly, fill: s.base },
+  ];
   if (art.stripes) out.push(stripes(poly, s.light, s.dark, 7));
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: s.ink, sw: 1.6 });
+  // A mowing edge, not a bold black outline — a soft, translucent ink so the surface reads as part
+  // of the terrain rather than a cut-out pasted on top.
+  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
   return out;
 }
 
-function styleGreen(poly: Vec[], art: ArtFeel, s: Shade, collar: string): Prim[] {
+function styleGreen(poly: Vec[], art: ArtFeel, s: Shade, collar: string, fringe: string): Prim[] {
   const c = centroidOf(poly);
   const out: Prim[] = [
-    // Collar/apron: a darker outset ring so the green sits ON the land, with depth.
-    { t: 'poly', pts: scalePoly(poly, c, 1.18), fill: collar, stroke: s.ink, sw: 1.4 },
+    // Two nested rings ease the green into the land: an outer first-cut fringe, then the darker
+    // collar/apron — a uniform-width OFFSET (not a centroid scale) so a long ice-shelf or kidney
+    // green keeps an even surround instead of ballooning at the ends.
+    { t: 'poly', pts: offsetPoly(poly, -6.5), fill: fringe },
+    { t: 'poly', pts: offsetPoly(poly, -3.4), fill: collar },
     { t: 'poly', pts: poly, fill: s.base },
   ];
   if (art.stripes) out.push(stripes(poly, s.light, s.dark, 6));
-  // A soft lit highlight toward the top-left, then the bold ink outline.
+  // A soft lit highlight toward the top-left, then a softened ink edge.
   const gb = bboxOf(poly);
   out.push({
     t: 'clip',
@@ -201,26 +320,30 @@ function styleGreen(poly: Vec[], art: ArtFeel, s: Shade, collar: string): Prim[]
       },
     ],
   });
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: s.ink, sw: 1.6 });
+  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.7), sw: 1.2 });
   return out;
 }
 
-function styleTee(poly: Vec[], art: ArtFeel, s: Shade): Prim[] {
-  const out: Prim[] = [{ t: 'poly', pts: poly, fill: s.base }];
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: s.ink, sw: 1.3 });
+function styleTee(poly: Vec[], art: ArtFeel, s: Shade, fringe: string): Prim[] {
+  const out: Prim[] = [
+    { t: 'poly', pts: offsetPoly(poly, -2.4), fill: fringe }, // nest the tee in a soft fringe
+    { t: 'poly', pts: poly, fill: s.base },
+  ];
+  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
   return out;
 }
 
 function styleBunker(poly: Vec[], art: ArtFeel, scale: number): Prim[] {
   const c = centroidOf(poly);
   const out: Prim[] = [
-    // Lip-shadow rim (outset, darker) under the sand → the bunker reads as a depression.
-    { t: 'poly', pts: scalePoly(poly, c, 1.14), fill: SAND.shadow },
+    // Lip-shadow rim (a uniform outset, darker) under the sand → the bunker reads as a depression
+    // that hugs its real outline, so a big round crater and a small pot bunker both look excavated.
+    { t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow },
     { t: 'poly', pts: poly, fill: SAND.base },
     // Inner depression crescent: an inset poly nudged down so the far lip catches shadow.
     {
       t: 'poly',
-      pts: scalePoly(poly, c, 0.74).map((p) => [p[0], p[1] - 1.5] as Vec),
+      pts: offsetPoly(poly, 2.4).map((p) => [p[0], p[1] - 1.5] as Vec),
       fill: SAND.rim,
     },
   ];
@@ -243,58 +366,103 @@ function styleBunker(poly: Vec[], art: ArtFeel, scale: number): Prim[] {
   return out;
 }
 
-function styleWater(poly: Vec[], rng: () => number, art: ArtFeel): Prim[] {
-  const c = centroidOf(poly);
-  const out: Prim[] = [
-    // Shoreline → body → deep core: three inset depth bands (cell-shaded depth).
-    { t: 'poly', pts: scalePoly(poly, c, 1.06), fill: WATER.shallow },
-    { t: 'poly', pts: poly, fill: WATER.base },
-    { t: 'poly', pts: scalePoly(poly, c, 0.62), fill: WATER.deep },
-    { t: 'poly', pts: scalePoly(poly, c, 0.32), fill: WATER.deepest },
-  ];
-  // Sparkle glints near the top edge.
-  const b = bboxOf(poly);
-  const glints = 2 + Math.floor(rng() * 2);
-  for (let i = 0; i < glints; i++) {
-    const gx = b.minX + (b.maxX - b.minX) * (0.2 + 0.6 * rng());
-    const gy = b.minY + (b.maxY - b.minY) * (0.15 + 0.3 * rng());
-    const r = 1 + rng() * 1.4;
-    out.push({ t: 'line', a: [gx - r, gy], b: [gx + r, gy], stroke: WATER.glint, sw: 1, round: true });
-    out.push({ t: 'line', a: [gx, gy - r], b: [gx, gy + r], stroke: WATER.glint, sw: 1, round: true });
-  }
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: WATER.ink, sw: 1.6 });
-  return out;
+/**
+ * A liquid's depth/detail palette. Water and lava share the same banded-depth machinery — only the
+ * tones differ — so a lake and a crossing river of the same liquid are drawn identically and read
+ * as one substance.
+ */
+interface LiquidPalette {
+  shore: string; // outset rim (water shoreline / lava crust)
+  base: string; // body fill
+  mid: string; // first depth ring
+  deep: string; // core ring
+  flow: string; // lengthwise flow streaks (current / molten flow)
+  glint: string; // sparkle on a still lake
 }
+const WATER_LIQ: LiquidPalette = {
+  shore: WATER.shallow,
+  base: WATER.base,
+  mid: WATER.deep,
+  deep: WATER.deepest,
+  flow: 'rgba(255,255,255,0.30)',
+  glint: WATER.glint,
+};
+const LAVA_LIQ: LiquidPalette = {
+  shore: LAVA.crust,
+  base: LAVA.body,
+  mid: LAVA.hot,
+  deep: LAVA.core,
+  flow: LAVA.crack,
+  glint: LAVA.core,
+};
 
-/** Molten lava (lake or river band): charred crust rim → glowing body → hot core + cracks. The
- *  same styler draws a flanking lava lake and a crossing river, so both read as the same magma. */
-function styleLava(poly: Vec[], rng: () => number): Prim[] {
-  const c = centroidOf(poly);
-  const b = bboxOf(poly);
-  const out: Prim[] = [
-    { t: 'poly', pts: scalePoly(poly, c, 1.08), fill: LAVA.crust }, // charred crust rim (outset)
-    { t: 'poly', pts: poly, fill: LAVA.body, stroke: LAVA.ink, sw: 1.4 },
-    { t: 'poly', pts: scalePoly(poly, c, 0.74), fill: LAVA.hot }, // glowing inner
-    { t: 'poly', pts: scalePoly(poly, c, 0.4), fill: LAVA.core }, // hot core
-  ];
-  // A few bright cracks/flow lines through the magma (clipped to the shape).
-  const cracks = 3 + Math.floor(rng() * 3);
-  const children: Prim[] = [];
-  for (let i = 0; i < cracks; i++) {
-    const ax = b.minX + (b.maxX - b.minX) * rng();
-    const ay = b.minY + (b.maxY - b.minY) * rng();
-    const len = 4 + rng() * 10;
-    const ang = rng() * Math.PI * 2;
-    children.push({
-      t: 'line',
-      a: [ax, ay],
-      b: [ax + Math.cos(ang) * len, ay + Math.sin(ang) * len],
-      stroke: LAVA.crack,
-      sw: 1,
-      round: true,
-    });
+const WATER_KINDS = new Set(['water', 'frozenpond', 'creek']);
+const LAVA_KINDS = new Set(['lava', 'lavariver']);
+
+/**
+ * Draw a whole FAMILY of same-liquid penalty bodies (all the water, or all the lava on a hole) in
+ * shared layered passes, so a lake and a river that touch read as ONE connected body instead of two
+ * stickers with a seam between them. Pass order across the WHOLE family:
+ *   1. shores/crusts (outset, contrasting) — UNDER every body
+ *   2. base bodies — overlapping bodies merge into one continuous surface
+ *   3. depth rings + flow/glints, each clipped to its own body
+ * Because every shore sits under every body, an overlap shows no shoreline between the two — only
+ * the outer edge against the land keeps its shore. Depth rings use `offsetPoly` (a true inward
+ * offset), so a thin RIVER band gets channel-following rings instead of a centroid sliver, and an
+ * elongated body additionally gets lengthwise FLOW lines so it reads as flowing current/molten lava.
+ * No per-body ink outline (that would re-draw a seam through an overlap); the shore is the edge.
+ */
+function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number): Prim[] {
+  if (polys.length === 0) return [];
+  const out: Prim[] = [];
+  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -3), fill: lp.shore }); // 1
+  for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: lp.base }); // 2
+  for (const poly of polys) {
+    const axis = longAxis(poly);
+    const width = extentAlong(poly, -axis.dir[1], axis.dir[0]); // extent ⟂ the long chord = channel width
+    const step = Math.max(1.6, Math.min(7, width * 0.26));
+    const detail: Prim[] = [
+      { t: 'poly', pts: offsetPoly(poly, step), fill: lp.mid },
+      { t: 'poly', pts: offsetPoly(poly, step * 2), fill: lp.deep },
+    ];
+    if (axis.len > width * 1.9) {
+      // A CHANNEL (river/creek/lava river): streaks running ALONG the flow so it reads as moving.
+      const px = -axis.dir[1];
+      const py = axis.dir[0];
+      const c = centroidOf(poly);
+      const lanes = 3;
+      for (let k = 0; k < lanes; k++) {
+        const off = (k - (lanes - 1) / 2) * (width / (lanes + 1));
+        const segs = 5;
+        for (let sgi = 0; sgi < segs; sgi++) {
+          const f0 = -0.42 + (0.84 * sgi) / segs;
+          const f1 = -0.42 + (0.84 * (sgi + 0.62)) / segs;
+          const wob = (rng() - 0.5) * step * 0.8;
+          const a: Vec = [
+            c[0] + axis.dir[0] * axis.len * f0 + px * (off + wob),
+            c[1] + axis.dir[1] * axis.len * f0 + py * (off + wob),
+          ];
+          const b: Vec = [
+            c[0] + axis.dir[0] * axis.len * f1 + px * (off + wob),
+            c[1] + axis.dir[1] * axis.len * f1 + py * (off + wob),
+          ];
+          detail.push({ t: 'line', a, b, stroke: lp.flow, sw: 1, round: true });
+        }
+      }
+    } else {
+      // A still LAKE: a couple of bright glints near the top edge.
+      const b = bboxOf(poly);
+      const glints = 2 + Math.floor(rng() * 2);
+      for (let i = 0; i < glints; i++) {
+        const gx = b.minX + (b.maxX - b.minX) * (0.2 + 0.6 * rng());
+        const gy = b.minY + (b.maxY - b.minY) * (0.15 + 0.3 * rng());
+        const r = 1 + rng() * 1.4;
+        detail.push({ t: 'line', a: [gx - r, gy], b: [gx + r, gy], stroke: lp.glint, sw: 1, round: true });
+        detail.push({ t: 'line', a: [gx, gy - r], b: [gx, gy + r], stroke: lp.glint, sw: 1, round: true });
+      }
+    }
+    out.push({ t: 'clip', clip: poly, children: detail });
   }
-  out.push({ t: 'clip', clip: poly, children });
   return out;
 }
 
@@ -530,12 +698,17 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // OB box stays the (invisible) trigger and its stakes float out in the void. Purely visual — OB /
   // fairness is untouched. (This generalises the void's "island in the abyss" look to all worlds.)
   const landMargin = Math.max(14, Math.min(36, span * 0.08));
-  const landBox: Vec[] = [
-    [cb.minX - landMargin, cb.minY - landMargin],
-    [cb.maxX + landMargin, cb.minY - landMargin],
-    [cb.maxX + landMargin, cb.maxY + landMargin],
-    [cb.minX - landMargin, cb.maxY + landMargin],
-  ];
+  // The landmass is a ROUNDED, gently-irregular island hull (not a hard rectangle) so a stop reads
+  // as a piece of ground floating in space, not a green picture-frame. Built off its OWN rng so the
+  // corner wobble never perturbs the terrain (`rng`) or celestial (`crng`) streams.
+  const lb: Box = {
+    minX: cb.minX - landMargin,
+    minY: cb.minY - landMargin,
+    maxX: cb.maxX + landMargin,
+    maxY: cb.maxY + landMargin,
+  };
+  const hrng = mulberry32((hashHole(hole) ^ 0x1b873593) >>> 0);
+  const landBox = roundedHull(lb, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22, 0.14, hrng);
   const islandPts = projPoly(landBox, proj);
   const islandC = centroidOf(islandPts);
   const space = spaceLookFor(arch, deepen);
@@ -657,6 +830,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
 
   // --- 5. Terrain features (fairway/green/tee + scatter surfaces) --------------
   const collar = collarFor(arch, deepen);
+  // "First-cut" fringe tones — each surface blended halfway toward this world's rough — so the cut
+  // grass eases into the surrounding land instead of meeting it on a hard cut-out edge.
+  const fwFringe = mixHex(fwShade.base, rs.base, 0.5);
+  const grFringe = mixHex(collar, rs.base, 0.5);
+  const teeFringe = mixHex(teeShade.base, rs.base, 0.45);
   // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
   // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
   const voidGlow = arch === 'void';
@@ -667,25 +845,34 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.34), fill: 'rgba(120,130,240,0.10)' });
       prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.16), fill: 'rgba(120,130,240,0.14)' });
     }
-    if (f.kind === 'fairway') prims.push(...styleFairway(sp, art, fwShade));
-    else if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar));
-    else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade));
+    if (f.kind === 'fairway') prims.push(...styleFairway(sp, art, fwShade, fwFringe));
+    else if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe));
+    else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art));
   }
 
   // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
+  // Penalty LIQUIDS are drawn as GROUPED families first (all the water, then all the lava) in shared
+  // layered passes, so a lake and a river that touch read as one connected body, not two stickers
+  // with a seam (GS-blend). Everything else (trees, sand/craters, exotic scatter) draws per-hazard
+  // on top of the liquids.
+  const waterPolys: Vec[][] = [];
+  const lavaPolys: Vec[][] = [];
+  for (const f of hole.hazards) {
+    if (WATER_KINDS.has(f.kind)) waterPolys.push(projPoly(f.poly, proj));
+    else if (LAVA_KINDS.has(f.kind)) lavaPolys.push(projPoly(f.poly, proj));
+  }
+  prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng));
+  prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
   for (const f of hole.hazards) {
     if (f.kind === 'trees') {
       prims.push(...styleTree(f.poly, proj, rng));
       continue;
     }
+    if (WATER_KINDS.has(f.kind) || LAVA_KINDS.has(f.kind)) continue; // drawn in the grouped passes
     const sp = projPoly(f.poly, proj);
     if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand') {
       prims.push(...styleBunker(sp, art, proj.scale));
-    } else if (f.kind === 'water' || f.kind === 'frozenpond' || f.kind === 'creek') {
-      prims.push(...styleWater(sp, rng, art));
-    } else if (f.kind === 'lava' || f.kind === 'lavariver') {
-      prims.push(...styleLava(sp, rng));
     } else {
       prims.push(...styleScatter(f.kind, sp, art));
     }
@@ -746,6 +933,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   void polylineDist; // (kept available for future corridor-aware accents)
   return prims;
 }
+
+/** Pure geometry helpers exposed for unit tests (not part of the public render API). */
+export const __test__ = { offsetPoly };
 
 // ---------------------------------------------------------------------------
 // Interpreters
