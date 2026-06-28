@@ -352,7 +352,7 @@ function characterScreen(): string {
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
-          <div class="gs-charcard-port">${golferSVG(ch.style)}</div>
+          <div class="gs-charcard-port">${golferSVG(ch.style, 96, 104)}</div>
           <div class="gs-charcard-id">
             <b class="gs-charcard-name" style="color:${cap};">${ch.name}</b>
             <div class="gs-charcard-org">${ch.origin} · ${ch.identity}</div>
