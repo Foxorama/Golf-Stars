@@ -606,21 +606,45 @@ export interface ClubSet {
    * different stat (tighter dispersion / a game effect) and are a documented follow-up.
    */
   distanceOnly?: boolean;
+  /**
+   * Restrict this set to SCORING-club types (the irons/wedges below the distance threshold). A scoring
+   * reward carries its BASE distance (no overshoot) — its value is COVERAGE: a club for a distance the
+   * balanced bag skips, so it fills a gap and lets you dial the shot in (the "too hard close to the
+   * green" fix). Offered only for a type you LACK — never as a same-carry "upgrade" to one you hold.
+   */
+  scoringOnly?: boolean;
+  /**
+   * Never appears in the rotating offer (GS-clubs-2). The legacy common 'starter' set is kept ONLY so
+   * old saves that bought a `club:starter:*` perk still resolve it on resume — the shop no longer sells
+   * common clubs (rewards are rare+ improvements). Absent ⇒ offerable.
+   */
+  offerable?: boolean;
 }
 
 export const CLUB_SETS: readonly ClubSet[] = [
-  // The common 'starter' set is buyable for ANY type — it's how a golfer FILLS a gap (a club they
-  // didn't start with): Larry grabbing a 3-Wood, Bo grabbing a Driver, anyone adding a missing iron.
-  { set: 'starter', label: '', rarity: 'common', carryBonus: 0, cost: 70 },
-  // 'tour' is the first UPGRADE tier: a longer rare version of a DISTANCE club that replaces your
-  // starter one (a verified reach upgrade). Epic / legendary / location-specific sets — and scoring-
-  // club upgrades via game EFFECTS, not carry — come later, one row each.
+  // Legacy common 'starter' set — NO LONGER OFFERED (rewards are rare+ now). Kept resolvable so old
+  // saves carrying a `club:starter:*` perk still rebuild it; the live bag's starting clubs are stamped
+  // 'starter' directly by the character (buildStartBag), not drawn from here.
+  { set: 'starter', label: '', rarity: 'common', carryBonus: 0, cost: 70, offerable: false },
+  // 'tour' — the first DISTANCE upgrade tier: a longer rare wood/long-hybrid that replaces your
+  // starter one (a verified reach upgrade), or fills a missing distance club.
   { set: 'tour', label: 'Tour', rarity: 'rare', carryBonus: 8, cost: 150, distanceOnly: true },
+  // 'masters' — the EPIC distance tier above 'tour' (a deeper reach upgrade for late-run builds).
+  { set: 'masters', label: 'Masters', rarity: 'epic', carryBonus: 16, cost: 240, distanceOnly: true },
+  // 'pro' — rare SCORING coverage: a premium iron/wedge at base carry that fills a gap the balanced
+  // bag leaves (tighter distance control close in). Offered only for a type you don't already carry.
+  { set: 'pro', label: 'Pro', rarity: 'rare', carryBonus: 0, cost: 120, scoringOnly: true },
 ];
 
-/** Club TYPES (base club ids) that can appear as rewards — broad enough to fill gaps AND upgrade. */
+/**
+ * Club TYPES (base club ids) that can appear as rewards. Two roles relative to the balanced 11-club
+ * bag: DISTANCE clubs (D/3W/5W/7W/2H) upgrade an owned one or fill a missing wood; SCORING clubs are
+ * the long/mid irons + wedge in-betweens the balanced bag skips (4H/3i/4i/5i/7i/9i, AW/58) — collecting
+ * them tightens the gaps so you can dial distance in close to the green. Clubs everyone already carries
+ * (6i/8i/PW/GW/SW/LW/60/putter) aren't here — a same-carry "premium" copy is no improvement.
+ */
 export const REWARD_CLUB_TYPES: readonly string[] = [
-  'D', '3W', '5W', '7W', '2H', '4H', '3i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW', '60', 'putter',
+  'D', '3W', '5W', '7W', '2H', '4H', '3i', '4i', '5i', '7i', '9i', 'AW', '58',
 ];
 
 /** Is this club type a hybrid (Longshot Larry refuses them)? Hybrid ids end in 'H'. */
@@ -632,6 +656,17 @@ export function isHybridType(type: string): boolean {
 export function isDistanceType(type: string): boolean {
   const base = clubById(type, CLUBS);
   return !!base && base.carry >= DISTANCE_CLUB_CARRY;
+}
+
+/** Is this club type a SCORING club (irons/wedges — coverage matters, extra carry would overshoot)? */
+export function isScoringType(type: string): boolean {
+  const base = clubById(type, CLUBS);
+  return !!base && base.carry < DISTANCE_CLUB_CARRY;
+}
+
+/** Look up a club SET row by its id (e.g. resolve a reward item's clubSet back to its tier/bonus). */
+export function clubSetById(set: string | undefined): ClubSet | undefined {
+  return CLUB_SETS.find((s) => s.set === set);
 }
 
 /** The reward-club shop-item id for a (set, type) — stable; encodes both so resume rebuilds it. */
@@ -662,18 +697,28 @@ export function equipClub(bag: readonly Club[], club: Club): Club[] {
   return [...bag.filter((c) => c.id !== club.id), club].sort((a, b) => b.carry - a.carry);
 }
 
+/** Does a set generate an item for a club type? distance-only sets (tour/masters) cover only distance
+ *  clubs; the scoring-only set (pro) only scoring clubs; an unrestricted set (legacy starter) covers all. */
+function setCoversType(set: ClubSet, type: string): boolean {
+  if (set.distanceOnly) return isDistanceType(type);
+  if (set.scoringOnly) return isScoringType(type);
+  return true;
+}
+
 /** Every reward club as a ShopItem (set × type). Generated once; apply() equips it into the bag. A
- *  distance-only set (tour) skips scoring-club types — a +carry upgrade there would overshoot. */
+ *  distance-only set (tour/masters) skips scoring-club types — a +carry upgrade there would overshoot;
+ *  the scoring-only set (pro) skips distance clubs (it carries base distance, value is coverage). */
 export const CLUB_ITEMS: readonly ShopItem[] = CLUB_SETS.flatMap((set) =>
-  REWARD_CLUB_TYPES.filter((type) => !set.distanceOnly || isDistanceType(type)).map((type): ShopItem => {
+  REWARD_CLUB_TYPES.filter((type) => setCoversType(set, type)).map((type): ShopItem => {
     const id = clubItemId(set.set, type);
     const base = clubById(type, CLUBS)!;
     const tierWord = set.rarity === 'common' ? 'A fresh' : `A ${set.rarity}`;
+    const carry = base.carry + (isDistanceType(type) ? set.carryBonus : 0);
     return {
       id,
       name: set.label ? `${set.label} ${base.name}` : base.name,
       cost: set.cost,
-      desc: `${tierWord} ${base.name} (~${base.carry + set.carryBonus} yd) · equips into your bag`,
+      desc: `${tierWord} ${base.name} (~${carry} yd) · equips into your bag`,
       rarity: set.rarity,
       clubType: type,
       clubSet: set.set,
@@ -696,24 +741,60 @@ function rarityRank(r: Rarity | undefined): number {
 }
 
 /**
- * The reward clubs offerable to a loadout (GS-clubs ownership rules):
+ * The reward clubs offerable to a loadout (GS-clubs-2 ownership rules). The shop only sells rare+
+ * IMPROVEMENTS now — no common gap-fillers:
+ *  - the legacy common 'starter' set is never offered (`offerable: false`);
  *  - a golfer who refuses a type (Larry/hybrids) never sees it;
- *  - a type you DON'T own → offered (fill a gap);
- *  - a type you own → offered only if this club is a HIGHER tier (an upgrade) or the SAME tier from a
- *    DIFFERENT set (a side-grade) — never the club you already have, never a downgrade.
+ *  - a type you DON'T carry → offered (NEW coverage: fills a gap so you can dial the distance in);
+ *  - a type you DO carry → offered only as a genuine carry UPGRADE: a higher-rarity DISTANCE club
+ *    (more reach, no overshoot). A scoring club you hold is never "upgraded" — its premium copy has
+ *    the same carry, so it's no improvement (the power-cell lesson).
  */
 export function offerableClubs(loadout: PlayerLoadout): ShopItem[] {
   return CLUB_ITEMS.filter((it) => {
+    if (clubSetById(it.clubSet)?.offerable === false) return false;
     const type = it.clubType!;
     if (loadout.noHybrids && isHybridType(type)) return false;
     const cur = loadout.bag.find((c) => c.id === type);
-    if (!cur) return true;
-    const r = rarityRank(it.rarity);
-    const cr = rarityRank(cur.rarity);
-    if (r > cr) return true;
-    if (r === cr && it.clubSet !== (cur.set ?? 'starter')) return true;
-    return false;
+    if (!cur) return true; // gap-fill: you don't carry this type
+    // Owned → only a real carry upgrade: a higher-rarity distance club.
+    return isDistanceType(type) && rarityRank(it.rarity) > rarityRank(cur.rarity);
   });
+}
+
+/**
+ * Player-facing note for a reward club on the shop card (GS-clubs-2): is it an UPGRADE to a club you
+ * carry (and by how many yards) or a NEW club, and which distance gap it fills (its neighbours in the
+ * bag). Pure — the UI turns this into a badge. Returns undefined for a non-club item.
+ */
+export interface ClubOfferNote {
+  kind: 'upgrade' | 'new';
+  /** The reward club's carry (with the golfer's distance bonus folded in, as it'll sit in the bag). */
+  carry: number;
+  /** Upgrade only: yards gained over the club currently carried (≥0). */
+  gainYd?: number;
+  /** New only: the bag club just LONGER than this one (the upper edge of the gap it fills), if any. */
+  longerName?: string;
+  /** New only: the bag club just SHORTER than this one (the lower edge of the gap it fills), if any. */
+  shorterName?: string;
+}
+
+export function clubOfferNote(item: ShopItem, loadout: PlayerLoadout): ClubOfferNote | undefined {
+  const set = clubSetById(item.clubSet);
+  if (!item.clubType || !set) return undefined;
+  const reward = buildRewardClub(set, item.clubType, loadout.distanceClubBonus ?? 0);
+  const cur = loadout.bag.find((c) => c.id === item.clubType);
+  if (cur) {
+    return { kind: 'upgrade', carry: reward.carry, gainYd: Math.max(0, Math.round(reward.carry - cur.carry)) };
+  }
+  // New club: find its neighbours by carry to describe the gap it slots into.
+  let longer: Club | undefined;
+  let shorter: Club | undefined;
+  for (const c of loadout.bag) {
+    if (c.carry > reward.carry && (!longer || c.carry < longer.carry)) longer = c;
+    if (c.carry < reward.carry && (!shorter || c.carry > shorter.carry)) shorter = c;
+  }
+  return { kind: 'new', carry: reward.carry, longerName: longer?.name, shorterName: shorter?.name };
 }
 
 export function shopItem(id: string): ShopItem | undefined {

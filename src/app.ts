@@ -24,7 +24,7 @@ import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
+import { clubOfferNote, itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, type GolferStyle } from './sim/rpg/characters';
 import { effectiveCut, snapshotRun } from './sim/rpg/run';
@@ -817,38 +817,51 @@ function shopScreen(): string {
   const perks = state.run.loadout.perks;
   const credits = state.run.credits;
   const hasCaddy = !!namedCaddyOwned(perks);
+  // A reward club (GS-clubs-2) shows whether it UPGRADES a club you carry or is a NEW club, and which
+  // distance gap it fills — so the buy decision is legible at a glance.
+  const clubBadge = (it: NonNullable<ReturnType<typeof shopItem>>): { text: string; tone?: 'up' | 'new' } | undefined => {
+    if (!it.clubType) return undefined;
+    const note = clubOfferNote(it, state.run.loadout);
+    if (!note) return undefined;
+    if (note.kind === 'upgrade') {
+      return { text: note.gainYd ? `▲ UPGRADE · +${note.gainYd} yd` : '▲ UPGRADE', tone: 'up' };
+    }
+    const between =
+      note.longerName && note.shorterName
+        ? `${note.longerName}→${note.shorterName}`
+        : note.longerName
+        ? `under ${note.longerName}`
+        : note.shorterName
+        ? `over ${note.shorterName}`
+        : '';
+    return { text: `✚ NEW · ~${note.carry} yd${between ? ` (${between})` : ''}`, tone: 'new' };
+  };
   const renderCard = (it: NonNullable<ReturnType<typeof shopItem>>): string => {
     const owned = ownedCount(perks, it.id);
     const maxed = owned >= itemCap(it);
     const cost = itemCost(it, owned);
     const afford = credits >= cost;
     const buyable = !maxed && afford;
-    const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned });
+    const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned, badge: clubBadge(it) });
     // Wrap the card so the whole thing is the buy button when purchasable.
     return buyable
       ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
       : `<div style="margin:4px;">${card}</div>`;
   };
-  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live. Split the offer
-  // into perk GEAR and reward CLUBS (GS-clubs) so each gets its own labelled row.
+  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live. Gear and reward
+  // clubs (GS-clubs-2) share ONE 4-card rack — no separate row.
   const stock = (state.shopOffer ?? [])
     .map((id) => shopItem(id))
     .filter((it): it is NonNullable<typeof it> => !!it)
     // Once any named caddy is hired, the others vanish from the offer (you may keep only one).
-    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0);
-  const gear = stock.filter((it) => !it.clubType).map(renderCard).join('');
-  const clubs = stock.filter((it) => it.clubType).map(renderCard).join('');
-  const clubsSection = clubs
-    ? `<h3 style="font-size:13px;margin:.8em 0 .2em;opacity:.85;">🏌 Reward Clubs</h3>
-       <p style="font-size:12px;opacity:.6;margin:.1em 0 .4em;">Buy a club to slot it into your bag — a higher-tier club replaces the one you carry.</p>
-       <div style="display:flex;flex-wrap:wrap;">${clubs}</div>`
-    : '';
+    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0)
+    .map(renderCard)
+    .join('');
   return `
     ${header()}
     <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own. A rare caddy may turn up in the stock; hire one and the rest stay home.</p>
-    <div style="display:flex;flex-wrap:wrap;">${gear}</div>
-    ${clubsSection}
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own. Rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up; hire one caddy and the rest stay home.</p>
+    <div style="display:flex;flex-wrap:wrap;">${stock}</div>
     <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}</div>`;
 }
 

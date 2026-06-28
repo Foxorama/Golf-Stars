@@ -137,30 +137,30 @@ describe('characters actually play differently (the shapes are real)', () => {
   it('Longshot Larry bombs the distance clubs; Backspin Bo is shorter off the tee', () => {
     const larry = applyCharacter('longshot-larry', startingLoadout()).bag;
     const bo = applyCharacter('backspin-bo', startingLoadout()).bag;
-    // Larry starts with a boosted Driver (only he carries one); Bo's longest is a SHORTENED 3-wood.
+    // Larry's Driver is boosted (+14); Bo's is shortened (−8) — both off the same balanced base bag.
     expect(carryOf(larry, 'D')).toBeGreaterThan(carryOf(neutralBag, 'D'));
-    expect(carryOf(bo, '3W')).toBeLessThan(carryOf(neutralBag, '3W'));
+    expect(carryOf(bo, 'D')).toBeLessThan(carryOf(neutralBag, 'D'));
     // Bo's scoring irons/wedges are untouched in length — only the big sticks shrink.
     expect(carryOf(bo, 'PW')).toBe(carryOf(neutralBag, 'PW'));
   });
 
-  it('the starting bags are sparse, signature, and well-formed (GS-clubs)', () => {
+  it('everyone starts with the same balanced 11-club bag (GS-clubs-2)', () => {
     for (const ch of CHARACTERS) {
       const bag = applyCharacter(ch.id, startingLoadout()).bag;
-      // Sparse (not the full taxonomy), descending, always with a putter, all the common 'starter' set.
-      expect(bag.length, `${ch.id} bag size`).toBeGreaterThanOrEqual(8);
-      expect(bag.length, `${ch.id} bag size`).toBeLessThan(CLUBS.length);
+      // A balanced 11 — driver + putter bookends, a dense short game, descending, all 'starter' set.
+      expect(bag.length, `${ch.id} bag size`).toBe(11);
+      expect(bag.some((c) => c.id === 'D'), `${ch.id} has a driver`).toBe(true);
       expect(bag.some((c) => c.id === 'putter')).toBe(true);
       for (const c of bag) expect(c.set).toBe('starter');
       for (let i = 1; i < bag.length; i++) expect(bag[i]!.carry).toBeLessThanOrEqual(bag[i - 1]!.carry);
     }
-    // Larry refuses hybrids — his bag (and trait) carry none; he's the only one who starts with a Driver.
+    // Larry refuses hybrids — his bag (and trait) carry none (a 3-iron stands in for the 3-hybrid).
     const larry = applyCharacter('longshot-larry', startingLoadout());
     expect(larry.bag.some((c) => /H$/.test(c.id))).toBe(false);
     expect(larry.noHybrids).toBe(true);
-    expect(larry.bag.some((c) => c.id === 'D')).toBe(true);
+    // Every other golfer DOES carry the hybrid (the only per-golfer bag difference).
     for (const other of ['feather-fade', 'huang-woo-hook', 'backspin-bo']) {
-      expect(applyCharacter(other, startingLoadout()).bag.some((c) => c.id === 'D'), `${other} no driver`).toBe(false);
+      expect(applyCharacter(other, startingLoadout()).bag.some((c) => /H$/.test(c.id)), `${other} has a hybrid`).toBe(true);
     }
   });
 
