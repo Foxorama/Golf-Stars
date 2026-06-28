@@ -32,6 +32,8 @@ import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
 import { mountIntro } from './render/introView';
+import { sfx, resumeAudio } from './render/audio';
+import { getSettings, toggleSetting, type Settings } from './settings';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -114,9 +116,20 @@ function persist(): void {
   });
 }
 
-/** A tiny tactile tick on supported phones — confirms a swing/putt the instant you commit it.
- *  Guarded + swallowed: vibration is a pure cosmetic side-effect, absent on desktop/iOS Safari. */
+/** Named haptic patterns — a small tactile vocabulary so the game is readable with sound off
+ *  (how phones are actually used). Gated on the player's `haptics` setting; guarded + swallowed
+ *  (vibration is absent on desktop/iOS Safari), so it's a pure no-op where unsupported. */
+const HAPTICS = {
+  tap: 8,
+  swing: 16,
+  putt: 10,
+  good: [10, 30, 14] as number[], // pure contact / made putt
+  bad: 40, // penalty / missed cut — one heavy buzz
+  holeOut: [12, 28, 12, 28, 20] as number[],
+  madeCut: [10, 40, 10, 40, 18] as number[],
+};
 function haptic(pattern: number | number[]): void {
+  if (!getSettings().haptics) return;
   try {
     (navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }).vibrate?.(pattern);
   } catch {
@@ -125,9 +138,11 @@ function haptic(pattern: number | number[]): void {
 }
 
 function dispatch(action: Action): void {
+  // The first user gesture is our cue to resume the (browser-suspended) audio context.
+  resumeAudio();
   // Tactile confirmation the moment a stroke is committed (swing a touch firmer than a putt).
-  if (action.type === 'shot') haptic(14);
-  else if (action.type === 'putt') haptic(9);
+  if (action.type === 'shot') haptic(HAPTICS.swing);
+  else if (action.type === 'putt') haptic(HAPTICS.putt);
   if (view) {
     view.destroy();
     view = null;
@@ -136,6 +151,10 @@ function dispatch(action: Action): void {
     puttMeter.destroy();
     puttMeter = null;
   }
+  // A light UI tick on navigation presses (the stroke + purchase actions get their own richer cue).
+  if (action.type !== 'shot' && action.type !== 'putt' && action.type !== 'buy' && action.type !== 'buyUpgrade') {
+    sfx.click();
+  }
   // Any reducer action dismisses a pending shot popup and cancels its timer.
   awaitingShotPopup = false;
   if (popupTimer) {
@@ -143,7 +162,21 @@ function dispatch(action: Action): void {
     popupTimer = 0;
   }
   try {
+    const prevScreen = state.screen;
     state = reduce(state, action);
+    // Purchase chime (a real buy only — unaffordable cards aren't clickable).
+    if (action.type === 'buy' || action.type === 'buyUpgrade') {
+      sfx.reward();
+      haptic(HAPTICS.tap);
+    }
+    // Big-beat cues on the cut transition: a bright arpeggio for making it, a fall for missing.
+    if (state.screen === 'result' && prevScreen !== 'result') {
+      sfx.madeCut();
+      haptic(HAPTICS.madeCut);
+    } else if (state.screen === 'gameover' && prevScreen !== 'gameover') {
+      sfx.missCut();
+      haptic(HAPTICS.bad);
+    }
     persist();
     render();
   } catch (err) {
@@ -202,6 +235,7 @@ function titleScreen(): string {
     <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
       ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' }, { variant: 'ghost' })}
+      <button class="gs-btn gs-btn--ghost" data-open-settings="1">⚙ Settings</button>
     </div>
     ${
       state.resumable
@@ -451,6 +485,23 @@ function windDescription(hole: Hole): string {
   return `🌬 ${Math.round(w.spd)} mph ${kind} ${arrow}`;
 }
 
+/** The current lie as a prominent, colour-coded chip with its effect on the NEXT shot — so the
+ *  player always knows what they're playing from and how it bites (carry penalty + spray), shown
+ *  right where the shot decision is made. This is the lie-awareness the per-shot popup used to
+ *  carry, moved to the moment it actually matters. */
+function lieChip(lie: string): string {
+  const info = lieInfo(lie);
+  const label = info.label ?? lie;
+  const carryPen = info.carryMult < 0.99 ? `−${Math.round((1 - info.carryMult) * 100)}% carry` : '';
+  const spray = info.dispersionMult >= 1.55 ? 'very wild' : info.dispersionMult >= 1.25 ? 'wild' : info.dispersionMult > 1.05 ? 'loose' : '';
+  const eff = [carryPen, spray].filter(Boolean).join(' · ');
+  const trouble = !!info.penalty || info.carryMult <= 0.6 || info.dispersionMult >= 1.55;
+  const caution = info.carryMult < 0.95 || info.dispersionMult > 1.15;
+  const col = trouble ? '#ff6b6b' : caution ? '#ffc454' : '#5fd45a';
+  const dot = trouble ? '🔴' : caution ? '🟠' : '🟢';
+  return `<span class="gs-liechip" style="border-color:${col};color:${col};">${dot} <b style="color:var(--gs-ink);">${label}</b>${eff ? ` <span style="opacity:.85;">${eff}</span>` : ''}</span>`;
+}
+
 /** Biome + special conditions (gravity, slick/true scatter surfaces) actually on this hole. */
 function conditionsSummary(hole: Hole, biomeId: string): string {
   const parts: string[] = [];
@@ -597,7 +648,7 @@ function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
         <span>Shot <b>${opts.shotNo}</b></span>
         ${zoneScoreChip()}
       </div>
-      <div class="gs-sub">lie <b>${v.lie}</b> · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
+      <div class="gs-sub">${lieChip(v.lie)} · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
     </div>`;
 }
 
@@ -723,6 +774,7 @@ function playingBody(animating: boolean): string {
       <button class="gs-mapbtn" data-mapzoom="in" title="Zoom in"${mapView === 'whole' ? ' disabled' : ''}>＋</button>
       <button class="gs-mapbtn" data-mapzoom="out" title="Zoom out"${mapView === 'whole' ? ' disabled' : ''}>－</button>
       ${mapViewMoved() ? `<button class="gs-mapbtn" data-mapview="reset" title="Recenter on the ball">⌖</button>` : ''}
+      <button class="gs-mapbtn" data-open-settings="1" title="Settings">⚙</button>
     </div>`;
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
@@ -772,6 +824,38 @@ function playingBody(animating: boolean): string {
       </div>
     </div>
     ${awaitingShotPopup ? shotPopupOverlay() : ''}`;
+}
+
+// Settings sheet — a view overlay (not reducer state), toggled like the shot popup.
+let settingsOpen = false;
+
+/** The settings sheet: player-owned feel/control prefs (sound, haptics, fast shots, swing gesture,
+ *  left-handed, reduced motion). Persisted to localStorage via the settings module. */
+function settingsOverlay(): string {
+  const s = getSettings();
+  const row = (key: keyof Settings, label: string, desc: string): string => {
+    const on = s[key];
+    return `<button class="gs-setrow" data-setting="${key}">
+      <span class="gs-setlabel"><b>${label}</b><span>${desc}</span></span>
+      <span class="gs-toggle${on ? ' gs-toggle--on' : ''}" aria-hidden="true"><span class="gs-knob"></span></span>
+    </button>`;
+  };
+  return `
+    <div class="gs-sheet-backdrop" data-settings="close">
+      <div class="gs-sheet" data-settings="keep">
+        <div class="gs-sheet-head"><b style="font-size:17px;">⚙ Settings</b>
+          <button class="gs-mapbtn" data-settings="close" title="Close">✕</button></div>
+        ${row('sound', 'Sound', 'Chimes & contact cues (no downloads)')}
+        ${row('haptics', 'Haptics', 'Vibration feedback on supported phones')}
+        ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
+        ${row('swingGesture', 'Swing gesture', 'Pull back on the map & release to hit')}
+        ${row('leftHanded', 'Left-handed', 'Mirror the bottom controls')}
+        ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
+        <div style="text-align:center;margin-top:10px;">
+          <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 26px;">Done</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 /** Modal shot-result popup: the just-played shot's card + a Continue, shown after the shot has
@@ -1000,7 +1084,7 @@ function render(): void {
       ? outpostScreen()
       : gameoverScreen();
 
-  app.innerHTML = `<main class="gs-main">${body}</main>`;
+  app.innerHTML = `<main class="gs-main">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
@@ -1063,6 +1147,32 @@ function render(): void {
       render();
     });
   });
+  // Settings sheet: open/close + toggle a preference (all view-only, persisted in localStorage).
+  app.querySelectorAll<HTMLElement>('[data-open-settings]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsOpen = true;
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-settings]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const a = el.dataset.settings;
+      if (a === 'keep') return; // clicks inside the sheet body don't close it
+      e.stopPropagation();
+      settingsOpen = false;
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-setting]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSetting(el.dataset.setting as keyof Settings);
+      resumeAudio();
+      sfx.click();
+      render();
+    });
+  });
   // Dismiss the shot-result popup → reveal the next decision (a local view control).
   app.querySelectorAll<HTMLElement>('[data-popup-continue]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -1104,6 +1214,7 @@ function render(): void {
         biome: state.course.biome, themeId: state.course.meta.themeId,
         golferLook: golferLook(),
         caddyId: caddyId(),
+        onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
       });
     }
   }
@@ -1136,12 +1247,30 @@ function render(): void {
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,
         follow: true,
+        onImpact: (kind, quality) => {
+          // Contact cue — fires at the strike moment (the windup has already played).
+          if (kind === 'shot') {
+            sfx.swing(quality ?? 0.6);
+            haptic((quality ?? 0) > 0.85 ? HAPTICS.good : HAPTICS.tap);
+          } else {
+            sfx.putt();
+          }
+        },
         onDone: () => {
           animatedShots = play.shots.length;
           animatedPutts = play.puttLogs.length;
+          // Terminal cue: ball in the cup vs found a hazard, as the ball settles.
+          const lastShot = play.shots[play.shots.length - 1];
+          if (play.holed) {
+            sfx.holeOut();
+            haptic(HAPTICS.holeOut);
+          } else if (lastShot?.penalty) {
+            sfx.penalty();
+            haptic(HAPTICS.bad);
+          }
           // Hold a beat after the ball settles so the finish reads as finished before the next screen
           // — chipping/putting used to cut to the follow-up instantly. Three cases:
-          //  • non-terminal full shot → pop the rich shot-result card (with Continue);
+          //  • non-terminal full shot → pop the rich shot-result card (auto-advances if Fast Shots is on);
           //  • terminal (holed/picked up/auto putt-out done) → a longer hold, then the done screen;
           //  • non-terminal putt(s) only (manual lag) → a brief hold, then back to the putt meter.
           const feelMs = (window as unknown as { _gsFeel?: Record<string, number> })._gsFeel ?? {};
@@ -1153,11 +1282,21 @@ function render(): void {
             }, hold);
           } else if (hadShots) {
             const delay = feelMs.popupDelayMs ?? 320;
-            popupTimer = window.setTimeout(() => {
-              popupTimer = 0;
-              awaitingShotPopup = true;
-              render();
-            }, delay);
+            // Fast Shots: skip the tap-to-continue and roll straight on after a short beat — the
+            // new lie + its effect are highlighted on the next decision bar, so you stay informed
+            // without the per-shot tap. Default off (the result card waits for a tap/dismiss).
+            if (getSettings().fastShots) {
+              popupTimer = window.setTimeout(() => {
+                popupTimer = 0;
+                render();
+              }, (feelMs.fastAdvanceMs ?? 620));
+            } else {
+              popupTimer = window.setTimeout(() => {
+                popupTimer = 0;
+                awaitingShotPopup = true;
+                render();
+              }, delay);
+            }
           } else {
             const hold = feelMs.puttHoldMs ?? 450;
             popupTimer = window.setTimeout(() => {
