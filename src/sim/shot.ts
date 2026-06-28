@@ -366,6 +366,22 @@ export function lieInfo(kind: string): LieInfo {
   return LIE_INFO[kind] ?? LIE_INFO[DEFAULT_LIE]!;
 }
 
+/**
+ * Apply an escape-specialist caddy's LIE RELIEF (GS-mux): lerp a PENALIZING lie's carry/dispersion
+ * back toward neutral by `relief` (0..1). It only ever helps a lie that's worse than neutral
+ * (carryMult < 1 or dispersionMult > 1) — never improves an already-clean fairway/tee/green lie.
+ * `relief` 0 / undefined returns the lie's exact values, so a relief-less shot is byte-for-byte
+ * unchanged (the determinism contract for every caddy field).
+ */
+export function reliedLie(li: LieInfo, relief?: number): { carryMult: number; dispersionMult: number } {
+  if (!relief) return { carryMult: li.carryMult, dispersionMult: li.dispersionMult };
+  const r = Math.max(0, Math.min(1, relief));
+  return {
+    carryMult: li.carryMult < 1 ? li.carryMult + (1 - li.carryMult) * r : li.carryMult,
+    dispersionMult: li.dispersionMult > 1 ? li.dispersionMult + (1 - li.dispersionMult) * r : li.dispersionMult,
+  };
+}
+
 // --- Penalty model (PEN_INFO analogue) --------------------------------------
 export interface PenaltyInfo {
   /** Penalty strokes added. */
@@ -472,6 +488,9 @@ export interface ShotInput {
   carryMult?: number;
   /** Player dispersion multiplier (<1 = a forgiveness/stability perk). */
   dispersionMult?: number;
+  /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty.
+   *  Undefined = no relief (byte-for-byte). */
+  lieRelief?: number;
   stats?: ClubStats;
   /**
    * Deterministic directional bias (radians) added to the random spray angle — a character's
@@ -530,11 +549,13 @@ export function resolveShot(input: ShotInput): ShotResult {
   const shotBearing = bearing(from, aim);
   const biomeMult = input.carryMult ?? 1;
   const nominal = clubDist(club, input.stats);
-  const intended = nominal * li.carryMult * biomeMult;
+  // Escape-specialist relief (no-op when absent → byte-for-byte unchanged).
+  const relief = reliedLie(li, input.lieRelief);
+  const intended = nominal * relief.carryMult * biomeMult;
 
   const w = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
 
-  const dispMult = li.dispersionMult * (input.dispersionMult ?? 1);
+  const dispMult = relief.dispersionMult * (input.dispersionMult ?? 1);
   const prof = dispersionProfile(nominal);
   const carrySd = intended * prof.carryFrac * dispMult;
   // Random spray is ANGULAR, not a flat sideways offset: a fraction-of-carry std-dev becomes the

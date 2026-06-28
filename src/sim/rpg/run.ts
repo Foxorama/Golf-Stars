@@ -218,6 +218,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     guard: run.loadout.caddyGuard,
     chipIn: run.loadout.chipInBoost,
     confidence: run.loadout.confidenceMod,
+    lieRelief: run.loadout.lieRelief,
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };

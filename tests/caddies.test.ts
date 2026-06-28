@@ -38,7 +38,7 @@ const richRun = (seed: number) => ({ ...startRun(seed), credits: 1_000_000 });
 describe('named caddies — uniqueness & shop gating', () => {
   it('the named caddies are all flagged caddy:"named" and are epic/legendary', () => {
     expect(NAMED_CADDY_IDS.slice().sort()).toEqual(
-      ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'space-ducks', 'suggestible-sam'].sort(),
+      ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'mystic-mole', 'sandy-sandsaver', 'space-ducks', 'suggestible-sam'].sort(),
     );
     for (const id of NAMED_CADDY_IDS) {
       const it = shopItem(id)!;
@@ -100,6 +100,8 @@ describe('caddy effects rebuild from perks (resume-safe, no save bump)', () => {
     expect(loadoutFromPerks(['convict-sheep']).caddyGuard).toEqual(CONVICT_SHEEP_GUARD);
     expect(loadoutFromPerks(['suggestible-sam']).clubSuggest).toBe(true);
     expect(loadoutFromPerks(['suggestible-sam']).confidenceMod).toEqual(SAM_CONFIDENCE);
+    expect(loadoutFromPerks(['sandy-sandsaver']).lieRelief).toBeGreaterThan(0);
+    expect(loadoutFromPerks(['mystic-mole']).puttBoost).toBeGreaterThan(0);
   });
 
   it('snapshot/resume reconstructs a hired caddy', () => {
@@ -209,6 +211,40 @@ describe('Suggestible Sam — club confidence (a real, gated scoring edge)', () 
     // A line with no penalty crossing reads clear.
     const clear: Hole = { ...withWater, hazards: [] };
     expect(forcedCarry(clear, [0, 0], [0, 300])).toBeNull();
+  });
+});
+
+describe('Sandy the Sand-Saver — lie relief (escape specialist, GS-mux)', () => {
+  const hole = generateCourse('sandy:relief', { holes: 6, distanceFromStart: 4 }).holes[0]!;
+  const club = CLUBS.find((c) => c.id === '7i')!;
+  const tgt: Vec = hole.green;
+
+  it('an absent lie-relief is byte-for-byte identical (no extra rng, landing unchanged)', () => {
+    for (let s = 0; s < 30; s++) {
+      const a = executeShot(hole, hole.tee, 'rough', tgt, club, { carryMult: 1 }, new Rng(`s:${s}`));
+      const b = executeShot(hole, hole.tee, 'rough', tgt, club, { carryMult: 1, lieRelief: undefined }, new Rng(`s:${s}`));
+      expect(b.ballAfter).toEqual(a.ballAfter);
+      expect(b.log.result.carry).toBe(a.log.result.carry);
+    }
+  });
+
+  it('relief recovers carry from a bad lie (rough flies closer to full)', () => {
+    let plain = 0;
+    let relieved = 0;
+    const n = 80;
+    for (let s = 0; s < n; s++) {
+      plain += executeShot(hole, hole.tee, 'rough', tgt, club, { carryMult: 1 }, new Rng(`r:${s}`)).log.result.carry;
+      relieved += executeShot(hole, hole.tee, 'rough', tgt, club, { carryMult: 1, lieRelief: 0.6 }, new Rng(`r:${s}`)).log.result.carry;
+    }
+    expect(relieved / n).toBeGreaterThan(plain / n); // a real escape — more carry out of the rough
+  });
+
+  it('relief never helps a clean lie (fairway is unchanged)', () => {
+    for (let s = 0; s < 20; s++) {
+      const a = executeShot(hole, hole.tee, 'fairway', tgt, club, { carryMult: 1 }, new Rng(`f:${s}`));
+      const b = executeShot(hole, hole.tee, 'fairway', tgt, club, { carryMult: 1, lieRelief: 0.6 }, new Rng(`f:${s}`));
+      expect(b.log.result.carry).toBe(a.log.result.carry); // fairway carryMult is 1 → relief is a no-op
+    }
   });
 });
 

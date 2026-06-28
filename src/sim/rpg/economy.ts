@@ -75,6 +75,13 @@ export interface PlayerLoadout {
    * holds. Undefined = no caddy → never applied (no shape change, no extra rng → byte-for-byte).
    */
   confidenceMod?: ShapeMod;
+  /**
+   * Escape-specialist caddy lie relief (GS-mux, Sandy the Sand-Saver): 0..1, softens a BAD lie's
+   * carry + spray penalty toward neutral (rough/bunker/trees/waste recover much better). Threaded
+   * IDENTICALLY through the auto sim and the interactive driver so auto≡interactive holds; undefined
+   * = no relief → byte-for-byte unchanged.
+   */
+  lieRelief?: number;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
@@ -208,6 +215,13 @@ export const CONVICT_SHEEP_GUARD: CaddyGuard = { remove: ['shankR'], halve: ['sl
  * forfeit the boost). Tuned so it's a clear epic-tier scoring lift without trivialising the spray.
  */
 export const SAM_CONFIDENCE: ShapeMod = { hookL: -0.03, sliceR: -0.03, duckHookL: -0.015, shankR: -0.015 };
+
+/** Sandy the Sand-Saver's lie relief (GS-mux): recover ~60% of the way back to a neutral lie from
+ *  rough/sand/waste/trees — a clear escape-artist power without trivialising trouble. */
+export const SANDY_LIE_RELIEF = 0.6;
+/** Mystic Mole's manual-putt boost (GS-mux): a strong make-band/lag lift on the existing putt-skill
+ *  field, so manual putting sinks far more — a legendary-feeling green read at epic scarcity. */
+export const MOLE_PUTT_BOOST = 0.32;
 
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
@@ -371,6 +385,26 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     rarity: 'epic',
     caddy: 'named',
     apply: (m) => ({ ...m, clubSuggest: true, confidenceMod: SAM_CONFIDENCE, perks: [...m.perks, 'suggestible-sam'] }),
+  },
+  {
+    id: 'sandy-sandsaver',
+    name: 'Sandy the Sand-Saver',
+    cost: 280,
+    desc: 'A grizzled escape artist — recover from rough, sand, waste & trees with far less distance & spray lost',
+    rarity: 'epic',
+    caddy: 'named',
+    // GS-mux escape specialist: softens a BAD lie's carry + dispersion penalty toward neutral.
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, SANDY_LIE_RELIEF), perks: [...m.perks, 'sandy-sandsaver'] }),
+  },
+  {
+    id: 'mystic-mole',
+    name: 'Mystic Mole',
+    cost: 260,
+    desc: 'Lives under the greens & knows every break — your manual putts sink far more often',
+    rarity: 'epic',
+    caddy: 'named',
+    // Rides the existing putt-skill field: a big make-band + lag boost for the manual pace meter.
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + MOLE_PUTT_BOOST, perks: [...m.perks, 'mystic-mole'] }),
   },
 
   // --- Stackable upgrades (the endless credit sink + growing build) -----------
