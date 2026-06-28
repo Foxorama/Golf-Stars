@@ -85,9 +85,13 @@ export interface RenderOptions {
  *  [a0,a1] to carve out the flanking risk wedges separately from the central likely zone. */
 function spraySector(s: ShotSpread, a0: number, a1: number): Vec[] {
   const br = (s.bearing * Math.PI) / 180;
+  // Left-handed mirror (GS-lefty): negate the band angle about the bearing so the cone reads as the
+  // lefty's world-flipped landing distribution — matching resolveShot's lateral sign flip. The
+  // per-zone % labels ride the band (so hook% still shows where a lefty's hook actually goes).
+  const h = s.lefty ? -1 : 1;
   const at = (r: number, a: number): Vec => [
-    s.origin[0] + Math.sin(br + a) * r,
-    s.origin[1] + Math.cos(br + a) * r,
+    s.origin[0] + Math.sin(br + h * a) * r,
+    s.origin[1] + Math.cos(br + h * a) * r,
   ];
   const N = 10; // samples per arc — smooth enough at map scale
   const span = a1 - a0;
@@ -180,7 +184,8 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     }
     // Per-zone % labels (the true share of shots — straight off the shape) at each band's mid-angle.
     const br = (s.bearing * Math.PI) / 180;
-    const ptAt = (a: number, r: number): Vec => [s.origin[0] + Math.sin(br + a) * r, s.origin[1] + Math.cos(br + a) * r];
+    const hm = s.lefty ? -1 : 1; // mirror the % label angle to match the mirrored band (GS-lefty)
+    const ptAt = (a: number, r: number): Vec => [s.origin[0] + Math.sin(br + hm * a) * r, s.origin[1] + Math.cos(br + hm * a) * r];
     const rMid = s.carryLow + 0.5 * (s.carryHigh - s.carryLow);
     const zoneLabel = (a: number, r: number, txt: string, size: number): string => {
       const [lx, ly] = place(ptAt(a, r));

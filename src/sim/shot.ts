@@ -524,6 +524,15 @@ export interface ShotInput {
    *  green. Absent (the default) consumes NO extra rng, so a guard-less shot is byte-for-byte the
    *  same — the interception draws only fire when a caddy is actually watching. */
   guard?: CaddyGuard;
+  /**
+   * Left-handed mode (GS-lefty): mirror the player's lateral shot tendencies in WORLD space. A
+   * left-handed golfer is the mirror image of a right-handed one — their hook curves right, their
+   * slice left — so on a fixed course their misses (and a character's baked fade/hook) go the
+   * OPPOSITE way. Implemented as a single sign flip on the FINAL lateral angle (spray + bias), AFTER
+   * the rng draws and the canonical-frame guard classification: zero extra rng, and `false`/undefined
+   * is byte-for-byte identical to right-handed. Crosswind is NOT flipped — it's a world phenomenon,
+   * independent of the golfer's stance — so wind still shifts the cone the same way for both. */
+  lefty?: boolean;
   rng: Rng;
 }
 
@@ -630,8 +639,13 @@ export function resolveShot(input: ShotInput): ShotResult {
   // toward this axis, matching the old "+lateral = right" convention).
   const rx = Math.cos(br);
   const ry = -Math.sin(br);
+  // Left-handed mirror (GS-lefty): negate the PLAYER's lateral angle so hook/slice (and a character
+  // bias) curve the opposite world way — a pure sign on the final rotation, no rng touched, so a
+  // right-handed shot (h=1) is byte-for-byte unchanged. Crosswind (windLat) is world-fixed → NOT
+  // flipped, so wind shifts the cone identically for both hands.
+  const h = input.lefty ? -1 : 1;
   const landAt = (theta: number): Vec => {
-    const brR = br + theta;
+    const brR = br + h * theta;
     return [from[0] + Math.sin(brR) * carry + rx * windLat, from[1] + Math.cos(brR) * carry + ry * windLat];
   };
   const landing = landAt(thetaRand);

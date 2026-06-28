@@ -375,6 +375,15 @@
          44px-class touch target instead of inheriting the default button padding. */
       .gs-ctrlrow [data-cycle] { min-width: 46px; padding: 11px 8px; font-size: 17px; }
 
+      /* Left-handed mode (GS-lefty): mirror the full-map HUD so the reach-critical chrome falls under
+         a LEFT thumb, pairing with the mirrored golfer/caddy/spray-cone on the map. The floating nav
+         column (overview/zoom/⚙) moves to the left edge, the top info chip swaps to the right to clear
+         it, and the bottom panel reverses so the caddy badge sits right and the round action button
+         lands on the left. The club ◄/► arrows are NOT reversed — their glyphs are directional. */
+      .gs-shot--lefty .gs-mapctrl { right: auto; left: 8px; }
+      .gs-shot--lefty .gs-hud-top { left: 56px; right: 8px; }
+      .gs-shot--lefty .gs-hud-bottom { flex-direction: row-reverse; }
+
       /* Page never scrolls sideways — a fixed-width card a hair wider than a tiny viewport
          clips instead of creating a horizontal-scroll jiggle. */
       html, body { overflow-x: hidden; }

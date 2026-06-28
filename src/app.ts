@@ -979,7 +979,7 @@ function playingBody(animating: boolean): string {
     : '';
   const autoFinish = `<button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole">»</button>`;
   return `
-    <div class="gs-shot gs-shot--full">
+    <div class="gs-shot gs-shot--full${lefty() ? ' gs-shot--lefty' : ''}">
       <div class="gs-bigmap" data-map="1">${svg}</div>
       ${mapCtrls}
       ${mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` })}
@@ -1274,9 +1274,20 @@ function caddyId(): string | undefined {
   return namedCaddyOwned(state.run.loadout.perks);
 }
 
+/** Left-handed mode (GS-lefty) — the live player setting. The sim reads it off `loadout.lefty`
+ *  (synced from this in `render`), the renderers take it as an option, the CSS keys a modifier. */
+function lefty(): boolean {
+  return getSettings().leftHanded;
+}
+
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
+  // Settings → sim bridge (GS-lefty): the pure sim can't read localStorage, so bake the live
+  // left-handed setting onto the loadout here. render() runs after every dispatch and after the
+  // settings toggle's direct render(), so `loadout.lefty` is always current before the next shot
+  // reducer reads it — and it's NOT serialised (re-derived here on resume), so no save bump.
+  if (state.run?.loadout) state.run.loadout.lefty = lefty();
 
   // The interactive playing screen interleaves animation with input, so it computes its
   // own body (controls vs "watching") based on whether shots are pending animation.
@@ -1445,6 +1456,7 @@ function render(): void {
         width: meterW,
         band,
         caddyId: caddyId(),
+        lefty: lefty(),
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
       });
     }
@@ -1461,7 +1473,8 @@ function render(): void {
     if (ctx) {
       ctx.clearRect(0, 0, cbCanvas.width, cbCanvas.height);
       // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
-      drawCaddy(ctx, cbId, cbCanvas.width / 2, cbCanvas.height - 8, cbCanvas.height * 0.92, performance.now());
+      // Mirror the portrait in left-handed mode (GS-lefty) so the caddy faces with the flipped cast.
+      drawCaddy(ctx, cbId, cbCanvas.width / 2, cbCanvas.height - 8, cbCanvas.height * 0.92, performance.now(), lefty());
     }
   }
 
@@ -1477,6 +1490,7 @@ function render(): void {
         biome: holeBiome(hole), themeId: holeThemeId(hole),
         golferLook: golferLook(),
         caddyId: caddyId(),
+        lefty: lefty(),
         onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
       });
     }
@@ -1506,6 +1520,7 @@ function render(): void {
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
         golferLook: golferLook(),
         caddyId: caddyId(),
+        lefty: lefty(),
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,

@@ -150,6 +150,7 @@ export function previewShot(
     minCarryBoost: loadout.minCarryBoost,
     wedgeWindow: loadout.wedgeWindow,
     lieRelief: loadout.lieRelief,
+    lefty: loadout.lefty,
     // Suggestible Sam: the cone visibly tightens on the club he'd suggest (his confidence boost).
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
@@ -196,6 +197,7 @@ export function takeShot(
     lieRelief: loadout.lieRelief,
     guard: loadout.caddyGuard,
     chipIn: loadout.chipInBoost,
+    lefty: loadout.lefty,
     // Suggestible Sam: commit to his suggested club and the confidence boost folds into this shot.
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod

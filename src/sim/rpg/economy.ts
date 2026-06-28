@@ -86,6 +86,15 @@ export interface PlayerLoadout {
    * = no relief → byte-for-byte unchanged.
    */
   lieRelief?: number;
+  /**
+   * Left-handed mode (GS-lefty): a player SETTING (not a perk/purchase) baked onto the loadout at the
+   * app boundary so the pure sim can read it. Mirrors the golfer's lateral shot tendencies in world
+   * space — hook/slice and any character bias curve the opposite way — threaded IDENTICALLY through
+   * the auto sim (playStop) and the interactive driver (takeShot/previewShot) so auto≡interactive
+   * holds. Undefined/false = right-handed → byte-for-byte unchanged. Not serialised: re-derived from
+   * the live setting on resume, so it needs no save bump.
+   */
+  lefty?: boolean;
   /** Owned perk ids (each shop item is buyable once). */
   perks: string[];
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
