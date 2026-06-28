@@ -290,6 +290,7 @@
          translucent overlay, so nothing competes with the map for space. The page frame
          (.gs-main) drops its padding for this screen via .gs-main--bleed. */
       .gs-main--bleed { padding: 0; max-width: none; }
+      .gs-main--wide { max-width: 1180px; }
       .gs-shot--full {
         position: relative; width: 100%;
         height: 100vh; height: 100dvh; overflow: hidden;
@@ -449,6 +450,90 @@
         100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1); }
       }
       @media (prefers-reduced-motion: reduce) { .gs-spark { animation: none; opacity: 0; } }
+
+      /* ── Character select (GS-18, flashy redesign) ─────────────────────────────────── */
+      .gs-char-head { border-left: 4px solid var(--gs-accent); padding-left: 12px; margin-bottom: 4px; }
+      .gs-char-head h1 {
+        margin: 0; font-size: 26px; letter-spacing: .3px;
+        background: linear-gradient(90deg, #eaf6ff, #9fd0ff 55%, var(--gs-accent));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .gs-char-head p { opacity: .72; font-size: 13px; margin: .35em 0 0; max-width: 60ch; }
+      .gs-charwrap {
+        display: grid; grid-template-columns: 1fr;
+        gap: 16px; margin-top: 18px;
+      }
+      /* 2-up on tablet, a full 4-across roster lineup on desktop — never an orphan 3+1 row. */
+      @media (min-width: 560px) { .gs-charwrap { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (min-width: 1000px) { .gs-charwrap { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+      .gs-charcard {
+        position: relative; overflow: hidden; text-align: left; cursor: pointer;
+        display: flex; flex-direction: column; gap: 10px;
+        padding: 16px 16px 18px; border-radius: var(--gs-r-lg); color: var(--gs-ink);
+        border: 1px solid color-mix(in srgb, var(--cc) 45%, var(--gs-line));
+        background:
+          radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--cc) 22%, transparent), transparent 60%),
+          linear-gradient(180deg, #141823, var(--gs-bg-2));
+        box-shadow: var(--gs-shadow);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        opacity: 0; transform: translateY(14px);
+        animation: gs-char-in .42s cubic-bezier(.2,.7,.3,1) both;
+        transition: transform .16s ease, box-shadow .2s ease, border-color .2s ease;
+      }
+      @keyframes gs-char-in { to { opacity: 1; transform: none; } }
+      .gs-charcard:hover {
+        transform: translateY(-4px);
+        border-color: var(--cc);
+        box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--cc) 60%, transparent), 0 0 0 1px color-mix(in srgb, var(--cc) 50%, transparent) inset;
+      }
+      .gs-charcard:active { transform: translateY(-1px); }
+      .gs-charcard:focus-visible { outline: 2px solid var(--cc); outline-offset: 2px; }
+      /* A diagonal light sheen that sweeps across on hover. */
+      .gs-charcard-sheen {
+        position: absolute; inset: 0; pointer-events: none; z-index: 1;
+        background: linear-gradient(115deg, transparent 30%, color-mix(in srgb, var(--cc) 30%, #fff) 50%, transparent 70%);
+        opacity: 0; transform: translateX(-120%); mix-blend-mode: screen;
+      }
+      .gs-charcard:hover .gs-charcard-sheen { animation: gs-char-sheen .7s ease; }
+      @keyframes gs-char-sheen { 0% { opacity: 0; transform: translateX(-120%); } 35% { opacity: .8; } 100% { opacity: 0; transform: translateX(120%); } }
+      .gs-charcard > * { position: relative; z-index: 2; }
+      .gs-charcard-top { display: flex; gap: 12px; align-items: center; }
+      .gs-charcard-port {
+        flex: 0 0 auto; display: grid; place-items: center; width: 96px; height: 104px;
+        border-radius: 12px; background: radial-gradient(60% 60% at 50% 40%, #1b2230, #0d1018);
+        border: 1px solid color-mix(in srgb, var(--cc) 30%, var(--gs-line));
+      }
+      .gs-charcard-id { flex: 1 1 auto; min-width: 0; }
+      .gs-charcard-name { display: block; font-size: 18px; line-height: 1.15; text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent); }
+      .gs-charcard-org { font-size: 11.5px; opacity: .65; margin-top: 3px; }
+      .gs-charcard-blurb { font-size: 12.5px; opacity: .9; margin: 0; line-height: 1.45; }
+      .gs-charcard-stats { display: grid; gap: 5px; padding: 2px 0; }
+      .gs-stat { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; }
+      .gs-stat-l { font-size: 10px; font-weight: 700; letter-spacing: .6px; opacity: .6; }
+      .gs-stat-rail { height: 7px; border-radius: 999px; background: #ffffff12; overflow: hidden; }
+      .gs-stat-fill {
+        display: block; height: 100%; width: var(--w); border-radius: 999px;
+        box-shadow: 0 0 8px -1px currentColor;
+        animation: gs-stat-grow .6s .15s cubic-bezier(.2,.7,.3,1) both;
+      }
+      @keyframes gs-stat-grow { from { width: 0; } to { width: var(--w); } }
+      .gs-charcard-pc { list-style: none; padding: 0; margin: 0; font-size: 12px; line-height: 1.55; }
+      .gs-charcard-pc .gs-pc-i { display: inline-block; width: 14px; }
+      .gs-charcard-cta {
+        margin-top: auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        font-size: 13.5px; font-weight: 700; padding: 9px 12px; border-radius: var(--gs-r);
+        color: var(--cc); border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent);
+        background: color-mix(in srgb, var(--cc) 12%, transparent);
+        transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+      }
+      .gs-charcard:hover .gs-charcard-cta {
+        color: #0b0d12; background: var(--cc);
+        box-shadow: 0 0 18px -2px color-mix(in srgb, var(--cc) 70%, transparent);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .gs-charcard, .gs-stat-fill { animation: none; opacity: 1; transform: none; }
+        .gs-charcard:hover .gs-charcard-sheen { animation: none; }
+      }
     </style>
   </head>
   <body>

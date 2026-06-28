@@ -25,7 +25,7 @@ import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { clubOfferNote, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
-import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle } from './sim/rpg/characters';
+import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
@@ -295,12 +295,21 @@ function titleScreen(): string {
 
 /** A compact inline-SVG of the play-view golfer silhouette, tinted to a character (GS-18). Static
  *  preview for the select card — same crew silhouette (legs, shirt torso, skin arms/head, cap +
- *  club) the on-course figure uses, so the card reads as "this is who you'll see swinging". */
-function golferSVG(style: GolferStyle, w = 78, h = 104): string {
+ *  club) the on-course figure uses, so the card reads as "this is who you'll see swinging". A soft
+ *  character-coloured aura disc sits behind the figure so the portrait pops on the dark card. */
+function golferSVG(style: GolferStyle, w = 104, h = 132): string {
   const s = style.build;
   return `
-    <svg viewBox="0 0 78 104" width="${w}" height="${h}" aria-hidden="true" style="display:block;">
-      <ellipse cx="39" cy="99" rx="${20 * s}" ry="4" fill="rgba(0,0,0,0.28)"/>
+    <svg viewBox="0 0 78 104" width="${w}" height="${h}" aria-hidden="true" style="display:block;overflow:visible;">
+      <defs>
+        <radialGradient id="ga-${style.cap.slice(1)}" cx="50%" cy="42%" r="58%">
+          <stop offset="0%" stop-color="${style.cap}" stop-opacity="0.55"/>
+          <stop offset="55%" stop-color="${style.cap}" stop-opacity="0.16"/>
+          <stop offset="100%" stop-color="${style.cap}" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="39" cy="44" rx="42" ry="46" fill="url(#ga-${style.cap.slice(1)})"/>
+      <ellipse cx="39" cy="99" rx="${20 * s}" ry="4" fill="rgba(0,0,0,0.32)"/>
       <g transform="translate(39,52) scale(${s}) translate(-39,-52)" stroke-linecap="round" stroke-linejoin="round">
         <!-- legs -->
         <path d="M39 64 L31 96 M39 64 L48 96" stroke="#2c3142" stroke-width="7" fill="none"/>
@@ -319,32 +328,48 @@ function golferSVG(style: GolferStyle, w = 78, h = 104): string {
     </svg>`;
 }
 
+/** A flashy 0–5 stat bar for the select card — `n` lit pips in the character colour over a dark rail,
+ *  the fill width set as a CSS var so it can animate in on card reveal. */
+function statBar(label: string, n: number, col: string): string {
+  const pct = Math.max(0, Math.min(5, n)) / 5 * 100;
+  return `
+    <div class="gs-stat">
+      <span class="gs-stat-l">${label}</span>
+      <span class="gs-stat-rail"><span class="gs-stat-fill" style="--w:${pct}%;background:linear-gradient(90deg,${col},${col}cc);"></span></span>
+    </div>`;
+}
+
 function characterScreen(): string {
-  const cards = CHARACTERS.map((ch) => {
-    const pros = ch.pros.map((p) => `<li style="color:var(--gs-accent);">✓ <span style="color:var(--gs-ink);">${p}</span></li>`).join('');
-    const cons = ch.cons.map((c) => `<li style="color:var(--gs-warn);">▲ <span style="color:var(--gs-dim);">${c}</span></li>`).join('');
+  const statRows = (st: GolferStats, col: string): string =>
+    statBar('PWR', st.power, col) + statBar('ACC', st.accuracy, col) + statBar('TCH', st.touch, col) + statBar('CON', st.consistency, col);
+
+  const cards = CHARACTERS.map((ch, i) => {
+    const cap = ch.style.cap;
+    const pros = ch.pros.map((p) => `<li><span class="gs-pc-i" style="color:var(--gs-accent);">✓</span> <span style="color:var(--gs-ink);">${p}</span></li>`).join('');
+    const cons = ch.cons.map((c) => `<li><span class="gs-pc-i" style="color:var(--gs-warn);">▲</span> <span style="color:var(--gs-dim);">${c}</span></li>`).join('');
     return `
-      <div class="gs-panel gs-clickcard" style="display:flex;flex-direction:column;gap:8px;border-color:${ch.style.cap}55;">
-        <div style="display:flex;gap:12px;align-items:center;">
-          <div style="flex:0 0 auto;background:linear-gradient(180deg,#0e1118,#161b27);border-radius:10px;padding:4px 6px;">${golferSVG(ch.style)}</div>
-          <div style="flex:1 1 auto;">
-            <b style="font-size:16px;color:${ch.style.cap};">${ch.name}</b>
-            <div style="font-size:11.5px;opacity:.7;margin-top:1px;">${ch.origin} · ${ch.identity}</div>
-            <p style="font-size:12.5px;opacity:.85;margin:.4em 0 0;">${ch.blurb}</p>
+      <button class="gs-charcard" data-action='${JSON.stringify({ type: 'selectCharacter', characterId: ch.id })}'
+        style="--cc:${cap};animation-delay:${i * 70}ms;">
+        <span class="gs-charcard-sheen" aria-hidden="true"></span>
+        <div class="gs-charcard-top">
+          <div class="gs-charcard-port">${golferSVG(ch.style)}</div>
+          <div class="gs-charcard-id">
+            <b class="gs-charcard-name" style="color:${cap};">${ch.name}</b>
+            <div class="gs-charcard-org">${ch.origin} · ${ch.identity}</div>
           </div>
         </div>
-        <ul style="list-style:none;padding:0;margin:0;font-size:12px;line-height:1.5;">${pros}${cons}</ul>
-        ${btn(`Choose ${ch.name.split(' ')[0]}`, { type: 'selectCharacter', characterId: ch.id }, { variant: 'primary', block: true })}
-      </div>`;
+        <p class="gs-charcard-blurb">${ch.blurb}</p>
+        <div class="gs-charcard-stats">${statRows(ch.stats, cap)}</div>
+        <ul class="gs-charcard-pc">${pros}${cons}</ul>
+        <span class="gs-charcard-cta" style="--cc:${cap};">Voyage as ${ch.name.split(' ')[0]} <span aria-hidden="true">→</span></span>
+      </button>`;
   }).join('');
   return `
-    <header style="border-left:4px solid #5fd45a;padding-left:10px;">
-      <h1 style="margin:0;font-size:22px;">Choose your golfer</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Each plays the galaxy differently — a clear strength, a clear quirk. Pick who you'll voyage as.</p>
+    <header class="gs-char-head">
+      <h1>Choose your golfer</h1>
+      <p>Four wildly different swings. Each trades a clear strength for a clear quirk — pick who you'll voyage the galaxy as.</p>
     </header>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:1em;">
-      ${cards}
-    </div>`;
+    <div class="gs-charwrap">${cards}</div>`;
 }
 
 /**
@@ -1337,7 +1362,9 @@ function render(): void {
   // The interactive play screen (decision / watching / putting — but not the hole-complete card) is
   // full-bleed: the map fills the page, so drop the page frame's padding/max-width for it.
   const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
+  // The character-select roster wants a wider frame so all four golfers line up across one screen.
+  const wide = state.screen === 'character';
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
