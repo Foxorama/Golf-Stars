@@ -593,17 +593,19 @@ function playingBody(animating: boolean): string {
   }
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
   const usable = usableBag(bag, play.lie, state.run.loadout.driverAnywhere ?? false);
-  // Club suggestions are a Suggestible Sam caddy perk (GS-caddy): without a caddy reading the yardage
-  // there is no 🎯 suggestion and the default-selected club is a neutral pick you override yourself.
+  // The EXPLICIT suggestion affordances are a Suggestible Sam caddy perk (GS-caddy): the 🎯 snap-back
+  // button, the legend's `suggested: …` readout, the 🎒 yardage read, and the confidence scoring edge
+  // only appear with Sam. But the DEFAULT-selected club is the green-coverage pick for EVERYONE — its
+  // whole job is to stop you flying the green, so handing the base flow the longest club (an overshoot
+  // by default) was an overcorrection. Sam sells the precise read + confidence, not "don't overshoot".
   const hasSuggest = !!state.run.loadout.clubSuggest;
   const onGreenPutter = v.lie === 'green' && usable.some((c) => c.id === 'putter');
-  // The green-coverage suggestion (only surfaced/used with Sam). Putter is the obvious green default
-  // for everyone — that's not a "suggestion", just the only sensible flat-stick choice.
+  // The green-coverage suggestion. Putter is the obvious green default for everyone — that's not a
+  // "suggestion", just the only sensible flat-stick choice.
   const suggested = onGreenPutter ? 'putter' : v.attackClubId;
-  // Default selection: putter on the green; with Sam the suggested club; otherwise the longest usable
-  // club (you read the distance + carry labels and cycle to the club you want).
-  const longestUsable = usable.filter((c) => c.id !== 'putter').reduce((a, b) => (b.carry > a.carry ? b : a), usable[0]!);
-  const defaultClubId = onGreenPutter ? 'putter' : hasSuggest ? v.attackClubId : longestUsable.id;
+  // Default selection: putter on the green, else the green-coverage club (longest that still stops on
+  // the green). You can still cycle/override; Sam just makes the suggestion explicit and snap-back-able.
+  const defaultClubId = suggested;
   if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = defaultClubId;
   // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
   const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined };

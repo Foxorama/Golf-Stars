@@ -466,13 +466,17 @@ This game lives or dies on three axes — put every change through all three bef
   `isNamedCaddy`, `namedCaddyOwned(perks)`.
 - **Suggestible Sam — club suggestions are a caddy perk (`clubSuggest`) AND a real scoring edge
   (`confidenceMod`).** Two coupled effects, both off hiring Sam:
-  - **(1) Suggestions are no longer the default flow.** The interactive 🎯 Suggested button, the
-    legend's `suggested: attack X · safe Y` readout, AND the default-selected club (the green-coverage
-    `suggestPlayerClub` pick) only appear with Sam. The BASE flow has no caddy reading the yardage: the
-    play screen surfaces no suggestion and the default club is a NEUTRAL pick (putter on the green, else
-    the longest usable club) you read the distance + carry labels and cycle to yourself.
+  - **(1) The EXPLICIT suggestion affordances are Sam's — the smart DEFAULT club is everyone's.** The
+    interactive 🎯 Suggested snap-back button and the legend's `suggested: attack X · safe Y` readout
+    only appear with Sam. BUT the default-selected club is the green-coverage `suggestPlayerClub` pick
+    (longest club that still STOPS on the green) for EVERYONE, not just Sam. Gating the default club too
+    was an overcorrection: it handed the base flow the LONGEST usable club, so a non-Sam approach
+    defaulted to the driver and flew the green — the exact overshoot `suggestPlayerClub` exists to
+    prevent. Sam sells the precise read (the explicit button + readout + yardages) and the confidence
+    edge, NOT "don't overshoot by default". (Putter is still the green default for all.)
     `suggestPlayerClub`/`shotView.attackClubId` are unchanged and still computed — `app.ts` just GATES
-    surfacing them on `loadout.clubSuggest`. Sam also surfaces a **caddy yardage read** (a 🎒 Sam line
+    the explicit affordances on `loadout.clubSuggest` while using the pick as the default club always.
+    Sam also surfaces a **caddy yardage read** (a 🎒 Sam line
     on the play screen): precise front/middle/back green distances (`greenDepth` + centroid dist) and
     the carry to clear the nearest forced penalty on the line to the pin (`forcedCarry`, a pure
     line-vs-penalty sampler in `round.ts` — info only, never feeds fairness/scoring).
