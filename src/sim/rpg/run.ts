@@ -34,12 +34,12 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossSpec } from './formats';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossSpec, type StopSpec } from './formats';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { themeForStop, resolveBiome, itemThemeWeight } from '../course/themes';
+import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, type Theme } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked' | 'won';
@@ -143,6 +143,12 @@ export function currentTheme(run: Run) {
 export function currentCourse(run: Run): Course {
   const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
   const theme = currentTheme(run);
+  // GS-variation: a split-biome stop CROSSES TWO WORLDS — the front holes are this stop's theme, the
+  // back holes a different theme of the same arc. Each half is generated independently and stitched,
+  // every hole stamped with its own biome/themeId so it renders + plays as its world.
+  if (spec.splitBiome && spec.holes >= 2) {
+    return stitchSplitCourse(run, spec.holes, spec.parCap, theme);
+  }
   return generateCourse(stopSeed(run), {
     holes: spec.holes,
     parCap: spec.parCap,
@@ -151,6 +157,51 @@ export function currentCourse(run: Run): Course {
     biomeRow: resolveBiome(theme),
     themeId: theme.id,
   });
+}
+
+/** Stamp every hole of a course with its biome/theme render keys (GS-variation). Pure. */
+function stampHoles(course: Course): Course {
+  return { ...course, holes: course.holes.map((h) => ({ ...h, biome: course.biome, themeId: course.meta.themeId })) };
+}
+
+/**
+ * Build a two-world stop (GS-variation): front holes from `themeA`, back holes from a DISTINCT theme
+ * of the same arc, concatenated into one Course. Holes carry their own biome/themeId so both renderer
+ * and per-hole physics (biomeMods) read the right world. Deterministic from the run + stop. The
+ * course's top-level identity is the front theme (the card leads with it); `meta.split` flags it.
+ */
+function stitchSplitCourse(run: Run, holes: number, parCap: StopSpec['parCap'], themeA: Theme): Course {
+  const front = Math.ceil(holes / 2);
+  const back = holes - front;
+  const arc = arcForDistance(run.distanceFromStart);
+  // A second, distinct theme of the same arc (re-draw until it differs; arcs have ≥9 themes).
+  const pick = new Rng(`${run.seed}:split:${run.stopIndex}`);
+  let themeB = pickTheme(pick, arc);
+  for (let i = 0; i < 6 && themeB.id === themeA.id; i++) themeB = pickTheme(pick, arc);
+  const a = stampHoles(
+    generateCourse(`${stopSeed(run)}:front`, {
+      holes: front,
+      parCap,
+      distanceFromStart: run.distanceFromStart,
+      biomeRow: resolveBiome(themeA),
+      themeId: themeA.id,
+    }),
+  );
+  const b = stampHoles(
+    generateCourse(`${stopSeed(run)}:back`, {
+      holes: back,
+      parCap,
+      distanceFromStart: run.distanceFromStart,
+      biomeRow: resolveBiome(themeB),
+      themeId: themeB.id,
+    }),
+  );
+  return {
+    ...a,
+    holes: [...a.holes, ...b.holes],
+    // Lead with the front theme's identity; flag the split + record the back theme for the UI.
+    meta: { ...a.meta, themeId: themeA.id, split: { backThemeId: themeB.id, frontHoles: front } },
+  };
 }
 
 /**

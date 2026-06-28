@@ -365,10 +365,17 @@ function introScreen(): string {
          ${partner ? `<div style="font-size:12.5px;margin-top:6px;color:${partner.style.cap};">🤝 Partner: <b>${partner.name}</b> — two balls a shot, the better one counts.</div>` : ''}
        </div>`
     : '';
+  // Two-world split stop (GS-variation): tell the player the back nine crosses into another world.
+  const split = state.course.meta.split;
+  const splitNote = split
+    ? `<div style="margin:.2em 0 .6em;padding:7px 11px;border-left:3px solid #7aa2ff;border-radius:8px;background:#ffffff08;">
+         🌗 <b>Two worlds</b> — the first ${split.frontHoles} holes play one world, then you cross into another for the run home.</div>`
+    : '';
   return `
     ${header()}
     <p style="opacity:.8;">${boss ? 'The course of legend awaits…' : 'A new world rises from the void…'}</p>
     ${bossBanner}
+    ${splitNote}
     ${zoneIdentityHTML()}
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
@@ -831,7 +838,7 @@ function zoneScoreChip(): string {
 function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
-  const cond = conditionsSummary(play.hole, state.course.biome);
+  const cond = conditionsSummary(play.hole, holeBiome(play.hole));
   // Scramble (GS-scramble): a co-op boss — show the partner + whether the last shot kept their ball.
   const boss = currentBoss(state.run);
   const scrambleLine = boss?.partner === 'scramble'
@@ -893,7 +900,7 @@ function playingBody(animating: boolean): string {
     ];
     const puttSvg = renderHoleSVG(play.hole, {
       shots: play.shots,
-      biome: state.course.biome, themeId: state.course.meta.themeId,
+      biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -961,7 +968,7 @@ function playingBody(animating: boolean): string {
   const mapOpts = decisionView(play, spray);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
-    biome: state.course.biome, themeId: state.course.meta.themeId,
+    biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     ball: play.ball,
     spray,
     sprayGeom,
@@ -1277,6 +1284,15 @@ function gameoverScreen(): string {
     </div>`;
 }
 
+/** Per-hole render keys (GS-variation): a split-biome stop's back holes carry their own biome/theme,
+ *  so each hole renders + reads as its world; fall back to the course-level keys otherwise. */
+function holeBiome(h: { biome?: string }): string {
+  return h.biome ?? state.course.biome;
+}
+function holeThemeId(h: { themeId?: string }): string | undefined {
+  return h.themeId ?? state.course.meta.themeId;
+}
+
 /** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. */
 function golferLook(): GolferStyle | undefined {
   return getCharacter(state.run.loadout.characterId)?.style;
@@ -1480,7 +1496,7 @@ function render(): void {
       view = mountPlayView(playEl, hole, holePlay.shots, holePlay.putts, {
         width: 340,
         height: 520,
-        biome: state.course.biome, themeId: state.course.meta.themeId,
+        biome: holeBiome(hole), themeId: holeThemeId(hole),
         golferLook: golferLook(),
         caddyId: caddyId(),
         onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
@@ -1509,7 +1525,7 @@ function render(): void {
       view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
         width: animW,
         height: animH,
-        biome: state.course.biome, themeId: state.course.meta.themeId,
+        biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
         golferLook: golferLook(),
         caddyId: caddyId(),
         focus,

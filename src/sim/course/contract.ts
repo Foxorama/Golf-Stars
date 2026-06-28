@@ -74,6 +74,14 @@ export interface Hole {
   hazards: Feature[];
   wind?: Wind;
   biomeMods?: BiomeMod[];
+  /**
+   * Per-hole biome/theme identity (GS-variation): on a SPLIT-biome stop the back holes belong to a
+   * different world than the front, so each hole carries its own render keys. Absent ⇒ the hole uses
+   * the course-level biome/themeId (the original single-world behaviour). Render-only — physics ride
+   * `biomeMods`.
+   */
+  biome?: string;
+  themeId?: string;
 }
 
 export interface CourseMeta {
@@ -84,6 +92,9 @@ export interface CourseMeta {
   wildness: number;
   /** Star-travel theme id (GS-17) the stop flew into; the render layer keys flavour off it. */
   themeId?: string;
+  /** Split-biome stop (GS-variation): the back holes belong to a different world. The back theme id +
+   *  how many front holes precede it. Absent ⇒ a single-world stop. */
+  split?: { backThemeId: string; frontHoles: number };
 }
 
 export interface Course {
