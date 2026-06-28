@@ -605,9 +605,17 @@ This game lives or dies on three axes — put every change through all three bef
   byte stable. Lives in `executeShot` so auto≡interactive. (NOT a flat 33% on every wedge — that would
   break the birdie/eagle balance; it's a chip-in near the pin.)
 - **Render (`render/caddyArt.ts`, eyes-on feel).** The hired caddy is drawn as a self-contained Canvas2D
-  figure (house "no asset" style) in the play-view's bottom-left corner the whole hole, and beside the
-  putt meter while putting (`PlayViewOptions.caddyId` / `PuttMeterOptions.caddyId`, both fed from
-  `namedCaddyOwned`). Figures: Penelope (teal caddy + flag), Driver Dan (burly + big driver), Dr
+  figure (house "no asset" style), but WHERE it shows is scoped to where it has a role (GS-caddy-display):
+  the decision screen always shows the hired caddy in its framed gold badge (`caddyBadgeHTML` →
+  `.gs-caddybadge`, the "cool outline"); the LIVE play view's bottom-left corner shows ONLY a guard
+  caddy (`flightCaddyId` = `caddyProjectile(id) != null` — Space Ducks / Convict Sheep, the only ones
+  with a flight-time job firing the redirect laser/boomerang), since any other caddy looming over the
+  ball-in-flight just clutters it (and it's already in the decision badge); and the PUTTING screen shows
+  ONLY a putting specialist in the SAME framed badge (`puttCaddyId` = `isPuttingCaddy(id)` →
+  Penelope/Mystic Mole, `PUTTING_CADDY_IDS` in economy) — a distance/guard caddy like Driver Dan has no
+  role on the green. The putt meter itself no longer draws a figure (it uses its full width); the badge
+  sits beside it. Both framed badges are one generic render pass (`canvas.gs-caddycv[data-caddy]`) so
+  every screen draws identically. Figures: Penelope (teal caddy + flag), Driver Dan (burly + big driver), Dr
   Chipinski (lab coat + wedge), Space Ducks (bubble-helmet duck + top hat + laser rifle), Convict Sheep
   (striped jumpsuit + boomerang). On a redirect, `playView` flies the ball toward `originalLanding`,
   fires the caddy's projectile (`drawCaddyProjectile` — laser beam / spinning boomerang) from the
@@ -1013,11 +1021,13 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   putt-meter canvas) capture taps; the framed caddy badge is explicitly kept pass-through. The ball
   bias eased to `DMAP_BIAS 0.72` so it reads ABOVE the bottom panel, not behind it. Applies to the
   decision, watching, and putting screens (the hole-complete card stays a normal centred layout).
-- **The hired caddy is shown FRAMED on the decision screen (GS-fullmap).** A gold-bordered glass badge
-  in the bottom-left corner draws the hired caddy's figure (the same `drawCaddy` the play view / putt
-  meter use) with its name, so the caddy stands out the whole hole — not just during the shot
-  animation. Drawn one-shot per render to a `#caddybadge` canvas (the idle bob updates live while
-  charging, so no rAF to leak); absent when no named caddy is hired. Verified eyes-on.
+- **The hired caddy is shown FRAMED on the decision screen (GS-fullmap), and on the putting screen for a
+  putting caddy (GS-caddy-display).** A gold-bordered glass badge (`caddyBadgeHTML` → `.gs-caddybadge`)
+  draws the caddy's figure (the same `drawCaddy` the play view uses) with its name, so the caddy stands
+  out the whole hole. Drawn one-shot per render via a generic pass over every `canvas.gs-caddycv[data-caddy]`
+  (the idle bob updates live while charging, so no rAF to leak); each badge carries its caddy id in
+  `data-caddy`, so the decision and putting screens share the one draw loop. Absent when there's no
+  relevant caddy (decision: no caddy hired; putting: no putting specialist). Verified eyes-on.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the

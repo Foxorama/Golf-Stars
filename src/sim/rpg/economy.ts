@@ -702,6 +702,16 @@ export function isNamedCaddy(id: string): boolean {
   return NAMED_CADDY_IDS.includes(id);
 }
 
+/** Putting-specialist caddies (GS-caddy): Penelope auto-putts, Mystic Mole reads the green. They
+ *  are the only caddies with a role on the putting screen — a distance/guard/short-game caddy has
+ *  nothing to do with the putter, so the green shows none of them. */
+export const PUTTING_CADDY_IDS: readonly string[] = ['auto-caddie', 'mystic-mole'];
+
+/** Does this caddy actively help on the green (auto-putt or green-read)? */
+export function isPuttingCaddy(id: string | undefined): boolean {
+  return !!id && PUTTING_CADDY_IDS.includes(id);
+}
+
 /** The named caddy currently on the bag, if any (you may hire only one). */
 export function namedCaddyOwned(perks: readonly string[]): string | undefined {
   return perks.find((p) => isNamedCaddy(p));
