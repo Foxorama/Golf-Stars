@@ -10,12 +10,15 @@
 import type { Course } from '../sim/course/contract';
 import type { PlayedHole, PuttControl } from '../sim/round';
 import {
+  ASCENSION_MAX,
+  bank,
   buy,
   currentCourse,
   finishStop,
   playStop,
   resumeRun,
   routeOptions,
+  scrambleOptsFor,
   shardsForRun,
   shopOffer,
   startRun,
@@ -64,6 +67,8 @@ export interface UiState {
    * reshuffle the cards. Live cost/stack state is recomputed from `run` at render time.
    */
   shopOffer?: string[];
+  /** How many times the current shop's stock has been rerolled (GS-shop-reroll) — drives the salt + cost. */
+  shopRerolls?: number;
   /** Which hole the play view is showing (0-based). */
   viewHole: number;
   /** A saved in-progress run that the title screen can resume, if any. */
@@ -84,10 +89,12 @@ export interface UiState {
   metaUpgrades: MetaUpgrades;
   /** Shards earned by the run that just ended — shown on the gameover screen. */
   lastRunShards?: number;
+  /** Highest Ascension tier unlocked (GS-ascension) — selectable on the title for a voyage. */
+  maxAscension: number;
 }
 
 export type Action =
-  | { type: 'start'; format: string }
+  | { type: 'start'; format: string; ascension?: number }
   | { type: 'selectCharacter'; characterId: string } // pick a golfer, then begin the run
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
@@ -98,8 +105,10 @@ export type Action =
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
   | { type: 'buy'; id: string }
+  | { type: 'rerollShop' } // pay credits to redraw the outfitter's stock (GS-shop-reroll)
   | { type: 'leaveShop' }
   | { type: 'route'; routeId: number }
+  | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
   | { type: 'viewHole'; hole: number }
   | { type: 'openOutpost' } // visit the between-run Outpost (from title or gameover)
   | { type: 'buyUpgrade'; id: string } // buy a permanent upgrade with shards
@@ -111,6 +120,7 @@ export interface MetaProgress {
   bestDistance?: number;
   shards?: number;
   metaUpgrades?: MetaUpgrades;
+  maxAscension?: number;
 }
 
 /**
@@ -136,7 +146,20 @@ export function initState(
     bestDistance: meta.bestDistance ?? 0,
     shards: meta.shards ?? 0,
     metaUpgrades,
+    maxAscension: meta.maxAscension ?? 0,
   };
+}
+
+/** The credit cost of the NEXT shop reroll (GS-shop-reroll) — base 30, ×1.6 per reroll this stop. */
+export const REROLL_BASE_COST = 30;
+export function rerollCost(rerolls: number): number {
+  return Math.round(REROLL_BASE_COST * Math.pow(1.6, Math.max(0, rerolls)));
+}
+
+/** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
+function unlockedAscension(state: UiState, run: Run): number {
+  if (run.endedReason !== 'won') return state.maxAscension;
+  return Math.min(ASCENSION_MAX, Math.max(state.maxAscension, run.ascension + 1));
 }
 
 export function reduce(state: UiState, action: Action): UiState {
@@ -146,7 +169,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // Lock in the chosen format, then pick a golfer before the run begins (GS-18). The run is
       // (re)built with the format now so the course preview works; the character layers on at
       // `selectCharacter`. `run.formatId` carries the pending choice — no extra state needed.
-      const run = startRun(state.run.seed, action.format, state.metaUpgrades);
+      // Ascension (GS-ascension) is chosen on the title for a voyage; clamp to what's unlocked.
+      const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? 0));
+      const run = startRun(state.run.seed, action.format, state.metaUpgrades, undefined, asc);
       return {
         ...state,
         run,
@@ -162,8 +187,8 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'selectCharacter': {
       if (state.screen !== 'character') return state;
-      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format chosen at 'start'.
-      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId);
+      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + ascension chosen at 'start'.
+      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId, state.run.ascension);
       return { ...state, run, course: currentCourse(run), screen: 'intro' };
     }
 
@@ -186,7 +211,9 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'play': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       const { run, result, played } = playStop(state.run);
-      const ended = !result.passed;
+      // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
+      // the gameover/victory screen; a survived non-final stop goes to the result screen.
+      const ended = run.status !== 'active';
       const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
@@ -194,11 +221,12 @@ export function reduce(state: UiState, action: Action): UiState {
         played,
         lastResult: result,
         viewHole: 0,
-        screen: result.passed ? 'result' : 'gameover',
+        screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
+        maxAscension: unlockedAscension(state, run),
       };
     }
 
@@ -224,6 +252,7 @@ export function reduce(state: UiState, action: Action): UiState {
         state.run.loadout,
         state.holeRng,
         auto,
+        scrambleOptsFor(state.run),
       );
       return { ...state, play };
     }
@@ -238,11 +267,12 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'playing' || !state.play || !state.holeRng) return state;
       let p = state.play;
       let guard = 0;
+      const scramble = scrambleOptsFor(state.run);
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
       while (!p.done && guard++ < 40) {
         p = awaitingPutt(p)
           ? takePutt(p, state.run.loadout, state.holeRng)
-          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true);
+          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble);
       }
       return { ...state, play: p };
     }
@@ -256,7 +286,7 @@ export function reduce(state: UiState, action: Action): UiState {
       }
       // Stop complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
-      const ended = !result.passed;
+      const ended = run.status !== 'active';
       const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
@@ -267,11 +297,12 @@ export function reduce(state: UiState, action: Action): UiState {
         played: stopPlayed,
         lastResult: result,
         viewHole: 0,
-        screen: result.passed ? 'result' : 'gameover',
+        screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
+        maxAscension: unlockedAscension(state, run),
       };
     }
 
@@ -283,12 +314,28 @@ export function reduce(state: UiState, action: Action): UiState {
         ...state,
         screen: 'shop',
         shopOffer: shopOffer(state.run).map((o) => o.item.id),
+        shopRerolls: 0,
       };
     }
 
     case 'buy': {
       if (state.screen !== 'shop') return state;
       return { ...state, run: buy(state.run, action.id) };
+    }
+
+    case 'rerollShop': {
+      // Pay an escalating fee to redraw the outfitter's stock (GS-shop-reroll): agency over the offer.
+      if (state.screen !== 'shop') return state;
+      const rerolls = state.shopRerolls ?? 0;
+      const cost = rerollCost(rerolls);
+      if (state.run.credits < cost) return state;
+      const next = rerolls + 1;
+      return {
+        ...state,
+        run: { ...state.run, credits: state.run.credits - cost },
+        shopRerolls: next,
+        shopOffer: shopOffer(state.run, undefined, next).map((o) => o.item.id),
+      };
     }
 
     case 'leaveShop': {
@@ -310,6 +357,24 @@ export function reduce(state: UiState, action: Action): UiState {
         lastResult: undefined,
         routes: undefined,
         viewHole: 0,
+      };
+    }
+
+    case 'bank': {
+      // Push-your-luck cash-out (GS-bank): only between stops (the travel screen), where you've
+      // survived the last cut and hold credits worth locking in. Banking ends the run with its
+      // credits converted to shards (busting forfeits them) — see shardsForRun.
+      if (state.screen !== 'travel' || state.run.status !== 'active') return state;
+      const run = bank(state.run);
+      const earned = shardsForRun(run);
+      return {
+        ...state,
+        run,
+        routes: undefined,
+        screen: 'gameover',
+        bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        shards: state.shards + earned,
+        lastRunShards: earned,
       };
     }
 
@@ -347,6 +412,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: state.bestDistance,
         shards: state.shards,
         metaUpgrades: state.metaUpgrades,
+        maxAscension: state.maxAscension,
       });
     }
   }

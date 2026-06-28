@@ -374,6 +374,47 @@ This game lives or dies on three axes — put every change through all three bef
 - **The spine** (`src/sim/rpg/run.ts`): `startRun → [playStop → buy* → travel]*` until a cut
   is missed. Pure/deterministic — a seed plays the same run; `simulateRun()` drives a whole run
   headlessly for tests.
+- **Push-your-luck banking (GS-bank).** `bank(run)` (reachable from the travel screen, stop 1+) ends a
+  run as `endedReason 'banked'` and `cashOutShards` converts its UNSPENT credits → shards
+  (`CREDITS_PER_SHARD` 20); a missed cut forfeits them (the cut path is byte-for-byte unchanged). So
+  every travel screen is a real "spend for power to push, or hold to bank" decision and credits have a
+  terminal value. `shardsForRun = base(distance×3+stops×2) + cashOut + (won ? WIN_SHARD_BONUS : 0)`.
+- **The Voyage = a bounded, WINNABLE campaign (GS-voyage, the headline format).** `formats.ts` gained
+  `BossSpec` + `StopSpec.boss/splitBiome` + `RunFormat.winnable/cutMult/maxJump`. `voyage` is three
+  arcs, each two ordinary stops then a BOSS (`bossAt`), the last `final` → clearing it sets
+  `endedReason 'won'` in `finishStop` (status ends, not 'active'). `effectiveCut` adds the boss
+  `cutBonus` AND scales the distance ramp by `cutMult` (a fixed-length run must PLATEAU, not spiral —
+  the endless flat/ladder formats keep cutMult 1, byte-identical) AND adds the Ascension bonus.
+  `routeOptions` caps the jump at `maxJump` and derives `elite` (the harder/richer lane — highest
+  `cutDelta`, no extra rng) + `bossAhead` previews. CRITICAL: flat/ladder are untouched (no boss, no
+  winnable, default cutMult/maxJump → existing tests + rng streams byte-identical). Auto reach-AI win
+  rate ~7.5% no-meta → ~40% maxed (interactive is higher); tune via cutMult/maxJump/cutBonus.
+- **Ascension difficulty ladder (GS-ascension).** `run.ascension` (0..`ASCENSION_MAX` 8, voyage-only in
+  practice) adds `ascensionCutBonus` (flat per stop) to `effectiveCut` and thins the starting purse
+  (floored at 20). Winning at your current top tier unlocks the next (`unlockedAscension` in the
+  reducer); the unlocked tier persists in **save v4** (`maxAscension`, v3→v4 migration). Selectable on
+  the title's voyage card (clamped to unlocked). Round-trips through snapshot/resume (absent → 0).
+- **Co-op SCRAMBLE bosses (GS-scramble).** A `boss.partner: 'scramble'` stop pairs you with an unchosen
+  golfer (`scramblePartnerId`, deterministic). `scrambleOptsFor(run)` carries the partner's swing shape;
+  `playHole` (auto) and `takeShot` (interactive) each fire a SECOND `executeShot` (partner's shape, same
+  club/target) and keep the better via `pickBetterExec` (holed > fewer penalties > closer to flag) for
+  ONE team stroke. CRITICAL: the partner draw fires ONLY when scramble is armed, so a normal hole's rng
+  stream is byte-for-byte unchanged and auto≡interactive holds (the player draw is first in both). It's
+  a real co-op assist (a boss course's mean SF lifts ~17.9→21.7), the fair-difficulty lever for bosses.
+- **Multi-biome SPLIT stops (GS-variation).** A `StopSpec.splitBiome` stop CROSSES TWO WORLDS:
+  `currentCourse` → `stitchSplitCourse` generates the front holes from the stop's theme and the back
+  holes from a DISTINCT theme of the same arc, concatenated; every Hole is stamped with its own
+  `biome`/`themeId` (new optional Hole fields, render-only — physics ride `biomeMods`) so it both
+  renders (per-hole `holeBiome`/`holeThemeId` in app.ts) and plays as its world. Each half goes through
+  the normal generator, so `validateFairness`/`validateCrossings` PROVE both fair (a split course only
+  builds if both halves pass). `CourseMeta.split` records it. Stops also vary in SIZE (voyage 6/7/9).
+- **Trigger relics + curse + reroll (GS-synergy).** Economy relics (`loadout.birdieCredit/eagleCredit/
+  comebackCredit`, via `relicCreditBonus(loadout, played, passed)`) pay credits at the end of a PASSED
+  stop for a PLAYSTYLE (aggression / comeback) and fold into `creditsForStop`'s `bonusFlat` BEFORE the
+  multiplier, so they COMPOUND with credit perks (the snowball archetype). A base loadout pays 0
+  (byte-for-byte economy); a failed stop pays 0. The **Glass Cannon** curse is an opt-in gamble (wider
+  hook/slice via shapeMod for +60% creditMult). The shop **reroll** (`rerollShop` action, `rerollCost`
+  30×1.6^n) redraws `shopOffer(run, size, salt)` — salt 0 keeps the original draw byte-identical.
 - **Fail gate = the cut line** (`economy.ts`): each stop needs a minimum Stableford that ramps
   with galaxy distance. Beat it to travel on; miss it and the run ends. Reuses the score we already
   compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.

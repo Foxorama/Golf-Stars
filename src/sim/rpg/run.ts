@@ -28,20 +28,22 @@ import {
   netDispersion,
   offerableClubs,
   ownedCount,
+  relicCreditBonus,
   shopItem,
   startingLoadout,
   type PlayerLoadout,
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossSpec, type StopSpec } from './formats';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
-import { applyCharacter, characterShotMods } from './characters';
+import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
+import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { themeForStop, resolveBiome, itemThemeWeight } from '../course/themes';
+import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, type Theme } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
-export type EndReason = 'cut' | 'banked';
+export type EndReason = 'cut' | 'banked' | 'won';
 
 export interface StopResult {
   stopIndex: number;
@@ -65,6 +67,11 @@ export interface Route {
   label: string;
   /** The risk/reward event waiting at the stop this route reaches (GS-14). */
   event: RouteEvent;
+  /** The HARDER path (GS-voyage): the deepest, highest-stakes lane this jump — biggest cut, biggest
+   *  payout. Derived from the drawn event (no extra rng), surfaced so the player can court the risk. */
+  elite?: boolean;
+  /** True if the stop this route reaches is a boss (GS-voyage) — previewed on the route card. */
+  bossAhead?: boolean;
 }
 
 export interface Run {
@@ -78,6 +85,9 @@ export interface Run {
   loadout: PlayerLoadout;
   /** Permanent meta-upgrade levels baked into this run's start (GS-12). Kept for resume. */
   meta: MetaUpgrades;
+  /** Ascension difficulty tier (GS-ascension): 0 = base; each level tightens every cut and thins the
+   *  starting purse. Selectable up to the highest tier unlocked by winning. Voyage-only in practice. */
+  ascension: number;
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
@@ -100,23 +110,37 @@ export function startingLoadoutFor(meta: MetaUpgrades, characterId?: string): Pl
   return applyMeta(meta, applyCharacter(characterId, startingLoadout()));
 }
 
+/** Ascension ladder (GS-ascension): a fixed-length campaign gets harder above the base difficulty,
+ *  unlocked one tier at a time by winning. Each level adds a flat per-stop cut and thins the purse. */
+export const ASCENSION_MAX = 8;
+export function ascensionCutBonus(level: number): number {
+  return Math.max(0, Math.round(level));
+}
+export function ascensionCreditPenalty(level: number): number {
+  return Math.max(0, Math.round(level)) * 8;
+}
+
 export function startRun(
   seed: number | string,
   formatId: string = DEFAULT_FORMAT,
   meta: MetaUpgrades = {},
   characterId?: string,
+  ascension = 0,
 ): Run {
   const rng = new Rng(seed);
+  const asc = Math.max(0, Math.min(ASCENSION_MAX, Math.round(ascension)));
   return {
     seed: rng.seed,
     formatId,
     stopIndex: 0,
     distanceFromStart: 0,
     // Permanent meta-progression bakes into the starting credits + loadout (GS-12); the chosen
-    // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor).
-    credits: metaStartingCredits(meta),
+    // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor). Ascension
+    // thins the starting purse (floored so it never strands you with nothing).
+    credits: Math.max(20, metaStartingCredits(meta) - ascensionCreditPenalty(asc)),
     loadout: startingLoadoutFor(meta, characterId),
     meta,
+    ascension: asc,
     firedEventIds: [],
     status: 'active',
     history: [],
@@ -137,6 +161,12 @@ export function currentTheme(run: Run) {
 export function currentCourse(run: Run): Course {
   const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
   const theme = currentTheme(run);
+  // GS-variation: a split-biome stop CROSSES TWO WORLDS — the front holes are this stop's theme, the
+  // back holes a different theme of the same arc. Each half is generated independently and stitched,
+  // every hole stamped with its own biome/themeId so it renders + plays as its world.
+  if (spec.splitBiome && spec.holes >= 2) {
+    return stitchSplitCourse(run, spec.holes, spec.parCap, theme);
+  }
   return generateCourse(stopSeed(run), {
     holes: spec.holes,
     parCap: spec.parCap,
@@ -145,6 +175,51 @@ export function currentCourse(run: Run): Course {
     biomeRow: resolveBiome(theme),
     themeId: theme.id,
   });
+}
+
+/** Stamp every hole of a course with its biome/theme render keys (GS-variation). Pure. */
+function stampHoles(course: Course): Course {
+  return { ...course, holes: course.holes.map((h) => ({ ...h, biome: course.biome, themeId: course.meta.themeId })) };
+}
+
+/**
+ * Build a two-world stop (GS-variation): front holes from `themeA`, back holes from a DISTINCT theme
+ * of the same arc, concatenated into one Course. Holes carry their own biome/themeId so both renderer
+ * and per-hole physics (biomeMods) read the right world. Deterministic from the run + stop. The
+ * course's top-level identity is the front theme (the card leads with it); `meta.split` flags it.
+ */
+function stitchSplitCourse(run: Run, holes: number, parCap: StopSpec['parCap'], themeA: Theme): Course {
+  const front = Math.ceil(holes / 2);
+  const back = holes - front;
+  const arc = arcForDistance(run.distanceFromStart);
+  // A second, distinct theme of the same arc (re-draw until it differs; arcs have ≥9 themes).
+  const pick = new Rng(`${run.seed}:split:${run.stopIndex}`);
+  let themeB = pickTheme(pick, arc);
+  for (let i = 0; i < 6 && themeB.id === themeA.id; i++) themeB = pickTheme(pick, arc);
+  const a = stampHoles(
+    generateCourse(`${stopSeed(run)}:front`, {
+      holes: front,
+      parCap,
+      distanceFromStart: run.distanceFromStart,
+      biomeRow: resolveBiome(themeA),
+      themeId: themeA.id,
+    }),
+  );
+  const b = stampHoles(
+    generateCourse(`${stopSeed(run)}:back`, {
+      holes: back,
+      parCap,
+      distanceFromStart: run.distanceFromStart,
+      biomeRow: resolveBiome(themeB),
+      themeId: themeB.id,
+    }),
+  );
+  return {
+    ...a,
+    holes: [...a.holes, ...b.holes],
+    // Lead with the front theme's identity; flag the split + record the back theme for the UI.
+    meta: { ...a.meta, themeId: themeA.id, split: { backThemeId: themeB.id, frontHoles: front } },
+  };
 }
 
 /**
@@ -165,9 +240,14 @@ export function finishStop(
   const event = run.pendingEvent ?? DEFAULT_EVENT;
   const cut = effectiveCut(run, course.holes.length);
   const passed = totals.stableford >= cut;
+  // Trigger-relic payouts (GS-synergy) add to the base before the credit multiplier, so they
+  // synergise with credit perks/events. Zero for a base loadout (no relics).
+  const relicBonus = relicCreditBonus(run.loadout, played, passed);
   const creditsEarned = passed
-    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult)
+    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult, relicBonus)
     : 0;
+  // Clearing the FINAL boss of a winnable voyage WINS the run (GS-voyage).
+  const won = passed && isFinalStop(getFormat(run.formatId), run.stopIndex);
 
   const result: StopResult = {
     stopIndex: run.stopIndex,
@@ -188,8 +268,9 @@ export function finishStop(
     history: [...run.history, result],
     // The event is spent — clear it so a resume can't double-apply it next stop.
     pendingEvent: undefined,
-    status: passed ? 'active' : 'ended',
-    ...(passed ? {} : { endedReason: 'cut' as const }),
+    // A missed cut ends the run; clearing the final boss WINS it; otherwise travel on.
+    status: passed && !won ? 'active' : 'ended',
+    ...(passed ? (won ? { endedReason: 'won' as const } : {}) : { endedReason: 'cut' as const }),
   };
   return { run: next, result };
 }
@@ -200,7 +281,34 @@ export function finishStop(
  */
 export function effectiveCut(run: Run, holes: number): number {
   const event = run.pendingEvent ?? DEFAULT_EVENT;
-  return cutLine(run.distanceFromStart, holes) + event.cutDelta;
+  const format = getFormat(run.formatId);
+  const boss = bossAt(format, run.stopIndex);
+  // A winnable campaign scales its distance ramp down (cutMult) so it plateaus rather than spirals.
+  const rampDistance = run.distanceFromStart * (format.cutMult ?? 1);
+  return (
+    cutLine(rampDistance, holes) +
+    event.cutDelta +
+    (boss?.cutBonus ?? 0) +
+    ascensionCutBonus(run.ascension)
+  );
+}
+
+/** The boss awaiting the player at the current stop, if any (GS-voyage). */
+export function currentBoss(run: Run): BossSpec | undefined {
+  return bossAt(getFormat(run.formatId), run.stopIndex);
+}
+
+/**
+ * Scramble options for the current stop (GS-scramble): a co-op partner's swing shape when the stop is
+ * a `partner: 'scramble'` boss, else undefined (ordinary solo play). The partner is a deterministic
+ * unchosen golfer; threaded IDENTICALLY into the auto sim (playStop) and the interactive driver so
+ * auto≡interactive holds. Pure.
+ */
+export function scrambleOptsFor(run: Run): ScrambleOpts | undefined {
+  const boss = currentBoss(run);
+  if (boss?.partner !== 'scramble') return undefined;
+  const partnerId = scramblePartnerId(run.seed, run.stopIndex, run.loadout.characterId);
+  return { partnerMods: characterShotMods(partnerId) };
 }
 
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
@@ -219,6 +327,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     chipIn: run.loadout.chipInBoost,
     confidence: run.loadout.confidenceMod,
     lieRelief: run.loadout.lieRelief,
+    scramble: scrambleOptsFor(run),
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };
@@ -228,15 +337,40 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
 export function routeOptions(run: Run): Route[] {
   const rng = new Rng(`${run.seed}:routes:${run.stopIndex}`);
   const labels: Record<number, string> = { 1: 'Short hop', 2: 'Cruise', 3: 'Deep jump' };
-  // Draw distances FIRST (unchanged RNG stream), then attach an event to each route.
+  // A bounded campaign caps the per-jump distance so its wildness/cut growth stays fair (GS-voyage);
+  // endless formats default to the original 1–3 draw, keeping their RNG stream byte-identical.
+  const maxJump = getFormat(run.formatId).maxJump ?? 3;
+  // Draw distances FIRST (unchanged RNG stream for flat/ladder), then attach an event to each route.
   const routes = Array.from({ length: 3 }, (_, i) => {
-    const distanceJump = rng.int(1, 3);
+    const distanceJump = rng.int(1, maxJump);
     return { id: i, distanceJump, label: labels[distanceJump]! };
   });
   // Pool is arc-tiered to the run's depth and excludes already-fired uniques (GS-17c).
   const pool = eventPool(run.distanceFromStart, run.firedEventIds);
   const events = drawRouteEvents(rng, routes.length, pool);
-  return routes.map((r, i) => ({ ...r, event: events[i]! }));
+  const withEvents = routes.map((r, i) => ({ ...r, event: events[i]! }));
+  // Derive the HARDER PATH (GS-voyage) WITHOUT touching the rng: the single highest-stakes lane —
+  // the route whose event raises the cut the most (ties broken by payout). Only a genuinely risky
+  // lane (cutDelta > 0) is flagged, so early calm jumps show no elite option.
+  const format = getFormat(run.formatId);
+  let eliteIdx = -1;
+  for (let i = 0; i < withEvents.length; i++) {
+    const e = withEvents[i]!.event;
+    if (e.cutDelta <= 0) continue;
+    if (
+      eliteIdx < 0 ||
+      e.cutDelta > withEvents[eliteIdx]!.event.cutDelta ||
+      (e.cutDelta === withEvents[eliteIdx]!.event.cutDelta && e.creditMult > withEvents[eliteIdx]!.event.creditMult)
+    ) {
+      eliteIdx = i;
+    }
+  }
+  return withEvents.map((r, i) => ({
+    ...r,
+    elite: i === eliteIdx,
+    // Preview whether the stop this route reaches (the next stop) is a boss.
+    bossAhead: !!bossAt(format, run.stopIndex + 1),
+  }));
 }
 
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
@@ -317,7 +451,7 @@ function weightedSample(
  * (and a resume reproduces it). Items already maxed (owned uniques / capped stackables)
  * drop out, so every slot is something you can still pursue. Costs reflect current stacks.
  */
-export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
+export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer[] {
   const perks = run.loadout.perks;
   const hasCaddy = !!namedCaddyOwned(perks);
   // Driver Dan (GS-clubs) only turns up once the golfer actually OWNS a driver. Everyone now starts
@@ -339,7 +473,9 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   // improvements (a distance upgrade, or a new club that fills a gap in the balanced bag), drawn
   // from the same rarity-weighted pool as the gear so they're appropriately scarce.
   const pool = [...gear, ...offerableClubs(run.loadout)];
-  const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
+  // A reroll (GS-shop-reroll) salts the seed so the draw changes; salt 0 keeps the original stock
+  // byte-for-byte (so existing tests + a fresh shop entry are unchanged).
+  const rng = new Rng(salt ? `${run.seed}:shop:${run.stopIndex}:r${salt}` : `${run.seed}:shop:${run.stopIndex}`);
   // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
   const archetype = currentTheme(run).archetype;
   const weight = (it: ShopItem) => itemThemeWeight(itemTags(it.id), archetype);
@@ -367,6 +503,8 @@ export interface RunSnapshot {
   perks: string[];
   /** Permanent meta-upgrade levels (GS-12); the resume base is rebuilt from these. */
   meta?: MetaUpgrades;
+  /** Ascension difficulty tier (GS-ascension); 0/absent for back-compat. */
+  ascension?: number;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
@@ -384,6 +522,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     credits: run.credits,
     perks: [...run.loadout.perks],
     meta: { ...run.meta },
+    ascension: run.ascension,
     pendingEventId: run.pendingEvent?.id,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
@@ -402,6 +541,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     // SAME way `startRun` builds it, so the bag (starting clubs + bought/upgraded clubs) reconstructs.
     loadout: loadoutFromPerks(snap.perks ?? [], startingLoadoutFor(meta, snap.characterId)),
     meta,
+    ascension: snap.ascension ?? 0,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',
@@ -413,17 +553,33 @@ export function resumeRun(snap: RunSnapshot): Run {
 
 export const SHARD_PER_DISTANCE = 3;
 export const SHARD_PER_STOP = 2;
+/** Credits → shards conversion when you BANK or WIN a run. Busting at the cut forfeits this. */
+export const CREDITS_PER_SHARD = 20;
+/** Flat shard bonus for completing a winnable voyage (GS-voyage) — the payoff for a finished run. */
+export const WIN_SHARD_BONUS = 60;
 
 /**
  * Star Shards earned by a run — the persistent currency spent at the Outpost. Rewards how
  * FAR you travelled (the roguelite goal) plus a little per stop cleared, so even a run that
  * bricks on stop 1 buys some lasting progress. Pure; floored at 1.
+ *
+ * Push-your-luck (GS-bank): a run you BANK (voluntarily cash out, `endedReason 'banked'`) also
+ * converts its UNSPENT credits into shards — a run cut short at the line forfeits them. This is
+ * what gives the "bank now or push one deeper" decision real teeth (the classic roguelite tension)
+ * and gives leftover credits a terminal value instead of evaporating when the run ends.
  */
+export function cashOutShards(run: Run): number {
+  const keepsCredits = run.endedReason === 'banked' || run.endedReason === 'won';
+  return keepsCredits ? Math.floor(Math.max(0, run.credits) / CREDITS_PER_SHARD) : 0;
+}
+
 export function shardsForRun(run: Run): number {
-  return Math.max(
+  const base = Math.max(
     1,
     Math.round(run.distanceFromStart * SHARD_PER_DISTANCE + run.history.length * SHARD_PER_STOP),
   );
+  const winBonus = run.endedReason === 'won' ? WIN_SHARD_BONUS : 0;
+  return base + cashOutShards(run) + winBonus;
 }
 
 // --- Headless full-run driver (for tests / AI sims) -------------------------
@@ -439,6 +595,8 @@ export interface RunStrategy {
   meta?: MetaUpgrades;
   /** Selected golfer id (GS-18); default = none (a neutral straight golfer). */
   characterId?: string;
+  /** Ascension difficulty tier (GS-ascension); default 0. */
+  ascension?: number;
 }
 
 export interface RunOutcome {
@@ -452,7 +610,7 @@ export function simulateRun(
   strategy: RunStrategy = {},
   maxStops = 100,
 ): RunOutcome {
-  let run = startRun(seed, strategy.formatId, strategy.meta, strategy.characterId);
+  let run = startRun(seed, strategy.formatId, strategy.meta, strategy.characterId, strategy.ascension);
   const stops: StopResult[] = [];
   for (let i = 0; i < maxStops && run.status === 'active'; i++) {
     const played = playStop(run);

@@ -19,11 +19,14 @@ import {
   layupTarget,
   manualPutt,
   onePutt,
+  pickBetterExec,
   pinOf,
   puttOutFrom,
   shotSpread,
   suggestPlayerClub,
+  type ExecOpts,
   type PuttControl,
+  type ScrambleOpts,
   type ShotSpread,
   type PuttLog,
   type ShotLog,
@@ -58,6 +61,8 @@ export interface HolePlay {
   holed: boolean;
   /** True if the hole was picked up at the max-score cap (par + MAX_OVER_PAR). */
   pickedUp: boolean;
+  /** Scramble (GS-scramble): true if the LAST shot kept the partner's ball, for UI attribution. */
+  partnerKept?: boolean;
 }
 
 export function beginHole(hole: Hole, holeIndex = 0): HolePlay {
@@ -162,6 +167,7 @@ export function takeShot(
   loadout: PlayerLoadout,
   rng: Rng,
   autoPutt = true,
+  scramble?: ScrambleOpts,
 ): HolePlay {
   if (state.done) return state;
   const pin = pinOf(state.hole);
@@ -174,7 +180,7 @@ export function takeShot(
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
 
   const dispersionMult = netDispersion(loadout);
-  const ex = executeShot(state.hole, state.ball, state.lie, target, club, {
+  const execOpts: ExecOpts = {
     carryMult,
     dispersionMult,
     shotMods: characterShotMods(loadout.characterId),
@@ -189,7 +195,18 @@ export function takeShot(
     suggestedClubId: loadout.confidenceMod
       ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id
       : undefined,
-  }, rng);
+  };
+  const playerEx = executeShot(state.hole, state.ball, state.lie, target, club, execOpts, rng);
+  // Scramble (GS-scramble): the partner hits a second ball and the team keeps the better — same rule
+  // and rng order as the auto sim (playHole), so auto≡interactive holds; absent ⇒ byte-for-byte solo.
+  let partnerKept = false;
+  let ex = playerEx;
+  if (scramble) {
+    const partnerEx = executeShot(state.hole, state.ball, state.lie, target, club, { ...execOpts, shotMods: scramble.partnerMods }, rng);
+    const best = pickBetterExec(playerEx, partnerEx, pin);
+    ex = best.ex;
+    partnerKept = best.partnerKept;
+  }
 
   const firstShot = state.shots.length === 0;
   let fairwayHit = state.fairwayHit;
@@ -244,6 +261,7 @@ export function takeShot(
     fairwayHit,
     done,
     holed,
+    partnerKept,
   };
 }
 
