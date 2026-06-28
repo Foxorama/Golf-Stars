@@ -44,6 +44,10 @@ export interface ShotDecision {
   aim: AimMode;
   /** Free-aim target (course-space) from tapping/dragging the map; overrides `aim` when set. */
   target?: Vec;
+  /** Shot POWER (GS-power): intended carry as a fraction of the club's full carry, set by the
+   *  pull-to-power gesture. 1 (or undefined) = a full swing (byte-for-byte unchanged); <1 a partial
+   *  shot; >1 overpowered (gated by the loadout's Overdrive). */
+  power?: number;
 }
 
 export interface HolePlay {
@@ -140,6 +144,7 @@ export function previewShot(
   return shotSpread(state.hole, state.ball, state.lie, target, club, {
     carryMult,
     dispersionMult,
+    power: decision.power,
     shotMods: characterShotMods(loadout.characterId),
     shapeMod: loadout.shapeMod,
     minCarryBoost: loadout.minCarryBoost,
@@ -183,6 +188,7 @@ export function takeShot(
   const execOpts: ExecOpts = {
     carryMult,
     dispersionMult,
+    power: decision.power,
     shotMods: characterShotMods(loadout.characterId),
     shapeMod: loadout.shapeMod,
     minCarryBoost: loadout.minCarryBoost,

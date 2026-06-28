@@ -265,18 +265,24 @@
         box-shadow: inset 0 0 12px rgba(95, 212, 90, .18);
       }
       .gs-legend { font-size: 12px; margin: 1px 0; line-height: 1.45; opacity: .92; }
-      /* Pull-back swing pad (opt-in): the Hit control becomes a draggable backswing meter. The
-         fill rises from the bottom as you pull; touch-action:none so the drag isn't a page scroll. */
-      .gs-swingpad {
-        position: relative; overflow: hidden; touch-action: none;
-        flex: 2; margin: 0; padding: 13px 10px; font-size: 16px; text-align: center;
+      /* Pull-to-power HUD (GS-power): a horizontal bar that fills as you drag DOWN on the map to
+         charge power; the 100% tick marks a full swing (the bar can run past it with Overdrive). */
+      .gs-power { margin: 3px 0 1px; }
+      .gs-powerbar {
+        position: relative; height: 9px; border-radius: 5px; overflow: hidden;
+        background: #14171f; border: 1px solid var(--gs-line);
       }
-      .gs-swingfill {
-        position: absolute; left: 0; right: 0; bottom: 0; height: 0;
-        background: linear-gradient(180deg, rgba(95,212,90,.55), rgba(95,212,90,.25));
-        pointer-events: none; transition: height .03s linear;
+      .gs-powerfill {
+        position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+        border-radius: 5px 0 0 5px; transition: width .04s linear, background .1s linear;
       }
-      .gs-swinglabel { position: relative; z-index: 1; pointer-events: none; }
+      .gs-power100 {
+        position: absolute; top: -2px; bottom: -2px; width: 2px; transform: translateX(-1px);
+        background: rgba(255,255,255,.5); pointer-events: none;
+      }
+      .gs-powerlabel { font-size: 12px; margin-top: 3px; line-height: 1.3; }
+      /* The map absorbs the pull gesture, so its touches are never page scrolls/zooms. */
+      .gs-shot .gs-bigmap[data-map] { touch-action: none; }
       .gs-shot .gs-hitbar { display: flex; gap: 8px; }
       /* Hit is the dominant target; Auto-finish (a hole-skip) is half the width so a fat-finger
          tap lands on Hit, not on accidentally watching the whole hole auto-play. */

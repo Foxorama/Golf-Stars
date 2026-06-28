@@ -491,6 +491,14 @@ export interface ShotInput {
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty.
    *  Undefined = no relief (byte-for-byte). */
   lieRelief?: number;
+  /**
+   * Shot POWER (GS-power): the intended carry as a fraction of the club's full carry. 1 = a full
+   * swing (the default — byte-for-byte unchanged), 0.5 = a half-power shot landing ~half as far,
+   * down to ~0.01 (a soft tap). Values ABOVE 1 are OVERPOWERED shots (the Overdrive upgrade lets the
+   * player dial past 100%). A pure scalar on `intended` — it consumes NO extra rng and the angular
+   * spread is keyed off the club (unchanged), so the cone in YARDS scales with power (a soft shot has
+   * a small cone, a full swing the full cone). Undefined/1 keeps the old fixed-club-distance shot. */
+  power?: number;
   stats?: ClubStats;
   /**
    * Deterministic directional bias (radians) added to the random spray angle — a character's
@@ -551,7 +559,12 @@ export function resolveShot(input: ShotInput): ShotResult {
   const nominal = clubDist(club, input.stats);
   // Escape-specialist relief (no-op when absent → byte-for-byte unchanged).
   const relief = reliedLie(li, input.lieRelief);
-  const intended = nominal * relief.carryMult * biomeMult;
+  // Shot power (GS-power) scales the intended carry — 1 (full swing) is the default and leaves the
+  // shot byte-for-byte unchanged; a pure scalar, no extra rng. The carry-window clamps below are
+  // fractions of `intended`, so they scale with power; the angular spread is keyed off the club's
+  // nominal carry (unchanged), so a soft shot's cone is small and a full swing's is the full cone.
+  const power = input.power ?? 1;
+  const intended = nominal * relief.carryMult * biomeMult * power;
 
   const w = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
 
