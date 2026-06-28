@@ -50,6 +50,33 @@ function seedFromUrl(): number | string | null {
 let state: UiState;
 let view: PlayViewHandle | null = null;
 
+/** Today's deterministic daily-challenge seed — same course for everyone on the same date. Reuses
+ *  the string-seed support (no new URL param/hook). Date is read in the browser (not the sim). */
+function dailySeed(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `daily-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function dailyLabel(): string {
+  const d = new Date();
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** The captured PWA install prompt (beforeinstallprompt), if the browser offered one and the
+ *  player hasn't installed/dismissed it. Surfaced as an "Install" button on the title. */
+let deferredInstall: (Event & { prompt?: () => void }) | null = null;
+function installDismissed(): boolean {
+  try {
+    return localStorage.getItem('gs_installNudge') === 'dismissed';
+  } catch {
+    return false;
+  }
+}
+function installButtonHTML(): string {
+  if (!deferredInstall || installDismissed()) return '';
+  return `<button class="gs-btn gs-btn--ghost" data-install="1">⬇ Install app</button>`;
+}
+
 /** Diagnostic breadcrumb the boot watchdog can read if the app never paints. */
 function stage(s: string): void {
   (window as unknown as { __gsStage?: string }).__gsStage = s;
@@ -236,6 +263,11 @@ function titleScreen(): string {
       <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
       ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' }, { variant: 'ghost' })}
       <button class="gs-btn gs-btn--ghost" data-open-settings="1">⚙ Settings</button>
+      ${installButtonHTML()}
+    </div>
+    <div style="margin:.2em 0 .6em;">
+      ${btn(`🗓 Daily Challenge — ${dailyLabel()}`, { type: 'restart', seed: dailySeed() }, { variant: 'ghost' })}
+      <span style="font-size:11.5px;opacity:.55;">same course for everyone today (a deterministic seed)</span>
     </div>
     ${
       state.resumable
@@ -419,17 +451,19 @@ function wireMapAiming(app: HTMLElement): void {
     return [((clientX - rect.left) / rect.width) * DMAP_W, ((clientY - rect.top) / rect.height) * DMAP_H];
   };
 
-  // ONE gesture model, disambiguated by movement (not a mode toggle): a TAP aims at that point
-  // (tap-the-green-to-aim — the discoverable default), a DRAG beyond a small threshold pans the
-  // follow-cam. So "aim there" and "move the map around" coexist without a mode button. (In
-  // whole-hole mode there's nothing to pan, so any release is a tap-aim.)
+  // Gesture model, disambiguated by pointer count + movement (no mode toggle):
+  //  • ONE finger, still (< slop) → TAP-aim at that point (tap-the-green-to-aim, the discoverable
+  //    default); ONE finger, moved → PAN the follow-cam ("move the map around").
+  //  • TWO fingers → PINCH-zoom the follow-cam (the universal map gesture), via mapZoom.
   const TAP_SLOP = 8; // px of movement below which a release counts as a tap, not a drag
+  const pointers = new Map<number, { x: number; y: number }>();
   let panProj: ReturnType<typeof holeProjector> | null = null;
   let panStartCourse: [number, number] | null = null;
   let panStartOffset: [number, number] = [0, 0];
   let downX = 0;
   let downY = 0;
   let dragging = false;
+  let pinch: { startDist: number; startZoom: number } | null = null;
 
   const aimTo = (clientX: number, clientY: number): void => {
     const vb = toViewBox(clientX, clientY);
@@ -447,34 +481,76 @@ function wireMapAiming(app: HTMLElement): void {
     mapPan = [panStartOffset[0] + (panStartCourse[0] - now[0]), panStartOffset[1] + (panStartCourse[1] - now[1])];
     scheduleRender();
   };
+  const twoFingerDist = (): number => {
+    const [a, b] = [...pointers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
   const move = (e: PointerEvent): void => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     e.preventDefault();
+    if (pinch) {
+      const d = twoFingerDist();
+      if (d > 0 && pinch.startDist > 0) {
+        mapZoom = Math.min(4, Math.max(0.4, pinch.startZoom * (d / pinch.startDist)));
+        scheduleRender();
+      }
+      return;
+    }
     if (!dragging && Math.hypot(e.clientX - downX, e.clientY - downY) > TAP_SLOP) {
       dragging = true; // crossed the slop → it's a drag (pan), not a tap
     }
     if (dragging && mapView !== 'whole') panTo(e.clientX, e.clientY);
   };
-  const up = (e: PointerEvent): void => {
-    if (!dragging) aimTo(e.clientX, e.clientY); // a still tap → aim there
-    panProj = null;
-    panStartCourse = null;
-    dragging = false;
+  const detach = (): void => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
   };
+  function up(e: PointerEvent): void {
+    pointers.delete(e.pointerId);
+    if (pinch) {
+      // Leaving a pinch: once below two fingers, end it and mark the gesture spent so the lingering
+      // finger's release can't register a stray tap-aim.
+      if (pointers.size < 2) {
+        pinch = null;
+        dragging = true;
+      }
+      if (pointers.size === 0) {
+        dragging = false;
+        detach();
+      }
+      return;
+    }
+    if (pointers.size === 0) {
+      if (!dragging) aimTo(e.clientX, e.clientY); // a still single tap → aim there
+      panProj = null;
+      panStartCourse = null;
+      dragging = false;
+      detach();
+    }
+  }
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    downX = e.clientX;
-    downY = e.clientY;
-    dragging = false;
-    // Freeze a projector at gesture start so pan math stays consistent across the per-frame
-    // re-render that replaces the map element.
-    const vb = toViewBox(e.clientX, e.clientY);
-    panProj = buildProj();
-    panStartCourse = vb ? (panProj.unproject(vb[0], vb[1]) as [number, number]) : null;
-    panStartOffset = [mapPan[0], mapPan[1]];
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) {
+      downX = e.clientX;
+      downY = e.clientY;
+      dragging = false;
+      // Freeze a projector at gesture start so pan math stays consistent across the per-frame
+      // re-render that replaces the map element.
+      const vb = toViewBox(e.clientX, e.clientY);
+      panProj = buildProj();
+      panStartCourse = vb ? (panProj.unproject(vb[0], vb[1]) as [number, number]) : null;
+      panStartOffset = [mapPan[0], mapPan[1]];
+    } else if (pointers.size === 2) {
+      pinch = { startDist: twoFingerDist(), startZoom: mapZoom };
+      dragging = true; // a second finger cancels any pending tap/pan
+    }
+    // Same fn refs each time → addEventListener de-dupes, so multiple pointers don't stack handlers.
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   });
 }
 
@@ -702,6 +778,26 @@ function burst(): string {
   return `<div class="gs-burst" aria-hidden="true">${sparks}</div>`;
 }
 
+/** A momentum rail: one pip per hole in the stop, coloured by the score already made (eagle gold →
+ *  blow-up red), the current hole ringed, upcoming holes dim — so the run's shape reads at a glance. */
+function holePips(): string {
+  const total = state.course.holes.length;
+  const done = state.stopPlayed ?? [];
+  const cur = state.play?.holeIndex ?? done.length;
+  const pips = Array.from({ length: total }, (_, i) => {
+    if (i < done.length) {
+      const r = done[i]!.record;
+      const rel = r.strokes - r.par;
+      const col = done[i]!.pickedUp
+        ? '#b3402f'
+        : rel <= -2 ? '#ffd54a' : rel === -1 ? '#5fd45a' : rel === 0 ? '#9fd8e6' : rel === 1 ? '#ffc454' : '#ff6b6b';
+      return `<span class="gs-pip" style="background:${col};" title="hole ${i + 1}: ${r.strokes} (par ${r.par})"></span>`;
+    }
+    return `<span class="gs-pip${i === cur ? ' gs-pip--cur' : ''}"></span>`;
+  }).join('');
+  return `<div class="gs-pips" aria-hidden="true">${pips}</div>`;
+}
+
 function zoneScoreChip(): string {
   const done = state.stopPlayed ?? [];
   const sf = playTotals(done.map((p) => p.record)).stableford;
@@ -728,6 +824,7 @@ function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
         ${zoneScoreChip()}
       </div>
       <div class="gs-sub">${lieChip(v.lie)} · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
+      ${holePips()}
     </div>`;
 }
 
@@ -1243,6 +1340,23 @@ function render(): void {
       render();
     });
   });
+  // PWA install nudge: fire the captured prompt, then forget it (one offer).
+  app.querySelectorAll<HTMLElement>('[data-install]').forEach((el) => {
+    el.addEventListener('click', () => {
+      try {
+        deferredInstall?.prompt?.();
+      } catch {
+        /* ignore */
+      }
+      deferredInstall = null;
+      try {
+        localStorage.setItem('gs_installNudge', 'dismissed');
+      } catch {
+        /* ignore */
+      }
+      render();
+    });
+  });
   // Settings sheet: open/close + toggle a preference (all view-only, persisted in localStorage).
   app.querySelectorAll<HTMLElement>('[data-open-settings]').forEach((el) => {
     el.addEventListener('click', (e) => {
@@ -1454,6 +1568,17 @@ function registerServiceWorker(): void {
 export function start(): void {
   boot();
   registerServiceWorker();
+  // Capture the install prompt so the title can offer an "Install app" button (instead of the
+  // browser's own mini-infobar). Re-render so the button appears once it's available.
+  try {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstall = e as Event & { prompt?: () => void };
+      if (state?.screen === 'title') render();
+    });
+  } catch {
+    /* ignore — install nudge is a bonus */
+  }
   if (!shouldPlayIntro()) return;
   try {
     sessionStorage.setItem('gs_introSeen', '1');
