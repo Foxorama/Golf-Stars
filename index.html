@@ -258,6 +258,18 @@
         box-shadow: inset 0 0 12px rgba(95, 212, 90, .18);
       }
       .gs-legend { font-size: 12px; margin: 1px 0; line-height: 1.45; opacity: .92; }
+      /* Pull-back swing pad (opt-in): the Hit control becomes a draggable backswing meter. The
+         fill rises from the bottom as you pull; touch-action:none so the drag isn't a page scroll. */
+      .gs-swingpad {
+        position: relative; overflow: hidden; touch-action: none;
+        flex: 2; margin: 0; padding: 13px 10px; font-size: 16px; text-align: center;
+      }
+      .gs-swingfill {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+        background: linear-gradient(180deg, rgba(95,212,90,.55), rgba(95,212,90,.25));
+        pointer-events: none; transition: height .03s linear;
+      }
+      .gs-swinglabel { position: relative; z-index: 1; pointer-events: none; }
       .gs-shot .gs-hitbar { display: flex; gap: 8px; }
       /* Hit is the dominant target; Auto-finish (a hole-skip) is half the width so a fat-finger
          tap lands on Hit, not on accidentally watching the whole hole auto-play. */

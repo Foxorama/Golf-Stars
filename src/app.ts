@@ -478,6 +478,63 @@ function wireMapAiming(app: HTMLElement): void {
   });
 }
 
+/**
+ * The opt-in pull-back swing pad (GS-mux). Press the pad and drag DOWN to load a backswing; a power
+ * meter + a number fill as you pull. Release past the commit threshold to swing (fires the SAME
+ * action the Hit button would — club + aim define the shot, so the sim/determinism is untouched; the
+ * pull is pure feel + a graded haptic). A short pull cancels. Pointer-move/up listen on `window` so
+ * the gesture survives a re-render.
+ */
+function wireSwingPad(pad: HTMLElement): void {
+  const MAX_PULL = 120; // px of drag for a full backswing
+  const COMMIT = 0.18; // min power to count as a swing (a flick cancels)
+  const fill = pad.querySelector<HTMLElement>('.gs-swingfill');
+  const label = pad.querySelector<HTMLElement>('.gs-swinglabel');
+  let active = false;
+  let startY = 0;
+  let power = 0;
+  let lastNotch = 0;
+  const setPower = (p: number): void => {
+    power = Math.max(0, Math.min(1, p));
+    if (fill) fill.style.height = `${(power * 100).toFixed(0)}%`;
+    if (label) label.textContent = power < 0.02 ? '⬇ Pull back to swing' : `Power ${Math.round(power * 100)}%`;
+    // A ratcheting haptic as the backswing loads.
+    const notch = Math.floor(power * 5);
+    if (notch !== lastNotch) {
+      lastNotch = notch;
+      haptic(6);
+    }
+  };
+  const move = (e: PointerEvent): void => {
+    if (!active) return;
+    e.preventDefault();
+    setPower((e.clientY - startY) / MAX_PULL); // drag DOWN = load
+  };
+  const up = (): void => {
+    if (!active) return;
+    active = false;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    const committed = power >= COMMIT;
+    const action = committed ? (JSON.parse(pad.dataset.swing!) as Action) : null;
+    setPower(0);
+    if (action) {
+      haptic(HAPTICS.swing);
+      dispatch(action);
+    }
+  };
+  pad.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    active = true;
+    startY = e.clientY;
+    lastNotch = 0;
+    setPower(0);
+    resumeAudio();
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+}
+
 /** Plain-language wind read relative to the hole's play direction (up = toward the green). */
 function windDescription(hole: Hole): string {
   const w = hole.wind;
@@ -845,7 +902,14 @@ function playingBody(animating: boolean): string {
         </p>
         ${aimButtons}
         <div class="gs-hitbar">
-          ${btn('🏌 Hit', hitAction, { variant: 'primary' })}
+          ${
+            getSettings().swingGesture
+              ? `<button class="gs-btn gs-btn--primary gs-swingpad" data-swing='${JSON.stringify(hitAction)}'>
+                   <span class="gs-swingfill"></span>
+                   <span class="gs-swinglabel">⬇ Pull back to swing</span>
+                 </button>`
+              : btn('🏌 Hit', hitAction, { variant: 'primary' })
+          }
           ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
         </div>
       </div>
@@ -1165,6 +1229,10 @@ function render(): void {
   // Tap/drag the map to aim (free-aim mode) or pan it (default). Pointer-move/up listen on window
   // so the drag survives the per-frame re-render (which replaces the map element).
   wireMapAiming(app);
+  // Opt-in swing gesture: pull back on the pad and release to swing. The pull builds a power/
+  // backswing meter (feel only — the shot is exactly the one club+aim define, so the sim is
+  // untouched). A short pull cancels; a committed pull fires the same action the Hit button would.
+  app.querySelectorAll<HTMLElement>('[data-swing]').forEach((el) => wireSwingPad(el));
   // "Use suggested" snaps the club back to the suggestion for this position.
   app.querySelectorAll<HTMLElement>('[data-suggest]').forEach((el) => {
     el.addEventListener('click', () => {
