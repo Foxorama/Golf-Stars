@@ -141,6 +141,7 @@ function drawGolfer(
   follow: number,
   alpha: number,
   look: GolferLook,
+  lefty = false,
 ): void {
   const u = h / 72;
   const S: Vec = [8, -50]; // shoulder pivot
@@ -163,8 +164,13 @@ function drawGolfer(
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(bx - B[0] * u, by - B[1] * u);
-  ctx.scale(u, u);
+  // Place the figure so its LOCAL ball B lands on the real ball, then for a left-handed golfer
+  // MIRROR the whole stick figure horizontally about that ball (GS-lefty) — a lefty stands on the
+  // other side and swings the mirror image. Right-handed (lefty=false) reduces to the original
+  // translate+scale, so the figure is byte-for-byte unchanged.
+  ctx.translate(bx, by);
+  ctx.scale(lefty ? -u : u, u);
+  ctx.translate(-B[0], -B[1]);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
@@ -258,6 +264,9 @@ export interface PlayViewOptions {
   /** The hired named caddy id (GS-caddy) — draws that caddy in the corner and powers the laser/
    *  boomerang redirect effect. Absent → no caddy figure. */
   caddyId?: string;
+  /** Left-handed mode (GS-lefty): draw the golfer swinging left-handed and mirror the caddy figure.
+   *  Pure cosmetic mirror — the ball flight already comes out mirrored from the sim. */
+  lefty?: boolean;
 }
 
 export interface PlayViewHandle {
@@ -544,7 +553,7 @@ export function mountPlayView(
       const ch = Math.max(40, Math.min(56, height * 0.085));
       const cx = ch * 0.7 + 6;
       const cy = height - 14;
-      caddyAnchor = drawCaddy(ctx, opts.caddyId, cx, cy, ch, now);
+      caddyAnchor = drawCaddy(ctx, opts.caddyId, cx, cy, ch, now, opts.lefty);
       ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.textAlign = 'center';
@@ -593,7 +602,7 @@ export function mountPlayView(
         ctx.beginPath();
         ctx.ellipse(bx, by, 4, 2, 0, 0, Math.PI * 2);
         ctx.fill();
-        if (F.golfer) drawGolfer(ctx, bx, by, golferH, clamp01((now - segStart) / lead), 0, 1, look);
+        if (F.golfer) drawGolfer(ctx, bx, by, golferH, clamp01((now - segStart) / lead), 0, 1, look, opts.lefty);
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = 'rgba(0,0,0,0.5)';
         ctx.beginPath();
@@ -710,7 +719,7 @@ export function mountPlayView(
         if (F.golfer && elapsed < F.followMs) {
           const [bx, by] = proj.project(shot.from);
           const fol = clamp01(elapsed / F.followMs);
-          drawGolfer(ctx, bx, by, golferH, 1, Math.max(0.001, fol), 1 - fol, look);
+          drawGolfer(ctx, bx, by, golferH, 1, Math.max(0.001, fol), 1 - fol, look, opts.lefty);
         }
 
         // Shadow (fades as the ball climbs).

@@ -68,12 +68,17 @@ export function drawCaddy(
   cy: number,
   h: number,
   t: number,
+  lefty = false,
 ): Vec {
   const u = h / 64;
   const bob = Math.sin(t * 0.004) * 1.2; // gentle idle bob (local units)
+  // Left-handed mode (GS-lefty): mirror the figure horizontally so the whole cast faces/holds the
+  // other way, matching the mirrored golfer. The returned muzzle anchor is mirrored too, so the
+  // laser/boomerang still launches from the (flipped) hand toward the already-mirrored target.
+  const sx = lefty ? -1 : 1;
   ctx.save();
   ctx.translate(cx, cy + bob * u);
-  ctx.scale(u, u);
+  ctx.scale(sx * u, u);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
@@ -112,7 +117,7 @@ export function drawCaddy(
       break;
   }
   ctx.restore();
-  return [cx + anchorLocal[0] * u, cy + (bob + anchorLocal[1]) * u];
+  return [cx + sx * anchorLocal[0] * u, cy + (bob + anchorLocal[1]) * u];
 }
 
 // --- shared bits -------------------------------------------------------------

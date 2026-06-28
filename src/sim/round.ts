@@ -282,6 +282,9 @@ export interface PlayHoleOptions {
   /** Co-op SCRAMBLE (GS-scramble, boss stops): a partner golfer hits a second ball each full shot
    *  and the TEAM keeps the better one (one stroke). Absent ⇒ ordinary solo play (no extra rng). */
   scramble?: ScrambleOpts;
+  /** Left-handed mode (GS-lefty): mirror the player's lateral tendencies in world space. Passed to
+   *  every executeShot; undefined/false is byte-for-byte right-handed. */
+  lefty?: boolean;
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -570,6 +573,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       chipIn: opts.chipIn,
       confidence: opts.confidence,
       suggestedClubId,
+      lefty: opts.lefty,
     };
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
     // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
@@ -665,6 +669,9 @@ export interface ExecOpts {
   confidence?: ShapeMod;
   /** The club id Sam suggested for this position — confidence applies iff the played club matches. */
   suggestedClubId?: string;
+  /** Left-handed mode (GS-lefty): mirror the lateral shot tendencies in world space. Threaded into
+   *  resolveShot; undefined/false is byte-for-byte right-handed. */
+  lefty?: boolean;
 }
 
 export interface ExecResult {
@@ -723,6 +730,7 @@ export function executeShot(
     carryWindowTighten: cw.carryWindowTighten,
     guard: opts.guard,
     lieRelief: opts.lieRelief,
+    lefty: opts.lefty,
     stats: opts.stats,
     rng,
   });
@@ -837,6 +845,10 @@ export interface ShotSpread {
   /** The asymmetric spray-zone shape (GS-dispersion-2) — the renderer draws each zone's band &
    *  % straight from this, so the graphic IS the landing distribution. */
   shape: SprayShape;
+  /** Left-handed mode (GS-lefty): the renderer mirrors the cone's band angles about the bearing so
+   *  it reads as the lefty's (world-flipped) landing distribution — matching resolveShot's sign
+   *  flip. The bias is already mirrored into `bearing`. Undefined/false = right-handed (no mirror). */
+  lefty?: boolean;
 }
 
 export function shotSpread(
@@ -858,6 +870,8 @@ export function shotSpread(
     suggestedClubId?: string;
     /** Escape-specialist caddy lie relief (GS-mux): softens a bad lie so the cone reads true. */
     lieRelief?: number;
+    /** Left-handed mode (GS-lefty): mirror the cone (and the character bias) about the bearing. */
+    lefty?: boolean;
   } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
@@ -895,9 +909,13 @@ export function shotSpread(
   const confident = opts.confidence && opts.suggestedClubId === club.id ? opts.confidence : undefined;
   const shape = resolveShape(combineShapeMods(opts.shapeMod, confident), mods.shape);
   const angleSpread = prof.lateralFrac * dispMult;
+  // Left-handed (GS-lefty): the character's directional bias rotates the OPPOSITE way (a lefty's fade
+  // ends left, not right). The renderer mirrors the spray bands about this bearing via `lefty` — so
+  // `bearing + h·bias` plus mirrored bands reproduces resolveShot's `h·(bias + sprayAngle)` exactly.
+  const h = opts.lefty ? -1 : 1;
   return {
     origin: from,
-    bearing: shotBearing + (mods.angleBias * 180) / Math.PI,
+    bearing: shotBearing + (h * mods.angleBias * 180) / Math.PI,
     expectedCarry: mean,
     carryLow: Math.max(0, low + along),
     carryHigh: high + along,
@@ -906,6 +924,7 @@ export function shotSpread(
     angleSd: sprayAngleRms(shape, angleSpread),
     angleSpread,
     shape,
+    lefty: opts.lefty,
   };
 }
 

@@ -327,6 +327,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     chipIn: run.loadout.chipInBoost,
     confidence: run.loadout.confidenceMod,
     lieRelief: run.loadout.lieRelief,
+    lefty: run.loadout.lefty,
     scramble: scrambleOptsFor(run),
   });
   const { run: next, result } = finishStop(run, course, played);

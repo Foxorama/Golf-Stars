@@ -1030,7 +1030,7 @@ function playingBody(animating: boolean): string {
     samRead = `<p class="gs-legend" style="opacity:.9;">🎒 <b>Sam:</b> front <b>${Math.round(gd.front)}</b> · middle <b>${mid}</b> · back <b>${Math.round(gd.back)}</b> yds${carryTxt}</p>`;
   }
   return `
-    <div class="gs-shot">
+    <div class="gs-shot${lefty() ? ' gs-shot--lefty' : ''}">
       ${playTopBar(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b> yds to pin` })}
       <div class="gs-bigmap" data-map="1">${svg}${mapCtrls}</div>
       <div class="gs-bottom">
@@ -1338,9 +1338,20 @@ function caddyId(): string | undefined {
   return namedCaddyOwned(state.run.loadout.perks);
 }
 
+/** Left-handed mode (GS-lefty) — the live player setting. The sim reads it off `loadout.lefty`
+ *  (synced from this in `render`), the renderers take it as an option, the CSS keys a modifier. */
+function lefty(): boolean {
+  return getSettings().leftHanded;
+}
+
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
+  // Settings → sim bridge (GS-lefty): the pure sim can't read localStorage, so bake the live
+  // left-handed setting onto the loadout here. render() runs after every dispatch and after the
+  // settings toggle's direct render(), so `loadout.lefty` is always current before the next shot
+  // reducer reads it — and it's NOT serialised (re-derived here on resume), so no save bump.
+  if (state.run?.loadout) state.run.loadout.lefty = lefty();
 
   // The interactive playing screen interleaves animation with input, so it computes its
   // own body (controls vs "watching") based on whether shots are pending animation.
@@ -1512,6 +1523,7 @@ function render(): void {
         width: meterW,
         band,
         caddyId: caddyId(),
+        lefty: lefty(),
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
       });
     }
@@ -1529,6 +1541,7 @@ function render(): void {
         biome: holeBiome(hole), themeId: holeThemeId(hole),
         golferLook: golferLook(),
         caddyId: caddyId(),
+        lefty: lefty(),
         onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
       });
     }
@@ -1558,6 +1571,7 @@ function render(): void {
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
         golferLook: golferLook(),
         caddyId: caddyId(),
+        lefty: lefty(),
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,

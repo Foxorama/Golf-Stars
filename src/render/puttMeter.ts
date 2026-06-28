@@ -22,6 +22,8 @@ export interface PuttMeterOptions {
   onCommit: (pace: number) => void;
   /** The hired named caddy id (GS-caddy) — drawn beside the meter so the caddy shows while putting. */
   caddyId?: string;
+  /** Left-handed mode (GS-lefty): mirror the caddy figure to match the rest of the lefty UI. */
+  lefty?: boolean;
 }
 
 export interface PuttMeterHandle {
@@ -128,7 +130,7 @@ export function mountPuttMeter(container: HTMLElement, opts: PuttMeterOptions): 
 
     // The hired caddy, watching over the putt.
     if (caddyW > 0 && opts.caddyId) {
-      drawCaddy(ctx, opts.caddyId, width - caddyW / 2 - 4, height - 6, height * 0.82, now);
+      drawCaddy(ctx, opts.caddyId, width - caddyW / 2 - 4, height - 6, height * 0.82, now, opts.lefty);
     }
 
     raf = requestAnimationFrame(draw);

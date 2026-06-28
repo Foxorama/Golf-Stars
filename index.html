@@ -288,6 +288,19 @@
          44px-class touch target instead of inheriting the default button padding. */
       .gs-ctrlrow [data-cycle] { min-width: 46px; padding: 11px 8px; font-size: 17px; }
 
+      /* Left-handed mode (GS-lefty): mirror the reach-critical controls to the LEFT so they fall
+         under a left thumb, pairing with the mirrored golfer/caddy/spray on the map. The floating
+         map overlay moves to the left edge; the aim segment and Hit/Auto-finish bar reverse order so
+         the dominant actions sit left. The club ◄/► arrows are NOT reversed — their glyphs are
+         directional, so they keep their meaning (only the cluster's reach side matters). */
+      .gs-shot--lefty .gs-mapctrl { right: auto; left: 8px; }
+      .gs-shot--lefty .gs-seg { flex-direction: row-reverse; }
+      /* Reversed, the visual-left segment is the LAST DOM child — move the seamless edge there so
+         the inter-button divider lines stay clean (the first child regains its internal seam). */
+      .gs-shot--lefty .gs-seg .gs-segbtn:first-child { border-left: 1px solid var(--gs-line); }
+      .gs-shot--lefty .gs-seg .gs-segbtn:last-child { border-left: none; }
+      .gs-shot--lefty .gs-hitbar { flex-direction: row-reverse; }
+
       /* Page never scrolls sideways — a fixed-width card a hair wider than a tiny viewport
          clips instead of creating a horizontal-scroll jiggle. */
       html, body { overflow-x: hidden; }

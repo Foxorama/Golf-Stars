@@ -652,6 +652,30 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   localStorage `gs_settings` (NOT reducer state): `sound`, `haptics`, `fastShots`, `swingGesture`,
   `leftHanded`, `reducedMotion` (seeded from the OS preference). Reachable via ⚙ on the title + the
   play-screen map controls; toggles re-render live.
+- **Left-handed mode is a true MIRROR, not a cosmetic flip (GS-lefty).** A left-handed golfer is the
+  mirror image of a right-handed one — their hook curves right, slice left, and a character's baked
+  fade/hook flips — so on a FIXED course (layout unchanged) a lefty's misses go the opposite way.
+  Implemented as a SINGLE lateral-sign on the FINAL shot angle (spray + bias) in `resolveShot`'s
+  `landAt` (`h = lefty ? -1 : 1`), applied AFTER the rng draws and AFTER the canonical-frame guard
+  classification — so EVERYTHING internal (the SprayShape zones, the caddy guard's `duckHookL`/`shankR`
+  targeting, the character `angleBias`) stays in one right-handed canonical frame and the ONE sign maps
+  it to world space. CRITICAL invariants: (1) ZERO extra rng — `lefty:false`/undefined is byte-for-byte
+  right-handed (the whole existing suite is the guard); (2) crosswind (`windLat`) is NOT flipped — it's
+  world-fixed, independent of stance, so wind shifts the cone the same way for both hands; (3) by mirror
+  symmetry, mirroring the PLAYER equals mirroring the COURSE (a seed relabelling), so it's BALANCE-NEUTRAL
+  — `tests/lefty.test.ts` proves mean per-stop Stableford matches righty within noise, so the
+  no-death-spiral bar is untouched. Threaded as `loadout.lefty` IDENTICALLY through the auto sim
+  (`playStop`→`playHole`→`executeShot`) and the interactive driver (`takeShot`/`previewShot`) so
+  auto≡interactive holds. It's a SETTING, not a perk: the pure sim can't read localStorage, so `app.ts`
+  bakes the live setting onto `loadout.lefty` in `render()` (the settings→sim bridge) — NOT serialised,
+  re-derived on resume, so NO save bump and NO `_gs*`/URL hook (the test-hub guard needs nothing). The
+  preview cone mirrors via `ShotSpread.lefty` (holeView negates the band angles + the bias rotates the
+  other way) so the graphic stays == the physics; the % labels ride their zones (hook% still shows where
+  a lefty's hook goes). Render mirrors (cosmetic, the flight already comes out mirrored from the sim):
+  `drawGolfer` swings left-handed (mirror the figure about the ball), `drawCaddy` mirrors the figure +
+  its muzzle anchor, and the `.gs-shot--lefty` CSS moves the floating map controls left + reverses the
+  aim segment / Hit bar (the club ◄/► arrows keep their direction). Re-run `tests/lefty.test.ts` after
+  any `resolveShot`/`shotSpread`/`holeView` spray change.
 - **Lie awareness on the DECISION bar (the per-shot-popup concern).** A colour-coded `lieChip` (🟢 ok /
   🟠 caution / 🔴 trouble) with the lie's carry+spray effect sits in the play top bar — shown exactly
   when you pick the next shot, so losing/skipping the result popup no longer loses lie awareness.
