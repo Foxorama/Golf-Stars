@@ -279,6 +279,38 @@ export interface PlayHoleOptions {
   /** Suggestible Sam's confidence shape boost (GS-caddy): applied when the AI happens to club the
    *  same club Sam would suggest, so auto-finish/headless play matches the interactive driver. */
   confidence?: ShapeMod;
+  /** Co-op SCRAMBLE (GS-scramble, boss stops): a partner golfer hits a second ball each full shot
+   *  and the TEAM keeps the better one (one stroke). Absent ⇒ ordinary solo play (no extra rng). */
+  scramble?: ScrambleOpts;
+}
+
+/** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
+ *  same club/target as the team and uses the player's distance/dispersion, but their own swing shape —
+ *  two balls a shot, the better is kept. */
+export interface ScrambleOpts {
+  partnerMods?: ShotMods;
+}
+
+/**
+ * Pick the better of two resolved shots for a scramble (GS-scramble): a holed ball wins; else the one
+ * that avoided a penalty; else the one resting closer to the flag. Pure. Returns the kept result and
+ * whether it was the PARTNER's ball (for UI attribution). `b` is the partner's ball.
+ */
+export function pickBetterExec(
+  a: ExecResult,
+  b: ExecResult,
+  flag: Vec,
+): { ex: ExecResult; partnerKept: boolean } {
+  const score = (e: ExecResult): [number, number, number] => [
+    e.holed ? 0 : 1, // holed beats everything
+    e.penaltyStrokes, // fewer penalties is better
+    dist(e.ballAfter, flag), // then closer to the flag
+  ];
+  const sa = score(a);
+  const sb = score(b);
+  // Lexicographic compare; ties keep the player's ball (a).
+  const bBetter = sb[0] < sa[0] || (sb[0] === sa[0] && (sb[1] < sa[1] || (sb[1] === sa[1] && sb[2] < sa[2])));
+  return bBetter ? { ex: b, partnerKept: true } : { ex: a, partnerKept: false };
 }
 
 /** Pin location: the generated flag within the green (GS-6), or the centroid if absent. */
@@ -525,7 +557,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       ? suggestPlayerClub(hole, ball, lie, usable, { carryMult, dispersionMult: opts.dispersionMult }).id
       : undefined;
 
-    const ex = executeShot(hole, ball, lie, tgt, club, {
+    const execOpts: ExecOpts = {
       carryMult,
       dispersionMult: opts.dispersionMult,
       stats: opts.stats,
@@ -538,7 +570,18 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       chipIn: opts.chipIn,
       confidence: opts.confidence,
       suggestedClubId,
-    }, rng);
+    };
+    const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
+    // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
+    // shape) and the team keeps the better — fewer penalties / closer to the flag. The partner draw
+    // fires ONLY when scramble is armed, so a normal hole's rng stream is byte-for-byte unchanged.
+    const ex: ExecResult = opts.scramble
+      ? pickBetterExec(
+          playerEx,
+          executeShot(hole, ball, lie, tgt, club, { ...execOpts, shotMods: opts.scramble.partnerMods }, rng),
+          flag,
+        ).ex
+      : playerEx;
     strokes += 1 + ex.penaltyStrokes;
     penalties += ex.penaltyStrokes;
 

@@ -36,7 +36,8 @@ import {
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossSpec } from './formats';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
-import { applyCharacter, characterShotMods } from './characters';
+import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
+import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome, itemThemeWeight } from '../course/themes';
 
@@ -220,6 +221,19 @@ export function currentBoss(run: Run): BossSpec | undefined {
   return bossAt(getFormat(run.formatId), run.stopIndex);
 }
 
+/**
+ * Scramble options for the current stop (GS-scramble): a co-op partner's swing shape when the stop is
+ * a `partner: 'scramble'` boss, else undefined (ordinary solo play). The partner is a deterministic
+ * unchosen golfer; threaded IDENTICALLY into the auto sim (playStop) and the interactive driver so
+ * auto≡interactive holds. Pure.
+ */
+export function scrambleOptsFor(run: Run): ScrambleOpts | undefined {
+  const boss = currentBoss(run);
+  if (boss?.partner !== 'scramble') return undefined;
+  const partnerId = scramblePartnerId(run.seed, run.stopIndex, run.loadout.characterId);
+  return { partnerMods: characterShotMods(partnerId) };
+}
+
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
   if (run.status !== 'active') throw new Error('playStop: run is not active');
   const course = currentCourse(run);
@@ -236,6 +250,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     chipIn: run.loadout.chipInBoost,
     confidence: run.loadout.confidenceMod,
     lieRelief: run.loadout.lieRelief,
+    scramble: scrambleOptsFor(run),
   });
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };

@@ -17,6 +17,7 @@ import {
   playStop,
   resumeRun,
   routeOptions,
+  scrambleOptsFor,
   shardsForRun,
   shopOffer,
   startRun,
@@ -228,6 +229,7 @@ export function reduce(state: UiState, action: Action): UiState {
         state.run.loadout,
         state.holeRng,
         auto,
+        scrambleOptsFor(state.run),
       );
       return { ...state, play };
     }
@@ -242,11 +244,12 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'playing' || !state.play || !state.holeRng) return state;
       let p = state.play;
       let guard = 0;
+      const scramble = scrambleOptsFor(state.run);
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
       while (!p.done && guard++ < 40) {
         p = awaitingPutt(p)
           ? takePutt(p, state.run.loadout, state.holeRng)
-          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true);
+          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble);
       }
       return { ...state, play: p };
     }

@@ -832,6 +832,11 @@ function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
   const cond = conditionsSummary(play.hole, state.course.biome);
+  // Scramble (GS-scramble): a co-op boss — show the partner + whether the last shot kept their ball.
+  const boss = currentBoss(state.run);
+  const scrambleLine = boss?.partner === 'scramble'
+    ? `<div class="gs-sub" style="color:${scramblePartner(state.run).style.cap};">🤝 Scramble with <b>${scramblePartner(state.run).name}</b>${play.partnerKept ? ' · kept their ball ✓' : play.shots.length ? ' · your ball held' : ''}</div>`
+    : '';
   return `
     <div class="gs-topbar">
       <div class="gs-stats">
@@ -842,6 +847,7 @@ function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
         ${zoneScoreChip()}
       </div>
       <div class="gs-sub">${lieChip(v.lie)} · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
+      ${scrambleLine}
       ${holePips()}
     </div>`;
 }
