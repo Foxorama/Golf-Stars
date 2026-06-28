@@ -51,6 +51,9 @@ export interface GolferStats {
 export interface Character {
   id: string;
   name: string;
+  /** The golfer's given name — used for the "Voyage as …" CTA (NOT always the first word of `name`:
+   *  Longshot Larry → "Larry", Backspin Bo → "Bo"). */
+  shortName: string;
   /** Where they hail from — flavour shown on the select card. */
   origin: string;
   /** Their pronoun/identity line (flavour). */
@@ -122,6 +125,7 @@ export const CHARACTERS: readonly Character[] = [
   {
     id: 'feather-fade',
     name: 'Feather Fade',
+    shortName: 'Feather',
     origin: 'Nairobi, Kenya',
     identity: 'she / her',
     blurb: 'A buttery, controlled fade on every shot — predictable shape, tidy dispersion.',
@@ -145,6 +149,7 @@ export const CHARACTERS: readonly Character[] = [
   {
     id: 'huang-woo-hook',
     name: 'Huang-Woo Hook',
+    shortName: 'Huang-Woo',
     origin: 'Busan, South Korea',
     identity: 'he / him',
     blurb: 'A surgeon with the irons, but the big sticks fight a snap-hook left.',
@@ -165,6 +170,7 @@ export const CHARACTERS: readonly Character[] = [
   {
     id: 'longshot-larry',
     name: 'Longshot Larry',
+    shortName: 'Larry',
     origin: 'Perth, Australia',
     identity: 'he / him',
     blurb: 'Bombs it off the tee. Where it ends up is anyone’s guess.',
@@ -188,6 +194,7 @@ export const CHARACTERS: readonly Character[] = [
   {
     id: 'backspin-bo',
     name: 'Backspin Bo',
+    shortName: 'Bo',
     origin: 'Portland, USA',
     identity: 'they / them',
     blurb: 'Zips the short irons back on a string — pin-seekers that bite and hold.',

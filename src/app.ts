@@ -361,13 +361,13 @@ function characterScreen(): string {
         <p class="gs-charcard-blurb">${ch.blurb}</p>
         <div class="gs-charcard-stats">${statRows(ch.stats, cap)}</div>
         <ul class="gs-charcard-pc">${pros}${cons}</ul>
-        <span class="gs-charcard-cta" style="--cc:${cap};">Voyage as ${ch.name.split(' ')[0]} <span aria-hidden="true">→</span></span>
+        <span class="gs-charcard-cta" style="--cc:${cap};">Voyage as ${ch.shortName} <span aria-hidden="true">→</span></span>
       </button>`;
   }).join('');
   return `
-    <header class="gs-char-head">
-      <h1>Choose your golfer</h1>
-      <p>Four wildly different swings. Each trades a clear strength for a clear quirk — pick who you'll voyage the galaxy as.</p>
+    <header style="border-left:4px solid #5fd45a;padding-left:10px;">
+      <h1 style="margin:0;font-size:24px;">Choose your golfer</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Four wildly different swings. Each trades a clear strength for a clear quirk — pick who you'll voyage the galaxy as.</p>
     </header>
     <div class="gs-charwrap">${cards}</div>`;
 }
