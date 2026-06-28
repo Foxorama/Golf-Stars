@@ -968,14 +968,32 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   or a charge pulled back up) CANCELS — a stray touch never fires, and "slide back to reset" works.
   Two fingers PINCH-zoom (kept); overview toggle + ＋/− zoom buttons kept. The map framing uses a
   STABLE full-power spread (`frameSpray`, `power: 1`) so the camera holds steady while the cone
-  grows/shrinks within it (no zoom-while-charging). A `.gs-power` HUD shows the live %/aim; the Hit
-  button still fires at the current charge (1 at rest) for desktop/accessibility. Pure feel — the sim
-  is untouched (the gesture only chooses club+target+power), so determinism + all sim tests are
+  grows/shrinks within it (no zoom-while-charging). A `.gs-power` HUD shows the live %/aim. The Hit
+  button is GONE (GS-fullmap) — the pull IS the trigger (a mouse drag covers desktop). Pure feel — the
+  sim is untouched (the gesture only chooses club+target+power), so determinism + all sim tests are
   unaffected; verified eyes-on (Playwright: a tap doesn't fire, slide-back cancels, a full pull fires,
   the 40%-charge cone is carry 53–116 vs the full 132–290). The `swingGesture` setting is GONE (the
   pull is the core input now). NB: no new `_gs*` flag or `?param` — gesture tunables (`PULL_RANGE`/
   `AIM_SENS`/`COMMIT`) are plain consts and Overdrive/power are loadout/decision fields — so the
   test-hub guard needs no new control (the new perk appears in the Sim Lab automatically).
+- **The play screen is a FULL-BLEED immersive map (GS-fullmap) — the hole IS the screen.** The old
+  fixed column (top stat bar + map + bottom control row) is gone; the map fills the whole viewport
+  (`.gs-shot--full` + `.gs-main--bleed` drops the page frame's padding) and every control/readout
+  FLOATS on it as a translucent `.gs-glass` overlay: a top-left info chip (`mapTopInfo` — hole/par/
+  distance/score + a thin lie·wind line + the momentum pips; the verbose biome/conditions string was
+  cut, only an armed lost-rough warning survives), the top-right map-nav column, and a bottom control
+  panel (club ◄►, the power HUD, the condensed spray odds, Sam's read). The big Hit button + the
+  Attack/Safe/Aim segmented row are REMOVED; the only shot input is the pull gesture, plus a small
+  round `»` auto-finish button. CRITICAL pass-through: the overlays are `pointer-events:none` so a
+  power pull can START anywhere on the map — even under a readout — and only real buttons (and the
+  putt-meter canvas) capture taps; the framed caddy badge is explicitly kept pass-through. The ball
+  bias eased to `DMAP_BIAS 0.72` so it reads ABOVE the bottom panel, not behind it. Applies to the
+  decision, watching, and putting screens (the hole-complete card stays a normal centred layout).
+- **The hired caddy is shown FRAMED on the decision screen (GS-fullmap).** A gold-bordered glass badge
+  in the bottom-left corner draws the hired caddy's figure (the same `drawCaddy` the play view / putt
+  meter use) with its name, so the caddy stands out the whole hole — not just during the shot
+  animation. Drawn one-shot per render to a `#caddybadge` canvas (the idle bob updates live while
+  charging, so no rAF to leak); absent when no named caddy is hired. Verified eyes-on.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the

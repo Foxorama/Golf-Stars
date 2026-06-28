@@ -13,10 +13,10 @@ import { renderHoleSVG } from './render/holeView';
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
+import { drawCaddy, hasCaddyArt, CADDY_LABEL } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
-import { biomeById } from './sim/course/biomes';
 import { archetypeFor, themeById } from './sim/course/themes';
 import { zoneProfile, difficultyPips } from './sim/course/zones';
 import { bearing, dist, type Hole } from './sim/course/contract';
@@ -661,21 +661,6 @@ function lieChip(lie: string): string {
   return `<span class="gs-liechip" style="border-color:${col};color:${col};">${dot} <b style="color:var(--gs-ink);">${label}</b>${eff ? ` <span style="opacity:.85;">${eff}</span>` : ''}</span>`;
 }
 
-/** Biome + special conditions (gravity, slick/true scatter surfaces) actually on this hole. */
-function conditionsSummary(hole: Hole, biomeId: string): string {
-  const parts: string[] = [];
-  const biome = biomeById(biomeId);
-  if (biome) parts.push(`🪐 ${biome.name}`);
-  const cm = biomeCarryMult(hole);
-  if (cm > 1.02) parts.push(`low gravity · carry ×${cm.toFixed(2)}`);
-  else if (cm < 0.98) parts.push(`heavy air · carry ×${cm.toFixed(2)}`);
-  const surfaces = new Set(hole.features.map((f) => f.kind));
-  const SCAT: Record<string, string> = { ice: '❄ slick ice', crystal: '💎 true crystal', waste: '🏜 waste sand' };
-  for (const [k, label] of Object.entries(SCAT)) if (surfaces.has(k)) parts.push(label);
-  // Per-hole warning when the void's lost-rough is actually ARMED here (deep stops): miss = lost ball.
-  if (lieInfo(roughLieOf(hole)).penalty) parts.push('🕳 lost rough — miss the fairway = lost ball');
-  return parts.join(' · ');
-}
 
 /** A list of zone traits (hazards/benefits), each an icon + line. */
 function traitList(title: string, accent: string, traits: { icon: string; text: string }[]): string {
@@ -696,10 +681,10 @@ function traitList(title: string, accent: string, traits: { icon: string; text: 
 // follow-cam in on the contemplated shot (smaller = tighter); the playable corridor fills the
 // frame and the rough/OB legitimately stretch off-screen.
 const DMAP_W = 360;
-const DMAP_H = 600;
-// Ball sits LOW in the tall portrait view so most of the frame is the shot AHEAD (a high bias
-// kills the dead space behind the tee that a centred camera leaves).
-const DMAP_BIAS = 0.8;
+const DMAP_H = 640;
+// Ball sits low-ish so most of the frame is the shot AHEAD, but high enough to clear the floating
+// bottom control panel on the full-bleed screen (the ball reads above the HUD, not behind it).
+const DMAP_BIAS = 0.72;
 /** View radius (course yds) framing a shot of max-carry `carryHigh`. Tuned with DMAP_BIAS so the
  *  contemplated shot nearly fills the height and the corridor fills the width — the rough/OB
  *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
@@ -791,28 +776,29 @@ function zoneScoreChip(): string {
   return `<span class="gs-shotscore" style="color:${col};" title="stop Stableford vs the cut to make">${sf}/${cut} pts</span>`;
 }
 
-/** The compact top stat bar for the play screen (replaces the old per-hole briefing splash):
- *  hole #/total, par + hole length, the live distance, the running zone score, the shot number,
- *  plus a thin lie/wind/conditions sub-line. */
-function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
+/** The floating top-left info chip for the full-bleed hole screen (GS-fullmap): hole #/total, par +
+ *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
+ *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
+ *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through. */
+function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
-  const cond = conditionsSummary(play.hole, holeBiome(play.hole));
-  // Scramble (GS-scramble): a co-op boss — show the partner + whether the last shot kept their ball.
+  // Only the decision-relevant warning survives onto the play HUD (the full conditions list lives on
+  // the zone splash): the void's armed lost-rough, which turns an offline miss into a lost ball.
+  const lostRough = lieInfo(roughLieOf(play.hole)).penalty ? ' · <span style="color:var(--gs-warn);">🕳 lost rough</span>' : '';
   const boss = currentBoss(state.run);
   const scrambleLine = boss?.partner === 'scramble'
-    ? `<div class="gs-sub" style="color:${scramblePartner(state.run).style.cap};">🤝 Scramble with <b>${scramblePartner(state.run).name}</b>${play.partnerKept ? ' · kept their ball ✓' : play.shots.length ? ' · your ball held' : ''}</div>`
+    ? `<div class="gs-sub" style="color:${scramblePartner(state.run).style.cap};">🤝 <b>${scramblePartner(state.run).name}</b>${play.partnerKept ? ' · kept ✓' : play.shots.length ? ' · yours held' : ''}</div>`
     : '';
   return `
-    <div class="gs-topbar">
+    <div class="gs-hud gs-hud-top gs-glass">
       <div class="gs-stats">
-        <span>⛳ Hole <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
-        <span>Par <b>${play.hole.par}</b> · ${len}y</span>
+        <span>⛳ <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
+        <span>Par <b>${play.hole.par}</b>·${len}y</span>
         <span>${opts.distLabel}</span>
-        <span>Shot <b>${opts.shotNo}</b></span>
         ${zoneScoreChip()}
       </div>
-      <div class="gs-sub">${lieChip(v.lie)} · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
+      <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}
       ${holePips()}
     </div>`;
@@ -825,10 +811,12 @@ function playingBody(animating: boolean): string {
   const par = play.hole.par;
 
   if (animating) {
+    // Full-bleed: the live shot canvas IS the screen (it draws the hired caddy itself), with just
+    // the floating info chip on top.
     return `
-      <div class="gs-shot">
-        ${playTopBar(v, { shotNo: play.strokes, distLabel: '…watching the shot…' })}
+      <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap" id="play"></div>
+        ${mapTopInfo(v, { shotNo: play.strokes, distLabel: '…watching…' })}
       </div>`;
   }
 
@@ -869,18 +857,17 @@ function playingBody(animating: boolean): string {
       focusBias: 0.5,
     });
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
-    // Tapping the meter OR the Putt button captures the pace. The band widens with putter upgrades.
-    const meterInstr =
-      '<p style="font-size:11.5px;opacity:.6;margin:.1em 0 .4em;line-height:1.4;">Tap the meter (or Putt) when the marker is in the green <b>MAKE</b> band. Too soft leaves it short; too firm runs it past.</p>';
+    // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
+    // the meter + Putt float in a bottom panel.
     return `
-      <div class="gs-shot">
-        ${playTopBar(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b> yds to cup · putt <b>${play.putts + 1}</b>` })}
+      <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap">${puttSvg}</div>
-        <div class="gs-bottom">
-          ${meterInstr}
-          <div id="puttmeter" style="margin:2px 0;"></div>
-          <div class="gs-hitbar">
-            <button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>
+        ${mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` })}
+        <div class="gs-hud gs-hud-bottom">
+          <div class="gs-hud-controls gs-glass">
+            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">Tap the meter (or Putt) in the green <b>MAKE</b> band — too soft is short, too firm runs past.</p>
+            <div id="puttmeter"></div>
+            <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
           </div>
         </div>
       </div>`;
@@ -951,56 +938,60 @@ function playingBody(animating: boolean): string {
     </div>`;
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
-  const clubButtons = `
-    ${cbtn('◄', -1)}
-    <b style="display:inline-block;min-width:6em;text-align:center;">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
-    ${cbtn('►', 1)}
-    ${selFreeTarget ? `<button class="gs-btn" data-aimreset="1" title="Re-aim at the pin">🎯 Pin</button>` : ''}
-    ${hasSuggest ? `<button class="gs-btn${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🏌 Suggested</button>` : ''}`;
-  // Power read-out + an instruction. Pulling DOWN on the map charges power (the cone grows); the
-  // bar fills live as you charge, and a >100% pull (with Overdrive) glows as an overpowered shot.
+  // Club row: ◄ name ► + (re-aim-at-pin when nudged) + (Sam's snap-to-suggested when hired).
+  const clubRow = `<div class="gs-clubrow">
+      ${cbtn('◄', -1)}
+      <span class="gs-clubname">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</span>
+      ${cbtn('►', 1)}
+      ${selFreeTarget ? `<button class="gs-btn gs-mini" data-aimreset="1" title="Re-aim at the pin">🎯</button>` : ''}
+      ${hasSuggest ? `<button class="gs-btn gs-mini${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🏌</button>` : ''}
+    </div>`;
+  // Power read-out: the bar fills as you pull DOWN on the map (the cone grows in step); past 100%
+  // (with Overdrive) it glows orange as an overpowered shot.
   const powerPct = Math.round(selPower * 100);
   const over = selPower > 1.001;
   const powerCol = over ? '#ff8a3d' : selPower >= 0.66 ? '#5fd45a' : selPower >= 0.33 ? '#ffc454' : '#9fd8e6';
-  const aimNote = selFreeTarget ? (selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2 ? 'aim adjusted' : 'aim: pin') : 'aim: pin';
+  const aimNote = selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2 ? 'aim adjusted' : 'aim: pin';
   const powerHud = `<div class="gs-power">
       <div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
-      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · slide to aim · pull back to cancel' : 'pull DOWN on the map to power up'}</span></div>
+      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · pull back to cancel' : 'pull DOWN on the map'}</span></div>
     </div>`;
-  // The Hit button fires at the CURRENT charge (1 = a full swing at rest) for desktop / accessibility;
-  // the map pull is the primary, one-smooth-action input.
-  const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}), power: selPower };
-  // Suggestible Sam's caddy read: precise front/middle/back green yardages + the carry to clear the
-  // nearest forced hazard on the line to the pin. Pure info off the sim — only shown once Sam is hired.
+  // Condensed spray odds + carry range (the cone on the map carries the detail). Sam (if hired) adds a
+  // compact green-depth + forced-carry read on its own line.
   let samRead = '';
   if (hasSuggest && play.lie !== 'green') {
     const gd = greenDepth(play.hole, play.ball);
-    const mid = Math.round(dist(play.ball, play.hole.green));
     const fc = forcedCarry(play.hole, play.ball, pinOf(play.hole));
-    const carryTxt = fc
-      ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> to clear ${hazardLabel(fc.kind)}</span>`
-      : '';
-    samRead = `<p class="gs-legend" style="opacity:.9;">🎒 <b>Sam:</b> front <b>${Math.round(gd.front)}</b> · middle <b>${mid}</b> · back <b>${Math.round(gd.back)}</b> yds${carryTxt}</p>`;
+    const carryTxt = fc ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> ${hazardLabel(fc.kind)}</span>` : '';
+    samRead = `<div class="gs-legend-line" style="opacity:.9;">🎒 ${Math.round(gd.front)}·${Math.round(dist(play.ball, play.hole.green))}·${Math.round(gd.back)}y${carryTxt}</div>`;
   }
+  const legend = `<div class="gs-legend-line">
+      <span style="color:#5fd45a;">●</span> ${pctRound(sh.green)}% ·
+      <span style="color:#ffc454;">●</span> ${pctRound(sh.hookL)}/${pctRound(sh.sliceR)}% ·
+      <span style="color:#ff4c4c;">●</span> ${pctRound(sh.duckHookL)}/${pctRound(sh.shankR)}% ·
+      <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)}y</b>
+    </div>`;
+  // The hired caddy, framed in the bottom-left so it stands out (GS-fullmap). The figure is drawn to
+  // the canvas in the render wiring. Absent when no caddy is hired.
+  const cid = caddyId();
+  const caddyBadge = hasCaddyArt(cid)
+    ? `<div class="gs-caddybadge"><canvas id="caddybadge" width="128" height="120"></canvas><span class="gs-caddyname">${CADDY_LABEL[cid]}</span></div>`
+    : '';
+  const autoFinish = `<button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole">»</button>`;
   return `
-    <div class="gs-shot">
-      ${playTopBar(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b> yds to pin` })}
-      <div class="gs-bigmap" data-map="1">${svg}${mapCtrls}</div>
-      <div class="gs-bottom">
-        <div class="gs-ctrlrow">${clubButtons}</div>
-        ${samRead}
-        <p class="gs-legend">
-          <span style="color:#5fd45a;">▮</span> ${pctRound(sh.green)}% great ·
-          <span style="color:#ffc454;">▮</span> ${pctRound(sh.hookL)}% hook / ${pctRound(sh.sliceR)}% slice ·
-          <span style="color:#ff4c4c;">▮</span> ${pctRound(sh.duckHookL)}% duck-hook / ${pctRound(sh.shankR)}% shank ·
-          carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
-          <span style="opacity:.6;">${hasSuggest ? ` · suggested: ${v.attackClubId}` : ''}</span>
-        </p>
-        ${powerHud}
-        <div class="gs-hitbar">
-          ${btn('🏌 Hit', hitAction, { variant: 'primary' })}
-          ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
+    <div class="gs-shot gs-shot--full">
+      <div class="gs-bigmap" data-map="1">${svg}</div>
+      ${mapCtrls}
+      ${mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` })}
+      <div class="gs-hud gs-hud-bottom">
+        ${caddyBadge}
+        <div class="gs-hud-controls gs-glass">
+          ${clubRow}
+          ${powerHud}
+          ${legend}
+          ${samRead}
         </div>
+        ${autoFinish}
       </div>
     </div>
     ${awaitingShotPopup ? shotPopupOverlay() : ''}`;
@@ -1325,7 +1316,10 @@ function render(): void {
       ? outpostScreen()
       : gameoverScreen();
 
-  app.innerHTML = `<main class="gs-main">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
+  // The interactive play screen (decision / watching / putting — but not the hole-complete card) is
+  // full-bleed: the map fills the page, so drop the page frame's padding/max-width for it.
+  const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
@@ -1453,6 +1447,21 @@ function render(): void {
         caddyId: caddyId(),
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
       });
+    }
+  }
+
+  // Draw the hired caddy into its framed bottom-left badge on the decision screen (GS-fullmap). The
+  // play view / putt meter draw the caddy themselves while animating / putting; this covers the
+  // aim-and-charge screen, where the player spends most of the hole. A one-shot draw per render (the
+  // idle bob updates whenever the screen re-renders — i.e. live while charging), so no rAF to leak.
+  const cbCanvas = document.getElementById('caddybadge') as HTMLCanvasElement | null;
+  const cbId = caddyId();
+  if (cbCanvas && hasCaddyArt(cbId)) {
+    const ctx = cbCanvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, cbCanvas.width, cbCanvas.height);
+      // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
+      drawCaddy(ctx, cbId, cbCanvas.width / 2, cbCanvas.height - 8, cbCanvas.height * 0.92, performance.now());
     }
   }
 
