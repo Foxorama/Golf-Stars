@@ -239,6 +239,10 @@ export interface PlayViewOptions {
   themeId?: string;
   /** Called once the final shot has landed. */
   onDone?: () => void;
+  /** Fired once per segment at the STRIKE moment (club–ball contact / putter tap) — the cue point
+   *  for a contact sound + haptic. `quality` 0..1 for a shot (1 = pure, derived from the miss),
+   *  undefined for a putt. Pure feel hook; never affects the sim. */
+  onImpact?: (kind: 'shot' | 'putt', quality?: number) => void;
   /**
    * Zoom-and-follow: when set, the camera centres on `focus` (the starting ball) at radius
    * `viewRadius` (course yards) and — if `follow` — eases to track the ball in flight, so the
@@ -324,6 +328,8 @@ export function mountPlayView(
   let done = false;
   let lastImpactShot = -1; // shot whose landing impact/hold has already been triggered
   let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
+  let impactFiredShot = -1; // shot whose strike cue (onImpact) has fired
+  let impactFiredPutt = -1; // putt whose strike cue has fired
   // Caddy-guard redirect (GS-caddy): the projectile fired for the current shot, if any.
   let redirectFiredShot = -1;
   let redirectFx: { kind: 'laser' | 'boomerang'; t0: number; from: Vec; to: Vec } | null = null;
@@ -340,6 +346,8 @@ export function mountPlayView(
     lastImpactShot = -1;
     lastRollClearShot = -1;
     redirectFiredShot = -1;
+    impactFiredShot = -1;
+    impactFiredPutt = -1;
     redirectFx = null;
   }
 
@@ -595,6 +603,17 @@ export function mountPlayView(
         hudText = `${shot.club.name} · ${Math.round(carry)} yds`;
       } else {
         const elapsed = flightElapsed;
+        // Strike cue — fire once as the ball launches (contact). Quality from how straight the
+        // shot finished relative to its carry, so a pure strike rings and a wild one thuds.
+        if (impactFiredShot !== shotIndex) {
+          impactFiredShot = shotIndex;
+          const brq = (shot.result.shotBearing * Math.PI) / 180;
+          const lat =
+            (shot.result.landing[0] - shot.from[0]) * Math.cos(brq) +
+            (shot.result.landing[1] - shot.from[1]) * -Math.sin(brq);
+          const mf = carry > 0 ? Math.abs(lat) / carry : 0;
+          opts.onImpact?.('shot', Math.max(0, 1 - mf / 0.2));
+        }
         let ground: Vec;
         let height: number;
         if (elapsed < flightDur) {
@@ -736,6 +755,10 @@ export function mountPlayView(
     } else if (puttIndex < putts.length) {
       // Putt phase: flat roll across the green, eased to a stop, into the cup.
       const putt = putts[puttIndex]!;
+      if (impactFiredPutt !== puttIndex) {
+        impactFiredPutt = puttIndex;
+        opts.onImpact?.('putt');
+      }
       const len = Math.hypot(putt.to[0] - putt.from[0], putt.to[1] - putt.from[1]);
       const dur = Math.max(300, Math.min(750, len * proj.scale * 12));
       const t = Math.max(0, Math.min(1, (now - segStart) / dur));

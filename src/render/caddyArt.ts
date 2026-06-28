@@ -18,7 +18,9 @@ export type CaddyArtId =
   | 'dr-chipinski'
   | 'space-ducks'
   | 'convict-sheep'
-  | 'suggestible-sam';
+  | 'suggestible-sam'
+  | 'sandy-sandsaver'
+  | 'mystic-mole';
 
 const ART_IDS: readonly string[] = [
   'auto-caddie',
@@ -27,6 +29,8 @@ const ART_IDS: readonly string[] = [
   'space-ducks',
   'convict-sheep',
   'suggestible-sam',
+  'sandy-sandsaver',
+  'mystic-mole',
 ];
 
 /** Does this caddy id have a drawable figure? */
@@ -42,6 +46,8 @@ export const CADDY_LABEL: Record<CaddyArtId, string> = {
   'space-ducks': 'Space Ducks',
   'convict-sheep': 'Convict Sheep',
   'suggestible-sam': 'Suggestible Sam',
+  'sandy-sandsaver': 'Sandy',
+  'mystic-mole': 'Mystic Mole',
 };
 
 /** Which caddies actively fire a projectile mid-flight (Space Ducks laser, Convict Sheep boomerang). */
@@ -93,6 +99,12 @@ export function drawCaddy(
       break;
     case 'suggestible-sam':
       anchorLocal = drawSuggestibleSam(ctx, t);
+      break;
+    case 'sandy-sandsaver':
+      anchorLocal = drawSandy(ctx, t);
+      break;
+    case 'mystic-mole':
+      anchorLocal = drawMole(ctx, t);
       break;
     case 'auto-caddie':
     default:
@@ -161,6 +173,101 @@ function drawPenelope(ctx: CanvasRenderingContext2D): Vec {
   ctx.fill();
   ctx.fillRect(-1, -53, 8, 2.4); // brim
   return [-1, -40];
+}
+
+// --- Sandy the Sand-Saver (escape specialist, GS-mux) -----------------------
+function drawSandy(ctx: CanvasRenderingContext2D, t: number): Vec {
+  legs(ctx, '#6b5a3a');
+  // Khaki bush-shirt torso.
+  ctx.strokeStyle = '#b89a5a';
+  ctx.lineWidth = 13;
+  ctx.beginPath();
+  ctx.moveTo(0, -21);
+  ctx.lineTo(-1, -43);
+  ctx.stroke();
+  // Arm + a sand wedge raised, with a little flying-sand spray (idle shimmer).
+  ctx.strokeStyle = '#d8b888';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(-1, -40);
+  ctx.lineTo(13, -36);
+  ctx.stroke();
+  ctx.strokeStyle = '#c8ccd6';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(13, -36);
+  ctx.lineTo(20, -50);
+  ctx.stroke();
+  ctx.fillStyle = '#aeb6c6';
+  ctx.beginPath();
+  ctx.ellipse(20, -50, 3.4, 2, 0.6, 0, Math.PI * 2); // wedge head
+  ctx.fill();
+  // Sand grains spraying off the wedge.
+  ctx.fillStyle = '#e3c98f';
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * 1.4 - 0.2 + Math.sin(t * 0.005 + i) * 0.1;
+    ctx.beginPath();
+    ctx.arc(20 + Math.cos(a) * 9, -50 - Math.sin(a) * 9, 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Weathered head + wide bush hat.
+  ctx.fillStyle = '#d8a878';
+  ctx.beginPath();
+  ctx.arc(-1, -49, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#7a6238';
+  ctx.beginPath();
+  ctx.ellipse(-1, -53, 12, 3, 0, 0, Math.PI * 2); // wide brim
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-1, -54, 5.5, Math.PI, Math.PI * 2); // crown
+  ctx.fill();
+  return [20, -50];
+}
+
+// --- Mystic Mole (green-reader, GS-mux) -------------------------------------
+function drawMole(ctx: CanvasRenderingContext2D, t: number): Vec {
+  // A dirt mound the mole pops from.
+  ctx.fillStyle = '#4a3a28';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 15, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const pop = Math.sin(t * 0.003) * 1.5; // gentle bob out of the hole
+  // Round dark-grey mole body.
+  ctx.fillStyle = '#5a5560';
+  ctx.beginPath();
+  ctx.ellipse(0, -16 + pop, 11, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Lighter belly.
+  ctx.fillStyle = '#7a7682';
+  ctx.beginPath();
+  ctx.ellipse(0, -12 + pop, 6, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Tiny digging claws holding a putter.
+  ctx.strokeStyle = '#d9dee8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(9, -22 + pop);
+  ctx.lineTo(15, -8 + pop);
+  ctx.stroke();
+  ctx.fillStyle = '#aeb6c6';
+  ctx.fillRect(13, -8 + pop, 5, 2.4);
+  // Big mystic spectacles + pink nose.
+  ctx.fillStyle = '#1a1d24';
+  ctx.beginPath();
+  ctx.arc(-4, -26 + pop, 3.4, 0, Math.PI * 2);
+  ctx.arc(4, -26 + pop, 3.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#9fd8e6';
+  ctx.beginPath();
+  ctx.arc(-4, -26 + pop, 2, 0, Math.PI * 2);
+  ctx.arc(4, -26 + pop, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff9db0';
+  ctx.beginPath();
+  ctx.arc(0, -21 + pop, 2.2, 0, Math.PI * 2); // nose
+  ctx.fill();
+  return [15, -8 + pop];
 }
 
 // --- Driver Dan (big stick from anywhere) -----------------------------------

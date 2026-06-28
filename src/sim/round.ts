@@ -13,6 +13,7 @@ import {
   dispersionProfile,
   lieAt,
   lieInfo,
+  reliedLie,
   playsLike,
   playWind,
   PEN_INFO,
@@ -262,6 +263,8 @@ export interface PlayHoleOptions {
   driverAnywhere?: boolean;
   /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail to the green. */
   guard?: CaddyGuard;
+  /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
+  lieRelief?: number;
   /** Wedge caddy chip-in chance (GS-caddy, Dr Chipinski): probability a PW-or-shorter shot resting
    *  within CHIPIN_RANGE of the flag drops for a chip-in. 0/undefined = off (no extra rng). */
   chipIn?: number;
@@ -531,6 +534,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       minCarryBoost: opts.minCarryBoost,
       wedgeWindow: opts.wedgeWindow,
       guard: opts.guard,
+      lieRelief: opts.lieRelief,
       chipIn: opts.chipIn,
       confidence: opts.confidence,
       suggestedClubId,
@@ -606,6 +610,8 @@ export interface ExecOpts {
   wedgeWindow?: number;
   /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail to the green. */
   guard?: CaddyGuard;
+  /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
+  lieRelief?: number;
   /** Wedge-caddy chip-in chance (GS-caddy): drop a PW-or-shorter shot resting near the flag. */
   chipIn?: number;
   /**
@@ -673,6 +679,7 @@ export function executeShot(
     minCarryFracBoost: cw.minCarryFracBoost,
     carryWindowTighten: cw.carryWindowTighten,
     guard: opts.guard,
+    lieRelief: opts.lieRelief,
     stats: opts.stats,
     rng,
   });
@@ -806,19 +813,22 @@ export function shotSpread(
     /** Sam's confidence shape boost — folded into the cone iff `club.id === suggestedClubId`. */
     confidence?: ShapeMod;
     suggestedClubId?: string;
+    /** Escape-specialist caddy lie relief (GS-mux): softens a bad lie so the cone reads true. */
+    lieRelief?: number;
   } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
   const li = lieInfo(lie);
+  const relief = reliedLie(li, opts.lieRelief);
   const shotBearing = bearingDeg(from, target);
   const nominal = clubDist(club, opts.stats);
-  const intended = nominal * li.carryMult * carryMult;
+  const intended = nominal * relief.carryMult * carryMult;
   const w = hole.wind ? playWind(hole.wind, shotBearing) : { along: 0, cross: 0 };
   // The character's per-club shape (GS-18): its dispersion folds into the cone's width and its
   // shot-shape bias ROTATES the cone's centre line, so a fade/hook is visible in the preview and
   // the player can aim to compensate — wind reads true, and so does shape.
   const mods = opts.shotMods ? opts.shotMods(nominal) : NEUTRAL_SHOT_MODS;
-  const dispMult = li.dispersionMult * (opts.dispersionMult ?? 1) * mods.dispMult;
+  const dispMult = relief.dispersionMult * (opts.dispersionMult ?? 1) * mods.dispMult;
   const prof = dispersionProfile(nominal);
   const along = w.along * TUNABLES.windCarryPerMph;
   // Carry window mirrors resolveShot's clamp (distance-control / wedge-window), so the preview's
