@@ -128,6 +128,15 @@ This game lives or dies on three axes — put every change through all three bef
   it never widens the corridor's fairness half-width — `validateFairness`/`fairwayHalfWidthOf` key off the
   FIRST `fairway` feature (the main corridor). `lieAt` precedence (green > fairway) keeps a ball on the
   green reading green even though the apron overlaps it.
+  - **The apron BLENDS into the corridor — it must not read as a rectangular shelf the green sits on
+    (GS-apron-blend).** The old apron was a constant-width strip with a FLAT tee-side cut; on a tight/wild
+    hole it was far wider than the narrow corridor, so behind the green you saw a hard-edged rectangle
+    with a flat bottom step ("the section around the green that doesn't fit"). Fix: the apron now STARTS at
+    the corridor's OWN half-width at the green (`corrHW = mean of leftHW/rightHW at the last point` → a
+    flush join, nothing protrudes), swells only enough to WRAP the green (`wrap = max(greenR+9, corrHW)`),
+    then tapers to a soft point past it — built from 5 centreline points with `ribbon(..., true, true)` so
+    BOTH ends are rounded (no flat cut anywhere). Pure geometry, NO rng → the generation stream is
+    byte-for-byte unchanged; only the apron polygon shape (and thus the near-green lie read) shifts.
 - **Fairways are RIBBONS with rounded ends, not a pointed almond (GS-terrain, `ribbon`).** The old
   corridor connected its two offset edges with a flat slash AND pinched both ends narrow (a symmetric
   sine undulation floored at 0.55), so a hole read as a leaf/eye floating on the ground — "badly fit in
@@ -161,6 +170,26 @@ This game lives or dies on three axes — put every change through all three bef
     coverage-blindness (a precise "just reaches" club drops into trouble the sparser bag's over-club flies
     past), so `tests/club-rewards.test`'s Pro-coverage "no-regression" slack was widened 0.2 → 0.5 — an
     auto-AI artifact, not unfairness (the death-spiral bar holds; the interactive dial-in win is unchanged).
+- **Crossings are MEANDERING RIVERS that pool into connected lakes, not perpendicular bridge-bands
+  (GS-river-shape, `riverChannel`).** The old `crossingBand` laid a straight band perpendicular to play —
+  it read as a flat "bridge" slab, and a separate flanking `pond` floated nearby unconnected. Grounded in
+  how real courses route water (the classic strategic hazard is a stream cutting ACROSS on a DIAGONAL — a
+  heroic carry you "bite off as much as you dare" — and natural water meanders down a hollow and POOLS into
+  a lake where it runs out), `riverChannel(centreline, t, fairwayHalfWidth, thickness, rng)` now builds the
+  lava river / frozen pond / creek: it crosses on a random DIAGONAL axis (the lateral rotated ±~31°, so no
+  two rivers run the same way), MEANDERS (two seeded sines whose amplitude is held at ZERO across the
+  corridor — clean carry — then grows out in the rough), runs WELL off into the rough on each side
+  (asymmetric reach, the longer arm pooling into a LAKE the generator drops at the returned `mouth`: a
+  separate `water`/`lava` blob, same liquid FAMILY, so the render merges river+lake into one seamless body
+  — the "rivers don't merge into lakes" fix), and has a believable variable width. CRITICAL — single
+  crossing, whatever the hole shape: a long diagonal arm can re-meet a doglegging centreline far away and
+  create a SECOND, unprovable bank, so each arm is built OUTWARD step-by-step and TRUNCATED the instant a
+  point PAST the corridor zone re-approaches the centreline (`polylineDist < 1.1·halfWidth`). The crossing
+  still passes exactly through the corridor point `c` (meander anchored to 0 there), so `validateCrossings`
+  proves every one carryable and `validateFairness` exempts it; the pooled lake is guarded by
+  `clearsPlayCorridor` (so it stays a fair, avoidable side-hazard). `crossingBand` is KEPT for the sandy
+  `fairwayBreaks` waste band (a clean cross-cut is right there). Re-shoot the gallery and re-run
+  `tests/zones.test.ts` after any `riverChannel` change (the diagonal/reach knobs can trip the carryable bars).
 - **Greens span the full vocabulary now (GS-terrain extends GS-greens).** `greenPoly` got FOUR seeded
   harmonics (bigger amplitudes), a low-frequency PEAR/teardrop bias (one end fatter), and 0–2 KIDNEY
   bites — so greens read unmistakably as round/oval/long-shelf/pear/kidney/boomerang/clover, not a gently
