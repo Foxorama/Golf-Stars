@@ -28,6 +28,7 @@ import {
   netDispersion,
   offerableClubs,
   ownedCount,
+  relicCreditBonus,
   shopItem,
   startingLoadout,
   type PlayerLoadout,
@@ -239,8 +240,11 @@ export function finishStop(
   const event = run.pendingEvent ?? DEFAULT_EVENT;
   const cut = effectiveCut(run, course.holes.length);
   const passed = totals.stableford >= cut;
+  // Trigger-relic payouts (GS-synergy) add to the base before the credit multiplier, so they
+  // synergise with credit perks/events. Zero for a base loadout (no relics).
+  const relicBonus = relicCreditBonus(run.loadout, played, passed);
   const creditsEarned = passed
-    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult)
+    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult, relicBonus)
     : 0;
   // Clearing the FINAL boss of a winnable voyage WINS the run (GS-voyage).
   const won = passed && isFinalStop(getFormat(run.formatId), run.stopIndex);
@@ -447,7 +451,7 @@ function weightedSample(
  * (and a resume reproduces it). Items already maxed (owned uniques / capped stackables)
  * drop out, so every slot is something you can still pursue. Costs reflect current stacks.
  */
-export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
+export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer[] {
   const perks = run.loadout.perks;
   const hasCaddy = !!namedCaddyOwned(perks);
   // Driver Dan (GS-clubs) only turns up once the golfer actually OWNS a driver. Everyone now starts
@@ -469,7 +473,9 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE): ShopOffer[] {
   // improvements (a distance upgrade, or a new club that fills a gap in the balanced bag), drawn
   // from the same rarity-weighted pool as the gear so they're appropriately scarce.
   const pool = [...gear, ...offerableClubs(run.loadout)];
-  const rng = new Rng(`${run.seed}:shop:${run.stopIndex}`);
+  // A reroll (GS-shop-reroll) salts the seed so the draw changes; salt 0 keeps the original stock
+  // byte-for-byte (so existing tests + a fresh shop entry are unchanged).
+  const rng = new Rng(salt ? `${run.seed}:shop:${run.stopIndex}:r${salt}` : `${run.seed}:shop:${run.stopIndex}`);
   // The current stop's theme biases the outfitter toward on-theme gear (GS-17d).
   const archetype = currentTheme(run).archetype;
   const weight = (it: ShopItem) => itemThemeWeight(itemTags(it.id), archetype);

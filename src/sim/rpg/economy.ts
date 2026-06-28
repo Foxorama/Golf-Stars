@@ -25,9 +25,13 @@ export function cutLine(distanceFromStart: number, holes = HOLES_PER_STOP): numb
   return Math.round(holes * (1.0 + distanceFromStart * 0.07));
 }
 
-/** Credits earned from a stop's Stableford total, scaled by any credit perk. */
-export function creditsForStop(stableford: number, creditMult = 1): number {
-  return Math.max(0, Math.round(stableford * CREDIT_PER_POINT * creditMult));
+/**
+ * Credits earned from a stop's Stableford total, scaled by any credit perk. `bonusFlat` (GS-synergy
+ * relic payouts — birdie/eagle/comeback) is added to the Stableford-derived base BEFORE the multiplier,
+ * so economy relics SYNERGISE with credit-mult perks (Fortune Chip / Lucky Coin amplify them too).
+ */
+export function creditsForStop(stableford: number, creditMult = 1, bonusFlat = 0): number {
+  return Math.max(0, Math.round((stableford * CREDIT_PER_POINT + bonusFlat) * creditMult));
 }
 
 /** The mutable player state a shop item modifies. Fully serialisable (data only). */
@@ -114,6 +118,14 @@ export interface PlayerLoadout {
    * perks/meta on resume, so it needs no save bump.
    */
   puttBoost: number;
+  /**
+   * Trigger-relic economy bonuses (GS-synergy) — credits awarded at the END of a stop you PASS, on top
+   * of the Stableford payout, for events that reward aggressive play. They feed the credit multiplier
+   * (Fortune/Lucky) so a credit-snowball build compounds. All default 0 (no relic → base economy).
+   */
+  birdieCredit: number; // per birdie-or-better holed this stop
+  eagleCredit: number; // extra per eagle-or-better holed this stop
+  comebackCredit: number; // flat, if you PASSED despite a blow-up (a 0-point hole)
 }
 
 /** The driver club id (off-tee use is gated unless the Driver Dan caddy is owned). */
@@ -144,7 +156,41 @@ export function startingLoadout(): PlayerLoadout {
     wedgeWindow: 0,
     puttBoost: 0,
     distanceClubBonus: 0,
+    birdieCredit: 0,
+    eagleCredit: 0,
+    comebackCredit: 0,
   };
+}
+
+/**
+ * Trigger-relic credit bonus for a passed stop (GS-synergy). Reads the holes played: each holed
+ * birdie-or-better pays `birdieCredit` (eagles add `eagleCredit` on top), and a `comebackCredit` flat
+ * bonus lands if you PASSED despite a blow-up (a hole that scored 0 Stableford, i.e. ≥ par+2 net).
+ * Pure; a base loadout (all 0) returns 0 so the economy is byte-for-byte unchanged.
+ */
+export function relicCreditBonus(
+  loadout: PlayerLoadout,
+  played: readonly { record: { par: number; strokes: number }; holed: boolean; pickedUp: boolean }[],
+  passed: boolean,
+): number {
+  if (!passed) return 0;
+  const birdie = loadout.birdieCredit ?? 0;
+  const eagle = loadout.eagleCredit ?? 0;
+  const comeback = loadout.comebackCredit ?? 0;
+  if (birdie === 0 && eagle === 0 && comeback === 0) return 0;
+  let bonus = 0;
+  let blewUp = false;
+  for (const p of played) {
+    const { par, strokes } = p.record;
+    if (p.holed && !p.pickedUp) {
+      if (strokes <= par - 1) bonus += birdie;
+      if (strokes <= par - 2) bonus += eagle;
+    }
+    // A blow-up hole = 0 Stableford (net ≥ par+2). Picked-up holes are always blow-ups.
+    if (p.pickedUp || strokes - par >= 2) blewUp = true;
+  }
+  if (blewUp) bonus += comeback;
+  return bonus;
 }
 
 /** Dispersion factor from handicap: ~0.7x at scratch (0) up to ~1.6x at 36. */
@@ -260,6 +306,11 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   // Distance-control (carry-window) upgrades — 'distance'.
   'distance-control': ['distance'],
   'wedge-touch': ['control'],
+  // Trigger relics + the curse (GS-synergy) — economy snowball pieces + a risk gamble.
+  'birdie-hunter': ['economy'],
+  'eagle-eye': ['economy'],
+  'comeback-kid': ['economy'],
+  'glass-cannon': ['economy'],
 };
 
 export function itemTags(id: string): readonly string[] {
@@ -553,6 +604,52 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       ...m,
       wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.18),
       perks: [...m.perks, 'wedge-touch'],
+    }),
+  },
+
+  // --- Trigger relics (GS-synergy) — payouts that reward a PLAYSTYLE, compounding with credit perks.
+  // They define a run's identity (go aggressive for birdie/eagle credits, or build a comeback engine)
+  // and stack into the credit-snowball archetype (Fortune Chip / Lucky Coin multiply their payouts).
+  {
+    id: 'birdie-hunter',
+    name: 'Birdie Hunter',
+    cost: 110,
+    desc: '+18 credits for every birdie-or-better you hole each stop · stacks (go aggressive)',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 4,
+    apply: (m) => ({ ...m, birdieCredit: (m.birdieCredit ?? 0) + 18, perks: [...m.perks, 'birdie-hunter'] }),
+  },
+  {
+    id: 'eagle-eye',
+    name: 'Eagle Eye',
+    cost: 160,
+    desc: '+60 credits on top for every EAGLE-or-better you hole each stop',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, eagleCredit: (m.eagleCredit ?? 0) + 60, perks: [...m.perks, 'eagle-eye'] }),
+  },
+  {
+    id: 'comeback-kid',
+    name: 'Comeback Kid',
+    cost: 120,
+    desc: '+90 credits whenever you make the cut DESPITE a blow-up hole · stacks',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 3,
+    apply: (m) => ({ ...m, comebackCredit: (m.comebackCredit ?? 0) + 90, perks: [...m.perks, 'comeback-kid'] }),
+  },
+  {
+    // The CURSE gamble (GS-curses): a real risk you opt into — wilder misses for a big payout multiplier.
+    id: 'glass-cannon',
+    name: 'Glass Cannon',
+    cost: 150,
+    desc: 'CURSE: wider misses (hook & slice up) — but +60% credits earned. High risk, high reward.',
+    rarity: 'epic',
+    apply: (m) => ({
+      ...m,
+      shapeMod: combineShapeMods(m.shapeMod, { hookL: 0.03, sliceR: 0.03 }),
+      creditMult: m.creditMult * 1.6,
+      perks: [...m.perks, 'glass-cannon'],
     }),
   },
 ];

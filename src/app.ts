@@ -29,7 +29,7 @@ import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
-import { initState, reduce, type Action, type UiState } from './ui/game';
+import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio } from './render/audio';
@@ -1192,7 +1192,14 @@ function shopScreen(): string {
     <h2 style="font-size:16px;">Outfitter · ${credits} credits</h2>
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — stackable upgrades cost more the more you own. Rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up; hire one caddy and the rest stay home.</p>
     <div style="display:flex;flex-wrap:wrap;">${stock}</div>
-    <div style="margin-top:12px;">${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}</div>`;
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}
+      ${
+        credits >= rerollCost(state.shopRerolls ?? 0)
+          ? btn(`🎲 Reroll stock (${rerollCost(state.shopRerolls ?? 0)} cr)`, { type: 'rerollShop' }, { variant: 'ghost' })
+          : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ${rerollCost(state.shopRerolls ?? 0)} cr</span>`
+      }
+    </div>`;
 }
 
 function outpostScreen(): string {

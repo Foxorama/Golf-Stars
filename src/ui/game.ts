@@ -67,6 +67,8 @@ export interface UiState {
    * reshuffle the cards. Live cost/stack state is recomputed from `run` at render time.
    */
   shopOffer?: string[];
+  /** How many times the current shop's stock has been rerolled (GS-shop-reroll) — drives the salt + cost. */
+  shopRerolls?: number;
   /** Which hole the play view is showing (0-based). */
   viewHole: number;
   /** A saved in-progress run that the title screen can resume, if any. */
@@ -103,6 +105,7 @@ export type Action =
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
   | { type: 'buy'; id: string }
+  | { type: 'rerollShop' } // pay credits to redraw the outfitter's stock (GS-shop-reroll)
   | { type: 'leaveShop' }
   | { type: 'route'; routeId: number }
   | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
@@ -145,6 +148,12 @@ export function initState(
     metaUpgrades,
     maxAscension: meta.maxAscension ?? 0,
   };
+}
+
+/** The credit cost of the NEXT shop reroll (GS-shop-reroll) — base 30, ×1.6 per reroll this stop. */
+export const REROLL_BASE_COST = 30;
+export function rerollCost(rerolls: number): number {
+  return Math.round(REROLL_BASE_COST * Math.pow(1.6, Math.max(0, rerolls)));
 }
 
 /** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
@@ -305,12 +314,28 @@ export function reduce(state: UiState, action: Action): UiState {
         ...state,
         screen: 'shop',
         shopOffer: shopOffer(state.run).map((o) => o.item.id),
+        shopRerolls: 0,
       };
     }
 
     case 'buy': {
       if (state.screen !== 'shop') return state;
       return { ...state, run: buy(state.run, action.id) };
+    }
+
+    case 'rerollShop': {
+      // Pay an escalating fee to redraw the outfitter's stock (GS-shop-reroll): agency over the offer.
+      if (state.screen !== 'shop') return state;
+      const rerolls = state.shopRerolls ?? 0;
+      const cost = rerollCost(rerolls);
+      if (state.run.credits < cost) return state;
+      const next = rerolls + 1;
+      return {
+        ...state,
+        run: { ...state.run, credits: state.run.credits - cost },
+        shopRerolls: next,
+        shopOffer: shopOffer(state.run, undefined, next).map((o) => o.item.id),
+      };
     }
 
     case 'leaveShop': {
