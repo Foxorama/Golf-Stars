@@ -27,9 +27,11 @@ import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCadd
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
-import { leaderboard, runField, type Leaderboard } from './sim/rpg/league';
+import { leaderboard, runField, arcBossId, type Leaderboard } from './sim/rpg/league';
 import { PLAYER_ID, type Field } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
+import { isMatchplayBoss } from './sim/rpg/formats';
+import { matchScoreline, matchState } from './sim/rpg/match';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -542,6 +544,75 @@ function leaderboardHTML(board: Leaderboard): string {
     </div>`;
 }
 
+/** The matchplay opponent id for the current boss stop (the leaderboard leader, with a fallback). */
+function currentOpponentId(): string | undefined {
+  if (state.match) return state.match.bossId;
+  return arcBossId(state.run) ?? runField(state.run).golfers.find((g) => !g.isPlayer)?.id;
+}
+
+/** A framed opponent badge (avatar + name + style) for a matchplay duel. */
+function opponentBadge(id: string, sub: string): string {
+  const g = getGolfer(id);
+  if (!g) return '';
+  const tag = g.home ? themeById(g.home)?.name ?? '' : getArchetype(g.archetypeId).label;
+  return `<div style="display:flex;align-items:center;gap:10px;">
+      <div style="line-height:0;border:2px solid #ffce54;border-radius:10px;background:#1a0e12;padding:2px;">${golferSVG(g.look, 44, 54)}</div>
+      <div><div style="font-size:15px;font-weight:800;">${g.name}</div>
+        <div style="font-size:11px;opacity:.7;">${g.tier === 'champion' ? '★ ' : ''}${tag}${sub ? ` · ${sub}` : ''}</div></div>
+    </div>`;
+}
+
+/** The live matchplay HUD shown on the play screen — scoreline vs the opponent. */
+function matchHud(): string {
+  const m = state.match;
+  if (!m) return '';
+  const st = matchState(m.duels, state.course.holes.length);
+  const opp = getGolfer(m.bossId);
+  const line =
+    st.thru === 0
+      ? 'Tee it up'
+      : st.holesUp > 0
+      ? `You ${matchScoreline(st)}`
+      : st.holesUp < 0
+      ? `${opp?.shortName ?? 'Boss'} ${Math.abs(st.holesUp)} UP`
+      : 'All square';
+  const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
+  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 9px;border:1px solid ${col};border-radius:8px;background:#0d1016cc;">
+      <span style="font-size:11px;opacity:.7;">⚔ vs ${opp?.shortName ?? 'Boss'}</span>
+      <span style="font-size:13px;font-weight:800;color:${col};">${line}</span>
+      <span style="font-size:10.5px;opacity:.6;">thru ${st.thru}/${state.course.holes.length}</span>
+    </div>`;
+}
+
+/** The matchplay duel result panel for the result screen (the hole-by-hole scoreline + verdict). */
+function matchResultPanel(): string {
+  const m = state.match;
+  if (!m) return '';
+  const st = matchState(m.duels, state.course.holes.length);
+  const opp = getGolfer(m.bossId);
+  const won = st.playerWon;
+  const halved = st.halved;
+  const verdict = won ? 'YOU WIN' : halved ? 'HALVED' : 'DEFEATED';
+  const col = won ? '#5fd45a' : halved ? '#ffce54' : '#ff6b6b';
+  const cells = m.duels
+    .map((d) => {
+      const c = d.winner === 'player' ? '#5fd45a' : d.winner === 'boss' ? '#ff6b6b' : '#6b7280';
+      return `<span title="Hole ${d.holeIndex + 1}: you ${d.playerStrokes} v ${d.bossStrokes}" style="width:16px;height:16px;border-radius:3px;background:${c}33;border:1px solid ${c};font-size:9px;display:inline-flex;align-items:center;justify-content:center;color:${c};">${
+        d.winner === 'player' ? 'W' : d.winner === 'boss' ? 'L' : '½'
+      }</span>`;
+    })
+    .join('');
+  return `<div style="border:1px solid ${col};border-radius:10px;padding:10px;background:linear-gradient(180deg,#160d12,#0d1016);margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        ${opponentBadge(m.bossId, 'Matchplay')}
+        <div style="text-align:right;"><div style="font-size:18px;font-weight:900;color:${col};">${verdict}</div>
+          <div style="font-size:13px;opacity:.85;">${matchScoreline(st)}</div></div>
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:9px;">${cells}</div>
+      <div style="font-size:11px;opacity:.6;margin-top:6px;">Hole-by-hole vs ${opp?.name ?? 'the leader'} — W win · L loss · ½ halved.</div>
+    </div>`;
+}
+
 function introScreen(): string {
   const c = state.course;
   // The cut reflects any pending route event (GS-14), so the line is honest about the bar.
@@ -567,10 +638,15 @@ function introScreen(): string {
     notes.push(`<div style="margin-top:10px;padding:9px 11px;border:1px solid ${boss.final ? '#ffce54' : '#c0392b'};
         border-radius:9px;background:linear-gradient(180deg,#1a0e12,#120b10);">
        <div style="font-size:11px;letter-spacing:.12em;color:${boss.final ? '#ffce54' : '#ff6b6b'};">
-         ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${boss.partner ? ' · SCRAMBLE' : ''}</div>
+         ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${boss.partner ? ' · SCRAMBLE' : ''}${isMatchplayBoss(boss) ? ' · MATCHPLAY' : ''}</div>
        <b style="font-size:16px;">${boss.name}</b>
        <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${boss.blurb}</div>
        ${partner ? `<div style="font-size:12px;margin-top:5px;color:${partner.style.cap};">🤝 Partner: <b>${partner.name}</b> — two balls a shot, the better one counts.</div>` : ''}
+       ${
+         isMatchplayBoss(boss) && currentOpponentId()
+           ? `<div style="margin-top:8px;">${opponentBadge(currentOpponentId()!, 'Your opponent — beat them hole by hole')}</div>`
+           : ''
+       }
      </div>`);
   if (split)
     notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #7aa2ff;border-radius:8px;background:#ffffff08;font-size:12.5px;">
@@ -1022,6 +1098,7 @@ function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
       </div>
       <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}
+      ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}
       ${holePips()}
     </div>`;
 }
@@ -1297,9 +1374,10 @@ function resultScreen(): string {
       <section style="flex:1 1 300px;min-width:280px;position:relative;">
         ${res.passed ? burst() : ''}
         <h2 style="font-size:16px;margin:.2em 0;color:${res.passed ? '#5fd45a' : '#ff6b6b'};">
-          ${res.passed ? 'MADE THE CUT' : 'MISSED CUT'}</h2>
-        <p style="font-size:14px;">Stableford <b>${res.stableford}</b> vs cut <b>${res.cut}</b>
+          ${state.match ? (res.passed ? 'MATCH WON' : 'MATCH LOST') : res.passed ? 'MADE THE CUT' : 'MISSED CUT'}</h2>
+        <p style="font-size:14px;">Stableford <b>${res.stableford}</b>${state.match ? '' : ` vs cut <b>${res.cut}</b>`}
           · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>
+        ${state.match ? matchResultPanel() : ''}
         ${(() => {
           const board = leaderboard(state.run);
           const me = board.standings.find((s) => s.isPlayer);

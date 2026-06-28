@@ -13,9 +13,11 @@ import {
   ASCENSION_MAX,
   bank,
   buy,
+  currentBoss,
   currentCourse,
   finishStop,
   playStop,
+  playerHoleOpts,
   resumeRun,
   routeOptions,
   scrambleOptsFor,
@@ -28,6 +30,9 @@ import {
   type RunSnapshot,
   type StopResult,
 } from '../sim/rpg/run';
+import { isMatchplayBoss } from '../sim/rpg/formats';
+import { arcBossId, runField } from '../sim/rpg/league';
+import { playMatchStop, playBossStop, holeDuel, matchState, type HoleDuel } from '../sim/rpg/match';
 import { buyMetaUpgrade, type MetaUpgrades } from '../sim/rpg/meta';
 import {
   autoDecision,
@@ -91,6 +96,24 @@ export interface UiState {
   lastRunShards?: number;
   /** Highest Ascension tier unlocked (GS-ascension) — selectable on the title for a voyage. */
   maxAscension: number;
+  /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
+  match?: MatchUi;
+}
+
+/** The matchplay duel a boss stop is played as (GS-100). */
+export interface MatchUi {
+  /** The opponent golfer id (the leaderboard leader). */
+  bossId: string;
+  /** The boss's real ball on each hole of the stop (pre-computed; revealed hole by hole). */
+  bossHoles: PlayedHole[];
+  /** Hole-by-hole duel results so far. */
+  duels: HoleDuel[];
+  /** Holes up from the player's view (+ player, − boss). */
+  holesUp: number;
+  /** Match mathematically decided (up by more than remain). */
+  decided: boolean;
+  /** Match over (decided early or all holes played). */
+  finished: boolean;
 }
 
 export type Action =
@@ -156,6 +179,12 @@ export function rerollCost(rerolls: number): number {
   return Math.round(REROLL_BASE_COST * Math.pow(1.6, Math.max(0, rerolls)));
 }
 
+/** The matchplay opponent for a boss stop (GS-100): the leaderboard leader, or — if the arc has no
+ *  scores yet (a fresh resume) — the field's top-rated non-player as a deterministic fallback. */
+function resolveBossId(run: Run): string {
+  return arcBossId(run) ?? runField(run).golfers.find((g) => !g.isPlayer)?.id ?? '';
+}
+
 /** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
 function unlockedAscension(state: UiState, run: Run): number {
   if (run.endedReason !== 'won') return state.maxAscension;
@@ -210,6 +239,34 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'play': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
+      // Matchplay boss stop (GS-100): play the duel (player ball + boss ball), pass on the match.
+      if (isMatchplayBoss(currentBoss(state.run))) {
+        const bossId = resolveBossId(state.run);
+        const stop = playMatchStop(
+          state.course.holes,
+          playerHoleOpts(state.run),
+          bossId,
+          new Rng(`${state.course.seed}:play`),
+          new Rng(`${state.course.seed}:boss`),
+        );
+        const { run, result } = finishStop(state.run, state.course, stop.player, { matchWon: stop.state.playerAdvances });
+        const ended = run.status !== 'active';
+        const earned = ended ? shardsForRun(run) : undefined;
+        return {
+          ...state,
+          run,
+          played: stop.player,
+          lastResult: result,
+          match: { bossId, bossHoles: stop.boss, duels: stop.duels, holesUp: stop.state.holesUp, decided: stop.state.decided, finished: true },
+          viewHole: 0,
+          screen: ended ? 'gameover' : 'result',
+          bestStableford: Math.max(state.bestStableford, result.stableford),
+          bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+          shards: state.shards + (earned ?? 0),
+          lastRunShards: earned,
+          maxAscension: unlockedAscension(state, run),
+        };
+      }
       const { run, result, played } = playStop(state.run);
       // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
       // the gameover/victory screen; a survived non-final stop goes to the result screen.
@@ -220,6 +277,7 @@ export function reduce(state: UiState, action: Action): UiState {
         run,
         played,
         lastResult: result,
+        match: undefined,
         viewHole: 0,
         screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
@@ -232,12 +290,22 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'playInteractive': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
+      // Matchplay boss stop (GS-100): pre-play the boss's ball for the whole stop (its own real shots,
+      // deterministic), then play your ball hole-by-hole and compare. The boss uses its OWN rng stream,
+      // so your interactive play is byte-for-byte the same as a non-boss stop.
+      let match: MatchUi | undefined;
+      if (isMatchplayBoss(currentBoss(state.run))) {
+        const bossId = resolveBossId(state.run);
+        const bossHoles = playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`));
+        match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false };
+      }
       return {
         ...state,
         screen: 'playing',
         holeRng: new Rng(`${state.course.seed}:play`),
         stopPlayed: [],
         play: beginHole(state.course.holes[0]!, 0),
+        match,
       };
     }
 
@@ -281,7 +349,42 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'playing' || !state.play || !state.play.done) return state;
       const stopPlayed = [...(state.stopPlayed ?? []), holeResult(state.play)];
       const nextIdx = state.play.holeIndex + 1;
-      if (nextIdx < state.course.holes.length) {
+      const total = state.course.holes.length;
+
+      // Matchplay (GS-100): score the just-finished hole against the boss's pre-played ball, and FINISH
+      // the stop the moment the match is decided (a "3 & 2"), not only after all holes.
+      if (state.match) {
+        const justPlayed = stopPlayed[stopPlayed.length - 1]!;
+        const bossHole = state.match.bossHoles[state.play.holeIndex]!;
+        const duels = [...state.match.duels, holeDuel(state.play.holeIndex, state.play.hole.par, justPlayed, bossHole)];
+        const ms = matchState(duels, total);
+        const match: MatchUi = { ...state.match, duels, holesUp: ms.holesUp, decided: ms.decided, finished: ms.finished };
+        if (!ms.finished) {
+          return { ...state, stopPlayed, match, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+        }
+        const { run, result } = finishStop(state.run, state.course, stopPlayed, { matchWon: ms.playerAdvances });
+        const ended = run.status !== 'active';
+        const earned = ended ? shardsForRun(run) : undefined;
+        return {
+          ...state,
+          run,
+          stopPlayed: undefined,
+          play: undefined,
+          holeRng: undefined,
+          played: stopPlayed,
+          lastResult: result,
+          match,
+          viewHole: 0,
+          screen: ended ? 'gameover' : 'result',
+          bestStableford: Math.max(state.bestStableford, result.stableford),
+          bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+          shards: state.shards + (earned ?? 0),
+          lastRunShards: earned,
+          maxAscension: unlockedAscension(state, run),
+        };
+      }
+
+      if (nextIdx < total) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
       // Stop complete — score it exactly as the auto path does.
@@ -296,6 +399,7 @@ export function reduce(state: UiState, action: Action): UiState {
         holeRng: undefined,
         played: stopPlayed,
         lastResult: result,
+        match: undefined,
         viewHole: 0,
         screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
@@ -356,6 +460,7 @@ export function reduce(state: UiState, action: Action): UiState {
         played: undefined,
         lastResult: undefined,
         routes: undefined,
+        match: undefined,
         viewHole: 0,
       };
     }

@@ -29,6 +29,19 @@ export interface BossSpec {
    * partner is chosen deterministically from the roster minus the player's golfer.
    */
   partner?: 'scramble';
+  /**
+   * Matchplay duel (GS-100): you face the leaderboard LEADER hole-by-hole on the actual course — the
+   * boss is a real golfer with their own avatar + shots, the match decided when one is up by more than
+   * remain. Winning/halving passes the stop. The opponent is resolved from the leaderboard at play
+   * time, not named here (this spec carries the tournament framing). Handled by the UI reducer; the
+   * headless `playStop`/`simulateRun` falls back to ordinary Stableford-vs-cut for balance/tests.
+   */
+  mode?: 'matchplay';
+}
+
+/** Is this boss a 1-on-1 matchplay duel against the leaderboard leader (GS-100)? */
+export function isMatchplayBoss(boss: BossSpec | undefined): boolean {
+  return boss?.mode === 'matchplay';
 }
 
 export interface StopSpec {
@@ -103,8 +116,8 @@ export const FORMATS: Record<string, RunFormat> = {
       { holes: 7, label: 'Orbit II · two worlds', splitBiome: true },
       {
         holes: 9,
-        label: 'Arc I Boss',
-        boss: { id: 'nebula-open', name: 'The Nebula Open', blurb: 'A nine-hole proving ground at the edge of the dust. Clear the cut to break into deep space.', cutBonus: 1 },
+        label: 'Arc I Boss · Matchplay',
+        boss: { id: 'nebula-open', name: 'The Nebula Open', blurb: 'A nine-hole matchplay duel against the leader of the field. Win the most holes and you break into deep space.', cutBonus: 1, mode: 'matchplay' },
       },
       // --- Arc 2 ---
       { holes: 6, label: 'Deep Run I' },
@@ -119,8 +132,8 @@ export const FORMATS: Record<string, RunFormat> = {
       { holes: 7, label: 'The Far Reach II · two worlds', splitBiome: true },
       {
         holes: 9,
-        label: 'The Galactic Major',
-        boss: { id: 'galactic-major', name: 'The Galactic Major', blurb: 'The final. A scramble against the galaxy itself with a partner at your side — win it and the voyage is yours.', cutBonus: 3, final: true, partner: 'scramble' },
+        label: 'The Galactic Major · Matchplay',
+        boss: { id: 'galactic-major', name: 'The Galactic Major', blurb: 'The final. A matchplay duel against the galaxy’s number one — win the match and the voyage is yours.', cutBonus: 3, final: true, mode: 'matchplay' },
       },
     ],
   },
