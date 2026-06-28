@@ -574,6 +574,66 @@ This game lives or dies on three axes — put every change through all three bef
   continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
   knobs/no new `_gs*` flag, so the test-hub guard needs no new control; the Sim Lab absorbs the new
   shop items automatically.
+- **Sandy the Sand-Saver — escape specialist (GS-mux, a NEW shot mechanic `lieRelief`).** A `loadout.
+  lieRelief` (0..1) LERPS a BAD lie's `carryMult`/`dispersionMult` back toward neutral (`reliedLie` in
+  `shot.ts`) — rough/sand/waste/trees recover far better — and NEVER touches a clean lie (carryMult 1 /
+  dispersionMult ≤ 1 are unchanged). Threaded IDENTICALLY through `resolveShot`, `shotSpread` (so the
+  cone reads true), `executeShot`, `playHole`/`playStop` (auto) AND `takeShot`/`previewShot`
+  (interactive), so auto≡interactive holds. CRITICAL determinism: `reliedLie(li, undefined)` returns the
+  lie's EXACT values and consumes NO rng, so a relief-less shot is byte-for-byte unchanged (the caddy-
+  field contract). It changes carry VALUES, not the 2-draw budget, so the rng stream is stable. Sandy
+  pairs with the new lie-awareness chip (you SEE the bad lie, a caddy digs you out). `SANDY_LIE_RELIEF`
+  0.6. Guarded in `tests/caddies.test.ts` (absent = byte-for-byte, clean lie unchanged, more carry out
+  of rough).
+- **Mystic Mole — green-reader (GS-mux).** Rides the EXISTING `puttBoost` field (`MOLE_PUTT_BOOST` 0.32
+  — a big manual make-band + lag lift), so it needs no new sim thread and is covered by the putting
+  guards. Distinct from Penelope (who AUTO-putts): the Mole rewards MANUAL putting skill instead of
+  replacing it. Both new caddies get assetless `caddyArt` figures (Sandy: bush hat + wedge + sand spray;
+  Mole: spectacled mole on a dirt mound with a putter), are mutually-exclusive named caddies
+  (`NAMED_CADDY_IDS` auto-derives), and rebuild from perks on resume (no save bump).
+
+## Feedback & mobile UX layer (GS-mux — audio, haptics, settings, juice)
+A pure side-effect layer over the reducer (like the play-view canvas + save persistence); the sim is
+untouched, so determinism + all sim tests are unaffected. NONE of it adds a top-level `_gs*` flag or
+URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub guard needs no new control.
+- **Assetless audio (`render/audio.ts`).** A WebAudio synth — every cue (contact, putt, hole-out,
+  made/missed-cut, penalty, reward, UI click) is built from oscillators + filtered noise at call time,
+  ZERO downloaded files (the house no-404 rule). Lazy `AudioContext`, resumed on the first user gesture
+  (`resumeAudio()` in `dispatch`), gated on the `sound` setting, fully guarded (no-op without WebAudio).
+  The contact cue fires at the TRUE strike moment via a new `playView` `onImpact(kind, quality)` hook
+  (quality from the shot's straightness → a pure strike rings, a wild one thuds). Big-beat cues
+  (made/missed cut) fire on the screen transition in `dispatch`; hole-out/penalty in the animation
+  `onDone`.
+- **Haptic vocabulary (`HAPTICS` in `app.ts`).** Named patterns (tap/swing/putt/good/bad/holeOut/
+  madeCut) gated on the `haptics` setting + guarded (absent on desktop/iOS) — so the game is readable
+  with sound off.
+- **Settings (`src/settings.ts` + a bottom-sheet overlay).** Player-owned prefs persisted to
+  localStorage `gs_settings` (NOT reducer state): `sound`, `haptics`, `fastShots`, `swingGesture`,
+  `leftHanded`, `reducedMotion` (seeded from the OS preference). Reachable via ⚙ on the title + the
+  play-screen map controls; toggles re-render live.
+- **Lie awareness on the DECISION bar (the per-shot-popup concern).** A colour-coded `lieChip` (🟢 ok /
+  🟠 caution / 🔴 trouble) with the lie's carry+spray effect sits in the play top bar — shown exactly
+  when you pick the next shot, so losing/skipping the result popup no longer loses lie awareness.
+- **Fast Shots + the result popup.** Default: the per-shot result card waits for a tap (whole backdrop
+  dismisses). `fastShots` auto-advances after a beat (`_gsFeel.fastAdvanceMs`), relying on the always-on
+  lie chip. The popup/celebration timing all live on `_gsFeel` sub-fields (no new flag).
+- **Opt-in pull-back swing gesture (`wireSwingPad`).** With `swingGesture` on, the Hit control becomes
+  a backswing pad: drag DOWN to load a power meter (ratcheting haptic), release past the commit
+  threshold to swing. PURE FEEL — the released swing fires the SAME action the Hit button would (club +
+  aim define the shot), so the sim is untouched. A short pull cancels.
+- **One-row SEGMENTED aim control + celebrations + momentum HUD.** Attack | Safe | Aim as one
+  `.gs-seg` (was three wrapping buttons); an assetless CSS sparkle `burst()` on made-cut + holed/birdie
+  (reduced-motion aware); a `holePips()` rail in the top bar (one pip per hole, coloured by score,
+  current ringed).
+- **Daily Challenge + install nudge.** A title button starts a run on a date-derived string seed
+  (`daily-YYYY-MM-DD`, reuses string-seed support — no new param); `beforeinstallprompt` is captured and
+  offered as an in-app "Install app" button (dismiss persists in `gs_installNudge`).
+- **Mobile hygiene (`index.html` CSS).** `viewport-fit=cover` + `env(safe-area-inset-*)` (mirrored into
+  the `.gs-shot` height math) clear the notch/home-indicator; `touch-action:manipulation` +
+  `user-select:none` on controls kill tap-delay/double-tap-zoom/stray selection; responsive putt meter +
+  replay canvas + `overflow-x:hidden` stop any horizontal scroll. Canvas/audio/haptic feel is eyes-on;
+  DEFERRED from the review: a landscape/tablet layout, first-run coaching coachmarks, a putt drag-back
+  gesture, and surfacing per-club/character personality in the UI (see `reports/mobile-ux-review-*`).
 
 ## Putting (manual pace-meter by default; auto ONLY via the Penelope Putter caddy)
 - **Two putt models, one shared `PuttSkill`.** AUTO putting is the rng `onePutt` (make%/lag);
@@ -781,15 +841,19 @@ This game lives or dies on three axes — put every change through all three bef
   projector fits the ENTIRE hole, green + OB + all hazards in frame), **＋/− zoom** (`mapZoom`, divides
   `viewRadius`; disabled in `whole`), and a **⌖ recenter** (shown only when moved). PAN: the projector
   `focus` is offset by a course-space `mapPan`, and in `follow` mode a map DRAG pans (drag-the-world-
-  under-the-finger via a projector frozen at gesture start). GESTURE DISAMBIGUATION: drag PANS by
-  default; it only AIMS when free-aim is active (`selFreeTarget` set, via the ✋ button) — so "move the
-  map around" is the default touch and a still tap no longer silently sets a free target. CRITICAL: the
-  decision render AND `wireMapAiming`'s unproject both build the projector from ONE shared helper
-  `decisionView(play, spray)`, so tap/drag aiming can't drift from what's drawn (the projector-sync
-  gotcha). `mapView/mapZoom/mapPan` are module UI state (like `selClubId`), reset by `resetMapView()` on
-  every new shot AND new hole — NOT save/reducer state, NOT a `_gs*` flag (so no test-hub sync needed).
-  Verified eyes-on (Playwright): the whole-hole toggle reveals the green on a 532y par-4, pan/zoom work,
-  free-aim still aims, and the page does not scroll.
+  under-the-finger via a projector frozen at gesture start). GESTURE DISAMBIGUATION (UPDATED GS-mux —
+  supersedes the old "drag pans, tap does nothing" model): the gesture is keyed by POINTER COUNT +
+  MOVEMENT, not a mode toggle. ONE finger still (< `TAP_SLOP` 8px) → **TAP-AIM** at that point (the
+  discoverable default — tap the green to aim there, sets `selFreeTarget`); ONE finger moved → **PAN**;
+  TWO fingers → **PINCH-zoom** (`mapZoom`, alongside the `＋/−` buttons). `wireMapAiming` tracks a
+  `Map<pointerId,pos>`; a second finger cancels any pending tap/pan, and the lingering finger after a
+  pinch can't register a stray tap. The ✋ button is now the "Aim" segment of the one-row SEGMENTED aim
+  control (Attack | Safe | Aim) and seeds the free target at the pin; tapping the map is the primary way
+  in. CRITICAL: the decision render AND `wireMapAiming`'s unproject both build the projector from ONE
+  shared helper `decisionView(play, spray)`, so tap/drag aiming can't drift from what's drawn (the
+  projector-sync gotcha). `mapView/mapZoom/mapPan` are module UI state (like `selClubId`), reset by
+  `resetMapView()` on every new shot AND new hole — NOT save/reducer state, NOT a `_gs*` flag (so no
+  test-hub sync needed). Single-pointer paths verified eyes-on; pinch needs multi-touch confirmation.
 - **The play screen NEVER scrolls (GS-mapnav).** `.gs-shot` is a FIXED-height flex column
   (`height: calc(100dvh − 46px)` + `overflow:hidden`, not the old `min-height`), and `.gs-bigmap` is
   `flex:1 1 0; min-height:0` so the MAP absorbs all the slack — the topbar and the club/aim/Hit

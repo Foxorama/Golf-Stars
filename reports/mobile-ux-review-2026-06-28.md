@@ -145,6 +145,34 @@ Ranked by impact-to-effort. These are the ideas that change how the game *feels*
 
 ---
 
+## Build log — what shipped after the review (GS-mux)
+
+Following the review, the bulk of B + C was built across five tested waves (sim untouched,
+determinism intact, 387 tests + build + hub guards green):
+
+| Item | Status |
+|---|---|
+| C1 Audio (assetless WebAudio) | ✅ shipped — fired at the true strike via `playView.onImpact` |
+| C8 Haptic vocabulary | ✅ shipped |
+| C9 Settings sheet | ✅ shipped (sound/haptics/fast-shots/swing/left-handed/reduced-motion) |
+| C4 Lie awareness + fast loop | ✅ shipped — decision-bar lie chip + Fast Shots auto-advance |
+| C6 Celebration bursts | ✅ shipped (assetless, reduced-motion aware) |
+| C3 Run-momentum HUD | ✅ shipped — per-hole pip rail |
+| C10 Daily seed + install nudge | ✅ shipped |
+| B2 Segmented aim control | ✅ shipped |
+| B3 Tap-to-aim by default | ✅ shipped (tap aims, drag pans) |
+| B1 Pinch-to-zoom | ✅ shipped — needs multi-touch eyes-on confirmation |
+| C2 Swing input | ✅ shipped as an **opt-in** pull-back gesture (pure feel, sim untouched) |
+| New caddies | ✅ Sandy (escape specialist, new `lieRelief` mechanic) + Mystic Mole (manual-putt) |
+| B4 First-run coaching | ⬜ deferred — needs content + anchored coachmarks |
+| B5 Landscape/tablet layout | ⬜ deferred — needs a media-query layout branch + eyes-on per orientation |
+| B6 Putt drag-back gesture | ⬜ deferred — the pace meter still stands |
+| C5 Bag/shot personality in UI | ⬜ deferred — clubs/characters are mechanically distinct but not yet surfaced |
+
+The two flagged concerns were addressed directly: **lie awareness** moved to the decision bar
+(shown when you choose the next shot, so the popup is no longer the only carrier), and the
+**swing pull-down** is opt-in (default off) so it never forces itself on every shot.
+
 ## Notes / non-goals
 
 - All "feel" knobs already route through `_gsFeel` and the test hub auto-discovers `_gs*` hooks —

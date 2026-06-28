@@ -140,15 +140,19 @@ Everything below serves whichever avenue wins.
   Remaining: a URL form for the feel flags (`?feel=`/`?spray=` seeding `window._gs*` at first paint)
   and a live no-reload helper for seed/intro (drive the iframe without a full reload). Small; the
   hub + auto-discovering guard + five hooks already shipped in GS-16.
-- **GS-mux — Mobile UX deep cuts.** First pass of immediate fixes SHIPPED (safe-area, touch targets,
-  haptic tick, no h-scroll, Hit/Auto-finish mis-tap, tap-to-dismiss popup). Backlog of the bigger
-  swings lives in `reports/mobile-ux-review-2026-06-28.md`: **(audio + graded haptics on contact —
-  the single biggest perceived-quality jump, the game has NO sound today)**, pinch-to-zoom + tap-to-
-  aim-by-default on the map, a drag-back-flick swing input, segmented one-row aim controls, first-run
-  coaching, a landscape/tablet layout, an opt-in/auto-advance shot popup (loop friction), reward
-  celebrations on the big beats, a settings sheet (sound/haptics/reduced-motion/left-handed/fast),
-  and an install nudge + daily-seed challenge (the deterministic RNG already supports it, cf. GS-7).
-  Any new feel knob must add its test-hub control in the same PR (I4 rule).
+- **GS-mux — Mobile UX deep cuts. LARGELY SHIPPED** (`reports/mobile-ux-review-2026-06-28.md`).
+  Done: immediate mobile hygiene (safe-area, touch targets, no h-scroll, Hit/Auto-finish mis-tap);
+  **assetless WebAudio sound engine** (contact/putt/hole-out/cut/reward, fired at the true strike via
+  a `playView.onImpact` hook); **haptic vocabulary**; **settings sheet** (sound/haptics/fast-shots/
+  swing-gesture/left-handed/reduced-motion, localStorage `gs_settings`); **lie-awareness chip** on the
+  decision bar (the per-shot-popup concern) + **Fast Shots** auto-advance; **one-row segmented aim** +
+  **tap-to-aim-by-default** + **pinch-to-zoom**; **opt-in pull-back swing gesture**; **celebration
+  bursts**; **run-momentum pip HUD**; **Daily Challenge** seed + **install nudge**; and two new caddies
+  (**Sandy** = `lieRelief` escape specialist, **Mystic Mole** = manual-putt boost). DEFERRED (need real
+  eyes-on tuning / larger scope): a **landscape/tablet layout**, **first-run coaching** coachmarks, a
+  **putt drag-back gesture** (the pace meter still stands), surfacing **per-club/character personality**
+  in the UI, and **multi-touch eyes-on** confirmation of pinch-zoom. Any new feel knob must add its
+  test-hub control in the same PR (I4 rule) — GS-mux added none (dev knobs ride `_gsFeel`).
 
 ## Done
 - **GS-dispersion-2 — Asymmetric spray-zone model + zone/distance upgrades.** Replaced the symmetric
