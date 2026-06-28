@@ -205,3 +205,20 @@ export function characterShotMods(id: string | undefined): ShotMods | undefined 
   const ch = getCharacter(id);
   return ch ? (carry) => ch.clubMods(carry) : undefined;
 }
+
+/**
+ * The co-op scramble PARTNER for a boss showdown (GS-scramble): an UNCHOSEN golfer from the roster,
+ * picked deterministically from the run seed + stop so it's stable across reloads/resume. Excludes the
+ * player's own golfer (you don't partner yourself). Pure — no rng object, just an index hash.
+ */
+export function scramblePartnerId(seed: number, stopIndex: number, playerId: string | undefined): string {
+  const pool = CHARACTERS.filter((c) => c.id !== playerId);
+  if (pool.length === 0) return CHARACTERS[0]!.id;
+  // A small stable hash off the seed+stop → an index into the eligible roster.
+  const h = Math.abs(Math.round(seed) * 2654435761 + stopIndex * 40503) % pool.length;
+  return pool[h]!.id;
+}
+
+export function scramblePartner(seed: number, stopIndex: number, playerId: string | undefined): Character {
+  return getCharacter(scramblePartnerId(seed, stopIndex, playerId))!;
+}

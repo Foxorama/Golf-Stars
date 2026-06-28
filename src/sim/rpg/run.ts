@@ -34,14 +34,14 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, getFormat, stopSpecFor } from './formats';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossSpec } from './formats';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods } from './characters';
 import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome, itemThemeWeight } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
-export type EndReason = 'cut' | 'banked';
+export type EndReason = 'cut' | 'banked' | 'won';
 
 export interface StopResult {
   stopIndex: number;
@@ -65,6 +65,11 @@ export interface Route {
   label: string;
   /** The risk/reward event waiting at the stop this route reaches (GS-14). */
   event: RouteEvent;
+  /** The HARDER path (GS-voyage): the deepest, highest-stakes lane this jump — biggest cut, biggest
+   *  payout. Derived from the drawn event (no extra rng), surfaced so the player can court the risk. */
+  elite?: boolean;
+  /** True if the stop this route reaches is a boss (GS-voyage) — previewed on the route card. */
+  bossAhead?: boolean;
 }
 
 export interface Run {
@@ -168,6 +173,8 @@ export function finishStop(
   const creditsEarned = passed
     ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult)
     : 0;
+  // Clearing the FINAL boss of a winnable voyage WINS the run (GS-voyage).
+  const won = passed && isFinalStop(getFormat(run.formatId), run.stopIndex);
 
   const result: StopResult = {
     stopIndex: run.stopIndex,
@@ -188,8 +195,9 @@ export function finishStop(
     history: [...run.history, result],
     // The event is spent — clear it so a resume can't double-apply it next stop.
     pendingEvent: undefined,
-    status: passed ? 'active' : 'ended',
-    ...(passed ? {} : { endedReason: 'cut' as const }),
+    // A missed cut ends the run; clearing the final boss WINS it; otherwise travel on.
+    status: passed && !won ? 'active' : 'ended',
+    ...(passed ? (won ? { endedReason: 'won' as const } : {}) : { endedReason: 'cut' as const }),
   };
   return { run: next, result };
 }
@@ -200,7 +208,16 @@ export function finishStop(
  */
 export function effectiveCut(run: Run, holes: number): number {
   const event = run.pendingEvent ?? DEFAULT_EVENT;
-  return cutLine(run.distanceFromStart, holes) + event.cutDelta;
+  const format = getFormat(run.formatId);
+  const boss = bossAt(format, run.stopIndex);
+  // A winnable campaign scales its distance ramp down (cutMult) so it plateaus rather than spirals.
+  const rampDistance = run.distanceFromStart * (format.cutMult ?? 1);
+  return cutLine(rampDistance, holes) + event.cutDelta + (boss?.cutBonus ?? 0);
+}
+
+/** The boss awaiting the player at the current stop, if any (GS-voyage). */
+export function currentBoss(run: Run): BossSpec | undefined {
+  return bossAt(getFormat(run.formatId), run.stopIndex);
 }
 
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
@@ -228,15 +245,40 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
 export function routeOptions(run: Run): Route[] {
   const rng = new Rng(`${run.seed}:routes:${run.stopIndex}`);
   const labels: Record<number, string> = { 1: 'Short hop', 2: 'Cruise', 3: 'Deep jump' };
-  // Draw distances FIRST (unchanged RNG stream), then attach an event to each route.
+  // A bounded campaign caps the per-jump distance so its wildness/cut growth stays fair (GS-voyage);
+  // endless formats default to the original 1–3 draw, keeping their RNG stream byte-identical.
+  const maxJump = getFormat(run.formatId).maxJump ?? 3;
+  // Draw distances FIRST (unchanged RNG stream for flat/ladder), then attach an event to each route.
   const routes = Array.from({ length: 3 }, (_, i) => {
-    const distanceJump = rng.int(1, 3);
+    const distanceJump = rng.int(1, maxJump);
     return { id: i, distanceJump, label: labels[distanceJump]! };
   });
   // Pool is arc-tiered to the run's depth and excludes already-fired uniques (GS-17c).
   const pool = eventPool(run.distanceFromStart, run.firedEventIds);
   const events = drawRouteEvents(rng, routes.length, pool);
-  return routes.map((r, i) => ({ ...r, event: events[i]! }));
+  const withEvents = routes.map((r, i) => ({ ...r, event: events[i]! }));
+  // Derive the HARDER PATH (GS-voyage) WITHOUT touching the rng: the single highest-stakes lane —
+  // the route whose event raises the cut the most (ties broken by payout). Only a genuinely risky
+  // lane (cutDelta > 0) is flagged, so early calm jumps show no elite option.
+  const format = getFormat(run.formatId);
+  let eliteIdx = -1;
+  for (let i = 0; i < withEvents.length; i++) {
+    const e = withEvents[i]!.event;
+    if (e.cutDelta <= 0) continue;
+    if (
+      eliteIdx < 0 ||
+      e.cutDelta > withEvents[eliteIdx]!.event.cutDelta ||
+      (e.cutDelta === withEvents[eliteIdx]!.event.cutDelta && e.creditMult > withEvents[eliteIdx]!.event.creditMult)
+    ) {
+      eliteIdx = i;
+    }
+  }
+  return withEvents.map((r, i) => ({
+    ...r,
+    elite: i === eliteIdx,
+    // Preview whether the stop this route reaches (the next stop) is a boss.
+    bossAhead: !!bossAt(format, run.stopIndex + 1),
+  }));
 }
 
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
@@ -413,8 +455,10 @@ export function resumeRun(snap: RunSnapshot): Run {
 
 export const SHARD_PER_DISTANCE = 3;
 export const SHARD_PER_STOP = 2;
-/** Credits → shards conversion when you BANK (cash out) a run. Busting at the cut forfeits this. */
+/** Credits → shards conversion when you BANK or WIN a run. Busting at the cut forfeits this. */
 export const CREDITS_PER_SHARD = 20;
+/** Flat shard bonus for completing a winnable voyage (GS-voyage) — the payoff for a finished run. */
+export const WIN_SHARD_BONUS = 60;
 
 /**
  * Star Shards earned by a run — the persistent currency spent at the Outpost. Rewards how
@@ -427,7 +471,8 @@ export const CREDITS_PER_SHARD = 20;
  * and gives leftover credits a terminal value instead of evaporating when the run ends.
  */
 export function cashOutShards(run: Run): number {
-  return run.endedReason === 'banked' ? Math.floor(Math.max(0, run.credits) / CREDITS_PER_SHARD) : 0;
+  const keepsCredits = run.endedReason === 'banked' || run.endedReason === 'won';
+  return keepsCredits ? Math.floor(Math.max(0, run.credits) / CREDITS_PER_SHARD) : 0;
 }
 
 export function shardsForRun(run: Run): number {
@@ -435,7 +480,8 @@ export function shardsForRun(run: Run): number {
     1,
     Math.round(run.distanceFromStart * SHARD_PER_DISTANCE + run.history.length * SHARD_PER_STOP),
   );
-  return base + cashOutShards(run);
+  const winBonus = run.endedReason === 'won' ? WIN_SHARD_BONUS : 0;
+  return base + cashOutShards(run) + winBonus;
 }
 
 // --- Headless full-run driver (for tests / AI sims) -------------------------

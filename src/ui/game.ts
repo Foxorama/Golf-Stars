@@ -188,7 +188,9 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'play': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       const { run, result, played } = playStop(state.run);
-      const ended = !result.passed;
+      // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
+      // the gameover/victory screen; a survived non-final stop goes to the result screen.
+      const ended = run.status !== 'active';
       const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
@@ -196,7 +198,7 @@ export function reduce(state: UiState, action: Action): UiState {
         played,
         lastResult: result,
         viewHole: 0,
-        screen: result.passed ? 'result' : 'gameover',
+        screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
@@ -258,7 +260,7 @@ export function reduce(state: UiState, action: Action): UiState {
       }
       // Stop complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
-      const ended = !result.passed;
+      const ended = run.status !== 'active';
       const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
@@ -269,7 +271,7 @@ export function reduce(state: UiState, action: Action): UiState {
         played: stopPlayed,
         lastResult: result,
         viewHole: 0,
-        screen: result.passed ? 'result' : 'gameover',
+        screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),

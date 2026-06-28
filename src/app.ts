@@ -26,8 +26,8 @@ import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { clubOfferNote, itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
-import { CHARACTERS, getCharacter, type GolferStyle } from './sim/rpg/characters';
-import { cashOutShards, effectiveCut, snapshotRun } from './sim/rpg/run';
+import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle } from './sim/rpg/characters';
+import { cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -241,13 +241,17 @@ function header(): string {
 }
 
 function titleScreen(): string {
+  // Headline the winnable campaign (GS-voyage) first, then the endless roguelite formats.
   const formats = Object.values(FORMATS)
+    .slice()
+    .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
     .map(
       (f) => `
-      <div class="gs-panel gs-format">
-        <div style="display:flex;align-items:baseline;gap:10px;">
+      <div class="gs-panel gs-format" ${f.winnable ? 'style="border-color:#ffce5466;"' : ''}>
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
           <b style="font-size:16px;">${f.name}</b>
-          <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
+          ${f.winnable ? '<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:10.5px;">★ CAMPAIGN · WINNABLE</span>' : ''}
+          <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.winnable ? '' : f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
         </div>
         <p style="font-size:13px;opacity:.8;margin:.4em 0;">${f.blurb}</p>
         ${btn(`Start — ${f.name}`, { type: 'start', format: f.id }, { variant: 'primary' })}
@@ -348,15 +352,29 @@ function introScreen(): string {
            <div style="font-size:13px;opacity:.82;margin-top:2px;">${ev.desc}</div>
          </div>`
       : '';
+  // Boss stop (GS-voyage): a louder, harder splash — and a co-op partner read for a scramble boss.
+  const boss = currentBoss(state.run);
+  const partner = boss?.partner ? scramblePartner(state.run) : undefined;
+  const bossBanner = boss
+    ? `<div style="margin:.2em 0 .8em;padding:11px 13px;border:1px solid ${boss.final ? '#ffce54' : '#c0392b'};
+          border-radius:10px;background:linear-gradient(180deg,#1a0e12,#120b10);">
+         <div style="font-size:12px;letter-spacing:.12em;color:${boss.final ? '#ffce54' : '#ff6b6b'};">
+           ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${boss.partner ? ' · SCRAMBLE' : ''}</div>
+         <b style="font-size:18px;">${boss.name}</b>
+         <div style="font-size:13px;opacity:.85;margin-top:3px;">${boss.blurb}</div>
+         ${partner ? `<div style="font-size:12.5px;margin-top:6px;color:${partner.style.cap};">🤝 Partner: <b>${partner.name}</b> — two balls a shot, the better one counts.</div>` : ''}
+       </div>`
+    : '';
   return `
     ${header()}
-    <p style="opacity:.8;">A new world rises from the void…</p>
+    <p style="opacity:.8;">${boss ? 'The course of legend awaits…' : 'A new world rises from the void…'}</p>
+    ${bossBanner}
     ${zoneIdentityHTML()}
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
       <section style="flex:1 1 220px;">
         ${evBanner}
-        <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes to make the cut and travel on.</p>
+        <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes${boss ? ' to beat the boss' : ' to make the cut and travel on'}.</p>
         ${btn('🏌 Play shot by shot', { type: 'playInteractive' }, { variant: 'primary' })}
         ${btn('» Auto-play (watch)', { type: 'play' }, { variant: 'ghost' })}
       </section>
@@ -1189,15 +1207,23 @@ function travelScreen(): string {
         ev.creditMult !== 1 ? `${ev.creditMult > 1 ? '+' : ''}${Math.round((ev.creditMult - 1) * 100)}% credits` : '';
       const cut = ev.cutDelta !== 0 ? `cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}` : '';
       const tag = [credit, cut].filter(Boolean).join(' · ');
+      // Boss-ahead preview + the harder-path (elite) flag (GS-voyage).
+      const badges = [
+        r.bossAhead ? `<span style="color:#ff8b6b;font-weight:600;">⚔ Boss ahead</span>` : '',
+        r.elite ? `<span style="color:#ffce54;font-weight:600;">🔥 Harder path</span>` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
       // A whole route card is the click target (the shared btn() wraps an action handler).
       return btn(
         `<div style="text-align:left;">
            <div style="font-size:15px;"><b>${ev.label}</b> <span style="opacity:.6;">· ↗ ${r.label} (+${r.distanceJump} distance)</span></div>
            <div style="font-size:13px;opacity:.82;margin:3px 0;">${ev.desc}</div>
            ${tag ? `<div style="font-size:12px;opacity:.7;">${tag}</div>` : ''}
+           ${badges ? `<div style="font-size:12px;margin-top:3px;">${badges}</div>` : ''}
          </div>`,
         { type: 'route', routeId: r.id },
-        { borderColor: rarCol(ev.rarity), block: true },
+        { borderColor: r.elite ? '#ffce54' : rarCol(ev.rarity), block: true },
       );
     })
     .join('');
@@ -1224,13 +1250,19 @@ function gameoverScreen(): string {
   const r = state.run;
   const earned = state.lastRunShards;
   const banked = r.endedReason === 'banked';
-  const heading = banked
+  const won = r.endedReason === 'won';
+  const heading = won
+    ? `<h2 style="font-size:22px;color:#ffce54;">🏆 Voyage complete — you won the Galactic Major!</h2>`
+    : banked
     ? `<h2 style="font-size:20px;color:#5fd45a;">Banked — you quit while ahead</h2>`
     : `<h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>`;
+  const reached = won
+    ? `<p style="font-size:15px;">You cleared all three arcs and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
+    : `<p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>`;
   return `
     ${header()}
     ${heading}
-    <p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>
+    ${reached}
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">
@@ -1242,6 +1274,11 @@ function gameoverScreen(): string {
 /** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. */
 function golferLook(): GolferStyle | undefined {
   return getCharacter(state.run.loadout.characterId)?.style;
+}
+
+/** The co-op scramble partner golfer for the current boss stop (GS-scramble), if any. */
+function scramblePartner(run: typeof state.run): Character {
+  return scramblePartnerChar(run.seed, run.stopIndex, run.loadout.characterId);
 }
 
 /** The hired named caddy's id (GS-caddy), or undefined — drawn in the play-view/putt-meter corner. */
