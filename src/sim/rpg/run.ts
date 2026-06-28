@@ -84,6 +84,9 @@ export interface Run {
   loadout: PlayerLoadout;
   /** Permanent meta-upgrade levels baked into this run's start (GS-12). Kept for resume. */
   meta: MetaUpgrades;
+  /** Ascension difficulty tier (GS-ascension): 0 = base; each level tightens every cut and thins the
+   *  starting purse. Selectable up to the highest tier unlocked by winning. Voyage-only in practice. */
+  ascension: number;
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
@@ -106,23 +109,37 @@ export function startingLoadoutFor(meta: MetaUpgrades, characterId?: string): Pl
   return applyMeta(meta, applyCharacter(characterId, startingLoadout()));
 }
 
+/** Ascension ladder (GS-ascension): a fixed-length campaign gets harder above the base difficulty,
+ *  unlocked one tier at a time by winning. Each level adds a flat per-stop cut and thins the purse. */
+export const ASCENSION_MAX = 8;
+export function ascensionCutBonus(level: number): number {
+  return Math.max(0, Math.round(level));
+}
+export function ascensionCreditPenalty(level: number): number {
+  return Math.max(0, Math.round(level)) * 8;
+}
+
 export function startRun(
   seed: number | string,
   formatId: string = DEFAULT_FORMAT,
   meta: MetaUpgrades = {},
   characterId?: string,
+  ascension = 0,
 ): Run {
   const rng = new Rng(seed);
+  const asc = Math.max(0, Math.min(ASCENSION_MAX, Math.round(ascension)));
   return {
     seed: rng.seed,
     formatId,
     stopIndex: 0,
     distanceFromStart: 0,
     // Permanent meta-progression bakes into the starting credits + loadout (GS-12); the chosen
-    // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor).
-    credits: metaStartingCredits(meta),
+    // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor). Ascension
+    // thins the starting purse (floored so it never strands you with nothing).
+    credits: Math.max(20, metaStartingCredits(meta) - ascensionCreditPenalty(asc)),
     loadout: startingLoadoutFor(meta, characterId),
     meta,
+    ascension: asc,
     firedEventIds: [],
     status: 'active',
     history: [],
@@ -264,7 +281,12 @@ export function effectiveCut(run: Run, holes: number): number {
   const boss = bossAt(format, run.stopIndex);
   // A winnable campaign scales its distance ramp down (cutMult) so it plateaus rather than spirals.
   const rampDistance = run.distanceFromStart * (format.cutMult ?? 1);
-  return cutLine(rampDistance, holes) + event.cutDelta + (boss?.cutBonus ?? 0);
+  return (
+    cutLine(rampDistance, holes) +
+    event.cutDelta +
+    (boss?.cutBonus ?? 0) +
+    ascensionCutBonus(run.ascension)
+  );
 }
 
 /** The boss awaiting the player at the current stop, if any (GS-voyage). */
@@ -475,6 +497,8 @@ export interface RunSnapshot {
   perks: string[];
   /** Permanent meta-upgrade levels (GS-12); the resume base is rebuilt from these. */
   meta?: MetaUpgrades;
+  /** Ascension difficulty tier (GS-ascension); 0/absent for back-compat. */
+  ascension?: number;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
@@ -492,6 +516,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     credits: run.credits,
     perks: [...run.loadout.perks],
     meta: { ...run.meta },
+    ascension: run.ascension,
     pendingEventId: run.pendingEvent?.id,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
@@ -510,6 +535,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     // SAME way `startRun` builds it, so the bag (starting clubs + bought/upgraded clubs) reconstructs.
     loadout: loadoutFromPerks(snap.perks ?? [], startingLoadoutFor(meta, snap.characterId)),
     meta,
+    ascension: snap.ascension ?? 0,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',
@@ -563,6 +589,8 @@ export interface RunStrategy {
   meta?: MetaUpgrades;
   /** Selected golfer id (GS-18); default = none (a neutral straight golfer). */
   characterId?: string;
+  /** Ascension difficulty tier (GS-ascension); default 0. */
+  ascension?: number;
 }
 
 export interface RunOutcome {
@@ -576,7 +604,7 @@ export function simulateRun(
   strategy: RunStrategy = {},
   maxStops = 100,
 ): RunOutcome {
-  let run = startRun(seed, strategy.formatId, strategy.meta, strategy.characterId);
+  let run = startRun(seed, strategy.formatId, strategy.meta, strategy.characterId, strategy.ascension);
   const stops: StopResult[] = [];
   for (let i = 0; i < maxStops && run.status === 'active'; i++) {
     const played = playStop(run);

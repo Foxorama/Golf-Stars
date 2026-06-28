@@ -10,6 +10,7 @@
 import type { Course } from '../sim/course/contract';
 import type { PlayedHole, PuttControl } from '../sim/round';
 import {
+  ASCENSION_MAX,
   bank,
   buy,
   currentCourse,
@@ -86,10 +87,12 @@ export interface UiState {
   metaUpgrades: MetaUpgrades;
   /** Shards earned by the run that just ended — shown on the gameover screen. */
   lastRunShards?: number;
+  /** Highest Ascension tier unlocked (GS-ascension) — selectable on the title for a voyage. */
+  maxAscension: number;
 }
 
 export type Action =
-  | { type: 'start'; format: string }
+  | { type: 'start'; format: string; ascension?: number }
   | { type: 'selectCharacter'; characterId: string } // pick a golfer, then begin the run
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
@@ -114,6 +117,7 @@ export interface MetaProgress {
   bestDistance?: number;
   shards?: number;
   metaUpgrades?: MetaUpgrades;
+  maxAscension?: number;
 }
 
 /**
@@ -139,7 +143,14 @@ export function initState(
     bestDistance: meta.bestDistance ?? 0,
     shards: meta.shards ?? 0,
     metaUpgrades,
+    maxAscension: meta.maxAscension ?? 0,
   };
+}
+
+/** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
+function unlockedAscension(state: UiState, run: Run): number {
+  if (run.endedReason !== 'won') return state.maxAscension;
+  return Math.min(ASCENSION_MAX, Math.max(state.maxAscension, run.ascension + 1));
 }
 
 export function reduce(state: UiState, action: Action): UiState {
@@ -149,7 +160,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // Lock in the chosen format, then pick a golfer before the run begins (GS-18). The run is
       // (re)built with the format now so the course preview works; the character layers on at
       // `selectCharacter`. `run.formatId` carries the pending choice — no extra state needed.
-      const run = startRun(state.run.seed, action.format, state.metaUpgrades);
+      // Ascension (GS-ascension) is chosen on the title for a voyage; clamp to what's unlocked.
+      const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? 0));
+      const run = startRun(state.run.seed, action.format, state.metaUpgrades, undefined, asc);
       return {
         ...state,
         run,
@@ -165,8 +178,8 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'selectCharacter': {
       if (state.screen !== 'character') return state;
-      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format chosen at 'start'.
-      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId);
+      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + ascension chosen at 'start'.
+      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId, state.run.ascension);
       return { ...state, run, course: currentCourse(run), screen: 'intro' };
     }
 
@@ -204,6 +217,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
+        maxAscension: unlockedAscension(state, run),
       };
     }
 
@@ -279,6 +293,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
+        maxAscension: unlockedAscension(state, run),
       };
     }
 
@@ -372,6 +387,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: state.bestDistance,
         shards: state.shards,
         metaUpgrades: state.metaUpgrades,
+        maxAscension: state.maxAscension,
       });
     }
   }

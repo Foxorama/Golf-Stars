@@ -113,6 +113,7 @@ describe('meta wired into the run', () => {
       credits: 0,
       loadout: startingLoadout(),
       meta: {},
+      ascension: 0,
       firedEventIds: [],
       status: 'ended',
       history: Array.from({ length: stops }, () => ({}) as never),

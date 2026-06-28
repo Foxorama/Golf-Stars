@@ -27,7 +27,7 @@ import { rarCol } from './sim/rpg/loot';
 import { clubOfferNote, itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle } from './sim/rpg/characters';
-import { cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
+import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -92,6 +92,7 @@ function boot(): void {
       bestDistance: save.bestDistance,
       shards: save.shards,
       metaUpgrades: save.metaUpgrades,
+      maxAscension: save.maxAscension,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -116,7 +117,7 @@ function recover(err: unknown): void {
   );
   stage('recover');
   try {
-    writeSave({ version: 3, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {} });
+    writeSave({ version: 4, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0 });
   } catch {
     /* ignore */
   }
@@ -134,11 +135,12 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 3,
+    version: 4,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
     metaUpgrades: state.metaUpgrades,
+    maxAscension: state.maxAscension,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -254,7 +256,14 @@ function titleScreen(): string {
           <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.winnable ? '' : f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
         </div>
         <p style="font-size:13px;opacity:.8;margin:.4em 0;">${f.blurb}</p>
-        ${btn(`Start — ${f.name}`, { type: 'start', format: f.id }, { variant: 'primary' })}
+        ${
+          f.winnable && state.maxAscension > 0
+            ? `<div style="font-size:12px;opacity:.75;margin-bottom:5px;">⚔ Ascension — harder cut, leaner purse. Win to unlock the next tier (max unlocked: A${state.maxAscension}):</div>
+               <div style="display:flex;gap:6px;flex-wrap:wrap;">${Array.from({ length: state.maxAscension + 1 }, (_, a) =>
+                 btn(`A${a}`, { type: 'start', format: f.id, ascension: a }, { variant: a === 0 ? 'primary' : 'ghost' }),
+               ).join('')}</div>`
+            : btn(`Start — ${f.name}`, { type: 'start', format: f.id }, { variant: 'primary' })
+        }
       </div>`,
     )
     .join('');
@@ -381,6 +390,7 @@ function introScreen(): string {
       ${courseCardHTML(c, { thumbWidth: 300, thumbHeight: 380 })}
       <section style="flex:1 1 220px;">
         ${evBanner}
+        ${state.run.ascension > 0 ? `<p style="font-size:12px;color:#ffce54;margin:.1em 0;">⚔ Ascension A${state.run.ascension} — a tougher cut, a leaner purse.</p>` : ''}
         <p style="font-size:15px;">Stableford format: <b>${cut}pts</b> required across the ${c.holes.length} holes${boss ? ' to beat the boss' : ' to make the cut and travel on'}.</p>
         ${btn('🏌 Play shot by shot', { type: 'playInteractive' }, { variant: 'primary' })}
         ${btn('» Auto-play (watch)', { type: 'play' }, { variant: 'ghost' })}
@@ -1269,9 +1279,17 @@ function gameoverScreen(): string {
     : banked
     ? `<h2 style="font-size:20px;color:#5fd45a;">Banked — you quit while ahead</h2>`
     : `<h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>`;
-  const reached = won
-    ? `<p style="font-size:15px;">You cleared all three arcs and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
-    : `<p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>`;
+  const unlock =
+    won && r.ascension < ASCENSION_MAX
+      ? `<p style="font-size:14px;color:#ffce54;">⚔ Ascension <b>A${r.ascension}</b> cleared — <b>A${r.ascension + 1}</b> unlocked. Start the next voyage tougher.</p>`
+      : won && r.ascension >= ASCENSION_MAX
+      ? `<p style="font-size:14px;color:#ffce54;">⚔ You cleared the TOP Ascension (A${r.ascension}). Legendary.</p>`
+      : '';
+  const reached =
+    (won
+      ? `<p style="font-size:15px;">You cleared all three arcs${r.ascension > 0 ? ` at Ascension A${r.ascension}` : ''} and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
+      : `<p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>`) +
+    unlock;
   return `
     ${header()}
     ${heading}
