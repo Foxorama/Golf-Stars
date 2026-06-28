@@ -305,6 +305,103 @@ function crossingBand(
 }
 
 /**
+ * A meandering RIVER channel crossing the play corridor at fraction `t` — the curving, varied
+ * replacement for the old straight perpendicular band (which read as a flat "bridge" slab across the
+ * hole). Grounded in how real courses route water: the classic strategic hazard is a stream that runs
+ * adjacent to a hole then cuts ACROSS on a DIAGONAL — a heroic carry you "bite off as much as you dare"
+ * — and natural water meanders down a hollow and POOLS into a lake where it runs out. So this channel:
+ *   • crosses on a random DIAGONAL axis (the lateral rotated ±~30°), so no two rivers run the same way
+ *     (straight across, slanted left, slanted right, sometimes quartering toward the green);
+ *   • MEANDERS with an amplitude that GROWS away from the corridor — anchored to ~0 at the crossing so
+ *     the carry stays clean and honest, but curving and wandering the further it runs out;
+ *   • runs WELL off into the rough on each side (asymmetric reach) so it heads off toward the horizon
+ *     instead of stopping at the fairway edge like a band;
+ *   • has a believable VARIABLE width (a gentle wobble), wider where it pools.
+ * It returns the polygon plus the far-end `mouth`, where the generator drops a connected LAKE of the
+ * same liquid so the river visibly flows INTO a body of water (the render's liquid family merges the
+ * two into one seamless surface). The crossing still passes exactly through the corridor point `c`
+ * (meander anchored to 0 there), so it stays a provably-fair forced carry (`validateCrossings`).
+ * Shared by the ember lava river, the frost frozen pond and the parkland creek.
+ */
+function riverChannel(
+  centreline: Vec[],
+  t: number,
+  fairwayHalfWidth: number,
+  thickness: number,
+  rng: Rng,
+): { poly: Vec[]; mouth: Vec } {
+  const c = centrePoint(centreline, t);
+  const a = centrePoint(centreline, Math.max(0, t - 0.02));
+  const b = centrePoint(centreline, Math.min(1, t + 0.02));
+  let tx = b[0] - a[0];
+  let ty = b[1] - a[1];
+  const tl = Math.hypot(tx, ty) || 1;
+  tx /= tl;
+  ty /= tl; // unit play direction
+  // Diagonal crossing axis: the lateral (perp) rotated by a random angle, so rivers slant differently.
+  const theta = rng.range(-0.55, 0.55); // ±~31° off perpendicular
+  const ct = Math.cos(theta);
+  const st = Math.sin(theta);
+  const ax = -ty * ct - tx * st; // axis = perp (−ty, tx) rotated by theta
+  const ay = tx * ct - ty * st;
+  // Meander runs ALONG the play direction (tx, ty), so it shifts a river point forward/back along the
+  // hole rather than swinging it sideways. Held at ZERO across the whole corridor zone so the carry is
+  // a clean straight diagonal, then growing the further it runs out — a wandering river in the rough.
+  const mx = tx;
+  const my = ty;
+  const reachNeg = fairwayHalfWidth + rng.range(28, 60);
+  const reachPos = fairwayHalfWidth + rng.range(52, 100); // the longer arm pools into the lake
+  const f1 = rng.range(1.2, 2.3);
+  const p1 = rng.range(0, Math.PI * 2);
+  const f2 = rng.range(2.6, 4.3);
+  const p2 = rng.range(0, Math.PI * 2);
+  const ampFrac = rng.range(0.22, 0.4);
+  const calm = fairwayHalfWidth * 0.8; // no meander inside this radius of the crossing
+  const half = thickness / 2;
+  const wobPh = rng.range(0, Math.PI * 2);
+  const wobLobes = rng.range(1.4, 2.8);
+  const STEPS = 9;
+  const ptAt = (s: number): Vec => {
+    const grow = Math.min(1, Math.max(0, (Math.abs(s) - calm) / (fairwayHalfWidth * 1.1 + 1)));
+    const sn = s / (Math.max(reachNeg, reachPos) || 1);
+    const amp = ampFrac * Math.max(reachNeg, reachPos) * grow;
+    const m = amp * (0.7 * Math.sin(f1 * sn * Math.PI + p1) + 0.42 * Math.sin(f2 * sn * Math.PI + p2));
+    return [c[0] + ax * s + mx * m, c[1] + ay * s + my * m];
+  };
+  const widthAt = (s: number): number => {
+    const grow = Math.min(1, Math.max(0, (Math.abs(s) - calm) / (fairwayHalfWidth * 1.1 + 1)));
+    const wob = grow * (0.26 * Math.sin(wobPh + s * 0.05 * wobLobes) - 0.1);
+    return half * (1 + wob);
+  };
+  // Build each arm OUTWARD from the crossing, TRUNCATING it the moment a point PAST the corridor zone
+  // re-approaches the centreline. A long diagonal arm can otherwise re-meet a doglegging centreline far
+  // away and create a SECOND bank — an unfair, unprovable carry. Once we're clear of the corridor
+  // (|s| past ~1.2·halfWidth), the river's distance to the centreline should only grow; if it drops back
+  // toward the corridor, the centreline is curving into us, so we stop the arm there (single crossing,
+  // whatever the hole shape).
+  const arm = (reach: number, dir: -1 | 1): Vec[] => {
+    const pts: Vec[] = [];
+    for (let k = 1; k <= STEPS; k++) {
+      const s = dir * (k / STEPS) * reach;
+      const p = ptAt(s);
+      if (Math.abs(s) > fairwayHalfWidth * 1.2 && polylineDist(p, centreline) < fairwayHalfWidth * 1.1) break;
+      pts.push(p);
+    }
+    return pts;
+  };
+  const neg = arm(reachNeg, -1); // points stepping out toward −axis
+  const pos = arm(reachPos, 1); // points stepping out toward +axis
+  const line: Vec[] = [...neg.slice().reverse(), c, ...pos];
+  const hw: number[] = line.map((p) => {
+    // recover s as the signed axis projection of (p − c)
+    const s = (p[0] - c[0]) * ax + (p[1] - c[1]) * ay;
+    return widthAt(s);
+  });
+  const mouth: Vec = pos[pos.length - 1] ?? neg[neg.length - 1] ?? c;
+  return { poly: ribbon(line, hw, hw, true, true), mouth };
+}
+
+/**
  * Clearance a point of radius `r` must keep from the play corridor for a *penalty*
  * hazard to be fair. The corridor here is both the centreline AND the direct tee→green
  * chord (the line the greedy sim actually plays).
@@ -441,17 +538,25 @@ function generateHole(
     const dl = Math.hypot(dx, dy) || 1;
     dx /= dl;
     dy /= dl;
-    const back = greenR + 12;
-    const tail = greenR * 1.5 + 14;
-    const aw = Math.max(baseHalf * 0.45, greenR + 9);
+    // The apron must MELT into the corridor, not sit on it as a rectangular shelf (the "section around
+    // the green that doesn't fit"). On a tight/wild hole the old constant-width apron was far wider than
+    // the narrow corridor, so its flat tee-side cut showed as a hard step behind the green. Fix: START
+    // the apron at the CORRIDOR's own half-width at the green (a flush join — nothing protrudes), swell
+    // only enough to WRAP the green, then taper to a soft point past it, with BOTH ends rounded so there
+    // is no flat cut anywhere. More points → a smooth, organic blend rather than a slab.
+    const corrHW = (leftHW[leftHW.length - 1]! + rightHW[rightHW.length - 1]!) / 2;
+    const back = greenR + 14;
+    const tail = greenR * 1.6 + 16;
+    const wrap = Math.max(greenR + 9, corrHW); // wraps the green, never narrower than the corridor here
     const apronLine: Vec[] = [
       [green[0] - dx * back, green[1] - dy * back],
+      [green[0] - dx * back * 0.4, green[1] - dy * back * 0.4],
       green,
+      [green[0] + dx * tail * 0.55, green[1] + dy * tail * 0.55],
       [green[0] + dx * tail, green[1] + dy * tail],
     ];
-    // A rounded back nose (not a hard taper to a point) so the fairway flows softly past the green.
-    const apronHW = [aw, aw, aw * 0.5];
-    features.push({ kind: 'fairway', poly: ribbon(apronLine, apronHW, apronHW, false, true) });
+    const apronHW = [corrHW, (corrHW + wrap) / 2, wrap, wrap * 0.62, wrap * 0.3];
+    features.push({ kind: 'fairway', poly: ribbon(apronLine, apronHW, apronHW, true, true) });
   }
   features.push(teeBox, greenF);
   const hazards: Feature[] = [];
@@ -608,7 +713,13 @@ function generateHole(
   if (biome.lavaRiver && par >= 4 && wildness >= LAVA_RIVER_MIN_WILDNESS) {
     const t = rng.range(0.34, 0.6);
     const thickness = Math.min(34, length * 0.085, rng.range(8, 13) + wildness * rng.range(6, 16));
-    hazards.push({ kind: 'lavariver', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+    const river = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
+    hazards.push({ kind: 'lavariver', poly: river.poly });
+    // A molten LAKE the river pools into at its mouth — same liquid family, so they merge seamlessly.
+    const lakeR = rng.range(13, 20) + wildness * 8;
+    if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
+      hazards.push({ kind: 'lava', poly: blobPoly(river.mouth, lakeR, 15, 0.3, rng) });
+    }
   }
 
   // Frozen-pond crossing (frost signature, GS-mechanics): a meltwater channel crosses the corridor
@@ -618,7 +729,13 @@ function generateHole(
   if (biome.frozenPond && par >= 4 && wildness >= FROZEN_POND_MIN_WILDNESS) {
     const t = rng.range(0.34, 0.6);
     const thickness = Math.min(30, length * 0.075, rng.range(7, 12) + wildness * rng.range(5, 14));
-    hazards.push({ kind: 'frozenpond', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+    const river = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
+    hazards.push({ kind: 'frozenpond', poly: river.poly });
+    // A frozen LAKE the meltwater channel pools into (water family → merges into the channel).
+    const lakeR = rng.range(13, 20) + wildness * 8;
+    if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
+      hazards.push({ kind: 'water', poly: blobPoly(river.mouth, lakeR, 15, 0.3, rng) });
+    }
   }
 
   // Water CREEK crossing (parkland signature, GS-terrain): a stream/creek runs across the fairway as
@@ -630,7 +747,14 @@ function generateHole(
   if (biome.waterCreek && par >= 4 && wildness >= WATER_CREEK_MIN_WILDNESS && !hasCrossing) {
     const t = rng.range(0.34, 0.6);
     const thickness = Math.min(26, length * 0.06, rng.range(6, 10) + wildness * rng.range(5, 13));
-    hazards.push({ kind: 'creek', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+    const river = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
+    hazards.push({ kind: 'creek', poly: river.poly });
+    // A LAKE/pond the creek feeds into at its mouth (water family → merges into the creek, so the
+    // stream visibly runs INTO the lake instead of a separate body floating beside it).
+    const lakeR = rng.range(14, 22) + wildness * 10;
+    if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
+      hazards.push({ kind: 'water', poly: blobPoly(river.mouth, lakeR, 16, 0.3, rng) });
+    }
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
