@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 5;
+export const GENERATOR_VERSION = 6;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -46,11 +46,13 @@ export const GENERATOR_VERSION = 5;
 const LOST_ROUGH_MIN_WILDNESS = 0.55; // below: void plays as ordinary (fair) rough
 const LAVA_RIVER_MIN_WILDNESS = 0.3; // below: a calm ember stop has no river
 const FROZEN_POND_MIN_WILDNESS = 0.3; // below: a calm frost stop has no pond crossing
+const WATER_CREEK_MIN_WILDNESS = 0.3; // below: a calm parkland stop has no creek crossing
 
 /** Penalty kinds that are SANCTIONED forced carries on the play corridor (GS-19/GS-mechanics): they
  *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
- *  carryable. A river of lava (ember) and a frozen-pond channel (frost) are both crossings. */
-const CROSSING_KINDS = new Set(['lavariver', 'frozenpond']);
+ *  carryable. A river of lava (ember), a frozen-pond channel (frost), and a water creek (parkland)
+ *  are all crossings — the carry-aware AI flies any of them generically (it keys off `penalty`). */
+const CROSSING_KINDS = new Set(['lavariver', 'frozenpond', 'creek']);
 /**
  * Corridor half-width SCALE when the rough is lethal (void islands). Constant (does NOT shrink with
  * wildness like a normal corridor) and generous, so that even max-wildness driver spray usually
@@ -103,41 +105,61 @@ function blobPoly(center: Vec, radius: number, n: number, jitter: number, rng: R
   return pts;
 }
 
+const TAU = Math.PI * 2;
+/** Minimal signed-magnitude angular distance between two angles (0..π). */
+function angDelta(a: number, b: number): number {
+  return Math.abs((((a - b + Math.PI) % TAU) + TAU) % TAU - Math.PI);
+}
+
 /**
- * A varied, organic GREEN shape (GS-greens) — so greens stop being identical circles. The radius is
- * modulated by a few seeded harmonics + an optional kidney lobe and stretched along a random long
- * axis, yielding blobs, kidneys, long shelves, pears and punchbowls. `aspectMax`/`irregular` come
- * from the biome row, so each world has a green character (frost shelves run long, inferno greens
- * jagged, desert greens big and smooth). Centre = `c`; the polygon stays a simple star shape about
- * `c` (so a ray from `c` hits the edge exactly once — the pin placer relies on that).
+ * A varied, organic GREEN shape (GS-greens, widened in GS-terrain) — so greens stop being basically
+ * circles. The radius r(θ) is driven by FOUR seeded harmonics (bigger amplitudes than before), a
+ * low-frequency PEAR/teardrop bias (one end fatter), and 0–2 KIDNEY bites, then stretched along a
+ * random long axis. The result spans the real green-complex vocabulary — round, oval, long shelf,
+ * pear, kidney, boomerang and clover — never a plain circle. `aspectMax`/`irregular` come from the
+ * biome row, so each world keeps a character (frost shelves long, inferno greens jagged, desert big
+ * and smooth). Centre = `c`; r(θ) stays single-valued so the polygon is STAR-SHAPED about `c` even
+ * when concave (the anisotropic stretch is linear, so it preserves star-shapedness) — `pinInGreen`
+ * and `rayPolyDist` rely on a ray from `c` hitting the edge exactly once.
  */
 function greenPoly(c: Vec, baseR: number, aspectMax: number, irregular: number, rng: Rng): Vec[] {
-  const n = 20;
+  const n = 28;
   const axis = rng.range(0, Math.PI); // long-axis orientation
   // Lean the stretch toward the world's max so the green CHARACTER reads (a frost shelf is reliably
-  // long, not occasionally) — at least ~45% of the way to the biome's max aspect.
-  const aspect = 1 + (Math.max(1, aspectMax) - 1) * (0.45 + 0.55 * rng.float());
-  const a1 = rng.range(-0.16, 0.16) * irregular;
-  const a2 = rng.range(-0.13, 0.13) * irregular;
-  const a3 = rng.range(-0.09, 0.09) * irregular;
-  const p1 = rng.range(0, Math.PI * 2);
-  const p2 = rng.range(0, Math.PI * 2);
-  const p3 = rng.range(0, Math.PI * 2);
-  // An occasional kidney indent (one soft bite out of the rim) for a real green-complex shape.
-  const lobeDepth = rng.float() < 0.45 * irregular ? rng.range(0.18, 0.42) : 0;
-  const lobeAng = rng.range(0, Math.PI * 2);
-  const lobeW = rng.range(0.12, 0.32);
+  // long, not occasionally) — at least halfway to the biome's max aspect.
+  const aspect = 1 + (Math.max(1, aspectMax) - 1) * (0.5 + 0.5 * rng.float());
+  // Bigger shape harmonics → real silhouettes rather than a gently-wobbled circle.
+  const a1 = rng.range(-0.3, 0.3) * irregular;
+  const a2 = rng.range(-0.22, 0.22) * irregular;
+  const a3 = rng.range(-0.15, 0.15) * irregular;
+  const a4 = rng.range(-0.1, 0.1) * irregular;
+  const p1 = rng.range(0, TAU);
+  const p2 = rng.range(0, TAU);
+  const p3 = rng.range(0, TAU);
+  const p4 = rng.range(0, TAU);
+  // Pear/teardrop bias: a low-frequency lobe that fattens one end and pinches the other.
+  const pearAmt = rng.range(0, 0.34) * irregular;
+  const pearAng = rng.range(0, TAU);
+  // 0–2 kidney bites for boomerang / kidney / clover green complexes.
+  const lobeCount = rng.float() < 0.6 * irregular ? (rng.float() < 0.4 ? 2 : 1) : 0;
+  const lobes: { ang: number; depth: number; w: number }[] = [];
+  for (let k = 0; k < lobeCount; k++) {
+    lobes.push({ ang: rng.range(0, TAU), depth: rng.range(0.26, 0.55), w: rng.range(0.1, 0.26) });
+  }
   const ca = Math.cos(axis);
   const sa = Math.sin(axis);
   const pts: Vec[] = [];
   for (let i = 0; i < n; i++) {
-    const th = (i / n) * Math.PI * 2;
-    let rr = baseR * (1 + a1 * Math.sin(th + p1) + a2 * Math.sin(2 * th + p2) + a3 * Math.sin(3 * th + p3));
-    if (lobeDepth) {
-      const d = Math.abs((((th - lobeAng + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI);
-      rr -= baseR * lobeDepth * Math.exp(-(d * d) / (lobeW * 2));
+    const th = (i / n) * TAU;
+    let rr =
+      baseR *
+      (1 + a1 * Math.sin(th + p1) + a2 * Math.sin(2 * th + p2) + a3 * Math.sin(3 * th + p3) + a4 * Math.sin(4 * th + p4));
+    rr *= 1 + pearAmt * Math.cos(th - pearAng);
+    for (const lobe of lobes) {
+      const d = angDelta(th, lobe.ang);
+      rr -= baseR * lobe.depth * Math.exp(-(d * d) / (lobe.w * 2));
     }
-    rr = Math.max(baseR * 0.42, rr);
+    rr = Math.max(baseR * 0.32, rr); // floor: a deep neck is allowed, a self-crossing is not
     // Local point, then stretch along `axis`: decompose into along/perp, scale the along part.
     const x = Math.cos(th) * rr;
     const y = Math.sin(th) * rr;
@@ -182,29 +204,55 @@ function pinInGreen(c: Vec, poly: Vec[], rng: Rng): Vec {
 }
 
 /**
- * Build a corridor polygon around a centreline polyline. `halfWidth` is either a single
- * value (a constant-thickness corridor) or one value PER centreline point (a variable-
- * thickness corridor — wide landing zones pinched by the odd neck).
+ * Build a fairway RIBBON around a centreline with INDEPENDENT left/right half-widths and ROUNDED end
+ * caps (GS-terrain) — the fix for "fairways badly fit in at the tee and green ends". `corridorPoly`
+ * connected the two offset edges with a flat slash, which (combined with the ends pinching narrow)
+ * made the fairway read as a pointed almond/leaf floating on the ground. A ribbon instead:
+ *  • offsets each side by its OWN half-width (so the corridor isn't a perfect mirror — a real
+ *    fairway bulges asymmetrically), and
+ *  • caps each end with a smooth rounded NOSE (a turfed front edge at the tee, a soft finish at the
+ *    green) instead of a flat cut or a sharp point — so the start/end look naturally shaped.
+ * Winding: left edge tee→green, round the green nose, right edge green→tee, round the tee nose.
  */
-function corridorPoly(line: Vec[], halfWidth: number | number[]): Vec[] {
-  const left: Vec[] = [];
-  const right: Vec[] = [];
-  for (let i = 0; i < line.length; i++) {
+function ribbon(line: Vec[], leftHW: number[], rightHW: number[], roundStart = true, roundEnd = true): Vec[] {
+  const m = line.length;
+  const frame = (i: number) => {
     const prev = line[Math.max(0, i - 1)]!;
-    const next = line[Math.min(line.length - 1, i + 1)]!;
+    const next = line[Math.min(m - 1, i + 1)]!;
     let dx = next[0] - prev[0];
     let dy = next[1] - prev[1];
     const len = Math.hypot(dx, dy) || 1;
     dx /= len;
     dy /= len;
-    const nx = -dy; // left normal
-    const ny = dx;
+    return { nx: -dy, ny: dx, tx: dx, ty: dy }; // left normal + unit tangent (play dir)
+  };
+  const left: Vec[] = [];
+  const right: Vec[] = [];
+  for (let i = 0; i < m; i++) {
+    const f = frame(i);
     const p = line[i]!;
-    const hw = typeof halfWidth === 'number' ? halfWidth : halfWidth[i]!;
-    left.push([p[0] + nx * hw, p[1] + ny * hw]);
-    right.push([p[0] - nx * hw, p[1] - ny * hw]);
+    left.push([p[0] + f.nx * leftHW[i]!, p[1] + f.ny * leftHW[i]!]);
+    right.push([p[0] - f.nx * rightHW[i]!, p[1] - f.ny * rightHW[i]!]);
   }
-  return [...left, ...right.reverse()];
+  // A rounded nose from the LEFT edge endpoint around to the RIGHT edge endpoint (skipping the two
+  // endpoints, already on the edges). `fwdSign` bulges it forward (green) or backward (tee).
+  const nose = (p: Vec, f: ReturnType<typeof frame>, hwL: number, hwR: number, fwdSign: number): Vec[] => {
+    const STEPS = 5;
+    const depth = Math.min(hwL, hwR) * 0.92;
+    const out: Vec[] = [];
+    for (let k = 1; k < STEPS; k++) {
+      const phi = (Math.PI * k) / STEPS;
+      const lat = Math.cos(phi) * (phi < Math.PI / 2 ? hwL : hwR);
+      const fwd = Math.sin(phi) * depth * fwdSign;
+      out.push([p[0] + f.nx * lat + f.tx * fwd, p[1] + f.ny * lat + f.ty * fwd]);
+    }
+    return out;
+  };
+  const poly: Vec[] = [...left];
+  if (roundEnd) poly.push(...nose(line[m - 1]!, frame(m - 1), leftHW[m - 1]!, rightHW[m - 1]!, 1));
+  poly.push(...right.reverse());
+  if (roundStart) poly.push(...nose(line[0]!, frame(0), leftHW[0]!, rightHW[0]!, -1).reverse());
+  return poly;
 }
 
 /** Resample a centreline into `n` parametric-evenly-spaced points (via `centrePoint`). */
@@ -220,7 +268,15 @@ function densifyCentreline(line: Vec[], n: number): Vec[] {
  * (so it reads as running ACROSS the hole), with a meandering thickness for a natural look. Built
  * perpendicular to the play direction so the carry is honest.
  */
-function crossingBand(centreline: Vec[], t: number, halfWidth: number, thickness: number, rng: Rng): Vec[] {
+function crossingBand(
+  centreline: Vec[],
+  t: number,
+  halfWidth: number,
+  thickness: number,
+  rng: Rng,
+  spillMin = 16,
+  spillMax = 38,
+): Vec[] {
   const c = centrePoint(centreline, t);
   const a = centrePoint(centreline, Math.max(0, t - 0.02));
   const b = centrePoint(centreline, Math.min(1, t + 0.02));
@@ -231,7 +287,7 @@ function crossingBand(centreline: Vec[], t: number, halfWidth: number, thickness
   ty /= tl; // unit play direction (tangent)
   const px = -ty;
   const py = tx; // unit lateral (perp)
-  const halfSpan = halfWidth + rng.range(16, 38); // spill into the rough either side
+  const halfSpan = halfWidth + rng.range(spillMin, spillMax); // spill into the rough either side
   const N = 6;
   const top: Vec[] = [];
   const bot: Vec[] = [];
@@ -310,27 +366,55 @@ function generateHole(
   // somewhere to land — you play TO the fairway or lose the ball, but the target is honest.
   const widthScale = lostRough ? VOID_ISLAND_SCALE : 2.0 - 1.25 * wildness;
   const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
-  const segs = par === 3 ? 9 : 15;
+  const segs = par === 3 ? 13 : 19; // denser so the ribbon edge and rounded caps read smoothly
   const dense = densifyCentreline(centreline, segs);
-  // Seeded thickness wave + one localized pinch; amplitude is early-heavy (calm holes get the
-  // wildest variation, brutal holes flatten toward a uniform — but tight — corridor).
-  const ampFrac = 0.18 + 0.32 * (1 - wildness);
+  // Fairway WIDTH PROFILE (GS-terrain) — a believable ribbon instead of a symmetric leaf. Three
+  // shaping pieces, each per-point along the hole, with a mean ≈ baseHalf so the death-spiral balance
+  // is preserved:
+  //  • an END ENVELOPE keeps the corridor FULL through the body and only EASES (never pinches to a
+  //    point) toward the tee/green ends — combined with `ribbon`'s rounded nose caps, the start/end
+  //    read as a turfed front edge and a soft finish, not the old pointed almond;
+  //  • LANDING-ZONE bulges (1–2 Gaussian swells at the driving/approach zones, 25–55 yd-wide in real
+  //    design) widen where you actually land;
+  //  • a gentle seeded WAVE + one localized PINCH for organic movement.
+  // Left/right half-widths then differ by a slow LATERAL asymmetry, so the fairway isn't a perfect
+  // mirror about its centreline (a real fairway bulges to one side).
+  const ampFrac = 0.1 + 0.16 * (1 - wildness);
   const wavePhase = rng.range(0, Math.PI * 2);
-  const waveLobes = rng.range(1.3, 2.7);
-  const pinchAt = rng.float();
-  const pinchDepth = 0.3 * (1 - 0.5 * wildness) * rng.float();
-  const halfWidths = dense.map((_, i) => {
+  const waveLobes = rng.range(1.6, 3.2);
+  const lz1 = rng.range(0.3, 0.42);
+  const lz2 = rng.range(0.62, 0.76);
+  const lzAmp = 0.16 + 0.12 * rng.float();
+  const pinchAt = rng.range(0.2, 0.8);
+  const pinchDepth = 0.2 * (1 - 0.5 * wildness) * rng.float();
+  const asymPhase = rng.range(0, Math.PI * 2);
+  const asymLobes = rng.range(0.6, 1.6);
+  const asymAmt = 0.12 + 0.1 * rng.float();
+  const envAt = (u: number): number => {
+    const teeEase = Math.min(1, 0.74 + (u / 0.12) * 0.26); // 0.74 → 1 over the first 12%
+    const grnEase = Math.min(1, 0.78 + ((1 - u) / 0.14) * 0.22); // taper the last 14% to 0.78
+    return Math.min(teeEase, grnEase);
+  };
+  const mid = dense.map((_, i) => {
     const u = i / (segs - 1);
-    const wave = Math.sin(wavePhase + u * Math.PI * waveLobes);
-    const pinch = Math.exp(-((u - pinchAt) ** 2) / 0.012) * pinchDepth;
-    // Never collapse the corridor: clamp the local half-width to ≥ 55% of base.
-    return Math.max(baseHalf * 0.55, baseHalf * (1 + wave * ampFrac - pinch));
+    const wave = Math.sin(wavePhase + u * Math.PI * waveLobes) * ampFrac;
+    const bulge = lzAmp * Math.exp(-((u - lz1) ** 2) / 0.02) + lzAmp * 0.85 * Math.exp(-((u - lz2) ** 2) / 0.02);
+    const pinch = Math.exp(-((u - pinchAt) ** 2) / 0.01) * pinchDepth;
+    return Math.max(baseHalf * 0.5, baseHalf * envAt(u) * (1 + wave + bulge - pinch));
   });
-  const fairway: Feature = { kind: 'fairway', poly: corridorPoly(dense, halfWidths) };
+  const leftHW = mid.map((w, i) => {
+    const u = i / (segs - 1);
+    return Math.max(baseHalf * 0.42, w * (1 + asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
+  });
+  const rightHW = mid.map((w, i) => {
+    const u = i / (segs - 1);
+    return Math.max(baseHalf * 0.42, w * (1 - asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
+  });
+  const fairway: Feature = { kind: 'fairway', poly: ribbon(dense, leftHW, rightHW) };
   // Hazard placement + the fairness validator both reason about the corridor's WIDEST point
   // (validateFairness recovers the max lateral extent of the fairway poly), so use that here —
   // penalty hazards then clear the widest part and stay provably fair.
-  const fairwayHalfWidth = Math.max(...halfWidths);
+  const fairwayHalfWidth = Math.max(...leftHW, ...rightHW);
 
   const teeBox: Feature = { kind: 'tee', poly: blobPoly(tee, 8, 8, 0, rng) };
   // Varied GREEN shape (GS-greens), per-biome character. baseR scaled by the biome's greenSize.
@@ -365,7 +449,9 @@ function generateHole(
       green,
       [green[0] + dx * tail, green[1] + dy * tail],
     ];
-    features.push({ kind: 'fairway', poly: corridorPoly(apronLine, [aw, aw, aw * 0.4]) });
+    // A rounded back nose (not a hard taper to a point) so the fairway flows softly past the green.
+    const apronHW = [aw, aw, aw * 0.5];
+    features.push({ kind: 'fairway', poly: ribbon(apronLine, apronHW, apronHW, false, true) });
   }
   features.push(teeBox, greenF);
   const hazards: Feature[] = [];
@@ -412,6 +498,37 @@ function generateHole(
     if (clearsPlayCorridor(c, r, centreline, tee, green, fairwayHalfWidth)) {
       hazards.push({ kind, poly: blobPoly(c, r, 12, 0.25, rng) });
     }
+  }
+
+  // Large PONDS / "dams" (GS-terrain): sizable bodies of penalty water flanking the landing zones —
+  // the big lake a wild shot is swallowed by, distinct from the small flanking hazards above. Placed
+  // CLEAR of the play corridor (fairness), so a sensible shot never has to carry them; they just make
+  // an offline miss genuinely costly and give a parkland/ice world real water presence. Drawn as
+  // water (or the biome's hazard kind for exotic worlds).
+  const pondCount = Math.round((biome.ponds ?? 0) * (0.5 + wildness));
+  for (let i = 0; i < pondCount; i++) {
+    const kind = biome.hazardKinds.includes('water') ? 'water' : rng.pick(biome.hazardKinds);
+    const r = rng.range(16, 22 + wildness * 18); // big — a lake/dam, not a puddle
+    const t = rng.range(0.28, 0.82);
+    const side = rng.bool() ? 1 : -1;
+    const along = centrePoint(centreline, t);
+    const perp = perpAt(centreline, t);
+    const lateral = fairwayHalfWidth + r + rng.range(6, 20); // near the corridor edge but clear of it
+    const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+    if (clearsPlayCorridor(c, r, centreline, tee, green, fairwayHalfWidth)) {
+      hazards.push({ kind, poly: blobPoly(c, r, 16, 0.3, rng) });
+    }
+  }
+
+  // Non-penalty fairway BREAK (GS-terrain): a sandy waste band cutting clean across the corridor — a
+  // visible interruption in the fairway you carry or thread (sandbelt-style). Waste is NON-PENALTY
+  // (precedence 3 → reads as 'waste', never costs a card) so it may sit on the line; `validateFairness`
+  // ignores it. A tight spill keeps it spanning mostly the fairway. Longer holes only, wildness-gated.
+  const breakBands = par >= 4 && wildness >= 0.25 ? Math.round((biome.fairwayBreaks ?? 0) * (0.5 + wildness)) : 0;
+  for (let i = 0; i < breakBands; i++) {
+    const t = rng.range(0.34, 0.64);
+    const thickness = rng.range(7, 12);
+    hazards.push({ kind: 'waste', poly: crossingBand(centreline, t, fairwayHalfWidth * 0.85, thickness, rng, 2, 9) });
   }
 
   // In-play scatter surfaces (non-penalty spice): ice/crystal/waste patches near the
@@ -466,14 +583,16 @@ function generateHole(
   // bumped the count + the lateral spread so the rough reads as real forest with depth, not a thin
   // single line) — a sensible shot is still always clear; only a sprayed ball punches out. Stored as
   // many small blobs so the renderer draws a believable wall of canopies.
-  const treeCount = Math.round((biome.treeDensity ?? 0) * (1.1 + wildness * 1.3) * (par === 3 ? 3 : 6));
+  const treeCount = Math.round((biome.treeDensity ?? 0) * (1.3 + wildness * 1.5) * (par === 3 ? 4 : 8));
   for (let i = 0; i < treeCount; i++) {
-    const t = rng.range(0.1, 0.96);
+    const t = rng.range(0.06, 0.97);
     const side = rng.bool() ? 1 : -1;
-    const r = rng.range(3, 6);
+    const r = rng.range(3, 6.5);
     const along = centrePoint(centreline, t);
     const perp = perpAt(centreline, t);
-    const lateral = fairwayHalfWidth + r + rng.range(3, 46); // deeper woods filling the rough
+    // Keep a clear gap off the corridor edge (only an offline shot finds the woods — the GS-13
+    // invariant), then fill DEEP into the rough so the treeline reads as real forest, not a thin line.
+    const lateral = fairwayHalfWidth + r + rng.range(5, 72);
     const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
     hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, rng) });
   }
@@ -500,6 +619,18 @@ function generateHole(
     const t = rng.range(0.34, 0.6);
     const thickness = Math.min(30, length * 0.075, rng.range(7, 12) + wildness * rng.range(5, 14));
     hazards.push({ kind: 'frozenpond', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
+  }
+
+  // Water CREEK crossing (parkland signature, GS-terrain): a stream/creek runs across the fairway as
+  // a FORCED CARRY — the same sanctioned-crossing machinery as the lava river / frozen pond (exempt
+  // from `validateFairness`, proven carryable by `validateCrossings`; the carry-aware AI flies it
+  // generically off its `penalty`). Only ONE crossing per hole — skip if a river/pond already crosses,
+  // so there's always a safe shelf between. Longer holes only; thickness capped relative to the hole.
+  const hasCrossing = hazards.some((h) => CROSSING_KINDS.has(h.kind));
+  if (biome.waterCreek && par >= 4 && wildness >= WATER_CREEK_MIN_WILDNESS && !hasCrossing) {
+    const t = rng.range(0.34, 0.6);
+    const thickness = Math.min(26, length * 0.06, rng.range(6, 10) + wildness * rng.range(5, 13));
+    hazards.push({ kind: 'creek', poly: crossingBand(centreline, t, fairwayHalfWidth, thickness, rng) });
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
@@ -687,7 +818,7 @@ export function validateCrossings(course: Course): string[] {
   course.holes.forEach((h, i) => {
     for (const hz of h.hazards) {
       if (!CROSSING_KINDS.has(hz.kind)) continue;
-      const what = hz.kind === 'frozenpond' ? 'frozen pond' : 'lava river';
+      const what = hz.kind === 'frozenpond' ? 'frozen pond' : hz.kind === 'creek' ? 'creek' : 'lava river';
       let tIn = -1;
       let tOut = -1;
       for (let s = 0; s <= SAMPLES; s++) {

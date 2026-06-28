@@ -83,6 +83,18 @@ export interface Biome {
   frozenPond?: boolean;
   /** Impact-crater bunkers per hole (base, scaled by wildness). Sand → always fair. */
   craters?: number;
+  /**
+   * Water/terrain features (GS-terrain), all pure data scaled fair→brutal by wildness:
+   *  • `waterCreek`   — a stream crosses the fairway as a forced carry (parkland/ice). A sanctioned
+   *    `creek` penalty band, proven carryable exactly like the lava river / frozen pond.
+   *  • `ponds`        — large flanking lakes/"dams" of penalty water per hole (base). Placed CLEAR
+   *    of the play corridor (fairness), so they punish an offline miss without an unfair carry.
+   *  • `fairwayBreaks`— sandy non-penalty WASTE bands cutting across the fairway per hole (base) — a
+   *    visible break you carry or thread, never a lost card.
+   */
+  waterCreek?: boolean;
+  ponds?: number;
+  fairwayBreaks?: number;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -99,11 +111,14 @@ export const BIOMES: readonly Biome[] = [
     scatter: [],
     fairwayWidthMult: 1.0,
     doglegBias: 0.35,
-    treeDensity: 1.6, // lush, tree-lined parkland
+    treeDensity: 2.6, // lush, densely tree-lined parkland — real forest down both sides
     fairwayBunkers: 1.5,
+    waterCreek: true, // signature: a creek crosses the fairway (forced carry)
+    ponds: 1.2, // big parkland lakes flank the landing zones
+    fairwayBreaks: 0.7, // the odd sandy waste break across the fairway
     greenSize: 1.05, // classic parkland greens — gently rolling, moderate variety
-    greenAspect: 1.8,
-    greenIrregular: 1.05,
+    greenAspect: 1.9,
+    greenIrregular: 1.1,
   },
   {
     id: 'dust-belt',
@@ -121,9 +136,10 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0.2, // sparse desert scrub
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
     craters: 2.2, // signature: impact-crater bunkers pock the landing zones
+    fairwayBreaks: 1.0, // sandbelt waste areas slash across the fairway
     greenSize: 1.3, // big, smooth oasis greens against the dunes
-    greenAspect: 1.6,
-    greenIrregular: 0.7,
+    greenAspect: 1.7,
+    greenIrregular: 0.85,
   },
   {
     id: 'ice-ring',
@@ -138,12 +154,13 @@ export const BIOMES: readonly Biome[] = [
     scatter: [{ kind: 'ice', freqPerHole: 1.5, rMin: 8, rMax: 16 }],
     fairwayWidthMult: 0.95,
     doglegBias: 0.3,
-    treeDensity: 0.8, // frosted pines ring the fairways
+    treeDensity: 1.3, // frosted pines ring the fairways more thickly
     fairwayBunkers: 1,
     frozenPond: true, // signature: a meltwater channel crosses the fairway (forced carry)
+    ponds: 1.0, // frozen lakes flank the landing zones
     greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
-    greenAspect: 2.5,
-    greenIrregular: 0.95,
+    greenAspect: 2.6,
+    greenIrregular: 1.0,
   },
   {
     id: 'ember-world',
@@ -158,11 +175,12 @@ export const BIOMES: readonly Biome[] = [
     scatter: [{ kind: 'crystal', freqPerHole: 0.8, rMin: 6, rMax: 11 }],
     fairwayWidthMult: 0.9,
     doglegBias: 0.4,
-    treeDensity: 0.35, // charred snags
+    treeDensity: 0.55, // charred snags, a little denser
     fairwayBunkers: 1.2,
     lavaRiver: true, // signature: molten rivers cross the fairway (forced carry)
+    fairwayBreaks: 0.4, // scorched waste cuts across the odd fairway
     greenSize: 0.95, // jagged, broken basalt greens
-    greenAspect: 1.9,
+    greenAspect: 2.0,
     greenIrregular: 1.45,
   },
   {
