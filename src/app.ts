@@ -1075,7 +1075,7 @@ function settingsOverlay(): string {
         ${row('sound', 'Sound', 'Chimes & contact cues (no downloads)')}
         ${row('haptics', 'Haptics', 'Vibration feedback on supported phones')}
         ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
-        ${row('leftHanded', 'Left-handed', 'Mirror the bottom controls')}
+        ${row('leftHanded', 'Left-handed', 'Enables left handed mode')}
         ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
         <div style="text-align:center;margin-top:10px;">
           <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 26px;">Done</button>
