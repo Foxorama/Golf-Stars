@@ -413,17 +413,29 @@ export function resumeRun(snap: RunSnapshot): Run {
 
 export const SHARD_PER_DISTANCE = 3;
 export const SHARD_PER_STOP = 2;
+/** Credits → shards conversion when you BANK (cash out) a run. Busting at the cut forfeits this. */
+export const CREDITS_PER_SHARD = 20;
 
 /**
  * Star Shards earned by a run — the persistent currency spent at the Outpost. Rewards how
  * FAR you travelled (the roguelite goal) plus a little per stop cleared, so even a run that
  * bricks on stop 1 buys some lasting progress. Pure; floored at 1.
+ *
+ * Push-your-luck (GS-bank): a run you BANK (voluntarily cash out, `endedReason 'banked'`) also
+ * converts its UNSPENT credits into shards — a run cut short at the line forfeits them. This is
+ * what gives the "bank now or push one deeper" decision real teeth (the classic roguelite tension)
+ * and gives leftover credits a terminal value instead of evaporating when the run ends.
  */
+export function cashOutShards(run: Run): number {
+  return run.endedReason === 'banked' ? Math.floor(Math.max(0, run.credits) / CREDITS_PER_SHARD) : 0;
+}
+
 export function shardsForRun(run: Run): number {
-  return Math.max(
+  const base = Math.max(
     1,
     Math.round(run.distanceFromStart * SHARD_PER_DISTANCE + run.history.length * SHARD_PER_STOP),
   );
+  return base + cashOutShards(run);
 }
 
 // --- Headless full-run driver (for tests / AI sims) -------------------------

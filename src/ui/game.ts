@@ -10,6 +10,7 @@
 import type { Course } from '../sim/course/contract';
 import type { PlayedHole, PuttControl } from '../sim/round';
 import {
+  bank,
   buy,
   currentCourse,
   finishStop,
@@ -100,6 +101,7 @@ export type Action =
   | { type: 'buy'; id: string }
   | { type: 'leaveShop' }
   | { type: 'route'; routeId: number }
+  | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
   | { type: 'viewHole'; hole: number }
   | { type: 'openOutpost' } // visit the between-run Outpost (from title or gameover)
   | { type: 'buyUpgrade'; id: string } // buy a permanent upgrade with shards
@@ -310,6 +312,24 @@ export function reduce(state: UiState, action: Action): UiState {
         lastResult: undefined,
         routes: undefined,
         viewHole: 0,
+      };
+    }
+
+    case 'bank': {
+      // Push-your-luck cash-out (GS-bank): only between stops (the travel screen), where you've
+      // survived the last cut and hold credits worth locking in. Banking ends the run with its
+      // credits converted to shards (busting forfeits them) — see shardsForRun.
+      if (state.screen !== 'travel' || state.run.status !== 'active') return state;
+      const run = bank(state.run);
+      const earned = shardsForRun(run);
+      return {
+        ...state,
+        run,
+        routes: undefined,
+        screen: 'gameover',
+        bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        shards: state.shards + earned,
+        lastRunShards: earned,
       };
     }
 

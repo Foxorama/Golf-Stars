@@ -27,7 +27,7 @@ import { rarCol } from './sim/rpg/loot';
 import { clubOfferNote, itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, type GolferStyle } from './sim/rpg/characters';
-import { effectiveCut, snapshotRun } from './sim/rpg/run';
+import { cashOutShards, effectiveCut, snapshotRun } from './sim/rpg/run';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -1201,20 +1201,36 @@ function travelScreen(): string {
       );
     })
     .join('');
+  // Push-your-luck cash-out (GS-bank): bank the run now to lock its credits in as permanent shards
+  // (busting at the next cut would forfeit them). Shown with the exact shard payout so the "push or
+  // bank" call is informed.
+  const cashOut = cashOutShards(state.run);
+  const bankBtn =
+    state.run.stopIndex > 0
+      ? `<div style="margin-top:14px;border-top:1px solid var(--gs-line);padding-top:12px;">
+           <p style="opacity:.7;font-size:13px;margin:0 0 6px;">…or quit while you're ahead — cash your <b>${state.run.credits}</b> credits into permanent shards. Push deeper and a missed cut forfeits them.</p>
+           ${btn(`✦ Bank run & cash out${cashOut > 0 ? ` (+${cashOut} shards)` : ''}`, { type: 'bank' }, { variant: 'ghost', block: true })}
+         </div>`
+      : '';
   return `
     ${header()}
     <h2 style="font-size:16px;">Choose your jump</h2>
     <p style="opacity:.75;font-size:14px;">Deeper jumps raise the cut and wildness; each lane's event tilts the risk and the payout. There's always a calm option.</p>
-    <div>${routes}</div>`;
+    <div>${routes}</div>
+    ${bankBtn}`;
 }
 
 function gameoverScreen(): string {
   const r = state.run;
   const earned = state.lastRunShards;
+  const banked = r.endedReason === 'banked';
+  const heading = banked
+    ? `<h2 style="font-size:20px;color:#5fd45a;">Banked — you quit while ahead</h2>`
+    : `<h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>`;
   return `
     ${header()}
-    <h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>
-    <p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>.</p>
+    ${heading}
+    <p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">

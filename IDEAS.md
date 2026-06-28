@@ -13,6 +13,57 @@ The big open question is what wraps the golf. Three avenues, NOT mutually exclus
    run format (GS-9) so 2 vs 3 can be *played*, not guessed.
 Everything below serves whichever avenue wins.
 
+## Gameplay-loop review (2026-06-28 — `reports/gameplay-loop-review-2026-06-28.md`)
+A roguelike-designer pass over the whole loop. Verdict: AAA "verb" (swing/flight/courses/caddies),
+thin roguelike "sentence." The replayability ceiling is STRUCTURAL — ranked items below. None touch
+the fairness/no-death-spiral bars (keep new systems on the economy/node/scoring side, as GS-14 did).
+
+**S+ tier (drastically improve fun & replayability):**
+- **GS-boss — Arcs with bosses + a WIN condition.** The run is an infinite attrition treadmill that
+  can only end in failure: no climax, no victory. Structure the voyage into 3 arcs (the `arcForDistance`
+  tiers exist), each ending in a named "Galactic Major" boss stop with a special victory condition;
+  clearing the final boss WINS the run (victory screen + payout/unlock). The keystone — everything
+  else (Ascension, contracts, rival) hangs off having something to *beat*.
+- **GS-synergy — Build synergy & archetypes (the Balatro lesson).** The shop is ~20 flat stat-stackers
+  that add up but never COMBINE. Re-tier around a few *engine relics* with triggers ("on birdie: +X",
+  "on made cut: −1% dispersion permanently") + loud archetype signposting (bomber/sniper/scrambler/
+  snowball) so caddies, club sets, shapers and relics interlock into a run identity. Caddies already
+  prove the engine does triggered effects cleanly. Turns "stat shopping" into "deck-building."
+- **GS-ascension — Ascension/Heat difficulty ladder.** Once a run is winnable (GS-boss), stacking
+  modifiers unlocked by winning (tighter cuts, wilder courses, costlier shops, nerfed start). The
+  genre's highest-ROI replayability lever (StS 1–20, Hades Heat): one win → 20+ distinct challenges.
+  Pair with shifting meta-shard spend from pure stat-creep toward CONTENT UNLOCKS (new golfers/caddies/
+  biomes/formats/modifiers) so the meta adds variety, not just power.
+- **GS-rival — Named AI rival / versus pulse.** A recurring deterministic rival raced down the galaxy
+  (score on the cut banner; beating them = the boss win condition). Cheap to sim (headless+deterministic
+  already), big for stakes & personality. Gives the solitaire loop a pulse.
+
+**A-tier (real design work, high value):**
+- **GS-encounters — Branching node map with encounter TYPES.** Replace "pick 1 of 3 routes by
+  distance+event" with a short StS-style map of node KINDS: normal course, ELITE (harder, guaranteed
+  rare+ loot), driving range (buff node), treasure (free club/relic), shop, arc boss. The format system
+  already abstracts "what a stop is" — a node type is the natural extension. Do this WITH GS-boss (same
+  change). Arguably itself S+.
+- **GS-contracts — Optional per-stop objectives.** "Eagle a hole → free relic", "4 GIR → +50% credits",
+  "no penalties → bonus shards." Texture for the 6 holes + a reason to play differently. Pure scoring
+  read over `PlayedHole[]`; a card on the intro splash.
+- **GS-curses — Genuine downside gambles.** Every event today is upside-with-a-cut-tax. Add curse
+  relics/lanes you OPT INTO ("shank zone doubled, but green holes pay double", "−1 club, +2 reward
+  rarity"). Real risk-you-choose is the heart of build-defining gambling (Hades Pacts, Balatro
+  vouchers). Fits the spray-shape/loadout model.
+
+**Obvious (small, safe):**
+- **GS-risk-shards — reward risk in the shard payout.** Shards = `distance×3 + stops×2` today; surviving
+  a high-`cutDelta` lane or a rarer course pays the same as a calm drift. Add a small shard bonus scaled
+  by `cutDelta` survived / course rarity. Pure tuning on `shardsForRun`/`finishStop`.
+- **GS-streak — birdie/eagle streak micro-reward.** Consecutive birdies-or-better add a small credit
+  bonus → an internal arc to the 6 holes, rewards aggression. Pure economy upside (Stableford already
+  caps the downside).
+- **GS-shop-reroll — a reroll button.** Cheap, escalating-cost reroll of the 4-card offer (StS/Hades
+  staple). Redraw `shopOffer` with a salted seed, charge credits. Turns "take what's shown" into agency.
+- **GS-bag-cap — bag pressure.** One-per-type with no size limit makes reward clubs pure accretion, never
+  a choice. A soft cap / swap-out decision makes club loot a real draft. (May grow to A-tier.)
+
 ## Now / next (the slice is done — these are the natural follow-ons)
 
 - **GS-clubs — Per-character starting bags + clubs as rewards. SHIPPED.** Each golfer now starts with
@@ -155,6 +206,17 @@ Everything below serves whichever avenue wins.
   test-hub control in the same PR (I4 rule) — GS-mux added none (dev knobs ride `_gsFeel`).
 
 ## Done
+- **GS-bank — Push-your-luck cash-out. SHIPPED** (`reports/gameplay-loop-review-2026-06-28.md`).
+  The classic roguelike "quit while ahead or risk it" decision was entirely absent: `bank()` was dead
+  code (unreachable in the UI) and `shardsForRun` paid the same whether you BANKED or BUSTED — so
+  pushing deeper was strictly correct and credits had no terminal value on a lost run. Fix (pure, no
+  fairness/determinism impact): `cashOutShards(run)` converts unspent credits → shards
+  (`CREDITS_PER_SHARD` 20) ONLY on a banked run (a cut forfeits them; the cut path is byte-for-byte
+  unchanged); a "✦ Bank run & cash out (+N shards)" button on the travel screen (stop 1+) with the
+  exact payout shown; the gameover screen reads green "quit while ahead" vs red "stranded at the cut".
+  Now every travel screen is a real decision (spend credits for power to push, or hold to bank) and a
+  fat stash is never wasted on a brick. `tests/bank.test.ts` guards the conversion, banked > busted,
+  the unchanged cut path, and the reducer flow.
 - **GS-dispersion-2 — Asymmetric spray-zone model + zone/distance upgrades.** Replaced the symmetric
   z-score spray with a `SprayShape` (green + 4 independent miss zones: duck-hook/shank red, hook/slice
   orange) that drives BOTH the physics sampling and the graphic, so the cone IS the landing
