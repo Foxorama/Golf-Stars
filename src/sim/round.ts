@@ -661,6 +661,10 @@ export interface ExecOpts {
   lieRelief?: number;
   /** Wedge-caddy chip-in chance (GS-caddy): drop a PW-or-shorter shot resting near the flag. */
   chipIn?: number;
+  /** Shot POWER (GS-power): intended carry as a fraction of the club's full carry (1 = full swing,
+   *  the default; <1 a partial shot; >1 overpowered). Undefined/1 → byte-for-byte unchanged. The auto
+   *  sim always plays full swings (power 1); the interactive pull-to-power gesture dials it. */
+  power?: number;
   /**
    * Suggestible Sam's "club confidence" shape boost (GS-caddy): a green-zone bonus ShapeMod applied
    * ONLY when the played club is the one Sam suggested (`suggestedClubId`) — commit to your caddy's
@@ -700,8 +704,11 @@ export function executeShot(
   rng: Rng,
 ): ExecResult {
   const carryMult = opts.carryMult;
+  const power = opts.power ?? 1;
   const shotBearing = bearingDeg(from, target);
-  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult);
+  // Wind compensation scales by the POWERED carry (a soft shot drifts less in the wind) so the
+  // upwind aim stays correct at any power. Power 1 leaves this byte-for-byte unchanged.
+  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult * power);
   // Character per-club shape: keyed by the club's nominal carry (a hooky driver, striped irons,
   // back-spun wedges). `dispMult === 1` passes the original dispersionMult through UNTOUCHED so a
   // characterless shot stays byte-for-byte (undefined stays undefined, never `undefined * 1`).
@@ -731,6 +738,7 @@ export function executeShot(
     guard: opts.guard,
     lieRelief: opts.lieRelief,
     lefty: opts.lefty,
+    power: opts.power,
     stats: opts.stats,
     rng,
   });
@@ -872,14 +880,18 @@ export function shotSpread(
     lieRelief?: number;
     /** Left-handed mode (GS-lefty): mirror the cone (and the character bias) about the bearing. */
     lefty?: boolean;
+    /** Shot POWER (GS-power): intended carry as a fraction of full (1 = full swing). Scales the
+     *  whole carry window so the previewed cone GROWS with power — the on-screen "draw to power up". */
+    power?: number;
   } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
+  const power = opts.power ?? 1;
   const li = lieInfo(lie);
   const relief = reliedLie(li, opts.lieRelief);
   const shotBearing = bearingDeg(from, target);
   const nominal = clubDist(club, opts.stats);
-  const intended = nominal * relief.carryMult * carryMult;
+  const intended = nominal * relief.carryMult * carryMult * power;
   const w = hole.wind ? playWind(hole.wind, shotBearing) : { along: 0, cross: 0 };
   // The character's per-club shape (GS-18): its dispersion folds into the cone's width and its
   // shot-shape bias ROTATES the cone's centre line, so a fade/hook is visible in the preview and

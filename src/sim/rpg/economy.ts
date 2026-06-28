@@ -110,6 +110,13 @@ export interface PlayerLoadout {
   /** Wedge distance-control: fraction the wedge carry window is tightened toward the mean (point 6). */
   wedgeWindow: number;
   /**
+   * Overdrive (GS-power): extra power FRACTION the interactive pull-to-power gesture may dial PAST a
+   * full swing — `0.1` lets you charge to 110% power for more carry (at the club's full spray). The
+   * sim accepts any power; this is the per-loadout ceiling the UI clamps to (`maxPowerOf`). The auto
+   * sim always plays full swings, so this is an INTERACTIVE-only edge — undefined/0 = capped at 100%.
+   */
+  overpower?: number;
+  /**
    * Running flat carry bonus applied to DISTANCE clubs (GS-clubs): the sum of the character's
    * distance trait (Larry +14 / Bo −8) and meta Tour Bag (+6/level), set as the bag is built. A
    * reward club bought mid-run reads this so a new distance club inherits the same bonus the
@@ -152,6 +159,14 @@ export function usableBag(bag: readonly Club[], lie: string, driverAnywhere: boo
 }
 
 export const STARTING_HANDICAP = 18;
+
+/** Base maximum shot power — a full swing is 100%. Overdrive upgrades raise it (per loadout). */
+export const BASE_MAX_POWER = 1;
+/** The most power the pull-to-power gesture may dial for this loadout (GS-power): 1 by default, more
+ *  with Overdrive. Shared by the gesture clamp + the cone preview so the on-screen meter reads true. */
+export function maxPowerOf(loadout: PlayerLoadout): number {
+  return BASE_MAX_POWER + Math.max(0, loadout.overpower ?? 0);
+}
 
 export function startingLoadout(): PlayerLoadout {
   return {
@@ -315,6 +330,8 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   // Distance-control (carry-window) upgrades — 'distance'.
   'distance-control': ['distance'],
   'wedge-touch': ['control'],
+  // Overdrive (GS-power): dial the pull-to-power gesture past 100% — pure distance.
+  overdrive: ['distance'],
   // Trigger relics + the curse (GS-synergy) — economy snowball pieces + a risk gamble.
   'birdie-hunter': ['economy'],
   'eagle-eye': ['economy'],
@@ -614,6 +631,20 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.18),
       perks: [...m.perks, 'wedge-touch'],
     }),
+  },
+
+  // --- Overdrive (GS-power): lets the pull-to-power gesture charge PAST a full swing for more carry.
+  {
+    id: 'overdrive',
+    name: 'Overdrive',
+    cost: 140,
+    desc: 'Overpowered shots: pull PAST 100% on the power gesture (+10% max carry) · stacks',
+    rarity: 'epic',
+    stackable: true,
+    maxStacks: 2,
+    // +0.1 power ceiling per copy (110% → 120% at two stacks). Interactive only — the auto sim
+    // always plays full swings, so a base/auto loadout is byte-for-byte unchanged.
+    apply: (m) => ({ ...m, overpower: (m.overpower ?? 0) + 0.1, perks: [...m.perks, 'overdrive'] }),
   },
 
   // --- Trigger relics (GS-synergy) — payouts that reward a PLAYSTYLE, compounding with credit perks.

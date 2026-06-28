@@ -10,20 +10,20 @@ import { scoreName, playTotals } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
-import { holeProjector, type ProjectOptions } from './render/project';
+import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
+import { drawCaddy, hasCaddyArt, CADDY_LABEL } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
-import { biomeById } from './sim/course/biomes';
 import { archetypeFor, themeById } from './sim/course/themes';
 import { zoneProfile, difficultyPips } from './sim/course/zones';
 import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { clubOfferNote, itemCap, itemCost, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
+import { clubOfferNote, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
@@ -447,8 +447,15 @@ let animatedPutts = 0; // putts of the current hole already animated
 let selClubId: string | null = null;
 let selAim: 'attack' | 'safe' = 'attack';
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
-// Free-aim target (course-space) from tapping/dragging the map; overrides attack/safe when set.
+// Free-aim target (course-space) from the pull-to-power gesture; overrides attack/safe when set.
 let selFreeTarget: [number, number] | null = null;
+// Pull-to-power gesture (GS-power): the player presses the map and drags DOWN to charge power
+// (1=full swing, dialable down to a soft tap and — with Overdrive — past 100%), sliding sideways to
+// aim, then releases to fire. `selPower` is the live charge (1 at rest so the cone previews a full
+// swing); `selAimBearing` is the aim line (deg), seeded to the pin each shot and nudged by the drag.
+let selPower = 1;
+let selAimBearing: number | null = null;
+let charging = false; // true while a pull gesture is loading (suppresses the result-popup wiring race)
 // Map navigation (local view state, reset per shot). `follow` zooms the camera onto the
 // contemplated shot (the default); `whole` fits the ENTIRE hole so you can read the green and
 // the full layout on a long hole. `mapZoom` (>1 = closer) and `mapPan` (a course-space offset
@@ -473,15 +480,25 @@ function pendingAnimation(play: NonNullable<UiState['play']>): { shots: typeof p
   return { shots: newShots, putts: newPutts };
 }
 
-/** Clamp a free-aim target so you can never aim BEYOND your longest club's reach (#10). */
-function clampToReach(play: NonNullable<UiState['play']>, target: [number, number]): [number, number] {
-  const bag = state.run.loadout.bag;
-  const maxReach = Math.max(...bag.filter((c) => c.id !== 'putter').map((c) => c.carry)) * biomeCarryMult(play.hole);
-  const dx = target[0] - play.ball[0];
-  const dy = target[1] - play.ball[1];
-  const d = Math.hypot(dx, dy);
-  if (d <= maxReach || d === 0) return [target[0], target[1]];
-  return [play.ball[0] + (dx / d) * maxReach, play.ball[1] + (dy / d) * maxReach];
+/** A free-aim target along an aim BEARING (deg, cw from up) at the club's powered reach. Only the
+ *  BEARING feeds the shot physics now (power sets the carry), so the distance just places the on-screen
+ *  target/cone sensibly. Pure. */
+function targetFromBearing(
+  play: NonNullable<UiState['play']>,
+  clubCarry: number,
+  bearingDeg: number,
+  powerFrac: number,
+): [number, number] {
+  const R = Math.max(8, clubCarry * biomeCarryMult(play.hole) * powerFrac);
+  const rad = (bearingDeg * Math.PI) / 180;
+  return [play.ball[0] + Math.sin(rad) * R, play.ball[1] + Math.cos(rad) * R];
+}
+
+/** The selected club's nominal carry (for the aim-target reach), resolved from the lie-legal bag. */
+function selectedClubCarry(play: NonNullable<UiState['play']>): number {
+  const bag = usableBag(state.run.loadout.bag, play.lie, state.run.loadout.driverAnywhere ?? false);
+  const c = bag.find((cl) => cl.id === selClubId) ?? bag[0]!;
+  return c.carry;
 }
 
 let renderScheduled = false;
@@ -496,71 +513,57 @@ function scheduleRender(): void {
 }
 
 /**
- * Wire pointer interaction on the decision map. Two gestures, disambiguated by mode:
- *  - FREE-AIM mode (the ✋ button is active, `selFreeTarget` set): tap/drag sets the aim target.
- *  - otherwise: drag PANS the map (moves the follow-cam's focus) so you can look ahead — "move the
- *    map around". A still tap does nothing.
- * Both reconstruct the EXACT decision-map projector via the shared `decisionView` helper so they
- * agree pixel-for-pixel with what's drawn. Pointer-move/up listen on `window` so a drag survives
- * the per-frame re-render that replaces the map element.
+ * Wire the unified PULL-TO-POWER shot gesture on the decision map (GS-power). One smooth action that
+ * replaces the old aim-then-pull-the-button flow: press anywhere on the map, drag DOWN to charge
+ * POWER (the spray cone grows from a soft tap toward the full-swing cone — `selPower`), slide
+ * sideways to AIM (nudges the aim bearing — `selAimBearing`), then release to FIRE. Releasing with
+ * power back near zero — a plain tap, or a charge pulled back up — CANCELS without a shot, so a stray
+ * touch never fires. Two fingers PINCH-zoom the map (kept). Pointer-move/up listen on `window` so the
+ * gesture survives the per-frame re-render that replaces the map element.
+ *
+ * Only the BEARING + power feed the sim; distance comes from club×power, so no projector/unproject is
+ * needed (the old free-aim tap-the-point model is gone — you aim by sliding while you charge).
  */
-function wireMapAiming(app: HTMLElement): void {
+function wireShotGesture(app: HTMLElement): void {
   if (state.screen !== 'playing' || !state.play || awaitingShotPopup) return;
   if (state.play.done || awaitingPutt(state.play)) return; // only the full-shot decision screen
   const svg = app.querySelector<SVGSVGElement>('[data-map] svg');
   if (!svg) return;
-  // Reconstruct the projector the render used (same shape, frozen for the whole gesture so pan
-  // math stays consistent even as the focus shifts mid-drag).
-  const buildProj = () => {
-    const spray = previewShot(
-      state.play!,
-      { clubId: selClubId!, aim: selAim, target: selFreeTarget ?? undefined },
-      state.run.loadout,
-    );
-    return holeProjector(state.play!.hole, decisionView(state.play!, spray));
-  };
-  // Pointer → viewBox coords against the live SVG element.
-  const toViewBox = (clientX: number, clientY: number): [number, number] | null => {
-    const cur = document.querySelector<SVGSVGElement>('[data-map] svg');
-    if (!cur) return null;
-    const rect = cur.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    return [((clientX - rect.left) / rect.width) * DMAP_W, ((clientY - rect.top) / rect.height) * DMAP_H];
-  };
-
-  // Gesture model, disambiguated by pointer count + movement (no mode toggle):
-  //  • ONE finger, still (< slop) → TAP-aim at that point (tap-the-green-to-aim, the discoverable
-  //    default); ONE finger, moved → PAN the follow-cam ("move the map around").
-  //  • TWO fingers → PINCH-zoom the follow-cam (the universal map gesture), via mapZoom.
-  const TAP_SLOP = 8; // px of movement below which a release counts as a tap, not a drag
+  const play = state.play;
+  const maxPower = maxPowerOf(state.run.loadout);
+  const PULL_RANGE = 150; // px of downward drag for 100% power
+  const AIM_SENS = 0.34; // degrees of aim nudge per px of horizontal drag
+  const COMMIT = 0.06; // release below this power = cancel (a tap, or pulled back to zero)
   const pointers = new Map<number, { x: number; y: number }>();
-  let panProj: ReturnType<typeof holeProjector> | null = null;
-  let panStartCourse: [number, number] | null = null;
-  let panStartOffset: [number, number] = [0, 0];
-  let downX = 0;
-  let downY = 0;
-  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  let startBearing = 0;
+  let active = false; // a single-finger charge is loading
   let pinch: { startDist: number; startZoom: number } | null = null;
+  let lastNotch = 0;
 
-  const aimTo = (clientX: number, clientY: number): void => {
-    const vb = toViewBox(clientX, clientY);
-    if (!vb || !state.play) return;
-    const t = buildProj().unproject(vb[0], vb[1]);
-    selFreeTarget = clampToReach(state.play, [t[0], t[1]]);
-    scheduleRender();
-  };
-  const panTo = (clientX: number, clientY: number): void => {
-    const vb = toViewBox(clientX, clientY);
-    if (!vb || !panProj || !panStartCourse) return;
-    // Drag the world under the finger: where the pointer started should stay under the pointer, so
-    // the focus moves by (start − now) in course space. Frozen projector ⇒ a stable mapping.
-    const now = panProj.unproject(vb[0], vb[1]);
-    mapPan = [panStartOffset[0] + (panStartCourse[0] - now[0]), panStartOffset[1] + (panStartCourse[1] - now[1])];
-    scheduleRender();
-  };
   const twoFingerDist = (): number => {
     const [a, b] = [...pointers.values()];
     return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
+  // Apply a drag (client coords) → live power + aim bearing, and re-render so the cone + HUD track.
+  const applyDrag = (x: number, y: number): void => {
+    selPower = Math.max(0, Math.min(maxPower, (y - startY) / PULL_RANGE));
+    selAimBearing = startBearing + (x - startX) * AIM_SENS;
+    selFreeTarget = targetFromBearing(play, selectedClubCarry(play), selAimBearing, Math.max(selPower, 0.12));
+    charging = true;
+    // A ratcheting haptic as the power loads (every 20%).
+    const notch = Math.floor(selPower * 5);
+    if (notch !== lastNotch) {
+      lastNotch = notch;
+      haptic(6);
+    }
+    scheduleRender();
+  };
+  const detach = (): void => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
   };
   const move = (e: PointerEvent): void => {
     if (!pointers.has(e.pointerId)) return;
@@ -574,117 +577,58 @@ function wireMapAiming(app: HTMLElement): void {
       }
       return;
     }
-    if (!dragging && Math.hypot(e.clientX - downX, e.clientY - downY) > TAP_SLOP) {
-      dragging = true; // crossed the slop → it's a drag (pan), not a tap
-    }
-    if (dragging && mapView !== 'whole') panTo(e.clientX, e.clientY);
-  };
-  const detach = (): void => {
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
-    window.removeEventListener('pointercancel', up);
+    if (active) applyDrag(e.clientX, e.clientY);
   };
   function up(e: PointerEvent): void {
     pointers.delete(e.pointerId);
     if (pinch) {
-      // Leaving a pinch: once below two fingers, end it and mark the gesture spent so the lingering
-      // finger's release can't register a stray tap-aim.
-      if (pointers.size < 2) {
-        pinch = null;
-        dragging = true;
-      }
+      if (pointers.size < 2) pinch = null; // dropped below two fingers → end the pinch
       if (pointers.size === 0) {
-        dragging = false;
+        active = false;
+        charging = false;
         detach();
       }
       return;
     }
-    if (pointers.size === 0) {
-      if (!dragging) aimTo(e.clientX, e.clientY); // a still single tap → aim there
-      panProj = null;
-      panStartCourse = null;
-      dragging = false;
-      detach();
+    if (pointers.size > 0) return; // still a finger down — wait
+    const fire = active && selPower >= COMMIT;
+    const target = selFreeTarget ?? undefined;
+    const power = selPower;
+    active = false;
+    charging = false;
+    selPower = 1; // reset the preview baseline (a full-swing cone) for the next decision
+    detach();
+    if (fire) {
+      haptic(HAPTICS.swing);
+      dispatch({ type: 'shot', clubId: selClubId!, aim: selAim, target, power });
+    } else {
+      scheduleRender(); // cancelled — restore the resting full-swing cone
     }
   }
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) {
-      downX = e.clientX;
-      downY = e.clientY;
-      dragging = false;
-      // Freeze a projector at gesture start so pan math stays consistent across the per-frame
-      // re-render that replaces the map element.
-      const vb = toViewBox(e.clientX, e.clientY);
-      panProj = buildProj();
-      panStartCourse = vb ? (panProj.unproject(vb[0], vb[1]) as [number, number]) : null;
-      panStartOffset = [mapPan[0], mapPan[1]];
+      startX = e.clientX;
+      startY = e.clientY;
+      // Seed the aim bearing from the current aim (the pin by default, or the last nudge).
+      startBearing = selAimBearing ?? bearing(play.ball, pinOf(play.hole));
+      active = true;
+      lastNotch = 0;
+      selPower = 0; // charge starts empty so a no-pull release reads as a cancel (no accidental shot)
+      charging = true;
+      resumeAudio();
+      scheduleRender();
     } else if (pointers.size === 2) {
       pinch = { startDist: twoFingerDist(), startZoom: mapZoom };
-      dragging = true; // a second finger cancels any pending tap/pan
+      active = false; // a second finger cancels the charge → pinch-zoom instead
+      selPower = 1;
+      charging = false;
     }
     // Same fn refs each time → addEventListener de-dupes, so multiple pointers don't stack handlers.
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
-  });
-}
-
-/**
- * The opt-in pull-back swing pad (GS-mux). Press the pad and drag DOWN to load a backswing; a power
- * meter + a number fill as you pull. Release past the commit threshold to swing (fires the SAME
- * action the Hit button would — club + aim define the shot, so the sim/determinism is untouched; the
- * pull is pure feel + a graded haptic). A short pull cancels. Pointer-move/up listen on `window` so
- * the gesture survives a re-render.
- */
-function wireSwingPad(pad: HTMLElement): void {
-  const MAX_PULL = 120; // px of drag for a full backswing
-  const COMMIT = 0.18; // min power to count as a swing (a flick cancels)
-  const fill = pad.querySelector<HTMLElement>('.gs-swingfill');
-  const label = pad.querySelector<HTMLElement>('.gs-swinglabel');
-  let active = false;
-  let startY = 0;
-  let power = 0;
-  let lastNotch = 0;
-  const setPower = (p: number): void => {
-    power = Math.max(0, Math.min(1, p));
-    if (fill) fill.style.height = `${(power * 100).toFixed(0)}%`;
-    if (label) label.textContent = power < 0.02 ? '⬇ Pull back to swing' : `Power ${Math.round(power * 100)}%`;
-    // A ratcheting haptic as the backswing loads.
-    const notch = Math.floor(power * 5);
-    if (notch !== lastNotch) {
-      lastNotch = notch;
-      haptic(6);
-    }
-  };
-  const move = (e: PointerEvent): void => {
-    if (!active) return;
-    e.preventDefault();
-    setPower((e.clientY - startY) / MAX_PULL); // drag DOWN = load
-  };
-  const up = (): void => {
-    if (!active) return;
-    active = false;
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
-    const committed = power >= COMMIT;
-    const action = committed ? (JSON.parse(pad.dataset.swing!) as Action) : null;
-    setPower(0);
-    if (action) {
-      haptic(HAPTICS.swing);
-      dispatch(action);
-    }
-  };
-  pad.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    active = true;
-    startY = e.clientY;
-    lastNotch = 0;
-    setPower(0);
-    resumeAudio();
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
   });
 }
 
@@ -717,21 +661,6 @@ function lieChip(lie: string): string {
   return `<span class="gs-liechip" style="border-color:${col};color:${col};">${dot} <b style="color:var(--gs-ink);">${label}</b>${eff ? ` <span style="opacity:.85;">${eff}</span>` : ''}</span>`;
 }
 
-/** Biome + special conditions (gravity, slick/true scatter surfaces) actually on this hole. */
-function conditionsSummary(hole: Hole, biomeId: string): string {
-  const parts: string[] = [];
-  const biome = biomeById(biomeId);
-  if (biome) parts.push(`🪐 ${biome.name}`);
-  const cm = biomeCarryMult(hole);
-  if (cm > 1.02) parts.push(`low gravity · carry ×${cm.toFixed(2)}`);
-  else if (cm < 0.98) parts.push(`heavy air · carry ×${cm.toFixed(2)}`);
-  const surfaces = new Set(hole.features.map((f) => f.kind));
-  const SCAT: Record<string, string> = { ice: '❄ slick ice', crystal: '💎 true crystal', waste: '🏜 waste sand' };
-  for (const [k, label] of Object.entries(SCAT)) if (surfaces.has(k)) parts.push(label);
-  // Per-hole warning when the void's lost-rough is actually ARMED here (deep stops): miss = lost ball.
-  if (lieInfo(roughLieOf(hole)).penalty) parts.push('🕳 lost rough — miss the fairway = lost ball');
-  return parts.join(' · ');
-}
 
 /** A list of zone traits (hazards/benefits), each an icon + line. */
 function traitList(title: string, accent: string, traits: { icon: string; text: string }[]): string {
@@ -752,10 +681,10 @@ function traitList(title: string, accent: string, traits: { icon: string; text: 
 // follow-cam in on the contemplated shot (smaller = tighter); the playable corridor fills the
 // frame and the rough/OB legitimately stretch off-screen.
 const DMAP_W = 360;
-const DMAP_H = 600;
-// Ball sits LOW in the tall portrait view so most of the frame is the shot AHEAD (a high bias
-// kills the dead space behind the tee that a centred camera leaves).
-const DMAP_BIAS = 0.8;
+const DMAP_H = 640;
+// Ball sits low-ish so most of the frame is the shot AHEAD, but high enough to clear the floating
+// bottom control panel on the full-bleed screen (the ball reads above the HUD, not behind it).
+const DMAP_BIAS = 0.72;
 /** View radius (course yds) framing a shot of max-carry `carryHigh`. Tuned with DMAP_BIAS so the
  *  contemplated shot nearly fills the height and the corridor fills the width — the rough/OB
  *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
@@ -847,28 +776,29 @@ function zoneScoreChip(): string {
   return `<span class="gs-shotscore" style="color:${col};" title="stop Stableford vs the cut to make">${sf}/${cut} pts</span>`;
 }
 
-/** The compact top stat bar for the play screen (replaces the old per-hole briefing splash):
- *  hole #/total, par + hole length, the live distance, the running zone score, the shot number,
- *  plus a thin lie/wind/conditions sub-line. */
-function playTopBar(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
+/** The floating top-left info chip for the full-bleed hole screen (GS-fullmap): hole #/total, par +
+ *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
+ *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
+ *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through. */
+function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
-  const cond = conditionsSummary(play.hole, holeBiome(play.hole));
-  // Scramble (GS-scramble): a co-op boss — show the partner + whether the last shot kept their ball.
+  // Only the decision-relevant warning survives onto the play HUD (the full conditions list lives on
+  // the zone splash): the void's armed lost-rough, which turns an offline miss into a lost ball.
+  const lostRough = lieInfo(roughLieOf(play.hole)).penalty ? ' · <span style="color:var(--gs-warn);">🕳 lost rough</span>' : '';
   const boss = currentBoss(state.run);
   const scrambleLine = boss?.partner === 'scramble'
-    ? `<div class="gs-sub" style="color:${scramblePartner(state.run).style.cap};">🤝 Scramble with <b>${scramblePartner(state.run).name}</b>${play.partnerKept ? ' · kept their ball ✓' : play.shots.length ? ' · your ball held' : ''}</div>`
+    ? `<div class="gs-sub" style="color:${scramblePartner(state.run).style.cap};">🤝 <b>${scramblePartner(state.run).name}</b>${play.partnerKept ? ' · kept ✓' : play.shots.length ? ' · yours held' : ''}</div>`
     : '';
   return `
-    <div class="gs-topbar">
+    <div class="gs-hud gs-hud-top gs-glass">
       <div class="gs-stats">
-        <span>⛳ Hole <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
-        <span>Par <b>${play.hole.par}</b> · ${len}y</span>
+        <span>⛳ <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
+        <span>Par <b>${play.hole.par}</b>·${len}y</span>
         <span>${opts.distLabel}</span>
-        <span>Shot <b>${opts.shotNo}</b></span>
         ${zoneScoreChip()}
       </div>
-      <div class="gs-sub">${lieChip(v.lie)} · ${windDescription(play.hole)}${cond ? ` · ${cond}` : ''} · pick up at +4 (${play.hole.par + 4})</div>
+      <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}
       ${holePips()}
     </div>`;
@@ -881,10 +811,12 @@ function playingBody(animating: boolean): string {
   const par = play.hole.par;
 
   if (animating) {
+    // Full-bleed: the live shot canvas IS the screen (it draws the hired caddy itself), with just
+    // the floating info chip on top.
     return `
-      <div class="gs-shot">
-        ${playTopBar(v, { shotNo: play.strokes, distLabel: '…watching the shot…' })}
+      <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap" id="play"></div>
+        ${mapTopInfo(v, { shotNo: play.strokes, distLabel: '…watching…' })}
       </div>`;
   }
 
@@ -925,18 +857,17 @@ function playingBody(animating: boolean): string {
       focusBias: 0.5,
     });
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
-    // Tapping the meter OR the Putt button captures the pace. The band widens with putter upgrades.
-    const meterInstr =
-      '<p style="font-size:11.5px;opacity:.6;margin:.1em 0 .4em;line-height:1.4;">Tap the meter (or Putt) when the marker is in the green <b>MAKE</b> band. Too soft leaves it short; too firm runs it past.</p>';
+    // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
+    // the meter + Putt float in a bottom panel.
     return `
-      <div class="gs-shot">
-        ${playTopBar(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b> yds to cup · putt <b>${play.putts + 1}</b>` })}
+      <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap">${puttSvg}</div>
-        <div class="gs-bottom">
-          ${meterInstr}
-          <div id="puttmeter" style="margin:2px 0;"></div>
-          <div class="gs-hitbar">
-            <button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>
+        ${mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` })}
+        <div class="gs-hud gs-hud-bottom">
+          <div class="gs-hud-controls gs-glass">
+            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">Tap the meter (or Putt) in the green <b>MAKE</b> band — too soft is short, too firm runs past.</p>
+            <div id="puttmeter"></div>
+            <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
           </div>
         </div>
       </div>`;
@@ -950,6 +881,8 @@ function playingBody(animating: boolean): string {
     selClubId = null;
     selAim = 'attack';
     selFreeTarget = null;
+    selPower = 1; // a full-swing cone previews by default until you pull
+    selAimBearing = null; // re-seed the aim to the pin for the new shot
     resetMapView();
   }
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
@@ -968,19 +901,22 @@ function playingBody(animating: boolean): string {
   // the green). You can still cycle/override; Sam just makes the suggestion explicit and snap-back-able.
   const defaultClubId = suggested;
   if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = defaultClubId;
-  // A tapped/dragged free target overrides attack/safe; otherwise the aim choice picks the point.
-  const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined };
+  const maxPower = maxPowerOf(state.run.loadout);
+  // The gesture's aim/power feed the shot: a target along the (gesture-nudged) aim bearing, at the
+  // live charge power. `selPower` is 1 at rest (a full-swing cone previews) and animates 0→pull as
+  // you charge. The cone the player sees is this powered shot; releasing fires it (GS-power).
+  const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined, power: selPower };
   const spray = previewShot(play, decision, state.run.loadout);
   // Feel escape-hatch: window._gsSpray scales the green centre wedge live (A/B the cone geometry).
   const sprayGeom = (window as unknown as { _gsSpray?: SprayGeomInput })._gsSpray;
   // % of shots per zone — straight off the shot's asymmetric shape, so the legend reads exactly true.
   const sh = spray.shape;
   const pctRound = (x: number) => Math.round(x * 100);
-  // Zoom in and follow the ball: frame the CONTEMPLATED shot's reach (the spray's far arc), so a
-  // short approach zooms right in and an unreachable green legitimately sits off-screen (#7). The
-  // map-nav controls (overview/zoom/pan) drive the projector through the SHARED `decisionView`
-  // helper so `wireMapAiming`'s unproject stays in lockstep with what's drawn.
-  const mapOpts = decisionView(play, spray);
+  // Frame the map on the FULL-power shot (not the live charge) so the camera stays steady while the
+  // cone grows/shrinks with power — the shot expands within a fixed view rather than zooming the world.
+  // Both the render and the gesture build the projector from this same stable spread (projector-sync).
+  const frameSpray = previewShot(play, { ...decision, power: 1 }, state.run.loadout);
+  const mapOpts = decisionView(play, frameSpray);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
@@ -1002,59 +938,60 @@ function playingBody(animating: boolean): string {
     </div>`;
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
-  const clubButtons = `
-    ${cbtn('◄', -1)}
-    <b style="display:inline-block;min-width:6em;text-align:center;">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
-    ${cbtn('►', 1)}
-    ${hasSuggest ? `<button class="gs-btn${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🎯 Suggested</button>` : ''}`;
-  // One-row SEGMENTED aim control (was three wrapping buttons eating vertical space). The "line
-  // blocked" state is a ⚠ glyph on Safe, not inline text that forces a wrap.
-  const seg = (key: string, label: string, sel: boolean, title = ''): string =>
-    `<button class="gs-segbtn${sel ? ' gs-segbtn--on' : ''}" data-aim="${key}"${title ? ` title="${title}"` : ''}>${label}</button>`;
-  const aimButtons = `<div class="gs-seg">
-    ${seg('attack', '🎯 Attack', selAim === 'attack' && !selFreeTarget)}
-    ${seg('safe', `🛟 Safe${v.blocked ? ' ⚠' : ''}`, selAim === 'safe' && !selFreeTarget, v.blocked ? 'Direct line blocked — Safe lays up to the corridor' : 'Lay up to the fat of the green')}
-    ${seg('free', `✋ Aim${selFreeTarget ? ' •' : ''}`, !!selFreeTarget, 'Tap the map to aim anywhere (drag the map to pan)')}
-  </div>`;
-  const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
-  // Suggestible Sam's caddy read: precise front/middle/back green yardages + the carry to clear the
-  // nearest forced hazard on the line to the pin. Pure info off the sim — only shown once Sam is hired.
+  // Club row: ◄ name ► + (re-aim-at-pin when nudged) + (Sam's snap-to-suggested when hired).
+  const clubRow = `<div class="gs-clubrow">
+      ${cbtn('◄', -1)}
+      <span class="gs-clubname">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</span>
+      ${cbtn('►', 1)}
+      ${selFreeTarget ? `<button class="gs-btn gs-mini" data-aimreset="1" title="Re-aim at the pin">🎯</button>` : ''}
+      ${hasSuggest ? `<button class="gs-btn gs-mini${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🏌</button>` : ''}
+    </div>`;
+  // Power read-out: the bar fills as you pull DOWN on the map (the cone grows in step); past 100%
+  // (with Overdrive) it glows orange as an overpowered shot.
+  const powerPct = Math.round(selPower * 100);
+  const over = selPower > 1.001;
+  const powerCol = over ? '#ff8a3d' : selPower >= 0.66 ? '#5fd45a' : selPower >= 0.33 ? '#ffc454' : '#9fd8e6';
+  const aimNote = selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2 ? 'aim adjusted' : 'aim: pin';
+  const powerHud = `<div class="gs-power">
+      <div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
+      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · pull back to cancel' : 'pull DOWN on the map'}</span></div>
+    </div>`;
+  // Condensed spray odds + carry range (the cone on the map carries the detail). Sam (if hired) adds a
+  // compact green-depth + forced-carry read on its own line.
   let samRead = '';
   if (hasSuggest && play.lie !== 'green') {
     const gd = greenDepth(play.hole, play.ball);
-    const mid = Math.round(dist(play.ball, play.hole.green));
     const fc = forcedCarry(play.hole, play.ball, pinOf(play.hole));
-    const carryTxt = fc
-      ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> to clear ${hazardLabel(fc.kind)}</span>`
-      : '';
-    samRead = `<p class="gs-legend" style="opacity:.9;">🎒 <b>Sam:</b> front <b>${Math.round(gd.front)}</b> · middle <b>${mid}</b> · back <b>${Math.round(gd.back)}</b> yds${carryTxt}</p>`;
+    const carryTxt = fc ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> ${hazardLabel(fc.kind)}</span>` : '';
+    samRead = `<div class="gs-legend-line" style="opacity:.9;">🎒 ${Math.round(gd.front)}·${Math.round(dist(play.ball, play.hole.green))}·${Math.round(gd.back)}y${carryTxt}</div>`;
   }
+  const legend = `<div class="gs-legend-line">
+      <span style="color:#5fd45a;">●</span> ${pctRound(sh.green)}% ·
+      <span style="color:#ffc454;">●</span> ${pctRound(sh.hookL)}/${pctRound(sh.sliceR)}% ·
+      <span style="color:#ff4c4c;">●</span> ${pctRound(sh.duckHookL)}/${pctRound(sh.shankR)}% ·
+      <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)}y</b>
+    </div>`;
+  // The hired caddy, framed in the bottom-left so it stands out (GS-fullmap). The figure is drawn to
+  // the canvas in the render wiring. Absent when no caddy is hired.
+  const cid = caddyId();
+  const caddyBadge = hasCaddyArt(cid)
+    ? `<div class="gs-caddybadge"><canvas id="caddybadge" width="128" height="120"></canvas><span class="gs-caddyname">${CADDY_LABEL[cid]}</span></div>`
+    : '';
+  const autoFinish = `<button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole">»</button>`;
   return `
-    <div class="gs-shot${lefty() ? ' gs-shot--lefty' : ''}">
-      ${playTopBar(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b> yds to pin` })}
-      <div class="gs-bigmap" data-map="1">${svg}${mapCtrls}</div>
-      <div class="gs-bottom">
-        <div class="gs-ctrlrow">${clubButtons}</div>
-        ${samRead}
-        <p class="gs-legend">
-          <span style="color:#5fd45a;">▮</span> ${pctRound(sh.green)}% great ·
-          <span style="color:#ffc454;">▮</span> ${pctRound(sh.hookL)}% hook / ${pctRound(sh.sliceR)}% slice ·
-          <span style="color:#ff4c4c;">▮</span> ${pctRound(sh.duckHookL)}% duck-hook / ${pctRound(sh.shankR)}% shank ·
-          carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
-          <span style="opacity:.6;">${hasSuggest ? ` · suggested: attack ${v.attackClubId} · safe ${v.safeClubId}` : ''}${selFreeTarget ? ' · ✋ free aim' : ''}</span>
-        </p>
-        ${aimButtons}
-        <div class="gs-hitbar">
-          ${
-            getSettings().swingGesture
-              ? `<button class="gs-btn gs-btn--primary gs-swingpad" data-swing='${JSON.stringify(hitAction)}'>
-                   <span class="gs-swingfill"></span>
-                   <span class="gs-swinglabel">⬇ Pull back to swing</span>
-                 </button>`
-              : btn('🏌 Hit', hitAction, { variant: 'primary' })
-          }
-          ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
+    <div class="gs-shot gs-shot--full${lefty() ? ' gs-shot--lefty' : ''}">
+      <div class="gs-bigmap" data-map="1">${svg}</div>
+      ${mapCtrls}
+      ${mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` })}
+      <div class="gs-hud gs-hud-bottom">
+        ${caddyBadge}
+        <div class="gs-hud-controls gs-glass">
+          ${clubRow}
+          ${powerHud}
+          ${legend}
+          ${samRead}
         </div>
+        ${autoFinish}
       </div>
     </div>
     ${awaitingShotPopup ? shotPopupOverlay() : ''}`;
@@ -1082,7 +1019,6 @@ function settingsOverlay(): string {
         ${row('sound', 'Sound', 'Chimes & contact cues (no downloads)')}
         ${row('haptics', 'Haptics', 'Vibration feedback on supported phones')}
         ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
-        ${row('swingGesture', 'Swing gesture', 'Pull back on the map & release to hit')}
         ${row('leftHanded', 'Left-handed', 'Mirror the bottom controls')}
         ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
         <div style="text-align:center;margin-top:10px;">
@@ -1363,6 +1299,8 @@ function render(): void {
       animHoleIndex = state.play.holeIndex;
       selClubId = null;
       selAim = 'attack';
+      selPower = 1;
+      selAimBearing = null;
       decisionShotCount = -1;
       awaitingShotPopup = false;
       resetMapView();
@@ -1389,7 +1327,10 @@ function render(): void {
       ? outpostScreen()
       : gameoverScreen();
 
-  app.innerHTML = `<main class="gs-main">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
+  // The interactive play screen (decision / watching / putting — but not the hole-complete card) is
+  // full-bleed: the map fills the page, so drop the page frame's padding/max-width for it.
+  const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
@@ -1408,16 +1349,11 @@ function render(): void {
       render();
     });
   });
-  app.querySelectorAll<HTMLElement>('[data-aim]').forEach((el) => {
+  // Re-aim at the pin: clear the gesture's aim nudge so the next shot lines up on the flag again.
+  app.querySelectorAll<HTMLElement>('[data-aimreset]').forEach((el) => {
     el.addEventListener('click', () => {
-      const a = el.dataset.aim;
-      if (a === 'free') {
-        // Seed the free target at the pin (clamped to reach) so it's there to nudge/drag.
-        if (state.play) selFreeTarget = clampToReach(state.play, pinOf(state.play.hole));
-      } else {
-        selAim = a === 'safe' ? 'safe' : 'attack';
-        selFreeTarget = null; // an explicit aim choice cancels free aim
-      }
+      selFreeTarget = null;
+      selAimBearing = null;
       render();
     });
   });
@@ -1439,13 +1375,10 @@ function render(): void {
       render();
     });
   });
-  // Tap/drag the map to aim (free-aim mode) or pan it (default). Pointer-move/up listen on window
-  // so the drag survives the per-frame re-render (which replaces the map element).
-  wireMapAiming(app);
-  // Opt-in swing gesture: pull back on the pad and release to swing. The pull builds a power/
-  // backswing meter (feel only — the shot is exactly the one club+aim define, so the sim is
-  // untouched). A short pull cancels; a committed pull fires the same action the Hit button would.
-  app.querySelectorAll<HTMLElement>('[data-swing]').forEach((el) => wireSwingPad(el));
+  // Pull-to-power shot gesture: press the map, drag DOWN to charge power (the cone grows), slide to
+  // aim, release to fire (GS-power). Pointer-move/up listen on window so the gesture survives the
+  // per-frame re-render that replaces the map element.
+  wireShotGesture(app);
   // "Use suggested" snaps the club back to the suggestion for this position.
   app.querySelectorAll<HTMLElement>('[data-suggest]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -1526,6 +1459,22 @@ function render(): void {
         lefty: lefty(),
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
       });
+    }
+  }
+
+  // Draw the hired caddy into its framed bottom-left badge on the decision screen (GS-fullmap). The
+  // play view / putt meter draw the caddy themselves while animating / putting; this covers the
+  // aim-and-charge screen, where the player spends most of the hole. A one-shot draw per render (the
+  // idle bob updates whenever the screen re-renders — i.e. live while charging), so no rAF to leak.
+  const cbCanvas = document.getElementById('caddybadge') as HTMLCanvasElement | null;
+  const cbId = caddyId();
+  if (cbCanvas && hasCaddyArt(cbId)) {
+    const ctx = cbCanvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, cbCanvas.width, cbCanvas.height);
+      // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
+      // Mirror the portrait in left-handed mode (GS-lefty) so the caddy faces with the flipped cast.
+      drawCaddy(ctx, cbId, cbCanvas.width / 2, cbCanvas.height - 8, cbCanvas.height * 0.92, performance.now(), lefty());
     }
   }
 

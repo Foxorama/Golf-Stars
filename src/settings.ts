@@ -21,8 +21,6 @@ export interface Settings {
   leftHanded: boolean;
   /** Skip the tap-to-continue on the per-shot result — auto-advance after a short beat. */
   fastShots: boolean;
-  /** Opt-in: pull back on the map and release to swing (power from the drag), vs the Hit button. */
-  swingGesture: boolean;
 }
 
 const KEY = 'gs_settings';
@@ -43,7 +41,6 @@ function defaults(): Settings {
     reducedMotion: prefersReducedMotion(),
     leftHanded: false,
     fastShots: false,
-    swingGesture: false,
   };
 }
 

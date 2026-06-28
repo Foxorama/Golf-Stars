@@ -265,19 +265,106 @@
         box-shadow: inset 0 0 12px rgba(95, 212, 90, .18);
       }
       .gs-legend { font-size: 12px; margin: 1px 0; line-height: 1.45; opacity: .92; }
-      /* Pull-back swing pad (opt-in): the Hit control becomes a draggable backswing meter. The
-         fill rises from the bottom as you pull; touch-action:none so the drag isn't a page scroll. */
-      .gs-swingpad {
-        position: relative; overflow: hidden; touch-action: none;
-        flex: 2; margin: 0; padding: 13px 10px; font-size: 16px; text-align: center;
+      /* Pull-to-power HUD (GS-power): a horizontal bar that fills as you drag DOWN on the map to
+         charge power; the 100% tick marks a full swing (the bar can run past it with Overdrive). */
+      .gs-power { margin: 3px 0 1px; }
+      .gs-powerbar {
+        position: relative; height: 9px; border-radius: 5px; overflow: hidden;
+        background: #14171f; border: 1px solid var(--gs-line);
       }
-      .gs-swingfill {
-        position: absolute; left: 0; right: 0; bottom: 0; height: 0;
-        background: linear-gradient(180deg, rgba(95,212,90,.55), rgba(95,212,90,.25));
-        pointer-events: none; transition: height .03s linear;
+      .gs-powerfill {
+        position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+        border-radius: 5px 0 0 5px; transition: width .04s linear, background .1s linear;
       }
-      .gs-swinglabel { position: relative; z-index: 1; pointer-events: none; }
+      .gs-power100 {
+        position: absolute; top: -2px; bottom: -2px; width: 2px; transform: translateX(-1px);
+        background: rgba(255,255,255,.5); pointer-events: none;
+      }
+      .gs-powerlabel { font-size: 12px; margin-top: 3px; line-height: 1.3; }
+      /* The map absorbs the pull gesture, so its touches are never page scrolls/zooms. */
+      .gs-shot .gs-bigmap[data-map] { touch-action: none; }
       .gs-shot .gs-hitbar { display: flex; gap: 8px; }
+
+      /* ===== Full-bleed immersive hole screen (GS-fullmap) =====================
+         The hole map fills the WHOLE screen; every control + readout floats ON it as a
+         translucent overlay, so nothing competes with the map for space. The page frame
+         (.gs-main) drops its padding for this screen via .gs-main--bleed. */
+      .gs-main--bleed { padding: 0; max-width: none; }
+      .gs-shot--full {
+        position: relative; width: 100%;
+        height: 100vh; height: 100dvh; overflow: hidden;
+        display: block; gap: 0;
+      }
+      .gs-shot--full .gs-bigmap {
+        position: absolute; inset: 0; border: none; border-radius: 0; box-shadow: none;
+      }
+      /* Overlays float above the map. Most are pass-through (pointer-events:none) so a pull
+         can START anywhere on the map even under a readout; only real buttons capture taps. */
+      .gs-hud { position: absolute; z-index: 6; pointer-events: none; }
+      .gs-hud button, .gs-hud [data-cycle], .gs-hud [data-suggest], .gs-hud [data-aimreset],
+      .gs-hud [data-action] { pointer-events: auto; }
+      /* The putt-meter canvas is tapped to set pace, so it must capture pointers. */
+      .gs-hud #puttmeter, .gs-hud #puttmeter canvas { pointer-events: auto; }
+      /* The caddy badge stays pass-through so a power pull can START over it (it's only a portrait). */
+      .gs-caddybadge, .gs-caddybadge canvas { pointer-events: none; }
+      .gs-glass {
+        background: rgba(10, 13, 19, .62); backdrop-filter: blur(7px);
+        -webkit-backdrop-filter: blur(7px);
+        border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+        box-shadow: 0 4px 18px rgba(0,0,0,.35);
+      }
+      /* Top-left info chip — hole/par/distance/score + a thin lie·wind sub-line + pips. */
+      .gs-hud-top {
+        top: calc(8px + env(safe-area-inset-top)); left: 8px;
+        right: 56px; /* clear the top-right nav column */
+        padding: 7px 11px;
+      }
+      .gs-hud-top .gs-stats {
+        display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
+        font-size: 13.5px; color: var(--gs-dim);
+      }
+      .gs-hud-top .gs-stats b { color: var(--gs-ink); }
+      .gs-hud-top .gs-sub { font-size: 11.5px; opacity: .9; line-height: 1.5; margin-top: 2px;
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      /* Bottom control panel — caddy badge + club + power + spray odds. */
+      .gs-hud-bottom {
+        left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
+        display: flex; align-items: stretch; gap: 8px;
+      }
+      .gs-hud-controls {
+        flex: 1 1 auto; min-width: 0; padding: 8px 11px 9px;
+        display: flex; flex-direction: column; gap: 6px;
+      }
+      .gs-clubrow { display: flex; align-items: center; gap: 7px; }
+      .gs-clubrow .gs-clubname { flex: 1 1 auto; text-align: center; font-weight: 700;
+        font-size: 15px; color: var(--gs-ink); min-width: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-clubrow .gs-btn { margin: 0; padding: 9px 11px; font-size: 16px; }
+      .gs-clubrow .gs-mini { padding: 7px 9px; font-size: 13px; }
+      .gs-legend-line { font-size: 11.5px; line-height: 1.4; opacity: .95; }
+      /* Caddy badge — the hired caddy, framed so it stands out (GS-fullmap). */
+      .gs-caddybadge {
+        flex: 0 0 auto; width: 76px; padding: 5px 5px 3px;
+        display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 214, 102, .55);
+        background: linear-gradient(180deg, rgba(38,32,16,.72), rgba(12,13,19,.78));
+        box-shadow: 0 4px 16px rgba(0,0,0,.4), inset 0 0 14px rgba(255,200,90,.10);
+      }
+      .gs-caddybadge canvas { display: block; width: 64px; height: 60px; }
+      .gs-caddybadge .gs-caddyname {
+        font-size: 9.5px; font-weight: 700; letter-spacing: .02em; line-height: 1;
+        color: #ffe6a3; margin-top: 1px; max-width: 70px; text-align: center;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      /* Floating round action button (auto-finish) tucked by the controls. */
+      .gs-roundbtn {
+        flex: 0 0 auto; width: 40px; align-self: stretch; padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 17px; color: var(--gs-ink);
+        border-radius: 12px; cursor: pointer;
+      }
+      .gs-roundbtn:active { filter: brightness(.9); }
       /* Hit is the dominant target; Auto-finish (a hole-skip) is half the width so a fat-finger
          tap lands on Hit, not on accidentally watching the whole hole auto-play. */
       .gs-shot .gs-hitbar .gs-btn { margin: 0; padding: 13px 10px; font-size: 16px; text-align: center; }
@@ -288,18 +375,14 @@
          44px-class touch target instead of inheriting the default button padding. */
       .gs-ctrlrow [data-cycle] { min-width: 46px; padding: 11px 8px; font-size: 17px; }
 
-      /* Left-handed mode (GS-lefty): mirror the reach-critical controls to the LEFT so they fall
-         under a left thumb, pairing with the mirrored golfer/caddy/spray on the map. The floating
-         map overlay moves to the left edge; the aim segment and Hit/Auto-finish bar reverse order so
-         the dominant actions sit left. The club ◄/► arrows are NOT reversed — their glyphs are
-         directional, so they keep their meaning (only the cluster's reach side matters). */
+      /* Left-handed mode (GS-lefty): mirror the full-map HUD so the reach-critical chrome falls under
+         a LEFT thumb, pairing with the mirrored golfer/caddy/spray-cone on the map. The floating nav
+         column (overview/zoom/⚙) moves to the left edge, the top info chip swaps to the right to clear
+         it, and the bottom panel reverses so the caddy badge sits right and the round action button
+         lands on the left. The club ◄/► arrows are NOT reversed — their glyphs are directional. */
       .gs-shot--lefty .gs-mapctrl { right: auto; left: 8px; }
-      .gs-shot--lefty .gs-seg { flex-direction: row-reverse; }
-      /* Reversed, the visual-left segment is the LAST DOM child — move the seamless edge there so
-         the inter-button divider lines stay clean (the first child regains its internal seam). */
-      .gs-shot--lefty .gs-seg .gs-segbtn:first-child { border-left: 1px solid var(--gs-line); }
-      .gs-shot--lefty .gs-seg .gs-segbtn:last-child { border-left: none; }
-      .gs-shot--lefty .gs-hitbar { flex-direction: row-reverse; }
+      .gs-shot--lefty .gs-hud-top { left: 56px; right: 8px; }
+      .gs-shot--lefty .gs-hud-bottom { flex-direction: row-reverse; }
 
       /* Page never scrolls sideways — a fixed-width card a hair wider than a tiny viewport
          clips instead of creating a horizontal-scroll jiggle. */
