@@ -419,10 +419,17 @@ function wireMapAiming(app: HTMLElement): void {
     return [((clientX - rect.left) / rect.width) * DMAP_W, ((clientY - rect.top) / rect.height) * DMAP_H];
   };
 
-  let mode: 'aim' | 'pan' | null = null;
+  // ONE gesture model, disambiguated by movement (not a mode toggle): a TAP aims at that point
+  // (tap-the-green-to-aim — the discoverable default), a DRAG beyond a small threshold pans the
+  // follow-cam. So "aim there" and "move the map around" coexist without a mode button. (In
+  // whole-hole mode there's nothing to pan, so any release is a tap-aim.)
+  const TAP_SLOP = 8; // px of movement below which a release counts as a tap, not a drag
   let panProj: ReturnType<typeof holeProjector> | null = null;
   let panStartCourse: [number, number] | null = null;
   let panStartOffset: [number, number] = [0, 0];
+  let downX = 0;
+  let downY = 0;
+  let dragging = false;
 
   const aimTo = (clientX: number, clientY: number): void => {
     const vb = toViewBox(clientX, clientY);
@@ -441,35 +448,33 @@ function wireMapAiming(app: HTMLElement): void {
     scheduleRender();
   };
   const move = (e: PointerEvent): void => {
-    if (!mode) return;
     e.preventDefault();
-    if (mode === 'aim') aimTo(e.clientX, e.clientY);
-    else panTo(e.clientX, e.clientY);
+    if (!dragging && Math.hypot(e.clientX - downX, e.clientY - downY) > TAP_SLOP) {
+      dragging = true; // crossed the slop → it's a drag (pan), not a tap
+    }
+    if (dragging && mapView !== 'whole') panTo(e.clientX, e.clientY);
   };
-  const up = (): void => {
-    mode = null;
+  const up = (e: PointerEvent): void => {
+    if (!dragging) aimTo(e.clientX, e.clientY); // a still tap → aim there
     panProj = null;
     panStartCourse = null;
+    dragging = false;
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
   };
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    downX = e.clientX;
+    downY = e.clientY;
+    dragging = false;
+    // Freeze a projector at gesture start so pan math stays consistent across the per-frame
+    // re-render that replaces the map element.
+    const vb = toViewBox(e.clientX, e.clientY);
+    panProj = buildProj();
+    panStartCourse = vb ? (panProj.unproject(vb[0], vb[1]) as [number, number]) : null;
+    panStartOffset = [mapPan[0], mapPan[1]];
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
-    if (selFreeTarget) {
-      // Free-aim mode: tap/drag aims.
-      mode = 'aim';
-      aimTo(e.clientX, e.clientY);
-    } else {
-      // Default: drag pans the follow-cam (no pan in whole-hole mode — you already see it all).
-      if (mapView === 'whole') { up(); return; }
-      const vb = toViewBox(e.clientX, e.clientY);
-      panProj = buildProj();
-      panStartCourse = vb ? (panProj.unproject(vb[0], vb[1]) as [number, number]) : null;
-      panStartOffset = [mapPan[0], mapPan[1]];
-      mode = 'pan';
-    }
   });
 }
 
@@ -623,6 +628,23 @@ function hazardLabel(kind: string): string {
   return 'the hazard';
 }
 
+/** A one-shot, assetless sparkle burst (CSS only) for the big beats — made cut, a holed shot.
+ *  Skipped under reduced-motion. Deterministic spark layout (no Math.random). Needs a
+ *  position:relative ancestor; pointer-events:none so it never blocks a tap. */
+function burst(): string {
+  if (getSettings().reducedMotion) return '';
+  const N = 16;
+  const sparks = Array.from({ length: N }, (_, i) => {
+    const ang = (i / N) * 360 + ((i * 37) % 30);
+    const d = 64 + ((i * 53) % 90);
+    const dx = Math.cos((ang * Math.PI) / 180) * d;
+    const dy = Math.sin((ang * Math.PI) / 180) * d;
+    const ch = ['✦', '⭐', '✧', '·'][i % 4];
+    return `<span class="gs-spark" style="--dx:${dx.toFixed(0)}px;--dy:${dy.toFixed(0)}px;animation-delay:${(i % 5) * 45}ms;">${ch}</span>`;
+  }).join('');
+  return `<div class="gs-burst" aria-hidden="true">${sparks}</div>`;
+}
+
 function zoneScoreChip(): string {
   const done = state.stopPlayed ?? [];
   const sf = playTotals(done.map((p) => p.record)).stableford;
@@ -672,8 +694,10 @@ function playingBody(animating: boolean): string {
     const puttCard = play.puttLogs.length
       ? puttCardHTML(play.puttLogs, { holed: play.holed, pickedUp: play.pickedUp })
       : '';
+    const birdieOrBetter = !play.pickedUp && play.strokes <= par - 1;
     return `
       ${header()}
+      <div style="position:relative;">${birdieOrBetter ? burst() : ''}</div>
       <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${play.holed && play.shots.some((s) => s.holed) ? ' 🎉' : ''}</h2>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;max-width:420px;">${lastCard}${puttCard}</div>
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
@@ -783,12 +807,15 @@ function playingBody(animating: boolean): string {
     <b style="display:inline-block;min-width:6em;text-align:center;">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</b>
     ${cbtn('►', 1)}
     ${hasSuggest ? `<button class="gs-btn${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🎯 Suggested</button>` : ''}`;
-  const aimBtn = (key: string, label: string, sel: boolean, title = ''): string =>
-    `<button class="gs-btn${sel ? ' gs-btn--on' : ''}" data-aim="${key}"${title ? ` title="${title}"` : ''}>${label}</button>`;
-  const aimButtons = `
-    ${aimBtn('attack', '🎯 Attack pin', selAim === 'attack' && !selFreeTarget)}
-    ${aimBtn('safe', `🛟 Play safe${v.blocked ? ' (line blocked!)' : ''}`, selAim === 'safe' && !selFreeTarget)}
-    ${aimBtn('free', '✋ Free aim', !!selFreeTarget, 'Tap or drag the map to aim (otherwise drag pans the map)')}`;
+  // One-row SEGMENTED aim control (was three wrapping buttons eating vertical space). The "line
+  // blocked" state is a ⚠ glyph on Safe, not inline text that forces a wrap.
+  const seg = (key: string, label: string, sel: boolean, title = ''): string =>
+    `<button class="gs-segbtn${sel ? ' gs-segbtn--on' : ''}" data-aim="${key}"${title ? ` title="${title}"` : ''}>${label}</button>`;
+  const aimButtons = `<div class="gs-seg">
+    ${seg('attack', '🎯 Attack', selAim === 'attack' && !selFreeTarget)}
+    ${seg('safe', `🛟 Safe${v.blocked ? ' ⚠' : ''}`, selAim === 'safe' && !selFreeTarget, v.blocked ? 'Direct line blocked — Safe lays up to the corridor' : 'Lay up to the fat of the green')}
+    ${seg('free', `✋ Aim${selFreeTarget ? ' •' : ''}`, !!selFreeTarget, 'Tap the map to aim anywhere (drag the map to pan)')}
+  </div>`;
   const hitAction: Action = { type: 'shot', clubId: selClubId!, aim: selAim, ...(selFreeTarget ? { target: selFreeTarget } : {}) };
   // Suggestible Sam's caddy read: precise front/middle/back green yardages + the carry to clear the
   // nearest forced hazard on the line to the pin. Pure info off the sim — only shown once Sam is hired.
@@ -816,7 +843,7 @@ function playingBody(animating: boolean): string {
           carry <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)} yds</b>
           <span style="opacity:.6;">${hasSuggest ? ` · suggested: attack ${v.attackClubId} · safe ${v.safeClubId}` : ''}${selFreeTarget ? ' · ✋ free aim' : ''}</span>
         </p>
-        <div class="gs-ctrlrow">${aimButtons}</div>
+        ${aimButtons}
         <div class="gs-hitbar">
           ${btn('🏌 Hit', hitAction, { variant: 'primary' })}
           ${btn('» Auto-finish hole', { type: 'autoShotHole' }, { variant: 'ghost' })}
@@ -902,7 +929,8 @@ function resultScreen(): string {
           <span style="font-size:12px;opacity:.6;">click a row to watch that hole</span>
         </div>
       </div>
-      <section style="flex:1 1 240px;min-width:240px;">
+      <section style="flex:1 1 240px;min-width:240px;position:relative;">
+        ${res.passed ? burst() : ''}
         <h2 style="font-size:16px;margin:.2em 0;color:${res.passed ? '#5fd45a' : '#ff6b6b'};">
           ${res.passed ? 'MADE THE CUT' : 'MISSED CUT'}</h2>
         <p style="font-size:15px;">Stableford <b>${res.stableford}</b> vs cut <b>${res.cut}</b>
