@@ -27,6 +27,9 @@ import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCadd
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
+import { leaderboard, runField, type Leaderboard } from './sim/rpg/league';
+import { PLAYER_ID, type Field } from './sim/rpg/competition';
+import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -455,6 +458,90 @@ function characterScreen(): string {
  * first hole (the loot) + lore/hazards below. The generic zoneHero art was dropped as redundant —
  * the real generated hole is the more exciting, more informative visual and carries the theme too.
  */
+// --- Competition field & leaderboard (GS-100) --------------------------------
+
+/** 1 → "1st", 2 → "2nd", … */
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]!);
+}
+
+/** A short style/home tag for a competitor (their constellation, rival flag, or archetype label). */
+function golferTag(id: string): string {
+  if (id === PLAYER_ID) return 'You';
+  const g = getGolfer(id);
+  if (!g) return '';
+  if (g.home) {
+    const t = themeById(g.home);
+    if (t) return t.name;
+  }
+  if (g.mirrorsCharacter) return 'Rival pro';
+  return getArchetype(g.archetypeId).label;
+}
+
+/** The arc's field of 20 — shown on the starting-zone intro at the head of each arc. */
+function competitorsCard(field: Field): string {
+  const cells = field.golfers
+    .map((g) => {
+      const champ = g.tier === 'champion';
+      const me = g.isPlayer;
+      const border = me ? 'var(--gs-accent)' : champ ? '#ffce54' : 'var(--gs-line-2)';
+      const tag = golferTag(g.id);
+      return `<div style="flex:0 0 auto;width:78px;text-align:center;padding:6px 4px;border:1px solid ${border};border-radius:9px;background:${me ? '#1a2a22' : '#ffffff06'};">
+        <div style="line-height:0;">${golferSVG(g.look, 38, 46)}</div>
+        <div style="font-size:11px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${me ? 'You' : g.shortName}</div>
+        <div style="font-size:9px;opacity:.62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${champ ? '★ ' : ''}${tag}</div>
+      </div>`;
+    })
+    .join('');
+  return `
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--gs-line-2);">
+      <div style="font-size:13px;font-weight:700;letter-spacing:.04em;">🏆 The field — ${field.golfers.length} golfers in this arc</div>
+      <div style="font-size:11.5px;opacity:.65;margin:3px 0 9px;">Beat the cut each stop; top the leaderboard and you'll face the leader in a matchplay duel. Constellation champions (★) are dangerous in their home zone.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${cells}</div>
+    </div>`;
+}
+
+/** The leaderboard table for the result screen — cumulative arc total, this-stop score, cut line. */
+function leaderboardHTML(board: Leaderboard): string {
+  let drewCut = false;
+  const rows = board.standings
+    .map((s) => {
+      const me = s.isPlayer;
+      // Draw the cut divider just before the first cut golfer.
+      const divider =
+        !drewCut && s.cut
+          ? ((drewCut = true),
+            `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;color:#ff6b6b;font-size:10.5px;letter-spacing:.1em;">
+              <div style="flex:1;height:1px;background:#ff6b6b66;"></div>CUT · ${board.cut} pts<div style="flex:1;height:1px;background:#ff6b6b66;"></div></div>`)
+          : '';
+      const tag = golferTag(s.golferId);
+      const stopTxt = s.stopScore !== undefined ? `<span style="opacity:.7;">+${s.stopScore}</span>` : '';
+      const row = `<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:7px;${
+        me ? 'background:#1a2a22;border:1px solid var(--gs-accent);' : 'border:1px solid transparent;'
+      }${s.cut ? 'opacity:.5;' : ''}">
+        <span style="width:20px;text-align:right;font-size:12px;opacity:.7;">${s.position}</span>
+        <span style="width:9px;height:9px;border-radius:50%;background:${s.look.cap};flex:0 0 auto;"></span>
+        <span style="flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:${me ? 800 : 600};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${me ? 'You' : s.name}${s.tier === 'champion' ? ' <span style="color:#ffce54;">★</span>' : ''}
+          <span style="font-size:10px;opacity:.5;"> · ${tag}</span>
+        </span>
+        <span style="font-size:11px;width:34px;text-align:right;">${stopTxt}</span>
+        <span style="font-size:13px;font-weight:800;width:30px;text-align:right;">${s.total}</span>
+      </div>`;
+      return divider + row;
+    })
+    .join('');
+  return `
+    <div style="border:1px solid var(--gs-line);border-radius:10px;padding:8px;background:#0d1016;">
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;opacity:.55;letter-spacing:.08em;padding:0 8px 4px;">
+        <span>ARC LEADERBOARD${board.thru ? ` · THRU ${board.thru}` : ''}</span><span>STOP · TOTAL</span>
+      </div>
+      ${rows}
+    </div>`;
+}
+
 function introScreen(): string {
   const c = state.course;
   // The cut reflects any pending route event (GS-14), so the line is honest about the bar.
@@ -537,6 +624,10 @@ function introScreen(): string {
           </div>
         </div>
       </div>
+      ${(() => {
+        const board = leaderboard(state.run);
+        return board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
+      })()}
     </article>`;
 }
 
@@ -1203,13 +1294,19 @@ function resultScreen(): string {
           <span style="font-size:12px;opacity:.6;">click a row to watch that hole</span>
         </div>
       </div>
-      <section style="flex:1 1 240px;min-width:240px;position:relative;">
+      <section style="flex:1 1 300px;min-width:280px;position:relative;">
         ${res.passed ? burst() : ''}
         <h2 style="font-size:16px;margin:.2em 0;color:${res.passed ? '#5fd45a' : '#ff6b6b'};">
           ${res.passed ? 'MADE THE CUT' : 'MISSED CUT'}</h2>
-        <p style="font-size:15px;">Stableford <b>${res.stableford}</b> vs cut <b>${res.cut}</b>
+        <p style="font-size:14px;">Stableford <b>${res.stableford}</b> vs cut <b>${res.cut}</b>
           · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>
-        ${scorecard()}
+        ${(() => {
+          const board = leaderboard(state.run);
+          const me = board.standings.find((s) => s.isPlayer);
+          const place = me ? `<p style="font-size:13px;margin:.2em 0 .6em;">You're <b>${ordinal(me.position)}</b> of ${board.standings.length} · ${board.survivors} make it through.</p>` : '';
+          return place + leaderboardHTML(board);
+        })()}
+        <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;opacity:.7;">Scorecard</summary>${scorecard()}</details>
         <div style="margin-top:10px;">${btn('Continue → shop', { type: 'continue' }, { variant: 'primary' })}</div>
       </section>
     </div>`;

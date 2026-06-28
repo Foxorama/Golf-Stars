@@ -255,7 +255,6 @@ export function arcStandings(
   scores: Map<string, number[]>,
   stopHoles?: number,
 ): Standing[] {
-  const tierRank: Record<string, number> = { player: 0, champion: 1, star: 2, contender: 3, field: 4 };
   const rows: Standing[] = field.golfers.map((g) => {
     const arr = scores.get(g.id) ?? [];
     const total = arr.reduce((s, x) => s + x, 0);
@@ -273,6 +272,12 @@ export function arcStandings(
       position: 0,
     };
   });
+  return rankStandings(rows);
+}
+
+/** Sort standings (total desc, then tier, then name — stable) and assign 1-based positions. */
+export function rankStandings(rows: Standing[]): Standing[] {
+  const tierRank: Record<string, number> = { player: 0, champion: 1, star: 2, contender: 3, field: 4 };
   rows.sort(
     (a, b) =>
       b.total - a.total ||
