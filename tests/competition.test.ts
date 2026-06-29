@@ -11,6 +11,7 @@ import {
   bossPick,
   bossGolfer,
   golferBaseline,
+  golferForm,
   homeMatches,
   type HoleContext,
   type Field,
@@ -119,6 +120,50 @@ describe('ghostHoleStableford', () => {
     expect(golferBaseline(0)).toBeCloseTo(0.6);
     expect(golferBaseline(1)).toBeCloseTo(2.6);
     expect(golferBaseline(0.5)).toBeCloseTo(1.6);
+  });
+});
+
+describe('golferForm (streaks, GS-streaks)', () => {
+  const keys = Array.from({ length: 300 }, (_, i) => `stop:${i}`);
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const variance = (xs: number[]) => {
+    const m = mean(xs);
+    return mean(xs.map((x) => (x - m) ** 2));
+  };
+
+  it('is deterministic', () => {
+    expect(golferForm('champ:crux', 'stop:3')).toBe(golferForm('champ:crux', 'stop:3'));
+  });
+
+  it('has mean ~0 (a streak reorders the board, it does not shift the scoring level)', () => {
+    expect(Math.abs(mean(keys.map((k) => golferForm('field:marco-vance', k))))).toBeLessThan(0.15);
+  });
+
+  it('streaky golfers swing more than metronomes', () => {
+    const streaky = variance(keys.map((k) => golferForm('champ:canis-minor', k))); // streaky archetype
+    const steady = variance(keys.map((k) => golferForm('champ:cygnus', k))); // metronome archetype
+    expect(streaky).toBeGreaterThan(steady);
+  });
+
+  it('changes the per-stop field leader from stop to stop (lead changes)', () => {
+    const f = buildField(11, 0, 2, player);
+    const leaders = new Set<string>();
+    for (let stop = 0; stop < 10; stop++) {
+      let best = '';
+      let bestSf = -Infinity;
+      for (const g of f.golfers) {
+        if (g.isPlayer) continue;
+        const form = golferForm(g.id, `r:form:${stop}`);
+        let sf = 0;
+        for (let i = 0; i < 9; i++) sf += ghostHoleStableford(g.id, `r:gl:${stop}:${i}`, false, 0, form);
+        if (sf > bestSf) {
+          bestSf = sf;
+          best = g.id;
+        }
+      }
+      leaders.add(best);
+    }
+    expect(leaders.size).toBeGreaterThan(1); // not the same golfer topping every single stop
   });
 });
 

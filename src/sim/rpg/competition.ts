@@ -177,20 +177,40 @@ export function golferBaseline(rating: number): number {
 export const HOME_BOOST = 0.6;
 
 /**
+ * A golfer's per-stop FORM (GS-streaks): a hot/cold streak that shifts their baseline SF/hole for a
+ * WHOLE stop, so the leaderboard has lead changes and runs of form instead of a static skill order — a
+ * field golfer can go on a tear and leap the board, a champion can have an off week and lose the lead.
+ * Constant within a stop (the streak), independent per stop, deterministic from a per-stop key. The
+ * swing scales with INCONSISTENCY: streaky golfers run hot and cold (big swings), metronomes stay level
+ * (small swings) — so "streaky" actually plays streaky. The mean is 0, so it doesn't shift the field's
+ * overall scoring level (the cut calibration is untouched), only WHO is where.
+ */
+export function golferForm(golferId: string, formKey: string): number {
+  const p = golferProfile(golferId);
+  const rng = new Rng(`${formKey}:${golferId}`);
+  // Sum of three uniforms ≈ a bell, mean 0; amplitude grows as consistency falls.
+  const amp = 0.35 + (1 - p.consistency) * 0.85; // ~0.35 (metronome) … ~1.2 (streaky)
+  return clamp((rng.float() + rng.float() + rng.float() - 1.5) * amp, -1.6, 1.6);
+}
+
+/**
  * One golfer's ghost Stableford for one hole. Deterministic from `holeKey`+golfer. `homeMatch` lifts a
- * champion in their zone; `pressure` (0..1, ramps toward a boss) lifts the clutch and sinks the chokers.
- * The spread widens for inconsistent/streaky golfers, so they bounce around the board.
+ * champion in their zone; `pressure` (0..1, ramps toward a boss) lifts the clutch and sinks the chokers;
+ * `form` (GS-streaks) is the golfer's per-stop hot/cold streak (see `golferForm`), constant across the
+ * stop's holes. The per-hole spread widens for inconsistent/streaky golfers, so they bounce around too.
  */
 export function ghostHoleStableford(
   golferId: string,
   holeKey: string,
   homeMatch: boolean,
   pressure = 0,
+  form = 0,
 ): number {
   const p = golferProfile(golferId);
   let base = golferBaseline(p.skill);
   if (homeMatch) base += HOME_BOOST;
   base += (p.nerve - 0.5) * pressure * 0.8;
+  base += form;
   const vol = 0.35 + (1 - p.consistency) * 0.7 - (homeMatch ? 0.1 : 0);
   const rng = new Rng(`${holeKey}:${golferId}`);
   // Sum of three uniforms ≈ a bell, mean 0, scaled by volatility.
