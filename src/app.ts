@@ -23,7 +23,7 @@ import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById, type BiomeArchetype } from './sim/course/themes';
 import { zoneProfile, difficultyPips, shopPro, proMood, proLine, sectionEvents } from './sim/course/zones';
-import { bearing, dist, type Hole } from './sim/course/contract';
+import { bearing, dist, type Hole, type Rarity } from './sim/course/contract';
 import { type ShotSpread, type PlayedHole } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
@@ -721,6 +721,7 @@ function introScreen(): string {
   const theme = themeId ? themeById(themeId) : undefined;
   const col = rarCol(c.rarity);
   const diffPips = difficultyPips(zone.difficulty);
+  const rar = rarityFlavour(c.rarity);
 
   // Contextual notes (boss / split / route event) — only when they apply, kept compact and ABOVE
   // the CTA so a decision is never buried under the hole art.
@@ -757,15 +758,16 @@ function introScreen(): string {
 
   return `
     ${header()}
-    <article class="gs-panel" style="border-color:${col}66;box-shadow:0 0 18px ${col}22;">
+    <article class="gs-panel" style="border-color:${col}${rar.strong ? 'aa' : '66'};box-shadow:0 0 ${rar.glow}px ${col}${rar.strong ? '44' : '22'};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div style="min-width:0;">
           <div style="font-size:21px;font-weight:800;line-height:1.1;">${zone.name}</div>
           <div style="font-size:13px;color:var(--gs-accent);margin-top:2px;">${zone.signature}${theme ? ` · ${theme.name}` : ''}</div>
           <div style="font-size:12.5px;opacity:.7;margin-top:3px;">${c.meta.name} · ${c.holes.length} holes · par ${par} · 🌪 ${c.meta.wildness.toFixed(2)}</div>
+          <div style="font-size:12px;margin-top:5px;color:${col};font-style:italic;opacity:.95;">${rar.glyph} ${rar.tagline}</div>
         </div>
         <div style="text-align:right;flex:0 0 auto;">
-          <span style="color:${col};border:1px solid ${col};border-radius:6px;padding:1px 7px;font-size:11px;text-transform:uppercase;letter-spacing:1px;">${c.rarity}</span>
+          <span style="${rar.strong ? `background:${col};color:#0b0d12;font-weight:800;` : `color:${col};`}border:1px solid ${col};border-radius:6px;padding:${rar.strong ? '2px 9px' : '1px 7px'};font-size:11px;text-transform:uppercase;letter-spacing:1px;">${rar.glyph} ${c.rarity}</span>
           <div style="font-size:10.5px;opacity:.65;margin-top:7px;letter-spacing:.06em;text-transform:uppercase;">Difficulty</div>
           <div style="font-size:15px;letter-spacing:1px;color:var(--gs-danger);">${diffPips}</div>
         </div>
@@ -1391,6 +1393,21 @@ function zoneScoreChip(): string {
  *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
  *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
  *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through. */
+/** Per-rarity course flavour (GS-rarity-style): a glyph, a one-line tagline, and how boldly to frame
+ *  the stop — so common→legendary read as DISTINCT finds, not just a colour swap. */
+function rarityFlavour(r: Rarity): { glyph: string; tagline: string; glow: number; strong: boolean } {
+  switch (r) {
+    case 'legendary':
+      return { glyph: '✦', tagline: 'A legendary world — the galaxy rarely yields its like.', glow: 34, strong: true };
+    case 'epic':
+      return { glyph: '◆', tagline: 'An epic find — a world worth the voyage.', glow: 28, strong: true };
+    case 'rare':
+      return { glyph: '◈', tagline: 'A rare stop — richer rewards, sterner test.', glow: 22, strong: false };
+    default:
+      return { glyph: '○', tagline: 'A common world to find your rhythm.', glow: 18, strong: false };
+  }
+}
+
 /** A short, fun label for a notable hole archetype (GS-shapes-2); '' for a plain straight/dogleg. */
 function shapeLabel(shapeId?: string): string {
   if (!shapeId) return '';

@@ -38,6 +38,10 @@ const cases = [
   { biome: 'ice-ring', themeId: 'cygnus', label: 'Frost · Cygnus' },
   { biome: 'ember-world', themeId: 'scorpius', label: 'Inferno · Scorpius' },
   { biome: 'void-garden', themeId: 'sagittarius', label: 'Void · Sagittarius' },
+  { biome: 'crystal-spires', themeId: 'corona-borealis', label: 'Crystal · Corona Borealis' },
+  { biome: 'tempest-reach', themeId: 'draco', label: 'Tempest · Draco' },
+  { biome: 'spore-jungle', themeId: 'lacerta', label: 'Fungal · Lacerta' },
+  { biome: 'tidal-archipelago', themeId: 'delphinus', label: 'Ocean · Delphinus' },
 ];
 const seeds = [7, 4242];
 
