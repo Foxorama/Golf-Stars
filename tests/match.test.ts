@@ -134,8 +134,8 @@ describe('reducer matchplay flow', () => {
       stopIndex: 2,
       distanceFromStart: 4,
       history: [
-        { stopIndex: 0, distanceFromStart: 0, biome: 'verdant-station', rarity: 'common', stableford: 14, gross: 24, cut: 6, passed: true, creditsEarned: 0 },
-        { stopIndex: 1, distanceFromStart: 2, biome: 'dust-belt', rarity: 'common', stableford: 15, gross: 25, cut: 7, passed: true, creditsEarned: 0 },
+        { stopIndex: 0, distanceFromStart: 0, biome: 'verdant-station', rarity: 'common', stableford: 14, gross: 24, cut: 6, passed: true, creditsEarned: 0, aces: 0 },
+        { stopIndex: 1, distanceFromStart: 2, biome: 'dust-belt', rarity: 'common', stableford: 15, gross: 25, cut: 7, passed: true, creditsEarned: 0, aces: 0 },
       ],
     };
     expect(isMatchplayBoss(currentBoss(run))).toBe(true);

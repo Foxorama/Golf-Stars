@@ -150,4 +150,20 @@ export const sfx = {
   reward(): void {
     [784, 1047, 1319].forEach((f, i) => tone(f, 0.16, { type: 'triangle', gain: 0.16, t: i * 0.06 }));
   },
+  /** Hole-in-one (GS-ace) — the biggest beat in the game: a rattle-in, a rising triumphant fanfare,
+   *  a held major chord, and a cascade of sparkle chimes. Grander + longer than every other cue. */
+  ace(): void {
+    // The drop + rattle.
+    noise(0.06, { gain: 0.22, freq: 2000, q: 1.4 });
+    // Rising fanfare (a major arpeggio climbing two octaves) with a brass-ish saw doubling the lead.
+    const fanfare = [523, 659, 784, 1047, 1319, 1568];
+    fanfare.forEach((f, i) => {
+      tone(f, 0.26, { type: 'triangle', gain: 0.2, t: 0.05 + i * 0.085 });
+      tone(f, 0.22, { type: 'sawtooth', gain: 0.05, t: 0.05 + i * 0.085 });
+    });
+    // A held major chord swelling under the climb (the "this is huge" pad).
+    [523, 659, 784].forEach((f) => tone(f, 0.9, { type: 'sine', gain: 0.09, t: 0.18 }));
+    // A sparkle cascade tail.
+    [1568, 2093, 2637, 3136].forEach((f, i) => tone(f, 0.2, { type: 'sine', gain: 0.12, t: 0.62 + i * 0.05 }));
+  },
 };

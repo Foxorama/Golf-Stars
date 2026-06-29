@@ -101,6 +101,8 @@ export interface UiState {
   lastRunShards?: number;
   /** Highest Ascension tier unlocked (GS-ascension) — selectable on the title for a voyage. */
   maxAscension: number;
+  /** Lifetime holes-in-one made across every run (GS-ace) — a permanent, cross-run record. */
+  lifetimeAces: number;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
   /** Boss-reward choices to pick from after beating a boss (GS-talents) — shown on the bossReward screen. */
@@ -152,6 +154,7 @@ export interface MetaProgress {
   shards?: number;
   metaUpgrades?: MetaUpgrades;
   maxAscension?: number;
+  lifetimeAces?: number;
 }
 
 /**
@@ -178,6 +181,7 @@ export function initState(
     shards: meta.shards ?? 0,
     metaUpgrades,
     maxAscension: meta.maxAscension ?? 0,
+    lifetimeAces: meta.lifetimeAces ?? 0,
   };
 }
 
@@ -280,6 +284,7 @@ export function reduce(state: UiState, action: Action): UiState {
           shards: state.shards + (earned ?? 0),
           lastRunShards: earned,
           maxAscension: unlockedAscension(state, run),
+          lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
         };
       }
@@ -301,6 +306,7 @@ export function reduce(state: UiState, action: Action): UiState {
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
         maxAscension: unlockedAscension(state, run),
+        lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
       };
     }
@@ -398,6 +404,7 @@ export function reduce(state: UiState, action: Action): UiState {
           shards: state.shards + (earned ?? 0),
           lastRunShards: earned,
           maxAscension: unlockedAscension(state, run),
+          lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
         };
       }
@@ -425,6 +432,7 @@ export function reduce(state: UiState, action: Action): UiState {
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
         maxAscension: unlockedAscension(state, run),
+        lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
       };
     }

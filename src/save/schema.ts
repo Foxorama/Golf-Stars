@@ -9,7 +9,7 @@
 import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -62,11 +62,25 @@ export interface SaveV4 {
   savedAt?: string;
 }
 
+/** v5 — adds the lifetime hole-in-one tally (GS-ace): a permanent, cross-run bragging-rights record. */
+export interface SaveV5 {
+  version: 5;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  /** Holes-in-one made across every run, ever (a permanent badge of honour). */
+  lifetimeAces: number;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV4;
+export type Save = SaveV5;
 
 export function defaultSave(): Save {
-  return { version: SAVE_VERSION, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0 };
+  return { version: SAVE_VERSION, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0, lifetimeAces: 0 };
 }
 
 /** v1 → v2: fold the loose run fields into the new shape. */
@@ -117,6 +131,21 @@ function v3ToV4(s: SaveV3): SaveV4 {
   };
 }
 
+/** v4 → v5: seed the lifetime ace tally at 0 (no aces recorded yet). */
+function v4ToV5(s: SaveV4): SaveV5 {
+  return {
+    version: 5,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: s.shards ?? 0,
+    metaUpgrades: s.metaUpgrades ?? {},
+    maxAscension: s.maxAscension ?? 0,
+    lifetimeAces: 0,
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -128,6 +157,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 1) s = v1ToV2(s as unknown as SaveV1) as unknown as typeof s;
   if (s.version === 2) s = v2ToV3(s as unknown as SaveV2) as unknown as typeof s;
   if (s.version === 3) s = v3ToV4(s as unknown as SaveV3) as unknown as typeof s;
+  if (s.version === 4) s = v4ToV5(s as unknown as SaveV4) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -135,16 +165,17 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v4 = s as unknown as Partial<SaveV4>;
+  const v5 = s as unknown as Partial<SaveV5>;
   return {
     version: SAVE_VERSION,
-    bestStableford: v4.bestStableford ?? 0,
-    bestDistance: v4.bestDistance ?? 0,
-    shards: v4.shards ?? 0,
-    metaUpgrades: v4.metaUpgrades ?? {},
-    maxAscension: v4.maxAscension ?? 0,
-    activeRun: v4.activeRun,
-    savedAt: v4.savedAt,
+    bestStableford: v5.bestStableford ?? 0,
+    bestDistance: v5.bestDistance ?? 0,
+    shards: v5.shards ?? 0,
+    metaUpgrades: v5.metaUpgrades ?? {},
+    maxAscension: v5.maxAscension ?? 0,
+    lifetimeAces: v5.lifetimeAces ?? 0,
+    activeRun: v5.activeRun,
+    savedAt: v5.savedAt,
   };
 }
 
