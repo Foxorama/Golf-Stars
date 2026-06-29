@@ -1450,7 +1450,17 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
       // Golfers + bag loading (day scene only).
       const lineX = [690, 726, 762, 798];
       const startX = [1080, 1150, 1220, 1290];
-      const colors = ['#e15b5b', '#56b870', '#5b8de1', '#e0a93f'];
+      // The four loader-crew golfers wear the four playable characters' signature colours, in
+      // character-select order, so the intro crew reads as the roster you choose from (cap colours
+      // from CHARACTERS[].style in src/sim/rpg/characters.ts — the vivid accent each golfer leads
+      // with). Kept as literals (not an import) so this cosmetic intro stays self-contained; to
+      // revert, restore the old palette ['#e15b5b', '#56b870', '#5b8de1', '#e0a93f'].
+      const colors = [
+        '#19b2a6', // Feather Fade   — teal
+        '#d23f4f', // Huang-Woo Hook — red
+        '#e0a83f', // Longshot Larry — gold
+        '#9b5fd4', // Backspin Bo    — purple
+      ];
       if (e < t1) {
         const dp = easeInOut(clamp01(e / t0));
         for (let i = 0; i < 4; i++) {
