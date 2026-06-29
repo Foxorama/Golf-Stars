@@ -179,6 +179,8 @@ const HAPTICS = {
   holeOut: [12, 28, 12, 28, 20] as number[],
   madeCut: [10, 40, 10, 40, 18] as number[],
   ace: [18, 40, 18, 40, 18, 40, 30] as number[], // the biggest beat — a long celebratory roll
+  eagle: [14, 30, 14, 30, 22] as number[], // a two-under — a sharp triumphant burst (the eagle's cry)
+  albatross: [10, 40, 10, 40, 16, 60, 28] as number[], // a three-under — a long majestic swell
   caddy: [14, 30, 14] as number[], // a caddy's signature effect lands (guard save / chip-in)
 };
 function haptic(pattern: number | number[]): void {
@@ -1219,6 +1221,8 @@ function burst(): string {
 // The hole index whose ace has already been celebrated, so the full-screen overlay fires exactly
 // once per hole-in-one (the play-view onDone can re-fire on a re-render). Reset per hole in render().
 let aceCelebratedHole = -1;
+// Same one-shot guard for the eagle/albatross fly-over celebration (a non-ace −2 / −3 hole-out).
+let birdCelebratedHole = -1;
 
 /**
  * The hole-in-one celebration (GS-ace) — a full-screen takeover for the rarest, biggest moment in the
@@ -1387,6 +1391,326 @@ function runAceFireworks(canvas: HTMLCanvasElement, seed: number): void {
       }
     }
     ctx.globalAlpha = 1;
+    (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
+  };
+  (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
+}
+
+/** Per-kind look + copy for the eagle/albatross fly-over celebration. Eagle = a silver space eagle
+ *  screaming overhead; albatross = a vast, glowing cosmic albatross gliding across the stars. */
+const BIRD_CEL: Record<'eagle' | 'albatross', {
+  emoji: string; title: string; kicker: (par: number) => string; sub: (club?: string) => string;
+  aria: string; sound: () => void; haptic: number[];
+}> = {
+  eagle: {
+    emoji: '🦅',
+    title: 'EAGLE!',
+    kicker: (par) => `TWO UNDER · PAR ${par}`,
+    sub: (club) => `A silver space eagle screams overhead${club ? ` · sealed with the ${club}` : ''}`,
+    aria: 'Eagle',
+    sound: () => sfx.eagle(),
+    haptic: HAPTICS.eagle,
+  },
+  albatross: {
+    emoji: '🕊️',
+    title: 'ALBATROSS!',
+    kicker: (par) => `THREE UNDER · PAR ${par}`,
+    sub: (club) => `The cosmic albatross glides across the void${club ? ` · ${club} for the ages` : ''}`,
+    aria: 'Albatross',
+    sound: () => sfx.albatross(),
+    haptic: HAPTICS.albatross,
+  },
+};
+
+/**
+ * Eagle / albatross celebration (GS-bird) — a full-screen fly-over for a holed −2 / −3 that isn't an
+ * ace (the ace keeps its own grander takeover). A cosmetic, assetless side-effect mirroring
+ * `showAceCelebration`: a Canvas2D bird soars across the sky behind a headline card, then it tears
+ * itself down and runs `onDismiss` (→ the normal end-of-hole screen). No reward, no save/reducer
+ * touch — purely feel, so determinism is untouched. Reduced-motion skips the rAF (a static card),
+ * and the whole thing is guarded so a glitch can never strand the player on the hole.
+ */
+function showBirdCelebration(
+  kind: 'eagle' | 'albatross',
+  info: { holeNo: number; par: number; club?: string },
+  onDismiss: () => void,
+): void {
+  const look = BIRD_CEL[kind];
+  try {
+    look.sound();
+    haptic(look.haptic);
+  } catch {
+    /* feel-only — never throw */
+  }
+  const reduced = getSettings().reducedMotion;
+  const overlay = document.createElement('div');
+  overlay.className = `gs-bird gs-bird--${kind}`;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', look.aria);
+
+  let done = false;
+  const cleanup = (): void => {
+    if (done) return;
+    done = true;
+    const h = (canvas as unknown as { _raf?: number } | null)?._raf;
+    if (h) cancelAnimationFrame(h);
+    overlay.removeEventListener('click', onTap);
+    window.removeEventListener('keydown', onKey);
+    overlay.remove(); // detaches the canvas → the flight loop self-stops on the next frame
+    try {
+      onDismiss();
+    } catch {
+      /* the caller's render() guards itself */
+    }
+  };
+  const onTap = (e: MouseEvent): void => {
+    e.preventDefault();
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') cleanup();
+  };
+
+  overlay.innerHTML = `
+    <canvas class="gs-bird-fx" aria-hidden="true"></canvas>
+    <div class="gs-bird-card">
+      <div class="gs-bird-emoji" aria-hidden="true">${look.emoji}</div>
+      <div class="gs-bird-kicker">HOLE ${info.holeNo} · ${look.kicker(info.par)}</div>
+      <h1 class="gs-bird-title">${look.title}</h1>
+      <div class="gs-bird-sub">${look.sub(info.club)}</div>
+      <button class="gs-btn gs-btn--primary gs-bird-go" data-bird-continue="1">Continue →</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const goBtn = overlay.querySelector<HTMLButtonElement>('.gs-bird-go');
+  goBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cleanup();
+  });
+  overlay.addEventListener('click', onTap);
+  window.addEventListener('keydown', onKey);
+
+  const canvas = overlay.querySelector<HTMLCanvasElement>('.gs-bird-fx');
+  if (canvas && !reduced) {
+    try {
+      runBirdFlight(canvas, kind, info.holeNo);
+    } catch {
+      /* a canvas fault must not strand the celebration */
+    }
+  }
+
+  // Auto-dismiss safety net (well past the show) so the player is never stuck if they look away.
+  window.setTimeout(() => cleanup(), reduced ? 4200 : 9000);
+}
+
+/**
+ * Deterministic, assetless fly-over: a stylised bird soars across the sky on repeated passes, with a
+ * sparkle/aurora trail. Seeded (no Math.random) so it's stable across reloads; the loop self-cancels
+ * when the overlay is torn down (the orphaned-rAF hazard the codebase warns about). The eagle is a
+ * fast, sharp, chrome-silver raptor; the albatross is a vast, slow, glowing-aurora glider.
+ */
+function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', seed: number): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round((window.innerWidth || 400) * dpr);
+  canvas.height = Math.round((window.innerHeight || 800) * dpr);
+  const W = canvas.width;
+  const H = canvas.height;
+  // mulberry32 — the house seeded rng (Math.random is banned for reproducible feel).
+  let s = (seed * 0x9e3779b1 + (kind === 'eagle' ? 0x85ebca6b : 0xc2b2ae35) + 0x6d2b79f5) >>> 0;
+  const rnd = (): number => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  const albatross = kind === 'albatross';
+  // The bird is sized off the smaller screen edge so it reads on phone + desktop alike.
+  const span = Math.min(W, H) * (albatross ? 0.38 : 0.2);
+  const baseY = H * (albatross ? 0.34 : 0.3);
+  const speed = (albatross ? 0.26 : 0.42) * dpr; // px/ms across the screen
+  const flapHz = albatross ? 1.0 : 3.0; // wing-beats per second
+  const trailCols = albatross
+    ? ['#5fe6c8', '#7ab8ff', '#c98bff', '#9fffe0', '#ffffff']
+    : ['#eef3fb', '#cdd8ec', '#aebdd8', '#ffffff'];
+
+  // A handful of background twinkles so the sky reads alive even between passes.
+  const stars = Array.from({ length: 70 }, () => ({
+    x: rnd() * W, y: rnd() * H, r: (0.5 + rnd() * 1.4) * dpr, ph: rnd() * Math.PI * 2,
+  }));
+
+  type Tr = { x: number; y: number; vx: number; vy: number; life: number; max: number; col: string; r: number };
+  const trail: Tr[] = [];
+
+  // The flying bird, drawn facing +x, seen from above. Wings stay broadly spread (a soaring raptor /
+  // glider) and "flap" with a gentle foreshorten + sweep-back so they never collapse into the body.
+  // The albatross has very long, narrow wings; the eagle's are broad with splayed primary "fingers".
+  const chordF = albatross ? 0.5 : 0.82; // front-to-back wing depth (albatross = high aspect ratio)
+  const drawBird = (cx: number, cy: number, sc: number, phase: number): void => {
+    const flap = Math.sin(phase); // -1..1
+    const fore = 0.82 + 0.18 * (0.5 + 0.5 * Math.cos(phase)); // 0.82..1.0 — a gentle wing-beat
+    const wingSpan = sc * fore;
+    const back = sc * (albatross ? 0.42 : 0.5) + sc * (1 - fore) * 0.45; // wingtips sweep back as they flap
+    const depth = sc * 0.5 * chordF; // trailing-edge sweep depth
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(flap * 0.05); // a touch of bank
+
+    // Wing fill — a metallic/aurora gradient down the wingspan, with an ink edge so the wing reads
+    // crisply against the soft glow rather than washing into a blob.
+    const grad = ctx.createLinearGradient(0, -wingSpan, 0, wingSpan);
+    if (albatross) {
+      grad.addColorStop(0, '#cdb6ff');
+      grad.addColorStop(0.42, '#7ab8ff');
+      grad.addColorStop(0.58, '#5fe6c8');
+      grad.addColorStop(1, '#cdb6ff');
+    } else {
+      grad.addColorStop(0, '#f4f8ff');
+      grad.addColorStop(0.5, '#c2cee2');
+      grad.addColorStop(1, '#8395b4');
+    }
+
+    const wing = (sign: number): void => {
+      const tipY = sign * wingSpan;
+      ctx.beginPath();
+      if (albatross) {
+        // A long, slim, swept blade — the albatross's famous high-aspect wing.
+        ctx.moveTo(sc * 0.18, sign * sc * 0.05);
+        ctx.quadraticCurveTo(sc * 0.06, tipY * 0.42, -back, tipY); // leading edge sweeps out & back
+        ctx.quadraticCurveTo(-back - sc * 0.05, tipY * 0.62, -sc * 0.16, sign * sc * 0.02); // thin trailing edge
+      } else {
+        // A broad raptor wing with three splayed primary "fingers" at the swept tip.
+        ctx.moveTo(sc * 0.26, sign * sc * 0.04);
+        ctx.quadraticCurveTo(sc * 0.30, tipY * 0.55, -back, tipY);
+        ctx.lineTo(-back - sc * 0.12, tipY * 0.96);
+        ctx.lineTo(-back - sc * 0.1, tipY * 0.84);
+        ctx.lineTo(-back - sc * 0.22, tipY * 0.8);
+        ctx.lineTo(-back - sc * 0.2, tipY * 0.68);
+        ctx.quadraticCurveTo(-back - depth * 0.3, tipY * 0.5, -sc * 0.4, sign * sc * 0.03);
+      }
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.shadowColor = albatross ? 'rgba(120,230,210,.8)' : 'rgba(205,220,245,.65)';
+      ctx.shadowBlur = sc * 0.26;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = Math.max(1, sc * 0.016);
+      ctx.strokeStyle = albatross ? 'rgba(48,34,86,.5)' : 'rgba(56,68,96,.5)';
+      ctx.stroke();
+    };
+    wing(1);
+    wing(-1);
+
+    // Slim body fuselage + head + beak — small, so the wings dominate the silhouette.
+    ctx.fillStyle = albatross ? '#e7edff' : '#dde4ef';
+    ctx.beginPath();
+    ctx.ellipse(-sc * 0.02, 0, sc * 0.46, sc * 0.08, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(sc * 0.46, 0, sc * 0.09, 0, Math.PI * 2); // head
+    ctx.fill();
+    ctx.fillStyle = albatross ? '#ffce6e' : '#ffbe2e'; // beak (hooked-looking for the eagle)
+    ctx.beginPath();
+    ctx.moveTo(sc * 0.53, -sc * 0.04);
+    ctx.lineTo(sc * (albatross ? 0.82 : 0.76), 0);
+    ctx.lineTo(sc * 0.53, sc * 0.04);
+    ctx.closePath();
+    ctx.fill();
+    // Forked tail.
+    ctx.fillStyle = albatross ? '#9fb8ff' : '#aebdd8';
+    ctx.beginPath();
+    ctx.moveTo(-sc * 0.38, 0);
+    ctx.lineTo(-sc * 0.72, -sc * 0.12);
+    ctx.lineTo(-sc * 0.58, 0);
+    ctx.lineTo(-sc * 0.72, sc * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const start = performance.now();
+  const passLen = W + span * 3; // off-screen left to off-screen right
+  const passMs = passLen / speed;
+  const gapMs = albatross ? 700 : 450; // pause between passes
+  let frame = 0;
+
+  const tick = (): void => {
+    if (!canvas.isConnected) return; // overlay torn down → stop (never draw into a detached canvas)
+    frame++;
+    const now = performance.now();
+    const elapsed = now - start;
+    const cycle = passMs + gapMs;
+    const inCycle = elapsed % cycle;
+    const passIndex = Math.floor(elapsed / cycle);
+    const flying = inCycle < passMs;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background twinkles.
+    for (const st of stars) {
+      const tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(frame * 0.05 + st.ph));
+      ctx.globalAlpha = tw * 0.7;
+      ctx.fillStyle = '#cfe0ff';
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    let bx = 0;
+    let by = 0;
+    if (flying) {
+      const t = inCycle / passMs; // 0..1 across the screen
+      bx = -span * 1.5 + t * passLen;
+      // Each pass drifts at a slightly different height and gently undulates as it soars.
+      by = baseY + (passIndex % 2 === 0 ? 0 : H * 0.12) + Math.sin(t * Math.PI * (albatross ? 2 : 3)) * span * 0.18;
+      // Spawn trail particles from just behind the bird.
+      const n = albatross ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const col = trailCols[Math.floor(rnd() * trailCols.length)]!;
+        const r = (albatross ? 2.4 + rnd() * 3.2 : 1.4 + rnd() * 2) * dpr;
+        trail.push({
+          x: bx - span * 0.6 + (rnd() - 0.5) * span * 0.3,
+          y: by + (rnd() - 0.5) * span * (albatross ? 0.5 : 0.3),
+          vx: -speed * 0.25 + (rnd() - 0.5) * 0.4 * dpr,
+          vy: (rnd() - 0.5) * 0.4 * dpr + (albatross ? 0.1 : 0),
+          life: 0,
+          max: albatross ? 70 + rnd() * 50 : 36 + rnd() * 26,
+          col,
+          r,
+        });
+      }
+    }
+
+    // Draw + age the trail (soft additive glow; no per-particle shadowBlur — cheap).
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = trail.length - 1; i >= 0; i--) {
+      const p = trail[i]!;
+      p.life++;
+      p.x += p.vx;
+      p.y += p.vy;
+      const k = 1 - p.life / p.max;
+      if (k <= 0) {
+        trail.splice(i, 1);
+        continue;
+      }
+      ctx.globalAlpha = Math.max(0, Math.min(1, k)) * (albatross ? 0.55 : 0.7);
+      ctx.fillStyle = p.col;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.5 + k * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+
+    if (flying) {
+      const phase = (now / 1000) * flapHz * Math.PI * 2;
+      drawBird(bx, by, span, phase);
+    }
+
     (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
   };
   (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
@@ -2373,6 +2697,7 @@ function render(): void {
       decisionShotCount = -1;
       awaitingShotPopup = false;
       aceCelebratedHole = -1;
+      birdCelebratedHole = -1;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
@@ -2658,6 +2983,13 @@ function render(): void {
           animatedPutts = play.puttLogs.length;
           // The rarest shot in the game (GS-ace): the TEE shot holed out. Worth a full-screen takeover.
           const isAce = play.done && play.holed && play.strokes === 1;
+          // A holed −2 / −3 that ISN'T an ace earns its own fly-over (GS-bird). Ace wins precedence
+          // (a holed-out par-4 is technically an albatross, but a hole-in-one is the bigger moment).
+          const relToPar = play.holed ? play.strokes - play.hole.par : 0;
+          const birdKind: 'eagle' | 'albatross' | null =
+            play.done && play.holed && !isAce
+              ? relToPar <= -3 ? 'albatross' : relToPar === -2 ? 'eagle' : null
+              : null;
           // Terminal cue: ball in the cup vs found a hazard, as the ball settles.
           const lastShot = play.shots[play.shots.length - 1];
           if (play.holed) {
@@ -2690,6 +3022,16 @@ function render(): void {
                 () => render(),
               );
             }, feelMs.aceDelayMs ?? 380);
+          } else if (birdKind && birdCelebratedHole !== play.holeIndex) {
+            birdCelebratedHole = play.holeIndex;
+            popupTimer = window.setTimeout(() => {
+              popupTimer = 0;
+              showBirdCelebration(
+                birdKind,
+                { holeNo: play.holeIndex + 1, par: play.hole.par, club: lastShot?.club.name },
+                () => render(),
+              );
+            }, feelMs.birdDelayMs ?? 380);
           } else if (play.done) {
             const hold = feelMs.resultHoldMs ?? 700;
             popupTimer = window.setTimeout(() => {
