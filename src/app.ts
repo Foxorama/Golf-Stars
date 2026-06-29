@@ -25,7 +25,7 @@ import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread, type PlayedHole } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
+import { ACE_CREDIT_BONUS, clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
@@ -100,6 +100,7 @@ function boot(): void {
       shards: save.shards,
       metaUpgrades: save.metaUpgrades,
       maxAscension: save.maxAscension,
+      lifetimeAces: save.lifetimeAces,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -124,7 +125,7 @@ function recover(err: unknown): void {
   );
   stage('recover');
   try {
-    writeSave({ version: 4, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0 });
+    writeSave({ version: 5, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0, lifetimeAces: 0 });
   } catch {
     /* ignore */
   }
@@ -142,12 +143,13 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 4,
+    version: 5,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
     metaUpgrades: state.metaUpgrades,
     maxAscension: state.maxAscension,
+    lifetimeAces: state.lifetimeAces,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -163,6 +165,7 @@ const HAPTICS = {
   bad: 40, // penalty / missed cut — one heavy buzz
   holeOut: [12, 28, 12, 28, 20] as number[],
   madeCut: [10, 40, 10, 40, 18] as number[],
+  ace: [18, 40, 18, 40, 18, 40, 30] as number[], // the biggest beat — a long celebratory roll
 };
 function haptic(pattern: number | number[]): void {
   if (!getSettings().haptics) return;
@@ -281,6 +284,7 @@ function titleScreen(): string {
     </header>
     <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
+      ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
       ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' }, { variant: 'ghost' })}
       <button class="gs-btn gs-btn--ghost" data-open-settings="1">⚙ Settings</button>
       ${installButtonHTML()}
@@ -1123,6 +1127,182 @@ function burst(): string {
   return `<div class="gs-burst" aria-hidden="true">${sparks}</div>`;
 }
 
+// The hole index whose ace has already been celebrated, so the full-screen overlay fires exactly
+// once per hole-in-one (the play-view onDone can re-fire on a re-render). Reset per hole in render().
+let aceCelebratedHole = -1;
+
+/**
+ * The hole-in-one celebration (GS-ace) — a full-screen takeover for the rarest, biggest moment in the
+ * game. A cosmetic, assetless side-effect (like the loading intro + the play-view canvas): it mounts a
+ * fixed overlay with a Canvas2D fireworks/confetti show, a huge "HOLE IN ONE!" headline, the reward it
+ * earned, and a Continue button — then tears itself down and runs `onDismiss` (→ the normal end-of-hole
+ * screen). Degrades safely: reduced-motion skips the rAF loop (a static burst), and the whole thing is
+ * guarded so a cosmetic glitch can never strand the player on the hole.
+ */
+function showAceCelebration(
+  info: { holeNo: number; total: number; par: number; club?: string; aceNo: number },
+  onDismiss: () => void,
+): void {
+  try {
+    sfx.ace();
+    haptic(HAPTICS.ace);
+  } catch {
+    /* feel-only — never throw */
+  }
+  const reduced = getSettings().reducedMotion;
+  const overlay = document.createElement('div');
+  overlay.className = 'gs-ace';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', 'Hole in one');
+
+  let done = false;
+  const cleanup = (): void => {
+    if (done) return;
+    done = true;
+    const h = (canvas as unknown as { _raf?: number } | null)?._raf;
+    if (h) cancelAnimationFrame(h);
+    overlay.removeEventListener('click', onTap);
+    window.removeEventListener('keydown', onKey);
+    overlay.remove(); // detaches the canvas → the fireworks loop self-stops on the next frame
+    try {
+      onDismiss();
+    } catch {
+      /* the caller's render() guards itself */
+    }
+  };
+  const onTap = (e: MouseEvent): void => {
+    // Any tap on the backdrop (but not a drag-select) dismisses — the button does too.
+    e.preventDefault();
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') cleanup();
+  };
+
+  const rewardLine = (icon: string, label: string, detail: string): string =>
+    `<div class="gs-ace-reward"><span>${icon}</span><div><b>${label}</b><i>${detail}</i></div></div>`;
+  const rewardLines = [
+    rewardLine('💰', `+${ACE_CREDIT_BONUS} credits`, 'spend them at the next Pro Shop'),
+    rewardLine('🎯', "Ace's Touch", '+8% precision for the rest of the run · stacks'),
+    rewardLine('⛳', `Lifetime ace #${info.aceNo}`, 'a permanent record'),
+  ].join('');
+
+  overlay.innerHTML = `
+    <canvas class="gs-ace-fx" aria-hidden="true"></canvas>
+    <div class="gs-ace-card">
+      <div class="gs-ace-emoji" aria-hidden="true">⛳</div>
+      <div class="gs-ace-kicker">HOLE ${info.holeNo} · PAR ${info.par}</div>
+      <h1 class="gs-ace-title">HOLE IN ONE!</h1>
+      <div class="gs-ace-sub">Aced it${info.club ? ` with the ${info.club}` : ''} 🎉</div>
+      <div class="gs-ace-rewards">${rewardLines}</div>
+      <button class="gs-btn gs-btn--primary gs-ace-go" data-ace-continue="1">Continue →</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // The Continue button (and any backdrop tap / key) dismisses.
+  const goBtn = overlay.querySelector<HTMLButtonElement>('.gs-ace-go');
+  goBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cleanup();
+  });
+  overlay.addEventListener('click', onTap);
+  window.addEventListener('keydown', onKey);
+
+  // Fireworks + confetti on the canvas (skipped under reduced-motion — the card alone carries it).
+  const canvas = overlay.querySelector<HTMLCanvasElement>('.gs-ace-fx');
+  if (canvas && !reduced) {
+    try {
+      runAceFireworks(canvas, info.holeNo);
+    } catch {
+      /* a canvas fault must not strand the celebration */
+    }
+  }
+
+  // A long auto-dismiss safety net so the player is never stuck if they look away (well past the show).
+  window.setTimeout(() => cleanup(), reduced ? 4200 : 9000);
+}
+
+/** Deterministic, assetless fireworks + confetti for the ace overlay. Seeded so it's stable across
+ *  reloads (no Math.random); particles are capped and the loop self-cancels on overlay teardown. */
+function runAceFireworks(canvas: HTMLCanvasElement, seed: number): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const resize = (): void => {
+    canvas.width = Math.round((window.innerWidth || 400) * dpr);
+    canvas.height = Math.round((window.innerHeight || 800) * dpr);
+  };
+  resize();
+  // mulberry32 — the house seeded rng (Math.random is banned for reproducible feel).
+  let s = (seed * 0x9e3779b1 + 0x6d2b79f5) >>> 0;
+  const rnd = (): number => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const W = (): number => canvas.width;
+  const H = (): number => canvas.height;
+  const COLS = ['#ffd54a', '#5fd45a', '#4fd0e0', '#ff6bd0', '#ff8a3c', '#ffffff'];
+  type P = { x: number; y: number; vx: number; vy: number; life: number; max: number; col: string; r: number; conf: boolean };
+  const parts: P[] = [];
+  const burstAt = (x: number, y: number): void => {
+    const col = COLS[Math.floor(rnd() * COLS.length)]!;
+    const n = 26 + Math.floor(rnd() * 16);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rnd() * 0.3;
+      const sp = (1.6 + rnd() * 2.6) * dpr;
+      parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: 52 + rnd() * 34, col: rnd() < 0.25 ? '#ffffff' : col, r: (1.6 + rnd() * 2.2) * dpr, conf: false });
+    }
+  };
+  const confetti = (): void => {
+    const x = rnd() * W();
+    parts.push({ x, y: -10 * dpr, vx: (rnd() - 0.5) * 1.2 * dpr, vy: (1.2 + rnd() * 1.6) * dpr, life: 0, max: 150 + rnd() * 80, col: COLS[Math.floor(rnd() * COLS.length)]!, r: (2 + rnd() * 2.4) * dpr, conf: true });
+  };
+  let frame = 0;
+  const grav = 0.045 * dpr;
+  const tick = (): void => {
+    // The overlay was torn down (Continue / tap / safety timeout) → stop the loop, never draw into a
+    // detached canvas (the orphaned-rAF hazard the codebase warns about).
+    if (!canvas.isConnected) return;
+    frame++;
+    // Launch a few bursts early, then keep a gentle confetti rain going.
+    if (frame < 90 && frame % 12 === 0) burstAt((0.2 + rnd() * 0.6) * W(), (0.2 + rnd() * 0.4) * H());
+    if (frame % 4 === 0 && parts.length < 360) confetti();
+    ctx.clearRect(0, 0, W(), H());
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]!;
+      p.life++;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += grav;
+      if (!p.conf) p.vx *= 0.985;
+      const k = 1 - p.life / p.max;
+      if (k <= 0 || p.y > H() + 20 * dpr) {
+        parts.splice(i, 1);
+        continue;
+      }
+      ctx.globalAlpha = Math.max(0, Math.min(1, k * 1.4));
+      ctx.fillStyle = p.col;
+      if (p.conf) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.life * 0.2 + p.x);
+        ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
+        ctx.restore();
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
+  };
+  (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
+}
+
 /** A momentum rail: one pip per hole in the stop, coloured by the score already made (eagle gold →
  *  blow-up red), the current hole ringed, upcoming holes dim — so the run's shape reads at a glance. */
 function holePips(): string {
@@ -1214,6 +1394,11 @@ function playingBody(animating: boolean): string {
     const holePts = stablefordPoints(par, play.pickedUp ? par + 6 : play.strokes);
     const d = play.pickedUp ? 99 : play.strokes - par;
     const scoreCol = d < 0 ? '#5fd45a' : d === 0 ? 'var(--gs-ink)' : d === 1 ? '#ffce54' : '#ff6b6b';
+    const isAce = play.holed && play.strokes === 1;
+    // After the celebration overlay lifts, the end-of-hole screen confirms the ace reward in place.
+    const aceNote = isAce
+      ? `<div style="margin:0 0 -2px;max-width:460px;background:linear-gradient(180deg,#1c1708,#120f06);border:1px solid rgba(255,213,74,.4);border-radius:12px;padding:9px 14px;font-size:12.5px;color:var(--gs-gold);">⛳ <b>Hole-in-one!</b> +${ACE_CREDIT_BONUS} credits · Ace's Touch (+8% precision) earned for the run.</div>`
+      : '';
     const scoreBanner = `
       <div style="display:flex;align-items:center;gap:14px;background:#0d1016;border:1px solid var(--gs-line);border-radius:12px;padding:12px 16px;max-width:460px;">
         <div style="text-align:center;min-width:48px;">
@@ -1241,6 +1426,7 @@ function playingBody(animating: boolean): string {
     return `
       ${header()}
       <div style="position:relative;">${birdieOrBetter ? burst() : ''}</div>
+      ${aceNote}
       ${scoreBanner}
       <div style="margin:12px 0;max-width:460px;">${progress}</div>
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
@@ -1883,6 +2069,7 @@ function render(): void {
       selAimBearing = null;
       decisionShotCount = -1;
       awaitingShotPopup = false;
+      aceCelebratedHole = -1;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
@@ -2128,6 +2315,8 @@ function render(): void {
         onDone: () => {
           animatedShots = play.shots.length;
           animatedPutts = play.puttLogs.length;
+          // The rarest shot in the game (GS-ace): the TEE shot holed out. Worth a full-screen takeover.
+          const isAce = play.done && play.holed && play.strokes === 1;
           // Terminal cue: ball in the cup vs found a hazard, as the ball settles.
           const lastShot = play.shots[play.shots.length - 1];
           if (play.holed) {
@@ -2138,12 +2327,29 @@ function render(): void {
             haptic(HAPTICS.bad);
           }
           // Hold a beat after the ball settles so the finish reads as finished before the next screen
-          // — chipping/putting used to cut to the follow-up instantly. Three cases:
+          // — chipping/putting used to cut to the follow-up instantly. Cases:
+          //  • a HOLE-IN-ONE → a brief beat for the ball to drop, then the celebration overlay (which
+          //    runs onDismiss → render() to land on the normal end-of-hole screen);
           //  • non-terminal full shot → pop the rich shot-result card (auto-advances if Fast Shots is on);
           //  • terminal (holed/picked up/auto putt-out done) → a longer hold, then the done screen;
           //  • non-terminal putt(s) only (manual lag) → a brief hold, then back to the putt meter.
           const feelMs = (window as unknown as { _gsFeel?: Record<string, number> })._gsFeel ?? {};
-          if (play.done) {
+          if (isAce && aceCelebratedHole !== play.holeIndex) {
+            aceCelebratedHole = play.holeIndex;
+            popupTimer = window.setTimeout(() => {
+              popupTimer = 0;
+              showAceCelebration(
+                {
+                  holeNo: play.holeIndex + 1,
+                  total: state.course.holes.length,
+                  par: play.hole.par,
+                  club: lastShot?.club.name,
+                  aceNo: state.lifetimeAces + 1, // this ace (counted into the save at stop scoring)
+                },
+                () => render(),
+              );
+            }, feelMs.aceDelayMs ?? 380);
+          } else if (play.done) {
             const hold = feelMs.resultHoldMs ?? 700;
             popupTimer = window.setTimeout(() => {
               popupTimer = 0;

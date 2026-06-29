@@ -125,9 +125,9 @@ describe('matchplay boss stop scoring (GS-matchplay)', () => {
       stopIndex: 2,
       distanceFromStart: 4,
       history: [
-        { stopIndex: 0, distanceFromStart: 0, biome: 'verdant-station', rarity: 'common', stableford: 18, gross: 24, cut: 6, passed: true, creditsEarned: 0 },
-        { stopIndex: 1, distanceFromStart: 2, biome: 'dust-belt', rarity: 'common', stableford: 19, gross: 25, cut: 7, passed: true, creditsEarned: 0 },
-        { stopIndex: 2, distanceFromStart: 4, biome: 'ice-ring', rarity: 'rare', stableford: 20, gross: 30, cut: 9, passed: true, creditsEarned: 0 },
+        { stopIndex: 0, distanceFromStart: 0, biome: 'verdant-station', rarity: 'common', stableford: 18, gross: 24, cut: 6, passed: true, creditsEarned: 0, aces: 0 },
+        { stopIndex: 1, distanceFromStart: 2, biome: 'dust-belt', rarity: 'common', stableford: 19, gross: 25, cut: 7, passed: true, creditsEarned: 0, aces: 0 },
+        { stopIndex: 2, distanceFromStart: 4, biome: 'ice-ring', rarity: 'rare', stableford: 20, gross: 30, cut: 9, passed: true, creditsEarned: 0, aces: 0 },
       ],
     };
     const board = leaderboard(run);

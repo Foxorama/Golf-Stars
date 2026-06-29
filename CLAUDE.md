@@ -732,6 +732,33 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   new `_gs*`/URL hook (the test-hub guard needs nothing; the Sim Lab absorbs the talents as data).
   Tests: `tests/talents.test.ts` (talents out of the shop, perk rebuild, themed/deterministic draw, free
   idempotent grant, the reducer pick→shop flow).
+- **A hole-in-one is the game's biggest moment — a full-screen celebration + a carry-forward reward
+  (GS-ace).** An ACE is the tee shot holed (`holed && strokes === 1`), astronomically rare, so it pays a
+  real jackpot in THREE layers. The reward is applied in the PURE `finishStop` (so the auto sim and the
+  interactive player reward an ace byte-for-byte identically, guarded): (1) a flat **credit jackpot**
+  (`ACE_CREDIT_BONUS` 40 per ace, folded into `creditsForStop`'s pre-multiplier `bonusFlat` so it
+  COMPOUNDS with credit perks exactly like a relic — paid on a passed stop); (2) a **stacking precision
+  talent** ("Ace's Touch", `ACE_TALENT_ID 'talent-ace'`, −8% `dispersionMult` per ace) granted via
+  `grantAceTalent` — it pushes the perk id once per ace so `loadoutFromPerks` rebuilds the exact stack on
+  resume (NO save bump for the run side). The talent lives in `TALENTS` with `archetype: 'ace'` so
+  `talentsForArchetype` excludes it from BOTH the themed and generic boss draws (it's ace-only, never
+  offered) yet `talentItem` still resolves it for resume. `StopResult.aces` records the count. A precision
+  boost can only EVER help scoring, so it can't trip the no-death-spiral bar (the full suite stays green —
+  aces don't occur in the seeded balance sims, so no seeded-number test shifted). (3) A **lifetime ace
+  tally** (`save v5` `lifetimeAces`, migrated v4→v5) — a permanent cross-run record shown on the title;
+  the reducer banks `result.aces` into `state.lifetimeAces` at every stop completion (the single
+  chokepoint that sees both watched + interactive aces). The **celebration** is a cosmetic app.ts
+  side-effect (like the loading intro / play-view canvas — NOT in the reducer, so determinism is
+  untouched): `showAceCelebration` mounts a fixed full-screen overlay with a seeded Canvas2D fireworks +
+  confetti show (`runAceFireworks`, mulberry32, NO `Math.random`; the loop self-stops on `!canvas.isConnected`
+  so it can't orphan a rAF), a gold "HOLE IN ONE!" headline, the reward reveal, and a Continue button →
+  `onDismiss` renders the normal end-of-hole screen (which confirms the reward in an `aceNote`). Fired from
+  the play-view `onDone` when the terminal shot is an ace, guarded once-per-hole (`aceCelebratedHole`,
+  reset per hole in `render`); reduced-motion drops the rAF loop (a static card). New cue `sfx.ace()` (a
+  grand fanfare) + `HAPTICS.ace`. NB: NO new `_gs*` flag or `?param` — the celebration timing rides the
+  existing `_gsFeel` (`aceDelayMs` sub-field), so the test-hub guard needs no new control. Tests:
+  `tests/ace.test.ts` (count/credit/talent helpers, ace-only talent, `finishStop` pays + applies +
+  records, no-ace no-regression, snapshot/resume rebuild) + `tests/save.test.ts` (v5 migration).
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only

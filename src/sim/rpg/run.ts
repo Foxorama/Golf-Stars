@@ -17,9 +17,12 @@ import type { Course, Rarity } from '../course/contract';
 import {
   DRIVER_ID,
   SHOP_ITEMS,
+  aceCount,
+  aceCreditBonus,
   canBuy,
   creditsForStop,
   cutLine,
+  grantAceTalent,
   itemCap,
   itemCost,
   itemTags,
@@ -61,6 +64,8 @@ export interface StopResult {
   cut: number;
   passed: boolean;
   creditsEarned: number;
+  /** Holes-in-one made this stop (GS-ace) — drives the celebration + the carry-forward reward. */
+  aces: number;
 }
 
 export interface Route {
@@ -262,8 +267,12 @@ export function finishStop(
   // Trigger-relic payouts (GS-synergy) add to the base before the credit multiplier, so they
   // synergise with credit perks/events. Zero for a base loadout (no relics).
   const relicBonus = relicCreditBonus(run.loadout, played, passed);
+  // Hole-in-one jackpot (GS-ace): a flat credit bundle per ace, folded into the pre-multiplier bonus
+  // so it compounds with credit perks — exactly like a relic. Paid on a passed stop (a missed cut ends
+  // the run, so its credits are moot); the carry-forward talent below is granted regardless.
+  const aces = aceCount(played);
   const creditsEarned = passed
-    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult, relicBonus)
+    ? creditsForStop(totals.stableford, run.loadout.creditMult * event.creditMult, relicBonus + aceCreditBonus(played))
     : 0;
   // Clearing the FINAL boss of a winnable voyage WINS the run (GS-voyage).
   const won = passed && isFinalStop(getFormat(run.formatId), run.stopIndex);
@@ -279,10 +288,17 @@ export function finishStop(
     cut,
     passed,
     creditsEarned,
+    aces,
   };
+
+  // Each ace stacks the Ace's Touch talent (GS-ace) — a precision boost kept for the rest of the run,
+  // rebuilt from `loadout.perks` on resume. Applied IN finishStop so the auto sim and the interactive
+  // player reward an ace byte-for-byte identically.
+  const loadout = grantAceTalent(run.loadout, aces);
 
   const next: Run = {
     ...run,
+    loadout,
     credits: run.credits + creditsEarned,
     history: [...run.history, result],
     // The event is spent — clear it so a resume can't double-apply it next stop.

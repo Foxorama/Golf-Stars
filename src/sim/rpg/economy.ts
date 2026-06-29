@@ -44,6 +44,46 @@ export function creditsForStop(stableford: number, creditMult = 1, bonusFlat = 0
   return Math.max(0, Math.round((stableford * CREDIT_PER_POINT + bonusFlat) * creditMult));
 }
 
+/**
+ * Hole-in-one reward (GS-ace). An ace (the tee shot holed, `holed && strokes === 1`) is the rarest
+ * shot in the game, so it pays a real jackpot that CARRIES FORWARD: a flat credit bundle (folded into
+ * `finishStop`'s pre-multiplier bonus, so it compounds with credit perks just like a relic), PLUS a
+ * stacking precision **talent** ("Ace's Touch") that you keep for the rest of the run. Both are applied
+ * in the pure `finishStop`, so the auto sim and the interactive player reward an ace IDENTICALLY.
+ */
+export const ACE_CREDIT_BONUS = 40;
+/** The stacking precision talent an ace grants — kept out of boss draws via the `'ace'` archetype. */
+export const ACE_TALENT_ID = 'talent-ace';
+
+/** Number of holes-in-one in a played stop (the tee shot holed). Pure; used by `finishStop`. */
+export function aceCount(
+  played: readonly { record: { strokes: number }; holed: boolean }[],
+): number {
+  return played.reduce((n, p) => n + (p.holed && p.record.strokes === 1 ? 1 : 0), 0);
+}
+
+/** The flat credit bonus for the aces in a stop (folded into `creditsForStop`'s `bonusFlat`). */
+export function aceCreditBonus(
+  played: readonly { record: { strokes: number }; holed: boolean }[],
+): number {
+  return aceCount(played) * ACE_CREDIT_BONUS;
+}
+
+/**
+ * Fold the Ace's Touch talent into a loadout once per ace (GS-ace). It STACKS — each ace pushes the
+ * perk id again so `loadoutFromPerks` rebuilds the exact stack on resume, and tightens dispersion a
+ * touch more. A precision boost can only ever HELP scoring (it can't trip the no-death-spiral bar),
+ * so it's a safe reward for an astronomically rare shot.
+ */
+export function grantAceTalent(loadout: PlayerLoadout, aces: number): PlayerLoadout {
+  if (aces <= 0) return loadout;
+  const t = talentItem(ACE_TALENT_ID);
+  if (!t) return loadout;
+  let m = loadout;
+  for (let i = 0; i < aces; i++) m = t.apply(m);
+  return m;
+}
+
 /** The mutable player state a shop item modifies. Fully serialisable (data only). */
 export interface PlayerLoadout {
   bag: Club[];
@@ -1047,6 +1087,14 @@ export const TALENTS: readonly ShopItem[] = [
     id: 'talent-fairwaymaster', name: 'Fairway Master', archetype: 'verdant', cost: 0, rarity: 'epic', talent: true,
     desc: 'Parkland precision — 10% tighter and less coming up short.',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.9, minCarryBoost: m.minCarryBoost + 0.04, perks: [...m.perks, 'talent-fairwaymaster'] }),
+  },
+  // Ace reward (GS-ace) — granted ONLY by a hole-in-one, never offered at a boss. The `'ace'`
+  // archetype is matched by no zone (inferno/frost/desert/void/verdant) and isn't `!archetype`
+  // either, so `talentsForArchetype` excludes it from both the themed and generic boss draws.
+  {
+    id: 'talent-ace', name: "Ace's Touch", archetype: 'ace', cost: 0, rarity: 'legendary', talent: true,
+    desc: 'A hole-in-one earns a touch you keep — 8% tighter dispersion (stacks with every ace).',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.92, perks: [...m.perks, 'talent-ace'] }),
   },
 ];
 
