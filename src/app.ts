@@ -27,7 +27,8 @@ import { bearing, dist, type Hole } from './sim/course/contract';
 import { type ShotSpread, type PlayedHole } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { ACE_CREDIT_BONUS, clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
+import { ACE_CREDIT_BONUS, clubOfferNote, isHybridType, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, REWARD_CLUB_TYPES, shopItem, usableBag } from './sim/rpg/economy';
+import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
@@ -1800,6 +1801,63 @@ function bossRewardScreen(): string {
     </section>`;
 }
 
+// A short headline for a club chip — the bag ids ('D','5W','PW','60') already read well; only the
+// long-form ids need a friendly cap.
+function shortClubLabel(id: string): string {
+  if (id === 'putter') return 'Putt';
+  if (id === 'chip') return 'Chip';
+  return id;
+}
+
+// The player's FULL bag inventory on the shop screen (GS-clubs-2): every club you carry shown with its
+// rarity, plus every reward-club SLOT you don't yet carry greyed out — so you can see at a glance what
+// is in the bag, what a shop club would replace, and which gaps a new club would fill. Pure render off
+// the live loadout (no hook, no save state).
+function bagInventoryHTML(): string {
+  const loadout = state.run.loadout;
+  const bag = loadout.bag;
+  // Universe of club TYPES: everything you carry, plus every rewardable slot (so empty slots read as
+  // greyed gaps). Larry never sees hybrids, so don't show empty hybrid slots he could never fill.
+  const types = new Set<string>(bag.map((c) => c.id));
+  for (const t of REWARD_CLUB_TYPES) {
+    if (loadout.noHybrids && isHybridType(t)) continue;
+    types.add(t);
+  }
+  // Club types for sale this stop, so an owned-or-empty slot can flag "available now".
+  const offered = new Set<string>(
+    (state.shopOffer ?? []).map((id) => shopItem(id)?.clubType).filter((t): t is string => !!t),
+  );
+  const carryOf = (t: string) => bag.find((c) => c.id === t)?.carry ?? clubById(t, CLUBS)?.carry ?? 0;
+  const chips = [...types]
+    .sort((a, b) => carryOf(b) - carryOf(a))
+    .map((t) => {
+      const owned = bag.find((c) => c.id === t);
+      const base = clubById(t, CLUBS);
+      const name = owned?.name ?? base?.name ?? t;
+      const carry = carryOf(t);
+      const rarity = owned?.rarity ?? 'common';
+      const col = owned ? rarCol(rarity) : '#5a6172';
+      const inShop = offered.has(t);
+      // Owned tier label: a reward club shows its rarity, a starting club reads "stock"; an empty slot reads "empty".
+      const tierLabel = owned ? (owned.set && owned.set !== 'starter' ? rarity : 'stock') : 'empty';
+      return `<div title="${name} · ~${carry} yd${owned ? ` · ${rarity}` : ' · not in bag'}"
+        style="display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-width:50px;
+        padding:5px 7px;border:1.5px solid ${owned ? col : col + '66'};border-radius:9px;
+        background:${owned ? col + '14' : '#ffffff05'};opacity:${owned ? 1 : 0.5};">
+        <span style="font-size:12.5px;font-weight:800;letter-spacing:.02em;">${shortClubLabel(t)}</span>
+        <span style="font-size:9.5px;opacity:.75;">${carry} yd</span>
+        <span style="font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:${col};">${inShop ? '🛒 ' : ''}${tierLabel}</span>
+      </div>`;
+    })
+    .join('');
+  return `
+    <div style="margin:.2em 0 .9em;padding:9px 11px;border:1px solid var(--gs-line-2);border-radius:10px;background:#ffffff05;">
+      <div style="font-size:12px;font-weight:700;opacity:.85;margin-bottom:7px;">🎒 Your bag — equipped clubs &amp; empty slots</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+      <div style="font-size:10px;opacity:.55;margin-top:7px;">Coloured = equipped (border shows rarity). Greyed = an empty slot a reward club could fill. 🛒 = on sale in this shop.</div>
+    </div>`;
+}
+
 function shopScreen(): string {
   const perks = state.run.loadout.perks;
   const credits = state.run.credits;
@@ -1849,6 +1907,7 @@ function shopScreen(): string {
     <h2 style="font-size:16px;">🏌 Pro Shop · ${credits} credits</h2>
     ${proGreetingHTML()}
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — early stops stock cheap commons, deeper stops stock rare/epic power. Stackable upgrades cost more the more you own; rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up. Hire one caddy and the rest stay home.</p>
+    ${bagInventoryHTML()}
     <div style="display:flex;flex-wrap:wrap;">${stock}</div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       ${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}
