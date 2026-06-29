@@ -109,6 +109,13 @@ export function buildField(seed: number | string, arcIndex: number, arc: Arc, pl
     isPlayer: true,
   });
 
+  // The chosen character IS the player — reserve their mirror so it can never re-enter the field as a
+  // rival (otherwise the fill pass in step 4, which only checks `used`, would add the golfer the player
+  // is playing as, showing them twice: once as "You" and once under their own name).
+  if (player.characterId) {
+    for (const g of GOLFERS.filter((x) => x.mirrorsCharacter === player.characterId)) used.add(g.id);
+  }
+
   // 2) Champions of this arc's constellations (a seeded sample, up to ~9 — enough that the favourite is
   //    present, not so many the field is all champions).
   const arcChampions = shuffle(

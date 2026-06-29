@@ -50,6 +50,20 @@ describe('buildField', () => {
     expect(mirrors.length).toBeGreaterThan(0); // the others are in
   });
 
+  it('never re-admits the chosen character as a rival via the fill pass (any seed/arc/character)', () => {
+    // The chosen character is the player ("You"); their mirror must never ALSO appear under its own
+    // name — otherwise the leaderboard shows the picked golfer twice.
+    for (const characterId of ['feather-fade', 'huang-woo-hook', 'longshot-larry', 'backspin-bo']) {
+      for (let seed = 0; seed < 40; seed++) {
+        for (const arc of [1, 2, 3] as const) {
+          const f = buildField(seed, 0, arc, { ...player, characterId });
+          const mirrors = f.golfers.filter((g) => g.mirrorsCharacter).map((g) => g.mirrorsCharacter);
+          expect(mirrors, `seed ${seed} arc ${arc} char ${characterId}`).not.toContain(characterId);
+        }
+      }
+    }
+  });
+
   it('seeds champions into the field', () => {
     const f = makeField();
     expect(f.golfers.some((g) => g.tier === 'champion')).toBe(true);
