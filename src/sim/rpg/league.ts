@@ -192,13 +192,16 @@ export interface LivePosition {
 }
 
 /**
- * The player's LIVE leaderboard position mid-stop (GS-100) — the arc total from completed stops plus
- * the in-progress stop's partial: the player's `playerStopSF` over `holesPlayed` holes, and each
- * ghost's score over the SAME holes. Drives the per-hole "you're Nth" chip on the play screen, so the
- * board updates the moment a hole is finished. Pure/deterministic.
+ * The FULL live arc leaderboard mid-stop (GS-100) — the cumulative arc board through the completed
+ * stops PLUS the in-progress stop's partial: the player's `playerStopSF` over `holesPlayed` holes and
+ * each ghost's score over the SAME holes. This is what the end-of-hole screen shows, so the standings
+ * visibly move every hole. `stopScore` is the in-progress stop partial; `thru` counts the partial holes.
+ * The cut line is the stop's effective cut for context, but the per-stop cut flag is left UNSET mid-stop
+ * (a partial stop hasn't been scored against the cut yet — the caller hides the divider for the live view).
+ * Pure/deterministic.
  */
-export function livePosition(run: Run, holesPlayed: number, playerStopSF: number): LivePosition {
-  const board = leaderboard(run); // completed arc stops
+export function liveLeaderboard(run: Run, holesPlayed: number, playerStopSF: number): Leaderboard {
+  const board = leaderboard(run); // completed arc stops (cumulative)
   const field = board.field;
   const course = currentCourse(run);
   const themeId = course.meta?.themeId;
@@ -206,8 +209,10 @@ export function livePosition(run: Run, holesPlayed: number, playerStopSF: number
   const pressure = stopPressure(run.stopIndex);
 
   const totals = new Map<string, number>();
+  const stopScores = new Map<string, number>();
   for (const s of board.standings) totals.set(s.golferId, s.total);
   totals.set(PLAYER_ID, (totals.get(PLAYER_ID) ?? 0) + playerStopSF);
+  stopScores.set(PLAYER_ID, playerStopSF);
   for (const g of field.golfers) {
     if (g.isPlayer) continue;
     let sf = 0;
@@ -215,11 +220,34 @@ export function livePosition(run: Run, holesPlayed: number, playerStopSF: number
       sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure);
     }
     totals.set(g.id, (totals.get(g.id) ?? 0) + sf);
+    stopScores.set(g.id, sf);
   }
 
-  const rows = field.golfers.map((g) => ({ id: g.id, total: totals.get(g.id) ?? 0 }));
-  rows.sort((a, b) => b.total - a.total);
-  const position = rows.findIndex((r) => r.id === PLAYER_ID) + 1;
-  const total = rows.find((r) => r.id === PLAYER_ID)?.total ?? 0;
-  return { position, total, of: rows.length, gapToLead: (rows[0]?.total ?? 0) - total };
+  const thru = board.thru + holesPlayed;
+  const rows: Standing[] = field.golfers.map((g) => ({
+    golferId: g.id,
+    name: g.name,
+    shortName: g.shortName,
+    tier: g.tier,
+    look: g.look,
+    isPlayer: g.isPlayer,
+    total: totals.get(g.id)!,
+    thru,
+    stopScore: stopScores.get(g.id)!,
+    position: 0,
+  }));
+  rankStandings(rows);
+  const cut = effectiveCut(run, holesForStop(run, run.stopIndex));
+  return { field, standings: rows, cut, survivors: field.golfers.length, thru, hasScores: true };
+}
+
+/**
+ * The player's LIVE leaderboard position mid-stop (GS-100) — drives the per-hole "you're Nth" play-HUD
+ * chip. A thin projection of `liveLeaderboard` onto the player's row. Pure/deterministic.
+ */
+export function livePosition(run: Run, holesPlayed: number, playerStopSF: number): LivePosition {
+  const board = liveLeaderboard(run, holesPlayed, playerStopSF);
+  const me = board.standings.find((s) => s.isPlayer)!;
+  const lead = board.standings[0]?.total ?? 0;
+  return { position: me.position, total: me.total, of: board.standings.length, gapToLead: lead - me.total };
 }

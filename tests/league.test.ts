@@ -8,6 +8,7 @@ import {
   holesForStop,
   runField,
   leaderboard,
+  liveLeaderboard,
   arcBossId,
   playerInfoFor,
   livePosition,
@@ -112,6 +113,40 @@ describe('livePosition', () => {
   it('is deterministic', () => {
     const run = startRun('live2', 'voyage', {}, 'feather-fade');
     expect(livePosition(run, 4, 8)).toEqual(livePosition(run, 4, 8));
+  });
+});
+
+describe('liveLeaderboard', () => {
+  it('returns the full field, ranked, with a live player row that climbs as they score', () => {
+    const run = startRun('llb', 'voyage', {}, 'feather-fade');
+    const of = runField(run).golfers.length;
+    const weak = liveLeaderboard(run, 6, 3);
+    const strong = liveLeaderboard(run, 6, 18);
+    expect(weak.standings.length).toBe(of);
+    expect(strong.standings.length).toBe(of);
+    // sorted by total desc, positions 1..N
+    for (let i = 1; i < strong.standings.length; i++) {
+      expect(strong.standings[i - 1]!.total).toBeGreaterThanOrEqual(strong.standings[i]!.total);
+    }
+    const me = (b: ReturnType<typeof liveLeaderboard>) => b.standings.find((s) => s.isPlayer)!;
+    expect(me(strong).position).toBeLessThan(me(weak).position);
+    expect(me(strong).total).toBeGreaterThan(me(weak).total);
+    expect(me(weak).thru).toBe(6);
+  });
+
+  it('agrees with livePosition on the player row', () => {
+    const run = startRun('llb2', 'voyage', {}, 'feather-fade');
+    const board = liveLeaderboard(run, 4, 9);
+    const lp = livePosition(run, 4, 9);
+    const me = board.standings.find((s) => s.isPlayer)!;
+    expect(lp.position).toBe(me.position);
+    expect(lp.total).toBe(me.total);
+    expect(lp.of).toBe(board.standings.length);
+  });
+
+  it('is deterministic', () => {
+    const run = startRun('llb3', 'voyage', {}, 'feather-fade');
+    expect(liveLeaderboard(run, 3, 7)).toEqual(liveLeaderboard(run, 3, 7));
   });
 });
 
