@@ -22,18 +22,19 @@ import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById, type BiomeArchetype } from './sim/course/themes';
 import { zoneProfile, difficultyPips, shopPro, proMood, proLine, sectionEvents } from './sim/course/zones';
 import { bearing, dist, type Hole } from './sim/course/contract';
-import { type ShotSpread } from './sim/round';
+import { type ShotSpread, type PlayedHole } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
-import { leaderboard, runField, arcBossId, livePosition, type Leaderboard } from './sim/rpg/league';
+import { leaderboard, liveLeaderboard, runField, arcBossId, livePosition, type Leaderboard } from './sim/rpg/league';
+import { holeResult } from './sim/rpg/play';
 import { PLAYER_ID, type Field } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss } from './sim/rpg/formats';
-import { matchScoreline, matchState } from './sim/rpg/match';
+import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
 import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
@@ -507,15 +508,17 @@ function competitorsCard(field: Field): string {
     </div>`;
 }
 
-/** The leaderboard table for the result screen — cumulative arc total, this-stop score, cut line. */
-function leaderboardHTML(board: Leaderboard): string {
+/** The leaderboard table for the result screen — cumulative arc total, this-stop score, cut line.
+ *  `opts.live` renders the mid-stop board (used on the end-of-hole screen): the title reads THRU N and
+ *  the per-stop cut divider is suppressed (a partial stop hasn't been scored against the cut yet). */
+function leaderboardHTML(board: Leaderboard, opts: { live?: boolean } = {}): string {
   let drewCut = false;
   const rows = board.standings
     .map((s) => {
       const me = s.isPlayer;
-      // Draw the cut divider just before the first cut golfer.
+      // Draw the cut divider just before the first cut golfer (not on the live mid-stop board).
       const divider =
-        !drewCut && s.cut
+        !opts.live && !drewCut && s.cut
           ? ((drewCut = true),
             `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;color:#ff6b6b;font-size:10.5px;letter-spacing:.1em;">
               <div style="flex:1;height:1px;background:#ff6b6b66;"></div>CUT · ${board.cut} pts<div style="flex:1;height:1px;background:#ff6b6b66;"></div></div>`)
@@ -623,6 +626,40 @@ function matchResultPanel(): string {
       </div>
       <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:9px;">${cells}</div>
       <div style="font-size:11px;opacity:.6;margin-top:6px;">Hole-by-hole vs ${opp?.name ?? 'the leader'} — W win · L loss · ½ halved.</div>
+    </div>`;
+}
+
+/** Live matchplay progress for the end-of-hole screen: the running scoreline + W/L/½ pips vs the boss,
+ *  built from the holes finished so far against the boss's pre-played ball. */
+function holeMatchProgressHTML(playedSoFar: PlayedHole[]): string {
+  const m = state.match;
+  if (!m) return '';
+  const duels = playedSoFar.map((p, i) => holeDuel(i, state.course.holes[i]!.par, p, m.bossHoles[i]!));
+  const st = matchState(duels, state.course.holes.length);
+  const opp = getGolfer(m.bossId);
+  const line =
+    st.holesUp > 0 ? `You ${matchScoreline(st)}` : st.holesUp < 0 ? `${opp?.shortName ?? 'Boss'} ${Math.abs(st.holesUp)} UP` : 'All square';
+  const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
+  const last = duels[duels.length - 1];
+  const lastLine = last
+    ? `<div style="font-size:11.5px;opacity:.8;margin-top:6px;">This hole: you <b>${last.playerStrokes}</b> v <b>${last.bossStrokes}</b> ${opp?.shortName ?? 'Boss'} — ${last.winner === 'player' ? '<span style="color:#5fd45a;">won</span>' : last.winner === 'boss' ? '<span style="color:#ff6b6b;">lost</span>' : 'halved'}</div>`
+    : '';
+  const cells = duels
+    .map((d) => {
+      const c = d.winner === 'player' ? '#5fd45a' : d.winner === 'boss' ? '#ff6b6b' : '#6b7280';
+      return `<span title="Hole ${d.holeIndex + 1}: you ${d.playerStrokes} v ${d.bossStrokes}" style="width:18px;height:18px;border-radius:3px;background:${c}33;border:1px solid ${c};font-size:10px;display:inline-flex;align-items:center;justify-content:center;color:${c};">${
+        d.winner === 'player' ? 'W' : d.winner === 'boss' ? 'L' : '½'
+      }</span>`;
+    })
+    .join('');
+  return `<div style="border:1px solid ${col};border-radius:10px;padding:10px;background:linear-gradient(180deg,#160d12,#0d1016);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        ${opponentBadge(m.bossId, 'Matchplay')}
+        <div style="text-align:right;"><div style="font-size:17px;font-weight:900;color:${col};">${line}</div>
+          <div style="font-size:11px;opacity:.7;">thru ${st.thru}/${state.course.holes.length}</div></div>
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:9px;">${cells}</div>
+      ${lastLine}
     </div>`;
 }
 
@@ -1140,11 +1177,26 @@ function playingBody(animating: boolean): string {
       ? puttCardHTML(play.puttLogs, { holed: play.holed, pickedUp: play.pickedUp })
       : '';
     const birdieOrBetter = !play.pickedUp && play.strokes <= par - 1;
+    // The end-of-hole screen IS the leaderboard screen now: include the hole just finished (it isn't in
+    // stopPlayed until `holeComplete`) and show the live arc standings so you track progress every hole.
+    // On a matchplay boss stop the duel HUD is the relevant tracker, so the board is replaced by it.
+    const playedSoFar = [...(state.stopPlayed ?? []), holeResult(play)];
+    const lastIsHoled = play.holed && play.shots.some((s) => s.holed);
+    const progress = state.match
+      ? holeMatchProgressHTML(playedSoFar)
+      : (() => {
+          const sf = playTotals(playedSoFar.map((p) => p.record)).stableford;
+          const board = liveLeaderboard(state.run, playedSoFar.length, sf);
+          const me = board.standings.find((s) => s.isPlayer)!;
+          const place = `<p style="font-size:13px;margin:.4em 0 .5em;">You're <b style="color:${me.position <= 3 ? '#5fd45a' : me.position <= board.standings.length / 2 ? '#ffce54' : '#ff6b6b'};">${ordinal(me.position)}</b> of ${board.standings.length} · ${board.thru} hole${board.thru === 1 ? '' : 's'} in.</p>`;
+          return place + leaderboardHTML(board, { live: true });
+        })();
     return `
       ${header()}
       <div style="position:relative;">${birdieOrBetter ? burst() : ''}</div>
-      <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${play.holed && play.shots.some((s) => s.holed) ? ' 🎉' : ''}</h2>
+      <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${lastIsHoled ? ' 🎉' : ''}</h2>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;max-width:420px;">${lastCard}${puttCard}</div>
+      <div style="margin:12px 0;max-width:460px;">${progress}</div>
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
   }
 
