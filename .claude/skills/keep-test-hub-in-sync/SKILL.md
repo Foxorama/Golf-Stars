@@ -52,6 +52,21 @@ source, so steps 1 and 3 are coupled: add the hook and CI goes red until the hub
 4. **Update docs.** The hub section in `CLAUDE.md` and the conformance notes in
    `standards/TEST-HUB-STANDARD.md` if the hook is significant.
 
+## Special case — a new CADDY / loadout effect (GS-caddy-test)
+
+A named caddy (or any `PlayerLoadout` field it folds in) is "new content as data" — it shows up as a
+perk stepper in the Lab automatically. But a caddy's EFFECT must be demoable/verifiable, not just
+listed. The rule, enforced by `tests/lab.test.ts`:
+
+1. **Surface it in `caddyEffects(loadout)`** (`src/test/lab.ts`) — one branch per loadout field, so the
+   hub's loadout stats SHOW what the caddy changed. The test asserts every id in `NAMED_CADDY_IDS`
+   surfaces ≥1 effect, so a caddy with no Lab effect reds the build.
+2. **If it changes a SAMPLED shot** (a guard, lie relief, a shape mod), thread it through
+   `dispersionStudy`'s `resolveShot` call so the scatter reflects it (see `caddyGuard`/`lieRelief`).
+3. **If it has a VISUAL throw** (a guard projectile), add a `_gsFeel.forceRedirect` case + a Demo button
+   so it can be watched on demand. This rides `_gsFeel` (a sub-field, NOT a new top-level `_gs*` flag),
+   so the auto-discovering guard needs nothing — but you still owe the control + the docs note.
+
 ## Verify before the PR
 
 ```

@@ -4,11 +4,13 @@ import {
   histogram,
   dispersionStudy,
   buildLoadout,
+  caddyEffects,
   scoreHarness,
   themeStudy,
   allThemeStudies,
 } from '../src/test/lab';
 import { THEMES, resolveBiome, themeById } from '../src/sim/course/themes';
+import { NAMED_CADDY_IDS } from '../src/sim/rpg/economy';
 
 /**
  * Guards the Sim Lab engine that powers the test hub (standards/TEST-HUB-STANDARD.md). The lab
@@ -58,6 +60,34 @@ describe('dispersion study (real resolveShot)', () => {
       loadout: buildLoadout({ handicap: 18, perks: ['gyro', 'pro-coach'] }).loadout,
     });
     expect(skilled.lateral.sd).toBeLessThan(raw.lateral.sd);
+  });
+});
+
+describe('caddy effects are demoable in the Lab (GS-caddy harness rule)', () => {
+  // The machine-checked "a new caddy must show up in the test harness" rule: every NAMED caddy folds
+  // a field into the loadout, and caddyEffects() must surface it. Add a caddy without a Lab effect
+  // and this reds the build — the I4 atomic-change rule, enforced.
+  it('every named caddy surfaces at least one effect', () => {
+    expect(NAMED_CADDY_IDS.length).toBeGreaterThan(0);
+    for (const id of NAMED_CADDY_IDS) {
+      const lo = buildLoadout({ perks: [id] }).loadout;
+      const effects = caddyEffects(lo);
+      expect(effects.length, `caddy "${id}" surfaces no Lab effect — add it to caddyEffects()`).toBeGreaterThan(0);
+    }
+  });
+
+  it('a base loadout has no caddy effects', () => {
+    expect(caddyEffects(buildLoadout({}).loadout)).toEqual([]);
+  });
+
+  it('the guard caddies report a redirect rate in the dispersion study', () => {
+    const base = dispersionStudy('D', { n: 1200, seed: 5, loadout: buildLoadout({}).loadout });
+    expect(base.redirectRate).toBeUndefined(); // no guard → not measured
+
+    const sheep = dispersionStudy('D', { n: 1200, seed: 5, loadout: buildLoadout({ perks: ['convict-sheep'] }).loadout });
+    expect(sheep.guardKind).toBe('boomerang');
+    expect(sheep.redirectRate).toBeGreaterThan(0); // some right misses get knocked back
+    expect(sheep.samples.some((s) => s.redirected && s.origLateral !== undefined)).toBe(true);
   });
 });
 

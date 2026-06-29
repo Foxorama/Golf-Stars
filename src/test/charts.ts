@@ -79,6 +79,27 @@ export function drawScatter(canvas: HTMLCanvasElement, study: DispersionStudy): 
     ctx.fill();
   }
 
+  // caddy-guard redirects (GS-caddy): the WOULD-BE miss in red with a faint line to where the ball
+  // ended up (on the green), so you SEE the boomerang/laser pulling shanks/hooks back to centre.
+  const redirected = samples.filter((s) => s.redirected && s.origLateral !== undefined);
+  if (redirected.length) {
+    const ra = Math.max(0.06, Math.min(0.6, 40 / redirected.length));
+    for (const s of redirected) {
+      const ox = x(s.origLateral!);
+      const oy = y(s.origCarry ?? s.carry);
+      ctx.strokeStyle = `rgba(255,138,138,${ra * 0.7})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(x(s.lateral), y(s.carry));
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,138,138,${Math.min(0.8, ra * 2)})`;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // target crosshair (intended, straight)
   const tx = x(0);
   const ty = y(study.intended);
