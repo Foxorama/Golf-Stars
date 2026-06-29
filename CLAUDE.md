@@ -895,12 +895,13 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
 - **The guard caddies redirect a sampled miss to the green MID-FLIGHT — they do NOT reshape the spray
   (`CaddyGuard` in shot.ts, distinct from `ShapeMod`).** The cone still shows the miss tails; what
   changes is that a shot already SAMPLED into a tail gets knocked back. `resolveShot` classifies the
-  sampled angle's zone (`classifySprayZone`) and, if a guard is present, `remove` zones are ALWAYS
-  redirected to a fresh green-band angle, `halve` zones with a 50% roll. **Space Ducks** =
-  `{remove:['duckHookL'], halve:['hookL'], kind:'laser'}` (no duck-hooks; 50% of hooks saved);
-  **Convict Sheep** = `{remove:['shankR'], halve:['sliceR'], kind:'boomerang'}` (the right-side mirror).
+  sampled angle's zone (`classifySprayZone`) and, if a guard is present, looks up that zone's redirect
+  CHANCE (`guard.redirect[zone]`): a chance ≥1 ALWAYS redirects to a fresh green-band angle (no roll), a
+  fractional chance rolls once, an absent/zero zone does nothing. **Space Ducks** =
+  `{redirect:{duckHookL:1, hookL:0.75}, kind:'laser'}` (every duck-hook gone; 75% of hooks saved);
+  **Convict Sheep** = `{redirect:{shankR:1, sliceR:0.75}, kind:'boomerang'}` (the right-side mirror).
   On a redirect, `ShotResult.redirect = {kind, fromZone, originalLanding}` records the would-be miss so
-  the renderer animates it. CRITICAL determinism: the guard's extra rng draws (the 50% roll + the green
+  the renderer animates it. CRITICAL determinism: the guard's extra rng draws (the chance roll + the green
   resample) fire ONLY when a guard is present AND the sampled zone qualifies — a guard-less shot (or an
   empty guard) draws NOTHING extra, so the base sim is byte-for-byte unchanged (guarded by
   `tests/caddies.test.ts`). The guard is threaded into BOTH the auto sim (`playStop`→`playHole`→

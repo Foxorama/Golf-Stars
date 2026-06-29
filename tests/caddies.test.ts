@@ -343,7 +343,7 @@ describe('Convict Sheep — boomerang the shanks', () => {
 
 describe('a guard with nothing to remove is byte-for-byte identical (no extra rng)', () => {
   it('an empty guard leaves the landing and rng stream untouched', () => {
-    const empty = { remove: [] as never[], halve: [] as never[], kind: 'laser' as const };
+    const empty = { redirect: {}, kind: 'laser' as const };
     for (let s = 0; s < 50; s++) {
       const a = resolveShot({ from: [0, 0], aim: [0, 100], club: driver, lie: 'fairway', shape: wideMiss, rng: new Rng(`e:${s}`) });
       const b = resolveShot({ from: [0, 0], aim: [0, 100], club: driver, lie: 'fairway', shape: wideMiss, guard: empty, rng: new Rng(`e:${s}`) });

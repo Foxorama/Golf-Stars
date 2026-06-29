@@ -256,7 +256,7 @@ export function caddyEffects(loadout: PlayerLoadout): CaddyEffect[] {
     out.push({
       id: 'caddyGuard',
       label: `Guard · ${g.kind}`,
-      detail: `removes ${g.remove.join(', ') || '—'}; halves ${g.halve.join(', ') || '—'} → green`,
+      detail: `${Object.entries(g.redirect).map(([z, p]) => `${Math.round((p as number) * 100)}% ${z}`).join(', ') || '—'} → green`,
     });
   }
   if (loadout.clubSuggest)
