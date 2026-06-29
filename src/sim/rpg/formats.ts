@@ -24,27 +24,50 @@ export interface BossSpec {
   /** The final boss of the voyage — clearing it WINS the run. Exactly one per format. */
   final?: boolean;
   /**
-   * Co-op showdown style (GS-scramble): you face this boss with an unchosen golfer as a PARTNER and
-   * play best-ball/scramble — hit two balls a shot, keep the better. Absent ⇒ a solo boss. The
-   * partner is chosen deterministically from the roster minus the player's golfer.
-   */
-  partner?: 'scramble';
-  /**
    * Matchplay knockout (GS-100 / GS-matchplay): the boss round is a 1-on-1 duel on the actual course
    * against the player's RANK-MIRROR — the field pairs best-vs-worst (#1 v last, …), so a strong arc
    * earns a weaker opponent and a scrape draws the leader. The boss is a real golfer with their own
    * avatar + shots, the match decided when one is up by more than remain; winning/halving passes the
    * stop and adds NO Stableford to the leaderboard (the match decides advancement, not points). The
    * opponent is resolved from the leaderboard at play time (matchOpponentFor), not named here. Handled
-   * by the UI reducer; the headless `playStop`/`simulateRun` falls back to ordinary Stableford-vs-cut
-   * for balance/tests.
+   * by the UI reducer; the headless `playStop`/`simulateRun` plays the same duel for balance/tests.
    */
   mode?: 'matchplay';
+  /**
+   * Team-duel boss (GS-team-duel): the matchplay duel is played as a TEAM format, where the
+   * LOWER-ranked side gets a partner (an extra golfer) and the format's advantage, while the
+   * higher-ranked side plays SOLO — a fair handicap that lets the underdog punch up at the boss.
+   *  • `'scramble'` — the team hits two balls a shot and plays the better; the player chooses which
+   *    ball to keep (the AI team auto-picks the better).
+   *  • `'bestball'` — both team players play their OWN ball the whole hole; the better hole score
+   *    counts (no per-shot choice).
+   *  • `'random'` — resolved to scramble or best-ball deterministically per run, so the boss varies.
+   * Always a duel (`mode: 'matchplay'` should be set too); the team layer rides on top. The partner
+   * side + the resolved format are computed at play time from the leaderboard (teamDuelSetupForRun).
+   */
+  team?: 'bestball' | 'scramble' | 'random';
 }
 
 /** Is this boss a 1-on-1 matchplay knockout vs the player's rank-mirror (GS-100 / GS-matchplay)? */
 export function isMatchplayBoss(boss: BossSpec | undefined): boolean {
   return boss?.mode === 'matchplay';
+}
+
+/** Is this boss a TEAM duel (GS-team-duel) — a matchplay duel where the underdog plays a team format? */
+export function isTeamDuelBoss(boss: BossSpec | undefined): boolean {
+  return !!boss?.team;
+}
+
+/**
+ * Resolve a team-duel boss's concrete format (GS-team-duel): `'random'` picks scramble|bestball
+ * deterministically from the run seed, so the format varies BETWEEN runs but is stable within one.
+ * Returns undefined for a non-team boss. Pure.
+ */
+export function resolveTeamFormat(boss: BossSpec | undefined, seed: number): 'bestball' | 'scramble' | undefined {
+  if (!boss?.team) return undefined;
+  if (boss.team !== 'random') return boss.team;
+  // A small stable hash off the seed → one of the two formats.
+  return Math.abs(Math.round(seed) * 2654435761 + 0x9e3779b1) % 2 === 0 ? 'scramble' : 'bestball';
 }
 
 export interface StopSpec {
@@ -103,9 +126,10 @@ export const FORMATS: Record<string, RunFormat> = {
     ],
   },
   // The headline campaign (GS-voyage): a bounded, WINNABLE voyage of three arcs. Each arc is two
-  // ordinary stops then a BOSS; clearing the final boss wins the run. Two of the three bosses are
-  // co-op SCRAMBLE showdowns (an unchosen golfer partners you). Stops vary in size and one mid-stop
-  // CROSSES TWO WORLDS (splitBiome) so the 6/6/6 sameness is broken.
+  // ordinary stops then a BOSS; clearing the final boss wins the run. Arc I + the FINAL are solo
+  // matchplay duels; Arc II is a TEAM duel (GS-team-duel) — best-ball or scramble, random per run,
+  // where the underdog side gets a partner. Stops vary in size and one mid-stop CROSSES TWO WORLDS
+  // (splitBiome) so the 6/6/6 sameness is broken.
   voyage: {
     id: 'voyage',
     name: 'The Voyage',
@@ -127,8 +151,8 @@ export const FORMATS: Record<string, RunFormat> = {
       { holes: 7, label: 'Deep Run II · two worlds', splitBiome: true },
       {
         holes: 9,
-        label: 'Arc II Boss · Scramble',
-        boss: { id: 'pulsar-classic', name: 'The Pulsar Classic', blurb: 'A best-ball showdown — an old rival of the crew joins your bag. Two balls a shot, keep the better.', cutBonus: 2, partner: 'scramble' },
+        label: 'Arc II Boss · Team Duel',
+        boss: { id: 'pulsar-classic', name: 'The Pulsar Classic', blurb: 'A team-format duel — best-ball or scramble. The underdog plays with a partner; the favourite goes it alone. Outscore your rival hole by hole.', cutBonus: 2, mode: 'matchplay', team: 'random' },
       },
       // --- Arc 3 ---
       { holes: 6, label: 'The Far Reach I' },

@@ -21,6 +21,7 @@ import {
   resumeRun,
   routeOptions,
   scrambleOptsFor,
+  teamDuelSetupForRun,
   shardsForRun,
   shopOffer,
   startRun,
@@ -32,13 +33,24 @@ import {
   type Run,
   type RunSnapshot,
   type StopResult,
+  type TeamDuelSetup,
 } from '../sim/rpg/run';
 import { archetypeFor } from '../sim/course/themes';
 import { isMatchplayBoss } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
-import { playMatchStop, playBossStop, holeDuel, matchState, type HoleDuel } from '../sim/rpg/match';
+import {
+  playMatchStop,
+  playTeamMatchStop,
+  playBossStop,
+  playBossSideStop,
+  betterPlayedHole,
+  holeDuel,
+  matchState,
+  type HoleDuel,
+} from '../sim/rpg/match';
 import { type MetaUpgrades } from '../sim/rpg/meta';
 import { canBuyShip, marketRerollCost, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { playHole } from '../sim/round';
 import {
   autoDecision,
   awaitingPutt,
@@ -46,8 +58,12 @@ import {
   holeResult,
   takePutt,
   takeShot,
+  resolveScrambleShot,
+  commitScrambleBall,
+  autoCommitScrambleBall,
   type AimMode,
   type HolePlay,
+  type ScrambleShot,
 } from '../sim/rpg/play';
 import { Rng } from '../sim/rng';
 
@@ -114,15 +130,17 @@ export interface UiState {
   marketRerolls?: number;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
+  /** A pending interactive SCRAMBLE shot (GS-team-duel) awaiting the player's ball choice. */
+  scrambleChoice?: ScrambleShot;
   /** Boss-reward choices to pick from after beating a boss (GS-talents) — shown on the bossReward screen. */
   bossReward?: BossReward[];
 }
 
-/** The matchplay duel a boss stop is played as (GS-100). */
+/** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
 export interface MatchUi {
   /** The opponent golfer id (the leaderboard leader). */
   bossId: string;
-  /** The boss's real ball on each hole of the stop (pre-computed; revealed hole by hole). */
+  /** The boss's (team-scored) ball on each hole of the stop (pre-computed; revealed hole by hole). */
   bossHoles: PlayedHole[];
   /** Hole-by-hole duel results so far. */
   duels: HoleDuel[];
@@ -132,6 +150,10 @@ export interface MatchUi {
   decided: boolean;
   /** Match over (decided early or all holes played). */
   finished: boolean;
+  /** Team-duel setup (GS-team-duel): format, which side has the partner, partner ids. Absent ⇒ solo duel. */
+  setup?: TeamDuelSetup;
+  /** The player's partner's parallel ball per completed hole (best-ball only) — for "which counted" display. */
+  partnerHoles?: PlayedHole[];
 }
 
 export type Action =
@@ -141,6 +163,7 @@ export type Action =
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number]; power?: number }
+  | { type: 'chooseScrambleBall'; pick: 'player' | 'partner' } // keep a ball in an interactive scramble (GS-team-duel)
   | { type: 'putt'; control?: PuttControl } // take one putt — with a pace-meter control = manual skill
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
@@ -276,15 +299,28 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'play': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       // Matchplay boss stop (GS-100): play the duel (player ball + boss ball), pass on the match.
+      // A TEAM duel (GS-team-duel) plays each side as solo/scramble/best-ball per the rank-based setup.
       if (isMatchplayBoss(currentBoss(state.run))) {
-        const bossId = resolveBossId(state.run);
-        const stop = playMatchStop(
-          state.course.holes,
-          playerHoleOpts(state.run),
-          bossId,
-          new Rng(`${state.course.seed}:play`),
-          new Rng(`${state.course.seed}:boss`),
-        );
+        const setup = teamDuelSetupForRun(state.run);
+        const bossId = setup?.opponentId ?? resolveBossId(state.run);
+        const homeEdge = setup?.homeEdge ?? false;
+        const stop = setup
+          ? playTeamMatchStop(
+              state.course.holes,
+              playerHoleOpts(state.run),
+              bossId,
+              setup,
+              new Rng(`${state.course.seed}:play`),
+              new Rng(`${state.course.seed}:boss`),
+              homeEdge,
+            )
+          : playMatchStop(
+              state.course.holes,
+              playerHoleOpts(state.run),
+              bossId,
+              new Rng(`${state.course.seed}:play`),
+              new Rng(`${state.course.seed}:boss`),
+            );
         const { run, result } = finishStop(state.run, state.course, stop.player, { matchWon: stop.state.playerAdvances });
         const ended = run.status !== 'active';
         const earned = ended ? shardsForRun(run) : undefined;
@@ -293,7 +329,7 @@ export function reduce(state: UiState, action: Action): UiState {
           run,
           played: stop.player,
           lastResult: result,
-          match: { bossId, bossHoles: stop.boss, duels: stop.duels, holesUp: stop.state.holesUp, decided: stop.state.decided, finished: true },
+          match: { bossId, bossHoles: stop.boss, duels: stop.duels, holesUp: stop.state.holesUp, decided: stop.state.decided, finished: true, setup },
           viewHole: 0,
           screen: ended ? 'gameover' : 'result',
           bestStableford: Math.max(state.bestStableford, result.stableford),
@@ -339,9 +375,12 @@ export function reduce(state: UiState, action: Action): UiState {
       // so your interactive play is byte-for-byte the same as a non-boss stop.
       let match: MatchUi | undefined;
       if (isMatchplayBoss(currentBoss(state.run))) {
-        const bossId = resolveBossId(state.run);
-        const bossHoles = playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`));
-        match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false };
+        const setup = teamDuelSetupForRun(state.run);
+        const bossId = setup?.opponentId ?? resolveBossId(state.run);
+        const bossHoles = setup
+          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge)
+          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`));
+        match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false, setup, partnerHoles: setup ? [] : undefined };
       }
       return {
         ...state,
@@ -356,6 +395,20 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'shot': {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
       if (awaitingPutt(state.play)) return state; // on the green → must putt, not swing
+      if (state.scrambleChoice) return state; // already awaiting a ball pick
+      // Team duel SCRAMBLE (GS-team-duel), player's side: resolve BOTH balls and let the player pick
+      // which to keep (the choice card). Putts are not scrambled, so this fires on full swings only.
+      const setup = state.match?.setup;
+      if (setup?.partnerSide === 'player' && setup.format === 'scramble') {
+        const scrambleChoice = resolveScrambleShot(
+          state.play,
+          { clubId: action.clubId, aim: action.aim, target: action.target, power: action.power },
+          state.run.loadout,
+          state.holeRng,
+          setup.playerPartnerMods,
+        );
+        return { ...state, scrambleChoice };
+      }
       // Auto putt-out only when the Auto-Caddie legendary is owned; otherwise putting is manual.
       const auto = !!state.run.loadout.autoPutt;
       const play = takeShot(
@@ -369,6 +422,13 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, play };
     }
 
+    case 'chooseScrambleBall': {
+      if (state.screen !== 'playing' || !state.scrambleChoice || !state.holeRng) return state;
+      const auto = !!state.run.loadout.autoPutt;
+      const play = commitScrambleBall(state.scrambleChoice, action.pick, state.run.loadout, state.holeRng, auto);
+      return { ...state, play, scrambleChoice: undefined };
+    }
+
     case 'putt': {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
       const play = takePutt(state.play, state.run.loadout, state.holeRng, action.control);
@@ -378,6 +438,10 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'autoShotHole': {
       if (state.screen !== 'playing' || !state.play || !state.holeRng) return state;
       let p = state.play;
+      // A pending scramble pick already drew both balls — auto-keep the better (don't re-draw the rng).
+      if (state.scrambleChoice) {
+        p = autoCommitScrambleBall(state.scrambleChoice, state.run.loadout, state.holeRng, true);
+      }
       let guard = 0;
       const scramble = scrambleOptsFor(state.run);
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
@@ -386,23 +450,38 @@ export function reduce(state: UiState, action: Action): UiState {
           ? takePutt(p, state.run.loadout, state.holeRng)
           : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble);
       }
-      return { ...state, play: p };
+      return { ...state, play: p, scrambleChoice: undefined };
     }
 
     case 'holeComplete': {
       if (state.screen !== 'playing' || !state.play || !state.play.done) return state;
-      const stopPlayed = [...(state.stopPlayed ?? []), holeResult(state.play)];
-      const nextIdx = state.play.holeIndex + 1;
+      const idx = state.play.holeIndex;
+      const raw: PlayedHole = holeResult(state.play);
+      // Team duel BEST-BALL (GS-team-duel), player's side: the partner plays a parallel ball on the SAME
+      // rng (so watch ≡ auto-finish), and the better hole SCORE counts for both the duel and the stop.
+      let teamHole = raw;
+      let partnerHoles = state.match?.partnerHoles;
+      const tSetup = state.match?.setup;
+      if (tSetup?.partnerSide === 'player' && tSetup.format === 'bestball' && state.holeRng) {
+        const partnerHole = playHole(state.course.holes[idx]!, state.holeRng, {
+          ...playerHoleOpts(state.run),
+          shotMods: tSetup.playerPartnerMods,
+        });
+        teamHole = betterPlayedHole(raw, partnerHole);
+        partnerHoles = [...(state.match!.partnerHoles ?? []), partnerHole];
+      }
+      const stopPlayed = [...(state.stopPlayed ?? []), teamHole];
+      const nextIdx = idx + 1;
       const total = state.course.holes.length;
 
       // Matchplay (GS-100): score the just-finished hole against the boss's pre-played ball, and FINISH
       // the stop the moment the match is decided (a "3 & 2"), not only after all holes.
       if (state.match) {
         const justPlayed = stopPlayed[stopPlayed.length - 1]!;
-        const bossHole = state.match.bossHoles[state.play.holeIndex]!;
-        const duels = [...state.match.duels, holeDuel(state.play.holeIndex, state.play.hole.par, justPlayed, bossHole)];
+        const bossHole = state.match.bossHoles[idx]!;
+        const duels = [...state.match.duels, holeDuel(idx, state.play.hole.par, justPlayed, bossHole)];
         const ms = matchState(duels, total);
-        const match: MatchUi = { ...state.match, duels, holesUp: ms.holesUp, decided: ms.decided, finished: ms.finished };
+        const match: MatchUi = { ...state.match, duels, holesUp: ms.holesUp, decided: ms.decided, finished: ms.finished, partnerHoles };
         if (!ms.finished) {
           return { ...state, stopPlayed, match, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
         }

@@ -251,3 +251,19 @@ export function scramblePartnerId(seed: number, stopIndex: number, playerId: str
 export function scramblePartner(seed: number, stopIndex: number, playerId: string | undefined): Character {
   return getCharacter(scramblePartnerId(seed, stopIndex, playerId))!;
 }
+
+/**
+ * A deterministic partner for the BOSS side of a team duel (GS-team-duel): a playable golfer used as
+ * the AI's partner, excluding the player's own character. Salted apart from `scramblePartnerId` so the
+ * two teams don't field the same golfer where possible. Pure — a stable index hash.
+ */
+export function bossPartnerId(seed: number, stopIndex: number, playerId: string | undefined): string {
+  const pool = CHARACTERS.filter((c) => c.id !== playerId);
+  if (pool.length === 0) return CHARACTERS[0]!.id;
+  const h = Math.abs(Math.round(seed) * 40503 + stopIndex * 2654435761 + 0x85ebca6b) % pool.length;
+  return pool[h]!.id;
+}
+
+export function bossPartner(seed: number, stopIndex: number, playerId: string | undefined): Character {
+  return getCharacter(bossPartnerId(seed, stopIndex, playerId))!;
+}

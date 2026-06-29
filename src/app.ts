@@ -33,13 +33,13 @@ import { rarCol } from './sim/rpg/loot';
 import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybridType, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, REWARD_CLUB_TYPES, shopItem, usableBag } from './sim/rpg/economy';
 import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS } from './sim/rpg/formats';
-import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
+import { CHARACTERS, getCharacter, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
+import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, snapshotRun, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition, type Leaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { PLAYER_ID, arcSurvivorTarget, type Field } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
-import { isMatchplayBoss } from './sim/rpg/formats';
+import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
 import { SHIPS, canBuyShip, marketOffer, marketRerollCost, type Ship } from './sim/rpg/ships';
 import { shipCardSVG } from './render/shipArt';
@@ -653,12 +653,32 @@ function matchHud(): string {
       target = `<span style="font-size:10.5px;opacity:.85;">· ${opp?.shortName ?? 'Boss'} made <b>${bh.record.strokes}</b> (${relTxt})</span>`;
     }
   }
+  const modeTag = state.match?.setup ? `<span style="font-size:10px;opacity:.6;">${teamFormatLabel(state.match.setup.format)}</span>` : '';
   return `<div style="display:flex;align-items:center;gap:8px;padding:4px 9px;border:1px solid ${col};border-radius:8px;background:#0d1016cc;flex-wrap:wrap;">
       <span style="font-size:11px;opacity:.7;">⚔ vs ${opp?.shortName ?? 'Boss'}</span>
+      ${modeTag}
       <span style="font-size:13px;font-weight:800;color:${col};">${line}</span>
       <span style="font-size:10.5px;opacity:.6;">thru ${st.thru}/${state.course.holes.length}</span>
       ${target}
     </div>`;
+}
+
+/** The label for the current duel's mode (GS-team-duel) — the team format, or plain matchplay. */
+function duelModeLabel(): string {
+  const setup = state.match?.setup;
+  return setup ? `${teamFormatLabel(setup.format)} duel` : 'Matchplay';
+}
+
+/** A line describing who carried the partner in a team duel (GS-team-duel), for the result screen. */
+function teamDuelCaption(): string {
+  const setup = state.match?.setup;
+  if (!setup) return '';
+  const partner = teamPartnerChar(setup);
+  if (!partner) return '';
+  const oppName = getGolfer(setup.opponentId)?.shortName ?? 'your rival';
+  return setup.partnerSide === 'player'
+    ? `<div style="font-size:11px;opacity:.7;margin-top:4px;">🤝 You played ${teamFormatLabel(setup.format)} with <b>${partner.name}</b> (you were the underdog).</div>`
+    : `<div style="font-size:11px;opacity:.7;margin-top:4px;">🤝 ${oppName} played ${teamFormatLabel(setup.format)} with <b>${partner.name}</b> — you went solo as the favourite.</div>`;
 }
 
 /** The matchplay duel result panel for the result screen (the hole-by-hole scoreline + verdict). */
@@ -681,12 +701,13 @@ function matchResultPanel(): string {
     .join('');
   return `<div style="border:1px solid ${col};border-radius:10px;padding:10px;background:linear-gradient(180deg,#160d12,#0d1016);margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        ${opponentBadge(m.bossId, 'Matchplay')}
+        ${opponentBadge(m.bossId, duelModeLabel())}
         <div style="text-align:right;"><div style="font-size:18px;font-weight:900;color:${col};">${verdict}</div>
           <div style="font-size:13px;opacity:.85;">${matchScoreline(st)}</div></div>
       </div>
       <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:9px;">${cells}</div>
       <div style="font-size:11px;opacity:.6;margin-top:6px;">Hole-by-hole vs ${opp?.name ?? 'the leader'} — W win · L loss · ½ halved.</div>
+      ${teamDuelCaption()}
     </div>`;
 }
 
@@ -715,7 +736,7 @@ function holeMatchProgressHTML(playedSoFar: PlayedHole[]): string {
     .join('');
   return `<div style="border:1px solid ${col};border-radius:10px;padding:10px;background:linear-gradient(180deg,#160d12,#0d1016);">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        ${opponentBadge(m.bossId, 'Matchplay')}
+        ${opponentBadge(m.bossId, duelModeLabel())}
         <div style="text-align:right;"><div style="font-size:17px;font-weight:900;color:${col};">${line}</div>
           <div style="font-size:11px;opacity:.7;">thru ${st.thru}/${state.course.holes.length}</div></div>
       </div>
@@ -730,9 +751,9 @@ function introScreen(): string {
   const cut = effectiveCut(state.run, c.holes.length);
   const par = c.holes.reduce((s, h) => s + h.par, 0);
   const ev = state.run.pendingEvent;
-  // Boss stop (GS-voyage): a louder note — and a co-op partner read for a scramble boss.
+  // Boss stop (GS-voyage): a louder note — and a team read (format + partner side) for a team duel.
   const boss = currentBoss(state.run);
-  const partner = boss?.partner ? scramblePartner(state.run) : undefined;
+  const duel = isTeamDuelBoss(boss) ? teamDuel() : undefined;
   const split = state.course.meta.split;
 
   // World identity (GS-19): the archetype's lore/profile, the per-stop theme name, difficulty.
@@ -746,20 +767,41 @@ function introScreen(): string {
   // Contextual notes (boss / split / route event) — only when they apply, kept compact and ABOVE
   // the CTA so a decision is never buried under the hole art.
   const notes: string[] = [];
-  if (boss)
+  if (boss) {
+    const tag = duel
+      ? ` · ${teamFormatLabel(duel.format).toUpperCase()} DUEL`
+      : isMatchplayBoss(boss)
+      ? ' · MATCHPLAY'
+      : '';
+    // Team duel (GS-team-duel): say which side carries the partner (the underdog) + the rule.
+    let teamNote = '';
+    if (duel) {
+      const partner = teamPartnerChar(duel);
+      const youHavePartner = duel.partnerSide === 'player';
+      const oppName = getGolfer(duel.opponentId)?.shortName ?? 'your rival';
+      teamNote = partner
+        ? `<div style="font-size:12px;margin-top:5px;color:${partner.style.cap};">🤝 ${
+            youHavePartner
+              ? `You're the underdog — <b>${partner.name}</b> joins your bag`
+              : `${oppName} outranks you and brings <b>${partner.name}</b>; you go it alone`
+          } · <b>${teamFormatLabel(duel.format)}</b> (${teamFormatRule(duel.format)}).</div>`
+        : '';
+    }
+    // Scouting line (GS-team-duel): the opponent's style read, so you know the matchup going in.
+    const oppId = duel?.opponentId ?? (isMatchplayBoss(boss) ? currentOpponentId() : undefined);
+    const scoutSub = oppId
+      ? `${opponentScouting(oppId)}${duel?.homeEdge ? ' · ⚑ on home turf — plays sharper here' : ''}`
+      : 'Your opponent — beat them hole by hole';
     notes.push(`<div style="margin-top:10px;padding:9px 11px;border:1px solid ${boss.final ? '#ffce54' : '#c0392b'};
         border-radius:9px;background:linear-gradient(180deg,#1a0e12,#120b10);">
        <div style="font-size:11px;letter-spacing:.12em;color:${boss.final ? '#ffce54' : '#ff6b6b'};">
-         ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${boss.partner ? ' · SCRAMBLE' : ''}${isMatchplayBoss(boss) ? ' · MATCHPLAY' : ''}</div>
+         ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${tag}</div>
        <b style="font-size:16px;">${boss.name}</b>
        <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${boss.blurb}</div>
-       ${partner ? `<div style="font-size:12px;margin-top:5px;color:${partner.style.cap};">🤝 Partner: <b>${partner.name}</b> — two balls a shot, the better one counts.</div>` : ''}
-       ${
-         isMatchplayBoss(boss) && currentOpponentId()
-           ? `<div style="margin-top:8px;">${opponentBadge(currentOpponentId()!, 'Your opponent — beat them hole by hole')}</div>`
-           : ''
-       }
+       ${teamNote}
+       ${oppId ? `<div style="margin-top:8px;">${opponentBadge(oppId, scoutSub)}</div>` : ''}
      </div>`);
+  }
   if (split)
     notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #7aa2ff;border-radius:8px;background:#ffffff08;font-size:12.5px;">
        🌗 <b>Two worlds</b> — the first ${split.frontHoles} holes play one world, then you cross into another for the run home.</div>`);
@@ -796,6 +838,10 @@ function introScreen(): string {
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gs-line-2);">
         <p style="font-size:14px;margin:0 0 10px;">${(() => {
           const winnable = !!(FORMATS[state.run.formatId] ?? FORMATS['flat']!).winnable;
+          if (duel)
+            return `⚔ Win the <b>${teamFormatLabel(duel.format)} duel</b> hole by hole — ${
+              duel.partnerSide === 'player' ? 'your partner has your back' : 'you give up the partner advantage'
+            }.`;
           if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
           if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
           if (winnable) {
@@ -1793,9 +1839,23 @@ function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
   // the zone splash): the void's armed lost-rough, which turns an offline miss into a lost ball.
   const lostRough = lieInfo(roughLieOf(play.hole)).penalty ? ' · <span style="color:var(--gs-warn);">🕳 lost rough</span>' : '';
   const boss = currentBoss(state.run);
-  const scrambleLine = boss?.partner === 'scramble'
-    ? `<div class="gs-sub" style="color:${scramblePartner(state.run).style.cap};">🤝 <b>${scramblePartner(state.run).name}</b>${play.partnerKept ? ' · kept ✓' : play.shots.length ? ' · yours held' : ''}</div>`
-    : '';
+  // Team duel (GS-team-duel): when YOU carry the partner, show them + the format on the HUD.
+  const duel = isTeamDuelBoss(boss) ? teamDuel() : undefined;
+  let scrambleLine = '';
+  if (duel && duel.partnerSide === 'player') {
+    const partner = teamPartnerChar(duel);
+    if (partner) {
+      const tail =
+        duel.format === 'scramble'
+          ? play.partnerKept
+            ? ' · kept ✓'
+            : play.shots.length
+            ? ' · yours held'
+            : ''
+          : '';
+      scrambleLine = `<div class="gs-sub" style="color:${partner.style.cap};">🤝 <b>${partner.name}</b> · ${teamFormatLabel(duel.format)}${tail}</div>`;
+    }
+  }
   return `
     <div class="gs-hud gs-hud-top gs-glass">
       <div class="gs-stats">
@@ -2077,7 +2137,7 @@ function playingBody(animating: boolean): string {
         ${autoFinish}
       </div>
     </div>
-    ${awaitingShotPopup ? shotPopupOverlay() : ''}`;
+    ${state.scrambleChoice ? scrambleChoiceOverlay() : awaitingShotPopup ? shotPopupOverlay() : ''}`;
 }
 
 // Settings sheet — a view overlay (not reducer state), toggled like the shot popup.
@@ -2106,6 +2166,50 @@ function settingsOverlay(): string {
         ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
         <div style="text-align:center;margin-top:10px;">
           <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 26px;">Done</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * The interactive SCRAMBLE ball-choice screen (GS-team-duel): both balls just hit from the same spot
+ * are shown — on an inline map (player line + partner line) and as two info cards with lie + distance
+ * to the pin — and the player CONFIRMS which to play on from. A real scramble decision: take the safe
+ * one in the fairway, or the aggressive one nearer the pin.
+ */
+function scrambleChoiceOverlay(): string {
+  const sc = state.scrambleChoice!;
+  const duel = teamDuel();
+  const partner = duel ? teamPartnerChar(duel) : undefined;
+  const hole = sc.base.hole;
+  // Both balls from the SAME spot: the player's line solid, the partner's muted (ghost) beneath.
+  const map = renderHoleSVG(hole, {
+    width: 320,
+    height: 240,
+    biome: holeBiome(hole),
+    themeId: holeThemeId(hole),
+    shots: [sc.player.log],
+    ghostShots: [sc.partner.log],
+  });
+  const option = (label: string, ex: typeof sc.player, dist: number, pick: 'player' | 'partner', accent: string): string => `
+    <div style="flex:1 1 150px;min-width:148px;display:flex;flex-direction:column;gap:7px;">
+      <div style="font-size:12px;font-weight:800;color:${accent};text-align:center;">${label}</div>
+      ${shotCardHTML(ex.log, { distToPin: ex.holed ? undefined : dist })}
+      <button class="gs-btn gs-btn--primary gs-btn--block"
+        data-action='${JSON.stringify({ type: 'chooseScrambleBall', pick })}'
+        style="text-align:center;font-size:14px;padding:11px;">${ex.holed ? '🏁 Holed — take it' : 'Play this →'}</button>
+    </div>`;
+  return `
+    <div style="position:fixed;inset:0;background:rgba(5,7,11,0.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;overflow:auto;">
+      <div style="display:flex;flex-direction:column;gap:11px;max-width:360px;width:100%;">
+        <div style="text-align:center;">
+          <div style="font-size:13px;font-weight:800;letter-spacing:.08em;color:#ffce54;">🤝 SCRAMBLE — CHOOSE YOUR BALL</div>
+          <div style="font-size:11.5px;opacity:.75;margin-top:2px;">You and ${partner?.name ?? 'your partner'} both hit — play on from the better lie.</div>
+        </div>
+        <div style="border-radius:10px;overflow:hidden;border:1px solid var(--gs-line-2);line-height:0;align-self:center;">${map}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          ${option('Your ball', sc.player, sc.playerDistToPin, 'player', '#5fd45a')}
+          ${option(`${partner?.name ?? 'Partner'}'s ball`, sc.partner, sc.partnerDistToPin, 'partner', partner?.style.cap ?? '#7aa2ff')}
         </div>
       </div>
     </div>`;
@@ -2684,9 +2788,35 @@ function golferLook(): GolferLook | undefined {
   return gear ? { ...base, gear: { theme: gear.theme, tint: gear.tint } } : base;
 }
 
-/** The co-op scramble partner golfer for the current boss stop (GS-scramble), if any. */
-function scramblePartner(run: typeof state.run): Character {
-  return scramblePartnerChar(run.seed, run.stopIndex, run.loadout.characterId);
+/** The team-duel setup for the current stop (GS-team-duel) — prefers the live match state, else recompute. */
+function teamDuel(): TeamDuelSetup | undefined {
+  return state.match?.setup ?? teamDuelSetupForRun(state.run);
+}
+
+/** A friendly label for a team-duel format. */
+function teamFormatLabel(fmt: 'bestball' | 'scramble'): string {
+  return fmt === 'scramble' ? 'Scramble' : 'Best Ball';
+}
+
+/** A one-line rule reminder for a team-duel format. */
+function teamFormatRule(fmt: 'bestball' | 'scramble'): string {
+  return fmt === 'scramble'
+    ? 'both hit every shot, play on from the better ball'
+    : 'both play your own ball; the better hole score counts';
+}
+
+/** The partner Character for a side of the team duel (player or boss), from the setup. */
+function teamPartnerChar(setup: TeamDuelSetup): Character | undefined {
+  if (setup.partnerSide === 'player' && setup.playerPartnerId) return getCharacter(setup.playerPartnerId);
+  if (setup.partnerSide === 'boss' && setup.bossPartnerId) return getCharacter(setup.bossPartnerId);
+  return undefined;
+}
+
+/** A scouting note on the opponent — their style tagline (GS-team-duel / scouting line). */
+function opponentScouting(id: string): string {
+  const g = getGolfer(id);
+  if (!g) return '';
+  return getArchetype(g.archetypeId).tagline;
 }
 
 /** The hired named caddy's id (GS-caddy), or undefined — drawn in the play-view/putt-meter corner. */
