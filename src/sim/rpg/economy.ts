@@ -198,6 +198,28 @@ export interface PlayerLoadout {
   birdieCredit: number; // per birdie-or-better holed this stop
   eagleCredit: number; // extra per eagle-or-better holed this stop
   comebackCredit: number; // flat, if you PASSED despite a blow-up (a 0-point hole)
+  /**
+   * Reduced weather impact (GS-proshop-2, Wind-Cheater balls): 0..1 fraction the wind's carry loss AND
+   * crosswind push are scaled DOWN by — low-spin gear that bores through the breeze. Threaded
+   * IDENTICALLY through the upwind aim (`aimWithWind`) and the shot physics (`resolveShot`) so the
+   * compensation stays consistent. Undefined/0 = full wind, byte-for-byte unchanged.
+   */
+  windResist?: number;
+  /**
+   * Increased backspin (GS-proshop-2, Spin-Milled wedges/balls): 0..1 subtracted from a shot's roll
+   * fraction — freshly milled grooves rip more check so approaches BITE and hold the green (less
+   * run-out, a touch more check on the wedges). Folded into the SAME single roll-energy rng draw, so
+   * undefined/0 is byte-for-byte unchanged.
+   */
+  backspinBoost?: number;
+  /**
+   * Hazard-skip balls (GS-proshop-2, Floater / Magma-Skimmer / Void-Walker): the penalty kinds the
+   * ball IGNORES. A ball that would rest in one of these (water/lava/void family) instead SKIMS across
+   * and settles on the nearest dry ground with NO penalty stroke (a free carry when you clear it; a
+   * drop at the near bank when you don't) — pure geometry, no rng. Each hazard-ball item adds its
+   * kind(s). Absent/empty = ordinary penalties, byte-for-byte unchanged.
+   */
+  hazardImmune?: string[];
 }
 
 /** The driver club id (off-tee use is gated unless the Driver Dan caddy is owned). */
@@ -398,6 +420,14 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'eagle-eye': ['economy'],
   'comeback-kid': ['economy'],
   'glass-cannon': ['economy'],
+  // GS-proshop-2 — new gameplay gear.
+  'wind-cheater': ['control'], // weather forgiveness reads as control
+  'spin-milled': ['skill'], // backspin/short-game touch
+  'floater-balls': ['control'], // hazard forgiveness
+  'magma-balls': ['control'],
+  'void-walkers': ['control'],
+  rangefinder: ['skill'],
+  'tour-spikes': ['control'],
 };
 
 export function itemTags(id: string): readonly string[] {
@@ -407,7 +437,7 @@ export function itemTags(id: string): readonly string[] {
 export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'power-cell',
-    name: 'Power Cell',
+    name: 'Graphite Power Shaft',
     cost: 120,
     desc: '+12 yds carry on your distance clubs · steadier tempo (−5% spray)',
     // Rare, not common: a +12yd unique is a stronger first-copy upgrade than the rare,
@@ -425,17 +455,17 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   },
   {
     id: 'gyro',
-    name: 'Gyro Stabiliser',
+    name: 'Counterbalance Shaft',
     cost: 150,
-    desc: '15% tighter dispersion',
+    desc: 'A counter-weighted shaft squares the face — 15% tighter dispersion',
     rarity: 'rare',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.85, perks: [...m.perks, 'gyro'] }),
   },
   {
     id: 'lucky-coin',
-    name: 'Lucky Coin',
+    name: 'Lucky Ball Marker',
     cost: 100,
-    desc: '+20% credits earned',
+    desc: 'A lucky silver ball-marker — +20% credits earned',
     rarity: 'rare',
     apply: (m) => ({ ...m, creditMult: m.creditMult * 1.2, perks: [...m.perks, 'lucky-coin'] }),
   },
@@ -564,7 +594,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   },
   {
     id: 'fortune-chip',
-    name: 'Fortune Chip',
+    name: "Sponsor's Badge",
     cost: 80,
     desc: '+15% credits earned · stacks (funds the deeper galaxy)',
     rarity: 'common',
@@ -574,9 +604,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   },
   {
     id: 'precision-chip',
-    name: 'Precision Chip',
+    name: 'Tour Glove',
     cost: 110,
-    desc: '8% tighter dispersion · stacks (forgiveness compounds)',
+    desc: 'A tacky all-weather glove — 8% tighter dispersion · stacks (forgiveness compounds)',
     rarity: 'rare',
     stackable: true,
     maxStacks: 10, // multiplicative decay self-limits value (asymptotic, never to zero → still fair)
@@ -584,9 +614,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   },
   {
     id: 'range-booster',
-    name: 'Range Booster',
+    name: 'Distance Balls',
     cost: 100,
-    desc: '+8 yds distance clubs · −3% spray · stacks',
+    desc: 'Hot, low-spin distance balls — +8 yds distance clubs · −3% spray · stacks',
     rarity: 'rare',
     stackable: true,
     maxStacks: 5,
@@ -671,9 +701,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   // --- Distance-control (carry-window) upgrades (GS-dispersion-2, points 5 & 6) ---
   {
     id: 'distance-control',
-    name: 'Distance Control',
+    name: 'Stiff Tour Shaft',
     cost: 120,
-    desc: 'Tighter distances on driver/woods/irons — raises the min carry, smaller gap · stacks',
+    desc: 'A stiff calibrated shaft — tighter distances on driver/woods/irons (raises the min carry) · stacks',
     rarity: 'rare',
     stackable: true,
     maxStacks: 4,
@@ -698,9 +728,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   // --- Overdrive (GS-power): lets the pull-to-power gesture charge PAST a full swing for more carry.
   {
     id: 'overdrive',
-    name: 'Overdrive',
+    name: 'Speed Whip Shaft',
     cost: 140,
-    desc: 'Overpowered shots: pull PAST 100% on the power gesture (+10% max carry) · stacks',
+    desc: 'A whippy speed shaft: pull PAST 100% on the power gesture (+10% max carry) · stacks',
     rarity: 'epic',
     stackable: true,
     maxStacks: 2,
@@ -743,9 +773,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     // The CURSE gamble (GS-curses): a real risk you opt into — wilder misses for a big payout multiplier.
     id: 'glass-cannon',
-    name: 'Glass Cannon',
+    name: 'Grip It & Rip It',
     cost: 150,
-    desc: 'CURSE: wider misses (hook & slice up) — but +60% credits earned. High risk, high reward.',
+    desc: 'CURSE: swing out of your shoes — wider misses (hook & slice up) but +60% credits earned. High risk, high reward.',
     rarity: 'epic',
     apply: (m) => ({
       ...m,
@@ -754,7 +784,88 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       perks: [...m.perks, 'glass-cannon'],
     }),
   },
+
+  // --- GS-proshop-2: NEW gameplay-changing golf gear --------------------------
+  // Weather / spin / hazard-ball items that MATERIALLY change how a shot plays — all default-off so a
+  // base loadout is byte-for-byte unchanged in the sim (the determinism contract).
+  {
+    // Reduced weather impact (windResist): low-spin balls that bore through the breeze. Both the
+    // upwind aim AND the actual wind push scale down together, so a shot stays fair — wind just bites
+    // less. A safe, clearly-beneficial upgrade (less wind chaos).
+    id: 'wind-cheater',
+    name: 'Wind-Cheater Balls',
+    cost: 120,
+    desc: 'Low, boring ball-flight that cuts through the breeze — 30% less wind impact · stacks',
+    rarity: 'rare',
+    stackable: true,
+    maxStacks: 2, // 30% → 60% wind reduction at two
+    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.3), perks: [...m.perks, 'wind-cheater'] }),
+  },
+  {
+    // Increased backspin (backspinBoost): milled grooves rip more check so approaches bite & hold.
+    id: 'spin-milled',
+    name: 'Spin-Milled Wedges',
+    cost: 130,
+    desc: 'Freshly milled grooves rip backspin — your approaches bite and check up instead of running on',
+    rarity: 'rare',
+    apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.07, perks: [...m.perks, 'spin-milled'] }),
+  },
+  {
+    // Hazard-skip ball: WATER. The ball skims clean across water (and creeks / frozen ponds, which
+    // carry a 'water' penalty) and settles on the nearest dry ground — no lost-ball stroke.
+    id: 'floater-balls',
+    name: 'Floater Balls',
+    cost: 220,
+    desc: 'Buoyant balls that skip clean across water — water hazards & creeks no longer cost you a stroke',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'water'), perks: [...m.perks, 'floater-balls'] }),
+  },
+  {
+    // Hazard-skip ball: LAVA (and the lava-river crossings).
+    id: 'magma-balls',
+    name: 'Magma Skimmers',
+    cost: 220,
+    desc: 'Heat-shielded balls that skip across molten lava — lava hazards & rivers cost you no stroke',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'lava'), perks: [...m.perks, 'magma-balls'] }),
+  },
+  {
+    // Hazard-skip ball: THE VOID — the hardest world's signature hazard. Legendary-scarce.
+    id: 'void-walkers',
+    name: 'Void-Walker Balls',
+    cost: 300,
+    desc: 'Anti-grav balls that drift across the abyss — the void no longer swallows your ball',
+    rarity: 'legendary',
+    apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'void', 'voidlost'), perks: [...m.perks, 'void-walkers'] }),
+  },
+  {
+    // Laser rangefinder: a cheaper, non-caddy way to get the club suggestion affordances. Interactive-
+    // only (the auto sim never reads clubSuggest), so it can't shift scoring/determinism.
+    id: 'rangefinder',
+    name: 'Laser Rangefinder',
+    cost: 90,
+    desc: 'Precise yardages on tap — shows a suggested club & the green front/middle/back read',
+    rarity: 'rare',
+    apply: (m) => ({ ...m, clubSuggest: true, perks: [...m.perks, 'rangefinder'] }),
+  },
+  {
+    // Tour spikes (shoes): a modest, weaker lie relief — better footing out of the rough/sand. Uses
+    // max() so it never downgrades Sandy's bigger relief; a clear, golf-themed escape upgrade.
+    id: 'tour-spikes',
+    name: 'Tour Spikes',
+    cost: 110,
+    desc: 'Aggressive cleats for a planted base — recover better from rough, sand & uneven lies',
+    rarity: 'rare',
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.35), perks: [...m.perks, 'tour-spikes'] }),
+  },
 ];
+
+/** Add penalty kind(s) to a hazard-immunity list (GS-proshop-2), de-duplicated. Pure. */
+function addImmune(cur: string[] | undefined, ...kinds: string[]): string[] {
+  const set = new Set(cur ?? []);
+  for (const k of kinds) set.add(k);
+  return [...set];
+}
 
 /** All named-caddy shop-item ids (GS-caddy) — the unique, mutually-exclusive caddies. */
 export const NAMED_CADDY_IDS: readonly string[] = SHOP_ITEMS.filter((i) => i.caddy === 'named').map((i) => i.id);
@@ -862,21 +973,41 @@ export interface ClubSet {
    * common clubs (rewards are rare+ improvements). Absent ⇒ offerable.
    */
   offerable?: boolean;
+  /**
+   * Visual THEME of the set (GS-proshop-2): drives the procedural club art on the shop card AND the
+   * glowing club head the golfer swings once the set is equipped. 'planet' (rare), 'phoenix' (epic),
+   * 'solarstorm' (legendary). Render-only — the sim never reads it. Absent ⇒ plain starter look.
+   */
+  theme?: string;
+  /** Accent colour for the set's theme (render-only) — the club-head glow + card art tint. */
+  tint?: string;
 }
 
+// Reward club sets are now THEMED by rarity (GS-proshop-2), each with its own look (a procedural club
+// art on the card + a glowing club head the golfer swings once it's equipped):
+//   • rare      → "Planet"        (the planet line: tour distance woods + pro scoring irons)
+//   • epic      → "Phoenix Flames" (the masters distance line)
+//   • legendary → "Solar Storm"    (the apex distance line)
+// The set IDs (tour/masters/pro/solar) are STABLE for save-compat; only the labels/themes are themed,
+// and a new legendary `solar` distance tier is added. Stats/roles (distanceOnly/scoringOnly/carryBonus)
+// are unchanged for the existing sets, so the verified balance + every club-rewards test still holds.
+// "later we can expand so different sets are better at different things" — the theme/tint metadata is
+// the seam for that (e.g. a future Solar Storm set that also tightens dispersion).
 export const CLUB_SETS: readonly ClubSet[] = [
   // Legacy common 'starter' set — NO LONGER OFFERED (rewards are rare+ now). Kept resolvable so old
   // saves carrying a `club:starter:*` perk still rebuild it; the live bag's starting clubs are stamped
   // 'starter' directly by the character (buildStartBag), not drawn from here.
   { set: 'starter', label: '', rarity: 'common', carryBonus: 0, cost: 70, offerable: false },
-  // 'tour' — the first DISTANCE upgrade tier: a longer rare wood/long-hybrid that replaces your
-  // starter one (a verified reach upgrade), or fills a missing distance club.
-  { set: 'tour', label: 'Tour', rarity: 'rare', carryBonus: 8, cost: 150, distanceOnly: true },
-  // 'masters' — the EPIC distance tier above 'tour' (a deeper reach upgrade for late-run builds).
-  { set: 'masters', label: 'Masters', rarity: 'epic', carryBonus: 16, cost: 240, distanceOnly: true },
-  // 'pro' — rare SCORING coverage: a premium iron/wedge at base carry that fills a gap the balanced
-  // bag leaves (tighter distance control close in). Offered only for a type you don't already carry.
-  { set: 'pro', label: 'Pro', rarity: 'rare', carryBonus: 0, cost: 120, scoringOnly: true },
+  // 'tour' — the rare PLANET distance tier: a longer wood/long-hybrid that replaces your starter one
+  // (a verified reach upgrade), or fills a missing distance club.
+  { set: 'tour', label: 'Planet', rarity: 'rare', carryBonus: 8, cost: 150, distanceOnly: true, theme: 'planet', tint: '#5b8bd0' },
+  // 'masters' — the epic PHOENIX FLAMES distance tier above Planet (a deeper reach upgrade for late-run builds).
+  { set: 'masters', label: 'Phoenix', rarity: 'epic', carryBonus: 16, cost: 240, distanceOnly: true, theme: 'phoenix', tint: '#ff7a3c' },
+  // 'pro' — rare PLANET SCORING coverage: a premium iron/wedge at base carry that fills a gap the
+  // balanced bag leaves (tighter distance control close in). Offered only for a type you don't carry.
+  { set: 'pro', label: 'Planet', rarity: 'rare', carryBonus: 0, cost: 120, scoringOnly: true, theme: 'planet', tint: '#5b8bd0' },
+  // 'solar' — the legendary SOLAR STORM distance tier: the apex reach upgrade (a deep-run prize).
+  { set: 'solar', label: 'Solar Storm', rarity: 'legendary', carryBonus: 24, cost: 360, distanceOnly: true, theme: 'solarstorm', tint: '#ffd23c' },
 ];
 
 /**
@@ -910,6 +1041,27 @@ export function isScoringType(type: string): boolean {
 /** Look up a club SET row by its id (e.g. resolve a reward item's clubSet back to its tier/bonus). */
 export function clubSetById(set: string | undefined): ClubSet | undefined {
   return CLUB_SETS.find((s) => s.set === set);
+}
+
+/**
+ * The themed gear look the golfer should SWING with (GS-proshop-2): the highest-rarity THEMED club set
+ * the bag currently carries (Planet < Phoenix Flames < Solar Storm), so buying a club set visibly
+ * changes the club head the on-course golfer swings. Pure, render-only; returns undefined for a plain
+ * starter bag. The renderer reads `theme`/`tint`; the sim never calls this.
+ */
+export interface GearTheme {
+  theme: string;
+  tint: string;
+  rarity: Rarity;
+}
+export function equippedGearTheme(loadout: PlayerLoadout): GearTheme | undefined {
+  let best: ClubSet | undefined;
+  for (const c of loadout.bag) {
+    const set = clubSetById(c.set);
+    if (!set?.theme || !set.tint) continue;
+    if (!best || RARITY_C[set.rarity].order > RARITY_C[best.rarity].order) best = set;
+  }
+  return best && best.theme && best.tint ? { theme: best.theme, tint: best.tint, rarity: best.rarity } : undefined;
 }
 
 /** The reward-club shop-item id for a (set, type) — stable; encodes both so resume rebuilds it. */

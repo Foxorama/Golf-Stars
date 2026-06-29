@@ -545,6 +545,9 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     confidence: run.loadout.confidenceMod,
     lieRelief: run.loadout.lieRelief,
     lefty: run.loadout.lefty,
+    windResist: run.loadout.windResist,
+    backspinBoost: run.loadout.backspinBoost,
+    hazardImmune: run.loadout.hazardImmune,
     scramble: scrambleOptsFor(run),
   };
 }

@@ -172,6 +172,8 @@ export interface ItemCardState {
    * they're an UPGRADE or a NEW club filling a distance gap. `{ text, tone }` — tone tints the pill.
    */
   badge?: { text: string; tone?: 'up' | 'new' };
+  /** Procedural item art (GS-proshop-2): an `<svg>` string shown atop the card (the gear you buy). */
+  artSVG?: string;
 }
 
 /** A shop item / loot card, rarity-tinted, dimmed when maxed or unaffordable. */
@@ -192,6 +194,9 @@ export function itemCardHTML(
         return `<div style="display:inline-block;margin:.1em 0 .3em;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:${bc};border:1px solid ${bc};border-radius:5px;padding:1px 6px;">${state.badge.text}</div>`;
       })()
     : '';
+  const art = state.artSVG
+    ? `<div style="margin:2px 0 7px;border-radius:9px;overflow:hidden;box-shadow:inset 0 0 0 1px ${col}33;">${state.artSVG}</div>`
+    : '';
   return `
     <article style="width:170px;border:2px solid ${col};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:0 0 12px ${col}22;">
       <div style="display:flex;align-items:baseline;gap:6px;">
@@ -199,6 +204,7 @@ export function itemCardHTML(
         <span style="margin-left:auto;">${rarityBadge(item.rarity)}</span>
       </div>
       ${badge}
+      ${art}
       <p style="font-size:12px;opacity:.8;margin:.5em 0;min-height:2.4em;">${item.desc}</p>
       <div style="font-size:13px;color:${col};font-weight:600;">${note}</div>
     </article>`;

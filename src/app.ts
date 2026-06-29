@@ -7,8 +7,9 @@
  */
 
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
-import { mountPlayView, type PlayViewHandle } from './render/playView';
+import { mountPlayView, type GolferLook, type PlayViewHandle } from './render/playView';
 import { itemCardHTML, shotCardHTML } from './render/cards';
+import { itemArtSVG } from './render/itemArt';
 import { renderHoleSVG } from './render/holeView';
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
@@ -28,7 +29,7 @@ import { bearing, dist, type Hole, type Rarity } from './sim/course/contract';
 import { type ShotSpread, type PlayedHole } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
-import { ACE_CREDIT_BONUS, clubOfferNote, isHybridType, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, REWARD_CLUB_TYPES, shopItem, usableBag } from './sim/rpg/economy';
+import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybridType, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, REWARD_CLUB_TYPES, shopItem, usableBag } from './sim/rpg/economy';
 import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
@@ -1976,7 +1977,9 @@ function shopScreen(): string {
     const cost = itemCost(it, owned);
     const afford = credits >= cost;
     const buyable = !maxed && afford;
-    const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned, badge: clubBadge(it) });
+    const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
+    const artSVG = itemArtSVG(it.id, it.rarity, setTheme);
+    const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned, badge: clubBadge(it), artSVG });
     // Wrap the card so the whole thing is the buy button when purchasable.
     return buyable
       ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
@@ -2280,9 +2283,13 @@ function currentEffect(): string | undefined {
   return state.course?.meta?.effect;
 }
 
-/** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. */
-function golferLook(): GolferStyle | undefined {
-  return getCharacter(state.run.loadout.characterId)?.style;
+/** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. A bought
+ *  themed club set (GS-proshop-2) adds the `gear` glow so the golfer swings the club you bought. */
+function golferLook(): GolferLook | undefined {
+  const base = getCharacter(state.run.loadout.characterId)?.style;
+  if (!base) return undefined;
+  const gear = equippedGearTheme(state.run.loadout);
+  return gear ? { ...base, gear: { theme: gear.theme, tint: gear.tint } } : base;
 }
 
 /** The co-op scramble partner golfer for the current boss stop (GS-scramble), if any. */

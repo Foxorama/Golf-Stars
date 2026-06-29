@@ -504,6 +504,10 @@ export interface ShotInput {
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty.
    *  Undefined = no relief (byte-for-byte). */
   lieRelief?: number;
+  /** Reduced weather impact (GS-proshop-2, Wind-Cheater): 0..1 fraction the wind's carry loss AND
+   *  crosswind push are scaled DOWN by. Applied to the SAME wind breakdown used for both, so it never
+   *  desyncs from the upwind aim (which scales by the matching factor). Undefined/0 = full wind. */
+  windResist?: number;
   /**
    * Shot POWER (GS-power): the intended carry as a fraction of the club's full carry. 1 = a full
    * swing (the default — byte-for-byte unchanged), 0.5 = a half-power shot landing ~half as far,
@@ -588,7 +592,13 @@ export function resolveShot(input: ShotInput): ShotResult {
   const power = input.power ?? 1;
   const intended = nominal * relief.carryMult * biomeMult * power;
 
-  const w = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
+  // Reduced weather impact (GS-proshop-2): scale the wind breakdown down by `windResist`. Both the
+  // headwind carry loss (carryMean below) and the crosswind push (windLat below) read off this `w`, so
+  // they shrink TOGETHER — and `aimWithWind` scales its upwind compensation by the same factor, so the
+  // aim stays consistent. windResist 0/undefined ⇒ `wr === 1` ⇒ byte-for-byte unchanged.
+  const wr = 1 - clamp01(input.windResist ?? 0);
+  const wRaw = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
+  const w = wr === 1 ? wRaw : { along: wRaw.along * wr, cross: wRaw.cross * wr };
 
   const dispMult = relief.dispersionMult * (input.dispersionMult ?? 1);
   const prof = dispersionProfile(nominal);
