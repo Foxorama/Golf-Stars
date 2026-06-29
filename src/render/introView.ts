@@ -1018,8 +1018,9 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.restore();
   }
 
-  /** A single cartoon golfer at foot position (x, GROUND_Y). */
-  function drawGolfer(x: number, scaleG: number, color: string, walk: number, withBag: boolean, alpha: number): void {
+  /** A single cartoon golfer at foot position (x, GROUND_Y). `skin` defaults to the original tone
+   *  so any caller that omits it is byte-identical. */
+  function drawGolfer(x: number, scaleG: number, color: string, walk: number, withBag: boolean, alpha: number, skin = '#f3c9a0'): void {
     if (!ctx || alpha <= 0) return;
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -1071,7 +1072,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     ctx.lineTo(12 + swing * 0.3, -34);
     ctx.stroke();
     // Head.
-    ctx.fillStyle = '#f3c9a0';
+    ctx.fillStyle = skin;
     ctx.beginPath();
     ctx.arc(0, -64, 8, 0, Math.PI * 2);
     ctx.fill();
@@ -1461,6 +1462,15 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         '#e0a83f', // Longshot Larry — gold
         '#9b5fd4', // Backspin Bo    — purple
       ];
+      // ...and their skin tones, matching each character's nationality (skin from
+      // CHARACTERS[].style in src/sim/rpg/characters.ts). To revert, drop the `skins[i]!`
+      // argument below — drawGolfer falls back to the original single tone.
+      const skins = [
+        '#6b4a32', // Feather Fade   — Nairobi, Kenya
+        '#e8c6a0', // Huang-Woo Hook — Busan, South Korea
+        '#d8a878', // Longshot Larry — Perth, Australia
+        '#caa182', // Backspin Bo    — Portland, USA
+      ];
       if (e < t1) {
         const dp = easeInOut(clamp01(e / t0));
         for (let i = 0; i < 4; i++) {
@@ -1471,13 +1481,13 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
 
           if (li < 0.5) {
             // Standing at the boot, bag still on the back (until the toss begins).
-            drawGolfer(gx, 1, colors[i]!, walking ? e * 0.02 + i : 0, true, 1);
+            drawGolfer(gx, 1, colors[i]!, walking ? e * 0.02 + i : 0, true, 1, skins[i]!);
             if (li > 0) drawFlyingBag(lineX[i]! - 10, 648, clamp01(li / 0.5));
           } else {
             // Bag's in — walk to the door and hop in (slide left + fade).
             const enter = clamp01((li - 0.5) / 0.5);
             const ex = lerp(lineX[i]!, 560, easeIn(enter));
-            drawGolfer(ex, 1, colors[i]!, e * 0.03 + i, false, 1 - enter);
+            drawGolfer(ex, 1, colors[i]!, e * 0.03 + i, false, 1 - enter, skins[i]!);
           }
         }
       }
