@@ -66,6 +66,37 @@ none touched the fairness/no-death-spiral bars (new systems live on the economy/
 - **GS-risk-shards / GS-bag-cap — small.** Reward `cutDelta`/rarity survived in shards; a soft bag cap so
   club loot is a draft not pure accretion.
 
+## Course / biome / hazard variety pass (2026-06-29 — `reports/course-variety-pass-2026-06-29.md`)
+A deep pass on "every hole plays the same, biomes are recolours, greens are identical", grounded in
+fresh golf-design research (`reports/golf-design-research-2026-06-29.md`). Shipped as PRs #129–#131.
+
+**SHIPPED:**
+- **GS-shapes-2 — hole archetypes (#129).** Template grammar coupling SHAPE × LENGTH: heroic **cape**
+  (early bite-off), severe **hairpin** + the existing straight/dogleg/S, and real length variety within
+  a par (drivable / long par-4, short / long par-3, reachable / three-shot par-5). `Hole.shapeId` + HUD label.
+- **GS-hazards-2 — hazards + greens (#130).** Deep **pot** bunkers (landing-zone pinch nests + greenside
+  rings), thick **fescue** native rough, dry **barranca** ravine forced-carry crossings, green **size
+  ∝ hole length**. All fair-by-construction; balance bars held.
+- **GS-worlds — four new worlds (#130).** **crystal** (precision), **tempest** (windiest), **fungal**
+  (densest groves), **ocean** (sea carries) — fully wired (physics/palette/zone+Pro/hero/talent/champions)
+  + 8 new real constellation themes. The `BiomeArchetype` registry now scales to N worlds.
+- **GS-rarity-style — rarity reads distinct (#131).** Render-only rarity deepen (decoupled from the
+  balance-stable physics intensity) + a zone-splash rarity ribbon/tagline.
+
+**Backlog (surfaced by the research — next pass):**
+- **GS-greens-3 — template green COMPLEXES with real mechanics (HIGHEST VALUE).** Greens still play as
+  a flat blob (shape varies, slope doesn't). Model: Redan kick-slope FEED, Biarritz swale, punchbowl
+  GATHER-to-centre, crowned/turtleback SHED-off-all-sides (effective target ~50% of area), false-front
+  REJECT, two-tier greens (treat a wrong-tier putt as a lag/dispersion penalty). Needs a green-slope
+  field on the contract + a putt/approach hook.
+- **GS-split-fairways — risky-short vs safe-long alternate fairways** (the dogleg-grove machinery is the
+  starting point); strategic centreline-bunker pinch with an opposite-side greenside bunker (open-the-angle).
+- **GS-canopy-recolour — per-world tree/canopy palette** so fungal "mushrooms" aren't green tree canopies
+  and crystal "spires" draw as crystal, not foliage (`CANOPY` is currently one fixed green).
+- **More worlds** now that the registry scales: metal/asteroid (low-grav scrap), neon/cyber grid,
+  toxic/acid swamp, lightning-storm. Each is a new archetype row + the 8 Record entries.
+- **Hazard vocab still open:** internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.
+
 ## Now / next (the slice is done — these are the natural follow-ons)
 
 - **GS-clubs — Per-character starting bags + clubs as rewards. SHIPPED.** Each golfer now starts with
