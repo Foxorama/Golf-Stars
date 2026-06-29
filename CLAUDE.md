@@ -587,18 +587,16 @@ This game lives or dies on three axes — put every change through all three bef
   byte-for-byte the old generation (the lower clamp never bites the unboosted base ≥ 0.1). (2)
   **atmosphere** — `routeEffect(ev)` maps the event (icon/id → category) to a render-only `CourseEffect`
   (`moonlight`/`meteorShower`/`solarStorm`/`aurora`/`spaceJunk`/`tradeMarket`), stamped on `course.meta.effect`
-  and drawn by BOTH renderers (`courseEffectPrims` in `style.ts` for the static scene — sky tint/moon/
-  meteors + course-space debris/trade-camp decor off the `crng` celestial stream, so it perturbs no
-  terrain placement; `drawCourseFx` in `playView.ts` for the animated falling-meteor/aurora/storm
-  overlay). Touches NEITHER physics NOR generation rng, so fairness is untouched and a `'none'`/absent
+  and drawn by the shared **`render/weather.ts`** layer (see *Weather / atmosphere layer* under Render).
+  Touches NEITHER physics NOR generation rng, so fairness is untouched and a `'none'`/absent
   effect adds nothing. The starmap history nodes now wear each cleared world's **biome glyph** with a
   gentle twinkle (`StarmapStop.glyph`), the forward planets carry an **effect badge** (`effectIcon`), and
   the route card previews the destination biome + a **difficulty band** + the effect blurb — so the
   choice's impact reads at a glance. No new `_gs*`/URL hook (effects ride course meta; difficulty rides
   the existing event), so the test-hub guard needs nothing. Tests: `tests/journey-effects.test.ts`
   (difficulty clamp/monotonicity, effect mapping, that a harder lane raises `currentCourse` wildness +
-  stamps the effect, stop-0/no-event unflavoured). Re-shoot the gallery only if `style.ts` base changes
-  (effect prims are gated behind `opts.effect`, so the no-effect gallery is byte-identical).
+  stamps the effect, stop-0/no-event unflavoured). The atmosphere RENDER was reworked into a shared
+  animated screen-space module (`render/weather.ts`) — see *Weather / atmosphere layer* under Render.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen
@@ -1368,7 +1366,7 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   motif to a large overhead **sky** drawn ON TOP of the terrain (so it's the stop's identity in BOTH the
   map and play), with the brightest star as a glowing **anchor** (Antares, Rigel…); still gated by
   `themeId` + a real figure, no rng, so a deep-sky/themeless render stays byte-identical. The play view's
-  `drawSpaceFX` was enriched (40 haloed twinkling stars + the sweeping shooting star) to carry the intro's
+  space FX (now the shared `render/weather.ts` twinkling stars + sweeping shooting star) carry the intro's
   starfield into live play — all on the existing `_gsFeel.spaceFX` knob, no new `_gs*` flag. NB: the
   aiming overlays (spray cone, flight lines, live ball) draw AFTER `buildScene`, so the busy sky never
   occludes the shot UI. Re-shoot the gallery after touching any of this.
@@ -1392,11 +1390,42 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   cosmic dust), with count + length scaling by `Wind.spd`. TWO layers, both off seeded streams so they
   never perturb determinism: a STATIC pass in the shared `buildScene` (`windStreaks`, off `crng`, so the
   SVG map + gallery read the weather and the constellation count invariants still hold — streaks are
-  theme-independent + archetype-equal) and an ANIMATED toroidal drift in `playView` (`drawWind`, off the
-  `fxRng`, on the existing `_gsFeel.wind` knob — no new `_gs*` flag, so the test-hub guard needs none).
+  theme-independent + archetype-equal) and an ANIMATED toroidal drift (now in `render/weather.ts`'s
+  `drawWind`, on the existing `_gsFeel.wind` knob — no new `_gs*` flag, so the test-hub guard needs none).
   Treelines are also DENSER and deeper (the `treeCount` multiplier + lateral spread bumped) so the rough
   reads as real forest, not a thin line — still non-penalty, still OUTSIDE the corridor (the death-spiral
   bars held). Animated wind is canvas feel → verified eyes-on; the static streaks are gallery-checked.
+- **Weather / atmosphere layer is a SHARED, animated, SCREEN-SPACE module (`render/weather.ts`,
+  GS-journey-fx rework).** The journey route's `CourseEffect` (moonlight / meteor shower / aurora / solar
+  storm / debris field / trade camp) used to be drawn TWO ways that diverged and disappointed: flat
+  `courseEffectPrims` polys baked into the static SVG scene (a muddy full-frame colour wash + tiny
+  course-PROJECTED ground decor — trade tents / debris shards planted near the tee), plus a thin
+  `drawCourseFx` overlay in `playView`. Three problems: (1) it "looked trash" — flat washes, scratch-like
+  meteors; (2) the course-projected ground decor read as a "static layer that jumps all over the place"
+  as the follow-cam panned (it was anchored to a fixed course point near the tee, swinging across/off
+  screen); (3) the animation only played while the ball was IN FLIGHT (the decision/aim + putt screens are
+  the static SVG map, so lining up a shot was dead). Fix: ONE module — `createWeather({effect, width,
+  height, archetype, windSpd, windDir, seed, spaceFX, wind})` returns a `{draw(ctx,now), setWind, resize}`
+  handle that paints the whole atmosphere in SCREEN space (the sky + the air): a subtle directional tint
+  (never a flat wash), the showpiece (glowing moon with halo+craters / gradient-trailed meteors with bright
+  heads / shimmering layered aurora curtains / a pulsing solar flare + edge vignette + crackle / drifting
+  lit debris wrecks with blink lights / a horizon trade caravan with dome tents + a swaying lantern string),
+  PLUS the always-on space ambience (twinkling stars + a periodic shooting star) and the VISIBLE wind. It
+  is consumed by BOTH the `playView` (in flight, replacing the old `drawSpaceFX`/`drawWind`/`drawCourseFx`)
+  AND a lightweight transparent overlay canvas `app.ts` mounts over the decision + putt maps
+  (`mountWeatherOverlay`, `[data-weather]`, `pointer-events:none` so the pull-to-shot passes through), so
+  the world is alive while you AIM and PUTT, not only mid-flight — and both screens use the SAME module +
+  the SAME per-hole `weatherSeed(hole)`, so it's a seamless hand-off. Because it's all SCREEN-SPACE it is
+  the SKY (correctly viewport-anchored) — the old "ground decor jumps" bug is gone (the trade camp is now a
+  screen-fixed horizon caravan, the debris drifts in orbit). The static `courseEffectPrims` + the
+  `SceneOpts.effect`/`RenderOptions.effect` fields were REMOVED, so `buildScene` no longer draws weather
+  (the overlay / play view own it); determinism is untouched (it consumed `crng` LAST, so terrain is
+  byte-for-byte identical — the constellation count invariants + `#3f8c3f`/`#5fd45a` turf checks hold). All
+  seeded (mulberry32 off the hole, never `Math.random`); reduced-motion draws a single calm frame (the
+  overlay just stops ticking). NO new `_gs*`/URL hook (`_gsFeel.spaceFX`/`.wind` still gate the ambience,
+  passed in by the play view; the overlay is plain DOM like the caddy badges + putt meter), so the test-hub
+  guard needs nothing. Canvas feel → verified eyes-on (Playwright: all six effects animate + read clean,
+  the decision-screen overlay mounts under the HUD with the pull gesture passing through).
 - **The swinging golfer + space ambience (play-view "alive" layer).** Each full shot in `playView`
   now opens with a little loader-style golfer (`drawGolfer` — same stick-figure/cap silhouette as the
   intro crew) who addresses → backswings → strikes during a `swingLeadMs` WINDUP, then holds a fading
@@ -1412,8 +1441,8 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   ringed planet, a comet) lives in the shared `buildScene` so BOTH renderers + the SVG gallery get it; it
   draws from a SEPARATE rng stream (`hashHole ^ 0x5747a2`) so existing terrain/tree/mote placement stays
   byte-identical, is gated by the existing `art.accents` density, and is culled OFF the cut grass so the
-  play corridor stays clean. `playView` adds a thin animated twinkle/shooting-star overlay (`drawSpaceFX`)
-  on top for motion only. Canvas feel — verified eyes-on (Playwright frames per swing phase).
+  play corridor stays clean. `playView` adds a thin animated twinkle/shooting-star overlay (the shared
+  `render/weather.ts`) on top for motion only. Canvas feel — verified eyes-on (Playwright frames per swing phase).
 - **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
   (centre on a point — the ball) + `viewRadius` (course yards) + `focusBias` (0..1, how far down
   the ball sits) instead of fitting the whole hole. The decision map zooms TIGHT to the contemplated

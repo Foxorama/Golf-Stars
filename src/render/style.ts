@@ -63,8 +63,6 @@ export interface SceneOpts {
   biome?: string;
   /** Star-travel theme id (GS-17e) — draws that constellation in the sky, rarity-tinted. */
   themeId?: string;
-  /** Atmospheric course effect the chosen route brought (GS-journey-fx). Render-only flavour. */
-  effect?: string;
   art?: ArtFeel;
 }
 
@@ -828,134 +826,6 @@ function hexAlpha(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-/**
- * The atmospheric flavour the chosen journey route brings to this world (GS-journey-fx) — moonlight,
- * meteors, an aurora, a solar storm, a crashed-debris field, or a trade camp. Render-ONLY: sky/lighting
- * tints (screen-space) plus, for spaceJunk + tradeMarket, a little COURSE-space ground decor (projected
- * off the centreline so it sits on the land). Off the celestial `crng` stream, consumed LAST in
- * buildScene, so it perturbs no terrain/scatter placement and a `'none'` effect adds nothing
- * (determinism + the constellation/turf invariants are untouched).
- */
-function courseEffectPrims(effect: string, hole: Hole, proj: Projector, W: number, H: number, crng: () => number): Prim[] {
-  if (!effect || effect === 'none') return [];
-  const p: Prim[] = [];
-  const full: Vec[] = [[0, 0], [W, 0], [W, H], [0, H]];
-  // A point lateral to the centreline at parameter `f` (0..1), `side` ±1, `d` course-yards out — for
-  // placing ground decor in the rough/edge, projected to screen.
-  const lateral = (f: number, side: number, d: number): Vec => {
-    const cl = hole.centreline;
-    const i = Math.max(1, Math.min(cl.length - 1, Math.round(f * (cl.length - 1))));
-    const a = cl[i - 1]!,
-      b = cl[i]!;
-    const tx = b[0] - a[0],
-      ty = b[1] - a[1];
-    const L = Math.hypot(tx, ty) || 1;
-    return [b[0] + (-ty / L) * side * d, b[1] + (tx / L) * side * d];
-  };
-  switch (effect) {
-    case 'moonlight': {
-      p.push({ t: 'poly', pts: full, fill: 'rgba(120,150,225,0.20)' });
-      const mx = W * 0.82,
-        my = H * 0.15,
-        r = Math.max(12, W * 0.05);
-      p.push({ t: 'circle', c: [mx, my], r: r * 2.1, fill: 'rgba(200,215,255,0.10)' });
-      p.push({ t: 'circle', c: [mx, my], r, fill: '#e8edff', stroke: 'rgba(180,195,235,0.6)', sw: 1 });
-      p.push({ t: 'circle', c: [mx - r * 0.32, my - r * 0.16], r: r * 0.22, fill: 'rgba(165,182,225,0.5)' });
-      p.push({ t: 'circle', c: [mx + r * 0.26, my + r * 0.3], r: r * 0.15, fill: 'rgba(165,182,225,0.45)' });
-      break;
-    }
-    case 'meteorShower': {
-      p.push({ t: 'poly', pts: full, fill: 'rgba(40,24,36,0.14)' });
-      for (let i = 0; i < 8; i++) {
-        const sx = crng() * W * 1.1 - W * 0.05;
-        const sy = crng() * H * 0.6;
-        const len = 16 + crng() * 28;
-        const ex = sx - len * 0.7,
-          ey = sy + len;
-        p.push({ t: 'line', a: [sx, sy], b: [ex, ey], stroke: 'rgba(255,224,168,0.85)', sw: 1.6, round: true });
-        p.push({ t: 'circle', c: [sx, sy], r: 1.7, fill: '#fff' });
-      }
-      break;
-    }
-    case 'solarStorm': {
-      p.push({ t: 'poly', pts: full, fill: 'rgba(150,40,30,0.16)' });
-      const fx = W * 0.2,
-        fy = H * 0.13,
-        fr = Math.max(10, W * 0.045);
-      p.push({ t: 'circle', c: [fx, fy], r: fr * 2.4, fill: 'rgba(255,120,70,0.16)' });
-      p.push({ t: 'circle', c: [fx, fy], r: fr, fill: 'rgba(255,170,90,0.55)' });
-      for (let i = 0; i < 5; i++) {
-        let x = crng() * W,
-          y = crng() * H * 0.4;
-        const segs = 3 + Math.floor(crng() * 3);
-        for (let s = 0; s < segs; s++) {
-          const nx = x + (crng() - 0.5) * 26,
-            ny = y + 10 + crng() * 16;
-          p.push({ t: 'line', a: [x, y], b: [nx, ny], stroke: 'rgba(255,150,90,0.5)', sw: 1.1, round: true });
-          x = nx;
-          y = ny;
-        }
-      }
-      break;
-    }
-    case 'aurora': {
-      const cols = ['rgba(90,230,170,0.16)', 'rgba(120,180,255,0.14)', 'rgba(200,140,255,0.13)'];
-      for (let b = 0; b < 3; b++) {
-        const y0 = H * (0.08 + b * 0.07);
-        const amp = 10 + crng() * 10;
-        const pts: Vec[] = [];
-        const N = 8;
-        for (let i = 0; i <= N; i++) pts.push([(W * i) / N, y0 + Math.sin(i * 1.3 + b) * amp]);
-        for (let i = N; i >= 0; i--) pts.push([(W * i) / N, y0 + 26 + Math.sin(i * 1.1 + b) * amp]);
-        p.push({ t: 'poly', pts, fill: cols[b]! });
-      }
-      break;
-    }
-    case 'spaceJunk': {
-      p.push({ t: 'poly', pts: full, fill: 'rgba(40,44,54,0.10)' });
-      for (let i = 0; i < 7; i++) {
-        const f = 0.12 + crng() * 0.76;
-        const side = crng() < 0.5 ? -1 : 1;
-        const d = 14 + crng() * 40; // fairway edge → out in the rough
-        const [cx, cy] = proj.project(lateral(f, side, d));
-        if (cx < -10 || cx > W + 10 || cy < -10 || cy > H + 10) continue;
-        const sz = 3 + crng() * 4;
-        const rot = crng() * Math.PI;
-        const c = Math.cos(rot),
-          s = Math.sin(rot);
-        const shard: Vec[] = [
-          [cx + c * sz, cy + s * sz],
-          [cx - s * sz * 0.7, cy + c * sz * 0.7],
-          [cx - c * sz, cy - s * sz],
-          [cx + s * sz * 0.6, cy - c * sz * 0.6],
-        ];
-        p.push({ t: 'poly', pts: [[cx - sz, cy + sz * 0.5], [cx + sz, cy + sz * 0.6], [cx, cy + sz * 1.1]], fill: 'rgba(0,0,0,0.28)' });
-        p.push({ t: 'poly', pts: shard, fill: '#7d828c', stroke: '#3a3d45', sw: 0.9 });
-        p.push({ t: 'line', a: [cx - sz * 0.4, cy], b: [cx + sz * 0.4, cy - sz * 0.3], stroke: 'rgba(220,230,245,0.5)', sw: 0.8, round: true });
-      }
-      break;
-    }
-    case 'tradeMarket': {
-      p.push({ t: 'poly', pts: full, fill: 'rgba(70,55,30,0.10)' });
-      const side = crng() < 0.5 ? -1 : 1;
-      const stallCols = ['#d06a4a', '#4a8fd0', '#d0b24a'];
-      for (let i = 0; i < 3; i++) {
-        const [cx, cy] = proj.project(lateral(0.1 + i * 0.04, side, 20 + i * 9));
-        const w = 7 + crng() * 2;
-        p.push({ t: 'poly', pts: [[cx - w, cy + w * 0.5], [cx + w, cy + w * 0.5], [cx, cy + w * 1.4]], fill: 'rgba(0,0,0,0.25)' }); // shadow
-        p.push({ t: 'poly', pts: [[cx - w, cy], [cx + w, cy], [cx + w, cy + w], [cx - w, cy + w]], fill: '#caa86e', stroke: '#5a4422', sw: 0.8 }); // crate body
-        p.push({ t: 'poly', pts: [[cx - w - 1, cy], [cx + w + 1, cy], [cx, cy - w]], fill: stallCols[i]!, stroke: '#2a1c10', sw: 0.9 }); // tent roof
-        p.push({ t: 'line', a: [cx, cy - w], b: [cx, cy - w - 5], stroke: '#8a6a35', sw: 1, round: true }); // pole
-        p.push({ t: 'poly', pts: [[cx, cy - w - 5], [cx + 5, cy - w - 3.5], [cx, cy - w - 2]], fill: '#ffd36b' }); // flag
-      }
-      break;
-    }
-    default:
-      break;
-  }
-  return p;
-}
-
 export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[] {
   const { width: W, height: H, biome, themeId } = opts;
   const art = artFeel(opts.art);
@@ -1212,11 +1082,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // to before (the constellation-backdrop test relies on that count invariant).
   if (themeId && art.accents > 0) prims.push(...constellationBackdrop(themeId, W, H));
 
-  // --- 8b. The journey route's atmospheric effect (GS-journey-fx) -------------
-  // Drawn on top of the terrain/sky but UNDER the OB stakes/centreline/flag below (so the gameplay
-  // markers stay crisp). Off `crng`, consumed last → a 'none'/absent effect adds nothing and changes
-  // no other prim.
-  if (opts.effect) prims.push(...courseEffectPrims(opts.effect, hole, proj, W, H, crng));
+  // NB: the journey route's atmospheric WEATHER (moonlight / meteors / aurora / storm / debris / trade
+  // camp) is NO LONGER baked into the static scene — it's drawn by the shared, animated, SCREEN-SPACE
+  // `weather.ts` layer (the play view in flight, an overlay while aiming/putting), so it's alive on
+  // every screen and never jumps as a false ground-anchored layer (GS-journey-fx rework).
 
   // --- 9. Out-of-bounds boundary + stakes -------------------------------------
   const corners = projPoly(playBoundsCorners(hole), proj);
