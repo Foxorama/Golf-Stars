@@ -1412,8 +1412,16 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   stop read as a recoloured golf hole on a coloured rectangle — "samey, just a different palette". Now
   `buildScene` paints, in order: (1) an opaque world-tinted **deep-space base** + soft nebula smears
   (`ARCHETYPE_SPACE`/`spaceLookFor` — verdant blue-night, desert rust dusk, frost teal void, inferno
-  ember-black, void violet abyss); (2) a **starfield** (90·`accents` screen-space stars w/ haloed
-  twinkles) + the existing far planet/comet, ALL off the independent `crng` stream; (3) the **landmass**
+  ember-black, void violet abyss). CRITICAL (GS-glow-prim): the nebulae are a SOFT radial **`glow`
+  Prim** (a new prim type — radial gradient `col`→transparent, drawn in BOTH `scenePrimsToSvg` via
+  `<radialGradient>` and `drawScenePrims` via `createRadialGradient`), NOT flat-fill `circle`s. Flat
+  discs rendered with HARD circular edges that read as a "weird static blob" floating over the hole
+  (and changed size/position between the portrait decision map and the fullscreen play view → "it
+  disappears on ball flight"); the glow is a luminous wash, matching the intro's screen-blended sky.
+  The bright-star halos use `glow` too. (Count went 2→3 nebulae — theme-independent + off `crng`, so
+  the constellation prim-count invariants `deepSky==plain`/`constellation>plain` still hold.) (2) a
+  **starfield** (90·`accents` screen-space stars w/ haloed twinkles) + the existing far planet/comet,
+  ALL off the independent `crng` stream; (3) the **landmass**
   = a TIGHT hull around the hole geometry (the feature/hazard bbox `cb` + a small `landMargin`, NOT the
   full OB box) filled with `landFillFor` and ringed by an atmospheric **edge glow** (`SpaceLook.edge`,
   the void's island treatment generalised to all five worlds), so beyond the shoreline you see SPACE,
@@ -1465,6 +1473,17 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   Treelines are also DENSER and deeper (the `treeCount` multiplier + lateral spread bumped) so the rough
   reads as real forest, not a thin line — still non-penalty, still OUTSIDE the corridor (the death-spiral
   bars held). Animated wind is canvas feel → verified eyes-on; the static streaks are gallery-checked.
+  - **Wind reads as FLOWING comet-streaks, not rain scratches (GS-wind-2).** The old streaks were short,
+    uniform, scratchy dashes (read as "rain on the glass" — the user's "really weird static affect").
+    Both layers were redrawn so the wind DIRECTION + STRENGTH are unmistakable at a glance (the design
+    goal: don't make the player squint at the tiny "14 mph crosswind" card chip): the ANIMATED `drawWind`
+    is `lighter`-blended tapered streaks — a bright glowing HEAD leading into the wind direction + a
+    gradient TAIL trailing upwind, with a gentle cross-stream flutter — where count, length, glow AND
+    drift SPEED all scale with `windSpd` (a strong wind is a faster, busier, brighter stream you can see
+    push the shot); the STATIC `windStreaks` are now sparse two-segment comets (faint long tail + brighter
+    short head) so the leading edge reads even on the still SVG map. The ambient starfield was also
+    lush'd to match the intro (area-scaled count, hero stars blooming through a cached glow sprite — the
+    intro's `shadowBlur`-avoidance perf trick). Still off the seeded streams (determinism untouched).
 - **Weather / atmosphere layer is a SHARED, animated, SCREEN-SPACE module (`render/weather.ts`,
   GS-journey-fx rework).** The journey route's `CourseEffect` (moonlight / meteor shower / aurora / solar
   storm / debris field / trade camp) used to be drawn TWO ways that diverged and disappointed: flat
