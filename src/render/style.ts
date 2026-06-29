@@ -17,7 +17,7 @@
 import type { Feature, Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBoundsCorners } from '../sim/round';
-import { themeById, archetypeFor, RARITY_INTENSITY, type BiomeArchetype } from '../sim/course/themes';
+import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
 import type { Projector } from './project';
@@ -638,9 +638,18 @@ function inView(p: Vec, w: number, h: number, m = 24): boolean {
  * keyed off the theme id when present, else the biome id, so a biome-only render (the Sim Lab) still
  * reads on-world. A themeless verdant render uses `verdant` + deepen 1 → byte-identical to before.
  */
+/**
+ * RENDER-ONLY rarity richness (GS-rarity-style). Decoupled from `RARITY_INTENSITY` (which scales the
+ * biome PHYSICS and must stay balance-stable) so a rarer stop can read VISIBLY richer/deeper on screen
+ * without touching gravity/wind/spice. Bolder than the physics intensity: a legendary world's turf +
+ * deep-space backdrop go markedly deeper and more saturated. Common = 1 (a themeless render is
+ * byte-identical). Pure value tint — it never adds prims, so the render prim-count invariants hold.
+ */
+const RARITY_VIEW_DEEPEN: Record<string, number> = { common: 1, rare: 1.3, epic: 1.6, legendary: 1.95 };
+
 function worldLook(themeId: string | undefined, biome: string | undefined): { arch: BiomeArchetype; deepen: number } {
   const arch = archetypeFor(themeId, biome ?? '');
-  const deepen = themeId ? RARITY_INTENSITY[themeById(themeId)?.rarity ?? 'common'] : 1;
+  const deepen = themeId ? RARITY_VIEW_DEEPEN[themeById(themeId)?.rarity ?? 'common'] ?? 1 : 1;
   return { arch, deepen };
 }
 
