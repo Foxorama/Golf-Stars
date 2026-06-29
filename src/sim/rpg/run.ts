@@ -45,7 +45,7 @@ import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, archetypeFor, type Theme } from '../course/themes';
+import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, archetypeFor, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
@@ -75,6 +75,13 @@ export interface Route {
   label: string;
   /** The risk/reward event waiting at the stop this route reaches (GS-14). */
   event: RouteEvent;
+  /**
+   * The WORLD this lane flies into (GS-journey-biome) — the theme/biome the next stop is generated
+   * from. Drawn from the ARC of the distance THIS jump reaches, so a deeper jump lands a later-arc
+   * world AND the lane you pick determines the biome you play (no longer a disconnected surprise).
+   * `travel` records it as the run's `pendingTheme`, which `currentTheme` then honours.
+   */
+  theme: Theme;
   /** The HARDER path (GS-voyage): the deepest, highest-stakes lane this jump — biggest cut, biggest
    *  payout. Derived from the drawn event (no extra rng), surfaced so the player can court the risk. */
   elite?: boolean;
@@ -101,6 +108,12 @@ export interface Run {
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
    */
   pendingEvent?: RouteEvent;
+  /**
+   * The WORLD the CURRENT stop flies into (GS-journey-biome) — set by `travel` from the chosen route's
+   * destination theme, read by `currentTheme`/`currentCourse`. Absent at stop 0 / on an old resume →
+   * `currentTheme` falls back to the deterministic `themeForStop` draw (byte-for-byte the old behaviour).
+   */
+  pendingTheme?: Theme;
   /** Permanent shards banked mid-run by route events (GS-routes `shardBonus`) — accrued on travel and
    *  kept even on a later bust, so a "salvage" lane is guaranteed meta progress. Added by shardsForRun. */
   bonusShards: number;
@@ -164,9 +177,25 @@ export function stopSeed(run: Run): string {
   return `${run.seed}:stop:${run.stopIndex}`;
 }
 
-/** The star-travel theme the current stop flies into (GS-17). Deterministic from the run. */
-export function currentTheme(run: Run) {
-  return themeForStop(run.seed, run.stopIndex, run.distanceFromStart);
+/**
+ * The star-travel theme the current stop flies into (GS-17). The lane you chose at the previous
+ * travel screen determines the world (GS-journey-biome) — so honour `pendingTheme` if set. At stop 0
+ * (no jump taken yet) or on an old resume it falls back to the deterministic `themeForStop` draw,
+ * keeping the very first stop byte-for-byte identical to the old behaviour.
+ */
+export function currentTheme(run: Run): Theme {
+  return run.pendingTheme ?? themeForStop(run.seed, run.stopIndex, run.distanceFromStart);
+}
+
+/**
+ * The world a route lane flies into (GS-journey-biome). Drawn from the ARC of the distance the jump
+ * REACHES (`reachedDistance`), so a deeper jump lands a later-arc, wilder world. Keyed by route id on
+ * its own rng stream, so attaching it to `routeOptions` leaves the existing `:routes:` draw order
+ * (distances + events) byte-for-byte unchanged. Pure & deterministic.
+ */
+export function routeTheme(seed: number | string, stopIndex: number, routeId: number, reachedDistance: number): Theme {
+  const rng = new Rng(`${seed}:routetheme:${stopIndex}:${routeId}`);
+  return pickTheme(rng, arcForDistance(reachedDistance));
 }
 
 /** The course awaiting the player at the current stop (shaped by the run format + theme). */
@@ -587,6 +616,9 @@ export function routeOptions(run: Run): Route[] {
   return withEvents.map((r, i) => ({
     ...r,
     elite: i === eliteIdx,
+    // The world this lane flies into (GS-journey-biome) — drawn from the arc the jump reaches, so the
+    // route preview, the map planet, and the biome you actually play all agree.
+    theme: routeTheme(run.seed, run.stopIndex, r.id, run.distanceFromStart + r.distanceJump),
     // Preview whether the stop this route reaches (the next stop) is a boss.
     bossAhead: !!bossAt(format, run.stopIndex + 1),
   }));
@@ -608,6 +640,9 @@ export function travel(run: Run, route: Route): Run {
     bonusShards: run.bonusShards + shardBonus,
     // Carry the chosen route's event into the next stop (applied by finishStop).
     pendingEvent: ev,
+    // Carry the chosen lane's WORLD into the next stop (GS-journey-biome) — the biome you arrive in is
+    // the one the route previewed, not an unrelated re-draw.
+    pendingTheme: route.theme,
     // A unique one-off is now spent for the rest of the run (GS-17c).
     firedEventIds: ev.unique ? [...run.firedEventIds, ev.id] : run.firedEventIds,
   };
@@ -751,6 +786,9 @@ export interface RunSnapshot {
   ascension?: number;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
+  /** The pending destination-world theme id (GS-journey-biome), so a resume keeps the stop's biome.
+   *  Absent on an old snapshot → `currentTheme` falls back to the deterministic draw. */
+  pendingThemeId?: string;
   /** Permanent shards banked mid-run by route events (GS-routes); 0/absent for back-compat. */
   bonusShards?: number;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
@@ -770,6 +808,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     meta: { ...run.meta },
     ascension: run.ascension,
     pendingEventId: run.pendingEvent?.id,
+    pendingThemeId: run.pendingTheme?.id,
     bonusShards: run.bonusShards,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
@@ -790,6 +829,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     meta,
     ascension: snap.ascension ?? 0,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
+    pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
     bonusShards: snap.bonusShards ?? 0,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',

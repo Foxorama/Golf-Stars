@@ -22,7 +22,6 @@
  * to inject via innerHTML; `wireJourneyScroll` (app.ts) just nudges the strip's scrollLeft after mount.
  */
 
-import { Rng } from '../sim/rng';
 import type { Rarity } from '../sim/course/contract';
 import { rarCol } from '../sim/rpg/loot';
 
@@ -30,14 +29,29 @@ export interface StarmapChoice {
   /** Route id — used only to key the DOM node, not drawn. */
   id: number;
   label: string;
-  /** Event glyph (emoji) drawn on the branch planet. */
+  /** Event glyph (emoji) — a small badge on the planet (the bet type; the planet itself reads biome). */
   icon: string;
   rarity: Rarity;
   /** How far this lane jumps (drawn as a +N chip). */
   distanceJump: number;
+  /** The BIOME this lane flies into (GS-journey-biome) — colours + glyphs the destination planet so the
+   *  route preview reads as the world you'll actually play. Optional → a neutral planet (old behaviour). */
+  archetype?: string;
+  /** The destination world's name, drawn under its planet. */
+  worldName?: string;
   elite?: boolean;
   bossAhead?: boolean;
 }
+
+/** Per-biome planet look (GS-journey-biome) — a colour + glyph so each lane's destination reads on-world.
+ *  Self-contained in the widget (no coupling to the heavy render palette). */
+const BIOME_LOOK: Record<string, { col: string; glyph: string }> = {
+  verdant: { col: '#5fd45a', glyph: '🌳' },
+  desert: { col: '#e0b15a', glyph: '🏜️' },
+  frost: { col: '#7fd6e6', glyph: '❄️' },
+  inferno: { col: '#ff6b4a', glyph: '🌋' },
+  void: { col: '#9a7bd0', glyph: '🌌' },
+};
 
 /** One cleared stop on the travelled trail (Earth → … → YOU). */
 export interface StarmapStop {
@@ -115,52 +129,33 @@ function wagonGlyph(cx: number, cy: number, s: number): string {
   </g>`;
 }
 
-/** A glowing branch planet for one route choice. */
+/** A glowing branch planet for one route choice. The planet BODY reads the destination biome (colour +
+ *  glyph), the RING reads the loot rarity, and a small corner badge carries the event/bet glyph — so a
+ *  lane previews where you'll play AND what it costs at a glance (GS-journey-biome). */
 function planetGlyph(cx: number, cy: number, c: StarmapChoice): string {
-  const col = rarCol(c.rarity);
-  const r = 15;
+  const ring = rarCol(c.rarity);
+  const look = (c.archetype && BIOME_LOOK[c.archetype]) || { col: '#8aa0c0', glyph: c.icon };
+  const r = 16;
   const markers: string[] = [];
   if (c.bossAhead) markers.push('⚔');
   if (c.elite) markers.push('🔥');
   const markerRow = markers.length
-    ? `<text x="${cx + r - 2}" y="${cy - r + 4}" font-size="11" text-anchor="middle">${markers.join('')}</text>`
+    ? `<text x="${cx + r - 1}" y="${cy - r + 5}" font-size="11" text-anchor="middle">${markers.join('')}</text>`
     : '';
+  const name = c.worldName ? (c.worldName.length > 14 ? `${c.worldName.slice(0, 13)}…` : c.worldName) : '';
+  const nameLabel = name ? `<text x="${cx}" y="${cy + r + 11}" font-size="8" fill="#cdd7ec" text-anchor="middle" font-weight="700">${esc(name)}</text>` : '';
   return `
     <g>
-      <circle cx="${cx}" cy="${cy}" r="${r + 5}" fill="${col}" opacity="0.14"/>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#0e1320" stroke="${col}" stroke-width="2"/>
-      <circle cx="${cx - 4}" cy="${cy - 4}" r="${r - 3}" fill="${col}" opacity="0.12"/>
-      <text x="${cx}" y="${cy + 5}" font-size="15" text-anchor="middle">${c.icon}</text>
+      <circle cx="${cx}" cy="${cy}" r="${r + 6}" fill="${look.col}" opacity="0.16"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${look.col}" opacity="0.20"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${ring}" stroke-width="2.4"/>
+      <circle cx="${cx - 4.5}" cy="${cy - 4.5}" r="${r - 4}" fill="${look.col}" opacity="0.30"/>
+      <text x="${cx}" y="${cy + 5.5}" font-size="16" text-anchor="middle">${look.glyph}</text>
       ${markerRow}
-      <text x="${cx}" y="${cy + r + 12}" font-size="8" fill="${col}" text-anchor="middle">+${c.distanceJump} jump</text>
+      ${nameLabel}
+      <text x="${cx}" y="${cy + r + (name ? 20 : 11)}" font-size="7.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump</text>
     </g>`;
 }
-
-/** A seeded starfield + nebula sized to a panel of `w`×`h`, as one SVG fragment. */
-function starfield(rng: Rng, w: number, h: number): string {
-  const stars: string[] = [];
-  const count = Math.round((w * h) / 920); // density-matched so a wide strip isn't sparse
-  for (let i = 0; i < count; i++) {
-    const x = rng.float() * w;
-    const y = rng.float() * h;
-    const sr = rng.float() * 1.1 + 0.3;
-    const op = (rng.float() * 0.5 + 0.25).toFixed(2);
-    const tw =
-      i % 11 === 0
-        ? `<animate attributeName="opacity" values="${op};0.12;${op}" dur="${(2 + rng.float() * 3).toFixed(1)}s" repeatCount="indefinite"/>`
-        : '';
-    stars.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${sr.toFixed(2)}" fill="#dfe7ff" opacity="${op}">${tw}</circle>`);
-  }
-  const nebula = `
-    <ellipse cx="${(w * 0.5).toFixed(0)}" cy="${(h * 0.3).toFixed(0)}" rx="${(w * 0.4).toFixed(0)}" ry="70" fill="url(#sm-neb)" opacity="0.5"/>
-    <ellipse cx="${(w * 0.2).toFixed(0)}" cy="${(h * 0.8).toFixed(0)}" rx="90" ry="55" fill="url(#sm-neb2)" opacity="0.4"/>`;
-  return nebula + stars.join('');
-}
-
-const NEBULA_DEFS = `<defs>
-  <radialGradient id="sm-neb" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3a5fb0" stop-opacity="0.5"/><stop offset="100%" stop-color="#3a5fb0" stop-opacity="0"/></radialGradient>
-  <radialGradient id="sm-neb2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#6b3aa0" stop-opacity="0.45"/><stop offset="100%" stop-color="#6b3aa0" stop-opacity="0"/></radialGradient>
-</defs>`;
 
 /**
  * The whole journey widget as an HTML string: a scrollable trail strip + a pinned forward panel.
@@ -196,7 +191,10 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     return { x, y, label: s.label };
   });
   const lastX = nodes.length ? nodes[nodes.length - 1]!.x : earth.x;
-  const trailW = Math.max(FW + 120, lastX + 96); // room past the last node for the bridge into YOU
+  // Width = the last node + room for the bridge into YOU. A small floor keeps an empty/short trail sane;
+  // when it's narrower than the strip the SVG's `min-width:100%` + right-anchor (xMaxYMid) pin the bridge
+  // to the seam so it MEETS the wagon while Earth still shows. A long trail exceeds this and just scrolls.
+  const trailW = Math.max(140, lastX + 96);
 
   // ---- trail path: a smooth poly through Earth → nodes, then a bridge toward YOU --------------
   const pts: Array<{ x: number; y: number }> = [earth, ...nodes, { x: trailW, y: MID_Y }];
@@ -230,11 +228,13 @@ export function journeyMapHTML(opts: StarmapOpts): string {
       <text x="${earth.x}" y="${earth.y + 32}" font-size="9.5" fill="#9fb0cf" text-anchor="middle" font-weight="700">EARTH</text>
     </g>`;
 
-  const trailRng = new Rng(`${opts.seed}:trail:${opts.stopIndex}`);
-  const trailSvg = `<svg width="${trailW}" height="${H}" viewBox="0 0 ${trailW} ${H}" role="img" aria-label="Travelled path" style="display:block;">
-    ${NEBULA_DEFS}
-    ${starfield(trailRng, trailW, H)}
-    <path d="${trailPath}" fill="none" stroke="#54607d" stroke-width="1.4" stroke-dasharray="1 4" opacity="0.6"/>
+  // The strip's starfield/nebula is a CONTINUOUS CSS background on `.gs-journey` (shared by both panels)
+  // so there's never a starless gap or a hard seam — the SVG itself is transparent. `min-width:100%` +
+  // `xMaxYMid` RIGHT-ANCHORS the content to the seam when the trail is shorter than the strip, so the
+  // bridge into YOU always meets the forward panel; when it's longer the strip just scrolls (app.ts
+  // snaps it to the right edge), and the bridge still lands at the seam.
+  const trailSvg = `<svg width="${trailW}" height="${H}" viewBox="0 0 ${trailW} ${H}" preserveAspectRatio="xMaxYMid meet" role="img" aria-label="Travelled path" style="display:block;min-width:100%;height:${H}px;">
+    <path d="${trailPath}" fill="none" stroke="#7f8db0" stroke-width="1.6" stroke-dasharray="1 4" opacity="0.7"/>
     ${dots}
     ${earthGlyph}
   </svg>`;
@@ -257,16 +257,14 @@ export function journeyMapHTML(opts: StarmapOpts): string {
       };
     })
     .reduce((acc, b) => ({ lines: acc.lines + b.line, planets: acc.planets + b.planet }), { lines: '', planets: '' });
-  // A short incoming stub on the panel's left edge so the trail visibly flows IN to YOU across the seam.
-  const youStub = `<path d="M0,${MID_Y} L${youX},${MID_Y}" fill="none" stroke="#54607d" stroke-width="1.4" stroke-dasharray="1 4" opacity="0.6"/>`;
+  // The trail flows IN to YOU across the seam: a SOLID lead-in from the left edge to the wagon (the trail
+  // strip's dashed bridge lands at the same MID_Y at the seam, so the line reads continuous wagon←trail).
+  const youStub = `<path d="M0,${MID_Y} L${youX},${MID_Y}" fill="none" stroke="#7f8db0" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>`;
   const youLabel = `
     <text x="${youX + 6}" y="${MID_Y - 16}" font-size="9" fill="#ffce54" text-anchor="middle" font-weight="800">YOU</text>
     <text x="${youX + 6}" y="${MID_Y + 22}" font-size="7.5" fill="#7f8aa3" text-anchor="middle">dist ${opts.distanceFromStart}</text>`;
 
-  const fwdRng = new Rng(`${opts.seed}:fwd:${opts.stopIndex}`);
   const fwdSvg = `<svg width="${FW}" height="${H}" viewBox="0 0 ${FW} ${H}" role="img" aria-label="Routes ahead" style="display:block;">
-    ${NEBULA_DEFS}
-    ${starfield(fwdRng, FW, H)}
     ${youStub}
     ${fbranch.lines}
     ${fbranch.planets}

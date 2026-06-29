@@ -1848,6 +1848,16 @@ function outpostScreen(): string {
     <div style="margin-top:12px;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
 }
 
+// The destination biome a lane flies into (GS-journey-biome) → a glyph + label + accent for the route
+// card, so picking a jump reads as choosing a world, not an unrelated surprise on arrival.
+const BIOME_BADGE: Record<string, { glyph: string; label: string; col: string }> = {
+  verdant: { glyph: '🌳', label: 'Verdant', col: '#5fd45a' },
+  desert: { glyph: '🏜️', label: 'Desert', col: '#e0b15a' },
+  frost: { glyph: '❄️', label: 'Frost', col: '#7fd6e6' },
+  inferno: { glyph: '🌋', label: 'Inferno', col: '#ff6b4a' },
+  void: { glyph: '🌌', label: 'Void', col: '#9a7bd0' },
+};
+
 // The functional family of a route event → a short pill label + accent (distinct from the rarity ring).
 const EVENT_CATEGORY: Record<EventCategory, { label: string; col: string }> = {
   calm: { label: 'SAFE', col: '#2bb673' },
@@ -1868,6 +1878,9 @@ function travelScreen(): string {
     icon: r.event.icon,
     rarity: r.event.rarity,
     distanceJump: r.distanceJump,
+    // The world this lane flies into (GS-journey-biome) — so the map planet reads the biome you'll play.
+    archetype: r.theme.archetype,
+    worldName: r.theme.name,
     elite: r.elite,
     bossAhead: r.bossAhead,
   }));
@@ -1926,7 +1939,11 @@ function travelScreen(): string {
                ${chip(ev.rarity.toUpperCase(), ring)}
                ${chip(cat.label, cat.col)}
              </div>
-             <div style="font-size:12px;opacity:.6;margin:2px 0 4px;">↗ ${r.label} · +${r.distanceJump} distance</div>
+             <div style="font-size:12px;opacity:.6;margin:2px 0 3px;">↗ ${r.label} · +${r.distanceJump} distance</div>
+             ${(() => {
+               const b = BIOME_BADGE[r.theme.archetype] ?? { glyph: '🪐', label: r.theme.archetype, col: '#8aa0c0' };
+               return `<div style="font-size:12.5px;margin:0 0 5px;color:${b.col};font-weight:600;">${b.glyph} ${r.theme.name} · ${b.label} world</div>`;
+             })()}
              <div style="font-size:13px;opacity:.9;margin-bottom:3px;">${ev.desc}</div>
              <div style="font-size:12px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
              <div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.join('')}</div>
