@@ -12,7 +12,7 @@
  */
 
 import type { Run } from './run';
-import { effectiveCut, currentCourse } from './run';
+import { effectiveCut, currentCourse, arcSlices, ascensionCutBonus } from './run';
 import { getFormat, stopSpecFor, bossAt } from './formats';
 import { arcForDistance, archetypeFor } from '../course/themes';
 import { getCharacter } from './characters';
@@ -26,28 +26,23 @@ import {
   survivorCount,
   bossPick,
   bossOpponentFor,
+  arcCut,
+  arcSurvivorTarget,
+  ARC_LEN,
+  arcIndexOf,
+  arcStartStop,
+  stopPosInArc,
+  isArcBossSlot,
+  stopPressure,
   PLAYER_ID,
   type Field,
   type Standing,
   type PlayerInfo,
 } from './competition';
 
-/** Stops per arc — voyage is 2 ordinary + 1 boss; flat/ladder reuse the grouping as a "season". */
-export const ARC_LEN = 3;
-
-export function arcIndexOf(stopIndex: number): number {
-  return Math.floor(stopIndex / ARC_LEN);
-}
-export function arcStartStop(arcIndex: number): number {
-  return arcIndex * ARC_LEN;
-}
-export function stopPosInArc(stopIndex: number): number {
-  return stopIndex % ARC_LEN;
-}
-/** Is this the boss (final) slot of its arc? */
-export function isArcBossSlot(stopIndex: number): boolean {
-  return stopPosInArc(stopIndex) === ARC_LEN - 1;
-}
+// The arc grouping helpers moved to competition.ts (so run.ts can use them for the positional cut
+// without an import cycle); re-export them here for back-compat with existing importers.
+export { ARC_LEN, arcIndexOf, arcStartStop, stopPosInArc, isArcBossSlot };
 
 const DEFAULT_LOOK = { cap: '#cfd6dd', shirt: '#7f8a96', skin: '#caa182', build: 1 };
 
@@ -72,12 +67,6 @@ export function runField(run: Run): Field {
   return buildField(run.seed, arcIndex, arcForDistance(run.distanceFromStart), playerInfoFor(run));
 }
 
-/** Pressure 0..1 a stop carries (ramps toward the arc's boss slot). */
-function stopPressure(stopIndex: number): number {
-  const pos = stopPosInArc(stopIndex);
-  return isArcBossSlot(stopIndex) ? 1 : pos / ARC_LEN;
-}
-
 /** A stable ghost hole key (independent of the real course seed — only needs to be deterministic). */
 function ghostHoleKey(run: Run, stopIndex: number, holeIdx: number): string {
   return `${run.seed}:gl:${stopIndex}:${holeIdx}`;
@@ -91,7 +80,8 @@ function stopFormKey(run: Run, stopIndex: number): string {
 export interface Leaderboard {
   field: Field;
   standings: Standing[];
-  /** This-stop cut line (the survival threshold drawn across the board). */
+  /** This-stop cut line. In 'positional' mode this is the survivor TARGET (top-N advance); in
+   *  'stableford' mode it's the Stableford threshold. */
   cut: number;
   /** AI golfers (excluding the player) still alive after this stop's cut. */
   survivors: number;
@@ -99,6 +89,46 @@ export interface Leaderboard {
   thru: number;
   /** Whether the current arc has any history yet (else the board is the pre-arc field only). */
   hasScores: boolean;
+  /** Survival model (GS-positional-cut): 'positional' = top-N of the field advance (the voyage);
+   *  'stableford' = beat a Stableford line (endless flat/ladder). */
+  mode: 'positional' | 'stableford';
+  /** The survivor target (top-N advance) when positional — for the "N advance" display. */
+  survivorTarget?: number;
+}
+
+/**
+ * The current arc's leaderboard. A WINNABLE campaign (the voyage) is a FIELD competition with a
+ * POSITIONAL cut (top-N advance) — survival is your place, the board is what matters; endless formats
+ * (flat/ladder) keep the Stableford-line board. Pure/deterministic.
+ */
+export function leaderboard(run: Run): Leaderboard {
+  return getFormat(run.formatId).winnable ? positionalLeaderboard(run) : stablefordLeaderboard(run);
+}
+
+/**
+ * The positional leaderboard (GS-positional-cut): cumulative arc standings with the top-N cut applied
+ * stop-by-stop (top 18, then top 16), so eliminated golfers are flagged and sink below the survivors.
+ * Uses the SAME slices + `arcCut` engine `finishStop` uses for survival, so the drawn cut and the real
+ * cut can never disagree. A boss stop in the arc adds nothing and draws no cut (the match decides).
+ */
+function positionalLeaderboard(run: Run): Leaderboard {
+  const field = runField(run);
+  const slices = arcSlices(run); // completed arc stops (the result screen renders AFTER history is appended)
+  const result = arcCut(field, run.seed, slices);
+  const survivors = result.standings.filter((s) => !s.isPlayer && !s.cut).length;
+  // The "cut" here is the survivor TARGET (top-N advance). Before any stop is played it's the first
+  // stop's target (so a fresh board reads "top 18 advance"); after a boss stop there's no positional cut.
+  const target = result.lastTarget ?? arcSurvivorTarget(run.stopIndex, ascensionCutBonus(run.ascension));
+  return {
+    field,
+    standings: result.standings,
+    cut: target ?? 0,
+    survivors,
+    thru: result.thru,
+    hasScores: slices.length > 0,
+    mode: 'positional',
+    survivorTarget: result.lastIsBoss ? undefined : target,
+  };
 }
 
 /**
@@ -106,7 +136,7 @@ export interface Leaderboard {
  * the arc contributes the player's REAL Stableford and the field's ghost Stableford; the LAST played stop
  * also sets each row's `stopScore` for the cut. `cut` is the just-played stop's effective cut.
  */
-export function leaderboard(run: Run): Leaderboard {
+function stablefordLeaderboard(run: Run): Leaderboard {
   const arcIndex = arcIndexOf(run.stopIndex);
   const field = runField(run);
   // The arc's completed stops, in order.
@@ -185,6 +215,7 @@ export function leaderboard(run: Run): Leaderboard {
     survivors: survivorCount(withCut),
     thru,
     hasScores: arcStops.length > 0,
+    mode: 'stableford',
   };
 }
 
@@ -236,31 +267,43 @@ export interface LivePosition {
  * Pure/deterministic.
  */
 export function liveLeaderboard(run: Run, holesPlayed: number, playerStopSF: number): Leaderboard {
-  const board = leaderboard(run); // completed arc stops (cumulative)
+  const board = leaderboard(run); // completed arc stops (cumulative; positional → carries cut flags)
   const field = board.field;
   const course = currentCourse(run);
   const themeId = course.meta?.themeId;
   const archetype = archetypeFor(themeId, course.biome);
   const pressure = stopPressure(run.stopIndex);
+  const currentIsBoss = !!bossAt(getFormat(run.formatId), run.stopIndex);
+  // Only a positional board carries PERMANENT eliminations between stops; a stableford board (flat/
+  // ladder) re-includes everyone each stop, so its prior cut flags are display-only — don't freeze them.
+  const carryElim = board.mode === 'positional';
+
+  const eliminated = new Map<string, boolean>();
+  for (const s of board.standings) eliminated.set(s.golferId, carryElim ? !!s.cut : false);
 
   const totals = new Map<string, number>();
   const stopScores = new Map<string, number>();
   for (const s of board.standings) totals.set(s.golferId, s.total);
-  totals.set(PLAYER_ID, (totals.get(PLAYER_ID) ?? 0) + playerStopSF);
-  stopScores.set(PLAYER_ID, playerStopSF);
-  const formKey = stopFormKey(run, run.stopIndex);
-  for (const g of field.golfers) {
-    if (g.isPlayer) continue;
-    const form = golferForm(g.id, formKey);
-    let sf = 0;
-    for (let i = 0; i < holesPlayed; i++) {
-      sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure, form);
+
+  // A boss stop adds nothing to the board (matchplay), so don't fold a partial there.
+  const addPartial = !currentIsBoss;
+  if (addPartial) {
+    totals.set(PLAYER_ID, (totals.get(PLAYER_ID) ?? 0) + playerStopSF);
+    stopScores.set(PLAYER_ID, playerStopSF);
+    const formKey = stopFormKey(run, run.stopIndex);
+    for (const g of field.golfers) {
+      if (g.isPlayer || eliminated.get(g.id)) continue; // an eliminated golfer is out — no partial
+      const form = golferForm(g.id, formKey);
+      let sf = 0;
+      for (let i = 0; i < holesPlayed; i++) {
+        sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure, form);
+      }
+      totals.set(g.id, (totals.get(g.id) ?? 0) + sf);
+      stopScores.set(g.id, sf);
     }
-    totals.set(g.id, (totals.get(g.id) ?? 0) + sf);
-    stopScores.set(g.id, sf);
   }
 
-  const thru = board.thru + holesPlayed;
+  const thru = board.thru + (addPartial ? holesPlayed : 0);
   const rows: Standing[] = field.golfers.map((g) => ({
     golferId: g.id,
     name: g.name,
@@ -268,14 +311,27 @@ export function liveLeaderboard(run: Run, holesPlayed: number, playerStopSF: num
     tier: g.tier,
     look: g.look,
     isPlayer: g.isPlayer,
-    total: totals.get(g.id)!,
+    total: totals.get(g.id) ?? 0,
     thru,
-    stopScore: stopScores.get(g.id)!,
+    stopScore: stopScores.get(g.id) ?? 0,
     position: 0,
+    cut: eliminated.get(g.id) ?? false,
   }));
-  rankStandings(rows);
-  const cut = effectiveCut(run, holesForStop(run, run.stopIndex));
-  return { field, standings: rows, cut, survivors: field.golfers.length, thru, hasScores: true };
+  // Sink eliminated golfers below the survivors (positional); a stableford board has none flagged.
+  rows.sort((a, b) => (a.cut ? 1 : 0) - (b.cut ? 1 : 0) || b.total - a.total || a.name.localeCompare(b.name));
+  rows.forEach((r, i) => (r.position = i + 1));
+
+  const survivorTarget = board.mode === 'positional' && !currentIsBoss ? arcSurvivorTarget(run.stopIndex, ascensionCutBonus(run.ascension)) : undefined;
+  return {
+    field,
+    standings: rows,
+    cut: survivorTarget ?? effectiveCut(run, holesForStop(run, run.stopIndex)),
+    survivors: rows.filter((s) => !s.isPlayer && !s.cut).length,
+    thru,
+    hasScores: true,
+    mode: board.mode,
+    survivorTarget,
+  };
 }
 
 /**

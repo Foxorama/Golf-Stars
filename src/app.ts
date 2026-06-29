@@ -28,10 +28,10 @@ import { rarCol } from './sim/rpg/loot';
 import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, shopItem, usableBag } from './sim/rpg/economy';
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
-import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
+import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition, type Leaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
-import { PLAYER_ID, type Field } from './sim/rpg/competition';
+import { PLAYER_ID, arcSurvivorTarget, type Field } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
@@ -512,16 +512,22 @@ function competitorsCard(field: Field): string {
  *  `opts.live` renders the mid-stop board (used on the end-of-hole screen): the title reads THRU N and
  *  the per-stop cut divider is suppressed (a partial stop hasn't been scored against the cut yet). */
 function leaderboardHTML(board: Leaderboard, opts: { live?: boolean } = {}): string {
+  // Positional cut (GS-positional-cut): survival is your PLACE — the divider reads "top N advance" and is
+  // drawn even live (the eliminations above it are real, frozen from prior stops). A Stableford board
+  // (flat/ladder) reads "CUT · N pts" and is suppressed mid-stop (a partial stop isn't scored yet).
+  const positional = board.mode === 'positional';
+  const cutLabel = positional ? `top ${board.survivorTarget ?? board.cut} advance` : `CUT · ${board.cut} pts`;
+  const showDivider = positional || !opts.live;
   let drewCut = false;
   const rows = board.standings
     .map((s) => {
       const me = s.isPlayer;
-      // Draw the cut divider just before the first cut golfer (not on the live mid-stop board).
+      // Draw the cut divider just before the first cut (eliminated) golfer.
       const divider =
-        !opts.live && !drewCut && s.cut
+        showDivider && !drewCut && s.cut
           ? ((drewCut = true),
             `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;color:#ff6b6b;font-size:10.5px;letter-spacing:.1em;">
-              <div style="flex:1;height:1px;background:#ff6b6b66;"></div>CUT · ${board.cut} pts<div style="flex:1;height:1px;background:#ff6b6b66;"></div></div>`)
+              <div style="flex:1;height:1px;background:#ff6b6b66;"></div>${cutLabel}<div style="flex:1;height:1px;background:#ff6b6b66;"></div></div>`)
           : '';
       const tag = golferTag(s.golferId);
       const stopTxt = s.stopScore !== undefined ? `<span style="opacity:.7;">+${s.stopScore}</span>` : '';
@@ -744,7 +750,16 @@ function introScreen(): string {
       </div>
       ${notes.join('')}
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gs-line-2);">
-        <p style="font-size:14px;margin:0 0 10px;">🎯 <b>${cut} pts</b> over ${c.holes.length} holes ${boss ? 'to beat the boss' : 'to make the cut and travel on'}.${
+        <p style="font-size:14px;margin:0 0 10px;">${(() => {
+          const winnable = !!(FORMATS[state.run.formatId] ?? FORMATS['flat']!).winnable;
+          if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
+          if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
+          if (winnable) {
+            const target = arcSurvivorTarget(state.run.stopIndex, ascensionCutBonus(state.run.ascension));
+            return `🏁 Finish in the <b>top ${target}</b> of the field over ${c.holes.length} holes to advance.`;
+          }
+          return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to make the cut and travel on.`;
+        })()}${
           state.run.ascension > 0 ? `<span style="color:#ffce54;"> · ⚔ Ascension A${state.run.ascension} (tougher cut, leaner purse)</span>` : ''
         }</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
@@ -1457,14 +1472,21 @@ function resultScreen(): string {
         ${res.passed ? burst() : ''}
         <h2 style="font-size:16px;margin:.2em 0;color:${res.passed ? '#5fd45a' : '#ff6b6b'};">
           ${state.match ? (res.passed ? 'MATCH WON' : 'MATCH LOST') : res.passed ? 'MADE THE CUT' : 'MISSED CUT'}</h2>
-        <p style="font-size:14px;">Stableford <b>${res.stableford}</b>${state.match ? '' : ` vs cut <b>${res.cut}</b>`}
-          · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>
-        ${state.match ? matchResultPanel() : ''}
         ${(() => {
           const board = leaderboard(state.run);
+          const positional = board.mode === 'positional';
           const me = board.standings.find((s) => s.isPlayer);
-          const place = me ? `<p style="font-size:13px;margin:.2em 0 .6em;">You're <b>${ordinal(me.position)}</b> of ${board.standings.length} · ${board.survivors} make it through.</p>` : '';
-          return place + leaderboardHTML(board);
+          // For a positional voyage stop the Stableford cut isn't the survival bar (your PLACE is), so
+          // don't show "vs cut N" — the standings + "you're Nth" line below carry survival.
+          const cutTxt = state.match || positional ? '' : ` vs cut <b>${res.cut}</b>`;
+          const summary = `<p style="font-size:14px;">Stableford <b>${res.stableford}</b>${cutTxt} · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>`;
+          const through = positional
+            ? board.survivorTarget
+              ? ` · top ${board.survivorTarget} advance`
+              : ''
+            : ` · ${board.survivors} make it through`;
+          const place = me ? `<p style="font-size:13px;margin:.2em 0 .6em;">You're <b>${ordinal(me.position)}</b> of ${board.standings.length}${through}.</p>` : '';
+          return summary + (state.match ? matchResultPanel() : '') + place + leaderboardHTML(board);
         })()}
         <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;opacity:.7;">Scorecard</summary>${scorecard()}</details>
         <div style="margin-top:10px;">${btn('Continue → shop', { type: 'continue' }, { variant: 'primary' })}</div>

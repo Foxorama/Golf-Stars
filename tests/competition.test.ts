@@ -11,6 +11,9 @@ import {
   bossPick,
   bossGolfer,
   bossOpponentFor,
+  arcCut,
+  arcSurvivorTarget,
+  type ArcStopSlice,
   golferBaseline,
   golferForm,
   homeMatches,
@@ -299,6 +302,51 @@ describe('matchplay pairing (GS-matchplay)', () => {
     const opp = bossOpponentFor(table, PLAYER_ID);
     const oppIdx = table.findIndex((s) => s.golferId === opp);
     expect(table[oppIdx]!.cut).toBeFalsy(); // never paired with a cut golfer
+  });
+});
+
+describe('arcCut (positional cut, GS-positional-cut)', () => {
+  const f = makeField(5, 0);
+  const slice = (stopIndex: number, playerSF: number, target?: number, isBoss = false): ArcStopSlice => ({
+    stopIndex,
+    archetype: 'verdant',
+    holeCount: 6,
+    playerSF,
+    isBoss,
+    target,
+  });
+
+  it('survivor targets are top-18 then top-16 for the two ordinary stops', () => {
+    expect(arcSurvivorTarget(0)).toBe(18);
+    expect(arcSurvivorTarget(1)).toBe(16);
+    expect(arcSurvivorTarget(2)).toBeUndefined(); // boss slot
+    expect(arcSurvivorTarget(0, 3)).toBe(15); // ascension tightens it
+  });
+
+  it('keeps the top-N and cuts the rest; a strong player survives, a blanking one is out', () => {
+    const strong = arcCut(f, 'seedA', [slice(0, 18, 18)]); // ~3/hole, elite
+    expect(strong.playerAlive).toBe(true);
+    expect(strong.standings.filter((s) => !s.cut).length).toBe(18);
+    const weak = arcCut(f, 'seedA', [slice(0, 0, 18)]); // blanks the stop
+    expect(weak.playerAlive).toBe(false);
+  });
+
+  it('eliminated golfers freeze and sink below the survivors (top-18 then top-16)', () => {
+    const r = arcCut(f, 'seedB', [slice(0, 12, 18), slice(1, 12, 16)]);
+    expect(r.standings.filter((s) => !s.cut).length).toBe(16);
+    const firstCutIdx = r.standings.findIndex((s) => s.cut);
+    expect(r.standings.slice(firstCutIdx).every((s) => s.cut)).toBe(true); // all cut rows are last
+  });
+
+  it('a boss slice adds nothing and applies no positional cut', () => {
+    const r = arcCut(f, 'seedC', [slice(0, 18, 18), slice(1, 18, 16), slice(2, 30, undefined, true)]);
+    const me = r.standings.find((s) => s.isPlayer)!;
+    expect(me.total).toBe(18 + 18); // the boss stop's 30 is NOT added
+    expect(r.lastIsBoss).toBe(true);
+  });
+
+  it('is deterministic', () => {
+    expect(arcCut(f, 'seedD', [slice(0, 14, 18)])).toEqual(arcCut(f, 'seedD', [slice(0, 14, 18)]));
   });
 });
 

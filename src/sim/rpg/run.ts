@@ -35,12 +35,14 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { playMatchStop } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, type Theme } from '../course/themes';
+import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, archetypeFor, type Theme } from '../course/themes';
+import { buildField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked' | 'won';
@@ -244,9 +246,18 @@ export function finishStop(
   // The pending route event shifts this stop's cut + payout (GS-14); neutral if none.
   const event = run.pendingEvent ?? DEFAULT_EVENT;
   const cut = effectiveCut(run, course.holes.length);
-  // A matchplay boss stop (GS-100) passes on the DUEL result, not Stableford-vs-cut; credits still
-  // come from the player's own Stableford. `matchWon` undefined ⇒ the ordinary gate (unchanged).
-  const passed = opts.matchWon !== undefined ? opts.matchWon : totals.stableford >= cut;
+  const format = getFormat(run.formatId);
+  const isBossStop = !!bossAt(format, run.stopIndex);
+  // Survival rule (GS-positional-cut): a WINNABLE campaign (the voyage) is a FIELD competition — you
+  // survive an ordinary stop by finishing in the TOP-N of the arc leaderboard (top 18, then top 16),
+  // not by clearing an abstract Stableford line, so the leaderboard is what decides your fate. The boss
+  // stop passes on the DUEL (matchWon). Endless formats (flat/ladder) keep the Stableford cut.
+  const passed =
+    opts.matchWon !== undefined
+      ? opts.matchWon
+      : format.winnable && !isBossStop
+      ? playerSurvivesStop(run, course, totals.stableford)
+      : totals.stableford >= cut;
   // Trigger-relic payouts (GS-synergy) add to the base before the credit multiplier, so they
   // synergise with credit perks/events. Zero for a base loadout (no relics).
   const relicBonus = relicCreditBonus(run.loadout, played, passed);
@@ -305,6 +316,79 @@ export function currentBoss(run: Run): BossSpec | undefined {
   return bossAt(getFormat(run.formatId), run.stopIndex);
 }
 
+// --- Positional cut (GS-positional-cut) -------------------------------------
+//
+// The leaderboard IS the cut for a winnable campaign. These helpers live in run.ts (which owns the Run,
+// format, history and course) and lean on competition.ts's pure engine, so `finishStop` can rank the
+// player WITHOUT importing league.ts (which would be a cycle). league.ts imports `arcSlices` back so the
+// displayed board and the survival verdict are computed from the SAME slices — they can never disagree.
+
+/** A neutral player look for the survival field — the field COMPOSITION is look-independent (it only
+ *  reserves the chosen character's mirror), so this matches league's real-look field golfer-for-golfer. */
+const SURVIVAL_LOOK = { cap: '#cfd6dd', shirt: '#7f8a96', skin: '#caa182', build: 1 };
+
+/** The arc field used for the positional cut (same golfers/scores as league's display field). */
+function survivalField(run: Run): Field {
+  const info: PlayerInfo = { name: 'You', look: SURVIVAL_LOOK, characterId: run.loadout.characterId };
+  return buildField(run.seed, arcIndexOf(run.stopIndex), arcForDistance(run.distanceFromStart), info);
+}
+
+/**
+ * Build the current arc's stop slices for the positional cut: the completed arc stops (from history) plus
+ * an optional CURRENT stop (the one being scored, not yet in history). Each slice carries the survivor
+ * target (top-N advance) for an ordinary stop. Exported so league.ts reuses the SAME builder.
+ */
+export function arcSlices(
+  run: Run,
+  current?: { themeId?: string; biome: string; holeCount: number; playerSF: number },
+): ArcStopSlice[] {
+  const format = getFormat(run.formatId);
+  const arcIdx = arcIndexOf(run.stopIndex);
+  const ascCut = ascensionCutBonus(run.ascension);
+  const make = (stopIndex: number, themeId: string | undefined, biome: string, holeCount: number, playerSF: number): ArcStopSlice => ({
+    stopIndex,
+    themeId,
+    archetype: archetypeFor(themeId, biome),
+    holeCount,
+    playerSF,
+    isBoss: !!bossAt(format, stopIndex),
+    target: arcSurvivorTarget(stopIndex, ascCut),
+  });
+  const slices: ArcStopSlice[] = [];
+  for (const h of run.history) {
+    if (arcIndexOf(h.stopIndex) !== arcIdx) continue;
+    slices.push(make(h.stopIndex, h.themeId, h.biome, stopSpecFor(format, h.stopIndex).holes, h.stableford));
+  }
+  if (current) slices.push(make(run.stopIndex, current.themeId, current.biome, current.holeCount, current.playerSF));
+  slices.sort((a, b) => a.stopIndex - b.stopIndex);
+  return slices;
+}
+
+/** Positional survival for the just-finished ORDINARY stop of a winnable run: is the player still in the
+ *  top-N of the arc field (top 18, then top 16) after this stop's scores? */
+function playerSurvivesStop(run: Run, course: Course, playerSF: number): boolean {
+  const slices = arcSlices(run, {
+    themeId: course.meta?.themeId,
+    biome: course.biome,
+    holeCount: course.holes.length,
+    playerSF,
+  });
+  return arcCut(survivalField(run), run.seed, slices).playerAlive;
+}
+
+/**
+ * The matchplay boss opponent for the player (GS-matchplay), computed WITHOUT league (so headless
+ * playStop can resolve it without a cycle): the rank-mirror among the arc's pre-boss survivors. Matches
+ * league.matchOpponentFor golfer-for-golfer (same field + slices), so headless ≡ interactive.
+ */
+export function matchOpponentForRun(run: Run): string | undefined {
+  const field = survivalField(run);
+  const slices = arcSlices(run); // the arc's completed (pre-boss) stops
+  if (!slices.length) return field.golfers.find((g) => !g.isPlayer)?.id;
+  const result = arcCut(field, run.seed, slices);
+  return bossOpponentFor(result.standings, 'player') ?? field.golfers.find((g) => !g.isPlayer)?.id;
+}
+
 /**
  * Scramble options for the current stop (GS-scramble): a co-op partner's swing shape when the stop is
  * a `partner: 'scramble'` boss, else undefined (ordinary solo play). The partner is a deterministic
@@ -341,6 +425,23 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
   if (run.status !== 'active') throw new Error('playStop: run is not active');
   const course = currentCourse(run);
+  // A matchplay boss stop (GS-matchplay) is a 1-on-1 knockout vs the player's rank-mirror, decided by
+  // the DUEL — so headless plays it exactly as the interactive reducer does (same opponent, same two
+  // rng streams), keeping auto ≡ interactive. The player's OWN ball is byte-for-byte a solo stop (the
+  // boss rides a separate stream), so balance for the player's shots is unchanged; only the PASS gate
+  // becomes the match instead of Stableford-vs-cut.
+  if (getFormat(run.formatId).winnable && isMatchplayBoss(currentBoss(run))) {
+    const oppId = matchOpponentForRun(run) ?? '';
+    const stop = playMatchStop(
+      course.holes,
+      playerHoleOpts(run),
+      oppId,
+      new Rng(`${course.seed}:play`),
+      new Rng(`${course.seed}:boss`),
+    );
+    const { run: next, result } = finishStop(run, course, stop.player, { matchWon: stop.state.playerAdvances });
+    return { run: next, result, played: stop.player };
+  }
   const rng = new Rng(`${course.seed}:play`);
   const played = playCourse(course.holes, rng, playerHoleOpts(run));
   const { run: next, result } = finishStop(run, course, played);
