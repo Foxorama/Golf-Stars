@@ -1338,6 +1338,16 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   pull is the core input now). NB: no new `_gs*` flag or `?param` — gesture tunables (`PULL_RANGE`/
   `AIM_SENS`/`COMMIT`) are plain consts and Overdrive/power are loadout/decision fields — so the
   test-hub guard needs no new control (the new perk appears in the Sim Lab automatically).
+  - **Pinch-zoom must NOT trip the pull-to-shot (GS-mapnav fix).** The first finger no longer charges
+    on touch — it starts PENDING and only ENGAGES a charge once it drags past `ENGAGE_SLOP` (6px). That
+    window lets a quickly-following SECOND finger be recognised as a `pinch` first (a second pointerdown
+    sets `pinch` + clears `pending`), so two-finger zoom — the natural zoom gesture — never fires a shot
+    or flickers the cone. GOTCHA: the stale-pointer clear that drops a dead gesture's leftover pointers
+    keys off `active`/`pinch`; a PENDING finger looks idle, so it's only cleared once OLDER than
+    `STALE_MS` (700ms, via `gestureStart = performance.now()`) — otherwise the clear would drop the first
+    finger and misread a genuine pinch's second finger as a fresh single-finger charge (never reaching
+    `size===2`). Verified eyes-on (Playwright synthetic multi-touch: a single-finger pull fires; a
+    two-finger pinch zooms — `mapZoom` changes — without charging or firing). Still pure feel, no hook.
 - **The play screen is a FULL-BLEED immersive map (GS-fullmap) — the hole IS the screen.** The old
   fixed column (top stat bar + map + bottom control row) is gone; the map fills the whole viewport
   (`.gs-shot--full` + `.gs-main--bleed` drops the page frame's padding) and every control/readout
@@ -1357,7 +1367,12 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   out the whole hole. Drawn one-shot per render via a generic pass over every `canvas.gs-caddycv[data-caddy]`
   (the idle bob updates live while charging, so no rAF to leak); each badge carries its caddy id in
   `data-caddy`, so the decision and putting screens share the one draw loop. Absent when there's no
-  relevant caddy (decision: no caddy hired; putting: no putting specialist). Verified eyes-on.
+  relevant caddy (decision: no caddy hired; putting: no putting specialist). Verified eyes-on. GOTCHA:
+  `.gs-hud-bottom` is `align-items: flex-end` (NOT `stretch`) so the badge + round `»` button sit at
+  their NATURAL height, bottom-aligned to the controls column — `stretch` ballooned the gold frame to
+  the controls' height, leaving a tall empty band above the figure ("caddy frame too tall for the
+  graphic"). The top info chip + bottom control panel are also kept tight (small padding/gaps) so they
+  occlude as little of the shot-range cone behind them as possible.
 
 ## UI layer (locked in GS-8)
 - **The screen flow is a PURE reducer** (`ui/game.ts`): `(UiState, Action) → UiState` over the

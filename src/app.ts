@@ -900,10 +900,14 @@ function wireShotGesture(app: HTMLElement): void {
   const PULL_RANGE = 150; // px of downward drag for 100% power
   const AIM_SENS = 0.34; // degrees of aim nudge per px of horizontal drag
   const COMMIT = 0.06; // release below this power = cancel (a tap, or pulled back to zero)
+  const ENGAGE_SLOP = 6; // px a single finger must move before a power charge engages (pinch window)
+  const STALE_MS = 700; // a pending single finger older than this is treated as a dropped/stale gesture
   const pointers = new Map<number, { x: number; y: number }>();
   let startX = 0;
   let startY = 0;
   let startBearing = 0;
+  let gestureStart = 0; // performance.now() when the current single-finger gesture began (staleness)
+  let pending = false; // a single finger is down but the charge hasn't engaged yet (pinch window)
   let active = false; // a single-finger charge is loading
   let pinch: { startDist: number; startZoom: number } | null = null;
   let lastNotch = 0;
@@ -945,6 +949,7 @@ function wireShotGesture(app: HTMLElement): void {
   function cancel(): void {
     pointers.clear();
     pinch = null;
+    pending = false;
     active = false;
     charging = false;
     selPower = 1;
@@ -963,7 +968,19 @@ function wireShotGesture(app: HTMLElement): void {
       }
       return;
     }
-    if (active) applyDrag(e.clientX, e.clientY);
+    if (active) {
+      applyDrag(e.clientX, e.clientY);
+      return;
+    }
+    // A single finger is down but the charge hasn't committed yet: only ENGAGE once it has moved
+    // past a small slop. That leaves a window for a SECOND finger to land first and be read as a
+    // pinch — so two-finger zoom no longer trips the pull-to-shot (which used to fire on touch).
+    if (pending && pointers.size === 1 && Math.hypot(e.clientX - startX, e.clientY - startY) > ENGAGE_SLOP) {
+      pending = false;
+      active = true;
+      charging = true;
+      applyDrag(e.clientX, e.clientY);
+    }
   };
   function up(e: PointerEvent): void {
     pointers.delete(e.pointerId);
@@ -980,6 +997,7 @@ function wireShotGesture(app: HTMLElement): void {
     const fire = active && selPower >= COMMIT;
     const target = selFreeTarget ?? undefined;
     const power = selPower;
+    pending = false;
     active = false;
     charging = false;
     selPower = 1; // reset the preview baseline (a full-swing cone) for the next decision
@@ -993,28 +1011,38 @@ function wireShotGesture(app: HTMLElement): void {
   }
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    // Clear any stale pointers left by a gesture whose up/cancel never arrived (e.g. the screen
-    // slept mid-touch and the OS dropped the release). Without this, a leftover entry made the
-    // first fresh tap read as a second finger → a spurious pinch, so "the first tap doesn't
-    // register". A genuine multi-touch keeps its pointers because `active`/`pinch` is set.
-    if (!active && !pinch) pointers.clear();
+    const now = performance.now();
+    // Clear pointers left by a gesture whose up/cancel never arrived (e.g. the screen slept mid-touch
+    // and the OS dropped the release) — without this a leftover entry made the first fresh tap read as
+    // a second finger → a spurious pinch. A LIVE gesture (active/pinch) keeps its pointers; a PENDING
+    // first finger is only treated as stale once it's OLD, otherwise clearing here would drop it and
+    // misread a genuine pinch's second finger as a fresh single-finger charge (never reaching size 2).
+    if (!active && !pinch && (!pending || now - gestureStart > STALE_MS)) {
+      pointers.clear();
+      pending = false;
+    }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) {
       startX = e.clientX;
       startY = e.clientY;
       // Seed the aim bearing from the current aim (the pin by default, or the last nudge).
       startBearing = selAimBearing ?? bearing(play.ball, pinOf(play.hole));
-      active = true;
+      // PENDING, not charging yet: the charge engages only once the finger drags past ENGAGE_SLOP
+      // (see `move`), leaving room for a second finger to start a pinch first. The resting
+      // full-swing cone stays up until then — a tap that never moves does nothing (no flicker).
+      pending = true;
+      active = false;
       lastNotch = 0;
+      gestureStart = now;
       selPower = 0; // charge starts empty so a no-pull release reads as a cancel (no accidental shot)
-      charging = true;
       resumeAudio();
-      scheduleRender();
     } else if (pointers.size === 2) {
       pinch = { startDist: twoFingerDist(), startZoom: mapZoom };
-      active = false; // a second finger cancels the charge → pinch-zoom instead
+      pending = false;
+      active = false; // a second finger cancels any pending charge → pinch-zoom instead
       selPower = 1;
       charging = false;
+      scheduleRender();
     }
     // Same fn refs each time → addEventListener de-dupes, so multiple pointers don't stack handlers.
     window.addEventListener('pointermove', move);
