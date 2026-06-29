@@ -190,6 +190,34 @@ describe('route events — run integration (GS-14)', () => {
     expect(resumed.pendingEvent?.id).toBe('derelict-cache');
   });
 
+  it('consecutive jumps never offer the identical set of lanes (anti-repeat, GS-journey)', () => {
+    // Walk a real voyage; capture the route offer at each travel screen and assert no two BACK-TO-BACK
+    // offers are the same id-set (the small early-arc pool used to repeat the same 3 lanes).
+    for (const seed of ['journey-1', 'journey-2', 'journey-3', 'abc', 'xyz']) {
+      let run = startRun(seed, 'voyage');
+      let prev: string | undefined;
+      for (let i = 0; i < 6 && run.status === 'active'; i++) {
+        run = playStop(run).run;
+        if (run.status !== 'active') break;
+        const offer = routeOptions(run);
+        const key = [...offer.map((r) => r.event.id)].sort().join('|');
+        if (prev !== undefined) expect(key).not.toBe(prev);
+        prev = key;
+        run = travel(run, offer[0]!);
+      }
+    }
+  });
+
+  it('routeOptions stays a deterministic pure function of the run (anti-repeat included)', () => {
+    let run = startRun('detr', 'voyage');
+    run = playStop(run).run;
+    run = travel(run, routeOptions(run)[0]!);
+    run = playStop(run).run;
+    const a = routeOptions(run).map((r) => r.event.id);
+    const b = routeOptions(run).map((r) => r.event.id);
+    expect(a).toEqual(b);
+  });
+
   it('a no-upgrade run still always terminates by missing a cut (events do not break it)', () => {
     for (let seed = 0; seed < 40; seed++) {
       const { run, stops } = simulateRun(seed);

@@ -1645,11 +1645,17 @@ function travelScreen(): string {
     elite: r.elite,
     bossAhead: r.bossAhead,
   }));
+  // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
+  // labelled with its zone name — so the journey reads as Earth → stage 1 → … → YOU as it builds.
+  const trail = state.run.history.slice(0, -1).map((h) => ({
+    label: themeById(h.themeId ?? '')?.name ?? 'Deep Space',
+  }));
   const map = starmapSVG({
     seed: state.run.seed,
     stopIndex: state.run.stopIndex,
     distanceFromStart: state.run.distanceFromStart,
     currentLabel: zoneName,
+    trail,
     choices,
   });
 
