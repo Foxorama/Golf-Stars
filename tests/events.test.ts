@@ -24,8 +24,12 @@ import {
 } from '../src/sim/rpg/run';
 import { cutLine } from '../src/sim/rpg/economy';
 import { RARITY_C, RARITIES } from '../src/sim/rpg/loot';
-import type { Arc } from '../src/sim/course/themes';
+import { themeById, type Arc } from '../src/sim/course/themes';
 import { Rng } from '../src/sim/rng';
+
+// A stand-in destination world for hand-built Route literals (GS-journey-biome): the route's `theme`
+// only drives the biome arrived in, which these economy/event tests don't assert on.
+const TEST_THEME = themeById('crux')!;
 
 describe('route events — data (GS-14)', () => {
   it('the table is well-formed and spans a real risk/reward spread', () => {
@@ -104,6 +108,7 @@ describe('event split — recurring vs unique + accent arcs (GS-17c)', () => {
       distanceJump: 1,
       label: 'Short hop',
       event: routeEvent('apophis-flyby')!,
+      theme: TEST_THEME,
     });
     expect(intoUnique.firedEventIds).toContain('apophis-flyby');
 
@@ -112,6 +117,7 @@ describe('event split — recurring vs unique + accent arcs (GS-17c)', () => {
       distanceJump: 1,
       label: 'Short hop',
       event: routeEvent('solar-flare')!,
+      theme: TEST_THEME,
     });
     expect(intoRecurring.firedEventIds).not.toContain('solar-flare');
   });
@@ -123,6 +129,7 @@ describe('event split — recurring vs unique + accent arcs (GS-17c)', () => {
       distanceJump: 1,
       label: 'Short hop',
       event: routeEvent('total-solar-eclipse')!,
+      theme: TEST_THEME,
     });
     const resumed = resumeRun(snapshotRun(run));
     expect(resumed.firedEventIds).toContain('total-solar-eclipse');
@@ -153,7 +160,7 @@ describe('route events — run integration (GS-14)', () => {
     const flare = routeEvent('solar-flare')!;
     let run = startRun(1234);
     run = { ...run, stopIndex: 1, distanceFromStart: 4 };
-    const moved = travel(run, { id: 0, distanceJump: 2, label: 'Cruise', event: flare });
+    const moved = travel(run, { id: 0, distanceJump: 2, label: 'Cruise', event: flare, theme: TEST_THEME });
     expect(moved.pendingEvent).toBe(flare);
 
     const course = { holes: new Array(6).fill(0), biome: 'x', rarity: 'common' } as never;
@@ -337,7 +344,7 @@ describe('route events — per-arc slot distribution (GS-routes)', () => {
 });
 
 describe('route events — toll + shard levers wired through the run (GS-routes)', () => {
-  const lane = (event: RouteEvent, distanceJump = 1) => ({ id: 0, distanceJump, label: 'Short hop', event });
+  const lane = (event: RouteEvent, distanceJump = 1) => ({ id: 0, distanceJump, label: 'Short hop', event, theme: TEST_THEME });
 
   it('a toll lane charges credits up front on travel (floored at 0)', () => {
     const toll = routeEvent('trade-lane')!;

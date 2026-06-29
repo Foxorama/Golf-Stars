@@ -534,8 +534,8 @@ This game lives or dies on three axes — put every change through all three bef
     across the whole run and re-renders never shuffle earlier nodes) and the X-gap to the previous world
     by real ANGULAR distance (`clamp(50 + greatCircleDeg·0.72, 64, 168)`) — so a hop to a far-flung
     constellation visibly LEAPS further. Pure/seeded (no `Math.random`); the forward branches are NOT
-    positioned by coords (the destination theme isn't known until you jump — they stay the rarity-coded
-    decision fan). NO new `_gs*`/URL hook (the scroll snap is a plain post-render DOM nudge, sky-coords
+    positioned by sky coords (a fan is clearer than 3 tiny coord dots) but DO now read the destination
+    BIOME each lane flies into (GS-journey-biome below). NO new `_gs*`/URL hook (the scroll snap is a plain post-render DOM nudge, sky-coords
     is a render table) → the test-hub guard needs nothing. Guarded by `tests/journey-map.test.ts` (every
     theme resolves to a valid coord, one node per stop / no truncation, far-hop > near-hop spacing,
     determinism). Re-run `gen-sky-coords.mjs` + that test after adding a theme.
@@ -547,6 +547,33 @@ This game lives or dies on three axes — put every change through all three bef
     `run` (so `routeOptions(run)===routeOptions(run)`); empty at stop 0. The arc-1 common pool was
     also widened (more commons/rares/an epic) so each tier has genuine variety. Guarded in
     `tests/events.test.ts` (no two back-to-back offers are the same id-set; determinism preserved).
+  - **The trail CONNECTS to the wagon with no seam (GS-journey-connect, `starmap.ts`/`index.html`).**
+    The old widget had two failings: a hard dark vertical SEAM where the scroll strip met the pinned
+    forward panel (a `box-shadow: -14px 0 …` band), and the trail line floated short of YOU (the trail
+    SVG's `trailW` had an `FW+120` floor wider than a phone strip, so the bridge end never reached the
+    seam). Fix: (1) the starfield+nebula moved OUT of the per-panel SVGs into ONE continuous CSS
+    background on `.gs-journey` (shared by both flex siblings), so the sky is seamless and there's never
+    a starless gap — the SVGs are now transparent; the box-shadow is gone. (2) The trail SVG is
+    `min-width:100%` + `preserveAspectRatio="xMaxYMid meet"`, RIGHT-ANCHORING its content to the seam
+    when the trail is shorter than the strip (so the dashed bridge into YOU always meets the forward
+    panel's solid lead-in stub at `MID_Y`, Earth still visible), and just SCROLLING when it's longer
+    (app.ts still snaps `scrollLeft` to the right). (3) `trailW` floor dropped `FW+120 → 140` so a short
+    trail right-anchors instead of force-scrolling Earth off-screen. Verified eyes-on (Playwright render
+    of the empty + long-trail cases); `tests/journey-map.test.ts` still green (node/coord asserts read
+    viewBox coords, unaffected by the anchor).
+- **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
+  only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
+  (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a
+  `theme` (its destination world), drawn by `routeTheme(seed, stopIndex, routeId, reachedDistance)`
+  from the ARC of the distance THAT jump reaches (a deeper jump → later-arc, wilder world) on its OWN
+  `:routetheme:` rng stream — so attaching it leaves the `:routes:` draw order (distances + events)
+  byte-for-byte unchanged. `travel` records it as `run.pendingTheme`; `currentTheme` honours
+  `pendingTheme ?? themeForStop(...)` (the fallback keeps STOP 0 / old resumes byte-for-byte). Snapshot
+  round-trips `pendingThemeId`. The route card + the map planet now read the destination biome (colour
+  + glyph + name via `BIOME_BADGE`/`BIOME_LOOK`), so a lane previews the world you'll actually play.
+  Content-as-data + pure, so no fairness/no-death-spiral validator is touched (it only SELECTS the
+  biome, like `themeForStop` always did). Guarded by the existing themes/formats/voyage suites (which
+  read `currentCourse`/`currentTheme` consistently) + full determinism.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen
