@@ -931,6 +931,24 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
   knobs/no new `_gs*` flag, so the test-hub guard needs no new control; the Sim Lab absorbs the new
   shop items automatically.
+- **Caddy effects are testable in the harness — DEMO the throw + VERIFY the rate (GS-caddy-test).** The
+  guard interception only fires on a rare right/left miss, so in normal play you can go a whole run
+  without seeing the boomerang/laser. Two harness affordances close that (and the rule below keeps every
+  caddy covered): (1) DEMO — `_gsFeel.forceRedirect` (`'' | 'boomerang' | 'laser'`, a `_gsFeel`
+  SUB-FIELD so NO new top-level hook) forces a caddy-guard interception on EVERY shot in the live play
+  view: it shows the guard caddy in the corner even if none is hired and FABRICATES a render-only
+  redirect (`fabricateRedirect` in `playView.ts` — pure, no rng, no sim/score change) for any shot the
+  sim didn't already redirect, so the throw can be watched on demand. The hub's Demo panel drives it
+  (🪃 Convict Sheep / 🔫 Space Ducks / Off). (2) VERIFY — the Sim Lab's `dispersionStudy` now threads
+  the built loadout's `caddyGuard` + `lieRelief` through `resolveShot`, so a guard caddy's redirects
+  sample for real: it reports `redirectRate`/`guardKind` and the scatter draws each would-be miss (red)
+  with a line to the saved green landing. And `caddyEffects(loadout)` (pure, in `lab.ts`) names every
+  active caddy/loadout effect (autoPutt / driverAnywhere / chipInBoost / caddyGuard / clubSuggest /
+  lieRelief / puttBoost), surfaced in the hub's loadout stats so toggling any caddy SHOWS what it
+  changed. THE RULE (machine-checked): every named caddy folds a field into the loadout, and
+  `tests/lab.test.ts` asserts each id in `NAMED_CADDY_IDS` surfaces a `caddyEffects` row — add a caddy
+  with no Lab effect and the build reds. A guard/visual caddy additionally needs a `_gsFeel.forceRedirect`
+  case + a Demo button.
 - **Sandy the Sand-Saver — escape specialist (GS-mux, a NEW shot mechanic `lieRelief`).** A `loadout.
   lieRelief` (0..1) LERPS a BAD lie's `carryMult`/`dispersionMult` back toward neutral (`reliedLie` in
   `shot.ts`) — rough/sand/waste/trees recover far better — and NEVER touches a clean lie (carryMult 1 /

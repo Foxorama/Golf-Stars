@@ -13,11 +13,12 @@
 
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
+import type { ShotRedirect } from '../sim/shot';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { archetypeFor } from '../sim/course/themes';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
-import { drawCaddy, drawCaddyProjectile, hasCaddyArt, CADDY_LABEL, type CaddyArtId } from './caddyArt';
+import { drawCaddy, drawCaddyProjectile, caddyProjectile, hasCaddyArt, CADDY_LABEL, type CaddyArtId } from './caddyArt';
 import {
   easeOutCubic,
   flightDurationMs,
@@ -66,6 +67,14 @@ interface PlayFeel extends FlightFeel {
   spaceFX: boolean;
   /** Animated wind streaks drifting across the hole (GS-wind), themed + scaled by wind speed. */
   wind: boolean;
+  /**
+   * DEMO/test hook (GS-caddy) — force a caddy-guard interception on EVERY shot so the boomerang/laser
+   * throw can be watched on demand, instead of only on a rare right/left miss. '' = off (default, the
+   * shipped behaviour, byte-for-byte). 'boomerang' = Convict Sheep, 'laser' = Space Ducks: the corner
+   * caddy is shown even if none is hired and a redirect is FABRICATED (render-only — no sim/score change)
+   * for any shot the sim didn't already redirect. Rides `_gsFeel`, so it needs no new top-level hook.
+   */
+  forceRedirect: '' | 'boomerang' | 'laser';
 }
 
 const BASE_FEEL: PlayFeel = {
@@ -90,7 +99,38 @@ const BASE_FEEL: PlayFeel = {
   followMs: 440,
   spaceFX: true,
   wind: true,
+  forceRedirect: '',
 };
+
+/** The corner caddy id implied by a forced-redirect demo kind (GS-caddy) — so the throw can be
+ *  watched even with no caddy hired. Off / a real caddy already drawn ⇒ undefined. */
+function forcedRedirectCaddy(kind: PlayFeel['forceRedirect']): string | undefined {
+  return kind === 'boomerang' ? 'convict-sheep' : kind === 'laser' ? 'space-ducks' : undefined;
+}
+
+/** Fabricate a render-only redirect (GS-caddy demo): the would-be miss the guard "saves", offset to
+ *  the guard's side of the touchdown. Pure (no rng) so it's stable across frames; the score already
+ *  used the real landing, so this only drives the watch-the-throw animation. */
+function fabricateRedirect(
+  kind: 'boomerang' | 'laser',
+  touchdown: Vec,
+  bearingDeg: number,
+  carry: number,
+  lefty?: boolean,
+): ShotRedirect {
+  const br = (bearingDeg * Math.PI) / 180;
+  // Right-perpendicular of the bearing (shot.ts's +lateral axis): rx=cos, ry=−sin.
+  const rx = Math.cos(br);
+  const ry = -Math.sin(br);
+  // Boomerang saves a right shank (+), laser a left duck-hook (−); lefty mirrors the world side.
+  const side = (kind === 'boomerang' ? 1 : -1) * (lefty ? -1 : 1);
+  const off = Math.max(22, carry * 0.32) * side;
+  return {
+    kind,
+    fromZone: kind === 'boomerang' ? 'shankR' : 'duckHookL',
+    originalLanding: [touchdown[0] + rx * off, touchdown[1] + ry * off],
+  };
+}
 
 // Loader-style cap colours so the play-view golfer reads as one of the intro's crew (the fallback
 // when no specific golfer is selected — the result-screen replay cycles them by shot).
@@ -551,16 +591,19 @@ export function mountPlayView(
     drawWind(now);
 
     // The hired caddy stands in the bottom-left corner the whole hole (GS-caddy). Its muzzle anchor
-    // is where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect.
-    if (hasCaddyArt(opts.caddyId)) {
+    // is where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. The
+    // force-redirect DEMO (GS-caddy) shows a guard caddy here even when none is hired so the throw
+    // can be watched on demand.
+    const cornerCaddyId = opts.caddyId ?? forcedRedirectCaddy(F.forceRedirect);
+    if (hasCaddyArt(cornerCaddyId)) {
       const ch = Math.max(40, Math.min(56, height * 0.085));
       const cx = ch * 0.7 + 6;
       const cy = height - 14;
-      caddyAnchor = drawCaddy(ctx, opts.caddyId, cx, cy, ch, now, opts.lefty);
+      caddyAnchor = drawCaddy(ctx, cornerCaddyId, cx, cy, ch, now, opts.lefty);
       ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.textAlign = 'center';
-      ctx.fillText(CADDY_LABEL[opts.caddyId as CaddyArtId], cx, cy + 9);
+      ctx.fillText(CADDY_LABEL[cornerCaddyId as CaddyArtId], cx, cy + 9);
       ctx.textAlign = 'left';
     }
 
@@ -630,7 +673,12 @@ export function mountPlayView(
         let height: number;
         if (elapsed < flightDur) {
           const tg = elapsed / flightDur;
-          const rd = shot.result.redirect;
+          // Real caddy-guard redirect (GS-caddy), or — in the force-redirect DEMO — a fabricated one so
+          // the throw fires on every shot. caddyProjectile(cornerCaddyId) is the active guard's kind.
+          const projKind = caddyProjectile(cornerCaddyId);
+          const rd =
+            shot.result.redirect ??
+            (F.forceRedirect && projKind ? fabricateRedirect(projKind, touchdown, bearing, carry, opts.lefty) : undefined);
           if (rd) {
             // Caddy-guard redirect (GS-caddy): the ball curves toward the would-be miss
             // (originalLanding), the caddy fires mid-flight, then it's knocked back to the green

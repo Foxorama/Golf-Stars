@@ -26,6 +26,7 @@ import { THEMES } from '../sim/course/themes';
 import {
   dispersionStudy,
   buildLoadout,
+  caddyEffects,
   scoreHarness,
   histogram,
   allThemeStudies,
@@ -150,6 +151,11 @@ function setArt(patch: object): void {
   const w = gameWin();
   if (w) w._gsArt = { ...(w._gsArt as object), ...patch }; // hook: _gsArt
 }
+// Force a caddy-guard interception on EVERY shot (GS-caddy) so the boomerang/laser throw can be
+// watched on demand — rides `_gsFeel.forceRedirect` (no new top-level hook). '' turns it off.
+function setForceRedirect(kind: '' | 'boomerang' | 'laser'): void {
+  setFeel({ forceRedirect: kind });
+}
 
 function demoGroup(): HTMLElement {
   const sprayVal = h('span', { class: 'pill' }, '80%');
@@ -176,7 +182,11 @@ function demoGroup(): HTMLElement {
       h('button', { class: 'ghost', onclick: () => setArt({ ink: false }) }, 'No ink'),
       h('button', { class: 'ghost', onclick: () => setArt({ stripes: false, texture: 0, accents: 0 }) }, 'Flat'),
       h('button', { class: 'ghost', onclick: () => setArt({ stripes: true, ink: true, texture: 2, accents: 2 }) }, 'Lush')),
-    h('p', { class: 'note' }, 'Live _gsFeel / _gsIntro / _gsSpray / _gsArt flags apply on the game’s next render/shot. Seed & intro reload the frame.'),
+    h('div', { class: 'row' }, h('label', {}, 'Guard throw'),
+      h('button', { class: 'ghost', onclick: () => setForceRedirect('boomerang') }, '🪃 Convict Sheep'),
+      h('button', { class: 'ghost', onclick: () => setForceRedirect('laser') }, '🔫 Space Ducks'),
+      h('button', { class: 'ghost', onclick: () => setForceRedirect('') }, 'Off')),
+    h('p', { class: 'note' }, 'Guard throw forces the caddy interception (boomerang/laser) on EVERY shot so you can watch it — start a run and take a shot. Live _gsFeel / _gsIntro / _gsSpray / _gsArt flags apply on the next render/shot; seed & intro reload the frame.'),
   ]);
 }
 
@@ -184,12 +194,22 @@ function demoGroup(): HTMLElement {
 function refreshStats(): void {
   const b = buildLoadout(build);
   const driver = b.clubs.find((c) => c.id === 'D')!;
+  // Every named caddy (GS-caddy) folds a field into the loadout; surface the active ones so toggling
+  // a caddy in the perks list SHOWS what it changed (the per-caddy lens onto the loadout).
+  const caddy = caddyEffects(b.loadout);
   statsBox.replaceChildren(
     stat('Net dispersion', fmt(b.netDispersion, 3) + '×'),
     stat('Handicap', String(b.handicap)),
     stat('Driver carry', driver.carry + ' yd'),
     stat('Credit mult', '×' + fmt(b.creditMult, 2)),
     stat('Auto-putt', b.autoPutt ? 'yes' : 'no'),
+    ...(caddy.length
+      ? [
+          h('div', { class: 'subhead', style: 'margin:8px 0 2px' }, 'Caddy effects'),
+          ...caddy.map((e) =>
+            h('div', { class: 'stat', title: e.detail }, h('span', { class: 'muted' }, e.label), h('b', {}, e.detail))),
+        ]
+      : []),
   );
 }
 function loadoutGroup(): HTMLElement {
@@ -368,6 +388,10 @@ function showDispersion(study: DispersionStudy): void {
       statRow('Lateral (yd)', l),
     ),
     h('p', { class: 'note' }, `Intended carry ${Math.round(study.intended)} yd. 2σ lateral cone ≈ ±${Math.round(2 * l.sd)} yd. Carry range ${Math.round(c.min)}–${Math.round(c.max)} yd (the “can come up short” tail).`),
+    study.redirectRate !== undefined
+      ? h('p', { class: 'note', style: 'color:#7ee0a0' },
+          `Caddy guard (${study.guardKind}): ${fmt(study.redirectRate * 100, 1)}% of shots knocked back to the green (red = the would-be miss saved). Hire Space Ducks / Convict Sheep in the loadout to see it.`)
+      : h('p', { class: 'note' }, 'Tip: add Space Ducks or Convict Sheep in the loadout to see the guard interception rate here.'),
   );
   // draw after layout so the canvas has its CSS size
   requestAnimationFrame(() => {

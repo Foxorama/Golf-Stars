@@ -102,6 +102,11 @@ export interface ShotSample {
   lateral: number;
   /** Downrange carry, yards. */
   carry: number;
+  /** A caddy-guard (Space Ducks / Convict Sheep) knocked this shot back to the green (GS-caddy). */
+  redirected?: boolean;
+  /** The WOULD-BE miss the guard saved (where the hook/shank would have come down) — for the chart. */
+  origLateral?: number;
+  origCarry?: number;
 }
 
 export interface DispersionStudy {
@@ -117,6 +122,12 @@ export interface DispersionStudy {
   samples: ShotSample[];
   carry: Stats;
   lateral: Stats;
+  /** Fraction of shots a caddy-guard redirected back to the green (GS-caddy) — undefined if the
+   *  built loadout has no guard caddy (Space Ducks / Convict Sheep). Lets the Lab VERIFY the
+   *  interception rate the live game only shows on a rare right-side miss. */
+  redirectRate?: number;
+  /** The guard's projectile flavour, when one is active. */
+  guardKind?: 'laser' | 'boomerang';
 }
 
 export interface DispersionOpts {
@@ -161,10 +172,18 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
   });
   const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
 
+  // Caddy effects that change a SAMPLED shot ride the built loadout, so toggling a caddy in the Lab
+  // shows up here: the in-flight guard (Space Ducks / Convict Sheep — knocks a right/left miss back to
+  // the green) and Sandy's lie relief (a bad lie carries more). Absent on a base loadout → no-op.
+  const guard = opts.loadout?.caddyGuard;
+  const lieRelief = opts.loadout?.lieRelief;
+  const lefty = opts.loadout?.lefty;
+
   const from: [number, number] = [0, 0];
   const aim: [number, number] = [0, 100]; // straight downrange (+Y) ⇒ shot bearing 0
   const samples: ShotSample[] = [];
   let intended = 0;
+  let redirects = 0;
   for (let i = 0; i < n; i++) {
     const res = resolveShot({
       from,
@@ -178,10 +197,20 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       shape,
       minCarryFracBoost: cw.minCarryFracBoost,
       carryWindowTighten: cw.carryWindowTighten,
+      guard,
+      lieRelief,
+      lefty,
       rng,
     });
     intended = res.intended;
-    samples.push({ lateral: res.landing[0], carry: res.landing[1] });
+    if (res.redirect) redirects++;
+    samples.push({
+      lateral: res.landing[0],
+      carry: res.landing[1],
+      redirected: !!res.redirect,
+      origLateral: res.redirect?.originalLanding[0],
+      origCarry: res.redirect?.originalLanding[1],
+    });
   }
 
   return {
@@ -195,8 +224,51 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
     samples,
     carry: summary(samples.map((s) => s.carry)),
     lateral: summary(samples.map((s) => s.lateral)),
+    redirectRate: guard ? redirects / n : undefined,
+    guardKind: guard?.kind,
   };
 }
+
+// ── caddy effect summary — "what did this caddy change?" ────────────────────────────────────
+// Every NAMED caddy (GS-caddy) folds a field into the loadout. This pure helper reads the BUILT
+// loadout and names each active caddy/loadout effect so the Lab can SHOW that a hired caddy did
+// something — the per-caddy counterpart to the dispersion/scoring studies. Because each named caddy
+// maps to a field here, `tests/lab.test.ts` asserts every caddy in NAMED_CADDY_IDS surfaces an
+// effect — the machine-checked "a new caddy must be demoable in the harness" rule.
+
+export interface CaddyEffect {
+  /** Loadout field the effect rides. */
+  id: string;
+  label: string;
+  detail: string;
+}
+
+export function caddyEffects(loadout: PlayerLoadout): CaddyEffect[] {
+  const pct = (x: number): string => `${Math.round(x * 100)}%`;
+  const out: CaddyEffect[] = [];
+  if (loadout.autoPutt) out.push({ id: 'autoPutt', label: 'Auto-putt', detail: 'caddy reads & sinks your putts' });
+  if (loadout.driverAnywhere)
+    out.push({ id: 'driverAnywhere', label: 'Driver anywhere', detail: 'driver usable from any lie at full stats' });
+  if (loadout.chipInBoost)
+    out.push({ id: 'chipInBoost', label: 'Chip-in', detail: `+${pct(loadout.chipInBoost)} to hole a wedge near the pin` });
+  if (loadout.caddyGuard) {
+    const g = loadout.caddyGuard;
+    out.push({
+      id: 'caddyGuard',
+      label: `Guard · ${g.kind}`,
+      detail: `removes ${g.remove.join(', ') || '—'}; halves ${g.halve.join(', ') || '—'} → green`,
+    });
+  }
+  if (loadout.clubSuggest)
+    out.push({ id: 'clubSuggest', label: 'Club suggestion', detail: 'green-coverage pick + confidence boost on it' });
+  if (loadout.lieRelief)
+    out.push({ id: 'lieRelief', label: 'Lie relief', detail: `bad-lie penalty eased ${pct(loadout.lieRelief)} toward neutral` });
+  if (loadout.puttBoost)
+    out.push({ id: 'puttBoost', label: 'Putt boost', detail: `+${fmtNum(loadout.puttBoost)} make-band / lag` });
+  return out;
+}
+
+const fmtNum = (x: number): string => (Number.isFinite(x) ? x.toFixed(2) : '—');
 
 // ── loadout builder — "test club/path/skill upgrades" ──────────────────────────────────────
 // Compose a real PlayerLoadout from a handicap, the permanent meta layer, and owned shop perks
