@@ -545,6 +545,46 @@ function styleScatter(kind: string, poly: Vec[], art: ArtFeel, arch: BiomeArchet
   return out;
 }
 
+/** Thick FESCUE / native rough (GS-hazards-2): an olive-tan body with seeded upright grass blades so
+ *  the deep rough reads as wispy native grass, not a flat blob. */
+function styleFescue(poly: Vec[], rng: () => number): Prim[] {
+  const out: Prim[] = [
+    { t: 'poly', pts: poly, fill: '#7c8c48' },
+    { t: 'poly', pts: poly, fill: 'none', stroke: 'rgba(40,52,20,0.4)', sw: 1 },
+  ];
+  const b = bboxOf(poly);
+  const blades = Math.max(6, Math.round((b.maxX - b.minX) * (b.maxY - b.minY) * 0.012));
+  const inner: Prim[] = [];
+  for (let i = 0; i < blades; i++) {
+    const x = b.minX + rng() * (b.maxX - b.minX);
+    const y = b.minY + rng() * (b.maxY - b.minY);
+    const h = 2.5 + rng() * 3.5;
+    const lean = (rng() - 0.5) * 2.2;
+    inner.push({ t: 'line', a: [x, y], b: [x + lean, y - h], stroke: rng() < 0.5 ? '#a7b86a' : '#6a7a3c', sw: 1, round: true });
+  }
+  out.push({ t: 'clip', clip: poly, children: inner });
+  return out;
+}
+
+/** Dry RAVINE / barranca (GS-hazards-2): a dark rocky chasm — a shaded gorge floor with a couple of
+ *  jagged crack lines and a lit rim, so it reads as a gash in the ground rather than a flat patch. */
+function styleRavine(poly: Vec[], rng: () => number): Prim[] {
+  const c = centroidOf(poly);
+  const out: Prim[] = [
+    { t: 'poly', pts: poly, fill: '#5a4b3c' }, // gorge floor
+    { t: 'poly', pts: scalePoly(poly, c, 0.62), fill: '#3a2f24' }, // shadowed depths
+    { t: 'poly', pts: poly, fill: 'none', stroke: 'rgba(220,200,170,0.4)', sw: 1.2 }, // lit rim
+  ];
+  const b = bboxOf(poly);
+  const inner: Prim[] = [];
+  for (let i = 0; i < 3; i++) {
+    const x = b.minX + ((i + 0.5) / 3) * (b.maxX - b.minX);
+    inner.push({ t: 'line', a: [x + (rng() - 0.5) * 4, b.minY], b: [x + (rng() - 0.5) * 8, b.maxY], stroke: 'rgba(20,14,8,0.6)', sw: 1.4, round: true });
+  }
+  out.push({ t: 'clip', clip: poly, children: inner });
+  return out;
+}
+
 /** One tree drawn as a 3-tone cell-shaded canopy with a cast shadow, trunk + ink outline. */
 function styleTree(poly: Vec[], proj: Projector, rng: () => number): Prim[] {
   const cc = centroidOf(poly);
@@ -659,6 +699,10 @@ const WIND_COL: Record<BiomeArchetype, string> = {
   desert: 'rgba(226,196,140,', // blown dust
   verdant: 'rgba(208,236,206,', // pollen / leaf drift
   void: 'rgba(200,170,255,', // cosmic dust
+  crystal: 'rgba(190,238,248,', // glittering crystal dust
+  tempest: 'rgba(200,180,255,', // driving storm rain
+  fungal: 'rgba(150,240,190,', // drifting glowing spores
+  ocean: 'rgba(190,235,230,', // sea spray
 };
 
 /** Unit SCREEN direction the wind blows, from a hole's `Wind.dir` (course bearing) through the
@@ -926,14 +970,20 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const lavaPolys: Vec[][] = [];
   const sandPolys: Vec[][] = [];
   const treeHaz: Feature[] = [];
+  const fescueHaz: Feature[] = [];
+  const ravineHaz: Feature[] = [];
   const scatterHaz: Feature[] = [];
   for (const f of hole.hazards) {
     if (WATER_KINDS.has(f.kind)) waterPolys.push(projPoly(f.poly, proj));
     else if (LAVA_KINDS.has(f.kind)) lavaPolys.push(projPoly(f.poly, proj));
-    else if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand') sandPolys.push(projPoly(f.poly, proj));
+    else if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand' || f.kind === 'pot') sandPolys.push(projPoly(f.poly, proj));
     else if (f.kind === 'trees') treeHaz.push(f);
+    else if (f.kind === 'fescue') fescueHaz.push(f);
+    else if (f.kind === 'barranca') ravineHaz.push(f);
     else scatterHaz.push(f);
   }
+  for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), rng));
+  for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
   prims.push(...styleSandFamily(sandPolys, art, proj.scale));
   for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
   // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.

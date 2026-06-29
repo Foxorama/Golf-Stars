@@ -61,7 +61,7 @@ describe('round simulation (the vertical slice)', () => {
         "par": 3,
         "penalties": 0,
         "putts": 1,
-        "strokes": 4,
+        "strokes": 3,
       }
     `);
   });

@@ -351,6 +351,10 @@ const PRO_LOOK: Record<BiomeArchetype, { cap: string; shirt: string; aura: strin
   frost: { cap: '#7fd0e8', shirt: '#4a90c2', aura: '#bfe9f5', skin: '#e8c4a8' },
   inferno: { cap: '#e0622b', shirt: '#9b2d1f', aura: '#ff8a3b', skin: '#cf8f63' },
   void: { cap: '#9b6fd0', shirt: '#5b3da0', aura: '#b88aff', skin: '#cdb8e0' },
+  crystal: { cap: '#7fc8bd', shirt: '#4a9aa0', aura: '#bff0ff', skin: '#e7c9b4' },
+  tempest: { cap: '#8a7fb0', shirt: '#5a5470', aura: '#c8b8ff', skin: '#d8c0a8' },
+  fungal: { cap: '#2fae82', shirt: '#7d46b8', aura: '#7af0c0', skin: '#d2b89c' },
+  ocean: { cap: '#46b487', shirt: '#2f7faa', aura: '#7fe6b8', skin: '#e0c2a0' },
 };
 
 /** A compact inline-SVG bust of a world's club pro — assetless house style, tinted per archetype. */
@@ -1970,6 +1974,10 @@ const BIOME_BADGE: Record<string, { glyph: string; label: string; col: string }>
   frost: { glyph: '❄️', label: 'Frost', col: '#7fd6e6' },
   inferno: { glyph: '🌋', label: 'Inferno', col: '#ff6b4a' },
   void: { glyph: '🌌', label: 'Void', col: '#9a7bd0' },
+  crystal: { glyph: '💎', label: 'Crystal', col: '#9fe0f5' },
+  tempest: { glyph: '🌪️', label: 'Tempest', col: '#c8b8ff' },
+  fungal: { glyph: '🍄', label: 'Jungle', col: '#54dba0' },
+  ocean: { glyph: '🌊', label: 'Ocean', col: '#5fd49e' },
 };
 
 // The functional family of a route event → a short pill label + accent (distinct from the rarity ring).

@@ -95,6 +95,20 @@ export interface Biome {
   waterCreek?: boolean;
   ponds?: number;
   fairwayBreaks?: number;
+  /**
+   * Hazard-variety fields (GS-hazards-2), all pure non-penalty (always fair) or sanctioned-crossing
+   * DATA, scaled by wildness at generation time:
+   *  • `potBunkers`  — deep POT-bunker NESTS per hole (base). Pots pinch the landing zone (the classic
+   *    strategic squeeze) and ring small greens; sand-class, so NON-penalty (a steep escape tax, never
+   *    a lost card). Also makes the world's greenside guards lean toward pots.
+   *  • `fescue`      — thick FESCUE / native-rough patches per hole (base) lining the deep rough — a
+   *    heavier non-penalty recovery lie than ordinary rough (you hack out, never lose a stroke).
+   *  • `barranca`    — a dry RAVINE crosses the fairway as a forced carry (a penalty-area crossing,
+   *    sanctioned + proven carryable exactly like the creek/lava river — a rocky chasm, not water).
+   */
+  potBunkers?: number;
+  fescue?: number;
+  barranca?: boolean;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -116,6 +130,8 @@ export const BIOMES: readonly Biome[] = [
     waterCreek: true, // signature: a creek crosses the fairway (forced carry)
     ponds: 1.2, // big parkland lakes flank the landing zones
     fairwayBreaks: 0.7, // the odd sandy waste break across the fairway
+    potBunkers: 0.8, // links-style pot bunkers pinch the landing zones
+    fescue: 1.0, // wispy native fescue lines the deep rough
     greenSize: 1.05, // classic parkland greens — gently rolling, moderate variety
     greenAspect: 1.9,
     greenIrregular: 1.1,
@@ -137,6 +153,9 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
     craters: 2.2, // signature: impact-crater bunkers pock the landing zones
     fairwayBreaks: 1.0, // sandbelt waste areas slash across the fairway
+    potBunkers: 0.6, // deep desert pots dot the landing zones
+    fescue: 0.8, // dune-grass fescue chokes the deep waste
+    barranca: true, // signature: a dry barranca/ravine crosses the fairway (forced carry)
     greenSize: 1.3, // big, smooth oasis greens against the dunes
     greenAspect: 1.7,
     greenIrregular: 0.85,
@@ -158,6 +177,8 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 1,
     frozenPond: true, // signature: a meltwater channel crosses the fairway (forced carry)
     ponds: 1.0, // frozen lakes flank the landing zones
+    potBunkers: 0.6, // frozen-faced pot bunkers ring the ice greens
+    fescue: 0.5, // frosted tussock grass in the deep rough
     greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
     greenAspect: 2.6,
     greenIrregular: 1.0,
@@ -179,6 +200,7 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 1.2,
     lavaRiver: true, // signature: molten rivers cross the fairway (forced carry)
     fairwayBreaks: 0.4, // scorched waste cuts across the odd fairway
+    potBunkers: 0.3, // the odd cinder pot near the green
     greenSize: 0.95, // jagged, broken basalt greens
     greenAspect: 2.0,
     greenIrregular: 1.45,
@@ -202,6 +224,92 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 0.85, // small, angular asteroid greens adrift in the abyss
     greenAspect: 1.7,
     greenIrregular: 1.25,
+  },
+  // --- GS-worlds: four new exotic worlds, each a distinct PLAYSTYLE -----------
+  {
+    id: 'crystal-spires',
+    name: 'Prism Reach',
+    weight: 10,
+    carryMult: 1.0,
+    carryJitter: 0,
+    windBase: 3,
+    windWild: 12,
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    // Signature: the fairways are STREWN with true, fast crystal — a precision world where a clean
+    // strike off the glass runs true, but the angular spires force a careful line.
+    scatter: [{ kind: 'crystal', freqPerHole: 2.6, rMin: 6, rMax: 13 }],
+    fairwayWidthMult: 1.0,
+    doglegBias: 0.4,
+    treeDensity: 0.3, // a few crystalline spires line the rough
+    fairwayBunkers: 1.0,
+    potBunkers: 0.5,
+    greenSize: 0.95, // sharp, faceted greens
+    greenAspect: 1.9,
+    greenIrregular: 1.4,
+  },
+  {
+    id: 'tempest-reach',
+    name: 'Tempest Reach',
+    weight: 11,
+    carryMult: 1.05, // a gas-giant updraught carries the ball a touch farther
+    carryJitter: 0.05, // gusts jostle the carry
+    windBase: 8,
+    windWild: 26, // the windiest world short of a frost gale — wind dominates here
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 1.05, // a touch wider to keep the gale fair
+    doglegBias: 0.3,
+    treeDensity: 0.4, // wind-bent scrub
+    fairwayBunkers: 1.4,
+    potBunkers: 0.4,
+    greenSize: 1.05,
+    greenAspect: 2.2, // long, storm-scoured shelves
+    greenIrregular: 1.1,
+  },
+  {
+    id: 'spore-jungle',
+    name: 'Spore Jungle',
+    weight: 11,
+    carryMult: 1.0,
+    carryJitter: 0,
+    windBase: 2,
+    windWild: 8, // sheltered under the canopy
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 0.95, // tight jungle corridors
+    doglegBias: 0.45,
+    treeDensity: 2.9, // signature: the DENSEST groves — luminous mushroom stands wall the fairways
+    fairwayBunkers: 0.9,
+    fescue: 1.2, // glowing undergrowth chokes the deep rough
+    waterCreek: true, // jungle streams cross the fairway
+    greenSize: 1.0,
+    greenAspect: 1.8,
+    greenIrregular: 1.2,
+  },
+  {
+    id: 'tidal-archipelago',
+    name: 'Tidal Archipelago',
+    weight: 12,
+    carryMult: 1.0,
+    carryJitter: 0,
+    windBase: 7,
+    windWild: 22, // coastal sea-breeze
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 1.0,
+    doglegBias: 0.35,
+    treeDensity: 0.6, // the odd palm
+    fairwayBunkers: 2.0, // beaches everywhere
+    potBunkers: 0.4,
+    waterCreek: true, // signature: a sea channel crosses the fairway (forced carry)
+    ponds: 1.8, // lagoons flank the corridors — an offline shot is wet
+    greenSize: 1.0,
+    greenAspect: 1.7,
+    greenIrregular: 1.0,
   },
 ];
 

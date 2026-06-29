@@ -52,7 +52,7 @@ const WATER_CREEK_MIN_WILDNESS = 0.26; // below: a calm parkland stop has no cre
  *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
  *  carryable. A river of lava (ember), a frozen-pond channel (frost), and a water creek (parkland)
  *  are all crossings — the carry-aware AI flies any of them generically (it keys off `penalty`). */
-const CROSSING_KINDS = new Set(['lavariver', 'frozenpond', 'creek']);
+const CROSSING_KINDS = new Set(['lavariver', 'frozenpond', 'creek', 'barranca']);
 /**
  * Corridor half-width SCALE when the rough is lethal (void islands). Constant (does NOT shrink with
  * wildness like a normal corridor) and generous, so that even max-wildness driver spray usually
@@ -517,8 +517,12 @@ function generateHole(
   const fairwayHalfWidth = Math.max(...leftHW, ...rightHW);
 
   const teeBox: Feature = { kind: 'tee', poly: blobPoly(tee, 8, 8, 0, rng) };
-  // Varied GREEN shape (GS-greens), per-biome character. baseR scaled by the biome's greenSize.
-  const greenR = rng.range(11, 16) * (biome.greenSize ?? 1);
+  // Varied GREEN shape (GS-greens), per-biome character. baseR scaled by the biome's greenSize AND by
+  // hole length (GS-hazards-2): a short pitch gets a SMALL, demanding target while a long par-5 gets a
+  // bigger, more receptive green — par-3 small / par-5 large, the real-design rule. Pure value scale
+  // off the already-drawn `tpl.lenMult`, so no new rng draw (the downstream stream is unperturbed).
+  const greenLenFactor = Math.max(0.74, Math.min(1.26, 0.5 + tpl.lenMult * 0.5));
+  const greenR = rng.range(11, 16) * (biome.greenSize ?? 1) * greenLenFactor;
   const greenPolygon = greenPoly(green, greenR, biome.greenAspect ?? 1.8, biome.greenIrregular ?? 1, rng);
   const greenF: Feature = { kind: 'green', poly: greenPolygon };
 
@@ -802,6 +806,65 @@ function generateHole(
     if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
       hazards.push({ kind: 'water', poly: blobPoly(river.mouth, lakeR, 16, 0.3, rng) });
     }
+  }
+
+  // POT-bunker NESTS (GS-hazards-2): clusters of small, deep pots that PINCH the landing zone — the
+  // classic strategic squeeze (carry well past or lay up short). Sand-class → NON-PENALTY (a steep
+  // escape tax, never a lost card), so they may bite the corridor edge; appended after the existing
+  // hazards so every earlier placement stays byte-identical to before this field existed.
+  const potNests = par >= 4 ? Math.round((biome.potBunkers ?? 0) * (0.6 + 0.7 * wildness)) : 0;
+  for (let i = 0; i < potNests; i++) {
+    const t = rng.range(0.32, 0.74);
+    const side = rng.bool() ? 1 : -1;
+    const perp = perpAt(centreline, t);
+    const cluster = rng.int(2, 4);
+    for (let k = 0; k < cluster; k++) {
+      const r = rng.range(3.2, 5);
+      // March the cluster out from the corridor edge so it pinches the landing zone's flank.
+      const along = centrePoint(centreline, Math.max(0.05, Math.min(0.95, t + (k - cluster / 2) * 0.012)));
+      const lateral = fairwayHalfWidth - rng.range(0, 4) + k * rng.range(4.5, 7);
+      const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+      hazards.push({ kind: 'pot', poly: blobPoly(c, r, 9, 0.16, rng) });
+    }
+  }
+
+  // Greenside POTS (GS-hazards-2): on a pot-bunker world, ring the green with a couple of deep pots —
+  // on a SMALL green this reads as the encircled "Short"-template look. Sand → always fair. Appended,
+  // so the existing greenside guards above are untouched.
+  const greensidePots = (biome.potBunkers ?? 0) > 0 ? rng.int(0, greenR < 13 ? 3 : 2) : 0;
+  for (let i = 0; i < greensidePots; i++) {
+    const r = rng.range(3, 5);
+    const ang = rng.range(0, Math.PI * 2);
+    const dir: Vec = [Math.cos(ang), Math.sin(ang)];
+    const d = rayPolyDist(green, dir, greenPolygon) + r + rng.range(2, 6);
+    hazards.push({ kind: 'pot', poly: blobPoly([green[0] + dir[0] * d, green[1] + dir[1] * d], r, 9, 0.18, rng) });
+  }
+
+  // Thick FESCUE / native rough (GS-hazards-2): non-penalty deep-rough patches lining the rough
+  // OUTSIDE the corridor (only an offline shot finds them — the GS-13 invariant) — a heavier recovery
+  // lie than ordinary rough so the deep stuff reads as real wispy native grass, not a flat slab.
+  const fescueCount = Math.round((biome.fescue ?? 0) * (1 + wildness) * (par === 3 ? 2 : 5));
+  for (let i = 0; i < fescueCount; i++) {
+    const t = rng.range(0.08, 0.95);
+    const side = rng.bool() ? 1 : -1;
+    const r = rng.range(5, 11);
+    const along = centrePoint(centreline, t);
+    const perp = perpAt(centreline, t);
+    const lateral = fairwayHalfWidth + r + rng.range(2, 40);
+    const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+    hazards.push({ kind: 'fescue', poly: blobPoly(c, r, 10, 0.32, rng) });
+  }
+
+  // Dry RAVINE / barranca crossing (GS-hazards-2): a rocky chasm crosses the fairway as a forced carry
+  // — the same sanctioned-crossing machinery as the creek/lava river (exempt from `validateFairness`,
+  // proven carryable by `validateCrossings`; the carry-aware AI flies it generically off its penalty).
+  // ONE crossing per hole — skipped if a river/pond/creek already crosses. Longer holes only.
+  const hadCrossing = hazards.some((h) => CROSSING_KINDS.has(h.kind));
+  if (biome.barranca && par >= 4 && wildness >= WATER_CREEK_MIN_WILDNESS && !hadCrossing) {
+    const t = rng.range(0.34, 0.6);
+    const thickness = Math.min(28, length * 0.07, rng.range(7, 11) + wildness * rng.range(5, 14));
+    const ravine = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
+    hazards.push({ kind: 'barranca', poly: ravine.poly });
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
@@ -1120,7 +1183,8 @@ export function validateCrossings(course: Course): string[] {
   course.holes.forEach((h, i) => {
     for (const hz of h.hazards) {
       if (!CROSSING_KINDS.has(hz.kind)) continue;
-      const what = hz.kind === 'frozenpond' ? 'frozen pond' : hz.kind === 'creek' ? 'creek' : 'lava river';
+      const what =
+        hz.kind === 'frozenpond' ? 'frozen pond' : hz.kind === 'creek' ? 'creek' : hz.kind === 'barranca' ? 'ravine' : 'lava river';
       let tIn = -1;
       let tOut = -1;
       for (let s = 0; s <= SAMPLES; s++) {

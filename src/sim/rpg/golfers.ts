@@ -351,6 +351,15 @@ const CHAMPIONS: readonly ChampRow[] = [
   { theme: 'virgo', name: 'Pia Spica', shortName: 'Spica', archetypeId: 'surgeon', origin: 'Virgo' },
   { theme: 'pegasus', name: 'Faraz Alpheratz', shortName: 'Alpheratz', archetypeId: 'bomber', origin: 'Pegasus' },
   { theme: 'capricornus', name: 'Cora Algedi', shortName: 'Algedi', archetypeId: 'grinder', origin: 'Capricornus' },
+  // GS-worlds: champions of the four new worlds.
+  { theme: 'triangulum', name: 'Talia Mothallah', shortName: 'Mothallah', archetypeId: 'surgeon', origin: 'Triangulum' },
+  { theme: 'corona-borealis', name: 'Alba Alphecca', shortName: 'Alphecca', archetypeId: 'metronome', origin: 'Corona Borealis' },
+  { theme: 'sagitta', name: 'Sasha Sham', shortName: 'Sham', archetypeId: 'wind', origin: 'Sagitta' },
+  { theme: 'draco', name: 'Drake Eltanin', shortName: 'Eltanin', archetypeId: 'wind', origin: 'Draco' },
+  { theme: 'lacerta', name: 'Lacy Vega', shortName: 'Lacerta', archetypeId: 'escape', origin: 'Lacerta' },
+  { theme: 'vulpecula', name: 'Vix Anser', shortName: 'Anser', archetypeId: 'maverick', origin: 'Vulpecula' },
+  { theme: 'delphinus', name: 'Della Rotanev', shortName: 'Rotanev', archetypeId: 'sand', origin: 'Delphinus' },
+  { theme: 'eridanus', name: 'Eira Achernar', shortName: 'Achernar', archetypeId: 'plotter', origin: 'Eridanus' },
 ];
 
 // --- The field (deterministically built named pack) ---------------------------

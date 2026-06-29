@@ -34,7 +34,17 @@ export type Arc = 1 | 2 | 3;
  * biome rows (`archetypeBiome`); the rarity-tiered biome expansion (GS-17b) widens this seam so
  * a legendary inferno reads wilder than a common one — without rewriting this table.
  */
-export type BiomeArchetype = 'verdant' | 'desert' | 'frost' | 'inferno' | 'void';
+export type BiomeArchetype =
+  | 'verdant'
+  | 'desert'
+  | 'frost'
+  | 'inferno'
+  | 'void'
+  // GS-worlds: four new exotic space worlds, each a distinct PLAYSTYLE, not just a recolour.
+  | 'crystal' // prismatic gem world — true/fast crystal lies everywhere, precision rewarded
+  | 'tempest' // gas-giant storm world — the wildest crosswinds in the galaxy
+  | 'fungal' // bioluminescent spore-jungle — the densest tree-lined corridors
+  | 'ocean'; // tidal archipelago — sea channels + flanking lagoons, island-hopping golf
 
 /**
  * Per-theme biome flavour (GS-17b) — bounded MULTIPLIERS on the archetype baseline that give a
@@ -114,6 +124,10 @@ const ARCHETYPE_BIOME: Record<BiomeArchetype, string> = {
   frost: 'ice-ring',
   inferno: 'ember-world',
   void: 'void-garden',
+  crystal: 'crystal-spires',
+  tempest: 'tempest-reach',
+  fungal: 'spore-jungle',
+  ocean: 'tidal-archipelago',
 };
 
 /** The biome id a theme generates its course from. */
@@ -172,6 +186,10 @@ export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
   frost: ['control', 'putting'],
   desert: ['control'],
   verdant: ['economy', 'skill'],
+  crystal: ['skill', 'putting'], // a precision world — reward true striking + putting
+  tempest: ['control'], // tame the wind
+  fungal: ['economy', 'skill'], // lush, growthy — like verdant's cousin
+  ocean: ['control', 'distance'], // carry the sea, flight the lagoons
 };
 
 /** How much an on-theme item's shop weight is multiplied (soft bias, not a filter). */
@@ -280,6 +298,20 @@ const CONSTELLATIONS: readonly ConstRow[] = [
   { id: 'virgo', name: 'Virgo', abbr: 'Vir', rarity: 'rare', stars: 9, archetype: 'verdant', anchor: 'Spica', blurb: 'The Maiden of the harvest, holding a sky full of galaxies.', flavour: { trees: 1.3, wind: 0.9 } },
   { id: 'pegasus', name: 'Pegasus', abbr: 'Peg', rarity: 'common', stars: 8, archetype: 'void', anchor: 'Alpheratz', blurb: 'The Winged Horse, the Great Square soaring the void.', flavour: { carry: 1.1, wind: 1.2 } },
   { id: 'capricornus', name: 'Capricornus', abbr: 'Cap', rarity: 'rare', stars: 8, archetype: 'frost', anchor: 'Deneb Algedi', blurb: 'The Sea-Goat, half-frozen in the cold deep.', flavour: { carry: 0.95, wind: 1.1, scatter: 1.2 } },
+
+  // --- GS-worlds: new exotic worlds, spread across the arcs by star count ---
+  // crystal — prismatic gem worlds
+  { id: 'triangulum', name: 'Triangulum', abbr: 'Tri', rarity: 'common', stars: 3, archetype: 'crystal', anchor: 'Mothallah', blurb: 'A sharp crystal wedge of three bright stars.', flavour: { scatter: 1.1, wind: 0.85 } },
+  { id: 'corona-borealis', name: 'Corona Borealis', abbr: 'CrB', rarity: 'rare', stars: 7, archetype: 'crystal', anchor: 'Alphecca', blurb: 'The Northern Crown — a jewelled arc of prismatic light.', flavour: { scatter: 1.25, tightness: 0.95 } },
+  // tempest — gas-giant storm worlds
+  { id: 'sagitta', name: 'Sagitta', abbr: 'Sge', rarity: 'common', stars: 4, archetype: 'tempest', anchor: 'Sham', blurb: 'The Arrow, loosed on a screaming stormwind.', flavour: { wind: 1.15 } },
+  { id: 'draco', name: 'Draco', abbr: 'Dra', rarity: 'common', stars: 8, archetype: 'tempest', anchor: 'Eltanin', blurb: 'The Dragon, coiled in the eye of the great storm.', flavour: { wind: 1.3, dogleg: 1.2 } },
+  // fungal — bioluminescent spore-jungles
+  { id: 'lacerta', name: 'Lacerta', abbr: 'Lac', rarity: 'rare', stars: 5, archetype: 'fungal', anchor: 'Alpha Lac', blurb: 'The Lizard, creeping the glowing spore-jungle.', flavour: { trees: 1.25, tightness: 0.95 } },
+  { id: 'vulpecula', name: 'Vulpecula', abbr: 'Vul', rarity: 'rare', stars: 6, archetype: 'fungal', anchor: 'Anser', blurb: 'The Fox, slinking through luminous fungal groves.', flavour: { trees: 1.35, dogleg: 1.1 } },
+  // ocean — tidal archipelagos
+  { id: 'delphinus', name: 'Delphinus', abbr: 'Del', rarity: 'common', stars: 5, archetype: 'ocean', anchor: 'Rotanev', blurb: 'The Dolphin, breaching the tidal sea of stars.', flavour: { wind: 1.1, bunkers: 1.1 } },
+  { id: 'eridanus', name: 'Eridanus', abbr: 'Eri', rarity: 'common', stars: 9, archetype: 'ocean', anchor: 'Achernar', blurb: 'The great celestial River, pouring to the deep south.', flavour: { wind: 1.15, dogleg: 1.1 } },
 ];
 
 /** Deep-sky + naked-eye galaxy showpieces: rare destinations gated by rarity. */
