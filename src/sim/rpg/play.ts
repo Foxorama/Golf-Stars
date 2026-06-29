@@ -278,6 +278,22 @@ export function awaitingPutt(state: HolePlay): boolean {
   return !state.done && state.lie === 'green';
 }
 
+/** Fringe/apron putt range (yards) — the "Texas wedge" distance from which the flat-stick is an
+ *  option from just off the green, instead of an awkward full-swing chip from a few yards. */
+export const FRINGE_PUTT_RANGE = 14;
+
+/**
+ * True when the ball sits just off the green — a short, non-penalty apron/fringe lie within
+ * FRINGE_PUTT_RANGE of the pin — so the player may PUTT it rather than being forced into the weird
+ * full-power chip the apron used to demand. Interactive-only affordance: the auto sim never putts
+ * from here (it only putts on `green`), so auto≡interactive is untouched.
+ */
+export function canPuttFringe(state: HolePlay): boolean {
+  if (state.done || state.lie === 'green') return false;
+  if (state.lie !== 'fairway' && state.lie !== 'rough') return false;
+  return dist(state.ball, pinOf(state.hole)) <= FRINGE_PUTT_RANGE;
+}
+
 /** Resolve ONE manual putt toward the pin. Holes out, lags, or — if the stroke budget is
  *  spent — picks up. The interactive counterpart to the auto putt-out. With a `control` (the
  *  player's pace-meter input) it resolves by SKILL via `manualPutt`; without one it falls back to
@@ -288,7 +304,9 @@ export function takePutt(
   rng: Rng,
   control?: PuttControl,
 ): HolePlay {
-  if (state.done || state.lie !== 'green') return state;
+  // The green, or a fringe/apron "Texas wedge" (an interactive-only affordance — the auto sim never
+  // putts from off the green, so this leaves auto≡interactive untouched).
+  if (state.done || (state.lie !== 'green' && !canPuttFringe(state))) return state;
   const pin = pinOf(state.hole);
   const maxStrokes = state.hole.par + MAX_OVER_PAR;
   const skill = puttSkillOf(loadout);

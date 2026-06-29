@@ -11,7 +11,7 @@ import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { itemCardHTML, shotCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
 import { type ProjectOptions } from './render/project';
-import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
+import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt, caddyProjectile, CADDY_LABEL } from './render/caddyArt';
 import { starmapSVG, type StarmapChoice } from './render/starmap';
@@ -802,6 +802,10 @@ let animHoleIndex = -1;
 let animatedPutts = 0; // putts of the current hole already animated
 let selClubId: string | null = null;
 let selAim: 'attack' | 'safe' = 'attack';
+// Fringe/apron putt (GS-fringe-putt): when the ball is just off the green, putting with the pace
+// meter is offered (and is the default) instead of an awkward full-swing chip — `selPutt` toggles
+// between the putt meter and the normal shot gesture. Reset each new shot to the lie's natural choice.
+let selPutt = false;
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
 // Free-aim target (course-space) from the pull-to-power gesture; overrides attack/safe when set.
 let selFreeTarget: [number, number] | null = null;
@@ -882,7 +886,8 @@ function scheduleRender(): void {
  */
 function wireShotGesture(app: HTMLElement): void {
   if (state.screen !== 'playing' || !state.play || awaitingShotPopup) return;
-  if (state.play.done || awaitingPutt(state.play)) return; // only the full-shot decision screen
+  // Only the full-shot decision screen — not the green putt, nor a fringe putt the player chose.
+  if (state.play.done || awaitingPutt(state.play) || (canPuttFringe(state.play) && selPutt)) return;
   const svg = app.querySelector<SVGSVGElement>('[data-map] svg');
   if (!svg) return;
   const play = state.play;
@@ -1439,8 +1444,10 @@ function playingBody(animating: boolean): string {
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
   }
 
-  // Manual putting on the green (auto-putt off): stroke putts one at a time.
-  if (awaitingPutt(play)) {
+  // Manual putting — on the green, or a chosen fringe/apron "Texas wedge" (GS-fringe-putt): stroke
+  // putts one at a time with the pace meter, instead of the awkward full-swing chip the apron forced.
+  const fringePutt = canPuttFringe(play) && selPutt;
+  if (awaitingPutt(play) || fringePutt) {
     // Frame the putt on the ball→cup line: centre the view on the MIDPOINT of the two and size it
     // to the putt length, so the cup and ball both sit on-screen with even margin — not the ball
     // dead-centre with the green (and a lot of dead rough) shoved to one edge.
@@ -1472,9 +1479,10 @@ function playingBody(animating: boolean): string {
         <div class="gs-hud gs-hud-bottom">
           ${caddyBadgeHTML(puttCaddyId())}
           <div class="gs-hud-controls gs-glass">
-            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">Tap the meter (or Putt) in the green <b>MAKE</b> band — too soft is short, too firm runs past.</p>
+            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Tap the meter (or Putt) in the green <b>MAKE</b> band — too soft is short, too firm runs past.</p>
             <div id="puttmeter"></div>
             <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
+            ${fringePutt ? `<button class="gs-btn gs-btn--ghost" data-putt-toggle="0" style="margin:6px 0 0;padding:9px;">⛳→🏌 Chip instead</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -1490,6 +1498,7 @@ function playingBody(animating: boolean): string {
     selFreeTarget = null;
     selPower = 1; // a full-swing cone previews by default until you pull
     selAimBearing = null; // re-seed the aim to the pin for the new shot
+    selPutt = canPuttFringe(play); // just off the green → default to the putter (a Texas wedge)
     resetMapView();
   }
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
@@ -1555,6 +1564,7 @@ function playingBody(animating: boolean): string {
       ${cbtn('►', 1)}
       ${selFreeTarget ? `<button class="gs-btn gs-mini" data-aimreset="1" title="Re-aim at the pin">🎯</button>` : ''}
       ${hasSuggest ? `<button class="gs-btn gs-mini${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🏌</button>` : ''}
+      ${canPuttFringe(play) ? `<button class="gs-btn gs-mini" data-putt-toggle="1" title="Putt from the fringe">⛳</button>` : ''}
     </div>`;
   // Power read-out: the bar fills as you pull DOWN on the map (the cone grows in step); past 100%
   // (with Overdrive) it glows orange as an overpowered shot.
@@ -2221,9 +2231,16 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-putt-commit]').forEach((el) => {
     el.addEventListener('click', () => puttMeter?.commit());
   });
+  // Fringe/apron (GS-fringe-putt): toggle between the putt meter (⛳) and the normal chip gesture (🏌).
+  app.querySelectorAll<HTMLElement>('[data-putt-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      selPutt = el.dataset.puttToggle === '1';
+      render();
+    });
+  });
 
   // Mount the manual-putt pace meter when the ball is on the green awaiting a manual putt.
-  if (state.screen === 'playing' && state.play && !animatingPlay && awaitingPutt(state.play) && !state.play.done) {
+  if (state.screen === 'playing' && state.play && !animatingPlay && !state.play.done && (awaitingPutt(state.play) || (canPuttFringe(state.play) && selPutt))) {
     const meterEl = document.getElementById('puttmeter');
     if (meterEl) {
       const band = puttSkillOf(state.run.loadout).manualBand ?? DEFAULT_MANUAL_BAND;
