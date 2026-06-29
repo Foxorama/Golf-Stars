@@ -309,8 +309,8 @@ function drawTrophy(col: string, seed: string): string {
   );
 }
 
-function drawCaddy(col: string, seed: string): string {
-  // A golf bag full of clubs (stands in for "a caddy on the bag").
+function drawCaddyBag(col: string, seed: string): string {
+  // A golf bag full of clubs — the fallback when a caddy id has no bespoke figure.
   const bag = mix(col, '#243049', 0.25);
   return frame(
     `${sparkles(seed, col, 5)}
@@ -329,6 +329,125 @@ function drawCaddy(col: string, seed: string): string {
      <path d="M 60 36 q 14 -4 28 0" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.5"/>`,
     col,
   );
+}
+
+// --- Bespoke named-caddy portraits (GS-proshop-2) ----------------------------
+// The named caddies are the game-changing centrepieces, so each gets a self-contained SVG portrait
+// matching its in-game canvas figure (see render/caddyArt.ts) — not the generic bag glyph. Authored
+// directly in the 150×96 card frame (ground ≈ y88, figure ≈ x58, props reach to the right).
+
+/** A hat/cap dome (semicircle, flat bottom at `cy`, arcing up to `cy-r`). */
+function dome(cx: number, cy: number, r: number, fill: string): string {
+  return `<path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy} Z" fill="${fill}"/>`;
+}
+const groundShadow = (cx = 60): string => `<ellipse cx="${cx}" cy="89" rx="27" ry="5" fill="rgba(0,0,0,0.32)"/>`;
+
+const CADDY_FIGURES: Record<string, () => string> = {
+  // Penelope Putter — teal caddy bib, flagstick + pennant, ponytail under a cap.
+  'auto-caddie': () =>
+    `${groundShadow(60)}
+     <path d="M60 60 L52 88 M60 60 L68 88" stroke="#2c3142" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+     <line x1="60" y1="62" x2="58" y2="35" stroke="#19b2a6" stroke-width="16" stroke-linecap="round"/>
+     <line x1="58" y1="44" x2="80" y2="34" stroke="#e8c6a0" stroke-width="4.2" stroke-linecap="round"/>
+     <line x1="86" y1="20" x2="86" y2="52" stroke="#d9dee8" stroke-width="2.6"/>
+     <path d="M86 20 L106 25 L86 30 Z" fill="#ff5d5d"/>
+     <ellipse cx="47" cy="31" rx="4.4" ry="8" fill="#6b4a2e"/>
+     <circle cx="58" cy="30" r="9.2" fill="#f0c49a"/>
+     ${dome(58, 27, 9.4, '#138f86')}<rect x="56" y="24.5" width="13" height="3.2" rx="1.5" fill="#138f86"/>`,
+  // Driver Dan — burly orange caddy, a big driver slung over the shoulder.
+  'driver-dan': () =>
+    `${groundShadow(60)}
+     <path d="M60 60 L51 88 M60 60 L69 88" stroke="#3a3f4c" stroke-width="7.5" stroke-linecap="round" fill="none"/>
+     <line x1="60" y1="62" x2="58" y2="33" stroke="#e0883a" stroke-width="20" stroke-linecap="round"/>
+     <line x1="44" y1="52" x2="94" y2="16" stroke="#c8ccd6" stroke-width="3.2" stroke-linecap="round"/>
+     <ellipse cx="96" cy="15" rx="8" ry="5.5" fill="#2b2f3a" transform="rotate(-35 96 15)"/>
+     <line x1="58" y1="42" x2="44" y2="52" stroke="#d8a878" stroke-width="5" stroke-linecap="round"/>
+     <circle cx="58" cy="30" r="10" fill="#d8a878"/>
+     ${dome(58, 27, 10, '#c4882a')}<rect x="44" y="24.5" width="14" height="3.4" rx="1.5" fill="#c4882a"/>`,
+  // Dr Chipinski — white lab coat, specs, a wedge held low, a ringing call badge.
+  'dr-chipinski': () =>
+    `${groundShadow(58)}
+     <path d="M58 60 L51 88 M58 60 L65 88" stroke="#39405a" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+     <line x1="58" y1="62" x2="56" y2="35" stroke="#eef2f7" stroke-width="16" stroke-linecap="round"/>
+     <line x1="56" y1="50" x2="55" y2="62" stroke="#cfd6e0" stroke-width="1.6"/>
+     <line x1="72" y1="44" x2="90" y2="66" stroke="#c8ccd6" stroke-width="2.8"/>
+     <path d="M90 66 L98 64 L95 73 Z" fill="#aeb6c6"/>
+     <line x1="56" y1="44" x2="72" y2="44" stroke="#e8c6a0" stroke-width="4.2" stroke-linecap="round"/>
+     <circle cx="56" cy="30" r="9.2" fill="#e8c6a0"/>
+     <g stroke="#2b2f3a" stroke-width="1.4" fill="none"><circle cx="52.5" cy="30" r="2.6"/><circle cx="60" cy="30" r="2.6"/><line x1="55.1" y1="30" x2="57.4" y2="30"/></g>
+     ${dome(56, 26, 9, '#3a3f4c')}
+     <g transform="translate(104 24)"><circle r="11" fill="#22c55e" stroke="rgba(0,0,0,0.25)" stroke-width="1.4"/>
+       <path d="M -4 -4 q -2 -2 0 -3 l 2 2 q 0 1 -1 1 q 0 3 3 4 q 0 -1 1 -1 l 2 2 q -1 2 -3 0 q -5 -1 -7 -6 z" fill="#fff" transform="rotate(-12)"/>
+       <g stroke="#bdf3cf" stroke-width="1.5" fill="none" opacity="0.85"><path d="M -13 -7 a5 5 0 0 1 4 -3"/><path d="M 13 -7 a5 5 0 0 0 -4 -3"/></g></g>`,
+  // Space Ducks — plump yellow duck in a bubble helmet + top hat, laser raised.
+  'space-ducks': () =>
+    `${groundShadow(58)}
+     <ellipse cx="52" cy="86" rx="5" ry="2.4" fill="#e8902a"/><ellipse cx="64" cy="86" rx="5" ry="2.4" fill="#e8902a"/>
+     <ellipse cx="58" cy="62" rx="14" ry="19" fill="#f7d046"/>
+     <ellipse cx="49" cy="62" rx="5" ry="11" fill="#e6bf36"/>
+     <line x1="62" y1="56" x2="92" y2="34" stroke="#3a4150" stroke-width="3.6" stroke-linecap="round"/>
+     <circle cx="93" cy="33" r="3.2" fill="#7cf3ff"/>
+     <circle cx="60" cy="36" r="10" fill="#f7d046"/>
+     <ellipse cx="71" cy="37" rx="6" ry="3.2" fill="#e8902a"/>
+     <circle cx="62" cy="34" r="1.8" fill="#222"/>
+     <circle cx="60" cy="35" r="16" fill="rgba(180,230,255,0.13)" stroke="rgba(180,230,255,0.85)" stroke-width="1.6"/>
+     <rect x="46" y="16" width="28" height="3.2" rx="1" fill="#1b1e26"/><rect x="51" y="3" width="17" height="14" rx="1.5" fill="#1b1e26"/>`,
+  // Convict Sheep — woolly jailbird in stripes, spinning a boomerang.
+  'convict-sheep': () =>
+    `${groundShadow(58)}
+     <path d="M52 62 L50 88 M64 62 L66 88" stroke="#2c3142" stroke-width="5" stroke-linecap="round" fill="none"/>
+     <ellipse cx="58" cy="58" rx="16" ry="17" fill="#dfe3ea"/>
+     <g stroke="#2b2f3a" stroke-width="2.4"><line x1="44" y1="50" x2="72" y2="50"/><line x1="43" y1="58" x2="73" y2="58"/><line x1="44" y1="66" x2="72" y2="66"/></g>
+     <circle cx="58" cy="36" r="12" fill="#f4f6fa"/>
+     <ellipse cx="58" cy="33" rx="6.5" ry="8" fill="#2b2f3a"/>
+     <circle cx="55.6" cy="31.5" r="1.5" fill="#fff"/><circle cx="60.4" cy="31.5" r="1.5" fill="#fff"/>
+     <ellipse cx="49" cy="33" rx="4" ry="2.2" fill="#2b2f3a" transform="rotate(34 49 33)"/>
+     <line x1="68" y1="44" x2="84" y2="26" stroke="#dfe3ea" stroke-width="4" stroke-linecap="round"/>
+     <path d="M76 34 L84 22 L92 34" stroke="#9a6b3a" stroke-width="4.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  // Suggestible Sam — green caddy vest, offering a club aloft with a yardage thought-bubble.
+  'suggestible-sam': () =>
+    `${groundShadow(58)}
+     <path d="M58 60 L51 88 M58 60 L65 88" stroke="#2f3a33" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+     <line x1="58" y1="62" x2="56" y2="35" stroke="#3fae5c" stroke-width="15" stroke-linecap="round"/>
+     <line x1="56" y1="44" x2="78" y2="30" stroke="#e8c6a0" stroke-width="4.2" stroke-linecap="round"/>
+     <line x1="78" y1="30" x2="86" y2="8" stroke="#c8ccd6" stroke-width="2.6" stroke-linecap="round"/>
+     <ellipse cx="86" cy="8" rx="4" ry="2.6" fill="#aeb6c6" transform="rotate(-28 86 8)"/>
+     <g><circle cx="34" cy="34" r="8" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.6)" stroke-width="1"/>
+       <path d="M34 29 L34 38 L37 39" stroke="#5fd45a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+       <circle cx="42" cy="42" r="2" fill="rgba(255,255,255,0.4)"/></g>
+     <circle cx="56" cy="30" r="9.2" fill="#e8c6a0"/>
+     ${dome(56, 27, 9.2, '#2f8f47')}<rect x="56" y="24.6" width="13" height="3.2" rx="1.5" fill="#2f8f47"/>`,
+  // Sandy the Sand-Saver — weathered bush-hat escape artist, wedge spraying sand.
+  'sandy-sandsaver': () =>
+    `${groundShadow(58)}
+     <path d="M58 60 L50 88 M58 60 L66 88" stroke="#6b5a3a" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+     <line x1="58" y1="62" x2="56" y2="34" stroke="#b89a5a" stroke-width="17" stroke-linecap="round"/>
+     <line x1="56" y1="44" x2="74" y2="38" stroke="#d8b888" stroke-width="4.2" stroke-linecap="round"/>
+     <line x1="74" y1="38" x2="84" y2="18" stroke="#c8ccd6" stroke-width="2.8" stroke-linecap="round"/>
+     <ellipse cx="84" cy="18" rx="4" ry="2.6" fill="#aeb6c6" transform="rotate(-32 84 18)"/>
+     <g fill="#e3c98f"><circle cx="90" cy="14" r="1.4"/><circle cx="94" cy="20" r="1.4"/><circle cx="88" cy="24" r="1.2"/><circle cx="95" cy="27" r="1.1"/></g>
+     <circle cx="56" cy="31" r="9" fill="#d8a878"/>
+     <ellipse cx="56" cy="24" rx="17" ry="3.6" fill="#7a6238"/>
+     ${dome(56, 24, 8, '#7a6238')}`,
+  // Mystic Mole — spectacled green-reader popping from a dirt mound, holding a putter.
+  'mystic-mole': () =>
+    `${groundShadow(60)}
+     <ellipse cx="60" cy="84" rx="22" ry="7" fill="#4a3a28"/>
+     <ellipse cx="60" cy="56" rx="16" ry="20" fill="#5a5560"/>
+     <ellipse cx="60" cy="62" rx="9" ry="12" fill="#7a7682"/>
+     <line x1="74" y1="46" x2="86" y2="74" stroke="#d9dee8" stroke-width="2.6"/>
+     <rect x="83" y="72" width="8" height="3.4" rx="1" fill="#aeb6c6"/>
+     <g fill="#1a1d24"><circle cx="54" cy="42" r="5"/><circle cx="66" cy="42" r="5"/></g>
+     <g fill="#9fd8e6"><circle cx="54" cy="42" r="2.8"/><circle cx="66" cy="42" r="2.8"/></g>
+     <line x1="58.8" y1="42" x2="61.2" y2="42" stroke="#1a1d24" stroke-width="1.4"/>
+     <circle cx="60" cy="50" r="3" fill="#ff9db0"/>`,
+};
+
+/** A bespoke caddy figure (GS-proshop-2), or the generic bag glyph for an unknown caddy id. */
+function drawCaddyFigure(id: string, col: string, seed: string): string {
+  const fig = CADDY_FIGURES[id];
+  if (!fig) return drawCaddyBag(col, seed);
+  return frame(`${sparkles(seed, col, 5)}${fig()}`, col);
 }
 
 /** Reward club, themed by its set (planet / phoenix / solarstorm). The head glows with the theme. */
@@ -408,6 +527,9 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
       return drawThemedClub(setTheme, col, seed);
     case 'caddy':
     default:
-      return drawCaddy(col, seed);
+      return drawCaddyFigure(id, col, seed);
   }
 }
+
+/** The named caddies with a bespoke shop-card portrait (GS-proshop-2). */
+export const CADDY_ART_IDS = Object.keys(CADDY_FIGURES);

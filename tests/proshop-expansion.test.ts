@@ -15,7 +15,8 @@ import { generateCourse } from '../src/sim/course/generate';
 import { playCourse, type PlayHoleOptions } from '../src/sim/round';
 import { playTotals } from '../src/sim/score';
 import { Rng } from '../src/sim/rng';
-import { itemArtSVG, itemArtKind } from '../src/render/itemArt';
+import { NAMED_CADDY_IDS } from '../src/sim/rpg/economy';
+import { itemArtSVG, itemArtKind, CADDY_ART_IDS } from '../src/render/itemArt';
 
 const HAZARD_PENALTIES = new Set(['water', 'lava', 'lavariver', 'void', 'voidlost', 'creek', 'frozenpond']);
 
@@ -165,6 +166,14 @@ describe('GS-proshop-2 — procedural item art', () => {
     expect(itemArtKind('power-cell')).toBe('shaft');
     expect(itemArtKind('rangefinder')).toBe('rangefinder');
     expect(itemArtKind('tour-spikes')).toBe('shoes');
-    expect(itemArtKind('auto-caddie')).toBe('caddy'); // a named caddy falls back to the bag glyph
+    expect(itemArtKind('auto-caddie')).toBe('caddy');
+  });
+
+  it('EVERY named caddy has a bespoke portrait (never the generic bag glyph)', () => {
+    // The machine-checked rule: add a named caddy without bespoke shop art and this reds.
+    for (const id of NAMED_CADDY_IDS) expect(CADDY_ART_IDS).toContain(id);
+    // …and each renders a DISTINCT figure.
+    const svgs = NAMED_CADDY_IDS.map((id) => itemArtSVG(id, 'epic'));
+    expect(new Set(svgs).size).toBe(NAMED_CADDY_IDS.length);
   });
 });

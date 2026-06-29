@@ -920,7 +920,11 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
     `itemArtSVG(id, rarity, setTheme)` is an assetless, deterministic SVG per item (house no-404 rule):
     the art KIND is resolved from the id (shaft/ball/glove/coin/putter/shoes/rangefinder/wedge/coach/trophy/
     caddy) — clubs draw a themed head (Planet ringed planet / Phoenix flame / Solar Storm sun rays); flavoured
-    balls (water/lava/void/wind/distance) read by tint+effect. Rendered atop each Pro Shop card via
+    balls (water/lava/void/wind/distance) read by tint+effect. EVERY named caddy gets a BESPOKE SVG portrait
+    (`CADDY_FIGURES`, matching its `caddyArt.ts` canvas figure — Penelope's flag, Dan's driver, Chipinski's
+    lab coat + ringing phone, the bubble-helmeted Space Duck, the striped boomerang sheep, Sam offering a
+    club, Sandy's bush hat, the spectacled Mole), NOT the generic bag glyph (the fallback for an unknown
+    caddy id); `tests/proshop-expansion.test.ts` machine-checks that every `NAMED_CADDY_IDS` has one. Rendered atop each Pro Shop card via
     `itemCardHTML`'s new `artSVG`. The SAME themed look feeds the SWING: `GolferLook.gear` (resolved in
     `app.ts golferLook()` from `equippedGearTheme`) makes `drawGolfer` swing a GLOWING themed club head with
     trailing sparks — so the club you BUY is the club you swing. Render-only, NO new `_gs*`/URL hook (the
