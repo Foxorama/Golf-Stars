@@ -396,6 +396,10 @@ export function mountPlayView(
   const followMode = !!opts.focus;
   let camera: Vec = (opts.focus ? ([...opts.focus] as Vec) : hole.tee);
   let lastGround: Vec = camera;
+  // cineZoom (default 1) is the live viewRadius multiplier that zooms the camera in to a caddy
+  // redirect's slow-mo impact and back out. Declared BEFORE buildProj (which closes over it and is
+  // called immediately at `let proj = buildProj()`) so the first call doesn't hit the TDZ.
+  let cineZoom = 1;
   const buildProj = () =>
     followMode
       ? holeProjector(hole, {
@@ -426,12 +430,11 @@ export function mountPlayView(
   // Caddy-guard redirect (GS-caddy): the slow-mo interception. `redirectDraw` is the projectile to
   // paint THIS frame (recomputed every frame so its target tracks the moving ball + camera pan — the
   // old frozen target drifted off and missed); `redirectFiredShot` gates the one-shot slow-mo+voice,
-  // `sparksFiredShot` the one-shot contact spray; `cineZoom` is the live viewRadius multiplier that
-  // zooms the camera in to the impact and back out.
+  // `sparksFiredShot` the one-shot contact spray; `cineZoom` (declared above buildProj) is the live
+  // viewRadius multiplier that zooms the camera in to the impact and back out.
   let redirectFiredShot = -1;
   let sparksFiredShot = -1;
   let redirectDraw: { kind: 'laser' | 'boomerang'; from: Vec; to: Vec; p: number } | null = null;
-  let cineZoom = 1;
   let caddyAnchor: Vec = [0, 0]; // the corner caddy's muzzle (screen px), refreshed each frame
   let caddyHead: Vec = [0, 0]; // the corner caddy's head (screen px) — where its speech bubble points
   // Caddy-effect slo-mo + callout (GS-caddy-slomo). The virtual clock advances at CADDY_SLOMO× real

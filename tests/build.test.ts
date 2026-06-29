@@ -144,4 +144,52 @@ describe('build output (real browser)', () => {
     },
     60_000,
   );
+
+  // The play view is canvas/DOM code the headless sim never mounts, so a fault there (e.g. the
+  // cineZoom temporal-dead-zone crash) sails past the unit suite while every interactive shot
+  // throws — dispatch's catch → recover() then wipes the save and dumps you back on the format
+  // picker. This drives ONE real shot end-to-end and asserts the play view mounts cleanly: no
+  // page error, no recovered error (recover() always stamps window.__gsErr), and we did NOT get
+  // bounced back to the title.
+  it.runIf(chromePath)(
+    'plays one interactive shot without crashing back to the title',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        const click = async (t: string) => {
+          const b = page.locator('button', { hasText: t }).first();
+          await b.click();
+          await page.waitForTimeout(350);
+        };
+        await click('Start — The Voyage');
+        await click('Voyage as Feather'); // character select
+        await click('Play shot by shot'); // → the play screen
+        await page.waitForTimeout(300);
+        // Pull-to-shot gesture: press on the map, drag DOWN to charge power past the commit
+        // threshold, release to fire.
+        await page.mouse.move(207, 400);
+        await page.mouse.down();
+        for (let i = 1; i <= 10; i++) {
+          await page.mouse.move(207, 400 + i * 18);
+          await page.waitForTimeout(15);
+        }
+        await page.mouse.up();
+        await page.waitForTimeout(1200);
+        const recovered = await page.evaluate(() => (window as unknown as { __gsErr?: string }).__gsErr ?? null);
+        const text = (await page.textContent('#app')) || '';
+        expect(errors).toEqual([]);
+        expect(recovered).toBeNull();
+        expect(text).not.toContain('Start — The Voyage'); // not bounced back to the format picker
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
 });
