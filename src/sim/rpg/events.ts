@@ -624,22 +624,47 @@ interface SlotSpec {
 const ARC_SLOTS: Record<Arc, SlotSpec[]> = {
   1: [
     { base: 'common', chain: [] },
-    { base: 'common', chain: [] },
-    { base: 'common', chain: [0.18, 0.22] }, // wildcard: ~14% rare, ~4% epic
+    { base: 'common', chain: [0.16] }, // a second wildcard nudge: ~16% rare (a touch of variety early)
+    { base: 'common', chain: [0.28, 0.26] }, // wildcard: ~28% rare, ~7% epic (raised from 18/22)
   ],
   2: [
-    { base: 'common', chain: [] },
-    { base: 'common', chain: [0.5, 0.22, 0.08] }, // crossover: 50% → rare, then epic, then legendary
-    { base: 'rare', chain: [0.22, 0.08] }, // rare → epic (22%) → legendary (8%)
+    { base: 'common', chain: [0.22] }, // the "safe" slot can now flash a rare
+    { base: 'common', chain: [0.58, 0.28, 0.12] }, // crossover: 58% → rare, then epic, then legendary
+    { base: 'rare', chain: [0.3, 0.12] }, // rare → epic (30%) → legendary (12%)
   ],
   3: [
-    { base: 'rare', chain: [0.22, 0.3] }, // rare → epic (22%) → legendary (30%)
-    { base: 'rare', chain: [0.22, 0.3] },
-    { base: 'epic', chain: [0.3] }, // epic → legendary (30%)
+    { base: 'rare', chain: [0.32, 0.38] }, // rare → epic (32%) → legendary (38%)
+    { base: 'rare', chain: [0.32, 0.38] },
+    { base: 'epic', chain: [0.42] }, // epic → legendary (42%)
   ],
 };
 
 const orderOf = (r: Rarity): number => RARITY_C[r].order;
+
+/**
+ * Swap duplicate-category picks for an unused event of the SAME rarity in a fresh category, so the
+ * three drawn lanes span distinct reward families (calm / payout / toll / salvage) where the pool
+ * allows — making each jump a real decision. Same-rarity only ⇒ the rarity distribution is preserved
+ * (the per-arc mix + triple-legendary ceiling tests still hold). Mutates `picks`/`used` in place.
+ */
+function diversifyCategories(rng: Rng, picks: RouteEvent[], pool: readonly RouteEvent[], used: Set<string>): void {
+  const seen = new Set<EventCategory>();
+  for (let i = 0; i < picks.length; i++) {
+    if (!seen.has(picks[i]!.category)) {
+      seen.add(picks[i]!.category);
+      continue;
+    }
+    const want = picks[i]!.rarity;
+    const cands = pool.filter((e) => !used.has(e.id) && e.rarity === want && !seen.has(e.category));
+    if (cands.length > 0) {
+      const repl = cands[rng.int(0, cands.length - 1)]!;
+      used.delete(picks[i]!.id);
+      used.add(repl.id);
+      picks[i] = repl;
+    }
+    seen.add(picks[i]!.category);
+  }
+}
 
 /** Resolve a slot to a concrete rarity by walking its gated upgrade chain on the supplied rng. */
 function rollSlotRarity(rng: Rng, slot: SlotSpec): Rarity {
@@ -695,6 +720,11 @@ export function drawArcRouteEvents(rng: Rng, arc: Arc, pool: readonly RouteEvent
     used.add(ev.id);
     picks.push(ev);
   }
+  // Spread the lanes across DISTINCT reward CATEGORIES so the three choices read as genuinely
+  // different bets — a safe out, a payout gamble, a salvage/toll play — instead of three
+  // near-identical commons ("there was no choice really"). Same-rarity swaps only, so the arc rarity
+  // mix (and the deep triple-legendary ceiling) is untouched; deterministic in `rng`.
+  diversifyCategories(rng, picks, pool, used);
   // Ensure an out (early arcs only). If none of the picks is calm, replace the lowest-stakes one.
   if (arc < 3 && picks.length > 0 && !picks.some(isCalm)) {
     const stakes = (e: RouteEvent) => e.cutDelta * 10 + e.creditMult; // lower = safer/poorer

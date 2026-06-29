@@ -648,8 +648,8 @@ export const SHOP_OFFER_SIZE = 4;
 // off galaxy distance — the same depth signal the cut line ramps off. This shifts WHICH items are
 // drawn, not the rng draw count, so the offer stays deterministic and resume-stable.
 const RARITY_RAMP_DEPTH = 18; // galaxy distance at which the rarity tilt reaches its deep extreme
-const RARITY_TILT_EARLY = 0.5; // tilt base at the start — strongly favours commons
-const RARITY_TILT_DEEP = 1.9; // tilt base deep in the run — favours rare/epic/legendary
+const RARITY_TILT_EARLY = 0.58; // tilt base at the start — favours commons (eased up so purple/orange show a touch more)
+const RARITY_TILT_DEEP = 2.15; // tilt base deep in the run — favours rare/epic/legendary (raised to surface more epic/legendary rewards)
 
 /** Depth-scaled rarity multiplier for the shop draw (early → commons, deep → rare/epic). */
 export function rarityDepthBias(rarity: Rarity, distanceFromStart: number): number {
