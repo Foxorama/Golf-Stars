@@ -30,6 +30,7 @@ import {
   ownedCount,
   relicCreditBonus,
   shopItem,
+  talentsForArchetype,
   startingLoadout,
   type PlayerLoadout,
   type ShopItem,
@@ -387,6 +388,64 @@ export function matchOpponentForRun(run: Run): string | undefined {
   if (!slices.length) return field.golfers.find((g) => !g.isPlayer)?.id;
   const result = arcCut(field, run.seed, slices);
   return bossOpponentFor(result.standings, 'player') ?? field.golfers.find((g) => !g.isPlayer)?.id;
+}
+
+// --- Boss rewards / talents (GS-talents) ------------------------------------
+
+export interface BossReward {
+  kind: 'talent' | 'shards';
+  /** Talent id (kind 'talent') or 'shards'. */
+  id: string;
+  name: string;
+  desc: string;
+  rarity: Rarity;
+  /** Permanent shards granted (kind 'shards'). */
+  shards?: number;
+}
+
+/** Permanent shard reward for a boss win, scaled by galaxy depth. */
+export function bossShardReward(run: Run): number {
+  return 8 + Math.round(run.distanceFromStart * 1.5);
+}
+
+/**
+ * The reward CHOICES offered after beating a boss (GS-talents): pick ONE of a themed run TALENT, a
+ * generic run talent, or a permanent shard bonus — the "talent or permanent reward for this run" ask.
+ * Thematic to the boss's zone, deterministic, skips talents you already own. Free (the spoils of victory).
+ */
+export function bossRewards(run: Run, archetype: string, salt = 0): BossReward[] {
+  const rng = new Rng(`${run.seed}:bossreward:${run.stopIndex}:${salt}`);
+  const owned = new Set(run.loadout.perks);
+  const { themed, generic } = talentsForArchetype(archetype);
+  const pickOne = (pool: ShopItem[]): BossReward | undefined => {
+    const avail = pool.filter((t) => !owned.has(t.id));
+    if (!avail.length) return undefined;
+    const t = avail[rng.int(0, avail.length - 1)]!;
+    owned.add(t.id); // don't offer the same talent twice on one screen
+    return { kind: 'talent', id: t.id, name: t.name, desc: t.desc, rarity: t.rarity };
+  };
+  const choices: BossReward[] = [];
+  const themedPick = pickOne(themed) ?? pickOne(generic);
+  if (themedPick) choices.push(themedPick);
+  const genericPick = pickOne(generic);
+  if (genericPick) choices.push(genericPick);
+  const shards = bossShardReward(run);
+  choices.push({
+    kind: 'shards',
+    id: 'shards',
+    name: 'Star Shards',
+    desc: `+${shards} permanent Star Shards — banked across runs, win or lose.`,
+    rarity: 'rare',
+    shards,
+  });
+  return choices;
+}
+
+/** Grant a boss-reward talent (GS-talents) — applies it free (no credit cost), idempotent. */
+export function grantTalent(run: Run, talentId: string): Run {
+  const item = shopItem(talentId);
+  if (!item || !item.talent || run.loadout.perks.includes(talentId)) return run;
+  return { ...run, loadout: item.apply(run.loadout) };
 }
 
 /**
