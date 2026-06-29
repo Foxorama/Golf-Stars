@@ -1478,15 +1478,16 @@ function playingBody(animating: boolean): string {
   const par = play.hole.par;
 
   if (animating) {
-    // Full-bleed: the live shot canvas IS the screen (it draws a guard caddy + effect callouts
-    // itself), with the floating info chip on top and the hired caddy's framed badge bottom-right
-    // (GS-caddy-display) so the border shows the whole shot — not just on the decision screen.
-    const watchBadge = caddyBadgeHTML(caddyId());
+    // Full-bleed: the live shot canvas IS the screen. The play view draws the active caddy ITSELF
+    // in the bottom-LEFT corner during flight — a guard caddy persistently (so its laser/boomerang
+    // redirect originates from the figure), and any other hired caddy transiently while its effect
+    // calls out. So the watch screen does NOT also render the framed badge (that double-drew the
+    // caddy — once left by the play view, once right in the badge); the single corner figure is the
+    // one the effects fire from. The framed badge stays on the aim-and-charge + putting screens.
     return `
       <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap" id="play"></div>
         ${mapTopInfo(v, { shotNo: play.strokes, distLabel: '…watching…' })}
-        ${watchBadge ? `<div class="gs-hud gs-hud-watchcaddy">${watchBadge}</div>` : ''}
       </div>`;
   }
 

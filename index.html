@@ -387,13 +387,6 @@
         .gs-caddybadge { animation: none; }
         .gs-caddybadge::before { animation: none; }
       }
-      /* The framed caddy badge floats bottom-RIGHT on the live shot (watch) screen, clear of the
-         play-view's bottom-left corner caddy + the top-left info chip. */
-      .gs-hud-watchcaddy {
-        right: 10px; left: auto; bottom: calc(10px + env(safe-area-inset-bottom));
-        display: flex;
-      }
-      .gs-hud-watchcaddy .gs-caddybadge { pointer-events: none; }
       /* Floating round action button (auto-finish) tucked by the controls. */
       .gs-roundbtn {
         flex: 0 0 auto; width: 40px; align-self: stretch; padding: 0;
