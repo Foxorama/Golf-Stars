@@ -39,6 +39,9 @@ export interface StarmapChoice {
   archetype?: string;
   /** The destination world's name, drawn under its planet. */
   worldName?: string;
+  /** The atmospheric course effect this lane brings (GS-journey-fx) — drawn as a small corner badge so
+   *  the lane previews the weather/lighting you'll play in, not just the biome. */
+  effectIcon?: string;
   elite?: boolean;
   bossAhead?: boolean;
 }
@@ -64,6 +67,11 @@ export interface StarmapStop {
   /** Real-sky position (equatorial J2000, degrees). Absent → placed at a neutral baseline. */
   ra?: number;
   dec?: number;
+  /** The world's biome glyph (GS-journey-history) — drawn on the node so a cleared stop reads as the
+   *  world you played (a fun, relevant icon), with a gentle twinkle. Absent → a plain visited dot. */
+  glyph?: string;
+  /** The biome's accent colour — tints the node ring. */
+  col?: string;
 }
 
 export interface StarmapOpts {
@@ -146,6 +154,12 @@ function planetGlyph(cx: number, cy: number, c: StarmapChoice): string {
   const markerRow = markers.length
     ? `<text x="${cx + r - 1}" y="${cy - r + 5}" font-size="11" text-anchor="middle">${markers.join('')}</text>`
     : '';
+  // The atmospheric effect badge (GS-journey-fx) — a small glyph low-left so the lane previews the
+  // weather/lighting you'll play in, alongside the biome (planet body) and stakes (ring/markers).
+  const effectBadge = c.effectIcon
+    ? `<circle cx="${cx - r + 3}" cy="${cy + r - 3}" r="6.5" fill="#0c1020" stroke="${ring}" stroke-width="1"/>
+       <text x="${cx - r + 3}" y="${cy + r}" font-size="9" text-anchor="middle">${c.effectIcon}</text>`
+    : '';
   const name = c.worldName ? (c.worldName.length > 14 ? `${c.worldName.slice(0, 13)}…` : c.worldName) : '';
   const nameLabel = name ? `<text x="${cx}" y="${cy + r + 11}" font-size="8" fill="#cdd7ec" text-anchor="middle" font-weight="700">${esc(name)}</text>` : '';
   return `
@@ -156,6 +170,7 @@ function planetGlyph(cx: number, cy: number, c: StarmapChoice): string {
       <circle cx="${cx - 4.5}" cy="${cy - 4.5}" r="${r - 4}" fill="${look.col}" opacity="0.30"/>
       <text x="${cx}" y="${cy + 5.5}" font-size="16" text-anchor="middle">${look.glyph}</text>
       ${markerRow}
+      ${effectBadge}
       ${nameLabel}
       <text x="${cx}" y="${cy + r + (name ? 20 : 11)}" font-size="7.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump</text>
     </g>`;
@@ -192,7 +207,7 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     x += gap;
     const y = coord ? decY(coord.dec) : MID_Y;
     prevCoord = coord ?? prevCoord;
-    return { x, y, label: s.label };
+    return { x, y, label: s.label, glyph: s.glyph, col: s.col };
   });
   const lastX = nodes.length ? nodes[nodes.length - 1]!.x : earth.x;
   // Width = the last node + room for the bridge into YOU. A small floor keeps an empty/short trail sane;
@@ -215,12 +230,22 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     .map((nd, k) => {
       const lab = nd.label.length > 13 ? `${nd.label.slice(0, 12)}…` : nd.label;
       const above = k % 2 === 0; // stagger labels above/below the trail to reduce overlap
-      const ly = above ? nd.y - 10 : nd.y + 15;
+      // Each cleared world wears its biome glyph (GS-journey-history) with a gentle twinkle, so the
+      // trail reads as the actual worlds you've crossed — a relevant, lightly-animated icon per step.
+      const ring = nd.col ?? nodeC;
+      const ly = above ? nd.y - 13 : nd.y + 19;
+      const cx = nd.x.toFixed(1);
+      const cy = nd.y.toFixed(1);
+      const face = nd.glyph
+        ? `<circle cx="${cx}" cy="${cy}" r="9" fill="${ring}" opacity="0.16"/>
+           <circle cx="${cx}" cy="${cy}" r="7" fill="#0e1320" stroke="${ring}" stroke-width="1.5"/>
+           <text x="${cx}" y="${(nd.y + 3.4).toFixed(1)}" font-size="10" text-anchor="middle"><animate attributeName="opacity" values="0.75;1;0.75" dur="${(2.4 + (k % 3) * 0.4).toFixed(1)}s" repeatCount="indefinite"/>${nd.glyph}</text>`
+        : `<circle cx="${cx}" cy="${cy}" r="6.5" fill="${nodeC}" opacity="0.14"/>
+           <circle cx="${cx}" cy="${cy}" r="4" fill="#0e1320" stroke="${nodeC}" stroke-width="1.4"/>
+           <circle cx="${(nd.x - 1.2).toFixed(1)}" cy="${(nd.y - 1.2).toFixed(1)}" r="1.6" fill="${nodeC}" opacity="0.5"/>`;
       return `<g>
-        <circle cx="${nd.x.toFixed(1)}" cy="${nd.y.toFixed(1)}" r="6.5" fill="${nodeC}" opacity="0.14"/>
-        <circle cx="${nd.x.toFixed(1)}" cy="${nd.y.toFixed(1)}" r="4" fill="#0e1320" stroke="${nodeC}" stroke-width="1.4"/>
-        <circle cx="${(nd.x - 1.2).toFixed(1)}" cy="${(nd.y - 1.2).toFixed(1)}" r="1.6" fill="${nodeC}" opacity="0.5"/>
-        <text x="${nd.x.toFixed(1)}" y="${ly.toFixed(1)}" font-size="8" fill="#aeb9cf" text-anchor="middle" font-weight="600">${esc(lab)}</text>
+        ${face}
+        <text x="${cx}" y="${ly.toFixed(1)}" font-size="8" fill="#aeb9cf" text-anchor="middle" font-weight="600">${esc(lab)}</text>
       </g>`;
     })
     .join('');

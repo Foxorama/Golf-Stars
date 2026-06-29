@@ -310,6 +310,9 @@ export interface PlayViewOptions {
   biome?: string;
   /** Star-travel theme id (GS-17e) — draws that constellation in the sky. */
   themeId?: string;
+  /** Atmospheric course effect the chosen journey route brought (GS-journey-fx) — adds a static layer
+   *  in the scene + an animated overlay (falling meteors, shimmering aurora, storm flicker). */
+  effect?: string;
   /** Called once the final shot has landed. */
   onDone?: () => void;
   /** Fired once per segment at the STRIKE moment (club–ball contact / putter tap) — the cue point
@@ -526,7 +529,7 @@ export function mountPlayView(
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, effect: opts.effect });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);
@@ -655,6 +658,65 @@ export function mountPlayView(
     ctx.restore();
   }
 
+  // Journey route effect (GS-journey-fx) — an ANIMATED atmosphere overlay matching the static scene
+  // layer the scene builder drew. Off the seeded fxRng (deterministic, perturbs no sim). Only the
+  // moving effects animate here (meteors fall, the aurora shimmers, the storm flickers); moonlight /
+  // debris / trade-camp are carried entirely by the static scene. Drawn UNDER the ball + cone.
+  const fxEffect = opts.effect ?? 'none';
+  const meteors = Array.from({ length: 10 }, () => ({ x: fxRng(), spd: 0.6 + fxRng() * 0.9, len: 14 + fxRng() * 26, off: fxRng() }));
+  function drawCourseFx(now: number): void {
+    if (fxEffect === 'meteorShower') {
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const m of meteors) {
+        const t = ((m.off + now * 0.00016 * (0.5 + m.spd)) % 1.3) - 0.12; // loop top → bottom
+        if (t < 0) continue;
+        const x = m.x * (width + 80) - 40 - t * width * 0.4; // drift down-left
+        const y = t * (height + 60) - 30;
+        const a = Math.min(1, t * 3) * Math.min(1, (1.18 - t) * 3);
+        ctx.strokeStyle = `rgba(255,224,168,${(0.85 * a).toFixed(3)})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - m.len * 0.7, y - m.len);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,255,255,${(0.9 * a).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.7, 0, 6.283);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (fxEffect === 'aurora') {
+      ctx.save();
+      const cols = ['90,230,170', '120,180,255', '200,140,255'];
+      for (let b = 0; b < 3; b++) {
+        const y0 = height * (0.06 + b * 0.06);
+        const amp = 10 + b * 4;
+        const N = 24;
+        ctx.beginPath();
+        for (let i = 0; i <= N; i++) {
+          const x = (width * i) / N;
+          const y = y0 + Math.sin(i * 0.5 + now * 0.0008 + b) * amp;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        for (let i = N; i >= 0; i--) {
+          const x = (width * i) / N;
+          ctx.lineTo(x, y0 + 24 + Math.sin(i * 0.45 + now * 0.0008 + b) * amp);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${cols[b]},0.10)`;
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (fxEffect === 'solarStorm') {
+      const flick = 0.05 + 0.05 * (0.5 + 0.5 * Math.sin(now * 0.004));
+      ctx.save();
+      ctx.fillStyle = `rgba(255,90,50,${flick.toFixed(3)})`;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+  }
+
   function frame(realNow: number): void {
     // Virtual animation clock (GS-caddy-slomo): advance by the real frame delta, scaled down while a
     // caddy effect is playing so the throw/drop is shown in slo-mo. Everything below times off `now`.
@@ -695,6 +757,7 @@ export function mountPlayView(
     drawStatic();
     drawSpaceFX(now);
     drawWind(now);
+    drawCourseFx(now);
 
     // A GUARD caddy stands in the bottom-left corner the whole hole (GS-caddy) — its muzzle anchor is
     // where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. Only guards

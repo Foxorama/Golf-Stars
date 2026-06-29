@@ -574,6 +574,31 @@ This game lives or dies on three axes — put every change through all three bef
   Content-as-data + pure, so no fairness/no-death-spiral validator is touched (it only SELECTS the
   biome, like `themeForStop` always did). Guarded by the existing themes/formats/voyage suites (which
   read `currentCourse`/`currentTheme` consistently) + full determinism.
+- **The route you pick MATERIALLY shapes the next course — difficulty + atmosphere (GS-journey-fx,
+  `effects.ts`).** A lane used to differ only by economy/cut levers, and the cut lever does NOTHING on a
+  matchplay-boss stop (positional survival, not a Stableford cut) — so the choice felt inconsequential.
+  Two PURE levers, BOTH derived from the chosen route's event (so NO new run/save state — `pendingEvent`
+  already round-trips, and `currentCourse` re-derives both): (1) **difficulty** — `routeDifficulty(ev)` =
+  `clamp(−0.15, 0.25, round(cutDelta)·0.07)` is a wildness DELTA threaded into `generateCourse`
+  (`wildnessBoost`, added before the `[0.05, 1]` clamp) so a harder lane generates a genuinely WILDER
+  course (tighter corridors, more hazards, sooner-armed signature mechanics) and a calm lane a gentler
+  one — and this BITES on a boss course where the cut lever is inert. CRITICAL: clamped to ≤1, i.e. never
+  beyond the wildness=1 case the no-death-spiral / fairness validators already prove; `wildnessBoost 0` is
+  byte-for-byte the old generation (the lower clamp never bites the unboosted base ≥ 0.1). (2)
+  **atmosphere** — `routeEffect(ev)` maps the event (icon/id → category) to a render-only `CourseEffect`
+  (`moonlight`/`meteorShower`/`solarStorm`/`aurora`/`spaceJunk`/`tradeMarket`), stamped on `course.meta.effect`
+  and drawn by BOTH renderers (`courseEffectPrims` in `style.ts` for the static scene — sky tint/moon/
+  meteors + course-space debris/trade-camp decor off the `crng` celestial stream, so it perturbs no
+  terrain placement; `drawCourseFx` in `playView.ts` for the animated falling-meteor/aurora/storm
+  overlay). Touches NEITHER physics NOR generation rng, so fairness is untouched and a `'none'`/absent
+  effect adds nothing. The starmap history nodes now wear each cleared world's **biome glyph** with a
+  gentle twinkle (`StarmapStop.glyph`), the forward planets carry an **effect badge** (`effectIcon`), and
+  the route card previews the destination biome + a **difficulty band** + the effect blurb — so the
+  choice's impact reads at a glance. No new `_gs*`/URL hook (effects ride course meta; difficulty rides
+  the existing event), so the test-hub guard needs nothing. Tests: `tests/journey-effects.test.ts`
+  (difficulty clamp/monotonicity, effect mapping, that a harder lane raises `currentCourse` wildness +
+  stamps the effect, stop-0/no-event unflavoured). Re-shoot the gallery only if `style.ts` base changes
+  (effect prims are gated behind `opts.effect`, so the no-effect gallery is byte-identical).
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen

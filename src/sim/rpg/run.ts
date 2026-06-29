@@ -45,6 +45,7 @@ import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
+import { routeDifficulty, routeEffect } from './effects';
 import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, archetypeFor, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
@@ -202,11 +203,16 @@ export function routeTheme(seed: number | string, stopIndex: number, routeId: nu
 export function currentCourse(run: Run): Course {
   const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
   const theme = currentTheme(run);
+  // The chosen journey route (GS-journey-fx) makes the world it flew into wilder/gentler AND brings an
+  // atmospheric effect — both derived from the CURRENT stop's pending event (already round-tripped on
+  // resume), so no new run/save state. Stop 0 / no event ⇒ boost 0, effect 'none' (byte-for-byte old).
+  const wildnessBoost = routeDifficulty(run.pendingEvent);
+  const effect = routeEffect(run.pendingEvent);
   // GS-variation: a split-biome stop CROSSES TWO WORLDS — the front holes are this stop's theme, the
   // back holes a different theme of the same arc. Each half is generated independently and stitched,
   // every hole stamped with its own biome/themeId so it renders + plays as its world.
   if (spec.splitBiome && spec.holes >= 2) {
-    return stitchSplitCourse(run, spec.holes, spec.parCap, theme);
+    return stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect);
   }
   return generateCourse(stopSeed(run), {
     holes: spec.holes,
@@ -215,6 +221,8 @@ export function currentCourse(run: Run): Course {
     // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
     biomeRow: resolveBiome(theme),
     themeId: theme.id,
+    wildnessBoost,
+    effect,
   });
 }
 
@@ -229,7 +237,14 @@ function stampHoles(course: Course): Course {
  * and per-hole physics (biomeMods) read the right world. Deterministic from the run + stop. The
  * course's top-level identity is the front theme (the card leads with it); `meta.split` flags it.
  */
-function stitchSplitCourse(run: Run, holes: number, parCap: StopSpec['parCap'], themeA: Theme): Course {
+function stitchSplitCourse(
+  run: Run,
+  holes: number,
+  parCap: StopSpec['parCap'],
+  themeA: Theme,
+  wildnessBoost = 0,
+  effect = 'none',
+): Course {
   const front = Math.ceil(holes / 2);
   const back = holes - front;
   const arc = arcForDistance(run.distanceFromStart);
@@ -244,6 +259,8 @@ function stitchSplitCourse(run: Run, holes: number, parCap: StopSpec['parCap'], 
       distanceFromStart: run.distanceFromStart,
       biomeRow: resolveBiome(themeA),
       themeId: themeA.id,
+      wildnessBoost,
+      effect,
     }),
   );
   const b = stampHoles(
@@ -253,6 +270,8 @@ function stitchSplitCourse(run: Run, holes: number, parCap: StopSpec['parCap'], 
       distanceFromStart: run.distanceFromStart,
       biomeRow: resolveBiome(themeB),
       themeId: themeB.id,
+      wildnessBoost,
+      effect,
     }),
   );
   return {

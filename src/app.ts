@@ -18,6 +18,7 @@ import { speakCaddy } from './render/speech';
 import { journeyMapHTML, type StarmapChoice } from './render/starmap';
 import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
+import { COURSE_EFFECTS, routeDifficulty, routeEffect } from './sim/rpg/effects';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, MANUAL_IDEAL_PACE, puttBreakYd, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
@@ -754,6 +755,7 @@ function introScreen(): string {
     height: 360,
     biome: holeBiome(c.holes[0]!),
     themeId: holeThemeId(c.holes[0]!),
+    effect: c.meta?.effect,
   });
 
   return `
@@ -1579,7 +1581,7 @@ function playingBody(animating: boolean): string {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
       // The putt screen is the ball↔cup line — the approach tracers belong to the whole-hole decision view.
-      biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
+      biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -1662,7 +1664,7 @@ function playingBody(animating: boolean): string {
     // On a matchplay boss stop, overlay the boss's pre-played line for THIS hole so you see them on the
     // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
     ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
-    biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
+    biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
     ball: play.ball,
     spray,
     sprayGeom,
@@ -2062,16 +2064,20 @@ function travelScreen(): string {
     // The world this lane flies into (GS-journey-biome) — so the map planet reads the biome you'll play.
     archetype: r.theme.archetype,
     worldName: r.theme.name,
+    // The atmospheric effect this lane brings (GS-journey-fx) — previewed as a small planet badge.
+    effectIcon: COURSE_EFFECTS[routeEffect(r.event)].icon,
     elite: r.elite,
     bossAhead: r.bossAhead,
   }));
   // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
   // labelled with its zone name AND its real-sky position (GS-galaxy-map) — so the journey plots a
-  // true path through the constellations as it builds, not a generic Earth→right curve.
+  // true path through the constellations as it builds, not a generic Earth→right curve. Each node now
+  // wears its world's biome glyph (GS-journey-history) so a cleared step reads as the world you played.
   const trail = state.run.history.slice(0, -1).map((h) => {
     const name = themeById(h.themeId ?? '')?.name ?? 'Deep Space';
     const sky = skyCoordForName(name);
-    return { label: name, ra: sky?.ra, dec: sky?.dec };
+    const badge = BIOME_BADGE[archetypeFor(h.themeId, h.biome)];
+    return { label: name, ra: sky?.ra, dec: sky?.dec, glyph: badge?.glyph, col: badge?.col };
   });
   const map = journeyMapHTML({
     seed: state.run.seed,
@@ -2123,7 +2129,21 @@ function travelScreen(): string {
              <div style="font-size:12px;opacity:.6;margin:2px 0 3px;">↗ ${r.label} · +${r.distanceJump} distance</div>
              ${(() => {
                const b = BIOME_BADGE[r.theme.archetype] ?? { glyph: '🪐', label: r.theme.archetype, col: '#8aa0c0' };
-               return `<div style="font-size:12.5px;margin:0 0 5px;color:${b.col};font-weight:600;">${b.glyph} ${r.theme.name} · ${b.label} world</div>`;
+               // The chosen lane MATERIALLY shapes the next course (GS-journey-fx): a difficulty band
+               // (a wildness delta — bites on boss courses where the cut lever is inert) + an
+               // atmospheric effect, both previewed here so the choice's impact reads at a glance.
+               const dd = routeDifficulty(ev);
+               const diff =
+                 dd <= -0.1 ? { t: 'Gentler course', c: '#2bb673' }
+                 : dd < 0.07 ? { t: 'Standard course', c: '#9fb0cf' }
+                 : dd < 0.16 ? { t: 'Tougher course', c: '#ffb04a' }
+                 : { t: 'Brutal course', c: '#ff6b4a' };
+               const eff = COURSE_EFFECTS[routeEffect(ev)];
+               const effLine =
+                 eff.id !== 'none'
+                   ? `<div style="font-size:12px;margin:0 0 5px;opacity:.85;">${eff.icon} <b>${eff.label}</b> · <span style="opacity:.75;">${eff.blurb}</span></div>`
+                   : '';
+               return `<div style="font-size:12.5px;margin:0 0 3px;color:${b.col};font-weight:600;">${b.glyph} ${r.theme.name} · ${b.label} world · <span style="color:${diff.c};">${diff.t}</span></div>${effLine}`;
              })()}
              <div style="font-size:13px;opacity:.9;margin-bottom:3px;">${ev.desc}</div>
              <div style="font-size:12px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
@@ -2205,6 +2225,11 @@ function holeBiome(h: { biome?: string }): string {
 }
 function holeThemeId(h: { themeId?: string }): string | undefined {
   return h.themeId ?? state.course.meta.themeId;
+}
+/** The current stop's atmospheric course effect (GS-journey-fx), stamped on the course meta by the
+ *  chosen route. Render-only flavour fed to both renderers. */
+function currentEffect(): string | undefined {
+  return state.course?.meta?.effect;
 }
 
 /** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. */
@@ -2517,7 +2542,7 @@ function render(): void {
       view = mountPlayView(playEl, hole, holePlay.shots, holePlay.putts, {
         width: 340,
         height: 520,
-        biome: holeBiome(hole), themeId: holeThemeId(hole),
+        biome: holeBiome(hole), themeId: holeThemeId(hole), effect: currentEffect(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
@@ -2554,7 +2579,7 @@ function render(): void {
       view = mountPlayView(playEl, play.hole, animatingPlay.shots, animatingPlay.putts, {
         width: animW,
         height: animH,
-        biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
+        biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
