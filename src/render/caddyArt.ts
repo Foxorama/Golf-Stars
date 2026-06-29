@@ -58,6 +58,146 @@ export function caddyProjectile(id: string | undefined): 'laser' | 'boomerang' |
 }
 
 /**
+ * Per-caddy signature catchphrase (GS-caddy-voices): the on-screen speech `bubble` text and the
+ * spoken `speech` line + its accent `lang` (BCP-47). Fired when the caddy's effect triggers (a guard
+ * redirect / a Dr Chipinski chip-in). `phone` caddies also flash a "answering a call" phone glyph.
+ */
+export interface CaddyVoice {
+  bubble: string;
+  speech: string;
+  lang: string;
+  /** Voice character tweaks (rate/pitch) so the accents read distinct. */
+  rate?: number;
+  pitch?: number;
+  /** Show the ringing-phone "you rang?" glyph alongside the bubble (Dr Chipinski). */
+  phone?: boolean;
+}
+
+export const CADDY_VOICE: Partial<Record<CaddyArtId, CaddyVoice>> = {
+  // Dr Chipinski answers the call like a doctor being paged — a crisp American "You rang?".
+  'dr-chipinski': { bubble: 'You rang?', speech: 'You rang?', lang: 'en-US', rate: 1.02, pitch: 1.08, phone: true },
+  // Convict Sheep's laconic Aussie reassurance.
+  'convict-sheep': { bubble: "She'll be right, mate.", speech: "She'll be right, mate.", lang: 'en-AU', rate: 0.96, pitch: 0.92 },
+  // Space Ducks' plummy British cheer.
+  'space-ducks': { bubble: 'Tally ho — good shot!', speech: 'Tally ho, good shot!', lang: 'en-GB', rate: 1.0, pitch: 1.12 },
+};
+
+/**
+ * Draw a comic speech bubble with `text`, its tail pointing down-left toward the caddy figure at
+ * (tailX, tailY). Anchored above-right of the tail so it clears the corner figure. `alpha` fades it
+ * in/out. Pure feel; never throws.
+ */
+export function drawSpeechBubble(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  tailX: number,
+  tailY: number,
+  alpha: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.font = '700 13px ui-rounded, system-ui, sans-serif';
+  const padX = 11;
+  const w = Math.ceil(ctx.measureText(text).width) + padX * 2;
+  const h = 28;
+  // Bubble sits up and to the right of the tail point.
+  const bx = tailX + 14;
+  const by = tailY - h - 16;
+  const r = 9;
+  // Soft drop shadow.
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = '#fdf6e3';
+  roundRect(ctx, bx, by, w, h, r);
+  ctx.fill();
+  // Tail (a little triangle from the bubble's lower-left toward the figure).
+  ctx.beginPath();
+  ctx.moveTo(bx + 10, by + h - 1);
+  ctx.lineTo(bx + 24, by + h - 1);
+  ctx.lineTo(tailX + 6, tailY - 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  // Ink outline.
+  ctx.strokeStyle = 'rgba(20,22,30,0.85)';
+  ctx.lineWidth = 1.6;
+  roundRect(ctx, bx, by, w, h, r);
+  ctx.stroke();
+  // Text.
+  ctx.fillStyle = '#1a1d24';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, bx + padX, by + h / 2 + 1);
+  ctx.restore();
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/**
+ * A ringing "answering a call" phone glyph (GS-caddy-voices, Dr Chipinski) at (cx, cy), `s` px tall,
+ * with little shake/ring motion lines driven by `t` (ms). Pure feel; never throws.
+ */
+export function drawPhoneIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, t: number): void {
+  ctx.save();
+  const wob = Math.sin(t * 0.03) * 0.18; // ringing wobble
+  ctx.translate(cx, cy);
+  ctx.rotate(wob);
+  const u = s / 24;
+  ctx.scale(u, u);
+  // Ring motion lines either side.
+  ctx.strokeStyle = 'rgba(120,230,140,0.9)';
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  const ring = 0.5 + 0.5 * Math.sin(t * 0.03);
+  for (let i = 1; i <= 2; i++) {
+    const rr = (8 + i * 4) * (0.85 + 0.25 * ring);
+    ctx.beginPath();
+    ctx.arc(-12, -8, rr, Math.PI * 0.9, Math.PI * 1.35);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(12, -8, rr, Math.PI * -0.35, Math.PI * 0.1);
+    ctx.stroke();
+  }
+  // Green call badge.
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  // Classic handset glyph.
+  ctx.fillStyle = '#fff';
+  ctx.save();
+  ctx.rotate(-0.5);
+  ctx.beginPath();
+  ctx.moveTo(-5, -5);
+  ctx.quadraticCurveTo(-7, -7, -5, -8);
+  ctx.lineTo(-2.5, -5.5);
+  ctx.quadraticCurveTo(-1.5, -4.5, -2.5, -3);
+  ctx.quadraticCurveTo(-1, 1, 3, 2.5);
+  ctx.quadraticCurveTo(4.5, 1.5, 5.5, 2.5);
+  ctx.lineTo(8, 5);
+  ctx.quadraticCurveTo(7, 7, 5, 5);
+  ctx.quadraticCurveTo(-3, 3, -5, -5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+/**
  * Draw a named caddy at feet-centre (cx, cy), `h` px tall. `t` is a time (ms) for a gentle idle bob.
  * Returns the weapon/hand anchor in screen px (the projectile launch point). Never throws.
  */

@@ -485,9 +485,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'dr-chipinski',
     name: 'Dr Chipinski',
-    cost: 260,
+    cost: 320,
     desc: 'A wedge wizard: +33% chance to hole out any pitching-wedge-or-shorter chip near the pin',
-    rarity: 'epic',
+    rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, chipInBoost: (m.chipInBoost ?? 0) + 0.33, perks: [...m.perks, 'dr-chipinski'] }),
   },
