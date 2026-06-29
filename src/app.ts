@@ -18,7 +18,7 @@ import { speakCaddy } from './render/speech';
 import { journeyMapHTML, type StarmapChoice } from './render/starmap';
 import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
-import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
+import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, MANUAL_IDEAL_PACE, puttBreakYd, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById, type BiomeArchetype } from './sim/course/themes';
@@ -819,7 +819,28 @@ let selAim: 'attack' | 'safe' = 'attack';
 // meter is offered (and is the default) instead of an awkward full-swing chip — `selPutt` toggles
 // between the putt meter and the normal shot gesture. Reset each new shot to the lie's natural choice.
 let selPutt = false;
+// Manual-putt lateral AIM (yards, + = right of the ball→cup line; GS-greens-3). The player nudges it
+// with ◄/► to read the slope BREAK; a green-reading caddy (Mystic Mole) snaps it to the ideal line.
+// `null` = not yet set this putt (seeded from the caddy/flat default on first render of a putt).
+let selPuttAim: number | null = null;
+let puttAimResolved = 0; // the aim (yd) shown this render — read by the commit handler so they match
+let lastPuttKey = ''; // `${holeIndex}:${putts}` — resets the aim for each new putt
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
+
+/** The break-read row on the putt screen (GS-greens-3): the slope's break + ◄/► aim controls (or the
+ *  caddy's read). `breakYd`/`aim` are signed (+ = right of the line); the player aims to cancel break. */
+function puttAimRow(breakYd: number, aim: number, reads: boolean): string {
+  const fmt = (y: number) => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
+  const brkTxt = Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
+  if (reads) {
+    return `<div style="font-size:11.5px;opacity:.85;text-align:center;margin:1px 0;">🐀 <b>Mole reads:</b> aim ${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)} · <span style="opacity:.7;">${brkTxt}</span></div>`;
+  }
+  return `<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11.5px;margin:1px 0;">
+      <button class="gs-btn gs-mini" data-putt-aim="-1" title="Aim left">◄</button>
+      <span style="min-width:120px;text-align:center;">Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)}</b><br><span style="opacity:.6;">slope ${brkTxt}</span></span>
+      <button class="gs-btn gs-mini" data-putt-aim="1" title="Aim right">►</button>
+    </div>`;
+}
 // Free-aim target (course-space) from the pull-to-power gesture; overrides attack/safe when set.
 let selFreeTarget: [number, number] | null = null;
 // Pull-to-power gesture (GS-power): the player presses the map and drags DOWN to charge power
@@ -1535,6 +1556,24 @@ function playingBody(animating: boolean): string {
       (play.ball[0] + puttPin[0]) / 2,
       (play.ball[1] + puttPin[1]) / 2,
     ];
+    // Putt BREAK (GS-greens-3): the slope curls the putt; the player aims HIGH to read it. A
+    // green-reading caddy (Mystic Mole) snaps the aim to the ideal line for you; otherwise it starts
+    // straight and you nudge ◄/► to find the read. The drawn dotted curve uses the SAME break model
+    // as the resolver, so the line you see is the line the ball takes.
+    // Reset the aim for each NEW putt (a fresh break to read), preserved across aim-nudge re-renders.
+    const puttKey = `${play.holeIndex}:${play.putts}`;
+    if (puttKey !== lastPuttKey) {
+      selPuttAim = null;
+      lastPuttKey = puttKey;
+    }
+    const slope = play.hole.greenSlope;
+    const ideal = idealPuttAim(play.ball, puttPin, slope);
+    const reads = !!state.run.loadout.greenRead;
+    if (selPuttAim === null) selPuttAim = reads ? ideal : 0;
+    const puttAim = reads ? ideal : selPuttAim;
+    puttAimResolved = puttAim; // read by the commit handler so the struck aim matches the drawn line
+    const breakYd = puttBreakYd(play.ball, puttPin, slope, MANUAL_IDEAL_PACE);
+    const puttPath = puttPathPreview(play.ball, puttPin, slope, puttAim, MANUAL_IDEAL_PACE);
     const puttSvg = renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
@@ -1549,6 +1588,7 @@ function playingBody(animating: boolean): string {
       focusBias: 0.5,
       // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
       up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
+      puttPath,
     });
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
@@ -1560,7 +1600,8 @@ function playingBody(animating: boolean): string {
         <div class="gs-hud gs-hud-bottom">
           ${caddyBadgeHTML(puttCaddyId())}
           <div class="gs-hud-controls gs-glass">
-            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Tap the meter (or Putt) in the green <b>MAKE</b> band — too soft is short, too firm runs past.</p>
+            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.</p>
+            ${puttAimRow(breakYd, puttAim, reads)}
             <div id="puttmeter"></div>
             <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
             ${fringePutt ? `<button class="gs-btn gs-btn--ghost" data-putt-toggle="0" style="margin:6px 0 0;padding:9px;">⛳→🏌 Chip instead</button>` : ''}
@@ -2395,6 +2436,14 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-putt-commit]').forEach((el) => {
     el.addEventListener('click', () => puttMeter?.commit());
   });
+  // ◄/► nudge the manual-putt AIM (GS-greens-3) to read the break, then re-render so the dotted
+  // break line + readout track. Step in yards; held within a sensible window.
+  app.querySelectorAll<HTMLElement>('[data-putt-aim]').forEach((el) => {
+    el.addEventListener('click', () => {
+      selPuttAim = Math.max(-12, Math.min(12, (selPuttAim ?? 0) + Number(el.dataset.puttAim) * 0.4));
+      render();
+    });
+  });
   // Fringe/apron (GS-fringe-putt): toggle between the putt meter (⛳) and the normal chip gesture (🏌).
   app.querySelectorAll<HTMLElement>('[data-putt-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -2416,7 +2465,7 @@ function render(): void {
         band,
         // The caddy now stands in the framed badge beside the meter (only a putting specialist), so
         // the meter itself draws no figure and uses its full width.
-        onCommit: (pace) => dispatch({ type: 'putt', control: { pace } }),
+        onCommit: (pace) => dispatch({ type: 'putt', control: { pace, aim: puttAimResolved } }),
       });
     }
   }

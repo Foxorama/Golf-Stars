@@ -71,6 +71,9 @@ export interface RenderOptions {
   ball?: Vec;
   /** Draw the aiming spray cone for the contemplated shot (interactive play). */
   spray?: ShotSpread;
+  /** Predicted curved PUTT path (course-space points, GS-greens-3) — drawn as a dotted break line
+   *  from the ball, so the player sees how the slope will curl the putt. */
+  puttPath?: Vec[];
   /** Spray cone display-geometry override (the `window._gsSpray` escape hatch). */
   sprayGeom?: SprayGeomInput;
   /** Zoom-and-follow: centre the map on this point (the ball) instead of fitting the whole hole. */
@@ -275,6 +278,16 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   }
 
   // (Tee + flagstick are drawn by the shared scene builder, so the map and the play view agree.)
+
+  // Predicted putt break line (GS-greens-3): a dotted curve showing how the slope will curl the ball,
+  // with a small ✕ where the player's current aim is pointed (the high-side read).
+  if (opts.puttPath && opts.puttPath.length > 1) {
+    const pts = opts.puttPath.map((p) => place(p));
+    const d = pts.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+    parts.push(`<path d="${d}" fill="none" stroke="#ffe14a" stroke-width="2" stroke-dasharray="3 3" opacity="0.85" stroke-linecap="round" />`);
+    const tip = pts[pts.length - 1]!;
+    parts.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="0.9" />`);
+  }
 
   if (opts.ball) {
     const [bx, by] = place(opts.ball);

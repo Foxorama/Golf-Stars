@@ -441,6 +441,61 @@ export interface PuttControl {
   /** Struck pace as a fraction of the distance to the cup: 1 ≈ dies at the hole, MANUAL_IDEAL_PACE
    *  drops it, <1 leaves it short, >1 runs it past. Captured when the sweeping marker is tapped. */
   pace: number;
+  /** Lateral AIM at the cup (yards, + = right of the ball→cup line; GS-greens-3). The player aims
+   *  HIGH to let a sidehill putt BREAK back into the hole. Default 0 = straight at the cup. */
+  aim?: number;
+}
+
+/** Break strength (GS-greens-3): how many yards a fully-sidehill putt curves, scaling with distance^1.35
+ *  and (inversely) pace. Tuned so a 3-yd putt barely breaks but a 16-yd sidehiller swings several feet. */
+const BREAK_K = 0.18;
+
+/**
+ * The lateral BREAK (yards, + = right) a manual putt picks up from the green slope, for a straight
+ * (aim-0) line from `from` to `pin` at the given pace. The shared truth for the resolver, the on-screen
+ * break-curve preview, and the Mystic Mole's read. Flat green / no slope → 0. Pure.
+ */
+export function puttBreakYd(from: Vec, pin: Vec, slope: Vec | undefined, pace: number): number {
+  if (!slope) return 0;
+  const d = dist(from, pin) || 1e-6;
+  let ux = (pin[0] - from[0]) / d;
+  let uy = (pin[1] - from[1]) / d;
+  const rperp: Vec = [-uy, ux]; // right of the ball→cup line
+  const lat = slope[0] * rperp[0] + slope[1] * rperp[1]; // signed sidehill component of the fall line
+  const paceFac = Math.max(0.7, Math.min(1.6, MANUAL_IDEAL_PACE / Math.max(0.4, pace)));
+  return BREAK_K * lat * Math.pow(d, 1.35) * paceFac;
+}
+
+/** The lateral AIM (yards) that cancels the break at the ideal pace — the line the Mystic Mole reads
+ *  out for you, and what the UI snaps to with a green-reading caddy. Pure. */
+export function idealPuttAim(from: Vec, pin: Vec, slope: Vec | undefined): number {
+  return -puttBreakYd(from, pin, slope, MANUAL_IDEAL_PACE);
+}
+
+/** Sample the predicted curved PATH of a manual putt (course-space points) for drawing the break line,
+ *  so the graphic IS the physics. The ball leaves along the aim and curves by the break as it slows
+ *  (break accelerates late, ∝ t^1.8). No wobble (that's the random part). Pure. */
+export function puttPathPreview(
+  from: Vec,
+  pin: Vec,
+  slope: Vec | undefined,
+  aim: number,
+  pace: number,
+  samples = 12,
+): Vec[] {
+  const d = dist(from, pin) || 1e-6;
+  const ux = (pin[0] - from[0]) / d;
+  const uy = (pin[1] - from[1]) / d;
+  const rperp: Vec = [-uy, ux];
+  const brk = puttBreakYd(from, pin, slope, pace);
+  const along = pace * d;
+  const pts: Vec[] = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const lat = aim * t + brk * Math.pow(t, 1.8);
+    pts.push([from[0] + ux * along * t + rperp[0] * lat, from[1] + uy * along * t + rperp[1] * lat]);
+  }
+  return pts;
 }
 
 /**
@@ -457,25 +512,32 @@ export function manualPutt(
   pinPt: Vec,
   control: PuttControl,
   skill: PuttSkill = {},
+  slope?: Vec,
 ): PuttLog {
   const d = dist(from, pinPt) || 1e-6;
   const band = skill.manualBand ?? DEFAULT_MANUAL_BAND;
   const pace = Math.max(0, control.pace);
+  const aim = control.aim ?? 0; // lateral aim at the cup (yd, + = right) — the player's break read
   const paceErr = pace - MANUAL_IDEAL_PACE; // <0 short, >0 long (in pace units)
-  // Unit vector to the cup + its right-perpendicular (the wobble axis).
+  // Unit vector to the cup + its right-perpendicular (the line/break axis).
   const ux = (pinPt[0] - from[0]) / d;
   const uy = (pinPt[1] - from[1]) / d;
+  const rperp: Vec = [-uy, ux];
   // Skill 0..1: a better putter (bigger band) wobbles less off-line.
   const skillF = clamp01((band - DEFAULT_MANUAL_BAND) / 0.3);
   const wobble = rng.gaussian(0, d * 0.05 * (1 - 0.6 * skillF));
-  // A make: pace inside the band AND the line holds (wobble within the cup). Short putts barely
-  // wobble, so a good pace drops; long putts wobble more, so good pace can still lip out.
-  if (Math.abs(paceErr) <= band && Math.abs(wobble) <= HOLE_OUT_RADIUS) {
+  // GS-greens-3: the green slope BREAKS the putt. The ball's lateral position AT THE CUP is your AIM
+  // plus the slope's break plus a little wobble — so on a sidehill green you must aim HIGH (aim ≈
+  // −break) for it to curl in. Flat green (no slope) → break 0 → byte-for-byte the old straight putt.
+  const breakYd = puttBreakYd(from, pinPt, slope, pace);
+  const netLat = aim + breakYd + wobble;
+  // A make: pace inside the band AND the net lateral (aim + break + wobble) holds within the cup.
+  if (Math.abs(paceErr) <= band && Math.abs(netLat) <= HOLE_OUT_RADIUS) {
     return { from, to: pinPt, holed: true };
   }
-  // Missed: it travels `pace × d` along the line (short or long) with the lateral wobble.
+  // Missed: it travels `pace × d` along the line with the net lateral offset (short/long + off-line).
   const travel = pace * d;
-  const to: Vec = [from[0] + ux * travel - uy * wobble, from[1] + uy * travel + ux * wobble];
+  const to: Vec = [from[0] + ux * travel + rperp[0] * netLat, from[1] + uy * travel + rperp[1] * netLat];
   return { from, to, holed: dist(to, pinPt) <= HOLE_OUT_RADIUS };
 }
 
