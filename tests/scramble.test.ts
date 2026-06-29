@@ -4,7 +4,7 @@ import { playCourse, playHole, pickBetterExec, type ExecResult } from '../src/si
 import { playTotals } from '../src/sim/score';
 import { Rng } from '../src/sim/rng';
 import { characterShotMods } from '../src/sim/rpg/characters';
-import { scrambleOptsFor, startRun, currentBoss } from '../src/sim/rpg/run';
+import { scrambleOptsFor, startRun, currentBoss, teamDuelSetupForRun } from '../src/sim/rpg/run';
 
 describe('co-op scramble bosses (GS-scramble)', () => {
   it('pickBetterExec prefers holed, then fewer penalties, then closer to the flag', () => {
@@ -51,14 +51,25 @@ describe('co-op scramble bosses (GS-scramble)', () => {
     expect(a).toEqual(b);
   });
 
-  it('scrambleOptsFor arms only on a scramble boss stop', () => {
+  it('scrambleOptsFor arms only when the player is the underdog on a SCRAMBLE team duel', () => {
     let run = startRun(5, 'voyage', {}, 'feather-fade');
     expect(scrambleOptsFor(run)).toBeUndefined(); // stop 0, not a boss
-    // Jump to the Arc-II scramble boss (stop 5).
+    // Jump to the Arc-II team-duel boss (stop 5).
     run = { ...run, stopIndex: 5 };
-    expect(currentBoss(run)?.partner).toBe('scramble');
-    expect(scrambleOptsFor(run)?.partnerMods).toBeTypeOf('function');
-    // The Arc-I boss (stop 2) is solo → no scramble.
+    expect(currentBoss(run)?.team).toBe('random');
+    const setup = teamDuelSetupForRun(run)!;
+    expect(setup).toBeDefined();
+    expect(['scramble', 'bestball']).toContain(setup.format);
+    // With no arc history the player defaults to the underdog (gets the assist).
+    expect(setup.partnerSide).toBe('player');
+    // The player's solo ball scrambles ONLY when the resolved format is scramble.
+    if (setup.format === 'scramble') {
+      expect(scrambleOptsFor(run)?.partnerMods).toBeTypeOf('function');
+    } else {
+      expect(scrambleOptsFor(run)).toBeUndefined(); // best-ball is a parallel ball, not per-shot scramble
+    }
+    // The Arc-I boss (stop 2) is a solo matchplay boss → no team setup, no scramble.
+    expect(teamDuelSetupForRun({ ...run, stopIndex: 2 })).toBeUndefined();
     expect(scrambleOptsFor({ ...run, stopIndex: 2 })).toBeUndefined();
   });
 });

@@ -13,7 +13,7 @@ import {
   type HoleDuel,
 } from '../src/sim/rpg/match';
 import { playerHoleOpts, startRun } from '../src/sim/rpg/run';
-import { getFormat, isMatchplayBoss, bossAt } from '../src/sim/rpg/formats';
+import { getFormat, isMatchplayBoss, isTeamDuelBoss, bossAt } from '../src/sim/rpg/formats';
 
 describe('boss loadout', () => {
   it('a stronger golfer plays off a lower handicap and longer', () => {
@@ -156,11 +156,16 @@ describe('reducer matchplay flow', () => {
 });
 
 describe('voyage matchplay wiring', () => {
-  it('the Arc-I and final bosses are matchplay, the Arc-II boss is scramble', () => {
+  it('the Arc-I and final bosses are solo matchplay, the Arc-II boss is a team duel', () => {
     const voyage = getFormat('voyage');
     expect(isMatchplayBoss(bossAt(voyage, 2))).toBe(true); // Arc I
-    expect(bossAt(voyage, 5)?.partner).toBe('scramble'); // Arc II co-op
+    expect(isTeamDuelBoss(bossAt(voyage, 2))).toBe(false);
+    // Arc II is a matchplay TEAM duel (best-ball or scramble, random per run).
+    expect(isMatchplayBoss(bossAt(voyage, 5))).toBe(true);
+    expect(bossAt(voyage, 5)?.team).toBe('random');
+    expect(isTeamDuelBoss(bossAt(voyage, 5))).toBe(true);
     expect(isMatchplayBoss(bossAt(voyage, 8))).toBe(true); // final
+    expect(isTeamDuelBoss(bossAt(voyage, 8))).toBe(false);
     expect(bossAt(voyage, 8)?.final).toBe(true);
   });
 });

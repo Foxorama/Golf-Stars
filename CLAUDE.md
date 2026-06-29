@@ -433,13 +433,50 @@ This game lives or dies on three axes — put every change through all three bef
   (floored at 20). Winning at your current top tier unlocks the next (`unlockedAscension` in the
   reducer); the unlocked tier persists in **save v4** (`maxAscension`, v3→v4 migration). Selectable on
   the title's voyage card (clamped to unlocked). Round-trips through snapshot/resume (absent → 0).
-- **Co-op SCRAMBLE bosses (GS-scramble).** A `boss.partner: 'scramble'` stop pairs you with an unchosen
-  golfer (`scramblePartnerId`, deterministic). `scrambleOptsFor(run)` carries the partner's swing shape;
-  `playHole` (auto) and `takeShot` (interactive) each fire a SECOND `executeShot` (partner's shape, same
-  club/target) and keep the better via `pickBetterExec` (holed > fewer penalties > closer to flag) for
-  ONE team stroke. CRITICAL: the partner draw fires ONLY when scramble is armed, so a normal hole's rng
-  stream is byte-for-byte unchanged and auto≡interactive holds (the player draw is first in both). It's
-  a real co-op assist (a boss course's mean SF lifts ~17.9→21.7), the fair-difficulty lever for bosses.
+- **Co-op SCRAMBLE mechanic (GS-scramble).** The base scramble fold: `scrambleOptsFor(run)` carries a
+  partner's swing shape; `playHole` (auto) and `takeShot` (interactive auto-pick) each fire a SECOND
+  `executeShot` (partner's shape, same club/target) and keep the better via `pickBetterExec` (holed >
+  fewer penalties > closer to flag) for ONE team stroke. CRITICAL: the partner draw fires ONLY when
+  scramble is armed, so a normal hole's rng stream is byte-for-byte unchanged and auto≡interactive holds
+  (the player draw is first in both). This fold is now the engine underneath the **team-duel boss** below
+  (and `scrambleOptsFor` is gated on the player being the scramble UNDERDOG, not on a bare boss flag).
+- **The Arc-II boss is a TEAM DUEL — best-ball or scramble, random per run (GS-team-duel).** The old
+  `boss.partner: 'scramble'` (a vs-the-CUT co-op stop) is replaced by a matchplay-style HEAD-TO-HEAD duel
+  vs your rank-mirror opponent (`BossSpec.team: 'bestball' | 'scramble' | 'random'`, alongside `mode:
+  'matchplay'`; `resolveTeamFormat(boss, seed)` fixes `'random'` per run). The HOOK is a fairness handicap:
+  the LOWER-ranked side gets a PARTNER and the team format; the higher-ranked side plays SOLO — so the
+  underdog can punch up at the boss and the favourite earns the harder solo task. `teamDuelSetupForRun(run)`
+  resolves EVERYTHING (opponent via `matchOpponentForRun`, format, `underdogSide(playerPos, oppPos)` from the
+  arc standings — opponent ranked higher ⇒ player gets the assist, else the boss does — partner golfer ids +
+  shapes, and the boss `homeEdge`), pure and shared by the headless `playStop` and the UI reducer so they
+  agree golfer-for-golfer. The two formats:
+  - **Scramble** — both hit every shot, play on from the BETTER ball. Interactively the PLAYER chooses:
+    `resolveScrambleShot` resolves both balls (player draw then partner draw — the SAME rng order as the
+    auto pick, so the stream is identical regardless of choice; only the SELECTION differs) and stashes them
+    in `UiState.scrambleChoice`; a `scrambleChoiceOverlay` shows both balls (inline map + two `shotCardHTML`
+    cards with lie + distance to pin) and the `chooseScrambleBall` action commits one via `commitScrambleBall`.
+    The auto/watch path (`autoShotHole`, the `play` watch action) instead auto-keeps the better
+    (`autoCommitScrambleBall` → `pickBetterExec`). Putts are NOT scrambled (matching the base fold), so the
+    choice fires on full swings only.
+  - **Best-ball** — both play their OWN ball the whole hole; the better hole SCORE counts (no per-shot
+    choice). Interactively the player plays their ball normally; at `holeComplete` the partner's parallel
+    ball is played on the SAME `:play` rng right after (so watch ≡ auto-finish) and `betterPlayedHole` takes
+    the min for both the duel and the player's stop score.
+  Engine: `match.ts` `playSideHole` (solo `playHole` / scramble fold / `bestBallHole`) builds a side's hole;
+  `playTeamMatchStop` runs the hole-by-hole duel (headless + watch); `playBossSideStop` pre-plays the boss's
+  team-scored side (revealed hole-by-hole like the solo matchplay boss). The boss side rides a SEPARATE
+  `:boss` rng, so when the player plays SOLO their `:play` ball is byte-for-byte a non-boss stop. `finishStop`
+  passes on the DUEL (`matchWon`), not a Stableford cut. Tune via the format mix, the partner shape, or the
+  home edge. Tests: `tests/team-duel.test.ts` (format resolution, the scoring engine, the rank rule, the
+  headless stop, and the interactive scramble-choice + best-ball reducer flows); `tests/scramble.test.ts`
+  guards the base fold + `scrambleOptsFor` gating. NO new `_gs*`/URL hook (the choice is reducer state).
+- **Boss EXTRAS (GS-team-duel): a home-zone edge + a pre-match scouting line.** (1) **Home edge** — a boss
+  golfer on THEIR home constellation (`bossHasHomeEdge(id, themeId)`) plays sharper: `bossLoadout(id,
+  homeEdge)` shaves `HOME_EDGE_HANDICAP` strokes and adds `HOME_EDGE_DISTANCE` yds (a "this is my turf"
+  signature you can dodge by routing elsewhere). Threaded through `bossPlayOpts`/`playMatchStop`/the team
+  helpers; defaults OFF (so existing matchplay seeds are byte-for-byte). (2) **Scouting** — the boss intro
+  shows the opponent's style tagline (`opponentScouting` = the golfer's archetype `tagline`), who holds the
+  partner edge, the resolved format, and a home-turf flag, so you read the matchup before teeing off.
 - **Multi-biome SPLIT stops (GS-variation).** A `StopSpec.splitBiome` stop CROSSES TWO WORLDS:
   `currentCourse` → `stitchSplitCourse` generates the front holes from the stop's theme and the back
   holes from a DISTINCT theme of the same arc, concatenated; every Hole is stamped with its own
@@ -789,8 +826,8 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   chip (updates as each hole finishes). `arcBossId(run)` = the leader going into the boss slot.
   CRITICAL: league imports `run.ts`; `run.ts` NEVER imports league (no cycle). The matchplay boss-id is
   resolved in the UI REDUCER (which can see the leaderboard), passed into the pure match engine.
-- **Matchplay bosses (`src/sim/rpg/match.ts`).** A boss `mode: 'matchplay'` (voyage Arc-I + FINAL; the
-  Arc-II boss stays co-op scramble for variety) is a 1-on-1 DUEL vs the leaderboard leader on the actual
+- **Matchplay bosses (`src/sim/rpg/match.ts`).** A boss `mode: 'matchplay'` (voyage Arc-I + FINAL are solo
+  duels; the Arc-II boss is a matchplay TEAM duel, GS-team-duel above) is a 1-on-1 DUEL vs the leaderboard leader on the actual
   course. The boss is a REAL ball: `bossLoadout`/`bossPlayOpts` give it the balanced bag + a power-derived
   distance bonus + a skill-derived handicap + its own `bossShotMods` shape, played through `playHole` on a
   SEPARATE rng stream — so the player's own ball is byte-for-byte identical to a non-boss stop (the
@@ -855,7 +892,7 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   resume exactly like a bought perk (NO save bump). UI: a new `bossReward` screen between the result and the
   shop (the result Continue routes there when a reward is pending); `pickBossReward` applies the choice
   (talent → `grantTalent`, shards → `state.shards`) and proceeds to the shop. The reward is detected in the
-  reducer (`bossRewardFor`: a survived, non-final boss win) for BOTH the matchplay and scramble bosses. No
+  reducer (`bossRewardFor`: a survived, non-final boss win) for every boss kind (solo matchplay + team duel). No
   new `_gs*`/URL hook (the test-hub guard needs nothing; the Sim Lab absorbs the talents as data).
   Tests: `tests/talents.test.ts` (talents out of the shop, perk rebuild, themed/deterministic draw, free
   idempotent grant, the reducer pick→shop flow).

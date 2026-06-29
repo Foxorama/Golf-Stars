@@ -25,6 +25,7 @@ import {
   shotSpread,
   suggestPlayerClub,
   type ExecOpts,
+  type ExecResult,
   type PuttControl,
   type ScrambleOpts,
   type ShotSpread,
@@ -220,6 +221,24 @@ export function takeShot(
     partnerKept = best.partnerKept;
   }
 
+  return finishShot(state, ex, loadout, rng, autoPutt, partnerKept);
+}
+
+/**
+ * Apply a resolved shot to the hole state — the shared TAIL of `takeShot`: fold the ExecResult into a
+ * new `HolePlay` (strokes, fairway-hit, hole-out / max-score / green auto-putt). Used by `takeShot` and
+ * by the interactive scramble choice flow (`commitScrambleBall`), so a kept ball advances identically
+ * however it was chosen. Pure (rng only for an auto putt-out on the green).
+ */
+function finishShot(
+  state: HolePlay,
+  ex: ExecResult,
+  loadout: PlayerLoadout,
+  rng: Rng,
+  autoPutt: boolean,
+  partnerKept: boolean,
+): HolePlay {
+  const pin = pinOf(state.hole);
   const firstShot = state.shots.length === 0;
   let fairwayHit = state.fairwayHit;
   if (firstShot && state.hole.par >= 4) fairwayHit = ex.restLie === 'fairway';
@@ -275,6 +294,100 @@ export function takeShot(
     holed,
     partnerKept,
   };
+}
+
+/**
+ * The two balls of an interactive SCRAMBLE shot (GS-team-duel), awaiting the player's choice. Both are
+ * resolved (the rng already consumed, same order as the auto sim) but NEITHER is committed — the player
+ * picks which to keep, then `commitScrambleBall` advances the hole from it. The base `state` is the
+ * pre-shot HolePlay; `player`/`partner` are the resolved shots (player's own + the partner's).
+ */
+export interface ScrambleShot {
+  base: HolePlay;
+  player: ExecResult;
+  partner: ExecResult;
+  /** Distance from the resting ball to the pin, for the choice card (player / partner). */
+  playerDistToPin: number;
+  partnerDistToPin: number;
+}
+
+/**
+ * Resolve a scramble shot's TWO balls without committing (GS-team-duel): the player's ball and the
+ * partner's (same club/target, the partner's swing shape). The rng is consumed in the SAME order as the
+ * auto sim (player draw then partner draw), so the stream is identical regardless of which the player
+ * later keeps — only the SELECTION differs (the point of an interactive scramble). The player then calls
+ * `commitScrambleBall`. (Putts are NOT scrambled — like the auto sim — so this fires on full swings only.)
+ */
+export function resolveScrambleShot(
+  state: HolePlay,
+  decision: ShotDecision,
+  loadout: PlayerLoadout,
+  rng: Rng,
+  partnerMods: ScrambleOpts['partnerMods'],
+): ScrambleShot {
+  const pin = pinOf(state.hole);
+  const carryMult = biomeCarryMult(state.hole);
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
+  const target =
+    decision.target ??
+    (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
+  const club: Club =
+    bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
+  const dispersionMult = netDispersion(loadout);
+  const execOpts: ExecOpts = {
+    carryMult,
+    dispersionMult,
+    power: decision.power,
+    shotMods: characterShotMods(loadout.characterId),
+    shapeMod: loadout.shapeMod,
+    minCarryBoost: loadout.minCarryBoost,
+    wedgeWindow: loadout.wedgeWindow,
+    lieRelief: loadout.lieRelief,
+    guard: loadout.caddyGuard,
+    chipIn: loadout.chipInBoost,
+    lefty: loadout.lefty,
+    windResist: loadout.windResist,
+    backspinBoost: loadout.backspinBoost,
+    hazardImmune: loadout.hazardImmune,
+    confidence: loadout.confidenceMod,
+    suggestedClubId: loadout.confidenceMod
+      ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id
+      : undefined,
+  };
+  // Player draw FIRST, then partner — the exact order the auto sim (playHole scramble) uses.
+  const player = executeShot(state.hole, state.ball, state.lie, target, club, execOpts, rng);
+  const partner = executeShot(state.hole, state.ball, state.lie, target, club, { ...execOpts, shotMods: partnerMods }, rng);
+  return {
+    base: state,
+    player,
+    partner,
+    playerDistToPin: Math.round(dist(player.ballAfter, pin)),
+    partnerDistToPin: Math.round(dist(partner.ballAfter, pin)),
+  };
+}
+
+/** Commit the player's chosen scramble ball (GS-team-duel): advance the hole from it (one team stroke). */
+export function commitScrambleBall(
+  shot: ScrambleShot,
+  pick: 'player' | 'partner',
+  loadout: PlayerLoadout,
+  rng: Rng,
+  autoPutt = true,
+): HolePlay {
+  const ex = pick === 'partner' ? shot.partner : shot.player;
+  return finishShot(shot.base, ex, loadout, rng, autoPutt, pick === 'partner');
+}
+
+/** Auto-keep the BETTER scramble ball (GS-team-duel) — the watch / auto-finish path, which picks like
+ *  the headless sim (`pickBetterExec`) instead of prompting the player. */
+export function autoCommitScrambleBall(
+  shot: ScrambleShot,
+  loadout: PlayerLoadout,
+  rng: Rng,
+  autoPutt = true,
+): HolePlay {
+  const better = pickBetterExec(shot.player, shot.partner, pinOf(shot.base.hole));
+  return commitScrambleBall(shot, better.partnerKept ? 'partner' : 'player', loadout, rng, autoPutt);
 }
 
 /** True when the ball is on the green awaiting a manual putt (not yet done). */

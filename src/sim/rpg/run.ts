@@ -39,10 +39,10 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, stopSpecFor, type BossSpec, type StopSpec } from './formats';
-import { playMatchStop } from './match';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
-import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
+import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { routeDifficulty, routeEffect } from './effects';
@@ -517,16 +517,80 @@ export function grantTalent(run: Run, talentId: string): Run {
 }
 
 /**
- * Scramble options for the current stop (GS-scramble): a co-op partner's swing shape when the stop is
- * a `partner: 'scramble'` boss, else undefined (ordinary solo play). The partner is a deterministic
- * unchosen golfer; threaded IDENTICALLY into the auto sim (playStop) and the interactive driver so
- * auto≡interactive holds. Pure.
+ * The full setup for a team-duel boss stop (GS-team-duel), or undefined for a non-team stop. Resolves
+ * EVERYTHING the player + boss sides need: the opponent, the concrete format (scramble|bestball — a
+ * `'random'` boss is fixed per run), which side is the UNDERDOG that gets the partner (the lower-ranked
+ * side), the partner golfer ids + their swing shapes, and whether the boss has the home-zone edge.
+ *
+ * The partner side is decided by RANK: if the opponent is ranked higher (better), the PLAYER is the
+ * underdog and gets the assist; if the player is ranked higher, the BOSS gets the partner. Computed
+ * from the SAME field + arc slices as `matchOpponentForRun`, so the headless sim and the interactive
+ * reducer agree golfer-for-golfer (both call this). Pure/deterministic.
+ */
+export interface TeamDuelSetup extends TeamSetup {
+  opponentId: string;
+  /** The boss course's theme, for the home-zone edge. */
+  homeEdge: boolean;
+  /** Resolved partner golfer ids (for UI attribution). */
+  playerPartnerId?: string;
+  bossPartnerId?: string;
+}
+
+export function teamDuelSetupForRun(run: Run): TeamDuelSetup | undefined {
+  const boss = currentBoss(run);
+  if (!isTeamDuelBoss(boss)) return undefined;
+  const course = currentCourse(run);
+  const opponentId = matchOpponentForRun(run) ?? '';
+  const format = resolveTeamFormat(boss, run.seed) as TeamFormat;
+  const partnerSide = teamPartnerSide(run, opponentId);
+  const playerPid = scramblePartnerId(run.seed, run.stopIndex, run.loadout.characterId);
+  const bossPid = bossPartnerId(run.seed, run.stopIndex, run.loadout.characterId);
+  return {
+    opponentId,
+    format,
+    partnerSide,
+    homeEdge: bossHasHomeEdge(opponentId, course.meta?.themeId),
+    playerPartnerId: partnerSide === 'player' ? playerPid : undefined,
+    bossPartnerId: partnerSide === 'boss' ? bossPid : undefined,
+    playerPartnerMods: partnerSide === 'player' ? characterShotMods(playerPid) : undefined,
+    bossPartnerMods: partnerSide === 'boss' ? characterShotMods(bossPid) : undefined,
+  };
+}
+
+/**
+ * Which side of a team duel is the UNDERDOG and gets the partner (GS-team-duel): the lower-ranked side.
+ * Compared on the arc standings (the same field/slices as the opponent pick). With no scores yet (the
+ * arc's first boss after a resume), default to the player getting the assist (the friendly default).
+ */
+function teamPartnerSide(run: Run, opponentId: string): 'player' | 'boss' {
+  const slices = arcSlices(run);
+  if (!slices.length) return 'player';
+  const standings = arcCut(survivalField(run), run.seed, slices).standings;
+  const playerPos = standings.find((s) => s.isPlayer)?.position ?? 99;
+  const oppPos = standings.find((s) => s.golferId === opponentId)?.position ?? 99;
+  return underdogSide(playerPos, oppPos);
+}
+
+/**
+ * Which side is the UNDERDOG and gets the partner, by leaderboard position (GS-team-duel): a LOWER
+ * position number is a HIGHER rank, so the side with the bigger number is the underdog. The opponent
+ * ranked higher (smaller number) ⇒ the PLAYER is the underdog and gets the assist; the player ranked
+ * higher ⇒ the BOSS gets the partner. Pure.
+ */
+export function underdogSide(playerPosition: number, opponentPosition: number): 'player' | 'boss' {
+  return playerPosition > opponentPosition ? 'player' : 'boss';
+}
+
+/**
+ * Scramble options for the player's OWN ball on the current stop (GS-team-duel): the partner's swing
+ * shape ONLY when the player is the underdog on a SCRAMBLE team duel, so the player's solo-played ball
+ * (auto sim / watch / auto-finish) plays best-of-two like the interactive driver. Undefined otherwise
+ * (solo play / best-ball / non-team stop) — no extra rng, byte-for-byte the solo hole. Pure.
  */
 export function scrambleOptsFor(run: Run): ScrambleOpts | undefined {
-  const boss = currentBoss(run);
-  if (boss?.partner !== 'scramble') return undefined;
-  const partnerId = scramblePartnerId(run.seed, run.stopIndex, run.loadout.characterId);
-  return { partnerMods: characterShotMods(partnerId) };
+  const setup = teamDuelSetupForRun(run);
+  if (!setup || setup.format !== 'scramble' || setup.partnerSide !== 'player') return undefined;
+  return { partnerMods: setup.playerPartnerMods };
 }
 
 /** The player's `playHole`/`playCourse` options from their loadout — shared by the auto sim and the
@@ -561,14 +625,29 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
   // boss rides a separate stream), so balance for the player's shots is unchanged; only the PASS gate
   // becomes the match instead of Stableford-vs-cut.
   if (getFormat(run.formatId).winnable && isMatchplayBoss(currentBoss(run))) {
-    const oppId = matchOpponentForRun(run) ?? '';
-    const stop = playMatchStop(
-      course.holes,
-      playerHoleOpts(run),
-      oppId,
-      new Rng(`${course.seed}:play`),
-      new Rng(`${course.seed}:boss`),
-    );
+    // A TEAM duel (GS-team-duel) plays each side as solo/scramble/best-ball per the rank-based setup;
+    // a plain matchplay boss is a straight 1-v-1. Both decided by the hole-by-hole duel.
+    const setup = teamDuelSetupForRun(run);
+    const oppId = setup?.opponentId ?? matchOpponentForRun(run) ?? '';
+    const homeEdge = setup?.homeEdge ?? bossHasHomeEdge(oppId, course.meta?.themeId);
+    const stop = setup
+      ? playTeamMatchStop(
+          course.holes,
+          playerHoleOpts(run),
+          oppId,
+          setup,
+          new Rng(`${course.seed}:play`),
+          new Rng(`${course.seed}:boss`),
+          homeEdge,
+        )
+      : playMatchStop(
+          course.holes,
+          playerHoleOpts(run),
+          oppId,
+          new Rng(`${course.seed}:play`),
+          new Rng(`${course.seed}:boss`),
+          homeEdge,
+        );
     const { run: next, result } = finishStop(run, course, stop.player, { matchWon: stop.state.playerAdvances });
     return { run: next, result, played: stop.player };
   }
