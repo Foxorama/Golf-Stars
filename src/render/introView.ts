@@ -1469,7 +1469,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
         '#6b4a32', // Feather Fade   — Nairobi, Kenya
         '#e8c6a0', // Huang-Woo Hook — Busan, South Korea
         '#d8a878', // Longshot Larry — Perth, Australia
-        '#caa182', // Backspin Bo    — Portland, USA
+        '#a8714c', // Backspin Bo    — Portland, USA (Native American)
       ];
       if (e < t1) {
         const dp = easeInOut(clamp01(e / t0));
