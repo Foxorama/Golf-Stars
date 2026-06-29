@@ -76,6 +76,15 @@ export interface GenerateOptions {
   biomeRow?: Biome;
   /** Star-travel theme id (GS-17) — recorded on the course meta for the render/UI layer. */
   themeId?: string;
+  /**
+   * Wildness DELTA from the chosen journey route (GS-journey-fx) — added to the distance-derived
+   * wildness before the [0.05, 1] clamp, so a harder lane generates a genuinely wilder course (and an
+   * easier lane a gentler one). Clamped to ≤1, i.e. never beyond the wildness=1 case the no-death-
+   * spiral / fairness validators already prove safe. Default 0 ⇒ byte-for-byte the old generation.
+   */
+  wildnessBoost?: number;
+  /** Atmospheric course effect (GS-journey-fx) — stamped on the meta for the renderers (no rng impact). */
+  effect?: string;
   /** Cap every hole's par (3 = all par-3s). Omit for the normal 3/4/5 mix. */
   parCap?: 3 | 4 | 5;
 }
@@ -1127,8 +1136,12 @@ function perpAt(line: Vec[], t: number): Vec {
 export function generateCourse(seed: number | string, opts: GenerateOptions = {}): Course {
   const rng = new Rng(seed);
   const distanceFromStart = opts.distanceFromStart ?? 0;
+  // A chosen journey route can make the next course wilder/gentler (GS-journey-fx). The boost is added
+  // to the distance-derived wildness then clamped to [0.05, 1]; boost 0 keeps the rng draw + result
+  // byte-for-byte (the lower clamp never bites the unboosted base, which is ≥ 0.1).
+  const boost = opts.wildnessBoost ?? 0;
   const wildness =
-    opts.wildness ?? Math.min(1, 0.1 + distanceFromStart * 0.05 + rng.range(0, 0.15));
+    opts.wildness ?? Math.max(0.05, Math.min(1, 0.1 + distanceFromStart * 0.05 + rng.range(0, 0.15) + boost));
 
   const holeCount = Math.max(1, opts.holes ?? 1);
   const rarity = pickRarity(rng);
@@ -1145,7 +1158,13 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     rarity,
     biome: biome.id,
     holes,
-    meta: { name, distanceFromStart, wildness, ...(opts.themeId ? { themeId: opts.themeId } : {}) },
+    meta: {
+      name,
+      distanceFromStart,
+      wildness,
+      ...(opts.themeId ? { themeId: opts.themeId } : {}),
+      ...(opts.effect && opts.effect !== 'none' ? { effect: opts.effect } : {}),
+    },
   };
 
   const errs = [...validateCourse(course), ...validateFairness(course), ...validateCrossings(course)];

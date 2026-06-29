@@ -67,6 +67,8 @@ export interface RenderOptions {
   biome?: string;
   /** Star-travel theme id (GS-17e) — draws that constellation in the sky. */
   themeId?: string;
+  /** Atmospheric course effect the chosen journey route brought (GS-journey-fx). Render-only. */
+  effect?: string;
   /** Draw a ball marker at this course-space position (interactive play). */
   ball?: Vec;
   /** Draw the aiming spray cone for the contemplated shot (interactive play). */
@@ -176,7 +178,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // scene builder (so the SVG map and the Canvas play view look identical) and serialised.
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
-    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art })),
+    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, effect: opts.effect, art: opts.art })),
   ];
 
   // Aiming spray cone (GS-dispersion-2): the shot's asymmetric SprayShape, drawn as true arc

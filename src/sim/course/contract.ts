@@ -109,6 +109,9 @@ export interface CourseMeta {
   wildness: number;
   /** Star-travel theme id (GS-17) the stop flew into; the render layer keys flavour off it. */
   themeId?: string;
+  /** Atmospheric course effect (GS-journey-fx) the chosen route brought — a render-only flavour key
+   *  ('moonlight' | 'meteorShower' | …). Absent ⇒ no effect. See sim/rpg/effects.ts CourseEffectId. */
+  effect?: string;
   /** Split-biome stop (GS-variation): the back holes belong to a different world. The back theme id +
    *  how many front holes precede it. Absent ⇒ a single-world stop. */
   split?: { backThemeId: string; frontHoles: number };
