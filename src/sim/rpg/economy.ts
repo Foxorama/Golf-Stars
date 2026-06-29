@@ -185,6 +185,12 @@ export interface PlayerLoadout {
    */
   puttBoost: number;
   /**
+   * Green-reading caddy (GS-greens-3, Mystic Mole): the caddy reads the BREAK for you — the putt UI
+   * snaps the aim to the ideal slope-compensated line + draws the read, so you only judge pace. Rebuilt
+   * from perks on resume (no save bump). Interactive-only (the headless auto path never reads it).
+   */
+  greenRead?: boolean;
+  /**
    * Trigger-relic economy bonuses (GS-synergy) — credits awarded at the END of a stop you PASS, on top
    * of the Stableford payout, for events that reward aggressive play. They feed the credit multiplier
    * (Fortune/Lucky) so a credit-snowball build compounds. All default 0 (no relic → base economy).
@@ -532,11 +538,12 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'mystic-mole',
     name: 'Mystic Mole',
     cost: 260,
-    desc: 'Lives under the greens & knows every break — your manual putts sink far more often',
+    desc: 'Lives under the greens & reads every break — he aims your putt on the perfect line, you judge the pace',
     rarity: 'epic',
     caddy: 'named',
-    // Rides the existing putt-skill field: a big make-band + lag boost for the manual pace meter.
-    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + MOLE_PUTT_BOOST, perks: [...m.perks, 'mystic-mole'] }),
+    // GS-greens-3: READS THE BREAK — the putt UI snaps your aim to the slope-compensated line + draws
+    // the read, so a sidehill putt is taken care of for you. Plus the make-band/lag boost he always had.
+    apply: (m) => ({ ...m, greenRead: true, puttBoost: (m.puttBoost ?? 0) + MOLE_PUTT_BOOST, perks: [...m.perks, 'mystic-mole'] }),
   },
 
   // --- Stackable upgrades (the endless credit sink + growing build) -----------
