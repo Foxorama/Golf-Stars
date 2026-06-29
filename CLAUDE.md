@@ -447,6 +447,17 @@ This game lives or dies on three axes — put every change through all three bef
 - **Fail gate = the cut line** (`economy.ts`): each stop needs a minimum Stableford that ramps
   with galaxy distance. Beat it to travel on; miss it and the run ends. Reuses the score we already
   compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.
+- **The cut is calibrated to where golfers SCORE, not below it (GS-cut-curve).** Both the player and
+  the ghost field average ~2 Stableford/hole (par pace), but `cutLine` used to start at ~1 pt/hole — half
+  the field's scoring — so arc 1 was a free pass and the leaderboard never thinned (measured: field stop
+  scores 10–19 over 6 holes vs a cut of 6, **0% of the field cut** the whole voyage). Now `cutLine =
+  round(holes·(1.7 + dist·0.09))` STARTS near par pace (~1.7 pt/hole, so even stop 0 cuts the weak tail)
+  and ramps ABOVE it (toward ~2.6 pt/hole deep) — a real "decent curve" that eliminates characters at the
+  end of each stage. The unupgraded auto reach-AI (the difficulty FLOOR) still clears arc 1 (~99/93/69%
+  per stop) and the gate tightens through arcs 2–3; an upgrading/interactive player keeps pace, and the
+  voyage's `cutMult` (0.65) still softens the distance term so a bounded campaign plateaus. Re-run the
+  `tests/` cut harness after touching the base/slope or `cutMult`. (No test hard-requires the auto-AI to
+  WIN the voyage — `voyage.test` only asserts the run terminates — so the cut can bite hard at the final.)
 - **Route events make travel a decision (GS-14, `events.ts`).** A jump used to differ only by
   distance; now each route carries a themed, content-as-data **event** that tilts the stop you fly
   *into* — two pure levers: `creditMult` (payout) and `cutDelta` (the cut/fail gate). The spread runs
@@ -613,8 +624,17 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   by clutch under boss `pressure`. The cut (`effectiveCut`, unchanged) RISES with distance, so it scythes
   more of a fixed-quality field over time — "harder and harder" for free, WITHOUT touching course
   generation (the fairness/no-death-spiral validators are untouched). `buildField(seed,arcIndex,arc,player)`
-  = 20 golfers (you + arc champions + unchosen characters + home-weighted fill), seed-stable so nothing new
-  persists. `arcStandings`/`applyCut`/`bossPick` (the boss = the top non-player, i.e. #2 if you lead).
+  = 20 golfers (you + arc champions + unchosen characters + a seed-stable random-SAMPLE fill), seed-stable
+  so nothing new persists. `arcStandings`/`applyCut`/`bossPick` (the boss = the top non-player, i.e. #2 if
+  you lead). FIELD SPREAD (GS-cut-curve): the fill is a plain seeded shuffle SAMPLE, NOT the top-by-skill —
+  the old fill sorted the pool by skill descending, so the field was always the STRONGEST 19 (an elite
+  cluster, all ~2.0–3.2 SF/hole) with no weak tail for the cut to bite, so the leaderboard never thinned.
+  Field-tier golfers carry no `homeArchetype`, so that sort was pure skill bias (the home-weighting did
+  nothing); a uniform sample restores a natural ability spread (weak field golfers ~1.7/hole up to
+  champions ~2.5/hole) so the ramping cut sweeps the tail first and eats upward. CRITICAL: a golfer's
+  ghost score never depends on the field's composition, so this changes WHO gets cut, NOT the player's own
+  difficulty (player pass% is byte-identical) — a "free" improvement to leaderboard thinning. Champions are
+  still seeded first (step 2) and keep their HOME_BOOST, so the home champion still tops their own zone.
 - **The run glue (`src/sim/rpg/league.ts`).** Groups stops into ARCS (`ARC_LEN` 3), builds the arc field,
   and computes the cumulative `leaderboard(run)` from the player's REAL per-stop Stableford (`run.history`)
   + ghost scores. `livePosition(run, holesPlayed, playerStopSF)` feeds the per-hole "you're Nth" play-HUD

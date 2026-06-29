@@ -134,25 +134,24 @@ export function buildField(seed: number | string, arcIndex: number, arc: Arc, pl
     add(g);
   }
 
-  // 4) Fill to 20 from the field pool, weighted toward this arc's home archetypes.
-  const arcArchetypes = new Set(themesForArc(arc).map((t) => t.archetype));
+  // 4) Fill to 20 from the field pool as a SEEDED RANDOM SAMPLE spanning the ability range — NOT the
+  //    top by skill. The old fill sorted the pool by skill descending, so the field was always the
+  //    STRONGEST 19 golfers (an elite cluster, all ~2.0–3.2 SF/hole) with no weak tail — the cut had
+  //    nothing gentle to bite, so the leaderboard never thinned early. Field-tier golfers carry no
+  //    home archetype, so that sort was pure skill bias and the home-weighting did nothing; a plain
+  //    shuffle restores a natural spread (weak field golfers ~1.7/hole up to champions ~2.5/hole), so
+  //    the ramping cut sweeps the tail first and eats upward — and because a golfer's score never
+  //    depends on the field's composition, this changes WHO gets cut, not the player's own difficulty.
   const pool = shuffle(
     GOLFERS.filter((g) => !used.has(g.id) && g.tier !== 'champion'),
     rng,
-  ).sort((a, b) => weightFor(b, arcArchetypes) - weightFor(a, arcArchetypes));
+  );
   for (const g of pool) {
     if (chosen.length >= FIELD_SIZE) break;
     add(g);
   }
 
   return { arcIndex, arc, playerId: PLAYER_ID, golfers: chosen.slice(0, FIELD_SIZE) };
-}
-
-/** A soft sort weight: a golfer whose home matches the arc floats up; field golfers stay neutral. */
-function weightFor(g: Golfer, arcArchetypes: Set<BiomeArchetype>): number {
-  let w = golferProfile(g.id).skill; // stronger golfers preferred slightly
-  if (g.homeArchetype && arcArchetypes.has(g.homeArchetype)) w += 0.5;
-  return w;
 }
 
 /** Fisher–Yates with a seeded Rng (pure). */
