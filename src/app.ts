@@ -923,6 +923,9 @@ let charging = false; // true while a pull gesture is loading (suppresses the re
 // map UNLESS free-aim is active (then drag aims) — so "move the map around" is the default touch.
 let mapView: 'follow' | 'whole' = 'follow';
 let mapZoom = 1;
+// Shop bag-inventory: the gear item the player tapped to inspect (its card shows for comparison with
+// the shop stock). View-only module state (like selClubId) — no reducer/save state, reset on buy.
+let inspectGearId: string | null = null;
 let mapPan: [number, number] = [0, 0];
 // Journey map (GS-galaxy-map): remember the trail strip's horizontal scroll so it survives the
 // per-frame re-render of the travel screen — snap to the most-recent stops only when a NEW stop's
@@ -2375,8 +2378,52 @@ function bagInventoryHTML(): string {
       </div>`;
     })
     .join('');
+  // --- The gear/accessories line (GS-proshop-3): every non-club item you own — glove, ball, shoe,
+  // shaft, putter, caddy, relic — sits ABOVE the clubs. Tap one to pop its card so you can compare it
+  // with what's on sale. Owned ids, de-duped, in purchase order.
+  const gearIds = [...new Set(loadout.perks)].filter((id) => {
+    const it = shopItem(id);
+    return !!it && !it.clubType; // clubs live in the row below
+  });
+  const gearChips = gearIds
+    .map((id) => {
+      const it = shopItem(id)!;
+      const owned = ownedCount(state.run.loadout.perks, id);
+      const col = rarCol(it.rarity);
+      const sel = inspectGearId === id;
+      const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
+      const count = owned > 1 ? `<span style="font-size:9px;opacity:.8;">×${owned}</span>` : '';
+      return `<div data-inspect="${id}" title="${it.name} — tap to compare"
+        style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:2px;width:54px;
+        padding:4px;border:1.5px solid ${sel ? col : col + '88'};border-radius:9px;background:${sel ? col + '22' : col + '10'};
+        ${sel ? `box-shadow:0 0 8px ${col}66;` : ''}">
+        <div style="width:100%;border-radius:6px;overflow:hidden;pointer-events:none;">${itemArtSVG(id, it.rarity, setTheme)}</div>
+        <span style="font-size:8.5px;text-align:center;line-height:1.05;max-height:2.1em;overflow:hidden;">${it.name}</span>${count}
+      </div>`;
+    })
+    .join('');
+  const gearRow = gearIds.length
+    ? `<div style="font-size:11px;font-weight:700;opacity:.8;margin:0 0 5px;">🧤 Your gear — tap to compare</div>
+       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px;">${gearChips}</div>`
+    : '';
+  // The inline inspect card for the tapped gear item (full card, for side-by-side comparison).
+  let inspectCard = '';
+  if (inspectGearId) {
+    const it = shopItem(inspectGearId);
+    if (it && gearIds.includes(inspectGearId)) {
+      const owned = ownedCount(state.run.loadout.perks, inspectGearId);
+      const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
+      const card = itemCardHTML(
+        { ...it, cost: itemCost(it, owned) },
+        { owned: owned >= itemCap(it), count: owned, artSVG: itemArtSVG(it.id, it.rarity, setTheme) },
+      );
+      inspectCard = `<div style="display:flex;justify-content:center;margin:2px 0 9px;">${card}</div>`;
+    }
+  }
   return `
     <div style="margin:.2em 0 .9em;padding:9px 11px;border:1px solid var(--gs-line-2);border-radius:10px;background:#ffffff05;">
+      ${gearRow}
+      ${inspectCard}
       <div style="font-size:12px;font-weight:700;opacity:.85;margin-bottom:7px;">🎒 Your bag — equipped clubs &amp; empty slots</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
       <div style="font-size:10px;opacity:.55;margin-top:7px;">Coloured = equipped (border shows rarity). Greyed = an empty slot a reward club could fill. 🛒 = on sale in this shop.</div>
@@ -2937,6 +2984,14 @@ function render(): void {
   // Wire actions.
   app.querySelectorAll<HTMLElement>('[data-action]').forEach((el) => {
     el.addEventListener('click', () => dispatch(JSON.parse(el.dataset.action!) as Action));
+  });
+  // Shop bag-inventory: tap an owned gear chip to pop its card (toggle), for comparison with the stock.
+  app.querySelectorAll<HTMLElement>('[data-inspect]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.inspect!;
+      inspectGearId = inspectGearId === id ? null : id;
+      render();
+    });
   });
   // Local (non-game) controls on the playing screen: club cycle + aim select.
   app.querySelectorAll<HTMLElement>('[data-cycle]').forEach((el) => {

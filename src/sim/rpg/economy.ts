@@ -738,6 +738,18 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     // always plays full swings, so a base/auto loadout is byte-for-byte unchanged.
     apply: (m) => ({ ...m, overpower: (m.overpower ?? 0) + 0.1, perks: [...m.perks, 'overdrive'] }),
   },
+  {
+    // The legendary power piece (GS-proshop-3): the 1989 NES Power Glove — MAX power. A single,
+    // unique, expensive overpower floor of +0.4 (a 140% pull ceiling, +40% carry), far past the
+    // stackable Overdrive's 120%. Interactive only (the auto sim always plays full swings), so it
+    // can't shift scoring or trip the death-spiral bar — a pure player-facing power fantasy.
+    id: 'power-glove',
+    name: 'Power Glove',
+    cost: 360,
+    desc: "It's so bad. Slip on the Power Glove and crank the pull gesture to MAX — pull to +40% carry, the biggest bomb in the galaxy",
+    rarity: 'legendary',
+    apply: (m) => ({ ...m, overpower: Math.max(m.overpower ?? 0, 0.4), perks: [...m.perks, 'power-glove'] }),
+  },
 
   // --- Trigger relics (GS-synergy) — payouts that reward a PLAYSTYLE, compounding with credit perks.
   // They define a run's identity (go aggressive for birdie/eagle credits, or build a comeback engine)

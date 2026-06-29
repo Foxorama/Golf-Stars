@@ -41,6 +41,7 @@ export type ItemArtKind =
   | 'shaft'
   | 'ball'
   | 'glove'
+  | 'powerglove'
   | 'coin'
   | 'putter'
   | 'shoes'
@@ -70,6 +71,7 @@ const KIND_BY_ID: Record<string, ItemArtKind> = {
   'hook-corrector': 'glove',
   'slice-corrector': 'glove',
   'draw-weighting': 'glove',
+  'power-glove': 'powerglove',
   'lucky-coin': 'coin',
   'fortune-chip': 'coin',
   'putting-grip': 'putter',
@@ -119,6 +121,144 @@ function sparkles(seed: string, col: string, n = 5): string {
     s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" opacity="${(0.4 + hash01(seed + 'o' + i) * 0.5).toFixed(2)}"/>`;
   }
   return s;
+}
+
+// --- Per-id EMBLEM roundels (GS-proshop-3) -----------------------------------
+// Several items share a base art KIND (4 shafts, 5 gloves, 4 wedges, 4 trophies, 2 coins/putters/
+// coaches). The base glyph keeps each "the right picture for the item" (a glove looks like a glove);
+// a small top-right emblem roundel — a vector symbol of what the item DOES — makes every card UNIQUE
+// and reads its function at a glance. Pure, deterministic (keyed off the id only).
+
+/** A small symbol roundel pinned top-right, holding a per-id function emblem. */
+function roundel(inner: string, col: string): string {
+  return `<g transform="translate(131 21)">
+    <circle r="14" fill="#0b0d12" stroke="${col}" stroke-width="1.6"/>
+    <circle r="14" fill="${mix(col, '#ffffff', 0.3)}" opacity="0.1"/>
+    ${inner}
+  </g>`;
+}
+
+/** A right-curving arrow (slice) or its mirror (hook) — `dir` 1 = right, −1 = left. */
+function curveArrow(col: string, dir: 1 | -1, crossed = false): string {
+  const d = dir;
+  const slash = crossed ? `<path d="M -10 -10 L 10 10" stroke="#ff5d5d" stroke-width="2.4" stroke-linecap="round"/>` : '';
+  return `<g transform="scale(${d} 1)" stroke="${col}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M -6 9 Q -6 -6 7 -8"/>
+      <path d="M 7 -8 l -5 -1 m 5 1 l -1 5" />
+    </g>${slash}`;
+}
+
+/** The per-id function emblem (vector symbol authored around the roundel origin, ±11). */
+const EMBLEM: Record<string, (col: string) => string> = {
+  // Shafts ----------------------------------------------------------------
+  'power-cell': (c) => `<path d="M 2 -10 L -6 1 L -1 1 L -3 10 L 6 -2 L 1 -2 Z" fill="${c}"/>`, // power bolt
+  gyro: (c) =>
+    `<g fill="none" stroke="${c}" stroke-width="1.6"><circle r="2.6"/><ellipse rx="10" ry="4.2"/><ellipse rx="10" ry="4.2" transform="rotate(60)"/><ellipse rx="10" ry="4.2" transform="rotate(120)"/></g>`, // gyroscope rings
+  'distance-control': (c) =>
+    `<g stroke="${c}" stroke-width="1.7" fill="none" stroke-linecap="round"><path d="M -9 -8 v 16 M 9 -8 v 16"/><path d="M -7 0 h 6 M -1 0 l -3 -3 m 3 3 l -3 3"/><path d="M 7 0 h -6 M 1 0 l 3 -3 m -3 3 l 3 3"/></g>`, // tightening window
+  overdrive: (c) =>
+    `<g stroke="${c}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M -8 -6 l 5 6 l -5 6"/><path d="M 0 -6 l 5 6 l -5 6"/></g>`, // speed chevrons
+  // Gloves ----------------------------------------------------------------
+  'precision-chip': (c) =>
+    `<g stroke="${c}" stroke-width="1.6" fill="none"><circle r="8"/><path d="M 0 -11 v 5 M 0 11 v -5 M -11 0 h 5 M 11 0 h -5"/></g><circle r="1.8" fill="${c}"/>`, // crosshair
+  'anti-duck-hook': (c) => curveArrow(c, -1, true), // crossed-out hard left
+  'hook-corrector': (c) => curveArrow(c, -1), // left curve
+  'slice-corrector': (c) => curveArrow(c, 1), // right curve
+  'draw-weighting': (c) =>
+    `<g stroke="${c}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M 8 -8 Q -8 -8 -8 8"/><path d="M -8 8 l 5 -1 m -5 1 l 1 -5"/></g>`, // draw shape
+  'power-glove': (c) => `<path d="M 2 -10 L -6 1 L -1 1 L -3 10 L 6 -2 L 1 -2 Z" fill="${c}"/>`, // MAX power bolt
+  // Coins -----------------------------------------------------------------
+  'lucky-coin': (c) =>
+    `<g fill="${c}"><circle cx="0" cy="-5" r="3.6"/><circle cx="-5" cy="0" r="3.6"/><circle cx="5" cy="0" r="3.6"/><circle cx="0" cy="5" r="3.6"/></g><rect x="-1" y="0" width="2" height="8" fill="${c}"/>`, // clover
+  'fortune-chip': (c) =>
+    `<path d="M 0 -10 L 9 -6 L 9 3 Q 9 9 0 11 Q -9 9 -9 3 L -9 -6 Z" fill="none" stroke="${c}" stroke-width="1.6"/><text y="4" font-size="11" text-anchor="middle" fill="${c}" font-weight="bold" font-family="Georgia,serif">$</text>`, // sponsor shield
+  // Putters ---------------------------------------------------------------
+  'putting-grip': (c) =>
+    `<g stroke="${c}" stroke-width="1.7" stroke-linecap="round"><path d="M -7 -9 l 14 5 M -7 -3 l 14 5 M -7 3 l 14 5"/></g>`, // grip wrap lines
+  'tour-putter': (c) =>
+    `<path d="M 0 -10 l 2.6 6.3 l 6.8 .5 l -5.2 4.4 l 1.7 6.6 l -5.9 -3.6 l -5.9 3.6 l 1.7 -6.6 l -5.2 -4.4 l 6.8 -.5 Z" fill="${c}"/>`, // star
+  // Wedges ----------------------------------------------------------------
+  'sweet-spot': (c) =>
+    `<g fill="none" stroke="${c}" stroke-width="1.5"><circle r="9"/><circle r="5"/></g><circle r="1.8" fill="${c}"/>`, // bullseye
+  'wedge-touch': (c) =>
+    `<g stroke="${c}" stroke-width="1.6" fill="none"><path d="M 0 -10 v 6 M 0 10 v -6 M -10 0 h 6 M 10 0 h -6"/></g><circle r="2.4" fill="${c}"/>`, // pin-point
+  'shank-guard': (c) => curveArrow(c, 1, true), // crossed-out hard right
+  'spin-milled': (c) =>
+    `<path d="M 0 0 m 0 -2 a 2 2 0 0 1 2 2 a 4 4 0 0 1 -4 4 a 6 6 0 0 1 -6 -6 a 8 8 0 0 1 8 -8 a 10 10 0 0 1 10 10" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round"/>`, // spin spiral
+  // Coaches ---------------------------------------------------------------
+  'pro-coach': (c) =>
+    `<g fill="none" stroke="${c}" stroke-width="1.6"><circle cx="2" cy="0" r="5"/><path d="M -3 0 L -10 -4 L -10 4 Z" fill="${c}"/></g>`, // whistle
+  'caddie-lesson': (c) =>
+    `<g fill="${c}"><path d="M 0 -8 L 11 -3 L 0 2 L -11 -3 Z"/><path d="M 0 2 L 7 -1 v 5 Q 0 8 -7 4 v -5 Z" opacity="0.85"/></g>`, // mortarboard
+  // Trophies / relics -----------------------------------------------------
+  'birdie-hunter': (c) =>
+    `<path d="M -10 2 Q -3 -8 0 -2 Q 3 -8 10 2 Q 3 0 0 6 Q -3 0 -10 2 Z" fill="${c}"/>`, // bird in flight
+  'eagle-eye': (c) =>
+    `<g fill="none" stroke="${c}" stroke-width="1.6"><path d="M -10 0 Q 0 -8 10 0 Q 0 8 -10 0 Z"/></g><circle r="3" fill="${c}"/>`, // eye
+  'comeback-kid': (c) =>
+    `<g stroke="${c}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M 0 9 V -8"/><path d="M -6 -2 L 0 -9 L 6 -2"/></g>`, // up arrow
+  'glass-cannon': (c) =>
+    `<g stroke="${c}" stroke-width="1.8" fill="none" stroke-linecap="round"><path d="M 0 -10 L 2 -2 L 9 -1 L 3 3 L 6 10 L 0 5 L -6 10 L -3 3 L -9 -1 L -2 -2 Z"/></g>`, // burst
+  // Singles (already unique by kind, but an emblem adds flavour) -----------
+  'tour-spikes': (c) => `<g fill="${c}"><circle cx="-6" cy="-5" r="2.2"/><circle cx="5" cy="-6" r="2.2"/><circle cx="-3" cy="4" r="2.2"/><circle cx="7" cy="3" r="2.2"/><circle cx="-8" cy="2" r="2.2"/></g>`, // cleats
+  rangefinder: (c) =>
+    `<g fill="none" stroke="${c}" stroke-width="1.6"><circle r="9"/><path d="M 0 -12 v 5 M 0 12 v -5 M -12 0 h 5 M 12 0 h -5"/></g><circle r="2" fill="${c}"/>`, // reticle
+};
+
+/** Legendary "awesome" flair: a radiant gold corona burst + extra glints behind the gear. */
+function legendaryFlair(col: string): string {
+  const gold = mix(col, '#ffe6a0', 0.4);
+  const rays = Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2;
+    const x0 = 36 + Math.cos(a) * 18;
+    const y0 = 46 + Math.sin(a) * 18;
+    const x1 = 36 + Math.cos(a) * (30 + (i % 2) * 8);
+    const y1 = 46 + Math.sin(a) * (30 + (i % 2) * 8);
+    return `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} L ${x1.toFixed(1)} ${y1.toFixed(1)}"/>`;
+  }).join('');
+  // A soft corona built from stacked translucent circles (no gradient <def> → no document-global id
+  // collision when several legendary cards share a page).
+  const corona = [22, 17, 12]
+    .map((r, i) => `<circle cx="30" cy="44" r="${r}" fill="${gold}" opacity="${(0.05 + i * 0.04).toFixed(2)}"/>`)
+    .join('');
+  return `<g>${corona}<g stroke="${gold}" stroke-width="1.2" stroke-linecap="round" opacity="0.32">${rays}</g></g>`;
+}
+
+/** Overlay extra content just inside the closing tag of a frame's `<svg>`. */
+function withOverlay(svg: string, extra: string): string {
+  return extra ? svg.replace(/<\/svg>\s*$/, `${extra}</svg>`) : svg;
+}
+
+/** The iconic 1989 NES Power Glove — the new legendary MAX-power item. */
+function drawPowerGlove(col: string, seed: string): string {
+  const silver = '#c9ccd4';
+  const dark = '#2b2f3a';
+  const orange = '#e0662a';
+  return frame(
+    `${sparkles(seed, col, 5)}
+     <g transform="translate(58 50) rotate(-18)">
+       <!-- forearm gauntlet -->
+       <rect x="-30" y="6" width="40" height="34" rx="6" fill="${dark}" stroke="#11141b" stroke-width="2"/>
+       <rect x="-30" y="6" width="40" height="13" rx="6" fill="${silver}" stroke="#11141b" stroke-width="2"/>
+       <!-- control pad -->
+       <rect x="-26" y="22" width="32" height="15" rx="2" fill="#15171d" stroke="#0a0c10" stroke-width="1.5"/>
+       <rect x="-24" y="24" width="11" height="8" rx="1" fill="#0c2a16" stroke="#1f6e3a" stroke-width="0.8"/>
+       <text x="-18.5" y="30.5" font-size="5.5" text-anchor="middle" fill="#48e27a" font-family="monospace">88</text>
+       <g fill="${orange}"><rect x="-10" y="24" width="3.5" height="3.5" rx="0.6"/><rect x="-5.5" y="24" width="3.5" height="3.5" rx="0.6"/><rect x="-1" y="24" width="3.5" height="3.5" rx="0.6"/>
+         <rect x="-10" y="28.5" width="3.5" height="3.5" rx="0.6"/><rect x="-5.5" y="28.5" width="3.5" height="3.5" rx="0.6"/><rect x="-1" y="28.5" width="3.5" height="3.5" rx="0.6"/></g>
+       <!-- hand + fingers -->
+       <path d="M 8 4 q 14 -2 20 6 q 4 6 -2 9 l -18 5 q -8 1 -8 -8 l 0 -10 q 0 -6 8 -7 z" fill="${silver}" stroke="#11141b" stroke-width="2" stroke-linejoin="round"/>
+       <g fill="${silver}" stroke="#11141b" stroke-width="1.6">
+         <rect x="24" y="-6" width="7" height="16" rx="3" transform="rotate(10 27 2)"/>
+         <rect x="26" y="2" width="7" height="16" rx="3" transform="rotate(2 29 10)"/>
+         <rect x="24" y="11" width="7" height="15" rx="3" transform="rotate(-8 27 18)"/>
+         <rect x="20" y="18" width="6" height="13" rx="3" transform="rotate(-18 23 24)"/>
+       </g>
+       <!-- gold finger sensors -->
+       <g fill="#f2c14e"><rect x="25" y="-3" width="5" height="2.4" rx="1" transform="rotate(10 27 2)"/><rect x="27" y="5" width="5" height="2.4" rx="1" transform="rotate(2 29 10)"/><rect x="25" y="14" width="5" height="2.4" rx="1" transform="rotate(-8 27 18)"/></g>
+     </g>`,
+    col,
+  );
 }
 
 /** A golf ball with dimples, optionally tinted. */
@@ -502,33 +642,56 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
   const col = rarCol(rarity);
   const kind = itemArtKind(id);
   const seed = id;
+  let base: string;
   switch (kind) {
     case 'shaft':
-      return drawShaft(col, seed);
+      base = drawShaft(col, seed);
+      break;
     case 'ball':
-      return drawBall(id, col, seed);
+      base = drawBall(id, col, seed);
+      break;
     case 'glove':
-      return drawGlove(col, seed);
+      base = drawGlove(col, seed);
+      break;
+    case 'powerglove':
+      base = drawPowerGlove(col, seed);
+      break;
     case 'coin':
-      return drawCoin(col, seed);
+      base = drawCoin(col, seed);
+      break;
     case 'putter':
-      return drawPutter(col, seed);
+      base = drawPutter(col, seed);
+      break;
     case 'shoes':
-      return drawShoes(col, seed);
+      base = drawShoes(col, seed);
+      break;
     case 'rangefinder':
-      return drawRangefinder(col, seed);
+      base = drawRangefinder(col, seed);
+      break;
     case 'wedge':
-      return drawWedge(col, seed);
+      base = drawWedge(col, seed);
+      break;
     case 'coach':
-      return drawCoach(col, seed);
+      base = drawCoach(col, seed);
+      break;
     case 'trophy':
-      return drawTrophy(col, seed);
+      base = drawTrophy(col, seed);
+      break;
     case 'club':
-      return drawThemedClub(setTheme, col, seed);
+      base = drawThemedClub(setTheme, col, seed);
+      break;
     case 'caddy':
     default:
-      return drawCaddyFigure(id, col, seed);
+      base = drawCaddyFigure(id, col, seed);
+      break;
   }
+  // Per-id emblem roundel (makes shared-kind items unique + reads the function); caddies/clubs/balls
+  // are already bespoke/flavoured, so they skip it. Legendary items get the radiant gold flair.
+  const emblem = EMBLEM[id];
+  let overlay = '';
+  if (rarity === 'legendary') overlay += legendaryFlair(col);
+  if (emblem) overlay += roundel(emblem(mix(col, '#ffffff', 0.3)), col);
+  return withOverlay(base, overlay);
 }
 
 /** The named caddies with a bespoke shop-card portrait (GS-proshop-2). */
