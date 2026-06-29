@@ -200,7 +200,7 @@ export const CHARACTERS: readonly Character[] = [
     blurb: 'Zips the short irons back on a string — pin-seekers that bite and hold.',
     pros: ['Heavy backspin from 5-iron down — approaches stop dead', 'Tighter scoring clubs'],
     cons: ['Slightly shorter off the tee'],
-    style: { cap: '#9b5fd4', shirt: '#7d46b8', skin: '#caa182', build: 1.0 },
+    style: { cap: '#9b5fd4', shirt: '#7d46b8', skin: '#a8714c', build: 1.0 },
     stats: { power: 2, accuracy: 4, touch: 5, consistency: 4 },
     // The balanced bag but −8 off the tee; distanceClubBonus carries the −8 onto reward distance clubs.
     loadout: (m) => ({
