@@ -888,6 +888,24 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   existing `_gsFeel` (`aceDelayMs` sub-field), so the test-hub guard needs no new control. Tests:
   `tests/ace.test.ts` (count/credit/talent helpers, ace-only talent, `finishStop` pays + applies +
   records, no-ace no-regression, snapshot/resume rebuild) + `tests/save.test.ts` (v5 migration).
+- **Eagle (−2) and albatross (−3) get their own fly-over celebration (GS-bird).** A holed −2 / −3 that
+  ISN'T an ace fires a full-screen, assetless Canvas2D takeover — a stylised bird soaring across the
+  starfield behind a themed headline card — mirroring `showAceCelebration` but PURELY COSMETIC (no
+  reward, no save/reducer touch, so determinism is untouched). The **eagle** is a fast chrome-silver
+  raptor (broad fingered wings) that screams overhead (`sfx.eagle()` — a stuttered "kek-kek" + a long
+  descending screech); the **albatross** is a vast, slow, glowing-aurora glider (long high-aspect
+  wings + an aurora sparkle trail) with an ethereal cosmic swell (`sfx.albatross()`). Precedence: ACE
+  wins (a holed-out par-4 is technically an albatross, but a hole-in-one keeps its grander overlay) —
+  the trigger order in the play-view `onDone` is `isAce → birdKind (relToPar ≤ −3 albatross, === −2
+  eagle) → done`. Lives entirely in `app.ts` as a side-effect (`showBirdCelebration` + the seeded
+  `runBirdFlight` rAF, mulberry32 — no `Math.random`; the loop self-stops on overlay teardown), gated
+  once-per-hole by `birdCelebratedHole` (reset per hole in `render()` beside `aceCelebratedHole`).
+  `HAPTICS.eagle`/`.albatross`, `sfx.eagle()`/`.albatross()` (assetless WebAudio synth), and the
+  `.gs-bird`/`.gs-bird--eagle`/`.gs-bird--albatross` CSS (reuses the GS-ace keyframes) round it out.
+  GOTCHA: the per-kind title gradient uses `background-image:` (NOT the `background` shorthand, which
+  resets `background-clip:text` and renders the title as a blank bar). Canvas/audio feel is eyes-on
+  (Playwright-verified per kind). NO new `_gs*` flag — the celebration delay rides the existing
+  `_gsFeel.birdDelayMs` sub-field (default 380) like `aceDelayMs`, so the test-hub guard needs nothing.
 - **Pro Shop expansion: golf-themed gear, new gameplay items, themed club sets + procedural images
   (GS-proshop-2).** Four coupled pieces, all default-OFF so a base loadout is byte-for-byte unchanged in
   the sim (the determinism contract — proven by the full suite staying green):

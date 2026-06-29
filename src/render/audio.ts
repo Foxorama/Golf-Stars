@@ -166,4 +166,32 @@ export const sfx = {
     // A sparkle cascade tail.
     [1568, 2093, 2637, 3136].forEach((f, i) => tone(f, 0.2, { type: 'sine', gain: 0.12, t: 0.62 + i * 0.05 }));
   },
+  /** Eagle (−2) — a raptor's scream: a stuttered "kek-kek-kek" attack, then a long piercing
+   *  descending screech (detuned for grit) over an airy rush of wings. */
+  eagle(): void {
+    // The stuttered chirp attack.
+    [0, 0.075, 0.15].forEach((t, i) =>
+      tone(2150 - i * 120, 0.06, { type: 'sawtooth', gain: 0.13, t, sweepTo: 1500 - i * 120 }),
+    );
+    // The long piercing screech, a detuned saw+triangle pair for a metallic rasp.
+    tone(2250, 0.6, { type: 'sawtooth', gain: 0.17, t: 0.2, sweepTo: 660 });
+    tone(2270, 0.6, { type: 'triangle', gain: 0.1, t: 0.2, sweepTo: 670 });
+    // The rush of wing-beaten air under it.
+    noise(0.55, { gain: 0.06, type: 'highpass', freq: 2800, t: 0.2 });
+  },
+  /** Albatross (−3) — the rarest, grandest moment a player will see: a deep cosmic swell, a soaring
+   *  lead that glides skyward, and a shimmering aurora cascade. Ethereal where the ace is a fanfare. */
+  albatross(): void {
+    // The deep rising pad — three voices opening into a fifth (the swell).
+    [98, 147, 196].forEach((f) => tone(f, 1.5, { type: 'sine', gain: 0.08, sweepTo: f * 1.5 }));
+    // A soaring lead taking the sky.
+    tone(440, 1.7, { type: 'triangle', gain: 0.14, t: 0.1, sweepTo: 1320 });
+    tone(660, 1.6, { type: 'sine', gain: 0.07, t: 0.2, sweepTo: 1760 });
+    // A shimmering aurora cascade tail.
+    [1047, 1319, 1568, 2093, 2637, 3136].forEach((f, i) =>
+      tone(f, 0.42, { type: 'sine', gain: 0.08, t: 0.55 + i * 0.11 }),
+    );
+    // A soft wind whoosh beneath the whole thing.
+    noise(1.3, { gain: 0.05, type: 'bandpass', freq: 520, q: 0.5, t: 0.1 });
+  },
 };
