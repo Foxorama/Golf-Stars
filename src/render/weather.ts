@@ -35,6 +35,27 @@ function mulberry32(seed: number): () => number {
 }
 const wrap = (v: number, m: number): number => ((v % m) + m) % m;
 
+/** A cached soft warm-white glow sprite, stamped with drawImage for hero stars / streak heads — far
+ *  cheaper than per-draw `shadowBlur` (the intro's perf lesson) and gives the same lush bloom. */
+let _glow: HTMLCanvasElement | null = null;
+function glowSprite(): HTMLCanvasElement | null {
+  if (_glow) return _glow;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext('2d');
+  if (!g) return null;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+  grad.addColorStop(0.35, 'rgba(218,234,255,0.36)');
+  grad.addColorStop(1, 'rgba(218,234,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  _glow = c;
+  return c;
+}
+
 /** Per-archetype wind tint (kept in sync with the scene builder's `WIND_COL`). */
 const WIND_RGBA: Record<string, string> = {
   inferno: '255,150,70',
@@ -76,6 +97,7 @@ interface Star {
   r: number;
   ph: number;
   blue: boolean;
+  hero: boolean;
 }
 interface Meteor {
   x: number; // 0..1 lane
@@ -117,13 +139,16 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
 
   function build(): void {
     const rng = mulberry32(o.seed);
-    // Ambient twinkle field — biased to the upper sky but salted across the view.
-    stars = Array.from({ length: 46 }, () => ({
+    // Ambient twinkle field — a LUSH starfield like the intro: density scales with the visible area,
+    // salted across the whole view, a tenth of them glowing "hero" stars.
+    const starCount = Math.max(60, Math.min(180, Math.round((W * H) / 7200)));
+    stars = Array.from({ length: starCount }, () => ({
       x: rng() * W,
-      y: rng() * H * 0.78,
-      r: 0.5 + rng() * 1.5,
+      y: rng() * H,
+      r: 0.5 + rng() * 1.6,
       ph: rng() * Math.PI * 2,
       blue: rng() < 0.45,
+      hero: rng() < 0.12,
     }));
     shootOff = rng() * 6000;
     // Meteor lanes (a handful of big fireballs among the streaks).
@@ -188,15 +213,18 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
 
   function drawStars(ctx: CanvasRenderingContext2D, now: number): void {
     if (!spaceOn) return;
+    const sprite = glowSprite();
     ctx.save();
     for (const s of stars) {
-      const a = 0.2 + 0.55 * (0.5 + 0.5 * Math.sin(now * 0.003 + s.ph));
-      if (s.r > 1.05) {
-        ctx.globalAlpha = a * 0.22;
-        ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r * 2.6, 0, Math.PI * 2);
-        ctx.fill();
+      const tw = 0.5 + 0.5 * Math.sin(now * 0.003 + s.ph);
+      const a = 0.25 + 0.6 * tw;
+      // Hero stars bloom through the cached glow sprite (cheap; the intro's perf trick).
+      if (s.hero && sprite) {
+        const gr = (s.r + 2.2) * (1.6 + 0.5 * tw);
+        ctx.globalAlpha = a * 0.7;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(sprite, s.x - gr, s.y - gr, gr * 2, gr * 2);
+        ctx.globalCompositeOperation = 'source-over';
       }
       ctx.globalAlpha = a;
       ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
@@ -246,25 +274,47 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     if (!windOn || o.windSpd < 2) return;
     const [dx, dy] = windDir;
     const intensity = Math.min(1, (o.windSpd - 2) / 26);
-    const count = Math.round(14 + intensity * 66);
-    const drift = now * 0.001 * (20 + intensity * 130);
-    const wW = W + 40;
-    const wH = H + 40;
+    // FLOWING comet-streaks that drift in the wind direction — a bright leading HEAD and a tapered
+    // glow TAIL trailing UPWIND, so direction is unmistakable and the whole field is clearly weather,
+    // not rain scratches. Count, length, glow AND drift speed all scale with wind speed, so a strong
+    // wind reads as a faster, busier, brighter stream you can feel pushing the shot.
+    const count = Math.round(10 + intensity * 46);
+    const speed = 26 + intensity * 150;
+    const drift = now * 0.001 * speed;
+    const wW = W + 60;
+    const wH = H + 60;
+    const px = -dy; // cross-stream, for a gentle flutter
+    const py = dx;
+    const sprite = glowSprite();
     ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
     for (let i = 0; i < count; i++) {
       const p = windDots[i]!;
-      const t = drift * p.s;
-      const x = wrap(p.x + dx * t, wW) - 20;
-      const y = wrap(p.y + dy * t, wH) - 20;
-      const a = (0.08 + intensity * 0.18) * (0.6 + 0.4 * Math.sin(now * 0.004 + p.ph));
-      const L = (3 + intensity * 13) * (0.6 + p.s);
-      ctx.strokeStyle = `rgba(${windCol},${a.toFixed(3)})`;
-      ctx.lineWidth = 1.1;
+      const t = drift * (0.6 + p.s);
+      const hx = wrap(p.x + dx * t, wW) - 30;
+      const hy = wrap(p.y + dy * t, wH) - 30;
+      const L = (14 + intensity * 40) * (0.5 + p.s);
+      const flut = Math.sin(now * 0.0022 + p.ph) * (1.5 + intensity * 3);
+      const tx = hx - dx * L + px * flut;
+      const ty = hy - dy * L + py * flut;
+      const a = (0.07 + intensity * 0.2) * (0.55 + 0.45 * Math.sin(now * 0.004 + p.ph));
+      const grad = ctx.createLinearGradient(tx, ty, hx, hy);
+      grad.addColorStop(0, `rgba(${windCol},0)`);
+      grad.addColorStop(1, `rgba(${windCol},${a.toFixed(3)})`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1 + p.s * 1.3;
       ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x - dx * L, y - dy * L);
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(hx, hy);
       ctx.stroke();
+      // A small glowing head so the leading edge pops (a couple bloom through the sprite).
+      if (sprite && p.s > 0.7) {
+        const gr = 3 + intensity * 4;
+        ctx.globalAlpha = a * 1.4;
+        ctx.drawImage(sprite, hx - gr, hy - gr, gr * 2, gr * 2);
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.restore();
   }

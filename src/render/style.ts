@@ -45,8 +45,34 @@ export type Prim =
   | { t: 'poly'; pts: Vec[]; fill?: string; stroke?: string; sw?: number; dash?: number[] }
   | { t: 'circle'; c: Vec; r: number; fill?: string; stroke?: string; sw?: number }
   | { t: 'line'; a: Vec; b: Vec; stroke: string; sw: number; round?: boolean; dash?: number[] }
+  /** A SOFT radial glow: `col` (rgba) at the centre fading to fully transparent at radius `r`. The
+   *  intro's sky is built from screen-blended soft nebulae — this brings the same look in-game so a
+   *  nebula reads as a luminous wash, not a hard-edged flat disc (the "weird static blob" bug). */
+  | { t: 'glow'; c: Vec; r: number; col: string }
   /** Draw `children` clipped to the `clip` polygon (used for mowing stripes). */
   | { t: 'clip'; clip: Vec[]; children: Prim[] };
+
+/** Split an `rgba()/rgb()/#hex` colour into an `rgb()` string + its alpha (render helper). */
+function rgbaParts(col: string): { rgb: string; a: number } {
+  const m = col.match(/rgba?\(([^)]+)\)/);
+  if (m) {
+    const p = m[1]!.split(',').map((s) => s.trim());
+    return { rgb: `rgb(${p[0]},${p[1]},${p[2]})`, a: p[3] !== undefined ? Number(p[3]) : 1 };
+  }
+  const h = col.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/(.)/g, '$1$1') : h, 16);
+  return { rgb: `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`, a: 1 };
+}
+/** The same colour at zero alpha — the outer stop of a glow gradient. */
+function fadeCol(col: string): string {
+  const { rgb } = rgbaParts(col);
+  return rgb.replace('rgb(', 'rgba(').replace(')', ',0)');
+}
+/** Scale an rgba colour's alpha (clamped to 1) — for tuning a glow's peak brightness. */
+function scaleAlpha(col: string, k: number): string {
+  const { rgb, a } = rgbaParts(col);
+  return rgb.replace('rgb(', 'rgba(').replace(')', `,${Math.min(1, a * k).toFixed(3)})`);
+}
 
 /** Art tunables (escape-hatch). Multipliers gate density; `0` switches a layer off. */
 export interface ArtFeel {
@@ -795,26 +821,30 @@ function windStreaks(hole: Hole, proj: Projector, arch: BiomeArchetype, W: numbe
   const [dx, dy] = windScreenDir(hole, proj);
   if (dx === 0 && dy === 0) return [];
   const intensity = Math.min(1, (spd - 2) / 26);
-  // Denser + brighter than before so the weather READS on the static decision map (it used to be so
-  // faint pre-shot that wind only seemed to appear once the animated play-view drift kicked in — the
-  // "weather only shows in flight" bug). Off the independent `crng`, and the LAST crng consumer in
-  // buildScene, so boosting the count shifts nothing else (determinism preserved).
-  const count = Math.round(16 + intensity * 52);
+  // FLOWING comet-streaks, not scratchy uniform dashes (the old look read as rain on the glass). Each
+  // streak is a faint long TAIL + a brighter short HEAD at its leading edge, so the wind DIRECTION
+  // reads at a glance even on the still SVG map; count/length/brightness scale with speed. The
+  // animated overlay (weather.ts) layers true motion on top during play. Off the independent `crng`,
+  // the LAST crng consumer in buildScene, so count/draw changes shift nothing else (determinism kept).
+  const count = Math.round(10 + intensity * 30);
   const colBase = WIND_COL[arch];
+  // The cross-stream perpendicular, to bow each streak slightly into a gust curve.
+  const px = -dy;
+  const py = dx;
   const prims: Prim[] = [];
   for (let i = 0; i < count; i++) {
-    const x = crng() * W;
-    const y = crng() * H;
-    const len = (9 + intensity * 24) * (0.6 + crng() * 0.8);
-    const a = (0.13 + intensity * 0.24) * (0.6 + crng() * 0.4);
-    prims.push({
-      t: 'line',
-      a: [x, y],
-      b: [x - dx * len, y - dy * len],
-      stroke: colBase + a.toFixed(3) + ')',
-      sw: 1,
-      round: true,
-    });
+    const hx = crng() * W;
+    const hy = crng() * H;
+    const len = (16 + intensity * 40) * (0.55 + crng() * 0.9);
+    const bow = (crng() - 0.5) * len * 0.18;
+    const tailA = (0.05 + intensity * 0.10) * (0.6 + crng() * 0.4);
+    const headA = tailA * 2.1;
+    // faint long tail, trailing back UPWIND from the head
+    const tx = hx - dx * len + px * bow;
+    const ty = hy - dy * len + py * bow;
+    prims.push({ t: 'line', a: [hx, hy], b: [tx, ty], stroke: colBase + tailA.toFixed(3) + ')', sw: 1, round: true });
+    // brighter short head segment so the leading edge (wind direction) pops
+    prims.push({ t: 'line', a: [hx, hy], b: [hx - dx * len * 0.32, hy - dy * len * 0.32], stroke: colBase + headA.toFixed(3) + ')', sw: 1.5, round: true });
   }
   return prims;
 }
@@ -882,13 +912,17 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const crng = mulberry32((hashHole(hole) ^ 0x5747a2) >>> 0);
 
   // --- 1. Deep space: an opaque world-tinted base + soft nebula smears ---------
+  // The nebulae are SOFT radial GLOWS (luminous wash, the intro's sky) — NOT hard-edged flat discs,
+  // which read as a "weird static blob" floating over the hole. A touch brighter at the core than the
+  // old flat alpha (a glow falls off, so a flat-alpha peak looked anaemic) and feathered to nothing.
   prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: space.base });
-  for (let i = 0; i < 2; i++) {
+  const nebPeak = scaleAlpha(space.nebula, 1.9);
+  for (let i = 0; i < 3; i++) {
     prims.push({
-      t: 'circle',
-      c: [W * (0.12 + crng() * 0.72), H * (0.06 + crng() * 0.42)],
-      r: (0.28 + crng() * 0.26) * Math.max(W, H),
-      fill: space.nebula,
+      t: 'glow',
+      c: [W * (0.08 + crng() * 0.84), H * (0.04 + crng() * 0.5)],
+      r: (0.3 + crng() * 0.3) * Math.max(W, H),
+      col: nebPeak,
     });
   }
 
@@ -904,8 +938,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
         tone < 0.6 ? 'rgba(255,255,255,0.92)' : tone < 0.8 ? 'rgba(186,214,255,0.9)' : 'rgba(255,222,228,0.85)';
       prims.push({ t: 'circle', c: [sx, sy], r, fill: col });
       if (crng() < 0.16) {
-        // A brighter star: a soft halo + a 4-point twinkle.
-        prims.push({ t: 'circle', c: [sx, sy], r: r * 2.6, fill: 'rgba(255,255,255,0.10)' });
+        // A brighter star: a soft glowing halo + a 4-point twinkle (the intro's hero stars).
+        prims.push({ t: 'glow', c: [sx, sy], r: r * 4.5, col: 'rgba(255,255,255,0.5)' });
         const s = r + 1.8;
         prims.push({ t: 'line', a: [sx - s, sy], b: [sx + s, sy], stroke: col, sw: 0.7, round: true });
         prims.push({ t: 'line', a: [sx, sy - s], b: [sx, sy + s], stroke: col, sw: 0.7, round: true });
@@ -1128,8 +1162,19 @@ function ptsStr(pts: Vec[]): string {
 /** Render a prim list to an SVG fragment string (pure). Clip ids are a deterministic counter. */
 export function scenePrimsToSvg(prims: Prim[]): string {
   let clipId = 0;
+  let glowId = 0;
   const one = (p: Prim): string => {
     switch (p.t) {
+      case 'glow': {
+        const id = `gsg${glowId++}`;
+        const { rgb, a } = rgbaParts(p.col);
+        return (
+          `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${n1(p.c[0])}" cy="${n1(p.c[1])}" r="${n1(Math.max(0.01, p.r))}">` +
+          `<stop offset="0" stop-color="${rgb}" stop-opacity="${a.toFixed(3)}"/>` +
+          `<stop offset="1" stop-color="${rgb}" stop-opacity="0"/></radialGradient>` +
+          `<circle cx="${n1(p.c[0])}" cy="${n1(p.c[1])}" r="${n1(Math.max(0, p.r))}" fill="url(#${id})" />`
+        );
+      }
       case 'poly': {
         const stroke = p.stroke
           ? ` stroke="${p.stroke}" stroke-width="${p.sw ?? 1}"${p.dash ? ` stroke-dasharray="${p.dash.join(' ')}"` : ''}`
@@ -1165,6 +1210,17 @@ export function drawScenePrims(ctx: CanvasRenderingContext2D, prims: Prim[]): vo
   };
   const one = (p: Prim): void => {
     switch (p.t) {
+      case 'glow': {
+        const r = Math.max(0.01, p.r);
+        const g = ctx.createRadialGradient(p.c[0], p.c[1], 0, p.c[0], p.c[1], r);
+        g.addColorStop(0, p.col);
+        g.addColorStop(1, fadeCol(p.col));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(p.c[0], p.c[1], r, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
       case 'poly': {
         path(p.pts);
         ctx.closePath();
