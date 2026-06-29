@@ -929,6 +929,22 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   (`caddyProjectile` gate — the no-clutter rule); a non-guard caddy (Dr Chipinski) appears in the corner
   TRANSIENTLY only during its callout, so the chip-in shows the doctor + phone + bubble then vanishes.
   Voice is gated on the `sound` setting + fully guarded (silent where unsupported).
+- **The guard redirect is a SLOW-MO ZOOM-TO-IMPACT cinematic where the projectile actually HITS the ball
+  (GS-caddy-impact, `playView.ts`).** The redirect used to fire the laser/boomerang on a SEPARATE fixed
+  clock (`t0`/`dur`) toward a FROZEN screen point, so under slo-mo (and with the follow-cam panning) the
+  throw sailed past the still-moving ball — "it no longer hits the ball." Now the projectile is tied to
+  the BALL's flight progress `tg`: the caddy looses it at `REDIRECT_FIRE_FRAC` (0.28) and its travel
+  `p = (tg − fireFrac)/(hitFrac − fireFrac)` reaches 1 exactly at `REDIRECT_HIT_FRAC` (0.5) — the
+  intercept — so it MEETS the ball (the ball is at that same curve point at `tg=0.5`). The target screen
+  point is RE-projected every frame (`redirectDraw`, recomputed in the cinematic, drawn over the ball),
+  so camera pan/zoom can never desync it (the old frozen `to` drifted). At contact: a `spawnSparks` spray
+  (cyan laser / warm boomerang, deterministic, no `Math.random`) + an expanding shock ring, and the
+  camera ZOOMS in (`cineZoom`, a `buildProj` viewRadius multiplier eased to `REDIRECT_ZOOM` 0.6 over the
+  approach and back out on the knock-back). Slow-mo still rides #121's global virtual clock
+  (`CADDY_SLOMO`, bumped `CADDY_SLOMO_MS`→1050 so the whole arc + early roll are slowed). The speech
+  bubble now points at the caddy's HEAD (`caddyHead`), not its weapon hand, so it sits cleanly above the
+  figure (was "a bit off position"). All render-only feel (module consts, no `_gsFeel`/hook) — sim +
+  tests untouched; the impact animation is canvas feel → verified eyes-on.
 - **The framed caddy badge shows on the WATCH screen too (GS-caddy-display), and the frame is FLASHY.**
   The hired caddy's gold-framed badge was decision-screen-only; it now also floats bottom-RIGHT on the
   live shot (watch) screen (`gs-hud-watchcaddy`, clear of the play-view's bottom-left corner caddy + the

@@ -180,8 +180,15 @@ const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 
 // the slowed clock only stretches the wall-time of the existing animation, never the sim. These are
 // plain module constants (like ARC_FEEL in flight.ts), NOT _gsFeel fields, so no new hook to wire.
 const CADDY_SLOMO = 0.34; // virtual-time scale while a caddy effect plays (≈3× slower)
-const CADDY_SLOMO_MS = 720; // virtual ms the slo-mo window lasts
+const CADDY_SLOMO_MS = 1050; // virtual ms the slo-mo window lasts (covers the whole intercept arc)
 const CADDY_CALLOUT_MS = 1500; // virtual ms the speech bubble / phone glyph stays up
+
+// Caddy-guard redirect geometry (GS-caddy): the projectile and the ball are tied to the SAME flight
+// progress `tg`, so they MEET — the caddy fires at FIRE_FRAC and the shot connects with the ball at
+// HIT_FRAC (the intercept). The camera zooms to REDIRECT_ZOOM (a viewRadius multiplier) at impact.
+const REDIRECT_FIRE_FRAC = 0.28; // flight progress where the caddy looses the laser/boomerang
+const REDIRECT_HIT_FRAC = 0.5; // flight progress where it meets the ball (the would-be miss point)
+const REDIRECT_ZOOM = 0.6; // viewRadius multiplier at the impact (smaller = zoomed in)
 
 /**
  * A little cartoon golfer mid-swing, in the same silhouette language as the loading intro's
@@ -391,7 +398,15 @@ export function mountPlayView(
   let lastGround: Vec = camera;
   const buildProj = () =>
     followMode
-      ? holeProjector(hole, { width, height, focus: camera, viewRadius: opts.viewRadius, focusBias: opts.focusBias, up: opts.up })
+      ? holeProjector(hole, {
+          width,
+          height,
+          focus: camera,
+          // cineZoom (default 1) tightens the view during a redirect's slow-mo impact (GS-caddy).
+          viewRadius: opts.viewRadius != null ? opts.viewRadius * cineZoom : undefined,
+          focusBias: opts.focusBias,
+          up: opts.up,
+        })
       : holeProjector(hole, { width, height, extra });
   let proj = buildProj();
 
@@ -408,10 +423,17 @@ export function mountPlayView(
   let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
   let impactFiredShot = -1; // shot whose strike cue (onImpact) has fired
   let impactFiredPutt = -1; // putt whose strike cue has fired
-  // Caddy-guard redirect (GS-caddy): the projectile fired for the current shot, if any.
+  // Caddy-guard redirect (GS-caddy): the slow-mo interception. `redirectDraw` is the projectile to
+  // paint THIS frame (recomputed every frame so its target tracks the moving ball + camera pan — the
+  // old frozen target drifted off and missed); `redirectFiredShot` gates the one-shot slow-mo+voice,
+  // `sparksFiredShot` the one-shot contact spray; `cineZoom` is the live viewRadius multiplier that
+  // zooms the camera in to the impact and back out.
   let redirectFiredShot = -1;
-  let redirectFx: { kind: 'laser' | 'boomerang'; t0: number; from: Vec; to: Vec } | null = null;
+  let sparksFiredShot = -1;
+  let redirectDraw: { kind: 'laser' | 'boomerang'; from: Vec; to: Vec; p: number } | null = null;
+  let cineZoom = 1;
   let caddyAnchor: Vec = [0, 0]; // the corner caddy's muzzle (screen px), refreshed each frame
+  let caddyHead: Vec = [0, 0]; // the corner caddy's head (screen px) — where its speech bubble points
   // Caddy-effect slo-mo + callout (GS-caddy-slomo). The virtual clock advances at CADDY_SLOMO× real
   // time while `vnow < slowUntilV`; everything below times off the virtual `now`. The callout is the
   // speech bubble (+ optional phone) shown for a hit caddy effect.
@@ -436,10 +458,12 @@ export function mountPlayView(
     lastImpactShot = -1;
     lastRollClearShot = -1;
     redirectFiredShot = -1;
+    sparksFiredShot = -1;
     impactFiredShot = -1;
     impactFiredPutt = -1;
     chipInFiredShot = -1;
-    redirectFx = null;
+    redirectDraw = null;
+    cineZoom = 1;
     caddyCallout = null;
   }
 
@@ -451,6 +475,26 @@ export function mountPlayView(
       particles.push({ pos: [...at] as Vec, vel: [Math.cos(a) * sp, Math.sin(a) * sp], life: 1 });
     }
     shake = Math.min(1, power);
+  }
+
+  /** Spark spray at the instant the laser/boomerang meets the ball (GS-caddy) — brighter and faster
+   *  than a normal impact, tinted to the weapon (laser = cyan, boomerang = warm). Deterministic
+   *  (index-based, no Math.random), cosmetic. */
+  function spawnSparks(at: Vec, kind: 'laser' | 'boomerang'): void {
+    const base = kind === 'laser' ? '150,228,255' : '255,206,140';
+    const n = 22;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + (i % 2 ? 0.32 : 0);
+      const sp = 1.4 + (i % 5) * 0.7;
+      particles.push({
+        pos: [...at] as Vec,
+        vel: [Math.cos(a) * sp, Math.sin(a) * sp - 0.5],
+        life: 1,
+        rgb: i % 3 === 0 ? '255,255,255' : base,
+        grav: 0.05,
+      });
+    }
+    shake = Math.max(shake, 0.75);
   }
 
   // A knocked-down ball rattles the canopy: a little green leaf-fall at the clip point, so the
@@ -620,6 +664,7 @@ export function mountPlayView(
     vnow += dt * scale;
     const now = vnow;
     if (!segStart) segStart = now;
+    redirectDraw = null; // recomputed each frame by the redirect cinematic, if active
 
     // Helper: fire a caddy effect (slo-mo + speech bubble + voice/haptic via onCaddyEffect), once.
     const fireCaddyEffect = (cid: string | undefined): void => {
@@ -665,6 +710,9 @@ export function mountPlayView(
       const cx = ch * 0.7 + 6;
       const cy = height - 14;
       caddyAnchor = drawCaddy(ctx, figureCaddyId, cx, cy, ch, now, opts.lefty);
+      // The speech bubble points at the caddy's HEAD (top of the figure), not its weapon hand — the
+      // muzzle anchor sat mid-figure so the bubble floated off to the side ("a bit off position").
+      caddyHead = [cx, cy - ch * 0.92];
       ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.textAlign = 'center';
@@ -736,6 +784,7 @@ export function mountPlayView(
         }
         let ground: Vec;
         let height: number;
+        let zoomTarget = 1; // redirect zoom-to-impact target (1 = no zoom); eased into cineZoom below
         if (elapsed < flightDur) {
           const tg = elapsed / flightDur;
           // Real caddy-guard redirect (GS-caddy), or — in the force-redirect DEMO — a fabricated one so
@@ -745,27 +794,57 @@ export function mountPlayView(
             shot.result.redirect ??
             (F.forceRedirect && projKind ? fabricateRedirect(projKind, touchdown, bearing, carry, opts.lefty) : undefined);
           if (rd) {
-            // Caddy-guard redirect (GS-caddy): the ball curves toward the would-be miss
-            // (originalLanding), the caddy fires mid-flight, then it's knocked back to the green
-            // (touchdown). Height is the single loft arc over the whole flight (it ignores the
-            // landing point), so only the GROUND path kinks at the intercept — exactly the "zapped"
-            // read. Eyes-on feel; the SCORE already used the redirected landing.
-            const interceptFrac = 0.5;
-            const fireFrac = 0.4;
+            // Caddy-guard SLOW-MO interception (GS-caddy). The ball flies toward the would-be miss; the
+            // caddy looses its shot at FIRE_FRAC and — KEY FIX — the projectile is tied to the same
+            // flight progress `tg`, so it MEETS the ball at HIT_FRAC instead of chasing a frozen point
+            // on a separate clock (the "no longer hits the ball" bug). At contact: a spark spray; the
+            // camera zooms in; then the ball is knocked back to the green. Slow-mo via fireCaddyEffect.
+            // Eyes-on feel; the SCORE already used the redirected landing.
+            const interceptFrac = REDIRECT_HIT_FRAC;
+            const fireFrac = REDIRECT_FIRE_FRAC;
             const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, interceptFrac, peak);
+            // Intercept screen point, recomputed EVERY frame so it tracks the camera pan + zoom.
+            const impactScreen: Vec = [0, 0];
+            {
+              const [ipx, ipy] = proj.project(sI.ground);
+              impactScreen[0] = ipx;
+              impactScreen[1] = ipy - sI.height * proj.scale * F.heightExaggeration;
+            }
             if (tg >= fireFrac && redirectFiredShot !== shotIndex) {
               redirectFiredShot = shotIndex;
-              const [ipx, ipy] = proj.project(sI.ground);
-              redirectFx = {
-                kind: rd.kind,
-                t0: now,
-                from: caddyAnchor,
-                to: [ipx, ipy - sI.height * proj.scale * F.heightExaggeration],
-              };
               shake = Math.max(shake, 0.4);
               // Slow the world + sound the caddy's catchphrase as the guard makes the save.
               fireCaddyEffect(forcedRedirectCaddy(rd.kind));
             }
+            // Projectile: progress tied to the ball's flight, so it arrives at the intercept (pp=1)
+            // exactly as the ball does. A short lead past contact lets it visibly strike.
+            if (tg >= fireFrac && tg < interceptFrac + 0.06) {
+              const pp = clamp01((tg - fireFrac) / (interceptFrac - fireFrac));
+              redirectDraw = { kind: rd.kind, from: caddyAnchor, to: impactScreen, p: pp };
+            }
+            // Contact: spark spray (once) + an expanding shock ring for a beat.
+            if (tg >= interceptFrac && sparksFiredShot !== shotIndex) {
+              sparksFiredShot = shotIndex;
+              spawnSparks(impactScreen, rd.kind);
+            }
+            const sinceHit = tg - interceptFrac;
+            if (sinceHit >= 0 && sinceHit < 0.16) {
+              const rp = sinceHit / 0.16;
+              ctx.save();
+              ctx.globalCompositeOperation = 'lighter';
+              ctx.strokeStyle = `rgba(${rd.kind === 'laser' ? '150,228,255' : '255,206,140'},${(1 - rp) * 0.85})`;
+              ctx.lineWidth = 2.5 * (1 - rp) + 0.5;
+              ctx.beginPath();
+              ctx.arc(impactScreen[0], impactScreen[1], 4 + rp * 46, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+            // Zoom-to-impact: ease IN over the approach to contact, hold, ease back OUT on the knock.
+            if (tg < interceptFrac)
+              zoomTarget = 1 + (REDIRECT_ZOOM - 1) * easeInOut(clamp01((tg - fireFrac) / (interceptFrac - fireFrac)));
+            else if (tg < interceptFrac + 0.14) zoomTarget = REDIRECT_ZOOM;
+            else zoomTarget = REDIRECT_ZOOM + (1 - REDIRECT_ZOOM) * easeInOut(clamp01((tg - interceptFrac - 0.14) / 0.3));
+
             height = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak).height;
             if (tg < interceptFrac) {
               ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tg, peak).ground;
@@ -836,6 +915,9 @@ export function mountPlayView(
         }
 
         lastGround = ground; // feed the follow-cam
+        // Ease the redirect zoom toward its target (one-frame lag like the follow-cam; consumed by
+        // buildProj next frame). zoomTarget is 1 outside a redirect, so non-redirect shots hold at 1.
+        cineZoom += (zoomTarget - cineZoom) * 0.2;
         const [gx, gy] = proj.project(ground);
         const ballY = gy - height * proj.scale * F.heightExaggeration;
 
@@ -931,15 +1013,11 @@ export function mountPlayView(
       opts.onDone?.();
     }
 
-    // Caddy-guard projectile (laser/boomerang) flying from the caddy to the ball mid-flight.
-    if (redirectFx) {
-      const dur = redirectFx.kind === 'laser' ? 150 : 300;
-      const age = now - redirectFx.t0;
-      drawCaddyProjectile(ctx, redirectFx.kind, redirectFx.from, redirectFx.to, clamp01(age / dur), now);
-      if (age >= dur) {
-        spawnImpact(redirectFx.to, 0.45);
-        redirectFx = null;
-      }
+    // Caddy-guard projectile (laser/boomerang) flying from the caddy to the ball mid-flight — drawn
+    // over the ball from THIS frame's recomputed endpoints (GS-caddy), so it tracks the moving ball
+    // and the camera. The contact sparks fire in the cinematic, not here.
+    if (redirectDraw) {
+      drawCaddyProjectile(ctx, redirectDraw.kind, redirectDraw.from, redirectDraw.to, redirectDraw.p, now);
     }
 
     // Particles.
@@ -964,8 +1042,8 @@ export function mountPlayView(
         const remain = caddyCallout.until - now;
         const age = CADDY_CALLOUT_MS - remain;
         const fade = Math.min(1, age / 140) * Math.min(1, remain / 260); // pop in, ease out
-        drawSpeechBubble(ctx, v.bubble, caddyAnchor[0], caddyAnchor[1], fade);
-        if (v.phone) drawPhoneIcon(ctx, caddyAnchor[0] + 4, caddyAnchor[1] - 6, 22, now);
+        drawSpeechBubble(ctx, v.bubble, caddyHead[0], caddyHead[1], fade);
+        if (v.phone) drawPhoneIcon(ctx, caddyHead[0] + 4, caddyHead[1] - 6, 22, now);
       }
     } else if (caddyCallout) {
       caddyCallout = null;
