@@ -63,6 +63,9 @@ export interface ShotLog {
   /** Surface the ball first touched down on (BEFORE the bounce & roll-out). Drives the renderer's
    *  firmness-based bounce (firm → skip & run, soft → plop) and is honest HUD data. */
   landLie: FeatureKind;
+  /** A hazard-skip ball (GS-proshop-2) skimmed across this penalty kind (water/lava/void) with NO
+   *  stroke — render-only flavour ("skipped across!"). Set only when an immune ball saves a hazard. */
+  skimmed?: string;
 }
 
 /** Per-yard roll MULTIPLIER of each surface (its "run"): how far the ball travels per unit of roll
@@ -107,6 +110,9 @@ export function surfaceFirmness(lie: FeatureKind): number {
 /** Clamp on the run-out (yards): forward roll caps high, backspin checks modestly back. */
 const MAX_ROLL = 42;
 const MAX_CHECK = 18;
+/** Per-yard run a hazard-skip ball (GS-proshop-2) keeps while skimming across an IMMUNE penalty —
+ *  fast (like firm ice) so a floater/magma/void ball carries on to dry ground instead of dying in it. */
+const SKIM_ROLL = 2.2;
 /** How strongly a green's slope speeds a downhill roll / brakes an uphill one (GS-greens-3). The
  *  green run-per-yard is scaled by `1 + SLOPE_ROLL_K · (downhill·travelDir) · slopeMag`, floored so a
  *  steep uphill still creeps a hair. slopeMag rides in the green-slope vector's magnitude. */
@@ -163,6 +169,7 @@ export function rollOut(
   dir: Vec,
   K: number,
   tdLie: FeatureKind,
+  immune?: ReadonlySet<string>,
 ): { roll: number; rest: Vec } {
   const sign = K < 0 ? -1 : 1;
   const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
@@ -186,15 +193,19 @@ export function rollOut(
   let guard = 0;
   while (budget > 1e-3 && dist < cap && guard++ < 400) {
     const k = lieAt(hole, at(dist + STEP * 0.5)); // the surface we're rolling onto
-    if (lieInfo(k).penalty) {
+    const kPen = lieInfo(k).penalty;
+    // Hazard-skip balls (GS-proshop-2): an IMMUNE penalty is skimmed across (low friction) instead of
+    // swallowing the ball — it keeps rolling toward dry ground. A non-immune penalty still stops it.
+    // `immune` absent ⇒ this is exactly the old behaviour (break on any penalty), byte-for-byte.
+    if (kPen && !(immune && immune.has(kPen))) {
       dist += STEP; // trickled into a penalty hazard → settles there (+stroke downstream)
       break;
     }
-    if (k !== tdLie && (k === 'bunker' || k === 'trees')) {
+    if (!kPen && k !== tdLie && (k === 'bunker' || k === 'trees')) {
       dist += STEP; // ran into sand / caught by the woods → stops
       break;
     }
-    const m = (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k); // this surface's run per yard, slope-adjusted on the green
+    const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k); // this surface's run per yard (immune hazard skims fast); slope-adjusted on the green
     if (m <= 0) break;
     const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
     if (need >= budget) {
@@ -306,6 +317,12 @@ export interface PlayHoleOptions {
   /** Left-handed mode (GS-lefty): mirror the player's lateral tendencies in world space. Passed to
    *  every executeShot; undefined/false is byte-for-byte right-handed. */
   lefty?: boolean;
+  /** Reduced weather impact (GS-proshop-2, Wind-Cheater balls), 0..1. Undefined/0 = full wind. */
+  windResist?: number;
+  /** Increased backspin (GS-proshop-2, Spin-Milled), 0..1: more check / less run. Undefined/0 = base. */
+  backspinBoost?: number;
+  /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke. Absent = base. */
+  hazardImmune?: readonly string[];
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -414,6 +431,27 @@ function dropPoint(hole: Hole, from: Vec, landing: Vec): Vec {
   for (let t = 0.85; t > 0; t -= 0.15) {
     const p: Vec = [from[0] + (landing[0] - from[0]) * t, from[1] + (landing[1] - from[1]) * t];
     if (!lieInfo(lieAt(hole, p)).penalty) return p;
+  }
+  return from;
+}
+
+/**
+ * Where a hazard-skip ball (GS-proshop-2) settles when it stopped IN an immune hazard (it didn't quite
+ * skim clear): walk back from `rest` toward the shot origin `from` in small steps and return the first
+ * in-bounds, non-penalty point — the near bank it last crossed. No penalty stroke is applied; this only
+ * picks the playable spot. Pure geometry. Falls back to `from` if no dry ground is found (a full carry
+ * that came up entirely inside the water — you replay from where you were, still penalty-free).
+ */
+function skimToDry(hole: Hole, rest: Vec, from: Vec): Vec {
+  const STEP = 2;
+  const dx = from[0] - rest[0];
+  const dy = from[1] - rest[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  for (let d = STEP; d <= len; d += STEP) {
+    const p: Vec = [rest[0] + ux * d, rest[1] + uy * d];
+    if (!lieInfo(lieAt(hole, p)).penalty && inBounds(hole, p)) return p;
   }
   return from;
 }
@@ -657,6 +695,9 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       confidence: opts.confidence,
       suggestedClubId,
       lefty: opts.lefty,
+      windResist: opts.windResist,
+      backspinBoost: opts.backspinBoost,
+      hazardImmune: opts.hazardImmune,
     };
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
     // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
@@ -759,6 +800,15 @@ export interface ExecOpts {
   /** Left-handed mode (GS-lefty): mirror the lateral shot tendencies in world space. Threaded into
    *  resolveShot; undefined/false is byte-for-byte right-handed. */
   lefty?: boolean;
+  /** Reduced weather impact (GS-proshop-2, Wind-Cheater): 0..1 — wind's carry/lateral scaled down.
+   *  Threaded into both the upwind aim and resolveShot. Undefined/0 = full wind (byte-for-byte). */
+  windResist?: number;
+  /** Increased backspin (GS-proshop-2): 0..1 subtracted from the roll fraction (more check, less run).
+   *  Folded into the SAME roll-energy rng draw. Undefined/0 = byte-for-byte unchanged. */
+  backspinBoost?: number;
+  /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke (water/lava/
+   *  void). Absent/empty = ordinary penalties (byte-for-byte). Pure geometry, no rng. */
+  hazardImmune?: readonly string[];
 }
 
 export interface ExecResult {
@@ -791,7 +841,7 @@ export function executeShot(
   const shotBearing = bearingDeg(from, target);
   // Wind compensation scales by the POWERED carry (a soft shot drifts less in the wind) so the
   // upwind aim stays correct at any power. Power 1 leaves this byte-for-byte unchanged.
-  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult * power);
+  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult * power, opts.windResist);
   // Character per-club shape: keyed by the club's nominal carry (a hooky driver, striped irons,
   // back-spun wedges). `dispMult === 1` passes the original dispersionMult through UNTOUCHED so a
   // characterless shot stays byte-for-byte (undefined stays undefined, never `undefined * 1`).
@@ -821,6 +871,7 @@ export function executeShot(
     guard: opts.guard,
     lieRelief: opts.lieRelief,
     lefty: opts.lefty,
+    windResist: opts.windResist,
     power: opts.power,
     stats: opts.stats,
     rng,
@@ -843,17 +894,26 @@ export function executeShot(
   // the surfaces it crosses: the ball keeps the same roll ENERGY but spends it fast in rough and
   // slowly on fairway/ice, so landing in the rough and trickling onto the fairway (or running off
   // the fairway into rough) reads physically, and it settles where it first finds water/sand/woods.
+  // Hazard-skip balls (GS-proshop-2): the penalty kinds this ball skims across with no stroke. Built
+  // only when an immunity item is owned, so a base loadout passes `undefined` and the roll/penalty
+  // paths below are byte-for-byte the old ones.
+  const immune = opts.hazardImmune && opts.hazardImmune.length ? new Set(opts.hazardImmune) : undefined;
   const touchdown = result.landing;
   const tdLie = lieAt(hole, touchdown);
+  const tdPen = lieInfo(tdLie).penalty;
   let rest: Vec = touchdown;
   let roll = 0;
-  if (!lieInfo(tdLie).penalty) {
-    const energy = rollPotential(nominalCarry, result.carry, rng, mods.rollFracDelta);
+  // Roll out unless it plugged in a non-immune penalty. An immune-hazard touchdown still rolls — it
+  // skims across toward dry ground (rollOut treats the immune surface as a fast skim).
+  if (!tdPen || (immune && immune.has(tdPen))) {
+    // Increased backspin (GS-proshop-2): subtract from the roll fraction (more check, less run) — same
+    // single rng draw, so backspinBoost 0/undefined is byte-for-byte the old energy.
+    const energy = rollPotential(nominalCarry, result.carry, rng, mods.rollFracDelta - (opts.backspinBoost ?? 0));
     if (energy !== 0) {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
       const len = Math.hypot(dx, dy) || 1;
-      const out = rollOut(hole, touchdown, [dx / len, dy / len], energy, tdLie);
+      const out = rollOut(hole, touchdown, [dx / len, dy / len], energy, tdLie, immune);
       roll = out.roll;
       rest = out.rest;
     }
@@ -867,7 +927,15 @@ export function executeShot(
   let lieAfter: FeatureKind = restLie;
   let penaltyStrokes = 0;
   let holed = false;
-  if (li.penalty) {
+  if (li.penalty && immune && immune.has(li.penalty)) {
+    // Hazard-skip ball (GS-proshop-2): it stopped in an immune hazard (didn't quite clear it) → play on
+    // from the nearest dry ground back toward the shot origin, with NO penalty stroke. Pure geometry.
+    const dry = skimToDry(hole, rest, from);
+    ballAfter = dry;
+    lieAfter = lieAt(hole, dry);
+    log.skimmed = li.penalty;
+    log.lieTo = lieAfter; // the card reads the dry finish, not "in the water"
+  } else if (li.penalty) {
     const pen = PEN_INFO[li.penalty];
     penaltyStrokes = pen.strokes;
     log.penalty = li.penalty;
@@ -966,6 +1034,9 @@ export function shotSpread(
     /** Shot POWER (GS-power): intended carry as a fraction of full (1 = full swing). Scales the
      *  whole carry window so the previewed cone GROWS with power — the on-screen "draw to power up". */
     power?: number;
+    /** Reduced weather impact (GS-proshop-2): scales the previewed headwind carry effect down, so the
+     *  cone reads true with Wind-Cheater gear. Undefined/0 = full wind. */
+    windResist?: number;
   } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
@@ -982,7 +1053,7 @@ export function shotSpread(
   const mods = opts.shotMods ? opts.shotMods(nominal) : NEUTRAL_SHOT_MODS;
   const dispMult = relief.dispersionMult * (opts.dispersionMult ?? 1) * mods.dispMult;
   const prof = dispersionProfile(nominal);
-  const along = w.along * TUNABLES.windCarryPerMph;
+  const along = w.along * TUNABLES.windCarryPerMph * (1 - Math.max(0, Math.min(1, opts.windResist ?? 0)));
   // Carry window mirrors resolveShot's clamp (distance-control / wedge-window), so the preview's
   // min/max carry read exactly what the shot will do.
   const cw = carryControlFor(nominal, opts);
@@ -1324,10 +1395,14 @@ function aimWithWind(
   wind: Hole['wind'],
   shotBearingDeg: number,
   carry: number,
+  windResist = 0,
 ): Vec {
   if (!wind) return target;
   const { cross } = playWind(wind, shotBearingDeg);
-  const drift = cross * TUNABLES.windLateralPerMph; // +drift pushes to the shot's right
+  // Reduced weather impact (GS-proshop-2): the ball drifts LESS in wind, so the upwind compensation
+  // shrinks by the SAME factor resolveShot scales the actual push — keeping aim consistent. 0 = full.
+  const wr = 1 - Math.max(0, Math.min(1, windResist));
+  const drift = cross * TUNABLES.windLateralPerMph * wr; // +drift pushes to the shot's right
   if (drift === 0) return target;
   // Right-perpendicular of the shot bearing (matches resolveShot's lateral convention).
   const br = (shotBearingDeg * Math.PI) / 180;

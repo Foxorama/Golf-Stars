@@ -888,6 +888,45 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   existing `_gsFeel` (`aceDelayMs` sub-field), so the test-hub guard needs no new control. Tests:
   `tests/ace.test.ts` (count/credit/talent helpers, ace-only talent, `finishStop` pays + applies +
   records, no-ace no-regression, snapshot/resume rebuild) + `tests/save.test.ts` (v5 migration).
+- **Pro Shop expansion: golf-themed gear, new gameplay items, themed club sets + procedural images
+  (GS-proshop-2).** Four coupled pieces, all default-OFF so a base loadout is byte-for-byte unchanged in
+  the sim (the determinism contract — proven by the full suite staying green):
+  - **Golf vocabulary rename.** The space-y item NAMES were re-themed to real golf gear (ids unchanged
+    for save-compat, only `name`/`desc`): Gyro Stabiliser→Counterbalance Shaft, Power Cell→Graphite Power
+    Shaft, Range Booster→Distance Balls, Precision Chip→Tour Glove, Lucky Coin→Lucky Ball Marker, Fortune
+    Chip→Sponsor's Badge, Distance Control→Stiff Tour Shaft, Overdrive→Speed Whip Shaft, Glass Cannon→Grip
+    It & Rip It. Tests assert ids, never names, so this is free.
+  - **New gameplay-changing items + 3 new `PlayerLoadout` fields**, threaded IDENTICALLY through the auto
+    sim (`playStop`→`playHole`→`executeShot`) and the interactive driver (`takeShot`/`previewShot`) so
+    auto≡interactive holds; each absent/0 ⇒ no extra rng, byte-for-byte: (1) **`windResist`** (Wind-Cheater
+    Balls, stackable→0.6) scales DOWN BOTH the wind's carry loss + crosswind push in `resolveShot` AND the
+    upwind compensation in `aimWithWind` by the same factor, so wind bites less without desyncing the aim;
+    (2) **`backspinBoost`** (Spin-Milled Wedges) subtracts from the roll fraction in the SAME single
+    roll-energy draw (more check, less run); (3) **`hazardImmune: string[]`** (Floater Balls→water, Magma
+    Skimmers→lava, Void-Walkers→void+voidlost) — a penalty kind the ball SKIMS across with NO stroke:
+    `rollOut` treats an immune penalty as a fast skim surface (`SKIM_ROLL`) and keeps rolling toward dry
+    ground; if it stops IN the hazard, `skimToDry` relocates it to the near bank (no stroke). Pure geometry,
+    no rng. Plus golf-vocab items reusing existing fields: Laser Rangefinder (`clubSuggest`, interactive
+    read), Tour Spikes (a weaker `lieRelief` 0.35). Hazard balls can only REMOVE penalties → strictly
+    help/neutral scoring (no death-spiral risk; the auto floor uses base loadouts so seeded sims are
+    unaffected). Wired into `ShotInput`/`ExecOpts`/`PlayHoleOptions`/`playerHoleOpts`/`shotSpread`.
+  - **Club sets themed by rarity (the user's ask).** `CLUB_SETS` labels re-themed + a new legendary set
+    (set IDs stable for save-compat, stats/roles UNCHANGED so club-rewards balance holds): rare = **Planet**
+    (`tour` distance + `pro` scoring), epic = **Phoenix Flames** (`masters` distance), legendary = **Solar
+    Storm** (NEW `solar` distance, +24 carry). Each set row carries `theme`/`tint` (render-only) — the seam
+    for "later, different sets are better at different things". `equippedGearTheme(loadout)` returns the
+    RAREST themed set the bag carries.
+  - **Procedural item images (`render/itemArt.ts`) + avatar gear (the "image changes your avatar" ask).**
+    `itemArtSVG(id, rarity, setTheme)` is an assetless, deterministic SVG per item (house no-404 rule):
+    the art KIND is resolved from the id (shaft/ball/glove/coin/putter/shoes/rangefinder/wedge/coach/trophy/
+    caddy) — clubs draw a themed head (Planet ringed planet / Phoenix flame / Solar Storm sun rays); flavoured
+    balls (water/lava/void/wind/distance) read by tint+effect. Rendered atop each Pro Shop card via
+    `itemCardHTML`'s new `artSVG`. The SAME themed look feeds the SWING: `GolferLook.gear` (resolved in
+    `app.ts golferLook()` from `equippedGearTheme`) makes `drawGolfer` swing a GLOWING themed club head with
+    trailing sparks — so the club you BUY is the club you swing. Render-only, NO new `_gs*`/URL hook (the
+    test-hub guard needs nothing; the Sim Lab absorbs the new items as data). Tests:
+    `tests/proshop-expansion.test.ts` (field apply/stack/cap, hazard-immunity behavioural proofs per biome
+    + no-regression, solar set + `equippedGearTheme` rarity pick, deterministic art for every item).
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only

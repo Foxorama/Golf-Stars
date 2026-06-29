@@ -153,6 +153,12 @@ export interface GolferLook {
   skin: string;
   /** Figure size scale (1 = default). */
   build: number;
+  /**
+   * Equipped GEAR theme (GS-proshop-2): the rarest themed club set the player carries (Planet /
+   * Phoenix Flames / Solar Storm). When set, the golfer swings a GLOWING themed club head — so the
+   * club you bought in the Pro Shop is the club you swing. Absent = a plain club head (unchanged).
+   */
+  gear?: { theme: string; tint: string };
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 function lookFromColor(color: string): GolferLook {
@@ -265,17 +271,50 @@ function drawGolfer(
   ctx.lineTo(S[0], S[1]);
   ctx.stroke();
 
-  // Club shaft + head (behind the arms).
-  ctx.strokeStyle = '#d9dee8';
+  // Club shaft + head (behind the arms). A bought themed club set (GS-proshop-2) tints the head and
+  // gives it a glow + a small theme accent, so the gear you bought visibly changes the swing.
+  const gear = look.gear;
+  ctx.strokeStyle = gear ? gear.tint : '#d9dee8';
   ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(hands[0], hands[1]);
   ctx.lineTo(head[0], head[1]);
   ctx.stroke();
-  ctx.fillStyle = '#aeb6c6';
-  ctx.beginPath();
-  ctx.arc(head[0], head[1], 2.4, 0, Math.PI * 2);
-  ctx.fill();
+  if (gear) {
+    // Soft glow behind the head, in the set's tint.
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillStyle = gear.tint;
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = gear.tint;
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], 3.4, 0, Math.PI * 2);
+    ctx.fill();
+    // A couple of themed sparks trailing the head once it's swinging through (Solar Storm sparkles,
+    // Phoenix embers, Planet glints) — purely cosmetic motion.
+    if (follow > 0.05) {
+      ctx.save();
+      ctx.globalAlpha = alpha * (1 - follow) * 0.9;
+      ctx.fillStyle = gear.theme === 'planet' ? '#ffffff' : gear.tint;
+      for (let i = 1; i <= 3; i++) {
+        const t = follow - i * 0.06;
+        if (t < 0) continue;
+        const a = aTop + (a0 - aTop) * 1 + (aFin - a0) * easeOutCubic(t);
+        ctx.beginPath();
+        ctx.arc(S[0] + Math.cos(a) * CL, S[1] + Math.sin(a) * CL, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  } else {
+    ctx.fillStyle = '#aeb6c6';
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Arms (shoulders → hands).
   ctx.strokeStyle = look.skin;
