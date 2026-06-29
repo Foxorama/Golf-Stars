@@ -66,6 +66,10 @@ export interface Biome {
   greenSize?: number;
   greenAspect?: number;
   greenIrregular?: number;
+  /** Green SLOPE character (GS-greens-3): the world's MAX green tilt (0 flat … ~1 severe). Each hole
+   *  draws a downhill direction + a magnitude up to this. Frost ice-shelves tilt hard, desert greens
+   *  run flat. Default ~0.5 if absent. */
+  greenSlopeMax?: number;
   /**
    * Signature mechanic flags (GS-19), scaled fair→brutal by wildness at generation time:
    *  • `lostRough` — off-fairway is the named PENALTY lie (the void: "play to the fairway or it's
@@ -135,6 +139,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 1.05, // classic parkland greens — gently rolling, moderate variety
     greenAspect: 1.9,
     greenIrregular: 1.1,
+    greenSlopeMax: 0.45, // GS-greens-3 green tilt character
   },
   {
     id: 'dust-belt',
@@ -159,6 +164,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 1.3, // big, smooth oasis greens against the dunes
     greenAspect: 1.7,
     greenIrregular: 0.85,
+    greenSlopeMax: 0.32, // GS-greens-3 green tilt character
   },
   {
     id: 'ice-ring',
@@ -182,6 +188,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
     greenAspect: 2.6,
     greenIrregular: 1.0,
+    greenSlopeMax: 0.7, // GS-greens-3 green tilt character
   },
   {
     id: 'ember-world',
@@ -204,6 +211,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 0.95, // jagged, broken basalt greens
     greenAspect: 2.0,
     greenIrregular: 1.45,
+    greenSlopeMax: 0.6, // GS-greens-3 green tilt character
   },
   {
     id: 'void-garden',
@@ -224,6 +232,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 0.85, // small, angular asteroid greens adrift in the abyss
     greenAspect: 1.7,
     greenIrregular: 1.25,
+    greenSlopeMax: 0.4, // GS-greens-3 green tilt character
   },
   // --- GS-worlds: four new exotic worlds, each a distinct PLAYSTYLE -----------
   {
@@ -247,6 +256,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 0.95, // sharp, faceted greens
     greenAspect: 1.9,
     greenIrregular: 1.4,
+    greenSlopeMax: 0.55, // GS-greens-3 green tilt character
   },
   {
     id: 'tempest-reach',
@@ -267,6 +277,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 1.05,
     greenAspect: 2.2, // long, storm-scoured shelves
     greenIrregular: 1.1,
+    greenSlopeMax: 0.5, // GS-greens-3 green tilt character
   },
   {
     id: 'spore-jungle',
@@ -288,6 +299,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 1.0,
     greenAspect: 1.8,
     greenIrregular: 1.2,
+    greenSlopeMax: 0.45, // GS-greens-3 green tilt character
   },
   {
     id: 'tidal-archipelago',
@@ -310,6 +322,7 @@ export const BIOMES: readonly Biome[] = [
     greenSize: 1.0,
     greenAspect: 1.7,
     greenIrregular: 1.0,
+    greenSlopeMax: 0.4, // GS-greens-3 green tilt character
   },
 ];
 

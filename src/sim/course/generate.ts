@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 8;
+export const GENERATOR_VERSION = 9;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -532,6 +532,14 @@ function generateHole(
   const pinRng = new Rng(`${rng.seed}:pin:${holeIndex}`);
   const pin: Vec = pinInGreen(green, greenPolygon, pinRng);
 
+  // Green SLOPE (GS-greens-3): a downhill fall-line direction + a magnitude up to the biome's
+  // greenSlopeMax. Drawn from a SIDE rng (like the pin) so adding it leaves the main terrain stream
+  // — and thus every existing course's layout — byte-for-byte unchanged.
+  const slopeRng = new Rng(`${rng.seed}:slope:${holeIndex}`);
+  const slopeAng = slopeRng.range(0, Math.PI * 2);
+  const slopeMag = (biome.greenSlopeMax ?? 0.5) * slopeRng.range(0.4, 1);
+  const greenSlope: Vec = [Math.cos(slopeAng) * slopeMag, Math.sin(slopeAng) * slopeMag];
+
   // Fairway APRON (GS-greens): a tapering strip that runs THROUGH and PAST the green so the fairway
   // wraps around it instead of ending at a hard flat line. Skipped for void island greens (the green
   // floats over the abyss — nothing behind it). A SEPARATE fairway feature so it never widens the
@@ -880,7 +888,7 @@ function generateHole(
   // either way; only the penalty is gated, so calm void stops are forgiving and deep ones bite.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
-  return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods, shapeId: tpl.id };
+  return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods, shapeId: tpl.id, greenSlope };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */
