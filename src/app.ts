@@ -6,9 +6,9 @@
  * DOM + the canvas play view + localStorage glue.
  */
 
-import { scoreName, playTotals } from './sim/score';
+import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
-import { itemCardHTML, shotCardHTML, puttCardHTML } from './render/cards';
+import { itemCardHTML, shotCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
@@ -1200,21 +1200,40 @@ function playingBody(animating: boolean): string {
 
   if (play.done) {
     const name = play.pickedUp ? 'Picked up' : scoreName(par, play.strokes);
-    const lastCard = play.shots.length ? shotCardHTML(play.shots[play.shots.length - 1]!) : '';
-    const puttCard = play.puttLogs.length
-      ? puttCardHTML(play.puttLogs, { holed: play.holed, pickedUp: play.pickedUp })
-      : '';
     const birdieOrBetter = !play.pickedUp && play.strokes <= par - 1;
     // The end-of-hole screen IS the leaderboard screen now: include the hole just finished (it isn't in
     // stopPlayed until `holeComplete`) and show the live arc standings so you track progress every hole.
     // On a matchplay boss stop the duel HUD is the relevant tracker, so the board is replaced by it.
     const playedSoFar = [...(state.stopPlayed ?? []), holeResult(play)];
     const lastIsHoled = play.holed && play.shots.some((s) => s.holed);
+    const stopPts = playTotals(playedSoFar.map((p) => p.record)).stableford;
+    // The two big shot/putt vignette cards used to push the score + leaderboard off the bottom of the
+    // screen — the actual point of the screen. They're scrapped for a compact banner that headlines the
+    // ONLY numbers that matter here: this hole's score and the running points total, with the leaderboard
+    // prominent right below it.
+    const holePts = stablefordPoints(par, play.pickedUp ? par + 6 : play.strokes);
+    const d = play.pickedUp ? 99 : play.strokes - par;
+    const scoreCol = d < 0 ? '#5fd45a' : d === 0 ? 'var(--gs-ink)' : d === 1 ? '#ffce54' : '#ff6b6b';
+    const scoreBanner = `
+      <div style="display:flex;align-items:center;gap:14px;background:#0d1016;border:1px solid var(--gs-line);border-radius:12px;padding:12px 16px;max-width:460px;">
+        <div style="text-align:center;min-width:48px;">
+          <div style="font-size:34px;font-weight:800;line-height:1;color:${scoreCol};">${play.pickedUp ? '—' : play.strokes}</div>
+          <div style="font-size:10px;opacity:.55;letter-spacing:.08em;margin-top:3px;">PAR ${par}</div>
+        </div>
+        <div style="flex:1 1 auto;min-width:0;">
+          <div style="font-size:10.5px;opacity:.5;letter-spacing:.1em;">HOLE ${play.holeIndex + 1}</div>
+          <div style="font-size:18px;font-weight:800;">${name}${lastIsHoled ? ' 🎉' : ''}</div>
+          <div style="font-size:12px;opacity:.7;margin-top:1px;">+${holePts} pt${holePts === 1 ? '' : 's'} this hole</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--gs-line-2);padding-left:14px;">
+          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--gs-accent);">${stopPts}</div>
+          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">STOP PTS</div>
+        </div>
+      </div>`;
     const progress = state.match
       ? holeMatchProgressHTML(playedSoFar)
       : (() => {
-          const sf = playTotals(playedSoFar.map((p) => p.record)).stableford;
-          const board = liveLeaderboard(state.run, playedSoFar.length, sf);
+          const board = liveLeaderboard(state.run, playedSoFar.length, stopPts);
           const me = board.standings.find((s) => s.isPlayer)!;
           const place = `<p style="font-size:13px;margin:.4em 0 .5em;">You're <b style="color:${me.position <= 3 ? '#5fd45a' : me.position <= board.standings.length / 2 ? '#ffce54' : '#ff6b6b'};">${ordinal(me.position)}</b> of ${board.standings.length} · ${board.thru} hole${board.thru === 1 ? '' : 's'} in.</p>`;
           return place + leaderboardHTML(board, { live: true });
@@ -1222,8 +1241,7 @@ function playingBody(animating: boolean): string {
     return `
       ${header()}
       <div style="position:relative;">${birdieOrBetter ? burst() : ''}</div>
-      <h2 style="font-size:17px;">Hole ${play.holeIndex + 1}: <b>${play.strokes}</b> — ${name}${lastIsHoled ? ' 🎉' : ''}</h2>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;max-width:420px;">${lastCard}${puttCard}</div>
+      ${scoreBanner}
       <div style="margin:12px 0;max-width:460px;">${progress}</div>
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
   }
