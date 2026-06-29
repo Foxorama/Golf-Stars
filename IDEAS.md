@@ -83,12 +83,26 @@ fresh golf-design research (`reports/golf-design-research-2026-06-29.md`). Shipp
 - **GS-rarity-style — rarity reads distinct (#131).** Render-only rarity deepen (decoupled from the
   balance-stable physics intensity) + a zone-splash rarity ribbon/tagline.
 
+**Greens pass (2026-06-29, PRs #133–#134) — GS-greens-3 slope + putting break SHIPPED:**
+- **Green SLOPE. SHIPPED (#133).** Every green carries a downhill fall-line vector (biome-flavoured,
+  side-rng so terrain stays byte-identical). The approach roll runs out downhill / checks uphill and a
+  ball never spins weirdly UP a slope (the thing to revisit once slope perks exist). Renderer shades
+  high/low + draws fall-line arrows. Roll-invariant + death-spiral bars held.
+- **Putting BREAK + green caddies. SHIPPED (#134).** Manual putts curl along the slope (∝ dist^1.35,
+  inverse pace); you aim HIGH (◄/►) to read it, the putt screen draws the predicted break curve from the
+  resolver's own model. Mystic Mole upgraded to a real GREEN READER (snaps your aim to the ideal line +
+  shows the read). Interactive-only — auto putting stays the flat `onePutt` byte-for-byte.
+
 **Backlog (surfaced by the research — next pass):**
-- **GS-greens-3 — template green COMPLEXES with real mechanics (HIGHEST VALUE).** Greens still play as
-  a flat blob (shape varies, slope doesn't). Model: Redan kick-slope FEED, Biarritz swale, punchbowl
-  GATHER-to-centre, crowned/turtleback SHED-off-all-sides (effective target ~50% of area), false-front
-  REJECT, two-tier greens (treat a wrong-tier putt as a lag/dispersion penalty). Needs a green-slope
-  field on the contract + a putt/approach hook.
+- **GS-greens-4 — template green COMPLEXES (the green slope is now a single linear tilt; add SHAPE).**
+  Redan kick-slope FEED (a local slope that funnels a running ball toward a back pin), Biarritz swale (a
+  transverse trough), punchbowl GATHER-to-centre, crowned/turtleback SHED-off-all-sides (effective target
+  ~50% of area), false-front REJECT (a steep front that rolls a short shot back off), two-tier greens
+  (treat a wrong-tier putt as a lag/dispersion penalty). Build on `Hole.greenSlope` + the rollOut/manualPutt
+  hooks — e.g. a per-region slope field instead of one vector, and a settle-trickle on the approach.
+- **GS-slope-perks — abilities that bend the slope rules** (now that slope is real): a backspin/zip perk
+  that DOES let a ball check back uphill, a green-reading talent (cheaper Mole), an uphill-magnet, etc.
+  The "until we add perks" caveat in the slope code is the hook.
 - **GS-split-fairways — risky-short vs safe-long alternate fairways** (the dogleg-grove machinery is the
   starting point); strategic centreline-bunker pinch with an opposite-side greenside bunker (open-the-angle).
 - **GS-canopy-recolour — per-world tree/canopy palette** so fungal "mushrooms" aren't green tree canopies
