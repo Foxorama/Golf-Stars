@@ -163,7 +163,9 @@ describe('ui reducer', () => {
   });
 
   it('a full playthrough ends in gameover and restart returns to the title', () => {
-    let s = started(7);
+    // seed 3 clears the opening cut comfortably, then fails a few stops deep as the cut ramps —
+    // so the run both advances (bestDistance > 0) and terminates within the cap.
+    let s = started(3);
     for (let i = 0; i < 100 && s.screen !== 'gameover'; i++) s = advanceStop(s);
     expect(s.screen).toBe('gameover');
     expect(s.run.status).toBe('ended');

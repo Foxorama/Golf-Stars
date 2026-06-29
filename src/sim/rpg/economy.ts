@@ -17,12 +17,22 @@ export const CREDIT_PER_POINT = 12;
 export const STARTING_CREDITS = 60;
 
 /**
- * Minimum Stableford to survive a stop. At distance 0 it's ~1 pt/hole (gentle); it
- * climbs past par pace (2 pts/hole) as you travel deeper. This is what eventually ends
- * a run if the loadout stops keeping up.
+ * Minimum Stableford to survive a stop — the cut line. Calibrated to where golfers actually SCORE,
+ * not below it: both the player and the ghost field average ~2 Stableford/hole (par pace), so the old
+ * ~1 pt/hole cut sat at half the field's scoring and never bit anyone — arc 1 was a free pass and the
+ * leaderboard never thinned (measured: field stop-scores 10–19 over 6 holes vs a cut of 6). Now it
+ * STARTS near par pace (~1.7 pt/hole) so even the opening stop cuts the weak tail, and ramps ABOVE par
+ * pace (toward ~2.6 pt/hole) as you travel deeper, so the cut scythes more of a fixed-quality field —
+ * the "decent curve" that actually eliminates characters at the end of each stage. The voyage softens
+ * the distance term via `cutMult` (see effectiveCut) so a bounded campaign plateaus rather than spirals.
+ *
+ * CALIBRATION (re-run `tests/` harness after touching these): at base+slope (1.7, 0.09) the unupgraded
+ * auto reach-AI — the difficulty FLOOR — passes arc 1 comfortably (≈99/93/69% per stop) and the gate
+ * tightens through arcs 2–3; an upgrading/interactive player keeps pace. Field-cut% (with the spread
+ * field, see buildField) ramps ≈5%→20%→…→88% across the voyage.
  */
 export function cutLine(distanceFromStart: number, holes = HOLES_PER_STOP): number {
-  return Math.round(holes * (1.0 + distanceFromStart * 0.07));
+  return Math.round(holes * (1.7 + distanceFromStart * 0.09));
 }
 
 /**

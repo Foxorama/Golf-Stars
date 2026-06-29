@@ -19,7 +19,7 @@ import { playTotals } from '../src/sim/score';
 describe('economy', () => {
   it('cut line ramps with distance', () => {
     expect(cutLine(0, 6)).toBeLessThan(cutLine(10, 6));
-    expect(cutLine(0, 6)).toBe(6); // ~1 pt/hole at the start
+    expect(cutLine(0, 6)).toBe(10); // ~1.7 pt/hole at the start (near par pace, so the cut bites)
   });
 
   it('credits scale with stableford and the credit multiplier', () => {
