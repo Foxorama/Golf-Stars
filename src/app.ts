@@ -29,7 +29,7 @@ import { clubOfferNote, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCadd
 import { FORMATS } from './sim/rpg/formats';
 import { CHARACTERS, getCharacter, scramblePartner as scramblePartnerChar, type Character, type GolferStyle, type GolferStats } from './sim/rpg/characters';
 import { ASCENSION_MAX, cashOutShards, currentBoss, effectiveCut, snapshotRun } from './sim/rpg/run';
-import { leaderboard, liveLeaderboard, runField, arcBossId, livePosition, type Leaderboard } from './sim/rpg/league';
+import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition, type Leaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { PLAYER_ID, type Field } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
@@ -503,7 +503,7 @@ function competitorsCard(field: Field): string {
   return `
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--gs-line-2);">
       <div style="font-size:13px;font-weight:700;letter-spacing:.04em;">🏆 The field — ${field.golfers.length} golfers in this arc</div>
-      <div style="font-size:11.5px;opacity:.65;margin:3px 0 9px;">Beat the cut each stop; top the leaderboard and you'll face the leader in a matchplay duel. Constellation champions (★) are dangerous in their home zone.</div>
+      <div style="font-size:11.5px;opacity:.65;margin:3px 0 9px;">Climb the leaderboard each stop; the boss round is a matchplay knockout that pairs the field best-vs-worst (#1 v last) — finish high and you draw a weaker opponent. Constellation champions (★) are dangerous in their home zone.</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${cells}</div>
     </div>`;
 }
@@ -563,7 +563,7 @@ function liveLeaderChip(): string {
 /** The matchplay opponent id for the current boss stop (the leaderboard leader, with a fallback). */
 function currentOpponentId(): string | undefined {
   if (state.match) return state.match.bossId;
-  return arcBossId(state.run) ?? runField(state.run).golfers.find((g) => !g.isPlayer)?.id;
+  return matchOpponentFor(state.run) ?? runField(state.run).golfers.find((g) => !g.isPlayer)?.id;
 }
 
 /** A framed opponent badge (avatar + name + style) for a matchplay duel. */
@@ -593,10 +593,23 @@ function matchHud(): string {
       ? `${opp?.shortName ?? 'Boss'} ${Math.abs(st.holesUp)} UP`
       : 'All square';
   const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
-  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 9px;border:1px solid ${col};border-radius:8px;background:#0d1016cc;">
+  // The boss is pre-played, so on the current hole you know their target — show "they made N here" so
+  // you can attack or protect accordingly (real matchplay: you can see the other ball).
+  const play = state.play;
+  let target = '';
+  if (play && !play.done) {
+    const bh = m.bossHoles[play.holeIndex];
+    if (bh) {
+      const rel = bh.record.strokes - play.hole.par;
+      const relTxt = rel === 0 ? 'par' : rel > 0 ? `+${rel}` : `${rel}`;
+      target = `<span style="font-size:10.5px;opacity:.85;">· ${opp?.shortName ?? 'Boss'} made <b>${bh.record.strokes}</b> (${relTxt})</span>`;
+    }
+  }
+  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 9px;border:1px solid ${col};border-radius:8px;background:#0d1016cc;flex-wrap:wrap;">
       <span style="font-size:11px;opacity:.7;">⚔ vs ${opp?.shortName ?? 'Boss'}</span>
       <span style="font-size:13px;font-weight:800;color:${col};">${line}</span>
       <span style="font-size:10.5px;opacity:.6;">thru ${st.thru}/${state.course.holes.length}</span>
+      ${target}
     </div>`;
 }
 
@@ -1287,6 +1300,9 @@ function playingBody(animating: boolean): string {
   const mapOpts = decisionView(play, frameSpray);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
+    // On a matchplay boss stop, overlay the boss's pre-played line for THIS hole so you see them on the
+    // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
+    ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     ball: play.ball,
     spray,

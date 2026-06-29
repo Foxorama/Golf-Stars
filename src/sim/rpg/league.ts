@@ -25,6 +25,7 @@ import {
   applyCut,
   survivorCount,
   bossPick,
+  bossOpponentFor,
   PLAYER_ID,
   type Field,
   type Standing,
@@ -118,11 +119,23 @@ export function leaderboard(run: Run): Leaderboard {
     stopScores.set(g.id, 0);
   }
 
+  const format = getFormat(run.formatId);
   let thru = 0;
   let lastCut = 0;
+  let lastIsBoss = false;
   for (let s = 0; s < arcStops.length; s++) {
     const h = arcStops[s]!;
     const isLast = s === arcStops.length - 1;
+    // A matchplay/scramble BOSS stop is a knockout, not a stroke-scoring round (GS-matchplay): it adds
+    // NO Stableford to anyone's arc total. Otherwise winning the boss but trailing them on points reads
+    // backwards. The stop still shows on the board as a +0 line (reinforcing "the boss round is decided
+    // by the match, not points").
+    const isBoss = !!bossAt(format, h.stopIndex);
+    if (isLast) lastIsBoss = isBoss;
+    if (isBoss) {
+      if (isLast) for (const g of field.golfers) stopScores.set(g.id, 0);
+      continue;
+    }
     const holeCount = holesForStop(run, h.stopIndex);
     const archetype = archetypeFor(h.themeId, h.biome);
     const pressure = stopPressure(h.stopIndex);
@@ -162,8 +175,9 @@ export function leaderboard(run: Run): Leaderboard {
   }));
   rankStandings(rows);
 
-  const cut = arcStops.length ? lastCut : effectiveCut(run, holesForStop(run, run.stopIndex));
-  const withCut = applyCut(rows, cut);
+  // No Stableford cut is drawn on (or after) a boss stop — the boss round is decided by the matchplay.
+  const cut = lastIsBoss ? 0 : arcStops.length ? lastCut : effectiveCut(run, holesForStop(run, run.stopIndex));
+  const withCut = lastIsBoss ? rows.map((r) => ({ ...r, cut: false })) : applyCut(rows, cut);
   return {
     field,
     standings: withCut,
@@ -182,6 +196,18 @@ export function arcBossId(run: Run): string | undefined {
   const board = leaderboard(run);
   if (!board.hasScores) return undefined;
   return bossPick(board.standings);
+}
+
+/**
+ * The matchplay boss opponent for the player (GS-matchplay): the field plays a knockout that pairs the
+ * leaderboard best-vs-worst (#1 v last, #2 v 2nd-last, …), so this returns the player's RANK-MIRROR — top
+ * of the arc earns the weakest opponent, a nervy scrape into the boss draws the leader. Falls back to the
+ * top-rated non-player on a fresh arc with no scores yet (a resume). Replaces "always face the leader".
+ */
+export function matchOpponentFor(run: Run): string | undefined {
+  const board = leaderboard(run);
+  if (!board.hasScores) return runField(run).golfers.find((g) => !g.isPlayer)?.id;
+  return bossOpponentFor(board.standings, PLAYER_ID);
 }
 
 /** Is the run currently AT (or about to play) an arc's boss stop? */

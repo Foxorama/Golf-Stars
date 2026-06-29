@@ -31,7 +31,7 @@ import {
   type StopResult,
 } from '../sim/rpg/run';
 import { isMatchplayBoss } from '../sim/rpg/formats';
-import { arcBossId, runField } from '../sim/rpg/league';
+import { matchOpponentFor, runField } from '../sim/rpg/league';
 import { playMatchStop, playBossStop, holeDuel, matchState, type HoleDuel } from '../sim/rpg/match';
 import { buyMetaUpgrade, type MetaUpgrades } from '../sim/rpg/meta';
 import {
@@ -182,7 +182,7 @@ export function rerollCost(rerolls: number): number {
 /** The matchplay opponent for a boss stop (GS-100): the leaderboard leader, or — if the arc has no
  *  scores yet (a fresh resume) — the field's top-rated non-player as a deterministic fallback. */
 function resolveBossId(run: Run): string {
-  return arcBossId(run) ?? runField(run).golfers.find((g) => !g.isPlayer)?.id ?? '';
+  return matchOpponentFor(run) ?? runField(run).golfers.find((g) => !g.isPlayer)?.id ?? '';
 }
 
 /** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */

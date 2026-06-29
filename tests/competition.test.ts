@@ -10,6 +10,7 @@ import {
   survivorCount,
   bossPick,
   bossGolfer,
+  bossOpponentFor,
   golferBaseline,
   golferForm,
   homeMatches,
@@ -261,6 +262,43 @@ describe('cut + boss pick', () => {
     const table = arcStandings(f, scores, 9);
     expect(table[0]!.isPlayer).toBe(false);
     expect(bossPick(table)).toBe(table[0]!.golferId);
+  });
+});
+
+describe('matchplay pairing (GS-matchplay)', () => {
+  function tableFor(playerSF: number) {
+    const f = makeField();
+    const holes: HoleContext[] = Array.from({ length: 9 }, (_, i) => ({ key: `mp:${i}`, archetype: 'verdant' }));
+    const scores = ghostScores(f, holes);
+    scores.set(PLAYER_ID, holes.map(() => playerSF));
+    return arcStandings(f, scores, 9);
+  }
+
+  it('pairs the player with their rank-mirror (#1 v last)', () => {
+    const table = tableFor(2);
+    const meIdx = table.findIndex((s) => s.isPlayer);
+    const opp = bossOpponentFor(table, PLAYER_ID);
+    const oppIdx = table.findIndex((s) => s.golferId === opp);
+    expect(opp).not.toBe(PLAYER_ID);
+    // mirror: meIdx + oppIdx ≈ N-1 (within 1, since a mirror landing on the player walks to the nearest).
+    expect(Math.abs(meIdx + oppIdx - (table.length - 1))).toBeLessThanOrEqual(1);
+  });
+
+  it('a top player draws a bottom opponent, a bottom player draws a top one', () => {
+    const strong = tableFor(5); // player near the top
+    const sOpp = strong.findIndex((s) => s.golferId === bossOpponentFor(strong, PLAYER_ID));
+    expect(sOpp).toBeGreaterThan(strong.length / 2); // a bottom-half opponent
+
+    const weak = tableFor(0); // player near the bottom
+    const wOpp = weak.findIndex((s) => s.golferId === bossOpponentFor(weak, PLAYER_ID));
+    expect(wOpp).toBeLessThan(weak.length / 2); // a top-half opponent
+  });
+
+  it('skips eliminated golfers — the pairing is over the survivors', () => {
+    const table = tableFor(2).map((s, i) => ({ ...s, cut: i >= 16 })); // bottom 4 cut
+    const opp = bossOpponentFor(table, PLAYER_ID);
+    const oppIdx = table.findIndex((s) => s.golferId === opp);
+    expect(table[oppIdx]!.cut).toBeFalsy(); // never paired with a cut golfer
   });
 });
 
