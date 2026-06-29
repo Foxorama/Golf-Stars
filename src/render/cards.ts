@@ -176,7 +176,22 @@ export interface ItemCardState {
   artSVG?: string;
 }
 
-/** A shop item / loot card, rarity-tinted, dimmed when maxed or unaffordable. */
+/**
+ * Per-rarity card glow (GS-proshop-3): common/rare get a soft tint, EPIC a slight halo, LEGENDARY a
+ * strong gold corona — so a card's stakes read before you parse the text. Returns the `box-shadow`.
+ */
+function cardGlow(rarity: Rarity, col: string): string {
+  if (rarity === 'legendary') return `0 0 22px ${col}99, 0 0 6px ${col}, inset 0 0 16px ${col}33`;
+  if (rarity === 'epic') return `0 0 16px ${col}77, inset 0 0 10px ${col}1f`;
+  return `0 0 12px ${col}22`;
+}
+
+/**
+ * A shop item / loot card, rarity-tinted, dimmed when maxed or unaffordable. All cards are the SAME
+ * SIZE (GS-proshop-3): a fixed width+height flex column with the art and footer in fixed bands and the
+ * description flexing between them, so a rack of mixed items lines up cleanly regardless of how much
+ * text, whether a badge is present, or whether art is shown.
+ */
 export function itemCardHTML(
   item: { name: string; cost: number; desc: string; rarity: Rarity },
   state: ItemCardState = {},
@@ -188,24 +203,26 @@ export function itemCardHTML(
     state.count && state.count > 0
       ? `<span style="margin-left:6px;font-size:11px;color:${col};opacity:.85;">×${state.count}</span>`
       : '';
+  // The badge band is always present (empty when no badge) so cards with/without a reward-club pill
+  // still align row-for-row.
   const badge = state.badge
     ? (() => {
         const bc = state.badge.tone === 'up' ? '#5fd45a' : '#9fd8e6';
-        return `<div style="display:inline-block;margin:.1em 0 .3em;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:${bc};border:1px solid ${bc};border-radius:5px;padding:1px 6px;">${state.badge.text}</div>`;
+        return `<div style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:${bc};border:1px solid ${bc};border-radius:5px;padding:1px 6px;">${state.badge.text}</div>`;
       })()
     : '';
   const art = state.artSVG
-    ? `<div style="margin:2px 0 7px;border-radius:9px;overflow:hidden;box-shadow:inset 0 0 0 1px ${col}33;">${state.artSVG}</div>`
+    ? `<div style="border-radius:9px;overflow:hidden;box-shadow:inset 0 0 0 1px ${col}33;">${state.artSVG}</div>`
     : '';
   return `
-    <article style="width:170px;border:2px solid ${col};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:0 0 12px ${col}22;">
+    <article style="width:170px;height:286px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;border:2px solid ${col};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:${cardGlow(item.rarity, col)};">
       <div style="display:flex;align-items:baseline;gap:6px;">
-        <b style="font-size:14px;">${item.name}</b>${stackBadge}
+        <b style="font-size:14px;line-height:1.15;">${item.name}</b>${stackBadge}
         <span style="margin-left:auto;">${rarityBadge(item.rarity)}</span>
       </div>
-      ${badge}
+      <div style="min-height:17px;">${badge}</div>
       ${art}
-      <p style="font-size:12px;opacity:.8;margin:.5em 0;min-height:2.4em;">${item.desc}</p>
+      <p style="font-size:12px;opacity:.8;margin:0;flex:1;overflow:hidden;">${item.desc}</p>
       <div style="font-size:13px;color:${col};font-weight:600;">${note}</div>
     </article>`;
 }

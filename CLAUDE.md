@@ -984,6 +984,39 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
     test-hub guard needs nothing; the Sim Lab absorbs the new items as data). Tests:
     `tests/proshop-expansion.test.ts` (field apply/stack/cap, hazard-immunity behavioural proofs per biome
     + no-regression, solar set + `equippedGearTheme` rarity pick, deterministic art for every item).
+- **Shop cards are EQUAL-SIZE, art is UNIQUE per item, rarity GLOWS, + a tappable gear inventory
+  (GS-proshop-3).** Four coupled UI/art changes, all render-only (no sim/save/hook touch — the suite +
+  test-hub guard are unaffected):
+  - **Equal-size cards (`render/cards.ts itemCardHTML`).** Every card is a fixed `170×286` flex column:
+    header → an always-present badge band (so reward-club pills don't misalign rows) → the fixed-aspect
+    art → the description (`flex:1; overflow:hidden`, so long text clips instead of growing the card) →
+    the cost footer pinned to the bottom. A mixed rack lines up regardless of text length / badge / art.
+    (The `cards.test.ts` `opacity:1`/`opacity:0.5` asserts still hold.)
+  - **Per-id EMBLEM roundels make shared-kind items unique (`render/itemArt.ts`).** Many items share a
+    base art KIND (4 shafts, 5 gloves, 4 wedges, 4 trophies, 2 coins/putters/coaches) and so were
+    near-identical (same kind glyph + same rarity colour). The base glyph stays (so each is still "the
+    right picture for the item"), and a small top-right `roundel()` draws a vector symbol of what the
+    item DOES (`EMBLEM[id]` — a power bolt, gyroscope rings, a tightening-window, speed chevrons, a
+    crosshair, hook/slice/draw curve arrows, a clover, a sponsor shield, a bullseye, a spin spiral, a
+    whistle, a mortarboard, a bird/eye/up-arrow/burst, …) so every card is UNIQUE and reads its function
+    at a glance. Pure + deterministic (keyed off the id). Balls/caddies/clubs already bespoke/flavoured,
+    so they skip the emblem.
+  - **Rarity glow (`cardGlow`).** Common/rare keep the soft tint; EPIC gets a slight halo (`box-shadow`
+    +`inset`); LEGENDARY a strong gold corona — plus `itemArtSVG` paints a faint radiant gold burst
+    (`legendaryFlair`, gradient-free stacked circles + rays so duplicate cards on one page can't collide
+    on an SVG `<def>` id) behind a legendary's art.
+  - **New legendary `power-glove` — the 1989 NES Power Glove (`economy.ts` + `itemArt.ts drawPowerGlove`).**
+    A unique legendary whose effect is MAX power: `overpower` floored at `0.4` (a 140% pull ceiling, +40%
+    carry, far past the stackable Overdrive's 120%). Interactive-only (the auto sim always plays full swings), so
+    it can't shift scoring or the death-spiral bar. Its own art kind `'powerglove'` draws the iconic grey
+    gauntlet + dark control pad (green LCD + orange buttons) + gold finger sensors.
+  - **Tappable gear inventory on the shop bag screen (`app.ts bagInventoryHTML`).** ABOVE the clubs row, a
+    "🧤 Your gear" line shows every NON-club item you own (glove/ball/shoe/shaft/putter/caddy/relic) as a
+    small art chip; tapping one (`data-inspect`, view-only module state `inspectGearId` like `selClubId`,
+    no reducer/save/hook) pops its full card inline so you can compare it side-by-side with the shop stock.
+  Eyes-on verified via `scripts/shop-cards-preview.mjs` (renders the real cards). Tests:
+  `tests/proshop-expansion.test.ts` already asserts every shop item renders a deterministic SVG (now
+  incl. `power-glove`); `tests/cards.test.ts` guards the equal-size card markup.
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only

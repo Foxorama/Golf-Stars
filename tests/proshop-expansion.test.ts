@@ -6,6 +6,7 @@ import {
   clubSetById,
   equippedGearTheme,
   loadoutFromPerks,
+  maxPowerOf,
   netDispersion,
   shopItem,
   startingLoadout,
@@ -57,6 +58,17 @@ describe('GS-proshop-2 — new gameplay-changing items', () => {
 
     expect(loadoutFromPerks(['rangefinder']).clubSuggest).toBe(true);
     expect(loadoutFromPerks(['tour-spikes']).lieRelief).toBeCloseTo(0.35);
+  });
+
+  it('the legendary Power Glove cranks the power ceiling to MAX (GS-proshop-3)', () => {
+    const pg = shopItem('power-glove')!;
+    expect(pg.rarity).toBe('legendary');
+    // +0.4 overpower → a 140% pull ceiling, far past the stackable Overdrive's 120%.
+    expect(loadoutFromPerks(['power-glove']).overpower).toBeCloseTo(0.4);
+    expect(maxPowerOf(loadoutFromPerks(['power-glove']))).toBeCloseTo(1.4);
+    expect(maxPowerOf(loadoutFromPerks(['overdrive', 'overdrive']))).toBeCloseTo(1.2);
+    // A base loadout never carries it (byte-for-byte default).
+    expect(startingLoadout().overpower).toBeUndefined();
   });
 
   it('hazard-skip balls record the right immune kinds (and combine)', () => {
@@ -167,6 +179,20 @@ describe('GS-proshop-2 — procedural item art', () => {
     expect(itemArtKind('rangefinder')).toBe('rangefinder');
     expect(itemArtKind('tour-spikes')).toBe('shoes');
     expect(itemArtKind('auto-caddie')).toBe('caddy');
+  });
+
+  it('shared-kind items render DISTINCT art (GS-proshop-3 per-id emblems)', () => {
+    // The whole point of the emblem roundels: items that share a base art KIND are no longer identical.
+    const groups = [
+      ['power-cell', 'gyro', 'distance-control', 'overdrive'], // shafts
+      ['precision-chip', 'anti-duck-hook', 'hook-corrector', 'slice-corrector', 'draw-weighting'], // gloves
+      ['sweet-spot', 'wedge-touch', 'shank-guard', 'spin-milled'], // wedges
+      ['birdie-hunter', 'eagle-eye', 'comeback-kid', 'glass-cannon'], // trophies/relics
+    ];
+    for (const ids of groups) {
+      const svgs = ids.map((id) => itemArtSVG(id, shopItem(id)!.rarity));
+      expect(new Set(svgs).size).toBe(ids.length);
+    }
   });
 
   it('EVERY named caddy has a bespoke portrait (never the generic bag glyph)', () => {
