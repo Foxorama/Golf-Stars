@@ -47,6 +47,30 @@ describe('holeView (pure SVG renderer)', () => {
     expect(withShots).toContain('#ffd84a'); // flight-line colour
   });
 
+  it('renders the muted opponent (boss) ghost trail when provided', () => {
+    const shot = {
+      from: [0, 0] as [number, number],
+      result: {
+        landing: [5, 120] as [number, number],
+        carry: 120,
+        shotBearing: 0,
+        wind: { along: 0, cross: 0 },
+        intended: 120,
+        apex: 22,
+      },
+      lieFrom: 'tee' as const,
+      lieTo: 'fairway' as const,
+      landLie: 'fairway' as const,
+      club: { id: '7i', name: '7-Iron', carry: 134 },
+      rest: [5, 130] as [number, number],
+      roll: 10,
+      holed: false,
+    };
+    const withGhost = renderHoleSVG(hole, { ghostShots: [shot] });
+    expect(withGhost).toContain('#ff6b6b'); // muted opponent colour
+    expect(withGhost).toContain('stroke-dasharray="4 3"');
+  });
+
   it('is deterministic for a given hole', () => {
     expect(renderHoleSVG(hole)).toBe(renderHoleSVG(hole));
   });

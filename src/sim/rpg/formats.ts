@@ -30,16 +30,19 @@ export interface BossSpec {
    */
   partner?: 'scramble';
   /**
-   * Matchplay duel (GS-100): you face the leaderboard LEADER hole-by-hole on the actual course — the
-   * boss is a real golfer with their own avatar + shots, the match decided when one is up by more than
-   * remain. Winning/halving passes the stop. The opponent is resolved from the leaderboard at play
-   * time, not named here (this spec carries the tournament framing). Handled by the UI reducer; the
-   * headless `playStop`/`simulateRun` falls back to ordinary Stableford-vs-cut for balance/tests.
+   * Matchplay knockout (GS-100 / GS-matchplay): the boss round is a 1-on-1 duel on the actual course
+   * against the player's RANK-MIRROR — the field pairs best-vs-worst (#1 v last, …), so a strong arc
+   * earns a weaker opponent and a scrape draws the leader. The boss is a real golfer with their own
+   * avatar + shots, the match decided when one is up by more than remain; winning/halving passes the
+   * stop and adds NO Stableford to the leaderboard (the match decides advancement, not points). The
+   * opponent is resolved from the leaderboard at play time (matchOpponentFor), not named here. Handled
+   * by the UI reducer; the headless `playStop`/`simulateRun` falls back to ordinary Stableford-vs-cut
+   * for balance/tests.
    */
   mode?: 'matchplay';
 }
 
-/** Is this boss a 1-on-1 matchplay duel against the leaderboard leader (GS-100)? */
+/** Is this boss a 1-on-1 matchplay knockout vs the player's rank-mirror (GS-100 / GS-matchplay)? */
 export function isMatchplayBoss(boss: BossSpec | undefined): boolean {
   return boss?.mode === 'matchplay';
 }
@@ -117,7 +120,7 @@ export const FORMATS: Record<string, RunFormat> = {
       {
         holes: 9,
         label: 'Arc I Boss · Matchplay',
-        boss: { id: 'nebula-open', name: 'The Nebula Open', blurb: 'A nine-hole matchplay duel against the leader of the field. Win the most holes and you break into deep space.', cutBonus: 1, mode: 'matchplay' },
+        boss: { id: 'nebula-open', name: 'The Nebula Open', blurb: 'A nine-hole matchplay knockout — the field pairs best-vs-worst and you face your rank-mirror. Win the most holes and you break into deep space.', cutBonus: 1, mode: 'matchplay' },
       },
       // --- Arc 2 ---
       { holes: 6, label: 'Deep Run I' },
@@ -133,7 +136,7 @@ export const FORMATS: Record<string, RunFormat> = {
       {
         holes: 9,
         label: 'The Galactic Major · Matchplay',
-        boss: { id: 'galactic-major', name: 'The Galactic Major', blurb: 'The final. A matchplay duel against the galaxy’s number one — win the match and the voyage is yours.', cutBonus: 3, final: true, mode: 'matchplay' },
+        boss: { id: 'galactic-major', name: 'The Galactic Major', blurb: 'The final. A matchplay knockout against your rank-paired rival — win the match and the voyage is yours.', cutBonus: 3, final: true, mode: 'matchplay' },
       },
     ],
   },

@@ -338,6 +338,30 @@ export function bossPick(standings: Standing[]): string | undefined {
   return undefined;
 }
 
+/**
+ * The matchplay boss-round PAIRING (GS-matchplay): the field plays a knockout where the leaderboard
+ * pairs best-vs-worst — #1 v last, #2 v 2nd-last, … — so a strong arc earns an easy match and a scrape
+ * into the boss draws the leader. This returns the golfer the PLAYER is paired with: their rank-mirror
+ * among the standings (the i-th from the top meets the i-th from the bottom). Eliminated golfers are
+ * dropped first so the pairing is over the boss-eligible survivors only. Falls back to the nearest valid
+ * opponent if a mirror lands on the player (an odd survivor count) or is missing.
+ */
+export function bossOpponentFor(standings: Standing[], playerId = PLAYER_ID): string | undefined {
+  const live = standings.filter((s) => !s.cut);
+  const pool = live.length >= 2 ? live : standings; // never strand the duel if everyone's flagged cut
+  const meIdx = pool.findIndex((s) => s.golferId === playerId);
+  if (meIdx < 0) return bossPick(standings);
+  const mirror = pool.length - 1 - meIdx;
+  // The exact mirror, then walk outward for the nearest non-player if the mirror is the player (odd pool).
+  for (let d = 0; d < pool.length; d++) {
+    for (const idx of [mirror + d, mirror - d]) {
+      const s = pool[idx];
+      if (s && idx !== meIdx && !s.isPlayer) return s.golferId;
+    }
+  }
+  return bossPick(standings);
+}
+
 /** Resolve the boss pick to its full Golfer (for avatar + shot mods). */
 export function bossGolfer(standings: Standing[]): Golfer | undefined {
   const id = bossPick(standings);

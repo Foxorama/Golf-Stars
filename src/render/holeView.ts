@@ -55,6 +55,9 @@ export interface RenderOptions {
   padding?: number;
   /** If given, draws each shot's flight line over the hole. */
   shots?: ShotLog[];
+  /** Optional OPPONENT shot trail (the matchplay boss, GS-matchplay) — drawn MUTED beneath the player's
+   *  own lines so you can see where the boss played the hole (feedback on their ball, not just a number). */
+  ghostShots?: ShotLog[];
   /** Show the centreline play-line. */
   showCentreline?: boolean;
   /** Biome id — tints the rough/background to sell the world. */
@@ -139,6 +142,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     // stroke-and-distance edge — see them, aim away from them).
     extra.push(...playBoundsCorners(hole));
     if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
+    if (opts.ghostShots) for (const s of opts.ghostShots) extra.push(s.from, s.result.landing, s.rest);
     if (opts.ball) extra.push(opts.ball);
     if (opts.spray && opts.spray.expectedCarry > 0) {
       const bands = sprayBands(opts.spray.shape, opts.spray.angleSpread, geom);
@@ -227,6 +231,23 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // and bends to the landing, so a fade/hook/slice reads as a banana on the map exactly as it
   // animates in the play view (they share `flightControl`). A roll tail (landing→rest) is added so
   // the bounce-and-run is visible, with a small marker where a tree knocked the ball down.
+  // The opponent's (boss's) shot trail, drawn FIRST so the player's own lines sit on top — a muted
+  // dashed crimson path with a small ring at each rest, so you literally see the boss on the course.
+  if (opts.ghostShots) {
+    for (const s of opts.ghostShots) {
+      const [fx, fy] = place(s.from);
+      const [tx, ty] = place(s.result.landing);
+      const [cx, cy] = place(flightControl(s.from, s.result.landing, s.result.shotBearing));
+      parts.push(
+        `<path d="M ${fx.toFixed(1)} ${fy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}" fill="none" stroke="#ff6b6b" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.55" />`,
+      );
+      const [rx, ry] = place(s.rest);
+      parts.push(
+        `<circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="2.6" fill="#ff6b6b" opacity="0.5" />`,
+      );
+    }
+  }
+
   if (opts.shots) {
     for (const s of opts.shots) {
       const [fx, fy] = place(s.from);
