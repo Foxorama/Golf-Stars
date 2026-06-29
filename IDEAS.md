@@ -283,6 +283,10 @@ none touched the fairness/no-death-spiral bars (new systems live on the economy/
   fairness + no-death-spiral validators untouched (all 522 tests green). `tests/events.test.ts` extended
   (lever design, rarity-stakes monotonicity, per-arc mix, the triple-legendary ceiling, toll/shard wiring,
   snapshot round-trip). Bumps `Run.bonusShards` + `RunSnapshot.bonusShards` (optional → back-compat).
+  - **Follow-on — triple-legendary as an Easter egg / achievement.** Three legendary lanes at once is
+    deliberately rare (~0.1% / deep jump, ~1 in 750) — a fun "whoa" moment, not a balance lever. If/when
+    an achievements system lands, wire a hidden achievement off detecting `routeOptions(run)` returning
+    three `legendary` events (pure to check). Keep the odds low so it stays a treat.
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
   differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
   content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression
