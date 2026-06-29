@@ -1,11 +1,14 @@
 /**
- * Persistent meta-progression (GS-12) — "Star Shards" earned across runs, spent at the
- * Outpost on PERMANENT upgrades to your STARTING loadout. Where shop perks (economy.ts)
- * last one run, these carry forever: each new run begins a little stronger, so a bricked
- * run still buys lasting progress and the roguelite has a between-run hook.
+ * Persistent meta-progression (GS-12) — "Star Shards" earned across runs.
  *
- * Pure & data-driven: a new upgrade is a new row. The save persists shards + per-upgrade
- * LEVELS (a Record id→level); `startRun` bakes them into the starting loadout/credits.
+ * RETIRED FROM THE UI (GS-garage): Star Shards no longer buy these permanent STAT upgrades — that
+ * spend moved to the cosmetic Trade Market (ships.ts), and the stat effects (−hcp, +distance, −spray,
+ * +credits, putt) now live in the in-run Pro Shop (economy.ts) as buyable perks. `META_UPGRADES` +
+ * `applyMeta` are KEPT only so (a) old saves that already bought levels keep them (startRun still folds
+ * them) and (b) tests can construct a boosted loadout. Nothing in the game offers them anymore.
+ *
+ * Pure & data-driven. The save still persists shards + any grandfathered per-upgrade LEVELS (a Record
+ * id→level); `startRun` bakes them into the starting loadout/credits.
  */
 
 import {

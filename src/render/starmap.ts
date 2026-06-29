@@ -24,6 +24,7 @@
 
 import type { Rarity } from '../sim/course/contract';
 import { rarCol } from '../sim/rpg/loot';
+import { shipSVG } from './shipArt';
 
 export interface StarmapChoice {
   /** Route id — used only to key the DOM node, not drawn. */
@@ -88,6 +89,8 @@ export interface StarmapOpts {
    */
   trail?: StarmapStop[];
   choices: StarmapChoice[];
+  /** The cosmetic ship to draw as the "YOU" craft (GS-garage). Absent → the classic Woody Wagon. */
+  shipId?: string;
 }
 
 const H = 200; // widget height (px); the trail strip and forward panel share it
@@ -118,28 +121,6 @@ function angSepDeg(a: { ra: number; dec: number }, b: { ra: number; dec: number 
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** The station-wagon spaceship, facing right — a compact vector glyph (no asset). `s` ≈ width/40. */
-function wagonGlyph(cx: number, cy: number, s: number): string {
-  const body = `
-    <g stroke="#1c130b" stroke-width="1" stroke-linejoin="round">
-      <path d="M-18,3 L-14,-4 L4,-5 L11,1 L18,2 L18,6 L-18,6 Z" fill="#8a5a2b"/>
-      <path d="M-12,-3 L-1,-3 L-1,0 L-13,0 Z" fill="#bfe3f2"/>
-      <path d="M1,-3 L8,0.4 L1,0.4 Z" fill="#bfe3f2"/>
-      <rect x="-3.4" y="-3.2" width="1.5" height="3.6" fill="#1c130b" stroke="none"/>
-      <circle cx="-9" cy="6.4" r="2.4" fill="#2a1c10"/>
-      <circle cx="9" cy="6.4" r="2.4" fill="#2a1c10"/>
-    </g>
-    <g stroke="none">
-      <path d="M-18,1 L-26,-1 L-26,4 L-18,5 Z" fill="#ff8a3c" opacity="0.95"/>
-      <path d="M-22,1.6 L-30,0.4 L-30,3 L-22,3.4 Z" fill="#ffd36b" opacity="0.9"/>
-      <rect x="13" y="-7" width="1.1" height="5" fill="#9a6a35"/>
-      <path d="M14,-7 l6,1.6 l-6,1.8 Z" fill="#ff5a4d"/>
-    </g>`;
-  return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">
-    <g opacity="0.9"><animateTransform attributeName="transform" type="translate" values="0 0;0 -1.4;0 0" dur="3.2s" repeatCount="indefinite"/>${body}</g>
-  </g>`;
-}
 
 /** A glowing branch planet for one route choice. The planet BODY reads the destination biome (colour +
  *  glyph), the RING reads the loot rarity, and a small corner badge carries the event/bet glyph — so a
@@ -297,7 +278,7 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     ${youStub}
     ${fbranch.lines}
     ${fbranch.planets}
-    ${wagonGlyph(youX, MID_Y, 0.82)}
+    ${shipSVG(opts.shipId, youX, MID_Y, 0.82)}
     ${youLabel}
   </svg>`;
 

@@ -679,8 +679,28 @@ This game lives or dies on three axes — put every change through all three bef
   the starting loadout/credits (`metaStartingLoadout`/`metaStartingCredits`); shop perks rebuild OVER
   the meta base (`loadoutFromPerks(perks, base)`), and the run snapshot carries `meta` so resume
   reconstructs both layers. Two currency layers: **credits** = per-run (reset each run, shop perks);
-  **shards** = cross-run (permanent upgrades). Save v3 migrates v2→v3 (drops the dead always-0
+  **shards** = cross-run. Save v3 migrates v2→v3 (drops the dead always-0
   `credits` field) via the one-step-at-a-time `migrate` chain.
+- **Star Shards buy COSMETIC SHIPS at the Trade Market now — the permanent STAT spend is retired
+  (GS-garage, `ships.ts`/`shipArt.ts`).** The permanent stat-upgrade Outpost is gone: those effects
+  (−hcp, +distance, −spray, +credits, putt) already live in the in-run **Pro Shop** as buyable perks
+  (Caddie Lesson / Power Cell+Range Booster / Gyro+Precision / Lucky Coin+Fortune Chip / Pro Putting
+  Grip), so they're now "baked into the run" instead of permanent. `META_UPGRADES`/`applyMeta` stay in
+  `meta.ts` ONLY for old-save grandfathering + as a test loadout-construction utility — nothing in the
+  UI offers them anymore (`startRun` still folds any grandfathered levels, so old saves keep what they
+  bought). Shards instead buy **ships** (`SHIPS`: a free default `Woody Wagon` + ~8 priced craft across
+  sets — the blinged Wagon line chrome→gold→cosmic, Racers, a Hauler, a UFO, a golf-ball Comet — tiered
+  by rarity = price). PURELY COSMETIC: the chosen ship is the "YOU" craft on the journey-map starmap
+  (`shipSVG` replaced the hard-coded `wagonGlyph`; the default look is byte-identical). The between-run
+  screen (still `screen: 'outpost'`) is now the **Trade Market + Garage**: a rotating `marketOffer`
+  (a seeded sample of UNOWNED ships, size `MARKET_OFFER_SIZE`) you buy with shards, RESET each completed
+  run (a persisted `marketSeed` bumps on every run end) with a steep escalating **reroll**
+  (`marketRerollCost`); plus a **Garage** that flies any owned ship (`selectShip`). Reducer actions
+  `buyShip`/`selectShip`/`rerollMarket` (replaced `buyUpgrade`); ownership + selection + `marketSeed`
+  persist in **save v6** (v5→v6 migration seeds the starter wagon). Pure + deterministic; ships never
+  touch the sim, so there are no balance/fairness implications. No new `_gs*`/URL hook. Tests:
+  `tests/ships.test.ts` (catalogue/offer/reroll/affordability), `tests/save.test.ts` (v6 migration),
+  `tests/ui.test.ts` (buy auto-flies, garage select, market guards + reroll).
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by
