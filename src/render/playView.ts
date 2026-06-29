@@ -939,9 +939,13 @@ export function mountPlayView(
         if (trail.length > F.trailLen) trail.shift();
         ctx.beginPath();
         trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
-        ctx.strokeStyle = 'rgba(255,216,74,0.5)';
+        // GS-tracer: the flight trail reads the chosen golfer's colour (was a fixed yellow).
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = look.cap;
         ctx.lineWidth = 2;
         ctx.stroke();
+        ctx.restore();
 
         // Ball (a touch bigger when lofted).
         ctx.fillStyle = '#fff';

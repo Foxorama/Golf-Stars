@@ -55,6 +55,9 @@ export interface RenderOptions {
   padding?: number;
   /** If given, draws each shot's flight line over the hole. */
   shots?: ShotLog[];
+  /** Player shot-line/tracer colour (GS-tracer — character colour-coded). Defaults to the classic
+   *  yellow `#ffd84a` so callers that don't pass a golfer colour (and the render tests) are unchanged. */
+  shotColor?: string;
   /** Optional OPPONENT shot trail (the matchplay boss, GS-matchplay) — drawn MUTED beneath the player's
    *  own lines so you can see where the boss played the hole (feedback on their ball, not just a number). */
   ghostShots?: ShotLog[];
@@ -249,17 +252,18 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   }
 
   if (opts.shots) {
+    const shotCol = opts.shotColor ?? '#ffd84a';
     for (const s of opts.shots) {
       const [fx, fy] = place(s.from);
       const [tx, ty] = place(s.result.landing);
       const [cx, cy] = place(flightControl(s.from, s.result.landing, s.result.shotBearing));
       parts.push(
-        `<path d="M ${fx.toFixed(1)} ${fy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}" fill="none" stroke="#ffd84a" stroke-width="2" />`,
+        `<path d="M ${fx.toFixed(1)} ${fy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}" fill="none" stroke="${shotCol}" stroke-width="2" />`,
       );
       if (Math.abs(s.roll) > 0.5) {
         const [rx, ry] = place(s.rest);
         parts.push(
-          `<line x1="${tx.toFixed(1)}" y1="${ty.toFixed(1)}" x2="${rx.toFixed(1)}" y2="${ry.toFixed(1)}" stroke="#ffd84a" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.7" />`,
+          `<line x1="${tx.toFixed(1)}" y1="${ty.toFixed(1)}" x2="${rx.toFixed(1)}" y2="${ry.toFixed(1)}" stroke="${shotCol}" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.7" />`,
         );
       }
       if (s.knockedDown) {

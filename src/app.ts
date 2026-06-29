@@ -1498,7 +1498,9 @@ function playingBody(animating: boolean): string {
       (play.ball[1] + puttPin[1]) / 2,
     ];
     const puttSvg = renderHoleSVG(play.hole, {
-      shots: play.shots,
+      // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
+      // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
+      // The putt screen is the ball↔cup line — the approach tracers belong to the whole-hole decision view.
       biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
       width: DMAP_W,
       height: DMAP_H,
@@ -1576,6 +1578,7 @@ function playingBody(animating: boolean): string {
   const mapOpts = decisionView(play, frameSpray);
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
+    shotColor: golferLook()?.cap, // GS-tracer: the player's shot tracer reads the chosen golfer's colour.
     // On a matchplay boss stop, overlay the boss's pre-played line for THIS hole so you see them on the
     // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
     ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
