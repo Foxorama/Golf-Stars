@@ -42,7 +42,7 @@ describe('boss rewards (GS-talents)', () => {
     expect(rewards[0]!.kind).toBe('talent');
     expect(rewards[0]!.id).toBe('talent-ember'); // the inferno signature talent
     expect(rewards[1]!.kind).toBe('talent');
-    expect(rewards[1]!.archetype).toBeUndefined; // a generic
+    expect(rewards[1]!.id).not.toBe('talent-ember'); // a distinct (generic) talent
     expect(rewards[2]!.kind).toBe('shards');
     expect(rewards[2]!.shards).toBeGreaterThan(0);
   });
