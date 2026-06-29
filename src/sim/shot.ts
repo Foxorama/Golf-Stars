@@ -310,7 +310,7 @@ export interface LieInfo {
   label: string;
 }
 
-export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void' | 'voidlost';
+export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void' | 'voidlost' | 'ravine';
 
 /**
  * Surface → playing characteristics. Open table (content-as-data): fantasy surfaces
@@ -324,6 +324,13 @@ export const LIE_INFO: Record<string, LieInfo> = {
   rough: { carryMult: 0.9, dispersionMult: 1.4, label: 'Rough' }, // 10% distance penalty
   waste: { carryMult: 0.9, dispersionMult: 1.2, label: 'Waste' },
   bunker: { carryMult: 0.5, dispersionMult: 1.6, label: 'Bunker' }, // 50% distance penalty — a real escape tax
+  // Deep POT bunker (GS-hazards-2): steeper-faced, smaller — a harsher escape than open sand. Sand
+  // class → NON-penalty (always fair), so it may pinch the landing zone / encircle a small green.
+  pot: { carryMult: 0.4, dispersionMult: 1.75, label: 'Pot bunker' }, // ~60% tax, a real sideways-out lie
+  // Thick FESCUE / native rough (GS-hazards-2): a non-penalty deep-rough lie that sits BETWEEN rough
+  // and the woods — heavier carry tax + wilder than ordinary rough, recoverable (you hack it out, you
+  // never lose a stroke). Fills the deep rough on links/parkland/desert worlds.
+  fescue: { carryMult: 0.72, dispersionMult: 1.55, label: 'Fescue' },
   // Trees are a tough non-penalty LIE, not a mid-flight collision: a sprayed ball ends up
   // "in the woods" and has to punch out (short carry, wild line) — fair and readable, since
   // only an offline shot finds them. NOT a penalty, so they may line the corridor edge.
@@ -340,6 +347,10 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // A parkland water creek crossing the fairway (GS-terrain): plays as water (penalty), sanctioned
   // as a forced carry exactly like the lava river / frozen pond.
   creek: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'water', label: 'Creek' },
+  // A dry RAVINE / barranca crossing the fairway (GS-hazards-2): a penalty-area forced carry exactly
+  // like the creek/lava river (sanctioned by `validateCrossings`), but a rocky chasm rather than water
+  // — diversifies the forced-carry vocabulary on desert/parkland worlds.
+  barranca: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'ravine', label: 'Ravine' },
   void: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'void', label: 'The Void' },
   // The void's "lost rough" (GS-19): off the fairway is the abyss. A penalty, but a NON-replay
   // drop-back-on-the-island (`voidlost`) — a stroke-and-distance cascade made max-wildness void
@@ -399,6 +410,7 @@ export const PEN_INFO: Record<PenaltyKind, PenaltyInfo> = {
   lava: { strokes: 1, replay: false, label: 'Lava' },
   void: { strokes: 1, replay: true, label: 'Lost to the void' },
   voidlost: { strokes: 1, replay: false, label: 'Lost to the void' },
+  ravine: { strokes: 1, replay: false, label: 'Ravine' },
 };
 
 // --- Lie lookup against a hole ----------------------------------------------
@@ -417,6 +429,7 @@ const SURFACE_PRIORITY: Record<string, number> = {
   ice: 3,
   crystal: 3,
   waste: 3,
+  fescue: 3, // thick native rough reads over plain fairway/rough it overlaps
   fairway: 2,
 };
 

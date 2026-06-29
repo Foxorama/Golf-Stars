@@ -78,6 +78,8 @@ const SURFACE_ROLL: Record<string, number> = {
   rough: 0.42, // thick stuff grabs the ball — a touch draggier than the old 0.5 now it's per-step
   waste: 0.7,
   bunker: 0.2,
+  pot: 0.12, // deep pot — plugs almost dead
+  fescue: 0.3, // thick native grass grabs harder than ordinary rough
   trees: 0.25, // knocked into the woods → drops nearly dead, barely trickles
   ice: 1.8,
   crystal: 1.1,
@@ -92,6 +94,8 @@ export const SURFACE_FIRMNESS: Record<string, number> = {
   rough: 0.3,
   waste: 0.6,
   bunker: 0.12,
+  pot: 0.08,
+  fescue: 0.22,
   trees: 0.15,
   ice: 1.0,
   crystal: 0.95,

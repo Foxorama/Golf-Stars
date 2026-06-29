@@ -13,6 +13,9 @@ export const FILL: Record<string, string> = {
   trees: '#1f6b2e', // canopy green (the renderers draw trees as canopies, not flat blobs)
   water: '#3f8fe0',
   waste: '#c2b280',
+  pot: '#d8c48f', // deep pot bunker — a touch darker than open sand
+  fescue: '#8a9a52', // wispy native fescue (olive-tan tall grass)
+  barranca: '#6b5a48', // dry rocky ravine/chasm
   lava: '#d2451e',
   lavariver: '#e2541a',
   frozenpond: '#5aa6d8',
