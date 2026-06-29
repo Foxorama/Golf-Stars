@@ -233,15 +233,15 @@ export function classifySprayZone(
 
 /**
  * A caddy's in-flight ball guard (GS-caddy): the named caddy that watches your misses and knocks the
- * ball back to the green mid-flight. `remove` zones are ALWAYS redirected to the green; `halve` zones
- * are redirected with 50% chance. `kind` is the render flavour (a Space Duck's laser, a Convict
- * Sheep's boomerang). Unlike a `ShapeMod`, this does NOT change the spray distribution (the cone still
- * shows the tails) — it intercepts a shot that was already sampled into a tail, so the renderer can
- * play the projectile redirect. Resolved identically in the auto sim and interactive driver.
+ * ball back to the green mid-flight. `redirect` maps a miss zone to the CHANCE (0..1) the caddy fires
+ * its projectile to redirect it to the green — 1 = always (a duck-hook/shank is never let go), a
+ * fraction = a per-shot roll (e.g. 0.75 of hooks). `kind` is the render flavour (a Space Duck's laser,
+ * a Convict Sheep's boomerang). Unlike a `ShapeMod`, this does NOT change the spray distribution (the
+ * cone still shows the tails) — it intercepts a shot that was already sampled into a tail, so the
+ * renderer can play the projectile redirect. Resolved identically in the auto sim and interactive driver.
  */
 export interface CaddyGuard {
-  remove: readonly SprayZone[];
-  halve: readonly SprayZone[];
+  redirect: Partial<Record<SprayZone, number>>;
   kind: 'laser' | 'boomerang';
 }
 
@@ -614,14 +614,16 @@ export function resolveShot(input: ShotInput): ShotResult {
   let sprayAngle = sampleShapeAngle(shape, angleSd, rng);
   // Caddy-guard interception (GS-caddy): a named caddy that watches a sampled miss tail and knocks
   // the ball back to the green mid-flight. Only runs when a guard is present (a caddy is owned), so a
-  // guard-less shot draws NO extra rng and stays byte-for-byte identical. The 50%-roll + green
-  // resample are the only added draws, both gated behind the guard.
+  // guard-less shot draws NO extra rng and stays byte-for-byte identical. A redirect chance of 1 fires
+  // unconditionally (no draw); a fractional chance rolls once; a zero/absent zone draws nothing — so
+  // the green resample is the only added draw on an actual knock-back, all gated behind the guard.
   let knockedFrom: SprayZone | undefined;
   let origTheta = 0;
   if (input.guard) {
     const zone = classifySprayZone(sprayAngle, shape, angleSd);
-    let knockBack = input.guard.remove.includes(zone);
-    if (!knockBack && input.guard.halve.includes(zone)) knockBack = rng.float() < 0.5;
+    const chance = input.guard.redirect[zone] ?? 0;
+    let knockBack = chance >= 1;
+    if (!knockBack && chance > 0) knockBack = rng.float() < chance;
     if (knockBack && zone !== 'green') {
       origTheta = (input.angleBias ?? 0) + sprayAngle;
       sprayAngle = sampleGreenAngle(angleSd, rng);
