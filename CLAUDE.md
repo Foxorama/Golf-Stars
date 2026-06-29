@@ -458,17 +458,38 @@ This game lives or dies on three axes — put every change through all three bef
   voyage's `cutMult` (0.65) still softens the distance term so a bounded campaign plateaus. Re-run the
   `tests/` cut harness after touching the base/slope or `cutMult`. (No test hard-requires the auto-AI to
   WIN the voyage — `voyage.test` only asserts the run terminates — so the cut can bite hard at the final.)
-- **Route events make travel a decision (GS-14, `events.ts`).** A jump used to differ only by
-  distance; now each route carries a themed, content-as-data **event** that tilts the stop you fly
-  *into* — two pure levers: `creditMult` (payout) and `cutDelta` (the cut/fail gate). The spread runs
-  from calm (easier cut, modest pay) to high-stakes (credits double, cut +2/+3); `routeOptions` draws
-  3 distinct events seeded + rarity-weighted and **always guarantees one calm option** (an out). The
-  chosen event rides `run.pendingEvent` (set by `travel`), is applied by `finishStop` via
-  `effectiveCut()` + the credit mult, then **cleared** there so a resume can't double-apply it
-  (`RunSnapshot.pendingEventId` round-trips it). Stop 0 / no-event = the neutral `DEFAULT_EVENT`, so
-  existing stop-0 behaviour is byte-for-byte unchanged. CRITICAL: events touch ONLY economy/cut, NEVER
-  course generation — that's what keeps the fairness + no-death-spiral validators untouched. Keep it
-  that way; a "wilder course" event would have to re-clear those bars.
+- **Route events make travel a decision (GS-14, rebalanced GS-routes, `events.ts`).** A jump used to
+  differ only by distance; now each route carries a themed, content-as-data **event** that tilts the
+  stop you fly *into*. The original two levers (`creditMult` payout, `cutDelta` fail-gate) made every
+  lane the same shape, with no real downside, so a green common often beat a rare (the imbalance the
+  rebalance fixes). Now FOUR pure levers give lanes DISTINCT, traded-off shapes: + `creditToll`
+  (credits paid UP FRONT in `travel`, floored at 0 — a genuine cost so the rich lanes bite) and
+  `shardBonus` (permanent shards banked in `travel` onto `run.bonusShards`, kept even on a later bust
+  — the meta/"banker" lane, added by `shardsForRun`). Calm lanes are now SAFE-BUT-POOR (creditMult ≤
+  ~1.05, or they charge a toll) so a common is never a strictly-better rare; rarity = STAKES (the
+  reward CEILING rises monotonically common→legendary, and so does the risk). The chosen event rides
+  `run.pendingEvent` (set by `travel`), applied by `finishStop` via `effectiveCut()` + the credit
+  mult, then **cleared** there so a resume can't double-apply it (`RunSnapshot.pendingEventId` +
+  `bonusShards` round-trip it). Stop 0 / no-event = the neutral `DEFAULT_EVENT`, so existing stop-0
+  behaviour is byte-for-byte unchanged. CRITICAL: events touch ONLY economy/cut/meta, NEVER course
+  generation — that's what keeps the fairness + no-death-spiral validators untouched. Keep it that
+  way; a "wilder course" event would have to re-clear those bars.
+- **The route draw is a per-ARC rarity SLOT model (GS-routes, `drawArcRouteEvents`).** Not a flat
+  rarity-weighted shuffle — the loot feel ramps with the journey via `ARC_SLOTS[arcForDistance(dist)]`.
+  Each slot names a BASE rarity + a GATED upgrade `chain` (`chain[k]` = P(climb one more tier | climbed
+  the last)): arc 1 = two commons + a wildcard (≈82% common / 14% rare / 4% epic); arc 2 = a common, a
+  CROSSOVER (≈50/50 common↔rare, may reach epic/legendary), and a rare (→epic →legendary); arc 3 = two
+  rares + an epic, all upgradeable — **up to THREE legendaries**. `routeOptions` draws the 3 distances
+  FIRST (so flat/ladder rng streams stay byte-identical) then the events from the dedicated
+  `:routes:stop` stream. Safety net is ARC-GATED: arcs 1–2 GUARANTEE a lower-risk OUT (swap the
+  lowest-stakes slot for a calm event if the draw produced none); arc 3 does NOT (the deep voyage / the
+  endless & ascension steady state is deliberately all-or-nothing — commit or bank). `pickOfRarity`
+  degrades a missing tier toward common first. The travel screen renders a deterministic SVG **starmap**
+  (`render/starmap.ts`): Earth → the travelled trail → YOU (the station-wagon spaceship) → three branch
+  planets colour-keyed to the choice cards (rarity ring + event glyph + ⚔ boss / 🔥 harder-path marker),
+  pure + seeded (no Math.random, no 404 asset). Each `RouteEvent` carries an `icon`, `lore`, and a
+  functional `category` (calm/payout/toll/salvage) so the cards read as distinct bets. No new `_gs*`/URL
+  hook (the new events appear in the Sim Lab automatically) → the test-hub guard needs no new control.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen

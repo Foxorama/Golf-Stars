@@ -39,7 +39,7 @@ import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, stopSpecFor, type BossS
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyCharacter, characterShotMods, scramblePartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
-import { DEFAULT_EVENT, drawRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
+import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, type Theme } from '../course/themes';
 
 export type RunStatus = 'active' | 'ended';
@@ -93,6 +93,9 @@ export interface Run {
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
    */
   pendingEvent?: RouteEvent;
+  /** Permanent shards banked mid-run by route events (GS-routes `shardBonus`) — accrued on travel and
+   *  kept even on a later bust, so a "salvage" lane is guaranteed meta progress. Added by shardsForRun. */
+  bonusShards: number;
   /** Ids of UNIQUE one-off events already travelled into (GS-17c) — so each fires at most once. */
   firedEventIds: string[];
   status: RunStatus;
@@ -141,6 +144,7 @@ export function startRun(
     loadout: startingLoadoutFor(meta, characterId),
     meta,
     ascension: asc,
+    bonusShards: 0,
     firedEventIds: [],
     status: 'active',
     history: [],
@@ -355,10 +359,13 @@ export function routeOptions(run: Run): Route[] {
     const distanceJump = rng.int(1, maxJump);
     return { id: i, distanceJump, label: labels[distanceJump]! };
   });
-  // Pool is arc-tiered to the run's depth and excludes already-fired uniques (GS-17c).
+  // Pool is arc-tiered to the run's depth and excludes already-fired uniques (GS-17c). The per-arc
+  // SLOT draw (GS-routes) sets the rarity MIX — gentle commons early, rares/epics/legendaries deep —
+  // so the loot feel ramps with the journey instead of a flat rarity-weighted shuffle.
+  const arc = arcForDistance(run.distanceFromStart);
   const pool = eventPool(run.distanceFromStart, run.firedEventIds);
-  const events = drawRouteEvents(rng, routes.length, pool);
-  const withEvents = routes.map((r, i) => ({ ...r, event: events[i]! }));
+  const events = drawArcRouteEvents(rng, arc, pool);
+  const withEvents = routes.map((r, i) => ({ ...r, event: events[i] ?? DEFAULT_EVENT }));
   // Derive the HARDER PATH (GS-voyage) WITHOUT touching the rng: the single highest-stakes lane —
   // the route whose event raises the cut the most (ties broken by payout). Only a genuinely risky
   // lane (cutDelta > 0) is flagged, so early calm jumps show no elite option.
@@ -386,16 +393,21 @@ export function routeOptions(run: Run): Route[] {
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
 export function travel(run: Run, route: Route): Run {
   if (run.status !== 'active') throw new Error('travel: run is not active');
+  const ev = route.event;
+  // GS-routes levers paid at the moment of choosing the lane: a credit TOLL bites up front (floored
+  // so it never strands you below zero), a SHARD bonus is banked now (kept even on a later bust).
+  const toll = Math.max(0, ev.creditToll ?? 0);
+  const shardBonus = Math.max(0, ev.shardBonus ?? 0);
   return {
     ...run,
     stopIndex: run.stopIndex + 1,
     distanceFromStart: run.distanceFromStart + route.distanceJump,
+    credits: Math.max(0, run.credits - toll),
+    bonusShards: run.bonusShards + shardBonus,
     // Carry the chosen route's event into the next stop (applied by finishStop).
-    pendingEvent: route.event,
+    pendingEvent: ev,
     // A unique one-off is now spent for the rest of the run (GS-17c).
-    firedEventIds: route.event.unique
-      ? [...run.firedEventIds, route.event.id]
-      : run.firedEventIds,
+    firedEventIds: ev.unique ? [...run.firedEventIds, ev.id] : run.firedEventIds,
   };
 }
 
@@ -537,6 +549,8 @@ export interface RunSnapshot {
   ascension?: number;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
+  /** Permanent shards banked mid-run by route events (GS-routes); 0/absent for back-compat. */
+  bonusShards?: number;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
   firedEventIds?: string[];
   /** The selected golfer (GS-18) — re-applied to the loadout on resume. */
@@ -554,6 +568,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     meta: { ...run.meta },
     ascension: run.ascension,
     pendingEventId: run.pendingEvent?.id,
+    bonusShards: run.bonusShards,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
   };
@@ -573,6 +588,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     meta,
     ascension: snap.ascension ?? 0,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
+    bonusShards: snap.bonusShards ?? 0,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',
     history: [],
@@ -609,7 +625,8 @@ export function shardsForRun(run: Run): number {
     Math.round(run.distanceFromStart * SHARD_PER_DISTANCE + run.history.length * SHARD_PER_STOP),
   );
   const winBonus = run.endedReason === 'won' ? WIN_SHARD_BONUS : 0;
-  return base + cashOutShards(run) + winBonus;
+  // Route-event salvage banked mid-run (GS-routes) is kept regardless of how the run ends.
+  return base + cashOutShards(run) + winBonus + Math.max(0, run.bonusShards ?? 0);
 }
 
 // --- Headless full-run driver (for tests / AI sims) -------------------------

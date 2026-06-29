@@ -267,6 +267,26 @@ none touched the fairness/no-death-spiral bars (new systems live on the economy/
   - **Driver on Deck** — *superseded by the Driver Dan caddy (GS-caddy)*. The 4-tier prereq-gated
     ladder was removed; the driver is tee-only by default and unlocked from any lie (full stats) by
     hiring Driver Dan, via the simplified shared `usableBag(bag, lie, driverAnywhere)` gate.
+- **GS-routes — Inter-round rebalance + starmap. SHIPPED.** The travel screen's three lanes were
+  functionally identical (all "+credits / +cut") with no real downside, so a green common often beat a
+  rare. Fixed on three fronts: (1) FOUR distinct levers with genuine trade-offs — `creditMult`/`cutDelta`
+  plus a new `creditToll` (credits paid UP FRONT on travel — the rich lanes bite) and `shardBonus`
+  (permanent shards banked on travel, kept even on a bust — the meta/"banker" lane). Calm lanes are now
+  SAFE-BUT-POOR (≤ ~1.05× pay) so safety has a price and a common is never a strictly-better rare.
+  Rarity = STAKES (the reward ceiling rises monotonically common→legendary). (2) A per-arc SLOT draw
+  (`drawArcRouteEvents`): arc 1 ≈ 2 commons + a wildcard; arc 2 ≈ common + crossover + rare(→epic→leg);
+  arc 3 = 2 rares + epic (up to THREE legendaries — the deep/endless/ascension steady state, no
+  guaranteed out). (3) ~26 recurring + 5 unique events (was ~15+5), each with an icon, lore line, and a
+  functional `category` (calm/payout/toll/salvage). Plus a deterministic SVG **starmap**
+  (`render/starmap.ts`): Earth → the travelled trail → YOU (the station-wagon spaceship) → three branch
+  planets colour-keyed to the choice cards (rarity ring, glyph, ⚔/🔥 markers). Economy/cut/meta only →
+  fairness + no-death-spiral validators untouched (all 522 tests green). `tests/events.test.ts` extended
+  (lever design, rarity-stakes monotonicity, per-arc mix, the triple-legendary ceiling, toll/shard wiring,
+  snapshot round-trip). Bumps `Run.bonusShards` + `RunSnapshot.bonusShards` (optional → back-compat).
+  - **Follow-on — triple-legendary as an Easter egg / achievement.** Three legendary lanes at once is
+    deliberately rare (~0.1% / deep jump, ~1 in 750) — a fun "whoa" moment, not a balance lever. If/when
+    an achievements system lands, wire a hidden achievement off detecting `routeOptions(run)` returning
+    three `legendary` events (pure to check). Keep the odds low so it stays a treat.
 - **GS-14 — Route events (risk/reward travel).** Travel was a non-decision — three lanes that
   differed only by distance. Now every onward route carries a themed **event** (`events.ts`,
   content-as-data) that tilts the stop you fly *into*: a `creditMult` (payout — the progression

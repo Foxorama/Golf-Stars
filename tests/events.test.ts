@@ -3,10 +3,12 @@ import {
   DEFAULT_EVENT,
   ROUTE_EVENTS,
   UNIQUE_EVENTS,
+  drawArcRouteEvents,
   drawRouteEvents,
   eventPool,
   isCalm,
   routeEvent,
+  type RouteEvent,
 } from '../src/sim/rpg/events';
 import {
   effectiveCut,
@@ -14,12 +16,15 @@ import {
   playStop,
   resumeRun,
   routeOptions,
+  shardsForRun,
   simulateRun,
   snapshotRun,
   startRun,
   travel,
 } from '../src/sim/rpg/run';
 import { cutLine } from '../src/sim/rpg/economy';
+import { RARITY_C, RARITIES } from '../src/sim/rpg/loot';
+import type { Arc } from '../src/sim/course/themes';
 import { Rng } from '../src/sim/rng';
 
 describe('route events — data (GS-14)', () => {
@@ -199,5 +204,151 @@ describe('route events — run integration (GS-14)', () => {
     const a = playStop(startRun(1234));
     expect(a.run.pendingEvent).toBeUndefined();
     expect(a.result.cut).toBe(cutLine(0, 6)); // flat stop 0 = 6 holes, distance 0
+  });
+});
+
+// --- The rebalance: distinct levers, rarity = stakes, per-arc distribution (GS-routes) -------------
+
+describe('route events — rebalanced lever design (GS-routes)', () => {
+  const ALL = [...ROUTE_EVENTS, ...UNIQUE_EVENTS];
+
+  it('no free lunch: a SAFE lane is either poor-paying or charges a toll (never rich-and-free)', () => {
+    for (const e of ALL) {
+      if (!isCalm(e)) continue; // only the low-risk "outs"
+      const rich = e.creditMult > 1.2;
+      if (rich) expect(e.creditToll ?? 0).toBeGreaterThan(0); // upside is paid for
+    }
+  });
+
+  it('rarity = stakes: the credit-multiplier CEILING rises with rarity', () => {
+    const ceilByOrder = new Map<number, number>();
+    for (const e of ALL) {
+      const o = RARITY_C[e.rarity].order;
+      ceilByOrder.set(o, Math.max(ceilByOrder.get(o) ?? 0, e.creditMult));
+    }
+    let prev = 0;
+    for (let o = 0; o < RARITIES.length; o++) {
+      const c = ceilByOrder.get(o);
+      if (c === undefined) continue;
+      expect(c).toBeGreaterThanOrEqual(prev); // monotonic non-decreasing ceiling
+      prev = c;
+    }
+    // A common never out-pays the best legendary (the original "green beats orange" bug).
+    const bestCommon = Math.max(...ALL.filter((e) => e.rarity === 'common').map((e) => e.creditMult));
+    const bestLegendary = Math.max(...ALL.filter((e) => e.rarity === 'legendary').map((e) => e.creditMult));
+    expect(bestLegendary).toBeGreaterThan(bestCommon);
+  });
+
+  it('the two new reward TYPES exist (a toll lane and a salvage/shard lane)', () => {
+    expect(ALL.some((e) => (e.creditToll ?? 0) > 0)).toBe(true);
+    expect(ALL.some((e) => (e.shardBonus ?? 0) > 0)).toBe(true);
+    // Every event carries the new flavour metadata so the cards read distinctly.
+    for (const e of ALL) {
+      expect(e.icon).toBeTruthy();
+      expect(e.lore).toBeTruthy();
+      expect(e.category).toBeTruthy();
+    }
+  });
+});
+
+describe('route events — per-arc slot distribution (GS-routes)', () => {
+  const poolFor = (arc: Arc) => eventPool(arc === 1 ? 0 : arc === 2 ? 6 : 15);
+
+  it('drawArcRouteEvents is deterministic and returns ≤3 distinct lanes; arcs 1–2 always offer an out', () => {
+    for (const arc of [1, 2, 3] as Arc[]) {
+      const pool = poolFor(arc);
+      for (let seed = 0; seed < 80; seed++) {
+        const a = drawArcRouteEvents(new Rng(`a:${seed}`), arc, pool);
+        const b = drawArcRouteEvents(new Rng(`a:${seed}`), arc, pool);
+        expect(a.map((e) => e.id)).toEqual(b.map((e) => e.id)); // deterministic
+        expect(a.length).toBeLessThanOrEqual(3);
+        expect(new Set(a.map((e) => e.id)).size).toBe(a.length); // distinct
+        // The early arcs always keep a safer lane; arc 3 may be all-or-nothing.
+        if (arc < 3) expect(a.some(isCalm)).toBe(true);
+      }
+    }
+  });
+
+  function rarityMix(arc: Arc): Record<string, number> {
+    const pool = poolFor(arc);
+    const counts: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
+    const N = 2000;
+    for (let s = 0; s < N; s++) {
+      for (const e of drawArcRouteEvents(new Rng(`mix:${arc}:${s}`), arc, pool)) counts[e.rarity]!++;
+    }
+    return counts;
+  }
+
+  it('the rarity mix ramps with the arc: commons dominate early, rares/epics/legendaries arrive deep', () => {
+    const m1 = rarityMix(1);
+    const m3 = rarityMix(3);
+    const frac = (m: Record<string, number>, k: string) =>
+      (m[k] ?? 0) / ((m.common ?? 0) + (m.rare ?? 0) + (m.epic ?? 0) + (m.legendary ?? 0));
+
+    // Arc 1 is overwhelmingly common; arc 3 is overwhelmingly NOT.
+    expect(frac(m1, 'common')).toBeGreaterThan(0.7);
+    expect(frac(m3, 'common')).toBeLessThan(0.2);
+    // Higher tiers are scarce early and common (relatively) deep.
+    expect(frac(m3, 'rare')).toBeGreaterThan(frac(m1, 'rare'));
+    expect(frac(m3, 'epic')).toBeGreaterThan(frac(m1, 'epic'));
+    expect(frac(m3, 'legendary')).toBeGreaterThan(frac(m1, 'legendary'));
+    // Arc 1 can flash a rare/epic (the wildcard) but never legendaries; arc 3 reaches them all.
+    expect(m1.legendary).toBe(0);
+    expect(m3.legendary).toBeGreaterThan(0);
+  });
+
+  it('arc 3 can deal a clean sweep of legendaries (the deep-game jackpot ceiling)', () => {
+    const pool = poolFor(3);
+    let sawTriple = false;
+    for (let s = 0; s < 20000 && !sawTriple; s++) {
+      const draw = drawArcRouteEvents(new Rng(`triple:${s}`), 3, pool);
+      if (draw.length === 3 && draw.every((e) => e.rarity === 'legendary')) sawTriple = true;
+    }
+    expect(sawTriple).toBe(true);
+  });
+});
+
+describe('route events — toll + shard levers wired through the run (GS-routes)', () => {
+  const lane = (event: RouteEvent, distanceJump = 1) => ({ id: 0, distanceJump, label: 'Short hop', event });
+
+  it('a toll lane charges credits up front on travel (floored at 0)', () => {
+    const toll = routeEvent('trade-lane')!;
+    expect(toll.creditToll).toBeGreaterThan(0);
+    const run = { ...startRun(3), credits: 100 };
+    const after = travel(run, lane(toll));
+    expect(after.credits).toBe(100 - toll.creditToll!);
+    // Floors at 0 — a toll never strands you below zero.
+    const broke = travel({ ...startRun(3), credits: 5 }, lane(toll));
+    expect(broke.credits).toBe(0);
+  });
+
+  it('a salvage lane banks permanent shards on travel, kept even on a later bust', () => {
+    const salvage = routeEvent('asteroid-mining')!;
+    expect(salvage.shardBonus).toBeGreaterThan(0);
+    const run = startRun(3);
+    const after = travel(run, lane(salvage));
+    expect(after.bonusShards).toBe(salvage.shardBonus);
+    // Banked shards survive a bust — isolate the bonus from the (distance-driven) base.
+    const busted = { ...after, status: 'ended' as const, endedReason: 'cut' as const };
+    const withoutBonus = shardsForRun({ ...busted, bonusShards: 0 });
+    expect(shardsForRun(busted)).toBe(withoutBonus + salvage.shardBonus!);
+  });
+
+  it('a plain lane (no toll/shard) leaves credits + bonusShards untouched', () => {
+    const plain = routeEvent('new-moon')!;
+    expect(plain.creditToll ?? 0).toBe(0);
+    expect(plain.shardBonus ?? 0).toBe(0);
+    const run = { ...startRun(3), credits: 60 };
+    const after = travel(run, lane(plain));
+    expect(after.credits).toBe(60);
+    expect(after.bonusShards).toBe(0);
+  });
+
+  it('snapshot/resume round-trips banked shards', () => {
+    let run = startRun(42);
+    run = travel(run, lane(routeEvent('asteroid-mining')!));
+    expect(run.bonusShards).toBeGreaterThan(0);
+    const resumed = resumeRun(snapshotRun(run));
+    expect(resumed.bonusShards).toBe(run.bonusShards);
   });
 });
