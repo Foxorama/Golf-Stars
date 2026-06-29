@@ -39,6 +39,43 @@ export const PLAYER_ID = 'player';
 /** Golfers in a field (20: the player + 19 AI). */
 export const FIELD_SIZE = 20;
 
+// --- Arc grouping (pure; here, not in league, so run.ts can compute the positional cut without a cycle) ---
+
+/** Stops per arc — voyage is 2 ordinary + 1 boss; flat/ladder reuse the grouping as a "season". */
+export const ARC_LEN = 3;
+export function arcIndexOf(stopIndex: number): number {
+  return Math.floor(stopIndex / ARC_LEN);
+}
+export function arcStartStop(arcIndex: number): number {
+  return arcIndex * ARC_LEN;
+}
+export function stopPosInArc(stopIndex: number): number {
+  return stopIndex % ARC_LEN;
+}
+/** Is this the boss (final) slot of its arc? */
+export function isArcBossSlot(stopIndex: number): boolean {
+  return stopPosInArc(stopIndex) === ARC_LEN - 1;
+}
+/** Pressure 0..1 a stop carries (ramps toward the arc's boss slot). */
+export function stopPressure(stopIndex: number): number {
+  const pos = stopPosInArc(stopIndex);
+  return isArcBossSlot(stopIndex) ? 1 : pos / ARC_LEN;
+}
+
+/**
+ * Positional cut targets (GS-positional-cut): how many of the arc field ADVANCE past each ordinary stop
+ * — top 18 after the first, top 16 after the second — so survival is your PLACE in the field, not an
+ * abstract Stableford number, and the leaderboard is the thing that matters. The boss slot (pos 2) has
+ * no entry — it's a matchplay knockout, not a positional cut. Ascension tightens the targets (fewer
+ * advance), floored so the field can still pair off into the boss.
+ */
+export const ARC_CUT_TARGETS = [18, 16] as const;
+export function arcSurvivorTarget(stopIndex: number, ascensionCut = 0): number | undefined {
+  const pos = stopPosInArc(stopIndex);
+  if (pos >= ARC_CUT_TARGETS.length) return undefined; // boss slot — decided by the match
+  return Math.max(8, ARC_CUT_TARGETS[pos]! - Math.max(0, Math.round(ascensionCut)));
+}
+
 /** A golfer entry in an arc's field (lighter than a full Golfer; the player carries no archetype). */
 export interface FieldGolfer {
   id: string;
@@ -366,4 +403,131 @@ export function bossOpponentFor(standings: Standing[], playerId = PLAYER_ID): st
 export function bossGolfer(standings: Standing[]): Golfer | undefined {
   const id = bossPick(standings);
   return id ? getGolfer(id) : undefined;
+}
+
+// --- Positional cut engine (GS-positional-cut) --------------------------------
+
+/** One stop's inputs to the arc cut: who scored what, and (for an ordinary stop) the survivor target. */
+export interface ArcStopSlice {
+  stopIndex: number;
+  themeId?: string;
+  archetype: BiomeArchetype;
+  holeCount: number;
+  /** The player's REAL Stableford for this stop. */
+  playerSF: number;
+  /** A boss/knockout stop: contributes NO Stableford and applies NO positional cut (the match decides). */
+  isBoss: boolean;
+  /** Top-N (by cumulative total) who advance past this ordinary stop; undefined = no cut (boss). */
+  target?: number;
+}
+
+/** Per-golfer Stableford for one stop: the player's real SF, each ghost's form-shifted ghost SF. A boss
+ *  stop scores 0 for everyone (it adds nothing to the leaderboard). Deterministic; the keys MUST match
+ *  league's so the displayed board and the survival computation agree byte-for-byte. */
+export function sliceScores(field: Field, seed: number | string, slice: ArcStopSlice): Map<string, number> {
+  const out = new Map<string, number>();
+  out.set(PLAYER_ID, slice.isBoss ? 0 : slice.playerSF);
+  const formKey = `${seed}:form:${slice.stopIndex}`;
+  const pressure = stopPressure(slice.stopIndex);
+  for (const g of field.golfers) {
+    if (g.isPlayer) continue;
+    if (slice.isBoss) {
+      out.set(g.id, 0);
+      continue;
+    }
+    const form = golferForm(g.id, formKey);
+    let sf = 0;
+    for (let i = 0; i < slice.holeCount; i++) {
+      sf += ghostHoleStableford(g.id, `${seed}:gl:${slice.stopIndex}:${i}`, homeMatches(g, slice.themeId, slice.archetype), pressure, form);
+    }
+    out.set(g.id, sf);
+  }
+  return out;
+}
+
+export interface ArcCut {
+  /** Final standings: cumulative total (frozen at elimination), eliminated golfers flagged + sunk below
+   *  survivors, ranked with 1-based positions. */
+  standings: Standing[];
+  /** golferId → the stop index they were cut at (absent ⇒ still alive). */
+  eliminatedAt: Map<string, number>;
+  /** Whether the player is still alive after every slice (the positional survival verdict). */
+  playerAlive: boolean;
+  /** Holes scored (boss stops excluded). */
+  thru: number;
+  /** Survivor target after the LAST ordinary slice (for the "top N advance" display). */
+  lastTarget?: number;
+  /** Whether the last slice was a boss (knockout) stop — no cut line is drawn then. */
+  lastIsBoss: boolean;
+}
+
+const TIER_ORDER: Record<string, number> = { player: 0, champion: 1, star: 2, contender: 3, field: 4 };
+
+/**
+ * Walk an arc's stops applying the POSITIONAL cut: after each ordinary stop the top-`target` by
+ * cumulative total advance, the rest are eliminated (frozen at their total). Survival is your PLACE in
+ * the field — the leaderboard IS the cut. Boss stops add nothing and apply no cut (the match decides).
+ * Pure/deterministic; the single source of truth for both the displayed board (league) and the player's
+ * survival (run.finishStop), so they can never disagree.
+ */
+export function arcCut(field: Field, seed: number | string, slices: ArcStopSlice[]): ArcCut {
+  const alive = new Set(field.golfers.map((g) => g.id));
+  const cum = new Map<string, number>(field.golfers.map((g) => [g.id, 0]));
+  const lastStop = new Map<string, number>(field.golfers.map((g) => [g.id, 0]));
+  const eliminatedAt = new Map<string, number>();
+  let thru = 0;
+  let lastTarget: number | undefined;
+  let lastIsBoss = false;
+
+  for (const slice of slices) {
+    lastIsBoss = slice.isBoss;
+    const scores = sliceScores(field, seed, slice);
+    if (!slice.isBoss) thru += slice.holeCount;
+    for (const g of field.golfers) {
+      const v = scores.get(g.id) ?? 0;
+      lastStop.set(g.id, v);
+      if (alive.has(g.id)) cum.set(g.id, cum.get(g.id)! + v);
+    }
+    if (!slice.isBoss && slice.target !== undefined) {
+      lastTarget = slice.target;
+      const ranked = [...alive].sort(
+        (a, b) => cum.get(b)! - cum.get(a)! || (TIER_ORDER[tierOf(field, a)] ?? 9) - (TIER_ORDER[tierOf(field, b)] ?? 9) || a.localeCompare(b),
+      );
+      for (let i = slice.target; i < ranked.length; i++) {
+        const id = ranked[i]!;
+        alive.delete(id);
+        eliminatedAt.set(id, slice.stopIndex);
+      }
+    }
+  }
+
+  const rows: Standing[] = field.golfers.map((g) => ({
+    golferId: g.id,
+    name: g.name,
+    shortName: g.shortName,
+    tier: g.tier,
+    look: g.look,
+    isPlayer: g.isPlayer,
+    total: cum.get(g.id)!,
+    thru,
+    stopScore: slices.length ? lastStop.get(g.id)! : undefined,
+    position: 0,
+    cut: eliminatedAt.has(g.id),
+  }));
+  // Survivors above eliminated, each block by total desc (then tier, then name) — so the cut divider
+  // sits cleanly between the last survivor and the first eliminated golfer.
+  rows.sort(
+    (a, b) =>
+      (a.cut ? 1 : 0) - (b.cut ? 1 : 0) ||
+      b.total - a.total ||
+      (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9) ||
+      a.name.localeCompare(b.name),
+  );
+  rows.forEach((r, i) => (r.position = i + 1));
+
+  return { standings: rows, eliminatedAt, playerAlive: alive.has(PLAYER_ID), thru, lastTarget, lastIsBoss };
+}
+
+function tierOf(field: Field, id: string): string {
+  return field.golfers.find((g) => g.id === id)?.tier ?? 'field';
 }

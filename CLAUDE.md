@@ -672,9 +672,34 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   more than remain; `finishStop(run, course, played, { matchWon })` passes on the duel (credits still from
   your Stableford). The reducer pre-plays the boss's stop and scores each hole on `holeComplete`, finishing
   early when decided. Render: opponent badge on the boss intro, a live match HUD, a duel result panel
-  (verdict + W/L/½ pips). DEFERRED: strict honour-gated, shot-by-shot boss animation on the map (today the
-  boss's ball is pre-computed and the duel revealed per hole; the headless `playStop`/`simulateRun` keep
-  stroke-play for balance/tests). Tests: `tests/golfers|competition|league|match.test.ts`.
+  (verdict + W/L/½ pips). The boss's pre-played shot trail for the current hole is overlaid MUTED on the
+  play map (`renderHoleSVG.ghostShots`) and the HUD shows "Boss made N here" so you have feedback on their
+  ball/score. Tests: `tests/golfers|competition|league|match.test.ts`.
+- **Survival is your PLACE in the field — the leaderboard IS the cut (GS-positional-cut).** A WINNABLE
+  campaign (the voyage) is a FIELD competition, so you no longer survive an ordinary stop by clearing an
+  abstract Stableford line — you survive by finishing in the TOP-N of the arc leaderboard (`ARC_CUT_TARGETS
+  = [18, 16]`: top 18 advance the first stop, top 16 the second), and the boss stop is a matchplay
+  KNOCKOUT. The engine is pure in `competition.ts`: `sliceScores` (player's real SF + each ghost's
+  form-shifted SF per stop, boss stops score 0) and `arcCut` (walk the arc, after each ordinary stop keep
+  the top-`target` by cumulative total, freeze + sink the rest) — the SINGLE source of truth for BOTH the
+  displayed board (`league.leaderboard`→`positionalLeaderboard`) and the player's survival
+  (`run.finishStop`→`playerSurvivesStop`), so the drawn cut and the real cut can NEVER disagree. To avoid a
+  league↔run cycle, the arc grouping helpers + `arcCut` live in `competition.ts` and the slice builder
+  (`arcSlices`) lives in `run.ts` (league imports it back). Ascension tightens the targets (fewer advance,
+  floored at 8). Endless formats (flat/ladder) are UNCHANGED — they keep the Stableford cut for both
+  survival and display (`stablefordLeaderboard`); `Leaderboard.mode` distinguishes them. The boss round
+  adds NO Stableford to anyone's arc total (so beating the #1 can't leave you trailing them on points) and
+  pairs the field best-vs-worst — `bossOpponentFor` gives the player their RANK-MIRROR (#1 v last, …), so a
+  strong arc earns a weaker opponent and a scrape draws the leader. Headless `playStop` plays the matchplay
+  boss as a real duel too (same opponent + two rng streams as the reducer), so auto ≡ interactive. BALANCE:
+  the competition is calibrated around the field median (~2.1–2.2 SF/hole); outscore the field to advance +
+  earn favourable boss draws. It's a genuine, hard tournament — the auto reach-AI floor (a deliberately weak
+  proxy at ~2.08/hole, just below median, that barely exploits upgrades) wins the voyage rarely (~2–3%);
+  interactive play that beats the field median ranks top, draws weak boss opponents, and wins much more.
+  `voyage.test`'s "can win" stays loose (a knockout bracket is inherently swingy — don't assert a hard win
+  rate). Tune via `ARC_CUT_TARGETS`, the field strength (`golferBaseline`), or the boss stat edge
+  (`bossLoadout`). Tests: `tests/competition` (arcCut/targets/pairing), `tests/league` (boss-no-Stableford),
+  `tests/voyage` (termination + winnable).
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only

@@ -117,25 +117,27 @@ describe('livePosition', () => {
 });
 
 describe('matchplay boss stop scoring (GS-matchplay)', () => {
-  it('a boss stop adds NO Stableford to the leaderboard and draws no cut', () => {
+  it('a boss stop adds NO Stableford to the leaderboard and applies no cut', () => {
     let run = startRun(7, 'voyage', {}, 'feather-fade');
+    // A strong player (≈3/hole) so they survive the positional cuts and reach the boss board.
     run = {
       ...run,
       stopIndex: 2,
       distanceFromStart: 4,
       history: [
-        { stopIndex: 0, distanceFromStart: 0, biome: 'verdant-station', rarity: 'common', stableford: 12, gross: 24, cut: 6, passed: true, creditsEarned: 0 },
-        { stopIndex: 1, distanceFromStart: 2, biome: 'dust-belt', rarity: 'common', stableford: 13, gross: 25, cut: 7, passed: true, creditsEarned: 0 },
+        { stopIndex: 0, distanceFromStart: 0, biome: 'verdant-station', rarity: 'common', stableford: 18, gross: 24, cut: 6, passed: true, creditsEarned: 0 },
+        { stopIndex: 1, distanceFromStart: 2, biome: 'dust-belt', rarity: 'common', stableford: 19, gross: 25, cut: 7, passed: true, creditsEarned: 0 },
         { stopIndex: 2, distanceFromStart: 4, biome: 'ice-ring', rarity: 'rare', stableford: 20, gross: 30, cut: 9, passed: true, creditsEarned: 0 },
       ],
     };
     const board = leaderboard(run);
     const me = board.standings.find((s) => s.isPlayer)!;
     // The boss stop's 20 points are NOT added — the duel decides advancement, not points.
-    expect(me.total).toBe(12 + 13);
+    expect(me.total).toBe(18 + 19);
+    expect(me.cut).toBeFalsy(); // a strong player survived the positional cuts
     expect(me.stopScore).toBe(0); // the boss stop shows as a +0 line
-    expect(board.standings.every((s) => !s.cut)).toBe(true); // no Stableford cut on the boss board
-    expect(board.cut).toBe(0);
+    expect(board.survivorTarget).toBeUndefined(); // no positional cut on the boss stop
+    expect(board.mode).toBe('positional');
   });
 });
 
