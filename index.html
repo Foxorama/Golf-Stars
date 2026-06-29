@@ -575,6 +575,34 @@
         .gs-charcard, .gs-stat-fill { animation: none; opacity: 1; transform: none; }
         .gs-charcard:hover .gs-charcard-sheen { animation: none; }
       }
+      /* Journey map (GS-galaxy-map): a scrollable travelled trail + a pinned forward-routes panel.
+         The trail strip scrolls horizontally (tap-scroll back through cleared worlds); the forward
+         panel is a flex sibling OUTSIDE the scroll area, so it stays stuck to the right edge. */
+      .gs-journey {
+        position: relative; display: flex; align-items: stretch;
+        border: 1px solid var(--gs-line); border-radius: 10px; overflow: hidden;
+        background: radial-gradient(120% 100% at 70% 30%, #16203a 0%, #0a0d16 60%, #05070d 100%);
+      }
+      .gs-journey-trail {
+        flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden;
+        scrollbar-width: thin; -webkit-overflow-scrolling: touch; touch-action: pan-x;
+      }
+      .gs-journey-trail::-webkit-scrollbar { height: 5px; }
+      .gs-journey-trail::-webkit-scrollbar-thumb { background: var(--gs-line); border-radius: 3px; }
+      /* Pinned routes-ahead panel — never scrolls; a soft left fade blends it into the trail. */
+      .gs-journey-fwd {
+        flex: 0 0 auto; position: relative;
+        box-shadow: -14px 0 16px -10px #05070dcc;
+      }
+      .gs-journey-fwd::before {
+        content: ''; position: absolute; inset: 0 auto 0 -1px; width: 18px;
+        background: linear-gradient(90deg, #05070d00, #0a0d1600); pointer-events: none;
+      }
+      /* Current-world caption under the map (the panel's wagon only shows "YOU"). */
+      .gs-journey-here {
+        margin: 6px 2px 0; font-size: 11.5px; color: var(--gs-dim);
+      }
+      .gs-journey-here b { color: #ffce54; }
     </style>
   </head>
   <body>

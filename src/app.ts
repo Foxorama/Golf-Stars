@@ -14,7 +14,8 @@ import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt, caddyProjectile, CADDY_LABEL } from './render/caddyArt';
-import { starmapSVG, type StarmapChoice } from './render/starmap';
+import { journeyMapHTML, type StarmapChoice } from './render/starmap';
+import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
@@ -824,6 +825,10 @@ let charging = false; // true while a pull gesture is loading (suppresses the re
 let mapView: 'follow' | 'whole' = 'follow';
 let mapZoom = 1;
 let mapPan: [number, number] = [0, 0];
+// Journey map (GS-galaxy-map): remember the trail strip's horizontal scroll so it survives the
+// per-frame re-render of the travel screen — snap to the most-recent stops only when a NEW stop's
+// map first appears, then honour wherever the player has tap-scrolled to.
+let journeyScroll = { key: '', left: -1 };
 // Shot-result popup: after a non-terminal shot settles, freeze on a result card + Continue
 // before the next decision, so each shot gets its own beat. Module-level (a timed view
 // effect, not reducer state — like animatedShots above).
@@ -1867,11 +1872,14 @@ function travelScreen(): string {
     bossAhead: r.bossAhead,
   }));
   // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
-  // labelled with its zone name — so the journey reads as Earth → stage 1 → … → YOU as it builds.
-  const trail = state.run.history.slice(0, -1).map((h) => ({
-    label: themeById(h.themeId ?? '')?.name ?? 'Deep Space',
-  }));
-  const map = starmapSVG({
+  // labelled with its zone name AND its real-sky position (GS-galaxy-map) — so the journey plots a
+  // true path through the constellations as it builds, not a generic Earth→right curve.
+  const trail = state.run.history.slice(0, -1).map((h) => {
+    const name = themeById(h.themeId ?? '')?.name ?? 'Deep Space';
+    const sky = skyCoordForName(name);
+    return { label: name, ra: sky?.ra, dec: sky?.dec };
+  });
+  const map = journeyMapHTML({
     seed: state.run.seed,
     stopIndex: state.run.stopIndex,
     distanceFromStart: state.run.distanceFromStart,
@@ -2271,6 +2279,27 @@ function render(): void {
     // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
     // Mirror the portrait in left-handed mode (GS-lefty) so the caddy faces with the flipped cast.
     drawCaddy(ctx, id, cv.width / 2, cv.height - 8, cv.height * 0.92, performance.now(), lefty());
+  });
+
+  // Journey map (GS-galaxy-map): the travelled trail is a wide scroll strip; show the MOST RECENT
+  // stops by default (scrolled to the far right, abutting the pinned forward panel). The user can
+  // tap-scroll left to review earlier worlds. preserveScroll keeps the position across the per-frame
+  // re-render of an unchanged travel screen (only the first mount of a given strip snaps right).
+  document.querySelectorAll<HTMLElement>('[data-journey-scroll]').forEach((el) => {
+    const key = `${state.run?.seed}:${state.run?.stopIndex}`;
+    if (journeyScroll.key === key && journeyScroll.left >= 0) {
+      el.scrollLeft = journeyScroll.left; // restore the player's review position across re-renders
+    } else {
+      el.scrollLeft = el.scrollWidth; // first view of this stop → most-recent stops, abutting YOU
+      journeyScroll = { key, left: el.scrollLeft };
+    }
+    el.addEventListener(
+      'scroll',
+      () => {
+        journeyScroll = { key, left: el.scrollLeft };
+      },
+      { passive: true },
+    );
   });
 
   // Mount the animated play view on the result screen.
