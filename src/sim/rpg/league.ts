@@ -19,6 +19,7 @@ import { getCharacter } from './characters';
 import {
   buildField,
   ghostHoleStableford,
+  golferForm,
   homeMatches,
   rankStandings,
   applyCut,
@@ -81,6 +82,11 @@ function ghostHoleKey(run: Run, stopIndex: number, holeIdx: number): string {
   return `${run.seed}:gl:${stopIndex}:${holeIdx}`;
 }
 
+/** A stable per-stop form key (GS-streaks) — each golfer's hot/cold streak is rolled off this + their id. */
+function stopFormKey(run: Run, stopIndex: number): string {
+  return `${run.seed}:form:${stopIndex}`;
+}
+
 export interface Leaderboard {
   field: Field;
   standings: Standing[];
@@ -127,12 +133,15 @@ export function leaderboard(run: Run): Leaderboard {
     totals.set(PLAYER_ID, totals.get(PLAYER_ID)! + h.stableford);
     if (isLast) stopScores.set(PLAYER_ID, h.stableford);
 
-    // Field: ghost per-hole, summed for the stop.
+    // Field: ghost per-hole, summed for the stop. Each golfer carries a per-stop form streak (GS-streaks)
+    // so the order shuffles stop to stop — a hot field golfer can leap the board, a cold champion slips.
+    const formKey = stopFormKey(run, h.stopIndex);
     for (const g of field.golfers) {
       if (g.isPlayer) continue;
+      const form = golferForm(g.id, formKey);
       let sf = 0;
       for (let i = 0; i < holeCount; i++) {
-        sf += ghostHoleStableford(g.id, ghostHoleKey(run, h.stopIndex, i), homeMatches(g, h.themeId, archetype), pressure);
+        sf += ghostHoleStableford(g.id, ghostHoleKey(run, h.stopIndex, i), homeMatches(g, h.themeId, archetype), pressure, form);
       }
       totals.set(g.id, totals.get(g.id)! + sf);
       if (isLast) stopScores.set(g.id, sf);
@@ -213,11 +222,13 @@ export function liveLeaderboard(run: Run, holesPlayed: number, playerStopSF: num
   for (const s of board.standings) totals.set(s.golferId, s.total);
   totals.set(PLAYER_ID, (totals.get(PLAYER_ID) ?? 0) + playerStopSF);
   stopScores.set(PLAYER_ID, playerStopSF);
+  const formKey = stopFormKey(run, run.stopIndex);
   for (const g of field.golfers) {
     if (g.isPlayer) continue;
+    const form = golferForm(g.id, formKey);
     let sf = 0;
     for (let i = 0; i < holesPlayed; i++) {
-      sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure);
+      sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure, form);
     }
     totals.set(g.id, (totals.get(g.id) ?? 0) + sf);
     stopScores.set(g.id, sf);
