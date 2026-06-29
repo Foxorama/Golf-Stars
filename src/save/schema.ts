@@ -8,8 +8,9 @@
 
 import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
+import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -76,11 +77,43 @@ export interface SaveV5 {
   savedAt?: string;
 }
 
+/** v6 — repurposes Star Shards from permanent stat upgrades to the cosmetic Trade Market (GS-garage):
+ *  the owned spaceship fleet + the selected ship, plus the market's rotating-offer seed. `metaUpgrades`
+ *  is kept for old-save compat (the Outpost stat-spend is retired; any grandfathered levels still apply). */
+export interface SaveV6 {
+  version: 6;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  lifetimeAces: number;
+  /** Owned cosmetic ship ids (always includes the default Woody Wagon). */
+  ownedShips: string[];
+  /** The ship currently flown on the journey map. */
+  selectedShip: string;
+  /** The Trade Market's rotating-offer seed — bumps on each completed run so the stock refreshes. */
+  marketSeed: number;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV5;
+export type Save = SaveV6;
 
 export function defaultSave(): Save {
-  return { version: SAVE_VERSION, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0, lifetimeAces: 0 };
+  return {
+    version: SAVE_VERSION,
+    bestStableford: 0,
+    bestDistance: 0,
+    shards: 0,
+    metaUpgrades: {},
+    maxAscension: 0,
+    lifetimeAces: 0,
+    ownedShips: [DEFAULT_SHIP_ID],
+    selectedShip: DEFAULT_SHIP_ID,
+    marketSeed: 0,
+  };
 }
 
 /** v1 → v2: fold the loose run fields into the new shape. */
@@ -146,6 +179,24 @@ function v4ToV5(s: SaveV4): SaveV5 {
   };
 }
 
+/** v5 → v6: seed the cosmetic fleet (own just the default wagon) + a fresh market seed. */
+function v5ToV6(s: SaveV5): SaveV6 {
+  return {
+    version: 6,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: s.shards ?? 0,
+    metaUpgrades: s.metaUpgrades ?? {},
+    maxAscension: s.maxAscension ?? 0,
+    lifetimeAces: s.lifetimeAces ?? 0,
+    ownedShips: [DEFAULT_SHIP_ID],
+    selectedShip: DEFAULT_SHIP_ID,
+    marketSeed: 0,
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -158,6 +209,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 2) s = v2ToV3(s as unknown as SaveV2) as unknown as typeof s;
   if (s.version === 3) s = v3ToV4(s as unknown as SaveV3) as unknown as typeof s;
   if (s.version === 4) s = v4ToV5(s as unknown as SaveV4) as unknown as typeof s;
+  if (s.version === 5) s = v5ToV6(s as unknown as SaveV5) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -165,17 +217,21 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v5 = s as unknown as Partial<SaveV5>;
+  const v6 = s as unknown as Partial<SaveV6>;
+  const ownedShips = v6.ownedShips && v6.ownedShips.length ? v6.ownedShips : [DEFAULT_SHIP_ID];
   return {
     version: SAVE_VERSION,
-    bestStableford: v5.bestStableford ?? 0,
-    bestDistance: v5.bestDistance ?? 0,
-    shards: v5.shards ?? 0,
-    metaUpgrades: v5.metaUpgrades ?? {},
-    maxAscension: v5.maxAscension ?? 0,
-    lifetimeAces: v5.lifetimeAces ?? 0,
-    activeRun: v5.activeRun,
-    savedAt: v5.savedAt,
+    bestStableford: v6.bestStableford ?? 0,
+    bestDistance: v6.bestDistance ?? 0,
+    shards: v6.shards ?? 0,
+    metaUpgrades: v6.metaUpgrades ?? {},
+    maxAscension: v6.maxAscension ?? 0,
+    lifetimeAces: v6.lifetimeAces ?? 0,
+    ownedShips,
+    selectedShip: v6.selectedShip && ownedShips.includes(v6.selectedShip) ? v6.selectedShip : DEFAULT_SHIP_ID,
+    marketSeed: v6.marketSeed ?? 0,
+    activeRun: v6.activeRun,
+    savedAt: v6.savedAt,
   };
 }
 

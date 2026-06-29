@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
+import { marketOffer } from '../src/sim/rpg/ships';
 
 /** Drive a whole stop via the interactive reducer flow (attacking every shot). */
 function playStopInteractive(s: UiState): UiState {
@@ -202,26 +203,47 @@ describe('ui reducer', () => {
     expect(s.shards).toBe(s.lastRunShards);
   });
 
-  it('the Outpost buys permanent upgrades and bakes them into the next run', () => {
-    let s = initState(7, { shards: 100, metaUpgrades: {} });
+  it('the Trade Market buys a cosmetic ship and auto-flies it (GS-garage)', () => {
+    let s = initState(7, { shards: 500 });
     s = reduce(s, { type: 'openOutpost' });
     expect(s.screen).toBe('outpost');
+    // The market draws unowned ships; buy the first offered one.
+    const offer = marketOffer(s.marketSeed, s.ownedShips, s.marketRerolls ?? 0);
+    expect(offer.length).toBeGreaterThan(0);
+    const ship = offer[0]!;
     const before = s.shards;
-    s = reduce(s, { type: 'buyUpgrade', id: 'deep-pockets' });
-    expect(s.metaUpgrades['deep-pockets']).toBe(1);
-    expect(s.shards).toBeLessThan(before);
+    s = reduce(s, { type: 'buyShip', id: ship.id });
+    expect(s.ownedShips).toContain(ship.id);
+    expect(s.selectedShip).toBe(ship.id); // flying the new ride immediately
+    expect(s.shards).toBe(before - ship.cost);
     s = reduce(s, { type: 'closeOutpost' });
     expect(s.screen).toBe('title');
-    // Deep Pockets (+40 starting credits) is now baked into a fresh run.
+    // The fleet + selection are pure cosmetics — a fresh run is unaffected.
     s = reduce(s, { type: 'start', format: 'flat' });
-    expect(s.run.credits).toBe(100);
+    expect(s.run.credits).toBe(60); // base starting credits (no permanent stat upgrades anymore)
   });
 
-  it('the Outpost is unreachable mid-run and guards bad buys', () => {
+  it('the Garage selects an owned ship; the market guards bad buys + rerolls (GS-garage)', () => {
+    // Selecting an unowned ship is a no-op; a rich market buy then makes it selectable.
+    let s = initState(7, { shards: 0 });
+    const offer = marketOffer(s.marketSeed, s.ownedShips, 0);
+    expect(reduce(s, { type: 'selectShip', id: offer[0]!.id })).toBe(s); // not owned → no-op
+    s = reduce(s, { type: 'openOutpost' });
+    expect(reduce(s, { type: 'buyShip', id: offer[0]!.id })).toBe(s); // can't afford → no-op
+    expect(reduce(s, { type: 'rerollMarket' })).toBe(s); // can't afford the reroll → no-op
+    // Mid-run the market is unreachable.
     const playing = reduce(started(7), { type: 'playInteractive' });
-    expect(reduce(playing, { type: 'openOutpost' })).toBe(playing); // not from a live run
-    const outpost = reduce(initState(7, { shards: 0 }), { type: 'openOutpost' });
-    expect(reduce(outpost, { type: 'buyUpgrade', id: 'vet-hands' })).toBe(outpost); // can't afford
+    expect(reduce(playing, { type: 'openOutpost' })).toBe(playing);
+  });
+
+  it('a reroll bumps the market salt for shards; a completed run refreshes the seed (GS-garage)', () => {
+    let s = initState(7, { shards: 1000 });
+    s = reduce(s, { type: 'openOutpost' });
+    expect(s.marketRerolls ?? 0).toBe(0);
+    const before = s.shards;
+    s = reduce(s, { type: 'rerollMarket' });
+    expect(s.marketRerolls).toBe(1);
+    expect(s.shards).toBeLessThan(before);
   });
 
   it('offers Continue when a saved run is present, and resume enters it', () => {

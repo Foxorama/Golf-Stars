@@ -39,9 +39,11 @@ import { PLAYER_ID, arcSurvivorTarget, type Field } from './sim/rpg/competition'
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
-import { META_UPGRADES, canBuyMeta, metaLevel, metaUpgradeCost } from './sim/rpg/meta';
+import { SHIPS, canBuyShip, marketOffer, marketRerollCost, type Ship } from './sim/rpg/ships';
+import { shipCardSVG } from './render/shipArt';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
+import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio } from './render/audio';
 import { getSettings, toggleSetting, type Settings } from './settings';
@@ -105,6 +107,9 @@ function boot(): void {
       metaUpgrades: save.metaUpgrades,
       maxAscension: save.maxAscension,
       lifetimeAces: save.lifetimeAces,
+      ownedShips: save.ownedShips,
+      selectedShip: save.selectedShip,
+      marketSeed: save.marketSeed,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -129,7 +134,7 @@ function recover(err: unknown): void {
   );
   stage('recover');
   try {
-    writeSave({ version: 5, bestStableford: 0, bestDistance: 0, shards: 0, metaUpgrades: {}, maxAscension: 0, lifetimeAces: 0 });
+    writeSave(defaultSave());
   } catch {
     /* ignore */
   }
@@ -147,13 +152,16 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 5,
+    version: 6,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
     metaUpgrades: state.metaUpgrades,
     maxAscension: state.maxAscension,
     lifetimeAces: state.lifetimeAces,
+    ownedShips: state.ownedShips,
+    selectedShip: state.selectedShip,
+    marketSeed: state.marketSeed,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -196,7 +204,7 @@ function dispatch(action: Action): void {
     puttMeter = null;
   }
   // A light UI tick on navigation presses (the stroke + purchase actions get their own richer cue).
-  if (action.type !== 'shot' && action.type !== 'putt' && action.type !== 'buy' && action.type !== 'buyUpgrade') {
+  if (action.type !== 'shot' && action.type !== 'putt' && action.type !== 'buy' && action.type !== 'buyShip') {
     sfx.click();
   }
   // Any reducer action dismisses a pending shot popup and cancels its timer.
@@ -209,7 +217,7 @@ function dispatch(action: Action): void {
     const prevScreen = state.screen;
     state = reduce(state, action);
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
-    if (action.type === 'buy' || action.type === 'buyUpgrade') {
+    if (action.type === 'buy' || action.type === 'buyShip') {
       sfx.reward();
       haptic(HAPTICS.tap);
     }
@@ -290,7 +298,7 @@ function titleScreen(): string {
     <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
       ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
-      ${btn('🛰 Outpost (permanent upgrades)', { type: 'openOutpost' }, { variant: 'ghost' })}
+      ${btn('🚀 Trade Market & Garage', { type: 'openOutpost' }, { variant: 'ghost' })}
       <button class="gs-btn gs-btn--ghost" data-open-settings="1">⚙ Settings</button>
       ${installButtonHTML()}
     </div>
@@ -2000,31 +2008,70 @@ function shopScreen(): string {
     ${bagInventoryHTML()}`;
 }
 
+/** A ship card (GS-garage) — the vector ship over a rarity-ringed panel, with name/set + a footer
+ *  (cost in the market, or a SELECT / SELECTED state in the garage). Clickable when `action` given. */
+function shipCardHTML(ship: Ship, footer: string, opts: { action?: Action; ring: string; dim?: boolean; glow?: boolean } = { ring: '#8aa0c0' }): string {
+  const inner = `
+    <div style="border:2px solid ${opts.ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${opts.ring}22, #0b0d12);text-align:center;width:128px;${opts.dim ? 'opacity:.55;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.ring}, 0 0 14px ${opts.ring}66;` : ''}">
+      ${shipCardSVG(ship.id, 116, 60)}
+      <div style="font-size:13px;font-weight:700;margin-top:2px;">${ship.name}</div>
+      <div style="font-size:10.5px;opacity:.55;">${ship.set} · ${ship.rarity}</div>
+      <div style="font-size:11.5px;margin-top:3px;color:${opts.ring};font-weight:700;">${footer}</div>
+    </div>`;
+  return opts.action
+    ? `<div class="gs-clickcard" data-action='${JSON.stringify(opts.action)}' style="cursor:pointer;margin:5px;">${inner}</div>`
+    : `<div style="margin:5px;">${inner}</div>`;
+}
+
+/** The Trade Market + Garage (GS-garage): spend Star Shards on cosmetic ships, and pick the one you
+ *  fly on the journey map. Replaces the retired permanent-upgrade Outpost — those stat effects now
+ *  live in the in-run Pro Shop. */
 function outpostScreen(): string {
-  const cards = META_UPGRADES.map((u) => {
-    const lvl = metaLevel(state.metaUpgrades, u.id);
-    const maxed = lvl >= u.maxLevel;
-    const cost = metaUpgradeCost(u, lvl);
-    const buyable = canBuyMeta(u, lvl, state.shards);
-    const card = itemCardHTML(
-      { name: u.name, cost, desc: u.desc, rarity: u.rarity },
-      { owned: maxed, affordable: state.shards >= cost, count: lvl },
-    );
-    // Show the level track and use shard pricing (the card's "c" reads as the shard cost).
-    const track = `<div style="font-size:11px;opacity:.6;text-align:center;margin-top:-4px;">Lv ${lvl}/${u.maxLevel}${maxed ? '' : ` · ✦${cost}`}</div>`;
-    return buyable
-      ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buyUpgrade', id: u.id })}' style="cursor:pointer;margin:4px;">${card}${track}</div>`
-      : `<div style="margin:4px;">${card}${track}</div>`;
-  }).join('');
+  const rerolls = state.marketRerolls ?? 0;
+  const offer = marketOffer(state.marketSeed, state.ownedShips, rerolls);
+  const rerollC = marketRerollCost(rerolls);
+
+  const marketCards = offer
+    .map((ship) => {
+      const ring = rarCol(ship.rarity);
+      const afford = canBuyShip(ship, state.shards, state.ownedShips);
+      const footer = `✦ ${ship.cost}${afford ? '' : ' — short'}`;
+      return shipCardHTML(ship, footer, { ring, dim: !afford, action: afford ? { type: 'buyShip', id: ship.id } : undefined });
+    })
+    .join('');
+  const marketBody = offer.length
+    ? `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${marketCards}</div>
+       <div style="text-align:center;margin-top:6px;">${
+         state.shards >= rerollC
+           ? btn(`🎲 Reroll stock (✦ ${rerollC})`, { type: 'rerollMarket' }, { variant: 'ghost' })
+           : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ✦ ${rerollC}</span>`
+       }</div>`
+    : `<p style="opacity:.6;font-size:13px;text-align:center;">🛸 Every ship in the catalogue is in your hangar. Nothing left to trade for!</p>`;
+
+  // The Garage: your owned fleet, click to fly a different one (the selected ship is ringed + glowing).
+  const fleet = SHIPS.filter((s) => state.ownedShips.includes(s.id))
+    .map((ship) => {
+      const selected = ship.id === state.selectedShip;
+      const ring = selected ? '#ffce54' : rarCol(ship.rarity);
+      return shipCardHTML(ship, selected ? '✓ FLYING' : 'Fly this', {
+        ring,
+        glow: selected,
+        action: selected ? undefined : { type: 'selectShip', id: ship.id },
+      });
+    })
+    .join('');
+
   return `
     <header style="border-left:4px solid #e08a2b;padding-left:10px;">
-      <h1 style="margin:0;font-size:22px;">🛰 Outpost</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on PERMANENT upgrades — they bake into the start of every future run.</p>
+      <h1 style="margin:0;font-size:22px;">🚀 Trade Market</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on a new ride for the journey map. Cosmetic only — the stock refreshes each run.</p>
     </header>
     <h2 style="font-size:16px;margin:.6em 0 .2em;">✦ ${state.shards} Star Shards</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy the next level. Shards are earned by how far each run travels.</p>
-    <div style="display:flex;flex-wrap:wrap;">${cards}</div>
-    <div style="margin-top:12px;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
+    ${marketBody}
+    <h2 style="font-size:16px;margin:1em 0 .2em;">🛖 Your Garage</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Pick the ship you fly between worlds.</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${fleet}</div>
+    <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
 }
 
 // The destination biome a lane flies into (GS-journey-biome) → a glyph + label + accent for the route
@@ -2086,6 +2133,7 @@ function travelScreen(): string {
     currentLabel: zoneName,
     trail,
     choices,
+    shipId: state.selectedShip,
   });
 
   const chip = (txt: string, col: string) =>
@@ -2213,7 +2261,7 @@ function gameoverScreen(): string {
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">
-      ${btn('🛰 Spend at the Outpost', { type: 'openOutpost' }, { variant: 'ghost' })}
+      ${btn('🚀 Trade Market & Garage', { type: 'openOutpost' }, { variant: 'ghost' })}
       ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) }, { variant: 'primary' })}
     </div>`;
 }

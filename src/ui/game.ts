@@ -37,7 +37,8 @@ import { archetypeFor } from '../sim/course/themes';
 import { isMatchplayBoss } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
 import { playMatchStop, playBossStop, holeDuel, matchState, type HoleDuel } from '../sim/rpg/match';
-import { buyMetaUpgrade, type MetaUpgrades } from '../sim/rpg/meta';
+import { type MetaUpgrades } from '../sim/rpg/meta';
+import { canBuyShip, marketRerollCost, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import {
   autoDecision,
   awaitingPutt,
@@ -103,6 +104,14 @@ export interface UiState {
   maxAscension: number;
   /** Lifetime holes-in-one made across every run (GS-ace) — a permanent, cross-run record. */
   lifetimeAces: number;
+  /** Owned cosmetic ships (GS-garage) — always includes the default Woody Wagon. */
+  ownedShips: string[];
+  /** The ship flown on the journey map. */
+  selectedShip: string;
+  /** The Trade Market's rotating-offer seed — bumps on each completed run so the stock refreshes. */
+  marketSeed: number;
+  /** How many times the Trade Market has been rerolled this visit (transient — drives the salt + cost). */
+  marketRerolls?: number;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
   /** Boss-reward choices to pick from after beating a boss (GS-talents) — shown on the bossReward screen. */
@@ -143,8 +152,10 @@ export type Action =
   | { type: 'route'; routeId: number }
   | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
   | { type: 'viewHole'; hole: number }
-  | { type: 'openOutpost' } // visit the between-run Outpost (from title or gameover)
-  | { type: 'buyUpgrade'; id: string } // buy a permanent upgrade with shards
+  | { type: 'openOutpost' } // visit the between-run Trade Market / Garage (from title or gameover)
+  | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (GS-garage)
+  | { type: 'selectShip'; id: string } // fly a different owned ship on the journey map
+  | { type: 'rerollMarket' } // pay shards to redraw the Trade Market's stock
   | { type: 'closeOutpost' } // back to the title
   | { type: 'restart'; seed?: number | string };
 
@@ -155,6 +166,9 @@ export interface MetaProgress {
   metaUpgrades?: MetaUpgrades;
   maxAscension?: number;
   lifetimeAces?: number;
+  ownedShips?: string[];
+  selectedShip?: string;
+  marketSeed?: number;
 }
 
 /**
@@ -182,6 +196,9 @@ export function initState(
     metaUpgrades,
     maxAscension: meta.maxAscension ?? 0,
     lifetimeAces: meta.lifetimeAces ?? 0,
+    ownedShips: meta.ownedShips && meta.ownedShips.length ? meta.ownedShips : [DEFAULT_SHIP_ID],
+    selectedShip: meta.selectedShip ?? DEFAULT_SHIP_ID,
+    marketSeed: meta.marketSeed ?? 0,
   };
 }
 
@@ -283,6 +300,8 @@ export function reduce(state: UiState, action: Action): UiState {
           bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
           shards: state.shards + (earned ?? 0),
           lastRunShards: earned,
+          // A completed run refreshes the Trade Market's rotating stock (GS-garage).
+          marketSeed: state.marketSeed + (ended ? 1 : 0),
           maxAscension: unlockedAscension(state, run),
           lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
@@ -305,6 +324,8 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
+        // A completed run refreshes the Trade Market's rotating stock (GS-garage).
+        marketSeed: state.marketSeed + (ended ? 1 : 0),
         maxAscension: unlockedAscension(state, run),
         lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
@@ -403,6 +424,8 @@ export function reduce(state: UiState, action: Action): UiState {
           bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
           shards: state.shards + (earned ?? 0),
           lastRunShards: earned,
+          // A completed run refreshes the Trade Market's rotating stock (GS-garage).
+          marketSeed: state.marketSeed + (ended ? 1 : 0),
           maxAscension: unlockedAscension(state, run),
           lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
@@ -431,6 +454,8 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
+        // A completed run refreshes the Trade Market's rotating stock (GS-garage).
+        marketSeed: state.marketSeed + (ended ? 1 : 0),
         maxAscension: unlockedAscension(state, run),
         lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
@@ -531,6 +556,8 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         shards: state.shards + earned,
         lastRunShards: earned,
+        // Banking ends the run → refresh the Trade Market's stock next visit (GS-garage).
+        marketSeed: state.marketSeed + 1,
       };
     }
 
@@ -541,24 +568,44 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openOutpost': {
-      // The Outpost is reachable between runs — from the title or after a run ends.
+      // The Trade Market / Garage is reachable between runs — from the title or after a run ends.
+      // Reset the per-visit reroll counter so the offer reads off the persisted marketSeed.
       if (state.screen !== 'title' && state.screen !== 'gameover') return state;
-      return { ...state, screen: 'outpost' };
+      return { ...state, screen: 'outpost', marketRerolls: 0 };
     }
 
-    case 'buyUpgrade': {
+    case 'buyShip': {
+      // Spend Star Shards on a cosmetic ship (GS-garage). Guarded: must be in the market, affordable,
+      // unowned, and a real ship. Bought → owned + auto-selected (fly your new ride immediately).
       if (state.screen !== 'outpost') return state;
-      const { meta, shards } = buyMetaUpgrade(state.metaUpgrades, state.shards, action.id);
-      if (meta === state.metaUpgrades) return state; // no-op: maxed, unaffordable, or bad id
-      return { ...state, metaUpgrades: meta, shards };
+      const ship = shipById(action.id);
+      if (!canBuyShip(ship, state.shards, state.ownedShips)) return state;
+      return {
+        ...state,
+        shards: state.shards - ship!.cost,
+        ownedShips: [...state.ownedShips, ship!.id],
+        selectedShip: ship!.id,
+      };
+    }
+
+    case 'selectShip': {
+      // Fly a different OWNED ship on the journey map (the Garage selector). Cosmetic only.
+      if (!state.ownedShips.includes(action.id)) return state;
+      return { ...state, selectedShip: action.id };
+    }
+
+    case 'rerollMarket': {
+      // Pay a (steep) Shard cost to redraw the market stock (GS-garage).
+      if (state.screen !== 'outpost') return state;
+      const rerolls = state.marketRerolls ?? 0;
+      const cost = marketRerollCost(rerolls);
+      if (state.shards < cost) return state;
+      return { ...state, shards: state.shards - cost, marketRerolls: rerolls + 1 };
     }
 
     case 'closeOutpost': {
       if (state.screen !== 'outpost') return state;
-      // Back to the title; refresh the placeholder run so the new meta shows, but keep any
-      // resumable run and the rest of the meta state intact (don't reset via initState).
-      const run = startRun(state.run.seed, undefined, state.metaUpgrades);
-      return { ...state, run, course: currentCourse(run), screen: 'title' };
+      return { ...state, screen: 'title' };
     }
 
     case 'restart': {
@@ -569,6 +616,10 @@ export function reduce(state: UiState, action: Action): UiState {
         shards: state.shards,
         metaUpgrades: state.metaUpgrades,
         maxAscension: state.maxAscension,
+        lifetimeAces: state.lifetimeAces,
+        ownedShips: state.ownedShips,
+        selectedShip: state.selectedShip,
+        marketSeed: state.marketSeed,
       });
     }
   }
