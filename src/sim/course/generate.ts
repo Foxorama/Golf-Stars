@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 7;
+export const GENERATOR_VERSION = 8;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -430,11 +430,6 @@ function generateHole(
   // then clamp to the cap so an all-par-3 ladder stop is just min(par, 3).
   const par = Math.min(parRoll < 0.25 ? 3 : parRoll < 0.8 ? 4 : 5, parCap ?? 5);
 
-  // Hole length (yards) by par. Low gravity (carryMult > 1) lengthens holes so they
-  // stay challenging despite longer carries.
-  const baseLen = par === 3 ? 165 : par === 4 ? 400 : 530;
-  const length = baseLen * biome.carryMult * rng.range(0.85, 1.12);
-
   const tee: Vec = [0, 0];
 
   // Lost rough (void signature): off the fairway is a PENALTY lie on the wilder/deeper stops.
@@ -443,10 +438,18 @@ function generateHole(
   // an honest straight target — their challenge is the abyss off the fairway, not the shape.
   const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
 
-  // Hole SHAPE (GS-shapes): a varied, smooth centreline from the template builder — straight drift,
-  // single dogleg L/R, or an S-curve — biome- and wildness-biased, so layouts stop feeling identical.
+  // Hole ARCHETYPE (GS-shapes-2): pick a design template that couples a SHAPE (straight drift / single
+  // dogleg L-R / S-curve double / heroic CAPE diagonal / severe HAIRPIN) with a LENGTH CLASS (drivable
+  // par-4, short/long par-3, reachable/three-shot par-5) so holes stop being one length + one bend.
+  // The picker draws first (length class, shape, side) so the RNG order downstream is stable.
+  const tpl = chooseTemplate(rng, par, biome, wildness, !!lostRough);
+  // Hole length (yards): par baseline × world gravity × the template's length multiplier. Low gravity
+  // (carryMult > 1) lengthens holes so they stay challenging despite the longer carries.
+  const baseLen = par === 3 ? 165 : par === 4 ? 400 : 530;
+  const length = baseLen * biome.carryMult * tpl.lenMult;
+
   // Everything downstream (corridor, hazards, scatter, green, apron) derives from this centreline.
-  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, !!lostRough);
+  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, tpl, !!lostRough);
   const green: Vec = centreline[centreline.length - 1]!;
 
   // Fairway corridor: WIDE and generous on early/easy stops, tightening as wildness climbs —
@@ -814,7 +817,7 @@ function generateHole(
   // either way; only the penalty is gated, so calm void stops are forgiving and deep ones bite.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
-  return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods };
+  return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods, shapeId: tpl.id };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */
@@ -859,55 +862,183 @@ function smoothCurve(ctrl: Vec[], per: number): Vec[] {
   return out;
 }
 
+/** The structural shapes the template grammar can draw (GS-shapes-2). */
+type ShapeKind = 'straight' | 'dogleg' | 'double' | 'hairpin' | 'cape';
+
 /**
- * Build a hole's centreline as a varied, SMOOTH shape (GS-shapes) — the lever that makes layouts
- * stop feeling identical. A template (straight drift / single dogleg L-R / S-curve double-dogleg) is
- * drawn, biome-biased (a calm verdant world leans straight; a chaotic void/inferno world bends more),
- * with the bend severity scaling by `doglegBias × wildness × length`. Control points are smoothed
- * into a curve so the corridor follows a real arc. Capped so an offset corridor doesn't self-cross.
+ * A drawn hole-design template (GS-shapes-2): a SHAPE coupled with a LENGTH multiplier, so the
+ * generator stops emitting one length + one gentle bend. `id` is the human/UI label stamped on
+ * `Hole.shapeId` (the sim never branches on it — physics ride the geometry). `side` is the bend
+ * direction (drawn once so a cape/dogleg/hairpin knows which way it turns), `severity` pushes a
+ * hairpin's corner toward the self-cross cap.
  */
-function buildCentreline(length: number, wildness: number, biome: Biome, rng: Rng, par: number, island = false): Vec[] {
+interface HoleTemplate {
+  id: string;
+  shape: ShapeKind;
+  side: 1 | -1;
+  lenMult: number;
+  severity: number;
+}
+
+/**
+ * Pick a hole archetype (GS-shapes-2). Couples a length CLASS (drivable / standard / long par-4,
+ * short / mid / long par-3, reachable / standard / three-shot par-5) with a SHAPE, biome- and
+ * wildness-biased: the chaotic worlds and the deeper stops bend more, the heroic CAPE and severe
+ * HAIRPIN only arm once the journey turns a touch wild, and a drivable par-4 stays playable-straight
+ * so you can genuinely have a go at the green. Draw order (length roll, shape roll, side) is fixed so
+ * the downstream RNG stream is stable. A void island stays a straight, honest target.
+ */
+function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, island: boolean): HoleTemplate {
+  const side: 1 | -1 = rng.bool() ? 1 : -1;
+  if (island) return { id: 'island', shape: 'straight', side, lenMult: rng.range(0.86, 1.12), severity: 1 };
+
+  const lenRoll = rng.float();
+  const shapeRoll = rng.float();
+
+  if (par === 3) {
+    let lenMult: number;
+    let lenTag: string;
+    if (lenRoll < 0.34) {
+      lenMult = rng.range(0.6, 0.82); // short pitch (drop-shot / island feel)
+      lenTag = 'short-3';
+    } else if (lenRoll < 0.82) {
+      lenMult = rng.range(0.88, 1.06);
+      lenTag = 'par-3';
+    } else {
+      lenMult = rng.range(1.1, 1.28); // long iron — kept modest so it stays reachable
+      lenTag = 'long-3';
+    }
+    // Mostly straight; the doglegging worlds give the odd angled (Redan-ish) par 3.
+    const angled = shapeRoll < 0.16 + biome.doglegBias * 0.5;
+    return { id: angled ? `angled-${lenTag}` : lenTag, shape: angled ? 'dogleg' : 'straight', side, lenMult, severity: 0.5 };
+  }
+
+  let lenMult: number;
+  let lenTag: string;
+  if (par === 4) {
+    const pDriv = 0.12 + 0.12 * (1 - wildness); // drivable shows up more on the calm early stops
+    if (lenRoll < pDriv) {
+      lenMult = rng.range(0.66, 0.8); // drivable short par-4
+      lenTag = 'drivable';
+    } else if (lenRoll < 0.82) {
+      lenMult = rng.range(0.9, 1.1);
+      lenTag = '';
+    } else {
+      lenMult = rng.range(1.12, 1.24); // long, stout par-4
+      lenTag = 'long';
+    }
+  } else {
+    if (lenRoll < 0.3) {
+      lenMult = rng.range(0.84, 0.96); // reachable in two
+      lenTag = 'reachable';
+    } else if (lenRoll < 0.8) {
+      lenMult = rng.range(1.0, 1.12);
+      lenTag = '';
+    } else {
+      lenMult = rng.range(1.16, 1.3); // a genuine three-shotter
+      lenTag = 'three-shot';
+    }
+  }
+  const parWord = par === 4 ? 'par-4' : 'par-5';
+
+  // Drivable par-4s stay straight/gentle so the bomb at the green is real.
+  if (lenTag === 'drivable') {
+    const shape: ShapeKind = shapeRoll < 0.62 ? 'straight' : 'dogleg';
+    return { id: 'drivable-par-4', shape, side, lenMult, severity: 0.55 };
+  }
+
+  // Shape mix, biome- + wildness-biased. Cape (heroic diagonal carry) and hairpin (severe corner)
+  // only arm once the journey turns a touch wild; calm stops stay gentle straights/doglegs.
+  const hairP = wildness >= 0.5 ? 0.08 + biome.doglegBias * 0.2 : 0;
+  const capeP = wildness >= 0.3 ? 0.12 + biome.doglegBias * 0.25 : 0;
+  const sP = Math.min(0.4, 0.12 + biome.doglegBias * 0.5 + wildness * 0.25); // S-curve / double-dogleg
+  const straightP = Math.max(0.12, 0.36 - biome.doglegBias * 0.7 - wildness * 0.16);
+  const sd = side > 0 ? 'r' : 'l';
+  let shape: ShapeKind;
+  let shapeTag: string;
+  if (shapeRoll < straightP) {
+    shape = 'straight';
+    shapeTag = 'straight';
+  } else if (shapeRoll < straightP + hairP) {
+    shape = 'hairpin';
+    shapeTag = `hairpin-${sd}`;
+  } else if (shapeRoll < straightP + hairP + capeP) {
+    shape = 'cape';
+    shapeTag = `cape-${sd}`;
+  } else if (shapeRoll < straightP + hairP + capeP + sP) {
+    shape = 'double';
+    shapeTag = `double-${sd}`;
+  } else {
+    shape = 'dogleg';
+    shapeTag = `dogleg-${sd}`;
+  }
+  const id = lenTag ? `${lenTag}-${parWord}-${shapeTag}` : `${parWord}-${shapeTag}`;
+  return { id, shape, side, lenMult, severity: shape === 'hairpin' ? 1.7 : 1 };
+}
+
+/**
+ * Build a hole's centreline as a varied, SMOOTH shape from a drawn template (GS-shapes-2, widening
+ * GS-shapes) — the lever that makes layouts stop feeling identical. The bend severity scales by
+ * `doglegBias × (0.35 + 0.65·wildness) × length`, capped at `0.4·length` so an offset corridor can't
+ * self-cross; control points are smoothed (Catmull-Rom) so a dogleg/cape/S follows a real arc.
+ * Shapes: straight drift, single dogleg, heroic CAPE (an early sharp corner — a tempting diagonal
+ * carry, green tucked inside), severe HAIRPIN (a big corner near mid-hole), and an S/double bend.
+ */
+function buildCentreline(
+  length: number,
+  wildness: number,
+  biome: Biome,
+  rng: Rng,
+  par: number,
+  tpl: HoleTemplate,
+  island = false,
+): Vec[] {
   const tee: Vec = [0, 0];
   const dogFac = 0.35 + 0.65 * wildness;
   const baseMag = biome.doglegBias * dogFac * length;
-  const cap = 0.4 * length; // keep bends smooth enough that the corridor offset stays clean
+  const cap = 0.4 * length;
   const endDrift = (): Vec => [rng.range(-0.06, 0.06) * length, length];
 
-  // A lost-ball island stays a straight, honest target (a dogleg over the abyss is unfair).
   if (island) return [tee, endDrift()];
-
-  if (par === 3) {
-    // Short holes: usually straight, occasionally a gentle single kink.
-    if (rng.float() < 0.6) return [tee, endDrift()];
-    const side = rng.bool() ? 1 : -1;
-    const mag = Math.min(0.16 * length, baseMag * rng.range(0.25, 0.55));
-    return smoothCurve([tee, [side * mag, length * 0.55], endDrift()], 4);
-  }
-
-  const bendAt = (f: number, side: number, scale: number): Vec => [
-    side * Math.min(cap, baseMag * scale * rng.range(0.5, 1.0)),
+  const side = tpl.side;
+  const bendAt = (f: number, s: number, scale: number): Vec => [
+    s * Math.min(cap, baseMag * scale * rng.range(0.5, 1.0)),
     length * f,
   ];
-  // Template probabilities, biome- + wildness-biased. The intercepts are tuned so EARLY/mid holes bend
-  // more (less "every early hole is dead straight, just a different palette") while DEEP holes are
-  // unchanged — at high wildness straightP is already on its 0.12 floor and sP on its 0.42 cap, so the
-  // nudge moves only the sub-max stops and the wildness-1 death-spiral bars are untouched.
-  const straightP = Math.max(0.12, 0.42 - biome.doglegBias * 0.8 - wildness * 0.18);
-  const sP = Math.min(0.42, 0.14 + biome.doglegBias * 0.55 + wildness * 0.28); // double-dogleg share
-  const roll = rng.float();
-  const side = rng.bool() ? 1 : -1;
-  let ctrl: Vec[];
-  if (roll < straightP) {
-    // Gentle landing-zone drift — visually straight, a touch of movement.
-    ctrl = [tee, bendAt(0.5, side, 0.28), endDrift()];
-  } else if (roll < 1 - sP) {
-    // Single dogleg, left or right; the green sits to the inside of the bend.
-    ctrl = [tee, bendAt(rng.range(0.42, 0.58), side, 1.0), [side * 0.12 * length * rng.float(), length]];
-  } else {
-    // S-curve: two opposite bends — the real shot-shaping test.
-    ctrl = [tee, bendAt(0.33, side, 0.8), bendAt(0.66, -side, 0.8), endDrift()];
+
+  switch (tpl.shape) {
+    case 'straight': {
+      if (par === 3) return [tee, endDrift()];
+      // Gentle landing-zone drift — visually straight, a touch of movement.
+      return smoothCurve([tee, bendAt(0.5, side, 0.28), endDrift()], 5);
+    }
+    case 'dogleg': {
+      if (par === 3) {
+        // A gentle angled (Redan-ish) par-3 — the green sits a little to one side.
+        const mag = Math.min(0.16 * length, baseMag * rng.range(0.3, 0.6) + 0.06 * length);
+        return smoothCurve([tee, [side * mag, length * 0.55], endDrift()], 4);
+      }
+      // Single dogleg, left or right; the green sits to the inside of the bend.
+      return smoothCurve([tee, bendAt(rng.range(0.42, 0.58), side, 1.0), [side * 0.12 * length * rng.float(), length]], 5);
+    }
+    case 'cape': {
+      // Heroic diagonal: a sharp EARLY corner (the bite-off temptation), green tucked to the inside.
+      const corner = rng.range(0.34, 0.46);
+      return smoothCurve([tee, bendAt(corner, side, 1.15), [side * 0.18 * length * rng.range(0.4, 1), length]], 5);
+    }
+    case 'hairpin': {
+      // Severe single corner near mid-hole — a true shot-shaper's hole. Magnitude pushed toward the cap.
+      const corner = rng.range(0.44, 0.56);
+      const mag = Math.min(cap, baseMag * tpl.severity * rng.range(0.7, 1.0));
+      return smoothCurve([tee, [side * mag, length * corner], [side * 0.2 * length * rng.range(0.3, 0.9), length]], 6);
+    }
+    case 'double': {
+      // S-curve, or a same-way double on the wilder/doglegging worlds — the real shot-shaping test.
+      const s2: number = rng.float() < biome.doglegBias * 0.5 ? side : -side;
+      return smoothCurve([tee, bendAt(0.33, side, 0.85), bendAt(0.66, s2, 0.85), endDrift()], 5);
+    }
   }
-  return smoothCurve(ctrl, 5);
+  return [tee, endDrift()];
 }
 
 /** Unit perpendicular to the centreline near fraction `t`. */

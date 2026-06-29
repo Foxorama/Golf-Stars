@@ -82,6 +82,14 @@ export interface Hole {
    */
   biome?: string;
   themeId?: string;
+  /**
+   * Hole-design template id (GS-shapes-2): which archetype the generator drew — 'straight',
+   * 'dogleg-l/r', 's-curve', 'hairpin-l/r', 'cape-l/r', 'double-l/r', plus a length class prefix
+   * for par variants ('drivable', 'long-3', 'short-3', 'reachable-5', 'three-shot-5', …). Render/UI
+   * label + variety tests read it; the sim never branches on it (physics ride the geometry). Optional
+   * for back-compat — a hole without one is unlabelled.
+   */
+  shapeId?: string;
 }
 
 export interface CourseMeta {
