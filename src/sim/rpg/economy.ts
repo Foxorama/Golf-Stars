@@ -278,6 +278,11 @@ export interface ShopItem {
   clubType?: string;
   /** Reward-club SET/style (GS-clubs): the set this club belongs to ('starter','tour',…). */
   clubSet?: string;
+  /** A boss-reward TALENT (GS-talents): a free run-scoped buff granted by beating a boss — NEVER sold in
+   *  the shop (it lives in the TALENTS table, not SHOP_ITEMS), so the rotating offer never surfaces it. */
+  talent?: boolean;
+  /** A talent's themed zone archetype (GS-talents), so a boss in that world offers its signature talent. */
+  archetype?: string;
   apply(loadout: PlayerLoadout): PlayerLoadout;
 }
 
@@ -988,8 +993,78 @@ export function clubOfferNote(item: ShopItem, loadout: PlayerLoadout): ClubOffer
   return { kind: 'new', carry: reward.carry, longerName: longer?.name, shorterName: shorter?.name };
 }
 
+/**
+ * Boss-reward TALENTS (GS-talents) — free, run-scoped buffs you PICK after beating a boss (one of a few
+ * thematic choices). They are ShopItems flagged `talent: true` and kept OUT of `SHOP_ITEMS`, so the
+ * rotating shop never offers them; they're granted by the boss-reward screen and rebuilt from `perks`
+ * on resume (via `shopItem`→`talentItem`), exactly like a bought perk. Each themed talent carries the
+ * zone `archetype` it belongs to, so a boss in that world offers its signature power.
+ */
+export const TALENTS: readonly ShopItem[] = [
+  // Generic — offered everywhere as the second choice.
+  {
+    id: 'talent-power', name: 'Cosmic Power', cost: 0, rarity: 'epic', talent: true,
+    desc: '+12 yds on your distance clubs for the rest of the run.',
+    apply: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 12), distanceClubBonus: (m.distanceClubBonus ?? 0) + 12, perks: [...m.perks, 'talent-power'] }),
+  },
+  {
+    id: 'talent-precision', name: 'Steady Hands', cost: 0, rarity: 'epic', talent: true,
+    desc: '10% tighter dispersion on every club.',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.9, perks: [...m.perks, 'talent-precision'] }),
+  },
+  {
+    id: 'talent-fortune', name: 'Treasure Sense', cost: 0, rarity: 'rare', talent: true,
+    desc: '+30% credits earned for the rest of the run.',
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.3, perks: [...m.perks, 'talent-fortune'] }),
+  },
+  {
+    id: 'talent-putt', name: 'Golden Putter', cost: 0, rarity: 'epic', talent: true,
+    desc: 'A far steadier putter — a much wider make window.',
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.18, perks: [...m.perks, 'talent-putt'] }),
+  },
+  // Zone-themed — the FIRST choice on a boss in that world.
+  {
+    id: 'talent-ember', name: 'Ember Surge', archetype: 'inferno', cost: 0, rarity: 'epic', talent: true,
+    desc: 'Forged in fire — +16 yds on your distance clubs.',
+    apply: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 16), distanceClubBonus: (m.distanceClubBonus ?? 0) + 16, perks: [...m.perks, 'talent-ember'] }),
+  },
+  {
+    id: 'talent-iceveins', name: 'Ice Veins', archetype: 'frost', cost: 0, rarity: 'epic', talent: true,
+    desc: 'Cold-blooded under pressure — 12% tighter dispersion.',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.88, perks: [...m.perks, 'talent-iceveins'] }),
+  },
+  {
+    id: 'talent-dunewalker', name: 'Dune Walker', archetype: 'desert', cost: 0, rarity: 'epic', talent: true,
+    desc: 'A genius from the sand — recover far better from bad lies.',
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, SANDY_LIE_RELIEF), perks: [...m.perks, 'talent-dunewalker'] }),
+  },
+  {
+    id: 'talent-voidfocus', name: 'Void Focus', archetype: 'void', cost: 0, rarity: 'epic', talent: true,
+    desc: 'Eerie calm — trims every miss zone, so more shots find the green.',
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.03, sliceR: -0.03, duckHookL: -0.015, shankR: -0.015 }), perks: [...m.perks, 'talent-voidfocus'] }),
+  },
+  {
+    id: 'talent-fairwaymaster', name: 'Fairway Master', archetype: 'verdant', cost: 0, rarity: 'epic', talent: true,
+    desc: 'Parkland precision — 10% tighter and less coming up short.',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.9, minCarryBoost: m.minCarryBoost + 0.04, perks: [...m.perks, 'talent-fairwaymaster'] }),
+  },
+];
+
+const talentById = new Map(TALENTS.map((t) => [t.id, t]));
+/** Resolve a talent by id (GS-talents) — used by `shopItem` so a granted talent rebuilds from perks. */
+export function talentItem(id: string): ShopItem | undefined {
+  return talentById.get(id);
+}
+/** The themed talents for a zone archetype, plus the generics (GS-talents). */
+export function talentsForArchetype(archetype: string): { themed: ShopItem[]; generic: ShopItem[] } {
+  return {
+    themed: TALENTS.filter((t) => t.archetype === archetype),
+    generic: TALENTS.filter((t) => !t.archetype),
+  };
+}
+
 export function shopItem(id: string): ShopItem | undefined {
-  return SHOP_ITEMS.find((i) => i.id === id) ?? clubItem(id);
+  return SHOP_ITEMS.find((i) => i.id === id) ?? clubItem(id) ?? talentItem(id);
 }
 
 /**

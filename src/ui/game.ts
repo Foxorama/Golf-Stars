@@ -25,11 +25,15 @@ import {
   shopOffer,
   startRun,
   travel,
+  bossRewards,
+  grantTalent,
+  type BossReward,
   type Route,
   type Run,
   type RunSnapshot,
   type StopResult,
 } from '../sim/rpg/run';
+import { archetypeFor } from '../sim/course/themes';
 import { isMatchplayBoss } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
 import { playMatchStop, playBossStop, holeDuel, matchState, type HoleDuel } from '../sim/rpg/match';
@@ -52,6 +56,7 @@ export type Screen =
   | 'intro'
   | 'playing'
   | 'result'
+  | 'bossReward'
   | 'shop'
   | 'travel'
   | 'gameover'
@@ -98,6 +103,8 @@ export interface UiState {
   maxAscension: number;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
+  /** Boss-reward choices to pick from after beating a boss (GS-talents) — shown on the bossReward screen. */
+  bossReward?: BossReward[];
 }
 
 /** The matchplay duel a boss stop is played as (GS-100). */
@@ -127,6 +134,7 @@ export type Action =
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
+  | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
   | { type: 'buy'; id: string }
   | { type: 'rerollShop' } // pay credits to redraw the outfitter's stock (GS-shop-reroll)
   | { type: 'leaveShop' }
@@ -189,6 +197,13 @@ function resolveBossId(run: Run): string {
 function unlockedAscension(state: UiState, run: Run): number {
   if (run.endedReason !== 'won') return state.maxAscension;
   return Math.min(ASCENSION_MAX, Math.max(state.maxAscension, run.ascension + 1));
+}
+
+/** Boss-reward choices to offer after a stop, if it was a survived (non-final) boss win (GS-talents).
+ *  Themed to the stop's zone. Undefined for an ordinary stop, a missed cut, or a run-winning final boss. */
+function bossRewardFor(run: Run, course: UiState['course'], result: StopResult): BossReward[] | undefined {
+  if (!result.passed || run.status !== 'active' || !currentBoss(run)) return undefined;
+  return bossRewards(run, archetypeFor(course.meta?.themeId, course.biome));
 }
 
 export function reduce(state: UiState, action: Action): UiState {
@@ -265,6 +280,7 @@ export function reduce(state: UiState, action: Action): UiState {
           shards: state.shards + (earned ?? 0),
           lastRunShards: earned,
           maxAscension: unlockedAscension(state, run),
+          bossReward: bossRewardFor(run, state.course, result),
         };
       }
       const { run, result, played } = playStop(state.run);
@@ -285,6 +301,7 @@ export function reduce(state: UiState, action: Action): UiState {
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
         maxAscension: unlockedAscension(state, run),
+        bossReward: bossRewardFor(run, state.course, result),
       };
     }
 
@@ -381,6 +398,7 @@ export function reduce(state: UiState, action: Action): UiState {
           shards: state.shards + (earned ?? 0),
           lastRunShards: earned,
           maxAscension: unlockedAscension(state, run),
+          bossReward: bossRewardFor(run, state.course, result),
         };
       }
 
@@ -407,17 +425,41 @@ export function reduce(state: UiState, action: Action): UiState {
         shards: state.shards + (earned ?? 0),
         lastRunShards: earned,
         maxAscension: unlockedAscension(state, run),
+        bossReward: bossRewardFor(run, state.course, result),
       };
     }
 
     case 'continue': {
       if (state.screen !== 'result') return state;
+      // After a boss win, claim the spoils first (GS-talents): a talent or a permanent reward.
+      if (state.bossReward && state.bossReward.length) {
+        return { ...state, screen: 'bossReward' };
+      }
       // Fix the outfitter's stock now (from the post-stop run) so it stays put while shopping. The
       // single 4-card offer now mixes perk gear AND rare+ reward CLUBS (GS-clubs-2) from one draw.
       return {
         ...state,
         screen: 'shop',
         shopOffer: shopOffer(state.run).map((o) => o.item.id),
+        shopRerolls: 0,
+      };
+    }
+
+    case 'pickBossReward': {
+      if (state.screen !== 'bossReward' || !state.bossReward) return state;
+      const choice = state.bossReward[action.index];
+      if (!choice) return state;
+      // A talent applies a run-scoped buff (rebuilt from perks on resume); a permanent reward banks
+      // shards (cross-run). Then on to the shop with a fixed stock.
+      const run = choice.kind === 'talent' ? grantTalent(state.run, choice.id) : state.run;
+      const shards = choice.kind === 'shards' ? state.shards + (choice.shards ?? 0) : state.shards;
+      return {
+        ...state,
+        run,
+        shards,
+        bossReward: undefined,
+        screen: 'shop',
+        shopOffer: shopOffer(run).map((o) => o.item.id),
         shopRerolls: 0,
       };
     }
@@ -461,6 +503,7 @@ export function reduce(state: UiState, action: Action): UiState {
         lastResult: undefined,
         routes: undefined,
         match: undefined,
+        bossReward: undefined,
         viewHole: 0,
       };
     }

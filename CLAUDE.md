@@ -700,6 +700,23 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   rate). Tune via `ARC_CUT_TARGETS`, the field strength (`golferBaseline`), or the boss stat edge
   (`bossLoadout`). Tests: `tests/competition` (arcCut/targets/pairing), `tests/league` (boss-no-Stableford),
   `tests/voyage` (termination + winnable).
+- **Boss-reward TALENTS — pick a run buff or a permanent reward (GS-talents).** Beating a NON-final boss
+  opens a reward screen: choose ONE of a thematic run **talent**, a generic run talent, or a permanent
+  **Star-Shard** bonus (the "talent or permanent reward for this run" ask). Talents (`TALENTS` in
+  `economy.ts`) are `ShopItem`s flagged `talent: true` and kept OUT of `SHOP_ITEMS`, so the rotating shop
+  never sells them; each themed one carries a zone `archetype` (`talent-ember`/inferno power,
+  `talent-iceveins`/frost precision, `talent-dunewalker`/desert lie-relief, `talent-voidfocus`/void
+  shaping, `talent-fairwaymaster`/verdant) so a boss in that world offers its signature power. `bossRewards
+  (run, archetype, salt)` (run.ts) draws the 3 deterministic choices (themed + generic + a depth-scaled
+  shard reward), skipping talents you own; `grantTalent` applies one FREE (no credit cost). A talent reuses
+  the perk machinery — `shopItem`→`talentItem` resolves it, so it's added to `loadout.perks` and rebuilt on
+  resume exactly like a bought perk (NO save bump). UI: a new `bossReward` screen between the result and the
+  shop (the result Continue routes there when a reward is pending); `pickBossReward` applies the choice
+  (talent → `grantTalent`, shards → `state.shards`) and proceeds to the shop. The reward is detected in the
+  reducer (`bossRewardFor`: a survived, non-final boss win) for BOTH the matchplay and scramble bosses. No
+  new `_gs*`/URL hook (the test-hub guard needs nothing; the Sim Lab absorbs the talents as data).
+  Tests: `tests/talents.test.ts` (talents out of the shop, perk rebuild, themed/deterministic draw, free
+  idempotent grant, the reducer pick→shop flow).
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only

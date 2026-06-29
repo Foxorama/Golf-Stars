@@ -1489,9 +1489,50 @@ function resultScreen(): string {
           return summary + (state.match ? matchResultPanel() : '') + place + leaderboardHTML(board);
         })()}
         <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;opacity:.7;">Scorecard</summary>${scorecard()}</details>
-        <div style="margin-top:10px;">${btn('Continue → shop', { type: 'continue' }, { variant: 'primary' })}</div>
+        <div style="margin-top:10px;">${btn(
+          state.bossReward && state.bossReward.length ? '🏆 Claim your reward →' : 'Continue → shop',
+          { type: 'continue' },
+          { variant: 'primary' },
+        )}</div>
       </section>
     </div>`;
+}
+
+/** The boss-reward screen (GS-talents): pick ONE of a few thematic spoils after beating a boss — a
+ *  run TALENT or a permanent Star-Shard reward. Clicking a card claims it and continues to the shop. */
+function bossRewardScreen(): string {
+  const rewards = state.bossReward ?? [];
+  const oppId = state.match?.bossId ?? currentOpponentId();
+  const opp = oppId ? getGolfer(oppId) : undefined;
+  const cards = rewards
+    .map((r, i) => {
+      const col = rarCol(r.rarity);
+      const icon = r.kind === 'shards' ? '✦' : '🌟';
+      return `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'pickBossReward', index: i })}'
+          style="cursor:pointer;flex:1 1 200px;min-width:200px;max-width:280px;border:1px solid ${col};border-radius:12px;
+          padding:14px;background:linear-gradient(180deg,${col}14,#0d1016);">
+        <div style="font-size:26px;line-height:1;">${icon}</div>
+        <div style="font-size:15px;font-weight:800;margin-top:8px;">${r.name}</div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:${col};margin-top:2px;">${
+          r.kind === 'shards' ? 'Permanent reward' : 'Run talent'
+        } · ${r.rarity}</div>
+        <div style="font-size:12.5px;opacity:.85;margin-top:8px;line-height:1.4;">${r.desc}</div>
+      </div>`;
+    })
+    .join('');
+  return `
+    ${header()}
+    <section style="max-width:680px;position:relative;">
+      ${burst()}
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        ${opp ? `<div style="line-height:0;border:2px solid #ffce54;border-radius:10px;background:#1a0e12;padding:2px;">${golferSVG(opp.look, 44, 54)}</div>` : ''}
+        <div>
+          <h2 style="font-size:20px;margin:.1em 0;color:#ffce54;">🏆 Victory Spoils</h2>
+          <p style="font-size:13px;opacity:.8;margin:0;">You beat ${opp?.name ?? 'the boss'} — choose your reward. A <b>talent</b> powers up the rest of this run; <b>Star Shards</b> are permanent.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;">${cards}</div>
+    </section>`;
 }
 
 function shopScreen(): string {
@@ -1834,6 +1875,8 @@ function render(): void {
       ? playingBody(animatingPlay !== null)
       : state.screen === 'result'
       ? resultScreen()
+      : state.screen === 'bossReward'
+      ? bossRewardScreen()
       : state.screen === 'shop'
       ? shopScreen()
       : state.screen === 'travel'
