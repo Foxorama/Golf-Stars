@@ -18,6 +18,7 @@ import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { archetypeFor } from '../sim/course/themes';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
+import { createWeather, type WeatherHandle } from './weather';
 import {
   drawCaddy,
   drawCaddyProjectile,
@@ -166,16 +167,6 @@ function lookFromColor(color: string): GolferLook {
 }
 
 /** Tiny deterministic PRNG (mulberry32) — the house style, so the ambient FX are stable. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
@@ -568,7 +559,7 @@ export function mountPlayView(
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, effect: opts.effect });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);
@@ -583,81 +574,14 @@ export function mountPlayView(
     ctx.fillText(text, 16, 24);
   }
 
-  // Animated space ambience: a fixed far starfield in the upper sky that twinkles, plus a
-  // shooting star that sweeps through on a slow loop. Purely additive "alive" feel on top of
-  // the static (seeded) celestial accents the scene builder already bakes in. Positions are
-  // seeded off the hole so they're stable for the session; only the alpha/sweep animate.
-  const fxRng = mulberry32((Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed);
-  const fxStars = Array.from({ length: 40 }, () => ({
-    x: fxRng() * width,
-    y: fxRng() * height * 0.72, // bias to the upper "sky" band, but salt most of the view
-    r: 0.5 + fxRng() * 1.4,
-    ph: fxRng() * Math.PI * 2,
-    blue: fxRng() < 0.5,
-  }));
-  const shootPeriod = 5200;
-  const shootDur = 760;
-  const shootOff = fxRng() * shootPeriod;
-  function drawSpaceFX(now: number): void {
-    if (!F.spaceFX) return;
-    ctx.save();
-    for (const s of fxStars) {
-      const a = 0.18 + 0.5 * (0.5 + 0.5 * Math.sin(now * 0.003 + s.ph));
-      // A soft glow halo on the brighter stars (cheap at this count — a single extra arc, not
-      // shadowBlur). Sells the deep-field twinkle the intro ends on, now over the live hole.
-      if (s.r > 1) {
-        ctx.globalAlpha = a * 0.22;
-        ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r * 2.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = a;
-      ctx.fillStyle = s.blue ? '#bcd6ff' : '#ffffff';
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Shooting star sweeping down-right across the upper third on a slow loop.
-    const sp = ((now + shootOff) % shootPeriod) / shootDur;
-    if (sp <= 1) {
-      const x0 = -40;
-      const y0 = height * 0.06;
-      const x1 = width + 40;
-      const y1 = height * 0.34;
-      const hx = x0 + (x1 - x0) * sp;
-      const hy = y0 + (y1 - y0) * sp;
-      const ang = Math.atan2(y1 - y0, x1 - x0);
-      const tail = 60;
-      const a = Math.sin(sp * Math.PI);
-      ctx.globalAlpha = a;
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = 'rgba(220,235,255,0.9)';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(hx - Math.cos(ang) * tail, hy - Math.sin(ang) * tail);
-      ctx.lineTo(hx, hy);
-      ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(hx, hy, 1.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  // Animated WIND (GS-wind): streaks drifting across the hole in the wind's screen direction,
-  // themed per world and scaled by `Wind.spd`, so you can SEE which way and how hard it blows (the
-  // shot-bearing wind the AI aims upwind into). Toroidal drift off the seeded fxRng — pure feel on
-  // the existing `_gsFeel.wind` knob; the static map gets matching streaks from the scene builder.
+  // Animated atmosphere — the always-on space ambience (twinkling stars + the odd shooting star),
+  // the VISIBLE wind, and the journey route's weather EFFECT (moonlight / meteors / aurora / solar
+  // storm / debris / trade camp). All screen-space sky+air, drawn by the SHARED weather module so the
+  // in-flight view and the aim/putt overlays look identical (GS-journey-fx rework). Off a seeded
+  // stream (deterministic, perturbs no sim); `_gsFeel.spaceFX` / `.wind` still gate the ambience.
   const windArch = archetypeFor(opts.themeId, opts.biome ?? '');
   const windSpd = hole.wind?.spd ?? 0;
   const windDirRad = ((hole.wind?.dir ?? 0) * Math.PI) / 180;
-  const WIND_RGBA: Record<string, string> = {
-    inferno: '255,150,70', frost: '222,243,255', desert: '226,196,140', verdant: '208,236,206', void: '200,170,255',
-  };
-  const windDots = Array.from({ length: 90 }, () => ({ x: fxRng() * (width + 40), y: fxRng() * (height + 40), s: 0.6 + fxRng() * 0.9, ph: fxRng() * 6.28 }));
   function windScreenDir(): Vec {
     const c0 = hole.tee;
     const c1: Vec = [c0[0] + Math.sin(windDirRad), c0[1] + Math.cos(windDirRad)];
@@ -668,93 +592,17 @@ export function mountPlayView(
     const l = Math.hypot(dx, dy) || 1;
     return [dx / l, dy / l];
   }
-  const wrap = (v: number, m: number): number => ((v % m) + m) % m;
-  function drawWind(now: number): void {
-    if (!F.wind || windSpd < 2) return;
-    const [dx, dy] = windScreenDir();
-    const intensity = Math.min(1, (windSpd - 2) / 26);
-    const count = Math.round(14 + intensity * 66);
-    const drift = now * 0.001 * (20 + intensity * 130);
-    const col = WIND_RGBA[windArch] ?? WIND_RGBA.verdant;
-    const wW = width + 40;
-    const wH = height + 40;
-    ctx.save();
-    ctx.lineCap = 'round';
-    for (let i = 0; i < count; i++) {
-      const p = windDots[i]!;
-      const t = drift * p.s;
-      const x = wrap(p.x + dx * t, wW) - 20;
-      const y = wrap(p.y + dy * t, wH) - 20;
-      const a = (0.08 + intensity * 0.18) * (0.6 + 0.4 * Math.sin(now * 0.004 + p.ph));
-      const L = (3 + intensity * 13) * (0.6 + p.s);
-      ctx.strokeStyle = `rgba(${col},${a.toFixed(3)})`;
-      ctx.lineWidth = 1.1;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x - dx * L, y - dy * L);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // Journey route effect (GS-journey-fx) — an ANIMATED atmosphere overlay matching the static scene
-  // layer the scene builder drew. Off the seeded fxRng (deterministic, perturbs no sim). Only the
-  // moving effects animate here (meteors fall, the aurora shimmers, the storm flickers); moonlight /
-  // debris / trade-camp are carried entirely by the static scene. Drawn UNDER the ball + cone.
-  const fxEffect = opts.effect ?? 'none';
-  const meteors = Array.from({ length: 10 }, () => ({ x: fxRng(), spd: 0.6 + fxRng() * 0.9, len: 14 + fxRng() * 26, off: fxRng() }));
-  function drawCourseFx(now: number): void {
-    if (fxEffect === 'meteorShower') {
-      ctx.save();
-      ctx.lineCap = 'round';
-      for (const m of meteors) {
-        const t = ((m.off + now * 0.00016 * (0.5 + m.spd)) % 1.3) - 0.12; // loop top → bottom
-        if (t < 0) continue;
-        const x = m.x * (width + 80) - 40 - t * width * 0.4; // drift down-left
-        const y = t * (height + 60) - 30;
-        const a = Math.min(1, t * 3) * Math.min(1, (1.18 - t) * 3);
-        ctx.strokeStyle = `rgba(255,224,168,${(0.85 * a).toFixed(3)})`;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - m.len * 0.7, y - m.len);
-        ctx.stroke();
-        ctx.fillStyle = `rgba(255,255,255,${(0.9 * a).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(x, y, 1.7, 0, 6.283);
-        ctx.fill();
-      }
-      ctx.restore();
-    } else if (fxEffect === 'aurora') {
-      ctx.save();
-      const cols = ['90,230,170', '120,180,255', '200,140,255'];
-      for (let b = 0; b < 3; b++) {
-        const y0 = height * (0.06 + b * 0.06);
-        const amp = 10 + b * 4;
-        const N = 24;
-        ctx.beginPath();
-        for (let i = 0; i <= N; i++) {
-          const x = (width * i) / N;
-          const y = y0 + Math.sin(i * 0.5 + now * 0.0008 + b) * amp;
-          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        for (let i = N; i >= 0; i--) {
-          const x = (width * i) / N;
-          ctx.lineTo(x, y0 + 24 + Math.sin(i * 0.45 + now * 0.0008 + b) * amp);
-        }
-        ctx.closePath();
-        ctx.fillStyle = `rgba(${cols[b]},0.10)`;
-        ctx.fill();
-      }
-      ctx.restore();
-    } else if (fxEffect === 'solarStorm') {
-      const flick = 0.05 + 0.05 * (0.5 + 0.5 * Math.sin(now * 0.004));
-      ctx.save();
-      ctx.fillStyle = `rgba(255,90,50,${flick.toFixed(3)})`;
-      ctx.fillRect(0, 0, width, height);
-      ctx.restore();
-    }
-  }
+  const weather: WeatherHandle = createWeather({
+    effect: opts.effect ?? 'none',
+    width,
+    height,
+    archetype: windArch,
+    windSpd,
+    windDir: windScreenDir(),
+    seed: (Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed,
+    spaceFX: F.spaceFX,
+    wind: F.wind,
+  });
 
   function frame(realNow: number): void {
     // Virtual animation clock (GS-caddy-slomo): advance by the real frame delta, scaled down while a
@@ -783,6 +631,7 @@ export function mountPlayView(
     if (followMode && opts.follow) {
       camera = [camera[0] + (lastGround[0] - camera[0]) * 0.2, camera[1] + (lastGround[1] - camera[1]) * 0.2];
       proj = buildProj();
+      weather.setWind(windScreenDir()); // keep the wind reading true as the camera pans
     }
 
     // Screen-shake offset (deterministic decay).
@@ -794,9 +643,7 @@ export function mountPlayView(
     }
 
     drawStatic();
-    drawSpaceFX(now);
-    drawWind(now);
-    drawCourseFx(now);
+    weather.draw(ctx, now);
 
     // A GUARD caddy stands in the bottom-left corner the whole hole (GS-caddy) — its muzzle anchor is
     // where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. Only guards

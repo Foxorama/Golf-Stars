@@ -11,7 +11,8 @@ import { mountPlayView, type GolferLook, type PlayViewHandle } from './render/pl
 import { itemCardHTML, shotCardHTML } from './render/cards';
 import { itemArtSVG } from './render/itemArt';
 import { renderHoleSVG } from './render/holeView';
-import { type ProjectOptions } from './render/project';
+import { holeProjector, type ProjectOptions } from './render/project';
+import { createWeather } from './render/weather';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt, CADDY_LABEL, CADDY_VOICE } from './render/caddyArt';
@@ -25,7 +26,7 @@ import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById, type BiomeArchetype } from './sim/course/themes';
 import { zoneProfile, difficultyPips, shopPro, proMood, proLine, sectionEvents } from './sim/course/zones';
-import { bearing, dist, type Hole, type Rarity } from './sim/course/contract';
+import { bearing, dist, type Hole, type Rarity, type Vec } from './sim/course/contract';
 import { type ShotSpread, type PlayedHole } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
@@ -63,6 +64,9 @@ function seedFromUrl(): number | string | null {
 
 let state: UiState;
 let view: PlayViewHandle | null = null;
+/** The animated weather overlay over the aim/putt map (GS-journey-fx rework) — so the sky + air are
+ *  alive while you line up, not only mid-flight. Torn down + remounted each render like `view`. */
+let weatherOverlay: { destroy(): void } | null = null;
 
 /** Today's deterministic daily-challenge seed — same course for everyone on the same date. Reuses
  *  the string-seed support (no new URL param/hook). Date is read in the browser (not the sim). */
@@ -201,6 +205,10 @@ function dispatch(action: Action): void {
   if (view) {
     view.destroy();
     view = null;
+  }
+  if (weatherOverlay) {
+    weatherOverlay.destroy();
+    weatherOverlay = null;
   }
   if (puttMeter) {
     puttMeter.destroy();
@@ -766,7 +774,6 @@ function introScreen(): string {
     height: 360,
     biome: holeBiome(c.holes[0]!),
     themeId: holeThemeId(c.holes[0]!),
-    effect: c.meta?.effect,
   });
 
   return `
@@ -1914,7 +1921,7 @@ function playingBody(animating: boolean): string {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
       // The putt screen is the ball↔cup line — the approach tracers belong to the whole-hole decision view.
-      biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
+      biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -1931,7 +1938,7 @@ function playingBody(animating: boolean): string {
     // the meter + Putt float in a bottom panel.
     return `
       <div class="gs-shot gs-shot--full">
-        <div class="gs-bigmap">${puttSvg}</div>
+        <div class="gs-bigmap" data-weather="putt">${puttSvg}</div>
         ${mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` })}
         <div class="gs-hud gs-hud-bottom">
           ${caddyBadgeHTML(puttCaddyId())}
@@ -1997,7 +2004,7 @@ function playingBody(animating: boolean): string {
     // On a matchplay boss stop, overlay the boss's pre-played line for THIS hole so you see them on the
     // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
     ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
-    biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
+    biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     ball: play.ball,
     spray,
     sprayGeom,
@@ -2056,7 +2063,7 @@ function playingBody(animating: boolean): string {
   const autoFinish = `<button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole">»</button>`;
   return `
     <div class="gs-shot gs-shot--full${lefty() ? ' gs-shot--lefty' : ''}">
-      <div class="gs-bigmap" data-map="1">${svg}</div>
+      <div class="gs-bigmap" data-map="1" data-weather="decision">${svg}</div>
       ${mapCtrls}
       ${mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` })}
       <div class="gs-hud gs-hud-bottom">
@@ -2607,6 +2614,67 @@ function currentEffect(): string | undefined {
   return state.course?.meta?.effect;
 }
 
+/** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
+ *  identically across screens (a quiet hand-off from lining up to watching the shot). */
+function weatherSeed(hole: Hole): number {
+  return (Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed;
+}
+
+/**
+ * Mount the animated, SCREEN-SPACE weather overlay over the aim/putt map (GS-journey-fx rework) so the
+ * sky + air are alive while you line up — not just during ball flight (the in-flight view draws the
+ * SAME weather from the shared module). `up` orients the wind to read true relative to the shot. A
+ * transparent, pointer-events-none canvas so the pull-to-shot gesture passes straight through.
+ */
+function mountWeatherOverlay(el: HTMLElement, hole: Hole, up: Vec): void {
+  const cw = Math.round(el.clientWidth || DMAP_W);
+  const ch = Math.round(el.clientHeight || DMAP_H);
+  if (cw < 2 || ch < 2) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const cv = document.createElement('canvas');
+  cv.width = cw * dpr;
+  cv.height = ch * dpr;
+  cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:10px;';
+  el.appendChild(cv);
+  const ctx = cv.getContext('2d');
+  if (!ctx) return;
+  ctx.scale(dpr, dpr);
+  // Wind screen-direction via a projector oriented the same way the map is (shot pointing up).
+  const proj = holeProjector(hole, { width: cw, height: ch, focus: hole.tee, up, viewRadius: 80, focusBias: DMAP_BIAS });
+  const rad = ((hole.wind?.dir ?? 0) * Math.PI) / 180;
+  const a = proj.project(hole.tee);
+  const b = proj.project([hole.tee[0] + Math.sin(rad), hole.tee[1] + Math.cos(rad)]);
+  let wdx = b[0] - a[0];
+  let wdy = b[1] - a[1];
+  const wl = Math.hypot(wdx, wdy) || 1;
+  const w = createWeather({
+    effect: currentEffect() ?? 'none',
+    width: cw,
+    height: ch,
+    archetype: archetypeFor(holeThemeId(hole), holeBiome(hole) ?? ''),
+    windSpd: hole.wind?.spd ?? 0,
+    windDir: [wdx / wl, wdy / wl],
+    seed: weatherSeed(hole),
+  });
+  const reduced = getSettings().reducedMotion;
+  let raf = 0;
+  let live = true;
+  const tick = (now: number): void => {
+    if (!live || !cv.isConnected) return;
+    ctx.clearRect(0, 0, cw, ch);
+    w.draw(ctx, now);
+    if (!reduced) raf = requestAnimationFrame(tick);
+  };
+  tick(performance.now());
+  weatherOverlay = {
+    destroy() {
+      live = false;
+      cancelAnimationFrame(raf);
+      cv.remove();
+    },
+  };
+}
+
 /** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. A bought
  *  themed club set (GS-proshop-2) adds the `gear` glow so the golfer swings the club you bought. */
 function golferLook(): GolferLook | undefined {
@@ -2671,6 +2739,10 @@ function render(): void {
   if (view) {
     view.destroy();
     view = null;
+  }
+  if (weatherOverlay) {
+    weatherOverlay.destroy();
+    weatherOverlay = null;
   }
   if (puttMeter) {
     puttMeter.destroy();
@@ -2873,6 +2945,18 @@ function render(): void {
         // the meter itself draws no figure and uses its full width.
         onCommit: (pace) => dispatch({ type: 'putt', control: { pace, aim: puttAimResolved } }),
       });
+    }
+  }
+
+  // Animated weather over the aim/putt map (GS-journey-fx rework): the sky + air are alive while you
+  // line up, drawn by the SAME shared module the in-flight view uses. Skipped while a shot animates
+  // (the play view owns the canvas + draws its own weather then).
+  if (state.screen === 'playing' && state.play && !animatingPlay) {
+    const wEl = document.querySelector<HTMLElement>('[data-weather]');
+    if (wEl) {
+      const ball = state.play.ball;
+      const pin = pinOf(state.play.hole);
+      mountWeatherOverlay(wEl, state.play.hole, [pin[0] - ball[0], pin[1] - ball[1]]);
     }
   }
 
