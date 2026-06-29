@@ -46,7 +46,7 @@ import { applyCharacter, characterShotMods, scramblePartnerId } from './characte
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { themeForStop, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, archetypeFor, type Theme } from '../course/themes';
-import { buildField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
+import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked' | 'won';
@@ -344,23 +344,28 @@ export function currentBoss(run: Run): BossSpec | undefined {
  *  reserves the chosen character's mirror), so this matches league's real-look field golfer-for-golfer. */
 const SURVIVAL_LOOK = { cap: '#cfd6dd', shirt: '#7f8a96', skin: '#caa182', build: 1 };
 
-/** The arc field used for the positional cut (same golfers/scores as league's display field). */
+/** The persistent voyage field used for the positional cut (same golfers/scores as league's display
+ *  field). For a winnable voyage it's ONE field across the whole journey (GS-voyage-field), so the
+ *  cut can thin it down to the final two; endless formats keep the per-arc field. */
 function survivalField(run: Run): Field {
   const info: PlayerInfo = { name: 'You', look: SURVIVAL_LOOK, characterId: run.loadout.characterId };
-  return buildField(run.seed, arcIndexOf(run.stopIndex), arcForDistance(run.distanceFromStart), info);
+  return getFormat(run.formatId).winnable
+    ? buildVoyageField(run.seed, info)
+    : buildField(run.seed, arcIndexOf(run.stopIndex), arcForDistance(run.distanceFromStart), info);
 }
 
 /**
- * Build the current arc's stop slices for the positional cut: the completed arc stops (from history) plus
- * an optional CURRENT stop (the one being scored, not yet in history). Each slice carries the survivor
- * target (top-N advance) for an ordinary stop. Exported so league.ts reuses the SAME builder.
+ * Build the voyage's stop slices for the positional cut (GS-voyage-field): EVERY completed stop (from
+ * history, across the whole voyage — the field persists and the cut is cumulative, not reset per arc)
+ * plus an optional CURRENT stop (the one being scored, not yet in history). Each slice carries the
+ * survivor target (top-N advance) for an ordinary stop — the ramp that thins the field to the final
+ * two. Exported so league.ts reuses the SAME builder, so the drawn cut and the real cut never disagree.
  */
 export function arcSlices(
   run: Run,
   current?: { themeId?: string; biome: string; holeCount: number; playerSF: number },
 ): ArcStopSlice[] {
   const format = getFormat(run.formatId);
-  const arcIdx = arcIndexOf(run.stopIndex);
   const ascCut = ascensionCutBonus(run.ascension);
   const make = (stopIndex: number, themeId: string | undefined, biome: string, holeCount: number, playerSF: number): ArcStopSlice => ({
     stopIndex,
@@ -373,7 +378,6 @@ export function arcSlices(
   });
   const slices: ArcStopSlice[] = [];
   for (const h of run.history) {
-    if (arcIndexOf(h.stopIndex) !== arcIdx) continue;
     slices.push(make(h.stopIndex, h.themeId, h.biome, stopSpecFor(format, h.stopIndex).holes, h.stableford));
   }
   if (current) slices.push(make(run.stopIndex, current.themeId, current.biome, current.holeCount, current.playerSF));

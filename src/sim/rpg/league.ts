@@ -18,6 +18,7 @@ import { arcForDistance, archetypeFor } from '../course/themes';
 import { getCharacter } from './characters';
 import {
   buildField,
+  buildVoyageField,
   ghostHoleStableford,
   golferForm,
   homeMatches,
@@ -61,10 +62,13 @@ export function holesForStop(run: Run, stopIndex: number): number {
   return stopSpecFor(getFormat(run.formatId), stopIndex).holes;
 }
 
-/** The competition field for the run's CURRENT arc (deterministic, seed-stable). */
+/** The competition field for the run (deterministic, seed-stable). A WINNABLE voyage uses ONE
+ *  persistent field across the whole journey (GS-voyage-field) so the cut thins it to the final two;
+ *  endless formats (flat/ladder) keep a fresh per-arc field each "season". */
 export function runField(run: Run): Field {
-  const arcIndex = arcIndexOf(run.stopIndex);
-  return buildField(run.seed, arcIndex, arcForDistance(run.distanceFromStart), playerInfoFor(run));
+  return getFormat(run.formatId).winnable
+    ? buildVoyageField(run.seed, playerInfoFor(run))
+    : buildField(run.seed, arcIndexOf(run.stopIndex), arcForDistance(run.distanceFromStart), playerInfoFor(run));
 }
 
 /** A stable ghost hole key (independent of the real course seed — only needs to be deterministic). */

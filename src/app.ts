@@ -520,7 +520,14 @@ function leaderboardHTML(board: Leaderboard, opts: { live?: boolean } = {}): str
   // drawn even live (the eliminations above it are real, frozen from prior stops). A Stableford board
   // (flat/ladder) reads "CUT · N pts" and is suppressed mid-stop (a partial stop isn't scored yet).
   const positional = board.mode === 'positional';
-  const cutLabel = positional ? `top ${board.survivorTarget ?? board.cut} advance` : `CUT · ${board.cut} pts`;
+  // On a positional BOSS stop there's no advance number (it's a matchplay knockout, decided by the
+  // duel) — survivorTarget is undefined there, so DON'T fall back to board.cut (a Stableford figure
+  // that read as a nonsense "top 22 advance" with a 20-golfer field). Label it a knockout instead.
+  const cutLabel = positional
+    ? board.survivorTarget !== undefined
+      ? `top ${board.survivorTarget} advance`
+      : '⚔ boss round'
+    : `CUT · ${board.cut} pts`;
   const showDivider = positional || !opts.live;
   let drewCut = false;
   const rows = board.standings
