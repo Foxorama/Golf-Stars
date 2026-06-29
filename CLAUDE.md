@@ -514,6 +514,31 @@ This game lives or dies on three axes — put every change through all three bef
     NAMED node along the curve (Earth → stage 1 → stage 2 → … → YOU), most-recent-`MAX_NODES` shown
     with a `＋N more` summary near Earth. Pure/seeded as before; `trail` is optional (falls back to the
     old anonymous dots) so the helper stays drop-in.
+  - **The journey map is a SCROLLABLE, galaxy-exact star-chart (GS-galaxy-map, `render/starmap.ts`).**
+    The old `starmapSVG` crammed Earth + every cleared node + YOU + the 3 forward branches into ONE
+    fixed 360×212 frame, so it SQUISHED as the run grew (MAX_NODES=4 + a `＋N more` summary only papered
+    over it). Replaced by `journeyMapHTML(opts)` → an HTML widget of TWO flex siblings: a wide,
+    horizontally-SCROLLABLE trail strip (`.gs-journey-trail`, `overflow-x:auto`) holding ALL cleared
+    worlds, and a NON-scrolling forward panel (`.gs-journey-fwd`) pinned to the right that always shows
+    YOU (the wagon) + the three branch lanes. `app.ts`'s render() snaps the strip's `scrollLeft` to the
+    far right on a NEW stop (so the most-recent ~2 worlds sit next to YOU), then honours wherever the
+    player tap-scrolls back (persisted in the module-level `journeyScroll = {key, left}` so it survives
+    the per-frame re-render; the key is `seed:stopIndex`). The forward panel is OUTSIDE the scroll area,
+    so "the paths forward are right-stickied as you scroll" falls out of the flex layout — no CSS sticky
+    needed. GALAXY-EXACT: every theme is grounded in a real constellation/deep-sky object, so it has a
+    true J2000 position — `scripts/gen-sky-coords.mjs` extracts `THEME_SKY` (theme name-slug → {ra,dec};
+    constellations = figure centroid, deep-sky = own coords, the 2 galaxy features = hand-pinned anchors)
+    into the GENERATED `src/render/sky-coords.ts` (DO NOT EDIT BY HAND — re-run the script). `app.ts`
+    maps each trail stop through `skyCoordForName(theme.name)`; the strip plots node Y by real
+    DECLINATION (a FIXED celestial window `dec +38..−80 → top..bottom`, so a world's height is stable
+    across the whole run and re-renders never shuffle earlier nodes) and the X-gap to the previous world
+    by real ANGULAR distance (`clamp(50 + greatCircleDeg·0.72, 64, 168)`) — so a hop to a far-flung
+    constellation visibly LEAPS further. Pure/seeded (no `Math.random`); the forward branches are NOT
+    positioned by coords (the destination theme isn't known until you jump — they stay the rarity-coded
+    decision fan). NO new `_gs*`/URL hook (the scroll snap is a plain post-render DOM nudge, sky-coords
+    is a render table) → the test-hub guard needs nothing. Guarded by `tests/journey-map.test.ts` (every
+    theme resolves to a valid coord, one node per stop / no truncation, far-hop > near-hop spacing,
+    determinism). Re-run `gen-sky-coords.mjs` + that test after adding a theme.
   - **Consecutive jumps never repeat the same lanes (GS-journey anti-repeat).** The early-arc common
     pool is small (slots = 2 commons + a wildcard), so an unconstrained draw kept showing the same 3
     lanes stop after stop. `routeOptions` now recomputes the PREVIOUS stop's offer (`offerEventIds`,
