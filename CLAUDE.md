@@ -911,7 +911,31 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   outside the auto hole-out radius, one rng draw `< chipIn` holes it (`log.chipIn = true`, ball moved to
   the cup). Gated on `chipIn` + proximity + wedge, so a base loadout never reaches the draw → byte-for-
   byte stable. Lives in `executeShot` so auto≡interactive. (NOT a flat 33% on every wedge — that would
-  break the birdie/eagle balance; it's a chip-in near the pin.)
+  break the birdie/eagle balance; it's a chip-in near the pin.) Dr Chipinski is **legendary** (a chip-in
+  near the pin is a big swing), so he's epic-scarce in the offer like the other game-changing caddies.
+- **Caddy effects play in SLO-MO with a voice line + speech bubble (GS-caddy-voices / GS-caddy-slomo,
+  `playView.ts` + `speech.ts` + `caddyArt.ts`).** When a caddy's signature effect fires — a guard
+  laser/boomerang redirect, or a Dr Chipinski chip-in — the play view drops its clock to `CADDY_SLOMO`×
+  real time for `CADDY_SLOMO_MS` of VIRTUAL time so the throw/drop is NOTICEABLE, and pops the caddy's
+  catchphrase as an on-screen `drawSpeechBubble` (Dr Chipinski also gets a ringing "answering a call"
+  `drawPhoneIcon`) while `app.ts`'s `onCaddyEffect` speaks it via the browser Web-Speech synth
+  (`speakCaddy`, ZERO downloaded audio — the house rule) in the caddy's accent: Dr Chipinski "You rang?"
+  (en-US), Convict Sheep "She'll be right, mate." (en-AU), Space Ducks "Tally ho, good shot!" (en-GB);
+  data lives in `CADDY_VOICE`. CRITICAL: the slo-mo is a VIRTUAL animation clock (`vnow += dt × scale`)
+  — it only stretches the wall-time of the EXISTING animation, never the sim, so determinism + every sim
+  test is untouched; the constants are plain module consts (like `ARC_FEEL`), NOT `_gsFeel` fields, so
+  no new hook to wire (the test-hub guard needs nothing). The play view now takes the FULL hired caddy id
+  (`opts.caddyId = caddyId()`, not just the guard) but still only draws a GUARD persistently in the corner
+  (`caddyProjectile` gate — the no-clutter rule); a non-guard caddy (Dr Chipinski) appears in the corner
+  TRANSIENTLY only during its callout, so the chip-in shows the doctor + phone + bubble then vanishes.
+  Voice is gated on the `sound` setting + fully guarded (silent where unsupported).
+- **The framed caddy badge shows on the WATCH screen too (GS-caddy-display), and the frame is FLASHY.**
+  The hired caddy's gold-framed badge was decision-screen-only; it now also floats bottom-RIGHT on the
+  live shot (watch) screen (`gs-hud-watchcaddy`, clear of the play-view's bottom-left corner caddy + the
+  top-left info chip) so the border reads the whole shot. The `.gs-caddybadge` frame got a real glow-up: a
+  pulsing gold glow (`@keyframes gs-caddyglow`), a slow rotating gold sheen behind the figure
+  (`::before` conic-gradient, `gs-caddyspin`), a warm radial backdrop + glowing name — gated by
+  `prefers-reduced-motion`. CSS-only; verified eyes-on.
 - **Render (`render/caddyArt.ts`, eyes-on feel).** The hired caddy is drawn as a self-contained Canvas2D
   figure (house "no asset" style), but WHERE it shows is scoped to where it has a role (GS-caddy-display):
   the decision screen always shows the hired caddy in its framed gold badge (`caddyBadgeHTML` →

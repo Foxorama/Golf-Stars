@@ -18,7 +18,17 @@ import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { archetypeFor } from '../sim/course/themes';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
-import { drawCaddy, drawCaddyProjectile, caddyProjectile, hasCaddyArt, CADDY_LABEL, type CaddyArtId } from './caddyArt';
+import {
+  drawCaddy,
+  drawCaddyProjectile,
+  caddyProjectile,
+  hasCaddyArt,
+  CADDY_LABEL,
+  CADDY_VOICE,
+  drawSpeechBubble,
+  drawPhoneIcon,
+  type CaddyArtId,
+} from './caddyArt';
 import {
   easeOutCubic,
   flightDurationMs,
@@ -163,6 +173,16 @@ function mulberry32(seed: number): () => number {
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
+// Caddy-effect SLO-MO + callout (GS-caddy-slomo): when a caddy's signature effect fires (a guard
+// laser/boomerang redirect, or a Dr Chipinski chip-in) the animation clock drops to CADDY_SLOMO×
+// real time for CADDY_SLOMO_MS of VIRTUAL time, so the throw/drop is noticeable — paired with an
+// on-screen speech bubble (+ a ringing phone for Dr Chipinski) for CADDY_CALLOUT_MS. Pure feel:
+// the slowed clock only stretches the wall-time of the existing animation, never the sim. These are
+// plain module constants (like ARC_FEEL in flight.ts), NOT _gsFeel fields, so no new hook to wire.
+const CADDY_SLOMO = 0.34; // virtual-time scale while a caddy effect plays (≈3× slower)
+const CADDY_SLOMO_MS = 720; // virtual ms the slo-mo window lasts
+const CADDY_CALLOUT_MS = 1500; // virtual ms the speech bubble / phone glyph stays up
+
 /**
  * A little cartoon golfer mid-swing, in the same silhouette language as the loading intro's
  * crew (stick legs, blocky torso, round head + cap) but posed side-on over the ball with a
@@ -304,9 +324,15 @@ export interface PlayViewOptions {
   follow?: boolean;
   /** The selected golfer's look (GS-18). Absent → the loader-crew cap cycle (result-screen replay). */
   golferLook?: GolferLook;
-  /** The hired named caddy id (GS-caddy) — draws that caddy in the corner and powers the laser/
-   *  boomerang redirect effect. Absent → no caddy figure. */
+  /** The hired named caddy id (GS-caddy) — the actual hired caddy. A GUARD caddy (Space Ducks /
+   *  Convict Sheep) is drawn persistently in the corner and powers the laser/boomerang redirect;
+   *  any other hired caddy only appears transiently for its signature effect (e.g. Dr Chipinski on a
+   *  chip-in). Absent → no caddy figure. */
   caddyId?: string;
+  /** Fired once when a caddy's signature effect triggers visually (a guard redirect or a Dr
+   *  Chipinski chip-in) — the cue for app.ts to speak the caddy's voice line + haptic. The arg is
+   *  the caddy id whose line to play. Pure feel hook; never affects the sim. */
+  onCaddyEffect?: (caddyId: string) => void;
   /** Left-handed mode (GS-lefty): draw the golfer swinging left-handed and mirror the caddy figure.
    *  Pure cosmetic mirror — the ball flight already comes out mirrored from the sim. */
   lefty?: boolean;
@@ -386,11 +412,23 @@ export function mountPlayView(
   let redirectFiredShot = -1;
   let redirectFx: { kind: 'laser' | 'boomerang'; t0: number; from: Vec; to: Vec } | null = null;
   let caddyAnchor: Vec = [0, 0]; // the corner caddy's muzzle (screen px), refreshed each frame
+  // Caddy-effect slo-mo + callout (GS-caddy-slomo). The virtual clock advances at CADDY_SLOMO× real
+  // time while `vnow < slowUntilV`; everything below times off the virtual `now`. The callout is the
+  // speech bubble (+ optional phone) shown for a hit caddy effect.
+  let vnow = 0; // virtual animation time (ms)
+  let lastReal = 0; // last real timestamp seen (ms)
+  let slowUntilV = 0; // virtual time to hold slo-mo until
+  let caddyCallout: { id: CaddyArtId; until: number } | null = null;
+  let chipInFiredShot = -1; // shot whose chip-in callout has fired
 
-  function reset(now: number): void {
+  function reset(_now: number): void {
     shotIndex = 0;
     puttIndex = 0;
-    segStart = now;
+    // Restart the virtual clock; the first frame re-seeds segStart/lastReal off it.
+    vnow = 0;
+    lastReal = 0;
+    slowUntilV = 0;
+    segStart = 0;
     trail = [];
     particles = [];
     shake = 0;
@@ -400,7 +438,9 @@ export function mountPlayView(
     redirectFiredShot = -1;
     impactFiredShot = -1;
     impactFiredPutt = -1;
+    chipInFiredShot = -1;
     redirectFx = null;
+    caddyCallout = null;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -568,8 +608,26 @@ export function mountPlayView(
     ctx.restore();
   }
 
-  function frame(now: number): void {
+  function frame(realNow: number): void {
+    // Virtual animation clock (GS-caddy-slomo): advance by the real frame delta, scaled down while a
+    // caddy effect is playing so the throw/drop is shown in slo-mo. Everything below times off `now`.
+    if (!lastReal) lastReal = realNow;
+    let dt = realNow - lastReal;
+    lastReal = realNow;
+    if (dt < 0) dt = 0;
+    if (dt > 80) dt = 80; // clamp tab-switch / GC stalls so the clock can't lurch
+    const scale = vnow < slowUntilV ? CADDY_SLOMO : 1;
+    vnow += dt * scale;
+    const now = vnow;
     if (!segStart) segStart = now;
+
+    // Helper: fire a caddy effect (slo-mo + speech bubble + voice/haptic via onCaddyEffect), once.
+    const fireCaddyEffect = (cid: string | undefined): void => {
+      if (!hasCaddyArt(cid)) return;
+      slowUntilV = Math.max(slowUntilV, now + CADDY_SLOMO_MS);
+      if (CADDY_VOICE[cid]) caddyCallout = { id: cid, until: now + CADDY_CALLOUT_MS };
+      opts.onCaddyEffect?.(cid);
+    };
 
     // Follow-cam: ease the camera toward the ball's last position and rebuild the projector,
     // so the view pans to keep up with the ball (one-frame lag is imperceptible).
@@ -590,20 +648,27 @@ export function mountPlayView(
     drawSpaceFX(now);
     drawWind(now);
 
-    // The hired caddy stands in the bottom-left corner the whole hole (GS-caddy). Its muzzle anchor
-    // is where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. The
-    // force-redirect DEMO (GS-caddy) shows a guard caddy here even when none is hired so the throw
-    // can be watched on demand.
-    const cornerCaddyId = opts.caddyId ?? forcedRedirectCaddy(F.forceRedirect);
-    if (hasCaddyArt(cornerCaddyId)) {
+    // A GUARD caddy stands in the bottom-left corner the whole hole (GS-caddy) — its muzzle anchor is
+    // where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. Only guards
+    // are shown persistently (the no-clutter rule); any other hired caddy appears transiently for its
+    // own effect (the chip-in callout below). The force-redirect DEMO shows a guard here even when
+    // none is hired so the throw can be watched on demand.
+    const cornerCaddyId =
+      (caddyProjectile(opts.caddyId) ? opts.caddyId : undefined) ?? forcedRedirectCaddy(F.forceRedirect);
+    // The caddy that should be VISIBLE in the corner this frame: the persistent guard, or — during a
+    // callout (e.g. Dr Chipinski's chip-in) — the calling caddy, so its bubble has a figure to point at.
+    const calloutActive = caddyCallout && now < caddyCallout.until ? caddyCallout : null;
+    const figureCaddyId =
+      cornerCaddyId ?? (calloutActive && hasCaddyArt(calloutActive.id) ? calloutActive.id : undefined);
+    if (hasCaddyArt(figureCaddyId)) {
       const ch = Math.max(40, Math.min(56, height * 0.085));
       const cx = ch * 0.7 + 6;
       const cy = height - 14;
-      caddyAnchor = drawCaddy(ctx, cornerCaddyId, cx, cy, ch, now, opts.lefty);
+      caddyAnchor = drawCaddy(ctx, figureCaddyId, cx, cy, ch, now, opts.lefty);
       ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.textAlign = 'center';
-      ctx.fillText(CADDY_LABEL[cornerCaddyId as CaddyArtId], cx, cy + 9);
+      ctx.fillText(CADDY_LABEL[figureCaddyId as CaddyArtId], cx, cy + 9);
       ctx.textAlign = 'left';
     }
 
@@ -698,6 +763,8 @@ export function mountPlayView(
                 to: [ipx, ipy - sI.height * proj.scale * F.heightExaggeration],
               };
               shake = Math.max(shake, 0.4);
+              // Slow the world + sound the caddy's catchphrase as the guard makes the save.
+              fireCaddyEffect(forcedRedirectCaddy(rd.kind));
             }
             height = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak).height;
             if (tg < interceptFrac) {
@@ -726,6 +793,12 @@ export function mountPlayView(
           if (lastRollClearShot !== shotIndex) {
             lastRollClearShot = shotIndex;
             trail = [];
+          }
+          // Dr Chipinski chip-in (GS-caddy-voices): as the ball drops in, slow the world and have the
+          // doctor "answer the call" — the phone glyph + "You rang?" bubble + voice. Fires once.
+          if (shot.chipIn && chipInFiredShot !== shotIndex) {
+            chipInFiredShot = shotIndex;
+            fireCaddyEffect(opts.caddyId);
           }
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
           if ((shot.roll ?? 0) < -0.3) {
@@ -880,6 +953,22 @@ export function mountPlayView(
       ctx.beginPath();
       ctx.arc(p.pos[0], p.pos[1], 2.5 * p.life + 0.5, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // Caddy callout (GS-caddy-voices): the signature speech bubble (+ a ringing phone for Dr
+    // Chipinski) over the corner caddy, fading out near the end of its window. Drawn last so it sits
+    // on top; anchored to the caddy figure's muzzle/hand.
+    if (caddyCallout && now < caddyCallout.until) {
+      const v = CADDY_VOICE[caddyCallout.id];
+      if (v) {
+        const remain = caddyCallout.until - now;
+        const age = CADDY_CALLOUT_MS - remain;
+        const fade = Math.min(1, age / 140) * Math.min(1, remain / 260); // pop in, ease out
+        drawSpeechBubble(ctx, v.bubble, caddyAnchor[0], caddyAnchor[1], fade);
+        if (v.phone) drawPhoneIcon(ctx, caddyAnchor[0] + 4, caddyAnchor[1] - 6, 22, now);
+      }
+    } else if (caddyCallout) {
+      caddyCallout = null;
     }
 
     ctx.restore();

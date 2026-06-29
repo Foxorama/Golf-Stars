@@ -13,7 +13,8 @@ import { renderHoleSVG } from './render/holeView';
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
-import { drawCaddy, hasCaddyArt, caddyProjectile, CADDY_LABEL } from './render/caddyArt';
+import { drawCaddy, hasCaddyArt, CADDY_LABEL, CADDY_VOICE } from './render/caddyArt';
+import { speakCaddy } from './render/speech';
 import { journeyMapHTML, type StarmapChoice } from './render/starmap';
 import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
@@ -167,6 +168,7 @@ const HAPTICS = {
   holeOut: [12, 28, 12, 28, 20] as number[],
   madeCut: [10, 40, 10, 40, 18] as number[],
   ace: [18, 40, 18, 40, 18, 40, 30] as number[], // the biggest beat — a long celebratory roll
+  caddy: [14, 30, 14] as number[], // a caddy's signature effect lands (guard save / chip-in)
 };
 function haptic(pattern: number | number[]): void {
   if (!getSettings().haptics) return;
@@ -1414,12 +1416,15 @@ function playingBody(animating: boolean): string {
   const par = play.hole.par;
 
   if (animating) {
-    // Full-bleed: the live shot canvas IS the screen (it draws the hired caddy itself), with just
-    // the floating info chip on top.
+    // Full-bleed: the live shot canvas IS the screen (it draws a guard caddy + effect callouts
+    // itself), with the floating info chip on top and the hired caddy's framed badge bottom-right
+    // (GS-caddy-display) so the border shows the whole shot — not just on the decision screen.
+    const watchBadge = caddyBadgeHTML(caddyId());
     return `
       <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap" id="play"></div>
         ${mapTopInfo(v, { shotNo: play.strokes, distLabel: '…watching…' })}
+        ${watchBadge ? `<div class="gs-hud gs-hud-watchcaddy">${watchBadge}</div>` : ''}
       </div>`;
   }
 
@@ -2069,13 +2074,13 @@ function caddyId(): string | undefined {
   return namedCaddyOwned(state.run.loadout.perks);
 }
 
-/** The caddy to draw in the LIVE play view's corner (the ball-in-flight screen). Only a guard caddy
- *  has a flight-time role there — it fires the redirect laser/boomerang — so it's the only one shown;
- *  any other hired caddy is already on the decision screen's framed badge, and looming it over the
- *  flight just clutters the screen (the dead-space complaint). */
-function flightCaddyId(): string | undefined {
-  const id = caddyId();
-  return caddyProjectile(id) ? id : undefined;
+/** Play a caddy's signature voice line + haptic when its effect fires in the play view (GS-caddy-
+ *  voices) — wired to the play view's `onCaddyEffect`. Gated/guarded inside `speakCaddy`. */
+function playCaddyVoice(id: string): void {
+  const v = CADDY_VOICE[id as keyof typeof CADDY_VOICE];
+  if (!v) return;
+  speakCaddy(v.speech, v.lang, { rate: v.rate, pitch: v.pitch });
+  haptic(HAPTICS.caddy);
 }
 
 /** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A
@@ -2358,9 +2363,10 @@ function render(): void {
         height: 520,
         biome: holeBiome(hole), themeId: holeThemeId(hole),
         golferLook: golferLook(),
-        caddyId: flightCaddyId(),
+        caddyId: caddyId(),
         lefty: lefty(),
         onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
+        onCaddyEffect: playCaddyVoice,
       });
     }
   }
@@ -2394,8 +2400,9 @@ function render(): void {
         height: animH,
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
         golferLook: golferLook(),
-        caddyId: flightCaddyId(),
+        caddyId: caddyId(),
         lefty: lefty(),
+        onCaddyEffect: playCaddyVoice,
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,
