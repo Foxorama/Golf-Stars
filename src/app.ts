@@ -1387,6 +1387,21 @@ function zoneScoreChip(): string {
  *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
  *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
  *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through. */
+/** A short, fun label for a notable hole archetype (GS-shapes-2); '' for a plain straight/dogleg. */
+function shapeLabel(shapeId?: string): string {
+  if (!shapeId) return '';
+  if (shapeId === 'drivable-par-4') return '🏌 Drivable';
+  if (shapeId.includes('hairpin')) return '↩ Hairpin';
+  if (shapeId.includes('cape')) return '🌊 Cape';
+  if (shapeId.includes('double')) return '〰 Double dogleg';
+  if (shapeId.startsWith('short-3')) return 'Short';
+  if (shapeId.startsWith('long-3')) return 'Long';
+  if (shapeId.startsWith('long-')) return 'Long';
+  if (shapeId.startsWith('three-shot')) return '3-shot';
+  if (shapeId.startsWith('reachable')) return 'Reachable';
+  return '';
+}
+
 function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
@@ -1402,6 +1417,7 @@ function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
       <div class="gs-stats">
         <span>⛳ <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
         <span>Par <b>${play.hole.par}</b>·${len}y</span>
+        ${shapeLabel(play.hole.shapeId) ? `<span style="color:var(--gs-info);">${shapeLabel(play.hole.shapeId)}</span>` : ''}
         <span>${opts.distLabel}</span>
         ${zoneScoreChip()}
         ${liveLeaderChip()}
