@@ -1907,7 +1907,6 @@ function shopScreen(): string {
     <h2 style="font-size:16px;">🏌 Pro Shop · ${credits} credits</h2>
     ${proGreetingHTML()}
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — early stops stock cheap commons, deeper stops stock rare/epic power. Stackable upgrades cost more the more you own; rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up. Hire one caddy and the rest stay home.</p>
-    ${bagInventoryHTML()}
     <div style="display:flex;flex-wrap:wrap;">${stock}</div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       ${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}
@@ -1916,7 +1915,8 @@ function shopScreen(): string {
           ? btn(`🎲 Reroll stock (${rerollCost(state.shopRerolls ?? 0)} cr)`, { type: 'rerollShop' }, { variant: 'ghost' })
           : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ${rerollCost(state.shopRerolls ?? 0)} cr</span>`
       }
-    </div>`;
+    </div>
+    ${bagInventoryHTML()}`;
 }
 
 function outpostScreen(): string {
