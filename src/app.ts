@@ -500,9 +500,12 @@ function competitorsCard(field: Field): string {
       const me = g.isPlayer;
       const border = me ? 'var(--gs-accent)' : champ ? '#ffce54' : 'var(--gs-line-2)';
       const tag = golferTag(g.id);
+      // Show the golfer's FIRST name, not g.shortName — for champions shortName is the star
+      // name (e.g. "Acrux"/"Vega"), which reads as the constellation, not the person.
+      const display = me ? 'You' : (g.name.split(' ')[0] || g.shortName);
       return `<div style="flex:0 0 auto;width:78px;text-align:center;padding:6px 4px;border:1px solid ${border};border-radius:9px;background:${me ? '#1a2a22' : '#ffffff06'};">
         <div style="line-height:0;">${golferSVG(g.look, 38, 46)}</div>
-        <div style="font-size:11px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${me ? 'You' : g.shortName}</div>
+        <div style="font-size:11px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${display}</div>
         <div style="font-size:9px;opacity:.62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${champ ? '★ ' : ''}${tag}</div>
       </div>`;
     })
