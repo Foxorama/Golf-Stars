@@ -143,6 +143,82 @@ export const ZONES: Record<BiomeArchetype, ZoneProfile> = {
     ],
     difficulty: 5,
   },
+  crystal: {
+    archetype: 'crystal',
+    name: 'Prism Reach',
+    signature: 'Fields of true crystal',
+    inspiration: 'Jewelled worlds and prismatic clusters — the Northern Crown, the crystal wedge of Triangulum.',
+    brief:
+      'A glittering world paved in fast, true crystal. A clean strike runs dead straight off the glass, so precision is richly rewarded — but the angular spires lining the fairways punish a loose line.',
+    hazards: [
+      { icon: '💠', text: 'Crystal spires line the rough' },
+      { icon: '🕳', text: 'Deep pot bunkers guard the greens' },
+      { icon: '📐', text: 'Sharp, faceted greens — tricky targets' },
+    ],
+    benefits: [
+      { icon: '💎', text: 'Fast, TRUE crystal lies everywhere — reward precision' },
+      { icon: '🍃', text: 'Gentle, calm air' },
+      { icon: '🎯', text: 'A clean strike runs straight and true' },
+    ],
+    difficulty: 3,
+  },
+  tempest: {
+    archetype: 'tempest',
+    name: 'Tempest Reach',
+    signature: 'Gas-giant storms',
+    inspiration: 'The screaming storms of the gas giants — the storm-dragon Draco, the stormwind Arrow of Sagitta.',
+    brief:
+      'A gas-giant world of perpetual, howling crosswinds — the wildest air in the galaxy. Read the gale right and the updraught will carry you far; read it wrong and the storm hurls your ball into the next county.',
+    hazards: [
+      { icon: '🌪️', text: 'The fiercest crosswinds anywhere — never calm' },
+      { icon: '🌀', text: 'Gusts jostle the carry' },
+      { icon: '🟡', text: 'Storm-scoured bunkers' },
+    ],
+    benefits: [
+      { icon: '🪶', text: 'Updraught carries the ball a touch farther' },
+      { icon: '↔️', text: 'Generous fairways to keep the gale fair' },
+      { icon: '🎯', text: 'Master the wind and the world opens up' },
+    ],
+    difficulty: 4,
+  },
+  fungal: {
+    archetype: 'fungal',
+    name: 'Spore Jungle',
+    signature: 'Bioluminescent jungle',
+    inspiration: 'Glowing fungal worlds — the creeping Lizard of Lacerta, the prowling Fox of Vulpecula.',
+    brief:
+      'A dense, luminous spore-jungle. Towering glowing mushroom stands wall the tightest corridors on the voyage and jungle streams cut across the fairways — a sprayed ball is swallowed by the undergrowth and has to be hacked out.',
+    hazards: [
+      { icon: '🍄', text: 'The densest groves — tight, walled corridors' },
+      { icon: '🌿', text: 'Thick glowing undergrowth (fescue)' },
+      { icon: '💧', text: 'Jungle streams cross the fairway — a forced carry' },
+    ],
+    benefits: [
+      { icon: '🌍', text: 'Earth-normal gravity — clubs play true' },
+      { icon: '🍃', text: 'Sheltered under the canopy — little wind' },
+      { icon: '🎯', text: 'Find the corridor and it scores' },
+    ],
+    difficulty: 3,
+  },
+  ocean: {
+    archetype: 'ocean',
+    name: 'Tidal Archipelago',
+    signature: 'Island-hopping golf',
+    inspiration: 'Ocean worlds and tidal seas — the breaching Dolphin of Delphinus, the great River Eridanus.',
+    brief:
+      'A scattered archipelago of fairway islands over a shimmering tidal sea. Sea channels cut across the holes as forced carries and lagoons flank every corridor — stray offline and the ball is wet. Beaches of bunker sand ring the isles.',
+    hazards: [
+      { icon: '🌊', text: 'Sea channels cross the fairway — a forced carry' },
+      { icon: '💧', text: 'Lagoons flank every corridor (penalty)' },
+      { icon: '🏖️', text: 'Beach bunkers everywhere' },
+    ],
+    benefits: [
+      { icon: '↔️', text: 'Safe shelves between the water' },
+      { icon: '🌬️', text: 'A steady sea-breeze to read' },
+      { icon: '🎯', text: 'Pick the island line and commit' },
+    ],
+    difficulty: 4,
+  },
 };
 
 export function zoneProfile(archetype: BiomeArchetype): ZoneProfile {
@@ -405,6 +481,134 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
         'Birdies in the emptiness? You bend space itself.',
         'A constellation of birdies. Fitting, out here.',
       ],
+    },
+  },
+  crystal: {
+    name: 'Facet Vey',
+    title: 'Prism Reach crystal-pro',
+    quips: {
+      scraped: [
+        'Scraped through on the glass — the crystal nearly cut you to pieces.',
+        'A pass, by a hair. The spires are still polishing themselves smug.',
+        'Survived the prism. Barely. Buy something shiny to match the décor.',
+      ],
+      solid: [
+        'Struck it true off the crystal. Solid, clean golf.',
+        'Nice and precise — the way this world likes it.',
+        'Tidy work on the glass. Respectable.',
+      ],
+      great: [
+        'Pure striking out there! The crystal sang every time.',
+        'Great precision — you played the facets like a jeweller.',
+        'Lovely. The spires barely got a look at your ball.',
+      ],
+      stellar: [
+        'Flawless on the glass. The whole world is reflecting your brilliance.',
+        'Stellar — diamond-sharp golf. Pick a prize, it’s all sparkling.',
+        'Untouchable precision. The crystal is genuinely jealous.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one on the prism world?! The facets are dazzled.', 'An ACE! Cut clean as a diamond.'],
+      eagle: ['An eagle off the crystal — pure, sharp brilliance.', 'Two under on the glass. Jewel-perfect.'],
+      blowup: ['One hole shattered on you back there. The spires bite. Reset.', 'A blow-up on the glass — happens. Polish it off.'],
+      birdieBlitz: ['Birdies sparkling all over the crystal — dazzling run.', 'A flurry of birdies, bright as the facets. Lovely.'],
+    },
+  },
+  tempest: {
+    name: 'Gale Maddox',
+    title: 'Tempest Reach storm-pro',
+    quips: {
+      scraped: [
+        'The gale nearly blew you off the planet. Scraped through, though.',
+        'Squeaked past in that wind? You’re either brave or lucky. Maybe both.',
+        'A pass — the storm’s still laughing. Gear up before it really blows.',
+      ],
+      solid: [
+        'Held your line in that wind. Solid storm golf.',
+        'Read the gale well enough. Respectable in this chaos.',
+        'Steady hands in a hurricane. Not bad at all.',
+      ],
+      great: [
+        'You flew the storm like you owned it! Great section.',
+        'Carved the gale beautifully — the wind couldn’t touch you.',
+        'Now THAT’S how you golf in a hurricane.',
+      ],
+      stellar: [
+        'Untouchable in the teeth of the gale. Magnificent.',
+        'Stellar — you made a screaming storm look like a calm morning.',
+        'Flawless in that wind. The tempest bows to you.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one in THIS gale?! Impossible. Glorious.', 'An ACE through the storm. I don’t believe my eyes.'],
+      eagle: ['An eagle into a hurricane — fearless stuff.', 'Two under in this wind? Astonishing.'],
+      blowup: ['The storm ate one hole whole. It does that. Lean into the wind.', 'One gust too many on that hole. Shake it off.'],
+      birdieBlitz: ['Birdies in a gale? You’re bending the wind itself.', 'A run of birdies through the storm — incredible.'],
+    },
+  },
+  fungal: {
+    name: 'Spore Greene',
+    title: 'Spore Jungle green-pro',
+    quips: {
+      scraped: [
+        'The jungle nearly kept your ball as compost. Close one.',
+        'Hacked through by a whisker. The undergrowth is still hungry.',
+        'A pass — barely. The mushrooms are taking notes.',
+      ],
+      solid: [
+        'Found the corridor often enough. Solid jungle golf.',
+        'Kept it out of the glowing stuff, mostly. Respectable.',
+        'Steady threading through the groves. Not bad.',
+      ],
+      great: [
+        'Threaded the jungle beautifully! The spores never touched you.',
+        'Great golf in the green dark — the groves are impressed.',
+        'You found gaps that weren’t even there. Lovely.',
+      ],
+      stellar: [
+        'Untouchable in the jungle. The whole canopy is glowing for you.',
+        'Stellar — you danced through the densest world on the voyage.',
+        'Flawless among the spores. Magnificent.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one through the jungle?! The mushrooms are speechless.', 'An ACE in the green dark. Luminous.'],
+      eagle: ['An eagle through the groves — brilliant threading.', 'Two under in the jungle. Show-off. I love it.'],
+      blowup: ['The undergrowth swallowed one hole back there. It happens. Onward.', 'One blow-up in the green — don’t let it take root.'],
+      birdieBlitz: ['Birdies blooming everywhere — the jungle approves.', 'A flurry of birdies in the spores. Glowing stuff.'],
+    },
+  },
+  ocean: {
+    name: 'Marina Quay',
+    title: 'Tidal Archipelago island-pro',
+    quips: {
+      scraped: [
+        'The sea nearly swallowed you whole. Scraped onto the last island.',
+        'Squeaked across the channels by a hair. The lagoons are still thirsty.',
+        'A pass — barely dry. Buy something before the tide turns.',
+      ],
+      solid: [
+        'Found the islands often enough. Solid sea golf.',
+        'Kept it dry, mostly. Respectable in this tide.',
+        'Steady hopping island to island. Not bad at all.',
+      ],
+      great: [
+        'Island-hopped like a dolphin! Great section.',
+        'Carried the channels clean — the sea went hungry.',
+        'You picked every line and committed. Beautiful.',
+      ],
+      stellar: [
+        'Bone-dry brilliance across the whole archipelago. Magnificent.',
+        'Stellar — you made the sea look like a pond.',
+        'Flawless over the water. The tide bows to you.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one over the SEA?! The dolphins are applauding.', 'An ACE across the channel. Bone-dry and brilliant.'],
+      eagle: ['An eagle over the water — fearless carries.', 'Two under across the islands. Sublime.'],
+      blowup: ['The sea ate one whole back there. It’s hungry out here. Dry off and go.', 'One splash too many on that hole. Let the tide take it.'],
+      birdieBlitz: ['Birdies all over the archipelago — riding the tide.', 'A run of birdies across the sea. Lovely to watch.'],
     },
   },
 };

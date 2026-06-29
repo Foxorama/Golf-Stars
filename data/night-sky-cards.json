@@ -2533,6 +2533,525 @@
           1
         ]
       ]
+    },
+    {
+      "name": "Triangulum",
+      "abbreviation": "Tri",
+      "icon": "△",
+      "rarity": "common",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Mothallah",
+      "meaning": "The Triangle — a small, sharp three-star wedge.",
+      "culture": "A crystalline shard of the northern sky.",
+      "howToFind": "Below Andromeda.",
+      "stars": [
+        {
+          "raDeg": 28.27,
+          "decDeg": 29.58,
+          "mag": 3.4
+        },
+        {
+          "raDeg": 32.39,
+          "decDeg": 34.99,
+          "mag": 3
+        },
+        {
+          "raDeg": 33.85,
+          "decDeg": 33.85,
+          "mag": 4
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "Corona Borealis",
+      "abbreviation": "CrB",
+      "icon": "◗",
+      "rarity": "rare",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Alphecca",
+      "meaning": "The Northern Crown — a jewelled arc of seven stars.",
+      "culture": "A diadem set with gems.",
+      "howToFind": "Between Boötes and Hercules.",
+      "stars": [
+        {
+          "raDeg": 231.95,
+          "decDeg": 31.36,
+          "mag": 4.1
+        },
+        {
+          "raDeg": 231.96,
+          "decDeg": 29.1,
+          "mag": 3.7
+        },
+        {
+          "raDeg": 233.67,
+          "decDeg": 26.71,
+          "mag": 2.2
+        },
+        {
+          "raDeg": 235.07,
+          "decDeg": 26.3,
+          "mag": 3.8
+        },
+        {
+          "raDeg": 237.4,
+          "decDeg": 26.07,
+          "mag": 4.6
+        },
+        {
+          "raDeg": 239.4,
+          "decDeg": 26.88,
+          "mag": 4.1
+        },
+        {
+          "raDeg": 236.06,
+          "decDeg": 29.85,
+          "mag": 5
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ]
+      ]
+    },
+    {
+      "name": "Sagitta",
+      "abbreviation": "Sge",
+      "icon": "➶",
+      "rarity": "common",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Sham",
+      "meaning": "The Arrow — a tiny dart loosed across the Milky Way.",
+      "culture": "A bolt hurled by storm-gods.",
+      "howToFind": "North of Aquila.",
+      "stars": [
+        {
+          "raDeg": 299.69,
+          "decDeg": 19.49,
+          "mag": 3.5
+        },
+        {
+          "raDeg": 296.85,
+          "decDeg": 18.53,
+          "mag": 3.8
+        },
+        {
+          "raDeg": 295.02,
+          "decDeg": 18.01,
+          "mag": 4.4
+        },
+        {
+          "raDeg": 294.98,
+          "decDeg": 17.48,
+          "mag": 4.4
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "Draco",
+      "abbreviation": "Dra",
+      "icon": "🐉",
+      "rarity": "common",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Eltanin",
+      "meaning": "The Dragon — a long serpent coiled round the pole.",
+      "culture": "A storm-dragon winding through the northern sky.",
+      "howToFind": "Between the Dippers.",
+      "stars": [
+        {
+          "raDeg": 269.15,
+          "decDeg": 51.49,
+          "mag": 2.2
+        },
+        {
+          "raDeg": 262.6,
+          "decDeg": 52.3,
+          "mag": 2.8
+        },
+        {
+          "raDeg": 268.38,
+          "decDeg": 56.87,
+          "mag": 3.7
+        },
+        {
+          "raDeg": 257.2,
+          "decDeg": 65.71,
+          "mag": 3.2
+        },
+        {
+          "raDeg": 231.23,
+          "decDeg": 58.97,
+          "mag": 3.3
+        },
+        {
+          "raDeg": 211.1,
+          "decDeg": 64.38,
+          "mag": 3.7
+        },
+        {
+          "raDeg": 288.14,
+          "decDeg": 67.66,
+          "mag": 3.1
+        },
+        {
+          "raDeg": 297.04,
+          "decDeg": 70.27,
+          "mag": 3.8
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          6,
+          7
+        ]
+      ]
+    },
+    {
+      "name": "Lacerta",
+      "abbreviation": "Lac",
+      "icon": "🦎",
+      "rarity": "rare",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Alpha Lac",
+      "meaning": "The Lizard — a zigzag dart of faint stars.",
+      "culture": "A little creeping thing of the spore-jungle sky.",
+      "howToFind": "Between Cygnus and Andromeda.",
+      "stars": [
+        {
+          "raDeg": 337.82,
+          "decDeg": 50.28,
+          "mag": 3.8
+        },
+        {
+          "raDeg": 335.1,
+          "decDeg": 52.23,
+          "mag": 4.4
+        },
+        {
+          "raDeg": 335.4,
+          "decDeg": 47.7,
+          "mag": 4.3
+        },
+        {
+          "raDeg": 334,
+          "decDeg": 46.5,
+          "mag": 4.5
+        },
+        {
+          "raDeg": 333.5,
+          "decDeg": 49.5,
+          "mag": 4.5
+        }
+      ],
+      "lines": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          4,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "Vulpecula",
+      "abbreviation": "Vul",
+      "icon": "🦊",
+      "rarity": "rare",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Anser",
+      "meaning": "The Fox — a faint prowler along the Milky Way.",
+      "culture": "A glowing fox slinking the spore-jungle stars.",
+      "howToFind": "South of Cygnus.",
+      "stars": [
+        {
+          "raDeg": 292.18,
+          "decDeg": 24.66,
+          "mag": 4.4
+        },
+        {
+          "raDeg": 298,
+          "decDeg": 27.8,
+          "mag": 4.6
+        },
+        {
+          "raDeg": 303.1,
+          "decDeg": 24.07,
+          "mag": 4.6
+        },
+        {
+          "raDeg": 305.3,
+          "decDeg": 27.6,
+          "mag": 4.5
+        },
+        {
+          "raDeg": 289.2,
+          "decDeg": 21.4,
+          "mag": 4.8
+        },
+        {
+          "raDeg": 296.5,
+          "decDeg": 25.9,
+          "mag": 5
+        }
+      ],
+      "lines": [
+        [
+          4,
+          0
+        ],
+        [
+          0,
+          5
+        ],
+        [
+          5,
+          1
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          5,
+          2
+        ]
+      ]
+    },
+    {
+      "name": "Delphinus",
+      "abbreviation": "Del",
+      "icon": "🐬",
+      "rarity": "common",
+      "minAltitudeDeg": 10,
+      "anchorStar": "Rotanev",
+      "meaning": "The Dolphin — Job's Coffin diamond leaping the sea of stars.",
+      "culture": "A dolphin breaching the tidal sky.",
+      "howToFind": "East of Altair.",
+      "stars": [
+        {
+          "raDeg": 309.39,
+          "decDeg": 15.91,
+          "mag": 3.8
+        },
+        {
+          "raDeg": 309.99,
+          "decDeg": 16.12,
+          "mag": 4.3
+        },
+        {
+          "raDeg": 309.05,
+          "decDeg": 15.07,
+          "mag": 4.4
+        },
+        {
+          "raDeg": 309.3,
+          "decDeg": 14.6,
+          "mag": 3.6
+        },
+        {
+          "raDeg": 308.3,
+          "decDeg": 11.3,
+          "mag": 4
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          0
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "Eridanus",
+      "abbreviation": "Eri",
+      "icon": "🌊",
+      "rarity": "common",
+      "minAltitudeDeg": 6,
+      "anchorStar": "Achernar",
+      "meaning": "The River — a great winding stream from Orion to the deep south.",
+      "culture": "A celestial river pouring toward the southern pole.",
+      "howToFind": "From Orion's foot, south.",
+      "stars": [
+        {
+          "raDeg": 76.96,
+          "decDeg": -5.09,
+          "mag": 2.8
+        },
+        {
+          "raDeg": 74,
+          "decDeg": -8,
+          "mag": 4
+        },
+        {
+          "raDeg": 68.89,
+          "decDeg": -3.35,
+          "mag": 4
+        },
+        {
+          "raDeg": 59.51,
+          "decDeg": -13.51,
+          "mag": 2.9
+        },
+        {
+          "raDeg": 55.81,
+          "decDeg": -9.76,
+          "mag": 3.5
+        },
+        {
+          "raDeg": 53.23,
+          "decDeg": -9.46,
+          "mag": 3.7
+        },
+        {
+          "raDeg": 44.57,
+          "decDeg": -40.3,
+          "mag": 2.9
+        },
+        {
+          "raDeg": 35,
+          "decDeg": -47,
+          "mag": 4
+        },
+        {
+          "raDeg": 24.43,
+          "decDeg": -57.24,
+          "mag": 0.5
+        }
+      ],
+      "lines": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          7,
+          8
+        ]
+      ]
     }
   ],
   "brightStars": [

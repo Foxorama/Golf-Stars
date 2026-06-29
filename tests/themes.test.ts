@@ -24,7 +24,7 @@ import { playTotals } from '../src/sim/score';
 import { playCourse } from '../src/sim/round';
 import { currentCourse, currentTheme, startRun } from '../src/sim/rpg/run';
 
-const ARCHETYPES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void'];
+const ARCHETYPES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void', 'crystal', 'tempest', 'fungal', 'ocean'];
 
 describe('theme table integrity', () => {
   it('every theme has a unique, stable id', () => {
@@ -46,7 +46,7 @@ describe('theme table integrity', () => {
     for (const a of ARCHETYPES) expect(biomeIds.has(archetypeBiome(a))).toBe(true);
   });
 
-  it('all five archetypes are actually used by the table', () => {
+  it('all archetypes are actually used by the table', () => {
     const used = new Set(THEMES.map((t) => t.archetype));
     for (const a of ARCHETYPES) expect(used.has(a)).toBe(true);
   });
@@ -67,11 +67,11 @@ describe('arc gating', () => {
     expect(arcForStars(STAR_ARC_BREAKS.arc3Min)).toBe(3);
   });
 
-  it('the 28 constellations split a balanced 9 / 10 / 9 across the arcs', () => {
+  it('the 36 constellations split across the arcs (GS-worlds added the new exotic worlds)', () => {
     const consts = THEMES.filter((t) => t.kind === 'constellation');
-    expect(consts.length).toBe(28);
+    expect(consts.length).toBe(36);
     const counts = [1, 2, 3].map((a) => consts.filter((t) => t.arc === a).length);
-    expect(counts).toEqual([9, 10, 9]);
+    expect(counts).toEqual([13, 12, 11]);
   });
 
   it('deep-sky/galaxy showpieces are gated to the later arcs (rare→2, epic→3)', () => {

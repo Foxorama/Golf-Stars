@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
-import { validateCourse, polylineDist, dist, type Hole } from '../src/sim/course/contract';
+import { validateCourse, polylineDist, type Hole } from '../src/sim/course/contract';
 import { lieInfo } from '../src/sim/shot';
 
 function countKind(holes: Hole[], kind: string): number {

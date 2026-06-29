@@ -1088,6 +1088,27 @@ export const TALENTS: readonly ShopItem[] = [
     desc: 'Parkland precision — 10% tighter and less coming up short.',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.9, minCarryBoost: m.minCarryBoost + 0.04, perks: [...m.perks, 'talent-fairwaymaster'] }),
   },
+  // GS-worlds — themed talents for the four new worlds.
+  {
+    id: 'talent-prism', name: 'Prism Strike', archetype: 'crystal', cost: 0, rarity: 'epic', talent: true,
+    desc: 'True off the crystal — 12% tighter dispersion.',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.88, perks: [...m.perks, 'talent-prism'] }),
+  },
+  {
+    id: 'talent-stormrider', name: 'Storm Rider', archetype: 'tempest', cost: 0, rarity: 'epic', talent: true,
+    desc: 'Born in the gale — steadier in wind (8% tighter) and +8 yds on distance clubs.',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.92, bag: boostDistanceClubs(m.bag, 8), distanceClubBonus: (m.distanceClubBonus ?? 0) + 8, perks: [...m.perks, 'talent-stormrider'] }),
+  },
+  {
+    id: 'talent-mycelial', name: 'Mycelial Touch', archetype: 'fungal', cost: 0, rarity: 'epic', talent: true,
+    desc: 'At home in the jungle — recover far better from the deep stuff.',
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, SANDY_LIE_RELIEF), perks: [...m.perks, 'talent-mycelial'] }),
+  },
+  {
+    id: 'talent-tidecaller', name: 'Tide Caller', archetype: 'ocean', cost: 0, rarity: 'epic', talent: true,
+    desc: 'Carry the sea with confidence — trims the wild miss zones so more shots find dry land.',
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.025, sliceR: -0.025, duckHookL: -0.02, shankR: -0.02 }), perks: [...m.perks, 'talent-tidecaller'] }),
+  },
   // Ace reward (GS-ace) — granted ONLY by a hole-in-one, never offered at a boss. The `'ace'`
   // archetype is matched by no zone (inferno/frost/desert/void/verdant) and isn't `!archetype`
   // either, so `talentsForArchetype` excludes it from both the themed and generic boss draws.

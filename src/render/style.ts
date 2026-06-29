@@ -699,6 +699,10 @@ const WIND_COL: Record<BiomeArchetype, string> = {
   desert: 'rgba(226,196,140,', // blown dust
   verdant: 'rgba(208,236,206,', // pollen / leaf drift
   void: 'rgba(200,170,255,', // cosmic dust
+  crystal: 'rgba(190,238,248,', // glittering crystal dust
+  tempest: 'rgba(200,180,255,', // driving storm rain
+  fungal: 'rgba(150,240,190,', // drifting glowing spores
+  ocean: 'rgba(190,235,230,', // sea spray
 };
 
 /** Unit SCREEN direction the wind blows, from a hole's `Wind.dir` (course bearing) through the

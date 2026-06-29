@@ -225,6 +225,92 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.7,
     greenIrregular: 1.25,
   },
+  // --- GS-worlds: four new exotic worlds, each a distinct PLAYSTYLE -----------
+  {
+    id: 'crystal-spires',
+    name: 'Prism Reach',
+    weight: 10,
+    carryMult: 1.0,
+    carryJitter: 0,
+    windBase: 3,
+    windWild: 12,
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    // Signature: the fairways are STREWN with true, fast crystal — a precision world where a clean
+    // strike off the glass runs true, but the angular spires force a careful line.
+    scatter: [{ kind: 'crystal', freqPerHole: 2.6, rMin: 6, rMax: 13 }],
+    fairwayWidthMult: 1.0,
+    doglegBias: 0.4,
+    treeDensity: 0.3, // a few crystalline spires line the rough
+    fairwayBunkers: 1.0,
+    potBunkers: 0.5,
+    greenSize: 0.95, // sharp, faceted greens
+    greenAspect: 1.9,
+    greenIrregular: 1.4,
+  },
+  {
+    id: 'tempest-reach',
+    name: 'Tempest Reach',
+    weight: 11,
+    carryMult: 1.05, // a gas-giant updraught carries the ball a touch farther
+    carryJitter: 0.05, // gusts jostle the carry
+    windBase: 8,
+    windWild: 26, // the windiest world short of a frost gale — wind dominates here
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 1.05, // a touch wider to keep the gale fair
+    doglegBias: 0.3,
+    treeDensity: 0.4, // wind-bent scrub
+    fairwayBunkers: 1.4,
+    potBunkers: 0.4,
+    greenSize: 1.05,
+    greenAspect: 2.2, // long, storm-scoured shelves
+    greenIrregular: 1.1,
+  },
+  {
+    id: 'spore-jungle',
+    name: 'Spore Jungle',
+    weight: 11,
+    carryMult: 1.0,
+    carryJitter: 0,
+    windBase: 2,
+    windWild: 8, // sheltered under the canopy
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 0.95, // tight jungle corridors
+    doglegBias: 0.45,
+    treeDensity: 2.9, // signature: the DENSEST groves — luminous mushroom stands wall the fairways
+    fairwayBunkers: 0.9,
+    fescue: 1.2, // glowing undergrowth chokes the deep rough
+    waterCreek: true, // jungle streams cross the fairway
+    greenSize: 1.0,
+    greenAspect: 1.8,
+    greenIrregular: 1.2,
+  },
+  {
+    id: 'tidal-archipelago',
+    name: 'Tidal Archipelago',
+    weight: 12,
+    carryMult: 1.0,
+    carryJitter: 0,
+    windBase: 7,
+    windWild: 22, // coastal sea-breeze
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 1.0,
+    doglegBias: 0.35,
+    treeDensity: 0.6, // the odd palm
+    fairwayBunkers: 2.0, // beaches everywhere
+    potBunkers: 0.4,
+    waterCreek: true, // signature: a sea channel crosses the fairway (forced carry)
+    ponds: 1.8, // lagoons flank the corridors — an offline shot is wet
+    greenSize: 1.0,
+    greenAspect: 1.7,
+    greenIrregular: 1.0,
+  },
 ];
 
 const TOTAL_WEIGHT = BIOMES.reduce((s, b) => s + b.weight, 0);

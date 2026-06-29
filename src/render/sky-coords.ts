@@ -122,6 +122,38 @@ export const THEME_SKY: Record<string, SkyCoord> = {
     "ra": 315.523,
     "dec": -18.993
   },
+  "triangulum": {
+    "ra": 31.503,
+    "dec": 32.807
+  },
+  "corona-borealis": {
+    "ra": 235.073,
+    "dec": 28.039
+  },
+  "sagitta": {
+    "ra": 296.635,
+    "dec": 18.378
+  },
+  "draco": {
+    "ra": 260.605,
+    "dec": 60.956
+  },
+  "lacerta": {
+    "ra": 335.164,
+    "dec": 49.242
+  },
+  "vulpecula": {
+    "ra": 297.38,
+    "dec": 25.238
+  },
+  "delphinus": {
+    "ra": 309.206,
+    "dec": 14.6
+  },
+  "eridanus": {
+    "ra": 54.711,
+    "dec": -21.523
+  },
   "eta-carinae-nebula": {
     "ra": 161.265,
     "dec": -59.866

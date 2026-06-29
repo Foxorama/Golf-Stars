@@ -144,6 +144,73 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
     return frame(W, H, inner, ['#2a0a06', '#7a1e0c'], gid);
   }
 
+  if (archetype === 'crystal') {
+    let inner = stars(rng, W, H, 26, 1);
+    inner += body(W * 0.8, H * 0.26, 12, '#cdeeff', { glow: 'rgba(170,225,240,0.25)', shade: false });
+    // A field of upright prismatic crystal spires catching the light.
+    inner += ridge(rng, W, H, H * 0.72, 8, '#1f2a40');
+    for (let i = 0; i < 9; i++) {
+      const x = W * (0.06 + i * 0.1 + rng() * 0.03);
+      const h = H * (0.18 + rng() * 0.34);
+      const y = H * 0.86;
+      const w = 4 + rng() * 5;
+      inner += `<polygon points="${n1(x)},${n1(y)} ${n1(x - w)},${n1(y - h * 0.7)} ${n1(x)},${n1(y - h)} ${n1(x + w)},${n1(y - h * 0.7)}" fill="${rng() < 0.5 ? '#7fc8bd' : '#9fe0f5'}" stroke="#cdeeff" stroke-width="0.8"/>`;
+    }
+    return frame(W, H, inner, ['#0a1420', '#26506a'], gid);
+  }
+
+  if (archetype === 'tempest') {
+    let inner = stars(rng, W, H, 14, 0.3);
+    // Swirling storm bands across a gas-giant sky.
+    for (let i = 0; i < 5; i++) {
+      const y = H * (0.12 + i * 0.12);
+      inner += `<path d="M0 ${n1(y)} Q ${n1(W * 0.3)} ${n1(y + (rng() - 0.5) * 22)} ${n1(W * 0.55)} ${n1(y)} T ${W} ${n1(y + (rng() - 0.5) * 14)}" fill="none" stroke="rgba(180,160,235,${(0.3 - i * 0.04).toFixed(2)})" stroke-width="${(7 - i).toFixed(1)}"/>`;
+    }
+    // A couple of lightning bolts.
+    for (let i = 0; i < 2; i++) {
+      const x = W * (0.3 + i * 0.4);
+      inner += `<path d="M${n1(x)} ${n1(H * 0.2)} L ${n1(x - 8)} ${n1(H * 0.45)} L ${n1(x + 4)} ${n1(H * 0.45)} L ${n1(x - 6)} ${n1(H * 0.75)}" fill="none" stroke="#f0e8ff" stroke-width="2" stroke-linejoin="round"/>`;
+    }
+    inner += ridge(rng, W, H, H * 0.82, 8, '#343841');
+    return frame(W, H, inner, ['#0e0b16', '#3a2f55'], gid);
+  }
+
+  if (archetype === 'fungal') {
+    let inner = stars(rng, W, H, 18, 0.4);
+    inner += ridge(rng, W, H, H * 0.64, 10, '#120c24');
+    inner += ridge(rng, W, H, H * 0.78, 8, '#1d1438');
+    // Glowing mushroom stands of varying height.
+    for (let i = 0; i < 6; i++) {
+      const x = W * (0.08 + i * 0.16 + rng() * 0.04);
+      const y = H * (0.9 - rng() * 0.06);
+      const stalk = 12 + rng() * 18;
+      const cap = 7 + rng() * 6;
+      const col = rng() < 0.5 ? '#54dba0' : '#b07eff';
+      inner += `<line x1="${n1(x)}" y1="${n1(y)}" x2="${n1(x)}" y2="${n1(y - stalk)}" stroke="#2f9e73" stroke-width="3" stroke-linecap="round"/>`;
+      inner += `<ellipse cx="${n1(x)}" cy="${n1(y - stalk)}" rx="${n1(cap)}" ry="${n1(cap * 0.6)}" fill="${col}"/>`;
+      inner += `<ellipse cx="${n1(x)}" cy="${n1(y - stalk)}" rx="${n1(cap * 1.6)}" ry="${n1(cap)}" fill="${col}" opacity="0.18"/>`;
+    }
+    return frame(W, H, inner, ['#05140e', '#163a2a'], gid);
+  }
+
+  if (archetype === 'ocean') {
+    let inner = stars(rng, W, H, 12, 0.3);
+    inner += body(W * 0.78, H * 0.24, 12, '#bfe8ff', { glow: 'rgba(150,220,235,0.22)', shade: false });
+    // A shimmering sea with a couple of fairway islands and a palm.
+    inner += `<rect x="0" y="${n1(H * 0.6)}" width="${W}" height="${n1(H * 0.4)}" fill="#164656"/>`;
+    for (let i = 0; i < 5; i++) {
+      const y = H * (0.64 + i * 0.07);
+      inner += `<line x1="0" y1="${n1(y)}" x2="${W}" y2="${n1(y)}" stroke="rgba(150,225,220,${(0.25 - i * 0.04).toFixed(2)})" stroke-width="1.5"/>`;
+    }
+    for (let i = 0; i < 3; i++) {
+      const cx = W * (0.22 + i * 0.28);
+      const cy = H * (0.74 + (i % 2) * 0.1);
+      inner += `<ellipse cx="${n1(cx)}" cy="${n1(cy)}" rx="${n1(26 - i * 4)}" ry="9" fill="#46b487"/>`;
+      inner += `<ellipse cx="${n1(cx)}" cy="${n1(cy)}" rx="${n1(30 - i * 4)}" ry="12" fill="#e9d8a6" opacity="0.5"/>`;
+    }
+    return frame(W, H, inner, ['#03101a', '#0e4456'], gid);
+  }
+
   // void
   let inner = stars(rng, W, H, 34, 1);
   // A nebula smear.

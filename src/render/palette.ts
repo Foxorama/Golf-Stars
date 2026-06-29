@@ -33,6 +33,10 @@ export const BIOME_ROUGH: Record<string, string> = {
   'ice-ring': '#3a4a55',
   'ember-world': '#3a1410',
   'void-garden': '#120a22',
+  'crystal-spires': '#2c3a55',
+  'tempest-reach': '#343841',
+  'spore-jungle': '#1d1438',
+  'tidal-archipelago': '#164656',
 };
 
 /** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
@@ -136,6 +140,38 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#5a64c0',
     rough: { light: '#1d1336', base: '#120a22', dark: '#0b0617', ink: '#05030c' },
   },
+  // Crystal — pale prismatic teal turf and bright cyan-white greens on a deep-indigo crystal field.
+  crystal: {
+    fairway: { light: '#a7e0d6', base: '#7fc8bd', dark: '#5fa399', ink: '#2f5650' },
+    green: { light: '#c4f3ff', base: '#9fe0f5', dark: '#7cc0dc', ink: '#3a6675' },
+    tee: { light: '#9fd0c8', base: '#84b4ac', dark: '#6a948c', ink: '#33504a' },
+    collar: '#6fb0a6',
+    rough: { light: '#3a4a6a', base: '#2c3a55', dark: '#1f2a40', ink: '#10172a' },
+  },
+  // Tempest — storm-greyed olive turf, electric-green greens, slate-grey storm ground.
+  tempest: {
+    fairway: { light: '#7e8a72', base: '#66735c', dark: '#4e5a46', ink: '#252b1f' },
+    green: { light: '#9cc874', base: '#7ea84e', dark: '#62843a', ink: '#2c3f1a' },
+    tee: { light: '#73806a', base: '#5e6a55', dark: '#495440', ink: '#22281c' },
+    collar: '#5a7a44',
+    rough: { light: '#454a55', base: '#343841', dark: '#262a31', ink: '#13161b' },
+  },
+  // Fungal — bioluminescent jade fairways and glowing mint greens on a dark-purple jungle floor.
+  fungal: {
+    fairway: { light: '#46d6a0', base: '#2fae82', dark: '#228866', ink: '#0e3f30' },
+    green: { light: '#7af0c0', base: '#54dba0', dark: '#3cb37e', ink: '#175440' },
+    tee: { light: '#3fbf8c', base: '#2f9e73', dark: '#247a58', ink: '#103a2b' },
+    collar: '#39b486',
+    rough: { light: '#2a1f4a', base: '#1d1438', dark: '#120c24', ink: '#080514' },
+  },
+  // Ocean — sea-green island turf and bright aqua greens over a deep-teal seafloor.
+  ocean: {
+    fairway: { light: '#5fd0a0', base: '#46b487', dark: '#36906c', ink: '#16402f' },
+    green: { light: '#7fe6b8', base: '#5fd49e', dark: '#49b07f', ink: '#1d4d38' },
+    tee: { light: '#54bf94', base: '#42a07c', dark: '#338062', ink: '#15402f' },
+    collar: '#3ca07a',
+    rough: { light: '#1f5a6a', base: '#164656', dark: '#0e3340', ink: '#06181f' },
+  },
 };
 
 /** Lum-only deepen tint so a rarer stop reads a touch richer (1 = neutral). */
@@ -190,6 +226,14 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   inferno: { base: '#0f0403', nebula: 'rgba(205,60,30,0.13)', edge: 'rgba(255,125,65,0.20)' },
   // Void — the abyss: deepest base, violet nebula, luminous indigo shore.
   void: { base: '#03020a', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(125,135,245,0.20)' },
+  // Crystal — a cool prismatic dark with an icy-cyan nebula and a bright crystalline shore.
+  crystal: { base: '#0a1420', nebula: 'rgba(150,210,230,0.11)', edge: 'rgba(180,235,240,0.20)' },
+  // Tempest — a storm-violet dark, electric nebula, lightning-lit shore.
+  tempest: { base: '#0e0b16', nebula: 'rgba(150,120,210,0.13)', edge: 'rgba(190,170,255,0.20)' },
+  // Fungal — a deep green-black, bioluminescent spore-glow nebula, glowing jade shore.
+  fungal: { base: '#05140e', nebula: 'rgba(80,210,150,0.12)', edge: 'rgba(120,240,180,0.20)' },
+  // Ocean — a deep sea-black, aqua nebula, luminous turquoise shore.
+  ocean: { base: '#03101a', nebula: 'rgba(60,180,210,0.11)', edge: 'rgba(120,225,220,0.20)' },
 };
 
 /** A world's deep-space look, rarity-deepened (the hex base only; the rgba glows pass through). */
@@ -277,6 +321,10 @@ export const ACCENTS: Record<string, Accent> = {
   'ice-ring': { flowers: ['#cdeef7', '#9fd8e6', '#ffffff'], mote: '#ffffff' },
   'ember-world': { flowers: ['#ff6a3c', '#ffb24a', '#ff8a2a'], mote: '#ff9a4a' },
   'void-garden': { flowers: ['#b07eff', '#7ed4ff', '#e6a0ff'], mote: '#d0a0ff' },
+  'crystal-spires': { flowers: ['#bff0ff', '#9fe0f5', '#ffffff'], mote: '#cdeeff' },
+  'tempest-reach': { flowers: ['#c8b8ff', '#9fd0ff', '#ffffff'], mote: '#d0c8ff' },
+  'spore-jungle': { flowers: ['#7af0c0', '#b07eff', '#ffe14a'], mote: '#9fffd0' },
+  'tidal-archipelago': { flowers: ['#7fe6b8', '#ffe14a', '#ffffff'], mote: '#bfe8ff' },
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };
 
