@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 6;
+export const GENERATOR_VERSION = 7;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -44,9 +44,9 @@ export const GENERATOR_VERSION = 6;
  * rough, no river), and the severity (island width / river width) ramps with wildness above it.
  */
 const LOST_ROUGH_MIN_WILDNESS = 0.55; // below: void plays as ordinary (fair) rough
-const LAVA_RIVER_MIN_WILDNESS = 0.3; // below: a calm ember stop has no river
-const FROZEN_POND_MIN_WILDNESS = 0.3; // below: a calm frost stop has no pond crossing
-const WATER_CREEK_MIN_WILDNESS = 0.3; // below: a calm parkland stop has no creek crossing
+const LAVA_RIVER_MIN_WILDNESS = 0.26; // below: a calm ember stop has no river
+const FROZEN_POND_MIN_WILDNESS = 0.26; // below: a calm frost stop has no pond crossing
+const WATER_CREEK_MIN_WILDNESS = 0.26; // below: a calm parkland stop has no creek crossing
 
 /** Penalty kinds that are SANCTIONED forced carries on the play corridor (GS-19/GS-mechanics): they
  *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
@@ -702,6 +702,50 @@ function generateHole(
     hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, rng) });
   }
 
+  // Blocking GROVES on a dogleg's cut-the-corner line (GS-variety): tall stands of trees planted where
+  // the STRAIGHT tee→green line leaves the fairway corridor — i.e. the corner you'd otherwise just fire
+  // over to reach the pin. With them there, you can't bomb it straight at the green; you have to play
+  // AROUND, along the fairway (the lever the future fairway-follow trick-shot perks/talents need).
+  // Trees are NON-PENALTY (a punch-out, never a lost card) and sit OUTSIDE the corridor, so
+  // validateFairness ignores them and the fairway route stays clean — only a shot trying to cut the
+  // corner is knocked down. Big blobs ⇒ TALL canopies that block lofted attempts too. Tree worlds,
+  // par 4/5, not on a void island (which stays a straight honest target).
+  // Wildness-gated (GS-19 "fair early, brutal late"): the calm opening stops stay forgiving — the
+  // corner blockers arm only once the journey is a touch wilder, ramping up deeper in.
+  if ((biome.treeDensity ?? 0) > 0 && par >= 4 && !lostRough && wildness >= 0.3) {
+    const chordLen = dist(tee, green) || 1;
+    const cdx = (green[0] - tee[0]) / chordLen;
+    const cdy = (green[1] - tee[1]) / chordLen;
+    // Scale the stand frequency by the world's tree density so a sparse world (ember snags) gets the
+    // odd blocker while parkland gets a proper wall — and so the extra knockdowns never tip the
+    // already-hard tree+crossing worlds over the no-death-spiral bar. Capped per hole; canopies are
+    // modest so a LOFTED approach can still carry the corner (it's the flat bomb-it-straight line
+    // that's blocked) — keeping it fair for the auto reach-AI while rewarding the played fairway route.
+    const standChance = Math.min(0.42, 0.1 + (biome.treeDensity ?? 0) * 0.14);
+    const maxStands = par >= 5 ? 3 : 2;
+    let stands = 0;
+    const STEPS = 16;
+    for (let s = 2; s < STEPS - 1 && stands < maxStands; s++) {
+      const f = s / STEPS;
+      const cp: Vec = [tee[0] + cdx * chordLen * f, tee[1] + cdy * chordLen * f];
+      // Only where the straight line is genuinely OFF the corridor (the corner being cut), and never
+      // near the corridor edge (keeps the fairway route clear).
+      if (polylineDist(cp, centreline) < fairwayHalfWidth + 12) continue;
+      if (rng.float() > standChance) continue;
+      stands++;
+      hazards.push({ kind: 'trees', poly: blobPoly(cp, rng.range(5, 8), 9, 0.3, rng) });
+      // One companion to read as a stand — never letting it drift onto the corridor.
+      if (rng.float() < 0.5) {
+        const a = rng.range(0, Math.PI * 2);
+        const dd = rng.range(7, 13);
+        const c2: Vec = [cp[0] + Math.cos(a) * dd, cp[1] + Math.sin(a) * dd];
+        if (polylineDist(c2, centreline) >= fairwayHalfWidth + 7) {
+          hazards.push({ kind: 'trees', poly: blobPoly(c2, rng.range(3, 6), 8, 0.3, rng) });
+        }
+      }
+    }
+  }
+
   // Lava rivers (ember signature, GS-19): one (two on the wildest stops) molten band crosses the
   // corridor as a FORCED CARRY. Tagged 'lavariver' so `validateFairness` treats it as a sanctioned
   // crossing (a played shot flies OVER it; the carry-aware AI lays up short or carries it), while
@@ -844,9 +888,12 @@ function buildCentreline(length: number, wildness: number, biome: Biome, rng: Rn
     side * Math.min(cap, baseMag * scale * rng.range(0.5, 1.0)),
     length * f,
   ];
-  // Template probabilities, biome- + wildness-biased.
-  const straightP = Math.max(0.12, 0.5 - biome.doglegBias * 0.8 - wildness * 0.18);
-  const sP = Math.min(0.42, 0.1 + biome.doglegBias * 0.55 + wildness * 0.28); // double-dogleg share
+  // Template probabilities, biome- + wildness-biased. The intercepts are tuned so EARLY/mid holes bend
+  // more (less "every early hole is dead straight, just a different palette") while DEEP holes are
+  // unchanged — at high wildness straightP is already on its 0.12 floor and sP on its 0.42 cap, so the
+  // nudge moves only the sub-max stops and the wildness-1 death-spiral bars are untouched.
+  const straightP = Math.max(0.12, 0.42 - biome.doglegBias * 0.8 - wildness * 0.18);
+  const sP = Math.min(0.42, 0.14 + biome.doglegBias * 0.55 + wildness * 0.28); // double-dogleg share
   const roll = rng.float();
   const side = rng.bool() ? 1 : -1;
   let ctrl: Vec[];

@@ -316,11 +316,17 @@ describe('arcCut (positional cut, GS-positional-cut)', () => {
     target,
   });
 
-  it('survivor targets are top-18 then top-16 for the two ordinary stops', () => {
-    expect(arcSurvivorTarget(0)).toBe(18);
-    expect(arcSurvivorTarget(1)).toBe(16);
-    expect(arcSurvivorTarget(2)).toBeUndefined(); // boss slot
-    expect(arcSurvivorTarget(0, 3)).toBe(15); // ascension tightens it
+  it('survivor targets ramp the persistent voyage field down to the final two (GS-voyage-field)', () => {
+    // One field across the whole voyage; the cut thins it 16→12→9→6→4→2 over the six ordinary stops,
+    // so exactly two remain (you + one rival) going into the final matchplay.
+    expect(arcSurvivorTarget(0)).toBe(16); // arc 1, ordinary stop 0
+    expect(arcSurvivorTarget(1)).toBe(12); // arc 1, ordinary stop 1
+    expect(arcSurvivorTarget(2)).toBeUndefined(); // boss slot — a knockout, no positional cut
+    expect(arcSurvivorTarget(3)).toBe(9); // arc 2, ordinary stop 0
+    expect(arcSurvivorTarget(4)).toBe(6); // arc 2, ordinary stop 1
+    expect(arcSurvivorTarget(6)).toBe(4); // arc 3, ordinary stop 0
+    expect(arcSurvivorTarget(7)).toBe(2); // arc 3, ordinary stop 1 → the final two
+    expect(arcSurvivorTarget(0, 3)).toBe(13); // ascension tightens it (floored at 2)
   });
 
   it('keeps the top-N and cuts the rest; a strong player survives, a blanking one is out', () => {

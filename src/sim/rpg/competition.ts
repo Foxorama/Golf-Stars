@@ -63,17 +63,26 @@ export function stopPressure(stopIndex: number): number {
 }
 
 /**
- * Positional cut targets (GS-positional-cut): how many of the arc field ADVANCE past each ordinary stop
- * — top 18 after the first, top 16 after the second — so survival is your PLACE in the field, not an
- * abstract Stableford number, and the leaderboard is the thing that matters. The boss slot (pos 2) has
- * no entry — it's a matchplay knockout, not a positional cut. Ascension tightens the targets (fewer
- * advance), floored so the field can still pair off into the boss.
+ * Positional cut targets (GS-positional-cut / GS-voyage-field): the field is now ONE persistent
+ * 20-golfer field across the WHOLE voyage (not rebuilt per arc), and the cut RAMPS DOWN over the six
+ * ordinary stops so that exactly TWO remain (you + one rival) going into the final — a 1-on-1
+ * matchplay for the title. Indexed by the ordinal of the ordinary stop (0..5: arc1 stops 0,1 → arc2
+ * stops 3,4 → arc3 stops 6,7); the boss slot of each arc (pos 2) has no entry (it's a knockout, not a
+ * positional cut, and adds nothing to the standings). Ascension tightens the targets, floored at 2 so
+ * the final is always a duel. A bigger field is fine — eliminated golfers sink below the cut line.
  */
-export const ARC_CUT_TARGETS = [18, 16] as const;
+export const VOYAGE_SURVIVOR_TARGETS = [16, 12, 9, 6, 4, 2] as const;
+
+/** The 0-based ordinal of an ORDINARY stop among the voyage's ordinary stops (skips boss slots). */
+export function ordinaryStopOrdinal(stopIndex: number): number {
+  return arcIndexOf(stopIndex) * (ARC_LEN - 1) + stopPosInArc(stopIndex);
+}
+
 export function arcSurvivorTarget(stopIndex: number, ascensionCut = 0): number | undefined {
-  const pos = stopPosInArc(stopIndex);
-  if (pos >= ARC_CUT_TARGETS.length) return undefined; // boss slot — decided by the match
-  return Math.max(8, ARC_CUT_TARGETS[pos]! - Math.max(0, Math.round(ascensionCut)));
+  if (isArcBossSlot(stopIndex)) return undefined; // boss slot — decided by the match, no positional cut
+  const ord = ordinaryStopOrdinal(stopIndex);
+  const base = VOYAGE_SURVIVOR_TARGETS[Math.min(ord, VOYAGE_SURVIVOR_TARGETS.length - 1)]!;
+  return Math.max(2, base - Math.max(0, Math.round(ascensionCut)));
 }
 
 /** A golfer entry in an arc's field (lighter than a full Golfer; the player carries no archetype). */
@@ -126,7 +135,31 @@ export interface PlayerInfo {
  * Seed-stable → recomputable, nothing new to persist.
  */
 export function buildField(seed: number | string, arcIndex: number, arc: Arc, player: PlayerInfo): Field {
-  const rng = new Rng(`${seed}:field:${arcIndex}`);
+  const champions = themesForArc(arc)
+    .filter((t) => t.kind === 'constellation')
+    .map((t) => championFor(t.id))
+    .filter((g): g is Golfer => !!g);
+  return assembleField(new Rng(`${seed}:field:${arcIndex}`), champions, player, arcIndex, arc);
+}
+
+/**
+ * The ONE persistent field for a whole WINNABLE voyage (GS-voyage-field): built once, identical at
+ * every stop, so the cut can thin it down across the journey to the final two. Champions span ALL
+ * voyage arcs so each zone you pass still has its home favourite in the field. Seed-stable — both
+ * the league display and the run's survival check call this with the same inputs, so they agree
+ * golfer-for-golfer.
+ */
+export function buildVoyageField(seed: number | string, player: PlayerInfo): Field {
+  const champions = ([1, 2, 3] as Arc[])
+    .flatMap((a) => themesForArc(a).filter((t) => t.kind === 'constellation'))
+    .map((t) => championFor(t.id))
+    .filter((g): g is Golfer => !!g);
+  return assembleField(new Rng(`${seed}:voyagefield`), champions, player, 0, 1);
+}
+
+/** Assemble a field from a champion pool: the player, a seeded champion sample, the unchosen
+ *  playable characters as rivals, then a random ability-spanning fill to FIELD_SIZE. Pure. */
+function assembleField(rng: Rng, championPool: Golfer[], player: PlayerInfo, arcIndex: number, arc: Arc): Field {
   const chosen: FieldGolfer[] = [];
   const used = new Set<string>([PLAYER_ID]);
 
@@ -153,17 +186,17 @@ export function buildField(seed: number | string, arcIndex: number, arc: Arc, pl
     for (const g of GOLFERS.filter((x) => x.mirrorsCharacter === player.characterId)) used.add(g.id);
   }
 
-  // 2) Champions of this arc's constellations (a seeded sample, up to ~9 — enough that the favourite is
-  //    present, not so many the field is all champions).
-  const arcChampions = shuffle(
-    themesForArc(arc)
-      .filter((t) => t.kind === 'constellation')
-      .map((t) => championFor(t.id))
-      .filter((g): g is Golfer => !!g),
-    rng,
-  );
-  const champTarget = Math.min(9, arcChampions.length);
-  for (let i = 0; i < champTarget; i++) add(arcChampions[i]);
+  // 2) Champions (a seeded sample, up to ~9 — enough that the favourites are present, not so many the
+  //    field is all champions). Deduped via `used`, so a voyage pool that spans arcs is fine.
+  const champions = shuffle(championPool, rng);
+  let added = 0;
+  for (const g of champions) {
+    if (added >= 9) break;
+    if (!used.has(g.id)) {
+      add(g);
+      added++;
+    }
+  }
 
   // 3) Unchosen playable characters as rivals (they can boss when you don't pick them).
   for (const g of GOLFERS.filter((x) => x.mirrorsCharacter && x.mirrorsCharacter !== player.characterId)) {

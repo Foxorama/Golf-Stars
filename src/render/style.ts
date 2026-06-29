@@ -14,7 +14,7 @@
  * same across reloads. `window._gsArt` is the live A/B escape-hatch (guarded for node).
  */
 
-import type { Hole, Vec } from '../sim/course/contract';
+import type { Feature, Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBoundsCorners } from '../sim/round';
 import { themeById, archetypeFor, RARITY_INTENSITY, type BiomeArchetype } from '../sim/course/themes';
@@ -352,36 +352,41 @@ function styleTee(poly: Vec[], art: ArtFeel, s: Shade, fringe: string): Prim[] {
   return out;
 }
 
-function styleBunker(poly: Vec[], art: ArtFeel, scale: number): Prim[] {
-  const c = centroidOf(poly);
-  const out: Prim[] = [
-    // Lip-shadow rim (a uniform outset, darker) under the sand → the bunker reads as a depression
-    // that hugs its real outline, so a big round crater and a small pot bunker both look excavated.
-    { t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow },
-    { t: 'poly', pts: poly, fill: SAND.base },
+/**
+ * Draw a whole FAMILY of sand bodies (every bunker / waste break / crater on a hole) in shared
+ * layered passes — the same GS-blend trick the liquids use — so overlapping sand bodies MERGE into
+ * one excavated surface instead of a pile of stickers each ringed with its own ink outline (the
+ * "bunkers and sand don't merge properly" bug). Pass order across the WHOLE family:
+ *   1. lip-shadow rims (outset, darker) UNDER every body — so an overlap shows no internal rim
+ *   2. sand bodies — overlapping bodies merge into one continuous surface
+ *   3. per-body depression crescent + rake texture, clipped (NO per-body ink → no seam through overlaps)
+ * The shadow outset is the edge against the land, exactly like the liquids' shore.
+ */
+function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number): Prim[] {
+  if (polys.length === 0) return [];
+  const out: Prim[] = [];
+  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow }); // 1
+  for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: SAND.base }); // 2
+  for (const poly of polys) {
+    const c = centroidOf(poly);
     // Inner depression crescent: an inset poly nudged down so the far lip catches shadow.
-    {
-      t: 'poly',
-      pts: offsetPoly(poly, 2.4).map((p) => [p[0], p[1] - 1.5] as Vec),
-      fill: SAND.rim,
-    },
-  ];
-  // A couple of pale rake arcs across the sand (subtle texture).
-  if (art.stripes) {
-    const b = bboxOf(poly);
-    const w = (b.maxX - b.minX) * 0.5;
-    for (let i = 1; i <= 2; i++) {
-      const y = b.minY + ((b.maxY - b.minY) * i) / 3;
-      out.push({
-        t: 'clip',
-        clip: poly,
-        children: [
-          { t: 'line', a: [c[0] - w, y], b: [c[0] + w, y], stroke: SAND.rake, sw: Math.max(0.8, scale * 0.5) },
-        ],
-      });
+    out.push({ t: 'poly', pts: offsetPoly(poly, 2.4).map((p) => [p[0], p[1] - 1.5] as Vec), fill: SAND.rim });
+    // A couple of pale rake arcs across the sand (subtle texture).
+    if (art.stripes) {
+      const b = bboxOf(poly);
+      const w = (b.maxX - b.minX) * 0.5;
+      for (let i = 1; i <= 2; i++) {
+        const y = b.minY + ((b.maxY - b.minY) * i) / 3;
+        out.push({
+          t: 'clip',
+          clip: poly,
+          children: [
+            { t: 'line', a: [c[0] - w, y], b: [c[0] + w, y], stroke: SAND.rake, sw: Math.max(0.8, scale * 0.5) },
+          ],
+        });
+      }
     }
   }
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: SAND.ink, sw: 1.3 });
   return out;
 }
 
@@ -485,23 +490,54 @@ function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number)
   return out;
 }
 
-/** A scatter surface (ice/crystal/waste/lava/void…): base fill + a lit inset band + ink. */
-function styleScatter(kind: string, poly: Vec[], art: ArtFeel): Prim[] {
+/**
+ * Per-archetype look for a faceted scatter surface (crystal/ice). The default reads as cool
+ * crystal/ice; on an INFERNO world the same surface is a glowing OBSIDIAN shard (hot core + warm
+ * cleavage), not a cyan ice patch — "ice areas on lava zones don't make sense" (the crystal scatter
+ * the ember biome drops used to render in its fixed cyan FILL regardless of the world). Render-only,
+ * no rng — purely recolours, so determinism is untouched.
+ */
+function scatterLook(
+  kind: string,
+  arch: BiomeArchetype,
+): { base: string; highlight: string; facet1: string; facet2: string; faceted: boolean } {
+  const faceted = kind === 'crystal' || kind === 'ice';
+  if (faceted && arch === 'inferno') {
+    return {
+      base: '#7a2a16', // charred obsidian body
+      highlight: 'rgba(255,196,120,0.22)',
+      facet1: 'rgba(255,180,90,0.55)',
+      facet2: 'rgba(255,120,50,0.4)',
+      faceted,
+    };
+  }
+  return {
+    base: fillFor(kind),
+    highlight: 'rgba(255,255,255,0.16)',
+    facet1: 'rgba(255,255,255,0.4)',
+    facet2: 'rgba(255,255,255,0.25)',
+    faceted,
+  };
+}
+
+/** A scatter surface (ice/crystal/waste/lava/void…): base fill + a lit inset band + ink. The
+ *  archetype recolours faceted crystal/ice so it suits the world (e.g. molten obsidian on inferno). */
+function styleScatter(kind: string, poly: Vec[], art: ArtFeel, arch: BiomeArchetype): Prim[] {
   const c = centroidOf(poly);
-  const base = fillFor(kind);
+  const look = scatterLook(kind, arch);
   const out: Prim[] = [
-    { t: 'poly', pts: poly, fill: base },
-    { t: 'poly', pts: scalePoly(poly, c, 0.6).map((p) => [p[0] - 1, p[1] - 1] as Vec), fill: 'rgba(255,255,255,0.16)' },
+    { t: 'poly', pts: poly, fill: look.base },
+    { t: 'poly', pts: scalePoly(poly, c, 0.6).map((p) => [p[0] - 1, p[1] - 1] as Vec), fill: look.highlight },
   ];
-  if (kind === 'crystal' || kind === 'ice') {
+  if (look.faceted) {
     // Faceting: a couple of bright cleavage lines.
     const b = bboxOf(poly);
     out.push({
       t: 'clip',
       clip: poly,
       children: [
-        { t: 'line', a: [b.minX, c[1]], b: [c[0], b.minY], stroke: 'rgba(255,255,255,0.4)', sw: 1, round: true },
-        { t: 'line', a: [c[0], b.minY], b: [b.maxX, c[1]], stroke: 'rgba(255,255,255,0.25)', sw: 1, round: true },
+        { t: 'line', a: [b.minX, c[1]], b: [c[0], b.minY], stroke: look.facet1, sw: 1, round: true },
+        { t: 'line', a: [c[0], b.minY], b: [b.maxX, c[1]], stroke: look.facet2, sw: 1, round: true },
       ],
     });
   }
@@ -653,14 +689,18 @@ function windStreaks(hole: Hole, proj: Projector, arch: BiomeArchetype, W: numbe
   const [dx, dy] = windScreenDir(hole, proj);
   if (dx === 0 && dy === 0) return [];
   const intensity = Math.min(1, (spd - 2) / 26);
-  const count = Math.round(8 + intensity * 34);
+  // Denser + brighter than before so the weather READS on the static decision map (it used to be so
+  // faint pre-shot that wind only seemed to appear once the animated play-view drift kicked in — the
+  // "weather only shows in flight" bug). Off the independent `crng`, and the LAST crng consumer in
+  // buildScene, so boosting the count shifts nothing else (determinism preserved).
+  const count = Math.round(16 + intensity * 52);
   const colBase = WIND_COL[arch];
   const prims: Prim[] = [];
   for (let i = 0; i < count; i++) {
     const x = crng() * W;
     const y = crng() * H;
-    const len = (6 + intensity * 20) * (0.6 + crng() * 0.8);
-    const a = (0.06 + intensity * 0.16) * (0.6 + crng() * 0.4);
+    const len = (9 + intensity * 24) * (0.6 + crng() * 0.8);
+    const a = (0.13 + intensity * 0.24) * (0.6 + crng() * 0.4);
     prims.push({
       t: 'line',
       a: [x, y],
@@ -873,35 +913,33 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     if (voidGlow && f.kind === 'green') glowRings(sp);
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
-    else prims.push(...styleScatter(f.kind, sp, art));
+    else prims.push(...styleScatter(f.kind, sp, art, arch));
   }
 
   // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
-  // Penalty LIQUIDS are drawn as GROUPED families first (all the water, then all the lava) in shared
-  // layered passes, so a lake and a river that touch read as one connected body, not two stickers
-  // with a seam (GS-blend). Everything else (trees, sand/craters, exotic scatter) draws per-hazard
-  // on top of the liquids.
+  // Draw order is layered so substances read correctly where they overlap (deep/wild holes pile
+  // hazards up): SAND first as a grouped family (overlapping bunkers/craters/waste merge into one
+  // excavated body — no internal seams), then exotic scatter, then the penalty LIQUIDS as grouped
+  // families ON TOP (so a river cutting through a sandy waste band reads as WATER, not buried under
+  // sand — the "sand showed on rivers" bug), and finally trees (canopies over everything).
   const waterPolys: Vec[][] = [];
   const lavaPolys: Vec[][] = [];
+  const sandPolys: Vec[][] = [];
+  const treeHaz: Feature[] = [];
+  const scatterHaz: Feature[] = [];
   for (const f of hole.hazards) {
     if (WATER_KINDS.has(f.kind)) waterPolys.push(projPoly(f.poly, proj));
     else if (LAVA_KINDS.has(f.kind)) lavaPolys.push(projPoly(f.poly, proj));
+    else if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand') sandPolys.push(projPoly(f.poly, proj));
+    else if (f.kind === 'trees') treeHaz.push(f);
+    else scatterHaz.push(f);
   }
+  prims.push(...styleSandFamily(sandPolys, art, proj.scale));
+  for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
+  // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
   prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng));
   prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
-  for (const f of hole.hazards) {
-    if (f.kind === 'trees') {
-      prims.push(...styleTree(f.poly, proj, rng));
-      continue;
-    }
-    if (WATER_KINDS.has(f.kind) || LAVA_KINDS.has(f.kind)) continue; // drawn in the grouped passes
-    const sp = projPoly(f.poly, proj);
-    if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand') {
-      prims.push(...styleBunker(sp, art, proj.scale));
-    } else {
-      prims.push(...styleScatter(f.kind, sp, art));
-    }
-  }
+  for (const f of treeHaz) prims.push(...styleTree(f.poly, proj, rng));
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);
