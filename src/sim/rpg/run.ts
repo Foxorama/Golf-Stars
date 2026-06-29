@@ -687,7 +687,7 @@ export const SHOP_OFFER_SIZE = 4;
 // off galaxy distance — the same depth signal the cut line ramps off. This shifts WHICH items are
 // drawn, not the rng draw count, so the offer stays deterministic and resume-stable.
 const RARITY_RAMP_DEPTH = 18; // galaxy distance at which the rarity tilt reaches its deep extreme
-const RARITY_TILT_EARLY = 0.58; // tilt base at the start — favours commons (eased up so purple/orange show a touch more)
+const RARITY_TILT_EARLY = 0.22; // tilt base at the start — strongly favours commons so the FIRST/SECOND Pro Shops stock foundational common/rare kit, not rare/epic. The catalogue + reward-club pool is heavily count-skewed toward rare/epic, so a low tilt is needed to keep the early draw common-dominant (measured ~61% common / 37% rare / 2% epic at stop 0, ramping to rare/epic-heavy deep).
 const RARITY_TILT_DEEP = 2.15; // tilt base deep in the run — favours rare/epic/legendary (raised to surface more epic/legendary rewards)
 
 /** Depth-scaled rarity multiplier for the shop draw (early → commons, deep → rare/epic). */
