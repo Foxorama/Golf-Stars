@@ -156,7 +156,10 @@ describe('merged club offer + Driver Dan gate (GS-clubs-2)', () => {
   it('Driver Dan needs a driver in the bag — everyone now starts with one, so he is eligible', () => {
     const hasDan = (run: ReturnType<typeof startRun>) => {
       for (let s = 0; s < 250; s++) {
-        const r = { ...run, seed: s };
+        // Driver Dan is epic, so he surfaces on the DEEPER racks now that early Pro Shops stock
+        // common/rare kit (rarity ramps with galaxy distance) — scan a mid-run depth where epics
+        // are plentiful, so the gate (owns-a-driver) is what decides eligibility, not the rarity roll.
+        const r = { ...run, seed: s, stopIndex: 4, distanceFromStart: 14 };
         if (shopOffer(r).some((o) => o.item.id === 'driver-dan')) return true;
       }
       return false;

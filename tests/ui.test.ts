@@ -74,14 +74,29 @@ describe('ui reducer', () => {
   });
 
   it('the shop offer includes reward clubs, and buying one equips it (GS-clubs)', () => {
-    // seed 3 / Feather clears the opening cut → reaches the shop.
-    let s = reduce(started(3), { type: 'play' });
-    expect(s.screen).toBe('result');
-    s = reduce(s, { type: 'continue' });
-    expect(s.screen).toBe('shop');
-    const clubIds = (s.shopOffer ?? []).filter((id) => id.startsWith('club:'));
-    expect(clubIds.length).toBeGreaterThan(0); // reward clubs are on the rack alongside the perks
-    // Buying a gap club through the reducer grows the bag (Feather starts without these types).
+    // Reward clubs are rare/epic, so they surface as the run goes DEEPER (early Pro Shops now
+    // stock mostly common/rare perks). Advance stop-by-stop until a rack racks a reward club.
+    const reachShopWithClub = (seed: number): { s: UiState; clubIds: string[] } | null => {
+      let s = started(seed);
+      for (let stop = 0; stop < 6; stop++) {
+        s = reduce(s, { type: 'play' });
+        if (s.screen !== 'result') return null; // missed the cut
+        s = reduce(s, { type: 'continue' });
+        if (s.screen !== 'shop') return null;
+        const clubIds = (s.shopOffer ?? []).filter((id) => id.startsWith('club:'));
+        if (clubIds.length > 0) return { s, clubIds };
+        s = reduce(s, { type: 'leaveShop' });
+        const routeId = s.routes?.[0]?.id;
+        if (routeId == null) return null;
+        s = reduce(s, { type: 'route', routeId });
+      }
+      return null;
+    };
+    let found: { s: UiState; clubIds: string[] } | null = null;
+    for (let seed = 0; seed < 60 && !found; seed++) found = reachShopWithClub(seed);
+    expect(found).not.toBeNull(); // reward clubs do appear on the rack alongside the perks
+    const { s, clubIds } = found!;
+    // Buying a gap club through the reducer grows the bag (a type the bag doesn't carry yet).
     const gap = clubIds.find((id) => !s.run.loadout.bag.some((c) => c.id === id.split(':')[2]));
     if (gap) {
       const before = s.run.loadout.bag.length;
