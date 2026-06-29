@@ -507,6 +507,21 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
   return { run: next, result, played };
 }
 
+/**
+ * The bare event-ids a given stop's route draw produces — mirrors `routeOptions`'s draw order (3
+ * distance rolls, then the arc event draw) so it can be recomputed for a PAST stop. Used only for
+ * anti-repeat; pure and deterministic. (Uses the run's CURRENT firedEventIds, a harmless arc-3-only
+ * approximation, since uniques don't gate arcs 1–2 where the small pool makes repeats most visible.)
+ */
+function offerEventIds(run: Run, stopIndex: number, distanceFromStart: number): string[] {
+  const rng = new Rng(`${run.seed}:routes:${stopIndex}`);
+  const maxJump = getFormat(run.formatId).maxJump ?? 3;
+  for (let i = 0; i < 3; i++) rng.int(1, maxJump);
+  const arc = arcForDistance(distanceFromStart);
+  const pool = eventPool(distanceFromStart, run.firedEventIds);
+  return drawArcRouteEvents(rng, arc, pool).map((e) => e.id);
+}
+
 /** The onward routes offered after a stop. Deterministic from the run + stop. */
 export function routeOptions(run: Run): Route[] {
   const rng = new Rng(`${run.seed}:routes:${run.stopIndex}`);
@@ -523,7 +538,14 @@ export function routeOptions(run: Run): Route[] {
   // SLOT draw (GS-routes) sets the rarity MIX — gentle commons early, rares/epics/legendaries deep —
   // so the loot feel ramps with the journey instead of a flat rarity-weighted shuffle.
   const arc = arcForDistance(run.distanceFromStart);
-  const pool = eventPool(run.distanceFromStart, run.firedEventIds);
+  // Anti-repeat (GS-journey): drop the events offered at the PREVIOUS stop so two consecutive jumps
+  // never show the same lanes (the "same 3 options again" complaint — the early-arc common pool is
+  // small, so an unconstrained draw repeats often). Recomputed deterministically from history, so it
+  // stays a pure function of `run` (no new run/save state); empty at stop 0 (there is no prior offer).
+  const prevStop = run.history.length >= 2 ? run.history[run.history.length - 2] : undefined;
+  const excludeIds = prevStop ? offerEventIds(run, prevStop.stopIndex, prevStop.distanceFromStart) : [];
+  const fullPool = eventPool(run.distanceFromStart, run.firedEventIds);
+  const pool = excludeIds.length ? fullPool.filter((e) => !excludeIds.includes(e.id)) : fullPool;
   const events = drawArcRouteEvents(rng, arc, pool);
   const withEvents = routes.map((r, i) => ({ ...r, event: events[i] ?? DEFAULT_EVENT }));
   // Derive the HARDER PATH (GS-voyage) WITHOUT touching the rng: the single highest-stakes lane —

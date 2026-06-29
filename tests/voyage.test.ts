@@ -35,9 +35,12 @@ describe('voyage format (GS-voyage)', () => {
     run = travel(run, routeOptions(run)[0]!);
     expect(currentBoss(run)?.id).toBe('nebula-open');
     const holes = stopSpecFor(voyage, run.stopIndex).holes;
-    // The non-boss baseline = the voyage's own (cutMult-scaled) ramp with no boss bonus, no event.
+    // The non-boss baseline = the voyage's own (cutMult-scaled) ramp with no boss bonus. The chosen
+    // route still carries an event, whose cutDelta effectiveCut folds in — so include it to isolate
+    // the boss bonus from the lane's own difficulty tweak.
     const baseline = cutLine(run.distanceFromStart * (voyage.cutMult ?? 1), holes);
-    expect(effectiveCut(run, holes)).toBe(baseline + currentBoss(run)!.cutBonus);
+    const eventDelta = run.pendingEvent?.cutDelta ?? 0;
+    expect(effectiveCut(run, holes)).toBe(baseline + eventDelta + currentBoss(run)!.cutBonus);
     expect(currentBoss(run)!.cutBonus).toBeGreaterThan(0);
   });
 

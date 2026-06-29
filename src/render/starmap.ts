@@ -30,6 +30,12 @@ export interface StarmapChoice {
   bossAhead?: boolean;
 }
 
+/** One cleared stop on the travelled trail (Earth → … → YOU). */
+export interface StarmapStop {
+  /** Zone/theme name, drawn under its node. */
+  label: string;
+}
+
 export interface StarmapOpts {
   seed: number | string;
   /** Stops already cleared (length of the travelled trail behind YOU). */
@@ -37,6 +43,12 @@ export interface StarmapOpts {
   distanceFromStart: number;
   /** The current stop's theme/zone name, labelled at YOU. */
   currentLabel: string;
+  /**
+   * The worlds already cleared, oldest → newest, drawn as named nodes between Earth and YOU so the
+   * journey visibly BUILDS (Earth → stage 1 → stage 2 → … → YOU) instead of a blank trail. The
+   * current stop (YOU) is NOT included. Optional — falls back to anonymous dots keyed off stopIndex.
+   */
+  trail?: StarmapStop[];
   choices: StarmapChoice[];
 }
 
@@ -123,25 +135,44 @@ export function starmapSVG(opts: StarmapOpts): string {
   const span = 122;
   const branchY = (i: number) => (n === 1 ? you.y : top + (span * i) / (n - 1));
 
-  // --- travelled trail: Earth → (cleared stops) → YOU ------------------------------------------
-  // A smooth curve; cleared stops drop as dots along it (capped so a long run stays legible).
+  // --- travelled trail: Earth → (cleared stops as NAMED nodes) → YOU ---------------------------
+  // A smooth curve with each cleared world as a labelled planet, so the journey reads as a built-up
+  // path. Sample the cubic (de Casteljau on its control points) for node positions.
   const trail = `M${earth.x},${earth.y} C ${earth.x + 50},${earth.y} ${you.x - 56},${you.y + 18} ${you.x},${you.y}`;
-  const shown = Math.min(opts.stopIndex, 5);
-  const dots: string[] = [];
-  for (let k = 1; k <= shown; k++) {
-    const t = k / (shown + 1);
-    // Sample the cubic for a dot position (de Casteljau on the trail's control points).
-    const p0 = earth,
-      p3 = you;
-    const p1 = { x: earth.x + 50, y: earth.y };
-    const p2 = { x: you.x - 56, y: you.y + 18 };
+  const cp1 = { x: earth.x + 50, y: earth.y };
+  const cp2 = { x: you.x - 56, y: you.y + 18 };
+  const bez = (t: number): { x: number; y: number } => {
     const mt = 1 - t;
-    const px = mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x;
-    const py = mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y;
-    dots.push(`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2.4" fill="#7f8aa3"/>`);
-  }
+    return {
+      x: mt * mt * mt * earth.x + 3 * mt * mt * t * cp1.x + 3 * mt * t * t * cp2.x + t * t * t * you.x,
+      y: mt * mt * mt * earth.y + 3 * mt * mt * t * cp1.y + 3 * mt * t * t * cp2.y + t * t * t * you.y,
+    };
+  };
+  // Prefer the real visited-zone list; fall back to anonymous dots (count from stopIndex) if absent.
+  const allStops: StarmapStop[] = opts.trail ?? Array.from({ length: Math.max(0, opts.stopIndex) }, () => ({ label: '' }));
+  const MAX_NODES = 4; // keep a long run legible — show the most recent worlds, summarise the rest
+  const overflow = Math.max(0, allStops.length - MAX_NODES);
+  const shownStops = allStops.slice(overflow);
+  const m = shownStops.length;
+  const nodeC = '#6fd0d8'; // a "visited" teal — distinct from Earth's blue and YOU's gold
+  const dots = shownStops
+    .map((s, k) => {
+      const p = bez((k + 1) / (m + 1));
+      const named = s.label.trim().length > 0;
+      if (!named) return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.6" fill="#7f8aa3"/>`;
+      const lab = s.label.length > 11 ? `${s.label.slice(0, 10)}…` : s.label;
+      const above = k % 2 === 0; // stagger labels to reduce overlap on a tight trail
+      const ly = above ? p.y - 9 : p.y + 14;
+      return `<g>
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6.5" fill="${nodeC}" opacity="0.14"/>
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#0e1320" stroke="${nodeC}" stroke-width="1.4"/>
+        <circle cx="${(p.x - 1.2).toFixed(1)}" cy="${(p.y - 1.2).toFixed(1)}" r="1.6" fill="${nodeC}" opacity="0.5"/>
+        <text x="${p.x.toFixed(1)}" y="${ly.toFixed(1)}" font-size="7.5" fill="#aeb9cf" text-anchor="middle" font-weight="600">${esc(lab)}</text>
+      </g>`;
+    })
+    .join('');
   const moreDots =
-    opts.stopIndex > 5 ? `<text x="${earth.x + 18}" y="${earth.y - 16}" font-size="9" fill="#7f8aa3">＋${opts.stopIndex - 5} more</text>` : '';
+    overflow > 0 ? `<text x="${earth.x + 16}" y="${earth.y - 18}" font-size="9" fill="#7f8aa3">＋${overflow} more</text>` : '';
 
   // --- branch connectors (dashed, rarity-coloured) + planets -----------------------------------
   const branches = choices
@@ -177,7 +208,7 @@ export function starmapSVG(opts: StarmapOpts): string {
     ${nebula}
     ${stars.join('')}
     <path d="${trail}" fill="none" stroke="#54607d" stroke-width="1.4" stroke-dasharray="1 4" opacity="0.6"/>
-    ${dots.join('')}
+    ${dots}
     ${moreDots}
     ${branches.lines}
     ${earthGlyph}

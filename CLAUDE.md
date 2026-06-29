@@ -490,6 +490,21 @@ This game lives or dies on three axes — put every change through all three bef
   pure + seeded (no Math.random, no 404 asset). Each `RouteEvent` carries an `icon`, `lore`, and a
   functional `category` (calm/payout/toll/salvage) so the cards read as distinct bets. No new `_gs*`/URL
   hook (the new events appear in the Sim Lab automatically) → the test-hub guard needs no new control.
+  - **The starmap trail is the REAL visited path (GS-journey).** The travelled trail used to be
+    anonymous interpolated dots keyed off `stopIndex`, so it read as "Earth → YOU" no matter how far
+    you'd come. Now `app.ts` passes `StarmapOpts.trail` = `run.history.slice(0,-1)` mapped to zone
+    names (the current stop IS YOU, so it's dropped), and the starmap draws each cleared world as a
+    NAMED node along the curve (Earth → stage 1 → stage 2 → … → YOU), most-recent-`MAX_NODES` shown
+    with a `＋N more` summary near Earth. Pure/seeded as before; `trail` is optional (falls back to the
+    old anonymous dots) so the helper stays drop-in.
+  - **Consecutive jumps never repeat the same lanes (GS-journey anti-repeat).** The early-arc common
+    pool is small (slots = 2 commons + a wildcard), so an unconstrained draw kept showing the same 3
+    lanes stop after stop. `routeOptions` now recomputes the PREVIOUS stop's offer (`offerEventIds`,
+    pure, from `run.history[-2]`'s stopIndex/distance — no new run/save state) and FILTERS those ids
+    out of this stop's event pool before `drawArcRouteEvents`. Stays a deterministic pure function of
+    `run` (so `routeOptions(run)===routeOptions(run)`); empty at stop 0. The arc-1 common pool was
+    also widened (more commons/rares/an epic) so each tier has genuine variety. Guarded in
+    `tests/events.test.ts` (no two back-to-back offers are the same id-set; determinism preserved).
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen
