@@ -109,6 +109,16 @@ This game lives or dies on three axes — put every change through all three bef
   drawn as glyphs/sand, trees as canopies (not flat blobs) in both renderers. Because they're
   non-penalty `validateFairness` ignores them, but they DO make scoring harder — keep them off the
   centre line and re-run the no-death-spiral test (`toPar/hole < 1.0`, blow-ups < 5%) after tuning.
+  EXCEPTION — **dogleg blocking GROVES (GS-variety) deliberately sit ON the straight tee→green line**
+  (but still OUTSIDE the corridor): tall tree stands planted where the cut-the-corner chord leaves the
+  fairway, so you can't bomb it straight at the pin and must play AROUND along the fairway (the lever for
+  future fairway-follow trick-shot perks). Still non-penalty → `validateFairness` ignores them and the
+  fairway route stays clean; scaled by `treeDensity`, capped per hole, and **wildness-gated (≥0.3)** so
+  the calm opener stays forgiving. They DO add knockdowns for the straight-line auto reach-AI — they
+  tipped ember over the 1.0 bar at full density, so the density/canopy/gate were tuned down (ember 0.23,
+  frost 0.49, verdant 0.74 toPar/hole at wildness 1). Re-run `tests/layout-variety` + the no-death-spiral
+  bars after touching them. (Crossing gates also dropped 0.3→0.26 — above the stop-0 wildness ceiling, so
+  water splits fairways from the mid stops on while stop 0 stays crossing-free.)
 - **Greens are VARIED organic shapes, NOT circles (GS-greens, `generate.ts`).** `greenPoly` builds the
   putting surface from a few seeded harmonics + an optional kidney lobe, stretched along a random long
   axis — so greens come as blobs, kidneys, long shelves, pears and punchbowls. The per-biome row sets
@@ -490,6 +500,13 @@ This game lives or dies on three axes — put every change through all three bef
   pure + seeded (no Math.random, no 404 asset). Each `RouteEvent` carries an `icon`, `lore`, and a
   functional `category` (calm/payout/toll/salvage) so the cards read as distinct bets. No new `_gs*`/URL
   hook (the new events appear in the Sim Lab automatically) → the test-hub guard needs no new control.
+  - **Distinct lanes + a touch richer (GS-routes tuning).** Choices felt interchangeable (often three
+    near-identical commons). `drawArcRouteEvents` now `diversifyCategories` — same-rarity swaps so the
+    three lanes span DISTINCT reward categories (a safe out, a payout gamble, a salvage/toll play), making
+    each jump a real decision; same-rarity only ⇒ the per-arc mix + triple-legendary ceiling are
+    untouched. The `ARC_SLOTS` upgrade chains were nudged up (arc 1 stays >70% common / no legendary), and
+    the shop's `rarityDepthBias` tilt eased early (0.5→0.58) and raised deep (1.9→2.15) so epic/legendary
+    rewards surface a touch more. Guarded by the existing `tests/events` + `tests/pro-shop` invariants.
   - **The starmap trail is the REAL visited path (GS-journey).** The travelled trail used to be
     anonymous interpolated dots keyed off `stopIndex`, so it read as "Earth → YOU" no matter how far
     you'd come. Now `app.ts` passes `StarmapOpts.trail` = `run.history.slice(0,-1)` mapped to zone
@@ -715,6 +732,21 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   rate). Tune via `ARC_CUT_TARGETS`, the field strength (`golferBaseline`), or the boss stat edge
   (`bossLoadout`). Tests: `tests/competition` (arcCut/targets/pairing), `tests/league` (boss-no-Stableford),
   `tests/voyage` (termination + winnable).
+- **The voyage field is ONE persistent field that thins to the final TWO (GS-voyage-field, supersedes the
+  per-arc cut above).** The field used to REBUILD every arc (`buildField(seed, arcIndex, …)`) and reset
+  `ARC_CUT_TARGETS = [18, 16]` each arc — so the leaderboard reset between acts and a boss board could
+  read a Stableford number as a nonsense "top 22 advance". Now a WINNABLE voyage builds ONE 20-golfer
+  field for the whole journey (`buildVoyageField(seed, player)`, champions spanning all three arcs) and the
+  positional cut is CUMULATIVE across the voyage, ramping the survivor target down
+  `VOYAGE_SURVIVOR_TARGETS = [16, 12, 9, 6, 4, 2]` over the six ordinary stops (`arcSurvivorTarget` now
+  indexes by `ordinaryStopOrdinal`, undefined on a boss slot, floored at 2 under Ascension) — so exactly
+  TWO remain (you + one rival) going into the final, a true 1st-vs-2nd matchplay. Both league (`runField`)
+  and run (`survivalField`) route winnable formats through `buildVoyageField`, and `arcSlices` now spans
+  the WHOLE history (not the current arc), so the cumulative total grows continuously with NO per-arc
+  reset/jump (a completed stop adds exactly the live partial — `tests/voyage-field` guards field stability,
+  the ramp-to-two, and score continuity). Endless flat/ladder keep the per-arc field + Stableford cut,
+  byte-for-byte. The leaderboard divider reads "⚔ boss round" on a positional boss stop (never a stray
+  "top N advance"). Tune the ramp via `VOYAGE_SURVIVOR_TARGETS`.
 - **Boss-reward TALENTS — pick a run buff or a permanent reward (GS-talents).** Beating a NON-final boss
   opens a reward screen: choose ONE of a thematic run **talent**, a generic run talent, or a permanent
   **Star-Shard** bonus (the "talent or permanent reward for this run" ask). Talents (`TALENTS` in
@@ -953,6 +985,15 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   auto gate is just `!!run.loadout.autoPutt`, so owning the caddie is the one and only "automate it"
   switch. (`» Auto-finish hole` on the decision screen still AI-plays the whole hole — that's a
   full-hole watch escape, not a putting mode.)
+- **Putt from the fringe/apron (GS-fringe-putt).** Being just off the green on the apron (a `fairway`
+  lie wrapping the green) used to force a full-swing chip from a few yards — a huge spray cone + a
+  fiddly feathered pull (the "weird shot pull" complaint). Now `canPuttFringe(state)` (play.ts: a
+  non-penalty `fairway`/`rough` lie within `FRINGE_PUTT_RANGE` 14yd of the pin) lets you take the
+  flat-stick with the pace meter, and it's the DEFAULT there (`selPutt` UI flag, a one-tap ⛳/🏌 toggle
+  to chip instead). `takePutt`'s guard is relaxed to accept a fringe lie (it still sets the rest lie to
+  `green`). CRITICAL: interactive-ONLY — the auto sim only ever putts on `green` (and the auto-finish
+  path gates on `awaitingPutt`, green-only), so auto≡interactive is byte-for-byte untouched; no new
+  `_gs*` flag (`selPutt` is module UI state like `selClubId`). Tests: `tests/fringe-putt`.
 - **Putting is upgradeable (`loadout.puttBoost`, 0 = base).** `puttSkillOf` derives make%/lag AND the
   manual make-band width from `puttBoost` + auto-caddie; a BASE loadout returns `{}` so auto/headless
   stay byte-for-byte. Shop perks **Pro Putting Grip** (stackable) + **Tour Putter** raise `puttBoost`;
@@ -1054,6 +1095,19 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   `tests/render-blend.test.ts` guards `offsetPoly` (shrink/grow + river-hugging) and that a lava river /
   water creek render through the family drawer. Re-shoot the gallery (`node scripts/gallery.mjs`) after any
   `style.ts` change.
+- **SAND is also a grouped family + hazard draw order + archetype scatter recolour (GS-blend-2, `style.ts`).**
+  Four cohesion fixes: (1) `styleSandFamily(polys, art, scale)` draws ALL sand (bunker/waste/craters) the
+  same GROUPED way as the liquids — shadows under every body, then bodies (overlaps merge), then per-body
+  rake, NO per-body ink — so overlapping bunkers read as one excavated body instead of seamed stickers.
+  (2) The hazard pass order is layered: SAND first, then exotic scatter, then the penalty LIQUIDS ON TOP
+  (so a river through a sandy waste band shows as WATER, not buried under sand), then trees last. (3)
+  `scatterLook(kind, arch)` recolours faceted crystal/ice per archetype — on INFERNO it's molten obsidian,
+  not a cyan ice patch (the "ice on lava zones" bug; `styleScatter` now takes `arch`, threaded at both the
+  feature + hazard call sites). (4) Static `windStreaks` are denser/brighter so the weather READS on the
+  decision map BEFORE the shot (it used to be so faint pre-shot that wind only seemed to appear in the
+  animated flight). CRITICAL: sand/scatter consume NO rng and wind is the last `crng` consumer, so the
+  main terrain rng stream + the liquid/tree draws are byte-for-byte unchanged (determinism + the full
+  suite hold). Re-shoot the gallery after touching it.
 - **Per-ZONE turf palettes + signature visuals (GS-19, `palette.ts`/`style.ts`).** The old per-theme
   look only HUE-ROTATED the green turf — barely readable ("green fairways in no way match the themes").
   Now each of the 5 archetypes has an EXPLICIT designed turf palette (`ARCHETYPE_TURF`): desert firm
