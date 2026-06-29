@@ -14,6 +14,8 @@ import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt, caddyProjectile, CADDY_LABEL } from './render/caddyArt';
+import { starmapSVG, type StarmapChoice } from './render/starmap';
+import type { EventCategory } from './sim/rpg/events';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
@@ -1489,49 +1491,112 @@ function outpostScreen(): string {
     <div style="margin-top:12px;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
 }
 
+// The functional family of a route event → a short pill label + accent (distinct from the rarity ring).
+const EVENT_CATEGORY: Record<EventCategory, { label: string; col: string }> = {
+  calm: { label: 'SAFE', col: '#2bb673' },
+  payout: { label: 'PAYOUT', col: '#ffce54' },
+  toll: { label: 'GAMBLE', col: '#ff8b6b' },
+  salvage: { label: 'SALVAGE', col: '#4fd0e0' },
+};
+
 function travelScreen(): string {
-  const routes = (state.routes ?? [])
+  const routeList = state.routes ?? [];
+  const credits = state.run.credits;
+
+  // The starmap (GS-routes): Earth → travelled trail → YOU → the three branch lanes ahead.
+  const zoneName = themeById(state.course.meta?.themeId ?? '')?.name ?? 'Deep Space';
+  const choices: StarmapChoice[] = routeList.map((r) => ({
+    id: r.id,
+    label: r.event.label,
+    icon: r.event.icon,
+    rarity: r.event.rarity,
+    distanceJump: r.distanceJump,
+    elite: r.elite,
+    bossAhead: r.bossAhead,
+  }));
+  const map = starmapSVG({
+    seed: state.run.seed,
+    stopIndex: state.run.stopIndex,
+    distanceFromStart: state.run.distanceFromStart,
+    currentLabel: zoneName,
+    choices,
+  });
+
+  const chip = (txt: string, col: string) =>
+    `<span style="display:inline-block;font-size:11px;font-weight:700;color:${col};border:1px solid ${col}66;border-radius:5px;padding:1px 6px;">${txt}</span>`;
+
+  const routes = routeList
     .map((r) => {
       const ev = r.event;
-      const credit =
-        ev.creditMult !== 1 ? `${ev.creditMult > 1 ? '+' : ''}${Math.round((ev.creditMult - 1) * 100)}% credits` : '';
-      const cut = ev.cutDelta !== 0 ? `cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}` : '';
-      const tag = [credit, cut].filter(Boolean).join(' · ');
-      // Boss-ahead preview + the harder-path (elite) flag (GS-voyage).
+      const cat = EVENT_CATEGORY[ev.category];
+      // Effect chips — each lever is its own readable token (real trade-offs read at a glance).
+      const tags: string[] = [];
+      if (ev.creditMult !== 1) {
+        const pct = Math.round((ev.creditMult - 1) * 100);
+        tags.push(chip(`${pct > 0 ? '+' : ''}${pct}% credits`, pct >= 0 ? '#ffce54' : '#ff8b6b'));
+      }
+      if (ev.cutDelta !== 0) tags.push(chip(`cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}`, ev.cutDelta > 0 ? '#ff8b6b' : '#2bb673'));
+      if (ev.creditToll) {
+        const afford = credits >= ev.creditToll;
+        tags.push(chip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
+      }
+      if (ev.shardBonus) tags.push(chip(`✦ +${ev.shardBonus} shards`, '#4fd0e0'));
+
       const badges = [
-        r.bossAhead ? `<span style="color:#ff8b6b;font-weight:600;">⚔ Boss ahead</span>` : '',
-        r.elite ? `<span style="color:#ffce54;font-weight:600;">🔥 Harder path</span>` : '',
+        r.bossAhead ? `<span style="color:#ff8b6b;font-weight:700;">⚔ Boss ahead</span>` : '',
+        r.elite ? `<span style="color:#ffce54;font-weight:700;">🔥 Harder path</span>` : '',
       ]
         .filter(Boolean)
-        .join(' · ');
+        .join('&nbsp;·&nbsp;');
+
+      const ring = rarCol(ev.rarity);
       // A whole route card is the click target (the shared btn() wraps an action handler).
       return btn(
-        `<div style="text-align:left;">
-           <div style="font-size:15px;"><b>${ev.label}</b> <span style="opacity:.6;">· ↗ ${r.label} (+${r.distanceJump} distance)</span></div>
-           <div style="font-size:13px;opacity:.82;margin:3px 0;">${ev.desc}</div>
-           ${tag ? `<div style="font-size:12px;opacity:.7;">${tag}</div>` : ''}
-           ${badges ? `<div style="font-size:12px;margin-top:3px;">${badges}</div>` : ''}
+        `<div style="display:flex;gap:12px;align-items:flex-start;text-align:left;">
+           <div style="flex:0 0 auto;width:46px;height:46px;border-radius:11px;background:radial-gradient(circle at 35% 30%, ${ring}33, #0c1020);border:2px solid ${ring};display:flex;align-items:center;justify-content:center;font-size:24px;">${ev.icon}</div>
+           <div style="flex:1 1 auto;min-width:0;">
+             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+               <b style="font-size:15px;">${ev.label}</b>
+               ${chip(ev.rarity.toUpperCase(), ring)}
+               ${chip(cat.label, cat.col)}
+             </div>
+             <div style="font-size:12px;opacity:.6;margin:2px 0 4px;">↗ ${r.label} · +${r.distanceJump} distance</div>
+             <div style="font-size:13px;opacity:.9;margin-bottom:3px;">${ev.desc}</div>
+             <div style="font-size:12px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
+             <div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.join('')}</div>
+             ${badges ? `<div style="font-size:12px;margin-top:6px;">${badges}</div>` : ''}
+           </div>
          </div>`,
         { type: 'route', routeId: r.id },
-        { borderColor: r.elite ? '#ffce54' : rarCol(ev.rarity), block: true },
+        { borderColor: r.elite ? '#ffce54' : ring, block: true },
       );
     })
     .join('');
+
   // Push-your-luck cash-out (GS-bank): bank the run now to lock its credits in as permanent shards
   // (busting at the next cut would forfeit them). Shown with the exact shard payout so the "push or
   // bank" call is informed.
   const cashOut = cashOutShards(state.run);
+  const banked =
+    state.run.bonusShards > 0
+      ? ` <span style="color:#4fd0e0;">(✦ ${state.run.bonusShards} salvage already banked)</span>`
+      : '';
   const bankBtn =
     state.run.stopIndex > 0
       ? `<div style="margin-top:14px;border-top:1px solid var(--gs-line);padding-top:12px;">
-           <p style="opacity:.7;font-size:13px;margin:0 0 6px;">…or quit while you're ahead — cash your <b>${state.run.credits}</b> credits into permanent shards. Push deeper and a missed cut forfeits them.</p>
+           <p style="opacity:.7;font-size:13px;margin:0 0 6px;">…or quit while you're ahead — cash your <b>${credits}</b> credits into permanent shards. Push deeper and a missed cut forfeits them.${banked}</p>
            ${btn(`✦ Bank run & cash out${cashOut > 0 ? ` (+${cashOut} shards)` : ''}`, { type: 'bank' }, { variant: 'ghost', block: true })}
          </div>`
       : '';
   return `
     ${header()}
-    <h2 style="font-size:16px;">Choose your jump</h2>
-    <p style="opacity:.75;font-size:14px;">Deeper jumps raise the cut and wildness; each lane's event tilts the risk and the payout. There's always a calm option.</p>
+    <h2 style="font-size:16px;margin-bottom:8px;">Choose your jump</h2>
+    <div style="margin-bottom:12px;">${map}</div>
+    <p style="opacity:.75;font-size:14px;margin-top:0;">Every lane is a different bet — safe-but-poor, a payout gamble, a toll for an outsized return, or guaranteed salvage. Deeper jumps raise the cut.${
+      routeList.some((r) => r.event.cutDelta <= 0)
+        ? " There's a safer option here."
+        : ' <span style="color:#ff8b6b;">Out here, every lane is a gamble — or bank the run.</span>'
+    }</p>
     <div>${routes}</div>
     ${bankBtn}`;
 }
