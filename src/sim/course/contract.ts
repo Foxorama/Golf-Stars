@@ -90,6 +90,15 @@ export interface Hole {
    * for back-compat — a hole without one is unlabelled.
    */
   shapeId?: string;
+  /**
+   * Green SLOPE (GS-greens-3): the green's dominant tilt as a DOWNHILL vector in course space — its
+   * direction is downhill (the fall line), its magnitude is steepness (~0 flat … ~1 severe). The sim
+   * reads it so the approach roll runs out downhill / checks uphill (and never spins weirdly UP a
+   * slope), and putts BREAK along it; the renderer shades the high/low sides + draws fall-line arrows.
+   * Drawn from a SIDE rng (like the pin) so adding it leaves existing courses' terrain byte-identical.
+   * Optional for back-compat: a hole without one plays flat.
+   */
+  greenSlope?: Vec;
 }
 
 export interface CourseMeta {

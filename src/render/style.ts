@@ -314,7 +314,14 @@ function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string): Pr
   return out;
 }
 
-function styleGreen(poly: Vec[], art: ArtFeel, s: Shade, collar: string, fringe: string): Prim[] {
+function styleGreen(
+  poly: Vec[],
+  art: ArtFeel,
+  s: Shade,
+  collar: string,
+  fringe: string,
+  slope?: { dir: Vec; mag: number },
+): Prim[] {
   const c = centroidOf(poly);
   const out: Prim[] = [
     // Two nested rings ease the green into the land: an outer first-cut fringe, then the darker
@@ -325,20 +332,50 @@ function styleGreen(poly: Vec[], art: ArtFeel, s: Shade, collar: string, fringe:
     { t: 'poly', pts: poly, fill: s.base },
   ];
   if (art.stripes) out.push(stripes(poly, s.light, s.dark, 6));
-  // A soft lit highlight toward the top-left, then a softened ink edge.
   const gb = bboxOf(poly);
-  out.push({
-    t: 'clip',
-    clip: poly,
-    children: [
-      {
-        t: 'circle',
-        c: [c[0] - (gb.maxX - gb.minX) * 0.18, c[1] - (gb.maxY - gb.minY) * 0.18],
-        r: Math.max(4, (gb.maxX - gb.minX) * 0.3),
-        fill: 'rgba(255,255,255,0.12)',
-      },
-    ],
-  });
+  // Green SLOPE (GS-greens-3): shade the LOW side darker + the HIGH side lighter and lay fall-line
+  // arrows pointing downhill, so the tilt reads at a glance (the graphic IS the slope the sim rolls
+  // on). `slope.dir` is the screen-space DOWNHILL unit; `mag` 0..~0.7 its steepness.
+  if (slope && slope.mag > 0.05) {
+    const span = Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY);
+    const a = Math.min(0.5, slope.mag * 0.7);
+    out.push({
+      t: 'clip',
+      clip: poly,
+      children: [
+        // low side (downhill) shadow
+        { t: 'circle', c: [c[0] + slope.dir[0] * span * 0.34, c[1] + slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(0,0,0,${(a * 0.5).toFixed(3)})` },
+        // high side (uphill) lit
+        { t: 'circle', c: [c[0] - slope.dir[0] * span * 0.34, c[1] - slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(255,255,255,${(a * 0.32).toFixed(3)})` },
+      ],
+    });
+    // 2 short chevron arrows pointing downhill.
+    const perp: Vec = [-slope.dir[1], slope.dir[0]];
+    const arrows: Prim[] = [];
+    for (let i = -1; i <= 1; i += 2) {
+      const base: Vec = [c[0] + perp[0] * span * 0.16 * i - slope.dir[0] * span * 0.14, c[1] + perp[1] * span * 0.16 * i - slope.dir[1] * span * 0.14];
+      const tip: Vec = [base[0] + slope.dir[0] * span * 0.3, base[1] + slope.dir[1] * span * 0.3];
+      const col = 'rgba(255,255,255,0.5)';
+      arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.4, round: true });
+      arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * 4 + perp[0] * 3, tip[1] - slope.dir[1] * 4 + perp[1] * 3], stroke: col, sw: 1.4, round: true });
+      arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * 4 - perp[0] * 3, tip[1] - slope.dir[1] * 4 - perp[1] * 3], stroke: col, sw: 1.4, round: true });
+    }
+    out.push({ t: 'clip', clip: poly, children: arrows });
+  } else {
+    // Flat green: the original soft lit highlight toward the top-left.
+    out.push({
+      t: 'clip',
+      clip: poly,
+      children: [
+        {
+          t: 'circle',
+          c: [c[0] - (gb.maxX - gb.minX) * 0.18, c[1] - (gb.maxY - gb.minY) * 0.18],
+          r: Math.max(4, (gb.maxX - gb.minX) * 0.3),
+          fill: 'rgba(255,255,255,0.12)',
+        },
+      ],
+    });
+  }
   if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.7), sw: 1.2 });
   return out;
 }
@@ -619,6 +656,22 @@ function styleTree(poly: Vec[], proj: Projector, rng: () => number): Prim[] {
 /** Project a whole polygon to screen space. */
 function projPoly(poly: Vec[], proj: Projector): Vec[] {
   return poly.map((p) => proj.project(p));
+}
+
+/** The green's downhill SLOPE as a SCREEN-space unit direction + magnitude (GS-greens-3), by
+ *  projecting the course-space fall line through the tee→green-up projector. Undefined for a flat
+ *  green. Pure — no rng — so it never perturbs the scene's seeded look. */
+function greenSlopeScreen(hole: Hole, proj: Projector): { dir: Vec; mag: number } | undefined {
+  const g = hole.greenSlope;
+  if (!g) return undefined;
+  const mag = Math.hypot(g[0], g[1]);
+  if (mag < 1e-4) return undefined;
+  const a = proj.project(hole.green);
+  const b = proj.project([hole.green[0] + g[0] / mag, hole.green[1] + g[1] / mag]);
+  let dx = b[0] - a[0];
+  let dy = b[1] - a[1];
+  const l = Math.hypot(dx, dy) || 1;
+  return { dir: [dx / l, dy / l], mag };
 }
 
 /** Is a screen point within the (padded) view? Used to cull off-screen accents/tufts. */
@@ -964,7 +1017,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
     const sp = projPoly(f.poly, proj);
     if (voidGlow && f.kind === 'green') glowRings(sp);
-    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe));
+    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, greenSlopeScreen(hole, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
   }

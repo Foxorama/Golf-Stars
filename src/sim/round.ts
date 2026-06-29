@@ -107,6 +107,10 @@ export function surfaceFirmness(lie: FeatureKind): number {
 /** Clamp on the run-out (yards): forward roll caps high, backspin checks modestly back. */
 const MAX_ROLL = 42;
 const MAX_CHECK = 18;
+/** How strongly a green's slope speeds a downhill roll / brakes an uphill one (GS-greens-3). The
+ *  green run-per-yard is scaled by `1 + SLOPE_ROLL_K · (downhill·travelDir) · slopeMag`, floored so a
+ *  steep uphill still creeps a hair. slopeMag rides in the green-slope vector's magnitude. */
+const SLOPE_ROLL_K = 0.95;
 
 /** Carry of the pitching wedge — at/below this, clubs start adding backspin. */
 export const BACKSPIN_CARRY = 106;
@@ -164,6 +168,19 @@ export function rollOut(
   const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
   const at = (d: number): Vec => [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
   const STEP = 1.5; // yards per integration step
+  // Green SLOPE (GS-greens-3): how much the roll runs downhill / checks uphill. The travel direction
+  // is sign*dir; its projection onto the green's DOWNHILL vector scales the green's run-per-yard, so a
+  // ball rolling downhill runs out far and one rolling (or BACKSPINNING) uphill brakes hard and can't
+  // climb — no ball ever spins weirdly up a slope. Pure geometry, no rng, straight roll → the
+  // roll-invariant (dist(rest,touchdown) === |roll|) and the renderer's straight run-out hold.
+  const slope = hole.greenSlope;
+  const tdx = dir[0] * sign;
+  const tdy = dir[1] * sign;
+  const slopeRun = (k: string): number => {
+    if (k !== 'green' || !slope) return 1;
+    const along = tdx * slope[0] + tdy * slope[1]; // + = travelling downhill, − = uphill
+    return Math.max(0.32, 1 + SLOPE_ROLL_K * along);
+  };
   let budget = Math.abs(K); // remaining energy, in fairway-equivalent yards
   let dist = 0;
   let guard = 0;
@@ -177,7 +194,7 @@ export function rollOut(
       dist += STEP; // ran into sand / caught by the woods → stops
       break;
     }
-    const m = SURFACE_ROLL[k] ?? 0.6; // this surface's run per yard
+    const m = (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k); // this surface's run per yard, slope-adjusted on the green
     if (m <= 0) break;
     const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
     if (need >= budget) {
