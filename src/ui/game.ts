@@ -82,6 +82,7 @@ export type Screen =
   | 'travel'
   | 'gameover'
   | 'trademarket'
+  | 'clubhouseHall'
   | 'clubhouse';
 
 export interface UiState {
@@ -196,6 +197,8 @@ export type Action =
   | { type: 'viewHole'; hole: number }
   | { type: 'openMarket' } // visit the between-run Trade Market (buy ships/apparel/bags) (GS-clubhouse)
   | { type: 'closeMarket' } // back to the title from the Trade Market
+  | { type: 'openClubhouseHall' } // enter the Clubhouse — the hall of all four golfers (GS-clubhouse)
+  | { type: 'closeClubhouseHall' } // back to the title from the Clubhouse hall
   | { type: 'openClubhouse'; characterId: string } // outfit one character's garage + wardrobe (GS-clubhouse)
   | { type: 'closeClubhouse' } // back to the title from the Clubhouse
   | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (global ownership) (GS-garage)
@@ -760,10 +763,22 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, screen: 'title' };
     }
 
+    case 'openClubhouseHall': {
+      // Enter the Clubhouse — the hall where all four golfers wait, each a doorway to their own
+      // garage + wardrobe. Reachable between runs (title / game over), like the Trade Market.
+      if (state.screen !== 'title' && state.screen !== 'gameover') return state;
+      return { ...state, screen: 'clubhouseHall' };
+    }
+
+    case 'closeClubhouseHall': {
+      if (state.screen !== 'clubhouseHall') return state;
+      return { ...state, screen: 'title' };
+    }
+
     case 'openClubhouse': {
       // Outfit ONE character's garage (owned ship) + wardrobe (owned hats/shirts). Reachable from the
-      // title's Clubhouse section.
-      if (state.screen !== 'title') return state;
+      // Clubhouse hall (and historically straight from the title).
+      if (state.screen !== 'title' && state.screen !== 'clubhouseHall') return state;
       if (!getCharacter(action.characterId)) return state;
       return { ...state, screen: 'clubhouse', manageCharacterId: action.characterId };
     }
