@@ -43,6 +43,9 @@ import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
 import { SHIPS, canBuyShip, marketOffer, marketRerollCost, type Ship } from './sim/rpg/ships';
 import { shipCardSVG } from './render/shipArt';
+import { apparelById, apparelForSlot, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
+import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
+import { cosmeticRarCol, isMythic } from './sim/rpg/cosmetics';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
 import { defaultSave } from './save/schema';
@@ -118,6 +121,9 @@ function boot(): void {
       ownedShips: save.ownedShips,
       selectedShip: save.selectedShip,
       marketSeed: save.marketSeed,
+      ownedApparel: save.ownedApparel,
+      equippedHat: save.equippedHat,
+      equippedShirt: save.equippedShirt,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -160,7 +166,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 6,
+    version: 7,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -170,6 +176,9 @@ function persist(): void {
     ownedShips: state.ownedShips,
     selectedShip: state.selectedShip,
     marketSeed: state.marketSeed,
+    ownedApparel: state.ownedApparel,
+    equippedHat: state.equippedHat,
+    equippedShirt: state.equippedShirt,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -193,7 +202,7 @@ function dispatch(action: Action): void {
     puttMeter = null;
   }
   // A light UI tick on navigation presses (the stroke + purchase actions get their own richer cue).
-  if (action.type !== 'shot' && action.type !== 'putt' && action.type !== 'buy' && action.type !== 'buyShip') {
+  if (action.type !== 'shot' && action.type !== 'putt' && action.type !== 'buy' && action.type !== 'buyShip' && action.type !== 'buyApparel') {
     sfx.click();
   }
   // Any reducer action dismisses a pending shot popup and cancels its timer.
@@ -206,7 +215,7 @@ function dispatch(action: Action): void {
     const prevScreen = state.screen;
     state = reduce(state, action);
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
-    if (action.type === 'buy' || action.type === 'buyShip') {
+    if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
       sfx.reward();
       haptic(HAPTICS.tap);
     }
@@ -1776,7 +1785,7 @@ function outpostScreen(): string {
 
   const marketCards = offer
     .map((ship) => {
-      const ring = rarCol(ship.rarity);
+      const ring = cosmeticRarCol(ship.rarity);
       const afford = canBuyShip(ship, state.shards, state.ownedShips);
       const footer = `✦ ${ship.cost}${afford ? '' : ' — short'}`;
       return shipCardHTML(ship, footer, { ring, dim: !afford, action: afford ? { type: 'buyShip', id: ship.id } : undefined });
@@ -1795,7 +1804,7 @@ function outpostScreen(): string {
   const fleet = SHIPS.filter((s) => state.ownedShips.includes(s.id))
     .map((ship) => {
       const selected = ship.id === state.selectedShip;
-      const ring = selected ? '#ffce54' : rarCol(ship.rarity);
+      const ring = selected ? '#ffce54' : cosmeticRarCol(ship.rarity);
       return shipCardHTML(ship, selected ? '✓ FLYING' : 'Fly this', {
         ring,
         glow: selected,
@@ -1807,14 +1816,82 @@ function outpostScreen(): string {
   return `
     <header style="border-left:4px solid #e08a2b;padding-left:10px;">
       <h1 style="margin:0;font-size:22px;">🚀 Trade Market</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on a new ride for the journey map. Cosmetic only — the stock refreshes each run.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on a new ride and a fresh look. Cosmetic only — the ship stock refreshes each run.</p>
     </header>
     <h2 style="font-size:16px;margin:.6em 0 .2em;">✦ ${state.shards} Star Shards</h2>
     ${marketBody}
     <h2 style="font-size:16px;margin:1em 0 .2em;">🛖 Your Garage</h2>
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Pick the ship you fly between worlds.</p>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;">${fleet}</div>
+    ${wardrobeSection()}
     <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
+}
+
+/** A wardrobe card for one garment — buyable (unowned), or an equip toggle (owned). */
+function apparelCardHTML(item: Apparel, state2: { shards: number; ownedApparel: string[]; equippedHat?: string; equippedShirt?: string }): string {
+  const ring = cosmeticRarCol(item.rarity);
+  const owned = state2.ownedApparel.includes(item.id);
+  const equipped = (item.slot === 'hat' ? state2.equippedHat : state2.equippedShirt) === item.id;
+  const afford = canBuyApparel(item, state2.shards, state2.ownedApparel);
+  let footer: string;
+  let action: Action | undefined;
+  if (equipped) {
+    footer = '✓ WEARING';
+    action = { type: 'equipApparel', id: item.id };
+  } else if (owned) {
+    footer = 'Wear this';
+    action = { type: 'equipApparel', id: item.id };
+  } else if (afford) {
+    footer = `✦ ${item.cost}`;
+    action = { type: 'buyApparel', id: item.id };
+  } else {
+    footer = `✦ ${item.cost} — short`;
+  }
+  const myth = isMythic(item.rarity);
+  const glow = equipped || myth;
+  const inner = `
+    <div style="border:2px solid ${equipped ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 30%, ${ring}22, #0b0d12);text-align:center;width:118px;${!owned && !afford ? 'opacity:.5;' : ''}${glow ? `box-shadow:0 0 0 2px ${equipped ? '#ffce54' : ring}, 0 0 14px ${ring}88;` : ''}">
+      ${apparelCardSVG(item.id, 104, 64)}
+      <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${item.name}</div>
+      <div style="font-size:10px;opacity:.55;">${item.set} · ${item.rarity}</div>
+      <div style="font-size:11px;margin-top:3px;color:${equipped ? '#ffce54' : ring};font-weight:700;">${footer}</div>
+    </div>`;
+  return action
+    ? `<div class="gs-clickcard" data-action='${JSON.stringify(action)}' style="cursor:pointer;margin:4px;">${inner}</div>`
+    : `<div style="margin:4px;">${inner}</div>`;
+}
+
+/** The Wardrobe (GS-cosmetics): a live golfer preview + racks of hats & shirts to buy/equip. */
+function wardrobeSection(): string {
+  const ch = getCharacter(state.run.loadout.characterId)?.style;
+  const preview = golferPreviewSVG(state.equippedHat, state.equippedShirt, {
+    skin: ch?.skin,
+    shirtBase: ch?.shirt,
+    w: 110,
+    h: 134,
+  });
+  const setName = equippedSet(state.equippedHat, state.equippedShirt);
+  const setBadge = setName
+    ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#ff4fd8;">✦ ${setName} set complete!</div>`
+    : '';
+  const rack = (slot: ApparelSlot) =>
+    `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${apparelForSlot(slot)
+      .map((a) => apparelCardHTML(a, state))
+      .join('')}</div>`;
+  return `
+    <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Your Wardrobe</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Dress your golfer. Click an owned piece to wear it (again to take it off). Complete a set for the full look.</p>
+    <div style="display:flex;justify-content:center;margin-bottom:8px;">
+      <div style="border:2px solid #2a3140;border-radius:12px;padding:8px 18px;background:radial-gradient(circle at 50% 25%, #1a2030, #0b0d12);text-align:center;">
+        ${preview}
+        <div style="font-size:11px;opacity:.6;">Now wearing</div>
+        ${setBadge}
+      </div>
+    </div>
+    <h3 style="font-size:13px;opacity:.8;margin:.6em 0 .1em;text-align:center;">🎩 Hats</h3>
+    ${rack('hat')}
+    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
+    ${rack('shirt')}`;
 }
 
 // The destination biome a lane flies into (GS-journey-biome) → a glyph + label + accent for the route
@@ -2105,7 +2182,15 @@ function golferLook(): GolferLook | undefined {
   const base = getCharacter(state.run.loadout.characterId)?.style;
   if (!base) return undefined;
   const gear = equippedGearTheme(state.run.loadout);
-  return gear ? { ...base, gear: { theme: gear.theme, tint: gear.tint } } : base;
+  // Layer the equipped cosmetic hat/shirt (GS-cosmetics) over the character's base colours.
+  const hat = apparelById(state.equippedHat)?.look;
+  const shirtStyle = apparelById(state.equippedShirt)?.look;
+  return {
+    ...base,
+    ...(gear ? { gear: { theme: gear.theme, tint: gear.tint } } : {}),
+    ...(hat ? { hat } : {}),
+    ...(shirtStyle ? { shirtStyle } : {}),
+  };
 }
 
 /** The team-duel setup for the current stop (GS-team-duel) — prefers the live match state, else recompute. */

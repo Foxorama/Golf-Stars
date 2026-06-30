@@ -74,6 +74,46 @@ function shipBody(look: ShipLook): string {
         </g>
         <circle cx="0" cy="0" r="9" fill="${body}" stroke="${accent}" stroke-width="1"/>
         <g fill="#c9ccd6"><circle cx="-2.5" cy="-2.5" r="1"/><circle cx="2" cy="-1.5" r="1"/><circle cx="-1" cy="2" r="1"/><circle cx="3" cy="2.5" r="1"/><circle cx="-4" cy="1" r="1"/></g>`;
+    case 'ufo': {
+      // The mythic Mothership — a classic flying saucer with SPINNING landing-gear wheels, a ring of
+      // FLASHING lights, a glass dome, and a "Hole 19" pennant flying off the top. Authored upright
+      // (it hovers, it doesn't drive), bigger than the other craft to read as the grail.
+      const lightCols = ['#ff5a4d', '#ffd36b', '#7fffd0', '#7fd6ff', '#ff8bf0'];
+      const lights = [-16, -8, 0, 8, 16]
+        .map((x, i) => {
+          const c = lightCols[i % lightCols.length];
+          return `<circle cx="${x}" cy="6" r="1.7" fill="${c}"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.9s" begin="${(i * 0.18).toFixed(2)}s" repeatCount="indefinite"/></circle>`;
+        })
+        .join('');
+      // A landing-gear wheel: a small rim with two cross-spokes, spun by an animateTransform rotate.
+      const wheel = (x: number, dir: number, dur: string) => `
+        <g stroke="#0c1116" stroke-width="0.9"><line x1="${x}" y1="6.5" x2="${x + dir * 3}" y2="12" /></g>
+        <g transform="translate(${x + dir * 3} 12.6)">
+          <g><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="${dur}" repeatCount="indefinite"/>
+            <circle cx="0" cy="0" r="2.6" fill="#2a2f3a" stroke="#c9ccd6" stroke-width="0.8"/>
+            <line x1="-2.6" y1="0" x2="2.6" y2="0" stroke="#c9ccd6" stroke-width="0.7"/>
+            <line x1="0" y1="-2.6" x2="0" y2="2.6" stroke="#c9ccd6" stroke-width="0.7"/>
+          </g>
+        </g>`;
+      return `
+        <g stroke="#0d1a14" stroke-width="1" stroke-linejoin="round">
+          ${wheel(-12, -1, '0.7s')}${wheel(12, 1, '0.8s')}
+          <ellipse cx="0" cy="4" rx="22" ry="6.5" fill="${body}"/>
+          <ellipse cx="0" cy="4" rx="22" ry="6.5" fill="none" stroke="${accent}" stroke-width="1.4"/>
+          <path d="M-12,0.5 A12,11 0 0 1 12,0.5 Z" fill="${glass}" opacity="0.92"/>
+          <path d="M-12,0.5 A12,11 0 0 1 12,0.5" fill="none" stroke="${accent}" stroke-width="1"/>
+          <ellipse cx="-4" cy="-4" rx="3.5" ry="2" fill="#ffffff" opacity="0.5"/>
+        </g>
+        ${lights}
+        <path d="M-7,9 L0,20 L7,9 Z" fill="${flame}" opacity="0.4"/>
+        <g stroke="#0c1116" stroke-width="0.9"><line x1="0" y1="-12" x2="0" y2="-24"/></g>
+        <circle cx="0" cy="-24" r="1.1" fill="${accent}"/>
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="-2.5 0 -20;2.5 0 -20;-2.5 0 -20" dur="2.4s" repeatCount="indefinite"/>
+          <path d="M0,-24 L19,-22 L16,-19 L19,-16 L0,-17 Z" fill="#ff4fd8" stroke="#0c1116" stroke-width="0.6"/>
+          <text x="2" y="-19" font-size="3" font-weight="700" fill="#ffffff" font-family="system-ui,sans-serif">Hole 19</text>
+        </g>`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `
