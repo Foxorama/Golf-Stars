@@ -392,6 +392,44 @@ describe('a guard with no fairway test is byte-for-byte identical (no extra rng)
   });
 });
 
+describe('greenside misses are dropped ON the green, not just the fairway', () => {
+  it('a greenside off-fairway miss on the guard side is teleported to the green target', () => {
+    const GREEN_PT: Vec = [9, 235];
+    const greenAim = (_p: Vec) => GREEN_PT; // treat every off-fairway miss as greenside
+    let saves = 0;
+    for (let s = 0; s < 400; s++) {
+      const r = resolveShot({
+        from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss,
+        guard: SPACE_DUCKS_GUARD, offFairway, greenAim, rng: new Rng(`gs:${s}`),
+      });
+      if (r.redirect) {
+        saves++;
+        expect(r.landing).toEqual(GREEN_PT); // dropped on the green, NOT recentred on the fairway line
+        expect(r.carry).toBeCloseTo(Math.hypot(GREEN_PT[0] - FROM[0], GREEN_PT[1] - FROM[1]), 3);
+      }
+    }
+    expect(saves).toBeGreaterThan(20); // plenty of left misses to save
+  });
+
+  it('when the miss is NOT greenside (greenAim → null) the save recentres onto the fairway instead', () => {
+    const greenAim = (_p: Vec) => null; // nothing is greenside
+    let redirects = 0;
+    let backOnFairway = 0;
+    for (let s = 0; s < 400; s++) {
+      const r = resolveShot({
+        from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss,
+        guard: SPACE_DUCKS_GUARD, offFairway, greenAim, rng: new Rng(`fw:${s}`),
+      });
+      if (r.redirect) {
+        redirects++;
+        if (!offFairway(r.landing)) backOnFairway++;
+      }
+    }
+    expect(redirects).toBeGreaterThan(20);
+    expect(backOnFairway).toBe(redirects); // every non-greenside save lands back on the fairway
+  });
+});
+
 describe('caddies hold the "a power-up must not hurt scoring" invariant', () => {
   const meanStableford = (perks: string[]): number => {
     const lo = loadoutFromPerks(perks);

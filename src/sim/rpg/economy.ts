@@ -110,8 +110,9 @@ export interface PlayerLoadout {
    */
   chipInBoost?: number;
   /**
-   * A named caddy's in-flight ball guard (GS-caddy, Space Ducks / Convict Sheep): redirects a sampled
-   * miss tail back onto the fairway mid-flight. Undefined = no guard.
+   * A named caddy's in-flight ball guard (GS-caddy, Space Ducks / Convict Sheep): redirects an off-
+   * fairway miss back onto the short grass mid-flight (the green if greenside, else the fairway).
+   * Undefined = no guard.
    */
   caddyGuard?: CaddyGuard;
   /**
@@ -366,11 +367,11 @@ export interface ShopItem {
 }
 
 /** Space Ducks' laser guard (GS-caddy): zaps EVERY ball that would come down off the LEFT side of the
- *  fairway (rough/sand/void/water — wherever) back onto the fairway. Fires on every left miss, not just
- *  the extreme hooks: if it's left of the short grass, the lasers bring it home. */
+ *  short grass (rough/sand/void/water — wherever) back onto it — a GREENSIDE miss is dropped on the GREEN,
+ *  any other miss on the fairway. Fires on every left miss, not just the extreme hooks. */
 export const SPACE_DUCKS_GUARD: CaddyGuard = { side: 'left', kind: 'laser' };
 /** Convict Sheep's boomerang guard (GS-caddy): knocks EVERY ball that would come down off the RIGHT side
- *  of the fairway back onto the fairway. The right-side mirror of Space Ducks. */
+ *  back onto the short grass (green if greenside, else the fairway). The right-side mirror of Space Ducks. */
 export const CONVICT_SHEEP_GUARD: CaddyGuard = { side: 'right', kind: 'boomerang' };
 
 /**
@@ -543,7 +544,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'space-ducks',
     name: 'Space Ducks',
     cost: 300,
-    desc: 'Laser-toting space ducks zap EVERY ball that would miss the fairway to the LEFT back onto it',
+    desc: 'Laser-toting space ducks zap EVERY ball missing LEFT back onto the short grass — the green if it’s a greenside miss, else the fairway',
     rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, caddyGuard: SPACE_DUCKS_GUARD, perks: [...m.perks, 'space-ducks'] }),
@@ -552,7 +553,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'convict-sheep',
     name: 'Convict Sheep',
     cost: 300,
-    desc: 'Boomerang-slinging convict sheep knock EVERY ball that would miss the fairway to the RIGHT back onto it',
+    desc: 'Boomerang-slinging convict sheep knock EVERY ball missing RIGHT back onto the short grass — the green if it’s a greenside miss, else the fairway',
     rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, caddyGuard: CONVICT_SHEEP_GUARD, perks: [...m.perks, 'convict-sheep'] }),

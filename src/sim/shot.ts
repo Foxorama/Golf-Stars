@@ -233,13 +233,14 @@ export function classifySprayZone(
 
 /**
  * A caddy's in-flight ball guard (GS-caddy): the named caddy that watches your misses and knocks the
- * ball back onto the fairway (the centre line) mid-flight. It fires whenever the ball is about to come
- * down OFF the fairway on the caddy's `side` — every qualifying miss, no chance roll. `side` is the
- * world side of the fairway it covers ('left' = a Space Duck's laser, 'right' = a Convict Sheep's
- * boomerang); `kind` is the render flavour. Unlike a `ShapeMod`, this does NOT change the spray
- * distribution (the cone still shows the tails) — it intercepts a shot that was already sampled into an
- * off-fairway miss, so the renderer can play the projectile redirect. The off-fairway test is supplied
- * by the caller (`ShotInput.offFairway`, course-aware); resolved identically in auto + interactive.
+ * ball back onto the SHORT GRASS mid-flight. It fires whenever the ball is about to come down OFF the
+ * fairway on the caddy's `side` — every qualifying miss, no chance roll. A GREENSIDE miss is dropped ON
+ * the green (the most useful save); any other miss is recentred onto the fairway. `side` is the world
+ * side it covers ('left' = a Space Duck's laser, 'right' = a Convict Sheep's boomerang); `kind` is the
+ * render flavour. Unlike a `ShapeMod`, this does NOT change the spray distribution (the cone still shows
+ * the tails) — it intercepts a shot already sampled into an off-fairway miss, so the renderer can play the
+ * projectile redirect. The course-aware tests are supplied by the caller (`ShotInput.offFairway` +
+ * `ShotInput.greenAim`); resolved identically in auto + interactive.
  */
 export interface CaddyGuard {
   side: 'left' | 'right';
@@ -576,6 +577,11 @@ export interface ShotInput {
    *  course-agnostic. Absent ⇒ the guard never fires (and draws no extra rng), so a hole-less unit call
    *  or a guard-less shot is byte-for-byte the base shot. */
   offFairway?: (landing: Vec) => boolean;
+  /** Course-aware GREENSIDE target for the caddy guard (GS-caddy): given a would-be off-fairway miss,
+   *  returns an on-green point to drop the ball on if the miss is GREENSIDE (near the green), else null —
+   *  so a greenside save lands ON the green, not just the fairway. The caller closes it over the hole's
+   *  green + pin. Absent/null ⇒ the guard recentres onto the fairway line instead (no green teleport). */
+  greenAim?: (landing: Vec) => Vec | null;
   /**
    * Left-handed mode (GS-lefty): mirror the player's lateral shot tendencies in WORLD space. A
    * left-handed golfer is the mirror image of a right-handed one — their hook curves right, their
@@ -660,7 +666,7 @@ export function resolveShot(input: ShotInput): ShotResult {
   // to the (possibly tightened) [low, high] window so a shot can come up short but never absurdly so.
   const carryMean = intended * prof.meanFrac + w.along * TUNABLES.windCarryPerMph;
   const carryNoisy = carryMean + rng.gaussian(0, carrySd);
-  const carry = Math.max(
+  let carry = Math.max(
     intended * lowFrac,
     Math.min(intended * highFrac, Math.max(0, carryNoisy)),
   );
@@ -693,22 +699,33 @@ export function resolveShot(input: ShotInput): ShotResult {
   let landing = landAt(thetaRand);
 
   // Caddy-guard interception (GS-caddy): a named caddy that watches the ball mid-flight and, if it's
-  // about to come down OFF the fairway on the caddy's side, zaps it back onto the fairway (the centre
-  // line). Outcome-based: `offFairway(landing)` (a course-aware predicate the caller closes over the
-  // hole with) tests the would-be touchdown, and the side is read off the landing's WORLD lateral sign
-  // (− = left of the bearing, + = right) so it matches "off the left/right side of the fairway". Fires
-  // on EVERY qualifying miss — no chance roll. Only runs when a guard is present AND a fairway test was
-  // supplied, so a guard-less shot (or a hole-less unit call) draws NO extra rng and stays byte-for-byte
-  // identical — the centre-band resample is the single added draw, and only on an actual knock-back.
+  // about to come down OFF the fairway on the caddy's side, zaps it back onto the SHORT GRASS. Outcome-
+  // based: `offFairway(landing)` (a course-aware predicate the caller closes over the hole with) tests
+  // the would-be touchdown, and the side is read off the landing's WORLD lateral sign (− = left of the
+  // bearing, + = right) so it matches "off the left/right side of the fairway". Where it sends the ball
+  // depends on WHERE the miss is: a GREENSIDE miss (one `greenAim` returns an on-green target for) is put
+  // straight ON the green — the most useful save; any other miss is recentred onto the fairway line at the
+  // same carry. Fires on EVERY qualifying miss — no chance roll. Only runs when a guard is present AND a
+  // fairway test was supplied, so a guard-less shot (or a hole-less unit call) draws NO extra rng and
+  // stays byte-for-byte identical — the fairway recentre is the single added draw (the greenside teleport
+  // is a deterministic point → no draw), and only on an actual knock-back.
   let redirect: ShotRedirect | undefined;
   if (input.guard && input.offFairway && input.offFairway(landing)) {
     const lateral = (landing[0] - from[0]) * rx + (landing[1] - from[1]) * ry;
     const side: 'left' | 'right' = lateral < 0 ? 'left' : 'right';
     if (side === input.guard.side) {
       const origLanding = landing;
-      sprayAngle = sampleGreenAngle(angleSd, rng);
-      thetaRand = (input.angleBias ?? 0) + sprayAngle;
-      landing = landAt(thetaRand);
+      const onGreen = input.greenAim ? input.greenAim(landing) : null;
+      if (onGreen) {
+        // Greenside save: drop it on the green (toward the pin) — carry follows so roll-out reads true.
+        landing = onGreen;
+        carry = Math.hypot(onGreen[0] - from[0], onGreen[1] - from[1]);
+      } else {
+        // Fairway save: recentre the angle onto the bearing line, same carry.
+        sprayAngle = sampleGreenAngle(angleSd, rng);
+        thetaRand = (input.angleBias ?? 0) + sprayAngle;
+        landing = landAt(thetaRand);
+      }
       redirect = {
         kind: input.guard.kind,
         fromZone: side === 'left' ? 'duckHookL' : 'shankR',

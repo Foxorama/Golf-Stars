@@ -265,7 +265,7 @@ export function caddyEffects(loadout: PlayerLoadout): CaddyEffect[] {
     out.push({
       id: 'caddyGuard',
       label: `Guard · ${g.kind}`,
-      detail: `every ball missing the fairway ${g.side === 'left' ? 'LEFT' : 'RIGHT'} → fairway`,
+      detail: `every ball missing ${g.side === 'left' ? 'LEFT' : 'RIGHT'} → green if greenside, else fairway`,
     });
   }
   if (loadout.clubSuggest)
