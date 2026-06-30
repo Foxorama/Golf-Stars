@@ -421,6 +421,31 @@
     is dropped. A defensive backfill drops any per-character entry referencing an unowned item. Tests:
     `tests/ships.test.ts` (full catalogue ordering), `tests/save.test.ts` (v10 migration + per-character seeding +
     unowned-drop), `tests/ui.test.ts` (buy-global / equip-per-character / guards / per-character independence).
+- **A third apparel slot — PANTS (GS-pants-outfit, save v11).** Apparel was a two-slot wardrobe (hat +
+  shirt); pants make the golfer dressable head-to-toe. The work was deliberately a CONTENT + plumbing change,
+  not an engine one — pants reuse every existing rail:
+  - **Data:** `ApparelSlot` becomes `'hat' | 'shirt' | 'pants'`, a new `PantsShape` union
+    (`trousers`/`shorts`/`knickers`/`leggings`/`spacepants`/`nebula`), and eight new `APPAREL` rows — one pair
+    per existing set so each clothing set can be completed (Rookie classic trousers + safari shorts, Tour
+    trousers, Gentleman plus-fours, Champion slacks, Neon leggings, Astronaut space-suit legs, Supernova
+    leggings), spanning every rarity tier incl. a mythic. Pants ride the SAME `ownedApparel` pool and
+    `APPAREL_COST` ladder — no new economy.
+  - **Set completion generalised:** `equippedSet(hat, shirt, pants)` now reports a set complete only when
+    EVERY slot that set defines in the catalogue is worn (a three-piece set needs all three; a two-slot set
+    like Gentleman = hat + pants needs both). This tightened the old "any matching hat+shirt" rule — a partial
+    set no longer sparkles — which is the intended "complete the set" semantics now that sets can be 3-piece.
+  - **Equip + render:** `pantsByCharacter` mirrors `hat`/`shirtByCharacter` exactly (`equipApparel` routes by
+    slot to the right map; `pantsForCharacter` resolves the played golfer's pick). `golferLook()` layers a
+    `pantsStyle` onto the on-course canvas golfer — `playView.ts drawGolfer` swaps its default dark legs for a
+    `drawPants` that shapes/tints them (shorts bare the shin, knickers buckle below the knee, spacepants add
+    mag-boots, glow tiers get an aura); with NO pants equipped the original legs draw byte-for-byte unchanged.
+    The wardrobe SVG gains a `pantsGlyph` card icon and the `golferPreviewSVG` mannequin grew legs so the
+    preview shows the full outfit. The Trade Market + Clubhouse each gained a 👖 Pants rack (the racks are
+    `apparelForSlot`-driven, so they absorbed the new slot automatically).
+  - **Save v11** (v10→v11 migration seeds an empty `pantsByCharacter`; the shared sanitize drops unowned
+    pants entries). No new `window._gs*` hook or `?param`, so the test hub needed no wiring. Tests:
+    `tests/apparel.test.ts` (pants tier coverage + three-/two-slot set completion), `tests/ui.test.ts`
+    (buy-global / equip-per-character pants), `tests/save.test.ts` (v11 round-trip + v10→v11 migration + unowned-drop).
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by

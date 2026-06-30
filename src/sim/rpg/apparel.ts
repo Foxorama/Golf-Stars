@@ -1,8 +1,8 @@
 /**
- * Apparel — the cosmetic HATS and SHIRTS your golfer wears (GS-cosmetics).
+ * Apparel — the cosmetic HATS, SHIRTS and PANTS your golfer wears (GS-cosmetics).
  *
  * Like the cosmetic ship fleet (`ships.ts`), apparel is pure CONTENT AS DATA: an id, the SLOT it fills
- * (hat or shirt), the cosmetic SET it belongs to (some pieces pair into a set, some stand alone), a
+ * (hat, shirt or pants), the cosmetic SET it belongs to (some pieces pair into a set, some stand alone), a
  * rarity (= price tier, up to the top `mythic`), and a render `look` that BOTH the wardrobe SVG card
  * (`render/apparelArt.ts`) and the on-course canvas golfer (`render/playView.ts drawGolfer`) key off,
  * so what you buy is what you wear. New garment = new row.
@@ -15,16 +15,18 @@
 import type { CosmeticRarity } from './cosmetics';
 import { COSMETIC_RARITY } from './cosmetics';
 
-export type ApparelSlot = 'hat' | 'shirt';
+export type ApparelSlot = 'hat' | 'shirt' | 'pants';
 
 /** Hat silhouettes the drawer renders (canvas + SVG share these shape names). */
 export type HatShape = 'cap' | 'bucket' | 'visor' | 'tophat' | 'crown' | 'helmet' | 'halo';
 /** Shirt silhouettes the drawer renders. */
 export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic';
+/** Pants silhouettes the drawer renders. */
+export type PantsShape = 'trousers' | 'shorts' | 'knickers' | 'leggings' | 'spacepants' | 'nebula';
 
 /** The vector look a garment renders as — a shape family + palette + optional aura for the top tiers. */
 export interface ApparelLook {
-  shape: HatShape | ShirtShape;
+  shape: HatShape | ShirtShape | PantsShape;
   /** Primary fabric colour. */
   color: string;
   /** Secondary trim / brim / stripe colour. */
@@ -192,6 +194,89 @@ export const APPAREL: readonly Apparel[] = [
     cost: APPAREL_COST.mythic,
     look: { shape: 'cosmic', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
   },
+
+  // ===== PANTS =========================================================================
+  // One pair per existing set, so each clothing set can be completed head-to-toe.
+  {
+    id: 'trousers-classic',
+    name: 'Classic Trousers',
+    slot: 'pants',
+    set: 'Rookie',
+    rarity: 'common',
+    blurb: 'Pressed and practical. Pairs with the Classic cap & polo.',
+    cost: APPAREL_COST.common,
+    look: { shape: 'trousers', color: '#2f6fb0', accent: '#1d4a7a' },
+  },
+  {
+    id: 'shorts-safari',
+    name: 'Safari Shorts',
+    slot: 'pants',
+    set: 'Rookie',
+    rarity: 'common',
+    blurb: 'Breezy khaki for a hot dust belt. Matches the Safari bucket.',
+    cost: APPAREL_COST.common,
+    look: { shape: 'shorts', color: '#b7a36a', accent: '#7c6c3e' },
+  },
+  {
+    id: 'trousers-tour',
+    name: 'Tour Trousers',
+    slot: 'pants',
+    set: 'Tour',
+    rarity: 'rare',
+    blurb: 'Crisp performance slacks. Completes the Tour look.',
+    cost: APPAREL_COST.rare,
+    look: { shape: 'trousers', color: '#f4f6fb', accent: '#22407a' },
+  },
+  {
+    id: 'knickers-ace',
+    name: 'Ace Plus-Fours',
+    slot: 'pants',
+    set: 'Gentleman',
+    rarity: 'epic',
+    blurb: 'Old-school golf knickers. The Gentleman is dressed to the ankle.',
+    cost: APPAREL_COST.epic,
+    look: { shape: 'knickers', color: '#1f2630', accent: '#c0392b' },
+  },
+  {
+    id: 'trousers-champion',
+    name: "Champion's Slacks",
+    slot: 'pants',
+    set: 'Champion',
+    rarity: 'epic',
+    blurb: 'Threaded with gold. For winners, from the waist down.',
+    cost: APPAREL_COST.epic,
+    look: { shape: 'trousers', color: '#f4c542', accent: '#b8860b' },
+  },
+  {
+    id: 'leggings-neon',
+    name: 'Neon Leggings',
+    slot: 'pants',
+    set: 'Neon',
+    rarity: 'epic',
+    blurb: 'Glowing circuit lines that hum to the Neon jersey.',
+    cost: APPAREL_COST.epic,
+    look: { shape: 'leggings', color: '#1d2030', accent: '#2bf0c0', glow: '#2bf0c0' },
+  },
+  {
+    id: 'pants-astro',
+    name: 'Space Suit Legs',
+    slot: 'pants',
+    set: 'Astronaut',
+    rarity: 'legendary',
+    blurb: 'Pressurised leggings and mag-boots. Completes the space suit.',
+    cost: APPAREL_COST.legendary,
+    look: { shape: 'spacepants', color: '#eef1f6', accent: '#d23b32', glow: '#bfe3ff' },
+  },
+  {
+    id: 'leggings-supernova',
+    name: 'Supernova Leggings',
+    slot: 'pants',
+    set: 'Supernova',
+    rarity: 'mythic',
+    blurb: 'Woven from caught starlight. The legs of the Supernova set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'nebula', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
 ];
 
 const BY_ID: Record<string, Apparel> = Object.fromEntries(APPAREL.map((a) => [a.id, a]));
@@ -213,18 +298,26 @@ export function canBuyApparel(item: Apparel | undefined, shards: number, owned: 
 }
 
 /**
- * The set a garment belongs to is COMPLETE when both its matching pieces are equipped (a hat + a shirt
- * of the same set). Used to award the "set bonus" sparkle on the wardrobe + the on-course aura. Returns
- * the set name if the currently-equipped hat & shirt are the two halves of one multi-piece set.
+ * The set a garment belongs to is COMPLETE when EVERY slot that set defines is equipped with a matching
+ * piece — hat + shirt + pants for a three-piece set, or both halves of a two-piece set. Used to award
+ * the "set bonus" sparkle on the wardrobe + the on-course aura. Returns the set name when the currently
+ * equipped pieces fully assemble one multi-piece set (Rookie's standalone basics never count as a set).
  */
-export function equippedSet(hatId: string | undefined, shirtId: string | undefined): string | undefined {
-  const hat = apparelById(hatId);
-  const shirt = apparelById(shirtId);
-  if (hat && shirt && hat.set === shirt.set) {
-    // Only multi-piece sets count (Rookie spans many standalone basics — don't treat it as a "set").
-    const setPieces = APPAREL.filter((a) => a.set === hat.set);
-    const slots = new Set(setPieces.map((a) => a.slot));
-    if (hat.set !== 'Rookie' && slots.has('hat') && slots.has('shirt')) return hat.set;
-  }
-  return undefined;
+export function equippedSet(
+  hatId: string | undefined,
+  shirtId: string | undefined,
+  pantsId: string | undefined,
+): string | undefined {
+  const worn = [apparelById(hatId), apparelById(shirtId), apparelById(pantsId)].filter(
+    (a): a is Apparel => !!a,
+  );
+  // A set needs at least two matching pieces; everything worn must share one non-Rookie set.
+  if (worn.length < 2) return undefined;
+  const set = worn[0]!.set;
+  if (set === 'Rookie' || !worn.every((a) => a.set === set)) return undefined;
+  // Complete only when every slot the set defines in the catalogue is actually worn.
+  const setSlots = new Set(APPAREL.filter((a) => a.set === set).map((a) => a.slot));
+  const wornSlots = new Set(worn.map((a) => a.slot));
+  for (const slot of setSlots) if (!wornSlots.has(slot)) return undefined;
+  return set;
 }

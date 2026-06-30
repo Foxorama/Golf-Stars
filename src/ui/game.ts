@@ -135,9 +135,10 @@ export interface UiState {
   /** The ship each character flies on the journey map (GS-clubhouse): characterId → ship id. Absent →
    *  the default Woody Wagon. Outfitted per golfer in the Clubhouse. */
   shipByCharacter: Record<string, string>;
-  /** The hat / shirt each character wears (characterId → apparel id). Absent → that golfer's default look. */
+  /** The hat / shirt / pants each character wears (characterId → apparel id). Absent → default look. */
   hatByCharacter: Record<string, string>;
   shirtByCharacter: Record<string, string>;
+  pantsByCharacter: Record<string, string>;
   /** The character whose Clubhouse (garage + wardrobe) is open for outfitting (transient — not saved). */
   manageCharacterId?: string;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
@@ -199,8 +200,8 @@ export type Action =
   | { type: 'closeClubhouse' } // back to the title from the Clubhouse
   | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (global ownership) (GS-garage)
   | { type: 'selectShip'; id: string } // fly a different owned ship on the managed character (Clubhouse)
-  | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt with shards (global ownership) (GS-cosmetics)
-  | { type: 'equipApparel'; id: string } // wear an owned hat/shirt on the managed character (toggles off)
+  | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt/pants with shards (global ownership) (GS-cosmetics)
+  | { type: 'equipApparel'; id: string } // wear an owned hat/shirt/pants on the managed character (toggles off)
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
   | { type: 'restart'; seed?: number | string };
 
@@ -216,6 +217,7 @@ export interface MetaProgress {
   shipByCharacter?: Record<string, string>;
   hatByCharacter?: Record<string, string>;
   shirtByCharacter?: Record<string, string>;
+  pantsByCharacter?: Record<string, string>;
   bagTier?: BagTier;
   unlockedClubsByCharacter?: Record<string, string[]>;
 }
@@ -244,6 +246,15 @@ export function shirtForCharacter(
   characterId: string | undefined,
 ): string | undefined {
   const pick = characterId ? s.shirtByCharacter[characterId] : undefined;
+  return pick && s.ownedApparel.includes(pick) ? pick : undefined;
+}
+
+/** The pants a character wears (GS-pants-outfit) — its Clubhouse pick if owned, else undefined. */
+export function pantsForCharacter(
+  s: { pantsByCharacter: Record<string, string>; ownedApparel: string[] },
+  characterId: string | undefined,
+): string | undefined {
+  const pick = characterId ? s.pantsByCharacter[characterId] : undefined;
   return pick && s.ownedApparel.includes(pick) ? pick : undefined;
 }
 
@@ -279,6 +290,7 @@ export function initState(
     shipByCharacter: meta.shipByCharacter ?? {},
     hatByCharacter: meta.hatByCharacter ?? {},
     shirtByCharacter: meta.shirtByCharacter ?? {},
+    pantsByCharacter: meta.pantsByCharacter ?? {},
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
   };
 }
@@ -801,7 +813,8 @@ export function reduce(state: UiState, action: Action): UiState {
       const item = apparelById(action.id);
       if (!item || !state.ownedApparel.includes(action.id)) return state;
       const cid = state.manageCharacterId;
-      const map = item.slot === 'hat' ? 'hatByCharacter' : 'shirtByCharacter';
+      const map =
+        item.slot === 'hat' ? 'hatByCharacter' : item.slot === 'shirt' ? 'shirtByCharacter' : 'pantsByCharacter';
       const current = state[map][cid];
       const next = { ...state[map] };
       if (current === action.id) delete next[cid];
@@ -841,6 +854,7 @@ export function reduce(state: UiState, action: Action): UiState {
         shipByCharacter: state.shipByCharacter,
         hatByCharacter: state.hatByCharacter,
         shirtByCharacter: state.shirtByCharacter,
+        pantsByCharacter: state.pantsByCharacter,
         bagTier: state.bagTier,
         unlockedClubsByCharacter: state.unlockedClubsByCharacter,
       });
