@@ -680,6 +680,10 @@ let mapZoom = 1;
 // Shop bag-inventory: the gear item the player tapped to inspect (its card shows for comparison with
 // the shop stock). View-only module state (like selClubId) — no reducer/save state, reset on buy.
 let inspectGearId: string | null = null;
+// Trade Market accordion (GS-market-accordion): which catalogue sections the player has collapsed.
+// View-only module state (like inspectGearId) — toggled via [data-toggle-section] + re-render, never
+// persisted. Empty = every section expanded (the default, non-surprising view).
+const collapsedMarketSections = new Set<string>();
 let mapPan: [number, number] = [0, 0];
 // Journey map (GS-galaxy-map): remember the trail strip's horizontal scroll so it survives the
 // per-frame re-render of the travel screen — snap to the most-recent stops only when a NEW stop's
@@ -1795,22 +1799,53 @@ function shopScreen(): string {
  *  (cost in the market, or a SELECT / SELECTED state in the garage). Clickable when `action` given. */
 function shipCardHTML(ship: Ship, footer: string, opts: { action?: Action; ring: string; dim?: boolean; glow?: boolean } = { ring: '#8aa0c0' }): string {
   const inner = `
-    <div style="border:2px solid ${opts.ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${opts.ring}22, #0b0d12);text-align:center;width:128px;${opts.dim ? 'opacity:.55;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.ring}, 0 0 14px ${opts.ring}66;` : ''}">
+    <div style="border:2px solid ${opts.ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${opts.ring}22, #0b0d12);text-align:center;width:130px;${opts.dim ? 'opacity:.55;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.ring}, 0 0 14px ${opts.ring}66;` : ''}">
       ${shipCardSVG(ship.id, 116, 60)}
-      <div style="font-size:13px;font-weight:700;margin-top:2px;">${ship.name}</div>
-      <div style="font-size:10.5px;opacity:.55;">${ship.set} · ${ship.rarity}</div>
-      <div style="font-size:11.5px;margin-top:3px;color:${opts.ring};font-weight:700;">${footer}</div>
+      <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${ship.name}</div>
+      <div style="font-size:10px;opacity:.55;">${ship.set} · ${ship.rarity}</div>
+      <div style="font-size:11px;margin-top:3px;color:${opts.ring};font-weight:700;">${footer}</div>
     </div>`;
   return opts.action
     ? `<div class="gs-clickcard" data-action='${JSON.stringify(opts.action)}' style="cursor:pointer;margin:5px;">${inner}</div>`
     : `<div style="margin:5px;">${inner}</div>`;
 }
 
+/** One collapsible Trade-Market section (GS-market-accordion): a tap-to-toggle header (icon · title ·
+ *  owned/total count · chevron) over a card rack, so the long catalogue stays navigable as it grows.
+ *  Collapse state is module-local (`collapsedMarketSections`) + re-rendered — same view-only pattern as
+ *  `inspectGearId` (native <details> can't be used: render() replaces app.innerHTML on every buy, which
+ *  would reset the open state). Every section shares this chrome so the catalogue reads consistently. */
+function marketSection(
+  id: string,
+  icon: string,
+  title: string,
+  owned: number,
+  total: number,
+  blurb: string,
+  rack: string,
+): string {
+  const collapsed = collapsedMarketSections.has(id);
+  return `
+    <section class="gs-acc${collapsed ? ' gs-acc--collapsed' : ''}">
+      <button class="gs-acc__head" data-toggle-section="${id}" aria-expanded="${collapsed ? 'false' : 'true'}">
+        <span class="gs-acc__icon" aria-hidden="true">${icon}</span>
+        <span class="gs-acc__title">${title}</span>
+        <span class="gs-acc__count">${owned}/${total}</span>
+        <span class="gs-acc__chev" aria-hidden="true">▾</span>
+      </button>
+      <div class="gs-acc__body">
+        ${blurb ? `<p class="gs-acc__blurb">${blurb}</p>` : ''}
+        <div class="gs-acc__rack">${rack}</div>
+      </div>
+    </section>`;
+}
+
 /** The Trade Market (GS-clubhouse): spend Star Shards on cosmetic ships, clothing, and bag tiers. Buying
- *  grants GLOBAL ownership — you then outfit each golfer individually in the Clubhouse. Replaces the old
- *  combined Outpost; the rotating offer is retired for a full browsable catalogue. */
+ *  grants GLOBAL ownership — you then outfit each golfer individually in the Clubhouse. The full browsable
+ *  catalogue is split into uniform collapsible sections (GS-market-accordion) so it stays navigable. */
 function tradeMarketScreen(): string {
-  const shipCards = shipCatalogue()
+  const ships = shipCatalogue();
+  const shipCards = ships
     .map((ship) => {
       const ring = cosmeticRarCol(ship.rarity);
       const owned = state.ownedShips.includes(ship.id);
@@ -1828,29 +1863,33 @@ function tradeMarketScreen(): string {
       return shipCardHTML(ship, footer, { ring, dim: !owned && !afford, glow: isMythic(ship.rarity) && !owned, action });
     })
     .join('');
+  const shipsOwned = ships.filter((s) => state.ownedShips.includes(s.id)).length;
 
-  const apparelRack = (slot: ApparelSlot) =>
-    `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${apparelForSlot(slot)
-      .map((a) => marketApparelCardHTML(a))
-      .join('')}</div>`;
+  // One uniform collapsible clothing rack per slot (hats / shirts / pants), each with its owned tally.
+  const apparelSection = (slot: ApparelSlot, icon: string, title: string, blurb: string) => {
+    const items = apparelForSlot(slot);
+    const owned = items.filter((a) => state.ownedApparel.includes(a.id)).length;
+    return marketSection(slot, icon, title, owned, items.length, blurb, items.map(marketApparelCardHTML).join(''));
+  };
 
   return `
     <header style="border-left:4px solid #e08a2b;padding-left:10px;">
       <h1 style="margin:0;font-size:22px;">🚀 Trade Market</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on ships and clothing. Cosmetic only — buy it here, then outfit each golfer in the <b>Clubhouse</b>.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on ships, clothing &amp; bag tiers. Cosmetic only — buy it here, then outfit each golfer in the <b>Clubhouse</b>. Tap a section to fold it away.</p>
     </header>
-    <h2 style="font-size:16px;margin:.6em 0 .2em;">✦ ${state.shards} Star Shards</h2>
-    <h2 style="font-size:16px;margin:1em 0 .2em;">🚀 Ships</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">The full fleet. The rarer the ride, the steeper the shard price — the Mothership is the grail.</p>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${shipCards}</div>
-    <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Clothing</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Hats, shirts &amp; pants for your golfers. Complete a matching set for the full look.</p>
-    <h3 style="font-size:13px;opacity:.8;margin:.6em 0 .1em;text-align:center;">🎩 Hats</h3>
-    ${apparelRack('hat')}
-    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
-    ${apparelRack('shirt')}
-    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👖 Pants</h3>
-    ${apparelRack('pants')}
+    <h2 style="font-size:16px;margin:.6em 0 .4em;">✦ ${state.shards} Star Shards</h2>
+    ${marketSection(
+      'ships',
+      '🚀',
+      'Ships',
+      shipsOwned,
+      ships.length,
+      'The full fleet. The rarer the ride, the steeper the shard price — the Mothership is the grail.',
+      shipCards,
+    )}
+    ${apparelSection('hat', '🎩', 'Hats', 'Caps &amp; crowns. Complete a matching set across all three slots for the full look.')}
+    ${apparelSection('shirt', '👕', 'Shirts', 'Tops &amp; jackets to suit each golfer.')}
+    ${apparelSection('pants', '👖', 'Pants', 'Trousers &amp; legwear to finish the outfit.')}
     ${bagSetSection()}
     <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}</div>`;
 }
@@ -2105,7 +2144,7 @@ function bagSetCardHTML(set: BagSet): string {
   }
   const dim = (!unlocked || (!afford && !current && !owned)) && !current;
   const inner = `
-    <div title="${set.blurb}" style="border:2px solid ${current ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${ring}22, #0b0d12);text-align:center;width:134px;${dim ? 'opacity:.55;' : ''}${current ? `box-shadow:0 0 0 2px #ffce54, 0 0 14px ${ring}66;` : ''}">
+    <div title="${set.blurb}" style="border:2px solid ${current ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${ring}22, #0b0d12);text-align:center;width:130px;${dim ? 'opacity:.55;' : ''}${current ? `box-shadow:0 0 0 2px #ffce54, 0 0 14px ${ring}66;` : ''}">
       ${drawGolfBag(set.tint, set.tier)}
       <div style="font-size:12.5px;font-weight:700;margin-top:3px;">${set.name}</div>
       <div style="font-size:10px;opacity:.55;text-transform:capitalize;">${set.tier} · clear ${set.gateLabel}</div>
@@ -2126,16 +2165,17 @@ function bagSetSection(): string {
   const hint = nextLocked
     ? `Clear Ascension <b>${nextLocked.gateLabel}</b> to unlock the ${nextLocked.name}.`
     : 'Every bag tier is unlocked — outfit the deepest run.';
-  return `
-    <h2 style="font-size:16px;margin:1.2em 0 .2em;">🎒 Bag &amp; Club Sets</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .5em;">Permanent upgrades that re-outfit <b>every</b> golfer's starting bag in a higher rarity — longer woods, a steadier putter, and a blingier bag for the deep-Ascension grind. Buying one also stops the Pro Shop dangling clubs below your bag's rarity. Current: <b>${currentLabel}</b>. ${hint}</p>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${BAG_SETS.map(bagSetCardHTML).join('')}</div>`;
+  // "Owned" = every tier at or below the equipped one (the starter/common tier doesn't count).
+  const currentRank = bagTierRank(state.bagTier);
+  const owned = currentRank > 0 ? BAG_SETS.filter((s) => bagTierRank(s.tier) <= currentRank).length : 0;
+  const blurb = `Permanent upgrades that re-outfit <b>every</b> golfer's starting bag in a higher rarity — longer woods, a steadier putter, and a blingier bag for the deep-Ascension grind. Buying one also stops the Pro Shop dangling clubs below your bag's rarity. Current: <b>${currentLabel}</b>. ${hint}`;
+  return marketSection('bags', '🎒', 'Bag &amp; Club Sets', owned, BAG_SETS.length, blurb, BAG_SETS.map(bagSetCardHTML).join(''));
 }
 
 /** Shared apparel card chrome — the garment art over a rarity-ringed panel with a footer. */
 function apparelCardChrome(item: Apparel, footer: string, opts: { ring: string; accent: string; action?: Action; dim?: boolean; glow?: boolean }): string {
   const inner = `
-    <div style="border:2px solid ${opts.accent};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 30%, ${opts.ring}22, #0b0d12);text-align:center;width:118px;${opts.dim ? 'opacity:.5;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.accent}, 0 0 14px ${opts.ring}88;` : ''}">
+    <div style="border:2px solid ${opts.accent};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 30%, ${opts.ring}22, #0b0d12);text-align:center;width:130px;${opts.dim ? 'opacity:.5;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.accent}, 0 0 14px ${opts.ring}88;` : ''}">
       ${apparelCardSVG(item.id, 104, 64)}
       <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${item.name}</div>
       <div style="font-size:10px;opacity:.55;">${item.set} · ${item.rarity}</div>
@@ -2673,6 +2713,15 @@ function render(): void {
     el.addEventListener('click', () => {
       const id = el.dataset.inspect!;
       inspectGearId = inspectGearId === id ? null : id;
+      render();
+    });
+  });
+  // Trade Market accordion: tap a section header to collapse/expand its card rack (view-only).
+  app.querySelectorAll<HTMLElement>('[data-toggle-section]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.toggleSection!;
+      if (collapsedMarketSections.has(id)) collapsedMarketSections.delete(id);
+      else collapsedMarketSections.add(id);
       render();
     });
   });
