@@ -90,6 +90,9 @@ export interface RenderOptions {
   /** Rainbow Ball (GS-rainbow): paint the hole as RAINBOW ROAD (rainbow ribbon through the stars,
    *  off-road = void). Baked from the live loadout at the app boundary; render-only. */
   rainbow?: boolean;
+  /** Trade-camp tents (GS-tents): draw the ring of collidable tents around the green (the trade-market
+   *  route's signature). Baked from the course effect at the app boundary; render-only. */
+  tradeTents?: boolean;
 }
 
 /** Course-space polygon of a spray landing SECTOR: the region swept between radii
@@ -179,7 +182,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // scene builder (so the SVG map and the Canvas play view look identical) and serialised.
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
-    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow })),
+    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow, tradeTents: opts.tradeTents })),
   ];
 
   // Aiming spray cone (GS-dispersion-2): the shot's asymmetric SprayShape, drawn as true arc

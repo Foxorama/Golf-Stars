@@ -377,9 +377,10 @@ export function reduce(state: UiState, action: Action): UiState {
       if (isMatchplayBoss(currentBoss(state.run))) {
         const setup = teamDuelSetupForRun(state.run);
         const bossId = setup?.opponentId ?? resolveBossId(state.run);
+        const bossTents = state.course.meta?.effect === 'tradeMarket';
         const bossHoles = setup
-          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad)
-          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), false, state.run.loadout.rainbowRoad);
+          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad, bossTents)
+          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), false, state.run.loadout.rainbowRoad, bossTents);
         match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false, setup, partnerHoles: setup ? [] : undefined };
       }
       return {
@@ -399,6 +400,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // Team duel SCRAMBLE (GS-team-duel), player's side: resolve BOTH balls and let the player pick
       // which to keep (the choice card). Putts are not scrambled, so this fires on full swings only.
       const setup = state.match?.setup;
+      // Trade-camp tents (GS-tents): the trade-market route arms the green's collidable tents for this
+      // course — pass it so the interactive shot ricochets exactly as the headless sim does.
+      const tents = state.course.meta?.effect === 'tradeMarket';
       if (setup?.partnerSide === 'player' && setup.format === 'scramble') {
         const scrambleChoice = resolveScrambleShot(
           state.play,
@@ -406,6 +410,7 @@ export function reduce(state: UiState, action: Action): UiState {
           state.run.loadout,
           state.holeRng,
           setup.playerPartnerMods,
+          tents,
         );
         return { ...state, scrambleChoice };
       }
@@ -418,6 +423,7 @@ export function reduce(state: UiState, action: Action): UiState {
         state.holeRng,
         auto,
         scrambleOptsFor(state.run),
+        tents,
       );
       return { ...state, play };
     }
@@ -444,11 +450,12 @@ export function reduce(state: UiState, action: Action): UiState {
       }
       let guard = 0;
       const scramble = scrambleOptsFor(state.run);
+      const tents = state.course.meta?.effect === 'tradeMarket';
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
       while (!p.done && guard++ < 40) {
         p = awaitingPutt(p)
           ? takePutt(p, state.run.loadout, state.holeRng)
-          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble);
+          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble, tents);
       }
       return { ...state, play: p, scrambleChoice: undefined };
     }

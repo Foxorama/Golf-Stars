@@ -613,6 +613,10 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     backspinBoost: run.loadout.backspinBoost,
     hazardImmune: run.loadout.hazardImmune,
     rainbowRoad: run.loadout.rainbowRoad,
+    // Trade-camp tents (GS-tents): the trade-market route arms a ring of collidable tents around the
+    // green. Derived from the SAME pending-event effect `currentCourse` stamps on the meta, so the sim
+    // collision and the renderer agree on when tents exist.
+    tradeTents: routeEffect(run.pendingEvent) === 'tradeMarket',
     scramble: scrambleOptsFor(run),
   };
 }

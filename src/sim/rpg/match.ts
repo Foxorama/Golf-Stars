@@ -72,8 +72,8 @@ export function bossPlayOpts(golferId: string, homeEdge = false): PlayHoleOption
 
 /** Play a boss golfer's whole stop (their own ball on each hole), deterministically. `rainbowRoad`
  *  (GS-rainbow) makes the boss play the player's rainbow-road hole (off-road = OOB); default off. */
-export function playBossStop(holes: readonly Hole[], golferId: string, rng: Rng, homeEdge = false, rainbowRoad = false): PlayedHole[] {
-  const opts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad };
+export function playBossStop(holes: readonly Hole[], golferId: string, rng: Rng, homeEdge = false, rainbowRoad = false, tradeTents = false): PlayedHole[] {
+  const opts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents };
   return holes.map((h) => playHole(h, rng, opts));
 }
 
@@ -217,7 +217,8 @@ export function playMatchStop(
   // The Rainbow Ball (GS-rainbow) transforms the HOLE, not just the player's ball — so the boss plays
   // the SAME rainbow road (off-road is OOB for them too). Inherit it from the player's opts so a duel
   // stays fair (both on the wire) instead of the player alone on a brutal course.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad };
+  // Trade-camp tents (GS-tents) likewise transform the hole, so the boss obeys the same ring.
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents };
   const player: PlayedHole[] = [];
   const boss: PlayedHole[] = [];
   const duels: HoleDuel[] = [];
@@ -246,10 +247,11 @@ export function playBossSideStop(
   rng: Rng,
   homeEdge = false,
   rainbowRoad = false,
+  tradeTents = false,
 ): PlayedHole[] {
-  // Rainbow Ball (GS-rainbow): the player's loadout transforms the hole, so the boss side (pre-played
-  // by the interactive reducer) plays the same rainbow road. Default false ⇒ ordinary boss play.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad };
+  // Rainbow Ball (GS-rainbow) / trade-camp tents (GS-tents): the player's loadout/route transforms the
+  // hole, so the boss side (pre-played by the interactive reducer) plays the same hole. Default false.
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents };
   const bossPartner = setup.partnerSide === 'boss' ? setup.bossPartnerMods : undefined;
   return holes.map((h) => playSideHole(h, rng, bossOpts, bossPartner, setup.format).played);
 }
@@ -282,7 +284,7 @@ export function playTeamMatchStop(
 ): MatchStop {
   // Rainbow Ball (GS-rainbow): the boss side plays the same transformed hole (off-road = OOB), and the
   // boss's partner inherits it via `bossOpts` below — so a team duel stays fair under rainbow road.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad };
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents };
   const playerPartner = setup.partnerSide === 'player' ? setup.playerPartnerMods : undefined;
   const bossPartner = setup.partnerSide === 'boss' ? setup.bossPartnerMods : undefined;
   const player: PlayedHole[] = [];

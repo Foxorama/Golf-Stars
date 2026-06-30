@@ -694,6 +694,36 @@ This game lives or dies on three axes — put every change through all three bef
   (difficulty clamp/monotonicity, effect mapping, that a harder lane raises `currentCourse` wildness +
   stamps the effect, stop-0/no-event unflavoured). The atmosphere RENDER was reworked into a shared
   animated screen-space module (`render/weather.ts`) — see *Weather / atmosphere layer* under Render.
+- **The trade-market route pitches COLLIDABLE TENTS around the green — the one effect that's also a
+  GAME MECHANIC (GS-tents, `src/sim/tents.ts`).** Every other `CourseEffect` is render-only; `tradeMarket`
+  is the deliberate EXCEPTION. The old trade "camp" was a screen-space horizon caravan drawn in
+  `weather.ts` (`drawTradeCamp`) — it floated over the controls on the decision map and hung in mid-air
+  during the flight ("doesn't make sense"). REMOVED. Now the trade market is a ring of bright, collidable
+  festival tents AROUND THE GREEN that a low/flat shot RICOCHETS off. `tradeTents(hole)` is a PURE function
+  of the hole geometry (NO rng — like the OB box): an arc of `TENT_COUNT` tents at `greenR+TENT_R+6`,
+  ridges TANGENT to the green (roof planes face radially in/out), deliberately leaving a clear approach
+  window of ±`FRONT_GAP_DEG` on the tee-facing side (fairness — a normal approach is never blocked).
+  COLLISION mirrors the tree knockdown: arc height decides it — `tentFlightHit` walks the SAME curved
+  flight path the renderer draws and, if the ball crosses a tent below its roof there, knocks it down AT
+  the tent and BOUNCES it along the reflected direction (`tentReflect` reflects the horizontal dir across
+  the struck roof slope's outward normal — so a ball off the BACK of the green bounces back toward it, a
+  side clip squirts away). A lofted wedge sails over and lands clean. NON-PENALTY always (a bounce only
+  relocates the ball). `executeShot` runs the bounce AFTER the rng draws (pure geometry, no new draws —
+  the single roll-energy draw is unchanged), and `rollOut` STOPS a ball that rolls into a tent (a straight
+  stop → the roll-invariant `dist(rest,touchdown)===|roll|` holds). CRITICAL determinism: gated behind
+  `opts.tradeTents` (off by default), so a base shot never builds tents and is byte-for-byte unchanged
+  (the whole suite is the guard); threaded IDENTICALLY through the auto sim (`playerHoleOpts` →
+  `playHole`, armed when `routeEffect(run.pendingEvent)==='tradeMarket'`) and the interactive driver
+  (`takeShot`/`resolveScrambleShot`, the reducer passes `course.meta.effect==='tradeMarket'`), so
+  auto≡interactive; the boss/partner inherit it via `match.ts` (like `rainbowRoad`) so a duel stays fair.
+  RENDER: `styleTents` draws them in COURSE space in `buildScene` (gated `SceneOpts.tradeTents`, baked at
+  the app boundary by `tentsActive()`), so they sit on the ground and track the follow-cam — the fix for
+  the floating bug. On a hit the play view pops an **"Ow!"/"Watch it!"** speech bubble at the tent +
+  `onTentHit` cues `sfx.bonk()`, a haptic, and a spoken yelp (`speakCaddy`). FAIRNESS proven by
+  `tests/tents.test.ts` (placement off-green + clear front window, non-penalty, the bounce fires, and the
+  no-death-spiral bar holds with tents armed across biomes at wildness 1). NO new `_gs*`/URL hook
+  (content/effect-derived + a loadout/effect-baked render flag), so the test-hub guard needs nothing.
+  Eyes-on the tents with `node scripts/tents-preview.mjs` (browser launch is blocked in some sandboxes).
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen

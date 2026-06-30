@@ -126,6 +126,11 @@ export const sfx = {
     tone(240, 0.08, { type: 'sine', gain: 0.16, sweepTo: 150 });
     noise(0.03, { gain: 0.08, freq: 600, q: 1 });
   },
+  /** Ball bonks a trade-camp tent (GS-tents) — a soft canvas thump + a springy boing as it ricochets. */
+  bonk(): void {
+    noise(0.05, { gain: 0.16, type: 'bandpass', freq: 380, q: 0.8 }); // muffled canvas thump
+    tone(300, 0.16, { type: 'triangle', gain: 0.16, sweepTo: 520, t: 0.02 }); // springy boing up
+  },
   /** Ball drops in the cup — a satisfying rattle + a rising confirm. */
   holeOut(): void {
     noise(0.05, { gain: 0.18, freq: 1800, q: 1.2 });

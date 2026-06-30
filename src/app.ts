@@ -1989,6 +1989,7 @@ function playingBody(animating: boolean): string {
       // The putt screen is the ball↔cup line — the approach tracers belong to the whole-hole decision view.
       biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
       rainbow: rainbowActive(),
+      tradeTents: tentsActive(),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -2087,6 +2088,7 @@ function playingBody(animating: boolean): string {
     ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     rainbow: rainbowActive(),
+    tradeTents: tentsActive(),
     ball: play.ball,
     spray,
     sprayGeom,
@@ -2211,6 +2213,7 @@ function scrambleChoiceOverlay(): string {
     biome: holeBiome(hole),
     themeId: holeThemeId(hole),
     rainbow: rainbowActive(),
+    tradeTents: tentsActive(),
     shots: [sc.player.log],
     ghostShots: [sc.partner.log],
   });
@@ -2794,6 +2797,13 @@ function rainbowActive(): boolean {
   return !!state.run?.loadout?.rainbowRoad;
 }
 
+/** Trade-camp tents (GS-tents): whether the current stop's route armed the green's collidable tents.
+ *  Baked into the render options (the ring is drawn in course space) — the sim's bounce is keyed off the
+ *  SAME course effect (`playerHoleOpts`), so the graphic and the physics stay in lock-step. */
+function tentsActive(): boolean {
+  return currentEffect() === 'tradeMarket';
+}
+
 /** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
  *  identically across screens (a quiet hand-off from lining up to watching the shot). */
 function weatherSeed(hole: Hole): number {
@@ -2907,6 +2917,14 @@ function playCaddyVoice(id: string): void {
   if (!v) return;
   speakCaddy(v.speech, v.lang, { rate: v.rate, pitch: v.pitch });
   haptic(HAPTICS.caddy);
+}
+
+/** Ball bonks a trade-camp tent (GS-tents): the canvas already pops an "Ow!"/"Watch it!" bubble — back
+ *  it with a soft bonk sound, a haptic, and a spoken yelp (a startled trader). Pure feel; guarded. */
+function playTentBonk(text: string): void {
+  sfx.bonk();
+  haptic(HAPTICS.tap);
+  speakCaddy(text, 'en-GB', { rate: 1.1, pitch: 1.2 });
 }
 
 /** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A
@@ -3222,11 +3240,13 @@ function render(): void {
         height: 520,
         biome: holeBiome(hole), themeId: holeThemeId(hole), effect: currentEffect(),
         rainbow: rainbowActive(),
+        tradeTents: tentsActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
         onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
         onCaddyEffect: playCaddyVoice,
+        onTentHit: playTentBonk,
       });
     }
   }
@@ -3259,10 +3279,12 @@ function render(): void {
         width: animW,
         height: animH,
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
+        tradeTents: tentsActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
         onCaddyEffect: playCaddyVoice,
+        onTentHit: playTentBonk,
         focus,
         viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,

@@ -12,10 +12,14 @@
  *      — i.e. never harder than the wildness=1 case the no-death-spiral / fairness validators already
  *      prove safe, so this can't destabilise generation.
  *
- *   2. FLAVOUR (`routeEffect`) — a render-only `CourseEffect` stamped on the course meta: meteor shower,
- *      moonlight, an aurora, a solar storm, a crashed-junk debris field, a trade-market camp. Pure
- *      atmosphere (weather / lighting / decor) drawn by the renderers — it touches NEITHER physics NOR
+ *   2. FLAVOUR (`routeEffect`) — a `CourseEffect` stamped on the course meta: meteor shower, moonlight,
+ *      an aurora, a solar storm, a crashed-junk debris field, a trade-market camp. Mostly pure
+ *      atmosphere (weather / lighting / decor) drawn by the renderers — touching NEITHER physics NOR
  *      generation rng, so fairness is untouched. It makes each lane LOOK like a distinct destination.
+ *      EXCEPTION (GS-tents): `tradeMarket` ALSO pitches a ring of COLLIDABLE tents around the green
+ *      (sim/tents.ts) that a low/flat shot ricochets off — a real, fair (non-penalty) gameplay twist,
+ *      derived from the hole geometry with NO generation rng, gated to this effect at the play
+ *      boundary (`playerHoleOpts` / the interactive driver), proven fair by `tests/tents.test.ts`.
  *
  * Both are derived from the event (content-as-data), so attaching them changes no rng stream and needs
  * no snapshot migration — `run.pendingEvent` already round-trips, and `currentCourse` re-derives these.
@@ -50,7 +54,7 @@ export const COURSE_EFFECTS: Record<CourseEffectId, CourseEffectInfo> = {
   solarStorm: { id: 'solarStorm', label: 'Solar storm', icon: '⚡', blurb: 'A red flare crackles — charged, restless air.' },
   aurora: { id: 'aurora', label: 'Aurora', icon: '🌈', blurb: 'Ribbons of colour shimmer over the horizon.' },
   spaceJunk: { id: 'spaceJunk', label: 'Debris field', icon: '🛰️', blurb: 'Crashed wreckage litters the rough.' },
-  tradeMarket: { id: 'tradeMarket', label: 'Trade camp', icon: '⛺', blurb: 'A trade caravan has pitched camp out by the rough.' },
+  tradeMarket: { id: 'tradeMarket', label: 'Trade camp', icon: '⛺', blurb: 'A trade camp rings the green — bounce your ball off the tents!' },
 };
 
 /**
