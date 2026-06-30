@@ -42,6 +42,7 @@ const cases = [
   { biome: 'tempest-reach', themeId: 'draco', label: 'Tempest · Draco' },
   { biome: 'spore-jungle', themeId: 'lacerta', label: 'Fungal · Lacerta' },
   { biome: 'tidal-archipelago', themeId: 'delphinus', label: 'Ocean · Delphinus' },
+  { biome: 'cetus-deep', themeId: 'cetus', label: 'Cetus · Cetus' },
 ];
 const seeds = [7, 4242];
 

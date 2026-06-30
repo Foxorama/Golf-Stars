@@ -37,6 +37,10 @@ const GALAXY_OVERRIDE = {
 };
 Object.assign(out, GALAXY_OVERRIDE);
 
+// Cetus (the Whale) is a GS-cetus voyage theme but isn't a card in the harvested catalogue — pin it to
+// its real figure centroid (J2000), the same hand-anchor approach the galaxies use above.
+out['cetus'] = { ra: 31.6, dec: -5.9 };
+
 const body = `/**
  * Real-sky coordinates per voyage THEME (GS-galaxy-map) — GENERATED from data/night-sky-cards.json
  * by scripts/gen-sky-coords.mjs. Equatorial J2000: \`ra\` in degrees (0–360), \`dec\` in degrees

@@ -324,6 +324,31 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.0,
     greenSlopeMax: 0.4, // GS-greens-3 green tilt character
   },
+  {
+    // GS-cetus: the Whale constellation's clifftop star-ocean. Plays the void's proven-fair island/
+    // abyss model (off the clifftop plateau is lost to the star-ocean), reskinned as a luminous deep
+    // sea — the render adds a river of stars pouring off the cliffs and whales surfacing below.
+    id: 'cetus-deep',
+    name: 'Cetus Deep',
+    weight: 10,
+    carryMult: 1.12, // a gentle low-pressure lift over the deep
+    carryJitter: 0.03,
+    windBase: 5,
+    windWild: 16, // a steady sea-current breeze off the ocean
+    hazardKinds: ['water'],
+    greensideKind: 'bunker',
+    // Bioluminescent reef/coral patches — true, fast lies that light the clifftop corridor.
+    scatter: [{ kind: 'crystal', freqPerHole: 1.0, rMin: 6, rMax: 12 }],
+    fairwayWidthMult: 0.92, // clifftop ribbons (the island scale widens the deep/wild stops fairly)
+    doglegBias: 0.4,
+    treeDensity: 0.3, // sparse wind-bent coastal stacks
+    fairwayBunkers: 1.4, // sandy clifftop coves
+    lostRough: 'cetusdeep', // signature: off the clifftop is lost to the star-ocean (deep/wild stops)
+    greenSize: 0.95, // organic tide-pool greens
+    greenAspect: 1.8,
+    greenIrregular: 1.2,
+    greenSlopeMax: 0.5, // GS-greens-3 green tilt character
+  },
 ];
 
 const TOTAL_WEIGHT = BIOMES.reduce((s, b) => s + b.weight, 0);

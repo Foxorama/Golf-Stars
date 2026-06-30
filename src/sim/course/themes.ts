@@ -44,7 +44,11 @@ export type BiomeArchetype =
   | 'crystal' // prismatic gem world — true/fast crystal lies everywhere, precision rewarded
   | 'tempest' // gas-giant storm world — the wildest crosswinds in the galaxy
   | 'fungal' // bioluminescent spore-jungle — the densest tree-lined corridors
-  | 'ocean'; // tidal archipelago — sea channels + flanking lagoons, island-hopping golf
+  | 'ocean' // tidal archipelago — sea channels + flanking lagoons, island-hopping golf
+  // GS-cetus: the Whale constellation's realm — clifftop plateaus over a starry ocean. Off the
+  // clifftop is lost to the star-ocean (the void's island/abyss model, reskinned); a river of stars
+  // pours off the cliffs as a waterfall where space whales surface.
+  | 'cetus'; // star-ocean clifftops — island plateaus over a starry sea, whales breaching below
 
 /**
  * Per-theme biome flavour (GS-17b) — bounded MULTIPLIERS on the archetype baseline that give a
@@ -128,6 +132,7 @@ const ARCHETYPE_BIOME: Record<BiomeArchetype, string> = {
   tempest: 'tempest-reach',
   fungal: 'spore-jungle',
   ocean: 'tidal-archipelago',
+  cetus: 'cetus-deep',
 };
 
 /** The biome id a theme generates its course from. */
@@ -190,6 +195,7 @@ export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
   tempest: ['control'], // tame the wind
   fungal: ['economy', 'skill'], // lush, growthy — like verdant's cousin
   ocean: ['control', 'distance'], // carry the sea, flight the lagoons
+  cetus: ['control', 'skill'], // hit the clifftop plateau or it's lost to the star-ocean — precision
 };
 
 /** How much an on-theme item's shop weight is multiplied (soft bias, not a filter). */
@@ -312,6 +318,8 @@ const CONSTELLATIONS: readonly ConstRow[] = [
   // ocean — tidal archipelagos
   { id: 'delphinus', name: 'Delphinus', abbr: 'Del', rarity: 'common', stars: 5, archetype: 'ocean', anchor: 'Rotanev', blurb: 'The Dolphin, breaching the tidal sea of stars.', flavour: { wind: 1.1, bunkers: 1.1 } },
   { id: 'eridanus', name: 'Eridanus', abbr: 'Eri', rarity: 'common', stars: 9, archetype: 'ocean', anchor: 'Achernar', blurb: 'The great celestial River, pouring to the deep south.', flavour: { wind: 1.15, dogleg: 1.1 } },
+  // cetus — the Whale's clifftop star-ocean (arc 2 via 7 stars)
+  { id: 'cetus', name: 'Cetus', abbr: 'Cet', rarity: 'rare', stars: 7, archetype: 'cetus', anchor: 'Diphda', blurb: 'The Whale, sounding the deep star-ocean off the clifftops.', flavour: { wind: 1.05, scatter: 1.1 } },
 ];
 
 /** Deep-sky + naked-eye galaxy showpieces: rare destinations gated by rarity. */

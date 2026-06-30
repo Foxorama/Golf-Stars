@@ -24,6 +24,25 @@ for (const c of cat.constellations) {
   out[slug(c.name)] = { name: c.name, stars, lines: c.lines };
 }
 
+// Cetus (the Whale) is a GS-cetus voyage theme but isn't a card in the harvested catalogue. Hand-author
+// its figure from its real bright stars, already normalized into the unit box (x left→right, y north-up;
+// derived from J2000 RA/Dec, anchored on Diphda/β Cet — the brightest, matching the theme anchor).
+out['cetus'] = {
+  name: 'Cetus',
+  stars: [
+    { x: 1, y: 0, m: 2.5 },       // 0 Menkar (α, head)
+    { x: 0.883, y: 0.038, m: 3.5 }, // 1 Gamma (head)
+    { x: 0.86, y: 0.17, m: 4.1 },  // 2 Delta
+    { x: 0.736, y: 0.32, m: 3.0 }, // 3 Mira (ο, neck)
+    { x: 0.519, y: 0.653, m: 3.7 }, // 4 Zeta (body)
+    { x: 0.333, y: 0.646, m: 3.45 }, // 5 Eta
+    { x: 0.52, y: 0.907, m: 3.5 },  // 6 Tau
+    { x: 0.148, y: 1, m: 2.0 },     // 7 Diphda (β, tail — the anchor)
+    { x: 0, y: 0.585, m: 3.6 },     // 8 Iota
+  ],
+  lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [4, 6], [6, 7], [7, 8], [8, 5]],
+};
+
 const ids = Object.keys(out);
 const body = `/**
  * Constellation figures for the sky backdrop (GS-17e) — GENERATED from data/night-sky-cards.json

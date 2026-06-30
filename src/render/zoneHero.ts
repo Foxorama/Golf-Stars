@@ -211,6 +211,55 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
     return frame(W, H, inner, ['#03101a', '#0e4456'], gid);
   }
 
+  if (archetype === 'cetus') {
+    const oceanY = H * 0.52;
+    const cliffX = W * 0.46;
+    let inner = stars(rng, W, H, 28, 0.5);
+    // A luminous deep-sea moon glow high in the sky.
+    inner += body(W * 0.82, H * 0.22, 11, '#cfefff', { glow: 'rgba(110,220,240,0.22)', shade: false });
+    // The vast star-ocean filling the lower frame, with depth bands + bioluminescent current streaks.
+    inner += `<rect x="0" y="${n1(oceanY)}" width="${W}" height="${n1(H - oceanY)}" fill="#063045"/>`;
+    inner += `<rect x="0" y="${n1(oceanY)}" width="${W}" height="${n1((H - oceanY) * 0.4)}" fill="#0e577a" opacity="0.7"/>`;
+    for (let i = 0; i < 5; i++) {
+      const y = oceanY + (H - oceanY) * (0.18 + i * 0.17);
+      inner += `<path d="M0 ${n1(y)} Q ${n1(W * 0.5)} ${n1(y - 5)} ${W} ${n1(y)}" fill="none" stroke="rgba(110,225,240,${(0.4 - i * 0.06).toFixed(2)})" stroke-width="1.4"/>`;
+    }
+    // Faint star-glints sprinkled on the ocean surface (the sea full of stars).
+    for (let i = 0; i < 16; i++) {
+      const x = rng() * W;
+      const y = oceanY + rng() * (H - oceanY);
+      inner += `<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(0.4 + rng() * 0.9)}" fill="rgba(190,244,255,${(0.4 + rng() * 0.4).toFixed(2)})"/>`;
+    }
+    // The clifftop plateau on the left — a dark luminous-edged landmass the fairway sits on.
+    inner += `<polygon points="0,${n1(oceanY - 4)} ${n1(cliffX * 0.8)},${n1(oceanY - 8)} ${n1(cliffX)},${n1(oceanY + 2)} ${n1(cliffX)},${H} 0,${H}" fill="#102e3a" stroke="rgba(120,230,240,0.35)" stroke-width="1.2"/>`;
+    // The bright fairway ribbon running along the clifftop toward the edge.
+    inner += `<polygon points="${n1(W * 0.04)},${n1(oceanY + 4)} ${n1(cliffX * 0.78)},${n1(oceanY - 2)} ${n1(cliffX * 0.96)},${n1(oceanY + 6)} ${n1(cliffX * 0.74)},${n1(oceanY + 14)} ${n1(W * 0.04)},${n1(oceanY + 20)}" fill="#2f8294"/>`;
+    for (let i = 0; i < 4; i++) {
+      inner += `<circle cx="${n1(W * (0.08 + i * 0.09))}" cy="${n1(oceanY + 6 + (rng() - 0.5) * 6)}" r="${n1(1 + rng())}" fill="#7af0ff"/>`;
+    }
+    // The river of stars pouring off the cliff edge as a waterfall into the ocean.
+    inner += `<circle cx="${n1(cliffX)}" cy="${n1(oceanY + 22)}" r="20" fill="rgba(130,235,255,0.16)"/>`;
+    for (let i = 0; i < 10; i++) {
+      const x = cliffX - 6 + rng() * 12;
+      const y0 = oceanY + 2 + rng() * 4;
+      const y1 = oceanY + 22 + rng() * 10;
+      inner += `<line x1="${n1(x)}" y1="${n1(y0)}" x2="${n1(x - 2)}" y2="${n1(y1)}" stroke="rgba(180,244,255,${(0.4 + rng() * 0.4).toFixed(2)})" stroke-width="1.1" stroke-linecap="round"/>`;
+      inner += `<circle cx="${n1(x - 1)}" cy="${n1(y0 + (y1 - y0) * rng())}" r="${n1(0.5 + rng() * 0.8)}" fill="#dffaff"/>`;
+    }
+    // Splash crown + ripple where the waterfall meets the sea.
+    inner += `<path d="M ${n1(cliffX - 8)} ${n1(oceanY + 24)} q 5 -10 10 0 M ${n1(cliffX + 2)} ${n1(oceanY + 22)} q 5 -11 10 0" stroke="#cffaff" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    // A space whale breaching the deep — a bold tail fluke rising from the star-ocean, lit from within.
+    const wx = W * 0.66;
+    const wl = oceanY + (H - oceanY) * 0.5; // the local waterline
+    const fw = H * 0.24; // fluke height
+    inner += `<circle cx="${n1(wx)}" cy="${n1(wl - fw * 0.45)}" r="${n1(fw * 0.75)}" fill="rgba(95,225,250,0.12)"/>`;
+    inner += `<path d="M ${n1(wx)} ${n1(wl)} Q ${n1(wx - 5)} ${n1(wl - fw * 0.55)} ${n1(wx - 21)} ${n1(wl - fw)} Q ${n1(wx - 8)} ${n1(wl - fw * 0.48)} ${n1(wx)} ${n1(wl - fw * 0.34)} Q ${n1(wx + 8)} ${n1(wl - fw * 0.48)} ${n1(wx + 21)} ${n1(wl - fw)} Q ${n1(wx + 5)} ${n1(wl - fw * 0.55)} ${n1(wx)} ${n1(wl)} Z" fill="#123e58" stroke="#6fe8f5" stroke-width="1.8"/>`;
+    inner += `<path d="M ${n1(wx)} ${n1(wl - fw * 0.34)} L ${n1(wx)} ${n1(wl - fw * 0.02)}" stroke="rgba(150,240,255,0.55)" stroke-width="1.2"/>`;
+    // splash ripples at the base of the fluke
+    for (let i = 1; i <= 3; i++) inner += `<ellipse cx="${n1(wx)}" cy="${n1(wl)}" rx="${n1(i * 7)}" ry="${n1(i * 2.2)}" fill="none" stroke="rgba(140,235,255,${(0.45 - i * 0.12).toFixed(2)})" stroke-width="1.1"/>`;
+    return frame(W, H, inner, ['#021019', '#073246'], gid);
+  }
+
   // void
   let inner = stars(rng, W, H, 34, 1);
   // A nebula smear.

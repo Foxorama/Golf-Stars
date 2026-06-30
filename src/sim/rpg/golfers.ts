@@ -360,6 +360,7 @@ const CHAMPIONS: readonly ChampRow[] = [
   { theme: 'vulpecula', name: 'Vix Anser', shortName: 'Anser', archetypeId: 'maverick', origin: 'Vulpecula' },
   { theme: 'delphinus', name: 'Della Rotanev', shortName: 'Rotanev', archetypeId: 'sand', origin: 'Delphinus' },
   { theme: 'eridanus', name: 'Eira Achernar', shortName: 'Achernar', archetypeId: 'plotter', origin: 'Eridanus' },
+  { theme: 'cetus', name: 'Cassia Diphda', shortName: 'Diphda', archetypeId: 'escape', origin: 'Cetus' },
 ];
 
 // --- The field (deterministically built named pack) ---------------------------

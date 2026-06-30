@@ -59,6 +59,7 @@ const BIOME_LOOK: Record<string, { col: string; glyph: string }> = {
   tempest: { col: '#c8b8ff', glyph: '🌪️' },
   fungal: { col: '#54dba0', glyph: '🍄' },
   ocean: { col: '#5fd49e', glyph: '🌊' },
+  cetus: { col: '#5fd8dc', glyph: '🐋' },
 };
 
 /** One cleared stop on the travelled trail (Earth → … → YOU). */

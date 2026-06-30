@@ -8,8 +8,8 @@ import { ARCHETYPE_TURF, ARCHETYPE_SPACE } from '../src/render/palette';
 import { zoneHeroSVG } from '../src/render/zoneHero';
 import { championFor } from '../src/sim/rpg/golfers';
 
-const NEW: BiomeArchetype[] = ['crystal', 'tempest', 'fungal', 'ocean'];
-const NEW_BIOMES = ['crystal-spires', 'tempest-reach', 'spore-jungle', 'tidal-archipelago'];
+const NEW: BiomeArchetype[] = ['crystal', 'tempest', 'fungal', 'ocean', 'cetus'];
+const NEW_BIOMES = ['crystal-spires', 'tempest-reach', 'spore-jungle', 'tidal-archipelago', 'cetus-deep'];
 
 function countKind(holes: Hole[], kind: string): number {
   return holes.reduce((n, h) => n + h.hazards.filter((z) => z.kind === kind).length + h.features.filter((f) => f.kind === kind).length, 0);
@@ -63,6 +63,10 @@ describe('new biome worlds (GS-worlds)', () => {
     // Ocean is the wettest: a sea-channel crossing + heavy flanking lagoons.
     expect(ocean.waterCreek).toBe(true);
     expect(ocean.ponds!).toBeGreaterThan(1.5);
+    // Cetus is the clifftop star-ocean: off the plateau is lost (the void's island/abyss model).
+    const cetus = biomeById('cetus-deep')!;
+    expect(cetus.lostRough).toBe('cetusdeep');
+    expect(verdant.lostRough).toBeUndefined(); // a plain parkland world has no lost-rough — distinct
   });
 
   it("the ocean's sea channels and the fungal jungle streams actually show up & stay carryable", () => {
