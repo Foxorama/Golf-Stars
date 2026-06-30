@@ -151,6 +151,14 @@ export interface PlayerLoadout {
   /** The selected golfer (GS-18), if any — its shot-shape is resolved from this id. */
   characterId?: string;
   /**
+   * The permanent DEFAULT-BAG tier baked in at run start (GS-bag-tiers): the loot rarity the starter
+   * bag was re-stamped to (rare/epic/legendary), or absent/'common' for the un-upgraded bag. The sim
+   * doesn't read it (the clubs already carry their stamped rarity/carry); it's the Pro Shop FLOOR —
+   * `offerableClubs` hides reward clubs BELOW it, so a purple bag never sees rare clubs for sale. Set by
+   * `applyBagTier`, rebuilt from meta on resume (no save bump to the run snapshot beyond the tier id).
+   */
+  bagTier?: Rarity;
+  /**
    * Accumulated spray-zone shape mod from shaping upgrades (GS-dispersion-2): suppresses or skews
    * the duck-hook/hook/slice/shank miss zones. Folded into every shot's shape (under the golfer's
    * per-club skew). Defaults to no change.
@@ -1220,8 +1228,13 @@ function rarityRank(r: Rarity | undefined): number {
  *    power-cell lesson); the putter is the exception because its upgrade is a stat, not carry.
  */
 export function offerableClubs(loadout: PlayerLoadout): ShopItem[] {
+  // The default-bag tier (GS-bag-tiers) is a rarity FLOOR: once your starter bag is rare/epic/legendary,
+  // the shop no longer dangles clubs BELOW that tier (a purple bag sees only purple+ clubs). Common
+  // (the un-upgraded bag) is rank 0, so this filters nothing — byte-for-byte unchanged when off.
+  const floor = rarityRank(loadout.bagTier);
   return CLUB_ITEMS.filter((it) => {
     if (clubSetById(it.clubSet)?.offerable === false) return false;
+    if (rarityRank(it.rarity) < floor) return false;
     const type = it.clubType!;
     if (loadout.noHybrids && isHybridType(type)) return false;
     const cur = loadout.bag.find((c) => c.id === type);

@@ -8,9 +8,10 @@
 
 import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
+import type { BagTier } from '../sim/rpg/bag';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -119,8 +120,30 @@ export interface SaveV7 {
   savedAt?: string;
 }
 
+/** v8 — adds the permanent default-bag tier (GS-bag-tiers): the loot rarity all default clubs are
+ *  re-stamped to (rare/epic/legendary), bought with Star Shards once the Ascension gate is cleared. */
+export interface SaveV8 {
+  version: 8;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  lifetimeAces: number;
+  ownedShips: string[];
+  selectedShip: string;
+  marketSeed: number;
+  ownedApparel: string[];
+  equippedHat?: string;
+  equippedShirt?: string;
+  /** The owned default-bag tier ('common' = the un-upgraded starter bag). */
+  bagTier: BagTier;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV7;
+export type Save = SaveV8;
 
 export function defaultSave(): Save {
   return {
@@ -135,6 +158,7 @@ export function defaultSave(): Save {
     selectedShip: DEFAULT_SHIP_ID,
     marketSeed: 0,
     ownedApparel: [],
+    bagTier: 'common',
   };
 }
 
@@ -238,6 +262,28 @@ function v6ToV7(s: SaveV6): SaveV7 {
   };
 }
 
+/** v7 → v8: seed the un-upgraded common default-bag tier (nothing bought yet). */
+function v7ToV8(s: SaveV7): SaveV8 {
+  return {
+    version: 8,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: s.shards ?? 0,
+    metaUpgrades: s.metaUpgrades ?? {},
+    maxAscension: s.maxAscension ?? 0,
+    lifetimeAces: s.lifetimeAces ?? 0,
+    ownedShips: s.ownedShips && s.ownedShips.length ? s.ownedShips : [DEFAULT_SHIP_ID],
+    selectedShip: s.selectedShip ?? DEFAULT_SHIP_ID,
+    marketSeed: s.marketSeed ?? 0,
+    ownedApparel: s.ownedApparel ?? [],
+    equippedHat: s.equippedHat,
+    equippedShirt: s.equippedShirt,
+    bagTier: 'common',
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -252,6 +298,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 4) s = v4ToV5(s as unknown as SaveV4) as unknown as typeof s;
   if (s.version === 5) s = v5ToV6(s as unknown as SaveV5) as unknown as typeof s;
   if (s.version === 6) s = v6ToV7(s as unknown as SaveV6) as unknown as typeof s;
+  if (s.version === 7) s = v7ToV8(s as unknown as SaveV7) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -259,25 +306,27 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v7 = s as unknown as Partial<SaveV7>;
-  const ownedShips = v7.ownedShips && v7.ownedShips.length ? v7.ownedShips : [DEFAULT_SHIP_ID];
-  const ownedApparel = v7.ownedApparel ?? [];
+  const v8 = s as unknown as Partial<SaveV8>;
+  const ownedShips = v8.ownedShips && v8.ownedShips.length ? v8.ownedShips : [DEFAULT_SHIP_ID];
+  const ownedApparel = v8.ownedApparel ?? [];
+  const bagTier: BagTier = v8.bagTier ?? 'common';
   return {
     version: SAVE_VERSION,
-    bestStableford: v7.bestStableford ?? 0,
-    bestDistance: v7.bestDistance ?? 0,
-    shards: v7.shards ?? 0,
-    metaUpgrades: v7.metaUpgrades ?? {},
-    maxAscension: v7.maxAscension ?? 0,
-    lifetimeAces: v7.lifetimeAces ?? 0,
+    bestStableford: v8.bestStableford ?? 0,
+    bestDistance: v8.bestDistance ?? 0,
+    shards: v8.shards ?? 0,
+    metaUpgrades: v8.metaUpgrades ?? {},
+    maxAscension: v8.maxAscension ?? 0,
+    lifetimeAces: v8.lifetimeAces ?? 0,
     ownedShips,
-    selectedShip: v7.selectedShip && ownedShips.includes(v7.selectedShip) ? v7.selectedShip : DEFAULT_SHIP_ID,
-    marketSeed: v7.marketSeed ?? 0,
+    selectedShip: v8.selectedShip && ownedShips.includes(v8.selectedShip) ? v8.selectedShip : DEFAULT_SHIP_ID,
+    marketSeed: v8.marketSeed ?? 0,
     ownedApparel,
-    equippedHat: v7.equippedHat && ownedApparel.includes(v7.equippedHat) ? v7.equippedHat : undefined,
-    equippedShirt: v7.equippedShirt && ownedApparel.includes(v7.equippedShirt) ? v7.equippedShirt : undefined,
-    activeRun: v7.activeRun,
-    savedAt: v7.savedAt,
+    equippedHat: v8.equippedHat && ownedApparel.includes(v8.equippedHat) ? v8.equippedHat : undefined,
+    equippedShirt: v8.equippedShirt && ownedApparel.includes(v8.equippedShirt) ? v8.equippedShirt : undefined,
+    bagTier,
+    activeRun: v8.activeRun,
+    savedAt: v8.savedAt,
   };
 }
 

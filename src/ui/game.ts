@@ -49,6 +49,7 @@ import {
   type HoleDuel,
 } from '../sim/rpg/match';
 import { type MetaUpgrades } from '../sim/rpg/meta';
+import { bagSet, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
 import { canBuyShip, marketRerollCost, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { playHole } from '../sim/round';
@@ -121,6 +122,9 @@ export interface UiState {
   maxAscension: number;
   /** Lifetime holes-in-one made across every run (GS-ace) — a permanent, cross-run record. */
   lifetimeAces: number;
+  /** The owned permanent default-bag tier (GS-bag-tiers) — baked into every new run's starting bag.
+   *  'common' = the un-upgraded starter bag. */
+  bagTier: BagTier;
   /** Owned cosmetic ships (GS-garage) — always includes the default Woody Wagon. */
   ownedShips: string[];
   /** The ship flown on the journey map. */
@@ -187,6 +191,7 @@ export type Action =
   | { type: 'rerollMarket' } // pay shards to redraw the Trade Market's stock
   | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt with shards (GS-cosmetics)
   | { type: 'equipApparel'; id: string } // wear an owned hat/shirt (toggles off if already worn)
+  | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
   | { type: 'closeOutpost' } // back to the title
   | { type: 'restart'; seed?: number | string };
 
@@ -203,6 +208,7 @@ export interface MetaProgress {
   ownedApparel?: string[];
   equippedHat?: string;
   equippedShirt?: string;
+  bagTier?: BagTier;
 }
 
 /**
@@ -217,7 +223,8 @@ export function initState(
   resumable?: RunSnapshot,
 ): UiState {
   const metaUpgrades = meta.metaUpgrades ?? {};
-  const run = startRun(seed, undefined, metaUpgrades);
+  const bagTier = meta.bagTier ?? DEFAULT_BAG_TIER;
+  const run = startRun(seed, undefined, metaUpgrades, undefined, 0, bagTier);
   return {
     run,
     screen: 'title',
@@ -230,6 +237,7 @@ export function initState(
     metaUpgrades,
     maxAscension: meta.maxAscension ?? 0,
     lifetimeAces: meta.lifetimeAces ?? 0,
+    bagTier,
     ownedShips: meta.ownedShips && meta.ownedShips.length ? meta.ownedShips : [DEFAULT_SHIP_ID],
     selectedShip: meta.selectedShip ?? DEFAULT_SHIP_ID,
     marketSeed: meta.marketSeed ?? 0,
@@ -273,7 +281,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // `selectCharacter`. `run.formatId` carries the pending choice — no extra state needed.
       // Ascension (GS-ascension) is chosen on the title for a voyage; clamp to what's unlocked.
       const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? 0));
-      const run = startRun(state.run.seed, action.format, state.metaUpgrades, undefined, asc);
+      const run = startRun(state.run.seed, action.format, state.metaUpgrades, undefined, asc, state.bagTier);
       return {
         ...state,
         run,
@@ -289,8 +297,9 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'selectCharacter': {
       if (state.screen !== 'character') return state;
-      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + ascension chosen at 'start'.
-      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId, state.run.ascension);
+      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + ascension + bag
+      // tier chosen at 'start'.
+      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId, state.run.ascension, state.bagTier);
       return { ...state, run, course: currentCourse(run), screen: 'intro' };
     }
 
@@ -728,6 +737,24 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, equippedShirt: state.equippedShirt === action.id ? undefined : action.id };
     }
 
+    case 'buyBagTier': {
+      // Spend Star Shards on a permanent default-bag upgrade (GS-bag-tiers). Guarded: must be at the
+      // Outpost, the tier unlocked (Ascension gate cleared), strictly higher than the current bag, and
+      // affordable. The upgrade takes effect on the NEXT run (the placeholder run is rebuilt so the
+      // course preview + a fresh start both reflect it).
+      if (state.screen !== 'outpost') return state;
+      const set = bagSet(action.tier);
+      if (!set || !canBuyBagSet(set, state.bagTier, state.maxAscension, state.shards)) return state;
+      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, undefined, state.run.ascension, set.tier);
+      return {
+        ...state,
+        run,
+        course: currentCourse(run),
+        shards: state.shards - set.cost,
+        bagTier: set.tier,
+      };
+    }
+
     case 'closeOutpost': {
       if (state.screen !== 'outpost') return state;
       return { ...state, screen: 'title' };
@@ -745,6 +772,10 @@ export function reduce(state: UiState, action: Action): UiState {
         ownedShips: state.ownedShips,
         selectedShip: state.selectedShip,
         marketSeed: state.marketSeed,
+        ownedApparel: state.ownedApparel,
+        equippedHat: state.equippedHat,
+        equippedShirt: state.equippedShirt,
+        bagTier: state.bagTier,
       });
     }
   }

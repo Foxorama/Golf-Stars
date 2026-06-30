@@ -9,7 +9,7 @@
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type GolferLook, type PlayViewHandle } from './render/playView';
 import { itemCardHTML, shotCardHTML } from './render/cards';
-import { itemArtSVG } from './render/itemArt';
+import { itemArtSVG, drawGolfBag } from './render/itemArt';
 import { renderHoleSVG } from './render/holeView';
 import { holeProjector, type ProjectOptions } from './render/project';
 import { createWeather } from './render/weather';
@@ -46,6 +46,7 @@ import { shipCardSVG } from './render/shipArt';
 import { apparelById, apparelForSlot, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
 import { cosmeticRarCol, isMythic } from './sim/rpg/cosmetics';
+import { BAG_SETS, bagSet, bagSetUnlocked, bagTierRank, canBuyBagSet, bagUnlockForClearedAscension, type BagSet } from './sim/rpg/bag';
 import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
 import { defaultSave } from './save/schema';
@@ -124,6 +125,7 @@ function boot(): void {
       ownedApparel: save.ownedApparel,
       equippedHat: save.equippedHat,
       equippedShirt: save.equippedShirt,
+      bagTier: save.bagTier,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -166,7 +168,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 7,
+    version: 8,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -179,6 +181,7 @@ function persist(): void {
     ownedApparel: state.ownedApparel,
     equippedHat: state.equippedHat,
     equippedShirt: state.equippedShirt,
+    bagTier: state.bagTier,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -1698,7 +1701,14 @@ function bagInventoryHTML(): string {
     <div style="margin:.2em 0 .9em;padding:9px 11px;border:1px solid var(--gs-line-2);border-radius:10px;background:#ffffff05;">
       ${gearRow}
       ${inspectCard}
-      <div style="font-size:12px;font-weight:700;opacity:.85;margin-bottom:7px;">🎒 Your bag — equipped clubs &amp; empty slots</div>
+      ${(() => {
+        // A blinged golf-bag thumbnail beside the header once the default bag is upgraded (GS-bag-tiers).
+        const bt = loadout.bagTier ?? 'common';
+        const bs = bagSet(bt);
+        const art = bt !== 'common' && bs ? `<div style="width:48px;flex:0 0 auto;border-radius:7px;overflow:hidden;">${drawGolfBag(bs.tint, bt)}</div>` : '';
+        const label = bs ? `🎒 ${bs.name} — your bag` : '🎒 Your bag — equipped clubs &amp; empty slots';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">${art}<div style="font-size:12px;font-weight:700;opacity:.85;">${label}</div></div>`;
+      })()}
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
       <div style="font-size:10px;opacity:.55;margin-top:7px;">Coloured = equipped (border shows rarity). Greyed = an empty slot a reward club could fill. 🛒 = on sale in this shop.</div>
     </div>`;
@@ -1831,8 +1841,61 @@ function outpostScreen(): string {
     <h2 style="font-size:16px;margin:1em 0 .2em;">🛖 Your Garage</h2>
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Pick the ship you fly between worlds.</p>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;">${fleet}</div>
+    ${bagSetSection()}
     ${wardrobeSection()}
     <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
+}
+
+/** A bag-set card (GS-bag-tiers): the blinged golf bag over a rarity panel, with a buy / owned /
+ *  equipped / locked footer. Clickable only when it's a buyable, unlocked, affordable upgrade. */
+function bagSetCardHTML(set: BagSet): string {
+  const ring = rarCol(set.tier);
+  const currentRank = bagTierRank(state.bagTier);
+  const current = state.bagTier === set.tier;
+  const owned = bagTierRank(set.tier) <= currentRank && currentRank > 0;
+  const unlocked = bagSetUnlocked(set, state.maxAscension);
+  const afford = canBuyBagSet(set, state.bagTier, state.maxAscension, state.shards);
+  let footer: string;
+  let action: Action | undefined;
+  if (current) {
+    footer = '✓ EQUIPPED';
+  } else if (owned) {
+    footer = '✓ owned';
+  } else if (!unlocked) {
+    footer = `🔒 Clear ${set.gateLabel}`;
+  } else if (afford) {
+    footer = `✦ ${set.cost}`;
+    action = { type: 'buyBagTier', tier: set.tier };
+  } else {
+    footer = `✦ ${set.cost} — short`;
+  }
+  const dim = (!unlocked || (!afford && !current && !owned)) && !current;
+  const inner = `
+    <div title="${set.blurb}" style="border:2px solid ${current ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${ring}22, #0b0d12);text-align:center;width:134px;${dim ? 'opacity:.55;' : ''}${current ? `box-shadow:0 0 0 2px #ffce54, 0 0 14px ${ring}66;` : ''}">
+      ${drawGolfBag(set.tint, set.tier)}
+      <div style="font-size:12.5px;font-weight:700;margin-top:3px;">${set.name}</div>
+      <div style="font-size:10px;opacity:.55;text-transform:capitalize;">${set.tier} · clear ${set.gateLabel}</div>
+      <div style="font-size:11px;margin-top:3px;color:${current ? '#ffce54' : ring};font-weight:700;">${footer}</div>
+    </div>`;
+  return action
+    ? `<div class="gs-clickcard" data-action='${JSON.stringify(action)}' style="cursor:pointer;margin:4px;">${inner}</div>`
+    : `<div style="margin:4px;">${inner}</div>`;
+}
+
+/** The Bag & Club Sets shop (GS-bag-tiers): permanent Star-Shard upgrades that lift EVERY golfer's
+ *  starting bag to a higher loot rarity (better distance clubs + a steadier putter + blinged graphics),
+ *  unlocked by CLEARING the Ascension gates. The won-bag also makes the Pro Shop skip lower-rarity clubs. */
+function bagSetSection(): string {
+  const current = bagSet(state.bagTier);
+  const currentLabel = current ? `${current.name} (${state.bagTier})` : 'Starter bag (common)';
+  const nextLocked = BAG_SETS.find((s) => !bagSetUnlocked(s, state.maxAscension) && bagTierRank(s.tier) > bagTierRank(state.bagTier));
+  const hint = nextLocked
+    ? `Clear Ascension <b>${nextLocked.gateLabel}</b> to unlock the ${nextLocked.name}.`
+    : 'Every bag tier is unlocked — outfit the deepest run.';
+  return `
+    <h2 style="font-size:16px;margin:1.2em 0 .2em;">🎒 Bag &amp; Club Sets</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .5em;">Permanent upgrades that re-outfit <b>every</b> golfer's starting bag in a higher rarity — longer woods, a steadier putter, and a blingier bag for the deep-Ascension grind. Buying one also stops the Pro Shop dangling clubs below your bag's rarity. Current: <b>${currentLabel}</b>. ${hint}</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${BAG_SETS.map(bagSetCardHTML).join('')}</div>`;
 }
 
 /** A wardrobe card for one garment — buyable (unowned), or an equip toggle (owned). */
@@ -2078,6 +2141,14 @@ function gameoverScreen(): string {
       : won && r.ascension >= ASCENSION_MAX
       ? `<p style="font-size:14px;color:#ffce54;">⚔ You cleared the TOP Ascension (A${r.ascension}). Legendary.</p>`
       : '';
+  // A cleared Ascension gate (A2/A6/A11) unlocks a new default-bag tier in the Trade Market (GS-bag-tiers).
+  const bagUnlock = won ? bagUnlockForClearedAscension(r.ascension) : undefined;
+  const bagNotice = bagUnlock
+    ? `<div style="margin:8px 0;padding:8px 11px;border-left:3px solid ${rarCol(bagUnlock.tier)};border-radius:8px;background:#ffffff08;display:flex;align-items:center;gap:9px;">
+         <div style="width:56px;flex:0 0 auto;">${drawGolfBag(bagUnlock.tint, bagUnlock.tier)}</div>
+         <div style="font-size:13px;"><b style="color:${rarCol(bagUnlock.tier)};">🎒 New bag unlocked!</b> Clearing ${bagUnlock.gateLabel} unlocks the <b>${bagUnlock.name}</b> at the Trade Market — upgrade <b>every</b> golfer's starting bag to ${bagUnlock.tier} for <b>✦ ${bagUnlock.cost}</b> Star Shards.</div>
+       </div>`
+    : '';
   const reached =
     (won
       ? `<p style="font-size:15px;">You cleared all three arcs${r.ascension > 0 ? ` at Ascension A${r.ascension}` : ''} and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
@@ -2087,6 +2158,7 @@ function gameoverScreen(): string {
     ${header()}
     ${heading}
     ${reached}
+    ${bagNotice}
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">
