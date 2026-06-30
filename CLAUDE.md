@@ -449,7 +449,11 @@ This game lives or dies on three axes — put every change through all three bef
   resolves EVERYTHING (opponent via `matchOpponentForRun`, format, `underdogSide(playerPos, oppPos)` from the
   arc standings — opponent ranked higher ⇒ player gets the assist, else the boss does — partner golfer ids +
   shapes, and the boss `homeEdge`), pure and shared by the headless `playStop` and the UI reducer so they
-  agree golfer-for-golfer. The two formats:
+  agree golfer-for-golfer. GOTCHA (intro copy): when `partnerSide === 'boss'` the BOSS is the underdog,
+  so YOU are the favourite — the boss-intro line must read "You're the favourite — <opp> brings <partner>
+  … you go it alone", NOT "<opp> outranks you" (the old text was backwards: it claimed the boss outranked
+  you even though the boss got the partner BECAUSE it ranked lower). The result-screen line ("you went
+  solo as the favourite") was already correct. The two formats:
   - **Scramble** — both hit every shot, play on from the BETTER ball. Interactively the PLAYER chooses:
     `resolveScrambleShot` resolves both balls (player draw then partner draw — the SAME rng order as the
     auto pick, so the stream is identical regardless of choice; only the SELECTION differs) and stashes them
@@ -938,7 +942,11 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   `HAPTICS.eagle`/`.albatross`, `sfx.eagle()`/`.albatross()` (assetless WebAudio synth), and the
   `.gs-bird`/`.gs-bird--eagle`/`.gs-bird--albatross` CSS (reuses the GS-ace keyframes) round it out.
   GOTCHA: the per-kind title gradient uses `background-image:` (NOT the `background` shorthand, which
-  resets `background-clip:text` and renders the title as a blank bar). Canvas/audio feel is eyes-on
+  resets `background-clip:text` and renders the title as a blank bar). GOTCHA 2: the card's 🦅/🕊️ EMOJI
+  is the dominant graphic, and on most platforms 🦅 is a brown/gold AMERICAN eagle — which clashed with
+  the "silver space eagle" copy. The `.gs-bird--eagle .gs-bird-emoji` CSS `filter: grayscale(1)
+  brightness(1.4) …` desaturates it into a chrome raptor (and the albatross emoji gets an aurora-glow
+  filter) so the icon matches the canvas raptor + the prose. Canvas/audio feel is eyes-on
   (Playwright-verified per kind). NO new `_gs*` flag — the celebration delay rides the existing
   `_gsFeel.birdDelayMs` sub-field (default 380) like `aceDelayMs`, so the test-hub guard needs nothing.
 - **Pro Shop expansion: golf-themed gear, new gameplay items, themed club sets + procedural images
@@ -991,7 +999,10 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
     header → an always-present badge band (so reward-club pills don't misalign rows) → the fixed-aspect
     art → the description (`flex:1; overflow:hidden`, so long text clips instead of growing the card) →
     the cost footer pinned to the bottom. A mixed rack lines up regardless of text length / badge / art.
-    (The `cards.test.ts` `opacity:1`/`opacity:0.5` asserts still hold.)
+    (The `cards.test.ts` `opacity:1`/`opacity:0.5` asserts still hold.) The TITLE block itself is a
+    FIXED-height row (`height:36px;overflow:hidden`) with the name `-webkit-line-clamp:2` — so a 1-, 2-
+    or 3-line title all start the art at the SAME Y (a wrapping title used to push the art down and
+    misalign the row, the "titles knock the shop images out of alignment" bug).
   - **Per-id EMBLEM roundels make shared-kind items unique (`render/itemArt.ts`).** Many items share a
     base art KIND (4 shafts, 5 gloves, 4 wedges, 4 trophies, 2 coins/putters/coaches) and so were
     near-identical (same kind glyph + same rarity colour). The base glyph stays (so each is still "the
@@ -1450,7 +1461,11 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   The bright-star halos use `glow` too. (Count went 2→3 nebulae — theme-independent + off `crng`, so
   the constellation prim-count invariants `deepSky==plain`/`constellation>plain` still hold.) (2) a
   **starfield** (90·`accents` screen-space stars w/ haloed twinkles) + the existing far planet/comet,
-  ALL off the independent `crng` stream; (3) the **landmass**
+  ALL off the independent `crng` stream (the far planet is kept SMALL, HIGH in the sky band, and
+  TRANSLUCENT — `hexAlpha(pcol, 0.62)`, `r 6–13`, `y 3.5–13.5%` — so it reads as a DISTANT body, not a
+  bright disc parked over the green; a low/large/opaque one looked like a "weirdly placed graphic"
+  floating on the course during the screen-space follow-cam flight; same `crng` draw count, so
+  determinism + the constellation prim-count invariants are untouched); (3) the **landmass**
   = a TIGHT hull around the hole geometry (the feature/hazard bbox `cb` + a small `landMargin`, NOT the
   full OB box) filled with `landFillFor` and ringed by an atmospheric **edge glow** (`SpaceLook.edge`,
   the void's island treatment generalised to all five worlds), so beyond the shoreline you see SPACE,
@@ -1650,6 +1665,14 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   pull is the core input now). NB: no new `_gs*` flag or `?param` — gesture tunables (`PULL_RANGE`/
   `AIM_SENS`/`COMMIT`) are plain consts and Overdrive/power are loadout/decision fields — so the
   test-hub guard needs no new control (the new perk appears in the Sim Lab automatically).
+  - **The AT-REST preview power is SEEDED to land the cone on the target, not always a full swing
+    (GS-power short-shot fix).** On a NEW shot `selPower` no longer defaults to a flat 1 — it's
+    `clamp(0.25, 1, distToPin ÷ the selected club's full expected carry)`, so the resting green/amber/red
+    cone sits ON the pin instead of flying way past it. The bug it fixes: a short chip (where even the
+    shortest club at full power overshoots the green) drew the arc "nowhere near where the ball lands."
+    A normal approach (target past the club's reach) clamps the ratio to 1 → a full swing, exactly as
+    before, so longer shots are unchanged. The gesture still charges from 0 on press; this only sets the
+    untouched resting preview. `frameSpray` stays `power:1` so the camera frame holds steady as you pull.
   - **Pinch-zoom must NOT trip the pull-to-shot (GS-mapnav fix).** The first finger no longer charges
     on touch — it starts PENDING and only ENGAGES a charge once it drags past `ENGAGE_SLOP` (6px). That
     window lets a quickly-following SECOND finger be recognised as a `pinch` first (a second pointerdown

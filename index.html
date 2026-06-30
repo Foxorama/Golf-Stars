@@ -543,12 +543,15 @@
       }
       .gs-bird-sub { font-size: 13px; color: var(--gs-ink); opacity: .85; margin-bottom: 14px; }
       .gs-bird-go { min-width: 180px; }
-      /* Eagle = chrome silver. */
+      /* Eagle = chrome silver. The 🦅 emoji is a brown/gold American eagle on most platforms, which
+         clashes with the "silver space eagle" copy — desaturate + brighten it into a chrome raptor. */
       .gs-bird--eagle .gs-bird-card { border: 1px solid rgba(200,214,235,.45); box-shadow: 0 0 40px rgba(190,205,230,.2), 0 18px 50px rgba(0,0,0,.5); }
       .gs-bird--eagle .gs-bird-title { background-image: linear-gradient(180deg, #ffffff, #c7d4e8 55%, #93a6c6); text-shadow: 0 2px 22px rgba(170,190,225,.4); }
-      /* Albatross = cosmic aurora. */
+      .gs-bird--eagle .gs-bird-emoji { filter: grayscale(1) brightness(1.4) contrast(1.02) drop-shadow(0 0 12px rgba(190,205,230,.65)) drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+      /* Albatross = cosmic aurora. Tint the 🕊️ emoji with an aurora glow to match the void copy. */
       .gs-bird--albatross .gs-bird-card { border: 1px solid rgba(122,184,255,.5); box-shadow: 0 0 46px rgba(95,230,200,.22), 0 18px 50px rgba(0,0,0,.5); }
       .gs-bird--albatross .gs-bird-title { background-image: linear-gradient(180deg, #d6c4ff, #7ab8ff 50%, #5fe6c8); text-shadow: 0 2px 26px rgba(120,200,230,.45); }
+      .gs-bird--albatross .gs-bird-emoji { filter: brightness(1.1) drop-shadow(0 0 14px rgba(95,230,200,.6)) drop-shadow(0 0 6px rgba(122,184,255,.5)) drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
       @media (prefers-reduced-motion: reduce) {
         .gs-bird, .gs-bird-card { animation: none; }
         .gs-bird-emoji { animation: none; }

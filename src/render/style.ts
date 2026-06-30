@@ -992,18 +992,21 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
         prims.push({ t: 'line', a: [sx, sy - s], b: [sx, sy + s], stroke: col, sw: 0.7, round: true });
       }
     }
-    // A far planet (ring + shaded disc + lit highlight) and a faint comet up in the sky.
+    // A far planet (ring + shaded disc + lit highlight) and a faint comet up in the sky. Kept SMALL,
+    // HIGH (the top sky band) and TRANSLUCENT so it reads as a DISTANT background body — not a bright
+    // disc parked over the course (it sits in screen space, so a low/large/opaque one looked like a
+    // "weirdly placed graphic" floating on the green during the follow-cam flight).
     const planetCols = ['#caa3ff', '#7be0d0', '#ffb27a', '#9bc2ff', '#ff9bbf'];
     const pcol = planetCols[(crng() * planetCols.length) | 0]!;
-    const pr = 10 + crng() * 14;
-    const ppx = W * (0.1 + crng() * 0.8);
-    const ppy = H * (0.05 + crng() * 0.16);
+    const pr = 6 + crng() * 7;
+    const ppx = W * (0.08 + crng() * 0.84);
+    const ppy = H * (0.035 + crng() * 0.1);
     if (crng() < 0.6) {
-      prims.push({ t: 'circle', c: [ppx, ppy], r: pr * 1.75, fill: 'none', stroke: 'rgba(255,255,255,0.10)', sw: 1.4 });
+      prims.push({ t: 'circle', c: [ppx, ppy], r: pr * 1.75, fill: 'none', stroke: 'rgba(255,255,255,0.08)', sw: 1.2 });
     }
-    prims.push({ t: 'circle', c: [ppx, ppy], r: pr, fill: pcol });
-    prims.push({ t: 'circle', c: [ppx + pr * 0.42, ppy + pr * 0.34], r: pr * 0.9, fill: 'rgba(8,10,20,0.34)' });
-    prims.push({ t: 'circle', c: [ppx - pr * 0.34, ppy - pr * 0.38], r: pr * 0.42, fill: 'rgba(255,255,255,0.5)' });
+    prims.push({ t: 'circle', c: [ppx, ppy], r: pr, fill: hexAlpha(pcol, 0.62) });
+    prims.push({ t: 'circle', c: [ppx + pr * 0.42, ppy + pr * 0.34], r: pr * 0.9, fill: 'rgba(8,10,20,0.28)' });
+    prims.push({ t: 'circle', c: [ppx - pr * 0.34, ppy - pr * 0.38], r: pr * 0.42, fill: 'rgba(255,255,255,0.4)' });
     if (crng() < 0.7) {
       const hx = W * (0.2 + crng() * 0.6);
       const hy = H * (0.06 + crng() * 0.12);
