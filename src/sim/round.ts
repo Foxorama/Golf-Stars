@@ -32,6 +32,7 @@ import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, flightKnockdown } from './flight';
+import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TradeTent } from './tents';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
@@ -67,6 +68,10 @@ export interface ShotLog {
   /** A hazard-skip ball (GS-proshop-2) skimmed across this penalty kind (water/lava/void) with NO
    *  stroke — render-only flavour ("skipped across!"). Set only when an immune ball saves a hazard. */
   skimmed?: string;
+  /** Trade-camp tent ricochet (GS-tents): the ball clipped a tent roof and bounced off. Carries the
+   *  impact point so the renderer can show the ball hit the tent + pop a voice bubble there ("Ow!").
+   *  Non-penalty — `result.landing` is the impact and the roll runs out along the reflected direction. */
+  tentHit?: { at: Vec; dir: Vec };
 }
 
 /** Per-yard roll MULTIPLIER of each surface (its "run"): how far the ball travels per unit of roll
@@ -171,11 +176,18 @@ export function rollOut(
   K: number,
   tdLie: FeatureKind,
   immune?: ReadonlySet<string>,
+  tents?: readonly TradeTent[],
 ): { roll: number; rest: Vec } {
   const sign = K < 0 ? -1 : 1;
   const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
   const at = (d: number): Vec => [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
   const STEP = 1.5; // yards per integration step
+  // Trade-camp tents (GS-tents): a ball ROLLING into a tent footprint stops against it (like sand /
+  // the woods), so the run-out stays a straight line and the roll-invariant holds. A tent the ball is
+  // ALREADY on (a fresh aerial-bounce ricochet starts at the roof it hit) doesn't re-stop it.
+  const startTents = tents?.filter((t) => insideTent(t, touchdown));
+  const hitsNewTent = (p: Vec): boolean =>
+    !!tents && tents.some((t) => insideTent(t, p) && !startTents!.includes(t));
   // Green SLOPE (GS-greens-3): how much the roll runs downhill / checks uphill. The travel direction
   // is sign*dir; its projection onto the green's DOWNHILL vector scales the green's run-per-yard, so a
   // ball rolling downhill runs out far and one rolling (or BACKSPINNING) uphill brakes hard and can't
@@ -204,6 +216,10 @@ export function rollOut(
     }
     if (!kPen && k !== tdLie && (k === 'bunker' || k === 'trees')) {
       dist += STEP; // ran into sand / caught by the woods → stops
+      break;
+    }
+    if (hitsNewTent(at(dist + STEP))) {
+      dist += STEP; // trickled up against a trade-camp tent → stops there
       break;
     }
     const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k); // this surface's run per yard (immune hazard skims fast); slope-adjusted on the green
@@ -329,6 +345,10 @@ export interface PlayHoleOptions {
    *  byte-for-byte unchanged. A property of the HOLE while the ball is in play, so a boss/partner on
    *  the same hole plays under the same rule (see match.ts). */
   rainbowRoad?: boolean;
+  /** Trade-camp tents (GS-tents): the trade-market route arms a ring of collidable tents around the
+   *  green. A property of the HOLE while in play (a boss/partner on the same hole obeys it too — see
+   *  match.ts). Absent/false = ordinary play, byte-for-byte unchanged. */
+  tradeTents?: boolean;
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -705,6 +725,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       backspinBoost: opts.backspinBoost,
       hazardImmune: opts.hazardImmune,
       rainbowRoad: opts.rainbowRoad,
+      tradeTents: opts.tradeTents,
     };
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
     // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
@@ -819,6 +840,10 @@ export interface ExecOpts {
   /** Rainbow Ball (GS-rainbow): off the fairway/bunker/green ribbon is OUT OF BOUNDS. Pure geometry on
    *  the rest lie (no rng); absent/false is byte-for-byte unchanged. */
   rainbowRoad?: boolean;
+  /** Trade-camp tents (GS-tents): when true the hole has a ring of COLLIDABLE tents around the green
+   *  (the trade-market route's signature) that a low/flat shot ricochets off. Pure geometry, no rng;
+   *  absent/false is byte-for-byte unchanged. Resolved from the course effect at the call sites. */
+  tradeTents?: boolean;
 }
 
 export interface ExecResult {
@@ -900,6 +925,22 @@ export function executeShot(
     result.apex = arcApex(kd.carry, nominalCarry);
   }
 
+  // Trade-camp tent ricochet (GS-tents): if NOT already knocked into the woods, a low/flat shot whose
+  // curved flight crosses a tent roof (around the green) is knocked down AT the tent and bounces off
+  // along the reflected direction — a lofted wedge sails over and lands clean. Pure geometry on the
+  // SAME curved path the renderer draws (no rng), so auto≡interactive holds; tents are built only when
+  // the trade-market route armed them, so a base shot never enters this branch (byte-for-byte stable).
+  const tents = opts.tradeTents ? tradeTents(hole) : undefined;
+  let tentHit: TentHit | null = null;
+  if (tents && !knockedDown) {
+    tentHit = tentFlightHit(tents, from, result.landing, result.shotBearing, result.carry, nominalCarry);
+    if (tentHit) {
+      result.landing = tentHit.point;
+      result.carry = tentHit.carry;
+      result.apex = arcApex(tentHit.carry, nominalCarry);
+    }
+  }
+
   // Touchdown → bounce & roll out (unless it plugs in a penalty surface). The run-out integrates
   // the surfaces it crosses: the ball keeps the same roll ENERGY but spends it fast in rough and
   // slowly on fairway/ice, so landing in the rough and trickling onto the fairway (or running off
@@ -919,11 +960,23 @@ export function executeShot(
     // Increased backspin (GS-proshop-2): subtract from the roll fraction (more check, less run) — same
     // single rng draw, so backspinBoost 0/undefined is byte-for-byte the old energy.
     const energy = rollPotential(nominalCarry, result.carry, rng, mods.rollFracDelta - (opts.backspinBoost ?? 0));
-    if (energy !== 0) {
+    // Tent ricochet (GS-tents): the run-out goes along the REFLECTED direction with a lively floor of
+    // energy (a real bounce, not a dead drop). Otherwise the roll runs along the flight direction. The
+    // rng draw above is unchanged either way, so the stream is stable. tents are passed so a roll that
+    // trickles into a DIFFERENT tent stops against it (a straight stop → the roll-invariant holds).
+    let rollDir: Vec;
+    let rollK = energy;
+    if (tentHit) {
+      rollDir = tentHit.dir;
+      rollK = Math.max(Math.abs(energy), TENT_BOUNCE_MIN); // bounce forward off the roof, always lively
+    } else {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
       const len = Math.hypot(dx, dy) || 1;
-      const out = rollOut(hole, touchdown, [dx / len, dy / len], energy, tdLie, immune);
+      rollDir = [dx / len, dy / len];
+    }
+    if (rollK !== 0) {
+      const out = rollOut(hole, touchdown, rollDir, rollK, tdLie, immune, tents);
       roll = out.roll;
       rest = out.rest;
     }
@@ -932,6 +985,7 @@ export function executeShot(
   const restLie = lieAt(hole, rest);
   const li = lieInfo(restLie);
   const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };
+  if (tentHit) log.tentHit = { at: tentHit.point, dir: tentHit.dir };
 
   let ballAfter: Vec = rest;
   let lieAfter: FeatureKind = restLie;

@@ -17,6 +17,7 @@
 import type { Feature, Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBoundsCorners } from '../sim/round';
+import { tradeTents as tradeTentsFor, type TradeTent } from '../sim/tents';
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
@@ -95,6 +96,10 @@ export interface SceneOpts {
    *  (it IS out of bounds; see `isRoadLie`). Render-only; the sim's OOB rule is the matching half.
    *  Baked at the app boundary from the live loadout (like `lefty`/`effect`), so no save/URL hook. */
   rainbow?: boolean;
+  /** Trade-camp tents (GS-tents): the trade-market route pitches a ring of bright, COLLIDABLE tents
+   *  around the green. Drawn in COURSE space (so they track the follow-cam — the fix for the old
+   *  screen-space caravan that floated in mid-air). Baked at the app boundary from the course effect. */
+  tradeTents?: boolean;
 }
 
 /** The Rainbow Road colour cycle (GS-rainbow) — a vivid 7-band rainbow the ribbon mows through. */
@@ -715,6 +720,71 @@ function styleTree(poly: Vec[], proj: Projector, rng: () => number): Prim[] {
     { t: 'circle', c: [x - rr * 0.12, y - rr * 0.12], r: rr * 0.82, fill: body }, // body
     { t: 'circle', c: [x - rr * 0.3, y - rr * 0.32], r: rr * 0.5, fill: CANOPY.lit }, // lit cap
   ];
+}
+
+/** Bright festival tent colour pairs (roof / shadow side) — content-as-data, cycled by tent index. */
+const TENT_FILLS: [string, string][] = [
+  ['#ef5350', '#b4302d'], // red
+  ['#42a5f5', '#1f6fbf'], // blue
+  ['#ffca28', '#cf9f17'], // gold
+  ['#66bb6a', '#3f8e4a'], // green
+  ['#ab47bc', '#7a2f8a'], // purple
+];
+
+/**
+ * Draw the trade-camp TENTS (GS-tents) as bright, billboard-upright festival tents at their course
+ * positions — projected so they sit ON the ground around the green and track the follow-cam (the fix
+ * for the old screen-space caravan that floated in mid-air). A striped conical roof + a dark doorway +
+ * a pennant + a warm camp glow, sized by `proj.scale`. Pure (the geometry is the tent's own; no rng).
+ */
+function styleTents(tents: readonly TradeTent[], proj: Projector): Prim[] {
+  const out: Prim[] = [];
+  for (const t of tents) {
+    const [x, y] = proj.project(t.c);
+    const rr = Math.max(6, t.r * proj.scale * 0.95);
+    const [roof, shade] = TENT_FILLS[t.hue % TENT_FILLS.length]!;
+    const peakY = y - rr * 1.85; // tent height
+    const eaveY = y - rr * 0.05;
+    const baseY = y + rr * 0.55;
+    // Warm camp glow so the tents read as a lively market at night.
+    out.push({ t: 'glow', c: [x, y - rr * 0.4], r: rr * 2.0, col: 'rgba(255,196,110,0.20)' });
+    // Cast shadow on the ground.
+    out.push({ t: 'circle', c: [x, baseY], r: rr * 0.95, fill: 'rgba(0,0,0,0.26)' });
+    // Body (the canvas walls) — a short trapezoid under the roof.
+    out.push({
+      t: 'poly',
+      pts: [
+        [x - rr * 0.74, eaveY],
+        [x + rr * 0.74, eaveY],
+        [x + rr * 0.6, baseY],
+        [x - rr * 0.6, baseY],
+      ],
+      fill: shade,
+      stroke: 'rgba(20,16,24,0.55)',
+      sw: 1,
+    });
+    // Roof: two panels meeting at the ridge peak (lit left, shaded right), with a couple of bright
+    // stripes so it reads as a striped marquee.
+    out.push({ t: 'poly', pts: [[x, peakY], [x - rr * 1.0, eaveY], [x, eaveY]], fill: roof, stroke: 'rgba(20,16,24,0.6)', sw: 1 });
+    out.push({ t: 'poly', pts: [[x, peakY], [x + rr * 1.0, eaveY], [x, eaveY]], fill: shade, stroke: 'rgba(20,16,24,0.6)', sw: 1 });
+    out.push({ t: 'line', a: [x - rr * 0.5, (peakY + eaveY) / 2], b: [x - rr * 0.5, eaveY], stroke: 'rgba(255,255,255,0.5)', sw: 1.4, round: true });
+    out.push({ t: 'line', a: [x + rr * 0.5, (peakY + eaveY) / 2], b: [x + rr * 0.5, eaveY], stroke: 'rgba(255,255,255,0.32)', sw: 1.4, round: true });
+    // Dark doorway.
+    out.push({
+      t: 'poly',
+      pts: [
+        [x - rr * 0.2, eaveY],
+        [x + rr * 0.2, eaveY],
+        [x + rr * 0.15, baseY],
+        [x - rr * 0.15, baseY],
+      ],
+      fill: 'rgba(28,20,30,0.8)',
+    });
+    // Pennant flag on the peak.
+    out.push({ t: 'line', a: [x, peakY], b: [x, peakY - rr * 0.55], stroke: 'rgba(235,238,250,0.85)', sw: 1.2, round: true });
+    out.push({ t: 'poly', pts: [[x, peakY - rr * 0.55], [x + rr * 0.5, peakY - rr * 0.4], [x, peakY - rr * 0.26]], fill: roof });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1500,6 +1570,13 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
     for (const f of treeHaz) prims.push(...styleTree(f.poly, proj, rng));
   }
+
+  // --- 6b. Trade-camp tents (GS-tents) ----------------------------------------
+  // The trade-market route's signature: a ring of bright, collidable tents around the green. Drawn in
+  // COURSE space (projected) so they sit on the ground and track the follow-cam — the fix for the old
+  // screen-space caravan that floated in mid-air over the controls / the flight. Pure (no rng); off the
+  // road under Rainbow Road (they'd be in the OOB void).
+  if (opts.tradeTents && !rainbow) prims.push(...styleTents(tradeTentsFor(hole), proj));
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);

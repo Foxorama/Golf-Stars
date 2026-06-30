@@ -12,9 +12,10 @@
  * EVERYTHING here is SCREEN-SPACE (the sky and the air), drawn in the canvas's own pixel frame. That
  * is deliberate and is what fixes the old "static decor jumps all over the place" bug: weather is the
  * sky, so it is anchored to the viewport, never to a course point that swings around under the
- * follow-cam. The old course-projected ground decor (trade tents / debris shards planted near the
- * tee) is gone — the trade camp is now a glowing caravan on the horizon and the debris drifts past in
- * orbit, both screen-fixed.
+ * follow-cam. The old course-projected ground decor (debris shards planted near the tee) is gone — the
+ * debris now drifts past in orbit, screen-fixed. (The TRADE-MARKET route is the exception: its tents
+ * are real COLLIDABLE course objects around the green — GS-tents, drawn by the scene builder, not here
+ * — so all that's left in this layer for it is a faint warm horizon tint.)
  *
  * Pure feel: seeded off the hole (mulberry32, never `Math.random`) so positions are stable for the
  * session and the same on every screen; only phase/drift animate off the clock. Reduced-motion draws a
@@ -115,11 +116,6 @@ interface Debris {
   shape: Vec[];
   blink: number;
 }
-interface Lantern {
-  x: number; // 0..1 along the camp
-  ph: number;
-  warm: boolean;
-}
 
 export function createWeather(o: WeatherOpts): WeatherHandle {
   let W = o.width;
@@ -133,7 +129,6 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   let stars: Star[] = [];
   let meteors: Meteor[] = [];
   let debris: Debris[] = [];
-  let lanterns: Lantern[] = [];
   let windDots: { x: number; y: number; s: number; ph: number }[] = [];
   let shootOff = 0;
 
@@ -170,8 +165,6 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       });
       return { y: 0.05 + rng() * 0.6, spd: 0.2 + (12 - sz) * 0.06, sz, off: rng(), spin: rng() * Math.PI * 2, shape, blink: rng() * Math.PI * 2 };
     });
-    // Trade-camp lantern string along the horizon.
-    lanterns = Array.from({ length: 22 }, (_, i) => ({ x: i / 21, ph: rng() * Math.PI * 2, warm: rng() < 0.8 }));
     windDots = Array.from({ length: 90 }, () => ({ x: rng() * (W + 40), y: rng() * (H + 40), s: 0.6 + rng() * 0.9, ph: rng() * 6.28 }));
   }
   build();
@@ -513,54 +506,6 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
-  function drawTradeCamp(ctx: CanvasRenderingContext2D, now: number): void {
-    // A distant caravan pitched on the horizon: a warm ground glow, a row of dome tents in
-    // silhouette, and a swaying string of lanterns. Screen-fixed — it never swings under the cam.
-    const hy = H * 0.84;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const glow = ctx.createRadialGradient(W * 0.5, hy, 0, W * 0.5, hy, W * 0.55);
-    glow.addColorStop(0, 'rgba(255,180,90,0.16)');
-    glow.addColorStop(1, 'rgba(255,180,90,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, hy - H * 0.3, W, H * 0.3 + 4);
-    ctx.restore();
-    ctx.save();
-    // Dome tents.
-    ctx.fillStyle = 'rgba(28,22,30,0.78)';
-    const tents = 5;
-    for (let i = 0; i < tents; i++) {
-      const cx = W * (0.18 + (i / (tents - 1)) * 0.64);
-      const tw = W * (0.05 + (i % 2) * 0.018);
-      const th = tw * 0.8;
-      ctx.beginPath();
-      ctx.moveTo(cx - tw, hy);
-      ctx.quadraticCurveTo(cx - tw, hy - th, cx, hy - th);
-      ctx.quadraticCurveTo(cx + tw, hy - th, cx + tw, hy);
-      ctx.closePath();
-      ctx.fill();
-      // A glowing doorway.
-      ctx.fillStyle = `rgba(255,190,110,${(0.4 + 0.2 * Math.sin(now * 0.002 + i)).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.ellipse(cx, hy - th * 0.18, tw * 0.22, th * 0.34, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(28,22,30,0.78)';
-    }
-    // Swaying lantern string above the camp.
-    ctx.globalCompositeOperation = 'lighter';
-    for (const L of lanterns) {
-      const lx = W * (0.12 + L.x * 0.76);
-      const sag = Math.sin(L.x * Math.PI) * 14;
-      const ly = hy - H * 0.12 - sag + Math.sin(now * 0.0015 + L.x * 6) * 2;
-      const tw = 0.5 + 0.5 * Math.sin(now * 0.003 + L.ph);
-      const col = L.warm ? `255,196,${Math.round(110 + tw * 60)}` : `150,210,255`;
-      ctx.fillStyle = `rgba(${col},${(0.35 + tw * 0.5).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(lx, ly, 1.6 + tw * 1.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
 
   function draw(ctx: CanvasRenderingContext2D, now: number): void {
     tint(ctx);
@@ -582,9 +527,6 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
         break;
       case 'spaceJunk':
         drawDebris(ctx, now);
-        break;
-      case 'tradeMarket':
-        drawTradeCamp(ctx, now);
         break;
       default:
         break;

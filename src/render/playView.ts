@@ -179,6 +179,7 @@ const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 
 const CADDY_SLOMO = 0.34; // virtual-time scale while a caddy effect plays (≈3× slower)
 const CADDY_SLOMO_MS = 1050; // virtual ms the slo-mo window lasts (covers the whole intercept arc)
 const CADDY_CALLOUT_MS = 1500; // virtual ms the speech bubble / phone glyph stays up
+const TENT_CALLOUT_MS = 1100; // virtual ms a trade-tent "Ow!" bubble (GS-tents) stays up
 
 // Caddy-guard redirect geometry (GS-caddy): the projectile and the ball are tied to the SAME flight
 // progress `tg`, so they MEET — the caddy fires at FIRE_FRAC and the shot connects with the ball at
@@ -346,6 +347,13 @@ export interface PlayViewOptions {
   /** Rainbow Ball (GS-rainbow): paint the play view as RAINBOW ROAD (rainbow ribbon through the stars,
    *  off-road = void). Baked from the live loadout at the app boundary; render-only. */
   rainbow?: boolean;
+  /** Trade-camp tents (GS-tents): draw the ring of collidable tents around the green. Baked from the
+   *  course effect at the app boundary; render-only (the sim's bounce is the matching half). */
+  tradeTents?: boolean;
+  /** Fired once when the ball ricochets off a trade-camp tent (GS-tents) — the cue for app.ts to play
+   *  the bonk sound + speak the yelp. The arg is the exact bubble text shown on-canvas ("Ow!" /
+   *  "Watch it!") so the spoken line matches. Pure feel hook; never affects the sim. */
+  onTentHit?: (text: string) => void;
   /** Called once the final shot has landed. */
   onDone?: () => void;
   /** Fired once per segment at the STRIKE moment (club–ball contact / putter tap) — the cue point
@@ -481,6 +489,9 @@ export function mountPlayView(
   let slowUntilV = 0; // virtual time to hold slo-mo until
   let caddyCallout: { id: CaddyArtId; until: number } | null = null;
   let chipInFiredShot = -1; // shot whose chip-in callout has fired
+  // Trade-camp tent ricochet (GS-tents): a transient "Ow!"/"Watch it!" bubble at the struck tent.
+  let tentCallout: { pos: Vec; text: string; until: number } | null = null;
+  let tentFiredShot = -1; // shot whose tent-hit callout has fired
 
   function reset(_now: number): void {
     shotIndex = 0;
@@ -504,6 +515,8 @@ export function mountPlayView(
     redirectDraw = null;
     cineZoom = 1;
     caddyCallout = null;
+    tentCallout = null;
+    tentFiredShot = -1;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -562,7 +575,7 @@ export function mountPlayView(
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow, tradeTents: opts.tradeTents });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);
@@ -834,6 +847,16 @@ export function mountPlayView(
             chipInFiredShot = shotIndex;
             fireCaddyEffect(opts.caddyId);
           }
+          // Trade-camp tent ricochet (GS-tents): the ball just bounced off a tent — pop an "Ow!" /
+          // "Watch it!" bubble at the struck tent + cue the sound. A little screen-shake for the bonk.
+          if (shot.tentHit && tentFiredShot !== shotIndex) {
+            tentFiredShot = shotIndex;
+            const [tx, ty] = proj.project(shot.tentHit.at);
+            const text = shotIndex % 2 === 0 ? 'Ow!' : 'Watch it!';
+            tentCallout = { pos: [tx, ty - 14], text, until: now + TENT_CALLOUT_MS };
+            shake = Math.max(shake, 0.3);
+            opts.onTentHit?.(text);
+          }
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
           if ((shot.roll ?? 0) < -0.3) {
             // Backspin is a TWO-BEAT run-out, not a smooth slide back to rest. The old monotonic
@@ -1006,6 +1029,16 @@ export function mountPlayView(
       }
     } else if (caddyCallout) {
       caddyCallout = null;
+    }
+
+    // Trade-camp tent ricochet bubble (GS-tents): "Ow!" / "Watch it!" over the struck tent.
+    if (tentCallout && now < tentCallout.until) {
+      const remain = tentCallout.until - now;
+      const age = TENT_CALLOUT_MS - remain;
+      const fade = Math.min(1, age / 120) * Math.min(1, remain / 240);
+      drawSpeechBubble(ctx, tentCallout.text, tentCallout.pos[0], tentCallout.pos[1], fade);
+    } else if (tentCallout) {
+      tentCallout = null;
     }
 
     ctx.restore();
