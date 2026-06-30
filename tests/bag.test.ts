@@ -122,7 +122,7 @@ describe('bag-tier unlock + purchase gating', () => {
 
   it('the reducer buys a bag tier with shards and carries it into the next run', () => {
     let s: UiState = initState(1, { maxAscension: 7, shards: 5000 });
-    s = { ...s, screen: 'outpost' };
+    s = { ...s, screen: 'trademarket' };
     s = reduce(s, { type: 'buyBagTier', tier: 'epic' });
     expect(s.bagTier).toBe('epic');
     expect(s.shards).toBe(3000); // 5000 − 2000
@@ -136,13 +136,13 @@ describe('bag-tier unlock + purchase gating', () => {
 
   it('the reducer refuses a locked or unaffordable bag tier', () => {
     let s: UiState = initState(1, { maxAscension: 2, shards: 100000 });
-    s = { ...s, screen: 'outpost' };
+    s = { ...s, screen: 'trademarket' };
     // A2 not cleared (maxAscension 2 < 3) → rare bag stays locked.
     s = reduce(s, { type: 'buyBagTier', tier: 'rare' });
     expect(s.bagTier).toBe('common');
     expect(s.shards).toBe(100000);
     // Unlocked but broke.
-    let poor: UiState = { ...initState(1, { maxAscension: 3, shards: 100 }), screen: 'outpost' };
+    let poor: UiState = { ...initState(1, { maxAscension: 3, shards: 100 }), screen: 'trademarket' };
     poor = reduce(poor, { type: 'buyBagTier', tier: 'rare' });
     expect(poor.bagTier).toBe('common');
   });

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
-import { marketOffer } from '../src/sim/rpg/ships';
+import { shipForCharacter, hatForCharacter, shirtForCharacter } from '../src/ui/game';
+import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 
 /** Drive a whole stop via the interactive reducer flow (attacking every shot). */
 function playStopInteractive(s: UiState): UiState {
@@ -203,76 +204,79 @@ describe('ui reducer', () => {
     expect(s.shards).toBe(s.lastRunShards);
   });
 
-  it('the Trade Market buys a cosmetic ship and auto-flies it (GS-garage)', () => {
+  it('the Trade Market buys a ship into GLOBAL ownership; the Clubhouse flies it per character (GS-clubhouse)', () => {
     let s = initState(7, { shards: 500 });
-    s = reduce(s, { type: 'openOutpost' });
-    expect(s.screen).toBe('outpost');
-    // The market draws unowned ships; buy the first offered one.
-    const offer = marketOffer(s.marketSeed, s.ownedShips, s.marketRerolls ?? 0);
-    expect(offer.length).toBeGreaterThan(0);
-    const ship = offer[0]!;
+    s = reduce(s, { type: 'openMarket' });
+    expect(s.screen).toBe('trademarket');
     const before = s.shards;
-    s = reduce(s, { type: 'buyShip', id: ship.id });
-    expect(s.ownedShips).toContain(ship.id);
-    expect(s.selectedShip).toBe(ship.id); // flying the new ride immediately
-    expect(s.shards).toBe(before - ship.cost);
-    s = reduce(s, { type: 'closeOutpost' });
+    // Buying grants ownership only — it does NOT auto-fly (outfitting is done in the Clubhouse).
+    s = reduce(s, { type: 'buyShip', id: 'racer-redline' });
+    expect(s.ownedShips).toContain('racer-redline');
+    expect(s.shards).toBe(before - 60);
+    expect(shipForCharacter(s, 'feather-fade')).toBe(DEFAULT_SHIP_ID); // still on the default wagon
+    s = reduce(s, { type: 'closeMarket' });
     expect(s.screen).toBe('title');
+    // Open one golfer's Clubhouse and fly the new ride on THEM only.
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    expect(s.screen).toBe('clubhouse');
+    s = reduce(s, { type: 'selectShip', id: 'racer-redline' });
+    expect(shipForCharacter(s, 'feather-fade')).toBe('racer-redline');
+    expect(shipForCharacter(s, 'huang-woo-hook')).toBe(DEFAULT_SHIP_ID); // a different golfer is untouched
     // The fleet + selection are pure cosmetics — a fresh run is unaffected.
+    s = reduce(s, { type: 'closeClubhouse' });
     s = reduce(s, { type: 'start', format: 'flat' });
     expect(s.run.credits).toBe(60); // base starting credits (no permanent stat upgrades anymore)
   });
 
-  it('the Garage selects an owned ship; the market guards bad buys + rerolls (GS-garage)', () => {
-    // Selecting an unowned ship is a no-op; a rich market buy then makes it selectable.
+  it('the Clubhouse selects only OWNED ships, only on the managed character (GS-clubhouse)', () => {
     let s = initState(7, { shards: 0 });
-    const offer = marketOffer(s.marketSeed, s.ownedShips, 0);
-    expect(reduce(s, { type: 'selectShip', id: offer[0]!.id })).toBe(s); // not owned → no-op
-    s = reduce(s, { type: 'openOutpost' });
-    expect(reduce(s, { type: 'buyShip', id: offer[0]!.id })).toBe(s); // can't afford → no-op
-    expect(reduce(s, { type: 'rerollMarket' })).toBe(s); // can't afford the reroll → no-op
-    // Mid-run the market is unreachable.
+    // Selecting outside the Clubhouse is a no-op.
+    expect(reduce(s, { type: 'selectShip', id: 'racer-redline' })).toBe(s);
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    expect(reduce(s, { type: 'selectShip', id: 'racer-redline' })).toBe(s); // not owned → no-op
+    // The market can't be opened mid-run.
     const playing = reduce(started(7), { type: 'playInteractive' });
-    expect(reduce(playing, { type: 'openOutpost' })).toBe(playing);
+    expect(reduce(playing, { type: 'openMarket' })).toBe(playing);
   });
 
-  it('the Wardrobe buys a cosmetic hat, auto-wears it, and toggles it off/on (GS-cosmetics)', () => {
+  it('the Trade Market buys clothing globally; the Clubhouse wears it per character (GS-clubhouse)', () => {
     let s = initState(7, { shards: 500 });
-    s = reduce(s, { type: 'openOutpost' });
+    s = reduce(s, { type: 'openMarket' });
     const before = s.shards;
-    // Buy a hat → owned + worn immediately.
+    // Buy a hat + shirt → globally owned, NOT auto-worn.
     s = reduce(s, { type: 'buyApparel', id: 'cap-classic' });
-    expect(s.ownedApparel).toContain('cap-classic');
-    expect(s.equippedHat).toBe('cap-classic');
-    expect(s.shards).toBe(before - 15);
+    s = reduce(s, { type: 'buyApparel', id: 'polo-classic' });
+    expect(s.ownedApparel).toEqual(['cap-classic', 'polo-classic']);
+    expect(s.shards).toBe(before - 30);
+    expect(hatForCharacter(s, 'feather-fade')).toBeUndefined(); // nothing worn yet
+    // Wear them on one golfer in the Clubhouse.
+    s = reduce(s, { type: 'closeMarket' });
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    s = reduce(s, { type: 'equipApparel', id: 'cap-classic' });
+    expect(hatForCharacter(s, 'feather-fade')).toBe('cap-classic');
     // Clicking the worn piece again takes it off; clicking once more puts it back on.
     s = reduce(s, { type: 'equipApparel', id: 'cap-classic' });
-    expect(s.equippedHat).toBeUndefined();
+    expect(hatForCharacter(s, 'feather-fade')).toBeUndefined();
     s = reduce(s, { type: 'equipApparel', id: 'cap-classic' });
-    expect(s.equippedHat).toBe('cap-classic');
-    // Hats and shirts live in independent slots.
-    s = reduce(s, { type: 'buyApparel', id: 'polo-classic' });
-    expect(s.equippedShirt).toBe('polo-classic');
-    expect(s.equippedHat).toBe('cap-classic'); // hat untouched by a shirt buy
+    expect(hatForCharacter(s, 'feather-fade')).toBe('cap-classic');
+    // Hats and shirts live in independent slots, and another golfer is unaffected.
+    s = reduce(s, { type: 'equipApparel', id: 'polo-classic' });
+    expect(shirtForCharacter(s, 'feather-fade')).toBe('polo-classic');
+    expect(hatForCharacter(s, 'feather-fade')).toBe('cap-classic');
+    expect(hatForCharacter(s, 'huang-woo-hook')).toBeUndefined();
   });
 
-  it('the Wardrobe guards unaffordable buys + equipping unowned pieces (GS-cosmetics)', () => {
+  it('clothing/ship buys are guarded; equipping is Clubhouse-only and owned-only (GS-clubhouse)', () => {
     let s = initState(7, { shards: 10 }); // can't afford even a common (15)
-    s = reduce(s, { type: 'openOutpost' });
+    s = reduce(s, { type: 'openMarket' });
     expect(reduce(s, { type: 'buyApparel', id: 'cap-classic' })).toBe(s); // too poor → no-op
-    expect(reduce(s, { type: 'equipApparel', id: 'cap-classic' })).toBe(s); // unowned → no-op
     // The mythic Supernova suit is the 500-shard splurge — unaffordable here.
     expect(reduce(s, { type: 'buyApparel', id: 'suit-supernova' })).toBe(s);
-  });
-
-  it('a reroll bumps the market salt for shards; a completed run refreshes the seed (GS-garage)', () => {
-    let s = initState(7, { shards: 1000 });
-    s = reduce(s, { type: 'openOutpost' });
-    expect(s.marketRerolls ?? 0).toBe(0);
-    const before = s.shards;
-    s = reduce(s, { type: 'rerollMarket' });
-    expect(s.marketRerolls).toBe(1);
-    expect(s.shards).toBeLessThan(before);
+    // Equipping an unowned piece (or outside the Clubhouse) is a no-op.
+    expect(reduce(s, { type: 'equipApparel', id: 'cap-classic' })).toBe(s);
+    s = reduce(s, { type: 'closeMarket' });
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    expect(reduce(s, { type: 'equipApparel', id: 'cap-classic' })).toBe(s); // unowned → no-op
   });
 
   it('offers Continue when a saved run is present, and resume enters it', () => {

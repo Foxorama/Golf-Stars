@@ -399,6 +399,28 @@
   also writes a standalone HTML; all 24 cosmetic SVGs are validated well-formed). Tests: `tests/apparel.test.ts`
   (catalogue/tiers/sets/buy-gate), `tests/ships.test.ts` (mythic UFO + weighted scarcity), `tests/save.test.ts`
   (v7), `tests/ui.test.ts` (buy auto-wears, equip toggle, guards).
+- **Cosmetics split into BUY (global) vs EQUIP (per character) — the Clubhouse (GS-clubhouse, save v10).**
+  The old combined `outpost` screen (which bundled the rotating ship market + a global Garage + a global
+  Wardrobe) is gone, replaced by two surfaces:
+  - **Trade Market** (`screen: 'trademarket'`, `tradeMarketScreen`): the acquisition surface. It now shows
+    the FULL ship catalogue (`shipCatalogue()`) AND the full apparel catalogue side-by-side, plus the Bag &
+    Club Sets. The **rotating ship offer + paid reroll are RETIRED** (`marketOffer`/`marketRerollCost`/
+    `MARKET_*`/`marketSeed`/`rerollMarket` all deleted) — a "proper shop" browses everything and scarcity is
+    the SHARD PRICE (the Mothership stays the 1,000-shard grail). Buying grants GLOBAL ownership only
+    (`buyShip`/`buyApparel` no longer auto-equip — there's no character context at the market).
+  - **Clubhouse** (`screen: 'clubhouse'` + a title-screen `clubhouseSection` of all four golfers): the
+    outfitting surface, ONE character at a time (`manageCharacterId`). Each golfer picks an owned ship
+    (`selectShip` → `shipByCharacter`) and wears owned hats/shirts (`equipApparel` toggle → `hatByCharacter`/
+    `shirtByCharacter`); the wardrobe shows ONLY owned pieces (buying lives at the market). So each of the
+    four characters can fly a different ride and wear a different look.
+  - **Resolution:** the journey-map ship and `golferLook()` resolve the PLAYED character's gear via the pure
+    exports `shipForCharacter`/`hatForCharacter`/`shirtForCharacter` (an owned pick, else the default wagon /
+    no apparel). Cosmetic-only — nothing here touches the sim, so determinism is untouched and no rng draws move.
+  - **Save v10** (v9→v10 migration): the old global `selectedShip`/`equippedHat`/`equippedShirt` are seeded
+    onto EVERY character so an existing player's look is preserved exactly, then they can diverge; `marketSeed`
+    is dropped. A defensive backfill drops any per-character entry referencing an unowned item. Tests:
+    `tests/ships.test.ts` (full catalogue ordering), `tests/save.test.ts` (v10 migration + per-character seeding +
+    unowned-drop), `tests/ui.test.ts` (buy-global / equip-per-character / guards / per-character independence).
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by

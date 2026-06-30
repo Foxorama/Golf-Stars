@@ -1,15 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import {
-  SHIPS,
-  DEFAULT_SHIP_ID,
-  shipById,
-  marketOffer,
-  marketRerollCost,
-  canBuyShip,
-  MARKET_OFFER_SIZE,
-} from '../src/sim/rpg/ships';
+import { SHIPS, DEFAULT_SHIP_ID, shipById, shipCatalogue, canBuyShip } from '../src/sim/rpg/ships';
+import { COSMETIC_RARITY } from '../src/sim/rpg/cosmetics';
 
-describe('ships catalogue (GS-garage)', () => {
+describe('ships catalogue (GS-garage / GS-clubhouse)', () => {
   it('has a free default wagon and several priced ships across sets/rarities', () => {
     const def = shipById(DEFAULT_SHIP_ID);
     expect(def).toBeTruthy();
@@ -37,60 +30,20 @@ describe('ships catalogue (GS-garage)', () => {
     expect(myth.look.flag).toBe('Hole 19');
   });
 
-  it('the rarity-weighted market makes the mythic UFO the scarcest draw', () => {
-    const myth = SHIPS.find((s) => s.rarity === 'mythic')!;
-    const owned = [DEFAULT_SHIP_ID];
-    let sawMyth = 0;
-    const N = 400;
-    for (let seed = 0; seed < N; seed++) {
-      if (marketOffer(seed, owned).some((s) => s.id === myth.id)) sawMyth++;
+  it('shipCatalogue lists the whole fleet, ordered common → mythic', () => {
+    const cat = shipCatalogue();
+    expect(cat.length).toBe(SHIPS.length); // the FULL fleet is browsable (no rotating offer)
+    expect(new Set(cat.map((s) => s.id)).size).toBe(SHIPS.length);
+    expect(cat[0]!.id).toBe(DEFAULT_SHIP_ID); // the common starter wagon first
+    expect(cat[cat.length - 1]!.rarity).toBe('mythic'); // the grail last
+    // Non-decreasing rarity order across the catalogue.
+    for (let i = 1; i < cat.length; i++) {
+      expect(COSMETIC_RARITY[cat[i]!.rarity].order).toBeGreaterThanOrEqual(COSMETIC_RARITY[cat[i - 1]!.rarity].order);
     }
-    // It DOES appear (obtainable), but far less than a uniform 3-of-pool share would give.
-    const pool = SHIPS.filter((s) => s.cost > 0).length;
-    const uniformRate = MARKET_OFFER_SIZE / pool;
-    expect(sawMyth).toBeGreaterThan(0);
-    expect(sawMyth / N).toBeLessThan(uniformRate);
-  });
-});
-
-describe('trade market offer (GS-garage)', () => {
-  const owned = [DEFAULT_SHIP_ID];
-
-  it('draws unowned, priced ships, deterministic per (seed, rerolls)', () => {
-    const a = marketOffer(0, owned, 0).map((s) => s.id);
-    const b = marketOffer(0, owned, 0).map((s) => s.id);
-    expect(a).toEqual(b); // deterministic
-    expect(a.length).toBe(Math.min(MARKET_OFFER_SIZE, SHIPS.filter((s) => s.cost > 0).length));
-    for (const id of a) {
-      expect(owned).not.toContain(id); // never offers an owned ship
-      expect(shipById(id)!.cost).toBeGreaterThan(0); // never offers the free default
-    }
-  });
-
-  it('a reroll (different salt) can change the draw; the seed bump refreshes it too', () => {
-    const r0 = marketOffer(0, owned, 0).map((s) => s.id);
-    const r1 = marketOffer(0, owned, 1).map((s) => s.id);
-    const s1 = marketOffer(1, owned, 0).map((s) => s.id);
-    // With a pool > offer size, at least one of the variants differs (not a hard guarantee per draw,
-    // but across both reroll + seed it must move).
-    expect(r0.join() !== r1.join() || r0.join() !== s1.join()).toBe(true);
-  });
-
-  it('shrinks to the remaining ships as the fleet fills, then empties', () => {
-    const allPriced = SHIPS.filter((s) => s.cost > 0).map((s) => s.id);
-    const nearlyAll = [DEFAULT_SHIP_ID, ...allPriced.slice(0, -1)];
-    expect(marketOffer(0, nearlyAll, 0).length).toBe(1); // only one ship left
-    const everything = [DEFAULT_SHIP_ID, ...allPriced];
-    expect(marketOffer(0, everything, 0)).toEqual([]); // fleet complete
-  });
-
-  it('the reroll cost is steep and ramps', () => {
-    expect(marketRerollCost(0)).toBeGreaterThanOrEqual(40);
-    expect(marketRerollCost(1)).toBeGreaterThan(marketRerollCost(0));
-    expect(marketRerollCost(2)).toBeGreaterThan(marketRerollCost(1));
   });
 
   it('canBuyShip gates on affordability, ownership, and a real priced ship', () => {
+    const owned = [DEFAULT_SHIP_ID];
     const ship = SHIPS.find((s) => s.cost > 0)!;
     expect(canBuyShip(ship, ship.cost, owned)).toBe(true);
     expect(canBuyShip(ship, ship.cost - 1, owned)).toBe(false); // can't afford
