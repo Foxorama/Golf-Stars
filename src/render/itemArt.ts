@@ -607,8 +607,10 @@ function drawCaddyFigure(id: string, col: string, seed: string): string {
   return frame(`${sparkles(seed, col, 5)}${fig()}`, col);
 }
 
-/** Reward club, themed by its set (planet / phoenix / solarstorm). The head glows with the theme. */
-function drawThemedClub(theme: string | undefined, col: string, seed: string): string {
+/** Reward club, themed by its set (planet / phoenix / solarstorm). The head glows with the theme.
+ *  `clubType` selects the head silhouette: a PUTTER gets a flat mallet blade + alignment line; every
+ *  other type keeps the swept iron/wood blade. */
+function drawThemedClub(theme: string | undefined, col: string, seed: string, clubType?: string): string {
   const head = mix(col, '#e8edf5', 0.4);
   let aura = '';
   let badge = '';
@@ -637,15 +639,24 @@ function drawThemedClub(theme: string | undefined, col: string, seed: string): s
       <circle cx="-4" cy="-4" r="4" fill="#fff7d6" opacity="0.7"/></g>`;
     badge = `<g stroke="#ffd23c" stroke-width="1.5" fill="none" opacity="0.6"><path d="M 96 64 q 8 -3 14 2"/></g>`;
   }
+  // A PUTTER reads as a flat mallet blade with an alignment line, not the swept iron face.
+  const headSvg =
+    clubType === 'putter'
+      ? `<g transform="translate(110 74) rotate(33)">
+       <rect x="-16" y="-7" width="30" height="13" rx="3" fill="${head}" stroke="#11141b" stroke-width="2"/>
+       <line x1="-1" y1="-7" x2="-1" y2="6" stroke="${col}" stroke-width="2"/>
+       <rect x="-16" y="-7" width="5" height="13" rx="2" fill="${col}" opacity="0.5"/>
+     </g>`
+      : `<g transform="translate(110 74) rotate(33)">
+       <path d="M -14 -12 Q 6 -16 12 0 Q 8 14 -12 11 Z" fill="${head}" stroke="#11141b" stroke-width="2"/>
+       <ellipse cx="-2" cy="-2" rx="3" ry="4" fill="${col}" opacity="0.5"/>
+     </g>`;
   return frame(
     `${sparkles(seed, col, 4)}${aura}
      <line x1="58" y1="22" x2="108" y2="72" stroke="#1b1f29" stroke-width="8" stroke-linecap="round"/>
      <line x1="58" y1="22" x2="108" y2="72" stroke="${mix(col, '#c9d2e0', 0.55)}" stroke-width="4" stroke-linecap="round"/>
      <rect x="50" y="14" width="15" height="9" rx="3" transform="rotate(33 57 18)" fill="#222633"/>
-     <g transform="translate(110 74) rotate(33)">
-       <path d="M -14 -12 Q 6 -16 12 0 Q 8 14 -12 11 Z" fill="${head}" stroke="#11141b" stroke-width="2"/>
-       <ellipse cx="-2" cy="-2" rx="3" ry="4" fill="${col}" opacity="0.5"/>
-     </g>
+     ${headSvg}
      ${badge}`,
     col,
   );
@@ -695,7 +706,8 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
       base = drawTrophy(col, seed);
       break;
     case 'club':
-      base = drawThemedClub(setTheme, col, seed);
+      // Reward club id is `club:<set>:<type>` — the type selects the head (putter vs iron/wood).
+      base = drawThemedClub(setTheme, col, seed, id.split(':')[2]);
       break;
     case 'caddy':
     default:

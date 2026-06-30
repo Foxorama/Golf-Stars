@@ -1017,6 +1017,14 @@ export interface ClubSet {
   theme?: string;
   /** Accent colour for the set's theme (render-only) — the club-head glow + card art tint. */
   tint?: string;
+  /**
+   * If set, this set ALSO covers the PUTTER type, and a themed putter from it grants this much
+   * `puttBoost` (a wider make-window). This is the clean way a SCORING-class reward is a genuine
+   * improvement (the deferred "scoring upgrade via a real stat, not carry"): everyone owns a putter,
+   * so a themed putter is only offered as a RARITY upgrade and its value is the better make-window —
+   * never extra carry (a putter has none to overshoot with). Rarity-scaled (Planet < Phoenix < Solar).
+   */
+  puttBoost?: number;
 }
 
 // Reward club sets are now THEMED by rarity (GS-proshop-2), each with its own look (a procedural club
@@ -1024,11 +1032,20 @@ export interface ClubSet {
 //   • rare      → "Planet"        (the planet line: tour distance woods + pro scoring irons)
 //   • epic      → "Phoenix Flames" (the masters distance line)
 //   • legendary → "Solar Storm"    (the apex distance line)
-// The set IDs (tour/masters/pro/solar) are STABLE for save-compat; only the labels/themes are themed,
-// and a new legendary `solar` distance tier is added. Stats/roles (distanceOnly/scoringOnly/carryBonus)
-// are unchanged for the existing sets, so the verified balance + every club-rewards test still holds.
-// "later we can expand so different sets are better at different things" — the theme/tint metadata is
-// the seam for that (e.g. a future Solar Storm set that also tightens dispersion).
+// The set IDs (tour/masters/pro/solar) are STABLE for save-compat; only the labels/themes are themed.
+// Each THEME is now a COMPLETE set (woods + irons + wedges + a putter), so you can assemble a full
+// themed bag (and the avatar swings its themed gear):
+//   • Planet (rare)      = `tour` woods (+8 carry)  +  `pro` irons/wedges/putter (base carry)
+//   • Phoenix (epic)     = `masters` woods (+16)  +  its own irons/wedges/putter (base carry)
+//   • Solar Storm (leg.) = `solar` woods (+24)   +  its own irons/wedges/putter (base carry)
+// CRITICAL balance: the carry bonus only ever lands on DISTANCE clubs (buildRewardClub gates on
+// DISTANCE_CLUB_CARRY) — irons/wedges carry BASE (coverage, never overshoots, the power-cell lesson),
+// proven by the `pro` tier. The PUTTER is the one scoring-class reward with a real stat (`puttBoost`,
+// rarity-scaled) so it's a genuine, offerable improvement, not a same-carry cosmetic dupe. So masters
+// and solar drop `distanceOnly` to also cover scoring + the putter; tour stays distance-only and the
+// Planet scoring/putter line lives on `pro` (an internal split, invisible to the player — both read
+// "Planet"). "later we can expand so different sets are better at different things" — the puttBoost
+// per-tier is the first step of that; the theme/tint metadata is the seam for more (e.g. dispersion).
 export const CLUB_SETS: readonly ClubSet[] = [
   // Legacy common 'starter' set — NO LONGER OFFERED (rewards are rare+ now). Kept resolvable so old
   // saves carrying a `club:starter:*` perk still rebuild it; the live bag's starting clubs are stamped
@@ -1037,13 +1054,17 @@ export const CLUB_SETS: readonly ClubSet[] = [
   // 'tour' — the rare PLANET distance tier: a longer wood/long-hybrid that replaces your starter one
   // (a verified reach upgrade), or fills a missing distance club.
   { set: 'tour', label: 'Planet', rarity: 'rare', carryBonus: 8, cost: 150, distanceOnly: true, theme: 'planet', tint: '#5b8bd0' },
-  // 'masters' — the epic PHOENIX FLAMES distance tier above Planet (a deeper reach upgrade for late-run builds).
-  { set: 'masters', label: 'Phoenix', rarity: 'epic', carryBonus: 16, cost: 240, distanceOnly: true, theme: 'phoenix', tint: '#ff7a3c' },
-  // 'pro' — rare PLANET SCORING coverage: a premium iron/wedge at base carry that fills a gap the
-  // balanced bag leaves (tighter distance control close in). Offered only for a type you don't carry.
-  { set: 'pro', label: 'Planet', rarity: 'rare', carryBonus: 0, cost: 120, scoringOnly: true, theme: 'planet', tint: '#5b8bd0' },
-  // 'solar' — the legendary SOLAR STORM distance tier: the apex reach upgrade (a deep-run prize).
-  { set: 'solar', label: 'Solar Storm', rarity: 'legendary', carryBonus: 24, cost: 360, distanceOnly: true, theme: 'solarstorm', tint: '#ffd23c' },
+  // 'masters' — the epic PHOENIX FLAMES tier: distance woods (+16) PLUS scoring irons/wedges (base
+  // carry) and a themed putter (a tidier make-window). A complete epic bag line.
+  { set: 'masters', label: 'Phoenix', rarity: 'epic', carryBonus: 16, cost: 240, theme: 'phoenix', tint: '#ff7a3c', puttBoost: 0.16 },
+  // 'pro' — the rare PLANET SCORING/PUTTER line: premium irons/wedges at base carry that fill the gaps
+  // the balanced bag leaves (tighter distance control close in) plus a steadier Planet putter. Together
+  // with `tour` woods this completes the rare Planet bag. Offered only for a type you lack / a putter
+  // upgrade.
+  { set: 'pro', label: 'Planet', rarity: 'rare', carryBonus: 0, cost: 120, scoringOnly: true, theme: 'planet', tint: '#5b8bd0', puttBoost: 0.10 },
+  // 'solar' — the legendary SOLAR STORM tier: the apex distance woods (+24) PLUS scoring irons/wedges
+  // (base carry) and the steadiest themed putter. The deep-run, complete legendary bag.
+  { set: 'solar', label: 'Solar Storm', rarity: 'legendary', carryBonus: 24, cost: 360, theme: 'solarstorm', tint: '#ffd23c', puttBoost: 0.22 },
 ];
 
 /**
@@ -1051,10 +1072,12 @@ export const CLUB_SETS: readonly ClubSet[] = [
  * bag: DISTANCE clubs (D/3W/5W/7W/2H) upgrade an owned one or fill a missing wood; SCORING clubs are
  * the long/mid irons + wedge in-betweens the balanced bag skips (4H/3i/4i/5i/7i/9i, AW/58) — collecting
  * them tightens the gaps so you can dial distance in close to the green. Clubs everyone already carries
- * (6i/8i/PW/GW/SW/LW/60/putter) aren't here — a same-carry "premium" copy is no improvement.
+ * (6i/8i/PW/GW/SW/LW/60) aren't here — a same-carry "premium" copy is no improvement. The PUTTER is the
+ * exception: everyone carries one, but a themed putter is a real UPGRADE via its make-window (`puttBoost`),
+ * so it's offered as a rarity upgrade — its value is the stat, never carry (see `ClubSet.puttBoost`).
  */
 export const REWARD_CLUB_TYPES: readonly string[] = [
-  'D', '3W', '5W', '7W', '2H', '4H', '3i', '4i', '5i', '7i', '9i', 'AW', '58',
+  'D', '3W', '5W', '7W', '2H', '4H', '3i', '4i', '5i', '7i', '9i', 'AW', '58', 'putter',
 ];
 
 /** Is this club type a hybrid (Longshot Larry refuses them)? Hybrid ids end in 'H'. */
@@ -1128,34 +1151,45 @@ export function equipClub(bag: readonly Club[], club: Club): Club[] {
   return [...bag.filter((c) => c.id !== club.id), club].sort((a, b) => b.carry - a.carry);
 }
 
-/** Does a set generate an item for a club type? distance-only sets (tour/masters) cover only distance
- *  clubs; the scoring-only set (pro) only scoring clubs; an unrestricted set (legacy starter) covers all. */
+/** Does a set generate an item for a club type? The PUTTER is covered only by a putter-capable set
+ *  (one with `puttBoost`) — checked first, since a putter's tiny carry otherwise reads as "scoring".
+ *  Then: a distance-only set (tour) covers distance clubs; the scoring-only set (pro) the irons/wedges;
+ *  an unrestricted set (masters/solar — full themed bags) both distance and scoring. */
 function setCoversType(set: ClubSet, type: string): boolean {
+  if (type === 'putter') return set.puttBoost !== undefined;
   if (set.distanceOnly) return isDistanceType(type);
   if (set.scoringOnly) return isScoringType(type);
-  return true;
+  return true; // unrestricted (distance + scoring; the putter is gated above)
 }
 
 /** Every reward club as a ShopItem (set × type). Generated once; apply() equips it into the bag. A
- *  distance-only set (tour/masters) skips scoring-club types — a +carry upgrade there would overshoot;
- *  the scoring-only set (pro) skips distance clubs (it carries base distance, value is coverage). */
+ *  distance-only set (tour) skips scoring-club types — a +carry upgrade there would overshoot; the
+ *  scoring-only set (pro) skips distance clubs (base distance, value is coverage); a themed PUTTER also
+ *  folds in the set's `puttBoost` (its make-window upgrade — the putter has no carry to upgrade). */
 export const CLUB_ITEMS: readonly ShopItem[] = CLUB_SETS.flatMap((set) =>
   REWARD_CLUB_TYPES.filter((type) => setCoversType(set, type)).map((type): ShopItem => {
     const id = clubItemId(set.set, type);
     const base = clubById(type, CLUBS)!;
     const tierWord = set.rarity === 'common' ? 'A fresh' : `A ${set.rarity}`;
     const carry = base.carry + (isDistanceType(type) ? set.carryBonus : 0);
+    const isPutt = type === 'putter';
+    const desc = isPutt
+      ? `${tierWord} ${set.label} putter — a steadier, wider make-window · equips into your bag`
+      : `${tierWord} ${base.name} (~${carry} yd) · equips into your bag`;
     return {
       id,
       name: set.label ? `${set.label} ${base.name}` : base.name,
       cost: set.cost,
-      desc: `${tierWord} ${base.name} (~${carry} yd) · equips into your bag`,
+      desc,
       rarity: set.rarity,
       clubType: type,
       clubSet: set.set,
       apply: (m) => ({
         ...m,
         bag: equipClub(m.bag, buildRewardClub(set, type, m.distanceClubBonus ?? 0)),
+        // A themed putter also raises the make-window (its real, non-carry upgrade); stacks like other
+        // putter perks, and rebuilds deterministically because loadoutFromPerks replays each apply().
+        puttBoost: isPutt && set.puttBoost ? (m.puttBoost ?? 0) + set.puttBoost : m.puttBoost,
         perks: [...m.perks, id],
       }),
     };
@@ -1177,9 +1211,10 @@ function rarityRank(r: Rarity | undefined): number {
  *  - the legacy common 'starter' set is never offered (`offerable: false`);
  *  - a golfer who refuses a type (Larry/hybrids) never sees it;
  *  - a type you DON'T carry → offered (NEW coverage: fills a gap so you can dial the distance in);
- *  - a type you DO carry → offered only as a genuine carry UPGRADE: a higher-rarity DISTANCE club
- *    (more reach, no overshoot). A scoring club you hold is never "upgraded" — its premium copy has
- *    the same carry, so it's no improvement (the power-cell lesson).
+ *  - a type you DO carry → offered only as a genuine UPGRADE: a higher-rarity DISTANCE club (more
+ *    reach, no overshoot) OR a higher-rarity PUTTER (a wider make-window). A scoring iron/wedge you
+ *    hold is never "upgraded" — its premium copy has the same carry, so it's no improvement (the
+ *    power-cell lesson); the putter is the exception because its upgrade is a stat, not carry.
  */
 export function offerableClubs(loadout: PlayerLoadout): ShopItem[] {
   return CLUB_ITEMS.filter((it) => {
@@ -1188,8 +1223,8 @@ export function offerableClubs(loadout: PlayerLoadout): ShopItem[] {
     if (loadout.noHybrids && isHybridType(type)) return false;
     const cur = loadout.bag.find((c) => c.id === type);
     if (!cur) return true; // gap-fill: you don't carry this type
-    // Owned → only a real carry upgrade: a higher-rarity distance club.
-    return isDistanceType(type) && rarityRank(it.rarity) > rarityRank(cur.rarity);
+    // Owned → only a real upgrade: a higher-rarity distance club (reach) or putter (make-window).
+    return (isDistanceType(type) || type === 'putter') && rarityRank(it.rarity) > rarityRank(cur.rarity);
   });
 }
 
@@ -1204,6 +1239,8 @@ export interface ClubOfferNote {
   carry: number;
   /** Upgrade only: yards gained over the club currently carried (≥0). */
   gainYd?: number;
+  /** Upgrade only: a PUTTER upgrade — the gain is a steadier make-window, not yards. */
+  putt?: boolean;
   /** New only: the bag club just LONGER than this one (the upper edge of the gap it fills), if any. */
   longerName?: string;
   /** New only: the bag club just SHORTER than this one (the lower edge of the gap it fills), if any. */
@@ -1216,6 +1253,8 @@ export function clubOfferNote(item: ShopItem, loadout: PlayerLoadout): ClubOffer
   const reward = buildRewardClub(set, item.clubType, loadout.distanceClubBonus ?? 0);
   const cur = loadout.bag.find((c) => c.id === item.clubType);
   if (cur) {
+    // A putter's upgrade is its make-window (puttBoost), not carry — flag it so the UI reads right.
+    if (item.clubType === 'putter') return { kind: 'upgrade', carry: reward.carry, putt: true };
     return { kind: 'upgrade', carry: reward.carry, gainYd: Math.max(0, Math.round(reward.carry - cur.carry)) };
   }
   // New club: find its neighbours by carry to describe the gap it slots into.

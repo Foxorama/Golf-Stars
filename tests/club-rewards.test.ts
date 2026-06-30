@@ -5,6 +5,7 @@ import {
   clubItem,
   clubOfferNote,
   clubItemId,
+  clubSetById,
   equipClub,
   loadoutFromPerks,
   netDispersion,
@@ -259,6 +260,65 @@ describe('reward clubs improve scoring — the collection loop pays off (GS-club
     // The balanced bag's distance clubs are D/5W (+ Larry's woods); Tour upgrades add reach.
     const upgrades = ['club:tour:D', 'club:tour:5W', 'club:tour:3W', 'club:tour:7W', 'club:tour:2H'];
     expect(rosterMean(upgrades)).toBeGreaterThan(rosterMean([]));
+  });
+});
+
+describe('themed full sets — irons, wedges & a putter (GS-fullsets)', () => {
+  it('Phoenix and Solar Storm are complete bags: woods + irons + wedges + putter', () => {
+    for (const set of ['masters', 'solar']) {
+      expect(clubItem(clubItemId(set, 'D')), `${set} wood`).toBeTruthy();
+      expect(clubItem(clubItemId(set, '5i')), `${set} iron`).toBeTruthy();
+      expect(clubItem(clubItemId(set, 'AW')), `${set} wedge`).toBeTruthy();
+      expect(clubItem(clubItemId(set, 'putter')), `${set} putter`).toBeTruthy();
+    }
+    // Planet's full bag is split across `tour` (woods) + `pro` (irons/wedges/putter).
+    expect(clubItem(clubItemId('tour', 'D'))).toBeTruthy();
+    expect(clubItem(clubItemId('pro', '7i'))).toBeTruthy();
+    expect(clubItem(clubItemId('pro', 'putter'))).toBeTruthy();
+  });
+
+  it('a themed iron/wedge carries BASE distance (coverage, never overshoots); woods keep their reach', () => {
+    expect(buildRewardClub(clubSetById('masters')!, '5i').carry).toBe(150); // 5-iron base
+    expect(buildRewardClub(clubSetById('solar')!, 'AW').carry).toBe(96); // approach-wedge base
+    expect(buildRewardClub(clubSetById('solar')!, 'D').carry).toBe(250 + 24); // wood keeps the bonus
+  });
+
+  it('a themed putter keeps base carry and grants a rarity-scaled puttBoost', () => {
+    const lo = clubItem(clubItemId('solar', 'putter'))!.apply(startingLoadout());
+    const p = lo.bag.find((c) => c.id === 'putter')!;
+    expect(p.carry).toBe(8); // base — a putter has no carry to overshoot with
+    expect(p.set).toBe('solar');
+    expect(p.rarity).toBe('legendary');
+    expect(lo.puttBoost).toBeCloseTo(0.22);
+    // A plain (non-putter) reward never touches puttBoost.
+    expect(clubItem(clubItemId('solar', 'D'))!.apply(startingLoadout()).puttBoost).toBe(0);
+  });
+
+  it('a themed putter is offered as a rarity upgrade over the starter putter, then only higher tiers', () => {
+    const feather = applyCharacter('feather-fade', startingLoadout());
+    const ids0 = offerableClubs(feather).map((i) => i.id);
+    expect(ids0).toContain('club:pro:putter'); // rare > the common starter putter
+    expect(ids0).toContain('club:solar:putter'); // legendary too
+    // Equip the legendary putter → no lower/equal-rarity putter is offered anymore.
+    const withSolar = clubItem(clubItemId('solar', 'putter'))!.apply(applyCharacter('feather-fade', startingLoadout()));
+    expect(offerableClubs(withSolar).some((i) => i.clubType === 'putter')).toBe(false);
+  });
+
+  it('the putter offer note reads as a make-window upgrade, not "+0 yd"', () => {
+    const feather = applyCharacter('feather-fade', startingLoadout());
+    const note = clubOfferNote(clubItem('club:solar:putter')!, feather);
+    expect(note?.kind).toBe('upgrade');
+    expect(note?.putt).toBe(true);
+    expect(note?.gainYd).toBeUndefined();
+  });
+
+  it('a bought themed putter survives snapshot/resume (bag + puttBoost rebuilt)', () => {
+    let run = rich(startRun(31, undefined, {}, 'feather-fade'));
+    run = buy(run, 'club:masters:putter');
+    expect(run.loadout.puttBoost).toBeCloseTo(0.16);
+    const resumed = resumeRun(snapshotRun(run));
+    expect(resumed.loadout.puttBoost).toBeCloseTo(0.16);
+    expect(resumed.loadout.bag.find((c) => c.id === 'putter')!.set).toBe('masters');
   });
 });
 
