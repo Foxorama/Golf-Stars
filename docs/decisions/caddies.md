@@ -52,20 +52,31 @@
 - **Generic caddy 'service' perks gate behind hiring a named caddy.** `caddie-lesson` is `caddy:
   'service'`: `shopOffer` only surfaces a service perk once `namedCaddyOwned(perks)` is set — you need a
   caddy before they'll give you lessons. (It still stacks/works exactly as before once unlocked.)
-- **The guard caddies redirect a sampled miss to the green MID-FLIGHT — they do NOT reshape the spray
-  (`CaddyGuard` in shot.ts, distinct from `ShapeMod`).** The cone still shows the miss tails; what
-  changes is that a shot already SAMPLED into a tail gets knocked back. `resolveShot` classifies the
-  sampled angle's zone (`classifySprayZone`) and, if a guard is present, looks up that zone's redirect
-  CHANCE (`guard.redirect[zone]`): a chance ≥1 ALWAYS redirects to a fresh green-band angle (no roll), a
-  fractional chance rolls once, an absent/zero zone does nothing. **Space Ducks** =
-  `{redirect:{duckHookL:1, hookL:0.75}, kind:'laser'}` (every duck-hook gone; 75% of hooks saved);
-  **Convict Sheep** = `{redirect:{shankR:1, sliceR:0.75}, kind:'boomerang'}` (the right-side mirror).
-  On a redirect, `ShotResult.redirect = {kind, fromZone, originalLanding}` records the would-be miss so
-  the renderer animates it. CRITICAL determinism: the guard's extra rng draws (the chance roll + the green
-  resample) fire ONLY when a guard is present AND the sampled zone qualifies — a guard-less shot (or an
-  empty guard) draws NOTHING extra, so the base sim is byte-for-byte unchanged (guarded by
-  `tests/caddies.test.ts`). The guard is threaded into BOTH the auto sim (`playStop`→`playHole`→
-  `executeShot`, `PlayHoleOptions.guard`) and the interactive driver (`takeShot`) so auto≡interactive.
+- **The guard caddies redirect an OFF-FAIRWAY miss back onto the SHORT GRASS MID-FLIGHT — green if it's a
+  GREENSIDE miss, else the fairway — they do NOT reshape the spray (`CaddyGuard` in shot.ts, distinct from
+  `ShapeMod`).** The cone still shows the miss tails; what changes is that a shot that would COME DOWN OFF
+  the fairway on the caddy's side gets knocked back. The trigger is OUTCOME-based, not zone-based:
+  `resolveShot` computes the would-be landing, then (if a guard is present) asks the caller-supplied
+  `offFairway(landing)` predicate whether it lands off the short grass (`ShotInput.offFairway` closes over
+  the hole as `lieAt(hole,p) !== 'fairway' && !== 'green'`, keeping `resolveShot` itself course-agnostic).
+  It reads the SIDE off the landing's WORLD lateral sign (− = left of the bearing, + = right) and, if it
+  matches `guard.side`, redirects: a GREENSIDE miss (one `ShotInput.greenAim(landing)` returns an on-green
+  point for — `executeShot` builds it as "within the green's radius + `CADDY_GREENSIDE_MARGIN`" → a point
+  60% from the green centre to the pin, always inside the star-shaped green) is teleported ONTO the green
+  with carry following so the roll-out reads true; any OTHER miss resamples a fresh centre-band angle
+  (`sampleGreenAngle`) so it comes down on the fairway. Fires on EVERY qualifying miss — no chance roll.
+  **Space Ducks** = `{side:'left', kind:'laser'}` (every ball missing LEFT — rough/sand/void/water,
+  wherever — lasered home; on the green if greenside); **Convict Sheep** = `{side:'right',
+  kind:'boomerang'}` (the right-side mirror). On a redirect, `ShotResult.redirect = {kind, fromZone,
+  originalLanding}` records the would-be miss so the renderer animates it (`fromZone` is now just a
+  representative tail for the side — the renderer reads `originalLanding`, not the zone). CRITICAL
+  determinism: the fairway recentre is the single extra rng draw (the greenside teleport is a deterministic
+  point → no draw), and it fires ONLY when a guard is present AND `offFairway` says it's a side miss — a
+  guard-less shot, a hole-less unit call, or a guard with no `offFairway` draws NOTHING extra, so the base
+  sim is byte-for-byte unchanged (guarded by `tests/caddies.test.ts`). The guard + the course-aware tests
+  (`offFairway`/`greenAim`) are threaded through the ONE shared
+  `executeShot` (which has the hole), so both the auto sim (`playStop`→`playHole`) and the interactive
+  driver (`takeShot`) get identical interception → auto≡interactive.
 - **Dr Chipinski adds a chip-in chance, not a spray change (`ExecOpts.chipIn`, `CHIPIN_RANGE` 8yds).**
   After a shot comes to rest, if `chipIn > 0` AND the club is a wedge (`nominalCarry ≤
   WEDGE_CONTROL_CARRY` 110 — PW and shorter) AND the ball rests within `CHIPIN_RANGE` of the flag but
@@ -128,8 +139,8 @@
   Chipinski (lab coat + wedge), Space Ducks (bubble-helmet duck + top hat + laser rifle), Convict Sheep
   (striped jumpsuit + boomerang). On a redirect, `playView` flies the ball toward `originalLanding`,
   fires the caddy's projectile (`drawCaddyProjectile` — laser beam / spinning boomerang) from the
-  figure's muzzle anchor mid-flight, then kinks the GROUND path back to the green (the loft arc is one
-  continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
+  figure's muzzle anchor mid-flight, then kinks the GROUND path back onto the fairway (the loft arc is
+  one continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
   knobs/no new `_gs*` flag, so the test-hub guard needs no new control; the Sim Lab absorbs the new
   shop items automatically.
 - **Caddy effects are testable in the harness — DEMO the throw + VERIFY the rate (GS-caddy-test).** The

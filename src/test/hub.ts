@@ -390,7 +390,7 @@ function showDispersion(study: DispersionStudy): void {
     h('p', { class: 'note' }, `Intended carry ${Math.round(study.intended)} yd. 2σ lateral cone ≈ ±${Math.round(2 * l.sd)} yd. Carry range ${Math.round(c.min)}–${Math.round(c.max)} yd (the “can come up short” tail).`),
     study.redirectRate !== undefined
       ? h('p', { class: 'note', style: 'color:#7ee0a0' },
-          `Caddy guard (${study.guardKind}): ${fmt(study.redirectRate * 100, 1)}% of shots knocked back to the green (red = the would-be miss saved). Hire Space Ducks / Convict Sheep in the loadout to see it.`)
+          `Caddy guard (${study.guardKind}): ${fmt(study.redirectRate * 100, 1)}% of shots knocked back onto the fairway (red = the would-be miss saved). Hire Space Ducks / Convict Sheep in the loadout to see it.`)
       : h('p', { class: 'note' }, 'Tip: add Space Ducks or Convict Sheep in the loadout to see the guard interception rate here.'),
   );
   // draw after layout so the canvas has its CSS size

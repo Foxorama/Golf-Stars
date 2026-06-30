@@ -336,6 +336,13 @@
            controls column (the "caddy frame too tall for the graphic" bug). */
         display: flex; align-items: flex-end; gap: 8px;
       }
+      /* Watch-screen caddy badge — the framed gold portrait floats bottom-RIGHT during the shot
+         animation (GS-caddy-display), clear of the play view's bottom-left corner caddy + the
+         top-left info chip, so the "premium hire" border reads the whole shot. */
+      .gs-hud-watchcaddy {
+        right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
+        display: flex; align-items: flex-end;
+      }
       .gs-hud-controls {
         flex: 1 1 auto; min-width: 0; padding: 7px 11px 8px;
         display: flex; flex-direction: column; gap: 5px;

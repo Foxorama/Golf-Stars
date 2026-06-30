@@ -102,7 +102,7 @@ export interface ShotSample {
   lateral: number;
   /** Downrange carry, yards. */
   carry: number;
-  /** A caddy-guard (Space Ducks / Convict Sheep) knocked this shot back to the green (GS-caddy). */
+  /** A caddy-guard (Space Ducks / Convict Sheep) knocked this shot back onto the fairway (GS-caddy). */
   redirected?: boolean;
   /** The WOULD-BE miss the guard saved (where the hook/shank would have come down) — for the chart. */
   origLateral?: number;
@@ -122,7 +122,7 @@ export interface DispersionStudy {
   samples: ShotSample[];
   carry: Stats;
   lateral: Stats;
-  /** Fraction of shots a caddy-guard redirected back to the green (GS-caddy) — undefined if the
+  /** Fraction of shots a caddy-guard redirected back onto the fairway (GS-caddy) — undefined if the
    *  built loadout has no guard caddy (Space Ducks / Convict Sheep). Lets the Lab VERIFY the
    *  interception rate the live game only shows on a rare right-side miss. */
   redirectRate?: number;
@@ -173,11 +173,19 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
   const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
 
   // Caddy effects that change a SAMPLED shot ride the built loadout, so toggling a caddy in the Lab
-  // shows up here: the in-flight guard (Space Ducks / Convict Sheep — knocks a right/left miss back to
-  // the green) and Sandy's lie relief (a bad lie carries more). Absent on a base loadout → no-op.
+  // shows up here: the in-flight guard (Space Ducks / Convict Sheep — knocks a ball that would miss the
+  // fairway on its side back onto the fairway) and Sandy's lie relief (a bad lie carries more). Absent
+  // on a base loadout → no-op.
   const guard = opts.loadout?.caddyGuard;
   const lieRelief = opts.loadout?.lieRelief;
   const lefty = opts.loadout?.lefty;
+  // The real guard fires off the hole's corridor (`lieAt`), which the Lab's synthetic, hole-less study
+  // doesn't have — so model a fairway as a strip ±FAIRWAY_HALF off the dead-straight aim line, scaled to
+  // the club's carry so it tracks the scatter across clubs. Any landing past it reads as off the short
+  // grass; the guard then knocks side-misses back. A centred (saved) ball lands well inside the strip,
+  // so it reads as a fairway hit. Built only when a guard is owned → a base study passes `undefined`.
+  const fairwayHalf = 0.06 * club.carry * (carryMult ?? 1);
+  const offFairway = guard ? (p: [number, number]) => Math.abs(p[0]) > fairwayHalf : undefined;
 
   const from: [number, number] = [0, 0];
   const aim: [number, number] = [0, 100]; // straight downrange (+Y) ⇒ shot bearing 0
@@ -198,6 +206,7 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       minCarryFracBoost: cw.minCarryFracBoost,
       carryWindowTighten: cw.carryWindowTighten,
       guard,
+      offFairway,
       lieRelief,
       lefty,
       rng,
@@ -256,7 +265,7 @@ export function caddyEffects(loadout: PlayerLoadout): CaddyEffect[] {
     out.push({
       id: 'caddyGuard',
       label: `Guard · ${g.kind}`,
-      detail: `${Object.entries(g.redirect).map(([z, p]) => `${Math.round((p as number) * 100)}% ${z}`).join(', ') || '—'} → green`,
+      detail: `every ball missing ${g.side === 'left' ? 'LEFT' : 'RIGHT'} → green if greenside, else fairway`,
     });
   }
   if (loadout.clubSuggest)

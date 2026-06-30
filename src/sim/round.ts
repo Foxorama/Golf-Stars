@@ -310,7 +310,7 @@ export interface PlayHoleOptions {
   /** Driver Dan caddy (GS-caddy): when true the driver is usable from ANY lie at full stats; the
    *  default keeps the driver tee-only. (Replaces the removed Driver-on-Deck level system.) */
   driverAnywhere?: boolean;
-  /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail to the green. */
+  /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail onto the fairway. */
   guard?: CaddyGuard;
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
   lieRelief?: number;
@@ -807,7 +807,7 @@ export interface ExecOpts {
   minCarryBoost?: number;
   /** Wedge distance-control: tighten the wedge carry window (point 6). */
   wedgeWindow?: number;
-  /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail to the green. */
+  /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail onto the fairway. */
   guard?: CaddyGuard;
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
   lieRelief?: number;
@@ -857,6 +857,11 @@ export interface ExecResult {
   holed: boolean;
 }
 
+/** How far OFF the green a miss can be and still count as "greenside" for a caddy-guard save (GS-caddy):
+ *  added to the green's own radius, so a ball within this margin of the putting surface is dropped ON the
+ *  green rather than recentred onto the fairway. */
+const CADDY_GREENSIDE_MARGIN = 30;
+
 /**
  * Resolve ONE full shot — wind-compensated aim, flight, bounce/roll-out, penalty, and
  * hole-out — given an explicit `target` and `club`. Shared by the AI (playHole) and the
@@ -891,6 +896,21 @@ export function executeShot(
   const confident = opts.confidence && opts.suggestedClubId === club.id ? opts.confidence : undefined;
   const shape = resolveShape(combineShapeMods(opts.shapeMod, confident), mods.shape);
   const cw = carryControlFor(nominalCarry, opts);
+  // Greenside save target (GS-caddy): when a guard fires on a miss NEAR the green, drop the ball ON the
+  // green (partway from the green centre to the pin — always inside the star-shaped green) instead of
+  // recentring on the fairway, the most useful save. "Near" = within the green's own radius + a greenside
+  // margin. Built only when a guard is owned, so a guard-less shot passes `undefined` (no green teleport).
+  let greenAim: ((p: Vec) => Vec | null) | undefined;
+  if (opts.guard) {
+    const gc = hole.green;
+    const pin = pinOf(hole);
+    const gpoly = hole.features.find((f) => f.kind === 'green')?.poly;
+    let gR = 0;
+    if (gpoly) for (const v of gpoly) gR = Math.max(gR, Math.hypot(v[0] - gc[0], v[1] - gc[1]));
+    const reach = gR + CADDY_GREENSIDE_MARGIN;
+    const target: Vec = [gc[0] + (pin[0] - gc[0]) * 0.6, gc[1] + (pin[1] - gc[1]) * 0.6];
+    greenAim = (p: Vec) => (dist(p, gc) <= reach ? target : null);
+  }
   const result = resolveShot({
     from,
     aim,
@@ -904,6 +924,11 @@ export function executeShot(
     minCarryFracBoost: cw.minCarryFracBoost,
     carryWindowTighten: cw.carryWindowTighten,
     guard: opts.guard,
+    // Caddy-guard fairway test (GS-caddy): closes the guard over THIS hole so resolveShot stays
+    // course-agnostic. Off the fairway = any lie that isn't fairway or green (rough/sand/void/water/…).
+    // Built only when a guard is owned, so a guard-less shot passes `undefined` → no redirect, no draw.
+    offFairway: opts.guard ? (p: Vec) => { const k = lieAt(hole, p); return k !== 'fairway' && k !== 'green'; } : undefined,
+    greenAim,
     lieRelief: opts.lieRelief,
     lefty: opts.lefty,
     windResist: opts.windResist,

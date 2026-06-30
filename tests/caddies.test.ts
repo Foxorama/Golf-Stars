@@ -294,62 +294,139 @@ describe('Dr Chipinski — wedge chip-ins near the pin', () => {
   });
 });
 
-// --- Guard helpers: classify the FINAL spray zone a shot finished in (no wind, no bias). ---
+// --- Guard helpers. The guard now fires on OUTCOME: a ball that would come down OFF the fairway on the
+// caddy's side is zapped back to the centre — every qualifying miss, no chance roll. resolveShot stays
+// course-agnostic, so the tests supply a synthetic `offFairway` predicate: a narrow strip of fairway
+// (|x| <= FW_HALF off the dead-straight aim line) with rough everywhere else. ---
 const wideMiss: SprayShape = { green: 0.5, hookL: 0.15, sliceR: 0.15, duckHookL: 0.1, shankR: 0.1 };
 const driver = CLUBS.find((c) => c.id === 'D')!;
 const angleSd = dispersionProfile(driver.carry).lateralFrac * lieInfo('fairway').dispersionMult;
+const FROM: Vec = [0, 0];
+const AIM: Vec = [0, 100]; // dead up +Y, so landing[0] IS the lateral miss (− left, + right)
 
-function finalZone(rng: Rng, guard?: typeof SPACE_DUCKS_GUARD) {
-  const from: Vec = [0, 0];
-  const aim: Vec = [0, 100];
-  const r = resolveShot({ from, aim, club: driver, lie: 'fairway', shape: wideMiss, guard, rng });
-  const theta = Math.atan2(r.landing[0], r.landing[1]) - (r.shotBearing * Math.PI) / 180;
-  return { zone: classifySprayZone(theta, wideMiss, angleSd), redirect: r.redirect };
+function rawShot(rng: Rng) {
+  return resolveShot({ from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss, rng });
+}
+function zoneOf(r: { landing: Vec }) {
+  return classifySprayZone(Math.atan2(r.landing[0], r.landing[1]), wideMiss, angleSd);
+}
+// Calibrate the fairway half-width to sit just OUTSIDE the green band, so a centred (saved) ball always
+// reads as ON the fairway and the miss tails always read as OFF it — no boundary ambiguity.
+let greenMaxX = 0;
+for (let s = 0; s < 800; s++) {
+  const r = rawShot(new Rng(`cal:${s}`));
+  if (zoneOf(r) === 'green') greenMaxX = Math.max(greenMaxX, Math.abs(r.landing[0]));
+}
+const FW_HALF = greenMaxX + 5; // a comfortable margin past the widest centred shot
+const offFairway = (p: Vec) => Math.abs(p[0]) > FW_HALF;
+
+function guardedShot(rng: Rng, guard: typeof SPACE_DUCKS_GUARD) {
+  return resolveShot({ from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss, guard, offFairway, rng });
 }
 
-describe('Space Ducks — laser-zap the duck-hooks', () => {
-  it('removes every duck-hook and redirects some hooks to the green', () => {
-    let baseDuck = 0;
-    let guardDuck = 0;
+describe('Space Ducks — laser EVERY ball that would miss the fairway LEFT back onto it', () => {
+  it('no ball is left to come down left of the fairway; each fires (and lands back on) the fairway', () => {
+    let baseLeft = 0;
+    let baseRight = 0;
+    let guardLeft = 0;
+    let guardRight = 0;
     let lasers = 0;
-    for (let s = 0; s < 600; s++) {
-      if (finalZone(new Rng(`d:${s}`)).zone === 'duckHookL') baseDuck++;
-      const g = finalZone(new Rng(`d:${s}`), SPACE_DUCKS_GUARD);
-      if (g.zone === 'duckHookL') guardDuck++;
-      if (g.redirect?.kind === 'laser') lasers++;
+    let savedOnFairway = 0;
+    for (let s = 0; s < 800; s++) {
+      const b = rawShot(new Rng(`d:${s}`));
+      if (b.landing[0] < -FW_HALF) baseLeft++;
+      if (b.landing[0] > FW_HALF) baseRight++;
+      const g = guardedShot(new Rng(`d:${s}`), SPACE_DUCKS_GUARD);
+      if (g.landing[0] < -FW_HALF) guardLeft++;
+      if (g.landing[0] > FW_HALF) guardRight++;
+      if (g.redirect?.kind === 'laser') {
+        lasers++;
+        if (!offFairway(g.landing)) savedOnFairway++; // the redirected ball lands back on the fairway
+      }
     }
-    expect(baseDuck).toBeGreaterThan(10); // the setup really does produce duck-hooks
-    expect(guardDuck).toBe(0); // …all of which the ducks zap away
-    expect(lasers).toBeGreaterThan(0); // and the redirect is recorded for the animation
+    expect(baseLeft).toBeGreaterThan(20); // the setup really does miss left a lot
+    expect(guardLeft).toBe(0); // …and the ducks zap EVERY one of them — none lands left of the fairway
+    expect(lasers).toBe(baseLeft); // exactly one laser per would-be left miss (100%, not a sample)
+    expect(savedOnFairway).toBe(lasers); // and every zapped ball comes down back ON the fairway
+    expect(guardRight).toBe(baseRight); // right misses are the sheep's job — the ducks leave them be
   });
 });
 
-describe('Convict Sheep — boomerang the shanks', () => {
-  it('removes every shank and redirects some slices to the green', () => {
-    let baseShank = 0;
-    let guardShank = 0;
+describe('Convict Sheep — boomerang EVERY ball that would miss the fairway RIGHT back onto it', () => {
+  it('no ball is left to come down right of the fairway; the ducks-mirror', () => {
+    let baseLeft = 0;
+    let baseRight = 0;
+    let guardLeft = 0;
+    let guardRight = 0;
     let boomerangs = 0;
-    for (let s = 0; s < 600; s++) {
-      if (finalZone(new Rng(`c:${s}`)).zone === 'shankR') baseShank++;
-      const g = finalZone(new Rng(`c:${s}`), CONVICT_SHEEP_GUARD);
-      if (g.zone === 'shankR') guardShank++;
-      if (g.redirect?.kind === 'boomerang') boomerangs++;
+    let savedOnFairway = 0;
+    for (let s = 0; s < 800; s++) {
+      const b = rawShot(new Rng(`c:${s}`));
+      if (b.landing[0] < -FW_HALF) baseLeft++;
+      if (b.landing[0] > FW_HALF) baseRight++;
+      const g = guardedShot(new Rng(`c:${s}`), CONVICT_SHEEP_GUARD);
+      if (g.landing[0] < -FW_HALF) guardLeft++;
+      if (g.landing[0] > FW_HALF) guardRight++;
+      if (g.redirect?.kind === 'boomerang') {
+        boomerangs++;
+        if (!offFairway(g.landing)) savedOnFairway++;
+      }
     }
-    expect(baseShank).toBeGreaterThan(10);
-    expect(guardShank).toBe(0);
-    expect(boomerangs).toBeGreaterThan(0);
+    expect(baseRight).toBeGreaterThan(20);
+    expect(guardRight).toBe(0); // every right miss is boomeranged home
+    expect(boomerangs).toBe(baseRight);
+    expect(savedOnFairway).toBe(boomerangs);
+    expect(guardLeft).toBe(baseLeft); // left misses are the ducks' job — untouched
   });
 });
 
-describe('a guard with nothing to remove is byte-for-byte identical (no extra rng)', () => {
-  it('an empty guard leaves the landing and rng stream untouched', () => {
-    const empty = { redirect: {}, kind: 'laser' as const };
+describe('a guard with no fairway test is byte-for-byte identical (no extra rng)', () => {
+  it('a guard but no offFairway predicate leaves the landing + rng stream untouched', () => {
+    const guard = { side: 'left' as const, kind: 'laser' as const };
     for (let s = 0; s < 50; s++) {
-      const a = resolveShot({ from: [0, 0], aim: [0, 100], club: driver, lie: 'fairway', shape: wideMiss, rng: new Rng(`e:${s}`) });
-      const b = resolveShot({ from: [0, 0], aim: [0, 100], club: driver, lie: 'fairway', shape: wideMiss, guard: empty, rng: new Rng(`e:${s}`) });
+      const a = resolveShot({ from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss, rng: new Rng(`e:${s}`) });
+      const b = resolveShot({ from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss, guard, rng: new Rng(`e:${s}`) });
       expect(b.landing).toEqual(a.landing);
       expect(b.redirect).toBeUndefined();
     }
+  });
+});
+
+describe('greenside misses are dropped ON the green, not just the fairway', () => {
+  it('a greenside off-fairway miss on the guard side is teleported to the green target', () => {
+    const GREEN_PT: Vec = [9, 235];
+    const greenAim = (_p: Vec) => GREEN_PT; // treat every off-fairway miss as greenside
+    let saves = 0;
+    for (let s = 0; s < 400; s++) {
+      const r = resolveShot({
+        from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss,
+        guard: SPACE_DUCKS_GUARD, offFairway, greenAim, rng: new Rng(`gs:${s}`),
+      });
+      if (r.redirect) {
+        saves++;
+        expect(r.landing).toEqual(GREEN_PT); // dropped on the green, NOT recentred on the fairway line
+        expect(r.carry).toBeCloseTo(Math.hypot(GREEN_PT[0] - FROM[0], GREEN_PT[1] - FROM[1]), 3);
+      }
+    }
+    expect(saves).toBeGreaterThan(20); // plenty of left misses to save
+  });
+
+  it('when the miss is NOT greenside (greenAim → null) the save recentres onto the fairway instead', () => {
+    const greenAim = (_p: Vec) => null; // nothing is greenside
+    let redirects = 0;
+    let backOnFairway = 0;
+    for (let s = 0; s < 400; s++) {
+      const r = resolveShot({
+        from: FROM, aim: AIM, club: driver, lie: 'fairway', shape: wideMiss,
+        guard: SPACE_DUCKS_GUARD, offFairway, greenAim, rng: new Rng(`fw:${s}`),
+      });
+      if (r.redirect) {
+        redirects++;
+        if (!offFairway(r.landing)) backOnFairway++;
+      }
+    }
+    expect(redirects).toBeGreaterThan(20);
+    expect(backOnFairway).toBe(redirects); // every non-greenside save lands back on the fairway
   });
 });
 

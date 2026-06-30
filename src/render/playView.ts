@@ -908,7 +908,7 @@ export function mountPlayView(
             // caddy looses its shot at FIRE_FRAC and — KEY FIX — the projectile is tied to the same
             // flight progress `tg`, so it MEETS the ball at HIT_FRAC instead of chasing a frozen point
             // on a separate clock (the "no longer hits the ball" bug). At contact: a spark spray; the
-            // camera zooms in; then the ball is knocked back to the green. Slow-mo via fireCaddyEffect.
+            // camera zooms in; then the ball is knocked back onto the fairway. Slow-mo via fireCaddyEffect.
             // Eyes-on feel; the SCORE already used the redirected landing.
             const interceptFrac = REDIRECT_HIT_FRAC;
             const fireFrac = REDIRECT_FIRE_FRAC;
