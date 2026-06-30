@@ -88,23 +88,24 @@ const mods = (m: Partial<ClubShotMods>): ClubShotMods => ({
 });
 
 /**
- * Everyone starts with the SAME balanced 11-club bag (GS-clubs-2) — a full, evenly-spaced set from
- * the driver down through a smooth wedge ladder to a 60° and the putter. The earlier sparse signature
- * bags left big gaps in the scoring zone, so dialling distance DOWN near the green meant over-clubbing
- * (the "small club list is too hard close in" complaint): with no club between, say, a 134-yd 7-iron
- * and a 106-yd wedge you had to pick one and miss. This balanced bag keeps the gaps tightest where
- * touch matters most (PW → GW → SW → LW → 60° are 10–20 yd apart) and only loosens up high, where a
- * long approach forgives a few yards. Character identity now lives in the SHOT SHAPE (clubMods) and
- * the distance scalars (Larry +14 / Bo −8), not in a hand-cut bag. Reward clubs (rare+) collected over
- * a run tighten the remaining long/mid gaps and upgrade the distance clubs.
+ * Everyone starts with the SAME balanced 10-club bag (GS-clubs-2; trimmed in GS-clubs-3) — a full,
+ * evenly-spaced set from the driver down through a smooth wedge ladder to a 60° and the putter. The
+ * earlier sparse signature bags left big gaps in the scoring zone, so dialling distance DOWN near the
+ * green meant over-clubbing (the "small club list is too hard close in" complaint): with no club
+ * between, say, a 134-yd 7-iron and a 106-yd wedge you had to pick one and miss. This balanced bag
+ * keeps the gaps tightest where touch matters most (PW → GW → SW → 60° are ~12–20 yd apart) and only
+ * loosens up high, where a long approach forgives a few yards. Character identity now lives in the
+ * SHOT SHAPE (clubMods) and the distance scalars (Larry +14 / Bo −8), not in a hand-cut bag. Reward
+ * clubs (rare+) collected over a run tighten the remaining long/mid gaps and upgrade the distance clubs.
  *
- * The carries (from CLUBS): D 250, 5W 217, 3H 181, 6i 142, 8i 125, PW 106, GW 88, SW 78, LW 68,
- * 60° 48, putter 8 — eleven clubs, descending, with a dense short game.
+ * The carries (from CLUBS): D 250, 5W 217, 3H 181, 6i 142, 8i 125, PW 106, GW 90, SW 74, 60° 56,
+ * putter 8 — ten clubs, descending, with a dense short game. (GS-clubs-3 dropped the Lob Wedge that
+ * used to sit between SW and 60°, along with the 7W/9W/4i/AW/58° from the wider taxonomy.)
  */
-const BALANCED_BAG: readonly string[] = ['D', '5W', '3H', '6i', '8i', 'PW', 'GW', 'SW', 'LW', '60', 'putter'];
+const BALANCED_BAG: readonly string[] = ['D', '5W', '3H', '6i', '8i', 'PW', 'GW', 'SW', '60', 'putter'];
 /** Longshot Larry refuses hybrids (GS-clubs): swap the 3-Hybrid for the 3-Iron — a long iron fits his
  *  bomber identity and keeps his bag hybrid-free, the only per-golfer bag difference. */
-const BALANCED_BAG_NO_HYBRID: readonly string[] = ['D', '5W', '3i', '6i', '8i', 'PW', 'GW', 'SW', 'LW', '60', 'putter'];
+const BALANCED_BAG_NO_HYBRID: readonly string[] = ['D', '5W', '3i', '6i', '8i', 'PW', 'GW', 'SW', '60', 'putter'];
 
 /** Build a golfer's starting bag from club-type ids, stamping every club as the common 'starter' set. */
 function buildStartBag(ids: readonly string[]): Club[] {

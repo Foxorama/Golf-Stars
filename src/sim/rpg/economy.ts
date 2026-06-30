@@ -1070,16 +1070,17 @@ export const CLUB_SETS: readonly ClubSet[] = [
 ];
 
 /**
- * Club TYPES (base club ids) that can appear as rewards. Two roles relative to the balanced 11-club
- * bag: DISTANCE clubs (D/3W/5W/7W/2H) upgrade an owned one or fill a missing wood; SCORING clubs are
- * the long/mid irons + wedge in-betweens the balanced bag skips (4H/3i/4i/5i/7i/9i, AW/58) — collecting
- * them tightens the gaps so you can dial distance in close to the green. Clubs everyone already carries
- * (6i/8i/PW/GW/SW/LW/60) aren't here — a same-carry "premium" copy is no improvement. The PUTTER is the
- * exception: everyone carries one, but a themed putter is a real UPGRADE via its make-window (`puttBoost`),
- * so it's offered as a rarity upgrade — its value is the stat, never carry (see `ClubSet.puttBoost`).
+ * Club TYPES (base club ids) that can appear as rewards. Two roles relative to the balanced 10-club
+ * bag: DISTANCE clubs (D/3W/5W/2H) upgrade an owned one or fill a missing wood; SCORING clubs are
+ * the long/mid irons the balanced bag skips (4H/3i/5i/7i/9i) — collecting them tightens the gaps so
+ * you can dial distance in close to the green. Clubs everyone already carries (6i/8i/PW/GW/SW/60)
+ * aren't here — a same-carry "premium" copy is no improvement. The PUTTER is the exception: everyone
+ * carries one, but a themed putter is a real UPGRADE via its make-window (`puttBoost`), so it's offered
+ * as a rarity upgrade — its value is the stat, never carry (see `ClubSet.puttBoost`).
+ * (GS-clubs-3 retired the 7W/4i/AW/58° reward types along with their base clubs.)
  */
 export const REWARD_CLUB_TYPES: readonly string[] = [
-  'D', '3W', '5W', '7W', '2H', '4H', '3i', '4i', '5i', '7i', '9i', 'AW', '58', 'putter',
+  'D', '3W', '5W', '2H', '4H', '3i', '5i', '7i', '9i', 'putter',
 ];
 
 /** Is this club type a hybrid (Longshot Larry refuses them)? Hybrid ids end in 'H'. */
