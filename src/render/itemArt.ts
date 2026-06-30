@@ -13,7 +13,7 @@
  */
 
 import type { Rarity } from '../sim/course/contract';
-import { rarCol } from '../sim/rpg/loot';
+import { rarCol, RARITY_C } from '../sim/rpg/loot';
 
 const W = 150;
 const H = 96;
@@ -485,6 +485,64 @@ function drawCaddyBag(col: string, seed: string): string {
      <circle cx="74" cy="64" r="6" fill="${col}" opacity="0.8"/>
      <path d="M 60 36 q 14 -4 28 0" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.5"/>`,
     col,
+  );
+}
+
+/**
+ * A blinged GOLF BAG (GS-bag-tiers), themed by `tint` and `tier`. The default-bag upgrade gets flashier
+ * with each rarity — more clubs poking out, a brighter body panel, a themed emblem, more sparkles, and a
+ * gold corona at legendary. Pure SVG, no rng (placement is a fixed function of the tier). Shown on the
+ * Trade Market bag-set cards, the Garage, and the Pro Shop bag-inventory header.
+ */
+export function drawGolfBag(tint: string, tier: Rarity): string {
+  const rank = RARITY_C[tier].order; // 0 (common) .. 3 (legendary)
+  const seed = `golfbag:${tier}`;
+  const cx = 75;
+  const body = mix(tint, '#1c2436', 0.3);
+  const panel = mix(tint, '#ffffff', 0.1 + rank * 0.05);
+  const head = mix(tint, '#e8edf5', 0.42);
+  // Club heads poking out the top — more sticks as the bag gets richer (3 → 6).
+  const n = 3 + rank;
+  let clubs = '<g stroke="#11141b" stroke-width="1.5">';
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    const x = cx - 16 + t * 32;
+    const lean = (t - 0.5) * 10;
+    const topY = 6 + Math.abs(t - 0.5) * 8;
+    clubs += `<line x1="${x.toFixed(1)}" y1="30" x2="${(x + lean).toFixed(1)}" y2="${topY.toFixed(1)}" stroke-width="3" stroke-linecap="round"/>`;
+    clubs += `<circle cx="${(x + lean).toFixed(1)}" cy="${(topY - 1).toFixed(1)}" r="4" fill="${head}"/>`;
+  }
+  clubs += '</g>';
+  // A centred themed corona for the legendary bag (a soft glow for epic; nothing lower).
+  const glow =
+    tier === 'legendary'
+      ? [24, 18, 12].map((r, i) => `<circle cx="${cx}" cy="58" r="${r}" fill="${mix(tint, '#ffe6a0', 0.4)}" opacity="${(0.05 + i * 0.05).toFixed(2)}"/>`).join('')
+      : rank >= 2
+      ? `<circle cx="${cx}" cy="58" r="20" fill="${tint}" opacity="0.1"/>`
+      : '';
+  // Themed emblem on the pocket; legendary stamps a gold star.
+  const emblem =
+    `<circle cx="${cx}" cy="62" r="${6 + rank}" fill="${tint}" opacity="0.9" stroke="#0b0d12" stroke-width="1"/>` +
+    (tier === 'legendary'
+      ? `<text x="${cx}" y="66.5" font-size="11" text-anchor="middle" fill="#7a5207" font-weight="bold" font-family="Georgia,serif">★</text>`
+      : '');
+  // A bright themed rim traces the bag from rare up (brighter the higher you go).
+  const rim =
+    rank >= 1
+      ? `<path d="M 57 32 q 18 -6 36 0 l -3 50 q -1 6 -7 6 l -16 0 q -6 0 -7 -6 z" fill="none" stroke="${mix(tint, '#ffffff', 0.5)}" stroke-width="1.4" opacity="${(0.3 + rank * 0.15).toFixed(2)}"/>`
+      : '';
+  return frame(
+    `${sparkles(seed, tint, 3 + rank * 2)}${glow}
+     <ellipse cx="${cx}" cy="88" rx="26" ry="5" fill="rgba(0,0,0,0.32)"/>
+     ${clubs}
+     <path d="M 57 32 q 18 -6 36 0 l -3 50 q -1 6 -7 6 l -16 0 q -6 0 -7 -6 z" fill="${body}" stroke="#11141b" stroke-width="2"/>
+     <path d="M 60 34 q 15 -5 30 0 l -2 22 l -26 0 z" fill="${panel}" opacity="0.85"/>
+     <rect x="59" y="46" width="32" height="7" rx="2" fill="${mix(tint, '#11141b', 0.35)}"/>
+     <path d="M 90 40 q 10 18 -2 40" fill="none" stroke="${mix(tint, '#11141b', 0.2)}" stroke-width="3" opacity="0.7"/>
+     ${emblem}
+     ${rim}
+     <path d="M 61 38 q 14 -4 28 0" fill="none" stroke="#fff" stroke-width="1.4" opacity="0.45"/>`,
+    tint,
   );
 }
 

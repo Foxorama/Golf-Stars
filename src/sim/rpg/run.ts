@@ -42,6 +42,7 @@ import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopSpecFor, type BossSpec, type StopSpec } from './formats';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
+import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
@@ -104,6 +105,9 @@ export interface Run {
   /** Ascension difficulty tier (GS-ascension): 0 = base; each level tightens every cut and thins the
    *  starting purse. Selectable up to the highest tier unlocked by winning. Voyage-only in practice. */
   ascension: number;
+  /** The permanent default-bag tier baked into this run's start (GS-bag-tiers); absent/'common' = the
+   *  un-upgraded starter bag. Kept for resume (the loadout is rebuilt from it). */
+  bagTier?: BagTier;
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
@@ -131,13 +135,20 @@ export interface Run {
  * sparse starting bag rather than a discarded default one, and the meta order is identical on resume.
  * One source of truth for `startRun` + `resumeRun` (and the Sim Lab) so they reconstruct it the same.
  */
-export function startingLoadoutFor(meta: MetaUpgrades, characterId?: string): PlayerLoadout {
-  return applyMeta(meta, applyCharacter(characterId, startingLoadout()));
+export function startingLoadoutFor(
+  meta: MetaUpgrades,
+  characterId?: string,
+  bagTier: BagTier = DEFAULT_BAG_TIER,
+): PlayerLoadout {
+  // The bag tier (GS-bag-tiers) re-stamps the LAST, so it reads the final distanceClubBonus (character +
+  // meta Tour Bag) when rebuilding the distance clubs — and a 'common' tier is a no-op (byte-for-byte).
+  return applyBagTier(applyMeta(meta, applyCharacter(characterId, startingLoadout())), bagTier);
 }
 
 /** Ascension ladder (GS-ascension): a fixed-length campaign gets harder above the base difficulty,
- *  unlocked one tier at a time by winning. Each level adds a flat per-stop cut and thins the purse. */
-export const ASCENSION_MAX = 8;
+ *  unlocked one tier at a time by winning. Each level adds a flat per-stop cut and thins the purse.
+ *  Raised to 15 (GS-bag-tiers) so the deepest bag unlock (clear A11 → legendary bag) is reachable. */
+export const ASCENSION_MAX = 15;
 export function ascensionCutBonus(level: number): number {
   return Math.max(0, Math.round(level));
 }
@@ -151,6 +162,7 @@ export function startRun(
   meta: MetaUpgrades = {},
   characterId?: string,
   ascension = 0,
+  bagTier: BagTier = DEFAULT_BAG_TIER,
 ): Run {
   const rng = new Rng(seed);
   const asc = Math.max(0, Math.min(ASCENSION_MAX, Math.round(ascension)));
@@ -161,11 +173,13 @@ export function startRun(
     distanceFromStart: 0,
     // Permanent meta-progression bakes into the starting credits + loadout (GS-12); the chosen
     // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor). Ascension
-    // thins the starting purse (floored so it never strands you with nothing).
+    // thins the starting purse (floored so it never strands you with nothing). The default-bag tier
+    // (GS-bag-tiers) re-stamps the starting clubs to a higher rarity.
     credits: Math.max(20, metaStartingCredits(meta) - ascensionCreditPenalty(asc)),
-    loadout: startingLoadoutFor(meta, characterId),
+    loadout: startingLoadoutFor(meta, characterId, bagTier),
     meta,
     ascension: asc,
+    bagTier,
     bonusShards: 0,
     firedEventIds: [],
     status: 'active',
@@ -890,6 +904,9 @@ export interface RunSnapshot {
   meta?: MetaUpgrades;
   /** Ascension difficulty tier (GS-ascension); 0/absent for back-compat. */
   ascension?: number;
+  /** Permanent default-bag tier (GS-bag-tiers), so a resume rebuilds the upgraded starting bag.
+   *  Absent ⇒ the un-upgraded common bag (old snapshots). */
+  bagTier?: BagTier;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
   /** The pending destination-world theme id (GS-journey-biome), so a resume keeps the stop's biome.
@@ -913,6 +930,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     perks: [...run.loadout.perks],
     meta: { ...run.meta },
     ascension: run.ascension,
+    bagTier: run.bagTier,
     pendingEventId: run.pendingEvent?.id,
     pendingThemeId: run.pendingTheme?.id,
     bonusShards: run.bonusShards,
@@ -923,17 +941,20 @@ export function snapshotRun(run: Run): RunSnapshot {
 
 export function resumeRun(snap: RunSnapshot): Run {
   const meta = snap.meta ?? {};
+  const bagTier = snap.bagTier ?? DEFAULT_BAG_TIER;
   return {
     seed: snap.seed,
     formatId: snap.formatId ?? DEFAULT_FORMAT,
     stopIndex: snap.stopIndex,
     distanceFromStart: snap.distanceFromStart,
     credits: snap.credits,
-    // Perks (incl. reward clubs, GS-clubs) sit on top of the golfer+meta starting loadout, rebuilt the
-    // SAME way `startRun` builds it, so the bag (starting clubs + bought/upgraded clubs) reconstructs.
-    loadout: loadoutFromPerks(snap.perks ?? [], startingLoadoutFor(meta, snap.characterId)),
+    // Perks (incl. reward clubs, GS-clubs) sit on top of the golfer+meta+bag-tier starting loadout,
+    // rebuilt the SAME way `startRun` builds it, so the bag (upgraded starting clubs + bought clubs)
+    // reconstructs identically.
+    loadout: loadoutFromPerks(snap.perks ?? [], startingLoadoutFor(meta, snap.characterId, bagTier)),
     meta,
     ascension: snap.ascension ?? 0,
+    bagTier,
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
     bonusShards: snap.bonusShards ?? 0,

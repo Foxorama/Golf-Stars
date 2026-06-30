@@ -116,7 +116,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
   (3 arcs, boss each, `endedReason 'won'`). Two currencies: per-run **credits** (shop perks) and
   cross-run **Star Shards** (cosmetic ships + the wardrobe of hats/shirts, up to a `mythic` tier above
-  legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v7). Route choice carries the destination biome + a
+  legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v8). Shards also
+  buy permanent **default-bag tiers** (`bag.ts BAG_SETS`, GS-bag-tiers): a won Ascension gate (clear
+  A2/A6/A11 → `maxAscension` ≥ 3/7/12) unlocks a rare/epic/legendary bag-and-set that re-stamps EVERY
+  golfer's starting bag to that rarity (the existing Planet/Phoenix/Solar reward sets via `applyBagTier`,
+  baked at `startRun`/`resumeRun` — NOT a new club, just the reward machinery applied to the default bag).
+  The owned tier is a Pro-Shop FLOOR (`offerableClubs` hides clubs below it) and a no-op at `'common'`
+  (byte-for-byte off). `ASCENSION_MAX = 15` so A11 is reachable. Route choice carries the destination biome + a
   difficulty/atmosphere event (economy/cut/meta only — NEVER course generation). Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a

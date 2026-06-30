@@ -453,3 +453,42 @@
   scoring harness must club shots with **`netDispersion(loadout)`** (handicap × equipment), not raw
   `dispersionMult` — else handicap perks like Caddie Lesson are invisible to the test.
 
+
+## Default-bag tiers — the deep-Ascension Shard sink (GS-bag-tiers)
+
+`bag.ts` adds a third thing Star Shards buy (after ships + apparel): a permanent **default-bag tier**
+that re-outfits *every* golfer's starting bag in a higher loot rarity, to help survive the deep
+Ascension ladder. It is deliberately **not** a new engine path — a bag tier is the existing themed
+reward-set machinery (`economy.CLUB_SETS` Planet/Phoenix/Solar) pointed at the *default* bag instead of
+a single bought club:
+
+- **The progression ladder is the point.** Clearing an Ascension gate unlocks the tier that makes the
+  *next* gate feasible: clear **A2** → the rare **Planet** bag (500 shards) → it helps you clear **A6**
+  → the epic **Phoenix Flames** bag (2,000) → helps you clear **A11** → the legendary **Solar Storm**
+  bag (10,000), the apex flex. The unlock is gated on the persisted `maxAscension` (a won voyage at gate
+  N bumps it to N+1), so "cleared A2" ⟺ `maxAscension ≥ 3`; the three gates are `≥ 3 / 7 / 12`.
+  `ASCENSION_MAX` was raised `8 → 15` so A11 is selectable+clearable at all.
+- **`applyBagTier` re-stamps, it doesn't special-case.** Each default club is *rebuilt from its base
+  type* via `buildRewardClub`: distance clubs (woods, `≥185 yd`) take the tier's distance set and gain
+  its carry bonus (folding in the golfer's own `distanceClubBonus`, so Larry's upgraded driver is still
+  a Larry driver); scoring clubs keep base carry (the power-cell overshoot lesson); the putter folds in
+  the set's `puttBoost` make-window. So a bought tier is byte-identical to having outfitted the whole bag
+  from the Pro Shop — and because `equippedGearTheme` already reads the bag's rarest themed set, the
+  on-course golfer **swings the themed gear** with no extra wiring. It's a strict scoring upgrade (more
+  reach + steadier putter, never extra carry on a scoring club), so it can't trip the no-death-spiral bar.
+- **Baked at run start, off by default.** The tier rides `startRun`/`resumeRun` (a `bagTier` param on
+  `startingLoadoutFor`, applied *last* so it reads the final `distanceClubBonus`), persisted on the run +
+  snapshot (save **v8**) like Ascension. `'common'` is a no-op that returns the loadout untouched, so the
+  whole determinism contract holds (zero rng draws, no stream reorder) and every existing seeded test is
+  byte-identical — the bag build is pure, so changing carries only moves *outcomes*, not draw order.
+- **The Pro-Shop floor.** Once your default bag is rare/epic/legendary, dangling *lower*-rarity clubs is
+  noise, so `offerableClubs` filters by `loadout.bagTier` as a rarity floor (a purple bag sees only
+  purple+ clubs). `'common'` is rank 0 → filters nothing.
+- **Graphics.** `render/itemArt.ts drawGolfBag(tint, tier)` is a self-contained, blingier-per-tier golf
+  bag (more clubs, brighter rim, themed emblem, a gold corona + star at legendary), tinted by the set
+  theme. Shown on the Trade-Market bag-set cards, the Pro-Shop bag-inventory header, and the victory page
+  (a "new bag unlocked!" notice fires when you clear A2/A6/A11). Pure SVG, no rng.
+- **No new hook.** This is content + sim + save + view — no `window._gs*` flag and no `?param`, so the
+  test-hub sync guard is untouched. `tests/bag.test.ts` covers the table/gates, `applyBagTier` carries +
+  rarities + putt-boost, the common no-op determinism, snapshot/resume round-trip, the offer floor, and
+  the reducer's `buyBagTier` gating.
