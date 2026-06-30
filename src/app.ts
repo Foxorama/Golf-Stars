@@ -41,13 +41,23 @@ import { arcSurvivorTarget } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
-import { SHIPS, canBuyShip, marketOffer, marketRerollCost, type Ship } from './sim/rpg/ships';
+import { canBuyShip, shipCatalogue, type Ship } from './sim/rpg/ships';
 import { shipCardSVG } from './render/shipArt';
 import { apparelById, apparelForSlot, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
 import { cosmeticRarCol, isMythic } from './sim/rpg/cosmetics';
 import { BAG_SETS, bagSet, bagSetUnlocked, bagTierRank, canBuyBagSet, bagUnlockForClearedAscension, type BagSet } from './sim/rpg/bag';
-import { initState, reduce, rerollCost, type Action, type UiState } from './ui/game';
+import {
+  initState,
+  reduce,
+  rerollCost,
+  shipForCharacter,
+  hatForCharacter,
+  shirtForCharacter,
+  type Action,
+  type UiState,
+} from './ui/game';
+import { CHARACTERS } from './sim/rpg/characters';
 import { loadSave, writeSave } from './save/storage';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
@@ -120,11 +130,10 @@ function boot(): void {
       maxAscension: save.maxAscension,
       lifetimeAces: save.lifetimeAces,
       ownedShips: save.ownedShips,
-      selectedShip: save.selectedShip,
-      marketSeed: save.marketSeed,
       ownedApparel: save.ownedApparel,
-      equippedHat: save.equippedHat,
-      equippedShirt: save.equippedShirt,
+      shipByCharacter: save.shipByCharacter,
+      hatByCharacter: save.hatByCharacter,
+      shirtByCharacter: save.shirtByCharacter,
       bagTier: save.bagTier,
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
     };
@@ -169,7 +178,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 9,
+    version: 10,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -177,11 +186,10 @@ function persist(): void {
     maxAscension: state.maxAscension,
     lifetimeAces: state.lifetimeAces,
     ownedShips: state.ownedShips,
-    selectedShip: state.selectedShip,
-    marketSeed: state.marketSeed,
     ownedApparel: state.ownedApparel,
-    equippedHat: state.equippedHat,
-    equippedShirt: state.equippedShirt,
+    shipByCharacter: state.shipByCharacter,
+    hatByCharacter: state.hatByCharacter,
+    shirtByCharacter: state.shirtByCharacter,
     bagTier: state.bagTier,
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
@@ -301,10 +309,11 @@ function titleScreen(): string {
     <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
       ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
-      ${btn('🚀 Trade Market & Garage', { type: 'openOutpost' }, { variant: 'ghost' })}
+      ${btn('🚀 Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       <button class="gs-btn gs-btn--ghost" data-open-settings="1">⚙ Settings</button>
       ${installButtonHTML()}
     </div>
+    ${clubhouseSection()}
     <div style="margin:.2em 0 .6em;">
       ${btn(`🗓 Daily Challenge — ${dailyLabel()}`, { type: 'restart', seed: dailySeed() }, { variant: 'ghost' })}
       <span style="font-size:11.5px;opacity:.55;">same course for everyone today (a deterministic seed)</span>
@@ -1795,57 +1804,144 @@ function shipCardHTML(ship: Ship, footer: string, opts: { action?: Action; ring:
     : `<div style="margin:5px;">${inner}</div>`;
 }
 
-/** The Trade Market + Garage (GS-garage): spend Star Shards on cosmetic ships, and pick the one you
- *  fly on the journey map. Replaces the retired permanent-upgrade Outpost — those stat effects now
- *  live in the in-run Pro Shop. */
-function outpostScreen(): string {
-  const rerolls = state.marketRerolls ?? 0;
-  const offer = marketOffer(state.marketSeed, state.ownedShips, rerolls);
-  const rerollC = marketRerollCost(rerolls);
-
-  const marketCards = offer
+/** The Trade Market (GS-clubhouse): spend Star Shards on cosmetic ships, clothing, and bag tiers. Buying
+ *  grants GLOBAL ownership — you then outfit each golfer individually in the Clubhouse. Replaces the old
+ *  combined Outpost; the rotating offer is retired for a full browsable catalogue. */
+function tradeMarketScreen(): string {
+  const shipCards = shipCatalogue()
     .map((ship) => {
       const ring = cosmeticRarCol(ship.rarity);
+      const owned = state.ownedShips.includes(ship.id);
       const afford = canBuyShip(ship, state.shards, state.ownedShips);
-      const footer = `✦ ${ship.cost}${afford ? '' : ' — short'}`;
-      return shipCardHTML(ship, footer, { ring, dim: !afford, action: afford ? { type: 'buyShip', id: ship.id } : undefined });
+      let footer: string;
+      let action: Action | undefined;
+      if (owned) {
+        footer = '✓ owned';
+      } else if (afford) {
+        footer = `✦ ${ship.cost}`;
+        action = { type: 'buyShip', id: ship.id };
+      } else {
+        footer = `✦ ${ship.cost} — short`;
+      }
+      return shipCardHTML(ship, footer, { ring, dim: !owned && !afford, glow: isMythic(ship.rarity) && !owned, action });
     })
     .join('');
-  const marketBody = offer.length
-    ? `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${marketCards}</div>
-       <div style="text-align:center;margin-top:6px;">${
-         state.shards >= rerollC
-           ? btn(`🎲 Reroll stock (✦ ${rerollC})`, { type: 'rerollMarket' }, { variant: 'ghost' })
-           : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ✦ ${rerollC}</span>`
-       }</div>`
-    : `<p style="opacity:.6;font-size:13px;text-align:center;">🛸 Every ship in the catalogue is in your hangar. Nothing left to trade for!</p>`;
 
-  // The Garage: your owned fleet, click to fly a different one (the selected ship is ringed + glowing).
-  const fleet = SHIPS.filter((s) => state.ownedShips.includes(s.id))
-    .map((ship) => {
-      const selected = ship.id === state.selectedShip;
-      const ring = selected ? '#ffce54' : cosmeticRarCol(ship.rarity);
-      return shipCardHTML(ship, selected ? '✓ FLYING' : 'Fly this', {
-        ring,
-        glow: selected,
-        action: selected ? undefined : { type: 'selectShip', id: ship.id },
-      });
-    })
-    .join('');
+  const apparelRack = (slot: ApparelSlot) =>
+    `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${apparelForSlot(slot)
+      .map((a) => marketApparelCardHTML(a))
+      .join('')}</div>`;
 
   return `
     <header style="border-left:4px solid #e08a2b;padding-left:10px;">
       <h1 style="margin:0;font-size:22px;">🚀 Trade Market</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on a new ride and a fresh look. Cosmetic only — the ship stock refreshes each run.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on ships and clothing. Cosmetic only — buy it here, then outfit each golfer in the <b>Clubhouse</b>.</p>
     </header>
     <h2 style="font-size:16px;margin:.6em 0 .2em;">✦ ${state.shards} Star Shards</h2>
-    ${marketBody}
-    <h2 style="font-size:16px;margin:1em 0 .2em;">🛖 Your Garage</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Pick the ship you fly between worlds.</p>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${fleet}</div>
+    <h2 style="font-size:16px;margin:1em 0 .2em;">🚀 Ships</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">The full fleet. The rarer the ride, the steeper the shard price — the Mothership is the grail.</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${shipCards}</div>
+    <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Clothing</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Hats &amp; shirts for your golfers. Complete a matching set for the full look.</p>
+    <h3 style="font-size:13px;opacity:.8;margin:.6em 0 .1em;text-align:center;">🎩 Hats</h3>
+    ${apparelRack('hat')}
+    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
+    ${apparelRack('shirt')}
     ${bagSetSection()}
-    ${wardrobeSection()}
-    <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeOutpost' }, { variant: 'ghost' })}</div>`;
+    <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}</div>`;
+}
+
+/** A compact Clubhouse card for ONE golfer on the title screen (GS-clubhouse) — a live preview of the
+ *  golfer in their assigned ship + outfit, click to open their garage + wardrobe. */
+function clubhouseCardHTML(ch: Character): string {
+  const hatId = hatForCharacter(state, ch.id);
+  const shirtId = shirtForCharacter(state, ch.id);
+  const shipId = shipForCharacter(state, ch.id);
+  const preview = golferPreviewSVG(hatId, shirtId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 78, h: 94 });
+  return `
+    <button class="gs-clickcard" data-action='${JSON.stringify({ type: 'openClubhouse', characterId: ch.id })}'
+      style="cursor:pointer;border:2px solid ${ch.style.cap}66;border-radius:12px;padding:8px 8px 6px;background:radial-gradient(circle at 50% 22%, ${ch.style.cap}1f, #0b0d12);text-align:center;width:128px;color:inherit;font:inherit;margin:5px;">
+      ${preview}
+      <div style="margin-top:2px;">${shipCardSVG(shipId, 104, 44)}</div>
+      <div style="font-size:13px;font-weight:700;color:${ch.style.cap};margin-top:3px;">${ch.shortName}</div>
+      <div style="font-size:10.5px;opacity:.6;">Manage ⚙</div>
+    </button>`;
+}
+
+/** The Clubhouse section on the title screen (GS-clubhouse) — all four golfers, each a doorway to
+ *  outfitting their own ship + clothes. */
+function clubhouseSection(): string {
+  const cards = CHARACTERS.map(clubhouseCardHTML).join('');
+  return `
+    <h2 style="font-size:16px;margin:1em 0 .15em;">🏠 Clubhouse</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Outfit each golfer individually — give them their own ride and their own look. Buy gear at the Trade Market.</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${cards}</div>`;
+}
+
+/** One character's Clubhouse (GS-clubhouse): their garage (pick an owned ship) + wardrobe (wear owned
+ *  hats/shirts), with a live preview. Outfitting is PER character — nothing here is shared. */
+function clubhouseScreen(): string {
+  const ch = getCharacter(state.manageCharacterId);
+  if (!ch) return titleScreen(); // safety: no character selected
+  const hatId = hatForCharacter(state, ch.id);
+  const shirtId = shirtForCharacter(state, ch.id);
+  const shipId = shipForCharacter(state, ch.id);
+  const preview = golferPreviewSVG(hatId, shirtId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 110, h: 134 });
+  const setName = equippedSet(hatId, shirtId);
+  const setBadge = setName
+    ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#ff4fd8;">✦ ${setName} set complete!</div>`
+    : '';
+
+  // The garage: your owned fleet, click to fly a different one on THIS golfer (their ship ringed + glowing).
+  const fleet = shipCatalogue()
+    .filter((s) => state.ownedShips.includes(s.id))
+    .map((ship) => {
+      const flying = ship.id === shipId;
+      const ring = flying ? '#ffce54' : cosmeticRarCol(ship.rarity);
+      return shipCardHTML(ship, flying ? '✓ FLYING' : 'Fly this', {
+        ring,
+        glow: flying,
+        action: flying ? undefined : { type: 'selectShip', id: ship.id },
+      });
+    })
+    .join('');
+
+  // The wardrobe: only OWNED garments (buying lives at the Trade Market), equip-toggled on THIS golfer.
+  const rack = (slot: ApparelSlot) => {
+    const owned = apparelForSlot(slot).filter((a) => state.ownedApparel.includes(a.id));
+    if (!owned.length) {
+      return `<p style="opacity:.5;font-size:12px;text-align:center;">No ${slot}s yet — buy some at the Trade Market.</p>`;
+    }
+    return `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${owned
+      .map((a) => clubhouseApparelCardHTML(a, hatId, shirtId))
+      .join('')}</div>`;
+  };
+
+  return `
+    <header style="border-left:4px solid ${ch.style.cap};padding-left:10px;">
+      <h1 style="margin:0;font-size:22px;">🏠 ${ch.name}'s Clubhouse</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Outfit ${ch.shortName} — pick a ride and a look that's all their own.</p>
+    </header>
+    <div style="display:flex;justify-content:center;margin:8px 0;">
+      <div style="border:2px solid ${ch.style.cap}55;border-radius:12px;padding:8px 18px;background:radial-gradient(circle at 50% 25%, ${ch.style.cap}22, #0b0d12);text-align:center;">
+        ${preview}
+        <div style="font-size:11px;opacity:.6;">${ch.shortName} is wearing</div>
+        ${setBadge}
+      </div>
+    </div>
+    <h2 style="font-size:16px;margin:.8em 0 .2em;">🛖 Garage</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">The ship ${ch.shortName} flies between worlds.</p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${fleet}</div>
+    <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Wardrobe</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Click an owned piece to wear it (again to take it off).</p>
+    <h3 style="font-size:13px;opacity:.8;margin:.5em 0 .1em;text-align:center;">🎩 Hats</h3>
+    ${rack('hat')}
+    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
+    ${rack('shirt')}
+    <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
+      ${btn('← Back to title', { type: 'closeClubhouse' }, { variant: 'ghost' })}
+    </div>`;
 }
 
 /** A bag-set card (GS-bag-tiers): the blinged golf bag over a rarity panel, with a buy / owned /
@@ -1900,71 +1996,46 @@ function bagSetSection(): string {
     <div style="display:flex;flex-wrap:wrap;justify-content:center;">${BAG_SETS.map(bagSetCardHTML).join('')}</div>`;
 }
 
-/** A wardrobe card for one garment — buyable (unowned), or an equip toggle (owned). */
-function apparelCardHTML(item: Apparel, state2: { shards: number; ownedApparel: string[]; equippedHat?: string; equippedShirt?: string }): string {
+/** Shared apparel card chrome — the garment art over a rarity-ringed panel with a footer. */
+function apparelCardChrome(item: Apparel, footer: string, opts: { ring: string; accent: string; action?: Action; dim?: boolean; glow?: boolean }): string {
+  const inner = `
+    <div style="border:2px solid ${opts.accent};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 30%, ${opts.ring}22, #0b0d12);text-align:center;width:118px;${opts.dim ? 'opacity:.5;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.accent}, 0 0 14px ${opts.ring}88;` : ''}">
+      ${apparelCardSVG(item.id, 104, 64)}
+      <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${item.name}</div>
+      <div style="font-size:10px;opacity:.55;">${item.set} · ${item.rarity}</div>
+      <div style="font-size:11px;margin-top:3px;color:${opts.accent};font-weight:700;">${footer}</div>
+    </div>`;
+  return opts.action
+    ? `<div class="gs-clickcard" data-action='${JSON.stringify(opts.action)}' style="cursor:pointer;margin:4px;">${inner}</div>`
+    : `<div style="margin:4px;">${inner}</div>`;
+}
+
+/** A Trade-Market clothing card (GS-clubhouse) — buy if unowned & affordable, else "owned" / "short". */
+function marketApparelCardHTML(item: Apparel): string {
   const ring = cosmeticRarCol(item.rarity);
-  const owned = state2.ownedApparel.includes(item.id);
-  const equipped = (item.slot === 'hat' ? state2.equippedHat : state2.equippedShirt) === item.id;
-  const afford = canBuyApparel(item, state2.shards, state2.ownedApparel);
+  const owned = state.ownedApparel.includes(item.id);
+  const afford = canBuyApparel(item, state.shards, state.ownedApparel);
   let footer: string;
   let action: Action | undefined;
-  if (equipped) {
-    footer = '✓ WEARING';
-    action = { type: 'equipApparel', id: item.id };
-  } else if (owned) {
-    footer = 'Wear this';
-    action = { type: 'equipApparel', id: item.id };
+  if (owned) {
+    footer = '✓ owned';
   } else if (afford) {
     footer = `✦ ${item.cost}`;
     action = { type: 'buyApparel', id: item.id };
   } else {
     footer = `✦ ${item.cost} — short`;
   }
-  const myth = isMythic(item.rarity);
-  const glow = equipped || myth;
-  const inner = `
-    <div style="border:2px solid ${equipped ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 30%, ${ring}22, #0b0d12);text-align:center;width:118px;${!owned && !afford ? 'opacity:.5;' : ''}${glow ? `box-shadow:0 0 0 2px ${equipped ? '#ffce54' : ring}, 0 0 14px ${ring}88;` : ''}">
-      ${apparelCardSVG(item.id, 104, 64)}
-      <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${item.name}</div>
-      <div style="font-size:10px;opacity:.55;">${item.set} · ${item.rarity}</div>
-      <div style="font-size:11px;margin-top:3px;color:${equipped ? '#ffce54' : ring};font-weight:700;">${footer}</div>
-    </div>`;
-  return action
-    ? `<div class="gs-clickcard" data-action='${JSON.stringify(action)}' style="cursor:pointer;margin:4px;">${inner}</div>`
-    : `<div style="margin:4px;">${inner}</div>`;
+  return apparelCardChrome(item, footer, { ring, accent: ring, action, dim: !owned && !afford, glow: isMythic(item.rarity) && !owned });
 }
 
-/** The Wardrobe (GS-cosmetics): a live golfer preview + racks of hats & shirts to buy/equip. */
-function wardrobeSection(): string {
-  const ch = getCharacter(state.run.loadout.characterId)?.style;
-  const preview = golferPreviewSVG(state.equippedHat, state.equippedShirt, {
-    skin: ch?.skin,
-    shirtBase: ch?.shirt,
-    w: 110,
-    h: 134,
-  });
-  const setName = equippedSet(state.equippedHat, state.equippedShirt);
-  const setBadge = setName
-    ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#ff4fd8;">✦ ${setName} set complete!</div>`
-    : '';
-  const rack = (slot: ApparelSlot) =>
-    `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${apparelForSlot(slot)
-      .map((a) => apparelCardHTML(a, state))
-      .join('')}</div>`;
-  return `
-    <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Your Wardrobe</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Dress your golfer. Click an owned piece to wear it (again to take it off). Complete a set for the full look.</p>
-    <div style="display:flex;justify-content:center;margin-bottom:8px;">
-      <div style="border:2px solid #2a3140;border-radius:12px;padding:8px 18px;background:radial-gradient(circle at 50% 25%, #1a2030, #0b0d12);text-align:center;">
-        ${preview}
-        <div style="font-size:11px;opacity:.6;">Now wearing</div>
-        ${setBadge}
-      </div>
-    </div>
-    <h3 style="font-size:13px;opacity:.8;margin:.6em 0 .1em;text-align:center;">🎩 Hats</h3>
-    ${rack('hat')}
-    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
-    ${rack('shirt')}`;
+/** A Clubhouse wardrobe card (GS-clubhouse) — an equip toggle for an OWNED garment on the managed
+ *  golfer (worn → click to take off). Only ever rendered for owned pieces. */
+function clubhouseApparelCardHTML(item: Apparel, hatId: string | undefined, shirtId: string | undefined): string {
+  const ring = cosmeticRarCol(item.rarity);
+  const worn = (item.slot === 'hat' ? hatId : shirtId) === item.id;
+  const accent = worn ? '#ffce54' : ring;
+  const footer = worn ? '✓ WEARING' : 'Wear this';
+  return apparelCardChrome(item, footer, { ring, accent, action: { type: 'equipApparel', id: item.id }, glow: worn || isMythic(item.rarity) });
 }
 
 // The destination biome a lane flies into (GS-journey-biome) → a glyph + label + accent for the route
@@ -2027,7 +2098,7 @@ function travelScreen(): string {
     currentLabel: zoneName,
     trail,
     choices,
-    shipId: state.selectedShip,
+    shipId: shipForCharacter(state, state.run.loadout.characterId),
   });
 
   const chip = (txt: string, col: string) =>
@@ -2179,7 +2250,7 @@ function gameoverScreen(): string {
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">
-      ${btn('🚀 Trade Market & Garage', { type: 'openOutpost' }, { variant: 'ghost' })}
+      ${btn('🚀 Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) }, { variant: 'primary' })}
     </div>`;
 }
@@ -2279,9 +2350,10 @@ function golferLook(): GolferLook | undefined {
   const base = getCharacter(state.run.loadout.characterId)?.style;
   if (!base) return undefined;
   const gear = equippedGearTheme(state.run.loadout);
-  // Layer the equipped cosmetic hat/shirt (GS-cosmetics) over the character's base colours.
-  const hat = apparelById(state.equippedHat)?.look;
-  const shirtStyle = apparelById(state.equippedShirt)?.look;
+  // Layer the PLAYED character's equipped cosmetic hat/shirt (GS-clubhouse) over their base colours.
+  const cid = state.run.loadout.characterId;
+  const hat = apparelById(hatForCharacter(state, cid))?.look;
+  const shirtStyle = apparelById(shirtForCharacter(state, cid))?.look;
   return {
     ...base,
     ...(gear ? { gear: { theme: gear.theme, tint: gear.tint } } : {}),
@@ -2432,8 +2504,10 @@ function render(): void {
       ? shopScreen()
       : state.screen === 'travel'
       ? travelScreen()
-      : state.screen === 'outpost'
-      ? outpostScreen()
+      : state.screen === 'trademarket'
+      ? tradeMarketScreen()
+      : state.screen === 'clubhouse'
+      ? clubhouseScreen()
       : gameoverScreen();
 
   // The interactive play screen (decision / watching / putting — but not the hole-complete card) is

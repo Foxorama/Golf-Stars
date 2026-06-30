@@ -10,8 +10,9 @@ import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -166,8 +167,37 @@ export interface SaveV9 {
   savedAt?: string;
 }
 
+/** v10 — splits cosmetic OUTFITTING per character (GS-clubhouse): the Trade Market still grants global
+ *  OWNERSHIP (ownedShips/ownedApparel), but the equipped ship + hat + shirt are now chosen PER golfer in
+ *  the Clubhouse — so each of the four characters can fly a different ride and wear a different look. The
+ *  old global `selectedShip`/`equippedHat`/`equippedShirt` become per-character maps; the rotating ship
+ *  market + its `marketSeed` are retired in favour of a full browsable catalogue. */
+export interface SaveV10 {
+  version: 10;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  lifetimeAces: number;
+  /** Owned cosmetic ship ids (always includes the default Woody Wagon) — global, bought at the market. */
+  ownedShips: string[];
+  /** Owned cosmetic apparel ids (hats + shirts) — global, bought at the market. */
+  ownedApparel: string[];
+  /** The ship each character flies on the journey map (characterId → ship id). Absent → the default wagon. */
+  shipByCharacter: Record<string, string>;
+  /** The hat each character wears (characterId → apparel id). Absent → that character's default look. */
+  hatByCharacter: Record<string, string>;
+  /** The shirt each character wears (characterId → apparel id). Absent → that character's default look. */
+  shirtByCharacter: Record<string, string>;
+  bagTier: BagTier;
+  unlockedClubsByCharacter: Record<string, string[]>;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV9;
+export type Save = SaveV10;
 
 export function defaultSave(): Save {
   return {
@@ -179,9 +209,10 @@ export function defaultSave(): Save {
     maxAscension: 0,
     lifetimeAces: 0,
     ownedShips: [DEFAULT_SHIP_ID],
-    selectedShip: DEFAULT_SHIP_ID,
-    marketSeed: 0,
     ownedApparel: [],
+    shipByCharacter: {},
+    hatByCharacter: {},
+    shirtByCharacter: {},
     bagTier: 'common',
     unlockedClubsByCharacter: {},
   };
@@ -332,6 +363,39 @@ function v8ToV9(s: SaveV8): SaveV9 {
   };
 }
 
+/** v9 → v10: split cosmetics per character. The old GLOBAL ship/hat/shirt selection is seeded onto
+ *  EVERY character so an existing player's look is preserved exactly (each golfer starts in the ship +
+ *  outfit they last flew/wore), then they can diverge per character. The retired `marketSeed` is dropped. */
+function v9ToV10(s: SaveV9): SaveV10 {
+  const ship = s.selectedShip && s.selectedShip !== DEFAULT_SHIP_ID ? s.selectedShip : undefined;
+  const shipByCharacter: Record<string, string> = {};
+  const hatByCharacter: Record<string, string> = {};
+  const shirtByCharacter: Record<string, string> = {};
+  for (const ch of CHARACTERS) {
+    if (ship) shipByCharacter[ch.id] = ship;
+    if (s.equippedHat) hatByCharacter[ch.id] = s.equippedHat;
+    if (s.equippedShirt) shirtByCharacter[ch.id] = s.equippedShirt;
+  }
+  return {
+    version: 10,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: s.shards ?? 0,
+    metaUpgrades: s.metaUpgrades ?? {},
+    maxAscension: s.maxAscension ?? 0,
+    lifetimeAces: s.lifetimeAces ?? 0,
+    ownedShips: s.ownedShips && s.ownedShips.length ? s.ownedShips : [DEFAULT_SHIP_ID],
+    ownedApparel: s.ownedApparel ?? [],
+    shipByCharacter,
+    hatByCharacter,
+    shirtByCharacter,
+    bagTier: s.bagTier ?? 'common',
+    unlockedClubsByCharacter: s.unlockedClubsByCharacter ?? {},
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -348,6 +412,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 6) s = v6ToV7(s as unknown as SaveV6) as unknown as typeof s;
   if (s.version === 7) s = v7ToV8(s as unknown as SaveV7) as unknown as typeof s;
   if (s.version === 8) s = v8ToV9(s as unknown as SaveV8) as unknown as typeof s;
+  if (s.version === 9) s = v9ToV10(s as unknown as SaveV9) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -355,28 +420,34 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v9 = s as unknown as Partial<SaveV9>;
-  const ownedShips = v9.ownedShips && v9.ownedShips.length ? v9.ownedShips : [DEFAULT_SHIP_ID];
-  const ownedApparel = v9.ownedApparel ?? [];
-  const bagTier: BagTier = v9.bagTier ?? 'common';
+  const v10 = s as unknown as Partial<SaveV10>;
+  const ownedShips = v10.ownedShips && v10.ownedShips.length ? v10.ownedShips : [DEFAULT_SHIP_ID];
+  const ownedApparel = v10.ownedApparel ?? [];
+  const bagTier: BagTier = v10.bagTier ?? 'common';
+  // Drop any per-character equip that references an unowned item (so a stale/edited blob can't show a
+  // ship/garment the player doesn't actually own).
+  const sanitize = (m: Record<string, string> | undefined, owned: string[]): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const [id, item] of Object.entries(m ?? {})) if (owned.includes(item)) out[id] = item;
+    return out;
+  };
   return {
     version: SAVE_VERSION,
-    bestStableford: v9.bestStableford ?? 0,
-    bestDistance: v9.bestDistance ?? 0,
-    shards: v9.shards ?? 0,
-    metaUpgrades: v9.metaUpgrades ?? {},
-    maxAscension: v9.maxAscension ?? 0,
-    lifetimeAces: v9.lifetimeAces ?? 0,
+    bestStableford: v10.bestStableford ?? 0,
+    bestDistance: v10.bestDistance ?? 0,
+    shards: v10.shards ?? 0,
+    metaUpgrades: v10.metaUpgrades ?? {},
+    maxAscension: v10.maxAscension ?? 0,
+    lifetimeAces: v10.lifetimeAces ?? 0,
     ownedShips,
-    selectedShip: v9.selectedShip && ownedShips.includes(v9.selectedShip) ? v9.selectedShip : DEFAULT_SHIP_ID,
-    marketSeed: v9.marketSeed ?? 0,
     ownedApparel,
-    equippedHat: v9.equippedHat && ownedApparel.includes(v9.equippedHat) ? v9.equippedHat : undefined,
-    equippedShirt: v9.equippedShirt && ownedApparel.includes(v9.equippedShirt) ? v9.equippedShirt : undefined,
+    shipByCharacter: sanitize(v10.shipByCharacter, ownedShips),
+    hatByCharacter: sanitize(v10.hatByCharacter, ownedApparel),
+    shirtByCharacter: sanitize(v10.shirtByCharacter, ownedApparel),
     bagTier,
-    unlockedClubsByCharacter: v9.unlockedClubsByCharacter ?? {},
-    activeRun: v9.activeRun,
-    savedAt: v9.savedAt,
+    unlockedClubsByCharacter: v10.unlockedClubsByCharacter ?? {},
+    activeRun: v10.activeRun,
+    savedAt: v10.savedAt,
   };
 }
 

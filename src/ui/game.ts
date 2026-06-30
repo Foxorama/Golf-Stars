@@ -51,8 +51,9 @@ import {
 import { type MetaUpgrades } from '../sim/rpg/meta';
 import { bagSet, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
 import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlock';
-import { canBuyShip, marketRerollCost, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { canBuyShip, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
+import { getCharacter } from '../sim/rpg/characters';
 import { playHole } from '../sim/round';
 import {
   autoDecision,
@@ -80,7 +81,8 @@ export type Screen =
   | 'shop'
   | 'travel'
   | 'gameover'
-  | 'outpost';
+  | 'trademarket'
+  | 'clubhouse';
 
 export interface UiState {
   run: Run;
@@ -126,19 +128,18 @@ export interface UiState {
   /** The owned permanent default-bag tier (GS-bag-tiers) — baked into every new run's starting bag.
    *  'common' = the un-upgraded starter bag. */
   bagTier: BagTier;
-  /** Owned cosmetic ships (GS-garage) — always includes the default Woody Wagon. */
+  /** Owned cosmetic ships (GS-garage) — always includes the default Woody Wagon. Global ownership. */
   ownedShips: string[];
-  /** The ship flown on the journey map. */
-  selectedShip: string;
-  /** The Trade Market's rotating-offer seed — bumps on each completed run so the stock refreshes. */
-  marketSeed: number;
-  /** How many times the Trade Market has been rerolled this visit (transient — drives the salt + cost). */
-  marketRerolls?: number;
-  /** Owned cosmetic apparel ids (GS-cosmetics) — hats + shirts bought at the wardrobe. */
+  /** Owned cosmetic apparel ids (GS-cosmetics) — hats + shirts bought at the Trade Market. Global. */
   ownedApparel: string[];
-  /** Equipped hat / shirt apparel ids (undefined = the character's default look for that slot). */
-  equippedHat?: string;
-  equippedShirt?: string;
+  /** The ship each character flies on the journey map (GS-clubhouse): characterId → ship id. Absent →
+   *  the default Woody Wagon. Outfitted per golfer in the Clubhouse. */
+  shipByCharacter: Record<string, string>;
+  /** The hat / shirt each character wears (characterId → apparel id). Absent → that golfer's default look. */
+  hatByCharacter: Record<string, string>;
+  shirtByCharacter: Record<string, string>;
+  /** The character whose Clubhouse (garage + wardrobe) is open for outfitting (transient — not saved). */
+  manageCharacterId?: string;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
   /** A pending interactive SCRAMBLE shot (GS-team-duel) awaiting the player's ball choice. */
@@ -192,14 +193,15 @@ export type Action =
   | { type: 'route'; routeId: number }
   | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
   | { type: 'viewHole'; hole: number }
-  | { type: 'openOutpost' } // visit the between-run Trade Market / Garage (from title or gameover)
-  | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (GS-garage)
-  | { type: 'selectShip'; id: string } // fly a different owned ship on the journey map
-  | { type: 'rerollMarket' } // pay shards to redraw the Trade Market's stock
-  | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt with shards (GS-cosmetics)
-  | { type: 'equipApparel'; id: string } // wear an owned hat/shirt (toggles off if already worn)
+  | { type: 'openMarket' } // visit the between-run Trade Market (buy ships/apparel/bags) (GS-clubhouse)
+  | { type: 'closeMarket' } // back to the title from the Trade Market
+  | { type: 'openClubhouse'; characterId: string } // outfit one character's garage + wardrobe (GS-clubhouse)
+  | { type: 'closeClubhouse' } // back to the title from the Clubhouse
+  | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (global ownership) (GS-garage)
+  | { type: 'selectShip'; id: string } // fly a different owned ship on the managed character (Clubhouse)
+  | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt with shards (global ownership) (GS-cosmetics)
+  | { type: 'equipApparel'; id: string } // wear an owned hat/shirt on the managed character (toggles off)
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
-  | { type: 'closeOutpost' } // back to the title
   | { type: 'restart'; seed?: number | string };
 
 export interface MetaProgress {
@@ -210,13 +212,39 @@ export interface MetaProgress {
   maxAscension?: number;
   lifetimeAces?: number;
   ownedShips?: string[];
-  selectedShip?: string;
-  marketSeed?: number;
   ownedApparel?: string[];
-  equippedHat?: string;
-  equippedShirt?: string;
+  shipByCharacter?: Record<string, string>;
+  hatByCharacter?: Record<string, string>;
+  shirtByCharacter?: Record<string, string>;
   bagTier?: BagTier;
   unlockedClubsByCharacter?: Record<string, string[]>;
+}
+
+/** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
+export function shipForCharacter(
+  s: { shipByCharacter: Record<string, string>; ownedShips: string[] },
+  characterId: string | undefined,
+): string {
+  const pick = characterId ? s.shipByCharacter[characterId] : undefined;
+  return pick && s.ownedShips.includes(pick) ? pick : DEFAULT_SHIP_ID;
+}
+
+/** The hat a character wears (GS-clubhouse) — its Clubhouse pick if owned, else undefined (default look). */
+export function hatForCharacter(
+  s: { hatByCharacter: Record<string, string>; ownedApparel: string[] },
+  characterId: string | undefined,
+): string | undefined {
+  const pick = characterId ? s.hatByCharacter[characterId] : undefined;
+  return pick && s.ownedApparel.includes(pick) ? pick : undefined;
+}
+
+/** The shirt a character wears (GS-clubhouse) — its Clubhouse pick if owned, else undefined. */
+export function shirtForCharacter(
+  s: { shirtByCharacter: Record<string, string>; ownedApparel: string[] },
+  characterId: string | undefined,
+): string | undefined {
+  const pick = characterId ? s.shirtByCharacter[characterId] : undefined;
+  return pick && s.ownedApparel.includes(pick) ? pick : undefined;
 }
 
 /**
@@ -247,11 +275,10 @@ export function initState(
     lifetimeAces: meta.lifetimeAces ?? 0,
     bagTier,
     ownedShips: meta.ownedShips && meta.ownedShips.length ? meta.ownedShips : [DEFAULT_SHIP_ID],
-    selectedShip: meta.selectedShip ?? DEFAULT_SHIP_ID,
-    marketSeed: meta.marketSeed ?? 0,
     ownedApparel: meta.ownedApparel ?? [],
-    equippedHat: meta.equippedHat,
-    equippedShirt: meta.equippedShirt,
+    shipByCharacter: meta.shipByCharacter ?? {},
+    hatByCharacter: meta.hatByCharacter ?? {},
+    shirtByCharacter: meta.shirtByCharacter ?? {},
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
   };
 }
@@ -303,7 +330,6 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
   return {
     shards: state.shards + earned + bonusShards,
     lastRunShards: earned,
-    marketSeed: state.marketSeed + 1,
     maxAscension,
     unlockedClubsByCharacter: gotClub
       ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
@@ -709,73 +735,86 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, viewHole: hole };
     }
 
-    case 'openOutpost': {
-      // The Trade Market / Garage is reachable between runs — from the title or after a run ends.
-      // Reset the per-visit reroll counter so the offer reads off the persisted marketSeed.
-      if (state.screen !== 'title' && state.screen !== 'gameover') return state;
-      return { ...state, screen: 'outpost', marketRerolls: 0 };
+    case 'openMarket': {
+      // The Trade Market (buy ships / apparel / bag tiers) is reachable between runs — from the title,
+      // after a run ends, or from a character's Clubhouse ("buy more"). Buying grants GLOBAL ownership;
+      // outfitting is done per character in the Clubhouse.
+      if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'clubhouse') return state;
+      return { ...state, screen: 'trademarket' };
+    }
+
+    case 'closeMarket': {
+      if (state.screen !== 'trademarket') return state;
+      return { ...state, screen: 'title' };
+    }
+
+    case 'openClubhouse': {
+      // Outfit ONE character's garage (owned ship) + wardrobe (owned hats/shirts). Reachable from the
+      // title's Clubhouse section.
+      if (state.screen !== 'title') return state;
+      if (!getCharacter(action.characterId)) return state;
+      return { ...state, screen: 'clubhouse', manageCharacterId: action.characterId };
+    }
+
+    case 'closeClubhouse': {
+      if (state.screen !== 'clubhouse') return state;
+      return { ...state, screen: 'title', manageCharacterId: undefined };
     }
 
     case 'buyShip': {
-      // Spend Star Shards on a cosmetic ship (GS-garage). Guarded: must be in the market, affordable,
-      // unowned, and a real ship. Bought → owned + auto-selected (fly your new ride immediately).
-      if (state.screen !== 'outpost') return state;
+      // Spend Star Shards on a cosmetic ship (GS-garage). Guarded: must be at the market, affordable,
+      // unowned, and a real ship. Bought → globally owned (assign it to a character in the Clubhouse).
+      if (state.screen !== 'trademarket') return state;
       const ship = shipById(action.id);
       if (!canBuyShip(ship, state.shards, state.ownedShips)) return state;
       return {
         ...state,
         shards: state.shards - ship!.cost,
         ownedShips: [...state.ownedShips, ship!.id],
-        selectedShip: ship!.id,
       };
     }
 
-    case 'selectShip': {
-      // Fly a different OWNED ship on the journey map (the Garage selector). Cosmetic only.
-      if (!state.ownedShips.includes(action.id)) return state;
-      return { ...state, selectedShip: action.id };
-    }
-
-    case 'rerollMarket': {
-      // Pay a (steep) Shard cost to redraw the market stock (GS-garage).
-      if (state.screen !== 'outpost') return state;
-      const rerolls = state.marketRerolls ?? 0;
-      const cost = marketRerollCost(rerolls);
-      if (state.shards < cost) return state;
-      return { ...state, shards: state.shards - cost, marketRerolls: rerolls + 1 };
-    }
-
     case 'buyApparel': {
-      // Spend Star Shards on a cosmetic hat/shirt (GS-cosmetics). Guarded: affordable + unowned. Bought
-      // → owned + auto-equipped in its slot (wear your new look immediately).
-      if (state.screen !== 'outpost') return state;
+      // Spend Star Shards on a cosmetic hat/shirt (GS-cosmetics). Guarded: at the market, affordable,
+      // unowned. Bought → globally owned (wear it on a character in the Clubhouse).
+      if (state.screen !== 'trademarket') return state;
       const item = apparelById(action.id);
       if (!canBuyApparel(item, state.shards, state.ownedApparel)) return state;
-      const slot = item!.slot === 'hat' ? 'equippedHat' : 'equippedShirt';
       return {
         ...state,
         shards: state.shards - item!.cost,
         ownedApparel: [...state.ownedApparel, item!.id],
-        [slot]: item!.id,
       };
     }
 
+    case 'selectShip': {
+      // Fly a different OWNED ship on the MANAGED character (the Clubhouse garage). Cosmetic only.
+      if (state.screen !== 'clubhouse' || !state.manageCharacterId) return state;
+      if (!state.ownedShips.includes(action.id)) return state;
+      return { ...state, shipByCharacter: { ...state.shipByCharacter, [state.manageCharacterId]: action.id } };
+    }
+
     case 'equipApparel': {
-      // Wear an OWNED hat/shirt; clicking the worn piece again takes it OFF (back to character default).
+      // Wear an OWNED hat/shirt on the MANAGED character; clicking the worn piece again takes it OFF
+      // (back to that character's default look).
+      if (state.screen !== 'clubhouse' || !state.manageCharacterId) return state;
       const item = apparelById(action.id);
       if (!item || !state.ownedApparel.includes(action.id)) return state;
-      if (item.slot === 'hat') {
-        return { ...state, equippedHat: state.equippedHat === action.id ? undefined : action.id };
-      }
-      return { ...state, equippedShirt: state.equippedShirt === action.id ? undefined : action.id };
+      const cid = state.manageCharacterId;
+      const map = item.slot === 'hat' ? 'hatByCharacter' : 'shirtByCharacter';
+      const current = state[map][cid];
+      const next = { ...state[map] };
+      if (current === action.id) delete next[cid];
+      else next[cid] = action.id;
+      return { ...state, [map]: next };
     }
 
     case 'buyBagTier': {
       // Spend Star Shards on a permanent default-bag upgrade (GS-bag-tiers). Guarded: must be at the
-      // Outpost, the tier unlocked (Ascension gate cleared), strictly higher than the current bag, and
-      // affordable. The upgrade takes effect on the NEXT run (the placeholder run is rebuilt so the
+      // Trade Market, the tier unlocked (Ascension gate cleared), strictly higher than the current bag,
+      // and affordable. The upgrade takes effect on the NEXT run (the placeholder run is rebuilt so the
       // course preview + a fresh start both reflect it).
-      if (state.screen !== 'outpost') return state;
+      if (state.screen !== 'trademarket') return state;
       const set = bagSet(action.tier);
       if (!set || !canBuyBagSet(set, state.bagTier, state.maxAscension, state.shards)) return state;
       const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, undefined, state.run.ascension, set.tier);
@@ -788,11 +827,6 @@ export function reduce(state: UiState, action: Action): UiState {
       };
     }
 
-    case 'closeOutpost': {
-      if (state.screen !== 'outpost') return state;
-      return { ...state, screen: 'title' };
-    }
-
     case 'restart': {
       // Fresh run; meta-progression carries over.
       return initState(action.seed ?? state.run.seed, {
@@ -803,11 +837,10 @@ export function reduce(state: UiState, action: Action): UiState {
         maxAscension: state.maxAscension,
         lifetimeAces: state.lifetimeAces,
         ownedShips: state.ownedShips,
-        selectedShip: state.selectedShip,
-        marketSeed: state.marketSeed,
         ownedApparel: state.ownedApparel,
-        equippedHat: state.equippedHat,
-        equippedShirt: state.equippedShirt,
+        shipByCharacter: state.shipByCharacter,
+        hatByCharacter: state.hatByCharacter,
+        shirtByCharacter: state.shirtByCharacter,
         bagTier: state.bagTier,
         unlockedClubsByCharacter: state.unlockedClubsByCharacter,
       });

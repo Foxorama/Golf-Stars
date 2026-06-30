@@ -6,16 +6,15 @@
  * craft on the starmap. A ship is content-as-data: an id, a SET it belongs to, a rarity (= price tier),
  * and a render `look` the vector drawer (`render/shipArt.ts`) keys off. New ship = new row.
  *
- * The market shows a small rotating OFFER drawn from the ships you don't yet own; it RESETS each
- * completed run (a persisted `marketSeed` bumps on every run end) and can be REROLLED for an
- * escalating Shard cost. Everyone starts owning the classic station wagon (`DEFAULT_SHIP_ID`), free.
+ * The Trade Market shows the FULL catalogue (GS-clubhouse) — every ship is browsable and buyable the
+ * moment you can afford it; scarcity lives in the Shard PRICE (the mythic Mothership is the 1,000-shard
+ * grail), not in a rotating offer. Everyone starts owning the classic station wagon (`DEFAULT_SHIP_ID`),
+ * free. Ownership is global; which ship each character FLIES is chosen per golfer in the Clubhouse.
  *
- * Pure + deterministic (seeded sampling, no Math.random) so the offer is stable within a visit and
- * reproducible. NOTHING here touches the sim — ships are cosmetic, so there are no balance/fairness
- * implications and the offer never affects a run.
+ * NOTHING here touches the sim — ships are cosmetic, so there are no balance/fairness implications and
+ * the catalogue never affects a run.
  */
 
-import { Rng } from '../rng';
 import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 
 /** The vector look the ship drawer renders (a base shape family + palette + bling). */
@@ -166,46 +165,10 @@ export function shipById(id: string | undefined): Ship | undefined {
   return id ? SHIP_BY_ID[id] : undefined;
 }
 
-/** The size of the Trade Market's rotating offer (cards shown at once). */
-export const MARKET_OFFER_SIZE = 3;
-/** Base + growth for the (deliberately expensive) market reroll. */
-export const MARKET_REROLL_BASE = 45;
-export const MARKET_REROLL_GROWTH = 2;
-
-/** The shard cost of the NEXT market reroll (GS-garage) — steep, ramps per reroll this visit. */
-export function marketRerollCost(rerolls: number): number {
-  return Math.round(MARKET_REROLL_BASE * Math.pow(MARKET_REROLL_GROWTH, Math.max(0, rerolls)));
-}
-
-/**
- * The Trade Market's current offer — a seeded sample of ships you DON'T yet own, of size up to
- * `MARKET_OFFER_SIZE`. Deterministic from `(marketSeed, rerolls)` so it's stable within a visit and
- * "resets" when `marketSeed` bumps on a completed run. Returns fewer (or none) as the fleet fills up.
- *
- * The sample is RARITY-WEIGHTED (a rarer ship draws less often, mythic least of all), so the mythic
- * Mothership is genuinely scarce to encounter — "rarer than the others" — without ever being unobtainable.
- */
-export function marketOffer(marketSeed: number, owned: readonly string[], rerolls = 0): Ship[] {
-  const ownedSet = new Set(owned);
-  const pool = SHIPS.filter((s) => !ownedSet.has(s.id) && s.cost > 0);
-  if (pool.length <= MARKET_OFFER_SIZE) return [...pool];
-  const rng = new Rng(`ships:market:${marketSeed}:${rerolls}`);
-  const remaining = [...pool];
-  const picked: Ship[] = [];
-  for (let i = 0; i < MARKET_OFFER_SIZE && remaining.length; i++) {
-    const total = remaining.reduce((sum, s) => sum + COSMETIC_RARITY[s.rarity].weight, 0);
-    let t = rng.float() * total;
-    let idx = remaining.length - 1;
-    for (let j = 0; j < remaining.length; j++) {
-      t -= COSMETIC_RARITY[remaining[j]!.rarity].weight;
-      if (t <= 0) {
-        idx = j;
-        break;
-      }
-    }
-    picked.push(remaining.splice(idx, 1)[0]!);
-  }
-  return picked;
+/** The full ship catalogue for the Trade Market, ordered by ascending rarity then catalogue order —
+ *  the common starter wagon first, the mythic grail last. (Mirrors `apparelForSlot` for apparel.) */
+export function shipCatalogue(): Ship[] {
+  return [...SHIPS].sort((a, b) => COSMETIC_RARITY[a.rarity].order - COSMETIC_RARITY[b.rarity].order);
 }
 
 /** Can this ship be bought? (Affordable, not already owned, and has a price.) */
