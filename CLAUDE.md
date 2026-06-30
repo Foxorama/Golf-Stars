@@ -112,7 +112,8 @@ For each system: the rule that constrains new work. Open the archive doc before 
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
   (3 arcs, boss each, `endedReason 'won'`). Two currencies: per-run **credits** (shop perks) and
-  cross-run **Star Shards** (cosmetic ships). Route choice carries the destination biome + a
+  cross-run **Star Shards** (cosmetic ships + the wardrobe of hats/shirts, up to a `mythic` tier above
+  legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v7). Route choice carries the destination biome + a
   difficulty/atmosphere event (economy/cut/meta only — NEVER course generation). Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a

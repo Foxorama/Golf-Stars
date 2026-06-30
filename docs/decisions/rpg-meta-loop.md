@@ -367,6 +367,37 @@
   touch the sim, so there are no balance/fairness implications. No new `_gs*`/URL hook. Tests:
   `tests/ships.test.ts` (catalogue/offer/reroll/affordability), `tests/save.test.ts` (v6 migration),
   `tests/ui.test.ts` (buy auto-flies, garage select, market guards + reroll).
+- **A top MYTHIC cosmetic tier + a WARDROBE of hats & shirts (GS-cosmetics, `cosmetics.ts`/`apparel.ts`/
+  `apparelArt.ts`).** Cosmetics now span a SUPERSET rarity — `CosmeticRarity = Rarity | 'mythic'` in
+  `cosmetics.ts` (`COSMETIC_RARITY` col/weight/order, `cosmeticRarCol`/`isMythic`). CRITICAL: mythic is kept
+  OUT of the sim's loot `Rarity` (clubs/perks/drops) — it would ripple into the rarity-weighted loot sampling +
+  economy balance for no reason; it exists ONLY for ships + apparel, which never touch the sim. Three additions,
+  all pure render/meta (no `_gs*`/URL hook, no balance/fairness implications):
+  - **Apparel = browsable WARDROBE** (`APPAREL` rows: id/slot `hat|shirt`/set/rarity/cost/`look`). Unlike the
+    rotating ship market, the wardrobe is the FULL catalogue (you pick the look you want); a piece is bought once
+    with shards (`APPAREL_COST` per tier: common 15 … legendary 280, **mythic 500**) and equipped per slot
+    (clicking the worn piece again takes it OFF — `equipApparel` toggles). Sets: the traditional **Astronaut** set
+    (legendary Helmet + Space Suit) and the **Supernova** mythic set (glowing halo-Crown + nebula Suit, 500 each —
+    the "super cool" pair); plus standalone basics (cap/bucket/visor/tophat/gold-crown, polo/striped/jersey).
+    `equippedSet(hat, shirt)` flags a completed multi-piece set. Hats render as 7 canvas/SVG SHAPES (cap/bucket/
+    visor/tophat/crown/helmet/halo), shirts as 5 (polo/striped/jersey/spacesuit/cosmic).
+  - **The golfer WEARS what you buy.** `GolferLook` (playView) gained `hat?`/`shirtStyle?: ApparelLook`; the
+    canvas `drawGolfer` draws the hat shape (replacing the default cap) + the shirt colour/glow/spacesuit chest
+    panel, and `app.ts golferLook()` layers the equipped hat/shirt over the character's base style. The wardrobe
+    SVG (`apparelArt.ts`: `apparelCardSVG` icons + `golferPreviewSVG` mannequin) mirrors the SAME shapes so the
+    card matches the on-course look.
+  - **The MYTHIC vehicle — the Mothership** (`ufo-mothership`, rarity mythic, **1,000 shards**). A new ship
+    `look.kind: 'ufo'` in `shipArt.ts`: a classic flying-saucer dome + a ring of FLASHING lights + SPINNING
+    landing-gear wheels (animateTransform) + a waving "Hole 19" pennant on a flagpole. The ship `marketOffer` is
+    now RARITY-WEIGHTED (`COSMETIC_RARITY.weight`), so the mythic UFO is genuinely the scarcest draw ("rarer than
+    the others") yet still obtainable.
+  Save **v7** (`ownedApparel`/`equippedHat`/`equippedShirt`, v6→v7 migration seeds an empty wardrobe; equipped
+  ids backfill to undefined if not owned). Ship `rarity` widened to `CosmeticRarity` (`TIER_COST.mythic = 1000`).
+  Reducer actions `buyApparel`/`equipApparel`; a Wardrobe section in the Trade Market with a live golfer preview +
+  set-complete badge. Eyes-on via `scripts/cosmetics-preview.mjs` (browser launch is blocked in some sandboxes → it
+  also writes a standalone HTML; all 24 cosmetic SVGs are validated well-formed). Tests: `tests/apparel.test.ts`
+  (catalogue/tiers/sets/buy-gate), `tests/ships.test.ts` (mythic UFO + weighted scarcity), `tests/save.test.ts`
+  (v7), `tests/ui.test.ts` (buy auto-wears, equip toggle, guards).
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by
