@@ -16,6 +16,7 @@ import type { PuttLog, ShotLog } from '../sim/round';
 import type { ShotRedirect } from '../sim/shot';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { archetypeFor } from '../sim/course/themes';
+import type { ApparelLook } from '../sim/rpg/apparel';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, type Prim } from './style';
 import { createWeather, type WeatherHandle } from './weather';
@@ -160,6 +161,10 @@ export interface GolferLook {
    * club you bought in the Pro Shop is the club you swing. Absent = a plain club head (unchanged).
    */
   gear?: { theme: string; tint: string };
+  /** Equipped cosmetic HAT (GS-cosmetics) — overrides the default cap with its own shape/palette. */
+  hat?: ApparelLook;
+  /** Equipped cosmetic SHIRT — overrides the torso colour + adds a glowing aura for the top tiers. */
+  shirtStyle?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 function lookFromColor(color: string): GolferLook {
@@ -255,13 +260,35 @@ function drawGolfer(
   ctx.lineTo(12, 0);
   ctx.stroke();
 
-  // Torso (hip → shoulders, tilted toward the ball).
-  ctx.strokeStyle = look.shirt;
+  // Torso (hip → shoulders, tilted toward the ball). A cosmetic shirt (GS-cosmetics) overrides the
+  // colour and, for the glowing top tiers, adds a soft aura behind the torso.
+  const shirtCol = look.shirtStyle?.color ?? look.shirt;
+  if (look.shirtStyle?.glow) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.strokeStyle = look.shirtStyle.glow;
+    ctx.lineWidth = 18;
+    ctx.beginPath();
+    ctx.moveTo(2, -30);
+    ctx.lineTo(S[0], S[1]);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.strokeStyle = shirtCol;
   ctx.lineWidth = 12;
   ctx.beginPath();
   ctx.moveTo(2, -30);
   ctx.lineTo(S[0], S[1]);
   ctx.stroke();
+  // Spacesuit chest control panel — a small accented box that sells the "suit" read.
+  if (look.shirtStyle?.shape === 'spacesuit') {
+    ctx.fillStyle = '#cdd6e2';
+    ctx.fillRect(2, -44, 8, 7);
+    ctx.fillStyle = look.shirtStyle.accent ?? '#d23b32';
+    ctx.fillRect(3, -42.6, 2, 2);
+    ctx.fillStyle = '#2bf0c0';
+    ctx.fillRect(6.5, -42.6, 2, 2);
+  }
 
   // Club shaft + head (behind the arms). A bought themed club set (GS-proshop-2) tints the head and
   // gives it a glow + a small theme accent, so the gear you bought visibly changes the swing.
@@ -316,18 +343,133 @@ function drawGolfer(
   ctx.lineTo(hands[0], hands[1]);
   ctx.stroke();
 
-  // Head + cap (brim points down the line).
+  // Head + headwear (brim/front points down the line, +x toward the target).
   ctx.fillStyle = look.skin;
   ctx.beginPath();
   ctx.arc(12, -58, 7, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = look.cap;
-  ctx.beginPath();
-  ctx.arc(12, -59, 7, Math.PI, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(15, -60, 9, 3); // brim
+  if (look.hat) {
+    drawHat(ctx, 12, -58, 7, look.hat);
+  } else {
+    // Default cap.
+    ctx.fillStyle = look.cap;
+    ctx.beginPath();
+    ctx.arc(12, -59, 7, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(15, -60, 9, 3); // brim
+  }
 
   ctx.restore();
+}
+
+/**
+ * Draw a cosmetic HAT on the golfer's head (canvas), centred on (hx,hy) with head radius r. Authored
+ * in the canonical right-facing frame (the outer transform mirrors it for a lefty); the brim/front
+ * points +x (down the line). Shapes mirror the wardrobe SVG (`render/apparelArt.ts`) so what you buy
+ * is what you wear.
+ */
+function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: number, look: ApparelLook): void {
+  const { shape, color, accent = '#15161c', glow } = look;
+  if (glow) {
+    ctx.save();
+    ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.55;
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(hx, hy - r, r + 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#0c1116';
+  ctx.lineWidth = 1;
+  switch (shape) {
+    case 'cap':
+      ctx.beginPath();
+      ctx.arc(hx, hy - 1, r, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.fillRect(hx + 3, hy - 2, r + 2, 2.6); // brim
+      break;
+    case 'bucket':
+      ctx.beginPath();
+      ctx.arc(hx, hy - 1, r - 0.5, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, r + 4, 2.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'visor':
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(hx, hy - 1);
+      ctx.lineTo(hx + r + 6, hy);
+      ctx.lineTo(hx + r, hy + 2);
+      ctx.lineTo(hx - 1, hy + 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(hx, hy - 1, r, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      break;
+    case 'tophat':
+      ctx.fillRect(hx - 5, hy - r - 9, 10, 11);
+      ctx.fillStyle = accent;
+      ctx.fillRect(hx - 5, hy - 2.5, 10, 2.4); // band
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, r + 3, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'crown':
+      ctx.beginPath();
+      ctx.moveTo(hx - r, hy);
+      ctx.lineTo(hx - r, hy - 5);
+      ctx.lineTo(hx - r / 2, hy - 1);
+      ctx.lineTo(hx, hy - 8);
+      ctx.lineTo(hx + r / 2, hy - 1);
+      ctx.lineTo(hx + r, hy - 5);
+      ctx.lineTo(hx + r, hy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ff5a4d';
+      ctx.beginPath();
+      ctx.arc(hx, hy - 7, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'helmet':
+      ctx.beginPath();
+      ctx.arc(hx, hy - 1, r + 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.ellipse(hx + 1, hy - 1, r - 1.5, r - 2.5, 0, Math.PI * 0.9, Math.PI * 2.1);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.ellipse(hx - 1.5, hy - 3, 2, 1.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'halo':
+      ctx.beginPath();
+      ctx.arc(hx, hy - 1, r + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.ellipse(hx + 1, hy - 1, r - 2, r - 3, 0, Math.PI * 0.9, Math.PI * 2.1);
+      ctx.fill();
+      // The glowing halo ring above.
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(hx, hy - r - 4, r, 2.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    default:
+      break;
+  }
 }
 
 function feel(): PlayFeel {

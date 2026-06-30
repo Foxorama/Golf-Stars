@@ -236,6 +236,35 @@ describe('ui reducer', () => {
     expect(reduce(playing, { type: 'openOutpost' })).toBe(playing);
   });
 
+  it('the Wardrobe buys a cosmetic hat, auto-wears it, and toggles it off/on (GS-cosmetics)', () => {
+    let s = initState(7, { shards: 500 });
+    s = reduce(s, { type: 'openOutpost' });
+    const before = s.shards;
+    // Buy a hat → owned + worn immediately.
+    s = reduce(s, { type: 'buyApparel', id: 'cap-classic' });
+    expect(s.ownedApparel).toContain('cap-classic');
+    expect(s.equippedHat).toBe('cap-classic');
+    expect(s.shards).toBe(before - 15);
+    // Clicking the worn piece again takes it off; clicking once more puts it back on.
+    s = reduce(s, { type: 'equipApparel', id: 'cap-classic' });
+    expect(s.equippedHat).toBeUndefined();
+    s = reduce(s, { type: 'equipApparel', id: 'cap-classic' });
+    expect(s.equippedHat).toBe('cap-classic');
+    // Hats and shirts live in independent slots.
+    s = reduce(s, { type: 'buyApparel', id: 'polo-classic' });
+    expect(s.equippedShirt).toBe('polo-classic');
+    expect(s.equippedHat).toBe('cap-classic'); // hat untouched by a shirt buy
+  });
+
+  it('the Wardrobe guards unaffordable buys + equipping unowned pieces (GS-cosmetics)', () => {
+    let s = initState(7, { shards: 10 }); // can't afford even a common (15)
+    s = reduce(s, { type: 'openOutpost' });
+    expect(reduce(s, { type: 'buyApparel', id: 'cap-classic' })).toBe(s); // too poor → no-op
+    expect(reduce(s, { type: 'equipApparel', id: 'cap-classic' })).toBe(s); // unowned → no-op
+    // The mythic Supernova suit is the 500-shard splurge — unaffordable here.
+    expect(reduce(s, { type: 'buyApparel', id: 'suit-supernova' })).toBe(s);
+  });
+
   it('a reroll bumps the market salt for shards; a completed run refreshes the seed (GS-garage)', () => {
     let s = initState(7, { shards: 1000 });
     s = reduce(s, { type: 'openOutpost' });

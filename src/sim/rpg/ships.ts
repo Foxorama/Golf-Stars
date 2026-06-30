@@ -16,12 +16,12 @@
  */
 
 import { Rng } from '../rng';
-import type { Rarity } from '../course/contract';
+import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 
 /** The vector look the ship drawer renders (a base shape family + palette + bling). */
 export interface ShipLook {
-  /** Base silhouette the drawer builds. */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle';
+  /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated). */
+  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -32,6 +32,8 @@ export interface ShipLook {
   accent: string;
   /** Bling level 0..3 — extra decals/sparkle for the blinged-out tiers. */
   bling?: number;
+  /** Pennant text flown on a flagpole (the mythic UFO's "Hole 19" flag). */
+  flag?: string;
 }
 
 export interface Ship {
@@ -39,8 +41,8 @@ export interface Ship {
   name: string;
   /** The cosmetic SET this belongs to (a family of related craft). */
   set: string;
-  /** Price tier — also gates the rarity ring + shard cost. */
-  rarity: Rarity;
+  /** Price tier — also gates the rarity ring + shard cost (up to the top `mythic`). */
+  rarity: CosmeticRarity;
   /** One-line flavour for the market card. */
   blurb: string;
   /** Shard price (0 = free / starter). */
@@ -51,8 +53,14 @@ export interface Ship {
 /** The classic woody station wagon — owned by everyone from the off, free. */
 export const DEFAULT_SHIP_ID = 'wagon-classic';
 
-/** Shard prices per rarity tier (the Trade Market economy). */
-const TIER_COST: Record<Rarity, number> = { common: 0, rare: 60, epic: 140, legendary: 300 };
+/** Shard prices per rarity tier (the Trade Market economy). Mythic is the 1,000-shard grail. */
+const TIER_COST: Record<CosmeticRarity, number> = {
+  common: 0,
+  rare: 60,
+  epic: 140,
+  legendary: 300,
+  mythic: 1000,
+};
 
 export const SHIPS: readonly Ship[] = [
   // --- The WAGON line: tiers of blinged-out station wagon (the heritage fleet) ---
@@ -140,6 +148,16 @@ export const SHIPS: readonly Ship[] = [
     cost: TIER_COST.legendary,
     look: { kind: 'comet', body: '#f4f6ff', glass: '#ffffff', flame: '#9ad8ff', accent: '#ffd36b', bling: 3 },
   },
+  // --- The MYTHIC grail: the rarest, flashiest ride in the galaxy ---
+  {
+    id: 'ufo-mothership',
+    name: 'The Mothership',
+    set: 'Mythic',
+    rarity: 'mythic',
+    blurb: 'A genuine flying saucer — spinning gear, flashing lights, and a "Hole 19" flag flying proud.',
+    cost: TIER_COST.mythic,
+    look: { kind: 'ufo', body: '#9fb4c8', glass: '#9affe0', flame: '#7fffd0', accent: '#ffd36b', bling: 3, flag: 'Hole 19' },
+  },
 ];
 
 const SHIP_BY_ID: Record<string, Ship> = Object.fromEntries(SHIPS.map((s) => [s.id, s]));
@@ -163,6 +181,9 @@ export function marketRerollCost(rerolls: number): number {
  * The Trade Market's current offer — a seeded sample of ships you DON'T yet own, of size up to
  * `MARKET_OFFER_SIZE`. Deterministic from `(marketSeed, rerolls)` so it's stable within a visit and
  * "resets" when `marketSeed` bumps on a completed run. Returns fewer (or none) as the fleet fills up.
+ *
+ * The sample is RARITY-WEIGHTED (a rarer ship draws less often, mythic least of all), so the mythic
+ * Mothership is genuinely scarce to encounter — "rarer than the others" — without ever being unobtainable.
  */
 export function marketOffer(marketSeed: number, owned: readonly string[], rerolls = 0): Ship[] {
   const ownedSet = new Set(owned);
@@ -172,7 +193,17 @@ export function marketOffer(marketSeed: number, owned: readonly string[], reroll
   const remaining = [...pool];
   const picked: Ship[] = [];
   for (let i = 0; i < MARKET_OFFER_SIZE && remaining.length; i++) {
-    picked.push(remaining.splice(rng.int(0, remaining.length - 1), 1)[0]!);
+    const total = remaining.reduce((sum, s) => sum + COSMETIC_RARITY[s.rarity].weight, 0);
+    let t = rng.float() * total;
+    let idx = remaining.length - 1;
+    for (let j = 0; j < remaining.length; j++) {
+      t -= COSMETIC_RARITY[remaining[j]!.rarity].weight;
+      if (t <= 0) {
+        idx = j;
+        break;
+      }
+    }
+    picked.push(remaining.splice(idx, 1)[0]!);
   }
   return picked;
 }

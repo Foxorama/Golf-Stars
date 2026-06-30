@@ -50,6 +50,7 @@ import {
 } from '../sim/rpg/match';
 import { type MetaUpgrades } from '../sim/rpg/meta';
 import { canBuyShip, marketRerollCost, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { playHole } from '../sim/round';
 import {
   autoDecision,
@@ -128,6 +129,11 @@ export interface UiState {
   marketSeed: number;
   /** How many times the Trade Market has been rerolled this visit (transient — drives the salt + cost). */
   marketRerolls?: number;
+  /** Owned cosmetic apparel ids (GS-cosmetics) — hats + shirts bought at the wardrobe. */
+  ownedApparel: string[];
+  /** Equipped hat / shirt apparel ids (undefined = the character's default look for that slot). */
+  equippedHat?: string;
+  equippedShirt?: string;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
   /** A pending interactive SCRAMBLE shot (GS-team-duel) awaiting the player's ball choice. */
@@ -179,6 +185,8 @@ export type Action =
   | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (GS-garage)
   | { type: 'selectShip'; id: string } // fly a different owned ship on the journey map
   | { type: 'rerollMarket' } // pay shards to redraw the Trade Market's stock
+  | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt with shards (GS-cosmetics)
+  | { type: 'equipApparel'; id: string } // wear an owned hat/shirt (toggles off if already worn)
   | { type: 'closeOutpost' } // back to the title
   | { type: 'restart'; seed?: number | string };
 
@@ -192,6 +200,9 @@ export interface MetaProgress {
   ownedShips?: string[];
   selectedShip?: string;
   marketSeed?: number;
+  ownedApparel?: string[];
+  equippedHat?: string;
+  equippedShirt?: string;
 }
 
 /**
@@ -222,6 +233,9 @@ export function initState(
     ownedShips: meta.ownedShips && meta.ownedShips.length ? meta.ownedShips : [DEFAULT_SHIP_ID],
     selectedShip: meta.selectedShip ?? DEFAULT_SHIP_ID,
     marketSeed: meta.marketSeed ?? 0,
+    ownedApparel: meta.ownedApparel ?? [],
+    equippedHat: meta.equippedHat,
+    equippedShirt: meta.equippedShirt,
   };
 }
 
@@ -687,6 +701,31 @@ export function reduce(state: UiState, action: Action): UiState {
       const cost = marketRerollCost(rerolls);
       if (state.shards < cost) return state;
       return { ...state, shards: state.shards - cost, marketRerolls: rerolls + 1 };
+    }
+
+    case 'buyApparel': {
+      // Spend Star Shards on a cosmetic hat/shirt (GS-cosmetics). Guarded: affordable + unowned. Bought
+      // → owned + auto-equipped in its slot (wear your new look immediately).
+      if (state.screen !== 'outpost') return state;
+      const item = apparelById(action.id);
+      if (!canBuyApparel(item, state.shards, state.ownedApparel)) return state;
+      const slot = item!.slot === 'hat' ? 'equippedHat' : 'equippedShirt';
+      return {
+        ...state,
+        shards: state.shards - item!.cost,
+        ownedApparel: [...state.ownedApparel, item!.id],
+        [slot]: item!.id,
+      };
+    }
+
+    case 'equipApparel': {
+      // Wear an OWNED hat/shirt; clicking the worn piece again takes it OFF (back to character default).
+      const item = apparelById(action.id);
+      if (!item || !state.ownedApparel.includes(action.id)) return state;
+      if (item.slot === 'hat') {
+        return { ...state, equippedHat: state.equippedHat === action.id ? undefined : action.id };
+      }
+      return { ...state, equippedShirt: state.equippedShirt === action.id ? undefined : action.id };
     }
 
     case 'closeOutpost': {

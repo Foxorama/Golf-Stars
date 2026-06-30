@@ -22,12 +22,34 @@ describe('ships catalogue (GS-garage)', () => {
     for (const s of SHIPS) expect(s.look.kind).toBeTruthy();
   });
 
-  it('a priced ship costs more for a rarer tier', () => {
+  it('a priced ship costs more for a rarer tier, topped by a 1,000-shard mythic UFO', () => {
     const rare = SHIPS.find((s) => s.rarity === 'rare')!;
     const epic = SHIPS.find((s) => s.rarity === 'epic')!;
     const leg = SHIPS.find((s) => s.rarity === 'legendary')!;
+    const myth = SHIPS.find((s) => s.rarity === 'mythic')!;
     expect(epic.cost).toBeGreaterThan(rare.cost);
     expect(leg.cost).toBeGreaterThan(epic.cost);
+    expect(myth).toBeTruthy();
+    expect(myth.cost).toBe(1000); // the headline grail
+    expect(myth.cost).toBeGreaterThan(leg.cost);
+    // The mythic ride is the animated UFO saucer with its "Hole 19" flag.
+    expect(myth.look.kind).toBe('ufo');
+    expect(myth.look.flag).toBe('Hole 19');
+  });
+
+  it('the rarity-weighted market makes the mythic UFO the scarcest draw', () => {
+    const myth = SHIPS.find((s) => s.rarity === 'mythic')!;
+    const owned = [DEFAULT_SHIP_ID];
+    let sawMyth = 0;
+    const N = 400;
+    for (let seed = 0; seed < N; seed++) {
+      if (marketOffer(seed, owned).some((s) => s.id === myth.id)) sawMyth++;
+    }
+    // It DOES appear (obtainable), but far less than a uniform 3-of-pool share would give.
+    const pool = SHIPS.filter((s) => s.cost > 0).length;
+    const uniformRate = MARKET_OFFER_SIZE / pool;
+    expect(sawMyth).toBeGreaterThan(0);
+    expect(sawMyth / N).toBeLessThan(uniformRate);
   });
 });
 
