@@ -904,6 +904,10 @@ export function executeShot(
     minCarryFracBoost: cw.minCarryFracBoost,
     carryWindowTighten: cw.carryWindowTighten,
     guard: opts.guard,
+    // Caddy-guard fairway test (GS-caddy): closes the guard over THIS hole so resolveShot stays
+    // course-agnostic. Off the fairway = any lie that isn't fairway or green (rough/sand/void/water/…).
+    // Built only when a guard is owned, so a guard-less shot passes `undefined` → no redirect, no draw.
+    offFairway: opts.guard ? (p: Vec) => { const k = lieAt(hole, p); return k !== 'fairway' && k !== 'green'; } : undefined,
     lieRelief: opts.lieRelief,
     lefty: opts.lefty,
     windResist: opts.windResist,
