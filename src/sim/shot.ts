@@ -213,7 +213,7 @@ export type SprayZone = 'green' | 'hookL' | 'sliceR' | 'duckHookL' | 'shankR';
 /**
  * Which zone a sampled spray ANGLE (radians off the bearing, PRE-bias) falls in, by the same band
  * boundaries `sprayBands` draws. Pure — no rng. Used by the caddy-guard interception (Space Ducks /
- * Convict Sheep): a ball sampled into a left/right miss tail can be knocked back to the green.
+ * Convict Sheep): a ball sampled into a left/right miss tail can be knocked back onto the fairway.
  */
 export function classifySprayZone(
   angle: number,
@@ -233,9 +233,9 @@ export function classifySprayZone(
 
 /**
  * A caddy's in-flight ball guard (GS-caddy): the named caddy that watches your misses and knocks the
- * ball back to the green mid-flight. `redirect` maps a miss zone to the CHANCE (0..1) the caddy fires
- * its projectile to redirect it to the green — 1 = always (a duck-hook/shank is never let go), a
- * fraction = a per-shot roll (e.g. 0.75 of hooks). `kind` is the render flavour (a Space Duck's laser,
+ * ball back onto the fairway (the centre line) mid-flight. `redirect` maps a miss zone to the CHANCE
+ * (0..1) the caddy fires its projectile to redirect it back to the fairway — 1 = always, a fraction =
+ * a per-shot roll (e.g. 0.33 of any left miss). `kind` is the render flavour (a Space Duck's laser,
  * a Convict Sheep's boomerang). Unlike a `ShapeMod`, this does NOT change the spray distribution (the
  * cone still shows the tails) — it intercepts a shot that was already sampled into a tail, so the
  * renderer can play the projectile redirect. Resolved identically in the auto sim and interactive driver.
@@ -245,7 +245,7 @@ export interface CaddyGuard {
   kind: 'laser' | 'boomerang';
 }
 
-/** A mid-flight redirect record — the caddy zapped a miss back to the green (render-only flavour). */
+/** A mid-flight redirect record — the caddy zapped a miss back onto the fairway (render-only flavour). */
 export interface ShotRedirect {
   kind: 'laser' | 'boomerang';
   /** The miss zone the shot was sampled into before being knocked back. */
@@ -254,8 +254,8 @@ export interface ShotRedirect {
   originalLanding: Vec;
 }
 
-/** Sample a green-band angle (centre-peaked triangular on [−g, g]) with a single rng draw — the
- *  landing a caddy-guard redirect knocks a miss back to. Mirrors the green branch of sampleShapeAngle. */
+/** Sample a centre-band (fairway) angle (centre-peaked triangular on [−g, g]) with a single rng draw —
+ *  the on-line landing a caddy-guard redirect knocks a miss back to. Mirrors the green branch of sampleShapeAngle. */
 function sampleGreenAngle(baseSpread: number, rng: Rng, geom: SprayGeom = SPRAY_GEOM): number {
   const h = geom.greenZ * baseSpread;
   const v = rng.float();
@@ -594,8 +594,8 @@ export interface ShotResult {
    *  with the renderer (it draws this exact arc) and the sim's tree-knockdown check, so the ball
    *  the player SEES clear/clip a tree is the ball the sim let through/knocked down. */
   apex: number;
-  /** Set when a named caddy knocked a miss back to the green mid-flight (GS-caddy). The `landing`
-   *  above is already the redirected (green) finish; this carries the would-be miss for the render. */
+  /** Set when a named caddy knocked a miss back onto the fairway mid-flight (GS-caddy). The `landing`
+   *  above is already the redirected (centre-line) finish; this carries the would-be miss for the render. */
   redirect?: ShotRedirect;
 }
 
@@ -664,10 +664,10 @@ export function resolveShot(input: ShotInput): ShotResult {
   const shape = input.shape ?? DEFAULT_SHAPE;
   let sprayAngle = sampleShapeAngle(shape, angleSd, rng);
   // Caddy-guard interception (GS-caddy): a named caddy that watches a sampled miss tail and knocks
-  // the ball back to the green mid-flight. Only runs when a guard is present (a caddy is owned), so a
-  // guard-less shot draws NO extra rng and stays byte-for-byte identical. A redirect chance of 1 fires
-  // unconditionally (no draw); a fractional chance rolls once; a zero/absent zone draws nothing — so
-  // the green resample is the only added draw on an actual knock-back, all gated behind the guard.
+  // the ball back onto the fairway (the centre line) mid-flight. Only runs when a guard is present (a
+  // caddy is owned), so a guard-less shot draws NO extra rng and stays byte-for-byte identical. A
+  // redirect chance of 1 fires unconditionally (no draw); a fractional chance rolls once; a zero/absent
+  // zone draws nothing — so the centre-band resample is the only added draw on an actual knock-back.
   let knockedFrom: SprayZone | undefined;
   let origTheta = 0;
   if (input.guard) {

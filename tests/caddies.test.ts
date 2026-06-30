@@ -307,37 +307,46 @@ function finalZone(rng: Rng, guard?: typeof SPACE_DUCKS_GUARD) {
   return { zone: classifySprayZone(theta, wideMiss, angleSd), redirect: r.redirect };
 }
 
-describe('Space Ducks — laser-zap the duck-hooks', () => {
-  it('removes every duck-hook and redirects some hooks to the green', () => {
-    let baseDuck = 0;
-    let guardDuck = 0;
+// A ball heading off the LEFT side of the fairway = a hook OR a duck-hook; off the RIGHT = a slice OR
+// a shank. The guards now save ~1 in 3 of these onto the fairway (a 33% laser/boomerang interception).
+const LEFT_MISS = ['hookL', 'duckHookL'];
+const RIGHT_MISS = ['sliceR', 'shankR'];
+
+describe('Space Ducks — laser ~a third of the left misses back onto the fairway', () => {
+  it('saves some (not all) balls heading left and records the laser', () => {
+    let baseLeft = 0;
+    let guardLeft = 0;
     let lasers = 0;
     for (let s = 0; s < 600; s++) {
-      if (finalZone(new Rng(`d:${s}`)).zone === 'duckHookL') baseDuck++;
+      if (LEFT_MISS.includes(finalZone(new Rng(`d:${s}`)).zone)) baseLeft++;
       const g = finalZone(new Rng(`d:${s}`), SPACE_DUCKS_GUARD);
-      if (g.zone === 'duckHookL') guardDuck++;
+      if (LEFT_MISS.includes(g.zone)) guardLeft++;
       if (g.redirect?.kind === 'laser') lasers++;
     }
-    expect(baseDuck).toBeGreaterThan(10); // the setup really does produce duck-hooks
-    expect(guardDuck).toBe(0); // …all of which the ducks zap away
-    expect(lasers).toBeGreaterThan(0); // and the redirect is recorded for the animation
+    expect(baseLeft).toBeGreaterThan(20); // the setup really does miss left a lot
+    expect(lasers).toBeGreaterThan(0); // the duck zaps some of them onto the fairway…
+    expect(guardLeft).toBeLessThan(baseLeft); // …so fewer balls end up left of the fairway
+    expect(guardLeft).toBeGreaterThan(0); // …but it's a 33% save, not a wall — most still leak through
+    expect(lasers).toBeLessThan(baseLeft); // it never saves MORE than the left misses it could fire on
   });
 });
 
-describe('Convict Sheep — boomerang the shanks', () => {
-  it('removes every shank and redirects some slices to the green', () => {
-    let baseShank = 0;
-    let guardShank = 0;
+describe('Convict Sheep — boomerang ~a third of the right misses back onto the fairway', () => {
+  it('saves some (not all) balls heading right and records the boomerang', () => {
+    let baseRight = 0;
+    let guardRight = 0;
     let boomerangs = 0;
     for (let s = 0; s < 600; s++) {
-      if (finalZone(new Rng(`c:${s}`)).zone === 'shankR') baseShank++;
+      if (RIGHT_MISS.includes(finalZone(new Rng(`c:${s}`)).zone)) baseRight++;
       const g = finalZone(new Rng(`c:${s}`), CONVICT_SHEEP_GUARD);
-      if (g.zone === 'shankR') guardShank++;
+      if (RIGHT_MISS.includes(g.zone)) guardRight++;
       if (g.redirect?.kind === 'boomerang') boomerangs++;
     }
-    expect(baseShank).toBeGreaterThan(10);
-    expect(guardShank).toBe(0);
+    expect(baseRight).toBeGreaterThan(20);
     expect(boomerangs).toBeGreaterThan(0);
+    expect(guardRight).toBeLessThan(baseRight);
+    expect(guardRight).toBeGreaterThan(0);
+    expect(boomerangs).toBeLessThan(baseRight);
   });
 });
 

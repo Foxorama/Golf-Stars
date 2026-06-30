@@ -52,18 +52,20 @@
 - **Generic caddy 'service' perks gate behind hiring a named caddy.** `caddie-lesson` is `caddy:
   'service'`: `shopOffer` only surfaces a service perk once `namedCaddyOwned(perks)` is set — you need a
   caddy before they'll give you lessons. (It still stacks/works exactly as before once unlocked.)
-- **The guard caddies redirect a sampled miss to the green MID-FLIGHT — they do NOT reshape the spray
-  (`CaddyGuard` in shot.ts, distinct from `ShapeMod`).** The cone still shows the miss tails; what
-  changes is that a shot already SAMPLED into a tail gets knocked back. `resolveShot` classifies the
-  sampled angle's zone (`classifySprayZone`) and, if a guard is present, looks up that zone's redirect
-  CHANCE (`guard.redirect[zone]`): a chance ≥1 ALWAYS redirects to a fresh green-band angle (no roll), a
-  fractional chance rolls once, an absent/zero zone does nothing. **Space Ducks** =
-  `{redirect:{duckHookL:1, hookL:0.75}, kind:'laser'}` (every duck-hook gone; 75% of hooks saved);
-  **Convict Sheep** = `{redirect:{shankR:1, sliceR:0.75}, kind:'boomerang'}` (the right-side mirror).
+- **The guard caddies redirect a sampled miss back onto the FAIRWAY (the centre line) MID-FLIGHT — they
+  do NOT reshape the spray (`CaddyGuard` in shot.ts, distinct from `ShapeMod`).** The cone still shows
+  the miss tails; what changes is that a shot already SAMPLED into a tail gets knocked back. `resolveShot`
+  classifies the sampled angle's zone (`classifySprayZone`) and, if a guard is present, looks up that
+  zone's redirect CHANCE (`guard.redirect[zone]`): a chance ≥1 ALWAYS redirects to a fresh centre-band
+  angle (no roll), a fractional chance rolls once, an absent/zero zone does nothing. The guards each
+  cover ONE side of the fairway at a flat **33%** — a clear, visible "one in three of your misses gets
+  saved" rather than a near-total wall. **Space Ducks** = `{redirect:{duckHookL:0.33, hookL:0.33},
+  kind:'laser'}` (33% of any ball heading LEFT — a hook or a duck-hook — zapped back to the fairway);
+  **Convict Sheep** = `{redirect:{shankR:0.33, sliceR:0.33}, kind:'boomerang'}` (the right-side mirror).
   On a redirect, `ShotResult.redirect = {kind, fromZone, originalLanding}` records the would-be miss so
-  the renderer animates it. CRITICAL determinism: the guard's extra rng draws (the chance roll + the green
-  resample) fire ONLY when a guard is present AND the sampled zone qualifies — a guard-less shot (or an
-  empty guard) draws NOTHING extra, so the base sim is byte-for-byte unchanged (guarded by
+  the renderer animates it. CRITICAL determinism: the guard's extra rng draws (the chance roll + the
+  centre-band resample) fire ONLY when a guard is present AND the sampled zone qualifies — a guard-less
+  shot (or an empty guard) draws NOTHING extra, so the base sim is byte-for-byte unchanged (guarded by
   `tests/caddies.test.ts`). The guard is threaded into BOTH the auto sim (`playStop`→`playHole`→
   `executeShot`, `PlayHoleOptions.guard`) and the interactive driver (`takeShot`) so auto≡interactive.
 - **Dr Chipinski adds a chip-in chance, not a spray change (`ExecOpts.chipIn`, `CHIPIN_RANGE` 8yds).**
@@ -128,8 +130,8 @@
   Chipinski (lab coat + wedge), Space Ducks (bubble-helmet duck + top hat + laser rifle), Convict Sheep
   (striped jumpsuit + boomerang). On a redirect, `playView` flies the ball toward `originalLanding`,
   fires the caddy's projectile (`drawCaddyProjectile` — laser beam / spinning boomerang) from the
-  figure's muzzle anchor mid-flight, then kinks the GROUND path back to the green (the loft arc is one
-  continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
+  figure's muzzle anchor mid-flight, then kinks the GROUND path back onto the fairway (the loft arc is
+  one continuous parabola, so only the ground bends — the "zapped" read). All caddy feel reuses existing
   knobs/no new `_gs*` flag, so the test-hub guard needs no new control; the Sim Lab absorbs the new
   shop items automatically.
 - **Caddy effects are testable in the harness — DEMO the throw + VERIFY the rate (GS-caddy-test).** The

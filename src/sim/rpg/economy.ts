@@ -111,7 +111,7 @@ export interface PlayerLoadout {
   chipInBoost?: number;
   /**
    * A named caddy's in-flight ball guard (GS-caddy, Space Ducks / Convict Sheep): redirects a sampled
-   * miss tail back to the green mid-flight. Undefined = no guard.
+   * miss tail back onto the fairway mid-flight. Undefined = no guard.
    */
   caddyGuard?: CaddyGuard;
   /**
@@ -365,12 +365,13 @@ export interface ShopItem {
   apply(loadout: PlayerLoadout): PlayerLoadout;
 }
 
-/** Space Ducks' laser guard (GS-caddy): the laser fires on EVERY duck-hook (100% → green) and on 75%
- *  of hooks. The cone still shows the left tails — the duck intercepts a sampled miss far more often. */
-export const SPACE_DUCKS_GUARD: CaddyGuard = { redirect: { duckHookL: 1, hookL: 0.75 }, kind: 'laser' };
-/** Convict Sheep's boomerang guard (GS-caddy): the boomerang knocks back EVERY shank (100% → green) and
- *  75% of slices. Mirrors Space Ducks on the right side. */
-export const CONVICT_SHEEP_GUARD: CaddyGuard = { redirect: { shankR: 1, sliceR: 0.75 }, kind: 'boomerang' };
+/** Space Ducks' laser guard (GS-caddy): a 33% chance to zap any ball heading off the LEFT side of the
+ *  fairway (a hook OR a duck-hook) back onto the fairway. The cone still shows the left tails — about a
+ *  third of any left miss is intercepted, so roughly one in three of your left misses is saved. */
+export const SPACE_DUCKS_GUARD: CaddyGuard = { redirect: { duckHookL: 0.33, hookL: 0.33 }, kind: 'laser' };
+/** Convict Sheep's boomerang guard (GS-caddy): a 33% chance to boomerang any ball heading off the RIGHT
+ *  side of the fairway (a slice OR a shank) back onto the fairway. The right-side mirror of Space Ducks. */
+export const CONVICT_SHEEP_GUARD: CaddyGuard = { redirect: { shankR: 0.33, sliceR: 0.33 }, kind: 'boomerang' };
 
 /**
  * Suggestible Sam's "club confidence" shape boost (GS-caddy): when you commit to the club Sam hands
@@ -542,7 +543,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'space-ducks',
     name: 'Space Ducks',
     cost: 300,
-    desc: 'Laser-toting space ducks zap every duck-hook (gone) & blast 75% of hooks back to the green',
+    desc: 'Laser-toting space ducks have a 33% chance to zap a ball heading left back onto the fairway',
     rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, caddyGuard: SPACE_DUCKS_GUARD, perks: [...m.perks, 'space-ducks'] }),
@@ -551,7 +552,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'convict-sheep',
     name: 'Convict Sheep',
     cost: 300,
-    desc: 'Boomerang-slinging convict sheep end every shank & knock 75% of slices back to the green',
+    desc: 'Boomerang-slinging convict sheep have a 33% chance to knock a ball heading right back onto the fairway',
     rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, caddyGuard: CONVICT_SHEEP_GUARD, perks: [...m.perks, 'convict-sheep'] }),

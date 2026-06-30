@@ -102,7 +102,7 @@ export interface ShotSample {
   lateral: number;
   /** Downrange carry, yards. */
   carry: number;
-  /** A caddy-guard (Space Ducks / Convict Sheep) knocked this shot back to the green (GS-caddy). */
+  /** A caddy-guard (Space Ducks / Convict Sheep) knocked this shot back onto the fairway (GS-caddy). */
   redirected?: boolean;
   /** The WOULD-BE miss the guard saved (where the hook/shank would have come down) — for the chart. */
   origLateral?: number;
@@ -122,7 +122,7 @@ export interface DispersionStudy {
   samples: ShotSample[];
   carry: Stats;
   lateral: Stats;
-  /** Fraction of shots a caddy-guard redirected back to the green (GS-caddy) — undefined if the
+  /** Fraction of shots a caddy-guard redirected back onto the fairway (GS-caddy) — undefined if the
    *  built loadout has no guard caddy (Space Ducks / Convict Sheep). Lets the Lab VERIFY the
    *  interception rate the live game only shows on a rare right-side miss. */
   redirectRate?: number;
@@ -256,7 +256,7 @@ export function caddyEffects(loadout: PlayerLoadout): CaddyEffect[] {
     out.push({
       id: 'caddyGuard',
       label: `Guard · ${g.kind}`,
-      detail: `${Object.entries(g.redirect).map(([z, p]) => `${Math.round((p as number) * 100)}% ${z}`).join(', ') || '—'} → green`,
+      detail: `${Object.entries(g.redirect).map(([z, p]) => `${Math.round((p as number) * 100)}% ${z}`).join(', ') || '—'} → fairway`,
     });
   }
   if (loadout.clubSuggest)

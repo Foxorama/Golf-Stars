@@ -310,7 +310,7 @@ export interface PlayHoleOptions {
   /** Driver Dan caddy (GS-caddy): when true the driver is usable from ANY lie at full stats; the
    *  default keeps the driver tee-only. (Replaces the removed Driver-on-Deck level system.) */
   driverAnywhere?: boolean;
-  /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail to the green. */
+  /** A named caddy's in-flight ball guard (GS-caddy): redirects a sampled miss tail onto the fairway. */
   guard?: CaddyGuard;
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
   lieRelief?: number;
@@ -807,7 +807,7 @@ export interface ExecOpts {
   minCarryBoost?: number;
   /** Wedge distance-control: tighten the wedge carry window (point 6). */
   wedgeWindow?: number;
-  /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail to the green. */
+  /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail onto the fairway. */
   guard?: CaddyGuard;
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
   lieRelief?: number;
