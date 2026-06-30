@@ -144,11 +144,12 @@ describe('characters actually play differently (the shapes are real)', () => {
     expect(carryOf(bo, 'PW')).toBe(carryOf(neutralBag, 'PW'));
   });
 
-  it('everyone starts with the same balanced 11-club bag (GS-clubs-2)', () => {
+  it('everyone starts with the same balanced 10-club bag (GS-clubs-2)', () => {
     for (const ch of CHARACTERS) {
       const bag = applyCharacter(ch.id, startingLoadout()).bag;
-      // A balanced 11 — driver + putter bookends, a dense short game, descending, all 'starter' set.
-      expect(bag.length, `${ch.id} bag size`).toBe(11);
+      // A balanced 10 — driver + putter bookends, a dense short game, descending, all 'starter' set.
+      // (GS-clubs-3 dropped the Lob Wedge, taking the bag from 11 → 10.)
+      expect(bag.length, `${ch.id} bag size`).toBe(10);
       expect(bag.some((c) => c.id === 'D'), `${ch.id} has a driver`).toBe(true);
       expect(bag.some((c) => c.id === 'putter')).toBe(true);
       for (const c of bag) expect(c.set).toBe('starter');

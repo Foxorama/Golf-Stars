@@ -268,7 +268,7 @@ describe('Dr Chipinski — wedge chip-ins near the pin', () => {
     const course = generateCourse('chip:test', { holes: 6, distanceFromStart: 0 });
     const hole = course.holes[0]!;
     const pin = pinOf(hole);
-    const wedge = CLUBS.find((c) => c.id === 'LW')!;
+    const wedge = CLUBS.find((c) => c.id === 'SW')!;
     // Place the ball `wedge carry` short of the pin, on the tee→pin line.
     const tee = hole.tee;
     const d = Math.hypot(tee[0] - pin[0], tee[1] - pin[1]) || 1;

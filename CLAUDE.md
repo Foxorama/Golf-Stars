@@ -69,6 +69,9 @@ This game lives or dies on three axes — put every change through all three bef
   need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
   caddies, ships are tables the sim reads. **New world / item / golfer = a new row, not an engine edit.**
+  Cutting/re-spreading the club taxonomy (`src/sim/clubs.ts CLUBS`) looks like a one-line edit but
+  fans out to default bags, reward types, carry thresholds + seeded tests, and can quietly fail the
+  death-spiral harness — follow `docs/decisions/club-list.md` before touching it.
 
 ## Non-negotiable contracts (break one and the suite goes red)
 These are the rules every change is measured against. They are *why* the codebase stays testable.

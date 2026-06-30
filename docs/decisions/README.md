@@ -19,6 +19,7 @@ domain. The root `CLAUDE.md` carries the load-bearing invariants and points here
 |------|--------|
 | `sim-generator.md` | Generator & sim invariants (GS-1): corridor/ribbon, centreline grammar, greens, dispersion/spray, flight & roll, OB, crossings, signature mechanics |
 | `rpg-meta-loop.md` | The run spine, voyage/ascension, banking, characters, talents, ace/eagle rewards, route events, bosses, team duels, ships/market, club rewards, rainbow ball |
+| `club-list.md` | Recipe & guardrails for changing the club taxonomy: what an id/carry touches, the carry-spread rule, the death-spiral harness check, the ordered how-to |
 | `competition.md` | The golfer roster, ghost leaderboard, league glue, matchplay bosses, positional cut, voyage field |
 | `caddies.md` | Named caddies, signature powers, guard redirects, slo-mo voice/impact, harness testing |
 | `feedback-mobile-ux.md` | Audio/haptics/settings layer, lefty mirror, lie awareness, gestures, mobile hygiene |

@@ -291,11 +291,12 @@
   inline-SVG silhouette, and the header shows the name. The Sim Lab (`lab.ts`/hub) gained a golfer
   selector so the shape is demoable (dispersion scatter + scoring harness); `CHARACTERS` is in the
   test-hub guard's imported-tables list so the roster can't fork.
-- **Balanced 11-club starting bag + rare+ club rewards (GS-clubs-2, supersedes GS-clubs' sparse bags;
-  `characters.ts` + `economy.ts`).** EVERYONE starts with the SAME balanced 11-club bag (`BALANCED_BAG`:
-  D, 5W, 3H, 6i, 8i, PW, GW, SW, LW, 60°, putter) — driver+putter bookends with a dense short-game
-  ladder (PW→60° are 10–20 yd apart) and the gaps loosening only up high where a long approach forgives
-  a few yards. This REPLACED the old sparse signature bags (`STARTING_BAGS`), which left big scoring-zone
+- **Balanced 10-club starting bag + rare+ club rewards (GS-clubs-2, trimmed in GS-clubs-3; supersedes
+  GS-clubs' sparse bags; `characters.ts` + `economy.ts`).** EVERYONE starts with the SAME balanced 10-club
+  bag (`BALANCED_BAG`: D, 5W, 3H, 6i, 8i, PW, GW, SW, 60°, putter) — driver+putter bookends with a dense
+  short-game ladder (PW→60° are ~12–18 yd apart) and the gaps loosening only up high where a long approach
+  forgives a few yards. (GS-clubs-3 cut the over-stuffed taxonomy 27→21 — dropping 7W/9W/4i/AW/LW/58° — which
+  took the Lob Wedge out of this bag, 11→10; see `docs/decisions/club-list.md` for the re-cut recipe.) This REPLACED the old sparse signature bags (`STARTING_BAGS`), which left big scoring-zone
   gaps so dialling distance DOWN near the green over-clubbed — the "small club list is too hard close in"
   complaint. Character identity now lives in the SHOT SHAPE (`clubMods`) + the distance scalars (Larry
   +14 / Bo −8), NOT a hand-cut bag; the only per-golfer bag difference is **Larry's `BALANCED_BAG_NO_HYBRID`**

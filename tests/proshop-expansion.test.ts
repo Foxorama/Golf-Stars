@@ -136,9 +136,9 @@ describe('GS-proshop-2 — themed club sets', () => {
     expect(clubItem(clubItemId('solar', 'D'))).toBeTruthy();
     expect(clubItem(clubItemId('solar', '7i'))).toBeTruthy();
     expect(clubItem(clubItemId('solar', 'putter'))).toBeTruthy();
-    // Phoenix (masters) is likewise complete now — irons/wedges + a putter, not just woods.
+    // Phoenix (masters) is likewise complete now — coverage irons + a putter, not just woods.
     expect(clubItem(clubItemId('masters', '7i'))).toBeTruthy();
-    expect(clubItem(clubItemId('masters', 'AW'))).toBeTruthy();
+    expect(clubItem(clubItemId('masters', '9i'))).toBeTruthy();
     expect(clubItem(clubItemId('masters', 'putter'))).toBeTruthy();
     // Planet's putter rides the `pro` line (its scoring/putter half); `tour` stays distance-only.
     expect(clubItem(clubItemId('pro', 'putter'))).toBeTruthy();

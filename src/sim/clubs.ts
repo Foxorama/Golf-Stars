@@ -29,36 +29,37 @@ export interface Club {
 }
 
 /**
- * Default 27-club taxonomy, ordered longest→shortest carry. Idealised (a real
+ * Default 21-club taxonomy, ordered longest→shortest carry. Idealised (a real
  * bag holds 14) but this is a *taxonomy* the suggester maps distances onto; loot
  * trims/upgrades it later. Carries are strictly descending for a clean mapping.
+ *
+ * GS-clubs-3 trimmed the taxonomy from 27 → 21: dropped the 7-Wood, 9-Wood, 4-Iron, Approach
+ * Wedge, Lob Wedge and 58° Wedge — clubs nobody reached for, a near-duplicate at every step.
+ * The survivors were re-spread to fill the gaps the six departures opened, so the ladder still
+ * descends in clean steps. The heavily-tested mid-iron core (5i 150 → PW 106) and the anchors
+ * (D 250, putter 8) kept their carries; the wedge ladder kept a low floor so the auto reach-AI
+ * doesn't over-club short approaches (see docs/decisions/club-list.md before re-cutting this).
  */
 export const CLUBS: readonly Club[] = [
   { id: 'D', name: 'Driver', carry: 250 },
   { id: '3W', name: '3-Wood', carry: 235 },
   { id: '4W', name: '4-Wood', carry: 226 },
   { id: '5W', name: '5-Wood', carry: 217 },
-  { id: '7W', name: '7-Wood', carry: 207 },
-  { id: '9W', name: '9-Wood', carry: 197 },
   { id: '2H', name: '2-Hybrid', carry: 189 },
   { id: '3H', name: '3-Hybrid', carry: 181 },
   { id: '4H', name: '4-Hybrid', carry: 173 },
   { id: '5H', name: '5-Hybrid', carry: 165 },
-  { id: '3i', name: '3-Iron', carry: 162 },
-  { id: '4i', name: '4-Iron', carry: 158 },
+  { id: '3i', name: '3-Iron', carry: 157 },
   { id: '5i', name: '5-Iron', carry: 150 },
   { id: '6i', name: '6-Iron', carry: 142 },
   { id: '7i', name: '7-Iron', carry: 134 },
   { id: '8i', name: '8-Iron', carry: 125 },
   { id: '9i', name: '9-Iron', carry: 116 },
   { id: 'PW', name: 'Pitching Wedge', carry: 106 },
-  { id: 'AW', name: 'Approach Wedge', carry: 96 },
-  { id: 'GW', name: 'Gap Wedge', carry: 88 },
-  { id: 'SW', name: 'Sand Wedge', carry: 78 },
-  { id: 'LW', name: 'Lob Wedge', carry: 68 },
-  { id: '58', name: '58° Wedge', carry: 58 },
-  { id: '60', name: '60° Wedge', carry: 48 },
-  { id: '64', name: '64° Wedge', carry: 38 },
+  { id: 'GW', name: 'Gap Wedge', carry: 90 },
+  { id: 'SW', name: 'Sand Wedge', carry: 74 },
+  { id: '60', name: '60° Wedge', carry: 56 },
+  { id: '64', name: '64° Wedge', carry: 40 },
   { id: 'chip', name: 'Chipper', carry: 20 },
   { id: 'putter', name: 'Putter', carry: 8 },
 ] as const;

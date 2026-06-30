@@ -258,17 +258,19 @@ describe('reward clubs improve scoring — the collection loop pays off (GS-club
 
   it('distance-club tour upgrades raise the roster mean Stableford (a verified upgrade)', () => {
     // The balanced bag's distance clubs are D/5W (+ Larry's woods); Tour upgrades add reach.
-    const upgrades = ['club:tour:D', 'club:tour:5W', 'club:tour:3W', 'club:tour:7W', 'club:tour:2H'];
+    const upgrades = ['club:tour:D', 'club:tour:5W', 'club:tour:3W', 'club:tour:2H'];
     expect(rosterMean(upgrades)).toBeGreaterThan(rosterMean([]));
   });
 });
 
-describe('themed full sets — irons, wedges & a putter (GS-fullsets)', () => {
-  it('Phoenix and Solar Storm are complete bags: woods + irons + wedges + putter', () => {
+describe('themed full sets — woods, irons & a putter (GS-fullsets)', () => {
+  it('Phoenix and Solar Storm are complete bags: woods + irons + putter', () => {
+    // GS-clubs-3 retired the reward WEDGE types (AW/58°), so a complete themed bag is now
+    // woods (distance) + the coverage irons + a themed putter.
     for (const set of ['masters', 'solar']) {
       expect(clubItem(clubItemId(set, 'D')), `${set} wood`).toBeTruthy();
       expect(clubItem(clubItemId(set, '5i')), `${set} iron`).toBeTruthy();
-      expect(clubItem(clubItemId(set, 'AW')), `${set} wedge`).toBeTruthy();
+      expect(clubItem(clubItemId(set, '9i')), `${set} short iron`).toBeTruthy();
       expect(clubItem(clubItemId(set, 'putter')), `${set} putter`).toBeTruthy();
     }
     // Planet's full bag is split across `tour` (woods) + `pro` (irons/wedges/putter).
@@ -277,9 +279,9 @@ describe('themed full sets — irons, wedges & a putter (GS-fullsets)', () => {
     expect(clubItem(clubItemId('pro', 'putter'))).toBeTruthy();
   });
 
-  it('a themed iron/wedge carries BASE distance (coverage, never overshoots); woods keep their reach', () => {
+  it('a themed iron carries BASE distance (coverage, never overshoots); woods keep their reach', () => {
     expect(buildRewardClub(clubSetById('masters')!, '5i').carry).toBe(150); // 5-iron base
-    expect(buildRewardClub(clubSetById('solar')!, 'AW').carry).toBe(96); // approach-wedge base
+    expect(buildRewardClub(clubSetById('solar')!, '9i').carry).toBe(116); // 9-iron base
     expect(buildRewardClub(clubSetById('solar')!, 'D').carry).toBe(250 + 24); // wood keeps the bonus
   });
 
