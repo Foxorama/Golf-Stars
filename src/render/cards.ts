@@ -216,9 +216,9 @@ export function itemCardHTML(
     : '';
   return `
     <article style="width:170px;height:286px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;border:2px solid ${col};border-radius:12px;background:#11141b;padding:10px;opacity:${dim ? 0.5 : 1};box-shadow:${cardGlow(item.rarity, col)};">
-      <div style="display:flex;align-items:baseline;gap:6px;">
-        <b style="font-size:14px;line-height:1.15;">${item.name}</b>${stackBadge}
-        <span style="margin-left:auto;">${rarityBadge(item.rarity)}</span>
+      <div style="display:flex;align-items:flex-start;gap:6px;height:36px;overflow:hidden;">
+        <b style="font-size:14px;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.name}</b>${stackBadge}
+        <span style="margin-left:auto;flex:none;">${rarityBadge(item.rarity)}</span>
       </div>
       <div style="min-height:17px;">${badge}</div>
       ${art}

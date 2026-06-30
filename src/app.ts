@@ -783,7 +783,7 @@ function introScreen(): string {
         ? `<div style="font-size:12px;margin-top:5px;color:${partner.style.cap};">🤝 ${
             youHavePartner
               ? `You're the underdog — <b>${partner.name}</b> joins your bag`
-              : `${oppName} outranks you and brings <b>${partner.name}</b>; you go it alone`
+              : `You're the favourite — ${oppName} brings <b>${partner.name}</b> to even it up; you go it alone`
           } · <b>${teamFormatLabel(duel.format)}</b> (${teamFormatRule(duel.format)}).</div>`
         : '';
     }
@@ -2021,12 +2021,13 @@ function playingBody(animating: boolean): string {
   // Decision screen: map with shots so far + ball marker, the aiming spray cone, and controls.
   // Re-default the club to the suggestion on each NEW shot, so an approach doesn't stay
   // stuck on the driver. The player can still cycle/override within the shot.
-  if (play.shots.length !== decisionShotCount) {
+  const newShot = play.shots.length !== decisionShotCount;
+  if (newShot) {
     decisionShotCount = play.shots.length;
     selClubId = null;
     selAim = 'attack';
     selFreeTarget = null;
-    selPower = 1; // a full-swing cone previews by default until you pull
+    selPower = 1; // seeded sensibly below once the club is known; full swing is the fallback
     selAimBearing = null; // re-seed the aim to the pin for the new shot
     selPutt = canPuttFringe(play); // just off the green → default to the putter (a Texas wedge)
     resetMapView();
@@ -2048,6 +2049,19 @@ function playingBody(animating: boolean): string {
   const defaultClubId = suggested;
   if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = defaultClubId;
   const maxPower = maxPowerOf(state.run.loadout);
+  // Seed the at-rest preview POWER on a NEW shot so the default cone lands AT the target rather than
+  // always flying a full swing (bug fix): for a short chip the shortest club at full power overshoots
+  // the green entirely, so the green/amber/red arc read "nowhere near where the ball lands". Scaling
+  // the at-rest power to (distance-to-pin ÷ the club's full expected carry) puts the cone on the pin;
+  // a normal approach (target past the club's reach) clamps the ratio to 1 — a full swing, as before.
+  // The player still pulls to override; the gesture charges from 0 on press regardless.
+  if (newShot && selClubId !== 'putter' && !selPutt) {
+    const full = previewShot(play, { clubId: selClubId, aim: selAim, power: 1 }, state.run.loadout);
+    if (full.expectedCarry > 1) {
+      const want = dist(play.ball, pinOf(play.hole));
+      selPower = Math.max(0.25, Math.min(1, want / full.expectedCarry));
+    }
+  }
   // The gesture's aim/power feed the shot: a target along the (gesture-nudged) aim bearing, at the
   // live charge power. `selPower` is 1 at rest (a full-swing cone previews) and animates 0→pull as
   // you charge. The cone the player sees is this powered shot; releasing fires it (GS-power).
