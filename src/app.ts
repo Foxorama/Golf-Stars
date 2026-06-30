@@ -54,6 +54,7 @@ import {
   shipForCharacter,
   hatForCharacter,
   shirtForCharacter,
+  pantsForCharacter,
   type Action,
   type UiState,
 } from './ui/game';
@@ -134,6 +135,7 @@ function boot(): void {
       shipByCharacter: save.shipByCharacter,
       hatByCharacter: save.hatByCharacter,
       shirtByCharacter: save.shirtByCharacter,
+      pantsByCharacter: save.pantsByCharacter,
       bagTier: save.bagTier,
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
     };
@@ -178,7 +180,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 10,
+    version: 11,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -190,6 +192,7 @@ function persist(): void {
     shipByCharacter: state.shipByCharacter,
     hatByCharacter: state.hatByCharacter,
     shirtByCharacter: state.shirtByCharacter,
+    pantsByCharacter: state.pantsByCharacter,
     bagTier: state.bagTier,
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
@@ -1842,11 +1845,13 @@ function tradeMarketScreen(): string {
     <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">The full fleet. The rarer the ride, the steeper the shard price — the Mothership is the grail.</p>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;">${shipCards}</div>
     <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Clothing</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Hats &amp; shirts for your golfers. Complete a matching set for the full look.</p>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Hats, shirts &amp; pants for your golfers. Complete a matching set for the full look.</p>
     <h3 style="font-size:13px;opacity:.8;margin:.6em 0 .1em;text-align:center;">🎩 Hats</h3>
     ${apparelRack('hat')}
     <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
     ${apparelRack('shirt')}
+    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👖 Pants</h3>
+    ${apparelRack('pants')}
     ${bagSetSection()}
     <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}</div>`;
 }
@@ -1856,8 +1861,9 @@ function tradeMarketScreen(): string {
 function clubhouseCardHTML(ch: Character): string {
   const hatId = hatForCharacter(state, ch.id);
   const shirtId = shirtForCharacter(state, ch.id);
+  const pantsId = pantsForCharacter(state, ch.id);
   const shipId = shipForCharacter(state, ch.id);
-  const preview = golferPreviewSVG(hatId, shirtId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 78, h: 94 });
+  const preview = golferPreviewSVG(hatId, shirtId, pantsId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 78, h: 94 });
   return `
     <button class="gs-clickcard" data-action='${JSON.stringify({ type: 'openClubhouse', characterId: ch.id })}'
       style="cursor:pointer;border:2px solid ${ch.style.cap}66;border-radius:12px;padding:8px 8px 6px;background:radial-gradient(circle at 50% 22%, ${ch.style.cap}1f, #0b0d12);text-align:center;width:128px;color:inherit;font:inherit;margin:5px;">
@@ -1885,9 +1891,10 @@ function clubhouseScreen(): string {
   if (!ch) return titleScreen(); // safety: no character selected
   const hatId = hatForCharacter(state, ch.id);
   const shirtId = shirtForCharacter(state, ch.id);
+  const pantsId = pantsForCharacter(state, ch.id);
   const shipId = shipForCharacter(state, ch.id);
-  const preview = golferPreviewSVG(hatId, shirtId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 110, h: 134 });
-  const setName = equippedSet(hatId, shirtId);
+  const preview = golferPreviewSVG(hatId, shirtId, pantsId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 110, h: 134 });
+  const setName = equippedSet(hatId, shirtId, pantsId);
   const setBadge = setName
     ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#ff4fd8;">✦ ${setName} set complete!</div>`
     : '';
@@ -1913,7 +1920,7 @@ function clubhouseScreen(): string {
       return `<p style="opacity:.5;font-size:12px;text-align:center;">No ${slot}s yet — buy some at the Trade Market.</p>`;
     }
     return `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${owned
-      .map((a) => clubhouseApparelCardHTML(a, hatId, shirtId))
+      .map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId))
       .join('')}</div>`;
   };
 
@@ -1938,6 +1945,8 @@ function clubhouseScreen(): string {
     ${rack('hat')}
     <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
     ${rack('shirt')}
+    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👖 Pants</h3>
+    ${rack('pants')}
     <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
       ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       ${btn('← Back to title', { type: 'closeClubhouse' }, { variant: 'ghost' })}
@@ -2030,9 +2039,15 @@ function marketApparelCardHTML(item: Apparel): string {
 
 /** A Clubhouse wardrobe card (GS-clubhouse) — an equip toggle for an OWNED garment on the managed
  *  golfer (worn → click to take off). Only ever rendered for owned pieces. */
-function clubhouseApparelCardHTML(item: Apparel, hatId: string | undefined, shirtId: string | undefined): string {
+function clubhouseApparelCardHTML(
+  item: Apparel,
+  hatId: string | undefined,
+  shirtId: string | undefined,
+  pantsId: string | undefined,
+): string {
   const ring = cosmeticRarCol(item.rarity);
-  const worn = (item.slot === 'hat' ? hatId : shirtId) === item.id;
+  const wornId = item.slot === 'hat' ? hatId : item.slot === 'shirt' ? shirtId : pantsId;
+  const worn = wornId === item.id;
   const accent = worn ? '#ffce54' : ring;
   const footer = worn ? '✓ WEARING' : 'Wear this';
   return apparelCardChrome(item, footer, { ring, accent, action: { type: 'equipApparel', id: item.id }, glow: worn || isMythic(item.rarity) });
@@ -2354,11 +2369,13 @@ function golferLook(): GolferLook | undefined {
   const cid = state.run.loadout.characterId;
   const hat = apparelById(hatForCharacter(state, cid))?.look;
   const shirtStyle = apparelById(shirtForCharacter(state, cid))?.look;
+  const pantsStyle = apparelById(pantsForCharacter(state, cid))?.look;
   return {
     ...base,
     ...(gear ? { gear: { theme: gear.theme, tint: gear.tint } } : {}),
     ...(hat ? { hat } : {}),
     ...(shirtStyle ? { shirtStyle } : {}),
+    ...(pantsStyle ? { pantsStyle } : {}),
   };
 }
 

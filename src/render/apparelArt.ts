@@ -116,6 +116,31 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   return a + base + shirtDetail(look, cx, cy) + flair;
 }
 
+/** Draw a PANTS glyph (aura + a pair-of-trousers silhouette + per-shape detail) centred near (cx,cy). */
+function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): string {
+  const { shape, color, accent = '#0c1116', glow } = look;
+  const a = glow ? aura(cx, cy + 2, 22, glow, `pg${uid}`) : '';
+  const ink = 'stroke="#0c1116" stroke-width="1.1" stroke-linejoin="round"';
+  const wide = shape === 'knickers';
+  const legBottom = shape === 'shorts' ? cy + 1 : wide ? cy + 8 : cy + 12;
+  const outer = wide ? 9 : 7;
+  // Waist band → two tapering legs with a notch between them.
+  const body = `<path d="M${cx - 8},${cy - 9} L${cx + 8},${cy - 9} L${cx + outer},${legBottom} L${cx + 2.5},${legBottom} L${cx},${cy - 3} L${cx - 2.5},${legBottom} L${cx - outer},${legBottom} Z" fill="${color}" ${ink}/>`;
+  const band = `<rect x="${cx - 8}" y="${cy - 9}" width="16" height="2.6" fill="${accent}" stroke="none"/>`;
+  let detail = '';
+  if (shape === 'leggings') {
+    detail = `<g stroke="${accent}" stroke-width="1" opacity="0.9"><line x1="${cx - 5}" y1="${cy - 5}" x2="${cx - 4}" y2="${legBottom - 1}"/><line x1="${cx + 5}" y1="${cy - 5}" x2="${cx + 4}" y2="${legBottom - 1}"/></g>`;
+  } else if (shape === 'spacepants') {
+    detail = `<rect x="${cx - 7}" y="${legBottom - 3}" width="6" height="3" fill="${accent}" stroke="none"/><rect x="${cx + 1}" y="${legBottom - 3}" width="6" height="3" fill="${accent}" stroke="none"/>`;
+  } else if (shape === 'knickers') {
+    detail = `<circle cx="${cx - 4.5}" cy="${legBottom - 1}" r="1.3" fill="${accent}"/><circle cx="${cx + 4.5}" cy="${legBottom - 1}" r="1.3" fill="${accent}"/>`;
+  } else if (shape === 'nebula') {
+    detail = `<g fill="#fff"><circle cx="${cx - 4}" cy="${cy + 1}" r="0.8"/><circle cx="${cx + 3}" cy="${cy + 5}" r="0.7"/><circle cx="${cx + 5}" cy="${cy - 4}" r="0.6"/></g>`;
+  }
+  const flair = shape === 'nebula' ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]]) : '';
+  return a + body + band + detail + flair;
+}
+
 /** A framed `<svg>` icon of a garment for a wardrobe card. */
 export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
   const item = apparelById(id);
@@ -123,34 +148,60 @@ export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
   const uid = id!.replace(/[^a-z0-9]/gi, '');
   const cx = w / 2;
   const cy = h / 2 + (item.slot === 'hat' ? 4 : 2);
-  const glyph = item.slot === 'hat' ? hatGlyph(item.look, cx, cy, uid) : shirtGlyph(item.look, cx, cy, uid);
+  const glyph =
+    item.slot === 'hat'
+      ? hatGlyph(item.look, cx, cy, uid)
+      : item.slot === 'shirt'
+        ? shirtGlyph(item.look, cx, cy, uid)
+        : pantsGlyph(item.look, cx, cy, uid);
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${item.name}" style="display:block;">${glyph}</svg>`;
 }
 
 /**
- * A small MANNEQUIN preview — the golfer (head + torso) wearing the currently-equipped hat + shirt.
- * Standalone so the wardrobe can show "this is how you'll look". Falls back to a plain figure when a
- * slot is empty. `skin`/`shirtBase` default to the loader-crew look.
+ * A small MANNEQUIN preview — the golfer (head + torso + legs) wearing the currently-equipped hat,
+ * shirt + pants. Standalone so the wardrobe can show "this is how you'll look". Falls back to a plain
+ * figure (default legs/look) when a slot is empty. `skin`/`shirtBase` default to the loader-crew look.
  */
 export function golferPreviewSVG(
   hatId: string | undefined,
   shirtId: string | undefined,
+  pantsId: string | undefined,
   opts: { skin?: string; shirtBase?: string; w?: number; h?: number } = {},
 ): string {
   const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132 } = opts;
   const hat = apparelById(hatId);
   const shirt = apparelById(shirtId);
+  const pants = apparelById(pantsId);
   const cx = w / 2;
   const headY = 40;
+  const hipY = h - 24;
+  const footY = h - 5;
   const shirtCol = shirt?.look.color ?? shirtBase;
-  // Body: torso trapezoid + arms.
   const glowAura = shirt?.look.glow ? aura(cx, headY + 36, 30, shirt.look.glow, 'prevsg') : '';
+  // Legs (drawn behind the torso): default dark trousers, tinted by the equipped pants. Shorts bare the
+  // shins (skin below the knee), and a glowing pair adds a soft aura.
+  const pantsCol = pants?.look.color ?? '#2c3142';
+  const pantsGlow = pants?.look.glow ? aura(cx, hipY + 6, 20, pants.look.glow, 'prevpg') : '';
+  const shorts = pants?.look.shape === 'shorts';
+  const lx = cx - 5;
+  const rx = cx + 5;
+  const lfx = cx - 7;
+  const rfx = cx + 7;
+  const kneeY = (hipY + footY) / 2;
+  const leg = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${wd}" stroke-linecap="round"/>`;
+  const legs = shorts
+    ? leg(lx, hipY, lfx, footY, skin, 5.5) +
+      leg(rx, hipY, rfx, footY, skin, 5.5) +
+      leg(lx, hipY, (lx + lfx) / 2, kneeY, pantsCol, 7) +
+      leg(rx, hipY, (rx + rfx) / 2, kneeY, pantsCol, 7)
+    : leg(lx, hipY, lfx, footY, pantsCol, 7) + leg(rx, hipY, rfx, footY, pantsCol, 7);
   const torso = `
-    <path d="M${cx - 20},${headY + 16} L${cx - 9},${headY + 10} L${cx},${headY + 14} L${cx + 9},${headY + 10} L${cx + 20},${headY + 16} L${cx + 16},${headY + 26} L${cx + 14},${h - 8} L${cx - 14},${h - 8} L${cx - 16},${headY + 26} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="1.4" stroke-linejoin="round"/>`;
+    <path d="M${cx - 20},${headY + 16} L${cx - 9},${headY + 10} L${cx},${headY + 14} L${cx + 9},${headY + 10} L${cx + 20},${headY + 16} L${cx + 16},${headY + 26} L${cx + 12},${hipY} L${cx - 12},${hipY} L${cx - 16},${headY + 26} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="1.4" stroke-linejoin="round"/>`;
   const detail = shirt ? shirtDetail(shirt.look, cx, headY + 30) : '';
   const head = `<circle cx="${cx}" cy="${headY}" r="13" fill="${skin}" stroke="#0c1116" stroke-width="1.2"/>`;
   const hatG = hat ? hatGlyph(hat.look, cx, headY - 6, 'prev') : '';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${glowAura}${torso}${detail}${head}${hatG}
+    ${glowAura}${pantsGlow}${legs}${torso}${detail}${head}${hatG}
   </svg>`;
 }

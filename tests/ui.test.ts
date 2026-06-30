@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
-import { shipForCharacter, hatForCharacter, shirtForCharacter } from '../src/ui/game';
+import { shipForCharacter, hatForCharacter, shirtForCharacter, pantsForCharacter } from '../src/ui/game';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 
 /** Drive a whole stop via the interactive reducer flow (attacking every shot). */
@@ -264,6 +264,26 @@ describe('ui reducer', () => {
     expect(shirtForCharacter(s, 'feather-fade')).toBe('polo-classic');
     expect(hatForCharacter(s, 'feather-fade')).toBe('cap-classic');
     expect(hatForCharacter(s, 'huang-woo-hook')).toBeUndefined();
+  });
+
+  it('the Trade Market buys pants globally; the Clubhouse wears them per character (GS-pants-outfit)', () => {
+    let s = initState(7, { shards: 500 });
+    s = reduce(s, { type: 'openMarket' });
+    // Buy a pair of pants → globally owned, NOT auto-worn, and an independent slot from hat/shirt.
+    s = reduce(s, { type: 'buyApparel', id: 'trousers-classic' });
+    expect(s.ownedApparel).toContain('trousers-classic');
+    expect(pantsForCharacter(s, 'feather-fade')).toBeUndefined();
+    // Wear them on one golfer in the Clubhouse; the toggle behaves like the other slots.
+    s = reduce(s, { type: 'closeMarket' });
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    s = reduce(s, { type: 'equipApparel', id: 'trousers-classic' });
+    expect(pantsForCharacter(s, 'feather-fade')).toBe('trousers-classic');
+    expect(hatForCharacter(s, 'feather-fade')).toBeUndefined(); // pants don't touch the hat slot
+    s = reduce(s, { type: 'equipApparel', id: 'trousers-classic' });
+    expect(pantsForCharacter(s, 'feather-fade')).toBeUndefined(); // clicking again takes them off
+    // Another golfer is unaffected.
+    s = reduce(s, { type: 'equipApparel', id: 'trousers-classic' });
+    expect(pantsForCharacter(s, 'huang-woo-hook')).toBeUndefined();
   });
 
   it('clothing/ship buys are guarded; equipping is Clubhouse-only and owned-only (GS-clubhouse)', () => {

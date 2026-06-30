@@ -43,10 +43,10 @@ const tile = (inner, label, col) =>
 const ships = SHIPS.map((s) => tile(shipCardSVG(s.id, 130, 70), s.name+' · '+s.rarity, cosmeticRarCol(s.rarity))).join('');
 const apparel = APPAREL.map((a) => tile(apparelCardSVG(a.id, 110, 70), a.name+' · '+a.rarity, cosmeticRarCol(a.rarity))).join('');
 const sets = [
-  ['helmet-astro','suit-space','Astronaut set'],
-  ['crown-supernova','suit-supernova','Supernova (mythic)'],
-  ['tophat-ace','tee-striped','Mix & match'],
-].map(([h,s,l]) => tile(golferPreviewSVG(h,s,{w:120,h:150}), l, '#ffce54')).join('');
+  ['helmet-astro','suit-space','pants-astro','Astronaut set'],
+  ['crown-supernova','suit-supernova','leggings-supernova','Supernova (mythic)'],
+  ['tophat-ace','tee-striped','knickers-ace','Mix & match'],
+].map(([h,s,p,l]) => tile(golferPreviewSVG(h,s,p,{w:120,h:150}), l, '#ffce54')).join('');
 
 document.body.innerHTML =
   '<h2 style="font-family:sans-serif;color:#eee">Ships (note the mythic Mothership UFO)</h2><div style="display:flex;flex-wrap:wrap;">'+ships+'</div>'+

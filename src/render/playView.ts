@@ -165,6 +165,8 @@ export interface GolferLook {
   hat?: ApparelLook;
   /** Equipped cosmetic SHIRT — overrides the torso colour + adds a glowing aura for the top tiers. */
   shirtStyle?: ApparelLook;
+  /** Equipped cosmetic PANTS (GS-pants-outfit) — overrides the default legs with their own shape/palette. */
+  pantsStyle?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 function lookFromColor(color: string): GolferLook {
@@ -250,15 +252,20 @@ function drawGolfer(
   ctx.ellipse(6, 1, 16, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Legs (a planted stance).
-  ctx.strokeStyle = '#2c3142';
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(2, -30);
-  ctx.lineTo(-7, 0);
-  ctx.moveTo(2, -30);
-  ctx.lineTo(12, 0);
-  ctx.stroke();
+  // Legs (a planted stance). A cosmetic PANTS (GS-pants-outfit) overrides the bare leg colour with its
+  // own shape/palette; with nothing equipped the original dark legs draw byte-for-byte unchanged.
+  if (look.pantsStyle) {
+    drawPants(ctx, look.pantsStyle, look.skin, alpha);
+  } else {
+    ctx.strokeStyle = '#2c3142';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(2, -30);
+    ctx.lineTo(-7, 0);
+    ctx.moveTo(2, -30);
+    ctx.lineTo(12, 0);
+    ctx.stroke();
+  }
 
   // Torso (hip → shoulders, tilted toward the ball). A cosmetic shirt (GS-cosmetics) overrides the
   // colour and, for the glowing top tiers, adds a soft aura behind the torso.
@@ -469,6 +476,85 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       break;
     default:
       break;
+  }
+}
+
+/**
+ * Draw cosmetic PANTS on the golfer's legs (canvas) — replaces the default dark legs. Authored in the
+ * same local frame as `drawGolfer` (hip at (2,-30), feet at (-7,0) & (12,0); the outer transform mirrors
+ * for a lefty). Shapes mirror the wardrobe SVG (`render/apparelArt.ts`) so what you buy is what you wear.
+ */
+function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: string, alpha: number): void {
+  const { shape, color, accent = '#0c1116', glow } = look;
+  const hip: Vec = [2, -30];
+  const feet: Vec[] = [[-7, 0], [12, 0]];
+  // Stroke both legs from the hip down to a fraction `frac` of the way to each foot (1 = full leg).
+  const legs = (col: string, w: number, frac = 1): void => {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    for (const [fx, fy] of feet) {
+      ctx.moveTo(hip[0], hip[1]);
+      ctx.lineTo(hip[0] + (fx - hip[0]) * frac, hip[1] + (fy - hip[1]) * frac);
+    }
+    ctx.stroke();
+  };
+  // A soft aura behind the legs for the glowing top tiers.
+  if (glow) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.4;
+    legs(glow, 14);
+    ctx.restore();
+  }
+  switch (shape) {
+    case 'shorts':
+      legs(skin, 5); // bare shins
+      legs(color, 7.5, 0.5); // shorts to the knee
+      break;
+    case 'knickers':
+      legs(skin, 4.5); // long socks
+      legs(color, 8.5, 0.62); // puffed plus-fours past the knee
+      ctx.fillStyle = accent; // buckled cuffs
+      for (const [fx, fy] of feet) {
+        ctx.beginPath();
+        ctx.arc(hip[0] + (fx - hip[0]) * 0.62, hip[1] + (fy - hip[1]) * 0.62, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    case 'leggings':
+      legs(color, 5);
+      break;
+    case 'spacepants':
+      legs(color, 7);
+      ctx.fillStyle = accent; // mag-boots
+      for (const [fx, fy] of feet) {
+        ctx.beginPath();
+        ctx.ellipse(fx, fy - 1, 3, 2.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    case 'nebula':
+      legs(color, 6.5);
+      ctx.fillStyle = '#fff'; // a couple of starfield specks
+      for (const [fx, fy] of feet) {
+        ctx.beginPath();
+        ctx.arc(hip[0] + (fx - hip[0]) * 0.4, hip[1] + (fy - hip[1]) * 0.4, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    case 'trousers':
+    default:
+      legs(color, 6.5);
+      break;
+  }
+  // A waistband accent across the hip (skipped for shorts, which read better bare-waisted).
+  if (shape !== 'shorts') {
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hip[0] - 4, hip[1]);
+    ctx.lineTo(hip[0] + 4, hip[1]);
+    ctx.stroke();
   }
 }
 

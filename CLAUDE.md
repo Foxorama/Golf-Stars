@@ -64,7 +64,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v10**; bump + add a migration when you persist
+  (localStorage is the only copy). Current schema is **v11**; bump + add a migration when you persist
   a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most run-state changes
   need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -115,14 +115,16 @@ For each system: the rule that constrains new work. Open the archive doc before 
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
   (3 arcs, boss each, `endedReason 'won'`). Two currencies: per-run **credits** (shop perks) and
-  cross-run **Star Shards** (cosmetic ships + apparel hats/shirts, up to a `mythic` tier above
+  cross-run **Star Shards** (cosmetic ships + apparel hats/shirts/pants, up to a `mythic` tier above
   legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v8). **Cosmetics
   split buy-vs-equip** (GS-clubhouse, save v10): the **Trade Market** sells the FULL ship + apparel
   catalogues for global OWNERSHIP (`ownedShips`/`ownedApparel`; no rotating offer/reroll — scarcity is the
   shard price); the **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
-  character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`), so each golfer flies its own ride +
-  wears its own look. The played character's ship (journey map) + outfit (`golferLook`) resolve via
-  `shipForCharacter`/`hatForCharacter`/`shirtForCharacter`. Shards also
+  character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
+  save v11), so each golfer flies its own ride + wears its own look head-to-toe. The `apparel.ts` catalogue
+  fills three slots (`ApparelSlot` hat|shirt|pants); a cosmetic **set** completes (`equippedSet`) only when
+  EVERY slot it defines is worn. The played character's ship (journey map) + outfit (`golferLook`) resolve via
+  `shipForCharacter`/`hatForCharacter`/`shirtForCharacter`/`pantsForCharacter`. Shards also
   buy permanent **default-bag tiers** (`bag.ts BAG_SETS`, GS-bag-tiers): a won Ascension gate (clear
   A2/A6/A11 → `maxAscension` ≥ 3/7/12) unlocks a rare/epic/legendary bag-and-set that re-stamps EVERY
   golfer's starting bag to that rarity (the existing Planet/Phoenix/Solar reward sets via `applyBagTier`,
