@@ -612,6 +612,7 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     windResist: run.loadout.windResist,
     backspinBoost: run.loadout.backspinBoost,
     hazardImmune: run.loadout.hazardImmune,
+    rainbowRoad: run.loadout.rainbowRoad,
     scramble: scrambleOptsFor(run),
   };
 }

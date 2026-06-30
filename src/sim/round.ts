@@ -11,6 +11,7 @@ import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs
 import {
   combineShapeMods,
   dispersionProfile,
+  isRoadLie,
   lieAt,
   lieInfo,
   reliedLie,
@@ -323,6 +324,11 @@ export interface PlayHoleOptions {
   backspinBoost?: number;
   /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke. Absent = base. */
   hazardImmune?: readonly string[];
+  /** The legendary Rainbow Ball (GS-rainbow): the hole becomes RAINBOW ROAD — a ball resting off the
+   *  fairway/bunker/green ribbon is OUT OF BOUNDS (stroke-and-distance). Absent/false = ordinary play,
+   *  byte-for-byte unchanged. A property of the HOLE while the ball is in play, so a boss/partner on
+   *  the same hole plays under the same rule (see match.ts). */
+  rainbowRoad?: boolean;
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -698,6 +704,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       windResist: opts.windResist,
       backspinBoost: opts.backspinBoost,
       hazardImmune: opts.hazardImmune,
+      rainbowRoad: opts.rainbowRoad,
     };
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
     // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
@@ -809,6 +816,9 @@ export interface ExecOpts {
   /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke (water/lava/
    *  void). Absent/empty = ordinary penalties (byte-for-byte). Pure geometry, no rng. */
   hazardImmune?: readonly string[];
+  /** Rainbow Ball (GS-rainbow): off the fairway/bunker/green ribbon is OUT OF BOUNDS. Pure geometry on
+   *  the rest lie (no rng); absent/false is byte-for-byte unchanged. */
+  rainbowRoad?: boolean;
 }
 
 export interface ExecResult {
@@ -927,7 +937,18 @@ export function executeShot(
   let lieAfter: FeatureKind = restLie;
   let penaltyStrokes = 0;
   let holed = false;
-  if (li.penalty && immune && immune.has(li.penalty)) {
+  if (opts.rainbowRoad && !isRoadLie(restLie)) {
+    // Rainbow Ball (GS-rainbow): the hole is RAINBOW ROAD. A ball resting off the fairway/bunker/green
+    // ribbon has fallen off into the void of space — out of bounds, stroke-and-distance (replay from
+    // the shot's origin). This subsumes ordinary penalties/rough/OOB for the off-road case, and reads
+    // as 'ob' (the OB stakes/vignette + "Out of bounds"). Pure geometry on the rest lie — no rng — so a
+    // base loadout (rainbowRoad absent) never enters this branch and is byte-for-byte unchanged. A
+    // green rest stays on the road, so holing out is unaffected (handled in the in-bounds branch below).
+    penaltyStrokes = PEN_INFO.ob.strokes;
+    log.penalty = 'ob';
+    ballAfter = from;
+    lieAfter = lie;
+  } else if (li.penalty && immune && immune.has(li.penalty)) {
     // Hazard-skip ball (GS-proshop-2): it stopped in an immune hazard (didn't quite clear it) → play on
     // from the nearest dry ground back toward the shot origin, with NO penalty stroke. Pure geometry.
     const dry = skimToDry(hole, rest, from);

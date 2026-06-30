@@ -1017,6 +1017,35 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   Eyes-on verified via `scripts/shop-cards-preview.mjs` (renders the real cards). Tests:
   `tests/proshop-expansion.test.ts` already asserts every shop item renders a deterministic SVG (now
   incl. `power-glove`); `tests/cards.test.ts` guards the equal-size card markup.
+- **The legendary RAINBOW BALL turns every hole into RAINBOW ROAD (GS-rainbow) — a gloriously
+  UNbalanced novelty.** Buy it (`rainbow-ball`, legendary) and `loadout.rainbowRoad` arms: the fairway/
+  green/tee become a glowing rainbow ribbon through the stars and **anything off the fairway/bunkers/
+  green is OUT OF BOUNDS** (stroke-and-distance). It deliberately BREAKS balance — there's no
+  recoverable rough, so every miss is OOB — and that high-wire spectacle IS the fun; do NOT try to
+  balance it. ONE source of truth for "what's safe": `ROAD_LIES`/`isRoadLie` in `shot.ts` (the mown
+  turf + the SAND family: fairway/green/tee/bunker/pot/waste/sand) — shared by the sim (the OOB rule)
+  and the renderer (which paints exactly those surfaces as road), so what you SEE as road is what's
+  in-bounds. SIM: the rule lives ONCE in `executeShot` as the FIRST rest-consequence branch — a ball
+  resting off-road reads as `'ob'` (replay from origin). It's PURE geometry on the rest lie (NO rng),
+  default-OFF, so a base loadout is byte-for-byte unchanged (`tests/rainbow-ball.test.ts` guards the
+  determinism contract + the OOB conversion + that a ball only ever rests on-road-or-OOB-or-holed).
+  Threaded IDENTICALLY through the auto sim (`playerHoleOpts`→`playHole`) and the interactive driver
+  (`takeShot`/`resolveScrambleShot`) so auto≡interactive. BOSS AWARENESS: the Rainbow Ball transforms
+  the HOLE, not just your ball, so in a duel the boss/partner play the SAME rainbow road — `match.ts`'s
+  `playMatchStop`/`playTeamMatchStop` inherit `rainbowRoad` from the player's opts onto `bossOpts` (the
+  partner inherits via `baseOpts`), and `playBossStop`/`playBossSideStop` take a `rainbowRoad` param the
+  reducer passes from the loadout — so best-ball/scramble stay fair (both sides on the wire) instead of
+  the player alone on a brutal course. Rebuilt from the `rainbow-ball` perk id on resume (no save bump).
+  RENDER: `SceneOpts.rainbow` (plumbed via `RenderOptions`/`PlayViewOpts`, baked from the live loadout by
+  `app.ts rainbowActive()` like `lefty`/`effect`) makes `buildScene` paint the play surfaces as a
+  `rainbowRibbon` (rainbow-banded clip + a glowing white rail) on ONE continuous band grid, drop the
+  landmass + rough + non-sand hazards (off-road = the bare starfield void), and keep the sand (road-
+  safe). All buildScene rng draws are KEPT (only the prim pushes change), so the art stream is stable
+  and the default (non-rainbow) path is byte-for-byte unchanged — the holeView turf-fill + constellation
+  count invariants still hold. The shop item draws a rainbow-trail BALL (`itemArt.ts` `'rainbow'`
+  flavour). NO new `_gs*`/URL hook (content-as-data + a loadout-derived render option), so the test-hub
+  guard needs nothing — the Sim Lab absorbs the item automatically. Eyes-on verified (Playwright render
+  of the rainbow-road hole + the item card).
 
 ## Caddies (GS-caddy) — named, UNIQUE hires with signature powers
 - **Named caddies are a unique class of shop item (`ShopItem.caddy: 'named'`).** You may hire only

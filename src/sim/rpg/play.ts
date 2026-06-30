@@ -203,6 +203,7 @@ export function takeShot(
     windResist: loadout.windResist,
     backspinBoost: loadout.backspinBoost,
     hazardImmune: loadout.hazardImmune,
+    rainbowRoad: loadout.rainbowRoad,
     // Suggestible Sam: commit to his suggested club and the confidence boost folds into this shot.
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
@@ -349,6 +350,7 @@ export function resolveScrambleShot(
     windResist: loadout.windResist,
     backspinBoost: loadout.backspinBoost,
     hazardImmune: loadout.hazardImmune,
+    rainbowRoad: loadout.rainbowRoad,
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
       ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id

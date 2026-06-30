@@ -378,8 +378,8 @@ export function reduce(state: UiState, action: Action): UiState {
         const setup = teamDuelSetupForRun(state.run);
         const bossId = setup?.opponentId ?? resolveBossId(state.run);
         const bossHoles = setup
-          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge)
-          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`));
+          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad)
+          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), false, state.run.loadout.rainbowRoad);
         match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false, setup, partnerHoles: setup ? [] : undefined };
       }
       return {

@@ -220,6 +220,17 @@ export interface PlayerLoadout {
    * kind(s). Absent/empty = ordinary penalties, byte-for-byte unchanged.
    */
   hazardImmune?: string[];
+  /**
+   * The legendary **Rainbow Ball** (GS-rainbow): every hole becomes RAINBOW ROAD — the fairway &
+   * green are a rainbow ribbon through the stars and ANYTHING off the fairway/bunkers/green is OUT OF
+   * BOUNDS (stroke-and-distance). A gloriously UNbalanced novelty legendary: it doesn't help you score
+   * — it turns every hole into a high-wire act (any miss is OOB). Threaded IDENTICALLY through the auto
+   * sim (playStop→playHole) and the interactive driver (takeShot), and propagated to the boss/partner
+   * on the SAME hole in a duel (it transforms the HOLE, not just your ball — see match.ts), so best-
+   * ball/scramble stay fair. Pure geometry on the rest lie (no rng), so absent/false is byte-for-byte
+   * unchanged. Rebuilt from the perk id on resume, so no save bump.
+   */
+  rainbowRoad?: boolean;
 }
 
 /** The driver club id (off-tee use is gated unless the Driver Dan caddy is owned). */
@@ -849,6 +860,19 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: 'Anti-grav balls that drift across the abyss — the void no longer swallows your ball',
     rarity: 'legendary',
     apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'void', 'voidlost'), perks: [...m.perks, 'void-walkers'] }),
+  },
+  {
+    // The legendary RAINBOW BALL (GS-rainbow): a glorious novelty that turns every hole into Rainbow
+    // Road — the fairway & green become a rainbow ribbon through the stars and ANYTHING off the
+    // fairway/bunkers/green is out of bounds. It deliberately BREAKS balance (any miss is OOB, no
+    // recoverable rough) — that's the fun. Pure rest-geometry, no rng, default-off → byte-for-byte
+    // unchanged for everyone who doesn't buy it. Expensive + legendary-scarce, so it's a rare splurge.
+    id: 'rainbow-ball',
+    name: 'Rainbow Ball',
+    cost: 360,
+    desc: 'Turns every hole into RAINBOW ROAD through the stars — the fairway & green are your rainbow ribbon, and anything off the fairway, bunkers or green is OUT OF BOUNDS. Gloriously unbalanced.',
+    rarity: 'legendary',
+    apply: (m) => ({ ...m, rainbowRoad: true, perks: [...m.perks, 'rainbow-ball'] }),
   },
   {
     // Laser rangefinder: a cheaper, non-caddy way to get the club suggestion affordances. Interactive-
