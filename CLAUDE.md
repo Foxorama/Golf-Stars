@@ -64,7 +64,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v6**; bump + add a migration when you persist
+  (localStorage is the only copy). Current schema is **v9**; bump + add a migration when you persist
   a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most run-state changes
   need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -122,7 +122,14 @@ For each system: the rule that constrains new work. Open the archive doc before 
   golfer's starting bag to that rarity (the existing Planet/Phoenix/Solar reward sets via `applyBagTier`,
   baked at `startRun`/`resumeRun` — NOT a new club, just the reward machinery applied to the default bag).
   The owned tier is a Pro-Shop FLOOR (`offerableClubs` hides clubs below it) and a no-op at `'common'`
-  (byte-for-byte off). `ASCENSION_MAX = 15` so A11 is reachable. Route choice carries the destination biome + a
+  (byte-for-byte off). `ASCENSION_MAX = 15` so A11 is reachable. **Ascension victory club unlocks**
+  (`club-unlock.ts`, GS-ascension-clubs, save v9): a NEW Ascension clear (a won voyage that pushes
+  `maxAscension` higher — same gate as the bag tiers, NOT every win) permanently adds one random club to
+  the *played character's* starting bag (`unlockedClubsByCharacter` stores TYPES only, re-stamped to the
+  live bag rarity by `applyBagTier`; `addUnlockedClubs` is the no-op fast path when empty). Pool = the
+  `CLUBS` taxonomy minus what the golfer carries/refuses + the putter; a full bag pays a rarity-scaled
+  Shard consolation (15/25/45/70) instead. The reducer's exported `runEndUpdates` is the single source for
+  all four run-end sites. Route choice carries the destination biome + a
   difficulty/atmosphere event (economy/cut/meta only — NEVER course generation). Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a

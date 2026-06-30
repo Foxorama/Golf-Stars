@@ -126,6 +126,7 @@ function boot(): void {
       equippedHat: save.equippedHat,
       equippedShirt: save.equippedShirt,
       bagTier: save.bagTier,
+      unlockedClubsByCharacter: save.unlockedClubsByCharacter,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -168,7 +169,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 8,
+    version: 9,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -182,6 +183,7 @@ function persist(): void {
     equippedHat: state.equippedHat,
     equippedShirt: state.equippedShirt,
     bagTier: state.bagTier,
+    unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -2149,6 +2151,20 @@ function gameoverScreen(): string {
          <div style="font-size:13px;"><b style="color:${rarCol(bagUnlock.tier)};">🎒 New bag unlocked!</b> Clearing ${bagUnlock.gateLabel} unlocks the <b>${bagUnlock.name}</b> at the Trade Market — upgrade <b>every</b> golfer's starting bag to ${bagUnlock.tier} for <b>✦ ${bagUnlock.cost}</b> Star Shards.</div>
        </div>`
     : '';
+  // Ascension victory club unlock (GS-ascension-clubs): the played golfer permanently gains a new
+  // starting club (or a Shard consolation if their bag is already full).
+  const clubUnlock = state.lastClubUnlock;
+  const golferName = getCharacter(r.loadout.characterId)?.shortName ?? 'your golfer';
+  const clubNotice =
+    won && clubUnlock
+      ? clubUnlock.kind === 'club'
+        ? `<div style="margin:8px 0;padding:8px 11px;border-left:3px solid ${rarCol(clubUnlock.rarity)};border-radius:8px;background:#ffffff08;">
+             <span style="font-size:13px;"><b style="color:${rarCol(clubUnlock.rarity)};">⛳ New club unlocked!</b> <b>${golferName}</b> permanently adds a ${clubUnlock.rarity} <b>${clubUnlock.clubName}</b> to their starting bag — kept for every future run with them.</span>
+           </div>`
+        : `<div style="margin:8px 0;padding:8px 11px;border-left:3px solid var(--gs-gold);border-radius:8px;background:#ffffff08;">
+             <span style="font-size:13px;"><b style="color:var(--gs-gold);">🎒 Bag complete!</b> <b>${golferName}</b> already carries every club, so your victory pays a bonus <b>✦ ${clubUnlock.shards}</b> Star Shards.</span>
+           </div>`
+      : '';
   const reached =
     (won
       ? `<p style="font-size:15px;">You cleared all three arcs${r.ascension > 0 ? ` at Ascension A${r.ascension}` : ''} and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
@@ -2158,6 +2174,7 @@ function gameoverScreen(): string {
     ${header()}
     ${heading}
     ${reached}
+    ${clubNotice}
     ${bagNotice}
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>

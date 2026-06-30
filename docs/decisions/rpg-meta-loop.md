@@ -492,3 +492,49 @@ a single bought club:
   test-hub sync guard is untouched. `tests/bag.test.ts` covers the table/gates, `applyBagTier` carries +
   rarities + putt-boost, the common no-op determinism, snapshot/resume round-trip, the offer floor, and
   the reducer's `buyBagTier` gating.
+
+## Ascension victory club unlocks — the per-character collection loop (GS-ascension-clubs)
+
+Winning a voyage now *grows the golfer you played with*: it permanently unlocks one new random club for
+that **character's** starting bag (`club-unlock.ts`). It celebrates the win and gives each character its
+own long-tail loop — win again with Feather Fade and her bag keeps filling out, run after run. This is a
+sibling of the bag tiers above (both are permanent starting-bag progression baked at run start), but the
+axis is orthogonal: bag tiers raise the *rarity* of every golfer's bag at once; club unlocks add *more
+clubs* to *one* golfer's bag.
+
+- **Only a NEW Ascension clear, not every win.** The reward fires when a won voyage pushes
+  `maxAscension` higher — the same gate the bag tiers use (`unlockedAscension(state, run) >
+  state.maxAscension`), NOT on every `endedReason === 'won'`. Clearing A0 the first time pays out, but
+  re-clearing a tier you already hold grants nothing; each tier rewards a club exactly once per save.
+  At `ASCENSION_MAX` there's no higher tier to unlock, so the cap stops paying (consistent with the
+  bag-tier gates topping out at A11). The club still lands on the *played character* — the tier you clear
+  decides *whether* you get a club; the golfer you played decides *whose* bag it joins.
+- **Character-specific, stored as TYPES.** The save (**v9**, `unlockedClubsByCharacter: characterId →
+  club type ids[]`) holds only the club *type* per golfer, never a baked rarity. At run start the unlocked
+  types are added to the bag as plain `starter` clubs (with the loadout's `distanceClubBonus` folded in,
+  so Larry's unlocked woods stay long) and then `applyBagTier` re-stamps them to the *current* tier with
+  the rest of the bag — so an unlocked club always matches the live bag rarity and upgrades for free if
+  you later buy a higher bag tier. "Same rarity as the starting bag" falls out of this for free.
+- **The eligible pool** (`unlockableClubTypes`) is the full `CLUBS` taxonomy minus what the golfer
+  already carries (signature bag + already-unlocked), minus the universal putter, minus any type the
+  golfer refuses (Larry/hybrids). The pick is a seeded `Rng(`${seed}:ascension-club:${ownedCount}`)` draw
+  — deterministic, and the `ownedCount` salt decorrelates repeated wins on one seed.
+- **Full bag → Shard consolation.** Once a golfer carries every unlockable club the pool is empty, so the
+  win pays Star Shards instead, scaled to the bag rarity (the value of "a club at that tier"):
+  `FULL_BAG_SHARD_BONUS` = 15 common / 25 rare / 45 epic / 70 legendary.
+- **Baked at run start, off by default.** Threaded through `startingLoadoutFor`/`startRun`/`resumeRun`
+  (an `unlockedClubs` param + a `Run.unlockedClubs`/snapshot field, stable for the run since unlocks only
+  grow at a win — which *ends* the run). An empty list is the `addUnlockedClubs` no-op fast path, so a
+  golfer with no unlocks is byte-for-byte the old loadout — the determinism contract holds (the whole
+  seeded suite stayed green). Adding coverage clubs is the same machinery `club-rewards.test` already
+  proves is fairness-safe (it never lowers roster mean Stableford), so it can't trip the death-spiral bar.
+- **One source of truth for the four run-end sites.** The reducer's `runEndUpdates(state, run)` (exported
+  for tests) computes every end-of-run delta — banked shards, the Trade-Market reseed, the Ascension tier
+  unlock, and the won-voyage club/Shard reward — so the auto/interactive × ordinary/matchplay end sites
+  (and `bank`) all reward a win identically. The victory page shows a "new club unlocked!" notice (or the
+  Shard-bonus notice when the bag is full), beside the existing Ascension + bag-tier notices.
+- **No new hook.** Content + sim + save + view — no `window._gs*` flag and no `?param`, so the test-hub
+  sync guard is untouched. `tests/club-unlock.test.ts` covers the pool rules, the seeded reward roll, the
+  full-bag consolation, the bag-grow/restamp/distance-bonus at each tier, snapshot/resume round-trip, and
+  the reducer wiring (new clear → club, full bag → shards, re-clear of a held tier → nothing, cut →
+  nothing).
