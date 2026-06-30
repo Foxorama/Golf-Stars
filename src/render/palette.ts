@@ -22,6 +22,7 @@ export const FILL: Record<string, string> = {
   creek: '#3f8fe0',
   void: '#160a26',
   voidrough: '#0a0518',
+  cetusdeep: '#06283a',
   ice: '#bfe6f0',
   crystal: '#9fd8e6',
 };
@@ -37,6 +38,7 @@ export const BIOME_ROUGH: Record<string, string> = {
   'tempest-reach': '#343841',
   'spore-jungle': '#1d1438',
   'tidal-archipelago': '#164656',
+  'cetus-deep': '#132a3c',
 };
 
 /** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
@@ -172,6 +174,16 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#3ca07a',
     rough: { light: '#1f5a6a', base: '#164656', dark: '#0e3340', ink: '#06181f' },
   },
+  // Cetus — luminous deep-sea CYAN clifftop turf and glowing aqua greens over an abyssal blue ground,
+  // darker + more bioluminescent than ocean's bright sea-green, so the plateau reads as land lit from
+  // within over a starry sea (the off-cliff abyss is the deep-ocean rough/space).
+  cetus: {
+    fairway: { light: '#46a8b8', base: '#2f8294', dark: '#226576', ink: '#0c2c36' },
+    green: { light: '#8af2ee', base: '#5fd8dc', dark: '#46b4bc', ink: '#174d52' },
+    tee: { light: '#3f96a6', base: '#327886', dark: '#275c68', ink: '#0e2e36' },
+    collar: '#3aa0aa',
+    rough: { light: '#1d3c52', base: '#132a3c', dark: '#0c1c2a', ink: '#050e16' },
+  },
 };
 
 /** Lum-only deepen tint so a rarer stop reads a touch richer (1 = neutral). */
@@ -234,6 +246,9 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   fungal: { base: '#05140e', nebula: 'rgba(80,210,150,0.12)', edge: 'rgba(120,240,180,0.20)' },
   // Ocean — a deep sea-black, aqua nebula, luminous turquoise shore.
   ocean: { base: '#03101a', nebula: 'rgba(60,180,210,0.11)', edge: 'rgba(120,225,220,0.20)' },
+  // Cetus — the star-ocean: an abyssal blue-black sea, a bioluminescent cyan bloom, a glowing
+  // cliff-shore where the plateau meets the deep (the surrounding void IS the ocean the whales swim).
+  cetus: { base: '#020a12', nebula: 'rgba(70,190,225,0.13)', edge: 'rgba(120,230,240,0.22)' },
 };
 
 /** A world's deep-space look, rarity-deepened (the hex base only; the rgba glows pass through). */
@@ -325,6 +340,7 @@ export const ACCENTS: Record<string, Accent> = {
   'tempest-reach': { flowers: ['#c8b8ff', '#9fd0ff', '#ffffff'], mote: '#d0c8ff' },
   'spore-jungle': { flowers: ['#7af0c0', '#b07eff', '#ffe14a'], mote: '#9fffd0' },
   'tidal-archipelago': { flowers: ['#7fe6b8', '#ffe14a', '#ffffff'], mote: '#bfe8ff' },
+  'cetus-deep': { flowers: ['#7af0ff', '#9fd8ff', '#c8fbff'], mote: '#bff4ff' },
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };
 

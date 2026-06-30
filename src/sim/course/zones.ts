@@ -219,6 +219,26 @@ export const ZONES: Record<BiomeArchetype, ZoneProfile> = {
     ],
     difficulty: 4,
   },
+  cetus: {
+    archetype: 'cetus',
+    name: 'Cetus Deep',
+    signature: 'Clifftops over the star-ocean',
+    inspiration:
+      'The Whale constellation sounding the deep — clifftop links perched over a vast, luminous star-ocean where leviathans breach.',
+    brief:
+      'Clifftop plateaus of fairway adrift over a glowing star-ocean. A river of stars threads the corridor and pours off the cliffs as a waterfall into the deep, where space whales surface and breach. On the wildest stops there is no rough — miss the plateau and the ball is lost to the star-ocean. Low pressure lets it carry a touch farther.',
+    hazards: [
+      { icon: '🐋', text: 'No rough on deep stops — off the cliff is LOST to the star-ocean' },
+      { icon: '🌊', text: 'Clifftop ribbons over the deep — a precise target' },
+      { icon: '🌬️', text: 'A steady sea-current breeze to read' },
+    ],
+    benefits: [
+      { icon: '🪶', text: 'Low pressure — the ball carries +~12%' },
+      { icon: '💎', text: 'Bioluminescent reef lies — fast and true' },
+      { icon: '🎯', text: 'Calm stops play as ordinary clifftop rough' },
+    ],
+    difficulty: 4,
+  },
 };
 
 export function zoneProfile(archetype: BiomeArchetype): ZoneProfile {
@@ -609,6 +629,38 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
       eagle: ['An eagle over the water — fearless carries.', 'Two under across the islands. Sublime.'],
       blowup: ['The sea ate one whole back there. It’s hungry out here. Dry off and go.', 'One splash too many on that hole. Let the tide take it.'],
       birdieBlitz: ['Birdies all over the archipelago — riding the tide.', 'A run of birdies across the sea. Lovely to watch.'],
+    },
+  },
+  cetus: {
+    name: 'Marlow Tide',
+    title: 'Cetus Deep clifftop pro',
+    quips: {
+      scraped: [
+        'The star-ocean nearly took your ball to the whales. Scraped onto the cliff by a hair.',
+        'One step from the abyss the whole way. A pass, just — buy something before the deep notices.',
+        'Held the clifftop by a fingernail. The sea is patient, friend.',
+      ],
+      solid: [
+        'Kept it on the plateau, mostly. Solid golf over the deep.',
+        'Found the clifftops often enough. Respectable in this drop.',
+        'Steady over the star-ocean. Most just freeze at the edge.',
+      ],
+      great: [
+        'You danced along the cliffs! The whales surfaced to watch.',
+        'Great target golf over the deep — the ocean went hungry.',
+        'Threaded the clifftops beautifully. The waterfall sang for you.',
+      ],
+      stellar: [
+        'Untouchable on the edge of the abyss. The leviathans bow.',
+        'Stellar — you made the star-ocean look like a pond.',
+        'Flawless over the deep. The whole sea is luminous for you.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one over the STAR-OCEAN?! The whales breached in salute.', 'An ACE off the clifftop. The deep is dazzled.'],
+      eagle: ['An eagle over the abyss — fearless carries.', 'Two under above the deep. The whales approve.'],
+      blowup: ['The star-ocean swallowed one whole back there. It’s hungry. Onward.', 'One ball lost to the deep — let the whales keep it. Keep going.'],
+      birdieBlitz: ['Birdies breaching everywhere — the whole pod is jealous.', 'A run of birdies over the deep. Luminous stuff.'],
     },
   },
 };

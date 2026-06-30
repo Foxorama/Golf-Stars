@@ -14,7 +14,7 @@ const W = 200;
 const H = 132;
 
 /** Surfaces where a finished ball would be SUNK / consumed and not visible — show the hazard alone. */
-const BALL_HIDDEN_PENALTIES = new Set(['water', 'lava', 'lavariver', 'void', 'voidlost']);
+const BALL_HIDDEN_PENALTIES = new Set(['water', 'lava', 'lavariver', 'void', 'voidlost', 'cetuslost']);
 
 export interface RestArtOpts {
   /** Penalty the shot incurred at rest, if any (water/lava/void/ob/…). Drives ball visibility. */
@@ -266,6 +266,36 @@ function voidScene(): string {
   );
 }
 
+function starOceanScene(): string {
+  // The Cetus deep: the ball is lost over the cliff into a luminous star-ocean — no ball shown, a
+  // breaching whale tail + a bioluminescent splash where it vanished into the deep.
+  const stars = Array.from({ length: 30 }, (_, i) => {
+    const x = (i * 67) % W;
+    const y = (i * 41) % (H * 0.5);
+    const r = 0.5 + (i % 3) * 0.45;
+    return `<circle cx="${x}" cy="${y.toFixed(1)}" r="${r}" fill="${i % 4 === 0 ? '#9fe6ff' : '#ffffff'}" opacity="0.85"/>`;
+  }).join('');
+  return frame(
+    `<rect x="0" y="0" width="${W}" height="${H}" fill="#02101c"/>` +
+      stars +
+      // the star-ocean surface + depth bands
+      `<rect x="0" y="74" width="${W}" height="${H - 74}" fill="#073047"/>` +
+      `<rect x="0" y="74" width="${W}" height="22" fill="#0e547a" opacity="0.7"/>` +
+      // bioluminescent current streaks
+      [82, 96, 112].map((y, i) => `<path d="M 0 ${y} Q 100 ${y - 6} 200 ${y}" stroke="#3fd6f0" stroke-width="${(1.6 - i * 0.4).toFixed(1)}" fill="none" opacity="${(0.5 - i * 0.12).toFixed(2)}"/>`).join('') +
+      // a breaching whale tail fluke, lit from within
+      `<path d="M 64 118 Q 70 92 60 74 Q 86 84 80 104 Q 96 92 104 80 Q 100 106 84 116 Z" fill="#0b3a52" stroke="#5fe0f0" stroke-width="1.4"/>` +
+      `<path d="M 70 96 Q 76 86 74 80" stroke="#7af0ff" stroke-width="1" fill="none" opacity="0.7"/>` +
+      // a luminous splash crown + ripple rings where the ball sank
+      `<path d="M 134 78 q 5 -15 11 0 M 148 76 q 5 -16 10 0 M 124 82 q 4 -11 9 0" stroke="#bff4ff" stroke-width="2.2" fill="none" stroke-linecap="round"/>` +
+      [
+        [144, 88, 11], [144, 88, 20], [144, 88, 30],
+      ]
+        .map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r! * 0.38}" fill="none" stroke="#7fe6ff" stroke-width="1.1" opacity="${(1 - r! / 38).toFixed(2)}"/>`)
+        .join(''),
+  );
+}
+
 function obScene(): string {
   const stake = (x: number): string =>
     `<rect x="${x - 2}" y="58" width="4" height="46" fill="#f2f2f2"/><rect x="${x - 2}" y="58" width="4" height="9" fill="#e23b3b"/>`;
@@ -296,6 +326,7 @@ export function restArtSVG(lie: string, opts: RestArtOpts = {}): string {
   if (pen && BALL_HIDDEN_PENALTIES.has(pen)) {
     if (pen === 'water') return waterScene();
     if (pen === 'lava' || pen === 'lavariver') return lavaScene();
+    if (pen === 'cetuslost') return starOceanScene();
     return voidScene(); // void / voidlost
   }
   if (pen === 'ob' || pen === 'lost') return obScene();
@@ -328,6 +359,8 @@ export function restArtSVG(lie: string, opts: RestArtOpts = {}): string {
       return lavaScene();
     case 'void':
       return voidScene();
+    case 'cetusdeep':
+      return starOceanScene();
     default:
       return fairwayScene();
   }
@@ -340,6 +373,7 @@ export function lieLabel(lie: string): string {
     fairway: 'the fairway',
     rough: 'the rough',
     voidrough: 'the void',
+    cetusdeep: 'the star-ocean',
     bunker: 'a bunker',
     trees: 'the trees',
     green: 'the green',

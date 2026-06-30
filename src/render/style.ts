@@ -747,6 +747,188 @@ function inView(p: Vec, w: number, h: number, m = 24): boolean {
   return p[0] >= -m && p[0] <= w + m && p[1] >= -m && p[1] <= h + m;
 }
 
+// ---------------------------------------------------------------------------
+// GS-cetus: the star-ocean clifftop world's bespoke decor — a river of stars threading the rough that
+// pours off the cliff as a star-waterfall, over a deep ocean where space whales surface. All drawn
+// from a dedicated rng stream + gated to the cetus archetype in buildScene, so every other world is
+// byte-for-byte unchanged.
+// ---------------------------------------------------------------------------
+
+/** Unit tangent at index i of a polyline, from its neighbours. */
+function tangentAt(pts: Vec[], i: number): Vec {
+  const a = pts[Math.max(0, i - 1)]!;
+  const b = pts[Math.min(pts.length - 1, i + 1)]!;
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const l = Math.hypot(dx, dy) || 1;
+  return [dx / l, dy / l];
+}
+
+/** A ribbon polygon of half-width `hw` around a polyline (left edge + reversed right edge). */
+function ribbonPoly(path: Vec[], hw: number): Vec[] {
+  const left: Vec[] = [];
+  const right: Vec[] = [];
+  for (let i = 0; i < path.length; i++) {
+    const t = tangentAt(path, i);
+    const px = -t[1];
+    const py = t[0];
+    left.push([path[i]![0] + px * hw, path[i]![1] + py * hw]);
+    right.push([path[i]![0] - px * hw, path[i]![1] - py * hw]);
+  }
+  return [...left, ...right.reverse()];
+}
+
+/** A space whale SURFACING in the star-ocean — a recognizable side-on humpback silhouette: a humped
+ *  back, a notched tail fluke, an eye, a blow-spout and a waterline ripple, lit from within. Drawn
+ *  near-horizontal (a small tilt + random facing) so the silhouette always reads. Screen space;
+ *  deterministic from the supplied rng. */
+function whaleSilhouette(cx: number, cy: number, len: number, rng: () => number): Prim[] {
+  const f = rng() < 0.5 ? 1 : -1; // facing
+  const tilt = (rng() - 0.5) * 0.3;
+  const ca = Math.cos(tilt);
+  const sa = Math.sin(tilt);
+  const h = len * 0.32; // body height
+  const T = (lx: number, ly: number): Vec => {
+    const x = f * lx;
+    return [cx + x * ca - ly * sa, cy + x * sa + ly * ca];
+  };
+  const body: Vec[] = [
+    T(len * 0.5, h * 0.06), // nose
+    T(len * 0.34, -h * 0.55), // top of head
+    T(0, -h * 0.62), // back hump
+    T(-len * 0.32, -h * 0.32), // pre-tail top
+    T(-len * 0.46, 0), // tail base
+    T(-len * 0.3, h * 0.34), // pre-tail belly
+    T(0, h * 0.5), // belly
+    T(len * 0.34, h * 0.45), // lower jaw
+  ];
+  const fluke: Vec[] = [T(-len * 0.42, 0), T(-len * 0.68, -h * 0.58), T(-len * 0.56, -h * 0.05), T(-len * 0.68, h * 0.5)];
+  const spout = T(len * 0.3, -h * 0.56);
+  return [
+    { t: 'glow', c: [cx, cy], r: len * 1.05, col: 'rgba(95,225,250,0.24)' },
+    { t: 'line', a: T(-len * 0.5, h * 0.6), b: T(len * 0.5, h * 0.5), stroke: 'rgba(150,232,248,0.28)', sw: 1, round: true }, // waterline ripple
+    { t: 'poly', pts: fluke, fill: '#10465f', stroke: 'rgba(150,245,255,0.85)', sw: 1.2 },
+    { t: 'poly', pts: body, fill: '#143f59', stroke: 'rgba(155,248,255,0.95)', sw: 1.6 },
+    { t: 'line', a: T(len * 0.32, -h * 0.5), b: T(-len * 0.28, -h * 0.42), stroke: 'rgba(185,248,255,0.55)', sw: 1, round: true }, // lit back
+    { t: 'circle', c: T(len * 0.34, -h * 0.06), r: Math.max(0.9, len * 0.028), fill: 'rgba(232,252,255,0.92)' }, // eye
+    { t: 'line', a: spout, b: T(len * 0.34, -h * 1.15), stroke: 'rgba(205,250,255,0.72)', sw: 1.5, round: true },
+    { t: 'line', a: spout, b: T(len * 0.22, -h * 1.05), stroke: 'rgba(205,250,255,0.55)', sw: 1.3, round: true },
+    { t: 'circle', c: T(len * 0.29, -h * 1.2), r: 1.3 + rng() * 0.8, fill: 'rgba(232,252,255,0.9)' }, // blow puff
+  ];
+}
+
+/** The star-ocean OFF the clifftop plateau: luminous current blooms + space whales surfacing in the
+ *  deep, kept clear of the island so they read as the sea beyond the cliffs. Drawn BEFORE the landmass
+ *  (the plateau overlaps their near edges). Screen space; own rng stream. */
+function cetusOcean(islandPts: Vec[], W: number, H: number, accents: number, rng: () => number): Prim[] {
+  const out: Prim[] = [];
+  // Broad bioluminescent current blooms + a few sweeping current arcs so the sea reads as a living
+  // ocean even in the margin around the plateau.
+  for (let i = 0; i < 3; i++) {
+    out.push({ t: 'glow', c: [W * (0.1 + rng() * 0.8), H * (0.5 + rng() * 0.45)], r: (0.2 + rng() * 0.2) * Math.max(W, H), col: 'rgba(55,180,215,0.12)' });
+  }
+  for (let i = 0; i < 4; i++) {
+    const y = H * (0.5 + rng() * 0.46);
+    const sag = (rng() - 0.5) * 26;
+    out.push({ t: 'line', a: [0, y], b: [W, y + sag], stroke: `rgba(110,225,240,${(0.06 + rng() * 0.06).toFixed(3)})`, sw: 1.2, round: true });
+  }
+  if (accents <= 0) return out;
+  // Whales surfacing in the open sea around the plateau. Sample widely, keep those clear of the island
+  // (drawn before the land, so any that graze the shore are tucked under the cliff). Bias to the lower
+  // sea so they read below the clifftop. Corner fallbacks guarantee a couple show even on a big island.
+  const targets: Vec[] = [];
+  const want = 3 + Math.floor(rng() * 2);
+  for (let i = 0; i < want * 12 && targets.length < want; i++) {
+    const c: Vec = [W * (0.06 + rng() * 0.88), H * (0.42 + rng() * 0.54)];
+    if (pointInPoly(c, islandPts)) continue;
+    targets.push(c);
+  }
+  // Fallback corners (sea-most regions of a portrait frame) if the island crowded the sampler out.
+  for (const corner of [[0.12, 0.9], [0.88, 0.88], [0.12, 0.5], [0.88, 0.52]] as const) {
+    if (targets.length >= 2) break;
+    const c: Vec = [W * corner[0], H * corner[1]];
+    if (!pointInPoly(c, islandPts)) targets.push(c);
+  }
+  for (const c of targets) {
+    const len = (0.1 + rng() * 0.07) * Math.max(W, H);
+    out.push(...whaleSilhouette(c[0], c[1], len, rng));
+  }
+  return out;
+}
+
+/** The clifftop RIVER OF STARS + its WATERFALL: a luminous star-river threads the rough beside the
+ *  fairway (clipped to the plateau), then pours off the cliff edge into the ocean (spilling beyond the
+ *  island). Own rng stream + gated to cetus → determinism-safe. */
+function cetusRiver(hole: Hole, proj: Projector, islandPts: Vec[], span: number, accents: number, rng: () => number): Prim[] {
+  const cl = hole.centreline;
+  if (cl.length < 2) return [];
+  const side = rng() < 0.5 ? 1 : -1;
+  const off = Math.max(10, Math.min(24, span * 0.1)); // sit in the rough beside the fairway, on the plateau
+  const rw = Math.max(2.8, span * 0.024);
+  const n = cl.length;
+  const path: Vec[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = tangentAt(cl, i);
+    const perp: Vec = [side * -t[1], side * t[0]];
+    const wobble = Math.sin((i / (n - 1)) * Math.PI * 2.5) * off * 0.16; // a gentle meander
+    const d = off + wobble;
+    path.push([cl[i]![0] + perp[0] * d, cl[i]![1] + perp[1] * d]);
+  }
+  const ribbon = projPoly(ribbonPoly(path, rw), proj);
+
+  // The river, clipped to the plateau — a bright glowing channel of stars beside the fairway.
+  const detail: Prim[] = [
+    { t: 'poly', pts: offsetPoly(ribbon, -4), fill: 'rgba(95,225,250,0.20)' }, // wide glow halo
+    { t: 'poly', pts: offsetPoly(ribbon, -1.6), fill: 'rgba(125,232,252,0.30)' }, // inner glow
+    { t: 'poly', pts: ribbon, fill: '#0d4a6e' },
+    { t: 'poly', pts: offsetPoly(ribbon, 1.6), fill: '#15648e' },
+  ];
+  const inner: Prim[] = [];
+  for (let i = 1; i < n; i++) {
+    inner.push({ t: 'line', a: proj.project(path[i - 1]!), b: proj.project(path[i]!), stroke: 'rgba(200,248,255,0.6)', sw: 1.5, round: true }); // luminous current spine
+  }
+  if (accents > 0) {
+    const steps = Math.max(8, Math.round(n * 2));
+    for (let i = 0; i < steps; i++) {
+      const idx = Math.min(n - 1, Math.floor((i / steps) * (n - 1)));
+      const p = proj.project(path[idx]!);
+      inner.push({ t: 'circle', c: [p[0] + (rng() - 0.5) * 6, p[1] + (rng() - 0.5) * 6], r: 0.6 + rng() * 1.3, fill: rng() < 0.5 ? 'rgba(225,251,255,0.95)' : 'rgba(160,238,255,0.85)' });
+    }
+  }
+  const river: Prim[] = [{ t: 'clip', clip: islandPts, children: [...detail, { t: 'clip', clip: ribbon, children: inner }] }];
+
+  // The waterfall: a spur from the river's green-end out over the cliff, spilling into the ocean
+  // (NOT clipped — it falls off the plateau). A bright lip glow, a fanning cascade of falling stars,
+  // a splash crown and ripple rings where it meets the deep.
+  const t0 = tangentAt(cl, 0);
+  const perp0: Vec = [side * -t0[1], side * t0[0]];
+  const headC = path[0]!; // the tee-side end of the river — pours off the cliff here, clear of the flag
+  const lipC: Vec = [headC[0] + perp0[0] * off * 1.8, headC[1] + perp0[1] * off * 1.8];
+  const headS = proj.project(headC);
+  const lipS = proj.project(lipC);
+  const wl = Math.hypot(lipS[0] - headS[0], lipS[1] - headS[1]) || 1;
+  const ux = (lipS[0] - headS[0]) / wl;
+  const uy = (lipS[1] - headS[1]) / wl;
+  const px = -uy;
+  const py = ux;
+  const fall: Prim[] = [{ t: 'glow', c: lipS, r: wl * 0.85, col: 'rgba(130,228,252,0.30)' }];
+  const fallN = accents > 0 ? 14 : 0;
+  for (let i = 0; i < fallN; i++) {
+    const lane = (i / Math.max(1, fallN - 1) - 0.5) * 1.8 + (rng() - 0.5) * 0.5; // even lanes → a curtain, not a burst
+    const dropLen = wl * (0.85 + rng() * 0.7);
+    const a: Vec = [headS[0] + px * lane * 5, headS[1] + py * lane * 5];
+    const b: Vec = [a[0] + ux * dropLen + px * lane * 3, a[1] + uy * dropLen + py * lane * 3];
+    fall.push({ t: 'line', a, b, stroke: `rgba(205,249,255,${(0.4 + rng() * 0.4).toFixed(2)})`, sw: 1.1, round: true });
+    fall.push({ t: 'circle', c: [a[0] + (b[0] - a[0]) * rng(), a[1] + (b[1] - a[1]) * rng()], r: 0.6 + rng() * 0.9, fill: 'rgba(230,252,255,0.92)' });
+  }
+  // ripple rings where the cascade meets the deep, just past the lip
+  const pool: Vec = [lipS[0] + ux * 6, lipS[1] + uy * 6];
+  for (let i = 1; i <= 3; i++) {
+    fall.push({ t: 'circle', c: pool, r: i * 5.5, fill: 'none', stroke: `rgba(150,238,255,${(0.45 - i * 0.11).toFixed(2)})`, sw: 1.1 });
+  }
+  return [...river, ...fall];
+}
+
 /**
  * Build the full static scene for a hole as a flat list of screen-space prims, in paint order:
  * rough background + texture, ground accents, terrain features, hazards, OB boundary, centreline,
@@ -833,6 +1015,7 @@ const WIND_COL: Record<BiomeArchetype, string> = {
   tempest: 'rgba(200,180,255,', // driving storm rain
   fungal: 'rgba(150,240,190,', // drifting glowing spores
   ocean: 'rgba(190,235,230,', // sea spray
+  cetus: 'rgba(150,235,245,', // luminous sea-spray off the deep
 };
 
 /** Unit SCREEN direction the wind blows, from a hole's `Wind.dir` (course bearing) through the
@@ -957,6 +1140,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that
   // reads off the main `rng` stays byte-identical) keyed off the same hole hash.
   const crng = mulberry32((hashHole(hole) ^ 0x5747a2) >>> 0);
+  // GS-cetus: a SEPARATE stream for the star-ocean / river / waterfall decor, so the bespoke Cetus
+  // visuals never perturb the terrain (`rng`) or celestial (`crng`) placement — every OTHER world is
+  // byte-for-byte unchanged (the decor is also gated to `arch === 'cetus'` below).
+  const org = mulberry32((hashHole(hole) ^ 0x000ce705) >>> 0);
 
   // --- 1. Deep space: an opaque world-tinted base + soft nebula smears ---------
   // The nebulae are SOFT radial GLOWS (luminous wash, the intro's sky) — NOT hard-edged flat discs,
@@ -1016,6 +1203,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
     }
   }
+
+  // --- 2b. The Cetus star-ocean: whales surfacing in the deep beyond the cliffs (GS-cetus) ----
+  // Drawn BEFORE the landmass so the clifftop plateau overlaps their near edges (they read as the
+  // sea below the cliffs). Gated to cetus + own `org` stream → no other world is touched.
+  if (arch === 'cetus' && !rainbow) prims.push(...cetusOcean(islandPts, W, H, art.accents, org));
 
   // --- 3. The floating landmass: an atmospheric rim feathering into the void ---
   // Rainbow Road: NO landmass at all (rim glow + fill) — the rainbow ribbon floats over open space, so
@@ -1133,6 +1325,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
   }
+
+  // --- 5b. The Cetus river of stars + its cliff waterfall (GS-cetus) ----------
+  // The luminous star-river threads the rough beside the fairway and pours off the cliff into the
+  // ocean. Gated to cetus + own `org` stream, drawn over the land but under the hazards/flag.
+  if (arch === 'cetus' && !rainbow) prims.push(...cetusRiver(hole, proj, islandPts, span, art.accents, org));
 
   // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
   // Draw order is layered so substances read correctly where they overlap (deep/wild holes pile

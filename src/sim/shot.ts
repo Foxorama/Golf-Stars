@@ -310,7 +310,7 @@ export interface LieInfo {
   label: string;
 }
 
-export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void' | 'voidlost' | 'ravine';
+export type PenaltyKind = 'water' | 'ob' | 'lost' | 'unplayable' | 'lava' | 'void' | 'voidlost' | 'ravine' | 'cetuslost';
 
 /**
  * Surface → playing characteristics. Open table (content-as-data): fantasy surfaces
@@ -356,6 +356,10 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // drop-back-on-the-island (`voidlost`) — a stroke-and-distance cascade made max-wildness void
   // stops a ball-shredder; a +1 drop keeps it brutal-but-fair (the miss still costs, no death loop).
   voidrough: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'voidlost', label: 'Lost to the void' },
+  // The Cetus world's clifftop "lost rough" (GS-cetus): off the plateau is the star-ocean below the
+  // cliffs. A penalty exactly like the void's lost rough (a +1 NON-replay drop-back-on-the-plateau,
+  // so the miss bites but never cascades into a ball-shredder), reskinned as the deep sea.
+  cetusdeep: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'cetuslost', label: 'Lost to the star-ocean' },
   ice: { carryMult: 1.02, dispersionMult: 1.5, label: 'Ice' }, // slick: hard to control
   crystal: { carryMult: 1.05, dispersionMult: 0.85, label: 'Crystal' }, // true & fast
 };
@@ -434,6 +438,7 @@ export const PEN_INFO: Record<PenaltyKind, PenaltyInfo> = {
   void: { strokes: 1, replay: true, label: 'Lost to the void' },
   voidlost: { strokes: 1, replay: false, label: 'Lost to the void' },
   ravine: { strokes: 1, replay: false, label: 'Ravine' },
+  cetuslost: { strokes: 1, replay: false, label: 'Lost to the star-ocean' },
 };
 
 // --- Lie lookup against a hole ----------------------------------------------

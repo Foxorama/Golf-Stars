@@ -229,6 +229,10 @@ export const THEME_SKY: Record<string, SkyCoord> = {
   "magellanic-clouds": {
     "ra": 80.894,
     "dec": -69.756
+  },
+  "cetus": {
+    "ra": 31.6,
+    "dec": -5.9
   }
 };
 

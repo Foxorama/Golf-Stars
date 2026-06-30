@@ -375,6 +375,7 @@ const PRO_LOOK: Record<BiomeArchetype, { cap: string; shirt: string; aura: strin
   tempest: { cap: '#8a7fb0', shirt: '#5a5470', aura: '#c8b8ff', skin: '#d8c0a8' },
   fungal: { cap: '#2fae82', shirt: '#7d46b8', aura: '#7af0c0', skin: '#d2b89c' },
   ocean: { cap: '#46b487', shirt: '#2f7faa', aura: '#7fe6b8', skin: '#e0c2a0' },
+  cetus: { cap: '#3aa0aa', shirt: '#216578', aura: '#7af0ff', skin: '#dcc0a4' },
 };
 
 /** A compact inline-SVG bust of a world's club pro — assetless house style, tinted per archetype. */
@@ -1253,6 +1254,7 @@ function hazardLabel(kind: string): string {
   if (kind === 'water') return 'the water';
   if (kind === 'lava' || kind === 'lavariver') return 'the lava';
   if (kind === 'void' || kind === 'voidrough') return 'the void';
+  if (kind === 'cetusdeep') return 'the star-ocean';
   if (kind === 'frozenpond') return 'the pond';
   if (kind === 'creek') return 'the creek';
   return 'the hazard';
@@ -2589,6 +2591,7 @@ const BIOME_BADGE: Record<string, { glyph: string; label: string; col: string }>
   tempest: { glyph: '🌪️', label: 'Tempest', col: '#c8b8ff' },
   fungal: { glyph: '🍄', label: 'Jungle', col: '#54dba0' },
   ocean: { glyph: '🌊', label: 'Ocean', col: '#5fd49e' },
+  cetus: { glyph: '🐋', label: 'Cetus', col: '#5fd8dc' },
 };
 
 // The functional family of a route event → a short pill label + accent (distinct from the rarity ring).

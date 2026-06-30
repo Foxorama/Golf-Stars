@@ -27,7 +27,7 @@ describe('constellation backdrop (GS-17e)', () => {
         expect(b).toBeLessThan(fig!.stars.length);
       }
     }
-    expect(Object.keys(CONSTELLATION_FIGURES).length).toBe(36);
+    expect(Object.keys(CONSTELLATION_FIGURES).length).toBe(37);
   });
 
   it('a themed render draws the constellation; an un-themed one does not', () => {
