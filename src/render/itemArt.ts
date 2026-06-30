@@ -59,6 +59,7 @@ const BALL_FLAVOUR: Record<string, string> = {
   'floater-balls': 'water',
   'magma-balls': 'lava',
   'void-walkers': 'void',
+  'rainbow-ball': 'rainbow',
 };
 
 const KIND_BY_ID: Record<string, ItemArtKind> = {
@@ -93,6 +94,7 @@ const KIND_BY_ID: Record<string, ItemArtKind> = {
   'floater-balls': 'ball',
   'magma-balls': 'ball',
   'void-walkers': 'ball',
+  'rainbow-ball': 'ball',
 };
 
 /** Resolve the art kind for an item id. Named caddies → 'caddy'; reward clubs → 'club'. */
@@ -315,6 +317,21 @@ function drawBall(id: string, col: string, seed: string): string {
     fx = mix('#d8c4ff', '#7a4ad8', 0.35);
     extra = sparkles(seed + 'void', '#cbb6ff', 7) +
       `<circle cx="80" cy="50" r="30" fill="none" stroke="#b59bff" stroke-width="1.5" opacity="0.5"/>`;
+  } else if (flav === 'rainbow') {
+    // The Rainbow Ball (GS-rainbow): a glowing white ball trailing a rainbow road of bands into the
+    // stars, ringed by a faint rainbow aura.
+    fx = '#ffffff';
+    const rc = ['#ff4d4d', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#7a6bff', '#d46bff'];
+    let road = '<g stroke-linecap="round" opacity="0.92">';
+    for (let i = 0; i < rc.length; i++) {
+      road += `<path d="M 2 ${(28 + i * 6).toFixed(0)} L 56 ${(42 + i * 1.6).toFixed(0)}" stroke="${rc[i]}" stroke-width="3.4"/>`;
+    }
+    road += '</g>';
+    let aura = '';
+    for (let i = 0; i < rc.length; i++) {
+      aura += `<circle cx="${cx}" cy="${cy}" r="${(r + 4 + i * 1.7).toFixed(1)}" fill="none" stroke="${rc[i]}" stroke-width="1.1" opacity="${(0.5 - i * 0.05).toFixed(2)}"/>`;
+    }
+    extra = sparkles(seed + 'rainbow', '#ffffff', 6) + road + aura;
   } else {
     // distance — a hot, fast ball with a motion streak
     fx = '#ffffff';

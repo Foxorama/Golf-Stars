@@ -343,6 +343,9 @@ export interface PlayViewOptions {
   /** Atmospheric course effect the chosen journey route brought (GS-journey-fx) — adds a static layer
    *  in the scene + an animated overlay (falling meteors, shimmering aurora, storm flicker). */
   effect?: string;
+  /** Rainbow Ball (GS-rainbow): paint the play view as RAINBOW ROAD (rainbow ribbon through the stars,
+   *  off-road = void). Baked from the live loadout at the app boundary; render-only. */
+  rainbow?: boolean;
   /** Called once the final shot has landed. */
   onDone?: () => void;
   /** Fired once per segment at the STRIKE moment (club–ball contact / putter tap) — the cue point
@@ -559,7 +562,7 @@ export function mountPlayView(
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);

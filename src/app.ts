@@ -816,6 +816,7 @@ function introScreen(): string {
     height: 360,
     biome: holeBiome(c.holes[0]!),
     themeId: holeThemeId(c.holes[0]!),
+    rainbow: rainbowActive(),
   });
 
   return `
@@ -1985,6 +1986,7 @@ function playingBody(animating: boolean): string {
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
       // The putt screen is the ball↔cup line — the approach tracers belong to the whole-hole decision view.
       biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
+      rainbow: rainbowActive(),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -2068,6 +2070,7 @@ function playingBody(animating: boolean): string {
     // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
     ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
+    rainbow: rainbowActive(),
     ball: play.ball,
     spray,
     sprayGeom,
@@ -2191,6 +2194,7 @@ function scrambleChoiceOverlay(): string {
     height: 240,
     biome: holeBiome(hole),
     themeId: holeThemeId(hole),
+    rainbow: rainbowActive(),
     shots: [sc.player.log],
     ghostShots: [sc.partner.log],
   });
@@ -2765,6 +2769,13 @@ function currentEffect(): string | undefined {
   return state.course?.meta?.effect;
 }
 
+/** Rainbow Ball (GS-rainbow): whether the live loadout has armed Rainbow Road. Baked into the render
+ *  options at the app boundary (like `lefty()`), so the renderer paints the rainbow ribbon + the sim's
+ *  OOB-off-road rule (both keyed off the same loadout flag) stay in lock-step. */
+function rainbowActive(): boolean {
+  return !!state.run?.loadout?.rainbowRoad;
+}
+
 /** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
  *  identically across screens (a quiet hand-off from lining up to watching the shot). */
 function weatherSeed(hole: Hole): number {
@@ -3192,6 +3203,7 @@ function render(): void {
         width: 340,
         height: 520,
         biome: holeBiome(hole), themeId: holeThemeId(hole), effect: currentEffect(),
+        rainbow: rainbowActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),

@@ -90,6 +90,48 @@ export interface SceneOpts {
   /** Star-travel theme id (GS-17e) — draws that constellation in the sky, rarity-tinted. */
   themeId?: string;
   art?: ArtFeel;
+  /** Rainbow Ball (GS-rainbow): paint the hole as RAINBOW ROAD — the fairway/green/tee/sand ribbon
+   *  becomes a glowing rainbow road through the stars and everything off it is the bare starry void
+   *  (it IS out of bounds; see `isRoadLie`). Render-only; the sim's OOB rule is the matching half.
+   *  Baked at the app boundary from the live loadout (like `lefty`/`effect`), so no save/URL hook. */
+  rainbow?: boolean;
+}
+
+/** The Rainbow Road colour cycle (GS-rainbow) — a vivid 7-band rainbow the ribbon mows through. */
+const RAINBOW_BANDS = ['#ff3b5c', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#5a6bff', '#c46bff'];
+
+/**
+ * A rainbow-road ribbon (GS-rainbow): fill a play surface (fairway/green/tee) with bright rainbow
+ * bands clipped to its polygon — perpendicular-to-play after the projector rotates tee→green up, so
+ * the bands read like a Mario-Kart Rainbow Road track — then cap it with a glowing white rail. Pure
+ * geometry (no rng); `phaseY`/`bandH` let several fairway pieces share one continuous band grid.
+ */
+function rainbowRibbon(poly: Vec[], phaseY: number, bandH: number): Prim[] {
+  const b = bboxOf(poly);
+  const children: Prim[] = [];
+  const i0 = Math.floor((b.minY - phaseY) / bandH);
+  for (let i = i0; phaseY + i * bandH < b.maxY; i++) {
+    const y0 = phaseY + i * bandH;
+    const y1 = y0 + bandH + 0.6; // overlap a hair so no seam shows
+    children.push({
+      t: 'poly',
+      pts: [
+        [b.minX, y0],
+        [b.maxX, y0],
+        [b.maxX, y1],
+        [b.minX, y1],
+      ],
+      fill: RAINBOW_BANDS[((i % RAINBOW_BANDS.length) + RAINBOW_BANDS.length) % RAINBOW_BANDS.length]!,
+    });
+  }
+  return [
+    // A dark under-edge so the road reads as a solid track floating in space (the void shows beyond).
+    { t: 'poly', pts: offsetPoly(poly, 2), fill: 'rgba(8,6,22,0.55)' },
+    { t: 'clip', clip: poly, children },
+    // A glowing white rail + a soft outer halo so the ribbon pops against the starfield.
+    { t: 'poly', pts: poly, fill: 'none', stroke: 'rgba(255,255,255,0.9)', sw: 2 },
+    { t: 'poly', pts: offsetPoly(poly, 2.4), fill: 'none', stroke: 'rgba(150,200,255,0.45)', sw: 1.2 },
+  ];
 }
 
 /** Merge caller art with a `window._gsArt` override when in a browser (node-safe). */
@@ -858,6 +900,11 @@ function hexAlpha(hex: string, a: number): string {
 
 export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[] {
   const { width: W, height: H, biome, themeId } = opts;
+  // Rainbow Road (GS-rainbow): the play surfaces become a glowing rainbow ribbon and everything off
+  // it is the bare starry void (out of bounds). The deep-space base + starfield (painted first) stay,
+  // so the ribbon floats through the stars; the land hull, rough texture and non-sand hazards are
+  // dropped below. All rng draws are KEPT (only the prim pushes change), so the art stream is stable.
+  const rainbow = !!opts.rainbow;
   const art = artFeel(opts.art);
   const rng = mulberry32(hashHole(hole));
   const prims: Prim[] = [];
@@ -968,9 +1015,13 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   }
 
   // --- 3. The floating landmass: an atmospheric rim feathering into the void ---
-  prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.05), fill: space.edge });
-  prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.025), fill: space.edge });
-  prims.push({ t: 'poly', pts: islandPts, fill: landFillFor(arch, deepen), stroke: space.edge, sw: 1.2 });
+  // Rainbow Road: NO landmass at all (rim glow + fill) — the rainbow ribbon floats over open space, so
+  // the starfield reads everywhere off the road (off-road IS out of bounds).
+  if (!rainbow) {
+    prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.05), fill: space.edge });
+    prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.025), fill: space.edge });
+    prims.push({ t: 'poly', pts: islandPts, fill: landFillFor(arch, deepen), stroke: space.edge, sw: 1.2 });
+  }
 
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
   // The main `rng` is consumed here in the SAME order as before (patches → tufts → flowers) so the
@@ -1025,7 +1076,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       land.push({ t: 'circle', c: sp, r, fill: crng() < 0.5 ? 'rgba(235,242,255,0.75)' : 'rgba(190,214,255,0.62)' });
     }
   }
-  prims.push({ t: 'clip', clip: islandPts, children: land });
+  // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); the rng was still consumed
+  // above, so the art stream is byte-stable whether or not the ribbon is painted.
+  if (!rainbow) prims.push({ t: 'clip', clip: islandPts, children: land });
 
   // --- 5. Terrain features (fairway/green/tee + scatter surfaces) --------------
   const collar = collarFor(arch, deepen);
@@ -1045,11 +1098,33 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // Fairways draw as ONE grouped pass FIRST (under tee/green/scatter) so the green apron blends into
   // the main corridor — see `styleFairways`. Everything else keeps its original per-feature order.
   const fairwaySps = hole.features.filter((f) => f.kind === 'fairway').map((f) => projPoly(f.poly, proj));
-  if (voidGlow) for (const sp of fairwaySps) glowRings(sp);
-  prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe));
+  if (voidGlow && !rainbow) for (const sp of fairwaySps) glowRings(sp);
+  if (rainbow) {
+    // Rainbow Road: paint every fairway piece as a rainbow ribbon, all riding ONE continuous band grid
+    // (the main corridor's bbox) so the apron's bands line up with the corridor — one seamless road.
+    if (fairwaySps[0]) {
+      const fb = bboxOf(fairwaySps[0]);
+      const bandH = Math.max(6, (fb.maxY - fb.minY) / 9);
+      for (const sp of fairwaySps) prims.push(...rainbowRibbon(sp, fb.minY, bandH));
+    }
+  } else {
+    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe));
+  }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
     const sp = projPoly(f.poly, proj);
+    if (rainbow) {
+      // The green & tee are part of the rainbow ribbon; scatter surfaces (ice/crystal/waste) are off
+      // the road → bare void, so they're dropped (they read as OOB, matching the sim's lie rule).
+      if (f.kind === 'green') {
+        const gb = bboxOf(sp);
+        prims.push(...rainbowRibbon(sp, gb.minY, Math.max(5, (gb.maxY - gb.minY) / 6)));
+      } else if (f.kind === 'tee') {
+        const tb = bboxOf(sp);
+        prims.push(...rainbowRibbon(sp, tb.minY, Math.max(4, (tb.maxY - tb.minY) / 4)));
+      }
+      continue;
+    }
     if (voidGlow && f.kind === 'green') glowRings(sp);
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, greenSlopeScreen(hole, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
@@ -1078,14 +1153,21 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     else if (f.kind === 'barranca') ravineHaz.push(f);
     else scatterHaz.push(f);
   }
-  for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), rng));
-  for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
+  // Rainbow Road: SAND is on the road (in-play, see `ROAD_LIES`) so bunkers/craters still draw; every
+  // OTHER hazard (rough fescue, ravines, exotic scatter, water/lava, trees) is OFF the road → the bare
+  // void, so it's dropped (it reads as the OOB space it now is, matching the sim's lie rule).
+  if (!rainbow) {
+    for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), rng));
+    for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
+  }
   prims.push(...styleSandFamily(sandPolys, art, proj.scale));
-  for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
-  // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
-  prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng));
-  prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
-  for (const f of treeHaz) prims.push(...styleTree(f.poly, proj, rng));
+  if (!rainbow) {
+    for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
+    // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
+    prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng));
+    prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
+    for (const f of treeHaz) prims.push(...styleTree(f.poly, proj, rng));
+  }
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);

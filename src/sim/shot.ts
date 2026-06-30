@@ -378,6 +378,29 @@ export function lieInfo(kind: string): LieInfo {
 }
 
 /**
+ * The "rainbow road" SAFE surfaces (GS-rainbow): the mown ribbon you start, travel and finish on,
+ * plus the sand the player explicitly counts as in-play ("off the fairway/bunkers/green is OOB").
+ * The legendary **Rainbow Ball** turns every OTHER surface into out-of-bounds — off the road is the
+ * void of space. One source of truth shared by the sim (the OOB rule in `executeShot`) and the
+ * renderer (which paints exactly these surfaces as the rainbow ribbon and lets space show elsewhere),
+ * so what you SEE as road is what's actually in-bounds. Sand FAMILY (bunker/pot/waste/sand) is safe.
+ */
+export const ROAD_LIES: ReadonlySet<string> = new Set([
+  'fairway',
+  'green',
+  'tee',
+  'bunker',
+  'pot',
+  'waste',
+  'sand',
+]);
+
+/** Whether a lie is on the rainbow road (in-play under the Rainbow Ball). Pure; see `ROAD_LIES`. */
+export function isRoadLie(kind: string): boolean {
+  return ROAD_LIES.has(kind);
+}
+
+/**
  * Apply an escape-specialist caddy's LIE RELIEF (GS-mux): lerp a PENALIZING lie's carry/dispersion
  * back toward neutral by `relief` (0..1). It only ever helps a lie that's worse than neutral
  * (carryMult < 1 or dispersionMult > 1) — never improves an already-clean fairway/tee/green lie.
