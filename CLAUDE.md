@@ -397,6 +397,29 @@ This game lives or dies on three axes — put every change through all three bef
     each one carryable: the centreline genuinely enters+exits it, with a penalty-free shelf BEFORE
     the near bank (lay up short) and just AFTER the far bank (land the carry). One river per hole
     (two close ones leave no safe shelf between).
+  - **Cetus = clifftop star-ocean (`cetus-deep.lostRough: 'cetusdeep'`, GS-cetus).** The Whale
+    constellation's world: clifftop fairway plateaus floating over a vast star-ocean. Mechanically it
+    REUSES the void's island/abyss machinery byte-for-byte — it just sets `lostRough` on its biome row
+    (a `cetusdeep` lie → a `cetuslost` +1 drop-back penalty, the same NON-replay drop-back as
+    `voidlost`), so it inherits `LOST_ROUGH_MIN_WILDNESS` (0.55) gating + the `VOID_ISLAND_SCALE`
+    widening + the straight-island template for free (the lostRough path is archetype-AGNOSTIC; there
+    is NO hardcoded `void` in the sim). Calm stops play as ordinary clifftop rough; deep stops lose a
+    missed plateau to the deep. Distinct visual identity, NOT a recolour. The signature SHOW is pure
+    RENDER decor in `buildScene`, gated to `arch === 'cetus'` and drawn from a dedicated `org` rng
+    stream (`mulberry32(hashHole ^ 0x000ce705)`) so it NEVER perturbs the terrain (`rng`) / celestial
+    (`crng`) / hull (`hrng`) streams — every other world is byte-for-byte unchanged: a glowing
+    **star-river** ribbon threads the rough beside the fairway (`cetusRiver`, an offset of the
+    centreline, clipped to the plateau) and pours off the tee-side cliff as a directional
+    **star-waterfall** (a curtain spilling BEYOND the island, unclipped), over a deep **star-ocean**
+    where recognizable side-on **space-whale silhouettes** surface (`cetusOcean`/`whaleSilhouette`,
+    placed clear of the island, drawn BEFORE the landmass so the cliff overlaps their near edges).
+    Both renderers get it (shared scene builder). Re-shoot the gallery after any `cetusRiver`/
+    `cetusOcean`/`whaleSilhouette` change; the abyss balance is covered generically by
+    `tests/worlds` + `tests/themes` (Cetus is in their world/theme lists) and `tests/cetus` locks the
+    render gating + determinism + the lie/penalty wiring. NOTE: the whole-hole map is the cramped
+    worst case for ocean visibility (the land hull hugs the geometry); the zoomed play view shows more
+    sea. NO new `_gs*`/URL hook (content-as-data + an archetype-derived render), so the test-hub guard
+    needs nothing.
 - **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
