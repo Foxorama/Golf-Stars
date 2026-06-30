@@ -128,13 +128,22 @@ describe('GS-proshop-2 — new gameplay-changing items', () => {
 });
 
 describe('GS-proshop-2 — themed club sets', () => {
-  it('the legendary Solar Storm distance set exists, plus the re-themed Planet/Phoenix labels', () => {
-    expect(clubSetById('solar')).toMatchObject({ rarity: 'legendary', theme: 'solarstorm', distanceOnly: true });
+  it('the legendary Solar Storm set exists as a COMPLETE bag, plus the re-themed Planet/Phoenix labels', () => {
+    expect(clubSetById('solar')).toMatchObject({ rarity: 'legendary', theme: 'solarstorm' });
     expect(clubSetById('tour')!.theme).toBe('planet');
     expect(clubSetById('masters')!.theme).toBe('phoenix');
-    // Solar is distance-only → it generates a Driver item but no scoring-iron item.
+    // Solar Storm is now a FULL themed set: a Driver (distance), a scoring iron, AND a putter.
     expect(clubItem(clubItemId('solar', 'D'))).toBeTruthy();
-    expect(clubItem(clubItemId('solar', '7i'))).toBeUndefined();
+    expect(clubItem(clubItemId('solar', '7i'))).toBeTruthy();
+    expect(clubItem(clubItemId('solar', 'putter'))).toBeTruthy();
+    // Phoenix (masters) is likewise complete now — irons/wedges + a putter, not just woods.
+    expect(clubItem(clubItemId('masters', '7i'))).toBeTruthy();
+    expect(clubItem(clubItemId('masters', 'AW'))).toBeTruthy();
+    expect(clubItem(clubItemId('masters', 'putter'))).toBeTruthy();
+    // Planet's putter rides the `pro` line (its scoring/putter half); `tour` stays distance-only.
+    expect(clubItem(clubItemId('pro', 'putter'))).toBeTruthy();
+    expect(clubItem(clubItemId('tour', '7i'))).toBeUndefined();
+    expect(clubItem(clubItemId('tour', 'putter'))).toBeUndefined();
   });
 
   it('a Solar Storm driver is the biggest reach upgrade', () => {

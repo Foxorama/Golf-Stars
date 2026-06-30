@@ -765,8 +765,10 @@ This game lives or dies on three axes — put every change through all three bef
   equip/replace, `clubOfferNote`, the merged offer, the distance-bonus inheritance, snapshot/resume, and
   that distance upgrades raise — and Pro coverage never lowers — the roster mean Stableford (coverage is an
   INTERACTIVE win the auto reach-AI barely exploits, so its guard is "no regression", not "strictly helps").
-  **Deferred:** scoring-club UPGRADES via a real stat (per-club dispersion/effect, not carry) and
-  location-specific legendary sets with game effects (the Tarantula Network's Spyder putter — one row each).
+  **Deferred:** scoring-club UPGRADES via a real stat — first step shipped (GS-fullsets, below): themed
+  PUTTERS carry a rarity-scaled `puttBoost`, the first non-carry scoring-class upgrade. Still deferred:
+  the same idea for irons/wedges (per-club dispersion/effect) and location-specific legendary sets with
+  game effects (the Tarantula Network's Spyder putter — one row each).
 - **Persistent meta-progression (GS-12, `meta.ts`):** runs bank **Star Shards** (`shardsForRun` =
   distance×3 + stops×2, floored at 1) in **save v3**, spent at the Outpost on PERMANENT, leveled
   *starting* upgrades (`META_UPGRADES`: Veteran Hands −2 hcp, Tour Bag +6yd, Steady Grip −4% spray,
@@ -1028,11 +1030,30 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
     help/neutral scoring (no death-spiral risk; the auto floor uses base loadouts so seeded sims are
     unaffected). Wired into `ShotInput`/`ExecOpts`/`PlayHoleOptions`/`playerHoleOpts`/`shotSpread`.
   - **Club sets themed by rarity (the user's ask).** `CLUB_SETS` labels re-themed + a new legendary set
-    (set IDs stable for save-compat, stats/roles UNCHANGED so club-rewards balance holds): rare = **Planet**
-    (`tour` distance + `pro` scoring), epic = **Phoenix Flames** (`masters` distance), legendary = **Solar
-    Storm** (NEW `solar` distance, +24 carry). Each set row carries `theme`/`tint` (render-only) — the seam
-    for "later, different sets are better at different things". `equippedGearTheme(loadout)` returns the
-    RAREST themed set the bag carries.
+    (set IDs stable for save-compat): rare = **Planet** (`tour` distance + `pro` scoring), epic = **Phoenix
+    Flames** (`masters`), legendary = **Solar Storm** (`solar`, +24 carry). Each set row carries `theme`/
+    `tint` (render-only). `equippedGearTheme(loadout)` returns the RAREST themed set the bag carries.
+  - **Each theme is now a COMPLETE bag — woods + irons + wedges + a putter (GS-fullsets).** Originally
+    Phoenix/Solar were `distanceOnly` (woods only) and no set had a putter; you couldn't assemble a full
+    themed bag. Now `masters`/`solar` drop `distanceOnly` and cover scoring irons/wedges too (BASE carry —
+    `buildRewardClub` only ever bumps DISTANCE clubs ≥ `DISTANCE_CLUB_CARRY`, so coverage clubs never
+    overshoot, the same balance basis as `pro`), and all three themes gain a **putter**. The putter is the
+    clean way a SCORING-class reward is a genuine, offerable improvement (the deferred "scoring upgrade via
+    a real stat, not carry"): everyone owns a putter, so a themed putter carries no extra distance — its
+    value is a wider make-window (`ClubSet.puttBoost`, rarity-scaled Planet 0.10 < Phoenix 0.16 < Solar
+    0.22), folded into `loadout.puttBoost` by the item's `apply()` (so it rebuilds on resume since
+    `loadoutFromPerks` replays every apply). `REWARD_CLUB_TYPES` gained `'putter'`; `setCoversType` gates
+    putter coverage on `set.puttBoost !== undefined` (checked FIRST — a putter's tiny carry otherwise reads
+    as "scoring"); `offerableClubs` offers a themed putter as a RARITY upgrade over the one you hold (same
+    rule as a distance club's reach upgrade — its make-window is the gain). Planet's putter rides the `pro`
+    line; `tour` stays distance-only. `clubOfferNote` flags a putter upgrade with `putt: true` (the badge
+    reads "▲ UPGRADE · putt", not a misleading "+0 yd"). Render: `drawThemedClub` takes the club TYPE and
+    draws a flat mallet blade + alignment line for a putter (vs the swept iron/wood face); the avatar's
+    swung gear already reads `equippedGearTheme`, so collecting any themed club (incl. the new putters/irons)
+    shows the theme on-course. Content-as-data → no new `_gs*`/URL hook (the Sim Lab absorbs the new rows).
+    Tests: `tests/club-rewards.test.ts` (full-set coverage, base-carry irons, putter puttBoost + offer-as-
+    rarity-upgrade + offer-note + snapshot/resume) and `tests/proshop-expansion.test.ts` (the complete-bag
+    catalogue assertions).
   - **Procedural item images (`render/itemArt.ts`) + avatar gear (the "image changes your avatar" ask).**
     `itemArtSVG(id, rarity, setTheme)` is an assetless, deterministic SVG per item (house no-404 rule):
     the art KIND is resolved from the id (shaft/ball/glove/coin/putter/shoes/rangefinder/wedge/coach/trophy/

@@ -2461,6 +2461,7 @@ function shopScreen(): string {
     const note = clubOfferNote(it, state.run.loadout);
     if (!note) return undefined;
     if (note.kind === 'upgrade') {
+      if (note.putt) return { text: '▲ UPGRADE · putt', tone: 'up' };
       return { text: note.gainYd ? `▲ UPGRADE · +${note.gainYd} yd` : '▲ UPGRADE', tone: 'up' };
     }
     const between =
