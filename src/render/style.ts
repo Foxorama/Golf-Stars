@@ -919,7 +919,7 @@ function whaleSilhouette(cx: number, cy: number, len: number, rng: () => number)
  * PROJECTED island, made the whale count — and the shared rng stream — depend on the projector).
  * Drawn BEFORE the landmass so the cliff overlaps their near edges. Own rng stream.
  */
-function cetusOcean(landBox: Vec[], cb: Box, proj: Projector, W: number, H: number, accents: number, rng: () => number): Prim[] {
+function cetusOcean(landPolys: Vec[][], cb: Box, proj: Projector, W: number, H: number, accents: number, rng: () => number): Prim[] {
   const out: Prim[] = [];
   // A denser star-ocean base so the deep reads as the intro's starfield (Cetus's signature). These
   // sit under the landmass; the cliff masks the part over the plateau. Off this dedicated rng stream.
@@ -956,7 +956,7 @@ function cetusOcean(landBox: Vec[], cb: Box, proj: Projector, W: number, H: numb
   // A band hugging the island (clear of the plateau but not so far they fly off the zoomed view).
   for (let i = 0; i < want * 18 && targets.length < want; i++) {
     const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.55, cyw + (rng() - 0.5) * spanY * 1.55];
-    if (pointInPoly(c, landBox)) continue; // keep clear of the plateau
+    if (landPolys.some((lp) => pointInPoly(c, lp))) continue; // keep clear of every land platform
     targets.push(c);
   }
   for (const c of targets) {
@@ -1245,7 +1245,21 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const hrng = mulberry32((hashHole(hole) ^ 0x1b873593) >>> 0);
   const landBox = roundedHull(lb, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22, 0.14, hrng);
   const islandPts = projPoly(landBox, proj);
-  const islandC = centroidOf(islandPts);
+  // Island-green par 3 (GS-cetus-2): a lost-rough par 3 has NO corridor — just the tee + a green
+  // island floating in the deep. So instead of ONE hull spanning tee→green (which would fill the
+  // gap with dark land), draw a land platform around EACH play feature (the green-island fairway +
+  // the tee), letting the open star-ocean read between them. Detected off the roughLie biomeMod
+  // (the lost-rough signal the sim already carries) so the render needs no new hole flag.
+  const islandHole =
+    hole.par === 3 && (hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false) && !rainbow;
+  const fairwayFeat = hole.features.find((f) => f.kind === 'fairway');
+  const teeFeat = hole.features.find((f) => f.kind === 'tee');
+  // The land platforms, in COURSE space (grown a touch beyond each feature for a turf margin).
+  const landPlatformsCourse: Vec[][] =
+    islandHole && fairwayFeat && teeFeat
+      ? [offsetPoly(fairwayFeat.poly, -14), offsetPoly(teeFeat.poly, -10)]
+      : [landBox];
+  const landPlatforms = landPlatformsCourse.map((p) => projPoly(p, proj));
   const space = spaceLookFor(arch, deepen);
   // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that
   // reads off the main `rng` stays byte-identical) keyed off the same hole hash.
@@ -1320,15 +1334,19 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // --- 2b. The Cetus star-ocean: whales surfacing in the deep beyond the cliffs (GS-cetus) ----
   // Drawn BEFORE the landmass so the clifftop plateau overlaps their near edges (they read as the
   // sea below the cliffs). Gated to cetus + own `org` stream → no other world is touched.
-  if (arch === 'cetus' && !rainbow) prims.push(...cetusOcean(landBox, cb, proj, W, H, art.accents, oceanRng));
+  if (arch === 'cetus' && !rainbow) prims.push(...cetusOcean(landPlatformsCourse, cb, proj, W, H, art.accents, oceanRng));
 
   // --- 3. The floating landmass: an atmospheric rim feathering into the void ---
   // Rainbow Road: NO landmass at all (rim glow + fill) — the rainbow ribbon floats over open space, so
-  // the starfield reads everywhere off the road (off-road IS out of bounds).
+  // the starfield reads everywhere off the road (off-road IS out of bounds). An island-green par 3
+  // draws a separate platform per play feature (tee + green island) so the deep shows between them.
   if (!rainbow) {
-    prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.05), fill: space.edge });
-    prims.push({ t: 'poly', pts: scalePoly(islandPts, islandC, 1.025), fill: space.edge });
-    prims.push({ t: 'poly', pts: islandPts, fill: landFillFor(arch, deepen), stroke: space.edge, sw: 1.2 });
+    for (const lp of landPlatforms) {
+      const lc = centroidOf(lp);
+      prims.push({ t: 'poly', pts: scalePoly(lp, lc, 1.05), fill: space.edge });
+      prims.push({ t: 'poly', pts: scalePoly(lp, lc, 1.025), fill: space.edge });
+      prims.push({ t: 'poly', pts: lp, fill: landFillFor(arch, deepen), stroke: space.edge, sw: 1.2 });
+    }
   }
 
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
@@ -1384,9 +1402,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       land.push({ t: 'circle', c: sp, r, fill: crng() < 0.5 ? 'rgba(235,242,255,0.75)' : 'rgba(190,214,255,0.62)' });
     }
   }
-  // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); the rng was still consumed
-  // above, so the art stream is byte-stable whether or not the ribbon is painted.
-  if (!rainbow) prims.push({ t: 'clip', clip: islandPts, children: land });
+  // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); an island-green par 3 also
+  // drops them (the platforms are tiny and turf-covered, the rest is open ocean). The rng was still
+  // consumed above, so the art stream is byte-stable whether or not the detail is painted.
+  if (!rainbow && !islandHole) prims.push({ t: 'clip', clip: islandPts, children: land });
 
   // --- 5. Terrain features (fairway/green/tee + scatter surfaces) --------------
   const collar = collarFor(arch, deepen);

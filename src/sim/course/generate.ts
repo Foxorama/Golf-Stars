@@ -446,6 +446,11 @@ function generateHole(
   // shredder (a dogleg pushes the AI's line off the island into the void), so void island holes stay
   // an honest straight target — their challenge is the abyss off the fairway, not the shape.
   const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
+  // Island-green PAR 3 (GS-cetus-2): on a lost-rough world (the void / Cetus), a par 3 has no fairway
+  // corridor at all — just the tee and a GENEROUS green-centred landing island floating in the deep.
+  // You carry the abyss to the island or lose the ball to it. A true island green; the deep is the
+  // hazard, so it needs no flanking penalty hazards. The island is sized generous (below) to stay fair.
+  const islandPar3 = !!lostRough && par === 3;
 
   // Hole ARCHETYPE (GS-shapes-2): pick a design template that couples a SHAPE (straight drift / single
   // dogleg L-R / S-curve double / heroic CAPE diagonal / severe HAIRPIN) with a LENGTH CLASS (drivable
@@ -519,11 +524,13 @@ function generateHole(
     const u = i / (segs - 1);
     return Math.max(baseHalf * 0.42, w * (1 - asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
   });
-  const fairway: Feature = { kind: 'fairway', poly: ribbon(dense, leftHW, rightHW) };
+  // The corridor ribbon (the normal hole). An island-green par 3 overrides this with a compact
+  // green-centred landing island once the green radius is known (just below).
+  let fairway: Feature = { kind: 'fairway', poly: ribbon(dense, leftHW, rightHW) };
   // Hazard placement + the fairness validator both reason about the corridor's WIDEST point
   // (validateFairness recovers the max lateral extent of the fairway poly), so use that here —
   // penalty hazards then clear the widest part and stay provably fair.
-  const fairwayHalfWidth = Math.max(...leftHW, ...rightHW);
+  let fairwayHalfWidth = Math.max(...leftHW, ...rightHW);
 
   const teeBox: Feature = { kind: 'tee', poly: blobPoly(tee, 8, 8, 0, rng) };
   // Varied GREEN shape (GS-greens), per-biome character. baseR scaled by the biome's greenSize AND by
@@ -534,6 +541,15 @@ function generateHole(
   const greenR = rng.range(11, 16) * (biome.greenSize ?? 1) * greenLenFactor;
   const greenPolygon = greenPoly(green, greenR, biome.greenAspect ?? 1.8, biome.greenIrregular ?? 1, rng);
   const greenF: Feature = { kind: 'green', poly: greenPolygon };
+
+  // Island-green par 3: replace the long corridor with a generous organic island around the green.
+  // Sized so a sensible tee shot holds it (≈110 yd wide at a ~165 yd hole) while a real miss finds the
+  // deep. fairwayHalfWidth → the island radius so any (sand) greenside hazards still clear fairly.
+  if (islandPar3) {
+    const islandR = greenR * 1.8 + 30;
+    fairway = { kind: 'fairway', poly: blobPoly(green, islandR, 14, 0.16, rng) };
+    fairwayHalfWidth = islandR;
+  }
 
   // Flag inside the (arbitrary-shape) green via ray-march from the centre (GS-6/GS-greens): always
   // genuinely inside (never on the lip) yet off-centre, for ANY shape. Drawn from a SIDE rng keyed
@@ -613,8 +629,9 @@ function generateHole(
   }
 
   // Fairway-flanking penalty hazards: count scales with wildness. Placed CLEAR of the
-  // play corridor (fairness guarantee) — rejected if they'd block a sensible line.
-  const flankAttempts = Math.round(rng.range(0, 1.5) + wildness * 3);
+  // play corridor (fairness guarantee) — rejected if they'd block a sensible line. An island-green
+  // par 3 skips them entirely: the surrounding deep IS the hazard (ponds in the void read wrong).
+  const flankAttempts = islandPar3 ? 0 : Math.round(rng.range(0, 1.5) + wildness * 3);
   for (let i = 0; i < flankAttempts; i++) {
     const kind = rng.pick(biome.hazardKinds);
     const r = rng.range(10, 14 + wildness * 12);
