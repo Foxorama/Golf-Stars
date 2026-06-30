@@ -11,10 +11,10 @@ import {
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 
 describe('save schema', () => {
-  it('default save carries the current version (8) with the starter fleet + empty wardrobe + common bag', () => {
-    expect(SAVE_VERSION).toBe(8);
+  it('default save carries the current version (9) with the starter fleet + empty wardrobe + common bag + no club unlocks', () => {
+    expect(SAVE_VERSION).toBe(9);
     const d = defaultSave();
-    expect(d.version).toBe(8);
+    expect(d.version).toBe(9);
     expect(d.shards).toBe(0);
     expect(d.metaUpgrades).toEqual({});
     expect(d.maxAscension).toBe(0);
@@ -26,9 +26,10 @@ describe('save schema', () => {
     expect(d.equippedHat).toBeUndefined();
     expect(d.equippedShirt).toBeUndefined();
     expect(d.bagTier).toBe('common');
+    expect(d.unlockedClubsByCharacter).toEqual({});
   });
 
-  it('round-trips a v8 save through export/import (fleet + wardrobe + bag tier preserved)', () => {
+  it('round-trips a v9 save through export/import (fleet + wardrobe + bag tier + club unlocks preserved)', () => {
     const save = {
       ...defaultSave(),
       bestStableford: 41,
@@ -43,6 +44,7 @@ describe('save schema', () => {
       equippedHat: 'cap-classic',
       equippedShirt: 'suit-space',
       bagTier: 'epic' as const,
+      unlockedClubsByCharacter: { 'feather-fade': ['7i', '3W'] },
       activeRun: {
         seed: 7,
         stopIndex: 3,
@@ -55,7 +57,7 @@ describe('save schema', () => {
     };
     const restored = importSave(exportSave(save));
     expect(restored).toMatchObject({
-      version: 8,
+      version: 9,
       shards: 120,
       bestDistance: 9,
       maxAscension: 0,
@@ -67,12 +69,38 @@ describe('save schema', () => {
       equippedHat: 'cap-classic',
       equippedShirt: 'suit-space',
       bagTier: 'epic',
+      unlockedClubsByCharacter: { 'feather-fade': ['7i', '3W'] },
       metaUpgrades: { 'vet-hands': 2, 'deep-pockets': 1 },
       activeRun: { seed: 7, perks: ['gyro', 'precision-chip', 'precision-chip'], meta: { 'vet-hands': 2 }, bagTier: 'epic' },
     });
   });
 
-  it('migrates a v7 blob forward to v8 (seeds the common bag tier, preserves the wardrobe)', () => {
+  it('migrates a v8 blob forward to v9 (seeds an empty per-character club-unlock map, preserves the rest)', () => {
+    const v8 = {
+      version: 8 as const,
+      bestStableford: 25,
+      bestDistance: 13,
+      shards: 95,
+      metaUpgrades: { 'tour-bag': 1 },
+      maxAscension: 3,
+      lifetimeAces: 1,
+      ownedShips: [DEFAULT_SHIP_ID, 'wagon-gold'],
+      selectedShip: 'wagon-gold',
+      marketSeed: 2,
+      ownedApparel: ['cap-classic'],
+      equippedHat: 'cap-classic',
+      bagTier: 'rare' as const,
+    };
+    const s = migrate(v8);
+    expect(s.version).toBe(9);
+    expect(s.shards).toBe(95);
+    expect(s.maxAscension).toBe(3);
+    expect(s.bagTier).toBe('rare');
+    expect(s.ownedApparel).toEqual(['cap-classic']);
+    expect(s.unlockedClubsByCharacter).toEqual({});
+  });
+
+  it('migrates a v7 blob forward to v9 (seeds the common bag tier + empty club unlocks, preserves the wardrobe)', () => {
     const v7 = {
       version: 7 as const,
       bestStableford: 18,
@@ -88,7 +116,7 @@ describe('save schema', () => {
       equippedHat: 'cap-classic',
     };
     const s = migrate(v7);
-    expect(s.version).toBe(8);
+    expect(s.version).toBe(9);
     expect(s.shards).toBe(70);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline']);
     expect(s.selectedShip).toBe('racer-redline');
@@ -96,9 +124,10 @@ describe('save schema', () => {
     expect(s.ownedApparel).toEqual(['cap-classic']);
     expect(s.equippedHat).toBe('cap-classic');
     expect(s.bagTier).toBe('common');
+    expect(s.unlockedClubsByCharacter).toEqual({});
   });
 
-  it('migrates a v6 blob forward to v8 (seeds an empty wardrobe + common bag, preserves the fleet)', () => {
+  it('migrates a v6 blob forward to v9 (seeds an empty wardrobe + common bag, preserves the fleet)', () => {
     const v6 = {
       version: 6 as const,
       bestStableford: 18,
@@ -112,7 +141,7 @@ describe('save schema', () => {
       marketSeed: 3,
     };
     const s = migrate(v6);
-    expect(s.version).toBe(8);
+    expect(s.version).toBe(9);
     expect(s.shards).toBe(70);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline']);
     expect(s.selectedShip).toBe('racer-redline');
@@ -128,7 +157,7 @@ describe('save schema', () => {
     expect(s.equippedShirt).toBe('polo-classic'); // owned → kept
   });
 
-  it('migrates a v2 blob forward to v8 (drops dead credits, seeds meta + ascension + aces + fleet)', () => {
+  it('migrates a v2 blob forward to v9 (drops dead credits, seeds meta + ascension + aces + fleet)', () => {
     const v2: SaveV2 = {
       version: 2,
       credits: 0,
@@ -137,7 +166,7 @@ describe('save schema', () => {
       activeRun: { seed: 5, stopIndex: 2, distanceFromStart: 8, credits: 50, perks: ['gyro'] },
     };
     const s = migrate(v2);
-    expect(s.version).toBe(8);
+    expect(s.version).toBe(9);
     expect(s.shards).toBe(0);
     expect(s.metaUpgrades).toEqual({});
     expect(s.maxAscension).toBe(0);
@@ -149,10 +178,10 @@ describe('save schema', () => {
     expect('credits' in s).toBe(false);
   });
 
-  it('migrates a v3 blob forward to v8 (preserves shards + meta, seeds the fleet)', () => {
+  it('migrates a v3 blob forward to v9 (preserves shards + meta, seeds the fleet)', () => {
     const v3 = { version: 3 as const, bestStableford: 12, bestDistance: 14, shards: 88, metaUpgrades: { 'tour-bag': 3 } };
     const s = migrate(v3);
-    expect(s.version).toBe(8);
+    expect(s.version).toBe(9);
     expect(s.maxAscension).toBe(0);
     expect(s.lifetimeAces).toBe(0);
     expect(s.shards).toBe(88);
@@ -160,7 +189,7 @@ describe('save schema', () => {
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
   });
 
-  it('migrates a v5 blob forward to v8 (seeds the cosmetic fleet, preserves the rest)', () => {
+  it('migrates a v5 blob forward to v9 (seeds the cosmetic fleet, preserves the rest)', () => {
     const v5 = {
       version: 5 as const,
       bestStableford: 22,
@@ -171,7 +200,7 @@ describe('save schema', () => {
       lifetimeAces: 4,
     };
     const s = migrate(v5);
-    expect(s.version).toBe(8);
+    expect(s.version).toBe(9);
     expect(s.shards).toBe(50);
     expect(s.maxAscension).toBe(2);
     expect(s.lifetimeAces).toBe(4);
@@ -181,7 +210,7 @@ describe('save schema', () => {
     expect(s.marketSeed).toBe(0);
   });
 
-  it('migrates a v1 blob all the way forward to v8', () => {
+  it('migrates a v1 blob all the way forward to v9', () => {
     const v1: SaveV1 = {
       version: 1,
       runSeed: 99,
@@ -190,7 +219,7 @@ describe('save schema', () => {
       bestStableford: 30,
     };
     const s = migrate(v1);
-    expect(s.version).toBe(8);
+    expect(s.version).toBe(9);
     expect(s.shards).toBe(0);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(s.bestStableford).toBe(30);

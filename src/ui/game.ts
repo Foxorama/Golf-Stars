@@ -50,6 +50,7 @@ import {
 } from '../sim/rpg/match';
 import { type MetaUpgrades } from '../sim/rpg/meta';
 import { bagSet, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
+import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlock';
 import { canBuyShip, marketRerollCost, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { playHole } from '../sim/round';
@@ -144,6 +145,12 @@ export interface UiState {
   scrambleChoice?: ScrambleShot;
   /** Boss-reward choices to pick from after beating a boss (GS-talents) — shown on the bossReward screen. */
   bossReward?: BossReward[];
+  /** Per-character ascension-victory club unlocks (GS-ascension-clubs): each golfer's permanently-unlocked
+   *  extra starting clubs (characterId → club type ids), grown one per voyage win with that golfer. */
+  unlockedClubsByCharacter: Record<string, string[]>;
+  /** The ascension-victory reward from the run that just WON (GS-ascension-clubs) — a newly-unlocked club
+   *  (or a Shard consolation if the character's bag was already full). Shown on the victory screen. */
+  lastClubUnlock?: ClubUnlockReward;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -209,6 +216,7 @@ export interface MetaProgress {
   equippedHat?: string;
   equippedShirt?: string;
   bagTier?: BagTier;
+  unlockedClubsByCharacter?: Record<string, string[]>;
 }
 
 /**
@@ -244,6 +252,7 @@ export function initState(
     ownedApparel: meta.ownedApparel ?? [],
     equippedHat: meta.equippedHat,
     equippedShirt: meta.equippedShirt,
+    unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
   };
 }
 
@@ -263,6 +272,40 @@ function resolveBossId(run: Run): string {
 function unlockedAscension(state: UiState, run: Run): number {
   if (run.endedReason !== 'won') return state.maxAscension;
   return Math.min(ASCENSION_MAX, Math.max(state.maxAscension, run.ascension + 1));
+}
+
+/**
+ * The meta-progression deltas every run-end site shares (GS-12 / GS-ascension / GS-ascension-clubs):
+ * banked shards, the Trade-Market reseed, the Ascension tier unlock, and — on a WON voyage — the
+ * character's ascension-victory club unlock (or a Shard consolation if their bag is already full). One
+ * source of truth so all four end sites (auto/interactive × ordinary/matchplay) reward a win identically.
+ * Returns the unchanged fields while the run is still active (a survived non-final stop). Exported so
+ * tests can assert the win reward directly (a natural voyage win is too rare to drive in a unit test).
+ */
+export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
+  if (run.status === 'active') {
+    return { lastRunShards: undefined, lastClubUnlock: undefined };
+  }
+  const earned = shardsForRun(run);
+  const characterId = run.loadout.characterId;
+  const owned = (characterId && state.unlockedClubsByCharacter[characterId]) || [];
+  // Only a WON voyage grants the character reward; a missed cut / bank just banks shards.
+  const reward =
+    run.endedReason === 'won'
+      ? ascensionClubReward(characterId, state.bagTier, owned, `${run.seed}:${run.ascension}`)
+      : undefined;
+  const gotClub = reward?.kind === 'club' && !!characterId;
+  const bonusShards = reward?.kind === 'shards' ? reward.shards : 0;
+  return {
+    shards: state.shards + earned + bonusShards,
+    lastRunShards: earned,
+    marketSeed: state.marketSeed + 1,
+    maxAscension: unlockedAscension(state, run),
+    unlockedClubsByCharacter: gotClub
+      ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
+      : state.unlockedClubsByCharacter,
+    lastClubUnlock: reward,
+  };
 }
 
 /** Boss-reward choices to offer after a stop, if it was a survived (non-final) boss win (GS-talents).
@@ -298,8 +341,17 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'selectCharacter': {
       if (state.screen !== 'character') return state;
       // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + ascension + bag
-      // tier chosen at 'start'.
-      const run = startRun(state.run.seed, state.run.formatId, state.metaUpgrades, action.characterId, state.run.ascension, state.bagTier);
+      // tier chosen at 'start'. The golfer's permanently-unlocked clubs (GS-ascension-clubs) grow their
+      // starting bag.
+      const run = startRun(
+        state.run.seed,
+        state.run.formatId,
+        state.metaUpgrades,
+        action.characterId,
+        state.run.ascension,
+        state.bagTier,
+        state.unlockedClubsByCharacter[action.characterId] ?? [],
+      );
       return { ...state, run, course: currentCourse(run), screen: 'intro' };
     }
 
@@ -346,7 +398,6 @@ export function reduce(state: UiState, action: Action): UiState {
             );
         const { run, result } = finishStop(state.run, state.course, stop.player, { matchWon: stop.state.playerAdvances });
         const ended = run.status !== 'active';
-        const earned = ended ? shardsForRun(run) : undefined;
         return {
           ...state,
           run,
@@ -357,20 +408,15 @@ export function reduce(state: UiState, action: Action): UiState {
           screen: ended ? 'gameover' : 'result',
           bestStableford: Math.max(state.bestStableford, result.stableford),
           bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-          shards: state.shards + (earned ?? 0),
-          lastRunShards: earned,
-          // A completed run refreshes the Trade Market's rotating stock (GS-garage).
-          marketSeed: state.marketSeed + (ended ? 1 : 0),
-          maxAscension: unlockedAscension(state, run),
           lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
+          ...runEndUpdates(state, run),
         };
       }
       const { run, result, played } = playStop(state.run);
       // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
       // the gameover/victory screen; a survived non-final stop goes to the result screen.
       const ended = run.status !== 'active';
-      const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
         run,
@@ -381,13 +427,9 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-        shards: state.shards + (earned ?? 0),
-        lastRunShards: earned,
-        // A completed run refreshes the Trade Market's rotating stock (GS-garage).
-        marketSeed: state.marketSeed + (ended ? 1 : 0),
-        maxAscension: unlockedAscension(state, run),
         lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
+        ...runEndUpdates(state, run),
       };
     }
 
@@ -517,7 +559,6 @@ export function reduce(state: UiState, action: Action): UiState {
         }
         const { run, result } = finishStop(state.run, state.course, stopPlayed, { matchWon: ms.playerAdvances });
         const ended = run.status !== 'active';
-        const earned = ended ? shardsForRun(run) : undefined;
         return {
           ...state,
           run,
@@ -531,13 +572,9 @@ export function reduce(state: UiState, action: Action): UiState {
           screen: ended ? 'gameover' : 'result',
           bestStableford: Math.max(state.bestStableford, result.stableford),
           bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-          shards: state.shards + (earned ?? 0),
-          lastRunShards: earned,
-          // A completed run refreshes the Trade Market's rotating stock (GS-garage).
-          marketSeed: state.marketSeed + (ended ? 1 : 0),
-          maxAscension: unlockedAscension(state, run),
           lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
+          ...runEndUpdates(state, run),
         };
       }
 
@@ -547,7 +584,6 @@ export function reduce(state: UiState, action: Action): UiState {
       // Stop complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
       const ended = run.status !== 'active';
-      const earned = ended ? shardsForRun(run) : undefined;
       return {
         ...state,
         run,
@@ -561,13 +597,9 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-        shards: state.shards + (earned ?? 0),
-        lastRunShards: earned,
-        // A completed run refreshes the Trade Market's rotating stock (GS-garage).
-        marketSeed: state.marketSeed + (ended ? 1 : 0),
-        maxAscension: unlockedAscension(state, run),
         lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
+        ...runEndUpdates(state, run),
       };
     }
 
@@ -656,17 +688,14 @@ export function reduce(state: UiState, action: Action): UiState {
       // credits converted to shards (busting forfeits them) — see shardsForRun.
       if (state.screen !== 'travel' || state.run.status !== 'active') return state;
       const run = bank(state.run);
-      const earned = shardsForRun(run);
       return {
         ...state,
         run,
         routes: undefined,
         screen: 'gameover',
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-        shards: state.shards + earned,
-        lastRunShards: earned,
-        // Banking ends the run → refresh the Trade Market's stock next visit (GS-garage).
-        marketSeed: state.marketSeed + 1,
+        // Banking ends the run (never a 'won') → bank shards + refresh the Trade Market (GS-garage).
+        ...runEndUpdates(state, run),
       };
     }
 
@@ -776,6 +805,7 @@ export function reduce(state: UiState, action: Action): UiState {
         equippedHat: state.equippedHat,
         equippedShirt: state.equippedShirt,
         bagTier: state.bagTier,
+        unlockedClubsByCharacter: state.unlockedClubsByCharacter,
       });
     }
   }

@@ -43,6 +43,7 @@ import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeam
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
+import { addUnlockedClubs } from './club-unlock';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
@@ -108,6 +109,10 @@ export interface Run {
   /** The permanent default-bag tier baked into this run's start (GS-bag-tiers); absent/'common' = the
    *  un-upgraded starter bag. Kept for resume (the loadout is rebuilt from it). */
   bagTier?: BagTier;
+  /** The CHARACTER's permanently-unlocked clubs baked into this run's starting bag (GS-ascension-clubs):
+   *  club types won as ascension-victory rewards on past runs with this golfer. Stable for the run's
+   *  duration (they only grow at a win, which ends the run); kept for resume so the bag rebuilds. */
+  unlockedClubs?: string[];
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
@@ -139,10 +144,14 @@ export function startingLoadoutFor(
   meta: MetaUpgrades,
   characterId?: string,
   bagTier: BagTier = DEFAULT_BAG_TIER,
+  unlockedClubs: readonly string[] = [],
 ): PlayerLoadout {
-  // The bag tier (GS-bag-tiers) re-stamps the LAST, so it reads the final distanceClubBonus (character +
-  // meta Tour Bag) when rebuilding the distance clubs — and a 'common' tier is a no-op (byte-for-byte).
-  return applyBagTier(applyMeta(meta, applyCharacter(characterId, startingLoadout())), bagTier);
+  // The character's ascension-victory club unlocks (GS-ascension-clubs) are added AFTER meta (so they
+  // inherit the final distanceClubBonus) but BEFORE the bag tier, so they re-stamp to the live rarity
+  // with the rest of the bag. The bag tier re-stamps LAST, reading the final distanceClubBonus (character
+  // + meta Tour Bag) when rebuilding the distance clubs — and a 'common' tier is a no-op (byte-for-byte).
+  const base = addUnlockedClubs(applyMeta(meta, applyCharacter(characterId, startingLoadout())), unlockedClubs);
+  return applyBagTier(base, bagTier);
 }
 
 /** Ascension ladder (GS-ascension): a fixed-length campaign gets harder above the base difficulty,
@@ -163,6 +172,7 @@ export function startRun(
   characterId?: string,
   ascension = 0,
   bagTier: BagTier = DEFAULT_BAG_TIER,
+  unlockedClubs: readonly string[] = [],
 ): Run {
   const rng = new Rng(seed);
   const asc = Math.max(0, Math.min(ASCENSION_MAX, Math.round(ascension)));
@@ -176,10 +186,11 @@ export function startRun(
     // thins the starting purse (floored so it never strands you with nothing). The default-bag tier
     // (GS-bag-tiers) re-stamps the starting clubs to a higher rarity.
     credits: Math.max(20, metaStartingCredits(meta) - ascensionCreditPenalty(asc)),
-    loadout: startingLoadoutFor(meta, characterId, bagTier),
+    loadout: startingLoadoutFor(meta, characterId, bagTier, unlockedClubs),
     meta,
     ascension: asc,
     bagTier,
+    unlockedClubs: [...unlockedClubs],
     bonusShards: 0,
     firedEventIds: [],
     status: 'active',
@@ -907,6 +918,9 @@ export interface RunSnapshot {
   /** Permanent default-bag tier (GS-bag-tiers), so a resume rebuilds the upgraded starting bag.
    *  Absent ⇒ the un-upgraded common bag (old snapshots). */
   bagTier?: BagTier;
+  /** The character's ascension-victory club unlocks (GS-ascension-clubs), so a resume rebuilds the
+   *  grown starting bag. Absent ⇒ none (old snapshots / a fresh roster). */
+  unlockedClubs?: string[];
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
   /** The pending destination-world theme id (GS-journey-biome), so a resume keeps the stop's biome.
@@ -931,6 +945,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     meta: { ...run.meta },
     ascension: run.ascension,
     bagTier: run.bagTier,
+    unlockedClubs: run.unlockedClubs ? [...run.unlockedClubs] : undefined,
     pendingEventId: run.pendingEvent?.id,
     pendingThemeId: run.pendingTheme?.id,
     bonusShards: run.bonusShards,
@@ -951,10 +966,14 @@ export function resumeRun(snap: RunSnapshot): Run {
     // Perks (incl. reward clubs, GS-clubs) sit on top of the golfer+meta+bag-tier starting loadout,
     // rebuilt the SAME way `startRun` builds it, so the bag (upgraded starting clubs + bought clubs)
     // reconstructs identically.
-    loadout: loadoutFromPerks(snap.perks ?? [], startingLoadoutFor(meta, snap.characterId, bagTier)),
+    loadout: loadoutFromPerks(
+      snap.perks ?? [],
+      startingLoadoutFor(meta, snap.characterId, bagTier, snap.unlockedClubs ?? []),
+    ),
     meta,
     ascension: snap.ascension ?? 0,
     bagTier,
+    unlockedClubs: snap.unlockedClubs ? [...snap.unlockedClubs] : [],
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
     bonusShards: snap.bonusShards ?? 0,
@@ -1013,6 +1032,9 @@ export interface RunStrategy {
   characterId?: string;
   /** Ascension difficulty tier (GS-ascension); default 0. */
   ascension?: number;
+  /** The character's ascension-victory club unlocks (GS-ascension-clubs) baked into the starting bag;
+   *  default none. */
+  unlockedClubs?: readonly string[];
 }
 
 export interface RunOutcome {
@@ -1026,7 +1048,15 @@ export function simulateRun(
   strategy: RunStrategy = {},
   maxStops = 100,
 ): RunOutcome {
-  let run = startRun(seed, strategy.formatId, strategy.meta, strategy.characterId, strategy.ascension);
+  let run = startRun(
+    seed,
+    strategy.formatId,
+    strategy.meta,
+    strategy.characterId,
+    strategy.ascension,
+    DEFAULT_BAG_TIER,
+    strategy.unlockedClubs ?? [],
+  );
   const stops: StopResult[] = [];
   for (let i = 0; i < maxStops && run.status === 'active'; i++) {
     const played = playStop(run);
