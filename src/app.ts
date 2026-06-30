@@ -305,6 +305,7 @@ function titleScreen(): string {
     )
     .join('');
   return `
+    <button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
     <header style="border-left:4px solid #5fd45a;padding-left:10px;">
       <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
@@ -312,11 +313,9 @@ function titleScreen(): string {
     <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
       ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
-      ${btn('🚀 Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
-      <button class="gs-btn gs-btn--ghost" data-open-settings="1">⚙ Settings</button>
       ${installButtonHTML()}
     </div>
-    ${clubhouseSection()}
+    ${navTilesHTML()}
     <div style="margin:.2em 0 .6em;">
       ${btn(`🗓 Daily Challenge — ${dailyLabel()}`, { type: 'restart', seed: dailySeed() }, { variant: 'ghost' })}
       <span style="font-size:11.5px;opacity:.55;">same course for everyone today (a deterministic seed)</span>
@@ -1874,14 +1873,142 @@ function clubhouseCardHTML(ch: Character): string {
     </button>`;
 }
 
-/** The Clubhouse section on the title screen (GS-clubhouse) — all four golfers, each a doorway to
- *  outfitting their own ship + clothes. */
-function clubhouseSection(): string {
+/** The Clubhouse hall (GS-clubhouse) — its own screen reached from the title's Clubhouse doorway. All
+ *  four golfers wait inside (no longer cluttering the title), each a door to their garage + wardrobe. */
+function clubhouseHallScreen(): string {
   const cards = CHARACTERS.map(clubhouseCardHTML).join('');
   return `
-    <h2 style="font-size:16px;margin:1em 0 .15em;">🏠 Clubhouse</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Outfit each golfer individually — give them their own ride and their own look. Buy gear at the Trade Market.</p>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${cards}</div>`;
+    <header style="border-left:4px solid #d8a24a;padding-left:10px;">
+      <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Step inside. Outfit each golfer individually — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
+    </header>
+    <div style="position:relative;border:1px solid #3a2f1f;border-radius:16px;margin:12px 0;padding:14px 10px 18px;overflow:hidden;background:linear-gradient(180deg,#1c160e,#120d08);">
+      ${clubhouseHallArt()}
+      <div style="position:relative;display:flex;flex-wrap:wrap;justify-content:center;">${cards}</div>
+    </div>
+    <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
+}
+
+/** The two big title-screen doorways (GS-nav): the Trade Market on the left, the Clubhouse on the
+ *  right, each a fat themed button with its own painted scene behind the label. */
+function navTilesHTML(): string {
+  return `
+    <div class="gs-navtiles">
+      <button class="gs-navtile gs-navtile--market" data-action='${JSON.stringify({ type: 'openMarket' })}'>
+        <span class="gs-navtile__art" aria-hidden="true">${marketTileArt()}</span>
+        <span class="gs-navtile__cap">
+          <span class="gs-navtile__title">🚀 Trade Market</span>
+          <span class="gs-navtile__sub">Spend ✦ Shards on ships &amp; threads</span>
+        </span>
+      </button>
+      <button class="gs-navtile gs-navtile--clubhouse" data-action='${JSON.stringify({ type: 'openClubhouseHall' })}'>
+        <span class="gs-navtile__art" aria-hidden="true">${clubhouseTileArt()}</span>
+        <span class="gs-navtile__cap">
+          <span class="gs-navtile__title">🏠 Clubhouse</span>
+          <span class="gs-navtile__sub">Outfit each of your golfers</span>
+        </span>
+      </button>
+    </div>`;
+}
+
+/** A faint cosy-interior backdrop behind the Clubhouse hall's four golfers — a panelled wall, a window
+ *  onto the dusk course, and a trophy shelf. Decorative + hand-placed (no rng), sits low-opacity so the
+ *  golfer cards stay the stars. */
+function clubhouseHallArt(): string {
+  return `<svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice"
+      style="position:absolute;inset:0;width:100%;height:100%;opacity:.5;">
+    <defs>
+      <linearGradient id="chWall" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#241a10"/><stop offset="100%" stop-color="#140d07"/>
+      </linearGradient>
+      <linearGradient id="chWin" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2a3a52"/><stop offset="65%" stop-color="#41543f"/><stop offset="100%" stop-color="#2f7a33"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="200" fill="url(#chWall)"/>
+    <rect x="0" y="150" width="400" height="50" fill="#3a2614"/>
+    <g stroke="#3a2a18" stroke-width="2" opacity="0.7">
+      <line x1="80" y1="0" x2="80" y2="150"/><line x1="200" y1="0" x2="200" y2="150"/><line x1="320" y1="0" x2="320" y2="150"/>
+    </g>
+    <g transform="translate(150,28)">
+      <rect x="-4" y="-4" width="108" height="86" fill="#5a3a1f"/>
+      <rect x="0" y="0" width="100" height="78" fill="url(#chWin)"/>
+      <circle cx="80" cy="16" r="9" fill="#ffe6a6" opacity="0.8"/>
+      <path d="M0,58 Q40,46 70,54 T100,52 V78 H0 Z" fill="#2f7a33"/>
+      <line x1="50" y1="0" x2="50" y2="78" stroke="#5a3a1f" stroke-width="3"/>
+      <line x1="0" y1="39" x2="100" y2="39" stroke="#5a3a1f" stroke-width="3"/>
+    </g>
+    <g transform="translate(20,40)" fill="#d8a24a" opacity="0.85">
+      <path d="M6,0 h16 v8 a8,8 0 0 1 -16,0 Z"/><rect x="12" y="14" width="4" height="6"/><rect x="6" y="20" width="16" height="4"/>
+    </g>
+    <g transform="translate(352,44)" fill="#d8a24a" opacity="0.85">
+      <path d="M6,0 h16 v8 a8,8 0 0 1 -16,0 Z"/><rect x="12" y="14" width="4" height="6"/><rect x="6" y="20" width="16" height="4"/>
+    </g>
+    <rect x="8" y="26" width="40" height="3" fill="#5a3a1f"/>
+    <rect x="344" y="30" width="44" height="3" fill="#5a3a1f"/>
+  </svg>`;
+}
+
+/** Painted backdrop for the Trade Market tile: a cosmic bazaar — nebula sky, scattered stars, a couple
+ *  of planets and a little rocket making a delivery. Hand-placed (no rng) so it stays byte-stable. */
+function marketTileArt(): string {
+  const stars = [
+    [14, 18], [34, 40], [58, 22], [86, 52], [110, 30], [140, 16], [168, 46],
+    [196, 26], [220, 58], [248, 20], [272, 44], [40, 70], [128, 64], [210, 12],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${1 + (i % 3) * 0.5}" fill="#ffffff" opacity="${0.45 + (i % 4) * 0.12}"/>`)
+    .join('');
+  return `<svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <radialGradient id="ntMkt" cx="32%" cy="30%" r="90%">
+        <stop offset="0%" stop-color="#3a2350"/><stop offset="55%" stop-color="#1d1538"/><stop offset="100%" stop-color="#0c0a1c"/>
+      </radialGradient>
+    </defs>
+    <rect width="300" height="120" fill="url(#ntMkt)"/>
+    ${stars}
+    <circle cx="232" cy="86" r="30" fill="#e08a2b" opacity="0.85"/>
+    <circle cx="222" cy="78" r="30" fill="#f0b15e" opacity="0.6"/>
+    <circle cx="60" cy="98" r="16" fill="#7a6bd8" opacity="0.8"/>
+    <g transform="translate(120,52) rotate(20)">
+      <path d="M0,-13 C7,-9 7,9 0,15 C-7,9 -7,-9 0,-13 Z" fill="#dfe6f2"/>
+      <circle cx="0" cy="-2" r="3.4" fill="#9fd8e6"/>
+      <path d="M-6,8 L-12,16 L-3,12 Z" fill="#ff6b6b"/>
+      <path d="M6,8 L12,16 L3,12 Z" fill="#ff6b6b"/>
+      <path d="M-2.6,15 L0,25 L2.6,15 Z" fill="#ffc454" opacity="0.9"/>
+    </g>
+  </svg>`;
+}
+
+/** Painted backdrop for the Clubhouse tile: a cosy clubhouse on the green under a dusk sky — building,
+ *  lit windows, a pin flag on a rolling hill. Hand-placed (no rng) so it stays byte-stable. */
+function clubhouseTileArt(): string {
+  return `<svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#23304a"/><stop offset="60%" stop-color="#3a4d55"/><stop offset="100%" stop-color="#5a6e3a"/>
+      </linearGradient>
+      <linearGradient id="ntGrass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5fb04a"/><stop offset="100%" stop-color="#2f7a33"/>
+      </linearGradient>
+    </defs>
+    <rect width="300" height="120" fill="url(#ntSky)"/>
+    <circle cx="248" cy="30" r="14" fill="#ffe6a6" opacity="0.85"/>
+    <path d="M0,84 Q90,58 170,74 T300,70 V120 H0 Z" fill="url(#ntGrass)"/>
+    <path d="M0,98 Q120,82 220,94 T300,92 V120 H0 Z" fill="#256a2a" opacity="0.7"/>
+    <g transform="translate(58,52)">
+      <rect x="0" y="14" width="78" height="40" fill="#6e4a2c"/>
+      <rect x="0" y="14" width="78" height="40" fill="#00000022"/>
+      <path d="M-8,16 L39,-8 L86,16 Z" fill="#8a3b2e"/>
+      <rect x="33" y="34" width="16" height="20" fill="#3a2716"/>
+      <rect x="10" y="24" width="13" height="11" fill="#ffd76b"/>
+      <rect x="55" y="24" width="13" height="11" fill="#ffd76b"/>
+    </g>
+    <g transform="translate(214,40)">
+      <rect x="0" y="0" width="2.5" height="44" fill="#d8d8d8"/>
+      <path d="M2.5,0 L24,7 L2.5,14 Z" fill="#ff6b6b"/>
+      <circle cx="1.2" cy="44" r="3.2" fill="#f4f4f4"/>
+    </g>
+  </svg>`;
 }
 
 /** One character's Clubhouse (GS-clubhouse): their garage (pick an owned ship) + wardrobe (wear owned
@@ -2523,6 +2650,8 @@ function render(): void {
       ? travelScreen()
       : state.screen === 'trademarket'
       ? tradeMarketScreen()
+      : state.screen === 'clubhouseHall'
+      ? clubhouseHallScreen()
       : state.screen === 'clubhouse'
       ? clubhouseScreen()
       : gameoverScreen();

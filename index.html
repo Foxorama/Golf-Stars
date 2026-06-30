@@ -138,6 +138,52 @@
       .gs-clickcard:hover { transform: translateY(-3px); filter: brightness(1.08); }
       .gs-clickcard:active { transform: translateY(-1px); }
 
+      /* ── Settings cog (fixed, top-right) ─────────────────────────────────── */
+      .gs-cog {
+        position: fixed;
+        top: calc(10px + env(safe-area-inset-top));
+        right: calc(12px + env(safe-area-inset-right));
+        z-index: 60;
+        width: 42px; height: 42px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; line-height: 1;
+        border-radius: 50%;
+        border: 1px solid var(--gs-line);
+        background: radial-gradient(circle at 40% 35%, #232838, #14171f);
+        color: var(--gs-dim); cursor: pointer; box-shadow: var(--gs-shadow);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .25s ease, color .16s ease, border-color .16s ease, filter .16s ease;
+      }
+      .gs-cog:hover { color: var(--gs-ink); border-color: #46506a; filter: brightness(1.1); transform: rotate(50deg); }
+      .gs-cog:active { filter: brightness(.95); }
+      .gs-cog:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+
+      /* ── Nav doorways: the Trade Market / Clubhouse tiles on the title ────── */
+      .gs-navtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 16px; }
+      @media (max-width: 460px) { .gs-navtiles { grid-template-columns: 1fr; } }
+      .gs-navtile {
+        position: relative; display: block; width: 100%; min-height: 134px; padding: 0;
+        border-radius: var(--gs-r-lg); border: 1px solid var(--gs-line);
+        background: var(--gs-bg-2); color: var(--gs-ink); cursor: pointer; overflow: hidden;
+        text-align: left; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        box-shadow: var(--gs-shadow);
+        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease, filter .16s ease;
+      }
+      .gs-navtile:hover { transform: translateY(-3px); border-color: #46506a; filter: brightness(1.05); box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
+      .gs-navtile:active { transform: translateY(-1px); }
+      .gs-navtile:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+      .gs-navtile--market { border-color: #4a3a5e; }
+      .gs-navtile--clubhouse { border-color: #4a3a22; }
+      .gs-navtile__art { position: absolute; inset: 0; display: block; }
+      .gs-navtile__art svg { display: block; width: 100%; height: 100%; }
+      .gs-navtile__cap {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        display: flex; flex-direction: column; gap: 2px; padding: 28px 14px 12px;
+        background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .88) 62%);
+      }
+      .gs-navtile__title { font: 700 18px/1.1 system-ui, sans-serif; }
+      .gs-navtile__sub { font-size: 12px; opacity: .82; }
+
       /* ── Scorecard table ─────────────────────────────────────────────────── */
       .gs-scorecard { border-collapse: collapse; font-size: 13px; width: 100%; }
       .gs-scorecard th { padding: 2px 8px; opacity: .55; text-align: left; font-weight: 600; }
