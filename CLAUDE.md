@@ -420,6 +420,39 @@ This game lives or dies on three axes — put every change through all three bef
     worst case for ocean visibility (the land hull hugs the geometry); the zoomed play view shows more
     sea. NO new `_gs*`/URL hook (content-as-data + an archetype-derived render), so the test-hub guard
     needs nothing.
+    - **GS-cetus-2 reworked all of the above — the original star-river was bugged + ugly + read as a
+      flat-fish whale.** Four coupled fixes (all still pure render gated to `arch === 'cetus'`):
+      (1) **The "river jumps with zoom/pan" bug.** `cetusRiver` + `cetusOcean` shared ONE `org` rng
+      stream, and `cetusOcean` rejected whale samples against the *projected* island polygon — whose
+      draw COUNT differs at every zoom/pan — so the river's side+wobble re-rolled every frame. Fixed by
+      giving the ocean and river DISTINCT seeds (`oceanRng` `^0x000ce705`, `riverRng` `^0x00cef10e`) AND
+      placing whales in COURSE space (rejected against the course-space hull, projector-independent
+      count). LESSON: never let one rng stream's draw count depend on the projector, and never share a
+      stream between two decor functions if either's draw count can vary.
+      (2) **The river is now CARVED, not a straight bar beside the fairway.** `cetusRiverPath(hole, rng)`
+      is a PURE, projector-independent meander that snakes down the hole and weaves across the corridor
+      (sized off the HOLE LENGTH, not the giant lostRough island half-width; swing capped within the
+      corridor). `cetusRiver` projects it to a glowing star-river (dark deep-water bed + glowing surface
+      + luminous banks + bright current spine + drifting stars), gated to par ≥ 4 (a par-3 island has no
+      corridor). GOTCHA (cost a long hunt): the SVG serializer emits a nested `<clipPath>` INSIDE the
+      clipped `<g>`, which silently DROPS the group's contents — clipping the styled river to the island
+      hid it entirely (the unclipped magenta debug showed it fine). The river needs no clip (meander is
+      corridor-capped), so it's drawn unclipped. Do NOT nest a `clip` prim inside another `clip` prim's
+      children.
+      (3) **Whales are proper SPACE WHALES** (`whaleSilhouette`): a chunky lit-from-above body + belly
+      shadow, a long humpback pectoral fin, a two-lobed notched fluke, a blowhole mist spout, a glowing
+      eye, bioluminescent star-speckles. Placed in COURSE space (drift with the camera), sized in screen
+      px (clamped 58–214) so they read at both the whole-hole map and the zoomed play view. A denser
+      star-ocean base makes the deep read as the intro's starfield.
+      (4) **Island-green PAR 3s** (the headline): a `lostRough && par === 3` hole has NO corridor — the
+      fairway feature is a compact organic island around the green (`generate.ts`, ≈110 yd wide at a
+      ~165 yd hole, `fairwayHalfWidth` = island radius, flanking penalty hazards skipped). The RENDER
+      detects it off the `roughLie` biomeMod (no new hole flag) and draws a separate land PLATFORM per
+      play feature (green island + tee) instead of one hull spanning tee→green, so the open star-ocean
+      (with whales) reads between them. Generous enough that the auto reach-AI clears the no-death-spiral
+      bars (full suite green); re-run `tests/worlds`+`tests/themes`+`tests/cetus` after any island-size
+      or river change. `tests/cetus` asserts the river colour `rgba(70,180,225,0.85)` (its glowing
+      water) — update it if you re-tone the river.
 - **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
