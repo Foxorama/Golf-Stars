@@ -1196,6 +1196,24 @@ function playingBody(animating: boolean): string {
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
   }
 
+  // Detect a NEW shot ONCE per shot, BEFORE the fringe-putt early-return below — so the per-shot
+  // defaults (club/aim/power and the putt-vs-chip choice) AND `decisionShotCount` are committed even
+  // when the putt screen is the first thing that renders for this shot. (Bug: landing near the green
+  // defaults `selPutt` to the putter, so the putt screen returned early and never advanced
+  // `decisionShotCount`; tapping "Chip instead" then re-tripped `newShot`, which snapped `selPutt`
+  // straight back to the putter and re-disabled the chip gesture — you had to toggle putt→chip twice.)
+  const newShot = play.shots.length !== decisionShotCount;
+  if (newShot) {
+    decisionShotCount = play.shots.length;
+    selClubId = null;
+    selAim = 'attack';
+    selFreeTarget = null;
+    selPower = 1; // seeded sensibly below once the club is known; full swing is the fallback
+    selAimBearing = null; // re-seed the aim to the pin for the new shot
+    selPutt = canPuttFringe(play); // just off the green → default to the putter (a Texas wedge)
+    resetMapView();
+  }
+
   // Manual putting — on the green, or a chosen fringe/apron "Texas wedge" (GS-fringe-putt): stroke
   // putts one at a time with the pace meter, instead of the awkward full-swing chip the apron forced.
   const fringePutt = canPuttFringe(play) && selPutt;
@@ -1265,19 +1283,7 @@ function playingBody(animating: boolean): string {
   }
 
   // Decision screen: map with shots so far + ball marker, the aiming spray cone, and controls.
-  // Re-default the club to the suggestion on each NEW shot, so an approach doesn't stay
-  // stuck on the driver. The player can still cycle/override within the shot.
-  const newShot = play.shots.length !== decisionShotCount;
-  if (newShot) {
-    decisionShotCount = play.shots.length;
-    selClubId = null;
-    selAim = 'attack';
-    selFreeTarget = null;
-    selPower = 1; // seeded sensibly below once the club is known; full swing is the fallback
-    selAimBearing = null; // re-seed the aim to the pin for the new shot
-    selPutt = canPuttFringe(play); // just off the green → default to the putter (a Texas wedge)
-    resetMapView();
-  }
+  // (The per-shot club/aim/power/putt defaults are seeded above, before the fringe-putt return.)
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
   const usable = usableBag(bag, play.lie, state.run.loadout.driverAnywhere ?? false);
   // The EXPLICIT suggestion affordances are a Suggestible Sam caddy perk (GS-caddy): the 🎯 snap-back
