@@ -138,6 +138,37 @@
       .gs-clickcard:hover { transform: translateY(-3px); filter: brightness(1.08); }
       .gs-clickcard:active { transform: translateY(-1px); }
 
+      /* ── Collapsible section (Trade Market accordion) ────────────────────── */
+      .gs-acc {
+        border: 1px solid var(--gs-line); border-radius: var(--gs-r-lg);
+        background: var(--gs-bg-2); margin: 10px 0; overflow: hidden;
+      }
+      .gs-acc__head {
+        width: 100%; display: flex; align-items: center; gap: 9px;
+        padding: 11px 14px; border: 0; cursor: pointer;
+        background: linear-gradient(180deg, #161b25, #12151d);
+        color: var(--gs-ink); font: inherit; text-align: left;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: background .16s ease;
+      }
+      .gs-acc__head:hover { background: linear-gradient(180deg, #1b2130, #141823); }
+      .gs-acc__head:focus-visible { outline: 2px solid var(--gs-info); outline-offset: -2px; }
+      .gs-acc__icon { font-size: 17px; line-height: 1; }
+      .gs-acc__title { font-size: 15px; font-weight: 700; }
+      .gs-acc__count {
+        font-size: 11.5px; color: var(--gs-dim); font-variant-numeric: tabular-nums;
+        border: 1px solid var(--gs-line); border-radius: 999px; padding: 1px 8px;
+      }
+      .gs-acc__chev {
+        margin-left: auto; font-size: 13px; color: var(--gs-dim);
+        transition: transform .2s ease;
+      }
+      .gs-acc--collapsed .gs-acc__chev { transform: rotate(-90deg); }
+      .gs-acc__body { padding: 8px 10px 12px; }
+      .gs-acc--collapsed .gs-acc__body { display: none; }
+      .gs-acc__blurb { font-size: 12px; opacity: .6; margin: .2em 0 .6em; text-align: center; }
+      .gs-acc__rack { display: flex; flex-wrap: wrap; justify-content: center; }
+
       /* ── Settings cog (fixed, top-right) ─────────────────────────────────── */
       .gs-cog {
         position: fixed;

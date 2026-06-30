@@ -446,6 +446,17 @@
     pants entries). No new `window._gs*` hook or `?param`, so the test hub needed no wiring. Tests:
     `tests/apparel.test.ts` (pants tier coverage + three-/two-slot set completion), `tests/ui.test.ts`
     (buy-global / equip-per-character pants), `tests/save.test.ts` (v11 round-trip + v10→v11 migration + unowned-drop).
+  - **Trade Market accordion (GS-market-accordion).** The browsable catalogue kept growing (Ships + Hats +
+    Shirts + Pants + Bag & Club Sets = one very long scroll), so each rack is now a collapsible `marketSection`
+    (`app.ts`): a uniform header bar — icon · title · `owned/total` count pill · ▾ chevron — over the card rack,
+    tap to fold. The Clothing H2/H3 grouping is gone; hats/shirts/pants are now three peer top-level sections.
+    Collapse state is module-local `collapsedMarketSections: Set<string>` toggled by `[data-toggle-section]` +
+    `render()` — the SAME view-only pattern as `inspectGearId`/`mapView`, NOT reducer/save state (native
+    `<details>` can't be used: `render()` replaces `app.innerHTML` on every buy, which would reset the open
+    state). Default = every section expanded (non-surprising). The three card builders (`shipCardHTML` /
+    `apparelCardChrome` / `bagSetCardHTML`, also used in the Clubhouse) were unified to a single 130px width +
+    matching name/sub/footer type so items advertise consistently across sections. CSS is the `.gs-acc*` block
+    in `index.html`. No new hook or save bump → no test-hub wiring; full suite stays green.
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by
