@@ -123,7 +123,8 @@ For each system: the rule that constrains new work. Open the archive doc before 
   baked at `startRun`/`resumeRun` — NOT a new club, just the reward machinery applied to the default bag).
   The owned tier is a Pro-Shop FLOOR (`offerableClubs` hides clubs below it) and a no-op at `'common'`
   (byte-for-byte off). `ASCENSION_MAX = 15` so A11 is reachable. **Ascension victory club unlocks**
-  (`club-unlock.ts`, GS-ascension-clubs, save v9): every WON voyage permanently adds one random club to
+  (`club-unlock.ts`, GS-ascension-clubs, save v9): a NEW Ascension clear (a won voyage that pushes
+  `maxAscension` higher — same gate as the bag tiers, NOT every win) permanently adds one random club to
   the *played character's* starting bag (`unlockedClubsByCharacter` stores TYPES only, re-stamped to the
   live bag rarity by `applyBagTier`; `addUnlockedClubs` is the no-op fast path when empty). Pool = the
   `CLUBS` taxonomy minus what the golfer carries/refuses + the putter; a full bag pays a rarity-scaled

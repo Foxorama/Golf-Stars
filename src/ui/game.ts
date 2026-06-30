@@ -276,22 +276,26 @@ function unlockedAscension(state: UiState, run: Run): number {
 
 /**
  * The meta-progression deltas every run-end site shares (GS-12 / GS-ascension / GS-ascension-clubs):
- * banked shards, the Trade-Market reseed, the Ascension tier unlock, and — on a WON voyage — the
- * character's ascension-victory club unlock (or a Shard consolation if their bag is already full). One
- * source of truth so all four end sites (auto/interactive × ordinary/matchplay) reward a win identically.
- * Returns the unchanged fields while the run is still active (a survived non-final stop). Exported so
- * tests can assert the win reward directly (a natural voyage win is too rare to drive in a unit test).
+ * banked shards, the Trade-Market reseed, the Ascension tier unlock, and — on a NEW Ascension clear —
+ * the character's ascension-victory club unlock (or a Shard consolation if their bag is already full).
+ * One source of truth so all four end sites (auto/interactive × ordinary/matchplay) reward a win
+ * identically. Returns the unchanged fields while the run is still active (a survived non-final stop).
+ * Exported so tests can assert the win reward directly (a natural voyage win is too rare to drive in a
+ * unit test).
  */
 export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
   if (run.status === 'active') {
     return { lastRunShards: undefined, lastClubUnlock: undefined };
   }
   const earned = shardsForRun(run);
+  const maxAscension = unlockedAscension(state, run);
   const characterId = run.loadout.characterId;
   const owned = (characterId && state.unlockedClubsByCharacter[characterId]) || [];
-  // Only a WON voyage grants the character reward; a missed cut / bank just banks shards.
+  // The club reward fires only on a NEW Ascension clear — a won voyage that pushes maxAscension higher
+  // (the same gate the bag tiers use), NOT every win. Re-clearing a tier you already hold grants nothing;
+  // a missed cut / bank just banks shards.
   const reward =
-    run.endedReason === 'won'
+    maxAscension > state.maxAscension
       ? ascensionClubReward(characterId, state.bagTier, owned, `${run.seed}:${run.ascension}`)
       : undefined;
   const gotClub = reward?.kind === 'club' && !!characterId;
@@ -300,7 +304,7 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
     shards: state.shards + earned + bonusShards,
     lastRunShards: earned,
     marketSeed: state.marketSeed + 1,
-    maxAscension: unlockedAscension(state, run),
+    maxAscension,
     unlockedClubsByCharacter: gotClub
       ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
       : state.unlockedClubsByCharacter,

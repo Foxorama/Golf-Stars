@@ -139,10 +139,10 @@ describe('reducer: a won voyage rewards the played golfer (GS-ascension-clubs)',
     expect(s2.run.loadout.bag.find((c) => c.id === '7i')).toBeFalsy();
   });
 
-  it('a won voyage banks a new club for the played golfer (at the starting-bag rarity)', () => {
+  it('a NEW Ascension clear banks a new club for the played golfer (at the starting-bag rarity)', () => {
     const win = wonVoyage(7, 'feather-fade');
     expect(win.endedReason).toBe('won');
-    const state = initState(1, {}); // common bag, nothing unlocked yet
+    const state = initState(1, {}); // maxAscension 0; an A0 win is a new clear (→ A1)
     const upd = runEndUpdates(state, win);
     expect(upd.lastClubUnlock?.kind).toBe('club');
     const owned = upd.unlockedClubsByCharacter!['feather-fade'] ?? [];
@@ -154,6 +154,17 @@ describe('reducer: a won voyage rewards the played golfer (GS-ascension-clubs)',
     }
     // The Ascension tier also advances on a win (existing GS-ascension behaviour, unaffected).
     expect(upd.maxAscension).toBe(1);
+  });
+
+  it('RE-clearing a tier you already hold grants NO club (only new clears reward)', () => {
+    const win = wonVoyage(7, 'feather-fade'); // an A0 win
+    // Already cleared higher (maxAscension 5) → an A0 win unlocks nothing new → no club, no tier change.
+    const state = initState(1, { maxAscension: 5 });
+    const upd = runEndUpdates(state, win);
+    expect(upd.maxAscension).toBe(5); // unchanged — not a new clear
+    expect(upd.lastClubUnlock).toBeUndefined();
+    expect(upd.unlockedClubsByCharacter).toBe(state.unlockedClubsByCharacter); // untouched
+    expect(upd.shards).toBe(state.shards + shardsForRun(win)); // only the normal run shards
   });
 
   it('a won voyage with a FULL bag pays the Shard consolation instead', () => {

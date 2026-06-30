@@ -502,10 +502,13 @@ sibling of the bag tiers above (both are permanent starting-bag progression bake
 axis is orthogonal: bag tiers raise the *rarity* of every golfer's bag at once; club unlocks add *more
 clubs* to *one* golfer's bag.
 
-- **Every won voyage, not just a new gate.** The reward fires on any `endedReason === 'won'` (the
-  literal "clear a run with this golfer" reading), independent of the Ascension tier — distinct from the
-  bag-tier gates, which key off `maxAscension` bumps. A0 counts: it's still a win. (Ascension wins are
-  genuinely rare, so this is a meaningful per-clear prize, not a faucet.)
+- **Only a NEW Ascension clear, not every win.** The reward fires when a won voyage pushes
+  `maxAscension` higher — the same gate the bag tiers use (`unlockedAscension(state, run) >
+  state.maxAscension`), NOT on every `endedReason === 'won'`. Clearing A0 the first time pays out, but
+  re-clearing a tier you already hold grants nothing; each tier rewards a club exactly once per save.
+  At `ASCENSION_MAX` there's no higher tier to unlock, so the cap stops paying (consistent with the
+  bag-tier gates topping out at A11). The club still lands on the *played character* — the tier you clear
+  decides *whether* you get a club; the golfer you played decides *whose* bag it joins.
 - **Character-specific, stored as TYPES.** The save (**v9**, `unlockedClubsByCharacter: characterId →
   club type ids[]`) holds only the club *type* per golfer, never a baked rarity. At run start the unlocked
   types are added to the bag as plain `starter` clubs (with the loadout's `distanceClubBonus` folded in,
@@ -533,4 +536,5 @@ clubs* to *one* golfer's bag.
 - **No new hook.** Content + sim + save + view — no `window._gs*` flag and no `?param`, so the test-hub
   sync guard is untouched. `tests/club-unlock.test.ts` covers the pool rules, the seeded reward roll, the
   full-bag consolation, the bag-grow/restamp/distance-bonus at each tier, snapshot/resume round-trip, and
-  the reducer wiring (win → club, full bag → shards, cut → nothing).
+  the reducer wiring (new clear → club, full bag → shards, re-clear of a held tier → nothing, cut →
+  nothing).
