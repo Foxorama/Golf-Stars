@@ -57,13 +57,59 @@ function glowSprite(): HTMLCanvasElement | null {
   return c;
 }
 
-/** Per-archetype wind tint (kept in sync with the scene builder's `WIND_COL`). */
-const WIND_RGBA: Record<string, string> = {
+/** Per-archetype wind tint (kept in sync with the scene builder's `WIND_COL`). All TEN worlds —
+ *  the five GS-worlds archetypes used to silently fall back to verdant's pollen green, so a gale on
+ *  a crystal or storm world blew the wrong colour (GS-biome-feel). */
+export const WIND_RGBA: Record<string, string> = {
   inferno: '255,150,70',
   frost: '222,243,255',
   desert: '226,196,140',
   verdant: '208,236,206',
   void: '200,170,255',
+  crystal: '190,238,248', // glittering crystal dust
+  tempest: '200,180,255', // driving storm rain
+  fungal: '150,240,190', // drifting glowing spores
+  ocean: '190,235,230', // sea spray
+  cetus: '150,235,245', // luminous spray off the deep
+};
+
+/**
+ * Always-on per-world AMBIENT particles (GS-biome-feel) — the air of the place, independent of the
+ * journey effect and the wind: rising embers on the ember world, falling snow on the ice ring,
+ * drifting glow-spores under the jungle canopy, fireflies at the verdant dusk, prismatic glints on
+ * Prism Reach, slow stardust in the void, sea-spray flecks on the archipelago, rising
+ * bioluminescent motes off the Cetus deep, dust on the dust belt — and on Tempest Reach, a distant
+ * lightning flicker. Screen-space, seeded, riding the same `spaceFX` ambience gate the stars use.
+ */
+interface AmbientCfg {
+  /** Motion model: fall (snow), rise (embers/spores/plankton), drift (dust/spray/stardust), twinkle (glints). */
+  mode: 'fall' | 'rise' | 'drift' | 'twinkle';
+  /** rgb triplet(s) — a particle picks one at build time. */
+  cols: string[];
+  /** Count per 7200 px² (the starfield's density unit), before clamping. */
+  density: number;
+  /** Base speed in px/s (unused for twinkle). */
+  spd: number;
+  /** Radius range. */
+  r: [number, number];
+  /** Peak alpha. */
+  a: number;
+  /** Bloom through the glow sprite. */
+  glow?: boolean;
+  /** Distant lightning flicker on top (tempest). */
+  lightning?: boolean;
+}
+export const AMBIENT: Record<string, AmbientCfg> = {
+  verdant: { mode: 'drift', cols: ['205,240,150', '235,255,180'], density: 0.16, spd: 9, r: [0.9, 1.8], a: 0.55, glow: true }, // fireflies
+  desert: { mode: 'drift', cols: ['226,196,140'], density: 0.5, spd: 26, r: [0.5, 1.2], a: 0.22 }, // blown dust
+  frost: { mode: 'fall', cols: ['255,255,255', '225,242,255'], density: 0.85, spd: 22, r: [0.7, 1.9], a: 0.6 }, // snowfall
+  inferno: { mode: 'rise', cols: ['255,150,70', '255,205,110'], density: 0.4, spd: 18, r: [0.6, 1.5], a: 0.6, glow: true }, // embers
+  void: { mode: 'drift', cols: ['200,170,255', '160,200,255'], density: 0.3, spd: 4, r: [0.5, 1.3], a: 0.4 }, // slow stardust
+  crystal: { mode: 'twinkle', cols: ['255,160,200', '255,225,120', '150,255,215', '170,220,255'], density: 0.34, spd: 0, r: [0.8, 1.8], a: 0.7 }, // prismatic glints
+  tempest: { mode: 'drift', cols: ['200,180,255'], density: 0.55, spd: 60, r: [0.5, 1.1], a: 0.3, lightning: true }, // scud + far lightning
+  fungal: { mode: 'rise', cols: ['150,240,190', '190,150,255'], density: 0.55, spd: 8, r: [0.7, 1.7], a: 0.5, glow: true }, // glow-spores
+  ocean: { mode: 'drift', cols: ['235,250,255'], density: 0.45, spd: 30, r: [0.5, 1.2], a: 0.3 }, // sea-spray flecks
+  cetus: { mode: 'rise', cols: ['122,240,255', '190,250,255'], density: 0.35, spd: 10, r: [0.6, 1.6], a: 0.55, glow: true }, // bioluminescent motes
 };
 
 export interface WeatherOpts {
@@ -130,6 +176,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   let meteors: Meteor[] = [];
   let debris: Debris[] = [];
   let windDots: { x: number; y: number; s: number; ph: number }[] = [];
+  let ambient: { x: number; y: number; s: number; ph: number; r: number; col: string }[] = [];
   let shootOff = 0;
 
   function build(): void {
@@ -166,6 +213,19 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       return { y: 0.05 + rng() * 0.6, spd: 0.2 + (12 - sz) * 0.06, sz, off: rng(), spin: rng() * Math.PI * 2, shape, blink: rng() * Math.PI * 2 };
     });
     windDots = Array.from({ length: 90 }, () => ({ x: rng() * (W + 40), y: rng() * (H + 40), s: 0.6 + rng() * 0.9, ph: rng() * 6.28 }));
+    // The world's ambient air (GS-biome-feel): count scales with area like the starfield.
+    const amb = AMBIENT[o.archetype];
+    if (amb) {
+      const n = Math.max(8, Math.min(70, Math.round(((W * H) / 7200) * amb.density * 4)));
+      ambient = Array.from({ length: n }, () => ({
+        x: rng() * (W + 40),
+        y: rng() * (H + 40),
+        s: 0.55 + rng() * 0.9,
+        ph: rng() * Math.PI * 2,
+        r: amb.r[0] + rng() * (amb.r[1] - amb.r[0]),
+        col: amb.cols[Math.floor(rng() * amb.cols.length)]!,
+      }));
+    }
   }
   build();
 
@@ -261,6 +321,92 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.arc(hx, hy, 1.9, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+
+  /** The world's ambient AIR (GS-biome-feel): snow falls, embers rise, spores drift, glints flash.
+   *  Rides the same `spaceFX` gate as the stars, so a reduced-feel setup switches it off with them. */
+  function drawAmbient(ctx: CanvasRenderingContext2D, now: number): void {
+    const amb = AMBIENT[o.archetype];
+    if (!spaceOn || !amb || ambient.length === 0) return;
+    const sprite = glowSprite();
+    const wW = W + 40;
+    const wH = H + 40;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of ambient) {
+      let x = p.x;
+      let y = p.y;
+      let a = amb.a * (0.5 + 0.5 * Math.sin(now * 0.002 + p.ph));
+      if (amb.mode === 'fall') {
+        // Snow: sink with a lazy cross-sway.
+        y = wrap(p.y + now * 0.001 * amb.spd * p.s, wH) - 20;
+        x = wrap(p.x + Math.sin(now * 0.0009 + p.ph) * 14, wW) - 20;
+      } else if (amb.mode === 'rise') {
+        // Embers/spores/plankton: climb with a flickering wobble.
+        y = wrap(p.y - now * 0.001 * amb.spd * p.s, wH) - 20;
+        x = wrap(p.x + Math.sin(now * 0.0013 + p.ph) * 9, wW) - 20;
+      } else if (amb.mode === 'drift') {
+        // Dust/spray/stardust/fireflies: wander sideways, bobbing.
+        x = wrap(p.x + now * 0.001 * amb.spd * p.s, wW) - 20;
+        y = wrap(p.y + Math.sin(now * 0.0011 + p.ph) * 10, wH) - 20;
+      } else {
+        // Twinkle (prism glints): fixed points that flash on their own phase.
+        const tw = Math.sin(now * 0.0035 + p.ph);
+        a = tw > 0.55 ? amb.a * ((tw - 0.55) / 0.45) : 0;
+        if (a <= 0.02) continue;
+      }
+      if (amb.glow && sprite && p.s > 0.9) {
+        const gr = p.r * 3.2;
+        ctx.globalAlpha = a * 0.8;
+        ctx.drawImage(sprite, x - gr, y - gr, gr * 2, gr * 2);
+      }
+      ctx.globalAlpha = a;
+      ctx.fillStyle = `rgba(${p.col},1)`;
+      ctx.beginPath();
+      if (amb.mode === 'twinkle') {
+        // A four-point sparkle, not a dot.
+        ctx.moveTo(x - p.r * 2, y);
+        ctx.lineTo(x + p.r * 2, y);
+        ctx.moveTo(x, y - p.r * 2);
+        ctx.lineTo(x, y + p.r * 2);
+        ctx.strokeStyle = `rgba(${p.col},1)`;
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
+      } else {
+        ctx.arc(x, y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    // Tempest: a distant lightning flicker — a soft whole-sky flash + a seeded fork, on a slow cadence.
+    if (amb.lightning) {
+      const cyc = 3400;
+      const phase = ((now + o.seed % 997) % cyc) / cyc;
+      const flash = phase < 0.09 ? 1 - phase / 0.09 : 0;
+      if (flash > 0.03) {
+        ctx.save();
+        ctx.fillStyle = `rgba(205,215,255,${(0.07 * flash).toFixed(3)})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'lighter';
+        const seed = mulberry32((o.seed ^ Math.floor(now / cyc) * 2654435761) >>> 0);
+        let x = seed() * W;
+        let y = H * 0.04 + seed() * H * 0.1;
+        ctx.strokeStyle = `rgba(230,238,255,${(0.75 * flash).toFixed(3)})`;
+        ctx.lineWidth = 1.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        const segs = 4 + Math.floor(seed() * 3);
+        for (let s = 0; s < segs; s++) {
+          x += (seed() - 0.5) * 46;
+          y += 14 + seed() * 26;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
   }
 
   function drawWind(ctx: CanvasRenderingContext2D, now: number): void {
@@ -510,6 +656,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   function draw(ctx: CanvasRenderingContext2D, now: number): void {
     tint(ctx);
     drawStars(ctx, now);
+    drawAmbient(ctx, now); // the world's own air (GS-biome-feel), under the journey showpiece
     // The meteor shower owns the sky; otherwise the ambient shooting star sweeps through.
     if (effect !== 'meteorShower') drawShootingStar(ctx, now);
     switch (effect) {

@@ -57,6 +57,37 @@ export const OB = {
 };
 
 /**
+ * Per-world OB boundary look (GS-biome-feel). The same white-post/red-cap golf stake ringed EVERY
+ * world — a picket fence floating in the void garden. Each archetype now marks its boundary in its
+ * own vocabulary: weathered desert posts, ember-capped obsidian pylons, prism stakes, storm rods,
+ * glowing spore lamps, sea buoys — and the two lost-rough worlds (void/cetus) trade the ground post
+ * for a FLOATING warp beacon (`beacon` set → drawn as a glowing diamond adrift in the abyss, since
+ * there is no ground out there to plant a stake in). `glow` adds a soft halo behind the cap so a
+ * luminous world's boundary reads at night. Render-only; the OB *rule* (play-bounds box) is untouched.
+ */
+export interface ObLook {
+  post: string;
+  cap: string;
+  line: string;
+  /** Soft halo behind the cap (rgba) — luminous worlds. */
+  glow?: string;
+  /** Floating warp-beacon style (rgba glow): no ground post — a lit diamond adrift in the void. */
+  beacon?: string;
+}
+export const OB_LOOK: Record<BiomeArchetype, ObLook> = {
+  verdant: { post: '#f4f4f4', cap: '#ff3b3b', line: 'rgba(244,244,244,0.16)' }, // the classic stakes
+  desert: { post: '#d8b98a', cap: '#e05a2a', line: 'rgba(216,185,138,0.18)' }, // sun-bleached timber
+  frost: { post: '#dff2fa', cap: '#4ac8e8', line: 'rgba(190,235,250,0.18)', glow: 'rgba(120,220,245,0.30)' }, // ice pylons
+  inferno: { post: '#3a2a24', cap: '#ff8a2a', line: 'rgba(255,138,42,0.14)', glow: 'rgba(255,130,50,0.35)' }, // ember-capped obsidian
+  void: { post: '#6a54b8', cap: '#b07eff', line: 'rgba(176,126,255,0.16)', beacon: 'rgba(160,120,255,0.45)' }, // floating warp beacons
+  crystal: { post: '#e8f6fa', cap: '#7ad8f0', line: 'rgba(190,235,248,0.18)', glow: 'rgba(150,225,250,0.30)' }, // prism stakes
+  tempest: { post: '#c8ccd8', cap: '#ffe14a', line: 'rgba(200,204,216,0.16)' }, // lightning rods
+  fungal: { post: '#caa8e8', cap: '#7af0c0', line: 'rgba(150,240,190,0.14)', glow: 'rgba(120,240,190,0.32)' }, // glowing spore lamps
+  ocean: { post: '#f4f4f4', cap: '#ff6a3c', line: 'rgba(244,244,244,0.16)' }, // channel buoys
+  cetus: { post: '#bfe8f0', cap: '#5fd8dc', line: 'rgba(150,235,245,0.16)', beacon: 'rgba(120,230,240,0.42)' }, // luminous sea-marks adrift
+};
+
+/**
  * Cell-shade tone ramps (GS graphic-upscale). A manga/comic look is flat colour BANDS with a
  * bold ink outline, not smooth gradients — so each styled surface picks `light`/`base`/`dark`
  * for its bands and `ink` for the outline. `base` deliberately keeps the original FILL value

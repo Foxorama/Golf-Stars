@@ -795,6 +795,48 @@ export function mountPlayView(
     shake = Math.max(shake, 0.3);
   }
 
+  /** Per-surface TOUCHDOWN feedback (GS-biome-feel): the landing used to look identical whether the
+   *  ball found lava, water, sand or the void. Now the surface answers — a blue splash, a fiery lava
+   *  burst with a kick of shake, a violet implosion as the void swallows the ball, a sand puff, an
+   *  icy skitter, a crystal chime-glint. Deterministic (index-based, no Math.random), cosmetic —
+   *  the sim already resolved the lie/penalty; this just makes it FELT. */
+  function spawnLandFX(at: Vec, lie: string, penalty?: string): void {
+    const burst = (n: number, rgbs: string[], opts: { up?: number; spread?: number; grav?: number; ring?: boolean }) => {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + (i % 2 ? 0.4 : 0);
+        const sp = (0.7 + (i % 4) * 0.5) * (opts.spread ?? 1);
+        if (opts.ring) {
+          // Implosion: start on a ring and get pulled INTO the point (the void feeds).
+          const r0 = 10 + (i % 3) * 5;
+          particles.push({ pos: [at[0] + Math.cos(a) * r0, at[1] + Math.sin(a) * r0] as Vec, vel: [-Math.cos(a) * sp * 1.1, -Math.sin(a) * sp * 1.1], life: 1, rgb: rgbs[i % rgbs.length], grav: 0 });
+        } else {
+          particles.push({ pos: [...at] as Vec, vel: [Math.cos(a) * sp, Math.sin(a) * sp * 0.6 - (opts.up ?? 0)], life: 1, rgb: rgbs[i % rgbs.length], grav: opts.grav ?? 0.06 });
+        }
+      }
+    };
+    if (penalty === 'lava') {
+      burst(18, ['255,138,42', '255,210,74', '255,90,30'], { up: 1.6, spread: 1.3, grav: 0.04 }); // magma burst
+      shake = Math.max(shake, 0.7);
+    } else if (penalty === 'void' || penalty === 'voidlost') {
+      burst(16, ['176,126,255', '126,212,255', '230,160,255'], { ring: true }); // the void swallows it
+      shake = Math.max(shake, 0.45);
+    } else if (penalty === 'cetuslost') {
+      burst(14, ['122,240,255', '235,252,255', '150,222,255'], { up: 1.4, grav: 0.08 }); // into the star-ocean
+    } else if (penalty === 'water' || lie === 'water' || lie === 'creek' || lie === 'frozenpond') {
+      burst(14, ['150,210,255', '235,246,255', '111,179,236'], { up: 1.5, grav: 0.09 }); // splash
+    } else if (penalty === 'ravine' || lie === 'barranca') {
+      burst(10, ['138,111,74', '107,90,72'], { up: 0.8, grav: 0.07 }); // rockfall dust
+    } else if (lie === 'bunker' || lie === 'pot' || lie === 'waste' || lie === 'sand') {
+      burst(10, ['233,216,166', '196,173,111'], { up: 1.0, grav: 0.07 }); // sand puff
+    } else if (lie === 'ice') {
+      burst(8, ['255,255,255', '205,238,247'], { up: 0.3, spread: 1.5, grav: 0.02 }); // icy skitter
+    } else if (lie === 'crystal') {
+      burst(8, ['191,240,255', '255,255,255'], { up: 1.2, spread: 0.8, grav: 0.03 }); // chime glints
+    } else if (lie === 'trees') {
+      spawnLeaves(at); // rattled the canopy on arrival
+    }
+  }
+
   // The full static world (rough texture, striped/banded surfaces, depth-banded water,
   // cell-shaded trees, OB, centreline, tee + flag) comes from the SAME shared scene builder
   // the SVG map uses, so the two renderers agree. Cache by projector identity: a whole-hole
@@ -1068,6 +1110,9 @@ export function mountPlayView(
           if (lastRollClearShot !== shotIndex) {
             lastRollClearShot = shotIndex;
             trail = [];
+            // The surface answers the touchdown (GS-biome-feel): splash / lava burst / void
+            // implosion / sand puff / icy skitter — keyed off the lie the sim already resolved.
+            spawnLandFX([tdx, tdy], shot.landLie ?? shot.lieTo, shot.penalty);
           }
           // Dr Chipinski chip-in (GS-caddy-voices): as the ball drops in, slow the world and have the
           // doctor "answer the call" — the phone glyph + "You rang?" bubble + voice. Fires once.

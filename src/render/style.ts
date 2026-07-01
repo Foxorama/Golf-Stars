@@ -36,6 +36,8 @@ import {
   LAVA,
   CANOPY,
   OB,
+  OB_LOOK,
+  type ObLook,
 } from './palette';
 
 // ---------------------------------------------------------------------------
@@ -703,7 +705,7 @@ function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number)
 function scatterLook(
   kind: string,
   arch: BiomeArchetype,
-): { base: string; highlight: string; facet1: string; facet2: string; faceted: boolean } {
+): { base: string; highlight: string; facet1: string; facet2: string; faceted: boolean; glow?: string } {
   const faceted = kind === 'crystal' || kind === 'ice';
   if (faceted && arch === 'inferno') {
     return {
@@ -712,6 +714,42 @@ function scatterLook(
       facet1: 'rgba(255,180,90,0.55)',
       facet2: 'rgba(255,120,50,0.4)',
       faceted,
+      glow: 'rgba(255,130,50,0.16)', // heat seeping through the glass
+    };
+  }
+  // The void's crystal gardens are VIOLET and lit from within — the only living light out there
+  // (the fixed cyan FILL read as ice floating in the abyss).
+  if (faceted && arch === 'void') {
+    return {
+      base: '#6a4fc0',
+      highlight: 'rgba(220,200,255,0.25)',
+      facet1: 'rgba(230,210,255,0.6)',
+      facet2: 'rgba(180,150,255,0.45)',
+      faceted,
+      glow: 'rgba(160,120,255,0.24)',
+    };
+  }
+  // Cetus's "crystal" scatter is a bioluminescent REEF, not a gem — warm coral pink over the deep
+  // teal turf, glowing like the star-ocean it grew from.
+  if (faceted && arch === 'cetus') {
+    return {
+      base: '#3f8a96',
+      highlight: 'rgba(255,190,210,0.3)',
+      facet1: 'rgba(255,170,200,0.6)',
+      facet2: 'rgba(140,240,255,0.5)',
+      faceted,
+      glow: 'rgba(120,230,240,0.22)',
+    };
+  }
+  // Prism Reach: the signature crystal fields flash prismatic, not flat cyan.
+  if (kind === 'crystal' && arch === 'crystal') {
+    return {
+      base: '#aee2f0',
+      highlight: 'rgba(255,255,255,0.3)',
+      facet1: 'rgba(255,160,200,0.55)', // a pink refraction …
+      facet2: 'rgba(160,255,220,0.5)', // … and a green one — light splitting in the glass
+      faceted,
+      glow: 'rgba(190,235,255,0.2)',
     };
   }
   return {
@@ -728,10 +766,17 @@ function scatterLook(
 function styleScatter(kind: string, poly: Vec[], art: ArtFeel, arch: BiomeArchetype): Prim[] {
   const c = centroidOf(poly);
   const look = scatterLook(kind, arch);
-  const out: Prim[] = [
+  const out: Prim[] = [];
+  // A luminous world's scatter glows from within (void crystal / cetus reef / prism / obsidian heat).
+  if (look.glow) {
+    let r = 0;
+    for (const p of poly) r += dist(p, c);
+    out.push({ t: 'glow', c, r: (r / poly.length) * 2.1, col: look.glow });
+  }
+  out.push(
     { t: 'poly', pts: poly, fill: look.base },
     { t: 'poly', pts: scalePoly(poly, c, 0.6).map((p) => [p[0] - 1, p[1] - 1] as Vec), fill: look.highlight },
-  ];
+  );
   if (look.faceted) {
     // Faceting: a couple of bright cleavage lines.
     const b = bboxOf(poly);
@@ -788,16 +833,54 @@ function styleRavine(poly: Vec[], rng: () => number): Prim[] {
   return out;
 }
 
-/** One tree drawn as a 3-tone cell-shaded canopy with a cast shadow, trunk + ink outline. */
-function styleTree(poly: Vec[], proj: Projector, rng: () => number): Prim[] {
+/** Deterministic 0..1 hash off a position (GS-biome-feel) — extra per-flora/per-decor variation
+ *  WITHOUT extra rng draws, so every world's art stream stays byte-identical to the classic one. */
+function posHash(x: number, y: number, k = 0): number {
+  const s = Math.sin(x * 12.9898 + y * 78.233 + k * 37.719) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/**
+ * One piece of world FLORA (GS-biome-feel). Every world used to draw the SAME green parkland canopy
+ * — the spore jungle's "luminous mushroom stands" and Prism Reach's "crystalline spires" were
+ * literally oak trees, the single biggest reskin tell. The tree hazard now dispatches per archetype
+ * to a distinct silhouette: glowing mushrooms, snow-dusted conifers, charred ember snags, saguaros,
+ * crystal spires, wind-bent storm scrub, palms, coastal sea-stacks. The LIE is unchanged (`trees` —
+ * you still punch out of whatever it is); this is pure render identity.
+ *
+ * CRITICAL determinism: every variant consumes EXACTLY the two rng draws the classic canopy did
+ * (size + tint) — all further variation is a `posHash` of the projected position — so the main art
+ * stream is byte-for-byte unchanged on every world, and verdant keeps the original canopy verbatim.
+ */
+function styleFlora(poly: Vec[], proj: Projector, rng: () => number, arch: BiomeArchetype): Prim[] {
   const cc = centroidOf(poly);
   let rad = 0;
   for (const p of poly) rad += dist(p, cc);
   rad /= poly.length;
   const [x, y] = proj.project(cc);
   const rr = Math.max(3, rad * proj.scale * (0.9 + rng() * 0.5));
-  // Slight per-tree hue variance so a treeline isn't a row of clones.
+  // Slight per-tree hue variance so a treeline isn't a row of clones (the SAME two draws everywhere).
   const tint = rng();
+  switch (arch) {
+    case 'fungal':
+      return floraMushroom(x, y, rr, tint);
+    case 'frost':
+      return floraConifer(x, y, rr, tint);
+    case 'inferno':
+      return floraSnag(x, y, rr, tint);
+    case 'desert':
+      return floraSaguaro(x, y, rr, tint);
+    case 'crystal':
+      return floraShard(x, y, rr, tint);
+    case 'tempest':
+      return floraWindScrub(x, y, rr, tint);
+    case 'ocean':
+      return floraPalm(x, y, rr, tint);
+    case 'cetus':
+      return floraSeaStack(x, y, rr, tint);
+    default:
+      break; // verdant (and any unknown) → the classic parkland canopy, byte-identical
+  }
   const body = tint < 0.33 ? '#247f34' : tint < 0.66 ? CANOPY.base : '#36a043';
   return [
     { t: 'circle', c: [x, y + rr * 0.7], r: rr * 0.7, fill: CANOPY.shadow }, // cast shadow
@@ -813,6 +896,200 @@ function styleTree(poly: Vec[], proj: Projector, rng: () => number): Prim[] {
     { t: 'circle', c: [x - rr * 0.12, y - rr * 0.12], r: rr * 0.82, fill: body }, // body
     { t: 'circle', c: [x - rr * 0.3, y - rr * 0.32], r: rr * 0.5, fill: CANOPY.lit }, // lit cap
   ];
+}
+
+/** Spore-jungle GIANT MUSHROOM: a pale stalk under a wide flattened dome cap that glows from
+ *  within, gill shadow under the rim, luminous spots on top. */
+function floraMushroom(x: number, y: number, rr: number, tint: number): Prim[] {
+  const cool = tint >= 0.66; // a teal minority among the violet stands
+  const cap = tint < 0.33 ? '#8a5ce0' : tint < 0.66 ? '#6a42c0' : '#3fbf9c';
+  const capLit = cool ? '#7ae8cc' : '#a97ef0';
+  const glow = cool ? 'rgba(90,240,190,0.26)' : 'rgba(150,120,255,0.26)';
+  const top = y - rr * 1.5; // cap underside height
+  const dome: Vec[] = [
+    [x - rr * 1.15, top],
+    [x - rr * 0.68, top - rr * 0.72],
+    [x, top - rr * 0.94],
+    [x + rr * 0.68, top - rr * 0.72],
+    [x + rr * 1.15, top],
+  ];
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.5], r: rr * 0.68, fill: CANOPY.shadow }, // cast shadow
+    { t: 'glow', c: [x, top - rr * 0.3], r: rr * 2.3, col: glow }, // bioluminescent halo
+    { t: 'line', a: [x, y + rr * 0.4], b: [x, top], stroke: '#ded4f2', sw: rr * 0.34, round: true }, // stalk
+    { t: 'line', a: [x - rr * 0.95, top + 1], b: [x + rr * 0.95, top + 1], stroke: 'rgba(30,16,60,0.55)', sw: 1.6, round: true }, // gill shadow
+    { t: 'poly', pts: dome, fill: cap, stroke: 'rgba(26,14,52,0.7)', sw: 1 }, // the cap
+    { t: 'poly', pts: [[x - rr * 0.62, top - rr * 0.5], [x - rr * 0.2, top - rr * 0.82], [x + rr * 0.28, top - rr * 0.78], [x - rr * 0.1, top - rr * 0.42]], fill: capLit }, // lit sheen
+  ];
+  // Luminous spots across the cap (position-hashed — no rng).
+  for (let i = 0; i < 3; i++) {
+    const u = posHash(x, y, i) - 0.5;
+    out.push({ t: 'circle', c: [x + u * rr * 1.5, top - rr * (0.28 + posHash(x, y, i + 3) * 0.4)], r: rr * 0.13, fill: 'rgba(240,236,255,0.9)' });
+  }
+  return out;
+}
+
+/** Frost-world CONIFER: three stacked spruce tiers dusted with snow along their lit edges. */
+function floraConifer(x: number, y: number, rr: number, tint: number): Prim[] {
+  const body = tint < 0.33 ? '#2c6a52' : tint < 0.66 ? '#2f7a5e' : '#256048';
+  const h = rr * 2.6;
+  const tw = [1.3, 0.98, 0.62]; // tier half-widths
+  const by = [0.02, 0.32, 0.58]; // tier base heights
+  const ty = [0.46, 0.74, 1.0]; // tier apex heights
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.5], r: rr * 0.6, fill: CANOPY.shadow },
+    { t: 'line', a: [x, y + rr * 0.35], b: [x, y - h * 0.1], stroke: CANOPY.trunk, sw: rr * 0.26, round: true },
+  ];
+  for (let i = 0; i < 3; i++) {
+    const bY = y - h * by[i]!;
+    const aY = y - h * ty[i]!;
+    out.push({ t: 'poly', pts: [[x - rr * tw[i]!, bY], [x + rr * tw[i]!, bY], [x, aY]], fill: body, stroke: '#123a2c', sw: 1 });
+    // Snow along each tier's lit (left) edge.
+    out.push({ t: 'line', a: [x, aY], b: [x - rr * tw[i]! * 0.72, bY - (bY - aY) * 0.24], stroke: 'rgba(255,255,255,0.85)', sw: 1.2, round: true });
+  }
+  out.push({ t: 'circle', c: [x, y - h], r: rr * 0.16, fill: '#ffffff' }); // snow cap
+  return out;
+}
+
+/** Ember-world CHARRED SNAG: a leaning burnt trunk with bare jagged branches, embers still
+ *  crawling up it, over a warm ground glow. */
+function floraSnag(x: number, y: number, rr: number, tint: number): Prim[] {
+  const body = tint < 0.5 ? '#33241c' : '#241710';
+  const lean = (posHash(x, y) - 0.5) * rr * 0.6;
+  const topX = x + lean;
+  const topY = y - rr * 2.2;
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.4], r: rr * 0.55, fill: 'rgba(0,0,0,0.2)' },
+    { t: 'glow', c: [x, y], r: rr * 1.6, col: 'rgba(255,120,44,0.18)' }, // ground ember glow
+    { t: 'line', a: [x, y + rr * 0.3], b: [topX, topY], stroke: body, sw: rr * 0.3, round: true }, // trunk
+    // Two bare jagged branches off the upper trunk.
+    { t: 'line', a: [x + lean * 0.55, y - rr * 1.3], b: [x + lean * 0.55 - rr * 0.9, y - rr * 1.8], stroke: body, sw: rr * 0.16, round: true },
+    { t: 'line', a: [x + lean * 0.8, y - rr * 1.8], b: [x + lean * 0.8 + rr * 0.75, y - rr * 2.3], stroke: body, sw: rr * 0.14, round: true },
+  ];
+  // An ember or two still glowing on the trunk (position-hashed).
+  for (let i = 0; i < 2; i++) {
+    if (posHash(x, y, i + 7) < 0.7) {
+      const t = 0.35 + posHash(x, y, i + 11) * 0.5;
+      out.push({ t: 'circle', c: [x + lean * t, y + rr * 0.3 - (y + rr * 0.3 - topY) * t], r: rr * 0.1 + 0.5, fill: '#ff8a2a' });
+    }
+  }
+  return out;
+}
+
+/** Dust-belt SAGUARO: a tall ribbed column with two elbowed arms, the desert's lone sentinel. */
+function floraSaguaro(x: number, y: number, rr: number, tint: number): Prim[] {
+  const body = tint < 0.33 ? '#5f8a4e' : tint < 0.66 ? '#6f9a58' : '#527c46';
+  const h = rr * 2.4;
+  const armY1 = y - h * 0.55;
+  const armY2 = y - h * (0.4 + posHash(x, y) * 0.15);
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.4], r: rr * 0.55, fill: 'rgba(0,0,0,0.18)' },
+    { t: 'line', a: [x, y + rr * 0.3], b: [x, y - h], stroke: body, sw: rr * 0.5, round: true }, // column
+    { t: 'line', a: [x - rr * 0.1, y], b: [x - rr * 0.1, y - h * 0.9], stroke: 'rgba(255,255,240,0.18)', sw: rr * 0.1, round: true }, // lit rib
+    // Left arm: out then up.
+    { t: 'line', a: [x, armY1], b: [x - rr * 0.8, armY1], stroke: body, sw: rr * 0.34, round: true },
+    { t: 'line', a: [x - rr * 0.8, armY1], b: [x - rr * 0.8, armY1 - rr * 0.85], stroke: body, sw: rr * 0.34, round: true },
+    // Right arm, a touch lower.
+    { t: 'line', a: [x, armY2], b: [x + rr * 0.7, armY2], stroke: body, sw: rr * 0.3, round: true },
+    { t: 'line', a: [x + rr * 0.7, armY2], b: [x + rr * 0.7, armY2 - rr * 0.6], stroke: body, sw: rr * 0.3, round: true },
+  ];
+  if (posHash(x, y, 5) < 0.3) out.push({ t: 'circle', c: [x, y - h - rr * 0.1], r: rr * 0.16, fill: '#ffd0e0' }); // desert bloom
+  return out;
+}
+
+/** Prism-Reach CRYSTAL SPIRE: a tall faceted shard with a smaller sibling, glowing from within. */
+function floraShard(x: number, y: number, rr: number, tint: number): Prim[] {
+  const body = tint < 0.33 ? '#9fd8e6' : tint < 0.66 ? '#b8c8f0' : '#cbe0ea';
+  const dark = tint < 0.33 ? '#5fa3b8' : tint < 0.66 ? '#8496c8' : '#93aab8';
+  const h = rr * 2.8;
+  const spire: Vec[] = [
+    [x, y - h],
+    [x + rr * 0.55, y - h * 0.32],
+    [x + rr * 0.3, y + rr * 0.1],
+    [x - rr * 0.42, y - h * 0.22],
+  ];
+  const side: Vec[] = [
+    [x + rr * 0.85, y - h * 0.5],
+    [x + rr * 1.2, y - h * 0.14],
+    [x + rr * 0.72, y + rr * 0.1],
+  ];
+  return [
+    { t: 'circle', c: [x, y + rr * 0.35], r: rr * 0.6, fill: 'rgba(0,0,0,0.16)' },
+    { t: 'glow', c: [x, y - h * 0.45], r: rr * 2.4, col: 'rgba(160,225,255,0.28)' },
+    { t: 'poly', pts: side, fill: dark, stroke: 'rgba(30,70,100,0.55)', sw: 1 },
+    { t: 'poly', pts: spire, fill: body, stroke: 'rgba(30,70,100,0.6)', sw: 1 },
+    { t: 'line', a: [x, y - h], b: [x - rr * 0.06, y + rr * 0.02], stroke: 'rgba(255,255,255,0.75)', sw: 1, round: true }, // cleavage highlight
+    { t: 'line', a: [x - rr * 0.5, y - h * 0.92], b: [x + rr * 0.5, y - h * 0.92], stroke: 'rgba(255,255,255,0.8)', sw: 0.8, round: true }, // apex glint
+    { t: 'line', a: [x, y - h - rr * 0.4], b: [x, y - h + rr * 0.4], stroke: 'rgba(255,255,255,0.8)', sw: 0.8, round: true },
+  ];
+}
+
+/** Tempest WIND-BENT SCRUB: a trunk bowed downwind with the whole canopy streaming off its tip. */
+function floraWindScrub(x: number, y: number, rr: number, tint: number): Prim[] {
+  const body = tint < 0.33 ? '#5a7a4a' : tint < 0.66 ? '#66735c' : '#4e6a44';
+  const L = rr * 0.95; // downwind lean (fixed screen direction — the gale never lets up)
+  const canopy: Vec[] = [
+    [x + L * 0.55, y - rr * 1.9],
+    [x + L + rr * 1.35, y - rr * 1.62],
+    [x + L + rr * 1.0, y - rr * 1.12],
+    [x + L * 0.45, y - rr * 1.18],
+  ];
+  return [
+    { t: 'circle', c: [x, y + rr * 0.4], r: rr * 0.55, fill: CANOPY.shadow },
+    { t: 'line', a: [x, y + rr * 0.3], b: [x + L * 0.45, y - rr * 0.9], stroke: '#4a3a26', sw: rr * 0.26, round: true },
+    { t: 'line', a: [x + L * 0.45, y - rr * 0.9], b: [x + L, y - rr * 1.5], stroke: '#4a3a26', sw: rr * 0.2, round: true },
+    { t: 'poly', pts: canopy, fill: body, stroke: 'rgba(20,26,16,0.6)', sw: 1 },
+    // Leaves streaming off the downwind edge.
+    { t: 'line', a: [x + L + rr * 1.3, y - rr * 1.55], b: [x + L + rr * 2.0, y - rr * 1.48], stroke: body, sw: 1.1, round: true },
+    { t: 'line', a: [x + L + rr * 1.05, y - rr * 1.24], b: [x + L + rr * 1.7, y - rr * 1.14], stroke: body, sw: 1, round: true },
+  ];
+}
+
+/** Tidal-archipelago PALM: a curved trunk with a burst of arcing fronds. */
+function floraPalm(x: number, y: number, rr: number, tint: number): Prim[] {
+  const frond = tint < 0.33 ? '#2f9a4a' : tint < 0.66 ? '#2c8a58' : '#3aa843';
+  const bend = rr * (0.4 + posHash(x, y) * 0.3);
+  const topX = x + bend;
+  const topY = y - rr * 2.1;
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.4], r: rr * 0.55, fill: CANOPY.shadow },
+    { t: 'line', a: [x, y + rr * 0.3], b: [x + bend * 0.45, y - rr * 1.15], stroke: '#a8845a', sw: rr * 0.26, round: true },
+    { t: 'line', a: [x + bend * 0.45, y - rr * 1.15], b: [topX, topY], stroke: '#a8845a', sw: rr * 0.2, round: true },
+  ];
+  // Fronds fanning from the crown, each a two-segment droop.
+  const angles = [-2.7, -2.1, -1.35, -0.6, 0.1];
+  for (let i = 0; i < angles.length; i++) {
+    const a = angles[i]! + (posHash(x, y, i) - 0.5) * 0.3;
+    const midX = topX + Math.cos(a) * rr * 0.9;
+    const midY = topY + Math.sin(a) * rr * 0.55;
+    out.push({ t: 'line', a: [topX, topY], b: [midX, midY], stroke: frond, sw: Math.max(1.2, rr * 0.16), round: true });
+    out.push({ t: 'line', a: [midX, midY], b: [midX + Math.cos(a) * rr * 0.5, midY + Math.abs(Math.sin(a)) * rr * 0.3 + rr * 0.3], stroke: frond, sw: Math.max(1, rr * 0.12), round: true });
+  }
+  if (posHash(x, y, 9) < 0.5) out.push({ t: 'circle', c: [topX - rr * 0.2, topY + rr * 0.25], r: rr * 0.14, fill: '#5a3a22' }); // coconut
+  return out;
+}
+
+/** Cetus COASTAL SEA-STACK: a wind-carved rock pillar speckled with bioluminescence, foam at
+ *  its foot — the sparse "trees" of the clifftop world. */
+function floraSeaStack(x: number, y: number, rr: number, tint: number): Prim[] {
+  const body = tint < 0.5 ? '#2a5a6a' : '#234c5c';
+  const h = rr * 2.0;
+  const stack: Vec[] = [
+    [x - rr * 0.7, y + rr * 0.15],
+    [x - rr * 0.42, y - h * 0.9],
+    [x + rr * 0.28, y - h],
+    [x + rr * 0.62, y + rr * 0.15],
+  ];
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.4], r: rr * 0.6, fill: 'rgba(0,0,0,0.2)' },
+    { t: 'poly', pts: stack, fill: body, stroke: 'rgba(6,20,30,0.6)', sw: 1 },
+    { t: 'line', a: [x - rr * 0.42, y - h * 0.9], b: [x + rr * 0.28, y - h], stroke: 'rgba(150,232,255,0.6)', sw: 1.2, round: true }, // starlit crown
+    { t: 'circle', c: [x, y + rr * 0.2], r: rr * 0.78, fill: 'none', stroke: 'rgba(220,248,255,0.35)', sw: 1.2 }, // foam ring at the foot
+  ];
+  for (let i = 0; i < 3; i++) {
+    out.push({ t: 'circle', c: [x + (posHash(x, y, i) - 0.5) * rr, y - h * (0.25 + posHash(x, y, i + 4) * 0.6)], r: 0.8, fill: 'rgba(122,240,255,0.85)' }); // bio-speckles
+  }
+  return out;
 }
 
 /** Bright festival tent colour pairs (roof / shadow side) — content-as-data, cycled by tent index. */
@@ -1531,6 +1808,260 @@ function hexAlpha(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
+/**
+ * Archetype SIGNATURE ground decor (GS-biome-feel) — the Cetus treatment (whales/star-river),
+ * generalised: each world gets a bespoke seeded decor pass so its ground reads as a PLACE, not a
+ * recoloured slab. Void: drifting asteroid islets in the abyss + a distant black-hole eye. Inferno:
+ * glowing ground fissures. Fungal: spore-mist + tiny toadstool clusters in the rough. Crystal: shard
+ * clusters + prismatic ground glints. Frost: snow drifts + ice-sheen cracks. Desert: dune ripples +
+ * sun-bleached rocks. Tempest: cloud-shadow bands + a storm eye with a forked lightning strand.
+ * Ocean: foam surf-lines around the island + sandy islets with a palm out in the sea.
+ *
+ * Determinism: consumes ONLY the dedicated `rng` stream passed in (seeded off the hole hash with its
+ * own salt, like the cetus streams) and is gated per archetype — so every other world's prims and
+ * every other stream are byte-for-byte untouched. Cetus/verdant return nothing (cetus has its own
+ * bespoke passes; verdant is the familiar parkland baseline the wild worlds contrast against).
+ */
+function archetypeDecor(
+  arch: BiomeArchetype,
+  islandPts: Vec[],
+  landPolysCourse: Vec[][],
+  cb: Box,
+  proj: Projector,
+  W: number,
+  H: number,
+  accents: number,
+  onGrass: (p: Vec) => boolean,
+  rng: () => number,
+): Prim[] {
+  const out: Prim[] = [];
+  const clipped: Prim[] = []; // gathered, then pushed as ONE island clip (never nest clips — SVG serializer bug)
+  // A course-space point in the hole's bbox, projected; rejected off the cut grass. Bounded attempts
+  // so the draw count can never run away; a miss returns null (rng was still consumed — fine, this
+  // stream feeds nothing else).
+  const groundPt = (): Vec | null => {
+    for (let i = 0; i < 8; i++) {
+      const cp: Vec = [cb.minX + (cb.maxX - cb.minX) * rng(), cb.minY + (cb.maxY - cb.minY) * rng()];
+      if (onGrass(cp)) continue;
+      const sp = proj.project(cp);
+      if (!inView(sp, W, H)) continue;
+      return sp;
+    }
+    return null;
+  };
+
+  switch (arch) {
+    case 'void': {
+      // Asteroid islets adrift in the abyss beyond the fairway islands — the void is a PLACE you
+      // could fall into, not a purple background. Course-space band around the island (the whale
+      // placement model), rejected off every land platform, sized in yards and clamped in px.
+      const spanX = cb.maxX - cb.minX || 1;
+      const spanY = cb.maxY - cb.minY || 1;
+      const cxw = (cb.minX + cb.maxX) / 2;
+      const cyw = (cb.minY + cb.maxY) / 2;
+      const want = 5 + Math.floor(rng() * 3);
+      for (let i = 0, placed = 0; i < want * 14 && placed < want; i++) {
+        const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.7, cyw + (rng() - 0.5) * spanY * 1.7];
+        if (landPolysCourse.some((lp) => pointInPoly(c, lp))) continue;
+        placed++;
+        const s = proj.project(c);
+        const r = Math.max(4, Math.min(22, (5 + rng() * 9) * proj.scale));
+        if (!inView(s, W, H)) continue; // sized + placed (rng consumed), just not painted
+        const pts: Vec[] = [];
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * Math.PI * 2;
+          const rk = r * (0.72 + posHash(s[0], s[1], k) * 0.5);
+          pts.push([s[0] + Math.cos(a) * rk, s[1] + Math.sin(a) * rk * 0.8]);
+        }
+        out.push({ t: 'glow', c: s, r: r * 2.1, col: 'rgba(150,120,255,0.14)' });
+        out.push({ t: 'poly', pts, fill: '#241a44', stroke: 'rgba(150,140,220,0.5)', sw: 1 });
+        out.push({ t: 'line', a: pts[4]!, b: pts[5]!, stroke: 'rgba(200,185,255,0.65)', sw: 1.4, round: true }); // starlit rim
+        out.push({ t: 'circle', c: [s[0] + r * 0.2, s[1] - r * 0.24], r: 1, fill: 'rgba(215,200,255,0.9)' }); // crystal glint
+      }
+      // A distant black-hole eye low in the sky — the thing the void gardens orbit.
+      const bx = W * (0.16 + rng() * 0.68);
+      const by = H * (0.05 + rng() * 0.1);
+      const br = 6 + rng() * 4;
+      out.push({ t: 'glow', c: [bx, by], r: br * 7, col: 'rgba(150,90,225,0.30)' });
+      out.push({ t: 'circle', c: [bx, by], r: br * 1.6, fill: 'none', stroke: 'rgba(235,210,255,0.55)', sw: 1.2 }); // accretion ring
+      out.push({ t: 'circle', c: [bx, by], r: br, fill: '#050208', stroke: 'rgba(200,160,255,0.8)', sw: 1 }); // the event horizon
+      break;
+    }
+    case 'inferno': {
+      // Glowing ground FISSURES crawling through the scorched rough — the crust is barely holding.
+      const fissures = 4 + Math.floor(rng() * 3);
+      for (let i = 0; i < fissures; i++) {
+        const p0 = groundPt();
+        const ang = rng() * Math.PI * 2;
+        if (!p0) continue; // nothing painted; this dedicated stream feeds nothing downstream
+        let px0 = p0[0];
+        let py0 = p0[1];
+        let a = ang;
+        for (let sgm = 0; sgm < 3; sgm++) {
+          const len = 9 + posHash(px0, py0, sgm) * 14;
+          const px1 = px0 + Math.cos(a) * len;
+          const py1 = py0 + Math.sin(a) * len;
+          clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(16,6,3,0.75)', sw: 3, round: true });
+          clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(255,138,42,0.8)', sw: 1.2, round: true });
+          a += (posHash(px1, py1, sgm) - 0.5) * 1.5;
+          px0 = px1;
+          py0 = py1;
+        }
+        clipped.push({ t: 'glow', c: p0, r: 8 + rng() * 8, col: 'rgba(255,130,50,0.28)' });
+      }
+      break;
+    }
+    case 'fungal': {
+      // Spore-mist pooling in the undergrowth + tiny toadstool clusters — the jungle floor is alive.
+      const mists = 3 + Math.floor(rng() * 2);
+      for (let i = 0; i < mists; i++) {
+        const p = groundPt();
+        const r = (0.07 + rng() * 0.08) * Math.min(W, H);
+        if (p) clipped.push({ t: 'glow', c: p, r, col: 'rgba(120,240,180,0.13)' });
+      }
+      const shrooms = Math.round(7 * accents);
+      for (let i = 0; i < shrooms; i++) {
+        const p = groundPt();
+        const cool = rng() < 0.4;
+        if (!p) continue;
+        const h = 3 + posHash(p[0], p[1]) * 2.5;
+        const cap = cool ? '#7af0c0' : '#b07eff';
+        clipped.push({ t: 'line', a: p, b: [p[0], p[1] - h], stroke: '#ded4f2', sw: 1.1, round: true });
+        clipped.push({ t: 'circle', c: [p[0], p[1] - h], r: 1.6 + posHash(p[0], p[1], 2), fill: cap });
+        if (posHash(p[0], p[1], 3) < 0.45) clipped.push({ t: 'glow', c: [p[0], p[1] - h], r: 6, col: cool ? 'rgba(122,240,192,0.35)' : 'rgba(176,126,255,0.35)' });
+      }
+      break;
+    }
+    case 'crystal': {
+      // Shard clusters growing out of the rough + prismatic ground glints — everything refracts.
+      const clusters = 4 + Math.floor(rng() * 3);
+      for (let i = 0; i < clusters; i++) {
+        const p = groundPt();
+        const big = 4 + rng() * 5;
+        if (!p) continue;
+        const lean = (posHash(p[0], p[1]) - 0.5) * big * 0.7;
+        clipped.push({ t: 'glow', c: [p[0], p[1] - big * 0.6], r: big * 2.4, col: 'rgba(160,225,255,0.22)' });
+        clipped.push({ t: 'poly', pts: [[p[0], p[1] - big * 1.7], [p[0] + big * 0.4, p[1] - big * 0.4], [p[0] + big * 0.2, p[1]], [p[0] - big * 0.34, p[1] - big * 0.3]], fill: '#9fd8e6', stroke: 'rgba(30,70,100,0.55)', sw: 0.8 });
+        clipped.push({ t: 'poly', pts: [[p[0] + lean + big * 0.5, p[1] - big], [p[0] + lean + big * 0.8, p[1] - big * 0.2], [p[0] + lean + big * 0.45, p[1]]], fill: '#cbe0ea', stroke: 'rgba(30,70,100,0.45)', sw: 0.8 });
+      }
+      const glintCols = ['#ff9ab8', '#ffe14a', '#7af0c0', '#9fd8ff'];
+      const glints = Math.round(5 * accents);
+      for (let i = 0; i < glints; i++) {
+        const p = groundPt();
+        const col = glintCols[Math.floor(rng() * glintCols.length)]!;
+        if (!p) continue;
+        clipped.push({ t: 'line', a: [p[0] - 2, p[1]], b: [p[0] + 2, p[1]], stroke: col, sw: 0.9, round: true });
+        clipped.push({ t: 'line', a: [p[0], p[1] - 2], b: [p[0], p[1] + 2], stroke: col, sw: 0.9, round: true });
+      }
+      break;
+    }
+    case 'frost': {
+      // Wind-blown snow drifts + ice-sheen cracks — the ground is frozen, not just teal.
+      const drifts = 3 + Math.floor(rng() * 2);
+      for (let i = 0; i < drifts; i++) {
+        const p = groundPt();
+        const r = (0.05 + rng() * 0.07) * Math.min(W, H);
+        if (p) clipped.push({ t: 'circle', c: p, r, fill: 'rgba(240,250,255,0.10)' });
+      }
+      const cracks = 4 + Math.floor(rng() * 3);
+      for (let i = 0; i < cracks; i++) {
+        const p = groundPt();
+        const ang = rng() * Math.PI * 2;
+        if (!p) continue;
+        const len = 8 + posHash(p[0], p[1]) * 12;
+        const mx = p[0] + Math.cos(ang) * len;
+        const my = p[1] + Math.sin(ang) * len;
+        clipped.push({ t: 'line', a: p, b: [mx, my], stroke: 'rgba(220,245,255,0.35)', sw: 0.9, round: true });
+        clipped.push({ t: 'line', a: [mx, my], b: [mx + Math.cos(ang + 0.7) * len * 0.5, my + Math.sin(ang + 0.7) * len * 0.5], stroke: 'rgba(220,245,255,0.28)', sw: 0.8, round: true });
+      }
+      break;
+    }
+    case 'desert': {
+      // Dune ripples combed across the waste + the odd sun-bleached rock.
+      const bands = 4 + Math.floor(rng() * 3);
+      for (let i = 0; i < bands; i++) {
+        const p = groundPt();
+        const ang = rng() * Math.PI; // ripple grain
+        if (!p) continue;
+        const dx = Math.cos(ang);
+        const dy = Math.sin(ang);
+        for (let k = 0; k < 4; k++) {
+          const off = (k - 1.5) * 4.5;
+          const cxp = p[0] - dy * off;
+          const cyp = p[1] + dx * off;
+          const len = 7 + posHash(cxp, cyp, k) * 8;
+          clipped.push({ t: 'line', a: [cxp - dx * len, cyp - dy * len], b: [cxp + dx * len, cyp + dy * len], stroke: 'rgba(235,205,150,0.20)', sw: 1.2, round: true });
+        }
+      }
+      const rocks = 2 + Math.floor(rng() * 2);
+      for (let i = 0; i < rocks; i++) {
+        const p = groundPt();
+        if (!p) continue;
+        const r = 2.5 + posHash(p[0], p[1]) * 3;
+        clipped.push({ t: 'poly', pts: [[p[0] - r, p[1]], [p[0] - r * 0.3, p[1] - r * 0.9], [p[0] + r * 0.7, p[1] - r * 0.6], [p[0] + r, p[1]]], fill: '#8a6f4a', stroke: 'rgba(46,36,19,0.6)', sw: 0.8 });
+        clipped.push({ t: 'line', a: [p[0] - r * 0.3, p[1] - r * 0.9], b: [p[0] + r * 0.7, p[1] - r * 0.6], stroke: 'rgba(255,240,210,0.5)', sw: 0.9, round: true });
+      }
+      break;
+    }
+    case 'tempest': {
+      // Cloud shadows racing over the ground + the storm's eye glowering in the sky.
+      const bands = 2 + Math.floor(rng() * 2);
+      for (let i = 0; i < bands; i++) {
+        const y0 = rng() * H;
+        const slant = 30 + rng() * 50;
+        const bw = 26 + rng() * 30;
+        clipped.push({ t: 'poly', pts: [[-20, y0], [W + 20, y0 - slant], [W + 20, y0 - slant + bw], [-20, y0 + bw]], fill: 'rgba(8,10,18,0.14)' });
+      }
+      const ex = W * (0.18 + rng() * 0.64);
+      const ey = H * (0.05 + rng() * 0.09);
+      const er = 12 + rng() * 10;
+      out.push({ t: 'glow', c: [ex, ey], r: er * 4, col: 'rgba(170,150,255,0.28)' });
+      out.push({ t: 'circle', c: [ex, ey], r: er, fill: 'none', stroke: 'rgba(210,195,255,0.4)', sw: 1.4 });
+      out.push({ t: 'circle', c: [ex, ey], r: er * 0.55, fill: 'none', stroke: 'rgba(230,220,255,0.5)', sw: 1 });
+      // One forked lightning strand hanging from the eye (static; the animated layer flickers live).
+      let lx = ex;
+      let ly = ey + er * 0.6;
+      for (let sgm = 0; sgm < 3; sgm++) {
+        const nx = lx + (posHash(lx, ly, sgm) - 0.5) * 22;
+        const ny = ly + 12 + posHash(lx, ly, sgm + 3) * 14;
+        out.push({ t: 'line', a: [lx, ly], b: [nx, ny], stroke: 'rgba(255,240,180,0.5)', sw: 1.4, round: true });
+        if (sgm === 1) out.push({ t: 'line', a: [lx, ly], b: [lx + 14, ly + 12], stroke: 'rgba(255,240,180,0.35)', sw: 1.1, round: true });
+        lx = nx;
+        ly = ny;
+      }
+      break;
+    }
+    case 'ocean': {
+      // Surf FOAM around the island's shore + sandy islets with a palm out in the lagoon.
+      out.push({ t: 'poly', pts: offsetPoly(islandPts, -5), fill: 'none', stroke: 'rgba(150,235,225,0.35)', sw: 2.6 });
+      out.push({ t: 'poly', pts: offsetPoly(islandPts, -11), fill: 'none', stroke: 'rgba(150,235,225,0.16)', sw: 4 });
+      const spanX = cb.maxX - cb.minX || 1;
+      const spanY = cb.maxY - cb.minY || 1;
+      const cxw = (cb.minX + cb.maxX) / 2;
+      const cyw = (cb.minY + cb.maxY) / 2;
+      const want = 3 + Math.floor(rng() * 2);
+      for (let i = 0, placed = 0; i < want * 14 && placed < want; i++) {
+        const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.7, cyw + (rng() - 0.5) * spanY * 1.7];
+        if (landPolysCourse.some((lp) => pointInPoly(c, lp))) continue;
+        placed++;
+        const s = proj.project(c);
+        const r = Math.max(4, Math.min(16, (4 + rng() * 6) * proj.scale));
+        if (!inView(s, W, H)) continue;
+        out.push({ t: 'circle', c: s, r: r * 1.35, fill: 'none', stroke: 'rgba(220,248,255,0.4)', sw: 1.2 }); // breaking surf
+        out.push({ t: 'circle', c: s, r, fill: '#c8b088', stroke: 'rgba(90,70,40,0.5)', sw: 1 }); // the sand cay
+        out.push({ t: 'line', a: [s[0], s[1] - r * 0.2], b: [s[0], s[1] - r * 1.1], stroke: '#a8845a', sw: 1.4, round: true }); // a lone palm
+        out.push({ t: 'line', a: [s[0], s[1] - r * 1.1], b: [s[0] - r * 0.5, s[1] - r * 1.25], stroke: '#2f9a4a', sw: 1.2, round: true });
+        out.push({ t: 'line', a: [s[0], s[1] - r * 1.1], b: [s[0] + r * 0.5, s[1] - r * 1.2], stroke: '#2f9a4a', sw: 1.2, round: true });
+      }
+      break;
+    }
+    default:
+      break; // verdant = the parkland baseline; cetus has its own bespoke ocean/river/cliff passes
+  }
+  if (clipped.length) out.push({ t: 'clip', clip: islandPts, children: clipped });
+  return out;
+}
+
 export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[] {
   const { width: W, height: H, biome, themeId } = opts;
   // Rainbow Road (GS-rainbow): the play surfaces become a glowing rainbow ribbon and everything off
@@ -1762,6 +2293,17 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // consumed above, so the art stream is byte-stable whether or not the detail is painted.
   if (!rainbow && !islandHole) prims.push({ t: 'clip', clip: islandPts, children: land });
 
+  // --- 4c. Archetype SIGNATURE decor (GS-biome-feel) ---------------------------
+  // The Cetus treatment generalised: void asteroid fields + a black-hole eye, inferno ground
+  // fissures, fungal spore-mist + toadstools, crystal shard clusters, frost drifts + ice cracks,
+  // desert dune ripples, tempest cloud shadows + storm eye, ocean surf + lagoon cays. Own dedicated
+  // stream (`brng`) + gated per archetype, drawn UNDER the terrain features (section 5 paints the
+  // mown turf over it) — so every other world, and every other stream, is byte-for-byte untouched.
+  if (!rainbow && art.accents > 0) {
+    const brng = mulberry32((hashHole(hole) ^ 0x00b10a3e) >>> 0);
+    prims.push(...archetypeDecor(arch, islandPts, landPlatformsCourse, cb, proj, W, H, art.accents, onGrass, brng));
+  }
+
   // --- 5. Terrain features (fairway/green/tee + scatter surfaces) --------------
   const collar = collarFor(arch, deepen);
   // "First-cut" fringe tones — each surface blended halfway toward this world's rough — so the cut
@@ -1853,7 +2395,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
     prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng));
     prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
-    for (const f of treeHaz) prims.push(...styleTree(f.poly, proj, rng));
+    for (const f of treeHaz) prims.push(...styleFlora(f.poly, proj, rng, arch));
   }
 
   // --- 6b. Trade-camp tents (GS-tents) ----------------------------------------
@@ -1897,13 +2439,28 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // `weather.ts` layer (the play view in flight, an overlay while aiming/putting), so it's alive on
   // every screen and never jumps as a false ground-anchored layer (GS-journey-fx rework).
 
-  // --- 9. Out-of-bounds boundary + stakes -------------------------------------
+  // --- 9. Out-of-bounds boundary + stakes (per-world look, GS-biome-feel) ------
+  // The same white/red golf stake used to ring EVERY world — a picket fence floating in the void.
+  // Each archetype now marks its boundary in its own vocabulary (`OB_LOOK`); the two lost-rough
+  // worlds trade the ground post for a FLOATING warp beacon (there's no ground out there to plant
+  // a stake in). Render-only — the OB rule (play-bounds box) is byte-identical.
+  const obl = OB_LOOK[arch] ?? OB;
   const corners = projPoly(playBoundsCorners(hole), proj);
-  prims.push({ t: 'poly', pts: corners, fill: 'none', stroke: OB.line, sw: 1.5, dash: [2, 7] });
+  prims.push({ t: 'poly', pts: corners, fill: 'none', stroke: obl.line, sw: 1.5, dash: [2, 7] });
   for (const s of obStakes(hole)) {
     const [x, y] = proj.project(s);
-    prims.push({ t: 'line', a: [x, y], b: [x, y - 7], stroke: OB.post, sw: 2, round: true });
-    prims.push({ t: 'circle', c: [x, y - 7], r: 1.7, fill: OB.cap });
+    const beacon = (obl as ObLook).beacon;
+    if (beacon) {
+      // A warp beacon adrift on the boundary: soft glow + a lit diamond, bobbed by a position hash.
+      const by = y - 4 - posHash(x, y) * 3;
+      prims.push({ t: 'glow', c: [x, by], r: 7, col: beacon });
+      prims.push({ t: 'poly', pts: [[x, by - 3.2], [x + 2.3, by], [x, by + 3.2], [x - 2.3, by]], fill: obl.cap, stroke: obl.post, sw: 0.8 });
+      prims.push({ t: 'circle', c: [x, by], r: 0.9, fill: '#ffffff' });
+      continue;
+    }
+    prims.push({ t: 'line', a: [x, y], b: [x, y - 7], stroke: obl.post, sw: 2, round: true });
+    if ((obl as ObLook).glow) prims.push({ t: 'glow', c: [x, y - 7], r: 5.5, col: (obl as ObLook).glow! });
+    prims.push({ t: 'circle', c: [x, y - 7], r: 1.7, fill: obl.cap });
   }
 
   // --- 10. Centreline ---------------------------------------------------------

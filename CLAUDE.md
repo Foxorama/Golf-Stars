@@ -198,7 +198,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   scene randomness is mulberry32 seeded from `hashHole()` (NEVER `Math.random`) on documented streams
   (`rng`/`crng`/`hrng`/decor seeds) so the SVG is byte-stable — adding a draw must not perturb the
   `rng` stream order. Turf bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
-  atmosphere is the shared screen-space `render/weather.ts`. Re-shoot the gallery
+  atmosphere is the shared screen-space `render/weather.ts`. **Per-world identity is table+dispatch,
+  never a fork (GS-biome-feel):** flora (`styleFlora`), boundary markers (`OB_LOOK`), signature decor
+  (`archetypeDecor`, own seeded stream per the cetus pattern), ambient air (`AMBIENT`) and wind tint
+  (`WIND_RGBA`) are ALL archetype-keyed — a new world adds a row to each (`tests/biome-identity.test.ts`
+  guards full coverage), and a flora variant must consume EXACTLY the classic two rng draws (extra
+  variation via `posHash`, never the stream). `playView`'s `spawnLandFX` answers the touchdown per
+  lie/penalty — extend it with any new penalty kind. Re-shoot the gallery
   (`node scripts/gallery.mjs`) after any `style.ts` change.
 - **UI layer** (`docs/decisions/ui-intro.md`). The screen flow is a PURE reducer (`ui/game.ts`):
   `(UiState, Action) → UiState`, no DOM/time, fully unit-tested. `app.ts`/`main.ts` render state +

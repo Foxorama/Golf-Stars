@@ -34,8 +34,6 @@ Foundations are shipped; these are the live follow-ons.
   uphill-magnet). The "until perks exist" caveat in the slope code is the hook.
 - **GS-split-fairways** — risky-short vs safe-long alternate fairways (the dogleg-grove machinery is the
   start); centreline-bunker pinch + opposite greenside bunker (open-the-angle).
-- **GS-canopy-recolour** — per-world tree/canopy palette (`CANOPY` is one fixed green today) so fungal reads
-  as mushrooms and crystal as spires, not foliage.
 - **GS-more-worlds** — metal/asteroid (low-grav scrap), neon/cyber grid, toxic/acid swamp, lightning-storm:
   each a new archetype row + its 8 Record entries (the registry scales now).
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.
@@ -68,6 +66,10 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-biome-feel** — per-world identity pass (supersedes GS-canopy-recolour): archetype flora (mushrooms/
+  conifers/snags/saguaros/spires/palms…), signature ground decor (void asteroids + black hole, inferno
+  fissures, ocean surf + cays…), themed OB markers (void warp beacons), per-surface landing FX (splash/
+  lava burst/void implosion), ambient air layer + full 10-world wind tints. See `docs/decisions/render.md`.
 - **GS-journey-alive** — journey select as a living cockpit: lit-sphere biome worlds (gradient body +
   surface art + terminator + specular + atmosphere), boss red-aura / heat shimmer, warp-corridor energy
   pulses, trail comet, launch-pad + thrusters, lit Earth, seeded twinkles/shooting stars, drifting sky.
