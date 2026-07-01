@@ -457,6 +457,25 @@
     `apparelCardChrome` / `bagSetCardHTML`, also used in the Clubhouse) were unified to a single 130px width +
     matching name/sub/footer type so items advertise consistently across sections. CSS is the `.gs-acc*` block
     in `index.html`. No new hook or save bump → no test-hub wiring; full suite stays green.
+- **The Clubhouse became a tap-to-restyle stage (GS-clubhouse-stage).** The per-golfer `clubhouseScreen`
+  used to be a long, hard-to-parse scroll: a small mannequin, then a garage rack, then three flat wardrobe
+  racks (hats/shirts/pants) all shown at once. Reframed around the golfer as the interface:
+  - **The stage.** A big full-body avatar (`golferPreviewSVG(…, w:150, h:210, legsFull:true)` — a new opt-in
+    flag that stands the mannequin up with proportional head/hip/foot so the figure reads as three clean tap
+    bands; the default short-legged mannequin used by the lounge/preview cards is unchanged byte-for-byte).
+    Over it sit three transparent tap zones (`.gs-czone--hat/--shirt/--pants`, absolutely positioned bands),
+    each with a floating chip naming the worn piece + a ✎ pencil. Below the figure, a **garage bay** tile
+    (`clubhouseGarageArt`: a hangar/launch-pad SVG scene — open star-bay, neon pillars tinted by the ride's
+    rarity, the parked ship via `shipSVG`) is a fourth tap target for the ride.
+  - **Reveal-one interaction.** Tapping a body part or the garage opens `clubhousePicker` — just THAT slot's
+    owned rack (the same `clubhouseApparelCardHTML` equip toggles / `shipCardHTML` fleet as before; empty
+    apparel slots show a Trade-Market buy button). The open slot is `clubhouseSlot: ApparelSlot | 'ship' | null`,
+    view-only module state toggled by `[data-clubslot]` + `render()` and reset on Clubhouse open/close — the
+    SAME pattern as `inspectGearId`/`collapsedMarketSections`, NOT reducer/save state. The pure reducer
+    (`selectShip`/`equipApparel`) and every `tests/ui.test.ts` assertion are untouched, so the live
+    preview-updates-as-you-equip contract and per-character isolation still hold. No new `window._gs*` hook or
+    `?param`, no save bump → no test-hub wiring; CSS is the `.gs-cstage`/`.gs-czone`/`.gs-garage`/`.gs-cpick`
+    block in `index.html`.
 - **The shop is a rotating, stacking outfitter (GS-11).** Two item kinds in `SHOP_ITEMS`: *uniques*
   (the original 5, buyable once) and *stackables* (`stackable: true`, buyable repeatedly at a
   geometric cost ramp — `itemCost(item, owned) = cost * STACK_COST_GROWTH^owned`, capped by

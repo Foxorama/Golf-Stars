@@ -166,16 +166,20 @@ export function golferPreviewSVG(
   hatId: string | undefined,
   shirtId: string | undefined,
   pantsId: string | undefined,
-  opts: { skin?: string; shirtBase?: string; w?: number; h?: number } = {},
+  opts: { skin?: string; shirtBase?: string; w?: number; h?: number; legsFull?: boolean } = {},
 ): string {
-  const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132 } = opts;
+  const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132, legsFull = false } = opts;
   const hat = apparelById(hatId);
   const shirt = apparelById(shirtId);
   const pants = apparelById(pantsId);
   const cx = w / 2;
-  const headY = 40;
-  const hipY = h - 24;
-  const footY = h - 5;
+  // `legsFull` stands the golfer up as a full-body figure (proportional head/hip/foot) so the big
+  // Clubhouse stage reads head→chest→legs as three clean tap bands; the default short-legged mannequin
+  // (lounge / preview cards) is unchanged byte-for-byte.
+  const headY = legsFull ? Math.round(h * 0.19) : 40;
+  const hipY = legsFull ? Math.round(h * 0.58) : h - 24;
+  const footY = legsFull ? Math.round(h * 0.93) : h - 5;
+  const headR = legsFull ? 15 : 13;
   const shirtCol = shirt?.look.color ?? shirtBase;
   const glowAura = shirt?.look.glow ? aura(cx, headY + 36, 30, shirt.look.glow, 'prevsg') : '';
   // Legs (drawn behind the torso): default dark trousers, tinted by the equipped pants. Shorts bare the
@@ -199,7 +203,7 @@ export function golferPreviewSVG(
   const torso = `
     <path d="M${cx - 20},${headY + 16} L${cx - 9},${headY + 10} L${cx},${headY + 14} L${cx + 9},${headY + 10} L${cx + 20},${headY + 16} L${cx + 16},${headY + 26} L${cx + 12},${hipY} L${cx - 12},${hipY} L${cx - 16},${headY + 26} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="1.4" stroke-linejoin="round"/>`;
   const detail = shirt ? shirtDetail(shirt.look, cx, headY + 30) : '';
-  const head = `<circle cx="${cx}" cy="${headY}" r="13" fill="${skin}" stroke="#0c1116" stroke-width="1.2"/>`;
+  const head = `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="${skin}" stroke="#0c1116" stroke-width="1.2"/>`;
   const hatG = hat ? hatGlyph(hat.look, cx, headY - 6, 'prev') : '';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
     ${glowAura}${pantsGlow}${legs}${torso}${detail}${head}${hatG}

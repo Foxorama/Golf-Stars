@@ -215,6 +215,94 @@
       .gs-navtile__title { font: 700 18px/1.1 system-ui, sans-serif; }
       .gs-navtile__sub { font-size: 12px; opacity: .82; }
 
+      /* ── Clubhouse: tap-to-restyle character stage + garage bay + slot picker ─ */
+      .gs-cstage {
+        position: relative; margin: 8px auto 6px; max-width: 340px; min-height: 250px;
+        border: 1px solid var(--gs-line); border-radius: var(--gs-r-lg); overflow: hidden;
+        background:
+          radial-gradient(115% 74% at 50% 4%, #26304e 0%, transparent 58%),
+          radial-gradient(52% 30% at 50% 100%, rgba(255, 255, 255, .07), transparent 72%),
+          linear-gradient(180deg, #12141d, #0b0d12);
+      }
+      .gs-cstage__figure { position: relative; z-index: 1; display: flex; justify-content: center; padding: 12px 0 8px; }
+      .gs-cstage__figure svg { height: 232px; width: auto; filter: drop-shadow(0 7px 11px rgba(0, 0, 0, .55)); }
+      /* Invisible tap band over one body part; a floating chip names the worn piece. */
+      .gs-czone {
+        position: absolute; left: 0; right: 0; z-index: 3; display: flex; align-items: center;
+        padding: 0 10px; border: 0; background: transparent; cursor: pointer;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+      }
+      .gs-czone::before {
+        content: ''; position: absolute; inset: 6px 28% 6px 28%;
+        border: 1.6px dashed transparent; border-radius: 44px;
+        transition: border-color .16s ease, background .16s ease;
+      }
+      .gs-czone:hover::before { border-color: #ffffff55; background: #ffffff0f; }
+      .gs-czone:focus-visible { outline: none; }
+      .gs-czone:focus-visible::before { border-color: var(--gs-info); }
+      .gs-czone--active::before { border-color: var(--gs-warn); background: #ffc45416; }
+      .gs-czone--hat   { top: 1%;  height: 27%; justify-content: flex-end; }
+      .gs-czone--shirt { top: 28%; height: 30%; justify-content: flex-start; }
+      .gs-czone--pants { top: 58%; height: 41%; justify-content: flex-end; }
+      .gs-czone__chip {
+        position: relative; z-index: 4; display: inline-flex; align-items: center; gap: 5px;
+        max-width: 47%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font: 700 11.5px/1 system-ui, sans-serif; color: var(--gs-ink);
+        padding: 5px 9px; border-radius: 999px;
+        background: rgba(10, 12, 18, .84); border: 1px solid var(--gs-line); box-shadow: var(--gs-shadow);
+      }
+      .gs-czone--active .gs-czone__chip { border-color: var(--gs-warn); color: var(--gs-warn); }
+      .gs-czone__pen { opacity: .55; font-weight: 400; }
+      .gs-clubset {
+        text-align: center; margin: 2px 0 8px; font: 700 12px/1 system-ui, sans-serif; color: #ff4fd8;
+      }
+      .gs-clubhint { text-align: center; font-size: 12.5px; opacity: .6; margin: 8px 0 4px; }
+
+      /* The garage bay tile — a wide tap target that opens the ride picker. */
+      .gs-garage {
+        position: relative; display: block; width: 100%; margin: 4px 0 2px; min-height: 130px;
+        padding: 0; overflow: hidden; border-radius: var(--gs-r-lg); border: 1px solid #35507a;
+        background: var(--gs-bg-2); color: var(--gs-ink); cursor: pointer; box-shadow: var(--gs-shadow);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease, filter .16s ease;
+      }
+      .gs-garage:hover { transform: translateY(-2px); border-color: #5a7db0; filter: brightness(1.06); box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
+      .gs-garage:active { transform: translateY(0); }
+      .gs-garage:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+      .gs-garage--active { border-color: var(--gs-warn); box-shadow: 0 0 0 1px var(--gs-warn), var(--gs-shadow); }
+      .gs-garage__art { position: absolute; inset: 0; display: block; }
+      .gs-garage__art svg { display: block; width: 100%; height: 100%; }
+      .gs-garage__cap {
+        position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end;
+        justify-content: space-between; gap: 8px; padding: 26px 12px 11px;
+        background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .9) 66%);
+      }
+      .gs-garage__name { display: block; font: 700 15px/1.15 system-ui, sans-serif; }
+      .gs-garage__sub { display: block; font-size: 11.5px; opacity: .78; text-transform: capitalize; }
+      .gs-garage__edit {
+        flex: none; align-self: flex-end; font: 700 11px/1 system-ui, sans-serif; color: var(--gs-warn);
+        padding: 5px 9px; border: 1px solid var(--gs-warn); border-radius: 999px; background: rgba(10, 12, 18, .72);
+        white-space: nowrap;
+      }
+
+      /* The revealed slot picker (owned rack for the tapped slot). */
+      .gs-cpick {
+        border: 1px solid var(--gs-warn); border-radius: var(--gs-r-lg);
+        background: linear-gradient(180deg, #171a24, var(--gs-bg-2)); margin: 10px 0 4px; padding: 10px 10px 12px;
+        animation: gsPickIn .18s ease;
+      }
+      @keyframes gsPickIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+      .gs-cpick__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+      .gs-cpick__title { font: 700 15px/1 system-ui, sans-serif; }
+      .gs-cpick__done {
+        margin-left: auto; font: 700 12px/1 system-ui, sans-serif; color: var(--gs-dim);
+        background: transparent; border: 1px solid var(--gs-line); border-radius: 999px; padding: 5px 11px; cursor: pointer;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: color .16s ease, border-color .16s ease;
+      }
+      .gs-cpick__done:hover { color: var(--gs-ink); border-color: #46506a; }
+      .gs-cpick__rack { display: flex; flex-wrap: wrap; justify-content: center; }
+      .gs-cpick__empty { text-align: center; font-size: 12.5px; opacity: .75; padding: 4px 0 8px; }
+
       /* ── Scorecard table ─────────────────────────────────────────────────── */
       .gs-scorecard { border-collapse: collapse; font-size: 13px; width: 100%; }
       .gs-scorecard th { padding: 2px 8px; opacity: .55; text-align: left; font-weight: 600; }

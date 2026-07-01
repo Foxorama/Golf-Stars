@@ -42,7 +42,7 @@ import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
 import { canBuyShip, shipCatalogue, type Ship } from './sim/rpg/ships';
-import { shipCardSVG } from './render/shipArt';
+import { shipCardSVG, shipSVG } from './render/shipArt';
 import { apparelById, apparelForSlot, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
 import { clubhouseLoungeHTML, type LoungeGolfer } from './render/clubhouseLounge';
@@ -233,6 +233,10 @@ function dispatch(action: Action): void {
   try {
     const prevScreen = state.screen;
     state = reduce(state, action);
+    // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
+    if (action.type === 'openClubhouse' || action.type === 'closeClubhouse' || action.type === 'openClubhouseHall') {
+      clubhouseSlot = null;
+    }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
     if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
       sfx.reward();
@@ -687,6 +691,11 @@ let inspectGearId: string | null = null;
 // View-only module state (like inspectGearId) — toggled via [data-toggle-section] + re-render, never
 // persisted. Empty = every section expanded (the default, non-surprising view).
 const collapsedMarketSections = new Set<string>();
+// Clubhouse editor (GS-clubhouse-stage): which slot picker is open — tap a body part or the garage on
+// the character stage to reveal that slot's rack. View-only module state (like inspectGearId), toggled
+// via [data-clubslot] + re-render, reset when the Clubhouse opens/closes. null = the resting stage.
+type ClubSlot = ApparelSlot | 'ship';
+let clubhouseSlot: ClubSlot | null = null;
 let mapPan: [number, number] = [0, 0];
 // Journey map (GS-galaxy-map): remember the trail strip's horizontal scroll so it survives the
 // per-frame re-render of the travel screen — snap to the most-recent stops only when a NEW stop's
@@ -2004,8 +2013,91 @@ function clubhouseTileArt(): string {
   </svg>`;
 }
 
-/** One character's Clubhouse (GS-clubhouse): their garage (pick an owned ship) + wardrobe (wear owned
- *  hats/shirts), with a live preview. Outfitting is PER character — nothing here is shared. */
+/** A hangar-bay backdrop for the Clubhouse garage tile (GS-clubhouse-stage): a launch pad under an open
+ *  star-bay, pillars + neon strips tinted by the parked ship's rarity, with the ship itself sat on the
+ *  glowing pad. Deterministic (fixed star spots — the render layer bans Math.random). */
+function clubhouseGarageArt(shipId: string | undefined, accent: string): string {
+  const stars = [
+    [58, 20], [92, 12], [130, 26], [168, 15], [206, 24], [240, 18],
+    [74, 34], [150, 8], [190, 36], [116, 40],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 === 0 ? 1.4 : 0.9}" fill="#eaf2ff" opacity="${i % 2 ? 0.7 : 0.95}"/>`)
+    .join('');
+  const chevron = (y: number, o: number) =>
+    `<path d="M132,${y} L150,${y + 6} L168,${y} L168,${y + 3} L150,${y + 9} L132,${y + 3} Z" fill="${accent}" opacity="${o}"/>`;
+  return `<svg viewBox="0 0 300 130" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <linearGradient id="ghSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#080c1a"/><stop offset="100%" stop-color="#141d36"/></linearGradient>
+      <radialGradient id="ghGlow" cx="50%" cy="88%" r="62%"><stop offset="0%" stop-color="${accent}" stop-opacity="0.4"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></radialGradient>
+      <linearGradient id="ghFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#28324f"/><stop offset="100%" stop-color="#0b0f1d"/></linearGradient>
+    </defs>
+    <rect width="300" height="130" fill="url(#ghSky)"/>
+    ${stars}
+    <path d="M34,4 Q150,-16 266,4 L266,60 L34,60 Z" fill="#0a0f22" opacity="0.55"/>
+    <rect x="0" y="84" width="300" height="46" fill="url(#ghFloor)"/>
+    <ellipse cx="150" cy="106" rx="104" ry="19" fill="url(#ghGlow)"/>
+    <ellipse cx="150" cy="106" rx="74" ry="12.5" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.75" stroke-dasharray="6 6"/>
+    ${chevron(112, 0.8)}${chevron(118, 0.4)}
+    <rect x="14" y="4" width="11" height="118" fill="#18223c"/>
+    <rect x="275" y="4" width="11" height="118" fill="#18223c"/>
+    <rect x="25" y="10" width="3.4" height="104" rx="1.7" fill="${accent}" opacity="0.55"/>
+    <rect x="271.6" y="10" width="3.4" height="104" rx="1.7" fill="${accent}" opacity="0.55"/>
+    ${shipSVG(shipId, 150, 80, 2.2)}
+  </svg>`;
+}
+
+/** The open slot-picker below the character stage (GS-clubhouse-stage): when a body part or the garage is
+ *  tapped, this reveals just that slot's owned rack (equip toggles / owned fleet). null = a resting hint. */
+function clubhousePicker(
+  ch: Character,
+  hatId: string | undefined,
+  shirtId: string | undefined,
+  pantsId: string | undefined,
+  shipId: string | undefined,
+): string {
+  if (!clubhouseSlot) {
+    return `<p class="gs-clubhint">Tap ${ch.shortName}'s hat, shirt, pants — or the garage — to change it.</p>`;
+  }
+  const meta: Record<ClubSlot, { icon: string; title: string }> = {
+    hat: { icon: '🎩', title: `Hats for ${ch.shortName}` },
+    shirt: { icon: '👕', title: `Shirts for ${ch.shortName}` },
+    pants: { icon: '👖', title: `Pants for ${ch.shortName}` },
+    ship: { icon: '🛸', title: `${ch.shortName}'s garage` },
+  };
+  const m = meta[clubhouseSlot];
+  let body: string;
+  if (clubhouseSlot === 'ship') {
+    body = `<div class="gs-cpick__rack">${shipCatalogue()
+      .filter((s) => state.ownedShips.includes(s.id))
+      .map((ship) => {
+        const flying = ship.id === shipId;
+        return shipCardHTML(ship, flying ? '✓ FLYING' : 'Fly this', {
+          ring: flying ? '#ffce54' : cosmeticRarCol(ship.rarity),
+          glow: flying,
+          action: flying ? undefined : { type: 'selectShip', id: ship.id },
+        });
+      })
+      .join('')}</div>`;
+  } else {
+    const owned = apparelForSlot(clubhouseSlot).filter((a) => state.ownedApparel.includes(a.id));
+    body = owned.length
+      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId)).join('')}</div>`
+      : `<div class="gs-cpick__empty">No ${clubhouseSlot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
+  }
+  return `
+    <section class="gs-cpick">
+      <div class="gs-cpick__head">
+        <span aria-hidden="true">${m.icon}</span>
+        <span class="gs-cpick__title">${m.title}</span>
+        <button class="gs-cpick__done" data-clubslot="${clubhouseSlot}">Done ✕</button>
+      </div>
+      ${body}
+    </section>`;
+}
+
+/** One character's Clubhouse (GS-clubhouse / GS-clubhouse-stage): a big full-body avatar you outfit by
+ *  TAPPING the body part you want to change (hat / shirt / pants) plus a garage bay below you tap to pick
+ *  the ride. Each tap reveals just that slot's owned rack. Outfitting is PER character — nothing shared. */
 function clubhouseScreen(): string {
   const ch = getCharacter(state.manageCharacterId);
   if (!ch) return titleScreen(); // safety: no character selected
@@ -2013,60 +2105,54 @@ function clubhouseScreen(): string {
   const shirtId = shirtForCharacter(state, ch.id);
   const pantsId = pantsForCharacter(state, ch.id);
   const shipId = shipForCharacter(state, ch.id);
-  const preview = golferPreviewSVG(hatId, shirtId, pantsId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 110, h: 134 });
+  const preview = golferPreviewSVG(hatId, shirtId, pantsId, {
+    skin: ch.style.skin,
+    shirtBase: ch.style.shirt,
+    w: 150,
+    h: 210,
+    legsFull: true,
+  });
   const setName = equippedSet(hatId, shirtId, pantsId);
   const setBadge = setName
-    ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#ff4fd8;">✦ ${setName} set complete!</div>`
+    ? `<div class="gs-clubset">✦ ${setName} set complete!</div>`
     : '';
+  const ship = shipCatalogue().find((s) => s.id === shipId);
+  const shipAccent = ship ? cosmeticRarCol(ship.rarity) : '#8aa0c0';
 
-  // The garage: your owned fleet, click to fly a different one on THIS golfer (their ship ringed + glowing).
-  const fleet = shipCatalogue()
-    .filter((s) => state.ownedShips.includes(s.id))
-    .map((ship) => {
-      const flying = ship.id === shipId;
-      const ring = flying ? '#ffce54' : cosmeticRarCol(ship.rarity);
-      return shipCardHTML(ship, flying ? '✓ FLYING' : 'Fly this', {
-        ring,
-        glow: flying,
-        action: flying ? undefined : { type: 'selectShip', id: ship.id },
-      });
-    })
-    .join('');
-
-  // The wardrobe: only OWNED garments (buying lives at the Trade Market), equip-toggled on THIS golfer.
-  const rack = (slot: ApparelSlot) => {
-    const owned = apparelForSlot(slot).filter((a) => state.ownedApparel.includes(a.id));
-    if (!owned.length) {
-      return `<p style="opacity:.5;font-size:12px;text-align:center;">No ${slot}s yet — buy some at the Trade Market.</p>`;
-    }
-    return `<div style="display:flex;flex-wrap:wrap;justify-content:center;">${owned
-      .map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId))
-      .join('')}</div>`;
+  const nameOf = (id: string | undefined, fallback: string) => apparelById(id)?.name ?? fallback;
+  // A tap zone over one body part: an invisible band with a floating "current item ✎" chip; the band
+  // that owns the open picker glows. Tapping toggles that slot's rack open/closed.
+  const zone = (slot: ApparelSlot, icon: string, label: string) => {
+    const active = clubhouseSlot === slot ? ' gs-czone--active' : '';
+    return `<button class="gs-czone gs-czone--${slot}${active}" data-clubslot="${slot}" aria-label="Change ${ch.shortName}'s ${slot}">
+      <span class="gs-czone__chip">${icon} ${label} <span class="gs-czone__pen">✎</span></span>
+    </button>`;
   };
+  const shipActive = clubhouseSlot === 'ship' ? ' gs-garage--active' : '';
 
   return `
     <header style="border-left:4px solid ${ch.style.cap};padding-left:10px;">
       <h1 style="margin:0;font-size:22px;">🏠 ${ch.name}'s Clubhouse</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Outfit ${ch.shortName} — pick a ride and a look that's all their own.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Tap ${ch.shortName} to restyle them, tap the garage to pick a ride.</p>
     </header>
-    <div style="display:flex;justify-content:center;margin:8px 0;">
-      <div style="border:2px solid ${ch.style.cap}55;border-radius:12px;padding:8px 18px;background:radial-gradient(circle at 50% 25%, ${ch.style.cap}22, #0b0d12);text-align:center;">
-        ${preview}
-        <div style="font-size:11px;opacity:.6;">${ch.shortName} is wearing</div>
-        ${setBadge}
-      </div>
+    <div class="gs-cstage">
+      <div class="gs-cstage__figure">${preview}</div>
+      ${zone('hat', '🎩', nameOf(hatId, 'No hat'))}
+      ${zone('shirt', '👕', nameOf(shirtId, 'Default shirt'))}
+      ${zone('pants', '👖', nameOf(pantsId, 'Default pants'))}
     </div>
-    <h2 style="font-size:16px;margin:.8em 0 .2em;">🛖 Garage</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">The ship ${ch.shortName} flies between worlds.</p>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;">${fleet}</div>
-    <h2 style="font-size:16px;margin:1.2em 0 .2em;">👕 Wardrobe</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .4em;">Click an owned piece to wear it (again to take it off).</p>
-    <h3 style="font-size:13px;opacity:.8;margin:.5em 0 .1em;text-align:center;">🎩 Hats</h3>
-    ${rack('hat')}
-    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👕 Shirts</h3>
-    ${rack('shirt')}
-    <h3 style="font-size:13px;opacity:.8;margin:.7em 0 .1em;text-align:center;">👖 Pants</h3>
-    ${rack('pants')}
+    ${setBadge}
+    <button class="gs-garage${shipActive}" data-clubslot="ship" aria-label="Change ${ch.shortName}'s ride">
+      <span class="gs-garage__art" aria-hidden="true">${clubhouseGarageArt(shipId, shipAccent)}</span>
+      <span class="gs-garage__cap">
+        <span>
+          <span class="gs-garage__name">🛸 ${ship?.name ?? 'Ship'}</span>
+          <span class="gs-garage__sub">${ship ? `${ship.set} · ${ship.rarity}` : ''}</span>
+        </span>
+        <span class="gs-garage__edit">Change ride ✎</span>
+      </span>
+    </button>
+    ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId)}
     <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
       ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       ${btn('← Back to title', { type: 'closeClubhouse' }, { variant: 'ghost' })}
@@ -2676,6 +2762,16 @@ function render(): void {
       const id = el.dataset.toggleSection!;
       if (collapsedMarketSections.has(id)) collapsedMarketSections.delete(id);
       else collapsedMarketSections.add(id);
+      render();
+    });
+  });
+  // Clubhouse stage: tap a body part or the garage to reveal that slot's picker (tap again to close).
+  app.querySelectorAll<HTMLElement>('[data-clubslot]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const slot = el.dataset.clubslot as ClubSlot;
+      clubhouseSlot = clubhouseSlot === slot ? null : slot;
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });
