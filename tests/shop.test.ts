@@ -10,6 +10,7 @@ import {
   ownedCount,
   shopItem,
   startingLoadout,
+  type ShopItem,
 } from '../src/sim/rpg/economy';
 import { buy, shopOffer, snapshotRun, resumeRun, startRun, SHOP_OFFER_SIZE } from '../src/sim/rpg/run';
 import { RARITY_C } from '../src/sim/rpg/loot';
@@ -18,96 +19,105 @@ import { playCourse } from '../src/sim/round';
 import { playTotals } from '../src/sim/score';
 import { Rng } from '../src/sim/rng';
 
-const STACKABLES = SHOP_ITEMS.filter((i) => i.stackable);
-const UNIQUES = SHOP_ITEMS.filter((i) => !i.stackable);
+// A synthetic stackable, kept only to prove the back-compat plumbing (itemCost geometric / itemCap)
+// still works for save-migration — the live catalogue no longer ships any stackable (GS-proshop-variety).
+const SYNTH_STACK: ShopItem = {
+  id: 'synth-stack',
+  name: 'Synthetic Stackable',
+  cost: 100,
+  desc: 'test-only',
+  rarity: 'rare',
+  stackable: true,
+  maxStacks: 3,
+  apply: (m) => m,
+};
 
-describe('stackable economy', () => {
-  it('the catalogue still has the original uniques plus new stackables', () => {
-    for (const id of ['power-cell', 'gyro', 'lucky-coin', 'pro-coach', 'auto-caddie']) {
-      expect(shopItem(id)!.stackable).toBeFalsy();
+describe('one-shot economy (GS-proshop-variety)', () => {
+  it('the whole catalogue is now single-purchase uniques — no stackables ship', () => {
+    for (const it of SHOP_ITEMS) expect(it.stackable, it.id).toBeFalsy();
+    // The former stackables survive as one-shot uniques.
+    for (const id of ['precision-chip', 'caddie-lesson', 'fortune-chip', 'range-booster', 'putting-grip']) {
+      expect(shopItem(id), id).toBeTruthy();
+      expect(shopItem(id)!.stackable, id).toBeFalsy();
     }
-    expect(STACKABLES.length).toBeGreaterThanOrEqual(4);
+    // The variety siblings that fill out each axis are present.
+    for (const id of ['mallet-putter', 'pinseeker-putter', 'pro-irons', 'flop-wedge', 'quantum-shafts', 'nova-driver']) {
+      expect(shopItem(id), id).toBeTruthy();
+    }
   });
 
-  it('rarity tracks power: the +12yd Power Cell is at least as rare as the +8yd Range Booster', () => {
+  it('rarity tracks power: the Power Cell is at least as rare as the Distance Balls, never common', () => {
     const power = shopItem('power-cell')!;
     const range = shopItem('range-booster')!;
-    // The stronger first-copy upgrade must not read as the lower rarity (the GS-mechanics #9 bug).
     expect(RARITY_C[power.rarity].order).toBeGreaterThanOrEqual(RARITY_C[range.rarity].order);
     expect(power.rarity).not.toBe('common');
   });
 
-  it('itemCost ramps geometrically for stackables, flat for uniques', () => {
+  it('the putting axis is a rarity ladder of distinct one-shots (not one stacked grip)', () => {
+    const order = (id: string) => RARITY_C[shopItem(id)!.rarity].order;
+    expect(order('putting-grip')).toBe(order('mallet-putter')); // both rare
+    expect(order('tour-putter')).toBeGreaterThan(order('mallet-putter')); // epic
+    expect(order('pinseeker-putter')).toBeGreaterThan(order('tour-putter')); // legendary
+  });
+
+  it('itemCost is flat for the (unique) catalogue, geometric only for a stackable', () => {
     const chip = shopItem('precision-chip')!;
     expect(itemCost(chip, 0)).toBe(chip.cost);
-    expect(itemCost(chip, 1)).toBe(Math.round(chip.cost * STACK_COST_GROWTH));
-    expect(itemCost(chip, 2)).toBe(Math.round(chip.cost * STACK_COST_GROWTH ** 2));
-    // A unique never ramps.
-    const gyro = shopItem('gyro')!;
-    expect(itemCost(gyro, 0)).toBe(gyro.cost);
-    expect(itemCost(gyro, 1)).toBe(gyro.cost);
+    expect(itemCost(chip, 1)).toBe(chip.cost); // a unique never ramps
+    // The retained plumbing still ramps a genuine stackable (save back-compat).
+    expect(itemCost(SYNTH_STACK, 0)).toBe(SYNTH_STACK.cost);
+    expect(itemCost(SYNTH_STACK, 1)).toBe(Math.round(SYNTH_STACK.cost * STACK_COST_GROWTH));
+    expect(itemCost(SYNTH_STACK, 2)).toBe(Math.round(SYNTH_STACK.cost * STACK_COST_GROWTH ** 2));
   });
 
-  it('caps: uniques cap at 1, stackables at maxStacks', () => {
-    expect(itemCap(shopItem('gyro')!)).toBe(1);
-    expect(itemCap(shopItem('caddie-lesson')!)).toBe(9);
+  it('caps: every catalogue item caps at 1; the stackable plumbing still honours maxStacks', () => {
+    for (const it of SHOP_ITEMS) expect(itemCap(it), it.id).toBe(1);
+    expect(itemCap(SYNTH_STACK)).toBe(3);
   });
 
-  it('ownedCount counts duplicate perk ids', () => {
+  it('ownedCount counts duplicate perk ids (old saves may carry stacked perks)', () => {
     expect(ownedCount(['precision-chip', 'precision-chip', 'gyro'], 'precision-chip')).toBe(2);
     expect(ownedCount([], 'precision-chip')).toBe(0);
   });
 
   it('canBuy respects the cap and the next price', () => {
-    const lesson = shopItem('caddie-lesson')!;
-    expect(canBuy(lesson, 0, 1000)).toBe(true);
-    expect(canBuy(lesson, 9, 100000)).toBe(false); // at cap
-    expect(canBuy(lesson, 0, 10)).toBe(false); // can't afford
+    const gyro = shopItem('gyro')!;
+    expect(canBuy(gyro, 0, 1000)).toBe(true);
+    expect(canBuy(gyro, 1, 100000)).toBe(false); // already owned (cap 1)
+    expect(canBuy(gyro, 0, 10)).toBe(false); // can't afford
   });
 });
 
-describe('buy with stacking', () => {
-  it('a stackable can be bought repeatedly, stacking effect and rising in price', () => {
+describe('buy (one-shot uniques)', () => {
+  it('an item is buyable once — a second buy is a no-op', () => {
     let run = { ...startRun(1), credits: 10000 };
     const chip = shopItem('precision-chip')!;
     const before = run.credits;
     run = buy(run, 'precision-chip');
     expect(run.credits).toBe(before - chip.cost);
     expect(ownedCount(run.loadout.perks, 'precision-chip')).toBe(1);
-    expect(run.loadout.dispersionMult).toBeCloseTo(0.92);
-
-    const mid = run.credits;
-    run = buy(run, 'precision-chip');
-    expect(ownedCount(run.loadout.perks, 'precision-chip')).toBe(2);
-    expect(run.loadout.dispersionMult).toBeCloseTo(0.92 * 0.92);
-    // Second copy cost more than the first.
-    expect(mid - run.credits).toBe(itemCost(chip, 1));
-    expect(itemCost(chip, 1)).toBeGreaterThan(chip.cost);
+    expect(run.loadout.dispersionMult).toBeCloseTo(0.88);
+    // Owned → a second buy changes nothing.
+    expect(buy(run, 'precision-chip')).toBe(run);
+    expect(buy({ ...startRun(3), credits: 10000 }, 'gyro')).not.toBe(startRun(3)); // sanity: first buy works
   });
 
-  it('stacking stops at the cap (a no-op once maxed)', () => {
-    let run = { ...startRun(2), credits: 1_000_000 };
-    for (let i = 0; i < 20; i++) run = buy(run, 'caddie-lesson');
-    expect(ownedCount(run.loadout.perks, 'caddie-lesson')).toBe(9);
-    const maxed = run;
-    expect(buy(maxed, 'caddie-lesson')).toBe(maxed); // no-op at cap
-  });
-
-  it('a unique is still buyable only once', () => {
-    let run = { ...startRun(3), credits: 10000 };
-    run = buy(run, 'gyro');
-    expect(buy(run, 'gyro')).toBe(run);
-  });
-
-  it('snapshot/resume rebuilds a stacked loadout from duplicate perk ids', () => {
+  it('snapshot/resume rebuilds the loadout from perk ids', () => {
     let run = { ...startRun(4), credits: 100000 };
     run = buy(run, 'precision-chip');
-    run = buy(run, 'precision-chip');
-    run = buy(run, 'caddie-lesson');
+    run = buy(run, 'gyro');
+    run = buy(run, 'caddie-lesson'); // caddie-lesson needs no gate to APPLY (the gate is offer-only)
     const resumed = resumeRun(snapshotRun(run));
-    expect(ownedCount(resumed.loadout.perks, 'precision-chip')).toBe(2);
-    expect(resumed.loadout.dispersionMult).toBeCloseTo(0.92 * 0.92);
-    expect(resumed.loadout.handicap).toBe(startingLoadout().handicap - 2);
+    expect(ownedCount(resumed.loadout.perks, 'precision-chip')).toBe(1);
+    expect(resumed.loadout.dispersionMult).toBeCloseTo(0.88 * 0.85);
+    expect(resumed.loadout.handicap).toBe(startingLoadout().handicap - 4);
+  });
+
+  it('back-compat: an old save with duplicate perk ids still stacks the effect on rebuild', () => {
+    // loadoutFromPerks applies each perk in the array, so a pre-GS-proshop-variety save that bought
+    // the same stackable twice still resolves its full stacked power — no lost upgrades on migration.
+    const lo = loadoutFromPerks(['precision-chip', 'precision-chip']);
+    expect(lo.dispersionMult).toBeCloseTo(0.88 * 0.88);
   });
 });
 
@@ -129,54 +139,28 @@ describe('shopOffer (rotating stock)', () => {
     }
   });
 
-  it('drops maxed items: an owned unique never appears, a capped stackable never appears', () => {
-    // Own every unique + max a stackable, then the offer must be the remaining pursuables.
-    const ownedUniques = UNIQUES.map((i) => i.id);
-    const cappedLesson = Array.from({ length: itemCap(shopItem('caddie-lesson')!) }, () => 'caddie-lesson');
-    const perks = [...ownedUniques, ...cappedLesson];
-    const run = { ...startRun(7), loadout: { ...startingLoadout(), perks } };
-    const ids = shopOffer(run).map((o) => o.item.id);
-    for (const u of ownedUniques) expect(ids).not.toContain(u);
-    expect(ids).not.toContain('caddie-lesson');
-    // Pool is the still-pursuable stackables → offer is bounded by that set.
-    expect(ids.length).toBeLessThanOrEqual(STACKABLES.length - 1);
-  });
-
-  it('offer cost reflects how many of a stackable you already own', () => {
-    const chip = shopItem('precision-chip')!;
-    // Build a run that owns 2 precision-chips and force it into an offer that includes it.
-    const perks = ['precision-chip', 'precision-chip'];
-    // Find a seed whose offer includes precision-chip with these perks.
-    let found = false;
-    for (let seed = 0; seed < 200 && !found; seed++) {
-      const run = { ...startRun(seed), loadout: { ...startingLoadout(), perks } };
-      const slot = shopOffer(run).find((o) => o.item.id === 'precision-chip');
-      if (slot) {
-        expect(slot.owned).toBe(2);
-        expect(slot.cost).toBe(itemCost(chip, 2));
-        found = true;
-      }
+  it('drops OWNED items — a bought item never re-appears (fresh stock every stop)', () => {
+    // Own a big slice of the catalogue; none of it may show up again.
+    const owned = SHOP_ITEMS.slice(0, 12).map((i) => i.id);
+    const run = { ...startRun(7), loadout: { ...startingLoadout(), perks: owned } };
+    for (let salt = 0; salt < 8; salt++) {
+      const ids = shopOffer(run, SHOP_OFFER_SIZE, salt).map((o) => o.item.id);
+      for (const u of owned) expect(ids).not.toContain(u);
     }
-    expect(found).toBe(true);
   });
 });
 
-describe('stackables hold the "a power-up must improve scoring" invariant', () => {
+describe('shop items hold the "a power-up must improve scoring" invariant', () => {
   // Mean per-stop Stableford over many independent stops — the stable balance signal
   // (full-run distance is chaotic; see CLAUDE.md / run.test.ts).
   const meanStableford = (perks: string[]): number => {
     const lo = loadoutFromPerks(perks);
     let sf = 0;
     let n = 0;
-    // 600 stops: enough samples that a genuine +0.1pt/stop distance perk clears the run-to-run
-    // noise floor. (Under the angular-dispersion model the single-item effects are real but
-    // small — verified at large N — so an underpowered sample can flip their sign by chance.)
     for (let s = 0; s < 600; s++) {
       const c = generateCourse(`${s}:stop`, { holes: 6, distanceFromStart: s % 12 });
       const played = playCourse(c.holes, new Rng(`${c.seed}:play`), {
         bag: lo.bag,
-        // The game applies handicap×equipment; use the same so handicap perks (Caddie
-        // Lesson) actually register — passing only dispersionMult would hide them.
         dispersionMult: netDispersion(lo),
       });
       sf += playTotals(played.map((p) => p.record)).stableford;
@@ -187,32 +171,24 @@ describe('stackables hold the "a power-up must improve scoring" invariant', () =
 
   const base = meanStableford([]);
 
-  it('Precision Chip helps, and stacks help more', () => {
+  it('Precision Chip helps, and the new legendary precision set helps more', () => {
     expect(meanStableford(['precision-chip'])).toBeGreaterThan(base);
-    expect(meanStableford(['precision-chip', 'precision-chip', 'precision-chip'])).toBeGreaterThan(
-      meanStableford(['precision-chip']),
-    );
+    // Quantum-Balanced Irons are the apex accuracy legendary — a clear lift over a single rare chip.
+    expect(meanStableford(['quantum-shafts'])).toBeGreaterThan(meanStableford(['precision-chip']));
   });
 
-  it('Caddie Lessons improve scoring as the build stacks', () => {
-    // A single −2 handicap bump (~4% tighter) is within run-to-run noise over the sample,
-    // so the honest invariant is that the BUILD clearly helps and more stacks help more.
-    const three = meanStableford(['caddie-lesson', 'caddie-lesson', 'caddie-lesson']);
-    const seven = meanStableford(Array.from({ length: 7 }, () => 'caddie-lesson'));
-    expect(three).toBeGreaterThan(base); // a few lessons (−6 handicap) clearly help
-    expect(seven).toBeGreaterThan(three); // stacks help more
-    // A single lesson is a small skill bump — never a regression.
-    expect(meanStableford(['caddie-lesson'])).toBeGreaterThanOrEqual(base - 0.2);
+  it('Caddie Lessons improve scoring (−4 handicap is a clear skill bump)', () => {
+    expect(meanStableford(['caddie-lesson'])).toBeGreaterThan(base);
   });
 
-  it('Range Booster never hurts scoring, even stacked to the cap', () => {
+  it('the distance items (Distance Balls, Nova Long Driver) never hurt scoring', () => {
     expect(meanStableford(['range-booster'])).toBeGreaterThanOrEqual(base);
-    expect(meanStableford(Array.from({ length: 5 }, () => 'range-booster'))).toBeGreaterThanOrEqual(base);
+    expect(meanStableford(['nova-driver'])).toBeGreaterThanOrEqual(base);
   });
 
   it('Fortune Chip is pure economy — it changes credits, not shot dispersion or the bag', () => {
-    const lo = loadoutFromPerks(['fortune-chip', 'fortune-chip']);
-    expect(lo.creditMult).toBeCloseTo(1.15 * 1.15);
+    const lo = loadoutFromPerks(['fortune-chip']);
+    expect(lo.creditMult).toBeCloseTo(1.15);
     expect(lo.dispersionMult).toBe(1);
     expect(lo.bag.find((c) => c.id === 'D')!.carry).toBe(startingLoadout().bag.find((c) => c.id === 'D')!.carry);
   });

@@ -90,6 +90,27 @@
   (byte-for-byte economy); a failed stop pays 0. The **Glass Cannon** curse is an opt-in gamble (wider
   hook/slice via shapeMod for +60% creditMult). The shop **reroll** (`rerollShop` action, `rerollCost`
   30×1.6^n) redraws `shopOffer(run, size, salt)` — salt 0 keeps the original draw byte-identical.
+- **Pro Shop rarity is VOYAGE-paced, and every item is a one-shot (GS-voyage-rarity / GS-proshop-variety).**
+  Two fixes to the same complaint ("legendaries never show; you buy the same card five stops running").
+  (1) *Rarity by stop, not distance.* The endless ramp (`rarityDepthBias`, keyed off galaxy distance,
+  peaks at distance 18) never got near its deep end inside a bounded 9-stop voyage, so the last shop was
+  stuck ~blue-heavy / 18% epic / 6% legendary. `shopOffer` now routes a **winnable** format through
+  `voyageRarityBias(rarity, voyageShopProgress(stopIndex, stops))` (endless formats keep the distance
+  ramp via `shopRarityBias`). The voyage curve is keyed off the STOP (the arc/boss pacing the player
+  reads): shop 1 mostly GREEN + a BLUE; a small PURPLE **and** the first ORANGE open between boss 1 & 2
+  (stops 2–4); a higher chance after boss 2, ending "halfish blue / halfish purple with a real (minority)
+  legendary chance" at the final pre-boss shop (stop 7). Two knobs the single `b^order` couples away:
+  `b` (eased) lerps the rare/epic base; a SEPARATE, later-opening `legTilt` gates the legendary tail so
+  orange is shut in the opening shops, a taste mid-voyage, a genuine-but-bounded chance late. Commons
+  stay flat (×1). It reweights WHICH item is drawn, never the rng draw COUNT → deterministic/resume-safe.
+  (2) *One-shot variety, no stacks.* The catalogue no longer ships any `stackable` item — once bought,
+  an item drops out of the offer, so every shop is fresh DISTINCT gear instead of one card re-bought. The
+  build still scales via the many SIBLING items per axis (control/distance/economy/putting/short-game),
+  each former stackable bumped to a worthwhile single value, plus new siblings that also give the epic/
+  legendary tiers real gear (`mallet-putter`/`pinseeker-putter`, `pro-irons`/`flop-wedge`, `quantum-shafts`/
+  `nova-driver`) — so a deep voyage actually has a legendary worth buying that ISN'T a named caddy. The
+  `stackable`/`maxStacks`/`itemCost`-geometric plumbing is KEPT (dormant) so old saves with duplicate perk
+  ids still fold each id in `loadoutFromPerks` and resolve their full stacked power on rebuild (no migration).
 - **Fail gate = the cut line** (`economy.ts`): each stop needs a minimum Stableford that ramps
   with galaxy distance. Beat it to travel on; miss it and the run ends. Reuses the score we already
   compute — and guarantees runs terminate. Credits (from Stableford) buy one-shot shop perks.

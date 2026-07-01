@@ -93,14 +93,12 @@ describe('Overdrive upgrade (overpower ceiling)', () => {
     expect(maxPowerOf(startingLoadout())).toBe(1);
   });
 
-  it('Overdrive raises the power ceiling and stacks (to maxStacks)', () => {
+  it('Overdrive raises the power ceiling to 120% (a one-shot epic)', () => {
     const one = loadoutFromPerks(['overdrive']);
-    expect(maxPowerOf(one)).toBeCloseTo(1.1, 6);
-    const two = loadoutFromPerks(['overdrive', 'overdrive']);
-    expect(maxPowerOf(two)).toBeCloseTo(1.2, 6);
-    // The shop item is a stackable epic capped at two copies.
+    expect(maxPowerOf(one)).toBeCloseTo(1.2, 6);
+    // A one-shot unique now (GS-proshop-variety) — no stacking, capped at one copy.
     const item = shopItem('overdrive')!;
-    expect(item.stackable).toBe(true);
-    expect(item.maxStacks).toBe(2);
+    expect(item.stackable).toBeFalsy();
+    expect(item.rarity).toBe('epic');
   });
 });

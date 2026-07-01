@@ -39,7 +39,7 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
@@ -821,11 +821,74 @@ const RARITY_RAMP_DEPTH = 18; // galaxy distance at which the rarity tilt reache
 const RARITY_TILT_EARLY = 0.22; // tilt base at the start — strongly favours commons so the FIRST/SECOND Pro Shops stock foundational common/rare kit, not rare/epic. The catalogue + reward-club pool is heavily count-skewed toward rare/epic, so a low tilt is needed to keep the early draw common-dominant (measured ~61% common / 37% rare / 2% epic at stop 0, ramping to rare/epic-heavy deep).
 const RARITY_TILT_DEEP = 2.15; // tilt base deep in the run — favours rare/epic/legendary (raised to surface more epic/legendary rewards)
 
-/** Depth-scaled rarity multiplier for the shop draw (early → commons, deep → rare/epic). */
+/**
+ * Depth-scaled rarity multiplier for the shop draw (early → commons, deep → rare/epic). Used by the
+ * ENDLESS formats (flat/ladder), which climb toward the deep extreme as galaxy distance grows.
+ */
 export function rarityDepthBias(rarity: Rarity, distanceFromStart: number): number {
   const p = Math.max(0, Math.min(1, distanceFromStart / RARITY_RAMP_DEPTH));
   const b = RARITY_TILT_EARLY + (RARITY_TILT_DEEP - RARITY_TILT_EARLY) * p;
   return Math.pow(b, RARITY_C[rarity].order);
+}
+
+// The VOYAGE rarity schedule (GS-voyage-rarity). The bounded voyage is only ~8 shops long and never
+// reaches the endless ramp's deep distance, so keying its rarity off raw galaxy distance left the last
+// shop stuck around blue-heavy / 18% epic / 6% legendary — legendaries barely showed. Instead the
+// voyage runs its OWN progress curve keyed off the STOP (the arc/boss structure the player actually
+// reads), so the mix scales the way the campaign is paced:
+//   • shop 1 (stop 0)         → mostly GREEN with a BLUE; epics/legendaries essentially absent.
+//   • between boss 1 & 2 (2–4) → a SMALL chance of purple AND the first orange.
+//   • after boss 2 (5–7)       → a HIGHER chance, ending "halfish blue / halfish purple with a shot at
+//                                a legendary" at the final pre-boss shop.
+// Two knobs give independent control the single `b^order` couples away: `b` lerps the rare/epic base,
+// and `legTilt` gates the legendary tail separately so it stays a real rarity (a taste between the
+// bosses, a genuine chance — not a flood — at the end). Bosses sit at stops 2 & 5, so the curve is
+// sampled at those thresholds by design. Byte-for-byte irrelevant to the endless formats (they never
+// call this) and to determinism (it reweights WHICH item is drawn, never the rng draw COUNT).
+const VOYAGE_TILT_EARLY = 0.16; // rare/epic base at the first shop — strong commons bias (mostly green + a blue)
+const VOYAGE_TILT_DEEP = 3.2; // rare/epic base at the last pre-boss shop — halfish blue / halfish purple
+const VOYAGE_LEG_EARLY = 0.0; // legendary tail multiplier at the start — no legendaries in the opening shops
+const VOYAGE_LEG_DEEP = 0.62; // legendary tail multiplier deep — a real (bounded) shot at orange late, not a flood
+const VOYAGE_TILT_EASE = 1.5; // ease-in on the rare/epic ramp so arc 1 stays green/blue and purple opens after boss 1
+const VOYAGE_LEG_OPEN = 0.12; // voyage progress at which the legendary tail starts opening (just after boss 1 / stop 2)
+
+/**
+ * Rarity multiplier for a VOYAGE shop draw, keyed off the stop (arc/boss pacing) rather than galaxy
+ * distance. `progress` is 0 at the first shop → 1 at the final pre-boss shop. Commons stay flat (×1);
+ * rare/epic ramp on `b^order`; the legendary tail rides a SEPARATE, later-opening multiplier so it
+ * only tastes in around boss 1 and reaches a genuine (bounded) chance by the end.
+ */
+export function voyageRarityBias(rarity: Rarity, progress: number): number {
+  const p = Math.max(0, Math.min(1, progress));
+  const order = RARITY_C[rarity].order;
+  if (order === 0) return 1; // commons flat
+  const eased = Math.pow(p, VOYAGE_TILT_EASE);
+  const b = VOYAGE_TILT_EARLY + (VOYAGE_TILT_DEEP - VOYAGE_TILT_EARLY) * eased;
+  const base = Math.pow(b, order);
+  if (rarity !== 'legendary') return base;
+  // Legendary rides the rare/epic ramp PLUS its own tail gate: 0 until `VOYAGE_LEG_OPEN`, then lerps
+  // up to VOYAGE_LEG_DEEP so orange opens around boss 1 and peaks (bounded) at the final shop.
+  const lp = Math.max(0, Math.min(1, (p - VOYAGE_LEG_OPEN) / (1 - VOYAGE_LEG_OPEN)));
+  return base * (VOYAGE_LEG_EARLY + (VOYAGE_LEG_DEEP - VOYAGE_LEG_EARLY) * lp);
+}
+
+/** Voyage shop progress 0..1 keyed off the stop — 0 at the first shop, 1 at the final pre-boss shop. */
+export function voyageShopProgress(stopIndex: number, stops: number): number {
+  // Shops sit at stops 0..(stops-2); the final stop is the boss with no shop after it.
+  const lastShop = Math.max(1, stops - 2);
+  return Math.max(0, Math.min(1, stopIndex / lastShop));
+}
+
+/**
+ * The rarity multiplier the shop draw applies for THIS run. A winnable voyage uses its own stop-keyed
+ * schedule (`voyageRarityBias`); the endless formats keep the galaxy-distance ramp (`rarityDepthBias`).
+ */
+export function shopRarityBias(run: Run, rarity: Rarity): number {
+  const format = getFormat(run.formatId);
+  if (format.winnable) {
+    return voyageRarityBias(rarity, voyageShopProgress(run.stopIndex, stopCount(format)));
+  }
+  return rarityDepthBias(rarity, run.distanceFromStart);
 }
 
 /**
@@ -888,7 +951,7 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
   // RAMPS with galaxy distance (GS-proshop): commons early, rare/epic/legendary deep.
   const archetype = currentTheme(run).archetype;
   const weight = (it: ShopItem) =>
-    itemThemeWeight(itemTags(it.id), archetype) * rarityDepthBias(it.rarity, run.distanceFromStart);
+    itemThemeWeight(itemTags(it.id), archetype) * shopRarityBias(run, it.rarity);
   return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => {
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
