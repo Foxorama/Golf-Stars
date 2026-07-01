@@ -27,18 +27,19 @@ export const FILL: Record<string, string> = {
   crystal: '#9fd8e6',
 };
 
-/** Per-biome rough/background tint, keyed by biome id (sell the world). */
+/** Per-biome rough/background tint, keyed by biome id (sell the world). Kept in sync with the
+ *  `ARCHETYPE_TURF` rough bases (GS-rough-frame: ground must read as ground on every world). */
 export const BIOME_ROUGH: Record<string, string> = {
   'verdant-station': '#274d27',
   'dust-belt': '#6b5230',
-  'ice-ring': '#3a4a55',
-  'ember-world': '#3a1410',
-  'void-garden': '#120a22',
-  'crystal-spires': '#2c3a55',
-  'tempest-reach': '#343841',
-  'spore-jungle': '#1d1438',
-  'tidal-archipelago': '#164656',
-  'cetus-deep': '#132a3c',
+  'ice-ring': '#485a68',
+  'ember-world': '#532c20',
+  'void-garden': '#241847',
+  'crystal-spires': '#41506e',
+  'tempest-reach': '#424854',
+  'spore-jungle': '#2c1f50',
+  'tidal-archipelago': '#1d5668',
+  'cetus-deep': '#1a3a50',
 };
 
 /** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
@@ -150,20 +151,25 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     rough: { light: '#7d6034', base: '#6b5230', dark: '#523f24', ink: '#2e2413' },
   },
   // Frost — snow-dusted, frosted teal-green turf and pale mint ice-greens.
+  // NB (GS-rough-frame follow-up): every world's rough ramp below is kept CLEARLY lighter than its
+  // `ARCHETYPE_SPACE` base — the rough slab only ever renders where it's PLAYABLE ground now, so a
+  // near-sky-dark rough just reads as more starless space. Ground must look like ground on all ten.
   frost: {
     fairway: { light: '#bfe0da', base: '#9cc3bf', dark: '#7ba39e', ink: '#3a5a59' },
     green: { light: '#dcf3ec', base: '#c2e6dd', dark: '#9fcabf', ink: '#4d716b' },
     tee: { light: '#abccc7', base: '#8fb0ac', dark: '#728e8a', ink: '#3a504e' },
     collar: '#7fb0a6',
-    rough: { light: '#4a5e6a', base: '#3a4a55', dark: '#2b3842', ink: '#19232b' },
+    rough: { light: '#5a7080', base: '#485a68', dark: '#364652', ink: '#202c34' },
   },
-  // Inferno — scorched ash-earth fairways, heat-stressed olive greens.
+  // Inferno — scorched ash-earth fairways, heat-stressed olive greens. The rough is CINDER EARTH,
+  // not near-black: a rough base that dark read as deep space with embers, i.e. as OB (the
+  // "lava biome is still a starfield" report, GS-rough-frame follow-up) — ground must look like ground.
   inferno: {
     fairway: { light: '#8a6a4e', base: '#6e5340', dark: '#523c2c', ink: '#2a1c12' },
     green: { light: '#97a653', base: '#7c8a3e', dark: '#62702f', ink: '#333a16' },
     tee: { light: '#82643f', base: '#6a5036', dark: '#523c28', ink: '#291c10' },
     collar: '#5e6b2e',
-    rough: { light: '#4a1d16', base: '#3a1410', dark: '#280c0a', ink: '#160605' },
+    rough: { light: '#66392a', base: '#532c20', dark: '#3d1e14', ink: '#200e08' },
   },
   // Void — cosmic indigo "astroturf" islands, luminous violet-blue greens.
   void: {
@@ -171,15 +177,17 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     green: { light: '#909aec', base: '#6f7ad6', dark: '#5460b4', ink: '#23284f' },
     tee: { light: '#473f88', base: '#34306a', dark: '#28244e', ink: '#14102b' },
     collar: '#5a64c0',
-    rough: { light: '#1d1336', base: '#120a22', dark: '#0b0617', ink: '#05030c' },
+    rough: { light: '#322260', base: '#241847', dark: '#180f30', ink: '#0a0618' },
   },
-  // Crystal — pale prismatic teal turf and bright cyan-white greens on a deep-indigo crystal field.
+  // Crystal — pale prismatic teal turf and bright cyan-white greens on an indigo-slate SCREE field.
+  // The rough is lifted well clear of the world's night-sky base: the old deep-indigo slab read as
+  // starfield, not ground ("crystal biome is still a starfield", GS-rough-frame follow-up).
   crystal: {
     fairway: { light: '#a7e0d6', base: '#7fc8bd', dark: '#5fa399', ink: '#2f5650' },
     green: { light: '#c4f3ff', base: '#9fe0f5', dark: '#7cc0dc', ink: '#3a6675' },
     tee: { light: '#9fd0c8', base: '#84b4ac', dark: '#6a948c', ink: '#33504a' },
     collar: '#6fb0a6',
-    rough: { light: '#3a4a6a', base: '#2c3a55', dark: '#1f2a40', ink: '#10172a' },
+    rough: { light: '#526487', base: '#41506e', dark: '#303c54', ink: '#181f30' },
   },
   // Tempest — storm-greyed olive turf, electric-green greens, slate-grey storm ground.
   tempest: {
@@ -187,7 +195,7 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     green: { light: '#9cc874', base: '#7ea84e', dark: '#62843a', ink: '#2c3f1a' },
     tee: { light: '#73806a', base: '#5e6a55', dark: '#495440', ink: '#22281c' },
     collar: '#5a7a44',
-    rough: { light: '#454a55', base: '#343841', dark: '#262a31', ink: '#13161b' },
+    rough: { light: '#525a68', base: '#424854', dark: '#30353e', ink: '#171a20' },
   },
   // Fungal — bioluminescent jade fairways and glowing mint greens on a dark-purple jungle floor.
   fungal: {
@@ -195,7 +203,7 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     green: { light: '#7af0c0', base: '#54dba0', dark: '#3cb37e', ink: '#175440' },
     tee: { light: '#3fbf8c', base: '#2f9e73', dark: '#247a58', ink: '#103a2b' },
     collar: '#39b486',
-    rough: { light: '#2a1f4a', base: '#1d1438', dark: '#120c24', ink: '#080514' },
+    rough: { light: '#3a2b66', base: '#2c1f50', dark: '#1f163a', ink: '#0e081e' },
   },
   // Ocean — sea-green island turf and bright aqua greens over a deep-teal seafloor.
   ocean: {
@@ -203,7 +211,7 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     green: { light: '#7fe6b8', base: '#5fd49e', dark: '#49b07f', ink: '#1d4d38' },
     tee: { light: '#54bf94', base: '#42a07c', dark: '#338062', ink: '#15402f' },
     collar: '#3ca07a',
-    rough: { light: '#1f5a6a', base: '#164656', dark: '#0e3340', ink: '#06181f' },
+    rough: { light: '#27687c', base: '#1d5668', dark: '#133c4a', ink: '#081e26' },
   },
   // Cetus — luminous deep-sea CYAN clifftop turf and glowing aqua greens over an abyssal blue ground,
   // darker + more bioluminescent than ocean's bright sea-green, so the plateau reads as land lit from
@@ -213,7 +221,7 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     green: { light: '#8af2ee', base: '#5fd8dc', dark: '#46b4bc', ink: '#174d52' },
     tee: { light: '#3f96a6', base: '#327886', dark: '#275c68', ink: '#0e2e36' },
     collar: '#3aa0aa',
-    rough: { light: '#1d3c52', base: '#132a3c', dark: '#0c1c2a', ink: '#050e16' },
+    rough: { light: '#254c64', base: '#1a3a50', dark: '#112a3a', ink: '#061420' },
   },
 };
 
@@ -364,16 +372,19 @@ export interface Accent {
   flowers: string[];
   mote: string;
 }
+// NB (GS-rough-frame): no PURE-WHITE flower dots on a dark-rough world — white specks scattered
+// over dark ground read as stars, i.e. the "rough is a starfield" bug by another route. Verdant's
+// bright green rough keeps its white daisies; the dark worlds get tinted blooms instead.
 export const ACCENTS: Record<string, Accent> = {
   'verdant-station': { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#bfe6ff' },
   'dust-belt': { flowers: ['#e6a23c', '#d98c4c', '#caa86a'], mote: '#ffe0a0' },
-  'ice-ring': { flowers: ['#cdeef7', '#9fd8e6', '#ffffff'], mote: '#ffffff' },
+  'ice-ring': { flowers: ['#cdeef7', '#9fd8e6', '#8ecbe0'], mote: '#dff2fa' },
   'ember-world': { flowers: ['#ff6a3c', '#ffb24a', '#ff8a2a'], mote: '#ff9a4a' },
   'void-garden': { flowers: ['#b07eff', '#7ed4ff', '#e6a0ff'], mote: '#d0a0ff' },
-  'crystal-spires': { flowers: ['#bff0ff', '#9fe0f5', '#ffffff'], mote: '#cdeeff' },
-  'tempest-reach': { flowers: ['#c8b8ff', '#9fd0ff', '#ffffff'], mote: '#d0c8ff' },
+  'crystal-spires': { flowers: ['#bff0ff', '#9fe0f5', '#ff9ab8'], mote: '#cdeeff' },
+  'tempest-reach': { flowers: ['#c8b8ff', '#9fd0ff', '#ffe14a'], mote: '#d0c8ff' },
   'spore-jungle': { flowers: ['#7af0c0', '#b07eff', '#ffe14a'], mote: '#9fffd0' },
-  'tidal-archipelago': { flowers: ['#7fe6b8', '#ffe14a', '#ffffff'], mote: '#bfe8ff' },
+  'tidal-archipelago': { flowers: ['#7fe6b8', '#ffe14a', '#ff9ab8'], mote: '#bfe8ff' },
   'cetus-deep': { flowers: ['#7af0ff', '#9fd8ff', '#c8fbff'], mote: '#bff4ff' },
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };

@@ -467,3 +467,31 @@
   OB corners sit inside the drawn land hull on a normal world, an armed void hole draws ≥2
   platforms with the OB corners in open space, a calm one draws exactly 1 hull, and the rift fill
   appears on armed void holes.
+- **GS-rough-frame follow-up: the ANIMATED starfield + sky-dark rough ramps (2026-07-01, second
+  pass).** Player re-test after the first GS-rough-frame deploy: "crystal and lava biomes still are
+  showing starfields and not rough." Two residual causes the static gallery could not show:
+  (1) **The animated weather layer pinned a 60–180-star twinkle field across the WHOLE play view**
+  (`weather.ts drawStars`, screen-space, every frame) — correct when the ground WAS space, but now it
+  re-painted the starfield over the playable rough live, worst on dark-rough worlds where white
+  twinkles read as stars, not sparkle. Fix: `WeatherOpts.starMask?: () => Vec[][] | null` — screen
+  polys the PINNED stars must stay out of, queried per frame. The mask's land source is the new
+  exported `landPolysCourseFor(hole, rainbow)` in `style.ts` (hull to the OB frame / lost-rough
+  platforms / `[]` on Rainbow Road) — the SAME helper `buildScene` now draws from, so the drawn
+  ground and the star mask can never disagree. `playView` feeds it through the LIVE projector (the
+  follow-cam pans; the mask tracks). The aim/putt overlay (`app.ts mountWeatherOverlay`) can't
+  project an exact mask (its local projector is wind-orientation only, not the SVG map's fit), so it
+  blanket-masks the whole overlay on land-dominant holes (non-lost, non-rainbow) and leaves lost/
+  rainbow unmasked. ONLY the pinned stars mask — the shooting star, meteors, debris and the ambient
+  biome air keep drawing everywhere: motion sells them as sky above the world. Differential-tested in
+  `tests/weather-mask.test.ts` (a proxy no-op ctx counts `arc` calls: full mask < bare, null ≡ bare).
+  (2) **Half the rough ramps were nearly as dark as their own night sky** (`ARCHETYPE_TURF`:
+  inferno #3a1410, crystal #2c3a55, fungal #1d1438, ocean #164656, tempest #343841, frost #3a4a55,
+  void #120a22, cetus #132a3c) — with the land now only rendering where it's PLAYABLE, a sky-dark
+  rough just reads as more starless OB. All eight lifted to clearly-ground tones (inferno → cinder
+  earth #532c20, crystal → indigo-slate scree #41506e, void/cetus calm-stop rough lifted too — the
+  abyss look lives on the ARMED platform holes now, so the calm rough may read as soil);
+  `BIOME_ROUGH` re-synced; pure-WHITE wildflower dots removed from dark-rough worlds' `ACCENTS`
+  (white specks on dark ground = stars by another route; verdant keeps its daisies). THE RULE,
+  machine-checked in `tests/biome-identity.test.ts`: every archetype's `rough.base` must sit ≥30/255
+  mean-channel brightness above its `ARCHETYPE_SPACE.base`. Gallery re-shot; `sw.js` VERSION bumped
+  (gs-pwa-4).

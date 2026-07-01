@@ -23,6 +23,7 @@
  * calm single frame (the caller simply stops ticking).
  */
 
+import { pointInPoly } from '../sim/course/contract';
 import type { Vec } from '../sim/course/contract';
 
 function mulberry32(seed: number): () => number {
@@ -128,6 +129,16 @@ export interface WeatherOpts {
   /** Honour `_gsFeel.spaceFX` / `.wind` from the play view; default on for the idle overlay. */
   spaceFX?: boolean;
   wind?: boolean;
+  /**
+   * SCREEN-space polygons the pinned twinkle STARFIELD must stay out of — the drawn LAND
+   * (GS-rough-frame): the rough is playable turf, so stars twinkling over it read as the old
+   * "rough is a starfield" bug; they belong only over true deep space (beyond the OB frame, or
+   * off a lost-rough hole's floating platforms). Queried EVERY frame (the follow-cam re-projects
+   * the land as it pans); the play view feeds it `landPolysCourseFor` through the live projector.
+   * Absent/`null` → unmasked. Only the pinned stars mask — the shooting star, meteors and debris
+   * MOVE, which sells them as sky above the world, and the ambient biome air is the ground's own.
+   */
+  starMask?: () => Vec[][] | null;
 }
 
 export interface WeatherHandle {
@@ -327,8 +338,10 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   function drawStars(ctx: CanvasRenderingContext2D, now: number): void {
     if (!spaceOn) return;
     const sprite = glowSprite();
+    const mask = o.starMask?.() ?? null; // the drawn land — stars only twinkle over true space
     ctx.save();
     for (const s of stars) {
+      if (mask && mask.some((p) => pointInPoly([s.x, s.y], p))) continue;
       const tw = 0.5 + 0.5 * Math.sin(now * 0.003 + s.ph);
       const a = 0.25 + 0.6 * tw;
       // Hero stars bloom through the cached glow sprite (cheap; the intro's perf trick).
