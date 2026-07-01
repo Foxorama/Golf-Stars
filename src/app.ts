@@ -40,7 +40,7 @@ import { holeResult } from './sim/rpg/play';
 import { arcSurvivorTarget } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
-import { matchScoreline, matchState, holeDuel } from './sim/rpg/match';
+import { matchScoreline, matchState, holeDuel, betterPlayedHole } from './sim/rpg/match';
 import { canBuyShip, shipCatalogue, type Ship } from './sim/rpg/ships';
 import { shipCardSVG, shipSVG } from './render/shipArt';
 import { apparelById, apparelForSlot, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
@@ -420,10 +420,12 @@ function matchHud(): string {
       : 'All square';
   const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
   // The boss is pre-played, so on the current hole you know their target — show "they made N here" so
-  // you can attack or protect accordingly (real matchplay: you can see the other ball).
+  // you can attack or protect accordingly (real matchplay: you can see the other ball). EXCEPT in a
+  // BEST-BALL duel (GS-team-duel): there every hole result — yours, your partner's, the other side's —
+  // is a hole-END reveal (the pair-cards screen), so mid-hole the HUD holds its tongue.
   const play = state.play;
   let target = '';
-  if (play && !play.done) {
+  if (play && !play.done && m.setup?.format !== 'bestball') {
     const bh = m.bossHoles[play.holeIndex];
     if (bh) {
       const rel = bh.record.strokes - play.hole.par;
@@ -501,8 +503,10 @@ function holeMatchProgressHTML(playedSoFar: PlayedHole[]): string {
     st.holesUp > 0 ? `You ${matchScoreline(st)}` : st.holesUp < 0 ? `${opp?.shortName ?? 'Boss'} ${Math.abs(st.holesUp)} UP` : 'All square';
   const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
   const last = duels[duels.length - 1];
+  // In a player-side best-ball the counted score is the TEAM's (better of you + partner) — label it so.
+  const youLbl = m.setup?.format === 'bestball' && m.setup.partnerSide === 'player' ? 'your side' : 'you';
   const lastLine = last
-    ? `<div style="font-size:11.5px;opacity:.8;margin-top:6px;">This hole: you <b>${last.playerStrokes}</b> v <b>${last.bossStrokes}</b> ${opp?.shortName ?? 'Boss'} — ${last.winner === 'player' ? '<span style="color:#5fd45a;">won</span>' : last.winner === 'boss' ? '<span style="color:#ff6b6b;">lost</span>' : 'halved'}</div>`
+    ? `<div style="font-size:11.5px;opacity:.8;margin-top:6px;">This hole: ${youLbl} <b>${last.playerStrokes}</b> v <b>${last.bossStrokes}</b> ${opp?.shortName ?? 'Boss'} — ${last.winner === 'player' ? '<span style="color:#5fd45a;">won</span>' : last.winner === 'boss' ? '<span style="color:#ff6b6b;">lost</span>' : 'halved'}</div>`
     : '';
   const cells = duels
     .map((d) => {
@@ -1168,7 +1172,7 @@ function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
             : play.shots.length
             ? ' · yours held'
             : ''
-          : '';
+          : ' · reveal at the flag'; // best-ball: their parallel ball stays hidden until the hole ends
       scrambleLine = `<div class="gs-sub" style="color:${partner.style.cap};">🤝 <b>${partner.name}</b> · ${teamFormatLabel(duel.format)}${tail}</div>`;
     }
   }
@@ -1212,20 +1216,30 @@ function playingBody(animating: boolean): string {
   }
 
   if (play.done) {
-    const name = play.pickedUp ? 'Picked up' : scoreName(par, play.strokes);
     const birdieOrBetter = !play.pickedUp && play.strokes <= par - 1;
     // The end-of-hole screen IS the leaderboard screen now: include the hole just finished (it isn't in
     // stopPlayed until `holeComplete`) and show the live arc standings so you track progress every hole.
     // On a matchplay boss stop the duel HUD is the relevant tracker, so the board is replaced by it.
-    const playedSoFar = [...(state.stopPlayed ?? []), holeResult(play)];
-    const lastIsHoled = play.holed && play.shots.some((s) => s.holed);
+    const raw = holeResult(play);
+    // Team duel BEST-BALL (GS-team-duel), player's side: the partner's parallel ball resolved the
+    // moment the hole finished (`withBestBallPartner`) — THIS screen is its reveal. Everything scored
+    // below (duel, points, banner) uses the KEPT team ball, exactly what `holeComplete` will record.
+    const tSetup = state.match?.setup;
+    const partnerHole =
+      tSetup?.partnerSide === 'player' && tSetup.format === 'bestball'
+        ? state.match?.partnerHoles?.[play.holeIndex]
+        : undefined;
+    const kept = partnerHole ? betterPlayedHole(raw, partnerHole) : raw;
+    const name = kept.pickedUp ? 'Picked up' : scoreName(par, kept.record.strokes);
+    const playedSoFar = [...(state.stopPlayed ?? []), kept];
+    const lastIsHoled = kept.holed && kept.shots.some((s) => s.holed);
     const stopPts = playTotals(playedSoFar.map((p) => p.record)).stableford;
     // The two big shot/putt vignette cards used to push the score + leaderboard off the bottom of the
     // screen — the actual point of the screen. They're scrapped for a compact banner that headlines the
     // ONLY numbers that matter here: this hole's score and the running points total, with the leaderboard
     // prominent right below it.
-    const holePts = stablefordPoints(par, play.pickedUp ? par + 6 : play.strokes);
-    const d = play.pickedUp ? 99 : play.strokes - par;
+    const holePts = stablefordPoints(par, kept.record.strokes);
+    const d = kept.pickedUp ? 99 : kept.record.strokes - par;
     const scoreCol = d < 0 ? '#5fd45a' : d === 0 ? 'var(--gs-ink)' : d === 1 ? '#ffce54' : '#ff6b6b';
     const isAce = play.holed && play.strokes === 1;
     // After the celebration overlay lifts, the end-of-hole screen confirms the ace reward in place.
@@ -1235,11 +1249,11 @@ function playingBody(animating: boolean): string {
     const scoreBanner = `
       <div style="display:flex;align-items:center;gap:14px;background:#0d1016;border:1px solid var(--gs-line);border-radius:12px;padding:12px 16px;max-width:460px;">
         <div style="text-align:center;min-width:48px;">
-          <div style="font-size:34px;font-weight:800;line-height:1;color:${scoreCol};">${play.pickedUp ? '—' : play.strokes}</div>
+          <div style="font-size:34px;font-weight:800;line-height:1;color:${scoreCol};">${kept.pickedUp ? '—' : kept.record.strokes}</div>
           <div style="font-size:10px;opacity:.55;letter-spacing:.08em;margin-top:3px;">PAR ${par}</div>
         </div>
         <div style="flex:1 1 auto;min-width:0;">
-          <div style="font-size:10.5px;opacity:.5;letter-spacing:.1em;">HOLE ${play.holeIndex + 1}</div>
+          <div style="font-size:10.5px;opacity:.5;letter-spacing:.1em;">HOLE ${play.holeIndex + 1}${partnerHole ? ' · TEAM BALL' : ''}</div>
           <div style="font-size:18px;font-weight:800;">${name}${lastIsHoled ? ' 🎉' : ''}</div>
           <div style="font-size:12px;opacity:.7;margin-top:1px;">+${holePts} pt${holePts === 1 ? '' : 's'} this hole</div>
         </div>
@@ -1260,6 +1274,7 @@ function playingBody(animating: boolean): string {
       ${header()}
       <div style="position:relative;">${birdieOrBetter ? burst() : ''}</div>
       ${aceNote}
+      ${partnerHole ? `<div style="margin:0 0 12px;">${bestBallRevealHTML(raw, partnerHole, par)}</div>` : ''}
       ${scoreBanner}
       <div style="margin:12px 0;max-width:460px;">${progress}</div>
       <div style="margin-top:8px;">${btn('Continue →', { type: 'holeComplete' }, { variant: 'primary' })}</div>`;
@@ -1410,7 +1425,12 @@ function playingBody(animating: boolean): string {
     shotColor: golferLook()?.cap, // GS-tracer: the player's shot tracer reads the chosen golfer's colour.
     // On a matchplay boss stop, overlay the boss's pre-played line for THIS hole so you see them on the
     // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
-    ghostShots: state.match ? state.match.bossHoles[play.holeIndex]?.shots : undefined,
+    // Best-ball (GS-team-duel) hides it: the hole result is revealed at the end-of-hole cards, and the
+    // boss's drawn path would spoil their score mid-hole.
+    ghostShots:
+      state.match && state.match.setup?.format !== 'bestball'
+        ? state.match.bossHoles[play.holeIndex]?.shots
+        : undefined,
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     rainbow: rainbowActive(),
     tradeTents: tentsActive(),
@@ -2735,6 +2755,38 @@ function teamPartnerChar(setup: TeamDuelSetup): Character | undefined {
   if (setup.partnerSide === 'player' && setup.playerPartnerId) return getCharacter(setup.playerPartnerId);
   if (setup.partnerSide === 'boss' && setup.bossPartnerId) return getCharacter(setup.bossPartnerId);
   return undefined;
+}
+
+/**
+ * Best-ball end-of-hole REVEAL (GS-team-duel): the pair's two cards side by side — each ball's
+ * strokes + score name — with the counting (better) one highlighted and badged. Ties keep the
+ * player's ball (`betterPlayedHole` keeps the first). This is the moment the partner's hidden
+ * parallel ball is shown, so the reveal lands with the hole, never mid-play.
+ */
+function bestBallRevealHTML(raw: PlayedHole, partnerHole: PlayedHole, par: number): string {
+  const duel = teamDuel();
+  const partner = duel ? teamPartnerChar(duel) : undefined;
+  const youChar = getCharacter(state.run.loadout.characterId ?? '');
+  const partnerKept = partnerHole.record.strokes < raw.record.strokes;
+  const card = (label: string, h: PlayedHole, kept: boolean, accent: string): string => {
+    const rel = h.record.strokes - par;
+    const col = h.pickedUp ? '#ff6b6b' : rel < 0 ? '#5fd45a' : rel === 0 ? 'var(--gs-ink)' : rel === 1 ? '#ffce54' : '#ff6b6b';
+    return `<div style="flex:1 1 0;min-width:0;text-align:center;padding:12px 8px 9px;border-radius:10px;position:relative;
+        border:2px solid ${kept ? accent : 'var(--gs-line-2)'};background:${kept ? `${accent}1a` : '#0d1016'};
+        ${kept ? `box-shadow:0 0 14px ${accent}55;` : 'opacity:.62;'}">
+      ${kept ? `<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:${accent};color:#0b0d12;font-size:9px;font-weight:800;letter-spacing:.08em;border-radius:5px;padding:1px 7px;white-space:nowrap;">✓ COUNTS</div>` : ''}
+      <div style="font-size:11px;font-weight:700;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</div>
+      <div style="font-size:30px;font-weight:800;line-height:1.15;color:${col};">${h.pickedUp ? '—' : h.record.strokes}</div>
+      <div style="font-size:11px;opacity:.75;">${h.pickedUp ? 'Picked up' : scoreName(par, h.record.strokes)}</div>
+    </div>`;
+  };
+  return `<div style="max-width:460px;">
+      <div style="display:flex;gap:10px;align-items:stretch;">
+        ${card(`You · ${youChar?.name ?? 'Player'}`, raw, !partnerKept, youChar?.style.cap ?? '#5fd45a')}
+        ${card(partner?.name ?? 'Partner', partnerHole, partnerKept, partner?.style.cap ?? '#7aa2ff')}
+      </div>
+      <div style="font-size:11px;opacity:.65;margin-top:8px;text-align:center;">🤝 Best ball — the better score is the team's for the hole.</div>
+    </div>`;
 }
 
 /** A scouting note on the opponent — their style tagline (GS-team-duel / scouting line). */

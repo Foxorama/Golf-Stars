@@ -58,9 +58,18 @@
     (`autoCommitScrambleBall` → `pickBetterExec`). Putts are NOT scrambled (matching the base fold), so the
     choice fires on full swings only.
   - **Best-ball** — both play their OWN ball the whole hole; the better hole SCORE counts (no per-shot
-    choice). Interactively the player plays their ball normally; at `holeComplete` the partner's parallel
-    ball is played on the SAME `:play` rng right after (so watch ≡ auto-finish) and `betterPlayedHole` takes
-    the min for both the duel and the player's stop score.
+    choice). Interactively the player plays their ball normally; the MOMENT the hole is done the reducer's
+    `withBestBallPartner` plays the partner's parallel ball on the SAME `:play` rng (the identical draws
+    `holeComplete` used to make — the stream order is player's full hole then partner's, exactly
+    `bestBallHole`, so watch ≡ auto-finish byte-for-byte; `holeComplete` now consumes the stashed
+    `match.partnerHoles[idx]`, with a defensive same-draws replay fallback). Resolving at done-time exists
+    for the REVEAL: the end-of-hole screen (`bestBallRevealHTML`) shows the pair's two cards side by side —
+    each ball's strokes + score name — with the counting one highlighted/badged (ties keep the player's),
+    and the score banner / stop points / duel line on that screen are all computed off the KEPT team ball,
+    matching what `holeComplete` records. The inverse rule mid-hole: a best-ball duel shows NO hole results
+    until the flag — the matchplay HUD's "boss made N here" line and the decision map's boss `ghostShots`
+    are both suppressed when `setup.format === 'bestball'` (they stay on for solo matchplay and scramble),
+    so neither the partner's nor the other side's score is spoiled before the end-of-hole reveal.
   Engine: `match.ts` `playSideHole` (solo `playHole` / scramble fold / `bestBallHole`) builds a side's hole;
   `playTeamMatchStop` runs the hole-by-hole duel (headless + watch); `playBossSideStop` pre-plays the boss's
   team-scored side (revealed hole-by-hole like the solo matchplay boss). The boss side rides a SEPARATE
