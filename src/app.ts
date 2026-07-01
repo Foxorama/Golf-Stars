@@ -702,6 +702,12 @@ let charging = false; // true while a pull gesture is loading (suppresses the re
 // map UNLESS free-aim is active (then drag aims) — so "move the map around" is the default touch.
 let mapView: 'follow' | 'whole' = 'follow';
 let mapZoom = 1;
+// The follow-cam radius (course yds) the decision map is CURRENTLY framed at — captured on every
+// decision render and handed to the shot animation so the release→watch cut keeps the exact zoom
+// the player was aiming at (the "zoom skip-jump on release" bug). null in whole-hole view (no
+// follow radius to match) and before any decision has rendered (resume) — those fall back to the
+// travel-framed reach.
+let decisionRadius: number | null = null;
 // Shop bag-inventory: the gear item the player tapped to inspect (its card shows for comparison with
 // the shop stock). View-only module state (like selClubId) — no reducer/save state, reset on buy.
 let inspectGearId: string | null = null;
@@ -1388,11 +1394,17 @@ function playingBody(animating: boolean): string {
   // % of shots per zone — straight off the shot's asymmetric shape, so the legend reads exactly true.
   const sh = spray.shape;
   const pctRound = (x: number) => Math.round(x * 100);
-  // Frame the map on the FULL-power shot (not the live charge) so the camera stays steady while the
-  // cone grows/shrinks with power — the shot expands within a fixed view rather than zooming the world.
-  // Both the render and the gesture build the projector from this same stable spread (projector-sync).
-  const frameSpray = previewShot(play, { ...decision, power: 1 }, state.run.loadout);
+  // Frame the map on the FULL-power PIN-AIM shot — NOT the live charge, and NOT the live drag
+  // target either: carryHigh folds in the wind component ALONG the shot bearing, so framing on the
+  // dragged target made viewRadius wobble with every pixel of aim slide. A sub-pixel projector
+  // change re-projects the whole seeded scene (the decor-jitter-while-pulling bug); the camera
+  // must hold perfectly still for the entire decision. Both the render and the gesture build the
+  // projector from this same stable spread (projector-sync).
+  const frameSpray = previewShot(play, { clubId: selClubId, aim: selAim, power: 1 }, state.run.loadout);
   const mapOpts = decisionView(play, frameSpray);
+  // Remember the follow-cam radius the player is LOOKING AT — the shot animation starts at this
+  // exact zoom so releasing the gesture never skip-jumps to a different framing (GS-power).
+  decisionRadius = mapOpts.viewRadius ?? null;
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
     shotColor: golferLook()?.cap, // GS-tracer: the player's shot tracer reads the chosen golfer's colour.
@@ -1405,6 +1417,7 @@ function playingBody(animating: boolean): string {
     meteorScorch: scorchActive(),
     ball: play.ball,
     spray,
+    fitSpray: frameSpray, // whole-map fit holds still while the live cone charges/aims
     sprayGeom,
     ...mapOpts,
   });
@@ -2820,6 +2833,7 @@ function render(): void {
       awaitingShotPopup = false;
       aceCelebratedHole = -1;
       birdCelebratedHole = -1;
+      decisionRadius = null;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
@@ -3145,7 +3159,11 @@ function render(): void {
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
         focus,
-        viewRadius: animatingPlay.shots.length ? decisionReach(travel) : 25,
+        // Start the watch-cam at the EXACT zoom the decision map was framed at (the player was just
+        // looking at it — release must not skip-jump), falling back to the travel-framed reach when
+        // no decision preceded this animation (resume, auto-advance). The radius holds for the whole
+        // animation; the follow-cam pans to keep up with the ball either way.
+        viewRadius: animatingPlay.shots.length ? decisionRadius ?? decisionReach(travel) : 25,
         focusBias: DMAP_BIAS,
         up: animUp,
         follow: true,

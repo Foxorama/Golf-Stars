@@ -799,7 +799,10 @@ function styleScatter(kind: string, poly: Vec[], art: ArtFeel, arch: BiomeArchet
 }
 
 /** Thick FESCUE / native rough (GS-hazards-2): an olive-tan body with seeded upright grass blades so
- *  the deep rough reads as wispy native grass, not a flat blob. */
+ *  the deep rough reads as wispy native grass, not a flat blob. The blade COUNT scales with the
+ *  PROJECTED patch size (blades are screen-px strokes), so this must run on its own per-patch
+ *  stream (see the call site) — on the shared stream a zoom step changed the count and re-rolled
+ *  every draw downstream (trees, water, lava — the decor-jitter bug). */
 function styleFescue(poly: Vec[], rng: () => number): Prim[] {
   const out: Prim[] = [
     { t: 'poly', pts: poly, fill: '#7c8c48' },
@@ -839,7 +842,10 @@ function styleRavine(poly: Vec[], rng: () => number): Prim[] {
 }
 
 /** Deterministic 0..1 hash off a position (GS-biome-feel) — extra per-flora/per-decor variation
- *  WITHOUT extra rng draws, so every world's art stream stays byte-identical to the classic one. */
+ *  WITHOUT extra rng draws, so every world's art stream stays byte-identical to the classic one.
+ *  ALWAYS key it off a COURSE-space position, never a projected pixel: the play view rebuilds the
+ *  scene through a moving projector every frame, and a sub-pixel camera shift flips a screen-keyed
+ *  hash to a completely different value — the "decor jerks wildly while the camera moves" bug. */
 function posHash(x: number, y: number, k = 0): number {
   const s = Math.sin(x * 12.9898 + y * 78.233 + k * 37.719) * 43758.5453;
   return s - Math.floor(s);
@@ -866,23 +872,24 @@ function styleFlora(poly: Vec[], proj: Projector, rng: () => number, arch: Biome
   const rr = Math.max(3, rad * proj.scale * (0.9 + rng() * 0.5));
   // Slight per-tree hue variance so a treeline isn't a row of clones (the SAME two draws everywhere).
   const tint = rng();
+  // Variants hash off the COURSE centroid `cc` (stable under any camera), never the projected px.
   switch (arch) {
     case 'fungal':
-      return floraMushroom(x, y, rr, tint);
+      return floraMushroom(x, y, rr, tint, cc);
     case 'frost':
       return floraConifer(x, y, rr, tint);
     case 'inferno':
-      return floraSnag(x, y, rr, tint);
+      return floraSnag(x, y, rr, tint, cc);
     case 'desert':
-      return floraSaguaro(x, y, rr, tint);
+      return floraSaguaro(x, y, rr, tint, cc);
     case 'crystal':
       return floraShard(x, y, rr, tint);
     case 'tempest':
       return floraWindScrub(x, y, rr, tint);
     case 'ocean':
-      return floraPalm(x, y, rr, tint);
+      return floraPalm(x, y, rr, tint, cc);
     case 'cetus':
-      return floraSeaStack(x, y, rr, tint);
+      return floraSeaStack(x, y, rr, tint, cc);
     default:
       break; // verdant (and any unknown) → the classic parkland canopy, byte-identical
   }
@@ -905,7 +912,7 @@ function styleFlora(poly: Vec[], proj: Projector, rng: () => number, arch: Biome
 
 /** Spore-jungle GIANT MUSHROOM: a pale stalk under a wide flattened dome cap that glows from
  *  within, gill shadow under the rim, luminous spots on top. */
-function floraMushroom(x: number, y: number, rr: number, tint: number): Prim[] {
+function floraMushroom(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
   const cool = tint >= 0.66; // a teal minority among the violet stands
   const cap = tint < 0.33 ? '#8a5ce0' : tint < 0.66 ? '#6a42c0' : '#3fbf9c';
   const capLit = cool ? '#7ae8cc' : '#a97ef0';
@@ -928,8 +935,8 @@ function floraMushroom(x: number, y: number, rr: number, tint: number): Prim[] {
   ];
   // Luminous spots across the cap (position-hashed — no rng).
   for (let i = 0; i < 3; i++) {
-    const u = posHash(x, y, i) - 0.5;
-    out.push({ t: 'circle', c: [x + u * rr * 1.5, top - rr * (0.28 + posHash(x, y, i + 3) * 0.4)], r: rr * 0.13, fill: 'rgba(240,236,255,0.9)' });
+    const u = posHash(key[0], key[1], i) - 0.5;
+    out.push({ t: 'circle', c: [x + u * rr * 1.5, top - rr * (0.28 + posHash(key[0], key[1], i + 3) * 0.4)], r: rr * 0.13, fill: 'rgba(240,236,255,0.9)' });
   }
   return out;
 }
@@ -958,9 +965,9 @@ function floraConifer(x: number, y: number, rr: number, tint: number): Prim[] {
 
 /** Ember-world CHARRED SNAG: a leaning burnt trunk with bare jagged branches, embers still
  *  crawling up it, over a warm ground glow. */
-function floraSnag(x: number, y: number, rr: number, tint: number): Prim[] {
+function floraSnag(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
   const body = tint < 0.5 ? '#33241c' : '#241710';
-  const lean = (posHash(x, y) - 0.5) * rr * 0.6;
+  const lean = (posHash(key[0], key[1]) - 0.5) * rr * 0.6;
   const topX = x + lean;
   const topY = y - rr * 2.2;
   const out: Prim[] = [
@@ -973,8 +980,8 @@ function floraSnag(x: number, y: number, rr: number, tint: number): Prim[] {
   ];
   // An ember or two still glowing on the trunk (position-hashed).
   for (let i = 0; i < 2; i++) {
-    if (posHash(x, y, i + 7) < 0.7) {
-      const t = 0.35 + posHash(x, y, i + 11) * 0.5;
+    if (posHash(key[0], key[1], i + 7) < 0.7) {
+      const t = 0.35 + posHash(key[0], key[1], i + 11) * 0.5;
       out.push({ t: 'circle', c: [x + lean * t, y + rr * 0.3 - (y + rr * 0.3 - topY) * t], r: rr * 0.1 + 0.5, fill: '#ff8a2a' });
     }
   }
@@ -982,11 +989,11 @@ function floraSnag(x: number, y: number, rr: number, tint: number): Prim[] {
 }
 
 /** Dust-belt SAGUARO: a tall ribbed column with two elbowed arms, the desert's lone sentinel. */
-function floraSaguaro(x: number, y: number, rr: number, tint: number): Prim[] {
+function floraSaguaro(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
   const body = tint < 0.33 ? '#5f8a4e' : tint < 0.66 ? '#6f9a58' : '#527c46';
   const h = rr * 2.4;
   const armY1 = y - h * 0.55;
-  const armY2 = y - h * (0.4 + posHash(x, y) * 0.15);
+  const armY2 = y - h * (0.4 + posHash(key[0], key[1]) * 0.15);
   const out: Prim[] = [
     { t: 'circle', c: [x, y + rr * 0.4], r: rr * 0.55, fill: 'rgba(0,0,0,0.18)' },
     { t: 'line', a: [x, y + rr * 0.3], b: [x, y - h], stroke: body, sw: rr * 0.5, round: true }, // column
@@ -998,7 +1005,7 @@ function floraSaguaro(x: number, y: number, rr: number, tint: number): Prim[] {
     { t: 'line', a: [x, armY2], b: [x + rr * 0.7, armY2], stroke: body, sw: rr * 0.3, round: true },
     { t: 'line', a: [x + rr * 0.7, armY2], b: [x + rr * 0.7, armY2 - rr * 0.6], stroke: body, sw: rr * 0.3, round: true },
   ];
-  if (posHash(x, y, 5) < 0.3) out.push({ t: 'circle', c: [x, y - h - rr * 0.1], r: rr * 0.16, fill: '#ffd0e0' }); // desert bloom
+  if (posHash(key[0], key[1], 5) < 0.3) out.push({ t: 'circle', c: [x, y - h - rr * 0.1], r: rr * 0.16, fill: '#ffd0e0' }); // desert bloom
   return out;
 }
 
@@ -1051,9 +1058,9 @@ function floraWindScrub(x: number, y: number, rr: number, tint: number): Prim[] 
 }
 
 /** Tidal-archipelago PALM: a curved trunk with a burst of arcing fronds. */
-function floraPalm(x: number, y: number, rr: number, tint: number): Prim[] {
+function floraPalm(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
   const frond = tint < 0.33 ? '#2f9a4a' : tint < 0.66 ? '#2c8a58' : '#3aa843';
-  const bend = rr * (0.4 + posHash(x, y) * 0.3);
+  const bend = rr * (0.4 + posHash(key[0], key[1]) * 0.3);
   const topX = x + bend;
   const topY = y - rr * 2.1;
   const out: Prim[] = [
@@ -1064,19 +1071,19 @@ function floraPalm(x: number, y: number, rr: number, tint: number): Prim[] {
   // Fronds fanning from the crown, each a two-segment droop.
   const angles = [-2.7, -2.1, -1.35, -0.6, 0.1];
   for (let i = 0; i < angles.length; i++) {
-    const a = angles[i]! + (posHash(x, y, i) - 0.5) * 0.3;
+    const a = angles[i]! + (posHash(key[0], key[1], i) - 0.5) * 0.3;
     const midX = topX + Math.cos(a) * rr * 0.9;
     const midY = topY + Math.sin(a) * rr * 0.55;
     out.push({ t: 'line', a: [topX, topY], b: [midX, midY], stroke: frond, sw: Math.max(1.2, rr * 0.16), round: true });
     out.push({ t: 'line', a: [midX, midY], b: [midX + Math.cos(a) * rr * 0.5, midY + Math.abs(Math.sin(a)) * rr * 0.3 + rr * 0.3], stroke: frond, sw: Math.max(1, rr * 0.12), round: true });
   }
-  if (posHash(x, y, 9) < 0.5) out.push({ t: 'circle', c: [topX - rr * 0.2, topY + rr * 0.25], r: rr * 0.14, fill: '#5a3a22' }); // coconut
+  if (posHash(key[0], key[1], 9) < 0.5) out.push({ t: 'circle', c: [topX - rr * 0.2, topY + rr * 0.25], r: rr * 0.14, fill: '#5a3a22' }); // coconut
   return out;
 }
 
 /** Cetus COASTAL SEA-STACK: a wind-carved rock pillar speckled with bioluminescence, foam at
  *  its foot — the sparse "trees" of the clifftop world. */
-function floraSeaStack(x: number, y: number, rr: number, tint: number): Prim[] {
+function floraSeaStack(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
   const body = tint < 0.5 ? '#2a5a6a' : '#234c5c';
   const h = rr * 2.0;
   const stack: Vec[] = [
@@ -1092,7 +1099,7 @@ function floraSeaStack(x: number, y: number, rr: number, tint: number): Prim[] {
     { t: 'circle', c: [x, y + rr * 0.2], r: rr * 0.78, fill: 'none', stroke: 'rgba(220,248,255,0.35)', sw: 1.2 }, // foam ring at the foot
   ];
   for (let i = 0; i < 3; i++) {
-    out.push({ t: 'circle', c: [x + (posHash(x, y, i) - 0.5) * rr, y - h * (0.25 + posHash(x, y, i + 4) * 0.6)], r: 0.8, fill: 'rgba(122,240,255,0.85)' }); // bio-speckles
+    out.push({ t: 'circle', c: [x + (posHash(key[0], key[1], i) - 0.5) * rr, y - h * (0.25 + posHash(key[0], key[1], i + 4) * 0.6)], r: 0.8, fill: 'rgba(122,240,255,0.85)' }); // bio-speckles
   }
   return out;
 }
@@ -1459,11 +1466,16 @@ function cetusCliffs(
     // slab casting onto its own face), and star-dust in the rock (Cetus stone is made of the deep).
     children.push({ t: 'poly', pts: [...dropped(0), ...dropped(0.16).slice().reverse()], fill: 'rgba(3,10,18,0.34)' });
     const fb = bboxOf(face);
+    // Dust count scales with the PROJECTED face size, so always run the capped loop and only PUSH
+    // the first `dust` motes — the rng consumption stays fixed per platform, and a zoom step can't
+    // shift the cliff stream and re-roll the cracks/next platform (the decor-jitter bug).
     const dust = Math.min(110, Math.round(((fb.maxX - fb.minX) * (fb.maxY - fb.minY)) / 620));
-    for (let i = 0; i < dust; i++) {
+    for (let i = 0; i < 110; i++) {
       const x = fb.minX + rng() * (fb.maxX - fb.minX);
       const y = fb.minY + rng() * (fb.maxY - fb.minY);
-      children.push({ t: 'circle', c: [x, y], r: 0.35 + rng() * 0.9, fill: rng() < 0.5 ? 'rgba(190,236,255,0.5)' : 'rgba(140,205,255,0.4)' });
+      const r = 0.35 + rng() * 0.9;
+      const fill = rng() < 0.5 ? 'rgba(190,236,255,0.5)' : 'rgba(140,205,255,0.4)';
+      if (i < dust) children.push({ t: 'circle', c: [x, y], r, fill });
     }
     // Vertical fault cracks + lit ridges give the wall its strata read.
     const cracks = 4 + Math.floor(rng() * 4);
@@ -1900,16 +1912,17 @@ function archetypeDecor(
 ): Prim[] {
   const out: Prim[] = [];
   const clipped: Prim[] = []; // gathered, then pushed as ONE island clip (never nest clips — SVG serializer bug)
-  // A course-space point in the hole's bbox, projected; rejected off the cut grass. Bounded attempts
-  // so the draw count can never run away; a miss returns null (rng was still consumed — fine, this
-  // stream feeds nothing else).
-  const groundPt = (): Vec | null => {
+  // A course-space point in the hole's bbox, rejected off the cut grass. Bounded attempts so the
+  // draw count can never run away; a miss returns null (rng was still consumed — fine, this stream
+  // feeds nothing else). CRITICAL: the rejection loop must NEVER consult the projection — the play
+  // view rebuilds the scene through a moving camera every frame, and a view-dependent retry changes
+  // the draw COUNT, re-rolling every placement after it (the decor-jitter bug). Visibility is
+  // decided at paint time, off-view pieces just aren't pushed.
+  const groundPt = (): { c: Vec; s: Vec } | null => {
     for (let i = 0; i < 8; i++) {
       const cp: Vec = [cb.minX + (cb.maxX - cb.minX) * rng(), cb.minY + (cb.maxY - cb.minY) * rng()];
       if (onGrass(cp)) continue;
-      const sp = proj.project(cp);
-      if (!inView(sp, W, H)) continue;
-      return sp;
+      return { c: cp, s: proj.project(cp) };
     }
     return null;
   };
@@ -1934,7 +1947,7 @@ function archetypeDecor(
         const pts: Vec[] = [];
         for (let k = 0; k < 6; k++) {
           const a = (k / 6) * Math.PI * 2;
-          const rk = r * (0.72 + posHash(s[0], s[1], k) * 0.5);
+          const rk = r * (0.72 + posHash(c[0], c[1], k) * 0.5); // hashed off the COURSE point — stable under the camera
           pts.push([s[0] + Math.cos(a) * rk, s[1] + Math.sin(a) * rk * 0.8]);
         }
         out.push({ t: 'glow', c: s, r: r * 2.1, col: 'rgba(150,120,255,0.14)' });
@@ -1955,23 +1968,27 @@ function archetypeDecor(
       // Glowing ground FISSURES crawling through the scorched rough — the crust is barely holding.
       const fissures = 4 + Math.floor(rng() * 3);
       for (let i = 0; i < fissures; i++) {
-        const p0 = groundPt();
+        const g = groundPt();
         const ang = rng() * Math.PI * 2;
-        if (!p0) continue; // nothing painted; this dedicated stream feeds nothing downstream
-        let px0 = p0[0];
-        let py0 = p0[1];
+        if (!g) continue; // nothing painted; this dedicated stream feeds nothing downstream
+        const glowR = 8 + rng() * 8; // drawn unconditionally — the count never reads the view
+        const vis = inView(g.s, W, H);
+        let px0 = g.s[0];
+        let py0 = g.s[1];
         let a = ang;
         for (let sgm = 0; sgm < 3; sgm++) {
-          const len = 9 + posHash(px0, py0, sgm) * 14;
+          const len = 9 + posHash(g.c[0], g.c[1], sgm) * 14;
           const px1 = px0 + Math.cos(a) * len;
           const py1 = py0 + Math.sin(a) * len;
-          clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(16,6,3,0.75)', sw: 3, round: true });
-          clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(255,138,42,0.8)', sw: 1.2, round: true });
-          a += (posHash(px1, py1, sgm) - 0.5) * 1.5;
+          if (vis) {
+            clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(16,6,3,0.75)', sw: 3, round: true });
+            clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(255,138,42,0.8)', sw: 1.2, round: true });
+          }
+          a += (posHash(g.c[0], g.c[1], sgm + 7) - 0.5) * 1.5;
           px0 = px1;
           py0 = py1;
         }
-        clipped.push({ t: 'glow', c: p0, r: 8 + rng() * 8, col: 'rgba(255,130,50,0.28)' });
+        if (vis) clipped.push({ t: 'glow', c: g.s, r: glowR, col: 'rgba(255,130,50,0.28)' });
       }
       break;
     }
@@ -1979,20 +1996,21 @@ function archetypeDecor(
       // Spore-mist pooling in the undergrowth + tiny toadstool clusters — the jungle floor is alive.
       const mists = 3 + Math.floor(rng() * 2);
       for (let i = 0; i < mists; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const r = (0.07 + rng() * 0.08) * Math.min(W, H);
-        if (p) clipped.push({ t: 'glow', c: p, r, col: 'rgba(120,240,180,0.13)' });
+        if (g && inView(g.s, W, H)) clipped.push({ t: 'glow', c: g.s, r, col: 'rgba(120,240,180,0.13)' });
       }
       const shrooms = Math.round(7 * accents);
       for (let i = 0; i < shrooms; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const cool = rng() < 0.4;
-        if (!p) continue;
-        const h = 3 + posHash(p[0], p[1]) * 2.5;
+        if (!g || !inView(g.s, W, H)) continue; // placed (rng consumed), just not painted
+        const p = g.s;
+        const h = 3 + posHash(g.c[0], g.c[1]) * 2.5;
         const cap = cool ? '#7af0c0' : '#b07eff';
         clipped.push({ t: 'line', a: p, b: [p[0], p[1] - h], stroke: '#ded4f2', sw: 1.1, round: true });
-        clipped.push({ t: 'circle', c: [p[0], p[1] - h], r: 1.6 + posHash(p[0], p[1], 2), fill: cap });
-        if (posHash(p[0], p[1], 3) < 0.45) clipped.push({ t: 'glow', c: [p[0], p[1] - h], r: 6, col: cool ? 'rgba(122,240,192,0.35)' : 'rgba(176,126,255,0.35)' });
+        clipped.push({ t: 'circle', c: [p[0], p[1] - h], r: 1.6 + posHash(g.c[0], g.c[1], 2), fill: cap });
+        if (posHash(g.c[0], g.c[1], 3) < 0.45) clipped.push({ t: 'glow', c: [p[0], p[1] - h], r: 6, col: cool ? 'rgba(122,240,192,0.35)' : 'rgba(176,126,255,0.35)' });
       }
       break;
     }
@@ -2000,10 +2018,11 @@ function archetypeDecor(
       // Shard clusters growing out of the rough + prismatic ground glints — everything refracts.
       const clusters = 4 + Math.floor(rng() * 3);
       for (let i = 0; i < clusters; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const big = 4 + rng() * 5;
-        if (!p) continue;
-        const lean = (posHash(p[0], p[1]) - 0.5) * big * 0.7;
+        if (!g || !inView(g.s, W, H)) continue; // placed (rng consumed), just not painted
+        const p = g.s;
+        const lean = (posHash(g.c[0], g.c[1]) - 0.5) * big * 0.7;
         clipped.push({ t: 'glow', c: [p[0], p[1] - big * 0.6], r: big * 2.4, col: 'rgba(160,225,255,0.22)' });
         clipped.push({ t: 'poly', pts: [[p[0], p[1] - big * 1.7], [p[0] + big * 0.4, p[1] - big * 0.4], [p[0] + big * 0.2, p[1]], [p[0] - big * 0.34, p[1] - big * 0.3]], fill: '#9fd8e6', stroke: 'rgba(30,70,100,0.55)', sw: 0.8 });
         clipped.push({ t: 'poly', pts: [[p[0] + lean + big * 0.5, p[1] - big], [p[0] + lean + big * 0.8, p[1] - big * 0.2], [p[0] + lean + big * 0.45, p[1]]], fill: '#cbe0ea', stroke: 'rgba(30,70,100,0.45)', sw: 0.8 });
@@ -2011,9 +2030,10 @@ function archetypeDecor(
       const glintCols = ['#ff9ab8', '#ffe14a', '#7af0c0', '#9fd8ff'];
       const glints = Math.round(5 * accents);
       for (let i = 0; i < glints; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const col = glintCols[Math.floor(rng() * glintCols.length)]!;
-        if (!p) continue;
+        if (!g || !inView(g.s, W, H)) continue;
+        const p = g.s;
         clipped.push({ t: 'line', a: [p[0] - 2, p[1]], b: [p[0] + 2, p[1]], stroke: col, sw: 0.9, round: true });
         clipped.push({ t: 'line', a: [p[0], p[1] - 2], b: [p[0], p[1] + 2], stroke: col, sw: 0.9, round: true });
       }
@@ -2023,16 +2043,17 @@ function archetypeDecor(
       // Wind-blown snow drifts + ice-sheen cracks — the ground is frozen, not just teal.
       const drifts = 3 + Math.floor(rng() * 2);
       for (let i = 0; i < drifts; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const r = (0.05 + rng() * 0.07) * Math.min(W, H);
-        if (p) clipped.push({ t: 'circle', c: p, r, fill: 'rgba(240,250,255,0.10)' });
+        if (g && inView(g.s, W, H)) clipped.push({ t: 'circle', c: g.s, r, fill: 'rgba(240,250,255,0.10)' });
       }
       const cracks = 4 + Math.floor(rng() * 3);
       for (let i = 0; i < cracks; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const ang = rng() * Math.PI * 2;
-        if (!p) continue;
-        const len = 8 + posHash(p[0], p[1]) * 12;
+        if (!g || !inView(g.s, W, H)) continue;
+        const p = g.s;
+        const len = 8 + posHash(g.c[0], g.c[1]) * 12;
         const mx = p[0] + Math.cos(ang) * len;
         const my = p[1] + Math.sin(ang) * len;
         clipped.push({ t: 'line', a: p, b: [mx, my], stroke: 'rgba(220,245,255,0.35)', sw: 0.9, round: true });
@@ -2044,24 +2065,26 @@ function archetypeDecor(
       // Dune ripples combed across the waste + the odd sun-bleached rock.
       const bands = 4 + Math.floor(rng() * 3);
       for (let i = 0; i < bands; i++) {
-        const p = groundPt();
+        const g = groundPt();
         const ang = rng() * Math.PI; // ripple grain
-        if (!p) continue;
+        if (!g || !inView(g.s, W, H)) continue;
+        const p = g.s;
         const dx = Math.cos(ang);
         const dy = Math.sin(ang);
         for (let k = 0; k < 4; k++) {
           const off = (k - 1.5) * 4.5;
           const cxp = p[0] - dy * off;
           const cyp = p[1] + dx * off;
-          const len = 7 + posHash(cxp, cyp, k) * 8;
+          const len = 7 + posHash(g.c[0], g.c[1], k) * 8;
           clipped.push({ t: 'line', a: [cxp - dx * len, cyp - dy * len], b: [cxp + dx * len, cyp + dy * len], stroke: 'rgba(235,205,150,0.20)', sw: 1.2, round: true });
         }
       }
       const rocks = 2 + Math.floor(rng() * 2);
       for (let i = 0; i < rocks; i++) {
-        const p = groundPt();
-        if (!p) continue;
-        const r = 2.5 + posHash(p[0], p[1]) * 3;
+        const g = groundPt();
+        if (!g || !inView(g.s, W, H)) continue;
+        const p = g.s;
+        const r = 2.5 + posHash(g.c[0], g.c[1]) * 3;
         clipped.push({ t: 'poly', pts: [[p[0] - r, p[1]], [p[0] - r * 0.3, p[1] - r * 0.9], [p[0] + r * 0.7, p[1] - r * 0.6], [p[0] + r, p[1]]], fill: '#8a6f4a', stroke: 'rgba(46,36,19,0.6)', sw: 0.8 });
         clipped.push({ t: 'line', a: [p[0] - r * 0.3, p[1] - r * 0.9], b: [p[0] + r * 0.7, p[1] - r * 0.6], stroke: 'rgba(255,240,210,0.5)', sw: 0.9, round: true });
       }
@@ -2312,17 +2335,23 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     const pr = (0.13 + rng() * 0.16) * Math.min(W, H);
     land.push({ t: 'circle', c: [px, py], r: pr, fill: rng() < 0.33 ? 'rgba(220,255,210,0.04)' : 'rgba(0,0,0,0.12)' });
   }
+  // Tufts/flowers/stars place in COURSE space and only CULL to the view at paint time — the rng
+  // consumption must never read the projection. These draws sit on the shared main `rng` stream:
+  // when the retry loops used to skip off-view points, a sub-pixel camera change flipped a point's
+  // visibility, shifted the draw COUNT, and re-rolled every tree/water/lava draw downstream — the
+  // "whole scene jerks wildly while the camera moves" bug (per-frame follow-cam scene rebuilds).
   const tuftTarget = Math.min(64, Math.round((span / 14) * art.texture));
   let placed = 0;
   for (let i = 0; i < tuftTarget * 3 && placed < tuftTarget; i++) {
     const cp = randCoursePt();
     if (onGrass(cp)) continue;
-    const sp = proj.project(cp);
-    if (!inView(sp, W, H)) continue;
     placed++;
     const len = 2 + rng() * 2.5;
     const dark = rng() < 0.55;
-    land.push({ t: 'line', a: [sp[0], sp[1]], b: [sp[0] + (rng() - 0.5) * 2, sp[1] - len], stroke: dark ? rs.dark : rs.light, sw: 1, round: true });
+    const jx = (rng() - 0.5) * 2;
+    const sp = proj.project(cp);
+    if (!inView(sp, W, H)) continue; // placed + drawn (rng consumed), just not painted
+    land.push({ t: 'line', a: [sp[0], sp[1]], b: [sp[0] + jx, sp[1] - len], stroke: dark ? rs.dark : rs.light, sw: 1, round: true });
   }
   const ac = accentFor(biome);
   const flowerTarget = Math.round(5 * art.accents);
@@ -2330,13 +2359,16 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   for (let i = 0; i < flowerTarget * 4 && flowers < flowerTarget; i++) {
     const cp = randCoursePt();
     if (onGrass(cp)) continue;
-    const sp = proj.project(cp);
-    if (!inView(sp, W, H)) continue;
     flowers++;
     const col = ac.flowers[Math.floor(rng() * ac.flowers.length)]!;
     const dots = 3 + Math.floor(rng() * 2);
+    const sp = proj.project(cp);
+    const vis = inView(sp, W, H);
     for (let d = 0; d < dots; d++) {
-      land.push({ t: 'circle', c: [sp[0] + (rng() - 0.5) * 6, sp[1] + (rng() - 0.5) * 6], r: 0.9 + rng() * 0.8, fill: col });
+      const dx = (rng() - 0.5) * 6;
+      const dy = (rng() - 0.5) * 6;
+      const r = 0.9 + rng() * 0.8;
+      if (vis) land.push({ t: 'circle', c: [sp[0] + dx, sp[1] + dy], r, fill: col });
     }
   }
   // Faint stars salt the dark land too (crng — does NOT perturb the terrain rng), so even the
@@ -2346,10 +2378,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     for (let i = 0; i < groundStars; i++) {
       const cp: Vec = [cb.minX + (cb.maxX - cb.minX) * crng(), cb.minY + (cb.maxY - cb.minY) * crng()];
       if (onGrass(cp)) continue;
+      const r = 0.5 + crng() * 1.1;
+      const fill = crng() < 0.5 ? 'rgba(235,242,255,0.75)' : 'rgba(190,214,255,0.62)';
       const sp = proj.project(cp);
       if (!inView(sp, W, H)) continue;
-      const r = 0.5 + crng() * 1.1;
-      land.push({ t: 'circle', c: sp, r, fill: crng() < 0.5 ? 'rgba(235,242,255,0.75)' : 'rgba(190,214,255,0.62)' });
+      land.push({ t: 'circle', c: sp, r, fill });
     }
   }
   // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); an island-green par 3 also
@@ -2450,7 +2483,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // OTHER hazard (rough fescue, ravines, exotic scatter, water/lava, trees) is OFF the road → the bare
   // void, so it's dropped (it reads as the OOB space it now is, matching the sim's lie rule).
   if (!rainbow) {
-    for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), rng));
+    // Fescue rides a per-patch LOCAL stream (hole hash ⊕ course centroid): its blade count is
+    // px-sized, so on the shared `rng` a zoom step re-rolled everything after it. Contained here,
+    // a count step just adds/removes a blade. (Ravine's draws are a fixed count — shared is fine.)
+    const patchRng = (poly: Vec[]): (() => number) => {
+      const c = centroidOf(poly);
+      return mulberry32((hashHole(hole) ^ Math.floor(posHash(c[0], c[1]) * 0xffffffff)) >>> 0);
+    };
+    for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), patchRng(f.poly)));
     for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
   }
   prims.push(...styleSandFamily(sandPolys, art, proj.scale));
@@ -2522,8 +2562,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     const [x, y] = proj.project(s);
     const beacon = (obl as ObLook).beacon;
     if (beacon) {
-      // A warp beacon adrift on the boundary: soft glow + a lit diamond, bobbed by a position hash.
-      const by = y - 4 - posHash(x, y) * 3;
+      // A warp beacon adrift on the boundary: soft glow + a lit diamond, bobbed by a position hash
+      // of the COURSE stake (screen coords would make the bob jitter as the follow-cam moves).
+      const by = y - 4 - posHash(s[0], s[1]) * 3;
       prims.push({ t: 'glow', c: [x, by], r: 7, col: beacon });
       prims.push({ t: 'poly', pts: [[x, by - 3.2], [x + 2.3, by], [x, by + 3.2], [x - 2.3, by]], fill: obl.cap, stroke: obl.post, sw: 0.8 });
       prims.push({ t: 'circle', c: [x, by], r: 0.9, fill: '#ffffff' });

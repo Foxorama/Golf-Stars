@@ -402,3 +402,32 @@
   graphic"). The top info chip + bottom control panel are also kept tight (small padding/gaps) so they
   occlude as little of the shot-range cone behind them as possible.
 
+- **The scene builder is CAMERA-PROOF: rng consumption + posHash keys never read the projection
+  (GS-gesture-jitter fix, 2026-07).** The bug: while pulling to shoot (and any time the follow-cam
+  moved), tree details, lava fissures and other decor "jerked wildly back and forth", stopping the
+  instant the finger lifted. Two mechanisms, both "the scene rebuilds per frame through a moving
+  projector" (follow-cam rebuilds `buildScene` per frame; the pull gesture used to wobble the
+  decision map's `viewRadius` every frame — see ui-intro.md):
+  (1) **View-dependent rng DRAW COUNTS.** The tuft/flower retry loops skipped candidates that
+  projected off-view (`inView`) and re-drew; `archetypeDecor`'s `groundPt` retried the same way;
+  fescue sized its blade count off the PROJECTED patch bbox; the cetus cliff dust count off the
+  projected face. A sub-pixel camera change flips one candidate's visibility (or steps one count)
+  → every draw downstream on that stream re-rolls → the whole scene (trees, water, lava live on the
+  same main `rng`) teleports each frame. Fixes: placement rejects ONLY on course-space tests
+  (`onGrass`), all per-item draws are consumed unconditionally, and visibility is decided at PAINT
+  time (off-view pieces just aren't pushed); fescue runs on a per-patch local stream
+  (`hashHole ^ posHash(centroid)`) so its px-scaled count is contained; cliff dust always consumes
+  its capped 110 draws and pushes the first `dust`. Consequence: decor is now genuinely
+  WORLD-anchored — a zoomed view shows the accents that live there rather than re-rolling the whole
+  budget into frame (slightly sparser when zoomed way in; correct trade — stable beats
+  dense-but-teleporting).
+  (2) **posHash keyed off PROJECTED px.** `posHash` is a sin hash — a 0.001px input change is a
+  different value — so flora details (mushroom spots, snag lean/embers, palm bend/fronds/coconut,
+  saguaro arm/bloom, sea-stack speckles), decor accents and the OB warp-beacon bob re-rolled under
+  any camera motion. All re-keyed to COURSE-space anchors (the flora fns take the course centroid
+  `key`; `groundPt` returns `{c, s}`; the beacon hashes the course stake). THE RULE: posHash input
+  = course space, always. `tests/camera-stability.test.ts` machine-checks both mechanisms (prim
+  structure identical under a panned+zoom-eased projector across all archetypes; a pure pan
+  translates flora details rigidly; `fitSpray` holds the whole-map fit still while the live cone
+  changes). Byte-level note: localizing fescue + the flower-dot reorder shifted the art streams
+  once (deterministic reshuffle, gallery re-shot — all worlds keep their identity).
