@@ -204,6 +204,7 @@ export type Action =
   | { type: 'closeClubhouseHall' } // back to the title from the Clubhouse hall
   | { type: 'openClubhouse'; characterId: string } // outfit one character's garage + wardrobe (GS-clubhouse)
   | { type: 'closeClubhouse' } // back to the title from the Clubhouse
+  | { type: 'clubhouseBackToHall' } // back to the hall (pick another golfer) from one golfer's Clubhouse
   | { type: 'buyShip'; id: string } // buy a cosmetic ship with shards (global ownership) (GS-garage)
   | { type: 'selectShip'; id: string } // fly a different owned ship on the managed character (Clubhouse)
   | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt/pants with shards (global ownership) (GS-cosmetics)
@@ -793,6 +794,13 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'closeClubhouse': {
       if (state.screen !== 'clubhouse') return state;
       return { ...state, screen: 'title', manageCharacterId: undefined };
+    }
+
+    case 'clubhouseBackToHall': {
+      // From one golfer's stage back to the hall, so you can outfit another golfer without a round-trip
+      // through the title (GS-clubhouse-stage). No-op unless we're actually on a golfer's stage.
+      if (state.screen !== 'clubhouse') return state;
+      return { ...state, screen: 'clubhouseHall', manageCharacterId: undefined };
     }
 
     case 'buyShip': {

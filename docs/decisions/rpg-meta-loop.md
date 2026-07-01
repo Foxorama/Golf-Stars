@@ -484,9 +484,11 @@
 - **The Clubhouse became a tap-to-restyle stage (GS-clubhouse-stage).** The per-golfer `clubhouseScreen`
   used to be a long, hard-to-parse scroll: a small mannequin, then a garage rack, then three flat wardrobe
   racks (hats/shirts/pants) all shown at once. Reframed around the golfer as the interface:
-  - **The stage.** A big full-body avatar (`golferPreviewSVG(…, w:150, h:210, legsFull:true)` — a new opt-in
-    flag that stands the mannequin up with proportional head/hip/foot so the figure reads as three clean tap
-    bands; the default short-legged mannequin used by the lounge/preview cards is unchanged byte-for-byte).
+  - **The stage.** A big full-body avatar (`golferPreviewSVG(…, w:150, h:210)`). The mannequin is ONE
+    proportional full-body figure at every size (head/hip/foot are fractions of `h`; every authored offset is
+    scaled by `S = h/210`, authored at the stage's h=210) with arms, so the figure reads as three clean tap
+    bands here AND stays in proportion at the lounge's small `h=84` (a fixed head+neck used to stunt the small
+    figure into a tiny chest + stretched legs). The `legsFull` flag it replaced is gone.
     Over it sit three transparent tap zones (`.gs-czone--hat/--shirt/--pants`, absolutely positioned bands),
     each with a floating chip naming the worn piece + a ✎ pencil. Below the figure, a **garage bay** tile
     (`clubhouseGarageArt`: a hangar/launch-pad SVG scene — open star-bay, neon pillars tinted by the ride's

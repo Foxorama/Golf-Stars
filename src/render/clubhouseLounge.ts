@@ -38,12 +38,12 @@ interface Spot {
  *  More spots than golfers so which ones sit empty also changes between visits. Front spots (larger y)
  *  are drawn on top via z-index so overlaps read correctly. */
 const SPOTS: Spot[] = [
-  { x: 29, y: 80, s: 0.86 }, // beside the hearth (clear of the firebox), back
-  { x: 37, y: 89, s: 0.99 }, // hearth rug, front
-  { x: 48, y: 90, s: 1.02 }, // centre rug, front
-  { x: 59, y: 80, s: 0.9 }, // lounge, mid
-  { x: 69, y: 73, s: 0.82 }, // bar end, back
-  { x: 80, y: 84, s: 0.94 }, // bar stool, front
+  { x: 26, y: 74, s: 0.82 }, // beside the hearth (clear of the firebox), back
+  { x: 36, y: 87, s: 1.04 }, // hearth rug, front
+  { x: 50, y: 90, s: 1.08 }, // centre rug, front
+  { x: 63, y: 79, s: 0.9 }, // lounge, mid
+  { x: 73, y: 70, s: 0.8 }, // bar end, back
+  { x: 83, y: 85, s: 1.0 }, // bar stool, front
 ];
 
 /** Fisher–Yates shuffle of `arr` in place using the seeded Rng (no Math.random). */
@@ -110,7 +110,7 @@ function loungeStyle(): string {
  *  fire on the left, a rug, and a wooden bar with a bottle shelf and pendant lights on the right.
  *  Hand-placed (no rng) so it's stable; a couple of `<animate>` flickers give the fire + lamps life. */
 function loungeArt(): string {
-  return `<svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice"
+  return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"
       style="position:absolute;inset:0;width:100%;height:100%;">
     <defs>
       <linearGradient id="clWall" x1="0" y1="0" x2="0" y2="1">
@@ -124,10 +124,16 @@ function loungeArt(): string {
       </radialGradient>
     </defs>
 
-    <!-- wall + wainscot + floor -->
-    <rect width="400" height="220" fill="url(#clWall)"/>
-    <rect x="0" y="150" width="400" height="70" fill="#3a2a19"/>
+    <!-- wall + wainscot + floor (floor runs deep into the foreground for the golfers to stand on) -->
+    <rect width="400" height="300" fill="url(#clWall)"/>
+    <rect x="0" y="150" width="400" height="150" fill="#3a2a19"/>
     <rect x="0" y="150" width="400" height="4" fill="#1c130b"/>
+    <!-- floorboard seams receding toward the back wall -->
+    <g stroke="#1c130b" stroke-width="1" opacity="0.25">
+      <line x1="0" y1="196" x2="400" y2="196"/><line x1="0" y1="250" x2="400" y2="250"/>
+      <line x1="120" y1="150" x2="70" y2="300"/><line x1="280" y1="150" x2="330" y2="300"/>
+      <line x1="200" y1="150" x2="200" y2="300"/>
+    </g>
     <g stroke="#1c130b" stroke-width="1.5" opacity="0.4">
       <line x1="70" y1="18" x2="70" y2="150"/><line x1="330" y1="18" x2="330" y2="150"/>
     </g>
@@ -179,10 +185,10 @@ function loungeArt(): string {
       <line x1="0" y1="25" x2="64" y2="25" stroke="#5a3a1f" stroke-width="2.5"/>
     </g>
 
-    <!-- rug on the floor -->
-    <ellipse cx="185" cy="192" rx="150" ry="26" fill="#7a2f2f" opacity="0.85"/>
-    <ellipse cx="185" cy="192" rx="150" ry="26" fill="none" stroke="#d8a24a" stroke-width="2" opacity="0.7"/>
-    <ellipse cx="185" cy="192" rx="120" ry="19" fill="none" stroke="#d8a24a" stroke-width="1.5" opacity="0.5"/>
+    <!-- rug on the foreground floor -->
+    <ellipse cx="200" cy="252" rx="176" ry="34" fill="#7a2f2f" opacity="0.85"/>
+    <ellipse cx="200" cy="252" rx="176" ry="34" fill="none" stroke="#d8a24a" stroke-width="2" opacity="0.7"/>
+    <ellipse cx="200" cy="252" rx="140" ry="25" fill="none" stroke="#d8a24a" stroke-width="1.5" opacity="0.5"/>
 
     <!-- pendant lamp over the lounge -->
     <line x1="200" y1="0" x2="200" y2="14" stroke="#2a1c10" stroke-width="2"/>
@@ -231,7 +237,7 @@ function loungeArt(): string {
     </g>
 
     <!-- warm vignette -->
-    <rect width="400" height="220" fill="url(#clHearth)" opacity="0.06"/>
+    <rect width="400" height="300" fill="url(#clHearth)" opacity="0.06"/>
   </svg>`;
 }
 
@@ -243,8 +249,10 @@ export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number): str
   const rng = new Rng((visit >>> 0) * 2654435761 + 0x9e37); // spread the small counter across the seed space
   const spots = shuffle([...SPOTS], rng).slice(0, golfers.length);
   const figures = golfers.map((g, i) => golferAt(g, spots[i] ?? SPOTS[i % SPOTS.length]!)).join('');
+  // Taller 4:3 frame that grows to fill the screen (was a squat 20:11 letterbox at 520px that left a lot
+  // of dead space above/below on a phone). The extra height is foreground floor the golfers stand on.
   return `${loungeStyle()}
-    <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:20/11;max-width:520px;
+    <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:680px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
       ${loungeArt()}
       ${figures}
