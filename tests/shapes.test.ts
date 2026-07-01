@@ -35,7 +35,10 @@ describe('hole archetypes (GS-shapes-2)', () => {
     }
   });
 
-  it('hairpins and capes are wildness-gated — calm stops stay gentle', () => {
+  it('shape VARIETY is present even on calm stops (GS-variety-2: variety decoupled from difficulty)', () => {
+    // The interesting archetypes no longer wait for a wild stop — a calm opener should already draw
+    // capes/hairpins/doubles, so the early holes stop feeling like one gentle straight-or-slight-bend.
+    // (Difficulty ramps via BEND SEVERITY, not via which shapes are allowed.)
     const countWild = (wild: number) => {
       let n = 0;
       for (let s = 0; s < 200; s++) {
@@ -46,8 +49,12 @@ describe('hole archetypes (GS-shapes-2)', () => {
       }
       return n;
     };
-    // Capes arm at wildness 0.3, hairpins at 0.5 — so a wild voyage carries far more than a calm one.
-    expect(countWild(0.9)).toBeGreaterThan(countWild(0.1) * 3);
+    // A calm voyage already carries a healthy share of capes/hairpins (variety early), and a wild one
+    // still carries somewhat more (the dial turns up) — but calm is no longer near-zero.
+    const calm = countWild(0.1);
+    const wild = countWild(0.9);
+    expect(calm).toBeGreaterThan(30); // real variety on the calm opening stops
+    expect(wild).toBeGreaterThanOrEqual(calm); // wildness still adds a touch more
   });
 
   it('par-4 length VARIES: drivable holes are genuinely short, long holes genuinely long', () => {

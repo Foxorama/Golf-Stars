@@ -111,7 +111,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   and sampled from an asymmetric 5-zone `SprayShape`. Forced-carry crossings (lava river / frozen
   pond / creek) are generic penalty bands; the carry-aware AI flies any of them off `penalty`, never
   the kind. OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
-  shrink it casually).
+  shrink it casually). **Variety is DECOUPLED from difficulty (GS-variety-2):** shape archetypes
+  (cape/hairpin/double) and dogleg-corner blocking GROVES appear even on CALM stops (no wildness gate)
+  — difficulty rides bend severity (`dogFac = 0.5 + 0.5·wildness`) + hazard density, not which shapes
+  exist. Corridors can be BROKEN into 2–3 mown segments by rough gaps (`brokenCorridor`, biome
+  `roughBreaks`; skipped on lost-rough worlds where a gap = the abyss). A hole gets a forced-carry
+  CROSSING **or** greenside DRAMA, never both: greenside penalty RINGS (`sanctioned:true` on Feature,
+  exempt from `validateFairness`, proven by `validateGreenApproach` — kept off the approach window +
+  lane) + an APPROACH LAKE ~3/4 up fill the mid/green zone that used to go quiet after driver range.
+  The per-world fairway MOWING PATTERN (`fairwayStripes`) differs by archetype (horizontal / vertical
+  grain / faceted-diagonal / checker) so turf reads distinct beyond colour. Difficulty bars were
+  deliberately relaxed (fun over the bar; tune per-hole later) — the strict blow-up guard stays.
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
   (3 arcs, boss each, `endedReason 'won'`). **Pro Shop rarity is VOYAGE-paced**: a winnable format draws

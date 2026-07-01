@@ -46,7 +46,7 @@ describe('course layout variety (GS-variety)', () => {
     expect(cornerBlockerHoles).toBeLessThan(total);
   });
 
-  it('the calm opening stops are far more forgiving than deep ones (groves are wildness-gated)', () => {
+  it('dogleg corners are FILLED even on calm stops (GS-variety-2: you can never just drive across)', () => {
     const countBlockers = (wild: number) => {
       let n = 0;
       for (let s = 0; s < 120; s++) {
@@ -55,8 +55,12 @@ describe('course layout variety (GS-variety)', () => {
       }
       return n;
     };
-    // Groves only arm past the gate, so the deep stops carry many more corner blockers than calm ones.
-    expect(countBlockers(0.9)).toBeGreaterThan(countBlockers(0.12) * 2);
+    // The grove wildness gate is GONE — a calm dogleg's corner is filled too (the whole point: you
+    // can't bomb it straight across the gap). Deep stops still carry somewhat more (denser groves).
+    const calm = countBlockers(0.12);
+    const deep = countBlockers(0.9);
+    expect(calm).toBeGreaterThan(0); // calm doglegs are guarded, not cuttable
+    expect(deep).toBeGreaterThanOrEqual(calm);
   });
 
   it('water crossings now reach the mid stops (more lakes across fairways), still all carryable', () => {

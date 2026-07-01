@@ -113,6 +113,13 @@ export interface Biome {
   potBunkers?: number;
   fescue?: number;
   barranca?: boolean;
+  /**
+   * BROKEN-fairway frequency (GS-variety-2): bands of native ROUGH carved across the mid-hole per
+   * par-4/5 hole (base, scaled by wildness), splitting the corridor into "a couple of small fairways
+   * broken by rough". Rough is non-penalty (a fair carry/thread), so it never costs a card. Grass/
+   * links worlds break more; barren worlds (void/desert) stay unbroken. Default ~0.6 if absent.
+   */
+  roughBreaks?: number;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -140,6 +147,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.9,
     greenIrregular: 1.1,
     greenSlopeMax: 0.45, // GS-greens-3 green tilt character
+    roughBreaks: 0.9, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'dust-belt',
@@ -165,6 +173,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.7,
     greenIrregular: 0.85,
     greenSlopeMax: 0.32, // GS-greens-3 green tilt character
+    roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'ice-ring',
@@ -189,6 +198,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 2.6,
     greenIrregular: 1.0,
     greenSlopeMax: 0.7, // GS-greens-3 green tilt character
+    roughBreaks: 0.6, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'ember-world',
@@ -212,6 +222,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 2.0,
     greenIrregular: 1.45,
     greenSlopeMax: 0.6, // GS-greens-3 green tilt character
+    roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'void-garden',
@@ -233,6 +244,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.7,
     greenIrregular: 1.25,
     greenSlopeMax: 0.4, // GS-greens-3 green tilt character
+    roughBreaks: 0.0, // GS-variety-2 broken-fairway frequency
   },
   // --- GS-worlds: four new exotic worlds, each a distinct PLAYSTYLE -----------
   {
@@ -257,6 +269,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.9,
     greenIrregular: 1.4,
     greenSlopeMax: 0.55, // GS-greens-3 green tilt character
+    roughBreaks: 0.5, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'tempest-reach',
@@ -278,6 +291,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 2.2, // long, storm-scoured shelves
     greenIrregular: 1.1,
     greenSlopeMax: 0.5, // GS-greens-3 green tilt character
+    roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'spore-jungle',
@@ -300,6 +314,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.8,
     greenIrregular: 1.2,
     greenSlopeMax: 0.45, // GS-greens-3 green tilt character
+    roughBreaks: 1.0, // GS-variety-2 broken-fairway frequency
   },
   {
     id: 'tidal-archipelago',
@@ -323,6 +338,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.7,
     greenIrregular: 1.0,
     greenSlopeMax: 0.4, // GS-greens-3 green tilt character
+    roughBreaks: 0.8, // GS-variety-2 broken-fairway frequency
   },
   {
     // GS-cetus: the Whale constellation's clifftop star-ocean. Plays the void's proven-fair island/
@@ -348,6 +364,7 @@ export const BIOMES: readonly Biome[] = [
     greenAspect: 1.8,
     greenIrregular: 1.2,
     greenSlopeMax: 0.5, // GS-greens-3 green tilt character
+    roughBreaks: 0.0, // GS-variety-2 broken-fairway frequency
   },
 ];
 

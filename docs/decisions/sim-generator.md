@@ -436,3 +436,47 @@
   byte-identical). NB: penalties apply where the ball RESTS (touchdown/roll), never mid-flight, so a
   river is automatically a forced carry the moment the AI stops laying up into it.
 
+
+## GS-variety-2 — holes stop feeling identical (variety decoupled from difficulty)
+The complaint: "fairways and greens are almost always exactly the same, same line grading, same curve
+— the only difference is the colour", hazards bunch at driver range then go quiet until the green, and
+doglegs are cuttable. Root cause: nearly all the variety machinery (capes, hairpins, blocking groves,
+big bends) was WILDNESS-GATED, so the calm early stops — where a run spends most of its time — were all
+gentle straights with sparse hazards. The fix decouples VARIETY from DIFFICULTY (the user's explicit
+steer: "be incredibly lax with the creation + difficulty rules; focus on fun/variety, tune difficulty
+per-hole later"). `GENERATOR_VERSION` bumped 9 → 10 (stream reordered — no byte-for-byte claim here).
+- **Shape variety at any wildness (`chooseTemplate`).** Cape/hairpin/double now carry a nonzero BASE
+  probability (biome-biased) instead of a `wildness ≥ 0.3/0.5` gate — a calm opener already draws the
+  full vocabulary. Wildness still turns the dial up a touch; the real difficulty ramp is bend SEVERITY.
+- **Proper doglegs (`buildCentreline`).** `dogFac` floor raised `0.35 → 0.5` (`0.5 + 0.5·wildness`), cap
+  `0.4 → 0.44·length`, so a calm dogleg genuinely bends instead of drifting.
+- **Filled corners (blocking groves).** The `wildness ≥ 0.3` gate is GONE — a dogleg's inside corner is
+  planted with a tree clump (a stand + `rng.int(1,3)` companions) whether the stop is calm or wild, so
+  you can never just bomb it straight across the gap. Still non-penalty + OUTSIDE the corridor
+  (`validateFairness` ignores them; the fairway route stays clean). Density/canopy were tuned DOWN from
+  a first over-aggressive pass that spiked the auto reach-AI (which fires at the green through the
+  corner) past the balance bars.
+- **Broken fairways (`brokenCorridor`, biome `roughBreaks`).** The corridor is carved into 2–3 mown
+  ribbons by bands of native ROUGH across the mid-hole ("a couple of small fairways broken by rough").
+  Rough is the default off-feature lie (a fair carry/thread, never a lost card), so it needs no fairness
+  exemption; each retained run ≥3 points becomes its own `fairway` feature (the FIRST anchors
+  `fairwayHalfWidthOf`). SKIPPED on lost-rough worlds (void/cetus) — a gap there reads as the abyss
+  PENALTY, not fair rough.
+- **Greenside penalty RINGS + APPROACH LAKES.** The mid/green zone that went quiet after driver range
+  now bites: a `sanctioned:true` greenside ring (lava/water/void hugging the green's NON-approach arc)
+  and a big flanking lake ~3/4 up. A ring is EXEMPT from `validateFairness` (it deliberately hugs the
+  green) but proven fair by the new `validateGreenApproach` — the flag + green centre stay penalty-free
+  and a penalty-free landing exists just short of the green, because the ring is kept off the approach
+  WINDOW (angular, ±~69°) AND the approach LANE (`segDist` to the incoming line). A hole gets a
+  forced-carry CROSSING **or** greenside drama, NEVER both (`noCrossing` gate) — stacking a ring + lake
+  on top of an ember/frost river piled the auto-AI's mean past the balance bar. So ember par-3s (no
+  river) get the lava ring; par-4/5s keep the river.
+- **Per-world fairway PATTERN (`fairwayStripes`, render).** Each archetype grooms its turf a different
+  way — horizontal mowing (parkland/ocean/void/cetus), a vertical swept grain (frost), a faceted/wind
+  diagonal (crystal/tempest/desert), a lush cross-mown checker (fungal) — so fairways read distinct
+  beyond their colour. Rides the main corridor's band grid so apron + broken segments line up. Both
+  renderers share it (buildScene), so `render-match` holds; re-shoot the gallery after any change.
+- **Difficulty bars relaxed on purpose.** The richer hazards + bigger bends nudge the auto reach-AI's
+  max-wildness mean up (`characters.test` toPar bar 1.15 → 1.3; ember/frost stay < 1.0). The STRICT
+  blow-up (≥+5) guard (< 5%) is untouched — that's the real death-spiral signal. `shapes.test` +
+  `layout-variety.test` were rewritten from "X is wildness-gated" to "X appears on calm stops too".

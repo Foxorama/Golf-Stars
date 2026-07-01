@@ -361,6 +361,103 @@ function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
   return stripesAt(poly, colA, colB, b.minY, (b.maxY - b.minY) / bands);
 }
 
+/** VERTICAL mowing bands (along X) — a groomed "grain" running down the hole rather than across it
+ *  (GS-variety-2, used for the frost world's swept-ice fairways). */
+function stripesAtV(poly: Vec[], colA: string, colB: string, phaseX: number, bandW: number): Prim {
+  const b = bboxOf(poly);
+  const children: Prim[] = [];
+  const i0 = Math.floor((b.minX - phaseX) / bandW);
+  for (let i = i0; phaseX + i * bandW < b.maxX; i++) {
+    const x0 = phaseX + i * bandW;
+    const x1 = x0 + bandW + 0.5;
+    children.push({
+      t: 'poly',
+      pts: [
+        [x0, b.minY],
+        [x1, b.minY],
+        [x1, b.maxY],
+        [x0, b.maxY],
+      ],
+      fill: ((i % 2) + 2) % 2 === 0 ? colA : colB,
+    });
+  }
+  return { t: 'clip', clip: poly, children };
+}
+
+/** DIAGONAL mowing bands: bands of constant `y − slope·x`, clipped to the poly (GS-variety-2 — the
+ *  faceted grain of the crystal world, the wind-swept grain of the tempest/desert worlds). */
+function slantStripes(poly: Vec[], colA: string, colB: string, bandH: number, slope: number): Prim {
+  const b = bboxOf(poly);
+  const uAt = (x: number, y: number) => y - slope * x;
+  const us = [uAt(b.minX, b.minY), uAt(b.maxX, b.minY), uAt(b.minX, b.maxY), uAt(b.maxX, b.maxY)];
+  const uMin = Math.min(...us);
+  const uMax = Math.max(...us);
+  const children: Prim[] = [];
+  for (let i = 0; uMin + i * bandH < uMax; i++) {
+    const a0 = uMin + i * bandH;
+    const a1 = a0 + bandH + 0.5;
+    children.push({
+      t: 'poly',
+      pts: [
+        [b.minX, a0 + slope * b.minX],
+        [b.maxX, a0 + slope * b.maxX],
+        [b.maxX, a1 + slope * b.maxX],
+        [b.minX, a1 + slope * b.minX],
+      ],
+      fill: ((i % 2) + 2) % 2 === 0 ? colA : colB,
+    });
+  }
+  return { t: 'clip', clip: poly, children };
+}
+
+/** CHECKERBOARD mowing (both directions) — the dense, lush cross-mown look of the spore-jungle. */
+function checkerStripes(poly: Vec[], colA: string, colB: string, cell: number): Prim {
+  const b = bboxOf(poly);
+  const children: Prim[] = [];
+  let j = 0;
+  for (let y = b.minY; y < b.maxY; y += cell, j++) {
+    let i = 0;
+    for (let x = b.minX; x < b.maxX; x += cell, i++) {
+      children.push({
+        t: 'poly',
+        pts: [
+          [x, y],
+          [x + cell + 0.5, y],
+          [x + cell + 0.5, y + cell + 0.5],
+          [x, y + cell + 0.5],
+        ],
+        fill: (i + j) % 2 === 0 ? colA : colB,
+      });
+    }
+  }
+  return { t: 'clip', clip: poly, children };
+}
+
+/** The per-world fairway mowing PATTERN (GS-variety-2): each archetype grooms its turf differently so
+ *  fairways read distinct beyond their colour — horizontal stripes (classic parkland), a vertical
+ *  swept grain (frost), a faceted/wind diagonal (crystal/tempest/desert), or a lush cross-mown
+ *  checker (jungle). The band grid still rides the MAIN corridor's bbox so apron + segments line up. */
+function fairwayStripes(sps: Vec[][], s: Shade, b0: { minX: number; minY: number; maxX: number; maxY: number }, arch: BiomeArchetype): Prim[] {
+  const spanY = b0.maxY - b0.minY;
+  const bandH = spanY / 7;
+  switch (arch) {
+    case 'frost':
+      return sps.map((sp) => stripesAtV(sp, s.light, s.dark, b0.minX, (b0.maxX - b0.minX) / 6));
+    case 'crystal':
+      return sps.map((sp) => slantStripes(sp, s.light, s.dark, bandH * 0.95, 0.6));
+    case 'tempest':
+      return sps.map((sp) => slantStripes(sp, s.light, s.dark, bandH, -0.5));
+    case 'desert':
+      return sps.map((sp) => slantStripes(sp, s.light, s.dark, spanY / 5, 0.28));
+    case 'fungal':
+      return sps.map((sp) => checkerStripes(sp, s.light, s.dark, bandH * 0.9));
+    case 'inferno':
+      return sps.map((sp) => stripesAt(sp, s.light, s.dark, b0.minY, spanY / 5));
+    default: // verdant / ocean / void / cetus — the classic horizontal mowing stripes
+      return sps.map((sp) => stripesAt(sp, s.light, s.dark, b0.minY, bandH));
+  }
+}
+
 /** All the hole's fairway polygons drawn as ONE grouped pass (GS-blend, same idea as the liquid
  *  families). A hole has the main corridor plus, near the green, a second `fairway` feature — the
  *  apron that wraps THROUGH and PAST the green. Drawn per-poly it stamped its own dark fringe ring,
@@ -369,19 +466,15 @@ function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
  *  every base, the stripes share the corridor's band grid, and only the corridor carries the ink
  *  edge, so the apron eases out on its soft fringe alone. With a single fairway (no apron — void
  *  islands) this is byte-for-byte the old per-poly output. */
-function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string): Prim[] {
+function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arch: BiomeArchetype): Prim[] {
   const out: Prim[] = [];
   // First-cut fringes UNDER all the bases, so the apron's fringe never paints over the corridor —
   // only the outermost edge (past the green) shows it, easing the cut grass into the rough.
   for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: fringe });
   for (const sp of sps) out.push({ t: 'poly', pts: sp, fill: s.base });
-  // Continuous stripes: every fairway poly rides the MAIN corridor's band grid (phase + height), so
-  // the apron's mowing bands line up with the corridor instead of running finer and out of phase.
-  if (art.stripes && sps[0]) {
-    const b0 = bboxOf(sps[0]);
-    const bandH = (b0.maxY - b0.minY) / 7;
-    for (const sp of sps) out.push(stripesAt(sp, s.light, s.dark, b0.minY, bandH));
-  }
+  // Per-world mowing PATTERN (GS-variety-2), riding the MAIN corridor's band grid so the apron +
+  // broken-fairway segments line up with the corridor instead of running out of phase.
+  if (art.stripes && sps[0]) out.push(...fairwayStripes(sps, s, bboxOf(sps[0]), arch));
   // ONE soft ink edge, on the main corridor only — no hard outline cuts back across it near the green.
   if (art.ink && sps[0]) out.push({ t: 'poly', pts: sps[0], fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
   return out;
@@ -1697,7 +1790,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       for (const sp of fairwaySps) prims.push(...rainbowRibbon(sp, fb.minY, bandH));
     }
   } else {
-    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe));
+    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch));
   }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
