@@ -20,7 +20,7 @@ import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 /** The vector look the ship drawer renders (a base shape family + palette + bling). */
 export interface ShipLook {
   /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated). */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto';
+  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -166,6 +166,15 @@ export const SHIPS: readonly Ship[] = [
     blurb: 'A genuine flying saucer — spinning gear, flashing lights, and a "Hole 19" flag flying proud.',
     cost: TIER_COST.mythic,
     look: { kind: 'ufo', body: '#9fb4c8', glass: '#9affe0', flame: '#7fffd0', accent: '#ffd36b', bling: 3, flag: 'Hole 19' },
+  },
+  {
+    id: 'chopper-thunderbolt',
+    name: 'The Thunderbolt',
+    set: 'Mythic',
+    rarity: 'mythic',
+    blurb: 'A hot-rod space chopper — fat wheels, a bag stood between the bars, wreathed in flame and forked lightning.',
+    cost: 1250, // the top of the fleet — a hand-built showpiece above the Mothership grail
+    look: { kind: 'chopper', body: '#16181f', glass: '#cfe9ff', flame: '#ff7a1a', accent: '#7fe049', bling: 3 },
   },
 ];
 
