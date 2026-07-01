@@ -76,7 +76,9 @@ Terse log — full story in the linked report / `docs/decisions/` / git history.
   (#158) out of `app.ts` (3,462 → 2,696 lines). Ongoing — see Now/next.
 - **GS-tents** — trade-market route pitches collidable tents around the green (#155).
 - **GS-rainbow** — legendary Rainbow Ball: every hole becomes Rainbow Road (#150).
-- **GS-cetus** — star-ocean clifftop whale world + island-green par-3s (#152, reworked in GS-cetus-2).
+- **GS-cetus** — star-ocean clifftop whale world + island-green par-3s (#152, reworked in GS-cetus-2;
+  GS-cetus-3 made it read side-on: render-only dropdown cliff faces + a river of stars with a source
+  spilling over the cliff into the starscape ocean, top-down play/aim projection kept untouched).
 - **GS-team-duel** — Arc-II boss as a rank-based best-ball/scramble team duel (#147).
 - **GS-proshop-2/3** — Pro Shop expansion: themed gear/club sets, bespoke caddy portraits, equal-size
   rarity-glow cards, Power Glove + gear inventory (#140/#141/#148).
