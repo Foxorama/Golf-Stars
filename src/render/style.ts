@@ -330,6 +330,47 @@ function roundedHull(box: Box, r: number, jit: number, rng: () => number): Vec[]
   return pts;
 }
 
+/** Yards of ground beyond the dashed OB line (GS-rough-frame) — the stakes stand on the land rim. */
+const LAND_PAD = 7;
+
+/** The normal-world LAND HULL in COURSE space: the OB play-bounds box + apron, gently rounded.
+ *  Corner radius is capped near 3·LAND_PAD so the rounded arc never cuts inside the OB rectangle
+ *  (the stakes always stand on land). Own seeded rng — never perturbs the terrain/celestial streams. */
+function landHullCourse(hole: Hole): Vec[] {
+  const pbb = playBounds(hole);
+  const lb: Box = {
+    minX: pbb.min[0] - LAND_PAD,
+    minY: pbb.min[1] - LAND_PAD,
+    maxX: pbb.max[0] + LAND_PAD,
+    maxY: pbb.max[1] + LAND_PAD,
+  };
+  const hrng = mulberry32((hashHole(hole) ^ 0x1b873593) >>> 0);
+  return roundedHull(lb, Math.min(3 * LAND_PAD, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22), 0.1, hrng);
+}
+
+/** A lost-rough hole's land platforms in COURSE space: each fairway piece + the tee, grown a touch
+ *  beyond the feature for a turf margin. Everything off them is the open deep. */
+function lostPlatformsCourse(hole: Hole): Vec[][] {
+  const teeFeat = hole.features.find((f) => f.kind === 'tee');
+  return [
+    ...hole.features.filter((f) => f.kind === 'fairway').map((f) => offsetPoly(f.poly, -14)),
+    ...(teeFeat ? [offsetPoly(teeFeat.poly, -10)] : []),
+  ];
+}
+
+/**
+ * The hole's full LAND footprint in COURSE space (GS-rough-frame) — the single source `buildScene`
+ * draws AND the play view's animated weather layer masks its twinkle starfield with, so the pinned
+ * stars only ever twinkle over true deep space, never over playable turf (the graphic IS the
+ * physics, animated edition). Normal hole → one rough hull to the OB frame; lost-rough ARMED
+ * (`roughLie` biomeMod) → a platform per play feature; Rainbow Road → no land at all (`[]`).
+ */
+export function landPolysCourseFor(hole: Hole, rainbow = false): Vec[][] {
+  if (rainbow) return [];
+  const lost = hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false;
+  return lost ? lostPlatformsCourse(hole) : [landHullCourse(hole)];
+}
+
 function n1(x: number): number {
   return Number.isFinite(x) ? Math.round(x * 10) / 10 : 0;
 }
@@ -2242,21 +2283,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // mark. (An earlier pass hugged the hole geometry and space-blended the rough, so every world's
   // in-bounds rough read as a starfield — i.e. as OB you could somehow play from. The graphic is
   // the physics: ground wherever the sim gives you a lie, the deep where the ball is gone.)
-  const landPad = 7; // yards of ground beyond the dashed OB line
-  const pbb = playBounds(hole);
-  // The landmass is a ROUNDED, gently-irregular island hull (not a hard rectangle) so a stop reads
-  // as a piece of ground floating in space, not a green picture-frame. Built off its OWN rng so the
-  // corner wobble never perturbs the terrain (`rng`) or celestial (`crng`) streams. The corner
-  // radius is capped near 3·landPad so the rounded corner arc never cuts inside the OB rectangle —
-  // the stakes always stand on land.
-  const lb: Box = {
-    minX: pbb.min[0] - landPad,
-    minY: pbb.min[1] - landPad,
-    maxX: pbb.max[0] + landPad,
-    maxY: pbb.max[1] + landPad,
-  };
-  const hrng = mulberry32((hashHole(hole) ^ 0x1b873593) >>> 0);
-  const landBox = roundedHull(lb, Math.min(3 * landPad, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22), 0.1, hrng);
+  // Computed by the shared `landHullCourse`/`landPolysCourseFor` helpers — the SAME source the play
+  // view's animated star-mask reads, so the twinkle field and the drawn ground can never disagree.
+  const landBox = landHullCourse(hole);
   const islandPts = projPoly(landBox, proj);
   // Lost-rough hole (the void / Cetus with the penalty ARMED — the `roughLie` biomeMod `lieAt`
   // reads): off the fairway IS a lost ball out there, so there is no rough to draw. Every play
@@ -2265,14 +2294,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // (penalty un-armed → off-fairway plays as ordinary rough) keeps the normal rough landmass.
   // Generalised from the island-green par 3 (GS-cetus-2) to every armed hole (GS-rough-frame).
   const lostHole = (hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false) && !rainbow;
-  const teeFeat = hole.features.find((f) => f.kind === 'tee');
-  // The land platforms, in COURSE space (grown a touch beyond each feature for a turf margin).
-  const landPlatformsCourse: Vec[][] = lostHole
-    ? [
-        ...hole.features.filter((f) => f.kind === 'fairway').map((f) => offsetPoly(f.poly, -14)),
-        ...(teeFeat ? [offsetPoly(teeFeat.poly, -10)] : []),
-      ]
-    : [landBox];
+  const landPlatformsCourse: Vec[][] = lostHole ? lostPlatformsCourse(hole) : [landBox];
   const landPlatforms = landPlatformsCourse.map((p) => projPoly(p, proj));
   const space = spaceLookFor(arch, deepen);
   // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that

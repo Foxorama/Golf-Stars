@@ -2685,6 +2685,21 @@ function mountWeatherOverlay(el: HTMLElement, hole: Hole, up: Vec): void {
   let wdx = b[0] - a[0];
   let wdy = b[1] - a[1];
   const wl = Math.hypot(wdx, wdy) || 1;
+  // Star-mask (GS-rough-frame): this overlay sits on the SVG decision map, whose land now fills to
+  // the OB frame — but the local projector above is only wind-orientation, NOT the map's exact fit,
+  // so a projected land mask would lie. Land dominates the aim framing on every normal hole, so the
+  // pinned twinkle stars are simply kept off the whole overlay there; a lost-rough hole or Rainbow
+  // Road is mostly open deep, where the twinkle belongs (unmasked). Shooting star/meteors/ambient
+  // air stay on either way — motion sells them as sky, not ground.
+  const landDominant = !rainbowActive() && !(hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false);
+  const overlayMask: Vec[][] = [
+    [
+      [0, 0],
+      [cw, 0],
+      [cw, ch],
+      [0, ch],
+    ],
+  ];
   const w = createWeather({
     effect: currentEffect() ?? 'none',
     width: cw,
@@ -2693,6 +2708,7 @@ function mountWeatherOverlay(el: HTMLElement, hole: Hole, up: Vec): void {
     windSpd: hole.wind?.spd ?? 0,
     windDir: [wdx / wl, wdy / wl],
     seed: weatherSeed(hole),
+    starMask: () => (landDominant ? overlayMask : null),
   });
   const reduced = getSettings().reducedMotion;
   let raf = 0;

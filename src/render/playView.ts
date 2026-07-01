@@ -19,7 +19,7 @@ import { inScorch, meteorScorch as meteorScorchFor } from '../sim/scorch';
 import { archetypeFor } from '../sim/course/themes';
 import type { ApparelLook } from '../sim/rpg/apparel';
 import { holeProjector } from './project';
-import { buildScene, drawScenePrims, type Prim } from './style';
+import { buildScene, drawScenePrims, landPolysCourseFor, type Prim } from './style';
 import { createWeather, type WeatherHandle } from './weather';
 import {
   drawCaddy,
@@ -887,6 +887,11 @@ export function mountPlayView(
     const l = Math.hypot(dx, dy) || 1;
     return [dx / l, dy / l];
   }
+  // The land footprint the twinkle starfield must stay OFF (GS-rough-frame): the same course-space
+  // polys `buildScene` draws as ground, pushed through the LIVE projector each frame (the follow-cam
+  // pans, so the mask is queried per draw). Stars twinkle only over true deep space — never over the
+  // playable rough that used to read as "the rough is a starfield".
+  const landCourse = landPolysCourseFor(hole, opts.rainbow);
   const weather: WeatherHandle = createWeather({
     effect: opts.effect ?? 'none',
     width,
@@ -897,6 +902,7 @@ export function mountPlayView(
     seed: (Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed,
     spaceFX: F.spaceFX,
     wind: F.wind,
+    starMask: () => landCourse.map((p) => p.map((pt) => proj.project(pt))),
   });
 
   function frame(realNow: number): void {

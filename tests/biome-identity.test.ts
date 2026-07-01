@@ -5,7 +5,7 @@ import { ARCHETYPE_TURF, ARCHETYPE_SPACE, OB_LOOK, LAND_SPACE_BLEND, landFillFor
 import { WIND_RGBA, AMBIENT } from '../src/render/weather';
 import { BIOMES } from '../src/sim/course/biomes';
 import type { BiomeArchetype } from '../src/sim/course/themes';
-import { buildScene, type Prim } from '../src/render/style';
+import { buildScene, landPolysCourseFor, type Prim } from '../src/render/style';
 import { holeProjector } from '../src/render/project';
 import { playBoundsCorners } from '../src/sim/round';
 import type { Hole, Vec } from '../src/sim/course/contract';
@@ -85,6 +85,20 @@ describe('rough vs the starfield (GS-rough-frame)', () => {
     expect(LAND_SPACE_BLEND).toBeLessThan(0.25);
   });
 
+  it("every world's rough reads as GROUND: clearly lighter than its own night sky", () => {
+    // The rough slab only ever renders where it's PLAYABLE ground, so a rough base near the
+    // world's space base just reads as more starless OB ("crystal/lava are still starfields").
+    // Mean-channel brightness gap ≥ 30/255, with LAND_SPACE_BLEND already bounded above.
+    const mean = (hex: string): number => {
+      const h = hex.replace('#', '');
+      return (parseInt(h.slice(0, 2), 16) + parseInt(h.slice(2, 4), 16) + parseInt(h.slice(4, 6), 16)) / 3;
+    };
+    for (const a of ARCHES) {
+      const gap = mean(ARCHETYPE_TURF[a].rough.base) - mean(ARCHETYPE_SPACE[a].base);
+      expect(gap, `${a}: rough base vs space base brightness gap`).toBeGreaterThanOrEqual(30);
+    }
+  });
+
   it('the land hull reaches the OB frame: every boundary corner stands on drawn ground', () => {
     const { scene, project } = sceneFor(wooded, 'verdant-station');
     const hulls = polysWithFill(scene, landFillFor('verdant'));
@@ -115,6 +129,13 @@ describe('rough vs the starfield (GS-rough-frame)', () => {
       const { scene } = sceneFor(h, 'void-garden');
       expect(polysWithFill(scene, landFillFor('void')).length).toBe(1);
     }
+  });
+
+  it('landPolysCourseFor is the ONE land source (scene + weather star-mask): hull / platforms / none', () => {
+    const armed = generateCourse(77, { biome: 'void-garden', holes: 1, wildness: 1 }).holes[0]!;
+    expect(landPolysCourseFor(wooded).length).toBe(1); // normal world: one rough hull to the OB frame
+    expect(landPolysCourseFor(armed).length).toBeGreaterThanOrEqual(2); // armed lost-rough: per-feature platforms
+    expect(landPolysCourseFor(armed, true).length).toBe(0); // Rainbow Road: no land — stars everywhere
   });
 
   it("the void's deep carries negative-energy rifts on an armed hole", () => {
