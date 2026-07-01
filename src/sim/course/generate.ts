@@ -1020,8 +1020,10 @@ function generateHole(
   // Carry modifier (gravity), with optional per-hole jitter (antigrav pockets).
   const carry = biome.carryMult * (biome.carryJitter ? 1 + rng.range(-biome.carryJitter, biome.carryJitter) : 1);
   const biomeMods: BiomeMod[] = [{ kind: 'carry', value: carry, note: `${biome.id} gravity` }];
-  // Arm the lost-rough lie for this hole (read by `lieAt` off-feature). Visual stays "space"
-  // either way; only the penalty is gated, so calm void stops are forgiving and deep ones bite.
+  // Arm the lost-rough lie for this hole (read by `lieAt` off-feature). The render mirrors this
+  // gate (GS-rough-frame): armed → the fairway floats as island platforms in the open deep, so
+  // off-fairway LOOKS like the lost ball it is; un-armed → a normal rough landmass, so calm
+  // void/cetus stops look as forgiving as they play.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
   return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods, shapeId: tpl.id, greenSlope };

@@ -106,6 +106,8 @@
   bright disc parked over the green; a low/large/opaque one looked like a "weirdly placed graphic"
   floating on the course during the screen-space follow-cam flight; same `crng` draw count, so
   determinism + the constellation prim-count invariants are untouched); (3) the **landmass**
+  ⚠️ *items (3)/(4) SUPERSEDED by GS-rough-frame (2026-07-01 entry, end of file): the land now fills
+  the OB box as proper rough and the star-salt is gone —*
   = a TIGHT hull around the hole geometry (the feature/hazard bbox `cb` + a small `landMargin`, NOT the
   full OB box) filled with `landFillFor` and ringed by an atmospheric **edge glow** (`SpaceLook.edge`,
   the void's island treatment generalised to all five worlds), so beyond the shoreline you see SPACE,
@@ -431,3 +433,37 @@
   translates flora details rigidly; `fitSpray` holds the whole-map fit still while the live cone
   changes). Byte-level note: localizing fescue + the flower-dot reorder shifted the art streams
   once (deterministic reshuffle, gallery re-shot — all worlds keep their identity).
+- **Rough is ROUGH; space starts at the OB frame (GS-rough-frame, 2026-07-01,
+  `style.ts`/`palette.ts`).** Player report: "the biomes' rough has somehow become starfields and it
+  looks hella weird." Root cause was two GS-stellar decisions compounding: `LAND_SPACE_BLEND = 0.62`
+  pulled every world's in-bounds rough 62% toward its deep-space base, and a `crng` "ground-star
+  salt" loop sprinkled stars over the land — so ALL playable rough read as the starfield, i.e. as
+  OB you could somehow play from. Worse, the land hull hugged the hole geometry (bbox + ≤36yd)
+  while the OB box runs 40–90yd out, so a ball between the shoreline and the stakes visually lay
+  "in space" but played as rough. The fix makes the graphic the physics again:
+  (1) **`LAND_SPACE_BLEND` 0.62 → 0.12** — the land fill is the world's rough palette near-verbatim
+  (a whisper of space base keeps the night mood); the rough-tone patches/tufts now read as turf
+  texture on turf. (2) **The land hull = `playBounds` + a 7yd apron** (`landPad`), so the rough
+  fills every in-bounds yard and DEEP SPACE + the starfield start exactly at the dashed OB line;
+  the stakes stand ON the land rim (hull corner radius capped at `3·landPad` so the rounded corner
+  never cuts inside the OB rectangle — beyond ~3.4·pad the arc would strand corner stakes in
+  space). The old "wall-to-wall green in the zoomed play view" objection is retired deliberately:
+  in-bounds ground SHOULD look like ground; the sky still reads on the whole-hole map and beyond
+  the frame. (3) **The island-green treatment generalised to every ARMED lost-rough hole**
+  (`lostHole`, was par-3-only `islandHole`): when the `roughLie` biomeMod is armed (void/cetus,
+  wildness ≥ `LOST_ROUGH_MIN_WILDNESS`) there IS no rough — each fairway piece + the tee becomes
+  its own land platform (`offsetPoly` margins) and the open deep reads everywhere off them, which
+  is exactly the lost-ball rule the sim plays. A CALM void/cetus stop (penalty un-armed) keeps the
+  normal rough landmass, so forgiveness is visible too — the render now mirrors the generator's
+  arming gate instead of showing "space either way" (generate.ts comment updated). (4) **Ground-star
+  salt deleted** (the `crng` loop; `windStreaks` values shift once — deterministic reshuffle, gallery
+  re-shot). (5) **The void's deep got its "negative energy" look**: dark lens-shaped RIFTS
+  (`#020106` fill, violet rim + glow) with energy wisps spiralling INWARD (alpha ramps dim→bright
+  toward the rim so the flow reads as falling in), on the void's dedicated decor stream in the
+  archetypeDecor 'void' case — course-space placement rejected off the land platforms, sized before
+  the paint cull, shape off course-space `posHash`, so they drift between an armed hole's islands
+  and beyond a calm hole's OB frame (camera-proof per the decor rules). Machine-checked in
+  `tests/biome-identity.test.ts` ("rough vs the starfield"): the blend stays rough-dominated, the
+  OB corners sit inside the drawn land hull on a normal world, an armed void hole draws ≥2
+  platforms with the OB corners in open space, a calm one draws exactly 1 hull, and the rift fill
+  appears on armed void holes.

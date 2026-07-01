@@ -16,7 +16,7 @@
 
 import type { Feature, Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
-import { obStakes, playBoundsCorners } from '../sim/round';
+import { obStakes, playBounds, playBoundsCorners } from '../sim/round';
 import { tradeTents as tradeTentsFor, type TradeTent } from '../sim/tents';
 import { meteorScorch as meteorScorchFor, type ScorchMark } from '../sim/scorch';
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
@@ -1962,6 +1962,59 @@ function archetypeDecor(
       out.push({ t: 'glow', c: [bx, by], r: br * 7, col: 'rgba(150,90,225,0.30)' });
       out.push({ t: 'circle', c: [bx, by], r: br * 1.6, fill: 'none', stroke: 'rgba(235,210,255,0.55)', sw: 1.2 }); // accretion ring
       out.push({ t: 'circle', c: [bx, by], r: br, fill: '#050208', stroke: 'rgba(200,160,255,0.8)', sw: 1 }); // the event horizon
+      // NEGATIVE-ENERGY RIFTS (GS-rough-frame): the void's deep is not a friendly starfield — it's
+      // dark lens-shaped TEARS in space, rimmed in violet, with faint energy wisps spiralling INTO
+      // them (light falling in, never shining out). Placed in COURSE space like the islets —
+      // rejected off the land platforms, sized before the paint-time cull, shape off posHash — so
+      // they drift between the fairway islands of an armed lost-rough hole (where the deep is the
+      // whole off-fairway world) and sit out beyond the OB frame on a calm stop.
+      const rifts = 2 + Math.floor(rng() * 2);
+      for (let i = 0, placed = 0; i < rifts * 14 && placed < rifts; i++) {
+        const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.8, cyw + (rng() - 0.5) * spanY * 1.8];
+        if (landPolysCourse.some((lp) => pointInPoly(c, lp))) continue;
+        placed++;
+        const s = proj.project(c);
+        const len = Math.max(10, Math.min(44, (10 + rng() * 12) * proj.scale)); // px long-axis
+        const ang = rng() * Math.PI; // sized + angled unconditionally — the count never reads the view
+        if (!inView(s, W, H)) continue;
+        const ux = Math.cos(ang);
+        const uy = Math.sin(ang);
+        const vx = -uy;
+        const vy = ux;
+        const wHalf = len * (0.16 + posHash(c[0], c[1]) * 0.1);
+        // The tear: two shallow arcs meeting at the tips (a dark lens), edges wobbled off posHash.
+        const tear: Vec[] = [];
+        const steps = 7;
+        for (let k = 0; k <= steps; k++) {
+          const t = k / steps - 0.5;
+          const b = Math.cos(t * Math.PI) * wHalf * (0.85 + posHash(c[0], c[1], k) * 0.3);
+          tear.push([s[0] + ux * t * len + vx * b, s[1] + uy * t * len + vy * b]);
+        }
+        for (let k = steps; k >= 0; k--) {
+          const t = k / steps - 0.5;
+          const b = Math.cos(t * Math.PI) * wHalf * (0.85 + posHash(c[0], c[1], k + 9) * 0.3);
+          tear.push([s[0] + ux * t * len - vx * b, s[1] + uy * t * len - vy * b]);
+        }
+        out.push({ t: 'glow', c: s, r: len * 1.5, col: 'rgba(140,80,220,0.20)' });
+        out.push({ t: 'poly', pts: tear, fill: '#020106', stroke: 'rgba(196,150,255,0.55)', sw: 1 });
+        out.push({ t: 'line', a: [s[0] - ux * len * 0.32, s[1] - uy * len * 0.32], b: [s[0] + ux * len * 0.32, s[1] + uy * len * 0.32], stroke: 'rgba(235,215,255,0.65)', sw: 0.9, round: true });
+        // Wisps spiralling in, drawn dim at the far end and brightening toward the rim so the
+        // energy visibly FLOWS INWARD — the "negative" in negative energy.
+        for (let wsp = 0; wsp < 3; wsp++) {
+          const a0 = posHash(c[0], c[1], 20 + wsp) * Math.PI * 2;
+          let px = 0;
+          let py = 0;
+          for (let seg = 0; seg <= 4; seg++) {
+            const aa = a0 + seg * 0.55;
+            const rr = len * (2.1 - seg * 0.38);
+            const qx = s[0] + Math.cos(aa) * rr;
+            const qy = s[1] + Math.sin(aa) * rr * 0.8;
+            if (seg > 0) out.push({ t: 'line', a: [px, py], b: [qx, qy], stroke: `rgba(176,126,255,${(0.1 + seg * 0.09).toFixed(2)})`, sw: 1.1, round: true });
+            px = qx;
+            py = qy;
+          }
+        }
+      }
       break;
     }
     case 'inferno': {
@@ -2183,40 +2236,43 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     cb.minY + (cb.maxY - cb.minY) * rng(),
   ];
 
-  // The floating landmass (GS — "golf amongst the stars") hugs the hole GEOMETRY (a tight margin),
-  // NOT the full OB play-bounds box. The OB box is a deliberately GENEROUS fairness boundary
-  // (`clamp(span*0.25,40,90)`); filling it with rough sprawled the turf to the screen edges, so the
-  // zoomed play view was wall-to-wall green with no sky. We draw a tighter land hull (the geometry
-  // bbox + a small margin) and let SPACE show beyond it, so the starfield reads DURING play; the real
-  // OB box stays the (invisible) trigger and its stakes float out in the void. Purely visual — OB /
-  // fairness is untouched. (This generalises the void's "island in the abyss" look to all worlds.)
-  const landMargin = Math.max(14, Math.min(36, span * 0.08));
+  // The floating landmass (GS-rough-frame) fills the OB PLAY-BOUNDS box, plus a small apron so
+  // the boundary stakes stand on solid ground: everything IN bounds is the world's ROUGH — proper,
+  // playable turf — and deep space with its starfield starts exactly at the OB frame the stakes
+  // mark. (An earlier pass hugged the hole geometry and space-blended the rough, so every world's
+  // in-bounds rough read as a starfield — i.e. as OB you could somehow play from. The graphic is
+  // the physics: ground wherever the sim gives you a lie, the deep where the ball is gone.)
+  const landPad = 7; // yards of ground beyond the dashed OB line
+  const pbb = playBounds(hole);
   // The landmass is a ROUNDED, gently-irregular island hull (not a hard rectangle) so a stop reads
   // as a piece of ground floating in space, not a green picture-frame. Built off its OWN rng so the
-  // corner wobble never perturbs the terrain (`rng`) or celestial (`crng`) streams.
+  // corner wobble never perturbs the terrain (`rng`) or celestial (`crng`) streams. The corner
+  // radius is capped near 3·landPad so the rounded corner arc never cuts inside the OB rectangle —
+  // the stakes always stand on land.
   const lb: Box = {
-    minX: cb.minX - landMargin,
-    minY: cb.minY - landMargin,
-    maxX: cb.maxX + landMargin,
-    maxY: cb.maxY + landMargin,
+    minX: pbb.min[0] - landPad,
+    minY: pbb.min[1] - landPad,
+    maxX: pbb.max[0] + landPad,
+    maxY: pbb.max[1] + landPad,
   };
   const hrng = mulberry32((hashHole(hole) ^ 0x1b873593) >>> 0);
-  const landBox = roundedHull(lb, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22, 0.14, hrng);
+  const landBox = roundedHull(lb, Math.min(3 * landPad, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22), 0.1, hrng);
   const islandPts = projPoly(landBox, proj);
-  // Island-green par 3 (GS-cetus-2): a lost-rough par 3 has NO corridor — just the tee + a green
-  // island floating in the deep. So instead of ONE hull spanning tee→green (which would fill the
-  // gap with dark land), draw a land platform around EACH play feature (the green-island fairway +
-  // the tee), letting the open star-ocean read between them. Detected off the roughLie biomeMod
-  // (the lost-rough signal the sim already carries) so the render needs no new hole flag.
-  const islandHole =
-    hole.par === 3 && (hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false) && !rainbow;
-  const fairwayFeat = hole.features.find((f) => f.kind === 'fairway');
+  // Lost-rough hole (the void / Cetus with the penalty ARMED — the `roughLie` biomeMod `lieAt`
+  // reads): off the fairway IS a lost ball out there, so there is no rough to draw. Every play
+  // feature (each fairway piece + the tee) becomes its own land platform and the open deep reads
+  // between and beyond them — the starfield/abyss you actually hit into. A CALM void/cetus stop
+  // (penalty un-armed → off-fairway plays as ordinary rough) keeps the normal rough landmass.
+  // Generalised from the island-green par 3 (GS-cetus-2) to every armed hole (GS-rough-frame).
+  const lostHole = (hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false) && !rainbow;
   const teeFeat = hole.features.find((f) => f.kind === 'tee');
   // The land platforms, in COURSE space (grown a touch beyond each feature for a turf margin).
-  const landPlatformsCourse: Vec[][] =
-    islandHole && fairwayFeat && teeFeat
-      ? [offsetPoly(fairwayFeat.poly, -14), offsetPoly(teeFeat.poly, -10)]
-      : [landBox];
+  const landPlatformsCourse: Vec[][] = lostHole
+    ? [
+        ...hole.features.filter((f) => f.kind === 'fairway').map((f) => offsetPoly(f.poly, -14)),
+        ...(teeFeat ? [offsetPoly(teeFeat.poly, -10)] : []),
+      ]
+    : [landBox];
   const landPlatforms = landPlatformsCourse.map((p) => projPoly(p, proj));
   const space = spaceLookFor(arch, deepen);
   // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that
@@ -2371,24 +2427,13 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       if (vis) land.push({ t: 'circle', c: [sp[0] + dx, sp[1] + dy], r, fill: col });
     }
   }
-  // Faint stars salt the dark land too (crng — does NOT perturb the terrain rng), so even the
-  // zoomed-in "on the ground" view reads as golf amongst the stars.
-  if (art.accents > 0) {
-    const groundStars = Math.round(34 * art.accents);
-    for (let i = 0; i < groundStars; i++) {
-      const cp: Vec = [cb.minX + (cb.maxX - cb.minX) * crng(), cb.minY + (cb.maxY - cb.minY) * crng()];
-      if (onGrass(cp)) continue;
-      const r = 0.5 + crng() * 1.1;
-      const fill = crng() < 0.5 ? 'rgba(235,242,255,0.75)' : 'rgba(190,214,255,0.62)';
-      const sp = proj.project(cp);
-      if (!inView(sp, W, H)) continue;
-      land.push({ t: 'circle', c: sp, r, fill });
-    }
-  }
-  // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); an island-green par 3 also
-  // drops them (the platforms are tiny and turf-covered, the rest is open ocean). The rng was still
-  // consumed above, so the art stream is byte-stable whether or not the detail is painted.
-  if (!rainbow && !islandHole) prims.push({ t: 'clip', clip: islandPts, children: land });
+  // NO star-salt on the land (GS-rough-frame): the in-bounds ground is playable rough and must
+  // read as turf, not as the starfield it once wore — the stars live beyond the OB frame, where
+  // the ball actually IS lost. (The old crng star loop here was the "rough became starfields" bug.)
+  // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); a lost-rough hole also
+  // drops them (its platforms are tiny and turf-covered, the rest is the open deep). The rng was
+  // still consumed above, so the art stream is byte-stable whether or not the detail is painted.
+  if (!rainbow && !lostHole) prims.push({ t: 'clip', clip: islandPts, children: land });
 
   // --- 4c. Archetype SIGNATURE decor (GS-biome-feel) ---------------------------
   // The Cetus treatment generalised: void asteroid fields + a black-hole eye, inferno ground

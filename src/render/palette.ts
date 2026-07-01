@@ -307,12 +307,15 @@ function parseHex(hex: string): [number, number, number] | null {
 }
 
 /**
- * The drawn LAND fill: the world's rough base blended toward its deep-space base, so the in-bounds
- * ground reads as a dark, star-salted nightscape (golf amongst the stars) rather than a bright slab
- * that walls off the sky in the zoomed play view. The mown fairway/green keep their bright turf
- * palette, so the corridor pops against the dark ground. `LAND_SPACE_BLEND` = how far toward space.
+ * The drawn LAND fill: the world's ROUGH turf, near-verbatim. The in-bounds ground must read as
+ * playable rough — the lie the sim actually gives you there — NOT as deep space: the old heavy
+ * blend (0.62) made every world's rough read as a starfield, i.e. as OB you could somehow play
+ * from (GS-rough-frame). A whisper of the world's space base keeps the night mood; deep space
+ * itself starts at the OB frame, where the land hull ends. The lost-rough worlds (void/cetus)
+ * skip the land hull entirely when the penalty is armed — off the fairway there really IS the
+ * deep, so the render shows it (see buildScene's `lostHole`).
  */
-export const LAND_SPACE_BLEND = 0.62;
+export const LAND_SPACE_BLEND = 0.12;
 export function landFillFor(archetype: BiomeArchetype, deepen = 1): string {
   return mixHex(roughBaseFor(archetype, deepen), spaceLookFor(archetype, deepen).base, LAND_SPACE_BLEND);
 }
