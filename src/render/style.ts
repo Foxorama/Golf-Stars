@@ -924,6 +924,133 @@ export function cetusRiverPath(hole: Hole, rng: () => number): { line: Vec[]; hw
   return { line, hw };
 }
 
+/** Convex hull (Andrew's monotone chain) of screen-space points, returned as a closed ring. */
+function convexHull(pts: Vec[]): Vec[] {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o: Vec, a: Vec, b: Vec) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: Vec[] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper: Vec[] = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+/**
+ * The FRONT (screen-down) silhouette of a hull: the chain of its edge from the leftmost to the
+ * rightmost vertex that runs along the BOTTOM (larger screen-y). This is the plateau edge the eye
+ * reads as facing the viewer — the lip we extrude a cliff down from (GS-cetus-3). Returned L→R.
+ */
+function frontEdge(hull: Vec[]): Vec[] {
+  if (hull.length < 2) return hull;
+  let li = 0;
+  let ri = 0;
+  for (let i = 1; i < hull.length; i++) {
+    if (hull[i]![0] < hull[li]![0]) li = i;
+    if (hull[i]![0] > hull[ri]![0]) ri = i;
+  }
+  const walk = (dir: 1 | -1): Vec[] => {
+    const out: Vec[] = [];
+    for (let i = li; ; i = (i + dir + hull.length) % hull.length) {
+      out.push(hull[i]!);
+      if (i === ri) break;
+    }
+    return out;
+  };
+  const a = walk(1);
+  const b = walk(-1);
+  const avgY = (c: Vec[]) => c.reduce((s, p) => s + p[1], 0) / (c.length || 1);
+  const front = avgY(a) >= avgY(b) ? a : b;
+  return front[0]![0] <= front[front.length - 1]![0] ? front : front.slice().reverse();
+}
+
+/**
+ * GS-cetus-3: extrude each clifftop plateau DOWNWARD into a visible CLIFF FACE so Cetus reads as a
+ * clifftop seen side-on — the depth the world always wanted (and the thing that lets the star-river
+ * spill over a real edge instead of "starting out of nowhere"). Pure screen-space render off the
+ * dedicated cetus cliff stream. Returns the drawn prims (face strata + star-dust + rugged base + lit
+ * lip) PLUS the front-edge geometry, which `cetusRiver` reuses so its waterfall pours down this exact
+ * face. Height keys off the plateau width so it scales consistently across the map/follow-cam zooms.
+ */
+function cetusCliffs(
+  platforms: Vec[][],
+  deepen: number,
+  rng: () => number,
+): { prims: Prim[]; faces: { top: Vec[]; height: number }[] } {
+  const prims: Prim[] = [];
+  const faces: { top: Vec[]; height: number }[] = [];
+  // A LIT rock wall (top catches the starlight) plunging to the abyss — high contrast so the cliff
+  // reads as solid rock against the dark void, which is what sells the side-on depth. Rarity deepens
+  // only the LOWER strata (`dk` ramps in with depth) so the lit clifftop always pops regardless of tier.
+  const dk = Math.min(0.24, Math.max(0, deepen - 1) * 0.24);
+  const strata = ['#5a9db8', '#3f7f9c', '#296079', '#1a4459', '#0f2d40', '#071a28'].map((c, i) =>
+    mixHex(c, '#03080f', dk * (i / 5)),
+  );
+  for (const plat of platforms) {
+    const hull = convexHull(plat);
+    if (hull.length < 3) continue;
+    const top = frontEdge(hull);
+    if (top.length < 2) continue;
+    const bb = bboxOf(plat);
+    const cx = (bb.minX + bb.maxX) / 2;
+    const cliffH = Math.max(34, Math.min(190, (bb.maxX - bb.minX) * 0.44));
+    faces.push({ top, height: cliffH });
+    // Drop the lip down (a slight outward splay so the block reads solid, base roughened into rubble).
+    const dropped = (t: number): Vec[] =>
+      top.map((p) => [p[0] + (p[0] - cx) * 0.06 * t, p[1] + cliffH * t] as Vec);
+    const base = dropped(1).map((p) => [p[0], p[1] + (rng() - 0.5) * cliffH * 0.16] as Vec);
+    const face: Vec[] = [...top, ...base.slice().reverse()];
+    // A soft cast shadow into the ocean at the cliff foot, so the wall reads as standing IN the sea.
+    prims.push({ t: 'poly', pts: [...dropped(0.86), ...dropped(1.32).slice().reverse()], fill: 'rgba(2,7,13,0.5)' });
+    prims.push({ t: 'poly', pts: face, fill: strata[strata.length - 1]! }); // solid backing (no clip gaps)
+    // Face detail, clipped to the face polygon. ONE clip only — the SVG serializer silently drops a
+    // group's contents if a clipPath nests inside another (the GS-cetus-2 bug), so no nested clips.
+    const children: Prim[] = [];
+    const K = strata.length;
+    for (let k = 0; k < K; k++) {
+      const bandTop = dropped(k / K);
+      const bandBot = dropped((k + 1) / K);
+      children.push({ t: 'poly', pts: [...bandTop, ...bandBot.slice().reverse()], fill: strata[k]! });
+    }
+    // A contact-shadow band tucked right under the lip (ambient occlusion → the plateau reads as a
+    // slab casting onto its own face), and star-dust in the rock (Cetus stone is made of the deep).
+    children.push({ t: 'poly', pts: [...dropped(0), ...dropped(0.16).slice().reverse()], fill: 'rgba(3,10,18,0.34)' });
+    const fb = bboxOf(face);
+    const dust = Math.min(110, Math.round(((fb.maxX - fb.minX) * (fb.maxY - fb.minY)) / 620));
+    for (let i = 0; i < dust; i++) {
+      const x = fb.minX + rng() * (fb.maxX - fb.minX);
+      const y = fb.minY + rng() * (fb.maxY - fb.minY);
+      children.push({ t: 'circle', c: [x, y], r: 0.35 + rng() * 0.9, fill: rng() < 0.5 ? 'rgba(190,236,255,0.5)' : 'rgba(140,205,255,0.4)' });
+    }
+    // Vertical fault cracks + lit ridges give the wall its strata read.
+    const cracks = 4 + Math.floor(rng() * 4);
+    for (let i = 0; i < cracks; i++) {
+      const sp = sampleAlong(top, rng());
+      const len = cliffH * (0.45 + rng() * 0.5);
+      const jx = (rng() - 0.5) * 10;
+      children.push({ t: 'line', a: sp, b: [sp[0] + jx, sp[1] + len], stroke: 'rgba(3,9,16,0.5)', sw: 1.2, round: true });
+      children.push({ t: 'line', a: [sp[0] + 1.4, sp[1]], b: [sp[0] + jx + 1.4, sp[1] + len], stroke: 'rgba(120,190,225,0.22)', sw: 0.8, round: true }); // lit edge beside each crack
+    }
+    prims.push({ t: 'clip', clip: face, children });
+    // The lit LIP: a luminous edge along the plateau's front rim so it catches the starlight and the
+    // slab reads with thickness (drawn LAST, on top of the land fill at the call site).
+    for (let i = 1; i < top.length; i++) {
+      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: 'rgba(150,232,255,0.9)', sw: 2.6, round: true });
+      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: 'rgba(232,252,255,0.7)', sw: 1, round: true });
+    }
+  }
+  return { prims, faces };
+}
+
 /**
  * A graceful side-on SPACE WHALE drifting through the deep (GS-cetus-2). A smooth fusiform body
  * (rounded head → tapering tail stock), a long curved humpback PECTORAL fin, a two-lobed notched
@@ -1046,12 +1173,20 @@ function cetusOcean(landPolys: Vec[][], cb: Box, proj: Projector, W: number, H: 
 }
 
 /**
- * The star-river CARVED through the fairway + its cliff WATERFALL (GS-cetus-2). The course-space
+ * The star-river CARVED through the fairway + its cliff WATERFALL (GS-cetus-3). The course-space
  * meander (`cetusRiverPath`, projector-independent) is projected to a glowing channel of deep
- * star-water weaving across the corridor, then spills off the plateau's tee-side edge into the
- * ocean. Own rng stream + gated to cetus → determinism-safe.
+ * star-water DENSELY packed with the intro's starscape, welling from a glowing SOURCE (so it no
+ * longer "starts out of nowhere") and pouring over the plateau's real front CLIFF FACE into the
+ * ocean. Own rng stream + gated to cetus → determinism-safe. `faces` is the cliff geometry from
+ * `cetusCliffs`, so the waterfall drops the exact height of the face it spills over.
  */
-function cetusRiver(hole: Hole, proj: Projector, accents: number, rng: () => number): Prim[] {
+function cetusRiver(
+  hole: Hole,
+  proj: Projector,
+  accents: number,
+  rng: () => number,
+  faces: { top: Vec[]; height: number }[],
+): Prim[] {
   const rp = cetusRiverPath(hole, rng);
   if (!rp) return [];
   const { line, hw } = rp;
@@ -1072,39 +1207,81 @@ function cetusRiver(hole: Hole, proj: Projector, accents: number, rng: () => num
   stroke(river, 'rgba(70,180,225,0.85)', avgHwPx * 1.4); // glowing star-water surface down the channel
   river.push({ t: 'poly', pts: ribbon, fill: 'none', stroke: 'rgba(195,248,255,0.92)', sw: 1.5 }); // bright luminous shoreline
   stroke(river, 'rgba(205,246,255,0.85)', Math.max(1.4, avgHwPx * 0.4)); // bright current spine
+  // Densely fill the channel with the intro's starscape so it reads as a RIVER OF STARS, not a teal
+  // stripe: stars packed across the width down the length, ~10% "hero" stars with a soft halo.
   if (accents > 0) {
-    const steps = 34;
+    const steps = 60;
     for (let i = 0; i < steps; i++) {
-      const p = proj.project(sampleAlong(line, i / (steps - 1)));
-      river.push({ t: 'circle', c: [p[0] + (rng() - 0.5) * 5, p[1] + (rng() - 0.5) * 5], r: 0.7 + rng() * 1.5, fill: rng() < 0.5 ? 'rgba(255,255,255,0.95)' : 'rgba(180,242,255,0.88)' }); // drifting stars on the water
+      const u = i / (steps - 1);
+      const c = sampleAlong(line, u);
+      const t = tangentAt(line, Math.min(line.length - 1, Math.round(u * (line.length - 1))));
+      const nx = -t[1];
+      const ny = t[0];
+      const halfW = (hw[Math.min(hw.length - 1, Math.round(u * (hw.length - 1)))] ?? 4) * 0.9;
+      const packed = 2;
+      for (let j = 0; j < packed; j++) {
+        const lat = (rng() * 2 - 1) * halfW;
+        const p = proj.project([c[0] + nx * lat, c[1] + ny * lat]);
+        const hero = rng() < 0.1;
+        const col = rng() < 0.5 ? 'rgba(255,255,255,0.95)' : rng() < 0.5 ? 'rgba(180,242,255,0.9)' : 'rgba(210,220,255,0.85)';
+        if (hero) river.push({ t: 'glow', c: p, r: 4 + rng() * 3, col: 'rgba(200,244,255,0.5)' });
+        river.push({ t: 'circle', c: p, r: hero ? 1.4 + rng() * 1 : 0.5 + rng() * 1, fill: col });
+      }
     }
   }
 
-  // The waterfall: the river spills off the plateau's tee-side edge (screen-down) into the deep —
-  // a bright lip glow, a fanning curtain of falling stars, and ripple rings where it meets the ocean.
-  const headS = screen[0]!;
-  const nextS = screen[1] ?? headS;
-  let ux = headS[0] - nextS[0];
-  let uy = headS[1] - nextS[1]; // downstream (off the tee end)
-  const ul = Math.hypot(ux, uy) || 1;
-  ux /= ul;
-  uy /= ul;
-  const px = -uy;
-  const py = ux;
-  const wl = Math.max(24, (hw[0] ?? 4) * proj.scale * 6);
-  const fall: Prim[] = [{ t: 'glow', c: [headS[0] + ux * wl * 0.4, headS[1] + uy * wl * 0.4], r: wl * 0.7, col: 'rgba(130,228,252,0.28)' }];
-  const fallN = accents > 0 ? 16 : 0;
-  for (let i = 0; i < fallN; i++) {
-    const lane = (i / Math.max(1, fallN - 1) - 0.5) * 1.8 + (rng() - 0.5) * 0.4; // even lanes → a curtain
-    const dropLen = wl * (0.8 + rng() * 0.7);
-    const a: Vec = [headS[0] + px * lane * (hw[0] ?? 4) * proj.scale, headS[1] + py * lane * (hw[0] ?? 4) * proj.scale];
-    const b: Vec = [a[0] + ux * dropLen + px * lane * 3, a[1] + uy * dropLen + py * lane * 3];
-    fall.push({ t: 'line', a, b, stroke: `rgba(205,249,255,${(0.4 + rng() * 0.4).toFixed(2)})`, sw: 1.1, round: true });
-    fall.push({ t: 'circle', c: [a[0] + (b[0] - a[0]) * rng(), a[1] + (b[1] - a[1]) * rng()], r: 0.6 + rng() * 0.9, fill: 'rgba(230,252,255,0.92)' });
+  // The river SOURCE (upstream end — screen-top / green side): a glowing spring where the star-water
+  // wells up out of the plateau, so the channel has an origin instead of fading in from nowhere.
+  const endA = screen[0]!;
+  const endB = screen[screen.length - 1]!;
+  // The SPILL end is whichever river mouth sits lowest on screen (nearest the front cliff we extruded).
+  const spillIsA = endA[1] >= endB[1];
+  const spill = spillIsA ? endA : endB;
+  const source = spillIsA ? endB : endA;
+  const srcW = Math.max(6, avgHwPx * 1.6);
+  river.push({ t: 'glow', c: source, r: srcW * 2.4, col: 'rgba(120,225,255,0.4)' });
+  river.push({ t: 'circle', c: source, r: srcW, fill: 'rgba(60,150,205,0.6)' });
+  river.push({ t: 'circle', c: source, r: srcW * 0.5, fill: 'rgba(220,248,255,0.9)' });
+  for (let i = 0; i < (accents > 0 ? 9 : 0); i++) {
+    river.push({ t: 'circle', c: [source[0] + (rng() - 0.5) * srcW * 2.2, source[1] + (rng() - 0.5) * srcW * 2.2], r: 0.5 + rng() * 1.2, fill: 'rgba(230,252,255,0.85)' });
   }
-  const pool: Vec = [headS[0] + ux * wl, headS[1] + uy * wl];
+
+  // The WATERFALL: the river pours off the front cliff FACE into the ocean. Drop the exact height of
+  // the widest extruded face (so the curtain lands in the sea, not mid-cliff), as a fanning curtain of
+  // falling stars over a watery veil, with a bright lip glow and a splash pool + ripple rings below.
+  const face = faces.length
+    ? faces.slice().sort((a, b) => bboxOf(b.top).maxX - bboxOf(b.top).minX - (bboxOf(a.top).maxX - bboxOf(a.top).minX))[0]!
+    : null;
+  const fallLen = (face?.height ?? Math.max(24, avgHwPx * 6)) + 26;
+  const spillW = Math.max(14, (spillIsA ? hw[0]! : hw[hw.length - 1]!) * proj.scale * 1.8);
+  const fall: Prim[] = [{ t: 'glow', c: spill, r: spillW * 1.4, col: 'rgba(140,232,255,0.4)' }];
+  // The watery veil behind the falling stars.
+  fall.push({
+    t: 'poly',
+    pts: [
+      [spill[0] - spillW * 0.5, spill[1]],
+      [spill[0] + spillW * 0.5, spill[1]],
+      [spill[0] + spillW * 0.72, spill[1] + fallLen],
+      [spill[0] - spillW * 0.72, spill[1] + fallLen],
+    ],
+    fill: 'rgba(22,64,96,0.5)',
+  });
+  const fallN = accents > 0 ? 22 : 6;
+  for (let i = 0; i < fallN; i++) {
+    const fx = (i / Math.max(1, fallN - 1) - 0.5) + (rng() - 0.5) * 0.08; // even lanes → a curtain
+    const yA = spill[1] + fallLen * rng() * 0.35;
+    const yB = Math.min(spill[1] + fallLen, yA + fallLen * (0.45 + rng() * 0.5));
+    const xAt = (y: number) => spill[0] + fx * spillW * (1 + 0.44 * ((y - spill[1]) / fallLen));
+    fall.push({ t: 'line', a: [xAt(yA), yA], b: [xAt(yB), yB], stroke: `rgba(205,249,255,${(0.35 + rng() * 0.5).toFixed(2)})`, sw: 1.1, round: true });
+    if (accents > 0) {
+      const yc = yA + (yB - yA) * rng();
+      fall.push({ t: 'circle', c: [xAt(yc), yc], r: 0.6 + rng() * 1, fill: 'rgba(232,252,255,0.92)' });
+    }
+  }
+  const pool: Vec = [spill[0], spill[1] + fallLen];
+  fall.push({ t: 'glow', c: pool, r: spillW * 1.3, col: 'rgba(150,238,255,0.32)' });
   for (let i = 1; i <= 3; i++) {
-    fall.push({ t: 'circle', c: pool, r: i * 5.5, fill: 'none', stroke: `rgba(150,238,255,${(0.45 - i * 0.11).toFixed(2)})`, sw: 1.1 });
+    fall.push({ t: 'circle', c: pool, r: i * 5.5 + spillW * 0.2, fill: 'none', stroke: `rgba(150,238,255,${(0.5 - i * 0.13).toFixed(2)})`, sw: 1.1 });
   }
   return [...river, ...fall];
 }
@@ -1341,6 +1518,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // — the root of the "river jumps with zoom/pan" bug (GS-cetus-2).
   const oceanRng = mulberry32((hashHole(hole) ^ 0x000ce705) >>> 0);
   const riverRng = mulberry32((hashHole(hole) ^ 0x00cef10e) >>> 0);
+  // GS-cetus-3: a THIRD dedicated stream for the clifftop extrusion (dropdown cliff faces), distinct
+  // from ocean/river so none of the three can desync the others.
+  const cliffRng = mulberry32((hashHole(hole) ^ 0x00c11ff5) >>> 0);
+  // The extruded cliff faces, filled by the cliff pass below and reused by the river's waterfall so it
+  // spills down a real edge. Empty on every non-cetus world (the pass is gated to `arch === 'cetus'`).
+  let cetusFaces: { top: Vec[]; height: number }[] = [];
 
   // --- 1. Deep space: an opaque world-tinted base + soft nebula smears ---------
   // The nebulae are SOFT radial GLOWS (luminous wash, the intro's sky) — NOT hard-edged flat discs,
@@ -1417,6 +1600,15 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'poly', pts: scalePoly(lp, lc, 1.025), fill: space.edge });
       prims.push({ t: 'poly', pts: lp, fill: landFillFor(arch, deepen), stroke: space.edge, sw: 1.2 });
     }
+  }
+
+  // --- 3b. Cetus: extrude the plateau into dropdown CLIFF FACES (GS-cetus-3) ---
+  // Drawn AFTER the land fill so the plateau caps each cliff (the lit lip sits crisp on the fill edge)
+  // and the face draws over the ocean/whales below. Fills `cetusFaces` for the river's waterfall.
+  if (arch === 'cetus' && !rainbow) {
+    const cliffs = cetusCliffs(landPlatforms, deepen, cliffRng);
+    prims.push(...cliffs.prims);
+    cetusFaces = cliffs.faces;
   }
 
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
@@ -1531,7 +1723,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // --- 5b. The Cetus river of stars + its cliff waterfall (GS-cetus) ----------
   // The luminous star-river threads the rough beside the fairway and pours off the cliff into the
   // ocean. Gated to cetus + own `org` stream, drawn over the land but under the hazards/flag.
-  if (arch === 'cetus' && !rainbow) prims.push(...cetusRiver(hole, proj, art.accents, riverRng));
+  if (arch === 'cetus' && !rainbow) prims.push(...cetusRiver(hole, proj, art.accents, riverRng, cetusFaces));
 
   // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
   // Draw order is layered so substances read correctly where they overlap (deep/wild holes pile

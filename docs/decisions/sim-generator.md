@@ -399,6 +399,31 @@
       bars (full suite green); re-run `tests/worlds`+`tests/themes`+`tests/cetus` after any island-size
       or river change. `tests/cetus` asserts the river colour `rgba(70,180,225,0.85)` (its glowing
       water) — update it if you re-tone the river.
+    - **GS-cetus-3 made it read SIDE-ON — a clifftop diorama, not a flat top-down map.** The ask: the
+      river "started out of nowhere", didn't read as a river/waterfall, and the world had no depth. The
+      lever is DELIBERATELY the render, NOT the shared projector — a real camera pitch would foreshorten
+      the play field and force an aim-unproject/spray-cone/follow-cam rewrite across `app.ts` (and break
+      the "shot readability is sacred" rule). Instead a pure, `arch === 'cetus'`-gated 2.5D treatment
+      sells the side-on clifftop while the top-down play/aim projection stays byte-for-byte untouched:
+      (1) **Dropdown cliff faces** (`cetusCliffs`, `style.ts`, own `cliffRng` `^0x00c11ff5`): each
+      projected plateau's FRONT (max-screen-y) silhouette — extracted via a `convexHull`+`frontEdge`
+      of the land hull — is extruded DOWNWARD into a lit rock wall (bright clifftop strata fading to
+      abyss, contact-shadow under the lip, vertical fault cracks + star-dust, a cast shadow into the sea,
+      a luminous lip). Height keys off plateau width so it scales across the map/follow-cam. Rarity
+      `deepen` only darkens the LOWER strata (`dk` ramp) so the lit top always pops. Face detail lives in
+      ONE `clip` (never nest a clip in a clip — the SVG-serializer drop bug). Drawn AFTER the land fill
+      (plateau caps the cliff) and BEFORE the river. (2) **The river now has a SOURCE + a real spill**
+      (`cetusRiver` reworked): a glowing spring wells up at the upstream (green-side) mouth so it no
+      longer fades in from nowhere; the channel is DENSELY packed with the intro's starscape (≈10% hero
+      stars w/ haloes) so it reads as a *river of stars*; and the waterfall pours over the actual
+      extruded front cliff FACE (the `faces` geometry `cetusCliffs` returns → the fall drops the exact
+      face height into the ocean), as a fanning star-curtain + watery veil + splash-pool ripples.
+      Determinism-safe: three DISTINCT cetus streams (ocean/river/cliff), all gated, so every other world
+      is byte-identical and `tests/cetus` (still asserting `rgba(70,180,225,0.85)` — kept as the river
+      surface stroke) stays green. Re-shoot the gallery after any `cetusCliffs`/`cetusRiver` change. NB
+      the whole-hole map is the cramped worst case; the zoomed decision/follow-cam view shows the cliff
+      dropping behind the ball with the fairway readable ahead. NO new `_gs*`/URL hook, so the test-hub
+      guard needs nothing.
 - **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
