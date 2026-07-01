@@ -45,6 +45,7 @@ import { canBuyShip, shipCatalogue, type Ship } from './sim/rpg/ships';
 import { shipCardSVG } from './render/shipArt';
 import { apparelById, apparelForSlot, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
+import { clubhouseLoungeHTML, type LoungeGolfer } from './render/clubhouseLounge';
 import { cosmeticRarCol, isMythic } from './sim/rpg/cosmetics';
 import { BAG_SETS, bagSet, bagSetUnlocked, bagTierRank, canBuyBagSet, bagUnlockForClearedAscension, type BagSet } from './sim/rpg/bag';
 import {
@@ -138,6 +139,7 @@ function boot(): void {
       pantsByCharacter: save.pantsByCharacter,
       bagTier: save.bagTier,
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
+      clubhouseVisit: save.clubhouseVisit,
     };
     const seed = seedFromUrl() ?? 1234;
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -180,7 +182,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 11,
+    version: 12,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -195,6 +197,7 @@ function persist(): void {
     pantsByCharacter: state.pantsByCharacter,
     bagTier: state.bagTier,
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
+    clubhouseVisit: state.clubhouseVisit,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -1894,37 +1897,26 @@ function tradeMarketScreen(): string {
     <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}</div>`;
 }
 
-/** A compact Clubhouse card for ONE golfer on the title screen (GS-clubhouse) — a live preview of the
- *  golfer in their assigned ship + outfit, click to open their garage + wardrobe. */
-function clubhouseCardHTML(ch: Character): string {
-  const hatId = hatForCharacter(state, ch.id);
-  const shirtId = shirtForCharacter(state, ch.id);
-  const pantsId = pantsForCharacter(state, ch.id);
-  const shipId = shipForCharacter(state, ch.id);
-  const preview = golferPreviewSVG(hatId, shirtId, pantsId, { skin: ch.style.skin, shirtBase: ch.style.shirt, w: 78, h: 94 });
-  return `
-    <button class="gs-clickcard" data-action='${JSON.stringify({ type: 'openClubhouse', characterId: ch.id })}'
-      style="cursor:pointer;border:2px solid ${ch.style.cap}66;border-radius:12px;padding:8px 8px 6px;background:radial-gradient(circle at 50% 22%, ${ch.style.cap}1f, #0b0d12);text-align:center;width:128px;color:inherit;font:inherit;margin:5px;">
-      ${preview}
-      <div style="margin-top:2px;">${shipCardSVG(shipId, 104, 44)}</div>
-      <div style="font-size:13px;font-weight:700;color:${ch.style.cap};margin-top:3px;">${ch.shortName}</div>
-      <div style="font-size:10.5px;opacity:.6;">Manage ⚙</div>
-    </button>`;
-}
-
-/** The Clubhouse hall (GS-clubhouse) — its own screen reached from the title's Clubhouse doorway. All
- *  four golfers wait inside (no longer cluttering the title), each a door to their garage + wardrobe. */
+/** The Clubhouse hall (GS-clubhouse / GS-clubhouse-lounge) — its own screen reached from the title's
+ *  Clubhouse doorway. The four golfers loiter in a cosy bar + fireplace lounge wearing their own outfits;
+ *  tap any of them to open their garage + wardrobe. They've shuffled to new spots since your last run. */
 function clubhouseHallScreen(): string {
-  const cards = CHARACTERS.map(clubhouseCardHTML).join('');
+  const golfers: LoungeGolfer[] = CHARACTERS.map((ch) => ({
+    id: ch.id,
+    shortName: ch.shortName,
+    capColor: ch.style.cap,
+    hatId: hatForCharacter(state, ch.id),
+    shirtId: shirtForCharacter(state, ch.id),
+    pantsId: pantsForCharacter(state, ch.id),
+    skin: ch.style.skin,
+    shirtBase: ch.style.shirt,
+  }));
   return `
     <header style="border-left:4px solid #d8a24a;padding-left:10px;">
       <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Step inside. Outfit each golfer individually — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire. Tap one to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
     </header>
-    <div style="position:relative;border:1px solid #3a2f1f;border-radius:16px;margin:12px 0;padding:14px 10px 18px;overflow:hidden;background:linear-gradient(180deg,#1c160e,#120d08);">
-      ${clubhouseHallArt()}
-      <div style="position:relative;display:flex;flex-wrap:wrap;justify-content:center;">${cards}</div>
-    </div>
+    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit)}</div>
     <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
 }
 
@@ -1948,44 +1940,6 @@ function navTilesHTML(): string {
         </span>
       </button>
     </div>`;
-}
-
-/** A faint cosy-interior backdrop behind the Clubhouse hall's four golfers — a panelled wall, a window
- *  onto the dusk course, and a trophy shelf. Decorative + hand-placed (no rng), sits low-opacity so the
- *  golfer cards stay the stars. */
-function clubhouseHallArt(): string {
-  return `<svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice"
-      style="position:absolute;inset:0;width:100%;height:100%;opacity:.5;">
-    <defs>
-      <linearGradient id="chWall" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#241a10"/><stop offset="100%" stop-color="#140d07"/>
-      </linearGradient>
-      <linearGradient id="chWin" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#2a3a52"/><stop offset="65%" stop-color="#41543f"/><stop offset="100%" stop-color="#2f7a33"/>
-      </linearGradient>
-    </defs>
-    <rect width="400" height="200" fill="url(#chWall)"/>
-    <rect x="0" y="150" width="400" height="50" fill="#3a2614"/>
-    <g stroke="#3a2a18" stroke-width="2" opacity="0.7">
-      <line x1="80" y1="0" x2="80" y2="150"/><line x1="200" y1="0" x2="200" y2="150"/><line x1="320" y1="0" x2="320" y2="150"/>
-    </g>
-    <g transform="translate(150,28)">
-      <rect x="-4" y="-4" width="108" height="86" fill="#5a3a1f"/>
-      <rect x="0" y="0" width="100" height="78" fill="url(#chWin)"/>
-      <circle cx="80" cy="16" r="9" fill="#ffe6a6" opacity="0.8"/>
-      <path d="M0,58 Q40,46 70,54 T100,52 V78 H0 Z" fill="#2f7a33"/>
-      <line x1="50" y1="0" x2="50" y2="78" stroke="#5a3a1f" stroke-width="3"/>
-      <line x1="0" y1="39" x2="100" y2="39" stroke="#5a3a1f" stroke-width="3"/>
-    </g>
-    <g transform="translate(20,40)" fill="#d8a24a" opacity="0.85">
-      <path d="M6,0 h16 v8 a8,8 0 0 1 -16,0 Z"/><rect x="12" y="14" width="4" height="6"/><rect x="6" y="20" width="16" height="4"/>
-    </g>
-    <g transform="translate(352,44)" fill="#d8a24a" opacity="0.85">
-      <path d="M6,0 h16 v8 a8,8 0 0 1 -16,0 Z"/><rect x="12" y="14" width="4" height="6"/><rect x="6" y="20" width="16" height="4"/>
-    </g>
-    <rect x="8" y="26" width="40" height="3" fill="#5a3a1f"/>
-    <rect x="344" y="30" width="44" height="3" fill="#5a3a1f"/>
-  </svg>`;
 }
 
 /** Painted backdrop for the Trade Market tile: a cosmic bazaar — nebula sky, scattered stars, a couple

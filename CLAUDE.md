@@ -64,7 +64,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v11**; bump + add a migration when you persist
+  (localStorage is the only copy). Current schema is **v12**; bump + add a migration when you persist
   a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most run-state changes
   need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -123,7 +123,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
   save v11), so each golfer flies its own ride + wears its own look head-to-toe. The `apparel.ts` catalogue
   fills three slots (`ApparelSlot` hat|shirt|pants); a cosmetic **set** completes (`equippedSet`) only when
-  EVERY slot it defines is worn. The played character's ship (journey map) + outfit (`golferLook`) resolve via
+  EVERY slot it defines is worn. The Clubhouse HALL is a painted bar/fireplace **lounge** (GS-clubhouse-lounge,
+  `render/clubhouseLounge.ts`): the golfers loiter in it wearing their outfits (each figure IS the button to
+  outfit them, a brass nameplate at its feet for identity), placed at a seeded shuffle of fixed floor spots
+  keyed off `clubhouseVisit` (a finished-run counter bumped once in `runEndUpdates`, save v12) — so they
+  appear to have milled around while you were away. Purely cosmetic: seeded via `Rng` (never `Math.random`),
+  zero sim/rng-stream impact. The played character's ship (journey map) + outfit (`golferLook`) resolve via
   `shipForCharacter`/`hatForCharacter`/`shirtForCharacter`/`pantsForCharacter`. Shards also
   buy permanent **default-bag tiers** (`bag.ts BAG_SETS`, GS-bag-tiers): a won Ascension gate (clear
   A2/A6/A11 → `maxAscension` ≥ 3/7/12) unlocks a rare/epic/legendary bag-and-set that re-stamps EVERY

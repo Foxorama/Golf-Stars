@@ -12,7 +12,7 @@ import type { BagTier } from '../sim/rpg/bag';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -221,8 +221,33 @@ export interface SaveV11 {
   savedAt?: string;
 }
 
+/** v12 — adds the Clubhouse-lounge shuffle counter (GS-clubhouse-lounge): the golfers mill around a
+ *  bar/fireplace lounge, and `clubhouseVisit` (bumped once per finished run) seeds where each one
+ *  stands, so it looks like they moved while you were away. Purely cosmetic — nothing sim-facing. */
+export interface SaveV12 {
+  version: 12;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  lifetimeAces: number;
+  ownedShips: string[];
+  ownedApparel: string[];
+  shipByCharacter: Record<string, string>;
+  hatByCharacter: Record<string, string>;
+  shirtByCharacter: Record<string, string>;
+  pantsByCharacter: Record<string, string>;
+  bagTier: BagTier;
+  unlockedClubsByCharacter: Record<string, string[]>;
+  /** Runs finished so far (GS-clubhouse-lounge) — the seed that reshuffles the lounge each time home. */
+  clubhouseVisit: number;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV11;
+export type Save = SaveV12;
 
 export function defaultSave(): Save {
   return {
@@ -241,6 +266,7 @@ export function defaultSave(): Save {
     pantsByCharacter: {},
     bagTier: 'common',
     unlockedClubsByCharacter: {},
+    clubhouseVisit: 0,
   };
 }
 
@@ -446,6 +472,31 @@ function v10ToV11(s: SaveV10): SaveV11 {
   };
 }
 
+/** v11 → v12: seed the Clubhouse-lounge shuffle counter at zero (the default arrangement); everything
+ *  else is preserved untouched. */
+function v11ToV12(s: SaveV11): SaveV12 {
+  return {
+    version: 12,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: s.shards ?? 0,
+    metaUpgrades: s.metaUpgrades ?? {},
+    maxAscension: s.maxAscension ?? 0,
+    lifetimeAces: s.lifetimeAces ?? 0,
+    ownedShips: s.ownedShips && s.ownedShips.length ? s.ownedShips : [DEFAULT_SHIP_ID],
+    ownedApparel: s.ownedApparel ?? [],
+    shipByCharacter: s.shipByCharacter ?? {},
+    hatByCharacter: s.hatByCharacter ?? {},
+    shirtByCharacter: s.shirtByCharacter ?? {},
+    pantsByCharacter: s.pantsByCharacter ?? {},
+    bagTier: s.bagTier ?? 'common',
+    unlockedClubsByCharacter: s.unlockedClubsByCharacter ?? {},
+    clubhouseVisit: 0,
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -464,6 +515,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 8) s = v8ToV9(s as unknown as SaveV8) as unknown as typeof s;
   if (s.version === 9) s = v9ToV10(s as unknown as SaveV9) as unknown as typeof s;
   if (s.version === 10) s = v10ToV11(s as unknown as SaveV10) as unknown as typeof s;
+  if (s.version === 11) s = v11ToV12(s as unknown as SaveV11) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -471,7 +523,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v11 = s as unknown as Partial<SaveV11>;
+  const v11 = s as unknown as Partial<SaveV12>;
   const ownedShips = v11.ownedShips && v11.ownedShips.length ? v11.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v11.ownedApparel ?? [];
   const bagTier: BagTier = v11.bagTier ?? 'common';
@@ -498,6 +550,7 @@ export function migrate(raw: unknown): Save {
     pantsByCharacter: sanitize(v11.pantsByCharacter, ownedApparel),
     bagTier,
     unlockedClubsByCharacter: v11.unlockedClubsByCharacter ?? {},
+    clubhouseVisit: v11.clubhouseVisit ?? 0,
     activeRun: v11.activeRun,
     savedAt: v11.savedAt,
   };

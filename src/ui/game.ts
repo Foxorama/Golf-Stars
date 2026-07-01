@@ -154,6 +154,9 @@ export interface UiState {
   /** The ascension-victory reward from the run that just WON (GS-ascension-clubs) — a newly-unlocked club
    *  (or a Shard consolation if the character's bag was already full). Shown on the victory screen. */
   lastClubUnlock?: ClubUnlockReward;
+  /** Finished-run counter (GS-clubhouse-lounge) — bumped once per run end; seeds where the golfers stand
+   *  in the Clubhouse lounge, so they appear to have milled around while you were away. Cosmetic only. */
+  clubhouseVisit: number;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -223,6 +226,7 @@ export interface MetaProgress {
   pantsByCharacter?: Record<string, string>;
   bagTier?: BagTier;
   unlockedClubsByCharacter?: Record<string, string[]>;
+  clubhouseVisit?: number;
 }
 
 /** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
@@ -295,6 +299,7 @@ export function initState(
     shirtByCharacter: meta.shirtByCharacter ?? {},
     pantsByCharacter: meta.pantsByCharacter ?? {},
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
+    clubhouseVisit: meta.clubhouseVisit ?? 0,
   };
 }
 
@@ -350,6 +355,8 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
       ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
       : state.unlockedClubsByCharacter,
     lastClubUnlock: reward,
+    // A finished run bumps the lounge counter so the golfers have shuffled around by the time you're home.
+    clubhouseVisit: state.clubhouseVisit + 1,
   };
 }
 
