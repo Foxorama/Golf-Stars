@@ -174,7 +174,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   ace/bird takeovers, NOT in the reducer); the win no longer shares the missed-cut fall. The played golfer's
   per-character unlocked clubs (`unlockedClubsByCharacter`) are surfaced as chips on the character-select
   card. Route choice carries the destination biome + a
-  difficulty/atmosphere event (economy/cut/meta only — NEVER course generation). Characters/talents/
+  difficulty/atmosphere event (economy/cut/meta only — NEVER generation rng; the ONE physics hook is
+  `effectWindMult`, a clamped pure post-gen scale on `hole.wind` so HUD/AI/sim all read the same number).
+  The three lanes always land DISTINCT world archetypes, never the one you're on (`routeTheme` avoid-set
+  via a filtered `pickThemeFrom` redraw, NOT a retry loop; split stops cross two archetypes —
+  GS-journey-variety); a new course effect = a `COURSE_EFFECTS` row + a `routeEffect` mapping + a
+  `weather.ts` showpiece on its OWN seeded stream. Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a
   non-boss stop.
