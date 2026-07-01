@@ -120,7 +120,7 @@ describe('left-handed mode (GS-lefty)', () => {
   it('mirrors the drawn spray cone about the bearing (renderHoleSVG)', () => {
     // A straight-up hole so the projected bearing is vertical and the cone mirrors about a vertical
     // screen line. A strongly one-sided shape makes the lop-sided cone (and its mirror) unmistakable.
-    const hole = generateCourse('lefty-cone', { holes: 1 }).holes[0]!;
+    const hole = generateCourse('lefty-cone-2', { holes: 1 }).holes[0]!; // a straight, near-vertical par-3
     const ball: Vec = [...hole.tee] as Vec;
     const target: Vec = [...hole.green] as Vec;
     const shotMods = characterShotMods('huang-woo-hook'); // a hooky driver — clearly one-sided

@@ -34,6 +34,14 @@ export interface Feature {
   kind: FeatureKind;
   /** Closed polygon (course-space). First≠last; the renderer closes it. */
   poly: Vec[];
+  /**
+   * Marks a PENALTY hazard as a SANCTIONED exception to `validateFairness` (GS-variety-2) — a
+   * greenside lava/water/void RING that deliberately hugs the green off the approach line. Unlike a
+   * flanking pond (which must clear the whole play corridor), a ring blob is proven fair by
+   * `validateGreenApproach` instead (the pin stays reachable down a penalty-free approach lane).
+   * Absent/false ⇒ the ordinary "clear of the corridor" fairness rule applies. Render-agnostic.
+   */
+  sanctioned?: boolean;
 }
 
 /**

@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 9;
+export const GENERATOR_VERSION = 10;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -269,6 +269,32 @@ function densifyCentreline(line: Vec[], n: number): Vec[] {
   const pts: Vec[] = [];
   for (let i = 0; i < n; i++) pts.push(centrePoint(line, n === 1 ? 0 : i / (n - 1)));
   return pts;
+}
+
+/**
+ * Build a fairway corridor as one OR MORE mown ribbons, carving out `gapBands` of native ROUGH
+ * (GS-variety-2) — the "a couple of small fairways broken by rough" ask. `gapBands` are `[uStart,
+ * uEnd]` ranges in [0,1] along the hole; each contiguous run of points OUTSIDE every gap becomes its
+ * own ribbon (with rounded end caps). A run shorter than 3 points is dropped (that grass just reads
+ * as rough), so the gaps are real breaks. Rough is the default off-feature lie — a fair carry/thread,
+ * never a lost card — so a broken fairway needs no fairness exemption. Returns [] only if every run
+ * was too short (the caller falls back to one solid ribbon).
+ */
+function brokenCorridor(dense: Vec[], leftHW: number[], rightHW: number[], gapBands: [number, number][]): Vec[][] {
+  const n = dense.length;
+  const inGap = (u: number) => gapBands.some(([a, b]) => u >= a && u <= b);
+  const segs: Vec[][] = [];
+  let run: number[] = [];
+  const flush = () => {
+    if (run.length >= 3) segs.push(ribbon(run.map((i) => dense[i]!), run.map((i) => leftHW[i]!), run.map((i) => rightHW[i]!)));
+    run = [];
+  };
+  for (let i = 0; i < n; i++) {
+    if (inGap(i / (n - 1))) flush();
+    else run.push(i);
+  }
+  flush();
+  return segs;
 }
 
 /**
@@ -524,9 +550,27 @@ function generateHole(
     const u = i / (segs - 1);
     return Math.max(baseHalf * 0.42, w * (1 - asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
   });
-  // The corridor ribbon (the normal hole). An island-green par 3 overrides this with a compact
-  // green-centred landing island once the green radius is known (just below).
-  let fairway: Feature = { kind: 'fairway', poly: ribbon(dense, leftHW, rightHW) };
+  // BROKEN fairway (GS-variety-2): carve 0–2 bands of native ROUGH across the mid-hole so the
+  // corridor plays as "a couple of small fairways broken by rough", not one unbroken ribbon. Rough is
+  // the default off-feature lie (a fair carry/thread, never a lost card), so this needs no fairness
+  // exemption. Count scales with the biome's `roughBreaks` and wildness; par-3s stay unbroken. Two
+  // gaps spread across the mid-hole make three fairway islands. Drawn here so the gap rng lands before
+  // the green stuff (the stream is reordered anyway — GENERATOR_VERSION is bumped).
+  // Never break a lost-rough world's corridor: a gap there reads as the abyss/void PENALTY (a lost
+  // ball mid-fairway), not fair rough. Those worlds keep an unbroken island/plateau corridor.
+  const roughBreakN = par >= 4 && !lostRough ? Math.round((biome.roughBreaks ?? 0.6) * (0.4 + wildness)) : 0;
+  const nGaps = Math.min(2, roughBreakN);
+  const gapBands: [number, number][] = [];
+  for (let g = 0; g < nGaps; g++) {
+    const center = nGaps === 1 ? rng.range(0.4, 0.6) : g === 0 ? rng.range(0.3, 0.42) : rng.range(0.58, 0.7);
+    const halfw = rng.range(0.035, 0.06);
+    gapBands.push([center - halfw, center + halfw]);
+  }
+  const corridorSegs = brokenCorridor(dense, leftHW, rightHW, gapBands);
+  if (corridorSegs.length === 0) corridorSegs.push(ribbon(dense, leftHW, rightHW)); // never carve it all away
+  // The corridor feature(s). An island-green par 3 overrides this with a compact green-centred island
+  // once the green radius is known (just below).
+  let corridorFeatures: Feature[] = corridorSegs.map((poly) => ({ kind: 'fairway', poly }));
   // Hazard placement + the fairness validator both reason about the corridor's WIDEST point
   // (validateFairness recovers the max lateral extent of the fairway poly), so use that here —
   // penalty hazards then clear the widest part and stay provably fair.
@@ -547,7 +591,7 @@ function generateHole(
   // deep. fairwayHalfWidth → the island radius so any (sand) greenside hazards still clear fairly.
   if (islandPar3) {
     const islandR = greenR * 1.8 + 30;
-    fairway = { kind: 'fairway', poly: blobPoly(green, islandR, 14, 0.16, rng) };
+    corridorFeatures = [{ kind: 'fairway', poly: blobPoly(green, islandR, 14, 0.16, rng) }];
     fairwayHalfWidth = islandR;
   }
 
@@ -569,7 +613,7 @@ function generateHole(
   // wraps around it instead of ending at a hard flat line. Skipped for void island greens (the green
   // floats over the abyss — nothing behind it). A SEPARATE fairway feature so it never widens the
   // corridor's fairness half-width (validateFairness keys off the FIRST fairway feature).
-  const features: Feature[] = [fairway];
+  const features: Feature[] = [...corridorFeatures];
   if (!lostRough) {
     const pa = dense[dense.length - 2] ?? tee;
     const pb = dense[dense.length - 1] ?? green;
@@ -751,18 +795,20 @@ function generateHole(
   // validateFairness ignores them and the fairway route stays clean — only a shot trying to cut the
   // corner is knocked down. Big blobs ⇒ TALL canopies that block lofted attempts too. Tree worlds,
   // par 4/5, not on a void island (which stays a straight honest target).
-  // Wildness-gated (GS-19 "fair early, brutal late"): the calm opening stops stay forgiving — the
-  // corner blockers arm only once the journey is a touch wilder, ramping up deeper in.
-  if ((biome.treeDensity ?? 0) > 0 && par >= 4 && !lostRough && wildness >= 0.3) {
+  // NOT wildness-gated any more (GS-variety-2): the whole point is that you CAN'T just bomb it
+  // straight across a dogleg's inside — so a bend gets its corner FILLED whether the stop is calm or
+  // wild. (The old `wildness >= 0.3` gate meant every early dogleg was cuttable, which read as "the
+  // doglegs aren't real".) Difficulty still ramps via bend severity + canopy height, not presence.
+  if ((biome.treeDensity ?? 0) > 0 && par >= 4 && !lostRough) {
     const chordLen = dist(tee, green) || 1;
     const cdx = (green[0] - tee[0]) / chordLen;
     const cdy = (green[1] - tee[1]) / chordLen;
-    // Scale the stand frequency by the world's tree density so a sparse world (ember snags) gets the
-    // odd blocker while parkland gets a proper wall — and so the extra knockdowns never tip the
-    // already-hard tree+crossing worlds over the no-death-spiral bar. Capped per hole; canopies are
-    // modest so a LOFTED approach can still carry the corner (it's the flat bomb-it-straight line
-    // that's blocked) — keeping it fair for the auto reach-AI while rewarding the played fairway route.
-    const standChance = Math.min(0.42, 0.1 + (biome.treeDensity ?? 0) * 0.14);
+    // Denser + a proper wall: scale the stand frequency by the world's tree density so a sparse world
+    // (ember snags) still gets a real blocker while parkland/jungle grows a thick grove. Capped per
+    // hole; canopies run TALLER (bigger blobs → higher canopy in flight.ts) so a lofted bomb over the
+    // corner is knocked down too — you play AROUND, along the fairway. A whole clump per stand so the
+    // inside of the leg reads as filled, not a token tree.
+    const standChance = Math.min(0.5, 0.16 + (biome.treeDensity ?? 0) * 0.14 + wildness * 0.08);
     const maxStands = par >= 5 ? 3 : 2;
     let stands = 0;
     const STEPS = 16;
@@ -774,14 +820,15 @@ function generateHole(
       if (polylineDist(cp, centreline) < fairwayHalfWidth + 12) continue;
       if (rng.float() > standChance) continue;
       stands++;
-      hazards.push({ kind: 'trees', poly: blobPoly(cp, rng.range(5, 8), 9, 0.3, rng) });
-      // One companion to read as a stand — never letting it drift onto the corridor.
-      if (rng.float() < 0.5) {
+      hazards.push({ kind: 'trees', poly: blobPoly(cp, rng.range(5, 8.5), 9, 0.3, rng) });
+      // A small clump of companions so the corner reads FILLED — each kept off the corridor edge.
+      const companions = rng.int(1, 3);
+      for (let k = 0; k < companions; k++) {
         const a = rng.range(0, Math.PI * 2);
-        const dd = rng.range(7, 13);
+        const dd = rng.range(7, 14);
         const c2: Vec = [cp[0] + Math.cos(a) * dd, cp[1] + Math.sin(a) * dd];
         if (polylineDist(c2, centreline) >= fairwayHalfWidth + 7) {
-          hazards.push({ kind: 'trees', poly: blobPoly(c2, rng.range(3, 6), 8, 0.3, rng) });
+          hazards.push({ kind: 'trees', poly: blobPoly(c2, rng.range(3.5, 6.5), 8, 0.3, rng) });
         }
       }
     }
@@ -899,6 +946,69 @@ function generateHole(
     const thickness = Math.min(28, length * 0.07, rng.range(7, 11) + wildness * rng.range(5, 14));
     const ravine = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
     hazards.push({ kind: 'barranca', poly: ravine.poly });
+  }
+
+  // A hole gets a forced-carry CROSSING (river/creek/pond/ravine) OR greenside DRAMA — never both, so
+  // a crossing world's greens aren't ALSO drowned (that piled ember/frost past the balance bar). Both
+  // of the following only fire on a hole with no crossing, so the variety lands where a hole is
+  // otherwise quiet (a par-3, or a par-4/5 that didn't draw its crossing).
+  const noCrossing = !hazards.some((h) => CROSSING_KINDS.has(h.kind));
+
+  // Greenside penalty RING (GS-variety-2): a lava ring (ember), a water inlet (parkland/ocean/frost)
+  // or a void moat (void/cetus) HUGGING the green around the NON-approach arc — the dramatic "carry it
+  // onto the green or you're wet/molten/lost" complex. Unlike a flanking pond (which clears the whole
+  // corridor), a ring blob is a SANCTIONED exception to validateFairness (`sanctioned: true`): it may
+  // sit right against the green but is kept OFF the approach window (the arc the ball flies in from)
+  // AND off the approach lane, so the pin stays reachable — `validateGreenApproach` proves it.
+  const ringKind = lieInfo(biome.greensideKind).penalty
+    ? biome.greensideKind
+    : biome.hazardKinds.includes('water')
+      ? 'water'
+      : biome.hazardKinds.find((k) => lieInfo(k).penalty);
+  if (noCrossing && !islandPar3 && ringKind && rng.float() < 0.34 + wildness * 0.3) {
+    const appFrom = centrePoint(centreline, 0.84);
+    let adx = green[0] - appFrom[0];
+    let ady = green[1] - appFrom[1];
+    const al = Math.hypot(adx, ady) || 1;
+    adx /= al;
+    ady /= al;
+    const openAng = Math.atan2(-ady, -adx); // toward the approach — the safe penalty-free opening
+    const openHalf = 1.2; // ±~69° penalty-free window on the approach side
+    const ringCount = rng.int(2, 4);
+    for (let b = 0; b < ringCount; b++) {
+      const r = rng.range(5, 9);
+      const gap = rng.range(1, 5);
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const ang = rng.range(0, Math.PI * 2);
+        if (angDelta(ang, openAng) < openHalf) continue; // keep the approach window clear
+        const dir: Vec = [Math.cos(ang), Math.sin(ang)];
+        const d = rayPolyDist(green, dir, greenPolygon) + r + gap;
+        const c: Vec = [green[0] + dir[0] * d, green[1] + dir[1] * d];
+        if (segDist(c, appFrom, green) < greenR * 0.9 + r) continue; // keep the approach lane clear
+        hazards.push({ kind: ringKind, poly: blobPoly(c, r, 10, 0.22, rng), sanctioned: true });
+        break;
+      }
+    }
+  }
+
+  // APPROACH LAKE (GS-variety-2): a big lake/lava body flanking the corridor ~3/4 of the way up —
+  // right where you land the approach or lay up. The old hazard field bunched at driver range then
+  // went quiet until the green; this fills the approach zone so the whole hole has teeth. Still CLEAR
+  // of the corridor (fairness) — it swallows an offline approach, never a sensible one. Longer holes.
+  if (noCrossing && par >= 4 && !islandPar3 && rng.float() < 0.4 + wildness * 0.35) {
+    const kind = biome.hazardKinds.includes('water') ? 'water' : biome.hazardKinds.find((k) => lieInfo(k).penalty);
+    if (kind) {
+      const r = rng.range(16, 24 + wildness * 14);
+      const t = rng.range(0.66, 0.82); // the approach / lay-up zone
+      const side = rng.bool() ? 1 : -1;
+      const along = centrePoint(centreline, t);
+      const perp = perpAt(centreline, t);
+      const lateral = fairwayHalfWidth + r + rng.range(4, 16);
+      const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+      if (clearsPlayCorridor(c, r, centreline, tee, green, fairwayHalfWidth)) {
+        hazards.push({ kind, poly: blobPoly(c, r, 16, 0.3, rng) });
+      }
+    }
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
@@ -1044,12 +1154,16 @@ function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, i
     return { id: 'drivable-par-4', shape, side, lenMult, severity: 0.55 };
   }
 
-  // Shape mix, biome- + wildness-biased. Cape (heroic diagonal carry) and hairpin (severe corner)
-  // only arm once the journey turns a touch wild; calm stops stay gentle straights/doglegs.
-  const hairP = wildness >= 0.5 ? 0.08 + biome.doglegBias * 0.2 : 0;
-  const capeP = wildness >= 0.3 ? 0.12 + biome.doglegBias * 0.25 : 0;
-  const sP = Math.min(0.4, 0.12 + biome.doglegBias * 0.5 + wildness * 0.25); // S-curve / double-dogleg
-  const straightP = Math.max(0.12, 0.36 - biome.doglegBias * 0.7 - wildness * 0.16);
+  // Shape mix, biome- + wildness-biased (GS-variety-2: VARIETY is decoupled from difficulty). The
+  // interesting archetypes — cape (heroic diagonal carry), hairpin (severe corner) and S/double —
+  // now show up even on the CALM opening stops (a nonzero base per shape, biome-biased), so a low-
+  // wildness hole is no longer always a gentle straight-or-slight-dogleg. Wildness still turns the
+  // dial UP (more capes/hairpins deep in), and the BEND SEVERITY is what ramps with difficulty
+  // (`buildCentreline`'s dogFac), so calm stops stay fair-but-shapely while deep ones bite.
+  const hairP = 0.05 + biome.doglegBias * 0.18 + wildness * 0.12;
+  const capeP = 0.11 + biome.doglegBias * 0.24 + wildness * 0.12;
+  const sP = Math.min(0.42, 0.15 + biome.doglegBias * 0.45 + wildness * 0.2); // S-curve / double-dogleg
+  const straightP = Math.max(0.08, 0.26 - biome.doglegBias * 0.55 - wildness * 0.12);
   const sd = side > 0 ? 'r' : 'l';
   let shape: ShapeKind;
   let shapeTag: string;
@@ -1091,9 +1205,13 @@ function buildCentreline(
   island = false,
 ): Vec[] {
   const tee: Vec = [0, 0];
-  const dogFac = 0.35 + 0.65 * wildness;
+  // Bend severity floor raised (GS-variety-2): the old `0.35 + 0.65·wildness` left calm doglegs
+  // nearly straight — "every early hole is the same gentle curve". A proper dogleg bends properly
+  // even on a calm stop; wildness still steepens it toward the self-cross cap. The cap is loosened a
+  // touch (0.4 → 0.46·length) so a bend can be genuinely dramatic without the corridor self-crossing.
+  const dogFac = 0.5 + 0.5 * wildness;
   const baseMag = biome.doglegBias * dogFac * length;
-  const cap = 0.4 * length;
+  const cap = 0.44 * length;
   const endDrift = (): Vec => [rng.range(-0.06, 0.06) * length, length];
 
   if (island) return [tee, endDrift()];
@@ -1184,7 +1302,12 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     },
   };
 
-  const errs = [...validateCourse(course), ...validateFairness(course), ...validateCrossings(course)];
+  const errs = [
+    ...validateCourse(course),
+    ...validateFairness(course),
+    ...validateCrossings(course),
+    ...validateGreenApproach(course),
+  ];
   if (errs.length) {
     throw new Error(`generateCourse produced an invalid course:\n  ${errs.join('\n  ')}`);
   }
@@ -1202,6 +1325,7 @@ export function validateFairness(course: Course): string[] {
     const half = fairwayHalfWidthOf(h);
     for (const hz of h.hazards) {
       if (CROSSING_KINDS.has(hz.kind)) continue; // sanctioned forced carry — proved by validateCrossings
+      if (hz.sanctioned) continue; // greenside ring — proved by validateGreenApproach (GS-variety-2)
       if (!lieInfo(hz.kind).penalty) continue; // only penalty surfaces must be avoidable
       for (const p of hz.poly) {
         if (polylineDist(p, h.centreline) < half * 0.5 && segDist(p, h.tee, h.green) < half * 0.5) {
@@ -1249,6 +1373,37 @@ export function validateCrossings(course: Course): string[] {
       const after = centrePoint(h.centreline, Math.min(0.99, tOut + 20 / total));
       if (lieInfo(lieAt(h, after)).penalty) errs.push(`hole[${i}]: no safe landing past the ${what}`);
     }
+  });
+  return errs;
+}
+
+/**
+ * Greenside-ring fairness (GS-variety-2): a `sanctioned` greenside penalty ring is EXEMPT from
+ * `validateFairness` (it deliberately hugs the green), so it must instead be proven not to wall the
+ * green off. For every hole carrying sanctioned penalty hazards this asserts the green stays
+ * playable: the flag and the green centre are penalty-free, and there is a penalty-free landing just
+ * SHORT of the green on the approach line (room to fly/run a shot onto the surface). By construction
+ * the ring is kept off the approach window + lane, so this holds — but it's proven on every course.
+ */
+export function validateGreenApproach(course: Course): string[] {
+  const errs: string[] = [];
+  course.holes.forEach((h, i) => {
+    if (!h.hazards.some((hz) => hz.sanctioned && lieInfo(hz.kind).penalty)) return;
+    const target = h.pin ?? h.green;
+    if (lieInfo(lieAt(h, target)).penalty) errs.push(`hole[${i}]: greenside ring covers the flag`);
+    if (lieInfo(lieAt(h, h.green)).penalty) errs.push(`hole[${i}]: greenside ring covers the green centre`);
+    // A landing just short of the green on the incoming line must be penalty-free (a fair approach).
+    const appFrom = centrePoint(h.centreline, 0.84);
+    let dx = h.green[0] - appFrom[0];
+    let dy = h.green[1] - appFrom[1];
+    const dl = Math.hypot(dx, dy) || 1;
+    dx /= dl;
+    dy /= dl;
+    let greenR = 0;
+    const gf = h.features.find((f) => f.kind === 'green');
+    if (gf) for (const p of gf.poly) greenR = Math.max(greenR, dist(p, h.green));
+    const shortPt: Vec = [h.green[0] - dx * (greenR + 12), h.green[1] - dy * (greenR + 12)];
+    if (lieInfo(lieAt(h, shortPt)).penalty) errs.push(`hole[${i}]: greenside ring blocks the approach`);
   });
   return errs;
 }
