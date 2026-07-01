@@ -20,7 +20,7 @@ import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 /** The vector look the ship drawer renders (a base shape family + palette + bling). */
 export interface ShipLook {
   /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated). */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo';
+  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -146,6 +146,16 @@ export const SHIPS: readonly Ship[] = [
     blurb: 'A dimpled golf-ball comet blazing across the void.',
     cost: TIER_COST.legendary,
     look: { kind: 'comet', body: '#f4f6ff', glass: '#ffffff', flame: '#9ad8ff', accent: '#ffd36b', bling: 3 },
+  },
+  // --- The SPEEDER set: single-rider space-bikes (motorcycle golf buggies) ---
+  {
+    id: 'moto-nitro',
+    name: 'Nitro Niblick',
+    set: 'Speeder',
+    rarity: 'legendary',
+    blurb: 'A motorcycle golf buggy — two glowing hover-wheels, a bag on the tail, a jet trail. All attitude.',
+    cost: TIER_COST.legendary,
+    look: { kind: 'moto', body: '#2a2f3a', glass: '#bfe9ff', flame: '#ff3ea5', accent: '#28e0d0', bling: 2 },
   },
   // --- The MYTHIC grail: the rarest, flashiest ride in the galaxy ---
   {

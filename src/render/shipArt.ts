@@ -114,6 +114,53 @@ function shipBody(look: ShipLook): string {
           <text x="2" y="-19" font-size="3" font-weight="700" fill="#ffffff" font-family="system-ui,sans-serif">Hole 19</text>
         </g>`;
     }
+    case 'moto': {
+      // A motorcycle golf buggy — a single-rider space-bike: a low swooping frame slung between two
+      // glowing hover-wheels, handlebars + windscreen up front, and a golf bag standing on the tail
+      // with club heads poking out. Neon speeder attitude; jet trail out the back.
+      const glow = `<animate attributeName="opacity" values="0.55;1;0.55" dur="1.3s" repeatCount="indefinite"/>`;
+      const wheel = (x: number) => `
+        <circle cx="${x}" cy="6.5" r="4.6" fill="#12161e" stroke="${accent}" stroke-width="1.5"/>
+        <circle cx="${x}" cy="6.5" r="4.6" fill="none" stroke="${flame}" stroke-width="1">${glow}</circle>
+        <g transform="translate(${x} 6.5)"><g stroke="${accent}" stroke-width="0.8">
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="0.5s" repeatCount="indefinite"/>
+          <line x1="-3.4" y1="0" x2="3.4" y2="0"/><line x1="0" y1="-3.4" x2="0" y2="3.4"/>
+          <line x1="-2.4" y1="-2.4" x2="2.4" y2="2.4"/><line x1="-2.4" y1="2.4" x2="2.4" y2="-2.4"/>
+        </g></g>
+        <circle cx="${x}" cy="6.5" r="1.5" fill="${accent}"/>`;
+      return `
+        ${exhaust}
+        <path d="M-16,3 L-30,1.4 L-30,4.8 Z" fill="${flame}" opacity="0.4"/>
+        <g stroke="#0c1016" stroke-width="1" stroke-linejoin="round">
+          <!-- golf bag standing on the tail, club heads poking out -->
+          <g>
+            <line x1="-13.4" y1="-6" x2="-14.8" y2="-14" stroke="#c9ccd6" stroke-width="1"/>
+            <circle cx="-14.9" cy="-14.4" r="1.5" fill="#e6ebf2"/>
+            <line x1="-11.6" y1="-6" x2="-10.6" y2="-13.4" stroke="#c9ccd6" stroke-width="1"/>
+            <circle cx="-10.5" cy="-13.8" r="1.3" fill="#b7c0cc"/>
+            <line x1="-12.5" y1="-6" x2="-12.8" y2="-15" stroke="#c9ccd6" stroke-width="0.9"/>
+            <circle cx="-12.9" cy="-15.3" r="1.2" fill="#d7dee6"/>
+            <path d="M-15.2,-6.5 L-9.8,-6.5 L-10.6,2 L-14.4,2 Z" fill="${accent}"/>
+            <rect x="-14.4" y="-5.4" width="4" height="3.4" rx="0.8" fill="${glass}" opacity="0.6"/>
+          </g>
+          <!-- swooping bike frame from tail to nose -->
+          <path d="M-14,3.6 L-9,-3.4 L2,-4.6 L12,-3.2 L18,1 L17,4 L11,4 L-8,4.2 Z" fill="${body}"/>
+          <!-- seat + rider fairing hump -->
+          <path d="M-11,-3.2 L-2,-4.2 L-1,-1 L-11,0 Z" fill="#151a22"/>
+          <!-- fairing accent stripe along the frame -->
+          <path d="M-8,-2.4 L2,-3.4 L11,-2.2 L16,0.6" fill="none" stroke="${accent}" stroke-width="1"/>
+          <!-- windscreen up front -->
+          <path d="M9,-3.4 L15,-1 L14,2.4 L8,0.4 Z" fill="${glass}" opacity="0.9"/>
+          <!-- headlamp -->
+          <circle cx="17" cy="1.4" r="1.3" fill="#fff6c0"/>
+          <!-- handlebar + mirror -->
+          <line x1="11" y1="-3.4" x2="14" y2="-7.6"/>
+          <circle cx="14.2" cy="-8" r="1.1" fill="${accent}"/>
+          <!-- neon underglow strip -->
+          <rect x="-9" y="2.2" width="24" height="1.3" rx="0.6" fill="${flame}" stroke="none">${glow}</rect>
+        </g>
+        ${wheel(-9)}${wheel(11)}`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `
