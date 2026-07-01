@@ -242,6 +242,22 @@
     nothing. `tests/journey-map.test.ts` reworked for the vertical orientation (Earth + `.gs-journey--v` +
     per-choice `data-route-inspect` present, one node per stop, far-hop climbs further, determinism).
     Verified eyes-on (Playwright render of the top/scrolled-to-Earth chart + the info sheet).
+  - **The chart is a LIVING cockpit view (GS-journey-alive, `starmap.ts`/`index.html`).** The flat
+    glyph-discs became actual WORLDS: each destination is a lit-from-upper-left sphere (per-world
+    `radialGradient` body + a terminator crescent + a pulsing specular glint + an atmosphere rim),
+    carrying biome-specific surface art clipped to the body — gas cloud-bands, molten crust with pulsing
+    ember cracks, icy polar caps, arid dune ribbons, lush drifting continents (`surfaceArt(family,…)`,
+    keyed off a `family` field added to `BIOME_LOOK`). Stakes read BEFORE biome: a boss world wears an
+    ominous breathing **red aura**, a harder path a warm **heat shimmer**, and the ⚔/🔥 markers pulse.
+    Energy pulses stream UP each warp corridor toward its gate (`animateMotion` along the lane path,
+    `keyPoints="1;0"`), a **comet** periodically flies the travelled trail from Earth up to YOU, Earth is
+    a proper lit blue marble, YOU sits on a glowing **launch pad** (pulsing ring + thruster flicker +
+    ascending sparks), and the sky itself gains seeded twinkles + the odd shooting star. All decoration
+    is placed by a LOCAL seeded `mulberry32(hashSeed(opts.seed))` — NEVER `Math.random` — so the widget
+    stays byte-stable (determinism test + a build-diff check confirm it). CSS adds a seamless slow
+    star-drift (uniform 180px = one tile, nebulae pinned) gated behind `prefers-reduced-motion`, and a
+    cockpit-window frame glow. No new `_gs*`/URL hook → the test-hub guard needs nothing. Verified
+    eyes-on (Playwright renders of both the top and the scrolled-to-Earth view).
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a
