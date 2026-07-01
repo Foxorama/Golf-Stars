@@ -197,6 +197,30 @@
     trail right-anchors instead of force-scrolling Earth off-screen. Verified eyes-on (Playwright render
     of the empty + long-trail cases); `tests/journey-map.test.ts` still green (node/coord asserts read
     viewBox coords, unaffected by the anchor).
+  - **VERTICAL, tap-to-choose star-chart (GS-journey-vertical, `starmap.ts`/`app.ts`/`index.html`).**
+    The horizontal two-panel widget above was a poor mobile fit (a wide scroll strip + a cramped right
+    fan of tiny planets, a wall of three big route cards below it). Reworked into a mobile-first VERTICAL
+    star-chart you climb: **Earth pinned at the BOTTOM**, the travelled trail winding UP to YOU, and the
+    three branch planets fanned across the TOP. Now ONE responsive SVG (`viewBox 0 0 320 H`,
+    `width:100%`) inside `.gs-journey--v` (a `max-height:64vh; overflow-y:auto` panel that scrolls
+    internally only on long voyages, starting at the top where the choices are) — no more two flex
+    siblings, no seam logic, no `journeyScroll`/`data-journey-scroll` DOM nudge (all deleted). GALAXY-EXACT
+    is preserved but ROTATED: a world's X follows real DECLINATION (fixed window `dec +38..−80 → left..
+    right`) and the VERTICAL gap to the previous world scales with real ANGULAR distance
+    (`clamp(46 + greatCircleDeg·0.66, 58, 150)`), so a far-flung hop CLIMBS further. History draws
+    newest-nearest-YOU (top) → oldest-nearest-Earth (bottom). **The three branch planets are TAP TARGETS**
+    (`data-route-inspect="<routeId>"` on the SVG `<g>`, a pulsing halo + fat transparent hit-circle):
+    tapping opens `routeInfoOverlay()` — a bottom-sheet (reusing `.gs-sheet`/`.gs-sheet-backdrop` chrome,
+    accent bar `--rs-accent`) with the FULL jump detail (biome/world + difficulty + weather effect + the
+    bet's levers + ⚔/🔥 markers) and a **Cancel / 🚀 Jump** pair. The old always-open route cards are
+    GONE — the sheet is the single detail surface. `inspectRouteId` is view-only module state in `app.ts`
+    (like `inspectGearId`/`settingsOpen`): toggled via the `[data-route-inspect]`/`[data-route]` handlers,
+    force-cleared whenever `state.screen !== 'travel'` (route ids repeat 1..3 per stop, so a stale id
+    would otherwise auto-reopen a sheet), ZERO reducer/save/rng impact — the reducer's existing
+    `{ type:'route' }` action still commits the jump. No new `_gs*`/URL hook → the test-hub guard needs
+    nothing. `tests/journey-map.test.ts` reworked for the vertical orientation (Earth + `.gs-journey--v` +
+    per-choice `data-route-inspect` present, one node per stop, far-hop climbs further, determinism).
+    Verified eyes-on (Playwright render of the top/scrolled-to-Earth chart + the info sheet).
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a
