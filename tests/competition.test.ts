@@ -326,7 +326,20 @@ describe('arcCut (positional cut, GS-positional-cut)', () => {
     expect(arcSurvivorTarget(4)).toBe(6); // arc 2, ordinary stop 1
     expect(arcSurvivorTarget(6)).toBe(4); // arc 3, ordinary stop 0
     expect(arcSurvivorTarget(7)).toBe(2); // arc 3, ordinary stop 1 → the final two
-    expect(arcSurvivorTarget(0, 3)).toBe(13); // ascension tightens it (floored at 2)
+    expect(arcSurvivorTarget(0, 3)).toBe(13); // ascension tightens it
+  });
+
+  it('only the FINAL ordinary stop cuts to 2 — pre-final targets floor at 4 under Ascension (GS-cut-balance)', () => {
+    // The reported bug: Ascension floored every target at 2, so a hard voyage collapsed to a
+    // two-player duel stops before the Galactic Major. The 1-v-2 must exist ONLY at the final boss;
+    // the section right before it (stops 6–7) keeps a field of at least four.
+    for (const asc of [1, 2, 5, 7, 15]) {
+      for (const stop of [0, 1, 3, 4, 6]) {
+        expect(arcSurvivorTarget(stop, asc)!).toBeGreaterThanOrEqual(4); // every pre-final stop
+      }
+      expect(arcSurvivorTarget(7, asc)).toBe(2); // the final ordinary stop → the title duel
+    }
+    expect(arcSurvivorTarget(6, 15)).toBe(4); // deepest squeeze still fields four into the Far Reach
   });
 
   it('keeps the top-N and cuts the rest; a strong player survives, a blanking one is out', () => {

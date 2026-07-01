@@ -189,7 +189,9 @@ For each system: the rule that constrains new work. Open the archive doc before 
 - **Competition & leaderboards** (`docs/decisions/competition.md`). The field is a deterministic
   STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims. Survival in the voyage is your
   POSITION in one persistent field that thins to the final two (`arcCut`/`VOYAGE_SURVIVOR_TARGETS`) —
-  `competition.ts` is the single source for both the drawn board and real survival. `league.ts`
+  `competition.ts` is the single source for both the drawn board and real survival. Only the FINAL
+  ordinary stop cuts to 2; every earlier target (Ascension included) floors at 4 (GS-cut-balance), so
+  the 1-v-2 exists only at the last boss. `league.ts`
   imports `run.ts`, never the reverse (no cycle); the matchplay boss-id is resolved in the UI reducer.
 - **Caddies** (`docs/decisions/caddies.md`). One named caddy at a time, rarity-weighted into the
   shop offer; the first hire blocks the rest. Each folds ONE loadout field (`driverAnywhere`/

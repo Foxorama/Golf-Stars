@@ -85,7 +85,7 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   field for the whole journey (`buildVoyageField(seed, player)`, champions spanning all three arcs) and the
   positional cut is CUMULATIVE across the voyage, ramping the survivor target down
   `VOYAGE_SURVIVOR_TARGETS = [16, 12, 9, 6, 4, 2]` over the six ordinary stops (`arcSurvivorTarget` now
-  indexes by `ordinaryStopOrdinal`, undefined on a boss slot, floored at 2 under Ascension) — so exactly
+  indexes by `ordinaryStopOrdinal`, undefined on a boss slot) — so exactly
   TWO remain (you + one rival) going into the final, a true 1st-vs-2nd matchplay. Both league (`runField`)
   and run (`survivalField`) route winnable formats through `buildVoyageField`, and `arcSlices` now spans
   the WHOLE history (not the current arc), so the cumulative total grows continuously with NO per-arc
@@ -93,6 +93,20 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   the ramp-to-two, and score continuity). Endless flat/ladder keep the per-arc field + Stableford cut,
   byte-for-byte. The leaderboard divider reads "⚔ boss round" on a positional boss stop (never a stray
   "top N advance"). Tune the ramp via `VOYAGE_SURVIVOR_TARGETS`.
+- **Only the FINAL ordinary stop cuts to 2 — pre-final targets floor at 4 (GS-cut-balance).** The
+  original `arcSurvivorTarget` subtracted `ascensionCutBonus` from EVERY target and floored the result
+  at 2 ("so the final is always a duel") — but the level IS the subtraction, so an ascended voyage
+  collapsed the field to a two-player duel stops before the Galactic Major (A2 → `[14,10,7,4,2,2]`, the
+  Far Reach played 1-v-1 twice; A7 → `[9,5,2,2,2,2]`, a duel from Deep Run I on). That both spoiled the
+  final's headline moment (the title match was just "another stop") and made mid-voyage survival
+  needlessly binary. THE RULE: the two-player state exists ONLY at the final boss. The last ordinal
+  (stop 7, feeding the final) keeps its floor of 2; every earlier ordinal floors at
+  `PRE_FINAL_SURVIVOR_FLOOR = 4`, so the section right before the last boss always fields at least four
+  and the cut-to-two lands exactly once, going into the 1st-v-2nd matchplay. Base (A0) targets
+  `[16,12,9,6,4,2]` already respect both floors, so the default path is byte-identical (the whole suite
+  is the guard); Ascension still tightens every step above the floor. No rng involvement — targets
+  change who is cut, never a draw. Tests: `tests/competition.test.ts` (pre-final floor across
+  A1/A2/A5/A7/A15, final stays 2).
 - **Boss-reward TALENTS — pick a run buff or a permanent reward (GS-talents).** Beating a NON-final boss
   opens a reward screen: choose ONE of a thematic run **talent**, a generic run talent, or a permanent
   **Star-Shard** bonus (the "talent or permanent reward for this run" ask). Talents (`TALENTS` in
