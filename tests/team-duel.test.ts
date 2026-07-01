@@ -15,7 +15,7 @@ import {
 import { resolveTeamFormat, isTeamDuelBoss, getFormat, bossAt } from '../src/sim/rpg/formats';
 import { startRun, currentCourse, teamDuelSetupForRun, underdogSide, playStop, scrambleOptsFor } from '../src/sim/rpg/run';
 import { initState, reduce, type UiState } from '../src/ui/game';
-import { shotView } from '../src/sim/rpg/play';
+import { shotView, holeResult } from '../src/sim/rpg/play';
 
 /** A UiState parked at the Arc-II team-duel boss (stop 5) of the first seed whose format matches. */
 function bossUiState(format: 'scramble' | 'bestball'): UiState {
@@ -202,17 +202,46 @@ describe('interactive team-duel reducer (GS-team-duel)', () => {
     expect(s.play!.done).toBe(true);
   });
 
-  it('best-ball: a completed hole records the BETTER of your ball and the partner ball', () => {
+  it('best-ball: the partner ball resolves the MOMENT the hole is done (the end-of-hole reveal), and holeComplete records the better', () => {
     let s = bossUiState('bestball');
     s = reduce(s, { type: 'playInteractive' });
     expect(s.match?.setup?.format).toBe('bestball');
-    // Auto-finish the first hole (no per-shot choice in best-ball), then complete it.
+    // Before any hole finishes, nothing of the partner exists — no mid-hole spoiler to show.
+    expect(s.match!.partnerHoles!.length).toBe(0);
+    // Auto-finish the first hole (no per-shot choice in best-ball).
     s = reduce(s, { type: 'autoShotHole' });
     expect(s.play!.done).toBe(true);
+    // The partner's parallel ball is ALREADY resolved (GS-team-duel reveal) — the end-of-hole
+    // screen shows both cards from this state, before `holeComplete` fires.
+    expect(s.match!.partnerHoles!.length).toBe(1);
+    const raw = holeResult(s.play!);
+    const partnerBall = s.match!.partnerHoles![0]!;
+    // A second done-state action must NOT re-draw the partner ball (rng-stream guard).
+    const again = reduce(s, { type: 'autoShotHole' });
+    expect(again.match!.partnerHoles!.length).toBe(1);
     s = reduce(s, { type: 'holeComplete' });
-    // The partner's parallel ball was played, and the team score is the better of the two.
+    // The recorded team hole is exactly the better of the two balls (ties keep the player's).
     expect(s.match!.partnerHoles!.length).toBe(1);
     const recorded = s.stopPlayed?.[0] ?? s.played?.[0];
-    expect(recorded!.record.strokes).toBeLessThanOrEqual(s.match!.partnerHoles![0]!.record.strokes);
+    expect(recorded!.record.strokes).toBe(Math.min(raw.record.strokes, partnerBall.record.strokes));
+  });
+
+  it('best-ball: the interactive stop resolves the SAME duel as the watch path (auto ≡ interactive)', () => {
+    const base = bossUiState('bestball');
+    // Watch path: one action plays the whole team-duel stop.
+    const watch = reduce(base, { type: 'play' });
+    // Interactive path: auto-finish each hole, completing hole by hole.
+    let s = reduce(base, { type: 'playInteractive' });
+    let guard = 0;
+    while (s.screen === 'playing' && guard++ < 40) {
+      s = s.play!.done ? reduce(s, { type: 'holeComplete' }) : reduce(s, { type: 'autoShotHole' });
+    }
+    expect(s.screen).not.toBe('playing');
+    // Same holes, same winners, same scoreline — the reveal timing moved, the stream didn't.
+    expect(s.match!.duels.map((d) => [d.playerStrokes, d.bossStrokes, d.winner])).toEqual(
+      watch.match!.duels.map((d) => [d.playerStrokes, d.bossStrokes, d.winner]),
+    );
+    expect(s.match!.holesUp).toBe(watch.match!.holesUp);
+    expect(s.lastResult!.passed).toBe(watch.lastResult!.passed);
   });
 });

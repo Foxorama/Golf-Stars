@@ -316,6 +316,37 @@ function resolveBossId(run: Run): string {
   return matchOpponentFor(run) ?? runField(run).golfers.find((g) => !g.isPlayer)?.id ?? '';
 }
 
+/**
+ * Best-ball partner resolution (GS-team-duel): the moment the PLAYER's ball is holed out, the
+ * partner's parallel ball plays on the SAME `:play` rng — so the end-of-hole screen can reveal both
+ * cards side by side (the kept one highlighted) instead of the partner's score materialising
+ * invisibly at `holeComplete`. The rng ORDER is unchanged from the auto sim (`bestBallHole`: the
+ * player's full hole, then the partner's whole hole after it) — only the action the partner's draws
+ * land in moved earlier. No-op on solo/scramble duels and on an already-resolved hole, so every
+ * other path's stream is byte-for-byte untouched.
+ */
+function withBestBallPartner(state: UiState, play: HolePlay): { play: HolePlay; match?: MatchUi } {
+  const setup = state.match?.setup;
+  if (
+    !play.done ||
+    !state.match ||
+    !state.holeRng ||
+    setup?.partnerSide !== 'player' ||
+    setup.format !== 'bestball' ||
+    (state.match.partnerHoles ?? []).length !== play.holeIndex
+  ) {
+    return { play, match: state.match };
+  }
+  const partnerHole = playHole(state.course.holes[play.holeIndex]!, state.holeRng, {
+    ...playerHoleOpts(state.run),
+    shotMods: setup.playerPartnerMods,
+  });
+  return {
+    play,
+    match: { ...state.match, partnerHoles: [...(state.match.partnerHoles ?? []), partnerHole] },
+  };
+}
+
 /** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
 function unlockedAscension(state: UiState, run: Run): number {
   if (run.endedReason !== 'won') return state.maxAscension;
@@ -548,7 +579,7 @@ export function reduce(state: UiState, action: Action): UiState {
         tents,
         scorch,
       );
-      return { ...state, play };
+      return { ...state, ...withBestBallPartner(state, play) };
     }
 
     case 'chooseScrambleBall': {
@@ -561,7 +592,7 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'putt': {
       if (state.screen !== 'playing' || !state.play || state.play.done || !state.holeRng) return state;
       const play = takePutt(state.play, state.run.loadout, state.holeRng, action.control);
-      return { ...state, play };
+      return { ...state, ...withBestBallPartner(state, play) };
     }
 
     case 'autoShotHole': {
@@ -581,25 +612,30 @@ export function reduce(state: UiState, action: Action): UiState {
           ? takePutt(p, state.run.loadout, state.holeRng)
           : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble, tents, scorch);
       }
-      return { ...state, play: p, scrambleChoice: undefined };
+      return { ...state, ...withBestBallPartner(state, p), scrambleChoice: undefined };
     }
 
     case 'holeComplete': {
       if (state.screen !== 'playing' || !state.play || !state.play.done) return state;
       const idx = state.play.holeIndex;
       const raw: PlayedHole = holeResult(state.play);
-      // Team duel BEST-BALL (GS-team-duel), player's side: the partner plays a parallel ball on the SAME
-      // rng (so watch ≡ auto-finish), and the better hole SCORE counts for both the duel and the stop.
+      // Team duel BEST-BALL (GS-team-duel), player's side: the partner played a parallel ball on the
+      // SAME rng the moment the hole finished (`withBestBallPartner` — so the end-of-hole screen could
+      // reveal both cards), and the better hole SCORE counts for both the duel and the stop. The
+      // fallback re-play here draws the identical numbers, purely defensive.
       let teamHole = raw;
       let partnerHoles = state.match?.partnerHoles;
       const tSetup = state.match?.setup;
       if (tSetup?.partnerSide === 'player' && tSetup.format === 'bestball' && state.holeRng) {
-        const partnerHole = playHole(state.course.holes[idx]!, state.holeRng, {
-          ...playerHoleOpts(state.run),
-          shotMods: tSetup.playerPartnerMods,
-        });
+        const already = state.match?.partnerHoles ?? [];
+        const partnerHole =
+          already[idx] ??
+          playHole(state.course.holes[idx]!, state.holeRng, {
+            ...playerHoleOpts(state.run),
+            shotMods: tSetup.playerPartnerMods,
+          });
         teamHole = betterPlayedHole(raw, partnerHole);
-        partnerHoles = [...(state.match!.partnerHoles ?? []), partnerHole];
+        partnerHoles = already.length > idx ? already : [...already, partnerHole];
       }
       const stopPlayed = [...(state.stopPlayed ?? []), teamHole];
       const nextIdx = idx + 1;
