@@ -205,7 +205,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view. All
   scene randomness is mulberry32 seeded from `hashHole()` (NEVER `Math.random`) on documented streams
   (`rng`/`crng`/`hrng`/decor seeds) so the SVG is byte-stable — adding a draw must not perturb the
-  `rng` stream order. Turf bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
+  `rng` stream order. **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
+  rng draw counts never read the projection (place in course space, consume unconditionally, cull
+  at paint — never retry on `inView` or size a count off projected px) and `posHash` keys are
+  course-space, never screen px — `tests/camera-stability.test.ts` guards both. The decision map's
+  framing must hold still for the whole shot decision (frame on the pin-aim full-power spread, not
+  the live drag), and the shot animation starts at the decision map's exact `decisionRadius`. Turf
+  bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
   atmosphere is the shared screen-space `render/weather.ts`. **Per-world identity is table+dispatch,
   never a fork (GS-biome-feel):** flora (`styleFlora`), boundary markers (`OB_LOOK`), signature decor
   (`archetypeDecor`, own seeded stream per the cetus pattern), ambient air (`AMBIENT`) and wind tint

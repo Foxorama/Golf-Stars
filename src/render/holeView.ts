@@ -71,6 +71,13 @@ export interface RenderOptions {
   ball?: Vec;
   /** Draw the aiming spray cone for the contemplated shot (interactive play). */
   spray?: ShotSpread;
+  /** STABLE spread to FIT the whole-hole view around (GS-power). The live `spray` changes every
+   *  frame of the pull gesture (power + aim bearing), and fitting on it made the camera re-fit —
+   *  and the seeded scene re-project — per frame (zoom breathing + decor jitter). Pass the
+   *  full-power pin-aim spread here so the fit holds still while the drawn cone moves. Defaults
+   *  to `spray` (existing callers/tests unchanged). Ignored in focus/zoom mode like the rest of
+   *  the fit extras. */
+  fitSpray?: ShotSpread;
   /** Predicted curved PUTT path (course-space points, GS-greens-3) — drawn as a dotted break line
    *  from the ball, so the player sees how the slope will curl the putt. */
   puttPath?: Vec[];
@@ -158,11 +165,12 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     if (opts.shots) for (const s of opts.shots) extra.push(s.from, s.result.landing, s.rest);
     if (opts.ghostShots) for (const s of opts.ghostShots) extra.push(s.from, s.result.landing, s.rest);
     if (opts.ball) extra.push(opts.ball);
-    if (opts.spray && opts.spray.expectedCarry > 0) {
-      const bands = sprayBands(opts.spray.shape, opts.spray.angleSpread, geom);
+    const fit = opts.fitSpray ?? opts.spray;
+    if (fit && fit.expectedCarry > 0) {
+      const bands = sprayBands(fit.shape, fit.angleSpread, geom);
       let outer = 0;
       for (const b of bands) outer = Math.max(outer, Math.abs(b.a0), Math.abs(b.a1));
-      extra.push(...sprayArc(opts.spray, outer));
+      extra.push(...sprayArc(fit, outer));
     }
   }
 

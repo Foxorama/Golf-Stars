@@ -105,3 +105,20 @@
   so a cosmetic glitch can never strand the boot. Canvas feel isn't unit-testable — verified
   eyes-on (Playwright screenshots per phase).
 
+- **The decision camera holds PERFECTLY still for the whole shot decision, and the watch-cam starts
+  at the exact same zoom (GS-gesture-jitter + the release "zoom skip-jump", 2026-07).** Two bugs, one
+  cause: the framing chased live gesture state. (1) `frameSpray` was built from the LIVE drag target;
+  `carryHigh` folds in the wind component ALONG the shot bearing, so every pixel of aim slide (even
+  finger tremor at `AIM_SENS 0.34°/px`) wobbled `viewRadius` sub-pixel per frame — invisible as
+  motion, but it re-projected the seeded scene every frame and lit up the style.ts decor-jitter bug
+  (see render.md). Now the map frames on the full-power PIN-AIM spread (`clubId + selAim`, no
+  target): the camera changes only when the club/lie changes, and the cone moves within a rock-still
+  world. The whole-map view gets the same treatment via `RenderOptions.fitSpray` (fit on the stable
+  spread; the live `spray` still draws the cone). (2) On release, the shot animation framed itself on
+  `decisionReach(actual travel)` — a different radius than the decision map (which frames on
+  full-power carryHigh / mapZoom), so the watch view CUT to a different zoom the instant the finger
+  lifted. `decisionRadius` (module view-state, like `mapZoom`) now captures the follow-cam radius on
+  every decision render and the animation mounts with exactly it; the follow-cam pans to keep up with
+  the ball as before (the radius is ≥ the old travel-framing for full shots, and for a pinched-in
+  player it honours THEIR zoom). Falls back to travel-framing when no decision preceded the animation
+  (resume, putt-only); reset per hole alongside the other per-hole view state.
