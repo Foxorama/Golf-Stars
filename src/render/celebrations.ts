@@ -331,13 +331,11 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
   // The flying bird, drawn facing +x, seen from above. Wings stay broadly spread (a soaring raptor /
   // glider) and "flap" with a gentle foreshorten + sweep-back so they never collapse into the body.
   // The albatross has very long, narrow wings; the eagle's are broad with splayed primary "fingers".
-  const chordF = albatross ? 0.5 : 0.82; // front-to-back wing depth (albatross = high aspect ratio)
   const drawBird = (cx: number, cy: number, sc: number, phase: number): void => {
     const flap = Math.sin(phase); // -1..1
     const fore = 0.82 + 0.18 * (0.5 + 0.5 * Math.cos(phase)); // 0.82..1.0 — a gentle wing-beat
     const wingSpan = sc * fore;
     const back = sc * (albatross ? 0.42 : 0.5) + sc * (1 - fore) * 0.45; // wingtips sweep back as they flap
-    const depth = sc * 0.5 * chordF; // trailing-edge sweep depth
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(flap * 0.05); // a touch of bank
@@ -374,19 +372,19 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
         // outward-and-back — the unmistakable spread-eagle wingtip — before the secondaries sweep the
         // trailing edge back into the body. `P(fx, fy)` is a tip/slot vertex in (chord, span) units.
         const P = (fx: number, fy: number): void => ctx.lineTo(sc * fx, tipY * fy);
-        ctx.moveTo(sc * 0.3, sign * sc * 0.02);
-        ctx.quadraticCurveTo(sc * 0.4, tipY * 0.32, sc * 0.08, tipY * 0.62); // arm → wrist
-        P(-0.06, 0.98); // finger 1 tip (outer)
-        P(-0.03, 0.77); // slot 1
-        P(-0.22, 1.0); // finger 2 tip
-        P(-0.15, 0.76); // slot 2
-        P(-0.38, 0.97); // finger 3 tip
-        P(-0.29, 0.72); // slot 3
-        P(-0.53, 0.89); // finger 4 tip
-        P(-0.42, 0.67); // slot 4
-        P(-0.65, 0.77); // finger 5 tip (inner)
-        P(-0.5, 0.58); // base of inner primary → onto the secondaries
-        ctx.quadraticCurveTo(-back - depth * 0.28, tipY * 0.33, -sc * 0.36, sign * sc * 0.04); // trailing edge → body
+        ctx.moveTo(sc * 0.22, sign * sc * 0.02);
+        ctx.quadraticCurveTo(sc * 0.2, tipY * 0.36, sc * 0.02, tipY * 0.66); // near-straight arm → wrist
+        P(-0.08, 0.99); // finger 1 tip (outer)
+        P(-0.04, 0.82); // slot 1
+        P(-0.24, 1.0); // finger 2 tip
+        P(-0.18, 0.8); // slot 2
+        P(-0.4, 0.96); // finger 3 tip
+        P(-0.32, 0.77); // slot 3
+        P(-0.54, 0.88); // finger 4 tip
+        P(-0.44, 0.73); // slot 4
+        P(-0.64, 0.78); // finger 5 tip (inner)
+        P(-0.52, 0.64); // base of inner primary → onto the secondaries
+        ctx.quadraticCurveTo(-sc * 0.36, tipY * 0.42, -sc * 0.28, sign * sc * 0.03); // slim trailing edge → body
       }
       ctx.closePath();
       ctx.fillStyle = grad;
@@ -402,21 +400,21 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
         // the leading edge — the "silver, spacey" sheen.
         ctx.globalAlpha = 0.5;
         ctx.strokeStyle = 'rgba(70,90,124,.6)';
-        ctx.lineWidth = Math.max(1, sc * 0.01);
+        ctx.lineWidth = Math.max(1, sc * 0.009);
         ctx.beginPath();
-        ctx.moveTo(sc * 0.02, tipY * 0.5);
-        ctx.quadraticCurveTo(-sc * 0.16, tipY * 0.6, -sc * 0.34, tipY * 0.62);
+        ctx.moveTo(0, tipY * 0.52);
+        ctx.quadraticCurveTo(-sc * 0.18, tipY * 0.6, -sc * 0.34, tipY * 0.6);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(-sc * 0.02, tipY * 0.34);
-        ctx.quadraticCurveTo(-sc * 0.14, tipY * 0.42, -sc * 0.3, tipY * 0.44);
+        ctx.moveTo(-sc * 0.06, tipY * 0.36);
+        ctx.quadraticCurveTo(-sc * 0.16, tipY * 0.42, -sc * 0.3, tipY * 0.42);
         ctx.stroke();
-        ctx.globalAlpha = 0.8;
+        ctx.globalAlpha = 0.85;
         ctx.strokeStyle = 'rgba(255,255,255,.9)';
-        ctx.lineWidth = Math.max(1, sc * 0.012);
+        ctx.lineWidth = Math.max(1, sc * 0.011);
         ctx.beginPath();
-        ctx.moveTo(sc * 0.26, sign * sc * 0.03);
-        ctx.quadraticCurveTo(sc * 0.36, tipY * 0.34, sc * 0.06, tipY * 0.6);
+        ctx.moveTo(sc * 0.2, sign * sc * 0.02);
+        ctx.quadraticCurveTo(sc * 0.18, tipY * 0.36, sc * 0.02, tipY * 0.62);
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
@@ -424,21 +422,18 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
     wing(1);
     wing(-1);
 
-    // Body fuselage + head. The albatross keeps a slim body with the head sitting close in; the eagle
-    // gets a broader chest and a projecting neck+head so it reads as a raptor peering ahead, not a gull.
-    ctx.fillStyle = albatross ? '#e7edff' : '#eef3fb';
-    ctx.beginPath();
-    ctx.ellipse(-sc * 0.02, 0, sc * (albatross ? 0.46 : 0.44), sc * (albatross ? 0.08 : 0.11), 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (!albatross) {
-      ctx.beginPath();
-      ctx.ellipse(sc * 0.4, 0, sc * 0.16, sc * 0.09, 0, 0, Math.PI * 2); // extended neck
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(sc * (albatross ? 0.46 : 0.56), 0, sc * (albatross ? 0.09 : 0.1), 0, Math.PI * 2); // head
-    ctx.fill();
+    // Body / head / tail. Kept fully separate per kind: the albatross is drawn exactly as before
+    // (slim ellipse body, head close in, spear beak, then the forked tail on top). The eagle draws its
+    // fanned tail first, then a broad chest tapering through a short neck to a distinct round raptor
+    // head over the tail root — so it flows body → neck → head → beak, not a lumpy worm.
     if (albatross) {
+      ctx.fillStyle = '#e7edff';
+      ctx.beginPath();
+      ctx.ellipse(-sc * 0.02, 0, sc * 0.46, sc * 0.08, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(sc * 0.46, 0, sc * 0.09, 0, Math.PI * 2); // head
+      ctx.fill();
       // Straight spear beak.
       ctx.fillStyle = '#ffce6e';
       ctx.beginPath();
@@ -447,25 +442,6 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
       ctx.lineTo(sc * 0.53, sc * 0.04);
       ctx.closePath();
       ctx.fill();
-    } else {
-      // Golden hooked raptor beak — curls down at the tip, the eagle's signature.
-      ctx.fillStyle = '#ffc22e';
-      ctx.beginPath();
-      ctx.moveTo(sc * 0.62, -sc * 0.06);
-      ctx.quadraticCurveTo(sc * 0.9, -sc * 0.05, sc * 0.92, sc * 0.02);
-      ctx.quadraticCurveTo(sc * 0.86, sc * 0.055, sc * 0.7, sc * 0.05);
-      ctx.closePath();
-      ctx.fill();
-      // Dark raptor eyes, set forward on the head.
-      ctx.fillStyle = '#2a3550';
-      ctx.beginPath();
-      ctx.arc(sc * 0.585, -sc * 0.045, sc * 0.014, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(sc * 0.585, sc * 0.045, sc * 0.014, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (albatross) {
       // Forked tail.
       ctx.fillStyle = '#9fb8ff';
       ctx.beginPath();
@@ -476,17 +452,47 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
       ctx.closePath();
       ctx.fill();
     } else {
-      // Broad fanned wedge tail — the eagle spreads its tail feathers, it does not fork like a gull.
+      // Broad fanned wedge tail (the eagle spreads its tail feathers, it does not fork like a gull),
+      // drawn first so the body covers its root.
       ctx.fillStyle = '#9fb0cc';
       ctx.beginPath();
-      ctx.moveTo(-sc * 0.34, sc * 0.05);
-      ctx.lineTo(-sc * 0.84, sc * 0.22);
-      ctx.lineTo(-sc * 0.9, sc * 0.14);
-      ctx.lineTo(-sc * 0.94, 0);
-      ctx.lineTo(-sc * 0.9, -sc * 0.14);
-      ctx.lineTo(-sc * 0.84, -sc * 0.22);
-      ctx.lineTo(-sc * 0.34, -sc * 0.05);
+      ctx.moveTo(-sc * 0.28, sc * 0.05);
+      ctx.lineTo(-sc * 0.82, sc * 0.22);
+      ctx.lineTo(-sc * 0.88, sc * 0.13);
+      ctx.lineTo(-sc * 0.92, 0);
+      ctx.lineTo(-sc * 0.88, -sc * 0.13);
+      ctx.lineTo(-sc * 0.82, -sc * 0.22);
+      ctx.lineTo(-sc * 0.28, -sc * 0.05);
       ctx.closePath();
+      ctx.fill();
+      // Tapered body: broad chest → short neck.
+      ctx.fillStyle = '#eef3fb';
+      ctx.beginPath();
+      ctx.moveTo(-sc * 0.34, 0); // tail root
+      ctx.quadraticCurveTo(-sc * 0.08, sc * 0.12, sc * 0.2, sc * 0.075); // lower chest
+      ctx.quadraticCurveTo(sc * 0.34, sc * 0.055, sc * 0.38, 0); // taper to a short neck
+      ctx.quadraticCurveTo(sc * 0.34, -sc * 0.055, sc * 0.2, -sc * 0.075);
+      ctx.quadraticCurveTo(-sc * 0.08, -sc * 0.12, -sc * 0.34, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath(); // round head, elongated forward so neck → head → beak flows
+      ctx.ellipse(sc * 0.45, 0, sc * 0.115, sc * 0.092, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Golden hooked raptor beak — curls down at the tip, the eagle's signature.
+      ctx.fillStyle = '#ffc22e';
+      ctx.beginPath();
+      ctx.moveTo(sc * 0.53, -sc * 0.05);
+      ctx.quadraticCurveTo(sc * 0.76, -sc * 0.045, sc * 0.78, sc * 0.015);
+      ctx.quadraticCurveTo(sc * 0.72, sc * 0.05, sc * 0.58, sc * 0.048);
+      ctx.closePath();
+      ctx.fill();
+      // Dark raptor eyes, set forward on the sides of the head — a fierce forward stare.
+      ctx.fillStyle = '#2a3550';
+      ctx.beginPath();
+      ctx.arc(sc * 0.49, -sc * 0.058, sc * 0.014, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(sc * 0.49, sc * 0.058, sc * 0.014, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
