@@ -994,9 +994,14 @@ function traitList(title: string, accent: string, traits: { icon: string; text: 
 // frame and the rough/OB legitimately stretch off-screen.
 const DMAP_W = 360;
 const DMAP_H = 640;
-// Ball sits low-ish so most of the frame is the shot AHEAD, but high enough to clear the floating
-// bottom control panel on the full-bleed screen (the ball reads above the HUD, not behind it).
-const DMAP_BIAS = 0.72;
+// Ball sits LOW — near the bottom of the map, just above the floating bottom control panel — so
+// nearly the whole frame is the shot AHEAD. At 0.72 the ball read too high and the top of a
+// max-distance shot landed at ~4% from the top, tucked behind the top info-chip / at the very top
+// edge, forcing a manual zoom-out on every full swing. Dropping it to 0.84 reclaims the wasted
+// space that was showing terrain BEHIND the ball, so the full arc for the longest club lands at
+// ~16% from the top — clear of the HUD and visible without zooming out. (The ball still clears the
+// bottom panel, which floats over roughly the bottom ~10% of the map.)
+const DMAP_BIAS = 0.84;
 /** View radius (course yds) framing a shot of max-carry `carryHigh`. Tuned with DMAP_BIAS so the
  *  contemplated shot nearly fills the height and the corridor fills the width — the rough/OB
  *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
