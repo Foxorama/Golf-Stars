@@ -177,6 +177,7 @@ export function takeShot(
   autoPutt = true,
   scramble?: ScrambleOpts,
   tradeTents = false,
+  meteorScorch = false,
 ): HolePlay {
   if (state.done) return state;
   const pin = pinOf(state.hole);
@@ -206,6 +207,7 @@ export function takeShot(
     hazardImmune: loadout.hazardImmune,
     rainbowRoad: loadout.rainbowRoad,
     tradeTents,
+    meteorScorch,
     // Suggestible Sam: commit to his suggested club and the confidence boost folds into this shot.
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
@@ -328,6 +330,7 @@ export function resolveScrambleShot(
   rng: Rng,
   partnerMods: ScrambleOpts['partnerMods'],
   tradeTents = false,
+  meteorScorch = false,
 ): ScrambleShot {
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
@@ -355,6 +358,7 @@ export function resolveScrambleShot(
     hazardImmune: loadout.hazardImmune,
     rainbowRoad: loadout.rainbowRoad,
     tradeTents,
+    meteorScorch,
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
       ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id

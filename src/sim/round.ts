@@ -33,6 +33,7 @@ import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, flightKnockdown } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TradeTent } from './tents';
+import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
@@ -349,6 +350,10 @@ export interface PlayHoleOptions {
    *  green. A property of the HOLE while in play (a boss/partner on the same hole obeys it too — see
    *  match.ts). Absent/false = ordinary play, byte-for-byte unchanged. */
   tradeTents?: boolean;
+  /** Meteor-strike scorch marks (GS-meteor-scorch): the meteor-shower route chars craters into the
+   *  turf — a ball resting on one plays a hot-but-wild 'scorch' lie. A property of the HOLE while in
+   *  play (see match.ts). Absent/false = ordinary play, byte-for-byte unchanged. */
+  meteorScorch?: boolean;
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -726,6 +731,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       hazardImmune: opts.hazardImmune,
       rainbowRoad: opts.rainbowRoad,
       tradeTents: opts.tradeTents,
+      meteorScorch: opts.meteorScorch,
     };
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
     // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
@@ -844,6 +850,11 @@ export interface ExecOpts {
    *  (the trade-market route's signature) that a low/flat shot ricochets off. Pure geometry, no rng;
    *  absent/false is byte-for-byte unchanged. Resolved from the course effect at the call sites. */
   tradeTents?: boolean;
+  /** Meteor-strike scorch marks (GS-meteor-scorch): when true the hole carries charred craters (the
+   *  meteor-shower route's signature) — a ball at REST on one plays the hot-but-wild 'scorch' lie.
+   *  Pure seeded geometry, no play rng; absent/false is byte-for-byte unchanged. Resolved from the
+   *  course effect at the call sites. */
+  meteorScorch?: boolean;
 }
 
 export interface ExecResult {
@@ -1007,7 +1018,16 @@ export function executeShot(
     }
   }
 
-  const restLie = lieAt(hole, rest);
+  let restLie = lieAt(hole, rest);
+  // Meteor-strike scorch (GS-meteor-scorch): a ball at REST on a charred crater plays the 'scorch'
+  // lie next shot — hot off the baked crust, but wild. The marks are a pure function of the hole
+  // (own seeded stream — ZERO play-rng), built only when the meteor-shower route armed them, so a
+  // base shot never enters this branch (byte-for-byte stable). Soft-turf lies only: a green/tee/
+  // sand/penalty rest keeps its own (harsher or rule-bearing) read. Skipped under the Rainbow Ball,
+  // whose own off-road rule reads the UNCONVERTED rest lie (a scorched fairway is still the road).
+  if (opts.meteorScorch && !opts.rainbowRoad && SCORCHABLE.has(restLie) && inScorch(meteorScorch(hole), rest)) {
+    restLie = SCORCH_LIE;
+  }
   const li = lieInfo(restLie);
   const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };
   if (tentHit) log.tentHit = { at: tentHit.point, dir: tentHit.dir };

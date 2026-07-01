@@ -369,6 +369,37 @@
   `tests/journey-effects.test.ts` (new mappings incl. the anchoring traps, spread across all ten
   effects, wind-mult ordering/band, exact per-hole wind scaling with deg untouched + clamp, neutral
   path untouched).
+- **The meteor-shower route chars SCORCH CRATERS into the turf — the second effect that's also a game
+  mechanic (GS-meteor-scorch, `src/sim/scorch.ts`).** The first GS-weather-play follow-on to the tents.
+  Two pure ideas, mirroring GS-tents exactly:
+  1. **PLACEMENT** — `meteorScorch(hole)` scatters up to `SCORCH_MAX` (6) craters (r 3.5–6yd) along the
+     mid corridor (t ∈ 0.2–0.88 of the centreline, ±26yd lateral) on a PRIVATE rng stream seeded off the
+     hole GEOMETRY (`scorch:tee:green:par`) — deterministic per hole, ZERO play-rng, so arming it changes
+     no existing draw. Fairness by construction: a candidate is accepted only on SOFT TURF
+     (`SCORCHABLE` = fairway/rough/waste/fescue — never the green, tee box, sand or a penalty surface,
+     with explicit green/tee clearance margins) and clear of the other marks. A fixed 16-candidate
+     budget, no unbounded loops.
+  2. **THE LIE** — `executeShot` converts the REST lie to `scorch` when the ball settles on a mark
+     (`LIE_INFO.scorch`: carry ×1.05 — it flies HOT off the baked crust — but dispersion ×1.45, wild;
+     NEVER a penalty, gentler than trees/fescue). Conversion applies only to SCORCHABLE underlying lies
+     (a green/sand/penalty rest keeps its stricter read) and is SKIPPED under Rainbow Road (whose
+     off-road rule reads the unconverted rest lie — a scorched fairway is still the road). Gated behind
+     `opts.meteorScorch` (default off ⇒ byte-for-byte; the ball's position/rng are identical armed or
+     not — ONLY the lie label converts), threaded identically through the auto sim (`playerHoleOpts`,
+     armed when `routeEffect === 'meteorShower'`), the interactive driver (`takeShot`/
+     `resolveScrambleShot`, reducer passes `course.meta.effect === 'meteorShower'`) and the boss/partner
+     (`match.ts`, like tents/rainbow) — so auto ≡ interactive and a duel stays fair.
+  RENDER: `styleScorch` draws the craters in COURSE space in `buildScene` (gated `SceneOpts.meteorScorch`,
+  baked at the app boundary by `scorchActive()`), from the SAME `meteorScorch(hole)` the sim reads — the
+  footprint circle drawn IS the radius the lie conversion tests (the graphic is the physics). All crater
+  variation is `posHash` (zero rng draws — the seeded scene streams untouched). A touchdown on a mark
+  answers with an ash+ember `spawnLandFX` burst (keyed off the same `inScorch`), and the lie chip shows
+  "Scorched +5% carry · wild" (the chip gained a carry-BONUS display — ice/crystal benefit too). NO new
+  `_gs*`/URL hook (content/effect-derived, like tents), so the test-hub guard needs nothing. FAIRNESS
+  proven by `tests/scorch.test.ts` (placement margins + soft-turf-only across seeds×biomes, purity,
+  conversion fires + never-a-penalty, armed-vs-unarmed ball identical with only the lie label differing,
+  the lie bites but sits below the trouble lies, and the no-death-spiral bar holds with scorch armed at
+  wildness 1 across biomes). Eyes-on with `node scripts/scorch-preview.mjs`.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen

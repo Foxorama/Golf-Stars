@@ -364,6 +364,11 @@ export const LIE_INFO: Record<string, LieInfo> = {
   cetusdeep: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'cetuslost', label: 'Lost to the star-ocean' },
   ice: { carryMult: 1.02, dispersionMult: 1.5, label: 'Ice' }, // slick: hard to control
   crystal: { carryMult: 1.05, dispersionMult: 0.85, label: 'Crystal' }, // true & fast
+  // Meteor-strike scorch (GS-meteor-scorch): charred, baked crust under a meteor-shower sky. The
+  // ball flies HOT off it (a touch long) but ash and cinders make it WILD — spicier than rough,
+  // never a penalty. `lieAt` never returns this: it exists only via the rest-lie conversion in
+  // `executeShot`, armed by the meteor-shower course effect (sim/scorch.ts).
+  scorch: { carryMult: 1.05, dispersionMult: 1.45, label: 'Scorched' },
 };
 
 /** Default lie when a point is off every polygon (native / out-of-frame): rough. */
