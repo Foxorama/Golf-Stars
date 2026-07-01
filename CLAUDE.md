@@ -174,8 +174,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   ace/bird takeovers, NOT in the reducer); the win no longer shares the missed-cut fall. The played golfer's
   per-character unlocked clubs (`unlockedClubsByCharacter`) are surfaced as chips on the character-select
   card. Route choice carries the destination biome + a
-  difficulty/atmosphere event (economy/cut/meta only — NEVER generation rng; the ONE physics hook is
-  `effectWindMult`, a clamped pure post-gen scale on `hole.wind` so HUD/AI/sim all read the same number).
+  difficulty/atmosphere event (economy/cut/meta only — NEVER generation rng; the physics hooks are
+  `effectWindMult`, a clamped pure post-gen scale on `hole.wind` so HUD/AI/sim all read the same number,
+  plus the two play-boundary twists: tradeMarket's collidable tents (GS-tents) and meteorShower's
+  scorch craters (GS-meteor-scorch, `sim/scorch.ts`) — a ball resting on a crater plays the hot-but-wild
+  non-penalty `scorch` lie; marks are a pure seeded function of the hole, drawn + played from the SAME source).
   The three lanes always land DISTINCT world archetypes, never the one you're on (`routeTheme` avoid-set
   via a filtered `pickThemeFrom` redraw, NOT a retry loop; split stops cross two archetypes —
   GS-journey-variety); a new course effect = a `COURSE_EFFECTS` row + a `routeEffect` mapping + a

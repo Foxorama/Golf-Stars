@@ -686,6 +686,9 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     // green. Derived from the SAME pending-event effect `currentCourse` stamps on the meta, so the sim
     // collision and the renderer agree on when tents exist.
     tradeTents: routeEffect(run.pendingEvent) === 'tradeMarket',
+    // Meteor-strike scorch marks (GS-meteor-scorch): the meteor-shower route chars craters into the
+    // turf — same effect-derived gate, so the sim's lie conversion and the drawn craters agree.
+    meteorScorch: routeEffect(run.pendingEvent) === 'meteorShower',
     scramble: scrambleOptsFor(run),
   };
 }

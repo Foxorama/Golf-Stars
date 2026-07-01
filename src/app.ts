@@ -964,7 +964,10 @@ function windDescription(hole: Hole): string {
 function lieChip(lie: string): string {
   const info = lieInfo(lie);
   const label = info.label ?? lie;
-  const carryPen = info.carryMult < 0.99 ? `−${Math.round((1 - info.carryMult) * 100)}% carry` : '';
+  const carryPen =
+    info.carryMult < 0.99 ? `−${Math.round((1 - info.carryMult) * 100)}% carry`
+    : info.carryMult > 1.01 ? `+${Math.round((info.carryMult - 1) * 100)}% carry` // hot/fast lies fly long
+    : '';
   const spray = info.dispersionMult >= 1.55 ? 'very wild' : info.dispersionMult >= 1.25 ? 'wild' : info.dispersionMult > 1.05 ? 'loose' : '';
   const eff = [carryPen, spray].filter(Boolean).join(' · ');
   const trouble = !!info.penalty || info.carryMult <= 0.6 || info.dispersionMult >= 1.55;
@@ -1311,6 +1314,7 @@ function playingBody(animating: boolean): string {
       biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
       rainbow: rainbowActive(),
       tradeTents: tentsActive(),
+      meteorScorch: scorchActive(),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -1398,6 +1402,7 @@ function playingBody(animating: boolean): string {
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     rainbow: rainbowActive(),
     tradeTents: tentsActive(),
+    meteorScorch: scorchActive(),
     ball: play.ball,
     spray,
     sprayGeom,
@@ -1523,6 +1528,7 @@ function scrambleChoiceOverlay(): string {
     themeId: holeThemeId(hole),
     rainbow: rainbowActive(),
     tradeTents: tentsActive(),
+    meteorScorch: scorchActive(),
     shots: [sc.player.log],
     ghostShots: [sc.partner.log],
   });
@@ -2606,6 +2612,13 @@ function tentsActive(): boolean {
   return currentEffect() === 'tradeMarket';
 }
 
+/** Meteor-strike scorch craters (GS-meteor-scorch): whether the current stop's route charred the turf.
+ *  Baked into the render options exactly like the tents — the sim's lie conversion keys off the SAME
+ *  course effect (`playerHoleOpts`), so the drawn craters and the physics stay in lock-step. */
+function scorchActive(): boolean {
+  return currentEffect() === 'meteorShower';
+}
+
 /** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
  *  identically across screens (a quiet hand-off from lining up to watching the shot). */
 function weatherSeed(hole: Hole): number {
@@ -3085,6 +3098,7 @@ function render(): void {
         biome: holeBiome(hole), themeId: holeThemeId(hole), effect: currentEffect(),
         rainbow: rainbowActive(),
         tradeTents: tentsActive(),
+        meteorScorch: scorchActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
@@ -3124,6 +3138,7 @@ function render(): void {
         height: animH,
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
         tradeTents: tentsActive(),
+        meteorScorch: scorchActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),

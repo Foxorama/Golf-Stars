@@ -18,6 +18,7 @@ import type { Feature, Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBoundsCorners } from '../sim/round';
 import { tradeTents as tradeTentsFor, type TradeTent } from '../sim/tents';
+import { meteorScorch as meteorScorchFor, type ScorchMark } from '../sim/scorch';
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
@@ -102,6 +103,10 @@ export interface SceneOpts {
    *  around the green. Drawn in COURSE space (so they track the follow-cam — the fix for the old
    *  screen-space caravan that floated in mid-air). Baked at the app boundary from the course effect. */
   tradeTents?: boolean;
+  /** Meteor-strike scorch craters (GS-meteor-scorch): the meteor-shower route chars craters into the
+   *  turf — a ball at rest on one plays the 'scorch' lie. Drawn in COURSE space from the SAME
+   *  `meteorScorch(hole)` the sim reads. Baked at the app boundary from the course effect. */
+  meteorScorch?: boolean;
 }
 
 /** The Rainbow Road colour cycle (GS-rainbow) — a vivid 7-band rainbow the ribbon mows through. */
@@ -1107,6 +1112,65 @@ const TENT_FILLS: [string, string][] = [
  * for the old screen-space caravan that floated in mid-air). A striped conical roof + a dark doorway +
  * a pennant + a warm camp glow, sized by `proj.scale`. Pure (the geometry is the tent's own; no rng).
  */
+/**
+ * Meteor-strike scorch craters (GS-meteor-scorch): a charred, still-smouldering strike mark — an
+ * irregular soot blob with a raised ash ring, radial burn rays where the impact splashed, and a few
+ * ember flecks glowing in the char. All variation is `posHash` of the mark's course position (zero
+ * rng draws — the seeded scene streams are untouched). The footprint circle drawn here is EXACTLY
+ * the `ScorchMark` radius the sim's lie conversion tests, so what you see is what you play.
+ */
+function styleScorch(marks: readonly ScorchMark[], proj: Projector): Prim[] {
+  const out: Prim[] = [];
+  for (const m of marks) {
+    const [x, y] = proj.project(m.c);
+    const rr = Math.max(4, m.r * proj.scale);
+    const h = (k: number) => posHash(m.c[0], m.c[1], m.variant * 17 + k);
+    // Faint ember glow under everything so the char reads warm, not like a plain shadow.
+    out.push({ t: 'glow', c: [x, y], r: rr * 1.5, col: 'rgba(255,120,50,0.12)' });
+    // Radial burn rays — the impact splash, tapered darts pointing outward.
+    const rays = 5 + Math.floor(h(1) * 3);
+    for (let i = 0; i < rays; i++) {
+      const a = (i / rays) * Math.PI * 2 + h(i + 2) * 0.8;
+      const len = rr * (1.25 + h(i + 9) * 0.6);
+      const wid = rr * 0.16;
+      const dx = Math.cos(a);
+      const dy = Math.sin(a);
+      out.push({
+        t: 'poly',
+        pts: [
+          [x + dx * rr * 0.7 - dy * wid, y + dy * rr * 0.7 + dx * wid],
+          [x + dx * rr * 0.7 + dy * wid, y + dy * rr * 0.7 - dx * wid],
+          [x + dx * len, y + dy * len],
+        ],
+        fill: 'rgba(26,20,16,0.5)',
+      });
+    }
+    // The charred blob itself — an irregular near-circle at the TRUE footprint radius.
+    const n = 10;
+    const blob: Vec[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const wob = 0.86 + h(i + 20) * 0.24;
+      blob.push([x + Math.cos(a) * rr * wob, y + Math.sin(a) * rr * wob]);
+    }
+    out.push({ t: 'poly', pts: blob, fill: 'rgba(24,18,15,0.88)', stroke: 'rgba(64,48,38,0.8)', sw: 1.1 });
+    // Ash-grey inner bowl, offset a touch so the crater reads dished, not flat.
+    out.push({ t: 'circle', c: [x - rr * 0.12, y - rr * 0.1], r: rr * 0.55, fill: 'rgba(66,58,52,0.75)' });
+    // Ember flecks smouldering in the char.
+    for (let i = 0; i < 3; i++) {
+      const a = h(i + 31) * Math.PI * 2;
+      const d = rr * (0.15 + h(i + 41) * 0.5);
+      out.push({
+        t: 'circle',
+        c: [x + Math.cos(a) * d, y + Math.sin(a) * d],
+        r: Math.max(0.7, rr * 0.09),
+        fill: i === 0 ? 'rgba(255,170,80,0.95)' : 'rgba(255,110,50,0.85)',
+      });
+    }
+  }
+  return out;
+}
+
 function styleTents(tents: readonly TradeTent[], proj: Projector): Prim[] {
   const out: Prim[] = [];
   for (const t of tents) {
@@ -2398,7 +2462,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     for (const f of treeHaz) prims.push(...styleFlora(f.poly, proj, rng, arch));
   }
 
-  // --- 6b. Trade-camp tents (GS-tents) ----------------------------------------
+  // --- 6b. Meteor-strike scorch craters (GS-meteor-scorch) ---------------------
+  // The meteor-shower route's signature: charred craters burned into the turf, drawn from the SAME
+  // `meteorScorch(hole)` the sim's lie conversion reads — a crater you see is exactly the lie the sim
+  // plays (the graphic IS the physics). Pure (posHash variation only — zero rng draws, so the seeded
+  // scene streams are untouched); off under Rainbow Road (whose road rule ignores scorch).
+  if (opts.meteorScorch && !rainbow) prims.push(...styleScorch(meteorScorchFor(hole), proj));
+
+  // --- 6c. Trade-camp tents (GS-tents) ----------------------------------------
   // The trade-market route's signature: a ring of bright, collidable tents around the green. Drawn in
   // COURSE space (projected) so they sit on the ground and track the follow-cam — the fix for the old
   // screen-space caravan that floated in mid-air over the controls / the flight. Pure (no rng); off the
