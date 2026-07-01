@@ -312,7 +312,7 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
 
   const albatross = kind === 'albatross';
   // The bird is sized off the smaller screen edge so it reads on phone + desktop alike.
-  const span = Math.min(W, H) * (albatross ? 0.38 : 0.2);
+  const span = Math.min(W, H) * (albatross ? 0.38 : 0.24);
   const baseY = H * (albatross ? 0.34 : 0.3);
   const speed = (albatross ? 0.26 : 0.42) * dpr; // px/ms across the screen
   const flapHz = albatross ? 1.0 : 3.0; // wing-beats per second
@@ -351,9 +351,13 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
       grad.addColorStop(0.58, '#5fe6c8');
       grad.addColorStop(1, '#cdb6ff');
     } else {
-      grad.addColorStop(0, '#f4f8ff');
-      grad.addColorStop(0.5, '#c2cee2');
-      grad.addColorStop(1, '#8395b4');
+      // Brushed chrome-silver: a hot white leading highlight raking down into cool steel — reads
+      // metallic, not the soft blue-grey that made it look like a gull/albatross.
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.26, '#e9eff8');
+      grad.addColorStop(0.52, '#b7c5da');
+      grad.addColorStop(0.78, '#8a9cb8');
+      grad.addColorStop(1, '#6b7d9c');
     }
 
     const wing = (sign: number): void => {
@@ -365,52 +369,84 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
         ctx.quadraticCurveTo(sc * 0.06, tipY * 0.42, -back, tipY); // leading edge sweeps out & back
         ctx.quadraticCurveTo(-back - sc * 0.05, tipY * 0.62, -sc * 0.16, sign * sc * 0.02); // thin trailing edge
       } else {
-        // A broad raptor wing with three splayed primary "fingers" at the swept tip.
-        ctx.moveTo(sc * 0.26, sign * sc * 0.04);
-        ctx.quadraticCurveTo(sc * 0.30, tipY * 0.55, -back, tipY);
-        ctx.lineTo(-back - sc * 0.12, tipY * 0.96);
-        ctx.lineTo(-back - sc * 0.1, tipY * 0.84);
-        ctx.lineTo(-back - sc * 0.22, tipY * 0.8);
-        ctx.lineTo(-back - sc * 0.2, tipY * 0.68);
-        ctx.quadraticCurveTo(-back - depth * 0.3, tipY * 0.5, -sc * 0.4, sign * sc * 0.03);
+        // A broad, deep-chested raptor wing: the leading edge bows forward off the shoulder and rakes
+        // out to the tip, where a cluster of splayed primary "fingers" slot back — the unmistakable
+        // spread-eagle wingtip — then a full trailing edge sweeps deep into the body.
+        ctx.moveTo(sc * 0.3, sign * sc * 0.05);
+        ctx.quadraticCurveTo(sc * 0.4, tipY * 0.52, sc * 0.02, tipY * 0.9); // leading edge bows out
+        ctx.quadraticCurveTo(-sc * 0.12, tipY * 0.99, -sc * 0.24, tipY * 1.0); // to the outer wingtip
+        ctx.lineTo(-sc * 0.2, tipY * 0.9); // splayed primary fingers, concentrated at the tip
+        ctx.lineTo(-sc * 0.4, tipY * 0.9);
+        ctx.lineTo(-sc * 0.34, tipY * 0.8);
+        ctx.lineTo(-sc * 0.54, tipY * 0.79);
+        ctx.lineTo(-sc * 0.46, tipY * 0.69);
+        ctx.lineTo(-sc * 0.64, tipY * 0.67);
+        ctx.quadraticCurveTo(-back - depth * 0.35, tipY * 0.36, -sc * 0.44, sign * sc * 0.05); // trailing edge → body
       }
       ctx.closePath();
       ctx.fillStyle = grad;
-      ctx.shadowColor = albatross ? 'rgba(120,230,210,.8)' : 'rgba(205,220,245,.65)';
+      ctx.shadowColor = albatross ? 'rgba(120,230,210,.8)' : 'rgba(224,235,252,.75)';
       ctx.shadowBlur = sc * 0.26;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.lineWidth = Math.max(1, sc * 0.016);
-      ctx.strokeStyle = albatross ? 'rgba(48,34,86,.5)' : 'rgba(56,68,96,.5)';
+      ctx.strokeStyle = albatross ? 'rgba(48,34,86,.5)' : 'rgba(38,50,76,.55)';
       ctx.stroke();
     };
     wing(1);
     wing(-1);
 
-    // Slim body fuselage + head + beak — small, so the wings dominate the silhouette.
-    ctx.fillStyle = albatross ? '#e7edff' : '#dde4ef';
+    // Body fuselage + head — the eagle sits a touch broader-chested (silver) so it doesn't read as a
+    // thin gull; the albatross keeps its slim body.
+    ctx.fillStyle = albatross ? '#e7edff' : '#eef3fb';
     ctx.beginPath();
-    ctx.ellipse(-sc * 0.02, 0, sc * 0.46, sc * 0.08, 0, 0, Math.PI * 2);
+    ctx.ellipse(-sc * 0.02, 0, sc * 0.46, sc * (albatross ? 0.08 : 0.1), 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(sc * 0.46, 0, sc * 0.09, 0, Math.PI * 2); // head
+    ctx.arc(sc * 0.46, 0, sc * (albatross ? 0.09 : 0.1), 0, Math.PI * 2); // head
     ctx.fill();
-    ctx.fillStyle = albatross ? '#ffce6e' : '#ffbe2e'; // beak (hooked-looking for the eagle)
-    ctx.beginPath();
-    ctx.moveTo(sc * 0.53, -sc * 0.04);
-    ctx.lineTo(sc * (albatross ? 0.82 : 0.76), 0);
-    ctx.lineTo(sc * 0.53, sc * 0.04);
-    ctx.closePath();
-    ctx.fill();
-    // Forked tail.
-    ctx.fillStyle = albatross ? '#9fb8ff' : '#aebdd8';
-    ctx.beginPath();
-    ctx.moveTo(-sc * 0.38, 0);
-    ctx.lineTo(-sc * 0.72, -sc * 0.12);
-    ctx.lineTo(-sc * 0.58, 0);
-    ctx.lineTo(-sc * 0.72, sc * 0.12);
-    ctx.closePath();
-    ctx.fill();
+    if (albatross) {
+      // Straight spear beak.
+      ctx.fillStyle = '#ffce6e';
+      ctx.beginPath();
+      ctx.moveTo(sc * 0.53, -sc * 0.04);
+      ctx.lineTo(sc * 0.82, 0);
+      ctx.lineTo(sc * 0.53, sc * 0.04);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Golden hooked raptor beak — curls down at the tip, the eagle's signature.
+      ctx.fillStyle = '#ffc22e';
+      ctx.beginPath();
+      ctx.moveTo(sc * 0.52, -sc * 0.06);
+      ctx.quadraticCurveTo(sc * 0.82, -sc * 0.05, sc * 0.83, sc * 0.02);
+      ctx.quadraticCurveTo(sc * 0.78, sc * 0.05, sc * 0.62, sc * 0.05);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (albatross) {
+      // Forked tail.
+      ctx.fillStyle = '#9fb8ff';
+      ctx.beginPath();
+      ctx.moveTo(-sc * 0.38, 0);
+      ctx.lineTo(-sc * 0.72, -sc * 0.12);
+      ctx.lineTo(-sc * 0.58, 0);
+      ctx.lineTo(-sc * 0.72, sc * 0.12);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Broad fanned wedge tail — the eagle spreads its tail feathers, it does not fork like a gull.
+      ctx.fillStyle = '#a9bad6';
+      ctx.beginPath();
+      ctx.moveTo(-sc * 0.34, sc * 0.06);
+      ctx.lineTo(-sc * 0.82, sc * 0.2);
+      ctx.lineTo(-sc * 0.9, sc * 0.06);
+      ctx.lineTo(-sc * 0.9, -sc * 0.06);
+      ctx.lineTo(-sc * 0.82, -sc * 0.2);
+      ctx.lineTo(-sc * 0.34, -sc * 0.06);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   };
 
