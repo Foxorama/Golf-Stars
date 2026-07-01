@@ -132,6 +132,44 @@
   starfield into live play — all on the existing `_gsFeel.spaceFX` knob, no new `_gs*` flag. NB: the
   aiming overlays (spray cone, flight lines, live ball) draw AFTER `buildScene`, so the busy sky never
   occludes the shot UI. Re-shoot the gallery after touching any of this.
+- **Per-world IDENTITY pass (GS-biome-feel, `style.ts`/`palette.ts`/`weather.ts`/`playView.ts`).** The
+  complaint: "all the biomes are just reskinned variants" — the physics table already differentiated
+  worlds (void 1.4× gravity, tempest gales, lost-rough abysses) but almost none of it READ, because the
+  presentation was shared: every world drew the identical green parkland canopy (the spore jungle's
+  "luminous mushroom stands" were literally oak trees), OB was the same white/red golf stake on every
+  world including the void, the animated wind tint only covered the original 5 archetypes (the 5
+  GS-worlds silently fell back to verdant's pollen green), landings looked identical whether the ball
+  found lava, water or the abyss, and the rough accents were the same wildflower dots recoloured. Five
+  coupled fixes, ALL render/feel-side (zero sim/rng-stream touch — determinism contract #1 holds
+  trivially): (1) **`styleFlora`** — the tree hazard dispatches per archetype to a distinct silhouette
+  (fungal glowing mushrooms, frost snow-dusted conifers, inferno charred ember snags, desert saguaros,
+  crystal prismatic shard spires, tempest wind-bent scrub, ocean palms, cetus bio-speckled sea-stacks;
+  verdant keeps the classic canopy BYTE-IDENTICAL). CRITICAL rng rule: every variant consumes EXACTLY
+  the two draws the old `styleTree` did (size + tint); all further variation is `posHash` of the
+  projected position — so the main art stream is byte-for-byte unchanged on every world. (2)
+  **`archetypeDecor`** — the Cetus whale/river treatment generalised: a bespoke signature decor pass per
+  world on its OWN dedicated stream (`hashHole ^ 0xb10a3e`), gated per archetype — void asteroid islets
+  (whale-style course-space rejection placement) + a black-hole eye, inferno glowing ground fissures,
+  fungal spore-mist + toadstool clusters, crystal shard clusters + prismatic ground glints, frost snow
+  drifts + ice-sheen cracks, desert dune ripples + bleached rocks, tempest cloud-shadow bands + a storm
+  eye with a static fork, ocean surf foam-lines + lagoon cays with a lone palm. Drawn under the terrain
+  pass so the mown turf paints over it; clipped decor gathers into ONE island clip (never nest clips —
+  the SVG serializer bug). (3) **`OB_LOOK`** (palette) — per-world boundary markers; the two lost-rough
+  worlds (void/cetus) trade the ground post for a FLOATING warp beacon (glow + lit diamond, position-hash
+  bobbed) since there's no ground out there to plant a stake in. The OB *rule* is untouched. (4)
+  **`scatterLook`** grew per-world crystal identities: void violet lit-from-within, cetus coral-pink
+  bioluminescent reef, prism-reach pink/green refractions — plus an under-glow prim when a look sets
+  `glow`. (5) **weather.ts** — `WIND_RGBA` covers all 10 archetypes, and a new always-on `AMBIENT` table
+  drives a per-world air layer on the same `spaceFX` gate as the stars: rising embers, falling snow,
+  drifting glow-spores, verdant fireflies, prismatic twinkle-glints, slow void stardust, sea-spray
+  flecks, rising cetus plankton motes, desert dust — and tempest gets a distant seeded lightning flicker.
+  (6) **playView.ts `spawnLandFX`** — per-surface touchdown feedback keyed off the lie/penalty the sim
+  already resolved (index-based deterministic particles, like `spawnSparks`): water/creek/frozenpond
+  splash, lava burst + shake, a violet ring-IMPLOSION as the void swallows the ball, star-ocean splash,
+  ravine rockfall dust, sand puff, icy skitter, crystal chime-glints, canopy leaf-rattle. Guards:
+  `tests/biome-identity.test.ts` (per-world flora/decor/OB gating + all-10 coverage of the weather/OB
+  tables + byte-stability); the existing turf-base, constellation prim-count and cetus gating tests all
+  hold (additions are theme-independent + archetype-gated). Re-shot the gallery.
 - **Zone splash card + procedural hero art (GS-19, `render/zoneHero.ts` + `app.ts`).** The zone
   identity now lives ONCE per stop, on the **starting zone screen** (the `intro` screen,
   `zoneIdentityHTML`) — NOT repeated per hole (the per-hole briefing splash was retired; see
