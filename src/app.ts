@@ -703,11 +703,12 @@ const collapsedMarketSections = new Set<string>(MARKET_SECTION_IDS);
 // via [data-clubslot] + re-render, reset when the Clubhouse opens/closes. null = the resting stage.
 type ClubSlot = ApparelSlot | 'ship';
 let clubhouseSlot: ClubSlot | null = null;
+// Travel screen (GS-journey-vertical): the route the player tapped on the star-chart to inspect — its
+// info sheet (world + bet + confirm/cancel) opens over the map. View-only module state (like
+// inspectGearId / settingsOpen): toggled via [data-route-inspect] + re-render, reset on leaving travel,
+// zero reducer/save/rng impact. The reducer's existing { type:'route' } action still commits the jump.
+let inspectRouteId: number | null = null;
 let mapPan: [number, number] = [0, 0];
-// Journey map (GS-galaxy-map): remember the trail strip's horizontal scroll so it survives the
-// per-frame re-render of the travel screen — snap to the most-recent stops only when a NEW stop's
-// map first appears, then honour wherever the player has tap-scrolled to.
-let journeyScroll = { key: '', left: -1 };
 // Shot-result popup: after a non-terminal shot settles, freeze on a result card + Continue
 // before the next decision, so each shot gets its own beat. Module-level (a timed view
 // effect, not reducer state — like animatedShots above).
@@ -2304,11 +2305,106 @@ const EVENT_CATEGORY: Record<EventCategory, { label: string; col: string }> = {
   salvage: { label: 'SALVAGE', col: '#4fd0e0' },
 };
 
+// A small pill token (label + accent) — shared by the travel screen + the route-info sheet.
+function travelChip(txt: string, col: string): string {
+  return `<span style="display:inline-block;font-size:11.5px;font-weight:700;color:${col};border:1px solid ${col}66;border-radius:5px;padding:1px 7px;">${txt}</span>`;
+}
+
+/** The route-info sheet (GS-journey-vertical): tapping a branch planet on the star-chart opens this
+ *  bottom-sheet with the FULL jump detail — the world you'll play (biome + difficulty + weather), the
+ *  bet's levers, and a confirm/cancel. Confirm dispatches the existing { type:'route' } action; cancel
+ *  closes it so you can inspect another lane. A view overlay (module state), not reducer state. */
+function routeInfoOverlay(): string {
+  const r = (state.routes ?? []).find((x) => x.id === inspectRouteId);
+  if (!r) return '';
+  const ev = r.event;
+  const credits = state.run.credits;
+  const ring = rarCol(ev.rarity);
+  const accent = r.elite ? '#ffce54' : ring;
+  const cat = EVENT_CATEGORY[ev.category];
+  const b = BIOME_BADGE[r.theme.archetype] ?? { glyph: '🪐', label: r.theme.archetype, col: '#8aa0c0' };
+  const dd = routeDifficulty(ev);
+  const diff =
+    dd <= -0.1 ? { t: 'Gentler course', c: '#2bb673' }
+    : dd < 0.07 ? { t: 'Standard course', c: '#9fb0cf' }
+    : dd < 0.16 ? { t: 'Tougher course', c: '#ffb04a' }
+    : { t: 'Brutal course', c: '#ff6b4a' };
+  const eff = COURSE_EFFECTS[routeEffect(ev)];
+
+  // The lane's levers, each its own readable token.
+  const tags: string[] = [];
+  if (ev.creditMult !== 1) {
+    const pct = Math.round((ev.creditMult - 1) * 100);
+    tags.push(travelChip(`${pct > 0 ? '+' : ''}${pct}% credits`, pct >= 0 ? '#ffce54' : '#ff8b6b'));
+  }
+  if (ev.cutDelta !== 0) tags.push(travelChip(`cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}`, ev.cutDelta > 0 ? '#ff8b6b' : '#2bb673'));
+  if (ev.creditToll) {
+    const afford = credits >= ev.creditToll;
+    tags.push(travelChip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
+  }
+  if (ev.shardBonus) tags.push(travelChip(`✦ +${ev.shardBonus} shards`, '#4fd0e0'));
+  tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
+
+  const markers = [
+    r.bossAhead ? `<span style="color:#ff8b6b;font-weight:700;">⚔ Boss ahead</span>` : '',
+    r.elite ? `<span style="color:#ffce54;font-weight:700;">🔥 Harder path</span>` : '',
+  ]
+    .filter(Boolean)
+    .join('&nbsp;·&nbsp;');
+
+  const tollWarn =
+    ev.creditToll && credits < ev.creditToll
+      ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⚠ You can't cover the ${ev.creditToll}-credit toll (you have ${credits}).</div>`
+      : '';
+
+  const effLine =
+    eff.id !== 'none'
+      ? `<div style="font-size:13px;margin:8px 0 0;opacity:.9;">${eff.icon} <b>${eff.label}</b> · <span style="opacity:.75;">${eff.blurb}</span></div>`
+      : '';
+
+  return `
+    <div class="gs-sheet-backdrop" data-route="close">
+      <div class="gs-sheet gs-routesheet" data-route="keep" style="--rs-accent:${accent};">
+        <div class="gs-sheet-head">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <div style="flex:0 0 auto;width:52px;height:52px;border-radius:13px;background:radial-gradient(circle at 35% 30%, ${b.col}44, #0c1020);border:2px solid ${accent};display:flex;align-items:center;justify-content:center;font-size:28px;">${b.glyph}</div>
+            <div style="min-width:0;">
+              <div style="font-size:12px;font-weight:700;color:${b.col};line-height:1.1;">${b.label} world</div>
+              <b style="font-size:19px;line-height:1.15;display:block;">${r.theme.name}</b>
+            </div>
+          </div>
+          <button class="gs-mapbtn" data-route="close" title="Close">✕</button>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 10px;">
+          ${travelChip(ev.icon + ' ' + ev.label, accent)}
+          ${travelChip(ev.rarity.toUpperCase(), ring)}
+          ${travelChip(cat.label, cat.col)}
+          ${travelChip(diff.t, diff.c)}
+        </div>
+
+        <div style="font-size:13.5px;opacity:.95;margin-bottom:4px;">${ev.desc}</div>
+        <div style="font-size:12.5px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
+        ${effLine}
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">${tags.join('')}</div>
+        ${markers ? `<div style="font-size:12.5px;margin-top:8px;">${markers}</div>` : ''}
+        ${tollWarn}
+
+        <div style="display:flex;gap:9px;margin-top:16px;">
+          <button class="gs-btn gs-btn--block" data-route="close" style="flex:1 1 0;">Cancel</button>
+          ${btn(`🚀 Jump to ${r.theme.name}`, { type: 'route', routeId: r.id }, { variant: 'primary', block: true, borderColor: accent })}
+        </div>
+      </div>
+    </div>`;
+}
+
 function travelScreen(): string {
   const routeList = state.routes ?? [];
   const credits = state.run.credits;
 
-  // The starmap (GS-routes): Earth → travelled trail → YOU → the three branch lanes ahead.
+  // The starmap (GS-routes, GS-journey-vertical): three tappable branch planets across the TOP → YOU →
+  // the travelled trail winding DOWN to Earth at the bottom. Tapping a planet opens its info sheet.
   const zoneName = themeById(state.course.meta?.themeId ?? '')?.name ?? 'Deep Space';
   const choices: StarmapChoice[] = routeList.map((r) => ({
     id: r.id,
@@ -2326,8 +2422,8 @@ function travelScreen(): string {
   }));
   // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
   // labelled with its zone name AND its real-sky position (GS-galaxy-map) — so the journey plots a
-  // true path through the constellations as it builds, not a generic Earth→right curve. Each node now
-  // wears its world's biome glyph (GS-journey-history) so a cleared step reads as the world you played.
+  // true path through the constellations as it builds. Each node wears its world's biome glyph
+  // (GS-journey-history) so a cleared step reads as the world you played.
   const trail = state.run.history.slice(0, -1).map((h) => {
     const name = themeById(h.themeId ?? '')?.name ?? 'Deep Space';
     const sky = skyCoordForName(name);
@@ -2344,78 +2440,9 @@ function travelScreen(): string {
     shipId: shipForCharacter(state, state.run.loadout.characterId),
   });
 
-  const chip = (txt: string, col: string) =>
-    `<span style="display:inline-block;font-size:11px;font-weight:700;color:${col};border:1px solid ${col}66;border-radius:5px;padding:1px 6px;">${txt}</span>`;
-
-  const routes = routeList
-    .map((r) => {
-      const ev = r.event;
-      const cat = EVENT_CATEGORY[ev.category];
-      // Effect chips — each lever is its own readable token (real trade-offs read at a glance).
-      const tags: string[] = [];
-      if (ev.creditMult !== 1) {
-        const pct = Math.round((ev.creditMult - 1) * 100);
-        tags.push(chip(`${pct > 0 ? '+' : ''}${pct}% credits`, pct >= 0 ? '#ffce54' : '#ff8b6b'));
-      }
-      if (ev.cutDelta !== 0) tags.push(chip(`cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}`, ev.cutDelta > 0 ? '#ff8b6b' : '#2bb673'));
-      if (ev.creditToll) {
-        const afford = credits >= ev.creditToll;
-        tags.push(chip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
-      }
-      if (ev.shardBonus) tags.push(chip(`✦ +${ev.shardBonus} shards`, '#4fd0e0'));
-
-      const badges = [
-        r.bossAhead ? `<span style="color:#ff8b6b;font-weight:700;">⚔ Boss ahead</span>` : '',
-        r.elite ? `<span style="color:#ffce54;font-weight:700;">🔥 Harder path</span>` : '',
-      ]
-        .filter(Boolean)
-        .join('&nbsp;·&nbsp;');
-
-      const ring = rarCol(ev.rarity);
-      // A whole route card is the click target (the shared btn() wraps an action handler).
-      return btn(
-        `<div style="display:flex;gap:12px;align-items:flex-start;text-align:left;">
-           <div style="flex:0 0 auto;width:46px;height:46px;border-radius:11px;background:radial-gradient(circle at 35% 30%, ${ring}33, #0c1020);border:2px solid ${ring};display:flex;align-items:center;justify-content:center;font-size:24px;">${ev.icon}</div>
-           <div style="flex:1 1 auto;min-width:0;">
-             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-               <b style="font-size:15px;">${ev.label}</b>
-               ${chip(ev.rarity.toUpperCase(), ring)}
-               ${chip(cat.label, cat.col)}
-             </div>
-             <div style="font-size:12px;opacity:.6;margin:2px 0 3px;">↗ ${r.label} · +${r.distanceJump} distance</div>
-             ${(() => {
-               const b = BIOME_BADGE[r.theme.archetype] ?? { glyph: '🪐', label: r.theme.archetype, col: '#8aa0c0' };
-               // The chosen lane MATERIALLY shapes the next course (GS-journey-fx): a difficulty band
-               // (a wildness delta — bites on boss courses where the cut lever is inert) + an
-               // atmospheric effect, both previewed here so the choice's impact reads at a glance.
-               const dd = routeDifficulty(ev);
-               const diff =
-                 dd <= -0.1 ? { t: 'Gentler course', c: '#2bb673' }
-                 : dd < 0.07 ? { t: 'Standard course', c: '#9fb0cf' }
-                 : dd < 0.16 ? { t: 'Tougher course', c: '#ffb04a' }
-                 : { t: 'Brutal course', c: '#ff6b4a' };
-               const eff = COURSE_EFFECTS[routeEffect(ev)];
-               const effLine =
-                 eff.id !== 'none'
-                   ? `<div style="font-size:12px;margin:0 0 5px;opacity:.85;">${eff.icon} <b>${eff.label}</b> · <span style="opacity:.75;">${eff.blurb}</span></div>`
-                   : '';
-               return `<div style="font-size:12.5px;margin:0 0 3px;color:${b.col};font-weight:600;">${b.glyph} ${r.theme.name} · ${b.label} world · <span style="color:${diff.c};">${diff.t}</span></div>${effLine}`;
-             })()}
-             <div style="font-size:13px;opacity:.9;margin-bottom:3px;">${ev.desc}</div>
-             <div style="font-size:12px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
-             <div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.join('')}</div>
-             ${badges ? `<div style="font-size:12px;margin-top:6px;">${badges}</div>` : ''}
-           </div>
-         </div>`,
-        { type: 'route', routeId: r.id },
-        { borderColor: r.elite ? '#ffce54' : ring, block: true },
-      );
-    })
-    .join('');
-
   // Push-your-luck cash-out (GS-bank): bank the run now to lock its credits in as permanent shards
   // (busting at the next cut would forfeit them). Shown with the exact shard payout so the "push or
-  // bank" call is informed.
+  // bank" call is informed. Lives below the map (under Earth) — the secondary "quit while ahead" exit.
   const cashOut = cashOutShards(state.run);
   const banked =
     state.run.bonusShards > 0
@@ -2428,16 +2455,14 @@ function travelScreen(): string {
            ${btn(`✦ Bank run & cash out${cashOut > 0 ? ` (+${cashOut} shards)` : ''}`, { type: 'bank' }, { variant: 'ghost', block: true })}
          </div>`
       : '';
+  const safeNote = routeList.some((r) => r.event.cutDelta <= 0)
+    ? "There's a safer option here."
+    : '<span style="color:#ff8b6b;">Out here, every lane is a gamble — or bank the run below.</span>';
   return `
     ${header()}
-    <h2 style="font-size:16px;margin-bottom:8px;">Choose your jump</h2>
-    <div style="margin-bottom:12px;">${map}</div>
-    <p style="opacity:.75;font-size:14px;margin-top:0;">Every lane is a different bet — safe-but-poor, a payout gamble, a toll for an outsized return, or guaranteed salvage. Deeper jumps raise the cut.${
-      routeList.some((r) => r.event.cutDelta <= 0)
-        ? " There's a safer option here."
-        : ' <span style="color:#ff8b6b;">Out here, every lane is a gamble — or bank the run.</span>'
-    }</p>
-    <div>${routes}</div>
+    <h2 style="font-size:17px;margin:0 0 3px;">Choose your jump</h2>
+    <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing planet up top to preview that world &amp; its bet, then confirm the jump. Deeper jumps raise the cut. ${safeNote}</p>
+    ${map}
     ${bankBtn}`;
 }
 
@@ -2732,6 +2757,10 @@ function render(): void {
     animatingPlay = pendingAnimation(state.play);
   }
 
+  // The route-info sheet is only meaningful on the travel screen; clear it the moment we leave so a
+  // stale id (route ids repeat 1..3 each stop) can't auto-reopen a sheet on the next travel screen.
+  if (state.screen !== 'travel') inspectRouteId = null;
+
   const body =
     state.screen === 'title'
       ? titleScreen()
@@ -2762,7 +2791,8 @@ function render(): void {
   const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}`;
+  const routeSheet = state.screen === 'travel' && inspectRouteId != null ? routeInfoOverlay() : '';
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}${routeSheet}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
@@ -2793,6 +2823,28 @@ function render(): void {
       clubhouseSlot = clubhouseSlot === slot ? null : slot;
       sfx.click();
       haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // Travel star-chart: tap a branch planet to open its route-info sheet; tap the backdrop / close /
+  // Cancel to dismiss it (the sheet's Confirm is a normal [data-action] route dispatch). getAttribute
+  // (not dataset) so it works on SVG <g> nodes too.
+  app.querySelectorAll<HTMLElement>('[data-route-inspect]').forEach((el) => {
+    el.addEventListener('click', () => {
+      inspectRouteId = Number(el.getAttribute('data-route-inspect'));
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-route]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      // The sheet card itself is data-route="keep" — clicks inside it must NOT close it.
+      if (el.getAttribute('data-route') === 'keep') {
+        e.stopPropagation();
+        return;
+      }
+      inspectRouteId = null;
       render();
     });
   });
@@ -2965,26 +3017,6 @@ function render(): void {
     drawCaddy(ctx, id, cv.width / 2, cv.height - 8, cv.height * 0.92, performance.now(), lefty());
   });
 
-  // Journey map (GS-galaxy-map): the travelled trail is a wide scroll strip; show the MOST RECENT
-  // stops by default (scrolled to the far right, abutting the pinned forward panel). The user can
-  // tap-scroll left to review earlier worlds. preserveScroll keeps the position across the per-frame
-  // re-render of an unchanged travel screen (only the first mount of a given strip snaps right).
-  document.querySelectorAll<HTMLElement>('[data-journey-scroll]').forEach((el) => {
-    const key = `${state.run?.seed}:${state.run?.stopIndex}`;
-    if (journeyScroll.key === key && journeyScroll.left >= 0) {
-      el.scrollLeft = journeyScroll.left; // restore the player's review position across re-renders
-    } else {
-      el.scrollLeft = el.scrollWidth; // first view of this stop → most-recent stops, abutting YOU
-      journeyScroll = { key, left: el.scrollLeft };
-    }
-    el.addEventListener(
-      'scroll',
-      () => {
-        journeyScroll = { key, left: el.scrollLeft };
-      },
-      { passive: true },
-    );
-  });
 
   // Mount the animated play view on the result screen.
   if (state.screen === 'result' && state.played) {
