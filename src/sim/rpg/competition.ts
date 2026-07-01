@@ -68,10 +68,16 @@ export function stopPressure(stopIndex: number): number {
  * ordinary stops so that exactly TWO remain (you + one rival) going into the final — a 1-on-1
  * matchplay for the title. Indexed by the ordinal of the ordinary stop (0..5: arc1 stops 0,1 → arc2
  * stops 3,4 → arc3 stops 6,7); the boss slot of each arc (pos 2) has no entry (it's a knockout, not a
- * positional cut, and adds nothing to the standings). Ascension tightens the targets, floored at 2 so
- * the final is always a duel. A bigger field is fine — eliminated golfers sink below the cut line.
+ * positional cut, and adds nothing to the standings). Ascension tightens the targets, but ONLY the
+ * FINAL ordinary stop may cut to 2 (the 1st-v-2nd title match) — every earlier target is floored at 4
+ * (GS-cut-balance), so the last pre-boss section always has a real field of at least four and the
+ * two-player state exists only at the final boss. A bigger field is fine — eliminated golfers sink
+ * below the cut line.
  */
 export const VOYAGE_SURVIVOR_TARGETS = [16, 12, 9, 6, 4, 2] as const;
+
+/** Pre-final targets never drop below this, however hard Ascension squeezes (GS-cut-balance). */
+export const PRE_FINAL_SURVIVOR_FLOOR = 4;
 
 /** The 0-based ordinal of an ORDINARY stop among the voyage's ordinary stops (skips boss slots). */
 export function ordinaryStopOrdinal(stopIndex: number): number {
@@ -81,8 +87,10 @@ export function ordinaryStopOrdinal(stopIndex: number): number {
 export function arcSurvivorTarget(stopIndex: number, ascensionCut = 0): number | undefined {
   if (isArcBossSlot(stopIndex)) return undefined; // boss slot — decided by the match, no positional cut
   const ord = ordinaryStopOrdinal(stopIndex);
-  const base = VOYAGE_SURVIVOR_TARGETS[Math.min(ord, VOYAGE_SURVIVOR_TARGETS.length - 1)]!;
-  return Math.max(2, base - Math.max(0, Math.round(ascensionCut)));
+  const last = VOYAGE_SURVIVOR_TARGETS.length - 1;
+  const base = VOYAGE_SURVIVOR_TARGETS[Math.min(ord, last)]!;
+  const floor = ord >= last ? 2 : PRE_FINAL_SURVIVOR_FLOOR;
+  return Math.max(floor, base - Math.max(0, Math.round(ascensionCut)));
 }
 
 /** A golfer entry in an arc's field (lighter than a full Golfer; the player carries no archetype). */
