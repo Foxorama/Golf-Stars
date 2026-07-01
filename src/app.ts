@@ -234,7 +234,12 @@ function dispatch(action: Action): void {
     const prevScreen = state.screen;
     state = reduce(state, action);
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
-    if (action.type === 'openClubhouse' || action.type === 'closeClubhouse' || action.type === 'openClubhouseHall') {
+    if (
+      action.type === 'openClubhouse' ||
+      action.type === 'closeClubhouse' ||
+      action.type === 'clubhouseBackToHall' ||
+      action.type === 'openClubhouseHall'
+    ) {
       clubhouseSlot = null;
     }
     // Opening the Trade Market re-collapses every catalogue section so it lands compact (GS-market-accordion).
@@ -2130,7 +2135,6 @@ function clubhouseScreen(): string {
     shirtBase: ch.style.shirt,
     w: 150,
     h: 210,
-    legsFull: true,
   });
   const setName = equippedSet(hatId, shirtId, pantsId);
   const setBadge = setName
@@ -2174,6 +2178,7 @@ function clubhouseScreen(): string {
     </button>
     ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId)}
     <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      ${btn('🏠 Back to Clubhouse', { type: 'clubhouseBackToHall' }, { variant: 'ghost' })}
       ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       ${btn('← Back to title', { type: 'closeClubhouse' }, { variant: 'ghost' })}
     </div>`;

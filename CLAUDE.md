@@ -122,9 +122,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   shard price); the **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
   character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
   save v11), so each golfer flies its own ride + wears its own look head-to-toe. The per-golfer Clubhouse is a
-  **tap-to-restyle stage** (GS-clubhouse-stage): a big full-body avatar (`golferPreviewSVG(…, legsFull:true)`)
-  whose hat/shirt/pants are three tap bands, over a garage-bay tile showing the parked ride — tapping any of the
-  four reveals just that slot's owned rack (equip toggles / owned fleet). The open slot is view-only module state
+  **tap-to-restyle stage** (GS-clubhouse-stage): a big full-body avatar (`golferPreviewSVG`, ONE proportional
+  figure at every size — anchors are fractions of `h`, offsets scaled by `S=h/210`, arms included — so it reads as
+  three tap bands here yet stays in proportion at the lounge's small `h`) whose hat/shirt/pants are three tap
+  bands, over a garage-bay tile showing the parked ride — tapping any of the four reveals just that slot's owned
+  rack (equip toggles / owned fleet); a "🏠 Back to Clubhouse" (`clubhouseBackToHall`) returns to the hall to
+  outfit another golfer without a title round-trip. The open slot is view-only module state
   (`clubhouseSlot`, like `inspectGearId`: toggled via `[data-clubslot]`, reset on open/close, zero save/rng
   impact). The `apparel.ts` catalogue fills three slots (`ApparelSlot` hat|shirt|pants); a cosmetic **set**
   completes (`equippedSet`) only when EVERY slot it defines is worn. The Clubhouse HALL is a painted bar/fireplace **lounge** (GS-clubhouse-lounge,

@@ -180,48 +180,68 @@ export function golferPreviewSVG(
   hatId: string | undefined,
   shirtId: string | undefined,
   pantsId: string | undefined,
-  opts: { skin?: string; shirtBase?: string; w?: number; h?: number; legsFull?: boolean } = {},
+  opts: { skin?: string; shirtBase?: string; w?: number; h?: number } = {},
 ): string {
-  const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132, legsFull = false } = opts;
+  const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132 } = opts;
   const hat = apparelById(hatId);
   const shirt = apparelById(shirtId);
   const pants = apparelById(pantsId);
   const cx = w / 2;
-  // `legsFull` stands the golfer up as a full-body figure (proportional head/hip/foot) so the big
-  // Clubhouse stage reads head→chest→legs as three clean tap bands; the default short-legged mannequin
-  // (lounge / preview cards) is unchanged byte-for-byte.
-  const headY = legsFull ? Math.round(h * 0.19) : 40;
-  const hipY = legsFull ? Math.round(h * 0.58) : h - 24;
-  const footY = legsFull ? Math.round(h * 0.93) : h - 5;
-  const headR = legsFull ? 15 : 13;
+  // ONE proportional full-body figure at every size. Vertical anchors are fractions of `h` so
+  // head→chest→legs read as three even bands (the Clubhouse stage's hat/shirt/pants tap zones line up
+  // with them); every authored offset/width is scaled by `S` so the small lounge mannequin stays in
+  // proportion (a fixed head+neck used to eat a short figure, leaving a stunted chest + stretched legs).
+  // Authored at h=210 (S=1 → the big stage), so smaller previews are just a clean scale-down.
+  const S = h / 210;
+  const px = (n: number): number => n * S; // scale an authored length to this figure
+  const sw = (n: number): number => Math.max(0.7, n * S); // scale a stroke, but keep hairlines visible
+  const headY = Math.round(h * 0.19);
+  const hipY = Math.round(h * 0.58);
+  const footY = Math.round(h * 0.93);
+  const headR = px(15);
   const shirtCol = shirt?.look.color ?? shirtBase;
-  const glowAura = shirt?.look.glow ? aura(cx, headY + 36, 30, shirt.look.glow, 'prevsg') : '';
+  const glowAura = shirt?.look.glow ? aura(cx, headY + px(36), px(30), shirt.look.glow, 'prevsg') : '';
   // Legs (drawn behind the torso): default dark trousers, tinted by the equipped pants. Shorts bare the
   // shins (skin below the knee), and a glowing pair adds a soft aura.
   const pantsCol = pants?.look.color ?? '#2c3142';
-  const pantsGlow = pants?.look.glow ? aura(cx, hipY + 6, 20, pants.look.glow, 'prevpg') : '';
+  const pantsGlow = pants?.look.glow ? aura(cx, hipY + px(6), px(20), pants.look.glow, 'prevpg') : '';
   const shorts = pants?.look.shape === 'shorts';
-  const lx = cx - 5;
-  const rx = cx + 5;
-  const lfx = cx - 7;
-  const rfx = cx + 7;
+  const lx = cx - px(5);
+  const rx = cx + px(5);
+  const lfx = cx - px(7);
+  const rfx = cx + px(7);
   const kneeY = (hipY + footY) / 2;
-  const leg = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
+  const line = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
     `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${wd}" stroke-linecap="round"/>`;
   const legs = shorts
-    ? leg(lx, hipY, lfx, footY, skin, 5.5) +
-      leg(rx, hipY, rfx, footY, skin, 5.5) +
-      leg(lx, hipY, (lx + lfx) / 2, kneeY, pantsCol, 7) +
-      leg(rx, hipY, (rx + rfx) / 2, kneeY, pantsCol, 7)
-    : leg(lx, hipY, lfx, footY, pantsCol, 7) + leg(rx, hipY, rfx, footY, pantsCol, 7);
+    ? line(lx, hipY, lfx, footY, skin, px(5.5)) +
+      line(rx, hipY, rfx, footY, skin, px(5.5)) +
+      line(lx, hipY, (lx + lfx) / 2, kneeY, pantsCol, px(7)) +
+      line(rx, hipY, (rx + rfx) / 2, kneeY, pantsCol, px(7))
+    : line(lx, hipY, lfx, footY, pantsCol, px(7)) + line(rx, hipY, rfx, footY, pantsCol, px(7));
+  // Arms hang at the sides: a sleeve (shirt colour) from just under the shoulder out to the hip, capped
+  // by a skin hand. Drawn BEHIND the torso so the sleeve emerges from under the shirt; the hands sit on
+  // top. Without these the figure read as an armless mannequin on the big stage.
+  const shoulderY = headY + px(18);
+  const handY = hipY + px(2);
+  const shoulderX = px(16);
+  const handX = px(20);
+  const armW = px(5.5);
+  const handR = px(3.2);
+  const arms =
+    line(cx - shoulderX, shoulderY, cx - handX, handY, shirtCol, armW) +
+    line(cx + shoulderX, shoulderY, cx + handX, handY, shirtCol, armW);
+  const hand = (x: number): string =>
+    `<circle cx="${x}" cy="${handY}" r="${handR}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
+  const hands = hand(cx - handX) + hand(cx + handX);
   const torso = `
-    <path d="M${cx - 20},${headY + 16} L${cx - 9},${headY + 10} L${cx},${headY + 14} L${cx + 9},${headY + 10} L${cx + 20},${headY + 16} L${cx + 16},${headY + 26} L${cx + 12},${hipY} L${cx - 12},${hipY} L${cx - 16},${headY + 26} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="1.4" stroke-linejoin="round"/>`;
-  const detail = shirt ? shirtDetail(shirt.look, cx, headY + 30) : '';
-  const head = `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="${skin}" stroke="#0c1116" stroke-width="1.2"/>`;
+    <path d="M${cx - px(20)},${headY + px(16)} L${cx - px(9)},${headY + px(10)} L${cx},${headY + px(14)} L${cx + px(9)},${headY + px(10)} L${cx + px(20)},${headY + px(16)} L${cx + px(16)},${headY + px(26)} L${cx + px(12)},${hipY} L${cx - px(12)},${hipY} L${cx - px(16)},${headY + px(26)} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="${sw(1.4)}" stroke-linejoin="round"/>`;
+  const detail = shirt ? shirtDetail(shirt.look, cx, headY + px(30)) : '';
+  const head = `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1.2)}"/>`;
   // Draw the hat ON the head (centre + real radius) so it scales to the head it sits on — a helmet
   // encloses the whole head, a cap perches on the crown — exactly as on-course.
   const hatG = hat ? hatGlyph(hat.look, cx, headY, headR, 'prev') : '';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${glowAura}${pantsGlow}${legs}${torso}${detail}${head}${hatG}
+    ${glowAura}${pantsGlow}${legs}${arms}${torso}${detail}${hands}${head}${hatG}
   </svg>`;
 }

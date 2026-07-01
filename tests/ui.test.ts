@@ -228,6 +228,20 @@ describe('ui reducer', () => {
     expect(s.run.credits).toBe(60); // base starting credits (no permanent stat upgrades anymore)
   });
 
+  it('a golfer stage can step back to the hall to outfit another (GS-clubhouse-stage)', () => {
+    let s = initState(7, { shards: 0 });
+    s = reduce(s, { type: 'openClubhouseHall' });
+    expect(s.screen).toBe('clubhouseHall');
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    expect(s.screen).toBe('clubhouse');
+    // Back to the hall (not the title) with no managed character, so any golfer can be picked next.
+    s = reduce(s, { type: 'clubhouseBackToHall' });
+    expect(s.screen).toBe('clubhouseHall');
+    expect(s.manageCharacterId).toBeUndefined();
+    // The action only applies on a golfer's stage — a no-op from the hall itself.
+    expect(reduce(s, { type: 'clubhouseBackToHall' })).toBe(s);
+  });
+
   it('the Clubhouse selects only OWNED ships, only on the managed character (GS-clubhouse)', () => {
     let s = initState(7, { shards: 0 });
     // Selecting outside the Clubhouse is a no-op.
