@@ -1,4 +1,5 @@
 import { CHARACTERS, type GolferStyle, type GolferStats } from '../sim/rpg/characters';
+import { CLUBS, clubById } from '../sim/clubs';
 import { themeById, type BiomeArchetype } from '../sim/course/themes';
 import { getGolfer, getArchetype } from '../sim/rpg/golfers';
 import { PLAYER_ID, type Field } from '../sim/rpg/competition';
@@ -106,7 +107,22 @@ export function statBar(label: string, n: number, col: string): string {
     </div>`;
 }
 
-export function characterScreen(): string {
+/** The per-character unlocked-clubs strip on the select card (GS-victory / GS-ascension-clubs): winning
+ *  an Ascension with a golfer permanently grows THEIR starting bag, so each card surfaces what that golfer
+ *  has earned — the character-specific progression made visible before you pick. Empty ⇒ nothing rendered. */
+function unlockedStrip(unlockedTypes: readonly string[], col: string): string {
+  const names = unlockedTypes.map((t) => clubById(t, CLUBS)?.name).filter((n): n is string => !!n);
+  if (names.length === 0) return '';
+  const chips = names
+    .map((n) => `<span style="display:inline-block;font-size:10.5px;line-height:1.5;padding:1px 8px;border-radius:999px;background:${col}1e;border:1px solid ${col}59;color:var(--gs-ink);">${n}</span>`)
+    .join('');
+  return `
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid var(--gs-line-2);">
+      <span style="font-size:10px;letter-spacing:.06em;font-weight:800;color:${col};opacity:.92;">⛳ UNLOCKED · ${names.length}</span>${chips}
+    </div>`;
+}
+
+export function characterScreen(unlockedByCharacter: Record<string, readonly string[]> = {}): string {
   const statRows = (st: GolferStats, col: string): string =>
     statBar('PWR', st.power, col) + statBar('ACC', st.accuracy, col) + statBar('TCH', st.touch, col) + statBar('CON', st.consistency, col);
 
@@ -114,6 +130,7 @@ export function characterScreen(): string {
     const cap = ch.style.cap;
     const pros = ch.pros.map((p) => `<li><span class="gs-pc-i" style="color:var(--gs-accent);">✓</span> <span style="color:var(--gs-ink);">${p}</span></li>`).join('');
     const cons = ch.cons.map((c) => `<li><span class="gs-pc-i" style="color:var(--gs-warn);">▲</span> <span style="color:var(--gs-dim);">${c}</span></li>`).join('');
+    const unlocks = unlockedStrip(unlockedByCharacter[ch.id] ?? [], cap);
     return `
       <button class="gs-charcard" data-action='${JSON.stringify({ type: 'selectCharacter', characterId: ch.id })}'
         style="--cc:${cap};animation-delay:${i * 70}ms;">
@@ -128,13 +145,14 @@ export function characterScreen(): string {
         <p class="gs-charcard-blurb">${ch.blurb}</p>
         <div class="gs-charcard-stats">${statRows(ch.stats, cap)}</div>
         <ul class="gs-charcard-pc">${pros}${cons}</ul>
+        ${unlocks}
         <span class="gs-charcard-cta" style="--cc:${cap};">Voyage as ${ch.shortName} <span aria-hidden="true">→</span></span>
       </button>`;
   }).join('');
   return `
     <header style="border-left:4px solid #5fd45a;padding-left:10px;">
       <h1 style="margin:0;font-size:24px;">Choose your golfer</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Four wildly different swings. Each trades a clear strength for a clear quirk — pick who you'll voyage the galaxy as.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Four wildly different swings. Each trades a clear strength for a clear quirk — and keeps their own clubs unlocked by winning Ascensions. Pick who you'll voyage the galaxy as.</p>
     </header>
     <div class="gs-charwrap">${cards}</div>`;
 }

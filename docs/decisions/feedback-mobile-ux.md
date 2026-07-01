@@ -61,6 +61,21 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   `.gs-seg` (was three wrapping buttons); an assetless CSS sparkle `burst()` on made-cut + holed/birdie
   (reduced-motion aware); a `holePips()` rail in the top bar (one pip per hole, coloured by score,
   current ringed).
+- **Voyage-victory takeover (GS-victory).** The end of a won run used to be a static text block that even
+  played the *missed-cut fall* — a win literally sounded like a loss. Fixed two ways. (1) A full-screen
+  champion's celebration (`render/celebrations.ts showVoyageVictory`) mirrors the ace/bird takeovers: a
+  new `sfx.victory()` fanfare + `HAPTICS.win` roll, the shared seeded `runFireworks` confetti canvas (no
+  `Math.random`), a 🏆 headline that spotlights the *played golfer* ("_X_ conquered all three arcs"), a
+  glowing hero banner for a genuinely NEW Ascension clear ("A_n cleared → A_n+1 unlocked" — gated on
+  `lastClubUnlock` being present, the exact new-tier signal), then a stack of the run's rewards (the
+  character's new club / bag-tier unlock / Shards). It overlays the settled gameover recap and dismisses
+  back to it (`onDismiss → render()`); reduced-motion drops the rAF to a static card, a safety timeout
+  guarantees you're never stranded, and it's a pure cosmetic side-effect (no reducer/save touch —
+  determinism untouched). The dispatch tail plays the fall ONLY when `endedReason !== 'won'`. (2) The
+  character-select card now surfaces each golfer's `unlockedClubsByCharacter` as chips ("⛳ UNLOCKED · N"),
+  so the per-character club-collection loop is visible before you pick — no screen-flow reorder needed
+  (character select already follows mode+ascension). `victoryInfo()` (app.ts) resolves display strings +
+  loot colours so `celebrations.ts` stays free of sim imports.
 - **Daily Challenge + install nudge.** A title button starts a run on a date-derived string seed
   (`daily-YYYY-MM-DD`, reuses string-seed support — no new param); `beforeinstallprompt` is captured and
   offered as an in-app "Install app" button (dismiss persists in `gs_installNudge`).

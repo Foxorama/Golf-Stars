@@ -88,7 +88,7 @@ export function showAceCelebration(
   const canvas = overlay.querySelector<HTMLCanvasElement>('.gs-ace-fx');
   if (canvas && !reduced) {
     try {
-      runAceFireworks(canvas, info.holeNo);
+      runFireworks(canvas, info.holeNo);
     } catch {
       /* a canvas fault must not strand the celebration */
     }
@@ -98,9 +98,10 @@ export function showAceCelebration(
   window.setTimeout(() => cleanup(), reduced ? 4200 : 9000);
 }
 
-/** Deterministic, assetless fireworks + confetti for the ace overlay. Seeded so it's stable across
- *  reloads (no Math.random); particles are capped and the loop self-cancels on overlay teardown. */
-function runAceFireworks(canvas: HTMLCanvasElement, seed: number): void {
+/** Deterministic, assetless fireworks + confetti overlay. Seeded so it's stable across reloads (no
+ *  Math.random); particles are capped and the loop self-cancels on overlay teardown. Shared by the ace
+ *  takeover and the voyage-victory takeover. */
+function runFireworks(canvas: HTMLCanvasElement, seed: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -177,6 +178,139 @@ function runAceFireworks(canvas: HTMLCanvasElement, seed: number): void {
     (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
   };
   (canvas as unknown as { _raf?: number })._raf = requestAnimationFrame(tick);
+}
+
+/**
+ * Everything the voyage-victory takeover needs to celebrate a won run (GS-victory). Assembled by the app
+ * from the finished run + the meta deltas `runEndUpdates` just banked, so this overlay stays presentation-
+ * only (no sim/save import). Colours are passed pre-resolved so `celebrations.ts` needn't reach into the
+ * loot palette.
+ */
+export interface VoyageVictoryInfo {
+  /** The golfer you won with — the run + its unlocks belong to them. */
+  golferName: string;
+  /** The Ascension tier just cleared. */
+  ascension: number;
+  /** The newly-unlocked next tier — present ONLY on a genuinely new clear (a higher `maxAscension`). */
+  tierUnlocked?: number;
+  /** Cleared the top Ascension — a terminal "legendary" beat instead of a "next tier" one. */
+  atMaxAscension: boolean;
+  /** The character's new permanent starting club (GS-ascension-clubs), if the win unlocked one. */
+  club?: { name: string; rarity: string; color: string };
+  /** A full-bag win pays Star-Shard consolation instead of a club. */
+  consolationShards?: number;
+  /** A cleared bag gate (A2/A6/A11) opens a new default-bag tier at the Trade Market. */
+  bag?: { name: string; cost: number; color: string };
+  /** Star Shards this run banked + the running total after it. */
+  shardsEarned: number;
+  shardsTotal: number;
+  /** Confetti seed (the run seed) so the show is stable across reloads. */
+  seed: number;
+}
+
+/**
+ * Voyage-victory takeover (GS-victory) — a full-screen champion's celebration for a won run, the biggest
+ * end-of-run beat in the game. A cosmetic, assetless side-effect mirroring `showAceCelebration`: a fanfare
+ * + fireworks card headlines the win, spotlights the golfer, and stacks the rewards it earned (a NEW
+ * Ascension tier unlocked reads as the hero banner), then tears itself down and runs `onDismiss` (→ the
+ * detailed gameover recap underneath). No reducer/save touch — determinism is untouched. Reduced-motion
+ * skips the rAF (a static card) and a safety timeout guarantees the player is never stranded.
+ */
+export function showVoyageVictory(info: VoyageVictoryInfo, onDismiss: () => void): void {
+  try {
+    sfx.victory();
+    haptic(HAPTICS.win);
+  } catch {
+    /* feel-only — never throw */
+  }
+  const reduced = getSettings().reducedMotion;
+  const overlay = document.createElement('div');
+  overlay.className = 'gs-win';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', 'Voyage won');
+
+  let done = false;
+  const cleanup = (): void => {
+    if (done) return;
+    done = true;
+    const h = (canvas as unknown as { _raf?: number } | null)?._raf;
+    if (h) cancelAnimationFrame(h);
+    overlay.removeEventListener('click', onTap);
+    window.removeEventListener('keydown', onKey);
+    overlay.remove(); // detaches the canvas → the fireworks loop self-stops on the next frame
+    try {
+      onDismiss();
+    } catch {
+      /* the caller's render() guards itself */
+    }
+  };
+  const onTap = (e: MouseEvent): void => {
+    e.preventDefault();
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') cleanup();
+  };
+
+  // The hero beat: a NEW Ascension tier unlocked (or the terminal top-tier clear). Absent on a re-clear.
+  const tierBanner =
+    info.tierUnlocked !== undefined
+      ? `<div class="gs-win-tier"><span class="gs-win-tier-from">A${info.ascension} CLEARED</span><span class="gs-win-tier-arrow" aria-hidden="true">→</span><span class="gs-win-tier-to">A${info.tierUnlocked} UNLOCKED</span></div>`
+      : info.atMaxAscension
+      ? `<div class="gs-win-tier gs-win-tier--max">⚔ TOP ASCENSION A${info.ascension} CLEARED · LEGENDARY</div>`
+      : '';
+
+  const rewardLine = (icon: string, label: string, detail: string, col?: string): string =>
+    `<div class="gs-ace-reward"><span>${icon}</span><div><b${col ? ` style="color:${col};"` : ''}>${label}</b><i>${detail}</i></div></div>`;
+  const rewards: string[] = [];
+  if (info.club) {
+    rewards.push(
+      rewardLine('⛳', `New club — the ${info.club.rarity} ${info.club.name}`, `${info.golferName} keeps it in their starting bag, forever`, info.club.color),
+    );
+  } else if (info.consolationShards) {
+    rewards.push(
+      rewardLine('🎒', `${info.golferName}'s bag is complete`, `Every club unlocked — the win pays ✦ ${info.consolationShards} Shards instead`),
+    );
+  }
+  if (info.bag) {
+    rewards.push(
+      rewardLine('🎒', `${info.bag.name} bag unlocked`, `Upgrade every golfer at the Trade Market · ✦ ${info.bag.cost}`, info.bag.color),
+    );
+  }
+  rewards.push(rewardLine('✦', `+${info.shardsEarned} Star Shards`, `${info.shardsTotal} banked — spend them at the Trade Market`));
+
+  overlay.innerHTML = `
+    <canvas class="gs-win-fx" aria-hidden="true"></canvas>
+    <div class="gs-win-card">
+      <div class="gs-win-emoji" aria-hidden="true">🏆</div>
+      <div class="gs-win-kicker">GALACTIC MAJOR${info.ascension > 0 ? ` · ASCENSION A${info.ascension}` : ''}</div>
+      <h1 class="gs-win-title">VOYAGE WON!</h1>
+      <div class="gs-win-sub">${info.golferName} conquered all three arcs of the galaxy 🎉</div>
+      ${tierBanner}
+      <div class="gs-ace-rewards">${rewards.join('')}</div>
+      <button class="gs-btn gs-btn--primary gs-win-go" data-win-continue="1">Continue →</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const goBtn = overlay.querySelector<HTMLButtonElement>('.gs-win-go');
+  goBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cleanup();
+  });
+  overlay.addEventListener('click', onTap);
+  window.addEventListener('keydown', onKey);
+
+  const canvas = overlay.querySelector<HTMLCanvasElement>('.gs-win-fx');
+  if (canvas && !reduced) {
+    try {
+      runFireworks(canvas, info.seed);
+    } catch {
+      /* a canvas fault must not strand the celebration */
+    }
+  }
+
+  // A long auto-dismiss safety net so the player is never stuck if they look away (well past the show).
+  window.setTimeout(() => cleanup(), reduced ? 4600 : 11000);
 }
 
 /** Per-kind look + copy for the eagle/albatross fly-over celebration. Eagle = a silver space eagle

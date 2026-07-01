@@ -155,6 +155,21 @@ export const sfx = {
   reward(): void {
     [784, 1047, 1319].forEach((f, i) => tone(f, 0.16, { type: 'triangle', gain: 0.16, t: i * 0.06 }));
   },
+  /** Voyage won (GS-victory) — the run-ending triumph: a rolling brass-ish fanfare climbing to a held
+   *  major chord, capped by a long sparkle cascade. The grandest cue in the game after the ace, sized to
+   *  carry the full-screen victory takeover. */
+  victory(): void {
+    // Rolling fanfare — a major arpeggio climbing, doubled with a brass-ish saw for weight.
+    const fanfare = [392, 523, 659, 784, 1047, 1319, 1568];
+    fanfare.forEach((f, i) => {
+      tone(f, 0.3, { type: 'triangle', gain: 0.2, t: 0.02 + i * 0.1 });
+      tone(f, 0.26, { type: 'sawtooth', gain: 0.055, t: 0.02 + i * 0.1 });
+    });
+    // A held major chord swelling under the climb (the "you did it" pad).
+    [523, 659, 784, 1047].forEach((f) => tone(f, 1.3, { type: 'sine', gain: 0.08, t: 0.72 }));
+    // A shimmering sparkle cascade tail.
+    [1568, 2093, 2637, 3136, 3951].forEach((f, i) => tone(f, 0.24, { type: 'sine', gain: 0.11, t: 0.9 + i * 0.06 }));
+  },
   /** Hole-in-one (GS-ace) — the biggest beat in the game: a rattle-in, a rising triumphant fanfare,
    *  a held major chord, and a cascade of sparkle chimes. Grander + longer than every other cue. */
   ace(): void {
