@@ -2473,8 +2473,11 @@ function travelScreen(): string {
     : '<span style="color:#ff8b6b;">Out here, every lane is a gamble — or bank the run below.</span>';
   return `
     ${header()}
-    <h2 style="font-size:17px;margin:0 0 3px;">Choose your jump</h2>
-    <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing planet up top to preview that world &amp; its bet, then confirm the jump. Deeper jumps raise the cut. ${safeNote}</p>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 3px;">
+      <h2 style="font-size:18px;margin:0;letter-spacing:0.6px;background:linear-gradient(90deg,#ffce54,#7fd6e6);-webkit-background-clip:text;background-clip:text;color:transparent;">◆ CHOOSE YOUR JUMP</h2>
+      <span style="flex:0 0 auto;font-size:11px;font-weight:700;color:#9fb0cf;border:1px solid var(--gs-line);border-radius:999px;padding:2px 9px;white-space:nowrap;">🛰 dist ${state.run.distanceFromStart}</span>
+    </div>
+    <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing world up top to preview where you'll play &amp; its bet, then confirm the jump. Deeper jumps raise the cut. ${safeNote}</p>
     ${map}
     ${bankBtn}`;
 }

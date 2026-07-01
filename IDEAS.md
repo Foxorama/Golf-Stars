@@ -68,6 +68,10 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-journey-alive** — journey select as a living cockpit: lit-sphere biome worlds (gradient body +
+  surface art + terminator + specular + atmosphere), boss red-aura / heat shimmer, warp-corridor energy
+  pulses, trail comet, launch-pad + thrusters, lit Earth, seeded twinkles/shooting stars, drifting sky.
+  Byte-stable (seeded mulberry32, no Math.random). See `docs/decisions/rpg-meta-loop.md`.
 - **GS-appsplit (partial)** — extracted haptics + celebrations (#157) and golfer avatars/leaderboard views
   (#158) out of `app.ts` (3,462 → 2,696 lines). Ongoing — see Now/next.
 - **GS-tents** — trade-market route pitches collidable tents around the green (#155).
