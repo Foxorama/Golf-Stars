@@ -23,51 +23,62 @@ function sparkles(pts: [number, number][]): string {
     .join('');
 }
 
-/** Draw a HAT glyph centred near (cx,cy) in a ~28u frame. */
-function hatGlyph(look: ApparelLook, cx: number, cy: number, uid: string): string {
-  const { shape, color, accent = '#0c1116', glow } = look;
-  const a = glow ? aura(cx, cy - 2, 22, glow, `hg${uid}`) : '';
-  const ink = 'stroke="#0c1116" stroke-width="1.1" stroke-linejoin="round"';
+/**
+ * Draw a HAT glyph on a head of radius `r` centred at (cx,cy). The shapes are authored in a canonical
+ * frame with the head centre at the origin and head radius R0 = 7 — the SAME numbers as the on-course
+ * `drawHat` (playView.ts) — then a single `scale(r/R0)` fits them to whatever head they sit on. That
+ * mirror is why "what you buy is what you wear": a proper full-head helmet on the course draws as a
+ * proper full-head helmet in the wardrobe/clubhouse, never a little bubble perched on top.
+ */
+function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: string): string {
+  const { shape, color, accent = '#15161c', glow } = look;
+  const R0 = 7; // canonical head radius the shapes below are drawn against (= drawHat's on-course r)
+  const s = r / R0;
+  const ink = 'stroke="#0c1116" stroke-width="1" stroke-linejoin="round"';
+  const a = glow ? aura(0, -R0, R0 + 6, glow, `hg${uid}`) : '';
   let g = '';
   switch (shape) {
     case 'cap':
-      g = `<path d="M${cx - 11},${cy + 2} Q${cx},${cy - 12} ${cx + 11},${cy + 1} L${cx + 11},${cy + 3} L${cx - 11},${cy + 4} Z" fill="${color}" ${ink}/>
-        <path d="M${cx + 7},${cy + 1} L${cx + 17},${cy + 4} L${cx + 7},${cy + 5} Z" fill="${accent}" ${ink}/>
-        <circle cx="${cx}" cy="${cy - 8}" r="1.4" fill="${accent}"/>`;
+      // Dome (top half-circle sitting on the head) + a brim curving down over the brow (front view).
+      g = `<path d="M-7,-2 A7 7 0 0 1 7,-2 Z" fill="${color}" ${ink}/>
+        <path d="M-6.5,-2 Q0,2.6 6.5,-2 Z" fill="${accent}" ${ink}/>`;
       break;
     case 'bucket':
-      g = `<path d="M${cx - 8},${cy - 7} Q${cx},${cy - 10} ${cx + 8},${cy - 7} L${cx + 9},${cy + 1} L${cx - 9},${cy + 1} Z" fill="${color}" ${ink}/>
-        <path d="M${cx - 14},${cy + 1} Q${cx},${cy + 7} ${cx + 14},${cy + 1} Q${cx},${cy + 4} ${cx - 14},${cy + 1} Z" fill="${accent}" ${ink}/>`;
+      g = `<path d="M-6.5,-1 A6.5 6.5 0 0 1 6.5,-1 Z" fill="${color}" ${ink}/>
+        <ellipse cx="0" cy="0" rx="11" ry="2.6" fill="${accent}" ${ink}/>`;
       break;
     case 'visor':
-      g = `<path d="M${cx - 12},${cy + 1} L${cx + 16},${cy + 4} L${cx + 8},${cy + 6} L${cx - 12},${cy + 4} Z" fill="${accent}" ${ink}/>
-        <path d="M${cx - 12},${cy + 1} Q${cx},${cy - 4} ${cx + 11},${cy + 2}" fill="none" stroke="${color}" stroke-width="3"/>`;
+      // Open-top: a brim curving down over the brow + a headband arcing across it (front view).
+      g = `<path d="M-7.5,-1 Q0,3.4 7.5,-1 Z" fill="${accent}" ${ink}/>
+        <path d="M-7,-2.4 A7 7 0 0 1 7,-2.4" fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round"/>`;
       break;
     case 'tophat':
-      g = `<rect x="${cx - 7}" y="${cy - 13}" width="14" height="16" rx="1" fill="${color}" ${ink}/>
-        <rect x="${cx - 7}" y="${cy - 4}" width="14" height="3.2" fill="${accent}" stroke="none"/>
-        <path d="M${cx - 14},${cy + 3} Q${cx},${cy + 6} ${cx + 14},${cy + 3} Q${cx},${cy + 0.5} ${cx - 14},${cy + 3} Z" fill="${color}" ${ink}/>`;
+      g = `<rect x="-5" y="-16" width="10" height="11" rx="1" fill="${color}" ${ink}/>
+        <rect x="-5" y="-2.5" width="10" height="2.4" fill="${accent}"/>
+        <ellipse cx="0" cy="0" rx="10" ry="2.2" fill="${color}" ${ink}/>`;
       break;
     case 'crown':
-      g = `<path d="M${cx - 11},${cy + 4} L${cx - 11},${cy - 6} L${cx - 5},${cy + 0} L${cx},${cy - 9} L${cx + 5},${cy} L${cx + 11},${cy - 6} L${cx + 11},${cy + 4} Z" fill="${color}" ${ink}/>
-        <rect x="${cx - 11}" y="${cy + 2}" width="22" height="3" fill="${accent}" stroke="none"/>
-        <circle cx="${cx}" cy="${cy - 8}" r="1.5" fill="#ff5a4d"/><circle cx="${cx - 11}" cy="${cy - 6}" r="1.2" fill="#5fd6ff"/><circle cx="${cx + 11}" cy="${cy - 6}" r="1.2" fill="#5fd6ff"/>`;
+      g = `<path d="M-7,0 L-7,-5 L-3.5,-1 L0,-8 L3.5,-1 L7,-5 L7,0 Z" fill="${color}" ${ink}/>
+        <rect x="-7" y="-0.5" width="14" height="1.8" fill="${accent}"/>
+        <circle cx="0" cy="-7" r="1.2" fill="#ff5a4d"/><circle cx="-7" cy="-5" r="1" fill="#5fd6ff"/><circle cx="7" cy="-5" r="1" fill="#5fd6ff"/>`;
       break;
     case 'helmet':
-      g = `<circle cx="${cx}" cy="${cy - 3}" r="11" fill="${color}" ${ink}/>
-        <path d="M${cx - 8},${cy - 5} Q${cx},${cy - 11} ${cx + 8},${cy - 5} L${cx + 8},${cy + 1} Q${cx},${cy + 4} ${cx - 8},${cy + 1} Z" fill="${accent}" opacity="0.85"/>
-        <ellipse cx="${cx - 3}" cy="${cy - 6}" rx="2.5" ry="1.6" fill="#fff" opacity="0.7"/>`;
+      // A sealed dome ENCLOSING the whole head (radius r+1.5, like drawHat) + a gold visor band across
+      // the face + a glint. This is the full-head covering the astronaut report was missing in preview.
+      g = `<circle cx="0" cy="-1" r="8.5" fill="${color}" ${ink}/>
+        <rect x="-5.6" y="-3.4" width="11.2" height="5.8" rx="2.7" fill="${accent}" opacity="0.92" ${ink}/>
+        <ellipse cx="-2" cy="-1.6" rx="2" ry="1.1" fill="#fff" opacity="0.55"/>`;
       break;
     case 'halo':
-      g = `<ellipse cx="${cx}" cy="${cy - 12}" rx="11" ry="3.4" fill="none" stroke="${color}" stroke-width="2.2"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></ellipse>
-        <circle cx="${cx}" cy="${cy - 2}" r="10" fill="${accent}" ${ink}/>
-        <path d="M${cx - 7},${cy - 4} Q${cx},${cy - 9} ${cx + 7},${cy - 4} L${cx + 7},${cy + 1} Q${cx},${cy + 3} ${cx - 7},${cy + 1} Z" fill="${color}" opacity="0.8"/>`;
+      g = `<circle cx="0" cy="-1" r="8" fill="${accent}" ${ink}/>
+        <path d="M-5,-1.5 A5 4 0 0 1 5,-1.5 Z" fill="${color}" opacity="0.8"/>
+        <ellipse cx="0" cy="-11" rx="7" ry="2.4" fill="none" stroke="${color}" stroke-width="2"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></ellipse>`;
       break;
     default:
       g = '';
   }
-  const flair = shape === 'halo' ? sparkles([[cx - 13, cy - 9], [cx + 13, cy - 7], [cx, cy + 8]]) : '';
-  return a + g + flair;
+  const flair = shape === 'halo' ? sparkles([[-9, -6], [9, -4], [0, 6]]) : '';
+  return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">${a}${g}${flair}</g>`;
 }
 
 /** The pattern/panel detail a shirt shape adds over a coloured torso (no base silhouette) — shared by
@@ -147,10 +158,13 @@ export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
   if (!item) return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"></svg>`;
   const uid = id!.replace(/[^a-z0-9]/gi, '');
   const cx = w / 2;
-  const cy = h / 2 + (item.slot === 'hat' ? 4 : 2);
+  // Hats now draw on a notional head centred at (cx,cy) with radius `hatR`; nudge the centre down a
+  // touch so brimmed hats (which sit on top of that head) stay vertically balanced in the card.
+  const hatR = 10;
+  const cy = h / 2 + (item.slot === 'hat' ? 6 : 2);
   const glyph =
     item.slot === 'hat'
-      ? hatGlyph(item.look, cx, cy, uid)
+      ? hatGlyph(item.look, cx, cy, hatR, uid)
       : item.slot === 'shirt'
         ? shirtGlyph(item.look, cx, cy, uid)
         : pantsGlyph(item.look, cx, cy, uid);
@@ -204,7 +218,9 @@ export function golferPreviewSVG(
     <path d="M${cx - 20},${headY + 16} L${cx - 9},${headY + 10} L${cx},${headY + 14} L${cx + 9},${headY + 10} L${cx + 20},${headY + 16} L${cx + 16},${headY + 26} L${cx + 12},${hipY} L${cx - 12},${hipY} L${cx - 16},${headY + 26} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="1.4" stroke-linejoin="round"/>`;
   const detail = shirt ? shirtDetail(shirt.look, cx, headY + 30) : '';
   const head = `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="${skin}" stroke="#0c1116" stroke-width="1.2"/>`;
-  const hatG = hat ? hatGlyph(hat.look, cx, headY - 6, 'prev') : '';
+  // Draw the hat ON the head (centre + real radius) so it scales to the head it sits on — a helmet
+  // encloses the whole head, a cap perches on the crown — exactly as on-course.
+  const hatG = hat ? hatGlyph(hat.look, cx, headY, headR, 'prev') : '';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
     ${glowAura}${pantsGlow}${legs}${torso}${detail}${head}${hatG}
   </svg>`;

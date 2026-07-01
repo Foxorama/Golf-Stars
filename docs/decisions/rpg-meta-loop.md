@@ -491,6 +491,16 @@
     each with a floating chip naming the worn piece + a ✎ pencil. Below the figure, a **garage bay** tile
     (`clubhouseGarageArt`: a hangar/launch-pad SVG scene — open star-bay, neon pillars tinted by the ride's
     rarity, the parked ship via `shipSVG`) is a fourth tap target for the ride.
+  - **Hats size to the head they sit on (GS-wardrobe-cosmetics).** The SVG `hatGlyph` (apparelArt.ts) used
+    to draw FIXED ~11u shapes anchored 6u above the head, so an *enclosing* hat (the astronaut `helmet`,
+    the supernova `halo`) landed as a small bubble perched on top of the big stage/lounge head instead of
+    covering it. `hatGlyph(look, cx, cy, r, uid)` is now HEAD-RADIUS parameterized: shapes are authored in a
+    canonical head-centre frame at R0=7 — the SAME numbers as the on-course `drawHat` (playView.ts) — then a
+    single `scale(r/R0)` fits them to the real head (`headR` in the preview, a chosen `hatR` in the card), so
+    the helmet encloses the head exactly as on-course. GOTCHA: the SVG preview is FRONT-facing (the figure
+    looks at you) while `drawHat`'s canvas is PROFILE (down-the-line, brim points +x); brimmed hats
+    (cap/visor) therefore keep symmetric front brims in the SVG — do NOT "sync" them to point sideways, the
+    viewpoints differ on purpose. Enclosing/symmetric hats (helmet/halo/tophat/crown/bucket) match both ways.
   - **Reveal-one interaction.** Tapping a body part or the garage opens `clubhousePicker` — just THAT slot's
     owned rack (the same `clubhouseApparelCardHTML` equip toggles / `shipCardHTML` fleet as before; empty
     apparel slots show a Trade-Market buy button). The open slot is `clubhouseSlot: ApparelSlot | 'ship' | null`,
