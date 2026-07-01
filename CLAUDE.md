@@ -114,7 +114,15 @@ For each system: the rule that constrains new work. Open the archive doc before 
   shrink it casually).
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
-  (3 arcs, boss each, `endedReason 'won'`). Two currencies: per-run **credits** (shop perks) and
+  (3 arcs, boss each, `endedReason 'won'`). **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
+  through `voyageRarityBias(rarity, voyageShopProgress(stopIndex,stops))` (endless formats keep the
+  galaxy-distance `rarityDepthBias`), keyed off the STOP so shop 1 is mostly green+a blue, a small
+  epic+legendary opens between boss 1 & 2, and the last pre-boss shop is halfish blue/halfish purple with
+  a bounded legendary chance — a separate later-opening `legTilt` gates orange; commons stay flat; it
+  reweights WHICH item is drawn, never the rng COUNT. **Every shop item is a one-shot** (no `stackable` in
+  the catalogue) so each shop is fresh distinct gear; build depth comes from SIBLING items per axis, not
+  re-buying one. The `stackable`/`itemCost`-geometric plumbing stays dormant for save back-compat (old
+  duplicate perk ids still fold via `loadoutFromPerks`). Two currencies: per-run **credits** (shop perks) and
   cross-run **Star Shards** (cosmetic ships + apparel hats/shirts/pants, up to a `mythic` tier above
   legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v8). **Cosmetics
   split buy-vs-equip** (GS-clubhouse, save v10): the **Trade Market** sells the FULL ship + apparel

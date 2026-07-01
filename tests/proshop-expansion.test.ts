@@ -49,10 +49,10 @@ function hazardPenalties(perks: string[], biome: string, seeds = 120): number {
 describe('GS-proshop-2 — new gameplay-changing items', () => {
   it('the new items resolve and apply their loadout fields', () => {
     expect(shopItem('wind-cheater')).toBeTruthy();
-    expect(loadoutFromPerks(['wind-cheater']).windResist).toBeCloseTo(0.3);
-    // wind-cheater stacks and CAPS at 0.6
+    expect(loadoutFromPerks(['wind-cheater']).windResist).toBeCloseTo(0.45);
+    // wind-cheater is a one-shot now (GS-proshop-variety) but the effect still CAPS at 0.6, so an old
+    // save that stacked it (duplicate perk ids) never exceeds the cap on rebuild.
     expect(loadoutFromPerks(['wind-cheater', 'wind-cheater']).windResist).toBeCloseTo(0.6);
-    expect(loadoutFromPerks(['wind-cheater', 'wind-cheater', 'wind-cheater']).windResist).toBeCloseTo(0.6);
 
     expect(loadoutFromPerks(['spin-milled']).backspinBoost).toBeCloseTo(0.07);
 
@@ -63,10 +63,10 @@ describe('GS-proshop-2 — new gameplay-changing items', () => {
   it('the legendary Power Glove cranks the power ceiling to MAX (GS-proshop-3)', () => {
     const pg = shopItem('power-glove')!;
     expect(pg.rarity).toBe('legendary');
-    // +0.4 overpower → a 140% pull ceiling, far past the stackable Overdrive's 120%.
+    // +0.4 overpower → a 140% pull ceiling, past the one-shot Overdrive's 120%.
     expect(loadoutFromPerks(['power-glove']).overpower).toBeCloseTo(0.4);
     expect(maxPowerOf(loadoutFromPerks(['power-glove']))).toBeCloseTo(1.4);
-    expect(maxPowerOf(loadoutFromPerks(['overdrive', 'overdrive']))).toBeCloseTo(1.2);
+    expect(maxPowerOf(loadoutFromPerks(['overdrive']))).toBeCloseTo(1.2);
     // A base loadout never carries it (byte-for-byte default).
     expect(startingLoadout().overpower).toBeUndefined();
   });

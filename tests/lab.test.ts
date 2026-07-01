@@ -110,11 +110,13 @@ describe('loadout builder (real loadoutFromPerks / meta)', () => {
     expect(wedgeBag).toBe(wedgePlain); // scoring clubs untouched
   });
 
-  it('stacks a stackable perk by repeating its id', () => {
+  it('rebuilds repeated perk ids by applying each (back-compat with old stacked saves)', () => {
+    // Items are one-shot uniques now (GS-proshop-variety), but loadoutFromPerks still folds every id in
+    // the array — so an old save that stacked a −4 Caddie Lesson twice resolves the full −8 on rebuild.
     const one = buildLoadout({ handicap: 18, perks: ['caddie-lesson'] });
-    const three = buildLoadout({ handicap: 18, perks: ['caddie-lesson', 'caddie-lesson', 'caddie-lesson'] });
-    expect(one.handicap).toBe(16);
-    expect(three.handicap).toBe(12);
+    const two = buildLoadout({ handicap: 18, perks: ['caddie-lesson', 'caddie-lesson'] });
+    expect(one.handicap).toBe(14);
+    expect(two.handicap).toBe(10);
   });
 });
 

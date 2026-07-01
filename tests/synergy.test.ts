@@ -22,8 +22,8 @@ describe('trigger relics + curse (GS-synergy)', () => {
 
   it('birdie/eagle/comeback relics pay out only on a PASSED stop', () => {
     const l = loadoutFromPerks(['birdie-hunter', 'eagle-eye', 'comeback-kid']);
-    // birdie 18 (+ eagle hole also counts as birdie 18) + eagle 60 + comeback 90 (blow-up present).
-    expect(relicCreditBonus(l, played, true)).toBe(18 + 18 + 60 + 90);
+    // birdie 28 (+ eagle hole also counts as birdie 28) + eagle 60 + comeback 140 (blow-up present).
+    expect(relicCreditBonus(l, played, true)).toBe(28 + 28 + 60 + 140);
     expect(relicCreditBonus(l, played, false)).toBe(0); // failed stop → nothing
   });
 

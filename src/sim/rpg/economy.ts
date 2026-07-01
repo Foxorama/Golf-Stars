@@ -417,7 +417,9 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'fortune-chip': ['economy'],
   'auto-caddie': ['putting'],
   'putting-grip': ['putting'],
+  'mallet-putter': ['putting'],
   'tour-putter': ['putting'],
+  'pinseeker-putter': ['putting'],
   // Named caddies (GS-caddy) — tagged by their flavour so the theme bias still nudges them.
   'driver-dan': ['distance'],
   'dr-chipinski': ['skill'],
@@ -434,6 +436,10 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   // Distance-control (carry-window) upgrades — 'distance'.
   'distance-control': ['distance'],
   'wedge-touch': ['control'],
+  'flop-wedge': ['control'], // high-spin short game reads as control
+  'pro-irons': ['control'], // premium precision iron set
+  'quantum-shafts': ['control'], // legendary precision set
+  'nova-driver': ['distance'], // legendary straight bomber
   // Overdrive (GS-power): dial the pull-to-power gesture past 100% — pure distance.
   overdrive: ['distance'],
   // Trigger relics + the curse (GS-synergy) — economy snowball pieces + a risk gamble.
@@ -461,8 +467,8 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     name: 'Graphite Power Shaft',
     cost: 120,
     desc: '+12 yds carry on your distance clubs · steadier tempo (−5% spray)',
-    // Rare, not common: a +12yd unique is a stronger first-copy upgrade than the rare,
-    // stackable Range Booster (+8yd) — rarity must track power, so it can't read as common.
+    // Rare, not common: a pure distance upgrade sits alongside the rare Distance Balls (a sibling on
+    // the distance axis) — rarity tracks power, so it can't read as common.
     rarity: 'rare',
     // Under the per-club wildness model, longer clubs spray more — so pure distance is
     // double-edged. The small −5% dispersion keeps the Power Cell a genuine upgrade
@@ -502,11 +508,19 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'putting-grip',
     name: 'Pro Putting Grip',
     cost: 90,
-    desc: 'Steadier stroke — widens the make window & tightens your lag · stacks',
+    desc: 'Steadier stroke — widens the make window & tightens your lag',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 4,
-    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.12, perks: [...m.perks, 'putting-grip'] }),
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.16, perks: [...m.perks, 'putting-grip'] }),
+  },
+  {
+    // Mid putting tier (GS-proshop-variety): a mallet sibling between the grip and the Tour Putter, so
+    // the putting axis is a ladder of distinct one-shots rather than one stacked grip.
+    id: 'mallet-putter',
+    name: 'Counterbalance Mallet',
+    cost: 130,
+    desc: 'A stable counter-weighted mallet — a solid lift to your putting make window & lag',
+    rarity: 'rare',
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.2, perks: [...m.perks, 'mallet-putter'] }),
   },
   {
     id: 'tour-putter',
@@ -515,6 +529,16 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: 'A precision flat-stick — a big lift to your putting make window & lag',
     rarity: 'epic',
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.26, perks: [...m.perks, 'tour-putter'] }),
+  },
+  {
+    // The legendary flat-stick (GS-proshop-variety): the apex of the putting ladder, a general-use
+    // legendary that isn't a named caddy — so a legendary is actually buyable deep in the voyage.
+    id: 'pinseeker-putter',
+    name: 'Pinseeker Putter',
+    cost: 340,
+    desc: 'A face-milled precision blade — the steadiest stroke in the galaxy, a huge make window',
+    rarity: 'legendary',
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.4, perks: [...m.perks, 'pinseeker-putter'] }),
   },
   // --- Named caddies (GS-caddy) — UNIQUE: only one may be hired at a time. They appear as random,
   // rarity-weighted inclusions in the rotating shop offer (epic/legendary, so scarce); once you hire
@@ -597,57 +621,50 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     apply: (m) => ({ ...m, greenRead: true, puttBoost: (m.puttBoost ?? 0) + MOLE_PUTT_BOOST, perks: [...m.perks, 'mystic-mole'] }),
   },
 
-  // --- Stackable upgrades (the endless credit sink + growing build) -----------
-  // Each is buyable repeatedly at a rising price, so credits never go dead and the
-  // loadout keeps scaling into the cut-line ramp. Effects compound through apply()
-  // being folded once per owned copy (loadoutFromPerks / buy both rely on this).
+  // --- One-shot upgrades (GS-proshop-variety) ---------------------------------
+  // Formerly stackable, now single-purchase uniques: once bought, an item drops out of the offer, so
+  // every shop is fresh DISTINCT gear instead of the same card five stops running. The build still
+  // scales — via the many sibling items across each axis (control/distance/economy/putting), not by
+  // re-buying one. Each single value is bumped up from its old first-copy strength to stay worthwhile.
   {
     id: 'caddie-lesson',
     name: 'Caddie Lesson',
-    cost: 70,
-    desc: '−2 handicap, tighter shots · stacks down to scratch · (needs a hired caddy)',
+    cost: 90,
+    desc: '−4 handicap — tighter, more accurate shots · (needs a hired caddy)',
     rarity: 'common',
-    stackable: true,
-    maxStacks: 9, // 18 handicap → 0 (scratch); past that the −handicap clamp wastes credits
     // A generic caddy 'service' — only offered once you've hired a named caddy (GS-caddy).
     caddy: 'service',
-    apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 2), perks: [...m.perks, 'caddie-lesson'] }),
+    apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 4), perks: [...m.perks, 'caddie-lesson'] }),
   },
   {
     id: 'fortune-chip',
     name: "Sponsor's Badge",
     cost: 80,
-    desc: '+15% credits earned · stacks (funds the deeper galaxy)',
+    desc: '+15% credits earned (funds the deeper galaxy)',
     rarity: 'common',
-    stackable: true,
-    maxStacks: 6,
     apply: (m) => ({ ...m, creditMult: m.creditMult * 1.15, perks: [...m.perks, 'fortune-chip'] }),
   },
   {
     id: 'precision-chip',
     name: 'Tour Glove',
     cost: 110,
-    desc: 'A tacky all-weather glove — 8% tighter dispersion · stacks (forgiveness compounds)',
+    desc: 'A tacky all-weather glove — 12% tighter dispersion',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 10, // multiplicative decay self-limits value (asymptotic, never to zero → still fair)
-    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.92, perks: [...m.perks, 'precision-chip'] }),
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.88, perks: [...m.perks, 'precision-chip'] }),
   },
   {
     id: 'range-booster',
     name: 'Distance Balls',
     cost: 100,
-    desc: 'Hot, low-spin distance balls — +8 yds distance clubs · −3% spray · stacks',
+    desc: 'Hot, low-spin distance balls — +12 yds distance clubs · −4% spray',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 5,
     // Distance clubs ONLY (same reason as Power Cell — boosting scoring clubs makes the
-    // reach AI overshoot greens). The −3% dispersion offsets the wider-spray penalty a
-    // longer club carries, so each stack stays a net scoring upgrade (guarded in tests).
+    // reach AI overshoot greens). The −4% dispersion offsets the wider-spray penalty a
+    // longer club carries, so it stays a net scoring upgrade (guarded in tests).
     apply: (m) => ({
       ...m,
-      bag: boostDistanceClubs(m.bag, 8),
-      dispersionMult: m.dispersionMult * 0.97,
+      bag: boostDistanceClubs(m.bag, 12),
+      dispersionMult: m.dispersionMult * 0.96,
       perks: [...m.perks, 'range-booster'],
     }),
   },
@@ -661,14 +678,12 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'sweet-spot',
     name: 'Sweet-Spot Forging',
     cost: 130,
-    desc: 'Find the centre more often — trims every miss, more GREAT shots · stacks',
+    desc: 'Find the centre more often — trims every miss, more GREAT shots',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 5,
     // Shave a little off all four miss zones → green % rises across the board (display tightens).
     apply: (m) => ({
       ...m,
-      shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.012, sliceR: -0.012, duckHookL: -0.006, shankR: -0.006 }),
+      shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.02, sliceR: -0.02, duckHookL: -0.01, shankR: -0.01 }),
       perks: [...m.perks, 'sweet-spot'],
     }),
   },
@@ -693,21 +708,17 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'hook-corrector',
     name: 'Hook Corrector',
     cost: 90,
-    desc: 'Halves the HOOK (left orange zone) → more centre · stacks',
+    desc: 'Tames the HOOK (left orange zone) → more centre',
     rarity: 'common',
-    stackable: true,
-    maxStacks: 3,
-    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.04 }), perks: [...m.perks, 'hook-corrector'] }),
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.06 }), perks: [...m.perks, 'hook-corrector'] }),
   },
   {
     id: 'slice-corrector',
     name: 'Slice Corrector',
     cost: 90,
-    desc: 'Halves the SLICE (right orange zone) → more centre · stacks',
+    desc: 'Tames the SLICE (right orange zone) → more centre',
     rarity: 'common',
-    stackable: true,
-    maxStacks: 3,
-    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.04 }), perks: [...m.perks, 'slice-corrector'] }),
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.06 }), perks: [...m.perks, 'slice-corrector'] }),
   },
   {
     id: 'draw-weighting',
@@ -724,25 +735,46 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'distance-control',
     name: 'Stiff Tour Shaft',
     cost: 120,
-    desc: 'A stiff calibrated shaft — tighter distances on driver/woods/irons (raises the min carry) · stacks',
+    desc: 'A stiff calibrated shaft — tighter distances on driver/woods/irons (raises the min carry)',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 4,
-    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.05, perks: [...m.perks, 'distance-control'] }),
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.1, perks: [...m.perks, 'distance-control'] }),
   },
   {
     id: 'wedge-touch',
     name: 'Wedge Touch',
     cost: 110,
-    desc: 'Pin-point wedges: tightens the wedge carry window so it lands where you aim · stacks',
+    desc: 'Pin-point wedges: tightens the wedge carry window so it lands where you aim',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 3,
-    // Tighten the wedge window AND its line a touch — forward/back AND left/right precision.
+    // Tighten the wedge window AND its line — forward/back AND left/right precision.
     apply: (m) => ({
       ...m,
-      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.18),
+      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.32),
       perks: [...m.perks, 'wedge-touch'],
+    }),
+  },
+  {
+    // Epic precision iron set (GS-proshop-variety): a premium accuracy sibling to the Counterbalance
+    // Shaft — a bigger single dispersion cut than any rare, giving the control axis a purple tier.
+    id: 'pro-irons',
+    name: 'Tour Muscle-Backs',
+    cost: 230,
+    desc: 'Forged tour muscle-back irons — a premium 18% tighter dispersion on every club',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.82, perks: [...m.perks, 'pro-irons'] }),
+  },
+  {
+    // Epic short-game piece (GS-proshop-variety): a high-spin lob wedge that both bites (backspin) and
+    // lands tight (wedge window) — the purple tier of the short-game axis.
+    id: 'flop-wedge',
+    name: 'Spin Lob Wedge',
+    cost: 200,
+    desc: 'A high-toe spin lob wedge — rips backspin so approaches check up AND tightens the wedge window',
+    rarity: 'epic',
+    apply: (m) => ({
+      ...m,
+      backspinBoost: (m.backspinBoost ?? 0) + 0.1,
+      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.2),
+      perks: [...m.perks, 'flop-wedge'],
     }),
   },
 
@@ -751,13 +783,43 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'overdrive',
     name: 'Speed Whip Shaft',
     cost: 140,
-    desc: 'A whippy speed shaft: pull PAST 100% on the power gesture (+10% max carry) · stacks',
+    desc: 'A whippy speed shaft: pull PAST 100% on the power gesture (+20% max carry)',
     rarity: 'epic',
-    stackable: true,
-    maxStacks: 2,
-    // +0.1 power ceiling per copy (110% → 120% at two stacks). Interactive only — the auto sim
-    // always plays full swings, so a base/auto loadout is byte-for-byte unchanged.
-    apply: (m) => ({ ...m, overpower: (m.overpower ?? 0) + 0.1, perks: [...m.perks, 'overdrive'] }),
+    // +0.2 power ceiling (120% pull). Interactive only — the auto sim always plays full swings, so a
+    // base/auto loadout is byte-for-byte unchanged.
+    apply: (m) => ({ ...m, overpower: (m.overpower ?? 0) + 0.2, perks: [...m.perks, 'overdrive'] }),
+  },
+  {
+    // Legendary straight bomber (GS-proshop-variety): the apex distance club — a big carry boost on the
+    // woods/long sticks (DISTANCE clubs only, so the reach AI never overshoots — the power-cell lesson)
+    // that ALSO flies straighter. A general-use legendary gear piece, not a named caddy.
+    id: 'nova-driver',
+    name: 'Nova Long Driver',
+    cost: 350,
+    desc: 'A supersonic tour driver — +24 yds on your distance clubs AND 10% tighter dispersion. A straight bomb.',
+    rarity: 'legendary',
+    apply: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 24),
+      dispersionMult: m.dispersionMult * 0.9,
+      perks: [...m.perks, 'nova-driver'],
+    }),
+  },
+  {
+    // Legendary precision set (GS-proshop-variety): the apex of the control axis — the biggest single
+    // dispersion cut in the game plus a shave off every miss zone. The go-to legendary for an accuracy
+    // build, so a deep-voyage shop has a legendary worth its price.
+    id: 'quantum-shafts',
+    name: 'Quantum-Balanced Irons',
+    cost: 360,
+    desc: 'Frequency-matched quantum shafts — 22% tighter dispersion AND fewer misses across the board',
+    rarity: 'legendary',
+    apply: (m) => ({
+      ...m,
+      dispersionMult: m.dispersionMult * 0.78,
+      shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.01, sliceR: -0.01, duckHookL: -0.008, shankR: -0.008 }),
+      perks: [...m.perks, 'quantum-shafts'],
+    }),
   },
   {
     // The legendary power piece (GS-proshop-3): the 1989 NES Power Glove — MAX power. A single,
@@ -779,11 +841,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'birdie-hunter',
     name: 'Birdie Hunter',
     cost: 110,
-    desc: '+18 credits for every birdie-or-better you hole each stop · stacks (go aggressive)',
+    desc: '+28 credits for every birdie-or-better you hole each stop (go aggressive)',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 4,
-    apply: (m) => ({ ...m, birdieCredit: (m.birdieCredit ?? 0) + 18, perks: [...m.perks, 'birdie-hunter'] }),
+    apply: (m) => ({ ...m, birdieCredit: (m.birdieCredit ?? 0) + 28, perks: [...m.perks, 'birdie-hunter'] }),
   },
   {
     id: 'eagle-eye',
@@ -797,11 +857,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'comeback-kid',
     name: 'Comeback Kid',
     cost: 120,
-    desc: '+90 credits whenever you make the cut DESPITE a blow-up hole · stacks',
+    desc: '+140 credits whenever you make the cut DESPITE a blow-up hole',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 3,
-    apply: (m) => ({ ...m, comebackCredit: (m.comebackCredit ?? 0) + 90, perks: [...m.perks, 'comeback-kid'] }),
+    apply: (m) => ({ ...m, comebackCredit: (m.comebackCredit ?? 0) + 140, perks: [...m.perks, 'comeback-kid'] }),
   },
   {
     // The CURSE gamble (GS-curses): a real risk you opt into — wilder misses for a big payout multiplier.
@@ -828,11 +886,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'wind-cheater',
     name: 'Wind-Cheater Balls',
     cost: 120,
-    desc: 'Low, boring ball-flight that cuts through the breeze — 30% less wind impact · stacks',
+    desc: 'Low, boring ball-flight that cuts through the breeze — 45% less wind impact',
     rarity: 'rare',
-    stackable: true,
-    maxStacks: 2, // 30% → 60% wind reduction at two
-    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.3), perks: [...m.perks, 'wind-cheater'] }),
+    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.45), perks: [...m.perks, 'wind-cheater'] }),
   },
   {
     // Increased backspin (backspinBoost): milled grooves rip more check so approaches bite & hold.

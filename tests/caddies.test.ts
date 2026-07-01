@@ -59,11 +59,14 @@ describe('named caddies — uniqueness & shop gating', () => {
 
   it('named caddies are random shop inclusions until one is hired, then never appear again', () => {
     // No caddy yet → named caddies CAN show up in the rotating offer (rarity-weighted, so scarce —
-    // assert they surface across enough seeds).
+    // assert they surface across enough seeds and a spread of stops, as a real run encounters them).
     let surfaced = 0;
     for (let seed = 0; seed < 120; seed++) {
-      const ids = shopOffer(startRun(seed)).map((o) => o.item.id);
-      if (ids.some((id) => NAMED_CADDY_IDS.includes(id))) surfaced++;
+      for (const distanceFromStart of [0, 3, 6, 9]) {
+        const run = { ...startRun(seed), stopIndex: 1, distanceFromStart };
+        const ids = shopOffer(run).map((o) => o.item.id);
+        if (ids.some((id) => NAMED_CADDY_IDS.includes(id))) surfaced++;
+      }
     }
     expect(surfaced).toBeGreaterThan(0);
 
