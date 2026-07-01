@@ -208,7 +208,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `rng` stream order. **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
   rng draw counts never read the projection (place in course space, consume unconditionally, cull
   at paint — never retry on `inView` or size a count off projected px) and `posHash` keys are
-  course-space, never screen px — `tests/camera-stability.test.ts` guards both. The decision map's
+  course-space, never screen px — `tests/camera-stability.test.ts` guards both. **Rough is ROUGH;
+  space starts at the OB frame (GS-rough-frame):** the land hull fills `playBounds`+apron with the
+  world's rough palette (`LAND_SPACE_BLEND` stays small; never star-salt the turf); an ARMED
+  lost-rough hole (`roughLie` biomeMod, void/cetus deep stops) instead floats a platform per play
+  feature in the open deep (the void's deep = negative-energy rifts) — the render mirrors the sim's
+  lost-ball gate; `tests/biome-identity.test.ts` guards it. The decision map's
   framing must hold still for the whole shot decision (frame on the pin-aim full-power spread, not
   the live drag), and the shot animation starts at the decision map's exact `decisionRadius`. Turf
   bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
