@@ -108,8 +108,8 @@ describe('the effect wind hook (GS-journey-variety)', () => {
       const s = still.holes[i]!;
       expect(g.wind!.spd).toBeCloseTo(Math.min(EFFECT_WIND_CAP, h.wind!.spd * kUp), 6);
       expect(s.wind!.spd).toBeCloseTo(h.wind!.spd * kDown, 6);
-      expect(g.wind!.deg).toBe(h.wind!.deg);
-      expect(s.wind!.deg).toBe(h.wind!.deg);
+      expect(g.wind!.dir).toBe(h.wind!.dir);
+      expect(s.wind!.dir).toBe(h.wind!.dir);
     });
   });
 
