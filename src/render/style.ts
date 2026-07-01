@@ -1356,15 +1356,22 @@ function sampleAlong(line: Vec[], u: number): Vec {
 }
 
 /**
- * The COURSE-SPACE star-river path (GS-cetus-2): a meander that snakes down the hole and weaves
- * across the play corridor, so the river is CARVED through the fairway rather than parked beside it
- * as a straight bar. It is a PURE function of the hole + its own rng — it never reads the projector —
- * so the geometry is byte-stable AND projector-independent. (The old render-only river shared an rng
- * stream with the ocean, whose draw COUNT depended on the projected island polygon — so the river's
- * side + wobble re-rolled on every zoom/pan, the "jumps back and forth all over the place" bug.)
- * Returns null for a hole with no real corridor (a par-3 island green has no fairway to carve).
+ * The COURSE-SPACE star-river path (GS-cetus-4): ONE diagonal crossing of the play corridor — a
+ * spring near the corridor's far side, a single meandering pass over the fairway around mid-hole,
+ * then out through the rough to the plateau's edge, where it can spill off the cliff. This replaces
+ * the GS-cetus-2/3 full-length meander that snaked tee→green down the middle of the corridor: on a
+ * par 4/5 that buried most of the mown fairway under river + bank glow (the "takes up too much
+ * fairway" bug). Still a PURE function of the hole + its own rng — it never reads the projector —
+ * so the geometry is byte-stable AND camera-proof; ALL rng draws happen up front, so the boundary
+ * marching can never shift the stream. The polyline is ordered SOURCE → SPILL (the downstream end
+ * is fixed in course space — the old "lowest river mouth on screen" pick re-chose the spill every
+ * follow-cam frame, which is what painted a bonus waterfall over the green on a side chip).
+ * Returns null for a hole with no real corridor (a par-3 island green has no fairway to cross).
  */
-export function cetusRiverPath(hole: Hole, rng: () => number): { line: Vec[]; hw: number[] } | null {
+export function cetusRiverPath(
+  hole: Hole,
+  rng: () => number,
+): { line: Vec[]; hw: number[]; spillAtEdge: boolean } | null {
   const cl = hole.centreline;
   const fw = hole.features.find((f) => f.kind === 'fairway');
   if (!fw || cl.length < 2 || hole.par < 4) return null;
@@ -1376,34 +1383,71 @@ export function cetusRiverPath(hole: Hole, rng: () => number): { line: Vec[]; hw
   let L = 0;
   for (let i = 1; i < cl.length; i++) L += dist(cl[i - 1]!, cl[i]!);
   if (L < 1) L = dist(cl[0]!, cl[cl.length - 1]!) || 100;
-  const N = 30;
+  // All rng draws up front, in a fixed order — the path maths below is deterministic geometry.
+  const uc = 0.38 + rng() * 0.22; // where it crosses the corridor: mid-hole, clear of both tee + green
+  const side = rng() < 0.5 ? 1 : -1; // which side of the corridor it exits toward
+  const lean = ((102 + rng() * 22) * Math.PI) / 180; // axis = tangent rotated PAST perpendicular → a tee-ward lean,
+  // so the downstream run heads for the plateau's FRONT edge (the cliff face the map extrudes), never the green.
   const phase = rng() * Math.PI * 2;
-  const lobes = 2.0 + rng() * 1.6; // a few S-bends down the length of the hole
-  // A real, modest river: its width is keyed off the HOLE LENGTH (not the giant island half-width),
-  // and the meander swing is CAPPED so the channel winds down the central fairway and reads as carved
-  // INTO the bright turf, instead of a huge band sprawling out across the whole island into the dark.
-  const amp = Math.min(halfW * 0.55, 34) * (0.8 + rng() * 0.4); // capped swing across the corridor
-  const rw = Math.max(5, Math.min(13, L * 0.018)); // river half-width (course yards)
+  const ampF = 0.7 + rng() * 0.6;
   const wPhase = rng() * Math.PI * 2;
-  const wLobes = 2.4 + rng() * 1.8;
+  const rw = Math.max(4, Math.min(8, L * 0.014)); // a modest creek half-width (course yards)
+  const C = sampleAlong(cl, uc);
+  const c0 = sampleAlong(cl, Math.max(0, uc - 0.02));
+  const c1 = sampleAlong(cl, Math.min(1, uc + 0.02));
+  let tx = c1[0] - c0[0];
+  let ty = c1[1] - c0[1];
+  const tl = Math.hypot(tx, ty) || 1;
+  tx /= tl;
+  ty /= tl;
+  const rot = side * lean;
+  const dxA = tx * Math.cos(rot) - ty * Math.sin(rot); // downstream axis
+  const dyA = tx * Math.sin(rot) + ty * Math.cos(rot);
+  const px = -dyA; // meander swing direction (perpendicular to the axis)
+  const py = dxA;
+  const amp = Math.min(halfW * 0.3, 9) * ampF; // a gentle wiggle, never a corridor-wide sprawl
+  const freq = (Math.PI * 1.6) / 130; // ~1.6 S-lobes per 130 yards of run
+  const at = (s: number): Vec => {
+    const m = amp * Math.sin(phase + s * freq);
+    return [C[0] + dxA * s + px * m, C[1] + dyA * s + py * m];
+  };
+  // The land platform the crossing lives on (lost holes: the corridor ribbon; calm: the land hull).
+  const home = landPolysCourseFor(hole).find((p) => pointInPoly(C, p));
+  if (!home) return null;
+  // March each way to the platform edge (fixed step counts + a bisection refine — no rng in here).
+  const edgeAt = (dir: 1 | -1, maxLen: number): { s: number; hit: boolean } => {
+    const K = 48;
+    const step = maxLen / K;
+    for (let k = 1; k <= K; k++) {
+      if (!pointInPoly(at(dir * k * step), home)) {
+        let lo = (k - 1) * step;
+        let hi = k * step;
+        for (let b = 0; b < 8; b++) {
+          const mid = (lo + hi) / 2;
+          if (pointInPoly(at(dir * mid), home)) lo = mid;
+          else hi = mid;
+        }
+        return { s: dir * ((lo + hi) / 2), hit: true };
+      }
+    }
+    return { s: dir * maxLen, hit: false };
+  };
+  const down = edgeAt(1, 200); // downstream: run out to the cliff edge (the spill)
+  const up = edgeAt(-1, Math.max(16, Math.min(40, halfW * 1.2))); // upstream: short — the spring sits near the corridor
+  const s0 = up.hit ? up.s * 0.86 : up.s; // an edge-clipped spring is pulled back so it wells up ON the plateau
+  const s1 = down.s;
+  if (s1 - s0 < 24) return null; // degenerate sliver (crossing pinched right at an edge) — skip the river
+  const N = 24;
   const line: Vec[] = [];
   const hw: number[] = [];
   for (let i = 0; i < N; i++) {
     const u = i / (N - 1);
-    const c = sampleAlong(cl, u);
-    const c0 = sampleAlong(cl, Math.max(0, u - 0.012));
-    const c2 = sampleAlong(cl, Math.min(1, u + 0.012));
-    let tx = c2[0] - c0[0];
-    let ty = c2[1] - c0[1];
-    const tl = Math.hypot(tx, ty) || 1;
-    tx /= tl;
-    ty /= tl;
-    const grow = 0.45 + 0.55 * u; // widens its swing toward the green
-    const lat = amp * grow * Math.sin(phase + u * Math.PI * lobes);
-    line.push([c[0] - ty * lat, c[1] + tx * lat]);
-    hw.push(rw * (1 + 0.32 * Math.sin(wPhase + u * Math.PI * wLobes)));
+    line.push(at(s0 + (s1 - s0) * u));
+    const taper = Math.min(1, u / 0.28) * 0.6 + 0.4; // narrow at the spring → full channel
+    const mouth = 1 + Math.max(0, (u - 0.9) / 0.1) * 0.2; // a slight widening at the spill mouth
+    hw.push(rw * (1 + 0.26 * Math.sin(wPhase + u * Math.PI * 2.2)) * taper * mouth);
   }
-  return { line, hw };
+  return { line, hw, spillAtEdge: down.hit };
 }
 
 /** Convex hull (Andrew's monotone chain) of screen-space points, returned as a closed ring. */
@@ -1660,12 +1704,15 @@ function cetusOcean(landPolys: Vec[][], cb: Box, proj: Projector, W: number, H: 
 }
 
 /**
- * The star-river CARVED through the fairway + its cliff WATERFALL (GS-cetus-3). The course-space
- * meander (`cetusRiverPath`, projector-independent) is projected to a glowing channel of deep
- * star-water DENSELY packed with the intro's starscape, welling from a glowing SOURCE (so it no
- * longer "starts out of nowhere") and pouring over the plateau's real front CLIFF FACE into the
- * ocean. Own rng stream + gated to cetus → determinism-safe. `faces` is the cliff geometry from
- * `cetusCliffs`, so the waterfall drops the exact height of the face it spills over.
+ * The star-river crossing the corridor + its cliff WATERFALL (GS-cetus-4). The course-space
+ * crossing (`cetusRiverPath`, projector-independent, ordered SOURCE → SPILL) is projected to a
+ * glowing channel of deep star-water packed with the intro's starscape, welling from a spring and
+ * pouring off the plateau edge into the ocean. Own rng stream + gated to cetus → determinism-safe.
+ * `faces` is the cliff geometry from `cetusCliffs` (the fall drops the height of the face it spills
+ * over); `landCourse` is the course-space land so the fall is PAINTED only when its drop actually
+ * lands off the plateau — under the rotating follow-cam a screen-space fall can point across turf
+ * (the "bonus waterfall over the green on a side chip" bug), and then it is simply not drawn. All
+ * rng draws stay unconditional so the camera can never shift the stream.
  */
 function cetusRiver(
   hole: Hole,
@@ -1673,6 +1720,7 @@ function cetusRiver(
   accents: number,
   rng: () => number,
   faces: { top: Vec[]; height: number }[],
+  landCourse: Vec[][],
 ): Prim[] {
   const rp = cetusRiverPath(hole, rng);
   if (!rp) return [];
@@ -1681,94 +1729,138 @@ function cetusRiver(
   const screen = line.map((p) => proj.project(p));
   const avgHwPx = Math.max(2, (hw.reduce((a, b) => a + b, 0) / hw.length) * proj.scale);
 
-  // Built from a ribbon FILL (the channel) + STROKES along the spine (glow / current / sparkle). The
-  // meander is capped within the corridor (see cetusRiverPath), so it never needs clipping to the
-  // island — and we deliberately AVOID clipping it: the SVG serializer nests a clipPath inside the
+  // Built from a ribbon FILL (the channel) + STROKES along the spine (glow / current / sparkle),
+  // each stroke segment following the LOCAL half-width so the spring taper and mouth flare read.
+  // We deliberately AVOID clipping to the island: the SVG serializer nests a clipPath inside the
   // clipped <g>, which silently drops the group's contents (the bug that hid the old render-only river).
-  const stroke = (out: Prim[], stk: string, sw: number) => {
-    for (let i = 1; i < screen.length; i++) out.push({ t: 'line', a: screen[i - 1]!, b: screen[i]!, stroke: stk, sw, round: true });
+  const strokeVar = (out: Prim[], stk: string, mul: number, add = 0, minW = 1) => {
+    for (let i = 1; i < screen.length; i++) {
+      const w = Math.max(minW, ((hw[i - 1]! + hw[i]!) / 2) * proj.scale * mul + add);
+      out.push({ t: 'line', a: screen[i - 1]!, b: screen[i]!, stroke: stk, sw: w, round: true });
+    }
   };
   const river: Prim[] = [];
-  stroke(river, 'rgba(95,225,252,0.2)', avgHwPx * 3.4 + 10); // soft outer bank glow (haloes past the rim)
+  // A quiet bank glow — the GS-cetus-3 halo (3.4×hw + 10px) washed over half the corridor.
+  strokeVar(river, 'rgba(95,225,252,0.13)', 1.9, 4);
   river.push({ t: 'poly', pts: ribbon, fill: 'rgba(8,30,48,0.9)' }); // dark deep-water bed → high contrast vs the teal turf
-  stroke(river, 'rgba(70,180,225,0.85)', avgHwPx * 1.4); // glowing star-water surface down the channel
-  river.push({ t: 'poly', pts: ribbon, fill: 'none', stroke: 'rgba(195,248,255,0.92)', sw: 1.5 }); // bright luminous shoreline
-  stroke(river, 'rgba(205,246,255,0.85)', Math.max(1.4, avgHwPx * 0.4)); // bright current spine
-  // Densely fill the channel with the intro's starscape so it reads as a RIVER OF STARS, not a teal
+  strokeVar(river, 'rgba(70,180,225,0.85)', 1.3); // glowing star-water surface down the channel
+  river.push({ t: 'poly', pts: ribbon, fill: 'none', stroke: 'rgba(195,248,255,0.85)', sw: 1.2 }); // luminous shoreline
+  strokeVar(river, 'rgba(205,246,255,0.8)', 0.34, 0, 1.2); // bright current spine
+  // Fill the channel with the intro's starscape so it reads as a RIVER OF STARS, not a teal
   // stripe: stars packed across the width down the length, ~10% "hero" stars with a soft halo.
   if (accents > 0) {
-    const steps = 60;
+    const steps = 40;
     for (let i = 0; i < steps; i++) {
       const u = i / (steps - 1);
       const c = sampleAlong(line, u);
       const t = tangentAt(line, Math.min(line.length - 1, Math.round(u * (line.length - 1))));
       const nx = -t[1];
       const ny = t[0];
-      const halfW = (hw[Math.min(hw.length - 1, Math.round(u * (hw.length - 1)))] ?? 4) * 0.9;
+      const halfW = (hw[Math.min(hw.length - 1, Math.round(u * (hw.length - 1)))] ?? 4) * 0.85;
+      // Star sizes are CLAMPED to the local projected channel width (paint-size only — never the
+      // draw count): on the whole-hole map the creek is a few px wide, and full-size stars + halos
+      // buried the dark water under solid white (the "chalk squiggle" read).
+      const hwPx = Math.max(1, halfW * proj.scale);
       const packed = 2;
       for (let j = 0; j < packed; j++) {
         const lat = (rng() * 2 - 1) * halfW;
         const p = proj.project([c[0] + nx * lat, c[1] + ny * lat]);
         const hero = rng() < 0.1;
         const col = rng() < 0.5 ? 'rgba(255,255,255,0.95)' : rng() < 0.5 ? 'rgba(180,242,255,0.9)' : 'rgba(210,220,255,0.85)';
-        if (hero) river.push({ t: 'glow', c: p, r: 4 + rng() * 3, col: 'rgba(200,244,255,0.5)' });
-        river.push({ t: 'circle', c: p, r: hero ? 1.4 + rng() * 1 : 0.5 + rng() * 1, fill: col });
+        if (hero) river.push({ t: 'glow', c: p, r: Math.min(4 + rng() * 3, hwPx * 1.5), col: 'rgba(200,244,255,0.5)' });
+        river.push({ t: 'circle', c: p, r: Math.min(hero ? 1.4 + rng() * 1 : 0.5 + rng() * 1, Math.max(0.7, hwPx * 0.45)), fill: col });
       }
     }
   }
 
-  // The river SOURCE (upstream end — screen-top / green side): a glowing spring where the star-water
-  // wells up out of the plateau, so the channel has an origin instead of fading in from nowhere.
-  const endA = screen[0]!;
-  const endB = screen[screen.length - 1]!;
-  // The SPILL end is whichever river mouth sits lowest on screen (nearest the front cliff we extruded).
-  const spillIsA = endA[1] >= endB[1];
-  const spill = spillIsA ? endA : endB;
-  const source = spillIsA ? endB : endA;
-  const srcW = Math.max(6, avgHwPx * 1.6);
-  river.push({ t: 'glow', c: source, r: srcW * 2.4, col: 'rgba(120,225,255,0.4)' });
+  // The river SOURCE — the fixed upstream end (course space): a modest glowing spring where the
+  // star-water wells up out of the plateau, sized off the tapered spring width so it reads as an
+  // origin, not a giant glowing golf ball parked in the rough.
+  const source = screen[0]!;
+  const srcW = Math.max(3.5, hw[0]! * proj.scale * 2.1);
+  river.push({ t: 'glow', c: source, r: srcW * 2.2, col: 'rgba(120,225,255,0.35)' });
   river.push({ t: 'circle', c: source, r: srcW, fill: 'rgba(60,150,205,0.6)' });
   river.push({ t: 'circle', c: source, r: srcW * 0.5, fill: 'rgba(220,248,255,0.9)' });
-  for (let i = 0; i < (accents > 0 ? 9 : 0); i++) {
-    river.push({ t: 'circle', c: [source[0] + (rng() - 0.5) * srcW * 2.2, source[1] + (rng() - 0.5) * srcW * 2.2], r: 0.5 + rng() * 1.2, fill: 'rgba(230,252,255,0.85)' });
+  for (let i = 0; i < (accents > 0 ? 7 : 0); i++) {
+    river.push({ t: 'circle', c: [source[0] + (rng() - 0.5) * srcW * 2.2, source[1] + (rng() - 0.5) * srcW * 2.2], r: 0.4 + rng() * 1, fill: 'rgba(230,252,255,0.85)' });
   }
 
-  // The WATERFALL: the river pours off the front cliff FACE into the ocean. Drop the exact height of
-  // the widest extruded face (so the curtain lands in the sea, not mid-cliff), as a fanning curtain of
-  // falling stars over a watery veil, with a bright lip glow and a splash pool + ripple rings below.
-  const face = faces.length
-    ? faces.slice().sort((a, b) => bboxOf(b.top).maxX - bboxOf(b.top).minX - (bboxOf(a.top).maxX - bboxOf(a.top).minX))[0]!
-    : null;
-  const fallLen = (face?.height ?? Math.max(24, avgHwPx * 6)) + 26;
-  const spillW = Math.max(14, (spillIsA ? hw[0]! : hw[hw.length - 1]!) * proj.scale * 1.8);
-  const fall: Prim[] = [{ t: 'glow', c: spill, r: spillW * 1.4, col: 'rgba(140,232,255,0.4)' }];
-  // The watery veil behind the falling stars.
-  fall.push({
-    t: 'poly',
-    pts: [
-      [spill[0] - spillW * 0.5, spill[1]],
-      [spill[0] + spillW * 0.5, spill[1]],
-      [spill[0] + spillW * 0.72, spill[1] + fallLen],
-      [spill[0] - spillW * 0.72, spill[1] + fallLen],
-    ],
-    fill: 'rgba(22,64,96,0.5)',
-  });
-  const fallN = accents > 0 ? 22 : 6;
-  for (let i = 0; i < fallN; i++) {
-    const fx = (i / Math.max(1, fallN - 1) - 0.5) + (rng() - 0.5) * 0.08; // even lanes → a curtain
-    const yA = spill[1] + fallLen * rng() * 0.35;
-    const yB = Math.min(spill[1] + fallLen, yA + fallLen * (0.45 + rng() * 0.5));
-    const xAt = (y: number) => spill[0] + fx * spillW * (1 + 0.44 * ((y - spill[1]) / fallLen));
-    fall.push({ t: 'line', a: [xAt(yA), yA], b: [xAt(yB), yB], stroke: `rgba(205,249,255,${(0.35 + rng() * 0.5).toFixed(2)})`, sw: 1.1, round: true });
-    if (accents > 0) {
-      const yc = yA + (yB - yA) * rng();
-      fall.push({ t: 'circle', c: [xAt(yc), yc], r: 0.6 + rng() * 1, fill: 'rgba(232,252,255,0.92)' });
+  // The WATERFALL: only when the river actually reached the plateau edge (`spillAtEdge`, course
+  // space). The curtain still falls screen-down (the cliff extrusion's convention), so PAINT it only
+  // when the drop lands off the land — both probes below the lip must sit over the deep, never turf.
+  if (!rp.spillAtEdge) return river;
+  const spill = screen[screen.length - 1]!;
+  // Drop the height of the cliff face under the spill (the lip the river pours over), if the camera
+  // has one there; otherwise a sensible default keyed off the channel width.
+  let fallLen = Math.max(26, avgHwPx * 5) + 20;
+  for (const f of faces) {
+    const fb = bboxOf(f.top);
+    if (spill[0] >= fb.minX - 6 && spill[0] <= fb.maxX + 6 && spill[1] >= fb.minY - 16 && spill[1] <= fb.maxY + 16) {
+      fallLen = f.height + 22;
+      break;
     }
   }
+  const onLand = (p: Vec) => landCourse.some((lp) => pointInPoly(p, lp));
+  const paint =
+    !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.35)) &&
+    !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.8));
+  const spillW = Math.max(10, hw[hw.length - 1]! * proj.scale * 2.2);
+  const fall: Prim[] = [];
+  if (paint) {
+    fall.push({ t: 'glow', c: spill, r: spillW * 1.3, col: 'rgba(140,232,255,0.38)' });
+    // A tapered veil that FADES with the drop (stacked bands), so the curtain dissolves into the
+    // deep instead of ending on a hard flat-alpha slab.
+    const xAt = (u: number, f: number) => spill[0] + f * spillW * (0.5 + 0.14 * u);
+    const bands: [number, number, number][] = [
+      [0, 0.42, 0.42],
+      [0.42, 0.72, 0.26],
+      [0.72, 1, 0.12],
+    ];
+    for (const [u0, u1, a] of bands) {
+      fall.push({
+        t: 'poly',
+        pts: [
+          [xAt(u0, -1), spill[1] + fallLen * u0],
+          [xAt(u0, 1), spill[1] + fallLen * u0],
+          [xAt(u1, 1), spill[1] + fallLen * u1],
+          [xAt(u1, -1), spill[1] + fallLen * u1],
+        ],
+        fill: `rgba(22,64,96,${a})`,
+      });
+    }
+  }
+  // Falling star-streaks: short, staggered, fading with the drop — rng consumed UNCONDITIONALLY
+  // (the `paint` gate reads the camera, so it may only choose what is pushed, never what is drawn).
+  const fallN = accents > 0 ? 16 : 5;
+  for (let i = 0; i < fallN; i++) {
+    const fx = (i / Math.max(1, fallN - 1) - 0.5) + (rng() - 0.5) * 0.1; // even lanes → a curtain
+    const u0 = rng() * 0.45;
+    const u1 = Math.min(1, u0 + 0.2 + rng() * 0.3);
+    const alpha = (0.55 + rng() * 0.3) * (1 - u0 * 0.55); // dimmer the further down it starts
+    const dropR = 0.5 + rng() * 0.9;
+    const uc2 = u0 + (u1 - u0) * rng();
+    if (!paint) continue;
+    const xf = (u: number) => spill[0] + fx * spillW * (1 + 0.3 * u);
+    fall.push({
+      t: 'line',
+      a: [xf(u0), spill[1] + fallLen * u0],
+      b: [xf(u1), spill[1] + fallLen * u1],
+      stroke: `rgba(205,249,255,${alpha.toFixed(2)})`,
+      sw: 1.1,
+      round: true,
+    });
+    if (accents > 0) fall.push({ t: 'circle', c: [xf(uc2), spill[1] + fallLen * uc2], r: dropR, fill: 'rgba(232,252,255,0.9)' });
+  }
+  // Splash foot: a soft mist bloom + ripple rings where the curtain meets the star-ocean.
   const pool: Vec = [spill[0], spill[1] + fallLen];
-  fall.push({ t: 'glow', c: pool, r: spillW * 1.3, col: 'rgba(150,238,255,0.32)' });
-  for (let i = 1; i <= 3; i++) {
-    fall.push({ t: 'circle', c: pool, r: i * 5.5 + spillW * 0.2, fill: 'none', stroke: `rgba(150,238,255,${(0.5 - i * 0.13).toFixed(2)})`, sw: 1.1 });
+  const mist: [number, number, number][] = [];
+  for (let i = 0; i < 3; i++) mist.push([(rng() - 0.5) * spillW * 0.9, rng() * 4, 2 + rng() * 3]);
+  if (paint) {
+    fall.push({ t: 'glow', c: pool, r: spillW * 1.2, col: 'rgba(150,238,255,0.3)' });
+    for (const [mx, my, mr] of mist) fall.push({ t: 'circle', c: [pool[0] + mx, pool[1] - my], r: mr, fill: 'rgba(210,246,255,0.25)' });
+    for (let i = 1; i <= 3; i++) {
+      fall.push({ t: 'circle', c: pool, r: i * 5 + spillW * 0.2, fill: 'none', stroke: `rgba(150,238,255,${(0.45 - i * 0.12).toFixed(2)})`, sw: 1 });
+    }
   }
   return [...river, ...fall];
 }
@@ -2479,9 +2571,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
   const voidGlow = arch === 'void';
   const glowRings = (sp: Vec[]) => {
-    const gc = centroidOf(sp);
-    prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.34), fill: 'rgba(120,130,240,0.10)' });
-    prims.push({ t: 'poly', pts: scalePoly(sp, gc, 1.16), fill: 'rgba(120,130,240,0.14)' });
+    // Uniform outward OFFSETS, not centroid scales: a scale balloons a long par-4/5 corridor
+    // lengthwise (34% of a 500px ribbon smeared the halo far past the tee/green ends — the
+    // "sausage blob" read), while an offset hugs the actual shape like the green collar does.
+    prims.push({ t: 'poly', pts: offsetPoly(sp, -13), fill: 'rgba(120,130,240,0.10)' });
+    prims.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: 'rgba(120,130,240,0.14)' });
   };
   // Fairways draw as ONE grouped pass FIRST (under tee/green/scatter) so the green apron blends into
   // the main corridor — see `styleFairways`. Everything else keeps its original per-feature order.
@@ -2497,6 +2591,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     }
   } else {
     prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch));
+    // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
+    // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
+    if (voidGlow) for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(165,175,255,0.5)', sw: 1.6 });
   }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
@@ -2522,7 +2619,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // --- 5b. The Cetus river of stars + its cliff waterfall (GS-cetus) ----------
   // The luminous star-river threads the rough beside the fairway and pours off the cliff into the
   // ocean. Gated to cetus + own `org` stream, drawn over the land but under the hazards/flag.
-  if (arch === 'cetus' && !rainbow) prims.push(...cetusRiver(hole, proj, art.accents, riverRng, cetusFaces));
+  if (arch === 'cetus' && !rainbow) prims.push(...cetusRiver(hole, proj, art.accents, riverRng, cetusFaces, landPlatformsCourse));
 
   // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
   // Draw order is layered so substances read correctly where they overlap (deep/wild holes pile
@@ -2671,14 +2768,28 @@ function ptsStr(pts: Vec[]): string {
   return pts.map((p) => `${n1(p[0])},${n1(p[1])}`).join(' ');
 }
 
-/** Render a prim list to an SVG fragment string (pure). Clip ids are a deterministic counter. */
-export function scenePrimsToSvg(prims: Prim[]): string {
+/** A per-hole deterministic SVG id prefix — same hole → same ids (byte-stable renders), different
+ *  holes → disjoint ids, so several hole SVGs can share one document (see scenePrimsToSvg). */
+export function holeIdPrefix(hole: Hole): string {
+  return `gs${hashHole(hole).toString(36)}`;
+}
+
+/**
+ * Render a prim list to an SVG fragment string (pure). Clip/gradient ids are a deterministic
+ * counter under `idPrefix` — and the prefix MUST be unique per distinct scene when several hole
+ * SVGs share one document: SVG ids are document-global, so two fragments both using `gsc0` make
+ * every `url(#gsc0)` resolve to the FIRST panel's clip geometry — the other panel's stripes get
+ * clipped away and its glows borrow the wrong gradient (the gallery/test-hub cross-panel bleed).
+ * `renderHoleSVG` passes a hole-hash prefix: the same hole re-rendered stays byte-identical, and
+ * identical ids across copies of the SAME hole reference identical geometry, so they stay harmless.
+ */
+export function scenePrimsToSvg(prims: Prim[], idPrefix = 'gs'): string {
   let clipId = 0;
   let glowId = 0;
   const one = (p: Prim): string => {
     switch (p.t) {
       case 'glow': {
-        const id = `gsg${glowId++}`;
+        const id = `${idPrefix}g${glowId++}`;
         const { rgb, a } = rgbaParts(p.col);
         return (
           `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${n1(p.c[0])}" cy="${n1(p.c[1])}" r="${n1(Math.max(0.01, p.r))}">` +
@@ -2703,7 +2814,7 @@ export function scenePrimsToSvg(prims: Prim[]): string {
         return `<line x1="${n1(p.a[0])}" y1="${n1(p.a[1])}" x2="${n1(p.b[0])}" y2="${n1(p.b[1])}" stroke="${p.stroke}" stroke-width="${p.sw}"${cap}${dash} />`;
       }
       case 'clip': {
-        const id = `gsc${clipId++}`;
+        const id = `${idPrefix}c${clipId++}`;
         return (
           `<clipPath id="${id}"><polygon points="${ptsStr(p.clip)}" /></clipPath>` +
           `<g clip-path="url(#${id})">${p.children.map(one).join('')}</g>`

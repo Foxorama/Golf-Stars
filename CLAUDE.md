@@ -207,7 +207,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view. All
   scene randomness is mulberry32 seeded from `hashHole()` (NEVER `Math.random`) on documented streams
   (`rng`/`crng`/`hrng`/decor seeds) so the SVG is byte-stable — adding a draw must not perturb the
-  `rng` stream order. **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
+  `rng` stream order. SVG clip/gradient ids are per-hole (`holeIdPrefix` → `scenePrimsToSvg`): ids
+  are DOCUMENT-global, so co-mounted hole SVGs sharing a `gsc0…` counter cross-clip each other — it
+  masquerades as a flat-turf/palette bug (GS-cetus-4). The cetus star-river is ONE corridor crossing
+  (spring → fairway → plateau edge), spill FIXED in course space; its waterfall PAINTS only when the
+  drop lands off-land (rng still consumed) — never re-anchor it per-frame in screen space.
+  **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
   rng draw counts never read the projection (place in course space, consume unconditionally, cull
   at paint — never retry on `inView` or size a count off projected px) and `posHash` keys are
   course-space, never screen px — `tests/camera-stability.test.ts` guards both. **Rough is ROUGH;

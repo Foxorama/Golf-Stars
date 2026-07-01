@@ -424,7 +424,41 @@
       the whole-hole map is the cramped worst case; the zoomed decision/follow-cam view shows the cliff
       dropping behind the ball with the fairway readable ahead. NO new `_gs*`/URL hook, so the test-hub
       guard needs nothing.
-- **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
+    - **GS-cetus-4 tamed the river on par 4/5 (+ fixed the side-chip "bonus waterfall").** Player
+      feedback: par 3s read great, but on par 4/5 the full-length meander + its 3.4×-width bank glow
+      buried most of the mown fairway, the waterfall poured from mid-turf at the TEE straight down over
+      the ground (worst on calm stops, where there's no abyss below it), and chipping onto the green
+      from the side conjured a second waterfall over the green. Three coupled fixes:
+      (1) **The river is ONE diagonal crossing now** (`cetusRiverPath` rewritten): a spring in the rough
+      near the corridor, a single meandering pass over the fairway at `uc ∈ [0.38, 0.6]` of the hole,
+      then out through the rough along a tee-ward-leaning axis (tangent rotated 102–124°) to the land
+      platform's edge — found by marching the analytic meander against `landPolysCourseFor(hole)` with
+      fixed step counts + a bisection refine, ALL rng drawn up front, so the path is byte-stable and
+      camera-proof. Narrower (`rw ≤ 8`yd), gentler swing (`amp ≤ 9`yd), tapered at the spring. Most of
+      the corridor is clean turf again; the crossing reads like a creek, not a canal.
+      (2) **The spill end is FIXED in course space** — the polyline is ordered SOURCE → SPILL. The old
+      code picked "whichever river mouth sits lowest on screen" per frame; under the follow-cam's
+      `up: ball→pin` rotation a side chip flipped the spill to the green-side mouth and painted the fall
+      there. The fall itself (still screen-down, the cliff extrusion's convention) is PAINT-GATED: it
+      draws only when `spillAtEdge` (the river actually reached the platform edge, course space) AND two
+      probe points below the lip `unproject` to open deep, never turf — rng for the streaks is consumed
+      UNCONDITIONALLY so the camera can only choose what's pushed, never what's drawn. Restyled: a
+      tapered veil fading in stacked bands, staggered dimming streaks, mist + ripple rings at the foot.
+      (3) **River star sizes clamp to the projected channel width** (paint-size only, never the count):
+      at whole-map zoom the narrow creek is a few px wide and full-size stars + halos read as a solid
+      white chalk squiggle. `tests/cetus` still asserts the `rgba(70,180,225,0.85)` surface stroke.
+      Same pass, the **void par-4/5 slab** got its identity back (GS-cetus-void-45): `glowRings` now
+      uses uniform `offsetPoly` outsets (a centroid scale ballooned a long corridor's halo lengthwise
+      past the tee/green — the "sausage blob"), fairways get a luminous rim stroke on the void only
+      (the par-3 islands' lit-platform read), and the void fairway palette's stripe light↔dark spread
+      widened (`#6a60ba`/`#241e4a`) so mowing bands survive the indigo-on-indigo value crush.
+      And a latent serializer bug found via the gallery: `scenePrimsToSvg` ids (`gsc0`/`gsg0`…) were
+      counter-per-render, but SVG ids are DOCUMENT-global — two hole SVGs in one document (gallery,
+      test hub) made `url(#gsc0)` resolve to the FIRST panel's clip/gradient, silently clipping the
+      second panel's stripes away and bleeding its glow colours. `scenePrimsToSvg(prims, idPrefix)` +
+      `holeIdPrefix(hole)` (a hole-hash prefix) keeps renders byte-stable per hole while co-mounted
+      holes get disjoint ids. If you ever eyeball a multi-hole sheet and the turf looks flat, check the
+      ids FIRST — this one masqueraded as a palette problem. A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
   far bank within reach — flying over a hazard is fair, only RESTING in it costs) or, if it can't
