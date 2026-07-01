@@ -237,6 +237,11 @@ function dispatch(action: Action): void {
     if (action.type === 'openClubhouse' || action.type === 'closeClubhouse' || action.type === 'openClubhouseHall') {
       clubhouseSlot = null;
     }
+    // Opening the Trade Market re-collapses every catalogue section so it lands compact (GS-market-accordion).
+    if (action.type === 'openMarket') {
+      collapsedMarketSections.clear();
+      for (const id of MARKET_SECTION_IDS) collapsedMarketSections.add(id);
+    }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
     if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
       sfx.reward();
@@ -689,8 +694,10 @@ let mapZoom = 1;
 let inspectGearId: string | null = null;
 // Trade Market accordion (GS-market-accordion): which catalogue sections the player has collapsed.
 // View-only module state (like inspectGearId) — toggled via [data-toggle-section] + re-render, never
-// persisted. Empty = every section expanded (the default, non-surprising view).
-const collapsedMarketSections = new Set<string>();
+// persisted. Every section starts collapsed (re-seeded from MARKET_SECTION_IDS each time the market
+// opens) so the catalogue lands compact and browsable; the player expands the racks they want.
+const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'bags'] as const;
+const collapsedMarketSections = new Set<string>(MARKET_SECTION_IDS);
 // Clubhouse editor (GS-clubhouse-stage): which slot picker is open — tap a body part or the garage on
 // the character stage to reveal that slot's rack. View-only module state (like inspectGearId), toggled
 // via [data-clubslot] + re-render, reset when the Clubhouse opens/closes. null = the resting stage.
@@ -1826,7 +1833,8 @@ function shipCardHTML(ship: Ship, footer: string, opts: { action?: Action; ring:
  *  owned/total count · chevron) over a card rack, so the long catalogue stays navigable as it grows.
  *  Collapse state is module-local (`collapsedMarketSections`) + re-rendered — same view-only pattern as
  *  `inspectGearId` (native <details> can't be used: render() replaces app.innerHTML on every buy, which
- *  would reset the open state). Every section shares this chrome so the catalogue reads consistently. */
+ *  would reset the open state). Sections start collapsed on open (see collapsedMarketSections). Every
+ *  section shares this chrome so the catalogue reads consistently. */
 function marketSection(
   id: string,
   icon: string,
@@ -1857,7 +1865,11 @@ function marketSection(
  *  catalogue is split into uniform collapsible sections (GS-market-accordion) so it stays navigable. */
 function tradeMarketScreen(): string {
   const ships = shipCatalogue();
+  // Owned rides sink to the bottom of the rack (greyed out) so the buyable fleet reads first (stable
+  // sort keeps rarity order within each group).
   const shipCards = ships
+    .slice()
+    .sort((a, b) => Number(state.ownedShips.includes(a.id)) - Number(state.ownedShips.includes(b.id)))
     .map((ship) => {
       const ring = cosmeticRarCol(ship.rarity);
       const owned = state.ownedShips.includes(ship.id);
@@ -1872,7 +1884,7 @@ function tradeMarketScreen(): string {
       } else {
         footer = `✦ ${ship.cost} — short`;
       }
-      return shipCardHTML(ship, footer, { ring, dim: !owned && !afford, glow: isMythic(ship.rarity) && !owned, action });
+      return shipCardHTML(ship, footer, { ring, dim: owned || !afford, glow: isMythic(ship.rarity) && !owned, action });
     })
     .join('');
   const shipsOwned = ships.filter((s) => state.ownedShips.includes(s.id)).length;
@@ -1881,7 +1893,14 @@ function tradeMarketScreen(): string {
   const apparelSection = (slot: ApparelSlot, icon: string, title: string, blurb: string) => {
     const items = apparelForSlot(slot);
     const owned = items.filter((a) => state.ownedApparel.includes(a.id)).length;
-    return marketSection(slot, icon, title, owned, items.length, blurb, items.map(marketApparelCardHTML).join(''));
+    // Owned garments sink to the bottom (greyed) so the buyable rack reads first; stable sort keeps
+    // rarity order within each group.
+    const rack = items
+      .slice()
+      .sort((a, b) => Number(state.ownedApparel.includes(a.id)) - Number(state.ownedApparel.includes(b.id)))
+      .map(marketApparelCardHTML)
+      .join('');
+    return marketSection(slot, icon, title, owned, items.length, blurb, rack);
   };
 
   return `
@@ -2182,7 +2201,9 @@ function bagSetCardHTML(set: BagSet): string {
   } else {
     footer = `✦ ${set.cost} — short`;
   }
-  const dim = (!unlocked || (!afford && !current && !owned)) && !current;
+  // Grey out anything that isn't the buyable frontier: locked gates, owned lower tiers, and
+  // can't-affords all dim; only the equipped tier (highlighted) and buyable upgrades stay bright.
+  const dim = !current && (!unlocked || owned || !afford);
   const inner = `
     <div title="${set.blurb}" style="border:2px solid ${current ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${ring}22, #0b0d12);text-align:center;width:130px;${dim ? 'opacity:.55;' : ''}${current ? `box-shadow:0 0 0 2px #ffce54, 0 0 14px ${ring}66;` : ''}">
       ${drawGolfBag(set.tint, set.tier)}
@@ -2241,7 +2262,7 @@ function marketApparelCardHTML(item: Apparel): string {
   } else {
     footer = `✦ ${item.cost} — short`;
   }
-  return apparelCardChrome(item, footer, { ring, accent: ring, action, dim: !owned && !afford, glow: isMythic(item.rarity) && !owned });
+  return apparelCardChrome(item, footer, { ring, accent: ring, action, dim: owned || !afford, glow: isMythic(item.rarity) && !owned });
 }
 
 /** A Clubhouse wardrobe card (GS-clubhouse) — an equip toggle for an OWNED garment on the managed
