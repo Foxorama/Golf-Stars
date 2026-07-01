@@ -729,6 +729,48 @@
         .gs-bird-emoji { animation: none; }
       }
 
+      /* ── Voyage-victory takeover (GS-victory) ──────────────────────────────────────── */
+      .gs-win {
+        position: fixed; inset: 0; z-index: 62; display: flex; align-items: center; justify-content: center;
+        padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+        background: radial-gradient(120% 90% at 50% 16%, rgba(38,30,10,.9), rgba(8,9,14,.97));
+        backdrop-filter: blur(2px); cursor: pointer; animation: gs-ace-fade .4s ease-out both;
+      }
+      .gs-win-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      .gs-win-card {
+        position: relative; z-index: 1; text-align: center; max-width: 480px; width: 100%;
+        padding: 26px 22px; border-radius: 22px; cursor: default;
+        background: linear-gradient(180deg, rgba(26,24,16,.82), rgba(11,12,16,.9));
+        border: 1px solid rgba(255,213,74,.5); box-shadow: 0 0 52px rgba(255,196,60,.28), 0 18px 54px rgba(0,0,0,.55);
+        animation: gs-ace-pop .5s cubic-bezier(.18,.9,.3,1.3) both;
+      }
+      .gs-win-emoji { font-size: 66px; line-height: 1; filter: drop-shadow(0 0 16px rgba(255,196,60,.6)) drop-shadow(0 4px 10px rgba(0,0,0,.5)); animation: gs-ace-bob 1.8s ease-in-out infinite; }
+      .gs-win-kicker { margin-top: 10px; font-size: 11px; letter-spacing: .24em; color: #ffdf9a; opacity: .85; font-weight: 700; }
+      .gs-win-title {
+        margin: 4px 0 2px; font-size: clamp(34px, 10vw, 54px); font-weight: 900; letter-spacing: .01em; line-height: 1;
+        background: linear-gradient(180deg, #fff7d6, #ffd54a 52%, #ff9e3c); -webkit-background-clip: text; background-clip: text;
+        color: transparent; text-shadow: 0 2px 26px rgba(255,170,60,.45);
+      }
+      .gs-win-sub { font-size: 14.5px; color: var(--gs-ink); opacity: .9; margin-bottom: 14px; }
+      /* The hero beat: a newly-unlocked Ascension tier, framed as a from → to gate. */
+      .gs-win-tier {
+        display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+        margin: 0 auto 16px; max-width: 380px; padding: 11px 16px; border-radius: 14px;
+        background: linear-gradient(180deg, rgba(255,206,84,.18), rgba(255,158,60,.09));
+        border: 1px solid rgba(255,206,84,.5); box-shadow: 0 0 26px rgba(255,196,60,.2) inset;
+        font-weight: 800; letter-spacing: .05em; animation: gs-win-tier-glow 2.4s ease-in-out infinite;
+      }
+      @keyframes gs-win-tier-glow { 0%,100% { box-shadow: 0 0 22px rgba(255,196,60,.16) inset, 0 0 0 rgba(255,196,60,0); } 50% { box-shadow: 0 0 30px rgba(255,196,60,.28) inset, 0 0 22px rgba(255,196,60,.28); } }
+      .gs-win-tier-from { font-size: 13px; color: #ffdf9a; opacity: .85; }
+      .gs-win-tier-arrow { font-size: 16px; color: #ffce54; }
+      .gs-win-tier-to { font-size: 15px; color: #ffce54; text-shadow: 0 0 14px rgba(255,206,84,.5); }
+      .gs-win-tier--max { font-size: 13px; color: #ffce54; }
+      .gs-win-go { min-width: 200px; margin-top: 4px; }
+      @media (prefers-reduced-motion: reduce) {
+        .gs-win, .gs-win-card { animation: none; }
+        .gs-win-emoji, .gs-win-tier { animation: none; }
+      }
+
       /* ── Character select (GS-18, flashy redesign) ─────────────────────────────────── */
       .gs-charwrap {
         display: grid; grid-template-columns: 1fr;

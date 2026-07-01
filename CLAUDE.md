@@ -149,7 +149,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   live bag rarity by `applyBagTier`; `addUnlockedClubs` is the no-op fast path when empty). Pool = the
   `CLUBS` taxonomy minus what the golfer carries/refuses + the putter; a full bag pays a rarity-scaled
   Shard consolation (15/25/45/70) instead. The reducer's exported `runEndUpdates` is the single source for
-  all four run-end sites. Route choice carries the destination biome + a
+  all four run-end sites. A won voyage is celebrated by the **victory takeover** (GS-victory,
+  `render/celebrations.ts showVoyageVictory`): a full-screen fanfare+fireworks overlay — a NEW tier clear
+  (⇔ `lastClubUnlock` present) heroes an "A_n cleared → A_n+1 unlocked" banner — that spotlights the played
+  golfer + stacks the run's rewards, then dismisses to the gameover recap. Cosmetic side-effect (mirrors the
+  ace/bird takeovers, NOT in the reducer); the win no longer shares the missed-cut fall. The played golfer's
+  per-character unlocked clubs (`unlockedClubsByCharacter`) are surfaced as chips on the character-select
+  card. Route choice carries the destination biome + a
   difficulty/atmosphere event (economy/cut/meta only — NEVER course generation). Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a

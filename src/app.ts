@@ -66,7 +66,7 @@ import { mountIntro } from './render/introView';
 import { sfx, resumeAudio } from './render/audio';
 import { getSettings, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
-import { showAceCelebration, showBirdCelebration } from './render/celebrations';
+import { showAceCelebration, showBirdCelebration, showVoyageVictory } from './render/celebrations';
 import { golferSVG, proAvatarSVG, characterScreen, ordinal, competitorsCard, leaderboardHTML, opponentBadge } from './render/golferCards';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
@@ -253,15 +253,23 @@ function dispatch(action: Action): void {
       haptic(HAPTICS.tap);
     }
     // Big-beat cues on the cut transition: a bright arpeggio for making it, a fall for missing.
+    // A WON voyage is the exception — its fanfare + haptic fire inside the victory takeover below, so it
+    // never plays the "you failed" fall it used to share with a missed cut.
+    const enteredGameover = state.screen === 'gameover' && prevScreen !== 'gameover';
     if (state.screen === 'result' && prevScreen !== 'result') {
       sfx.madeCut();
       haptic(HAPTICS.madeCut);
-    } else if (state.screen === 'gameover' && prevScreen !== 'gameover') {
+    } else if (enteredGameover && state.run.endedReason !== 'won') {
       sfx.missCut();
       haptic(HAPTICS.bad);
     }
     persist();
     render();
+    // The voyage-victory takeover (GS-victory) overlays the settled gameover recap on a won run, then
+    // dismisses back to it. A cosmetic side-effect (like the ace/bird celebrations) — no reducer/save touch.
+    if (enteredGameover && state.run.endedReason === 'won') {
+      showVoyageVictory(victoryInfo(), () => render());
+    }
   } catch (err) {
     recover(err);
   }
@@ -2471,6 +2479,36 @@ function travelScreen(): string {
     ${bankBtn}`;
 }
 
+/** Assemble the voyage-victory takeover's payload (GS-victory) from the finished run + the meta deltas
+ *  `runEndUpdates` just banked. `lastClubUnlock` is set ONLY on a genuinely new Ascension clear (a higher
+ *  `maxAscension`) — so its presence is the signal to hero the "new tier unlocked" banner. Presentation-
+ *  only: resolves display strings + colours here, keeping `celebrations.ts` free of sim/loot imports. */
+function victoryInfo(): Parameters<typeof showVoyageVictory>[0] {
+  const r = state.run;
+  const unlock = state.lastClubUnlock; // present ⇔ a NEW tier was cleared this run
+  const isNewClear = unlock !== undefined;
+  const bagUnlock = bagUnlockForClearedAscension(r.ascension);
+  // A stable numeric confetti seed from the (number|string) run seed.
+  const seedNum = Number.isFinite(Number(r.seed))
+    ? Number(r.seed)
+    : [...String(r.seed)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 0);
+  return {
+    golferName: getCharacter(r.loadout.characterId)?.shortName ?? 'Your golfer',
+    ascension: r.ascension,
+    tierUnlocked: isNewClear && r.ascension < ASCENSION_MAX ? r.ascension + 1 : undefined,
+    atMaxAscension: r.ascension >= ASCENSION_MAX,
+    club:
+      unlock?.kind === 'club'
+        ? { name: unlock.clubName, rarity: unlock.rarity, color: rarCol(unlock.rarity) }
+        : undefined,
+    consolationShards: unlock?.kind === 'shards' ? unlock.shards : undefined,
+    bag: bagUnlock ? { name: bagUnlock.name, cost: bagUnlock.cost, color: rarCol(bagUnlock.tier) } : undefined,
+    shardsEarned: state.lastRunShards ?? 0,
+    shardsTotal: state.shards,
+    seed: seedNum,
+  };
+}
+
 function gameoverScreen(): string {
   const r = state.run;
   const earned = state.lastRunShards;
@@ -2770,7 +2808,7 @@ function render(): void {
     state.screen === 'title'
       ? titleScreen()
       : state.screen === 'character'
-      ? characterScreen()
+      ? characterScreen(state.unlockedClubsByCharacter)
       : state.screen === 'intro'
       ? introScreen()
       : state.screen === 'playing'
