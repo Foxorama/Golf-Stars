@@ -219,10 +219,14 @@
 - **Focus/zoom + follow-cam (GS-mechanics #7).** The projector has a second fit mode: `focus`
   (centre on a point — the ball) + `viewRadius` (course yards) + `focusBias` (0..1, how far down
   the ball sits) instead of fitting the whole hole. The decision map zooms TIGHT to the contemplated
-  shot — `decisionReach = max(30, carryHigh × 0.36)` at `focusBias 0.8` (`DMAP_BIAS`) so the ball
-  sits LOW, the shot ahead nearly fills the tall portrait view, the corridor fills the width, and the
-  rough/OB legitimately stretch off-screen (the "zoom in, let the hole run off the edges" ask). A
-  short approach zooms right in; an unreachable green sits off the top. The reach factor + dims +
+  shot — `decisionReach = max(30, carryHigh × 0.36)` at `focusBias 0.84` (`DMAP_BIAS`) so the ball
+  sits LOW (near the bottom, just above the floating control panel), the shot ahead nearly fills the
+  tall portrait view, the corridor fills the width, and the rough/OB legitimately stretch off-screen
+  (the "zoom in, let the hole run off the edges" ask). The bias is deliberately deep: at the old 0.72
+  the top of a max-distance shot landed ~4% from the top, hidden behind the top info-chip HUD, forcing
+  a manual zoom-out on every full swing; 0.84 moves that landing to ~16% from the top (clear of the
+  HUD) so the full arc is visible without zooming out. A short approach zooms right in; an unreachable
+  green sits off the top. The reach factor + dims +
   bias live in `app.ts` (`DMAP_W/DMAP_H/DMAP_BIAS/decisionReach`) and MUST be kept in sync across
   the three call sites: the decision `renderHoleSVG`, the `wireMapAiming` projector (tap/drag aim
   unprojects against the SAME params or aiming drifts), and the play-view animation mount. The
