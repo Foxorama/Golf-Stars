@@ -161,6 +161,75 @@ function shipBody(look: ShipLook): string {
         </g>
         ${wheel(-9)}${wheel(11)}`;
     }
+    case 'chopper': {
+      // The mythic Thunderbolt — a hot-rod SPACE CHOPPER modelled on the Sun Mountain FinnCycle
+      // silhouette: fat knobby tyres on bright rims, a long flat seat, a low slung frame, and the
+      // golf bag stood UPRIGHT dead-centre between seat and handlebars (its signature). Wreathed in
+      // licking flame and forked lightning that crackles around it. Authored bigger to read as a grail.
+      const flick = (dur: string, begin: string) =>
+        `<animate attributeName="opacity" values="0;1;0;0.7;0;0.9;0" dur="${dur}" begin="${begin}" repeatCount="indefinite"/>`;
+      // A jagged lightning bolt: a wide electric-blue glow under a white core, flickering on its own phase.
+      const bolt = (d: string, dur: string, begin: string) => `
+        <path d="${d}" fill="none" stroke="#59b6ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="0">${flick(dur, begin)}</path>
+        <path d="${d}" fill="none" stroke="#eaf6ff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0">${flick(dur, begin)}</path>`;
+      // A fat tyre on a bright rim with spinning spokes and a hub.
+      const tyre = (x: number, r: number, dur: string) => `
+        <circle cx="${x}" cy="7" r="${r}" fill="#0c0e13" stroke="#0a0c10" stroke-width="1"/>
+        <circle cx="${x}" cy="7" r="${(r - 1.3).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1.6"/>
+        <g transform="translate(${x} 7)"><g stroke="${accent}" stroke-width="0.8">
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="${dur}" repeatCount="indefinite"/>
+          <line x1="${-(r - 1.6)}" y1="0" x2="${r - 1.6}" y2="0"/><line x1="0" y1="${-(r - 1.6)}" x2="0" y2="${r - 1.6}"/>
+          <line x1="${-(r - 2.4)}" y1="${-(r - 2.4)}" x2="${r - 2.4}" y2="${r - 2.4}"/><line x1="${-(r - 2.4)}" y1="${r - 2.4}" x2="${r - 2.4}" y2="${-(r - 2.4)}"/>
+        </g></g>
+        <circle cx="${x}" cy="7" r="1.7" fill="${accent}"/><circle cx="${x}" cy="7" r="0.8" fill="#0c0e13"/>`;
+      return `
+        <!-- forked lightning crackling around the whole rig (behind) -->
+        <g>
+          ${bolt('M-11,-15 L-6,-19 L-2,-13 L3,-20 L8,-13 L12,-17', '0.7s', '0s')}
+          ${bolt('M15,3 L21,4 L18,8 L24,10', '0.5s', '0.15s')}
+          ${bolt('M-19,-1 L-25,1 L-21,5 L-27,7', '0.6s', '0.32s')}
+        </g>
+        <!-- roaring exhaust flame plume trailing off the rear -->
+        <g>
+          <path d="M-19,4 L-34,-1 L-30,4 L-37,4 L-30,5 L-33,9 Z" fill="${flame}" opacity="0.9"><animate attributeName="opacity" values="0.55;1;0.7;1;0.6" dur="0.4s" repeatCount="indefinite"/></path>
+          <path d="M-19,4 L-29,1 L-27,4 L-31,4.5 L-27,5.5 Z" fill="#ffd23a"/>
+          <path d="M-19,4 L-25,2.6 L-24,4 L-26,4.6 Z" fill="#fff2b0"/>
+        </g>
+        <g stroke="#0a0c10" stroke-width="1" stroke-linejoin="round" stroke-linecap="round">
+          <!-- low chopper frame mass under seat + bag (with battery box) -->
+          <path d="M-13,6 L-17,-3 L2,-2 L9,-3 L11,5 Z" fill="${body}"/>
+          <rect x="-6" y="-1" width="13" height="6.5" rx="1" fill="#0d0f15"/>
+          <rect x="-5" y="0" width="11" height="1.6" rx="0.8" fill="${accent}" stroke="none" opacity="0.85"/>
+          <!-- long flat ribbed seat over the rear -->
+          <path d="M-20,-4.6 L-6,-5.2 L-4,-3.4 L-19,-3 Z" fill="#1c1f28"/>
+          <g stroke="${accent}" stroke-width="0.5" opacity="0.7"><line x1="-18" y1="-4.2" x2="-18" y2="-3.4"/><line x1="-15" y1="-4.4" x2="-15" y2="-3.5"/><line x1="-12" y1="-4.5" x2="-12" y2="-3.6"/><line x1="-9" y1="-4.6" x2="-9" y2="-3.7"/></g>
+          <!-- front fork raked down to the front wheel -->
+          <line x1="8" y1="-4" x2="13" y2="6" stroke="${accent}" stroke-width="1.6"/>
+          <line x1="10" y1="-4" x2="14.5" y2="6" stroke="#0a0c10" stroke-width="1"/>
+          <!-- handlebars rising over the front -->
+          <line x1="9" y1="-4" x2="12" y2="-11" stroke-width="1.4"/>
+          <line x1="12" y1="-11.4" x2="15.5" y2="-11" stroke-width="1.6"/>
+          <circle cx="15.6" cy="-11" r="1" fill="${accent}"/>
+          <!-- headlamp -->
+          <circle cx="12.5" cy="-2" r="1.7" fill="#fff6c0"/>
+        </g>
+        <!-- hot-rod flame licks along the lower frame -->
+        <g fill="${flame}" opacity="0.92" stroke="none">
+          <path d="M8,5.5 L-2,4.4 L1,5.4 L-6,4.6 L-2,6 L-10,5 L-5,6.6 L9,6.2 Z"/>
+          <path d="M6,5.4 L-1,4.7 L1,5.4 L-4,4.9 L-1,6 Z" fill="#ffd23a"/>
+        </g>
+        <!-- the golf bag stood UPRIGHT dead-centre, between seat and bars — the signature -->
+        <g stroke="#0a0c10" stroke-width="0.9" stroke-linejoin="round">
+          <line x1="1" y1="-8" x2="-0.5" y2="-17" stroke="#c9ccd6" stroke-width="1"/><circle cx="-0.6" cy="-17.4" r="1.6" fill="#e6ebf2"/>
+          <line x1="3.4" y1="-8" x2="4.6" y2="-16" stroke="#c9ccd6" stroke-width="1"/><circle cx="4.7" cy="-16.4" r="1.4" fill="#b7c0cc"/>
+          <line x1="2" y1="-8" x2="1.8" y2="-18" stroke="#c9ccd6" stroke-width="0.9"/><circle cx="1.7" cy="-18.3" r="1.3" fill="#d7dee6"/>
+          <path d="M-2.8,-8.5 L5.8,-8.5 L4.8,1.2 L-1.8,1.2 Z" fill="${accent}"/>
+          <path d="M-2.8,-8.5 L5.8,-8.5 L5.4,-6 L-2.5,-6 Z" fill="#0d0f15" stroke="none" opacity="0.35"/>
+          <rect x="-1.6" y="-6.6" width="4.8" height="3.4" rx="0.8" fill="${glass}" opacity="0.55"/>
+          <circle cx="6" cy="-3" r="1.5" fill="#0d0f15"/><circle cx="6" cy="-3" r="0.7" fill="${accent}"/>
+        </g>
+        ${tyre(-13, 5.6, '0.5s')}${tyre(13, 7, '0.55s')}`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `
