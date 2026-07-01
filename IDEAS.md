@@ -37,6 +37,10 @@ Foundations are shipped; these are the live follow-ons.
 - **GS-more-worlds** — metal/asteroid (low-grav scrap), neon/cyber grid, toxic/acid swamp, lightning-storm:
   each a new archetype row + its 8 Record entries (the registry scales now).
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.
+- **GS-weather-play** — deeper per-sky gameplay signatures beyond GS-journey-variety's wind hook:
+  collidable junk HULKS in the rough on debris-field stops (generalize the GS-tents machinery),
+  meteor-strike scorch lies, a comet-tail tailwind corridor, eclipse dimming the putt read. Each must
+  stay fair-by-construction and thread auto≡interactive exactly like GS-tents did.
 
 **Shot model & clubs**
 - **GS-clubs follow-ons** — location-specific club SETS with game EFFECTS (not just carry); scoring-club
@@ -66,6 +70,11 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-journey-variety** — the three journey lanes always land distinct world archetypes (never the one
+  you're on; split stops cross two archetypes); four new skies (eclipse / ion storm / nebula / comet) with
+  real showpiece visuals + junk/trade-camp upgrades; the `effectWindMult` play hook makes weather bite
+  fairly (storms gust, eclipses go still — HUD/AI/sim read the same wind). See
+  `docs/decisions/rpg-meta-loop.md`.
 - **GS-biome-feel** — per-world identity pass (supersedes GS-canopy-recolour): archetype flora (mushrooms/
   conifers/snags/saguaros/spires/palms…), signature ground decor (void asteroids + black hole, inferno
   fissures, ocean surf + cays…), themed OB markers (void warp beacons), per-surface landing FX (splash/

@@ -1,8 +1,9 @@
 /**
  * Shared atmospheric WEATHER layer (GS-journey-fx rework).
  *
- * The journey route you fly brings a `CourseEffect` — moonlight, a meteor shower, a solar storm, an
- * aurora, a debris field, a trade camp. This module is the ONE source of truth for drawing that
+ * The journey route you fly brings a `CourseEffect` — moonlight, a meteor shower, a solar or ion
+ * storm, a total eclipse, a nebula shroud, a grand comet, an aurora, a debris field, a trade camp
+ * (GS-journey-variety widened the set). This module is the ONE source of truth for drawing that
  * atmosphere, plus the always-on space ambience (twinkling stars, the odd shooting star) and the
  * VISIBLE wind. It is consumed by BOTH:
  *   - the animated play view (`playView.ts`) while the ball is in flight, and
@@ -178,6 +179,13 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   let windDots: { x: number; y: number; s: number; ph: number }[] = [];
   let ambient: { x: number; y: number; s: number; ph: number; r: number; col: string }[] = [];
   let shootOff = 0;
+  // Per-effect showpiece elements (GS-journey-variety) — each built on its OWN seeded stream so
+  // adding an effect never re-scatters the shared starfield/wind/ambient layout above.
+  let nebulae: { x: number; y: number; r: number; col: string; spd: number; ph: number }[] = [];
+  let ions: { x: number; y: number; s: number; ph: number }[] = [];
+  let cometDust: { t: number; off: number; s: number; ph: number }[] = [];
+  let lanterns: { x: number; y: number; s: number; ph: number; col: string }[] = [];
+  let hulk: { y: number; sz: number; shape: Vec[]; spin: number } | null = null;
 
   function build(): void {
     const rng = mulberry32(o.seed);
@@ -213,6 +221,38 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       return { y: 0.05 + rng() * 0.6, spd: 0.2 + (12 - sz) * 0.06, sz, off: rng(), spin: rng() * Math.PI * 2, shape, blink: rng() * Math.PI * 2 };
     });
     windDots = Array.from({ length: 90 }, () => ({ x: rng() * (W + 40), y: rng() * (H + 40), s: 0.6 + rng() * 0.9, ph: rng() * 6.28 }));
+    // Effect showpiece scatters — independent streams (see the declarations above for why).
+    const rng2 = mulberry32((o.seed ^ 0x9e3779b9) >>> 0);
+    const NEB_COLS = ['255,120,210', '120,200,255', '180,140,255', '90,235,190'];
+    nebulae = Array.from({ length: 4 }, (_, i) => ({
+      x: rng2() * W,
+      y: H * (0.03 + rng2() * 0.3),
+      r: Math.min(W, H) * (0.22 + rng2() * 0.2),
+      col: NEB_COLS[i % NEB_COLS.length]!,
+      spd: 2.5 + rng2() * 4,
+      ph: rng2() * Math.PI * 2,
+    }));
+    ions = Array.from({ length: 30 }, () => ({ x: rng2() * (W + 40), y: rng2() * (H + 40), s: 0.5 + rng2(), ph: rng2() * Math.PI * 2 }));
+    cometDust = Array.from({ length: 26 }, () => ({ t: rng2(), off: rng2(), s: 0.5 + rng2(), ph: rng2() * Math.PI * 2 }));
+    const LANTERN_COLS = ['255,196,110', '255,150,70', '255,220,150'];
+    lanterns = Array.from({ length: 14 }, (_, i) => ({
+      x: rng2() * (W + 40),
+      y: H * (0.45 + rng2() * 0.55),
+      s: 0.5 + rng2(),
+      ph: rng2() * Math.PI * 2,
+      col: LANTERN_COLS[i % LANTERN_COLS.length]!,
+    }));
+    // One BIG foreground derelict for the junk field — a slow hulking silhouette with real presence.
+    {
+      const sz = 24 + rng2() * 14;
+      const n = 6 + Math.floor(rng2() * 3);
+      const shape: Vec[] = Array.from({ length: n }, (_, k) => {
+        const a = (k / n) * Math.PI * 2 + rng2() * 0.4;
+        const rr = sz * (0.6 + rng2() * 0.55);
+        return [Math.cos(a) * rr, Math.sin(a) * rr] as Vec;
+      });
+      hulk = { y: 0.1 + rng2() * 0.25, sz, shape, spin: rng2() * Math.PI * 2 };
+    }
     // The world's ambient air (GS-biome-feel): count scales with area like the starfield.
     const amb = AMBIENT[o.archetype];
     if (amb) {
@@ -251,6 +291,26 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       g.addColorStop(1, 'rgba(40,90,80,0.0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H * 0.5);
+    } else if (effect === 'eclipse') {
+      // The day goes DARK: a deep indigo pall, strongest at the sky, easing off the turf.
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(10,8,34,0.34)');
+      g.addColorStop(0.55, 'rgba(12,10,36,0.16)');
+      g.addColorStop(1, 'rgba(12,10,36,0.04)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    } else if (effect === 'nebula') {
+      const g = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+      g.addColorStop(0, 'rgba(70,40,90,0.16)');
+      g.addColorStop(1, 'rgba(70,40,90,0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H * 0.7);
+    } else if (effect === 'comet') {
+      const g = ctx.createLinearGradient(W, 0, W * 0.35, H * 0.5);
+      g.addColorStop(0, 'rgba(90,180,200,0.12)');
+      g.addColorStop(1, 'rgba(90,180,200,0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H * 0.6);
     } else if (effect === 'spaceJunk') {
       ctx.fillStyle = 'rgba(40,44,54,0.10)';
       ctx.fillRect(0, 0, W, H);
@@ -261,7 +321,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       ctx.fillStyle = g;
       ctx.fillRect(0, H * 0.55, W, H * 0.45);
     }
-    // solarStorm tints as an edge vignette inside its own draw (centre stays clear).
+    // solarStorm / ionStorm tint as edge vignettes inside their own draws (centre stays clear).
   }
 
   function drawStars(ctx: CanvasRenderingContext2D, now: number): void {
@@ -617,8 +677,296 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
+  /** A single lightning fork from (x,y): a jagged descending polyline with one side branch, drawn as
+   *  a soft wide GLOW pass under a hot thin core so the bolt pops instead of reading as a hairline. */
+  function drawFork(ctx: CanvasRenderingContext2D, seed: () => number, x: number, y: number, col: string, flash: number, lw: number): void {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const segs = 5 + Math.floor(seed() * 3);
+    const branchAt = 1 + Math.floor(seed() * (segs - 2));
+    const main: Vec[] = [[x, y]];
+    for (let s = 0; s < segs; s++) {
+      x += (seed() - 0.5) * 52;
+      y += 16 + seed() * 30;
+      main.push([x, y]);
+    }
+    // The side branch — forking off sideways then dying out.
+    const side = seed() < 0.5 ? -1 : 1;
+    let [bx, by] = main[branchAt + 1]!;
+    const branch: Vec[] = [[bx, by]];
+    for (let s = 0; s < 3; s++) {
+      bx += side * (14 + seed() * 22);
+      by += 8 + seed() * 18;
+      branch.push([bx, by]);
+    }
+    const trace = (pts: Vec[]) => {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+      ctx.stroke();
+    };
+    // Glow pass, then hot white-ish core.
+    ctx.strokeStyle = `rgba(${col},${(0.3 * flash).toFixed(3)})`;
+    ctx.lineWidth = lw * 4;
+    trace(main);
+    ctx.lineWidth = lw * 2.6;
+    trace(branch);
+    ctx.strokeStyle = `rgba(245,248,255,${(0.9 * flash).toFixed(3)})`;
+    ctx.lineWidth = lw;
+    trace(main);
+    ctx.strokeStyle = `rgba(${col},${(0.6 * flash).toFixed(3)})`;
+    ctx.lineWidth = lw * 0.6;
+    trace(branch);
+  }
+
+  function drawIonStorm(ctx: CanvasRenderingContext2D, now: number): void {
+    // A blue-violet EDGE vignette (centre clear, same discipline as the solar storm).
+    ctx.save();
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.5, Math.min(W, H) * 0.3, W * 0.5, H * 0.5, Math.max(W, H) * 0.72);
+    vig.addColorStop(0, 'rgba(56,66,190,0)');
+    vig.addColorStop(1, `rgba(56,66,190,${(0.14 + 0.06 * (0.5 + 0.5 * Math.sin(now * 0.0013))).toFixed(3)})`);
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    // Charged sparks riding the gusts — small bright motes with a glow, drifting fast.
+    const sprite = glowSprite();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of ions) {
+      const x = wrap(p.x + now * 0.001 * 34 * p.s, W + 40) - 20;
+      const y = wrap(p.y + Math.sin(now * 0.0016 + p.ph) * 12, H + 40) - 20;
+      const a = 0.3 + 0.4 * (0.5 + 0.5 * Math.sin(now * 0.005 + p.ph));
+      if (sprite && p.s > 1.1) {
+        ctx.globalAlpha = a * 0.7;
+        ctx.drawImage(sprite, x - 4, y - 4, 8, 8);
+      }
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#cfe0ff';
+      ctx.beginPath();
+      ctx.arc(x, y, 0.9 + p.s * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // Forked lightning, two independent families — busier and brighter than the tempest flicker.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 2; k++) {
+      const cyc = 1150 + k * 640;
+      const phase = ((now + k * 517) % cyc) / cyc;
+      const flash = phase < 0.11 ? 1 - phase / 0.11 : 0;
+      if (flash <= 0.02) continue;
+      // Whole-sky charge flash under the bolt.
+      ctx.fillStyle = `rgba(190,205,255,${(0.08 * flash).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      const seed = mulberry32((o.seed ^ (k * 40503) ^ Math.floor(now / cyc) * 2654435761) >>> 0);
+      drawFork(ctx, seed, seed() * W, H * 0.02 + seed() * H * 0.12, '185,205,255', flash, 1.8);
+    }
+    ctx.restore();
+  }
+
+  function drawEclipse(ctx: CanvasRenderingContext2D, now: number): void {
+    const mx = W * 0.78;
+    const my = H * 0.16;
+    const r = Math.max(15, Math.min(W, H) * 0.075);
+    const pulse = 0.5 + 0.5 * Math.sin(now * 0.0009);
+    // The blazing corona — a broad soft halo plus slowly-turning flare petals, all additive.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(mx, my, r * 0.9, mx, my, r * (2.9 + pulse * 0.5));
+    halo.addColorStop(0, 'rgba(255,244,214,0.55)');
+    halo.addColorStop(0.35, 'rgba(255,220,170,0.20)');
+    halo.addColorStop(1, 'rgba(255,210,150,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(mx, my, r * 3.6, 0, Math.PI * 2);
+    ctx.fill();
+    // Corona streamers: 7 tapered petals wheeling imperceptibly slowly.
+    const base = now * 0.00004;
+    for (let k = 0; k < 7; k++) {
+      const a = base + (k / 7) * Math.PI * 2;
+      const len = r * (1.9 + 0.7 * Math.sin(k * 2.1 + pulse * 2));
+      const tipX = mx + Math.cos(a) * len;
+      const tipY = my + Math.sin(a) * len;
+      const g = ctx.createLinearGradient(mx, my, tipX, tipY);
+      g.addColorStop(0, 'rgba(255,236,200,0.30)');
+      g.addColorStop(1, 'rgba(255,236,200,0)');
+      ctx.strokeStyle = g;
+      ctx.lineWidth = r * 0.34;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(mx + Math.cos(a) * r, my + Math.sin(a) * r);
+      ctx.lineTo(tipX, tipY);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // The BLACK SUN itself, over the corona, with a razor-thin bright rim.
+    ctx.save();
+    ctx.fillStyle = '#05060d';
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,246,225,${(0.55 + 0.35 * pulse).toFixed(3)})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // A diamond-ring glint that slides around the rim.
+    const ga = now * 0.00013;
+    const gx = mx + Math.cos(ga) * r;
+    const gy = my + Math.sin(ga) * r;
+    const sprite = glowSprite();
+    if (sprite) {
+      ctx.globalCompositeOperation = 'lighter';
+      const gr = r * 0.55;
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(sprite, gx - gr, gy - gr, gr * 2, gr * 2);
+    }
+    ctx.restore();
+  }
+
+  function drawNebula(ctx: CanvasRenderingContext2D, now: number): void {
+    // Vast colour-lit fog banks drifting over the sky half — alphas kept low so the course reads.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const n of nebulae) {
+      const x = wrap(n.x + now * 0.001 * n.spd, W + n.r * 2) - n.r;
+      const breathe = 1 + 0.08 * Math.sin(now * 0.0005 + n.ph);
+      const rr = n.r * breathe;
+      const a = 0.16 + 0.05 * (0.5 + 0.5 * Math.sin(now * 0.0007 + n.ph * 1.7));
+      const g = ctx.createRadialGradient(x, n.y, 0, x, n.y, rr);
+      g.addColorStop(0, `rgba(${n.col},${a.toFixed(3)})`);
+      g.addColorStop(0.55, `rgba(${n.col},${(a * 0.55).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${n.col},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, n.y, rr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawComet(ctx: CanvasRenderingContext2D, now: number): void {
+    // The grand comet: a blazing head upper-right, twin tails (blue ion + pale dust) streaming away
+    // up-sky, and a slow fall of sparkle dust shed along the tail line.
+    const hx = W * 0.74 + Math.sin(now * 0.00012) * W * 0.02;
+    const hy = H * 0.14 + Math.cos(now * 0.00009) * H * 0.012;
+    const L = Math.min(W * 0.52, 340);
+    const dir: Vec = [-0.87, -0.5]; // tail streams to the upper-left
+    const perp: Vec = [-dir[1], dir[0]];
+    const sprite = glowSprite();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // Two tails at slightly split angles: the narrow blue ion tail and the broad pale dust tail.
+    const tails: { split: number; wid: number; col: string; a: number }[] = [
+      { split: 0.06, wid: 9, col: '140,200,255', a: 0.5 },
+      { split: -0.1, wid: 20, col: '235,240,255', a: 0.3 },
+    ];
+    for (const t of tails) {
+      const tx = hx + (dir[0] + perp[0] * t.split) * L;
+      const ty = hy + (dir[1] + perp[1] * t.split) * L;
+      const g = ctx.createLinearGradient(hx, hy, tx, ty);
+      g.addColorStop(0, `rgba(${t.col},${t.a.toFixed(3)})`);
+      g.addColorStop(1, `rgba(${t.col},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(hx + perp[0] * 2, hy + perp[1] * 2);
+      ctx.lineTo(tx + perp[0] * t.wid, ty + perp[1] * t.wid);
+      ctx.lineTo(tx - perp[0] * t.wid, ty - perp[1] * t.wid);
+      ctx.lineTo(hx - perp[0] * 2, hy - perp[1] * 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // The head: a hot core blooming through the glow sprite.
+    if (sprite) {
+      const gr = 16 + 2.5 * Math.sin(now * 0.003);
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(sprite, hx - gr, hy - gr, gr * 2, gr * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(hx, hy, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    // Sparkle dust shed along the tail, sinking gently off it as it twinkles out.
+    for (const p of cometDust) {
+      const prog = (p.t + now * 0.00002 * (0.5 + p.s)) % 1;
+      const px = hx + dir[0] * L * prog + perp[0] * (p.off - 0.5) * 26;
+      const py = hy + dir[1] * L * prog + perp[1] * (p.off - 0.5) * 26 + prog * 26 * p.s;
+      const a = (1 - prog) * (0.25 + 0.45 * (0.5 + 0.5 * Math.sin(now * 0.004 + p.ph)));
+      if (a <= 0.02) continue;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#dff2ff';
+      ctx.beginPath();
+      ctx.arc(px, py, 0.8 + p.s * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawLanterns(ctx: CanvasRenderingContext2D, now: number): void {
+    // Trade-camp lantern motes rising off the market below — warm fireflies over the horizon tint.
+    const sprite = glowSprite();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of lanterns) {
+      const y = H * 0.45 + wrap(p.y - H * 0.45 - now * 0.001 * 7 * p.s, H * 0.55 + 20);
+      const x = wrap(p.x + Math.sin(now * 0.0011 + p.ph) * 10, W + 40) - 20;
+      const a = 0.45 + 0.35 * (0.5 + 0.5 * Math.sin(now * 0.0024 + p.ph));
+      if (sprite && p.s > 0.75) {
+        ctx.globalAlpha = a * 0.9;
+        const gr = 5 + p.s * 3;
+        ctx.drawImage(sprite, x - gr, y - gr, gr * 2, gr * 2);
+      }
+      ctx.globalAlpha = a;
+      ctx.fillStyle = `rgba(${p.col},1)`;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.3 + p.s * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawDebris(ctx: CanvasRenderingContext2D, now: number): void {
     ctx.save();
+    // The big foreground hulk first — a slow, unmistakable derelict crossing behind the small fry.
+    if (hulk) {
+      const x = wrap(now * 0.0035, W + hulk.sz * 4) - hulk.sz * 2;
+      const y = hulk.y * H;
+      const rot = hulk.spin + now * 0.00005;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      hulk.shape.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+      ctx.closePath();
+      const hg = ctx.createLinearGradient(-hulk.sz, -hulk.sz, hulk.sz, hulk.sz);
+      hg.addColorStop(0, 'rgba(96,108,132,0.9)');
+      hg.addColorStop(1, 'rgba(34,40,54,0.9)');
+      ctx.fillStyle = hg;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(186,202,228,0.55)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      // Panel seams so it reads as a built thing, not a rock.
+      ctx.strokeStyle = 'rgba(20,24,34,0.6)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-hulk.sz * 0.7, 0);
+      ctx.lineTo(hulk.sz * 0.7, 0);
+      ctx.moveTo(0, -hulk.sz * 0.6);
+      ctx.lineTo(0, hulk.sz * 0.6);
+      ctx.stroke();
+      ctx.restore();
+      // Twin nav lights blinking in counter-phase.
+      const blink = 0.5 + 0.5 * Math.sin(now * 0.003);
+      ctx.fillStyle = `rgba(255,90,90,${(blink * 0.9).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x - hulk.sz * 0.5, y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(120,255,140,${((1 - blink) * 0.9).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x + hulk.sz * 0.5, y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
     for (const d of debris) {
       const x = wrap(d.off * (W + 120) + now * 0.001 * d.spd * 18, W + 120) - 60;
       const y = d.y * H;
@@ -672,8 +1020,23 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       case 'solarStorm':
         drawSolarStorm(ctx, now);
         break;
+      case 'ionStorm':
+        drawIonStorm(ctx, now);
+        break;
+      case 'eclipse':
+        drawEclipse(ctx, now);
+        break;
+      case 'nebula':
+        drawNebula(ctx, now);
+        break;
+      case 'comet':
+        drawComet(ctx, now);
+        break;
       case 'spaceJunk':
         drawDebris(ctx, now);
+        break;
+      case 'tradeMarket':
+        drawLanterns(ctx, now);
         break;
       default:
         break;

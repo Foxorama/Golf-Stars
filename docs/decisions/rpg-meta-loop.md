@@ -324,6 +324,51 @@
   no-death-spiral bar holds with tents armed across biomes at wildness 1). NO new `_gs*`/URL hook
   (content/effect-derived + a loadout/effect-baked render flag), so the test-hub guard needs nothing.
   Eyes-on the tents with `node scripts/tents-preview.mjs` (browser launch is blocked in some sandboxes).
+- **The three lanes are three DIFFERENT worlds, and the weather set widened with a wind hook
+  (GS-journey-variety, `run.ts`/`effects.ts`/`themes.ts`/`render/weather.ts`).** Two complaints from
+  play: the journey map "consistently does 2 or 3 of the same biome", and the space weather was
+  "limited in type and effect on game" with weak course visuals. Three coupled fixes:
+  1. **Lane-distinct biomes.** `routeTheme` gains an `avoid` set of archetypes; `routeOptions` threads
+     the CURRENT stop's archetype plus each already-drawn lane's, so the three branch planets always
+     land three distinct world archetypes and (pool permitting — every arc has ≥5, avoid is ≤3) never
+     the world you're standing on. NOT a bounded retry loop: a colliding first draw is replaced by ONE
+     rarity-weighted redraw over the arc pool FILTERED to permitted archetypes (`pickThemeFrom`, the
+     extracted weighted core of `pickTheme` — identical rng shape, one float), so distinctness is
+     guaranteed, deterministic, and testable as a hard assert. Extra draws ride each lane's own
+     `:routetheme:` stream, so nothing else shifts. The split "two worlds" stop got the same treatment:
+     `stitchSplitCourse`'s back half is distinct by ARCHETYPE now, not just theme id.
+  2. **Four new skies.** `CourseEffectId` grew `eclipse` (the dated eclipse uniques + the planetary
+     conjunction — a black sun, no longer generic "moonlight"), `ionStorm` (ion-storm/pulsar/quasar —
+     the blue storm, distinct from the red solar one), `nebula` (star-nursery/galactic-core/void-rift/
+     cosmic-jackpot), and `comet` (the comet events, distinct from a meteor shower). `routeEffect`'s
+     regexes are ordered most-specific-first and ANCHORED where needed (`/(^|-)ions?(-|$)/` so
+     opposition/apparition don't read as ion storms); `perseids`/`geminids` now correctly read as
+     meteor showers and `iss-pass` as a junk field. The catalogue provably spreads across ALL ten
+     non-none effects (`tests/journey-effects.test.ts`).
+  3. **The wind hook — weather that BITES, fairly.** Each effect may carry a wind multiplier
+     (`EFFECT_WIND`: ion storm ×1.35, solar storm ×1.2, nebula ×0.9, moonlight ×0.85, eclipse ×0.7),
+     applied in `currentCourse` as a PURE post-generation transform on `hole.wind.spd`, clamped to
+     `EFFECT_WIND_CAP` (46 — the generator's own band). Honest by construction: the transformed speed
+     IS the hole's wind, so the HUD, the visible wind streaks, the club AI and the shot physics all
+     read the SAME number; auto ≡ interactive holds because it's course data, not a driver-side knob.
+     No rng, no geometry → `validateFairness`/`validateCrossings` untouched; a neutral effect returns
+     the course OBJECT unchanged (byte-for-byte the old path — the whole suite is the guard, and the
+     no-death-spiral harnesses stay green with the hook live). The route-info sheet surfaces it as a
+     "💨 winds +35%" / "🍃 still air −30%" chip so the lever is readable before you commit the jump.
+  RENDER (`weather.ts`): each new sky is a real showpiece — eclipse: indigo pall + black sun with
+  wheeling corona streamers and a sliding diamond-ring glint; ion storm: blue-violet edge vignette,
+  charged glowing sparks riding the gusts, and two families of BRANCHED forked lightning; nebula: vast
+  seeded colour fog banks drifting and breathing over the sky half (alphas low so the course reads);
+  comet: a blazing head with split ion/dust tails and a sparkle-dust fall. The weak ones got punched
+  up: the junk field gains one BIG slow foreground derelict (panel seams, counter-phase nav lights),
+  the trade camp gains rising warm lantern motes. All on their OWN mulberry streams (seeded off
+  `o.seed ^ const`) so adding an effect never re-scatters the shared starfield/wind/ambient layout.
+  No new `_gs*`/URL hook → the test-hub guard needs nothing. Tests: `tests/journey-variety.test.ts`
+  (arc archetype coverage, hard-assert lane distinctness + never-current across seeds×hops,
+  determinism, avoid-set fallback, split-stop archetype split) + the extended
+  `tests/journey-effects.test.ts` (new mappings incl. the anchoring traps, spread across all ten
+  effects, wind-mult ordering/band, exact per-hole wind scaling with deg untouched + clamp, neutral
+  path untouched).
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen

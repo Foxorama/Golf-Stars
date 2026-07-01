@@ -420,6 +420,21 @@ export function arcForDistance(distanceFromStart: number): Arc {
 }
 
 /**
+ * Rarity-weighted draw from an EXPLICIT theme pool (one rng float — the same stream shape as
+ * `pickTheme`). Exposed for GS-journey-variety, where the caller pre-filters the arc pool to the
+ * archetypes a lane may still land on. The pool must be non-empty.
+ */
+export function pickThemeFrom(rng: Rng, pool: readonly Theme[]): Theme {
+  const total = pool.reduce((s, t) => s + RARITY_C[t.rarity].weight, 0);
+  let r = rng.float() * total;
+  for (let i = 0; i < pool.length - 1; i++) {
+    r -= RARITY_C[pool[i]!.rarity].weight;
+    if (r <= 0) return pool[i]!;
+  }
+  return pool[pool.length - 1]!;
+}
+
+/**
  * Pick the theme for a stop: a rarity-weighted draw (rarer = scarcer, so a legendary FEELS
  * legendary) from the themes of the stop's arc. Deterministic in the supplied rng. Falls back
  * to lower arcs if a tier is somehow empty (it never is — 9/18/20 themes).
@@ -431,13 +446,7 @@ export function pickTheme(rng: Rng, arc: Arc): Theme {
     a = (a - 1) as Arc;
     pool = themesForArc(a);
   }
-  const total = pool.reduce((s, t) => s + RARITY_C[t.rarity].weight, 0);
-  let r = rng.float() * total;
-  for (let i = 0; i < pool.length - 1; i++) {
-    r -= RARITY_C[pool[i]!.rarity].weight;
-    if (r <= 0) return pool[i]!;
-  }
-  return pool[pool.length - 1]!;
+  return pickThemeFrom(rng, pool);
 }
 
 /** Convenience: the theme a run's current stop flies into, from its distance. */

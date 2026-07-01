@@ -27,12 +27,17 @@
 
 import type { RouteEvent } from './events';
 
-/** The atmospheric flavour a lane brings to the world it flies into. Render-only. */
+/** The atmospheric flavour a lane brings to the world it flies into. Render-only, except where a
+ *  documented play hook says otherwise (tents; `effectWindMult`). */
 export type CourseEffectId =
   | 'none'
-  | 'moonlight' //   cool moonlit night — a silver wash over the course
+  | 'moonlight' //   cool moonlit night — a silver wash + still air
   | 'meteorShower' // streaking meteors raining across the sky
-  | 'solarStorm' //   an angry red flare — crackling charged air
+  | 'solarStorm' //   an angry red flare — crackling, gusty charged air
+  | 'ionStorm' //     blue-violet forked lightning — the gustiest sky of all
+  | 'eclipse' //      a black sun ringed by corona — the air goes dead still
+  | 'nebula' //       colour-lit fog banks drifting over the course
+  | 'comet' //        a grand comet hanging overhead, tail shedding sparkle dust
   | 'aurora' //       shimmering colour ribbons overhead
   | 'spaceJunk' //    a crashed-debris field strewn through the rough
   | 'tradeMarket'; // a bustling trade camp pitched at the world's edge
@@ -49,13 +54,42 @@ export interface CourseEffectInfo {
 
 export const COURSE_EFFECTS: Record<CourseEffectId, CourseEffectInfo> = {
   none: { id: 'none', label: 'Clear skies', icon: '✦', blurb: 'Still, open space.' },
-  moonlight: { id: 'moonlight', label: 'Moonlit', icon: '🌙', blurb: 'A silver moon washes the course in cool light.' },
-  meteorShower: { id: 'meteorShower', label: 'Meteor shower', icon: '☄️', blurb: 'Meteors streak down across the whole sky.' },
-  solarStorm: { id: 'solarStorm', label: 'Solar storm', icon: '⚡', blurb: 'A red flare crackles — charged, restless air.' },
+  moonlight: { id: 'moonlight', label: 'Moonlit', icon: '🌙', blurb: 'A silver moon washes the course — calm, still air.' },
+  meteorShower: { id: 'meteorShower', label: 'Meteor shower', icon: '🌠', blurb: 'Meteors streak down across the whole sky.' },
+  solarStorm: { id: 'solarStorm', label: 'Solar storm', icon: '⚡', blurb: 'A red flare crackles — charged, gusty air.' },
+  ionStorm: { id: 'ionStorm', label: 'Ion storm', icon: '🌩️', blurb: 'Blue lightning forks overhead — the wildest winds in the sky.' },
+  eclipse: { id: 'eclipse', label: 'Total eclipse', icon: '🌘', blurb: 'A black sun ringed by corona — the air goes dead still.' },
+  nebula: { id: 'nebula', label: 'Nebula shroud', icon: '🌌', blurb: 'Glowing fog banks drift over the course in slow colour.' },
+  comet: { id: 'comet', label: 'Comet overhead', icon: '☄️', blurb: 'A grand comet hangs in the sky, tail shedding sparkle dust.' },
   aurora: { id: 'aurora', label: 'Aurora', icon: '🌈', blurb: 'Ribbons of colour shimmer over the horizon.' },
   spaceJunk: { id: 'spaceJunk', label: 'Debris field', icon: '🛰️', blurb: 'Crashed wreckage litters the rough.' },
   tradeMarket: { id: 'tradeMarket', label: 'Trade camp', icon: '⛺', blurb: 'A trade camp rings the green — bounce your ball off the tents!' },
 };
+
+/**
+ * The one physics hook a course effect carries (GS-journey-variety): a WIND multiplier applied to
+ * every hole's generated wind speed as a pure POST-generation transform (`currentCourse`), clamped to
+ * `EFFECT_WIND_CAP` so it never exceeds the band the no-death-spiral harness proves. Storm skies gust
+ * harder; a moonlit night or an eclipse goes still. Honest by construction: the transformed speed IS
+ * `hole.wind`, so the HUD, the visible wind streaks, the AI's aim and the shot physics all read the
+ * SAME number — and auto ≡ interactive holds because it's course data, not a driver-side tweak.
+ * 1 (or an absent entry) = untouched, byte-for-byte the old course.
+ */
+export const EFFECT_WIND: Partial<Record<CourseEffectId, number>> = {
+  moonlight: 0.85,
+  eclipse: 0.7,
+  nebula: 0.9,
+  solarStorm: 1.2,
+  ionStorm: 1.35,
+};
+
+/** Wind speed ceiling (mph) after an effect multiplier — the generator's own max band. */
+export const EFFECT_WIND_CAP = 46;
+
+/** The wind multiplier a course effect applies (1 = none). */
+export function effectWindMult(effect: string | undefined): number {
+  return EFFECT_WIND[(effect ?? 'none') as CourseEffectId] ?? 1;
+}
 
 /**
  * The wildness DELTA a route applies to the course it reaches — derived from the event's cut lever so a
@@ -68,18 +102,24 @@ export function routeDifficulty(ev: RouteEvent | undefined): number {
   return Math.max(-0.15, Math.min(0.25, d));
 }
 
-/** The atmospheric flavour a route brings — keyed off the event's theme (icon/id) then its category. */
+/** The atmospheric flavour a route brings — keyed off the event's theme (icon/id) then its category.
+ *  Order matters: the most specific showpieces first (an eclipse is not just "moonlight", a comet is
+ *  not just "meteors", the ion storm is not the solar one), so every headline event reads true. */
 export function routeEffect(ev: RouteEvent | undefined): CourseEffectId {
   if (!ev || ev.id === 'open-space') return 'none';
   const id = ev.id.toLowerCase();
   const icon = ev.icon;
   // Thematic overrides first (the dated/astronomical showpieces read true).
-  if (/moon|eclipse/.test(id) || /🌑|🌕|🌗|🌒|🌘|🌙/.test(icon)) return 'moonlight';
-  if (/meteor|comet|shower|asteroid/.test(id) || /☄/.test(icon)) return 'meteorShower';
-  if (/solar|flare|quasar|storm|nova|pulsar|magnet/.test(id) || /⚡|☀|🌋|💥/.test(icon)) return 'solarStorm';
-  if (/aurora|nebula|borealis|prism|spectr/.test(id) || /🌈|🎆|✨/.test(icon)) return 'aurora';
+  if (/eclipse|conjunction/.test(id)) return 'eclipse';
+  if (/comet/.test(id)) return 'comet';
+  if (/moon/.test(id) || /🌑|🌕|🌗|🌒|🌘|🌙/.test(icon)) return 'moonlight';
+  if (/meteor|shower|perseid|geminid|leonid|apophis/.test(id) || /☄/.test(icon)) return 'meteorShower';
+  if (/(^|-)ions?(-|$)|pulsar|quasar|magnet|plasma/.test(id)) return 'ionStorm';
+  if (/solar|flare|storm|nova|opposition/.test(id) || /⚡|☀|🌋|💥/.test(icon)) return 'solarStorm';
+  if (/aurora|borealis|prism|spectr/.test(id) || /🌈/.test(icon)) return 'aurora';
+  if (/nebula|nursery|galactic|rift|jackpot|cluster/.test(id) || /🎆/.test(icon)) return 'nebula';
   if (/trade|market|bazaar|caravan|outpost|depot/.test(id)) return 'tradeMarket';
-  if (/salvage|scrap|junk|derelict|wreck|debris/.test(id)) return 'spaceJunk';
+  if (/salvage|scrap|junk|derelict|wreck|debris|station|iss-/.test(id)) return 'spaceJunk';
   // Otherwise fall back to the functional family.
   switch (ev.category) {
     case 'calm':

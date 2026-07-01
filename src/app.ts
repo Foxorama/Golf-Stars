@@ -20,7 +20,7 @@ import { speakCaddy } from './render/speech';
 import { journeyMapHTML, type StarmapChoice } from './render/starmap';
 import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
-import { COURSE_EFFECTS, routeDifficulty, routeEffect } from './sim/rpg/effects';
+import { COURSE_EFFECTS, effectWindMult, routeDifficulty, routeEffect } from './sim/rpg/effects';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, MANUAL_IDEAL_PACE, puttBreakYd, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
@@ -2361,6 +2361,10 @@ function routeInfoOverlay(): string {
     tags.push(travelChip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
   }
   if (ev.shardBonus) tags.push(travelChip(`✦ +${ev.shardBonus} shards`, '#4fd0e0'));
+  // The weather's play hook (GS-journey-variety): a gusty or dead-still sky is a real lever — say so.
+  const windMult = effectWindMult(eff.id);
+  if (windMult > 1) tags.push(travelChip(`💨 winds +${Math.round((windMult - 1) * 100)}%`, '#ff8b6b'));
+  else if (windMult < 1) tags.push(travelChip(`🍃 still air −${Math.round((1 - windMult) * 100)}%`, '#2bb673'));
   tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
 
   const markers = [

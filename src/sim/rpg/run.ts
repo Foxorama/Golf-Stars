@@ -47,8 +47,8 @@ import { addUnlockedClubs } from './club-unlock';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { routeDifficulty, routeEffect } from './effects';
-import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, arcForDistance, archetypeFor, type Theme } from '../course/themes';
+import { EFFECT_WIND_CAP, effectWindMult, routeDifficulty, routeEffect } from './effects';
+import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
@@ -218,10 +218,28 @@ export function currentTheme(run: Run): Theme {
  * REACHES (`reachedDistance`), so a deeper jump lands a later-arc, wilder world. Keyed by route id on
  * its own rng stream, so attaching it to `routeOptions` leaves the existing `:routes:` draw order
  * (distances + events) byte-for-byte unchanged. Pure & deterministic.
+ *
+ * `avoid` (GS-journey-variety) is a set of biome ARCHETYPES this lane must steer clear of — the
+ * other lanes' worlds plus the world you're standing on — so the three branch planets read as three
+ * genuinely different destinations instead of "ember world, ember world, ember world". A colliding
+ * first draw is replaced by ONE rarity-weighted redraw over the arc pool FILTERED to permitted
+ * archetypes (this lane's own stream — extra draws perturb nothing else), so distinctness is
+ * guaranteed whenever the arc offers enough archetypes (every arc has ≥7; the avoid set is ≤3).
+ * Only if the filter empties the pool does the first draw stand.
  */
-export function routeTheme(seed: number | string, stopIndex: number, routeId: number, reachedDistance: number): Theme {
+export function routeTheme(
+  seed: number | string,
+  stopIndex: number,
+  routeId: number,
+  reachedDistance: number,
+  avoid?: ReadonlySet<BiomeArchetype>,
+): Theme {
   const rng = new Rng(`${seed}:routetheme:${stopIndex}:${routeId}`);
-  return pickTheme(rng, arcForDistance(reachedDistance));
+  const arc = arcForDistance(reachedDistance);
+  const first = pickTheme(rng, arc);
+  if (!avoid || !avoid.has(first.archetype)) return first;
+  const cands = themesForArc(arc).filter((t) => !avoid.has(t.archetype));
+  return cands.length > 0 ? pickThemeFrom(rng, cands) : first;
 }
 
 /** The course awaiting the player at the current stop (shaped by the run format + theme). */
@@ -237,18 +255,39 @@ export function currentCourse(run: Run): Course {
   // back holes a different theme of the same arc. Each half is generated independently and stitched,
   // every hole stamped with its own biome/themeId so it renders + plays as its world.
   if (spec.splitBiome && spec.holes >= 2) {
-    return stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect);
+    return applyEffectWind(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect);
   }
-  return generateCourse(stopSeed(run), {
-    holes: spec.holes,
-    parCap: spec.parCap,
-    distanceFromStart: run.distanceFromStart,
-    // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
-    biomeRow: resolveBiome(theme),
-    themeId: theme.id,
-    wildnessBoost,
+  return applyEffectWind(
+    generateCourse(stopSeed(run), {
+      holes: spec.holes,
+      parCap: spec.parCap,
+      distanceFromStart: run.distanceFromStart,
+      // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
+      biomeRow: resolveBiome(theme),
+      themeId: theme.id,
+      wildnessBoost,
+      effect,
+    }),
     effect,
-  });
+  );
+}
+
+/**
+ * The course effect's one physics hook (GS-journey-variety): scale every hole's generated wind by
+ * `effectWindMult`, clamped to the generator's own max band — a PURE post-generation transform (no
+ * rng, no geometry), so `validateFairness`/`validateCrossings` are untouched and auto ≡ interactive
+ * holds by construction (the transformed speed IS `hole.wind`, read by HUD, renderer, AI and sim
+ * alike). A neutral effect returns the course object UNCHANGED (byte-for-byte the old path).
+ */
+function applyEffectWind(course: Course, effect: string): Course {
+  const mult = effectWindMult(effect);
+  if (mult === 1) return course;
+  return {
+    ...course,
+    holes: course.holes.map((h) =>
+      h.wind ? { ...h, wind: { ...h.wind, spd: Math.min(EFFECT_WIND_CAP, Math.max(0, h.wind.spd * mult)) } } : h,
+    ),
+  };
 }
 
 /** Stamp every hole of a course with its biome/theme render keys (GS-variation). Pure. */
@@ -273,10 +312,15 @@ function stitchSplitCourse(
   const front = Math.ceil(holes / 2);
   const back = holes - front;
   const arc = arcForDistance(run.distanceFromStart);
-  // A second, distinct theme of the same arc (re-draw until it differs; arcs have ≥9 themes).
+  // A second, distinct theme of the same arc — distinct by ARCHETYPE, not just id (GS-journey-variety),
+  // so the two halves read as two visibly different worlds: a colliding draw is replaced by one
+  // rarity-weighted redraw over the arc pool minus the front archetype (arcs have ≥7 archetypes).
   const pick = new Rng(`${run.seed}:split:${run.stopIndex}`);
   let themeB = pickTheme(pick, arc);
-  for (let i = 0; i < 6 && themeB.id === themeA.id; i++) themeB = pickTheme(pick, arc);
+  if (themeB.archetype === themeA.archetype) {
+    const cands = themesForArc(arc).filter((t) => t.archetype !== themeA.archetype);
+    if (cands.length > 0) themeB = pickThemeFrom(pick, cands);
+  }
   const a = stampHoles(
     generateCourse(`${stopSeed(run)}:front`, {
       holes: front,
@@ -744,15 +788,23 @@ export function routeOptions(run: Run): Route[] {
       eliteIdx = i;
     }
   }
-  return withEvents.map((r, i) => ({
-    ...r,
-    elite: i === eliteIdx,
-    // The world this lane flies into (GS-journey-biome) — drawn from the arc the jump reaches, so the
-    // route preview, the map planet, and the biome you actually play all agree.
-    theme: routeTheme(run.seed, run.stopIndex, r.id, run.distanceFromStart + r.distanceJump),
-    // Preview whether the stop this route reaches (the next stop) is a boss.
-    bossAhead: !!bossAt(format, run.stopIndex + 1),
-  }));
+  // Lane-distinct worlds (GS-journey-variety): each lane avoids the archetypes the earlier lanes
+  // drew AND the world you're currently standing on, so the three planets are three different
+  // biomes and you (pool permitting) never fly straight back into the world you just played.
+  const avoid = new Set<BiomeArchetype>([currentTheme(run).archetype]);
+  return withEvents.map((r, i) => {
+    const theme = routeTheme(run.seed, run.stopIndex, r.id, run.distanceFromStart + r.distanceJump, avoid);
+    avoid.add(theme.archetype);
+    return {
+      ...r,
+      elite: i === eliteIdx,
+      // The world this lane flies into (GS-journey-biome) — drawn from the arc the jump reaches, so the
+      // route preview, the map planet, and the biome you actually play all agree.
+      theme,
+      // Preview whether the stop this route reaches (the next stop) is a boss.
+      bossAhead: !!bossAt(format, run.stopIndex + 1),
+    };
+  });
 }
 
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */

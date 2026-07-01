@@ -237,6 +237,17 @@
   passed in by the play view; the overlay is plain DOM like the caddy badges + putt meter), so the test-hub
   guard needs nothing. Canvas feel → verified eyes-on (Playwright: all six effects animate + read clean,
   the decision-screen overlay mounts under the HUD with the pull gesture passing through).
+  **GS-journey-variety widened the sky set to TEN:** four new showpieces — `eclipse` (indigo pall +
+  black sun with wheeling corona streamers and a sliding diamond-ring glint), `ionStorm` (blue-violet
+  edge vignette, charged glowing sparks, two families of BRANCHED forked lightning via the shared
+  `drawFork`), `nebula` (vast seeded colour fog banks drifting/breathing over the sky half, alphas kept
+  low so the course reads), `comet` (blazing head, split ion/dust tails, a sparkle-dust fall) — plus
+  upgrades to the weak ones (`spaceJunk` gains one BIG slow foreground derelict with panel seams +
+  counter-phase nav lights; `tradeMarket` gains rising warm lantern motes). RULE: every effect's
+  scatter is built on its OWN mulberry stream (`o.seed ^ const`), so adding one never re-scatters the
+  shared starfield/wind/ambient layout. The sim side (event → effect mapping, the `effectWindMult`
+  play hook) lives in `docs/decisions/rpg-meta-loop.md` under GS-journey-variety. Eyes-on all the
+  skies at once with `node scripts/weather-preview.mjs` (one canvas per effect over a mock course).
 - **The swinging golfer + space ambience (play-view "alive" layer).** Each full shot in `playView`
   now opens with a little loader-style golfer (`drawGolfer` — same stick-figure/cap silhouette as the
   intro crew) who addresses → backswings → strikes during a `swingLeadMs` WINDUP, then holds a fading
