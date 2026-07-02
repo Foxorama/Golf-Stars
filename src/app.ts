@@ -3503,6 +3503,8 @@ function render(): void {
         onImpact: (kind, quality, clubId) => (kind === 'shot' ? sfx.swing(quality ?? 0.6, clubId) : sfx.putt()),
         onLand: (lie, penalty, knockedDown) =>
           sfx.land(lie, penalty, archetypeFor(holeThemeId(hole), holeBiome(hole)), knockedDown),
+        onRedirect: (kind, phase, travelMs) =>
+          phase === 'fire' ? sfx.redirectFire(kind, travelMs) : sfx.redirectHit(kind),
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
       });
@@ -3567,6 +3569,10 @@ function render(): void {
         // hole's world archetype so the tree you clipped sounds like the tree you see.
         onLand: (lie, penalty, knockedDown) =>
           sfx.land(lie, penalty, archetypeFor(holeThemeId(play.hole), holeBiome(play.hole)), knockedDown),
+        // Caddy-guard projectile cues (GS-audio-4): the laser pew / boomerang whir at the launch,
+        // the zap / wooden crack as it meets the ball — layered under the caddy's voice line.
+        onRedirect: (kind, phase, travelMs) =>
+          phase === 'fire' ? sfx.redirectFire(kind, travelMs) : sfx.redirectHit(kind),
         onDone: () => {
           animatedShots = play.shots.length;
           animatedPutts = play.puttLogs.length;

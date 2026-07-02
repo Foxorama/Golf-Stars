@@ -82,6 +82,13 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-audio-4** — caddy-guard projectile cues: the Space Ducks laser PEWs on launch (beam whine
+  rising into the ball) and SNAPs on contact; the Convict Sheep boomerang whooshes + whirs
+  (whip-whip pulses quickening across the flight) and CRACKs wood-on-ball with a wobbling ring.
+  Fired via a pure `onRedirect(kind, phase, travelMs)` feel hook at the redirect cinematic's own
+  fire/spark beats; `travelMs` folds in the slow-mo so the whir ends exactly at the hit. Zero
+  sim/rng impact; call-clean headless contract pinned (`tests/audio.test.ts`). See
+  `docs/decisions/audio.md`.
 - **GS-audio-3** — hazard & tree landing voices: the touchdown answers in sound (the audio half of
   `spawnLandFX`) — water splash, lava sizzle, void implosion, cetus whale song, ravine rockfall,
   sand/ice/crystal/scorch/stardust/junk — and tree hits are voiced per world archetype off the

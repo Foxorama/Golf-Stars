@@ -11,7 +11,7 @@
  * itself part of the contract: the audio layer must never break the headless test world.
  */
 import { describe, it, expect } from 'vitest';
-import { strikeClassOf, landVoiceOf, treeVoiceOf, TREE_VOICES, type StrikeClass } from '../src/render/audio';
+import { sfx, strikeClassOf, landVoiceOf, treeVoiceOf, TREE_VOICES, type StrikeClass } from '../src/render/audio';
 import { MUSIC_TRACKS, type MusicSceneId } from '../src/render/music';
 import { CLUBS } from '../src/sim/clubs';
 import { ARCHETYPE_TURF } from '../src/render/palette';
@@ -122,5 +122,18 @@ describe('hazard landing voices (GS-audio-3)', () => {
     expect(treeVoiceOf('cetus')).toBe('stone');
     // No archetype known → the classic wood knock, never a throw.
     expect(treeVoiceOf(undefined)).toBe('wood');
+  });
+});
+
+describe('caddy-guard projectile cues (GS-audio-4)', () => {
+  it('both projectile kinds voice fire + hit cues as guarded headless no-ops (never a throw in node)', () => {
+    for (const k of ['laser', 'boomerang'] as const) {
+      expect(() => sfx.redirectFire(k, 900)).not.toThrow();
+      expect(() => sfx.redirectFire(k)).not.toThrow(); // travel defaulted
+      expect(() => sfx.redirectHit(k)).not.toThrow();
+    }
+    // The landing voices honour the same guard.
+    expect(() => sfx.land('water', 'water', 'verdant')).not.toThrow();
+    expect(() => sfx.land('trees', undefined, 'crystal', true)).not.toThrow();
   });
 });
