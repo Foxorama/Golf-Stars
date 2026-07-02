@@ -14,9 +14,12 @@ import { getSettings } from '../settings';
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 
-/** Lazily create (and return) the shared AudioContext + master gain, or null if unsupported. */
-function audio(): { ctx: AudioContext; master: GainNode } | null {
-  if (!getSettings().sound) return null;
+/**
+ * Lazily create (and return) the ONE AudioContext the whole app shares — SFX and the music layer
+ * both hang off it (a page gets few contexts; two would fight for the hardware). Not gated on any
+ * setting: each consumer gates its OWN bus (SFX on `sound`, music on `music`). Null if unsupported.
+ */
+export function sharedAudioContext(): AudioContext | null {
   try {
     if (!ctx) {
       const AC =
@@ -25,21 +28,38 @@ function audio(): { ctx: AudioContext; master: GainNode } | null {
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return null;
       ctx = new AC();
-      master = ctx.createGain();
-      master.gain.value = 0.5;
-      master.connect(ctx.destination);
     }
-    if (!ctx || !master) return null;
-    return { ctx, master };
+    return ctx;
   } catch {
     return null;
   }
 }
 
-/** Resume the context after a user gesture (browsers start it suspended). Safe to call often. */
-export function resumeAudio(): void {
+/** The SFX bus: the shared context + the cue master gain, or null when sound is off/unsupported. */
+function audio(): { ctx: AudioContext; master: GainNode } | null {
+  if (!getSettings().sound) return null;
+  const c = sharedAudioContext();
+  if (!c) return null;
   try {
-    audio()?.ctx.resume();
+    if (!master) {
+      master = c.createGain();
+      master.gain.value = 0.5;
+      master.connect(c.destination);
+    }
+    return { ctx: c, master };
+  } catch {
+    return null;
+  }
+}
+
+/** Resume the context after a user gesture (browsers start it suspended). Safe to call often.
+ *  Resumes when EITHER audio consumer is on (the music layer needs it even with SFX muted);
+ *  with both off it stays lazy — no context is ever created for a silent player. */
+export function resumeAudio(): void {
+  const s = getSettings();
+  if (!s.sound && !s.music) return;
+  try {
+    sharedAudioContext()?.resume();
   } catch {
     /* ignore */
   }
@@ -107,6 +127,25 @@ function noise(
 }
 
 /**
+ * Which VOICE a club strikes with (GS-audio-2). Derived from the club-id conventions of the
+ * `CLUBS` taxonomy (`src/sim/clubs.ts`): 'D' the driver, `*W` woods, `*H` hybrids, `*i` irons,
+ * the putter itself — everything else (PW/GW/SW/60/64/chip) is a wedge-family touch shot.
+ * Convention-based on purpose: a NEW club row picks up a sensible voice with zero audio edits.
+ */
+export type StrikeClass = 'driver' | 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
+
+export function strikeClassOf(clubId?: string): StrikeClass {
+  if (!clubId) return 'iron'; // the neutral mid-bag voice when no club is known
+  if (clubId === 'D') return 'driver';
+  if (clubId === 'putter') return 'putter';
+  // Digit-prefixed families only: PW/GW/SW also end in 'W' but are wedges, not woods.
+  if (/^\d+W$/.test(clubId)) return 'wood';
+  if (/^\d+H$/.test(clubId)) return 'hybrid';
+  if (/^\d+i$/.test(clubId)) return 'iron';
+  return 'wedge';
+}
+
+/**
  * The cue library. Each is a tiny composition; quality/strength scales the brightness so a pure
  * strike rings and a chunked one thuds. All no-ops when sound is off / unsupported.
  */
@@ -115,11 +154,52 @@ export const sfx = {
   click(): void {
     tone(420, 0.05, { type: 'triangle', gain: 0.12 });
   },
-  /** Club–ball contact. `quality` 0..1 (1 = pure): brighter crack + a ringing tone when pure. */
-  swing(quality = 0.6): void {
+  /**
+   * Club–ball contact, voiced by the club family (GS-audio-2). `quality` 0..1 (1 = pure) scales
+   * the brightness in every voice, so a pure strike rings and a chunked one thuds.
+   *   driver — a deep boomy THWACK + a titanium ping that rings when pure;
+   *   wood/hybrid — the same shape, progressively smaller and tighter;
+   *   iron — a crisp metallic CLICK with a short turf brush;
+   *   wedge — a soft fat thump under a longer grass/sand "shhk" (touch, not power);
+   *   putter — falls through to the putt tap.
+   */
+  swing(quality = 0.6, clubId?: string): void {
     const q = Math.max(0, Math.min(1, quality));
-    noise(0.07, { gain: 0.32, type: 'bandpass', freq: 900 + q * 2200, q: 0.7 });
-    tone(180 + q * 220, 0.12, { type: 'triangle', gain: 0.12 + q * 0.12, sweepTo: 90 + q * 120 });
+    const cls = strikeClassOf(clubId);
+    switch (cls) {
+      case 'driver':
+        // The big dog: a low airy boom, a hard titanium ping, and a pure-strike crack of air.
+        noise(0.09, { gain: 0.34, type: 'bandpass', freq: 260 + q * 240, q: 0.6 });
+        tone(150, 0.16, { type: 'triangle', gain: 0.2, sweepTo: 55 });
+        tone(1500 + q * 700, 0.06, { type: 'triangle', gain: 0.1 + q * 0.14 });
+        if (q > 0.6) noise(0.04, { gain: (q - 0.6) * 0.3, type: 'highpass', freq: 3200 });
+        break;
+      case 'wood':
+        noise(0.08, { gain: 0.32, type: 'bandpass', freq: 380 + q * 400, q: 0.65 });
+        tone(170, 0.14, { type: 'triangle', gain: 0.17, sweepTo: 70 });
+        tone(1200 + q * 500, 0.05, { type: 'triangle', gain: 0.08 + q * 0.1 });
+        break;
+      case 'hybrid':
+        noise(0.07, { gain: 0.3, type: 'bandpass', freq: 620 + q * 800, q: 0.7 });
+        tone(200, 0.12, { type: 'triangle', gain: 0.15, sweepTo: 85 });
+        tone(1000 + q * 450, 0.05, { type: 'sine', gain: 0.07 + q * 0.08 });
+        break;
+      case 'iron':
+        // Crisp click: bright compact crack + a firm body knock + a whisper of turf after.
+        noise(0.05, { gain: 0.3, type: 'bandpass', freq: 1800 + q * 1600, q: 0.9 });
+        tone(300 + q * 160, 0.1, { type: 'triangle', gain: 0.12 + q * 0.1, sweepTo: 150 });
+        noise(0.09, { gain: 0.06, type: 'lowpass', freq: 900, t: 0.02 });
+        break;
+      case 'wedge':
+        // Touch shot: a soft fat thump under a longer grass/sand brush — feel over power.
+        noise(0.05, { gain: 0.22, type: 'bandpass', freq: 650 + q * 350, q: 0.8 });
+        tone(250, 0.09, { type: 'sine', gain: 0.12 + q * 0.06, sweepTo: 130 });
+        noise(0.13, { gain: 0.1, type: 'bandpass', freq: 2400, q: 0.6, t: 0.015 });
+        break;
+      case 'putter':
+        sfx.putt();
+        break;
+    }
   },
   /** Putter tap — a soft, low knock. */
   putt(): void {
@@ -131,11 +211,28 @@ export const sfx = {
     noise(0.05, { gain: 0.16, type: 'bandpass', freq: 380, q: 0.8 }); // muffled canvas thump
     tone(300, 0.16, { type: 'triangle', gain: 0.16, sweepTo: 520, t: 0.02 }); // springy boing up
   },
-  /** Ball drops in the cup — a satisfying rattle + a rising confirm. */
+  /** Ball drops in the cup (GS-audio-2) — the real thing: a rim knock, a couple of hollow
+   *  rattle bounces off the cup wall (each lower + softer as the ball dies), a bottom-of-the-cup
+   *  plastic THUNK, then the little rising "it's in" confirm. The most-earned cue in golf. */
   holeOut(): void {
-    noise(0.05, { gain: 0.18, freq: 1800, q: 1.2 });
-    tone(660, 0.12, { type: 'sine', gain: 0.2, t: 0.02 });
-    tone(990, 0.18, { type: 'sine', gain: 0.18, t: 0.09 });
+    // Rim knock as the ball catches the edge.
+    noise(0.03, { gain: 0.16, freq: 1300, q: 1.1 });
+    tone(820, 0.05, { type: 'triangle', gain: 0.1, sweepTo: 600 });
+    // Rattle: hollow knocks walking down the cup wall.
+    [
+      { t: 0.06, f: 950, g: 0.13 },
+      { t: 0.12, f: 870, g: 0.1 },
+      { t: 0.17, f: 800, g: 0.07 },
+    ].forEach(({ t, f, g }) => {
+      noise(0.025, { gain: g, freq: 1700, q: 1.3, t });
+      tone(f, 0.04, { type: 'triangle', gain: g * 0.8, t });
+    });
+    // The bottom-of-the-cup settle.
+    tone(320, 0.09, { type: 'sine', gain: 0.16, t: 0.22, sweepTo: 170 });
+    noise(0.04, { gain: 0.1, type: 'lowpass', freq: 520, t: 0.22 });
+    // The rising confirm chime, after the ball is definitely home.
+    tone(660, 0.12, { type: 'sine', gain: 0.18, t: 0.32 });
+    tone(990, 0.18, { type: 'sine', gain: 0.16, t: 0.4 });
   },
   /** Found a hazard / OB — a downward "wah". */
   penalty(): void {

@@ -67,6 +67,7 @@ import { loadSave, writeSave } from './save/storage';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio } from './render/audio';
+import { setMusicScene, type MusicSceneId } from './render/music';
 import { getSettings, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showVoyageVictory } from './render/celebrations';
@@ -1718,6 +1719,7 @@ function settingsOverlay(): string {
         <div class="gs-sheet-head"><b style="font-size:17px;">⚙ Settings</b>
           <button class="gs-mapbtn" data-settings="close" title="Close">✕</button></div>
         ${row('sound', 'Sound', 'Chimes & contact cues (no downloads)')}
+        ${row('music', 'Music', 'Ambient world themes — a different mood per world')}
         ${row('haptics', 'Haptics', 'Vibration feedback on supported phones')}
         ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
         ${row('leftHanded', 'Left-handed', 'Enables left handed mode')}
@@ -2929,6 +2931,22 @@ function patchActive(): PatchKind | undefined {
   return effectPatchKind(currentEffect());
 }
 
+/** Drive the ambient music layer (GS-audio-2) off the current screen: the stop's world theme
+ *  while golf is on screen (playing/result — the hole under view picks the track, so a
+ *  split-biome stop's back holes switch), the clubhouse lull everywhere else. A cheap no-op when
+ *  the scene hasn't changed, so it's safe on render()'s hot path (power-pull re-renders). */
+function syncMusic(): void {
+  let sceneId: MusicSceneId = 'menu';
+  const hole =
+    state.screen === 'playing' && state.play
+      ? state.play.hole
+      : state.screen === 'result' && state.played
+        ? state.course.holes[state.viewHole] ?? state.course.holes[0]
+        : undefined;
+  if (hole) sceneId = archetypeFor(holeThemeId(hole), holeBiome(hole));
+  setMusicScene(sceneId);
+}
+
 /** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
  *  identically across screens (a quiet hand-off from lining up to watching the shot). */
 function weatherSeed(hole: Hole): number {
@@ -3135,6 +3153,8 @@ function lefty(): boolean {
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
+  // Keep the ambient music matched to what's on screen (a no-op when the scene is unchanged).
+  syncMusic();
   // Tear down the previous canvas mounts BEFORE we wipe the DOM and (maybe) mount fresh ones.
   // render() replaces `app.innerHTML`, which detaches the old play-view / putt-meter canvases —
   // but their self-perpetuating rAF loops (playView re-requests every frame even after `done`,
@@ -3494,7 +3514,7 @@ function render(): void {
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
-        onImpact: (kind, quality) => (kind === 'shot' ? sfx.swing(quality ?? 0.6) : sfx.putt()),
+        onImpact: (kind, quality, clubId) => (kind === 'shot' ? sfx.swing(quality ?? 0.6, clubId) : sfx.putt()),
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
       });
@@ -3546,10 +3566,10 @@ function render(): void {
         focusBias: DMAP_BIAS,
         up: animUp,
         follow: true,
-        onImpact: (kind, quality) => {
+        onImpact: (kind, quality, clubId) => {
           // Contact cue — fires at the strike moment (the windup has already played).
           if (kind === 'shot') {
-            sfx.swing(quality ?? 0.6);
+            sfx.swing(quality ?? 0.6, clubId);
             haptic((quality ?? 0) > 0.85 ? HAPTICS.good : HAPTICS.tap);
           } else {
             sfx.putt();

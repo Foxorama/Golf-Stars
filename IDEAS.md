@@ -77,6 +77,11 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-audio-2** — sound-design pass: club-FAMILY strike voices (driver boom+ping / wood / hybrid /
+  iron click / wedge turf-shhk), a real ball-in-cup drop (rim knock → rattle → thunk → confirm), and
+  an assetless GENERATIVE music layer — a distinct ambient track per world archetype + a menu lull,
+  behind its own Music setting; coverage + the ≤0.35 subtlety gain bar machine-checked
+  (`tests/audio.test.ts`). See `docs/decisions/audio.md`.
 - **GS-journey-variety** — the three journey lanes always land distinct world archetypes (never the one
   you're on; split stops cross two archetypes); four new skies (eclipse / ion storm / nebula / comet) with
   real showpiece visuals + junk/trade-camp upgrades; the `effectWindMult` play hook makes weather bite
