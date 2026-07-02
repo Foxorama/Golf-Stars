@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 11;
+export const GENERATOR_VERSION = 12;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -59,6 +59,27 @@ const CROSSING_KINDS = new Set(['lavariver', 'frozenpond', 'creek', 'barranca'])
  * finds the island — "brutal but fair": a miss is genuinely lost, but the target is honest and big.
  */
 const VOID_ISLAND_SCALE = 2.4;
+
+/**
+ * Island-hop completability (GS-cetus-gaps): the void carries between a lost-rough hole's pads must
+ * be CARRYABLE WITH THE COMMON STARTER BAG, by construction. Gap yardage budgets are relative to the
+ * nominal 250-yd common driver at earth gravity — hole length and shot carry both scale with the
+ * biome's `carryMult`, so the ratio holds on any world. The per-gap ceiling ramps with wildness
+ * (gentler just past the arming threshold, ~60% of a driver at wildness 1); pads between gaps keep a
+ * minimum landing length AND enough corridor samples to survive `brokenCorridor`'s ≥3-point rule
+ * (a dropped sliver pad silently fused two gaps into one uncarryable mega-void — the GS-cetus-gaps
+ * bug). `validateIslandHops` proves all of it on every generated course.
+ */
+const ISLAND_GAP_MAX_YD_CALM = 100; // per-gap ceiling at the arming threshold (wildness 0.55)
+const ISLAND_GAP_MAX_YD_WILD = 150; // per-gap ceiling at wildness 1 — ~60% of a nominal driver
+const ISLAND_PAD_MIN_U = 0.09; // min pad between gaps (u-space) — ≥3 dense points at ISLAND_SEGS
+const ISLAND_PAD_MIN_YD = 30; // …and never shorter than a landable shelf in (carry-relative) yards
+const ISLAND_GAP_SPAN: [number, number] = [0.2, 0.85]; // gaps live here: real tee + green pads
+/** Denser corridor sampling on lost-rough holes so a legal min-width pad ALWAYS keeps ≥3 points. */
+const ISLAND_SEGS = 37;
+/** Validator bar: generation caps a gap at 150 relative yd; +10% void carryJitter headroom ⇒ 175. */
+const ISLAND_GAP_VALIDATE_YD = 175;
+const ISLAND_PAD_VALIDATE_YD = 20;
 
 export interface GenerateOptions {
   /** Number of holes (default 1 — the vertical slice). */
@@ -295,6 +316,53 @@ function brokenCorridor(dense: Vec[], leftHW: number[], rightHW: number[], gapBa
   }
   flush();
   return segs;
+}
+
+/**
+ * Clamp + separate a lost-rough hole's island gap draws so the chain is completable by construction
+ * (GS-cetus-gaps). PURE geometry over already-drawn (centre, half-width) pairs — zero rng draws, so
+ * every seeded stream is byte-identical; only the derived band edges move. Guarantees:
+ *   • every gap ≤ `maxGapU` (the wildness-ramped, common-driver-carryable ceiling);
+ *   • every pad between two gaps ≥ `minPadU` (a landable shelf that also survives
+ *     `brokenCorridor`'s ≥3-point rule — the raw draws could overlap or leave a sliver pad that was
+ *     silently DROPPED, fusing two gaps into one uncarryable mega-void);
+ *   • the whole chain stays inside `span` (a real tee pad and a real green pad).
+ * If the drawn widths can't fit the span with full pads, they are scaled down proportionally first,
+ * so a solution always exists (n ≤ 3 gaps in a 0.65 span).
+ */
+function separateIslandGaps(
+  raw: { c: number; h: number }[],
+  maxGapU: number,
+  minPadU: number,
+  span: [number, number],
+): [number, number][] {
+  const bands = raw
+    .map((b) => ({ c: b.c, h: Math.min(b.h, maxGapU / 2) }))
+    .sort((a, b) => a.c - b.c);
+  const pads = (bands.length - 1) * minPadU;
+  const width = bands.reduce((s, b) => s + 2 * b.h, 0);
+  const avail = span[1] - span[0];
+  const scale = width + pads > avail ? (avail - pads) / width : 1;
+  // Forward pass: keep each gap at its drawn centre where possible, pushed right of the previous
+  // gap's far edge + a full pad.
+  const out: [number, number][] = [];
+  let cursor = span[0];
+  for (const b of bands) {
+    const h = b.h * scale;
+    const start = Math.max(b.c - h, cursor);
+    out.push([start, start + 2 * h]);
+    cursor = start + 2 * h + minPadU;
+  }
+  // Backward pass: if the chain overran the span, pull it back left (pads stay intact — the scale
+  // step above guarantees it fits).
+  let over = out[out.length - 1]![1] - span[1];
+  for (let i = out.length - 1; i >= 0 && over > 0; i--) {
+    const [s, e] = out[i]!;
+    out[i] = [s - over, e - over];
+    const prevEnd = i > 0 ? out[i - 1]![1] + minPadU : span[0];
+    over = Math.max(0, prevEnd - out[i]![0]);
+  }
+  return out;
 }
 
 /**
@@ -603,7 +671,12 @@ function generateHole(
   // somewhere to land — you play TO the fairway or lose the ball, but the target is honest.
   const widthScale = lostRough ? VOID_ISLAND_SCALE : 2.0 - 1.25 * wildness;
   const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
-  const segs = par === 3 ? 13 : 19; // denser so the ribbon edge and rounded caps read smoothly
+  // Denser so the ribbon edge and rounded caps read smoothly. Lost-rough holes sample DENSER still
+  // (GS-cetus-gaps): at 19 points (u-step ≈ 0.056) a legal min-width island pad could hold <3 dense
+  // points and be dropped by `brokenCorridor`, fusing two void gaps into one uncarryable mega-void.
+  // 37 points (u-step ≈ 0.028) guarantee ≥3 points in any pad ≥ ISLAND_PAD_MIN_U. Gated on lostRough
+  // (no rng involved), so every normal world's corridor is byte-identical.
+  const segs = par === 3 ? 13 : lostRough ? ISLAND_SEGS : 19;
   const dense = densifyCentreline(centreline, segs);
   // Fairway WIDTH PROFILE (GS-terrain) — a believable ribbon instead of a symmetric leaf. Three
   // shaping pieces, each per-point along the hole, with a mean ≈ baseHalf so the death-spiral balance
@@ -666,17 +739,32 @@ function generateHole(
   // ISLAND-HOP breaks (GS-cetus-5): a lost-rough par 4/5 (void/cetus deep) is broken into a CHAIN of
   // clifftop pads by VOID gaps you must carry — the biome's island signature made real. Appended here
   // in its OWN gated draws (only when lost-rough is armed), so every normal world's gap rng + geometry
-  // stays byte-identical. The gaps are genuine void carries; their playability is deliberately left to
-  // the AI/death-spiral rebalance (the void isn't a hazard poly, so the fairness validators are silent
-  // on a lost corridor's shape). par-5 gets one more pad than par-4.
+  // stays byte-identical. The gaps are genuine void carries, COMPLETABLE BY CONSTRUCTION
+  // (GS-cetus-gaps): the raw draws are clamped to a wildness-ramped, common-driver-carryable ceiling
+  // and separated by real landable pads (`separateIslandGaps` — pure, zero extra rng), because the
+  // void isn't a hazard poly so the fairness validators are silent on a lost corridor's shape —
+  // `validateIslandHops` proves the chain instead. par-5 gets one more pad than par-4.
   if (lostRough && par >= 4) {
     const nIsl = (par === 5 ? 2 : 1) + (rng.float() < 0.5 ? 1 : 0); // par-4: 2–3 pads, par-5: 3–4 pads
+    const rawGaps: { c: number; h: number }[] = [];
     for (let g = 0; g < nIsl; g++) {
       const frac = nIsl === 1 ? 0.5 : 0.34 + (0.7 - 0.34) * (g / (nIsl - 1));
       const center = frac + rng.range(-0.035, 0.035);
       const halfw = rng.range(0.05, 0.08); // a bit wider than a fair-rough break — a real void carry
-      gapBands.push([center - halfw, center + halfw]);
+      rawGaps.push({ c: center, h: halfw });
     }
+    // Gap ceiling in carry-relative yards (shot carry scales with the biome's carryMult, so the bar
+    // is `yd × carryMult` in course units): gentler just past the arming threshold, up to ~60% of a
+    // nominal driver at wildness 1 — the A4+ brutality the deep stops are meant for. Budgets are
+    // u-fractions of the ACTUAL centreline arc (island chains bend 1.4× harder, so the arc runs well
+    // past the nominal `length`); the straight chord a shot actually flies is ≤ the arc, so an
+    // arc-capped gap is conservatively carryable.
+    const wRamp = Math.max(0, Math.min(1, (wildness - LOST_ROUGH_MIN_WILDNESS) / (1 - LOST_ROUGH_MIN_WILDNESS)));
+    const maxGapYd = ISLAND_GAP_MAX_YD_CALM + (ISLAND_GAP_MAX_YD_WILD - ISLAND_GAP_MAX_YD_CALM) * wRamp;
+    const arcLen = pathLength(centreline) || length;
+    const maxGapU = (maxGapYd * biome.carryMult) / arcLen;
+    const minPadU = Math.max(ISLAND_PAD_MIN_U, (ISLAND_PAD_MIN_YD * biome.carryMult) / arcLen);
+    gapBands.push(...separateIslandGaps(rawGaps, maxGapU, minPadU, ISLAND_GAP_SPAN));
   }
   const corridorSegs = brokenCorridor(dense, leftHW, rightHW, gapBands);
   if (corridorSegs.length === 0) corridorSegs.push(ribbon(dense, leftHW, rightHW)); // never carve it all away
@@ -1435,6 +1523,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     ...validateFairness(course),
     ...validateCrossings(course),
     ...validateGreenApproach(course),
+    ...validateIslandHops(course),
   ];
   if (errs.length) {
     throw new Error(`generateCourse produced an invalid course:\n  ${errs.join('\n  ')}`);
@@ -1532,6 +1621,65 @@ export function validateGreenApproach(course: Course): string[] {
     if (gf) for (const p of gf.poly) greenR = Math.max(greenR, dist(p, h.green));
     const shortPt: Vec = [h.green[0] - dx * (greenR + 12), h.green[1] - dy * (greenR + 12)];
     if (lieInfo(lieAt(h, shortPt)).penalty) errs.push(`hole[${i}]: greenside ring blocks the approach`);
+  });
+  return errs;
+}
+
+/**
+ * Island-hop completability (GS-cetus-gaps): on an ARMED lost-rough hole (void/cetus deep, par 4/5)
+ * the corridor is broken into pads separated by genuine void carries — the void is the implicit
+ * rough lie, not a hazard poly, so `validateFairness`/`validateCrossings` are silent on it. This
+ * validator proves the chain can actually be PLAYED with the baseline common bag: every EFFECTIVE
+ * carry along the centreline stays inside a driver-carryable bar. A non-penalty sliver too short to
+ * land on (a ribbon nose clipping a bent centreline inside a gap) is NO relief, so the bar holds
+ * ACROSS it — which is exactly how the two historical failure modes read: overlapping gap draws,
+ * and a sliver pad silently dropped by `brokenCorridor`'s ≥3-point rule (either fused two gaps into
+ * one uncarryable mega-void). Island par-3s are exempt — their single carry is design-sized
+ * (GS-cetus-2). Bars scale by the hole's carry mod (gravity), like every shot.
+ */
+export function validateIslandHops(course: Course): string[] {
+  const errs: string[] = [];
+  const SAMPLES = 400;
+  course.holes.forEach((h, i) => {
+    if (h.par < 4) return;
+    const mods = h.biomeMods ?? [];
+    if (!mods.some((m) => m.kind === 'roughLie')) return;
+    let carry = 1;
+    for (const m of mods) if (m.kind === 'carry' && typeof m.value === 'number') carry *= m.value;
+    const total = pathLength(h.centreline) || 1;
+    // Contiguous same-class runs along the centreline: penalty = a void carry, else = a pad.
+    const runs: { from: number; to: number; penalty: boolean }[] = [];
+    for (let s = 0; s <= SAMPLES; s++) {
+      const t = s / SAMPLES;
+      const pen = !!lieInfo(lieAt(h, centrePoint(h.centreline, t))).penalty;
+      const last = runs[runs.length - 1];
+      if (last && last.penalty === pen) last.to = t;
+      else runs.push({ from: t, to: t, penalty: pen });
+    }
+    // Effective carries: penalty runs, merged ACROSS any non-penalty sliver too short to land on.
+    const carries: { from: number; to: number }[] = [];
+    let cur: { from: number; to: number } | undefined;
+    runs.forEach((r, k) => {
+      const yd = (r.to - r.from) * total;
+      if (r.penalty) {
+        if (cur) cur.to = r.to;
+        else cur = { from: r.from, to: r.to };
+      } else if (cur && k < runs.length - 1 && yd < ISLAND_PAD_VALIDATE_YD * carry) {
+        cur.to = r.to; // a nose-clip sliver mid-void — no landable relief, the carry continues
+      } else {
+        if (cur) carries.push(cur);
+        cur = undefined;
+      }
+    });
+    if (cur) carries.push(cur);
+    for (const g of carries) {
+      const yd = (g.to - g.from) * total;
+      if (yd > ISLAND_GAP_VALIDATE_YD * carry) {
+        errs.push(
+          `hole[${i}]: island-hop void carry of ${Math.round(yd)}yd exceeds the completable bar (${Math.round(ISLAND_GAP_VALIDATE_YD * carry)}yd)`,
+        );
+      }
+    }
   });
   return errs;
 }
