@@ -110,8 +110,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves carry)
   and sampled from an asymmetric 5-zone `SprayShape`. Forced-carry crossings (lava river / frozen
   pond / creek) are generic penalty bands; the carry-aware AI flies any of them off `penalty`, never
-  the kind. OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
-  shrink it casually). **Variety is DECOUPLED from difficulty (GS-variety-2):** shape archetypes
+  the kind. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
+  hazard spawned on a different substance (trees exempt both ways; crossings always win) — a pure
+  ZERO-rng post-filter, so the streams are untouched; SAME-family overlaps are legal and the render
+  union-merges them into one body. OB = stroke-and-distance off the play-bounds box (which doubles as
+  the OB trigger — don't shrink it casually). **Variety is DECOUPLED from difficulty (GS-variety-2):** shape archetypes
   (cape/hairpin/double) and dogleg-corner blocking GROVES appear even on CALM stops (no wildness gate)
   — difficulty rides bend severity (`dogFac = 0.5 + 0.5·wildness`) + hazard density, not which shapes
   exist. Corridors can be BROKEN into 2–3 mown segments by rough gaps (`brokenCorridor`, biome
@@ -226,7 +229,9 @@ For each system: the rule that constrains new work. Open the archive doc before 
   **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
   rng draw counts never read the projection (place in course space, consume unconditionally, cull
   at paint — never retry on `inView` or size a count off projected px) and `posHash` keys are
-  course-space, never screen px — `tests/camera-stability.test.ts` guards both. **Rough is ROUGH;
+  course-space, never screen px — `tests/camera-stability.test.ts` guards both; `archetypeDecor`
+  goes further and pushes its few prims UNCONDITIONALLY (an edge-straddling paint cull still flips
+  the prim COUNT between frames). **Rough is ROUGH;
   space starts at the OB frame (GS-rough-frame):** the land hull fills `playBounds`+apron with the
   world's rough palette (`LAND_SPACE_BLEND` stays small; never star-salt the turf; every archetype's
   `rough.base` must sit ≥30/255 brightness above its `ARCHETYPE_SPACE.base` — machine-checked), and
@@ -236,7 +241,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   archetype has a row EXCEPT void/cetus (bespoke ground rules; machine-checked); an
   ARMED lost-rough hole (`roughLie` biomeMod, void/cetus deep stops) instead floats a platform per
   play feature in the open deep (the void's deep = negative-energy rifts) — the render mirrors the
-  sim's lost-ball gate. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /
+  sim's lost-ball gate. **Platforms + hazard families merge through `render/merge.ts`
+  (GS-hazard-blend):** platforms are `dilateUnion(fairways+green+tee, 14)` (never a mitred
+  `offsetPoly` outset — it folds at concave bends and the flipped winding paints a star gap), and
+  sand / each liquid family draws its `unionPolys` merged bodies (course-space + WeakMap-cached, so
+  merged-body rng counts stay camera-proof); touching bunkers read as ONE complex, a creek pools
+  into its lake. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /
   void violet asteroid, `CliffLook` palette); a CALM cetus/void stop (playable rough everywhere, can't
   be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
   fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only). The ANIMATED weather layer honours the same land: its pinned twinkle
