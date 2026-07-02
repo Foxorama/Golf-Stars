@@ -148,57 +148,6 @@
         display: flex; align-items: center; gap: 10px;
       }
       .gs-seclabel::after { content: ''; flex: 1; height: 1px; background: var(--gs-line-2); }
-      .gs-modetiles { display: grid; gap: 12px; margin: 4px 0 6px; }
-      .gs-modetile {
-        position: relative; display: block; width: 100%; min-height: 208px; padding: 0;
-        border-radius: var(--gs-r-lg);
-        border: 1px solid color-mix(in srgb, var(--mc) 50%, var(--gs-line));
-        background: var(--gs-bg-2); color: var(--gs-ink); cursor: pointer; overflow: hidden;
-        text-align: left; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-        font: inherit;
-        box-shadow: var(--gs-shadow), 0 0 20px -8px color-mix(in srgb, var(--mc) 40%, transparent);
-        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease, filter .16s ease;
-      }
-      @media (hover: hover) {
-        .gs-modetile:hover {
-          transform: translateY(-3px); border-color: var(--mc); filter: brightness(1.05);
-          box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--mc) 50%, transparent);
-        }
-      }
-      .gs-modetile:active { transform: translateY(-1px); }
-      .gs-modetile:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
-      .gs-modetile__art { position: absolute; inset: 0; display: block; }
-      .gs-modetile__art svg { display: block; width: 100%; height: 100%; }
-      .gs-modetile__badge {
-        position: absolute; top: 10px; left: 12px;
-        font-size: 10px; font-weight: 800; letter-spacing: .14em;
-        color: var(--mc); background: #0b0d12cc;
-        border: 1px solid color-mix(in srgb, var(--mc) 55%, transparent);
-        border-radius: 999px; padding: 4px 10px;
-      }
-      .gs-modetile__cap {
-        position: absolute; left: 0; right: 0; bottom: 0;
-        display: flex; flex-direction: column; gap: 4px; padding: 40px 14px 12px;
-        background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .94) 58%);
-      }
-      .gs-modetile__title {
-        font: 800 21px/1.15 system-ui, sans-serif; color: var(--mc);
-        text-shadow: 0 0 16px color-mix(in srgb, var(--mc) 45%, transparent);
-      }
-      .gs-modetile__sub { font-size: 12px; line-height: 1.4; opacity: .88; }
-      .gs-modetile__meta { font-size: 11px; opacity: .68; }
-      .gs-modetile__go {
-        margin-top: 8px; text-align: center; padding: 11px 14px; border-radius: 11px;
-        font: 800 14px/1 system-ui, sans-serif; letter-spacing: .03em; color: #0b0d12;
-        border: 1px solid color-mix(in srgb, var(--mc) 80%, #fff);
-        background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 92%, #fff), color-mix(in srgb, var(--mc) 72%, #000));
-        box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--mc) 60%, transparent);
-        transition: filter .16s ease, box-shadow .16s ease;
-      }
-      @media (hover: hover) {
-        .gs-modetile:hover .gs-modetile__go { filter: brightness(1.1); box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--mc) 75%, transparent); }
-      }
-
       /* ── Character-select difficulty picker (GS-title-2): Ascension chips, chosen with the golfer ── */
       .gs-ascpick { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 12px 0 0; }
       .gs-ascpick-l { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--gs-gold); margin-right: 3px; }
@@ -289,6 +238,11 @@
       }
       .gs-navtile__title { font: 700 18px/1.1 system-ui, sans-serif; }
       .gs-navtile__sub { font-size: 12px; opacity: .82; }
+      /* GAME tiles (GS-title-2): the Voyage / Unending Universe doorways — the same component,
+         distinguished only by the `--mc` accent (gold / violet) on border + title. */
+      .gs-navtile--game { min-height: 150px; border-color: color-mix(in srgb, var(--mc) 45%, var(--gs-line)); }
+      .gs-navtile--game:hover { border-color: var(--mc); }
+      .gs-navtile--game .gs-navtile__title { color: var(--mc); text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 40%, transparent); }
 
       /* ── Clubhouse: tap-to-restyle character stage + garage bay + slot picker ─ */
       .gs-cstage {

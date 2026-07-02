@@ -318,9 +318,10 @@ For each system: the rule that constrains new work. Open the archive doc before 
   swap blurb+pros/cons for a one-line hint via CSS visibility, not a template fork; the CTA verb
   follows the format). **Ascension is picked WITH the golfer** (GS-title-2): the difficulty chips
   live on character select (`[data-asc]` view state → `selectCharacter.ascension`, reducer-clamped),
-  never on the title. The title (GS-title-2) is a centred hero wordmark + two `.gs-modetile` GAME
-  tiles (whole tile = the button; painted-scene art + caption in the SAME house style as the
-  Market/Clubhouse doorway tiles, distinct via accent border/badge/launch bar), data-driven off
+  never on the title. The title (GS-title-2/-3) is a centred hero wordmark + two GAME tiles that
+  REUSE the Market/Clubhouse doorway component (`.gs-navtile--game`: whole tile = the button,
+  painted-scene art + title + ONE-line caption, distinct only via the `--mc` accent — never regrow
+  badges/launch bars/progress text on them), data-driven off
   `FORMATS`; the Daily button is parked off the title for now. **`app.ts` is a 3,400-line god-file — the likeliest source of
   regressions; prefer extracting a module over growing it, and re-read the relevant span before
   editing.**
