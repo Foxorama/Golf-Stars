@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 10;
+export const GENERATOR_VERSION = 11;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -565,6 +565,21 @@ function generateHole(
     const center = nGaps === 1 ? rng.range(0.4, 0.6) : g === 0 ? rng.range(0.3, 0.42) : rng.range(0.58, 0.7);
     const halfw = rng.range(0.035, 0.06);
     gapBands.push([center - halfw, center + halfw]);
+  }
+  // ISLAND-HOP breaks (GS-cetus-5): a lost-rough par 4/5 (void/cetus deep) is broken into a CHAIN of
+  // clifftop pads by VOID gaps you must carry — the biome's island signature made real. Appended here
+  // in its OWN gated draws (only when lost-rough is armed), so every normal world's gap rng + geometry
+  // stays byte-identical. The gaps are genuine void carries; their playability is deliberately left to
+  // the AI/death-spiral rebalance (the void isn't a hazard poly, so the fairness validators are silent
+  // on a lost corridor's shape). par-5 gets one more pad than par-4.
+  if (lostRough && par >= 4) {
+    const nIsl = (par === 5 ? 2 : 1) + (rng.float() < 0.5 ? 1 : 0); // par-4: 2–3 pads, par-5: 3–4 pads
+    for (let g = 0; g < nIsl; g++) {
+      const frac = nIsl === 1 ? 0.5 : 0.34 + (0.7 - 0.34) * (g / (nIsl - 1));
+      const center = frac + rng.range(-0.035, 0.035);
+      const halfw = rng.range(0.05, 0.08); // a bit wider than a fair-rough break — a real void carry
+      gapBands.push([center - halfw, center + halfw]);
+    }
   }
   const corridorSegs = brokenCorridor(dense, leftHW, rightHW, gapBands);
   if (corridorSegs.length === 0) corridorSegs.push(ribbon(dense, leftHW, rightHW)); // never carve it all away
@@ -1099,7 +1114,12 @@ interface HoleTemplate {
  */
 function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, island: boolean): HoleTemplate {
   const side: 1 | -1 = rng.bool() ? 1 : -1;
-  if (island) return { id: 'island', shape: 'straight', side, lenMult: rng.range(0.86, 1.12), severity: 1 };
+  // Par-3 island (void/cetus deep): a single generous target island — a straight carry, no corridor
+  // to shape. Par 4/5 islands FALL THROUGH to the full shape grammar below (GS-cetus-5): a lost-rough
+  // par 4/5 is now a bending CHAIN of clifftop pads, the island-hop signature. (The old rule forced
+  // ALL lost holes straight to protect the auto-AI from aiming into the void; that balance is now
+  // deliberately deferred to the AI/death-spiral rework — human interest first.)
+  if (island && par === 3) return { id: 'island', shape: 'straight', side, lenMult: rng.range(0.86, 1.12), severity: 1 };
 
   const lenRoll = rng.float();
   const shapeRoll = rng.float();
@@ -1212,11 +1232,15 @@ function buildCentreline(
   // even on a calm stop; wildness still steepens it toward the self-cross cap. The cap is loosened a
   // touch (0.4 → 0.46·length) so a bend can be genuinely dramatic without the corridor self-crossing.
   const dogFac = 0.5 + 0.5 * wildness;
-  const baseMag = biome.doglegBias * dogFac * length;
+  // Lost-rough par 4/5 chains bend HARDER (GS-cetus-5) — the island-hop route swings between pads for
+  // real drama. `island` is false for every normal hole, so their bend magnitude is byte-identical.
+  const baseMag = biome.doglegBias * dogFac * length * (island ? 1.4 : 1);
   const cap = 0.44 * length;
   const endDrift = (): Vec => [rng.range(-0.06, 0.06) * length, length];
 
-  if (island) return [tee, endDrift()];
+  // Par-3 island: a straight carry to the target island (no corridor). Par 4/5 islands flow into the
+  // shape switch below so the chain of pads doglegs/capes/S-bends like any other shaped hole.
+  if (island && par === 3) return [tee, endDrift()];
   const side = tpl.side;
   const bendAt = (f: number, s: number, scale: number): Vec => [
     s * Math.min(cap, baseMag * scale * rng.range(0.5, 1.0)),

@@ -122,6 +122,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   The per-world fairway MOWING PATTERN (`fairwayStripes`) differs by archetype (horizontal / vertical
   grain / faceted-diagonal / checker) so turf reads distinct beyond colour. Difficulty bars were
   deliberately relaxed (fun over the bar; tune per-hole later) — the strict blow-up guard stays.
+  **Void & Cetus deep par 4/5 are ISLAND-HOP chains (GS-cetus-5):** a lost-rough par 4/5 bends
+  (dogleg/cape/S) AND breaks into 2–4 clifftop/asteroid PADS split by VOID carries (the `if (lostRough
+  && par>=4)` gap block + shape fall-through). Structural validators are silent on a lost corridor's
+  shape (the void is the implicit `roughLie` lie, not a hazard poly), so this can't crash generation —
+  but it IS deliberately death-spiral-brutal: these two are in `BALANCE_EXEMPT_BIOMES` and skipped by
+  the death-spiral harnesses (human interest first; AI/scoring rebalance is GS-cetus-6). All new draws
+  gate on lost-rough so every other world + calm cetus/void stop is byte-identical.
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
   (3 arcs, boss each, `endedReason 'won'`). **Pro Shop rarity is VOYAGE-paced**: a winnable format draws

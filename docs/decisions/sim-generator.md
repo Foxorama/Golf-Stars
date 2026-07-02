@@ -458,7 +458,42 @@
       second panel's stripes away and bleeding its glow colours. `scenePrimsToSvg(prims, idPrefix)` +
       `holeIdPrefix(hole)` (a hole-hash prefix) keeps renders byte-stable per hole while co-mounted
       holes get disjoint ids. If you ever eyeball a multi-hole sheet and the turf looks flat, check the
-      ids FIRST — this one masqueraded as a palette problem. A forced carry needs an AI that flies it.
+      ids FIRST — this one masqueraded as a palette problem.
+    - **GS-cetus-5 turned Void & Cetus into ISLAND-HOP clifftop worlds — human interest first, balance
+      later.** The deep (lost-rough) par 4/5 were the only dull holes left: forced dead-STRAIGHT (the old
+      rule kept a lost corridor straight so the auto-AI's straight aim couldn't wander off the island into
+      the void). Player call: for these two biomes, **ignore the death-spiral balance for now** and make
+      them the most visually interesting worlds; rebalance the AI afterward. So a lost-rough par 4/5 is now
+      a bending CHAIN of clifftop/asteroid PADS separated by VOID carries:
+      (1) `chooseTemplate` lets a lost par 4/5 fall through to the full shape grammar (dogleg/cape/S/
+      hairpin); only the par-3 island stays a straight single-target carry. `buildCentreline` honours the
+      shape for lost par 4/5 and bends them 1.4× HARDER (`island` multiplier) — still capped at 0.44·len so
+      no self-cross. (2) The corridor is BROKEN into pads: an `if (lostRough && par>=4)` block appends
+      island-hop gap bands (par-4: 2–3 pads, par-5: 3–4), evenly spread with jitter, a touch wider than a
+      fair-rough break — genuine void carries. Reuses `brokenCorridor` (already multi-segment) → each pad
+      becomes its own fairway feature → `lostPlatformsCourse` already maps each to a platform → the render
+      extrudes each into a 3D block, so the par 4/5 finally gets the par-3's side-on diorama for FREE.
+      All new draws are gated to lost-rough, so every other world (and calm cetus/void stops) is
+      byte-identical; `GENERATOR_VERSION` bumped 10→11. **Why the structural validators stay green:** on a
+      lost hole the void off the fairway is the implicit `roughLie` LIE, not a hazard polygon — so
+      `validateFairness` (hazard polys only) and `validateCrossings` (lava/creek/etc. only) impose ZERO
+      constraint on a lost corridor's shape. Bending + breaking it can't crash generation. **The waived
+      part is balance:** the void gaps DO cross the centreline, so the carry-aware AI treats them as forced
+      carries (it lays up / carries), which is why `tests/biomes` death-spiral still passes even at
+      wildness 1 — but a low-skill golfer tips over the relaxed bar. So `BALANCE_EXEMPT_BIOMES`
+      (`biomes.ts` = {void-garden, cetus-deep}) skips these two in the death-spiral harnesses
+      (`tests/characters`, `tests/biomes`, `tests/scorch`) and `tests/zones` drops the void toPar bar
+      (keeping "the void genuinely bites" + "every hole terminates"). Structural fairness is NOT relaxed.
+      TODO(GS-cetus-6): teach the AI to hop the chain (aim pad-to-pad, not straight at the pin), then
+      restore the bars + remove the exemption. RENDER: `platformCliffs` (renamed from `cetusCliffs`) takes
+      a `CliffLook` palette — cetus = blue clifftop (`CETUS_CLIFF`), void = violet ASTEROID underside
+      (`VOID_CLIFF`, applied to void's lost pads only, gated so a calm void rectangle isn't given an odd
+      underside). Fairway mowing stripes were softened (`mowTones` blends the light/dark bands halfway to
+      the base — the "Beetlejuice snake" fix; indigo worlds keep a touch more via `MOW_BLEND`). NOTE: CALM
+      cetus/void par 4/5 still read flatter (their whole play-bounds is playable rough, so they can't be
+      islands) — a two-tier raised-fairway shelf is the follow-up if wanted. Re-shoot the gallery after any
+      `platformCliffs`/`mowTones`/island-hop change.
+- **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
   far bank within reach — flying over a hazard is fair, only RESTING in it costs) or, if it can't

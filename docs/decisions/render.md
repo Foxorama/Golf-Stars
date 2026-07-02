@@ -21,7 +21,14 @@
   (canvas) — draw them, so the map and the play view agree. The manga/comic language: flat tone BANDS +
   a bold ink outline per surface (`SHADES` ramps in `palette.ts`, `base` = the original `FILL` value so
   the SVG still carries `#3f8c3f`/`#5fd45a` and the render tests stay green); mowing **stripes** (clipped
-  horizontal bands — perpendicular-to-play after the projector rotates tee→green up) on fairway/green;
+  horizontal bands — perpendicular-to-play after the projector rotates tee→green up) on fairway/green.
+  Fairway-stripe tones are SOFTENED toward the base (`mowTones`, GS-cetus-5) — the full light/dark shades
+  read as a harsh striped snake on a thin wiggly corridor; `MOW_BLEND` keeps the value-crushed indigo
+  worlds (void/cetus) a touch stronger so their mow doesn't vanish.
+  Side-on plateau extrusion is `platformCliffs` (renamed from `cetusCliffs`, GS-cetus-5) taking a
+  `CliffLook` palette: cetus = blue CLIFFTOP into the star-ocean, void = violet ASTEROID underside for
+  its lost island-hop pads (gated to the armed hole so a calm void rectangle isn't given an odd
+  underside). Both keep the returned `faces` for the cetus waterfall.
   a darker **collar** ring + lit dome on greens; lip-shadow + depression + rake lines on bunkers; concentric
   **depth banding** + shoreline + glints on water; 3-tone **cell-shaded tree canopies** (core/body/lit cap +
   cast shadow + per-tree colour/size variance); a **textured rough** (soft tone undulation + grass tufts);

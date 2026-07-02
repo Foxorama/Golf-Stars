@@ -481,28 +481,41 @@ function checkerStripes(poly: Vec[], colA: string, colB: string, cell: number): 
   return { t: 'clip', clip: poly, children };
 }
 
+/** Softened mowing tones (GS-cetus-5). The mowing bands used to fill with the FULL `s.light`/`s.dark`
+ *  turf shades — maximum contrast, which on a thin wiggly corridor reads as a harsh striped snake
+ *  ("Beetlejuice snakes"), not groomed grass. Blend each tone halfway back to the base so the stripes
+ *  whisper the mow instead of shouting it. The value-crushed indigo worlds (void/cetus) keep a touch
+ *  more contrast (they'd otherwise vanish into the base), tuned by `MOW_BLEND`. */
+const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.66, cetus: 0.62 };
+function mowTones(s: Shade, arch: BiomeArchetype): { hi: string; lo: string } {
+  const k = MOW_BLEND[arch] ?? 0.5; // fraction of the way from base toward light/dark (1 = full old contrast)
+  return { hi: mixHex(s.base, s.light, k), lo: mixHex(s.base, s.dark, k) };
+}
+
 /** The per-world fairway mowing PATTERN (GS-variety-2): each archetype grooms its turf differently so
  *  fairways read distinct beyond their colour — horizontal stripes (classic parkland), a vertical
  *  swept grain (frost), a faceted/wind diagonal (crystal/tempest/desert), or a lush cross-mown
- *  checker (jungle). The band grid still rides the MAIN corridor's bbox so apron + segments line up. */
+ *  checker (jungle). The band grid still rides the MAIN corridor's bbox so apron + segments line up.
+ *  Tones are softened toward the base (`mowTones`) so the mow reads groomed, not striped. */
 function fairwayStripes(sps: Vec[][], s: Shade, b0: { minX: number; minY: number; maxX: number; maxY: number }, arch: BiomeArchetype): Prim[] {
   const spanY = b0.maxY - b0.minY;
   const bandH = spanY / 7;
+  const { hi, lo } = mowTones(s, arch);
   switch (arch) {
     case 'frost':
-      return sps.map((sp) => stripesAtV(sp, s.light, s.dark, b0.minX, (b0.maxX - b0.minX) / 6));
+      return sps.map((sp) => stripesAtV(sp, hi, lo, b0.minX, (b0.maxX - b0.minX) / 6));
     case 'crystal':
-      return sps.map((sp) => slantStripes(sp, s.light, s.dark, bandH * 0.95, 0.6));
+      return sps.map((sp) => slantStripes(sp, hi, lo, bandH * 0.95, 0.6));
     case 'tempest':
-      return sps.map((sp) => slantStripes(sp, s.light, s.dark, bandH, -0.5));
+      return sps.map((sp) => slantStripes(sp, hi, lo, bandH, -0.5));
     case 'desert':
-      return sps.map((sp) => slantStripes(sp, s.light, s.dark, spanY / 5, 0.28));
+      return sps.map((sp) => slantStripes(sp, hi, lo, spanY / 5, 0.28));
     case 'fungal':
-      return sps.map((sp) => checkerStripes(sp, s.light, s.dark, bandH * 0.9));
+      return sps.map((sp) => checkerStripes(sp, hi, lo, bandH * 0.9));
     case 'inferno':
-      return sps.map((sp) => stripesAt(sp, s.light, s.dark, b0.minY, spanY / 5));
+      return sps.map((sp) => stripesAt(sp, hi, lo, b0.minY, spanY / 5));
     default: // verdant / ocean / void / cetus — the classic horizontal mowing stripes
-      return sps.map((sp) => stripesAt(sp, s.light, s.dark, b0.minY, bandH));
+      return sps.map((sp) => stripesAt(sp, hi, lo, b0.minY, bandH));
   }
 }
 
@@ -1500,27 +1513,69 @@ function frontEdge(hull: Vec[]): Vec[] {
 }
 
 /**
- * GS-cetus-3: extrude each clifftop plateau DOWNWARD into a visible CLIFF FACE so Cetus reads as a
- * clifftop seen side-on — the depth the world always wanted (and the thing that lets the star-river
- * spill over a real edge instead of "starting out of nowhere"). Pure screen-space render off the
- * dedicated cetus cliff stream. Returns the drawn prims (face strata + star-dust + rugged base + lit
- * lip) PLUS the front-edge geometry, which `cetusRiver` reuses so its waterfall pours down this exact
- * face. Height keys off the plateau width so it scales consistently across the map/follow-cam zooms.
+ * Palette for the side-on plateau extrusion (GS-cetus-3 / GS-cetus-5). Cetus = a lit blue CLIFFTOP
+ * plunging to the star-ocean; void = a chunky violet ASTEROID underside floating in the abyss — same
+ * geometry, different rock, so both lost-rough worlds read side-on and 3D (not flat decals).
  */
-function cetusCliffs(
+interface CliffLook {
+  strata: string[]; // face bands, top (lit) → bottom (abyss)
+  deepMix: string; // rarity-deepen tint for the lower strata
+  lipA: string;
+  lipB: string; // the two lit-lip strokes along the top rim
+  crackDark: string;
+  crackLit: string;
+  dustA: string;
+  dustB: string;
+  shadow: string; // cast shadow at the foot
+  contact: string; // contact shadow tucked under the lip
+}
+const CETUS_CLIFF: CliffLook = {
+  strata: ['#5a9db8', '#3f7f9c', '#296079', '#1a4459', '#0f2d40', '#071a28'],
+  deepMix: '#03080f',
+  lipA: 'rgba(150,232,255,0.9)',
+  lipB: 'rgba(232,252,255,0.7)',
+  crackDark: 'rgba(3,9,16,0.5)',
+  crackLit: 'rgba(120,190,225,0.22)',
+  dustA: 'rgba(190,236,255,0.5)',
+  dustB: 'rgba(140,205,255,0.4)',
+  shadow: 'rgba(2,7,13,0.5)',
+  contact: 'rgba(3,10,18,0.34)',
+};
+const VOID_CLIFF: CliffLook = {
+  strata: ['#4a3f80', '#392f66', '#2b234e', '#1e183a', '#130d28', '#090619'],
+  deepMix: '#050210',
+  lipA: 'rgba(176,126,255,0.85)',
+  lipB: 'rgba(224,205,255,0.72)',
+  crackDark: 'rgba(6,3,16,0.55)',
+  crackLit: 'rgba(150,110,220,0.24)',
+  dustA: 'rgba(206,180,255,0.5)',
+  dustB: 'rgba(150,120,220,0.4)',
+  shadow: 'rgba(3,1,10,0.5)',
+  contact: 'rgba(6,3,16,0.36)',
+};
+
+/**
+ * Extrude each plateau DOWNWARD into a visible side-on FACE (GS-cetus-3, generalised GS-cetus-5) so a
+ * lost-rough world reads as floating clifftops/asteroids, not a flat top-down map — and the thing that
+ * lets the cetus star-river spill over a real edge. Pure screen-space render off a dedicated cliff
+ * stream. Returns the drawn prims (face strata + rock-dust + rugged base + lit lip) PLUS the front-edge
+ * geometry, which `cetusRiver` reuses so its waterfall pours down this exact face. Height keys off the
+ * plateau width so it scales consistently across the map/follow-cam zooms. `look` recolours the rock
+ * (cetus clifftop vs void asteroid).
+ */
+function platformCliffs(
   platforms: Vec[][],
   deepen: number,
   rng: () => number,
+  look: CliffLook = CETUS_CLIFF,
 ): { prims: Prim[]; faces: { top: Vec[]; height: number }[] } {
   const prims: Prim[] = [];
   const faces: { top: Vec[]; height: number }[] = [];
-  // A LIT rock wall (top catches the starlight) plunging to the abyss — high contrast so the cliff
+  // A LIT rock wall (top catches the starlight) plunging to the abyss — high contrast so the face
   // reads as solid rock against the dark void, which is what sells the side-on depth. Rarity deepens
-  // only the LOWER strata (`dk` ramps in with depth) so the lit clifftop always pops regardless of tier.
+  // only the LOWER strata (`dk` ramps in with depth) so the lit top always pops regardless of tier.
   const dk = Math.min(0.24, Math.max(0, deepen - 1) * 0.24);
-  const strata = ['#5a9db8', '#3f7f9c', '#296079', '#1a4459', '#0f2d40', '#071a28'].map((c, i) =>
-    mixHex(c, '#03080f', dk * (i / 5)),
-  );
+  const strata = look.strata.map((c, i) => mixHex(c, look.deepMix, dk * (i / 5)));
   for (const plat of platforms) {
     const hull = convexHull(plat);
     if (hull.length < 3) continue;
@@ -1536,7 +1591,7 @@ function cetusCliffs(
     const base = dropped(1).map((p) => [p[0], p[1] + (rng() - 0.5) * cliffH * 0.16] as Vec);
     const face: Vec[] = [...top, ...base.slice().reverse()];
     // A soft cast shadow into the ocean at the cliff foot, so the wall reads as standing IN the sea.
-    prims.push({ t: 'poly', pts: [...dropped(0.86), ...dropped(1.32).slice().reverse()], fill: 'rgba(2,7,13,0.5)' });
+    prims.push({ t: 'poly', pts: [...dropped(0.86), ...dropped(1.32).slice().reverse()], fill: look.shadow });
     prims.push({ t: 'poly', pts: face, fill: strata[strata.length - 1]! }); // solid backing (no clip gaps)
     // Face detail, clipped to the face polygon. ONE clip only — the SVG serializer silently drops a
     // group's contents if a clipPath nests inside another (the GS-cetus-2 bug), so no nested clips.
@@ -1549,7 +1604,7 @@ function cetusCliffs(
     }
     // A contact-shadow band tucked right under the lip (ambient occlusion → the plateau reads as a
     // slab casting onto its own face), and star-dust in the rock (Cetus stone is made of the deep).
-    children.push({ t: 'poly', pts: [...dropped(0), ...dropped(0.16).slice().reverse()], fill: 'rgba(3,10,18,0.34)' });
+    children.push({ t: 'poly', pts: [...dropped(0), ...dropped(0.16).slice().reverse()], fill: look.contact });
     const fb = bboxOf(face);
     // Dust count scales with the PROJECTED face size, so always run the capped loop and only PUSH
     // the first `dust` motes — the rng consumption stays fixed per platform, and a zoom step can't
@@ -1559,7 +1614,7 @@ function cetusCliffs(
       const x = fb.minX + rng() * (fb.maxX - fb.minX);
       const y = fb.minY + rng() * (fb.maxY - fb.minY);
       const r = 0.35 + rng() * 0.9;
-      const fill = rng() < 0.5 ? 'rgba(190,236,255,0.5)' : 'rgba(140,205,255,0.4)';
+      const fill = rng() < 0.5 ? look.dustA : look.dustB;
       if (i < dust) children.push({ t: 'circle', c: [x, y], r, fill });
     }
     // Vertical fault cracks + lit ridges give the wall its strata read.
@@ -1568,15 +1623,15 @@ function cetusCliffs(
       const sp = sampleAlong(top, rng());
       const len = cliffH * (0.45 + rng() * 0.5);
       const jx = (rng() - 0.5) * 10;
-      children.push({ t: 'line', a: sp, b: [sp[0] + jx, sp[1] + len], stroke: 'rgba(3,9,16,0.5)', sw: 1.2, round: true });
-      children.push({ t: 'line', a: [sp[0] + 1.4, sp[1]], b: [sp[0] + jx + 1.4, sp[1] + len], stroke: 'rgba(120,190,225,0.22)', sw: 0.8, round: true }); // lit edge beside each crack
+      children.push({ t: 'line', a: sp, b: [sp[0] + jx, sp[1] + len], stroke: look.crackDark, sw: 1.2, round: true });
+      children.push({ t: 'line', a: [sp[0] + 1.4, sp[1]], b: [sp[0] + jx + 1.4, sp[1] + len], stroke: look.crackLit, sw: 0.8, round: true }); // lit edge beside each crack
     }
     prims.push({ t: 'clip', clip: face, children });
     // The lit LIP: a luminous edge along the plateau's front rim so it catches the starlight and the
     // slab reads with thickness (drawn LAST, on top of the land fill at the call site).
     for (let i = 1; i < top.length; i++) {
-      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: 'rgba(150,232,255,0.9)', sw: 2.6, round: true });
-      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: 'rgba(232,252,255,0.7)', sw: 1, round: true });
+      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: look.lipA, sw: 2.6, round: true });
+      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: look.lipB, sw: 1, round: true });
     }
   }
   return { prims, faces };
@@ -1708,7 +1763,7 @@ function cetusOcean(landPolys: Vec[][], cb: Box, proj: Projector, W: number, H: 
  * crossing (`cetusRiverPath`, projector-independent, ordered SOURCE → SPILL) is projected to a
  * glowing channel of deep star-water packed with the intro's starscape, welling from a spring and
  * pouring off the plateau edge into the ocean. Own rng stream + gated to cetus → determinism-safe.
- * `faces` is the cliff geometry from `cetusCliffs` (the fall drops the height of the face it spills
+ * `faces` is the cliff geometry from `platformCliffs` (the fall drops the height of the face it spills
  * over); `landCourse` is the course-space land so the fall is PAINTED only when its drop actually
  * lands off the plateau — under the rotating follow-cam a screen-space fall can point across turf
  * (the "bonus waterfall over the green on a side chip" bug), and then it is simply not drawn. All
@@ -2487,9 +2542,16 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // Drawn AFTER the land fill so the plateau caps each cliff (the lit lip sits crisp on the fill edge)
   // and the face draws over the ocean/whales below. Fills `cetusFaces` for the river's waterfall.
   if (arch === 'cetus' && !rainbow) {
-    const cliffs = cetusCliffs(landPlatforms, deepen, cliffRng);
+    const cliffs = platformCliffs(landPlatforms, deepen, cliffRng, CETUS_CLIFF);
     prims.push(...cliffs.prims);
     cetusFaces = cliffs.faces;
+  }
+  // Void island-hop pads (GS-cetus-5): extrude each floating pad into a chunky violet ASTEROID
+  // underside so the void par 4/5 chain reads as 3D floating rock, not flat indigo decals — the same
+  // side-on depth cetus gets. Gated to the LOST (armed) hole so a calm void stop's full-bounds rough
+  // rectangle isn't given an odd rectangular underside; own cliff stream, so other streams are stable.
+  if (arch === 'void' && lostHole && !rainbow) {
+    prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, VOID_CLIFF).prims);
   }
 
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
