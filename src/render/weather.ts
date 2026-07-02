@@ -139,6 +139,22 @@ export interface WeatherOpts {
    * MOVE, which sells them as sky above the world, and the ambient biome air is the ground's own.
    */
   starMask?: () => Vec[][] | null;
+  /**
+   * Meteor STRIKES (GS-meteor-strikes): the meteor-shower sky no longer just streaks and fades —
+   * on a clock-driven cadence one meteor DIVES INTO one of the hole's scorch craters and lands with
+   * an impact flash + ember splash, closing the fiction gap between the sky show and the char marks
+   * the sim plays. The callback supplies the craters' SCREEN positions (+ px radii) per frame — the
+   * play view projects the SAME `meteorScorch(hole)` marks the sim's lie conversion reads through
+   * its LIVE projector, so a strike tracks the follow-cam and always lands exactly on a drawn
+   * crater. Purely cosmetic and purely clock-driven (zero rng streams touched; the craters
+   * pre-exist — a strike RE-BURNS an existing mark, never spawns a new one). Absent/`null`/empty →
+   * no strikes (e.g. the aim-overlay, whose local projector is wind-orientation only and would lie
+   * about crater positions — same reason it can't feed `starMask`). Only the meteorShower effect
+   * reads it.
+   */
+  strikeTargets?: () => { c: Vec; r: number }[] | null;
+  /** Fired once per landing strike — the play view's cue for a touch of screen-shake. Cosmetic. */
+  onStrike?: () => void;
 }
 
 export interface WeatherHandle {
@@ -1134,6 +1150,95 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
+  // --- Meteor STRIKES (GS-meteor-strikes) -----------------------------------------------------
+  // One strike per STRIKE_PERIOD: pick a crater (seeded off the cycle index — deterministic in the
+  // clock, no shared stream), dive a fireball into it along the sky lanes' fall direction, then an
+  // impact flash + ember splash over the crater's true footprint. All timing is phase-of-clock so a
+  // paused/reduced-motion frame just shows one instant of it.
+  const STRIKE_PERIOD = 2600; // ms per cycle: dive ~0.9s, burn ~0.8s, quiet the rest
+  let lastStrikeK = -1; // which cycle already fired the onStrike cue
+
+  function drawStrikes(ctx: CanvasRenderingContext2D, now: number): void {
+    const targets = o.strikeTargets?.() ?? null;
+    if (!targets || targets.length === 0) return;
+    const k = Math.floor(now / STRIKE_PERIOD);
+    const t = (now % STRIKE_PERIOD) / STRIKE_PERIOD;
+    // Per-cycle picks off a private mulberry seeded by the cycle index — identical for every frame
+    // of the cycle, different across cycles, and never touching the layout streams above.
+    const pick = mulberry32((o.seed ^ Math.imul(k + 1, 0x9e3779b9)) >>> 0);
+    const target = targets[Math.floor(pick() * targets.length)]!;
+    const jitter = pick() * 0.3 - 0.15; // slight per-strike approach-angle variation
+    const [cx, cy] = target.c;
+    // A strike aimed well off-screen is a paint cull only — the cadence/clock is unaffected.
+    if (cx < -60 || cx > W + 60 || cy < -60 || cy > H + 60) return;
+    const IN = 0.14; // dive starts
+    const IMPACT = 0.48; // touchdown
+    const OUT = 0.78; // afterglow ends
+    // Incoming from the upper-right, matching the ambient sky lanes' down-left fall.
+    const dx = 0.36 + jitter;
+    const dy = -1;
+    const dl = Math.hypot(dx, dy);
+    const reach = Math.max(W, H) * 0.85;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    if (t >= IN && t < IMPACT) {
+      const f = (t - IN) / (IMPACT - IN); // 0 → 1 along the dive
+      const x = cx + (dx / dl) * reach * (1 - f);
+      const y = cy + (dy / dl) * reach * (1 - f);
+      const len = 34 + 26 * f; // the tail stretches as it accelerates in
+      const tx = x + (dx / dl) * len;
+      const ty = y + (dy / dl) * len;
+      const grad = ctx.createLinearGradient(tx, ty, x, y);
+      grad.addColorStop(0, 'rgba(255,200,140,0)');
+      grad.addColorStop(0.55, 'rgba(255,220,165,0.6)');
+      grad.addColorStop(1, 'rgba(255,248,230,0.95)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      const hg = ctx.createRadialGradient(x, y, 0, x, y, 11);
+      hg.addColorStop(0, 'rgba(255,255,250,0.95)');
+      hg.addColorStop(0.4, 'rgba(255,225,180,0.5)');
+      hg.addColorStop(1, 'rgba(255,210,150,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath();
+      ctx.arc(x, y, 11, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (t >= IMPACT && t < OUT) {
+      if (lastStrikeK !== k) {
+        lastStrikeK = k;
+        o.onStrike?.(); // the landing moment — cue the caller's shake exactly once per cycle
+      }
+      const f = (t - IMPACT) / (OUT - IMPACT); // 0 → 1 through the afterglow
+      const fade = 1 - f;
+      // Core flash over the crater's TRUE footprint, blooming out and fading.
+      const fr = target.r * (1.1 + 1.9 * f);
+      const fg = ctx.createRadialGradient(cx, cy, 0, cx, cy, fr);
+      fg.addColorStop(0, `rgba(255,250,235,${(0.85 * fade).toFixed(3)})`);
+      fg.addColorStop(0.45, `rgba(255,190,110,${(0.45 * fade).toFixed(3)})`);
+      fg.addColorStop(1, 'rgba(255,150,60,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, fr, 0, Math.PI * 2);
+      ctx.fill();
+      // Ember splash — a handful of sparks thrown up-and-out on simple ballistic arcs.
+      for (let i = 0; i < 7; i++) {
+        const a = pick() * Math.PI * 2;
+        const sp = target.r * (1.2 + pick() * 1.6);
+        const ex = cx + Math.cos(a) * sp * f;
+        const ey = cy + Math.sin(a) * sp * f * 0.6 - (f - f * f) * target.r * 2.6; // rise then fall
+        ctx.fillStyle = i % 2 ? `rgba(255,170,80,${(0.9 * fade).toFixed(3)})` : `rgba(255,120,50,${(0.8 * fade).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 1.4 + (i % 3) * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   function draw(ctx: CanvasRenderingContext2D, now: number): void {
     tint(ctx);
     drawStars(ctx, now);
@@ -1146,6 +1251,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
         break;
       case 'meteorShower':
         drawMeteors(ctx, now);
+        drawStrikes(ctx, now); // one gets through and LANDS — on a real crater (GS-meteor-strikes)
         break;
       case 'aurora':
         drawAurora(ctx, now);

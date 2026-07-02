@@ -255,8 +255,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
   fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only). The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
-  meteors/ambient air — stays unmasked). Guards: `tests/biome-identity.test.ts` +
-  `tests/weather-mask.test.ts`. The decision map's
+  meteors/ambient air — stays unmasked); on a meteor-shower stop it also LANDS one meteor per cycle
+  INTO a drawn scorch crater (`WeatherOpts.strikeTargets`, fed the craters' screen positions by the
+  play view's LIVE projector — clock-driven, cosmetic, re-burns an EXISTING mark, never spawns one;
+  the aim overlay's wind-only projector must NOT feed it, same reason it can't feed starMask).
+  Guards: `tests/biome-identity.test.ts` + `tests/weather-mask.test.ts` + `tests/weather-strikes.test.ts`. The decision map's
   framing must hold still for the whole shot decision (frame on the pin-aim full-power spread, not
   the live drag), and the shot animation starts at the decision map's exact `decisionRadius`. Turf
   bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
