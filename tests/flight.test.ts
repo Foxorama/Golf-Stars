@@ -2,8 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   arcApex,
   arcHeight,
+  ARC_FEEL,
+  flightApexT,
+  flightClassOf,
   flightControl,
   flightGround,
+  flightProfileOf,
+  FLIGHT_PROFILES,
   canopyHeight,
   flightKnockdown,
 } from '../src/sim/flight';
@@ -35,10 +40,48 @@ describe('arc apex (loft-scaled)', () => {
     expect(arcApex(120, 70)).toBeGreaterThan(arcApex(120, 250));
   });
 
-  it('arcHeight is a parabola peaking at midflight, zero at the ends', () => {
+  it('arcHeight defaults to the classic parabola peaking at midflight, zero at the ends', () => {
     expect(arcHeight(30, 0)).toBeCloseTo(0, 6);
     expect(arcHeight(30, 1)).toBeCloseTo(0, 6);
     expect(arcHeight(30, 0.5)).toBeCloseTo(30, 6);
+    expect(arcHeight(30, 0.25)).toBeCloseTo(Math.sin(Math.PI * 0.25) * 30, 6); // = sin(πt) exactly
+  });
+});
+
+describe('per-family flight profiles (GS-flight-3)', () => {
+  it('the classifier maps the whole CLUBS taxonomy onto a profile row', () => {
+    for (const c of CLUBS) expect(FLIGHT_PROFILES[flightClassOf(c.id)]).toBeDefined();
+    expect(flightClassOf('D')).toBe('driver');
+    expect(flightClassOf('3W')).toBe('wood');
+    expect(flightClassOf('4H')).toBe('hybrid');
+    expect(flightClassOf('7i')).toBe('iron');
+    expect(flightClassOf('PW')).toBe('wedge'); // ends in W but is a wedge, not a wood
+    expect(flightClassOf('SW')).toBe('wedge');
+    expect(flightClassOf('putter')).toBe('putter');
+  });
+
+  it('a hybrid flies higher than a wood of the same carry (the rescue-club identity)', () => {
+    expect(arcApex(180, 181, ARC_FEEL, FLIGHT_PROFILES.hybrid.peakMult)).toBeGreaterThan(
+      arcApex(180, 181, ARC_FEEL, FLIGHT_PROFILES.wood.peakMult),
+    );
+  });
+
+  it('a driver bores lower than the neutral ramp; a wedge towers above it', () => {
+    expect(arcApex(200, 250, ARC_FEEL, FLIGHT_PROFILES.driver.peakMult)).toBeLessThan(arcApex(200, 250));
+    expect(arcApex(90, 90, ARC_FEEL, FLIGHT_PROFILES.wedge.peakMult)).toBeGreaterThan(arcApex(90, 90));
+  });
+
+  it('apex position: a wedge peaks later along the ground than a driver; every arc stays anchored', () => {
+    const dT = flightApexT(FLIGHT_PROFILES.driver);
+    const wT = flightApexT(FLIGHT_PROFILES.wedge);
+    expect(wT).toBeGreaterThan(dT);
+    for (const T of [dT, wT]) {
+      expect(arcHeight(30, 0, T)).toBeCloseTo(0, 6);
+      expect(arcHeight(30, 1, T)).toBeCloseTo(0, 6);
+      expect(arcHeight(30, T, T)).toBeCloseTo(30, 6); // the peak sits exactly at apexT
+      expect(arcHeight(30, T - 0.05, T)).toBeLessThan(30);
+      expect(arcHeight(30, T + 0.05, T)).toBeLessThan(30);
+    }
   });
 });
 
@@ -94,35 +137,46 @@ describe('tree canopy + knockdown (arc height matters)', () => {
       features: [{ kind: 'fairway', poly: [[-30, 0], [30, 0], [30, 220], [-30, 220]] }],
       hazards: [],
     };
-    expect(flightKnockdown(clear, [0, 0], [0, 200], 0, 200, 250)).toBeNull();
+    expect(flightKnockdown(clear, [0, 0], [0, 200], 0, 200, 250, flightProfileOf('D'))).toBeNull();
   });
 
   it('a low ball that crosses a treeline near launch is knocked down', () => {
     const hole = treeAt([0, 22], 6); // a tree just ahead, where the arc is still low
-    const kd = flightKnockdown(hole, [0, 0], [0, 200], 0, 200, 250);
+    const kd = flightKnockdown(hole, [0, 0], [0, 200], 0, 200, 250, flightProfileOf('D'));
     expect(kd).not.toBeNull();
     expect(kd!.carry).toBeLessThan(200); // clipped short of the intended landing
     expect(dist(kd!.point, [0, 22])).toBeLessThan(12);
   });
 
   it('ARC HEIGHT decides it: a lofted approach clears a guarding tree a low borer would clip', () => {
-    // Same target + same tree guarding the front of the green; only the apex differs.
+    // Same target + same tree guarding the front of the green; only the arc differs.
     const hole = treeAt([0, 90], 3);
-    const lofted = flightKnockdown(hole, [0, 0], [0, 100], 0, 100, 106); // PW: balloons up & over
-    const borer = flightKnockdown(hole, [0, 0], [0, 100], 0, 100, 250); // a flat low strike: clipped
+    const lofted = flightKnockdown(hole, [0, 0], [0, 100], 0, 100, 106, flightProfileOf('PW')); // balloons up & over
+    const borer = flightKnockdown(hole, [0, 0], [0, 100], 0, 100, 250, flightProfileOf('D')); // a flat low strike: clipped
     expect(lofted).toBeNull();
     expect(borer).not.toBeNull();
+  });
+
+  it('the FAMILY arc decides it too: a 7-iron flies a mid-range grove the driver line cannot (GS-flight-3)', () => {
+    // Same landing point, same grove — only the club family differs. The driver's boring flight
+    // clips it; the 7-iron's higher, later-peaking arc sails over. This is the club-choice lever
+    // the aim overlay now shows (pick more club → the blocked slice opens up).
+    const hole = treeAt([0, 90], 3);
+    const iron = flightKnockdown(hole, [0, 0], [0, 120], 0, 120, 134, flightProfileOf('7i'));
+    const driver = flightKnockdown(hole, [0, 0], [0, 120], 0, 120, 250, flightProfileOf('D'));
+    expect(iron).toBeNull();
+    expect(driver).not.toBeNull();
   });
 
   it('a ball already in the trees is not re-trapped at its own bush', () => {
     const hole = treeAt([0, 10], 8);
     // Launch from inside the blob: the outside→inside guard means no fresh clip.
-    expect(flightKnockdown(hole, [0, 10], [0, 200], 0, 190, 250)).toBeNull();
+    expect(flightKnockdown(hole, [0, 10], [0, 200], 0, 190, 250, flightProfileOf('D'))).toBeNull();
   });
 
   it('a tree well off the shot line is ignored (broad-phase prune)', () => {
     const hole = treeAt([120, 100], 6);
-    expect(flightKnockdown(hole, [0, 0], [0, 200], 0, 200, 250)).toBeNull();
+    expect(flightKnockdown(hole, [0, 0], [0, 200], 0, 200, 250, flightProfileOf('D'))).toBeNull();
   });
 });
 

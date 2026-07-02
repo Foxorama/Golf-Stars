@@ -383,8 +383,9 @@
   (the same GS-spray-zoom scale-honesty): intervals shallower than `minDepthYd` drop; a near edge
   within `snapYd` of the near carry arc snaps onto it (no 1px open rim); angular runs closer than
   `mergeGapRad` merge (lerped through the gap — no barcode striping) and runs narrower than
-  `minSpanRad` drop (no 1px blockers). `ShotSpread` gained `nominalCarry` so the overlay can drive
-  the loft/apex model. Guards: `tests/spray-blocking.test.ts` (physics agreement for trees AND tents,
+  `minSpanRad` drop (no 1px blockers). `ShotSpread` gained `nominalCarry` (and later `flight`, the
+  club family's `FlightProfile` — GS-flight-3) so the overlay drives the same loft/apex model the sim
+  resolves: switching driver → 7-iron visibly changes what reads blocked. Guards: `tests/spray-blocking.test.ts` (physics agreement for trees AND tents,
   block-to-far-edge, fly-over-clear, tent gating, sliver drop, gap merge, render glyphs).
   GOTCHA: `sprayBlocking` runs per decision re-render (every drag frame) — it's ~3ms worst-case on a
   grove-heavy hole (the first-hit break makes blocked slices cheaper than v1); keep the probe budget

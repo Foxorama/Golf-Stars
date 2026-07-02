@@ -40,6 +40,7 @@ import {
   DEFAULT_FLIGHT_FEEL,
   type FlightFeel,
 } from './trajectory';
+import { flightApexT, flightProfileOf } from '../sim/flight';
 
 interface PlayFeel extends FlightFeel {
   /** Multiplies on-screen arc height (course px → visible loft). */
@@ -1043,10 +1044,12 @@ export function mountPlayView(
       const carry = shot.result.carry;
       const touchdown = shot.result.landing;
       const rest = shot.rest ?? touchdown;
-      // The arc apex the SIM resolved (loft-scaled), so the drawn height matches the physics that
-      // decided whether a tree knocked the ball down. The curved ground path launches along the
-      // shot bearing and bends to the landing (the fade/hook banana).
+      // The arc apex the SIM resolved (loft-scaled) + the club FAMILY's apex position (GS-flight-3),
+      // so the drawn height matches the physics that decided whether a tree knocked the ball down —
+      // a driver visibly bores while a wedge towers. The curved ground path launches along the shot
+      // bearing and bends to the landing (the fade/hook banana).
       const peak = shot.result.apex;
+      const apexT = flightApexT(flightProfileOf(shot.club.id));
       const bearing = shot.result.shotBearing;
       const flightDur = flightDurationMs(carry);
       const [tdx, tdy] = proj.project(touchdown);
@@ -1118,7 +1121,7 @@ export function mountPlayView(
             // Eyes-on feel; the SCORE already used the redirected landing.
             const interceptFrac = REDIRECT_HIT_FRAC;
             const fireFrac = REDIRECT_FIRE_FRAC;
-            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, interceptFrac, peak);
+            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, interceptFrac, peak, apexT);
             // Intercept screen point, recomputed EVERY frame so it tracks the camera pan + zoom.
             const impactScreen: Vec = [0, 0];
             {
@@ -1161,9 +1164,9 @@ export function mountPlayView(
             else if (tg < interceptFrac + 0.14) zoomTarget = REDIRECT_ZOOM;
             else zoomTarget = REDIRECT_ZOOM + (1 - REDIRECT_ZOOM) * easeInOut(clamp01((tg - interceptFrac - 0.14) / 0.3));
 
-            height = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak).height;
+            height = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak, apexT).height;
             if (tg < interceptFrac) {
-              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tg, peak).ground;
+              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tg, peak, apexT).ground;
             } else {
               const e = easeInOut((tg - interceptFrac) / (1 - interceptFrac));
               ground = [
@@ -1172,7 +1175,7 @@ export function mountPlayView(
               ];
             }
           } else {
-            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak);
+            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak, apexT);
             ground = s.ground;
             height = s.height;
           }

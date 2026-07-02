@@ -65,13 +65,15 @@ describe('sprayBlocking (GS-spray-block / GS-spray-block-2, pure)', () => {
   });
 
   it('blocks a slice to the cone FAR edge once interrupted — no floating clear pocket beyond (GS-spray-block-2)', () => {
-    // Fly-over is real: the longest landing in the window would individually clear the grove...
-    expect(
-      flightKnockdown(hole, [0, 0], [0, spread.carryHigh], spread.bearing, spread.carryHigh, spread.nominalCarry),
-    ).toBeNull();
+    // A mid-height grove (canopy ≈ 18y): fly-over is real — the longest landing in the window
+    // would individually clear it...
+    const grove = holeWithTrees([blob(0, 100, 5)]);
+    const s = shotSpread(grove, [0, 0], 'tee', [0, 400], driver, {});
+    expect(flightKnockdown(grove, [0, 0], [0, s.carryHigh], s.bearing, s.carryHigh, s.nominalCarry, s.flight)).toBeNull();
     // ...yet the blocked line still reads dead all the way out: every sample runs to carryHigh.
-    const regions = sprayBlocking(hole, spread);
-    for (const sm of regions[0]!.samples) expect(sm.r1).toBeCloseTo(spread.carryHigh, 6);
+    const regions = sprayBlocking(grove, s);
+    expect(regions.length).toBe(1);
+    for (const sm of regions[0]!.samples) expect(sm.r1).toBeCloseTo(s.carryHigh, 6);
     // And a mid-range grove starts its shade AT the tree (the interruption point), not at the near arc.
     const midHole = holeWithTrees([blob(0, 180, 7)]);
     const s2 = shotSpread(midHole, [0, 0], 'tee', [0, 400], driver, {});
@@ -83,11 +85,11 @@ describe('sprayBlocking (GS-spray-block / GS-spray-block-2, pure)', () => {
   });
 
   it('an object the whole swing flies over does NOT shade at all (fly-over honesty)', () => {
-    // A low copse (canopy ≈ 11y): every landing in the driver window sails over it.
-    const low = holeWithTrees([blob(0, 100, 2)]);
+    // A low copse (canopy ≈ 11y) near the tee: every landing in the driver window sails over it.
+    const low = holeWithTrees([blob(0, 60, 2)]);
     const s = shotSpread(low, [0, 0], 'tee', [0, 400], driver, {});
     expect(
-      flightKnockdown(low, [0, 0], [0, s.carryLow], s.bearing, s.carryLow, s.nominalCarry),
+      flightKnockdown(low, [0, 0], [0, s.carryLow], s.bearing, s.carryLow, s.nominalCarry, s.flight),
     ).toBeNull();
     expect(sprayBlocking(low, s)).toEqual([]);
   });
@@ -99,13 +101,23 @@ describe('sprayBlocking (GS-spray-block / GS-spray-block-2, pure)', () => {
     // Just inside the shaded region's near edge: the sim knocks that landing down.
     const rIn = Math.min(spread.carryHigh, Math.max(spread.carryLow, mid.r0 + 2));
     expect(
-      flightKnockdown(hole, [0, 0], at(mid.a, rIn), spread.bearing, rIn, spread.nominalCarry),
+      flightKnockdown(hole, [0, 0], at(mid.a, rIn), spread.bearing, rIn, spread.nominalCarry, spread.flight),
     ).not.toBeNull();
     // Well outside every region at the same radius: flies clean.
     const clearA = regions[0]!.a1 + 0.15;
     expect(
-      flightKnockdown(hole, [0, 0], at(clearA, rIn), spread.bearing, rIn, spread.nominalCarry),
+      flightKnockdown(hole, [0, 0], at(clearA, rIn), spread.bearing, rIn, spread.nominalCarry, spread.flight),
     ).toBeNull();
+  });
+
+  it('the blocked read is CLUB-AWARE: a grove that walls a driver line opens up for a 7-iron (GS-flight-3)', () => {
+    // A modest grove at mid-iron range: the driver's boring flight is interrupted, the 7-iron's
+    // higher family arc clears it — the overlay shows club choice changing what's reachable.
+    const grove = holeWithTrees([blob(0, 90, 3)]);
+    const dSpread = shotSpread(grove, [0, 0], 'tee', [0, 400], driver, {});
+    const iSpread = shotSpread(grove, [0, 0], 'tee', [0, 400], seven, {});
+    expect(sprayBlocking(grove, dSpread).length).toBeGreaterThan(0);
+    expect(sprayBlocking(grove, iSpread)).toEqual([]);
   });
 
   it('drops angular slivers below the minimum span (no 1-px blockers)', () => {
@@ -153,9 +165,9 @@ describe('sprayBlocking over trade-camp tents (GS-tents × GS-spray-block-2)', (
       from[1] + Math.cos(a) * r,
     ];
     const rIn = Math.min(spread.carryHigh, mid.r0 + 2);
-    expect(tentFlightHit(tents, from, at(mid.a, rIn), spread.bearing, rIn, spread.nominalCarry)).not.toBeNull();
+    expect(tentFlightHit(tents, from, at(mid.a, rIn), spread.bearing, rIn, spread.nominalCarry, spread.flight)).not.toBeNull();
     // Straight at the pin the approach window is kept CLEAR of tents (fairness by placement):
-    expect(tentFlightHit(tents, from, at(0, rIn), spread.bearing, rIn, spread.nominalCarry)).toBeNull();
+    expect(tentFlightHit(tents, from, at(0, rIn), spread.bearing, rIn, spread.nominalCarry, spread.flight)).toBeNull();
   });
 });
 

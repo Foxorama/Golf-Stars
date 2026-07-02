@@ -63,9 +63,10 @@ export function sampleFlight(from: Vec, landing: Vec, t: number, peak: number): 
 /**
  * Sample the CURVED flight at progress `t`: the ground follows a quadratic Bézier that launches
  * along the shot bearing and curves to the landing (the fade/hook banana), and the height follows
- * the loft-scaled arc whose apex the SIM resolved (`shot.result.apex`). Both come from the shared
- * `sim/flight` geometry, so the ball the player watches curve + clear/clip a tree is exactly the
- * ball the sim computed. Pure.
+ * the family-shaped arc whose apex the SIM resolved (`shot.result.apex`; `apexT` is the club
+ * family's peak position — `flightApexT(flightProfileOf(club.id))`, GS-flight-3, defaulting to the
+ * classic symmetric arc). Both come from the shared `sim/flight` geometry, so the ball the player
+ * watches tower/bore + clear/clip a tree is exactly the ball the sim computed. Pure.
  */
 export function sampleCurvedFlight(
   from: Vec,
@@ -73,10 +74,11 @@ export function sampleCurvedFlight(
   bearingDeg: number,
   t: number,
   apex: number,
+  apexT = 0.5,
 ): FlightSample {
   const tt = Math.max(0, Math.min(1, t));
   const control = flightControl(from, landing, bearingDeg);
-  return { ground: flightGround(from, control, landing, tt), height: arcHeight(apex, tt) };
+  return { ground: flightGround(from, control, landing, tt), height: arcHeight(apex, tt, apexT) };
 }
 
 export function easeOutCubic(t: number): number {

@@ -12,6 +12,7 @@ import {
   type TradeTent,
 } from '../src/sim/tents';
 import { dist, type Vec } from '../src/sim/course/contract';
+import { flightProfileOf } from '../src/sim/flight';
 
 const BIOMES = ['verdant-station', 'dust-belt', 'ice-ring', 'ember-world', 'void-garden'];
 
@@ -53,11 +54,11 @@ describe('trade-camp tents (GS-tents)', () => {
     const from: Vec = [0, 0];
     const landing: Vec = [0, 80]; // dead ahead, through the tent
     // A flat long club (driver, nominal ~250) flies low → clips the tent.
-    const low = tentFlightHit([tent], from, landing, 0, 80, 250);
+    const low = tentFlightHit([tent], from, landing, 0, 80, 250, flightProfileOf('D'));
     expect(low).not.toBeNull();
     expect(dist(low!.point, tent.c)).toBeLessThanOrEqual(tent.r + 0.01);
     // A lofted wedge (nominal ~60) balloons over a 11yd roof on an 80yd carry → clears.
-    const high = tentFlightHit([tent], from, landing, 0, 80, 60);
+    const high = tentFlightHit([tent], from, landing, 0, 80, 60, flightProfileOf('60'));
     expect(high).toBeNull();
   });
 

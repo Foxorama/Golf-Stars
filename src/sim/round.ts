@@ -34,7 +34,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, flightBlockedBy, flightKnockdown, flightObstacles } from './flight';
+import { arcApex, ARC_FEEL, flightBlockedBy, flightKnockdown, flightObstacles, flightProfileOf, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TradeTent } from './tents';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -967,13 +967,14 @@ export function executeShot(
   // ask. A low ball that crosses a treeline below its canopy is knocked out of the air into the
   // woods (a tough non-penalty lie); a high one drops over. Pure geometry on the SAME curved path
   // the renderer draws, off the already-resolved endpoints — no rng, so auto≡interactive holds.
-  const kd = flightKnockdown(hole, from, result.landing, result.shotBearing, result.carry, nominalCarry);
+  const flight = flightProfileOf(club.id);
+  const kd = flightKnockdown(hole, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
   let knockedDown = false;
   if (kd) {
     knockedDown = true;
     result.landing = kd.point;
     result.carry = kd.carry;
-    result.apex = arcApex(kd.carry, nominalCarry);
+    result.apex = arcApex(kd.carry, nominalCarry, ARC_FEEL, flight.peakMult);
   }
 
   // Trade-camp tent ricochet (GS-tents): if NOT already knocked into the woods, a low/flat shot whose
@@ -984,11 +985,11 @@ export function executeShot(
   const tents = opts.tradeTents ? tradeTents(hole) : undefined;
   let tentHit: TentHit | null = null;
   if (tents && !knockedDown) {
-    tentHit = tentFlightHit(tents, from, result.landing, result.shotBearing, result.carry, nominalCarry);
+    tentHit = tentFlightHit(tents, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
     if (tentHit) {
       result.landing = tentHit.point;
       result.carry = tentHit.carry;
-      result.apex = arcApex(tentHit.carry, nominalCarry);
+      result.apex = arcApex(tentHit.carry, nominalCarry, ARC_FEEL, flight.peakMult);
     }
   }
 
@@ -1153,6 +1154,9 @@ export interface ShotSpread {
   /** The club's nominal (full) carry (yards) — feeds the loft/apex model so the blocked-by-trees
    *  overlay (`sprayBlocking`) walks the SAME flight the sim resolves via `flightKnockdown`. */
   nominalCarry: number;
+  /** The club family's flight profile (GS-flight-3) — the overlay probes the SAME family-shaped arc
+   *  the sim resolves, so switching from driver to 7-iron visibly changes what reads blocked. */
+  flight: FlightProfile;
 }
 
 export function shotSpread(
@@ -1237,6 +1241,7 @@ export function shotSpread(
     shape,
     lefty: opts.lefty,
     nominalCarry: nominal,
+    flight: flightProfileOf(club.id),
   };
 }
 
@@ -1365,12 +1370,12 @@ export function sprayBlocking(
     for (let k = 0; k < K; k++) {
       const r = rLow + rStep * k;
       const landing = landAt(a, r);
-      const kd = flightBlockedBy(obstacles, s.origin, landing, s.bearing, r, s.nominalCarry);
+      const kd = flightBlockedBy(obstacles, s.origin, landing, s.bearing, r, s.nominalCarry, s.flight);
       if (kd) {
         hitAt = kd.carry;
         break;
       }
-      const th = tents ? tentFlightHit(tents, s.origin, landing, s.bearing, r, s.nominalCarry) : null;
+      const th = tents ? tentFlightHit(tents, s.origin, landing, s.bearing, r, s.nominalCarry, s.flight) : null;
       if (th) {
         hitAt = th.carry;
         cause = 'tents';
