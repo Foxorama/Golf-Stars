@@ -449,8 +449,22 @@ export function pickTheme(rng: Rng, arc: Arc): Theme {
   return pickThemeFrom(rng, pool);
 }
 
-/** Convenience: the theme a run's current stop flies into, from its distance. */
+/**
+ * Worlds too punishing to OPEN a run on (GS-fresh-start): the lost-ball abysses (void, cetus),
+ * the lava world and the storm world. The FIRST stop's draw skips them — a voyage tees off on a
+ * readable world; the journey supplies the heat (route lanes CAN land these from stop 1 on).
+ */
+export const HARD_ARCHETYPES: ReadonlySet<BiomeArchetype> = new Set(['inferno', 'tempest', 'void', 'cetus']);
+
+/** Convenience: the theme a run's current stop flies into, from its distance. Stop 0 (the tee-off
+ *  world — no route chosen yet) draws from the arc pool MINUS the hard archetypes: the same single
+ *  rarity-weighted rng draw, just a gentler pool (GS-fresh-start). */
 export function themeForStop(seed: number | string, stopIndex: number, distanceFromStart: number): Theme {
   const rng = new Rng(`${seed}:theme:${stopIndex}`);
-  return pickTheme(rng, arcForDistance(distanceFromStart));
+  const arc = arcForDistance(distanceFromStart);
+  if (stopIndex === 0) {
+    const pool = themesForArc(arc).filter((t) => !HARD_ARCHETYPES.has(t.archetype));
+    if (pool.length > 0) return pickThemeFrom(rng, pool);
+  }
+  return pickTheme(rng, arc);
 }

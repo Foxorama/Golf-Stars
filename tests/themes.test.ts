@@ -11,6 +11,7 @@ import {
   pickTheme,
   themeForStop,
   resolveBiome,
+  HARD_ARCHETYPES,
   STAR_ARC_BREAKS,
   type BiomeArchetype,
 } from '../src/sim/course/themes';
@@ -125,6 +126,22 @@ describe('theme selection', () => {
     expect(a.id).toBe(b.id);
     expect(a.arc).toBe(1);
     expect(themeForStop(42, 9, 20).arc).toBe(3); // deep → arc 3
+  });
+
+  it('the first stop never opens on a hard world, but still varies by seed (GS-fresh-start)', () => {
+    const opened = new Set<string>();
+    for (let s = 0; s < 300; s++) {
+      const t = themeForStop(`first:${s}`, 0, 0);
+      expect(HARD_ARCHETYPES.has(t.archetype)).toBe(false);
+      opened.add(t.archetype);
+    }
+    // Random non-hard opener, not one fixed world.
+    expect(opened.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('later stops CAN still land hard worlds (the filter is stop-0 only)', () => {
+    const later = Array.from({ length: 300 }, (_, s) => themeForStop(`later:${s}`, 4, 20).archetype);
+    expect(later.some((a) => HARD_ARCHETYPES.has(a))).toBe(true);
   });
 
   it('rarer themes really are scarcer in the draw (legendary feels legendary)', () => {
