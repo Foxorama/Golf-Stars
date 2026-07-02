@@ -154,13 +154,32 @@ describe('spray cone render (SVG)', () => {
     expect(svg.match(/rgba\(255,196,84,0\.18\)/g)!.length).toBe(2);
     expect(svg.match(/rgba\(255,76,76,0\.20\)/g)!.length).toBe(2);
   });
-  it('labels each zone with an easy-to-read % of shots (≈80 / 8 / 2)', () => {
+  it('labels each zone with an easy-to-read % of shots (≈80 / 8 / 2) at the decision framing', () => {
     const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { dispersionMult: 1.2 });
-    const svg = renderHoleSVG(hole, { width: 320, height: 460, spray });
+    // The follow-cam framing the aim screen actually uses (decisionReach ≈ 0.36·carryHigh): every
+    // band is wide enough on screen to carry its % label.
+    const svg = renderHoleSVG(hole, {
+      width: 360,
+      height: 640,
+      spray,
+      focus: hole.tee,
+      viewRadius: Math.max(30, spray.carryHigh * 0.36),
+    });
     // Defaults: 80% centre, 8% each orange flank, 2% each red flank (the hook/shank tail).
     expect(svg).toContain('>80%<');
     expect(svg.match(/>8%</g)!.length).toBe(2);
     expect(svg.match(/>2%</g)!.length).toBe(2);
+  });
+  it('sheds labels that no longer fit on screen instead of overlapping (GS-spray-zoom)', () => {
+    const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { dispersionMult: 1.2 });
+    // Zoomed far out (a huge view radius → the cone is a few px wide): the narrow red 2% tails
+    // can't hold their labels — they must vanish rather than pile onto each other. The bands
+    // themselves still draw.
+    const svg = renderHoleSVG(hole, { width: 360, height: 640, spray, focus: hole.tee, viewRadius: 2000 });
+    expect(svg.match(/rgba\(255,76,76,0\.20\)/g)!.length).toBe(2);
+    expect(svg).not.toContain('>2%<');
+    // And the min/max carry labels merge into one "lo–hi y" readout (they'd collide at this scale).
+    expect(svg).toContain(`${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)}y`);
   });
   it('omits the cone when no spray is supplied', () => {
     const svg = renderHoleSVG(hole, { width: 320, height: 460 });

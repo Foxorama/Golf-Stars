@@ -16,7 +16,7 @@
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PatchKind } from '../sim/patches';
 import type { ShotLog, ShotSpread } from '../sim/round';
-import { playBoundsCorners } from '../sim/round';
+import { playBoundsCorners, sprayBlocking } from '../sim/round';
 import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
 import { flightControl } from '../sim/flight';
 import { holeProjector } from './project';
@@ -49,6 +49,27 @@ const BAND_STROKE: Record<string, string> = {
   orange: 'rgba(255,196,84,0.5)',
   red: 'rgba(255,76,76,0.6)',
 };
+
+/** Blocked-by-trees zone treatment (GS-spray-block): a dark canopy shade over the part of the cone
+ *  a tree would knock down, dashed-edged so the safe remainder of the band reads clearly around it. */
+const BLOCK_FILL = 'rgba(14,26,16,0.60)';
+const BLOCK_STROKE = 'rgba(150,220,140,0.45)';
+
+// --- Zoom-aware overlay layout (GS-spray-zoom) --------------------------------
+// Every overlay layout decision below reads the projector's px-per-yard scale, so the cone stays
+// readable at ANY zoom/shot length: a chip's tiny cone sheds the labels that would drown it, a
+// zoomed-in driver cone gains arc smoothness, and nothing collides or turns to barcode stripes.
+/** Approximate rendered width (px) of a label — SVG has no text metrics, ~0.62em per char is close
+ *  enough for the digits+% strings we draw. */
+const textWidthPx = (txt: string, fontSize: number): number => txt.length * fontSize * 0.62;
+/** Min projected radial gap (px) between the near/far arcs before the min/max carry labels merge
+ *  into a single "lo–hi y" readout (they'd otherwise collide at chip distances / low zoom). */
+const CARRY_LABEL_MERGE_PX = 20;
+/** Blocked-region smoothing thresholds, in screen px (converted to radians/yards per render). */
+const BLOCK_MIN_SPAN_PX = 10; // an angular blocked run narrower than this is dropped (the "1-px blocker")
+const BLOCK_MERGE_GAP_PX = 14; // a clear gap narrower than this merges its neighbours (no striping)
+const BLOCK_MIN_DEPTH_PX = 6; // a radial graze shallower than this is ignored
+const BLOCK_SNAP_PX = 8; // a blocked edge this close to the carry arc snaps onto it (no open rim sliver)
 
 export interface RenderOptions {
   width?: number;
@@ -114,21 +135,21 @@ export interface RenderOptions {
  *  arc of constant distance (carryHigh) in every direction, never a square corner that reads
  *  as exceeding max distance. Use a symmetric ±halfAngle via `sprayArc`, or an off-centre
  *  [a0,a1] to carve out the flanking risk wedges separately from the central likely zone. */
-function spraySector(s: ShotSpread, a0: number, a1: number): Vec[] {
+/** Course-space point at band angle `a` (radians off the bearing) and radius `r` — the ONE mapping
+ *  every cone element (sectors, labels, blocked zones) shares, including the lefty mirror
+ *  (GS-lefty: the band angle negates about the bearing, matching resolveShot's lateral sign flip). */
+function sprayPoint(s: ShotSpread, a: number, r: number): Vec {
   const br = (s.bearing * Math.PI) / 180;
-  // Left-handed mirror (GS-lefty): negate the band angle about the bearing so the cone reads as the
-  // lefty's world-flipped landing distribution — matching resolveShot's lateral sign flip. The
-  // per-zone % labels ride the band (so hook% still shows where a lefty's hook actually goes).
   const h = s.lefty ? -1 : 1;
-  const at = (r: number, a: number): Vec => [
-    s.origin[0] + Math.sin(br + h * a) * r,
-    s.origin[1] + Math.cos(br + h * a) * r,
-  ];
-  const N = 10; // samples per arc — smooth enough at map scale
+  return [s.origin[0] + Math.sin(br + h * a) * r, s.origin[1] + Math.cos(br + h * a) * r];
+}
+
+function spraySector(s: ShotSpread, a0: number, a1: number, segs = 10): Vec[] {
+  const N = Math.max(2, Math.round(segs)); // samples per arc
   const span = a1 - a0;
   const pts: Vec[] = [];
-  for (let i = 0; i <= N; i++) pts.push(at(s.carryHigh, a0 + (span * i) / N)); // far arc a0→a1
-  for (let i = 0; i <= N; i++) pts.push(at(s.carryLow, a1 - (span * i) / N)); // near arc a1→a0
+  for (let i = 0; i <= N; i++) pts.push(sprayPoint(s, a0 + (span * i) / N, s.carryHigh)); // far arc a0→a1
+  for (let i = 0; i <= N; i++) pts.push(sprayPoint(s, a1 - (span * i) / N, s.carryLow)); // near arc a1→a0
   return pts;
 }
 
@@ -139,8 +160,7 @@ function sprayArc(s: ShotSpread, halfAngle: number): Vec[] {
 
 /** Midpoint of one of the spray arcs (on the bearing, at radius `r`) — where a distance label sits. */
 function arcMid(s: ShotSpread, r: number): Vec {
-  const br = (s.bearing * Math.PI) / 180;
-  return [s.origin[0] + Math.sin(br) * r, s.origin[1] + Math.cos(br) * r];
+  return sprayPoint(s, 0, r);
 }
 
 function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
@@ -212,29 +232,70 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     const s = opts.spray;
     const bands = sprayBands(s.shape, s.angleSpread, geom);
     const drawn = bands.filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
+    // px-per-yard at the current framing — every layout decision below reads it (GS-spray-zoom),
+    // so the cone stays readable at any zoom level / shot distance.
+    const pxYd = Math.max(1e-6, proj.scale);
+    const rMid = s.carryLow + 0.5 * (s.carryHigh - s.carryLow);
+    // Arc smoothness follows the PROJECTED arc length (~8px per segment), not a fixed count — a
+    // zoomed-in cone stays a true curve, a distant one stays cheap.
+    const segsFor = (a0: number, a1: number): number =>
+      Math.max(6, Math.min(48, Math.ceil((Math.abs(a1 - a0) * s.carryHigh * pxYd) / 8)));
     // Draw the miss bands first, the green centre last (so its outline sits on top).
     const ordered = [...drawn.filter((b) => b.tier !== 'green'), ...drawn.filter((b) => b.tier === 'green')];
     for (const b of ordered) {
       parts.push(
-        `<polygon points="${pts(spraySector(s, b.a0, b.a1))}" fill="${BAND_FILL[b.tier]}" stroke="${BAND_STROKE[b.tier]}" stroke-width="1" />`,
+        `<polygon points="${pts(spraySector(s, b.a0, b.a1, segsFor(b.a0, b.a1)))}" fill="${BAND_FILL[b.tier]}" stroke="${BAND_STROKE[b.tier]}" stroke-width="1" />`,
       );
     }
+    // Blocked-by-trees zones (GS-spray-block): the part of the cone a tall obstacle would knock out
+    // of the air, probed with the sim's own knockdown walk and smoothed in SCREEN terms — slivers
+    // narrower than a few px are dropped, near-touching runs merge, edges snap to the carry arcs —
+    // so the shading reads as "that line is wooded", never a 1-px barcode. The clear remainder of
+    // the cone still draws its bands untouched: that's the safe line.
+    const blocked = sprayBlocking(hole, s, geom, {
+      minSpanRad: BLOCK_MIN_SPAN_PX / (pxYd * rMid),
+      mergeGapRad: BLOCK_MERGE_GAP_PX / (pxYd * rMid),
+      minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
+      snapYd: BLOCK_SNAP_PX / pxYd,
+    });
+    for (const region of blocked) {
+      const poly: Vec[] = [];
+      for (const sm of region.samples) poly.push(sprayPoint(s, sm.a, sm.r1)); // outer edge a0→a1
+      for (let i = region.samples.length - 1; i >= 0; i--) {
+        const sm = region.samples[i]!;
+        poly.push(sprayPoint(s, sm.a, sm.r0)); // inner edge a1→a0
+      }
+      parts.push(
+        `<polygon points="${pts(poly)}" fill="${BLOCK_FILL}" stroke="${BLOCK_STROKE}" stroke-width="1" stroke-dasharray="3 2" />`,
+      );
+      // A canopy glyph when the region is big enough to carry one (px-tested, so it never swamps
+      // a small patch): marks the shading as trees at a glance.
+      const mid = region.samples[Math.floor(region.samples.length / 2)]!;
+      const wPx = (region.a1 - region.a0) * rMid * pxYd;
+      const dPx = (mid.r1 - mid.r0) * pxYd;
+      if (wPx >= 26 && dPx >= 16) {
+        const [gx, gy] = place(sprayPoint(s, mid.a, (mid.r0 + mid.r1) / 2));
+        parts.push(
+          `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">🌲</text>`,
+        );
+      }
+    }
     // Per-zone % labels (the true share of shots — straight off the shape) at each band's mid-angle.
-    const br = (s.bearing * Math.PI) / 180;
-    const hm = s.lefty ? -1 : 1; // mirror the % label angle to match the mirrored band (GS-lefty)
-    const ptAt = (a: number, r: number): Vec => [s.origin[0] + Math.sin(br + hm * a) * r, s.origin[1] + Math.cos(br + hm * a) * r];
-    const rMid = s.carryLow + 0.5 * (s.carryHigh - s.carryLow);
+    // A label only draws when its band is wide enough ON SCREEN to hold it (chip cones and low zooms
+    // shed them instead of collapsing into an overlapping smudge).
     const zoneLabel = (a: number, r: number, txt: string, size: number): string => {
-      const [lx, ly] = place(ptAt(a, r));
+      const [lx, ly] = place(sprayPoint(s, a, r));
       return (
         `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="system-ui,sans-serif" font-size="${size}" font-weight="800" ` +
         `fill="#fff" stroke="rgba(0,0,0,0.7)" stroke-width="2.5" paint-order="stroke" text-anchor="middle" dominant-baseline="middle">${txt}</text>`
       );
     };
     for (const b of drawn) {
-      // The green % can be a touch noisy at the edges; only label a band wide enough to read.
-      const mid = (b.a0 + b.a1) / 2;
-      parts.push(zoneLabel(mid, rMid, `${Math.round(b.prob * 100)}%`, b.tier === 'green' ? 13 : 10));
+      const txt = `${Math.round(b.prob * 100)}%`;
+      const size = b.tier === 'green' ? 13 : 10;
+      const bandPx = (b.a1 - b.a0) * rMid * pxYd; // the band's projected arc width where the label sits
+      if (bandPx < textWidthPx(txt, size) + 2) continue;
+      parts.push(zoneLabel((b.a0 + b.a1) / 2, rMid, txt, size));
     }
     // Aim line to the expected-carry centre.
     const [ox, oy] = place(s.origin);
@@ -242,7 +303,9 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     parts.push(
       `<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${cFar[0].toFixed(1)}" y2="${cFar[1].toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1" stroke-dasharray="3 3" />`,
     );
-    // Min / max carry labels on the near and far arcs (so the player reads the hole length).
+    // Min / max carry labels on the near and far arcs (so the player reads the hole length). When
+    // the carry window projects thinner than the two labels (a chip, or a zoomed-out map) they'd
+    // collide — merge them into a single "lo–hi y" readout past the far arc instead.
     const label = (r: number, txt: string, dy: number): string => {
       const [lx, ly] = place(arcMid(s, r));
       return (
@@ -250,10 +313,13 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
         `fill="#fff" stroke="rgba(0,0,0,0.65)" stroke-width="2.5" paint-order="stroke" text-anchor="middle">${txt}</text>`
       );
     };
-    parts.push(
-      label(s.carryHigh, `${Math.round(s.carryHigh)}y`, -3),
-      label(s.carryLow, `${Math.round(s.carryLow)}y`, 11),
-    );
+    const lo = Math.round(s.carryLow);
+    const hi = Math.round(s.carryHigh);
+    if ((s.carryHigh - s.carryLow) * pxYd < CARRY_LABEL_MERGE_PX || lo === hi) {
+      parts.push(label(s.carryHigh, lo === hi ? `${hi}y` : `${lo}–${hi}y`, -4));
+    } else {
+      parts.push(label(s.carryHigh, `${hi}y`, -3), label(s.carryLow, `${lo}y`, 11));
+    }
   }
 
   // Shot flight lines (optional): CURVED — a quadratic Bézier that launches along the shot bearing
