@@ -194,6 +194,46 @@ describe('ui reducer', () => {
     expect(restarted.shards).toBe(s.shards); // shards carry over too
   });
 
+  it('toTitle returns to the title from anywhere; an underway run stays resumable (GS-settings-nav)', () => {
+    // Mid-run (interactive, shots taken): back to title parks the run as a resumable snapshot.
+    let s = reduce(started(15), { type: 'playInteractive' });
+    const v = shotView(s.play!, s.run.loadout);
+    s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
+    const stopIndex = s.run.stopIndex;
+    s = reduce(s, { type: 'toTitle' });
+    expect(s.screen).toBe('title');
+    expect(s.play).toBeUndefined(); // transient play state cleaned up
+    expect(s.holeRng).toBeUndefined();
+    expect(s.resumable).toBeDefined();
+    expect(s.resumable!.stopIndex).toBe(stopIndex);
+    expect(s.resumable!.characterId).toBe('feather-fade');
+    // …and resuming re-enters the run at the current stop, exactly like a page reload.
+    const back = reduce(s, { type: 'resume' });
+    expect(back.screen).toBe('intro');
+    expect(back.run.stopIndex).toBe(stopIndex);
+    expect(back.run.loadout.characterId).toBe('feather-fade');
+  });
+
+  it('toTitle from the character screen does NOT offer the unpicked run as resumable', () => {
+    // The run behind the character screen has no golfer yet — nothing worth resuming.
+    const picked = reduce(initState(7), { type: 'start', format: 'unending' });
+    expect(picked.screen).toBe('character');
+    const s = reduce(picked, { type: 'toTitle' });
+    expect(s.screen).toBe('title');
+    expect(s.resumable).toBeUndefined();
+    // A no-op on the title itself.
+    expect(reduce(s, { type: 'toTitle' })).toBe(s);
+  });
+
+  it('toTitle from a between-run screen keeps any existing resume offer', () => {
+    const snap = { seed: 42, formatId: 'unending', stopIndex: 2, distanceFromStart: 5, credits: 90, perks: [] };
+    let s = initState(1, {}, snap);
+    s = reduce(s, { type: 'openClubhouseHall' });
+    s = reduce(s, { type: 'toTitle' });
+    expect(s.screen).toBe('title');
+    expect(s.resumable).toEqual(snap); // the saved run survives the round-trip
+  });
+
   it('a missed cut awards Star Shards (GS-12)', () => {
     // Walk the run until a cut is missed (the gentle opening cut is now reliably cleared, so
     // failure comes a few stops deep as the cut ramps) — the missed cut must award shards.

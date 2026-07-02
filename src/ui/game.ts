@@ -26,6 +26,7 @@ import {
   teamDuelSetupForRun,
   shardsForRun,
   shopOffer,
+  snapshotRun,
   startRun,
   travel,
   bossRewards,
@@ -220,6 +221,7 @@ export type Action =
   | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt/pants with shards (global ownership) (GS-cosmetics)
   | { type: 'equipApparel'; id: string } // wear an owned hat/shirt/pants on the managed character (toggles off)
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
+  | { type: 'toTitle' } // back to the title from anywhere (GS-settings-nav) — an underway run stays resumable
   | { type: 'restart'; seed?: number | string };
 
 export interface MetaProgress {
@@ -972,27 +974,67 @@ export function reduce(state: UiState, action: Action): UiState {
       };
     }
 
+    case 'toTitle': {
+      // Return to the title from any screen (GS-settings-nav) — the escape hatch the settings sheet
+      // offers on screens with no nav of their own (character select, clubhouse, mid-run…). Never
+      // destructive: a run that's actually underway (a golfer picked, still active) is kept as a
+      // resumable snapshot — exactly what a page reload offers — so "back to title" can't lose a run.
+      // The title's placeholder run (no golfer yet) is NOT worth resuming; any older offer survives.
+      if (state.screen === 'title') return state;
+      const resumable =
+        state.run.status === 'active' && state.run.loadout.characterId
+          ? snapshotRun(state.run)
+          : state.resumable;
+      // Rebuild the placeholder run backing the title (same seed) so format previews start clean.
+      const run = startRun(state.run.seed, undefined, state.metaUpgrades, undefined, 0, state.bagTier);
+      return {
+        ...state,
+        run,
+        course: currentCourse(run),
+        screen: 'title',
+        resumable,
+        played: undefined,
+        lastResult: undefined,
+        routes: undefined,
+        shopOffer: undefined,
+        shopRerolls: undefined,
+        play: undefined,
+        holeRng: undefined,
+        stopPlayed: undefined,
+        match: undefined,
+        scrambleChoice: undefined,
+        bossReward: undefined,
+        manageCharacterId: undefined,
+        viewHole: 0,
+      };
+    }
+
     case 'restart': {
-      // Fresh run; meta-progression carries over.
-      return initState(action.seed ?? state.run.seed, {
-        bestStableford: state.bestStableford,
-        bestDistance: state.bestDistance,
-        shards: state.shards,
-        metaUpgrades: state.metaUpgrades,
-        maxAscension: state.maxAscension,
-        lifetimeAces: state.lifetimeAces,
-        ownedShips: state.ownedShips,
-        ownedApparel: state.ownedApparel,
-        shipByCharacter: state.shipByCharacter,
-        hatByCharacter: state.hatByCharacter,
-        shirtByCharacter: state.shirtByCharacter,
-        pantsByCharacter: state.pantsByCharacter,
-        golfBagByCharacter: state.golfBagByCharacter,
-        bagTier: state.bagTier,
-        unlockedClubsByCharacter: state.unlockedClubsByCharacter,
-        clubhouseVisit: state.clubhouseVisit,
-        endlessBestHoles: state.endlessBestHoles,
-      });
+      // Fresh run; meta-progression carries over. A pending resume offer (a saved run) also
+      // survives — restarting to a new seed (e.g. the Daily) must not wipe an unplayed run.
+      return initState(
+        action.seed ?? state.run.seed,
+        {
+          bestStableford: state.bestStableford,
+          bestDistance: state.bestDistance,
+          shards: state.shards,
+          metaUpgrades: state.metaUpgrades,
+          maxAscension: state.maxAscension,
+          lifetimeAces: state.lifetimeAces,
+          ownedShips: state.ownedShips,
+          ownedApparel: state.ownedApparel,
+          shipByCharacter: state.shipByCharacter,
+          hatByCharacter: state.hatByCharacter,
+          shirtByCharacter: state.shirtByCharacter,
+          pantsByCharacter: state.pantsByCharacter,
+          golfBagByCharacter: state.golfBagByCharacter,
+          bagTier: state.bagTier,
+          unlockedClubsByCharacter: state.unlockedClubsByCharacter,
+          clubhouseVisit: state.clubhouseVisit,
+          endlessBestHoles: state.endlessBestHoles,
+        },
+        state.resumable,
+      );
     }
   }
 }

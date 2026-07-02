@@ -213,7 +213,14 @@ function persist(): void {
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     clubhouseVisit: state.clubhouseVisit,
     endlessBestHoles: state.endlessBestHoles,
-    activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
+    // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
+    // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
+    // moment anything dispatched from the title. While no real run is live, any resumable offer
+    // the state carries (a reload's, or one parked by 'toTitle') is kept instead of wiped.
+    activeRun:
+      state.run.status === 'active' && state.run.loadout.characterId
+        ? snapshotRun(state.run)
+        : state.resumable,
   });
 }
 
@@ -387,33 +394,47 @@ function endlessProgressHTML(): string {
 }
 
 function titleScreen(): string {
-  // Headline the winnable campaign (GS-voyage) first, then the endless survival format.
+  // Headline the winnable campaign (GS-voyage) first, then the endless survival format — each as a
+  // hero MODE TILE (GS-settings-nav): a big accent-coloured launch button instead of a plain panel.
   const formats = Object.values(FORMATS)
     .slice()
     .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
-    .map(
-      (f) => `
-      <div class="gs-panel gs-format" ${f.winnable ? 'style="border-color:#ffce5466;"' : ''}>
-        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-          <b style="font-size:16px;">${f.name}</b>
-          ${f.winnable ? '<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:10.5px;">★ CAMPAIGN · WINNABLE</span>' : ''}
-          <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.winnable ? '' : f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
+    .map((f) => {
+      const mc = f.winnable ? '#ffce54' : '#b88aff';
+      const icon = f.winnable ? '🚀' : '🌌';
+      const badge = f.winnable ? '★ CAMPAIGN · WINNABLE' : '∞ ENDLESS SURVIVAL';
+      const path = `${f.stops.map((s) => s.label).join(' → ')}${f.winnable ? '' : f.stops.length > 1 ? ' → …' : ' → forever'}`;
+      const launch = `<button class="gs-modestart" data-action='${JSON.stringify({ type: 'start', format: f.id })}'>
+          ${icon} ${f.winnable ? 'Set sail' : 'Tee off'} — ${f.name}</button>`;
+      // The voyage's Ascension ladder (GS-ascension): the big button launches A0; unlocked higher
+      // tiers ride a chip row beneath it.
+      const asc =
+        f.winnable && state.maxAscension > 0
+          ? `<div class="gs-modeasc">
+               <span>⚔ Ascension — harder cut, leaner purse (max unlocked: A${state.maxAscension}):</span>
+               <div style="display:flex;gap:6px;flex-wrap:wrap;">${Array.from({ length: state.maxAscension }, (_, a) =>
+                 btn(`A${a + 1}`, { type: 'start', format: f.id, ascension: a + 1 }, { variant: 'ghost' }),
+               ).join('')}</div>
+             </div>`
+          : '';
+      return `
+      <div class="gs-modetile" style="--mc:${mc};">
+        <div class="gs-modetile-head">
+          <span class="gs-modetile-icon" aria-hidden="true">${icon}</span>
+          <div style="min-width:0;">
+            <b class="gs-modetile-name">${f.name}</b>
+            <div class="gs-modetile-badge">${badge}</div>
+          </div>
         </div>
-        <p style="font-size:13px;opacity:.8;margin:.4em 0;">${f.blurb}</p>
+        <p class="gs-modetile-blurb">${f.blurb}</p>
+        <div class="gs-modetile-path">${path}</div>
         ${f.holeGate ? endlessProgressHTML() : ''}
-        ${
-          f.winnable && state.maxAscension > 0
-            ? `<div style="font-size:12px;opacity:.75;margin-bottom:5px;">⚔ Ascension — harder cut, leaner purse. Win to unlock the next tier (max unlocked: A${state.maxAscension}):</div>
-               <div style="display:flex;gap:6px;flex-wrap:wrap;">${Array.from({ length: state.maxAscension + 1 }, (_, a) =>
-                 btn(`A${a}`, { type: 'start', format: f.id, ascension: a }, { variant: a === 0 ? 'primary' : 'ghost' }),
-               ).join('')}</div>`
-            : btn(`Start — ${f.name}`, { type: 'start', format: f.id }, { variant: 'primary' })
-        }
-      </div>`,
-    )
+        ${launch}
+        ${asc}
+      </div>`;
+    })
     .join('');
   return `
-    <button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
     <header style="border-left:4px solid #5fd45a;padding-left:10px;">
       <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
@@ -436,7 +457,7 @@ function titleScreen(): string {
            </div>`
         : ''
     }
-    <h2 style="font-size:15px;margin-top:1em;">${state.resumable ? 'Or start a new run' : 'Choose a run format'}</h2>
+    <h2 style="font-size:15px;margin-top:1em;">${state.resumable ? 'Or start a new run' : 'Choose your game'}</h2>
     ${formats}`;
 }
 
@@ -1623,7 +1644,8 @@ function playingBody(animating: boolean): string {
 let settingsOpen = false;
 
 /** The settings sheet: player-owned feel/control prefs (sound, haptics, fast shots, swing gesture,
- *  left-handed, reduced motion). Persisted to localStorage via the settings module. */
+ *  left-handed, reduced motion), plus — anywhere but the title itself — a "Return to title" escape
+ *  hatch (GS-settings-nav). An underway run is parked as a resumable snapshot, never destroyed. */
 function settingsOverlay(): string {
   const s = getSettings();
   const row = (key: keyof Settings, label: string, desc: string): string => {
@@ -1633,6 +1655,14 @@ function settingsOverlay(): string {
       <span class="gs-toggle${on ? ' gs-toggle--on' : ''}" aria-hidden="true"><span class="gs-knob"></span></span>
     </button>`;
   };
+  const midRun = state.run.status === 'active' && !!state.run.loadout.characterId;
+  const homeRow =
+    state.screen === 'title'
+      ? ''
+      : `<button class="gs-setrow" data-settings-home="1">
+          <span class="gs-setlabel"><b>🏠 Return to title</b><span>${midRun ? 'Your run is saved — continue it any time' : 'Back to the main menu'}</span></span>
+          <span style="font-size:16px;opacity:.6;" aria-hidden="true">→</span>
+        </button>`;
   return `
     <div class="gs-sheet-backdrop" data-settings="close">
       <div class="gs-sheet" data-settings="keep">
@@ -1643,6 +1673,7 @@ function settingsOverlay(): string {
         ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
         ${row('leftHanded', 'Left-handed', 'Enables left handed mode')}
         ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
+        ${homeRow}
         <div style="text-align:center;margin-top:10px;">
           <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 26px;">Done</button>
         </div>
@@ -3112,7 +3143,10 @@ function render(): void {
     state.screen === 'title'
       ? titleScreen()
       : state.screen === 'character'
-      ? characterScreen(state.unlockedClubsByCharacter)
+      ? characterScreen(state.unlockedClubsByCharacter, {
+          modeName: getFormat(state.run.formatId).name,
+          winnable: !!getFormat(state.run.formatId).winnable,
+        })
       : state.screen === 'intro'
       ? introScreen()
       : state.screen === 'playing'
@@ -3139,7 +3173,11 @@ function render(): void {
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
   const routeSheet = state.screen === 'travel' && inspectRouteId != null ? routeInfoOverlay() : '';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${settingsOpen ? settingsOverlay() : ''}${routeSheet}`;
+  // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's
+  // own markup so no screen can forget it. The full-bleed play view is the one exception: its
+  // map-nav stack already carries a cog, and a second fixed button would collide with it.
+  const cog = fullBleed ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Wire actions.
@@ -3288,6 +3326,15 @@ function render(): void {
       resumeAudio();
       sfx.click();
       render();
+    });
+  });
+  // "Return to title" (GS-settings-nav): close the sheet, then the reducer parks an underway run
+  // as a resumable snapshot and lands on the title — the same offer a page reload makes.
+  app.querySelectorAll<HTMLElement>('[data-settings-home]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsOpen = false;
+      dispatch({ type: 'toTitle' });
     });
   });
   // Dismiss the shot-result popup → reveal the next decision (a local view control).

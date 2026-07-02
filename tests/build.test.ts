@@ -98,7 +98,7 @@ describe('build output (real browser)', () => {
         const text = (await page.textContent('#app')) || '';
         expect(errors).toEqual([]);
         expect(text).toContain('Golf Stars');
-        expect(text).toContain('run format'); // the title screen actually rendered
+        expect(text).toContain('Choose your game'); // the title screen actually rendered
       } finally {
         await browser.close();
       }
@@ -167,7 +167,7 @@ describe('build output (real browser)', () => {
           await b.click();
           await page.waitForTimeout(350);
         };
-        await click('Start — The Voyage');
+        await click('Set sail — The Voyage');
         await click('Voyage as Feather'); // character select
         await click('Play shot by shot'); // → the play screen
         await page.waitForTimeout(300);
@@ -185,7 +185,7 @@ describe('build output (real browser)', () => {
         const text = (await page.textContent('#app')) || '';
         expect(errors).toEqual([]);
         expect(recovered).toBeNull();
-        expect(text).not.toContain('Start — The Voyage'); // not bounced back to the format picker
+        expect(text).not.toContain('Set sail — The Voyage'); // not bounced back to the format picker
       } finally {
         await browser.close();
       }

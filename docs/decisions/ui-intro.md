@@ -13,7 +13,8 @@
   `--gs-accent/-info/-danger/-gold/-warn`, `--gs-r/-r-lg`, `--gs-shadow`) are the single palette;
   component classes carry the hover/active/focus states inline styles can't express:
   `.gs-btn` (+ `--primary` green CTA / `--ghost` secondary / `--on` selected-toggle / `--block`),
-  `.gs-panel`, `.gs-format` (hover-lift title cards), `.gs-chip`, `.gs-clickcard` (hover-lift shop/
+  `.gs-panel`, `.gs-modetile`/`.gs-modestart` (the title's game-mode hero tiles + accent launch
+  buttons, GS-settings-nav — they replaced the old `.gs-format` panels), `.gs-chip`, `.gs-clickcard` (hover-lift shop/
   outpost cards), `.gs-scorecard`, `.gs-main` (the cosmic-vignette page frame). The `btn()` helper in
   `app.ts` takes `variant`; a dynamic rarity border is passed as `borderColor` → `--btn-border`/
   `--btn-hover` inline override (used by the travel route lanes). Adding a screen = reuse these
@@ -48,6 +49,37 @@
   block in `index.html` drives the full-bleed shot screen (`.gs-shot/.gs-topbar/.gs-bigmap/.gs-bottom/
   .gs-shotscore`); the older side-by-side `.gs-play/.gs-map/.gs-controls` classes still back other
   screens. The map fills the flex remainder and the controls always sit under it without a scroll.
+
+## Global settings nav + one-screen roster + mode tiles (GS-settings-nav, 2026-07)
+- **The settings cog rides EVERY screen.** It used to be hand-placed per screen (title + the play
+  view's map stack) so new screens (character select, clubhouse, market…) silently shipped without
+  settings. Now `render()` appends one fixed cog OUTSIDE each screen's markup for every non-full-bleed
+  screen — no screen can forget it. The full-bleed play view is the one exception (its map-nav stack
+  already carries a cog; a second fixed button would collide).
+- **"Return to title" lives in the settings sheet**, shown on every screen but the title itself. It
+  dispatches the reducer action `toTitle`, which is deliberately NON-destructive: a run that's
+  actually underway (`status === 'active'` AND a `characterId` picked) is parked as a `resumable`
+  snapshot (`snapshotRun`) — exactly the offer a page reload makes — while the title's character-less
+  placeholder run is never offered (nothing worth resuming). The sheet's subtext tells the player
+  which case they're in ("Your run is saved…" vs "Back to the main menu").
+- **`persist()` prefers the live run, else the parked offer.** It used to snapshot ANY active run —
+  including the title's placeholder — so any dispatch from the title (opening the Clubhouse/Market)
+  overwrote a saved run's snapshot with the empty placeholder. Now `activeRun` is written only for an
+  underway run (characterId picked); otherwise the state's `resumable` is passed through, so a parked
+  run survives reloads and title-screen wandering. `restart` (the Daily button) also carries
+  `state.resumable` through `initState` for the same reason.
+- **Character select fits ONE screen in every mode.** The roster is a 2×2 grid on phones (4-across
+  ≥1000px, never a 3+1 orphan). Small screens swap the blurb + full pros/cons `<ul>` for a one-line
+  `✓ pros[0] · ▲ cons[0]` hint — SAME markup, media-query visibility (`.gs-charcard-hint` vs
+  `.gs-charcard-blurb`/`.gs-charcard-pc`), so there's no per-breakpoint template fork. The CTA verb
+  follows the chosen format via `characterScreen(unlocked, { modeName, winnable })`: "Voyage as …"
+  for the campaign, "Survive as …" for the Unending Universe, with the mode named in the header so
+  you always know what you're picking for.
+- **Title mode tiles**: each format renders as a `.gs-modetile` hero card — gold + 🚀 for the
+  winnable Voyage, violet + 🌌 for the Unending Universe — with a big accent `.gs-modestart` launch
+  button ("Set sail — The Voyage" / "Tee off — Unending Universe"; the build test clicks the former
+  by label). The Ascension ladder rides a chip row UNDER the big button (the button launches A0),
+  still data-driven off `FORMATS` — a new format gets a tile for free.
 
 ## Loading intro cinematic (`render/introView.ts`)
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
