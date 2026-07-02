@@ -323,6 +323,49 @@ export const sfx = {
     tone(240, 0.08, { type: 'sine', gain: 0.16, sweepTo: 150 });
     noise(0.03, { gain: 0.08, freq: 600, q: 1 });
   },
+  /**
+   * A caddy guard looses its projectile (GS-audio-4) — the launch half of the redirect cinematic.
+   * Space Ducks laser: a sci-fi PEW dive + a thin beam whine that rises as it closes on the ball.
+   * Convict Sheep boomerang: a launch whoosh + a whirring whip-whip-whip that quickens/brightens
+   * across the flight. `travelMs` is the REAL time until contact (playView computes it from the
+   * intercept arc + slow-mo scale) so the whir/whine ends exactly where the hit cue takes over.
+   */
+  redirectFire(kind: 'laser' | 'boomerang', travelMs = 900): void {
+    const dur = Math.max(0.4, Math.min(1.8, travelMs / 1000));
+    if (kind === 'laser') {
+      tone(1750, 0.22, { type: 'sawtooth', gain: 0.15, sweepTo: 220 }); // the PEW dive
+      tone(2320, 0.18, { type: 'square', gain: 0.05, sweepTo: 340 }); // bright zap layer
+      noise(0.05, { gain: 0.1, type: 'highpass', freq: 5200 }); // muzzle crack
+      tone(760, dur, { type: 'sawtooth', gain: 0.035, sweepTo: 1350 }); // beam whine, rising as it closes
+    } else {
+      noise(0.12, { gain: 0.14, type: 'bandpass', freq: 600, q: 0.8 }); // the launch whoosh
+      // The whir: whip-whip-whip pulses that quicken slightly and brighten as the boomerang closes.
+      const pulses = Math.max(4, Math.round(dur / 0.11));
+      for (let i = 0; i < pulses; i++) {
+        const p = i / pulses;
+        noise(0.07, { gain: 0.09 + 0.06 * p, type: 'bandpass', freq: 900 + 750 * p, q: 1.4, t: p * dur });
+      }
+    }
+  },
+  /**
+   * The projectile MEETS the ball (GS-audio-4) — the contact half, cued at the spark spray.
+   * Laser: an energy SNAP that zaps the ball's ping UP + a discharge slump and spark crackle.
+   * Boomerang: the wooden CRACK of a thrown stick on a golf ball + a wobbling ring as it spins off.
+   */
+  redirectHit(kind: 'laser' | 'boomerang'): void {
+    if (kind === 'laser') {
+      noise(0.06, { gain: 0.22, type: 'highpass', freq: 3800 }); // the energy SNAP
+      tone(1568, 0.14, { type: 'square', gain: 0.09, sweepTo: 2350 }); // the zapped ball pings UP
+      tone(392, 0.12, { type: 'sawtooth', gain: 0.1, sweepTo: 130 }); // discharge slump
+      noise(0.03, { gain: 0.1, freq: 2600, q: 2, t: 0.05 }); // spark crackle
+      noise(0.025, { gain: 0.07, freq: 3200, q: 2, t: 0.1 });
+    } else {
+      noise(0.035, { gain: 0.3, type: 'bandpass', freq: 1100, q: 1 }); // the wooden CRACK on the ball
+      tone(260, 0.09, { type: 'triangle', gain: 0.18, sweepTo: 120 }); // solid knock body
+      tone(1200, 0.05, { type: 'triangle', gain: 0.08, t: 0.01 }); // the ball's ping off the wood
+      tone(340, 0.18, { type: 'sine', gain: 0.06, t: 0.05, sweepTo: 300 }); // wobble ring spinning off
+    }
+  },
   /** Ball bonks a trade-camp tent (GS-tents) — a soft canvas thump + a springy boing as it ricochets. */
   bonk(): void {
     noise(0.05, { gain: 0.16, type: 'bandpass', freq: 380, q: 0.8 }); // muffled canvas thump

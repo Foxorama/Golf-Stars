@@ -644,6 +644,11 @@ export interface PlayViewOptions {
    *  the land FX shows), `penalty` the sim's penalty kind, `knockedDown` true when a tree clipped
    *  the ball out of the air. Pure feel hook; never affects the sim. */
   onLand?: (lie: string, penalty?: string, knockedDown?: boolean) => void;
+  /** Fired at both beats of a caddy-guard redirect (GS-audio-4) — the cue points for the projectile
+   *  sounds. `'fire'` as the guard looses the laser/boomerang (`travelMs` = REAL ms until contact,
+   *  slow-mo already folded in, so a whir/whine can be sized to end at the hit); `'hit'` at the
+   *  spark-spray contact with the ball. Pure feel hook; never affects the sim. */
+  onRedirect?: (kind: 'laser' | 'boomerang', phase: 'fire' | 'hit', travelMs?: number) => void;
   /**
    * Zoom-and-follow: when set, the camera centres on `focus` (the starting ball) at radius
    * `viewRadius` (course yards) and — if `follow` — eases to track the ball in flight, so the
@@ -1140,6 +1145,10 @@ export function mountPlayView(
               shake = Math.max(shake, 0.4);
               // Slow the world + sound the caddy's catchphrase as the guard makes the save.
               fireCaddyEffect(forcedRedirectCaddy(rd.kind));
+              // The launch sound (GS-audio-4): pass the REAL ms until contact — the intercept arc
+              // in virtual time, stretched by the slow-mo the fireCaddyEffect above just armed —
+              // so the laser whine / boomerang whir ends exactly as the hit cue takes over.
+              opts.onRedirect?.(rd.kind, 'fire', ((interceptFrac - fireFrac) * flightDur) / CADDY_SLOMO);
             }
             // Projectile: progress tied to the ball's flight, so it arrives at the intercept (pp=1)
             // exactly as the ball does. A short lead past contact lets it visibly strike.
@@ -1151,6 +1160,7 @@ export function mountPlayView(
             if (tg >= interceptFrac && sparksFiredShot !== shotIndex) {
               sparksFiredShot = shotIndex;
               spawnSparks(impactScreen, rd.kind);
+              opts.onRedirect?.(rd.kind, 'hit'); // the projectile meets the ball (GS-audio-4)
             }
             const sinceHit = tg - interceptFrac;
             if (sinceHit >= 0 && sinceHit < 0.16) {

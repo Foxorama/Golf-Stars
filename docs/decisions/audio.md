@@ -76,6 +76,28 @@ clear of the canopy poly. Pure feel hook + pure classifiers: zero sim/rng impact
 (so no test-hub wiring), and `tests/audio.test.ts` machine-checks that every surface-bearing
 penalty kind and every archetype resolve to a voice.
 
+## Caddy-guard projectile cues (GS-audio-4)
+
+The redirect cinematic (GS-caddy) sounds at both of its beats via a second feel hook,
+`onRedirect(kind, phase, travelMs)`, fired from the exact code points the visuals already key off:
+`'fire'` in the `redirectFiredShot` block (as the guard looses the shot, alongside the slow-mo +
+voice line) and `'hit'` in the `sparksFiredShot` block (the spark-spray contact). Voices:
+
+- **Space Ducks laser** — fire: a sci-fi PEW (saw dive 1750→220 + a bright square zap + muzzle
+  crack) under a thin beam whine that RISES as it closes on the ball; hit: an energy SNAP, the
+  zapped ball pinging UP, a discharge slump, spark crackle.
+- **Convict Sheep boomerang** — fire: a launch whoosh + a whirring whip-whip-whip (bandpass noise
+  pulses that quicken and brighten across the flight); hit: the wooden CRACK of stick-on-ball, a
+  solid knock body, the ball's ping, and a wobbling ring as it spins off.
+
+The trick that makes the whir/whine read true: `travelMs` is the REAL time until contact —
+playView computes `(HIT_FRAC − FIRE_FRAC) · flightDur / CADDY_SLOMO` (the intercept arc in virtual
+time, stretched by the slow-mo that `fireCaddyEffect` armed one line earlier) — so the projectile
+sound ends exactly where the hit cue takes over instead of dying early or overshooting. The cues
+layer under the caddy's spoken catchphrase (`onCaddyEffect`), which stays the headline. The
+force-redirect demo (`_gsFeel.forceRedirect`) exercises the full sound on demand, no new hook
+needed. `tests/audio.test.ts` pins the call-clean contract: every cue is a guarded no-op in node.
+
 ## Generative music (`render/music.ts`)
 
 **Table + dispatch, the GS-biome-feel pattern:** `MUSIC_TRACKS` has one row per world archetype
