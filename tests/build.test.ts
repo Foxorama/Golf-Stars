@@ -167,7 +167,7 @@ describe('build output (real browser)', () => {
           await b.click();
           await page.waitForTimeout(350);
         };
-        await click('Set sail'); // the Voyage mode tile (whole tile is the button)
+        await click('The Voyage'); // the Voyage game tile (whole tile is the button)
         await click('Voyage as Feather'); // character select
         await click('Play shot by shot'); // → the play screen
         await page.waitForTimeout(300);
@@ -185,7 +185,7 @@ describe('build output (real browser)', () => {
         const text = (await page.textContent('#app')) || '';
         expect(errors).toEqual([]);
         expect(recovered).toBeNull();
-        expect(text).not.toContain('Set sail'); // not bounced back to the title's mode tiles
+        expect(text).not.toContain('Choose your game'); // not bounced back to the title
       } finally {
         await browser.close();
       }

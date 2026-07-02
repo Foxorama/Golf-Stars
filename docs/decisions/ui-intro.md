@@ -13,8 +13,8 @@
   `--gs-accent/-info/-danger/-gold/-warn`, `--gs-r/-r-lg`, `--gs-shadow`) are the single palette;
   component classes carry the hover/active/focus states inline styles can't express:
   `.gs-btn` (+ `--primary` green CTA / `--ghost` secondary / `--on` selected-toggle / `--block`),
-  `.gs-panel`, `.gs-modetile`/`.gs-modestart` (the title's game-mode hero tiles + accent launch
-  buttons, GS-settings-nav — they replaced the old `.gs-format` panels), `.gs-chip`, `.gs-clickcard` (hover-lift shop/
+  `.gs-panel`, `.gs-navtile` (+ `--game`, the title's doorway tiles — they replaced the old
+  `.gs-format` panels), `.gs-chip`, `.gs-clickcard` (hover-lift shop/
   outpost cards), `.gs-scorecard`, `.gs-main` (the cosmic-vignette page frame). The `btn()` helper in
   `app.ts` takes `variant`; a dynamic rarity border is passed as `borderColor` → `--btn-border`/
   `--btn-hover` inline override (used by the travel route lanes). Adding a screen = reuse these
@@ -75,11 +75,10 @@
   follows the chosen format via `characterScreen(unlocked, { modeName, winnable })`: "Voyage as …"
   for the campaign, "Survive as …" for the Unending Universe, with the mode named in the header so
   you always know what you're picking for.
-- **Title mode tiles**: each format renders as a `.gs-modetile` hero card — gold + 🚀 for the
-  winnable Voyage, violet + 🌌 for the Unending Universe — with a big accent `.gs-modestart` launch
-  button ("Set sail — The Voyage" / "Tee off — Unending Universe"; the build test clicks the former
-  by label). The Ascension ladder rides a chip row UNDER the big button (the button launches A0),
-  still data-driven off `FORMATS` — a new format gets a tile for free.
+- **Title game tiles**: each format renders as a doorway tile — gold + 🚀 for the winnable Voyage,
+  violet + 🌌 for the Unending Universe — data-driven off `FORMATS`, a new format gets a tile for
+  free. (First shipped as a busier `.gs-modetile` hero card with badge + launch bar; unified onto
+  `.gs-navtile--game` in the GS-title-3 pass below.)
 
 ## Title rework: hero wordmark, painted mode tiles, Ascension at golfer select (GS-title-2, 2026-07)
 First-device feedback on GS-settings-nav reshaped the title:
@@ -96,16 +95,21 @@ First-device feedback on GS-settings-nav reshaped the title:
 - **The Daily Challenge button is PARKED (removed from the title), not deleted from the engine** —
   string seeds still work (`?seed=daily-YYYY-MM-DD` reproduces it); only the `dailySeed`/`dailyLabel`
   helpers went. Bring it back as its own surface when it earns a place.
-- **Mode tiles joined the doorway-tile family but read as a distinct class.** Same visual language
-  as the Market/Clubhouse tiles (a hand-placed, byte-stable painted SVG scene behind a bottom-scrim
-  caption — `voyageTileArt()`: a dotted gold route arcing over three worlds to a pin flag, a ship
-  mid-jump; `unendingTileArt()`: a violet star tunnel of receding rings with a golf ball streaking
-  in), differentiated as GAMES by: full-width (nav tiles are 2-up), taller, accent border + glow
-  (`--mc` gold/violet), a corner badge (★ CAMPAIGN · WINNABLE / ∞ ENDLESS SURVIVAL), and a fat
-  `.gs-modetile__go` launch bar ("▶ Set sail" / "▶ Tee off" — the build test clicks "Set sail").
-  The WHOLE tile is one `<button>` (no nested controls — Ascension left, the endless milestone strip
-  shrank to a one-line `endlessTeaseHTML()` best + next-unlock tease; the full milestone trail's
-  home is the Trade Market's earned gear). Still data-driven off `FORMATS` keyed on `winnable`.
+- **Game tiles ARE doorway tiles (GS-title-3, 2026-07).** The first GS-title-2 cut gave the game
+  tiles their own busier `.gs-modetile` component — full-width, taller, corner badge, meta/progress
+  text and a fat `.gs-modetile__go` launch bar. Device feedback: they read as "a tap panel plus a
+  button plus a heap of text" and clashed with the clean Market/Clubhouse doorways. So the component
+  was DELETED and the game tiles now reuse `.gs-navtile` verbatim with a `--game` modifier — same
+  2-up grid (1-up ≤460px), same art + title + one-line caption anatomy (the caption is the format's
+  `blurb`, trimmed to doorway length), distinct ONLY via the `--mc` accent (gold/violet) on border +
+  title and a slightly taller `min-height` (150px vs 134px). The painted scenes stayed
+  (`voyageTileArt()`: a dotted gold route arcing over three worlds to a pin flag, a ship mid-jump;
+  `unendingTileArt()`: a violet star tunnel with a golf ball streaking in). The WHOLE tile is one
+  `<button>`, still data-driven off `FORMATS` keyed on `winnable`. The endless best-holes count
+  moved to a hero chip (`∞ Best N holes`); the next-unlock tease line was dropped — the full
+  milestone trail's home is the Trade Market's earned gear. The build test now clicks the tile by
+  its format name ("The Voyage") and uses the title-only "Choose your game" seclabel as its
+  not-on-title sentinel.
 - **Hero header**: centred wordmark (green/gold glow) + small-caps tagline + a chips row (shards /
   aces / bests / install). Sections are labelled by `.gs-seclabel` rules ("Choose your game" — the
   build test asserts this string — and "Between runs" over the Market/Clubhouse doorways).

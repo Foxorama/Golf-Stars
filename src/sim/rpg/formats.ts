@@ -121,8 +121,7 @@ export const FORMATS: Record<string, RunFormat> = {
   unending: {
     id: 'unending',
     name: 'Unending Universe',
-    blurb:
-      'Four random holes, a shop, a jump — forever. Every hole has a survival score, one stroke tighter each eight holes, until only birdies keep the run alive.',
+    blurb: 'Endless survival — every hole has a score to beat',
     stops: [{ holes: 4, label: '4 holes' }],
     holeGate: true,
   },
@@ -134,7 +133,7 @@ export const FORMATS: Record<string, RunFormat> = {
   voyage: {
     id: 'voyage',
     name: 'The Voyage',
-    blurb: 'Three arcs across the galaxy, each capped by a boss. Beat the Galactic Major to win the run.',
+    blurb: 'The campaign — three arcs, three bosses, one win',
     winnable: true,
     cutMult: 0.65,
     maxJump: 2,

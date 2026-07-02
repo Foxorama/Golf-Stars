@@ -357,50 +357,35 @@ function header(): string {
     </header>`;
 }
 
-/** One-line Unending-Universe progress for the mode tile (GS-unending): lifetime-best holes + the
- *  next unlock tease (the hole-150 secret masked as "? ? ?" until owned). The full milestone trail
- *  lives with the earned gear in the Trade Market; the tile keeps just the pull. */
-function endlessTeaseHTML(): string {
-  const best = state.endlessBestHoles;
-  const next = nextEndlessUnlock(best);
-  const tease = next
-    ? `next unlock <b>${next.secret ? '? ? ?' : next.name}</b> @ hole ${next.holes}`
-    : 'every unlock earned — the universe is yours';
-  return `💀 ${best > 0 ? `Best: <b style="color:#4fe08a;">${best} holes</b>` : 'Survive as long as you can'} · ${tease}`;
-}
-
 function titleScreen(): string {
-  // Headline the winnable campaign (GS-voyage) first, then the endless survival format. Each is a
-  // hero MODE TILE (GS-title-2): the same painted-scene + caption language as the Market/Clubhouse
-  // doorways, but taller, accent-bordered and carrying a launch bar — one visual family, two clear
-  // classes. The whole tile is the button; Ascension is picked at golfer select, not here.
+  // Headline the winnable campaign (GS-voyage) first, then the endless survival format. Each GAME
+  // tile (GS-title-2) is the SAME doorway component as the Market/Clubhouse tiles below — painted
+  // scene + title + one-line caption, whole tile the button — distinct only via the `--mc` accent
+  // (gold vs violet). No badge/launch-bar/progress text: one clean visual family across the title.
+  // Ascension is picked at golfer select, not here.
   const modes = Object.values(FORMATS)
     .slice()
     .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
-    .map((f) => {
-      const mc = f.winnable ? '#ffce54' : '#b88aff';
-      const badge = f.winnable ? '★ CAMPAIGN · WINNABLE' : '∞ ENDLESS SURVIVAL';
-      const meta = f.winnable
-        ? state.maxAscension > 0
-          ? `⚔ Ascension up to A${state.maxAscension} — pick your difficulty at golfer select`
-          : ''
-        : endlessTeaseHTML();
-      return `
-      <button class="gs-modetile" style="--mc:${mc};" data-action='${JSON.stringify({ type: 'start', format: f.id })}'>
-        <span class="gs-modetile__art" aria-hidden="true">${f.winnable ? voyageTileArt() : unendingTileArt()}</span>
-        <span class="gs-modetile__badge">${badge}</span>
-        <span class="gs-modetile__cap">
-          <span class="gs-modetile__title">${f.winnable ? '🚀' : '🌌'} ${f.name}</span>
-          <span class="gs-modetile__sub">${f.blurb}</span>
-          ${meta ? `<span class="gs-modetile__meta">${meta}</span>` : ''}
-          <span class="gs-modetile__go">▶ ${f.winnable ? 'Set sail' : 'Tee off'}</span>
+    .map(
+      (f) => `
+      <button class="gs-navtile gs-navtile--game" style="--mc:${f.winnable ? '#ffce54' : '#b88aff'};" data-action='${JSON.stringify({ type: 'start', format: f.id })}'>
+        <span class="gs-navtile__art" aria-hidden="true">${f.winnable ? voyageTileArt() : unendingTileArt()}</span>
+        <span class="gs-navtile__cap">
+          <span class="gs-navtile__title">${f.winnable ? '🚀' : '🌌'} ${f.name}</span>
+          <span class="gs-navtile__sub">${f.blurb}</span>
         </span>
-      </button>`;
-    })
+      </button>`,
+    )
     .join('');
   const best =
     state.bestDistance > 0 || state.bestStableford > 0
       ? `<span class="gs-chip" title="personal bests" style="font-size:12px;">🏁 Best dist <b>${state.bestDistance}</b> · SF <b>${state.bestStableford}</b></span>`
+      : '';
+  // Unending-Universe lifetime best rides the hero chips row (the tile itself stays caption-only;
+  // the full milestone trail lives with the earned gear in the Trade Market).
+  const endlessBest =
+    state.endlessBestHoles > 0
+      ? `<span class="gs-chip" title="Unending Universe best" style="font-size:12px;">∞ Best <b style="color:#4fe08a;">${state.endlessBestHoles}</b> holes</span>`
       : '';
   return `
     <header class="gs-hero">
@@ -410,6 +395,7 @@ function titleScreen(): string {
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;">✦ <b>${state.shards}</b> Star Shards</span>
         ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
         ${best}
+        ${endlessBest}
         ${installButtonHTML()}
       </div>
     </header>
@@ -422,12 +408,12 @@ function titleScreen(): string {
         : ''
     }
     <h2 class="gs-seclabel">${state.resumable ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-modetiles">${modes}</div>
+    <div class="gs-navtiles">${modes}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
 }
 
-/** Painted backdrop for the Voyage mode tile (GS-title-2): the campaign as a dotted gold route
+/** Painted backdrop for the Voyage game tile (GS-title-2): the campaign as a dotted gold route
  *  arcing across three worlds (the three arcs) to a pin flag on the far planet, a ship mid-jump.
  *  Same hand-placed byte-stable house style as the Market/Clubhouse doorway scenes. */
 function voyageTileArt(): string {
@@ -470,7 +456,7 @@ function voyageTileArt(): string {
   </svg>`;
 }
 
-/** Painted backdrop for the Unending Universe mode tile (GS-title-2): a star tunnel of receding
+/** Painted backdrop for the Unending Universe game tile (GS-title-2): a star tunnel of receding
  *  rings pulling toward a bright singularity, a golf ball streaking in — no far shore. Hand-placed,
  *  byte-stable, same house style as the other doorway scenes. */
 function unendingTileArt(): string {
