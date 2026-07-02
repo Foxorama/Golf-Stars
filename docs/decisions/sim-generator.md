@@ -489,10 +489,20 @@
       a `CliffLook` palette — cetus = blue clifftop (`CETUS_CLIFF`), void = violet ASTEROID underside
       (`VOID_CLIFF`, applied to void's lost pads only, gated so a calm void rectangle isn't given an odd
       underside). Fairway mowing stripes were softened (`mowTones` blends the light/dark bands halfway to
-      the base — the "Beetlejuice snake" fix; indigo worlds keep a touch more via `MOW_BLEND`). NOTE: CALM
-      cetus/void par 4/5 still read flatter (their whole play-bounds is playable rough, so they can't be
-      islands) — a two-tier raised-fairway shelf is the follow-up if wanted. Re-shoot the gallery after any
-      `platformCliffs`/`mowTones`/island-hop change.
+      the base — the "Beetlejuice snake" fix; indigo worlds keep a touch more via `MOW_BLEND`). Re-shoot
+      the gallery after any `platformCliffs`/`mowTones`/island-hop change.
+    - **GS-cetus-6 gave the CALM cetus/void stops a two-tier raised fairway SHELF.** A calm stop's whole
+      play-bounds is playable ROUGH (it can't be islands), so its corridor read flat. The projection is
+      top-down (shot-readability sacred → no camera pitch), where only DOWN-facing surfaces are visible —
+      so a long near-vertical corridor can't show a cliff along its sides (a pure downward drop is
+      invisible in the zoomed play view). `raisedShelf` (render-only, no rng, gated to calm cetus/void via
+      `calmShelf`) implies the lift the top-down way: an OUTSET rock PEDESTAL (`offsetPoly` grow) shifted
+      DOWN by a scaled lift, drawn UNDER the fairway/green fill, so a band of rock rings the surface —
+      present on the near-vertical EDGES (what makes it read at follow-cam zoom) and thicker/darker along
+      the down-screen edge — plus a soft cast shadow on the rough and a lit rim (cyan cetus / violet void)
+      on top. Reads as a raised causeway/mesa at both the whole-hole map and the zoom, using the pads'
+      `CliffLook` palette. Deep stops already sit on real extruded platforms, so the shelf is
+      `!lostHole`-gated.
 - **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the

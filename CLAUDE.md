@@ -228,7 +228,10 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `rough.base` must sit ≥30/255 brightness above its `ARCHETYPE_SPACE.base` — machine-checked); an
   ARMED lost-rough hole (`roughLie` biomeMod, void/cetus deep stops) instead floats a platform per
   play feature in the open deep (the void's deep = negative-energy rifts) — the render mirrors the
-  sim's lost-ball gate. The ANIMATED weather layer honours the same land: its pinned twinkle
+  sim's lost-ball gate. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /
+  void violet asteroid, `CliffLook` palette); a CALM cetus/void stop (playable rough everywhere, can't
+  be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
+  fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only). The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
   meteors/ambient air — stays unmasked). Guards: `tests/biome-identity.test.ts` +
   `tests/weather-mask.test.ts`. The decision map's

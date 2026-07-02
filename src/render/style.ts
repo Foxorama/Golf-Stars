@@ -1638,6 +1638,40 @@ function platformCliffs(
 }
 
 /**
+ * TWO-TIER raised fairway/green SHELF (GS-cetus-6) for a CALM cetus/void stop. The deep stops became
+ * island-hop pads on real extruded cliffs, but a calm stop's whole play-bounds is playable ROUGH
+ * (can't be islands), so its corridor read flat. The projection is top-down (shot-readability is
+ * sacred — no camera pitch), where only DOWN-facing surfaces are visible, so a long vertical corridor
+ * can't show a cliff along its sides. Instead we imply elevation the top-down way: a soft cast SHADOW
+ * on the rough below the surface + a rock FACE peeking out under its down-screen edge, so the cut
+ * grass reads as a raised shelf/mesa above the rough. Drawn UNDER the surface fill (which caps the
+ * shelf top); the lit rim is added over the fill at the call site. Pure geometry — no rng, so every
+ * seeded stream is untouched. `h` (shelf height, px) scales with the projector so it holds across
+ * the map + follow-cam zooms.
+ */
+function raisedShelf(sp: Vec[], scale: number, look: CliffLook): Prim[] {
+  // Two knobs: G = how far the rock PEDESTAL sticks out sideways (visible on the near-vertical corridor
+  // EDGES in the zoomed play view — a pure downward drop is invisible there), h = the vertical LIFT
+  // (the pedestal + shadow shift DOWN so the block reads raised, not a flat symmetric collar). Both
+  // scale with the projector so the shelf holds across the map + follow-cam zooms.
+  const G = Math.max(2.5, Math.min(10, scale * 1.7));
+  const h = Math.max(3, Math.min(13, scale * 2.4));
+  const ped = offsetPoly(sp, -G); // grow the silhouette outward → the pedestal footprint
+  const wide = offsetPoly(sp, -G * 1.7);
+  const shift = (poly: Vec[], dy: number, dx = 0): Vec[] => poly.map((p) => [p[0] + dx, p[1] + dy] as Vec);
+  return [
+    // Soft cast shadow onto the rough below (lit from the upper-left → nudged down-right), fading out.
+    { t: 'poly', pts: shift(wide, h * 1.9, h * 0.45), fill: 'rgba(2,7,13,0.16)' },
+    { t: 'poly', pts: shift(ped, h * 1.25, h * 0.3), fill: 'rgba(2,7,13,0.22)' },
+    // The rock PEDESTAL: the outset footprint dropped by the lift, so a band of rock rings the surface
+    // (thicker + darker along the down-screen edge, present on the sides) — the raised-shelf face. Two
+    // bands (lower darker) sell the drop; the surface fill drawn next caps the top.
+    { t: 'poly', pts: shift(ped, h), fill: look.strata[4]! },
+    { t: 'poly', pts: shift(ped, h * 0.5), fill: look.strata[3]! },
+  ];
+}
+
+/**
  * A graceful side-on SPACE WHALE drifting through the deep (GS-cetus-2). A smooth fusiform body
  * (rounded head → tapering tail stock), a long curved humpback PECTORAL fin, a two-lobed notched
  * tail FLUKE, a blowhole MIST spout, a glowing eye, a lit dorsal ridge and a scatter of
@@ -2639,6 +2673,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push({ t: 'poly', pts: offsetPoly(sp, -13), fill: 'rgba(120,130,240,0.10)' });
     prims.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: 'rgba(120,130,240,0.14)' });
   };
+  // Two-tier raised shelf (GS-cetus-6): armed on a CALM cetus/void stop only (deep stops already sit
+  // on extruded island platforms; other worlds are flat parkland by design).
+  const calmShelf = (arch === 'cetus' || arch === 'void') && !lostHole && !rainbow;
+  const shelfLook = arch === 'void' ? VOID_CLIFF : CETUS_CLIFF;
   // Fairways draw as ONE grouped pass FIRST (under tee/green/scatter) so the green apron blends into
   // the main corridor — see `styleFairways`. Everything else keeps its original per-feature order.
   const fairwaySps = hole.features.filter((f) => f.kind === 'fairway').map((f) => projPoly(f.poly, proj));
@@ -2652,10 +2690,17 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       for (const sp of fairwaySps) prims.push(...rainbowRibbon(sp, fb.minY, bandH));
     }
   } else {
+    // Two-tier raised fairway SHELF (GS-cetus-6): on a CALM cetus/void stop (the whole play-bounds is
+    // playable rough, so it can't be islands) lift the corridor onto a shelf above the rough — a rock
+    // face + cast shadow UNDER the fairway fill — so it reads with depth like the deep-stop pads. Deep
+    // stops already sit on extruded platforms, so gate to !lostHole. Pure geometry (no rng).
+    if (calmShelf) for (const sp of fairwaySps) prims.push(...raisedShelf(sp, proj.scale, shelfLook));
     prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch));
     // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
     // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
     if (voidGlow) for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(165,175,255,0.5)', sw: 1.6 });
+    // Cetus shelf gets a lit cyan rim so the raised edge catches the starlight (void has its own above).
+    if (calmShelf && arch === 'cetus') for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(150,232,255,0.55)', sw: 1.6 });
   }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
@@ -2673,6 +2718,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       continue;
     }
     if (voidGlow && f.kind === 'green') glowRings(sp);
+    // Raise the green onto the same shelf as the fairway so the play surface reads as one continuous
+    // raised mesa (GS-cetus-6) rather than the green sitting back down at rough level.
+    if (calmShelf && f.kind === 'green') prims.push(...raisedShelf(sp, proj.scale, shelfLook));
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, greenSlopeScreen(hole, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));

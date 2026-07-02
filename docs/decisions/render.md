@@ -28,7 +28,11 @@
   Side-on plateau extrusion is `platformCliffs` (renamed from `cetusCliffs`, GS-cetus-5) taking a
   `CliffLook` palette: cetus = blue CLIFFTOP into the star-ocean, void = violet ASTEROID underside for
   its lost island-hop pads (gated to the armed hole so a calm void rectangle isn't given an odd
-  underside). Both keep the returned `faces` for the cetus waterfall.
+  underside). Both keep the returned `faces` for the cetus waterfall. CALM cetus/void stops (whole
+  play-bounds is playable rough, can't be islands) instead get `raisedShelf` (GS-cetus-6): an outset
+  rock PEDESTAL shifted down under the fairway/green fill + cast shadow + lit rim, so the corridor
+  reads as a two-tier raised mesa. The pedestal rings the surface (visible on the near-vertical edges
+  — the key at follow-cam zoom, where a pure downward drop is invisible). Render-only, no rng.
   a darker **collar** ring + lit dome on greens; lip-shadow + depression + rake lines on bunkers; concentric
   **depth banding** + shoreline + glints on water; 3-tone **cell-shaded tree canopies** (core/body/lit cap +
   cast shadow + per-tree colour/size variance); a **textured rough** (soft tone undulation + grass tufts);
