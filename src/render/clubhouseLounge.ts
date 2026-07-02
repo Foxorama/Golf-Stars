@@ -1,9 +1,10 @@
 /**
  * Clubhouse lounge (GS-clubhouse-lounge) — the interior the four golfers wait in, replacing the old
- * grid of manage-buttons. A cosy bar + fireplace + lounge is painted behind them (self-contained SVG,
- * the house no-asset rule); each golfer stands in the room wearing their own outfit, a brass nameplate
- * at their feet so you can tell who's who across changing looks, and the whole figure is the button to
- * outfit them.
+ * grid of manage-buttons. A cosy 19th-hole bar is painted behind them (self-contained SVG, the house
+ * no-asset rule): a stone fireplace with a live fire, an armchair + floor lamp, a picture window onto
+ * the space course, and a REAL bar — mirrored back-bar, bottles, taps, brass foot rail, stools and a
+ * neon sign. Each golfer stands in the room wearing their own outfit, a brass nameplate at their feet
+ * so you can tell who's who across changing looks, and the whole figure is the button to outfit them.
  *
  * Where each golfer stands is chosen by a seeded shuffle of a fixed set of floor "spots", keyed off the
  * finished-run counter (`visit`) — so every time you come home from a run they've milled around to new
@@ -34,16 +35,16 @@ interface Spot {
   s: number;
 }
 
-/** Fixed floor spots around the lounge — fireplace hearth (left), rug (centre), bar stools (right).
- *  More spots than golfers so which ones sit empty also changes between visits. Front spots (larger y)
- *  are drawn on top via z-index so overlaps read correctly. */
+/** Fixed floor spots around the lounge, each anchored to a piece of furniture — the hearth, the rug,
+ *  the armchair corner, the bar stools. More spots than golfers so which ones sit empty also changes
+ *  between visits. Front spots (larger y) are drawn on top via z-index so overlaps read correctly. */
 const SPOTS: Spot[] = [
-  { x: 26, y: 74, s: 0.82 }, // beside the hearth (clear of the firebox), back
-  { x: 36, y: 87, s: 1.04 }, // hearth rug, front
-  { x: 50, y: 90, s: 1.08 }, // centre rug, front
-  { x: 63, y: 79, s: 0.9 }, // lounge, mid
-  { x: 73, y: 70, s: 0.8 }, // bar end, back
-  { x: 83, y: 85, s: 1.0 }, // bar stool, front
+  { x: 15, y: 76, s: 0.88 }, // warming up before the hearth, back
+  { x: 31, y: 89, s: 1.06 }, // hearth rug, front
+  { x: 46, y: 94, s: 1.12 }, // centre rug, front
+  { x: 60, y: 78, s: 0.86 }, // by the armchair / window, back
+  { x: 71, y: 92, s: 1.06 }, // ambling toward the bar, front
+  { x: 82, y: 89, s: 1.0 }, // at the bar, between the stools
 ];
 
 /** Fisher–Yates shuffle of `arr` in place using the seeded Rng (no Math.random). */
@@ -57,7 +58,7 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
 
 /** A small engraved brass nameplate, the golfer's name inked in their signature colour. */
 function nameplate(name: string, col: string): string {
-  return `<span style="display:inline-block;margin-top:2px;padding:2px 8px;border-radius:3px;
+  return `<span style="display:inline-block;margin-top:1px;padding:2px 8px;border-radius:3px;
     background:linear-gradient(180deg,#e8c266,#a97b25);border:1px solid #5c3f12;
     box-shadow:inset 0 1px 0 #fff6cf,0 1px 2px #0008;font-size:clamp(8px,2.1cqw,11.5px);font-weight:800;letter-spacing:.02em;
     color:${col};text-shadow:0 1px 0 #fff5;white-space:nowrap;font-family:Georgia,'Times New Roman',serif;">
@@ -73,12 +74,13 @@ function golferAt(g: LoungeGolfer, spot: Spot): string {
   const preview = golferPreviewSVG(g.hatId, g.shirtId, g.pantsId, {
     skin: g.skin,
     shirtBase: g.shirtBase,
+    capColor: g.capColor,
+    uid: `lg${g.id.replace(/[^a-z0-9]/gi, '')}`,
     w: 66,
-    h: 84,
+    h: 88,
   });
   const z = Math.round(spot.y * 10);
-  // 12.7cqw ≈ the old 66px at the 520px max width; the spot factor scales for depth.
-  const w = (12.7 * spot.s).toFixed(2);
+  const w = (13.2 * spot.s).toFixed(2);
   return `<button class="gs-lounge-golfer" data-action='${action}' aria-label="Outfit ${g.shortName}"
     style="position:absolute;left:${spot.x}%;top:${spot.y}%;z-index:${z};width:${w}cqw;
       transform:translate(-50%,-100%);transform-origin:bottom center;
@@ -106,15 +108,72 @@ function loungeStyle(): string {
   </style>`;
 }
 
-/** The painted lounge interior behind the golfers: warm panelled wall, a stone fireplace with a live
- *  fire on the left, a rug, and a wooden bar with a bottle shelf and pendant lights on the right.
- *  Hand-placed (no rng) so it's stable; a couple of `<animate>` flickers give the fire + lamps life. */
+/** One back-bar bottle: a shaped body (rounded shoulders), neck and cap with a glint — so the shelf
+ *  reads as a drinks cabinet, not a bookcase. `x` centres it, `baseY` is the shelf it stands on. */
+function bottle(x: number, baseY: number, hgt: number, wid: number, col: string): string {
+  const body = hgt * 0.62;
+  const neckW = wid * 0.34;
+  return `<path d="M${x - wid / 2},${baseY} L${x - wid / 2},${baseY - body + 2} Q${x - wid / 2},${baseY - body} ${x - wid / 2 + 1.2},${baseY - body - 1}
+      L${x - neckW / 2},${baseY - body - 2} L${x - neckW / 2},${baseY - hgt + 2} L${x + neckW / 2},${baseY - hgt + 2} L${x + neckW / 2},${baseY - body - 2}
+      L${x + wid / 2 - 1.2},${baseY - body - 1} Q${x + wid / 2},${baseY - body} ${x + wid / 2},${baseY - body + 2} L${x + wid / 2},${baseY} Z"
+      fill="${col}"/>
+    <rect x="${x - neckW / 2 - 0.4}" y="${baseY - hgt}" width="${neckW + 0.8}" height="2.4" rx="0.8" fill="#2a1c10"/>
+    <line x1="${x - wid / 2 + 1.1}" y1="${baseY - body + 1}" x2="${x - wid / 2 + 1.1}" y2="${baseY - 2}" stroke="#ffffff" stroke-width="0.8" opacity="0.4"/>`;
+}
+
+/** An upside-down stemmed glass hanging from the rack over the counter: foot, stem, rounded bowl. */
+function hungGlass(x: number): string {
+  return `<line x1="${x - 2.6}" y1="123" x2="${x + 2.6}" y2="123" stroke="#cfe0ef" stroke-width="1.2" opacity="0.85"/>
+    <line x1="${x}" y1="123" x2="${x}" y2="127" stroke="#cfe0ef" stroke-width="1" opacity="0.8"/>
+    <path d="M${x - 3.6},127 Q${x - 3.8},133 ${x},133.8 Q${x + 3.8},133 ${x + 3.6},127 Z" fill="#cfe0ef" opacity="0.7"/>`;
+}
+
+/** A bar stool: cushioned seat, chrome legs, a foot ring — parked in front of the counter. */
+function stool(x: number): string {
+  return `<g>
+    <ellipse cx="${x}" cy="262" rx="13" ry="3.5" fill="#000" opacity="0.3"/>
+    <g stroke="#8a9099" stroke-width="2" stroke-linecap="round">
+      <line x1="${x - 9}" y1="232" x2="${x - 12}" y2="260"/>
+      <line x1="${x + 9}" y1="232" x2="${x + 12}" y2="260"/>
+      <line x1="${x}" y1="233" x2="${x}" y2="261"/>
+    </g>
+    <ellipse cx="${x}" cy="248" rx="10.5" ry="3" fill="none" stroke="#6a7078" stroke-width="1.4"/>
+    <ellipse cx="${x}" cy="231" rx="13" ry="5.5" fill="#5c2424"/>
+    <ellipse cx="${x}" cy="228.5" rx="13" ry="5.5" fill="#7a2f2f"/>
+    <ellipse cx="${x - 3}" cy="227.5" rx="6" ry="2" fill="#a04a42" opacity="0.7"/>
+  </g>`;
+}
+
+/** The painted lounge interior behind the golfers. Hand-placed (no rng) so it's byte-stable; a few
+ *  `<animate>` flickers give the fire, lamps and neon sign life. Layout: fireplace + armchair on the
+ *  left, space-course window centre, the bar along the right, a patterned rug up front. */
 function loungeArt(): string {
+  const bottlesTop = [
+    bottle(316, 76, 20, 6.5, '#4fae8a'),
+    bottle(328, 76, 24, 6, '#c65a4a'),
+    bottle(340, 76, 17, 7, '#d8a24a'),
+    bottle(352, 76, 22, 6, '#6a8fd0'),
+    bottle(364, 76, 18, 6.5, '#9b6fd4'),
+    bottle(376, 76, 23, 5.5, '#4fae8a'),
+    bottle(387, 76, 16, 6, '#e8e2d2'),
+  ].join('');
+  const bottlesLow = [
+    bottle(318, 104, 17, 7, '#d8a24a'),
+    bottle(331, 104, 20, 6, '#c65a4a'),
+    bottle(344, 104, 15, 7.5, '#4fae8a'),
+    bottle(357, 104, 19, 6, '#e8e2d2'),
+    bottle(370, 104, 16, 6.5, '#6a8fd0'),
+    bottle(383, 104, 20, 5.5, '#9b6fd4'),
+  ].join('');
+  const glasses = [320, 334, 348, 362, 376].map(hungGlass).join('');
   return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"
       style="position:absolute;inset:0;width:100%;height:100%;">
     <defs>
       <linearGradient id="clWall" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#33251a"/><stop offset="55%" stop-color="#241a12"/><stop offset="100%" stop-color="#1a120c"/>
+        <stop offset="0%" stop-color="#402e1f"/><stop offset="55%" stop-color="#2a1e13"/><stop offset="100%" stop-color="#1d140c"/>
+      </linearGradient>
+      <linearGradient id="clFloorG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4c3724"/><stop offset="100%" stop-color="#211505"/>
       </linearGradient>
       <radialGradient id="clHearth" cx="50%" cy="55%" r="60%">
         <stop offset="0%" stop-color="#ffd27a" stop-opacity="0.9"/><stop offset="100%" stop-color="#ffd27a" stop-opacity="0"/>
@@ -122,122 +181,287 @@ function loungeArt(): string {
       <radialGradient id="clLamp" cx="50%" cy="0%" r="90%">
         <stop offset="0%" stop-color="#ffe6a6" stop-opacity="0.6"/><stop offset="100%" stop-color="#ffe6a6" stop-opacity="0"/>
       </radialGradient>
+      <linearGradient id="clMirror" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#3a4c68"/><stop offset="100%" stop-color="#1d2940"/>
+      </linearGradient>
+      <linearGradient id="clCounterTop" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a2743f"/><stop offset="100%" stop-color="#6e4a2c"/>
+      </linearGradient>
+      <linearGradient id="clWoodFront" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5e3f24"/><stop offset="100%" stop-color="#392610"/>
+      </linearGradient>
+      <linearGradient id="clWinSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#111a3a"/><stop offset="60%" stop-color="#292350"/><stop offset="100%" stop-color="#3a2a5e"/>
+      </linearGradient>
+      <radialGradient id="clVig" cx="50%" cy="46%" r="72%">
+        <stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="78%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.42"/>
+      </radialGradient>
     </defs>
 
-    <!-- wall + wainscot + floor (floor runs deep into the foreground for the golfers to stand on) -->
-    <rect width="400" height="300" fill="url(#clWall)"/>
-    <rect x="0" y="150" width="400" height="150" fill="#3a2a19"/>
-    <rect x="0" y="150" width="400" height="4" fill="#1c130b"/>
-    <!-- floorboard seams receding toward the back wall -->
-    <g stroke="#1c130b" stroke-width="1" opacity="0.25">
-      <line x1="0" y1="196" x2="400" y2="196"/><line x1="0" y1="250" x2="400" y2="250"/>
-      <line x1="120" y1="150" x2="70" y2="300"/><line x1="280" y1="150" x2="330" y2="300"/>
-      <line x1="200" y1="150" x2="200" y2="300"/>
+    <!-- wall, crown molding, wainscot; the floor runs deep into the foreground for the golfers -->
+    <rect width="400" height="152" fill="url(#clWall)"/>
+    <rect y="12" width="400" height="5" fill="#4a3520"/>
+    <rect y="17" width="400" height="1.5" fill="#000" opacity="0.35"/>
+    <rect y="116" width="400" height="36" fill="#2b1e12"/>
+    <rect y="114" width="400" height="3.5" fill="#57422b"/>
+    <g stroke="#1c130b" stroke-width="1.2" opacity="0.55">
+      <line x1="120" y1="121" x2="120" y2="150"/><line x1="150" y1="121" x2="150" y2="150"/>
+      <line x1="215" y1="121" x2="215" y2="150"/><line x1="245" y1="121" x2="245" y2="150"/>
+      <line x1="275" y1="121" x2="275" y2="150"/>
     </g>
-    <g stroke="#1c130b" stroke-width="1.5" opacity="0.4">
-      <line x1="70" y1="18" x2="70" y2="150"/><line x1="330" y1="18" x2="330" y2="150"/>
+    <rect y="150" width="400" height="4" fill="#17100a"/>
+    <rect y="152" width="400" height="148" fill="url(#clFloorG)"/>
+    <!-- floorboards receding toward the front -->
+    <g stroke="#17100a" stroke-width="1" opacity="0.28">
+      <line x1="0" y1="168" x2="400" y2="168"/><line x1="0" y1="188" x2="400" y2="188"/>
+      <line x1="0" y1="214" x2="400" y2="214"/><line x1="0" y1="246" x2="400" y2="246"/>
+      <line x1="0" y1="280" x2="400" y2="280"/>
+      <line x1="96" y1="152" x2="56" y2="300"/><line x1="204" y1="152" x2="200" y2="300"/>
+      <line x1="308" y1="152" x2="348" y2="300"/>
     </g>
-    <rect x="0" y="18" width="400" height="4" fill="#4a3520"/>
 
-    <!-- FIREPLACE (left) -->
-    <g>
-      <ellipse cx="52" cy="128" rx="70" ry="46" fill="url(#clHearth)">
-        <animate attributeName="opacity" values="0.75;1;0.8;0.95;0.75" dur="3.4s" repeatCount="indefinite"/>
-      </ellipse>
-      <rect x="12" y="70" width="80" height="88" fill="#5a5148"/>
-      <rect x="12" y="70" width="80" height="88" fill="#000" opacity="0.12"/>
-      <rect x="6" y="60" width="92" height="14" rx="2" fill="#6e4a2c"/>
-      <rect x="6" y="60" width="92" height="4" fill="#8a6034"/>
-      <!-- firebox -->
-      <rect x="26" y="96" width="52" height="62" fill="#140b06"/>
-      <!-- logs -->
-      <rect x="30" y="140" width="44" height="8" rx="3" fill="#3a2412"/>
-      <rect x="34" y="132" width="36" height="7" rx="3" fill="#4a2f18"/>
-      <!-- flames -->
-      <g>
-        <path d="M52,150 C40,132 48,124 46,112 C56,122 58,124 58,132 C64,126 62,118 60,112 C70,124 68,140 60,150 Z" fill="#ff7a1f">
-          <animate attributeName="d"
-            values="M52,150 C40,132 48,124 46,112 C56,122 58,124 58,132 C64,126 62,118 60,112 C70,124 68,140 60,150 Z;
-                    M52,150 C42,134 46,122 50,110 C54,122 56,126 56,134 C62,128 60,116 62,110 C68,126 66,142 60,150 Z;
-                    M52,150 C40,132 48,124 46,112 C56,122 58,124 58,132 C64,126 62,118 60,112 C70,124 68,140 60,150 Z"
-            dur="1.1s" repeatCount="indefinite"/>
-        </path>
-        <path d="M52,150 C46,138 50,130 52,120 C56,130 58,134 56,142 C62,138 60,130 60,124 C64,134 62,144 56,150 Z" fill="#ffd23f">
-          <animate attributeName="opacity" values="0.85;1;0.7;1;0.85" dur="0.9s" repeatCount="indefinite"/>
-        </path>
+    <!-- ══ FIREPLACE (left): chimney breast, mantel trophies, stone surround, live fire ══ -->
+    <rect x="8" y="17" width="94" height="135" fill="#463225"/>
+    <rect x="8" y="17" width="3" height="135" fill="#000" opacity="0.25"/>
+    <rect x="99" y="17" width="3" height="135" fill="#000" opacity="0.25"/>
+    <!-- crossed clubs on a shield plaque over the mantel -->
+    <g transform="translate(55,38)">
+      <path d="M0,-14 L13,-9 L13,4 Q13,12 0,16 Q-13,12 -13,4 L-13,-9 Z" fill="#5a3a1f" stroke="#2e1d0c" stroke-width="1.5"/>
+      <g stroke="#c9b28a" stroke-width="1.8" stroke-linecap="round">
+        <line x1="-8" y1="-8" x2="8" y2="10"/><line x1="8" y1="-8" x2="-8" y2="10"/>
       </g>
-      <!-- clock on the mantel -->
-      <circle cx="52" cy="46" r="9" fill="#e8c266" stroke="#5c3f12" stroke-width="1.5"/>
-      <line x1="52" y1="46" x2="52" y2="41" stroke="#2a1c10" stroke-width="1.2"/>
-      <line x1="52" y1="46" x2="56" y2="48" stroke="#2a1c10" stroke-width="1.2"/>
+      <path d="M-8,-8 L-11,-11 L-9,-13 Z" fill="#dfe6f0"/>
+      <circle cx="8.5" cy="-8.5" r="2.2" fill="#dfe6f0"/>
+      <circle cx="0" cy="1" r="2.6" fill="#e8c266" stroke="#5c3f12" stroke-width="1"/>
     </g>
-
-    <!-- window onto the dusk course (centre-back) -->
-    <g transform="translate(168,40)">
-      <rect x="-5" y="-5" width="74" height="60" rx="2" fill="#5a3a1f"/>
-      <linearGradient id="clWin" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#2a3a52"/><stop offset="60%" stop-color="#41543f"/><stop offset="100%" stop-color="#2f7a33"/>
-      </linearGradient>
-      <rect x="0" y="0" width="64" height="50" fill="url(#clWin)"/>
-      <circle cx="50" cy="12" r="6" fill="#ffe6a6" opacity="0.85"/>
-      <path d="M0,36 Q26,28 44,34 T64,32 V50 H0 Z" fill="#2f7a33"/>
-      <line x1="32" y1="0" x2="32" y2="50" stroke="#5a3a1f" stroke-width="2.5"/>
-      <line x1="0" y1="25" x2="64" y2="25" stroke="#5a3a1f" stroke-width="2.5"/>
+    <!-- mantel shelf + trophies -->
+    <rect x="4" y="62" width="102" height="9" rx="1.5" fill="#7a5230"/>
+    <rect x="4" y="62" width="102" height="2.5" fill="#9a6c3e"/>
+    <g transform="translate(24,62)">
+      <path d="M-5,-14 Q-5,-6 0,-5 Q5,-6 5,-14 Z" fill="#e8c266" stroke="#5c3f12" stroke-width="1"/>
+      <path d="M-5,-13 Q-9,-12 -5,-8 M5,-13 Q9,-12 5,-8" fill="none" stroke="#e8c266" stroke-width="1.4"/>
+      <rect x="-1.4" y="-5" width="2.8" height="3" fill="#c9a24a"/>
+      <rect x="-4" y="-2" width="8" height="2.4" rx="0.8" fill="#5c3f12"/>
     </g>
-
-    <!-- rug on the foreground floor -->
-    <ellipse cx="200" cy="252" rx="176" ry="34" fill="#7a2f2f" opacity="0.85"/>
-    <ellipse cx="200" cy="252" rx="176" ry="34" fill="none" stroke="#d8a24a" stroke-width="2" opacity="0.7"/>
-    <ellipse cx="200" cy="252" rx="140" ry="25" fill="none" stroke="#d8a24a" stroke-width="1.5" opacity="0.5"/>
-
-    <!-- pendant lamp over the lounge -->
-    <line x1="200" y1="0" x2="200" y2="14" stroke="#2a1c10" stroke-width="2"/>
-    <ellipse cx="200" cy="24" rx="60" ry="30" fill="url(#clLamp)">
-      <animate attributeName="opacity" values="0.7;0.9;0.7" dur="4s" repeatCount="indefinite"/>
+    <g transform="translate(85,62)">
+      <rect x="-8" y="-13" width="16" height="13" rx="1" fill="#a97b25" stroke="#5c3f12" stroke-width="1.2"/>
+      <rect x="-6" y="-11" width="12" height="9" fill="#2a3a52"/>
+      <path d="M-6,-4.5 Q-1,-7.5 6,-4.8 L6,-2 L-6,-2 Z" fill="#2f7a33"/>
+      <circle cx="3" cy="-8.5" r="1.6" fill="#ffe6a6"/>
+    </g>
+    <!-- stone surround + arched firebox -->
+    <rect x="16" y="71" width="78" height="81" fill="#5d5348"/>
+    <g stroke="#3f3a33" stroke-width="1.1" opacity="0.8">
+      <line x1="16" y1="88" x2="94" y2="88"/><line x1="16" y1="104" x2="94" y2="104"/>
+      <line x1="16" y1="122" x2="94" y2="122"/><line x1="16" y1="138" x2="94" y2="138"/>
+      <line x1="38" y1="71" x2="38" y2="88"/><line x1="66" y1="71" x2="66" y2="88"/>
+      <line x1="27" y1="88" x2="27" y2="104"/><line x1="84" y1="88" x2="84" y2="104"/>
+      <line x1="24" y1="122" x2="24" y2="138"/><line x1="88" y1="122" x2="88" y2="138"/>
+    </g>
+    <path d="M28,152 L28,110 Q55,90 82,110 L82,152 Z" fill="#0f0803"/>
+    <ellipse cx="55" cy="130" rx="34" ry="26" fill="url(#clHearth)" opacity="0.5">
+      <animate attributeName="opacity" values="0.4;0.62;0.45;0.58;0.4" dur="3.1s" repeatCount="indefinite"/>
     </ellipse>
-    <path d="M190,14 h20 l4 10 h-28 Z" fill="#3a2a19"/>
-    <ellipse cx="200" cy="24" rx="16" ry="3" fill="#ffe6a6"/>
-
-    <!-- BAR (right) -->
+    <!-- logs + grate -->
+    <rect x="36" y="142" width="38" height="6.5" rx="3" fill="#3a2412"/>
+    <rect x="40" y="136" width="30" height="6" rx="3" fill="#4a2f18"/>
+    <line x1="34" y1="150" x2="76" y2="150" stroke="#1c130b" stroke-width="2"/>
+    <!-- flames -->
     <g>
-      <!-- back shelf + bottles -->
-      <rect x="300" y="40" width="100" height="70" fill="#2a1c10"/>
-      <rect x="300" y="66" width="100" height="4" fill="#4a3520"/>
-      <rect x="300" y="100" width="100" height="4" fill="#4a3520"/>
-      <g>
-        <rect x="312" y="46" width="7" height="18" rx="2" fill="#4fae8a"/>
-        <rect x="326" y="42" width="6" height="22" rx="2" fill="#c65a4a"/>
-        <rect x="338" y="48" width="7" height="16" rx="2" fill="#d8a24a"/>
-        <rect x="352" y="44" width="6" height="20" rx="2" fill="#6a8fd0"/>
-        <rect x="366" y="48" width="7" height="16" rx="2" fill="#9b6fd4"/>
-        <rect x="380" y="43" width="6" height="21" rx="2" fill="#4fae8a"/>
-        <rect x="318" y="80" width="7" height="18" rx="2" fill="#c65a4a"/>
-        <rect x="334" y="82" width="6" height="16" rx="2" fill="#d8a24a"/>
-        <rect x="350" y="78" width="7" height="20" rx="2" fill="#6a8fd0"/>
-        <rect x="368" y="82" width="6" height="16" rx="2" fill="#4fae8a"/>
-      </g>
-      <!-- pendant lights over the bar -->
-      <g>
-        <line x1="330" y1="18" x2="330" y2="30" stroke="#2a1c10" stroke-width="1.5"/>
-        <circle cx="330" cy="33" r="4" fill="#ffd27a"><animate attributeName="opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/></circle>
-        <line x1="372" y1="18" x2="372" y2="30" stroke="#2a1c10" stroke-width="1.5"/>
-        <circle cx="372" cy="33" r="4" fill="#ffd27a"><animate attributeName="opacity" values="1;0.8;1" dur="3.4s" repeatCount="indefinite"/></circle>
-      </g>
-      <!-- bar counter -->
-      <rect x="292" y="150" width="108" height="14" fill="#6e4a2c"/>
-      <rect x="292" y="150" width="108" height="4" fill="#8a6034"/>
-      <rect x="298" y="164" width="96" height="30" fill="#4a3520"/>
+      <path d="M55,148 C43,130 51,122 49,110 C59,120 61,122 61,130 C67,124 65,116 63,110 C73,122 71,138 63,148 Z" fill="#ff7a1f">
+        <animate attributeName="d"
+          values="M55,148 C43,130 51,122 49,110 C59,120 61,122 61,130 C67,124 65,116 63,110 C73,122 71,138 63,148 Z;
+                  M55,148 C45,132 49,120 53,108 C57,120 59,124 59,132 C65,126 63,114 65,108 C71,124 69,140 63,148 Z;
+                  M55,148 C43,130 51,122 49,110 C59,120 61,122 61,130 C67,124 65,116 63,110 C73,122 71,138 63,148 Z"
+          dur="1.1s" repeatCount="indefinite"/>
+      </path>
+      <path d="M55,148 C49,136 53,128 55,118 C59,128 61,132 59,140 C65,136 63,128 63,122 C67,132 65,142 59,148 Z" fill="#ffd23f">
+        <animate attributeName="opacity" values="0.85;1;0.7;1;0.85" dur="0.9s" repeatCount="indefinite"/>
+      </path>
+      <circle cx="47" cy="132" r="1.2" fill="#ffb45e"><animate attributeName="opacity" values="0;1;0" dur="1.7s" repeatCount="indefinite"/></circle>
+      <circle cx="64" cy="124" r="1" fill="#ffdf9e"><animate attributeName="opacity" values="1;0;1" dur="2.3s" repeatCount="indefinite"/></circle>
+    </g>
+    <!-- hearthstone + warm pool on the floor -->
+    <rect x="12" y="152" width="86" height="7" rx="2.5" fill="#6a6157"/>
+    <ellipse cx="55" cy="176" rx="66" ry="19" fill="url(#clHearth)">
+      <animate attributeName="opacity" values="0.5;0.72;0.55;0.68;0.5" dur="3.4s" repeatCount="indefinite"/>
+    </ellipse>
+    <!-- the clubhouse cat, asleep on the warm hearthstone -->
+    <g transform="translate(94,172)">
+      <ellipse cx="0" cy="0" rx="9" ry="4.5" fill="#3a3f4d"/>
+      <circle cx="-7.5" cy="-2" r="3.6" fill="#3a3f4d"/>
+      <path d="M-10,-4.4 L-9.6,-7.4 L-7.4,-5.2 Z" fill="#3a3f4d"/>
+      <path d="M-6.6,-5 L-5.6,-7.6 L-4.2,-5 Z" fill="#3a3f4d"/>
+      <path d="M8,1 Q13,0 12,-4" fill="none" stroke="#3a3f4d" stroke-width="2" stroke-linecap="round"/>
+      <path d="M-9.4,-1.6 Q-8.4,-0.8 -7.4,-1.6" fill="none" stroke="#1d2029" stroke-width="0.7"/>
     </g>
 
-    <!-- a couple of leafy plants for warmth -->
-    <g transform="translate(120,150)">
-      <rect x="-6" y="8" width="12" height="12" rx="2" fill="#5a3a1f"/>
-      <path d="M0,10 C-10,0 -8,-12 0,-16 C8,-12 10,0 0,10 Z" fill="#2f7a33"/>
-      <path d="M0,8 C-6,2 -6,-8 0,-12 C6,-8 6,2 0,8 Z" fill="#3f9a43"/>
+    <!-- ══ dartboard + floor lamp + leather armchair ══ -->
+    <g transform="translate(146,50)">
+      <circle r="15" fill="#2a1e12"/>
+      <circle r="12" fill="#e8e2d2"/>
+      <g fill="#1d2029">
+        <path d="M0,0 L0,-12 A12 12 0 0 1 8.5,-8.5 Z"/><path d="M0,0 L12,0 A12 12 0 0 1 8.5,8.5 Z"/>
+        <path d="M0,0 L0,12 A12 12 0 0 1 -8.5,8.5 Z"/><path d="M0,0 L-12,0 A12 12 0 0 1 -8.5,-8.5 Z"/>
+      </g>
+      <circle r="5.5" fill="none" stroke="#c65a4a" stroke-width="1.6"/>
+      <circle r="1.8" fill="#c65a4a"/>
+      <line x1="3" y1="-6" x2="8" y2="-14" stroke="#d8a24a" stroke-width="1.2"/>
+      <path d="M8,-14 L11,-18 L9.4,-13.2 Z" fill="#4fae8a"/>
+    </g>
+    <!-- floor lamp -->
+    <g>
+      <path d="M108,78 L128,78 L124,96 L112,96 Z" fill="#8a5a30"/>
+      <path d="M108,78 L128,78 L127,82 L109,82 Z" fill="#a97140"/>
+      <ellipse cx="118" cy="97" rx="6" ry="2" fill="#ffe6a6" opacity="0.85">
+        <animate attributeName="opacity" values="0.7;0.95;0.7" dur="4.2s" repeatCount="indefinite"/>
+      </ellipse>
+      <line x1="118" y1="97" x2="118" y2="172" stroke="#2a1c10" stroke-width="2.5"/>
+      <ellipse cx="118" cy="173" rx="9" ry="2.6" fill="#2a1c10"/>
+      <ellipse cx="118" cy="186" rx="34" ry="9" fill="#ffd27a" opacity="0.1"/>
+    </g>
+    <!-- armchair, facing the fire -->
+    <g>
+      <ellipse cx="160" cy="176" rx="30" ry="6" fill="#000" opacity="0.28"/>
+      <rect x="162" y="102" width="24" height="64" rx="9" fill="#7a3b2a"/>
+      <rect x="165" y="106" width="8" height="56" rx="4" fill="#8f4936" opacity="0.7"/>
+      <rect x="134" y="138" width="42" height="26" rx="7" fill="#8a4634"/>
+      <rect x="136" y="140" width="38" height="10" rx="5" fill="#9c5340" opacity="0.8"/>
+      <rect x="128" y="124" width="14" height="42" rx="6.5" fill="#6e3526"/>
+      <rect x="130" y="126" width="5" height="20" rx="2.5" fill="#82412f" opacity="0.8"/>
+      <circle cx="174" cy="120" r="1.1" fill="#4a2015"/><circle cx="174" cy="134" r="1.1" fill="#4a2015"/><circle cx="174" cy="148" r="1.1" fill="#4a2015"/>
+      <rect x="136" y="164" width="6" height="9" rx="2" fill="#3a2412"/>
+      <rect x="172" y="164" width="6" height="9" rx="2" fill="#3a2412"/>
     </g>
 
-    <!-- warm vignette -->
-    <rect width="400" height="300" fill="url(#clHearth)" opacity="0.06"/>
+    <!-- ══ picture window onto the space course ══ -->
+    <g>
+      <rect x="171" y="19" width="90" height="84" rx="3" fill="#5a3a1f"/>
+      <rect x="176" y="24" width="80" height="74" fill="#3a2712"/>
+      <rect x="178" y="26" width="76" height="70" fill="url(#clWinSky)"/>
+      <g fill="#fff">
+        <circle cx="186" cy="34" r="1"/><circle cx="204" cy="30" r="0.8"/><circle cx="196" cy="46" r="0.7"/>
+        <circle cx="214" cy="40" r="0.9"/><circle cx="244" cy="32" r="0.8"/><circle cx="250" cy="48" r="0.7"/>
+        <circle cx="188" cy="58" r="0.7"/><circle cx="240" cy="60" r="0.8"/>
+      </g>
+      <line x1="200" y1="36" x2="210" y2="41" stroke="#fff" stroke-width="0.8" opacity="0.7"/>
+      <g transform="translate(233,42)">
+        <circle r="7" fill="#d8a24a"/>
+        <circle cx="-2" cy="-2" r="7" fill="#e8bd6e" opacity="0.55"/>
+        <ellipse rx="12" ry="3" fill="none" stroke="#ffe6a6" stroke-width="1.5" transform="rotate(-18)"/>
+      </g>
+      <circle cx="193" cy="38" r="4" fill="#ffe6a6" opacity="0.9"/>
+      <path d="M178,80 Q206,68 226,77 T254,74 L254,96 L178,96 Z" fill="#2f7a33"/>
+      <path d="M178,88 Q210,80 254,86 L254,96 L178,96 Z" fill="#256a2a" opacity="0.85"/>
+      <line x1="222" y1="60" x2="222" y2="80" stroke="#e8e2d2" stroke-width="1.4"/>
+      <path d="M222,60 L234,64 L222,68 Z" fill="#ff6b6b"/>
+      <ellipse cx="222" cy="80" rx="6" ry="1.6" fill="#3f9a43"/>
+      <rect x="214" y="24" width="4.5" height="72" fill="#5a3a1f"/>
+      <rect x="176" y="58" width="80" height="4.5" fill="#5a3a1f"/>
+      <path d="M180,28 L204,26 L188,52 L180,54 Z" fill="#ffffff" opacity="0.05"/>
+      <rect x="169" y="103" width="94" height="6" rx="2" fill="#6e4a2c"/>
+      <rect x="169" y="103" width="94" height="2" fill="#8a6034"/>
+    </g>
+
+    <!-- framed course painting, hung a touch crooked -->
+    <g transform="rotate(-2 281 51)">
+      <rect x="266" y="36" width="30" height="30" rx="1.5" fill="#a97b25" stroke="#5c3f12" stroke-width="1.5"/>
+      <rect x="269" y="39" width="24" height="24" fill="#2a3a52"/>
+      <path d="M269,55 Q278,49 285,54 T293,53 L293,63 L269,63 Z" fill="#2f7a33"/>
+      <ellipse cx="280" cy="59" rx="4" ry="1.8" fill="#d8c690"/>
+      <line x1="287" y1="46" x2="287" y2="54" stroke="#e8e2d2" stroke-width="0.9"/>
+      <path d="M287,46 L292,47.6 L287,49.2 Z" fill="#ff6b6b"/>
+      <circle cx="274" cy="43" r="2" fill="#ffe6a6" opacity="0.9"/>
+    </g>
+
+    <!-- ══ THE BAR (right): neon sign, mirrored back-bar, glass rack, counter, taps, stools ══ -->
+    <g>
+      <ellipse cx="350" cy="31" rx="46" ry="16" fill="#ff4fd8" opacity="0.16">
+        <animate attributeName="opacity" values="0.16;0.24;0.16;0.2;0.16" dur="5s" repeatCount="indefinite"/>
+      </ellipse>
+      <rect x="306" y="19" width="88" height="25" rx="6" fill="#140b16" stroke="#3a2438" stroke-width="1.5"/>
+      <g>
+        <text x="350" y="37" text-anchor="middle" font-size="15" font-weight="800" fill="none" stroke="#ff4fd8" stroke-width="3.5" stroke-linejoin="round" opacity="0.45" font-family="Georgia,'Times New Roman',serif" font-style="italic">19th Hole</text>
+        <text x="350" y="37" text-anchor="middle" font-size="15" font-weight="800" fill="#ffd6ef" font-family="Georgia,'Times New Roman',serif" font-style="italic">19th Hole</text>
+        <animate attributeName="opacity" values="1;1;0.72;1;0.92;1" dur="6s" repeatCount="indefinite"/>
+      </g>
+    </g>
+    <!-- back-bar cabinet with mirror + bottle shelves -->
+    <rect x="300" y="46" width="100" height="76" fill="#2e1f11"/>
+    <rect x="300" y="46" width="6" height="76" fill="#4a3520"/>
+    <rect x="394" y="46" width="6" height="76" fill="#4a3520"/>
+    <rect x="308" y="52" width="84" height="62" fill="url(#clMirror)"/>
+    <path d="M314,52 L336,52 L318,114 L308,114 L308,90 Z" fill="#ffffff" opacity="0.06"/>
+    <path d="M352,52 L362,52 L340,114 L334,114 Z" fill="#ffffff" opacity="0.05"/>
+    <rect x="308" y="52" width="84" height="62" fill="none" stroke="#d8a24a" stroke-width="1" opacity="0.5"/>
+    <rect x="306" y="80" width="88" height="5" fill="#ffd27a" opacity="0.1"/>
+    ${bottlesTop}
+    <rect x="306" y="76" width="88" height="2.5" fill="#caa06a" opacity="0.85"/>
+    <rect x="306" y="108" width="88" height="5" fill="#ffd27a" opacity="0.1"/>
+    ${bottlesLow}
+    <rect x="306" y="104" width="88" height="2.5" fill="#caa06a" opacity="0.85"/>
+    <!-- hanging stemware rack -->
+    <rect x="308" y="120" width="84" height="2.5" fill="#4a3520"/>
+    ${glasses}
+    <!-- counter: worktop, panelled front, brass foot rail -->
+    <rect x="282" y="144" width="118" height="13" rx="3" fill="url(#clCounterTop)"/>
+    <rect x="282" y="144" width="118" height="3" rx="1.5" fill="#c99a5c"/>
+    <line x1="282" y1="157" x2="400" y2="157" stroke="#17100a" stroke-width="1.5"/>
+    <rect x="286" y="157" width="114" height="56" fill="url(#clWoodFront)"/>
+    <rect x="286" y="157" width="114" height="3" fill="#7a5230"/>
+    <g stroke="#17100a" stroke-width="1.2" opacity="0.6">
+      <line x1="314" y1="160" x2="314" y2="213"/><line x1="342" y1="160" x2="342" y2="213"/>
+      <line x1="370" y1="160" x2="370" y2="213"/>
+    </g>
+    <g fill="none" stroke="#000" stroke-width="1" opacity="0.25">
+      <rect x="292" y="165" width="16" height="40" rx="2"/><rect x="320" y="165" width="16" height="40" rx="2"/>
+      <rect x="348" y="165" width="16" height="40" rx="2"/><rect x="376" y="165" width="16" height="40" rx="2"/>
+    </g>
+    <line x1="290" y1="206" x2="398" y2="206" stroke="#d8a24a" stroke-width="3" opacity="0.9"/>
+    <g stroke="#a97b25" stroke-width="2">
+      <line x1="300" y1="206" x2="300" y2="213"/><line x1="348" y1="206" x2="348" y2="213"/><line x1="392" y1="206" x2="392" y2="213"/>
+    </g>
+    <!-- on the counter: beer taps + poured drinks -->
+    <g>
+      <rect x="356" y="128" width="6" height="17" rx="2" fill="#b9c2cf" stroke="#5a626e" stroke-width="1"/>
+      <path d="M356,132 L350,132 L350,136 L356,136 Z" fill="#8a9099"/>
+      <line x1="359" y1="128" x2="355" y2="120" stroke="#8a9099" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="354.4" cy="118.8" r="2.6" fill="#c0392b"/>
+      <line x1="366" y1="128" x2="370" y2="121" stroke="#8a9099" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="370.6" cy="119.8" r="2.6" fill="#2f6fb0"/>
+      <rect x="364" y="128" width="6" height="17" rx="2" fill="#b9c2cf" stroke="#5a626e" stroke-width="1"/>
+      <rect x="318" y="132" width="9" height="12" rx="1" fill="#e8a33c" opacity="0.92"/>
+      <ellipse cx="322.5" cy="131" rx="5" ry="2.4" fill="#fff4d9"/>
+      <line x1="320" y1="134" x2="320" y2="142" stroke="#ffffff" stroke-width="1" opacity="0.5"/>
+      <path d="M336,134 L346,134 L341,141 Z" fill="#9fd8e6" opacity="0.9"/>
+      <line x1="341" y1="141" x2="341" y2="144" stroke="#cfe0ef" stroke-width="1.2"/>
+      <circle cx="339" cy="135.5" r="1.2" fill="#4fae8a"/>
+    </g>
+    ${stool(306)}${stool(348)}
+
+    <!-- potted monstera between the painting and the bar -->
+    <g transform="translate(272,150)">
+      <ellipse cx="0" cy="22" rx="12" ry="3" fill="#000" opacity="0.3"/>
+      <path d="M-9,6 L9,6 L6.5,21 L-6.5,21 Z" fill="#7a4a26"/>
+      <path d="M-9,6 L9,6 L8.4,10 L-8.4,10 Z" fill="#8f5a30"/>
+      <path d="M0,6 C-14,-2 -12,-18 -2,-22 C0,-14 -2,-4 0,6 Z" fill="#2f7a33"/>
+      <path d="M0,6 C12,0 16,-14 6,-20 C4,-12 2,-2 0,6 Z" fill="#3f9a43"/>
+      <path d="M0,7 C-4,-4 2,-16 0,-24 C6,-18 8,-6 3,4 Z" fill="#2a6e2e"/>
+    </g>
+
+    <!-- patterned rug up front -->
+    <ellipse cx="170" cy="248" rx="142" ry="35" fill="#7a2f2f" opacity="0.92"/>
+    <ellipse cx="170" cy="248" rx="134" ry="31" fill="none" stroke="#d8a24a" stroke-width="2.2" opacity="0.7"/>
+    <ellipse cx="170" cy="248" rx="106" ry="23" fill="none" stroke="#d8a24a" stroke-width="1.2" opacity="0.45"/>
+    <g fill="#d8a24a" opacity="0.5">
+      <path d="M170,232 L175,240 L170,248 L165,240 Z"/>
+      <path d="M110,242 L115,249 L110,256 L105,249 Z"/>
+      <path d="M230,242 L235,249 L230,256 L225,249 Z"/>
+    </g>
+
+    <!-- warm ambience + corner vignette -->
+    <rect width="400" height="300" fill="url(#clHearth)" opacity="0.05"/>
+    <rect width="400" height="300" fill="url(#clVig)"/>
   </svg>`;
 }
 

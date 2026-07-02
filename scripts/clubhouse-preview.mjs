@@ -17,26 +17,42 @@ const entry = `
 import { golferPreviewSVG } from './src/render/apparelArt';
 import { clubhouseLoungeHTML } from './src/render/clubhouseLounge';
 
-const stage = golferPreviewSVG('cap-classic','polo-classic','trousers-classic',{skin:'#f0c49a',shirtBase:'#3f7fd0',w:150,h:210});
-const small = golferPreviewSVG('tophat-ace','tee-striped','trousers-classic',{skin:'#e6b98a',shirtBase:'#c65a4a',w:66,h:84});
+const stageOutfits = [
+  ['cap-classic','polo-classic','trousers-classic','Rookie'],
+  [undefined,undefined,undefined,'Bare + signature cap'],
+  ['helmet-astro','suit-space','pants-astro','Astronaut'],
+  ['crown-supernova','suit-supernova','leggings-supernova','Supernova'],
+  ['tophat-ace','tee-striped','knickers-ace','Gentleman mix'],
+  ['bucket-safari','jersey-neon','shorts-safari','Shorts + jersey'],
+  ['cap-baggy-green','jacket-green','pants-evergreen','Evergreen'],
+];
+const stages = stageOutfits.map(([h,s,p,l],i) =>
+  '<div style="background:#1a2233;display:inline-block;padding:8px;margin:4px;text-align:center;">'
+  + golferPreviewSVG(h,s,p,{skin:'#f0c49a',shirtBase:'#3f7fd0',capColor:'#d8a24a',uid:'st'+i,w:150,h:210,bagId:i===6?'bag-evergreen':undefined})
+  + '<div style="font:12px sans-serif;color:#ccc;">'+l+'</div></div>').join('');
+const small = golferPreviewSVG('tophat-ace','tee-striped','trousers-classic',{skin:'#e6b98a',shirtBase:'#c65a4a',capColor:'#ff6b4a',uid:'sm',w:66,h:88});
 const golfers = [
   {id:'a',shortName:'Fade',capColor:'#d8a24a',hatId:'cap-classic',shirtId:'polo-classic',pantsId:'trousers-classic',skin:'#f0c49a',shirtBase:'#3f7fd0'},
   {id:'b',shortName:'Hook',capColor:'#5fd6ff',hatId:'crown-supernova',shirtId:'suit-supernova',pantsId:'leggings-supernova',skin:'#c98a5a',shirtBase:'#9b6fd4'},
   {id:'c',shortName:'Draw',capColor:'#5fd45a',hatId:'helmet-astro',shirtId:'suit-space',pantsId:'pants-astro',skin:'#e6b98a',shirtBase:'#4fae8a'},
-  {id:'d',shortName:'Punch',capColor:'#ff6b4a',hatId:'bucket-safari',shirtId:'tee-striped',pantsId:undefined,skin:'#a8683f',shirtBase:'#c65a4a'},
+  {id:'d',shortName:'Punch',capColor:'#ff6b4a',hatId:undefined,shirtId:'tee-striped',pantsId:undefined,skin:'#a8683f',shirtBase:'#c65a4a'},
 ];
 document.body.innerHTML =
-  '<h2 style="font-family:sans-serif;color:#eee">Stage figure (h=210) — should have arms</h2>' +
-  '<div style="background:#1a2233;display:inline-block;padding:10px;">'+stage+'</div>' +
-  '<h2 style="font-family:sans-serif;color:#eee">Lounge-size figure (h=84)</h2>' +
+  '<h2 style="font-family:sans-serif;color:#eee">Stage figures (h=210)</h2>' +
+  '<div style="display:flex;flex-wrap:wrap;">'+stages+'</div>' +
+  '<h2 style="font-family:sans-serif;color:#eee">Lounge-size figure (h=88)</h2>' +
   '<div style="background:#1a2233;display:inline-block;padding:10px;">'+small+'</div>' +
-  '<h2 style="font-family:sans-serif;color:#eee">Full lounge</h2>' +
-  '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 3)+'</div>';
+  '<h2 style="font-family:sans-serif;color:#eee">Full lounge (visit 3)</h2>' +
+  '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 3)+'</div>' +
+  '<h2 style="font-family:sans-serif;color:#eee">Full lounge (visit 7 — reshuffled)</h2>' +
+  '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 7)+'</div>';
 `;
 
 const result = await build({ stdin: { contents: entry, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'iife', write: false, platform: 'browser' });
 const html = `<!doctype html><html><head><meta charset="utf8"></head><body style="margin:0;padding:16px;background:#0b0d12;"><script>${result.outputFiles[0].text}</script></body></html>`;
-const pngPath = '/tmp/claude-0/-home-user-Golf-Stars/c2e80cf9-b04d-5487-875c-7064000a2dda/scratchpad/clubhouse-preview.png';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const pngPath = process.env.CLUBHOUSE_PREVIEW_PNG ?? join(tmpdir(), 'clubhouse-preview.png');
 try {
   const exe = findChromium();
   if (!exe) throw new Error('no chromium');

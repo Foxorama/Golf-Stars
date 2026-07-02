@@ -2397,6 +2397,8 @@ function clubhouseScreen(): string {
   const preview = golferPreviewSVG(hatId, shirtId, pantsId, {
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
+    capColor: ch.style.cap,
+    uid: 'stage',
     w: 190,
     h: 210,
     bagId,

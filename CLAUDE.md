@@ -174,16 +174,19 @@ For each system: the rule that constrains new work. Open the archive doc before 
   character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
   save v11), so each golfer flies its own ride + wears its own look head-to-toe. The per-golfer Clubhouse is a
   **tap-to-restyle stage** (GS-clubhouse-stage): a big full-body avatar (`golferPreviewSVG`, ONE proportional
-  figure at every size — anchors are fractions of `h`, offsets scaled by `S=h/210`, arms included — so it reads as
-  three tap bands here yet stays in proportion at the lounge's small `h`) whose hat/shirt/pants are three tap
+  cel-shaded character at every size (GS-clubhouse-glow) — anchors are fractions of `h`, offsets scaled by
+  `S=h/210`; wears the signature cap when no hat is equipped, mirroring on-course; SVG def ids namespaced by
+  `uid`, defaulting to an input hash so co-mounted figures never cross-tint) whose hat/shirt/pants are three tap
   bands, over a garage-bay tile showing the parked ride — tapping any of the four reveals just that slot's owned
   rack (equip toggles / owned fleet); a "🏠 Back to Clubhouse" (`clubhouseBackToHall`) returns to the hall to
   outfit another golfer without a title round-trip. The open slot is view-only module state
   (`clubhouseSlot`, like `inspectGearId`: toggled via `[data-clubslot]`, reset on open/close, zero save/rng
   impact). The `apparel.ts` catalogue fills three slots (`ApparelSlot` hat|shirt|pants); a cosmetic **set**
-  completes (`equippedSet`) only when EVERY slot it defines is worn. The Clubhouse HALL is a painted bar/fireplace **lounge** (GS-clubhouse-lounge,
-  `render/clubhouseLounge.ts`): the golfers loiter in it wearing their outfits (each figure IS the button to
-  outfit them, a brass nameplate at its feet for identity), placed at a seeded shuffle of fixed floor spots
+  completes (`equippedSet`) only when EVERY slot it defines is worn. The Clubhouse HALL is a painted 19th-hole
+  bar/fireplace **lounge** (GS-clubhouse-lounge + GS-clubhouse-glow, `render/clubhouseLounge.ts`; eyes-on via
+  `scripts/clubhouse-preview.mjs` — re-shoot it after touching `apparelArt.ts`/`clubhouseLounge.ts`): the
+  golfers loiter in it wearing their outfits (each figure IS the button to
+  outfit them, a brass nameplate at its feet for identity), placed at a seeded shuffle of furniture-anchored floor spots
   keyed off `clubhouseVisit` (a finished-run counter bumped once in `runEndUpdates`, save v12) — so they
   appear to have milled around while you were away. Purely cosmetic: seeded via `Rng` (never `Math.random`),
   zero sim/rng-stream impact. The played character's ship (journey map) + outfit (`golferLook`) resolve via
