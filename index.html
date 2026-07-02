@@ -127,8 +127,52 @@
         padding: 12px 14px; margin: 8px 0;
         box-shadow: var(--gs-shadow);
       }
-      .gs-format { transition: border-color .16s ease, transform .12s ease, box-shadow .16s ease; }
-      .gs-format:hover { border-color: #39435a; transform: translateY(-1px); box-shadow: var(--gs-shadow); }
+      /* ── Game-mode tiles on the title (GS-settings-nav): the Voyage (gold) and the Unending
+             Universe (violet), each with a big accent launch button. --mc = the mode accent. ── */
+      .gs-modetile {
+        position: relative; overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--mc) 40%, var(--gs-line));
+        border-radius: var(--gs-r-lg); padding: 14px 16px; margin: 12px 0;
+        background:
+          radial-gradient(120% 90% at 85% -20%, color-mix(in srgb, var(--mc) 18%, transparent), transparent 60%),
+          linear-gradient(180deg, #141823, var(--gs-bg-2));
+        box-shadow: var(--gs-shadow);
+        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease;
+      }
+      @media (hover: hover) {
+        .gs-modetile:hover {
+          transform: translateY(-2px);
+          border-color: color-mix(in srgb, var(--mc) 70%, var(--gs-line));
+          box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--mc) 45%, transparent);
+        }
+      }
+      .gs-modetile-head { display: flex; align-items: center; gap: 12px; }
+      .gs-modetile-icon { font-size: 30px; line-height: 1; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--mc) 60%, transparent)); }
+      .gs-modetile-name {
+        display: block; font-size: 19px; line-height: 1.15; color: var(--mc);
+        text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 45%, transparent);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .gs-modetile-badge { font-size: 10px; letter-spacing: .12em; font-weight: 800; color: var(--mc); opacity: .8; margin-top: 2px; }
+      .gs-modetile-blurb { font-size: 13px; opacity: .82; margin: .5em 0 .3em; }
+      .gs-modetile-path { font-size: 11px; opacity: .55; margin-bottom: 8px; }
+      .gs-modestart {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        width: 100%; padding: 13px 16px; margin-top: 6px;
+        font: 800 15px/1.2 system-ui, sans-serif; letter-spacing: .02em;
+        color: #0b0d12; cursor: pointer;
+        border: 1px solid color-mix(in srgb, var(--mc) 80%, #fff);
+        border-radius: 12px;
+        background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 92%, #fff), color-mix(in srgb, var(--mc) 72%, #000));
+        box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--mc) 55%, transparent);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .12s ease, filter .16s ease, box-shadow .16s ease;
+      }
+      .gs-modestart:hover { filter: brightness(1.08); box-shadow: 0 6px 22px -4px color-mix(in srgb, var(--mc) 70%, transparent); }
+      .gs-modestart:active { transform: translateY(1px); }
+      .gs-modestart:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+      .gs-modeasc { margin-top: 9px; font-size: 11.5px; }
+      .gs-modeasc > span { display: block; opacity: .7; margin-bottom: 5px; }
       .gs-chip {
         display: inline-flex; align-items: center; gap: 6px;
         font-size: 13px; padding: 4px 10px; border-radius: 999px;
@@ -776,18 +820,20 @@
         .gs-win-emoji, .gs-win-tier { animation: none; }
       }
 
-      /* ── Character select (GS-18, flashy redesign) ─────────────────────────────────── */
+      /* ── Character select (GS-18, flashy redesign; compacted GS-settings-nav so the whole
+             roster fits ONE screen in every game mode — 2×2 on phones, 4-across on desktop) ── */
+      .gs-charhead h1 { margin: 0; font-size: 20px; }
+      .gs-charhead p { opacity: .75; font-size: 12px; margin: .25em 0 0; }
       .gs-charwrap {
-        display: grid; grid-template-columns: 1fr;
-        gap: 16px; margin-top: 18px;
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px; margin-top: 12px;
       }
-      /* 2-up on tablet, a full 4-across roster lineup on desktop — never an orphan 3+1 row. */
-      @media (min-width: 560px) { .gs-charwrap { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-      @media (min-width: 1000px) { .gs-charwrap { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+      /* A full 4-across roster lineup on desktop — never an orphan 3+1 row. */
+      @media (min-width: 1000px) { .gs-charwrap { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
       .gs-charcard {
         position: relative; overflow: hidden; text-align: left; cursor: pointer;
-        display: flex; flex-direction: column; gap: 10px;
-        padding: 16px 16px 18px; border-radius: var(--gs-r-lg); color: var(--gs-ink);
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 11px 11px 12px; border-radius: var(--gs-r-lg); color: var(--gs-ink);
         border: 1px solid color-mix(in srgb, var(--cc) 45%, var(--gs-line));
         background:
           radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--cc) 22%, transparent), transparent 60%),
@@ -820,20 +866,25 @@
       @media (hover: hover) { .gs-charcard:hover .gs-charcard-sheen { animation: gs-char-sheen .7s ease; } }
       @keyframes gs-char-sheen { 0% { opacity: 0; transform: translateX(-120%); } 35% { opacity: .8; } 100% { opacity: 0; transform: translateX(120%); } }
       .gs-charcard > * { position: relative; z-index: 2; }
-      .gs-charcard-top { display: flex; gap: 12px; align-items: center; }
+      .gs-charcard-top { display: flex; gap: 9px; align-items: center; }
       .gs-charcard-port {
-        flex: 0 0 auto; display: grid; place-items: center; width: 96px; height: 104px;
-        border-radius: 12px; background: radial-gradient(60% 60% at 50% 40%, #1b2230, #0d1018);
+        flex: 0 0 auto; display: grid; place-items: center; width: 64px; height: 76px;
+        border-radius: 10px; background: radial-gradient(60% 60% at 50% 40%, #1b2230, #0d1018);
         border: 1px solid color-mix(in srgb, var(--cc) 30%, var(--gs-line));
       }
       .gs-charcard-id { flex: 1 1 auto; min-width: 0; }
-      .gs-charcard-name { display: block; font-size: 18px; line-height: 1.15; text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent); }
-      .gs-charcard-org { font-size: 11.5px; opacity: .65; margin-top: 3px; }
+      .gs-charcard-name { display: block; font-size: 15px; line-height: 1.15; text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent); }
+      .gs-charcard-org { font-size: 10.5px; opacity: .65; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .gs-charcard-blurb { font-size: 12.5px; opacity: .9; margin: 0; line-height: 1.45; }
-      .gs-charcard-stats { display: grid; gap: 5px; padding: 2px 0; }
-      .gs-stat { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; }
+      /* Phone-sized cards: the one-line ✓ strength · ▲ quirk hint stands in for the blurb + full
+         pros/cons list, which come back at desktop width (same markup, media-query visibility). */
+      .gs-charcard-hint { font-size: 10.5px; line-height: 1.45; opacity: .85; margin: 0; }
+      @media (max-width: 999px) { .gs-charcard-blurb, .gs-charcard-pc { display: none; } }
+      @media (min-width: 1000px) { .gs-charcard-hint { display: none; } }
+      .gs-charcard-stats { display: grid; gap: 4px; padding: 2px 0; }
+      .gs-stat { display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 7px; }
       .gs-stat-l { font-size: 10px; font-weight: 700; letter-spacing: .6px; opacity: .6; }
-      .gs-stat-rail { height: 7px; border-radius: 999px; background: #ffffff12; overflow: hidden; }
+      .gs-stat-rail { height: 6px; border-radius: 999px; background: #ffffff12; overflow: hidden; }
       .gs-stat-fill {
         display: block; height: 100%; width: var(--w); border-radius: 999px;
         box-shadow: 0 0 8px -1px currentColor;
@@ -844,7 +895,7 @@
       .gs-charcard-pc .gs-pc-i { display: inline-block; width: 14px; }
       .gs-charcard-cta {
         margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 6px;
-        font-size: 13.5px; font-weight: 700; padding: 9px 12px; border-radius: var(--gs-r);
+        font-size: 12px; font-weight: 700; padding: 7px 10px; border-radius: var(--gs-r);
         color: var(--cc); border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent);
         background: color-mix(in srgb, var(--cc) 12%, transparent);
         transition: background .16s ease, color .16s ease, box-shadow .16s ease;

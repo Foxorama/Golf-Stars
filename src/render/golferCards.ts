@@ -122,7 +122,18 @@ function unlockedStrip(unlockedTypes: readonly string[], col: string): string {
     </div>`;
 }
 
-export function characterScreen(unlockedByCharacter: Record<string, readonly string[]> = {}): string {
+/**
+ * The golfer roster (GS-18, compacted GS-settings-nav): a 2×2 grid on phones / 4-across on desktop
+ * so ALL four golfers fit one screen without scrolling in every game mode. Small screens compress
+ * each card to portrait + stats + a one-line strength/quirk hint (the full blurb + pros/cons list
+ * come back at desktop width via CSS — same markup, media-query visibility). The CTA verb follows
+ * the chosen format ("Voyage as …" for the campaign, "Survive as …" for the Unending Universe).
+ */
+export function characterScreen(
+  unlockedByCharacter: Record<string, readonly string[]> = {},
+  opts: { modeName?: string; winnable?: boolean } = {},
+): string {
+  const verb = opts.winnable === false ? 'Survive as' : 'Voyage as';
   const statRows = (st: GolferStats, col: string): string =>
     statBar('PWR', st.power, col) + statBar('ACC', st.accuracy, col) + statBar('TCH', st.touch, col) + statBar('CON', st.consistency, col);
 
@@ -131,12 +142,14 @@ export function characterScreen(unlockedByCharacter: Record<string, readonly str
     const pros = ch.pros.map((p) => `<li><span class="gs-pc-i" style="color:var(--gs-accent);">✓</span> <span style="color:var(--gs-ink);">${p}</span></li>`).join('');
     const cons = ch.cons.map((c) => `<li><span class="gs-pc-i" style="color:var(--gs-warn);">▲</span> <span style="color:var(--gs-dim);">${c}</span></li>`).join('');
     const unlocks = unlockedStrip(unlockedByCharacter[ch.id] ?? [], cap);
+    // The phone-sized card swaps the blurb + full pros/cons for this one-line strength · quirk hint.
+    const hint = `<p class="gs-charcard-hint"><span style="color:var(--gs-accent);">✓</span> ${ch.pros[0] ?? ''} <span style="color:var(--gs-warn);">▲</span> ${ch.cons[0] ?? ''}</p>`;
     return `
       <button class="gs-charcard" data-action='${JSON.stringify({ type: 'selectCharacter', characterId: ch.id })}'
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
-          <div class="gs-charcard-port">${golferSVG(ch.style, 96, 104)}</div>
+          <div class="gs-charcard-port">${golferSVG(ch.style, 64, 76)}</div>
           <div class="gs-charcard-id">
             <b class="gs-charcard-name" style="color:${cap};">${ch.name}</b>
             <div class="gs-charcard-org">${ch.origin} · ${ch.identity}</div>
@@ -144,15 +157,16 @@ export function characterScreen(unlockedByCharacter: Record<string, readonly str
         </div>
         <p class="gs-charcard-blurb">${ch.blurb}</p>
         <div class="gs-charcard-stats">${statRows(ch.stats, cap)}</div>
+        ${hint}
         <ul class="gs-charcard-pc">${pros}${cons}</ul>
         ${unlocks}
-        <span class="gs-charcard-cta" style="--cc:${cap};">Voyage as ${ch.shortName} <span aria-hidden="true">→</span></span>
+        <span class="gs-charcard-cta" style="--cc:${cap};">${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>
       </button>`;
   }).join('');
   return `
-    <header style="border-left:4px solid #5fd45a;padding-left:10px;">
-      <h1 style="margin:0;font-size:24px;">Choose your golfer</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Four wildly different swings. Each trades a clear strength for a clear quirk — and keeps their own clubs unlocked by winning Ascensions. Pick who you'll voyage the galaxy as.</p>
+    <header class="gs-charhead" style="border-left:4px solid #5fd45a;padding-left:10px;">
+      <h1>Choose your golfer</h1>
+      <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
     </header>
     <div class="gs-charwrap">${cards}</div>`;
 }

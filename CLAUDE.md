@@ -299,8 +299,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   dispatch; save persistence + canvas mounts + the intro cinematic are side-effects there, never in
   the reducer. Visual theme is the design-token CSS in `index.html`, not the SVG layer. The play
   screen is full-bleed (the map IS the screen) and never scrolls; the pull-to-power gesture is the
-  only shot input. **`app.ts` is a 3,400-line god-file — the likeliest source of regressions; prefer
-  extracting a module over growing it, and re-read the relevant span before editing.**
+  only shot input. **The settings cog rides EVERY screen** (GS-settings-nav: appended once in
+  `render()`, never per-screen; the full-bleed play view's map stack carries its own), and the
+  sheet's "Return to title" (`toTitle`) is NON-destructive: an underway run (active + characterId)
+  parks as a `resumable` snapshot. `persist()` snapshots the live run only when one is underway,
+  else passes `state.resumable` through — NEVER snapshot the title's character-less placeholder run
+  (it wipes saves). Character select fits ONE screen in every mode (2×2 phone grid; small screens
+  swap blurb+pros/cons for a one-line hint via CSS visibility, not a template fork; the CTA verb
+  follows the format). Title formats render as `.gs-modetile` hero tiles + `.gs-modestart` launch
+  buttons, data-driven off `FORMATS`. **`app.ts` is a 3,400-line god-file — the likeliest source of
+  regressions; prefer extracting a module over growing it, and re-read the relevant span before
+  editing.**
 - **Intro cinematic** (`docs/decisions/ui-intro.md`). Cosmetic Canvas2D, not in the reducer; degrades
   safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached sprite, never
   per-element `shadowBlur`. The real title boots first, the intro overlays it (keeps `build.test` green).
