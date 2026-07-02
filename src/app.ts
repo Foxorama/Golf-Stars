@@ -36,7 +36,7 @@ import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS, getFormat } from './sim/rpg/formats';
 import { getCharacter, type Character } from './sim/rpg/characters';
 import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
-import { ENDLESS_MILESTONES, ENDLESS_UNLOCKS, endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
+import { ENDLESS_MILESTONES, endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { arcSurvivorTarget } from './sim/rpg/competition';
@@ -97,18 +97,6 @@ let view: PlayViewHandle | null = null;
 /** The animated weather overlay over the aim/putt map (GS-journey-fx rework) — so the sky + air are
  *  alive while you line up, not only mid-flight. Torn down + remounted each render like `view`. */
 let weatherOverlay: { destroy(): void } | null = null;
-
-/** Today's deterministic daily-challenge seed — same course for everyone on the same date. Reuses
- *  the string-seed support (no new URL param/hook). Date is read in the browser (not the sim). */
-function dailySeed(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `daily-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-function dailyLabel(): string {
-  const d = new Date();
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
 
 /** The captured PWA install prompt (beforeinstallprompt), if the browser offered one and the
  *  player hasn't installed/dismissed it. Surfaced as an "Install" button on the title. */
@@ -260,6 +248,9 @@ function dispatch(action: Action): void {
     const prevHoles = state.run.holesSurvived;
     const prevBestHoles = state.endlessBestHoles;
     state = reduce(state, action);
+    // Entering character select resets the difficulty picker to A0 (GS-title-2) — a fresh choice
+    // per run, never a sticky leftover from the last one.
+    if (action.type === 'start') selAscension = 0;
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
       action.type === 'openClubhouse' ||
@@ -365,90 +356,62 @@ function header(): string {
     </header>`;
 }
 
-/** The Unending Universe's title-card progress strip (GS-unending): lifetime-best holes, the survival
- *  ladder in one line, and the milestone/unlock trail — earned pieces lit, the hole-150 secret masked
- *  as "? ? ?" until it's owned. Pure presentation over `state.endlessBestHoles` + the owned pools. */
-function endlessProgressHTML(): string {
+/** One-line Unending-Universe progress for the mode tile (GS-unending): lifetime-best holes + the
+ *  next unlock tease (the hole-150 secret masked as "? ? ?" until owned). The full milestone trail
+ *  lives with the earned gear in the Trade Market; the tile keeps just the pull. */
+function endlessTeaseHTML(): string {
   const best = state.endlessBestHoles;
-  const chips = ENDLESS_MILESTONES.map((m) => {
-    const unlock = ENDLESS_UNLOCKS.find((u) => u.holes === m.holes && !u.secret);
-    const done = best >= m.holes;
-    const col = done ? '#4fe08a' : 'var(--gs-dim)';
-    return `<span class="gs-chip" title="${m.holes} holes: ✦ ${m.shards} Shards${unlock ? ` + ${unlock.name}` : ''}" style="border-color:${done ? '#2a5a40' : 'var(--gs-line-2)'};color:${col};font-size:10.5px;">${done ? '✓' : ''} ${m.holes}${unlock ? ' 🎁' : ''}</span>`;
-  }).join('');
-  const secret = ENDLESS_UNLOCKS.find((u) => u.secret);
-  const secretOwned = !!secret && (secret.kind === 'ship' ? state.ownedShips : state.ownedApparel).includes(secret.id);
-  const secretChip = secret
-    ? `<span class="gs-chip" title="${secretOwned ? secret.name : 'Something waits at hole 150…'}" style="border-color:${secretOwned ? '#3a3320' : 'var(--gs-line-2)'};color:${secretOwned ? 'var(--gs-gold)' : 'var(--gs-dim)'};font-size:10.5px;">${secretOwned ? `✓ 150 🛸 ${secret.name}` : '150 · ? ? ?'}</span>`
-    : '';
   const next = nextEndlessUnlock(best);
   const tease = next
-    ? `Next unlock: <b>${next.secret ? '? ? ?' : next.name}</b> at hole ${next.holes}`
-    : 'Every unlock earned — the universe is yours';
-  return `
-    <div style="margin:6px 0 8px;">
-      <div style="font-size:12px;opacity:.75;margin-bottom:4px;">💀 Survival bar: quad bogey → one stroke tighter every 8 holes → <b>birdie</b> from hole 41 on.
-        ${best > 0 ? ` · Best: <b style="color:#4fe08a;">${best} holes</b>` : ''} · ${tease}</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;">${chips}${secretChip}</div>
-    </div>`;
+    ? `next unlock <b>${next.secret ? '? ? ?' : next.name}</b> @ hole ${next.holes}`
+    : 'every unlock earned — the universe is yours';
+  return `💀 ${best > 0 ? `Best: <b style="color:#4fe08a;">${best} holes</b>` : 'Survive as long as you can'} · ${tease}`;
 }
 
 function titleScreen(): string {
-  // Headline the winnable campaign (GS-voyage) first, then the endless survival format — each as a
-  // hero MODE TILE (GS-settings-nav): a big accent-coloured launch button instead of a plain panel.
-  const formats = Object.values(FORMATS)
+  // Headline the winnable campaign (GS-voyage) first, then the endless survival format. Each is a
+  // hero MODE TILE (GS-title-2): the same painted-scene + caption language as the Market/Clubhouse
+  // doorways, but taller, accent-bordered and carrying a launch bar — one visual family, two clear
+  // classes. The whole tile is the button; Ascension is picked at golfer select, not here.
+  const modes = Object.values(FORMATS)
     .slice()
     .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
     .map((f) => {
       const mc = f.winnable ? '#ffce54' : '#b88aff';
-      const icon = f.winnable ? '🚀' : '🌌';
       const badge = f.winnable ? '★ CAMPAIGN · WINNABLE' : '∞ ENDLESS SURVIVAL';
-      const path = `${f.stops.map((s) => s.label).join(' → ')}${f.winnable ? '' : f.stops.length > 1 ? ' → …' : ' → forever'}`;
-      const launch = `<button class="gs-modestart" data-action='${JSON.stringify({ type: 'start', format: f.id })}'>
-          ${icon} ${f.winnable ? 'Set sail' : 'Tee off'} — ${f.name}</button>`;
-      // The voyage's Ascension ladder (GS-ascension): the big button launches A0; unlocked higher
-      // tiers ride a chip row beneath it.
-      const asc =
-        f.winnable && state.maxAscension > 0
-          ? `<div class="gs-modeasc">
-               <span>⚔ Ascension — harder cut, leaner purse (max unlocked: A${state.maxAscension}):</span>
-               <div style="display:flex;gap:6px;flex-wrap:wrap;">${Array.from({ length: state.maxAscension }, (_, a) =>
-                 btn(`A${a + 1}`, { type: 'start', format: f.id, ascension: a + 1 }, { variant: 'ghost' }),
-               ).join('')}</div>
-             </div>`
-          : '';
+      const meta = f.winnable
+        ? state.maxAscension > 0
+          ? `⚔ Ascension up to A${state.maxAscension} — pick your difficulty at golfer select`
+          : ''
+        : endlessTeaseHTML();
       return `
-      <div class="gs-modetile" style="--mc:${mc};">
-        <div class="gs-modetile-head">
-          <span class="gs-modetile-icon" aria-hidden="true">${icon}</span>
-          <div style="min-width:0;">
-            <b class="gs-modetile-name">${f.name}</b>
-            <div class="gs-modetile-badge">${badge}</div>
-          </div>
-        </div>
-        <p class="gs-modetile-blurb">${f.blurb}</p>
-        <div class="gs-modetile-path">${path}</div>
-        ${f.holeGate ? endlessProgressHTML() : ''}
-        ${launch}
-        ${asc}
-      </div>`;
+      <button class="gs-modetile" style="--mc:${mc};" data-action='${JSON.stringify({ type: 'start', format: f.id })}'>
+        <span class="gs-modetile__art" aria-hidden="true">${f.winnable ? voyageTileArt() : unendingTileArt()}</span>
+        <span class="gs-modetile__badge">${badge}</span>
+        <span class="gs-modetile__cap">
+          <span class="gs-modetile__title">${f.winnable ? '🚀' : '🌌'} ${f.name}</span>
+          <span class="gs-modetile__sub">${f.blurb}</span>
+          ${meta ? `<span class="gs-modetile__meta">${meta}</span>` : ''}
+          <span class="gs-modetile__go">▶ ${f.winnable ? 'Set sail' : 'Tee off'}</span>
+        </span>
+      </button>`;
     })
     .join('');
+  const best =
+    state.bestDistance > 0 || state.bestStableford > 0
+      ? `<span class="gs-chip" title="personal bests" style="font-size:12px;">🏁 Best dist <b>${state.bestDistance}</b> · SF <b>${state.bestStableford}</b></span>`
+      : '';
   return `
-    <header style="border-left:4px solid #5fd45a;padding-left:10px;">
-      <h1 style="margin:0;font-size:24px;">⛳ Golf Stars</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Voyage the galaxy. Make the cut. Travel deeper. — Best dist ${state.bestDistance}, best SF ${state.bestStableford}</p>
+    <header class="gs-hero">
+      <h1 class="gs-hero-title">⛳ Golf Stars</h1>
+      <p class="gs-hero-tag">Voyage the galaxy · Make the cut · Travel deeper</p>
+      <div class="gs-hero-chips">
+        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;">✦ <b>${state.shards}</b> Star Shards</span>
+        ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
+        ${best}
+        ${installButtonHTML()}
+      </div>
     </header>
-    <div style="margin:.8em 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);">✦ <b>${state.shards}</b> Star Shards</span>
-      ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
-      ${installButtonHTML()}
-    </div>
-    ${navTilesHTML()}
-    <div style="margin:.2em 0 .6em;">
-      ${btn(`🗓 Daily Challenge — ${dailyLabel()}`, { type: 'restart', seed: dailySeed() }, { variant: 'ghost' })}
-      <span style="font-size:11.5px;opacity:.55;">same course for everyone today (a deterministic seed)</span>
-    </div>
     ${
       state.resumable
         ? `<div class="gs-panel" style="border-color:#2bb673;background:linear-gradient(180deg,#10241a,#0e1a14);">
@@ -457,8 +420,89 @@ function titleScreen(): string {
            </div>`
         : ''
     }
-    <h2 style="font-size:15px;margin-top:1em;">${state.resumable ? 'Or start a new run' : 'Choose your game'}</h2>
-    ${formats}`;
+    <h2 class="gs-seclabel">${state.resumable ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
+    <div class="gs-modetiles">${modes}</div>
+    <h2 class="gs-seclabel">Between runs</h2>
+    ${navTilesHTML()}`;
+}
+
+/** Painted backdrop for the Voyage mode tile (GS-title-2): the campaign as a dotted gold route
+ *  arcing across three worlds (the three arcs) to a pin flag on the far planet, a ship mid-jump.
+ *  Same hand-placed byte-stable house style as the Market/Clubhouse doorway scenes. */
+function voyageTileArt(): string {
+  const stars = [
+    [18, 26], [44, 60], [70, 18], [104, 44], [148, 14], [186, 40], [214, 70],
+    [246, 18], [278, 48], [126, 78], [30, 104], [258, 96], [90, 96], [170, 60],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${0.9 + (i % 3) * 0.5}" fill="#ffffff" opacity="${0.4 + (i % 4) * 0.14}"/>`)
+    .join('');
+  return `<svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <radialGradient id="ntVoy" cx="80%" cy="18%" r="105%">
+        <stop offset="0%" stop-color="#3d3018"/><stop offset="45%" stop-color="#1c2038"/><stop offset="100%" stop-color="#0b0d1c"/>
+      </radialGradient>
+    </defs>
+    <rect width="300" height="150" fill="url(#ntVoy)"/>
+    ${stars}
+    <!-- three worlds, near → far, the route threading them -->
+    <circle cx="34" cy="124" r="20" fill="#4a9e58" opacity="0.9"/>
+    <circle cx="28" cy="118" r="20" fill="#63c26e" opacity="0.5"/>
+    <circle cx="150" cy="84" r="13" fill="#c2702e" opacity="0.9"/>
+    <circle cx="146" cy="80" r="13" fill="#e8a45e" opacity="0.5"/>
+    <circle cx="258" cy="40" r="24" fill="#6a4bb8" opacity="0.9"/>
+    <circle cx="250" cy="32" r="24" fill="#8f6fd8" opacity="0.45"/>
+    <path d="M46,112 C86,96 112,94 138,88 S204,64 236,50" fill="none" stroke="#ffce54" stroke-width="2"
+      stroke-dasharray="1.5 7" stroke-linecap="round" opacity="0.9"/>
+    <!-- the pin waits on the far world -->
+    <g transform="translate(256,14)">
+      <rect x="0" y="0" width="2" height="22" fill="#e8e8ea"/>
+      <path d="M2,1 L16,6 L2,11 Z" fill="#ff6b6b"/>
+    </g>
+    <!-- ship mid-jump along the route -->
+    <g transform="translate(96,96) rotate(66)">
+      <path d="M0,-11 C6,-7.5 6,7.5 0,12.5 C-6,7.5 -6,-7.5 0,-11 Z" fill="#dfe6f2"/>
+      <circle cx="0" cy="-1.5" r="2.8" fill="#9fd8e6"/>
+      <path d="M-5,6.5 L-10,13 L-2.5,10 Z" fill="#ff6b6b"/>
+      <path d="M5,6.5 L10,13 L2.5,10 Z" fill="#ff6b6b"/>
+      <path d="M-2.2,12.5 L0,21 L2.2,12.5 Z" fill="#ffc454" opacity="0.9"/>
+    </g>
+  </svg>`;
+}
+
+/** Painted backdrop for the Unending Universe mode tile (GS-title-2): a star tunnel of receding
+ *  rings pulling toward a bright singularity, a golf ball streaking in — no far shore. Hand-placed,
+ *  byte-stable, same house style as the other doorway scenes. */
+function unendingTileArt(): string {
+  const stars = [
+    [16, 22], [48, 48], [80, 14], [118, 58], [160, 20], [204, 48], [242, 12],
+    [274, 42], [36, 88], [140, 96], [232, 88], [70, 118], [190, 122], [280, 112],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${0.8 + (i % 3) * 0.5}" fill="#ffffff" opacity="${0.35 + (i % 4) * 0.14}"/>`)
+    .join('');
+  // Receding rings pulling toward the bright core — the tunnel with no far end.
+  const rings = [
+    [58, 44, 0.16], [44, 33, 0.24], [32, 24, 0.34], [21, 15.5, 0.46], [12, 8.5, 0.6],
+  ]
+    .map(([rx, ry, o]) => `<ellipse cx="212" cy="66" rx="${rx}" ry="${ry}" fill="none" stroke="#b88aff" stroke-width="1.6" opacity="${o}"/>`)
+    .join('');
+  return `<svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <radialGradient id="ntUnd" cx="70%" cy="42%" r="95%">
+        <stop offset="0%" stop-color="#332052"/><stop offset="55%" stop-color="#191338"/><stop offset="100%" stop-color="#0a081a"/>
+      </radialGradient>
+      <radialGradient id="ntUndCore" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#f2ecff"/><stop offset="45%" stop-color="#c9a6ff" stop-opacity="0.8"/><stop offset="100%" stop-color="#b88aff" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="300" height="150" fill="url(#ntUnd)"/>
+    ${stars}
+    ${rings}
+    <circle cx="212" cy="66" r="15" fill="url(#ntUndCore)"/>
+    <!-- a golf ball streaks into the tunnel, trail behind it -->
+    <path d="M58,110 Q120,96 176,78" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.5" stroke-dasharray="3 5" stroke-linecap="round"/>
+    <circle cx="180" cy="77" r="4.4" fill="#f4f4f4"/>
+    <circle cx="178.6" cy="75.6" r="1.3" fill="#ffffff"/>
+  </svg>`;
 }
 
 /** The Pro Shop greeting block: the world's club pro + a pithy line on how the last section went. */
@@ -1642,6 +1686,11 @@ function playingBody(animating: boolean): string {
 
 // Settings sheet — a view overlay (not reducer state), toggled like the shot popup.
 let settingsOpen = false;
+
+// The Ascension tier picked on the character-select screen (GS-title-2) — view state, like the
+// club selection: the [data-asc] chips set it, every golfer card's select action carries it, and
+// entering character select ('start') resets it to A0. Never persisted; the reducer clamps it.
+let selAscension = 0;
 
 /** The settings sheet: player-owned feel/control prefs (sound, haptics, fast shots, swing gesture,
  *  left-handed, reduced motion), plus — anywhere but the title itself — a "Return to title" escape
@@ -3146,6 +3195,12 @@ function render(): void {
       ? characterScreen(state.unlockedClubsByCharacter, {
           modeName: getFormat(state.run.formatId).name,
           winnable: !!getFormat(state.run.formatId).winnable,
+          // The Voyage's difficulty is picked here, with the golfer (GS-title-2) — only when
+          // tiers are actually unlocked (a fresh account just plays A0, no row to parse).
+          ascension:
+            getFormat(state.run.formatId).winnable && state.maxAscension > 0
+              ? { max: state.maxAscension, sel: selAscension }
+              : undefined,
         })
       : state.screen === 'intro'
       ? introScreen()
@@ -3325,6 +3380,16 @@ function render(): void {
       toggleSetting(el.dataset.setting as keyof Settings);
       resumeAudio();
       sfx.click();
+      render();
+    });
+  });
+  // Ascension difficulty chips on character select (GS-title-2): pure view state — the picked
+  // tier re-renders lit and rides every golfer card's select action.
+  app.querySelectorAll<HTMLElement>('[data-asc]').forEach((el) => {
+    el.addEventListener('click', () => {
+      selAscension = Number(el.dataset.asc);
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });
