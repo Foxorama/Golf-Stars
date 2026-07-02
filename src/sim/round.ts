@@ -21,17 +21,20 @@ import {
   resolveShape,
   resolveShot,
   sprayAngleRms,
+  sprayBands,
+  SPRAY_GEOM,
   TUNABLES,
   type CaddyGuard,
   type ShapeMod,
   type ShotResult,
+  type SprayGeom,
   type SprayShape,
 } from './shot';
 import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, flightKnockdown } from './flight';
+import { arcApex, flightBlockedBy, flightKnockdown, flightObstacles } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TradeTent } from './tents';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -1147,6 +1150,9 @@ export interface ShotSpread {
    *  it reads as the lefty's (world-flipped) landing distribution — matching resolveShot's sign
    *  flip. The bias is already mirrored into `bearing`. Undefined/false = right-handed (no mirror). */
   lefty?: boolean;
+  /** The club's nominal (full) carry (yards) — feeds the loft/apex model so the blocked-by-trees
+   *  overlay (`sprayBlocking`) walks the SAME flight the sim resolves via `flightKnockdown`. */
+  nominalCarry: number;
 }
 
 export function shotSpread(
@@ -1230,7 +1236,170 @@ export function shotSpread(
     angleSpread,
     shape,
     lefty: opts.lefty,
+    nominalCarry: nominal,
   };
+}
+
+// --- Blocked-shot spray overlay (GS-spray-block) ------------------------------
+/** One angular sample of a blocked region: the landing radii [r0, r1] (yards) at band angle `a`
+ *  (radians off the bearing, in the same pre-mirror band space `sprayBands` uses) where a ball
+ *  sampled to land would instead be knocked down by a tall obstacle. */
+export interface BlockedSample {
+  a: number;
+  r0: number;
+  r1: number;
+}
+
+/** A contiguous angular run of blocked landings inside the spray cone — the renderer shades it. */
+export interface BlockedRegion {
+  a0: number;
+  a1: number;
+  /** Per-angle radial intervals, evenly spaced a0→a1 — the region's drawable boundary. */
+  samples: BlockedSample[];
+}
+
+export interface SprayBlockingOpts {
+  /** Angular width (radians) below which a blocked run is DROPPED — a sliver reads as noise, not
+   *  information. The renderer derives this from the projected pixel size, so it's zoom-honest. */
+  minSpanRad?: number;
+  /** Clear gap (radians) between two blocked runs below which they MERGE — no barcode striping. */
+  mergeGapRad?: number;
+  /** Radial depth (yards) below which a blocked interval is ignored (a grazing clip, not a wall). */
+  minDepthYd?: number;
+  /** Snap a blocked interval's edge onto the carry-window edge when within this (yards) — kills the
+   *  1-px "open rim" sliver between a blocked zone and the arc it nearly touches. */
+  snapYd?: number;
+  /** Angular sample count across the cone (clamped; default scales with `minSpanRad`). */
+  samples?: number;
+}
+
+/**
+ * Where the contemplated shot would be BLOCKED by tall obstacles (trees), across the drawn spray
+ * cone (GS-spray-block). For each angle across the cone's full band extent and each landing radius
+ * in the carry window, a candidate landing is probed with the SAME `flightKnockdown` walk the sim
+ * resolves shots with (via `flightBlockedBy`) — so a shaded landing is exactly one the sim would
+ * knock out of the air, and the unshaded remainder of the cone is what's genuinely reachable.
+ *
+ * The raw per-angle mask is then smoothed so it reads as intent, not noise:
+ *  - per angle, the blocked radii collapse to ONE interval (first→last blocked — a clear pocket
+ *    sandwiched between two clips is counted blocked: conservative, and never a radial barcode);
+ *  - intervals thinner than `minDepthYd` are dropped, and edges within `snapYd` of the carry
+ *    window snap onto it;
+ *  - angular runs closer than `mergeGapRad` merge (interpolating across the gap), and runs
+ *    narrower than `minSpanRad` are dropped — no 1-px blockers, no blocked/open striping.
+ *
+ * Pure, zero rng — display-only geometry; the sim's own knockdown in `executeShot` is untouched.
+ */
+export function sprayBlocking(
+  hole: Hole,
+  s: ShotSpread,
+  geom: SprayGeom = SPRAY_GEOM,
+  opts: SprayBlockingOpts = {},
+): BlockedRegion[] {
+  if (s.expectedCarry <= 0 || s.angleSpread <= 0 || s.carryHigh <= 0) return [];
+  const obstacles = flightObstacles(hole);
+  if (obstacles.length === 0) return [];
+  const bands = sprayBands(s.shape, s.angleSpread, geom).filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
+  if (bands.length === 0) return [];
+  let aMin = Infinity;
+  let aMax = -Infinity;
+  for (const b of bands) {
+    aMin = Math.min(aMin, b.a0);
+    aMax = Math.max(aMax, b.a1);
+  }
+  const span = aMax - aMin;
+  if (!(span > 0)) return [];
+
+  const minSpan = Math.max(0, opts.minSpanRad ?? 0.02);
+  const mergeGap = Math.max(0, opts.mergeGapRad ?? 0.03);
+  const minDepth = Math.max(0, opts.minDepthYd ?? 2);
+  const snap = Math.max(0, opts.snapYd ?? 2);
+  // Angular resolution: fine enough to resolve runs at the sliver threshold (≥2 samples per
+  // `minSpan`), clamped so a huge cone stays cheap and a tiny one stays smooth.
+  const N = Math.max(
+    16,
+    Math.min(72, opts.samples ?? Math.ceil(span / Math.max(1e-4, minSpan / 2))),
+  );
+  const rLow = Math.max(0.5, s.carryLow);
+  const rHigh = Math.max(rLow, s.carryHigh);
+  // Radial probes: every few yards through the carry window (endpoints included).
+  const K = Math.max(3, Math.min(16, Math.ceil((rHigh - rLow) / 4) + 1));
+  const rStep = K > 1 ? (rHigh - rLow) / (K - 1) : 0;
+
+  const br = (s.bearing * Math.PI) / 180;
+  // The same lefty mirror the drawn cone (and resolveShot) applies: band angle a → world bearing
+  // br + h·a, so the probed landings are exactly the points the cone draws.
+  const h = s.lefty ? -1 : 1;
+  const landAt = (a: number, r: number): Vec => [
+    s.origin[0] + Math.sin(br + h * a) * r,
+    s.origin[1] + Math.cos(br + h * a) * r,
+  ];
+
+  // Per-angle blocked interval (or null): first→last blocked radius, padded by half a probe step,
+  // snapped onto the window edges, dropped when shallower than minDepth.
+  const intervals: ({ r0: number; r1: number } | null)[] = [];
+  const angles: number[] = [];
+  for (let i = 0; i <= N; i++) {
+    const a = aMin + (span * i) / N;
+    angles.push(a);
+    let first = -1;
+    let last = -1;
+    for (let k = 0; k < K; k++) {
+      const r = rLow + rStep * k;
+      if (flightBlockedBy(obstacles, s.origin, landAt(a, r), s.bearing, r, s.nominalCarry)) {
+        if (first < 0) first = r;
+        last = r;
+      }
+    }
+    if (first < 0) {
+      intervals.push(null);
+      continue;
+    }
+    let r0 = Math.max(rLow, first - rStep / 2);
+    let r1 = Math.min(rHigh, last + rStep / 2);
+    if (r0 - rLow < snap) r0 = rLow;
+    if (rHigh - r1 < snap) r1 = rHigh;
+    intervals.push(r1 - r0 >= minDepth ? { r0, r1 } : null);
+  }
+
+  // Merge angular runs across sub-threshold clear gaps (lerp the interval through the gap), then
+  // drop runs narrower than the sliver threshold.
+  const step = span / N;
+  const gapSamples = Math.floor(mergeGap / Math.max(1e-6, step));
+  for (let i = 0; i <= N; i++) {
+    if (intervals[i] !== null) continue;
+    // A clear gap: find its extent and the blocked neighbours on both sides.
+    let j = i;
+    while (j <= N && intervals[j] === null) j++;
+    const prev = i - 1 >= 0 ? intervals[i - 1] : null;
+    const next = j <= N ? intervals[j] : null;
+    if (prev && next && j - i <= gapSamples) {
+      for (let k = i; k < j; k++) {
+        const t = (k - (i - 1)) / (j - (i - 1));
+        intervals[k] = { r0: prev.r0 + (next.r0 - prev.r0) * t, r1: prev.r1 + (next.r1 - prev.r1) * t };
+      }
+    }
+    i = j;
+  }
+
+  const regions: BlockedRegion[] = [];
+  for (let i = 0; i <= N; i++) {
+    if (intervals[i] === null) continue;
+    let j = i;
+    while (j <= N && intervals[j] !== null) j++;
+    // Run spans samples [i, j); width in radians:
+    const width = angles[j - 1]! - angles[i]!;
+    if (width >= minSpan) {
+      const samples: BlockedSample[] = [];
+      for (let k = i; k < j; k++) {
+        const iv = intervals[k]!;
+        samples.push({ a: angles[k]!, r0: iv.r0, r1: iv.r1 });
+      }
+      regions.push({ a0: angles[i]!, a1: angles[j - 1]!, samples });
+    }
+    i = j;
+  }
+  return regions;
 }
 
 /** The club the AI would choose for a target: reach the plays-like distance, minus a

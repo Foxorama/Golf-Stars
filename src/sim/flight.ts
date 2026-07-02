@@ -150,6 +150,25 @@ export interface Knockdown {
   t: number;
 }
 
+/** A tall obstacle with its broad-phase geometry precomputed — the input to `flightBlockedBy`, so a
+ *  spray-wide scan (many candidate landings on one hole) prices the hazard list ONCE, not per landing. */
+export interface FlightObstacle {
+  poly: Vec[];
+  canopy: number;
+  centre: Vec;
+  radius: number;
+}
+
+/** All tall obstacles on a hole, with canopy/centre/radius precomputed. Pure. */
+export function flightObstacles(hole: Hole): FlightObstacle[] {
+  const out: FlightObstacle[] = [];
+  for (const z of hole.hazards) {
+    if (!OBSTACLE_KINDS.has(z.kind)) continue;
+    out.push({ poly: z.poly, canopy: canopyHeight(z.poly), centre: blobCentroid(z.poly), radius: blobRadius(z.poly) });
+  }
+  return out;
+}
+
 /**
  * Walk the curved flight path and return the EARLIEST tree the ball clips — i.e. the first obstacle
  * blob it crosses while its arc height there is below the canopy. Returns null if the ball flies
@@ -168,16 +187,31 @@ export function flightKnockdown(
   nominalCarry: number,
   steps = 22,
 ): Knockdown | null {
+  return flightBlockedBy(flightObstacles(hole), from, landing, bearingDeg, carry, nominalCarry, steps);
+}
+
+/**
+ * The same knockdown walk as `flightKnockdown`, against a PRE-BUILT obstacle list — the shape the
+ * blocked-shot spray overlay needs (it probes hundreds of candidate landings per hole, so it builds
+ * `flightObstacles(hole)` once). `flightKnockdown` delegates here, so the overlay and the sim resolve
+ * a clip from ONE code path — the drawn blocked zone IS the physics. Pure, no rng.
+ */
+export function flightBlockedBy(
+  obstacles: readonly FlightObstacle[],
+  from: Vec,
+  landing: Vec,
+  bearingDeg: number,
+  carry: number,
+  nominalCarry: number,
+  steps = 22,
+): Knockdown | null {
   if (carry <= 0) return null;
   // Candidate obstacles: only those whose blob comes near the straight launch→landing chord
   // (broad-phase prune so we fine-walk a handful, not every tree on the hole).
   const candidates: { poly: Vec[]; canopy: number; inside: boolean }[] = [];
-  for (const z of hole.hazards) {
-    if (!OBSTACLE_KINDS.has(z.kind)) continue;
-    const c = blobCentroid(z.poly);
-    const r = blobRadius(z.poly);
-    if (segDist(c, from, landing) > r + 6) continue;
-    candidates.push({ poly: z.poly, canopy: canopyHeight(z.poly), inside: pointInPoly(from, z.poly) });
+  for (const o of obstacles) {
+    if (segDist(o.centre, from, landing) > o.radius + 6) continue;
+    candidates.push({ poly: o.poly, canopy: o.canopy, inside: pointInPoly(from, o.poly) });
   }
   if (candidates.length === 0) return null;
 
