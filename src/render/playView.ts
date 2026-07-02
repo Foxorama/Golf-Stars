@@ -638,6 +638,12 @@ export interface PlayViewOptions {
    *  undefined for a putt. `clubId` is the struck club's taxonomy id (GS-audio-2) so the cue can
    *  voice driver/wood/iron/wedge distinctly. Pure feel hook; never affects the sim. */
   onImpact?: (kind: 'shot' | 'putt', quality?: number, clubId?: string) => void;
+  /** Fired once per shot at TOUCHDOWN, alongside the landing FX (GS-audio-3) — the cue point for a
+   *  surface sound (splash / lava sizzle / void implosion / whale / per-world tree knock). `lie` is
+   *  the resolved landing surface (scorch-crater + effect-patch conversions included, exactly what
+   *  the land FX shows), `penalty` the sim's penalty kind, `knockedDown` true when a tree clipped
+   *  the ball out of the air. Pure feel hook; never affects the sim. */
+  onLand?: (lie: string, penalty?: string, knockedDown?: boolean) => void;
   /**
    * Zoom-and-follow: when set, the camera centres on `focus` (the starting ball) at radius
    * `viewRadius` (course yards) and — if `follow` — eases to track the ball in flight, so the
@@ -1198,7 +1204,10 @@ export function mountPlayView(
             // read from the SAME mark sources the sim's lie conversion uses.
             const onScorch = scorchMarks.length > 0 && inScorch(scorchMarks, touchdown);
             const onPatch = !onScorch && patchLie && patchMarks.length > 0 && inPatch(patchMarks, touchdown);
-            spawnLandFX([tdx, tdy], onScorch ? 'scorch' : onPatch ? patchLie : (shot.landLie ?? shot.lieTo), shot.penalty);
+            const landLie = onScorch ? 'scorch' : onPatch ? patchLie : (shot.landLie ?? shot.lieTo);
+            spawnLandFX([tdx, tdy], landLie, shot.penalty);
+            // The surface also ANSWERS in sound (GS-audio-3) — same resolved lie the FX just showed.
+            opts.onLand?.(landLie, shot.penalty, shot.knockedDown);
           }
           // Dr Chipinski chip-in (GS-caddy-voices): as the ball drops in, slow the world and have the
           // doctor "answer the call" — the phone glyph + "You rang?" bubble + voice. Fires once.

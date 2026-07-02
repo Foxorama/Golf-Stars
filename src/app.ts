@@ -3501,6 +3501,8 @@ function render(): void {
         caddyId: caddyId(),
         lefty: lefty(),
         onImpact: (kind, quality, clubId) => (kind === 'shot' ? sfx.swing(quality ?? 0.6, clubId) : sfx.putt()),
+        onLand: (lie, penalty, knockedDown) =>
+          sfx.land(lie, penalty, archetypeFor(holeThemeId(hole), holeBiome(hole)), knockedDown),
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
       });
@@ -3561,6 +3563,10 @@ function render(): void {
             sfx.putt();
           }
         },
+        // Touchdown surface cue (GS-audio-3): the splash/sizzle/whale/tree-knock, voiced off the
+        // hole's world archetype so the tree you clipped sounds like the tree you see.
+        onLand: (lie, penalty, knockedDown) =>
+          sfx.land(lie, penalty, archetypeFor(holeThemeId(play.hole), holeBiome(play.hole)), knockedDown),
         onDone: () => {
           animatedShots = play.shots.length;
           animatedPutts = play.puttLogs.length;
