@@ -16,6 +16,7 @@ import type { PuttLog, ShotLog } from '../sim/round';
 import type { ShotRedirect } from '../sim/shot';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { inScorch, meteorScorch as meteorScorchFor } from '../sim/scorch';
+import { effectPatches as effectPatchesFor, inPatch, PATCH_SPECS, type PatchKind } from '../sim/patches';
 import { archetypeFor } from '../sim/course/themes';
 import type { ApparelLook } from '../sim/rpg/apparel';
 import { holeProjector } from './project';
@@ -581,6 +582,10 @@ export interface PlayViewOptions {
   tradeTents?: boolean;
   /** Meteor-strike scorch craters (GS-meteor-scorch): drawn in the scene + an ash-burst land FX. */
   meteorScorch?: boolean;
+  /** Effect ground patches (GS-journey-fx-2): the route's turf-patch family (comet stardust /
+   *  frostfall ice / debris wreckage) — drawn in the scene + a per-family land FX. Baked from the
+   *  course effect at the app boundary; render-only (the sim's lie conversion is the matching half). */
+  groundPatch?: PatchKind;
   /** Fired once when the ball ricochets off a trade-camp tent (GS-tents) — the cue for app.ts to play
    *  the bonk sound + speak the yelp. The arg is the exact bubble text shown on-canvas ("Ow!" /
    *  "Watch it!") so the spoken line matches. Pure feel hook; never affects the sim. */
@@ -837,6 +842,10 @@ export function mountPlayView(
       burst(8, ['191,240,255', '255,255,255'], { up: 1.2, spread: 0.8, grav: 0.03 }); // chime glints
     } else if (lie === 'scorch') {
       burst(12, ['150,140,132', '255,150,60', '96,84,76'], { up: 1.1, spread: 1.1, grav: 0.05 }); // ash + embers
+    } else if (lie === 'stardust') {
+      burst(12, ['235,250,255', '150,225,255', '255,255,255'], { up: 1.3, spread: 1.0, grav: 0.02 }); // charged glitter
+    } else if (lie === 'junk') {
+      burst(10, ['150,164,188', '96,106,124', '255,120,80'], { up: 0.9, spread: 1.2, grav: 0.07 }); // rattled scrap + a spark
     } else if (lie === 'trees') {
       spawnLeaves(at); // rattled the canopy on arrival
     }
@@ -845,6 +854,9 @@ export function mountPlayView(
   // Meteor-strike scorch craters (GS-meteor-scorch): the SAME mark source the sim's lie conversion
   // reads (sim/scorch.ts), so the touchdown FX below answers exactly the craters that bite.
   const scorchMarks = opts.meteorScorch ? meteorScorchFor(hole) : [];
+  // Effect ground patches (GS-journey-fx-2): same contract — the SAME patch source the sim reads.
+  const patchMarks = opts.groundPatch ? effectPatchesFor(hole, opts.groundPatch) : [];
+  const patchLie = opts.groundPatch ? PATCH_SPECS[opts.groundPatch].lie : undefined;
 
   // The full static world (rough texture, striped/banded surfaces, depth-banded water,
   // cell-shaded trees, OB, centreline, tee + flag) comes from the SAME shared scene builder
@@ -854,7 +866,7 @@ export function mountPlayView(
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch, groundPatch: opts.groundPatch });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);
@@ -1128,9 +1140,11 @@ export function mountPlayView(
             // The surface answers the touchdown (GS-biome-feel): splash / lava burst / void
             // implosion / sand puff / icy skitter — keyed off the lie the sim already resolved.
             // A touchdown ON a meteor-strike crater (GS-meteor-scorch) answers with ash + embers,
-            // read from the SAME mark source the sim's lie conversion uses.
+            // and one ON an effect ground patch (GS-journey-fx-2) with that family's burst — both
+            // read from the SAME mark sources the sim's lie conversion uses.
             const onScorch = scorchMarks.length > 0 && inScorch(scorchMarks, touchdown);
-            spawnLandFX([tdx, tdy], onScorch ? 'scorch' : (shot.landLie ?? shot.lieTo), shot.penalty);
+            const onPatch = !onScorch && patchLie && patchMarks.length > 0 && inPatch(patchMarks, touchdown);
+            spawnLandFX([tdx, tdy], onScorch ? 'scorch' : onPatch ? patchLie : (shot.landLie ?? shot.lieTo), shot.penalty);
           }
           // Dr Chipinski chip-in (GS-caddy-voices): as the ball drops in, slow the world and have the
           // doctor "answer the call" — the phone glyph + "You rang?" bubble + voice. Fires once.

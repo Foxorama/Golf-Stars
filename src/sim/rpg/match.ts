@@ -18,6 +18,7 @@
  */
 
 import { playHole, type PlayHoleOptions, type PlayedHole, type ShotMods } from '../round';
+import type { PatchKind } from '../patches';
 import type { Hole } from '../course/contract';
 import { Rng } from '../rng';
 import {
@@ -72,8 +73,8 @@ export function bossPlayOpts(golferId: string, homeEdge = false): PlayHoleOption
 
 /** Play a boss golfer's whole stop (their own ball on each hole), deterministically. `rainbowRoad`
  *  (GS-rainbow) makes the boss play the player's rainbow-road hole (off-road = OOB); default off. */
-export function playBossStop(holes: readonly Hole[], golferId: string, rng: Rng, homeEdge = false, rainbowRoad = false, tradeTents = false, meteorScorch = false): PlayedHole[] {
-  const opts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents, meteorScorch };
+export function playBossStop(holes: readonly Hole[], golferId: string, rng: Rng, homeEdge = false, rainbowRoad = false, tradeTents = false, meteorScorch = false, groundPatch?: PatchKind): PlayedHole[] {
+  const opts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents, meteorScorch, groundPatch };
   return holes.map((h) => playHole(h, rng, opts));
 }
 
@@ -217,9 +218,10 @@ export function playMatchStop(
   // The Rainbow Ball (GS-rainbow) transforms the HOLE, not just the player's ball — so the boss plays
   // the SAME rainbow road (off-road is OOB for them too). Inherit it from the player's opts so a duel
   // stays fair (both on the wire) instead of the player alone on a brutal course.
-  // Trade-camp tents (GS-tents) and meteor scorch marks (GS-meteor-scorch) likewise transform the
-  // hole, so the boss obeys the same ring / plays off the same charred craters.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch };
+  // Trade-camp tents (GS-tents), meteor scorch marks (GS-meteor-scorch) and effect ground patches
+  // (GS-journey-fx-2) likewise transform the hole, so the boss obeys the same ring / plays off the
+  // same charred craters and turf patches.
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch, groundPatch: playerOpts.groundPatch };
   const player: PlayedHole[] = [];
   const boss: PlayedHole[] = [];
   const duels: HoleDuel[] = [];
@@ -250,11 +252,12 @@ export function playBossSideStop(
   rainbowRoad = false,
   tradeTents = false,
   meteorScorch = false,
+  groundPatch?: PatchKind,
 ): PlayedHole[] {
-  // Rainbow Ball (GS-rainbow) / trade-camp tents (GS-tents) / meteor scorch (GS-meteor-scorch): the
-  // player's loadout/route transforms the hole, so the boss side (pre-played by the interactive
-  // reducer) plays the same hole. Default false.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents, meteorScorch };
+  // Rainbow Ball (GS-rainbow) / trade-camp tents (GS-tents) / meteor scorch (GS-meteor-scorch) /
+  // effect ground patches (GS-journey-fx-2): the player's loadout/route transforms the hole, so the
+  // boss side (pre-played by the interactive reducer) plays the same hole. Default off.
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents, meteorScorch, groundPatch };
   const bossPartner = setup.partnerSide === 'boss' ? setup.bossPartnerMods : undefined;
   return holes.map((h) => playSideHole(h, rng, bossOpts, bossPartner, setup.format).played);
 }
@@ -287,7 +290,7 @@ export function playTeamMatchStop(
 ): MatchStop {
   // Rainbow Ball (GS-rainbow): the boss side plays the same transformed hole (off-road = OOB), and the
   // boss's partner inherits it via `bossOpts` below — so a team duel stays fair under rainbow road.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch };
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch, groundPatch: playerOpts.groundPatch };
   const playerPartner = setup.partnerSide === 'player' ? setup.playerPartnerMods : undefined;
   const bossPartner = setup.partnerSide === 'boss' ? setup.bossPartnerMods : undefined;
   const player: PlayedHole[] = [];

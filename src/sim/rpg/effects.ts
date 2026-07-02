@@ -26,21 +26,25 @@
  */
 
 import type { RouteEvent } from './events';
+import type { PatchKind } from '../patches';
 
 /** The atmospheric flavour a lane brings to the world it flies into. Render-only, except where a
- *  documented play hook says otherwise (tents; `effectWindMult`). */
+ *  documented play hook says otherwise (tents; scorch; `effectWindMult`; `effectCarryMult`;
+ *  `effectPatchKind` — GS-journey-fx-2 gave EVERY effect a real, readable play consequence). */
 export type CourseEffectId =
   | 'none'
   | 'moonlight' //   cool moonlit night — a silver wash + still air
-  | 'meteorShower' // streaking meteors raining across the sky
+  | 'meteorShower' // streaking meteors raining across the sky — scorch craters char the turf
   | 'solarStorm' //   an angry red flare — crackling, gusty charged air
   | 'ionStorm' //     blue-violet forked lightning — the gustiest sky of all
   | 'eclipse' //      a black sun ringed by corona — the air goes dead still
   | 'nebula' //       colour-lit fog banks drifting over the course
-  | 'comet' //        a grand comet hanging overhead, tail shedding sparkle dust
-  | 'aurora' //       shimmering colour ribbons overhead
-  | 'spaceJunk' //    a crashed-debris field strewn through the rough
-  | 'tradeMarket'; // a bustling trade camp pitched at the world's edge
+  | 'comet' //        a grand comet overhead — its tail sheds STARDUST drifts (bonus lies)
+  | 'aurora' //       shimmering colour ribbons — charged air LIFTS the ball (carry up)
+  | 'spaceJunk' //    a crashed-debris field — WRECKAGE tangles on the turf (trouble lies)
+  | 'tradeMarket' //  a bustling trade camp pitched around the green (collidable tents)
+  | 'gravityWell' //  a giant world looms — heavy sky DRAGS the ball down (carry down)
+  | 'frostfall'; //   glittering frost sifts down — ICE patches freeze onto the turf
 
 export interface CourseEffectInfo {
   id: CourseEffectId;
@@ -50,20 +54,26 @@ export interface CourseEffectInfo {
   icon: string;
   /** One-line atmosphere blurb for the route card. */
   blurb: string;
+  /** The effect's GEOMETRIC play hook, one readable line for the route card (tents / craters /
+   *  ground patches). Absent = the hook is a numeric wind/carry lever (the card computes those
+   *  chips from `EFFECT_WIND`/`EFFECT_CARRY` so the numbers can never drift from the physics). */
+  play?: string;
 }
 
 export const COURSE_EFFECTS: Record<CourseEffectId, CourseEffectInfo> = {
   none: { id: 'none', label: 'Clear skies', icon: '✦', blurb: 'Still, open space.' },
   moonlight: { id: 'moonlight', label: 'Moonlit', icon: '🌙', blurb: 'A silver moon washes the course — calm, still air.' },
-  meteorShower: { id: 'meteorShower', label: 'Meteor shower', icon: '🌠', blurb: 'Meteors streak down across the whole sky.' },
+  meteorShower: { id: 'meteorShower', label: 'Meteor shower', icon: '🌠', blurb: 'Meteors streak down across the whole sky.', play: 'Craters char the turf — hot, wild lies' },
   solarStorm: { id: 'solarStorm', label: 'Solar storm', icon: '⚡', blurb: 'A red flare crackles — charged, gusty air.' },
   ionStorm: { id: 'ionStorm', label: 'Ion storm', icon: '🌩️', blurb: 'Blue lightning forks overhead — the wildest winds in the sky.' },
   eclipse: { id: 'eclipse', label: 'Total eclipse', icon: '🌘', blurb: 'A black sun ringed by corona — the air goes dead still.' },
   nebula: { id: 'nebula', label: 'Nebula shroud', icon: '🌌', blurb: 'Glowing fog banks drift over the course in slow colour.' },
-  comet: { id: 'comet', label: 'Comet overhead', icon: '☄️', blurb: 'A grand comet hangs in the sky, tail shedding sparkle dust.' },
+  comet: { id: 'comet', label: 'Comet overhead', icon: '☄️', blurb: 'A grand comet hangs in the sky, tail shedding sparkle dust.', play: 'Stardust drifts on the turf — charged lies fly hot AND true' },
   aurora: { id: 'aurora', label: 'Aurora', icon: '🌈', blurb: 'Ribbons of colour shimmer over the horizon.' },
-  spaceJunk: { id: 'spaceJunk', label: 'Debris field', icon: '🛰️', blurb: 'Crashed wreckage litters the rough.' },
-  tradeMarket: { id: 'tradeMarket', label: 'Trade camp', icon: '⛺', blurb: 'A trade camp rings the green — bounce your ball off the tents!' },
+  spaceJunk: { id: 'spaceJunk', label: 'Debris field', icon: '🛰️', blurb: 'Crashed wreckage litters the rough.', play: 'Wreckage tangles on the turf — snagged, wild lies' },
+  tradeMarket: { id: 'tradeMarket', label: 'Trade camp', icon: '⛺', blurb: 'A trade camp rings the green — bounce your ball off the tents!', play: 'Tents ring the green — low shots ricochet off the roofs' },
+  gravityWell: { id: 'gravityWell', label: 'Gravity well', icon: '🪐', blurb: 'A giant world looms close — its pull hangs heavy on every shot.' },
+  frostfall: { id: 'frostfall', label: 'Frostfall', icon: '❄️', blurb: 'Glittering frost sifts down out of a cold, clear sky.', play: 'Ice patches freeze the turf — slick, skiddy lies' },
 };
 
 /**
@@ -81,6 +91,7 @@ export const EFFECT_WIND: Partial<Record<CourseEffectId, number>> = {
   nebula: 0.9,
   solarStorm: 1.2,
   ionStorm: 1.35,
+  frostfall: 0.9, // cold air lies still — frostfall's danger is on the ground, not in the sky
 };
 
 /** Wind speed ceiling (mph) after an effect multiplier — the generator's own max band. */
@@ -89,6 +100,42 @@ export const EFFECT_WIND_CAP = 46;
 /** The wind multiplier a course effect applies (1 = none). */
 export function effectWindMult(effect: string | undefined): number {
   return EFFECT_WIND[(effect ?? 'none') as CourseEffectId] ?? 1;
+}
+
+/**
+ * The effect's second physics hook (GS-journey-fx-2): a CARRY multiplier on every full shot. Applied
+ * as a pure post-generation `biomeMods` carry row (`currentCourse`), the SAME mechanism low-gravity
+ * biomes already use — so `biomeCarryMult` feeds it identically to the HUD's range preview, the AI's
+ * club pick, the interactive suggestions and the shot physics, and auto ≡ interactive holds by
+ * construction (it's course data, not a driver-side tweak). Honest by design: the ball flies exactly
+ * as far as every readout said it would. Kept in a modest band (±10%) so club coverage never breaks.
+ */
+export const EFFECT_CARRY: Partial<Record<CourseEffectId, number>> = {
+  aurora: 1.06, // the charged curtain lifts the ball — everything flies a touch farther
+  gravityWell: 0.92, // the giant's pull hangs on the ball — everything falls a touch short
+};
+
+/** The carry multiplier a course effect applies (1 = none). */
+export function effectCarryMult(effect: string | undefined): number {
+  return EFFECT_CARRY[(effect ?? 'none') as CourseEffectId] ?? 1;
+}
+
+/**
+ * The effect's GROUND-PATCH hook (GS-journey-fx-2): which seeded turf-patch family the effect scatters
+ * along the corridor (`sim/patches.ts` — the generalised GS-meteor-scorch machinery). A ball at REST
+ * on a patch plays that family's lie next shot: comet stardust is a BONUS lie (hot and true — worth
+ * hunting), frostfall ice is slick, junk wreckage snags. Pure seeded geometry gated at the play
+ * boundary exactly like the scorch craters; the meteor shower keeps its own dedicated scorch path.
+ */
+export const EFFECT_PATCH: Partial<Record<CourseEffectId, PatchKind>> = {
+  comet: 'stardust',
+  frostfall: 'frost',
+  spaceJunk: 'junk',
+};
+
+/** The ground-patch family a course effect scatters (undefined = none). */
+export function effectPatchKind(effect: string | undefined): PatchKind | undefined {
+  return EFFECT_PATCH[(effect ?? 'none') as CourseEffectId];
 }
 
 /**
@@ -111,7 +158,11 @@ export function routeEffect(ev: RouteEvent | undefined): CourseEffectId {
   const icon = ev.icon;
   // Thematic overrides first (the dated/astronomical showpieces read true).
   if (/eclipse|conjunction/.test(id)) return 'eclipse';
-  if (/comet/.test(id)) return 'comet';
+  // Heavy-sky events (GS-journey-fx-2) — before /moon/ so the supermoon's tide-pull reads as the
+  // gravity well its lore describes, and before /comet/ so a dwarf star never reads as dust.
+  if (/gravit|slingshot|neutron|dwarf|singular|rogue|(^|-)tide(-|$)|supermoon|black-hole|horizon/.test(id)) return 'gravityWell';
+  if (/comet|stardust/.test(id)) return 'comet';
+  if (/frost|cryo|glacial|frozen|freeze|hail/.test(id) || /❄/.test(icon)) return 'frostfall';
   if (/moon/.test(id) || /🌑|🌕|🌗|🌒|🌘|🌙/.test(icon)) return 'moonlight';
   if (/meteor|shower|perseid|geminid|leonid|apophis/.test(id) || /☄/.test(icon)) return 'meteorShower';
   if (/(^|-)ions?(-|$)|pulsar|quasar|magnet|plasma/.test(id)) return 'ionStorm';

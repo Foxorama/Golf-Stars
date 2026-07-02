@@ -34,6 +34,7 @@ import { usableBag } from './rpg/economy';
 import { arcApex, flightKnockdown } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TradeTent } from './tents';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
+import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
 
 /** Ball within this many yards of the pin counts as holed. */
 export const HOLE_OUT_RADIUS = 1.2;
@@ -354,6 +355,11 @@ export interface PlayHoleOptions {
    *  turf — a ball resting on one plays a hot-but-wild 'scorch' lie. A property of the HOLE while in
    *  play (see match.ts). Absent/false = ordinary play, byte-for-byte unchanged. */
   meteorScorch?: boolean;
+  /** Effect ground patches (GS-journey-fx-2, sim/patches.ts): the route's course effect scatters a
+   *  seeded turf-patch family (comet stardust / frostfall ice / debris wreckage) — a ball at REST on
+   *  one plays that family's lie. A property of the HOLE while in play, exactly like the scorch
+   *  craters (see match.ts). Absent = ordinary play, byte-for-byte unchanged. */
+  groundPatch?: PatchKind;
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -732,6 +738,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       rainbowRoad: opts.rainbowRoad,
       tradeTents: opts.tradeTents,
       meteorScorch: opts.meteorScorch,
+      groundPatch: opts.groundPatch,
     };
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
     // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
@@ -855,6 +862,11 @@ export interface ExecOpts {
    *  Pure seeded geometry, no play rng; absent/false is byte-for-byte unchanged. Resolved from the
    *  course effect at the call sites. */
   meteorScorch?: boolean;
+  /** Effect ground patches (GS-journey-fx-2): which seeded turf-patch family the hole carries
+   *  (comet stardust / frostfall ice / debris wreckage) — a ball at REST on one plays that family's
+   *  lie. Pure seeded geometry exactly like the scorch craters, no play rng; absent is byte-for-byte
+   *  unchanged. Resolved from the course effect at the call sites. */
+  groundPatch?: PatchKind;
 }
 
 export interface ExecResult {
@@ -1027,6 +1039,13 @@ export function executeShot(
   // whose own off-road rule reads the UNCONVERTED rest lie (a scorched fairway is still the road).
   if (opts.meteorScorch && !opts.rainbowRoad && SCORCHABLE.has(restLie) && inScorch(meteorScorch(hole), rest)) {
     restLie = SCORCH_LIE;
+  }
+  // Effect ground patches (GS-journey-fx-2): the same rest-lie conversion for the generalised patch
+  // families — comet stardust (a bonus lie), frostfall ice, debris wreckage. Pure seeded geometry on
+  // a private stream (ZERO play-rng), built only when the owning route armed it, so a base shot never
+  // enters this branch. Soft-turf rests only; skipped under the Rainbow Ball for the same road rule.
+  if (opts.groundPatch && !opts.rainbowRoad && PATCHABLE.has(restLie) && inPatch(effectPatches(hole, opts.groundPatch), rest)) {
+    restLie = PATCH_SPECS[opts.groundPatch].lie as FeatureKind;
   }
   const li = lieInfo(restLie);
   const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };

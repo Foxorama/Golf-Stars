@@ -197,6 +197,10 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   let cometDust: { t: number; off: number; s: number; ph: number }[] = [];
   let lanterns: { x: number; y: number; s: number; ph: number; col: string }[] = [];
   let hulk: { y: number; sz: number; shape: Vec[]; spin: number } | null = null;
+  // GS-journey-fx-2 showpieces, each on its OWN seeded stream (rng3) so adding them never
+  // re-scatters the earlier layers (the same rule rng2 obeys for the rng layout).
+  let flakes: { x: number; spd: number; s: number; off: number; ph: number }[] = [];
+  let giant: { x: number; y: number; r: number; tilt: number; hue: number } | null = null;
 
   function build(): void {
     const rng = mulberry32(o.seed);
@@ -264,6 +268,24 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       });
       hulk = { y: 0.1 + rng2() * 0.25, sz, shape, spin: rng2() * Math.PI * 2 };
     }
+    // GS-journey-fx-2 showpiece scatters — a third independent stream (see the declarations above).
+    const rng3 = mulberry32((o.seed ^ 0x85ebca6b) >>> 0);
+    // Frostfall: big glittering crystals sifting straight down out of a dead-still sky.
+    flakes = Array.from({ length: 36 }, () => ({
+      x: rng3(),
+      spd: 12 + rng3() * 18,
+      s: 1.0 + rng3() * 1.8,
+      off: rng3(),
+      ph: rng3() * Math.PI * 2,
+    }));
+    // Gravity well: ONE vast ringed giant looming low in the sky.
+    giant = {
+      x: W * (0.22 + rng3() * 0.56),
+      y: H * (0.10 + rng3() * 0.10),
+      r: Math.min(W, H) * (0.13 + rng3() * 0.05),
+      tilt: -0.35 + rng3() * 0.7,
+      hue: rng3(),
+    };
     // The world's ambient air (GS-biome-feel): count scales with area like the starfield.
     const amb = AMBIENT[o.archetype];
     if (amb) {
@@ -331,6 +353,21 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       g.addColorStop(1, 'rgba(120,80,30,0.0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, H * 0.55, W, H * 0.45);
+    } else if (effect === 'frostfall') {
+      // Cold, dead-clear air: a pale icy wash off the top of the sky.
+      const g = ctx.createLinearGradient(0, 0, 0, H * 0.6);
+      g.addColorStop(0, 'rgba(180,220,245,0.16)');
+      g.addColorStop(1, 'rgba(180,220,245,0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H * 0.6);
+    } else if (effect === 'gravityWell') {
+      // The giant's shadowed presence: a heavy violet pall pressing down from the sky.
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(60,40,110,0.26)');
+      g.addColorStop(0.5, 'rgba(50,36,90,0.10)');
+      g.addColorStop(1, 'rgba(40,30,70,0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
     }
     // solarStorm / ionStorm tint as edge vignettes inside their own draws (centre stays clear).
   }
@@ -1014,6 +1051,89 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   }
 
 
+  // Frostfall (GS-journey-fx-2): big glittering ice crystals sifting straight down through still
+  // air — the sky-half of the route whose ground-half is the frozen turf patches.
+  function drawFrostfall(ctx: CanvasRenderingContext2D, now: number): void {
+    const sprite = glowSprite();
+    ctx.save();
+    for (const f of flakes) {
+      const t = wrap(f.off + (now * 0.001 * f.spd) / (H + 40), 1);
+      const y = t * (H + 30) - 15;
+      const x = wrap(f.x * (W + 30) + Math.sin(now * 0.0012 + f.ph) * 9, W + 30) - 15;
+      const tw = 0.5 + 0.5 * Math.sin(now * 0.004 + f.ph);
+      const a = 0.35 + 0.5 * tw;
+      const r = f.s * (0.9 + 0.25 * tw);
+      // A six-point crystal glint: two crossed strokes + a soft bloom on the biggest flakes.
+      ctx.strokeStyle = `rgba(235,248,255,${a.toFixed(3)})`;
+      ctx.lineWidth = 0.9;
+      for (let k = 0; k < 3; k++) {
+        const ang = (k / 3) * Math.PI + f.ph;
+        ctx.beginPath();
+        ctx.moveTo(x - Math.cos(ang) * r, y - Math.sin(ang) * r);
+        ctx.lineTo(x + Math.cos(ang) * r, y + Math.sin(ang) * r);
+        ctx.stroke();
+      }
+      if (f.s > 2 && sprite) {
+        ctx.globalAlpha = 0.3 * tw;
+        ctx.drawImage(sprite, x - r * 2.4, y - r * 2.4, r * 4.8, r * 4.8);
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+
+  // Gravity well (GS-journey-fx-2): ONE vast ringed giant looming low in the sky — the visible
+  // reason every shot flies heavy (the carry hook is the matching physics half).
+  function drawGravityWell(ctx: CanvasRenderingContext2D, now: number): void {
+    if (!giant) return;
+    const { x, y, r, tilt, hue } = giant;
+    const breathe = 0.5 + 0.5 * Math.sin(now * 0.0006);
+    // Two banded palettes so different holes get different giants.
+    const bands = hue < 0.5 ? ['#8f7ad8', '#6c58b8', '#57459c', '#463786'] : ['#d8a07a', '#b87d58', '#9c6245', '#864f37'];
+    ctx.save();
+    // A heavy, PULLING halo — drawn 'lighter' so the sky bends bright around the mass.
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(x, y, r, x, y, r * (2.6 + breathe * 0.3));
+    halo.addColorStop(0, 'rgba(150,120,255,0.20)');
+    halo.addColorStop(0.6, 'rgba(120,90,220,0.08)');
+    halo.addColorStop(1, 'rgba(120,90,220,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // The banded disc.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.clip();
+    for (let i = 0; i < bands.length; i++) {
+      ctx.fillStyle = bands[i]!;
+      const by = y - r + (i / bands.length) * 2 * r;
+      ctx.fillRect(x - r, by, 2 * r, (2 * r) / bands.length + 1);
+    }
+    // Day-side light + limb shadow so the sphere reads round.
+    const shade = ctx.createRadialGradient(x - r * 0.45, y - r * 0.4, r * 0.15, x, y, r);
+    shade.addColorStop(0, 'rgba(255,255,255,0.28)');
+    shade.addColorStop(0.55, 'rgba(255,255,255,0.0)');
+    shade.addColorStop(1, 'rgba(10,8,30,0.55)');
+    ctx.fillStyle = shade;
+    ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+    ctx.restore();
+    // The ring system — an ellipse tilted across the disc, brighter where it crosses in front.
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(tilt);
+    for (const [rr, a] of [[1.55, 0.5], [1.75, 0.32], [1.95, 0.18]] as const) {
+      ctx.strokeStyle = `rgba(220,210,255,${a})`;
+      ctx.lineWidth = Math.max(1.2, r * 0.07);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * rr, r * rr * 0.26, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function draw(ctx: CanvasRenderingContext2D, now: number): void {
     tint(ctx);
     drawStars(ctx, now);
@@ -1050,6 +1170,12 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
         break;
       case 'tradeMarket':
         drawLanterns(ctx, now);
+        break;
+      case 'frostfall':
+        drawFrostfall(ctx, now);
+        break;
+      case 'gravityWell':
+        drawGravityWell(ctx, now);
         break;
       default:
         break;

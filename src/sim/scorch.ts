@@ -55,8 +55,9 @@ const MIN_GAP = 12;
 /** Candidate slots tried (a fixed budget — placement never loops unbounded). */
 const CANDIDATES = 16;
 
-/** Rough radius of the green feature (mean centroid→vertex), or a sensible fallback. */
-function greenRadius(hole: Hole): number {
+/** Rough radius of the green feature (mean centroid→vertex), or a sensible fallback.
+ *  (Exported for `sim/patches.ts`, the generalised patch machinery — GS-journey-fx-2.) */
+export function greenRadius(hole: Hole): number {
   const g = hole.features.find((f) => f.kind === 'green');
   if (!g || g.poly.length < 3) return 12;
   let r = 0;
@@ -64,8 +65,9 @@ function greenRadius(hole: Hole): number {
   return r / g.poly.length;
 }
 
-/** Point + travel direction at fraction `t` (0..1 by arc length) along the centreline. */
-function centrelinePoint(cl: readonly Vec[], t: number): { p: Vec; dir: Vec } {
+/** Point + travel direction at fraction `t` (0..1 by arc length) along the centreline.
+ *  (Exported for `sim/patches.ts`, the generalised patch machinery — GS-journey-fx-2.) */
+export function centrelinePoint(cl: readonly Vec[], t: number): { p: Vec; dir: Vec } {
   if (cl.length < 2) {
     const p = cl[0] ?? ([0, 0] as Vec);
     return { p: [p[0], p[1]], dir: [0, 1] };

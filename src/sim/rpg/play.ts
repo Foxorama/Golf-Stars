@@ -9,6 +9,7 @@
  */
 
 import { dist, type FeatureKind, type Hole, type Vec } from '../course/contract';
+import type { PatchKind } from '../patches';
 import { type Club } from '../clubs';
 import {
   aiClub,
@@ -178,6 +179,7 @@ export function takeShot(
   scramble?: ScrambleOpts,
   tradeTents = false,
   meteorScorch = false,
+  groundPatch?: PatchKind,
 ): HolePlay {
   if (state.done) return state;
   const pin = pinOf(state.hole);
@@ -208,6 +210,7 @@ export function takeShot(
     rainbowRoad: loadout.rainbowRoad,
     tradeTents,
     meteorScorch,
+    groundPatch,
     // Suggestible Sam: commit to his suggested club and the confidence boost folds into this shot.
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
@@ -331,6 +334,7 @@ export function resolveScrambleShot(
   partnerMods: ScrambleOpts['partnerMods'],
   tradeTents = false,
   meteorScorch = false,
+  groundPatch?: PatchKind,
 ): ScrambleShot {
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
@@ -359,6 +363,7 @@ export function resolveScrambleShot(
     rainbowRoad: loadout.rainbowRoad,
     tradeTents,
     meteorScorch,
+    groundPatch,
     confidence: loadout.confidenceMod,
     suggestedClubId: loadout.confidenceMod
       ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id

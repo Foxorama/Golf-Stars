@@ -409,6 +409,49 @@
   conversion fires + never-a-penalty, armed-vs-unarmed ball identical with only the lie label differing,
   the lie bites but sits below the trouble lies, and the no-death-spiral bar holds with scorch armed at
   wildness 1 across biomes). Eyes-on with `node scripts/scorch-preview.mjs`.
+- **EVERY course effect now carries a real play hook, and the sky-set widened again (GS-journey-fx-2,
+  `effects.ts`/`sim/patches.ts`).** The play complaint: "the weather effects and the consequences for
+  each journey really don't make any sense or have a lot of difference" — four of the ten skies
+  (comet/aurora/spaceJunk/nebula-adjacent) were pure dressing, and the card never SAID what a sky did.
+  Three coupled fixes, all riding existing machinery:
+  1. **A second numeric hook — CARRY.** `EFFECT_CARRY` (aurora ×1.06 — the charged curtain lifts the
+     ball; the new gravityWell ×0.92 — the giant's pull drags it), applied in `currentCourse`'s
+     `applyEffectPhysics` (the renamed `applyEffectWind`) as a pure post-gen `biomeMods` carry row —
+     the SAME mechanism low-gravity biomes use, so `biomeCarryMult` feeds the HUD range preview, club
+     suggestions, layup AI and shot physics ONE identical number with ZERO driver threading; auto ≡
+     interactive by construction. Kept in a ±10% band (machine-checked) so club coverage never breaks.
+     The `note` on the appended mod is the effect id (handy for tests/debug).
+  2. **The scorch machinery GENERALISED into ground patches** (`sim/patches.ts`, the GS-weather-play
+     backlog item). `effectPatches(hole, kind)` = the exact scorch placement algorithm (mid-corridor
+     band, soft-turf-only, green/tee margins, 16-candidate budget) on a per-kind private stream
+     (`patch:<kind>:tee:green:par`); `PATCH_SPECS` maps each family to its `LIE_INFO` row: **comet →
+     `stardust`** (carry ×1.08, dispersion ×0.9 — the one patch you AIM for, a bonus not a burn),
+     **frostfall → `ice`** (the existing slick row), **spaceJunk → `junk`** (carry ×0.85, dispersion
+     ×1.6 — worse than rough, gentler than trees). One new `groundPatch?: PatchKind` opt threaded
+     everywhere `meteorScorch` already went (`playerHoleOpts` via `effectPatchKind(routeEffect(…))`,
+     reducer → `takeShot`/`resolveScrambleShot`, boss/partner via `match.ts`, render via
+     `stylePatches` in `buildScene` + per-family `spawnLandFX` bursts). Same guarantees, proven by
+     `tests/patches.test.ts` (mirrors scorch.test.ts, all three families + armed-vs-unarmed ball
+     identity + the no-death-spiral bar per family). NOTE for tests: frost's `ice` lie ALSO occurs
+     naturally on ice worlds — assert against the RAW surface (`lieAt` of the rest), not the label.
+  3. **Two new skies + ~16 new events + a legible card.** `gravityWell` (ONE vast seeded ringed giant
+     looming in the sky — `drawGravityWell`; a heavy violet pall) and `frostfall` (big six-point
+     crystals sifting straight down — `drawFrostfall`; wind ×0.9 — its danger is on the GROUND), both
+     on a third mulberry stream (`o.seed ^ 0x85ebca6b`) so earlier layers never re-scatter.
+     `routeEffect` grew ordered regex families — gravity (`gravit|slingshot|neutron|dwarf|singular|
+     rogue|(^|-)tide(-|$)|supermoon|black-hole|horizon`, BEFORE /moon/ so the supermoon's tide-pull
+     lore reads true) and frost (`frost|cryo|glacial|frozen|freeze|hail` or a ❄ icon) — remapping
+     `supermoon`/`gravity-slingshot` to the well. The catalogue gained ~13 recurring + 2 unique
+     events spread across arcs/rarities/categories (frost-drift, stardust-wake, gravity-eddy,
+     hail-belt, neutron-tide, comet-dust-run, cryo-harvest, wreckers-claim, white-dwarf-passage,
+     glacial-veil, junker-armada, rogue-planet, great-comet-harvest; uniques deep-freeze +
+     event-horizon), and provably spreads across ALL TWELVE non-none effects. LEGIBILITY: the
+     route-info sheet now computes wind AND carry chips from the physics tables (they can never
+     drift from the course) and shows each geometric hook's one-liner via the new
+     `CourseEffectInfo.play` field ("🎯 Ice patches freeze the turf — slick, skiddy lies"). The
+     capstone guard: `tests/journey-effects.test.ts` asserts EVERY non-none effect has at least one
+     hook (wind ≠ 1 | carry ≠ 1 | patch | tents | craters) — a new sky can never ship as pure
+     dressing again. NO new `_gs*`/URL hook, so the test-hub guard needs nothing.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen
