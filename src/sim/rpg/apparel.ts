@@ -15,18 +15,21 @@
 import type { CosmeticRarity } from './cosmetics';
 import { COSMETIC_RARITY } from './cosmetics';
 
-export type ApparelSlot = 'hat' | 'shirt' | 'pants';
+export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag';
 
-/** Hat silhouettes the drawer renders (canvas + SVG share these shape names). */
-export type HatShape = 'cap' | 'bucket' | 'visor' | 'tophat' | 'crown' | 'helmet' | 'halo';
-/** Shirt silhouettes the drawer renders. */
-export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic';
+/** Hat silhouettes the drawer renders (canvas + SVG share these shape names). `baggy` is the soft
+ *  slouched-crown cap of the Evergreen set (GS-unending). */
+export type HatShape = 'cap' | 'bucket' | 'visor' | 'tophat' | 'crown' | 'helmet' | 'halo' | 'baggy';
+/** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest. */
+export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic' | 'blazer';
 /** Pants silhouettes the drawer renders. */
 export type PantsShape = 'trousers' | 'shorts' | 'knickers' | 'leggings' | 'spacepants' | 'nebula';
+/** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
+export type BagShape = 'staffbag';
 
 /** The vector look a garment renders as — a shape family + palette + optional aura for the top tiers. */
 export interface ApparelLook {
-  shape: HatShape | ShirtShape | PantsShape;
+  shape: HatShape | ShirtShape | PantsShape | BagShape;
   /** Primary fabric colour. */
   color: string;
   /** Secondary trim / brim / stripe colour. */
@@ -48,6 +51,9 @@ export interface Apparel {
   blurb: string;
   /** Shard price. */
   cost: number;
+  /** Earned, never bought (GS-unending): unlocked by surviving this many holes of the Unending
+   *  Universe. The Trade Market shows it locked with its milestone; `canBuyApparel` refuses it. */
+  unlockHoles?: number;
   look: ApparelLook;
 }
 
@@ -277,6 +283,55 @@ export const APPAREL: readonly Apparel[] = [
     cost: APPAREL_COST.mythic,
     look: { shape: 'nebula', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
   },
+
+  // ===== THE EVERGREEN SET (GS-unending) ==============================================
+  // Earned, never bought: the Unending Universe's survival trophies. Deep championship green
+  // with gold thread throughout, capped by the mythic Green Jacket. Kept AFTER the shard-bought
+  // catalogue so the market's per-slot `.find(mythic)` ordering (tests) is undisturbed.
+  {
+    id: 'bag-evergreen',
+    name: 'Evergreen Tour Bag',
+    slot: 'bag',
+    set: 'Evergreen',
+    rarity: 'epic',
+    blurb: 'A hand-stitched staff bag in championship green. Survive 40 holes of the Unending Universe.',
+    cost: APPAREL_COST.epic,
+    unlockHoles: 40,
+    look: { shape: 'staffbag', color: '#0f5132', accent: '#d9b74a' },
+  },
+  {
+    id: 'cap-baggy-green',
+    name: 'Baggy Green Cap',
+    slot: 'hat',
+    set: 'Evergreen',
+    rarity: 'legendary',
+    blurb: 'The fabled soft-crowned baggy green, gold-embroidered. Survive 60 holes of the Unending Universe.',
+    cost: APPAREL_COST.legendary,
+    unlockHoles: 60,
+    look: { shape: 'baggy', color: '#0e4d2c', accent: '#d9b74a', glow: '#7fe0a8' },
+  },
+  {
+    id: 'pants-evergreen',
+    name: 'Evergreen Pro Pants',
+    slot: 'pants',
+    set: 'Evergreen',
+    rarity: 'legendary',
+    blurb: 'Dark-green tour slacks with a gold pinstripe, pressed to a knife edge. Survive 80 holes.',
+    cost: APPAREL_COST.legendary,
+    unlockHoles: 80,
+    look: { shape: 'trousers', color: '#0b3d24', accent: '#d9b74a', glow: '#7fe0a8' },
+  },
+  {
+    id: 'jacket-green',
+    name: 'The Green Jacket',
+    slot: 'shirt',
+    set: 'Evergreen',
+    rarity: 'mythic',
+    blurb: 'THE jacket — tailored championship green, gold buttons, a crest over the heart. Survive 100 holes.',
+    cost: APPAREL_COST.mythic,
+    unlockHoles: 100,
+    look: { shape: 'blazer', color: '#0f5132', accent: '#f2d06b', glow: '#4fe08a' },
+  },
 ];
 
 const BY_ID: Record<string, Apparel> = Object.fromEntries(APPAREL.map((a) => [a.id, a]));
@@ -292,23 +347,25 @@ export function apparelForSlot(slot: ApparelSlot): Apparel[] {
   );
 }
 
-/** Can this garment be bought? (Affordable + not already owned.) */
+/** Can this garment be bought? (Affordable + not already owned + actually FOR SALE — an
+ *  Unending-Universe unlock (GS-unending) is earned, never bought.) */
 export function canBuyApparel(item: Apparel | undefined, shards: number, owned: readonly string[]): boolean {
-  return !!item && shards >= item.cost && !owned.includes(item.id);
+  return !!item && !item.unlockHoles && shards >= item.cost && !owned.includes(item.id);
 }
 
 /**
  * The set a garment belongs to is COMPLETE when EVERY slot that set defines is equipped with a matching
- * piece — hat + shirt + pants for a three-piece set, or both halves of a two-piece set. Used to award
- * the "set bonus" sparkle on the wardrobe + the on-course aura. Returns the set name when the currently
- * equipped pieces fully assemble one multi-piece set (Rookie's standalone basics never count as a set).
+ * piece — hat + shirt + pants (+ bag, for a set that defines one) — or both halves of a two-piece set.
+ * Used to award the "set bonus" sparkle on the wardrobe + the on-course aura. Returns the set name when
+ * the currently equipped pieces fully assemble one multi-piece set (Rookie's basics never count).
  */
 export function equippedSet(
   hatId: string | undefined,
   shirtId: string | undefined,
   pantsId: string | undefined,
+  bagId?: string | undefined,
 ): string | undefined {
-  const worn = [apparelById(hatId), apparelById(shirtId), apparelById(pantsId)].filter(
+  const worn = [apparelById(hatId), apparelById(shirtId), apparelById(pantsId), apparelById(bagId)].filter(
     (a): a is Apparel => !!a,
   );
   // A set needs at least two matching pieces; everything worn must share one non-Rookie set.

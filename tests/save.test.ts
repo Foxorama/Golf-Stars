@@ -13,9 +13,11 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(12);
+    expect(SAVE_VERSION).toBe(13);
     const d = defaultSave();
-    expect(d.version).toBe(12);
+    expect(d.version).toBe(13);
+    expect(d.golfBagByCharacter).toEqual({});
+    expect(d.endlessBestHoles).toBe(0);
     expect(d.shards).toBe(0);
     expect(d.metaUpgrades).toEqual({});
     expect(d.maxAscension).toBe(0);
@@ -31,7 +33,7 @@ describe('save schema', () => {
     expect(d.clubhouseVisit).toBe(0);
   });
 
-  it('round-trips a v12 save through export/import (per-character ship + outfit + pants + bag + club unlocks + lounge visit preserved)', () => {
+  it('round-trips a v13 save through export/import (per-character ship + outfit + pants + bag + club unlocks + lounge visit preserved)', () => {
     const save = {
       ...defaultSave(),
       clubhouseVisit: 7,
@@ -60,7 +62,7 @@ describe('save schema', () => {
     };
     const restored = importSave(exportSave(save));
     expect(restored).toMatchObject({
-      version: 12,
+      version: 13,
       clubhouseVisit: 7,
       shards: 120,
       bestDistance: 9,
@@ -79,7 +81,37 @@ describe('save schema', () => {
     });
   });
 
-  it('migrates a v11 blob forward to v12 (seeds the lounge visit counter at 0, preserves everything else)', () => {
+  it('migrates a v12 blob forward to v13 (seeds endless progress at 0 + an empty bag map)', () => {
+    const v12 = {
+      version: 12 as const,
+      bestStableford: 25,
+      bestDistance: 12,
+      shards: 77,
+      metaUpgrades: {},
+      maxAscension: 3,
+      lifetimeAces: 1,
+      ownedShips: [DEFAULT_SHIP_ID, 'racer-redline'],
+      ownedApparel: ['cap-classic'],
+      shipByCharacter: { 'feather-fade': 'racer-redline' },
+      hatByCharacter: { 'feather-fade': 'cap-classic' },
+      shirtByCharacter: {},
+      pantsByCharacter: {},
+      bagTier: 'rare' as const,
+      unlockedClubsByCharacter: {},
+      clubhouseVisit: 4,
+    };
+    const s = migrate(v12);
+    expect(s.version).toBe(13);
+    expect(s.endlessBestHoles).toBe(0);
+    expect(s.golfBagByCharacter).toEqual({});
+    // Everything else rides through untouched.
+    expect(s.clubhouseVisit).toBe(4);
+    expect(s.shards).toBe(77);
+    expect(s.bagTier).toBe('rare');
+    expect(s.shipByCharacter).toEqual({ 'feather-fade': 'racer-redline' });
+  });
+
+  it('migrates a v11 blob forward to v13 (seeds the lounge visit counter at 0, preserves everything else)', () => {
     const v11 = {
       version: 11 as const,
       bestStableford: 22,
@@ -98,7 +130,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
     };
     const s = migrate(v11);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.clubhouseVisit).toBe(0);
     // Everything else rides through untouched.
     expect(s.shards).toBe(88);
@@ -108,7 +140,7 @@ describe('save schema', () => {
     expect(s.unlockedClubsByCharacter).toEqual({ 'feather-fade': ['7i'] });
   });
 
-  it('migrates a v10 blob forward to v12 (seeds an empty pants map, preserves ships/hats/shirts)', () => {
+  it('migrates a v10 blob forward to v13 (seeds an empty pants map, preserves ships/hats/shirts)', () => {
     const v10 = {
       version: 10 as const,
       bestStableford: 33,
@@ -126,7 +158,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
     };
     const s = migrate(v10);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.shards).toBe(140);
     expect(s.bagTier).toBe('epic');
     expect(s.ownedApparel).toEqual(['cap-classic', 'polo-classic']);
@@ -138,7 +170,7 @@ describe('save schema', () => {
     expect(s.unlockedClubsByCharacter).toEqual({ 'feather-fade': ['7i'] });
   });
 
-  it('migrates a v9 blob forward to v12 (seeds the old GLOBAL look onto every character, drops marketSeed)', () => {
+  it('migrates a v9 blob forward to v13 (seeds the old GLOBAL look onto every character, drops marketSeed)', () => {
     const v9 = {
       version: 9 as const,
       bestStableford: 25,
@@ -157,7 +189,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'backspin-bo': ['6i'] },
     };
     const s = migrate(v9);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.shards).toBe(95);
     expect(s.maxAscension).toBe(3);
     expect(s.bagTier).toBe('rare');
@@ -180,7 +212,7 @@ describe('save schema', () => {
     expect(s.shipByCharacter).toEqual({});
   });
 
-  it('migrates a v8 blob forward to v12 (preserves ships, seeds empty per-character maps)', () => {
+  it('migrates a v8 blob forward to v13 (preserves ships, seeds empty per-character maps)', () => {
     const v8 = {
       version: 8 as const,
       bestStableford: 25,
@@ -197,7 +229,7 @@ describe('save schema', () => {
       bagTier: 'rare' as const,
     };
     const s = migrate(v8);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.shards).toBe(95);
     expect(s.bagTier).toBe('rare');
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'wagon-gold']);
@@ -208,7 +240,7 @@ describe('save schema', () => {
     expect(s.unlockedClubsByCharacter).toEqual({});
   });
 
-  it('migrates a v6 blob forward to v12 (seeds an empty wardrobe + common bag, preserves the fleet)', () => {
+  it('migrates a v6 blob forward to v13 (seeds an empty wardrobe + common bag, preserves the fleet)', () => {
     const v6 = {
       version: 6 as const,
       bestStableford: 18,
@@ -222,7 +254,7 @@ describe('save schema', () => {
       marketSeed: 3,
     };
     const s = migrate(v6);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.shards).toBe(70);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline']);
     expect(s.shipByCharacter[CHARACTERS[0]!.id]).toBe('racer-redline');
@@ -248,7 +280,7 @@ describe('save schema', () => {
     expect(s.pantsByCharacter).toEqual({ 'feather-fade': 'trousers-tour' }); // unowned pants dropped
   });
 
-  it('migrates a v2 blob forward to v12 (drops dead credits, seeds meta + ascension + aces + fleet)', () => {
+  it('migrates a v2 blob forward to v13 (drops dead credits, seeds meta + ascension + aces + fleet)', () => {
     const v2: SaveV2 = {
       version: 2,
       credits: 0,
@@ -257,7 +289,7 @@ describe('save schema', () => {
       activeRun: { seed: 5, stopIndex: 2, distanceFromStart: 8, credits: 50, perks: ['gyro'] },
     };
     const s = migrate(v2);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.shards).toBe(0);
     expect(s.metaUpgrades).toEqual({});
     expect(s.maxAscension).toBe(0);
@@ -269,7 +301,7 @@ describe('save schema', () => {
     expect('credits' in s).toBe(false);
   });
 
-  it('migrates a v1 blob all the way forward to v12', () => {
+  it('migrates a v1 blob all the way forward to v13', () => {
     const v1: SaveV1 = {
       version: 1,
       runSeed: 99,
@@ -278,7 +310,7 @@ describe('save schema', () => {
       bestStableford: 30,
     };
     const s = migrate(v1);
-    expect(s.version).toBe(12);
+    expect(s.version).toBe(13);
     expect(s.shards).toBe(0);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(s.bestStableford).toBe(30);

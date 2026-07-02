@@ -71,11 +71,11 @@ describe('voyageRarityBias (GS-voyage-rarity) — pure schedule', () => {
 
   it('shopRarityBias routes the voyage through its schedule and endless formats through distance', () => {
     const voyage = startRun(1, 'voyage');
-    const flat = startRun(1, 'flat');
+    const endless = startRun(1, 'unending');
     // Voyage first shop uses the stop schedule (legendary shut at progress 0).
     expect(shopRarityBias({ ...voyage, stopIndex: 0 }, 'legendary')).toBe(0);
     // Endless format falls back to the galaxy-distance ramp.
-    expect(shopRarityBias({ ...flat, distanceFromStart: 5 }, 'epic')).toBe(rarityDepthBias('epic', 5));
+    expect(shopRarityBias({ ...endless, distanceFromStart: 5 }, 'epic')).toBe(rarityDepthBias('epic', 5));
   });
 });
 

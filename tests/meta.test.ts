@@ -107,7 +107,8 @@ describe('meta wired into the run', () => {
   it('shardsForRun rewards distance + stops and is floored at 1', () => {
     const ended = (distance: number, stops: number): Run => ({
       seed: 1,
-      formatId: 'flat',
+      formatId: 'unending',
+      holesSurvived: 0,
       stopIndex: stops,
       distanceFromStart: distance,
       credits: 0,

@@ -12,7 +12,7 @@ import type { BagTier } from '../sim/rpg/bag';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -246,8 +246,36 @@ export interface SaveV12 {
   savedAt?: string;
 }
 
+/** v13 — the Unending Universe (GS-unending): the lifetime-best survived-hole count (drives the
+ *  Evergreen cosmetic unlocks + the title-card progress tease) and the per-character cosmetic GOLF
+ *  BAG equip map (the new 'bag' apparel slot, outfitted in the Clubhouse like hat/shirt/pants). */
+export interface SaveV13 {
+  version: 13;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  lifetimeAces: number;
+  ownedShips: string[];
+  ownedApparel: string[];
+  shipByCharacter: Record<string, string>;
+  hatByCharacter: Record<string, string>;
+  shirtByCharacter: Record<string, string>;
+  pantsByCharacter: Record<string, string>;
+  /** The cosmetic golf bag each character carries (characterId → apparel id). Absent → no bag. */
+  golfBagByCharacter: Record<string, string>;
+  bagTier: BagTier;
+  unlockedClubsByCharacter: Record<string, string[]>;
+  clubhouseVisit: number;
+  /** Most holes ever survived in one Unending-Universe run (GS-unending) — the unlock ladder key. */
+  endlessBestHoles: number;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV12;
+export type Save = SaveV13;
 
 export function defaultSave(): Save {
   return {
@@ -264,9 +292,11 @@ export function defaultSave(): Save {
     hatByCharacter: {},
     shirtByCharacter: {},
     pantsByCharacter: {},
+    golfBagByCharacter: {},
     bagTier: 'common',
     unlockedClubsByCharacter: {},
     clubhouseVisit: 0,
+    endlessBestHoles: 0,
   };
 }
 
@@ -497,6 +527,33 @@ function v11ToV12(s: SaveV11): SaveV12 {
   };
 }
 
+/** v12 → v13: seed the Unending-Universe progress at zero + an empty per-character bag map;
+ *  everything else is preserved untouched. */
+function v12ToV13(s: SaveV12): SaveV13 {
+  return {
+    version: 13,
+    bestStableford: s.bestStableford ?? 0,
+    bestDistance: s.bestDistance ?? 0,
+    shards: s.shards ?? 0,
+    metaUpgrades: s.metaUpgrades ?? {},
+    maxAscension: s.maxAscension ?? 0,
+    lifetimeAces: s.lifetimeAces ?? 0,
+    ownedShips: s.ownedShips && s.ownedShips.length ? s.ownedShips : [DEFAULT_SHIP_ID],
+    ownedApparel: s.ownedApparel ?? [],
+    shipByCharacter: s.shipByCharacter ?? {},
+    hatByCharacter: s.hatByCharacter ?? {},
+    shirtByCharacter: s.shirtByCharacter ?? {},
+    pantsByCharacter: s.pantsByCharacter ?? {},
+    golfBagByCharacter: {},
+    bagTier: s.bagTier ?? 'common',
+    unlockedClubsByCharacter: s.unlockedClubsByCharacter ?? {},
+    clubhouseVisit: s.clubhouseVisit ?? 0,
+    endlessBestHoles: 0,
+    activeRun: s.activeRun,
+    savedAt: s.savedAt,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -516,6 +573,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 9) s = v9ToV10(s as unknown as SaveV9) as unknown as typeof s;
   if (s.version === 10) s = v10ToV11(s as unknown as SaveV10) as unknown as typeof s;
   if (s.version === 11) s = v11ToV12(s as unknown as SaveV11) as unknown as typeof s;
+  if (s.version === 12) s = v12ToV13(s as unknown as SaveV12) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -523,10 +581,10 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v11 = s as unknown as Partial<SaveV12>;
-  const ownedShips = v11.ownedShips && v11.ownedShips.length ? v11.ownedShips : [DEFAULT_SHIP_ID];
-  const ownedApparel = v11.ownedApparel ?? [];
-  const bagTier: BagTier = v11.bagTier ?? 'common';
+  const v13 = s as unknown as Partial<SaveV13>;
+  const ownedShips = v13.ownedShips && v13.ownedShips.length ? v13.ownedShips : [DEFAULT_SHIP_ID];
+  const ownedApparel = v13.ownedApparel ?? [];
+  const bagTier: BagTier = v13.bagTier ?? 'common';
   // Drop any per-character equip that references an unowned item (so a stale/edited blob can't show a
   // ship/garment the player doesn't actually own).
   const sanitize = (m: Record<string, string> | undefined, owned: string[]): Record<string, string> => {
@@ -536,23 +594,25 @@ export function migrate(raw: unknown): Save {
   };
   return {
     version: SAVE_VERSION,
-    bestStableford: v11.bestStableford ?? 0,
-    bestDistance: v11.bestDistance ?? 0,
-    shards: v11.shards ?? 0,
-    metaUpgrades: v11.metaUpgrades ?? {},
-    maxAscension: v11.maxAscension ?? 0,
-    lifetimeAces: v11.lifetimeAces ?? 0,
+    bestStableford: v13.bestStableford ?? 0,
+    bestDistance: v13.bestDistance ?? 0,
+    shards: v13.shards ?? 0,
+    metaUpgrades: v13.metaUpgrades ?? {},
+    maxAscension: v13.maxAscension ?? 0,
+    lifetimeAces: v13.lifetimeAces ?? 0,
     ownedShips,
     ownedApparel,
-    shipByCharacter: sanitize(v11.shipByCharacter, ownedShips),
-    hatByCharacter: sanitize(v11.hatByCharacter, ownedApparel),
-    shirtByCharacter: sanitize(v11.shirtByCharacter, ownedApparel),
-    pantsByCharacter: sanitize(v11.pantsByCharacter, ownedApparel),
+    shipByCharacter: sanitize(v13.shipByCharacter, ownedShips),
+    hatByCharacter: sanitize(v13.hatByCharacter, ownedApparel),
+    shirtByCharacter: sanitize(v13.shirtByCharacter, ownedApparel),
+    pantsByCharacter: sanitize(v13.pantsByCharacter, ownedApparel),
+    golfBagByCharacter: sanitize(v13.golfBagByCharacter, ownedApparel),
     bagTier,
-    unlockedClubsByCharacter: v11.unlockedClubsByCharacter ?? {},
-    clubhouseVisit: v11.clubhouseVisit ?? 0,
-    activeRun: v11.activeRun,
-    savedAt: v11.savedAt,
+    unlockedClubsByCharacter: v13.unlockedClubsByCharacter ?? {},
+    clubhouseVisit: v13.clubhouseVisit ?? 0,
+    endlessBestHoles: v13.endlessBestHoles ?? 0,
+    activeRun: v13.activeRun,
+    savedAt: v13.savedAt,
   };
 }
 

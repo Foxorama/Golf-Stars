@@ -298,6 +298,30 @@ function drawGolfer(
     ctx.fillStyle = '#2bf0c0';
     ctx.fillRect(6.5, -42.6, 2, 2);
   }
+  // Green-Jacket lapels (GS-unending 'blazer'): a light shirt V in the open front + gold lapel lines
+  // and a button, so the jacket reads as tailored even at swing size.
+  if (look.shirtStyle?.shape === 'blazer') {
+    const gold = look.shirtStyle.accent ?? '#f2d06b';
+    ctx.fillStyle = '#f4f6f2';
+    ctx.beginPath();
+    ctx.moveTo(1, -46);
+    ctx.lineTo(6, -38);
+    ctx.lineTo(11, -46);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -47);
+    ctx.lineTo(6, -38);
+    ctx.moveTo(12, -47);
+    ctx.lineTo(6, -38);
+    ctx.stroke();
+    ctx.fillStyle = gold;
+    ctx.beginPath();
+    ctx.arc(5, -35, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Club shaft + head (behind the arms). A bought themed club set (GS-proshop-2) tints the head and
   // gives it a glow + a small theme accent, so the gear you bought visibly changes the swing.
@@ -475,6 +499,22 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.beginPath();
       ctx.ellipse(hx, hy - r - 4, r, 2.4, 0, 0, Math.PI * 2);
       ctx.stroke();
+      break;
+    case 'baggy':
+      // The baggy green (GS-unending): a soft crown that slouches back off the brow, over a short
+      // front brim, with a gold emblem dot. Mirrors the wardrobe SVG's slouched silhouette.
+      ctx.beginPath();
+      ctx.moveTo(hx - r - 1.5, hy - 1);
+      ctx.quadraticCurveTo(hx - r - 2.5, hy - r - 2, hx - 2, hy - r - 3);
+      ctx.quadraticCurveTo(hx + 3, hy - r - 4.5, hx + r - 1, hy - r + 0.5);
+      ctx.quadraticCurveTo(hx + r + 1, hy - 2, hx + r - 1, hy - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.fillRect(hx + 3, hy - 2, r + 1.5, 2.4); // short front brim
+      ctx.beginPath();
+      ctx.arc(hx, hy - r + 1, 1.3, 0, Math.PI * 2); // gold emblem
+      ctx.fill();
       break;
     default:
       break;

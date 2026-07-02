@@ -15,7 +15,9 @@ import {
   buy,
   currentBoss,
   currentCourse,
+  endlessHolePassed,
   finishStop,
+  holeGateArmed,
   playStop,
   playerHoleOpts,
   resumeRun,
@@ -35,6 +37,7 @@ import {
   type StopResult,
   type TeamDuelSetup,
 } from '../sim/rpg/run';
+import { endlessUnlocksCrossed } from '../sim/rpg/endless';
 import { archetypeFor } from '../sim/course/themes';
 import { effectPatchKind } from '../sim/rpg/effects';
 import { isMatchplayBoss } from '../sim/rpg/formats';
@@ -141,6 +144,9 @@ export interface UiState {
   hatByCharacter: Record<string, string>;
   shirtByCharacter: Record<string, string>;
   pantsByCharacter: Record<string, string>;
+  /** The cosmetic golf bag each character carries (GS-unending): characterId → apparel id ('bag'
+   *  slot). Absent → no bag on the stage. Outfitted in the Clubhouse like the other slots. */
+  golfBagByCharacter: Record<string, string>;
   /** The character whose Clubhouse (garage + wardrobe) is open for outfitting (transient — not saved). */
   manageCharacterId?: string;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
@@ -158,6 +164,9 @@ export interface UiState {
   /** Finished-run counter (GS-clubhouse-lounge) — bumped once per run end; seeds where the golfers stand
    *  in the Clubhouse lounge, so they appear to have milled around while you were away. Cosmetic only. */
   clubhouseVisit: number;
+  /** Most holes ever survived in one Unending-Universe run (GS-unending) — persisted; the key the
+   *  Evergreen cosmetic unlocks + the title-card progress read. */
+  endlessBestHoles: number;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -226,9 +235,11 @@ export interface MetaProgress {
   hatByCharacter?: Record<string, string>;
   shirtByCharacter?: Record<string, string>;
   pantsByCharacter?: Record<string, string>;
+  golfBagByCharacter?: Record<string, string>;
   bagTier?: BagTier;
   unlockedClubsByCharacter?: Record<string, string[]>;
   clubhouseVisit?: number;
+  endlessBestHoles?: number;
 }
 
 /** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
@@ -267,6 +278,15 @@ export function pantsForCharacter(
   return pick && s.ownedApparel.includes(pick) ? pick : undefined;
 }
 
+/** The cosmetic golf bag a character carries (GS-unending) — its Clubhouse pick if owned, else none. */
+export function golfBagForCharacter(
+  s: { golfBagByCharacter: Record<string, string>; ownedApparel: string[] },
+  characterId: string | undefined,
+): string | undefined {
+  const pick = characterId ? s.golfBagByCharacter[characterId] : undefined;
+  return pick && s.ownedApparel.includes(pick) ? pick : undefined;
+}
+
 /**
  * Build the initial UI state. Always lands on the TITLE screen (pick a format, or resume
  * a saved run if one is offered). A placeholder run backs the title until a format is
@@ -300,8 +320,10 @@ export function initState(
     hatByCharacter: meta.hatByCharacter ?? {},
     shirtByCharacter: meta.shirtByCharacter ?? {},
     pantsByCharacter: meta.pantsByCharacter ?? {},
+    golfBagByCharacter: meta.golfBagByCharacter ?? {},
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
     clubhouseVisit: meta.clubhouseVisit ?? 0,
+    endlessBestHoles: meta.endlessBestHoles ?? 0,
   };
 }
 
@@ -391,6 +413,26 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
     // A finished run bumps the lounge counter so the golfers have shuffled around by the time you're home.
     clubhouseVisit: state.clubhouseVisit + 1,
   };
+}
+
+/**
+ * Unending-Universe progression (GS-unending): applied at EVERY stop-scoring site (not just run end,
+ * since milestones cross mid-run while the run survives). Lifts the persisted lifetime-best hole count
+ * and grants any newly-crossed cosmetic unlock into the owned pools — the same ownership arrays the
+ * Trade Market/Clubhouse already read, so an earned Evergreen piece equips exactly like a bought one.
+ * Pure function of the counters; the milestone SHARD bonus is banked by the sim (`finishStop` →
+ * `run.bonusShards`), not here. A no-op ({}) for non-gate formats or a non-record run.
+ */
+export function endlessProgressUpdates(state: UiState, run: Run): Partial<UiState> {
+  const holes = run.holesSurvived ?? 0;
+  if (!holeGateArmed(run) || holes <= state.endlessBestHoles) return {};
+  let ownedApparel = state.ownedApparel;
+  let ownedShips = state.ownedShips;
+  for (const u of endlessUnlocksCrossed(state.endlessBestHoles, holes)) {
+    if (u.kind === 'apparel' && !ownedApparel.includes(u.id)) ownedApparel = [...ownedApparel, u.id];
+    if (u.kind === 'ship' && !ownedShips.includes(u.id)) ownedShips = [...ownedShips, u.id];
+  }
+  return { endlessBestHoles: holes, ownedApparel, ownedShips };
 }
 
 /** Boss-reward choices to offer after a stop, if it was a survived (non-final) boss win (GS-talents).
@@ -514,6 +556,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
+        ...endlessProgressUpdates(state, run),
         ...runEndUpdates(state, run),
       };
     }
@@ -679,10 +722,14 @@ export function reduce(state: UiState, action: Action): UiState {
         };
       }
 
-      if (nextIdx < total) {
+      // The Unending Universe's survival bar (GS-unending): a hole that misses its required score
+      // ends the stop RIGHT HERE — score the partial stop exactly as the headless `playStop` does
+      // (it breaks its hole loop at the same failure), so auto ≡ interactive holds.
+      const gateFailed = holeGateArmed(state.run) && !endlessHolePassed(state.run, idx, teamHole);
+      if (nextIdx < total && !gateFailed) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
-      // Stop complete — score it exactly as the auto path does.
+      // Stop complete (or survival bar missed) — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
       const ended = run.status !== 'active';
       return {
@@ -700,6 +747,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
         lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
+        ...endlessProgressUpdates(state, run),
         ...runEndUpdates(state, run),
       };
     }
@@ -892,7 +940,13 @@ export function reduce(state: UiState, action: Action): UiState {
       if (!item || !state.ownedApparel.includes(action.id)) return state;
       const cid = state.manageCharacterId;
       const map =
-        item.slot === 'hat' ? 'hatByCharacter' : item.slot === 'shirt' ? 'shirtByCharacter' : 'pantsByCharacter';
+        item.slot === 'hat'
+          ? 'hatByCharacter'
+          : item.slot === 'shirt'
+            ? 'shirtByCharacter'
+            : item.slot === 'bag'
+              ? 'golfBagByCharacter'
+              : 'pantsByCharacter';
       const current = state[map][cid];
       const next = { ...state[map] };
       if (current === action.id) delete next[cid];
@@ -933,8 +987,11 @@ export function reduce(state: UiState, action: Action): UiState {
         hatByCharacter: state.hatByCharacter,
         shirtByCharacter: state.shirtByCharacter,
         pantsByCharacter: state.pantsByCharacter,
+        golfBagByCharacter: state.golfBagByCharacter,
         bagTier: state.bagTier,
         unlockedClubsByCharacter: state.unlockedClubsByCharacter,
+        clubhouseVisit: state.clubhouseVisit,
+        endlessBestHoles: state.endlessBestHoles,
       });
     }
   }

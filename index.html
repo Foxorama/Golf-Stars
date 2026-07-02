@@ -244,6 +244,11 @@
       .gs-czone--hat   { top: 1%;  height: 27%; justify-content: flex-end; }
       .gs-czone--shirt { top: 28%; height: 30%; justify-content: flex-start; }
       .gs-czone--pants { top: 58%; height: 41%; justify-content: flex-end; }
+      /* The golf-bag prop stands at the figure's left; its tap band owns the lower-left corner,
+         painted over the pants band's left edge (GS-unending). */
+      .gs-czone--bag   { top: 58%; height: 41%; right: 62%; justify-content: flex-start; z-index: 4; }
+      .gs-czone--bag::before { inset: 6px 10% 6px 6px; border-radius: 24px; }
+      .gs-czone--bag .gs-czone__chip { max-width: 94%; }
       .gs-czone__chip {
         position: relative; z-index: 4; display: inline-flex; align-items: center; gap: 5px;
         max-width: 47%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

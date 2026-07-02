@@ -14,7 +14,7 @@ import { initState, reduce, type UiState } from '../src/ui/game';
 
 /** Force a run into a known mid-voyage state (a couple of stops deep, holding credits). */
 function midRun(seed = 12345): Run {
-  let run = startRun(seed, 'flat');
+  let run = startRun(seed, 'unending');
   // Play + travel one stop so distanceFromStart/history advance (banking is a between-stops choice).
   const played = playStop(run);
   run = played.run;
@@ -55,7 +55,7 @@ describe('push-your-luck banking (GS-bank)', () => {
   });
 
   it('reducer: banking from the travel screen ends the run and credits the shards', () => {
-    let s: UiState = reduce(initState(777), { type: 'start', format: 'flat' });
+    let s: UiState = reduce(initState(777), { type: 'start', format: 'unending' });
     s = reduce(s, { type: 'selectCharacter', characterId: 'feather-fade' });
     // Drive to a travel screen.
     s = reduce(s, { type: 'play' });
@@ -72,7 +72,7 @@ describe('push-your-luck banking (GS-bank)', () => {
   });
 
   it('reducer: bank is a no-op off the travel screen', () => {
-    const s = reduce(initState(1), { type: 'start', format: 'flat' });
+    const s = reduce(initState(1), { type: 'start', format: 'unending' });
     expect(reduce(s, { type: 'bank' })).toBe(s);
   });
 });

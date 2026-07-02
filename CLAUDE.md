@@ -133,8 +133,21 @@ For each system: the rule that constrains new work. Open the archive doc before 
   the death-spiral harnesses (human interest first; AI/scoring rebalance is GS-cetus-6). All new draws
   gate on lost-rough so every other world + calm cetus/void stop is byte-identical.
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
-  travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
-  (3 arcs, boss each, `endedReason 'won'`). **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
+  travel]*` until the run's survival rule fails; pure/deterministic. The **Voyage** is the winnable
+  campaign (3 arcs, boss each, `endedReason 'won'`); the **Unending Universe** (GS-unending) is the ONLY
+  endless format — `flat`/`ladder` are retired (`getFormat` folds their ids to the default): 4-hole stops
+  forever, survival a PER-HOLE PAR-RELATIVE bar (`endless.ts`: quad bogey holes 1–8, one stroke tighter
+  every 8, birdie-or-better from 41; a pickup always fails) threaded identically through `playStop` (the
+  hole loop breaks at the first miss — a clean PREFIX of the `:play` stream) and the interactive
+  `holeComplete`, so auto ≡ interactive holds; `run.holesSurvived` (snapshotted) numbers the bar, and
+  milestones 40/60/…/140 bank shard bonuses via `bonusShards` (kept on a bust). Course difficulty keeps
+  riding galaxy distance + `routeDifficulty`, so the universe escalates after the bar parks at birdie.
+  Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
+  bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
+  ship@150 hidden from the market until owned), keyed off the persisted `endlessBestHoles` (save v13,
+  with `golfBagByCharacter`) through the reducer's `endlessProgressUpdates` — applied at EVERY
+  stop-scoring site, not just run end; `tests/endless.test.ts` machine-checks the unlock-id↔catalogue
+  link and the gate ladder. **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
   through `voyageRarityBias(rarity, voyageShopProgress(stopIndex,stops))` (endless formats keep the
   galaxy-distance `rarityDepthBias`), keyed off the STOP so shop 1 is mostly green+a blue, a small
   epic+legendary opens between boss 1 & 2, and the last pre-boss shop is halfish blue/halfish purple with
