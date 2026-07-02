@@ -537,3 +537,40 @@
   ocean grain+ridge colours present in the SVG, byte-determinism. This also resolves the
   "lakes in the middle of nowhere" read: the hazards were always ON land — the land just didn't
   look like land. Gallery re-shot.
+
+## GS-hazard-blend: union-merged hazard families + fold-proof platforms (2026-07)
+
+- **`render/merge.ts`** is the grid geometry engine: scanline-rasterise polys onto a small course-space
+  node grid → optional chamfer-DT dilation → marching-squares contour trace → decimate + Chaikin smooth.
+  Pure, zero rng. Two exports:
+  - `unionPolys(polys)` — true union; bbox-cluster union-find first, so ISOLATED bodies return their
+    exact original vertices (identity fast path) and only genuinely touching clusters rasterise.
+  - `dilateUnion(polys, pad)` — union of the polys grown by `pad`, rounded corners, can never fold.
+- **Sand + liquid families draw MERGED bodies.** `mergedHazardsFor(hole)` (WeakMap-cached per hole)
+  unions each family's polys in COURSE space; `styleSandFamily`/`styleLiquidFamily` receive the merged
+  loops, so touching bunkers/pots/waste read as ONE excavated complex with a single lip-shadow +
+  depression crescent, and a creek + its mouth lake as one water body with one shoreline. Course-space
+  merging keeps the merged-body COUNT camera-proof (the liquid pass draws rng per body — a screen-space
+  union could flip counts under zoom and shift the shared stream). Known, accepted edge: a fully
+  ENCLOSED turf pocket inside a merged ring would paint as the family surface — geometrically near
+  impossible with the game's blob patterns, noted in `merge.ts`.
+- **Lost-rough platforms are `dilateUnion(fairways+green+tee, 14)`** (`lostPlatformsCourse`, cached).
+  The old mitred `offsetPoly(poly, -14)` outset SELF-INTERSECTED at concave ribbon bends — the flipped
+  winding left the fold unfilled, which was exactly the Cetus "star gap between the fairway and the
+  border". Including the GREEN fixes the other seam (a green fatter than the corridor nose used to
+  overhang the deep), and the union joins touching pads into one continuous platform (tee melts into
+  the corridor). Guarded by `tests/hazard-overlap.test.ts` (every play-feature vertex on-platform) +
+  `tests/render-merge.test.ts` (no-fold, coverage, merge/separate cases).
+- **`archetypeDecor` pushes UNCONDITIONALLY — no paint-time `inView` culls.** A decor piece sitting
+  exactly on the view edge flipped the prim COUNT between two follow-cam frames (the camera-stability
+  guard caught it when the generator change legitimately moved decor). Decor is a few dozen cheap
+  prims; off-view pieces drawing nothing beats the flake. rng consumption was already unconditional.
+- **Cetus star-river reads as a RIVER (GS-cetus-7).** Wider channel (`rw` up to 11 yd), ONE broad
+  S-lobe per ~145 yd (the old tight wiggle at creek width read as "an electric eel"), calm banks
+  (12% width wobble), a widening DELTA into the spill. The solid-white current spine is gone —
+  replaced by broken bank-hugging filaments (pure geometry) — and the star fill is smaller/dimmer
+  dust with rare hero halos. The WATERFALL is a LUMINOUS cyan curtain (the old dark-blue veil
+  vanished against the dark cliff, leaving only streaks that read as dangling drips) + a bright
+  brink line at the lip, streaks/droplets inside the curtain, mist + ripples at the foot. Same
+  dedicated river stream; all draws stay unconditional (the `paint` gate only chooses pushes).
+  `tests/cetus.test.ts`'s river sentinel colour updated (`rgba(60,150,205,0.7)`).

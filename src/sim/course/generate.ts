@@ -331,12 +331,23 @@ function crossingBand(
     const meander = (rng.float() - 0.5) * thickness * 0.5; // shift the band centre along play
     const cx = c[0] + px * s + tx * meander;
     const cy = c[1] + py * s + ty * meander;
-    const htTop = thickness * (0.5 + rng.range(0, 0.18));
-    const htBot = thickness * (0.5 + rng.range(0, 0.18));
+    // TAPER toward both ends (pure math on the same draws — the rng stream is untouched) so the
+    // band reads as a natural sand blowout LENS, not a road slab with flat-cut ends.
+    const taper = 0.3 + 0.7 * Math.sin(Math.PI * (i / N));
+    const htTop = thickness * (0.5 + rng.range(0, 0.18)) * taper;
+    const htBot = thickness * (0.5 + rng.range(0, 0.18)) * taper;
     top.push([cx + tx * htTop, cy + ty * htTop]);
     bot.push([cx - tx * htBot, cy - ty * htBot]);
   }
-  return [...top, ...bot.reverse()];
+  // Rounded NOSE points past each tapered end (pure geometry off the built edges) so the lens
+  // finishes on a soft tip rather than a blunt cut.
+  const tip = (ti: Vec, bi: Vec, dir: 1 | -1): Vec => [
+    (ti[0] + bi[0]) / 2 + dir * px * thickness * 0.55,
+    (ti[1] + bi[1]) / 2 + dir * py * thickness * 0.55,
+  ];
+  const nose0 = tip(top[0]!, bot[0]!, -1);
+  const noseN = tip(top[N]!, bot[N]!, 1);
+  return [nose0, ...top, noseN, ...bot.reverse()];
 }
 
 /**
@@ -451,6 +462,92 @@ function clearsPlayCorridor(
 ): boolean {
   const margin = halfWidth + r + 4;
   return polylineDist(c, centreline) > margin && segDist(c, tee, green) > margin;
+}
+
+/** Substance FAMILY of a hazard kind (GS-hazard-blend). Same-family bodies may overlap freely —
+ *  the render's family passes merge them into one surface (a creek pooling into its lake, a chain
+ *  of pots reading as one complex). CROSS-family overlaps are the "water spawned on a bunker"
+ *  stickers the dedupe below removes. Trees are exempt entirely (canopies overhang anything). */
+const HAZARD_FAMILY: Record<string, string> = {
+  bunker: 'sand',
+  pot: 'sand',
+  waste: 'sand',
+  sand: 'sand',
+  water: 'water',
+  creek: 'water',
+  frozenpond: 'water',
+  lava: 'lava',
+  lavariver: 'lava',
+  barranca: 'ravine',
+  fescue: 'fescue',
+};
+
+/** Proper segment intersection (strict — shared endpoints/collinear touch don't count). */
+function segsCross(a: Vec, b: Vec, c: Vec, d: Vec): boolean {
+  const o = (p: Vec, q: Vec, r: Vec) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  const o1 = o(a, b, c);
+  const o2 = o(a, b, d);
+  const o3 = o(c, d, a);
+  const o4 = o(c, d, b);
+  return o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0 && o1 !== o2 && o3 !== o4;
+}
+
+/** Do two simple polygons overlap (share interior area)? Bbox reject, then vertex-containment both
+ *  ways, then edge crossings (catches two thin bands crossing with no vertex inside the other). */
+function polysOverlap(a: Vec[], b: Vec[]): boolean {
+  let aMinX = Infinity, aMinY = Infinity, aMaxX = -Infinity, aMaxY = -Infinity;
+  for (const p of a) {
+    if (p[0] < aMinX) aMinX = p[0];
+    if (p[1] < aMinY) aMinY = p[1];
+    if (p[0] > aMaxX) aMaxX = p[0];
+    if (p[1] > aMaxY) aMaxY = p[1];
+  }
+  let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+  for (const p of b) {
+    if (p[0] < bMinX) bMinX = p[0];
+    if (p[1] < bMinY) bMinY = p[1];
+    if (p[0] > bMaxX) bMaxX = p[0];
+    if (p[1] > bMaxY) bMaxY = p[1];
+  }
+  if (aMinX > bMaxX || bMinX > aMaxX || aMinY > bMaxY || bMinY > aMaxY) return false;
+  for (const p of a) if (pointInPoly(p, b)) return true;
+  for (const p of b) if (pointInPoly(p, a)) return true;
+  for (let i = 0; i < a.length; i++) {
+    const a0 = a[i]!;
+    const a1 = a[(i + 1) % a.length]!;
+    for (let j = 0; j < b.length; j++) {
+      if (segsCross(a0, a1, b[j]!, b[(j + 1) % b.length]!)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Drop hazards that spawned ON a different-substance hazard (GS-hazard-blend) — the "water pool
+ * stamped over a bunker" stickers. PURE geometry over already-drawn placements: zero rng draws, so
+ * every seeded stream is byte-identical; only which of the drawn hazards SURVIVE changes.
+ * Rules: trees are exempt both ways (anything may sit under a canopy); sanctioned forced-carry
+ * CROSSINGS are load-bearing (validateCrossings proves them) so they always survive — a blob that
+ * overlaps a crossing loses, whichever was placed first. Same-family overlaps are kept: the render
+ * merges them into one body (a creek flowing into its lake, pots fusing into a complex).
+ */
+function dedupeHazardOverlaps(hazards: Feature[]): Feature[] {
+  const accepted: Feature[] = hazards.filter((h) => CROSSING_KINDS.has(h.kind));
+  const out: Feature[] = [];
+  for (const h of hazards) {
+    if (h.kind === 'trees' || CROSSING_KINDS.has(h.kind)) {
+      out.push(h);
+      continue;
+    }
+    const fam = HAZARD_FAMILY[h.kind];
+    const clash = accepted.some(
+      (a) => a !== h && HAZARD_FAMILY[a.kind] !== fam && polysOverlap(h.poly, a.poly),
+    );
+    if (clash) continue;
+    accepted.push(h);
+    out.push(h);
+  }
+  return out;
 }
 
 function generateHole(
@@ -1026,6 +1123,11 @@ function generateHole(
     }
   }
 
+  // Cross-family overlap dedupe (GS-hazard-blend): a hazard that spawned ON a different substance
+  // (water over sand, sand over lava…) is dropped — trees and the sanctioned crossings excepted.
+  // Pure geometry, zero rng draws — every stream stays byte-identical.
+  const cleanHazards = dedupeHazardOverlaps(hazards);
+
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
   const wind: Wind = {
     dir: rng.range(0, 360),
@@ -1041,7 +1143,7 @@ function generateHole(
   // void/cetus stops look as forgiving as they play.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
-  return { par, tee, green, pin, centreline, features, hazards, wind, biomeMods, shapeId: tpl.id, greenSlope };
+  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, greenSlope };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */

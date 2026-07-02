@@ -35,7 +35,7 @@ describe('Cetus — the star-ocean clifftop world (GS-cetus)', () => {
   it('draws the bespoke star-river decor, byte-stably, ONLY on Cetus (the render gating proof)', () => {
     const c = generateCourse(7, { biome: 'cetus-deep', holes: 4, wildness: 0.5 });
     const hole = c.holes.find((h) => h.par >= 4) ?? c.holes[0]!;
-    const RIVER = 'rgba(70,180,225,0.85)'; // the star-river's glowing water — emitted only by the cetus decor
+    const RIVER = 'rgba(60,150,205,0.7)'; // the star-river's glowing water — emitted only by the cetus decor
     const a = renderHoleSVG(hole, { width: 320, height: 480, biome: 'cetus-deep', themeId: 'cetus' });
     const b = renderHoleSVG(hole, { width: 320, height: 480, biome: 'cetus-deep', themeId: 'cetus' });
     expect(a).toBe(b); // deterministic / byte-stable

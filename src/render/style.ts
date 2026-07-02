@@ -22,6 +22,7 @@ import { meteorScorch as meteorScorchFor, type ScorchMark } from '../sim/scorch'
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
+import { unionPolys, dilateUnion } from './merge';
 import type { Projector } from './project';
 import {
   accentFor,
@@ -348,14 +349,40 @@ function landHullCourse(hole: Hole): Vec[] {
   return roundedHull(lb, Math.min(3 * LAND_PAD, Math.min(lb.maxX - lb.minX, lb.maxY - lb.minY) * 0.22), 0.1, hrng);
 }
 
-/** A lost-rough hole's land platforms in COURSE space: each fairway piece + the tee, grown a touch
- *  beyond the feature for a turf margin. Everything off them is the open deep. */
+/** A lost-rough hole's land platforms in COURSE space: every play feature (fairway pieces + tee +
+ *  GREEN), grown by a turf margin and UNION-merged — touching pads join into one continuous
+ *  platform. Built with the fold-proof grid dilation (`dilateUnion`): the old mitred
+ *  `offsetPoly(-14)` outset self-intersected at a concave bend, and the flipped winding left the
+ *  fold UNFILLED — the "star gap between the fairway and the border" on Cetus. Including the green
+ *  fixes the other seam: a green fatter than the corridor nose used to overhang the open deep.
+ *  Cached per hole (pure function of the hole) so the per-frame follow-cam rebuild pays nothing. */
+const lostPlatformsCache = new WeakMap<Hole, Vec[][]>();
 function lostPlatformsCourse(hole: Hole): Vec[][] {
-  const teeFeat = hole.features.find((f) => f.kind === 'tee');
-  return [
-    ...hole.features.filter((f) => f.kind === 'fairway').map((f) => offsetPoly(f.poly, -14)),
-    ...(teeFeat ? [offsetPoly(teeFeat.poly, -10)] : []),
-  ];
+  const hit = lostPlatformsCache.get(hole);
+  if (hit) return hit;
+  const feats = hole.features.filter((f) => f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee');
+  const out = dilateUnion(feats.map((f) => f.poly), 14, 3);
+  lostPlatformsCache.set(hole, out);
+  return out;
+}
+
+/** Per-hole cache of the hazard families' UNION-merged course-space bodies (GS-hazard-blend) —
+ *  pure geometry per hole, rebuilt scenes (the follow-cam re-renders every frame) reuse it. */
+const mergedHazardsCache = new WeakMap<Hole, { sand: Vec[][]; water: Vec[][]; lava: Vec[][] }>();
+function mergedHazardsFor(hole: Hole): { sand: Vec[][]; water: Vec[][]; lava: Vec[][] } {
+  const hit = mergedHazardsCache.get(hole);
+  if (hit) return hit;
+  const sand: Vec[][] = [];
+  const water: Vec[][] = [];
+  const lava: Vec[][] = [];
+  for (const f of hole.hazards) {
+    if (WATER_KINDS.has(f.kind)) water.push(f.poly);
+    else if (LAVA_KINDS.has(f.kind)) lava.push(f.poly);
+    else if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand' || f.kind === 'pot') sand.push(f.poly);
+  }
+  const out = { sand: unionPolys(sand), water: unionPolys(water), lava: unionPolys(lava) };
+  mergedHazardsCache.set(hole, out);
+  return out;
 }
 
 /**
@@ -1404,7 +1431,10 @@ export function cetusRiverPath(
   const phase = rng() * Math.PI * 2;
   const ampF = 0.7 + rng() * 0.6;
   const wPhase = rng() * Math.PI * 2;
-  const rw = Math.max(4, Math.min(8, L * 0.014)); // a modest creek half-width (course yards)
+  // A proper RIVER half-width (course yards) — the old creek-thin channel with a tight wiggle read
+  // as a glowing squiggle ("an electric eel"), not a river of stars. Wider water + the longer,
+  // gentler meander below give the star fill and the banks room to actually read as a river.
+  const rw = Math.max(5.5, Math.min(11, L * 0.02));
   const C = sampleAlong(cl, uc);
   const c0 = sampleAlong(cl, Math.max(0, uc - 0.02));
   const c1 = sampleAlong(cl, Math.min(1, uc + 0.02));
@@ -1418,8 +1448,8 @@ export function cetusRiverPath(
   const dyA = tx * Math.sin(rot) + ty * Math.cos(rot);
   const px = -dyA; // meander swing direction (perpendicular to the axis)
   const py = dxA;
-  const amp = Math.min(halfW * 0.3, 9) * ampF; // a gentle wiggle, never a corridor-wide sprawl
-  const freq = (Math.PI * 1.6) / 130; // ~1.6 S-lobes per 130 yards of run
+  const amp = Math.min(halfW * 0.22, 7) * ampF; // a gentle sweep, never a corridor-wide sprawl
+  const freq = (Math.PI * 1.1) / 160; // ~1 broad S-lobe per 145 yards — a river bend, not a wriggle
   const at = (s: number): Vec => {
     const m = amp * Math.sin(phase + s * freq);
     return [C[0] + dxA * s + px * m, C[1] + dyA * s + py * m];
@@ -1456,9 +1486,9 @@ export function cetusRiverPath(
   for (let i = 0; i < N; i++) {
     const u = i / (N - 1);
     line.push(at(s0 + (s1 - s0) * u));
-    const taper = Math.min(1, u / 0.28) * 0.6 + 0.4; // narrow at the spring → full channel
-    const mouth = 1 + Math.max(0, (u - 0.9) / 0.1) * 0.2; // a slight widening at the spill mouth
-    hw.push(rw * (1 + 0.26 * Math.sin(wPhase + u * Math.PI * 2.2)) * taper * mouth);
+    const taper = Math.min(1, u / 0.24) * 0.65 + 0.35; // narrow at the spring → full channel
+    const mouth = 1 + Math.max(0, (u - 0.78) / 0.22) * 0.5; // a widening DELTA into the spill
+    hw.push(rw * (1 + 0.12 * Math.sin(wPhase + u * Math.PI * 1.6)) * taper * mouth); // calm banks
   }
   return { line, hw, spillAtEdge: down.hit };
 }
@@ -1829,35 +1859,48 @@ function cetusRiver(
     }
   };
   const river: Prim[] = [];
-  // A quiet bank glow — the GS-cetus-3 halo (3.4×hw + 10px) washed over half the corridor.
-  strokeVar(river, 'rgba(95,225,252,0.13)', 1.9, 4);
-  river.push({ t: 'poly', pts: ribbon, fill: 'rgba(8,30,48,0.9)' }); // dark deep-water bed → high contrast vs the teal turf
-  strokeVar(river, 'rgba(70,180,225,0.85)', 1.3); // glowing star-water surface down the channel
-  river.push({ t: 'poly', pts: ribbon, fill: 'none', stroke: 'rgba(195,248,255,0.85)', sw: 1.2 }); // luminous shoreline
-  strokeVar(river, 'rgba(205,246,255,0.8)', 0.34, 0, 1.2); // bright current spine
-  // Fill the channel with the intro's starscape so it reads as a RIVER OF STARS, not a teal
-  // stripe: stars packed across the width down the length, ~10% "hero" stars with a soft halo.
+  // A quiet bank glow — the luminous water lighting the turf either side, kept soft.
+  strokeVar(river, 'rgba(95,225,252,0.10)', 1.8, 4);
+  river.push({ t: 'poly', pts: ribbon, fill: 'rgba(8,30,48,0.92)' }); // dark deep-water bed → high contrast vs the teal turf
+  strokeVar(river, 'rgba(60,150,205,0.7)', 1.1); // star-water surface down the channel — a tone, not a beam
+  river.push({ t: 'poly', pts: ribbon, fill: 'none', stroke: 'rgba(170,235,250,0.5)', sw: 1 }); // soft shoreline
+  // Two gentle CURRENT filaments hugging the banks (pure geometry — no rng): the flow read the old
+  // solid-white spine tried for, without painting a chalk squiggle down the middle.
+  for (const laneOff of [-0.45, 0.45]) {
+    for (let i = 1; i < screen.length; i++) {
+      if (i % 3 === 0) continue; // broken filaments — current, not an outline
+      const h0 = hw[i - 1]! * laneOff;
+      const h1 = hw[i]! * laneOff;
+      const t0 = tangentAt(line, i - 1);
+      const t1 = tangentAt(line, i);
+      const a = proj.project([line[i - 1]![0] - t0[1] * h0, line[i - 1]![1] + t0[0] * h0]);
+      const b = proj.project([line[i]![0] - t1[1] * h1, line[i]![1] + t1[0] * h1]);
+      river.push({ t: 'line', a, b, stroke: 'rgba(160,225,248,0.28)', sw: 1, round: true });
+    }
+  }
+  // Fill the channel with the intro's starscape so it reads as a RIVER OF STARS: small dim star
+  // dust packed across the width, the odd hero star with a soft halo — never froth.
   if (accents > 0) {
-    const steps = 40;
+    const steps = 56;
     for (let i = 0; i < steps; i++) {
       const u = i / (steps - 1);
       const c = sampleAlong(line, u);
       const t = tangentAt(line, Math.min(line.length - 1, Math.round(u * (line.length - 1))));
       const nx = -t[1];
       const ny = t[0];
-      const halfW = (hw[Math.min(hw.length - 1, Math.round(u * (hw.length - 1)))] ?? 4) * 0.85;
+      const halfW = (hw[Math.min(hw.length - 1, Math.round(u * (hw.length - 1)))] ?? 4) * 0.8;
       // Star sizes are CLAMPED to the local projected channel width (paint-size only — never the
-      // draw count): on the whole-hole map the creek is a few px wide, and full-size stars + halos
+      // draw count): on the whole-hole map the river is a few px wide, and full-size stars + halos
       // buried the dark water under solid white (the "chalk squiggle" read).
       const hwPx = Math.max(1, halfW * proj.scale);
       const packed = 2;
       for (let j = 0; j < packed; j++) {
         const lat = (rng() * 2 - 1) * halfW;
         const p = proj.project([c[0] + nx * lat, c[1] + ny * lat]);
-        const hero = rng() < 0.1;
-        const col = rng() < 0.5 ? 'rgba(255,255,255,0.95)' : rng() < 0.5 ? 'rgba(180,242,255,0.9)' : 'rgba(210,220,255,0.85)';
-        if (hero) river.push({ t: 'glow', c: p, r: Math.min(4 + rng() * 3, hwPx * 1.5), col: 'rgba(200,244,255,0.5)' });
-        river.push({ t: 'circle', c: p, r: Math.min(hero ? 1.4 + rng() * 1 : 0.5 + rng() * 1, Math.max(0.7, hwPx * 0.45)), fill: col });
+        const hero = rng() < 0.07;
+        const col = rng() < 0.5 ? 'rgba(255,255,255,0.85)' : rng() < 0.5 ? 'rgba(180,242,255,0.8)' : 'rgba(210,220,255,0.75)';
+        if (hero) river.push({ t: 'glow', c: p, r: Math.min(3.5 + rng() * 2, hwPx * 1.2), col: 'rgba(200,244,255,0.4)' });
+        river.push({ t: 'circle', c: p, r: Math.min(hero ? 1.1 + rng() * 0.7 : 0.35 + rng() * 0.65, Math.max(0.6, hwPx * 0.4)), fill: col });
       }
     }
   }
@@ -1893,19 +1936,20 @@ function cetusRiver(
   const paint =
     !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.35)) &&
     !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.8));
-  const spillW = Math.max(10, hw[hw.length - 1]! * proj.scale * 2.2);
+  const spillW = Math.max(12, hw[hw.length - 1]! * proj.scale * 2.2);
   const fall: Prim[] = [];
   if (paint) {
     fall.push({ t: 'glow', c: spill, r: spillW * 1.3, col: 'rgba(140,232,255,0.38)' });
-    // A tapered veil that FADES with the drop (stacked bands), so the curtain dissolves into the
-    // deep instead of ending on a hard flat-alpha slab.
+    // A LUMINOUS curtain that fades with the drop (stacked translucent bands): the old dark-blue
+    // veil vanished against the dark cliff face, leaving only the sparse streaks — which read as
+    // dangling drips ("an electric eel vomiting"), not a waterfall. Star-water GLOWS as it falls.
     const xAt = (u: number, f: number) => spill[0] + f * spillW * (0.5 + 0.14 * u);
-    const bands: [number, number, number][] = [
-      [0, 0.42, 0.42],
-      [0.42, 0.72, 0.26],
-      [0.72, 1, 0.12],
+    const bands: [number, number, string][] = [
+      [0, 0.4, 'rgba(150,222,248,0.4)'],
+      [0.4, 0.72, 'rgba(118,190,235,0.24)'],
+      [0.72, 1, 'rgba(92,150,210,0.1)'],
     ];
-    for (const [u0, u1, a] of bands) {
+    for (const [u0, u1, colBand] of bands) {
       fall.push({
         t: 'poly',
         pts: [
@@ -1914,22 +1958,27 @@ function cetusRiver(
           [xAt(u1, 1), spill[1] + fallLen * u1],
           [xAt(u1, -1), spill[1] + fallLen * u1],
         ],
-        fill: `rgba(22,64,96,${a})`,
+        fill: colBand,
       });
     }
+    // The LIP: a bright brink line right where the river tips over the edge — the highlight that
+    // sells "water leaves the ground here" at both zooms.
+    fall.push({ t: 'line', a: [spill[0] - spillW * 0.5, spill[1]], b: [spill[0] + spillW * 0.5, spill[1]], stroke: 'rgba(235,252,255,0.9)', sw: 1.8, round: true });
+    fall.push({ t: 'line', a: [spill[0] - spillW * 0.42, spill[1] + 2.2], b: [spill[0] + spillW * 0.42, spill[1] + 2.2], stroke: 'rgba(170,232,250,0.5)', sw: 1, round: true });
   }
-  // Falling star-streaks: short, staggered, fading with the drop — rng consumed UNCONDITIONALLY
-  // (the `paint` gate reads the camera, so it may only choose what is pushed, never what is drawn).
+  // Falling star-streaks INSIDE the curtain: short, staggered, fading with the drop — rng consumed
+  // UNCONDITIONALLY (the `paint` gate reads the camera, so it may only choose what is pushed,
+  // never what is drawn).
   const fallN = accents > 0 ? 16 : 5;
   for (let i = 0; i < fallN; i++) {
     const fx = (i / Math.max(1, fallN - 1) - 0.5) + (rng() - 0.5) * 0.1; // even lanes → a curtain
     const u0 = rng() * 0.45;
     const u1 = Math.min(1, u0 + 0.2 + rng() * 0.3);
-    const alpha = (0.55 + rng() * 0.3) * (1 - u0 * 0.55); // dimmer the further down it starts
+    const alpha = (0.4 + rng() * 0.25) * (1 - u0 * 0.55); // dimmer the further down it starts
     const dropR = 0.5 + rng() * 0.9;
     const uc2 = u0 + (u1 - u0) * rng();
     if (!paint) continue;
-    const xf = (u: number) => spill[0] + fx * spillW * (1 + 0.3 * u);
+    const xf = (u: number) => spill[0] + fx * spillW * (0.9 + 0.28 * u); // splays gently with the drop, stays inside the curtain
     fall.push({
       t: 'line',
       a: [xf(u0), spill[1] + fallLen * u0],
@@ -1938,17 +1987,17 @@ function cetusRiver(
       sw: 1.1,
       round: true,
     });
-    if (accents > 0) fall.push({ t: 'circle', c: [xf(uc2), spill[1] + fallLen * uc2], r: dropR, fill: 'rgba(232,252,255,0.9)' });
+    if (accents > 0) fall.push({ t: 'circle', c: [xf(uc2), spill[1] + fallLen * uc2], r: dropR, fill: 'rgba(232,252,255,0.8)' });
   }
   // Splash foot: a soft mist bloom + ripple rings where the curtain meets the star-ocean.
   const pool: Vec = [spill[0], spill[1] + fallLen];
   const mist: [number, number, number][] = [];
-  for (let i = 0; i < 3; i++) mist.push([(rng() - 0.5) * spillW * 0.9, rng() * 4, 2 + rng() * 3]);
+  for (let i = 0; i < 3; i++) mist.push([(rng() - 0.5) * spillW * 0.9, rng() * 4, 2.5 + rng() * 3.5]);
   if (paint) {
-    fall.push({ t: 'glow', c: pool, r: spillW * 1.2, col: 'rgba(150,238,255,0.3)' });
-    for (const [mx, my, mr] of mist) fall.push({ t: 'circle', c: [pool[0] + mx, pool[1] - my], r: mr, fill: 'rgba(210,246,255,0.25)' });
+    fall.push({ t: 'glow', c: pool, r: spillW * 1.3, col: 'rgba(150,238,255,0.35)' });
+    for (const [mx, my, mr] of mist) fall.push({ t: 'circle', c: [pool[0] + mx, pool[1] - my], r: mr, fill: 'rgba(210,246,255,0.3)' });
     for (let i = 1; i <= 3; i++) {
-      fall.push({ t: 'circle', c: pool, r: i * 5 + spillW * 0.2, fill: 'none', stroke: `rgba(150,238,255,${(0.45 - i * 0.12).toFixed(2)})`, sw: 1 });
+      fall.push({ t: 'circle', c: pool, r: i * 5 + spillW * 0.22, fill: 'none', stroke: `rgba(150,238,255,${(0.45 - i * 0.12).toFixed(2)})`, sw: 1 });
     }
   }
   return [...river, ...fall];
@@ -2336,7 +2385,10 @@ function archetypeDecor(
         placed++;
         const s = proj.project(c);
         const r = Math.max(4, Math.min(22, (5 + rng() * 9) * proj.scale));
-        if (!inView(s, W, H)) continue; // sized + placed (rng consumed), just not painted
+        // Pushed UNCONDITIONALLY (no paint-time view cull): decor is a few dozen cheap prims, and
+        // an off-view piece drawing nothing costs less than the flake it caused — a piece sitting
+        // exactly on the view edge flipped the prim COUNT between two follow-cam frames (the
+        // camera-stability guard). Same rule for every case below.
         const pts: Vec[] = [];
         for (let k = 0; k < 6; k++) {
           const a = (k / 6) * Math.PI * 2;
@@ -2369,7 +2421,6 @@ function archetypeDecor(
         const s = proj.project(c);
         const len = Math.max(10, Math.min(44, (10 + rng() * 12) * proj.scale)); // px long-axis
         const ang = rng() * Math.PI; // sized + angled unconditionally — the count never reads the view
-        if (!inView(s, W, H)) continue;
         const ux = Math.cos(ang);
         const uy = Math.sin(ang);
         const vx = -uy;
@@ -2418,7 +2469,6 @@ function archetypeDecor(
         const ang = rng() * Math.PI * 2;
         if (!g) continue; // nothing painted; this dedicated stream feeds nothing downstream
         const glowR = 8 + rng() * 8; // drawn unconditionally — the count never reads the view
-        const vis = inView(g.s, W, H);
         let px0 = g.s[0];
         let py0 = g.s[1];
         let a = ang;
@@ -2426,15 +2476,13 @@ function archetypeDecor(
           const len = 9 + posHash(g.c[0], g.c[1], sgm) * 14;
           const px1 = px0 + Math.cos(a) * len;
           const py1 = py0 + Math.sin(a) * len;
-          if (vis) {
-            clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(16,6,3,0.75)', sw: 3, round: true });
-            clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(255,138,42,0.8)', sw: 1.2, round: true });
-          }
+          clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(16,6,3,0.75)', sw: 3, round: true });
+          clipped.push({ t: 'line', a: [px0, py0], b: [px1, py1], stroke: 'rgba(255,138,42,0.8)', sw: 1.2, round: true });
           a += (posHash(g.c[0], g.c[1], sgm + 7) - 0.5) * 1.5;
           px0 = px1;
           py0 = py1;
         }
-        if (vis) clipped.push({ t: 'glow', c: g.s, r: glowR, col: 'rgba(255,130,50,0.28)' });
+        clipped.push({ t: 'glow', c: g.s, r: glowR, col: 'rgba(255,130,50,0.28)' });
       }
       break;
     }
@@ -2444,13 +2492,13 @@ function archetypeDecor(
       for (let i = 0; i < mists; i++) {
         const g = groundPt();
         const r = (0.07 + rng() * 0.08) * Math.min(W, H);
-        if (g && inView(g.s, W, H)) clipped.push({ t: 'glow', c: g.s, r, col: 'rgba(120,240,180,0.13)' });
+        if (g) clipped.push({ t: 'glow', c: g.s, r, col: 'rgba(120,240,180,0.13)' });
       }
       const shrooms = Math.round(7 * accents);
       for (let i = 0; i < shrooms; i++) {
         const g = groundPt();
         const cool = rng() < 0.4;
-        if (!g || !inView(g.s, W, H)) continue; // placed (rng consumed), just not painted
+        if (!g) continue;
         const p = g.s;
         const h = 3 + posHash(g.c[0], g.c[1]) * 2.5;
         const cap = cool ? '#7af0c0' : '#b07eff';
@@ -2466,7 +2514,7 @@ function archetypeDecor(
       for (let i = 0; i < clusters; i++) {
         const g = groundPt();
         const big = 4 + rng() * 5;
-        if (!g || !inView(g.s, W, H)) continue; // placed (rng consumed), just not painted
+        if (!g) continue;
         const p = g.s;
         const lean = (posHash(g.c[0], g.c[1]) - 0.5) * big * 0.7;
         clipped.push({ t: 'glow', c: [p[0], p[1] - big * 0.6], r: big * 2.4, col: 'rgba(160,225,255,0.22)' });
@@ -2478,7 +2526,7 @@ function archetypeDecor(
       for (let i = 0; i < glints; i++) {
         const g = groundPt();
         const col = glintCols[Math.floor(rng() * glintCols.length)]!;
-        if (!g || !inView(g.s, W, H)) continue;
+        if (!g) continue;
         const p = g.s;
         clipped.push({ t: 'line', a: [p[0] - 2, p[1]], b: [p[0] + 2, p[1]], stroke: col, sw: 0.9, round: true });
         clipped.push({ t: 'line', a: [p[0], p[1] - 2], b: [p[0], p[1] + 2], stroke: col, sw: 0.9, round: true });
@@ -2491,13 +2539,13 @@ function archetypeDecor(
       for (let i = 0; i < drifts; i++) {
         const g = groundPt();
         const r = (0.05 + rng() * 0.07) * Math.min(W, H);
-        if (g && inView(g.s, W, H)) clipped.push({ t: 'circle', c: g.s, r, fill: 'rgba(240,250,255,0.10)' });
+        if (g) clipped.push({ t: 'circle', c: g.s, r, fill: 'rgba(240,250,255,0.10)' });
       }
       const cracks = 4 + Math.floor(rng() * 3);
       for (let i = 0; i < cracks; i++) {
         const g = groundPt();
         const ang = rng() * Math.PI * 2;
-        if (!g || !inView(g.s, W, H)) continue;
+        if (!g) continue;
         const p = g.s;
         const len = 8 + posHash(g.c[0], g.c[1]) * 12;
         const mx = p[0] + Math.cos(ang) * len;
@@ -2513,7 +2561,7 @@ function archetypeDecor(
       for (let i = 0; i < bands; i++) {
         const g = groundPt();
         const ang = rng() * Math.PI; // ripple grain
-        if (!g || !inView(g.s, W, H)) continue;
+        if (!g) continue;
         const p = g.s;
         const dx = Math.cos(ang);
         const dy = Math.sin(ang);
@@ -2528,7 +2576,7 @@ function archetypeDecor(
       const rocks = 2 + Math.floor(rng() * 2);
       for (let i = 0; i < rocks; i++) {
         const g = groundPt();
-        if (!g || !inView(g.s, W, H)) continue;
+        if (!g) continue;
         const p = g.s;
         const r = 2.5 + posHash(g.c[0], g.c[1]) * 3;
         clipped.push({ t: 'poly', pts: [[p[0] - r, p[1]], [p[0] - r * 0.3, p[1] - r * 0.9], [p[0] + r * 0.7, p[1] - r * 0.6], [p[0] + r, p[1]]], fill: '#8a6f4a', stroke: 'rgba(46,36,19,0.6)', sw: 0.8 });
@@ -2579,7 +2627,6 @@ function archetypeDecor(
         placed++;
         const s = proj.project(c);
         const r = Math.max(4, Math.min(16, (4 + rng() * 6) * proj.scale));
-        if (!inView(s, W, H)) continue;
         out.push({ t: 'circle', c: s, r: r * 1.35, fill: 'none', stroke: 'rgba(220,248,255,0.4)', sw: 1.2 }); // breaking surf
         out.push({ t: 'circle', c: s, r, fill: '#c8b088', stroke: 'rgba(90,70,40,0.5)', sw: 1 }); // the sand cay
         out.push({ t: 'line', a: [s[0], s[1] - r * 0.2], b: [s[0], s[1] - r * 1.1], stroke: '#a8845a', sw: 1.4, round: true }); // a lone palm
@@ -2923,21 +2970,23 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // excavated body — no internal seams), then exotic scatter, then the penalty LIQUIDS as grouped
   // families ON TOP (so a river cutting through a sandy waste band reads as WATER, not buried under
   // sand — the "sand showed on rivers" bug), and finally trees (canopies over everything).
-  const waterPolys: Vec[][] = [];
-  const lavaPolys: Vec[][] = [];
-  const sandPolys: Vec[][] = [];
+  // Sand + each liquid draw from their per-hole UNION-merged bodies (GS-hazard-blend, course-space
+  // + cached): touching bunkers/pots/waste fuse into ONE excavated complex with a single rim, a
+  // creek + its mouth lake into one water body. Merging in COURSE space keeps the merged-body count
+  // (and thus the family passes' rng draw counts) camera-proof.
+  const merged = mergedHazardsFor(hole);
+  const waterPolys: Vec[][] = merged.water.map((p) => projPoly(p, proj));
+  const lavaPolys: Vec[][] = merged.lava.map((p) => projPoly(p, proj));
+  const sandPolys: Vec[][] = merged.sand.map((p) => projPoly(p, proj));
   const treeHaz: Feature[] = [];
   const fescueHaz: Feature[] = [];
   const ravineHaz: Feature[] = [];
   const scatterHaz: Feature[] = [];
   for (const f of hole.hazards) {
-    if (WATER_KINDS.has(f.kind)) waterPolys.push(projPoly(f.poly, proj));
-    else if (LAVA_KINDS.has(f.kind)) lavaPolys.push(projPoly(f.poly, proj));
-    else if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand' || f.kind === 'pot') sandPolys.push(projPoly(f.poly, proj));
-    else if (f.kind === 'trees') treeHaz.push(f);
+    if (f.kind === 'trees') treeHaz.push(f);
     else if (f.kind === 'fescue') fescueHaz.push(f);
     else if (f.kind === 'barranca') ravineHaz.push(f);
-    else scatterHaz.push(f);
+    else if (!WATER_KINDS.has(f.kind) && !LAVA_KINDS.has(f.kind) && f.kind !== 'bunker' && f.kind !== 'waste' && f.kind !== 'sand' && f.kind !== 'pot') scatterHaz.push(f);
   }
   // Rainbow Road: SAND is on the road (in-play, see `ROAD_LIES`) so bunkers/craters still draw; every
   // OTHER hazard (rough fescue, ravines, exotic scatter, water/lava, trees) is OFF the road → the bare

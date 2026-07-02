@@ -559,3 +559,19 @@ per-hole later"). `GENERATOR_VERSION` bumped 9 → 10 (stream reordered — no b
   max-wildness mean up (`characters.test` toPar bar 1.15 → 1.3; ember/frost stay < 1.0). The STRICT
   blow-up (≥+5) guard (< 5%) is untouched — that's the real death-spiral signal. `shapes.test` +
   `layout-variety.test` were rewritten from "X is wildness-gated" to "X appears on calm stops too".
+- **Cross-family hazard-overlap dedupe (GS-hazard-blend, 2026-07).** Hazards used to stamp onto each
+  other freely — water pools over bunkers, sand over lava — a pile of stickers ("water and other
+  hazards spawn on each other"). `dedupeHazardOverlaps` (end of `generateHole`) now drops any non-tree
+  hazard whose polygon overlaps an already-accepted hazard of a DIFFERENT substance family
+  (`HAZARD_FAMILY`: sand bunker/pot/waste, water water/creek/frozenpond, lava lava/lavariver, ravine,
+  fescue). TREES are exempt both ways (anything may sit under a canopy — the one sanctioned overlap),
+  and the forced-carry CROSSINGS always survive a clash (they're load-bearing: `validateCrossings`
+  proves them; a blob that hit a crossing loses whichever was placed first). SAME-family overlaps are
+  kept on purpose — the render union-merges them into one body (a creek pooling into its lake, pot
+  chains fusing into one complex). The filter is pure geometry over already-drawn placements — ZERO
+  rng draws, so every seeded stream is byte-identical; only which hazards SURVIVE changed. Guarded by
+  `tests/hazard-overlap.test.ts` (no cross-family overlap across biomes/seeds; tree overlaps still
+  plentiful; crossings still present).
+- **Waste band is a tapered LENS (GS-hazard-blend).** `crossingBand` (the sandy waste break) tapers
+  its thickness toward both ends (`0.3 + 0.7·sin(π·u)`) and finishes on rounded nose tips — a natural
+  sandbelt blowout instead of a flat-cut road slab. Pure math on the SAME rng draws (count unchanged).
