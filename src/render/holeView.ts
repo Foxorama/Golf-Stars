@@ -19,6 +19,7 @@ import type { ShotLog, ShotSpread } from '../sim/round';
 import { playBoundsCorners, sprayBlocking } from '../sim/round';
 import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
 import { flightControl } from '../sim/flight';
+import { tradeTents } from '../sim/tents';
 import { holeProjector } from './project';
 import { buildScene, holeIdPrefix, scenePrimsToSvg, type ArtFeel } from './style';
 
@@ -50,10 +51,13 @@ const BAND_STROKE: Record<string, string> = {
   red: 'rgba(255,76,76,0.6)',
 };
 
-/** Blocked-by-trees zone treatment (GS-spray-block): a dark canopy shade over the part of the cone
- *  a tree would knock down, dashed-edged so the safe remainder of the band reads clearly around it. */
+/** Blocked-zone treatment (GS-spray-block): a dark shade over the part of the cone a tall obstacle
+ *  (tree canopy / tent roof) would interrupt, dashed-edged so the safe remainder of the band reads
+ *  clearly around it. */
 const BLOCK_FILL = 'rgba(14,26,16,0.60)';
 const BLOCK_STROKE = 'rgba(150,220,140,0.45)';
+/** Glyph marking what blocks a shaded region — trees vs trade-camp tents. */
+const BLOCK_GLYPH: Record<'trees' | 'tents', string> = { trees: '🌲', tents: '⛺' };
 
 // --- Zoom-aware overlay layout (GS-spray-zoom) --------------------------------
 // Every overlay layout decision below reads the projector's px-per-yard scale, so the cone stays
@@ -247,16 +251,20 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
         `<polygon points="${pts(spraySector(s, b.a0, b.a1, segsFor(b.a0, b.a1)))}" fill="${BAND_FILL[b.tier]}" stroke="${BAND_STROKE[b.tier]}" stroke-width="1" />`,
       );
     }
-    // Blocked-by-trees zones (GS-spray-block): the part of the cone a tall obstacle would knock out
-    // of the air, probed with the sim's own knockdown walk and smoothed in SCREEN terms — slivers
-    // narrower than a few px are dropped, near-touching runs merge, edges snap to the carry arcs —
-    // so the shading reads as "that line is wooded", never a 1-px barcode. The clear remainder of
-    // the cone still draws its bands untouched: that's the safe line.
+    // Blocked zones (GS-spray-block / GS-spray-block-2): the slices of the cone a tall obstacle
+    // (tree canopy, or a trade-camp tent when the effect is armed) would interrupt, probed with the
+    // sim's own knockdown/bounce walks. A blocked slice shades from the object to the cone's FAR
+    // edge (the line is dead past it — no floating clear pocket); a line the whole swing flies over
+    // stays unshaded. Smoothed in SCREEN terms — slivers narrower than a few px are dropped,
+    // near-touching runs merge, near edges snap to the carry arc — so the shading reads as "that
+    // line is blocked", never a 1-px barcode. The clear remainder of the cone still draws its
+    // bands untouched: that's the safe line.
     const blocked = sprayBlocking(hole, s, geom, {
       minSpanRad: BLOCK_MIN_SPAN_PX / (pxYd * rMid),
       mergeGapRad: BLOCK_MERGE_GAP_PX / (pxYd * rMid),
       minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
       snapYd: BLOCK_SNAP_PX / pxYd,
+      tents: opts.tradeTents ? tradeTents(hole) : undefined,
     });
     for (const region of blocked) {
       const poly: Vec[] = [];
@@ -268,15 +276,15 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
       parts.push(
         `<polygon points="${pts(poly)}" fill="${BLOCK_FILL}" stroke="${BLOCK_STROKE}" stroke-width="1" stroke-dasharray="3 2" />`,
       );
-      // A canopy glyph when the region is big enough to carry one (px-tested, so it never swamps
-      // a small patch): marks the shading as trees at a glance.
+      // A glyph when the region is big enough to carry one (px-tested, so it never swamps a small
+      // patch): marks WHAT blocks the shading at a glance — tree canopy or a trade-camp tent roof.
       const mid = region.samples[Math.floor(region.samples.length / 2)]!;
       const wPx = (region.a1 - region.a0) * rMid * pxYd;
       const dPx = (mid.r1 - mid.r0) * pxYd;
       if (wPx >= 26 && dPx >= 16) {
         const [gx, gy] = place(sprayPoint(s, mid.a, (mid.r0 + mid.r1) / 2));
         parts.push(
-          `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">🌲</text>`,
+          `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">${BLOCK_GLYPH[region.src]}</text>`,
         );
       }
     }

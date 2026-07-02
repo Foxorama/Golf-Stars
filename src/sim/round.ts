@@ -1256,6 +1256,9 @@ export interface BlockedRegion {
   a1: number;
   /** Per-angle radial intervals, evenly spaced a0→a1 — the region's drawable boundary. */
   samples: BlockedSample[];
+  /** What interrupts the flight here — picks the render glyph (🌲/⛺). A run is 'tents' only when
+   *  NO tree contributes to it (a mixed grove+tent run reads as woods). */
+  src: 'trees' | 'tents';
 }
 
 export interface SprayBlockingOpts {
@@ -1271,24 +1274,35 @@ export interface SprayBlockingOpts {
   snapYd?: number;
   /** Angular sample count across the cone (clamped; default scales with `minSpanRad`). */
   samples?: number;
+  /** Trade-camp tents (GS-tents) to probe as aerial obstacles alongside the trees — pass the SAME
+   *  `tradeTents(hole)` the sim collides with in `executeShot`, and only when the trade-market
+   *  course effect is armed (the call sites gate it). Absent ⇒ tents never shade. */
+  tents?: readonly TradeTent[];
 }
 
 /**
- * Where the contemplated shot would be BLOCKED by tall obstacles (trees), across the drawn spray
- * cone (GS-spray-block). For each angle across the cone's full band extent and each landing radius
- * in the carry window, a candidate landing is probed with the SAME `flightKnockdown` walk the sim
- * resolves shots with (via `flightBlockedBy`) — so a shaded landing is exactly one the sim would
- * knock out of the air, and the unshaded remainder of the cone is what's genuinely reachable.
+ * Where the contemplated shot would be BLOCKED by tall obstacles, across the drawn spray cone
+ * (GS-spray-block / GS-spray-block-2). For each angle across the cone's full band extent, the
+ * landing radii in the carry window are probed with the SAME walks the sim resolves shots with —
+ * trees via `flightBlockedBy` (the path `flightKnockdown` delegates to) and trade-camp tents via
+ * `tentFlightHit` (when `opts.tents` is armed). Per angle the read is BINARY (GS-spray-block-2):
+ *  - if EVERY landing in the window flies clean over everything on that line (or nothing is in
+ *    reach), the line is CLEAR — no shading, however tall the scenery it sails over;
+ *  - if ANY landing gets interrupted, the line is BLOCKED from the interruption point (where the
+ *    ball actually comes down — the object, not the aimed landing) out to the cone's FAR edge.
+ *    No floating "clear pocket" draws beyond the object: the whole rest of that slice reads dead.
+ * So an unshaded landing is exactly one the sim lets through, and a shaded slice always starts at
+ * a real knockdown/bounce (the far part is conservative — a flyer that would individually clear
+ * the object lands as a pleasant surprise, never a hidden wall).
  *
- * The raw per-angle mask is then smoothed so it reads as intent, not noise:
- *  - per angle, the blocked radii collapse to ONE interval (first→last blocked — a clear pocket
- *    sandwiched between two clips is counted blocked: conservative, and never a radial barcode);
- *  - intervals thinner than `minDepthYd` are dropped, and edges within `snapYd` of the carry
- *    window snap onto it;
+ * The per-angle mask is then smoothed so it reads as intent, not noise:
+ *  - intervals shallower than `minDepthYd` are dropped, and a near edge within `snapYd` of the
+ *    carry window snaps onto it;
  *  - angular runs closer than `mergeGapRad` merge (interpolating across the gap), and runs
  *    narrower than `minSpanRad` are dropped — no 1-px blockers, no blocked/open striping.
  *
- * Pure, zero rng — display-only geometry; the sim's own knockdown in `executeShot` is untouched.
+ * Pure, zero rng — display-only geometry; the sim's own knockdown/bounce in `executeShot` is
+ * untouched.
  */
 export function sprayBlocking(
   hole: Hole,
@@ -1298,7 +1312,8 @@ export function sprayBlocking(
 ): BlockedRegion[] {
   if (s.expectedCarry <= 0 || s.angleSpread <= 0 || s.carryHigh <= 0) return [];
   const obstacles = flightObstacles(hole);
-  if (obstacles.length === 0) return [];
+  const tents = opts.tents && opts.tents.length ? opts.tents : undefined;
+  if (obstacles.length === 0 && !tents) return [];
   const bands = sprayBands(s.shape, s.angleSpread, geom).filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
   if (bands.length === 0) return [];
   let aMin = Infinity;
@@ -1335,31 +1350,43 @@ export function sprayBlocking(
     s.origin[1] + Math.cos(br + h * a) * r,
   ];
 
-  // Per-angle blocked interval (or null): first→last blocked radius, padded by half a probe step,
-  // snapped onto the window edges, dropped when shallower than minDepth.
+  // Per-angle blocked interval (or null), GS-spray-block-2: scan the landing radii short→long and
+  // stop at the FIRST interruption (tree knockdown, else tent bounce — the sim checks trees first
+  // in `executeShot` too). Blocked ⇒ the interval runs from where the ball comes DOWN (the object)
+  // to the cone's far edge; no interruption at any radius ⇒ the line is clear, nothing shades.
   const intervals: ({ r0: number; r1: number } | null)[] = [];
+  const causes: ('trees' | 'tents' | null)[] = [];
   const angles: number[] = [];
   for (let i = 0; i <= N; i++) {
     const a = aMin + (span * i) / N;
     angles.push(a);
-    let first = -1;
-    let last = -1;
+    let hitAt = -1;
+    let cause: 'trees' | 'tents' = 'trees';
     for (let k = 0; k < K; k++) {
       const r = rLow + rStep * k;
-      if (flightBlockedBy(obstacles, s.origin, landAt(a, r), s.bearing, r, s.nominalCarry)) {
-        if (first < 0) first = r;
-        last = r;
+      const landing = landAt(a, r);
+      const kd = flightBlockedBy(obstacles, s.origin, landing, s.bearing, r, s.nominalCarry);
+      if (kd) {
+        hitAt = kd.carry;
+        break;
+      }
+      const th = tents ? tentFlightHit(tents, s.origin, landing, s.bearing, r, s.nominalCarry) : null;
+      if (th) {
+        hitAt = th.carry;
+        cause = 'tents';
+        break;
       }
     }
-    if (first < 0) {
+    if (hitAt < 0) {
       intervals.push(null);
+      causes.push(null);
       continue;
     }
-    let r0 = Math.max(rLow, first - rStep / 2);
-    let r1 = Math.min(rHigh, last + rStep / 2);
+    let r0 = Math.max(rLow, hitAt);
     if (r0 - rLow < snap) r0 = rLow;
-    if (rHigh - r1 < snap) r1 = rHigh;
-    intervals.push(r1 - r0 >= minDepth ? { r0, r1 } : null);
+    const keep = rHigh - r0 >= minDepth;
+    intervals.push(keep ? { r0, r1: rHigh } : null);
+    causes.push(keep ? cause : null);
   }
 
   // Merge angular runs across sub-threshold clear gaps (lerp the interval through the gap), then
@@ -1391,11 +1418,20 @@ export function sprayBlocking(
     const width = angles[j - 1]! - angles[i]!;
     if (width >= minSpan) {
       const samples: BlockedSample[] = [];
+      let treeHits = 0;
+      let tentHits = 0;
       for (let k = i; k < j; k++) {
         const iv = intervals[k]!;
         samples.push({ a: angles[k]!, r0: iv.r0, r1: iv.r1 });
+        if (causes[k] === 'trees') treeHits++;
+        else if (causes[k] === 'tents') tentHits++;
       }
-      regions.push({ a0: angles[i]!, a1: angles[j - 1]!, samples });
+      regions.push({
+        a0: angles[i]!,
+        a1: angles[j - 1]!,
+        samples,
+        src: tentHits > 0 && treeHits === 0 ? 'tents' : 'trees',
+      });
     }
     i = j;
   }

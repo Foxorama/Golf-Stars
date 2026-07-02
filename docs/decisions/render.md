@@ -358,26 +358,37 @@
   `viewRadius ≈ 0.36·carryHigh`) — the whole-hole overview may legitimately shed the 2% tails
   (`tests/spray-ob.test.ts` asserts both). `sprayPoint()` is the one band-angle→course-space mapping
   (lefty mirror included) shared by sectors, labels and blocked zones.
-- **Blocked-by-trees zones shade the cone from the sim's own knockdown walk (GS-spray-block,
-  `round.ts sprayBlocking` + `flight.ts flightBlockedBy` + `holeView.ts`).** The part of the cone a
-  tall obstacle would knock out of the air is shaded dark (`BLOCK_FILL`, dashed edge, a 🌲 glyph when
-  the region is big enough in px); the clear remainder keeps its bands — that's the safe line. The
-  probe is THE SAME code path the sim resolves shots with: `flightKnockdown` now delegates to
-  `flightBlockedBy(flightObstacles(hole), …)`, and `sprayBlocking` probes each (angle × landing
-  radius) in the carry window through it — so a shaded landing is exactly one `executeShot` would
-  knock down (including the curve: a sprayed shot launches along the BEARING and bends out, so a
-  grove's blocked run is WIDER than its straight-ray shadow — that's the physics, not a bug). Pure,
-  zero rng, display-only; holes without trees early-return `[]`. The mask is SMOOTHED so it reads as
-  intent, not noise, with thresholds the renderer derives from projected px (the same GS-spray-zoom
-  scale-honesty): per angle the blocked radii collapse to ONE interval (conservative — a clear pocket
-  between two clips counts blocked); intervals shallower than `minDepthYd` drop; edges within
-  `snapYd` of a carry arc snap onto it (no 1px open rim); angular runs closer than `mergeGapRad`
-  merge (lerped through the gap — no barcode striping) and runs narrower than `minSpanRad` drop (no
-  1px blockers). `ShotSpread` gained `nominalCarry` so the overlay can drive the loft/apex model.
-  Guards: `tests/spray-blocking.test.ts` (physics agreement, sliver drop, gap merge, render).
+- **Blocked zones shade the cone from the sim's own flight walks (GS-spray-block + GS-spray-block-2,
+  `round.ts sprayBlocking` + `flight.ts flightBlockedBy` + `tents.ts tentFlightHit` + `holeView.ts`).**
+  The slices of the cone a tall obstacle would interrupt are shaded dark (`BLOCK_FILL`, dashed edge, a
+  🌲/⛺ glyph — `BlockedRegion.src`, 'tents' only when no tree contributes — when the region is big
+  enough in px); the clear remainder keeps its bands — that's the safe line. The probe is THE SAME
+  code path the sim resolves shots with: trees via `flightBlockedBy(flightObstacles(hole), …)` (the
+  path `flightKnockdown` delegates to) and trade-camp tents via `tentFlightHit` — tents are passed in
+  (`opts.tents`, from `tradeTents(hole)`) only when the trade-market effect is armed, mirroring
+  `executeShot`'s gate and check order (trees first). Per angle the read is BINARY
+  (GS-spray-block-2, replacing v1's per-landing radial bands that drew floating mid-cone patches
+  with misleading "clear" rims beyond a blocking grove):
+  the landing radii are scanned short→long, and (a) if EVERY landing in the window flies clean over
+  everything on that line, the line is CLEAR — no shade however tall the scenery it sails over; (b) at
+  the FIRST interruption the line is blocked from the impact carry (where the ball actually comes
+  down — the object, not the aimed landing) out to the cone's FAR edge — the whole rest of the slice
+  reads dead, no clear pocket beyond the object. So an unshaded landing is exactly one the sim lets
+  through, and a shaded slice always starts at a real knockdown/bounce; the far part is deliberately
+  conservative (a flyer that would individually clear the object is a pleasant surprise, never a
+  hidden wall). Including the curve: a sprayed shot launches along the BEARING and bends out, so a
+  grove's blocked run is WIDER than its straight-ray shadow — that's the physics, not a bug. Pure,
+  zero rng, display-only; holes with no trees and no armed tents early-return `[]`. The mask is
+  SMOOTHED so it reads as intent, not noise, with thresholds the renderer derives from projected px
+  (the same GS-spray-zoom scale-honesty): intervals shallower than `minDepthYd` drop; a near edge
+  within `snapYd` of the near carry arc snaps onto it (no 1px open rim); angular runs closer than
+  `mergeGapRad` merge (lerped through the gap — no barcode striping) and runs narrower than
+  `minSpanRad` drop (no 1px blockers). `ShotSpread` gained `nominalCarry` so the overlay can drive
+  the loft/apex model. Guards: `tests/spray-blocking.test.ts` (physics agreement for trees AND tents,
+  block-to-far-edge, fly-over-clear, tent gating, sliver drop, gap merge, render glyphs).
   GOTCHA: `sprayBlocking` runs per decision re-render (every drag frame) — it's ~3ms worst-case on a
-  grove-heavy hole; keep the probe budget bounded (samples clamp 16–72 angles × ≤16 radii) if you
-  ever widen it.
+  grove-heavy hole (the first-hit break makes blocked slices cheaper than v1); keep the probe budget
+  bounded (samples clamp 16–72 angles × ≤16 radii) if you ever widen it.
 - **Shot POWER + the pull-to-power gesture (GS-power).** Distance is now POWER-dependent: a shot's
   intended carry is `clubDist(club) × carryMult × power`, where `power` is a fraction of the club's
   full carry — 1 a full swing, down to a soft tap, and (with Overdrive) PAST 100%. It's a SINGLE pure

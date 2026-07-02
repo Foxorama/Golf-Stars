@@ -283,9 +283,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   the live drag), and the shot animation starts at the decision map's exact `decisionRadius`. **The
   aim-cone overlay is SCALE-HONEST (GS-spray-zoom/GS-spray-block):** every layout decision (arc
   sampling, zone-% labels, the merged `lo–hi y` carry label) reads the projector's px-per-yard, and
-  the blocked-by-trees shading probes the sim's OWN knockdown walk (`sprayBlocking` →
-  `flightBlockedBy`, the path `flightKnockdown` delegates to) with px-derived sliver/merge smoothing
-  — never fork the walk, never hard-code a px size into the sim. Turf
+  the blocked-zone shading probes the sim's OWN flight walks (`sprayBlocking` → `flightBlockedBy`
+  for trees — the path `flightKnockdown` delegates to — plus `tentFlightHit` when trade tents are
+  armed) with px-derived sliver/merge smoothing — never fork the walks, never hard-code a px size
+  into the sim. A line is shaded BINARY (GS-spray-block-2): clear when every landing in the window
+  flies over, else blocked from the object to the cone's FAR edge — never a floating mid-cone band. Turf
   bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
   atmosphere is the shared screen-space `render/weather.ts`. **Per-world identity is table+dispatch,
   never a fork (GS-biome-feel):** flora (`styleFlora`), boundary markers (`OB_LOOK`), signature decor
