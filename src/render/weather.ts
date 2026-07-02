@@ -175,11 +175,12 @@ interface Star {
   hero: boolean;
 }
 interface Meteor {
-  x: number; // 0..1 lane
+  x: number; // 0..1 spawn lane across the top of the sky
   spd: number;
-  len: number;
-  off: number;
-  big: boolean;
+  head: number; // fireball head radius (px)
+  tail: number; // flame tail length (px)
+  off: number; // phase offset within the loop
+  burn: number; // burns out at this fraction of the sky's height — never reaches the turf
 }
 interface Debris {
   y: number;
@@ -189,6 +190,39 @@ interface Debris {
   spin: number;
   shape: Vec[];
   blink: number;
+}
+
+/**
+ * One meteor FIREBALL (GS-meteor-look): a white-hot head inside a tapered, licking flame tail,
+ * drawn as a chain of shrinking, cooling blobs back along the flight line — reads as burning rock,
+ * not the old 1px "rain streak". Shared by the ambient shower and the crater strike so the one that
+ * lands is unmistakably the same object. Screen-space + clock-driven only; `flick` animates the
+ * flame. `dir` is the unit FLIGHT direction (the tail streams behind); caller sets 'lighter'.
+ */
+function fireball(ctx: CanvasRenderingContext2D, x: number, y: number, dirX: number, dirY: number, head: number, tail: number, a: number, flick: number): void {
+  const n = Math.max(9, Math.round(tail / 2.5)); // dense enough that the blobs fuse into flame
+  for (let i = 1; i <= n; i++) {
+    const f = i / n; // 0 head → 1 tail tip
+    const lick = Math.sin(flick * 2.2 + f * 9.5) * head * 0.5 * f; // side-to-side flame licks
+    const bx = x - dirX * tail * f - dirY * lick;
+    const by = y - dirY * tail * f + dirX * lick;
+    const r = Math.max(0.4, head * (1.2 - f * 0.95) * (0.85 + 0.15 * Math.sin(flick * 3.1 + f * 11)));
+    const fa = a * (1 - f) * (1 - f) * 0.3;
+    // White-hot at the head, cooling through amber to ember red at the tail tip.
+    const col = f < 0.22 ? '255,238,196' : f < 0.55 ? '255,184,96' : '255,116,52';
+    ctx.fillStyle = `rgba(${col},${fa.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const hg = ctx.createRadialGradient(x, y, 0, x, y, head * 3);
+  hg.addColorStop(0, `rgba(255,255,246,${(0.95 * a).toFixed(3)})`);
+  hg.addColorStop(0.35, `rgba(255,214,150,${(0.55 * a).toFixed(3)})`);
+  hg.addColorStop(1, 'rgba(255,140,60,0)');
+  ctx.fillStyle = hg;
+  ctx.beginPath();
+  ctx.arc(x, y, head * 3, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export function createWeather(o: WeatherOpts): WeatherHandle {
@@ -232,13 +266,17 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       hero: rng() < 0.12,
     }));
     shootOff = rng() * 6000;
-    // Meteor lanes (a handful of big fireballs among the streaks).
-    meteors = Array.from({ length: 14 }, (_, i) => ({
-      x: rng(),
-      spd: 0.55 + rng() * 1.0,
-      len: 26 + rng() * 46,
-      off: rng(),
-      big: i < 3,
+    // Meteor fireballs (GS-meteor-look): a SPARSE handful on their OWN stream — each flies for only
+    // ~a third of its loop, so two-or-so ride the sky at once instead of a constant rain, and
+    // retuning their count/shape never re-scatters the shared starfield/wind/ambient layout above.
+    const rngM = mulberry32((o.seed ^ 0xc2b2ae35) >>> 0);
+    meteors = Array.from({ length: 6 }, (_, i) => ({
+      x: rngM(),
+      spd: 0.75 + rngM() * 0.6,
+      head: i < 2 ? 2.7 + rngM() * 0.9 : 1.7 + rngM() * 0.7,
+      tail: 34 + rngM() * 34,
+      off: rngM(),
+      burn: 0.26 + rngM() * 0.24,
     }));
     // Orbital debris silhouettes — small tumbling wrecks at varied "depth" (size↔speed parallax).
     debris = Array.from({ length: 9 }, () => {
@@ -619,40 +657,41 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
+  // The ambient shower (GS-meteor-look): a sparse handful of true fireballs that dive down-left on
+  // the SAME bearing the strike arrives on, then visibly BURN UP high in the sky — they never plunge
+  // into the turf, so the only meteor that ever reaches the ground is the strike, and it lands on a
+  // crater (GS-meteor-strikes). That closes the old "rain of streaks falling through the course
+  // without ever hitting the marks" read.
   function drawMeteors(ctx: CanvasRenderingContext2D, now: number): void {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.lineCap = 'round';
     for (const m of meteors) {
-      const t = ((m.off + now * 0.00016 * (0.5 + m.spd)) % 1.32) - 0.12;
-      if (t < 0) continue;
-      const x = m.x * (W + 120) - 60 - t * W * 0.42;
-      const y = t * (H + 80) - 40;
-      const a = Math.min(1, t * 3) * Math.min(1, (1.2 - t) * 3);
+      // Sparse duty cycle: each fireball flies for ~a third of its loop, then its lane rests.
+      const ph = (m.off + now * 0.00024 * m.spd) % 1;
+      if (ph >= 0.36) continue;
+      const u = ph / 0.36;
+      const x0 = m.x * (W + 200) - 60;
+      const y0 = -30;
+      const y1 = H * m.burn;
+      const x1 = x0 - (y1 - y0) * 0.38;
+      const x = x0 + (x1 - x0) * u;
+      const y = y0 + (y1 - y0) * u;
+      const a = Math.min(1, u * 5) * Math.min(1, (1 - u) * 2.4);
       if (a <= 0.01) continue;
-      const tx = x - m.len * 0.66;
-      const ty = y - m.len;
-      const lw = m.big ? 2.6 : 1.5;
-      const grad = ctx.createLinearGradient(tx, ty, x, y);
-      grad.addColorStop(0, `rgba(255,210,150,0)`);
-      grad.addColorStop(0.6, `rgba(255,224,170,${(0.5 * a).toFixed(3)})`);
-      grad.addColorStop(1, `rgba(255,245,225,${(0.9 * a).toFixed(3)})`);
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = lw;
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      // Glowing head.
-      const hr = m.big ? 3.4 : 2;
-      const hg = ctx.createRadialGradient(x, y, 0, x, y, hr * 3);
-      hg.addColorStop(0, `rgba(255,255,250,${(0.95 * a).toFixed(3)})`);
-      hg.addColorStop(0.4, `rgba(255,225,180,${(0.5 * a).toFixed(3)})`);
-      hg.addColorStop(1, 'rgba(255,210,150,0)');
-      ctx.fillStyle = hg;
-      ctx.beginPath();
-      ctx.arc(x, y, hr * 3, 0, Math.PI * 2);
-      ctx.fill();
+      const dl = Math.hypot(x1 - x0, y1 - y0) || 1;
+      fireball(ctx, x, y, (x1 - x0) / dl, (y1 - y0) / dl, m.head, m.tail * (0.55 + 0.45 * u), a, now * 0.02 + m.off * 40);
+      // Terminal flare — the last stretch pops and gutters out: a burn-up, not a vanish.
+      if (u > 0.8) {
+        const fu = (u - 0.8) / 0.2;
+        const fr = m.head * (2 + 5 * fu);
+        const fg = ctx.createRadialGradient(x, y, 0, x, y, fr);
+        fg.addColorStop(0, `rgba(255,240,210,${(0.5 * (1 - fu) * a).toFixed(3)})`);
+        fg.addColorStop(1, 'rgba(255,160,80,0)');
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.arc(x, y, fr, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     ctx.restore();
   }
@@ -1166,15 +1205,22 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     // Per-cycle picks off a private mulberry seeded by the cycle index — identical for every frame
     // of the cycle, different across cycles, and never touching the layout streams above.
     const pick = mulberry32((o.seed ^ Math.imul(k + 1, 0x9e3779b9)) >>> 0);
-    const target = targets[Math.floor(pick() * targets.length)]!;
+    const idx0 = Math.floor(pick() * targets.length);
     const jitter = pick() * 0.3 - 0.15; // slight per-strike approach-angle variation
+    // Aim at an ON-SCREEN crater: scan from the seeded pick for the first visible one (stable
+    // target order, so the choice holds through the cycle) — a cycle is never wasted diving at a
+    // mark the camera can't see. No visible crater at all → paint cull, cadence/clock unaffected.
+    let target: { c: Vec; r: number } | null = null;
+    for (let i = 0; i < targets.length && !target; i++) {
+      const cand = targets[(idx0 + i) % targets.length]!;
+      if (cand.c[0] >= -60 && cand.c[0] <= W + 60 && cand.c[1] >= -60 && cand.c[1] <= H + 60) target = cand;
+    }
+    if (!target) return;
     const [cx, cy] = target.c;
-    // A strike aimed well off-screen is a paint cull only — the cadence/clock is unaffected.
-    if (cx < -60 || cx > W + 60 || cy < -60 || cy > H + 60) return;
     const IN = 0.14; // dive starts
     const IMPACT = 0.48; // touchdown
     const OUT = 0.78; // afterglow ends
-    // Incoming from the upper-right, matching the ambient sky lanes' down-left fall.
+    // Incoming from the upper-right, matching the ambient shower's down-left fall.
     const dx = 0.36 + jitter;
     const dy = -1;
     const dl = Math.hypot(dx, dy);
@@ -1182,31 +1228,13 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     if (t >= IN && t < IMPACT) {
-      const f = (t - IN) / (IMPACT - IN); // 0 → 1 along the dive
+      const f0 = (t - IN) / (IMPACT - IN); // 0 → 1 along the dive
+      const f = f0 * f0; // a falling rock ACCELERATES in — not a constant-speed slide
       const x = cx + (dx / dl) * reach * (1 - f);
       const y = cy + (dy / dl) * reach * (1 - f);
-      const len = 34 + 26 * f; // the tail stretches as it accelerates in
-      const tx = x + (dx / dl) * len;
-      const ty = y + (dy / dl) * len;
-      const grad = ctx.createLinearGradient(tx, ty, x, y);
-      grad.addColorStop(0, 'rgba(255,200,140,0)');
-      grad.addColorStop(0.55, 'rgba(255,220,165,0.6)');
-      grad.addColorStop(1, 'rgba(255,248,230,0.95)');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      const hg = ctx.createRadialGradient(x, y, 0, x, y, 11);
-      hg.addColorStop(0, 'rgba(255,255,250,0.95)');
-      hg.addColorStop(0.4, 'rgba(255,225,180,0.5)');
-      hg.addColorStop(1, 'rgba(255,210,150,0)');
-      ctx.fillStyle = hg;
-      ctx.beginPath();
-      ctx.arc(x, y, 11, 0, Math.PI * 2);
-      ctx.fill();
+      // The strike is the ambient fireball's big sibling — same painter, so the one that lands
+      // is unmistakably the same object the shower has been teasing.
+      fireball(ctx, x, y, -dx / dl, -dy / dl, 4.4, 46 + 42 * f, Math.min(1, f0 * 4), now * 0.02 + k * 13);
     } else if (t >= IMPACT && t < OUT) {
       if (lastStrikeK !== k) {
         lastStrikeK = k;
@@ -1224,6 +1252,13 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       ctx.beginPath();
       ctx.arc(cx, cy, fr, 0, Math.PI * 2);
       ctx.fill();
+      // Shock ring racing out over the turf — the "it really hit HERE" read on the crater.
+      const ring = target.r * (1 + 3.4 * f);
+      ctx.strokeStyle = `rgba(255,200,130,${(0.55 * fade * fade).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, 2.6 * fade);
+      ctx.beginPath();
+      ctx.arc(cx, cy, ring, 0, Math.PI * 2);
+      ctx.stroke();
       // Ember splash — a handful of sparks thrown up-and-out on simple ballistic arcs.
       for (let i = 0; i < 7; i++) {
         const a = pick() * Math.PI * 2;
