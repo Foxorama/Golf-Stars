@@ -409,6 +409,24 @@
   conversion fires + never-a-penalty, armed-vs-unarmed ball identical with only the lie label differing,
   the lie bites but sits below the trouble lies, and the no-death-spiral bar holds with scorch armed at
   wildness 1 across biomes). Eyes-on with `node scripts/scorch-preview.mjs`.
+  **The shower now LANDS (GS-meteor-strikes, `render/weather.ts`).** The follow-up fiction fix: the sky
+  meteors were screen-space streaks that faded mid-air while the craters sat below, fully formed —
+  nothing connected them ("a random flying set of meteors and completely separate impact marks"). Now,
+  on a meteor-shower stop, one meteor per cycle (2600ms) DIVES INTO one of the drawn craters and lands
+  with an impact flash sized to the crater's true footprint + an ember splash + a soft distant-impact
+  screen shake (`WeatherOpts.onStrike` → the play view's `shake`). Anchoring: `WeatherOpts.strikeTargets`
+  is a per-frame callback (the `starMask` pattern) supplying the craters' SCREEN positions — the play
+  view projects the SAME `meteorScorch(hole)` marks the sim reads through its LIVE projector, so strikes
+  track the follow-cam and always land exactly on a drawn crater. The AIM overlay does NOT feed it: its
+  local projector is wind-orientation only and would lie about crater positions (the same reason it
+  can't feed `starMask` — documented at `mountWeatherOverlay`). Purely cosmetic + purely clock-driven:
+  per-cycle picks ride a private mulberry seeded off the CYCLE INDEX (`seed ^ imul(k+1, φ)`), zero rng
+  streams touched, and a strike RE-BURNS an existing mark — the mark set stays a pure function of the
+  hole, so the physics never changes mid-hole. Off-screen targets are paint-culled (cadence unaffected —
+  camera-safe). Guarded headlessly by `tests/weather-strikes.test.ts` (fake-ctx differential: strikes
+  add draws only under meteorShower; null/empty targets are byte-identical to no targets; the onStrike
+  cue fires exactly once per cycle; off-screen culling). Eyes-on: `node scripts/weather-preview.mjs`
+  gained frozen dive/impact frames (plus the gravityWell/frostfall cases GS-journey-fx-2 forgot to add).
 - **EVERY course effect now carries a real play hook, and the sky-set widened again (GS-journey-fx-2,
   `effects.ts`/`sim/patches.ts`).** The play complaint: "the weather effects and the consequences for
   each journey really don't make any sense or have a lot of difference" — four of the ten skies

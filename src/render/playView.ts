@@ -915,6 +915,16 @@ export function mountPlayView(
     spaceFX: F.spaceFX,
     wind: F.wind,
     starMask: () => landCourse.map((p) => p.map((pt) => proj.project(pt))),
+    // Meteor STRIKES (GS-meteor-strikes): feed the sky the craters' live screen positions — the SAME
+    // `meteorScorch(hole)` marks the sim reads, through the live projector (follow-cam-proof, like
+    // starMask) — so every few seconds one meteor visibly dives in and re-burns a mark. A landing
+    // answers with a soft distant-impact shake.
+    strikeTargets: scorchMarks.length
+      ? () => scorchMarks.map((m) => ({ c: proj.project(m.c), r: Math.max(4, m.r * proj.scale) }))
+      : undefined,
+    onStrike: () => {
+      shake = Math.max(shake, 0.28);
+    },
   });
 
   function frame(realNow: number): void {
