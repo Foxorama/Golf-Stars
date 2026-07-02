@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { shotSpread, sprayBlocking } from '../src/sim/round';
 import { flightKnockdown } from '../src/sim/flight';
+import { tradeTents, tentFlightHit } from '../src/sim/tents';
 import { renderHoleSVG } from '../src/render/holeView';
 import { CLUBS } from '../src/sim/clubs';
 import type { Hole, Vec } from '../src/sim/course/contract';
 
 const driver = CLUBS.find((c) => c.id === 'D')!;
+const seven = CLUBS.find((c) => c.id === '7i')!;
 
 /** A synthetic straight-up hole; `treeBlobs` drop tall obstacles onto the shot corridor. */
 function holeWithTrees(treeBlobs: Vec[][]): Hole {
@@ -30,10 +32,10 @@ const blob = (cx: number, cy: number, h: number): Vec[] => [
   [cx - h, cy + h],
 ];
 
-describe('sprayBlocking (GS-spray-block, pure)', () => {
-  // One tall grove dead on the line at 100y: tall enough (canopy ≈ 32y) that the whole driver
-  // carry window flies below it, so the cone's centre is blocked while the flanks stay clear.
-  const hole = holeWithTrees([blob(0, 100, 12)]);
+describe('sprayBlocking (GS-spray-block / GS-spray-block-2, pure)', () => {
+  // One tall grove dead on the line at 100y: tall enough (canopy ≈ 22y) that low landings across
+  // the whole driver carry window clip it, so the cone's centre is blocked while the flanks stay clear.
+  const hole = holeWithTrees([blob(0, 100, 7)]);
   const spread = shotSpread(hole, [0, 0], 'tee', [0, 400], driver, {});
 
   it('returns [] when the hole has no tall obstacles', () => {
@@ -45,6 +47,7 @@ describe('sprayBlocking (GS-spray-block, pure)', () => {
     const regions = sprayBlocking(hole, spread);
     expect(regions.length).toBe(1);
     const r = regions[0]!;
+    expect(r.src).toBe('trees');
     // The grove sits on the bearing → the blocked run straddles angle 0 but is NOT the whole cone.
     expect(r.a0).toBeLessThan(0);
     expect(r.a1).toBeGreaterThan(0);
@@ -61,11 +64,40 @@ describe('sprayBlocking (GS-spray-block, pure)', () => {
     }
   });
 
-  it('agrees with the sim: a shaded landing is one flightKnockdown would knock down, a clear one is not', () => {
+  it('blocks a slice to the cone FAR edge once interrupted — no floating clear pocket beyond (GS-spray-block-2)', () => {
+    // Fly-over is real: the longest landing in the window would individually clear the grove...
+    expect(
+      flightKnockdown(hole, [0, 0], [0, spread.carryHigh], spread.bearing, spread.carryHigh, spread.nominalCarry),
+    ).toBeNull();
+    // ...yet the blocked line still reads dead all the way out: every sample runs to carryHigh.
+    const regions = sprayBlocking(hole, spread);
+    for (const sm of regions[0]!.samples) expect(sm.r1).toBeCloseTo(spread.carryHigh, 6);
+    // And a mid-range grove starts its shade AT the tree (the interruption point), not at the near arc.
+    const midHole = holeWithTrees([blob(0, 180, 7)]);
+    const s2 = shotSpread(midHole, [0, 0], 'tee', [0, 400], driver, {});
+    const mid = sprayBlocking(midHole, s2)[0]!;
+    const centre = mid.samples[Math.floor(mid.samples.length / 2)]!;
+    expect(centre.r0).toBeGreaterThan(s2.carryLow + 20); // shade begins around the 180y grove
+    expect(centre.r0).toBeLessThan(190);
+    expect(centre.r1).toBeCloseTo(s2.carryHigh, 6);
+  });
+
+  it('an object the whole swing flies over does NOT shade at all (fly-over honesty)', () => {
+    // A low copse (canopy ≈ 11y): every landing in the driver window sails over it.
+    const low = holeWithTrees([blob(0, 100, 2)]);
+    const s = shotSpread(low, [0, 0], 'tee', [0, 400], driver, {});
+    expect(
+      flightKnockdown(low, [0, 0], [0, s.carryLow], s.bearing, s.carryLow, s.nominalCarry),
+    ).toBeNull();
+    expect(sprayBlocking(low, s)).toEqual([]);
+  });
+
+  it('agrees with the sim: a shaded slice starts at a landing flightKnockdown knocks down, a clear line flies clean', () => {
     const regions = sprayBlocking(hole, spread);
     const mid = regions[0]!.samples[Math.floor(regions[0]!.samples.length / 2)]!;
     const at = (a: number, r: number): Vec => [Math.sin(a) * r, Math.cos(a) * r];
-    const rIn = (mid.r0 + mid.r1) / 2;
+    // Just inside the shaded region's near edge: the sim knocks that landing down.
+    const rIn = Math.min(spread.carryHigh, Math.max(spread.carryLow, mid.r0 + 2));
     expect(
       flightKnockdown(hole, [0, 0], at(mid.a, rIn), spread.bearing, rIn, spread.nominalCarry),
     ).not.toBeNull();
@@ -99,6 +131,34 @@ describe('sprayBlocking (GS-spray-block, pure)', () => {
   });
 });
 
+describe('sprayBlocking over trade-camp tents (GS-tents × GS-spray-block-2)', () => {
+  // An approach whose carry window reaches the tents ringing the green.
+  const hole = holeWithTrees([]);
+  const tents = tradeTents(hole);
+  const from: Vec = [0, 250];
+  const spread = shotSpread(hole, from, 'fairway', [0, 400], seven, {});
+
+  it('tents shade the cone ONLY when passed (the trade-market effect gates them)', () => {
+    expect(sprayBlocking(hole, spread)).toEqual([]);
+    const regions = sprayBlocking(hole, spread, undefined, { tents });
+    expect(regions.length).toBeGreaterThan(0);
+    for (const r of regions) expect(r.src).toBe('tents');
+  });
+
+  it('agrees with the sim: a shaded tent slice starts at a landing tentFlightHit bounces', () => {
+    const regions = sprayBlocking(hole, spread, undefined, { tents });
+    const mid = regions[0]!.samples[Math.floor(regions[0]!.samples.length / 2)]!;
+    const at = (a: number, r: number): Vec => [
+      from[0] + Math.sin(a) * r,
+      from[1] + Math.cos(a) * r,
+    ];
+    const rIn = Math.min(spread.carryHigh, mid.r0 + 2);
+    expect(tentFlightHit(tents, from, at(mid.a, rIn), spread.bearing, rIn, spread.nominalCarry)).not.toBeNull();
+    // Straight at the pin the approach window is kept CLEAR of tents (fairness by placement):
+    expect(tentFlightHit(tents, from, at(0, rIn), spread.bearing, rIn, spread.nominalCarry)).toBeNull();
+  });
+});
+
 describe('blocked-zone render (SVG overlay)', () => {
   const hole = holeWithTrees([blob(0, 100, 12)]);
   const spread = shotSpread(hole, [0, 0], 'tee', [0, 400], driver, {});
@@ -108,6 +168,7 @@ describe('blocked-zone render (SVG overlay)', () => {
     const svg = renderHoleSVG(hole, { ...view, spray: spread });
     expect(svg).toContain('rgba(14,26,16,0.60)'); // the canopy shade
     expect(svg).toContain('rgba(95,212,90,0.30)'); // the green band still draws (the safe read)
+    expect(svg).toContain('🌲'); // marked as woods
   });
 
   it('draws no shade when the cone is clear of trees', () => {
@@ -115,5 +176,16 @@ describe('blocked-zone render (SVG overlay)', () => {
     const s = shotSpread(clear, [0, 0], 'tee', [0, 400], driver, {});
     const svg = renderHoleSVG(clear, { ...view, spray: s });
     expect(svg).not.toContain('rgba(14,26,16,0.60)');
+  });
+
+  it('shades tents (⛺) only on a trade-camp hole', () => {
+    const clear = holeWithTrees([]);
+    const from: Vec = [0, 250];
+    const s = shotSpread(clear, from, 'fairway', [0, 400], seven, {});
+    const tentView = { width: 360, height: 640, focus: from, viewRadius: s.carryHigh * 0.36 };
+    const withTents = renderHoleSVG(clear, { ...tentView, spray: s, tradeTents: true });
+    expect(withTents).toContain('rgba(14,26,16,0.60)');
+    const without = renderHoleSVG(clear, { ...tentView, spray: s });
+    expect(without).not.toContain('rgba(14,26,16,0.60)');
   });
 });
