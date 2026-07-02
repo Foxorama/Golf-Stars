@@ -122,6 +122,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   The per-world fairway MOWING PATTERN (`fairwayStripes`) differs by archetype (horizontal / vertical
   grain / faceted-diagonal / checker) so turf reads distinct beyond colour. Difficulty bars were
   deliberately relaxed (fun over the bar; tune per-hole later) — the strict blow-up guard stays.
+  **Void & Cetus deep par 4/5 are ISLAND-HOP chains (GS-cetus-5):** a lost-rough par 4/5 bends
+  (dogleg/cape/S) AND breaks into 2–4 clifftop/asteroid PADS split by VOID carries (the `if (lostRough
+  && par>=4)` gap block + shape fall-through). Structural validators are silent on a lost corridor's
+  shape (the void is the implicit `roughLie` lie, not a hazard poly), so this can't crash generation —
+  but it IS deliberately death-spiral-brutal: these two are in `BALANCE_EXEMPT_BIOMES` and skipped by
+  the death-spiral harnesses (human interest first; AI/scoring rebalance is GS-cetus-6). All new draws
+  gate on lost-rough so every other world + calm cetus/void stop is byte-identical.
 - **RPG meta-loop** (`docs/decisions/rpg-meta-loop.md`). The spine: `startRun → [playStop → buy* →
   travel]*` until a cut is missed; pure/deterministic. The **Voyage** is the headline winnable format
   (3 arcs, boss each, `endedReason 'won'`). **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
@@ -207,7 +214,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view. All
   scene randomness is mulberry32 seeded from `hashHole()` (NEVER `Math.random`) on documented streams
   (`rng`/`crng`/`hrng`/decor seeds) so the SVG is byte-stable — adding a draw must not perturb the
-  `rng` stream order. **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
+  `rng` stream order. SVG clip/gradient ids are per-hole (`holeIdPrefix` → `scenePrimsToSvg`): ids
+  are DOCUMENT-global, so co-mounted hole SVGs sharing a `gsc0…` counter cross-clip each other — it
+  masquerades as a flat-turf/palette bug (GS-cetus-4). The cetus star-river is ONE corridor crossing
+  (spring → fairway → plateau edge), spill FIXED in course space; its waterfall PAINTS only when the
+  drop lands off-land (rng still consumed) — never re-anchor it per-frame in screen space.
+  **The scene is also CAMERA-PROOF** (the follow-cam rebuilds it per frame):
   rng draw counts never read the projection (place in course space, consume unconditionally, cull
   at paint — never retry on `inView` or size a count off projected px) and `posHash` keys are
   course-space, never screen px — `tests/camera-stability.test.ts` guards both. **Rough is ROUGH;
@@ -216,7 +228,10 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `rough.base` must sit ≥30/255 brightness above its `ARCHETYPE_SPACE.base` — machine-checked); an
   ARMED lost-rough hole (`roughLie` biomeMod, void/cetus deep stops) instead floats a platform per
   play feature in the open deep (the void's deep = negative-energy rifts) — the render mirrors the
-  sim's lost-ball gate. The ANIMATED weather layer honours the same land: its pinned twinkle
+  sim's lost-ball gate. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /
+  void violet asteroid, `CliffLook` palette); a CALM cetus/void stop (playable rough everywhere, can't
+  be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
+  fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only). The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
   meteors/ambient air — stays unmasked). Guards: `tests/biome-identity.test.ts` +
   `tests/weather-mask.test.ts`. The decision map's

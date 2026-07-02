@@ -19,7 +19,7 @@ import { playBoundsCorners } from '../sim/round';
 import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
 import { flightControl } from '../sim/flight';
 import { holeProjector } from './project';
-import { buildScene, scenePrimsToSvg, type ArtFeel } from './style';
+import { buildScene, holeIdPrefix, scenePrimsToSvg, type ArtFeel } from './style';
 
 /** Spray-cone display geometry (GS-dispersion-2). The cone is drawn straight from the shot's
  *  asymmetric `SprayShape`: a fixed-width GREEN centre wedge (±`greenZ·σ0`) and per-side ORANGE/RED
@@ -192,7 +192,10 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // scene builder (so the SVG map and the Canvas play view look identical) and serialised.
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
-    scenePrimsToSvg(buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch })),
+    scenePrimsToSvg(
+      buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch }),
+      holeIdPrefix(hole), // ids are document-global — a per-hole prefix keeps co-mounted hole SVGs from cross-clipping
+    ),
   ];
 
   // Aiming spray cone (GS-dispersion-2): the shot's asymmetric SprayShape, drawn as true arc

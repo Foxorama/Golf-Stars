@@ -171,9 +171,11 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#5e6b2e',
     rough: { light: '#66392a', base: '#532c20', dark: '#3d1e14', ink: '#200e08' },
   },
-  // Void — cosmic indigo "astroturf" islands, luminous violet-blue greens.
+  // Void — cosmic indigo "astroturf" islands, luminous violet-blue greens. The fairway stripes carry
+  // a wider light↔dark spread than other worlds: indigo turf sits so close in value to the indigo
+  // platform/rough that the mowing bands vanished on long par-4/5 corridors (GS-cetus-void-45).
   void: {
-    fairway: { light: '#4f4691', base: '#3a3270', dark: '#2a2452', ink: '#15102e' },
+    fairway: { light: '#6a60ba', base: '#443a80', dark: '#241e4a', ink: '#15102e' },
     green: { light: '#909aec', base: '#6f7ad6', dark: '#5460b4', ink: '#23284f' },
     tee: { light: '#473f88', base: '#34306a', dark: '#28244e', ink: '#14102b' },
     collar: '#5a64c0',

@@ -424,6 +424,85 @@
       the whole-hole map is the cramped worst case; the zoomed decision/follow-cam view shows the cliff
       dropping behind the ball with the fairway readable ahead. NO new `_gs*`/URL hook, so the test-hub
       guard needs nothing.
+    - **GS-cetus-4 tamed the river on par 4/5 (+ fixed the side-chip "bonus waterfall").** Player
+      feedback: par 3s read great, but on par 4/5 the full-length meander + its 3.4×-width bank glow
+      buried most of the mown fairway, the waterfall poured from mid-turf at the TEE straight down over
+      the ground (worst on calm stops, where there's no abyss below it), and chipping onto the green
+      from the side conjured a second waterfall over the green. Three coupled fixes:
+      (1) **The river is ONE diagonal crossing now** (`cetusRiverPath` rewritten): a spring in the rough
+      near the corridor, a single meandering pass over the fairway at `uc ∈ [0.38, 0.6]` of the hole,
+      then out through the rough along a tee-ward-leaning axis (tangent rotated 102–124°) to the land
+      platform's edge — found by marching the analytic meander against `landPolysCourseFor(hole)` with
+      fixed step counts + a bisection refine, ALL rng drawn up front, so the path is byte-stable and
+      camera-proof. Narrower (`rw ≤ 8`yd), gentler swing (`amp ≤ 9`yd), tapered at the spring. Most of
+      the corridor is clean turf again; the crossing reads like a creek, not a canal.
+      (2) **The spill end is FIXED in course space** — the polyline is ordered SOURCE → SPILL. The old
+      code picked "whichever river mouth sits lowest on screen" per frame; under the follow-cam's
+      `up: ball→pin` rotation a side chip flipped the spill to the green-side mouth and painted the fall
+      there. The fall itself (still screen-down, the cliff extrusion's convention) is PAINT-GATED: it
+      draws only when `spillAtEdge` (the river actually reached the platform edge, course space) AND two
+      probe points below the lip `unproject` to open deep, never turf — rng for the streaks is consumed
+      UNCONDITIONALLY so the camera can only choose what's pushed, never what's drawn. Restyled: a
+      tapered veil fading in stacked bands, staggered dimming streaks, mist + ripple rings at the foot.
+      (3) **River star sizes clamp to the projected channel width** (paint-size only, never the count):
+      at whole-map zoom the narrow creek is a few px wide and full-size stars + halos read as a solid
+      white chalk squiggle. `tests/cetus` still asserts the `rgba(70,180,225,0.85)` surface stroke.
+      Same pass, the **void par-4/5 slab** got its identity back (GS-cetus-void-45): `glowRings` now
+      uses uniform `offsetPoly` outsets (a centroid scale ballooned a long corridor's halo lengthwise
+      past the tee/green — the "sausage blob"), fairways get a luminous rim stroke on the void only
+      (the par-3 islands' lit-platform read), and the void fairway palette's stripe light↔dark spread
+      widened (`#6a60ba`/`#241e4a`) so mowing bands survive the indigo-on-indigo value crush.
+      And a latent serializer bug found via the gallery: `scenePrimsToSvg` ids (`gsc0`/`gsg0`…) were
+      counter-per-render, but SVG ids are DOCUMENT-global — two hole SVGs in one document (gallery,
+      test hub) made `url(#gsc0)` resolve to the FIRST panel's clip/gradient, silently clipping the
+      second panel's stripes away and bleeding its glow colours. `scenePrimsToSvg(prims, idPrefix)` +
+      `holeIdPrefix(hole)` (a hole-hash prefix) keeps renders byte-stable per hole while co-mounted
+      holes get disjoint ids. If you ever eyeball a multi-hole sheet and the turf looks flat, check the
+      ids FIRST — this one masqueraded as a palette problem.
+    - **GS-cetus-5 turned Void & Cetus into ISLAND-HOP clifftop worlds — human interest first, balance
+      later.** The deep (lost-rough) par 4/5 were the only dull holes left: forced dead-STRAIGHT (the old
+      rule kept a lost corridor straight so the auto-AI's straight aim couldn't wander off the island into
+      the void). Player call: for these two biomes, **ignore the death-spiral balance for now** and make
+      them the most visually interesting worlds; rebalance the AI afterward. So a lost-rough par 4/5 is now
+      a bending CHAIN of clifftop/asteroid PADS separated by VOID carries:
+      (1) `chooseTemplate` lets a lost par 4/5 fall through to the full shape grammar (dogleg/cape/S/
+      hairpin); only the par-3 island stays a straight single-target carry. `buildCentreline` honours the
+      shape for lost par 4/5 and bends them 1.4× HARDER (`island` multiplier) — still capped at 0.44·len so
+      no self-cross. (2) The corridor is BROKEN into pads: an `if (lostRough && par>=4)` block appends
+      island-hop gap bands (par-4: 2–3 pads, par-5: 3–4), evenly spread with jitter, a touch wider than a
+      fair-rough break — genuine void carries. Reuses `brokenCorridor` (already multi-segment) → each pad
+      becomes its own fairway feature → `lostPlatformsCourse` already maps each to a platform → the render
+      extrudes each into a 3D block, so the par 4/5 finally gets the par-3's side-on diorama for FREE.
+      All new draws are gated to lost-rough, so every other world (and calm cetus/void stops) is
+      byte-identical; `GENERATOR_VERSION` bumped 10→11. **Why the structural validators stay green:** on a
+      lost hole the void off the fairway is the implicit `roughLie` LIE, not a hazard polygon — so
+      `validateFairness` (hazard polys only) and `validateCrossings` (lava/creek/etc. only) impose ZERO
+      constraint on a lost corridor's shape. Bending + breaking it can't crash generation. **The waived
+      part is balance:** the void gaps DO cross the centreline, so the carry-aware AI treats them as forced
+      carries (it lays up / carries), which is why `tests/biomes` death-spiral still passes even at
+      wildness 1 — but a low-skill golfer tips over the relaxed bar. So `BALANCE_EXEMPT_BIOMES`
+      (`biomes.ts` = {void-garden, cetus-deep}) skips these two in the death-spiral harnesses
+      (`tests/characters`, `tests/biomes`, `tests/scorch`) and `tests/zones` drops the void toPar bar
+      (keeping "the void genuinely bites" + "every hole terminates"). Structural fairness is NOT relaxed.
+      TODO(GS-cetus-6): teach the AI to hop the chain (aim pad-to-pad, not straight at the pin), then
+      restore the bars + remove the exemption. RENDER: `platformCliffs` (renamed from `cetusCliffs`) takes
+      a `CliffLook` palette — cetus = blue clifftop (`CETUS_CLIFF`), void = violet ASTEROID underside
+      (`VOID_CLIFF`, applied to void's lost pads only, gated so a calm void rectangle isn't given an odd
+      underside). Fairway mowing stripes were softened (`mowTones` blends the light/dark bands halfway to
+      the base — the "Beetlejuice snake" fix; indigo worlds keep a touch more via `MOW_BLEND`). Re-shoot
+      the gallery after any `platformCliffs`/`mowTones`/island-hop change.
+    - **GS-cetus-6 gave the CALM cetus/void stops a two-tier raised fairway SHELF.** A calm stop's whole
+      play-bounds is playable ROUGH (it can't be islands), so its corridor read flat. The projection is
+      top-down (shot-readability sacred → no camera pitch), where only DOWN-facing surfaces are visible —
+      so a long near-vertical corridor can't show a cliff along its sides (a pure downward drop is
+      invisible in the zoomed play view). `raisedShelf` (render-only, no rng, gated to calm cetus/void via
+      `calmShelf`) implies the lift the top-down way: an OUTSET rock PEDESTAL (`offsetPoly` grow) shifted
+      DOWN by a scaled lift, drawn UNDER the fairway/green fill, so a band of rock rings the surface —
+      present on the near-vertical EDGES (what makes it read at follow-cam zoom) and thicker/darker along
+      the down-screen edge — plus a soft cast shadow on the rough and a lit rim (cyan cetus / violet void)
+      on top. Reads as a raised causeway/mesa at both the whole-hole map and the zoom, using the pads'
+      `CliffLook` palette. Deep stops already sit on real extruded platforms, so the shelf is
+      `!lostHole`-gated.
 - **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
