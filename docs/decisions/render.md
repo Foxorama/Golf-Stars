@@ -24,7 +24,16 @@
   horizontal bands — perpendicular-to-play after the projector rotates tee→green up) on fairway/green.
   Fairway-stripe tones are SOFTENED toward the base (`mowTones`, GS-cetus-5) — the full light/dark shades
   read as a harsh striped snake on a thin wiggly corridor; `MOW_BLEND` keeps the value-crushed indigo
-  worlds (void/cetus) a touch stronger so their mow doesn't vanish.
+  worlds (void/cetus) a touch stronger so their mow doesn't vanish. GS-mow-blend went further on both
+  counts: every band boundary in the four stripe builders (`stripesAt`/`stripesAtV`/`slantStripes`/
+  `checkerStripes`) is FEATHERED — a short 2-step ramp of 35%/65% intermediate tones (single 50% mid
+  strip along the checker's grid lines) laid over the hard edge, width `FEATHER_FRAC` of the band; and
+  the DARK tone is muted asymmetrically (`mowTones` eases `lo` a further ×0.72 toward the base, ×0.85
+  on void/cetus) because the eye reads the dark cut as a shadow line — it was the austere half. The
+  green's stripes, which had kept FULL light/dark contrast, now blend toward its base too (0.7 light /
+  0.5 dark — a touch stronger than the fairway since the green is the small showpiece surface). All
+  pure geometry, zero rng — band grids, phases and counts are untouched, so continuity across
+  apron/segments and the byte-stable SVG both hold.
   Side-on plateau extrusion is `platformCliffs` (renamed from `cetusCliffs`, GS-cetus-5) taking a
   `CliffLook` palette: cetus = blue CLIFFTOP into the star-ocean, void = violet ASTEROID underside for
   its lost island-hop pads (gated to the armed hole so a calm void rectangle isn't given an odd

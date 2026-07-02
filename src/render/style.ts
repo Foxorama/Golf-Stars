@@ -414,25 +414,41 @@ function n1(x: number): number {
 
 /** Horizontal mowing bands clipped to a (screen-space) polygon. After the projector rotates
  *  tee→green up-screen, horizontal bands run perpendicular to play — i.e. real mowing stripes. */
+/** Soft band-edge feather (GS-mow-blend). The mowing bands used to butt at a hard line — the tone
+ *  jump read as ruled tape, not a mown transition. Each interior boundary gets a short 2-step ramp
+ *  of intermediate tones (35%/65% mixes, width a fraction of the band) laid OVER the bands, so one
+ *  stripe eases into the next. Pure geometry, zero rng — the SVG stays byte-stable. */
+const FEATHER_FRAC = 0.16;
 /** Mowing bands on an EXPLICIT grid (phase origin + band height). Sharing one grid across several
  *  polygons keeps their stripes continuous — what lets the green apron line up with the corridor. */
 function stripesAt(poly: Vec[], colA: string, colB: string, phaseY: number, bandH: number): Prim {
   const b = bboxOf(poly);
   const children: Prim[] = [];
+  const hBand = (y0: number, y1: number, fill: string): Prim => ({
+    t: 'poly',
+    pts: [
+      [b.minX, y0],
+      [b.maxX, y0],
+      [b.maxX, y1],
+      [b.minX, y1],
+    ],
+    fill,
+  });
   const i0 = Math.floor((b.minY - phaseY) / bandH);
   for (let i = i0; phaseY + i * bandH < b.maxY; i++) {
     const y0 = phaseY + i * bandH;
-    const y1 = y0 + bandH + 0.5; // overlap a hair so no seam shows
-    children.push({
-      t: 'poly',
-      pts: [
-        [b.minX, y0],
-        [b.maxX, y0],
-        [b.maxX, y1],
-        [b.minX, y1],
-      ],
-      fill: ((i % 2) + 2) % 2 === 0 ? colA : colB,
-    });
+    // overlap a hair so no seam shows
+    children.push(hBand(y0, y0 + bandH + 0.5, ((i % 2) + 2) % 2 === 0 ? colA : colB));
+  }
+  // Feather every boundary (GS-mow-blend): ease out of the band above, into the band below.
+  const f = bandH * FEATHER_FRAC;
+  const m35 = mixHex(colA, colB, 0.35);
+  const m65 = mixHex(colA, colB, 0.65);
+  for (let i = i0 + 1; phaseY + i * bandH < b.maxY; i++) {
+    const y = phaseY + i * bandH;
+    const belowIsA = ((i % 2) + 2) % 2 === 0; // colour of the band BELOW this boundary
+    children.push(hBand(y - f, y, belowIsA ? m65 : m35));
+    children.push(hBand(y, y + f, belowIsA ? m35 : m65));
   }
   return { t: 'clip', clip: poly, children };
 }
@@ -447,20 +463,30 @@ function stripes(poly: Vec[], colA: string, colB: string, bands: number): Prim {
 function stripesAtV(poly: Vec[], colA: string, colB: string, phaseX: number, bandW: number): Prim {
   const b = bboxOf(poly);
   const children: Prim[] = [];
+  const vBand = (x0: number, x1: number, fill: string): Prim => ({
+    t: 'poly',
+    pts: [
+      [x0, b.minY],
+      [x1, b.minY],
+      [x1, b.maxY],
+      [x0, b.maxY],
+    ],
+    fill,
+  });
   const i0 = Math.floor((b.minX - phaseX) / bandW);
   for (let i = i0; phaseX + i * bandW < b.maxX; i++) {
     const x0 = phaseX + i * bandW;
-    const x1 = x0 + bandW + 0.5;
-    children.push({
-      t: 'poly',
-      pts: [
-        [x0, b.minY],
-        [x1, b.minY],
-        [x1, b.maxY],
-        [x0, b.maxY],
-      ],
-      fill: ((i % 2) + 2) % 2 === 0 ? colA : colB,
-    });
+    children.push(vBand(x0, x0 + bandW + 0.5, ((i % 2) + 2) % 2 === 0 ? colA : colB));
+  }
+  // Feather every boundary (GS-mow-blend), same 2-step ramp as the horizontal bands.
+  const f = bandW * FEATHER_FRAC;
+  const m35 = mixHex(colA, colB, 0.35);
+  const m65 = mixHex(colA, colB, 0.65);
+  for (let i = i0 + 1; phaseX + i * bandW < b.maxX; i++) {
+    const x = phaseX + i * bandW;
+    const rightIsA = ((i % 2) + 2) % 2 === 0;
+    children.push(vBand(x - f, x, rightIsA ? m65 : m35));
+    children.push(vBand(x, x + f, rightIsA ? m35 : m65));
   }
   return { t: 'clip', clip: poly, children };
 }
@@ -474,19 +500,29 @@ function slantStripes(poly: Vec[], colA: string, colB: string, bandH: number, sl
   const uMin = Math.min(...us);
   const uMax = Math.max(...us);
   const children: Prim[] = [];
+  const uBand = (a0: number, a1: number, fill: string): Prim => ({
+    t: 'poly',
+    pts: [
+      [b.minX, a0 + slope * b.minX],
+      [b.maxX, a0 + slope * b.maxX],
+      [b.maxX, a1 + slope * b.maxX],
+      [b.minX, a1 + slope * b.minX],
+    ],
+    fill,
+  });
   for (let i = 0; uMin + i * bandH < uMax; i++) {
     const a0 = uMin + i * bandH;
-    const a1 = a0 + bandH + 0.5;
-    children.push({
-      t: 'poly',
-      pts: [
-        [b.minX, a0 + slope * b.minX],
-        [b.maxX, a0 + slope * b.maxX],
-        [b.maxX, a1 + slope * b.maxX],
-        [b.minX, a1 + slope * b.minX],
-      ],
-      fill: ((i % 2) + 2) % 2 === 0 ? colA : colB,
-    });
+    children.push(uBand(a0, a0 + bandH + 0.5, ((i % 2) + 2) % 2 === 0 ? colA : colB));
+  }
+  // Feather every boundary (GS-mow-blend), the same 2-step ramp run along the slanted grid.
+  const f = bandH * FEATHER_FRAC;
+  const m35 = mixHex(colA, colB, 0.35);
+  const m65 = mixHex(colA, colB, 0.65);
+  for (let i = 1; uMin + i * bandH < uMax; i++) {
+    const u = uMin + i * bandH;
+    const nextIsA = ((i % 2) + 2) % 2 === 0;
+    children.push(uBand(u - f, u, nextIsA ? m65 : m35));
+    children.push(uBand(u, u + f, nextIsA ? m35 : m65));
   }
   return { t: 'clip', clip: poly, children };
 }
@@ -511,6 +547,34 @@ function checkerStripes(poly: Vec[], colA: string, colB: string, cell: number): 
       });
     }
   }
+  // Feather (GS-mow-blend): in a checker EVERY neighbour flips tone, so one mid-tone strip along
+  // each interior grid line (both directions) softens every edge at once.
+  const f = cell * FEATHER_FRAC * 0.75; // slightly narrower — checker boundaries are denser
+  const mid = mixHex(colA, colB, 0.5);
+  for (let y = b.minY + cell; y < b.maxY; y += cell) {
+    children.push({
+      t: 'poly',
+      pts: [
+        [b.minX, y - f],
+        [b.maxX, y - f],
+        [b.maxX, y + f],
+        [b.minX, y + f],
+      ],
+      fill: mid,
+    });
+  }
+  for (let x = b.minX + cell; x < b.maxX; x += cell) {
+    children.push({
+      t: 'poly',
+      pts: [
+        [x - f, b.minY],
+        [x + f, b.minY],
+        [x + f, b.maxY],
+        [x - f, b.maxY],
+      ],
+      fill: mid,
+    });
+  }
   return { t: 'clip', clip: poly, children };
 }
 
@@ -518,11 +582,15 @@ function checkerStripes(poly: Vec[], colA: string, colB: string, cell: number): 
  *  turf shades — maximum contrast, which on a thin wiggly corridor reads as a harsh striped snake
  *  ("Beetlejuice snakes"), not groomed grass. Blend each tone halfway back to the base so the stripes
  *  whisper the mow instead of shouting it. The value-crushed indigo worlds (void/cetus) keep a touch
- *  more contrast (they'd otherwise vanish into the base), tuned by `MOW_BLEND`. */
+ *  more contrast (they'd otherwise vanish into the base), tuned by `MOW_BLEND`. The DARK tone eases
+ *  further back than the light one (GS-mow-blend) — the eye reads a dark cut as a shadow/edge, so it
+ *  was the austere half of the stripe; muting it asymmetrically keeps the mow while losing the harsh
+ *  line (void/cetus mute less, again for the crushed-value reason). */
 const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.66, cetus: 0.62 };
 function mowTones(s: Shade, arch: BiomeArchetype): { hi: string; lo: string } {
   const k = MOW_BLEND[arch] ?? 0.5; // fraction of the way from base toward light/dark (1 = full old contrast)
-  return { hi: mixHex(s.base, s.light, k), lo: mixHex(s.base, s.dark, k) };
+  const kLo = k * (MOW_BLEND[arch] !== undefined ? 0.85 : 0.72);
+  return { hi: mixHex(s.base, s.light, k), lo: mixHex(s.base, s.dark, kLo) };
 }
 
 /** The per-world fairway mowing PATTERN (GS-variety-2): each archetype grooms its turf differently so
@@ -591,7 +659,10 @@ function styleGreen(
     { t: 'poly', pts: offsetPoly(poly, -3.4), fill: collar },
     { t: 'poly', pts: poly, fill: s.base },
   ];
-  if (art.stripes) out.push(stripes(poly, s.light, s.dark, 6));
+  // Softened like the fairway's mowTones (GS-mow-blend) — the green used to stripe at FULL
+  // light/dark contrast, the harshest cut on the map. A touch stronger than the fairway's 0.5
+  // blend (the green is the small showpiece surface), dark muted below light.
+  if (art.stripes) out.push(stripes(poly, mixHex(s.base, s.light, 0.7), mixHex(s.base, s.dark, 0.5), 6));
   const gb = bboxOf(poly);
   // Green SLOPE (GS-greens-3): shade the LOW side darker + the HIGH side lighter and lay fall-line
   // arrows pointing downhill, so the tilt reads at a glance (the graphic IS the slope the sim rolls
