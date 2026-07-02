@@ -503,6 +503,37 @@
       on top. Reads as a raised causeway/mesa at both the whole-hole map and the zoom, using the pads'
       `CliffLook` palette. Deep stops already sit on real extruded platforms, so the shelf is
       `!lostHole`-gated.
+    - **GS-cetus-gaps made the island-hop chains COMPLETABLE BY CONSTRUCTION.** Field report (low-
+      difficulty Voyage): deep Cetus (and Void) par 4/5 sometimes generated holes that could NOT be
+      finished — the void gap between pads was beyond any carry, and the lost-ball penalty is a
+      drop-back, so the hole looped forever. Measurement (40 seeds × 6 holes, both biomes): **11–13%
+      of armed par-4/5s had an effective void carry over 175 relative yards, worst 782** (vs a 250-yd
+      common driver) — at EVERY wildness, so it was never actually "fine at A4+"; higher-Ascension
+      players just had the rare bag (+8 carry) and luck on the marginal holes (Ascension only tightens
+      cuts/credits, the generator never sees it). TWO compounding root causes, both in the
+      `if (lostRough && par>=4)` gap block: (1) the raw gap draws (centres 0.18 apart in u, half-widths
+      up to 0.08) could OVERLAP or leave a sliver pad between them; (2) worse, `brokenCorridor` drops
+      any pad run with <3 dense points, and at 19 corridor samples (u-step ≈0.056) the sliver pad
+      routinely had <3 — so it VANISHED, silently fusing two drawn gaps into one 200–330 yd mega-void.
+      Fix, all inside the lost-rough gate (every other world byte-identical; `GENERATOR_VERSION` 11→12):
+      `separateIslandGaps` (pure, ZERO extra rng — the draws are unchanged, only the derived band edges
+      move) clamps every gap to a wildness-ramped ceiling in carry-relative yards (`ISLAND_GAP_MAX_YD`
+      100 at the 0.55 arming threshold → 150 at wildness 1, ~60% of a nominal driver — shot carry and
+      hole length both scale with the biome's `carryMult`, so the budget holds on any world; computed
+      against the ACTUAL centreline arc since island chains bend 1.4× harder) and separates gaps with
+      guaranteed landable pads (`ISLAND_PAD_MIN_U`/`_YD`); lost-rough corridors sample DENSER
+      (`ISLAND_SEGS` 37 vs 19) so a legal min pad always keeps ≥3 points and can never be dropped.
+      `validateIslandHops` (wired into `generateCourse`'s throw, like the other fairness proofs) proves
+      it per hole: every penalty-lie run along the centreline — merged across non-penalty slivers too
+      short to land on (a ribbon NOSE can clip a bent centreline mid-gap for a few yards; that's no
+      relief) — must stay under 175 relative yd (150 cap + the void's ±10% `carryJitter` headroom).
+      Post-fix worst carries: 63–96 relative yd at wildness 0.55 (a mid-iron), 135–148 at wildness 1
+      (a genuine heroic driver carry) — the low end is now fair with the common starter bag while the
+      A4+ brutality the biomes are meant for is preserved. Guarded by `tests/island-gaps.test.ts`
+      (sweeps both biomes across the armed wildness band incl. the 0.55 threshold, asserts every
+      armed par-4/5 keeps ≥2 surviving pads, and that multi-gap chains still spawn). The death-spiral
+      exemption (`BALANCE_EXEMPT_BIOMES`) and the GS-cetus-6 AI-hop TODO are unchanged — this fixes
+      COMPLETABILITY, not scoring balance.
 - **Carry-aware AI (GS-19, `safeTarget`/`layupTarget`).** A forced carry needs an AI that flies it.
   When the line is blocked, `safeTarget` now distinguishes a CENTRELINE-crossing penalty (a lava
   river) from a side hazard: it CARRIES the river (aims at the furthest penalty-free point past the
