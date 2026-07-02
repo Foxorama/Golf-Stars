@@ -5,7 +5,7 @@ import { ARCHETYPE_TURF, ARCHETYPE_SPACE, OB_LOOK, LAND_SPACE_BLEND, landFillFor
 import { WIND_RGBA, AMBIENT } from '../src/render/weather';
 import { BIOMES } from '../src/sim/course/biomes';
 import type { BiomeArchetype } from '../src/sim/course/themes';
-import { buildScene, landPolysCourseFor, type Prim } from '../src/render/style';
+import { buildScene, landPolysCourseFor, GROUND_COVER, type Prim } from '../src/render/style';
 import { holeProjector } from '../src/render/project';
 import { playBoundsCorners } from '../src/sim/round';
 import type { Hole, Vec } from '../src/sim/course/contract';
@@ -52,6 +52,28 @@ describe('biome identity (GS-biome-feel)', () => {
       expect(OB_LOOK[a], `OB look for ${a}`).toBeDefined();
       expect(ARCHETYPE_SPACE[a], `space look for ${a}`).toBeDefined();
     }
+  });
+});
+
+// --- GS-ground-cover: the rough wears the biome's actual ground covering -----------------------
+
+describe('ground covering (GS-ground-cover)', () => {
+  it('every archetype has a GROUND_COVER row EXCEPT void/cetus (bespoke ground rules)', () => {
+    for (const a of ARCHES) {
+      if (a === 'void' || a === 'cetus') expect(GROUND_COVER[a], `${a} keeps its own ground rules`).toBeUndefined();
+      else expect(GROUND_COVER[a], `ground cover for ${a}`).toBeDefined();
+    }
+  });
+
+  it('the covering paints on the land: frost renders snow mottle, ocean beach-sand grain', () => {
+    const frost = renderHoleSVG(wooded, { biome: 'ice-ring' });
+    expect(frost).toContain(GROUND_COVER.frost!.mottleLight);
+    expect(frost).toContain(GROUND_COVER.frost!.sparkle!);
+    const ocean = renderHoleSVG(wooded, { biome: 'tidal-archipelago' });
+    expect(ocean).toContain(GROUND_COVER.ocean!.grain[0]!);
+    expect(ocean).toContain(GROUND_COVER.ocean!.ridge!);
+    // Deterministic: same hole + biome → byte-identical (the covering is seeded, never Math.random).
+    expect(renderHoleSVG(wooded, { biome: 'ice-ring' })).toBe(frost);
   });
 });
 

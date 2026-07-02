@@ -506,3 +506,34 @@
   machine-checked in `tests/biome-identity.test.ts`: every archetype's `rough.base` must sit ≥30/255
   mean-channel brightness above its `ARCHETYPE_SPACE.base`. Gallery re-shot; `sw.js` VERSION bumped
   (gs-pwa-4).
+- **GS-ground-cover: the rough wears the biome's actual ground COVERING (2026-07-02).** Player
+  re-test after the second GS-rough-frame pass: "the rough still doesn't look like ground and it's
+  really weird with hazards like lakes just in the middle of nowhere… it needs to look like proper
+  ground covering matching that biome — snowy/frosty for frost, sandy all-bunker rough for
+  beach/ocean, mossy/fungus coverings for fungus… except Cetus and Void." Diagnosis: the ≥30/255
+  brightness rule made the land *brighter* than space but several ramps were still night-tinted
+  slabs (frost slate-blue #485a68, ocean deep-teal #1d5668, fungal dark-purple #2c1f50), and a flat
+  slab with a handful of decor pieces has no surface TEXTURE — so it still read as sky, and a lake
+  drawn on it read as floating in nothing. Two-part fix, both render-only:
+  (1) **Rough ramps become the covering's colour** (`ARCHETYPE_TURF.rough` + `BIOME_ROUGH` re-sync):
+  frost → bright SNOWFIELD #dce9f2 (the frosted-teal corridor is mown *through* snow — the one ramp
+  now deliberately LIGHTER than its fairway), ocean → open BEACH SAND #cfba85 (the island off the
+  turf is one big strand; distinct from bunker #e9d8a6 so the excavated family drawer still reads),
+  fungal → MOSS carpet #3a6446, inferno → ASH & CINDER #594238, desert → dune sand #85683a,
+  crystal → shard-gravel scree #5a6680, tempest → rain-soaked moor #4d5945. Verdant byte-identical;
+  void/cetus untouched (their own rules).
+  (2) **A dense ground-covering texture pass** (`style.ts GROUND_COVER` table + `groundCover()`,
+  buildScene section 4b): per-archetype tonal mottle patches (soft 7-gon blobs, posHash-wobbled,
+  sized in YARDS via `proj.scale`), fine grain flecks (snow crumbs / shells / lichen / cinders /
+  gravel), optional COHERENT combing ridges (one per-hole grain angle: snow drifts, dune ripples,
+  tide-rake, rain-flattened grass) and rare sparkle glints (ice / ember / prism) — scattered over
+  the LAND-HULL bbox (playBounds+apron, wider than the features bbox so the covering reaches the
+  OB corners), rejected off the cut grass with bounded course-space attempts, clipped to the land,
+  culled at paint. All on a NEW dedicated stream (`hashHole ^ 0x006c0de5`) so every existing stream
+  (`rng`/`crng`/cetus/decor) is byte-for-byte untouched; gated `!rainbow && !lostHole` and by row
+  presence (void/cetus have NO row by design — machine-checked). Counts key off the course-space
+  land span only (camera-proof; `tests/camera-stability.test.ts` stays green). Guards added to
+  `tests/biome-identity.test.ts`: full row coverage except void/cetus, frost mottle+sparkle and
+  ocean grain+ridge colours present in the SVG, byte-determinism. This also resolves the
+  "lakes in the middle of nowhere" read: the hazards were always ON land — the land just didn't
+  look like land. Gallery re-shot.

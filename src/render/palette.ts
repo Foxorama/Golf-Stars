@@ -28,17 +28,18 @@ export const FILL: Record<string, string> = {
 };
 
 /** Per-biome rough/background tint, keyed by biome id (sell the world). Kept in sync with the
- *  `ARCHETYPE_TURF` rough bases (GS-rough-frame: ground must read as ground on every world). */
+ *  `ARCHETYPE_TURF` rough bases (GS-rough-frame: ground must read as ground on every world;
+ *  GS-ground-cover: and the ground is the biome's COVERING — snow, beach sand, moss, ash…). */
 export const BIOME_ROUGH: Record<string, string> = {
   'verdant-station': '#274d27',
-  'dust-belt': '#6b5230',
-  'ice-ring': '#485a68',
-  'ember-world': '#532c20',
+  'dust-belt': '#85683a',
+  'ice-ring': '#dce9f2',
+  'ember-world': '#594238',
   'void-garden': '#241847',
-  'crystal-spires': '#41506e',
-  'tempest-reach': '#424854',
-  'spore-jungle': '#2c1f50',
-  'tidal-archipelago': '#1d5668',
+  'crystal-spires': '#5a6680',
+  'tempest-reach': '#4d5945',
+  'spore-jungle': '#3a6446',
+  'tidal-archipelago': '#cfba85',
   'cetus-deep': '#1a3a50',
 };
 
@@ -142,15 +143,20 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#3c9a3a',
     rough: { light: '#315c31', base: '#274d27', dark: '#1b3a1b', ink: '#0f240f' },
   },
-  // Desert — firm, dry Bermuda tan with an oasis-green putting surface.
+  // Desert — firm, dry Bermuda tan with an oasis-green putting surface. The rough is open DUNE
+  // SAND (GS-ground-cover) — lighter than the old scrub-dirt so off the fairway reads as the
+  // rolling sand sea the world is, not dark wasteland.
   desert: {
     fairway: { light: '#ccae64', base: '#b89a52', dark: '#9a7f3e', ink: '#5e4a22' },
     green: { light: '#b6d676', base: '#9bbf5a', dark: '#7e9e44', ink: '#46591f' },
     tee: { light: '#c0a563', base: '#a98f4e', dark: '#8c7338', ink: '#4e3f1d' },
     collar: '#86a046',
-    rough: { light: '#7d6034', base: '#6b5230', dark: '#523f24', ink: '#2e2413' },
+    rough: { light: '#98793f', base: '#85683a', dark: '#68512c', ink: '#392c16' },
   },
-  // Frost — snow-dusted, frosted teal-green turf and pale mint ice-greens.
+  // Frost — snow-dusted, frosted teal-green turf and pale mint ice-greens. The rough is a bright
+  // SNOWFIELD (GS-ground-cover): the frosted turf corridor is mown THROUGH deep snow cover, so the
+  // off-fairway ground reads white — the old slate-blue slab read as more night sky ("the rough
+  // still doesn't look like ground").
   // NB (GS-rough-frame follow-up): every world's rough ramp below is kept CLEARLY lighter than its
   // `ARCHETYPE_SPACE` base — the rough slab only ever renders where it's PLAYABLE ground now, so a
   // near-sky-dark rough just reads as more starless space. Ground must look like ground on all ten.
@@ -159,17 +165,17 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     green: { light: '#dcf3ec', base: '#c2e6dd', dark: '#9fcabf', ink: '#4d716b' },
     tee: { light: '#abccc7', base: '#8fb0ac', dark: '#728e8a', ink: '#3a504e' },
     collar: '#7fb0a6',
-    rough: { light: '#5a7080', base: '#485a68', dark: '#364652', ink: '#202c34' },
+    rough: { light: '#eef6fb', base: '#dce9f2', dark: '#c0d3e0', ink: '#6d8494' },
   },
-  // Inferno — scorched ash-earth fairways, heat-stressed olive greens. The rough is CINDER EARTH,
-  // not near-black: a rough base that dark read as deep space with embers, i.e. as OB (the
-  // "lava biome is still a starfield" report, GS-rough-frame follow-up) — ground must look like ground.
+  // Inferno — scorched ash-earth fairways, heat-stressed olive greens. The rough is an ASH & CINDER
+  // field (GS-ground-cover): grey-brown volcanic ash rather than dark red-brown earth, so the ember
+  // decor (fissures, cinder flecks) sits on visible ground instead of near-darkness.
   inferno: {
     fairway: { light: '#8a6a4e', base: '#6e5340', dark: '#523c2c', ink: '#2a1c12' },
     green: { light: '#97a653', base: '#7c8a3e', dark: '#62702f', ink: '#333a16' },
     tee: { light: '#82643f', base: '#6a5036', dark: '#523c28', ink: '#291c10' },
     collar: '#5e6b2e',
-    rough: { light: '#66392a', base: '#532c20', dark: '#3d1e14', ink: '#200e08' },
+    rough: { light: '#6b5246', base: '#594238', dark: '#43302a', ink: '#221712' },
   },
   // Void — cosmic indigo "astroturf" islands, luminous violet-blue greens. The fairway stripes carry
   // a wider light↔dark spread than other worlds: indigo turf sits so close in value to the indigo
@@ -181,39 +187,45 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#5a64c0',
     rough: { light: '#322260', base: '#241847', dark: '#180f30', ink: '#0a0618' },
   },
-  // Crystal — pale prismatic teal turf and bright cyan-white greens on an indigo-slate SCREE field.
-  // The rough is lifted well clear of the world's night-sky base: the old deep-indigo slab read as
-  // starfield, not ground ("crystal biome is still a starfield", GS-rough-frame follow-up).
+  // Crystal — pale prismatic teal turf and bright cyan-white greens on a crystalline GRAVEL SCREE
+  // (GS-ground-cover): a lavender-slate shard-litter field, lifted well clear of the world's
+  // night-sky base (the old deep-indigo slab read as starfield, not ground — GS-rough-frame).
   crystal: {
     fairway: { light: '#a7e0d6', base: '#7fc8bd', dark: '#5fa399', ink: '#2f5650' },
     green: { light: '#c4f3ff', base: '#9fe0f5', dark: '#7cc0dc', ink: '#3a6675' },
     tee: { light: '#9fd0c8', base: '#84b4ac', dark: '#6a948c', ink: '#33504a' },
     collar: '#6fb0a6',
-    rough: { light: '#526487', base: '#41506e', dark: '#303c54', ink: '#181f30' },
+    rough: { light: '#6b7796', base: '#5a6680', dark: '#454f64', ink: '#232a3a' },
   },
-  // Tempest — storm-greyed olive turf, electric-green greens, slate-grey storm ground.
+  // Tempest — storm-greyed olive turf, electric-green greens. The rough is rain-soaked MOORLAND
+  // HEATH (GS-ground-cover): a wet green-grey moor rather than bare slate, so the storm world's
+  // ground reads as flattened wild grass under the gale.
   tempest: {
     fairway: { light: '#7e8a72', base: '#66735c', dark: '#4e5a46', ink: '#252b1f' },
     green: { light: '#9cc874', base: '#7ea84e', dark: '#62843a', ink: '#2c3f1a' },
     tee: { light: '#73806a', base: '#5e6a55', dark: '#495440', ink: '#22281c' },
     collar: '#5a7a44',
-    rough: { light: '#525a68', base: '#424854', dark: '#30353e', ink: '#171a20' },
+    rough: { light: '#5e6b54', base: '#4d5945', dark: '#3a4433', ink: '#1d2418' },
   },
-  // Fungal — bioluminescent jade fairways and glowing mint greens on a dark-purple jungle floor.
+  // Fungal — bioluminescent jade fairways and glowing mint greens. The rough is a MOSS & LICHEN
+  // carpet (GS-ground-cover): deep living green undergrowth (the old dark-purple floor read as
+  // night sky) — the toadstool/spore decor grows out of visible moss now.
   fungal: {
     fairway: { light: '#46d6a0', base: '#2fae82', dark: '#228866', ink: '#0e3f30' },
     green: { light: '#7af0c0', base: '#54dba0', dark: '#3cb37e', ink: '#175440' },
     tee: { light: '#3fbf8c', base: '#2f9e73', dark: '#247a58', ink: '#103a2b' },
     collar: '#39b486',
-    rough: { light: '#3a2b66', base: '#2c1f50', dark: '#1f163a', ink: '#0e081e' },
+    rough: { light: '#4b7c58', base: '#3a6446', dark: '#294a33', ink: '#12281a' },
   },
-  // Ocean — sea-green island turf and bright aqua greens over a deep-teal seafloor.
+  // Ocean — sea-green island turf and bright aqua greens on open BEACH SAND (GS-ground-cover):
+  // the whole island off the mown turf is one big strand — "sandy all-bunker rough" — instead of
+  // the old deep-teal seafloor slab (which read as being IN the sea, not on the island).
   ocean: {
     fairway: { light: '#5fd0a0', base: '#46b487', dark: '#36906c', ink: '#16402f' },
     green: { light: '#7fe6b8', base: '#5fd49e', dark: '#49b07f', ink: '#1d4d38' },
     tee: { light: '#54bf94', base: '#42a07c', dark: '#338062', ink: '#15402f' },
     collar: '#3ca07a',
-    rough: { light: '#27687c', base: '#1d5668', dark: '#133c4a', ink: '#081e26' },
+    rough: { light: '#e0cf9e', base: '#cfba85', dark: '#b09a67', ink: '#6a5834' },
   },
   // Cetus — luminous deep-sea CYAN clifftop turf and glowing aqua greens over an abyssal blue ground,
   // darker + more bioluminescent than ocean's bright sea-green, so the plateau reads as land lit from
