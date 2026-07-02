@@ -229,7 +229,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   course-space, never screen px — `tests/camera-stability.test.ts` guards both. **Rough is ROUGH;
   space starts at the OB frame (GS-rough-frame):** the land hull fills `playBounds`+apron with the
   world's rough palette (`LAND_SPACE_BLEND` stays small; never star-salt the turf; every archetype's
-  `rough.base` must sit ≥30/255 brightness above its `ARCHETYPE_SPACE.base` — machine-checked); an
+  `rough.base` must sit ≥30/255 brightness above its `ARCHETYPE_SPACE.base` — machine-checked), and
+  the rough IS the biome's ground COVERING (GS-ground-cover): the ramp is the covering's colour
+  (snow / beach sand / moss / ash / scree / moor) and the `GROUND_COVER` table + `groundCover()`
+  pass texture it (mottle/grain/ridges/sparkle, own seeded stream, clipped to land) — every
+  archetype has a row EXCEPT void/cetus (bespoke ground rules; machine-checked); an
   ARMED lost-rough hole (`roughLie` biomeMod, void/cetus deep stops) instead floats a platform per
   play feature in the open deep (the void's deep = negative-energy rifts) — the render mirrors the
   sim's lost-ball gate. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /

@@ -2107,6 +2107,177 @@ function hexAlpha(hex: string, a: number): string {
 }
 
 /**
+ * Per-world ground COVERING (GS-ground-cover). The rough palette gives each world its ground
+ * COLOUR; this table gives it the covering TEXTURE — the dense, low-contrast surface detail that
+ * makes the in-bounds land read as actual ground and not a flat tinted slab ("the rough still
+ * doesn't look like ground"). Snow mottling + drift ridges + ice sparkle on frost; wind-combed
+ * beach sand + shell flecks on ocean; moss clumps + lichen dots on fungal; ash drifts + cinder
+ * flecks + ember winks on inferno; dune combing on desert; shard-gravel scree on crystal;
+ * rain-flattened moor grass on tempest; meadow-grass mottling on verdant.
+ *
+ * Void and cetus are DELIBERATELY absent: their ground rules are bespoke (floating platforms over
+ * the abyss / star-sea clifftops) and their calm-stop rough keeps the luminous night-garden read.
+ * Table + dispatch per the GS-biome-feel rule — a new world adds a row, never a fork; coverage is
+ * machine-checked by `tests/biome-identity.test.ts`.
+ */
+export interface GroundCoverLook {
+  /** Soft light tonal patch (rgba, low alpha) — the covering's undulation. */
+  mottleLight: string;
+  /** Soft dark tonal patch (rgba, low alpha). */
+  mottleDark: string;
+  /** Fine flecks strewn through the covering (snow crumbs, shells, lichen, cinders…). */
+  grain: string[];
+  /** Directional combing strokes (drift ridges / dune ripples / rain-flattened grass), coherent per hole. */
+  ridge?: string;
+  /** Rare bright glints (ice sparkle / ember winks / prism flashes). */
+  sparkle?: string;
+}
+export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
+  verdant: {
+    mottleLight: 'rgba(130,205,115,0.07)',
+    mottleDark: 'rgba(0,22,0,0.13)',
+    grain: ['rgba(150,220,130,0.45)', 'rgba(18,48,18,0.5)'],
+  },
+  desert: {
+    mottleLight: 'rgba(255,226,160,0.10)',
+    mottleDark: 'rgba(62,38,12,0.14)',
+    grain: ['rgba(255,235,190,0.5)', 'rgba(84,58,26,0.5)'],
+    ridge: 'rgba(242,212,152,0.22)',
+  },
+  frost: {
+    mottleLight: 'rgba(255,255,255,0.30)',
+    mottleDark: 'rgba(92,132,164,0.16)',
+    grain: ['rgba(255,255,255,0.75)', 'rgba(140,176,206,0.5)'],
+    ridge: 'rgba(255,255,255,0.35)',
+    sparkle: 'rgba(255,255,255,0.9)',
+  },
+  inferno: {
+    mottleLight: 'rgba(168,136,116,0.10)',
+    mottleDark: 'rgba(14,8,5,0.18)',
+    grain: ['rgba(28,17,11,0.6)', 'rgba(198,168,148,0.35)'],
+    sparkle: 'rgba(255,150,60,0.8)',
+  },
+  crystal: {
+    mottleLight: 'rgba(192,215,240,0.10)',
+    mottleDark: 'rgba(20,28,48,0.16)',
+    grain: ['rgba(206,230,250,0.5)', 'rgba(34,44,68,0.55)'],
+    sparkle: 'rgba(222,246,255,0.9)',
+  },
+  tempest: {
+    mottleLight: 'rgba(172,192,150,0.08)',
+    mottleDark: 'rgba(10,16,10,0.16)',
+    grain: ['rgba(162,182,140,0.4)', 'rgba(24,32,22,0.55)'],
+    ridge: 'rgba(182,202,160,0.20)',
+  },
+  fungal: {
+    mottleLight: 'rgba(122,232,172,0.10)',
+    mottleDark: 'rgba(8,26,16,0.20)',
+    grain: ['rgba(150,240,190,0.45)', 'rgba(176,126,255,0.4)'],
+    sparkle: 'rgba(150,240,190,0.7)',
+  },
+  ocean: {
+    mottleLight: 'rgba(255,240,205,0.14)',
+    mottleDark: 'rgba(112,86,50,0.14)',
+    grain: ['rgba(255,248,225,0.55)', 'rgba(122,96,60,0.5)'],
+    ridge: 'rgba(255,245,215,0.25)',
+    sparkle: 'rgba(255,255,255,0.7)',
+  },
+};
+
+/**
+ * The ground-covering pass itself: tonal mottle patches, fine grain flecks, optional directional
+ * combing ridges and rare glints, scattered across the LAND-HULL bbox (playBounds + apron — wider
+ * than the features bbox, so the covering reaches the OB frame's corners) and clipped to the land
+ * by the caller. Determinism/camera rules (the archetypeDecor contract): consumes ONLY its own
+ * dedicated stream; placement rejects off the cut grass with BOUNDED attempts in COURSE space
+ * (the draw count never reads the projection); per-item shape varies off `posHash` of the course
+ * point; visibility culls at paint time only. Patch radii are sized in YARDS via `proj.scale`
+ * (clamped in px) so the covering sticks to the ground at every zoom.
+ */
+function groundCover(
+  look: GroundCoverLook,
+  landBoxCourse: Vec[],
+  onGrass: (p: Vec) => boolean,
+  proj: Projector,
+  W: number,
+  H: number,
+  texture: number,
+  rng: () => number,
+): Prim[] {
+  const out: Prim[] = [];
+  const lb = bboxOf(landBoxCourse);
+  const spanX = lb.maxX - lb.minX || 1;
+  const spanY = lb.maxY - lb.minY || 1;
+  const span = Math.max(spanX, spanY);
+  const pt = (): { c: Vec; s: Vec } | null => {
+    for (let i = 0; i < 6; i++) {
+      const c: Vec = [lb.minX + spanX * rng(), lb.minY + spanY * rng()];
+      if (onGrass(c)) continue;
+      return { c, s: proj.project(c) };
+    }
+    return null;
+  };
+  // 1. Tonal mottle — soft irregular light/dark patches, the covering's large-scale undulation.
+  const mottles = Math.min(26, Math.round((span / 14) * texture));
+  for (let i = 0; i < mottles; i++) {
+    const g = pt();
+    const ry = 5 + rng() * 9; // radius in yards — drawn unconditionally, the count never reads the view
+    const light = rng() < 0.45;
+    if (!g) continue;
+    const r = Math.max(7, Math.min(64, ry * proj.scale));
+    if (!inView(g.s, W, H, r + 24)) continue; // placed + sized (rng consumed), just not painted
+    const pts: Vec[] = [];
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2;
+      const rk = r * (0.68 + posHash(g.c[0], g.c[1], k) * 0.55);
+      pts.push([g.s[0] + Math.cos(a) * rk, g.s[1] + Math.sin(a) * rk * 0.82]);
+    }
+    out.push({ t: 'poly', pts, fill: light ? look.mottleLight : look.mottleDark });
+  }
+  // 2. Fine grain — the covering's speckle (snow crumbs / shells / lichen / cinders / gravel).
+  const grains = Math.min(110, Math.round((span / 5) * texture));
+  for (let i = 0; i < grains; i++) {
+    const g = pt();
+    const which = rng();
+    if (!g || !inView(g.s, W, H)) continue;
+    const col = look.grain[Math.floor(which * look.grain.length) % look.grain.length]!;
+    out.push({ t: 'circle', c: g.s, r: 0.5 + posHash(g.c[0], g.c[1]) * 0.9, fill: col });
+  }
+  // 3. Combing ridges — short parallel strokes on ONE coherent per-hole grain (wind-blown covering).
+  if (look.ridge) {
+    const baseAng = rng() * Math.PI;
+    const ridges = Math.min(12, Math.round((span / 30) * texture));
+    for (let i = 0; i < ridges; i++) {
+      const g = pt();
+      const ang = baseAng + (rng() - 0.5) * 0.5;
+      if (!g || !inView(g.s, W, H)) continue;
+      const dx = Math.cos(ang);
+      const dy = Math.sin(ang);
+      for (let k = 0; k < 3; k++) {
+        const off = (k - 1) * 4.2;
+        const cxp = g.s[0] - dy * off;
+        const cyp = g.s[1] + dx * off;
+        const len = 6 + posHash(g.c[0], g.c[1], k) * 9;
+        out.push({ t: 'line', a: [cxp - dx * len, cyp - dy * len], b: [cxp + dx * len, cyp + dy * len], stroke: look.ridge, sw: 1.1, round: true });
+      }
+    }
+  }
+  // 4. Sparkle — rare bright glints so a crystalline/frozen/ember covering catches the light.
+  if (look.sparkle) {
+    const sparks = Math.min(14, Math.round((span / 26) * texture));
+    for (let i = 0; i < sparks; i++) {
+      const g = pt();
+      if (!g || !inView(g.s, W, H)) continue;
+      const p = g.s;
+      const s = 1.2 + posHash(g.c[0], g.c[1], 5) * 1.4;
+      out.push({ t: 'line', a: [p[0] - s, p[1]], b: [p[0] + s, p[1]], stroke: look.sparkle, sw: 0.8, round: true });
+      out.push({ t: 'line', a: [p[0], p[1] - s], b: [p[0], p[1] + s], stroke: look.sparkle, sw: 0.8, round: true });
+    }
+  }
+  return out;
+}
+
+/**
  * Archetype SIGNATURE ground decor (GS-biome-feel) — the Cetus treatment (whales/star-river),
  * generalised: each world gets a bespoke seeded decor pass so its ground reads as a PLACE, not a
  * recoloured slab. Void: drifting asteroid islets in the abyss + a distant black-hole eye. Inferno:
@@ -2644,6 +2815,21 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // drops them (its platforms are tiny and turf-covered, the rest is the open deep). The rng was
   // still consumed above, so the art stream is byte-stable whether or not the detail is painted.
   if (!rainbow && !lostHole) prims.push({ t: 'clip', clip: islandPts, children: land });
+
+  // --- 4b. Ground COVERING (GS-ground-cover) -----------------------------------
+  // The biome's actual surface texture over the whole land hull — snow / beach sand / moss / ash /
+  // scree / moor grass — so the in-bounds rough reads as GROUND, not a flat tinted slab. Own
+  // dedicated stream (never perturbs any existing draw), clipped to the land, gated off on a
+  // lost-rough hole (its platforms are tiny turf pads; the deep between them is not ground) and on
+  // the two bespoke-ground worlds (void/cetus have no GROUND_COVER row by design).
+  if (!rainbow && !lostHole && art.texture > 0) {
+    const cover = GROUND_COVER[arch];
+    if (cover) {
+      const grng = mulberry32((hashHole(hole) ^ 0x006c0de5) >>> 0);
+      const coverPrims = groundCover(cover, landBox, onGrass, proj, W, H, art.texture, grng);
+      if (coverPrims.length) prims.push({ t: 'clip', clip: islandPts, children: coverPrims });
+    }
+  }
 
   // --- 4c. Archetype SIGNATURE decor (GS-biome-feel) ---------------------------
   // The Cetus treatment generalised: void asteroid fields + a black-hole eye, inferno ground
