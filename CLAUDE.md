@@ -189,7 +189,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   The three lanes always land DISTINCT world archetypes, never the one you're on (`routeTheme` avoid-set
   via a filtered `pickThemeFrom` redraw, NOT a retry loop; split stops cross two archetypes —
   GS-journey-variety); a new course effect = a `COURSE_EFFECTS` row + a `routeEffect` mapping + a
-  `weather.ts` showpiece on its OWN seeded stream. Characters/talents/
+  `weather.ts` showpiece on its OWN seeded stream. **A fresh run opens RANDOM + non-hard
+  (GS-fresh-start):** the boot/new-run seed is random (`app.ts freshRunSeed()` — the ONE sanctioned
+  `Math.random`, side-effect layer only; `?seed=` pins it, the Daily keeps its dated seed), and stop 0's
+  theme draw skips `HARD_ARCHETYPES` (inferno/tempest/void/cetus — same single draw off a filtered pool,
+  no other stream moves); journey lanes randomize with the seed. Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a
   non-boss stop.

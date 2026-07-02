@@ -81,6 +81,14 @@ function seedFromUrl(): number | string | null {
   return Number.isFinite(n) && q.trim() !== '' ? n : q;
 }
 
+/** A fresh random seed for a new run (GS-fresh-start). The run stays fully deterministic FROM its
+ *  seed — this only picks WHICH deterministic run you get, so every boot/new-run opens a different
+ *  world + journey instead of the old fixed-1234 opener. `?seed=` pins it (repro/sharing/test hub);
+ *  the sim itself never calls Math.random. */
+function freshRunSeed(): number {
+  return Math.floor(Math.random() * 1e9);
+}
+
 let state: UiState;
 let view: PlayViewHandle | null = null;
 /** The animated weather overlay over the aim/putt map (GS-journey-fx rework) — so the sky + air are
@@ -141,7 +149,7 @@ function boot(): void {
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
       clubhouseVisit: save.clubhouseVisit,
     };
-    const seed = seedFromUrl() ?? 1234;
+    const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
     state = initState(seed, meta, save.activeRun);
@@ -169,7 +177,7 @@ function recover(err: unknown): void {
     /* ignore */
   }
   try {
-    state = initState(1234, {});
+    state = initState(freshRunSeed(), {});
     render();
   } catch {
     const app = document.getElementById('app');
@@ -2613,7 +2621,7 @@ function gameoverScreen(): string {
     <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
     <div style="margin-top:8px;">
       ${btn('🚀 Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
-      ${btn('🚀 New run', { type: 'restart', seed: Math.floor(Math.random() * 1e9) }, { variant: 'primary' })}
+      ${btn('🚀 New run', { type: 'restart', seed: freshRunSeed() }, { variant: 'primary' })}
     </div>`;
 }
 

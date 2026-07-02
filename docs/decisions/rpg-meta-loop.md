@@ -773,3 +773,31 @@ clubs* to *one* golfer's bag.
   full-bag consolation, the bag-grow/restamp/distance-bonus at each tier, snapshot/resume round-trip, and
   the reducer wiring (new clear → club, full bag → shards, re-clear of a held tier → nothing, cut →
   nothing).
+
+## A fresh run opens on a RANDOM, non-hard world (GS-fresh-start)
+- **The complaint:** the Voyage "always seems to start on the same biome for each difficulty". True by
+  construction — `app.ts` booted every session with the fixed fallback seed `1234` and the title's
+  Start buttons reuse `state.run.seed`, so stop 0 (`themeForStop(seed, 0, 0)`) was the SAME world on
+  every fresh page load at every Ascension, and the journey lanes (`routeTheme`, also keyed off the
+  run seed) repeated identically. Ascension never feeds the seed, so "per difficulty" was literally
+  "always".
+- **Fix 1 — the boot seed is random (`app.ts freshRunSeed()`).** `seedFromUrl() ?? freshRunSeed()`
+  (was `?? 1234`); the gameover "New run" button and the `recover()` fault path use the same helper
+  (New run already rolled `Math.random` inline — now shared). This is the ONE sanctioned
+  `Math.random` spot: it only picks WHICH fully-deterministic run you get, in the side-effect layer —
+  the sim/render layers stay seeded-rng-only. `?seed=` still PINS the seed (repro, sharing, the test
+  hub's demos — no new hook, the guard needs nothing), and the Daily Challenge is untouched: it
+  travels `restart → seed: dailySeed()` → title, and Start reuses that run seed as before. With the
+  seed random per boot/new-run, the journey-map lanes randomize for free — no sim change needed there.
+- **Fix 2 — stop 0 skips the hard worlds (`themes.ts HARD_ARCHETYPES`).** `themeForStop` at
+  `stopIndex === 0` draws from the arc pool FILTERED of `inferno`/`tempest`/`void`/`cetus` (the lava
+  world, the galaxy's wildest winds, and the two lost-ball abysses) via `pickThemeFrom` — the SAME
+  single rarity-weighted float on the same `:theme:0` stream, just a gentler pool, so no other stream
+  moves. You tee off on a readable world; travel can land the hard ones from stop 1 on (arc 1 only
+  carries inferno+tempest anyway — the filter leaves 6 archetypes across 11 themes). Old resumes at
+  stop > 0 without a `pendingTheme` still take the unfiltered fallback.
+- **Test fallout, on purpose:** remapping stop-0 themes changed which scripted seeds clear the opening
+  cut — `tests/ui.test.ts`'s "passing seed" 3 became a miss, re-pinned to seed 15 (verified: clears
+  stop 0, survives 5 stops, terminates). New guards in `tests/themes.test.ts`: 300 seeds never open on
+  a `HARD_ARCHETYPES` world yet spread across ≥4 archetypes, and later stops STILL land hard worlds
+  (the filter is stop-0 only).

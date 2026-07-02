@@ -57,7 +57,7 @@ describe('ui reducer', () => {
   });
 
   it('playing a passable stop goes to the result screen with played holes', () => {
-    const s = reduce(started(3), { type: 'play' }); // seed 3 clears the opening cut comfortably
+    const s = reduce(started(15), { type: 'play' }); // seed 15 clears the opening cut comfortably
     expect(s.screen).toBe('result');
     expect(s.played).toHaveLength(s.course.holes.length);
     expect(s.lastResult!.passed).toBe(true);
@@ -117,7 +117,7 @@ describe('ui reducer', () => {
   });
 
   it('result → shop → buy → travel → next intro', () => {
-    let s = reduce(started(3), { type: 'play' }); // passing seed → reaches the result/shop flow
+    let s = reduce(started(15), { type: 'play' }); // passing seed → reaches the result/shop flow
     s = reduce(s, { type: 'continue' });
     expect(s.screen).toBe('shop');
     const before = s.run.credits;
@@ -135,7 +135,7 @@ describe('ui reducer', () => {
   });
 
   it('entering the shop fixes a rotating offer; leaving clears it', () => {
-    let s = reduce(started(3), { type: 'play' }); // passing seed → reaches the shop
+    let s = reduce(started(15), { type: 'play' }); // passing seed → reaches the shop
     expect(s.shopOffer).toBeUndefined();
     s = reduce(s, { type: 'continue' });
     expect(s.screen).toBe('shop');
@@ -180,9 +180,9 @@ describe('ui reducer', () => {
   });
 
   it('a full playthrough ends in gameover and restart returns to the title', () => {
-    // seed 3 clears the opening cut comfortably, then fails a few stops deep as the cut ramps —
+    // seed 15 clears the opening cut comfortably, then fails a few stops deep as the cut ramps —
     // so the run both advances (bestDistance > 0) and terminates within the cap.
-    let s = started(3);
+    let s = started(15);
     for (let i = 0; i < 100 && s.screen !== 'gameover'; i++) s = advanceStop(s);
     expect(s.screen).toBe('gameover');
     expect(s.run.status).toBe('ended');
