@@ -194,6 +194,21 @@ describe('ui reducer', () => {
     expect(restarted.shards).toBe(s.shards); // shards carry over too
   });
 
+  it('Ascension is picked at character select, clamped to what is unlocked (GS-title-2)', () => {
+    // With tiers unlocked, the golfer pick carries the difficulty — the run starts at that tier.
+    let s = reduce(initState(7, { maxAscension: 5 }), { type: 'start', format: 'voyage' });
+    expect(s.screen).toBe('character');
+    const a3 = reduce(s, { type: 'selectCharacter', characterId: 'feather-fade', ascension: 3 });
+    expect(a3.screen).toBe('intro');
+    expect(a3.run.ascension).toBe(3);
+    // Clamped to the unlocked ladder; absent → the 'start' default (A0).
+    expect(reduce(s, { type: 'selectCharacter', characterId: 'feather-fade', ascension: 99 }).run.ascension).toBe(5);
+    expect(reduce(s, { type: 'selectCharacter', characterId: 'feather-fade' }).run.ascension).toBe(0);
+    // A fresh account (nothing unlocked) can't sneak a harder tier in.
+    const fresh = reduce(initState(7), { type: 'start', format: 'voyage' });
+    expect(reduce(fresh, { type: 'selectCharacter', characterId: 'feather-fade', ascension: 4 }).run.ascension).toBe(0);
+  });
+
   it('toTitle returns to the title from anywhere; an underway run stays resumable (GS-settings-nav)', () => {
     // Mid-run (interactive, shots taken): back to title parks the run as a resumable snapshot.
     let s = reduce(started(15), { type: 'playInteractive' });

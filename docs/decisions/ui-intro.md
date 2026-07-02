@@ -81,6 +81,35 @@
   by label). The Ascension ladder rides a chip row UNDER the big button (the button launches A0),
   still data-driven off `FORMATS` — a new format gets a tile for free.
 
+## Title rework: hero wordmark, painted mode tiles, Ascension at golfer select (GS-title-2, 2026-07)
+First-device feedback on GS-settings-nav reshaped the title:
+- **Ascension moved OFF the title, onto character select.** On a veteran account the A1…A7 chip
+  rows ballooned the Voyage tile (two rows of buttons under the launch button), and the difficulty
+  is really a per-run, per-golfer decision — so it's picked WITH the golfer. `characterScreen` takes
+  `opts.ascension = { max, sel }` and renders a `⚔ Difficulty` chip row (`[data-asc]`); the picked
+  tier is app-layer VIEW state (`selAscension`, reset to 0 on every 'start' — never sticky across
+  runs, never persisted) baked into every golfer card's `selectCharacter` action; the reducer clamps
+  (`min(maxAscension, ascension)`) so a forged action can't start above the unlocked ladder. The
+  unlock ladder itself stays ACCOUNT-wide (`maxAscension` — the bag-tier gates key off it); only the
+  choice point is per-character. `start` still accepts an `ascension` (clamped) as the base the
+  select screen overrides — kept for tests/back-compat.
+- **The Daily Challenge button is PARKED (removed from the title), not deleted from the engine** —
+  string seeds still work (`?seed=daily-YYYY-MM-DD` reproduces it); only the `dailySeed`/`dailyLabel`
+  helpers went. Bring it back as its own surface when it earns a place.
+- **Mode tiles joined the doorway-tile family but read as a distinct class.** Same visual language
+  as the Market/Clubhouse tiles (a hand-placed, byte-stable painted SVG scene behind a bottom-scrim
+  caption — `voyageTileArt()`: a dotted gold route arcing over three worlds to a pin flag, a ship
+  mid-jump; `unendingTileArt()`: a violet star tunnel of receding rings with a golf ball streaking
+  in), differentiated as GAMES by: full-width (nav tiles are 2-up), taller, accent border + glow
+  (`--mc` gold/violet), a corner badge (★ CAMPAIGN · WINNABLE / ∞ ENDLESS SURVIVAL), and a fat
+  `.gs-modetile__go` launch bar ("▶ Set sail" / "▶ Tee off" — the build test clicks "Set sail").
+  The WHOLE tile is one `<button>` (no nested controls — Ascension left, the endless milestone strip
+  shrank to a one-line `endlessTeaseHTML()` best + next-unlock tease; the full milestone trail's
+  home is the Trade Market's earned gear). Still data-driven off `FORMATS` keyed on `winnable`.
+- **Hero header**: centred wordmark (green/gold glow) + small-caps tagline + a chips row (shards /
+  aces / bests / install). Sections are labelled by `.gs-seclabel` rules ("Choose your game" — the
+  build test asserts this string — and "Between runs" over the Market/Clubhouse doorways).
+
 ## Loading intro cinematic (`render/introView.ts`)
 - A cosmetic, vector-drawn Canvas2D title sequence (no sim, no art asset to 404): four golfers
   pitch their bags into a woody station wagon in a suburban driveway → wheels fold up, it hovers,

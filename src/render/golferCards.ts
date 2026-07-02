@@ -128,10 +128,16 @@ function unlockedStrip(unlockedTypes: readonly string[], col: string): string {
  * each card to portrait + stats + a one-line strength/quirk hint (the full blurb + pros/cons list
  * come back at desktop width via CSS — same markup, media-query visibility). The CTA verb follows
  * the chosen format ("Voyage as …" for the campaign, "Survive as …" for the Unending Universe).
+ *
+ * A voyage with unlocked Ascension tiers gets a DIFFICULTY picker row here (GS-title-2) — the
+ * ascension is a per-run choice made alongside the golfer, not on the title. `opts.ascension`
+ * carries `{ max, sel }`: the row renders A0…Amax with `sel` lit ([data-asc] chips the app layer
+ * wires), and every golfer card's select action bakes the CURRENT `sel` in, so tapping a golfer
+ * starts that golfer at that tier.
  */
 export function characterScreen(
   unlockedByCharacter: Record<string, readonly string[]> = {},
-  opts: { modeName?: string; winnable?: boolean } = {},
+  opts: { modeName?: string; winnable?: boolean; ascension?: { max: number; sel: number } } = {},
 ): string {
   const verb = opts.winnable === false ? 'Survive as' : 'Voyage as';
   const statRows = (st: GolferStats, col: string): string =>
@@ -144,8 +150,11 @@ export function characterScreen(
     const unlocks = unlockedStrip(unlockedByCharacter[ch.id] ?? [], cap);
     // The phone-sized card swaps the blurb + full pros/cons for this one-line strength · quirk hint.
     const hint = `<p class="gs-charcard-hint"><span style="color:var(--gs-accent);">✓</span> ${ch.pros[0] ?? ''} <span style="color:var(--gs-warn);">▲</span> ${ch.cons[0] ?? ''}</p>`;
+    const action = opts.ascension
+      ? { type: 'selectCharacter', characterId: ch.id, ascension: opts.ascension.sel }
+      : { type: 'selectCharacter', characterId: ch.id };
     return `
-      <button class="gs-charcard" data-action='${JSON.stringify({ type: 'selectCharacter', characterId: ch.id })}'
+      <button class="gs-charcard" data-action='${JSON.stringify(action)}'
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
@@ -163,11 +172,22 @@ export function characterScreen(
         <span class="gs-charcard-cta" style="--cc:${cap};">${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>
       </button>`;
   }).join('');
+  const ascRow = opts.ascension
+    ? `<div class="gs-ascpick">
+        <span class="gs-ascpick-l">⚔ Difficulty</span>
+        ${Array.from({ length: opts.ascension.max + 1 }, (_, a) => {
+          const on = a === opts.ascension!.sel;
+          return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip" data-asc="${a}">A${a}</button>`;
+        }).join('')}
+        <span class="gs-ascpick-hint">harder cut, leaner purse — win your top tier to unlock the next</span>
+      </div>`
+    : '';
   return `
     <header class="gs-charhead" style="border-left:4px solid #5fd45a;padding-left:10px;">
       <h1>Choose your golfer</h1>
       <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
     </header>
+    ${ascRow}
     <div class="gs-charwrap">${cards}</div>`;
 }
 

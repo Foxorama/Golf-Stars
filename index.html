@@ -127,52 +127,83 @@
         padding: 12px 14px; margin: 8px 0;
         box-shadow: var(--gs-shadow);
       }
-      /* ── Game-mode tiles on the title (GS-settings-nav): the Voyage (gold) and the Unending
-             Universe (violet), each with a big accent launch button. --mc = the mode accent. ── */
+      /* ── Title screen (GS-title-2): hero wordmark, section labels, and the game-mode tiles.
+             The mode tiles speak the SAME painted-scene + caption language as the Market/Clubhouse
+             doorways (one visual family) but are unmistakably the games: taller, accent-bordered
+             (--mc = mode accent), badged, and carrying a launch bar. The whole tile is the button. ── */
+      .gs-hero { text-align: center; padding: 4px 0 2px; }
+      .gs-hero-title {
+        margin: 0; font-size: 34px; letter-spacing: .045em; line-height: 1.1;
+        color: #ecffe9;
+        text-shadow: 0 0 22px rgba(95, 212, 90, .38), 0 0 44px rgba(255, 206, 84, .18);
+      }
+      .gs-hero-tag {
+        margin: .45em 0 0; font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+        color: var(--gs-dim); text-wrap: balance;
+      }
+      .gs-hero-chips { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+      .gs-seclabel {
+        font-size: 11px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase;
+        color: var(--gs-dim); margin: 20px 0 8px;
+        display: flex; align-items: center; gap: 10px;
+      }
+      .gs-seclabel::after { content: ''; flex: 1; height: 1px; background: var(--gs-line-2); }
+      .gs-modetiles { display: grid; gap: 12px; margin: 4px 0 6px; }
       .gs-modetile {
-        position: relative; overflow: hidden;
-        border: 1px solid color-mix(in srgb, var(--mc) 40%, var(--gs-line));
-        border-radius: var(--gs-r-lg); padding: 14px 16px; margin: 12px 0;
-        background:
-          radial-gradient(120% 90% at 85% -20%, color-mix(in srgb, var(--mc) 18%, transparent), transparent 60%),
-          linear-gradient(180deg, #141823, var(--gs-bg-2));
-        box-shadow: var(--gs-shadow);
-        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease;
+        position: relative; display: block; width: 100%; min-height: 208px; padding: 0;
+        border-radius: var(--gs-r-lg);
+        border: 1px solid color-mix(in srgb, var(--mc) 50%, var(--gs-line));
+        background: var(--gs-bg-2); color: var(--gs-ink); cursor: pointer; overflow: hidden;
+        text-align: left; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        font: inherit;
+        box-shadow: var(--gs-shadow), 0 0 20px -8px color-mix(in srgb, var(--mc) 40%, transparent);
+        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease, filter .16s ease;
       }
       @media (hover: hover) {
         .gs-modetile:hover {
-          transform: translateY(-2px);
-          border-color: color-mix(in srgb, var(--mc) 70%, var(--gs-line));
-          box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--mc) 45%, transparent);
+          transform: translateY(-3px); border-color: var(--mc); filter: brightness(1.05);
+          box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--mc) 50%, transparent);
         }
       }
-      .gs-modetile-head { display: flex; align-items: center; gap: 12px; }
-      .gs-modetile-icon { font-size: 30px; line-height: 1; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--mc) 60%, transparent)); }
-      .gs-modetile-name {
-        display: block; font-size: 19px; line-height: 1.15; color: var(--mc);
-        text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 45%, transparent);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      .gs-modetile:active { transform: translateY(-1px); }
+      .gs-modetile:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+      .gs-modetile__art { position: absolute; inset: 0; display: block; }
+      .gs-modetile__art svg { display: block; width: 100%; height: 100%; }
+      .gs-modetile__badge {
+        position: absolute; top: 10px; left: 12px;
+        font-size: 10px; font-weight: 800; letter-spacing: .14em;
+        color: var(--mc); background: #0b0d12cc;
+        border: 1px solid color-mix(in srgb, var(--mc) 55%, transparent);
+        border-radius: 999px; padding: 4px 10px;
       }
-      .gs-modetile-badge { font-size: 10px; letter-spacing: .12em; font-weight: 800; color: var(--mc); opacity: .8; margin-top: 2px; }
-      .gs-modetile-blurb { font-size: 13px; opacity: .82; margin: .5em 0 .3em; }
-      .gs-modetile-path { font-size: 11px; opacity: .55; margin-bottom: 8px; }
-      .gs-modestart {
-        display: flex; align-items: center; justify-content: center; gap: 8px;
-        width: 100%; padding: 13px 16px; margin-top: 6px;
-        font: 800 15px/1.2 system-ui, sans-serif; letter-spacing: .02em;
-        color: #0b0d12; cursor: pointer;
+      .gs-modetile__cap {
+        position: absolute; left: 0; right: 0; bottom: 0;
+        display: flex; flex-direction: column; gap: 4px; padding: 40px 14px 12px;
+        background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .94) 58%);
+      }
+      .gs-modetile__title {
+        font: 800 21px/1.15 system-ui, sans-serif; color: var(--mc);
+        text-shadow: 0 0 16px color-mix(in srgb, var(--mc) 45%, transparent);
+      }
+      .gs-modetile__sub { font-size: 12px; line-height: 1.4; opacity: .88; }
+      .gs-modetile__meta { font-size: 11px; opacity: .68; }
+      .gs-modetile__go {
+        margin-top: 8px; text-align: center; padding: 11px 14px; border-radius: 11px;
+        font: 800 14px/1 system-ui, sans-serif; letter-spacing: .03em; color: #0b0d12;
         border: 1px solid color-mix(in srgb, var(--mc) 80%, #fff);
-        border-radius: 12px;
         background: linear-gradient(180deg, color-mix(in srgb, var(--mc) 92%, #fff), color-mix(in srgb, var(--mc) 72%, #000));
-        box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--mc) 55%, transparent);
-        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-        transition: transform .12s ease, filter .16s ease, box-shadow .16s ease;
+        box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--mc) 60%, transparent);
+        transition: filter .16s ease, box-shadow .16s ease;
       }
-      .gs-modestart:hover { filter: brightness(1.08); box-shadow: 0 6px 22px -4px color-mix(in srgb, var(--mc) 70%, transparent); }
-      .gs-modestart:active { transform: translateY(1px); }
-      .gs-modestart:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
-      .gs-modeasc { margin-top: 9px; font-size: 11.5px; }
-      .gs-modeasc > span { display: block; opacity: .7; margin-bottom: 5px; }
+      @media (hover: hover) {
+        .gs-modetile:hover .gs-modetile__go { filter: brightness(1.1); box-shadow: 0 6px 20px -4px color-mix(in srgb, var(--mc) 75%, transparent); }
+      }
+
+      /* ── Character-select difficulty picker (GS-title-2): Ascension chips, chosen with the golfer ── */
+      .gs-ascpick { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 12px 0 0; }
+      .gs-ascpick-l { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--gs-gold); margin-right: 3px; }
+      .gs-ascpick-chip { padding: 6px 11px; font-size: 12.5px; margin: 0; }
+      .gs-ascpick-hint { flex-basis: 100%; font-size: 10.5px; opacity: .55; }
       .gs-chip {
         display: inline-flex; align-items: center; gap: 6px;
         font-size: 13px; padding: 4px 10px; border-radius: 999px;

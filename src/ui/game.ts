@@ -192,7 +192,7 @@ export interface MatchUi {
 
 export type Action =
   | { type: 'start'; format: string; ascension?: number }
-  | { type: 'selectCharacter'; characterId: string } // pick a golfer, then begin the run
+  | { type: 'selectCharacter'; characterId: string; ascension?: number } // pick a golfer (+ their Ascension tier for a voyage), then begin the run
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
@@ -451,7 +451,8 @@ export function reduce(state: UiState, action: Action): UiState {
       // Lock in the chosen format, then pick a golfer before the run begins (GS-18). The run is
       // (re)built with the format now so the course preview works; the character layers on at
       // `selectCharacter`. `run.formatId` carries the pending choice — no extra state needed.
-      // Ascension (GS-ascension) is chosen on the title for a voyage; clamp to what's unlocked.
+      // Ascension (GS-ascension) is normally picked WITH the golfer at `selectCharacter`
+      // (GS-title-2); 'start' still accepts one (clamped) as the base the select screen overrides.
       const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? 0));
       const run = startRun(state.run.seed, action.format, state.metaUpgrades, undefined, asc, state.bagTier);
       return {
@@ -469,15 +470,19 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'selectCharacter': {
       if (state.screen !== 'character') return state;
-      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + ascension + bag
-      // tier chosen at 'start'. The golfer's permanently-unlocked clubs (GS-ascension-clubs) grow their
+      // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + bag tier
+      // chosen at 'start'. Ascension (GS-ascension) is a per-run difficulty picked HERE, alongside
+      // the golfer (GS-title-2) — it's a choice about who you're playing, so it lives on the same
+      // screen; absent (endless formats / no tiers unlocked) the 'start' value carries. Clamped to
+      // what's unlocked. The golfer's permanently-unlocked clubs (GS-ascension-clubs) grow their
       // starting bag.
+      const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? state.run.ascension));
       const run = startRun(
         state.run.seed,
         state.run.formatId,
         state.metaUpgrades,
         action.characterId,
-        state.run.ascension,
+        asc,
         state.bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
       );

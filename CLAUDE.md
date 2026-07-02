@@ -216,7 +216,8 @@ For each system: the rule that constrains new work. Open the archive doc before 
   GS-journey-variety); a new course effect = a `COURSE_EFFECTS` row + a `routeEffect` mapping + a
   `weather.ts` showpiece on its OWN seeded stream. **A fresh run opens RANDOM + non-hard
   (GS-fresh-start):** the boot/new-run seed is random (`app.ts freshRunSeed()` — the ONE sanctioned
-  `Math.random`, side-effect layer only; `?seed=` pins it, the Daily keeps its dated seed), and stop 0's
+  `Math.random`, side-effect layer only; `?seed=` pins it; the dated-seed Daily button is PARKED off
+  the title for now — GS-title-2), and stop 0's
   theme draw skips `HARD_ARCHETYPES` (inferno/tempest/void/cetus — same single draw off a filtered pool,
   no other stream moves); journey lanes randomize with the seed. Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
@@ -306,8 +307,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   else passes `state.resumable` through — NEVER snapshot the title's character-less placeholder run
   (it wipes saves). Character select fits ONE screen in every mode (2×2 phone grid; small screens
   swap blurb+pros/cons for a one-line hint via CSS visibility, not a template fork; the CTA verb
-  follows the format). Title formats render as `.gs-modetile` hero tiles + `.gs-modestart` launch
-  buttons, data-driven off `FORMATS`. **`app.ts` is a 3,400-line god-file — the likeliest source of
+  follows the format). **Ascension is picked WITH the golfer** (GS-title-2): the difficulty chips
+  live on character select (`[data-asc]` view state → `selectCharacter.ascension`, reducer-clamped),
+  never on the title. The title (GS-title-2) is a centred hero wordmark + two `.gs-modetile` GAME
+  tiles (whole tile = the button; painted-scene art + caption in the SAME house style as the
+  Market/Clubhouse doorway tiles, distinct via accent border/badge/launch bar), data-driven off
+  `FORMATS`; the Daily button is parked off the title for now. **`app.ts` is a 3,400-line god-file — the likeliest source of
   regressions; prefer extracting a module over growing it, and re-read the relevant span before
   editing.**
 - **Intro cinematic** (`docs/decisions/ui-intro.md`). Cosmetic Canvas2D, not in the reducer; degrades
