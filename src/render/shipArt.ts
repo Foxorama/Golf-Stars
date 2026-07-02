@@ -230,6 +230,63 @@ function shipBody(look: ShipLook): string {
         </g>
         ${tyre(-13, 5.6, '0.5s')}${tyre(13, 7, '0.55s')}`;
     }
+    case 'infinity': {
+      // The Infinity Ace (GS-unending) — the hole-150 grail and, by construction, the top of the
+      // fleet: a golden phoenix-winged star-yacht. Slow-beating flame-feather wings, a triple
+      // aurora exhaust, an orbiting ring of light, a spinning golden hull core, and the ∞ pennant
+      // flying off the tail fin. Authored biggest of all so nothing in the garage upstages it.
+      const shimmer = (dur: string) =>
+        `<animate attributeName="opacity" values="0.55;1;0.7;1;0.55" dur="${dur}" repeatCount="indefinite"/>`;
+      // A phoenix wing: three layered feather sweeps that gently beat (rotate about the wing root).
+      const wing = (sy: number, begin: string) => `
+        <g transform="translate(-2 ${sy < 0 ? -4 : 2}) scale(1 ${sy})">
+          <g>
+            <animateTransform attributeName="transform" type="rotate" values="-4 0 0;5 0 0;-4 0 0" dur="1.8s" begin="${begin}" repeatCount="indefinite"/>
+            <path d="M0,0 Q-10,-9 -24,-8 Q-14,-4 -20,-1 Q-12,-2 -16,2 Q-8,1 0,3 Z" fill="${flame}" opacity="0.9">${shimmer('2.2s')}</path>
+            <path d="M0,0 Q-8,-6 -18,-5.5 Q-10,-2.5 -14,-0.5 Q-6,-0.5 0,2 Z" fill="${body}"/>
+            <path d="M0,0.6 Q-6,-3 -12,-2.6 Q-5,0 0,1.6 Z" fill="#fff2b0" opacity="0.85"/>
+          </g>
+        </g>`;
+      // The orbiting ring: a tilted ellipse of three light-motes circling the hull.
+      const orbiters = [0, 1, 2]
+        .map(
+          (i) => `
+        <g><animateTransform attributeName="transform" type="rotate" from="${i * 120}" to="${i * 120 + 360}" dur="3.6s" repeatCount="indefinite"/>
+          <circle cx="17" cy="0" r="1.3" fill="#fff"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" begin="${(i * 0.4).toFixed(1)}s" repeatCount="indefinite"/></circle>
+        </g>`,
+        )
+        .join('');
+      return `
+        <!-- triple aurora exhaust, roaring in three colours -->
+        <g stroke="none">
+          <path d="M-19,-2 L-34,-6 L-31,-2 Z" fill="#7fd6ff" opacity="0.85">${shimmer('0.9s')}</path>
+          <path d="M-20,1.5 L-38,1.5 L-33,3.5 Z" fill="${flame}" opacity="0.95">${shimmer('0.7s')}</path>
+          <path d="M-19,5 L-33,9 L-30,4.5 Z" fill="#ff8bf0" opacity="0.85">${shimmer('1.1s')}</path>
+          <path d="M-20,1 L-30,0.6 L-30,2.6 L-20,3 Z" fill="#fff2b0" opacity="0.9"/>
+        </g>
+        ${wing(-1, '0s')}${wing(1, '0.4s')}
+        <g stroke="#3a2a08" stroke-width="1" stroke-linejoin="round">
+          <!-- golden hull: a long swept teardrop with an under-keel -->
+          <path d="M-20,2 Q-14,-5.5 0,-6 Q14,-6 21,-0.5 Q15,6 0,6.5 Q-12,6.5 -20,2 Z" fill="${body}"/>
+          <path d="M-14,4.6 Q0,8.2 14,4.2 L11,6.4 Q0,8.6 -10,6.4 Z" fill="${accent}" stroke="none" opacity="0.9"/>
+          <!-- canopy + glint -->
+          <path d="M-2,-5.4 Q6,-8.6 13,-3.4 Q7,-1.4 -1,-2.4 Z" fill="${glass}"/>
+          <ellipse cx="4" cy="-4.6" rx="2.6" ry="1" fill="#ffffff" opacity="0.6"/>
+          <!-- gold filigree stripe -->
+          <path d="M-17,0.6 Q0,-2.6 19,-0.4" fill="none" stroke="#fff2b0" stroke-width="1.1"/>
+          <!-- nose lamp -->
+          <circle cx="20" cy="-0.4" r="1.6" fill="#fff6c0"><animate attributeName="opacity" values="0.6;1;0.6" dur="1.6s" repeatCount="indefinite"/></circle>
+        </g>
+        ${orbiters}
+        <!-- tail fin + the ∞ pennant, rocking proudly -->
+        <g stroke="#3a2a08" stroke-width="0.9"><line x1="-14" y1="-4" x2="-16" y2="-17"/></g>
+        <circle cx="-16" cy="-17" r="1.1" fill="${accent}"/>
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="-3 -16 -14;3 -16 -14;-3 -16 -14" dur="2.2s" repeatCount="indefinite"/>
+          <path d="M-16,-17 L1,-15.4 L-2,-12.6 L1,-9.8 L-16,-11 Z" fill="#0f5132" stroke="#3a2a08" stroke-width="0.6"/>
+          <text x="-13.4" y="-12.2" font-size="4.6" font-weight="800" fill="#ffd76b" font-family="system-ui,sans-serif">∞</text>
+        </g>`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `

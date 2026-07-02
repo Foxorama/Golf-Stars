@@ -11,7 +11,7 @@
 
 import { Rng } from '../rng';
 import { generateCourse } from '../course/generate';
-import { playCourse, type PlayedHole, type PlayHoleOptions } from '../round';
+import { playCourse, playHole, type PlayedHole, type PlayHoleOptions } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
@@ -40,6 +40,7 @@ import {
 } from './economy';
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { endlessMilestoneShards, passesEndlessGate } from './endless';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
@@ -125,8 +126,13 @@ export interface Run {
    */
   pendingTheme?: Theme;
   /** Permanent shards banked mid-run by route events (GS-routes `shardBonus`) — accrued on travel and
-   *  kept even on a later bust, so a "salvage" lane is guaranteed meta progress. Added by shardsForRun. */
+   *  kept even on a later bust, so a "salvage" lane is guaranteed meta progress. Added by shardsForRun.
+   *  The Unending Universe's milestone bonuses (GS-unending) bank through here too. */
   bonusShards: number;
+  /** Cumulative holes SURVIVED this run (GS-unending) — the per-hole survival format's progress
+   *  counter, driving the gate tier, the milestones and the cosmetic unlocks. Advanced by
+   *  `finishStop`; always 0 for formats without `holeGate`. Snapshotted so a resume keeps the bar. */
+  holesSurvived: number;
   /** Ids of UNIQUE one-off events already travelled into (GS-17c) — so each fires at most once. */
   firedEventIds: string[];
   status: RunStatus;
@@ -192,6 +198,7 @@ export function startRun(
     bagTier,
     unlockedClubs: [...unlockedClubs],
     bonusShards: 0,
+    holesSurvived: 0,
     firedEventIds: [],
     status: 'active',
     history: [],
@@ -382,13 +389,34 @@ export function finishStop(
   const cut = effectiveCut(run, course.holes.length);
   const format = getFormat(run.formatId);
   const isBossStop = !!bossAt(format, run.stopIndex);
+  // The Unending Universe's PER-HOLE survival bar (GS-unending): every played hole must clear its
+  // par-relative required score (endless.ts), numbered cumulatively across the whole run. The driver
+  // stops at the first failure, so `played` may be a PARTIAL stop — count the leading passes.
+  let gateSurvived = 0;
+  if (format.holeGate) {
+    // Read the canonical scoring `record` (the same numbers Stableford scores) + the holed flag.
+    while (
+      gateSurvived < played.length &&
+      passesEndlessGate(
+        played[gateSurvived]!.record.par,
+        played[gateSurvived]!.record.strokes,
+        played[gateSurvived]!.holed,
+        run.holesSurvived + gateSurvived + 1,
+      )
+    ) {
+      gateSurvived++;
+    }
+  }
   // Survival rule (GS-positional-cut): a WINNABLE campaign (the voyage) is a FIELD competition — you
   // survive an ordinary stop by finishing in the TOP-N of the arc leaderboard (top 18, then top 16),
   // not by clearing an abstract Stableford line, so the leaderboard is what decides your fate. The boss
-  // stop passes on the DUEL (matchWon). Endless formats (flat/ladder) keep the Stableford cut.
+  // stop passes on the DUEL (matchWon). The Unending Universe (GS-unending) passes only when EVERY
+  // hole of the stop cleared its per-hole bar.
   const passed =
     opts.matchWon !== undefined
       ? opts.matchWon
+      : format.holeGate
+      ? gateSurvived === course.holes.length
       : format.winnable && !isBossStop
       ? playerSurvivesStop(run, course, totals.stableford)
       : totals.stableford >= cut;
@@ -424,10 +452,18 @@ export function finishStop(
   // player reward an ace byte-for-byte identically.
   const loadout = grantAceTalent(run.loadout, aces);
 
+  // Unending-Universe progress (GS-unending): advance the survived-hole counter and bank any crossed
+  // milestone's shard bonus INSTANTLY through `bonusShards` (the same kept-even-on-a-bust channel the
+  // route events use) — so a victory screen's reward can never be clawed back by a later death.
+  const holesSurvived = run.holesSurvived + (format.holeGate ? gateSurvived : 0);
+  const milestoneShards = format.holeGate ? endlessMilestoneShards(run.holesSurvived, holesSurvived) : 0;
+
   const next: Run = {
     ...run,
     loadout,
     credits: run.credits + creditsEarned,
+    holesSurvived,
+    bonusShards: run.bonusShards + milestoneShards,
     history: [...run.history, result],
     // The event is spent — clear it so a resume can't double-apply it next stop.
     pendingEvent: undefined,
@@ -743,9 +779,43 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     return { run: next, result, played: stop.player };
   }
   const rng = new Rng(`${course.seed}:play`);
+  // The Unending Universe (GS-unending) dies at the FIRST hole that misses its survival bar, so the
+  // auto sim plays hole by hole on the same sequential `:play` stream and stops there — an exact
+  // prefix of the full-stop stream, so it resolves byte-for-byte like the interactive driver (which
+  // also plays this stream hole by hole and stops at the same failure).
+  if (getFormat(run.formatId).holeGate) {
+    const holeOpts = playerHoleOpts(run);
+    const played: PlayedHole[] = [];
+    for (let i = 0; i < course.holes.length; i++) {
+      const p = playHole(course.holes[i]!, rng, holeOpts);
+      played.push(p);
+      if (!passesEndlessGate(p.record.par, p.record.strokes, p.holed, run.holesSurvived + i + 1)) break;
+    }
+    const { run: next, result } = finishStop(run, course, played);
+    return { run: next, result, played };
+  }
   const played = playCourse(course.holes, rng, playerHoleOpts(run));
   const { run: next, result } = finishStop(run, course, played);
   return { run: next, result, played };
+}
+
+// --- Unending-Universe helpers (GS-unending) ---------------------------------
+
+/** Is this run governed by the per-hole survival bar (the Unending Universe)? */
+export function holeGateArmed(run: Run): boolean {
+  return !!getFormat(run.formatId).holeGate;
+}
+
+/** The cumulative (1-based) hole NUMBER of the current stop's `holeIndex`-th hole — the number the
+ *  survival bar is keyed off. Valid before the stop is scored (holesSurvived is the pre-stop count). */
+export function endlessHoleNumber(run: Run, holeIndex: number): number {
+  return run.holesSurvived + holeIndex + 1;
+}
+
+/** Did this finished hole clear its Unending-Universe survival bar? Shared by the interactive driver
+ *  so its end-of-run verdict is byte-for-byte the headless `playStop`'s. */
+export function endlessHolePassed(run: Run, holeIndex: number, played: PlayedHole): boolean {
+  return passesEndlessGate(played.record.par, played.record.strokes, played.holed, endlessHoleNumber(run, holeIndex));
 }
 
 /**
@@ -1060,6 +1130,9 @@ export interface RunSnapshot {
   pendingThemeId?: string;
   /** Permanent shards banked mid-run by route events (GS-routes); 0/absent for back-compat. */
   bonusShards?: number;
+  /** Cumulative holes survived (GS-unending), so a resume keeps the survival bar + milestone
+   *  progress. 0/absent for back-compat (non-gate formats never advance it). */
+  holesSurvived?: number;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
   firedEventIds?: string[];
   /** The selected golfer (GS-18) — re-applied to the loadout on resume. */
@@ -1081,6 +1154,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     pendingEventId: run.pendingEvent?.id,
     pendingThemeId: run.pendingTheme?.id,
     bonusShards: run.bonusShards,
+    holesSurvived: run.holesSurvived,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
   };
@@ -1109,6 +1183,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
     bonusShards: snap.bonusShards ?? 0,
+    holesSurvived: snap.holesSurvived ?? 0,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',
     history: [],
@@ -1156,7 +1231,7 @@ export interface RunStrategy {
   pickRoute?(run: Run, routes: Route[]): Route;
   /** Item ids to attempt buying after a stop; default = none. */
   shop?(run: Run): string[];
-  /** Run format id; default = the engine default ('flat'). */
+  /** Run format id; default = the engine default (DEFAULT_FORMAT). */
   formatId?: string;
   /** Permanent meta-upgrades baked into the starting loadout/credits; default = none. */
   meta?: MetaUpgrades;

@@ -316,7 +316,7 @@ function dispersionGroup(): HTMLElement {
 
 // ── SCORING harness panel ────────────────────────────────────────────────────────────────
 const seedsSel = selectFrom([['20', '20'], ['60', '60'], ['150', '150'], ['400', '400']], '60');
-const formatSel = selectFrom(Object.values(FORMATS).map((f) => [f.id, f.name]), 'flat');
+const formatSel = selectFrom(Object.values(FORMATS).map((f) => [f.id, f.name]), 'unending');
 function runScoring(): void {
   const seeds = +seedsSel.value;
   const formatId = String(formatSel.value);

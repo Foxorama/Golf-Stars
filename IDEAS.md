@@ -4,11 +4,10 @@ Living doc (per CLAUDE.md): scan, rerank, merge, retire — **not append-only.**
 work**. Stable IDs, never reused. When something ships it collapses to a one-line **Done** entry (link the
 PR/report); the full story lives in `reports/` + `docs/decisions/` + git, never here. Bad → **Dropped** (say why).
 
-## Avenue decision (open)
-What wraps the golf — three non-exclusive avenues: (1) **full top-down RPG** (overworld/narrative shell
-*around* the loop) — deferred until the golf + run shape are locked; (2) **roguelite** (`flat` format) —
-current; (3) **escalating ladder** (`ladder` format) — shipped selectable (GS-9) so 2-vs-3 can be *played*.
-Everything below serves whichever wins.
+## Avenue decision (settled for now)
+What wraps the golf: the **Voyage** is the winnable campaign and the **Unending Universe** (GS-unending)
+is the endless survival mode — the old `flat`/`ladder` roguelites are retired (their machinery lives on
+under the new format). Avenue (1), a full top-down RPG shell, stays deferred until the loop is exhausted.
 
 ## Now / next
 Foundations are shipped; these are the live follow-ons.
@@ -23,8 +22,12 @@ Foundations are shipped; these are the live follow-ons.
 - **GS-risk-shards / GS-bag-cap** (small) — reward `cutDelta`/rarity-survived in shards; a soft bag cap so
   club loot is a draft, not pure accretion.
 - **GS-100 follow-ons** — shot-by-shot boss ANIMATION on the map (honour-gated away-player sequencing);
-  matchplay/boss cadence for the endless `flat`/`ladder` formats (voyage-only today); headless
+  a matchplay/boss cadence for the endless Unending Universe (voyage-only today); headless
   `simulateRun` playing the real duel (stroke-play today, for balance/tests).
+- **GS-unending follow-ons** — tune the birdie wall from real play (hole 41+ demands birdie-or-better;
+  baseline auto-AI dies ~hole 24, so 60/80/100+ are meant to need a stacked build — verify a maxed human
+  can actually reach 150); per-tier intro stingers ("the bar tightens…"); an endless leaderboard
+  (best-holes daily); maybe a mercy token (one bar-miss forgiven) as a deep shop legendary.
 
 **Course / greens / hazards**
 - **GS-greens-4** — template green COMPLEXES on top of the linear `greenSlope`: redan kick-feed, Biarritz
@@ -129,7 +132,10 @@ Terse log — full story in the linked report / `docs/decisions/` / git history.
 - **GS-12** — persistent meta: Star Shards + Outpost (save v3).
 - **GS-11** — deep shop: stackable upgrades + rotating rarity-weighted offer.
 - **GS-10** — RPG shot model + interactive play (#18–#21).
-- **GS-9** — run formats: flat + ladder (#8).
+- **GS-unending** — the Unending Universe endless survival format (4-hole stops forever, par-relative
+  per-hole bar, milestone victory screens + the earn-only Evergreen set + the secret hole-150 ship;
+  replaced the flat/ladder roguelites; save v13).
+- **GS-9** — run formats: flat + ladder (#8; both retired by GS-unending).
 - **GS-8** — interactive meta-loop UI reducer (#5).
 - **GS-6** — real pin within the green.
 - **GS-5** — course/item cards (#9).

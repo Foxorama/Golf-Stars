@@ -74,10 +74,24 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         <path d="M-5,-1.5 A5 4 0 0 1 5,-1.5 Z" fill="${color}" opacity="0.8"/>
         <ellipse cx="0" cy="-11" rx="7" ry="2.4" fill="none" stroke="${color}" stroke-width="2"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></ellipse>`;
       break;
+    case 'baggy':
+      // The baggy green (GS-unending): a soft, slouched crown that droops over one side, stitched
+      // panel seams, a short brim, and a gold-thread emblem front and centre.
+      g = `<path d="M-7.4,-1.6 Q-8.4,-8.2 -2.5,-9.6 Q0.5,-11.4 4,-9.4 Q8.6,-8.8 7.6,-3.4 Q8.8,-1.4 6.8,-1.2 Z" fill="${color}" ${ink}/>
+        <path d="M-4.5,-9 Q-3.4,-4.6 -3.8,-1.6 M1.5,-10.2 Q1.2,-5.4 1.2,-1.5 M5.4,-8.6 Q4.8,-4.8 5,-2" fill="none" stroke="#0c1116" stroke-width="0.6" opacity="0.55"/>
+        <path d="M-6.8,-2 Q0,1.8 6.6,-2 Z" fill="${accent}" ${ink}/>
+        <circle cx="0.6" cy="-5.6" r="1.6" fill="none" stroke="${accent}" stroke-width="0.9"/>
+        <path d="M0.6,-6.8 L0.6,-4.4 M-0.6,-5.6 L1.8,-5.6" stroke="${accent}" stroke-width="0.7"/>`;
+      break;
     default:
       g = '';
   }
-  const flair = shape === 'halo' ? sparkles([[-9, -6], [9, -4], [0, 6]]) : '';
+  const flair =
+    shape === 'halo'
+      ? sparkles([[-9, -6], [9, -4], [0, 6]])
+      : shape === 'baggy'
+        ? sparkles([[-8, -8], [8, -6]])
+        : '';
   return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">${a}${g}${flair}</g>`;
 }
 
@@ -109,6 +123,15 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number): string {
       detail = `<g fill="#fff"><circle cx="${cx - 4}" cy="${cy - 2}" r="0.9"/><circle cx="${cx + 3}" cy="${cy + 1}" r="0.7"/><circle cx="${cx - 1}" cy="${cy + 6}" r="0.8"/><circle cx="${cx + 6}" cy="${cy - 4}" r="0.6"/><circle cx="${cx - 6}" cy="${cy + 4}" r="0.6"/></g>
         <path d="M${cx - 9},${cy + 2} Q${cx},${cy - 3} ${cx + 9},${cy + 5}" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.8"/>`;
       break;
+    case 'blazer':
+      // The tailored jacket (GS-unending's Green Jacket): notched gold-trimmed lapels down to a
+      // single button, a breast-pocket crest, and a hint of shirt in the open V.
+      detail = `<path d="M${cx - 5},${cy - 9.5} L${cx},${cy - 4} L${cx + 5},${cy - 9.5} L${cx + 2.4},${cy + 4} L${cx - 2.4},${cy + 4} Z" fill="#f4f6f2" opacity="0.9"/>
+        <path d="M${cx - 6},${cy - 10} L${cx - 1},${cy - 4.5} L${cx - 2.6},${cy + 5} L${cx - 5.4},${cy - 1}" fill="none" stroke="${accent}" stroke-width="1.3"/>
+        <path d="M${cx + 6},${cy - 10} L${cx + 1},${cy - 4.5} L${cx + 2.6},${cy + 5} L${cx + 5.4},${cy - 1}" fill="none" stroke="${accent}" stroke-width="1.3"/>
+        <circle cx="${cx}" cy="${cy + 6}" r="1" fill="${accent}"/>
+        <g transform="translate(${cx - 6.5} ${cy + 1})"><circle r="2.1" fill="${accent}"/><path d="M0,-1.3 L0.4,-0.4 L1.3,-0.3 L0.6,0.3 L0.8,1.2 L0,0.7 L-0.8,1.2 L-0.6,0.3 L-1.3,-0.3 L-0.4,-0.4 Z" fill="#0f5132"/></g>`;
+      break;
     default:
       detail = '';
   }
@@ -123,7 +146,8 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   // A common shirt silhouette (shoulders → collar V → body) all shapes share.
   const bodyPath = `M${cx - 13},${cy - 9} L${cx - 6},${cy - 11} L${cx},${cy - 7} L${cx + 6},${cy - 11} L${cx + 13},${cy - 9} L${cx + 10},${cy - 3} L${cx + 9},${cy + 12} L${cx - 9},${cy + 12} L${cx - 10},${cy - 3} Z`;
   const base = `<path d="${bodyPath}" fill="${color}" ${ink}/>`;
-  const flair = shape === 'cosmic' ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]]) : '';
+  const flair =
+    shape === 'cosmic' || shape === 'blazer' ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]]) : '';
   return a + base + shirtDetail(look, cx, cy) + flair;
 }
 
@@ -152,6 +176,32 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   return a + body + band + detail + flair;
 }
 
+/**
+ * Draw a GOLF-BAG glyph (the cosmetic bag slot, GS-unending) — an upright staff bag: tapered body,
+ * gold trim ring + pocket, a shoulder strap, and three clubs standing out of the top. Authored in a
+ * ~34u-tall frame about (cx,cy); `scale` fits it elsewhere (the mannequin's side prop).
+ */
+function bagGlyph(look: ApparelLook, cx: number, cy: number, uid: string, scale = 1): string {
+  const { color, accent = '#d9b74a', glow } = look;
+  const ink = 'stroke="#0c1116" stroke-width="1" stroke-linejoin="round"';
+  const a = glow ? aura(0, 0, 22, glow, `bg${uid}`) : '';
+  const clubs = `
+    <g stroke="#b9c2cf" stroke-width="1.3" stroke-linecap="round">
+      <line x1="-3.5" y1="-11" x2="-5.5" y2="-19"/><line x1="0.5" y1="-11" x2="0.5" y2="-21"/><line x1="4" y1="-11" x2="6" y2="-18"/>
+    </g>
+    <circle cx="-5.9" cy="-19.6" r="1.7" fill="#dfe6f0" ${ink}/>
+    <path d="M0.5,-21 L4.4,-19.6 L0.5,-18.6 Z" fill="#dfe6f0" ${ink}/>
+    <circle cx="6.4" cy="-18.5" r="1.5" fill="#dfe6f0" ${ink}/>`;
+  const body = `
+    <path d="M-6.5,-11 L6.5,-11 L5.4,13 Q0,15.4 -5.4,13 Z" fill="${color}" ${ink}/>
+    <ellipse cx="0" cy="-11" rx="6.5" ry="2.3" fill="${accent}" ${ink}/>
+    <rect x="-4.6" y="-4" width="9.2" height="2" fill="${accent}" stroke="none"/>
+    <path d="M-4.2,0 L4.2,0 L3.6,8 Q0,9.6 -3.6,8 Z" fill="${accent}" opacity="0.9" ${ink}/>
+    <path d="M-6,-9 Q-11,0 -5.6,10" fill="none" stroke="${accent}" stroke-width="1.6"/>
+    <circle cx="0" cy="4" r="1.9" fill="none" stroke="#0f5132" stroke-width="0.9"/>`;
+  return `<g transform="translate(${cx} ${cy}) scale(${scale.toFixed(3)})">${a}${clubs}${body}${sparkles([[-9, -14], [9, 6]])}</g>`;
+}
+
 /** A framed `<svg>` icon of a garment for a wardrobe card. */
 export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
   const item = apparelById(id);
@@ -167,7 +217,9 @@ export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
       ? hatGlyph(item.look, cx, cy, hatR, uid)
       : item.slot === 'shirt'
         ? shirtGlyph(item.look, cx, cy, uid)
-        : pantsGlyph(item.look, cx, cy, uid);
+        : item.slot === 'bag'
+          ? bagGlyph(item.look, cx, cy - 2, uid, 1.4)
+          : pantsGlyph(item.look, cx, cy, uid);
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${item.name}" style="display:block;">${glyph}</svg>`;
 }
 
@@ -180,12 +232,13 @@ export function golferPreviewSVG(
   hatId: string | undefined,
   shirtId: string | undefined,
   pantsId: string | undefined,
-  opts: { skin?: string; shirtBase?: string; w?: number; h?: number } = {},
+  opts: { skin?: string; shirtBase?: string; w?: number; h?: number; bagId?: string } = {},
 ): string {
   const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132 } = opts;
   const hat = apparelById(hatId);
   const shirt = apparelById(shirtId);
   const pants = apparelById(pantsId);
+  const bag = apparelById(opts.bagId);
   const cx = w / 2;
   // ONE proportional full-body figure at every size. Vertical anchors are fractions of `h` so
   // head→chest→legs read as three even bands (the Clubhouse stage's hat/shirt/pants tap zones line up
@@ -241,7 +294,10 @@ export function golferPreviewSVG(
   // Draw the hat ON the head (centre + real radius) so it scales to the head it sits on — a helmet
   // encloses the whole head, a cap perches on the crown — exactly as on-course.
   const hatG = hat ? hatGlyph(hat.look, cx, headY, headR, 'prev') : '';
+  // The equipped golf bag (GS-unending) stands propped at the golfer's side, feet on the same floor
+  // line, scaled with the figure — the caddy-bag flex without cluttering the swing pose.
+  const bagG = bag ? bagGlyph(bag.look, cx - px(34), footY - px(15), 'prevbag', S * 1.15) : '';
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${glowAura}${pantsGlow}${legs}${arms}${torso}${detail}${hands}${head}${hatG}
+    ${glowAura}${pantsGlow}${bagG}${legs}${arms}${torso}${detail}${hands}${head}${hatG}
   </svg>`;
 }

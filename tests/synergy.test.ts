@@ -62,7 +62,7 @@ describe('shop reroll (GS-shop-reroll)', () => {
   });
 
   it('rerolling redraws the stock and charges credits', () => {
-    let s: UiState = reduce(initState(31), { type: 'start', format: 'flat' });
+    let s: UiState = reduce(initState(31), { type: 'start', format: 'unending' });
     s = reduce(s, { type: 'selectCharacter', characterId: 'feather-fade' });
     s = reduce(s, { type: 'play' });
     if (s.screen === 'gameover') return; // unlucky stop-0 cut
@@ -81,7 +81,7 @@ describe('shop reroll (GS-shop-reroll)', () => {
   });
 
   it('reroll is a no-op when you cannot afford it', () => {
-    let s: UiState = reduce(initState(32), { type: 'start', format: 'flat' });
+    let s: UiState = reduce(initState(32), { type: 'start', format: 'unending' });
     s = reduce(s, { type: 'selectCharacter', characterId: 'feather-fade' });
     s = reduce(s, { type: 'play' });
     if (s.screen === 'gameover') return;

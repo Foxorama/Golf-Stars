@@ -19,8 +19,9 @@ import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 
 /** The vector look the ship drawer renders (a base shape family + palette + bling). */
 export interface ShipLook {
-  /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated). */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper';
+  /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated); `infinity` is
+   *  the hole-150 Unending-Universe grail (GS-unending) — the most animated craft in the fleet. */
+  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -46,6 +47,10 @@ export interface Ship {
   blurb: string;
   /** Shard price (0 = free / starter). */
   cost: number;
+  /** Earned, never bought (GS-unending): unlocked by surviving this many holes of the Unending
+   *  Universe. A `secret` unlock is hidden from the market entirely until it's owned. */
+  unlockHoles?: number;
+  secret?: boolean;
   look: ShipLook;
 }
 
@@ -176,6 +181,20 @@ export const SHIPS: readonly Ship[] = [
     cost: 1250, // the top of the fleet — a hand-built showpiece above the Mothership grail
     look: { kind: 'chopper', body: '#16181f', glass: '#cfe9ff', flame: '#ff7a1a', accent: '#7fe049', bling: 3 },
   },
+  // --- The SECRET grail (GS-unending): earned at hole 150 of the Unending Universe, never sold.
+  // Kept LAST so the ships tests' first-mythic assertions (the Mothership) are undisturbed.
+  {
+    id: 'infinity-ace',
+    name: 'The Infinity Ace',
+    set: 'Mythic',
+    rarity: 'mythic',
+    blurb:
+      'Forged at the edge of the unending universe — a golden phoenix-winged star-yacht wreathed in living aurora, flying the ∞ pennant. There is no better ride. There cannot be.',
+    cost: 0, // priceless — earned by surviving 150 holes of the Unending Universe (GS-unending)
+    unlockHoles: 150,
+    secret: true,
+    look: { kind: 'infinity', body: '#f2c94c', glass: '#eafff6', flame: '#7fffd4', accent: '#4fe08a', bling: 3, flag: '∞' },
+  },
 ];
 
 const SHIP_BY_ID: Record<string, Ship> = Object.fromEntries(SHIPS.map((s) => [s.id, s]));
@@ -190,7 +209,8 @@ export function shipCatalogue(): Ship[] {
   return [...SHIPS].sort((a, b) => COSMETIC_RARITY[a.rarity].order - COSMETIC_RARITY[b.rarity].order);
 }
 
-/** Can this ship be bought? (Affordable, not already owned, and has a price.) */
+/** Can this ship be bought? (Affordable, not already owned, has a price, and actually FOR SALE —
+ *  an Unending-Universe unlock (GS-unending) is earned, never bought.) */
 export function canBuyShip(ship: Ship | undefined, shards: number, owned: readonly string[]): boolean {
-  return !!ship && ship.cost > 0 && shards >= ship.cost && !owned.includes(ship.id);
+  return !!ship && !ship.unlockHoles && ship.cost > 0 && shards >= ship.cost && !owned.includes(ship.id);
 }

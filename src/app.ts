@@ -33,9 +33,10 @@ import { type SprayGeomInput } from './render/holeView';
 import { rarCol } from './sim/rpg/loot';
 import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybridType, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, REWARD_CLUB_TYPES, shopItem, usableBag } from './sim/rpg/economy';
 import { CLUBS, clubById } from './sim/clubs';
-import { FORMATS } from './sim/rpg/formats';
+import { FORMATS, getFormat } from './sim/rpg/formats';
 import { getCharacter, type Character } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, snapshotRun, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
+import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
+import { ENDLESS_MILESTONES, ENDLESS_UNLOCKS, endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { arcSurvivorTarget } from './sim/rpg/competition';
@@ -57,6 +58,7 @@ import {
   hatForCharacter,
   shirtForCharacter,
   pantsForCharacter,
+  golfBagForCharacter,
   type Action,
   type UiState,
 } from './ui/game';
@@ -67,7 +69,7 @@ import { mountIntro } from './render/introView';
 import { sfx, resumeAudio } from './render/audio';
 import { getSettings, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
-import { showAceCelebration, showBirdCelebration, showVoyageVictory } from './render/celebrations';
+import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showVoyageVictory } from './render/celebrations';
 import { golferSVG, proAvatarSVG, characterScreen, ordinal, competitorsCard, leaderboardHTML, opponentBadge } from './render/golferCards';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
@@ -146,9 +148,11 @@ function boot(): void {
       hatByCharacter: save.hatByCharacter,
       shirtByCharacter: save.shirtByCharacter,
       pantsByCharacter: save.pantsByCharacter,
+      golfBagByCharacter: save.golfBagByCharacter,
       bagTier: save.bagTier,
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
       clubhouseVisit: save.clubhouseVisit,
+      endlessBestHoles: save.endlessBestHoles,
     };
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -191,7 +195,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 12,
+    version: 13,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -204,9 +208,11 @@ function persist(): void {
     hatByCharacter: state.hatByCharacter,
     shirtByCharacter: state.shirtByCharacter,
     pantsByCharacter: state.pantsByCharacter,
+    golfBagByCharacter: state.golfBagByCharacter,
     bagTier: state.bagTier,
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     clubhouseVisit: state.clubhouseVisit,
+    endlessBestHoles: state.endlessBestHoles,
     activeRun: state.run.status === 'active' ? snapshotRun(state.run) : undefined,
   });
 }
@@ -241,6 +247,11 @@ function dispatch(action: Action): void {
   }
   try {
     const prevScreen = state.screen;
+    // The Unending Universe's milestone takeover (GS-unending) fires on a survived-hole CROSSING —
+    // capture the pre-action counters so the post-reduce state can be diffed (same run only).
+    const prevRunSeed = state.run.seed;
+    const prevHoles = state.run.holesSurvived;
+    const prevBestHoles = state.endlessBestHoles;
     state = reduce(state, action);
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -279,6 +290,40 @@ function dispatch(action: Action): void {
     if (enteredGameover && state.run.endedReason === 'won') {
       showVoyageVictory(victoryInfo(), () => render());
     }
+    // The Unending-Universe milestone takeover (GS-unending): a full-screen victory screen the moment
+    // the survived-hole count crosses 40/60/…/140 (or the hole-150 secret) — over the result screen
+    // mid-run, or over the gameover recap if the crossing stop was also the dying one. Same cosmetic
+    // side-effect pattern as the voyage victory; the shards/unlocks were already banked by the reducer.
+    if (state.run.seed === prevRunSeed && state.run.holesSurvived > prevHoles && holeGateArmed(state.run)) {
+      const crossed = endlessMilestonesCrossed(prevHoles, state.run.holesSurvived);
+      // Unlock reveals key off the LIFETIME best (a re-crossed milestone banks shards again, but an
+      // already-owned Evergreen piece isn't re-announced).
+      const unlocked = endlessUnlocksCrossed(prevBestHoles, state.endlessBestHoles);
+      const secret = unlocked.find((u) => u.secret);
+      const top = crossed[crossed.length - 1];
+      if (top || secret) {
+        const holes = secret && (!top || secret.holes > top.holes) ? secret.holes : top!.holes;
+        const shards = crossed.reduce((s, m) => s + m.shards, 0);
+        const u = secret ?? unlocked[unlocked.length - 1];
+        showEndlessMilestone(
+          {
+            holes,
+            shards,
+            unlock: u
+              ? {
+                  name: u.name,
+                  detail: u.kind === 'ship' ? 'Parked in every golfer’s Clubhouse garage' : 'Wear it from the Clubhouse — earned, never sold',
+                  color: '#4fe08a',
+                  secret: u.secret,
+                }
+              : undefined,
+            bar: `${endlessGateLabel(endlessGateOverPar(state.run.holesSurvived + 1))} or better`,
+            seed: state.run.seed,
+          },
+          () => render(),
+        );
+      }
+    }
   } catch (err) {
     recover(err);
   }
@@ -313,8 +358,36 @@ function header(): string {
     </header>`;
 }
 
+/** The Unending Universe's title-card progress strip (GS-unending): lifetime-best holes, the survival
+ *  ladder in one line, and the milestone/unlock trail — earned pieces lit, the hole-150 secret masked
+ *  as "? ? ?" until it's owned. Pure presentation over `state.endlessBestHoles` + the owned pools. */
+function endlessProgressHTML(): string {
+  const best = state.endlessBestHoles;
+  const chips = ENDLESS_MILESTONES.map((m) => {
+    const unlock = ENDLESS_UNLOCKS.find((u) => u.holes === m.holes && !u.secret);
+    const done = best >= m.holes;
+    const col = done ? '#4fe08a' : 'var(--gs-dim)';
+    return `<span class="gs-chip" title="${m.holes} holes: ✦ ${m.shards} Shards${unlock ? ` + ${unlock.name}` : ''}" style="border-color:${done ? '#2a5a40' : 'var(--gs-line-2)'};color:${col};font-size:10.5px;">${done ? '✓' : ''} ${m.holes}${unlock ? ' 🎁' : ''}</span>`;
+  }).join('');
+  const secret = ENDLESS_UNLOCKS.find((u) => u.secret);
+  const secretOwned = !!secret && (secret.kind === 'ship' ? state.ownedShips : state.ownedApparel).includes(secret.id);
+  const secretChip = secret
+    ? `<span class="gs-chip" title="${secretOwned ? secret.name : 'Something waits at hole 150…'}" style="border-color:${secretOwned ? '#3a3320' : 'var(--gs-line-2)'};color:${secretOwned ? 'var(--gs-gold)' : 'var(--gs-dim)'};font-size:10.5px;">${secretOwned ? `✓ 150 🛸 ${secret.name}` : '150 · ? ? ?'}</span>`
+    : '';
+  const next = nextEndlessUnlock(best);
+  const tease = next
+    ? `Next unlock: <b>${next.secret ? '? ? ?' : next.name}</b> at hole ${next.holes}`
+    : 'Every unlock earned — the universe is yours';
+  return `
+    <div style="margin:6px 0 8px;">
+      <div style="font-size:12px;opacity:.75;margin-bottom:4px;">💀 Survival bar: quad bogey → one stroke tighter every 8 holes → <b>birdie</b> from hole 41 on.
+        ${best > 0 ? ` · Best: <b style="color:#4fe08a;">${best} holes</b>` : ''} · ${tease}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">${chips}${secretChip}</div>
+    </div>`;
+}
+
 function titleScreen(): string {
-  // Headline the winnable campaign (GS-voyage) first, then the endless roguelite formats.
+  // Headline the winnable campaign (GS-voyage) first, then the endless survival format.
   const formats = Object.values(FORMATS)
     .slice()
     .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
@@ -327,6 +400,7 @@ function titleScreen(): string {
           <span style="font-size:12px;opacity:.6;">${f.stops.map((s) => s.label).join(' → ')}${f.winnable ? '' : f.stops.length > 1 ? ' → …' : ' (repeats)'}</span>
         </div>
         <p style="font-size:13px;opacity:.8;margin:.4em 0;">${f.blurb}</p>
+        ${f.holeGate ? endlessProgressHTML() : ''}
         ${
           f.winnable && state.maxAscension > 0
             ? `<div style="font-size:12px;opacity:.75;margin-bottom:5px;">⚔ Ascension — harder cut, leaner purse. Win to unlock the next tier (max unlocked: A${state.maxAscension}):</div>
@@ -599,7 +673,7 @@ function introScreen(): string {
   if (ev && ev.id !== 'open-space')
     notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid ${rarCol(ev.rarity)};border-radius:8px;background:#ffffff08;">
        <b style="font-size:13px;">${ev.label}</b>
-       <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${ev.desc}</div>
+       <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${eventDescFor(ev.desc)}</div>
      </div>`);
 
   const thumb = renderHoleSVG(c.holes[0]!, {
@@ -629,14 +703,25 @@ function introScreen(): string {
       ${notes.join('')}
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gs-line-2);">
         <p style="font-size:14px;margin:0 0 10px;">${(() => {
-          const winnable = !!(FORMATS[state.run.formatId] ?? FORMATS['flat']!).winnable;
+          const format = getFormat(state.run.formatId);
           if (duel)
             return `⚔ Win the <b>${teamFormatLabel(duel.format)} duel</b> hole by hole — ${
               duel.partnerSide === 'player' ? 'your partner has your back' : 'you give up the partner advantage'
             }.`;
           if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
           if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
-          if (winnable) {
+          if (format.holeGate) {
+            // The Unending Universe (GS-unending): the stakes are the PER-HOLE survival bar. Say the
+            // bar for these exact holes (and flag mid-stop tightening, which happens every 8 holes).
+            const first = endlessGateOverPar(endlessHoleNumber(state.run, 0));
+            const last = endlessGateOverPar(endlessHoleNumber(state.run, c.holes.length - 1));
+            const bar =
+              first === last
+                ? `<b>${endlessGateLabel(first)}</b> or better on every hole`
+                : `<b>${endlessGateLabel(first)}</b> or better — tightening to <b>${endlessGateLabel(last)}</b> mid-set`;
+            return `💀 Holes ${endlessHoleNumber(state.run, 0)}–${endlessHoleNumber(state.run, c.holes.length - 1)} · survive ${bar}. One miss ends the run.`;
+          }
+          if (format.winnable) {
             const target = arcSurvivorTarget(state.run.stopIndex, ascensionCutBonus(state.run.ascension));
             return `🏁 Finish in the <b>top ${target}</b> of the field over ${c.holes.length} holes to advance.`;
           }
@@ -728,7 +813,7 @@ let inspectGearId: string | null = null;
 // View-only module state (like inspectGearId) — toggled via [data-toggle-section] + re-render, never
 // persisted. Every section starts collapsed (re-seeded from MARKET_SECTION_IDS each time the market
 // opens) so the catalogue lands compact and browsable; the player expands the racks they want.
-const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'bags'] as const;
+const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'bag', 'bags'] as const;
 const collapsedMarketSections = new Set<string>(MARKET_SECTION_IDS);
 // Clubhouse editor (GS-clubhouse-stage): which slot picker is open — tap a body part or the garage on
 // the character stage to reveal that slot's rack. View-only module state (like inspectGearId), toggled
@@ -1119,6 +1204,18 @@ function holePips(): string {
 }
 
 function zoneScoreChip(): string {
+  // The Unending Universe (GS-unending): the number that matters is THIS hole's survival score, not a
+  // stop Stableford — show the strokes left under the bar, going amber → red as they burn down.
+  if (holeGateArmed(state.run)) {
+    const done = state.stopPlayed ?? [];
+    const idx = state.play?.holeIndex ?? done.length;
+    const par = state.course.holes[idx]?.par ?? 4;
+    const holeNo = endlessHoleNumber(state.run, idx);
+    const req = endlessRequiredStrokes(par, holeNo);
+    const left = req - (state.play?.strokes ?? 0);
+    const col = left >= 3 ? '#5fd45a' : left === 2 ? '#ffc454' : '#ff6b6b';
+    return `<span class="gs-shotscore" style="color:${col};" title="hole ${holeNo} of the run — hole out in ${req} (${endlessGateLabel(endlessGateOverPar(holeNo))}) or the run ends">💀 ≤${req}</span>`;
+  }
   const done = state.stopPlayed ?? [];
   const sf = playTotals(done.map((p) => p.record)).stableford;
   const cut = effectiveCut(state.run, state.course.holes.length);
@@ -1648,22 +1745,46 @@ function resultScreen(): string {
       <section style="flex:1 1 300px;min-width:280px;position:relative;">
         ${res.passed ? burst() : ''}
         <h2 style="font-size:16px;margin:.2em 0;color:${res.passed ? '#5fd45a' : '#ff6b6b'};">
-          ${state.match ? (res.passed ? 'MATCH WON' : 'MATCH LOST') : res.passed ? 'MADE THE CUT' : 'MISSED CUT'}</h2>
+          ${
+            state.match
+              ? res.passed
+                ? 'MATCH WON'
+                : 'MATCH LOST'
+              : holeGateArmed(state.run)
+                ? res.passed
+                  ? 'SET SURVIVED'
+                  : 'THE UNIVERSE WINS'
+                : res.passed
+                  ? 'MADE THE CUT'
+                  : 'MISSED CUT'
+          }</h2>
         ${(() => {
           const board = leaderboard(state.run);
           const positional = board.mode === 'positional';
+          const gate = holeGateArmed(state.run);
           const me = board.standings.find((s) => s.isPlayer);
           // For a positional voyage stop the Stableford cut isn't the survival bar (your PLACE is), so
-          // don't show "vs cut N" — the standings + "you're Nth" line below carry survival.
-          const cutTxt = state.match || positional ? '' : ` vs cut <b>${res.cut}</b>`;
+          // don't show "vs cut N" — the standings + "you're Nth" line below carry survival. Same for
+          // the Unending Universe (GS-unending), whose bar is per-hole — show the survival ledger instead.
+          const cutTxt = state.match || positional || gate ? '' : ` vs cut <b>${res.cut}</b>`;
           const summary = `<p style="font-size:14px;">Stableford <b>${res.stableford}</b>${cutTxt} · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>`;
+          let survival = '';
+          if (gate) {
+            const holes = state.run.holesSurvived;
+            const nextM = ENDLESS_MILESTONES.find((m) => m.holes > holes);
+            survival = `<p style="font-size:13.5px;margin:.2em 0 .6em;color:#4fe08a;">🌌 <b>${holes}</b> holes survived${
+              nextM ? ` · next victory at <b>${nextM.holes}</b> (✦ ${nextM.shards})` : ' · beyond every milestone'
+            } · bar: <b>${endlessGateLabel(endlessGateOverPar(holes + 1))}</b></p>`;
+          }
           const through = positional
             ? board.survivorTarget
               ? ` · top ${board.survivorTarget} advance`
               : ''
             : ` · ${board.survivors} make it through`;
           const place = me ? `<p style="font-size:13px;margin:.2em 0 .6em;">You're <b>${ordinal(me.position)}</b> of ${board.standings.length}${through}.</p>` : '';
-          return summary + (state.match ? matchResultPanel() : '') + place + leaderboardHTML(board);
+          // The ghost field is flavour in the Unending Universe (survival is the per-hole bar), so the
+          // board stays but the "make it through" framing goes.
+          return summary + survival + (state.match ? matchResultPanel() : '') + (gate ? '' : place) + leaderboardHTML(board);
         })()}
         <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;opacity:.7;">Scorecard</summary>${scorecard()}</details>
         <div style="margin-top:10px;">${btn(
@@ -1934,7 +2055,9 @@ function marketSection(
  *  grants GLOBAL ownership — you then outfit each golfer individually in the Clubhouse. The full browsable
  *  catalogue is split into uniform collapsible sections (GS-market-accordion) so it stays navigable. */
 function tradeMarketScreen(): string {
-  const ships = shipCatalogue();
+  // A SECRET Unending-Universe ship (GS-unending) stays out of the rack entirely until it's earned —
+  // the market never spoils the hole-150 reveal.
+  const ships = shipCatalogue().filter((s) => !s.secret || state.ownedShips.includes(s.id));
   // Owned rides sink to the bottom of the rack (greyed out) so the buyable fleet reads first (stable
   // sort keeps rarity order within each group).
   const shipCards = ships
@@ -1988,9 +2111,10 @@ function tradeMarketScreen(): string {
       'The full fleet. The rarer the ride, the steeper the shard price — the Mothership is the grail.',
       shipCards,
     )}
-    ${apparelSection('hat', '🎩', 'Hats', 'Caps &amp; crowns. Complete a matching set across all three slots for the full look.')}
+    ${apparelSection('hat', '🎩', 'Hats', 'Caps &amp; crowns. Complete a matching set across every slot for the full look.')}
     ${apparelSection('shirt', '👕', 'Shirts', 'Tops &amp; jackets to suit each golfer.')}
     ${apparelSection('pants', '👖', 'Pants', 'Trousers &amp; legwear to finish the outfit.')}
+    ${apparelSection('bag', '🎒', 'Caddy Bags', 'Cosmetic staff bags your golfer poses with in the Clubhouse — earned in the <b>Unending Universe</b>, never sold.')}
     ${bagSetSection()}
     <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}</div>`;
 }
@@ -2143,14 +2267,16 @@ function clubhousePicker(
   shirtId: string | undefined,
   pantsId: string | undefined,
   shipId: string | undefined,
+  bagId: string | undefined,
 ): string {
   if (!clubhouseSlot) {
-    return `<p class="gs-clubhint">Tap ${ch.shortName}'s hat, shirt, pants — or the garage — to change it.</p>`;
+    return `<p class="gs-clubhint">Tap ${ch.shortName}'s hat, shirt, pants, bag — or the garage — to change it.</p>`;
   }
   const meta: Record<ClubSlot, { icon: string; title: string }> = {
     hat: { icon: '🎩', title: `Hats for ${ch.shortName}` },
     shirt: { icon: '👕', title: `Shirts for ${ch.shortName}` },
     pants: { icon: '👖', title: `Pants for ${ch.shortName}` },
+    bag: { icon: '🎒', title: `Golf bags for ${ch.shortName}` },
     ship: { icon: '🛸', title: `${ch.shortName}'s garage` },
   };
   const m = meta[clubhouseSlot];
@@ -2169,9 +2295,14 @@ function clubhousePicker(
       .join('')}</div>`;
   } else {
     const owned = apparelForSlot(clubhouseSlot).filter((a) => state.ownedApparel.includes(a.id));
+    // Golf bags are Unending-Universe trophies (GS-unending) — an empty rack points at the run, not the shop.
+    const emptyMsg =
+      clubhouseSlot === 'bag'
+        ? `<div class="gs-cpick__empty">No golf bags earned yet.<br><span style="font-size:12px;opacity:.75;">Survive 40 holes of the <b>Unending Universe</b> to earn the Evergreen Tour Bag.</span></div>`
+        : `<div class="gs-cpick__empty">No ${clubhouseSlot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
     body = owned.length
-      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId)).join('')}</div>`
-      : `<div class="gs-cpick__empty">No ${clubhouseSlot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
+      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId, bagId)).join('')}</div>`
+      : emptyMsg;
   }
   return `
     <section class="gs-cpick">
@@ -2194,13 +2325,15 @@ function clubhouseScreen(): string {
   const shirtId = shirtForCharacter(state, ch.id);
   const pantsId = pantsForCharacter(state, ch.id);
   const shipId = shipForCharacter(state, ch.id);
+  const bagId = golfBagForCharacter(state, ch.id);
   const preview = golferPreviewSVG(hatId, shirtId, pantsId, {
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
-    w: 150,
+    w: 190,
     h: 210,
+    bagId,
   });
-  const setName = equippedSet(hatId, shirtId, pantsId);
+  const setName = equippedSet(hatId, shirtId, pantsId, bagId);
   const setBadge = setName
     ? `<div class="gs-clubset">✦ ${setName} set complete!</div>`
     : '';
@@ -2228,6 +2361,7 @@ function clubhouseScreen(): string {
       ${zone('hat', '🎩', nameOf(hatId, 'No hat'))}
       ${zone('shirt', '👕', nameOf(shirtId, 'Default shirt'))}
       ${zone('pants', '👖', nameOf(pantsId, 'Default pants'))}
+      ${zone('bag', '🎒', nameOf(bagId, 'No bag'))}
     </div>
     ${setBadge}
     <button class="gs-garage${shipActive}" data-clubslot="ship" aria-label="Change ${ch.shortName}'s ride">
@@ -2240,7 +2374,7 @@ function clubhouseScreen(): string {
         <span class="gs-garage__edit">Change ride ✎</span>
       </span>
     </button>
-    ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId)}
+    ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId, bagId)}
     <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
       ${btn('🏠 Back to Clubhouse', { type: 'clubhouseBackToHall' }, { variant: 'ghost' })}
       ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
@@ -2326,6 +2460,9 @@ function marketApparelCardHTML(item: Apparel): string {
   let action: Action | undefined;
   if (owned) {
     footer = '✓ owned';
+  } else if (item.unlockHoles) {
+    // An Unending-Universe trophy (GS-unending): browsable as a tease, never buyable.
+    footer = `🔒 Survive ${item.unlockHoles} holes · Unending Universe`;
   } else if (afford) {
     footer = `✦ ${item.cost}`;
     action = { type: 'buyApparel', id: item.id };
@@ -2342,9 +2479,11 @@ function clubhouseApparelCardHTML(
   hatId: string | undefined,
   shirtId: string | undefined,
   pantsId: string | undefined,
+  bagId: string | undefined,
 ): string {
   const ring = cosmeticRarCol(item.rarity);
-  const wornId = item.slot === 'hat' ? hatId : item.slot === 'shirt' ? shirtId : pantsId;
+  const wornId =
+    item.slot === 'hat' ? hatId : item.slot === 'shirt' ? shirtId : item.slot === 'bag' ? bagId : pantsId;
   const worn = wornId === item.id;
   const accent = worn ? '#ffce54' : ring;
   const footer = worn ? '✓ WEARING' : 'Wear this';
@@ -2379,6 +2518,14 @@ function travelChip(txt: string, col: string): string {
   return `<span style="display:inline-block;font-size:11.5px;font-weight:700;color:${col};border:1px solid ${col}66;border-radius:5px;padding:1px 7px;">${txt}</span>`;
 }
 
+/** Route-event copy, kept honest per format (GS-unending): in the Unending Universe there is no
+ *  Stableford cut — an event's `cutDelta` lands as course WILDNESS (`routeDifficulty`) instead, so
+ *  its "cut +1" phrasing is rewritten to say what actually happens. Other formats read as authored. */
+function eventDescFor(desc: string): string {
+  if (!holeGateArmed(state.run)) return desc;
+  return desc.replace(/cut \+\d+/gi, 'wilder course').replace(/cut -\d+/gi, 'calmer course');
+}
+
 /** The route-info sheet (GS-journey-vertical): tapping a branch planet on the star-chart opens this
  *  bottom-sheet with the FULL jump detail — the world you'll play (biome + difficulty + weather), the
  *  bet's levers, and a confirm/cancel. Confirm dispatches the existing { type:'route' } action; cancel
@@ -2406,7 +2553,10 @@ function routeInfoOverlay(): string {
     const pct = Math.round((ev.creditMult - 1) * 100);
     tags.push(travelChip(`${pct > 0 ? '+' : ''}${pct}% credits`, pct >= 0 ? '#ffce54' : '#ff8b6b'));
   }
-  if (ev.cutDelta !== 0) tags.push(travelChip(`cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}`, ev.cutDelta > 0 ? '#ff8b6b' : '#2bb673'));
+  // In the Unending Universe the cut lever doesn't exist — the difficulty line above already says
+  // what cutDelta really does there (a wilder/gentler generated course via routeDifficulty).
+  if (ev.cutDelta !== 0 && !holeGateArmed(state.run))
+    tags.push(travelChip(`cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}`, ev.cutDelta > 0 ? '#ff8b6b' : '#2bb673'));
   if (ev.creditToll) {
     const afford = credits >= ev.creditToll;
     tags.push(travelChip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
@@ -2466,7 +2616,7 @@ function routeInfoOverlay(): string {
           ${travelChip(diff.t, diff.c)}
         </div>
 
-        <div style="font-size:13.5px;opacity:.95;margin-bottom:4px;">${ev.desc}</div>
+        <div style="font-size:13.5px;opacity:.95;margin-bottom:4px;">${eventDescFor(ev.desc)}</div>
         <div style="font-size:12.5px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
         ${effLine}
 
@@ -2541,13 +2691,18 @@ function travelScreen(): string {
   const safeNote = routeList.some((r) => r.event.cutDelta <= 0)
     ? "There's a safer option here."
     : '<span style="color:#ff8b6b;">Out here, every lane is a gamble — or bank the run below.</span>';
+  // The Unending Universe (GS-unending) has no Stableford cut — deeper jumps buy shard pace at the
+  // price of WILDER worlds under an ever-tightening per-hole bar.
+  const stakes = holeGateArmed(state.run)
+    ? 'Deeper jumps land wilder worlds — and the survival bar keeps tightening.'
+    : 'Deeper jumps raise the cut.';
   return `
     ${header()}
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 3px;">
       <h2 style="font-size:18px;margin:0;letter-spacing:0.6px;background:linear-gradient(90deg,#ffce54,#7fd6e6);-webkit-background-clip:text;background-clip:text;color:transparent;">◆ CHOOSE YOUR JUMP</h2>
       <span style="flex:0 0 auto;font-size:11px;font-weight:700;color:#9fb0cf;border:1px solid var(--gs-line);border-radius:999px;padding:2px 9px;white-space:nowrap;">🛰 dist ${state.run.distanceFromStart}</span>
     </div>
-    <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing world up top to preview where you'll play &amp; its bet, then confirm the jump. Deeper jumps raise the cut. ${safeNote}</p>
+    <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing world up top to preview where you'll play &amp; its bet, then confirm the jump. ${stakes} ${safeNote}</p>
     ${map}
     ${bankBtn}`;
 }
@@ -2587,10 +2742,13 @@ function gameoverScreen(): string {
   const earned = state.lastRunShards;
   const banked = r.endedReason === 'banked';
   const won = r.endedReason === 'won';
+  const gate = holeGateArmed(r);
   const heading = won
     ? `<h2 style="font-size:22px;color:#ffce54;">🏆 Voyage complete — you won the Galactic Major!</h2>`
     : banked
     ? `<h2 style="font-size:20px;color:#5fd45a;">Banked — you quit while ahead</h2>`
+    : gate
+    ? `<h2 style="font-size:20px;color:#ff6b6b;">Run over — the universe caught you at hole ${r.holesSurvived + 1}</h2>`
     : `<h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>`;
   const unlock =
     won && r.ascension < ASCENSION_MAX
@@ -2620,10 +2778,20 @@ function gameoverScreen(): string {
              <span style="font-size:13px;"><b style="color:var(--gs-gold);">🎒 Bag complete!</b> <b>${golferName}</b> already carries every club, so your victory pays a bonus <b>✦ ${clubUnlock.shards}</b> Star Shards.</span>
            </div>`
       : '';
+  // The Unending Universe's ledger (GS-unending): the run's survived-hole count IS the score.
+  const endlessRecap = gate
+    ? `<p style="font-size:15px;">🌌 You survived <b>${r.holesSurvived}</b> hole${r.holesSurvived === 1 ? '' : 's'} of the Unending Universe${
+        r.holesSurvived >= state.endlessBestHoles && r.holesSurvived > 0 ? ' — <b style="color:#4fe08a;">a new best!</b>' : state.endlessBestHoles > 0 ? ` (best: ${state.endlessBestHoles})` : ''
+      }${(() => {
+        const next = nextEndlessUnlock(state.endlessBestHoles);
+        return next ? ` · next unlock: <b>${next.secret ? '? ? ?' : next.name}</b> at hole ${next.holes}` : '';
+      })()}.</p>`
+    : '';
   const reached =
     (won
       ? `<p style="font-size:15px;">You cleared all three arcs${r.ascension > 0 ? ` at Ascension A${r.ascension}` : ''} and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
       : `<p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>`) +
+    endlessRecap +
     unlock;
   return `
     ${header()}

@@ -25,7 +25,7 @@ function playStopInteractive(s: UiState): UiState {
 }
 
 /** A run started from the title screen with the given format (and a golfer picked, GS-18). */
-function started(seed: number | string, format = 'flat'): UiState {
+function started(seed: number | string, format = 'unending'): UiState {
   const picked = reduce(initState(seed), { type: 'start', format });
   return reduce(picked, { type: 'selectCharacter', characterId: 'feather-fade' });
 }
@@ -45,15 +45,15 @@ describe('ui reducer', () => {
   it('a fresh seed opens on the title screen; start picks a format then a golfer', () => {
     const title = initState(1234);
     expect(title.screen).toBe('title');
-    const picked = reduce(title, { type: 'start', format: 'ladder' });
+    const picked = reduce(title, { type: 'start', format: 'unending' });
     expect(picked.screen).toBe('character'); // GS-18: choose a golfer before the run begins
-    expect(picked.run.formatId).toBe('ladder');
+    expect(picked.run.formatId).toBe('unending');
     const s = reduce(picked, { type: 'selectCharacter', characterId: 'longshot-larry' });
     expect(s.screen).toBe('intro');
-    expect(s.run.formatId).toBe('ladder');
+    expect(s.run.formatId).toBe('unending');
     expect(s.run.loadout.characterId).toBe('longshot-larry');
-    expect(s.course.holes.length).toBe(3); // ladder stop 0 = 3 par-3s
-    expect(s.course.holes.every((h) => h.par === 3)).toBe(true);
+    expect(s.course.holes.length).toBe(4); // Unending Universe stop 0 = 4 holes (GS-unending)
+    expect(s.run.holesSurvived).toBe(0);
   });
 
   it('playing a passable stop goes to the result screen with played holes', () => {
@@ -113,7 +113,7 @@ describe('ui reducer', () => {
     expect(reduce(s, { type: 'continue' })).toBe(s); // can't continue from intro
     expect(reduce(s, { type: 'buy', id: 'gyro' })).toBe(s);
     expect(reduce(s, { type: 'route', routeId: 0 })).toBe(s);
-    expect(reduce(s, { type: 'start', format: 'ladder' })).toBe(s); // can't start mid-run
+    expect(reduce(s, { type: 'start', format: 'voyage' })).toBe(s); // can't start mid-run
   });
 
   it('result → shop → buy → travel → next intro', () => {
@@ -224,7 +224,7 @@ describe('ui reducer', () => {
     expect(shipForCharacter(s, 'huang-woo-hook')).toBe(DEFAULT_SHIP_ID); // a different golfer is untouched
     // The fleet + selection are pure cosmetics — a fresh run is unaffected.
     s = reduce(s, { type: 'closeClubhouse' });
-    s = reduce(s, { type: 'start', format: 'flat' });
+    s = reduce(s, { type: 'start', format: 'unending' });
     expect(s.run.credits).toBe(60); // base starting credits (no permanent stat upgrades anymore)
   });
 
@@ -363,17 +363,20 @@ describe('ui reducer', () => {
     expect(['playing', 'result', 'gameover']).toContain(s.screen);
   });
 
-  it('the ladder format escalates hole counts across stops', () => {
-    let s = started(7, 'ladder');
-    const counts: number[] = [];
-    for (let i = 0; i < 5 && s.screen !== 'gameover'; i++) {
-      counts.push(s.course.holes.length);
+  it('the Unending Universe survives stop by stop until the bar is missed (GS-unending)', () => {
+    let s = started(7, 'unending');
+    let stops = 0;
+    while (s.screen !== 'gameover' && stops < 100) {
+      expect(s.course.holes.length).toBe(4); // every stop is a fresh set of four
+      const before = s.run.holesSurvived;
       s = advanceStop(s);
+      stops++;
+      expect(s.run.holesSurvived).toBeGreaterThanOrEqual(before); // the ledger only ever grows
     }
-    // First stops should be non-decreasing in size: 3 → 6 → 9 → 9 → 18.
-    expect(counts[0]).toBe(3);
-    for (let i = 1; i < counts.length; i++) {
-      expect(counts[i]!).toBeGreaterThanOrEqual(counts[i - 1]!);
-    }
+    expect(s.screen).toBe('gameover');
+    expect(s.run.endedReason).toBe('cut');
+    // The dying stop's failed hole never counts as survived, and the persisted best matches the run.
+    expect(s.run.holesSurvived).toBeLessThan(stops * 4);
+    expect(s.endlessBestHoles).toBe(s.run.holesSurvived);
   });
 });

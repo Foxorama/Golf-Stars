@@ -313,6 +313,114 @@ export function showVoyageVictory(info: VoyageVictoryInfo, onDismiss: () => void
   window.setTimeout(() => cleanup(), reduced ? 4600 : 11000);
 }
 
+/**
+ * Everything the Unending-Universe milestone takeover celebrates (GS-unending): the survived-hole
+ * count, the shard bonus it just banked, an optional cosmetic unlock (the hole-150 secret gets its
+ * own reveal copy), and the survival bar now in force. Assembled by the app — presentation-only.
+ */
+export interface EndlessMilestoneInfo {
+  /** The milestone hole count just crossed (40/60/…/150). */
+  holes: number;
+  /** Star Shards banked by this milestone (already safe — kept even on a later bust). */
+  shards: number;
+  /** A cosmetic unlock earned at this milestone, if any. */
+  unlock?: { name: string; detail: string; color?: string; secret?: boolean };
+  /** The survival bar the run now demands ("Birdie or better"), shown as the onward stakes. */
+  bar?: string;
+  /** Confetti seed (stable across reloads). */
+  seed: number;
+}
+
+/**
+ * Unending-Universe milestone takeover (GS-unending) — the mid-run victory screen for surviving
+ * 40/60/80/100/120/140 holes (and the hole-150 secret). A cosmetic, assetless side-effect exactly
+ * mirroring `showVoyageVictory` (same card chrome, fireworks + fanfare, dismiss paths, reduced-motion
+ * + safety timeout); no reducer/save touch — the shards/unlocks were already banked by the reducer.
+ */
+export function showEndlessMilestone(info: EndlessMilestoneInfo, onDismiss: () => void): void {
+  try {
+    sfx.victory();
+    haptic(HAPTICS.win);
+  } catch {
+    /* feel-only — never throw */
+  }
+  const reduced = getSettings().reducedMotion;
+  const overlay = document.createElement('div');
+  overlay.className = 'gs-win';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', `${info.holes} holes survived`);
+
+  let done = false;
+  const cleanup = (): void => {
+    if (done) return;
+    done = true;
+    const h = (canvas as unknown as { _raf?: number } | null)?._raf;
+    if (h) cancelAnimationFrame(h);
+    overlay.removeEventListener('click', onTap);
+    window.removeEventListener('keydown', onKey);
+    overlay.remove();
+    try {
+      onDismiss();
+    } catch {
+      /* the caller's render() guards itself */
+    }
+  };
+  const onTap = (e: MouseEvent): void => {
+    e.preventDefault();
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') cleanup();
+  };
+
+  const rewardLine = (icon: string, label: string, detail: string, col?: string): string =>
+    `<div class="gs-ace-reward"><span>${icon}</span><div><b${col ? ` style="color:${col};"` : ''}>${label}</b><i>${detail}</i></div></div>`;
+  const rewards: string[] = [];
+  if (info.shards > 0) rewards.push(rewardLine('✦', `+${info.shards} Star Shards banked`, 'Yours to keep — no bust can claw them back'));
+  if (info.unlock) {
+    rewards.push(
+      rewardLine(
+        info.unlock.secret ? '🌟' : '🎁',
+        `${info.unlock.secret ? 'SECRET UNLOCKED — ' : 'Unlocked — '}${info.unlock.name}`,
+        info.unlock.detail,
+        info.unlock.color,
+      ),
+    );
+  }
+  if (info.bar) rewards.push(rewardLine('⛳', `The bar is now ${info.bar}`, 'The universe keeps escalating — how deep can you go?'));
+
+  const secret = !!info.unlock?.secret;
+  overlay.innerHTML = `
+    <canvas class="gs-win-fx" aria-hidden="true"></canvas>
+    <div class="gs-win-card">
+      <div class="gs-win-emoji" aria-hidden="true">${secret ? '🛸' : '🌌'}</div>
+      <div class="gs-win-kicker">UNENDING UNIVERSE</div>
+      <h1 class="gs-win-title">${info.holes} HOLES SURVIVED!</h1>
+      <div class="gs-win-sub">${secret ? 'The universe bows. Something impossible lands beside you…' : 'Still alive. Still travelling. The universe blinks first 🎉'}</div>
+      <div class="gs-ace-rewards">${rewards.join('')}</div>
+      <button class="gs-btn gs-btn--primary gs-win-go" data-win-continue="1">Play on →</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const goBtn = overlay.querySelector<HTMLButtonElement>('.gs-win-go');
+  goBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cleanup();
+  });
+  overlay.addEventListener('click', onTap);
+  window.addEventListener('keydown', onKey);
+
+  const canvas = overlay.querySelector<HTMLCanvasElement>('.gs-win-fx');
+  if (canvas && !reduced) {
+    try {
+      runFireworks(canvas, info.seed + info.holes);
+    } catch {
+      /* a canvas fault must not strand the celebration */
+    }
+  }
+  window.setTimeout(() => cleanup(), reduced ? 4600 : 11000);
+}
+
 /** Per-kind look + copy for the eagle/albatross fly-over celebration. Eagle = a silver space eagle
  *  screaming overhead; albatross = a vast, glowing cosmic albatross gliding across the stars. */
 const BIRD_CEL: Record<'eagle' | 'albatross', {

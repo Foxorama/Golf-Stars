@@ -164,8 +164,8 @@ describe('route events — run integration (GS-14)', () => {
     expect(moved.pendingEvent).toBe(flare);
 
     const course = { holes: new Array(6).fill(0), biome: 'x', rarity: 'common' } as never;
-    // A passing scoreline so credits/cut both bite.
-    const played = Array.from({ length: 6 }, () => ({ record: { strokes: 3, par: 4 } })) as never;
+    // A passing scoreline (holed birdies clear the default format's survival bar) so credits bite.
+    const played = Array.from({ length: 6 }, () => ({ record: { strokes: 3, par: 4 }, holed: true })) as never;
     const { run: scored } = finishStop(moved, course as never, played as never);
     expect(scored.pendingEvent).toBeUndefined(); // spent — cannot double-apply on resume
   });
@@ -183,7 +183,7 @@ describe('route events — run integration (GS-14)', () => {
 
     // Same played holes, two events → the richer creditMult earns strictly more credits.
     const course = { holes: new Array(holes).fill(0) } as never;
-    const played = Array.from({ length: holes }, () => ({ record: { strokes: 3, par: 4 } })) as never;
+    const played = Array.from({ length: holes }, () => ({ record: { strokes: 3, par: 4 }, holed: true })) as never;
     const calm = routeEvent('calm-drift')!; // creditMult 1.0
     const poor = finishStop({ ...stop, pendingEvent: calm }, course, played).run.credits;
     const rich = finishStop({ ...stop, pendingEvent: routeEvent('trade-lane')! }, course, played).run.credits;
@@ -238,7 +238,7 @@ describe('route events — run integration (GS-14)', () => {
     // playStop on a fresh run has no pending event → the cut is the un-modified ramp value.
     const a = playStop(startRun(1234));
     expect(a.run.pendingEvent).toBeUndefined();
-    expect(a.result.cut).toBe(cutLine(0, 6)); // flat stop 0 = 6 holes, distance 0
+    expect(a.result.cut).toBe(cutLine(0, 4)); // Unending Universe stop 0 = 4 holes, distance 0
   });
 });
 

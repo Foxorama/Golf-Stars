@@ -882,3 +882,61 @@ clubs* to *one* golfer's bag.
   stop 0, survives 5 stops, terminates). New guards in `tests/themes.test.ts`: 300 seeds never open on
   a `HARD_ARCHETYPES` world yet spread across ≥4 archetypes, and later stops STILL land hard worlds
   (the filter is stop-0 only).
+
+## The Unending Universe — the endless survival format (GS-unending)
+
+**What shipped.** The two original endless roguelites (`flat` 6-hole stops, `ladder` 3→6→9→9→18) were
+RETIRED and replaced by one endless mode: **Unending Universe** (`FORMATS.unending`, the new
+`DEFAULT_FORMAT`). Four random holes → Pro Shop → journey-lane choice → four more, forever. The whole
+meta-loop (shop, three-lane starmap with distinct destination worlds, route events, credits, ghost
+leaderboard flavour) is reused unchanged; what's new is the SURVIVAL LAW and the milestone ladder.
+
+**The survival bar (`src/sim/rpg/endless.ts`, pure).** Every hole of the run carries a required score,
+numbered cumulatively across stops (`run.holesSurvived + holeIndex + 1`) and PAR-RELATIVE so a par-3
+and a par-5 are equally fair (golf-soul rule — the user-facing "8/7/6/5/4" spec is exactly this ladder
+on a par 4): holes 1–8 quad bogey, then triple / double / bogey / par per 8-hole block, and from hole
+41 on only birdie-or-better keeps the run alive, forever. A pickup (never holed out) always fails.
+Miss the bar once → the stop ends AT THAT HOLE and the run is over (`endedReason 'cut'`).
+
+**Why this stays deterministic + auto ≡ interactive.** Both drivers play the stop's holes sequentially
+on the single `${course.seed}:play` stream, so "stop at the first failed hole" is a clean PREFIX of the
+full-stop stream: `playStop` breaks its hole loop where `passesEndlessGate` fails; the interactive
+`holeComplete` calls the same predicate (`endlessHolePassed`, reading the canonical `record` + `holed`)
+and finishes the stop with the partial `stopPlayed`. `finishStop` recounts the leading passes
+(`gateSurvived`), so both paths score identically — guarded end-to-end by `tests/endless.test.ts`'s
+"interactive dies at the same hole as the headless sim" run. Voyage and boss paths are untouched
+(the gate branch only arms on `format.holeGate`).
+
+**Difficulty design.** The bar ramps on HOLE COUNT; course wildness keeps ramping on GALAXY DISTANCE
+(your jump choice) + `routeDifficulty` (a risky lane's `cutDelta` already generates a wilder course —
+which is also why the route UI in this mode rewrites "cut +1" copy to "wilder course" and drops the
+cut chip: the Stableford cut simply doesn't exist here). So after the bar parks at birdie (hole 41+),
+the universe still escalates every set, per the spec. Balance read at ship time: a no-upgrade auto-AI
+survives median ~24 holes (max 35 over 60 seeds) — hole 40 is meant to need a real build, and the
+birdie wall makes 60+ heroic. Tune from real play (see IDEAS GS-unending follow-ons); the mode is not
+in any death-spiral harness bar (those are biome/character-keyed and unchanged).
+
+**Milestones + the Evergreen set.** Crossing 40/60/80/100/120/140 survived holes fires a full-screen
+victory takeover (`showEndlessMilestone`, mirroring the voyage victory — cosmetic side-effect in
+`dispatch`, keyed off the pre/post `holesSurvived` diff) and banks a growing shard bonus INSTANTLY via
+`run.bonusShards` (the same kept-even-on-a-bust channel route events use — a victory can't be clawed
+back). Permanent unlocks ride the LIFETIME best (`endlessBestHoles`, save v13): the earn-only
+**Evergreen** cosmetic set — Tour Bag @40 (a NEW 4th apparel slot `bag`, equipped per character via
+`golfBagByCharacter`, drawn beside the Clubhouse stage figure; on-course rendering deliberately skipped),
+Baggy Green Cap @60 (new `baggy` hat shape), Evergreen Pro Pants @80, THE GREEN JACKET @100 (mythic, new
+`blazer` shirt shape with lapels/crest both in SVG and on-course canvas) — plus a SECRET mythic ship at
+150, **The Infinity Ace** (new `infinity` ship kind: phoenix wings, triple aurora exhaust, orbiting
+lights, ∞ pennant), hidden from the Trade Market entirely until owned. Unlock rows carry `unlockHoles`;
+`canBuyApparel`/`canBuyShip` refuse them (the market shows a 🔒 milestone footer instead), and the
+reducer's `endlessProgressUpdates` pushes crossed ids into `ownedApparel`/`ownedShips` at EVERY
+stop-scoring site (milestones cross mid-run). `equippedSet` gained an optional 4th bag argument — the
+Evergreen set completes only head-to-toe-to-bag.
+
+**Removal fallout (for the next archaeologist).** `DEFAULT_FORMAT` is `'unending'`; `getFormat` folds
+retired/unknown ids to it so an old save's active `flat`/`ladder` run resumes as unending mid-journey.
+`app.ts`'s one hardcoded `FORMATS['flat']!` fallback became `getFormat`; the test hub's scoring-harness
+dropdown default moved to `unending`. `tests/ui.test.ts`'s `started()` helper and several format
+literals retargeted; the ladder-escalation test became the unending survival-walk test. The secret-mask
+copy is "? ? ?" (spaced) — a literal "???" trips `tests/build.test.ts`'s no-`??`-in-bundle guard.
+`restart` now also carries `clubhouseVisit` + `endlessBestHoles` (the former was a pre-existing drop —
+the lounge shuffle counter reset to 0 on every restart).

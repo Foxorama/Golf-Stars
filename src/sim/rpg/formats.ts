@@ -2,11 +2,10 @@
  * Run formats — content-as-data shapes for a run (GS-9).
  *
  * This is the lever for the "what wraps the golf" question: the SAME run machinery plays
- * a flat roguelite (every stop a 6-hole course) or an escalating ladder (3 par-3s → 6 →
- * 9 → 18…). A format is just a list of per-stop specs; nothing in the engine changes.
- *
- * Pure data. `flat` reproduces the original fixed 6-hole behaviour exactly, so adding
- * formats regresses nothing.
+ * the endless Unending Universe (4-hole stops forever, per-hole survival bar) or the bounded,
+ * winnable Voyage. A format is just a list of per-stop specs plus a couple of rule switches;
+ * nothing in the engine changes. (The original `flat`/`ladder` roguelites were retired by
+ * GS-unending — `getFormat` folds their ids into the default so old saves still resume.)
  */
 
 /**
@@ -93,37 +92,39 @@ export interface RunFormat {
   /** Per-stop specs; stops beyond the list reuse the last (the run ends by cut, not length). */
   stops: StopSpec[];
   /** A bounded, WINNABLE voyage (GS-voyage): the run is over (won) when the final boss is cleared,
-   *  not endless. Absent ⇒ an infinite roguelite that only ends by a missed cut (flat/ladder). */
+   *  not endless. Absent ⇒ an infinite run that only ends by failing the survival rule. */
   winnable?: boolean;
   /**
    * Scales the DISTANCE term of the cut ramp (GS-voyage). A winnable campaign is a fixed-length
    * gauntlet, not an endless climb, so its cut should reach a beatable plateau rather than spiral —
-   * 1 = the original ramp (flat/ladder), <1 = gentler. Default 1.
+   * 1 = the original ramp, <1 = gentler. Default 1.
    */
   cutMult?: number;
   /** Cap the per-jump distance (and thus the wildness/cut growth) for a bounded campaign. Default 3
    *  (the original 1–3 draw); voyage uses a tighter cap so the deep arcs stay fair to clear. */
   maxJump?: number;
+  /**
+   * PER-HOLE survival (GS-unending): the run lives or dies hole by hole against the par-relative
+   * bar in `endless.ts` (quad bogey → … → birdie-or-better), NOT a stop-level Stableford cut. The
+   * moment a hole misses its bar the stop stops and the run ends. Threaded identically through the
+   * headless `playStop` and the interactive driver so auto ≡ interactive holds.
+   */
+  holeGate?: boolean;
 }
 
 export const FORMATS: Record<string, RunFormat> = {
-  flat: {
-    id: 'flat',
-    name: 'Roguelite',
-    blurb: 'Every stop is a 6-hole course. Beat the cut, upgrade, travel deeper.',
-    stops: [{ holes: 6, label: '6 holes' }],
-  },
-  ladder: {
-    id: 'ladder',
-    name: 'The Ascent',
-    blurb: 'Start tiny and climb: 3 par-3s → a short 6 → a front 9 → a full 9 → 18.',
-    stops: [
-      { holes: 3, parCap: 3, label: '3 par-3s' },
-      { holes: 6, parCap: 4, label: 'short 6' },
-      { holes: 9, label: 'front 9' },
-      { holes: 9, label: 'full 9' },
-      { holes: 18, label: 'the 18' },
-    ],
+  // The endless survival mode (GS-unending): 4 random holes → Pro Shop → journey lane → 4 more,
+  // forever. Survival is the PER-HOLE bar (endless.ts) — quad bogey for the first 8 holes, one
+  // stroke tighter every 8, birdie-or-better from hole 41 on — while course wildness keeps ramping
+  // with galaxy distance, so the universe itself never stops escalating. Milestones at
+  // 40/60/80/100/120/140 holes bank shard bonuses + unlock the Evergreen cosmetic set.
+  unending: {
+    id: 'unending',
+    name: 'Unending Universe',
+    blurb:
+      'Four random holes, a shop, a jump — forever. Every hole has a survival score, one stroke tighter each eight holes, until only birdies keep the run alive.',
+    stops: [{ holes: 4, label: '4 holes' }],
+    holeGate: true,
   },
   // The headline campaign (GS-voyage): a bounded, WINNABLE voyage of three arcs. Each arc is two
   // ordinary stops then a BOSS; clearing the final boss wins the run. Arc I + the FINAL are solo
@@ -166,9 +167,10 @@ export const FORMATS: Record<string, RunFormat> = {
   },
 };
 
-export const DEFAULT_FORMAT = 'flat';
+export const DEFAULT_FORMAT = 'unending';
 
 export function getFormat(id: string | undefined): RunFormat {
+  // Retired ids ('flat'/'ladder') fold into the default, so an old save's active run still resumes.
   return (id && FORMATS[id]) || FORMATS[DEFAULT_FORMAT]!;
 }
 
