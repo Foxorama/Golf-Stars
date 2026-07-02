@@ -427,6 +427,26 @@
   add draws only under meteorShower; null/empty targets are byte-identical to no targets; the onStrike
   cue fires exactly once per cycle; off-screen culling). Eyes-on: `node scripts/weather-preview.mjs`
   gained frozen dive/impact frames (plus the gravityWell/frostfall cases GS-journey-fx-2 forgot to add).
+  **The shower now looks like METEORS (GS-meteor-look, `render/weather.ts`).** The strikes shipped but
+  the play verdict stayed: "doesn't look like meteors at all, way too many, and they don't properly hit
+  the impact craters." Three causes, three fixes, all screen-space cosmetic (zero rng-stream / sim
+  impact): (1) TOO MANY — 14 ambient streaks whose loop kept each visible ~91% of the time, i.e. a
+  constant 14-streak rain; now SIX fireballs on a sparse duty cycle (each flies ~a third of its loop)
+  so ~2 ride the sky at once. They build on their OWN mulberry stream (`seed ^ 0xc2b2ae35`) so retuning
+  the count never re-scatters the shared starfield/wind/ambient layout. (2) NOT METEORS — the old look
+  was a 1.5px gradient-stroked line; now a shared `fireball()` painter draws a white-hot head inside a
+  tapered, licking flame tail (a dense chain of shrinking blobs cooling white→amber→ember-red along the
+  flight line, under 'lighter'). (3) NOT HITTING THE CRATERS — the ambient streaks used to plunge
+  through the turf and fade mid-course while only the strike ever landed, so meteors visibly "missed"
+  the marks everywhere (worst on the aim overlay, which has no strike targets at all). Now ambient
+  fireballs BURN UP high in the sky (each carries a `burn` altitude; the last stretch pops a terminal
+  flare and gutters out) — the ONLY meteor that ever reaches the ground is the strike, and it lands on
+  a crater. The strike itself is the same `fireball()` at hero size (the object the shower teases is
+  the object that lands), ACCELERATES in (f²) like a falling rock, picks an ON-SCREEN crater (scans
+  from the seeded pick through the stable target order, so a cycle is never wasted diving at a mark
+  the camera can't see; none visible → the old paint cull), and its impact gained a shock ring racing
+  out over the crater footprint. Guards unchanged (`tests/weather-strikes.test.ts` is differential and
+  stays green); eyes-on re-shot via `node scripts/weather-preview.mjs`.
 - **EVERY course effect now carries a real play hook, and the sky-set widened again (GS-journey-fx-2,
   `effects.ts`/`sim/patches.ts`).** The play complaint: "the weather effects and the consequences for
   each journey really don't make any sense or have a lot of difference" — four of the ten skies

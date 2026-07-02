@@ -231,8 +231,8 @@
   the static SVG map, so lining up a shot was dead). Fix: ONE module — `createWeather({effect, width,
   height, archetype, windSpd, windDir, seed, spaceFX, wind})` returns a `{draw(ctx,now), setWind, resize}`
   handle that paints the whole atmosphere in SCREEN space (the sky + the air): a subtle directional tint
-  (never a flat wash), the showpiece (glowing moon with halo+craters / gradient-trailed meteors with bright
-  heads / shimmering layered aurora curtains / a pulsing solar flare + edge vignette + crackle / drifting
+  (never a flat wash), the showpiece (glowing moon with halo+craters / flame-tailed meteor fireballs
+  (GS-meteor-look — see rpg-meta-loop.md) / shimmering layered aurora curtains / a pulsing solar flare + edge vignette + crackle / drifting
   lit debris wrecks with blink lights / a horizon trade caravan with dome tents + a swaying lantern string),
   PLUS the always-on space ambience (twinkling stars + a periodic shooting star) and the VISIBLE wind. It
   is consumed by BOTH the `playView` (in flight, replacing the old `drawSpaceFX`/`drawWind`/`drawCourseFx`)
