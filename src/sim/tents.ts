@@ -28,7 +28,7 @@
 
 import type { Hole, Vec } from './course/contract';
 import { dist, pointInPoly } from './course/contract';
-import { arcApex, arcHeight, flightControl, flightGround } from './flight';
+import { arcApex, arcHeight, ARC_FEEL, flightApexT, flightControl, flightGround, type FlightProfile } from './flight';
 
 export interface TradeTent {
   /** Footprint centre (course space). */
@@ -158,6 +158,7 @@ export function tentFlightHit(
   bearingDeg: number,
   carry: number,
   nominalCarry: number,
+  profile: FlightProfile,
   steps = 26,
 ): TentHit | null {
   if (!tents.length || carry <= 0) return null;
@@ -170,12 +171,13 @@ export function tentFlightHit(
   if (!near.length) return null;
 
   const control = flightControl(from, landing, bearingDeg);
-  const apex = arcApex(carry, nominalCarry);
+  const apex = arcApex(carry, nominalCarry, ARC_FEEL, profile.peakMult);
+  const apexT = flightApexT(profile);
   let prev = from;
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const pos = flightGround(from, control, landing, t);
-    const h = arcHeight(apex, t);
+    const h = arcHeight(apex, t, apexT);
     for (const tent of near) {
       // Inside the footprint AND below the roof there → a clip. Use the segment's nearer point so the
       // impact reads as the near roof face.

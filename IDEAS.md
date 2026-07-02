@@ -50,6 +50,11 @@ Foundations are shipped; these are the live follow-ons.
   thread auto≡interactive exactly like GS-tents did.
 
 **Shot model & clubs**
+- **GS-flight-shop** — flight-shaping Pro-Shop gear on top of the per-family flight profiles
+  (GS-flight-3): a piercing low-wind driver (apexAt later / peakMult down), a sky-high "drop-anchor"
+  wedge set (clears greenside trouble, kills roll), a hybrid that launches over anything. Mechanism
+  exists: a `FlightProfile` mod threaded like `ShapeMod` through `flightProfileOf` — items scale
+  `peakMult`/`apexAt`, and the aim overlay + knockdown walks read it automatically.
 - **GS-clubs follow-ons** — location-specific club SETS with game EFFECTS (not just carry); scoring-club
   upgrade tiers via per-club dispersion/shape (a "tour wedge" that doesn't overshoot); wire reward-club
   acquisition into the cut/credit curve (most runs end before the bag fills today).

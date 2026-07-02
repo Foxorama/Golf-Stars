@@ -10,6 +10,7 @@
  */
 
 import { getSettings } from '../settings';
+import { flightClassOf, type FlightClass } from '../sim/flight';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -127,23 +128,13 @@ function noise(
 }
 
 /**
- * Which VOICE a club strikes with (GS-audio-2). Derived from the club-id conventions of the
- * `CLUBS` taxonomy (`src/sim/clubs.ts`): 'D' the driver, `*W` woods, `*H` hybrids, `*i` irons,
- * the putter itself — everything else (PW/GW/SW/60/64/chip) is a wedge-family touch shot.
- * Convention-based on purpose: a NEW club row picks up a sensible voice with zero audio edits.
+ * Which VOICE a club strikes with (GS-audio-2). The club-family classifier is the SAME one the
+ * flight physics use (`sim/flight.ts flightClassOf`, GS-flight-3) — one id-convention read for the
+ * whole game, so a NEW club row picks up a sensible voice AND flight with zero engine edits.
  */
-export type StrikeClass = 'driver' | 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
+export type StrikeClass = FlightClass;
 
-export function strikeClassOf(clubId?: string): StrikeClass {
-  if (!clubId) return 'iron'; // the neutral mid-bag voice when no club is known
-  if (clubId === 'D') return 'driver';
-  if (clubId === 'putter') return 'putter';
-  // Digit-prefixed families only: PW/GW/SW also end in 'W' but are wedges, not woods.
-  if (/^\d+W$/.test(clubId)) return 'wood';
-  if (/^\d+H$/.test(clubId)) return 'hybrid';
-  if (/^\d+i$/.test(clubId)) return 'iron';
-  return 'wedge';
-}
+export const strikeClassOf = flightClassOf;
 
 /**
  * The cue library. Each is a tiny composition; quality/strength scales the brightness so a pure

@@ -283,6 +283,31 @@
   canopy/knockdown arc-height logic, the broad-phase prune, and the executeShot integration. NB: these
   are pure module constants (`ARC_FEEL`/`CANOPY_FEEL`), NOT `_gs*` window flags, so the test-hub guard
   needs no new control; the play-view feel reuses the existing `_gsFeel` (apex now off `result.apex`).
+- **Ball flight is PER CLUB FAMILY (GS-flight-3, `src/sim/flight.ts FLIGHT_PROFILES`).** The old model
+  was ONE loft-interpolated parabola (`sin(πt)` in Bézier param) for every club — and because the curved
+  path's ground progress is `2t−t²` (fast early, slow late), every apex landed at ~75% of ground distance:
+  all flights read low-and-late, so a 7-iron got knocked down by scenery golf intuition says it clears.
+  Now each family (driver/wood/hybrid/iron/wedge/putter) has a `FlightProfile` row — `peakMult` scales the
+  loft-interpolated apex HEIGHT (driver 0.85 bores, hybrid/wedge 1.12 balloon — hybrids are the
+  high-launch rescue identity) and `apexAt` places the apex along the GROUND (driver 0.60 → wedge 0.70;
+  `flightApexT` converts to the Bézier param via `1−√(1−apexAt)`, exact for a straight shot). The height
+  curve is a two-piece sine peaked at that param (`arcHeight(apex, t, apexT)`; the 0.5 default reproduces
+  the legacy `sin(πt)` exactly — putts/`sampleFlight` untouched). Families come from `flightClassOf`, the
+  SAME id-convention classifier the audio strike voices use (now defined in flight.ts, audio delegates) —
+  a new club row picks up flight + voice with zero engine edits. `FlightProfile` is threaded through EVERY
+  consumer so none can disagree: `resolveShot` (family-shaped `ShotResult.apex`), `flightKnockdown`/
+  `flightBlockedBy` + `tentFlightHit` (a REQUIRED param — no silent neutral default), `ShotSpread.flight` →
+  `sprayBlocking` (the aim overlay's blocked shading now visibly changes with club selection — the
+  club-choice lever), and `sampleCurvedFlight(…, apexT)` (the animated ball tows/bores per family).
+  Zero rng anywhere in flight geometry, so streams are untouched; knockdown OUTCOMES shift, so the
+  no-death-spiral harness was re-run: `toPar/hole` 0.727 → 0.673 at max wildness (blow-ups 0%,
+  knockdowns/hole 0.36 → 0.32) — the AI's iron/wedge approaches clear more trouble than the boring
+  driver loses. Real-world flights are proportionally HIGHER than the game's — the fracs stay game-scaled
+  to the 7–22y canopies on purpose (raise them and trees stop mattering). Launch angles land arcade-true:
+  driver ~12°, wedge ~25°. Guards in `tests/flight.test.ts` (classifier coverage, hybrid>wood, family
+  knockdown split: the same grove blocks a driver line while a 7-iron flies it) +
+  `tests/spray-blocking.test.ts` (club-aware blocked overlay). The profile table is the hook for
+  flight-shaping Pro-Shop gear (IDEAS GS-flight-shop).
 - **Run-out is a SURFACE-FRICTION INTEGRAL, not a single multiply (GS-flight-2, `rollOut`).** The roll
   used to be `carry·loftFrac·SURFACE_ROLL[touchdownLie]·variance` — one surface, applied once. Now the
   ball carries a surface-FREE roll ENERGY (`rollPotential` = `carry·loftFrac·variance`, the *one* rng

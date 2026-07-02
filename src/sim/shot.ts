@@ -15,7 +15,7 @@ import type { FeatureKind, Hole, Vec, Wind } from './course/contract';
 import { bearing, pointInPoly } from './course/contract';
 import type { Club } from './clubs';
 import { clubDist, type ClubStats } from './clubs';
-import { arcApex } from './flight';
+import { arcApex, ARC_FEEL, flightProfileOf } from './flight';
 import type { Rng } from './rng';
 
 // --- Feel tunables -----------------------------------------------------------
@@ -746,5 +746,15 @@ export function resolveShot(input: ShotInput): ShotResult {
     }
   }
 
-  return { landing, carry, shotBearing, wind: w, intended, apex: arcApex(carry, nominal), redirect };
+  // The apex is family-shaped (GS-flight-3): the club's flight profile scales the loft ramp, so a
+  // driver's resolved arc bores and a hybrid/wedge's balloons — the render + knockdown share it.
+  return {
+    landing,
+    carry,
+    shotBearing,
+    wind: w,
+    intended,
+    apex: arcApex(carry, nominal, ARC_FEEL, flightProfileOf(club.id).peakMult),
+    redirect,
+  };
 }

@@ -93,7 +93,12 @@ These are the rules every change is measured against. They are *why* the codebas
    hazard tuning. A power-up must *raise* mean per-stop Stableford to ship.
 5. **The graphic IS the physics.** `flight.ts` and `shot.ts`'s `SprayShape` are the single shared
    source the sim samples AND the renderer draws — a ball drawn clearing a tree is one the sim let
-   through; the spray cone reads exactly the sampled distribution. Never fork them.
+   through; the spray cone reads exactly the sampled distribution. Never fork them. Ball flight is
+   per club FAMILY (GS-flight-3): `FLIGHT_PROFILES` keyed by `flightClassOf` (the id-convention
+   classifier the audio voices also use) shapes apex height + ground position, and the profile is a
+   REQUIRED param through every consumer (resolve, knockdown/tent walks, aim overlay, animation) —
+   a new club row picks up its flight with zero engine edits; retuning a row is a physics change
+   (re-run the no-death-spiral harness, contract 4).
 6. **Feel lives behind `window._gsFeel`** (and `_gsIntro`/`_gsSpray`/`_gsArt`) escape hatches, read
    through a `typeof window` guard so the sim stays node-pure. Prefer a `_gsFeel` *sub-field* over a
    new top-level `_gs*` flag — a new flag obligates the test-hub sync (below).
