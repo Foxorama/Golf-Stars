@@ -1,11 +1,27 @@
 /**
  * Apparel vector art (GS-cosmetics) — draws the cosmetic hats & shirts as self-contained SVG glyphs
- * (no asset, the house no-404 rule). The wardrobe cards show the garment ICON; a small MANNEQUIN
- * preview shows the golfer wearing the currently-equipped hat + shirt, so what you buy is what you
- * wear (the canvas `drawGolfer` in playView.ts renders the same shapes on-course). Pure string builders.
+ * (no asset, the house no-404 rule). The wardrobe cards show the garment ICON; the full-body
+ * `golferPreviewSVG` shows the golfer wearing the equipped hat + shirt + pants (the Clubhouse stage
+ * and lounge both mount it). The clubhouse look stands on its own — cel-shaded, characterful — and
+ * stays RECOGNISABLE as the on-course outfit by sharing the same `ApparelLook` shapes + palette that
+ * the canvas `drawGolfer` (playView.ts) keys off. Pure string builders.
  */
 
 import { apparelById, type ApparelLook } from '../sim/rpg/apparel';
+
+/** Lighten (amt>0, toward white) or darken (amt<0, toward black) a #rrggbb colour. Anything that
+ *  isn't 6-digit hex passes through untouched. */
+function shade(hex: string, amt: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  const ch = (v: number): number =>
+    Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt))));
+  const r = ch((n >> 16) & 255);
+  const g = ch((n >> 8) & 255);
+  const b = ch(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
 
 /** A soft glowing aura for the legendary/mythic tiers (a radial halo behind the garment). */
 function aura(cx: number, cy: number, r: number, col: string, id: string): string {
@@ -41,10 +57,13 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
     case 'cap':
       // Dome (top half-circle sitting on the head) + a brim curving down over the brow (front view).
       g = `<path d="M-7,-2 A7 7 0 0 1 7,-2 Z" fill="${color}" ${ink}/>
-        <path d="M-6.5,-2 Q0,2.6 6.5,-2 Z" fill="${accent}" ${ink}/>`;
+        <path d="M-5.2,-7.2 A7 7 0 0 1 2,-8.5 Q-2.6,-6.2 -5.2,-7.2 Z" fill="#ffffff" opacity="0.22"/>
+        <path d="M-6.5,-2 Q0,2.6 6.5,-2 Z" fill="${accent}" ${ink}/>
+        <circle cx="0" cy="-8.6" r="0.9" fill="${accent}" stroke="#0c1116" stroke-width="0.6"/>`;
       break;
     case 'bucket':
       g = `<path d="M-6.5,-1 A6.5 6.5 0 0 1 6.5,-1 Z" fill="${color}" ${ink}/>
+        <path d="M-4.6,-6 A6.5 6.5 0 0 1 1.6,-7.6 Q-2.4,-5.6 -4.6,-6 Z" fill="#ffffff" opacity="0.2"/>
         <ellipse cx="0" cy="0" rx="11" ry="2.6" fill="${accent}" ${ink}/>`;
       break;
     case 'visor':
@@ -54,6 +73,7 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       break;
     case 'tophat':
       g = `<rect x="-5" y="-16" width="10" height="11" rx="1" fill="${color}" ${ink}/>
+        <rect x="-4.2" y="-15.2" width="2.2" height="9.6" rx="1" fill="#ffffff" opacity="0.14"/>
         <rect x="-5" y="-2.5" width="10" height="2.4" fill="${accent}"/>
         <ellipse cx="0" cy="0" rx="10" ry="2.2" fill="${color}" ${ink}/>`;
       break;
@@ -67,7 +87,8 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       // the face + a glint. This is the full-head covering the astronaut report was missing in preview.
       g = `<circle cx="0" cy="-1" r="8.5" fill="${color}" ${ink}/>
         <rect x="-5.6" y="-3.4" width="11.2" height="5.8" rx="2.7" fill="${accent}" opacity="0.92" ${ink}/>
-        <ellipse cx="-2" cy="-1.6" rx="2" ry="1.1" fill="#fff" opacity="0.55"/>`;
+        <ellipse cx="-2" cy="-1.6" rx="2" ry="1.1" fill="#fff" opacity="0.55"/>
+        <path d="M-6.4,-4.6 A8.5 8.5 0 0 1 0.5,-9.4 Q-4.4,-7.4 -6.4,-4.6 Z" fill="#ffffff" opacity="0.3"/>`;
       break;
     case 'halo':
       g = `<circle cx="0" cy="-1" r="8" fill="${accent}" ${ink}/>
@@ -95,47 +116,51 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
   return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">${a}${g}${flair}</g>`;
 }
 
-/** The pattern/panel detail a shirt shape adds over a coloured torso (no base silhouette) — shared by
- *  the wardrobe icon and the mannequin preview so both read identically. */
-function shirtDetail(look: ApparelLook, cx: number, cy: number): string {
+/** The pattern/panel detail a shirt shape adds over a coloured torso (no base silhouette) — authored
+ *  in a canonical frame about the chest centre and fitted by a single scale, so the wardrobe icon
+ *  (s=1) and the full-body figure (s tracks the figure size) read identically instead of the detail
+ *  shrinking into a speck on a big torso. */
+function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
   const { shape, accent = '#0c1116' } = look;
   let detail = '';
   switch (shape) {
     case 'polo':
-      detail = `<path d="M${cx - 4},${cy - 9} L${cx},${cy - 4} L${cx + 4},${cy - 9}" fill="none" stroke="${accent}" stroke-width="1.6"/>
-        <line x1="${cx}" y1="${cy - 4}" x2="${cx}" y2="${cy + 3}" stroke="${accent}" stroke-width="1"/>
-        <circle cx="${cx}" cy="${cy - 1}" r="0.8" fill="${accent}"/><circle cx="${cx}" cy="${cy + 2}" r="0.8" fill="${accent}"/>`;
+      detail = `<path d="M-4,-9 L0,-4 L4,-9" fill="none" stroke="${accent}" stroke-width="1.6"/>
+        <line x1="0" y1="-4" x2="0" y2="3" stroke="${accent}" stroke-width="1"/>
+        <circle cx="0" cy="-1" r="0.8" fill="${accent}"/><circle cx="0" cy="2" r="0.8" fill="${accent}"/>`;
       break;
     case 'striped':
-      detail = `<g stroke="${accent}" stroke-width="2.4"><line x1="${cx - 9}" y1="${cy - 2}" x2="${cx + 9}" y2="${cy - 2}"/><line x1="${cx - 9}" y1="${cy + 3}" x2="${cx + 9}" y2="${cy + 3}"/><line x1="${cx - 9}" y1="${cy + 8}" x2="${cx + 9}" y2="${cy + 8}"/></g>`;
+      detail = `<g stroke="${accent}" stroke-width="2.4"><line x1="-12" y1="-2" x2="12" y2="-2"/><line x1="-12" y1="3" x2="12" y2="3"/><line x1="-12" y1="8" x2="12" y2="8"/></g>`;
       break;
     case 'jersey':
-      detail = `<rect x="${cx - 6}" y="${cy - 3}" width="12" height="12" rx="1.5" fill="${accent}" opacity="0.85"/>
-        <text x="${cx}" y="${cy + 7}" font-size="9" font-weight="800" text-anchor="middle" fill="#0c1116" font-family="system-ui,sans-serif">7</text>`;
+      detail = `<rect x="-6" y="-3" width="12" height="12" rx="1.5" fill="${accent}" opacity="0.85"/>
+        <text x="0" y="7" font-size="9" font-weight="800" text-anchor="middle" fill="#0c1116" font-family="system-ui,sans-serif">7</text>`;
       break;
     case 'spacesuit':
-      detail = `<rect x="${cx - 5}" y="${cy - 2}" width="10" height="8" rx="1.4" fill="#cdd6e2" stroke="#0c1116" stroke-width="0.8"/>
-        <circle cx="${cx - 2}" cy="${cy + 1}" r="1.1" fill="${accent}"/><circle cx="${cx + 2}" cy="${cy + 1}" r="1.1" fill="#2bf0c0"/>
-        <rect x="${cx - 3}" y="${cy + 3.4}" width="6" height="1.4" fill="#ffd36b"/>
-        <line x1="${cx - 13}" y1="${cy - 6}" x2="${cx - 11}" y2="${cy + 8}" stroke="#cdd6e2" stroke-width="1.4"/>`;
+      detail = `<rect x="-5" y="-2" width="10" height="8" rx="1.4" fill="#cdd6e2" stroke="#0c1116" stroke-width="0.8"/>
+        <circle cx="-2" cy="1" r="1.1" fill="${accent}"/><circle cx="2" cy="1" r="1.1" fill="#2bf0c0"/>
+        <rect x="-3" y="3.4" width="6" height="1.4" fill="#ffd36b"/>
+        <path d="M-12,-6 Q-14,1 -11,8" fill="none" stroke="#cdd6e2" stroke-width="1.4"/>`;
       break;
     case 'cosmic':
-      detail = `<g fill="#fff"><circle cx="${cx - 4}" cy="${cy - 2}" r="0.9"/><circle cx="${cx + 3}" cy="${cy + 1}" r="0.7"/><circle cx="${cx - 1}" cy="${cy + 6}" r="0.8"/><circle cx="${cx + 6}" cy="${cy - 4}" r="0.6"/><circle cx="${cx - 6}" cy="${cy + 4}" r="0.6"/></g>
-        <path d="M${cx - 9},${cy + 2} Q${cx},${cy - 3} ${cx + 9},${cy + 5}" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.8"/>`;
+      detail = `<g fill="#fff"><circle cx="-4" cy="-2" r="0.9"/><circle cx="3" cy="1" r="0.7"/><circle cx="-1" cy="6" r="0.8"/><circle cx="6" cy="-4" r="0.6"/><circle cx="-6" cy="4" r="0.6"/></g>
+        <path d="M-9,2 Q0,-3 9,5" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.8"/>`;
       break;
     case 'blazer':
       // The tailored jacket (GS-unending's Green Jacket): notched gold-trimmed lapels down to a
       // single button, a breast-pocket crest, and a hint of shirt in the open V.
-      detail = `<path d="M${cx - 5},${cy - 9.5} L${cx},${cy - 4} L${cx + 5},${cy - 9.5} L${cx + 2.4},${cy + 4} L${cx - 2.4},${cy + 4} Z" fill="#f4f6f2" opacity="0.9"/>
-        <path d="M${cx - 6},${cy - 10} L${cx - 1},${cy - 4.5} L${cx - 2.6},${cy + 5} L${cx - 5.4},${cy - 1}" fill="none" stroke="${accent}" stroke-width="1.3"/>
-        <path d="M${cx + 6},${cy - 10} L${cx + 1},${cy - 4.5} L${cx + 2.6},${cy + 5} L${cx + 5.4},${cy - 1}" fill="none" stroke="${accent}" stroke-width="1.3"/>
-        <circle cx="${cx}" cy="${cy + 6}" r="1" fill="${accent}"/>
-        <g transform="translate(${cx - 6.5} ${cy + 1})"><circle r="2.1" fill="${accent}"/><path d="M0,-1.3 L0.4,-0.4 L1.3,-0.3 L0.6,0.3 L0.8,1.2 L0,0.7 L-0.8,1.2 L-0.6,0.3 L-1.3,-0.3 L-0.4,-0.4 Z" fill="#0f5132"/></g>`;
+      detail = `<path d="M-5,-9.5 L0,-4 L5,-9.5 L2.4,4 L-2.4,4 Z" fill="#f4f6f2" opacity="0.9"/>
+        <path d="M-6,-10 L-1,-4.5 L-2.6,5 L-5.4,-1" fill="none" stroke="${accent}" stroke-width="1.3"/>
+        <path d="M6,-10 L1,-4.5 L2.6,5 L5.4,-1" fill="none" stroke="${accent}" stroke-width="1.3"/>
+        <circle cx="0" cy="6" r="1" fill="${accent}"/>
+        <g transform="translate(-6.5 1)"><circle r="2.1" fill="${accent}"/><path d="M0,-1.3 L0.4,-0.4 L1.3,-0.3 L0.6,0.3 L0.8,1.2 L0,0.7 L-0.8,1.2 L-0.6,0.3 L-1.3,-0.3 L-0.4,-0.4 Z" fill="#0f5132"/></g>`;
       break;
     default:
       detail = '';
   }
-  return detail;
+  return detail
+    ? `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">${detail}</g>`
+    : '';
 }
 
 /** Draw a SHIRT glyph (aura + torso silhouette + pattern detail) centred near (cx,cy) in a ~30u frame. */
@@ -224,80 +249,246 @@ export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
 }
 
 /**
- * A small MANNEQUIN preview — the golfer (head + torso + legs) wearing the currently-equipped hat,
- * shirt + pants. Standalone so the wardrobe can show "this is how you'll look". Falls back to a plain
- * figure (default legs/look) when a slot is empty. `skin`/`shirtBase` default to the loader-crew look.
+ * The full-body golfer preview — a cel-shaded character wearing the equipped hat + shirt + pants
+ * (+ the bag propped at their side). This is the Clubhouse's hero rendering (stage + lounge), built
+ * to look good on its own: gradient-shaded garments, a real face, shaped legs and shoes, and the
+ * golfer's signature cap when no cosmetic hat is worn (the same default the on-course figure wears,
+ * so the clubhouse look is recognisably the on-course look).
+ *
+ * ONE proportional figure at every size: vertical anchors are fractions of `h` so head→chest→legs
+ * read as three even bands (the stage's hat/shirt/pants tap zones line up with them); every authored
+ * offset is scaled by `S = h/210`, so the small lounge figure is a clean scale-down of the stage one.
+ *
+ * `uid` namespaces the SVG defs (gradients/clips) — ids are DOCUMENT-global and the lounge mounts
+ * four figures in one document, so figures sharing a fixed id would cross-tint each other's glows
+ * (the same class of bug as GS-cetus-4's cross-clipping hole SVGs).
  */
 export function golferPreviewSVG(
   hatId: string | undefined,
   shirtId: string | undefined,
   pantsId: string | undefined,
-  opts: { skin?: string; shirtBase?: string; w?: number; h?: number; bagId?: string } = {},
+  opts: {
+    skin?: string;
+    shirtBase?: string;
+    w?: number;
+    h?: number;
+    bagId?: string;
+    /** Signature cap colour — worn when no cosmetic hat is equipped (mirrors on-course). */
+    capColor?: string;
+    /** Unique id prefix for this figure's SVG defs — ids are DOCUMENT-global, so co-mounted figures
+     *  need distinct prefixes. Defaults to a hash of the figure's inputs, which makes an accidental
+     *  collision harmless (two figures hashing alike are wearing the identical look anyway). */
+    uid?: string;
+  } = {},
 ): string {
-  const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132 } = opts;
+  const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132, capColor } = opts;
+  const uid =
+    opts.uid ??
+    `p${Math.abs(
+      [hatId, shirtId, pantsId, opts.bagId, skin, shirtBase, capColor, w, h]
+        .join('|')
+        .split('')
+        .reduce((a, c) => (Math.imul(a, 33) + c.charCodeAt(0)) | 0, 5381),
+    ).toString(36)}`;
   const hat = apparelById(hatId);
   const shirt = apparelById(shirtId);
   const pants = apparelById(pantsId);
   const bag = apparelById(opts.bagId);
   const cx = w / 2;
-  // ONE proportional full-body figure at every size. Vertical anchors are fractions of `h` so
-  // head→chest→legs read as three even bands (the Clubhouse stage's hat/shirt/pants tap zones line up
-  // with them); every authored offset/width is scaled by `S` so the small lounge mannequin stays in
-  // proportion (a fixed head+neck used to eat a short figure, leaving a stunted chest + stretched legs).
-  // Authored at h=210 (S=1 → the big stage), so smaller previews are just a clean scale-down.
   const S = h / 210;
   const px = (n: number): number => n * S; // scale an authored length to this figure
   const sw = (n: number): number => Math.max(0.7, n * S); // scale a stroke, but keep hairlines visible
-  const headY = Math.round(h * 0.19);
-  const hipY = Math.round(h * 0.58);
-  const footY = Math.round(h * 0.93);
+  const f = (n: number): string => (Math.round(n * 10) / 10).toString();
+
+  // The three tap-band anchors (fractions of h — the stage CSS zones key off these).
+  const headY = h * 0.19;
+  const hipY = h * 0.58;
+  const footY = h * 0.93;
   const headR = px(15);
+  const shoY = headY + px(17); // shoulder line
+
   const shirtCol = shirt?.look.color ?? shirtBase;
-  const glowAura = shirt?.look.glow ? aura(cx, headY + px(36), px(30), shirt.look.glow, 'prevsg') : '';
-  // Legs (drawn behind the torso): default dark trousers, tinted by the equipped pants. Shorts bare the
-  // shins (skin below the knee), and a glowing pair adds a soft aura.
-  const pantsCol = pants?.look.color ?? '#2c3142';
-  const pantsGlow = pants?.look.glow ? aura(cx, hipY + px(6), px(20), pants.look.glow, 'prevpg') : '';
-  const shorts = pants?.look.shape === 'shorts';
-  const lx = cx - px(5);
-  const rx = cx + px(5);
-  const lfx = cx - px(7);
-  const rfx = cx + px(7);
-  const kneeY = (hipY + footY) / 2;
-  const line = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
-    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${wd}" stroke-linecap="round"/>`;
-  const legs = shorts
-    ? line(lx, hipY, lfx, footY, skin, px(5.5)) +
-      line(rx, hipY, rfx, footY, skin, px(5.5)) +
-      line(lx, hipY, (lx + lfx) / 2, kneeY, pantsCol, px(7)) +
-      line(rx, hipY, (rx + rfx) / 2, kneeY, pantsCol, px(7))
-    : line(lx, hipY, lfx, footY, pantsCol, px(7)) + line(rx, hipY, rfx, footY, pantsCol, px(7));
-  // Arms hang at the sides: a sleeve (shirt colour) from just under the shoulder out to the hip, capped
-  // by a skin hand. Drawn BEHIND the torso so the sleeve emerges from under the shirt; the hands sit on
-  // top. Without these the figure read as an armless mannequin on the big stage.
-  const shoulderY = headY + px(18);
-  const handY = hipY + px(2);
-  const shoulderX = px(16);
-  const handX = px(20);
-  const armW = px(5.5);
-  const handR = px(3.2);
-  const arms =
-    line(cx - shoulderX, shoulderY, cx - handX, handY, shirtCol, armW) +
-    line(cx + shoulderX, shoulderY, cx + handX, handY, shirtCol, armW);
-  const hand = (x: number): string =>
-    `<circle cx="${x}" cy="${handY}" r="${handR}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
-  const hands = hand(cx - handX) + hand(cx + handX);
-  const torso = `
-    <path d="M${cx - px(20)},${headY + px(16)} L${cx - px(9)},${headY + px(10)} L${cx},${headY + px(14)} L${cx + px(9)},${headY + px(10)} L${cx + px(20)},${headY + px(16)} L${cx + px(16)},${headY + px(26)} L${cx + px(12)},${hipY} L${cx - px(12)},${hipY} L${cx - px(16)},${headY + px(26)} Z" fill="${shirtCol}" stroke="#0c1116" stroke-width="${sw(1.4)}" stroke-linejoin="round"/>`;
-  const detail = shirt ? shirtDetail(shirt.look, cx, headY + px(30)) : '';
-  const head = `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1.2)}"/>`;
-  // Draw the hat ON the head (centre + real radius) so it scales to the head it sits on — a helmet
-  // encloses the whole head, a cap perches on the crown — exactly as on-course.
-  const hatG = hat ? hatGlyph(hat.look, cx, headY, headR, 'prev') : '';
+  const pantsLook = pants?.look;
+  const pantsShape = pantsLook?.shape;
+  const pantsCol = pantsLook?.color ?? '#2c3142';
+  const pantsAcc = pantsLook?.accent ?? shade(pantsCol, -0.35);
+  const ink = `stroke="#0c1116" stroke-width="${sw(1.1)}" stroke-linejoin="round"`;
+
+  // Torso: rounded shoulders → collar dip → gentle waist taper to the hip. Built once — the fill,
+  // the cel-shade clip and the shirt-detail clip all reuse it.
+  const waistY = (shoY + hipY) / 2;
+  const torsoPath =
+    `M${f(cx - px(19))},${f(shoY + px(5))} ` +
+    `Q${f(cx - px(19.5))},${f(shoY - px(4))} ${f(cx - px(10))},${f(shoY - px(5))} ` +
+    `L${f(cx - px(4.5))},${f(shoY - px(4.5))} Q${f(cx)},${f(shoY - px(0.5))} ${f(cx + px(4.5))},${f(shoY - px(4.5))} ` +
+    `L${f(cx + px(10))},${f(shoY - px(5))} Q${f(cx + px(19.5))},${f(shoY - px(4))} ${f(cx + px(19))},${f(shoY + px(5))} ` +
+    `Q${f(cx + px(15.5))},${f(waistY)} ${f(cx + px(13))},${f(hipY)} ` +
+    `L${f(cx - px(13))},${f(hipY)} ` +
+    `Q${f(cx - px(15.5))},${f(waistY)} ${f(cx - px(19))},${f(shoY + px(5))} Z`;
+
+  const defs = `<defs>
+    <linearGradient id="shg${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${shade(shirtCol, 0.2)}"/><stop offset="55%" stop-color="${shirtCol}"/><stop offset="100%" stop-color="${shade(shirtCol, -0.16)}"/>
+    </linearGradient>
+    <linearGradient id="ptg${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${shade(pantsCol, 0.12)}"/><stop offset="60%" stop-color="${pantsCol}"/><stop offset="100%" stop-color="${shade(pantsCol, -0.2)}"/>
+    </linearGradient>
+    <clipPath id="tor${uid}"><path d="${torsoPath}"/></clipPath>
+    <clipPath id="hd${uid}"><circle cx="${f(cx)}" cy="${f(headY)}" r="${f(headR)}"/></clipPath>
+  </defs>`;
+
+  // ── Auras (legendary/mythic garments glow behind the figure) ─────────────────────────────
+  const glowAura = shirt?.look.glow ? aura(cx, shoY + px(20), px(32), shirt.look.glow, `psg${uid}`) : '';
+  const pantsGlow = pantsLook?.glow ? aura(cx, (hipY + footY) / 2, px(26), pantsLook.glow, `ppg${uid}`) : '';
+
+  // ── Legs + shoes ──────────────────────────────────────────────────────────────────────────
+  const ankleY = footY - px(4);
+  const kneeY = hipY + (ankleY - hipY) * 0.5;
+  const lHip = cx - px(6.2);
+  const rHip = cx + px(6.2);
+  const lAnk = cx - px(9);
+  const rAnk = cx + px(9);
+  const pantsFill = `url(#ptg${uid})`;
+  const legPoly = (
+    hipC: number,
+    ankC: number,
+    topHalf: number,
+    ankHalf: number,
+    top: number,
+    bot: number,
+    fill: string,
+  ): string =>
+    `<path d="M${f(hipC - topHalf)},${f(top)} L${f(hipC + topHalf)},${f(top)} L${f(ankC + ankHalf)},${f(bot)} L${f(ankC - ankHalf)},${f(bot)} Z" fill="${fill}" ${ink}/>`;
+  const shoe = (x: number, col = '#232733'): string =>
+    `<path d="M${f(x - px(5))},${f(footY - px(1.8))} Q${f(x - px(5.6))},${f(footY - px(8.6))} ${f(x)},${f(footY - px(8.6))} Q${f(x + px(5.6))},${f(footY - px(8.6))} ${f(x + px(5.8))},${f(footY - px(1.8))} Z" fill="${col}" ${ink}/>
+     <rect x="${f(x - px(6.2))}" y="${f(footY - px(2.6))}" width="${f(px(12.6))}" height="${f(px(2.8))}" rx="${f(px(1.4))}" fill="#e8ecf2" ${ink}/>
+     <ellipse cx="${f(x - px(1.6))}" cy="${f(footY - px(6.4))}" rx="${f(px(1.8))}" ry="${f(px(1))}" fill="#ffffff" opacity="0.35"/>`;
+  // The hip block bridges the two legs so no background peeks through at the crotch.
+  const hipBlock = `<rect x="${f(cx - px(11.8))}" y="${f(hipY - px(1))}" width="${f(px(23.6))}" height="${f(px(10))}" rx="${f(px(4))}" fill="${pantsFill}" ${ink}/>`;
+  let legs = '';
+  let legDetail = '';
+  if (pantsShape === 'shorts') {
+    const hemY = kneeY + px(1.5);
+    legs =
+      hipBlock +
+      legPoly(lHip, (lHip + lAnk) / 2, px(5.8), px(5.4), hipY, hemY, pantsFill) +
+      legPoly(rHip, (rHip + rAnk) / 2, px(5.8), px(5.4), hipY, hemY, pantsFill) +
+      legPoly((lHip + lAnk) / 2, lAnk, px(3), px(2.7), hemY, ankleY, skin) +
+      legPoly((rHip + rAnk) / 2, rAnk, px(3), px(2.7), hemY, ankleY, skin) +
+      // ankle socks
+      `<rect x="${f(lAnk - px(3.4))}" y="${f(ankleY - px(4.4))}" width="${f(px(6.8))}" height="${f(px(4))}" rx="${f(px(1.4))}" fill="#e8ecf2" ${ink}/>
+       <rect x="${f(rAnk - px(3.4))}" y="${f(ankleY - px(4.4))}" width="${f(px(6.8))}" height="${f(px(4))}" rx="${f(px(1.4))}" fill="#e8ecf2" ${ink}/>`;
+    legDetail = `<rect x="${f(lHip - px(5.8))}" y="${f(hemY - px(2.6))}" width="${f(px(11))}" height="${f(px(2.6))}" fill="${pantsAcc}" opacity="0.9"/>
+      <rect x="${f(rHip - px(5.2))}" y="${f(hemY - px(2.6))}" width="${f(px(11))}" height="${f(px(2.6))}" fill="${pantsAcc}" opacity="0.9"/>`;
+  } else if (pantsShape === 'knickers') {
+    const cuffY = kneeY + px(6);
+    // Puffed plus-fours: the outer edge bellies out, gathered into a cuff below the knee.
+    const puff = (hipC: number, ankC: number, side: 1 | -1): string =>
+      `<path d="M${f(hipC - side * px(5.8))},${f(hipY)} L${f(hipC + side * px(5.8))},${f(hipY)} Q${f(ankC + side * px(8.4))},${f((hipY + cuffY) / 2 + px(4))} ${f(ankC + side * px(3.2))},${f(cuffY)} L${f(ankC - side * px(3.4))},${f(cuffY)} Q${f(ankC - side * px(6.6))},${f((hipY + cuffY) / 2)} ${f(hipC - side * px(5.8))},${f(hipY)} Z" fill="${pantsFill}" ${ink}/>`;
+    legs =
+      hipBlock +
+      puff(lHip, lAnk, -1) +
+      puff(rHip, rAnk, 1) +
+      legPoly(lAnk, lAnk, px(2.8), px(2.6), cuffY, ankleY, '#e8ecf2') +
+      legPoly(rAnk, rAnk, px(2.8), px(2.6), cuffY, ankleY, '#e8ecf2');
+    legDetail = `<rect x="${f(lAnk - px(4))}" y="${f(cuffY - px(1.4))}" width="${f(px(8))}" height="${f(px(3))}" rx="${f(px(1.2))}" fill="${pantsAcc}" ${ink}/>
+      <rect x="${f(rAnk - px(4))}" y="${f(cuffY - px(1.4))}" width="${f(px(8))}" height="${f(px(3))}" rx="${f(px(1.2))}" fill="${pantsAcc}" ${ink}/>`;
+  } else {
+    const slim = pantsShape === 'leggings';
+    const ankHalf = slim ? px(2.5) : px(3.4);
+    legs =
+      hipBlock +
+      legPoly(lHip, lAnk, px(5.8), ankHalf, hipY, ankleY, pantsFill) +
+      legPoly(rHip, rAnk, px(5.8), ankHalf, hipY, ankleY, pantsFill);
+    if (pantsShape === 'spacepants') {
+      // Mag-boots: accent boot shells swallow the shins.
+      const boot = (x: number): string =>
+        `<rect x="${f(x - px(4.6))}" y="${f(footY - px(14))}" width="${f(px(9.2))}" height="${f(px(11))}" rx="${f(px(2))}" fill="${pantsAcc}" ${ink}/>
+         <rect x="${f(x - px(4.6))}" y="${f(footY - px(14))}" width="${f(px(9.2))}" height="${f(px(2.6))}" rx="${f(px(1.3))}" fill="${shade(pantsAcc, 0.3)}" stroke="none"/>`;
+      legDetail = boot(lAnk) + boot(rAnk);
+    } else if (pantsShape === 'nebula') {
+      legDetail = `<g fill="#fff"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(14))}" r="${f(px(1.1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(24))}" r="${f(px(0.9))}"/><circle cx="${f(lAnk)}" cy="${f(ankleY - px(10))}" r="${f(px(0.9))}"/><circle cx="${f(rAnk - px(1))}" cy="${f(ankleY - px(20))}" r="${f(px(0.7))}"/></g>`;
+    } else {
+      // Trousers/leggings: a pinstripe (or legging seam) down each outer leg sells the tailoring.
+      const op = slim ? 0.9 : 0.55;
+      legDetail = `<g stroke="${pantsAcc}" stroke-width="${sw(1.2)}" opacity="${op}" stroke-linecap="round">
+        <line x1="${f(lHip - px(3.6))}" y1="${f(hipY + px(4))}" x2="${f(lAnk - px(1.4))}" y2="${f(ankleY - px(1))}"/>
+        <line x1="${f(rHip + px(3.6))}" y1="${f(hipY + px(4))}" x2="${f(rAnk + px(1.4))}" y2="${f(ankleY - px(1))}"/>
+      </g>`;
+    }
+  }
+  const bootCol = pantsShape === 'spacepants' ? pantsAcc : '#232733';
+  const shoes = shoe(lAnk, bootCol) + shoe(rAnk, bootCol);
+
+  // ── Arms: shirt-sleeve to the elbow, bare forearm, a hand — a relaxed A-pose ─────────────
+  const sleeveCol = shade(shirtCol, -0.06);
+  const elbowY = shoY + px(27);
+  const handY = hipY + px(4);
+  const armSeg = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
+    `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${col}" stroke-width="${f(wd)}" stroke-linecap="round"/>`;
+  const arm = (side: 1 | -1): string =>
+    armSeg(cx + side * px(15.5), shoY + px(3), cx + side * px(19.5), elbowY, sleeveCol, px(7)) +
+    armSeg(cx + side * px(19.5), elbowY, cx + side * px(16.5), handY, skin, px(5));
+  const hand = (side: 1 | -1): string =>
+    `<circle cx="${f(cx + side * px(16.5))}" cy="${f(handY)}" r="${f(px(3.4))}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
+
+  // ── Torso + cel shading + garment detail ─────────────────────────────────────────────────
+  const neck = `<rect x="${f(cx - px(3.6))}" y="${f(headY + headR - px(4))}" width="${f(px(7.2))}" height="${f(shoY - headY - headR + px(6))}" fill="${shade(skin, -0.12)}"/>`;
+  const torso = `<path d="${torsoPath}" fill="url(#shg${uid})" stroke="#0c1116" stroke-width="${sw(1.5)}" stroke-linejoin="round"/>`;
+  const torsoShade = `<g clip-path="url(#tor${uid})">
+    <ellipse cx="${f(cx - px(9))}" cy="${f(shoY + px(5))}" rx="${f(px(15))}" ry="${f(px(11))}" fill="#ffffff" opacity="0.13"/>
+    <rect x="${f(cx + px(7))}" y="${f(shoY - px(6))}" width="${f(px(14))}" height="${f(hipY - shoY + px(12))}" fill="#000000" opacity="0.1"/>
+    <rect x="${f(cx - px(20))}" y="${f(hipY - px(4))}" width="${f(px(40))}" height="${f(px(5))}" fill="#000000" opacity="0.08"/>
+  </g>`;
+  const detail = shirt
+    ? `<g clip-path="url(#tor${uid})">${shirtDetail(shirt.look, cx, shoY + px(12), S * 1.55)}</g>`
+    : '';
+  // Belt across the shirt hem (skipped for shorts — their waistband reads on its own).
+  const belt =
+    pantsShape === 'shorts'
+      ? ''
+      : `<rect x="${f(cx - px(12.6))}" y="${f(hipY - px(2.2))}" width="${f(px(25.2))}" height="${f(px(4.4))}" rx="${f(px(2))}" fill="${shade(pantsCol, -0.35)}" ${ink}/>
+       <rect x="${f(cx - px(2.4))}" y="${f(hipY - px(1.6))}" width="${f(px(4.8))}" height="${f(px(3.2))}" rx="${f(px(1))}" fill="${pantsAcc}" stroke="none"/>`;
+
+  // ── Head: skin, cel shade, a friendly face, ears, then the hat ───────────────────────────
+  const ears = `<circle cx="${f(cx - headR + px(0.5))}" cy="${f(headY + px(1.5))}" r="${f(px(2.6))}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>
+    <circle cx="${f(cx + headR - px(0.5))}" cy="${f(headY + px(1.5))}" r="${f(px(2.6))}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
+  const head = `<circle cx="${f(cx)}" cy="${f(headY)}" r="${f(headR)}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1.3)}"/>`;
+  const headShade = `<g clip-path="url(#hd${uid})">
+    <circle cx="${f(cx - px(5))}" cy="${f(headY - px(5))}" r="${f(px(13))}" fill="#ffffff" opacity="0.13"/>
+    <circle cx="${f(cx + px(8))}" cy="${f(headY + px(5))}" r="${f(px(13))}" fill="#000000" opacity="0.07"/>
+  </g>`;
+  const eyeY = headY - px(0.5);
+  const face = `
+    <g fill="#232733">
+      <circle cx="${f(cx - px(5.2))}" cy="${f(eyeY)}" r="${f(px(1.8))}"/>
+      <circle cx="${f(cx + px(5.2))}" cy="${f(eyeY)}" r="${f(px(1.8))}"/>
+    </g>
+    <circle cx="${f(cx - px(4.6))}" cy="${f(eyeY - px(0.6))}" r="${f(px(0.6))}" fill="#fff"/>
+    <circle cx="${f(cx + px(5.8))}" cy="${f(eyeY - px(0.6))}" r="${f(px(0.6))}" fill="#fff"/>
+    <path d="M${f(cx - px(7.4))},${f(eyeY - px(4))} Q${f(cx - px(5))},${f(eyeY - px(5.6))} ${f(cx - px(2.8))},${f(eyeY - px(4.2))}" fill="none" stroke="#0c1116" stroke-width="${sw(1.1)}" stroke-linecap="round" opacity="0.6"/>
+    <path d="M${f(cx + px(2.8))},${f(eyeY - px(4.2))} Q${f(cx + px(5))},${f(eyeY - px(5.6))} ${f(cx + px(7.4))},${f(eyeY - px(4))}" fill="none" stroke="#0c1116" stroke-width="${sw(1.1)}" stroke-linecap="round" opacity="0.6"/>
+    <path d="M${f(cx - px(3.6))},${f(headY + px(6))} Q${f(cx)},${f(headY + px(9))} ${f(cx + px(3.6))},${f(headY + px(6))}" fill="none" stroke="#0c1116" stroke-width="${sw(1.3)}" stroke-linecap="round" opacity="0.75"/>
+    <ellipse cx="${f(cx - px(8))}" cy="${f(headY + px(4.5))}" rx="${f(px(2.4))}" ry="${f(px(1.4))}" fill="#ff7b6b" opacity="0.22"/>
+    <ellipse cx="${f(cx + px(8))}" cy="${f(headY + px(4.5))}" rx="${f(px(2.4))}" ry="${f(px(1.4))}" fill="#ff7b6b" opacity="0.22"/>`;
+  // A cosmetic hat, or the golfer's signature cap (same default as on-course) when none is worn.
+  const hatG = hat
+    ? hatGlyph(hat.look, cx, headY, headR, uid)
+    : capColor
+      ? hatGlyph({ shape: 'cap', color: capColor, accent: shade(capColor, -0.3) }, cx, headY, headR, `dc${uid}`)
+      : '';
+
   // The equipped golf bag (GS-unending) stands propped at the golfer's side, feet on the same floor
-  // line, scaled with the figure — the caddy-bag flex without cluttering the swing pose.
-  const bagG = bag ? bagGlyph(bag.look, cx - px(34), footY - px(15), 'prevbag', S * 1.15) : '';
+  // line, scaled with the figure — the caddy-bag flex without cluttering the pose.
+  const bagG = bag ? bagGlyph(bag.look, cx - px(37), footY - px(16), `pb${uid}`, S * 1.2) : '';
+
+  // Mythic/legendary outfits shed a few sparkles around the whole figure.
+  const flair =
+    shirt?.look.glow || pantsLook?.glow
+      ? `<g transform="translate(${f(cx)} ${f(shoY + px(18))}) scale(${(S * 1.4).toFixed(2)})">${sparkles([[-17, -12], [16, -3], [-13, 16], [14, 20]])}</g>`
+      : '';
+
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${glowAura}${pantsGlow}${bagG}${legs}${arms}${torso}${detail}${hands}${head}${hatG}
+    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${arm(-1)}${arm(1)}${neck}${torso}${torsoShade}${detail}${belt}${hand(-1)}${hand(1)}${ears}${head}${headShade}${face}${hatG}${flair}
   </svg>`;
 }

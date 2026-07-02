@@ -940,3 +940,45 @@ literals retargeted; the ladder-escalation test became the unending survival-wal
 copy is "? ? ?" (spaced) — a literal "???" trips `tests/build.test.ts`'s no-`??`-in-bundle guard.
 `restart` now also carries `clubhouseVisit` + `endlessBestHoles` (the former was a pre-existing drop —
 the lounge shuffle counter reset to 0 on every restart).
+
+## The Clubhouse glow-up (GS-clubhouse-glow): cel-shaded golfers + a real 19th-hole bar
+
+The clubhouse looked flat next to the on-course game: stick-figure golfers (line legs, no face, no
+shading), garment details authored at fixed pixel sizes that vanished on the big stage torso, and a
+lounge whose "bar" read as a bookshelf. Reframed so the clubhouse **stands on its own** — the only
+contract with the course view is that the outfit is *recognisable* (same `ApparelLook` shapes +
+palette); the rendering style is free to differ (front-facing, cel-shaded, detailed) because the
+course view is a tiny profile glimpsed mid-swing anyway.
+
+- **`golferPreviewSVG` is a character now**: gradient-shaded torso with cel highlight/shade bands
+  (clipped to the torso path), shaped tapered legs with real shoes, elbow-bent arms (shirt sleeve →
+  skin forearm → hand), neck, ears, and a face (eyes+catchlights, brows, smile, blush). Per-shape
+  pants tailoring on the legs: shorts bare shins + ankle socks + hem bands, plus-fours puff into
+  accent cuffs + white socks, spacepants get accent mag-boot shells, leggings/trousers get seam/
+  pinstripe lines, nebula gets stars; a belt with an accent buckle covers the shirt hem. The three
+  tap-band anchors (head 0.19h / hip 0.58h / feet 0.93h) are UNCHANGED — the stage `.gs-czone` CSS
+  still lines up.
+- **When no cosmetic hat is worn the figure wears its SIGNATURE CAP** (`opts.capColor`, the same
+  default cap the on-course `drawGolfer` paints), so a fresh character is identifiable in the hall.
+- **`shirtDetail` is canonical-frame + scale** (`(look, cx, cy, s=1)`), like `hatGlyph`: the wardrobe
+  card uses s=1, the figure passes `S*1.55` and clips the detail to the torso — details no longer
+  shrink into specks as the torso grows. Card glyphs are otherwise untouched.
+- **SVG def ids collide across co-mounted figures** (the GS-cetus-4 class of bug: ids are
+  document-global, and the lounge mounts four figures). `uid` namespaces every gradient/clip; it
+  DEFAULTS to a hash of the figure's inputs so an unthreaded caller can't cross-tint two different
+  outfits (identical hashes ⇒ identical looks ⇒ harmless). The stage passes `uid:'stage'`, the lounge
+  `lg<characterId>`.
+- **The lounge is a furnished 19th-hole bar** (`loungeArt`, still hand-placed / zero-rng / animated
+  only via `<animate>`): stone fireplace with arched firebox, mantel trophy/photo/crossed-clubs
+  plaque, the clubhouse cat asleep on the hearthstone; leather armchair + floor lamp; a picture
+  window onto the space course (ringed planet, shooting star, pin flag); dartboard + crooked course
+  painting; and a REAL bar — mirrored back-bar with shaped bottles (necks, not book-spines) on lit
+  shelves, hanging stemware, wood counter with taps + poured drinks, panelled front, brass foot rail
+  and two cushioned stools under a flickering neon **19th Hole** sign. Floor spots re-anchored to
+  the furniture (hearth / rug / armchair / bar). GOTCHA that cost a round: the bar pendant lamps and
+  the neon sign occupied the same wall band and the lamp bulbs sat exactly on the sign's "1", so
+  "19th Hole" read "9th Hole" — the sign is the bar's light source now, don't re-hang lamps there.
+- **Eyes-on loop**: `scripts/clubhouse-preview.mjs` (esbuild + Playwright screenshot; PNG path via
+  `CLUBHOUSE_PREVIEW_PNG`) renders seven stage outfits, a lounge-size figure and two shuffled lounge
+  visits — re-shoot it after touching `apparelArt.ts` or `clubhouseLounge.ts`. No new hook, no save
+  bump, no reducer change; full suite green (the change is render-string-only).
