@@ -295,6 +295,15 @@ For each system: the rule that constrains new work. Open the archive doc before 
   variation via `posHash`, never the stream). `playView`'s `spawnLandFX` answers the touchdown per
   lie/penalty — extend it with any new penalty kind. Re-shoot the gallery
   (`node scripts/gallery.mjs`) after any `style.ts` change.
+- **Audio** (`docs/decisions/audio.md`). ASSETLESS, always (GS-audio-2): every cue + music note is
+  synthesized WebAudio — no downloaded audio file, ever (nothing to 404; the bundle stays one
+  inlined file). ONE shared `AudioContext` (`audio.ts sharedAudioContext`), two independent
+  buses/settings: SFX on `sound`, generative music on `music`. Strikes are voiced per club FAMILY
+  (`strikeClassOf`, convention-based on CLUBS ids — beware `PW/GW/SW` end in 'W' but are wedges);
+  music is table+dispatch per archetype (`MUSIC_TRACKS` + `'menu'`; coverage, distinct moods and
+  the subtlety gain bar ≤0.35 machine-checked by `tests/audio.test.ts`) on a PRIVATE seeded stream
+  — never `Math.random`, never the sim/render streams. The sim never calls audio; the audio
+  modules must import clean in node.
 - **UI layer** (`docs/decisions/ui-intro.md`). The screen flow is a PURE reducer (`ui/game.ts`):
   `(UiState, Action) → UiState`, no DOM/time, fully unit-tested. `app.ts`/`main.ts` render state +
   dispatch; save persistence + canvas mounts + the intro cinematic are side-effects there, never in

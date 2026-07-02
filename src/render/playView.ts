@@ -634,8 +634,9 @@ export interface PlayViewOptions {
   onDone?: () => void;
   /** Fired once per segment at the STRIKE moment (club–ball contact / putter tap) — the cue point
    *  for a contact sound + haptic. `quality` 0..1 for a shot (1 = pure, derived from the miss),
-   *  undefined for a putt. Pure feel hook; never affects the sim. */
-  onImpact?: (kind: 'shot' | 'putt', quality?: number) => void;
+   *  undefined for a putt. `clubId` is the struck club's taxonomy id (GS-audio-2) so the cue can
+   *  voice driver/wood/iron/wedge distinctly. Pure feel hook; never affects the sim. */
+  onImpact?: (kind: 'shot' | 'putt', quality?: number, clubId?: string) => void;
   /**
    * Zoom-and-follow: when set, the camera centres on `focus` (the starting ball) at radius
    * `viewRadius` (course yards) and — if `follow` — eases to track the ball in flight, so the
@@ -1095,7 +1096,7 @@ export function mountPlayView(
             (shot.result.landing[0] - shot.from[0]) * Math.cos(brq) +
             (shot.result.landing[1] - shot.from[1]) * -Math.sin(brq);
           const mf = carry > 0 ? Math.abs(lat) / carry : 0;
-          opts.onImpact?.('shot', Math.max(0, 1 - mf / 0.2));
+          opts.onImpact?.('shot', Math.max(0, 1 - mf / 0.2), shot.club.id);
         }
         let ground: Vec;
         let height: number;

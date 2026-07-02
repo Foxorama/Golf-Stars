@@ -13,6 +13,9 @@
 export interface Settings {
   /** Master sound on/off (assetless WebAudio SFX). */
   sound: boolean;
+  /** Ambient background music (assetless generative WebAudio, per-world themes) — its own
+   *  toggle, independent of `sound`, so cues-without-music and music-without-cues both work. */
+  music: boolean;
   /** Vibration feedback on supported devices. */
   haptics: boolean;
   /** Honour prefers-reduced-motion: trims screen-shake, celebrations, ambient FX. */
@@ -36,6 +39,7 @@ function prefersReducedMotion(): boolean {
 function defaults(): Settings {
   return {
     sound: true,
+    music: true,
     haptics: true,
     // Seed from the OS preference so a reduced-motion user gets a calm first run by default.
     reducedMotion: prefersReducedMotion(),
