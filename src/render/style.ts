@@ -19,6 +19,7 @@ import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
 import { obStakes, playBounds, playBoundsCorners } from '../sim/round';
 import { tradeTents as tradeTentsFor, type TradeTent } from '../sim/tents';
 import { meteorScorch as meteorScorchFor, type ScorchMark } from '../sim/scorch';
+import { effectPatches as effectPatchesFor, type GroundPatch, type PatchKind } from '../sim/patches';
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
@@ -108,6 +109,11 @@ export interface SceneOpts {
    *  turf — a ball at rest on one plays the 'scorch' lie. Drawn in COURSE space from the SAME
    *  `meteorScorch(hole)` the sim reads. Baked at the app boundary from the course effect. */
   meteorScorch?: boolean;
+  /** Effect ground patches (GS-journey-fx-2): the route's turf-patch family (comet stardust /
+   *  frostfall ice / debris wreckage) — a ball at rest on one plays that family's lie. Drawn in
+   *  COURSE space from the SAME `effectPatches(hole, kind)` the sim reads (the graphic IS the
+   *  physics). Baked at the app boundary from the course effect. */
+  groundPatch?: PatchKind;
 }
 
 /** The Rainbow Road colour cycle (GS-rainbow) — a vivid 7-band rainbow the ribbon mows through. */
@@ -1254,6 +1260,89 @@ function styleScorch(marks: readonly ScorchMark[], proj: Projector): Prim[] {
         r: Math.max(0.7, rr * 0.09),
         fill: i === 0 ? 'rgba(255,170,80,0.95)' : 'rgba(255,110,50,0.85)',
       });
+    }
+  }
+  return out;
+}
+
+/**
+ * Effect GROUND PATCHES (GS-journey-fx-2): per-family turf-patch art, drawn at the TRUE footprint
+ * radius the sim's lie conversion tests (the graphic IS the physics). All variation is `posHash` of
+ * the patch's course position (zero rng draws — the seeded scene streams are untouched).
+ *   • stardust — a pale charged shimmer with little four-point sparkles: reads as a BONUS, not a burn.
+ *   • frost    — an icy rime disc with crystalline spokes: reads slick.
+ *   • junk     — half-buried scrap slabs with a warning blink: reads snagged.
+ */
+function stylePatches(kind: PatchKind, patches: readonly GroundPatch[], proj: Projector): Prim[] {
+  const out: Prim[] = [];
+  for (const m of patches) {
+    const [x, y] = proj.project(m.c);
+    const rr = Math.max(4, m.r * proj.scale);
+    const h = (k: number) => posHash(m.c[0], m.c[1], m.variant * 17 + k);
+    // Irregular near-circle footprint at the TRUE radius (shared by all three families).
+    const n = 10;
+    const blob: Vec[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const wob = 0.86 + h(i + 20) * 0.24;
+      blob.push([x + Math.cos(a) * rr * wob, y + Math.sin(a) * rr * wob]);
+    }
+    if (kind === 'stardust') {
+      // Charged comet dust — a cool glow, a translucent pale drift, and tiny four-point sparkles.
+      out.push({ t: 'glow', c: [x, y], r: rr * 1.6, col: 'rgba(150,225,255,0.16)' });
+      out.push({ t: 'poly', pts: blob, fill: 'rgba(205,240,255,0.42)', stroke: 'rgba(160,230,255,0.7)', sw: 1 });
+      out.push({ t: 'circle', c: [x - rr * 0.15, y - rr * 0.12], r: rr * 0.5, fill: 'rgba(235,250,255,0.4)' });
+      const sparks = 3 + Math.floor(h(1) * 2);
+      for (let i = 0; i < sparks; i++) {
+        const a = h(i + 31) * Math.PI * 2;
+        const d = rr * (0.15 + h(i + 41) * 0.65);
+        const sx = x + Math.cos(a) * d;
+        const sy = y + Math.sin(a) * d;
+        const sr = rr * (0.14 + h(i + 51) * 0.12);
+        out.push({ t: 'line', a: [sx - sr, sy], b: [sx + sr, sy], stroke: 'rgba(255,255,255,0.9)', sw: 0.9, round: true });
+        out.push({ t: 'line', a: [sx, sy - sr], b: [sx, sy + sr], stroke: 'rgba(255,255,255,0.9)', sw: 0.9, round: true });
+      }
+    } else if (kind === 'frost') {
+      // Rime frozen onto the turf — an icy disc, crystalline spokes, a bright specular rim.
+      out.push({ t: 'poly', pts: blob, fill: 'rgba(210,238,252,0.55)', stroke: 'rgba(245,252,255,0.85)', sw: 1.1 });
+      out.push({ t: 'circle', c: [x - rr * 0.12, y - rr * 0.1], r: rr * 0.55, fill: 'rgba(240,250,255,0.5)' });
+      const spokes = 5 + Math.floor(h(1) * 3);
+      for (let i = 0; i < spokes; i++) {
+        const a = (i / spokes) * Math.PI * 2 + h(i + 2) * 0.7;
+        const len = rr * (0.55 + h(i + 9) * 0.4);
+        out.push({
+          t: 'line',
+          a: [x + Math.cos(a) * rr * 0.15, y + Math.sin(a) * rr * 0.15],
+          b: [x + Math.cos(a) * len, y + Math.sin(a) * len],
+          stroke: 'rgba(255,255,255,0.75)',
+          sw: 0.9,
+          round: true,
+        });
+      }
+    } else {
+      // Wreckage half-buried in the grass — a dark scorched bed, grey scrap slabs, one blinking light.
+      out.push({ t: 'poly', pts: blob, fill: 'rgba(30,32,38,0.55)', stroke: 'rgba(70,76,90,0.7)', sw: 1 });
+      const slabs = 2 + Math.floor(h(1) * 2);
+      for (let i = 0; i < slabs; i++) {
+        const a = h(i + 5) * Math.PI * 2;
+        const d = rr * (0.1 + h(i + 15) * 0.45);
+        const cx = x + Math.cos(a) * d;
+        const cy = y + Math.sin(a) * d;
+        const w = rr * (0.35 + h(i + 25) * 0.3);
+        const ht = w * (0.45 + h(i + 35) * 0.3);
+        const rot = h(i + 45) * Math.PI;
+        const ca = Math.cos(rot);
+        const sa = Math.sin(rot);
+        const pts: Vec[] = [
+          [cx - ca * w + sa * ht, cy - sa * w - ca * ht],
+          [cx + ca * w + sa * ht, cy + sa * w - ca * ht],
+          [cx + ca * w - sa * ht, cy + sa * w + ca * ht],
+          [cx - ca * w - sa * ht, cy - sa * w + ca * ht],
+        ];
+        out.push({ t: 'poly', pts, fill: i % 2 ? 'rgba(96,106,124,0.9)' : 'rgba(70,78,94,0.9)', stroke: 'rgba(150,164,188,0.6)', sw: 0.8 });
+      }
+      // A dead panel light — a static red dot (the sim reads the footprint, the light is dressing).
+      out.push({ t: 'circle', c: [x + rr * 0.3, y - rr * 0.2], r: Math.max(0.7, rr * 0.08), fill: 'rgba(255,90,90,0.85)' });
     }
   }
   return out;
@@ -3017,6 +3106,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // plays (the graphic IS the physics). Pure (posHash variation only — zero rng draws, so the seeded
   // scene streams are untouched); off under Rainbow Road (whose road rule ignores scorch).
   if (opts.meteorScorch && !rainbow) prims.push(...styleScorch(meteorScorchFor(hole), proj));
+  // Effect ground patches (GS-journey-fx-2): same contract as the craters — drawn from the SAME
+  // `effectPatches(hole, kind)` the sim's lie conversion reads, posHash variation only (zero rng).
+  if (opts.groundPatch && !rainbow) prims.push(...stylePatches(opts.groundPatch, effectPatchesFor(hole, opts.groundPatch), proj));
 
   // --- 6c. Trade-camp tents (GS-tents) ----------------------------------------
   // The trade-market route's signature: a ring of bright, collidable tents around the green. Drawn in

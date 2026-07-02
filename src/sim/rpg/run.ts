@@ -47,7 +47,7 @@ import { addUnlockedClubs } from './club-unlock';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { EFFECT_WIND_CAP, effectWindMult, routeDifficulty, routeEffect } from './effects';
+import { EFFECT_WIND_CAP, effectWindMult, effectCarryMult, effectPatchKind, routeDifficulty, routeEffect } from './effects';
 import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
@@ -255,9 +255,9 @@ export function currentCourse(run: Run): Course {
   // back holes a different theme of the same arc. Each half is generated independently and stitched,
   // every hole stamped with its own biome/themeId so it renders + plays as its world.
   if (spec.splitBiome && spec.holes >= 2) {
-    return applyEffectWind(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect);
+    return applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect);
   }
-  return applyEffectWind(
+  return applyEffectPhysics(
     generateCourse(stopSeed(run), {
       holes: spec.holes,
       parCap: spec.parCap,
@@ -273,20 +273,31 @@ export function currentCourse(run: Run): Course {
 }
 
 /**
- * The course effect's one physics hook (GS-journey-variety): scale every hole's generated wind by
- * `effectWindMult`, clamped to the generator's own max band — a PURE post-generation transform (no
- * rng, no geometry), so `validateFairness`/`validateCrossings` are untouched and auto ≡ interactive
- * holds by construction (the transformed speed IS `hole.wind`, read by HUD, renderer, AI and sim
- * alike). A neutral effect returns the course object UNCHANGED (byte-for-byte the old path).
+ * The course effect's NUMERIC physics hooks (GS-journey-variety wind; GS-journey-fx-2 carry): scale
+ * every hole's generated wind by `effectWindMult` (clamped to the generator's own max band) and fold
+ * `effectCarryMult` in as a `biomeMods` carry row — the SAME mechanism low-gravity biomes use, so
+ * `biomeCarryMult` feeds the HUD range preview, club suggestions, AI and shot physics one identical
+ * number. Both are PURE post-generation transforms (no rng, no geometry), so `validateFairness`/
+ * `validateCrossings` are untouched and auto ≡ interactive holds by construction (the transformed
+ * numbers ARE the course data). A neutral effect returns the course object UNCHANGED (byte-for-byte
+ * the old path).
  */
-function applyEffectWind(course: Course, effect: string): Course {
-  const mult = effectWindMult(effect);
-  if (mult === 1) return course;
+function applyEffectPhysics(course: Course, effect: string): Course {
+  const wind = effectWindMult(effect);
+  const carry = effectCarryMult(effect);
+  if (wind === 1 && carry === 1) return course;
   return {
     ...course,
-    holes: course.holes.map((h) =>
-      h.wind ? { ...h, wind: { ...h.wind, spd: Math.min(EFFECT_WIND_CAP, Math.max(0, h.wind.spd * mult)) } } : h,
-    ),
+    holes: course.holes.map((h) => {
+      let out = h;
+      if (wind !== 1 && out.wind) {
+        out = { ...out, wind: { ...out.wind, spd: Math.min(EFFECT_WIND_CAP, Math.max(0, out.wind.spd * wind)) } };
+      }
+      if (carry !== 1) {
+        out = { ...out, biomeMods: [...(out.biomeMods ?? []), { kind: 'carry', value: carry, note: effect }] };
+      }
+      return out;
+    }),
   };
 }
 
@@ -689,6 +700,9 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     // Meteor-strike scorch marks (GS-meteor-scorch): the meteor-shower route chars craters into the
     // turf — same effect-derived gate, so the sim's lie conversion and the drawn craters agree.
     meteorScorch: routeEffect(run.pendingEvent) === 'meteorShower',
+    // Effect ground patches (GS-journey-fx-2): comet stardust / frostfall ice / debris wreckage —
+    // same effect-derived gate, so the sim's lie conversion and the drawn patches agree.
+    groundPatch: effectPatchKind(routeEffect(run.pendingEvent)),
     scramble: scrambleOptsFor(run),
   };
 }

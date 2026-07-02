@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { routeDifficulty, routeEffect, effectWindMult, COURSE_EFFECTS, EFFECT_WIND, EFFECT_WIND_CAP, type CourseEffectId } from '../src/sim/rpg/effects';
+import { routeDifficulty, routeEffect, effectWindMult, effectCarryMult, effectPatchKind, COURSE_EFFECTS, EFFECT_WIND, EFFECT_CARRY, EFFECT_PATCH, EFFECT_WIND_CAP, type CourseEffectId } from '../src/sim/rpg/effects';
 import { DEFAULT_EVENT, ROUTE_EVENTS, UNIQUE_EVENTS, type RouteEvent } from '../src/sim/rpg/events';
-import { startRun, currentCourse } from '../src/sim/rpg/run';
+import { startRun, currentCourse, playerHoleOpts } from '../src/sim/rpg/run';
+import { biomeCarryMult } from '../src/sim/round';
+import { PATCH_SPECS } from '../src/sim/patches';
 
 const ev = (over: Partial<RouteEvent>): RouteEvent => ({ ...DEFAULT_EVENT, ...over });
 
@@ -62,6 +64,28 @@ describe('route effect mapping (GS-journey-fx)', () => {
     expect(routeEffect(ev({ id: 'iss-pass', icon: '🛰️' }))).toBe('spaceJunk');
   });
 
+  it('the GS-journey-fx-2 effects read true: heavy skies, frost, stardust, wreckage', () => {
+    // Mass reads as the gravity well — including the supermoon, whose lore IS the tide-pull.
+    expect(routeEffect(ev({ id: 'gravity-slingshot', icon: '🪐' }))).toBe('gravityWell');
+    expect(routeEffect(ev({ id: 'supermoon', icon: '🌝' }))).toBe('gravityWell');
+    expect(routeEffect(ev({ id: 'neutron-tide', icon: '🪐' }))).toBe('gravityWell');
+    expect(routeEffect(ev({ id: 'white-dwarf-passage', icon: '🪐' }))).toBe('gravityWell');
+    expect(routeEffect(ev({ id: 'rogue-planet', icon: '🪐' }))).toBe('gravityWell');
+    expect(routeEffect(ev({ id: 'event-horizon', icon: '🕳️' }))).toBe('gravityWell');
+    // Cold reads as frostfall.
+    expect(routeEffect(ev({ id: 'frost-drift', icon: '❄️' }))).toBe('frostfall');
+    expect(routeEffect(ev({ id: 'hail-belt', icon: '❄️' }))).toBe('frostfall');
+    expect(routeEffect(ev({ id: 'cryo-harvest', icon: '🧊' }))).toBe('frostfall');
+    expect(routeEffect(ev({ id: 'deep-freeze', icon: '🧊' }))).toBe('frostfall');
+    // Tail dust reads as the comet; a wrecked fleet as the junk field.
+    expect(routeEffect(ev({ id: 'stardust-wake', icon: '✨' }))).toBe('comet');
+    expect(routeEffect(ev({ id: 'junker-armada', icon: '🛸' }))).toBe('spaceJunk');
+    // …and the old showpieces are NOT swallowed by the new regexes.
+    expect(routeEffect(ev({ id: 'stellar-tailwind', icon: '🌬️', category: 'calm' }))).toBe('moonlight');
+    expect(routeEffect(ev({ id: 'black-market', icon: '🏴' }))).toBe('tradeMarket');
+    expect(routeEffect(ev({ id: 'full-moon', icon: '🌕' }))).toBe('moonlight');
+  });
+
   it('every catalogue event (recurring + unique) resolves to a known effect with a card info row', () => {
     for (const e of [...ROUTE_EVENTS, ...UNIQUE_EVENTS]) {
       const fx = routeEffect(e);
@@ -69,15 +93,30 @@ describe('route effect mapping (GS-journey-fx)', () => {
       expect(COURSE_EFFECTS[fx].icon.length).toBeGreaterThan(0);
     }
     // The info table covers exactly the union.
-    const ids: CourseEffectId[] = ['none', 'moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket'];
+    const ids: CourseEffectId[] = ['none', 'moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket', 'gravityWell', 'frostfall'];
     for (const id of ids) expect(COURSE_EFFECTS[id].id).toBe(id);
   });
 
   it('the catalogue actually SPREADS across the widened effect set (no monoculture)', () => {
     const seen = new Set([...ROUTE_EVENTS, ...UNIQUE_EVENTS].map((e) => routeEffect(e)));
-    for (const id of ['moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket'] as CourseEffectId[]) {
+    for (const id of ['moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket', 'gravityWell', 'frostfall'] as CourseEffectId[]) {
       expect(seen.has(id), `no event maps to ${id}`).toBe(true);
     }
+  });
+
+  it('EVERY effect except "none" carries a real play hook (wind, carry, patches, tents or craters)', () => {
+    for (const info of Object.values(COURSE_EFFECTS)) {
+      if (info.id === 'none') continue;
+      const hooked =
+        effectWindMult(info.id) !== 1 ||
+        effectCarryMult(info.id) !== 1 ||
+        effectPatchKind(info.id) !== undefined ||
+        info.id === 'tradeMarket' || // collidable tents (GS-tents)
+        info.id === 'meteorShower'; // scorch craters (GS-meteor-scorch)
+      expect(hooked, `${info.id} is pure sky-dressing — give it a play hook`).toBe(true);
+    }
+    // Every patch family points at a real spec (the lie rows are guarded in tests/patches.test.ts).
+    for (const kind of Object.values(EFFECT_PATCH)) expect(PATCH_SPECS[kind!]).toBeDefined();
   });
 });
 
@@ -119,6 +158,49 @@ describe('the effect wind hook (GS-journey-variety)', () => {
     const b = currentCourse(base);
     expect(a).toEqual(b); // no pending event ⇒ no transform, fully deterministic
     for (const h of a.holes) expect(h.wind!.spd).toBeLessThanOrEqual(EFFECT_WIND_CAP);
+  });
+});
+
+describe('the effect carry hook (GS-journey-fx-2)', () => {
+  it('aurora lifts the ball, the gravity well drags it, everything stays in a modest fair band', () => {
+    expect(effectCarryMult('aurora')).toBeGreaterThan(1);
+    expect(effectCarryMult('gravityWell')).toBeLessThan(1);
+    expect(effectCarryMult('none')).toBe(1);
+    expect(effectCarryMult(undefined)).toBe(1);
+    for (const m of Object.values(EFFECT_CARRY)) {
+      expect(m).toBeGreaterThanOrEqual(0.9);
+      expect(m).toBeLessThanOrEqual(1.1);
+    }
+  });
+
+  it('lands on every hole as a biomeMods carry row, so biomeCarryMult (HUD/AI/sim alike) reads it', () => {
+    const base = startRun(11, 'voyage');
+    // Same cutDelta ⇒ identical generation; only the effect (and so the carry transform) differs.
+    const plain = currentCourse({ ...base, pendingEvent: ev({ id: 'plain-x', category: 'toll', cutDelta: 1 }) }); // → solarStorm, carry ×1
+    const heavy = currentCourse({ ...base, pendingEvent: ev({ id: 'rogue-planet', category: 'payout', cutDelta: 1 }) }); // → gravityWell
+    const lifted = currentCourse({ ...base, pendingEvent: ev({ id: 'plain-payout', category: 'payout', cutDelta: 1 }) }); // → aurora
+    plain.holes.forEach((h, i) => {
+      const base = biomeCarryMult(h); // whatever the biome itself says (lowgrav worlds ≠ 1)
+      expect(biomeCarryMult(heavy.holes[i]!)).toBeCloseTo(base * effectCarryMult('gravityWell'), 6);
+      expect(biomeCarryMult(lifted.holes[i]!)).toBeCloseTo(base * effectCarryMult('aurora'), 6);
+    });
+  });
+
+  it('a neutral effect appends NO carry mod (byte-for-byte the old holes)', () => {
+    const base = startRun(13, 'voyage');
+    const a = currentCourse({ ...base, pendingEvent: ev({ id: 'plain-x', category: 'toll', cutDelta: 0 }) }); // solarStorm: wind-only
+    for (const h of a.holes) expect((h.biomeMods ?? []).some((m) => m.note === 'solarStorm')).toBe(false);
+  });
+});
+
+describe('the effect ground-patch hook arms through playerHoleOpts (GS-journey-fx-2)', () => {
+  it('a comet/frost/junk route arms its family; other routes arm none', () => {
+    const base = startRun(17, 'voyage');
+    expect(playerHoleOpts(base).groundPatch).toBeUndefined(); // stop 0: no pending event
+    expect(playerHoleOpts({ ...base, pendingEvent: ev({ id: 'stardust-wake', icon: '✨' }) }).groundPatch).toBe('stardust');
+    expect(playerHoleOpts({ ...base, pendingEvent: ev({ id: 'frost-drift', icon: '❄️' }) }).groundPatch).toBe('frost');
+    expect(playerHoleOpts({ ...base, pendingEvent: ev({ id: 'wreckers-claim', icon: '🛰️', category: 'salvage' }) }).groundPatch).toBe('junk');
+    expect(playerHoleOpts({ ...base, pendingEvent: ev({ id: 'ion-storm', icon: '⚡' }) }).groundPatch).toBeUndefined();
   });
 });
 

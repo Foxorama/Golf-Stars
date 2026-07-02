@@ -369,6 +369,13 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // never a penalty. `lieAt` never returns this: it exists only via the rest-lie conversion in
   // `executeShot`, armed by the meteor-shower course effect (sim/scorch.ts).
   scorch: { carryMult: 1.05, dispersionMult: 1.45, label: 'Scorched' },
+  // Effect ground patches (GS-journey-fx-2, sim/patches.ts) — like scorch, `lieAt` never returns
+  // these: they exist only via the rest-lie conversion, armed by their course effect. Comet stardust
+  // is the BONUS patch: charged dust launches the ball hot AND true — the one lie worth aiming at.
+  stardust: { carryMult: 1.08, dispersionMult: 0.9, label: 'Stardust' },
+  // Debris-field wreckage snags the club: robbed distance, wide spray — worse than rough, gentler
+  // than trees, never a stroke. ('ice' above doubles as the frostfall patch's lie.)
+  junk: { carryMult: 0.85, dispersionMult: 1.6, label: 'Wreckage' },
 };
 
 /** Default lie when a point is off every polygon (native / out-of-frame): rough. */

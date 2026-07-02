@@ -14,6 +14,7 @@
  */
 
 import type { Hole, Vec } from '../sim/course/contract';
+import type { PatchKind } from '../sim/patches';
 import type { ShotLog, ShotSpread } from '../sim/round';
 import { playBoundsCorners } from '../sim/round';
 import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
@@ -102,6 +103,9 @@ export interface RenderOptions {
   tradeTents?: boolean;
   /** Meteor-strike scorch craters (GS-meteor-scorch) — drawn from the sim's own mark source. */
   meteorScorch?: boolean;
+  /** Effect ground patches (GS-journey-fx-2): comet stardust / frostfall ice / debris wreckage —
+   *  drawn from the sim's own patch source. Baked from the course effect at the app boundary. */
+  groundPatch?: PatchKind;
 }
 
 /** Course-space polygon of a spray landing SECTOR: the region swept between radii
@@ -193,7 +197,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
     scenePrimsToSvg(
-      buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch }),
+      buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch, groundPatch: opts.groundPatch }),
       holeIdPrefix(hole), // ids are document-global — a per-hole prefix keeps co-mounted hole SVGs from cross-clipping
     ),
   ];

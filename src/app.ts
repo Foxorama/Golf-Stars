@@ -20,7 +20,8 @@ import { speakCaddy } from './render/speech';
 import { journeyMapHTML, type StarmapChoice } from './render/starmap';
 import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
-import { COURSE_EFFECTS, effectWindMult, routeDifficulty, routeEffect } from './sim/rpg/effects';
+import { COURSE_EFFECTS, effectWindMult, effectCarryMult, effectPatchKind, routeDifficulty, routeEffect } from './sim/rpg/effects';
+import type { PatchKind } from './sim/patches';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, MANUAL_IDEAL_PACE, puttBreakYd, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
@@ -1344,6 +1345,7 @@ function playingBody(animating: boolean): string {
       rainbow: rainbowActive(),
       tradeTents: tentsActive(),
       meteorScorch: scorchActive(),
+      groundPatch: patchActive(),
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
@@ -1443,6 +1445,7 @@ function playingBody(animating: boolean): string {
     rainbow: rainbowActive(),
     tradeTents: tentsActive(),
     meteorScorch: scorchActive(),
+      groundPatch: patchActive(),
     ball: play.ball,
     spray,
     fitSpray: frameSpray, // whole-map fit holds still while the live cone charges/aims
@@ -1570,6 +1573,7 @@ function scrambleChoiceOverlay(): string {
     rainbow: rainbowActive(),
     tradeTents: tentsActive(),
     meteorScorch: scorchActive(),
+      groundPatch: patchActive(),
     shots: [sc.player.log],
     ghostShots: [sc.partner.log],
   });
@@ -2408,10 +2412,15 @@ function routeInfoOverlay(): string {
     tags.push(travelChip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
   }
   if (ev.shardBonus) tags.push(travelChip(`✦ +${ev.shardBonus} shards`, '#4fd0e0'));
-  // The weather's play hook (GS-journey-variety): a gusty or dead-still sky is a real lever — say so.
+  // The weather's play hooks (GS-journey-variety wind; GS-journey-fx-2 carry + ground twists): the
+  // sky is a real lever now — say EXACTLY what it does to your golf, computed from the same tables
+  // the physics read so the card can never drift from the course.
   const windMult = effectWindMult(eff.id);
   if (windMult > 1) tags.push(travelChip(`💨 winds +${Math.round((windMult - 1) * 100)}%`, '#ff8b6b'));
   else if (windMult < 1) tags.push(travelChip(`🍃 still air −${Math.round((1 - windMult) * 100)}%`, '#2bb673'));
+  const carryMult = effectCarryMult(eff.id);
+  if (carryMult > 1) tags.push(travelChip(`🎈 shots fly +${Math.round((carryMult - 1) * 100)}%`, '#2bb673'));
+  else if (carryMult < 1) tags.push(travelChip(`⚓ shots fly −${Math.round((1 - carryMult) * 100)}%`, '#ff8b6b'));
   tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
 
   const markers = [
@@ -2426,9 +2435,14 @@ function routeInfoOverlay(): string {
       ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⚠ You can't cover the ${ev.creditToll}-credit toll (you have ${credits}).</div>`
       : '';
 
+  // The effect's GEOMETRIC play hook (tents / craters / turf patches) gets its own loud line — the
+  // consequence you'll actually putt around, not just sky-dressing (GS-journey-fx-2).
+  const playLine = eff.play
+    ? `<div style="font-size:12.5px;margin:4px 0 0;color:#ffce54;font-weight:600;">🎯 ${eff.play}</div>`
+    : '';
   const effLine =
     eff.id !== 'none'
-      ? `<div style="font-size:13px;margin:8px 0 0;opacity:.9;">${eff.icon} <b>${eff.label}</b> · <span style="opacity:.75;">${eff.blurb}</span></div>`
+      ? `<div style="font-size:13px;margin:8px 0 0;opacity:.9;">${eff.icon} <b>${eff.label}</b> · <span style="opacity:.75;">${eff.blurb}</span></div>${playLine}`
       : '';
 
   return `
@@ -2658,6 +2672,13 @@ function tentsActive(): boolean {
  *  course effect (`playerHoleOpts`), so the drawn craters and the physics stay in lock-step. */
 function scorchActive(): boolean {
   return currentEffect() === 'meteorShower';
+}
+
+/** Effect ground patches (GS-journey-fx-2): which turf-patch family the current stop's route armed
+ *  (comet stardust / frostfall ice / debris wreckage), or undefined. Baked into the render options
+ *  exactly like the scorch craters — the sim's lie conversion keys off the SAME course effect. */
+function patchActive(): PatchKind | undefined {
+  return effectPatchKind(currentEffect());
 }
 
 /** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
@@ -3189,6 +3210,7 @@ function render(): void {
         rainbow: rainbowActive(),
         tradeTents: tentsActive(),
         meteorScorch: scorchActive(),
+        groundPatch: patchActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),
@@ -3229,6 +3251,7 @@ function render(): void {
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
         tradeTents: tentsActive(),
         meteorScorch: scorchActive(),
+        groundPatch: patchActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
         lefty: lefty(),

@@ -38,10 +38,13 @@ Foundations are shipped; these are the live follow-ons.
   each a new archetype row + its 8 Record entries (the registry scales now).
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.
 - **GS-weather-play** — deeper per-sky gameplay signatures beyond GS-journey-variety's wind hook.
-  SHIPPED: meteor-strike scorch lies (GS-meteor-scorch). Remaining: collidable junk HULKS in the rough
-  on debris-field stops (generalize the GS-tents machinery), a comet-tail tailwind corridor, eclipse
-  dimming the putt read. Each must stay fair-by-construction and thread auto≡interactive exactly like
-  GS-tents did.
+  SHIPPED: meteor-strike scorch lies (GS-meteor-scorch); GS-journey-fx-2 — every effect now carries a
+  real hook (carry mult via biomeMods; stardust/ice/junk GROUND PATCHES generalising the scorch
+  machinery in `sim/patches.ts`; gravityWell + frostfall skies; ~16 new events; play-consequence chips
+  on the route card; machine-checked "no sky ships as pure dressing"). Remaining: collidable junk
+  HULKS in the rough (generalize the GS-tents collision the way patches generalized scorch), a
+  comet-tail tailwind corridor, eclipse dimming the putt read. Each must stay fair-by-construction and
+  thread auto≡interactive exactly like GS-tents did.
 
 **Shot model & clubs**
 - **GS-clubs follow-ons** — location-specific club SETS with game EFFECTS (not just carry); scoring-club
