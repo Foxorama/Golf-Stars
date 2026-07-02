@@ -82,6 +82,12 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-audio-3** — hazard & tree landing voices: the touchdown answers in sound (the audio half of
+  `spawnLandFX`) — water splash, lava sizzle, void implosion, cetus whale song, ravine rockfall,
+  sand/ice/crystal/scorch/stardust/junk — and tree hits are voiced per world archetype off the
+  flora table (crystal spires ping, fungal mushrooms squelch, parkland knocks wood, saguaros tonk…).
+  Pure `onLand` feel hook + pure classifiers (`landVoiceOf`/`treeVoiceOf`), zero sim/rng impact,
+  coverage machine-checked (`tests/audio.test.ts`). See `docs/decisions/audio.md`.
 - **GS-audio-2** — sound-design pass: club-FAMILY strike voices (driver boom+ping / wood / hybrid /
   iron click / wedge turf-shhk), a real ball-in-cup drop (rim knock → rattle → thunk → confirm), and
   an assetless GENERATIVE music layer — a distinct ambient track per world archetype + a menu lull,

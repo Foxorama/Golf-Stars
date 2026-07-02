@@ -11,11 +11,12 @@
  * itself part of the contract: the audio layer must never break the headless test world.
  */
 import { describe, it, expect } from 'vitest';
-import { strikeClassOf, type StrikeClass } from '../src/render/audio';
+import { strikeClassOf, landVoiceOf, treeVoiceOf, TREE_VOICES, type StrikeClass } from '../src/render/audio';
 import { MUSIC_TRACKS, type MusicSceneId } from '../src/render/music';
 import { CLUBS } from '../src/sim/clubs';
 import { ARCHETYPE_TURF } from '../src/render/palette';
 import type { BiomeArchetype } from '../src/sim/course/themes';
+import type { PenaltyKind } from '../src/sim/shot';
 
 const ARCHES = Object.keys(ARCHETYPE_TURF) as BiomeArchetype[];
 const CLASSES: readonly StrikeClass[] = ['driver', 'wood', 'hybrid', 'iron', 'wedge', 'putter'];
@@ -74,5 +75,52 @@ describe('world music (GS-audio-2)', () => {
   it('no two worlds share the identical mood (root+scale+bpm fingerprint is unique)', () => {
     const prints = Object.values(MUSIC_TRACKS).map((t) => `${t.root}|${t.scale.join(',')}|${t.bpm}`);
     expect(new Set(prints).size).toBe(prints.length);
+  });
+});
+
+describe('hazard landing voices (GS-audio-3)', () => {
+  it('every SURFACE-bearing penalty kind resolves to a landing voice', () => {
+    // OB / lost / unplayable are administrative — no surface to sound; the penalty wah answers those.
+    const surfaced: PenaltyKind[] = ['water', 'lava', 'void', 'voidlost', 'ravine', 'cetuslost'];
+    for (const p of surfaced) expect(landVoiceOf('rough', p), `voice for penalty ${p}`).toBeTruthy();
+    for (const p of ['ob', 'lost', 'unplayable'] as PenaltyKind[]) expect(landVoiceOf('rough', p)).toBeNull();
+  });
+
+  it('the marquee hazards land where the ear expects', () => {
+    expect(landVoiceOf('rough', 'lava')).toBe('sizzle');
+    expect(landVoiceOf('lavariver', 'lava')).toBe('sizzle');
+    expect(landVoiceOf('water', undefined)).toBe('splash');
+    expect(landVoiceOf('creek', 'water')).toBe('splash');
+    expect(landVoiceOf('frozenpond', 'water')).toBe('splash');
+    expect(landVoiceOf('cetusdeep', 'cetuslost')).toBe('whale'); // the star-ocean answers with its whale
+    expect(landVoiceOf('void', 'void')).toBe('void');
+    expect(landVoiceOf('voidrough', 'voidlost')).toBe('void');
+    expect(landVoiceOf('barranca', 'ravine')).toBe('rockfall');
+    expect(landVoiceOf('trees')).toBe('tree');
+    expect(landVoiceOf('bunker')).toBe('sand');
+    // The effect ground patches (GS-journey-fx-2) each sound their family.
+    expect(landVoiceOf('ice')).toBe('ice');
+    expect(landVoiceOf('stardust')).toBe('stardust');
+    expect(landVoiceOf('junk')).toBe('junk');
+    expect(landVoiceOf('scorch')).toBe('scorch');
+    // Ordinary turf stays quiet — the strike and bounce already carry it.
+    expect(landVoiceOf('fairway')).toBeNull();
+    expect(landVoiceOf('green')).toBeNull();
+    expect(landVoiceOf('rough')).toBeNull();
+  });
+
+  it('every world archetype voices its tree hit (full-coverage table, like the flora)', () => {
+    for (const a of Object.keys(ARCHETYPE_TURF) as BiomeArchetype[]) {
+      expect(TREE_VOICES[a], `tree voice for ${a}`).toBeTruthy();
+    }
+  });
+
+  it('the signature trees ring true: crystal pings, mushrooms squelch, parkland knocks wood', () => {
+    expect(treeVoiceOf('crystal')).toBe('ping');
+    expect(treeVoiceOf('fungal')).toBe('squelch');
+    expect(treeVoiceOf('verdant')).toBe('wood');
+    expect(treeVoiceOf('cetus')).toBe('stone');
+    // No archetype known → the classic wood knock, never a throw.
+    expect(treeVoiceOf(undefined)).toBe('wood');
   });
 });

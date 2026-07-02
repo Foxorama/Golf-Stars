@@ -46,6 +46,36 @@ moment with the shot's `club.id`) — a pure widening of the callback, no sim/rn
 The hole-out cue is a real cup now: rim knock → descending hollow rattle knocks → bottom-of-cup
 thunk → the rising confirm chime. Sequenced with `t` offsets on the same tone/noise primitives.
 
+## Hazard & tree landing voices (GS-audio-3)
+
+The touchdown now ANSWERS in sound, the audio half of the render's `spawnLandFX` (GS-biome-feel):
+`sfx.land(lie, penalty, arch, treeHit)` dispatches through `landVoiceOf(lie, penalty)` — a pure
+classifier that mirrors `spawnLandFX`'s lie/penalty branches in the SAME precedence order, so what
+you see burst is what you hear. Voices: water/creek/frozen-pond **splash** (noise body + deep bloop
++ droplet plinks), lava **sizzle** (plunge + long hiss + bubble glorps), the void's **implosion**
+(detuned falling saw pair + a whistle pulled down + sub swallow), the cetus star-ocean's **whale**
+(a plunge answered by a rising moan and its long falling reply), ravine **rockfall**, sand **pff**,
+plus the effect-patch families (ice skitter / stardust shimmer / junk clatter / scorch ember whump).
+Ordinary turf returns `null` — the strike + bounce already carry it — and the administrative
+penalties (OB / lost / unplayable) stay with the score-cost wah (`sfx.penalty`), which still plays
+at the end of a penalty animation as the "stroke added" reading over the surface cue.
+
+Tree hits are voiced per world ARCHETYPE via `treeVoiceOf` — a full-coverage
+`Record<BiomeArchetype, TreeVoice>` mirroring the flora table (`style.ts styleFlora`), so the
+silhouette you clipped is the sound you hear: crystal spires **ping**, fungal mushrooms **squelch**,
+parkland (and the void's classic canopy) knocks **wood**, frost conifers whump snow, inferno snags
+**crack** dry with an ember fizz, saguaros give a hollow drum **tonk**, tempest scrub whips, ocean
+palms rustle + coconut-knock, cetus sea-stacks **clack** stone.
+
+Plumbing: a new `onLand(lie, penalty, knockedDown)` feel hook on `PlayViewOptions`, fired once per
+shot at the exact `spawnLandFX` touchdown site with the SAME resolved lie (scorch-crater and
+effect-patch conversions included), wired in `app.ts` at both play-view mounts with the hole's
+archetype (`archetypeFor(holeThemeId, holeBiome)` — split-biome stops voice their back holes
+correctly). `knockedDown` forces the tree voice for a mid-flight knockdown even if the ball drops
+clear of the canopy poly. Pure feel hook + pure classifiers: zero sim/rng impact, no `_gs*` flag
+(so no test-hub wiring), and `tests/audio.test.ts` machine-checks that every surface-bearing
+penalty kind and every archetype resolve to a voice.
+
 ## Generative music (`render/music.ts`)
 
 **Table + dispatch, the GS-biome-feel pattern:** `MUSIC_TRACKS` has one row per world archetype

@@ -11,6 +11,7 @@
 
 import { getSettings } from '../settings';
 import { flightClassOf, type FlightClass } from '../sim/flight';
+import type { BiomeArchetype } from '../sim/course/themes';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -137,6 +138,131 @@ export type StrikeClass = FlightClass;
 export const strikeClassOf = flightClassOf;
 
 /**
+ * Which VOICE a touchdown surface answers with (GS-audio-3) — the audio half of the render's
+ * `spawnLandFX` (playView.ts): the SAME lie/penalty dispatch, in the SAME precedence order, so what
+ * you see burst is what you hear. Pure classifier (no WebAudio) so tests can machine-check that
+ * every surface-bearing penalty kind resolves to a voice. `null` = ordinary turf: the strike and
+ * bounce already carry it, and the administrative penalties (OB / lost / unplayable) have no
+ * surface to sound — the score-cost "wah" (`sfx.penalty`) answers those.
+ */
+export type LandVoice =
+  | 'sizzle' // lava — the ball plunges into magma
+  | 'void' // the void / lost-rough abyss — a negative-energy implosion
+  | 'whale' // cetus star-ocean — a splash answered by a whale's song
+  | 'splash' // water / creek / frozen pond
+  | 'rockfall' // ravine / barranca — dry rock clatter
+  | 'sand' // bunker / waste — a soft puff
+  | 'ice' // frostfall patch — a bright skitter
+  | 'crystal' // crystal lie — a glassy chime glint
+  | 'scorch' // meteor crater — ash whump + ember fizz
+  | 'stardust' // comet patch — a charged shimmer
+  | 'junk' // debris patch — rattled scrap
+  | 'tree'; // the canopy — voiced per world by `treeVoiceOf`
+
+export function landVoiceOf(lie: string, penalty?: string): LandVoice | null {
+  if (penalty === 'lava') return 'sizzle';
+  if (penalty === 'void' || penalty === 'voidlost') return 'void';
+  if (penalty === 'cetuslost') return 'whale';
+  if (penalty === 'water' || lie === 'water' || lie === 'creek' || lie === 'frozenpond') return 'splash';
+  if (penalty === 'ravine' || lie === 'barranca') return 'rockfall';
+  if (lie === 'bunker' || lie === 'pot' || lie === 'waste' || lie === 'sand') return 'sand';
+  if (lie === 'ice') return 'ice';
+  if (lie === 'crystal') return 'crystal';
+  if (lie === 'scorch') return 'scorch';
+  if (lie === 'stardust') return 'stardust';
+  if (lie === 'junk') return 'junk';
+  if (lie === 'trees') return 'tree';
+  return null;
+}
+
+/**
+ * Which VOICE a tree hit knocks with (GS-audio-3) — per world ARCHETYPE, mirroring the flora table
+ * (`style.ts styleFlora`): the silhouette you clipped is the sound you hear. Prism Reach's spires
+ * ring a crystal ping, the spore jungle's mushrooms squelch, a parkland oak knocks wood. Full
+ * coverage is compile-checked by the Record; the fallback (unknown archetype) is the classic wood.
+ */
+export type TreeVoice =
+  | 'wood' // verdant parkland canopy (and the void's classic trees) — a woody thock + leaf rustle
+  | 'squelch' // fungal giant mushrooms — a wet blorp
+  | 'ping' // crystal spires — a glassy ring
+  | 'conifer' // frost pines — a muffled snow whump + needle shiver
+  | 'snag' // inferno charred snags — a dry crack + ember fizz
+  | 'saguaro' // desert cacti — a hollow drum tonk
+  | 'scrub' // tempest wind-bent scrub — a whippy rustle
+  | 'palm' // ocean palms — frond rustle + a coconut knock
+  | 'stone'; // cetus sea-stacks — a dense rock clack
+
+export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
+  verdant: 'wood',
+  desert: 'saguaro',
+  frost: 'conifer',
+  inferno: 'snag',
+  void: 'wood', // styleFlora's default: the void keeps the classic canopy
+  crystal: 'ping',
+  tempest: 'scrub',
+  fungal: 'squelch',
+  ocean: 'palm',
+  cetus: 'stone',
+};
+
+export function treeVoiceOf(arch?: string): TreeVoice {
+  return TREE_VOICES[arch as BiomeArchetype] ?? 'wood';
+}
+
+/** The tree-hit compositions (GS-audio-3) — one knock per `TreeVoice`. */
+function treeSound(v: TreeVoice): void {
+  switch (v) {
+    case 'wood':
+      noise(0.04, { gain: 0.24, type: 'bandpass', freq: 950, q: 1.2 }); // the knock off the trunk
+      tone(240, 0.1, { type: 'triangle', gain: 0.18, sweepTo: 110 }); // woody thock body
+      noise(0.25, { gain: 0.08, type: 'highpass', freq: 2400, t: 0.03 }); // rattled-leaf rustle
+      break;
+    case 'squelch':
+      tone(320, 0.16, { type: 'sine', gain: 0.2, sweepTo: 70 }); // the wet blorp down
+      noise(0.14, { gain: 0.16, type: 'lowpass', freq: 500 }); // squelchy flesh body
+      tone(140, 0.12, { type: 'sine', gain: 0.12, t: 0.08, sweepTo: 260 }); // sucking rebound blip
+      noise(0.08, { gain: 0.08, type: 'bandpass', freq: 1400, q: 3, t: 0.1 }); // spore-puff squick
+      break;
+    case 'ping':
+      tone(2093, 0.4, { type: 'triangle', gain: 0.14 }); // the glassy ping
+      tone(3136, 0.3, { type: 'sine', gain: 0.08, t: 0.01 }); // sparkling upper partial
+      tone(1568, 0.5, { type: 'sine', gain: 0.05, t: 0.02 }); // ringing under-tone
+      noise(0.03, { gain: 0.08, type: 'highpass', freq: 6000 }); // glint
+      break;
+    case 'conifer':
+      noise(0.12, { gain: 0.2, type: 'lowpass', freq: 360 }); // snow whump off the boughs
+      tone(190, 0.09, { type: 'triangle', gain: 0.12, sweepTo: 95 }); // soft branch knock
+      noise(0.3, { gain: 0.07, type: 'highpass', freq: 3200, t: 0.05 }); // needle/snow shiver
+      break;
+    case 'snag':
+      noise(0.025, { gain: 0.28, type: 'highpass', freq: 1800 }); // the dry CRACK
+      tone(300, 0.07, { type: 'triangle', gain: 0.14, sweepTo: 130 }); // brittle charred knock
+      noise(0.3, { gain: 0.06, type: 'highpass', freq: 4000, t: 0.05 }); // ember fizz
+      break;
+    case 'saguaro':
+      tone(170, 0.12, { type: 'sine', gain: 0.2, sweepTo: 75 }); // hollow drum body
+      noise(0.03, { gain: 0.16, type: 'bandpass', freq: 620, q: 1.5 }); // the tonk
+      tone(255, 0.06, { type: 'triangle', gain: 0.07, t: 0.05, sweepTo: 140 }); // wobble answer
+      break;
+    case 'scrub':
+      noise(0.18, { gain: 0.2, type: 'bandpass', freq: 2600, q: 0.6 }); // the whip through leaves
+      noise(0.12, { gain: 0.1, type: 'bandpass', freq: 1600, q: 0.8, t: 0.08 }); // settling rustle
+      tone(210, 0.05, { type: 'triangle', gain: 0.07, sweepTo: 120 }); // a thin stem knock
+      break;
+    case 'palm':
+      noise(0.16, { gain: 0.16, type: 'bandpass', freq: 2200, q: 0.7 }); // frond rustle
+      tone(420, 0.09, { type: 'sine', gain: 0.16, t: 0.06, sweepTo: 190 }); // the coconut knock
+      noise(0.03, { gain: 0.12, type: 'bandpass', freq: 800, q: 1.4, t: 0.06 });
+      break;
+    case 'stone':
+      noise(0.04, { gain: 0.24, type: 'lowpass', freq: 900 }); // stone clack
+      tone(150, 0.12, { type: 'sine', gain: 0.16, sweepTo: 65 }); // dense body thud
+      noise(0.06, { gain: 0.08, type: 'lowpass', freq: 500, t: 0.07 }); // grit trickle
+      break;
+  }
+}
+
+/**
  * The cue library. Each is a tiny composition; quality/strength scales the brightness so a pure
  * strike rings and a chunked one thuds. All no-ops when sound is off / unsupported.
  */
@@ -228,6 +354,92 @@ export const sfx = {
   /** Found a hazard / OB — a downward "wah". */
   penalty(): void {
     tone(300, 0.28, { type: 'sawtooth', gain: 0.14, sweepTo: 120 });
+  },
+  /**
+   * Touchdown voiced by the SURFACE (GS-audio-3) — the audio half of `spawnLandFX`: a water splash,
+   * a lava sizzle, the void's negative-energy implosion, the star-ocean's whale answering the plunge,
+   * and per-world tree knocks (crystal spires ping, giant mushrooms squelch, parkland knocks wood).
+   * `treeHit` forces the tree voice for a mid-flight knockdown even when the ball drops clear of the
+   * canopy poly. Silent (null voice) on ordinary turf — the strike + bounce already carry those.
+   */
+  land(lie: string, penalty?: string, arch?: string, treeHit?: boolean): void {
+    const v = treeHit ? 'tree' : landVoiceOf(lie, penalty);
+    switch (v) {
+      case 'tree':
+        treeSound(treeVoiceOf(arch));
+        break;
+      case 'splash':
+        noise(0.16, { gain: 0.3, type: 'bandpass', freq: 850, q: 0.7 }); // the splash body
+        tone(260, 0.18, { type: 'sine', gain: 0.18, sweepTo: 95 }); // the deep bloop under it
+        noise(0.3, { gain: 0.1, type: 'highpass', freq: 2600, t: 0.04 }); // spray hiss
+        tone(900, 0.05, { type: 'sine', gain: 0.08, t: 0.22, sweepTo: 1400 }); // falling droplets plink
+        tone(1100, 0.05, { type: 'sine', gain: 0.06, t: 0.32, sweepTo: 1650 });
+        break;
+      case 'sizzle':
+        tone(180, 0.14, { type: 'sine', gain: 0.16, sweepTo: 60 }); // the ball plunges into magma
+        noise(0.7, { gain: 0.16, type: 'highpass', freq: 3400 }); // the long sizzle hiss
+        noise(0.25, { gain: 0.12, type: 'bandpass', freq: 500, q: 0.6 }); // magma splash body
+        tone(90, 0.2, { type: 'sine', gain: 0.1, t: 0.2, sweepTo: 140 }); // rising bubble glorps
+        tone(70, 0.22, { type: 'sine', gain: 0.1, t: 0.42, sweepTo: 120 });
+        noise(0.05, { gain: 0.08, freq: 1800, q: 2, t: 0.32 }); // a bubble pops
+        break;
+      case 'void':
+        tone(160, 0.7, { type: 'sawtooth', gain: 0.11, sweepTo: 34 }); // dark falling drone…
+        tone(164, 0.7, { type: 'sawtooth', gain: 0.08, sweepTo: 36 }); // …detuned twin, beating
+        tone(1200, 0.5, { type: 'sine', gain: 0.07, sweepTo: 130 }); // a whistle pulled down into it
+        noise(0.55, { gain: 0.1, type: 'bandpass', freq: 300, q: 0.5, t: 0.05 }); // hollow rush
+        tone(55, 0.35, { type: 'sine', gain: 0.14, t: 0.3, sweepTo: 30 }); // the sub swallow
+        break;
+      case 'whale':
+        noise(0.12, { gain: 0.18, type: 'bandpass', freq: 900, q: 0.7 }); // the plunge into the star-sea
+        noise(0.6, { gain: 0.06, type: 'lowpass', freq: 380, t: 0.1 }); // deep-water wash
+        tone(150, 0.55, { type: 'sine', gain: 0.15, t: 0.18, sweepTo: 420 }); // the whale's rising moan
+        tone(420, 0.8, { type: 'sine', gain: 0.13, t: 0.68, sweepTo: 130 }); // …and its long falling answer
+        tone(300, 0.5, { type: 'triangle', gain: 0.05, t: 0.72, sweepTo: 195 }); // harmonic shadow
+        break;
+      case 'rockfall':
+        [
+          { t: 0, f: 520, g: 0.2 },
+          { t: 0.09, f: 430, g: 0.16 },
+          { t: 0.2, f: 360, g: 0.12 },
+          { t: 0.33, f: 300, g: 0.08 },
+        ].forEach(({ t, f, g }) => {
+          noise(0.05, { gain: g, type: 'lowpass', freq: f * 2, t }); // tumbling rock knocks
+          tone(f * 0.35, 0.07, { type: 'triangle', gain: g * 0.7, t, sweepTo: f * 0.2 });
+        });
+        break;
+      case 'sand':
+        noise(0.12, { gain: 0.22, type: 'lowpass', freq: 700 }); // the soft "pff"
+        tone(140, 0.08, { type: 'sine', gain: 0.1, sweepTo: 80 }); // a dead little thump
+        break;
+      case 'ice':
+        tone(1900, 0.05, { type: 'triangle', gain: 0.1, sweepTo: 2300 }); // skittering plinks
+        noise(0.04, { gain: 0.1, type: 'highpass', freq: 4000 });
+        tone(2500, 0.04, { type: 'triangle', gain: 0.07, t: 0.07 });
+        break;
+      case 'crystal':
+        tone(1568, 0.3, { type: 'triangle', gain: 0.1 }); // a glassy chime glint
+        tone(2349, 0.35, { type: 'triangle', gain: 0.08, t: 0.03 });
+        noise(0.03, { gain: 0.06, type: 'highpass', freq: 5000 });
+        break;
+      case 'scorch':
+        noise(0.2, { gain: 0.14, type: 'lowpass', freq: 480 }); // ash whump
+        noise(0.35, { gain: 0.08, type: 'highpass', freq: 3000, t: 0.05 }); // ember fizz
+        tone(120, 0.1, { type: 'sine', gain: 0.08, sweepTo: 70 });
+        break;
+      case 'stardust':
+        [1319, 1760, 2217].forEach((f, i) => tone(f, 0.12, { type: 'sine', gain: 0.07, t: i * 0.045 })); // charged shimmer
+        noise(0.15, { gain: 0.05, type: 'highpass', freq: 5000 });
+        break;
+      case 'junk':
+        noise(0.05, { gain: 0.2, type: 'bandpass', freq: 1300, q: 2 }); // the clank
+        tone(720, 0.09, { type: 'square', gain: 0.05, sweepTo: 500 }); // ringing scrap
+        noise(0.04, { gain: 0.12, type: 'bandpass', freq: 900, q: 2, t: 0.09 }); // settling rattle
+        noise(0.03, { gain: 0.08, type: 'bandpass', freq: 1600, q: 2, t: 0.16 });
+        break;
+      case null:
+        break;
+    }
   },
   /** Made the cut — a bright ascending arpeggio. */
   madeCut(): void {

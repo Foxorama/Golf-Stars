@@ -307,6 +307,9 @@ For each system: the rule that constrains new work. Open the archive doc before 
   inlined file). ONE shared `AudioContext` (`audio.ts sharedAudioContext`), two independent
   buses/settings: SFX on `sound`, generative music on `music`. Strikes are voiced per club FAMILY
   (`strikeClassOf`, convention-based on CLUBS ids — beware `PW/GW/SW` end in 'W' but are wedges);
+  touchdowns per SURFACE + tree hits per ARCHETYPE (GS-audio-3: `landVoiceOf` mirrors
+  `spawnLandFX`'s dispatch, `treeVoiceOf` mirrors the flora table — coverage machine-checked;
+  fired via the play view's `onLand` feel hook, wah stays the score-cost cue);
   music is table+dispatch per archetype (`MUSIC_TRACKS` + `'menu'`; coverage, distinct moods and
   the subtlety gain bar ≤0.35 machine-checked by `tests/audio.test.ts`) on a PRIVATE seeded stream
   — never `Math.random`, never the sim/render streams. The sim never calls audio; the audio
