@@ -376,14 +376,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   void violet asteroid, `CliffLook` palette); a CALM cetus/void stop (playable rough everywhere, can't
   be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
   fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only).
-  **Carved features share ONE light so a hole reads as one lit landform, not a collage (GS-inset):**
-  a single upper-left `LIGHT_UL` drives `castShadow` (a soft dark shadow onto the turf that grounds a
-  feature IN the ground) + `insetEmboss`/`embossChildren` (repaint the interior as a bowl — rim in
-  shadow, base re-laid toward the light, far floor sunlit); `styleSandFamily`/`styleLiquidFamily` use
-  them so bunkers/water/lava read as DUG IN (water's up-light bank shadows the surface, its shore
-  dimmed from candy-cyan), and greens get a faint grounding shadow (flush fairway does NOT — a drop
-  shadow there reads as a floating sticker). The emboss is inlined as clip CHILDREN, never a nested
-  clip. Land tone-patches are small faint mottle, never viewport-spanning "spotlight" washes. All pure
+  **Carved features share ONE light so a hole reads as one lit landform, not a collage (GS-inset,
+  refined GS-inset-2):** a single upper-left `LIGHT_UL` drives `insetEmboss`/`embossChildren` (repaint
+  the interior as a bowl — near up-light rim in shadow, base re-laid AWAY from the light, far floor
+  sunlit); `styleSandFamily`/`styleLiquidFamily` use them so bunkers/water/lava read as DUG IN
+  (water's up-light bank shadows the surface, its shore dimmed from candy-cyan). GS-inset-2: NO drop
+  shadow is cast onto the turf — a shadow on the surrounding grass read as the feature FLOATING proud
+  of the land (the "raised/bevelled outward" bug); a depression is sold by the emboss alone, so the
+  near-rim shadow band is widened (~2·w) to carry the read. For the same reason the GREEN is FLUSH
+  with the fairway (no cast shadow — only its own mown fringe/collar rings ease it in); the
+  shelf/void-glow worlds still model their raised corridor edge. The emboss is inlined as clip
+  CHILDREN, never a nested clip. Land tone-patches are small faint mottle, never viewport-spanning "spotlight" washes. All pure
   geometry — ZERO rng draws/reorders (void/cetus byte-identical). Palette: `*.wall/bank/contact` tones.
   **The fairway reads as mown INTO the land (GS-fairway):** `styleFairways` takes an optional `collar`
   (a wider first-cut ROUGH band `mixHex(fw, rough, 0.72)` under the light fringe) + a directional
