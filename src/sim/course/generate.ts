@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 12;
+export const GENERATOR_VERSION = 13;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -443,7 +443,7 @@ function riverChannel(
   fairwayHalfWidth: number,
   thickness: number,
   rng: Rng,
-): { poly: Vec[]; mouth: Vec } {
+): { poly: Vec[]; mouth: Vec; source: Vec } {
   const c = centrePoint(centreline, t);
   const a = centrePoint(centreline, Math.max(0, t - 0.02));
   const b = centrePoint(centreline, Math.min(1, t + 0.02));
@@ -469,7 +469,7 @@ function riverChannel(
   const p1 = rng.range(0, Math.PI * 2);
   const f2 = rng.range(2.6, 4.3);
   const p2 = rng.range(0, Math.PI * 2);
-  const ampFrac = rng.range(0.22, 0.4);
+  const ampFrac = rng.range(0.26, 0.52); // (GS-rivers) a touch more wander so it reads as a real river
   const calm = fairwayHalfWidth * 0.8; // no meander inside this radius of the crossing
   const half = thickness / 2;
   const wobPh = rng.range(0, Math.PI * 2);
@@ -482,10 +482,19 @@ function riverChannel(
     const m = amp * (0.7 * Math.sin(f1 * sn * Math.PI + p1) + 0.42 * Math.sin(f2 * sn * Math.PI + p2));
     return [c[0] + ax * s + mx * m, c[1] + ay * s + my * m];
   };
+  // Width TAPER (GS-rivers): the +arm is the MOUTH — it swells downstream into its lake; the −arm is
+  // the SOURCE — it narrows to a thin trickle so the river reads as flowing FROM a headwater rather
+  // than a blunt band stopping in mid-rough. The full carry width is held across the corridor +
+  // clearance zone (|s| ≤ taperZone) so the forced-carry geometry — and `validateCrossings` — is
+  // untouched; the taper only shapes the off-corridor arms. Pure geometry, no rng.
+  const taperZone = fairwayHalfWidth * 1.2;
   const widthAt = (s: number): number => {
     const grow = Math.min(1, Math.max(0, (Math.abs(s) - calm) / (fairwayHalfWidth * 1.1 + 1)));
     const wob = grow * (0.26 * Math.sin(wobPh + s * 0.05 * wobLobes) - 0.1);
-    return half * (1 + wob);
+    let taper = 1;
+    if (s > taperZone) taper = 1 + 0.5 * Math.min(1, (s - taperZone) / Math.max(1, reachPos - taperZone));
+    else if (s < -taperZone) taper = 1 - 0.74 * Math.min(1, (-s - taperZone) / Math.max(1, reachNeg - taperZone));
+    return Math.max(half * 0.24, half * taper * (1 + wob));
   };
   // Build each arm OUTWARD from the crossing, TRUNCATING it the moment a point PAST the corridor zone
   // re-approaches the centreline. A long diagonal arm can otherwise re-meet a doglegging centreline far
@@ -512,7 +521,47 @@ function riverChannel(
     return widthAt(s);
   });
   const mouth: Vec = pos[pos.length - 1] ?? neg[neg.length - 1] ?? c;
-  return { poly: ribbon(line, hw, hw, true, true), mouth };
+  const source: Vec = neg[neg.length - 1] ?? pos[pos.length - 1] ?? c;
+  return { poly: ribbon(line, hw, hw, true, true), mouth, source };
+}
+
+/**
+ * Give a river believable ENDS (GS-rivers) so it flows from a source to a sink instead of a band
+ * that stops in mid-rough. The MOUTH (the wide, long arm) pools into a LAKE of the river's own
+ * liquid — as before — and the SOURCE (the narrow, tapered arm) gets, for variety: a small SPRING
+ * pool it wells out of, a stand of TREES it emerges from ("out of the woods"), or nothing (the
+ * tapered trickle simply peters out). Every added body is gated to CLEAR the play corridor
+ * (`clearsPlayCorridor`) so fairness is untouched — a lake/pool is a normal penalty body, and even
+ * the grove (trees are exempt from fairness) is kept off the corridor so it can't wall the hole in.
+ * Returns the extra hazards to push; all rng is drawn here on the shared stream (armed holes only).
+ */
+function riverTerminals(
+  river: { mouth: Vec; source: Vec },
+  liquidKind: 'water' | 'lava',
+  o: { allowGrove: boolean; centreline: Vec[]; tee: Vec; green: Vec; halfW: number; wildness: number },
+  rng: Rng,
+): { kind: string; poly: Vec[] }[] {
+  const out: { kind: string; poly: Vec[] }[] = [];
+  const clears = (p: Vec, r: number): boolean => clearsPlayCorridor(p, r, o.centreline, o.tee, o.green, o.halfW);
+  // MOUTH lake — the river pools into a body of water/lava (same render family → merges seamlessly).
+  const lakeR = rng.range(14, 22) + o.wildness * 9;
+  if (clears(river.mouth, lakeR)) out.push({ kind: liquidKind, poly: blobPoly(river.mouth, lakeR, 16, 0.3, rng) });
+  // SOURCE terminal — pick one for variety so no two rivers begin the same way.
+  const pick = rng.range(0, 1);
+  if (pick < 0.42) {
+    const r = rng.range(8, 13) + o.wildness * 4; // a small spring pool the river wells out of
+    if (clears(river.source, r)) out.push({ kind: liquidKind, poly: blobPoly(river.source, r, 13, 0.34, rng) });
+  } else if (pick < 0.72 && o.allowGrove) {
+    const n = rng.int(2, 4); // emerge from a small stand of trees
+    for (let k = 0; k < n; k++) {
+      const rr = rng.range(6, 10);
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(0, 9);
+      const c: Vec = [river.source[0] + Math.cos(a) * d, river.source[1] + Math.sin(a) * d];
+      if (clears(c, rr)) out.push({ kind: 'trees', poly: blobPoly(c, rr, 10, 0.3, rng) });
+    }
+  } // else: the tapered trickle simply peters out (no terminal)
+  return out;
 }
 
 /**
@@ -1068,11 +1117,8 @@ function generateHole(
     const thickness = Math.min(34, length * 0.085, rng.range(8, 13) + wildness * rng.range(6, 16));
     const river = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
     hazards.push({ kind: 'lavariver', poly: river.poly });
-    // A molten LAKE the river pools into at its mouth — same liquid family, so they merge seamlessly.
-    const lakeR = rng.range(13, 20) + wildness * 8;
-    if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
-      hazards.push({ kind: 'lava', poly: blobPoly(river.mouth, lakeR, 15, 0.3, rng) });
-    }
+    // Molten source + mouth pools (GS-rivers) — no grove (lava wells from a vent, not a forest).
+    hazards.push(...riverTerminals(river, 'lava', { allowGrove: false, centreline, tee, green, halfW: fairwayHalfWidth, wildness }, rng));
   }
 
   // Frozen-pond crossing (frost signature, GS-mechanics): a meltwater channel crosses the corridor
@@ -1084,11 +1130,8 @@ function generateHole(
     const thickness = Math.min(30, length * 0.075, rng.range(7, 12) + wildness * rng.range(5, 14));
     const river = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
     hazards.push({ kind: 'frozenpond', poly: river.poly });
-    // A frozen LAKE the meltwater channel pools into (water family → merges into the channel).
-    const lakeR = rng.range(13, 20) + wildness * 8;
-    if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
-      hazards.push({ kind: 'water', poly: blobPoly(river.mouth, lakeR, 15, 0.3, rng) });
-    }
+    // Meltwater source + mouth pools (GS-rivers); a snowy tree stand can hide the source ("out of the woods").
+    hazards.push(...riverTerminals(river, 'water', { allowGrove: true, centreline, tee, green, halfW: fairwayHalfWidth, wildness }, rng));
   }
 
   // Water CREEK crossing (parkland signature, GS-terrain): a stream/creek runs across the fairway as
@@ -1102,12 +1145,9 @@ function generateHole(
     const thickness = Math.min(26, length * 0.06, rng.range(6, 10) + wildness * rng.range(5, 13));
     const river = riverChannel(centreline, t, fairwayHalfWidth, thickness, rng);
     hazards.push({ kind: 'creek', poly: river.poly });
-    // A LAKE/pond the creek feeds into at its mouth (water family → merges into the creek, so the
-    // stream visibly runs INTO the lake instead of a separate body floating beside it).
-    const lakeR = rng.range(14, 22) + wildness * 10;
-    if (clearsPlayCorridor(river.mouth, lakeR, centreline, tee, green, fairwayHalfWidth)) {
-      hazards.push({ kind: 'water', poly: blobPoly(river.mouth, lakeR, 16, 0.3, rng) });
-    }
+    // Source + mouth pools (GS-rivers): the creek visibly runs FROM a headwater/wood INTO a lake
+    // instead of a band floating in the rough (water family → the mouth lake merges into the creek).
+    hazards.push(...riverTerminals(river, 'water', { allowGrove: true, centreline, tee, green, halfW: fairwayHalfWidth, wildness }, rng));
   }
 
   // POT-bunker NESTS (GS-hazards-2): clusters of small, deep pots that PINCH the landing zone — the
