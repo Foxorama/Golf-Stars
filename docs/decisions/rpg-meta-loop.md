@@ -1022,3 +1022,11 @@ rides.
   painted OVER the flag/bunker so they read through glass). Nebula washes, twinkle stars, drifting
   asteroids and anti-grav emitter cones sell the float. Road-paint gold is banned on the deck —
   station markings are energy-teal/ice; brass stays reserved for the nameplates.
+- **Third pass — the hub is a GARDEN, not a pitch**: the flat turf oval + concentric mow rings read
+  as a football stadium. The dome now holds a real par-3 vignette: rough base (`spRough` + mottle
+  blobs) with a mown fairway RIBBON drawn as one thick round-capped stroke tee→green, its mow bands a
+  duplicate path stroked `stroke-dasharray` in low-alpha white (banded segments along the curve — the
+  cheap way to stripe a curved ribbon); a light-turf green with fringe ring, cup and the pin; two
+  guarding bunkers; a teal-rimmed pond; cel garden trees (`tree()` helper) and moon-rocks, all inside
+  a `spCourseClip` ellipse clip. Gotcha: a round fairway cap + two bright symmetric tee markers reads
+  as a WORM WITH EYES — markers are small, white and staggered.

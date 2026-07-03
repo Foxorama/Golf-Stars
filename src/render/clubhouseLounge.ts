@@ -595,6 +595,14 @@ function spaceportArt(): string {
         <path d="M-5,-5 L2,-7 L5,-4 L-3,-3 Z" fill="#4a5470" opacity="0.7"/>
       </g>
     </g>`;
+  // A tiny cel garden tree under the dome (grounding shadow, trunk, two-tone canopy).
+  const tree = (x: number, y: number, sc: number): string =>
+    `<g transform="translate(${x},${y}) scale(${sc})">
+      <ellipse cx="0" cy="1.6" rx="6.5" ry="2" fill="#000" opacity="0.25"/>
+      <rect x="-1" y="-6" width="2" height="7" fill="#5a3a1f"/>
+      <circle cx="0" cy="-9" r="6" fill="#2f7a33"/>
+      <circle cx="-2" cy="-11" r="3.4" fill="#3f9a43"/>
+    </g>`;
   // An anti-grav emitter hanging off the ring's underside: a nub + flickering light cone.
   const emitter = (x: number, y: number): string =>
     `<rect x="${x - 3}" y="${y - 2}" width="6" height="4" rx="1.4" fill="#3d4f79"/>
@@ -610,9 +618,10 @@ function spaceportArt(): string {
       <linearGradient id="spDeck" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#2b3452"/><stop offset="55%" stop-color="#364266"/><stop offset="100%" stop-color="#1d2440"/>
       </linearGradient>
-      <radialGradient id="spGreen" cx="50%" cy="42%" r="70%">
-        <stop offset="0%" stop-color="#3f9a43"/><stop offset="100%" stop-color="#2a6e2e"/>
+      <radialGradient id="spRough" cx="50%" cy="42%" r="70%">
+        <stop offset="0%" stop-color="#338038"/><stop offset="100%" stop-color="#26602a"/>
       </radialGradient>
+      <clipPath id="spCourseClip"><ellipse cx="200" cy="138" rx="106" ry="40.5"/></clipPath>
       <radialGradient id="spNebA" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#2bf0c0" stop-opacity="0.14"/><stop offset="100%" stop-color="#2bf0c0" stop-opacity="0"/>
       </radialGradient>
@@ -668,18 +677,49 @@ function spaceportArt(): string {
     </ellipse>
     ${rim}
     ${emitter(60, 187)}${emitter(200, 213)}${emitter(340, 187)}
-    <!-- the bio-dome green in the hub of the station -->
-    <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="url(#spGreen)"/>
+    <!-- the bio-dome GARDEN in the hub: a real par-3 — rough base, a mown fairway ribbon running
+         tee → green, fringe + cup, guarding bunkers, a pond, trees and moon-rocks (the old flat
+         oval + concentric rings read as a stadium pitch, not golf) -->
+    <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="url(#spRough)"/>
+    <g clip-path="url(#spCourseClip)">
+      <!-- rough mottle -->
+      <g fill="#1e5222" opacity="0.18">
+        <ellipse cx="130" cy="135" rx="18" ry="6"/><ellipse cx="215" cy="160" rx="22" ry="7"/>
+        <ellipse cx="286" cy="142" rx="16" ry="5"/><ellipse cx="180" cy="118" rx="14" ry="4.5"/>
+      </g>
+      <g fill="#54b458" opacity="0.1">
+        <ellipse cx="160" cy="148" rx="20" ry="6"/><ellipse cx="256" cy="152" rx="14" ry="4.5"/>
+      </g>
+      <!-- pond, teal-rimmed, with a glint -->
+      <path d="M132,116 Q146,108 158,114 Q166,118 158,123 Q142,127 132,122 Q126,119 132,116 Z" fill="#3f8fc9"/>
+      <path d="M132,116 Q146,108 158,114 Q166,118 158,123 Q142,127 132,122 Q126,119 132,116 Z" fill="none" stroke="#7fd6ff" stroke-width="1" opacity="0.5"/>
+      <path d="M138,116 Q146,113 152,116" stroke="#cfeaff" stroke-width="1" fill="none" opacity="0.6"/>
+      <!-- mown fairway ribbon, tee → green, banded stripes along its length -->
+      <path d="M128,155 Q168,152 200,141 Q228,132 250,130" fill="none" stroke="#3f9a43" stroke-width="17" stroke-linecap="round"/>
+      <path d="M128,155 Q168,152 200,141 Q228,132 250,130" fill="none" stroke="#ffffff" stroke-width="17" stroke-dasharray="11 11" opacity="0.07"/>
+      <!-- the green + fringe + cup -->
+      <ellipse cx="258" cy="129" rx="25" ry="10.5" fill="#5cc160"/>
+      <ellipse cx="258" cy="129" rx="25" ry="10.5" fill="none" stroke="#3f9a43" stroke-width="2.5" opacity="0.9"/>
+      <ellipse cx="252" cy="126" rx="10" ry="3.4" fill="#7fd47f" opacity="0.5"/>
+      <ellipse cx="263" cy="131" rx="1.9" ry="0.9" fill="#123c14"/>
+      <!-- bunkers guarding the green -->
+      <path d="M228,141 Q238,137 246,141 Q240,146 230,145 Q226,143 228,141 Z" fill="#d8c690"/>
+      <path d="M231,141 Q238,138.6 243,141.4 Q238,143.6 232,143 Z" fill="#e6d6a4"/>
+      <ellipse cx="280" cy="118" rx="8" ry="3" fill="#d8c690"/>
+      <ellipse cx="279" cy="117.4" rx="5.4" ry="1.9" fill="#e6d6a4"/>
+      <!-- tee pad + markers, and the ball waiting mid-fairway -->
+      <rect x="118" y="151" width="17" height="7" rx="3" fill="#4aa84e"/>
+      <circle cx="120.5" cy="152.6" r="0.8" fill="#e8e2d2"/><circle cx="126" cy="157.2" r="0.8" fill="#e8e2d2"/>
+      <circle cx="222" cy="136" r="1.7" fill="#fff"/>
+      ${tree(116, 128, 0.9)}${tree(172, 112, 1.05)}${tree(292, 148, 0.95)}${tree(240, 158, 0.8)}
+      <!-- a couple of moon-rocks in the rough -->
+      <path d="M186,124 L190,120 L195,122 L194,126 L188,127 Z" fill="#8a93a6"/>
+      <path d="M188,124 L190,121 L193,122.4 Z" fill="#aab3c6"/>
+    </g>
     <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="none" stroke="#1e5222" stroke-width="2.5"/>
-    <ellipse cx="200" cy="138" rx="82" ry="31" fill="none" stroke="#54b458" stroke-width="3" opacity="0.4"/>
-    <ellipse cx="200" cy="138" rx="56" ry="21" fill="none" stroke="#54b458" stroke-width="3" opacity="0.3"/>
-    <!-- bunker + the waiting ball + the flag, under glass -->
-    <ellipse cx="152" cy="150" rx="14" ry="5.5" fill="#d8c690"/>
-    <ellipse cx="150" cy="149" rx="10" ry="3.6" fill="#e6d6a4"/>
-    <circle cx="214" cy="151" r="1.7" fill="#fff"/>
-    <ellipse cx="233" cy="149" rx="3.4" ry="1.3" fill="#123c14"/>
-    <line x1="233" y1="149" x2="233" y2="112" stroke="#e8e2d2" stroke-width="1.6"/>
-    <path d="M233,112 L253,117 L233,122 Z" fill="#ff6b6b"/>
+    <!-- the pin on the green -->
+    <line x1="263" y1="131" x2="263" y2="106" stroke="#e8e2d2" stroke-width="1.6"/>
+    <path d="M263,106 L281,110.5 L263,115 Z" fill="#ff6b6b"/>
     <!-- the glass bio-dome sealing the green in: shell, meridian seams, a specular sweep -->
     <path d="M94,138 A106,44 0 0 1 306,138 A106,40.5 0 0 1 94,138 Z" fill="url(#spDome)" stroke="#9fdcef" stroke-width="1.2" opacity="0.9"/>
     <path d="M94,138 A106,44 0 0 1 306,138" fill="none" stroke="#cfeaff" stroke-width="0.8" opacity="0.5"/>
