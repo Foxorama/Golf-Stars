@@ -720,3 +720,29 @@
 - Re-shot `node scripts/gallery.mjs` (all 10 worlds read as cohesive lit landforms; void/cetus
   identical). Known follow-up left open: the fairway is still a flat uniform-width bright tube — the
   most "object-like" element — but reshaping it is a generator concern, not render.
+
+## GS-fairway: the corridor reads as mown INTO the land (2026-07-03)
+
+- **Follow-up to GS-inset** (the fairway was the deliberately-skipped remaining tell). The corridor
+  read as a bright uniform tube laid ON the rough, because its only edge treatment was a single
+  LIGHTER first-cut fringe (`mixHex(fw, rough, 0.5)`) — a soft washy halo, not a defined mow line —
+  over a flat single-tone fill. Two render-only additions in `styleFairways`, both pure geometry
+  (**zero rng draws, zero stream reorders**):
+  - **A first-cut ROUGH collar** — a wider outset band (`offsetPoly(sp, -6)`) UNDER the light fringe,
+    toned mostly toward rough (`fwCollar = mixHex(fwShade.base, rs.base, 0.72)`) so the corridor sits
+    DOWN in a graded fairway → first-cut → rough transition instead of meeting the rough on a soft
+    bright edge. Grouped like the fringe (every collar under every base), so a broken corridor's
+    segments share one continuous first cut.
+  - **A gentle directional SHEEN** — a soft lit band (`hexAlpha(s.light, 0.16)`) pooled on the
+    up-light side via `shiftPoly(offsetPoly(sp, 4), LIGHT_UL·4)` clipped to each segment, so the mown
+    turf reads as gently crowned ground catching the shared GS-inset light, not a flat decal.
+- **Gated to the parkland worlds** (`groundedFw = arch !== 'void' && arch !== 'cetus'`, passed as the
+  optional `collar` param; Rainbow Road takes its own ribbon branch and never calls `styleFairways`).
+  void/cetus edge their corridor with a glow rim / raised shelf, so a collar would fight it — they
+  pass NO collar and `styleFairways` with `collar === undefined` is **byte-for-byte the pre-change
+  output** (the whole suite, incl. the void/cetus determinism + camera-stability guards, stays green;
+  870 tests). Ocean/frost/inferno/desert/crystal/tempest/fungal/verdant all pick the collar up: the
+  first-cut takes each world's own rough tone (sandy on the beach, snowy on frost, cinder on inferno).
+- Eyeballed high-res across verdant/ocean/frost/inferno (collar + sheen read as a cut corridor) and
+  void/cetus (unchanged). Re-shoot `node scripts/gallery.mjs` after further `styleFairways` edits.
+  The uniform-WIDTH read remains a generator concern (varying width / green taper), still out of scope.
