@@ -755,17 +755,6 @@ function shiftPoly(pts: Vec[], dx: number, dy: number): Vec[] {
 }
 
 /**
- * A soft dark shadow the feature casts onto the surrounding turf — offset AWAY from the light
- * (down-right) so a crescent peeks past the down-light edge. Drawn UNDER the feature body, it
- * grounds the hazard IN the terrain instead of floating it on top (the "pasted sticker" fix).
- * Outset silhouette; pure geometry, zero rng.
- */
-function castShadow(poly: Vec[], scale: number, fill: string): Prim {
-  const d = Math.max(2, Math.min(6.5, scale * 1.2));
-  return { t: 'poly', pts: shiftPoly(offsetPoly(poly, -2), -LIGHT_UL[0] * d, -LIGHT_UL[1] * d), fill };
-}
-
-/**
  * Emboss a filled feature's interior as an INSET bowl (clipped to the body): drop the whole rim to
  * a shadow tone, then re-lay the base shifted toward the light so the NEAR (up-light) rim keeps a
  * shadow crescent while the far side stays bright; an optional lit floor pools sun on the down-light
@@ -782,12 +771,15 @@ function embossChildren(
 ): Prim[] {
   const b = bboxOf(poly);
   const half = Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.5;
-  const w = Math.max(1.1, Math.min(scale * 1.05, half * 0.5));
+  // GS-inset-2: a wider near-rim shadow so the depression READS as dug in (the old thin crescent, once
+  // the raised drop-shadow was removed, left the feature looking flat). The exposed up-light shadow
+  // band is ~2·w wide (inward offset + the away-from-light shift), so this is the visible "wall".
+  const w = Math.max(1.4, Math.min(scale * 1.5, half * 0.55));
   const sx = -LIGHT_UL[0]; // down-right = away from the light
   const sy = -LIGHT_UL[1];
   const children: Prim[] = [
     { t: 'poly', pts: poly, fill: tone.wall }, // whole interior drops to the shadowed-wall tone
-    { t: 'poly', pts: shiftPoly(offsetPoly(poly, w), sx * w, sy * w), fill: tone.base }, // base shifted toward light → dark crescent on the up-light rim
+    { t: 'poly', pts: shiftPoly(offsetPoly(poly, w), sx * w, sy * w), fill: tone.base }, // base shifted away from light → dark crescent on the up-light rim
   ];
   if (tone.floor) {
     children.push({ t: 'poly', pts: shiftPoly(offsetPoly(poly, w * 2.4), sx * w * 1.8, sy * w * 1.8), fill: tone.floor });
@@ -802,7 +794,9 @@ function insetEmboss(poly: Vec[], scale: number, tone: { wall: string; base: str
 function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
-  for (const poly of polys) out.push(castShadow(poly, scale, SAND.contact)); // 0: contact shadow on the turf
+  // GS-inset-2: no drop shadow cast onto the surrounding turf — a bunker is DUG INTO the ground, it
+  // doesn't float above it. The excavated read comes entirely from the inset emboss below (near
+  // up-light rim in shadow, far floor sunlit), so the sand sits flush-then-down, not proud.
   for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow }); // 1: sandy lip against the grass
   for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: SAND.base }); // 2
   for (const poly of polys) {
@@ -883,7 +877,8 @@ const LAVA_KINDS = new Set(['lava', 'lavariver']);
 function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number, scale = 4): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
-  for (const poly of polys) out.push(castShadow(poly, scale, lp.contact)); // 0: contact shadow on the turf
+  // GS-inset-2: no drop shadow on the turf — water/lava sits SUNK below its bank, it doesn't float
+  // proud of the land. The sunk read comes from the inset bank emboss + depth rings below.
   for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -3), fill: lp.shore }); // 1
   for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: lp.base }); // 2
   for (const poly of polys) {
@@ -3711,10 +3706,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // Raise the green onto the same shelf as the fairway so the play surface reads as one continuous
     // raised mesa (GS-cetus-6) rather than the green sitting back down at rough level.
     if (calmShelf && f.kind === 'green') prims.push(...raisedShelf(sp, proj.scale, shelfLook));
-    // GS-inset: ground the green with a soft cast shadow (a putting surface sits slightly proud of
-    // the rough, so top-down it drops a faint shadow down-light) — pushed UNDER the green fill, but
-    // not where a shelf/void glow already models its edge, and never on Rainbow Road.
-    if (f.kind === 'green' && !calmShelf && !voidGlow) prims.push(castShadow(sp, proj.scale, 'rgba(4,10,6,0.16)'));
+    // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
+    // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
+    // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, greenSlopeScreen(hole, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
