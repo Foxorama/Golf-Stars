@@ -618,6 +618,27 @@ function dedupeHazardOverlaps(hazards: Feature[]): Feature[] {
   return out;
 }
 
+/**
+ * Clear the abyss of stray hazards on a LOST-ROUGH island hole (GS-cetus / void). The fairway/green
+ * pads float in the deep and the deep IS the only penalty, so a pond/void-pool/lava body stranded in
+ * the abyss — or a bunker/tree floating off a pad — reads wrong (the same reason an island-green par 3
+ * skips its flanking hazards: "ponds in the void read wrong"). Before this filter the par-4/5 island
+ * CHAINS (GS-cetus-5) still ran the full flanking/pond/approach-lake/greenside placement against a
+ * wide, bending island corridor, scattering water blobs and bunkers over the pads and the deep.
+ * PURE geometry over already-drawn placements: zero rng draws, so every seeded stream stays
+ * byte-identical; only which hazards SURVIVE changes. A hazard is kept only when it is NON-penalty
+ * (sand: a genuine clifftop cove) AND actually sits ON a pad (overlaps a fairway/green/tee feature).
+ * Sanctioned forced-carry crossings are load-bearing so they always survive (none spawn on the
+ * void/cetus biomes, but the exemption keeps the rule honest).
+ */
+function clearVoidHazards(hazards: Feature[], pads: Feature[]): Feature[] {
+  return hazards.filter((h) => {
+    if (CROSSING_KINDS.has(h.kind)) return true;
+    if (lieInfo(h.kind).penalty) return false; // the abyss is the only penalty on an island hole
+    return pads.some((p) => polysOverlap(h.poly, p.poly));
+  });
+}
+
 function generateHole(
   rng: Rng,
   biome: Biome,
@@ -1214,7 +1235,15 @@ function generateHole(
   // Cross-family overlap dedupe (GS-hazard-blend): a hazard that spawned ON a different substance
   // (water over sand, sand over lava…) is dropped — trees and the sanctioned crossings excepted.
   // Pure geometry, zero rng draws — every stream stays byte-identical.
-  const cleanHazards = dedupeHazardOverlaps(hazards);
+  let cleanHazards = dedupeHazardOverlaps(hazards);
+  // On a LOST-ROUGH island hole the pads float in the abyss and the abyss IS the only penalty, so
+  // strip any hazard stranded in the void (GS-cetus / void): every penalty pool and every sand/tree
+  // blob that isn't sitting on a pad. Zero-rng post-filter (like the dedupe), gated on lostRough so
+  // every normal world + calm void/cetus stop stays byte-identical.
+  if (lostRough) {
+    const pads = features.filter((f) => f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee');
+    cleanHazards = clearVoidHazards(cleanHazards, pads);
+  }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
   const wind: Wind = {

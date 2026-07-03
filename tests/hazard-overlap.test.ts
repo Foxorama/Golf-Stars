@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse } from '../src/sim/course/generate';
 import { pointInPoly, type Vec } from '../src/sim/course/contract';
+import { lieInfo } from '../src/sim/shot';
 import { landPolysCourseFor } from '../src/render/style';
 
 /**
@@ -126,5 +127,34 @@ describe('lost-rough land platforms cover the play features (GS-hazard-blend / s
       }
     }
     expect(lostHoles).toBeGreaterThan(0);
+  });
+});
+
+describe('lost-rough island holes clear the abyss of stray hazards (GS-cetus-water)', () => {
+  it('no penalty pool, and every surviving hazard sits ON a pad, across void/cetus seeds', () => {
+    let lostHoles = 0;
+    let survivingHazards = 0;
+    for (const biome of ['void-garden', 'cetus-deep']) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const c = generateCourse(seed * 23, { biome, holes: 4, wildness: 0.95 });
+        for (const h of c.holes) {
+          if (!h.biomeMods?.some((m) => m.kind === 'roughLie')) continue;
+          lostHoles++;
+          const pads = h.features.filter((f) => f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee');
+          for (const z of h.hazards) {
+            survivingHazards++;
+            // The abyss is the only penalty on an island hole — no water/void/lava pools survive.
+            expect(lieInfo(z.kind).penalty, `${biome} seed ${seed * 23}: penalty ${z.kind} floats in the void`).toBeFalsy();
+            // Whatever remains (sand coves) genuinely bites a pad — nothing hangs stranded in the deep.
+            expect(
+              pads.some((p) => polysOverlap(z.poly, p.poly)),
+              `${biome} seed ${seed * 23}: a ${z.kind} is stranded off every pad`,
+            ).toBe(true);
+          }
+        }
+      }
+    }
+    expect(lostHoles).toBeGreaterThan(0);
+    expect(survivingHazards).toBeGreaterThan(0); // on-pad sand coves still exist (not everything stripped)
   });
 });
