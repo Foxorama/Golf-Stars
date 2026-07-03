@@ -771,10 +771,11 @@ function embossChildren(
 ): Prim[] {
   const b = bboxOf(poly);
   const half = Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.5;
-  // GS-inset-2: a wider near-rim shadow so the depression READS as dug in (the old thin crescent, once
-  // the raised drop-shadow was removed, left the feature looking flat). The exposed up-light shadow
-  // band is ~2·w wide (inward offset + the away-from-light shift), so this is the visible "wall".
-  const w = Math.max(1.4, Math.min(scale * 1.5, half * 0.55));
+  // GS-inset-2: a THIN near-rim shadow — just enough to hint at a dug-in lip, never a big dark blob.
+  // The exposed up-light band is ~2·w wide (inward offset + the away-from-light shift). `w` is capped
+  // hard by the body radius (`half`) so it stays a slim rim at the zoomed-in play scale, where a
+  // scale-proportional band ballooned into a distinct shadow across a third of the feature.
+  const w = Math.max(1, Math.min(scale * 0.6, half * 0.14));
   const sx = -LIGHT_UL[0]; // down-right = away from the light
   const sy = -LIGHT_UL[1];
   const children: Prim[] = [
@@ -801,8 +802,9 @@ function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number): Prim[] {
   for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: SAND.base }); // 2
   for (const poly of polys) {
     const c = centroidOf(poly);
-    // Inset bowl: near (up-light) wall in shadow, far floor sunlit — so the bunker reads dug in.
-    out.push(...insetEmboss(poly, scale, { wall: SAND.wall, base: SAND.base, floor: SAND.rim }));
+    // Inset lip: a slim shadow on the near (up-light) rim so the bunker reads dug in — no bright far
+    // floor (the lit pool against the shadow band read as a hard "distinct shadow", GS-inset-2).
+    out.push(...insetEmboss(poly, scale, { wall: SAND.wall, base: SAND.base }));
     // A couple of pale rake arcs across the sand (subtle texture).
     if (art.stripes) {
       const b = bboxOf(poly);
@@ -835,7 +837,6 @@ interface LiquidPalette {
   flow: string; // lengthwise flow streaks (current / molten flow)
   glint: string; // sparkle on a still lake
   bank: string; // GS-inset: shadow the raised bank casts on the up-light shore
-  contact: string; // GS-inset: soft dark shadow cast onto the surrounding turf
 }
 const WATER_LIQ: LiquidPalette = {
   shore: WATER.shallow,
@@ -845,7 +846,6 @@ const WATER_LIQ: LiquidPalette = {
   flow: 'rgba(255,255,255,0.30)',
   glint: WATER.glint,
   bank: WATER.bank,
-  contact: WATER.contact,
 };
 const LAVA_LIQ: LiquidPalette = {
   shore: LAVA.crust,
@@ -855,7 +855,6 @@ const LAVA_LIQ: LiquidPalette = {
   flow: LAVA.crack,
   glint: LAVA.core,
   bank: LAVA.bank,
-  contact: LAVA.contact,
 };
 
 const WATER_KINDS = new Set(['water', 'frozenpond', 'creek']);
