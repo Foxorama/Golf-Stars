@@ -899,6 +899,8 @@ export function mountPlayView(
       burst(12, ['235,250,255', '150,225,255', '255,255,255'], { up: 1.3, spread: 1.0, grav: 0.02 }); // charged glitter
     } else if (lie === 'junk') {
       burst(10, ['150,164,188', '96,106,124', '255,120,80'], { up: 0.9, spread: 1.2, grav: 0.07 }); // rattled scrap + a spark
+    } else if (lie === 'tar') {
+      burst(9, ['40,26,60', '90,60,140', '20,14,30'], { up: 0.4, spread: 0.6, grav: 0.12 }); // heavy tar glob — plugs, no run
     } else if (lie === 'trees') {
       spawnLeaves(at); // rattled the canopy on arrival
     }

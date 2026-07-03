@@ -509,6 +509,35 @@
      capstone guard: `tests/journey-effects.test.ts` asserts EVERY non-none effect has at least one
      hook (wind ≠ 1 | carry ≠ 1 | patch | tents | craters) — a new sky can never ship as pure
      dressing again. NO new `_gs*`/URL hook, so the test-hub guard needs nothing.
+- **Five more skies + a sticky new lie (GS-journey-weather, `effects.ts`/`sim/patches.ts`/`render/weather.ts`).**
+  Prompted by "I thought we'd added a heap of weather events but I'm not seeing any new ones" — the
+  GS-journey-fx-2 work WAS all shipped (12 effects, full physics + visuals); the ask was simply MORE
+  variety. The roster grows 12 → 17, every one reusing the proven wind/carry/patch machinery so no new
+  physics extreme touches the no-death-spiral envelope:
+  1. **`blizzard`** — wind ×1.3 + the frostfall `ice` patch. The storm-cold cousin of frostfall (which
+     is calm+icy); this is *gale+icy*, a genuinely new combo. `drawBlizzard` streaks dense flakes ALONG
+     the wind under a gust-pulsing whiteout veil (distinct from frostfall's gentle straight-down fall).
+  2. **`radiant`** — carry ×1.06 + wind ×0.82. A bomber's-paradise sky: still, bright air, the ball
+     flies far and true. `drawRadiant` pours slow god-rays from one brilliant seeded star.
+  3. **`dustStorm`** — wind ×1.25 + carry ×0.94. Grit that gusts AND drags — the meanest combo.
+     `drawDustStorm` sweeps parallax grit motes + rolling ochre fronts.
+  4. **`solarWind`** — wind ×1.15. A steady laminar particle stream (`drawSolarWind`) — a third storm
+     that isn't lightning, so it reads distinct from solar/ion.
+  5. **`darkMatter`** — wind ×0.78 + a NEW `tar` patch. The "really spacey" one: `drawDarkMatter`
+     drifts dark clouds with cold violet star-lensing rims over an eerily still sky. `tar` (`PATCH_SPECS`
+     + `LIE_INFO`, carry ×0.78 / dispersion ×1.05) is the sticky, dead-straight INVERSE of ice's wild
+     skid — the ball plugs, robbed of distance but not sprayed (the sim models "no roll" as lost carry,
+     since roll is a landing-time integral, not a per-lie coefficient). Drawn as a glossy black gravitic
+     sink in `stylePatches`, with a heavy low `spawnLandFX` glob.
+  All five showpieces build on a FOURTH mulberry stream (`o.seed ^ 0x27d4eb2f`) so no earlier scatter
+  moves; `routeEffect` gained five ordered regex families placed so their tokens win the collisions
+  (`snowstorm` doesn't fall to the solar STORM regex, `solar-wind` beats bare `solar`, `stardust`/
+  `stellar-tailwind` stay comet/moonlight, `dark-matter` isn't a gravity SINGULARity). ~10 new events
+  (radiant-bloom, sunbath-drift, solar-wind, dust-storm, snow-squall, blizzard, helios-gale, sirocco,
+  dark-matter-fog, umbral-veil) spread arc-tiered across all five. Adding events shifts the seeded route
+  draw, so one pinned-seed ace fixture (`ui.test.ts` GS-ace-ship) was re-pinned (seed 74 → 185). No new
+  `_gs*`/URL hook (content + a patch kind the hub absorbs automatically), so the test-hub guard needs
+  nothing. Eyes-on: `scripts/weather-preview.mjs` + `scripts/patches-preview.mjs` both cover the new set.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen

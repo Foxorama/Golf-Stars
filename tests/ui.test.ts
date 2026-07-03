@@ -444,9 +444,9 @@ describe('ui reducer', () => {
   });
 
   it('a hole-in-one unlocks the secret Comet Rider ship, through the full play flow (GS-ace-ship)', () => {
-    // Seed 74 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
+    // Seed 185 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
     // the ship lands in the global owned pool exactly when the ace is scored (auto-play path).
-    let s = started(74, 'voyage');
+    let s = started(185, 'voyage');
     expect(s.ownedShips).not.toContain('comet-rider'); // not owned at the off
     let sawAce = false;
     for (let stop = 0; stop < 4 && s.run.status === 'active'; stop++) {

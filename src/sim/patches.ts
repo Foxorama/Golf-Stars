@@ -8,6 +8,9 @@
  *     existing `ice` lie: slick and skiddy, hard to control.
  *   • `junk` (the DEBRIS-FIELD route) — wreckage shards half-buried in the grass. A `junk` lie:
  *     the club snags on scrap, robbing distance and spraying wide. Worse than rough, never a stroke.
+ *   • `tar` (the DARK-MATTER route) — gravitic pools that grab the ball. A `tar` lie: the club plants
+ *     in the muck, robbing distance HARD but not spraying — the sticky, dead-straight inverse of ice
+ *     (ice runs away wild; tar goes nowhere). Never a stroke.
  *
  * Same contract as the scorch craters (sim/scorch.ts), machine-checked by tests/patches.test.ts:
  *
@@ -34,7 +37,7 @@ import { lieAt } from './shot';
 import { greenRadius, centrelinePoint, SCORCHABLE } from './scorch';
 
 /** The patch families a course effect can scatter (see EFFECT_PATCH in rpg/effects.ts). */
-export type PatchKind = 'stardust' | 'frost' | 'junk';
+export type PatchKind = 'stardust' | 'frost' | 'junk' | 'tar';
 
 export interface GroundPatch {
   /** Patch centre (course space). */
@@ -61,6 +64,7 @@ export const PATCH_SPECS: Record<PatchKind, PatchSpec> = {
   stardust: { lie: 'stardust', max: 5, minR: 4, maxR: 7 },
   frost: { lie: 'ice', max: 6, minR: 4, maxR: 7 },
   junk: { lie: 'junk', max: 5, minR: 3.5, maxR: 6 },
+  tar: { lie: 'tar', max: 4, minR: 4, maxR: 6.5 }, // fewer, bigger sinks — you can steer around them
 };
 
 /** Lies a patch can settle on — soft turf ONLY, the same set the scorch craters use: a green/tee/

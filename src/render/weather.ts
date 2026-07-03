@@ -251,6 +251,13 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   // re-scatters the earlier layers (the same rule rng2 obeys for the rng layout).
   let flakes: { x: number; spd: number; s: number; off: number; ph: number }[] = [];
   let giant: { x: number; y: number; r: number; tilt: number; hue: number } | null = null;
+  // GS-journey-weather new skies, each on its OWN seeded stream (rng4) so adding them leaves every
+  // earlier scatter byte-identical (the same "own stream" rule rng2/rng3 obey).
+  let blizzardFlakes: { x: number; y: number; spd: number; s: number; ph: number }[] = [];
+  let grit: { x: number; y: number; spd: number; s: number; ph: number; band: number }[] = [];
+  let solarStream: { x: number; y: number; spd: number; len: number; ph: number }[] = [];
+  let darkBlobs: { x: number; y: number; r: number; spd: number; ph: number; col: number }[] = [];
+  let radiantSun: { x: number; y: number; r: number } | null = null;
 
   function build(): void {
     const rng = mulberry32(o.seed);
@@ -340,6 +347,45 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       tilt: -0.35 + rng3() * 0.7,
       hue: rng3(),
     };
+    // GS-journey-weather showpiece scatters — a FOURTH independent stream (see the declarations above
+    // for why: adding these never re-scatters the earlier rng/rng2/rng3 layers).
+    const rng4 = mulberry32((o.seed ^ 0x27d4eb2f) >>> 0);
+    // Blizzard: a dense field of wind-driven flakes streaking across (not gently falling like frost).
+    blizzardFlakes = Array.from({ length: 90 }, () => ({
+      x: rng4() * (W + 60),
+      y: rng4() * (H + 60),
+      spd: 0.7 + rng4() * 0.8,
+      s: 0.8 + rng4() * 1.8,
+      ph: rng4() * Math.PI * 2,
+    }));
+    // Dust storm: grit motes in three depth bands (parallax), swept sideways by the wind.
+    grit = Array.from({ length: 80 }, () => ({
+      x: rng4() * (W + 60),
+      y: rng4() * (H + 60),
+      spd: 0.5 + rng4() * 1.1,
+      s: 0.7 + rng4() * 1.6,
+      ph: rng4() * Math.PI * 2,
+      band: Math.floor(rng4() * 3),
+    }));
+    // Solar wind: a laminar stream of short particle streaks flowing along the wind.
+    solarStream = Array.from({ length: 70 }, () => ({
+      x: rng4() * (W + 60),
+      y: rng4() * (H + 60),
+      spd: 1.1 + rng4() * 1.4,
+      len: 8 + rng4() * 20,
+      ph: rng4() * Math.PI * 2,
+    }));
+    // Dark matter: a few slow drifting dark clouds with a cold violet edge, plus a lensing centre.
+    darkBlobs = Array.from({ length: 6 }, () => ({
+      x: rng4() * W,
+      y: H * (0.02 + rng4() * 0.5),
+      r: Math.min(W, H) * (0.14 + rng4() * 0.2),
+      spd: 1.5 + rng4() * 2.5,
+      ph: rng4() * Math.PI * 2,
+      col: Math.floor(rng4() * 2),
+    }));
+    // Radiant: ONE brilliant star high in the sky, the source of the god-rays + the still bright wash.
+    radiantSun = { x: W * (0.2 + rng4() * 0.6), y: H * (0.08 + rng4() * 0.14), r: Math.max(14, Math.min(W, H) * 0.05) };
     // The world's ambient air (GS-biome-feel): count scales with area like the starfield.
     const amb = AMBIENT[o.archetype];
     if (amb) {
@@ -422,8 +468,40 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       g.addColorStop(1, 'rgba(40,30,70,0.0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
+    } else if (effect === 'blizzard') {
+      // A cold whiteout haze — heavier than frostfall, washing the whole view pale.
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(200,222,240,0.24)');
+      g.addColorStop(0.6, 'rgba(190,212,232,0.12)');
+      g.addColorStop(1, 'rgba(190,212,232,0.05)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    } else if (effect === 'radiant') {
+      // A warm golden bath off the top of the sky — bright but never muddy.
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(255,224,150,0.22)');
+      g.addColorStop(0.55, 'rgba(255,214,130,0.08)');
+      g.addColorStop(1, 'rgba(255,214,130,0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    } else if (effect === 'dustStorm') {
+      // A thick ochre pall rolling in low across the whole view.
+      const g = ctx.createLinearGradient(0, H, 0, 0);
+      g.addColorStop(0, 'rgba(150,104,54,0.30)');
+      g.addColorStop(0.5, 'rgba(160,116,64,0.16)');
+      g.addColorStop(1, 'rgba(170,128,74,0.06)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    } else if (effect === 'darkMatter') {
+      // An unnatural cold pall — dark and faintly violet, pressing the light down.
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(26,16,48,0.36)');
+      g.addColorStop(0.55, 'rgba(30,20,54,0.18)');
+      g.addColorStop(1, 'rgba(24,16,44,0.06)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
     }
-    // solarStorm / ionStorm tint as edge vignettes inside their own draws (centre stays clear).
+    // solarStorm / ionStorm / solarWind tint as edge vignettes inside their own draws (centre clear).
   }
 
   function drawStars(ctx: CanvasRenderingContext2D, now: number): void {
@@ -1189,6 +1267,181 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
+  /** A wind direction unit vector with a sane fallback (the aim overlay may pass a still wind). */
+  function windUnit(fdx: number, fdy: number): [number, number] {
+    const dx = windDir[0] || fdx;
+    const dy = windDir[1] || fdy;
+    const dl = Math.hypot(dx, dy) || 1;
+    return [dx / dl, dy / dl];
+  }
+
+  // Blizzard (GS-journey-weather): a driving whiteout — dense flakes streaking ALONG the wind (not
+  // gently falling like frostfall) under a veil that surges and eases so the gale reads as gusting.
+  // The ice patches on the turf are the matching physics (same lie as frostfall, but here in a gale).
+  function drawBlizzard(ctx: CanvasRenderingContext2D, now: number): void {
+    const gust = 0.6 + 0.4 * Math.sin(now * 0.0008); // the gale surges and eases
+    const [ux, uy] = windUnit(0.6, 0.25);
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const f of blizzardFlakes) {
+      const drift = now * 0.06 * f.spd * (0.6 + gust);
+      const x = wrap(f.x + ux * drift + Math.sin(now * 0.002 + f.ph) * 6, W + 60) - 30;
+      const y = wrap(f.y + uy * drift, H + 60) - 30;
+      const len = f.s * (3 + 5 * gust);
+      ctx.strokeStyle = `rgba(240,250,255,${(0.4 + 0.4 * gust).toFixed(3)})`;
+      ctx.lineWidth = f.s * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - ux * len, y - uy * len);
+      ctx.stroke();
+    }
+    // Whiteout veil surge — a soft pale wash pulsing with the gust (kept subtle so the course reads).
+    ctx.fillStyle = `rgba(232,244,255,${(0.05 + 0.09 * gust).toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // Radiant burst (GS-journey-weather): a brilliant star pouring still, warm god-rays across the sky —
+  // the visible reason the ball flies far in dead air (the carry-up + wind-down hooks are the physics).
+  function drawRadiant(ctx: CanvasRenderingContext2D, now: number): void {
+    if (!radiantSun) return;
+    const { x, y, r } = radiantSun;
+    const breathe = 0.5 + 0.5 * Math.sin(now * 0.0009);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // Sweeping god-rays — long soft triangles fanning out from the star, rotating very slowly.
+    const rays = 9;
+    const spin = now * 0.00006;
+    const reach = Math.max(W, H) * 1.3;
+    for (let i = 0; i < rays; i++) {
+      const a = spin + (i / rays) * Math.PI * 2;
+      const spread = 0.05 + 0.03 * Math.sin(now * 0.0011 + i);
+      const g = ctx.createLinearGradient(x, y, x + Math.cos(a) * reach, y + Math.sin(a) * reach);
+      g.addColorStop(0, `rgba(255,236,172,${(0.10 + 0.05 * breathe).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255,224,150,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a - spread) * reach, y + Math.sin(a - spread) * reach);
+      ctx.lineTo(x + Math.cos(a + spread) * reach, y + Math.sin(a + spread) * reach);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // The star: a hot white core in a warm bloom.
+    const bloom = ctx.createRadialGradient(x, y, 0, x, y, r * (3 + breathe));
+    bloom.addColorStop(0, 'rgba(255,252,240,0.95)');
+    bloom.addColorStop(0.3, 'rgba(255,232,160,0.6)');
+    bloom.addColorStop(1, 'rgba(255,220,140,0)');
+    ctx.fillStyle = bloom;
+    ctx.beginPath();
+    ctx.arc(x, y, r * (3 + breathe), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,250,0.95)';
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Dust storm (GS-journey-weather): a rolling ochre haze — grit streaking sideways in parallax depth
+  // bands, under a couple of soft rolling fronts. The gust-and-drag combo is the matching physics.
+  function drawDustStorm(ctx: CanvasRenderingContext2D, now: number): void {
+    const [ux, uy] = windUnit(0.85, 0.15);
+    const bandSpd = [0.5, 0.85, 1.3];
+    ctx.save();
+    // Rolling haze fronts — soft ochre blooms sweeping across the view.
+    for (let b = 0; b < 2; b++) {
+      const cx = wrap(now * 0.02 * (0.4 + b * 0.3), W + 400) - 200;
+      const g = ctx.createRadialGradient(cx, H * (0.5 + b * 0.18), 0, cx, H * (0.5 + b * 0.18), W * 0.5);
+      g.addColorStop(0, `rgba(170,120,64,${(0.10 - b * 0.02).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(170,120,64,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // Grit motes streaking with the wind, three depth bands for parallax.
+    ctx.lineCap = 'round';
+    for (const m of grit) {
+      const sp = bandSpd[m.band] ?? 1;
+      const drift = now * 0.05 * m.spd * sp;
+      const x = wrap(m.x + ux * drift + Math.sin(now * 0.0016 + m.ph) * 5, W + 60) - 30;
+      const y = wrap(m.y + uy * drift + Math.cos(now * 0.0013 + m.ph) * 4, H + 60) - 30;
+      const len = m.s * (2.5 + sp * 2);
+      ctx.strokeStyle = `rgba(196,150,92,${(0.2 + 0.28 * sp).toFixed(3)})`;
+      ctx.lineWidth = m.s * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - ux * len, y - uy * len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Solar wind (GS-journey-weather): a steady laminar stream of charged particles flowing along the
+  // wind — a stiff, constant breeze (the wind-up hook is the physics). Distinct from the lightning
+  // storms: no forks, no flares, just relentless flow under a faint gold edge vignette.
+  function drawSolarWind(ctx: CanvasRenderingContext2D, now: number): void {
+    const [ux, uy] = windUnit(0.9, 0.1);
+    ctx.save();
+    // Faint warm edge vignette (centre stays clear so the course reads).
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.5, Math.min(W, H) * 0.3, W * 0.5, H * 0.5, Math.max(W, H) * 0.7);
+    vig.addColorStop(0, 'rgba(210,170,90,0)');
+    vig.addColorStop(1, 'rgba(210,170,90,0.10)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (const p of solarStream) {
+      const drift = now * 0.12 * p.spd;
+      const x = wrap(p.x + ux * drift, W + 60) - 30;
+      const y = wrap(p.y + uy * drift + Math.sin(now * 0.001 + p.ph) * 3, H + 60) - 30;
+      const flick = 0.4 + 0.4 * Math.sin(now * 0.006 + p.ph);
+      ctx.strokeStyle = `rgba(255,224,150,${(0.25 + 0.3 * flick).toFixed(3)})`;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - ux * p.len, y - uy * p.len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Dark-matter drift (GS-journey-weather): the spacey one — slow dark clouds with a cold violet rim
+  // that LENS the stars behind them, over a still, eerie sky. The gravitic tar pooling on the turf is
+  // the matching physics half.
+  function drawDarkMatter(ctx: CanvasRenderingContext2D, now: number): void {
+    ctx.save();
+    for (const b of darkBlobs) {
+      const x = wrap(b.x + now * 0.001 * b.spd, W + b.r * 2) - b.r;
+      const y = b.y + Math.sin(now * 0.0004 + b.ph) * 12;
+      // A soft dark core that occludes the sky, ringed by a faint violet lensing halo.
+      const col = b.col ? '150,90,210' : '110,70,180';
+      const halo = ctx.createRadialGradient(x, y, b.r * 0.3, x, y, b.r);
+      halo.addColorStop(0, 'rgba(6,4,12,0.72)');
+      halo.addColorStop(0.7, 'rgba(10,6,20,0.35)');
+      halo.addColorStop(0.88, `rgba(${col},0.18)`);
+      halo.addColorStop(1, 'rgba(10,6,20,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(x, y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Bright lensed points on the blob rims (warped starlight) — 'lighter' for a cold glint.
+    ctx.globalCompositeOperation = 'lighter';
+    for (const b of darkBlobs) {
+      const x = wrap(b.x + now * 0.001 * b.spd, W + b.r * 2) - b.r;
+      const y = b.y + Math.sin(now * 0.0004 + b.ph) * 12;
+      const a = b.ph + now * 0.0006;
+      const px = x + Math.cos(a) * b.r * 0.95;
+      const py = y + Math.sin(a) * b.r * 0.95;
+      const tw = 0.5 + 0.5 * Math.sin(now * 0.003 + b.ph);
+      ctx.fillStyle = `rgba(200,180,255,${(0.4 * tw).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.4 + tw, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // --- Meteor STRIKES (GS-meteor-strikes) -----------------------------------------------------
   // One strike per STRIKE_PERIOD: pick a crater (seeded off the cycle index — deterministic in the
   // clock, no shared stream), dive a fireball into it along the sky lanes' fall direction, then an
@@ -1317,6 +1570,21 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
         break;
       case 'gravityWell':
         drawGravityWell(ctx, now);
+        break;
+      case 'blizzard':
+        drawBlizzard(ctx, now);
+        break;
+      case 'radiant':
+        drawRadiant(ctx, now);
+        break;
+      case 'dustStorm':
+        drawDustStorm(ctx, now);
+        break;
+      case 'solarWind':
+        drawSolarWind(ctx, now);
+        break;
+      case 'darkMatter':
+        drawDarkMatter(ctx, now);
         break;
       default:
         break;

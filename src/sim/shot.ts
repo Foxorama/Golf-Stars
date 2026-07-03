@@ -381,8 +381,13 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // is the BONUS patch: charged dust launches the ball hot AND true — the one lie worth aiming at.
   stardust: { carryMult: 1.08, dispersionMult: 0.9, label: 'Stardust' },
   // Debris-field wreckage snags the club: robbed distance, wide spray — worse than rough, gentler
-  // than trees, never a stroke. ('ice' above doubles as the frostfall patch's lie.)
+  // than trees, never a stroke. ('ice' above doubles as the frostfall/blizzard patch's lie.)
   junk: { carryMult: 0.85, dispersionMult: 1.6, label: 'Wreckage' },
+  // Dark-matter tar (GS-journey-weather): the ball plugs in gravitic muck. Distance robbed HARD (the
+  // sim models "no roll" as lost carry — roll is a landing-time integral, not a per-lie coefficient),
+  // but it comes out dead STRAIGHT — the sticky inverse of ice's wild skid. Worse than rough, never a
+  // stroke. Only reached via the rest-lie conversion, armed by the dark-matter route (sim/patches.ts).
+  tar: { carryMult: 0.78, dispersionMult: 1.05, label: 'Tar pit' },
 };
 
 /** Default lie when a point is off every polygon (native / out-of-frame): rough. */
