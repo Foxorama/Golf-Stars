@@ -174,7 +174,14 @@ For each system: the rule that constrains new work. Open the archive doc before 
   keyed off the persisted `endlessBestHoles` (save v13,
   with `golfBagByCharacter`) through the reducer's `endlessProgressUpdates` — applied at EVERY
   stop-scoring site, not just run end; `tests/endless.test.ts` machine-checks the unlock-id↔catalogue
-  link and the gate ladder. **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
+  link and the gate ladder. **A hole-in-one is the ONLY way to earn the secret Comet Rider ship
+  (GS-ace-ship):** the `comet-rider` row is now `secret:true`/`cost:0` (hidden from the market, never
+  buyable), granted by the reducer's `aceUpdates` at every stop-scoring site — `aceShipUnlock` adds it to
+  global `ownedShips` on ANY ace the player doesn't already own (NOT a first-ace flag), so a player who
+  aced before the feature shipped still earns it on their next ace and nobody is ever locked out; the ace
+  takeover reveals it (`showAceCelebration` `shipUnlocked`). Zero rng, no save bump (`ownedShips` already
+  persists); composes AFTER `endlessProgressUpdates` so a hole-150 + ace on one stop keeps both grants.
+  **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
   through `voyageRarityBias(rarity, voyageShopProgress(stopIndex,stops))` (endless formats keep the
   galaxy-distance `rarityDepthBias`), keyed off the STOP so shop 1 is mostly green+a blue, a small
   epic+legendary opens between boss 1 & 2, and the last pre-boss shop is halfish blue/halfish purple with

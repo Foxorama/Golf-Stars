@@ -56,7 +56,7 @@ import {
 import { type MetaUpgrades } from '../sim/rpg/meta';
 import { bagSet, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
 import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlock';
-import { canBuyShip, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { canBuyShip, shipById, aceShipUnlock, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { getCharacter } from '../sim/rpg/characters';
 import { playHole } from '../sim/round';
@@ -437,6 +437,21 @@ export function endlessProgressUpdates(state: UiState, run: Run): Partial<UiStat
   return { endlessBestHoles: holes, ownedApparel, ownedShips };
 }
 
+/**
+ * Ace-driven state deltas for a scored stop (GS-ace): the lifetime hole-in-one tally + the secret
+ * Comet Rider ship unlock (GS-ace-ship, granted on ANY ace the player doesn't already own — so a
+ * player who aced before this shipped still earns it on their next ace). `baseOwnedShips` is the
+ * owned list AFTER any endless-milestone unlock at this same site, so the two ship grants compose
+ * rather than clobber; spread this LAST at each scoring site. Pure.
+ */
+function aceUpdates(state: UiState, result: StopResult, baseOwnedShips: string[]): Partial<UiState> {
+  const owned = aceShipUnlock(baseOwnedShips, result.aces);
+  return {
+    lifetimeAces: state.lifetimeAces + result.aces,
+    ...(owned !== baseOwnedShips ? { ownedShips: owned } : {}),
+  };
+}
+
 /** Boss-reward choices to offer after a stop, if it was a survived (non-final) boss win (GS-talents).
  *  Themed to the stop's zone. Undefined for an ordinary stop, a missed cut, or a run-winning final boss. */
 function bossRewardFor(run: Run, course: UiState['course'], result: StopResult): BossReward[] | undefined {
@@ -542,15 +557,16 @@ export function reduce(state: UiState, action: Action): UiState {
           screen: ended ? 'gameover' : 'result',
           bestStableford: Math.max(state.bestStableford, result.stableford),
           bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-          lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
           ...runEndUpdates(state, run),
+          ...aceUpdates(state, result, state.ownedShips),
         };
       }
       const { run, result, played } = playStop(state.run);
       // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
       // the gameover/victory screen; a survived non-final stop goes to the result screen.
       const ended = run.status !== 'active';
+      const endless = endlessProgressUpdates(state, run);
       return {
         ...state,
         run,
@@ -561,10 +577,10 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-        lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
-        ...endlessProgressUpdates(state, run),
+        ...endless,
         ...runEndUpdates(state, run),
+        ...aceUpdates(state, result, endless.ownedShips ?? state.ownedShips),
       };
     }
 
@@ -723,9 +739,9 @@ export function reduce(state: UiState, action: Action): UiState {
           screen: ended ? 'gameover' : 'result',
           bestStableford: Math.max(state.bestStableford, result.stableford),
           bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-          lifetimeAces: state.lifetimeAces + result.aces,
           bossReward: bossRewardFor(run, state.course, result),
           ...runEndUpdates(state, run),
+          ...aceUpdates(state, result, state.ownedShips),
         };
       }
 
@@ -739,6 +755,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // Stop complete (or survival bar missed) — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);
       const ended = run.status !== 'active';
+      const endless = endlessProgressUpdates(state, run);
       return {
         ...state,
         run,
@@ -752,10 +769,10 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: ended ? 'gameover' : 'result',
         bestStableford: Math.max(state.bestStableford, result.stableford),
         bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
-        lifetimeAces: state.lifetimeAces + result.aces,
         bossReward: bossRewardFor(run, state.course, result),
-        ...endlessProgressUpdates(state, run),
+        ...endless,
         ...runEndUpdates(state, run),
+        ...aceUpdates(state, result, endless.ownedShips ?? state.ownedShips),
       };
     }
 

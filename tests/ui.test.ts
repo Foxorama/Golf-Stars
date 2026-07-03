@@ -434,4 +434,28 @@ describe('ui reducer', () => {
     expect(s.run.holesSurvived).toBeLessThan(stops * 4);
     expect(s.endlessBestHoles).toBe(s.run.holesSurvived);
   });
+
+  it('a hole-in-one unlocks the secret Comet Rider ship, through the full play flow (GS-ace-ship)', () => {
+    // Seed 74 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
+    // the ship lands in the global owned pool exactly when the ace is scored (auto-play path).
+    let s = started(74, 'voyage');
+    expect(s.ownedShips).not.toContain('comet-rider'); // not owned at the off
+    let sawAce = false;
+    for (let stop = 0; stop < 4 && s.run.status === 'active'; stop++) {
+      const ownedBefore = s.ownedShips.includes('comet-rider');
+      s = reduce(s, { type: 'play' });
+      if ((s.lastResult?.aces ?? 0) > 0) {
+        sawAce = true;
+        expect(ownedBefore).toBe(false);
+        expect(s.ownedShips).toContain('comet-rider'); // the ace granted it
+        expect(s.lifetimeAces).toBeGreaterThan(0); // and still counted the lifetime tally
+        break;
+      }
+      if (s.screen === 'gameover') break;
+      s = reduce(s, { type: 'continue' });
+      s = reduce(s, { type: 'leaveShop' });
+      s = reduce(s, { type: 'route', routeId: s.routes![0]!.id });
+    }
+    expect(sawAce).toBe(true); // fixture guard: the pinned seed really does ace within the window
+  });
 });
