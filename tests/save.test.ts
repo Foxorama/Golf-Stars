@@ -13,9 +13,9 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(15);
+    expect(SAVE_VERSION).toBe(16);
     const d = defaultSave();
-    expect(d.version).toBe(15);
+    expect(d.version).toBe(16);
     expect(d.golfBagByCharacter).toEqual({});
     expect(d.endlessBestHoles).toBe(0);
     expect(d.shards).toBe(0);
@@ -33,6 +33,37 @@ describe('save schema', () => {
     expect(d.unlockedClubsByCharacter).toEqual({});
     expect(d.clubhouseVisit).toBe(0);
     expect(d.marmotBartender).toBe(false);
+    expect(d.endlessRuns).toEqual([]);
+  });
+
+  it('migrates a v15 blob forward to v16 (seeds an empty endless-runs history, preserves everything else)', () => {
+    const v15 = {
+      ...defaultSave(),
+      version: 15 as const,
+      shards: 51,
+      endlessBestHoles: 42,
+      marmotBartender: true,
+    } as unknown as Parameters<typeof migrate>[0];
+    // Strip the v16-only field so the input is a genuine v15 shape.
+    delete (v15 as Record<string, unknown>).endlessRuns;
+    const s = migrate(v15);
+    expect(s.version).toBe(16);
+    expect(s.endlessRuns).toEqual([]); // no runs recorded yet — the history starts empty
+    expect(s.shards).toBe(51);
+    expect(s.endlessBestHoles).toBe(42);
+    expect(s.marmotBartender).toBe(true);
+  });
+
+  it('round-trips endless run records through export/import', () => {
+    const save = {
+      ...defaultSave(),
+      endlessRuns: [
+        { characterId: 'feather-fade', tier: 'common' as const, holes: 37, gross: 160, par: 148, ascension: 0, seed: 7 },
+        { characterId: 'longshot-larry', tier: 'epic' as const, holes: 12, gross: 55, par: 49, ascension: 0, seed: 9 },
+      ],
+    };
+    const restored = importSave(exportSave(save));
+    expect(restored.endlessRuns).toEqual(save.endlessRuns);
   });
 
   it('round-trips a v13 save through export/import (per-character ship + outfit + pants + bag + club unlocks + lounge visit preserved)', () => {
@@ -64,7 +95,7 @@ describe('save schema', () => {
     };
     const restored = importSave(exportSave(save));
     expect(restored).toMatchObject({
-      version: 15,
+      version: 16,
       clubhouseVisit: 7,
       shards: 120,
       bestDistance: 9,
@@ -103,7 +134,7 @@ describe('save schema', () => {
       clubhouseVisit: 4,
     };
     const s = migrate(v12);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.endlessBestHoles).toBe(0);
     expect(s.golfBagByCharacter).toEqual({});
     // Everything else rides through untouched.
@@ -124,7 +155,7 @@ describe('save schema', () => {
     // Strip the v14-only field so the input is a genuine v13 shape.
     delete (v13 as Record<string, unknown>).maxAscensionByCharacter;
     const s = migrate(v13);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.maxAscensionByCharacter).toEqual({}); // nobody retroactively granted or locked out
     // Everything else rides through untouched.
     expect(s.maxAscension).toBe(5);
@@ -143,7 +174,7 @@ describe('save schema', () => {
     // Strip the v15-only field so the input is a genuine v14 shape.
     delete (v14 as Record<string, unknown>).marmotBartender;
     const s = migrate(v14);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.marmotBartender).toBe(false); // earned in play, never granted retroactively
     expect(s.shards).toBe(42);
     expect(s.clubhouseVisit).toBe(3);
@@ -174,7 +205,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
     };
     const s = migrate(v11);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.clubhouseVisit).toBe(0);
     // Everything else rides through untouched.
     expect(s.shards).toBe(88);
@@ -202,7 +233,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
     };
     const s = migrate(v10);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.shards).toBe(140);
     expect(s.bagTier).toBe('epic');
     expect(s.ownedApparel).toEqual(['cap-classic', 'polo-classic']);
@@ -233,7 +264,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'backspin-bo': ['6i'] },
     };
     const s = migrate(v9);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.shards).toBe(95);
     expect(s.maxAscension).toBe(3);
     expect(s.bagTier).toBe('rare');
@@ -273,7 +304,7 @@ describe('save schema', () => {
       bagTier: 'rare' as const,
     };
     const s = migrate(v8);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.shards).toBe(95);
     expect(s.bagTier).toBe('rare');
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'wagon-gold']);
@@ -298,7 +329,7 @@ describe('save schema', () => {
       marketSeed: 3,
     };
     const s = migrate(v6);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.shards).toBe(70);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline']);
     expect(s.shipByCharacter[CHARACTERS[0]!.id]).toBe('racer-redline');
@@ -333,7 +364,7 @@ describe('save schema', () => {
       activeRun: { seed: 5, stopIndex: 2, distanceFromStart: 8, credits: 50, perks: ['gyro'] },
     };
     const s = migrate(v2);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.shards).toBe(0);
     expect(s.metaUpgrades).toEqual({});
     expect(s.maxAscension).toBe(0);
@@ -354,7 +385,7 @@ describe('save schema', () => {
       bestStableford: 30,
     };
     const s = migrate(v1);
-    expect(s.version).toBe(15);
+    expect(s.version).toBe(16);
     expect(s.shards).toBe(0);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(s.bestStableford).toBe(30);

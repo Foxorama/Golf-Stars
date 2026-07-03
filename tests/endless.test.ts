@@ -13,6 +13,16 @@ import {
   endlessUnlocksEarned,
   nextEndlessUnlock,
   passesEndlessGate,
+  CLUB_SET_DIFFICULTIES,
+  clubSetOf,
+  clubSetHandicapStrokes,
+  netStrokes,
+  formatToPar,
+  addEndlessRecord,
+  bestEndlessRecord,
+  recordNetToPar,
+  ENDLESS_RECORDS_KEPT,
+  type EndlessRunRecord,
 } from '../src/sim/rpg/endless';
 import {
   currentCourse,
@@ -31,7 +41,7 @@ import { getFormat, DEFAULT_FORMAT } from '../src/sim/rpg/formats';
 import { apparelById, apparelRevealedInMarket, canBuyApparel, equippedSet } from '../src/sim/rpg/apparel';
 import { shipById, canBuyShip, shipRevealedInMarket } from '../src/sim/rpg/ships';
 import { BAG_SETS, bagSetRevealedInMarket } from '../src/sim/rpg/bag';
-import { initState, reduce, endlessProgressUpdates, type UiState } from '../src/ui/game';
+import { initState, reduce, endlessProgressUpdates, runEndUpdates, type UiState } from '../src/ui/game';
 import type { PlayedHole } from '../src/sim/round';
 
 /** A minimal holed-out PlayedHole for gate/milestone unit tests (only the gate-read fields matter). */
@@ -293,5 +303,128 @@ describe('the reducer plumbs progression + unlocks (GS-unending)', () => {
     expect(s.run.history.map((h) => h.stableford)).toEqual(headlessChar.run.history.map((h) => h.stableford));
     // And the no-character headless run also terminated (sanity on the harness itself).
     expect(headless.run.status).toBe('ended');
+  });
+});
+
+describe('golf scoring: gross / net / to-par (GS-golf-score)', () => {
+  it('the four starting club sets map to green/blue/purple/orange with a decreasing handicap', () => {
+    expect(CLUB_SET_DIFFICULTIES.map((d) => d.key)).toEqual(['green', 'blue', 'purple', 'orange']);
+    expect(CLUB_SET_DIFFICULTIES.map((d) => d.tier)).toEqual(['common', 'rare', 'epic', 'legendary']);
+    // A weaker set is the sterner test → gets MORE handicap strokes; the legendary Elite set is scratch.
+    const hcaps = CLUB_SET_DIFFICULTIES.map((d) => d.handicap18);
+    for (let i = 1; i < hcaps.length; i++) expect(hcaps[i]!).toBeLessThan(hcaps[i - 1]!);
+    expect(clubSetOf('legendary').handicap18).toBe(0);
+    expect(clubSetOf(undefined).key).toBe('green'); // absent ⇒ the starter set
+  });
+
+  it('prorates the handicap allowance to holes played and floors net at 0', () => {
+    // Green gives a full 18 over 18 holes → one stroke per hole; prorated for a partial round.
+    expect(clubSetHandicapStrokes('common', 18)).toBe(18);
+    expect(clubSetHandicapStrokes('common', 9)).toBe(9);
+    expect(clubSetHandicapStrokes('epic', 18)).toBe(6);
+    expect(clubSetHandicapStrokes('legendary', 40)).toBe(0);
+    // Net = gross − allowance; scratch net == gross; never negative.
+    expect(netStrokes(80, 18, 'common')).toBe(62);
+    expect(netStrokes(80, 18, 'legendary')).toBe(80);
+    expect(netStrokes(5, 18, 'common')).toBe(0);
+  });
+
+  it('formats a to-par figure like a golf scorecard', () => {
+    expect(formatToPar(0)).toBe('E');
+    expect(formatToPar(-3)).toBe('−3');
+    expect(formatToPar(5)).toBe('+5');
+  });
+});
+
+describe('the last-runs leaderboard records (GS-golf-score)', () => {
+  const rec = (over: Partial<EndlessRunRecord> = {}): EndlessRunRecord => ({
+    characterId: 'feather-fade',
+    tier: 'common',
+    holes: 12,
+    gross: 55,
+    par: 49,
+    ascension: 0,
+    seed: 1,
+    ...over,
+  });
+
+  it('prepends newest-first and caps the stored window', () => {
+    let recs: EndlessRunRecord[] = [];
+    for (let i = 0; i < ENDLESS_RECORDS_KEPT + 5; i++) recs = addEndlessRecord(recs, rec({ seed: i, holes: i }));
+    expect(recs.length).toBe(ENDLESS_RECORDS_KEPT);
+    expect(recs[0]!.seed).toBe(ENDLESS_RECORDS_KEPT + 4); // the most recent is first
+  });
+
+  it('picks the furthest-reaching run as the best, breaking ties on net-to-par', () => {
+    const a = rec({ seed: 1, holes: 20, gross: 90, par: 82 });
+    const b = rec({ seed: 2, holes: 30, gross: 130, par: 120 }); // further → best
+    const c = rec({ seed: 3, holes: 30, gross: 128, par: 120 }); // same holes, better score
+    expect(bestEndlessRecord([a, b])).toBe(b);
+    expect(bestEndlessRecord([b, c])).toBe(c);
+    expect(bestEndlessRecord([])).toBeUndefined();
+  });
+
+  it('net-to-par rewards a harder set for the same raw round', () => {
+    const green = rec({ tier: 'common', holes: 18, gross: 80, par: 72 });
+    const orange = rec({ tier: 'legendary', holes: 18, gross: 80, par: 72 });
+    expect(recordNetToPar(green)).toBeLessThan(recordNetToPar(orange));
+  });
+});
+
+describe('finishStop accumulates the golf round (GS-golf-score)', () => {
+  it('adds gross + par over the SURVIVED holes only, and round-trips through snapshot/resume', () => {
+    const course = currentCourse(startRun(3, 'unending'));
+    const pars = course.holes.map((h) => h.par);
+    const base = startRun(3, 'unending');
+    // Two clean pars then a blow-up that busts the bar mid-stop (holes 1–8 bar = quad bogey).
+    const res = finishStop(base, course, [
+      played(pars[0]!, pars[0]!),
+      played(pars[1]!, pars[1]!),
+      played(pars[2]!, pars[2]! + 9, false), // picked up — fails the gate, excluded from the round
+    ]);
+    expect(res.run.holesSurvived).toBe(2);
+    expect(res.run.grossStrokes).toBe(pars[0]! + pars[1]!);
+    expect(res.run.parPlayed).toBe(pars[0]! + pars[1]!);
+    // Snapshot/resume keeps the running round total.
+    const resumed = resumeRun(snapshotRun(res.run));
+    expect(resumed.grossStrokes).toBe(res.run.grossStrokes);
+    expect(resumed.parPlayed).toBe(res.run.parPlayed);
+  });
+
+  it('a voyage run never accumulates the endless round (stays 0)', () => {
+    const course = currentCourse(startRun(3, 'voyage'));
+    const pars = course.holes.map((h) => h.par);
+    const res = finishStop(startRun(3, 'voyage'), course, pars.map((p) => played(p, p)));
+    expect(res.run.grossStrokes).toBe(0);
+    expect(res.run.parPlayed).toBe(0);
+  });
+});
+
+describe('runEndUpdates banks the finished run into the last-runs leaderboard (GS-golf-score)', () => {
+  it('records an ended endless run (golfer, club set, holes, gross/par) once; a voyage run records nothing', () => {
+    const s = initState(1);
+    const run: Run = {
+      ...startRun(7, 'unending', {}, 'feather-fade'),
+      status: 'ended',
+      endedReason: 'cut',
+      holesSurvived: 15,
+      grossStrokes: 70,
+      parPlayed: 62,
+      bagTier: 'common',
+    };
+    const up = runEndUpdates(s, run);
+    expect(up.endlessRuns!.length).toBe(1);
+    expect(up.endlessRuns![0]).toMatchObject({
+      characterId: 'feather-fade',
+      tier: 'common',
+      holes: 15,
+      gross: 70,
+      par: 62,
+      seed: 7,
+    });
+    // An active run banks nothing; a voyage run (non-gate) never touches the endless history.
+    expect(runEndUpdates(s, { ...run, status: 'active' }).endlessRuns).toBeUndefined();
+    const voyage: Run = { ...startRun(7, 'voyage', {}, 'feather-fade'), status: 'ended', endedReason: 'cut' };
+    expect(runEndUpdates(s, voyage).endlessRuns).toBe(s.endlessRuns);
   });
 });

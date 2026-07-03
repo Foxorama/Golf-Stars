@@ -64,8 +64,8 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v15** (`marmotBartender`); bump + add a migration
-  when you persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
+  (localStorage is the only copy). Current schema is **v16** (`endlessRuns` — the Unending-Universe
+  last-runs leaderboard); bump + add a migration when you persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
   caddies, ships are tables the sim reads. **New world / item / golfer = a new row, not an engine edit.**
@@ -178,6 +178,19 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `holeComplete`, so auto ≡ interactive holds; `run.holesSurvived` (snapshotted) numbers the bar, and
   milestones 40/60/…/140 bank shard bonuses via `bonusShards` (kept on a bust). Course difficulty keeps
   riding galaxy distance + `routeDifficulty`, so the universe escalates after the bar parks at birdie.
+  **The Unending Universe is SCORED like golf (GS-golf-score):** survival is unchanged (the per-hole bar,
+  `holesSurvived` is still the headline), but the presentation is a running golf ROUND — cumulative
+  gross + par accumulate on the Run (`grossStrokes`/`parPlayed`, snapshotted, advanced by `finishStop`
+  over the SURVIVED holes only, always 0 for non-gate formats → the voyage is byte-identical), giving
+  gross / to-par / NET (`endless.ts netStrokes`, a club-set handicap so runs on different bags compare
+  fairly). The STARTING CLUB SET is the mode's difficulty axis (green/blue/purple/orange = common→
+  legendary rarity; `CLUB_SET_DIFFICULTIES`), picked on character-select for endless only (bounded to the
+  owned `bagTier`, green always; the voyage always plays the full owned tier), a weaker set the sterner
+  test but netting more strokes. Finished runs bank into the persisted `endlessRuns` last-runs
+  leaderboard (save v16, capped, newest-first; written ONCE in the reducer's `runEndUpdates`) grouped by
+  club set, showing holes reached + net + golfer. Pure/zero-rng display + a per-run record — the survival
+  gate, the balance harness, and every existing seed are untouched. UI in `render/endlessCards.ts`
+  (intro / end-of-hole / result / gameover), all gated on `holeGateArmed`.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
   ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),

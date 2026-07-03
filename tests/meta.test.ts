@@ -109,6 +109,8 @@ describe('meta wired into the run', () => {
       seed: 1,
       formatId: 'unending',
       holesSurvived: 0,
+      grossStrokes: 0,
+      parPlayed: 0,
       stopIndex: stops,
       distanceFromStart: distance,
       credits: 0,
