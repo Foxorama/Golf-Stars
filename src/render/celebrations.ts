@@ -16,7 +16,7 @@ import { HAPTICS, haptic } from './haptics';
  * guarded so a cosmetic glitch can never strand the player on the hole.
  */
 export function showAceCelebration(
-  info: { holeNo: number; total: number; par: number; club?: string; aceNo: number },
+  info: { holeNo: number; total: number; par: number; club?: string; aceNo: number; shipUnlocked?: boolean },
   onDismiss: () => void,
 ): void {
   try {
@@ -61,6 +61,10 @@ export function showAceCelebration(
     rewardLine('💰', `+${ACE_CREDIT_BONUS} credits`, 'spend them at the next Pro Shop'),
     rewardLine('🎯', "Ace's Touch", '+8% precision for the rest of the run · stacks'),
     rewardLine('⛳', `Lifetime ace #${info.aceNo}`, 'a permanent record'),
+    // The secret ace ship (GS-ace-ship): a one-time reveal the first ace you make while you don't own it.
+    ...(info.shipUnlocked
+      ? [rewardLine('🛸', 'SECRET UNLOCKED — the Comet Rider', 'Fly it on any golfer from the Clubhouse')]
+      : []),
   ].join('');
 
   overlay.innerHTML = `

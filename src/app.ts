@@ -44,7 +44,7 @@ import { arcSurvivorTarget } from './sim/rpg/competition';
 import { getGolfer, getArchetype } from './sim/rpg/golfers';
 import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel, betterPlayedHole } from './sim/rpg/match';
-import { canBuyShip, shipCatalogue, shipRevealedInMarket, type Ship } from './sim/rpg/ships';
+import { canBuyShip, shipCatalogue, shipRevealedInMarket, ACE_SHIP_ID, type Ship } from './sim/rpg/ships';
 import { shipCardSVG, shipSVG } from './render/shipArt';
 import { apparelById, apparelForSlot, apparelRevealedInMarket, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
@@ -3675,6 +3675,9 @@ function render(): void {
                   par: play.hole.par,
                   club: lastShot?.club.name,
                   aceNo: state.lifetimeAces + 1, // this ace (counted into the save at stop scoring)
+                  // The secret Comet Rider (GS-ace-ship) is granted at stop scoring on any ace you don't
+                  // yet own it; not owning it now = this ace earns it, so reveal it in the takeover.
+                  shipUnlocked: !state.ownedShips.includes(ACE_SHIP_ID),
                 },
                 () => render(),
               );

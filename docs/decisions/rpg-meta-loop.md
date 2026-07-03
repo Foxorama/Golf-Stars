@@ -1073,3 +1073,38 @@ rides.
   A future secret unlock is just another `unlockHoles`/`secret` catalogue row (or a gated `BAG_SETS` row);
   the reveal predicate picks it up with no market edit. The bag-set roadmap hint was also degraded to a
   generic "clear a higher gate" line so a not-yet-unlocked tier's NAME isn't spoiled before it's earned.
+
+## The Comet Rider becomes a hole-in-one unlock (GS-ace-ship)
+
+- **What changed.** The Comet Rider — a golf-ball comet that was a 300-shard legendary ship on the Trade
+  Market rack — is now a **secret, free ride earned by making a hole-in-one**, and nothing else. The `SHIPS`
+  row flips `cost: TIER_COST.legendary → 0` and gains `secret: true` (it keeps `rarity: 'legendary'` for its
+  ring/blurb colour). No `unlockHoles` — this is an *event* unlock, not an endless-holes count, so the two
+  reveal gates read the same but the earn path is different.
+- **Why any ace, not the first.** The ask was "awarded to their first hole-in-one, but a player who already
+  aced before this shipped must not be locked out forever." We don't retro-scan `lifetimeAces` at migration
+  (that would be a retroactive grant), and we can't tie the reward to a *first-ace* transition (0→1) because
+  a veteran already past that would never fire it. The resolution: grant on **any ace the player doesn't yet
+  own the ship on** (`aceShipUnlock(ownedShips, aces)`). A brand-new player earns it on their genuine first
+  ace; a veteran earns it on their *next* ace. Idempotent once owned, so it never double-grants. This is the
+  only design that satisfies both halves of the request without a save bump.
+- **Where it's wired.** A pure `aceUpdates(state, result, baseOwnedShips)` helper (the sibling of
+  `runEndUpdates`/`endlessProgressUpdates`) returns the `lifetimeAces` tally **and** the ship grant, spread
+  LAST at all four stop-scoring sites in `reduce` (auto + interactive, ordinary + matchplay-boss). It takes
+  `baseOwnedShips` = the owned list *after* any `endlessProgressUpdates` unlock at that site, so a hole-150
+  crossing and an ace on the same stop both land (compose, don't clobber). Ownership is global
+  (`ownedShips`), matching the request that the account — not the played golfer — earns the ship; which
+  golfer *flies* it is still a Clubhouse choice.
+- **The reveal.** The ace takeover (`showAceCelebration`) gains an optional `shipUnlocked` reward line
+  ("🛸 SECRET UNLOCKED — the Comet Rider"). The app sets it from `!state.ownedShips.includes(ACE_SHIP_ID)`
+  at celebration time (before stop scoring commits the grant), so the surprise reveals on exactly the ace
+  that earns it. Purely cosmetic — the reducer is the source of truth for ownership.
+- **Contracts.** Zero rng draws, zero stream reorder (all 871 existing seeded tests byte-identical); no save
+  bump (`ownedShips` already persists, migrations already default-seed it). `canBuyShip` refuses it (cost 0),
+  `shipRevealedInMarket` hides it until owned — so it silently drops off the market rack until the ace lands.
+  Tests: `tests/ships.test.ts` (the `aceShipUnlock` rule + market gating), `tests/ui.test.ts` (a full-flow
+  integration on pinned voyage seed 74, which aces early and lands the ship in `ownedShips`).
+- **Follow-ons.** The old 300-shard legendary slot in the Exotic set is now empty of a *buyable* legendary
+  (the set still has `ufo-saucer` epic); if the market wants another mid-tier Exotic later, add a new row —
+  don't un-secret the Comet Rider. A future event-earned ship is the same shape: `secret:true`/`cost:0` row +
+  a reducer grant on its trigger; no market or reveal-predicate edit needed.
