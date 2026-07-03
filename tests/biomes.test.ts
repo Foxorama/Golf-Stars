@@ -4,6 +4,7 @@ import { BIOMES, BALANCE_EXEMPT_BIOMES, biomeById, pickBiome } from '../src/sim/
 import { generateCourse, validateFairness } from '../src/sim/course/generate';
 import { validateCourse } from '../src/sim/course/contract';
 import { biomeCarryMult, playCourse } from '../src/sim/round';
+import { MAX_OVER_PAR } from '../src/sim/round';
 import { LIE_INFO, lieInfo, resolveShot } from '../src/sim/shot';
 import { CLUBS } from '../src/sim/clubs';
 
@@ -113,12 +114,15 @@ describe('fairness invariant holds across all biomes at max wildness', () => {
           strokes += p.record.strokes;
           par += p.record.par;
           holes++;
-          if (p.record.strokes >= 10) blowups++;
+          // A blow-up = the hole hit the max-score FLOOR (par + MAX_OVER_PAR → pick-up). The old guard
+          // tested `strokes >= 10`, which the par+4 cap makes STRUCTURALLY IMPOSSIBLE (max par 5 → max
+          // gross 9), so it silently measured nothing. `pickedUp` is the real disaster signal.
+          if (p.pickedUp || p.record.strokes - p.record.par >= MAX_OVER_PAR) blowups++;
         }
       }
     }
     const toParPerHole = (strokes - par) / holes;
     expect(toParPerHole).toBeLessThan(1.0); // hard, but not a death machine
-    expect(blowups / holes).toBeLessThan(0.05); // <5% disaster holes even at max wildness
+    expect(blowups / holes).toBeLessThan(0.05); // <5% disaster (floor-hit) holes even at max wildness
   });
 });

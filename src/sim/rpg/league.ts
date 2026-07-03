@@ -322,7 +322,16 @@ export function liveLeaderboard(run: Run, holesPlayed: number, playerStopSF: num
     cut: eliminated.get(g.id) ?? false,
   }));
   // Sink eliminated golfers below the survivors (positional); a stableford board has none flagged.
-  rows.sort((a, b) => (a.cut ? 1 : 0) - (b.cut ? 1 : 0) || b.total - a.total || a.name.localeCompare(b.name));
+  // On an EXACT total tie the order is arbitrary, so break it in the PLAYER's favour — otherwise a
+  // name-alphabetical tiebreak buries the player at (e.g.) 19th while `gapToLead` is 0, and the HUD
+  // reads the contradictory "19th/20 · leading" on the very first tee when the whole field is at 0.
+  rows.sort(
+    (a, b) =>
+      (a.cut ? 1 : 0) - (b.cut ? 1 : 0) ||
+      b.total - a.total ||
+      (a.isPlayer ? -1 : b.isPlayer ? 1 : 0) ||
+      a.name.localeCompare(b.name),
+  );
   rows.forEach((r, i) => (r.position = i + 1));
 
   const survivorTarget = board.mode === 'positional' && !currentIsBoss ? arcSurvivorTarget(run.stopIndex, ascensionCutBonus(run.ascension)) : undefined;
