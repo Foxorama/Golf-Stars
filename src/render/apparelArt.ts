@@ -420,17 +420,41 @@ export function golferPreviewSVG(
   const bootCol = pantsShape === 'spacepants' ? pantsAcc : '#232733';
   const shoes = shoe(lAnk, bootCol) + shoe(rAnk, bootCol);
 
-  // ── Arms: shirt-sleeve to the elbow, bare forearm, a hand — a relaxed A-pose ─────────────
-  const sleeveCol = shade(shirtCol, -0.06);
+  // ── Arms: a relaxed A-pose whose SLEEVE follows the shirt. The old arms started well inside the
+  //    torso and so hid the sleeve behind it — every outfit then read as bare-skin pegs (the astronaut
+  //    "still had arms showing"). Now they anchor at the shoulder CORNER and draw over the torso edge,
+  //    so the sleeve is visible and reads as attached. Short-sleeve golf shirts (polo/tee/jersey) bare
+  //    the forearm; full-cover suits (spacesuit/nebula suit/green jacket) sleeve all the way down —
+  //    ending in a glove on the pressure suits, a bare hand at the jacket cuff.
+  const shirtShape = shirt?.look.shape;
+  const fullSleeve = shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'blazer';
+  const gloved = shirtShape === 'spacesuit' || shirtShape === 'cosmic';
+  const sleeveCol = shade(shirtCol, -0.05);
+  const handCol = gloved ? shade(shirtCol, 0.06) : skin;
   const elbowY = shoY + px(27);
   const handY = hipY + px(4);
+  const shoX = (side: 1 | -1): number => cx + side * px(17.5); // shoulder corner
+  const wristX = (side: 1 | -1): number => cx + side * px(16.5);
   const armSeg = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
     `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${col}" stroke-width="${f(wd)}" stroke-linecap="round"/>`;
-  const arm = (side: 1 | -1): string =>
-    armSeg(cx + side * px(15.5), shoY + px(3), cx + side * px(19.5), elbowY, sleeveCol, px(7)) +
-    armSeg(cx + side * px(19.5), elbowY, cx + side * px(16.5), handY, skin, px(5));
+  const arm = (side: 1 | -1): string => {
+    if (fullSleeve) {
+      // One continuous fabric arm: shoulder → elbow (bowed out past the torso) → wrist.
+      return (
+        armSeg(shoX(side), shoY + px(1), cx + side * px(20.5), elbowY, sleeveCol, px(7.6)) +
+        armSeg(cx + side * px(20.5), elbowY, wristX(side), handY, sleeveCol, px(6.4))
+      );
+    }
+    // Short sleeve capping just below the shoulder, then a bare forearm.
+    const hemX = cx + side * px(19.5);
+    const hemY = shoY + px(13);
+    return (
+      armSeg(shoX(side), shoY + px(1), hemX, hemY, sleeveCol, px(7.6)) +
+      armSeg(hemX, hemY, wristX(side), handY, skin, px(5.2))
+    );
+  };
   const hand = (side: 1 | -1): string =>
-    `<circle cx="${f(cx + side * px(16.5))}" cy="${f(handY)}" r="${f(px(3.4))}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
+    `<circle cx="${f(wristX(side))}" cy="${f(handY)}" r="${f(px(3.6))}" fill="${handCol}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
 
   // ── Torso + cel shading + garment detail ─────────────────────────────────────────────────
   const neck = `<rect x="${f(cx - px(3.6))}" y="${f(headY + headR - px(4))}" width="${f(px(7.2))}" height="${f(shoY - headY - headR + px(6))}" fill="${shade(skin, -0.12)}"/>`;
@@ -489,6 +513,6 @@ export function golferPreviewSVG(
       : '';
 
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${arm(-1)}${arm(1)}${neck}${torso}${torsoShade}${detail}${belt}${hand(-1)}${hand(1)}${ears}${head}${headShade}${face}${hatG}${flair}
+    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${neck}${torso}${torsoShade}${detail}${belt}${arm(-1)}${arm(1)}${hand(-1)}${hand(1)}${ears}${head}${headShade}${face}${hatG}${flair}
   </svg>`;
 }
