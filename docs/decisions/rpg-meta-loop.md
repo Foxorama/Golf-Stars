@@ -982,3 +982,34 @@ course view is a tiny profile glimpsed mid-swing anyway.
   `CLUBHOUSE_PREVIEW_PNG`) renders seven stage outfits, a lounge-size figure and two shuffled lounge
   visits — re-shoot it after touching `apparelArt.ts` or `clubhouseLounge.ts`. No new hook, no save
   bump, no reducer change; full suite green (the change is render-string-only).
+
+## The Clubhouse spaceport + figure scale fix (GS-clubhouse-spaceport)
+
+Two eyes-on complaints after the glow-up shipped: the lounge golfers still read as dolls next to the
+furniture, and the bottom half of the hall screen was dead space with nowhere to show off the equipped
+rides.
+
+- **The doll bug was a FRAME bug, not a figure bug.** The lounge asked `golferPreviewSVG` for a 66×88
+  frame — but the figure's horizontal offsets scale off `S = h/210`, so at h=88 the drawn body spanned
+  only ~40% of that frame's width; the button was sized by frame width, so the visible golfer was both
+  skinny and short (~65 room-units vs the 74-unit armchair). THE RULE: size lounge/stage mounts off a
+  TIGHT frame — the lounge now asks for **72×210** (fits arms + auras + tall hats, nothing else) and
+  sizes buttons at `11.2·s cqw`, which lands the figures at ~1.5× the armchair, human-proportioned at
+  every container width. A wide frame renders as invisible margin and silently shrinks the character.
+- **Cosmetic pop** is three dials, all in `apparelArt.ts`: steeper garment gradients (`shade` ±0.22…0.3),
+  stronger cel highlight/shade band opacities, and `shirtDetail` scaled `S*1.75`. Plus a lounge-side
+  **rarity glow**: `popFilter` wraps any golfer wearing (or ship being) rare+ gear in a
+  `drop-shadow` of `cosmeticRarCol`, growing with `cosmeticRarOrder` — owned treasure reads across the room.
+- **The spaceport** (`spaceportArt`/`spaceportHTML` in `clubhouseLounge.ts`) fills the bottom half: a
+  floating tarmac landing RING around a putting green (flag, bunker, waiting ball), blinking rim
+  lights, control tower, windsock, a teal neon **Spaceport** gate sign, and FOUR painted pads — two on
+  the back band (s=0.72), two up front. Each golfer's equipped ride (`shipId` on `LoungeGolfer`,
+  resolved by the caller via `shipForCharacter`) parks on a pad as a `shipSVG` button firing the same
+  `openClubhouse` action as tapping the golfer, nameplate at its nose, cap-colour pad glow beneath.
+  The ship glyph mounts in a tight `96×62` frame with a `-3cqw` bottom margin tucking the nameplate
+  under the hull — without both, the ship floats visibly above its pad (the first cut did).
+- **Determinism**: pads are dealt by the SAME visit-seeded `Rng`, with the pad draws AFTER the spot
+  draws — a given visit's lounge arrangement is byte-identical to before the spaceport existed, and
+  the fleet "re-parks" between runs like the golfers mill around. Zero sim/rng-stream impact, no save
+  bump, no new hook; `clubhouse-preview.mjs` now carries `shipId` fixtures (wagon / mothership / racer
+  / moto) — re-shoot it after touching the spaceport art.

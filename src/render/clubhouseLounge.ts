@@ -14,8 +14,12 @@
 
 import { Rng } from '../sim/rng';
 import { golferPreviewSVG } from './apparelArt';
+import { shipSVG } from './shipArt';
+import { apparelById } from '../sim/rpg/apparel';
+import { shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { cosmeticRarCol, cosmeticRarOrder, type CosmeticRarity } from '../sim/rpg/cosmetics';
 
-/** One golfer to place in the lounge: identity + the outfit ids resolved by the caller. */
+/** One golfer to place in the lounge: identity + the outfit/ride ids resolved by the caller. */
 export interface LoungeGolfer {
   id: string;
   shortName: string;
@@ -24,6 +28,8 @@ export interface LoungeGolfer {
   hatId: string | undefined;
   shirtId: string | undefined;
   pantsId: string | undefined;
+  /** The equipped ride — parked on this golfer's spaceport pad below the lounge. */
+  shipId: string;
   skin: string;
   shirtBase: string;
 }
@@ -65,10 +71,29 @@ function nameplate(name: string, col: string): string {
     ${name}</span>`;
 }
 
+/** The rarity of the best cosmetic in a set of worn/flown ids — drives the "pop" glow: rare+ gear
+ *  wraps its wearer in the rarity's colour so an outfitted golfer (or parked grail ship) reads as
+ *  treasure across the room. */
+function bestRarity(rarities: (CosmeticRarity | undefined)[]): CosmeticRarity {
+  return rarities.reduce<CosmeticRarity>(
+    (best, r) => (r && cosmeticRarOrder(r) > cosmeticRarOrder(best) ? r : best),
+    'common',
+  );
+}
+
+/** CSS drop-shadow stack for a lounge/spaceport button: grounding shadow + a rarity glow (rare and up). */
+function popFilter(rarity: CosmeticRarity): string {
+  const ord = cosmeticRarOrder(rarity);
+  const glow = ord >= 1 ? ` drop-shadow(0 0 ${3 + ord * 2}px ${cosmeticRarCol(rarity)}cc)` : '';
+  return `drop-shadow(0 6px 5px #0007)${glow}`;
+}
+
 /** One golfer standing in the room: the outfit preview + nameplate, the whole thing a button that opens
  *  their Clubhouse. Anchored by the feet at the spot; sized in container-query units so the figures scale
  *  WITH the room (never crowding on a narrow phone), the per-spot factor giving a little depth. Front
- *  golfers (larger y) sit on top via z-index. */
+ *  golfers (larger y) sit on top via z-index. The preview frame is TIGHT (72u for a 210u figure) — a
+ *  wide frame renders as invisible margin and shrinks the drawn body to doll size next to the furniture,
+ *  the GS-clubhouse-scale bug. */
 function golferAt(g: LoungeGolfer, spot: Spot): string {
   const action = JSON.stringify({ type: 'openClubhouse', characterId: g.id });
   const preview = golferPreviewSVG(g.hatId, g.shirtId, g.pantsId, {
@@ -76,32 +101,39 @@ function golferAt(g: LoungeGolfer, spot: Spot): string {
     shirtBase: g.shirtBase,
     capColor: g.capColor,
     uid: `lg${g.id.replace(/[^a-z0-9]/gi, '')}`,
-    w: 66,
-    h: 88,
+    w: 72,
+    h: 210,
   });
   const z = Math.round(spot.y * 10);
-  const w = (13.2 * spot.s).toFixed(2);
+  const w = (11.2 * spot.s).toFixed(2);
+  const rarity = bestRarity([g.hatId, g.shirtId, g.pantsId].map((id) => apparelById(id)?.rarity));
   return `<button class="gs-lounge-golfer" data-action='${action}' aria-label="Outfit ${g.shortName}"
     style="position:absolute;left:${spot.x}%;top:${spot.y}%;z-index:${z};width:${w}cqw;
       transform:translate(-50%,-100%);transform-origin:bottom center;
       background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
-      filter:drop-shadow(0 6px 5px #0007);">
+      filter:${popFilter(rarity)};">
     <span class="gs-manage-hint">Outfit ⚙</span>
-    <span class="gs-lounge-shadow" style="background:radial-gradient(ellipse at 50% 50%, ${g.capColor}55, #0000 70%);"></span>
+    <span class="gs-lounge-shadow" style="background:radial-gradient(ellipse at 50% 50%, ${g.capColor}66, #0000 70%);"></span>
     ${preview}
     ${nameplate(g.shortName, g.capColor)}
   </button>`;
 }
 
-/** Once-per-screen CSS for the lounge golfers (responsive sizing + hover lift). Scoped to the hall. */
+/** Once-per-screen CSS for the lounge golfers + spaceport ships (responsive sizing + hover lift).
+ *  Scoped to the hall. */
 function loungeStyle(): string {
   return `<style>
-    .gs-lounge-golfer{transition:filter .15s ease, translate .15s ease;}
-    .gs-lounge-golfer svg{width:100%;height:auto;display:block;}
+    .gs-lounge-golfer,.gs-port-ship{transition:filter .15s ease, translate .15s ease;
+      background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;}
+    .gs-lounge-golfer svg,.gs-port-ship svg{width:100%;height:auto;display:block;}
     .gs-lounge-shadow{display:block;width:80%;height:1.4cqw;min-height:5px;margin:0 auto -1cqw;border-radius:50%;}
-    .gs-lounge-golfer:hover,.gs-lounge-golfer:focus-visible{
-      filter:drop-shadow(0 10px 8px #000a) brightness(1.08);outline:none;translate:0 -3px;}
-    .gs-lounge-golfer:hover .gs-manage-hint,.gs-lounge-golfer:focus-visible .gs-manage-hint{opacity:1;}
+    .gs-port-glow{display:block;width:88%;height:2.2cqw;min-height:6px;margin:0 auto -1.6cqw;border-radius:50%;}
+    .gs-port-ship svg{margin-bottom:-3cqw;}
+    .gs-lounge-golfer:hover,.gs-lounge-golfer:focus-visible,
+    .gs-port-ship:hover,.gs-port-ship:focus-visible{
+      filter:drop-shadow(0 10px 8px #000a) brightness(1.1);outline:none;translate:0 -3px;}
+    .gs-lounge-golfer:hover .gs-manage-hint,.gs-lounge-golfer:focus-visible .gs-manage-hint,
+    .gs-port-ship:hover .gs-manage-hint,.gs-port-ship:focus-visible .gs-manage-hint{opacity:1;}
     .gs-manage-hint{position:absolute;top:-1.8cqw;left:50%;transform:translateX(-50%);
       font-size:clamp(8px,2cqw,11px);font-weight:700;opacity:0;transition:opacity .15s ease;white-space:nowrap;
       background:#000a;color:#ffe6a6;padding:1px 6px;border-radius:8px;pointer-events:none;}
@@ -465,9 +497,181 @@ function loungeArt(): string {
   </svg>`;
 }
 
+/* ══════════════════════════ THE SPACEPORT (GS-clubhouse-spaceport) ══════════════════════════
+ * The parking lot below the lounge: a floating landing RING wrapped around a little putting green,
+ * one lit pad per golfer with their equipped ride parked on it. Tapping a ride opens that golfer's
+ * Clubhouse (same action as tapping the golfer) — the ship IS the button, a brass nameplate at its
+ * nose. Pads are re-dealt by the same visit-seeded shuffle, so the fleet re-parks between runs. */
+
+/** A landing pad on the ring: centre + painted size (art units of the 400×230 panel), depth scale. */
+interface Pad {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  s: number;
+}
+
+/** Two pads on the back band of the ring, two up front (drawn bigger — nearer the camera). */
+const PORT_PADS: Pad[] = [
+  { x: 98, y: 86, rx: 27, ry: 9.5, s: 0.72 }, // back-left
+  { x: 302, y: 86, rx: 27, ry: 9.5, s: 0.72 }, // back-right
+  { x: 124, y: 196, rx: 37, ry: 12.5, s: 1 }, // front-left
+  { x: 276, y: 196, rx: 37, ry: 12.5, s: 1 }, // front-right
+];
+
+/** One parked ride: the equipped ship hovering over its pad, nameplate at the nose, whole thing the
+ *  button into that golfer's Clubhouse. Anchored to the pad in % of the panel; container-query sized. */
+function shipAt(g: LoungeGolfer, pad: Pad): string {
+  const action = JSON.stringify({ type: 'openClubhouse', characterId: g.id });
+  const ship = shipById(g.shipId) ?? shipById(DEFAULT_SHIP_ID)!;
+  const art = `<svg viewBox="0 0 96 62" role="img" aria-hidden="true">${shipSVG(ship.id, 48, 36, 1.2)}</svg>`;
+  const left = ((pad.x / 400) * 100).toFixed(1);
+  const top = (((pad.y + pad.ry + 6) / 230) * 100).toFixed(1);
+  const w = (24 * pad.s).toFixed(1);
+  const z = Math.round(pad.y);
+  return `<button class="gs-port-ship" data-action='${action}' aria-label="Open ${g.shortName}'s garage"
+    style="position:absolute;left:${left}%;top:${top}%;z-index:${z};width:${w}cqw;
+      transform:translate(-50%,-100%);transform-origin:bottom center;
+      filter:${popFilter(ship.rarity)};">
+    <span class="gs-manage-hint">Garage 🚀</span>
+    <span class="gs-port-glow" style="background:radial-gradient(ellipse at 50% 50%, ${g.capColor}55, #0000 70%);"></span>
+    ${art}
+    ${nameplate(g.shortName, g.capColor)}
+  </button>`;
+}
+
+/** One painted landing pad: dark disc, gold marker ring, corner ticks and a pair of rim lights. */
+function padArt(p: Pad): string {
+  const tick = (dx: number, dy: number): string =>
+    `<line x1="${p.x + dx * p.rx * 0.82}" y1="${p.y + dy * p.ry * 0.82}" x2="${p.x + dx * p.rx}" y2="${p.y + dy * p.ry}" stroke="#d8a24a" stroke-width="1.6" opacity="0.7"/>`;
+  return `<g>
+    <ellipse cx="${p.x}" cy="${p.y + 1.5}" rx="${p.rx + 2}" ry="${p.ry + 1.5}" fill="#000" opacity="0.3"/>
+    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx}" ry="${p.ry}" fill="#1b2130" stroke="#8a93a6" stroke-width="1.3"/>
+    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx * 0.6}" ry="${p.ry * 0.6}" fill="none" stroke="#d8a24a" stroke-width="1.1" opacity="0.6"/>
+    ${tick(-0.9, -0.5)}${tick(0.9, -0.5)}${tick(-0.9, 0.5)}${tick(0.9, 0.5)}
+    <circle cx="${p.x - p.rx}" cy="${p.y}" r="1.4" fill="#7fd6ff"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.1s" repeatCount="indefinite"/></circle>
+    <circle cx="${p.x + p.rx}" cy="${p.y}" r="1.4" fill="#7fd6ff"><animate attributeName="opacity" values="1;0.3;1" dur="2.1s" repeatCount="indefinite"/></circle>
+  </g>`;
+}
+
+/** The painted spaceport: a tarmac landing ring floating in space, a putting green in the hole of the
+ *  donut (flag, bunker, waiting ball), blinking rim lights, a control tower, windsock and neon sign.
+ *  Hand-placed (no rng) so it's byte-stable, like the lounge. */
+function spaceportArt(): string {
+  // Rim lights sit ON the outer ellipse (cx 200, cy 138, rx 188, ry 74), alternating ice/amber.
+  const rim = [
+    [388, 138], [363, 175], [294, 202], [106, 202], [37, 175], [12, 138],
+    [37, 101], [106, 74], [200, 64], [294, 74], [363, 101],
+  ]
+    .map(
+      ([x, y], i) =>
+        `<circle cx="${x}" cy="${y}" r="1.7" fill="${i % 2 ? '#ffd36b' : '#7fd6ff'}"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.6s" begin="${(i * 0.24).toFixed(2)}s" repeatCount="indefinite"/></circle>`,
+    )
+    .join('');
+  return `<svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid slice"
+      style="position:absolute;inset:0;width:100%;height:100%;">
+    <defs>
+      <linearGradient id="spSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0a0d1f"/><stop offset="60%" stop-color="#151332"/><stop offset="100%" stop-color="#241c44"/>
+      </linearGradient>
+      <linearGradient id="spTarmac" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2c3242"/><stop offset="55%" stop-color="#39404e"/><stop offset="100%" stop-color="#232833"/>
+      </linearGradient>
+      <radialGradient id="spGreen" cx="50%" cy="42%" r="70%">
+        <stop offset="0%" stop-color="#3f9a43"/><stop offset="100%" stop-color="#2a6e2e"/>
+      </radialGradient>
+      <radialGradient id="spVig" cx="50%" cy="48%" r="72%">
+        <stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="80%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.4"/>
+      </radialGradient>
+    </defs>
+    <rect width="400" height="230" fill="url(#spSky)"/>
+    <!-- starfield + a ringed neighbour planet + one shooting star -->
+    <g fill="#fff">
+      <circle cx="30" cy="26" r="1"/><circle cx="66" cy="14" r="0.7"/><circle cx="118" cy="30" r="0.8"/>
+      <circle cx="152" cy="12" r="0.7"/><circle cx="258" cy="16" r="0.8"/><circle cx="300" cy="30" r="0.7"/>
+      <circle cx="342" cy="12" r="0.9"/><circle cx="382" cy="34" r="0.7"/><circle cx="14" cy="70" r="0.7"/>
+      <circle cx="388" cy="76" r="0.8"/><circle cx="206" cy="8" r="0.7"/><circle cx="92" cy="50" r="0.6"/>
+    </g>
+    <g transform="translate(52,30)">
+      <circle r="9" fill="#c65a4a"/><circle cx="-2.5" cy="-2.5" r="9" fill="#d8755f" opacity="0.5"/>
+      <ellipse rx="15" ry="3.6" fill="none" stroke="#ffe6a6" stroke-width="1.4" transform="rotate(-16)" opacity="0.85"/>
+    </g>
+    <g opacity="0.8">
+      <line x1="292" y1="22" x2="318" y2="34" stroke="#fff" stroke-width="1">
+        <animate attributeName="opacity" values="0;1;0;0" dur="7s" repeatCount="indefinite"/>
+      </line>
+    </g>
+    <!-- engine under-glow, so the ring reads as floating -->
+    <ellipse cx="200" cy="216" rx="176" ry="9" fill="#7f8bff" opacity="0.12">
+      <animate attributeName="opacity" values="0.08;0.16;0.08" dur="4.4s" repeatCount="indefinite"/>
+    </ellipse>
+    <!-- the landing RING: tarmac annulus + rims + dashed taxi stripe -->
+    <path fill-rule="evenodd" fill="url(#spTarmac)" stroke="#6a7284" stroke-width="1.4"
+      d="M12,138 a188,74 0 1,0 376,0 a188,74 0 1,0 -376,0 Z
+         M92,138 a108,42 0 1,0 216,0 a108,42 0 1,0 -216,0 Z"/>
+    <ellipse cx="200" cy="138" rx="108" ry="42" fill="none" stroke="#161a24" stroke-width="2.4" opacity="0.8"/>
+    <ellipse cx="200" cy="138" rx="148" ry="58" fill="none" stroke="#d8a24a" stroke-width="1.6"
+      stroke-dasharray="11 9" opacity="0.4"/>
+    ${rim}
+    <!-- the putting green in the middle of the ring -->
+    <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="url(#spGreen)"/>
+    <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="none" stroke="#1e5222" stroke-width="2.5"/>
+    <ellipse cx="200" cy="138" rx="82" ry="31" fill="none" stroke="#54b458" stroke-width="3" opacity="0.4"/>
+    <ellipse cx="200" cy="138" rx="56" ry="21" fill="none" stroke="#54b458" stroke-width="3" opacity="0.3"/>
+    <!-- bunker + the waiting ball + the flag -->
+    <ellipse cx="152" cy="150" rx="14" ry="5.5" fill="#d8c690"/>
+    <ellipse cx="150" cy="149" rx="10" ry="3.6" fill="#e6d6a4"/>
+    <circle cx="214" cy="151" r="1.7" fill="#fff"/>
+    <ellipse cx="233" cy="149" rx="3.4" ry="1.3" fill="#123c14"/>
+    <line x1="233" y1="149" x2="233" y2="112" stroke="#e8e2d2" stroke-width="1.6"/>
+    <path d="M233,112 L253,117 L233,122 Z" fill="#ff6b6b"/>
+    <!-- control tower on the back band -->
+    <g>
+      <rect x="349" y="66" width="5" height="32" fill="#4a5262"/>
+      <line x1="345" y1="98" x2="358" y2="98" stroke="#2c3242" stroke-width="2.5"/>
+      <ellipse cx="351.5" cy="62" rx="16" ry="7" fill="#39404e" stroke="#161a24" stroke-width="1"/>
+      <ellipse cx="351.5" cy="59.5" rx="12.5" ry="4.2" fill="#9fdcef" opacity="0.85"/>
+      <ellipse cx="347" cy="58.6" rx="4" ry="1.4" fill="#fff" opacity="0.5"/>
+      <circle cx="351.5" cy="51" r="2" fill="#ff5a4d"><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>
+    </g>
+    <!-- windsock on the back-left band -->
+    <g>
+      <line x1="52" y1="98" x2="52" y2="70" stroke="#4a5262" stroke-width="2"/>
+      <g>
+        <path d="M52,70 L74,73 L70,79 L52,77 Z" fill="#ff8b4a"/>
+        <path d="M59,71 L63,71.6 L62.4,78 L58.6,77.6 Z" fill="#fff" opacity="0.8"/>
+        <animateTransform attributeName="transform" type="rotate" values="-4 52 70;3 52 70;-4 52 70" dur="3.2s" repeatCount="indefinite"/>
+      </g>
+    </g>
+    <!-- neon gate sign over the back of the ring -->
+    <ellipse cx="200" cy="30" rx="52" ry="14" fill="#2bf0c0" opacity="0.13">
+      <animate attributeName="opacity" values="0.13;0.2;0.13" dur="5.2s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="152" y="19" width="96" height="21" rx="6" fill="#0d1416" stroke="#1f3a35" stroke-width="1.4"/>
+    <text x="200" y="34" text-anchor="middle" font-size="12" font-weight="800" fill="none" stroke="#2bf0c0" stroke-width="3" stroke-linejoin="round" opacity="0.4" font-family="Georgia,'Times New Roman',serif" font-style="italic">Spaceport</text>
+    <text x="200" y="34" text-anchor="middle" font-size="12" font-weight="800" fill="#d9fff4" font-family="Georgia,'Times New Roman',serif" font-style="italic">Spaceport</text>
+    ${PORT_PADS.map(padArt).join('')}
+    <rect width="400" height="230" fill="url(#spVig)"/>
+  </svg>`;
+}
+
+/** The spaceport panel: painted ring + the four rides parked on visit-shuffled pads. */
+function spaceportHTML(golfers: LoungeGolfer[], rng: Rng): string {
+  const pads = shuffle([...PORT_PADS], rng).slice(0, golfers.length);
+  const ships = golfers.map((g, i) => shipAt(g, pads[i] ?? PORT_PADS[i % PORT_PADS.length]!)).join('');
+  return `<div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:40/23;max-width:680px;
+      margin:10px auto 0;border:1px solid #232c42;border-radius:16px;overflow:hidden;background:#0a0d1f;">
+      ${spaceportArt()}
+      ${ships}
+    </div>`;
+}
+
 /**
- * Build the full lounge interior HTML: the painted room, then the golfers placed at seed-shuffled spots
- * with brass nameplates. `visit` (the finished-run counter) reshuffles the arrangement each time home.
+ * Build the full clubhouse-hall HTML: the painted lounge with the golfers placed at seed-shuffled spots,
+ * then the spaceport panel below it with each golfer's equipped ride parked on its own pad. `visit` (the
+ * finished-run counter) reshuffles both arrangements each time home — the pad draws happen AFTER the spot
+ * draws on the same Rng, so the lounge arrangement for a given visit is unchanged by the spaceport.
  */
 export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number): string {
   const rng = new Rng((visit >>> 0) * 2654435761 + 0x9e37); // spread the small counter across the seed space
@@ -480,5 +684,6 @@ export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number): str
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
       ${loungeArt()}
       ${figures}
-    </div>`;
+    </div>
+    ${spaceportHTML(golfers, rng)}`;
 }

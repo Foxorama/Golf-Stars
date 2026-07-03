@@ -328,10 +328,10 @@ export function golferPreviewSVG(
 
   const defs = `<defs>
     <linearGradient id="shg${uid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${shade(shirtCol, 0.2)}"/><stop offset="55%" stop-color="${shirtCol}"/><stop offset="100%" stop-color="${shade(shirtCol, -0.16)}"/>
+      <stop offset="0%" stop-color="${shade(shirtCol, 0.3)}"/><stop offset="55%" stop-color="${shirtCol}"/><stop offset="100%" stop-color="${shade(shirtCol, -0.24)}"/>
     </linearGradient>
     <linearGradient id="ptg${uid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${shade(pantsCol, 0.12)}"/><stop offset="60%" stop-color="${pantsCol}"/><stop offset="100%" stop-color="${shade(pantsCol, -0.2)}"/>
+      <stop offset="0%" stop-color="${shade(pantsCol, 0.22)}"/><stop offset="60%" stop-color="${pantsCol}"/><stop offset="100%" stop-color="${shade(pantsCol, -0.3)}"/>
     </linearGradient>
     <clipPath id="tor${uid}"><path d="${torsoPath}"/></clipPath>
     <clipPath id="hd${uid}"><circle cx="${f(cx)}" cy="${f(headY)}" r="${f(headR)}"/></clipPath>
@@ -436,12 +436,12 @@ export function golferPreviewSVG(
   const neck = `<rect x="${f(cx - px(3.6))}" y="${f(headY + headR - px(4))}" width="${f(px(7.2))}" height="${f(shoY - headY - headR + px(6))}" fill="${shade(skin, -0.12)}"/>`;
   const torso = `<path d="${torsoPath}" fill="url(#shg${uid})" stroke="#0c1116" stroke-width="${sw(1.5)}" stroke-linejoin="round"/>`;
   const torsoShade = `<g clip-path="url(#tor${uid})">
-    <ellipse cx="${f(cx - px(9))}" cy="${f(shoY + px(5))}" rx="${f(px(15))}" ry="${f(px(11))}" fill="#ffffff" opacity="0.13"/>
-    <rect x="${f(cx + px(7))}" y="${f(shoY - px(6))}" width="${f(px(14))}" height="${f(hipY - shoY + px(12))}" fill="#000000" opacity="0.1"/>
-    <rect x="${f(cx - px(20))}" y="${f(hipY - px(4))}" width="${f(px(40))}" height="${f(px(5))}" fill="#000000" opacity="0.08"/>
+    <ellipse cx="${f(cx - px(9))}" cy="${f(shoY + px(5))}" rx="${f(px(15))}" ry="${f(px(11))}" fill="#ffffff" opacity="0.2"/>
+    <rect x="${f(cx + px(7))}" y="${f(shoY - px(6))}" width="${f(px(14))}" height="${f(hipY - shoY + px(12))}" fill="#000000" opacity="0.14"/>
+    <rect x="${f(cx - px(20))}" y="${f(hipY - px(4))}" width="${f(px(40))}" height="${f(px(5))}" fill="#000000" opacity="0.12"/>
   </g>`;
   const detail = shirt
-    ? `<g clip-path="url(#tor${uid})">${shirtDetail(shirt.look, cx, shoY + px(12), S * 1.55)}</g>`
+    ? `<g clip-path="url(#tor${uid})">${shirtDetail(shirt.look, cx, shoY + px(12), S * 1.75)}</g>`
     : '';
   // Belt across the shirt hem (skipped for shorts — their waistband reads on its own).
   const belt =
@@ -455,8 +455,8 @@ export function golferPreviewSVG(
     <circle cx="${f(cx + headR - px(0.5))}" cy="${f(headY + px(1.5))}" r="${f(px(2.6))}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
   const head = `<circle cx="${f(cx)}" cy="${f(headY)}" r="${f(headR)}" fill="${skin}" stroke="#0c1116" stroke-width="${sw(1.3)}"/>`;
   const headShade = `<g clip-path="url(#hd${uid})">
-    <circle cx="${f(cx - px(5))}" cy="${f(headY - px(5))}" r="${f(px(13))}" fill="#ffffff" opacity="0.13"/>
-    <circle cx="${f(cx + px(8))}" cy="${f(headY + px(5))}" r="${f(px(13))}" fill="#000000" opacity="0.07"/>
+    <circle cx="${f(cx - px(5))}" cy="${f(headY - px(5))}" r="${f(px(13))}" fill="#ffffff" opacity="0.18"/>
+    <circle cx="${f(cx + px(8))}" cy="${f(headY + px(5))}" r="${f(px(13))}" fill="#000000" opacity="0.1"/>
   </g>`;
   const eyeY = headY - px(0.5);
   const face = `

@@ -32,10 +32,10 @@ const stages = stageOutfits.map(([h,s,p,l],i) =>
   + '<div style="font:12px sans-serif;color:#ccc;">'+l+'</div></div>').join('');
 const small = golferPreviewSVG('tophat-ace','tee-striped','trousers-classic',{skin:'#e6b98a',shirtBase:'#c65a4a',capColor:'#ff6b4a',uid:'sm',w:66,h:88});
 const golfers = [
-  {id:'a',shortName:'Fade',capColor:'#d8a24a',hatId:'cap-classic',shirtId:'polo-classic',pantsId:'trousers-classic',skin:'#f0c49a',shirtBase:'#3f7fd0'},
-  {id:'b',shortName:'Hook',capColor:'#5fd6ff',hatId:'crown-supernova',shirtId:'suit-supernova',pantsId:'leggings-supernova',skin:'#c98a5a',shirtBase:'#9b6fd4'},
-  {id:'c',shortName:'Draw',capColor:'#5fd45a',hatId:'helmet-astro',shirtId:'suit-space',pantsId:'pants-astro',skin:'#e6b98a',shirtBase:'#4fae8a'},
-  {id:'d',shortName:'Punch',capColor:'#ff6b4a',hatId:undefined,shirtId:'tee-striped',pantsId:undefined,skin:'#a8683f',shirtBase:'#c65a4a'},
+  {id:'a',shortName:'Fade',capColor:'#d8a24a',hatId:'cap-classic',shirtId:'polo-classic',pantsId:'trousers-classic',shipId:'wagon-classic',skin:'#f0c49a',shirtBase:'#3f7fd0'},
+  {id:'b',shortName:'Hook',capColor:'#5fd6ff',hatId:'crown-supernova',shirtId:'suit-supernova',pantsId:'leggings-supernova',shipId:'ufo-mothership',skin:'#c98a5a',shirtBase:'#9b6fd4'},
+  {id:'c',shortName:'Draw',capColor:'#5fd45a',hatId:'helmet-astro',shirtId:'suit-space',pantsId:'pants-astro',shipId:'racer-nebula',skin:'#e6b98a',shirtBase:'#4fae8a'},
+  {id:'d',shortName:'Punch',capColor:'#ff6b4a',hatId:undefined,shirtId:'tee-striped',pantsId:undefined,shipId:'moto-nitro',skin:'#a8683f',shirtBase:'#c65a4a'},
 ];
 document.body.innerHTML =
   '<h2 style="font-family:sans-serif;color:#eee">Stage figures (h=210)</h2>' +
