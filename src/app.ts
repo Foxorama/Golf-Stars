@@ -2233,32 +2233,66 @@ function navTilesHTML(): string {
     </div>`;
 }
 
-/** Painted backdrop for the Trade Market tile: a cosmic bazaar — nebula sky, scattered stars, a couple
- *  of planets and a little rocket making a delivery. Hand-placed (no rng) so it stays byte-stable. */
+/** Painted backdrop for the Trade Market tile: an orbital trading post — a teal-lit docking ring
+ *  around a modular hub with warm market windows, stacked cargo crates for wares, and a shuttle
+ *  ferrying a crate in. Teal/amber scheme keeps it clearly apart from the violet Unending Universe
+ *  doorway. Hand-placed (no rng) so it stays byte-stable. */
 function marketTileArt(): string {
   const stars = [
     [14, 18], [34, 40], [58, 22], [86, 52], [110, 30], [140, 16], [168, 46],
-    [196, 26], [220, 58], [248, 20], [272, 44], [40, 70], [128, 64], [210, 12],
+    [196, 26], [220, 20], [248, 20], [272, 44], [40, 70], [128, 64], [96, 12],
   ]
-    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${1 + (i % 3) * 0.5}" fill="#ffffff" opacity="${0.45 + (i % 4) * 0.12}"/>`)
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${1 + (i % 3) * 0.5}" fill="#dff7f2" opacity="${0.4 + (i % 4) * 0.12}"/>`)
+    .join('');
+  // A stack of traded cargo containers — the wares of the space bazaar.
+  const crate = (x: number, y: number, w: number, h: number, fill: string) =>
+    `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="${fill}"/>` +
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="none" stroke="#00000033" stroke-width="1"/>` +
+    `<line x1="${x + w * 0.5}" y1="${y}" x2="${x + w * 0.5}" y2="${y + h}" stroke="#00000022" stroke-width="1"/></g>`;
+  const cargo =
+    crate(28, 92, 27, 16, '#e0a53e') +
+    crate(57, 96, 22, 12, '#2f8f8a') +
+    crate(33, 78, 21, 13, '#c98a6a') +
+    crate(56, 84, 16, 11, '#e0a53e');
+  // Warm market windows glowing on the station hub.
+  const windows = [
+    [197, 54], [206, 54], [215, 54], [224, 54],
+    [197, 63], [206, 63], [215, 63], [224, 63],
+  ]
+    .map(([x, y]) => `<rect x="${x}" y="${y}" width="4" height="4" rx="0.6" fill="#ffd27a" opacity="0.92"/>`)
     .join('');
   return `<svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
     <defs>
-      <radialGradient id="ntMkt" cx="32%" cy="30%" r="90%">
-        <stop offset="0%" stop-color="#3a2350"/><stop offset="55%" stop-color="#1d1538"/><stop offset="100%" stop-color="#0c0a1c"/>
+      <radialGradient id="ntMkt" cx="66%" cy="30%" r="98%">
+        <stop offset="0%" stop-color="#17585c"/><stop offset="52%" stop-color="#0d2b38"/><stop offset="100%" stop-color="#06121c"/>
+      </radialGradient>
+      <radialGradient id="ntMktGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffd98a" stop-opacity="0.5"/><stop offset="100%" stop-color="#ffd98a" stop-opacity="0"/>
       </radialGradient>
     </defs>
     <rect width="300" height="120" fill="url(#ntMkt)"/>
     ${stars}
-    <circle cx="232" cy="86" r="30" fill="#e08a2b" opacity="0.85"/>
-    <circle cx="222" cy="78" r="30" fill="#f0b15e" opacity="0.6"/>
-    <circle cx="60" cy="98" r="16" fill="#7a6bd8" opacity="0.8"/>
-    <g transform="translate(120,52) rotate(20)">
-      <path d="M0,-13 C7,-9 7,9 0,15 C-7,9 -7,-9 0,-13 Z" fill="#dfe6f2"/>
-      <circle cx="0" cy="-2" r="3.4" fill="#9fd8e6"/>
-      <path d="M-6,8 L-12,16 L-3,12 Z" fill="#ff6b6b"/>
-      <path d="M6,8 L12,16 L3,12 Z" fill="#ff6b6b"/>
-      <path d="M-2.6,15 L0,25 L2.6,15 Z" fill="#ffc454" opacity="0.9"/>
+    <!-- orbital trade station: a docking ring circling a modular hub with lit market windows -->
+    <g>
+      <circle cx="212" cy="56" r="30" fill="url(#ntMktGlow)"/>
+      <ellipse cx="212" cy="56" rx="48" ry="19" fill="none" stroke="#39d9c4" stroke-width="3.4" opacity="0.42"/>
+      <ellipse cx="212" cy="56" rx="48" ry="19" fill="none" stroke="#7ff0e0" stroke-width="1.2" opacity="0.6"/>
+      <circle cx="164" cy="56" r="3.4" fill="#39d9c4" opacity="0.85"/>
+      <circle cx="260" cy="56" r="3.4" fill="#39d9c4" opacity="0.85"/>
+      <rect x="192" y="42" width="40" height="30" rx="7" fill="#28454d"/>
+      <rect x="192" y="42" width="40" height="9" rx="7" fill="#35636d"/>
+      ${windows}
+      <rect x="211" y="30" width="2" height="12" fill="#5c7a80"/>
+      <circle cx="212" cy="29" r="2.4" fill="#ff8f5e"/>
+    </g>
+    ${cargo}
+    <!-- a shuttle ferrying a crate in toward the market -->
+    <g transform="translate(118,44) rotate(18)">
+      <path d="M0,-12 C6,-8 6,8 0,14 C-6,8 -6,-8 0,-12 Z" fill="#dfe6f2"/>
+      <circle cx="0" cy="-2" r="3.1" fill="#8fe6da"/>
+      <path d="M-6,7 L-11,15 L-3,11 Z" fill="#39d9c4"/>
+      <path d="M6,7 L11,15 L3,11 Z" fill="#39d9c4"/>
+      <rect x="-4" y="14" width="8" height="6" rx="1" fill="#e0a53e"/>
     </g>
   </svg>`;
 }

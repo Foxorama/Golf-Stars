@@ -110,6 +110,15 @@ First-device feedback on GS-settings-nav reshaped the title:
   milestone trail's home is the Trade Market's earned gear. The build test now clicks the tile by
   its format name ("The Voyage") and uses the title-only "Choose your game" seclabel as its
   not-on-title sentinel.
+- **Trade Market gets its own teal/amber identity (2026-07).** Device feedback: the Trade Market
+  doorway (violet `--mc` + a purple nebula with planets) read as a near-twin of the Unending Universe
+  game tile directly above it (also violet, also a nebula-with-core scene). Fixed by giving the Market
+  a distinct scheme with NO shared motif: `--mc` moved orchid `#d98cff` → trade-teal `#39d9c4`, and
+  `marketTileArt()` was repainted from "nebula + planets + rocket" to a warm-lit ORBITAL TRADING POST
+  — a teal docking ring circling a modular hub with amber market windows + a beacon, a stack of cargo
+  crates for wares, and a shuttle ferrying a crate in (teal deep-space gradient, not violet). Still
+  hand-placed/no-rng so the tile stays byte-stable. Unending keeps the violet star-tunnel-to-a-core;
+  the two now differ in both hue and subject.
 - **Hero header**: centred wordmark (green/gold glow) + small-caps tagline + a chips row (shards /
   aces / bests / install). Sections are labelled by `.gs-seclabel` rules ("Choose your game" — the
   build test asserts this string — and "Between runs" over the Market/Clubhouse doorways).
