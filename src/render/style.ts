@@ -3792,7 +3792,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // COURSE space (projected) so they sit on the ground and track the follow-cam — the fix for the old
   // screen-space caravan that floated in mid-air over the controls / the flight. Pure (no rng); off the
   // road under Rainbow Road (they'd be in the OOB void).
-  if (opts.tradeTents && !rainbow) prims.push(...styleTents(tradeTentsFor(hole), proj));
+  // Tents live on ONE stamped hole of the stop (GS-tent-interactions) — draw only when this hole carries them.
+  if (opts.tradeTents && !rainbow && hole.tents) prims.push(...styleTents(tradeTentsFor(hole), proj));
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);

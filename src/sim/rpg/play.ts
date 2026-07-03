@@ -317,6 +317,9 @@ export interface ScrambleShot {
   /** Distance from the resting ball to the pin, for the choice card (player / partner). */
   playerDistToPin: number;
   partnerDistToPin: number;
+  /** True when this "two balls" is a fortune-teller MULLIGAN (GS-tent-interactions), not a team
+   *  scramble — both balls are the player's OWN swing, so the choice card labels them "Tee shot A/B". */
+  mulligan?: boolean;
 }
 
 /**

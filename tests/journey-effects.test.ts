@@ -24,6 +24,29 @@ describe('route difficulty (GS-journey-fx)', () => {
   });
 });
 
+describe('trade-market tents on ONE hole (GS-tent-interactions)', () => {
+  it('stamps tents on exactly one hole of a trade-market stop, and none otherwise', () => {
+    const base = startRun(31, 'voyage');
+    expect(routeEffect(ev({ id: 'trade-market' }))).toBe('tradeMarket'); // the event we craft maps to tents
+    const trade = currentCourse({ ...base, pendingEvent: ev({ id: 'trade-market', category: 'payout', cutDelta: 0 }) });
+    const armed = trade.holes.filter((h) => h.tents).length;
+    expect(armed).toBe(1); // one surprise hole, not the whole stop
+    // A non-trade effect (and no event) never stamps a tent hole.
+    const aurora = currentCourse({ ...base, pendingEvent: ev({ id: 'plain-payout', category: 'payout', cutDelta: 0 }) });
+    expect(aurora.holes.some((h) => h.tents)).toBe(false);
+    expect(currentCourse(base).holes.some((h) => h.tents)).toBe(false);
+  });
+
+  it('the armed hole is deterministic (a resume reproduces it)', () => {
+    const base = startRun(77, 'voyage');
+    const run = { ...base, pendingEvent: ev({ id: 'bazaar', category: 'payout', cutDelta: 0 }) };
+    const a = currentCourse(run).holes.map((h) => !!h.tents);
+    const b = currentCourse(run).holes.map((h) => !!h.tents);
+    expect(a).toEqual(b);
+    expect(a.filter(Boolean)).toHaveLength(1);
+  });
+});
+
 describe('route effect mapping (GS-journey-fx)', () => {
   it('open space brings no effect', () => {
     expect(routeEffect(DEFAULT_EVENT)).toBe('none');

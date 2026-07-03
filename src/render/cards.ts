@@ -174,6 +174,10 @@ export interface ItemCardState {
   badge?: { text: string; tone?: 'up' | 'new' };
   /** Procedural item art (GS-proshop-2): an `<svg>` string shown atop the card (the gear you buy). */
   artSVG?: string;
+  /** Override the price footer (GS-tent-interactions): the StarMart prices in SHARDS, not credits, so
+   *  it passes e.g. `'10 ⭐'` and `'NEED SHARDS'` instead of the default credits labels. */
+  costLabel?: string;
+  unaffordableNote?: string;
 }
 
 /**
@@ -198,7 +202,11 @@ export function itemCardHTML(
 ): string {
   const col = rarCol(item.rarity);
   const dim = state.owned || state.affordable === false;
-  const note = state.owned ? 'MAXED' : state.affordable === false ? 'NEED CREDITS' : `${item.cost}c`;
+  const note = state.owned
+    ? 'MAXED'
+    : state.affordable === false
+    ? state.unaffordableNote ?? 'NEED CREDITS'
+    : state.costLabel ?? `${item.cost}c`;
   const stackBadge =
     state.count && state.count > 0
       ? `<span style="margin-left:6px;font-size:11px;color:${col};opacity:.85;">×${state.count}</span>`

@@ -7,8 +7,11 @@ import {
   tradeTents,
   tentFlightHit,
   tentReflect,
+  assignTentEffects,
   TENT_COUNT,
   TENT_ROOF_H,
+  TENT_EFFECTS,
+  TENT_LINES,
   type TradeTent,
 } from '../src/sim/tents';
 import { dist, type Vec } from '../src/sim/course/contract';
@@ -50,7 +53,7 @@ describe('trade-camp tents (GS-tents)', () => {
 
   it('a low shot into a tent is knocked down + reflected; a high one clears', () => {
     // A synthetic tent straight ahead, ridge across the line so it bounces back.
-    const tent: TradeTent = { c: [0, 50], r: 6, ridge: [1, 0], out: [0, 1], roofH: TENT_ROOF_H, hue: 0 };
+    const tent: TradeTent = { c: [0, 50], r: 6, ridge: [1, 0], out: [0, 1], roofH: TENT_ROOF_H, hue: 0, effect: 'ow' };
     const from: Vec = [0, 0];
     const landing: Vec = [0, 80]; // dead ahead, through the tent
     // A flat long club (driver, nominal ~250) flies low → clips the tent.
@@ -65,16 +68,18 @@ describe('trade-camp tents (GS-tents)', () => {
   it('reflect bounces a ball back off the far (green-facing) slope', () => {
     // A back tent: out points away from the green (+y). A ball travelling +y (away from green) that
     // hits the green-facing (−y) slope should be sent back toward the green (−y component).
-    const tent: TradeTent = { c: [0, 60], r: 6, ridge: [1, 0], out: [0, 1], roofH: TENT_ROOF_H, hue: 0 };
+    const tent: TradeTent = { c: [0, 60], r: 6, ridge: [1, 0], out: [0, 1], roofH: TENT_ROOF_H, hue: 0, effect: 'ow' };
     const impact: Vec = [0, 55]; // on the green-facing side of the ridge (below c in y)
     const d = tentReflect(tent, impact, [0, 1]); // ball moving away from green
     expect(d[1]).toBeLessThan(0); // bounced back toward the green
   });
 
-  it('NEVER adds a penalty stroke (tents are non-penalty)', () => {
+  it('is non-penalty for every tent EXCEPT the marmot, which is a lost ball (GS-tent-interactions)', () => {
     let tentShots = 0;
+    let marmotShots = 0;
     for (let seed = 0; seed < 30; seed++) {
-      const hole = generateCourse(seed + 200, { biome: 'verdant-station', wildness: 0.7 }).holes[0]!;
+      // Tents build only on a stamped hole (GS-tent-interactions) — arm this one.
+      const hole = { ...generateCourse(seed + 200, { biome: 'verdant-station', wildness: 0.7 }).holes[0]!, tents: true };
       const opts: ExecOpts = { carryMult: 1, bag: CLUBS, tradeTents: true } as ExecOpts;
       const rng = new Rng(`t:${seed}`);
       // Fire a bunch of shots from random-ish spots near the green at the pin.
@@ -84,12 +89,47 @@ describe('trade-camp tents (GS-tents)', () => {
         const ex = executeShot(hole, near, 'fairway', hole.green, club, opts, rng);
         if (ex.log.tentHit) {
           tentShots++;
-          expect(ex.penaltyStrokes).toBe(0);
-          expect(ex.log.penalty).toBeUndefined();
+          if (ex.log.tentHit.effect === 'marmot') {
+            // The marmot pockets the ball → lost ball (stroke-and-distance from the shot origin).
+            marmotShots++;
+            expect(ex.penaltyStrokes).toBe(1);
+            expect(ex.log.penalty).toBe('lost');
+            expect(ex.ballAfter).toEqual(near);
+          } else {
+            expect(ex.penaltyStrokes).toBe(0);
+            expect(ex.log.penalty).toBeUndefined();
+          }
         }
       }
     }
     expect(tentShots).toBeGreaterThan(0); // the mechanic actually fires across these seeds
+    expect(marmotShots).toBeGreaterThan(0); // and the marmot's lost-ball path is exercised
+  });
+
+  it('an unstamped hole builds NO tents (tents live on one hole of the stop)', () => {
+    const hole = generateCourse(200, { biome: 'verdant-station', wildness: 0.7 }).holes[0]!; // no tents flag
+    const opts: ExecOpts = { carryMult: 1, bag: CLUBS, tradeTents: true } as ExecOpts;
+    const rng = new Rng('unstamped');
+    const near: Vec = [hole.green[0] + 20, hole.green[1] - 80];
+    for (let s = 0; s < 12; s++) {
+      const club = CLUBS[Math.floor((s / 12) * CLUBS.length)] ?? CLUBS[0]!;
+      const ex = executeShot(hole, near, 'fairway', hole.green, club, opts, rng);
+      expect(ex.log.tentHit).toBeUndefined();
+    }
+  });
+
+  it('assignTentEffects deals all five effects, is deterministic, and scrambles colour→effect per hole', () => {
+    const a = generateCourse(11, { biome: 'verdant-station', holes: 4, wildness: 0.6 }).holes;
+    const e0 = assignTentEffects(a[0]!);
+    expect(e0).toHaveLength(TENT_COUNT);
+    expect(new Set(e0)).toEqual(new Set(TENT_EFFECTS)); // one of each of the five
+    expect(assignTentEffects(a[0]!)).toEqual(e0); // deterministic (pure)
+    // Different holes generally deal a different colour→effect order (not all identical).
+    const orders = a.map((h) => assignTentEffects(h).join(','));
+    expect(new Set(orders).size).toBeGreaterThan(1);
+    // Every tent carries its assigned effect + a bubble line.
+    const tents = tradeTents(a[0]!);
+    for (const t of tents) expect(TENT_LINES[t.effect]).toBeTruthy();
   });
 
   it('does NOT death-spiral with tents armed (the fairness bar holds)', () => {
@@ -100,7 +140,9 @@ describe('trade-camp tents (GS-tents)', () => {
     for (const biome of BIOMES) {
       for (let seed = 0; seed < 20; seed++) {
         const course = generateCourse(seed + 800, { biome, holes: 3, wildness: 1 });
-        const played = playCourse(course.holes, new Rng(`${biome}:${seed}:p`), { tradeTents: true });
+        // Arm tents on every hole (a worst-case bound; in play only one hole carries them).
+        const armed = course.holes.map((h) => ({ ...h, tents: true }));
+        const played = playCourse(armed, new Rng(`${biome}:${seed}:p`), { tradeTents: true });
         for (const p of played) {
           strokes += p.record.strokes;
           par += p.record.par;

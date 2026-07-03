@@ -265,21 +265,45 @@ export function currentCourse(run: Run): Course {
   // back holes a different theme of the same arc. Each half is generated independently and stitched,
   // every hole stamped with its own biome/themeId so it renders + plays as its world.
   if (spec.splitBiome && spec.holes >= 2) {
-    return applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect);
+    return armTentHole(applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect), effect);
   }
-  return applyEffectPhysics(
-    generateCourse(stopSeed(run), {
-      holes: spec.holes,
-      parCap: spec.parCap,
-      distanceFromStart: run.distanceFromStart,
-      // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
-      biomeRow: resolveBiome(theme),
-      themeId: theme.id,
-      wildnessBoost,
+  return armTentHole(
+    applyEffectPhysics(
+      generateCourse(stopSeed(run), {
+        holes: spec.holes,
+        parCap: spec.parCap,
+        distanceFromStart: run.distanceFromStart,
+        // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
+        biomeRow: resolveBiome(theme),
+        themeId: theme.id,
+        wildnessBoost,
+        effect,
+      }),
       effect,
-    }),
+    ),
     effect,
   );
+}
+
+/**
+ * Pitch the trade-market tent ring on exactly ONE hole of the stop (GS-tent-interactions). The
+ * tradeMarket route used to arm collidable tents around EVERY green — a novelty that wore thin over a
+ * full stop and turned the whole world into a bounce-house. Now it's a single surprise hole: pick the
+ * index deterministically from the course seed (a pure hash — no rng draw, so the generated course is
+ * byte-for-byte unchanged) and stamp `tents:true` on that hole only. A non-tradeMarket effect returns
+ * the course untouched. Both the headless sim and the interactive driver read this one stamp, so they
+ * agree on which hole carries the market.
+ */
+function armTentHole(course: Course, effect: string): Course {
+  if (effect !== 'tradeMarket' || course.holes.length === 0) return course;
+  let h = 2166136261;
+  const s = `${course.seed}:tenthole`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const idx = (h >>> 0) % course.holes.length;
+  return { ...course, holes: course.holes.map((hole, i) => (i === idx ? { ...hole, tents: true } : hole)) };
 }
 
 /**
@@ -1112,6 +1136,59 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
     const owned = ownedCount(perks, item.id);
     return { item, cost: itemCost(item, owned), owned };
   });
+}
+
+// --- StarMart: the trade-tent pop-up shop (GS-tent-interactions) -------------
+// One of the five trade tents opens a StarMart window mid-hole — a shop that spends cross-run STAR
+// SHARDS instead of run credits. It stocks only the good stuff (NO commons) and skews epic/legendary,
+// at a flat shard price per rarity. Items last the run like any Pro-Shop buy (they round-trip through
+// `loadout.perks`), so no save bump. The offer is a pure, seeded, resume-stable draw off the run + stop.
+
+/** How many cards the StarMart window shows. */
+export const STARMART_OFFER_SIZE = 4;
+/** Flat StarMart shard price by rarity — blue 5, purple 10, orange 15 (commons never appear). */
+export const STARMART_COST: Record<Rarity, number> = { common: 0, rare: 5, epic: 10, legendary: 15 };
+/** Rarity draw boost for the StarMart — counteracts the catalogue's base scarcity so epic/legendary
+ *  show up far more than in the credit Pro Shop (the "epic & legendary have a higher chance" ask). */
+const STARMART_RARITY_BOOST: Record<Rarity, number> = { common: 0, rare: 1, epic: 5, legendary: 8 };
+/** Shard cost of the next StarMart reroll (a gentle ramp). */
+export function starmartRerollCost(rerolls: number): number {
+  return 3 + Math.max(0, rerolls) * 2;
+}
+
+export interface ShardShopOffer {
+  item: ShopItem;
+  /** Price in STAR SHARDS (by rarity). */
+  cost: number;
+}
+
+/**
+ * The StarMart window's stock for the current stop (GS-tent-interactions): a seeded, rarity-weighted
+ * draw over the Pro-Shop catalogue + reward clubs, with COMMONS excluded and epic/legendary boosted.
+ * Priced in shards by rarity. Deterministic from the run seed + stop (a resume/re-open reproduces it);
+ * a reroll salts the seed. Owned/maxed items and gated caddies drop out exactly like `shopOffer`.
+ */
+export function starmartOffer(run: Run, size = STARMART_OFFER_SIZE, salt = 0): ShardShopOffer[] {
+  const perks = run.loadout.perks;
+  const hasCaddy = !!namedCaddyOwned(perks);
+  const ownsDriver = run.loadout.bag.some((c) => c.id === DRIVER_ID);
+  const gear = SHOP_ITEMS.filter(
+    (it) =>
+      it.rarity !== 'common' &&
+      ownedCount(perks, it.id) < itemCap(it) &&
+      (!it.prereq || perks.includes(it.prereq)) &&
+      (it.caddy !== 'named' || !hasCaddy) &&
+      (it.caddy !== 'service' || hasCaddy) &&
+      (it.id !== 'driver-dan' || ownsDriver),
+  );
+  const clubs = offerableClubs(run.loadout).filter((c) => c.rarity !== 'common');
+  const pool = [...gear, ...clubs];
+  const rng = new Rng(salt ? `${run.seed}:starmart:${run.stopIndex}:r${salt}` : `${run.seed}:starmart:${run.stopIndex}`);
+  const weight = (it: ShopItem) => STARMART_RARITY_BOOST[it.rarity];
+  return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => ({
+    item,
+    cost: STARMART_COST[item.rarity],
+  }));
 }
 
 /** Voluntarily bank the run (cash out) — ends it with reason 'banked'. */

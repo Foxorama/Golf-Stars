@@ -31,6 +31,9 @@ import {
   travel,
   bossRewards,
   grantTalent,
+  starmartOffer,
+  starmartRerollCost,
+  STARMART_COST,
   type BossReward,
   type Route,
   type Run,
@@ -58,7 +61,8 @@ import { bagSet, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg
 import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlock';
 import { canBuyShip, shipById, aceShipUnlock, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
-import { getCharacter } from '../sim/rpg/characters';
+import { getCharacter, characterShotMods } from '../sim/rpg/characters';
+import { shopItem, ownedCount, itemCap } from '../sim/rpg/economy';
 import { playHole } from '../sim/round';
 import {
   autoDecision,
@@ -88,7 +92,8 @@ export type Screen =
   | 'gameover'
   | 'trademarket'
   | 'clubhouseHall'
-  | 'clubhouse';
+  | 'clubhouse'
+  | 'starmart';
 
 export interface UiState {
   run: Run;
@@ -156,8 +161,17 @@ export interface UiState {
   manageCharacterId?: string;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
   match?: MatchUi;
-  /** A pending interactive SCRAMBLE shot (GS-team-duel) awaiting the player's ball choice. */
+  /** A pending interactive SCRAMBLE shot (GS-team-duel) — or a fortune-teller MULLIGAN (GS-tent-
+   *  interactions, `mulligan` flag) — awaiting the player's ball choice. */
   scrambleChoice?: ScrambleShot;
+  /** A fortune-teller tent granted a free mulligan (GS-tent-interactions): the NEXT tee shot resolves
+   *  two of the player's own balls and they keep the better line. Consumed on that tee shot. */
+  mulliganPending?: boolean;
+  /** A StarMart tent's pop-up shop (GS-tent-interactions): the item ids on offer (spend shards). Set
+   *  when the shop opens mid-hole; cleared on leave. */
+  starmartOffer?: string[];
+  /** StarMart reroll count this visit (shard cost ramps). */
+  starmartRerolls?: number;
   /** Boss-reward choices to pick from after beating a boss (GS-talents) — shown on the bossReward screen. */
   bossReward?: BossReward[];
   /** Per-character ascension-victory club unlocks (GS-ascension-clubs): each golfer's permanently-unlocked
@@ -172,6 +186,9 @@ export interface UiState {
   /** Most holes ever survived in one Unending-Universe run (GS-unending) — persisted; the key the
    *  Evergreen cosmetic unlocks + the title-card progress read. */
   endlessBestHoles: number;
+  /** The Marmot Bartender clubhouse unlock (GS-tent-interactions) — persisted; set the first time a
+   *  ball bonks the marmot trade-tent, after which a marmot tends the 19th-hole bar. */
+  marmotBartender: boolean;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -210,6 +227,10 @@ export type Action =
   | { type: 'buy'; id: string }
   | { type: 'rerollShop' } // pay credits to redraw the outfitter's stock (GS-shop-reroll)
   | { type: 'leaveShop' }
+  | { type: 'openStarmart' } // a StarMart tent's pop-up shop opens mid-hole (GS-tent-interactions)
+  | { type: 'buyStarmart'; id: string } // buy a StarMart item with shards
+  | { type: 'rerollStarmart' } // pay shards to redraw the StarMart rack
+  | { type: 'leaveStarmart' } // close the StarMart and keep playing the hole
   | { type: 'route'; routeId: number }
   | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
   | { type: 'viewHole'; hole: number }
@@ -247,6 +268,7 @@ export interface MetaProgress {
   unlockedClubsByCharacter?: Record<string, string[]>;
   clubhouseVisit?: number;
   endlessBestHoles?: number;
+  marmotBartender?: boolean;
 }
 
 /** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
@@ -332,6 +354,7 @@ export function initState(
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
     clubhouseVisit: meta.clubhouseVisit ?? 0,
     endlessBestHoles: meta.endlessBestHoles ?? 0,
+    marmotBartender: meta.marmotBartender ?? false,
   };
 }
 
@@ -376,6 +399,25 @@ function withBestBallPartner(state: UiState, play: HolePlay): { play: HolePlay; 
     play,
     match: { ...state.match, partnerHoles: [...(state.match.partnerHoles ?? []), partnerHole] },
   };
+}
+
+/**
+ * Fire a struck trade-tent's non-shot REACTION (GS-tent-interactions) after a shot resolves. The
+ * SHOT itself (the ricochet, and the marmot's lost ball) is already resolved in the shared physics, so
+ * auto ≡ interactive holds; these are the interactive-only META reactions, layered on like the ace /
+ * unlock side-effects:
+ *   • marmot   → the first-ever bonk unlocks the persistent Marmot Bartender (clubhouse cosmetic);
+ *   • fortune  → grant a free mulligan for the NEXT tee shot;
+ *   • starmart → opening the pop-up shop is deferred to AFTER the shot animation (app-layer `onDone`),
+ *                so it isn't handled here.
+ * `ow`/`watch` are pure flavour (the bubble + voice), so no state change. Reads the LAST shot only.
+ */
+function applyTentReactions(state: UiState, play: HolePlay): UiState {
+  const effect = play.shots[play.shots.length - 1]?.tentHit?.effect;
+  if (!effect) return state;
+  if (effect === 'marmot' && !state.marmotBartender) return { ...state, marmotBartender: true };
+  if (effect === 'fortune') return { ...state, mulliganPending: true };
+  return state;
 }
 
 /** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
@@ -625,6 +667,10 @@ export function reduce(state: UiState, action: Action): UiState {
         stopPlayed: [],
         play: beginHole(state.course.holes[0]!, 0),
         match,
+        // A tent mulligan/StarMart never carries across a stop boundary (GS-tent-interactions).
+        mulliganPending: undefined,
+        starmartOffer: undefined,
+        starmartRerolls: undefined,
       };
     }
 
@@ -654,6 +700,22 @@ export function reduce(state: UiState, action: Action): UiState {
         );
         return { ...state, scrambleChoice };
       }
+      // Fortune-teller MULLIGAN (GS-tent-interactions): a granted mulligan is spent on the NEXT tee shot
+      // — resolve TWO of the player's OWN tee shots (both with the player's swing mods) and let them keep
+      // the better line, reusing the scramble pick machinery. Consumes the pending mulligan.
+      if (state.mulliganPending && state.play.lie === 'tee' && state.play.shots.length === 0) {
+        const two = resolveScrambleShot(
+          state.play,
+          { clubId: action.clubId, aim: action.aim, target: action.target, power: action.power },
+          state.run.loadout,
+          state.holeRng,
+          characterShotMods(state.run.loadout.characterId),
+          tents,
+          scorch,
+          patch,
+        );
+        return { ...state, scrambleChoice: { ...two, mulligan: true }, mulliganPending: false };
+      }
       // Auto putt-out only when the Auto-Caddie legendary is owned; otherwise putting is manual.
       const auto = !!state.run.loadout.autoPutt;
       const play = takeShot(
@@ -667,14 +729,14 @@ export function reduce(state: UiState, action: Action): UiState {
         scorch,
         patch,
       );
-      return { ...state, ...withBestBallPartner(state, play) };
+      return applyTentReactions({ ...state, ...withBestBallPartner(state, play) }, play);
     }
 
     case 'chooseScrambleBall': {
       if (state.screen !== 'playing' || !state.scrambleChoice || !state.holeRng) return state;
       const auto = !!state.run.loadout.autoPutt;
       const play = commitScrambleBall(state.scrambleChoice, action.pick, state.run.loadout, state.holeRng, auto);
-      return { ...state, play, scrambleChoice: undefined };
+      return applyTentReactions({ ...state, play, scrambleChoice: undefined }, play);
     }
 
     case 'putt': {
@@ -851,6 +913,56 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'leaveShop': {
       if (state.screen !== 'shop') return state;
       return { ...state, screen: 'travel', routes: routeOptions(state.run), shopOffer: undefined };
+    }
+
+    // --- StarMart pop-up shop (GS-tent-interactions): spend SHARDS mid-hole ------------------------
+    case 'openStarmart': {
+      // Opened from the play screen the moment a StarMart tent's shot finishes animating (app `onDone`).
+      if (state.screen !== 'playing') return state;
+      return {
+        ...state,
+        screen: 'starmart',
+        starmartOffer: starmartOffer(state.run).map((o) => o.item.id),
+        starmartRerolls: 0,
+      };
+    }
+
+    case 'buyStarmart': {
+      if (state.screen !== 'starmart' || !state.starmartOffer) return state;
+      const item = shopItem(action.id);
+      if (!item || item.rarity === 'common') return state;
+      const cost = STARMART_COST[item.rarity];
+      const owned = ownedCount(state.run.loadout.perks, action.id);
+      // Guard affordability + not-already-maxed; spend SHARDS (cross-run) and apply the item to the run
+      // loadout (it round-trips via loadout.perks, so it lasts the run with no save bump). Pull the
+      // bought card off the rack so it can't be re-bought.
+      if (owned >= itemCap(item) || state.shards < cost) return state;
+      return {
+        ...state,
+        shards: state.shards - cost,
+        run: { ...state.run, loadout: item.apply(state.run.loadout) },
+        starmartOffer: state.starmartOffer.filter((id) => id !== action.id),
+      };
+    }
+
+    case 'rerollStarmart': {
+      if (state.screen !== 'starmart') return state;
+      const rerolls = state.starmartRerolls ?? 0;
+      const cost = starmartRerollCost(rerolls);
+      if (state.shards < cost) return state;
+      const next = rerolls + 1;
+      return {
+        ...state,
+        shards: state.shards - cost,
+        starmartRerolls: next,
+        starmartOffer: starmartOffer(state.run, undefined, next).map((o) => o.item.id),
+      };
+    }
+
+    case 'leaveStarmart': {
+      if (state.screen !== 'starmart') return state;
+      // Back to the hole — keep playing from where the ball came to rest.
+      return { ...state, screen: 'playing', starmartOffer: undefined, starmartRerolls: undefined };
     }
 
     case 'route': {
@@ -1073,6 +1185,7 @@ export function reduce(state: UiState, action: Action): UiState {
           unlockedClubsByCharacter: state.unlockedClubsByCharacter,
           clubhouseVisit: state.clubhouseVisit,
           endlessBestHoles: state.endlessBestHoles,
+          marmotBartender: state.marmotBartender,
         },
         state.resumable,
       );

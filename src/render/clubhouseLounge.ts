@@ -160,6 +160,59 @@ function hungGlass(x: number): string {
     <path d="M${x - 3.6},127 Q${x - 3.8},133 ${x},133.8 Q${x + 3.8},133 ${x + 3.6},127 Z" fill="#cfe0ef" opacity="0.7"/>`;
 }
 
+/**
+ * The Marmot Bartender (GS-tent-interactions), earned the first time a ball bonks a marmot trade-tent.
+ * A plump marmot in a bow tie tends the 19th-hole bar — drawn BEHIND the counter (before the worktop),
+ * so the counter front occludes its belly and only its head, ears and little paws show over the bar.
+ * Centred around x≈333, resting on the back-bar side of the counter (worktop top y=144).
+ */
+function marmotBartender(): string {
+  const x = 333;
+  return `<g>
+    <!-- shoulders / bow-tie vest peeking over the bar -->
+    <path d="M${x - 15},150 Q${x},131 ${x + 15},150 Z" fill="#7a4e2c"/>
+    <path d="M${x - 12},150 Q${x},137 ${x + 12},150 Z" fill="#3b2a1a"/>
+    <path d="M${x - 3.4},142 L${x},145 L${x + 3.4},142 L${x + 2.6},147 L${x - 2.6},147 Z" fill="#c0392b"/>
+    <circle cx="${x}" cy="144.4" r="1.1" fill="#8a2018"/>
+    <!-- head -->
+    <ellipse cx="${x}" cy="126" rx="11.5" ry="10.5" fill="#8a5a34"/>
+    <ellipse cx="${x - 6}" cy="115.5" rx="3.4" ry="3.8" fill="#8a5a34"/>
+    <ellipse cx="${x + 6}" cy="115.5" rx="3.4" ry="3.8" fill="#8a5a34"/>
+    <ellipse cx="${x - 6}" cy="116" rx="1.6" ry="2" fill="#5f3c20"/>
+    <ellipse cx="${x + 6}" cy="116" rx="1.6" ry="2" fill="#5f3c20"/>
+    <!-- muzzle + cheeks -->
+    <ellipse cx="${x}" cy="130" rx="7" ry="5.4" fill="#c79a68"/>
+    <ellipse cx="${x}" cy="128.4" rx="2" ry="1.5" fill="#2a1a10"/>
+    <path d="M${x},130 L${x},132.4" stroke="#2a1a10" stroke-width="1"/>
+    <path d="M${x - 3.2},133.4 Q${x},135 ${x + 3.2},133.4" fill="none" stroke="#2a1a10" stroke-width="1" stroke-linecap="round"/>
+    <!-- eyes -->
+    <circle cx="${x - 4.4}" cy="123.6" r="1.7" fill="#1a120b"/>
+    <circle cx="${x + 4.4}" cy="123.6" r="1.7" fill="#1a120b"/>
+    <circle cx="${x - 3.9}" cy="123.1" r="0.6" fill="#fff" opacity="0.85"/>
+    <circle cx="${x + 4.9}" cy="123.1" r="0.6" fill="#fff" opacity="0.85"/>
+    <!-- two little front teeth -->
+    <rect x="${x - 1.6}" y="132.6" width="1.4" height="2" rx="0.4" fill="#fff"/>
+    <rect x="${x + 0.2}" y="132.6" width="1.4" height="2" rx="0.4" fill="#fff"/>
+    <!-- paws resting on the bar + a cocktail shaker -->
+    <ellipse cx="${x - 9.5}" cy="143" rx="2.6" ry="1.8" fill="#7a4e2c"/>
+    <ellipse cx="${x + 9.5}" cy="143" rx="2.6" ry="1.8" fill="#7a4e2c"/>
+    <rect x="${x + 11}" y="134" width="5" height="9" rx="1.4" fill="#cfd6de" stroke="#8a9099" stroke-width="0.8"/>
+    <rect x="${x + 11.4}" y="132.5" width="4.2" height="2" rx="0.8" fill="#aeb6c0"/>
+  </g>`;
+}
+
+/** A golf ball keepsake on the bar (GS-tent-interactions), sat on the counter next to the drinks. */
+function barGolfBall(): string {
+  return `<g>
+    <ellipse cx="299" cy="143.4" rx="4" ry="1.5" fill="#000" opacity="0.28"/>
+    <circle cx="299" cy="140.6" r="3.4" fill="#f4f6f8"/>
+    <circle cx="298" cy="139.6" r="1" fill="#fff"/>
+    <g fill="#c9ced4">
+      <circle cx="299.6" cy="141.4" r="0.5"/><circle cx="300.6" cy="140" r="0.5"/><circle cx="298.4" cy="141.6" r="0.5"/>
+    </g>
+  </g>`;
+}
+
 /** A bar stool: cushioned seat, chrome legs, a foot ring — parked in front of the counter. */
 function stool(x: number): string {
   return `<g>
@@ -178,8 +231,10 @@ function stool(x: number): string {
 
 /** The painted lounge interior behind the golfers. Hand-placed (no rng) so it's byte-stable; a few
  *  `<animate>` flickers give the fire, lamps and neon sign life. Layout: fireplace + armchair on the
- *  left, space-course window centre, the bar along the right, a patterned rug up front. */
-function loungeArt(): string {
+ *  left, space-course window centre, the bar along the right, a patterned rug up front.
+ *  `marmot` = the Marmot Bartender clubhouse unlock (GS-tent-interactions) is earned: a marmot tends
+ *  the bar and a golf ball sits on the counter as a keepsake. */
+function loungeArt(marmot = false): string {
   const bottlesTop = [
     bottle(316, 76, 20, 6.5, '#4fae8a'),
     bottle(328, 76, 24, 6, '#c65a4a'),
@@ -435,6 +490,7 @@ function loungeArt(): string {
     <!-- hanging stemware rack -->
     <rect x="308" y="120" width="84" height="2.5" fill="#4a3520"/>
     ${glasses}
+    ${marmot ? marmotBartender() : ''}
     <!-- counter: worktop, panelled front, brass foot rail -->
     <rect x="282" y="144" width="118" height="13" rx="3" fill="url(#clCounterTop)"/>
     <rect x="282" y="144" width="118" height="3" rx="1.5" fill="#c99a5c"/>
@@ -469,6 +525,7 @@ function loungeArt(): string {
       <line x1="341" y1="141" x2="341" y2="144" stroke="#cfe0ef" stroke-width="1.2"/>
       <circle cx="339" cy="135.5" r="1.2" fill="#4fae8a"/>
     </g>
+    ${marmot ? barGolfBall() : ''}
     ${stool(306)}${stool(348)}
 
     <!-- potted monstera between the painting and the bar -->
@@ -779,7 +836,7 @@ function spaceportHTML(golfers: LoungeGolfer[], rng: Rng): string {
  * finished-run counter) reshuffles both arrangements each time home — the pad draws happen AFTER the spot
  * draws on the same Rng, so the lounge arrangement for a given visit is unchanged by the spaceport.
  */
-export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number): string {
+export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number, marmot = false): string {
   const rng = new Rng((visit >>> 0) * 2654435761 + 0x9e37); // spread the small counter across the seed space
   const spots = shuffle([...SPOTS], rng).slice(0, golfers.length);
   const figures = golfers.map((g, i) => golferAt(g, spots[i] ?? SPOTS[i % SPOTS.length]!)).join('');
@@ -788,7 +845,7 @@ export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number): str
   return `${loungeStyle()}
     <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:680px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
-      ${loungeArt()}
+      ${loungeArt(marmot)}
       ${figures}
     </div>
     ${spaceportHTML(golfers, rng)}`;
