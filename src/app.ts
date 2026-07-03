@@ -36,7 +36,7 @@ import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybr
 import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS, getFormat } from './sim/rpg/formats';
 import { getCharacter, type Character } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
+import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun, starmartRerollCost, STARMART_COST, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
 import { ENDLESS_MILESTONES, endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
@@ -144,6 +144,7 @@ function boot(): void {
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
       clubhouseVisit: save.clubhouseVisit,
       endlessBestHoles: save.endlessBestHoles,
+      marmotBartender: save.marmotBartender,
     };
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -186,7 +187,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 14,
+    version: 15,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -205,6 +206,7 @@ function persist(): void {
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     clubhouseVisit: state.clubhouseVisit,
     endlessBestHoles: state.endlessBestHoles,
+    marmotBartender: state.marmotBartender,
     // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
     // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
     // moment anything dispatched from the title. While no real run is live, any resumable offer
@@ -1757,17 +1759,25 @@ function scrambleChoiceOverlay(): string {
         data-action='${JSON.stringify({ type: 'chooseScrambleBall', pick })}'
         style="text-align:center;font-size:14px;padding:11px;">${ex.holed ? '🏁 Holed — take it' : 'Play this →'}</button>
     </div>`;
+  // A fortune-teller MULLIGAN (GS-tent-interactions) reuses this "choose your ball" card, but both balls
+  // are the player's OWN tee shot — so it's titled as a mulligan and the two options read "Tee shot A/B".
+  const isMulligan = !!sc.mulligan;
+  const heading = isMulligan
+    ? { title: '🔮 FORTUNE\'S MULLIGAN — PICK YOUR TEE SHOT', sub: 'The fortune teller gifted a second tee shot — keep whichever line you like best.' }
+    : { title: '🤝 SCRAMBLE — CHOOSE YOUR BALL', sub: `You and ${partner?.name ?? 'your partner'} both hit — play on from the better lie.` };
+  const labelA = isMulligan ? 'Tee shot A' : 'Your ball';
+  const labelB = isMulligan ? 'Tee shot B' : `${partner?.name ?? 'Partner'}'s ball`;
   return `
     <div style="position:fixed;inset:0;background:rgba(5,7,11,0.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;overflow:auto;">
       <div style="display:flex;flex-direction:column;gap:11px;max-width:360px;width:100%;">
         <div style="text-align:center;">
-          <div style="font-size:13px;font-weight:800;letter-spacing:.08em;color:#ffce54;">🤝 SCRAMBLE — CHOOSE YOUR BALL</div>
-          <div style="font-size:11.5px;opacity:.75;margin-top:2px;">You and ${partner?.name ?? 'your partner'} both hit — play on from the better lie.</div>
+          <div style="font-size:13px;font-weight:800;letter-spacing:.08em;color:#ffce54;">${heading.title}</div>
+          <div style="font-size:11.5px;opacity:.75;margin-top:2px;">${heading.sub}</div>
         </div>
         <div style="border-radius:10px;overflow:hidden;border:1px solid var(--gs-line-2);line-height:0;align-self:center;">${map}</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          ${option('Your ball', sc.player, sc.playerDistToPin, 'player', '#5fd45a')}
-          ${option(`${partner?.name ?? 'Partner'}'s ball`, sc.partner, sc.partnerDistToPin, 'partner', partner?.style.cap ?? '#7aa2ff')}
+          ${option(labelA, sc.player, sc.playerDistToPin, 'player', '#5fd45a')}
+          ${option(labelB, sc.partner, sc.partnerDistToPin, 'partner', isMulligan ? '#c39bd3' : partner?.style.cap ?? '#7aa2ff')}
         </div>
       </div>
     </div>`;
@@ -2080,6 +2090,53 @@ function shopScreen(): string {
     ${bagInventoryHTML()}`;
 }
 
+/**
+ * The StarMart pop-up shop (GS-tent-interactions): a mid-hole shop a StarMart trade-tent opens, spending
+ * cross-run STAR SHARDS instead of run credits. It stocks only rare/epic/legendary (no commons) and
+ * skews epic/legendary; items last the run like any Pro-Shop buy. Priced in shards by rarity (5/10/15).
+ */
+function starmartScreen(): string {
+  const shards = state.shards;
+  const perks = state.run.loadout.perks;
+  const renderCard = (it: NonNullable<ReturnType<typeof shopItem>>): string => {
+    const owned = ownedCount(perks, it.id);
+    const maxed = owned >= itemCap(it);
+    const cost = STARMART_COST[it.rarity];
+    const afford = shards >= cost;
+    const buyable = !maxed && afford;
+    const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
+    const artSVG = itemArtSVG(it.id, it.rarity, setTheme);
+    const card = itemCardHTML(
+      { ...it, cost },
+      { owned: maxed, affordable: afford, count: owned, artSVG, costLabel: `${cost} ⭐`, unaffordableNote: 'NEED SHARDS' },
+    );
+    return buyable
+      ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buyStarmart', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
+      : `<div style="margin:4px;">${card}</div>`;
+  };
+  const stock = (state.starmartOffer ?? [])
+    .map((id) => shopItem(id))
+    .filter((it): it is NonNullable<typeof it> => !!it)
+    .map(renderCard)
+    .join('');
+  const rerollCostShards = starmartRerollCost(state.starmartRerolls ?? 0);
+  const empty = stock === '' ? `<p style="font-size:13px;opacity:.6;">Sold out! Nothing left on the rack — reroll or head back to your ball.</p>` : '';
+  return `
+    ${header()}
+    <h2 style="font-size:16px;">🛰 StarMart · ${shards} ⭐ shards</h2>
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">A trader's pop-up on the course! Spend your <b>Star Shards</b> on premium gear — rare, epic &amp; legendary only, no filler. Everything here lasts the rest of this run. Blue 5 ⭐ · Purple 10 ⭐ · Orange 15 ⭐.</p>
+    <div style="display:flex;flex-wrap:wrap;">${stock}</div>
+    ${empty}
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${btn('← Back to the hole', { type: 'leaveStarmart' }, { variant: 'primary' })}
+      ${
+        shards >= rerollCostShards
+          ? btn(`🎲 Reroll stock (${rerollCostShards} ⭐)`, { type: 'rerollStarmart' }, { variant: 'ghost' })
+          : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ${rerollCostShards} ⭐</span>`
+      }
+    </div>`;
+}
+
 /** A ship card (GS-garage) — the vector ship over a rarity-ringed panel, with name/set + a footer
  *  (cost in the market, or a SELECT / SELECTED state in the garage). Clickable when `action` given. */
 function shipCardHTML(ship: Ship, footer: string, opts: { action?: Action; ring: string; dim?: boolean; glow?: boolean } = { ring: '#8aa0c0' }): string {
@@ -2233,7 +2290,7 @@ function clubhouseHallScreen(): string {
       <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire, their rides parked at the spaceport below. Tap a golfer or their ship to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
     </header>
-    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit)}</div>
+    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender)}</div>
     <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
 }
 
@@ -3305,6 +3362,8 @@ function render(): void {
       ? bossRewardScreen()
       : state.screen === 'shop'
       ? shopScreen()
+      : state.screen === 'starmart'
+      ? starmartScreen()
       : state.screen === 'travel'
       ? travelScreen()
       : state.screen === 'trademarket'
@@ -3702,7 +3761,15 @@ function render(): void {
           //  • terminal (holed/picked up/auto putt-out done) → a longer hold, then the done screen;
           //  • non-terminal putt(s) only (manual lag) → a brief hold, then back to the putt meter.
           const feelMs = (window as unknown as { _gsFeel?: Record<string, number> })._gsFeel ?? {};
-          if (isAce && aceCelebratedHole !== play.holeIndex) {
+          // A StarMart tent (GS-tent-interactions): once the ricochet settles, pop the shard shop for the
+          // mid-hole. Takes precedence over the shot-result card; opening it advances via the reducer.
+          const starmartHit = !play.done && play.shots[play.shots.length - 1]?.tentHit?.effect === 'starmart';
+          if (starmartHit) {
+            popupTimer = window.setTimeout(() => {
+              popupTimer = 0;
+              dispatch({ type: 'openStarmart' });
+            }, feelMs.popupDelayMs ?? 340);
+          } else if (isAce && aceCelebratedHole !== play.holeIndex) {
             aceCelebratedHole = play.holeIndex;
             popupTimer = window.setTimeout(() => {
               popupTimer = 0;

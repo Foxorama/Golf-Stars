@@ -47,7 +47,9 @@ const cases = [
 let cards = '';
 for (const c of cases) {
   const course = generateCourse(7, { biome: c.biome, themeId: c.themeId, holes: 3, wildness: 0.6 });
-  const hole = course.holes[0];
+  // Tents live on ONE stamped hole of a trade-market stop (GS-tent-interactions) — arm this hole so the
+  // preview shows the ring (in play the stamp is done by currentCourse).
+  const hole = { ...course.holes[0], tents: true };
   // Whole-hole view.
   const whole = renderHoleSVG(hole, { width: 300, height: 460, biome: c.biome, themeId: c.themeId, tradeTents: true });
   // Zoomed-to-green view so the tents read big (focus on the green).

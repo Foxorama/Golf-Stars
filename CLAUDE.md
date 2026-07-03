@@ -64,9 +64,9 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v14**; bump + add a migration when you persist
-  a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most run-state changes
-  need NO save bump.
+  (localStorage is the only copy). Current schema is **v15** (`marmotBartender`); bump + add a migration
+  when you persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
+  run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
   caddies, ships are tables the sim reads. **New world / item / golfer = a new row, not an engine edit.**
   Cutting/re-spreading the club taxonomy (`src/sim/clubs.ts CLUBS`) looks like a one-line edit but
@@ -266,12 +266,27 @@ For each system: the rule that constrains new work. Open the archive doc before 
   effect carries a REAL play hook, machine-checked** (GS-journey-fx-2, `tests/journey-effects.test.ts`):
   numeric — `effectWindMult` (clamped pure post-gen scale on `hole.wind`) and `effectCarryMult` (a pure
   post-gen `biomeMods` carry row, the lowgrav mechanism, so `biomeCarryMult` feeds HUD/AI/sim ONE number);
-  geometric — tradeMarket's collidable tents (GS-tents), meteorShower's scorch craters (GS-meteor-scorch,
+  geometric — tradeMarket's collidable tents (GS-tents / GS-tent-interactions), meteorShower's scorch craters (GS-meteor-scorch,
   `sim/scorch.ts`) and the generalised GROUND PATCHES (`sim/patches.ts`): comet→`stardust` (a BONUS lie,
   hot AND true), frostfall/blizzard→`ice`, spaceJunk→`junk`, darkMatter→`tar` (a sticky distance-killer,
   the dead-straight inverse of ice's wild skid) — pure seeded per-kind streams, rest-lie conversion in
   `executeShot`, drawn + played from the SAME source. The route card states every hook (wind/carry chips
   computed from the physics tables; geometric hooks via `CourseEffectInfo.play`), so a lane reads pre-jump.
+  **Trade tents are now ONE surprise hole with FIVE randomised interactions (GS-tent-interactions):** the
+  tradeMarket route stamps its collidable tent ring on a single deterministic hole (`Hole.tents`, chosen
+  by a pure hash in `run.ts armTentHole` — zero generation rng), and each of the five tents carries an
+  `effect` dealt by a per-hole shuffle (`sim/tents.ts assignTentEffects`) so COLOUR never predicts effect.
+  The bounce PHYSICS is identical for all tents EXCEPT the **marmot**, whose bite is a deterministic LOST
+  BALL (stroke-and-distance) resolved in `executeShot` (so auto ≡ interactive); the other four are
+  interactive-only META reactions layered in the reducer like the ace/unlock side-effects: **ow**/**watch**
+  = flavour bubble only; **marmot** first-ever bonk unlocks the persistent **Marmot Bartender** (save v15,
+  a `clubhouseLounge` cosmetic); **fortune** grants a free MULLIGAN spent on the next tee shot (reuses the
+  scramble two-ball pick, `mulligan` flag); **starmart** opens a mid-hole **StarMart** shard shop
+  (`run.ts starmartOffer` — no commons, epic/legendary boosted, priced 5/10/15 shards, items last the run
+  via `loadout.perks`). The speech bubble anchors on the tent CENTRE in course space, re-projected each
+  frame (`ShotLog.tentHit.c`) — the fix for the old bubble that drifted with the ball. Every other hole/
+  world stays byte-identical (all gates are `hole.tents` + effect-armed). `tests/tents.test.ts` +
+  `tests/starmart.test.ts` + `tests/journey-effects.test.ts` (one-hole invariant) + `tests/ui.test.ts`.
   **The sky roster is 17 effects (GS-journey-weather adds 5):** `blizzard` (gale wind + ice — the storm-cold
   cousin of frostfall), `radiant` (carry↑ + wind↓ — a bomber's-paradise still, bright sky), `dustStorm`
   (wind↑ + carry↓ — grit that gusts AND drags), `solarWind` (steady wind↑, a third storm that isn't

@@ -107,6 +107,13 @@ export interface Hole {
    * Optional for back-compat: a hole without one plays flat.
    */
   greenSlope?: Vec;
+  /**
+   * Trade-camp TENTS armed on THIS hole (GS-tent-interactions): the trade-market route pitches its
+   * collidable tent ring on exactly ONE random hole of the stop, not every hole. Stamped post-generation
+   * by `currentCourse` (like `biome`/`biomeMods`), so both the sim collision and the renderers read one
+   * source of truth. Absent/false ⇒ no tents (byte-for-byte the plain hole). Pure, no rng.
+   */
+  tents?: boolean;
 }
 
 export interface CourseMeta {

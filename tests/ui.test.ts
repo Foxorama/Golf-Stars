@@ -467,3 +467,42 @@ describe('ui reducer', () => {
     expect(sawAce).toBe(true); // fixture guard: the pinned seed really does ace within the window
   });
 });
+
+describe('StarMart + tent reactions (GS-tent-interactions)', () => {
+  it('opens the StarMart, buys with shards, and returns to the hole', () => {
+    let s = reduce(started(42, 'voyage'), { type: 'playInteractive' });
+    s = { ...s, shards: 100 };
+    s = reduce(s, { type: 'openStarmart' });
+    expect(s.screen).toBe('starmart');
+    expect((s.starmartOffer ?? []).length).toBeGreaterThan(0);
+    const id = s.starmartOffer![0]!;
+    const before = s.shards;
+    s = reduce(s, { type: 'buyStarmart', id });
+    expect(s.shards).toBeLessThan(before); // shards spent
+    expect(s.starmartOffer).not.toContain(id); // the bought card is pulled from the rack
+    s = reduce(s, { type: 'leaveStarmart' });
+    expect(s.screen).toBe('playing'); // back to the hole, keep playing
+    expect(s.starmartOffer).toBeUndefined();
+  });
+
+  it('a StarMart buy with no shards is a no-op', () => {
+    let s = reduce(started(7, 'voyage'), { type: 'playInteractive' });
+    s = reduce({ ...s, shards: 0 }, { type: 'openStarmart' });
+    const id = s.starmartOffer![0]!;
+    const t = reduce(s, { type: 'buyStarmart', id });
+    expect(t.shards).toBe(0);
+    expect(t.starmartOffer).toEqual(s.starmartOffer); // rack unchanged
+  });
+
+  it('a pending fortune mulligan turns the next tee shot into a two-ball pick', () => {
+    let s = reduce(started(15, 'voyage'), { type: 'playInteractive' });
+    s = { ...s, mulliganPending: true };
+    const v = shotView(s.play!, s.run.loadout);
+    s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
+    expect(s.scrambleChoice?.mulligan).toBe(true);
+    expect(s.mulliganPending).toBe(false); // consumed on that tee shot
+    const t = reduce(s, { type: 'chooseScrambleBall', pick: 'player' });
+    expect(t.scrambleChoice).toBeUndefined();
+    expect(t.play!.shots.length).toBe(1); // the hole advanced from the kept ball
+  });
+});

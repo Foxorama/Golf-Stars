@@ -17,6 +17,7 @@ import type { ShotRedirect } from '../sim/shot';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
 import { inScorch, meteorScorch as meteorScorchFor } from '../sim/scorch';
 import { effectPatches as effectPatchesFor, inPatch, PATCH_SPECS, type PatchKind } from '../sim/patches';
+import { TENT_LINES } from '../sim/tents';
 import { archetypeFor } from '../sim/course/themes';
 import type { ApparelLook } from '../sim/rpg/apparel';
 import { holeProjector } from './project';
@@ -778,8 +779,11 @@ export function mountPlayView(
   let slowUntilV = 0; // virtual time to hold slo-mo until
   let caddyCallout: { id: CaddyArtId; until: number } | null = null;
   let chipInFiredShot = -1; // shot whose chip-in callout has fired
-  // Trade-camp tent ricochet (GS-tents): a transient "Ow!"/"Watch it!" bubble at the struck tent.
-  let tentCallout: { pos: Vec; text: string; until: number } | null = null;
+  // Trade-camp tent bubble (GS-tent-interactions): a transient line at the struck tent. Anchored in
+  // COURSE space (`at` = the tent CENTRE) and re-projected every frame — the old bug stored a SCREEN
+  // position captured at impact, so as the follow-cam panned with the ball the bubble drifted with the
+  // ball instead of staying on the tent. Storing the world point + re-projecting fixes that.
+  let tentCallout: { at: Vec; text: string; until: number } | null = null;
   let tentFiredShot = -1; // shot whose tent-hit callout has fired
 
   function reset(_now: number): void {
@@ -1242,9 +1246,11 @@ export function mountPlayView(
           // "Watch it!" bubble at the struck tent + cue the sound. A little screen-shake for the bonk.
           if (shot.tentHit && tentFiredShot !== shotIndex) {
             tentFiredShot = shotIndex;
-            const [tx, ty] = proj.project(shot.tentHit.at);
-            const text = shotIndex % 2 === 0 ? 'Ow!' : 'Watch it!';
-            tentCallout = { pos: [tx, ty - 14], text, until: now + TENT_CALLOUT_MS };
+            // The line is the struck tent's own (GS-tent-interactions) — a startled "Ow!", a grateful
+            // marmot, a fortune teller, a shooed trader, a StarMart welcome. Anchor to the tent CENTRE
+            // in course space so it stays put on the tent while the follow-cam pans.
+            const text = TENT_LINES[shot.tentHit.effect] ?? 'Ow!';
+            tentCallout = { at: shot.tentHit.c, text, until: now + TENT_CALLOUT_MS };
             shake = Math.max(shake, 0.3);
             opts.onTentHit?.(text);
           }
@@ -1429,12 +1435,15 @@ export function mountPlayView(
       caddyCallout = null;
     }
 
-    // Trade-camp tent ricochet bubble (GS-tents): "Ow!" / "Watch it!" over the struck tent.
+    // Trade-camp tent bubble (GS-tent-interactions): the struck tent's line, anchored ON the tent.
+    // Re-projected from the tent's COURSE point every frame so it tracks the tent as the camera pans
+    // (the fix for the bubble that used to drift with the ball).
     if (tentCallout && now < tentCallout.until) {
       const remain = tentCallout.until - now;
       const age = TENT_CALLOUT_MS - remain;
       const fade = Math.min(1, age / 120) * Math.min(1, remain / 240);
-      drawSpeechBubble(ctx, tentCallout.text, tentCallout.pos[0], tentCallout.pos[1], fade);
+      const [bx, by] = proj.project(tentCallout.at);
+      drawSpeechBubble(ctx, tentCallout.text, bx, by - 14, fade);
     } else if (tentCallout) {
       tentCallout = null;
     }

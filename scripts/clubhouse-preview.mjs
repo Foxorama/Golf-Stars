@@ -45,7 +45,9 @@ document.body.innerHTML =
   '<h2 style="font-family:sans-serif;color:#eee">Full lounge (visit 3)</h2>' +
   '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 3)+'</div>' +
   '<h2 style="font-family:sans-serif;color:#eee">Full lounge (visit 7 — reshuffled)</h2>' +
-  '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 7)+'</div>';
+  '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 7)+'</div>' +
+  '<h2 style="font-family:sans-serif;color:#eee">Full lounge — Marmot Bartender UNLOCKED (GS-tent-interactions)</h2>' +
+  '<div style="max-width:680px;">'+clubhouseLoungeHTML(golfers, 3, true)+'</div>';
 `;
 
 const result = await build({ stdin: { contents: entry, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'iife', write: false, platform: 'browser' });

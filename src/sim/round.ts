@@ -35,7 +35,7 @@ import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, ARC_FEEL, flightBlockedBy, flightKnockdown, flightObstacles, flightProfileOf, type FlightProfile } from './flight';
-import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TradeTent } from './tents';
+import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
 
@@ -73,10 +73,12 @@ export interface ShotLog {
   /** A hazard-skip ball (GS-proshop-2) skimmed across this penalty kind (water/lava/void) with NO
    *  stroke — render-only flavour ("skipped across!"). Set only when an immune ball saves a hazard. */
   skimmed?: string;
-  /** Trade-camp tent ricochet (GS-tents): the ball clipped a tent roof and bounced off. Carries the
-   *  impact point so the renderer can show the ball hit the tent + pop a voice bubble there ("Ow!").
-   *  Non-penalty — `result.landing` is the impact and the roll runs out along the reflected direction. */
-  tentHit?: { at: Vec; dir: Vec };
+  /** Trade-camp tent ricochet (GS-tents / GS-tent-interactions): the ball clipped a tent roof. Carries
+   *  the ball's impact point `at`, the tent CENTRE `c` (so the bubble anchors ON the tent, re-projected
+   *  each frame — not on the ball), the tent's `effect` (which drives the bubble line + the interactive
+   *  reaction), and the reflected roll direction `dir`. Non-penalty for every tent EXCEPT the marmot,
+   *  whose bite resolves as a lost ball above. */
+  tentHit?: { at: Vec; c: Vec; effect: TentEffectId; dir: Vec };
 }
 
 /** Per-yard roll MULTIPLIER of each surface (its "run"): how far the ball travels per unit of roll
@@ -1019,7 +1021,9 @@ export function executeShot(
   // along the reflected direction — a lofted wedge sails over and lands clean. Pure geometry on the
   // SAME curved path the renderer draws (no rng), so auto≡interactive holds; tents are built only when
   // the trade-market route armed them, so a base shot never enters this branch (byte-for-byte stable).
-  const tents = opts.tradeTents ? tradeTents(hole) : undefined;
+  // Tents live on ONE stamped hole of a trade-market stop (GS-tent-interactions): armed only when the
+  // effect is on (`opts.tradeTents`) AND this is that hole (`hole.tents`). Every other hole is unchanged.
+  const tents = opts.tradeTents && hole.tents ? tradeTents(hole) : undefined;
   let tentHit: TentHit | null = null;
   if (tents && !knockedDown) {
     tentHit = tentFlightHit(tents, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
@@ -1029,6 +1033,11 @@ export function executeShot(
       result.apex = arcApex(tentHit.carry, nominalCarry, ARC_FEEL, flight.peakMult);
     }
   }
+  // The MARMOT tent (GS-tent-interactions) is the one exception to "tents are non-penalty": the marmot
+  // pockets your ball and vanishes, so a marmot bonk is a LOST BALL (stroke-and-distance), resolved in
+  // the shared physics so the headless sim and the interactive driver score it identically. The ball
+  // stops dead at the tent (no ricochet run-out) and replays from the shot's origin below.
+  const tentLost = tentHit?.tent.effect === 'marmot';
 
   // Touchdown → bounce & roll out (unless it plugs in a penalty surface). The run-out integrates
   // the surfaces it crosses: the ball keeps the same roll ENERGY but spends it fast in rough and
@@ -1057,7 +1066,9 @@ export function executeShot(
     let rollK = energy;
     if (tentHit) {
       rollDir = tentHit.dir;
-      rollK = Math.max(Math.abs(energy), TENT_BOUNCE_MIN); // bounce forward off the roof, always lively
+      // The marmot keeps the ball — it stops dead at the tent (no ricochet). Every other tent bounces
+      // forward off the roof with a lively energy floor.
+      rollK = tentLost ? 0 : Math.max(Math.abs(energy), TENT_BOUNCE_MIN);
     } else {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
@@ -1090,13 +1101,21 @@ export function executeShot(
   }
   const li = lieInfo(restLie);
   const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };
-  if (tentHit) log.tentHit = { at: tentHit.point, dir: tentHit.dir };
+  // Surface the tent CENTRE + effect (not just the ball's roof-contact point) so the renderer can anchor
+  // the speech bubble ON the tent (GS-tent-interactions) and the interactive driver can fire the effect.
+  if (tentHit) log.tentHit = { at: tentHit.point, c: tentHit.tent.c, effect: tentHit.tent.effect, dir: tentHit.dir };
 
   let ballAfter: Vec = rest;
   let lieAfter: FeatureKind = restLie;
   let penaltyStrokes = 0;
   let holed = false;
-  if (opts.rainbowRoad && !isRoadLie(restLie)) {
+  if (tentLost) {
+    // Marmot tent (GS-tent-interactions): the ball is gone — lost ball, stroke-and-distance from origin.
+    penaltyStrokes = PEN_INFO.lost.strokes;
+    log.penalty = 'lost';
+    ballAfter = from;
+    lieAfter = lie;
+  } else if (opts.rainbowRoad && !isRoadLie(restLie)) {
     // Rainbow Ball (GS-rainbow): the hole is RAINBOW ROAD. A ball resting off the fairway/bunker/green
     // ribbon has fallen off into the void of space — out of bounds, stroke-and-distance (replay from
     // the shot's origin). This subsumes ordinary penalties/rough/OOB for the off-road case, and reads

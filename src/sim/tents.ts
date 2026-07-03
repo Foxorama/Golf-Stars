@@ -30,6 +30,28 @@ import type { Hole, Vec } from './course/contract';
 import { dist, pointInPoly } from './course/contract';
 import { arcApex, arcHeight, ARC_FEEL, flightApexT, flightControl, flightGround, type FlightProfile } from './flight';
 
+/**
+ * What lives inside a tent (GS-tent-interactions). A ball that bonks a tent triggers its effect the
+ * first time it's struck on the hole — a startled yelp, a hungry marmot that pockets your ball, a
+ * fortune teller who gifts a mulligan, a shooed trader, or a pop-up StarMart. The effect is assigned
+ * by a per-hole PERMUTATION (`assignTentEffects`) so the colour↔effect mapping shuffles hole to hole —
+ * you can't just aim at the red tent every time. The bounce PHYSICS is identical for every tent (a
+ * deterministic ricochet), EXCEPT the marmot, whose bite is a lost ball resolved in `executeShot`.
+ */
+export type TentEffectId = 'ow' | 'marmot' | 'fortune' | 'watch' | 'starmart';
+
+/** The five tent effects, one per tent, dealt in a shuffled order per hole. */
+export const TENT_EFFECTS: readonly TentEffectId[] = ['ow', 'marmot', 'fortune', 'watch', 'starmart'];
+
+/** The speech-bubble line each tent pops when first bonked (render + voice). */
+export const TENT_LINES: Record<TentEffectId, string> = {
+  ow: 'Ow!',
+  marmot: 'Thank you for this offering.',
+  fortune: 'I can see into your future!',
+  watch: 'Hey — watch it!',
+  starmart: 'Welcome to StarMart!',
+};
+
 export interface TradeTent {
   /** Footprint centre (course space). */
   c: Vec;
@@ -43,6 +65,8 @@ export interface TradeTent {
   roofH: number;
   /** Colour index (0..) for the bright tent canvas — render-only. */
   hue: number;
+  /** What's inside — the interaction triggered on the first bonk this hole (GS-tent-interactions). */
+  effect: TentEffectId;
 }
 
 /** Footprint radius of a tent (yards). */
@@ -95,6 +119,10 @@ export function tradeTents(hole: Hole): TradeTent[] {
   const gap = (FRONT_GAP_DEG * Math.PI) / 180;
   // Spread the tents across the ALLOWED arc (the full circle minus the front window).
   const span = 2 * Math.PI - 2 * gap;
+  // Deal the five effects into a hole-specific order so a tent's COLOUR (hue = its ring position) does
+  // NOT predict its effect — the shuffle is a pure function of the hole, so it's byte-stable but varies
+  // hole to hole. You have to read the ring and pick your target, not memorise "the red one".
+  const effects = assignTentEffects(hole);
   const tents: TradeTent[] = [];
   for (let i = 0; i < TENT_COUNT; i++) {
     // Walk from just past the front gap, around the back, to just before it on the other side.
@@ -104,9 +132,44 @@ export function tradeTents(hole: Hole): TradeTent[] {
     const c: Vec = [green[0] + dir[0] * radius, green[1] + dir[1] * radius];
     const out = norm(dir);
     const ridge: Vec = [-out[1], out[0]]; // tangent: roof planes face radially in/out
-    tents.push({ c, r: TENT_R, ridge, out, roofH: TENT_ROOF_H, hue: i });
+    tents.push({ c, r: TENT_R, ridge, out, roofH: TENT_ROOF_H, hue: i, effect: effects[i]! });
   }
   return tents;
+}
+
+/** A stable 32-bit hash of a hole's identity (tee/green/par) — the seed for the effect shuffle. Pure. */
+function holeHash(hole: Hole): number {
+  const s = `${hole.tee[0].toFixed(1)},${hole.tee[1].toFixed(1)}:${hole.green[0].toFixed(1)},${hole.green[1].toFixed(1)}:${hole.par}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * The per-tent effect order for a hole (GS-tent-interactions): a Fisher–Yates shuffle of `TENT_EFFECTS`
+ * seeded off `holeHash`, so each of the five effects lands on exactly one tent and the colour→effect
+ * mapping is scrambled per hole. Pure and deterministic — same hole → same order (no rng stream). If a
+ * hole ever rings fewer/more than five tents, the order simply cycles.
+ */
+export function assignTentEffects(hole: Hole): TentEffectId[] {
+  const order = [...TENT_EFFECTS];
+  let seed = holeHash(hole) || 1;
+  const next = () => {
+    // mulberry32 step — a self-contained PRNG so this stays free of the sim rng streams.
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
+  // Materialise one effect per tent (cycling if TENT_COUNT ever diverges from the five effects).
+  return Array.from({ length: TENT_COUNT }, (_, i) => order[i % order.length]!);
 }
 
 /** Roof height (yards) of a tent at course point `p`: peak at the ridge line, sloping to 0 at the

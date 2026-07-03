@@ -284,7 +284,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
       mergeGapRad: BLOCK_MERGE_GAP_PX / (pxYd * rMid),
       minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
       snapYd: BLOCK_SNAP_PX / pxYd,
-      tents: opts.tradeTents ? tradeTents(hole) : undefined,
+      tents: opts.tradeTents && hole.tents ? tradeTents(hole) : undefined,
     });
     for (const region of blocked) {
       const poly: Vec[] = [];

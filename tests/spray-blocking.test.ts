@@ -199,7 +199,8 @@ describe('blocked-zone render (SVG overlay)', () => {
   });
 
   it('shades tents (⛺) only on a trade-camp hole', () => {
-    const clear = holeWithTrees([]);
+    // Tents live on ONE stamped hole of a trade-market stop (GS-tent-interactions) — arm this hole.
+    const clear = { ...holeWithTrees([]), tents: true };
     const from: Vec = [0, 250];
     const s = shotSpread(clear, from, 'fairway', [0, 400], seven, {});
     const tentView = { width: 360, height: 640, focus: from, viewRadius: s.carryHigh * 0.36 };
