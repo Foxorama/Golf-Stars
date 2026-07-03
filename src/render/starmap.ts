@@ -105,13 +105,17 @@ export interface StarmapOpts {
 }
 
 // ---- vertical chart geometry -----------------------------------------------------------------
+// The chart is drawn TALL (a big height:width ratio) on purpose: the SVG scales to the container
+// WIDTH, so on a phone (where width is capped by the screen) a taller viewBox is the only lever that
+// lets the map fill the vertical screen space instead of sitting as a short strip. Generous spreads +
+// bigger worlds read as a vast voyage and fill the cockpit window (GS-journey-fill).
 const W = 320; // viewBox width (px, user units); the SVG scales to the container via width:100%
-const CHOICE_Y = 66; // the three destination worlds sit across the top
-const YOU_Y = 172; // YOU sits below the choices; lanes rise from here to each world
+const CHOICE_Y = 84; // the three destination worlds sit across the top
+const YOU_Y = 214; // YOU sits below the choices; lanes rise from here to each world
 const YOU_X = W / 2;
-const FIRST_DROP = 66; // YOU → the most-recent cleared world
-const EARTH_DROP = 74; // the oldest cleared world → Earth (Earth has no real coord)
-const BOTTOM_PAD = 42; // room under Earth for its label
+const FIRST_DROP = 78; // YOU → the most-recent cleared world
+const EARTH_DROP = 88; // the oldest cleared world → Earth (Earth has no real coord)
+const BOTTOM_PAD = 48; // room under Earth for its label
 
 // Declination → screen x. A FIXED celestial window (so a world's horizontal position is stable across
 // the whole run — re-renders never shuffle earlier nodes). The catalogue is southern-curated
@@ -128,10 +132,10 @@ const decX = (dec: number): number => {
 // Vertical gap between consecutive worlds = a small fixed step + a real-angular-distance term, clamped
 // to stay legible. The base step keeps labels from colliding on a near hop while still letting a
 // far-flung jump CLIMB further; the slope is gentle so a half-sky leap doesn't blow the strip out.
-const BASE_GAP = 46;
-const PX_PER_DEG = 0.66;
-const MIN_GAP = 58;
-const MAX_GAP = 150;
+const BASE_GAP = 54;
+const PX_PER_DEG = 0.72;
+const MIN_GAP = 66;
+const MAX_GAP = 172;
 
 // Great-circle angular separation (degrees) between two equatorial positions.
 function angSepDeg(a: { ra: number; dec: number }, b: { ra: number; dec: number }): number {
@@ -253,7 +257,7 @@ function surfaceArt(family: SurfaceFamily, cx: number, cy: number, r: number, co
 function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
   const ring = rarCol(c.rarity);
   const look = (c.archetype && BIOME_LOOK[c.archetype]) || { col: '#8aa0c0', glyph: c.icon, family: 'plain' as SurfaceFamily };
-  const r = 21;
+  const r = 26;
   const gid = `jw${c.id}`; // unique gradient + clip ids per world
   const light = lighten(look.col, 0.6);
   const dark = darken(look.col, 0.5);
@@ -319,8 +323,8 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
       <!-- rarity ring -->
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${ring}" stroke-width="2.4"/>
       <!-- a soft dark vignette keeps the biome glyph legible over any surface -->
-      <circle cx="${cx}" cy="${cy}" r="11" fill="#0a0e18" opacity="0.24"/>
-      <text x="${cx}" y="${cy + 6}" font-size="18" text-anchor="middle">${look.glyph}</text>
+      <circle cx="${cx}" cy="${cy}" r="13" fill="#0a0e18" opacity="0.24"/>
+      <text x="${cx}" y="${cy + 7}" font-size="22" text-anchor="middle">${look.glyph}</text>
       ${markerRow}
       ${effectBadge}
       ${nameLabel}
@@ -350,7 +354,7 @@ export function journeyMapHTML(opts: StarmapOpts): string {
   const nodes = rev.map((s, i) => {
     const hasC = typeof s.ra === 'number' && typeof s.dec === 'number';
     const coord = hasC ? { ra: s.ra!, dec: s.dec! } : null;
-    let gap = i === 0 ? FIRST_DROP : 88; // leaving YOU, or a coord-less hop — a neutral baseline step
+    let gap = i === 0 ? FIRST_DROP : 100; // leaving YOU, or a coord-less hop — a neutral baseline step
     if (i > 0 && coord && prevCoord) gap = Math.max(MIN_GAP, Math.min(MAX_GAP, BASE_GAP + angSepDeg(coord, prevCoord) * PX_PER_DEG));
     y += gap;
     const x = coord ? decX(coord.dec) : YOU_X;
@@ -358,8 +362,8 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     return { x, y, label: s.label, glyph: s.glyph, col: s.col };
   });
   const lastY = nodes.length ? nodes[nodes.length - 1]!.y : YOU_Y;
-  const earth = { x: decX(8), y: lastY + (nodes.length ? EARTH_DROP : 96) };
-  const H = Math.max(300, Math.round(earth.y + BOTTOM_PAD));
+  const earth = { x: decX(8), y: lastY + (nodes.length ? EARTH_DROP : 190) };
+  const H = Math.max(430, Math.round(earth.y + BOTTOM_PAD));
 
   // ---- trail path: a smooth poly from YOU down through the nodes to Earth ---------------------
   const pts: Array<{ x: number; y: number }> = [{ x: YOU_X, y: YOU_Y }, ...nodes, earth];
@@ -407,17 +411,17 @@ export function journeyMapHTML(opts: StarmapOpts): string {
           <stop offset="55%" stop-color="#1f4f9e"/>
           <stop offset="100%" stop-color="#0c1f45"/>
         </radialGradient>
-        <clipPath id="jearthc"><circle cx="${earth.x}" cy="${earth.y}" r="19"/></clipPath>
+        <clipPath id="jearthc"><circle cx="${earth.x}" cy="${earth.y}" r="23"/></clipPath>
       </defs>
-      <circle cx="${earth.x}" cy="${earth.y}" r="27" fill="#3f8fff" opacity="0.1"/>
-      <circle cx="${earth.x}" cy="${earth.y}" r="22" fill="#3f8fff" opacity="0.14"/>
-      <circle cx="${earth.x}" cy="${earth.y}" r="19" fill="url(#jearth)" stroke="#3f7fd0" stroke-width="1.4"/>
+      <circle cx="${earth.x}" cy="${earth.y}" r="32" fill="#3f8fff" opacity="0.1"/>
+      <circle cx="${earth.x}" cy="${earth.y}" r="26" fill="#3f8fff" opacity="0.14"/>
+      <circle cx="${earth.x}" cy="${earth.y}" r="23" fill="url(#jearth)" stroke="#3f7fd0" stroke-width="1.6"/>
       <g clip-path="url(#jearthc)">
-        <path d="M${earth.x - 13},${earth.y - 6} q7,-4 13,1 q5,4 12,1 M${earth.x - 15},${earth.y + 6} q8,3 14,-1 q6,-3 13,1" stroke="#4fbf6a" stroke-width="3.2" fill="none" stroke-linecap="round" opacity="0.9"/>
-        <ellipse cx="${(earth.x + 7).toFixed(1)}" cy="${(earth.y + 4).toFixed(1)}" rx="19" ry="19" fill="#05070f" opacity="0.28"/>
+        <path d="M${earth.x - 16},${earth.y - 7} q8,-5 16,1 q6,5 14,1 M${earth.x - 18},${earth.y + 7} q10,4 17,-1 q7,-4 15,1" stroke="#4fbf6a" stroke-width="3.8" fill="none" stroke-linecap="round" opacity="0.9"/>
+        <ellipse cx="${(earth.x + 8).toFixed(1)}" cy="${(earth.y + 5).toFixed(1)}" rx="23" ry="23" fill="#05070f" opacity="0.28"/>
       </g>
-      <ellipse cx="${(earth.x - 6).toFixed(1)}" cy="${(earth.y - 7).toFixed(1)}" rx="6" ry="4" fill="#ffffff" opacity="0.4"/>
-      <text x="${earth.x}" y="${earth.y + 36}" font-size="10.5" fill="#9fb0cf" text-anchor="middle" font-weight="700">EARTH · home</text>
+      <ellipse cx="${(earth.x - 7).toFixed(1)}" cy="${(earth.y - 8).toFixed(1)}" rx="7" ry="4.6" fill="#ffffff" opacity="0.4"/>
+      <text x="${earth.x}" y="${earth.y + 42}" font-size="11" fill="#9fb0cf" text-anchor="middle" font-weight="700">EARTH · home</text>
     </g>`;
 
   // ---- forward lanes: YOU → the three destination worlds across the top ----------------------
@@ -507,7 +511,7 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     ${earthGlyph}
     ${launchPad}
     ${sparks}
-    ${shipSVG(opts.shipId, YOU_X, YOU_Y, 0.9)}
+    ${shipSVG(opts.shipId, YOU_X, YOU_Y, 1.08)}
     ${youLabel}
     ${fbranch.planets}
   </svg>`;
