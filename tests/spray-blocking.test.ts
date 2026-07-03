@@ -180,7 +180,15 @@ describe('blocked-zone render (SVG overlay)', () => {
     const svg = renderHoleSVG(hole, { ...view, spray: spread });
     expect(svg).toContain('rgba(14,26,16,0.60)'); // the canopy shade
     expect(svg).toContain('rgba(95,212,90,0.30)'); // the green band still draws (the safe read)
-    expect(svg).toContain('🌲'); // marked as woods
+    expect(svg).toContain('🌳'); // parkland oak — the default (verdant) tree glyph, not a phantom pine
+  });
+
+  it('marks the blocked zone with the WORLD tree glyph (frost → conifer, desert → saguaro)', () => {
+    const frost = renderHoleSVG(hole, { ...view, spray: spread, themeId: 'grus' });
+    expect(frost).toContain('🌲'); // a conifer world genuinely shows the pine
+    const desert = renderHoleSVG(hole, { ...view, spray: spread, themeId: 'vela' });
+    expect(desert).toContain('🌵');
+    expect(desert).not.toContain('🌲'); // …and never a pine where there are none
   });
 
   it('draws no shade when the cone is clear of trees', () => {

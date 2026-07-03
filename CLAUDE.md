@@ -64,7 +64,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v12**; bump + add a migration when you persist
+  (localStorage is the only copy). Current schema is **v14**; bump + add a migration when you persist
   a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most run-state changes
   need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -248,8 +248,9 @@ For each system: the rule that constrains new work. Open the archive doc before 
   baked at `startRun`/`resumeRun` — NOT a new club, just the reward machinery applied to the default bag).
   The owned tier is a Pro-Shop FLOOR (`offerableClubs` hides clubs below it) and a no-op at `'common'`
   (byte-for-byte off). `ASCENSION_MAX = 15` so A11 is reachable. **Ascension victory club unlocks**
-  (`club-unlock.ts`, GS-ascension-clubs, save v9): a NEW Ascension clear (a won voyage that pushes
-  `maxAscension` higher — same gate as the bag tiers, NOT every win) permanently adds one random club to
+  (`club-unlock.ts`, GS-ascension-clubs, save v9): a NEW **per-character** Ascension clear (a won voyage
+  that pushes THAT golfer's own `maxAscensionByCharacter[id]` higher — save v14, NOT the global `maxAscension`
+  the bag tiers/difficulty select still use, and NOT every win) permanently adds one random club to
   the *played character's* starting bag (`unlockedClubsByCharacter` stores TYPES only, re-stamped to the
   live bag rarity by `applyBagTier`; `addUnlockedClubs` is the no-op fast path when empty). Pool = the
   `CLUBS` taxonomy minus what the golfer carries/refuses + the putter; a full bag pays a rarity-scaled
@@ -302,7 +303,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   shop offer; the first hire blocks the rest. Each folds ONE loadout field (`driverAnywhere`/
   `chipInBoost`/`caddyGuard`/`clubSuggest`/`confidenceMod`/`lieRelief`/`puttBoost`/`autoPutt`).
   THE RULE (machine-checked by `tests/lab.test.ts`): every `NAMED_CADDY_IDS` entry must surface a
-  `caddyEffects` row. Guard redirects + chip-ins add rng ONLY when armed + qualifying.
+  `caddyEffects` row. Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side`
+  is a FAIRWAY side (ducks cover left-of-fairway, sheep right): `resolveShot` classifies off the hole's
+  `centreline` via `ShotInput.fairwaySide` (round.ts closes it over the hole), NOT the shot bearing —
+  a recovery aimed across from the rough used to misfire the ducks onto right-side misses. The renderer
+  draws the guard figure ONCE (the bottom-left corner figure the projectile fires from); do not also
+  float the portrait badge on the watch screen (it double-rendered the same caddy).
 - **Putting** (`docs/decisions/putting.md`). Manual pace-meter by default (`manualPutt`); AUTO only
   via the Penelope Putter caddy (`loadout.autoPutt`) — no manual toggle. `takePutt(…, control?)`:
   control → manual, none → `onePutt` (auto/tests, byte-for-byte). Fringe-putt is interactive-only.
@@ -378,7 +384,10 @@ For each system: the rule that constrains new work. Open the archive doc before 
   for trees — the path `flightKnockdown` delegates to — plus `tentFlightHit` when trade tents are
   armed) with px-derived sliver/merge smoothing — never fork the walks, never hard-code a px size
   into the sim. A line is shaded BINARY (GS-spray-block-2): clear when every landing in the window
-  flies over, else blocked from the object to the cone's FAR edge — never a floating mid-cone band. Turf
+  flies over, else blocked from the object to the cone's FAR edge — never a floating mid-cone band. The
+  blocked-zone marker glyph is keyed to the WORLD archetype (`TREE_GLYPH` mirrors `styleFlora`: oak/mushroom/
+  conifer/saguaro/…) so it matches the silhouette drawn — a fixed 🌲 stamped phantom pines on lyra's oaks;
+  tents stay ⛺. Turf
   bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test). Weather/
   atmosphere is the shared screen-space `render/weather.ts`. **Per-world identity is table+dispatch,
   never a fork (GS-biome-feel):** flora (`styleFlora`), boundary markers (`OB_LOOK`), signature decor
@@ -395,7 +404,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   (`strikeClassOf`, convention-based on CLUBS ids — beware `PW/GW/SW` end in 'W' but are wedges);
   touchdowns per SURFACE + tree hits per ARCHETYPE (GS-audio-3: `landVoiceOf` mirrors
   `spawnLandFX`'s dispatch, `treeVoiceOf` mirrors the flora table — coverage machine-checked;
-  fired via the play view's `onLand` feel hook, wah stays the score-cost cue); guard redirects
+  fired via the play view's `onLand` feel hook). A hazard with its OWN surface voice (splash/sizzle/void/
+  whale) does NOT also play the terminal `sfx.penalty` "wah" — that stays for SURFACELESS penalties (OB /
+  lost with no `landVoiceOf`), else the ball played both the new splash and the old wah (the doubled-sound
+  bug). And a lost-rough (void/cetus) ball that lands SAFE then rolls off into the abyss fires its lost-ball
+  FX+voice at REST, not on the safe fairway landing (`penaltyAtRest` in playView, GS-cetus-water). guard redirects
   sound both beats via `onRedirect` (GS-audio-4: laser pew/zap, boomerang whir/crack — the fire
   cue's `travelMs` folds in the slow-mo so the whir ends at the hit);
   music is table+dispatch per archetype (`MUSIC_TRACKS` + `'menu'`; coverage, distinct moods and

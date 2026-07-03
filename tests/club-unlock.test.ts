@@ -156,15 +156,30 @@ describe('reducer: a won voyage rewards the played golfer (GS-ascension-clubs)',
     expect(upd.maxAscension).toBe(1);
   });
 
-  it('RE-clearing a tier you already hold grants NO club (only new clears reward)', () => {
+  it('RE-clearing a tier THIS golfer already holds grants NO club (per-character gate)', () => {
     const win = wonVoyage(7, 'feather-fade'); // an A0 win
-    // Already cleared higher (maxAscension 5) → an A0 win unlocks nothing new → no club, no tier change.
-    const state = initState(1, { maxAscension: 5 });
+    // feather-fade has personally cleared A0 already (their own ladder is at 1) → nothing new to unlock.
+    const state = initState(1, { maxAscension: 5, maxAscensionByCharacter: { 'feather-fade': 1 } });
     const upd = runEndUpdates(state, win);
-    expect(upd.maxAscension).toBe(5); // unchanged — not a new clear
+    expect(upd.maxAscension).toBe(5); // unchanged — not a new GLOBAL clear
     expect(upd.lastClubUnlock).toBeUndefined();
     expect(upd.unlockedClubsByCharacter).toBe(state.unlockedClubsByCharacter); // untouched
+    expect(upd.maxAscensionByCharacter).toBe(state.maxAscensionByCharacter); // untouched
     expect(upd.shards).toBe(state.shards + shardsForRun(win)); // only the normal run shards
+  });
+
+  it('a SECOND golfer clearing a tier the FIRST already cleared still earns their own club (the per-character fix)', () => {
+    // The reported bug: only the first golfer to clear a tier got a club. Here feather-fade already
+    // pushed the GLOBAL maxAscension to 5, but longshot-larry has cleared nothing — an A0 win with larry
+    // must still bank larry's own first club, independent of the global counter.
+    const win = wonVoyage(7, 'longshot-larry');
+    const state = initState(1, { maxAscension: 5, maxAscensionByCharacter: { 'feather-fade': 5 } });
+    const upd = runEndUpdates(state, win);
+    expect(upd.lastClubUnlock?.kind).toBe('club');
+    expect(upd.maxAscensionByCharacter!['longshot-larry']).toBe(1); // larry's own ladder advances
+    expect(upd.maxAscensionByCharacter!['feather-fade']).toBe(5); // …the other golfer is untouched
+    expect(upd.maxAscension).toBe(5); // the global tier was already at 5 — unchanged
+    expect((upd.unlockedClubsByCharacter!['longshot-larry'] ?? []).length).toBe(1);
   });
 
   it('a won voyage with a FULL bag pays the Shard consolation instead', () => {
