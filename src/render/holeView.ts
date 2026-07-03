@@ -20,6 +20,7 @@ import { playBoundsCorners, sprayBlocking } from '../sim/round';
 import { sprayBands, SPRAY_GEOM, type SprayGeom } from '../sim/shot';
 import { flightControl } from '../sim/flight';
 import { tradeTents } from '../sim/tents';
+import { archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { holeProjector } from './project';
 import { buildScene, holeIdPrefix, scenePrimsToSvg, type ArtFeel } from './style';
 
@@ -56,8 +57,24 @@ const BAND_STROKE: Record<string, string> = {
  *  clearly around it. */
 const BLOCK_FILL = 'rgba(14,26,16,0.60)';
 const BLOCK_STROKE = 'rgba(150,220,140,0.45)';
-/** Glyph marking what blocks a shaded region — trees vs trade-camp tents. */
-const BLOCK_GLYPH: Record<'trees' | 'tents', string> = { trees: '🌲', tents: '⛺' };
+/** Glyph marking what blocks a shaded region. The TREE glyph is per world archetype so it matches the
+ *  silhouette actually drawn (styleFlora) — a fixed conifer 🌲 stamped pines over lyra's round oaks and
+ *  every other non-frost world (the "pine trees where there are none" bug). Tents are always ⛺. */
+const TENT_GLYPH = '⛺';
+const TREE_GLYPH: Record<BiomeArchetype, string> = {
+  verdant: '🌳', // round parkland oak
+  fungal: '🍄', // glowing mushroom stand
+  frost: '🌲', // snow-dusted conifer
+  inferno: '🪵', // charred ember snag
+  desert: '🌵', // saguaro
+  crystal: '🔷', // prism shard
+  tempest: '🌿', // wind-bent storm scrub
+  ocean: '🌴', // palm
+  cetus: '🪨', // coastal sea-stack
+  void: '🪨', // asteroid crag
+};
+const blockGlyph = (src: 'trees' | 'tents', arch: BiomeArchetype): string =>
+  src === 'tents' ? TENT_GLYPH : TREE_GLYPH[arch];
 
 // --- Zoom-aware overlay layout (GS-spray-zoom) --------------------------------
 // Every overlay layout decision below reads the projector's px-per-yard scale, so the cone stays
@@ -234,6 +251,9 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // one-sided suppression reads as a lop-sided cone. Each band is labelled with its true % of shots.
   if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0) {
     const s = opts.spray;
+    // The world archetype — so a blocked-zone TREE glyph matches the silhouette this world actually
+    // draws (round oak / mushroom / conifer / saguaro / …), never a hardcoded pine.
+    const arch = archetypeFor(opts.themeId, opts.biome ?? '');
     const bands = sprayBands(s.shape, s.angleSpread, geom);
     const drawn = bands.filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
     // px-per-yard at the current framing — every layout decision below reads it (GS-spray-zoom),
@@ -284,7 +304,7 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
       if (wPx >= 26 && dPx >= 16) {
         const [gx, gy] = place(sprayPoint(s, mid.a, (mid.r0 + mid.r1) / 2));
         parts.push(
-          `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">${BLOCK_GLYPH[region.src]}</text>`,
+          `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">${blockGlyph(region.src, arch)}</text>`,
         );
       }
     }

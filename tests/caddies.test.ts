@@ -383,6 +383,33 @@ describe('Convict Sheep — boomerang EVERY ball that would miss the fairway RIG
   });
 });
 
+describe('a guard classifies by FAIRWAY side, not the aim line (GS-caddy fix)', () => {
+  it('the ducks leave a RIGHT-of-fairway miss for the sheep even when the aim line is offset in the rough', () => {
+    // The reported bug: from the right rough, aiming straight down the hole (an aim line PARALLEL to the
+    // fairway but offset right of it), a ball that sprays a little left is still RIGHT of the fairway — yet
+    // the old bearing-relative sign read it as a LEFT miss and the ducks lasered it further offline (into a
+    // lake). The fix classifies off the fairway centreline (here `x < 0`).
+    const FROM_R: Vec = [50, 0]; // parked in the right rough
+    const AIM_UP: Vec = [50, 120]; // aim straight down the hole — parallel to the fairway, offset right of it
+    const fairwaySide = (p: Vec): 'left' | 'right' => (p[0] < 0 ? 'left' : 'right'); // fairway centred on x=0
+    let rightMisses = 0;
+    let fixedLasersRight = 0; // ducks firing on a right-of-fairway ball, WITH the centreline classifier
+    let buggyLasersRight = 0; // …with the old bearing-relative fallback (no fairwaySide)
+    for (let s = 0; s < 800; s++) {
+      const raw = resolveShot({ from: FROM_R, aim: AIM_UP, club: driver, lie: 'fairway', shape: wideMiss, rng: new Rng(`fs:${s}`) });
+      if (!(raw.landing[0] > FW_HALF)) continue; // only the right-of-fairway misses
+      rightMisses++;
+      const fixed = resolveShot({ from: FROM_R, aim: AIM_UP, club: driver, lie: 'fairway', shape: wideMiss, guard: SPACE_DUCKS_GUARD, offFairway, fairwaySide, rng: new Rng(`fs:${s}`) });
+      const buggy = resolveShot({ from: FROM_R, aim: AIM_UP, club: driver, lie: 'fairway', shape: wideMiss, guard: SPACE_DUCKS_GUARD, offFairway, rng: new Rng(`fs:${s}`) });
+      if (fixed.redirect?.kind === 'laser') fixedLasersRight++;
+      if (buggy.redirect?.kind === 'laser') buggyLasersRight++;
+    }
+    expect(rightMisses).toBeGreaterThan(10); // the setup really does miss right of the fairway a lot
+    expect(fixedLasersRight).toBe(0); // FIX: the ducks (left) never touch a right-of-fairway ball
+    expect(buggyLasersRight).toBeGreaterThan(0); // the OLD bearing-relative sign wrongly lasered some of them
+  });
+});
+
 describe('a guard with no fairway test is byte-for-byte identical (no extra rng)', () => {
   it('a guard but no offFairway predicate leaves the landing + rng stream untouched', () => {
     const guard = { side: 'left' as const, kind: 'laser' as const };

@@ -67,7 +67,7 @@ import { CHARACTERS } from './sim/rpg/characters';
 import { loadSave, writeSave } from './save/storage';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
-import { sfx, resumeAudio } from './render/audio';
+import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { setMusicScene, type MusicSceneId } from './render/music';
 import { getSettings, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
@@ -131,6 +131,7 @@ function boot(): void {
       shards: save.shards,
       metaUpgrades: save.metaUpgrades,
       maxAscension: save.maxAscension,
+      maxAscensionByCharacter: save.maxAscensionByCharacter,
       lifetimeAces: save.lifetimeAces,
       ownedShips: save.ownedShips,
       ownedApparel: save.ownedApparel,
@@ -185,12 +186,13 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 13,
+    version: 14,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
     metaUpgrades: state.metaUpgrades,
     maxAscension: state.maxAscension,
+    maxAscensionByCharacter: state.maxAscensionByCharacter,
     lifetimeAces: state.lifetimeAces,
     ownedShips: state.ownedShips,
     ownedApparel: state.ownedApparel,
@@ -1368,15 +1370,13 @@ function playingBody(animating: boolean): string {
     // Full-bleed: the live shot canvas IS the screen. The play view draws the active caddy ITSELF in
     // the bottom-LEFT corner during flight — a guard caddy persistently (so its laser/boomerang
     // redirect originates from the figure), and any other hired caddy transiently while its effect
-    // calls out. The framed GOLD badge ALSO floats bottom-RIGHT here (`gs-hud-watchcaddy`, clear of
-    // that bottom-left corner figure + the top-left info chip) so the "premium hire" border reads the
-    // whole shot, matching the aim-and-charge + putting screens. The badge is a portrait; the corner
-    // figure is what the effects fire from.
+    // calls out. We do NOT also float the framed gold portrait badge here: the corner figure already
+    // shows the caddy, so a badge just rendered the SAME caddy twice (the "caddy shows twice on the
+    // shot-watching screen" bug). The portrait still rides the aim-and-charge + putting screens.
     return `
       <div class="gs-shot gs-shot--full">
         <div class="gs-bigmap" id="play"></div>
         ${mapTopInfo(v, { shotNo: play.strokes, distLabel: '…watching…' })}
-        <div class="gs-hud gs-hud-watchcaddy">${caddyBadgeHTML(caddyId())}</div>
       </div>`;
   }
 
@@ -3687,7 +3687,11 @@ function render(): void {
             sfx.holeOut();
             haptic(HAPTICS.holeOut);
           } else if (lastShot?.penalty) {
-            sfx.penalty();
+            // The touchdown surface voice (GS-audio-3) already sounds hazards with their own cue — a
+            // water splash, a lava sizzle, the void implosion, the star-ocean whale. Only add the generic
+            // penalty "wah" for a SURFACELESS penalty (OB / lost with no surface voice), so a water/void
+            // ball doesn't play BOTH the new splash and the old wah (the doubled-sound bug).
+            if (!landVoiceOf(lastShot.lieTo, lastShot.penalty)) sfx.penalty();
             haptic(HAPTICS.bad);
           }
           // Hold a beat after the ball settles so the finish reads as finished before the next screen

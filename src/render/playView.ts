@@ -1055,6 +1055,14 @@ export function mountPlayView(
       const carry = shot.result.carry;
       const touchdown = shot.result.landing;
       const rest = shot.rest ?? touchdown;
+      // The sim resolves `shot.penalty` at REST (after the roll-out), but the landing FX/voice fire at
+      // TOUCHDOWN. For every ordinary world these coincide (penalty surfaces are kept off the corridor,
+      // so a ball that lands safe never rolls into one). But on lost-rough islands (void/cetus) the ball
+      // routinely lands SAFE on the fairway island and then trickles off the edge INTO the void — so its
+      // "lost ball" implosion + void/whale voice must fire where the ball comes to REST, not on the safe
+      // fairway landing (the "lost-ball noise played on the fairway, not in the void" bug). The ball
+      // landed directly in the penalty ⇔ its touchdown lie === its rest lie; otherwise it rolled in.
+      const penaltyAtRest = !!shot.penalty && (shot.landLie ?? shot.lieTo) !== shot.lieTo;
       // The arc apex the SIM resolved (loft-scaled) + the club FAMILY's apex position (GS-flight-3),
       // so the drawn height matches the physics that decided whether a tree knocked the ball down —
       // a driver visibly bores while a wedge towers. The curved ground path launches along the shot
@@ -1215,9 +1223,12 @@ export function mountPlayView(
             const onScorch = scorchMarks.length > 0 && inScorch(scorchMarks, touchdown);
             const onPatch = !onScorch && patchLie && patchMarks.length > 0 && inPatch(patchMarks, touchdown);
             const landLie = onScorch ? 'scorch' : onPatch ? patchLie : (shot.landLie ?? shot.lieTo);
-            spawnLandFX([tdx, tdy], landLie, shot.penalty);
+            // Only carry the penalty into the TOUCHDOWN cue when the ball landed directly in it; a ball
+            // that rolls off into the void fires its lost-ball cue at rest below, not on the safe landing.
+            const tdPenalty = penaltyAtRest ? undefined : shot.penalty;
+            spawnLandFX([tdx, tdy], landLie, tdPenalty);
             // The surface also ANSWERS in sound (GS-audio-3) — same resolved lie the FX just showed.
-            opts.onLand?.(landLie, shot.penalty, shot.knockedDown);
+            opts.onLand?.(landLie, tdPenalty, shot.knockedDown);
           }
           // Dr Chipinski chip-in (GS-caddy-voices): as the ball drops in, slow the world and have the
           // doctor "answer the call" — the phone glyph + "You rang?" bubble + voice. Fires once.
@@ -1319,6 +1330,13 @@ export function mountPlayView(
           lastImpactShot = shotIndex;
           if (shot.holed) spawnImpact([rsx, rsy], 1);
           else if (shot.knockedDown) spawnLeaves([tdx, tdy]);
+          // A ball that landed safe and then rolled off into a penalty (a lost-rough void/cetus island)
+          // fires its lost-ball implosion + voice HERE, at the ball's actual resting point in the void —
+          // not on the safe fairway landing above (the "lost-ball cue on the fairway" bug).
+          if (penaltyAtRest) {
+            spawnLandFX([rsx, rsy], shot.lieTo, shot.penalty);
+            opts.onLand?.(shot.lieTo, shot.penalty, shot.knockedDown);
+          }
           trail = [];
         }
         // Advance to the next shot only after the ball has sat at rest for restHoldMs.

@@ -891,6 +891,37 @@ export interface ExecResult {
 const CADDY_GREENSIDE_MARGIN = 30;
 
 /**
+ * Which WORLD side of the fairway a point sits on (GS-caddy). Finds the nearest segment of the hole's
+ * centreline and returns 'left'/'right' off that segment's local forward direction — the same
+ * "+ = right of the shot line" convention `resolveShot` uses (right-perp of forward `f` is `(f.y, −f.x)`).
+ * A guard's `side` is a fairway side, so this is what decides whether the Space Ducks (left) or the
+ * Convict Sheep (right) cover a given miss — independent of where the player happened to aim.
+ */
+function fairwaySideOf(centreline: Vec[], p: Vec): 'left' | 'right' {
+  if (centreline.length < 2) return 'right';
+  let bestD = Infinity;
+  let lateral = 0;
+  for (let i = 0; i < centreline.length - 1; i++) {
+    const a = centreline[i]!;
+    const b = centreline[i + 1]!;
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const segLen2 = dx * dx + dy * dy;
+    // Project p onto the segment, clamped to its endpoints, to find the closest point on it.
+    const t = segLen2 > 1e-9 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / segLen2)) : 0;
+    const cx = a[0] + dx * t;
+    const cy = a[1] + dy * t;
+    const d = (p[0] - cx) * (p[0] - cx) + (p[1] - cy) * (p[1] - cy);
+    if (d < bestD) {
+      bestD = d;
+      // Signed side off this segment's forward direction: right-perp of (dx,dy) is (dy,-dx).
+      lateral = (p[0] - cx) * dy + (p[1] - cy) * -dx;
+    }
+  }
+  return lateral < 0 ? 'left' : 'right';
+}
+
+/**
  * Resolve ONE full shot — wind-compensated aim, flight, bounce/roll-out, penalty, and
  * hole-out — given an explicit `target` and `club`. Shared by the AI (playHole) and the
  * interactive player driver so both obey identical physics. Pure: randomness from `rng`.
@@ -956,6 +987,10 @@ export function executeShot(
     // course-agnostic. Off the fairway = any lie that isn't fairway or green (rough/sand/void/water/…).
     // Built only when a guard is owned, so a guard-less shot passes `undefined` → no redirect, no draw.
     offFairway: opts.guard ? (p: Vec) => { const k = lieAt(hole, p); return k !== 'fairway' && k !== 'green'; } : undefined,
+    // Which side of the FAIRWAY the miss is on (GS-caddy) — classified off the hole's centreline, not the
+    // shot bearing, so the guard covers its true world side (fixes ducks firing on right-of-fairway misses
+    // aimed across from the rough). Built only with a guard, so a guard-less shot is byte-for-byte unchanged.
+    fairwaySide: opts.guard ? (p: Vec) => fairwaySideOf(hole.centreline, p) : undefined,
     greenAim,
     lieRelief: opts.lieRelief,
     lefty: opts.lefty,
@@ -1411,6 +1446,10 @@ export function sprayBlocking(
       for (let k = i; k < j; k++) {
         const t = (k - (i - 1)) / (j - (i - 1));
         intervals[k] = { r0: prev.r0 + (next.r0 - prev.r0) * t, r1: prev.r1 + (next.r1 - prev.r1) * t };
+        // Carry a cause across the bridged gap too (nearest blocked neighbour), so a merged region's
+        // tree-vs-tent classification counts the whole run — a bridged gap left as `null` biased every
+        // merged region to 'trees' and could stamp the wrong glyph over a tent stretch.
+        causes[k] = (k - (i - 1) <= j - k ? causes[i - 1] : causes[j]) ?? causes[i - 1] ?? causes[j] ?? 'trees';
       }
     }
     i = j;

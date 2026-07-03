@@ -12,7 +12,7 @@ import type { BagTier } from '../sim/rpg/bag';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -274,8 +274,38 @@ export interface SaveV13 {
   savedAt?: string;
 }
 
+/** v14 — per-character Ascension clears (GS-ascension-clubs fix): the highest Ascension tier EACH
+ *  golfer has personally cleared (characterId → cleared-tier+1), so the victory club unlock is gated
+ *  per character instead of off the single global `maxAscension`. Without it only the FIRST golfer to
+ *  clear a tier ever earned a club; now every golfer has their own unlock ladder. `maxAscension` stays
+ *  global (difficulty selection + bag tiers). */
+export interface SaveV14 {
+  version: 14;
+  bestStableford: number;
+  bestDistance: number;
+  shards: number;
+  metaUpgrades: MetaUpgrades;
+  maxAscension: number;
+  /** Per-character highest Ascension cleared (+1), keyed by characterId — the club-unlock gate. */
+  maxAscensionByCharacter: Record<string, number>;
+  lifetimeAces: number;
+  ownedShips: string[];
+  ownedApparel: string[];
+  shipByCharacter: Record<string, string>;
+  hatByCharacter: Record<string, string>;
+  shirtByCharacter: Record<string, string>;
+  pantsByCharacter: Record<string, string>;
+  golfBagByCharacter: Record<string, string>;
+  bagTier: BagTier;
+  unlockedClubsByCharacter: Record<string, string[]>;
+  clubhouseVisit: number;
+  endlessBestHoles: number;
+  activeRun?: RunSnapshot;
+  savedAt?: string;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV13;
+export type Save = SaveV14;
 
 export function defaultSave(): Save {
   return {
@@ -285,6 +315,7 @@ export function defaultSave(): Save {
     shards: 0,
     metaUpgrades: {},
     maxAscension: 0,
+    maxAscensionByCharacter: {},
     lifetimeAces: 0,
     ownedShips: [DEFAULT_SHIP_ID],
     ownedApparel: [],
@@ -554,6 +585,13 @@ function v12ToV13(s: SaveV12): SaveV13 {
   };
 }
 
+/** v13 → v14: seed each character's personal Ascension-clear ladder empty. Existing golfers start at
+ *  zero and earn their first per-character club on their next new clear — nobody is retroactively
+ *  granted or locked out. Everything else is preserved. */
+function v13ToV14(s: SaveV13): SaveV14 {
+  return { ...s, version: 14, maxAscensionByCharacter: {} };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -574,6 +612,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 10) s = v10ToV11(s as unknown as SaveV10) as unknown as typeof s;
   if (s.version === 11) s = v11ToV12(s as unknown as SaveV11) as unknown as typeof s;
   if (s.version === 12) s = v12ToV13(s as unknown as SaveV12) as unknown as typeof s;
+  if (s.version === 13) s = v13ToV14(s as unknown as SaveV13) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -581,10 +620,10 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v13 = s as unknown as Partial<SaveV13>;
-  const ownedShips = v13.ownedShips && v13.ownedShips.length ? v13.ownedShips : [DEFAULT_SHIP_ID];
-  const ownedApparel = v13.ownedApparel ?? [];
-  const bagTier: BagTier = v13.bagTier ?? 'common';
+  const v14 = s as unknown as Partial<SaveV14>;
+  const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
+  const ownedApparel = v14.ownedApparel ?? [];
+  const bagTier: BagTier = v14.bagTier ?? 'common';
   // Drop any per-character equip that references an unowned item (so a stale/edited blob can't show a
   // ship/garment the player doesn't actually own).
   const sanitize = (m: Record<string, string> | undefined, owned: string[]): Record<string, string> => {
@@ -594,25 +633,26 @@ export function migrate(raw: unknown): Save {
   };
   return {
     version: SAVE_VERSION,
-    bestStableford: v13.bestStableford ?? 0,
-    bestDistance: v13.bestDistance ?? 0,
-    shards: v13.shards ?? 0,
-    metaUpgrades: v13.metaUpgrades ?? {},
-    maxAscension: v13.maxAscension ?? 0,
-    lifetimeAces: v13.lifetimeAces ?? 0,
+    bestStableford: v14.bestStableford ?? 0,
+    bestDistance: v14.bestDistance ?? 0,
+    shards: v14.shards ?? 0,
+    metaUpgrades: v14.metaUpgrades ?? {},
+    maxAscension: v14.maxAscension ?? 0,
+    maxAscensionByCharacter: v14.maxAscensionByCharacter ?? {},
+    lifetimeAces: v14.lifetimeAces ?? 0,
     ownedShips,
     ownedApparel,
-    shipByCharacter: sanitize(v13.shipByCharacter, ownedShips),
-    hatByCharacter: sanitize(v13.hatByCharacter, ownedApparel),
-    shirtByCharacter: sanitize(v13.shirtByCharacter, ownedApparel),
-    pantsByCharacter: sanitize(v13.pantsByCharacter, ownedApparel),
-    golfBagByCharacter: sanitize(v13.golfBagByCharacter, ownedApparel),
+    shipByCharacter: sanitize(v14.shipByCharacter, ownedShips),
+    hatByCharacter: sanitize(v14.hatByCharacter, ownedApparel),
+    shirtByCharacter: sanitize(v14.shirtByCharacter, ownedApparel),
+    pantsByCharacter: sanitize(v14.pantsByCharacter, ownedApparel),
+    golfBagByCharacter: sanitize(v14.golfBagByCharacter, ownedApparel),
     bagTier,
-    unlockedClubsByCharacter: v13.unlockedClubsByCharacter ?? {},
-    clubhouseVisit: v13.clubhouseVisit ?? 0,
-    endlessBestHoles: v13.endlessBestHoles ?? 0,
-    activeRun: v13.activeRun,
-    savedAt: v13.savedAt,
+    unlockedClubsByCharacter: v14.unlockedClubsByCharacter ?? {},
+    clubhouseVisit: v14.clubhouseVisit ?? 0,
+    endlessBestHoles: v14.endlessBestHoles ?? 0,
+    activeRun: v14.activeRun,
+    savedAt: v14.savedAt,
   };
 }
 

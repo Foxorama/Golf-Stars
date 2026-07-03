@@ -602,6 +602,13 @@ export interface ShotInput {
    *  so a greenside save lands ON the green, not just the fairway. The caller closes it over the hole's
    *  green + pin. Absent/null ⇒ the guard recentres onto the fairway line instead (no green teleport). */
   greenAim?: (landing: Vec) => Vec | null;
+  /** Which side of the FAIRWAY a would-be landing sits on (GS-caddy). The caller closes it over the
+   *  hole's centreline so a guard fires on the correct WORLD side ('left' = a Space Duck's laser covers
+   *  left-of-fairway misses; 'right' = a Convict Sheep's boomerang covers right). Without it the guard
+   *  falls back to the landing's sign off the SHOT BEARING — wrong whenever the aim line isn't parallel
+   *  to the fairway (e.g. a recovery aimed across from the rough), which fired the ducks on right-side
+   *  misses and knocked them further offline. Absent ⇒ the old bearing-relative sign (byte-for-byte). */
+  fairwaySide?: (landing: Vec) => 'left' | 'right';
   /**
    * Left-handed mode (GS-lefty): mirror the player's lateral shot tendencies in WORLD space. A
    * left-handed golfer is the mirror image of a right-handed one — their hook curves right, their
@@ -731,8 +738,15 @@ export function resolveShot(input: ShotInput): ShotResult {
   // is a deterministic point → no draw), and only on an actual knock-back.
   let redirect: ShotRedirect | undefined;
   if (input.guard && input.offFairway && input.offFairway(landing)) {
-    const lateral = (landing[0] - from[0]) * rx + (landing[1] - from[1]) * ry;
-    const side: 'left' | 'right' = lateral < 0 ? 'left' : 'right';
+    // Which side of the FAIRWAY the miss came down on — the guard's `side` is a WORLD side ('left'/
+    // 'right' of the fairway), so classify off the fairway centreline when the caller supplied it. The
+    // old sign-off-the-bearing (kept as the fallback for hole-less unit calls) misfired the guard the
+    // moment the aim line wasn't parallel to the fairway.
+    const side: 'left' | 'right' = input.fairwaySide
+      ? input.fairwaySide(landing)
+      : (landing[0] - from[0]) * rx + (landing[1] - from[1]) * ry < 0
+        ? 'left'
+        : 'right';
     if (side === input.guard.side) {
       const origLanding = landing;
       const onGreen = input.greenAim ? input.greenAim(landing) : null;

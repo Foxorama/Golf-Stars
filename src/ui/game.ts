@@ -129,6 +129,10 @@ export interface UiState {
   lastRunShards?: number;
   /** Highest Ascension tier unlocked (GS-ascension) — selectable on the title for a voyage. */
   maxAscension: number;
+  /** Highest Ascension tier EACH golfer has personally cleared (+1), keyed by characterId
+   *  (GS-ascension-clubs fix). Gates the per-character victory club unlock independently of the global
+   *  `maxAscension`, so every golfer has its own unlock ladder (not just the first to clear a tier). */
+  maxAscensionByCharacter: Record<string, number>;
   /** Lifetime holes-in-one made across every run (GS-ace) — a permanent, cross-run record. */
   lifetimeAces: number;
   /** The owned permanent default-bag tier (GS-bag-tiers) — baked into every new run's starting bag.
@@ -230,6 +234,7 @@ export interface MetaProgress {
   shards?: number;
   metaUpgrades?: MetaUpgrades;
   maxAscension?: number;
+  maxAscensionByCharacter?: Record<string, number>;
   lifetimeAces?: number;
   ownedShips?: string[];
   ownedApparel?: string[];
@@ -314,6 +319,7 @@ export function initState(
     shards: meta.shards ?? 0,
     metaUpgrades,
     maxAscension: meta.maxAscension ?? 0,
+    maxAscensionByCharacter: meta.maxAscensionByCharacter ?? {},
     lifetimeAces: meta.lifetimeAces ?? 0,
     bagTier,
     ownedShips: meta.ownedShips && meta.ownedShips.length ? meta.ownedShips : [DEFAULT_SHIP_ID],
@@ -395,19 +401,30 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
   const maxAscension = unlockedAscension(state, run);
   const characterId = run.loadout.characterId;
   const owned = (characterId && state.unlockedClubsByCharacter[characterId]) || [];
-  // The club reward fires only on a NEW Ascension clear — a won voyage that pushes maxAscension higher
-  // (the same gate the bag tiers use), NOT every win. Re-clearing a tier you already hold grants nothing;
-  // a missed cut / bank just banks shards.
-  const reward =
-    maxAscension > state.maxAscension
-      ? ascensionClubReward(characterId, state.bagTier, owned, `${run.seed}:${run.ascension}`)
-      : undefined;
+  // The club reward is PER CHARACTER (GS-ascension-clubs fix): a golfer earns a club when THEY clear an
+  // Ascension tier they hadn't cleared before — tracked in `maxAscensionByCharacter`, independent of
+  // which OTHER golfer first pushed the global `maxAscension`. Before this fix the gate was the global
+  // `maxAscension > state.maxAscension`, so only the FIRST golfer to clear a tier ever got a club; every
+  // later golfer clearing the same tier was silently denied. Now each golfer has its own unlock ladder;
+  // re-clearing a tier THIS golfer already holds grants nothing (a missed cut / bank just banks shards).
+  const charBest = (characterId && state.maxAscensionByCharacter[characterId]) || 0;
+  const charCleared =
+    run.endedReason === 'won' && characterId
+      ? Math.min(ASCENSION_MAX, Math.max(charBest, run.ascension + 1))
+      : charBest;
+  const newCharClear = charCleared > charBest && !!characterId;
+  const reward = newCharClear
+    ? ascensionClubReward(characterId, state.bagTier, owned, `${run.seed}:${run.ascension}`)
+    : undefined;
   const gotClub = reward?.kind === 'club' && !!characterId;
   const bonusShards = reward?.kind === 'shards' ? reward.shards : 0;
   return {
     shards: state.shards + earned + bonusShards,
     lastRunShards: earned,
     maxAscension,
+    maxAscensionByCharacter: newCharClear
+      ? { ...state.maxAscensionByCharacter, [characterId!]: charCleared }
+      : state.maxAscensionByCharacter,
     unlockedClubsByCharacter: gotClub
       ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
       : state.unlockedClubsByCharacter,
@@ -1043,6 +1060,7 @@ export function reduce(state: UiState, action: Action): UiState {
           shards: state.shards,
           metaUpgrades: state.metaUpgrades,
           maxAscension: state.maxAscension,
+          maxAscensionByCharacter: state.maxAscensionByCharacter,
           lifetimeAces: state.lifetimeAces,
           ownedShips: state.ownedShips,
           ownedApparel: state.ownedApparel,

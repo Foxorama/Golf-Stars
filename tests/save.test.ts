@@ -13,14 +13,15 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(13);
+    expect(SAVE_VERSION).toBe(14);
     const d = defaultSave();
-    expect(d.version).toBe(13);
+    expect(d.version).toBe(14);
     expect(d.golfBagByCharacter).toEqual({});
     expect(d.endlessBestHoles).toBe(0);
     expect(d.shards).toBe(0);
     expect(d.metaUpgrades).toEqual({});
     expect(d.maxAscension).toBe(0);
+    expect(d.maxAscensionByCharacter).toEqual({});
     expect(d.lifetimeAces).toBe(0);
     expect(d.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(d.ownedApparel).toEqual([]);
@@ -62,7 +63,7 @@ describe('save schema', () => {
     };
     const restored = importSave(exportSave(save));
     expect(restored).toMatchObject({
-      version: 13,
+      version: 14,
       clubhouseVisit: 7,
       shards: 120,
       bestDistance: 9,
@@ -101,7 +102,7 @@ describe('save schema', () => {
       clubhouseVisit: 4,
     };
     const s = migrate(v12);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.endlessBestHoles).toBe(0);
     expect(s.golfBagByCharacter).toEqual({});
     // Everything else rides through untouched.
@@ -109,6 +110,25 @@ describe('save schema', () => {
     expect(s.shards).toBe(77);
     expect(s.bagTier).toBe('rare');
     expect(s.shipByCharacter).toEqual({ 'feather-fade': 'racer-redline' });
+  });
+
+  it('migrates a v13 blob forward to v14 (seeds an empty per-character Ascension ladder, preserves everything else)', () => {
+    const v13 = {
+      ...defaultSave(),
+      version: 13 as const,
+      maxAscension: 5,
+      unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
+      clubhouseVisit: 6,
+    } as unknown as Parameters<typeof migrate>[0];
+    // Strip the v14-only field so the input is a genuine v13 shape.
+    delete (v13 as Record<string, unknown>).maxAscensionByCharacter;
+    const s = migrate(v13);
+    expect(s.version).toBe(14);
+    expect(s.maxAscensionByCharacter).toEqual({}); // nobody retroactively granted or locked out
+    // Everything else rides through untouched.
+    expect(s.maxAscension).toBe(5);
+    expect(s.unlockedClubsByCharacter).toEqual({ 'feather-fade': ['7i'] });
+    expect(s.clubhouseVisit).toBe(6);
   });
 
   it('migrates a v11 blob forward to v13 (seeds the lounge visit counter at 0, preserves everything else)', () => {
@@ -130,7 +150,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
     };
     const s = migrate(v11);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.clubhouseVisit).toBe(0);
     // Everything else rides through untouched.
     expect(s.shards).toBe(88);
@@ -158,7 +178,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'feather-fade': ['7i'] },
     };
     const s = migrate(v10);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.shards).toBe(140);
     expect(s.bagTier).toBe('epic');
     expect(s.ownedApparel).toEqual(['cap-classic', 'polo-classic']);
@@ -189,7 +209,7 @@ describe('save schema', () => {
       unlockedClubsByCharacter: { 'backspin-bo': ['6i'] },
     };
     const s = migrate(v9);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.shards).toBe(95);
     expect(s.maxAscension).toBe(3);
     expect(s.bagTier).toBe('rare');
@@ -229,7 +249,7 @@ describe('save schema', () => {
       bagTier: 'rare' as const,
     };
     const s = migrate(v8);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.shards).toBe(95);
     expect(s.bagTier).toBe('rare');
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'wagon-gold']);
@@ -254,7 +274,7 @@ describe('save schema', () => {
       marketSeed: 3,
     };
     const s = migrate(v6);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.shards).toBe(70);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline']);
     expect(s.shipByCharacter[CHARACTERS[0]!.id]).toBe('racer-redline');
@@ -289,7 +309,7 @@ describe('save schema', () => {
       activeRun: { seed: 5, stopIndex: 2, distanceFromStart: 8, credits: 50, perks: ['gyro'] },
     };
     const s = migrate(v2);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.shards).toBe(0);
     expect(s.metaUpgrades).toEqual({});
     expect(s.maxAscension).toBe(0);
@@ -310,7 +330,7 @@ describe('save schema', () => {
       bestStableford: 30,
     };
     const s = migrate(v1);
-    expect(s.version).toBe(13);
+    expect(s.version).toBe(14);
     expect(s.shards).toBe(0);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(s.bestStableford).toBe(30);
