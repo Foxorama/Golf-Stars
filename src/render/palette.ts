@@ -350,10 +350,9 @@ export const SAND = {
   shadow: '#c4ad6f',
   rake: 'rgba(255,250,230,0.55)',
   ink: '#8a7740',
-  // GS-inset depression shading (a single upper-left light): the near (up-light) wall in shadow,
-  // and a soft dark contact shadow cast onto the surrounding turf so the bunker sits IN the ground.
-  wall: 'rgba(74,54,18,0.42)',
-  contact: 'rgba(8,10,6,0.20)',
+  // GS-inset-2 depression shading (a single upper-left light): a SLIM shadow on the near (up-light)
+  // rim so the bunker reads dug in — soft, so it's a lip, not a distinct dark shadow.
+  wall: 'rgba(74,54,18,0.28)',
 };
 
 /** Water as banded depth: a shallow shoreline, a mid body, a deep core + white glints. */
@@ -364,9 +363,8 @@ export const WATER = {
   deepest: '#1d4f96',
   glint: 'rgba(255,255,255,0.65)',
   ink: '#163b6b',
-  // GS-inset: the raised bank shadows the water along the up-light shore + a contact shadow on turf.
-  bank: 'rgba(6,20,44,0.40)',
-  contact: 'rgba(4,8,20,0.22)',
+  // GS-inset-2: a slim shadow along the up-light shore so the water reads sunk below its bank.
+  bank: 'rgba(6,20,44,0.30)',
 };
 
 /** Molten lava (lakes + rivers): a charred crust rim, a glowing body, a hot core + bright cracks. */
@@ -377,9 +375,8 @@ export const LAVA = {
   core: '#ffd24a',
   crack: '#ffb24a',
   ink: '#651a0a',
-  // GS-inset: a cooler charred bank along the up-light shore + a dark contact shadow on the turf.
-  bank: 'rgba(18,4,2,0.45)',
-  contact: 'rgba(10,4,2,0.24)',
+  // GS-inset-2: a cooler charred bank along the up-light shore so the lava reads sunk below its crust.
+  bank: 'rgba(18,4,2,0.32)',
 };
 
 /** Cell-shaded canopy: a core shadow, a mid body, a lit cap, a trunk + ground shadow + ink. */
