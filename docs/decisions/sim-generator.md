@@ -65,6 +65,35 @@
   frost 0.49, verdant 0.74 toPar/hole at wildness 1). Re-run `tests/layout-variety` + the no-death-spiral
   bars after touching them. (Crossing gates also dropped 0.3→0.26 — above the stop-0 wildness ceiling, so
   water splits fairways from the mid stops on while stop 0 stays crossing-free.)
+- **DEEP ROUGH chokes the dogleg cut-line (GS-deep-rough).** Groves alone weren't enough — a lofted
+  bomb clears a treeline, so firing straight over a dogleg corner at the pin still paid off and the
+  "play down the fairway" strategy had no teeth. Deep rough is the GROUND answer, sitting in the same
+  place as the groves (walk the STRAIGHT tee→green chord; where it's genuinely OFF the corridor — the
+  corner being cut — drop a themed blob + a couple of companions to choke the gap). On land worlds it's
+  the new `deeprough` lie (carry 0.5, dispersion 1.7, roll 0.2/firmness 0.14 — the deepest recoverable
+  land lie, harsher than `fescue`; NON-penalty, a hack-out you can't advance far from, so cutting the
+  corner GAINS NOTHING). On the OCEAN world (`tidal-archipelago`) the deep rough is the SEA itself
+  (`deepRough: 'water'`) — the sandy-shore rough gives way to open water, so the cut is a real penalty
+  carry; every other world sets `deepRough: 'deeprough'`. Opt-in per biome via the `deepRough` field:
+  the lost-rough worlds (void/cetus) DON'T set it (off their fairway is already the abyss → untouched)
+  and the `!lostRough` guard double-protects a calm cetus/void stop. **Fair by construction:** the blob
+  sits far from the BENT corridor even though it's on the straight chord (placement requires
+  `polylineDist(cp, centreline) ≥ fairwayHalfWidth + 22`, radii kept small), so for the ocean's penalty
+  water `validateFairness` holds with big headroom — the fairway route around the leg is always clean.
+  STRAIGHT holes place nothing (the chord hugs the centreline → the off-corridor reject fires with zero
+  rng), so the pass draws NOTHING on a straight hole and is byte-identical there; a dogleg's new draws
+  are appended AFTER every other hazard pass (each earlier placement byte-identical). Wildness-gated at
+  `DEEP_ROUGH_MIN_WILDNESS = 0.3` (above the stop-0 ceiling → the forgiving opener stays cuttable).
+  Balance holds because the auto reach-AI plays down the fairway, not the cut — the corner deep rough
+  punishes the PLAYER's greedy line, so the death-spiral bars barely move (full suite + harness green).
+  Render is table+dispatch per archetype (`style.ts DEEP_ROUGH` + `styleDeepRough`, own per-patch
+  stream like fescue): a dark dense body — tangled grass (verdant/tempest/desert/fungal), a shadowed
+  packed snowdrift (frost), a cinder-ash clump (inferno), a shard thicket (crystal) — so the tangle
+  suits the world. `GENERATOR_VERSION` 12→13; content-as-data (a biome field + a lie row + a generator
+  pass), no new `_gs*`/URL hook, so the test-hub guard needs nothing. Re-shoot
+  `scripts/deeprough-preview.mjs` after any `styleDeepRough`/`DEEP_ROUGH` change; guarded by
+  `tests/deep-rough.test.ts` (lie ordering, off-corridor placement + fairness, the cut-line is choked,
+  the ocean's sea carry, void/cetus untouched, the calm-opener gate, determinism).
 - **Greens are VARIED organic shapes, NOT circles (GS-greens, `generate.ts`).** `greenPoly` builds the
   putting surface from a few seeded harmonics + an optional kidney lobe, stretched along a random long
   axis — so greens come as blobs, kidneys, long shelves, pears and punchbowls. The per-biome row sets

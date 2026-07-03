@@ -36,7 +36,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 12;
+export const GENERATOR_VERSION = 13;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -47,6 +47,7 @@ const LOST_ROUGH_MIN_WILDNESS = 0.55; // below: void plays as ordinary (fair) ro
 const LAVA_RIVER_MIN_WILDNESS = 0.26; // below: a calm ember stop has no river
 const FROZEN_POND_MIN_WILDNESS = 0.26; // below: a calm frost stop has no pond crossing
 const WATER_CREEK_MIN_WILDNESS = 0.26; // below: a calm parkland stop has no creek crossing
+const DEEP_ROUGH_MIN_WILDNESS = 0.3; // below (incl. the stop-0 ceiling): doglegs stay cuttable — the forgiving opener
 
 /** Penalty kinds that are SANCTIONED forced carries on the play corridor (GS-19/GS-mechanics): they
  *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
@@ -548,6 +549,7 @@ const HAZARD_FAMILY: Record<string, string> = {
   lavariver: 'lava',
   barranca: 'ravine',
   fescue: 'fescue',
+  deeprough: 'deeprough',
 };
 
 /** Proper segment intersection (strict — shared endpoints/collinear touch don't count). */
@@ -1207,6 +1209,53 @@ function generateHole(
       const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
       if (clearsPlayCorridor(c, r, centreline, tee, green, fairwayHalfWidth)) {
         hazards.push({ kind, poly: blobPoly(c, r, 16, 0.3, rng) });
+      }
+    }
+  }
+
+  // DEEP ROUGH on a dogleg's cut-the-corner line (GS-deep-rough): the deepest recoverable land lie
+  // (`deeprough`) — or, on the OCEAN world, the sea itself (`water`, a penalty carry) — CHOKING the
+  // inside of a bend, right on the STRAIGHT tee→green line you'd otherwise just fire over to reach the
+  // pin. With it there, cutting the corner drops you in hay you can barely advance from (or in the
+  // drink), so you must play AROUND, down the fairway — the same lever as the blocking groves but a
+  // GROUND hazard a lofted bomb can't clear. Kept fully OFF the corridor (a generous margin), so the
+  // fairway route stays clean and, for the ocean's penalty water, `validateFairness` holds by
+  // construction (the corner sits far from the bent corridor even though it's on the straight chord).
+  // Only genuine bends qualify — on a straight hole the chord hugs the centreline, so nothing places.
+  // Wildness-gated (the opener stays forgiving) and per-biome opt-in via `deepRough`; the lost-rough
+  // worlds (void/cetus) never set it, so they're untouched. Appended after every other hazard pass, so
+  // each earlier placement is byte-identical to before this field existed.
+  if (biome.deepRough && par >= 4 && !lostRough && wildness >= DEEP_ROUGH_MIN_WILDNESS) {
+    const kind = biome.deepRough;
+    const chordLen = dist(tee, green) || 1;
+    const cdx = (green[0] - tee[0]) / chordLen;
+    const cdy = (green[1] - tee[1]) / chordLen;
+    // Reliable enough to actually FORCE the fairway route (the whole point), ramping with wildness.
+    const standChance = Math.min(0.9, 0.55 + wildness * 0.35);
+    const maxStands = par >= 5 ? 3 : 2;
+    let stands = 0;
+    const STEPS = 14;
+    for (let s = 2; s < STEPS - 1 && stands < maxStands; s++) {
+      const f = s / STEPS;
+      const cp: Vec = [tee[0] + cdx * chordLen * f, tee[1] + cdy * chordLen * f];
+      // Only where the straight line is genuinely OFF the corridor (the corner being cut). The +22
+      // reject leaves clearance for the blob radius below so its inner edge never reaches the corridor.
+      if (polylineDist(cp, centreline) < fairwayHalfWidth + 22) continue;
+      if (rng.float() > standChance) continue;
+      stands++;
+      const r = rng.range(7, 11);
+      hazards.push({ kind, poly: blobPoly(cp, r, 12, 0.3, rng) });
+      // A couple of companions choke the rest of the gap between the corridor and the straight line —
+      // each kept off the corridor edge so the fairway stays clean (and any penalty stays fair).
+      const companions = rng.int(1, 3);
+      for (let k = 0; k < companions; k++) {
+        const a = rng.range(0, Math.PI * 2);
+        const dd = rng.range(6, 14);
+        const c2: Vec = [cp[0] + Math.cos(a) * dd, cp[1] + Math.sin(a) * dd];
+        const r2 = rng.range(5, 8);
+        if (polylineDist(c2, centreline) >= fairwayHalfWidth + r2 + 10) {
+          hazards.push({ kind, poly: blobPoly(c2, r2, 10, 0.3, rng) });
+        }
       }
     }
   }

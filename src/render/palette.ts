@@ -15,6 +15,7 @@ export const FILL: Record<string, string> = {
   waste: '#c2b280',
   pot: '#d8c48f', // deep pot bunker — a touch darker than open sand
   fescue: '#8a9a52', // wispy native fescue (olive-tan tall grass)
+  deeprough: '#3a4a1e', // deepest tangle (dark; themed per world in style.ts styleDeepRough)
   barranca: '#6b5a48', // dry rocky ravine/chasm
   lava: '#d2451e',
   lavariver: '#e2541a',
