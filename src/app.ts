@@ -1960,90 +1960,154 @@ function shotPopupOverlay(): string {
     </div>`;
 }
 
-function scorecard(): string {
-  if (!state.played) return '';
-  const rows = state.played
-    .map((p, i) => {
-      const sel = i === state.viewHole;
-      return `<tr${sel ? ' style="background:#1d212c;"' : ''} data-action='${JSON.stringify({ type: 'viewHole', hole: i })}'>
-        <td>${i + 1}</td><td>${p.record.par}</td>
-        <td><b>${p.record.strokes}</b></td><td style="opacity:.8;">${p.pickedUp ? 'Picked up' : scoreName(p.record.par, p.record.strokes)}</td></tr>`;
-    })
-    .join('');
-  return `<table class="gs-scorecard">
-    <tr><th>#</th><th>Par</th><th>Score</th><th></th></tr>${rows}</table>`;
+/** One big stat tile for the stop-result header (label over a large value), mirroring the intro's
+ *  stat language + the Unending-Universe score card so the recap reads at a glance. */
+function resultStat(label: string, value: string, col: string, sub = ''): string {
+  return `<div class="gs-result-stat">
+    <div class="gs-result-stat-v" style="color:${col};">${value}</div>
+    <div class="gs-result-stat-l">${label}</div>
+    ${sub ? `<div class="gs-result-stat-s">${sub}</div>` : ''}
+  </div>`;
 }
 
+/** The round, hole by hole (GS-result): a clickable strip of hole cards — strokes, par and the
+ *  score relative to par, tinted eagle-gold → blow-up-red (the `holePips` palette). Tapping a hole
+ *  drives the replay below it (the `viewHole` action, selected hole ringed). This is the golf-soul
+ *  journey of the stop, promoted out of the old collapsed `<details>` scorecard. */
+function roundStrip(): string {
+  if (!state.played || state.played.length === 0) return '';
+  const cards = state.played
+    .map((p, i) => {
+      const sel = i === state.viewHole;
+      const r = p.record;
+      const rel = r.strokes - r.par;
+      const col = p.pickedUp
+        ? '#b3402f'
+        : rel <= -2 ? '#ffd54a' : rel === -1 ? '#5fd45a' : rel === 0 ? '#9fd8e6' : rel === 1 ? '#ffc454' : '#ff6b6b';
+      const relLabel = p.pickedUp ? '✕' : rel === 0 ? 'E' : rel > 0 ? `+${rel}` : `${rel}`;
+      const name = p.pickedUp ? 'Picked up' : scoreName(r.par, r.strokes);
+      return `<button class="gs-round-hole${sel ? ' gs-round-hole--sel' : ''}" style="--hc:${col};"
+          data-action='${JSON.stringify({ type: 'viewHole', hole: i })}' title="Hole ${i + 1} · par ${r.par} · ${r.strokes} strokes — ${name}. Tap to replay.">
+        <span class="gs-round-no">H${i + 1}</span>
+        <span class="gs-round-strokes">${r.strokes}</span>
+        <span class="gs-round-par">par ${r.par}</span>
+        <span class="gs-round-name">${relLabel}</span>
+      </button>`;
+    })
+    .join('');
+  return `<div class="gs-round" role="group" aria-label="Your round, hole by hole — tap a hole to replay it">${cards}</div>`;
+}
+
+/**
+ * The post-stop recap (GS-result): built to the same quality bar as the arc/hole intro — a
+ * rarity-framed panel with a verdict badge over the world you just played, big stat tiles (Stableford
+ * / gross / cut-or-place / credits), the round hole-by-hole (tap to replay), then the standings and a
+ * full-width Continue. The Unending Universe keeps its golf-score card + records board; the Voyage/
+ * match paths get the new tiles + round strip. Pure render off `state` — no rng, no save.
+ */
 function resultScreen(): string {
   const res = state.lastResult!;
+  const c = state.course;
+  const gate = holeGateArmed(state.run);
+  const passed = res.passed;
+  const col = rarCol(c.rarity);
+  const rar = rarityFlavour(c.rarity);
+  const zone = zoneProfile(archetypeFor(c.meta.themeId, c.biome));
+  const theme = c.meta.themeId ? themeById(c.meta.themeId) : undefined;
+  const par = c.holes.reduce((s, h) => s + h.par, 0);
+
+  const verdict = state.match
+    ? passed
+      ? 'MATCH WON'
+      : 'MATCH LOST'
+    : gate
+      ? passed
+        ? 'SET SURVIVED'
+        : 'THE UNIVERSE WINS'
+      : passed
+        ? 'MADE THE CUT'
+        : 'MISSED CUT';
+  const vcol = passed ? '#5fd45a' : '#ff6b6b';
+
+  const head = `<div class="gs-result-head">
+      <div style="min-width:0;">
+        <div class="gs-result-eyebrow">Stop ${res.stopIndex + 1} · ${passed ? 'cleared' : 'ended'}</div>
+        <div class="gs-result-world">${zone.name}</div>
+        <div class="gs-result-sub">${zone.signature}${theme ? ` · ${theme.name}` : ''} · par ${par} · ${c.holes.length} holes</div>
+      </div>
+      <div class="gs-result-vwrap">
+        <div class="gs-result-verdict" style="color:${vcol};border-color:${vcol};background:${vcol}12;">${verdict}</div>
+        <div class="gs-result-rar" style="color:${col};">${rar.glyph} ${c.rarity}</div>
+      </div>
+    </div>`;
+
+  // The scoring block: the Unending Universe stays on its golf-score card + records board; the
+  // Voyage/match paths get the stat tiles + the standings.
+  let body: string;
+  if (gate) {
+    const r = state.run;
+    const setLine = `<p style="font-size:12.5px;opacity:.82;margin:0;">This set · gross <b>${res.gross}</b> · <b>+${res.creditsEarned}</b> credits${
+      res.aces ? ` · ⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''
+    }</p>`;
+    body =
+      endlessScoreCard(
+        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
+        { title: 'Round so far', next: true },
+      ) +
+      setLine +
+      endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your recent runs' });
+  } else {
+    const board = leaderboard(state.run);
+    const positional = board.mode === 'positional';
+    const me = board.standings.find((s) => s.isPlayer);
+    const target = board.survivorTarget ?? board.survivors ?? board.standings.length;
+    const made = res.stableford >= res.cut;
+    const tiles = [
+      resultStat('STABLEFORD', String(res.stableford), passed ? '#5fd45a' : '#ff6b6b'),
+      resultStat('GROSS', String(res.gross), 'var(--gs-ink)'),
+      // A positional voyage stop survives on your PLACE (not the Stableford cut) — show it; a
+      // matchplay boss is decided in the panel below, so give it the aces/credits slot instead.
+      ...(state.match
+        ? []
+        : positional && me
+          ? [resultStat('PLACE', ordinal(me.position), me.position <= target ? '#5fd45a' : '#ffc454', `of ${board.standings.length}`)]
+          : [resultStat('CUT', String(res.cut), made ? '#5fd45a' : '#ff6b6b', made ? 'made' : 'missed')]),
+      resultStat('CREDITS', `+${res.creditsEarned}`, '#ffce54', res.aces ? `⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''),
+    ].join('');
+    const through = positional ? (board.survivorTarget ? ` · top ${board.survivorTarget} advance` : '') : ` · ${board.survivors} make it through`;
+    const place = me
+      ? `<p style="font-size:13px;margin:0;">You're <b style="color:${me.position <= target ? '#5fd45a' : 'var(--gs-ink)'};">${ordinal(me.position)}</b> of ${board.standings.length}${through}.</p>`
+      : '';
+    body =
+      `<div class="gs-result-stats">${tiles}</div>` +
+      (state.match ? matchResultPanel() : '') +
+      place +
+      leaderboardHTML(board);
+  }
+
+  const replay = `<div class="gs-result-replay">
+      <div id="play" class="gs-replay" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);"></div>
+      <div class="gs-result-replay-ctl">
+        ${btn('↻ Replay', { type: 'viewHole', hole: state.viewHole }, { variant: 'ghost' })}
+        <span>Hole ${state.viewHole + 1}${state.played ? ` of ${state.played.length}` : ''}</span>
+      </div>
+    </div>`;
+
   return `
     ${header()}
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-      <div>
-        <div id="play" class="gs-replay" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);"></div>
-        <div style="margin-top:6px;">
-          ${btn('↻ Replay', { type: 'viewHole', hole: state.viewHole }, { variant: 'ghost' })}
-          <span style="font-size:12px;opacity:.6;">click a row to watch that hole</span>
-        </div>
-      </div>
-      <section style="flex:1 1 300px;min-width:280px;position:relative;">
-        ${res.passed ? burst() : ''}
-        <h2 style="font-size:16px;margin:.2em 0;color:${res.passed ? '#5fd45a' : '#ff6b6b'};">
-          ${
-            state.match
-              ? res.passed
-                ? 'MATCH WON'
-                : 'MATCH LOST'
-              : holeGateArmed(state.run)
-                ? res.passed
-                  ? 'SET SURVIVED'
-                  : 'THE UNIVERSE WINS'
-                : res.passed
-                  ? 'MADE THE CUT'
-                  : 'MISSED CUT'
-          }</h2>
-        ${(() => {
-          const gate = holeGateArmed(state.run);
-          // The Unending Universe (GS-golf-score): the set is scored as golf — the running ROUND card
-          // (gross/to-par/net) + a one-line set summary + the personal last-runs leaderboard, in place of
-          // the voyage's ghost field. The run's cumulative gross/par already include this just-scored stop.
-          if (gate) {
-            const r = state.run;
-            const setLine = `<p style="font-size:12.5px;opacity:.82;margin:10px 0 0;">This set · gross <b>${res.gross}</b> · <b>+${res.creditsEarned}</b> credits${
-              res.aces ? ` · ⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''
-            }</p>`;
-            return (
-              endlessScoreCard(
-                { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-                { title: 'Round so far', next: true },
-              ) +
-              setLine +
-              endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your recent runs' })
-            );
-          }
-          const board = leaderboard(state.run);
-          const positional = board.mode === 'positional';
-          const me = board.standings.find((s) => s.isPlayer);
-          // For a positional voyage stop the Stableford cut isn't the survival bar (your PLACE is), so
-          // don't show "vs cut N" — the standings + "you're Nth" line below carry survival.
-          const cutTxt = state.match || positional ? '' : ` vs cut <b>${res.cut}</b>`;
-          const summary = `<p style="font-size:14px;">Stableford <b>${res.stableford}</b>${cutTxt} · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>`;
-          const through = positional
-            ? board.survivorTarget
-              ? ` · top ${board.survivorTarget} advance`
-              : ''
-            : ` · ${board.survivors} make it through`;
-          const place = me ? `<p style="font-size:13px;margin:.2em 0 .6em;">You're <b>${ordinal(me.position)}</b> of ${board.standings.length}${through}.</p>` : '';
-          return summary + (state.match ? matchResultPanel() : '') + place + leaderboardHTML(board);
-        })()}
-        <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;opacity:.7;">Scorecard</summary>${scorecard()}</details>
-        <div style="margin-top:10px;">${btn(
-          state.bossReward && state.bossReward.length ? '🏆 Claim your reward →' : 'Continue → shop',
-          { type: 'continue' },
-          { variant: 'primary' },
-        )}</div>
-      </section>
-    </div>`;
+    <article class="gs-panel gs-result" style="border-color:${col}${rar.strong ? 'aa' : '66'};box-shadow:0 0 ${rar.glow}px ${col}${rar.strong ? '44' : '22'};">
+      ${passed ? burst() : ''}
+      ${head}
+      ${body}
+      <div class="gs-result-secl">⛳ Your round — tap a hole to replay it</div>
+      ${roundStrip()}
+      ${replay}
+      <div class="gs-result-continue">${btn(
+        state.bossReward && state.bossReward.length ? '🏆 Claim your reward →' : 'Continue → shop',
+        { type: 'continue' },
+        { variant: 'primary' },
+      )}</div>
+    </article>`;
 }
 
 /** The boss-reward screen (GS-talents): pick ONE of a few thematic spoils after beating a boss — a
