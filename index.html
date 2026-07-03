@@ -936,9 +936,15 @@
       /* Vertical chart: cap the height and scroll inside when the trail grows past it (starts scrolled to
          the top, where your route choices are). Below this cap on early stops it just shows in full. */
       .gs-journey--v {
-        max-height: 64vh; overflow-y: auto; overflow-x: hidden;
+        /* Fill the cockpit window: give the chart a tall slice of the viewport so the map (and its
+           living star sky) fills the empty screen space instead of sitting as a short strip. When the
+           chart is shorter than the panel it centres in the starfield; a long voyage grows to the cap
+           then scrolls internally (`safe center` keeps the top reachable when it overflows). */
+        min-height: 56vh;
+        max-height: 82vh; overflow-y: auto; overflow-x: hidden;
         scrollbar-width: thin; -webkit-overflow-scrolling: touch; touch-action: pan-y;
         padding: 4px 2px;
+        display: flex; flex-direction: column; justify-content: safe center;
       }
       .gs-journey--v::-webkit-scrollbar { width: 5px; }
       .gs-journey--v::-webkit-scrollbar-thumb { background: var(--gs-line); border-radius: 3px; }
