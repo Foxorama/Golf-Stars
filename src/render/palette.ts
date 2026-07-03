@@ -345,20 +345,27 @@ export function landFillFor(archetype: BiomeArchetype, deepen = 1): string {
 /** Sand: a lit base, a lip-shadow rim, a depression crescent and pale rake lines. */
 export const SAND = {
   base: '#e9d8a6', // keep the FILL.bunker value
-  rim: '#cbb77c',
+  rim: '#f4ead0', // sunlit far floor of the bowl (lifted brighter — the lit side of the depression)
   shadow: '#c4ad6f',
   rake: 'rgba(255,250,230,0.55)',
   ink: '#8a7740',
+  // GS-inset depression shading (a single upper-left light): the near (up-light) wall in shadow,
+  // and a soft dark contact shadow cast onto the surrounding turf so the bunker sits IN the ground.
+  wall: 'rgba(74,54,18,0.42)',
+  contact: 'rgba(8,10,6,0.20)',
 };
 
 /** Water as banded depth: a shallow shoreline, a mid body, a deep core + white glints. */
 export const WATER = {
-  shallow: '#6fb3ec',
+  shallow: '#5f9ed6', // shoreline rim, dimmed from the old candy-bright cyan so it reads as a bank, not a sticker border
   base: '#3f8fe0', // keep the FILL.water value
   deep: '#2c6dc0',
   deepest: '#1d4f96',
-  glint: 'rgba(255,255,255,0.85)',
+  glint: 'rgba(255,255,255,0.65)',
   ink: '#163b6b',
+  // GS-inset: the raised bank shadows the water along the up-light shore + a contact shadow on turf.
+  bank: 'rgba(6,20,44,0.40)',
+  contact: 'rgba(4,8,20,0.22)',
 };
 
 /** Molten lava (lakes + rivers): a charred crust rim, a glowing body, a hot core + bright cracks. */
@@ -369,6 +376,9 @@ export const LAVA = {
   core: '#ffd24a',
   crack: '#ffb24a',
   ink: '#651a0a',
+  // GS-inset: a cooler charred bank along the up-light shore + a dark contact shadow on the turf.
+  bank: 'rgba(18,4,2,0.45)',
+  contact: 'rgba(10,4,2,0.24)',
 };
 
 /** Cell-shaded canopy: a core shadow, a mid body, a lit cap, a trunk + ground shadow + ink. */

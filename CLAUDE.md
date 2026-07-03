@@ -307,7 +307,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   into its lake. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /
   void violet asteroid, `CliffLook` palette); a CALM cetus/void stop (playable rough everywhere, can't
   be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
-  fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only). The ANIMATED weather layer honours the same land: its pinned twinkle
+  fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only).
+  **Carved features share ONE light so a hole reads as one lit landform, not a collage (GS-inset):**
+  a single upper-left `LIGHT_UL` drives `castShadow` (a soft dark shadow onto the turf that grounds a
+  feature IN the ground) + `insetEmboss`/`embossChildren` (repaint the interior as a bowl — rim in
+  shadow, base re-laid toward the light, far floor sunlit); `styleSandFamily`/`styleLiquidFamily` use
+  them so bunkers/water/lava read as DUG IN (water's up-light bank shadows the surface, its shore
+  dimmed from candy-cyan), and greens get a faint grounding shadow (flush fairway does NOT — a drop
+  shadow there reads as a floating sticker). The emboss is inlined as clip CHILDREN, never a nested
+  clip. Land tone-patches are small faint mottle, never viewport-spanning "spotlight" washes. All pure
+  geometry — ZERO rng draws/reorders (void/cetus byte-identical). Palette: `*.wall/bank/contact` tones.
+  The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
   meteors/ambient air — stays unmasked); on a meteor-shower stop it also LANDS one meteor per cycle
   INTO a drawn scorch crater (`WeatherOpts.strikeTargets`, fed the craters' screen positions by the
