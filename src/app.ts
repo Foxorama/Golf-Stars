@@ -2198,13 +2198,14 @@ function clubhouseHallScreen(): string {
     hatId: hatForCharacter(state, ch.id),
     shirtId: shirtForCharacter(state, ch.id),
     pantsId: pantsForCharacter(state, ch.id),
+    shipId: shipForCharacter(state, ch.id),
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
   }));
   return `
     <header style="border-left:4px solid #d8a24a;padding-left:10px;">
       <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire. Tap one to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
+      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire, their rides parked at the spaceport below. Tap a golfer or their ship to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
     </header>
     <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit)}</div>
     <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;

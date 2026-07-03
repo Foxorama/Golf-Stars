@@ -183,12 +183,18 @@ For each system: the rule that constrains new work. Open the archive doc before 
   (`clubhouseSlot`, like `inspectGearId`: toggled via `[data-clubslot]`, reset on open/close, zero save/rng
   impact). The `apparel.ts` catalogue fills three slots (`ApparelSlot` hat|shirt|pants); a cosmetic **set**
   completes (`equippedSet`) only when EVERY slot it defines is worn. The Clubhouse HALL is a painted 19th-hole
-  bar/fireplace **lounge** (GS-clubhouse-lounge + GS-clubhouse-glow, `render/clubhouseLounge.ts`; eyes-on via
+  bar/fireplace **lounge** over a **spaceport** panel (GS-clubhouse-lounge + GS-clubhouse-glow +
+  GS-clubhouse-spaceport, `render/clubhouseLounge.ts`; eyes-on via
   `scripts/clubhouse-preview.mjs` — re-shoot it after touching `apparelArt.ts`/`clubhouseLounge.ts`): the
   golfers loiter in it wearing their outfits (each figure IS the button to
   outfit them, a brass nameplate at its feet for identity), placed at a seeded shuffle of furniture-anchored floor spots
   keyed off `clubhouseVisit` (a finished-run counter bumped once in `runEndUpdates`, save v12) — so they
-  appear to have milled around while you were away. Purely cosmetic: seeded via `Rng` (never `Math.random`),
+  appear to have milled around while you were away; the spaceport below is a landing ring around a
+  putting green parking each golfer's equipped ride on its own pad (the ship is the same `openClubhouse`
+  button; pads dealt by the same visit Rng AFTER the spot draws, so lounge arrangements are unchanged).
+  Mount figures/ships in TIGHT frames (golfer 72×210, ship 96×62) — a wide frame is invisible margin
+  that shrinks the art to doll size against the furniture; rare+ gear pops via `popFilter`'s
+  rarity-coloured drop-shadow. Purely cosmetic: seeded via `Rng` (never `Math.random`),
   zero sim/rng-stream impact. The played character's ship (journey map) + outfit (`golferLook`) resolve via
   `shipForCharacter`/`hatForCharacter`/`shirtForCharacter`/`pantsForCharacter`. Shards also
   buy permanent **default-bag tiers** (`bag.ts BAG_SETS`, GS-bag-tiers): a won Ascension gate (clear
