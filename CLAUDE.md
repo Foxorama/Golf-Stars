@@ -267,9 +267,15 @@ For each system: the rule that constrains new work. Open the archive doc before 
   post-gen `biomeMods` carry row, the lowgrav mechanism, so `biomeCarryMult` feeds HUD/AI/sim ONE number);
   geometric — tradeMarket's collidable tents (GS-tents), meteorShower's scorch craters (GS-meteor-scorch,
   `sim/scorch.ts`) and the generalised GROUND PATCHES (`sim/patches.ts`): comet→`stardust` (a BONUS lie,
-  hot AND true), frostfall→`ice`, spaceJunk→`junk` — pure seeded per-kind streams, rest-lie conversion in
+  hot AND true), frostfall/blizzard→`ice`, spaceJunk→`junk`, darkMatter→`tar` (a sticky distance-killer,
+  the dead-straight inverse of ice's wild skid) — pure seeded per-kind streams, rest-lie conversion in
   `executeShot`, drawn + played from the SAME source. The route card states every hook (wind/carry chips
   computed from the physics tables; geometric hooks via `CourseEffectInfo.play`), so a lane reads pre-jump.
+  **The sky roster is 17 effects (GS-journey-weather adds 5):** `blizzard` (gale wind + ice — the storm-cold
+  cousin of frostfall), `radiant` (carry↑ + wind↓ — a bomber's-paradise still, bright sky), `dustStorm`
+  (wind↑ + carry↓ — grit that gusts AND drags), `solarWind` (steady wind↑, a third storm that isn't
+  lightning), and the spacey `darkMatter` (wind↓ + tar patches, star-lensing void sky). All reuse the
+  proven wind/carry/patch machinery (no new physics extremes — the no-death-spiral harness stays green).
   **A `salvage`-category lane LOOTS A CLUB, not a shard drip (GS-journey-fx-3, `salvage.ts` +
   `tests/salvage.test.ts`):** `routeClubFind(ev)` (salvage lanes only, rarity floored at RARE) drives
   `salvageClubFind`, which picks a club you don't carry from `offerableClubs` filtered to that rarity

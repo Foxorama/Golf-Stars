@@ -1501,6 +1501,7 @@ function styleScorch(marks: readonly ScorchMark[], proj: Projector): Prim[] {
  *   • stardust — a pale charged shimmer with little four-point sparkles: reads as a BONUS, not a burn.
  *   • frost    — an icy rime disc with crystalline spokes: reads slick.
  *   • junk     — half-buried scrap slabs with a warning blink: reads snagged.
+ *   • tar      — a glossy black gravitic sink with a violet sheen and sunk bubbles: reads sticky.
  */
 function stylePatches(kind: PatchKind, patches: readonly GroundPatch[], proj: Projector): Prim[] {
   const out: Prim[] = [];
@@ -1547,6 +1548,23 @@ function stylePatches(kind: PatchKind, patches: readonly GroundPatch[], proj: Pr
           sw: 0.9,
           round: true,
         });
+      }
+    } else if (kind === 'tar') {
+      // Gravitic tar — a glossy black sink with a cold violet sheen, a darker sunken well and a few
+      // trapped bubbles. Reads heavy and sticky: the ball plugs, it doesn't run.
+      out.push({ t: 'glow', c: [x, y], r: rr * 1.5, col: 'rgba(120,70,190,0.14)' });
+      out.push({ t: 'poly', pts: blob, fill: 'rgba(14,10,22,0.82)', stroke: 'rgba(120,80,180,0.6)', sw: 1.2 });
+      // The sunken well — an inner darker disc, offset toward the light for a bowl read.
+      out.push({ t: 'circle', c: [x + rr * 0.1, y + rr * 0.1], r: rr * 0.62, fill: 'rgba(6,4,12,0.85)' });
+      // A cold specular highlight up-light (the glossy surface).
+      out.push({ t: 'circle', c: [x - rr * 0.24, y - rr * 0.24], r: rr * 0.28, fill: 'rgba(150,120,210,0.35)' });
+      // A few trapped bubbles half-sunk in the pitch.
+      const bubbles = 2 + Math.floor(h(1) * 3);
+      for (let i = 0; i < bubbles; i++) {
+        const a = h(i + 31) * Math.PI * 2;
+        const d = rr * (0.15 + h(i + 41) * 0.55);
+        const br = rr * (0.08 + h(i + 51) * 0.1);
+        out.push({ t: 'circle', c: [x + Math.cos(a) * d, y + Math.sin(a) * d], r: br, fill: 'rgba(60,40,90,0.7)' });
       }
     } else {
       // Wreckage half-buried in the grass — a dark scorched bed, grey scrap slabs, one blinking light.

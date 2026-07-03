@@ -45,6 +45,7 @@ const cases = [
   { kind: 'stardust', biome: 'verdant-station', themeId: 'crux', label: 'Comet stardust (bonus lie)' },
   { kind: 'frost', biome: 'verdant-station', themeId: 'crux', label: 'Frostfall ice (slick lie)' },
   { kind: 'junk', biome: 'dust-belt', themeId: 'vela', label: 'Debris wreckage (snag lie)' },
+  { kind: 'tar', biome: 'verdant-station', themeId: 'crux', label: 'Dark-matter tar (sticky lie)' },
 ];
 
 let cards = '';

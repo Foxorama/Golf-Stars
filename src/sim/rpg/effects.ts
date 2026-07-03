@@ -45,7 +45,12 @@ export type CourseEffectId =
   | 'spaceJunk' //    a crashed-debris field — WRECKAGE tangles on the turf (trouble lies)
   | 'tradeMarket' //  a bustling trade camp pitched around the green (collidable tents)
   | 'gravityWell' //  a giant world looms — heavy sky DRAGS the ball down (carry down)
-  | 'frostfall'; //   glittering frost sifts down — ICE patches freeze onto the turf
+  | 'frostfall' //    glittering frost sifts down — ICE patches freeze onto the turf
+  | 'blizzard' //     a howling whiteout — gusty wind UP + ICE patches (the storm-cold cousin of frostfall)
+  | 'radiant' //      a brilliant star bathes the course — still bright air LIFTS the ball (carry up, wind down)
+  | 'dustStorm' //    a rolling wall of grit — gusty wind UP + thick air DRAGS the ball (carry down)
+  | 'solarWind' //    a steady stream of solar particles — a stiff, constant breeze (wind up)
+  | 'darkMatter'; //  an unseen mass warps the starlight, stills the air — gravitic TAR pools on the turf
 
 export interface CourseEffectInfo {
   id: CourseEffectId;
@@ -75,6 +80,11 @@ export const COURSE_EFFECTS: Record<CourseEffectId, CourseEffectInfo> = {
   tradeMarket: { id: 'tradeMarket', label: 'Trade camp', icon: '⛺', blurb: 'A trade camp rings the green — bounce your ball off the tents!', play: 'Tents ring the green — low shots ricochet off the roofs' },
   gravityWell: { id: 'gravityWell', label: 'Gravity well', icon: '🪐', blurb: 'A giant world looms close — its pull hangs heavy on every shot.' },
   frostfall: { id: 'frostfall', label: 'Frostfall', icon: '❄️', blurb: 'Glittering frost sifts down out of a cold, clear sky.', play: 'Ice patches freeze the turf — slick, skiddy lies' },
+  blizzard: { id: 'blizzard', label: 'Blizzard', icon: '🌨️', blurb: 'A howling whiteout drives snow sideways across the course.', play: 'Ice patches freeze the turf — slick lies, in a gale' },
+  radiant: { id: 'radiant', label: 'Radiant burst', icon: '☀️', blurb: 'A brilliant star bathes the course in still, golden light.' },
+  dustStorm: { id: 'dustStorm', label: 'Dust storm', icon: '🏜️', blurb: 'A rolling wall of grit sweeps in — the air gusts and drags at once.' },
+  solarWind: { id: 'solarWind', label: 'Solar wind', icon: '🌬️', blurb: 'A steady stream of solar particles streaks past — a stiff, constant breeze.' },
+  darkMatter: { id: 'darkMatter', label: 'Dark-matter drift', icon: '🌑', blurb: 'An unseen mass warps the starlight and stills the air — dark matter pools on the ground.', play: 'Gravitic tar pools on the turf — sticky lies that kill your distance' },
 };
 
 /**
@@ -93,6 +103,11 @@ export const EFFECT_WIND: Partial<Record<CourseEffectId, number>> = {
   solarStorm: 1.2,
   ionStorm: 1.35,
   frostfall: 0.9, // cold air lies still — frostfall's danger is on the ground, not in the sky
+  blizzard: 1.3, // a driving gale — between the solar and ion storms, its bite doubled by the ice
+  solarWind: 1.15, // a steady stiff particle breeze — a third storm that isn't lightning
+  dustStorm: 1.25, // grit that gusts hard (and drags the ball down — see EFFECT_CARRY)
+  radiant: 0.82, // brilliant, dead-still air — the calm half of the bomber's-paradise sky
+  darkMatter: 0.78, // the mass swallows the wind — an eerie, unnatural stillness
 };
 
 /** Wind speed ceiling (mph) after an effect multiplier — the generator's own max band. */
@@ -114,6 +129,8 @@ export function effectWindMult(effect: string | undefined): number {
 export const EFFECT_CARRY: Partial<Record<CourseEffectId, number>> = {
   aurora: 1.06, // the charged curtain lifts the ball — everything flies a touch farther
   gravityWell: 0.92, // the giant's pull hangs on the ball — everything falls a touch short
+  radiant: 1.06, // thin, bright, still air — the ball flies far and true (a bomber's paradise)
+  dustStorm: 0.94, // thick grit hangs on the ball — the gritty half of the gust-and-drag sky
 };
 
 /** The carry multiplier a course effect applies (1 = none). */
@@ -132,6 +149,8 @@ export const EFFECT_PATCH: Partial<Record<CourseEffectId, PatchKind>> = {
   comet: 'stardust',
   frostfall: 'frost',
   spaceJunk: 'junk',
+  blizzard: 'frost', // the blizzard freezes the same ice patches as frostfall — but under a gale
+  darkMatter: 'tar', // gravitic pools that grab the ball and kill its run (the sticky inverse of ice)
 };
 
 /** The ground-patch family a course effect scatters (undefined = none). */
@@ -173,6 +192,15 @@ export function routeEffect(ev: RouteEvent | undefined): CourseEffectId {
   const icon = ev.icon;
   // Thematic overrides first (the dated/astronomical showpieces read true).
   if (/eclipse|conjunction/.test(id)) return 'eclipse';
+  // GS-journey-weather new skies — placed BEFORE the older families so their tokens win: 'snowstorm'
+  // must not fall to the solar STORM regex, 'dark-matter' must not read as a gravity SINGULARity, and
+  // 'solar-wind' must beat the bare 'solar' storm. Each requires a specific token so it never steals an
+  // existing event (e.g. 'stardust' stays a comet, 'stellar-tailwind' stays moonlight).
+  if (/dark-?matter|dark-?nebula|umbral|phantom-?mass|void-?fog/.test(id)) return 'darkMatter';
+  if (/blizzard|whiteout|snowstorm|snow-?squall|ice-?storm/.test(id) || /🌨/.test(icon)) return 'blizzard';
+  if (/dust-?storm|sandstorm|sirocco|haboob|grit-?storm/.test(id) || /🏜/.test(icon)) return 'dustStorm';
+  if (/solar-?wind|stellar-?wind|helios|particle-?wind/.test(id)) return 'solarWind';
+  if (/radian|sun-?bath|sunbath|photon-?bloom|brilliance|sunburst|starshine/.test(id)) return 'radiant';
   // Heavy-sky events (GS-journey-fx-2) — before /moon/ so the supermoon's tide-pull reads as the
   // gravity well its lore describes, and before /comet/ so a dwarf star never reads as dust.
   if (/gravit|slingshot|neutron|dwarf|singular|rogue|(^|-)tide(-|$)|supermoon|black-hole|horizon/.test(id)) return 'gravityWell';

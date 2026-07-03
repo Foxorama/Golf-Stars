@@ -53,6 +53,11 @@ const CASES = [
   { effect: 'tradeMarket', archetype: 'cetus' },
   { effect: 'gravityWell', archetype: 'void' },
   { effect: 'frostfall', archetype: 'frost' },
+  { effect: 'blizzard', archetype: 'frost' },
+  { effect: 'radiant', archetype: 'desert' },
+  { effect: 'dustStorm', archetype: 'desert' },
+  { effect: 'solarWind', archetype: 'inferno' },
+  { effect: 'darkMatter', archetype: 'void' },
 ];
 
 const html = `<!doctype html><meta charset="utf8">

@@ -93,15 +93,34 @@ describe('route effect mapping (GS-journey-fx)', () => {
       expect(COURSE_EFFECTS[fx].icon.length).toBeGreaterThan(0);
     }
     // The info table covers exactly the union.
-    const ids: CourseEffectId[] = ['none', 'moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket', 'gravityWell', 'frostfall'];
+    const ids: CourseEffectId[] = ['none', 'moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket', 'gravityWell', 'frostfall', 'blizzard', 'radiant', 'dustStorm', 'solarWind', 'darkMatter'];
     for (const id of ids) expect(COURSE_EFFECTS[id].id).toBe(id);
   });
 
   it('the catalogue actually SPREADS across the widened effect set (no monoculture)', () => {
     const seen = new Set([...ROUTE_EVENTS, ...UNIQUE_EVENTS].map((e) => routeEffect(e)));
-    for (const id of ['moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket', 'gravityWell', 'frostfall'] as CourseEffectId[]) {
+    for (const id of ['moonlight', 'meteorShower', 'solarStorm', 'ionStorm', 'eclipse', 'nebula', 'comet', 'aurora', 'spaceJunk', 'tradeMarket', 'gravityWell', 'frostfall', 'blizzard', 'radiant', 'dustStorm', 'solarWind', 'darkMatter'] as CourseEffectId[]) {
       expect(seen.has(id), `no event maps to ${id}`).toBe(true);
     }
+  });
+
+  it('the GS-journey-weather new skies read true and do not steal existing showpieces', () => {
+    // Each new sky maps from its own event tokens…
+    expect(routeEffect(ev({ id: 'blizzard', icon: '🌨️' }))).toBe('blizzard');
+    expect(routeEffect(ev({ id: 'snow-squall', icon: '🌨️' }))).toBe('blizzard');
+    expect(routeEffect(ev({ id: 'radiant-bloom', icon: '☀️' }))).toBe('radiant');
+    expect(routeEffect(ev({ id: 'sunbath-drift', icon: '🌤️', category: 'calm' }))).toBe('radiant');
+    expect(routeEffect(ev({ id: 'dust-storm', icon: '🏜️' }))).toBe('dustStorm');
+    expect(routeEffect(ev({ id: 'sirocco', icon: '🏜️' }))).toBe('dustStorm');
+    expect(routeEffect(ev({ id: 'solar-wind', icon: '🌬️' }))).toBe('solarWind');
+    expect(routeEffect(ev({ id: 'helios-gale', icon: '🌬️' }))).toBe('solarWind');
+    expect(routeEffect(ev({ id: 'dark-matter-fog', icon: '🌑' }))).toBe('darkMatter');
+    expect(routeEffect(ev({ id: 'umbral-veil', icon: '🌑' }))).toBe('darkMatter');
+    // …and the tricky collisions resolve to the RIGHT older family, not the new tokens:
+    expect(routeEffect(ev({ id: 'solar-flare', icon: '⚡' }))).toBe('solarStorm'); // 'solar' w/o 'wind' → storm
+    expect(routeEffect(ev({ id: 'stardust-wake', icon: '✨' }))).toBe('comet'); // 'dust' w/o '-storm' → comet
+    expect(routeEffect(ev({ id: 'stellar-tailwind', icon: '🌬️', category: 'calm' }))).toBe('moonlight'); // still moonlight
+    expect(routeEffect(ev({ id: 'gravity-slingshot', icon: '🪐' }))).toBe('gravityWell'); // 'singular' not stolen
   });
 
   it('EVERY effect except "none" carries a real play hook (wind, carry, patches, tents or craters)', () => {
