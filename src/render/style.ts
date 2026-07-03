@@ -628,8 +628,14 @@ function fairwayStripes(sps: Vec[][], s: Shade, b0: { minX: number; minY: number
  *  every base, the stripes share the corridor's band grid, and only the corridor carries the ink
  *  edge, so the apron eases out on its soft fringe alone. With a single fairway (no apron — void
  *  islands) this is byte-for-byte the old per-poly output. */
-function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arch: BiomeArchetype): Prim[] {
+function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arch: BiomeArchetype, collar?: string): Prim[] {
   const out: Prim[] = [];
+  // GS-fairway: a wider first-cut ROUGH collar UNDER the light fringe, so the corridor reads as mown
+  // DOWN into taller grass rather than a bright tube laid on top (the "flat object" tell). Only the
+  // parkland worlds pass a `collar` — void/cetus model their corridor edge with their own glow rim /
+  // raised shelf, so they omit it and stay byte-for-byte identical. Grouped like the fringe (every
+  // collar UNDER every base), so a broken corridor's segments share one continuous first cut.
+  if (collar) for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: collar });
   // First-cut fringes UNDER all the bases, so the apron's fringe never paints over the corridor —
   // only the outermost edge (past the green) shows it, easing the cut grass into the rough.
   for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: fringe });
@@ -637,6 +643,15 @@ function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arc
   // Per-world mowing PATTERN (GS-variety-2), riding the MAIN corridor's band grid so the apron +
   // broken-fairway segments line up with the corridor instead of running out of phase.
   if (art.stripes && sps[0]) out.push(...fairwayStripes(sps, s, bboxOf(sps[0]), arch));
+  // GS-fairway: a gentle directional SHEEN — a soft lit band pooled on the up-light side (the shared
+  // LIGHT_UL) so the mown turf reads as gently crowned ground catching the sun, not a flat decal.
+  // Very low alpha; clipped to each segment; pure geometry, zero rng. Grounded worlds only.
+  if (collar) {
+    for (const sp of sps) {
+      const lit = shiftPoly(offsetPoly(sp, 4), LIGHT_UL[0] * 4, LIGHT_UL[1] * 4);
+      out.push({ t: 'clip', clip: sp, children: [{ t: 'poly', pts: lit, fill: hexAlpha(s.light, 0.16) }] });
+    }
+  }
   // ONE soft ink edge, on the main corridor only — no hard outline cuts back across it near the green.
   if (art.ink && sps[0]) out.push({ t: 'poly', pts: sps[0], fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
   return out;
@@ -3539,6 +3554,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const fwFringe = mixHex(fwShade.base, rs.base, 0.5);
   const grFringe = mixHex(collar, rs.base, 0.5);
   const teeFringe = mixHex(teeShade.base, rs.base, 0.45);
+  // GS-fairway: the first-cut ROUGH collar tone (mostly toward rough — a taller mown band) + the
+  // gate for it. Only the parkland worlds get the grounded collar/sheen; void/cetus edge their
+  // corridor with a glow rim / raised shelf, so they pass no collar and stay byte-for-byte identical.
+  const fwCollar = mixHex(fwShade.base, rs.base, 0.72);
+  const groundedFw = arch !== 'void' && arch !== 'cetus';
   // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
   // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
   const voidGlow = arch === 'void';
@@ -3571,7 +3591,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // face + cast shadow UNDER the fairway fill — so it reads with depth like the deep-stop pads. Deep
     // stops already sit on extruded platforms, so gate to !lostHole. Pure geometry (no rng).
     if (calmShelf) for (const sp of fairwaySps) prims.push(...raisedShelf(sp, proj.scale, shelfLook));
-    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch));
+    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined));
     // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
     // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
     if (voidGlow) for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(165,175,255,0.5)', sw: 1.6 });

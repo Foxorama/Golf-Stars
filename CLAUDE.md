@@ -317,6 +317,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   shadow there reads as a floating sticker). The emboss is inlined as clip CHILDREN, never a nested
   clip. Land tone-patches are small faint mottle, never viewport-spanning "spotlight" washes. All pure
   geometry — ZERO rng draws/reorders (void/cetus byte-identical). Palette: `*.wall/bank/contact` tones.
+  **The fairway reads as mown INTO the land (GS-fairway):** `styleFairways` takes an optional `collar`
+  (a wider first-cut ROUGH band `mixHex(fw, rough, 0.72)` under the light fringe) + a directional
+  up-light SHEEN, so the corridor sits in a graded fairway→first-cut→rough transition, not a bright
+  tube on top. Gated to parkland worlds (`arch !== 'void' && 'cetus'`); void/cetus edge their corridor
+  with a glow rim / raised shelf, so they pass NO collar and stay byte-identical. Pure geometry, zero rng.
   The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
   meteors/ambient air — stays unmasked); on a meteor-shower stop it also LANDS one meteor per cycle
