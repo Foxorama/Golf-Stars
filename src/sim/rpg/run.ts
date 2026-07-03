@@ -223,6 +223,32 @@ export function stopSeed(run: Run): string {
 }
 
 /**
+ * Generate a stop's course, RETRYING with a reseeded variant if the generator throws (GS-cetus-gaps
+ * hardening). `generateCourse` proves fairness by construction and THROWS on a violation rather than
+ * shipping an unfair hole — but a rare void island-hop config (~0.1% at galaxy depth) can still trip
+ * `validateIslandHops` (a dropped sliver pad fuses two void carries into one over-long gap). At the RPG
+ * boundary that uncaught throw crashes the whole run, so here we never let it escape: a thrown seed is
+ * ALWAYS an unfair course we'd never show, so deterministically reseeding and regenerating is strictly
+ * better than a hard crash. Deterministic (same run → same retry ladder, so auto ≡ interactive and
+ * resume both hold), and byte-for-byte unchanged on the 99.9% happy path (attempt 0 succeeds). Only if
+ * every retry fails — astronomically unlikely (~0.001^N) — does the last throw propagate, preserving the
+ * invariant that an invalid course is never dealt. The proper fix is `separateIslandGaps` respecting the
+ * validator's merge threshold in the same units; this is the safe production guard until then.
+ */
+export function generateStopCourse(seed: string, opts: Parameters<typeof generateCourse>[1]): Course {
+  const MAX_RETRIES = 8;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      return generateCourse(attempt === 0 ? seed : `${seed}:regen${attempt}`, opts);
+    } catch (err) {
+      if (attempt === MAX_RETRIES - 1) throw err;
+    }
+  }
+  // Unreachable (the loop either returns or rethrows on the last attempt), but satisfies the type.
+  return generateCourse(seed, opts);
+}
+
+/**
  * The star-travel theme the current stop flies into (GS-17). The lane you chose at the previous
  * travel screen determines the world (GS-journey-biome) — so honour `pendingTheme` if set. At stop 0
  * (no jump taken yet) or on an old resume it falls back to the deterministic `themeForStop` draw,
@@ -278,7 +304,7 @@ export function currentCourse(run: Run): Course {
   }
   return armTentHole(
     applyEffectPhysics(
-      generateCourse(stopSeed(run), {
+      generateStopCourse(stopSeed(run), {
         holes: spec.holes,
         parCap: spec.parCap,
         distanceFromStart: run.distanceFromStart,
@@ -376,7 +402,7 @@ function stitchSplitCourse(
     if (cands.length > 0) themeB = pickThemeFrom(pick, cands);
   }
   const a = stampHoles(
-    generateCourse(`${stopSeed(run)}:front`, {
+    generateStopCourse(`${stopSeed(run)}:front`, {
       holes: front,
       parCap,
       distanceFromStart: run.distanceFromStart,
@@ -387,7 +413,7 @@ function stitchSplitCourse(
     }),
   );
   const b = stampHoles(
-    generateCourse(`${stopSeed(run)}:back`, {
+    generateStopCourse(`${stopSeed(run)}:back`, {
       holes: back,
       parCap,
       distanceFromStart: run.distanceFromStart,

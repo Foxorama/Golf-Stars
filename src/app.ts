@@ -545,6 +545,9 @@ function proGreetingHTML(): string {
 /** A compact LIVE arc-leaderboard chip for the play HUD — updates the moment a hole is finished. */
 function liveLeaderChip(): string {
   if (state.match) return ''; // a matchplay stop shows its duel HUD instead
+  // Endless survival is the per-hole par bar, not a field cut — an arc-leaderboard position has no
+  // bearing on survival there and implies a competition that doesn't exist. Voyage-only.
+  if (!getFormat(state.run.formatId).winnable) return '';
   const played = state.stopPlayed ?? [];
   const sf = playTotals(played.map((p) => p.record)).stableford;
   const lp = livePosition(state.run, played.length, sf);
