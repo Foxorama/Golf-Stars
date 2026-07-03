@@ -16,13 +16,13 @@ import {
   playStop,
   resumeRun,
   routeOptions,
-  shardsForRun,
   simulateRun,
   snapshotRun,
   startRun,
   travel,
 } from '../src/sim/rpg/run';
-import { cutLine } from '../src/sim/rpg/economy';
+import { cutLine, clubItem, offerableClubs } from '../src/sim/rpg/economy';
+import { routeClubFind } from '../src/sim/rpg/effects';
 import { RARITY_C, RARITIES } from '../src/sim/rpg/loot';
 import { themeById, type Arc } from '../src/sim/course/themes';
 import { Rng } from '../src/sim/rng';
@@ -274,9 +274,12 @@ describe('route events — rebalanced lever design (GS-routes)', () => {
     expect(bestLegendary).toBeGreaterThan(bestCommon);
   });
 
-  it('the two new reward TYPES exist (a toll lane and a salvage/shard lane)', () => {
+  it('the reward TYPES exist (a toll lane and a salvage club-find lane)', () => {
     expect(ALL.some((e) => (e.creditToll ?? 0) > 0)).toBe(true);
-    expect(ALL.some((e) => (e.shardBonus ?? 0) > 0)).toBe(true);
+    // GS-journey-fx-3: salvage lanes hand you a CLUB, not a trivial shard drip.
+    expect(ALL.some((e) => routeClubFind(e) !== undefined)).toBe(true);
+    // No route event drips shards any more — that's a run-END reward now.
+    for (const e of ALL) expect('shardBonus' in e).toBe(false);
     // Every event carries the new flavour metadata so the cards read distinctly.
     for (const e of ALL) {
       expect(e.icon).toBeTruthy();
@@ -343,7 +346,7 @@ describe('route events — per-arc slot distribution (GS-routes)', () => {
   });
 });
 
-describe('route events — toll + shard levers wired through the run (GS-routes)', () => {
+describe('route events — toll + salvage club find wired through the run (GS-journey-fx-3)', () => {
   const lane = (event: RouteEvent, distanceJump = 1) => ({ id: 0, distanceJump, label: 'Short hop', event, theme: TEST_THEME });
 
   it('a toll lane charges credits up front on travel (floored at 0)', () => {
@@ -357,33 +360,55 @@ describe('route events — toll + shard levers wired through the run (GS-routes)
     expect(broke.credits).toBe(0);
   });
 
-  it('a salvage lane banks permanent shards on travel, kept even on a later bust', () => {
-    const salvage = routeEvent('asteroid-mining')!;
-    expect(salvage.shardBonus).toBeGreaterThan(0);
+  it('a salvage lane equips a fresh club on travel, at the lane rarity, kept through resume', () => {
+    const salvage = routeEvent('asteroid-mining')!; // rare salvage → a rare find
+    expect(routeClubFind(salvage)).toBe('rare');
     const run = startRun(3);
+    const before = run.loadout.bag.length;
     const after = travel(run, lane(salvage));
-    expect(after.bonusShards).toBe(salvage.shardBonus);
-    // Banked shards survive a bust — isolate the bonus from the (distance-driven) base.
-    const busted = { ...after, status: 'ended' as const, endedReason: 'cut' as const };
-    const withoutBonus = shardsForRun({ ...busted, bonusShards: 0 });
-    expect(shardsForRun(busted)).toBe(withoutBonus + salvage.shardBonus!);
+    // A new perk (the found club's shop id) was recorded, and the bag grew or a club was upgraded.
+    expect(after.loadout.perks.length).toBeGreaterThan(run.loadout.perks.length);
+    expect(after.loadout.bag.length).toBeGreaterThanOrEqual(before);
+    const foundId = after.loadout.perks.find((p) => !run.loadout.perks.includes(p))!;
+    expect(clubItem(foundId)!.rarity).toBe('rare');
+    // Resume-safe for free: loadoutFromPerks re-equips the found club from its perk id.
+    const resumed = resumeRun(snapshotRun(after));
+    expect(resumed.loadout.perks).toContain(foundId);
+    expect(resumed.loadout.bag.map((c) => c.id).sort()).toEqual(after.loadout.bag.map((c) => c.id).sort());
+    // Route salvage no longer drips shards — bonusShards is untouched by travel.
+    expect(after.bonusShards).toBe(run.bonusShards);
   });
 
-  it('a plain lane (no toll/shard) leaves credits + bonusShards untouched', () => {
+  it('a salvage lane whose bag is already full pays a credit consolation instead', () => {
+    // Legendary find, but hand the golfer a bag already stuffed with a legendary club of every
+    // offerable type → the find pool is empty → consolation credits.
+    const run = startRun(3);
+    const full = offerableClubs(run.loadout)
+      .filter((it) => it.rarity === 'legendary')
+      .reduce((m, it) => it.apply(m), run.loadout);
+    const stuffed = { ...run, loadout: full };
+    const legendarySalvage = routeEvent('great-comet-harvest')!; // legendary salvage
+    expect(routeClubFind(legendarySalvage)).toBe('legendary');
+    const before = stuffed.credits;
+    const after = travel(stuffed, lane(legendarySalvage));
+    expect(after.credits).toBeGreaterThan(before); // paid the consolation
+    expect(after.loadout.perks.length).toBe(stuffed.loadout.perks.length); // no club added
+  });
+
+  it('a non-salvage lane finds no club and leaves credits/bag untouched', () => {
     const plain = routeEvent('new-moon')!;
-    expect(plain.creditToll ?? 0).toBe(0);
-    expect(plain.shardBonus ?? 0).toBe(0);
+    expect(routeClubFind(plain)).toBeUndefined();
     const run = { ...startRun(3), credits: 60 };
     const after = travel(run, lane(plain));
     expect(after.credits).toBe(60);
+    expect(after.loadout.perks).toEqual(run.loadout.perks);
     expect(after.bonusShards).toBe(0);
   });
 
-  it('snapshot/resume round-trips banked shards', () => {
-    let run = startRun(42);
-    run = travel(run, lane(routeEvent('asteroid-mining')!));
-    expect(run.bonusShards).toBeGreaterThan(0);
-    const resumed = resumeRun(snapshotRun(run));
-    expect(resumed.bonusShards).toBe(run.bonusShards);
+  it('the club find is deterministic in the run seed + arriving stop', () => {
+    const salvage = routeEvent('asteroid-mining')!;
+    const a = travel(startRun(77), lane(salvage));
+    const b = travel(startRun(77), lane(salvage));
+    expect(a.loadout.perks).toEqual(b.loadout.perks);
   });
 });

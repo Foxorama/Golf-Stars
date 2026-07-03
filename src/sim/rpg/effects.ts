@@ -27,6 +27,7 @@
 
 import type { RouteEvent } from './events';
 import type { PatchKind } from '../patches';
+import type { Rarity } from '../course/contract';
 
 /** The atmospheric flavour a lane brings to the world it flies into. Render-only, except where a
  *  documented play hook says otherwise (tents; scorch; `effectWindMult`; `effectCarryMult`;
@@ -136,6 +137,20 @@ export const EFFECT_PATCH: Partial<Record<CourseEffectId, PatchKind>> = {
 /** The ground-patch family a course effect scatters (undefined = none). */
 export function effectPatchKind(effect: string | undefined): PatchKind | undefined {
   return EFFECT_PATCH[(effect ?? 'none') as CourseEffectId];
+}
+
+/**
+ * The CLUB FIND a route hands you (GS-journey-fx-3): a salvage / debris / wreck / mining lane
+ * (`category: 'salvage'`) scavenges a club of this rarity that you don't already carry, equipped for
+ * the rest of the run (resolved against the live loadout in `salvage.ts`, paid on travel). The rarity
+ * tracks the lane's loot grade but is floored at RARE — the shop's own floor, since commons aren't
+ * offerable gear — so even an early common salvage lane is a genuine rare find, never junk. This
+ * single source is read by both `travel` (the grant) and the route card (the preview) so they agree.
+ * Non-salvage lanes return undefined (their reward is credits / carry / cut, not loot).
+ */
+export function routeClubFind(ev: RouteEvent | undefined): Rarity | undefined {
+  if (!ev || ev.category !== 'salvage') return undefined;
+  return ev.rarity === 'common' ? 'rare' : ev.rarity;
 }
 
 /**

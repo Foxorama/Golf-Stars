@@ -6,13 +6,17 @@
  * INTO. The original two levers (credits ×, cut Δ) made every lane the same shape — "a bit more pay
  * for a bit more cut" — so a green common often beat a rare. The rebalance fixes that on two fronts:
  *
- *   1. FOUR pure levers so lanes are functionally DISTINCT, with REAL downsides (no free lunch):
+ *   1. Pure, functionally DISTINCT levers with REAL downsides (no free lunch):
  *      • `creditMult` — scales the credits earned at the stop (the per-run currency).
  *      • `cutDelta`   — shifts that stop's cut line (the fail-gate risk).
  *      • `creditToll` — credits paid UP FRONT on travel (a genuine cost — the rich lanes bite back).
- *      • `shardBonus` — permanent shards banked on travel, kept even if you then bust (the meta /
- *        "banker" lane — guaranteed progress traded for a poor per-run payout).
- *      Calm lanes are now SAFE-BUT-POOR (creditMult ≤ ~1.05): safety costs you payout, so a common
+ *      • SALVAGE finds (GS-journey-fx-3) — a `salvage`-category lane doesn't bank a trivial shard drip
+ *        (a +1…+8 that was noise against a Trade Market priced in the hundreds); it SCAVENGES A CLUB
+ *        you don't already carry — rare/epic/legendary by loot grade — equipped for the rest of the run
+ *        (derived by `routeClubFind`, resolved in `salvage.ts`, paid on travel). A reward you feel THIS
+ *        run, traded for a poor per-run payout (salvage `creditMult` ≤ ~1). Shards stay a run-END reward
+ *        (distance / win / bank), so meta progress rides how far the loot carries you, not a flat drip.
+ *      Calm lanes are SAFE-BUT-POOR (creditMult ≤ ~1.05): safety costs you payout, so a common
  *      is a different proposition from a rare, never a strictly-better one.
  *
  *   2. RARITY = STAKES. The reward CEILING rises monotonically with rarity (common → small, rare →
@@ -41,7 +45,7 @@ export type EventCategory =
   | 'calm' //   safe but poor — an OUT (cut ≤ 0, modest pay)
   | 'payout' // the classic gamble — more credits for a higher cut
   | 'toll' //   pay credits up front for an outsized return (the rich lanes bite)
-  | 'salvage'; // guaranteed permanent shards, traded for a poor per-run payout (the banker lane)
+  | 'salvage'; // scavenge a CLUB you don't carry (GS-journey-fx-3), traded for a poor per-run payout
 
 export interface RouteEvent {
   id: string;
@@ -62,8 +66,6 @@ export interface RouteEvent {
   cutDelta: number;
   /** Credits paid UP FRONT on travel (a genuine cost — the rich/risky lanes charge admission). 0 = free. */
   creditToll?: number;
-  /** Permanent shards banked on travel, kept even on a later bust (the meta/banker lane). 0 = none. */
-  shardBonus?: number;
   /** Earliest arc this event can appear in (accents the arcs — high stakes come later). Default 1. */
   minArc?: Arc;
   /** A one-off dated event: offered at most once per run (tracked on the run). Default false. */
@@ -133,14 +135,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'quiet-vacuum',
     label: 'Quiet Vacuum',
-    desc: 'Credits −10% · +1 shard. Scrounge a little salvage.',
+    desc: 'Credits −10% · loot a rare club. Scavenge the drifting offcuts.',
     lore: 'Nothing out here but you and a few drifting offcuts.',
     icon: '🧊',
     category: 'salvage',
     rarity: 'common',
     creditMult: 0.9,
     cutDelta: 0,
-    shardBonus: 1,
     minArc: 1,
   },
   {
@@ -194,14 +195,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'debris-drift',
     label: 'Debris Drift',
-    desc: 'Credits −8% · +1 shard. Pick the field clean.',
+    desc: 'Credits −8% · loot a rare club. Pick the field clean.',
     lore: 'A slow tumble of old wreckage. Worth a poke if you’re patient.',
     icon: '🛰️',
     category: 'salvage',
     rarity: 'common',
     creditMult: 0.92,
     cutDelta: 0,
-    shardBonus: 1,
     minArc: 1,
   },
   {
@@ -314,14 +314,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'asteroid-mining',
     label: 'Asteroid Claim',
-    desc: 'Credits −10% · +4 shards. Bank the ore, whatever happens next.',
-    lore: 'Stake a rock, work it dry. Slow money, but it’s yours forever.',
+    desc: 'Credits −10% · loot a rare club. Strip the rock for parts.',
+    lore: 'Stake a rock, work it dry — and pocket whatever gear it coughs up.',
     icon: '⛏️',
     category: 'salvage',
     rarity: 'rare',
     creditMult: 0.9,
     cutDelta: 0,
-    shardBonus: 4,
     minArc: 2,
   },
   {
@@ -339,14 +338,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'comet-fragment',
     label: 'Comet Fragment',
-    desc: 'Credits −10% · +4 shards. Net the ice, bank it forever.',
-    lore: 'A shard of a broken comet, dirty ice and frozen ore.',
+    desc: 'Credits −10% · loot a rare club. Crack the ice for salvage.',
+    lore: 'A shard of a broken comet — dirty ice, frozen ore, and lost gear.',
     icon: '🔭',
     category: 'salvage',
     rarity: 'rare',
     creditMult: 0.9,
     cutDelta: 0,
-    shardBonus: 4,
     minArc: 2,
   },
   {
@@ -400,27 +398,25 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'cryo-harvest',
     label: 'Cryo Harvest',
-    desc: 'Credits −10% · +4 shards. Mine the glacier moonlet.',
-    lore: 'Ancient ice, clean as glass. It sells forever.',
+    desc: 'Credits −10% · loot a rare club. Mine the glacier moonlet.',
+    lore: 'Ancient ice, clean as glass — and the odd frozen-in club.',
     icon: '🧊',
     category: 'salvage',
     rarity: 'rare',
     creditMult: 0.9,
     cutDelta: 0,
-    shardBonus: 4,
     minArc: 2,
   },
   {
     id: 'wreckers-claim',
     label: 'Wrecker’s Claim',
-    desc: 'Credits −5% · +3 shards. Strip the debris field.',
-    lore: 'Somebody’s fleet died here. Their loss, your salvage rights.',
+    desc: 'Credits −5% · loot a rare club. Strip the debris field.',
+    lore: 'Somebody’s fleet died here. Their loss, your salvage rights — and their clubs.',
     icon: '🛰️',
     category: 'salvage',
     rarity: 'rare',
     creditMult: 0.95,
     cutDelta: 0,
-    shardBonus: 3,
     minArc: 2,
   },
 
@@ -452,14 +448,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'derelict-cache',
     label: 'Derelict Cache',
-    desc: 'Credits +45% · cut +1 · +3 shards. A salvage haul.',
+    desc: 'Credits +45% · cut +1 · loot an epic club. A salvage haul.',
     lore: 'A dead freighter, holds still full. A tense, profitable boarding.',
     icon: '🛸',
     category: 'salvage',
     rarity: 'epic',
     creditMult: 1.45,
     cutDelta: 1,
-    shardBonus: 3,
     minArc: 2,
   },
   {
@@ -480,14 +475,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'wandering-comet',
     label: 'Wandering Comet',
-    desc: 'Credits +120% · cut +2 · +5 shards. Hitch the great tail.',
+    desc: 'Credits +120% · cut +2. Hitch the great tail.',
     lore: 'A lone comet on a thousand-year orbit. You will not pass it again.',
     icon: '☄️',
     category: 'payout',
     rarity: 'legendary',
     creditMult: 2.2,
     cutDelta: 2,
-    shardBonus: 5,
     minArc: 2,
   },
 
@@ -586,14 +580,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'junker-armada',
     label: 'Junker Armada',
-    desc: 'Credits +50% · cut +2 · +4 shards. Board the drifting fleet.',
+    desc: 'Credits +50% · cut +2 · loot an epic club. Board the drifting fleet.',
     lore: 'A hundred dead hulls in convoy formation, still flying nowhere.',
     icon: '🛸',
     category: 'salvage',
     rarity: 'epic',
     creditMult: 1.5,
     cutDelta: 2,
-    shardBonus: 4,
     minArc: 3,
   },
 
@@ -613,14 +606,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'aurora-australis',
     label: 'Aurora Australis',
-    desc: 'Credits +150% · cut +3 · +8 shards. The southern lights erupt.',
+    desc: 'Credits +150% · cut +3. The southern lights erupt.',
     lore: 'Curtains of green and violet pour over the pole. A jackpot lane.',
     icon: '🌈',
     category: 'payout',
     rarity: 'legendary',
     creditMult: 2.5,
     cutDelta: 3,
-    shardBonus: 8,
     minArc: 3,
   },
   {
@@ -651,14 +643,13 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'great-comet-harvest',
     label: 'Great Comet Harvest',
-    desc: 'Credits +100% · cut +2 · +8 shards. Net the mother lode of tail dust.',
+    desc: 'Credits +100% · cut +2 · loot a legendary club. Net the mother lode.',
     lore: 'A comet the size of a nation, shedding riches with every mile.',
     icon: '☄️',
     category: 'salvage',
     rarity: 'legendary',
     creditMult: 2.0,
     cutDelta: 2,
-    shardBonus: 8,
     minArc: 3,
   },
 ];
@@ -685,14 +676,13 @@ export const UNIQUE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'comet-apparition',
     label: 'Comet Apparition',
-    desc: 'Credits +95% · cut +2 · +6 shards. Seen but once.',
+    desc: 'Credits +95% · cut +2 · loot an epic club. Seen but once.',
     lore: 'A comet swings through on its long, lonely arc. A lifetime event.',
     icon: '☄️',
     category: 'salvage',
     rarity: 'epic',
     creditMult: 1.95,
     cutDelta: 2,
-    shardBonus: 6,
     minArc: 3,
     unique: true,
   },
@@ -712,14 +702,13 @@ export const UNIQUE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'total-solar-eclipse',
     label: 'Total Solar Eclipse',
-    desc: 'Credits +160% · cut +3 · +10 shards. The day goes dark.',
+    desc: 'Credits +160% · cut +3 · loot a legendary club. The day goes dark.',
     lore: 'A once-in-a-run totality — the corona blazes round a black sun.',
     icon: '🌘',
     category: 'salvage',
     rarity: 'legendary',
     creditMult: 2.6,
     cutDelta: 3,
-    shardBonus: 10,
     minArc: 3,
     unique: true,
   },
@@ -740,14 +729,13 @@ export const UNIQUE_EVENTS: readonly RouteEvent[] = [
   {
     id: 'deep-freeze',
     label: 'The Deep Freeze',
-    desc: 'Credits +60% · cut +1 · +7 shards. A once-a-run pocket of ancient cold.',
+    desc: 'Credits +60% · cut +1 · loot an epic club. A once-a-run pocket of ancient cold.',
     lore: 'Space itself frosted over. Nothing has moved here for a million years.',
     icon: '🧊',
     category: 'salvage',
     rarity: 'epic',
     creditMult: 1.6,
     cutDelta: 1,
-    shardBonus: 7,
     minArc: 3,
     unique: true,
   },

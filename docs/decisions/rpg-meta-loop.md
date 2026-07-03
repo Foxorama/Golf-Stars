@@ -138,18 +138,37 @@
   differ only by distance; now each route carries a themed, content-as-data **event** that tilts the
   stop you fly *into*. The original two levers (`creditMult` payout, `cutDelta` fail-gate) made every
   lane the same shape, with no real downside, so a green common often beat a rare (the imbalance the
-  rebalance fixes). Now FOUR pure levers give lanes DISTINCT, traded-off shapes: + `creditToll`
-  (credits paid UP FRONT in `travel`, floored at 0 — a genuine cost so the rich lanes bite) and
-  `shardBonus` (permanent shards banked in `travel` onto `run.bonusShards`, kept even on a later bust
-  — the meta/"banker" lane, added by `shardsForRun`). Calm lanes are now SAFE-BUT-POOR (creditMult ≤
+  rebalance fixes). Now pure levers give lanes DISTINCT, traded-off shapes: `creditToll`
+  (credits paid UP FRONT in `travel`, floored at 0 — a genuine cost so the rich lanes bite) and, on a
+  `salvage`-category lane, a **club find** (GS-journey-fx-3, below). Calm lanes are now SAFE-BUT-POOR (creditMult ≤
   ~1.05, or they charge a toll) so a common is never a strictly-better rare; rarity = STAKES (the
   reward CEILING rises monotonically common→legendary, and so does the risk). The chosen event rides
   `run.pendingEvent` (set by `travel`), applied by `finishStop` via `effectiveCut()` + the credit
-  mult, then **cleared** there so a resume can't double-apply it (`RunSnapshot.pendingEventId` +
-  `bonusShards` round-trip it). Stop 0 / no-event = the neutral `DEFAULT_EVENT`, so existing stop-0
+  mult, then **cleared** there so a resume can't double-apply it (`RunSnapshot.pendingEventId`
+  round-trips it). Stop 0 / no-event = the neutral `DEFAULT_EVENT`, so existing stop-0
   behaviour is byte-for-byte unchanged. CRITICAL: events touch ONLY economy/cut/meta, NEVER course
   generation — that's what keeps the fairness + no-death-spiral validators untouched. Keep it that
   way; a "wilder course" event would have to re-clear those bars.
+- **Salvage lanes LOOT A CLUB, not a shard drip (GS-journey-fx-3, `salvage.ts` + `tests/salvage.test.ts`).**
+  The old `shardBonus` lever banked +1…+8 permanent shards on a `salvage` lane — noise against a Trade
+  Market priced 60…1000 shards, so the "reward" moved nothing and the lane was a dull pick. The rebrand:
+  a salvage / debris / wreck / mining lane now SCAVENGES a club you don't already carry, equipped for the
+  rest of the run. `routeClubFind(ev)` (in `effects.ts`, the single source read by both `travel` and the
+  route card) returns the find rarity for `category==='salvage'` lanes only, floored at RARE (the shop's
+  own floor — commons aren't offerable gear) else the lane's own grade, so an early common salvage lane is
+  a genuine rare find and an epic/legendary lane loots epic/legendary. `salvageClubFind(loadout, rarity,
+  seed)` picks from `offerableClubs` filtered to that rarity (the shop's own "a club you don't carry, or a
+  genuine distance/putter upgrade, respecting golfer refusals + the bag-tier floor" filter), preferring a
+  brand-NEW type over a same-type upgrade; an empty pool (bag already full at that tier) pays a rarity-scaled
+  credit consolation so the lane never comes up empty. Applied in `travel`. THREE properties make it safe:
+  (1) **resume-safe for free** — the find is a shop `CLUB_ITEM`, so `item.apply` records its perk id on the
+  loadout and `loadoutFromPerks` re-equips it on resume; no new save field. (2) **determinism** — the pick
+  runs on a PRIVATE `Rng` stream (`salvage:<seed>:<arrivingStop>:<eventId>`), never a shared sim/render
+  stream, so attaching a find perturbs no existing draw order (the whole seeded suite stayed byte-identical).
+  (3) **can't spiral** — paid at travel (touches neither generation nor the shot stream), and a found club
+  only ever RAISES Stableford. The route card previews the EXACT club off the same stream, so it can't lie.
+  Shards are a run-END reward now (`shardsForRun`: distance/win/bank); `run.bonusShards` moves only via
+  endless milestones (GS-unending). No new `_gs*`/URL hook → the test-hub guard needs no new control.
 - **The route draw is a per-ARC rarity SLOT model (GS-routes, `drawArcRouteEvents`).** Not a flat
   rarity-weighted shuffle — the loot feel ramps with the journey via `ARC_SLOTS[arcForDistance(dist)]`.
   Each slot names a BASE rarity + a GATED upgrade `chain` (`chain[k]` = P(climb one more tier | climbed
@@ -919,8 +938,7 @@ in any death-spiral harness bar (those are biome/character-keyed and unchanged).
 **Milestones + the Evergreen set.** Crossing 40/60/80/100/120/140 survived holes fires a full-screen
 victory takeover (`showEndlessMilestone`, mirroring the voyage victory — cosmetic side-effect in
 `dispatch`, keyed off the pre/post `holesSurvived` diff) and banks a growing shard bonus INSTANTLY via
-`run.bonusShards` (the same kept-even-on-a-bust channel route events use — a victory can't be clawed
-back). Permanent unlocks ride the LIFETIME best (`endlessBestHoles`, save v13): the earn-only
+`run.bonusShards` (a kept-even-on-a-bust channel — banked shards can't be clawed back by a later death). Permanent unlocks ride the LIFETIME best (`endlessBestHoles`, save v13): the earn-only
 **Evergreen** cosmetic set — Tour Bag @40 (a NEW 4th apparel slot `bag`, equipped per character via
 `golfBagByCharacter`, drawn beside the Clubhouse stage figure; on-course rendering deliberately skipped),
 Baggy Green Cap @60 (new `baggy` hat shape), Evergreen Pro Pants @80, THE GREEN JACKET @100 (mythic, new
