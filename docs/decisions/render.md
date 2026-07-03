@@ -674,3 +674,75 @@
   the playful worlds + none for void/cetus, determinism, corridor/liquid rejection, a beach-prop
   render integration). Eyeball with `node scripts/egg-preview.mjs` (large single-hole renders) or
   re-shoot `node scripts/gallery.mjs`.
+
+## GS-inset: one light, carved features — holes read as one lit landform (2026-07-03)
+
+- **Player report:** "the holes look like a bunch of associated art assets copy-pasted together
+  instead of single unified holes — can we make inset bunkers, lakes and rivers look like they're all
+  part of one hole." Diagnosis (code + a high-res gallery): the compositor gives only flat-fill polys,
+  thin strokes, clipped bands and radial `glow`s — no shadow, bevel, gradient or blur prim. Every
+  hazard was a flat blob ringed by a **same-tint** outset "shadow"/"shore" (which reads as an
+  OUTLINE, not a depression) plus same-tint inset depth rings. Water's outset shore was even *lighter*
+  than the body — a candy-bright halo, the exact opposite of a carved bank. Nothing cast a shadow onto
+  its neighbours and there was no shared light, so the eye read a collage. The proven depth recipe
+  already existed but was gated to cetus/void (`raisedShelf`/`platformCliffs`: a dark shadow cast on
+  the ground + a contact band under the lip + a lit rim). GS-inset generalises that recipe — INVERTED
+  into a depression — to the normal worlds' hazards. All render-only, pure geometry, **zero rng draws
+  and zero stream reorders** (determinism contract #1 holds trivially), so the whole suite stayed
+  green (870 tests) and void/cetus are byte-for-byte untouched.
+- **One global light (`LIGHT_UL`, upper-left)** — matching the green's existing lit highlight and the
+  cetus shelf — so every carved feature shades the same way. Two shared helpers in `style.ts`:
+  `castShadow(poly, scale, fill)` (a soft dark shadow offset AWAY from the light onto the surrounding
+  turf, so the feature sits IN the ground, not on it) and `embossChildren(poly, scale, {wall, base,
+  floor?})`/`insetEmboss` (repaint the interior as a bowl: the whole rim drops to a shadow `wall`
+  tone, the `base` is re-laid shifted toward the light so the NEAR/up-light rim keeps a shadow
+  crescent, an optional lit `floor` pools sun on the far side). Sized in px off `proj.scale`, clamped
+  to the body half-extent so thin creeks can't collapse; fixed prim count (camera-proof).
+- **Sand** (`styleSandFamily`): a `castShadow` (`SAND.contact`) under every body grounds the bunker,
+  then the old sandy lip + base, then `insetEmboss` with `{wall: SAND.wall, base, floor: SAND.rim}`
+  (rim lifted brighter to `#f4ead0` — the sunlit far floor). **Water & lava** (`styleLiquidFamily`,
+  now taking `proj.scale`): a `castShadow` (`lp.contact`) under, and the up-light **bank shadow** is
+  `embossChildren` (wall = `WATER.bank`/`LAVA.bank`, no lit floor) drawn INSIDE the per-body clip
+  BEFORE the depth rings — so the rings still repaint the deep core and the body reads as water sunk
+  beneath its bank. `WATER.shallow` was dimmed from candy-cyan `#6fb3ec` → `#5f9ed6` and the glint
+  alpha eased, so the shore reads as a bank, not a sticker border. The emboss is inlined as clip
+  CHILDREN (never a nested clip — the SVG serializer bug). New palette keys: `SAND.wall/contact`,
+  `WATER.bank/contact`, `LAVA.bank/contact`.
+- **Greens** get a `castShadow` (`rgba(4,10,6,0.16)`) UNDER the fill on normal worlds (a putting
+  surface sits slightly proud → a faint down-light drop shadow grounds it), skipped where a
+  shelf/void-glow already models the edge, and on Rainbow Road. The flush fairway was deliberately
+  LEFT alone — a cast shadow there would read as a floating sticker, the opposite of "mown in."
+- **The land tone-patch "spotlights" were tamed** (`buildScene` §4): 5 screen-space tonal discs
+  spanning up to 29% of the viewport at heavy alpha read as lens-flare washes pasted over the hole —
+  the single biggest remaining collage tell once the hazards were fixed. Radius dialled to
+  `(0.05 + rng·0.06)·min(W,H)` and alpha to `0.07`/`0.03` (soft mottle, not spotlights). Kept the
+  SAME 4 rng draws per patch, so every downstream stream is byte-for-byte unchanged.
+- Re-shot `node scripts/gallery.mjs` (all 10 worlds read as cohesive lit landforms; void/cetus
+  identical). Known follow-up left open: the fairway is still a flat uniform-width bright tube — the
+  most "object-like" element — but reshaping it is a generator concern, not render.
+
+## GS-fairway: the corridor reads as mown INTO the land (2026-07-03)
+
+- **Follow-up to GS-inset** (the fairway was the deliberately-skipped remaining tell). The corridor
+  read as a bright uniform tube laid ON the rough, because its only edge treatment was a single
+  LIGHTER first-cut fringe (`mixHex(fw, rough, 0.5)`) — a soft washy halo, not a defined mow line —
+  over a flat single-tone fill. Two render-only additions in `styleFairways`, both pure geometry
+  (**zero rng draws, zero stream reorders**):
+  - **A first-cut ROUGH collar** — a wider outset band (`offsetPoly(sp, -6)`) UNDER the light fringe,
+    toned mostly toward rough (`fwCollar = mixHex(fwShade.base, rs.base, 0.72)`) so the corridor sits
+    DOWN in a graded fairway → first-cut → rough transition instead of meeting the rough on a soft
+    bright edge. Grouped like the fringe (every collar under every base), so a broken corridor's
+    segments share one continuous first cut.
+  - **A gentle directional SHEEN** — a soft lit band (`hexAlpha(s.light, 0.16)`) pooled on the
+    up-light side via `shiftPoly(offsetPoly(sp, 4), LIGHT_UL·4)` clipped to each segment, so the mown
+    turf reads as gently crowned ground catching the shared GS-inset light, not a flat decal.
+- **Gated to the parkland worlds** (`groundedFw = arch !== 'void' && arch !== 'cetus'`, passed as the
+  optional `collar` param; Rainbow Road takes its own ribbon branch and never calls `styleFairways`).
+  void/cetus edge their corridor with a glow rim / raised shelf, so a collar would fight it — they
+  pass NO collar and `styleFairways` with `collar === undefined` is **byte-for-byte the pre-change
+  output** (the whole suite, incl. the void/cetus determinism + camera-stability guards, stays green;
+  870 tests). Ocean/frost/inferno/desert/crystal/tempest/fungal/verdant all pick the collar up: the
+  first-cut takes each world's own rough tone (sandy on the beach, snowy on frost, cinder on inferno).
+- Eyeballed high-res across verdant/ocean/frost/inferno (collar + sheen read as a cut corridor) and
+  void/cetus (unchanged). Re-shoot `node scripts/gallery.mjs` after further `styleFairways` edits.
+  The uniform-WIDTH read remains a generator concern (varying width / green taper), still out of scope.

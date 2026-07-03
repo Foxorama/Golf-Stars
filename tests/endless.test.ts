@@ -28,8 +28,9 @@ import {
   type Run,
 } from '../src/sim/rpg/run';
 import { getFormat, DEFAULT_FORMAT } from '../src/sim/rpg/formats';
-import { apparelById, canBuyApparel, equippedSet } from '../src/sim/rpg/apparel';
-import { shipById, canBuyShip } from '../src/sim/rpg/ships';
+import { apparelById, apparelRevealedInMarket, canBuyApparel, equippedSet } from '../src/sim/rpg/apparel';
+import { shipById, canBuyShip, shipRevealedInMarket } from '../src/sim/rpg/ships';
+import { BAG_SETS, bagSetRevealedInMarket } from '../src/sim/rpg/bag';
 import { initState, reduce, endlessProgressUpdates, type UiState } from '../src/ui/game';
 import type { PlayedHole } from '../src/sim/round';
 
@@ -124,6 +125,31 @@ describe('milestones & unlocks (GS-unending)', () => {
     expect(endlessUnlocksCrossed(59, 80).map((u) => u.id)).toEqual(['cap-baggy-green', 'pants-evergreen']);
     expect(nextEndlessUnlock(140)!.id).toBe('infinity-ace');
     expect(nextEndlessUnlock(150)).toBeUndefined();
+  });
+
+  it('earned & gated unlocks stay HIDDEN from the Trade Market until unlocked/owned (GS-hide-unlocks)', () => {
+    // Earn-only cosmetics: out of the market until OWNED (never spoil the milestone reward).
+    for (const u of ENDLESS_UNLOCKS) {
+      if (u.kind === 'apparel') {
+        const item = apparelById(u.id)!;
+        expect(apparelRevealedInMarket(item, [])).toBe(false); // not earned yet → hidden
+        expect(apparelRevealedInMarket(item, [u.id])).toBe(true); // owned → shown (greyed "✓ owned")
+      } else {
+        const ship = shipById(u.id)!;
+        expect(shipRevealedInMarket(ship, [])).toBe(false);
+        expect(shipRevealedInMarket(ship, [u.id])).toBe(true);
+      }
+    }
+    // Ordinary for-sale gear is always shown regardless of ownership.
+    expect(apparelRevealedInMarket(apparelById('cap-classic')!, [])).toBe(true);
+    expect(shipRevealedInMarket(shipById('racer-redline')!, [])).toBe(true);
+
+    // Gated club-set upgrades: purchasable, so revealed once AVAILABLE TO BUY (gate cleared) — or owned.
+    const planet = BAG_SETS.find((s) => s.tier === 'rare')!; // unlocks at A2 clear (maxAscension 3)
+    expect(bagSetRevealedInMarket(planet, 2, 'common')).toBe(false); // gate not yet cleared → hidden
+    expect(bagSetRevealedInMarket(planet, 3, 'common')).toBe(true); // available to buy → shown
+    // Owned lower tier stays shown even if a re-lock somehow occurred (rank-based ownership).
+    expect(bagSetRevealedInMarket(planet, 0, 'rare')).toBe(true);
   });
 
   it('the Evergreen set completes only with all FOUR slots worn (bag included)', () => {

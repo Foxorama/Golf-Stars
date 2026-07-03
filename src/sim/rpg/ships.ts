@@ -48,7 +48,9 @@ export interface Ship {
   /** Shard price (0 = free / starter). */
   cost: number;
   /** Earned, never bought (GS-unending): unlocked by surviving this many holes of the Unending
-   *  Universe. A `secret` unlock is hidden from the market entirely until it's owned. */
+   *  Universe. Hidden from the market entirely until owned (GS-hide-unlocks — see
+   *  `shipRevealedInMarket`); `secret` is the same reveal-on-own gate, kept for the hole-150 grail
+   *  AND the ace-earned Comet Rider (GS-ace-ship — a `secret` ship with no `unlockHoles`). */
   unlockHoles?: number;
   secret?: boolean;
   look: ShipLook;
@@ -56,6 +58,10 @@ export interface Ship {
 
 /** The classic woody station wagon — owned by everyone from the off, free. */
 export const DEFAULT_SHIP_ID = 'wagon-classic';
+
+/** The secret ship earned by making a hole-in-one (GS-ace-ship). A `secret`, `cost: 0` ride —
+ *  never sold, hidden from the Trade Market until owned; granted by the reducer on any ace. */
+export const ACE_SHIP_ID = 'comet-rider';
 
 /** Shard prices per rarity tier (the Trade Market economy). Mythic is the 1,000-shard grail. */
 const TIER_COST: Record<CosmeticRarity, number> = {
@@ -144,12 +150,15 @@ export const SHIPS: readonly Ship[] = [
     look: { kind: 'saucer', body: '#54dba0', glass: '#d8fff0', flame: '#9affd6', accent: '#1c5a3c', bling: 1 },
   },
   {
-    id: 'comet-rider',
+    // The SECRET ace ship (GS-ace-ship): earned — never bought — by making a hole-in-one. A `secret`
+    // ride (hidden from the market until owned), free (`cost: 0`), granted by the reducer on any ace.
+    id: ACE_SHIP_ID,
     name: 'Comet Rider',
     set: 'Exotic',
     rarity: 'legendary',
-    blurb: 'A dimpled golf-ball comet blazing across the void.',
-    cost: TIER_COST.legendary,
+    blurb: 'A dimpled golf-ball comet blazing across the void — earned with a hole-in-one.',
+    cost: 0,
+    secret: true,
     look: { kind: 'comet', body: '#f4f6ff', glass: '#ffffff', flame: '#9ad8ff', accent: '#ffd36b', bling: 3 },
   },
   // --- The SPEEDER set: single-rider space-bikes (motorcycle golf buggies) ---
@@ -213,4 +222,21 @@ export function shipCatalogue(): Ship[] {
  *  an Unending-Universe unlock (GS-unending) is earned, never bought.) */
 export function canBuyShip(ship: Ship | undefined, shards: number, owned: readonly string[]): boolean {
   return !!ship && !ship.unlockHoles && ship.cost > 0 && shards >= ship.cost && !owned.includes(ship.id);
+}
+
+/** Should this ship appear in the Trade Market at all (GS-hide-unlocks)? An earned unlock (a `secret`
+ *  or `unlockHoles` ride) stays OUT of the rack until it's owned — the market never spoils a reveal.
+ *  Ordinary for-sale ships are always shown. */
+export function shipRevealedInMarket(ship: Ship, owned: readonly string[]): boolean {
+  return !(ship.secret || ship.unlockHoles) || owned.includes(ship.id);
+}
+
+/** Grant the secret Comet Rider (GS-ace-ship) when the player makes a hole-in-one. Returns the owned
+ *  list WITH the ship added on an ace-they-don't-yet-own, else the list unchanged (referentially, so
+ *  callers can cheaply detect "no change"). Awarded on ANY ace, not just the very first — so a player
+ *  who aced before this shipped still unlocks it on their next ace (never force-granted retroactively,
+ *  never locked out). Global ownership, like every ship. */
+export function aceShipUnlock(ownedShips: readonly string[], aces: number): string[] {
+  if (aces > 0 && !ownedShips.includes(ACE_SHIP_ID)) return [...ownedShips, ACE_SHIP_ID];
+  return ownedShips as string[];
 }

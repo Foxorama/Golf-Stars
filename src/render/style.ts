@@ -628,8 +628,14 @@ function fairwayStripes(sps: Vec[][], s: Shade, b0: { minX: number; minY: number
  *  every base, the stripes share the corridor's band grid, and only the corridor carries the ink
  *  edge, so the apron eases out on its soft fringe alone. With a single fairway (no apron — void
  *  islands) this is byte-for-byte the old per-poly output. */
-function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arch: BiomeArchetype): Prim[] {
+function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arch: BiomeArchetype, collar?: string): Prim[] {
   const out: Prim[] = [];
+  // GS-fairway: a wider first-cut ROUGH collar UNDER the light fringe, so the corridor reads as mown
+  // DOWN into taller grass rather than a bright tube laid on top (the "flat object" tell). Only the
+  // parkland worlds pass a `collar` — void/cetus model their corridor edge with their own glow rim /
+  // raised shelf, so they omit it and stay byte-for-byte identical. Grouped like the fringe (every
+  // collar UNDER every base), so a broken corridor's segments share one continuous first cut.
+  if (collar) for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: collar });
   // First-cut fringes UNDER all the bases, so the apron's fringe never paints over the corridor —
   // only the outermost edge (past the green) shows it, easing the cut grass into the rough.
   for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: fringe });
@@ -637,6 +643,15 @@ function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: string, arc
   // Per-world mowing PATTERN (GS-variety-2), riding the MAIN corridor's band grid so the apron +
   // broken-fairway segments line up with the corridor instead of running out of phase.
   if (art.stripes && sps[0]) out.push(...fairwayStripes(sps, s, bboxOf(sps[0]), arch));
+  // GS-fairway: a gentle directional SHEEN — a soft lit band pooled on the up-light side (the shared
+  // LIGHT_UL) so the mown turf reads as gently crowned ground catching the sun, not a flat decal.
+  // Very low alpha; clipped to each segment; pure geometry, zero rng. Grounded worlds only.
+  if (collar) {
+    for (const sp of sps) {
+      const lit = shiftPoly(offsetPoly(sp, 4), LIGHT_UL[0] * 4, LIGHT_UL[1] * 4);
+      out.push({ t: 'clip', clip: sp, children: [{ t: 'poly', pts: lit, fill: hexAlpha(s.light, 0.16) }] });
+    }
+  }
   // ONE soft ink edge, on the main corridor only — no hard outline cuts back across it near the green.
   if (art.ink && sps[0]) out.push({ t: 'poly', pts: sps[0], fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1 });
   return out;
@@ -730,15 +745,70 @@ function styleTee(poly: Vec[], art: ArtFeel, s: Shade, fringe: string): Prim[] {
  *   3. per-body depression crescent + rake texture, clipped (NO per-body ink → no seam through overlaps)
  * The shadow outset is the edge against the land, exactly like the liquids' shore.
  */
+// GS-inset: ONE global light — the sun sits upper-left (matching the green's lit highlight and the
+// cetus raised-shelf), so every carved feature shades the same way and the hole reads as one lit
+// landform instead of a collage of stickers. Unit vector pointing TOWARD the light.
+const LIGHT_UL: Vec = [-0.576, -0.816];
+
+function shiftPoly(pts: Vec[], dx: number, dy: number): Vec[] {
+  return pts.map((p) => [p[0] + dx, p[1] + dy] as Vec);
+}
+
+/**
+ * A soft dark shadow the feature casts onto the surrounding turf — offset AWAY from the light
+ * (down-right) so a crescent peeks past the down-light edge. Drawn UNDER the feature body, it
+ * grounds the hazard IN the terrain instead of floating it on top (the "pasted sticker" fix).
+ * Outset silhouette; pure geometry, zero rng.
+ */
+function castShadow(poly: Vec[], scale: number, fill: string): Prim {
+  const d = Math.max(2, Math.min(6.5, scale * 1.2));
+  return { t: 'poly', pts: shiftPoly(offsetPoly(poly, -2), -LIGHT_UL[0] * d, -LIGHT_UL[1] * d), fill };
+}
+
+/**
+ * Emboss a filled feature's interior as an INSET bowl (clipped to the body): drop the whole rim to
+ * a shadow tone, then re-lay the base shifted toward the light so the NEAR (up-light) rim keeps a
+ * shadow crescent while the far side stays bright; an optional lit floor pools sun on the down-light
+ * floor. This is the raised-shelf recipe INVERTED — a depression, not a plateau — and is what makes
+ * a bunker read as dug into the land and a lake as water sunk below the bank. Fixed prim count,
+ * zero rng; sized in px off the projector `scale` and clamped to the body so thin creeks don't
+ * collapse. The base re-lay is a solid so any interior detail (depth rings, rake) drawn AFTER still
+ * paints over the centre.
+ */
+function embossChildren(
+  poly: Vec[],
+  scale: number,
+  tone: { wall: string; base: string; floor?: string },
+): Prim[] {
+  const b = bboxOf(poly);
+  const half = Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.5;
+  const w = Math.max(1.1, Math.min(scale * 1.05, half * 0.5));
+  const sx = -LIGHT_UL[0]; // down-right = away from the light
+  const sy = -LIGHT_UL[1];
+  const children: Prim[] = [
+    { t: 'poly', pts: poly, fill: tone.wall }, // whole interior drops to the shadowed-wall tone
+    { t: 'poly', pts: shiftPoly(offsetPoly(poly, w), sx * w, sy * w), fill: tone.base }, // base shifted toward light → dark crescent on the up-light rim
+  ];
+  if (tone.floor) {
+    children.push({ t: 'poly', pts: shiftPoly(offsetPoly(poly, w * 2.4), sx * w * 1.8, sy * w * 1.8), fill: tone.floor });
+  }
+  return children;
+}
+
+function insetEmboss(poly: Vec[], scale: number, tone: { wall: string; base: string; floor?: string }): Prim[] {
+  return [{ t: 'clip', clip: poly, children: embossChildren(poly, scale, tone) }];
+}
+
 function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
-  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow }); // 1
+  for (const poly of polys) out.push(castShadow(poly, scale, SAND.contact)); // 0: contact shadow on the turf
+  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow }); // 1: sandy lip against the grass
   for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: SAND.base }); // 2
   for (const poly of polys) {
     const c = centroidOf(poly);
-    // Inner depression crescent: an inset poly nudged down so the far lip catches shadow.
-    out.push({ t: 'poly', pts: offsetPoly(poly, 2.4).map((p) => [p[0], p[1] - 1.5] as Vec), fill: SAND.rim });
+    // Inset bowl: near (up-light) wall in shadow, far floor sunlit — so the bunker reads dug in.
+    out.push(...insetEmboss(poly, scale, { wall: SAND.wall, base: SAND.base, floor: SAND.rim }));
     // A couple of pale rake arcs across the sand (subtle texture).
     if (art.stripes) {
       const b = bboxOf(poly);
@@ -770,6 +840,8 @@ interface LiquidPalette {
   deep: string; // core ring
   flow: string; // lengthwise flow streaks (current / molten flow)
   glint: string; // sparkle on a still lake
+  bank: string; // GS-inset: shadow the raised bank casts on the up-light shore
+  contact: string; // GS-inset: soft dark shadow cast onto the surrounding turf
 }
 const WATER_LIQ: LiquidPalette = {
   shore: WATER.shallow,
@@ -778,6 +850,8 @@ const WATER_LIQ: LiquidPalette = {
   deep: WATER.deepest,
   flow: 'rgba(255,255,255,0.30)',
   glint: WATER.glint,
+  bank: WATER.bank,
+  contact: WATER.contact,
 };
 const LAVA_LIQ: LiquidPalette = {
   shore: LAVA.crust,
@@ -786,6 +860,8 @@ const LAVA_LIQ: LiquidPalette = {
   deep: LAVA.core,
   flow: LAVA.crack,
   glint: LAVA.core,
+  bank: LAVA.bank,
+  contact: LAVA.contact,
 };
 
 const WATER_KINDS = new Set(['water', 'frozenpond', 'creek']);
@@ -804,16 +880,22 @@ const LAVA_KINDS = new Set(['lava', 'lavariver']);
  * elongated body additionally gets lengthwise FLOW lines so it reads as flowing current/molten lava.
  * No per-body ink outline (that would re-draw a seam through an overlap); the shore is the edge.
  */
-function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number): Prim[] {
+function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number, scale = 4): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
+  for (const poly of polys) out.push(castShadow(poly, scale, lp.contact)); // 0: contact shadow on the turf
   for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -3), fill: lp.shore }); // 1
   for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: lp.base }); // 2
   for (const poly of polys) {
     const axis = longAxis(poly);
     const width = extentAlong(poly, -axis.dir[1], axis.dir[0]); // extent ⟂ the long chord = channel width
     const step = Math.max(1.6, Math.min(7, width * 0.26));
+    // GS-inset: the raised bank shadows the up-light shore (base re-laid shifted toward the light) —
+    // then the depth rings below inset from the rim and repaint the deep centre, so the body stays
+    // dark-cored while the up-light shore reads as water sunk beneath its bank. NO lit floor (the
+    // depth rings own the centre); clipped, fixed count, zero rng.
     const detail: Prim[] = [
+      ...embossChildren(poly, scale, { wall: lp.bank, base: lp.base }), // detail is clipped to poly below → no nested clip
       { t: 'poly', pts: offsetPoly(poly, step), fill: lp.mid },
       { t: 'poly', pts: offsetPoly(poly, step * 2), fill: lp.deep },
     ];
@@ -3451,8 +3533,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   for (let i = 0; i < patches; i++) {
     const px = rng() * W;
     const py = rng() * H;
-    const pr = (0.13 + rng() * 0.16) * Math.min(W, H);
-    land.push({ t: 'circle', c: [px, py], r: pr, fill: rng() < 0.33 ? 'rgba(220,255,210,0.04)' : 'rgba(0,0,0,0.12)' });
+    // Gentle tonal undulation — deliberately SMALL + faint. These used to span up to 29% of the
+    // viewport at heavy alpha, reading as lens-flare "spotlights" pasted over the hole (a cohesion
+    // tell); dialled down to soft mottle so the ground reads as one surface. (Same 4 rng draws → the
+    // downstream stream is byte-for-byte unchanged.)
+    const pr = (0.05 + rng() * 0.06) * Math.min(W, H);
+    land.push({ t: 'circle', c: [px, py], r: pr, fill: rng() < 0.33 ? 'rgba(220,255,210,0.03)' : 'rgba(0,0,0,0.07)' });
   }
   // Tufts/flowers/stars place in COURSE space and only CULL to the view at paint time — the rng
   // consumption must never read the projection. These draws sit on the shared main `rng` stream:
@@ -3544,6 +3630,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const fwFringe = mixHex(fwShade.base, rs.base, 0.5);
   const grFringe = mixHex(collar, rs.base, 0.5);
   const teeFringe = mixHex(teeShade.base, rs.base, 0.45);
+  // GS-fairway: the first-cut ROUGH collar tone (mostly toward rough — a taller mown band) + the
+  // gate for it. Only the parkland worlds get the grounded collar/sheen; void/cetus edge their
+  // corridor with a glow rim / raised shelf, so they pass no collar and stay byte-for-byte identical.
+  const fwCollar = mixHex(fwShade.base, rs.base, 0.72);
+  const groundedFw = arch !== 'void' && arch !== 'cetus';
   // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
   // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
   const voidGlow = arch === 'void';
@@ -3576,7 +3667,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // face + cast shadow UNDER the fairway fill — so it reads with depth like the deep-stop pads. Deep
     // stops already sit on extruded platforms, so gate to !lostHole. Pure geometry (no rng).
     if (calmShelf) for (const sp of fairwaySps) prims.push(...raisedShelf(sp, proj.scale, shelfLook));
-    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch));
+    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined));
     // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
     // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
     if (voidGlow) for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(165,175,255,0.5)', sw: 1.6 });
@@ -3602,6 +3693,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // Raise the green onto the same shelf as the fairway so the play surface reads as one continuous
     // raised mesa (GS-cetus-6) rather than the green sitting back down at rough level.
     if (calmShelf && f.kind === 'green') prims.push(...raisedShelf(sp, proj.scale, shelfLook));
+    // GS-inset: ground the green with a soft cast shadow (a putting surface sits slightly proud of
+    // the rough, so top-down it drops a faint shadow down-light) — pushed UNDER the green fill, but
+    // not where a shelf/void glow already models its edge, and never on Rainbow Road.
+    if (f.kind === 'green' && !calmShelf && !voidGlow) prims.push(castShadow(sp, proj.scale, 'rgba(4,10,6,0.16)'));
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, greenSlopeScreen(hole, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
@@ -3659,8 +3754,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   if (!rainbow) {
     for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
     // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
-    prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng));
-    prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng));
+    prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng, proj.scale));
+    prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng, proj.scale));
     for (const f of treeHaz) prims.push(...styleFlora(f.poly, proj, rng, arch));
   }
 

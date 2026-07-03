@@ -283,6 +283,14 @@ describe('ui reducer', () => {
     expect(s.run.credits).toBe(60); // base starting credits (no permanent stat upgrades anymore)
   });
 
+  it('the Trade Market can jump straight to the Clubhouse hall (try-it-on shortcut)', () => {
+    let s = initState(7, { shards: 500 });
+    s = reduce(s, { type: 'openMarket' });
+    expect(s.screen).toBe('trademarket');
+    s = reduce(s, { type: 'openClubhouseHall' });
+    expect(s.screen).toBe('clubhouseHall');
+  });
+
   it('a golfer stage can step back to the hall to outfit another (GS-clubhouse-stage)', () => {
     let s = initState(7, { shards: 0 });
     s = reduce(s, { type: 'openClubhouseHall' });
@@ -433,5 +441,29 @@ describe('ui reducer', () => {
     // The dying stop's failed hole never counts as survived, and the persisted best matches the run.
     expect(s.run.holesSurvived).toBeLessThan(stops * 4);
     expect(s.endlessBestHoles).toBe(s.run.holesSurvived);
+  });
+
+  it('a hole-in-one unlocks the secret Comet Rider ship, through the full play flow (GS-ace-ship)', () => {
+    // Seed 74 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
+    // the ship lands in the global owned pool exactly when the ace is scored (auto-play path).
+    let s = started(74, 'voyage');
+    expect(s.ownedShips).not.toContain('comet-rider'); // not owned at the off
+    let sawAce = false;
+    for (let stop = 0; stop < 4 && s.run.status === 'active'; stop++) {
+      const ownedBefore = s.ownedShips.includes('comet-rider');
+      s = reduce(s, { type: 'play' });
+      if ((s.lastResult?.aces ?? 0) > 0) {
+        sawAce = true;
+        expect(ownedBefore).toBe(false);
+        expect(s.ownedShips).toContain('comet-rider'); // the ace granted it
+        expect(s.lifetimeAces).toBeGreaterThan(0); // and still counted the lifetime tally
+        break;
+      }
+      if (s.screen === 'gameover') break;
+      s = reduce(s, { type: 'continue' });
+      s = reduce(s, { type: 'leaveShop' });
+      s = reduce(s, { type: 'route', routeId: s.routes![0]!.id });
+    }
+    expect(sawAce).toBe(true); // fixture guard: the pinned seed really does ace within the window
   });
 });

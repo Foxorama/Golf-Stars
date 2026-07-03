@@ -175,6 +175,51 @@
   `clearsPlayCorridor` (so it stays a fair, avoidable side-hazard). `crossingBand` is KEPT for the sandy
   `fairwayBreaks` waste band (a clean cross-cut is right there). Re-shoot the gallery and re-run
   `tests/zones.test.ts` after any `riverChannel` change (the diagonal/reach knobs can trip the carryable bars).
+  - **Follow-up: rivers FLOW from a source to a sink, they don't start/stop in mid-rough (GS-rivers).**
+    Player report: "the rivers are all the same shape and just start and stop out of nowhere — they should
+    look and flow like real rivers with different sizes/shapes/directions, starting off-map or hidden in
+    trees and ending in a lake." Two changes, both keeping the CROSSING geometry (and thus
+    `validateCrossings` + difficulty) untouched — the full carry width holds across `|s| ≤ 1.2·halfWidth`
+    and only the OFF-corridor arms change: (1) **`widthAt` now TAPERS** — the +arm (mouth) swells
+    downstream toward its lake, the −arm (source) narrows to a thin trickle (`half·0.24` floor), so the
+    river reads as flowing FROM a headwater instead of a blunt band with two rounded-nose ends (this alone
+    kills most of the "stops out of nowhere"); the meander `ampFrac` was widened (0.26–0.52) for more
+    wander. Pure geometry — `riverChannel` still draws its SAME 10 rng values in the same order (only the
+    shape they describe changed), and it now also returns the `source` point. (2) **`riverTerminals`** gives
+    both ends a believable terminus for variety: the mouth pools into a LAKE (as before), and the source
+    gets — picked from the stream — a small SPRING pool it wells out of, a stand of TREES it emerges from
+    ("out of the woods"; water/frost only — lava has no grove), or nothing (the tapered trickle just peters
+    out). Every added body is gated by `clearsPlayCorridor`, so the pools stay fair penalty side-hazards and
+    the grove (trees are fairness-exempt anyway) is kept off the corridor. `GENERATOR_VERSION` 12→13 (the
+    armed river holes' downstream stream shifts — feature-OFF/calm holes are byte-identical since the whole
+    river block is wildness-gated). All property guards hold: `validateCrossings`/`validateFairness` empty
+    across worlds/seeds, the ember-river + frost-pond no-death-spiral bars (`tests/zones.test.ts`), and
+    render-blend still see creek/lavariver bodies. Eyeball a `creek`/`frozenpond`/`lavariver` study set
+    (busiest at `wildness 0.9`) after any further tweak.
+  - **Follow-up: VARIABLE crossing placement + character breaks the "every hole is the same shape" read
+    (GS-rivers-2).** Player report: "the enforced fairness layer is what makes the holes keep the exact
+    same shape — vary WHERE the river crosses and whether it's straight/diagonal/winding for more
+    interesting layouts (still fair)." Diagnosis: fairness only constrains the CARRY WINDOW, not where in
+    it the crossing sits — but the generator hard-coded `t = rng.range(0.34, 0.6)` (always the middle
+    third) at a uniform `theta = ±0.55` (always a moderate diagonal), so every water hole read the same.
+    Two changes in `riverChannel`, both fair BY CONSTRUCTION (there is NO retry — `generateCourse` throws
+    on a `validateCrossings`/`validateFairness` failure, so the crossing must be provably valid, not
+    hope-it-passes): (1) **a CHARACTER profile** drawn up front — `character < 0.30` STRAIGHT
+    (near-perpendicular `theta ±0.16`, gentle arms), `< 0.68` DIAGONAL (a real angled carry `theta
+    ±0.34–0.80`), else WINDING (moderate angle, `ampFrac 0.46–0.74` so the ARMS wander hard while the
+    carry itself stays a clean single crossing — the meander is still anchored to 0 across the corridor).
+    (2) **variable POSITION** — the caller now passes a WIDE raw `t = rng.range(0.08, 0.92)` and
+    `riverChannel` clamps it into the fair window `[0.15 + dt, 0.80 − dt]`, where `dt = 2·half /
+    (cos(theta)·arcLen)` is the centreline fraction a band of that thickness+angle spans — so both banks
+    provably stay inside `validateCrossings`' `[0.12, 0.82]` (lay-up room before, green room after) with
+    margin, and the crossing can be an early tee-shot carry, a mid-hole hazard, or a late approach carry.
+    The character params REPLACE the old single `theta`/`ampFrac` draws (net a few more draws, reordered);
+    all still inside the wildness-gated block, so calm/feature-off holes are byte-identical.
+    `GENERATOR_VERSION` 13→14. Full suite green (870): `validateCrossings`/`validateFairness` empty across
+    every world/seed/wildness (the by-construction clamp proven by the suite's generate-or-throw), the
+    death-spiral bars hold. If the clamp is ever loosened, the suite THROWS at generation (its own guard).
+    Eyeballed a 6-wide `creek` + `lavariver` variety sheet: crossings now sit early/mid/late at varied
+    angles + straight/diagonal/winding characters.
 - **Greens span the full vocabulary now (GS-terrain extends GS-greens).** `greenPoly` got FOUR seeded
   harmonics (bigger amplitudes), a low-frequency PEAR/teardrop bias (one end fatter), and 0–2 KIDNEY
   bites — so greens read unmistakably as round/oval/long-shelf/pear/kidney/boomerang/clover, not a gently
@@ -657,6 +702,23 @@ per-hole later"). `GENERATOR_VERSION` bumped 9 → 10 (stream reordered — no b
   rng draws, so every seeded stream is byte-identical; only which hazards SURVIVE changed. Guarded by
   `tests/hazard-overlap.test.ts` (no cross-family overlap across biomes/seeds; tree overlaps still
   plentiful; crossings still present).
+- **Lost-rough island holes CLEAR the abyss of stray hazards (GS-cetus-water, 2026-07).** On Void &
+  Cetus deep stops the fairway/green pads float in the abyss, and the abyss IS the only penalty. But
+  the par-4/5 island CHAINS (GS-cetus-5) still ran the full ordinary hazard placement — flanking
+  penalty blobs, ponds, the approach lake, greenside rings, greenside sand, fairway bunkers/craters —
+  positioned at lateral offsets from a WIDE (`VOID_ISLAND_SCALE = 2.4`), bending island corridor. The
+  result (reported with a screenshot): water pools and bunkers scattered over the clifftop pads and
+  hanging in the deep, and water reading as if stamped over a bunker. Only the island-green PAR 3
+  skipped its flanking hazards ("ponds in the void read wrong"); the chains never got that treatment.
+  Fix: `clearVoidHazards` — a second pure, ZERO-rng post-filter run right after `dedupeHazardOverlaps`,
+  gated on `lostRough` so every normal world and every CALM void/cetus stop (lost-rough un-armed, plays
+  as ordinary rough) is byte-identical. It keeps a hazard only when it is NON-penalty (sand) AND its
+  polygon overlaps a fairway/green/tee pad; every penalty pool and every void-stranded sand/tree blob
+  is dropped. Sanctioned forced-carry crossings are exempted (load-bearing) though none spawn on these
+  biomes. Net: the pads keep their genuine on-pad sand "clifftop coves" (Cetus's signature) while the
+  deep is swept clean. Because the streams are untouched, no seeded rng test shifts (all 869 pass);
+  verified across 240 armed island holes (void + cetus, wildness 0.95) — 0 penalty pools, 0 stranded
+  blobs, all surviving sand genuinely on a pad — while calm stops keep their normal hazards.
 - **Waste band is a tapered LENS (GS-hazard-blend).** `crossingBand` (the sandy waste break) tapers
   its thickness toward both ends (`0.3 + 0.7·sin(π·u)`) and finishes on rounded nose tips — a natural
   sandbelt blowout instead of a flat-cut road slab. Pure math on the SAME rng draws (count unchanged).

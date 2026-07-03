@@ -115,10 +115,26 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves carry)
   and sampled from an asymmetric 5-zone `SprayShape`. Forced-carry crossings (lava river / frozen
   pond / creek) are generic penalty bands; the carry-aware AI flies any of them off `penalty`, never
-  the kind. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
+  the kind. **Crossings FLOW like real rivers (GS-rivers):** `riverChannel` holds the full carry width
+  across the corridor (`|s| ≤ 1.2·halfWidth` — `validateCrossings` + difficulty untouched) but TAPERS
+  the off-corridor arms — the mouth swells into its lake, the source narrows to a trickle — and
+  `riverTerminals` ends both sides believably (mouth LAKE; source = spring pool / stand of TREES /
+  taper-out, all `clearsPlayCorridor`-gated), so a river reads as flowing from a headwater into a sink
+  rather than a band stopping in mid-rough. **And the crossing itself VARIES (GS-rivers-2)** so holes
+  don't all read the same: a CHARACTER profile (STRAIGHT near-perpendicular / DIAGONAL angled carry /
+  WINDING wandering arms) sets the angle + arm meander, and WHERE it crosses spans the whole hole (an
+  early tee-shot carry → a late approach carry), not just the middle third — the caller passes a wide
+  raw `t` and `riverChannel` CLAMPS it into the fair window `[0.15+dt, 0.8−dt]` (dt = the band's
+  centreline span from angle+thickness), so it's fair BY CONSTRUCTION (generateCourse throws, no
+  retry). All new draws inside the wildness-gated river block (calm holes byte-identical);
+  `GENERATOR_VERSION` 14. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
   hazard spawned on a different substance (trees exempt both ways; crossings always win) — a pure
   ZERO-rng post-filter, so the streams are untouched; SAME-family overlaps are legal and the render
-  union-merges them into one body. OB = stroke-and-distance off the play-bounds box (which doubles as
+  union-merges them into one body. **An ARMED lost-rough island hole then STRIPS every void-stranded
+  hazard** (GS-cetus-water): `clearVoidHazards` (same zero-rng, lostRough-gated post-filter) drops all
+  penalty pools (the abyss is the only penalty — "ponds in the void read wrong") and any sand/tree blob
+  not overlapping a pad; only on-pad sand (clifftop coves) survives — the par-4/5 chains used to scatter
+  the full flanking/pond/lake/greenside placement over the pads and deep. OB = stroke-and-distance off the play-bounds box (which doubles as
   the OB trigger — don't shrink it casually). **Variety is DECOUPLED from difficulty (GS-variety-2):** shape archetypes
   (cape/hairpin/double) and dogleg-corner blocking GROVES appear even on CALM stops (no wildness gate)
   — difficulty rides bend severity (`dogFac = 0.5 + 0.5·wildness`) + hazard density, not which shapes
@@ -164,10 +180,18 @@ For each system: the rule that constrains new work. Open the archive doc before 
   riding galaxy distance + `routeDifficulty`, so the universe escalates after the bar parks at birdie.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
-  ship@150 hidden from the market until owned), keyed off the persisted `endlessBestHoles` (save v13,
+  ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),
+  keyed off the persisted `endlessBestHoles` (save v13,
   with `golfBagByCharacter`) through the reducer's `endlessProgressUpdates` — applied at EVERY
   stop-scoring site, not just run end; `tests/endless.test.ts` machine-checks the unlock-id↔catalogue
-  link and the gate ladder. **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
+  link and the gate ladder. **A hole-in-one is the ONLY way to earn the secret Comet Rider ship
+  (GS-ace-ship):** the `comet-rider` row is now `secret:true`/`cost:0` (hidden from the market, never
+  buyable), granted by the reducer's `aceUpdates` at every stop-scoring site — `aceShipUnlock` adds it to
+  global `ownedShips` on ANY ace the player doesn't already own (NOT a first-ace flag), so a player who
+  aced before the feature shipped still earns it on their next ace and nobody is ever locked out; the ace
+  takeover reveals it (`showAceCelebration` `shipUnlocked`). Zero rng, no save bump (`ownedShips` already
+  persists); composes AFTER `endlessProgressUpdates` so a hole-150 + ace on one stop keeps both grants.
+  **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
   through `voyageRarityBias(rarity, voyageShopProgress(stopIndex,stops))` (endless formats keep the
   galaxy-distance `rarityDepthBias`), keyed off the STOP so shop 1 is mostly green+a blue, a small
   epic+legendary opens between boss 1 & 2, and the last pre-boss shop is halfish blue/halfish purple with
@@ -180,7 +204,18 @@ For each system: the rule that constrains new work. Open the archive doc before 
   legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v8). **Cosmetics
   split buy-vs-equip** (GS-clubhouse, save v10): the **Trade Market** sells the FULL ship + apparel
   catalogues for global OWNERSHIP (`ownedShips`/`ownedApparel`; no rotating offer/reroll — scarcity is the
-  shard price); the **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
+  shard price) — **but every unlock-gated item is HIDDEN until it's unlockable (GS-hide-unlocks):** the
+  earn-only Unending-Universe cosmetics (`unlockHoles`/`secret` ships + apparel) stay out of the rack until
+  OWNED, and the gated club-set bag tiers (`bag.ts BAG_SETS`) until their Ascension gate is cleared (⇔
+  available to buy). ONE reveal predicate per catalogue (`shipRevealedInMarket`/`apparelRevealedInMarket`/
+  `bagSetRevealedInMarket`) drives the filter; a section with nothing revealed drops out entirely (Caddy
+  Bags before any is earned; club sets before the first gate). Pure display filter — zero sim/rng/save
+  impact; a new secret unlock is a `unlockHoles`/`secret` row, nothing else. A **`Show Owned` view toggle**
+  (default OFF, reset on every `openMarket`) drops already-owned gear from every rack so the market lands on
+  what's still buyable; a fully-owned section keeps its `owned/total` header + a "flip Show Owned on" note.
+  The Market also carries a **direct `openClubhouseHall` button** (guarded to also fire from `trademarket`)
+  so a shopper can jump to try gear on without a title round-trip. Both are view-only module state
+  (`marketShowOwned`, like `collapsedMarketSections`) — no save/rng impact, no test-hub hook. The **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
   character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
   save v11), so each golfer flies its own ride + wears its own look head-to-toe. The per-golfer Clubhouse is a
   **tap-to-restyle stage** (GS-clubhouse-stage): a big full-body avatar (`golferPreviewSVG`, ONE proportional
@@ -313,7 +348,22 @@ For each system: the rule that constrains new work. Open the archive doc before 
   into its lake. Those pads are extruded side-on 3D by `platformCliffs` (cetus blue clifftop /
   void violet asteroid, `CliffLook` palette); a CALM cetus/void stop (playable rough everywhere, can't
   be islands) instead gets `raisedShelf` — an outset rock pedestal + shadow + lit rim under the
-  fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only). The ANIMATED weather layer honours the same land: its pinned twinkle
+  fairway/green so the corridor reads as a two-tier raised mesa at both zooms (GS-cetus-6, render-only).
+  **Carved features share ONE light so a hole reads as one lit landform, not a collage (GS-inset):**
+  a single upper-left `LIGHT_UL` drives `castShadow` (a soft dark shadow onto the turf that grounds a
+  feature IN the ground) + `insetEmboss`/`embossChildren` (repaint the interior as a bowl — rim in
+  shadow, base re-laid toward the light, far floor sunlit); `styleSandFamily`/`styleLiquidFamily` use
+  them so bunkers/water/lava read as DUG IN (water's up-light bank shadows the surface, its shore
+  dimmed from candy-cyan), and greens get a faint grounding shadow (flush fairway does NOT — a drop
+  shadow there reads as a floating sticker). The emboss is inlined as clip CHILDREN, never a nested
+  clip. Land tone-patches are small faint mottle, never viewport-spanning "spotlight" washes. All pure
+  geometry — ZERO rng draws/reorders (void/cetus byte-identical). Palette: `*.wall/bank/contact` tones.
+  **The fairway reads as mown INTO the land (GS-fairway):** `styleFairways` takes an optional `collar`
+  (a wider first-cut ROUGH band `mixHex(fw, rough, 0.72)` under the light fringe) + a directional
+  up-light SHEEN, so the corridor sits in a graded fairway→first-cut→rough transition, not a bright
+  tube on top. Gated to parkland worlds (`arch !== 'void' && 'cetus'`); void/cetus edge their corridor
+  with a glow rim / raised shelf, so they pass NO collar and stay byte-identical. Pure geometry, zero rng.
+  The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
   meteors/ambient air — stays unmasked); on a meteor-shower stop it also LANDS one meteor per cycle
   INTO a drawn scorch crater (`WeatherOpts.strikeTargets`, fed the craters' screen positions by the

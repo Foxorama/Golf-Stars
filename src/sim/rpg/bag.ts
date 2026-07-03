@@ -115,6 +115,16 @@ export function bagSetUnlocked(set: BagSet, maxAscension: number): boolean {
   return maxAscension >= set.unlockMaxAscension;
 }
 
+/** Should this bag/club set appear in the Trade Market at all (GS-hide-unlocks)? A locked upgrade stays
+ *  OUT of the rack until its Ascension gate is cleared — i.e. until it's actually available to purchase,
+ *  or already owned (equipped at or below the current tier). Purchasable-but-gated, so revealed on unlock,
+ *  not on owning it (unlike the earn-only cosmetics). */
+export function bagSetRevealedInMarket(set: BagSet, maxAscension: number, current: BagTier | undefined): boolean {
+  const currentRank = bagTierRank(current);
+  const owned = currentRank > 0 && bagTierRank(set.tier) <= currentRank;
+  return bagSetUnlocked(set, maxAscension) || owned;
+}
+
 /** Can the player buy this bag set right now — unlocked, strictly higher than the current tier, and
  *  affordable? (Tiers don't have to be bought in order: a richer player may jump straight to a higher
  *  unlocked tier.) */
