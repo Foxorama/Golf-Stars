@@ -11,18 +11,25 @@ was anchored to the ball's roof-contact point captured in **screen** space — s
 with the ball, the bubble drifted with the ball and read as coming from the golf ball, not the tent.
 
 ## The shape of the fix
-Make the tents a **single surprise hole** with **five distinct, randomised interactions**, and fix the
-bubble. The guiding constraint (CLAUDE.md contracts): the SHOT must resolve identically in the headless
+Give every hole of a tradeMarket stop a tent camp, each with **five distinct, randomised interactions**,
+and fix the bubble. (The tents first shipped on a single surprise hole per stop; see "Every hole of the
+stop" below for why that moved to the whole world.) The guiding constraint (CLAUDE.md contracts): the SHOT must resolve identically in the headless
 auto sim and the interactive driver, so anything that changes the shot outcome lives in the shared pure
 physics; anything player-facing/stateful is an interactive-only META reaction layered on like the
 ace-celebration / unlock side-effects.
 
-### One hole per stop (`run.ts armTentHole`, `Hole.tents`)
-`currentCourse` stamps `tents:true` on exactly one hole of a tradeMarket stop, picked by a pure FNV hash
-of the course seed — **zero generation rng**, so the generated course is byte-for-byte unchanged and a
-resume reproduces the same hole. Every tent gate (sim `executeShot`, `style.ts`, `holeView.ts`) now reads
-`opts.tradeTents && hole.tents`, and the render side reads `hole.tents` directly, so the app call sites
-(which pass the stop-wide `tentsActive()`) need no per-hole logic — the stamp does the filtering.
+### Every hole of the stop (`run.ts armTentHoles`, `Hole.tents`)
+`currentCourse` stamps `tents:true` on **every** hole of a tradeMarket stop — **zero generation rng**, so
+the generated course is byte-for-byte unchanged and a resume reproduces the same holes. The tents were
+first stamped on a single hole per stop (a pure FNV hash of the course seed picked the index), but a lone
+surprise hole was too rare for a route billed as a *trade market* — you'd cross the whole world and meet
+the camp once. Stamping the whole stop makes the tradeMarket lane read as its trade-camp world (a camp at
+each green, however many holes the mode runs — 6 for a voyage stop, 4 for the Unending Universe, whatever a
+future mode sets), while the per-hole effect shuffle (`assignTentEffects`) keeps each green's colour→effect
+mapping distinct so no two holes play identically. Every tent gate (sim `executeShot`, `style.ts`,
+`holeView.ts`) still reads `opts.tradeTents && hole.tents`, and the render side reads `hole.tents` directly,
+so the app call sites (which pass the stop-wide `tentsActive()`) need no per-hole logic — the stamp does the
+filtering.
 
 ### Five randomised effects (`tents.ts assignTentEffects`, `TentEffectId`)
 Each tent gets one of `ow | marmot | fortune | watch | starmart`, dealt by a mulberry32 Fisher–Yates
@@ -39,7 +46,7 @@ so it stays glued to the tent as the camera pans. The text is the struck tent's 
 - **ow / watch** — pure flavour: the bubble + a startled voice. No state change.
 - **marmot** — the marmot pockets your ball. This DOES change the shot, so it's resolved in the shared
   physics: a marmot bonk is a **lost ball** (stroke-and-distance, `PEN_INFO.lost`, replay from origin) in
-  `executeShot` — deterministic, auto ≡ interactive, negligible balance impact (one tent, one hole, a
+  `executeShot` — deterministic, auto ≡ interactive, negligible balance impact (a non-penalty carry on a
   route that isn't in the death-spiral harness; `tents.test.ts` proves non-marmot tents stay non-penalty).
   The **first-ever** marmot bonk unlocks the persistent **Marmot Bartender** (save **v15** `marmotBartender`)
   — a marmot tends the 19th-hole bar and a golf ball sits on the counter (`clubhouseLounge.ts`, gated
@@ -58,18 +65,18 @@ so it stays glued to the tent as the camera pans. The text is the struck tent's 
   / `rerollStarmart` / `leaveStarmart` reducer actions, mirroring the credit Pro Shop.
 
 ## Why this respects the contracts
-- **Determinism:** the one-hole stamp and the effect shuffle are pure hashes (no rng draws); every gate is
-  `hole.tents`-armed, so all other holes/worlds/seeds are byte-identical. Existing seeded tests unchanged.
+- **Determinism:** the every-hole stamp and the per-hole effect shuffle are pure (no rng draws); every gate
+  is `hole.tents`-armed, so all non-tradeMarket holes/worlds/seeds are byte-identical. Existing seeded tests unchanged.
 - **auto ≡ interactive:** the only shot-outcome change (the marmot lost ball) is in the shared
   `executeShot`. Fortune/StarMart are interactive META reactions (new player decisions the auto sim never
   makes), exactly like celebrations and cosmetic unlocks — they don't fork the physics.
-- **No death spiral:** tents are one hole on a non-harness route; `tents.test.ts` re-proves the fairness
-  bar with tents armed on every hole (a worst-case bound).
+- **No death spiral:** tents ride a non-harness route; `tents.test.ts` re-proves the fairness bar with
+  tents armed on every hole at max wildness.
 - **No new hook:** no `window._gs*` flag or `?param` was added, so the test-hub sync guard is untouched.
 
 ## Tests
 `tests/tents.test.ts` (effect shuffle, marmot lost ball, unstamped-hole = no tents, fairness bar),
-`tests/journey-effects.test.ts` (exactly one hole stamped per trade stop, deterministic),
+`tests/journey-effects.test.ts` (every hole stamped on a trade stop, deterministic),
 `tests/starmart.test.ts` (no commons, shard pricing, epic/legendary skew, reroll),
 `tests/ui.test.ts` (StarMart open/buy/leave flow, fortune mulligan two-ball pick), `tests/save.test.ts`
 (v14→v15 migration + round-trip).

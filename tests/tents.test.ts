@@ -106,7 +106,7 @@ describe('trade-camp tents (GS-tents)', () => {
     expect(marmotShots).toBeGreaterThan(0); // and the marmot's lost-ball path is exercised
   });
 
-  it('an unstamped hole builds NO tents (tents live on one hole of the stop)', () => {
+  it('an unstamped hole builds NO tents (tents live only on a stamped trade-market hole)', () => {
     const hole = generateCourse(200, { biome: 'verdant-station', wildness: 0.7 }).holes[0]!; // no tents flag
     const opts: ExecOpts = { carryMult: 1, bag: CLUBS, tradeTents: true } as ExecOpts;
     const rng = new Rng('unstamped');
@@ -140,7 +140,7 @@ describe('trade-camp tents (GS-tents)', () => {
     for (const biome of BIOMES) {
       for (let seed = 0; seed < 20; seed++) {
         const course = generateCourse(seed + 800, { biome, holes: 3, wildness: 1 });
-        // Arm tents on every hole (a worst-case bound; in play only one hole carries them).
+        // Arm tents on every hole — the trade-market stop now carries them on all holes.
         const armed = course.holes.map((h) => ({ ...h, tents: true }));
         const played = playCourse(armed, new Rng(`${biome}:${seed}:p`), { tradeTents: true });
         for (const p of played) {
