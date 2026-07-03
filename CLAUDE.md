@@ -170,7 +170,8 @@ For each system: the rule that constrains new work. Open the archive doc before 
   riding galaxy distance + `routeDifficulty`, so the universe escalates after the bar parks at birdie.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
-  ship@150 hidden from the market until owned), keyed off the persisted `endlessBestHoles` (save v13,
+  ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),
+  keyed off the persisted `endlessBestHoles` (save v13,
   with `golfBagByCharacter`) through the reducer's `endlessProgressUpdates` — applied at EVERY
   stop-scoring site, not just run end; `tests/endless.test.ts` machine-checks the unlock-id↔catalogue
   link and the gate ladder. **Pro Shop rarity is VOYAGE-paced**: a winnable format draws
@@ -186,7 +187,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   legendary — `cosmetics.ts CosmeticRarity` is kept OUT of the sim's loot `Rarity`; save v8). **Cosmetics
   split buy-vs-equip** (GS-clubhouse, save v10): the **Trade Market** sells the FULL ship + apparel
   catalogues for global OWNERSHIP (`ownedShips`/`ownedApparel`; no rotating offer/reroll — scarcity is the
-  shard price); the **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
+  shard price) — **but every unlock-gated item is HIDDEN until it's unlockable (GS-hide-unlocks):** the
+  earn-only Unending-Universe cosmetics (`unlockHoles`/`secret` ships + apparel) stay out of the rack until
+  OWNED, and the gated club-set bag tiers (`bag.ts BAG_SETS`) until their Ascension gate is cleared (⇔
+  available to buy). ONE reveal predicate per catalogue (`shipRevealedInMarket`/`apparelRevealedInMarket`/
+  `bagSetRevealedInMarket`) drives the filter; a section with nothing revealed drops out entirely (Caddy
+  Bags before any is earned; club sets before the first gate). Pure display filter — zero sim/rng/save
+  impact; a new secret unlock is a `unlockHoles`/`secret` row, nothing else. The **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
   character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
   save v11), so each golfer flies its own ride + wears its own look head-to-toe. The per-golfer Clubhouse is a
   **tap-to-restyle stage** (GS-clubhouse-stage): a big full-body avatar (`golferPreviewSVG`, ONE proportional

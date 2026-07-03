@@ -52,7 +52,8 @@ export interface Apparel {
   /** Shard price. */
   cost: number;
   /** Earned, never bought (GS-unending): unlocked by surviving this many holes of the Unending
-   *  Universe. The Trade Market shows it locked with its milestone; `canBuyApparel` refuses it. */
+   *  Universe. Hidden from the Trade Market until OWNED (GS-hide-unlocks — see `apparelRevealedInMarket`);
+   *  `canBuyApparel` refuses it. */
   unlockHoles?: number;
   look: ApparelLook;
 }
@@ -351,6 +352,13 @@ export function apparelForSlot(slot: ApparelSlot): Apparel[] {
  *  Unending-Universe unlock (GS-unending) is earned, never bought.) */
 export function canBuyApparel(item: Apparel | undefined, shards: number, owned: readonly string[]): boolean {
   return !!item && !item.unlockHoles && shards >= item.cost && !owned.includes(item.id);
+}
+
+/** Should this garment appear in the Trade Market at all (GS-hide-unlocks)? An earned Unending-Universe
+ *  unlock stays OUT of the rack until it's owned — the market never spoils the milestone reward. Ordinary
+ *  for-sale garments are always shown. */
+export function apparelRevealedInMarket(item: Apparel, owned: readonly string[]): boolean {
+  return !item.unlockHoles || owned.includes(item.id);
 }
 
 /**

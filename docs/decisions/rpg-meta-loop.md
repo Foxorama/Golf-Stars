@@ -1048,3 +1048,28 @@ rides.
   guarding bunkers; a teal-rimmed pond; cel garden trees (`tree()` helper) and moon-rocks, all inside
   a `spCourseClip` ellipse clip. Gotcha: a round fairway cap + two bright symmetric tee markers reads
   as a WORM WITH EYES — markers are small, white and staggered.
+
+## Hide unlock-gated gear from the Trade Market until it's unlockable (GS-hide-unlocks)
+- **The problem.** The Trade Market rendered the FULL catalogue including gear you can't touch yet:
+  the earn-only Unending-Universe cosmetics showed as greyed "🔒 Survive 40 holes" teasers, and the
+  locked Ascension club-set bag tiers as "🔒 Clear A2" teasers. The secret hole-150 ship was the ONE
+  thing already hidden (`!s.secret || owned`). The player wanted the market to only ever show what you
+  can actually buy now or already own — no spoilers, no shelf full of padlocks.
+- **The rule, split by acquisition kind.**
+  - **Earn-only cosmetics** (ships/apparel with `unlockHoles`, plus the `secret` grail) — hidden until
+    OWNED. You never *buy* these, so "available" = you earned it. Once owned they reappear in the market
+    greyed "✓ owned" (and become equippable in the Clubhouse).
+  - **Gated-but-purchasable club sets** (`bag.ts BAG_SETS`, GS-bag-tiers) — hidden until UNLOCKED (their
+    Ascension gate cleared ⇔ available to buy), or already owned. These ARE bought with shards, so they
+    reveal the moment you *can* buy them, not when you own them.
+- **One reveal predicate per catalogue**, all pure and unit-tested (`tests/endless.test.ts`):
+  `shipRevealedInMarket(ship, owned)`, `apparelRevealedInMarket(item, owned)`,
+  `bagSetRevealedInMarket(set, maxAscension, currentTier)`. `tradeMarketScreen`/`bagSetSection` filter by
+  them; a section with nothing revealed (Caddy Bags before any is earned; club sets before the first gate)
+  drops out of the accordion entirely rather than showing an empty rack. The per-card "locked" footer
+  branches (`marketApparelCardHTML`, `bagSetCardHTML`) are now unreachable for visible cards and kept only
+  as defensive fallbacks.
+- **Cost of the change: nil beyond render.** Pure display filter — no sim, no rng stream, no save bump.
+  A future secret unlock is just another `unlockHoles`/`secret` catalogue row (or a gated `BAG_SETS` row);
+  the reveal predicate picks it up with no market edit. The bag-set roadmap hint was also degraded to a
+  generic "clear a higher gate" line so a not-yet-unlocked tier's NAME isn't spoiled before it's earned.
