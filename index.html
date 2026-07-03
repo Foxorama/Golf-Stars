@@ -127,6 +127,39 @@
         padding: 12px 14px; margin: 8px 0;
         box-shadow: var(--gs-shadow);
       }
+      /* ── Stop intro (GS-intro-split): two mobile-first steps — the ARC (mode + field of
+             competitors) then the HOLE (map + hazards popup). Each step is built to hold one
+             phone screen; the arc's bottom First-Tee is revealed by JS only when the field
+             overflows, and the hole map is viewport-capped so its action row stays on-screen. ── */
+      .gs-intro-ctarow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+      .gs-intro-ctarow--bottom { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gs-line-2); }
+      .gs-intro-first { flex: 1 1 auto; min-width: 160px; text-align: center; font-size: 16px; padding: 14px 18px; }
+      .gs-holeintro { display: flex; flex-direction: column; gap: 10px; }
+      .gs-holeintro-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .gs-holeintro-boss {
+        font-size: 12px; font-weight: 700; letter-spacing: .04em; border: 1px solid; border-radius: 8px;
+        padding: 5px 10px; background: linear-gradient(180deg, #1a0e12, #120b10);
+      }
+      .gs-holeintro-map {
+        border-radius: 12px; overflow: hidden; border: 1px solid var(--gs-line-2);
+        line-height: 0; background: #0d1016;
+      }
+      .gs-holeintro-map svg { display: block; width: 100%; height: auto; max-height: 44vh; margin: 0 auto; }
+      .gs-holeintro-ctas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .gs-holeintro-ctas .gs-btn { flex: 1 1 auto; text-align: center; }
+      .gs-holeintro-ctas .gs-btn--primary { flex: 2 1 40%; font-size: 16px; padding: 13px 16px; }
+      .gs-holeintro-back { flex: 0 0 auto; }
+      .gs-traits-bar {
+        display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px;
+        border: 1px solid var(--gs-line-2); border-radius: 10px; background: #ffffff06;
+        color: var(--gs-ink); cursor: pointer; font: inherit; text-align: left;
+      }
+      .gs-traits-bar:hover { border-color: var(--gs-line); background: #ffffff0d; }
+      .gs-traits-bar:active { transform: translateY(1px); filter: brightness(.97); }
+      .gs-trait-chip { display: inline-flex; align-items: center; gap: 6px; }
+      .gs-trait-chip-i { font-size: 15px; }
+      .gs-trait-chip-l { font-size: 11.5px; font-weight: 700; color: var(--tc); letter-spacing: .02em; }
+      .gs-traits-bar-more { margin-left: auto; font-size: 11.5px; opacity: .6; white-space: nowrap; }
       /* ── Title screen (GS-title-2): hero wordmark, section labels, and the game-mode tiles.
              The mode tiles speak the SAME painted-scene + caption language as the Market/Clubhouse
              doorways (one visual family) but are unmistakably the games: taller, accent-bordered

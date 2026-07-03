@@ -273,6 +273,12 @@ function dispatch(action: Action): void {
       for (const id of MARKET_SECTION_IDS) collapsedMarketSections.add(id);
       marketShowOwned = false;
     }
+    // Entering the stop intro (from character-select, resume, or a route jump) always opens on the
+    // ARC step with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop.
+    if (state.screen === 'intro' && prevScreen !== 'intro') {
+      introStage = 'arc';
+      introTraitsOpen = false;
+    }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
     if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
       sfx.reward();
@@ -669,7 +675,36 @@ function holeMatchProgressHTML(playedSoFar: PlayedHole[]): string {
     </div>`;
 }
 
-function introScreen(): string {
+// Two-step stop briefing (GS-intro-split). The old intro crammed the world header, the win
+// condition, the field of 20 AND the hole art + hazard list into one long mobile scroll. It's now
+// split so each step fits a phone and has its own primary action:
+//   'arc'  — the GAME (mode + objective) and the COMPETITION (boss note + the field of competitors),
+//            a big "First Tee ▸" at the top (and again at the bottom when the field overflows a
+//            screen), plus a "Change golfer" back-out.
+//   'hole' — the HOLE you're about to play: a big map, a tap-to-open hazards/benefits popup, and a
+//            "Tee Off" / "Watch AI" / "Back" action row, sized to hold one screen.
+// View-only module state (like settingsOpen / inspectRouteId) — reset to the arc step + closed
+// popup whenever we (re-)enter the intro, so a fresh stop always opens on the arc. No save/rng touch.
+let introStage: 'arc' | 'hole' = 'arc';
+let introTraitsOpen = false;
+
+/**
+ * Shared derivation for BOTH intro steps: the world identity, the compact competition/route NOTES,
+ * and the mode's OBJECTIVE line — computed once here so the arc step and the hole step can never
+ * drift apart. Pure read of `state` (no rng, no mutation), like the rest of the render layer.
+ */
+function introShared(): {
+  c: typeof state.course;
+  zone: ReturnType<typeof zoneProfile>;
+  theme: ReturnType<typeof themeById> | undefined;
+  col: string;
+  par: number;
+  rar: ReturnType<typeof rarityFlavour>;
+  diffPips: string;
+  notes: string[];
+  objective: string;
+  boss: ReturnType<typeof currentBoss>;
+} {
   const c = state.course;
   // The cut reflects any pending route event (GS-14), so the line is honest about the bar.
   const cut = effectiveCut(state.run, c.holes.length);
@@ -735,19 +770,60 @@ function introScreen(): string {
        <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${eventDescFor(ev.desc)}</div>
      </div>`);
 
-  const thumb = renderHoleSVG(c.holes[0]!, {
-    width: 300,
-    height: 360,
-    biome: holeBiome(c.holes[0]!),
-    themeId: holeThemeId(c.holes[0]!),
-    rainbow: rainbowActive(),
-  });
+  const objective = `${(() => {
+    const format = getFormat(state.run.formatId);
+    if (duel)
+      return `⚔ Win the <b>${teamFormatLabel(duel.format)} duel</b> hole by hole — ${
+        duel.partnerSide === 'player' ? 'your partner has your back' : 'you give up the partner advantage'
+      }.`;
+    if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
+    if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
+    if (format.holeGate) {
+      // The Unending Universe (GS-unending): the stakes are the PER-HOLE survival bar. Say the
+      // bar for these exact holes (and flag mid-stop tightening, which happens every 8 holes).
+      const first = endlessGateOverPar(endlessHoleNumber(state.run, 0));
+      const last = endlessGateOverPar(endlessHoleNumber(state.run, c.holes.length - 1));
+      const bar =
+        first === last
+          ? `<b>${endlessGateLabel(first)}</b> or better on every hole`
+          : `<b>${endlessGateLabel(first)}</b> or better — tightening to <b>${endlessGateLabel(last)}</b> mid-set`;
+      return `💀 Holes ${endlessHoleNumber(state.run, 0)}–${endlessHoleNumber(state.run, c.holes.length - 1)} · survive ${bar}. One miss ends the run.`;
+    }
+    if (format.winnable) {
+      const target = arcSurvivorTarget(state.run.stopIndex, ascensionCutBonus(state.run.ascension));
+      return `🏁 Finish in the <b>top ${target}</b> of the field over ${c.holes.length} holes to advance.`;
+    }
+    return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to make the cut and travel on.`;
+  })()}${
+    state.run.ascension > 0 ? `<span style="color:#ffce54;"> · ⚔ Ascension A${state.run.ascension} (tougher cut, leaner purse)</span>` : ''
+  }`;
 
+  return { c, zone, theme, col, par, rar, diffPips, notes, objective, boss };
+}
+
+/** The stop briefing: the arc step or the hole step (GS-intro-split), chosen by view state. */
+function introScreen(): string {
+  return introStage === 'hole' ? holeIntroScreen() : arcIntroScreen();
+}
+
+/**
+ * STEP 1 — the arc: the game mode + win condition and the field of 20 competitors. A big "First
+ * Tee ▸" up top drops to the hole step; a second one appears at the very bottom ONLY when the
+ * field pushes the page past one screen (revealed post-render in `render()` by measuring overflow),
+ * so it's there after you've scrolled the roster but never a redundant duplicate on a short screen.
+ */
+function arcIntroScreen(): string {
+  const { c, zone, theme, col, par, rar, diffPips, notes, objective } = introShared();
+  const board = leaderboard(state.run);
+  const field = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
+  const firstTee = (id: string): string =>
+    `<button class="gs-btn gs-btn--primary gs-intro-first" id="${id}" data-intro-stage="hole">First Tee <span aria-hidden="true">▸</span></button>`;
   return `
     ${header()}
     <article class="gs-panel" style="border-color:${col}${rar.strong ? 'aa' : '66'};box-shadow:0 0 ${rar.glow}px ${col}${rar.strong ? '44' : '22'};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div style="min-width:0;">
+          <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gs-accent);opacity:.85;margin-bottom:2px;">Arc briefing</div>
           <div style="font-size:21px;font-weight:800;line-height:1.1;">${zone.name}</div>
           <div style="font-size:13px;color:var(--gs-accent);margin-top:2px;">${zone.signature}${theme ? ` · ${theme.name}` : ''}</div>
           <div style="font-size:12.5px;opacity:.7;margin-top:3px;">${c.meta.name} · ${c.holes.length} holes · par ${par} · 🌪 ${c.meta.wildness.toFixed(2)}</div>
@@ -759,56 +835,89 @@ function introScreen(): string {
           <div style="font-size:15px;letter-spacing:1px;color:var(--gs-danger);">${diffPips}</div>
         </div>
       </div>
+      <p style="font-size:14px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--gs-line-2);">${objective}</p>
+      <div class="gs-intro-ctarow">
+        ${firstTee('gs-firsttee-top')}
+        ${btn('‹ Change golfer', { type: 'backToCharacter' }, { variant: 'ghost' })}
+      </div>
       ${notes.join('')}
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gs-line-2);">
-        <p style="font-size:14px;margin:0 0 10px;">${(() => {
-          const format = getFormat(state.run.formatId);
-          if (duel)
-            return `⚔ Win the <b>${teamFormatLabel(duel.format)} duel</b> hole by hole — ${
-              duel.partnerSide === 'player' ? 'your partner has your back' : 'you give up the partner advantage'
-            }.`;
-          if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
-          if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
-          if (format.holeGate) {
-            // The Unending Universe (GS-unending): the stakes are the PER-HOLE survival bar. Say the
-            // bar for these exact holes (and flag mid-stop tightening, which happens every 8 holes).
-            const first = endlessGateOverPar(endlessHoleNumber(state.run, 0));
-            const last = endlessGateOverPar(endlessHoleNumber(state.run, c.holes.length - 1));
-            const bar =
-              first === last
-                ? `<b>${endlessGateLabel(first)}</b> or better on every hole`
-                : `<b>${endlessGateLabel(first)}</b> or better — tightening to <b>${endlessGateLabel(last)}</b> mid-set`;
-            return `💀 Holes ${endlessHoleNumber(state.run, 0)}–${endlessHoleNumber(state.run, c.holes.length - 1)} · survive ${bar}. One miss ends the run.`;
-          }
-          if (format.winnable) {
-            const target = arcSurvivorTarget(state.run.stopIndex, ascensionCutBonus(state.run.ascension));
-            return `🏁 Finish in the <b>top ${target}</b> of the field over ${c.holes.length} holes to advance.`;
-          }
-          return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to make the cut and travel on.`;
-        })()}${
-          state.run.ascension > 0 ? `<span style="color:#ffce54;"> · ⚔ Ascension A${state.run.ascension} (tougher cut, leaner purse)</span>` : ''
-        }</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-          ${btn('🏌 Play shot by shot', { type: 'playInteractive' }, { variant: 'primary' })}
-          ${btn('» Watch the AI play', { type: 'play' }, { variant: 'ghost' })}
-        </div>
+      ${field}
+      <div class="gs-intro-ctarow gs-intro-ctarow--bottom" id="gs-firsttee-bottomwrap" style="display:none;">
+        ${firstTee('gs-firsttee-bottom')}
       </div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;padding-top:14px;border-top:1px solid var(--gs-line-2);">
-        <div style="flex:0 0 auto;border-radius:10px;overflow:hidden;border:1px solid var(--gs-line-2);line-height:0;">${thumb}</div>
-        <div style="flex:1 1 240px;min-width:0;">
-          <p style="font-size:12px;font-style:italic;opacity:.7;margin:0 0 6px;line-height:1.4;">${zone.inspiration}</p>
-          <p style="font-size:13px;opacity:.92;margin:0 0 12px;line-height:1.4;">${zone.brief}</p>
-          <div style="display:flex;gap:18px;flex-wrap:wrap;">
-            ${traitList('Hazards', 'var(--gs-danger)', zone.hazards)}
-            ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
-          </div>
-        </div>
-      </div>
-      ${(() => {
-        const board = leaderboard(state.run);
-        return board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
-      })()}
     </article>`;
+}
+
+/**
+ * STEP 2 — the hole: a large map of the first hole, a tap-to-open hazards/benefits popup (the detail
+ * that used to sprawl down the page), and the action row. Laid out as a flex column with a
+ * viewport-capped map so it holds one phone screen; "Tee Off" starts play, "Watch AI" auto-plays,
+ * "Back" returns to the arc step.
+ */
+function holeIntroScreen(): string {
+  const { c, zone, col, diffPips, boss } = introShared();
+  const hole = c.holes[0]!;
+  const map = renderHoleSVG(hole, {
+    width: 300,
+    height: 360,
+    biome: holeBiome(hole),
+    themeId: holeThemeId(hole),
+    rainbow: rainbowActive(),
+  });
+  const chip = (icons: string[], label: string, accent: string): string =>
+    `<span class="gs-trait-chip" style="--tc:${accent};"><span class="gs-trait-chip-i">${icons.join(' ')}</span><span class="gs-trait-chip-l">${label}</span></span>`;
+  const bossRibbon = boss
+    ? `<div class="gs-holeintro-boss" style="border-color:${boss.final ? '#ffce54' : '#c0392b'};color:${boss.final ? '#ffce54' : '#ff6b6b'};">${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'} · ${boss.name}</div>`
+    : '';
+  return `
+    ${header()}
+    <article class="gs-panel gs-holeintro" style="border-color:${col}66;">
+      <div class="gs-holeintro-head">
+        <div style="min-width:0;">
+          <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gs-accent);opacity:.85;">First hole</div>
+          <div style="font-size:18px;font-weight:800;line-height:1.1;">${zone.name}</div>
+          <div style="font-size:12px;opacity:.72;margin-top:2px;">${zone.signature} · par ${hole.par} · ${c.meta.name}</div>
+        </div>
+        <div style="text-align:right;flex:0 0 auto;">
+          <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em;">Difficulty</div>
+          <div style="font-size:14px;color:var(--gs-danger);letter-spacing:1px;">${diffPips}</div>
+        </div>
+      </div>
+      ${bossRibbon}
+      <div class="gs-holeintro-map">${map}</div>
+      <button class="gs-traits-bar" data-introtraits="open" aria-label="Show hazards and benefits">
+        ${chip(zone.hazards.map((t) => t.icon), `${zone.hazards.length} hazards`, 'var(--gs-danger)')}
+        ${chip(zone.benefits.map((t) => t.icon), `${zone.benefits.length} benefits`, 'var(--gs-accent)')}
+        <span class="gs-traits-bar-more">Details ›</span>
+      </button>
+      <div class="gs-holeintro-ctas">
+        ${btn('🏌 Tee Off', { type: 'playInteractive' }, { variant: 'primary' })}
+        ${btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })}
+        <button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>
+      </div>
+    </article>`;
+}
+
+/** The hazards/benefits popup for the hole step (GS-intro-split): every hazard AND benefit in one
+ *  window, plus the world's inspiration + brief — so the detail is one tap away, not a long scroll. */
+function introTraitsOverlay(): string {
+  const { zone } = introShared();
+  return `
+    <div class="gs-sheet-backdrop" data-introtraits="close">
+      <div class="gs-sheet" data-introtraits="keep">
+        <div class="gs-sheet-head"><b style="font-size:17px;">${zone.name} — hazards &amp; benefits</b>
+          <button class="gs-mapbtn" data-introtraits="close" title="Close">✕</button></div>
+        <p style="font-size:12.5px;font-style:italic;opacity:.72;margin:0 0 6px;line-height:1.4;">${zone.inspiration}</p>
+        <p style="font-size:13px;opacity:.92;margin:0 0 12px;line-height:1.4;">${zone.brief}</p>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;">
+          ${traitList('Hazards', 'var(--gs-danger)', zone.hazards)}
+          ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
+        </div>
+        <div style="text-align:center;margin-top:12px;">
+          <button class="gs-btn gs-btn--primary" data-introtraits="close" style="padding:11px 26px;">Done</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 // --- interactive playing screen ----------------------------------------------
@@ -3384,8 +3493,22 @@ function render(): void {
   // own markup so no screen can forget it. The full-bleed play view is the one exception: its
   // map-nav stack already carries a cog, and a second fixed button would collide with it.
   const cog = fullBleed ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}`;
+  // The hole-step hazards/benefits popup (GS-intro-split) rides over the page like the settings sheet.
+  const introTraits = state.screen === 'intro' && introStage === 'hole' && introTraitsOpen ? introTraitsOverlay() : '';
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}${introTraits}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
+
+  // Arc-intro "First Tee" at the BOTTOM only when the field overflows one screen (GS-intro-split):
+  // measure after layout settles and reveal the second CTA so it's reachable without scrolling back
+  // up — but never a redundant duplicate on a short screen. rAF so scrollHeight is post-layout.
+  if (state.screen === 'intro' && introStage === 'arc') {
+    requestAnimationFrame(() => {
+      const wrap = document.getElementById('gs-firsttee-bottomwrap');
+      if (!wrap) return;
+      const overflows = document.documentElement.scrollHeight - window.innerHeight > 8;
+      wrap.style.display = overflows ? 'flex' : 'none';
+    });
+  }
 
   // Wire actions.
   app.querySelectorAll<HTMLElement>('[data-action]').forEach((el) => {
@@ -3515,6 +3638,29 @@ function render(): void {
       } catch {
         /* ignore */
       }
+      render();
+    });
+  });
+  // Stop-intro step switch (GS-intro-split): First Tee (→ hole) / Back (→ arc). View-only; closing
+  // the hazards popup as we move keeps steps clean. A UI tick sells the page turn.
+  app.querySelectorAll<HTMLElement>('[data-intro-stage]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      introStage = el.dataset.introStage === 'hole' ? 'hole' : 'arc';
+      introTraitsOpen = false;
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // Hole-step hazards/benefits popup open/close (view-only, like the settings sheet).
+  app.querySelectorAll<HTMLElement>('[data-introtraits]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const a = el.dataset.introtraits;
+      if (a === 'keep') return; // clicks inside the sheet body don't close it
+      e.stopPropagation();
+      introTraitsOpen = a === 'open';
+      sfx.click();
       render();
     });
   });
