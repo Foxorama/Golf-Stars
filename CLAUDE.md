@@ -283,8 +283,16 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `rough.base` must sit ≥30/255 brightness above its `ARCHETYPE_SPACE.base` — machine-checked), and
   the rough IS the biome's ground COVERING (GS-ground-cover): the ramp is the covering's colour
   (snow / beach sand / moss / ash / scree / moor) and the `GROUND_COVER` table + `groundCover()`
-  pass texture it (mottle/grain/ridges/sparkle, own seeded stream, clipped to land) — every
-  archetype has a row EXCEPT void/cetus (bespoke ground rules; machine-checked); an
+  pass texture it (mottle/grain/ridges/sparkle + biome-characteristic raised `tuft` CLUMPS —
+  GS-rough-cover-2: grass blades / mineral shards / cinder tussocks, `density`-boosted on the worlds
+  that read as a flat slab — crystal/tempest/inferno; own seeded stream, clipped to land) — every
+  archetype has a row EXCEPT void/cetus (bespoke ground rules; machine-checked). **Whimsical
+  EASTER-EGG props hide in the rough (GS-egg, `EGGS` table + `easterEggs`):** a few thematic props
+  per hole (snowman/igloo/penguin, sandcastle/umbrella/surfboard, gnome/picnic, geode, toadstool
+  cottage…) placed ON land, OFF the corridor (a 9-yd buffered cut-grass reject) and off penalty
+  liquids, on their OWN dedicated stream — a treat you find by scanning the whole hole; void/cetus
+  are excluded (no `EGGS` row). Both passes follow the archetypeDecor camera-proof contract (fixed
+  prim count per prop off course-space `posHash`, unconditional push, course-space rejection). An
   ARMED lost-rough hole (`roughLie` biomeMod, void/cetus deep stops) instead floats a platform per
   play feature in the open deep (the void's deep = negative-energy rifts) — the render mirrors the
   sim's lost-ball gate. **Platforms + hazard families merge through `render/merge.ts`
