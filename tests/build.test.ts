@@ -169,7 +169,8 @@ describe('build output (real browser)', () => {
         };
         await click('The Voyage'); // the Voyage game tile (whole tile is the button)
         await click('Voyage as Feather'); // character select
-        await click('Play shot by shot'); // → the play screen
+        await click('First Tee'); // arc-intro → the hole step (GS-intro-split)
+        await click('Tee Off'); // hole step → the play screen
         await page.waitForTimeout(300);
         // Pull-to-shot gesture: press on the map, drag DOWN to charge power past the commit
         // threshold, release to fire.

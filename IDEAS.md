@@ -82,6 +82,11 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-intro-split** — the stop briefing is two mobile steps instead of one long scroll: step 1 the
+  ARC (mode + win condition + the field of 20 competitors, "First Tee ▸" top + bottom-on-overflow +
+  "Change golfer"), step 2 the HOLE (viewport-fit map + tap-to-open hazards/benefits popup + Tee Off
+  / Watch AI / Back). One `'intro'` reducer screen toggled by view state (`introStage`), reset on
+  entry; new `backToCharacter` action; zero save/rng. See `docs/decisions/ui-intro.md`.
 - **GS-audio-4** — caddy-guard projectile cues: the Space Ducks laser PEWs on launch (beam whine
   rising into the ball) and SNAPs on contact; the Convict Sheep boomerang whooshes + whirs
   (whip-whip pulses quickening across the flight) and CRACKs wood-on-ball with a wobbling ring.

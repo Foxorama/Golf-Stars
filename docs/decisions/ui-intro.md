@@ -196,3 +196,38 @@ First-device feedback on GS-settings-nav reshaped the title:
   the ball as before (the radius is ≥ the old travel-framing for full shots, and for a pinched-in
   player it honours THEIR zoom). Falls back to travel-framing when no decision preceded the animation
   (resume, putt-only); reset per hole alongside the other per-hole view state.
+
+- **The stop intro is two mobile steps, not one long scroll (GS-intro-split, 2026-07).** The old
+  single `introScreen()` stacked the world header, the win condition, the whole 20-golfer field AND
+  the hole map + full hazards/benefits lists into one `.gs-panel` — a long phone scroll where the
+  primary action sat below the fold and the competitors were buried. It's now split into two steps
+  that each hold a phone screen, kept as ONE reducer screen (`'intro'`) toggled by a view-state
+  module var `introStage` (`'arc' | 'hole'`, like `settingsOpen`/`inspectRouteId`), reset to `'arc'`
+  + popup-closed whenever we (re-)enter the intro (the `prevScreen !== 'intro'` guard in `dispatch`).
+  So NO new reducer screen, NO save bump, NO rng — every seeded `ui.test` flow that lands on `'intro'`
+  is byte-identical; the two `playInteractive`/`play` actions still fire from `'intro'` exactly as
+  before (the build smoke test just clicks First Tee → Tee Off to reach them).
+  - **Step 1 `arcIntroScreen()` — the arc:** the world identity, the mode's OBJECTIVE line, the
+    boss/split/event NOTES, and the field of competitors (`competitorsCard`/`leaderboardHTML`). A big
+    "First Tee ▸" (`data-intro-stage="hole"`) sits up top next to "‹ Change golfer" (the new
+    `backToCharacter` action → the roster; the run rebuilds on the next `selectCharacter`, same
+    seed+format, so it's view-only). A SECOND First Tee is emitted at the very bottom but hidden by
+    default; `render()` reveals it (post-`requestAnimationFrame`, so `scrollHeight` is settled) ONLY
+    when the field overflows one screen — reachable after scrolling the roster, never a redundant
+    duplicate on a short screen. Verified: a 20-golfer arc overflows ~157px and shows both; a short
+    arc shows one.
+  - **Step 2 `holeIntroScreen()` — the hole:** a compact header + a large hole map + the action row
+    (Tee Off / Watch AI / Back), laid out as a flex column with the map viewport-capped
+    (`.gs-holeintro-map svg{max-height:44vh}`) so the CTAs stay on-screen without scrolling (measured
+    overflow 0 at 414×896). The hazards/benefits detail — which used to sprawl down the page — is
+    now a single tappable `.gs-traits-bar` (icons + counts) that opens `introTraitsOverlay()`: a
+    bottom-sheet popup (the settings-sheet pattern, `data-introtraits` open/keep/close) listing ALL
+    hazards AND benefits plus the world inspiration + brief in one window. **Gotcha:** the dataset
+    key must match the selector — the bar attribute, the overlay's close buttons, and the
+    `[data-introtraits]` handler all use the single token `introtraits` (a hyphenated
+    `data-intro-traits` maps to `dataset.introTraits` and silently won't match `[data-introtraits]`;
+    that typo shipped for one build and the popup no-oped until unified).
+  - `introShared()` derives the world/notes/objective ONCE (pure read of `state`) and both steps
+    consume it, so the two screens can never drift. CSS lives in the `GS-intro-split` block in
+    `index.html`. Feel verified eyes-on (Playwright, 414×896): arc, hole, and popup all render
+    correctly with zero page errors.

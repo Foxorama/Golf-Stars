@@ -456,7 +456,16 @@ For each system: the rule that constrains new work. Open the archive doc before 
   swap blurb+pros/cons for a one-line hint via CSS visibility, not a template fork; the CTA verb
   follows the format). **Ascension is picked WITH the golfer** (GS-title-2): the difficulty chips
   live on character select (`[data-asc]` view state → `selectCharacter.ascension`, reducer-clamped),
-  never on the title. The title (GS-title-2/-3) is a centred hero wordmark + two GAME tiles that
+  never on the title. **The stop intro is TWO mobile steps (GS-intro-split), one reducer screen
+  (`'intro'`) toggled by view state `introStage` (`'arc'`→`'hole'`), reset to `'arc'` on entry —
+  no new screen/save/rng:** step 1 (`arcIntroScreen`) is the MODE + the field of competitors, with a
+  big "First Tee ▸" up top and a second one at the bottom shown only when the field overflows a screen
+  (`render()` measures `scrollHeight` post-rAF), plus "Change golfer" → the new `backToCharacter`
+  action (intro→character, no run rebuild); step 2 (`holeIntroScreen`) is the HOLE — a viewport-capped
+  map (`.gs-holeintro-map svg{max-height:44vh}` so it holds one screen) + a tap-to-open hazards/benefits
+  popup (`introTraitsOverlay`, the settings-sheet pattern; `data-introtraits` open/close) + Tee Off /
+  Watch AI / Back. `introShared()` derives the world/notes/objective ONCE so the two steps never drift.
+  The title (GS-title-2/-3) is a centred hero wordmark + two GAME tiles that
   REUSE the Market/Clubhouse doorway component (`.gs-navtile--game`: whole tile = the button,
   painted-scene art + title + ONE-line caption, distinct only via the `--mc` accent — never regrow
   badges/launch bars/progress text on them), data-driven off

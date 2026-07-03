@@ -214,6 +214,7 @@ export interface MatchUi {
 export type Action =
   | { type: 'start'; format: string; ascension?: number }
   | { type: 'selectCharacter'; characterId: string; ascension?: number } // pick a golfer (+ their Ascension tier for a voyage), then begin the run
+  | { type: 'backToCharacter' } // GS-intro-split: from the stop intro, step back to re-pick the golfer
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'playInteractive' } // play shot-by-shot
@@ -561,6 +562,14 @@ export function reduce(state: UiState, action: Action): UiState {
         state.unlockedClubsByCharacter[action.characterId] ?? [],
       );
       return { ...state, run, course: currentCourse(run), screen: 'intro' };
+    }
+
+    case 'backToCharacter': {
+      // GS-intro-split: the arc-intro "Change golfer" back-out. Return to the roster to re-pick;
+      // the run rebuilds (same seed + format) on the next `selectCharacter`. View-only navigation —
+      // no run/rng change here, so seeded tests are untouched.
+      if (state.screen !== 'intro') return state;
+      return { ...state, screen: 'character' };
     }
 
     case 'resume': {
