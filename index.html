@@ -946,6 +946,10 @@
         padding: 4px 2px;
         display: flex; flex-direction: column; justify-content: safe center;
       }
+      /* The SVG keeps its TRUE height (width:100% → intrinsic tall aspect ratio) — never let flex shrink
+         it to fit the panel, or a long voyage scales the whole map DOWN (zoom-out) instead of scrolling.
+         flex-shrink:0 makes it overflow past max-height so `overflow-y:auto` scrolls the chart instead. */
+      .gs-journey--v [data-journey-svg] { flex: 0 0 auto; }
       .gs-journey--v::-webkit-scrollbar { width: 5px; }
       .gs-journey--v::-webkit-scrollbar-thumb { background: var(--gs-line); border-radius: 3px; }
       .gs-journey--v [data-route-inspect] { outline: none; }
