@@ -118,7 +118,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   the kind. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
   hazard spawned on a different substance (trees exempt both ways; crossings always win) — a pure
   ZERO-rng post-filter, so the streams are untouched; SAME-family overlaps are legal and the render
-  union-merges them into one body. OB = stroke-and-distance off the play-bounds box (which doubles as
+  union-merges them into one body. **An ARMED lost-rough island hole then STRIPS every void-stranded
+  hazard** (GS-cetus-water): `clearVoidHazards` (same zero-rng, lostRough-gated post-filter) drops all
+  penalty pools (the abyss is the only penalty — "ponds in the void read wrong") and any sand/tree blob
+  not overlapping a pad; only on-pad sand (clifftop coves) survives — the par-4/5 chains used to scatter
+  the full flanking/pond/lake/greenside placement over the pads and deep. OB = stroke-and-distance off the play-bounds box (which doubles as
   the OB trigger — don't shrink it casually). **Variety is DECOUPLED from difficulty (GS-variety-2):** shape archetypes
   (cape/hairpin/double) and dogleg-corner blocking GROVES appear even on CALM stops (no wildness gate)
   — difficulty rides bend severity (`dogFac = 0.5 + 0.5·wildness`) + hazard density, not which shapes

@@ -628,6 +628,23 @@ per-hole later"). `GENERATOR_VERSION` bumped 9 → 10 (stream reordered — no b
   rng draws, so every seeded stream is byte-identical; only which hazards SURVIVE changed. Guarded by
   `tests/hazard-overlap.test.ts` (no cross-family overlap across biomes/seeds; tree overlaps still
   plentiful; crossings still present).
+- **Lost-rough island holes CLEAR the abyss of stray hazards (GS-cetus-water, 2026-07).** On Void &
+  Cetus deep stops the fairway/green pads float in the abyss, and the abyss IS the only penalty. But
+  the par-4/5 island CHAINS (GS-cetus-5) still ran the full ordinary hazard placement — flanking
+  penalty blobs, ponds, the approach lake, greenside rings, greenside sand, fairway bunkers/craters —
+  positioned at lateral offsets from a WIDE (`VOID_ISLAND_SCALE = 2.4`), bending island corridor. The
+  result (reported with a screenshot): water pools and bunkers scattered over the clifftop pads and
+  hanging in the deep, and water reading as if stamped over a bunker. Only the island-green PAR 3
+  skipped its flanking hazards ("ponds in the void read wrong"); the chains never got that treatment.
+  Fix: `clearVoidHazards` — a second pure, ZERO-rng post-filter run right after `dedupeHazardOverlaps`,
+  gated on `lostRough` so every normal world and every CALM void/cetus stop (lost-rough un-armed, plays
+  as ordinary rough) is byte-identical. It keeps a hazard only when it is NON-penalty (sand) AND its
+  polygon overlaps a fairway/green/tee pad; every penalty pool and every void-stranded sand/tree blob
+  is dropped. Sanctioned forced-carry crossings are exempted (load-bearing) though none spawn on these
+  biomes. Net: the pads keep their genuine on-pad sand "clifftop coves" (Cetus's signature) while the
+  deep is swept clean. Because the streams are untouched, no seeded rng test shifts (all 869 pass);
+  verified across 240 armed island holes (void + cetus, wildness 0.95) — 0 penalty pools, 0 stranded
+  blobs, all surviving sand genuinely on a pad — while calm stops keep their normal hazards.
 - **Waste band is a tapered LENS (GS-hazard-blend).** `crossingBand` (the sandy waste break) tapers
   its thickness toward both ends (`0.3 + 0.7·sin(π·u)`) and finishes on rounded nose tips — a natural
   sandbelt blowout instead of a flat-cut road slab. Pure math on the SAME rng draws (count unchanged).
