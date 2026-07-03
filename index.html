@@ -227,8 +227,6 @@
       .gs-navtile:hover { transform: translateY(-3px); border-color: #46506a; filter: brightness(1.05); box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
       .gs-navtile:active { transform: translateY(-1px); }
       .gs-navtile:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
-      .gs-navtile--market { border-color: #4a3a5e; }
-      .gs-navtile--clubhouse { border-color: #4a3a22; }
       .gs-navtile__art { position: absolute; inset: 0; display: block; }
       .gs-navtile__art svg { display: block; width: 100%; height: 100%; }
       .gs-navtile__cap {
@@ -238,11 +236,18 @@
       }
       .gs-navtile__title { font: 700 18px/1.1 system-ui, sans-serif; }
       .gs-navtile__sub { font-size: 12px; opacity: .82; }
-      /* GAME tiles (GS-title-2): the Voyage / Unending Universe doorways — the same component,
-         distinguished only by the `--mc` accent (gold / violet) on border + title. */
-      .gs-navtile--game { min-height: 150px; border-color: color-mix(in srgb, var(--mc) 45%, var(--gs-line)); }
-      .gs-navtile--game:hover { border-color: var(--mc); }
-      .gs-navtile--game .gs-navtile__title { color: var(--mc); text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 40%, transparent); }
+      /* ACCENT tiles (GS-title-2): the Voyage / Unending game doorways AND the Trade Market /
+         Clubhouse between-run doorways share one component, distinguished only by the `--mc`
+         accent on border + title (gold / violet / orchid / green). Game tiles set --mc inline. */
+      .gs-navtile--market { --mc: #d98cff; }
+      .gs-navtile--clubhouse { --mc: #7ed957; }
+      .gs-navtile--game, .gs-navtile--market, .gs-navtile--clubhouse {
+        min-height: 150px; border-color: color-mix(in srgb, var(--mc) 45%, var(--gs-line));
+      }
+      .gs-navtile--game:hover, .gs-navtile--market:hover, .gs-navtile--clubhouse:hover { border-color: var(--mc); }
+      .gs-navtile--game .gs-navtile__title,
+      .gs-navtile--market .gs-navtile__title,
+      .gs-navtile--clubhouse .gs-navtile__title { color: var(--mc); text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 40%, transparent); }
 
       /* ── Clubhouse: tap-to-restyle character stage + garage bay + slot picker ─ */
       .gs-cstage {
