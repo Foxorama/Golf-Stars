@@ -1013,3 +1013,12 @@ rides.
   the fleet "re-parks" between runs like the golfers mill around. Zero sim/rng-stream impact, no save
   bump, no new hook; `clubhouse-preview.mjs` now carries `shipId` fixtures (wagon / mothership / racer
   / moto) — re-shoot it after touching the spaceport art.
+- **Second pass — spacey, not raceway** (same PR family): the first cut's asphalt-grey annulus +
+  dashed GOLD centreline + gold pad paint + windsock read as a racetrack/airport. The deck is now
+  blue-steel HULL PLATING (radial seams every 30° between the rim ellipses), the centreline a
+  continuous pulsing teal ENERGY CONDUIT, the pads recessed HOLO discs (breathing teal projection
+  ring + ice ticks), the windsock a grav-beacon (pulsing orb + radar ping), and the green sits under
+  a GLASS BIO-DOME (a low lens `M94,138 A106,44… A106,40.5… Z` with meridian seams + specular sweep,
+  painted OVER the flag/bunker so they read through glass). Nebula washes, twinkle stars, drifting
+  asteroids and anti-grav emitter cones sell the float. Road-paint gold is banned on the deck —
+  station markings are energy-teal/ice; brass stays reserved for the nameplates.

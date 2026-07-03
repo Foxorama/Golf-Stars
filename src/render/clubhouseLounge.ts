@@ -541,57 +541,106 @@ function shipAt(g: LoungeGolfer, pad: Pad): string {
   </button>`;
 }
 
-/** One painted landing pad: dark disc, gold marker ring, corner ticks and a pair of rim lights. */
+/** One holo landing pad: a recessed disc lit from within, a breathing teal projection ring and ice
+ *  guide ticks — energy-field markings, not painted tarmac (the gold road-paint read as a raceway). */
 function padArt(p: Pad): string {
   const tick = (dx: number, dy: number): string =>
-    `<line x1="${p.x + dx * p.rx * 0.82}" y1="${p.y + dy * p.ry * 0.82}" x2="${p.x + dx * p.rx}" y2="${p.y + dy * p.ry}" stroke="#d8a24a" stroke-width="1.6" opacity="0.7"/>`;
+    `<line x1="${p.x + dx * p.rx * 0.8}" y1="${p.y + dy * p.ry * 0.8}" x2="${p.x + dx * p.rx * 0.96}" y2="${p.y + dy * p.ry * 0.96}" stroke="#7fd6ff" stroke-width="1.4" opacity="0.8"/>`;
   return `<g>
     <ellipse cx="${p.x}" cy="${p.y + 1.5}" rx="${p.rx + 2}" ry="${p.ry + 1.5}" fill="#000" opacity="0.3"/>
-    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx}" ry="${p.ry}" fill="#1b2130" stroke="#8a93a6" stroke-width="1.3"/>
-    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx * 0.6}" ry="${p.ry * 0.6}" fill="none" stroke="#d8a24a" stroke-width="1.1" opacity="0.6"/>
-    ${tick(-0.9, -0.5)}${tick(0.9, -0.5)}${tick(-0.9, 0.5)}${tick(0.9, 0.5)}
+    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx}" ry="${p.ry}" fill="#131a2e" stroke="#3d4f79" stroke-width="1.2"/>
+    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx * 0.72}" ry="${p.ry * 0.72}" fill="#2bf0c0" opacity="0.08">
+      <animate attributeName="opacity" values="0.05;0.14;0.05" dur="2.8s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="${p.x}" cy="${p.y}" rx="${p.rx * 0.6}" ry="${p.ry * 0.6}" fill="none" stroke="#2bf0c0" stroke-width="1.1" opacity="0.55">
+      <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2.8s" repeatCount="indefinite"/>
+    </ellipse>
+    ${tick(-0.95, -0.4)}${tick(0.95, -0.4)}${tick(-0.95, 0.4)}${tick(0.95, 0.4)}${tick(0, -1)}${tick(0, 1)}
     <circle cx="${p.x - p.rx}" cy="${p.y}" r="1.4" fill="#7fd6ff"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.1s" repeatCount="indefinite"/></circle>
     <circle cx="${p.x + p.rx}" cy="${p.y}" r="1.4" fill="#7fd6ff"><animate attributeName="opacity" values="1;0.3;1" dur="2.1s" repeatCount="indefinite"/></circle>
   </g>`;
 }
 
-/** The painted spaceport: a tarmac landing ring floating in space, a putting green in the hole of the
- *  donut (flag, bunker, waiting ball), blinking rim lights, a control tower, windsock and neon sign.
+/** The painted spaceport: an orbital station RING floating in deep space — blue-steel hull deck with
+ *  radial plating seams and a pulsing energy conduit (NOT road markings — the first cut's asphalt +
+ *  dashed gold centreline read as a raceway), holo landing pads, a glass bio-dome over the putting
+ *  green in the hub, anti-grav emitters beneath, nebulae and drifting asteroids around it.
  *  Hand-placed (no rng) so it's byte-stable, like the lounge. */
 function spaceportArt(): string {
-  // Rim lights sit ON the outer ellipse (cx 200, cy 138, rx 188, ry 74), alternating ice/amber.
+  // Rim lights sit ON the outer ellipse (cx 200, cy 138, rx 188, ry 74) — all cool tones.
   const rim = [
     [388, 138], [363, 175], [294, 202], [106, 202], [37, 175], [12, 138],
     [37, 101], [106, 74], [200, 64], [294, 74], [363, 101],
   ]
     .map(
       ([x, y], i) =>
-        `<circle cx="${x}" cy="${y}" r="1.7" fill="${i % 2 ? '#ffd36b' : '#7fd6ff'}"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.6s" begin="${(i * 0.24).toFixed(2)}s" repeatCount="indefinite"/></circle>`,
+        `<circle cx="${x}" cy="${y}" r="1.7" fill="${i % 2 ? '#b39dff' : '#7fd6ff'}"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.6s" begin="${(i * 0.24).toFixed(2)}s" repeatCount="indefinite"/></circle>`,
     )
     .join('');
+  // Hull plating seams every 30° across the deck band (inner ellipse 108×42 → outer 188×74).
+  const seams = [15, 45, 75, 105, 135, 165, 195, 225, 255, 285, 315, 345]
+    .map((deg) => {
+      const a = (deg * Math.PI) / 180;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      return `<line x1="${(200 + 108 * c).toFixed(1)}" y1="${(138 + 42 * s).toFixed(1)}" x2="${(200 + 188 * c).toFixed(1)}" y2="${(138 + 74 * s).toFixed(1)}" stroke="#10162a" stroke-width="1.2" opacity="0.55"/>`;
+    })
+    .join('');
+  // A small cratered asteroid drifting near the ring.
+  const asteroid = (x: number, y: number, sc: number, dur: string): string =>
+    `<g transform="translate(${x},${y}) scale(${sc})">
+      <g><animateTransform attributeName="transform" type="translate" values="0 0;0 -2.4;0 0" dur="${dur}" repeatCount="indefinite"/>
+        <path d="M-8,2 L-5,-5 L2,-7 L8,-2 L6,5 L-2,7 Z" fill="#3a4258" stroke="#161a24" stroke-width="1"/>
+        <circle cx="1" cy="0" r="2" fill="#2a3040"/><circle cx="-4" cy="2" r="1.2" fill="#2a3040"/>
+        <path d="M-5,-5 L2,-7 L5,-4 L-3,-3 Z" fill="#4a5470" opacity="0.7"/>
+      </g>
+    </g>`;
+  // An anti-grav emitter hanging off the ring's underside: a nub + flickering light cone.
+  const emitter = (x: number, y: number): string =>
+    `<rect x="${x - 3}" y="${y - 2}" width="6" height="4" rx="1.4" fill="#3d4f79"/>
+     <path d="M${x - 2.6},${y + 2} L${x + 2.6},${y + 2} L${x + 5.5},${y + 12} L${x - 5.5},${y + 12} Z" fill="#7f8bff" opacity="0.3">
+       <animate attributeName="opacity" values="0.18;0.4;0.24;0.38;0.18" dur="1.7s" repeatCount="indefinite"/>
+     </path>`;
   return `<svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid slice"
       style="position:absolute;inset:0;width:100%;height:100%;">
     <defs>
       <linearGradient id="spSky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#0a0d1f"/><stop offset="60%" stop-color="#151332"/><stop offset="100%" stop-color="#241c44"/>
+        <stop offset="0%" stop-color="#070a1a"/><stop offset="60%" stop-color="#131230"/><stop offset="100%" stop-color="#201a42"/>
       </linearGradient>
-      <linearGradient id="spTarmac" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#2c3242"/><stop offset="55%" stop-color="#39404e"/><stop offset="100%" stop-color="#232833"/>
+      <linearGradient id="spDeck" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2b3452"/><stop offset="55%" stop-color="#364266"/><stop offset="100%" stop-color="#1d2440"/>
       </linearGradient>
       <radialGradient id="spGreen" cx="50%" cy="42%" r="70%">
         <stop offset="0%" stop-color="#3f9a43"/><stop offset="100%" stop-color="#2a6e2e"/>
       </radialGradient>
+      <radialGradient id="spNebA" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#2bf0c0" stop-opacity="0.14"/><stop offset="100%" stop-color="#2bf0c0" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="spNebB" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ff4fd8" stop-opacity="0.12"/><stop offset="100%" stop-color="#ff4fd8" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="spDome" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#cfeaff" stop-opacity="0.26"/><stop offset="55%" stop-color="#9fdcef" stop-opacity="0.1"/><stop offset="100%" stop-color="#9fdcef" stop-opacity="0.04"/>
+      </linearGradient>
       <radialGradient id="spVig" cx="50%" cy="48%" r="72%">
         <stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="80%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.4"/>
       </radialGradient>
     </defs>
     <rect width="400" height="230" fill="url(#spSky)"/>
-    <!-- starfield + a ringed neighbour planet + one shooting star -->
+    <!-- nebulae washes behind everything -->
+    <ellipse cx="310" cy="44" rx="130" ry="52" fill="url(#spNebA)"/>
+    <ellipse cx="80" cy="70" rx="110" ry="48" fill="url(#spNebB)"/>
+    <ellipse cx="200" cy="210" rx="180" ry="40" fill="url(#spNebB)" opacity="0.6"/>
+    <!-- starfield (a few twinkling) + a ringed neighbour planet + one shooting star -->
     <g fill="#fff">
       <circle cx="30" cy="26" r="1"/><circle cx="66" cy="14" r="0.7"/><circle cx="118" cy="30" r="0.8"/>
       <circle cx="152" cy="12" r="0.7"/><circle cx="258" cy="16" r="0.8"/><circle cx="300" cy="30" r="0.7"/>
       <circle cx="342" cy="12" r="0.9"/><circle cx="382" cy="34" r="0.7"/><circle cx="14" cy="70" r="0.7"/>
       <circle cx="388" cy="76" r="0.8"/><circle cx="206" cy="8" r="0.7"/><circle cx="92" cy="50" r="0.6"/>
+      <circle cx="240" cy="34" r="0.9"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.9s" repeatCount="indefinite"/></circle>
+      <circle cx="178" cy="22" r="0.8"><animate attributeName="opacity" values="1;0.2;1" dur="3.7s" repeatCount="indefinite"/></circle>
+      <circle cx="8" cy="120" r="0.8"><animate attributeName="opacity" values="0.3;1;0.3" dur="3.1s" repeatCount="indefinite"/></circle>
+      <circle cx="394" cy="180" r="0.7"><animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite"/></circle>
     </g>
     <g transform="translate(52,30)">
       <circle r="9" fill="#c65a4a"/><circle cx="-2.5" cy="-2.5" r="9" fill="#d8755f" opacity="0.5"/>
@@ -602,47 +651,64 @@ function spaceportArt(): string {
         <animate attributeName="opacity" values="0;1;0;0" dur="7s" repeatCount="indefinite"/>
       </line>
     </g>
-    <!-- engine under-glow, so the ring reads as floating -->
+    ${asteroid(24, 186, 1, '5.2s')}${asteroid(384, 118, 0.7, '6.4s')}
+    <!-- anti-grav under-glow, so the ring reads as floating -->
     <ellipse cx="200" cy="216" rx="176" ry="9" fill="#7f8bff" opacity="0.12">
       <animate attributeName="opacity" values="0.08;0.16;0.08" dur="4.4s" repeatCount="indefinite"/>
     </ellipse>
-    <!-- the landing RING: tarmac annulus + rims + dashed taxi stripe -->
-    <path fill-rule="evenodd" fill="url(#spTarmac)" stroke="#6a7284" stroke-width="1.4"
+    <!-- the station RING: hull-metal deck annulus + plating seams + energy conduit -->
+    <path fill-rule="evenodd" fill="url(#spDeck)" stroke="#4a5878" stroke-width="1.4"
       d="M12,138 a188,74 0 1,0 376,0 a188,74 0 1,0 -376,0 Z
          M92,138 a108,42 0 1,0 216,0 a108,42 0 1,0 -216,0 Z"/>
-    <ellipse cx="200" cy="138" rx="108" ry="42" fill="none" stroke="#161a24" stroke-width="2.4" opacity="0.8"/>
-    <ellipse cx="200" cy="138" rx="148" ry="58" fill="none" stroke="#d8a24a" stroke-width="1.6"
-      stroke-dasharray="11 9" opacity="0.4"/>
+    ${seams}
+    <ellipse cx="200" cy="138" rx="150" ry="59" fill="none" stroke="#10162a" stroke-width="1" opacity="0.4"/>
+    <ellipse cx="200" cy="138" rx="108" ry="42" fill="none" stroke="#0f1424" stroke-width="2.4" opacity="0.8"/>
+    <ellipse cx="200" cy="138" rx="136" ry="53" fill="none" stroke="#2bf0c0" stroke-width="2" opacity="0.2">
+      <animate attributeName="opacity" values="0.12;0.3;0.12" dur="3.6s" repeatCount="indefinite"/>
+    </ellipse>
     ${rim}
-    <!-- the putting green in the middle of the ring -->
+    ${emitter(60, 187)}${emitter(200, 213)}${emitter(340, 187)}
+    <!-- the bio-dome green in the hub of the station -->
     <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="url(#spGreen)"/>
     <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="none" stroke="#1e5222" stroke-width="2.5"/>
     <ellipse cx="200" cy="138" rx="82" ry="31" fill="none" stroke="#54b458" stroke-width="3" opacity="0.4"/>
     <ellipse cx="200" cy="138" rx="56" ry="21" fill="none" stroke="#54b458" stroke-width="3" opacity="0.3"/>
-    <!-- bunker + the waiting ball + the flag -->
+    <!-- bunker + the waiting ball + the flag, under glass -->
     <ellipse cx="152" cy="150" rx="14" ry="5.5" fill="#d8c690"/>
     <ellipse cx="150" cy="149" rx="10" ry="3.6" fill="#e6d6a4"/>
     <circle cx="214" cy="151" r="1.7" fill="#fff"/>
     <ellipse cx="233" cy="149" rx="3.4" ry="1.3" fill="#123c14"/>
     <line x1="233" y1="149" x2="233" y2="112" stroke="#e8e2d2" stroke-width="1.6"/>
     <path d="M233,112 L253,117 L233,122 Z" fill="#ff6b6b"/>
-    <!-- control tower on the back band -->
+    <!-- the glass bio-dome sealing the green in: shell, meridian seams, a specular sweep -->
+    <path d="M94,138 A106,44 0 0 1 306,138 A106,40.5 0 0 1 94,138 Z" fill="url(#spDome)" stroke="#9fdcef" stroke-width="1.2" opacity="0.9"/>
+    <path d="M94,138 A106,44 0 0 1 306,138" fill="none" stroke="#cfeaff" stroke-width="0.8" opacity="0.5"/>
+    <g fill="none" stroke="#9fdcef" stroke-width="0.7" opacity="0.3">
+      <path d="M148,102 Q144,120 146,138"/>
+      <path d="M200,94 Q200,116 200,138"/>
+      <path d="M252,102 Q256,120 254,138"/>
+    </g>
+    <path d="M124,116 A96,40 0 0 1 172,98" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.22"/>
+    <!-- control tower on the back band, dish + beacon -->
     <g>
       <rect x="349" y="66" width="5" height="32" fill="#4a5262"/>
-      <line x1="345" y1="98" x2="358" y2="98" stroke="#2c3242" stroke-width="2.5"/>
-      <ellipse cx="351.5" cy="62" rx="16" ry="7" fill="#39404e" stroke="#161a24" stroke-width="1"/>
+      <line x1="345" y1="98" x2="358" y2="98" stroke="#2b3452" stroke-width="2.5"/>
+      <ellipse cx="351.5" cy="62" rx="16" ry="7" fill="#364266" stroke="#10162a" stroke-width="1"/>
       <ellipse cx="351.5" cy="59.5" rx="12.5" ry="4.2" fill="#9fdcef" opacity="0.85"/>
       <ellipse cx="347" cy="58.6" rx="4" ry="1.4" fill="#fff" opacity="0.5"/>
+      <path d="M363,58 Q370,52 368,45 L372,44 Q375,53 365,60 Z" fill="#8a93a6"/>
       <circle cx="351.5" cy="51" r="2" fill="#ff5a4d"><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>
     </g>
-    <!-- windsock on the back-left band -->
+    <!-- grav-beacon on the back-left band: pulsing orb + radar ping -->
     <g>
-      <line x1="52" y1="98" x2="52" y2="70" stroke="#4a5262" stroke-width="2"/>
-      <g>
-        <path d="M52,70 L74,73 L70,79 L52,77 Z" fill="#ff8b4a"/>
-        <path d="M59,71 L63,71.6 L62.4,78 L58.6,77.6 Z" fill="#fff" opacity="0.8"/>
-        <animateTransform attributeName="transform" type="rotate" values="-4 52 70;3 52 70;-4 52 70" dur="3.2s" repeatCount="indefinite"/>
-      </g>
+      <line x1="52" y1="98" x2="52" y2="72" stroke="#4a5262" stroke-width="2"/>
+      <circle cx="52" cy="68" r="3.6" fill="#2bf0c0">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="1.8s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="52" cy="68" r="6" fill="none" stroke="#2bf0c0" stroke-width="1">
+        <animate attributeName="r" values="5;12" dur="1.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0" dur="1.8s" repeatCount="indefinite"/>
+      </circle>
     </g>
     <!-- neon gate sign over the back of the ring -->
     <ellipse cx="200" cy="30" rx="52" ry="14" fill="#2bf0c0" opacity="0.13">
