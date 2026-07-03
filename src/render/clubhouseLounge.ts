@@ -538,14 +538,15 @@ function loungeArt(marmot = false): string {
       <path d="M0,7 C-4,-4 2,-16 0,-24 C6,-18 8,-6 3,4 Z" fill="#2a6e2e"/>
     </g>
 
-    <!-- patterned rug up front -->
-    <ellipse cx="170" cy="248" rx="142" ry="35" fill="#7a2f2f" opacity="0.92"/>
-    <ellipse cx="170" cy="248" rx="134" ry="31" fill="none" stroke="#d8a24a" stroke-width="2.2" opacity="0.7"/>
-    <ellipse cx="170" cy="248" rx="106" ry="23" fill="none" stroke="#d8a24a" stroke-width="1.2" opacity="0.45"/>
+    <!-- patterned rug up front — pulled in from the right so it clears the bar stools (it used to slide
+         under them, cutting off the stool feet so the rug read as floating off the floor) -->
+    <ellipse cx="160" cy="248" rx="122" ry="35" fill="#7a2f2f" opacity="0.92"/>
+    <ellipse cx="160" cy="248" rx="114" ry="31" fill="none" stroke="#d8a24a" stroke-width="2.2" opacity="0.7"/>
+    <ellipse cx="160" cy="248" rx="90" ry="23" fill="none" stroke="#d8a24a" stroke-width="1.2" opacity="0.45"/>
     <g fill="#d8a24a" opacity="0.5">
-      <path d="M170,232 L175,240 L170,248 L165,240 Z"/>
-      <path d="M110,242 L115,249 L110,256 L105,249 Z"/>
-      <path d="M230,242 L235,249 L230,256 L225,249 Z"/>
+      <path d="M160,232 L165,240 L160,248 L155,240 Z"/>
+      <path d="M102,242 L107,249 L102,256 L97,249 Z"/>
+      <path d="M218,242 L223,249 L218,256 L213,249 Z"/>
     </g>
 
     <!-- warm ambience + corner vignette -->
@@ -734,6 +735,46 @@ function spaceportArt(): string {
     </ellipse>
     ${rim}
     ${emitter(60, 187)}${emitter(200, 213)}${emitter(340, 187)}
+    <!-- ══ THE SPACE-GOLF CLUBHOUSE: the pro-shop / 19th-hole HQ on the back deck, flanked by the
+         grav-beacon (left) and control tower (right); the putting green parks in front of it. Drawn
+         BEFORE the dome garden so the green's back edge occludes the plinth (building sits behind the
+         green, reading as the hub everyone parks around). Warm lit, to pop against the cool station. -->
+    <g>
+      <ellipse cx="200" cy="78" rx="60" ry="32" fill="#ffcf8a" opacity="0.13"/>
+      <ellipse cx="200" cy="97" rx="52" ry="6" fill="#000" opacity="0.32"/>
+      <!-- deck plinth -->
+      <rect x="152" y="91" width="96" height="8" rx="2.5" fill="#39456a" stroke="#10162a" stroke-width="1"/>
+      <rect x="152" y="91" width="96" height="2.4" fill="#516592"/>
+      <!-- lower side wings + their windows -->
+      <g fill="#d8cdb4" stroke="#7a6f52" stroke-width="0.8">
+        <rect x="156" y="76" width="20" height="16"/>
+        <rect x="224" y="76" width="20" height="16"/>
+      </g>
+      <g fill="#ffd98a"><rect x="161" y="81" width="10" height="8" rx="1"/><rect x="229" y="81" width="10" height="8" rx="1"/></g>
+      <!-- main hall -->
+      <rect x="170" y="64" width="60" height="28" fill="#ece2cd" stroke="#7a6f52" stroke-width="1"/>
+      <rect x="170" y="64" width="60" height="4" fill="#f6efdd"/>
+      <g fill="#cabf9f"><rect x="170" y="64" width="2.4" height="28"/><rect x="227.6" y="64" width="2.4" height="28"/></g>
+      <!-- tall warm windows (with mullions) + a glowing arched doorway -->
+      <g fill="#ffd98a" stroke="#b98f4a" stroke-width="0.6">
+        <rect x="177" y="70" width="10" height="15" rx="1"/>
+        <rect x="213" y="70" width="10" height="15" rx="1"/>
+      </g>
+      <g stroke="#b98f4a" stroke-width="0.5" opacity="0.85">
+        <line x1="182" y1="70" x2="182" y2="85"/><line x1="177" y1="77.5" x2="187" y2="77.5"/>
+        <line x1="218" y1="70" x2="218" y2="85"/><line x1="213" y1="77.5" x2="223" y2="77.5"/>
+      </g>
+      <path d="M194,92 L194,74 Q200,69 206,74 L206,92 Z" fill="#ffcf7a" stroke="#b98f4a" stroke-width="0.7"/>
+      <line x1="200" y1="72" x2="200" y2="92" stroke="#b98f4a" stroke-width="0.6" opacity="0.7"/>
+      <!-- eave board + pitched green roof (ridge highlight + shaded slope) -->
+      <rect x="166" y="61" width="68" height="4" rx="1.5" fill="#c9bd9c"/>
+      <path d="M162,64 L200,50 L238,64 Z" fill="#2f7a33" stroke="#1e5222" stroke-width="1"/>
+      <path d="M200,50 L238,64 L231,64 L200,52.6 Z" fill="#000" opacity="0.14"/>
+      <path d="M163,63 L200,50.6 L237,63" fill="none" stroke="#4bbe52" stroke-width="1.1" opacity="0.6"/>
+      <!-- golf-pin flag finial on the ridge (kept below the neon Spaceport sign) -->
+      <line x1="200" y1="50" x2="200" y2="43" stroke="#cfd6de" stroke-width="1"/>
+      <path d="M200,43 L208,45.4 L200,47.8 Z" fill="#ff6b6b"/>
+    </g>
     <!-- the bio-dome GARDEN in the hub: a real par-3 — rough base, a mown fairway ribbon running
          tee → green, fringe + cup, guarding bunkers, a pond, trees and moon-rocks (the old flat
          oval + concentric rings read as a stadium pitch, not golf) -->
