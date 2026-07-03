@@ -627,3 +627,50 @@
   brink line at the lip, streaks/droplets inside the curtain, mist + ripples at the foot. Same
   dedicated river stream; all draws stay unconditional (the `paint` gate only chooses pushes).
   `tests/cetus.test.ts`'s river sentinel colour updated (`rgba(60,150,205,0.7)`).
+
+## GS-rough-cover-2 + GS-egg: rough that reads as rough, and easter eggs to find (2026-07-03)
+
+- **The flat-slab roughs get characterful TUFTS (GS-rough-cover-2, `style.ts`/`palette.ts`).** Player
+  report after GS-ground-cover: "make the rough still more rough — crystal, tempest, inferno lava
+  biomes in particular don't actually look like rough." The GROUND_COVER pass gave every world a
+  covering COLOUR + fine mottle/grain, but on those three the rough still read as a flat tinted slab
+  (crystal a washed pale grey, inferno a red-brown wash, tempest a dark olive). Fix, render-only:
+  `GroundCoverLook` grows an optional `tuft` ({`cols`, `style`}) + `density` multiplier, and
+  `groundCover()` gains a 5th pass drawing raised little CLUMPS that give the rough 3-D texture —
+  `blade` (leaning grass/reed tufts: moor, dune marram, desert dry-grass), `shard` (angular mineral
+  splinters: crystal scree, frost rime-needles), `clump` (rounded tussock/cinder mounds: inferno ash,
+  fungal moss). Blades share ONE coherent per-hole lean so a windswept moor / dune grain reads across
+  the whole rough. crystal/tempest/inferno also carry `density` 1.5–1.6 (denser mottle/grain/tufts) +
+  a touch more mottle contrast, so their rough now reads as crystalline gravel / smouldering cinder /
+  wild moor grass instead of a slab. Sized in YARDS (clamped px), varied off course-space `posHash`
+  (camera-stable per-clump prim count), drawn on the EXISTING dedicated `grng` stream — every other
+  stream is byte-for-byte untouched, and worlds without a `density`/`tuft` are unchanged. NB: the
+  inferno tuft's ember-fleck tone is a DISTINCT orange (`#ff7a1e`), not the snag-ember `#ff8a2a` the
+  camera-stability test rigidly tracks — ground texture legitimately culls at paint (the established
+  `groundCover` convention), so reusing the tracked decor colour would pollute its count. Guards:
+  `tests/biome-identity.test.ts` (the three flagged worlds have tuft+density; the crystal shard tone
+  paints). Gallery re-shot; verdant/void/cetus untouched.
+- **Whimsical EASTER-EGG props hidden in the rough (GS-egg, `style.ts EGGS`/`easterEggs`).** Same
+  report: "throw some beach settings around as easter-egg stuff not too close to the fairway/green…
+  throw some random thematically-appropriate stuff into the other biomes too (except void/Cetus) —
+  fun if you zoom out and look around the entire area." A new decor pass places a few of the world's
+  whimsical props per hole: verdant (picnic blanket / gnome / duck pond), desert (cow skull / cactus
+  in bloom / pyramid / tumbleweed), frost (snowman / igloo / penguin), inferno (mini volcano / charred
+  stump / obsidian golf ball), crystal (geode / spire cluster / floating prism), tempest (wind turbine
+  / weather vane / lightning-blasted tree), fungal (toadstool cottage / fairy ring / giant snail),
+  ocean (beach umbrella+towel / sandcastle / beach ball / starfish+shells / surfboard — the beach gets
+  the most, per the ask). Each painter gets a terse `EggPen` (`circle/line/poly/glow` + `h(k)`
+  course-space posHash) and pushes a FIXED prim count so a prop is camera-proof (variety off `h`,
+  never rng, never the projection; pushed unconditionally like archetypeDecor). Placement scatters
+  over the LAND-HULL bbox on a DEDICATED stream (`hashHole ^ 0x00e99e66`), accepted only where
+  `eggOk` holds — ON the land hull, OFF a 9-yd buffered cut-grass reject (`offsetPoly(feature,-9)` for
+  fairway/green/tee), and OFF penalty liquids (a snowman in a lava lake reads as a bug; sand & trees
+  are fine — a beach ball on the strand belongs). Props are ~4.8 yd (clamped 15–36 px) so they read
+  both zoomed-out on the map AND in the follow-cam. Sized bigger + a few per hole (ocean 4–5, else
+  3–4) so scanning the hole actually turns them up. Skipped on lost-rough holes (no rough to hide in)
+  and Rainbow Road; void/cetus have NO `EGGS` row by design (their bespoke deep already reads great).
+  Determinism/camera holds trivially (dedicated stream, course-space rejection, fixed-count
+  unconditional pushes) — no existing stream moves. Guards: `tests/biome-identity.test.ts` (props for
+  the playful worlds + none for void/cetus, determinism, corridor/liquid rejection, a beach-prop
+  render integration). Eyeball with `node scripts/egg-preview.mjs` (large single-hole renders) or
+  re-shoot `node scripts/gallery.mjs`.

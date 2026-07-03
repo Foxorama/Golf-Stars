@@ -5,8 +5,8 @@ import { ARCHETYPE_TURF, ARCHETYPE_SPACE, OB_LOOK, LAND_SPACE_BLEND, landFillFor
 import { WIND_RGBA, AMBIENT } from '../src/render/weather';
 import { BIOMES } from '../src/sim/course/biomes';
 import type { BiomeArchetype } from '../src/sim/course/themes';
-import { buildScene, landPolysCourseFor, GROUND_COVER, type Prim } from '../src/render/style';
-import { holeProjector } from '../src/render/project';
+import { buildScene, landPolysCourseFor, GROUND_COVER, easterEggs, type Prim } from '../src/render/style';
+import { holeProjector, type Projector } from '../src/render/project';
 import { playBoundsCorners } from '../src/sim/round';
 import type { Hole, Vec } from '../src/sim/course/contract';
 
@@ -74,6 +74,76 @@ describe('ground covering (GS-ground-cover)', () => {
     expect(ocean).toContain(GROUND_COVER.ocean!.ridge!);
     // Deterministic: same hole + biome → byte-identical (the covering is seeded, never Math.random).
     expect(renderHoleSVG(wooded, { biome: 'ice-ring' })).toBe(frost);
+  });
+});
+
+// --- GS-rough-cover-2: the flat-reading roughs get characterful tufts --------------------------
+
+describe('rough tufts (GS-rough-cover-2)', () => {
+  it('the worlds that read as a flat slab (crystal / tempest / inferno) pack a denser, tufted covering', () => {
+    for (const a of ['crystal', 'tempest', 'inferno'] as const) {
+      expect(GROUND_COVER[a]!.tuft, `${a} tuft`).toBeDefined();
+      expect(GROUND_COVER[a]!.density ?? 1, `${a} density`).toBeGreaterThan(1);
+    }
+  });
+
+  it('the tuft renders on the land: the crystal shard-splinter tone appears in the SVG', () => {
+    const svg = renderHoleSVG(wooded, { biome: 'crystal-spires' });
+    expect(svg).toContain(GROUND_COVER.crystal!.tuft!.cols[0]!);
+  });
+});
+
+// --- GS-egg: whimsical props hidden in the rough (except void/cetus) ---------------------------
+
+/** Deterministic mulberry32-style rng for the unit tests (no Math.random). */
+function seededRng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** A trivial identity-ish projector (course→screen) for exercising `easterEggs` directly. */
+function flatProj(): Projector {
+  return {
+    width: 400,
+    height: 600,
+    scale: 4,
+    project: (p: Vec): Vec => [200 + p[0] * 2, 300 + p[1] * 2],
+    unproject: (px: number, py: number): Vec => [(px - 200) / 2, (py - 300) / 2],
+  };
+}
+
+describe('easter eggs (GS-egg)', () => {
+  const land: Vec[] = [[-40, -40], [40, -40], [40, 40], [-40, 40]];
+
+  it('places whimsical props for the playful worlds and NOTHING for void/cetus (bespoke deep)', () => {
+    const proj = flatProj();
+    expect(easterEggs('ocean', land, () => true, proj, 4, seededRng(1)).length).toBeGreaterThan(0);
+    expect(easterEggs('verdant', land, () => true, proj, 3, seededRng(2)).length).toBeGreaterThan(0);
+    expect(easterEggs('inferno', land, () => true, proj, 3, seededRng(3)).length).toBeGreaterThan(0);
+    expect(easterEggs('void', land, () => true, proj, 3, seededRng(4))).toEqual([]);
+    expect(easterEggs('cetus', land, () => true, proj, 3, seededRng(5))).toEqual([]);
+  });
+
+  it('is deterministic and only ever places where the predicate allows (off the corridor)', () => {
+    const a = easterEggs('ocean', land, () => true, flatProj(), 4, seededRng(7));
+    const b = easterEggs('ocean', land, () => true, flatProj(), 4, seededRng(7));
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    // eggOk=false everywhere → nothing placed (props reject onto open ground, never near the cut grass).
+    expect(easterEggs('ocean', land, () => false, flatProj(), 4, seededRng(7))).toEqual([]);
+  });
+
+  it('the beach really shows its props across a course (render integration)', () => {
+    const holes = generateCourse(31, { biome: 'tidal-archipelago', holes: 6 }).holes;
+    const svgs = holes.map((h) => renderHoleSVG(h, { biome: 'tidal-archipelago' }));
+    // At least one beach prop lands somewhere: umbrella/ball (#ff5a3c) · sandcastle flag (#ff3b3b) ·
+    // starfish (#ff8a4a) · surfboard (#ffd24a) — none of which the ocean world paints otherwise.
+    const beach = ['#ff5a3c', '#ff3b3b', '#ff8a4a', '#ffd24a'];
+    expect(svgs.some((s) => beach.some((c) => s.includes(c)))).toBe(true);
   });
 });
 
