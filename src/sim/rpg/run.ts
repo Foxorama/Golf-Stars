@@ -20,6 +20,7 @@ import {
   aceCount,
   aceCreditBonus,
   canBuy,
+  clubItem,
   creditsForStop,
   cutLine,
   grantAceTalent,
@@ -48,7 +49,8 @@ import { addUnlockedClubs } from './club-unlock';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { EFFECT_WIND_CAP, effectWindMult, effectCarryMult, effectPatchKind, routeDifficulty, routeEffect } from './effects';
+import { EFFECT_WIND_CAP, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
+import { salvageClubFind } from './salvage';
 import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
@@ -125,9 +127,10 @@ export interface Run {
    * `currentTheme` falls back to the deterministic `themeForStop` draw (byte-for-byte the old behaviour).
    */
   pendingTheme?: Theme;
-  /** Permanent shards banked mid-run by route events (GS-routes `shardBonus`) — accrued on travel and
-   *  kept even on a later bust, so a "salvage" lane is guaranteed meta progress. Added by shardsForRun.
-   *  The Unending Universe's milestone bonuses (GS-unending) bank through here too. */
+  /** Permanent shards banked mid-run and kept even on a later bust — the Unending Universe's milestone
+   *  bonuses (GS-unending) accrue here. Added by shardsForRun. (Route-event salvage lanes no longer drip
+   *  shards — they hand you a CLUB instead, GS-journey-fx-3 — so in the voyage this only ever moves via
+   *  endless milestones.) */
   bonusShards: number;
   /** Cumulative holes SURVIVED this run (GS-unending) — the per-hole survival format's progress
    *  counter, driving the gate tier, the milestones and the cosmetic unlocks. Advanced by
@@ -898,16 +901,30 @@ export function routeOptions(run: Run): Route[] {
 export function travel(run: Run, route: Route): Run {
   if (run.status !== 'active') throw new Error('travel: run is not active');
   const ev = route.event;
-  // GS-routes levers paid at the moment of choosing the lane: a credit TOLL bites up front (floored
-  // so it never strands you below zero), a SHARD bonus is banked now (kept even on a later bust).
+  const arrivingStop = run.stopIndex + 1;
+  // GS-routes: a credit TOLL bites up front (floored so it never strands you below zero).
   const toll = Math.max(0, ev.creditToll ?? 0);
-  const shardBonus = Math.max(0, ev.shardBonus ?? 0);
+  // GS-journey-fx-3: a SALVAGE lane scavenges a club you don't already carry, equipped for the rest of
+  // the run — a reward you feel THIS run, in place of the old trivial shard drip. Resume-safe for free:
+  // the find is a shop CLUB_ITEM, so applying it records the item's perk id and `loadoutFromPerks`
+  // re-equips it on resume. Deterministic on a PRIVATE stream (never a shared sim/render stream), so
+  // attaching it perturbs no existing draw order (contract 1). If the bag already holds every candidate
+  // at that rarity, it pays a rarity-scaled credit consolation so the lane never comes up empty.
+  const findRarity = routeClubFind(ev);
+  let loadout = run.loadout;
+  let salvageCredits = 0;
+  if (findRarity) {
+    const found = salvageClubFind(loadout, findRarity, `salvage:${run.seed}:${arrivingStop}:${ev.id}`);
+    const item = found.clubItemId ? clubItem(found.clubItemId) : undefined;
+    if (item) loadout = item.apply(loadout);
+    else salvageCredits = found.consolationCredits ?? 0;
+  }
   return {
     ...run,
-    stopIndex: run.stopIndex + 1,
+    loadout,
+    stopIndex: arrivingStop,
     distanceFromStart: run.distanceFromStart + route.distanceJump,
-    credits: Math.max(0, run.credits - toll),
-    bonusShards: run.bonusShards + shardBonus,
+    credits: Math.max(0, run.credits - toll) + salvageCredits,
     // Carry the chosen route's event into the next stop (applied by finishStop).
     pendingEvent: ev,
     // Carry the chosen lane's WORLD into the next stop (GS-journey-biome) — the biome you arrive in is

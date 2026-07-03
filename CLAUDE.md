@@ -225,6 +225,15 @@ For each system: the rule that constrains new work. Open the archive doc before 
   hot AND true), frostfall→`ice`, spaceJunk→`junk` — pure seeded per-kind streams, rest-lie conversion in
   `executeShot`, drawn + played from the SAME source. The route card states every hook (wind/carry chips
   computed from the physics tables; geometric hooks via `CourseEffectInfo.play`), so a lane reads pre-jump.
+  **A `salvage`-category lane LOOTS A CLUB, not a shard drip (GS-journey-fx-3, `salvage.ts` +
+  `tests/salvage.test.ts`):** `routeClubFind(ev)` (salvage lanes only, rarity floored at RARE) drives
+  `salvageClubFind`, which picks a club you don't carry from `offerableClubs` filtered to that rarity
+  (prefers a NEW type over a same-type upgrade), applied in `travel` — resume-safe FOR FREE (the find is a
+  shop `CLUB_ITEM`, so its perk id round-trips via `loadoutFromPerks`, no save bump), deterministic on a
+  PRIVATE stream (no shared draw moves), and only ever RAISES Stableford (can't spiral). Bag full at that
+  tier → a rarity-scaled credit consolation. The route card previews the EXACT club (same stream, can't
+  lie). Route events no longer carry `shardBonus` — shards are a run-END reward now (distance/win/bank),
+  so meta progress rides how far the loot carries you; `run.bonusShards` moves only via endless milestones.
   The three lanes always land DISTINCT world archetypes, never the one you're on (`routeTheme` avoid-set
   via a filtered `pickThemeFrom` redraw, NOT a retry loop; split stops cross two archetypes —
   GS-journey-variety); a new course effect = a `COURSE_EFFECTS` row + a `routeEffect` mapping + a

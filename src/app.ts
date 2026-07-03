@@ -20,7 +20,8 @@ import { speakCaddy } from './render/speech';
 import { journeyMapHTML, type StarmapChoice } from './render/starmap';
 import { skyCoordForName } from './render/sky-coords';
 import type { EventCategory } from './sim/rpg/events';
-import { COURSE_EFFECTS, effectWindMult, effectCarryMult, effectPatchKind, routeDifficulty, routeEffect } from './sim/rpg/effects';
+import { COURSE_EFFECTS, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './sim/rpg/effects';
+import { salvageClubFind } from './sim/rpg/salvage';
 import type { PatchKind } from './sim/patches';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, MANUAL_IDEAL_PACE, puttBreakYd, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
@@ -2666,7 +2667,6 @@ function routeInfoOverlay(): string {
     const afford = credits >= ev.creditToll;
     tags.push(travelChip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
   }
-  if (ev.shardBonus) tags.push(travelChip(`✦ +${ev.shardBonus} shards`, '#4fd0e0'));
   // The weather's play hooks (GS-journey-variety wind; GS-journey-fx-2 carry + ground twists): the
   // sky is a real lever now — say EXACTLY what it does to your golf, computed from the same tables
   // the physics read so the card can never drift from the course.
@@ -2690,6 +2690,17 @@ function routeInfoOverlay(): string {
       ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⚠ You can't cover the ${ev.creditToll}-credit toll (you have ${credits}).</div>`
       : '';
 
+  // A SALVAGE lane's club find (GS-journey-fx-3) gets its own loud, honest line — the exact club you'll
+  // loot (resolved from the same private stream `travel` grants it on, so the preview can't lie), or the
+  // credit consolation when your bag is already full at that tier.
+  const findRarity = routeClubFind(ev);
+  let salvageLine = '';
+  if (findRarity) {
+    const found = salvageClubFind(state.run.loadout, findRarity, `salvage:${state.run.seed}:${state.run.stopIndex + 1}:${ev.id}`);
+    salvageLine = found.clubName
+      ? `<div style="font-size:12.5px;margin:4px 0 0;color:${rarCol(found.rarity ?? findRarity)};font-weight:600;">🎁 Salvage: loot the <b>${found.clubName}</b> · equips for the run</div>`
+      : `<div style="font-size:12.5px;margin:4px 0 0;color:#4fd0e0;font-weight:600;">🎁 Salvage: bag full — +${found.consolationCredits} credits instead</div>`;
+  }
   // The effect's GEOMETRIC play hook (tents / craters / turf patches) gets its own loud line — the
   // consequence you'll actually putt around, not just sky-dressing (GS-journey-fx-2).
   const playLine = eff.play
@@ -2724,6 +2735,7 @@ function routeInfoOverlay(): string {
         <div style="font-size:13.5px;opacity:.95;margin-bottom:4px;">${eventDescFor(ev.desc)}</div>
         <div style="font-size:12.5px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
         ${effLine}
+        ${salvageLine}
 
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">${tags.join('')}</div>
         ${markers ? `<div style="font-size:12.5px;margin-top:8px;">${markers}</div>` : ''}
