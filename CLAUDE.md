@@ -478,6 +478,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   map (`.gs-holeintro-map svg{max-height:44vh}` so it holds one screen) + a tap-to-open hazards/benefits
   popup (`introTraitsOverlay`, the settings-sheet pattern; `data-introtraits` open/close) + Tee Off /
   Watch AI / Back. `introShared()` derives the world/notes/objective ONCE so the two steps never drift.
+  **The post-stop recap (`resultScreen`, GS-result) is built to the SAME bar as the intro:** a
+  rarity-framed `.gs-panel.gs-result` (border/glow off `rarCol`/`rarityFlavour`) with a verdict badge
+  over the world you just played (`zoneProfile`, mirroring the arc head), big `.gs-result-stat` tiles
+  (Stableford/gross/cut-or-place/credits), the round HOLE-BY-HOLE (`roundStrip` — a clickable
+  `.gs-round` strip tinted by the `holePips` palette, `viewHole` drives the framed replay), then the
+  standings + a full-width Continue. The Unending Universe keeps its `endlessScoreCard`/records board.
+  Pure render off `state` (no rng/save); the old collapsed `<details>` scorecard is retired.
   The title (GS-title-2/-3) is a centred hero wordmark + two GAME tiles that
   REUSE the Market/Clubhouse doorway component (`.gs-navtile--game`: whole tile = the button,
   painted-scene art + title + ONE-line caption, distinct only via the `--mc` accent — never regrow

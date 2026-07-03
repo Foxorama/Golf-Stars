@@ -231,3 +231,31 @@ First-device feedback on GS-settings-nav reshaped the title:
     consume it, so the two screens can never drift. CSS lives in the `GS-intro-split` block in
     `index.html`. Feel verified eyes-on (Playwright, 414×896): arc, hole, and popup all render
     correctly with zero page errors.
+
+- **The post-stop recap now matches the intro's bar (GS-result, 2026-07).** After the intro got the
+  two-step polish, the AFTER-hole `resultScreen()` was the weakest beat in the Voyage loop: a plain
+  16px `<h2>` verdict, a one-sentence "Stableford N vs cut M · gross X · +Y credits" summary, and the
+  hole-by-hole scorecard hidden inside a collapsed `<details>` — almost entirely ad-hoc inline styles,
+  no rarity theming, no stat tiles (the Unending Universe already enjoyed `endlessScoreCard`, so the
+  gap was Voyage-only). It's rebuilt to speak the intro's language, top to bottom:
+  - **A rarity-framed `.gs-panel.gs-result`** (border + glow off `rarCol`/`rarityFlavour`, the arc
+    head's exact treatment) headed by a "STOP N · cleared/ended" eyebrow, the WORLD you just played
+    (`zoneProfile(archetypeFor(...))` → zone name + signature + theme, mirroring `arcIntroScreen`),
+    a glowing **verdict badge** (`MADE THE CUT` / `MISSED CUT` / `SET SURVIVED` / `MATCH WON`…), and
+    the rarity chip. The pass sparkle (`burst()`) fires inside the panel.
+  - **Big `.gs-result-stat` tiles** (the `endlessCards.ts stat()` idiom, local `resultStat`): STABLEFORD
+    (tinted by pass), GROSS, then CUT-made/missed or — on a positional stop where survival is your PLACE
+    — the ordinal place, and +CREDITS (with an ⛳ aces sub). A matchplay boss drops the cut/place tile
+    (the `matchResultPanel` below carries the duel verdict).
+  - **The round, hole by hole (`roundStrip`)** — a clickable `.gs-round` strip promoted OUT of the old
+    `<details>`: one card per hole with strokes (big), par, and score-relative-to-par (`E`/`−1`/`+1`/
+    `✕` pick-up), tinted by the shared `holePips` palette (eagle-gold → blow-up-red). Tapping a hole
+    fires the existing `viewHole` action and drives the framed replay below it (selected hole ringed) —
+    the golf-soul journey of the stop made visible instead of buried.
+  - Then the standings (`leaderboardHTML`) and a full-width primary Continue. The Unending-Universe
+    branch is untouched (still `endlessScoreCard` + `endlessRecordsBoard`, now inside the same panel).
+  Pure render off `state` — zero rng draws, no save touch, no reducer/sim change (the whole `src/sim`
+  suite + `ui.test` stay byte-identical; typecheck + build + 912 tests green). The dead `scorecard()`
+  table is retired. CSS lives in the "Stop result" block in `index.html`. Verified eyes-on (Playwright,
+  430×950) across a RARE island world and a COMMON glacier world: verdict, tiles, tinted round strip,
+  and tap-to-replay all render correctly with zero page errors.
