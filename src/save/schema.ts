@@ -9,10 +9,11 @@
 import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
+import type { EndlessRunRecord } from '../sim/rpg/endless';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -313,8 +314,18 @@ export interface SaveV15 extends Omit<SaveV14, 'version'> {
   marmotBartender: boolean;
 }
 
+/** v16 adds the Unending-Universe golf-scoring records (GS-golf-score): a rolling history of finished
+ *  endless runs, each stamped with its starting CLUB SET (the leaderboard difficulty), the golfer, and
+ *  the round's holes/gross/par — the data behind the "last runs" leaderboard. Purely additive; existing
+ *  fields are untouched. */
+export interface SaveV16 extends Omit<SaveV15, 'version'> {
+  version: 16;
+  /** Finished Unending-Universe runs, newest first (capped) — the personal last-runs leaderboard. */
+  endlessRuns: EndlessRunRecord[];
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV15;
+export type Save = SaveV16;
 
 export function defaultSave(): Save {
   return {
@@ -338,6 +349,7 @@ export function defaultSave(): Save {
     clubhouseVisit: 0,
     endlessBestHoles: 0,
     marmotBartender: false,
+    endlessRuns: [],
   };
 }
 
@@ -607,6 +619,11 @@ function v14ToV15(s: SaveV14): SaveV15 {
   return { ...s, version: 15, marmotBartender: false };
 }
 
+/** v15 → v16: no endless runs recorded yet — the history starts empty and fills as runs finish. */
+function v15ToV16(s: SaveV15): SaveV16 {
+  return { ...s, version: 16, endlessRuns: [] };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -629,6 +646,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 12) s = v12ToV13(s as unknown as SaveV12) as unknown as typeof s;
   if (s.version === 13) s = v13ToV14(s as unknown as SaveV13) as unknown as typeof s;
   if (s.version === 14) s = v14ToV15(s as unknown as SaveV14) as unknown as typeof s;
+  if (s.version === 15) s = v15ToV16(s as unknown as SaveV15) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -636,7 +654,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV15>;
+  const v14 = s as unknown as Partial<SaveV16>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -668,6 +686,7 @@ export function migrate(raw: unknown): Save {
     clubhouseVisit: v14.clubhouseVisit ?? 0,
     endlessBestHoles: v14.endlessBestHoles ?? 0,
     marmotBartender: v14.marmotBartender ?? false,
+    endlessRuns: Array.isArray(v14.endlessRuns) ? v14.endlessRuns : [],
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,
   };

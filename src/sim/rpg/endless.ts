@@ -1,3 +1,6 @@
+import type { BagTier } from './bag';
+import { RARITY_C } from './loot';
+
 /**
  * The Unending Universe (GS-unending) — the endless survival format's pure rules.
  *
@@ -130,4 +133,114 @@ export function endlessUnlocksCrossed(before: number, after: number): EndlessUnl
 /** The next unearned unlock (the market/title tease); secrets stay in the list but read "???". */
 export function nextEndlessUnlock(bestHoles: number): EndlessUnlock | undefined {
   return ENDLESS_UNLOCKS.find((u) => bestHoles < u.holes);
+}
+
+// --- Golf scoring: gross / net / to-par (GS-golf-score) -----------------------
+//
+// The Unending Universe is now scored like a real round of golf: a running GROSS (total strokes over
+// the holes you've conquered), a TO-PAR figure ("−3", "+5", "E"), and a NET that applies a course
+// handicap so runs on different STARTING CLUB SETS are comparable. Survival is unchanged — you still
+// play until you miss a hole's par-relative bar; these are the presentation of how you played the holes
+// you reached. All pure arithmetic — no rng, no DOM — so both the headless sim and the interactive
+// driver read the identical numbers.
+
+/**
+ * The four STARTING CLUB SETS, tiered by loot rarity, that double as the mode's difficulty axis
+ * (GS-golf-score): green (common starter clubs) → orange (legendary). A weaker set is the sterner
+ * test — so it receives more handicap strokes, keeping NET scores fair to compare across sets. The
+ * colour + label read straight off the shared rarity table, so a new tier is a new rarity row, nothing
+ * here.
+ */
+export interface ClubSetDifficulty {
+  tier: BagTier;
+  /** The rack colour keyword the leaderboard groups by. */
+  key: 'green' | 'blue' | 'purple' | 'orange';
+  /** Player-facing name of the set / difficulty. */
+  label: string;
+  /** Rarity accent colour (the leaderboard's category colour). */
+  col: string;
+  /** Course handicap: strokes given back over a full 18 holes (a weaker set gets more). */
+  handicap18: number;
+}
+
+export const CLUB_SET_DIFFICULTIES: readonly ClubSetDifficulty[] = [
+  { tier: 'common', key: 'green', label: 'Starter set', col: RARITY_C.common.col, handicap18: 18 },
+  { tier: 'rare', key: 'blue', label: 'Tour set', col: RARITY_C.rare.col, handicap18: 12 },
+  { tier: 'epic', key: 'purple', label: 'Pro set', col: RARITY_C.epic.col, handicap18: 6 },
+  { tier: 'legendary', key: 'orange', label: 'Elite set', col: RARITY_C.legendary.col, handicap18: 0 },
+];
+
+/** The club-set difficulty a run's starting bag tier maps to (absent/unknown ⇒ the green starter set). */
+export function clubSetOf(tier: BagTier | undefined): ClubSetDifficulty {
+  return CLUB_SET_DIFFICULTIES.find((d) => d.tier === (tier ?? 'common')) ?? CLUB_SET_DIFFICULTIES[0]!;
+}
+
+/**
+ * The handicap strokes received over `holes` holes on a given starting set — the full-18 allowance
+ * prorated to how far the run got, rounded to whole strokes (real golf gives whole strokes). Scratch
+ * (the legendary Elite set) always returns 0, so its net == gross.
+ */
+export function clubSetHandicapStrokes(tier: BagTier | undefined, holes: number): number {
+  const h18 = clubSetOf(tier).handicap18;
+  return Math.round((h18 * Math.max(0, holes)) / 18);
+}
+
+/** Net strokes = gross minus the starting set's prorated handicap allowance (floored at 0). */
+export function netStrokes(gross: number, holes: number, tier: BagTier | undefined): number {
+  return Math.max(0, gross - clubSetHandicapStrokes(tier, holes));
+}
+
+/** A golf-readable to-par figure: "E" at level, "−3" under, "+5" over. */
+export function formatToPar(toPar: number): string {
+  if (toPar === 0) return 'E';
+  return toPar > 0 ? `+${toPar}` : `−${-toPar}`;
+}
+
+/** The colour a to-par figure reads in (under green, level ink-neutral, over amber→red). */
+export function toParColour(toPar: number): string {
+  if (toPar < 0) return '#5fd45a';
+  if (toPar === 0) return '#cdd3df';
+  return toPar <= 4 ? '#ffce54' : '#ff6b6b';
+}
+
+// --- Per-run records: the last-runs leaderboard (GS-golf-score) ----------------
+
+/** One completed Unending-Universe run, banked for the personal last-runs leaderboard. */
+export interface EndlessRunRecord {
+  /** Which golfer played the run (character id). */
+  characterId: string;
+  /** The STARTING CLUB SET the run began on — the leaderboard's difficulty category. */
+  tier: BagTier;
+  /** Holes reached (the survival streak) — the headline result. */
+  holes: number;
+  /** Total gross strokes over the holes reached. */
+  gross: number;
+  /** Total par of the holes reached (⇒ toPar = gross − par). */
+  par: number;
+  /** Ascension tier the run was played at (usually 0 in the endless format). */
+  ascension: number;
+  /** The run seed (lets a record be replayed / disambiguated). */
+  seed: number;
+}
+
+/** Cap on stored records — we keep a rolling window and surface the most recent slice. */
+export const ENDLESS_RECORDS_KEPT = 30;
+
+/** Prepend a finished run to the history, newest first, capped at ENDLESS_RECORDS_KEPT. */
+export function addEndlessRecord(records: readonly EndlessRunRecord[], rec: EndlessRunRecord): EndlessRunRecord[] {
+  return [rec, ...records].slice(0, ENDLESS_RECORDS_KEPT);
+}
+
+/** A record's net-to-par (gross − handicap − par) — the fair, cross-set comparison figure. */
+export function recordNetToPar(rec: EndlessRunRecord): number {
+  return netStrokes(rec.gross, rec.holes, rec.tier) - rec.par;
+}
+
+/** The furthest-reaching record (ties broken by better net-to-par) — the "best effort". */
+export function bestEndlessRecord(records: readonly EndlessRunRecord[]): EndlessRunRecord | undefined {
+  return records.reduce<EndlessRunRecord | undefined>((best, r) => {
+    if (!best) return r;
+    if (r.holes !== best.holes) return r.holes > best.holes ? r : best;
+    return recordNetToPar(r) < recordNetToPar(best) ? r : best;
+  }, undefined);
 }

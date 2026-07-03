@@ -1137,3 +1137,50 @@ rides.
   (the set still has `ufo-saucer` epic); if the market wants another mid-tier Exotic later, add a new row —
   don't un-secret the Comet Rider. A future event-earned ship is the same shape: `secret:true`/`cost:0` row +
   a reducer grant on its trigger; no market or reveal-predicate edit needed.
+
+## GS-golf-score — the Unending Universe scored as a round of golf + a last-runs leaderboard
+
+**Why.** The endless mode's only score was "holes survived" + a Stableford ghost field borrowed from
+the voyage. That reads as a survival counter, not *golf*. Players think in gross / to-par / net, and a
+roguelike wants a *personal* record wall to chase — not a fictional field of AI golfers who don't
+matter (survival is decided per-hole, so their standings were pure flavour). This makes the Unending
+Universe present as a real round and gives it its own leaderboard.
+
+**What it is NOT.** It does **not** touch survival. The per-hole par-relative bar (`passesEndlessGate`),
+the milestone ladder, the cosmetic unlocks, the no-death-spiral harness, and every seeded test are all
+unchanged. Gross/par accumulate on the Run but are read by NOBODY in the survival/scoring path — they're
+presentation + a per-run record. `finishStop` advances them **only** for `holeGate` formats and **only**
+over the SURVIVED prefix of a stop (the same holes `holesSurvived` counts), so the voyage stays
+byte-for-byte and the mid-round card can never disagree with the banked record.
+
+**Scoring model.**
+- `Run.grossStrokes` / `Run.parPlayed` — cumulative over survived holes; snapshotted (optional fields,
+  back-compat) so a resume keeps the round; 0 for non-gate formats. To-par = gross − par.
+- **Net** (`endless.ts netStrokes`) applies a course handicap read off the STARTING CLUB SET, prorated
+  to holes played (green 18/18 → one stroke a hole … legendary scratch). A weaker set gets more strokes,
+  so net scores compare fairly across bags — the whole point of splitting the leaderboard by set.
+
+**Difficulty = the starting club set** (`CLUB_SET_DIFFICULTIES`, green/blue/purple/orange = common→
+legendary rarity, reusing `RARITY_C` colours). Picked on character-select for endless only (a `data-clubset`
+chip row mirroring the voyage's `data-asc` ascension row), **bounded to the owned `bagTier`** (green always;
+higher tiers only if unlocked in the voyage) — so it can never grant a free bag upgrade, and `common`
+selection is the historical default (byte-identical). The reducer re-clamps (`bagTierRank`). The voyage
+ignores the chip and always plays the full owned tier.
+
+**The last-runs leaderboard** (`endlessRuns`, save v16). A finished endless run banks one
+`EndlessRunRecord` (golfer, club set, holes reached, gross, par, ascension, seed) — prepended newest-first,
+capped at `ENDLESS_RECORDS_KEPT`. Written in **exactly one place**, the reducer's `runEndUpdates` (the
+single shared run-end site), gated on `holeGateArmed` + a character, so every end path logs it once and the
+voyage logs nothing. Displayed grouped by the four club sets with a per-set best-holes strip + the 🏅
+best-effort row.
+
+**Render** (`render/endlessCards.ts`, pure like `golferCards.ts`): `endlessScoreCard` (holes · gross ·
+to-par · net + next bar/milestone) and `endlessRecordsBoard` (the grouped last-runs board). Wired into the
+arc intro (replaces the ghost field), the end-of-hole card (replaces the ghost live leaderboard), the stop
+result, and the gameover recap — **all gated on `holeGateArmed`**, so the voyage's screens are untouched.
+No `window._gs*`/`?param` hook added, so the test-hub sync guard needs nothing.
+
+Tests: `tests/endless.test.ts` (club-set handicap monotonicity + proration, net floor, to-par format,
+record prepend/cap/best-effort/net-to-par, `finishStop` survived-only accumulation + snapshot round-trip,
+voyage-stays-0, `runEndUpdates` records once / voyage records nothing) and `tests/save.test.ts` (v15→v16
+migration + record round-trip).

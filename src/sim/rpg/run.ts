@@ -136,6 +136,13 @@ export interface Run {
    *  counter, driving the gate tier, the milestones and the cosmetic unlocks. Advanced by
    *  `finishStop`; always 0 for formats without `holeGate`. Snapshotted so a resume keeps the bar. */
   holesSurvived: number;
+  /** Cumulative GROSS strokes over the holes survived (GS-golf-score) — the running golf-round score
+   *  for the Unending Universe. Advanced by `finishStop` alongside `holesSurvived`; always 0 for
+   *  non-gate formats. Snapshotted so a resume keeps the round total. */
+  grossStrokes: number;
+  /** Cumulative PAR of the holes survived (GS-golf-score) — with `grossStrokes` gives to-par + net.
+   *  Advanced by `finishStop`; always 0 for non-gate formats. Snapshotted. */
+  parPlayed: number;
   /** Ids of UNIQUE one-off events already travelled into (GS-17c) — so each fires at most once. */
   firedEventIds: string[];
   status: RunStatus;
@@ -202,6 +209,8 @@ export function startRun(
     unlockedClubs: [...unlockedClubs],
     bonusShards: 0,
     holesSurvived: 0,
+    grossStrokes: 0,
+    parPlayed: 0,
     firedEventIds: [],
     status: 'active',
     history: [],
@@ -484,12 +493,25 @@ export function finishStop(
   // route events use) — so a victory screen's reward can never be clawed back by a later death.
   const holesSurvived = run.holesSurvived + (format.holeGate ? gateSurvived : 0);
   const milestoneShards = format.holeGate ? endlessMilestoneShards(run.holesSurvived, holesSurvived) : 0;
+  // Golf-round score (GS-golf-score): accumulate the GROSS strokes + PAR of exactly the holes that were
+  // survived (a partial busting stop counts only its leading passes), so the running gross/to-par/net
+  // stays in lock-step with `holesSurvived`. Zero for non-gate formats (the voyage never reads these).
+  let grossAdded = 0;
+  let parAdded = 0;
+  if (format.holeGate) {
+    for (let i = 0; i < gateSurvived; i++) {
+      grossAdded += played[i]!.record.strokes;
+      parAdded += played[i]!.record.par;
+    }
+  }
 
   const next: Run = {
     ...run,
     loadout,
     credits: run.credits + creditsEarned,
     holesSurvived,
+    grossStrokes: run.grossStrokes + grossAdded,
+    parPlayed: run.parPlayed + parAdded,
     bonusShards: run.bonusShards + milestoneShards,
     history: [...run.history, result],
     // The event is spent — clear it so a resume can't double-apply it next stop.
@@ -1227,6 +1249,10 @@ export interface RunSnapshot {
   /** Cumulative holes survived (GS-unending), so a resume keeps the survival bar + milestone
    *  progress. 0/absent for back-compat (non-gate formats never advance it). */
   holesSurvived?: number;
+  /** Cumulative gross strokes + par over the survived holes (GS-golf-score), so a resume keeps the
+   *  running golf-round score. 0/absent for back-compat. */
+  grossStrokes?: number;
+  parPlayed?: number;
   /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
   firedEventIds?: string[];
   /** The selected golfer (GS-18) — re-applied to the loadout on resume. */
@@ -1249,6 +1275,8 @@ export function snapshotRun(run: Run): RunSnapshot {
     pendingThemeId: run.pendingTheme?.id,
     bonusShards: run.bonusShards,
     holesSurvived: run.holesSurvived,
+    grossStrokes: run.grossStrokes,
+    parPlayed: run.parPlayed,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
   };
@@ -1278,6 +1306,8 @@ export function resumeRun(snap: RunSnapshot): Run {
     pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
     bonusShards: snap.bonusShards ?? 0,
     holesSurvived: snap.holesSurvived ?? 0,
+    grossStrokes: snap.grossStrokes ?? 0,
+    parPlayed: snap.parPlayed ?? 0,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     status: 'active',
     history: [],

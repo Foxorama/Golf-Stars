@@ -41,7 +41,7 @@ import {
   type StopResult,
   type TeamDuelSetup,
 } from '../sim/rpg/run';
-import { endlessUnlocksCrossed } from '../sim/rpg/endless';
+import { endlessUnlocksCrossed, addEndlessRecord, type EndlessRunRecord } from '../sim/rpg/endless';
 import { archetypeFor } from '../sim/course/themes';
 import { effectPatchKind } from '../sim/rpg/effects';
 import { isMatchplayBoss } from '../sim/rpg/formats';
@@ -57,7 +57,7 @@ import {
   type HoleDuel,
 } from '../sim/rpg/match';
 import { type MetaUpgrades } from '../sim/rpg/meta';
-import { bagSet, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
+import { bagSet, bagTierRank, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
 import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlock';
 import { canBuyShip, shipById, aceShipUnlock, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
@@ -189,6 +189,9 @@ export interface UiState {
   /** The Marmot Bartender clubhouse unlock (GS-tent-interactions) — persisted; set the first time a
    *  ball bonks the marmot trade-tent, after which a marmot tends the 19th-hole bar. */
   marmotBartender: boolean;
+  /** Finished Unending-Universe runs (GS-golf-score), newest first — the personal last-runs
+   *  leaderboard: holes reached + golf score + golfer, grouped by starting CLUB SET. Persisted. */
+  endlessRuns: EndlessRunRecord[];
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -213,7 +216,7 @@ export interface MatchUi {
 
 export type Action =
   | { type: 'start'; format: string; ascension?: number }
-  | { type: 'selectCharacter'; characterId: string; ascension?: number } // pick a golfer (+ their Ascension tier for a voyage), then begin the run
+  | { type: 'selectCharacter'; characterId: string; ascension?: number; bagTier?: BagTier } // pick a golfer (+ their Ascension tier for a voyage / starting club set for the Unending Universe), then begin the run
   | { type: 'backToCharacter' } // GS-intro-split: from the stop intro, step back to re-pick the golfer
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
@@ -270,6 +273,7 @@ export interface MetaProgress {
   clubhouseVisit?: number;
   endlessBestHoles?: number;
   marmotBartender?: boolean;
+  endlessRuns?: EndlessRunRecord[];
 }
 
 /** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
@@ -356,6 +360,7 @@ export function initState(
     clubhouseVisit: meta.clubhouseVisit ?? 0,
     endlessBestHoles: meta.endlessBestHoles ?? 0,
     marmotBartender: meta.marmotBartender ?? false,
+    endlessRuns: meta.endlessRuns ?? [],
   };
 }
 
@@ -461,6 +466,22 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
     : undefined;
   const gotClub = reward?.kind === 'club' && !!characterId;
   const bonusShards = reward?.kind === 'shards' ? reward.shards : 0;
+  // Bank the finished Unending-Universe run into the last-runs leaderboard (GS-golf-score): its holes
+  // reached + golf-round gross/par + golfer + starting club set. Recorded once, here at the single
+  // shared run-end site, so every end path (auto/interactive) logs it exactly once; a non-gate voyage
+  // run adds nothing. A characterless placeholder never reaches this (runs only end after a stop).
+  const endlessRuns =
+    holeGateArmed(run) && characterId
+      ? addEndlessRecord(state.endlessRuns, {
+          characterId,
+          tier: run.bagTier ?? 'common',
+          holes: run.holesSurvived,
+          gross: run.grossStrokes,
+          par: run.parPlayed,
+          ascension: run.ascension,
+          seed: run.seed,
+        })
+      : state.endlessRuns;
   return {
     shards: state.shards + earned + bonusShards,
     lastRunShards: earned,
@@ -472,6 +493,7 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
       ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
       : state.unlockedClubsByCharacter,
     lastClubUnlock: reward,
+    endlessRuns,
     // A finished run bumps the lounge counter so the golfers have shuffled around by the time you're home.
     clubhouseVisit: state.clubhouseVisit + 1,
   };
@@ -552,13 +574,22 @@ export function reduce(state: UiState, action: Action): UiState {
       // what's unlocked. The golfer's permanently-unlocked clubs (GS-ascension-clubs) grow their
       // starting bag.
       const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? state.run.ascension));
+      // Starting CLUB SET = the Unending Universe's difficulty axis (GS-golf-score): the player may pick
+      // any set they OWN (down to the green starter set, always available), a weaker set being the sterner
+      // test. Clamped to the owned tier so it can never exceed `state.bagTier` (no free bag upgrade), and
+      // ignored entirely for the voyage, which always plays the full owned tier.
+      const owned = state.bagTier;
+      const bagTier: BagTier =
+        holeGateArmed(state.run) && action.bagTier && bagTierRank(action.bagTier) <= bagTierRank(owned)
+          ? action.bagTier
+          : owned;
       const run = startRun(
         state.run.seed,
         state.run.formatId,
         state.metaUpgrades,
         action.characterId,
         asc,
-        state.bagTier,
+        bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
       );
       return { ...state, run, course: currentCourse(run), screen: 'intro' };
@@ -1195,6 +1226,7 @@ export function reduce(state: UiState, action: Action): UiState {
           clubhouseVisit: state.clubhouseVisit,
           endlessBestHoles: state.endlessBestHoles,
           marmotBartender: state.marmotBartender,
+          endlessRuns: state.endlessRuns,
         },
         state.resumable,
       );

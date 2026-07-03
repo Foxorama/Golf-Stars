@@ -36,8 +36,8 @@ import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybr
 import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS, getFormat } from './sim/rpg/formats';
 import { getCharacter, type Character } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun, starmartRerollCost, STARMART_COST, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
-import { ENDLESS_MILESTONES, endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
+import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, holeGateArmed, snapshotRun, starmartRerollCost, STARMART_COST, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
+import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { arcSurvivorTarget } from './sim/rpg/competition';
@@ -50,7 +50,8 @@ import { apparelById, apparelForSlot, apparelRevealedInMarket, canBuyApparel, eq
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
 import { clubhouseLoungeHTML, type LoungeGolfer } from './render/clubhouseLounge';
 import { cosmeticRarCol, isMythic } from './sim/rpg/cosmetics';
-import { BAG_SETS, bagSet, bagSetUnlocked, bagSetRevealedInMarket, bagTierRank, canBuyBagSet, bagUnlockForClearedAscension, type BagSet } from './sim/rpg/bag';
+import { BAG_SETS, bagSet, bagSetUnlocked, bagSetRevealedInMarket, bagTierRank, canBuyBagSet, bagUnlockForClearedAscension, type BagSet, type BagTier } from './sim/rpg/bag';
+import { endlessScoreCard, endlessRecordsBoard } from './render/endlessCards';
 import {
   initState,
   reduce,
@@ -145,6 +146,7 @@ function boot(): void {
       clubhouseVisit: save.clubhouseVisit,
       endlessBestHoles: save.endlessBestHoles,
       marmotBartender: save.marmotBartender,
+      endlessRuns: save.endlessRuns,
     };
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -187,7 +189,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 15,
+    version: 16,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -207,6 +209,7 @@ function persist(): void {
     clubhouseVisit: state.clubhouseVisit,
     endlessBestHoles: state.endlessBestHoles,
     marmotBartender: state.marmotBartender,
+    endlessRuns: state.endlessRuns,
     // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
     // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
     // moment anything dispatched from the title. While no real run is live, any resumable offer
@@ -254,9 +257,13 @@ function dispatch(action: Action): void {
     const prevHoles = state.run.holesSurvived;
     const prevBestHoles = state.endlessBestHoles;
     state = reduce(state, action);
-    // Entering character select resets the difficulty picker to A0 (GS-title-2) — a fresh choice
-    // per run, never a sticky leftover from the last one.
-    if (action.type === 'start') selAscension = 0;
+    // Entering character select resets the difficulty pickers (GS-title-2 / GS-golf-score) — a fresh
+    // choice per run, never a sticky leftover from the last one. The club set defaults to the owned
+    // tier (the strongest bag you have; opt DOWN for a harder run).
+    if (action.type === 'start') {
+      selAscension = 0;
+      selClubSet = state.bagTier;
+    }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
       action.type === 'openClubhouse' ||
@@ -807,6 +814,26 @@ function introScreen(): string {
 }
 
 /**
+ * The Unending-Universe running GOLF ROUND (GS-golf-score) through a stop's holes so far: the run's
+ * banked gross/par (prior stops) plus the SURVIVED prefix of this stop's holes — counted exactly as
+ * `finishStop` will, so the mid-round card and the final record never disagree. `playedSoFar` includes
+ * the hole just finished (which may be the busting one — it's excluded, like `holesSurvived`).
+ */
+function endlessRoundSoFar(playedSoFar: PlayedHole[]): { holes: number; gross: number; par: number; tier: BagTier } {
+  const r = state.run;
+  let holes = r.holesSurvived;
+  let gross = r.grossStrokes;
+  let par = r.parPlayed;
+  for (let i = 0; i < playedSoFar.length; i++) {
+    if (!endlessHolePassed(r, i, playedSoFar[i]!)) break;
+    holes++;
+    gross += playedSoFar[i]!.record.strokes;
+    par += playedSoFar[i]!.record.par;
+  }
+  return { holes, gross, par, tier: r.bagTier ?? 'common' };
+}
+
+/**
  * STEP 1 — the arc: the game mode + win condition and the field of 20 competitors. A big "First
  * Tee ▸" up top drops to the hole step; a second one appears at the very bottom ONLY when the
  * field pushes the page past one screen (revealed post-render in `render()` by measuring overflow),
@@ -814,8 +841,22 @@ function introScreen(): string {
  */
 function arcIntroScreen(): string {
   const { c, zone, theme, col, par, rar, diffPips, notes, objective } = introShared();
-  const board = leaderboard(state.run);
-  const field = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
+  // The Unending Universe is scored like a round of golf (GS-golf-score): the "field" slot shows your
+  // RUNNING round (gross/to-par/net) + the personal last-runs leaderboard grouped by starting club set,
+  // instead of the voyage's ghost competitor board. Gated to the gate format so the voyage is untouched.
+  const gate = holeGateArmed(state.run);
+  let field: string;
+  if (gate) {
+    const r = state.run;
+    field =
+      endlessScoreCard(
+        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
+        { title: r.holesSurvived > 0 ? 'Round so far' : 'Your round', next: true },
+      ) + endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common' });
+  } else {
+    const board = leaderboard(state.run);
+    field = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
+  }
   const firstTee = (id: string): string =>
     `<button class="gs-btn gs-btn--primary gs-intro-first" id="${id}" data-intro-stage="hole">First Tee <span aria-hidden="true">▸</span></button>`;
   return `
@@ -1540,6 +1581,10 @@ function playingBody(animating: boolean): string {
       </div>`;
     const progress = state.match
       ? holeMatchProgressHTML(playedSoFar)
+      : holeGateArmed(state.run)
+      ? // The Unending Universe (GS-golf-score): the running GOLF ROUND scorecard replaces the ghost
+        // leaderboard — the score you're actually building, hole by hole.
+        endlessScoreCard(endlessRoundSoFar(playedSoFar), { title: 'Round so far', next: true })
       : (() => {
           const board = liveLeaderboard(state.run, playedSoFar.length, stopPts);
           const me = board.standings.find((s) => s.isPlayer)!;
@@ -1797,6 +1842,11 @@ let settingsOpen = false;
 // entering character select ('start') resets it to A0. Never persisted; the reducer clamps it.
 let selAscension = 0;
 
+// The starting CLUB SET picked on the character-select screen for the Unending Universe (GS-golf-score)
+// — the mode's difficulty axis. View state like `selAscension`: the [data-clubset] chips set it, every
+// golfer card's select action bakes it in, and 'start' resets it to the owned tier. The reducer clamps.
+let selClubSet: BagTier = 'common';
+
 /** The settings sheet: player-owned feel/control prefs (sound, haptics, fast shots, swing gesture,
  *  left-handed, reduced motion), plus — anywhere but the title itself — a "Return to title" escape
  *  hatch (GS-settings-nav). An underway run is parked as a resumable snapshot, never destroyed. */
@@ -1953,32 +2003,38 @@ function resultScreen(): string {
                   : 'MISSED CUT'
           }</h2>
         ${(() => {
+          const gate = holeGateArmed(state.run);
+          // The Unending Universe (GS-golf-score): the set is scored as golf — the running ROUND card
+          // (gross/to-par/net) + a one-line set summary + the personal last-runs leaderboard, in place of
+          // the voyage's ghost field. The run's cumulative gross/par already include this just-scored stop.
+          if (gate) {
+            const r = state.run;
+            const setLine = `<p style="font-size:12.5px;opacity:.82;margin:10px 0 0;">This set · gross <b>${res.gross}</b> · <b>+${res.creditsEarned}</b> credits${
+              res.aces ? ` · ⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''
+            }</p>`;
+            return (
+              endlessScoreCard(
+                { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
+                { title: 'Round so far', next: true },
+              ) +
+              setLine +
+              endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your recent runs' })
+            );
+          }
           const board = leaderboard(state.run);
           const positional = board.mode === 'positional';
-          const gate = holeGateArmed(state.run);
           const me = board.standings.find((s) => s.isPlayer);
           // For a positional voyage stop the Stableford cut isn't the survival bar (your PLACE is), so
-          // don't show "vs cut N" — the standings + "you're Nth" line below carry survival. Same for
-          // the Unending Universe (GS-unending), whose bar is per-hole — show the survival ledger instead.
-          const cutTxt = state.match || positional || gate ? '' : ` vs cut <b>${res.cut}</b>`;
+          // don't show "vs cut N" — the standings + "you're Nth" line below carry survival.
+          const cutTxt = state.match || positional ? '' : ` vs cut <b>${res.cut}</b>`;
           const summary = `<p style="font-size:14px;">Stableford <b>${res.stableford}</b>${cutTxt} · gross ${res.gross} · <b>+${res.creditsEarned}</b> credits</p>`;
-          let survival = '';
-          if (gate) {
-            const holes = state.run.holesSurvived;
-            const nextM = ENDLESS_MILESTONES.find((m) => m.holes > holes);
-            survival = `<p style="font-size:13.5px;margin:.2em 0 .6em;color:#4fe08a;">🌌 <b>${holes}</b> holes survived${
-              nextM ? ` · next victory at <b>${nextM.holes}</b> (✦ ${nextM.shards})` : ' · beyond every milestone'
-            } · bar: <b>${endlessGateLabel(endlessGateOverPar(holes + 1))}</b></p>`;
-          }
           const through = positional
             ? board.survivorTarget
               ? ` · top ${board.survivorTarget} advance`
               : ''
             : ` · ${board.survivors} make it through`;
           const place = me ? `<p style="font-size:13px;margin:.2em 0 .6em;">You're <b>${ordinal(me.position)}</b> of ${board.standings.length}${through}.</p>` : '';
-          // The ghost field is flavour in the Unending Universe (survival is the per-hole bar), so the
-          // board stays but the "make it through" framing goes.
-          return summary + survival + (state.match ? matchResultPanel() : '') + (gate ? '' : place) + leaderboardHTML(board);
+          return summary + (state.match ? matchResultPanel() : '') + place + leaderboardHTML(board);
         })()}
         <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;opacity:.7;">Scorecard</summary>${scorecard()}</details>
         <div style="margin-top:10px;">${btn(
@@ -3099,6 +3155,17 @@ function gameoverScreen(): string {
              <span style="font-size:13px;"><b style="color:var(--gs-gold);">🎒 Bag complete!</b> <b>${golferName}</b> already carries every club, so your victory pays a bonus <b>✦ ${clubUnlock.shards}</b> Star Shards.</span>
            </div>`
       : '';
+  // The Unending Universe's final GOLF ROUND (GS-golf-score): the round card + the personal last-runs
+  // leaderboard (which now includes this just-finished run, prepended by `runEndUpdates`).
+  const endlessCard = gate
+    ? endlessScoreCard(
+        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
+        { title: 'Final round' },
+      )
+    : '';
+  const endlessBoard = gate
+    ? endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your last runs' })
+    : '';
   // The Unending Universe's ledger (GS-unending): the run's survived-hole count IS the score.
   const endlessRecap = gate
     ? `<p style="font-size:15px;">🌌 You survived <b>${r.holesSurvived}</b> hole${r.holesSurvived === 1 ? '' : 's'} of the Unending Universe${
@@ -3117,11 +3184,13 @@ function gameoverScreen(): string {
   return `
     ${header()}
     ${heading}
+    ${endlessCard}
     ${reached}
     ${clubNotice}
     ${bagNotice}
     ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
-    <p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>
+    ${gate ? '' : `<p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>`}
+    ${endlessBoard}
     <div style="margin-top:8px;">
       ${btn('🚀 Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       ${btn('🚀 New run', { type: 'restart', seed: freshRunSeed() }, { variant: 'primary' })}
@@ -3460,6 +3529,11 @@ function render(): void {
             getFormat(state.run.formatId).winnable && state.maxAscension > 0
               ? { max: state.maxAscension, sel: selAscension }
               : undefined,
+          // The Unending Universe picks its STARTING CLUB SET here (GS-golf-score) — the mode's
+          // difficulty axis. Bounded to the owned tier (green always); the reducer re-clamps.
+          clubSet: holeGateArmed(state.run)
+            ? { owned: state.bagTier, sel: bagTierRank(selClubSet) <= bagTierRank(state.bagTier) ? selClubSet : state.bagTier }
+            : undefined,
         })
       : state.screen === 'intro'
       ? introScreen()
@@ -3695,6 +3769,16 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-asc]').forEach((el) => {
     el.addEventListener('click', () => {
       selAscension = Number(el.dataset.asc);
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // Starting club-set chips on character select (GS-golf-score): the Unending Universe's difficulty
+  // axis — pure view state, re-renders lit, rides every golfer card's select action (reducer clamps).
+  app.querySelectorAll<HTMLElement>('[data-clubset]').forEach((el) => {
+    el.addEventListener('click', () => {
+      selClubSet = el.dataset.clubset as BagTier;
       sfx.click();
       haptic(HAPTICS.tap);
       render();

@@ -4,6 +4,8 @@ import { themeById, type BiomeArchetype } from '../sim/course/themes';
 import { getGolfer, getArchetype } from '../sim/rpg/golfers';
 import { PLAYER_ID, type Field } from '../sim/rpg/competition';
 import { type Leaderboard } from '../sim/rpg/league';
+import { CLUB_SET_DIFFICULTIES } from '../sim/rpg/endless';
+import { bagTierRank, type BagTier } from '../sim/rpg/bag';
 
 // Golfer presentation: the player/competitor avatar SVG art, the character-select cards, and the
 // arc competition views (field strip + leaderboard table). All pure string/SVG builders — they take
@@ -137,7 +139,15 @@ function unlockedStrip(unlockedTypes: readonly string[], col: string): string {
  */
 export function characterScreen(
   unlockedByCharacter: Record<string, readonly string[]> = {},
-  opts: { modeName?: string; winnable?: boolean; ascension?: { max: number; sel: number } } = {},
+  opts: {
+    modeName?: string;
+    winnable?: boolean;
+    ascension?: { max: number; sel: number };
+    /** The Unending Universe's STARTING CLUB SET picker (GS-golf-score): `owned` is the highest tier the
+     *  player can play (every tier at or below it is selectable; green is always available), `sel` the
+     *  chosen difficulty. Absent for the voyage (it always plays the full owned tier). */
+    clubSet?: { owned: BagTier; sel: BagTier };
+  } = {},
 ): string {
   const verb = opts.winnable === false ? 'Survive as' : 'Voyage as';
   const statRows = (st: GolferStats, col: string): string =>
@@ -150,9 +160,12 @@ export function characterScreen(
     const unlocks = unlockedStrip(unlockedByCharacter[ch.id] ?? [], cap);
     // The phone-sized card swaps the blurb + full pros/cons for this one-line strength · quirk hint.
     const hint = `<p class="gs-charcard-hint"><span style="color:var(--gs-accent);">✓</span> ${ch.pros[0] ?? ''} <span style="color:var(--gs-warn);">▲</span> ${ch.cons[0] ?? ''}</p>`;
-    const action = opts.ascension
-      ? { type: 'selectCharacter', characterId: ch.id, ascension: opts.ascension.sel }
-      : { type: 'selectCharacter', characterId: ch.id };
+    const action = {
+      type: 'selectCharacter',
+      characterId: ch.id,
+      ...(opts.ascension ? { ascension: opts.ascension.sel } : {}),
+      ...(opts.clubSet ? { bagTier: opts.clubSet.sel } : {}),
+    };
     return `
       <button class="gs-charcard" data-action='${JSON.stringify(action)}'
         style="--cc:${cap};animation-delay:${i * 70}ms;">
@@ -182,12 +195,28 @@ export function characterScreen(
         <span class="gs-ascpick-hint">harder cut, leaner purse — win your top tier to unlock the next</span>
       </div>`
     : '';
+  // The Unending Universe's STARTING CLUB SET picker (GS-golf-score) — the mode's difficulty axis. Every
+  // set at or below the owned tier is selectable (green always); locked sets show 🔒. A weaker set is
+  // the sterner test but nets more handicap strokes, so scores compare fairly across sets.
+  const clubRow = opts.clubSet
+    ? `<div class="gs-ascpick">
+        <span class="gs-ascpick-l">🎒 Club set</span>
+        ${CLUB_SET_DIFFICULTIES.map((d) => {
+          const locked = bagTierRank(d.tier) > bagTierRank(opts.clubSet!.owned);
+          const on = d.tier === opts.clubSet!.sel;
+          return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip"${locked ? ' disabled' : ` data-clubset="${d.tier}"`}
+            style="--cc:${d.col};${on ? `border-color:${d.col};color:${d.col};` : ''}${locked ? 'opacity:.4;' : ''}">${locked ? '🔒 ' : ''}${d.label}</button>`;
+        }).join('')}
+        <span class="gs-ascpick-hint">a weaker set is the sterner test — net scoring keeps the leaderboard fair; unlock better bags in the Voyage</span>
+      </div>`
+    : '';
   return `
     <header class="gs-charhead" style="border-left:4px solid #5fd45a;padding-left:10px;">
       <h1>Choose your golfer</h1>
       <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
     </header>
     ${ascRow}
+    ${clubRow}
     <div class="gs-charwrap">${cards}</div>`;
 }
 
