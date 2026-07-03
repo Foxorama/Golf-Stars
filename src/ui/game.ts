@@ -893,8 +893,9 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'openClubhouseHall': {
       // Enter the Clubhouse — the hall where all four golfers wait, each a doorway to their own
-      // garage + wardrobe. Reachable between runs (title / game over), like the Trade Market.
-      if (state.screen !== 'title' && state.screen !== 'gameover') return state;
+      // garage + wardrobe. Reachable between runs (title / game over) and straight from the Trade
+      // Market ("try it on") so a shopper can jump to outfitting without a title round-trip.
+      if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'trademarket') return state;
       return { ...state, screen: 'clubhouseHall' };
     }
 

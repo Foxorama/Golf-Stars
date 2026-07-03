@@ -262,10 +262,12 @@ function dispatch(action: Action): void {
     ) {
       clubhouseSlot = null;
     }
-    // Opening the Trade Market re-collapses every catalogue section so it lands compact (GS-market-accordion).
+    // Opening the Trade Market re-collapses every catalogue section so it lands compact
+    // (GS-market-accordion) and re-hides owned gear so it lands on the buyable rack (Show Owned off).
     if (action.type === 'openMarket') {
       collapsedMarketSections.clear();
       for (const id of MARKET_SECTION_IDS) collapsedMarketSections.add(id);
+      marketShowOwned = false;
     }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
     if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
@@ -868,6 +870,10 @@ let inspectGearId: string | null = null;
 // opens) so the catalogue lands compact and browsable; the player expands the racks they want.
 const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'bag', 'bags'] as const;
 const collapsedMarketSections = new Set<string>(MARKET_SECTION_IDS);
+// Trade Market "Show Owned" toggle: view-only module state (like collapsedMarketSections). OFF by
+// default so the rack shows only gear you can still buy — the player flips it on to browse what they
+// already own. Toggled via [data-market-showowned] + re-render, never persisted / no rng impact.
+let marketShowOwned = false;
 // Clubhouse editor (GS-clubhouse-stage): which slot picker is open — tap a body part or the garage on
 // the character stage to reveal that slot's rack. View-only module state (like inspectGearId), toggled
 // via [data-clubslot] + re-render, reset when the Clubhouse opens/closes. null = the resting stage.
@@ -2127,12 +2133,17 @@ function tradeMarketScreen(): string {
   // Earned Unending-Universe unlocks (ships/apparel) and locked Ascension bag tiers stay OUT of the
   // rack entirely until they're unlocked/owned (GS-hide-unlocks) — the market only shows what you can
   // actually buy or already have, never spoiling a milestone reward.
+  // A section whose only items are owned goes empty once Show Owned is off — show this instead of a
+  // blank rack so the fold still reads (its count header still shows the owned/total tally).
+  const emptyRackNote = '<p class="gs-acc__blurb" style="opacity:.55;">You own everything here — flip on <b>Show Owned</b> above to browse it.</p>';
   const ships = shipCatalogue().filter((s) => shipRevealedInMarket(s, state.ownedShips));
   // Owned rides sink to the bottom of the rack (greyed out) so the buyable fleet reads first (stable
-  // sort keeps rarity order within each group).
-  const shipCards = ships
-    .slice()
-    .sort((a, b) => Number(state.ownedShips.includes(a.id)) - Number(state.ownedShips.includes(b.id)))
+  // sort keeps rarity order within each group). With Show Owned off they're dropped from the rack
+  // entirely — a fully-owned section shows a gentle note instead of an empty rack.
+  const shipCards =
+    ships
+      .filter((s) => marketShowOwned || !state.ownedShips.includes(s.id))
+      .sort((a, b) => Number(state.ownedShips.includes(a.id)) - Number(state.ownedShips.includes(b.id)))
     .map((ship) => {
       const ring = cosmeticRarCol(ship.rarity);
       const owned = state.ownedShips.includes(ship.id);
@@ -2149,7 +2160,7 @@ function tradeMarketScreen(): string {
       }
       return shipCardHTML(ship, footer, { ring, dim: owned || !afford, glow: isMythic(ship.rarity) && !owned, action });
     })
-    .join('');
+    .join('') || emptyRackNote;
   const shipsOwned = ships.filter((s) => state.ownedShips.includes(s.id)).length;
 
   // One uniform collapsible clothing rack per slot (hats / shirts / pants / bag), each with its owned
@@ -2159,13 +2170,14 @@ function tradeMarketScreen(): string {
     const items = apparelForSlot(slot).filter((a) => apparelRevealedInMarket(a, state.ownedApparel));
     if (!items.length) return '';
     const owned = items.filter((a) => state.ownedApparel.includes(a.id)).length;
-    // Owned garments sink to the bottom (greyed) so the buyable rack reads first; stable sort keeps
-    // rarity order within each group.
-    const rack = items
-      .slice()
-      .sort((a, b) => Number(state.ownedApparel.includes(a.id)) - Number(state.ownedApparel.includes(b.id)))
-      .map(marketApparelCardHTML)
-      .join('');
+    // With Show Owned off, owned garments drop out of the rack; on, they sink to the bottom (greyed)
+    // so the buyable rack still reads first. Stable sort keeps rarity order within each group.
+    const rack =
+      items
+        .filter((a) => marketShowOwned || !state.ownedApparel.includes(a.id))
+        .sort((a, b) => Number(state.ownedApparel.includes(a.id)) - Number(state.ownedApparel.includes(b.id)))
+        .map(marketApparelCardHTML)
+        .join('') || emptyRackNote;
     return marketSection(slot, icon, title, owned, items.length, blurb, rack);
   };
 
@@ -2174,7 +2186,13 @@ function tradeMarketScreen(): string {
       <h1 style="margin:0;font-size:22px;">🚀 Trade Market</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on ships, clothing &amp; bag tiers. Cosmetic only — buy it here, then outfit each golfer in the <b>Clubhouse</b>. Tap a section to fold it away.</p>
     </header>
-    <h2 style="font-size:16px;margin:.6em 0 .4em;">✦ ${state.shards} Star Shards</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:.6em 0 .4em;flex-wrap:wrap;">
+      <h2 style="font-size:16px;margin:0;">✦ ${state.shards} Star Shards</h2>
+      <button class="gs-setrow" data-market-showowned="1" aria-pressed="${marketShowOwned}" style="width:auto;padding:6px 10px;gap:9px;border-top:none;border-radius:999px;background:#ffffff08;">
+        <span class="gs-setlabel"><b>Show Owned</b></span>
+        <span class="gs-toggle${marketShowOwned ? ' gs-toggle--on' : ''}" aria-hidden="true"><span class="gs-knob"></span></span>
+      </button>
+    </div>
     ${marketSection(
       'ships',
       '🚀',
@@ -2189,7 +2207,10 @@ function tradeMarketScreen(): string {
     ${apparelSection('pants', '👖', 'Pants', 'Trousers &amp; legwear to finish the outfit.')}
     ${apparelSection('bag', '🎒', 'Caddy Bags', 'Cosmetic staff bags your golfer poses with in the Clubhouse — earned in the <b>Unending Universe</b>, never sold.')}
     ${bagSetSection()}
-    <div style="margin-top:14px;text-align:center;">${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}</div>`;
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      ${btn('🏠 Clubhouse', { type: 'openClubhouseHall' }, { variant: 'ghost' })}
+      ${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}
+    </div>`;
 }
 
 /** The Clubhouse hall (GS-clubhouse / GS-clubhouse-lounge) — its own screen reached from the title's
@@ -2552,7 +2573,11 @@ function bagSetSection(): string {
   const currentRank = bagTierRank(state.bagTier);
   const owned = currentRank > 0 ? sets.filter((s) => bagTierRank(s.tier) <= currentRank).length : 0;
   const blurb = `Permanent upgrades that re-outfit <b>every</b> golfer's starting bag in a higher rarity — longer woods, a steadier putter, and a blingier bag for the deep-Ascension grind. Buying one also stops the Pro Shop dangling clubs below your bag's rarity. Current: <b>${currentLabel}</b>. ${hint}`;
-  return marketSection('bags', '🎒', 'Bag &amp; Club Sets', owned, sets.length, blurb, sets.map(bagSetCardHTML).join(''));
+  // A tier at or below the equipped one counts as owned — hidden with Show Owned off.
+  const rack =
+    sets.filter((s) => marketShowOwned || bagTierRank(s.tier) > currentRank).map(bagSetCardHTML).join('') ||
+    '<p class="gs-acc__blurb" style="opacity:.55;">You own every tier here — flip on <b>Show Owned</b> above to browse it.</p>';
+  return marketSection('bags', '🎒', 'Bag &amp; Club Sets', owned, sets.length, blurb, rack);
 }
 
 /** Shared apparel card chrome — the garment art over a rarity-ringed panel with a footer. */
@@ -3321,6 +3346,15 @@ function render(): void {
       const id = el.dataset.toggleSection!;
       if (collapsedMarketSections.has(id)) collapsedMarketSections.delete(id);
       else collapsedMarketSections.add(id);
+      render();
+    });
+  });
+  // Trade Market "Show Owned" toggle: flip whether already-owned gear appears in the racks (view-only).
+  app.querySelectorAll<HTMLElement>('[data-market-showowned]').forEach((el) => {
+    el.addEventListener('click', () => {
+      marketShowOwned = !marketShowOwned;
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });

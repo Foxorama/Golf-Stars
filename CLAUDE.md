@@ -200,7 +200,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   available to buy). ONE reveal predicate per catalogue (`shipRevealedInMarket`/`apparelRevealedInMarket`/
   `bagSetRevealedInMarket`) drives the filter; a section with nothing revealed drops out entirely (Caddy
   Bags before any is earned; club sets before the first gate). Pure display filter — zero sim/rng/save
-  impact; a new secret unlock is a `unlockHoles`/`secret` row, nothing else. The **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
+  impact; a new secret unlock is a `unlockHoles`/`secret` row, nothing else. A **`Show Owned` view toggle**
+  (default OFF, reset on every `openMarket`) drops already-owned gear from every rack so the market lands on
+  what's still buyable; a fully-owned section keeps its `owned/total` header + a "flip Show Owned on" note.
+  The Market also carries a **direct `openClubhouseHall` button** (guarded to also fire from `trademarket`)
+  so a shopper can jump to try gear on without a title round-trip. Both are view-only module state
+  (`marketShowOwned`, like `collapsedMarketSections`) — no save/rng impact, no test-hub hook. The **Clubhouse** (a title-screen section, one screen per golfer) EQUIPS owned gear PER
   character (`shipByCharacter`/`hatByCharacter`/`shirtByCharacter`/`pantsByCharacter`, the last added GS-pants-outfit
   save v11), so each golfer flies its own ride + wears its own look head-to-toe. The per-golfer Clubhouse is a
   **tap-to-restyle stage** (GS-clubhouse-stage): a big full-body avatar (`golferPreviewSVG`, ONE proportional

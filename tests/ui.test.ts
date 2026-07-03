@@ -283,6 +283,14 @@ describe('ui reducer', () => {
     expect(s.run.credits).toBe(60); // base starting credits (no permanent stat upgrades anymore)
   });
 
+  it('the Trade Market can jump straight to the Clubhouse hall (try-it-on shortcut)', () => {
+    let s = initState(7, { shards: 500 });
+    s = reduce(s, { type: 'openMarket' });
+    expect(s.screen).toBe('trademarket');
+    s = reduce(s, { type: 'openClubhouseHall' });
+    expect(s.screen).toBe('clubhouseHall');
+  });
+
   it('a golfer stage can step back to the hall to outfit another (GS-clubhouse-stage)', () => {
     let s = initState(7, { shards: 0 });
     s = reduce(s, { type: 'openClubhouseHall' });
