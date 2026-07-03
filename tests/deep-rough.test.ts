@@ -30,6 +30,7 @@ describe('deep rough (GS-deep-rough)', () => {
         expect(validateCourse(c)).toEqual([]);
         expect(validateFairness(c)).toEqual([]); // deep rough is non-penalty AND off the corridor
         expect(validateCrossings(c)).toEqual([]);
+        expect(validateGreenApproach(c)).toEqual([]); // deep rough never fouls a greenside ring's approach
         for (const h of c.holes) {
           const half = fairwayHalf(h);
           for (const z of h.hazards.filter((x) => x.kind === 'deeprough')) {
@@ -68,6 +69,7 @@ describe('deep rough (GS-deep-rough)', () => {
       const c = generateCourse(s + 42000, { biome: 'tidal-archipelago', holes: 4, wildness: 0.7 });
       expect(validateFairness(c)).toEqual([]); // the corner sea sits off the bent corridor → fair
       expect(validateCourse(c)).toEqual([]);
+      expect(validateGreenApproach(c)).toEqual([]); // corner sea never fouls a greenside ring's approach
       expect(countKind(c.holes, 'deeprough')).toBe(0); // the ocean never uses the land lie
       for (const h of c.holes) {
         if (h.par < 4) continue;
