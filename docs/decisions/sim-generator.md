@@ -167,6 +167,30 @@
     across worlds/seeds, the ember-river + frost-pond no-death-spiral bars (`tests/zones.test.ts`), and
     render-blend still see creek/lavariver bodies. Eyeball a `creek`/`frozenpond`/`lavariver` study set
     (busiest at `wildness 0.9`) after any further tweak.
+  - **Follow-up: VARIABLE crossing placement + character breaks the "every hole is the same shape" read
+    (GS-rivers-2).** Player report: "the enforced fairness layer is what makes the holes keep the exact
+    same shape — vary WHERE the river crosses and whether it's straight/diagonal/winding for more
+    interesting layouts (still fair)." Diagnosis: fairness only constrains the CARRY WINDOW, not where in
+    it the crossing sits — but the generator hard-coded `t = rng.range(0.34, 0.6)` (always the middle
+    third) at a uniform `theta = ±0.55` (always a moderate diagonal), so every water hole read the same.
+    Two changes in `riverChannel`, both fair BY CONSTRUCTION (there is NO retry — `generateCourse` throws
+    on a `validateCrossings`/`validateFairness` failure, so the crossing must be provably valid, not
+    hope-it-passes): (1) **a CHARACTER profile** drawn up front — `character < 0.30` STRAIGHT
+    (near-perpendicular `theta ±0.16`, gentle arms), `< 0.68` DIAGONAL (a real angled carry `theta
+    ±0.34–0.80`), else WINDING (moderate angle, `ampFrac 0.46–0.74` so the ARMS wander hard while the
+    carry itself stays a clean single crossing — the meander is still anchored to 0 across the corridor).
+    (2) **variable POSITION** — the caller now passes a WIDE raw `t = rng.range(0.08, 0.92)` and
+    `riverChannel` clamps it into the fair window `[0.15 + dt, 0.80 − dt]`, where `dt = 2·half /
+    (cos(theta)·arcLen)` is the centreline fraction a band of that thickness+angle spans — so both banks
+    provably stay inside `validateCrossings`' `[0.12, 0.82]` (lay-up room before, green room after) with
+    margin, and the crossing can be an early tee-shot carry, a mid-hole hazard, or a late approach carry.
+    The character params REPLACE the old single `theta`/`ampFrac` draws (net a few more draws, reordered);
+    all still inside the wildness-gated block, so calm/feature-off holes are byte-identical.
+    `GENERATOR_VERSION` 13→14. Full suite green (870): `validateCrossings`/`validateFairness` empty across
+    every world/seed/wildness (the by-construction clamp proven by the suite's generate-or-throw), the
+    death-spiral bars hold. If the clamp is ever loosened, the suite THROWS at generation (its own guard).
+    Eyeballed a 6-wide `creek` + `lavariver` variety sheet: crossings now sit early/mid/late at varied
+    angles + straight/diagonal/winding characters.
 - **Greens span the full vocabulary now (GS-terrain extends GS-greens).** `greenPoly` got FOUR seeded
   harmonics (bigger amplitudes), a low-frequency PEAR/teardrop bias (one end fatter), and 0–2 KIDNEY
   bites — so greens read unmistakably as round/oval/long-shelf/pear/kidney/boomerang/clover, not a gently

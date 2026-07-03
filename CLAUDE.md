@@ -120,8 +120,14 @@ For each system: the rule that constrains new work. Open the archive doc before 
   the off-corridor arms — the mouth swells into its lake, the source narrows to a trickle — and
   `riverTerminals` ends both sides believably (mouth LAKE; source = spring pool / stand of TREES /
   taper-out, all `clearsPlayCorridor`-gated), so a river reads as flowing from a headwater into a sink
-  rather than a band stopping in mid-rough. Shape-only change: same 10 rng draws in `riverChannel`, all
-  new draws inside the wildness-gated river block (calm holes byte-identical); `GENERATOR_VERSION` 13. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
+  rather than a band stopping in mid-rough. **And the crossing itself VARIES (GS-rivers-2)** so holes
+  don't all read the same: a CHARACTER profile (STRAIGHT near-perpendicular / DIAGONAL angled carry /
+  WINDING wandering arms) sets the angle + arm meander, and WHERE it crosses spans the whole hole (an
+  early tee-shot carry → a late approach carry), not just the middle third — the caller passes a wide
+  raw `t` and `riverChannel` CLAMPS it into the fair window `[0.15+dt, 0.8−dt]` (dt = the band's
+  centreline span from angle+thickness), so it's fair BY CONSTRUCTION (generateCourse throws, no
+  retry). All new draws inside the wildness-gated river block (calm holes byte-identical);
+  `GENERATOR_VERSION` 14. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
   hazard spawned on a different substance (trees exempt both ways; crossings always win) — a pure
   ZERO-rng post-filter, so the streams are untouched; SAME-family overlaps are legal and the render
   union-merges them into one body. **An ARMED lost-rough island hole then STRIPS every void-stranded
