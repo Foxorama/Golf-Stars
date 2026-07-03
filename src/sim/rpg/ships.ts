@@ -48,7 +48,8 @@ export interface Ship {
   /** Shard price (0 = free / starter). */
   cost: number;
   /** Earned, never bought (GS-unending): unlocked by surviving this many holes of the Unending
-   *  Universe. A `secret` unlock is hidden from the market entirely until it's owned. */
+   *  Universe. Hidden from the market entirely until owned (GS-hide-unlocks — see
+   *  `shipRevealedInMarket`); `secret` is the same reveal-on-own gate, kept for the hole-150 grail. */
   unlockHoles?: number;
   secret?: boolean;
   look: ShipLook;
@@ -213,4 +214,11 @@ export function shipCatalogue(): Ship[] {
  *  an Unending-Universe unlock (GS-unending) is earned, never bought.) */
 export function canBuyShip(ship: Ship | undefined, shards: number, owned: readonly string[]): boolean {
   return !!ship && !ship.unlockHoles && ship.cost > 0 && shards >= ship.cost && !owned.includes(ship.id);
+}
+
+/** Should this ship appear in the Trade Market at all (GS-hide-unlocks)? An earned unlock (a `secret`
+ *  or `unlockHoles` ride) stays OUT of the rack until it's owned — the market never spoils a reveal.
+ *  Ordinary for-sale ships are always shown. */
+export function shipRevealedInMarket(ship: Ship, owned: readonly string[]): boolean {
+  return !(ship.secret || ship.unlockHoles) || owned.includes(ship.id);
 }
