@@ -115,7 +115,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves carry)
   and sampled from an asymmetric 5-zone `SprayShape`. Forced-carry crossings (lava river / frozen
   pond / creek) are generic penalty bands; the carry-aware AI flies any of them off `penalty`, never
-  the kind. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
+  the kind. **Crossings FLOW like real rivers (GS-rivers):** `riverChannel` holds the full carry width
+  across the corridor (`|s| ≤ 1.2·halfWidth` — `validateCrossings` + difficulty untouched) but TAPERS
+  the off-corridor arms — the mouth swells into its lake, the source narrows to a trickle — and
+  `riverTerminals` ends both sides believably (mouth LAKE; source = spring pool / stand of TREES /
+  taper-out, all `clearsPlayCorridor`-gated), so a river reads as flowing from a headwater into a sink
+  rather than a band stopping in mid-rough. Shape-only change: same 10 rng draws in `riverChannel`, all
+  new draws inside the wildness-gated river block (calm holes byte-identical); `GENERATOR_VERSION` 13. **Hazards never overlap CROSS-family** (GS-hazard-blend): `dedupeHazardOverlaps` drops any
   hazard spawned on a different substance (trees exempt both ways; crossings always win) — a pure
   ZERO-rng post-filter, so the streams are untouched; SAME-family overlaps are legal and the render
   union-merges them into one body. **An ARMED lost-rough island hole then STRIPS every void-stranded

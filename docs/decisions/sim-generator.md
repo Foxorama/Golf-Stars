@@ -146,6 +146,27 @@
   `clearsPlayCorridor` (so it stays a fair, avoidable side-hazard). `crossingBand` is KEPT for the sandy
   `fairwayBreaks` waste band (a clean cross-cut is right there). Re-shoot the gallery and re-run
   `tests/zones.test.ts` after any `riverChannel` change (the diagonal/reach knobs can trip the carryable bars).
+  - **Follow-up: rivers FLOW from a source to a sink, they don't start/stop in mid-rough (GS-rivers).**
+    Player report: "the rivers are all the same shape and just start and stop out of nowhere — they should
+    look and flow like real rivers with different sizes/shapes/directions, starting off-map or hidden in
+    trees and ending in a lake." Two changes, both keeping the CROSSING geometry (and thus
+    `validateCrossings` + difficulty) untouched — the full carry width holds across `|s| ≤ 1.2·halfWidth`
+    and only the OFF-corridor arms change: (1) **`widthAt` now TAPERS** — the +arm (mouth) swells
+    downstream toward its lake, the −arm (source) narrows to a thin trickle (`half·0.24` floor), so the
+    river reads as flowing FROM a headwater instead of a blunt band with two rounded-nose ends (this alone
+    kills most of the "stops out of nowhere"); the meander `ampFrac` was widened (0.26–0.52) for more
+    wander. Pure geometry — `riverChannel` still draws its SAME 10 rng values in the same order (only the
+    shape they describe changed), and it now also returns the `source` point. (2) **`riverTerminals`** gives
+    both ends a believable terminus for variety: the mouth pools into a LAKE (as before), and the source
+    gets — picked from the stream — a small SPRING pool it wells out of, a stand of TREES it emerges from
+    ("out of the woods"; water/frost only — lava has no grove), or nothing (the tapered trickle just peters
+    out). Every added body is gated by `clearsPlayCorridor`, so the pools stay fair penalty side-hazards and
+    the grove (trees are fairness-exempt anyway) is kept off the corridor. `GENERATOR_VERSION` 12→13 (the
+    armed river holes' downstream stream shifts — feature-OFF/calm holes are byte-identical since the whole
+    river block is wildness-gated). All property guards hold: `validateCrossings`/`validateFairness` empty
+    across worlds/seeds, the ember-river + frost-pond no-death-spiral bars (`tests/zones.test.ts`), and
+    render-blend still see creek/lavariver bodies. Eyeball a `creek`/`frozenpond`/`lavariver` study set
+    (busiest at `wildness 0.9`) after any further tweak.
 - **Greens span the full vocabulary now (GS-terrain extends GS-greens).** `greenPoly` got FOUR seeded
   harmonics (bigger amplitudes), a low-frequency PEAR/teardrop bias (one end fatter), and 0–2 KIDNEY
   bites — so greens read unmistakably as round/oval/long-shelf/pear/kidney/boomerang/clover, not a gently
