@@ -1062,6 +1062,82 @@ function styleFescue(poly: Vec[], rng: () => number): Prim[] {
   return out;
 }
 
+/** DEEP ROUGH look per world ARCHETYPE (GS-deep-rough) — a DARK, dense body (deeper than the world's
+ *  fescue/rough so it reads as trouble at a glance) with a themed surface texture: tangled grass
+ *  blades (grassy worlds), packed snow mounds (frost), upright shard splinters (crystal), or
+ *  ember-flecked cinder clumps (inferno). Ocean never uses this (its deep rough is `water`); the
+ *  lost-rough worlds (void/cetus) never arm it — so those three need no row. */
+type DeepRoughMark = 'blade' | 'mound' | 'shard' | 'clump';
+interface DeepRoughLook {
+  base: string;
+  shade: string;
+  ink: string;
+  mark: DeepRoughMark;
+  markCols: [string, string];
+  glow?: string;
+}
+const DEEP_ROUGH: Partial<Record<BiomeArchetype, DeepRoughLook>> = {
+  verdant: { base: '#2c4014', shade: '#1a2a0c', ink: 'rgba(10,20,4,0.5)', mark: 'blade', markCols: ['#3e5a1e', '#597e2c'] },
+  desert: { base: '#5c4a22', shade: '#3f3216', ink: 'rgba(28,20,8,0.5)', mark: 'blade', markCols: ['#7a6330', '#a68a4a'] },
+  // A DARKER shadowed drift so it reads as trouble against the bright snow ground (not just more snow);
+  // white crust mounds ride on top to keep it snow.
+  frost: { base: '#7c9bb4', shade: '#586f8a', ink: 'rgba(40,60,84,0.5)', mark: 'mound', markCols: ['#ffffff', '#cfe0ee'] },
+  inferno: { base: '#3a281e', shade: '#241812', ink: 'rgba(10,6,4,0.55)', mark: 'clump', markCols: ['#4a3226', '#ff7a1e'], glow: 'rgba(255,120,40,0.14)' },
+  crystal: { base: '#2c3652', shade: '#1a2238', ink: 'rgba(12,18,34,0.5)', mark: 'shard', markCols: ['#bfe0ea', '#7fa8c8'], glow: 'rgba(180,220,255,0.12)' },
+  tempest: { base: '#2e3826', shade: '#1c2418', ink: 'rgba(8,14,6,0.5)', mark: 'blade', markCols: ['#3f4e30', '#6f7d58'] },
+  fungal: { base: '#173a28', shade: '#0d2418', ink: 'rgba(4,18,10,0.5)', mark: 'clump', markCols: ['#2f7a54', '#5fd49e'], glow: 'rgba(120,240,180,0.13)' },
+};
+const DEEP_ROUGH_DEFAULT: DeepRoughLook = { base: '#2c4014', shade: '#1a2a0c', ink: 'rgba(10,20,4,0.5)', mark: 'blade', markCols: ['#3e5a1e', '#597e2c'] };
+
+/** Draw one DEEP ROUGH patch (GS-deep-rough), themed per world. Like `styleFescue` the surface-mark
+ *  COUNT scales with the PROJECTED patch size (marks are screen-px strokes), so this MUST run on its
+ *  own per-patch stream (see the call site) — on the shared stream a zoom step would re-roll every
+ *  draw downstream. */
+function styleDeepRough(poly: Vec[], arch: BiomeArchetype, rng: () => number): Prim[] {
+  const look = DEEP_ROUGH[arch] ?? DEEP_ROUGH_DEFAULT;
+  const c = centroidOf(poly);
+  const out: Prim[] = [];
+  if (look.glow) {
+    let r = 0;
+    for (const p of poly) r += dist(p, c);
+    out.push({ t: 'glow', c, r: (r / poly.length) * 1.9, col: look.glow });
+  }
+  out.push(
+    { t: 'poly', pts: poly, fill: look.base },
+    { t: 'poly', pts: scalePoly(poly, c, 0.6), fill: look.shade }, // a deep shadowed core so it reads THICK
+    { t: 'poly', pts: poly, fill: 'none', stroke: look.ink, sw: 1.2 },
+  );
+  const b = bboxOf(poly);
+  const marks = Math.max(8, Math.round((b.maxX - b.minX) * (b.maxY - b.minY) * 0.016));
+  const inner: Prim[] = [];
+  for (let i = 0; i < marks; i++) {
+    const x = b.minX + rng() * (b.maxX - b.minX);
+    const y = b.minY + rng() * (b.maxY - b.minY);
+    const col = rng() < 0.5 ? look.markCols[0] : look.markCols[1];
+    if (look.mark === 'mound') {
+      const w = 2 + rng() * 3;
+      inner.push({ t: 'line', a: [x - w, y], b: [x + w, y - 1], stroke: col, sw: 1.6, round: true });
+    } else if (look.mark === 'shard') {
+      const h = 3 + rng() * 4;
+      inner.push({ t: 'line', a: [x, y], b: [x + (rng() - 0.5) * 1.5, y - h], stroke: col, sw: 1.3, round: true });
+    } else if (look.mark === 'clump') {
+      const rr = 1.2 + rng() * 1.8; // a small squat tuft/cinder mound (a hexish blob, no rng helper needed)
+      const pts: Vec[] = [];
+      for (let a = 0; a < 6; a++) {
+        const ang = (a / 6) * Math.PI * 2;
+        pts.push([x + Math.cos(ang) * rr * (0.8 + rng() * 0.4), y + Math.sin(ang) * rr * (0.8 + rng() * 0.4)]);
+      }
+      inner.push({ t: 'poly', pts, fill: col });
+    } else {
+      const h = 3.5 + rng() * 4.5; // tall tangled blade
+      const lean = (rng() - 0.5) * 2.6;
+      inner.push({ t: 'line', a: [x, y], b: [x + lean, y - h], stroke: col, sw: 1.1, round: true });
+    }
+  }
+  out.push({ t: 'clip', clip: poly, children: inner });
+  return out;
+}
+
 /** Dry RAVINE / barranca (GS-hazards-2): a dark rocky chasm — a shaded gorge floor with a couple of
  *  jagged crack lines and a lit rim, so it reads as a gash in the ground rather than a flat patch. */
 function styleRavine(poly: Vec[], rng: () => number): Prim[] {
@@ -3647,11 +3723,13 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const sandPolys: Vec[][] = merged.sand.map((p) => projPoly(p, proj));
   const treeHaz: Feature[] = [];
   const fescueHaz: Feature[] = [];
+  const deepRoughHaz: Feature[] = [];
   const ravineHaz: Feature[] = [];
   const scatterHaz: Feature[] = [];
   for (const f of hole.hazards) {
     if (f.kind === 'trees') treeHaz.push(f);
     else if (f.kind === 'fescue') fescueHaz.push(f);
+    else if (f.kind === 'deeprough') deepRoughHaz.push(f);
     else if (f.kind === 'barranca') ravineHaz.push(f);
     else if (!WATER_KINDS.has(f.kind) && !LAVA_KINDS.has(f.kind) && f.kind !== 'bunker' && f.kind !== 'waste' && f.kind !== 'sand' && f.kind !== 'pot') scatterHaz.push(f);
   }
@@ -3667,6 +3745,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       return mulberry32((hashHole(hole) ^ Math.floor(posHash(c[0], c[1]) * 0xffffffff)) >>> 0);
     };
     for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), patchRng(f.poly)));
+    // Deep rough (GS-deep-rough) rides the same per-patch stream as fescue (its mark count is
+    // screen-px-sized), themed per world archetype so the tangle suits the biome.
+    for (const f of deepRoughHaz) prims.push(...styleDeepRough(projPoly(f.poly, proj), arch, patchRng(f.poly)));
     for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
   }
   prims.push(...styleSandFamily(sandPolys, art, proj.scale));

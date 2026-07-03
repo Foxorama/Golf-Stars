@@ -138,7 +138,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   the OB trigger — don't shrink it casually). **Variety is DECOUPLED from difficulty (GS-variety-2):** shape archetypes
   (cape/hairpin/double) and dogleg-corner blocking GROVES appear even on CALM stops (no wildness gate)
   — difficulty rides bend severity (`dogFac = 0.5 + 0.5·wildness`) + hazard density, not which shapes
-  exist. Corridors can be BROKEN into 2–3 mown segments by rough gaps (`brokenCorridor`, biome
+  exist. **DEEP ROUGH (GS-deep-rough)** chokes the INSIDE of a dogleg's cut-the-corner chord (same walk
+  as the groves, but a GROUND hazard a lofted bomb can't clear): land worlds fill it with the new
+  `deeprough` lie (carry 0.5, the deepest recoverable land lie — cutting the corner GAINS NOTHING), the
+  OCEAN world with `water` (the sea laps the sandy shore → a penalty carry). Opt-in per biome via
+  `deepRough`; the lost-rough worlds (void/cetus) don't set it (untouched). Fair by construction —
+  placed far from the BENT corridor even though it's on the straight chord (`polylineDist ≥
+  fairwayHalfWidth + 22`), so the fairway route stays clean and penalty water passes `validateFairness`;
+  wildness-gated (`DEEP_ROUGH_MIN_WILDNESS = 0.3`, above the stop-0 ceiling → forgiving opener) and
+  ZERO-rng on a straight hole (the off-corridor reject fires first). Balance holds (the auto-AI plays
+  the fairway, not the cut). Render is per-archetype (`style.ts DEEP_ROUGH`/`styleDeepRough`). Corridors
+  can be BROKEN into 2–3 mown segments by rough gaps (`brokenCorridor`, biome
   `roughBreaks`; skipped on lost-rough worlds where a gap = the abyss). A hole gets a forced-carry
   CROSSING **or** greenside DRAMA, never both: greenside penalty RINGS (`sanctioned:true` on Feature,
   exempt from `validateFairness`, proven by `validateGreenApproach` — kept off the approach window +

@@ -94,6 +94,7 @@ const SURFACE_ROLL: Record<string, number> = {
   bunker: 0.2,
   pot: 0.12, // deep pot — plugs almost dead
   fescue: 0.3, // thick native grass grabs harder than ordinary rough
+  deeprough: 0.2, // deepest tangle — grabs the ball almost dead (GS-deep-rough)
   trees: 0.25, // knocked into the woods → drops nearly dead, barely trickles
   ice: 1.8,
   crystal: 1.1,
@@ -110,6 +111,7 @@ export const SURFACE_FIRMNESS: Record<string, number> = {
   bunker: 0.12,
   pot: 0.08,
   fescue: 0.22,
+  deeprough: 0.14, // deep tangle — plops dead, no skip (GS-deep-rough)
   trees: 0.15,
   ice: 1.0,
   crystal: 0.95,

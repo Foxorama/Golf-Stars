@@ -85,6 +85,16 @@ export interface Biome {
   lostRough?: string;
   lavaRiver?: boolean;
   frozenPond?: boolean;
+  /**
+   * DEEP ROUGH (GS-deep-rough) — the lie kind that fills the INSIDE of a dogleg's cut-the-corner line
+   * so a player can't just fire straight over the bend at the pin; they must play down the fairway.
+   * Names a LIE_INFO kind: land worlds set `'deeprough'` (a punishing non-penalty hack-out, themed per
+   * world in the render layer); the OCEAN world sets `'water'` — its deep rough is the sea lapping the
+   * sandy shore, a real penalty carry. Off-corridor by construction (the fairway route stays clean),
+   * wildness-gated (fair early → brutal late). The lost-rough worlds (void/cetus) DON'T set it — off
+   * their fairway is already the abyss, so they're untouched.
+   */
+  deepRough?: string;
   /** Impact-crater bunkers per hole (base, scaled by wildness). Sand → always fair. */
   craters?: number;
   /**
@@ -139,6 +149,7 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 2.6, // lush, densely tree-lined parkland — real forest down both sides
     fairwayBunkers: 1.5,
     waterCreek: true, // signature: a creek crosses the fairway (forced carry)
+    deepRough: 'deeprough', // hay-thick tangle guards the inside of the doglegs
     ponds: 1.2, // big parkland lakes flank the landing zones
     fairwayBreaks: 0.7, // the odd sandy waste break across the fairway
     potBunkers: 0.8, // links-style pot bunkers pinch the landing zones
@@ -165,6 +176,7 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0.2, // sparse desert scrub
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
     craters: 2.2, // signature: impact-crater bunkers pock the landing zones
+    deepRough: 'deeprough', // deep waste dune-scrub swallows a cut corner
     fairwayBreaks: 1.0, // sandbelt waste areas slash across the fairway
     potBunkers: 0.6, // deep desert pots dot the landing zones
     fescue: 0.8, // dune-grass fescue chokes the deep waste
@@ -191,6 +203,7 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 1.3, // frosted pines ring the fairways more thickly
     fairwayBunkers: 1,
     frozenPond: true, // signature: a meltwater channel crosses the fairway (forced carry)
+    deepRough: 'deeprough', // deep wind-packed snowdrift buries a cut corner
     ponds: 1.0, // frozen lakes flank the landing zones
     potBunkers: 0.6, // frozen-faced pot bunkers ring the ice greens
     fescue: 0.5, // frosted tussock grass in the deep rough
@@ -216,6 +229,7 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0.55, // charred snags, a little denser
     fairwayBunkers: 1.2,
     lavaRiver: true, // signature: molten rivers cross the fairway (forced carry)
+    deepRough: 'deeprough', // deep cinder-ash brush chokes a cut corner
     fairwayBreaks: 0.4, // scorched waste cuts across the odd fairway
     potBunkers: 0.3, // the odd cinder pot near the green
     greenSize: 0.95, // jagged, broken basalt greens
@@ -262,6 +276,7 @@ export const BIOMES: readonly Biome[] = [
     scatter: [{ kind: 'crystal', freqPerHole: 2.6, rMin: 6, rMax: 13 }],
     fairwayWidthMult: 1.0,
     doglegBias: 0.4,
+    deepRough: 'deeprough', // a dense shard-thicket walls off a cut corner
     treeDensity: 0.3, // a few crystalline spires line the rough
     fairwayBunkers: 1.0,
     potBunkers: 0.5,
@@ -282,6 +297,7 @@ export const BIOMES: readonly Biome[] = [
     hazardKinds: ['water'],
     greensideKind: 'bunker',
     scatter: [],
+    deepRough: 'deeprough', // deep storm-flattened moor grass grabs a cut corner
     fairwayWidthMult: 1.05, // a touch wider to keep the gale fair
     doglegBias: 0.3,
     treeDensity: 0.4, // wind-bent scrub
@@ -307,6 +323,7 @@ export const BIOMES: readonly Biome[] = [
     fairwayWidthMult: 0.95, // tight jungle corridors
     doglegBias: 0.45,
     treeDensity: 2.9, // signature: the DENSEST groves — luminous mushroom stands wall the fairways
+    deepRough: 'deeprough', // deep glowing undergrowth swallows a cut corner
     fairwayBunkers: 0.9,
     fescue: 1.2, // glowing undergrowth chokes the deep rough
     waterCreek: true, // jungle streams cross the fairway
@@ -333,6 +350,9 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 2.0, // beaches everywhere
     potBunkers: 0.4,
     waterCreek: true, // signature: a sea channel crosses the fairway (forced carry)
+    // Signature deep rough: the OCEAN itself — the sea laps the sandy shore of the rough, so cutting
+    // the corner of a dogleg means carrying open water (a real penalty, not a hack-out).
+    deepRough: 'water',
     ponds: 1.8, // lagoons flank the corridors — an offline shot is wet
     greenSize: 1.0,
     greenAspect: 1.7,

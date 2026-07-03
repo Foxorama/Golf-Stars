@@ -333,6 +333,13 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // and the woods — heavier carry tax + wilder than ordinary rough, recoverable (you hack it out, you
   // never lose a stroke). Fills the deep rough on links/parkland/desert worlds.
   fescue: { carryMult: 0.72, dispersionMult: 1.55, label: 'Fescue' },
+  // DEEP ROUGH (GS-deep-rough): the deepest recoverable land lie — a hay-thick tangle that fills the
+  // INSIDE of a dogleg's cut-the-corner line so firing straight at the pin over the bend is punished
+  // (you can hack out but barely advance, and it sprays), forcing play down the fairway. Deeper than
+  // fescue but still NON-penalty (a hack-out, never a lost card); off the corridor, so the fairway
+  // route stays clean. Themed per world in the render layer; the OCEAN world uses `water` instead
+  // (its "deep rough" is the sea lapping the sandy shore — a real penalty carry).
+  deeprough: { carryMult: 0.5, dispersionMult: 1.7, label: 'Deep rough' },
   // Trees are a tough non-penalty LIE, not a mid-flight collision: a sprayed ball ends up
   // "in the woods" and has to punch out (short carry, wild line) — fair and readable, since
   // only an offline shot finds them. NOT a penalty, so they may line the corridor edge.
@@ -472,6 +479,7 @@ const SURFACE_PRIORITY: Record<string, number> = {
   crystal: 3,
   waste: 3,
   fescue: 3, // thick native rough reads over plain fairway/rough it overlaps
+  deeprough: 3, // deep rough reads over plain fairway/rough it overlaps (GS-deep-rough)
   fairway: 2,
 };
 
