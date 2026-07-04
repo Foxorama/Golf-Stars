@@ -985,6 +985,13 @@ let selPutt = false;
 let selPuttAim: number | null = null;
 let puttAimResolved = 0; // the aim (yd) shown this render — read by the commit handler so they match
 let lastPuttKey = ''; // `${holeIndex}:${putts}` — resets the aim for each new putt
+// Aim-nudge feel (GS-putt-feel): the ◄/► step + clamp scale with the putt (set each putt render), so a
+// long, big-breaking putt is reachable and not 30 taps to dial in. Consecutive quick taps accelerate
+// (streak below); press-and-hold auto-repeats (wired on the buttons).
+let puttAimStep = 0.4; // base yd per tap for this putt (grows with distance, ≤1yd)
+let puttAimMax = 12; // ± clamp for this putt (grows with the break to read)
+let puttAimLastTapMs = 0;
+let puttAimStreak = 0;
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
 
 /** The aim readout inside the break-read row — split out so an aim nudge can update JUST this span
@@ -1035,11 +1042,6 @@ let decisionRadius: number | null = null;
 // so the strike→watch cut keeps the exact green zoom instead of popping out to a fixed radius (the
 // "weird zoom on the green" bug). Fixed per putt (aim-nudge-independent) so the camera holds still.
 let puttViewRadius: number | null = null;
-// Aim-nudge tuning for the CURRENT putt (set on each putt render). The ◄/► step scales with the read
-// so a big borrow doesn't take 30 taps, and the clamp always reaches past the ideal line — a steep
-// long putt used to need more aim than the old hard ±12yd window allowed (unmakeable by UI).
-let puttAimStep = 0.4;
-let puttAimMax = 12;
 // Surgical refresh for aim nudges: redraws the putt map SVG + the aim readout IN PLACE, without a
 // full render() — a full render remounts the pace meter (resetting its sweep) on every tap, which
 // made reading a long break slow and painful. Assigned by the putt branch; buttons call it.
@@ -1683,10 +1685,17 @@ function playingBody(animating: boolean): string {
     const puttLen = v.distToPin;
     const puttReadRange = puttSkillOf(state.run.loadout).puttRange ?? DEFAULT_PUTT_RANGE;
     const puttReadFrac = reads ? 1 : Math.min(1, puttReadRange / Math.max(1e-3, puttLen));
+    // Aim range/step scaled to THIS putt so a long, big-breaking putt is reachable and quick to dial in
+    // (a fixed ±12 clamp / 0.4-yd step made a long sidehiller impossible AND painfully slow). The clamp
+    // comfortably exceeds the break you'd need to cancel (floored at the old ±12); the step covers the
+    // range in ~a dozen taps but stays ≤1yd so a single tap is still precise (the cup's HOLE_OUT_RADIUS
+    // 1.2yd is the bar) — press-and-hold / tap bursts carry the long hauls.
+    puttAimMax = Math.max(12, Math.abs(ideal) * 1.6 + 4);
+    puttAimStep = Math.max(0.4, Math.min(1, puttAimMax / 14));
     // Frame the putt to cover the ball↔cup span PLUS the break's lateral swing — on a steep green the
-    // curved line used to bow outside the old distance-only radius. Keyed to breakYd (aim-independent)
-    // so the zoom holds perfectly still while the player nudges the read.
-    const puttRadius = Math.max(9, v.distToPin * 0.62 + Math.min(14, Math.abs(breakYd)) * 0.6);
+    // curved line used to bow outside a distance-only radius. Keyed to breakYd (aim-INDEPENDENT) so the
+    // zoom holds perfectly still while the player nudges the read.
+    const puttRadius = Math.max(5.5, v.distToPin * 0.6 + 3 + Math.min(14, Math.abs(breakYd)) * 0.6);
     puttViewRadius = puttRadius;
     const buildPuttSvg = (aim: number) => renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
@@ -1700,7 +1709,9 @@ function playingBody(animating: boolean): string {
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
-      // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin.
+      // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin. A lower
+      // floor lets a SHORT putt actually zoom in (the old flat 9-yd floor left a tap-in tiny in a big
+      // view); the +3 keeps a little green around the cup so the break/hole read has context.
       focus: puttMid,
       viewRadius: puttRadius,
       focusBias: 0.5,
@@ -1710,12 +1721,6 @@ function playingBody(animating: boolean): string {
       puttReadFrac,
     });
     const puttSvg = buildPuttSvg(puttAim);
-    // Aim-nudge tuning: the step scales with the read (≈8 taps from straight to the ideal borrow,
-    // floored at the old fine 0.4yd, capped at 1yd — the cup's HOLE_OUT_RADIUS keeps that precise
-    // enough), and the clamp always reaches comfortably past the ideal line so a steep long putt is
-    // never unmakeable because the UI ran out of aim.
-    puttAimStep = Math.max(0.4, Math.min(1, Math.abs(ideal) / 8));
-    puttAimMax = Math.max(12, Math.ceil(Math.abs(ideal) * 1.6));
     // Nudging the aim redraws the map + readout IN PLACE (never a full render(), which would remount
     // the pace meter and reset its sweep). Only the SVG child is swapped — the weather canvas mounted
     // over the same .gs-bigmap survives.
@@ -3966,8 +3971,15 @@ function render(): void {
         held = false;
         return;
       }
+      // Tap acceleration: consecutive quick taps the SAME way ramp the step up (to ~5×), so a burst
+      // of taps covers a long read fast while single taps stay precise (press-and-hold also repeats).
+      const now = performance.now();
+      if (now - puttAimLastTapMs < 380 && Math.sign(dir) === Math.sign(puttAimStreak || dir)) puttAimStreak += dir;
+      else puttAimStreak = dir;
+      puttAimLastTapMs = now;
+      const accel = Math.min(5, 1 + (Math.abs(puttAimStreak) - 1) * 0.7);
       sfx.click();
-      apply();
+      apply(accel);
     });
   });
   // Fringe/apron (GS-fringe-putt): toggle between the putt meter (⛳) and the normal chip gesture (🏌).

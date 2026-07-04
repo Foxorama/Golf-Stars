@@ -702,25 +702,24 @@ function styleGreen(
       ],
     });
     // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
-    // reads with a FINER, denser grid of arrows so the tilt's severity is legible at a glance — a gentle
-    // green keeps the classic two, a full-tilt green fills a 3-wide × up-to-3-deep fall-line grid. Pure
-    // geometry off the deterministic slope magnitude (camera-proof: a fixed count for a given mag).
+    // reads with a slightly denser cluster so the tilt's severity is legible — a gentle green keeps the
+    // classic pair, a full-tilt green a small 3×2 grid. Sizes are span-proportional but CAPPED IN PX:
+    // prims live in SCREEN space, so uncapped span-fraction chevrons ballooned into bold lines stretched
+    // clear across the green at the putt zoom (the "overpowering angle lines" bug) — while a too-small
+    // cap (#247's 3.4, believed to be course-yards) went near-invisible at putt zoom AND shrank the
+    // classic map-zoom pair. These caps never bind at map zoom (a whole-hole green is smaller than them
+    // → the classic look) and hold the glyphs modest-but-legible at green zoom. Pure geometry off the
+    // deterministic slope magnitude (camera-proof: fixed count per mag; sizes may read the projection).
     const perp: Vec = [-slope.dir[1], slope.dir[0]];
     const arrows: Prim[] = [];
     const steep = Math.max(0, Math.min(1, (slope.mag - 0.15) / 0.5)); // 0 gentle → 1 full tilt
-    const cols = 2 + Math.round(steep * 1); // 2 or 3 across
-    const rows = 1 + Math.round(steep * 2); // 1..3 down the fall line
-    // Arrow sizes are CAPPED IN PX, not purely span-proportional: prims live in screen space, so on
-    // the tight putt zoom the green spans hundreds of px and span-scaled chevrons ballooned into bold
-    // lines stretched across the whole green (the GS-putt-depth "overpowering angle lines" bug). The
-    // caps never bind at map zoom (a whole-hole green is far smaller than them), so the decision map
-    // is unchanged; at green zoom the grid stays a modest centred glyph. Count is still fixed per mag
-    // (camera-proof); sizes reading the projection is fine — pure geometry, zero rng.
-    const colGap = Math.min(span * 0.17, 30);
-    const rowGap = Math.min(span * 0.24, 42);
-    const len = Math.min(span * (0.3 - steep * 0.08), 34); // finer (shorter) arrows as they get denser
-    const head = Math.max(3, len * 0.2);
-    const col = `rgba(255,255,255,${(0.3 + steep * 0.14).toFixed(3)})`;
+    const cols = 2 + Math.round(steep); // 2 or 3 across
+    const rows = 1 + Math.round(steep); // 1 or 2 down the fall line
+    const len = Math.min(span * (0.3 - steep * 0.08), 30); // finer (shorter) arrows as they get denser
+    const colGap = Math.min(span * 0.17, 26);
+    const rowGap = Math.min(span * 0.24, 38);
+    const head = Math.max(2.1, len * 0.2);
+    const col = `rgba(255,255,255,${(0.3 + steep * 0.12).toFixed(3)})`; // subtle: never bold/overpowering
     for (let r = 0; r < rows; r++) {
       const roff = (r - (rows - 1) / 2) * rowGap;
       for (let ci = 0; ci < cols; ci++) {
@@ -730,9 +729,9 @@ function styleGreen(
           c[1] + perp[1] * coff - slope.dir[1] * (len * 0.5 + roff),
         ];
         const tip: Vec = [base[0] + slope.dir[0] * len, base[1] + slope.dir[1] * len];
-        arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.4, round: true });
-        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head + perp[0] * (head * 0.75), tip[1] - slope.dir[1] * head + perp[1] * (head * 0.75)], stroke: col, sw: 1.4, round: true });
-        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head - perp[0] * (head * 0.75), tip[1] - slope.dir[1] * head - perp[1] * (head * 0.75)], stroke: col, sw: 1.4, round: true });
+        arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.1, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head + perp[0] * (head * 0.7), tip[1] - slope.dir[1] * head + perp[1] * (head * 0.7)], stroke: col, sw: 1.1, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head - perp[0] * (head * 0.7), tip[1] - slope.dir[1] * head - perp[1] * (head * 0.7)], stroke: col, sw: 1.1, round: true });
       }
     }
     out.push({ t: 'clip', clip: poly, children: arrows });

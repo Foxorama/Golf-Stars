@@ -367,7 +367,8 @@ For each system: the rule that constrains new work. Open the archive doc before 
   (`puttViewRadius`, the `decisionRadius` pattern) so strike→watch never pops zoom, and the frame pads
   for the break's lateral bow off `breakYd` (aim-INDEPENDENT — the camera holds still while nudging).
   The ◄/► aim is per-putt scaled (`puttAimStep`/`puttAimMax` — the clamp always reaches past the ideal
-  borrow, so no putt is UI-unmakeable) with press-and-hold auto-repeat, and nudges update SURGICALLY
+  borrow, so no putt is UI-unmakeable) with press-and-hold auto-repeat + quick-tap streak acceleration,
+  and nudges update SURGICALLY
   (`puttAimRefresh` swaps the map SVG + label in place — a full `render()` remounts the pace meter and
   resets its sweep mid-aim).
 - **Render layer** (`docs/decisions/render.md`). ONE pure projector (`render/project.ts`) both
