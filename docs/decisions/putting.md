@@ -83,20 +83,42 @@ untouched — it never reads slope or range).
   guards the factor curve, the range-upgrade → more-long-makes claim, the within-range byte-equality, and the
   wildness → steeper-greens statistic.
 
-### Feel fixes after first play-test (GS-putt-depth)
-The first build shipped the mechanics but three things read wrong in the hand — all render/UX, zero sim
-change (every seeded test byte-identical):
-- **The fall-line arrows overpowered the green.** They were sized as a FRACTION of the green's course-space
-  span (`len = span·0.3`), so on a big green they became bold lines stretching clear across the putt-zoom
-  view. Now they're SMALL glyphs capped in ABSOLUTE course-yards (`len = min(span·0.16, 3.4)`, gaps capped
-  likewise), thinner (`sw 1.1`) and fainter (opacity `0.3 + steep·0.12`, was up to 0.64) — a compact
-  fall-line marker that reads at any zoom, denser only by a row/col on the steepest greens.
-- **Long, big-breaking putts weren't reachable.** The aim nudge was clamped to ±12 yd with a flat 0.4-yd
-  step — a long sidehiller needed more break than that to cancel, and dialing it was ~30 taps. The clamp +
-  step now scale with the putt (`puttAimMax = max(8, |ideal|·1.6 + 4)`, `step = max(0.4, max/14)`), and
-  consecutive quick taps ACCELERATE (up to ~5×, `performance.now` in the side-effect layer) so a burst
-  covers the range fast while single taps stay precise.
-- **Short putts framed weird.** The putt camera had a flat 9-yд `viewRadius` floor, so a tap-in sat tiny in
-  a big view. Lowered to `max(5.5, dist·0.6 + 3)` so a short putt actually zooms in (with a little green
-  around the cup for context) while long putts are unchanged.
+## Putt FEEL fixes — the GS-putt-depth fallout (GS-putt-feel, PRs #247 + #248 merged)
+Play-test feedback on the putting-depth build: "weird zoom things on the green", fall-line arrows "bold
+and stretch all across the green", long putts "not makeable because you can't adjust the line far
+enough", and adjusting the line "really slow and painful". TWO sessions fixed it in parallel — #247
+(the GS-putt-depth author) and #248 — and the merge keeps the best of both. All render/UX, zero sim/rng
+change (every seeded test byte-identical). The final state:
+
+- **Fall-line arrows are PX-CAPPED, modest-but-legible.** The grid was sized purely off the green's
+  PROJECTED span — prims live in SCREEN space, so at putt zoom (green ≈ 500px) the arrows were 100px+
+  bold lines stretched across the whole green, centred on the green's CENTROID (which is why a short
+  putt framed near the pin didn't show them — "no impact on sub-5yd putts"). #247 capped them at 3.4
+  believing prims were course-yards — that's 3.4 PX: near-invisible at putt zoom and it shrank the
+  classic map-zoom pair too. Merged tuning: `len = min(span·(0.3−steep·0.08), 30)`, gaps capped 26/38px,
+  `sw 1.1`, alpha `0.3 + steep·0.12`, grid 2–3 × 1–2 (#247's smaller counts). The caps never bind at map
+  zoom (classic look intact); at green zoom the grid reads as a compact fall-line marker. Count still
+  fixed per mag (camera-proof); sizes reading the projection is fine — pure geometry, zero rng.
+- **The zoom holds still and follows through.** Framing: `max(5.5, d·0.6 + 3 + min(14,|breakYd|)·0.6)` —
+  #247's lower floor lets a tap-in actually zoom in; #248's break pad keeps a steep green's curved line
+  in frame, keyed to `breakYd` (NOT the live aim) so the camera never moves while nudging. And the putt
+  watch-cam now reuses the putt screen's exact framing (`puttViewRadius`, module state on the
+  `decisionRadius` pattern, reset with it on hole change) — putt-only animations ran at a FIXED
+  viewRadius 25, so every stroke popped the camera out and back (the "weird zoom things").
+- **The aim clamp scales with the read.** The old hard ±12yd couldn't cancel a steep long putt's break —
+  unmakeable BY UI. Merged: `puttAimMax = max(12, |ideal|·1.6 + 4)` (always comfortably past the ideal
+  borrow; flat/short putts keep the old ±12), `puttAimStep = max(0.4, min(1, puttAimMax/14))` — the step
+  stays ≤1yd so a single tap is precise against the cup's `HOLE_OUT_RADIUS` 1.2yd.
+- **Aiming is fast, three ways.** (1) Consecutive quick taps the same way ACCELERATE up to ~5×
+  (`puttAimStreak`, `performance.now` in the side-effect layer — #247); (2) ◄/► PRESS-AND-HOLD
+  auto-repeats (330ms delay, 80ms ticks, 2× after ~1s; pointer-captured so a drifting finger keeps
+  repeating; the click that ends a hold is swallowed — #248); (3) every nudge is SURGICAL —
+  `puttAimRefresh` swaps the map `<svg>` (`outerHTML`, so the weather canvas over the same `.gs-bigmap`
+  survives) and the `#puttaimlabel` span in place (`puttAimLabel` is split out of `puttAimRow` for
+  this). The old handler called full `render()` per tap, which REMOUNTED the pace meter and reset its
+  sweep — that, plus flat 0.4yd taps, was the "slow and painful".
+- **Verified eyes-on**: `scripts/putt-preview.mjs` + `scripts/gallery.mjs` re-shot (arrows modest at
+  putt zoom, map zoom unchanged), plus a real-browser drive (build → play to a green → tap/hold the
+  aim → commit): label updates without a meter remount, hold moved the aim 5.6yd in 1.4s, no page
+  errors. Zero sim/rng changes — the full 921-test suite is byte-identical-green.
 

@@ -703,19 +703,22 @@ function styleGreen(
     });
     // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
     // reads with a slightly denser cluster so the tilt's severity is legible — a gentle green keeps the
-    // classic pair, a full-tilt green a small 3×2 grid. The glyphs are SMALL and capped in ABSOLUTE
-    // course-yards (NOT a fraction of the green span) so they read as a compact fall-line marker at any
-    // zoom — a span-fraction length ballooned into bold lines that stretched clear across the green at the
-    // putt zoom. Pure geometry off the deterministic slope magnitude (camera-proof: fixed count per mag).
+    // classic pair, a full-tilt green a small 3×2 grid. Sizes are span-proportional but CAPPED IN PX:
+    // prims live in SCREEN space, so uncapped span-fraction chevrons ballooned into bold lines stretched
+    // clear across the green at the putt zoom (the "overpowering angle lines" bug) — while a too-small
+    // cap (#247's 3.4, believed to be course-yards) went near-invisible at putt zoom AND shrank the
+    // classic map-zoom pair. These caps never bind at map zoom (a whole-hole green is smaller than them
+    // → the classic look) and hold the glyphs modest-but-legible at green zoom. Pure geometry off the
+    // deterministic slope magnitude (camera-proof: fixed count per mag; sizes may read the projection).
     const perp: Vec = [-slope.dir[1], slope.dir[0]];
     const arrows: Prim[] = [];
     const steep = Math.max(0, Math.min(1, (slope.mag - 0.15) / 0.5)); // 0 gentle → 1 full tilt
     const cols = 2 + Math.round(steep); // 2 or 3 across
     const rows = 1 + Math.round(steep); // 1 or 2 down the fall line
-    const len = Math.min(span * 0.16, 3.4); // capped small — a glyph, not a line across the green
-    const colGap = Math.min(span * 0.16, 3.6);
-    const rowGap = Math.min(span * 0.22, 4.6);
-    const head = 2.1;
+    const len = Math.min(span * (0.3 - steep * 0.08), 30); // finer (shorter) arrows as they get denser
+    const colGap = Math.min(span * 0.17, 26);
+    const rowGap = Math.min(span * 0.24, 38);
+    const head = Math.max(2.1, len * 0.2);
     const col = `rgba(255,255,255,${(0.3 + steep * 0.12).toFixed(3)})`; // subtle: never bold/overpowering
     for (let r = 0; r < rows; r++) {
       const roff = (r - (rows - 1) / 2) * rowGap;
