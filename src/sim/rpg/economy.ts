@@ -9,7 +9,7 @@
 import { CLUBS, clubById, type Club } from '../clubs';
 import type { Rarity } from '../course/contract';
 import { combineShapeMods, type CaddyGuard, type ShapeMod } from '../shot';
-import { DEFAULT_MANUAL_BAND } from '../round';
+import { DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE } from '../round';
 import { RARITY_C } from './loot';
 
 export const HOLES_PER_STOP = 6;
@@ -1021,7 +1021,7 @@ export function canBuy(item: ShopItem, owned: number, credits: number): boolean 
  */
 export function puttSkillOf(
   loadout: PlayerLoadout,
-): { makeChance?: number; lagFrac?: number; lagSd?: number; manualBand?: number } {
+): { makeChance?: number; lagFrac?: number; lagSd?: number; manualBand?: number; puttRange?: number } {
   const boost = loadout.puttBoost ?? 0;
   const caddie = loadout.perks.includes('auto-caddie');
   if (boost === 0 && !caddie) return {};
@@ -1032,6 +1032,9 @@ export function puttSkillOf(
     lagFrac: Math.max(0.03, 0.07 - b * 0.035),
     lagSd: Math.max(0.02, 0.05 - b * 0.03),
     manualBand: Math.min(0.4, DEFAULT_MANUAL_BAND + b * 0.18),
+    // GS-putt-depth: a better putter READS and HOLES from further — its confident range extends with
+    // the boost, so the make band stays wide (and the break line stays solid) deeper into a long putt.
+    puttRange: DEFAULT_PUTT_RANGE + Math.min(0.7, b) * 12,
   };
 }
 

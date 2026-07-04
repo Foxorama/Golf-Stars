@@ -511,12 +511,31 @@ export interface PuttSkill {
   /** MANUAL putting only: half-width of the pace-meter "make" band, as a pace fraction (default
    *  DEFAULT_MANUAL_BAND). Wider = more forgiving timing window. Putter upgrades raise it. */
   manualBand?: number;
+  /** MANUAL putting only (GS-putt-depth): the putter's confident RANGE (yards). Inside it the make
+   *  band is full; beyond it the band shrinks with distance (a long putt is a nervier stroke), so a
+   *  better putter — which reads and holes from further — is a real upgrade. Default DEFAULT_PUTT_RANGE. */
+  puttRange?: number;
 }
 
 /** Manual-putt pace-meter tuning (shared by the resolver and the on-screen meter so they agree). */
 export const MANUAL_IDEAL_PACE = 1.06; // perfect pace: firm enough to reach the cup and drop just past
 export const MANUAL_PACE_MAX = 1.7; // top of the meter (a bold, runs-well-past stroke)
 export const DEFAULT_MANUAL_BAND = 0.13; // base make-band half-width (pace fraction)
+
+// GS-putt-depth — the make band SHRINKS with distance past the putter's confident range, so a long
+// putt has a nervier timing window than a tap-in and a better putter (bigger `puttRange`) genuinely
+// holes more from distance. Inside the range the factor is 1 (byte-for-byte the old flat band).
+export const DEFAULT_PUTT_RANGE = 6.5; // base putter's confident range (yards) — full band within it
+const PUTT_BAND_DECAY = 0.085; // how fast the band tightens per yard beyond the range
+const PUTT_BAND_FLOOR = 0.32; // the band never shrinks below this fraction of its full width
+
+/** The make-band multiplier at putt length `d` for a putter of confident range `range` (GS-putt-depth):
+ *  1 within the range, then a smooth reciprocal taper to `PUTT_BAND_FLOOR` beyond it. Pure. Shared by
+ *  the resolver and the on-screen meter so the drawn MAKE band is exactly the one you must hit. */
+export function puttBandDistanceFactor(d: number, range = DEFAULT_PUTT_RANGE): number {
+  const over = Math.max(0, d - range);
+  return Math.max(PUTT_BAND_FLOOR, 1 / (1 + over * PUTT_BAND_DECAY));
+}
 
 /** The player's manual-putt input from the pace meter. */
 export interface PuttControl {
@@ -598,6 +617,10 @@ export function manualPutt(
 ): PuttLog {
   const d = dist(from, pinPt) || 1e-6;
   const band = skill.manualBand ?? DEFAULT_MANUAL_BAND;
+  // GS-putt-depth: the pace make-band tightens once the putt is past the putter's confident range —
+  // a long putt is a nervier stroke, and a better putter (bigger range) holds a full band further out.
+  // Within the range the factor is 1, so a tap-in / short putt is byte-for-byte the old flat band.
+  const effBand = band * puttBandDistanceFactor(d, skill.puttRange ?? DEFAULT_PUTT_RANGE);
   const pace = Math.max(0, control.pace);
   const aim = control.aim ?? 0; // lateral aim at the cup (yd, + = right) — the player's break read
   const paceErr = pace - MANUAL_IDEAL_PACE; // <0 short, >0 long (in pace units)
@@ -605,7 +628,9 @@ export function manualPutt(
   const ux = (pinPt[0] - from[0]) / d;
   const uy = (pinPt[1] - from[1]) / d;
   const rperp: Vec = [-uy, ux];
-  // Skill 0..1: a better putter (bigger band) wobbles less off-line.
+  // Skill 0..1: a better putter (bigger band) wobbles less off-line. Keyed to the putter's INHERENT
+  // band, not the distance-shrunk one, so the lateral skill is a property of the flat-stick (the
+  // distance penalty lives entirely in the pace window above).
   const skillF = clamp01((band - DEFAULT_MANUAL_BAND) / 0.3);
   const wobble = rng.gaussian(0, d * 0.05 * (1 - 0.6 * skillF));
   // GS-greens-3: the green slope BREAKS the putt. The ball's lateral position AT THE CUP is your AIM
@@ -613,8 +638,9 @@ export function manualPutt(
   // −break) for it to curl in. Flat green (no slope) → break 0 → byte-for-byte the old straight putt.
   const breakYd = puttBreakYd(from, pinPt, slope, pace);
   const netLat = aim + breakYd + wobble;
-  // A make: pace inside the band AND the net lateral (aim + break + wobble) holds within the cup.
-  if (Math.abs(paceErr) <= band && Math.abs(netLat) <= HOLE_OUT_RADIUS) {
+  // A make: pace inside the (distance-scaled) band AND the net lateral (aim + break + wobble) holds
+  // within the cup.
+  if (Math.abs(paceErr) <= effBand && Math.abs(netLat) <= HOLE_OUT_RADIUS) {
     return { from, to: pinPt, holed: true };
   }
   // Missed: it travels `pace × d` along the line with the net lateral offset (short/long + off-line).

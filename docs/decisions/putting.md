@@ -41,3 +41,45 @@
   perks/meta on resume, so NO save bump. `tests/manual-putt.test.ts` guards the pace model + that the
   upgrades widen the band and sink more putts; `tests/putting.test.ts` still guards the auto model.
 
+## Putting DEPTH — distance matters, putters matter, hard greens break (GS-putt-depth)
+The complaint: "there's no reason to take any putting upgrades or putters" and "the make window never
+does anything." Both were true because the make band was a CONSTANT pace fraction regardless of putt
+length — on a flat green a base putter already holed everything, so a wider band bought nothing you
+could feel, and long putts were no harder than short ones. GS-putt-depth makes putting a genuine skill/
+gear axis on three fronts, all interactive-only (the headless `onePutt` auto path is byte-for-byte
+untouched — it never reads slope or range).
+
+- **The make band SHRINKS with distance.** `puttBandDistanceFactor(d, range)` (round.ts) is `1` within
+  the putter's confident `range`, then a smooth reciprocal taper to a floor (`PUTT_BAND_FLOOR`) beyond
+  it. `manualPutt` scales its pace make-band by this factor; the on-screen meter (`app.ts` → `mountPuttMeter`)
+  draws the SAME shrunk band, so the green window you aim at is exactly the one that drops the putt (contract
+  5). A tap-in / short putt is factor 1 → **byte-for-byte the old flat band**, which is *why* every existing
+  fixed-ideal-pace test (`manual-putt`, `putt-break`) still passes: those strike at `MANUAL_IDEAL_PACE` so
+  `paceErr = 0 ≤` any positive band, shrunk or not. Only OFF-ideal paces feel the tighter window — i.e. real
+  play. **Only the PACE window is distance-scaled;** the lateral `wobble` stays keyed to the putter's
+  INHERENT `manualBand` (not the shrunk one), so lateral skill is a property of the flat-stick and the whole
+  distance penalty lives in one place.
+- **The putter's `puttRange` is the upgrade.** `puttSkillOf` returns `puttRange = DEFAULT_PUTT_RANGE +
+  min(0.7, b)·12`, so every putter perk / Putting Coach / auto-caddie that raises `puttBoost` also reads +
+  holes from further. A base loadout still returns `{}` (no `puttRange`) → the resolver falls back to
+  `DEFAULT_PUTT_RANGE`, so nothing changes for a fresh bag beyond the universal distance taper. This is the
+  concrete "reason to buy a putter": at 18 yd a legendary flat-stick keeps a wide band a base putter has
+  long since lost.
+- **The break READ has a length.** The dotted break curve is drawn bright/solid-dashed only out to the
+  putter's confident range and fades to a faint wide-dashed "you're guessing" tail beyond, with a tick where
+  the confidence ends (`RenderOptions.puttReadFrac`, holeView.ts; `frac = range/puttLen`). A green-reading
+  **Mystic Mole** (`greenRead`) sees the WHOLE break → `frac = 1`, a clear visible caddy benefit. The HUD
+  spells it out ("past Ny the read goes blind — a better putter reads further").
+- **Harder stops tilt the greens more.** The green-slope magnitude multiplier floor rises with wildness:
+  `slopeMag = greenSlopeMax · range(0.4 + 0.45·wildness, 1)`. A CALM stop (wildness ≈ 0) keeps the old
+  `range(0.4, 1)` draw **byte-for-byte**; a wild stop biases steeper — a stiffer, breakier putt — but never
+  past the biome's `greenSlopeMax` ceiling (so `green-slope.test` still holds) and drawn from the SIDE slope
+  rng (terrain stream intact, every LAYOUT byte-identical). Steeper greens read with a FINER, denser fall-line
+  arrow grid (`styleGreen`: `cols`/`rows`/`len` scale with `slope.mag`) — camera-proof, a fixed count off the
+  deterministic magnitude. The auto sim only feels this through `walkRoll`'s green roll-out; the death-spiral
+  and character-balance bars were re-run and hold (the manual-putt break itself never touches the auto path).
+- **No new hook.** All tuning is round.ts module constants (the sim stays node-pure — no `window` read), so
+  there is no `_gs*` flag / `?param` and the test-hub sync guard is unaffected. `tests/putt-depth.test.ts`
+  guards the factor curve, the range-upgrade → more-long-makes claim, the within-range byte-equality, and the
+  wildness → steeper-greens statistic.
+

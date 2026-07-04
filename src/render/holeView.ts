@@ -124,6 +124,10 @@ export interface RenderOptions {
   /** Predicted curved PUTT path (course-space points, GS-greens-3) — drawn as a dotted break line
    *  from the ball, so the player sees how the slope will curl the putt. */
   puttPath?: Vec[];
+  /** GS-putt-depth: the fraction (0..1) of the putt path the putter can CONFIDENTLY read. The prefix
+   *  up to it is drawn bright/solid-dashed; the rest fades to a faint guess — so a longer putt than
+   *  your putter's range reads "blind" past the confident length, and better putters read further. */
+  puttReadFrac?: number;
   /** Spray cone display-geometry override (the `window._gsSpray` escape hatch). */
   sprayGeom?: SprayGeomInput;
   /** Zoom-and-follow: centre the map on this point (the ball) instead of fitting the whole hole. */
@@ -400,10 +404,24 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // with a small ✕ where the player's current aim is pointed (the high-side read).
   if (opts.puttPath && opts.puttPath.length > 1) {
     const pts = opts.puttPath.map((p) => place(p));
-    const d = pts.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
-    parts.push(`<path d="${d}" fill="none" stroke="#ffe14a" stroke-width="2" stroke-dasharray="3 3" opacity="0.85" stroke-linecap="round" />`);
-    const tip = pts[pts.length - 1]!;
-    parts.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="0.9" />`);
+    const n = pts.length;
+    const toPath = (seg: Vec[]) => seg.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+    // GS-putt-depth: draw the CONFIDENT read (out to the putter's range) bright, then fade the rest to
+    // a faint guess. `puttReadFrac` undefined ⇒ the whole line is confident (back-compat / short putt).
+    const frac = opts.puttReadFrac == null ? 1 : Math.max(0, Math.min(1, opts.puttReadFrac));
+    const cut = Math.max(1, Math.round(frac * (n - 1)));
+    const sure = pts.slice(0, cut + 1);
+    parts.push(`<path d="${toPath(sure)}" fill="none" stroke="#ffe14a" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" stroke-linecap="round" />`);
+    if (cut < n - 1) {
+      // Beyond the confident range — a faint, wider-dashed "you're guessing the rest" tail.
+      const guess = pts.slice(cut);
+      parts.push(`<path d="${toPath(guess)}" fill="none" stroke="#ffe14a" stroke-width="1.6" stroke-dasharray="2 5" opacity="0.32" stroke-linecap="round" />`);
+      // A small tick where the confident read ends.
+      const edge = pts[cut]!;
+      parts.push(`<circle cx="${edge[0].toFixed(1)}" cy="${edge[1].toFixed(1)}" r="2.2" fill="#ffe14a" opacity="0.55" />`);
+    }
+    const tip = pts[n - 1]!;
+    parts.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="${cut < n - 1 ? '0.5' : '0.9'}" />`);
   }
 
   if (opts.ball) {

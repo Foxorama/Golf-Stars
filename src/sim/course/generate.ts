@@ -901,9 +901,13 @@ function generateHole(
   // Green SLOPE (GS-greens-3): a downhill fall-line direction + a magnitude up to the biome's
   // greenSlopeMax. Drawn from a SIDE rng (like the pin) so adding it leaves the main terrain stream
   // — and thus every existing course's layout — byte-for-byte unchanged.
+  // GS-putt-depth: harder stops tilt the greens MORE — the multiplier floor rises with wildness, so a
+  // wild stop's greens bias steeper (a stiffer, breakier putt) while a CALM stop (wildness 0) keeps the
+  // old range(0.4,1) draw byte-for-byte. Still capped at 1 → never above the biome's greenSlopeMax
+  // ceiling (green-slope test holds), and drawn from the SIDE slope rng so the terrain stream is intact.
   const slopeRng = new Rng(`${rng.seed}:slope:${holeIndex}`);
   const slopeAng = slopeRng.range(0, Math.PI * 2);
-  const slopeMag = (biome.greenSlopeMax ?? 0.5) * slopeRng.range(0.4, 1);
+  const slopeMag = (biome.greenSlopeMax ?? 0.5) * slopeRng.range(0.4 + 0.45 * wildness, 1);
   const greenSlope: Vec = [Math.cos(slopeAng) * slopeMag, Math.sin(slopeAng) * slopeMag];
 
   // Fairway APRON (GS-greens): a tapering strip that runs THROUGH and PAST the green so the fairway

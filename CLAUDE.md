@@ -349,6 +349,18 @@ For each system: the rule that constrains new work. Open the archive doc before 
   via the Penelope Putter caddy (`loadout.autoPutt`) — no manual toggle. `takePutt(…, control?)`:
   control → manual, none → `onePutt` (auto/tests, byte-for-byte). Fringe-putt is interactive-only.
   `puttBoost` upgrades widen the make-band; base loadout returns `{}` so auto stays stable.
+  **Putting has DEPTH now (GS-putt-depth)** — a real reason to buy putters: the make band SHRINKS with
+  distance past the putter's confident `puttRange` (`puttBandDistanceFactor`, floored, =1 within range →
+  a tap-in is byte-for-byte the old flat band; the on-screen MAKE band draws the SAME shrunk window), so
+  a long putt is a nervier stroke and a better putter (bigger `puttRange`, derived from `puttBoost` in
+  `puttSkillOf`) holds a wide band + reads further. The break line fades to a faint "blind" tail past the
+  read range (`RenderOptions.puttReadFrac`; a green-reading Mystic Mole sees the whole break → frac 1).
+  Only the PACE window is distance-scaled — the lateral wobble stays keyed to the putter's inherent band,
+  and auto putting (`onePutt`, no slope/range) is untouched. And HARDER stops tilt the greens MORE: the
+  slope-magnitude multiplier floor rises with wildness (`range(0.4+0.45·wildness, 1)`, still ≤ biome
+  `greenSlopeMax`, drawn from the SIDE slope rng so terrain is byte-identical and a CALM stop keeps the old
+  draw), read via a finer/denser fall-line arrow grid on steeper greens (`styleGreen`, camera-proof off the
+  deterministic mag). No new `_gs*` hook. Guarded by `tests/putt-depth.test.ts`.
 - **Render layer** (`docs/decisions/render.md`). ONE pure projector (`render/project.ts`) both
   renderers share — never reimplement the transform. ONE shared cell-shaded scene builder
   (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view. All
