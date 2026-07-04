@@ -860,8 +860,13 @@ function arcIntroScreen(): string {
     const board = leaderboard(state.run);
     field = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
   }
+  // Stop 0 is the first tee after character select — the ONLY intro where "Change golfer" makes
+  // sense (you've committed to this golfer for the run). Every later world intro (post pro-shop) is
+  // "Next Tee" with no back-out to character select (GS-intro-nav).
+  const firstStop = state.run.stopIndex === 0;
+  const teeLabel = firstStop ? 'First Tee' : 'Next Tee';
   const firstTee = (id: string): string =>
-    `<button class="gs-btn gs-btn--primary gs-intro-first" id="${id}" data-intro-stage="hole">First Tee <span aria-hidden="true">▸</span></button>`;
+    `<button class="gs-btn gs-btn--primary gs-intro-first" id="${id}" data-intro-stage="hole">${teeLabel} <span aria-hidden="true">▸</span></button>`;
   return `
     ${header()}
     <article class="gs-panel" style="border-color:${col}${rar.strong ? 'aa' : '66'};box-shadow:0 0 ${rar.glow}px ${col}${rar.strong ? '44' : '22'};">
@@ -882,7 +887,7 @@ function arcIntroScreen(): string {
       <p style="font-size:14px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--gs-line-2);">${objective}</p>
       <div class="gs-intro-ctarow">
         ${firstTee('gs-firsttee-top')}
-        ${btn('‹ Change golfer', { type: 'backToCharacter' }, { variant: 'ghost' })}
+        ${firstStop ? btn('‹ Change golfer', { type: 'backToCharacter' }, { variant: 'ghost' }) : ''}
       </div>
       ${notes.join('')}
       ${field}
@@ -2032,6 +2037,12 @@ function resultScreen(): string {
         : 'MISSED CUT';
   const vcol = passed ? '#5fd45a' : '#ff6b6b';
 
+  // The continue-to-shop CTA — surfaced BOTH at the top (right of the verdict, no scroll needed) and
+  // full-width at the bottom (GS-result-nav). Same label/action either way.
+  const continueLabel = state.bossReward && state.bossReward.length ? '🏆 Claim your reward →' : 'Continue → shop';
+  const continueBtn = (variant: 'primary' | 'ghost'): string =>
+    btn(continueLabel, { type: 'continue' }, { variant });
+
   const head = `<div class="gs-result-head">
       <div style="min-width:0;">
         <div class="gs-result-eyebrow">Stop ${res.stopIndex + 1} · ${passed ? 'cleared' : 'ended'}</div>
@@ -2041,6 +2052,7 @@ function resultScreen(): string {
       <div class="gs-result-vwrap">
         <div class="gs-result-verdict" style="color:${vcol};border-color:${vcol};background:${vcol}12;">${verdict}</div>
         <div class="gs-result-rar" style="color:${col};">${rar.glyph} ${c.rarity}</div>
+        <div class="gs-result-continue gs-result-continue--top">${continueBtn('primary')}</div>
       </div>
     </div>`;
 
@@ -2105,11 +2117,7 @@ function resultScreen(): string {
       <div class="gs-result-secl">⛳ Your round — tap a hole to replay it</div>
       ${roundStrip()}
       ${replay}
-      <div class="gs-result-continue">${btn(
-        state.bossReward && state.bossReward.length ? '🏆 Claim your reward →' : 'Continue → shop',
-        { type: 'continue' },
-        { variant: 'primary' },
-      )}</div>
+      <div class="gs-result-continue">${continueBtn('primary')}</div>
     </article>`;
 }
 

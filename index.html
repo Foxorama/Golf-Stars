@@ -707,6 +707,10 @@
       .gs-result-replay { display: flex; flex-direction: column; align-items: center; gap: 6px; }
       .gs-result-replay-ctl { display: flex; align-items: center; gap: 10px; font-size: 12px; opacity: .7; }
       .gs-result-continue .gs-btn { width: 100%; text-align: center; font-size: 16px; padding: 13px 16px; }
+      /* Top continue CTA (right of the verdict) — reach the shop without scrolling; compact so it
+         doesn't crowd the verdict badge on a phone. */
+      .gs-result-continue--top { margin-top: 8px; }
+      .gs-result-continue--top .gs-btn { width: auto; font-size: 13px; padding: 8px 13px; white-space: nowrap; }
 
       /* ── Settings sheet (bottom-sheet on mobile, centered card on desktop) ─────────── */
       .gs-sheet-backdrop {
