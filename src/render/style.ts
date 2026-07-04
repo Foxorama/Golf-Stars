@@ -16,6 +16,7 @@
 
 import type { Feature, Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../sim/course/contract';
+import { greenSlopeAt } from '../sim/round';
 import { obStakes, playBounds, playBoundsCorners } from '../sim/round';
 import { tradeTents as tradeTentsFor, type TradeTent } from '../sim/tents';
 import { meteorScorch as meteorScorchFor, type ScorchMark } from '../sim/scorch';
@@ -666,7 +667,7 @@ function styleGreen(
   collar: string,
   fringe: string,
   arch: BiomeArchetype,
-  slope?: { dir: Vec; mag: number },
+  slope?: GreenSlopeArt,
 ): Prim[] {
   const c = centroidOf(poly);
   const out: Prim[] = [
@@ -688,19 +689,52 @@ function styleGreen(
   // Green SLOPE (GS-greens-3): shade the LOW side darker + the HIGH side lighter and lay fall-line
   // arrows pointing downhill, so the tilt reads at a glance (the graphic IS the slope the sim rolls
   // on). `slope.dir` is the screen-space DOWNHILL unit; `mag` 0..~0.7 its steepness.
-  if (slope && slope.mag > 0.05) {
+  const contoured = !!(slope?.arrows && slope.arrows.length > 0);
+  if (slope && (slope.mag > 0.05 || contoured)) {
     const span = Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY);
-    const a = Math.min(0.5, slope.mag * 0.7);
-    out.push({
-      t: 'clip',
-      clip: poly,
-      children: [
-        // low side (downhill) shadow
-        { t: 'circle', c: [c[0] + slope.dir[0] * span * 0.34, c[1] + slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(0,0,0,${(a * 0.5).toFixed(3)})` },
-        // high side (uphill) lit
-        { t: 'circle', c: [c[0] - slope.dir[0] * span * 0.34, c[1] - slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(255,255,255,${(a * 0.32).toFixed(3)})` },
-      ],
-    });
+    if (slope.mag > 0.05) {
+      const a = Math.min(0.5, slope.mag * 0.7);
+      out.push({
+        t: 'clip',
+        clip: poly,
+        children: [
+          // low side (downhill) shadow
+          { t: 'circle', c: [c[0] + slope.dir[0] * span * 0.34, c[1] + slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(0,0,0,${(a * 0.5).toFixed(3)})` },
+          // high side (uphill) lit
+          { t: 'circle', c: [c[0] - slope.dir[0] * span * 0.34, c[1] - slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(255,255,255,${(a * 0.32).toFixed(3)})` },
+        ],
+      });
+    }
+    // GS-green-contour: shade each lobe's crest lit / hollow shadowed (soft, clipped) so the mounds
+    // read as raised rolls on the surface, then draw the LOCAL fall-line field instead of the single
+    // central grid — each chevron points down ITS OWN slope, so a double-breaking green shows arrows
+    // fanning around the mound exactly the way the putt will curl. Pure geometry, zero rng.
+    if (contoured) {
+      const lobeShade: Prim[] = (slope.lobes ?? []).map((lb) => ({
+        t: 'circle',
+        c: lb.c,
+        r: Math.max(3, lb.rPx * 0.9),
+        fill: lb.h > 0 ? `rgba(255,255,255,${Math.min(0.16, Math.abs(lb.h) * 0.3).toFixed(3)})` : `rgba(0,0,0,${Math.min(0.18, Math.abs(lb.h) * 0.34).toFixed(3)})`,
+      }));
+      if (lobeShade.length) out.push({ t: 'clip', clip: poly, children: lobeShade });
+      const arrows: Prim[] = [];
+      // Px-capped sizes off the projected span (the GS-putt-feel lesson): legible glyphs at putt
+      // zoom, a subtle stipple at map zoom — the caps never let them balloon into bold bars.
+      const len = Math.max(3.5, Math.min(11, span * 0.08));
+      const head = Math.max(1.6, len * 0.28);
+      for (const ar of slope.arrows!) {
+        const col = `rgba(255,255,255,${(0.24 + Math.min(0.2, ar.mag * 0.35)).toFixed(3)})`;
+        const perp: Vec = [-ar.dir[1], ar.dir[0]];
+        const base: Vec = [ar.p[0] - ar.dir[0] * len * 0.5, ar.p[1] - ar.dir[1] * len * 0.5];
+        const tip: Vec = [ar.p[0] + ar.dir[0] * len * 0.5, ar.p[1] + ar.dir[1] * len * 0.5];
+        arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.05, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - ar.dir[0] * head + perp[0] * (head * 0.7), tip[1] - ar.dir[1] * head + perp[1] * (head * 0.7)], stroke: col, sw: 1.05, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - ar.dir[0] * head - perp[0] * (head * 0.7), tip[1] - ar.dir[1] * head - perp[1] * (head * 0.7)], stroke: col, sw: 1.05, round: true });
+      }
+      out.push({ t: 'clip', clip: poly, children: arrows });
+      if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.7), sw: 1.2 });
+      return out;
+    }
     // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
     // reads with a slightly denser cluster so the tilt's severity is legible — a gentle green keeps the
     // classic pair, a full-tilt green a small 3×2 grid. Sizes are span-proportional but CAPPED IN PX:
@@ -1697,6 +1731,18 @@ function projPoly(poly: Vec[], proj: Projector): Vec[] {
   return poly.map((p) => proj.project(p));
 }
 
+/** Screen-space green slope ART inputs: the dominant plane's downhill dir + mag (GS-greens-3), and —
+ *  on a contoured green (GS-green-contour) — a LOCAL fall-line arrow field sampled from the sim's own
+ *  `greenSlopeAt` plus the projected lobes for crest/hollow shading. All pure geometry, zero rng. */
+interface GreenSlopeArt {
+  dir: Vec;
+  mag: number;
+  /** Local downhill sample per course-space grid cell inside the green — the contour arrow field. */
+  arrows?: { p: Vec; dir: Vec; mag: number }[];
+  /** Projected contour lobes: screen centre, px radius, signed peak slope (+ mound / − hollow). */
+  lobes?: { c: Vec; rPx: number; h: number }[];
+}
+
 /** The green's downhill SLOPE as a SCREEN-space unit direction + magnitude (GS-greens-3), by
  *  projecting the course-space fall line through the tee→green-up projector. Undefined for a flat
  *  green. Pure — no rng — so it never perturbs the scene's seeded look. */
@@ -1711,6 +1757,46 @@ function greenSlopeScreen(hole: Hole, proj: Projector): { dir: Vec; mag: number 
   let dy = b[1] - a[1];
   const l = Math.hypot(dx, dy) || 1;
   return { dir: [dx / l, dy / l], mag };
+}
+
+/**
+ * Green slope art for `styleGreen` (GS-green-contour): the plane read plus, when the hole carries
+ * contour lobes, a local fall-line arrow FIELD — one downhill sample per course-space grid cell
+ * inside the green, taken from the sim's `greenSlopeAt` (the exact field the putt resolver
+ * integrates — the graphic IS the physics). The grid lives in COURSE space and the near-flat-crest
+ * cut reads only the deterministic field, so the sample count is camera-proof (the follow-cam
+ * rebuilds the scene per frame); only px SIZES read the projection, per the camera contract.
+ */
+function greenSlopeArt(hole: Hole, greenPolyCourse: Vec[], proj: Projector): GreenSlopeArt | undefined {
+  const base = greenSlopeScreen(hole, proj);
+  const lobes = hole.greenContour;
+  if (!lobes || lobes.length === 0) return base; // plane-only hole → the classic GS-greens-3 look
+  const plane: GreenSlopeArt = base ?? { dir: [0, 1], mag: 0 };
+  const gb = bboxOf(greenPolyCourse);
+  const span = Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY);
+  const step = Math.max(6, span / 5); // course yards — a handful of reads across the surface
+  const arrows: { p: Vec; dir: Vec; mag: number }[] = [];
+  for (let x = gb.minX + step * 0.5; x < gb.maxX; x += step) {
+    for (let y = gb.minY + step * 0.5; y < gb.maxY; y += step) {
+      const cp: Vec = [x, y];
+      if (!pointInPoly(cp, greenPolyCourse)) continue;
+      const s = greenSlopeAt(cp, hole.greenSlope, lobes);
+      const m = Math.hypot(s[0], s[1]);
+      if (m < 0.06) continue; // a flat crest/saddle has no read to give
+      const a = proj.project(cp);
+      const b = proj.project([cp[0] + s[0] / m, cp[1] + s[1] / m]);
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l = Math.hypot(dx, dy) || 1;
+      arrows.push({ p: a, dir: [dx / l, dy / l], mag: m });
+    }
+  }
+  const lobArt = lobes.map((lb) => {
+    const c = proj.project(lb.c);
+    const e = proj.project([lb.c[0] + lb.r, lb.c[1]]);
+    return { c, rPx: Math.hypot(e[0] - c[0], e[1] - c[1]), h: lb.h };
+  });
+  return { ...plane, arrows, lobes: lobArt };
 }
 
 /** Is a screen point within the (padded) view? Used to cull off-screen accents/tufts. */
@@ -3757,7 +3843,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
     // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
-    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, arch, greenSlopeScreen(hole, proj)));
+    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, arch, greenSlopeArt(hole, f.poly, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
   }

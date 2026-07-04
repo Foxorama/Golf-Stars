@@ -6,7 +6,7 @@
  * any bug reproduces by its seed. The renderer will later animate exactly these shots.
  */
 
-import { dist, pathLength, type FeatureKind, type Hole, type Vec } from './course/contract';
+import { dist, pathLength, type FeatureKind, type GreenLobe, type Hole, type Vec } from './course/contract';
 import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
   combineShapeMods,
@@ -202,6 +202,8 @@ export function rollOut(
   // ball rolling downhill runs out far and one rolling (or BACKSPINNING) uphill brakes hard and can't
   // climb — no ball ever spins weirdly up a slope. Pure geometry, no rng, straight roll → the
   // roll-invariant (dist(rest,touchdown) === |roll|) and the renderer's straight run-out hold.
+  // (GS-green-contour lobes are putting-scale texture only: the run-out reads the dominant plane,
+  // so every seeded approach roll stays byte-identical.)
   const slope = hole.greenSlope;
   const tdx = dir[0] * sign;
   const tdy = dir[1] * sign;
@@ -562,48 +564,152 @@ export interface PuttControl {
 const BREAK_K = 0.18;
 
 /**
- * The lateral BREAK (yards, + = right) a manual putt picks up from the green slope, for a straight
- * (aim-0) line from `from` to `pin` at the given pace. The shared truth for the resolver, the on-screen
- * break-curve preview, and the Mystic Mole's read. Flat green / no slope → 0. Pure.
+ * The LOCAL green slope (downhill vector, course space) at point `p` (GS-green-contour): the
+ * dominant `greenSlope` plane plus each contour lobe's radial gradient. A mound's (h > 0) downhill
+ * points away from its crest, a hollow's (h < 0) toward its centre; each lobe's magnitude ramps
+ * 0 → |h| out to its radius `r` and fades smoothly beyond, so the field is continuous everywhere.
+ * The ONE field the putt resolver, the break-line preview, and the renderer's fall-line arrows all
+ * sample — the graphic IS the physics. No lobes → exactly the plane. Pure, zero rng.
  */
-export function puttBreakYd(from: Vec, pin: Vec, slope: Vec | undefined, pace: number): number {
-  if (!slope) return 0;
+export function greenSlopeAt(p: Vec, slope?: Vec, lobes?: readonly GreenLobe[]): Vec {
+  let sx = slope ? slope[0] : 0;
+  let sy = slope ? slope[1] : 0;
+  if (lobes) {
+    for (const l of lobes) {
+      const dx = p[0] - l.c[0];
+      const dy = p[1] - l.c[1];
+      const d = Math.hypot(dx, dy);
+      if (d < 1e-6 || l.r < 1e-6) continue;
+      const u = d / l.r;
+      const m = l.h * u * Math.exp((1 - u * u) / 2); // 0 at the crest, peaks at |h| on the flank (u=1)
+      sx += (dx / d) * m;
+      sy += (dy / d) * m;
+    }
+  }
+  return [sx, sy];
+}
+
+/**
+ * Cumulative BREAK profile (GS-green-contour): the signed lateral drift (yards, + = right of the
+ * ball→cup line) accumulated at each of `samples`+1 evenly-spaced points along the stroke's travel.
+ * The last entry is the net break at the ball's finish. Without lobes it is EXACTLY the GS-greens-3
+ * closed form (brk · t^1.8 — the classic late-accelerating curl), byte-for-byte; with lobes the
+ * LOCAL field is integrated along the line with the same late weighting (w(t) = t^0.8, the t^1.8
+ * curve's derivative shape, normalised so a constant field still lands on the closed form at the
+ * cup) — so a putt crossing a mound curls one way then the other, and the profile shows it. Pure.
+ */
+export function puttBreakProfile(
+  from: Vec,
+  pin: Vec,
+  slope: Vec | undefined,
+  pace: number,
+  lobes?: readonly GreenLobe[],
+  samples = 12,
+): number[] {
   const d = dist(from, pin) || 1e-6;
-  let ux = (pin[0] - from[0]) / d;
-  let uy = (pin[1] - from[1]) / d;
+  const ux = (pin[0] - from[0]) / d;
+  const uy = (pin[1] - from[1]) / d;
   const rperp: Vec = [-uy, ux]; // right of the ball→cup line
-  const lat = slope[0] * rperp[0] + slope[1] * rperp[1]; // signed sidehill component of the fall line
   const paceFac = Math.max(0.7, Math.min(1.6, MANUAL_IDEAL_PACE / Math.max(0.4, pace)));
-  return BREAK_K * lat * Math.pow(d, 1.35) * paceFac;
+  const scale = BREAK_K * Math.pow(d, 1.35) * paceFac;
+  const out: number[] = [0];
+  if (!lobes || lobes.length === 0) {
+    // Constant plane → the exact classic curl (keeps every existing preview/resolve byte-for-byte).
+    const lat = slope ? slope[0] * rperp[0] + slope[1] * rperp[1] : 0;
+    for (let i = 1; i <= samples; i++) out.push(scale * lat * Math.pow(i / samples, 1.8));
+    return out;
+  }
+  const along = pace * d; // sample the field where the ball actually travels
+  let acc = 0;
+  let tot = 0;
+  const accs: number[] = [];
+  for (let i = 0; i < samples; i++) {
+    const tm = (i + 0.5) / samples; // midpoint of each travel slice
+    const s = greenSlopeAt([from[0] + ux * along * tm, from[1] + uy * along * tm], slope, lobes);
+    acc += Math.pow(tm, 0.8) * (s[0] * rperp[0] + s[1] * rperp[1]);
+    tot += Math.pow(tm, 0.8);
+    accs.push(acc);
+  }
+  for (let i = 0; i < samples; i++) out.push((scale * accs[i]!) / tot);
+  return out;
+}
+
+/**
+ * The lateral BREAK (yards, + = right) a manual putt picks up from the green, for a straight
+ * (aim-0) line from `from` to `pin` at the given pace — the NET drift at the finish. The shared
+ * truth for the resolver, the on-screen break-curve preview, and the Mystic Mole's read. With
+ * contour lobes the green can double-break; this is the net of the whole journey. Flat green → 0.
+ */
+export function puttBreakYd(
+  from: Vec,
+  pin: Vec,
+  slope: Vec | undefined,
+  pace: number,
+  lobes?: readonly GreenLobe[],
+): number {
+  if (!lobes || lobes.length === 0) {
+    // The original GS-greens-3 closed form, byte-for-byte for every plane-only green.
+    if (!slope) return 0;
+    const d = dist(from, pin) || 1e-6;
+    const ux = (pin[0] - from[0]) / d;
+    const uy = (pin[1] - from[1]) / d;
+    const rperp: Vec = [-uy, ux];
+    const lat = slope[0] * rperp[0] + slope[1] * rperp[1];
+    const paceFac = Math.max(0.7, Math.min(1.6, MANUAL_IDEAL_PACE / Math.max(0.4, pace)));
+    return BREAK_K * lat * Math.pow(d, 1.35) * paceFac;
+  }
+  const prof = puttBreakProfile(from, pin, slope, pace, lobes);
+  return prof[prof.length - 1]!;
+}
+
+/** The widest lateral BOW of the break curve either side of the line at ideal pace (GS-green-contour):
+ *  `max` ≥ 0 the rightmost drift, `min` ≤ 0 the leftmost. Aim-independent — the putt screen frames off
+ *  it (a double-breaker bows BOTH ways, wider than its net break) and reads "double-breaks" off both
+ *  sides exceeding a threshold. Pure. */
+export function puttBreakBow(
+  from: Vec,
+  pin: Vec,
+  slope: Vec | undefined,
+  lobes?: readonly GreenLobe[],
+): { max: number; min: number } {
+  let max = 0;
+  let min = 0;
+  for (const v of puttBreakProfile(from, pin, slope, MANUAL_IDEAL_PACE, lobes)) {
+    if (v > max) max = v;
+    if (v < min) min = v;
+  }
+  return { max, min };
 }
 
 /** The lateral AIM (yards) that cancels the break at the ideal pace — the line the Mystic Mole reads
  *  out for you, and what the UI snaps to with a green-reading caddy. Pure. */
-export function idealPuttAim(from: Vec, pin: Vec, slope: Vec | undefined): number {
-  return -puttBreakYd(from, pin, slope, MANUAL_IDEAL_PACE);
+export function idealPuttAim(from: Vec, pin: Vec, slope: Vec | undefined, lobes?: readonly GreenLobe[]): number {
+  return -puttBreakYd(from, pin, slope, MANUAL_IDEAL_PACE, lobes);
 }
 
 /** Sample the predicted curved PATH of a manual putt (course-space points) for drawing the break line,
- *  so the graphic IS the physics. The ball leaves along the aim and curves by the break as it slows
- *  (break accelerates late, ∝ t^1.8). No wobble (that's the random part). Pure. */
+ *  so the graphic IS the physics. The ball leaves along the aim and curves by the cumulative break as
+ *  it slows (`puttBreakProfile` — on a contoured green the line can S-curve through a double-break).
+ *  No wobble (that's the random part). Pure. */
 export function puttPathPreview(
   from: Vec,
   pin: Vec,
   slope: Vec | undefined,
   aim: number,
   pace: number,
+  lobes?: readonly GreenLobe[],
   samples = 12,
 ): Vec[] {
   const d = dist(from, pin) || 1e-6;
   const ux = (pin[0] - from[0]) / d;
   const uy = (pin[1] - from[1]) / d;
   const rperp: Vec = [-uy, ux];
-  const brk = puttBreakYd(from, pin, slope, pace);
+  const prof = puttBreakProfile(from, pin, slope, pace, lobes, samples);
   const along = pace * d;
   const pts: Vec[] = [];
   for (let i = 0; i <= samples; i++) {
     const t = i / samples;
-    const lat = aim * t + brk * Math.pow(t, 1.8);
+    const lat = aim * t + prof[i]!;
     pts.push([from[0] + ux * along * t + rperp[0] * lat, from[1] + uy * along * t + rperp[1] * lat]);
   }
   return pts;
@@ -624,6 +730,7 @@ export function manualPutt(
   control: PuttControl,
   skill: PuttSkill = {},
   slope?: Vec,
+  lobes?: readonly GreenLobe[],
 ): PuttLog {
   const d = dist(from, pinPt) || 1e-6;
   const band = skill.manualBand ?? DEFAULT_MANUAL_BAND;
@@ -646,7 +753,9 @@ export function manualPutt(
   // GS-greens-3: the green slope BREAKS the putt. The ball's lateral position AT THE CUP is your AIM
   // plus the slope's break plus a little wobble — so on a sidehill green you must aim HIGH (aim ≈
   // −break) for it to curl in. Flat green (no slope) → break 0 → byte-for-byte the old straight putt.
-  const breakYd = puttBreakYd(from, pinPt, slope, pace);
+  // GS-green-contour: with contour lobes the break is the INTEGRATED local field along the line (a
+  // double-breaker's net) — same wobble draw, so the rng stream is untouched either way.
+  const breakYd = puttBreakYd(from, pinPt, slope, pace, lobes);
   const netLat = aim + breakYd + wobble;
   // A make: pace inside the (distance-scaled) band AND the net lateral (aim + break + wobble) holds
   // within the cup.

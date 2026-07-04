@@ -454,10 +454,11 @@ export function takePutt(
   const pin = pinOf(state.hole);
   const maxStrokes = state.hole.par + MAX_OVER_PAR;
   const skill = puttSkillOf(loadout);
-  // Manual putts BREAK along the green slope (GS-greens-3) — the player aims to read it. The auto
-  // path (no control) stays the flat `onePutt`, so the headless sim + auto-finish are byte-for-byte.
+  // Manual putts BREAK along the green slope (GS-greens-3) plus the contour lobes' local field
+  // (GS-green-contour — a real green double-breaks) — the player aims to read it. The auto path (no
+  // control) stays the flat `onePutt`, so the headless sim + auto-finish are byte-for-byte.
   const p = control
-    ? manualPutt(rng, state.ball, pin, control, skill, state.hole.greenSlope)
+    ? manualPutt(rng, state.ball, pin, control, skill, state.hole.greenSlope, state.hole.greenContour)
     : onePutt(rng, state.ball, pin, skill);
   let strokes = state.strokes + 1;
   let done = false;

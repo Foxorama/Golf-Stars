@@ -27,11 +27,12 @@ for (const [biome, label] of [['ice-ring', 'Frost (steep)'], ['verdant-station',
   for (const hole of holes.slice(0, 3)) {
     const pin = pinOf(hole);
     const slope = hole.greenSlope;
+    const contour = hole.greenContour; // GS-green-contour: lobes fold into the read + the drawn line
     // A LONG putt (~16 yds) so both the break AND the GS-putt-depth read-fade past the putter range show.
     const len = 16;
     const ball = [pin[0] + (slope ? slope[1] : 0) * 9 - 1, pin[1] - len];
-    const aim = idealPuttAim(ball, pin, slope); // draw the Mole's read
-    const path = puttPathPreview(ball, pin, slope, aim, MANUAL_IDEAL_PACE);
+    const aim = idealPuttAim(ball, pin, slope, contour); // draw the Mole's read
+    const path = puttPathPreview(ball, pin, slope, aim, MANUAL_IDEAL_PACE, contour);
     const dist = Math.hypot(pin[0] - ball[0], pin[1] - ball[1]);
     const readFrac = Math.min(1, DEFAULT_PUTT_RANGE / dist); // base putter: reads confidently only ~6.5y
     const mid = [(ball[0] + pin[0]) / 2, (ball[1] + pin[1]) / 2];
