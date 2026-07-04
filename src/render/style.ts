@@ -794,10 +794,6 @@ function embossChildren(
   return children;
 }
 
-function insetEmboss(poly: Vec[], scale: number, tone: { wall: string; base: string; floor?: string }): Prim[] {
-  return [{ t: 'clip', clip: poly, children: embossChildren(poly, scale, tone) }];
-}
-
 function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number, land: string): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
@@ -815,24 +811,26 @@ function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number, land: stri
   for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: SAND.base }); // 2
   for (const poly of polys) {
     const c = centroidOf(poly);
-    // Inset lip: a slim shadow on the near (up-light) rim so the bunker reads dug in — no bright far
-    // floor (the lit pool against the shadow band read as a hard "distinct shadow", GS-inset-2).
-    out.push(...insetEmboss(poly, scale, { wall: SAND.wall, base: SAND.base }));
-    // A couple of pale rake arcs across the sand (subtle texture).
+    const b = bboxOf(poly);
+    const half = Math.max(3, Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.5);
+    const detail: Prim[] = [];
+    // GS-hazard-blend-2: a smoothly SHADED bowl instead of harsh straight white rake lines across the
+    // sand (the "awkward white lines" tell). Inset rim shadow (dug in) + a soft sunlit swell on the
+    // DOWN-light floor (opposite the shadowed rim), so the bunker reads as a gently scooped bowl that
+    // blends, not a flat pale patch scored with white bars.
+    detail.push(...embossChildren(poly, scale, { wall: SAND.wall, base: SAND.base }));
+    // Soft sunlit floor, pooled toward the down-light side (away from the up-light rim shadow) — low
+    // alpha so it's a gentle swell, not a distinct pool (the GS-inset-2 lesson).
+    const litC: Vec = [c[0] - LIGHT_UL[0] * half * 0.32, c[1] - LIGHT_UL[1] * half * 0.32];
+    detail.push({ t: 'glow', c: litC, r: half * 1.4, col: hexAlpha(SAND.rim, 0.4) });
+    // Subtle rake arcs that FOLLOW the rim (concentric, thin, low-alpha warm) — reads as a raked bowl
+    // that blends into the sand, unlike the old full-width near-white bars.
     if (art.stripes) {
-      const b = bboxOf(poly);
-      const w = (b.maxX - b.minX) * 0.5;
-      for (let i = 1; i <= 2; i++) {
-        const y = b.minY + ((b.maxY - b.minY) * i) / 3;
-        out.push({
-          t: 'clip',
-          clip: poly,
-          children: [
-            { t: 'line', a: [c[0] - w, y], b: [c[0] + w, y], stroke: SAND.rake, sw: Math.max(0.8, scale * 0.5) },
-          ],
-        });
+      for (let i = 1; i <= 3; i++) {
+        detail.push({ t: 'poly', pts: offsetPoly(poly, half * 0.24 * i), fill: 'none', stroke: 'rgba(255,248,224,0.14)', sw: Math.max(0.6, scale * 0.32) });
       }
     }
+    out.push({ t: 'clip', clip: poly, children: detail });
   }
   return out;
 }
@@ -904,14 +902,24 @@ function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number,
     const width = extentAlong(poly, -axis.dir[1], axis.dir[0]); // extent ⟂ the long chord = channel width
     const step = Math.max(1.6, Math.min(7, width * 0.26));
     // GS-inset: the raised bank shadows the up-light shore (base re-laid shifted toward the light) —
-    // then the depth rings below inset from the rim and repaint the deep centre, so the body stays
-    // dark-cored while the up-light shore reads as water sunk beneath its bank. NO lit floor (the
-    // depth rings own the centre); clipped, fixed count, zero rng.
+    // then the depth ramp below insets from the rim and repaints the deep centre, so the body stays
+    // dark-cored while the up-light shore reads as water sunk beneath its bank. Clipped, zero rng.
     const detail: Prim[] = [
       ...embossChildren(poly, scale, { wall: lp.bank, base: lp.base }), // detail is clipped to poly below → no nested clip
-      { t: 'poly', pts: offsetPoly(poly, step), fill: lp.mid },
-      { t: 'poly', pts: offsetPoly(poly, step * 2), fill: lp.deep },
     ];
+    // GS-hazard-blend-2: SMOOTH depth — many thin feathered rings interpolating base→mid→deep so the
+    // body deepens SEAMLESSLY toward its core, instead of the 2 hard contour bands it used to draw (a
+    // topographic-map look, not water). `offsetPoly` follows the shape, so a thin river darkens toward
+    // its centreline and a lake toward its middle alike. Pure geometry (no rng) — the flow/glint draws
+    // below still consume the exact same rng, so every seeded scene is byte-stable.
+    const half = Math.max(2, width / 2);
+    const maxOff = half * 0.82; // don't collapse the body to a sliver
+    const depthRings = 7;
+    for (let i = 1; i <= depthRings; i++) {
+      const dt = i / depthRings; // 0..1 depth fraction, edge→core
+      const col = dt < 0.5 ? mixHex(lp.base, lp.mid, dt * 2) : mixHex(lp.mid, lp.deep, (dt - 0.5) * 2);
+      detail.push({ t: 'poly', pts: offsetPoly(poly, maxOff * dt), fill: col });
+    }
     if (axis.len > width * 1.9) {
       // A CHANNEL (river/creek/lava river): streaks running ALONG the flow so it reads as moving.
       const px = -axis.dir[1];
