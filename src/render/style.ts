@@ -701,16 +701,33 @@ function styleGreen(
         { t: 'circle', c: [c[0] - slope.dir[0] * span * 0.34, c[1] - slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(255,255,255,${(a * 0.32).toFixed(3)})` },
       ],
     });
-    // 2 short chevron arrows pointing downhill.
+    // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
+    // reads with a FINER, denser grid of arrows so the tilt's severity is legible at a glance — a gentle
+    // green keeps the classic two, a full-tilt green fills a 3-wide × up-to-3-deep fall-line grid. Pure
+    // geometry off the deterministic slope magnitude (camera-proof: a fixed count for a given mag).
     const perp: Vec = [-slope.dir[1], slope.dir[0]];
     const arrows: Prim[] = [];
-    for (let i = -1; i <= 1; i += 2) {
-      const base: Vec = [c[0] + perp[0] * span * 0.16 * i - slope.dir[0] * span * 0.14, c[1] + perp[1] * span * 0.16 * i - slope.dir[1] * span * 0.14];
-      const tip: Vec = [base[0] + slope.dir[0] * span * 0.3, base[1] + slope.dir[1] * span * 0.3];
-      const col = 'rgba(255,255,255,0.5)';
-      arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.4, round: true });
-      arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * 4 + perp[0] * 3, tip[1] - slope.dir[1] * 4 + perp[1] * 3], stroke: col, sw: 1.4, round: true });
-      arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * 4 - perp[0] * 3, tip[1] - slope.dir[1] * 4 - perp[1] * 3], stroke: col, sw: 1.4, round: true });
+    const steep = Math.max(0, Math.min(1, (slope.mag - 0.15) / 0.5)); // 0 gentle → 1 full tilt
+    const cols = 2 + Math.round(steep * 1); // 2 or 3 across
+    const rows = 1 + Math.round(steep * 2); // 1..3 down the fall line
+    const colGap = span * 0.17;
+    const rowGap = span * 0.24;
+    const len = span * (0.3 - steep * 0.08); // finer (shorter) arrows as they get denser
+    const head = 4 - steep * 1.2;
+    const col = `rgba(255,255,255,${(0.42 + steep * 0.22).toFixed(3)})`;
+    for (let r = 0; r < rows; r++) {
+      const roff = (r - (rows - 1) / 2) * rowGap;
+      for (let ci = 0; ci < cols; ci++) {
+        const coff = (ci - (cols - 1) / 2) * colGap;
+        const base: Vec = [
+          c[0] + perp[0] * coff - slope.dir[0] * (len * 0.5 + roff),
+          c[1] + perp[1] * coff - slope.dir[1] * (len * 0.5 + roff),
+        ];
+        const tip: Vec = [base[0] + slope.dir[0] * len, base[1] + slope.dir[1] * len];
+        arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.4, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head + perp[0] * (head * 0.75), tip[1] - slope.dir[1] * head + perp[1] * (head * 0.75)], stroke: col, sw: 1.4, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head - perp[0] * (head * 0.75), tip[1] - slope.dir[1] * head - perp[1] * (head * 0.75)], stroke: col, sw: 1.4, round: true });
+      }
     }
     out.push({ t: 'clip', clip: poly, children: arrows });
   } else {

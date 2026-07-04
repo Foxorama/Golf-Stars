@@ -23,7 +23,7 @@ import type { EventCategory } from './sim/rpg/events';
 import { COURSE_EFFECTS, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './sim/rpg/effects';
 import { salvageClubFind } from './sim/rpg/salvage';
 import type { PatchKind } from './sim/patches';
-import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, MANUAL_IDEAL_PACE, puttBreakYd, idealPuttAim, puttPathPreview } from './sim/round';
+import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById } from './sim/course/themes';
@@ -1657,6 +1657,12 @@ function playingBody(animating: boolean): string {
     puttAimResolved = puttAim; // read by the commit handler so the struck aim matches the drawn line
     const breakYd = puttBreakYd(play.ball, puttPin, slope, MANUAL_IDEAL_PACE);
     const puttPath = puttPathPreview(play.ball, puttPin, slope, puttAim, MANUAL_IDEAL_PACE);
+    // GS-putt-depth: how far up the line the putter can CONFIDENTLY read. A green-reading caddy (Mystic
+    // Mole) sees the whole break; otherwise the confident read ends at the putter's range, and the line
+    // fades beyond it. Same range the resolver uses (puttSkillOf), so the picture matches the physics.
+    const puttLen = v.distToPin;
+    const puttReadRange = puttSkillOf(state.run.loadout).puttRange ?? DEFAULT_PUTT_RANGE;
+    const puttReadFrac = reads ? 1 : Math.min(1, puttReadRange / Math.max(1e-3, puttLen));
     const puttSvg = renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
@@ -1676,6 +1682,7 @@ function playingBody(animating: boolean): string {
       // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
       up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
       puttPath,
+      puttReadFrac,
     });
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
@@ -1687,7 +1694,7 @@ function playingBody(animating: boolean): string {
         <div class="gs-hud gs-hud-bottom">
           ${caddyBadgeHTML(puttCaddyId())}
           <div class="gs-hud-controls gs-glass">
-            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.</p>
+            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` <span style="opacity:.85;">Past <b>${Math.round(puttReadRange)}y</b> the read goes <b>blind</b> — a better putter reads further.</span>` : ''}</p>
             ${puttAimRow(breakYd, puttAim, reads)}
             <div id="puttmeter"></div>
             <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
@@ -3899,7 +3906,13 @@ function render(): void {
   if (state.screen === 'playing' && state.play && !animatingPlay && !state.play.done && (awaitingPutt(state.play) || (canPuttFringe(state.play) && selPutt))) {
     const meterEl = document.getElementById('puttmeter');
     if (meterEl) {
-      const band = puttSkillOf(state.run.loadout).manualBand ?? DEFAULT_MANUAL_BAND;
+      // GS-putt-depth: the drawn MAKE band is the SAME distance-scaled window the resolver holes on —
+      // it shrinks the further the ball is from the cup (past the putter's confident range), so a long
+      // putt shows a nervously narrow band and a better putter keeps it wide. `puttBandDistanceFactor`
+      // is the shared truth so the green band you aim at is exactly the one that drops the putt.
+      const skill = puttSkillOf(state.run.loadout);
+      const puttDist = dist(state.play.ball, pinOf(state.play.hole));
+      const band = (skill.manualBand ?? DEFAULT_MANUAL_BAND) * puttBandDistanceFactor(puttDist, skill.puttRange ?? DEFAULT_PUTT_RANGE);
       // Fit the meter to its container so it never overflows a narrow phone (it mounts at a
       // fixed px width); clamp so it stays usable on tiny and tablet-wide screens alike.
       const meterW = Math.max(240, Math.min(420, meterEl.clientWidth || 300));
