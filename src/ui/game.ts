@@ -12,9 +12,11 @@ import type { PlayedHole, PuttControl } from '../sim/round';
 import {
   ASCENSION_MAX,
   bank,
+  bossEdgeForRun,
   buy,
   currentBoss,
   currentCourse,
+  endlessAttackArmed,
   endlessHolePassed,
   finishStop,
   holeGateArmed,
@@ -52,6 +54,7 @@ import {
   playBossStop,
   playBossSideStop,
   betterPlayedHole,
+  bossHasHomeEdge,
   holeDuel,
   matchState,
   type HoleDuel,
@@ -626,7 +629,9 @@ export function reduce(state: UiState, action: Action): UiState {
       if (isMatchplayBoss(currentBoss(state.run))) {
         const setup = teamDuelSetupForRun(state.run);
         const bossId = setup?.opponentId ?? resolveBossId(state.run);
-        const homeEdge = setup?.homeEdge ?? false;
+        // The solo boss's home-turf edge was silently dropped on this watch path (headless playStop
+        // always applied it) — resolve it the same way, and carry the Ascension edge (GS-boss-scale).
+        const homeEdge = setup?.homeEdge ?? bossHasHomeEdge(bossId, state.course.meta?.themeId);
         const stop = setup
           ? playTeamMatchStop(
               state.course.holes,
@@ -636,6 +641,7 @@ export function reduce(state: UiState, action: Action): UiState {
               new Rng(`${state.course.seed}:play`),
               new Rng(`${state.course.seed}:boss`),
               homeEdge,
+              bossEdgeForRun(state.run),
             )
           : playMatchStop(
               state.course.holes,
@@ -643,6 +649,8 @@ export function reduce(state: UiState, action: Action): UiState {
               bossId,
               new Rng(`${state.course.seed}:play`),
               new Rng(`${state.course.seed}:boss`),
+              homeEdge,
+              bossEdgeForRun(state.run),
             );
         const { run, result } = finishStop(state.run, state.course, stop.player, { matchWon: stop.state.playerAdvances });
         const ended = run.status !== 'active';
@@ -695,9 +703,13 @@ export function reduce(state: UiState, action: Action): UiState {
         const bossTents = state.course.meta?.effect === 'tradeMarket';
         const bossScorch = state.course.meta?.effect === 'meteorShower';
         const bossPatch = effectPatchKind(state.course.meta?.effect);
+        // The solo boss keeps its home-turf edge here too (it was dropped only on this interactive
+        // path — headless playStop always applied it), and both shapes carry the run's Ascension
+        // sharpening (GS-boss-scale) so the pre-played boss is the exact headless boss.
+        const soloHomeEdge = bossHasHomeEdge(bossId, state.course.meta?.themeId);
         const bossHoles = setup
-          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch)
-          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), false, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch);
+          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(state.run))
+          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), soloHomeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(state.run));
         match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false, setup, partnerHoles: setup ? [] : undefined };
       }
       return {
@@ -798,10 +810,13 @@ export function reduce(state: UiState, action: Action): UiState {
       const scorch = state.course.meta?.effect === 'meteorShower';
       const patch = effectPatchKind(state.course.meta?.effect);
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
+      // GS-ai-attack: past the bogey bar the endless auto driver hunts pins — the identical per-hole
+      // rule headless playStop applies, so an auto-finished hole stays byte-for-byte the sim's.
+      const attack = endlessAttackArmed(state.run, p.holeIndex);
       while (!p.done && guard++ < 40) {
         p = awaitingPutt(p)
           ? takePutt(p, state.run.loadout, state.holeRng)
-          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble, tents, scorch, patch);
+          : takeShot(p, autoDecision(p, state.run.loadout, attack), state.run.loadout, state.holeRng, true, scramble, tents, scorch, patch);
       }
       return { ...state, ...withBestBallPartner(state, p), scrambleChoice: undefined };
     }

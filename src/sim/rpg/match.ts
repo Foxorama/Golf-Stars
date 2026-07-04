@@ -25,8 +25,10 @@ import {
   startingLoadout,
   boostDistanceClubs,
   netDispersion,
+  puttSkillOf,
   type PlayerLoadout,
 } from './economy';
+import { applyBagTier, type BagTier } from './bag';
 import { bossShotMods, golferDistanceBonus, golferProfile, getGolfer } from './golfers';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -35,6 +37,35 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 export const HOME_EDGE_DISTANCE = 6;
 /** Handicap strokes the home-zone edge sharpens the boss by (a lower handicap → tighter, longer). */
 export const HOME_EDGE_HANDICAP = 2;
+
+// --- Ascension boss scaling (GS-boss-scale) -----------------------------------
+//
+// Bosses used to play the identical game at every Ascension tier while the PLAYER's build kept
+// growing (rare/epic/legendary bag tiers, perks, unlocked clubs) — so from ~A4 up the duels fell
+// flat. Now the duel carries an EDGE derived from the run: the boss's handicap tightens and their
+// distance clubs lengthen per tier, they bring the SAME bag rarity the run is played on (gear
+// parity — the applyBagTier machinery, no new club rows), and from BOSS_ATTACK_ASCENSION up they
+// hunt pins (the shared GS-ai-attack target rule). A0 with a common bag is an exact no-op, so the
+// classic boss — and every existing seeded test — is byte-for-byte unchanged.
+
+/** The run-derived sharpening a boss duel is played at. Empty/A0+common = the classic boss. */
+export interface BossEdge {
+  /** Ascension tier of the run (0 = classic, byte-identical). */
+  ascension?: number;
+  /** The run's bag tier — the boss brings the same rarity clubs (gear parity). */
+  bagTier?: BagTier;
+}
+
+/** Handicap strokes shaved off the boss per Ascension tier (they bottom out at scratch). */
+export const BOSS_ASC_HANDICAP = 0.7;
+/** Extra distance-club yards the boss gains per Ascension tier. */
+export const BOSS_ASC_DISTANCE = 2;
+/** Dispersion tightening per Ascension tier (multiplicative, floored) — the knob that keeps biting
+ *  after the handicap bottoms out at scratch (elite bosses start near it). */
+export const BOSS_ASC_DISPERSION = 0.015;
+export const BOSS_ASC_DISPERSION_FLOOR = 0.78;
+/** From this Ascension tier up, the boss hunts pins (GS-ai-attack) instead of the percentage play. */
+export const BOSS_ATTACK_ASCENSION = 4;
 
 /** Does this boss golfer get the "their turf" home-zone edge on a course of the given theme? */
 export function bossHasHomeEdge(golferId: string, themeId: string | undefined): boolean {
@@ -47,34 +78,55 @@ export function bossHasHomeEdge(golferId: string, themeId: string | undefined): 
  * `homeEdge` (GS-team-duel) sharpens them on their home constellation — a lower handicap and a touch
  * more distance, a "this is my turf" signature advantage (fair: you can dodge their home by routing).
  */
-export function bossLoadout(golferId: string, homeEdge = false): PlayerLoadout {
+export function bossLoadout(golferId: string, homeEdge = false, edge: BossEdge = {}): PlayerLoadout {
   const p = golferProfile(golferId);
-  const base = startingLoadout();
-  // Skill+accuracy → handicap ~2 (elite) to ~16 (journeyman); the home edge shaves a couple of strokes.
-  const handicap = Math.round(clamp(20 - p.skill * 12 - p.accuracy * 6 - (homeEdge ? HOME_EDGE_HANDICAP : 0), 1, 18));
+  const asc = clamp(Math.round(edge.ascension ?? 0), 0, 15);
+  // Gear parity (GS-boss-scale): re-stamp the boss's bag to the run's tier FIRST (applyBagTier
+  // rebuilds carries from the set rows), then lay the golfer/home/ascension distance bonus on top.
+  const base = applyBagTier(startingLoadout(), edge.bagTier ?? 'common');
+  // Skill+accuracy → handicap ~2 (elite) to ~16 (journeyman); the home edge shaves a couple of
+  // strokes, and each Ascension tier shaves BOSS_ASC_HANDICAP more (floored at scratch above A0 —
+  // the A0 floor stays 1 so the classic boss is byte-identical).
+  const handicap = Math.round(
+    clamp(
+      20 - p.skill * 12 - p.accuracy * 6 - (homeEdge ? HOME_EDGE_HANDICAP : 0) - asc * BOSS_ASC_HANDICAP,
+      asc > 0 ? 0 : 1,
+      18,
+    ),
+  );
   return {
     ...base,
-    bag: boostDistanceClubs(base.bag, golferDistanceBonus(golferId) + (homeEdge ? HOME_EDGE_DISTANCE : 0)),
+    bag: boostDistanceClubs(
+      base.bag,
+      golferDistanceBonus(golferId) + (homeEdge ? HOME_EDGE_DISTANCE : 0) + Math.round(asc * BOSS_ASC_DISTANCE),
+    ),
     handicap,
-    dispersionMult: 1,
+    // The tier ALSO tightens raw dispersion (multiplicative, floored) — handicap alone saturates
+    // at scratch, and the deep tiers need a knob that keeps working. ×1 at A0, byte-identical.
+    dispersionMult: Math.max(BOSS_ASC_DISPERSION_FLOOR, 1 - asc * BOSS_ASC_DISPERSION),
     characterId: undefined,
   };
 }
 
-/** The `playHole` options for a boss golfer (their bag, dispersion, and shot shape). */
-export function bossPlayOpts(golferId: string, homeEdge = false): PlayHoleOptions {
-  const lo = bossLoadout(golferId, homeEdge);
+/** The `playHole` options for a boss golfer (their bag, dispersion, shot shape — and, at high
+ *  Ascension, the pin-hunting aim). */
+export function bossPlayOpts(golferId: string, homeEdge = false, edge: BossEdge = {}): PlayHoleOptions {
+  const lo = bossLoadout(golferId, homeEdge, edge);
   return {
     bag: lo.bag,
     dispersionMult: netDispersion(lo),
     shotMods: bossShotMods(golferId),
+    attackPin: (edge.ascension ?? 0) >= BOSS_ATTACK_ASCENSION,
+    // A tier-parity bag carries its putter's boost — the boss putts like its flat-stick deserves
+    // ({} on the classic common bag, byte-identical).
+    puttSkill: puttSkillOf(lo),
   };
 }
 
 /** Play a boss golfer's whole stop (their own ball on each hole), deterministically. `rainbowRoad`
  *  (GS-rainbow) makes the boss play the player's rainbow-road hole (off-road = OOB); default off. */
-export function playBossStop(holes: readonly Hole[], golferId: string, rng: Rng, homeEdge = false, rainbowRoad = false, tradeTents = false, meteorScorch = false, groundPatch?: PatchKind): PlayedHole[] {
-  const opts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents, meteorScorch, groundPatch };
+export function playBossStop(holes: readonly Hole[], golferId: string, rng: Rng, homeEdge = false, rainbowRoad = false, tradeTents = false, meteorScorch = false, groundPatch?: PatchKind, edge: BossEdge = {}): PlayedHole[] {
+  const opts = { ...bossPlayOpts(golferId, homeEdge, edge), rainbowRoad, tradeTents, meteorScorch, groundPatch };
   return holes.map((h) => playHole(h, rng, opts));
 }
 
@@ -214,6 +266,7 @@ export function playMatchStop(
   playerRng: Rng,
   bossRng: Rng,
   homeEdge = false,
+  edge: BossEdge = {},
 ): MatchStop {
   // The Rainbow Ball (GS-rainbow) transforms the HOLE, not just the player's ball — so the boss plays
   // the SAME rainbow road (off-road is OOB for them too). Inherit it from the player's opts so a duel
@@ -221,7 +274,7 @@ export function playMatchStop(
   // Trade-camp tents (GS-tents), meteor scorch marks (GS-meteor-scorch) and effect ground patches
   // (GS-journey-fx-2) likewise transform the hole, so the boss obeys the same ring / plays off the
   // same charred craters and turf patches.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch, groundPatch: playerOpts.groundPatch };
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge, edge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch, groundPatch: playerOpts.groundPatch };
   const player: PlayedHole[] = [];
   const boss: PlayedHole[] = [];
   const duels: HoleDuel[] = [];
@@ -253,11 +306,12 @@ export function playBossSideStop(
   tradeTents = false,
   meteorScorch = false,
   groundPatch?: PatchKind,
+  edge: BossEdge = {},
 ): PlayedHole[] {
   // Rainbow Ball (GS-rainbow) / trade-camp tents (GS-tents) / meteor scorch (GS-meteor-scorch) /
   // effect ground patches (GS-journey-fx-2): the player's loadout/route transforms the hole, so the
   // boss side (pre-played by the interactive reducer) plays the same hole. Default off.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad, tradeTents, meteorScorch, groundPatch };
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge, edge), rainbowRoad, tradeTents, meteorScorch, groundPatch };
   const bossPartner = setup.partnerSide === 'boss' ? setup.bossPartnerMods : undefined;
   return holes.map((h) => playSideHole(h, rng, bossOpts, bossPartner, setup.format).played);
 }
@@ -287,10 +341,11 @@ export function playTeamMatchStop(
   playerRng: Rng,
   bossRng: Rng,
   homeEdge = false,
+  edge: BossEdge = {},
 ): MatchStop {
   // Rainbow Ball (GS-rainbow): the boss side plays the same transformed hole (off-road = OOB), and the
   // boss's partner inherits it via `bossOpts` below — so a team duel stays fair under rainbow road.
-  const bossOpts = { ...bossPlayOpts(golferId, homeEdge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch, groundPatch: playerOpts.groundPatch };
+  const bossOpts = { ...bossPlayOpts(golferId, homeEdge, edge), rainbowRoad: playerOpts.rainbowRoad, tradeTents: playerOpts.tradeTents, meteorScorch: playerOpts.meteorScorch, groundPatch: playerOpts.groundPatch };
   const playerPartner = setup.partnerSide === 'player' ? setup.playerPartnerMods : undefined;
   const bossPartner = setup.partnerSide === 'boss' ? setup.bossPartnerMods : undefined;
   const player: PlayedHole[] = [];

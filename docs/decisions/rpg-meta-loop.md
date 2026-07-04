@@ -1184,3 +1184,63 @@ Tests: `tests/endless.test.ts` (club-set handicap monotonicity + proration, net 
 record prepend/cap/best-effort/net-to-par, `finishStop` survived-only accumulation + snapshot round-trip,
 voyage-stays-0, `runEndUpdates` records once / voyage records nothing) and `tests/save.test.ts` (v15→v16
 migration + record round-trip).
+
+## GS-boss-scale + GS-ai-attack — bosses scale with Ascension; the auto-AI pin-hunts under pressure (2026-07-04)
+
+**Problem (player report).** Bosses were "too easy to beat at A4 and higher — even with scramble /
+best-ball it still loses easily", and the team formats "never seem to make a difference".
+
+**Diagnosis (measured, `scratchpad` harnesses over the pure sim).** Two separate truths:
+1. The team formats WORK mechanically — over 900 seeded holes, scramble saved 0.52 strokes/hole and
+   best-ball 0.85 vs the same side solo; the partner's ball counts on ~32% of best-ball holes. The
+   "no difference" perception is real anyway: the PLAYER-side partner is an auto-AI ball, so a
+   skilled human's own ball beats it nearly always (the assist matters to the AI, not to you), and
+   the BOSS-side assist (~0.85 str/hole) was nowhere near the human-vs-boss gap.
+2. `match.ts` never read Ascension. The boss played the identical common-bag, fixed-handicap game at
+   A0 and A15 while the player's build grew every tier (bag tiers at A3/A7/A11, perks, unlocks) —
+   measured: boss 4.18 strokes/hole flat, while player builds walked from 4.89 (A0) to 4.59 (A8-ish).
+
+**Fix.** Every duel now carries a `BossEdge` derived from the RUN (`bossEdgeForRun` — one source for
+headless `playStop` and both reducer pre-play sites, so auto ≡ interactive by construction):
+- **Handicap** −`BOSS_ASC_HANDICAP` (0.7)/tier, floored at scratch above A0 (elite bosses start ~4,
+  so this saturates early by design);
+- **Dispersion** ×(1 − `BOSS_ASC_DISPERSION`·asc) floored at `BOSS_ASC_DISPERSION_FLOOR` — the knob
+  that keeps biting after handicap bottoms out;
+- **Distance** +`BOSS_ASC_DISTANCE` (2yd)/tier on the distance clubs;
+- **Gear parity**: the boss's bag re-stamps to the run's OWN `bagTier` via `applyBagTier` (tier
+  first, distance boost after — applyBagTier rebuilds carries from the set rows), incl. the tier
+  putter's `puttBoost` through the new `puttSkill` opt;
+- **Pin-hunting** from `BOSS_ATTACK_ASCENSION` (4) up, via GS-ai-attack below.
+Calibration (200-hole sweeps, top-rated boss): strokes/hole 4.16 (A0, byte-identical) → 3.91 (A4) →
+3.86 (A8) → 3.74 (A12); the boss's hole-win share vs a matching AI player build now RISES with tier
+(45.8% → 47.2%) instead of eroding. Knobs are named constants in `match.ts` — retune from playtests.
+Also fixed while in here: BOTH interactive boss pre-play sites dropped the solo boss's home-turf
+edge (`playBossStop(..., false, ...)` / an omitted `homeEdge` arg) that headless `playStop` applied
+— an auto ≢ interactive drift on the boss's ball, now resolved like the headless path.
+
+**GS-ai-attack.** `PlayHoleOptions.attackPin` (default off = byte-identical): on a green-REACH shot
+(the shared `attackTarget` rule — some usable club's carry×carryMult covers the flag) the AI aims at
+the FLAG instead of the fat-of-green percentage play; lay-ups untouched; club choice + physics
+identical machinery. Armed (a) in the Unending Universe once the survival bar is bogey-or-tighter
+(`endlessAttackArmed`, `ENDLESS_ATTACK_GATE = 1` — hole 25+), threaded through headless `playStop`
+AND the interactive `autoShotHole`→`autoDecision(…, attackPin)` so contract 2 holds; (b) for
+high-Ascension bosses. Every voyage player-ball and calm-bar endless hole is byte-identical (the
+whole 921-test suite passed unmodified).
+
+**GS-ai-attack putt fix.** `playHole`'s auto putt-out ran DEFAULT skill while the interactive
+auto-putt used `puttSkillOf(loadout)` — putter perks worked only interactively (silent auto ≢
+interactive drift, and part of why shopping barely moved the endless AI's depth). `PlayHoleOptions.
+puttSkill` now threads it (`playerHoleOpts` passes `puttSkillOf(run.loadout)`; `{}` on a stock
+loadout = byte-identical).
+
+**Endless depth after the tune** (`scripts/endless-ai-depth.ts`, 200 seeds/config): purple/orange
+greedy+shallowest now mean ~27.2, median 28, p90 35–36, reach-32 ~33% (was 27–29%), reach-40 3–4%
+(was 0–1%), max 46. The bogey-bar wall (holes 25–32) still dominates deaths — those are BLOW-UPS
+(penalty/pickup chains), not missing birdies, so the next depth lever is course-management (club
+down off the tee on tight corridors), GS-cetus-6-adjacent — NOT more aggression.
+
+Tests: `tests/boss-scale.test.ts` (A0+common byte-identity incl. the played ball, knob monotonicity,
+attack flip at the tier, gear parity, determinism + better-golf-on-average) and
+`tests/ai-attack.test.ts` (off = byte-identity, attackTarget reach rule, endless arming table,
+auto ≡ interactive under attack, puttSkill {} identity + boost sinks more, attack lands nearer the
+flag on average).

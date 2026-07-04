@@ -32,6 +32,7 @@ import {
   netDispersion,
   offerableClubs,
   ownedCount,
+  puttSkillOf,
   relicCreditBonus,
   shopItem,
   talentsForArchetype,
@@ -41,8 +42,8 @@ import {
 } from './economy';
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
-import { endlessMilestoneShards, passesEndlessGate } from './endless';
-import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type TeamSetup, type TeamFormat } from './match';
+import { endlessGateOverPar, endlessMilestoneShards, passesEndlessGate } from './endless';
+import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type BossEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
 import { addUnlockedClubs } from './club-unlock';
@@ -785,6 +786,8 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
   return {
     bag: run.loadout.bag,
     dispersionMult: netDispersion(run.loadout),
+    // Putter perks reach the headless putt-out too (auto ≡ interactive) — {} on a stock loadout.
+    puttSkill: puttSkillOf(run.loadout),
     shotMods: characterShotMods(run.loadout.characterId),
     shapeMod: run.loadout.shapeMod,
     minCarryBoost: run.loadout.minCarryBoost,
@@ -813,6 +816,13 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
   };
 }
 
+/** The run-derived boss sharpening (GS-boss-scale): Ascension tier + the run's bag tier (gear
+ *  parity). One source for the headless `playStop` and the interactive reducer, so a duel plays
+ *  the identical boss either way. A0 + common bag ⇒ the classic boss, byte-for-byte. */
+export function bossEdgeForRun(run: Run): BossEdge {
+  return { ascension: run.ascension, bagTier: run.bagTier };
+}
+
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
   if (run.status !== 'active') throw new Error('playStop: run is not active');
   const course = currentCourse(run);
@@ -836,6 +846,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
           new Rng(`${course.seed}:play`),
           new Rng(`${course.seed}:boss`),
           homeEdge,
+          bossEdgeForRun(run),
         )
       : playMatchStop(
           course.holes,
@@ -844,6 +855,7 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
           new Rng(`${course.seed}:play`),
           new Rng(`${course.seed}:boss`),
           homeEdge,
+          bossEdgeForRun(run),
         );
     const { run: next, result } = finishStop(run, course, stop.player, { matchWon: stop.state.playerAdvances });
     return { run: next, result, played: stop.player };
@@ -857,7 +869,9 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
     const holeOpts = playerHoleOpts(run);
     const played: PlayedHole[] = [];
     for (let i = 0; i < course.holes.length; i++) {
-      const p = playHole(course.holes[i]!, rng, holeOpts);
+      // GS-ai-attack: once the survival bar tightens to bogey-or-better, the auto-AI hunts pins —
+      // the same per-hole rule the interactive auto driver reads via `endlessAttackArmed`.
+      const p = playHole(course.holes[i]!, rng, endlessAttackArmed(run, i) ? { ...holeOpts, attackPin: true } : holeOpts);
       played.push(p);
       if (!passesEndlessGate(p.record.par, p.record.strokes, p.holed, run.holesSurvived + i + 1)) break;
     }
@@ -886,6 +900,17 @@ export function endlessHoleNumber(run: Run, holeIndex: number): number {
  *  so its end-of-run verdict is byte-for-byte the headless `playStop`'s. */
 export function endlessHolePassed(run: Run, holeIndex: number, played: PlayedHole): boolean {
   return passesEndlessGate(played.record.par, played.record.strokes, played.holed, endlessHoleNumber(run, holeIndex));
+}
+
+/** The survival bar (strokes over par) at/below which the endless auto-AI turns pin-hunter. */
+export const ENDLESS_ATTACK_GATE = 1;
+
+/** Should the auto-AI hunt pins on this hole (GS-ai-attack)? Armed only in the Unending Universe,
+ *  once the hole's survival bar is bogey-or-tighter — safe play can't buy pars/birdies at the rate
+ *  the deep bar demands. One rule for headless `playStop` AND the interactive auto driver
+ *  (`autoShotHole`), so auto ≡ interactive holds; every voyage/calm-bar hole is byte-identical. */
+export function endlessAttackArmed(run: Run, holeIndex: number): boolean {
+  return holeGateArmed(run) && endlessGateOverPar(endlessHoleNumber(run, holeIndex)) <= ENDLESS_ATTACK_GATE;
 }
 
 /**

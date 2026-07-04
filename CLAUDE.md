@@ -327,7 +327,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   no other stream moves); journey lanes randomize with the seed. Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a
-  non-boss stop.
+  non-boss stop. **Bosses SCALE with Ascension (GS-boss-scale):** every duel carries a run-derived
+  `BossEdge` (`bossEdgeForRun` — the ONE source for headless playStop AND the reducer's pre-play):
+  handicap/dispersion/distance sharpen per tier (knobs in `match.ts`), the boss bags the run's OWN
+  `bagTier` (gear parity), and from `BOSS_ATTACK_ASCENSION` they pin-hunt via GS-ai-attack; A0 + a
+  common bag is the classic boss, byte-for-byte. **The auto-AI pin-hunts under pressure
+  (GS-ai-attack):** `PlayHoleOptions.attackPin` (default off = byte-identical) aims a green-REACH
+  shot at the FLAG via the shared `attackTarget` rule — armed in the Unending Universe once the bar
+  is bogey-or-tighter (`endlessAttackArmed`, threaded identically through `playStop` and the
+  interactive `autoShotHole`/`autoDecision`, contract 2) and for high-Ascension bosses. And
+  `playHole` now takes `puttSkill` (`playerHoleOpts` passes `puttSkillOf`) so putter perks reach the
+  HEADLESS putt-out — they used to work only interactively, a silent auto ≢ interactive drift.
 - **Competition & leaderboards** (`docs/decisions/competition.md`). The field is a deterministic
   STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims. Survival in the voyage is your
   POSITION in one persistent field that thins to the final two (`arcCut`/`VOYAGE_SURVIVOR_TARGETS`) —

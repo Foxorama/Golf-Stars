@@ -61,3 +61,33 @@ the birdie wall (41+): best case 1% reach hole 40, max observed 41.
 **Verified:** everything above is measured from the pure sim at 200 seeds/config (~4s each).
 **Assumed:** greedy-affordable buying approximates a human build; a human picks synergies better,
 but since the whole economy axis moves the AI ≤2 holes, better buying cannot close the gap to 40.
+
+---
+
+## Addendum (same day): after the GS-ai-attack / GS-boss-scale tune
+
+Two AI changes landed after the baseline above: the endless auto-AI **pin-hunts once the bar is
+bogey-or-tighter** (hole 25+, `endlessAttackArmed`), and **putter perks now reach the headless
+putt-out** (`PlayHoleOptions.puttSkill` — they used to work only interactively, so the AI's
+shopping was partly dead weight). Re-run of the same 200-seed sweep:
+
+| Config | mean | median | p90 | max | reach 32 | reach 40 |
+|---|---:|---:|---:|---:|---:|---:|
+| green, greedy, shallowest | 25.7 (=) | 26 | 33 | 40 | 21% (was 25%) | 2% |
+| purple, greedy, shallowest | 27.1 (+0.3) | 28 | 36 | 41 | 33% (was 29%) | 4% |
+| orange, greedy, shallowest | 27.3 (+0.4) | 28 | 35 | 46 | 33% (was 27%) | 3% |
+
+Deaths at the par bar (33–40) and birdie wall shifted deeper (birdie-tier deaths 0–1 → 4–8 per 200),
+but the **bogey-bar wall (25–32) still dominates** — and those deaths are blow-ups (penalty/pickup
+chains), not missing birdies. The next real depth lever is course MANAGEMENT (club down off the tee
+on tight corridors, avoid hero carries when the bar is loose), which is GS-cetus-6-adjacent AI work —
+more aggression won't move it. Warp's practical ceiling after this tune: **median ~28, p90 ~35** on
+a good build.
+
+Boss scaling (GS-boss-scale) was calibrated in the same pass — strokes/hole for the top-rated boss:
+4.16 (A0, byte-identical to before) → 3.91 (A4) → 3.86 (A8) → 3.74 (A12), with gear parity to the
+run's bag tier and pin-hunting from A4. Knobs are constants in `match.ts`; see
+`docs/decisions/rpg-meta-loop.md` (GS-boss-scale) for the full story, including why best-ball /
+scramble "never seemed to make a difference" (they work — measured scramble Δ0.52, best-ball Δ0.85
+strokes/hole — but the player-side partner is an auto-AI ball a skilled human out-plays ~always,
+and the boss-side assist couldn't close the old fixed-skill gap).

@@ -367,6 +367,16 @@ export interface PlayHoleOptions {
    *  one plays that family's lie. A property of the HOLE while in play, exactly like the scorch
    *  craters (see match.ts). Absent = ordinary play, byte-for-byte unchanged. */
   groundPatch?: PatchKind;
+  /** Pin-hunting AI (GS-ai-attack): on a green-REACH shot, aim at the FLAG instead of the fat of the
+   *  green — the higher-variance line a tight survival bar (or a sharpened boss) demands. Only the
+   *  TARGET changes; club choice and physics run through the identical machinery, and lay-ups are
+   *  untouched. Absent/false = the classic percentage play, byte-for-byte unchanged. */
+  attackPin?: boolean;
+  /** Putting skill for the auto putt-out (GS-ai-attack): the loadout's putter upgrades, so the
+   *  headless sim sinks putts exactly like the interactive auto-putt (`puttSkillOf`) — putter perks
+   *  used to work only interactively, a silent auto ≢ interactive drift. Absent/{} = the classic
+   *  default stroke, byte-for-byte unchanged. */
+  puttSkill?: PuttSkill;
 }
 
 /** Co-op scramble partner (GS-scramble): the partner's per-club shot SHAPE. The partner plays the
@@ -708,6 +718,25 @@ export function biomeCarryMult(hole: Hole): number {
   return m;
 }
 
+/**
+ * The pin-hunting target (GS-ai-attack): the FLAG, when some usable club can carry to it — the
+ * green-reach "go" shot — else null (lay-ups keep the percentage play). Shared by the headless
+ * `playHole` and the interactive auto driver (`autoDecision`) so both resolve the identical rule
+ * (contract 2, auto ≡ interactive). Pure.
+ */
+export function attackTarget(
+  hole: Hole,
+  ball: Vec,
+  usable: readonly Club[],
+  carryMult: number,
+  stats?: ClubStats,
+): Vec | null {
+  const flag = pin(hole);
+  let reach = 0;
+  for (const c of usable) reach = Math.max(reach, clubDist(c, stats) * carryMult);
+  return dist(ball, flag) <= reach ? flag : null;
+}
+
 export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): PlayedHole {
   const bag = opts.bag ?? CLUBS;
   // Aim at the FAT OF THE GREEN (centroid) — the percentage play. Aiming at an off-centre
@@ -742,7 +771,11 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     // Club from the lie-appropriate bag: the driver is tee-only unless the Driver Dan caddy unlocks
     // it from any lie at full stats — same rule the interactive player obeys.
     const usable = usableBag(bag, lie, opts.driverAnywhere ?? false);
-    const tgt = layupTarget(hole, ball, lie, usable, carryMult);
+    // GS-ai-attack: when armed, a green-reach shot hunts the FLAG (variance the tight bar demands);
+    // lay-ups and the default path keep the fat-of-green percentage play, byte-for-byte.
+    const tgt =
+      (opts.attackPin ? attackTarget(hole, ball, usable, carryMult, opts.stats) : null) ??
+      layupTarget(hole, ball, lie, usable, carryMult);
     const club = aiClub(hole, ball, tgt, carryMult, usable, opts.stats);
     // Sam's confidence boost applies when the played club IS the one he'd suggest. Gate the
     // suggestion compute on Sam being owned (confidence present) so a non-Sam run is byte-for-byte
@@ -815,7 +848,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
     if (remaining <= HOLE_OUT_RADIUS) {
       holed = true;
     } else {
-      const out = puttOut(rng, ball, flag, Math.max(1, maxStrokes - strokes));
+      const out = puttOut(rng, ball, flag, Math.max(1, maxStrokes - strokes), opts.puttSkill);
       putts = out.putts;
       puttLog.push(...out.log);
       strokes += putts;
