@@ -702,19 +702,21 @@ function styleGreen(
       ],
     });
     // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
-    // reads with a FINER, denser grid of arrows so the tilt's severity is legible at a glance — a gentle
-    // green keeps the classic two, a full-tilt green fills a 3-wide × up-to-3-deep fall-line grid. Pure
-    // geometry off the deterministic slope magnitude (camera-proof: a fixed count for a given mag).
+    // reads with a slightly denser cluster so the tilt's severity is legible — a gentle green keeps the
+    // classic pair, a full-tilt green a small 3×2 grid. The glyphs are SMALL and capped in ABSOLUTE
+    // course-yards (NOT a fraction of the green span) so they read as a compact fall-line marker at any
+    // zoom — a span-fraction length ballooned into bold lines that stretched clear across the green at the
+    // putt zoom. Pure geometry off the deterministic slope magnitude (camera-proof: fixed count per mag).
     const perp: Vec = [-slope.dir[1], slope.dir[0]];
     const arrows: Prim[] = [];
     const steep = Math.max(0, Math.min(1, (slope.mag - 0.15) / 0.5)); // 0 gentle → 1 full tilt
-    const cols = 2 + Math.round(steep * 1); // 2 or 3 across
-    const rows = 1 + Math.round(steep * 2); // 1..3 down the fall line
-    const colGap = span * 0.17;
-    const rowGap = span * 0.24;
-    const len = span * (0.3 - steep * 0.08); // finer (shorter) arrows as they get denser
-    const head = 4 - steep * 1.2;
-    const col = `rgba(255,255,255,${(0.42 + steep * 0.22).toFixed(3)})`;
+    const cols = 2 + Math.round(steep); // 2 or 3 across
+    const rows = 1 + Math.round(steep); // 1 or 2 down the fall line
+    const len = Math.min(span * 0.16, 3.4); // capped small — a glyph, not a line across the green
+    const colGap = Math.min(span * 0.16, 3.6);
+    const rowGap = Math.min(span * 0.22, 4.6);
+    const head = 2.1;
+    const col = `rgba(255,255,255,${(0.3 + steep * 0.12).toFixed(3)})`; // subtle: never bold/overpowering
     for (let r = 0; r < rows; r++) {
       const roff = (r - (rows - 1) / 2) * rowGap;
       for (let ci = 0; ci < cols; ci++) {
@@ -724,9 +726,9 @@ function styleGreen(
           c[1] + perp[1] * coff - slope.dir[1] * (len * 0.5 + roff),
         ];
         const tip: Vec = [base[0] + slope.dir[0] * len, base[1] + slope.dir[1] * len];
-        arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.4, round: true });
-        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head + perp[0] * (head * 0.75), tip[1] - slope.dir[1] * head + perp[1] * (head * 0.75)], stroke: col, sw: 1.4, round: true });
-        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head - perp[0] * (head * 0.75), tip[1] - slope.dir[1] * head - perp[1] * (head * 0.75)], stroke: col, sw: 1.4, round: true });
+        arrows.push({ t: 'line', a: base, b: tip, stroke: col, sw: 1.1, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head + perp[0] * (head * 0.7), tip[1] - slope.dir[1] * head + perp[1] * (head * 0.7)], stroke: col, sw: 1.1, round: true });
+        arrows.push({ t: 'line', a: tip, b: [tip[0] - slope.dir[0] * head - perp[0] * (head * 0.7), tip[1] - slope.dir[1] * head - perp[1] * (head * 0.7)], stroke: col, sw: 1.1, round: true });
       }
     }
     out.push({ t: 'clip', clip: poly, children: arrows });

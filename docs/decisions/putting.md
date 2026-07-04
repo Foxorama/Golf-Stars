@@ -83,3 +83,20 @@ untouched — it never reads slope or range).
   guards the factor curve, the range-upgrade → more-long-makes claim, the within-range byte-equality, and the
   wildness → steeper-greens statistic.
 
+### Feel fixes after first play-test (GS-putt-depth)
+The first build shipped the mechanics but three things read wrong in the hand — all render/UX, zero sim
+change (every seeded test byte-identical):
+- **The fall-line arrows overpowered the green.** They were sized as a FRACTION of the green's course-space
+  span (`len = span·0.3`), so on a big green they became bold lines stretching clear across the putt-zoom
+  view. Now they're SMALL glyphs capped in ABSOLUTE course-yards (`len = min(span·0.16, 3.4)`, gaps capped
+  likewise), thinner (`sw 1.1`) and fainter (opacity `0.3 + steep·0.12`, was up to 0.64) — a compact
+  fall-line marker that reads at any zoom, denser only by a row/col on the steepest greens.
+- **Long, big-breaking putts weren't reachable.** The aim nudge was clamped to ±12 yd with a flat 0.4-yd
+  step — a long sidehiller needed more break than that to cancel, and dialing it was ~30 taps. The clamp +
+  step now scale with the putt (`puttAimMax = max(8, |ideal|·1.6 + 4)`, `step = max(0.4, max/14)`), and
+  consecutive quick taps ACCELERATE (up to ~5×, `performance.now` in the side-effect layer) so a burst
+  covers the range fast while single taps stay precise.
+- **Short putts framed weird.** The putt camera had a flat 9-yд `viewRadius` floor, so a tap-in sat tiny in
+  a big view. Lowered to `max(5.5, dist·0.6 + 3)` so a short putt actually zooms in (with a little green
+  around the cup for context) while long putts are unchanged.
+

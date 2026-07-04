@@ -985,6 +985,12 @@ let selPutt = false;
 let selPuttAim: number | null = null;
 let puttAimResolved = 0; // the aim (yd) shown this render — read by the commit handler so they match
 let lastPuttKey = ''; // `${holeIndex}:${putts}` — resets the aim for each new putt
+// Aim-nudge feel (GS-putt-depth fix): the ◄/► step + clamp scale with the putt, so a long, big-breaking
+// putt is reachable and not 30 taps to dial in. Set each putt render; consecutive quick taps accelerate.
+let puttAimStep = 0.4; // base yд per tap for this putt (grows with distance)
+let puttAimMax = 12; // ± clamp for this putt (grows with the break to read)
+let puttAimLastTapMs = 0;
+let puttAimStreak = 0;
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
 
 /** The break-read row on the putt screen (GS-greens-3): the slope's break + ◄/► aim controls (or the
@@ -1663,6 +1669,11 @@ function playingBody(animating: boolean): string {
     const puttLen = v.distToPin;
     const puttReadRange = puttSkillOf(state.run.loadout).puttRange ?? DEFAULT_PUTT_RANGE;
     const puttReadFrac = reads ? 1 : Math.min(1, puttReadRange / Math.max(1e-3, puttLen));
+    // Aim range/step scaled to THIS putt so a long, big-breaking putt is reachable and quick to dial in
+    // (a fixed ±12 clamp / 0.4-yd step made a long sidehiller impossible AND painfully slow). The clamp
+    // comfortably exceeds the break you'd need to cancel; the step covers the range in ~a dozen taps.
+    puttAimMax = Math.max(8, Math.abs(ideal) * 1.6 + 4);
+    puttAimStep = Math.max(0.4, puttAimMax / 14);
     const puttSvg = renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
@@ -1675,9 +1686,11 @@ function playingBody(animating: boolean): string {
       width: DMAP_W,
       height: DMAP_H,
       ball: play.ball,
-      // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin.
+      // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin. A lower
+      // floor lets a SHORT putt actually zoom in (the old flat 9-yd floor left a tap-in tiny in a big
+      // view); the +3 keeps a little green around the cup so the break/hole read has context.
       focus: puttMid,
-      viewRadius: Math.max(9, v.distToPin * 0.62),
+      viewRadius: Math.max(5.5, v.distToPin * 0.6 + 3),
       focusBias: 0.5,
       // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
       up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
@@ -3890,7 +3903,15 @@ function render(): void {
   // break line + readout track. Step in yards; held within a sensible window.
   app.querySelectorAll<HTMLElement>('[data-putt-aim]').forEach((el) => {
     el.addEventListener('click', () => {
-      selPuttAim = Math.max(-12, Math.min(12, (selPuttAim ?? 0) + Number(el.dataset.puttAim) * 0.4));
+      const dir = Number(el.dataset.puttAim);
+      // Tap acceleration: consecutive quick taps the SAME way ramp the step up (to ~5×), so dialing a
+      // long, big break isn't a slog — a burst of taps covers the range fast, single taps stay fine.
+      const now = performance.now();
+      if (now - puttAimLastTapMs < 380 && Math.sign(dir) === Math.sign(puttAimStreak || dir)) puttAimStreak += dir;
+      else puttAimStreak = dir;
+      puttAimLastTapMs = now;
+      const accel = Math.min(5, 1 + (Math.abs(puttAimStreak) - 1) * 0.7);
+      selPuttAim = Math.max(-puttAimMax, Math.min(puttAimMax, (selPuttAim ?? 0) + dir * puttAimStep * accel));
       render();
     });
   });
