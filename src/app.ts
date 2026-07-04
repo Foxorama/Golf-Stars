@@ -36,7 +36,7 @@ import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybr
 import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS, getFormat } from './sim/rpg/formats';
 import { getCharacter, type Character } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, holeGateArmed, snapshotRun, starmartRerollCost, STARMART_COST, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
+import { ASCENSION_MAX, ascensionCutBonus, canWarpStop, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, holeGateArmed, snapshotRun, starmartRerollCost, STARMART_COST, teamDuelSetupForRun, type TeamDuelSetup } from './sim/rpg/run';
 import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
@@ -189,7 +189,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 16,
+    version: 17,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,
@@ -941,6 +941,14 @@ function holeIntroScreen(): string {
       </button>
       <div class="gs-holeintro-ctas">
         ${btn('🏌 Tee Off', { type: 'playInteractive' }, { variant: 'primary' })}
+        ${
+          // WARP (GS-warp): fast-forward this stop under the hidden auto-birdie rule — offered only
+          // while the whole stop sits under the player's proven best (canWarpStop), so the button
+          // vanishes exactly where the real golf begins.
+          canWarpStop(state.run, state.endlessBestHoles, state.course.holes.length)
+            ? btn(`⚡ Warp to hole ${state.run.holesSurvived + state.course.holes.length + 1}`, { type: 'warpStop' }, { variant: 'ghost' })
+            : ''
+        }
         ${btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })}
         <button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>
       </div>

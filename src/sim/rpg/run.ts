@@ -42,7 +42,7 @@ import {
 } from './economy';
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
-import { endlessGateOverPar, endlessMilestoneShards, passesEndlessGate } from './endless';
+import { endlessGateOverPar, endlessMilestoneShards, passesEndlessGate, warpBirdieHole } from './endless';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type BossEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
@@ -146,6 +146,11 @@ export interface Run {
   parPlayed: number;
   /** Ids of UNIQUE one-off events already travelled into (GS-17c) — so each fires at most once. */
   firedEventIds: string[];
+  /** Holes fast-forwarded by WARP (GS-warp) — the auto-birdie prefix's length. Warp keeps this in
+   *  lock-step with `holesSurvived` (warping is only allowed while they're equal, so the warped
+   *  span is always a contiguous prefix from hole 1); the first hand-played hole is
+   *  `warpedThrough + 1`, the leaderboard range's start. 0 = an unwarped run. Snapshotted. */
+  warpedThrough: number;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -213,6 +218,7 @@ export function startRun(
     grossStrokes: 0,
     parPlayed: 0,
     firedEventIds: [],
+    warpedThrough: 0,
     status: 'active',
     history: [],
   };
@@ -439,7 +445,7 @@ export function finishStop(
   run: Run,
   course: Course,
   played: PlayedHole[],
-  opts: { matchWon?: boolean } = {},
+  opts: { matchWon?: boolean; warp?: boolean } = {},
 ): { run: Run; result: StopResult } {
   const totals = playTotals(played.map((p) => p.record));
   // The pending route event shifts this stop's cut + payout (GS-14); neutral if none.
@@ -514,7 +520,9 @@ export function finishStop(
   // milestone's shard bonus INSTANTLY through `bonusShards` (the same kept-even-on-a-bust channel the
   // route events use) — so a victory screen's reward can never be clawed back by a later death.
   const holesSurvived = run.holesSurvived + (format.holeGate ? gateSurvived : 0);
-  const milestoneShards = format.holeGate ? endlessMilestoneShards(run.holesSurvived, holesSurvived) : 0;
+  // A WARPED stop (GS-warp) never banks milestone shards — its holes were auto-birdied, not earned,
+  // and warp is retryable/instant, so banking here would be a free shard farm every run.
+  const milestoneShards = format.holeGate && !opts.warp ? endlessMilestoneShards(run.holesSurvived, holesSurvived) : 0;
   // Golf-round score (GS-golf-score): accumulate the GROSS strokes + PAR of exactly the holes that were
   // survived (a partial busting stop counts only its leading passes), so the running gross/to-par/net
   // stays in lock-step with `holesSurvived`. Zero for non-gate formats (the voyage never reads these).
@@ -821,6 +829,48 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
  *  the identical boss either way. A0 + common bag ⇒ the classic boss, byte-for-byte. */
 export function bossEdgeForRun(run: Run): BossEdge {
   return { ascension: run.ascension, bagTier: run.bagTier };
+}
+
+// --- Warp (GS-warp): fast-forward the proven holes under the auto-birdie rule -----------------
+
+/**
+ * May the NEXT stop be warped? Only in the Unending Universe, only while the run is still a pure
+ * warp prefix (`holesSurvived === warpedThrough` — you can't resume warping after taking a real
+ * swing, so the leaderboard range stays one contiguous span), and only while the whole stop fits
+ * under the player's PROVEN best (`bestHoles`) — new ground is always hand-played, which is what
+ * keeps `endlessBestHoles`, the milestones and the Evergreen unlocks un-farmable.
+ */
+export function canWarpStop(run: Run, bestHoles: number, stopHoles: number): boolean {
+  return (
+    run.status === 'active' &&
+    holeGateArmed(run) &&
+    run.holesSurvived === run.warpedThrough &&
+    stopHoles > 0 &&
+    run.holesSurvived + stopHoles <= bestHoles
+  );
+}
+
+/**
+ * Auto-play the current stop under WARP (GS-warp): the auto-AI plays every hole instantly on the
+ * ordinary `:play` stream (same courses, same shot engine, pin-attack arming and all), and each
+ * hole is then floored at a BIRDIE (`warpBirdieHole` — the hidden mirror of the pickup rule), so
+ * the stop always survives its bars. Credits/economy accrue off the (birdie-floored) card exactly
+ * as if played — the build you arrive with is the build the run pays for — but milestone shards
+ * are NOT banked (finishStop's warp opt) and the reducer suppresses the ace-ship grant. The caller
+ * enforces `canWarpStop`; a non-gate format falls through to the ordinary `playStop`.
+ */
+export function playStopWarp(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
+  if (run.status !== 'active') throw new Error('playStopWarp: run is not active');
+  if (!getFormat(run.formatId).holeGate) return playStop(run);
+  const course = currentCourse(run);
+  const rng = new Rng(`${course.seed}:play`);
+  const holeOpts = playerHoleOpts(run);
+  const played = course.holes.map((h, i) =>
+    warpBirdieHole(playHole(h, rng, endlessAttackArmed(run, i) ? { ...holeOpts, attackPin: true } : holeOpts)),
+  );
+  const fin = finishStop(run, course, played, { warp: true });
+  // The warp prefix extends in lock-step with the survived count (every warped hole survives).
+  return { run: { ...fin.run, warpedThrough: fin.run.holesSurvived }, result: fin.result, played };
 }
 
 export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
@@ -1303,6 +1353,9 @@ export interface RunSnapshot {
   firedEventIds?: string[];
   /** The selected golfer (GS-18) — re-applied to the loadout on resume. */
   characterId?: string;
+  /** Holes fast-forwarded by warp (GS-warp), so a resume keeps the leaderboard range's start.
+   *  0/absent for back-compat (an unwarped run). */
+  warpedThrough?: number;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -1325,6 +1378,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     parPlayed: run.parPlayed,
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
+    warpedThrough: run.warpedThrough || undefined,
   };
 }
 
@@ -1355,6 +1409,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     grossStrokes: snap.grossStrokes ?? 0,
     parPlayed: snap.parPlayed ?? 0,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
+    warpedThrough: snap.warpedThrough ?? 0,
     status: 'active',
     history: [],
   };

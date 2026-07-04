@@ -8,7 +8,9 @@ import {
   formatToPar,
   toParColour,
   recordNetToPar,
+  recordRange,
   bestEndlessRecord,
+  endlessRecordsByDepth,
   endlessGateOverPar,
   endlessGateLabel,
   ENDLESS_MILESTONES,
@@ -112,11 +114,14 @@ export function endlessRecordsBoard(
 ): string {
   const limit = opts.limit ?? 10;
   const title = opts.title ?? `Your last ${limit} runs`;
-  const shown = records.slice(0, limit);
+  // GS-warp: the board ranks the last runs by the FURTHEST HOLE REACHED (score is flavour), and
+  // each row carries its hole RANGE — a warped run reads "50–67", a solo one "1–49", so how far
+  // AND from where are both honest at a glance.
+  const shown = endlessRecordsByDepth(records, limit);
   const best = bestEndlessRecord(records);
   const head = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;">
       <span style="font-size:13px;font-weight:800;letter-spacing:.02em;">🏆 ${title}</span>
-      <span style="font-size:10.5px;opacity:.55;">holes · net</span>
+      <span style="font-size:10.5px;opacity:.55;">furthest hole first</span>
     </div>`;
   if (shown.length === 0) {
     return `<div style="max-width:460px;margin-top:14px;padding:14px;border:1px dashed var(--gs-line-2);border-radius:12px;background:#0d1016;">
@@ -147,6 +152,7 @@ export function endlessRecordsBoard(
         <span style="text-align:right;flex:0 0 auto;">
           <span style="font-size:16px;font-weight:800;color:#4fe08a;">${r.holes}</span>
           <span style="font-size:10px;opacity:.5;"> holes</span>
+          <div style="font-size:10px;opacity:.75;white-space:nowrap;">${(r.startHole ?? 1) > 1 ? '⚡ ' : ''}holes ${recordRange(r)}</div>
           <div style="font-size:10.5px;color:${toParColour(nToPar)};">${formatToPar(nToPar)} net</div>
         </span>
       </div>`;

@@ -162,3 +162,9 @@ Two hard lessons in the tails:
   at 32 balls (table above) against the ~99.998%/hole that 60 consecutive gated birdies demand.
   If "resume at 100+" ever becomes a product goal, it needs a different mechanism (e.g. a banked
   checkpoint the format explicitly blesses), not a better AI or more balls.
+
+**Shipped (same day):** the recommendation evolved in review — rather than crew scramble, warp
+shipped as the **hidden automatic-birdie rule** (GS-warp): warped stops floor every hole at a
+birdie (the mirror of the pickup rule), capped at the player's proven best so new ground is always
+hand-played, with the last-runs board re-ranked by furthest hole and showing each run's honest
+range ("1–49" vs "⚡ 50–67"). Full rationale in `docs/decisions/rpg-meta-loop.md` (GS-warp).

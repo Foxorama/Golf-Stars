@@ -1244,3 +1244,49 @@ attack flip at the tier, gear parity, determinism + better-golf-on-average) and
 `tests/ai-attack.test.ts` (off = byte-identity, attackTarget reach rule, endless arming table,
 auto ≡ interactive under attack, puttSkill {} identity + boost sinks more, attack lands nearer the
 flag on average).
+
+## GS-warp — Warp mode: the hidden automatic-birdie rule + the range leaderboard (2026-07-04)
+
+**Problem.** The Unending Universe made players replay 40–50 low-effort holes to get back to their
+frontier. Two measurement passes (see `reports/endless-ai-depth-2026-07-04.md` + its addenda)
+closed off every "honest" fast-forward: the solo auto-AI caps at ~hole 28 median; an N-ball crew
+scramble lifts the median (~35 at 4 balls) but not the guarantee (~hole 13 at any crew size —
+blow-ups are correlated through the shared aim/club decision); and NO assist reaches hole 100+
+because the 41+ birdie-or-better bar compounds exponentially (76%/hole birdie even at 32
+balls/stroke → ~1e-4 % over 60 holes). Conclusion: deep resumption must be format-blessed, not
+earned by a better AI.
+
+**The rule.** Warp auto-plays whole stops instantly on the ordinary `:play` stream (same courses,
+same engine, pin-attack arming and all), then FLOORS each hole at a BIRDIE — `warpBirdieHole`:
+holed in `min(actual, par−1)` (never <1; a real eagle/ace stands; a pickup becomes the birdie). It
+is the deliberate mirror of the pickup rule (disasters cap at par+4 → warped holes floor at par−1),
+and a birdie beats every survival bar, so a warped stop can never bust. "Hidden" = it's presented
+as warp, not as a score cheat; the scorecard reads as plausible golf and the leaderboard RANGE
+(below) discloses it structurally.
+
+**Fairness by scope.** `canWarpStop(run, bestHoles, stopHoles)`: Unending only; only while the run
+is a contiguous warp prefix (`run.holesSurvived === run.warpedThrough` — you cannot resume warping
+after a real swing, so a record's range is always one clean span); and only while the WHOLE stop
+fits under the player's proven `endlessBestHoles`. New ground is therefore always hand-played:
+`endlessBestHoles` can only rise through real golf, so milestones and the Evergreen unlocks stay
+un-farmable. A warped stop banks NO milestone shards (`finishStop`'s new `warp` opt — warp is
+instant + retryable, so banking would be a per-run shard faucet) and the reducer's `warpStop` case
+deliberately omits `aceUpdates` (an auto-birdied prefix can't earn the Comet Rider). Credits DO
+accrue off the birdie-floored card — the build you arrive with is the run's engine, same as if
+you'd survived those stops for real.
+
+**State + persistence.** `Run.warpedThrough` (0 = unwarped) advances in lock-step with
+`holesSurvived` inside `playStopWarp`; snapshotted (`RunSnapshot.warpedThrough`) so a resume keeps
+the range. `EndlessRunRecord.startHole` = `warpedThrough + 1` (absent = from the first tee). Save
+**v17** — a pure version stamp (both fields optional; old data correctly reads as unwarped).
+
+**The range leaderboard.** The last-runs board now ranks the newest 10 records by FURTHEST HOLE
+REACHED (`endlessRecordsByDepth`; ties by net-to-par) — per the design call that the actual score
+is flavour, depth is the game — and every row shows `recordRange` ("1–49" solo, "⚡ 50–67" warped),
+so a warped run is honestly distinguishable at a glance without a second board.
+
+**Determinism.** Warp adds ZERO draws to any existing path: `playStopWarp` plays the identical
+`:play` stream a watch-path would (the birdie floor is post-processing), all gating is pure, and
+the whole 941-test suite passes with only the save-version literals bumped. Guarded by
+`tests/warp.test.ts` (birdie floor incl. pickups, scope gates, lock-step prefix, same-stream proof,
+milestone suppression, snapshot round-trip, reducer flow, range sorting, v17 migration).

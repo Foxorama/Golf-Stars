@@ -14,6 +14,7 @@ import {
   bank,
   bossEdgeForRun,
   buy,
+  canWarpStop,
   currentBoss,
   currentCourse,
   endlessAttackArmed,
@@ -21,6 +22,7 @@ import {
   finishStop,
   holeGateArmed,
   playStop,
+  playStopWarp,
   playerHoleOpts,
   resumeRun,
   routeOptions,
@@ -223,6 +225,7 @@ export type Action =
   | { type: 'backToCharacter' } // GS-intro-split: from the stop intro, step back to re-pick the golfer
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
+  | { type: 'warpStop' } // GS-warp: fast-forward this stop under the hidden auto-birdie rule
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number]; power?: number }
   | { type: 'chooseScrambleBall'; pick: 'player' | 'partner' } // keep a ball in an interactive scramble (GS-team-duel)
@@ -483,6 +486,8 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
           par: run.parPlayed,
           ascension: run.ascension,
           seed: run.seed,
+          // GS-warp: a warped run's board range starts at its first HAND-PLAYED hole ("50–67").
+          startHole: run.warpedThrough > 0 ? run.warpedThrough + 1 : undefined,
         })
       : state.endlessRuns;
   return {
@@ -688,6 +693,33 @@ export function reduce(state: UiState, action: Action): UiState {
         ...endless,
         ...runEndUpdates(state, run),
         ...aceUpdates(state, result, endless.ownedShips ?? state.ownedShips),
+      };
+    }
+
+    case 'warpStop': {
+      // WARP (GS-warp): fast-forward this whole stop under the hidden auto-birdie rule. Gated on
+      // the pure `canWarpStop` (Unending only, contiguous prefix, whole stop under the proven
+      // best), so it can never open new ground or fire past the cap. A warped stop always
+      // survives, so this never reaches gameover; the result screen shows the (birdie-floored)
+      // card like any watched stop. NO `aceUpdates` — an auto-birdied prefix can't earn the
+      // Comet Rider — and `finishStop`'s warp opt already withheld the milestone shards;
+      // `endlessProgressUpdates` is safe (the best-holes cap means it's a no-op) and keeps the
+      // call-site shape identical to the other stop-scoring sites.
+      if (state.screen !== 'intro') return state;
+      if (!canWarpStop(state.run, state.endlessBestHoles, state.course.holes.length)) return state;
+      const { run, result, played } = playStopWarp(state.run);
+      return {
+        ...state,
+        run,
+        played,
+        lastResult: result,
+        match: undefined,
+        viewHole: 0,
+        screen: 'result',
+        bestStableford: Math.max(state.bestStableford, result.stableford),
+        bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        ...endlessProgressUpdates(state, run),
+        ...runEndUpdates(state, run),
       };
     }
 
