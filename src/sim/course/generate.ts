@@ -29,6 +29,7 @@ import {
   type BiomeMod,
   type Course,
   type Feature,
+  type GreenLobe,
   type Hole,
   type Rarity,
   type Vec,
@@ -36,7 +37,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 15;
+export const GENERATOR_VERSION = 16;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -910,6 +911,28 @@ function generateHole(
   const slopeMag = (biome.greenSlopeMax ?? 0.5) * slopeRng.range(0.4 + 0.45 * wildness, 1);
   const greenSlope: Vec = [Math.cos(slopeAng) * slopeMag, Math.sin(slopeAng) * slopeMag];
 
+  // Green CONTOUR (GS-green-contour): 1–2 radial mounds/hollows layered over the plane, so putts
+  // break in MORE THAN ONE direction — cross a lobe and the ball curls left then right, like a real
+  // green. Drawn from its OWN side stream (like pin/slope) so terrain, pin and plane slope draws are
+  // all byte-identical; a second lobe is likelier on wilder stops (a nastier read), but even a calm
+  // green gets one gentle roll so greens never read as flat planes. Lobe strength is capped by the
+  // biome's greenSlopeMax like the plane, and its footprint is sized to the green so the break is
+  // readable at putt zoom — fairness rides the aim clamp always reaching past the ideal borrow.
+  const contourRng = new Rng(`${rng.seed}:contour:${holeIndex}`);
+  const nLobes = contourRng.bool(0.3 + 0.45 * wildness) ? 2 : 1;
+  const greenContour: GreenLobe[] = [];
+  for (let li = 0; li < nLobes; li++) {
+    const la = contourRng.range(0, Math.PI * 2);
+    const ld = greenR * contourRng.range(0.2, 0.75); // centre inside the green, off-middle
+    const lr = greenR * contourRng.range(0.45, 0.85); // footprint: a broad roll, not a pimple
+    const lh =
+      (biome.greenSlopeMax ?? 0.5) *
+      contourRng.range(0.3, 0.75) *
+      (0.55 + 0.45 * wildness) *
+      (contourRng.bool() ? 1 : -1); // mound or hollow
+    greenContour.push({ c: [green[0] + Math.cos(la) * ld, green[1] + Math.sin(la) * ld], r: lr, h: lh });
+  }
+
   // Fairway APRON (GS-greens): a tapering strip that runs THROUGH and PAST the green so the fairway
   // wraps around it instead of ending at a hard flat line. Skipped for void island greens (the green
   // floats over the abyss — nothing behind it). A SEPARATE fairway feature so it never widens the
@@ -1378,7 +1401,7 @@ function generateHole(
   // void/cetus stops look as forgiving as they play.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
-  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, greenSlope };
+  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, greenSlope, greenContour };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */

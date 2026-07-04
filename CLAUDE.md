@@ -384,6 +384,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `greenSlopeMax`, drawn from the SIDE slope rng so terrain is byte-identical and a CALM stop keeps the old
   draw), read via a finer/denser fall-line arrow grid on steeper greens (`styleGreen`, camera-proof off the
   deterministic mag). No new `_gs*` hook. Guarded by `tests/putt-depth.test.ts`.
+  **Greens BREAK in more than one direction (GS-green-contour):** every green layers 1–2 mound/hollow
+  LOBES (`Hole.greenContour`, own side rng stream — terrain/pin/plane draws byte-identical) over the
+  `greenSlope` plane, and `greenSlopeAt` is the ONE local field the resolver's integrated break
+  (`puttBreakProfile`; no lobes ⇒ the old closed form byte-for-byte), the S-curving preview line, the
+  "double-breaks" read (`puttBreakBow`, also the putt-cam frame) AND the renderer's per-cell fall-line
+  arrow field all sample. PUTTING-ONLY by design: `rollOut` still reads the dominant plane — folding
+  lobes into approach roll is a physics retune (contract 4). `tests/green-contour.test.ts` guards.
   **Putt-FEEL rules (GS-putt-feel):** the fall-line arrows are PX-CAPPED in `styleGreen` (prims are
   screen-space — span-proportional chevrons ballooned into bold lines across the whole green at putt
   zoom; the caps never bind at map zoom). The putt watch-cam reuses the putt screen's exact framing

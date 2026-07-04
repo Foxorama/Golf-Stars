@@ -133,3 +133,53 @@ weight for the auto-AI's shopping. `PlayHoleOptions.puttSkill` now threads the l
 `playHole` (`playerHoleOpts` → `puttSkillOf(run.loadout)`; boss bags pass their tier putter's boost
 too). A stock loadout yields `{}` — byte-for-byte the old stroke, so every seeded test is untouched.
 Guarded by `tests/ai-attack.test.ts` (identity + boost-sinks-more).
+
+
+## GS-green-contour — greens break in more than one direction (2026-07-04)
+
+**The ask.** "More arrows" was the first wording, but the real want was more CURVE: greens that read
+like real greens, with more than one angle of break, so the ball can curl left *then* right on one
+putt. A single dominant `greenSlope` plane (GS-greens-3) can only ever break a putt one way.
+
+**The model.** Each green now carries 1–2 contour LOBES (`Hole.greenContour`, `GreenLobe { c, r, h }`)
+on top of the plane: a radial mound (`h > 0`) or hollow (`h < 0`) whose slope magnitude ramps
+0 → |h| out to radius `r` (profile `u·e^((1−u²)/2)`, peak exactly at the flank) and fades smoothly
+beyond, so the surface is continuous everywhere. `greenSlopeAt(p, slope, lobes)` (sim/round.ts) is
+the ONE local field the putt resolver, the break-line preview, and the renderer's arrows all sample.
+
+**Break = the integrated field.** `puttBreakProfile` accumulates the local sidehill component along
+the stroke's travel with the late weighting `w(t) = t^0.8` — the derivative shape of the classic
+`t^1.8` curl — normalised so a CONSTANT field lands exactly on the GS-greens-3 closed form at the
+cup. `puttBreakYd` is the profile's last entry (the net); `puttPathPreview` draws the cumulative
+profile, so a double-breaker's drawn line genuinely S-curves; `puttBreakBow` (max/min drift either
+side, aim-independent) frames the putt camera and flags the "double-breaks" label. **No-lobes paths
+keep the original closed forms byte-for-byte** — every pre-contour test is untouched.
+
+**Scope guard — putting only.** `rollOut`'s green run-out still reads the dominant plane, NOT the
+local field: folding lobes into approach roll would shift every seeded landing on a green and
+re-open the balance harness for a putting-feel feature. The roll is a straight line anyway (the
+roll-invariant), so the plane is the honest average. If lobes should ever brake/boost the roll,
+that's a deliberate physics retune: re-run the no-death-spiral harness (contract 4).
+
+**Generation.** Lobes draw from a dedicated side stream (`${seed}:contour:${holeIndex}` — the
+pin/slope pattern), so terrain, pin and plane-slope draws are all byte-identical. A second lobe is
+likelier on wilder stops (`bool(0.3 + 0.45·wildness)`); strength caps at the biome's
+`greenSlopeMax` (`range(0.3, 0.75) · (0.55 + 0.45·wildness)`), footprint `0.45–0.85·greenR`, centre
+inside `0.2–0.75·greenR`. Fairness rides the existing aim clamp (`puttAimMax` always reaches past
+the ideal borrow) — no putt is UI-unmakeable. `GENERATOR_VERSION` 16.
+
+**Render.** On a contoured green `styleGreen` swaps the single central chevron grid for a LOCAL
+fall-line arrow FIELD: one downhill chevron per course-space grid cell (`step = max(6yd, span/5)`)
+inside the green, sampling `greenSlopeAt` — arrows visibly fan around a mound exactly the way the
+putt will curl. Camera-proof per the contract: grid + near-flat cut (`mag < 0.06`) read only
+course-space/deterministic values; only px sizes read the projection, and they're capped
+(`len ≤ 11px` — the GS-putt-feel lesson) so putt zoom stays subtle. Lobes also get a soft
+crest-lit / hollow-shadowed circle. Plane-only holes render the classic GS-greens-3 look unchanged.
+
+**UI.** The putt screen threads `greenContour` into ideal aim, net break, the drawn line, and frames
+off the BOW (a double-breaker bows wider than its net); the read row says "double-breaks · nets
+1.2yd right" when the curve bows > 0.35yd both sides — net-only would read as flat and lie.
+
+Guarded by `tests/green-contour.test.ts` (field shape, closed-form back-compat, S-curve reality,
+graphic≡physics at the finish, ideal-read holes with wobble stripped, generator emission + side
+stream). Full suite byte-identical-green.

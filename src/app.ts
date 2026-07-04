@@ -23,7 +23,7 @@ import type { EventCategory } from './sim/rpg/events';
 import { COURSE_EFFECTS, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './sim/rpg/effects';
 import { salvageClubFind } from './sim/rpg/salvage';
 import type { PatchKind } from './sim/patches';
-import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
+import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
 import { archetypeFor, themeById } from './sim/course/themes';
@@ -1004,17 +1004,23 @@ let decisionShotCount = -1; // shots taken when the current club selection was d
 
 /** The aim readout inside the break-read row — split out so an aim nudge can update JUST this span
  *  in place (the ◄/► buttons keep their listeners; see puttAimRefresh). */
-function puttAimLabel(breakYd: number, aim: number): string {
+function puttAimLabel(breakYd: number, aim: number, dbl = false): string {
   const fmt = (y: number) => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
-  const brkTxt = Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
+  // GS-green-contour: a double-breaker is called out — its NET break can be tiny while the line
+  // still S-curves, so "breaks —" alone would read as a flat putt and lie about the picture.
+  const brkTxt = dbl
+    ? `double-breaks${Math.abs(breakYd) < 0.2 ? '' : ` · nets ${fmt(breakYd)}`}`
+    : Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
   return `Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)}</b><br><span style="opacity:.6;">slope ${brkTxt}</span>`;
 }
 
 /** The break-read row on the putt screen (GS-greens-3): the slope's break + ◄/► aim controls (or the
  *  caddy's read). `breakYd`/`aim` are signed (+ = right of the line); the player aims to cancel break. */
-function puttAimRow(breakYd: number, aim: number, reads: boolean): string {
+function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = false): string {
   const fmt = (y: number) => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
-  const brkTxt = Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
+  const brkTxt = dbl
+    ? `double-breaks${Math.abs(breakYd) < 0.2 ? '' : ` · nets ${fmt(breakYd)}`}`
+    : Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
   if (reads) {
     return `<div style="font-size:11.5px;opacity:.85;text-align:center;margin:1px 0;">🐀 <b>Mole reads:</b> aim ${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)} · <span style="opacity:.7;">${brkTxt}</span></div>`;
   }
@@ -1681,12 +1687,19 @@ function playingBody(animating: boolean): string {
       lastPuttKey = puttKey;
     }
     const slope = play.hole.greenSlope;
-    const ideal = idealPuttAim(play.ball, puttPin, slope);
+    // GS-green-contour: the contour lobes fold into every read here — ideal aim, net break, the bow
+    // the frame must hold, and the drawn line — through the same sim field the resolver integrates.
+    const contour = play.hole.greenContour;
+    const ideal = idealPuttAim(play.ball, puttPin, slope, contour);
     const reads = !!state.run.loadout.greenRead;
     if (selPuttAim === null) selPuttAim = reads ? ideal : 0;
     const puttAim = reads ? ideal : selPuttAim;
     puttAimResolved = puttAim; // read by the commit handler so the struck aim matches the drawn line
-    const breakYd = puttBreakYd(play.ball, puttPin, slope, MANUAL_IDEAL_PACE);
+    const breakYd = puttBreakYd(play.ball, puttPin, slope, MANUAL_IDEAL_PACE, contour);
+    const bow = puttBreakBow(play.ball, puttPin, slope, contour);
+    // A real double-breaker (the curve bows meaningfully BOTH sides of the line) gets called out in
+    // the read row — its net break alone under-sells the S.
+    const doubleBreak = bow.max > 0.35 && bow.min < -0.35;
     // GS-putt-depth: how far up the line the putter can CONFIDENTLY read. A green-reading caddy (Mystic
     // Mole) sees the whole break; otherwise the confident read ends at the putter's range, and the line
     // fades beyond it. Same range the resolver uses (puttSkillOf), so the picture matches the physics.
@@ -1701,9 +1714,10 @@ function playingBody(animating: boolean): string {
     puttAimMax = Math.max(12, Math.abs(ideal) * 1.6 + 4);
     puttAimStep = Math.max(0.4, Math.min(1, puttAimMax / 14));
     // Frame the putt to cover the ball↔cup span PLUS the break's lateral swing — on a steep green the
-    // curved line used to bow outside a distance-only radius. Keyed to breakYd (aim-INDEPENDENT) so the
-    // zoom holds perfectly still while the player nudges the read.
-    const puttRadius = Math.max(5.5, v.distToPin * 0.6 + 3 + Math.min(14, Math.abs(breakYd)) * 0.6);
+    // curved line used to bow outside a distance-only radius. Keyed to the break BOW (aim-INDEPENDENT;
+    // GS-green-contour: a double-breaker bows both ways, wider than its net break) so the zoom holds
+    // perfectly still while the player nudges the read.
+    const puttRadius = Math.max(5.5, v.distToPin * 0.6 + 3 + Math.min(14, Math.max(bow.max, -bow.min)) * 0.6);
     puttViewRadius = puttRadius;
     const buildPuttSvg = (aim: number) => renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
@@ -1725,7 +1739,7 @@ function playingBody(animating: boolean): string {
       focusBias: 0.5,
       // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
       up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
-      puttPath: puttPathPreview(play.ball, puttPin, slope, aim, MANUAL_IDEAL_PACE),
+      puttPath: puttPathPreview(play.ball, puttPin, slope, aim, MANUAL_IDEAL_PACE, contour),
       puttReadFrac,
     });
     const puttSvg = buildPuttSvg(puttAim);
@@ -1738,7 +1752,7 @@ function playingBody(animating: boolean): string {
       const svgEl = document.querySelector('.gs-bigmap[data-weather="putt"] svg');
       if (svgEl) svgEl.outerHTML = buildPuttSvg(aim);
       const label = document.getElementById('puttaimlabel');
-      if (label) label.innerHTML = puttAimLabel(breakYd, aim);
+      if (label) label.innerHTML = puttAimLabel(breakYd, aim, doubleBreak);
     };
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
@@ -1751,7 +1765,7 @@ function playingBody(animating: boolean): string {
           ${caddyBadgeHTML(puttCaddyId())}
           <div class="gs-hud-controls gs-glass">
             <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` <span style="opacity:.85;">Past <b>${Math.round(puttReadRange)}y</b> the read goes <b>blind</b> — a better putter reads further.</span>` : ''}</p>
-            ${puttAimRow(breakYd, puttAim, reads)}
+            ${puttAimRow(breakYd, puttAim, reads, doubleBreak)}
             <div id="puttmeter"></div>
             <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
             ${fringePutt ? `<button class="gs-btn gs-btn--ghost" data-putt-toggle="0" style="margin:6px 0 0;padding:9px;">⛳→🏌 Chip instead</button>` : ''}

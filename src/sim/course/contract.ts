@@ -56,6 +56,21 @@ export interface BiomeMod {
   note?: string;
 }
 
+/**
+ * One green-contour lobe (GS-green-contour): a radial mound (h > 0) or hollow (h < 0) whose gradient
+ * is added to the green's dominant `greenSlope` plane. Its slope magnitude ramps 0 → |h| from the
+ * centre out to radius `r`, then fades smoothly beyond, so the surface stays continuous. Emitted by
+ * the generator, sampled by the sim (`greenSlopeAt`) and drawn by the renderer from the SAME numbers.
+ */
+export interface GreenLobe {
+  /** Lobe centre (course space, on/near the green). */
+  c: Vec;
+  /** Footprint radius (yards) — the local slope peaks at ~r from centre. */
+  r: number;
+  /** Signed peak slope magnitude: + = mound (downhill points away), − = hollow (downhill points in). */
+  h: number;
+}
+
 export interface Wind {
   /** Direction the wind blows TOWARD, in degrees clockwise from +Y (up-screen). */
   dir: number;
@@ -107,6 +122,17 @@ export interface Hole {
    * Optional for back-compat: a hole without one plays flat.
    */
   greenSlope?: Vec;
+  /**
+   * Green CONTOUR lobes (GS-green-contour): real greens break in more than one direction, so on top
+   * of the dominant `greenSlope` plane each green carries 1–2 radial mounds (h > 0) / hollows (h < 0).
+   * The LOCAL slope at any point is the plane plus each lobe's gradient (`greenSlopeAt` in sim/round),
+   * so a putt crossing a mound curls one way then the other — a double-breaker. `c` is the lobe centre
+   * (course space, on/near the green), `r` its footprint radius (yards; slope peaks at ~r from centre
+   * and fades beyond), `h` the signed PEAK slope magnitude it adds (same units as `greenSlope`'s mag).
+   * Drawn from a dedicated SIDE rng stream so every other stream — terrain, pin, plane slope — is
+   * byte-identical. Optional for back-compat: absent ⇒ the single-plane GS-greens-3 green.
+   */
+  greenContour?: GreenLobe[];
   /**
    * Trade-camp TENTS armed on THIS hole (GS-tent-interactions): the trade-market route pitches its
    * collidable tent ring on exactly ONE random hole of the stop, not every hole. Stamped post-generation
