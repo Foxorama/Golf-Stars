@@ -122,3 +122,14 @@ change (every seeded test byte-identical). The final state:
   aim → commit): label updates without a meter remount, hold moved the aim 5.6yd in 1.4s, no page
   errors. Zero sim/rng changes — the full 921-test suite is byte-identical-green.
 
+
+## GS-ai-attack putt fix — putter perks now reach the headless putt-out (2026-07-04)
+
+`playHole`'s auto putt-out called `puttOut(rng, ball, flag, budget)` with DEFAULT skill, while the
+interactive green (`finishShot`/`takePutt`) used `puttSkillOf(loadout)` — so `puttBoost` perks and
+the Auto-Caddie sank more putts interactively than the headless sim for the SAME run: a silent
+auto ≢ interactive drift (unseen because the seeded parity tests never shop putters), and dead
+weight for the auto-AI's shopping. `PlayHoleOptions.puttSkill` now threads the loadout's skill into
+`playHole` (`playerHoleOpts` → `puttSkillOf(run.loadout)`; boss bags pass their tier putter's boost
+too). A stock loadout yields `{}` — byte-for-byte the old stroke, so every seeded test is untouched.
+Guarded by `tests/ai-attack.test.ts` (identity + boost-sinks-more).

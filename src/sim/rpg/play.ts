@@ -13,6 +13,7 @@ import type { PatchKind } from '../patches';
 import { type Club } from '../clubs';
 import {
   aiClub,
+  attackTarget,
   biomeCarryMult,
   executeShot,
   HOLE_OUT_RADIUS,
@@ -162,8 +163,16 @@ export function previewShot(
   });
 }
 
-/** The decision the AI would make (mirrors playHole): lay up to the corridor, AI club. */
-export function autoDecision(state: HolePlay, loadout: PlayerLoadout): ShotDecision {
+/** The decision the AI would make (mirrors playHole): lay up to the corridor, AI club — or, with
+ *  `attackPin` armed (GS-ai-attack), hunt the flag on a green-reach shot exactly as the headless
+ *  `playHole` does (shared `attackTarget` rule + the same `aiClub` pick, so auto ≡ interactive). */
+export function autoDecision(state: HolePlay, loadout: PlayerLoadout, attackPin = false): ShotDecision {
+  if (attackPin) {
+    const carryMult = biomeCarryMult(state.hole);
+    const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
+    const flag = attackTarget(state.hole, state.ball, bag, carryMult);
+    if (flag) return { aim: 'attack', clubId: aiClub(state.hole, state.ball, flag, carryMult, bag).id };
+  }
   return { aim: 'safe', clubId: shotView(state, loadout).safeClubId };
 }
 

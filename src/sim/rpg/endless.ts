@@ -1,4 +1,5 @@
 import type { BagTier } from './bag';
+import type { PlayedHole } from '../round';
 import { RARITY_C } from './loot';
 
 /**
@@ -66,6 +67,25 @@ export function endlessRequiredStrokes(par: number, holeNumber: number): number 
 /** Does a finished hole clear its survival bar? A pickup (never holed out) always fails. */
 export function passesEndlessGate(par: number, strokes: number, holed: boolean, holeNumber: number): boolean {
   return holed && strokes <= endlessRequiredStrokes(par, holeNumber);
+}
+
+// --- Warp: the hidden automatic-birdie rule (GS-warp) --------------------------
+//
+// Warp fast-forwards the early holes the player has ALREADY proven they can beat (capped at their
+// lifetime best), auto-playing whole stops instantly. Its survival law is the mirror of the pickup
+// rule: just as a disaster hole is CAPPED at par + MAX_OVER_PAR, a warped hole is FLOORED at a
+// BIRDIE — the ball is deemed holed in par−1 (a better real score, an eagle or ace, stands). A
+// birdie beats every survival bar, so a warped stop can never bust the run; measurement showed no
+// honest assist can deliver deep holes anyway (the 41+ birdie-or-better bar compounds
+// exponentially — see reports/endless-ai-depth-2026-07-04.md), so warp is a format-blessed
+// checkpoint, kept honest on the leaderboard by recording the run's STARTING hole (the range
+// "50–67" can never masquerade as "1–67").
+
+/** Floor a warp-played hole at a birdie: holed in min(actual, par−1) strokes (never below 1) —
+ *  a real eagle/ace stands, a pickup becomes the birdie. Pure; zero rng. */
+export function warpBirdieHole(p: PlayedHole): PlayedHole {
+  const strokes = Math.min(p.record.strokes, Math.max(1, p.record.par - 1));
+  return { ...p, record: { ...p.record, strokes }, holed: true, pickedUp: false };
 }
 
 // --- Milestones (the victory screens) ----------------------------------------
@@ -221,6 +241,28 @@ export interface EndlessRunRecord {
   ascension: number;
   /** The run seed (lets a record be replayed / disambiguated). */
   seed: number;
+  /** The first HAND-PLAYED hole (GS-warp): 1 / absent = played from the first tee; a warped run
+   *  starts where the auto-birdie prefix ended + 1 — so the board's range ("50–67") keeps a warped
+   *  run honestly distinguishable from a solo one. */
+  startHole?: number;
+}
+
+/** The record's hole RANGE, first hand-played → last survived ("1–49", "50–67"). What the board
+ *  tracks is how far the run got; the range shows where it started earning it (GS-warp). */
+export function recordRange(rec: EndlessRunRecord): string {
+  return `${rec.startHole ?? 1}–${rec.holes}`;
+}
+
+/** The board view (GS-warp): the newest `n` runs, sorted by the highest hole reached (ties by
+ *  better net-to-par, then newer first). Score is flavour; depth is the ranking. Pure. */
+export function endlessRecordsByDepth(records: readonly EndlessRunRecord[], n = 10): EndlessRunRecord[] {
+  const newest = records.slice(0, n);
+  return [...newest].sort((a, b) => {
+    if (a.holes !== b.holes) return b.holes - a.holes;
+    const d = recordNetToPar(a) - recordNetToPar(b);
+    if (d !== 0) return d;
+    return newest.indexOf(a) - newest.indexOf(b);
+  });
 }
 
 /** Cap on stored records — we keep a rolling window and surface the most recent slice. */

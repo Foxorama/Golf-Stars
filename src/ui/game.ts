@@ -12,13 +12,17 @@ import type { PlayedHole, PuttControl } from '../sim/round';
 import {
   ASCENSION_MAX,
   bank,
+  bossEdgeForRun,
   buy,
+  canWarpStop,
   currentBoss,
   currentCourse,
+  endlessAttackArmed,
   endlessHolePassed,
   finishStop,
   holeGateArmed,
   playStop,
+  playStopWarp,
   playerHoleOpts,
   resumeRun,
   routeOptions,
@@ -52,6 +56,7 @@ import {
   playBossStop,
   playBossSideStop,
   betterPlayedHole,
+  bossHasHomeEdge,
   holeDuel,
   matchState,
   type HoleDuel,
@@ -220,6 +225,7 @@ export type Action =
   | { type: 'backToCharacter' } // GS-intro-split: from the stop intro, step back to re-pick the golfer
   | { type: 'resume' }
   | { type: 'play' } // auto-play the whole stop (watch)
+  | { type: 'warpStop' } // GS-warp: fast-forward this stop under the hidden auto-birdie rule
   | { type: 'playInteractive' } // play shot-by-shot
   | { type: 'shot'; clubId: string; aim: AimMode; target?: [number, number]; power?: number }
   | { type: 'chooseScrambleBall'; pick: 'player' | 'partner' } // keep a ball in an interactive scramble (GS-team-duel)
@@ -480,6 +486,8 @@ export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
           par: run.parPlayed,
           ascension: run.ascension,
           seed: run.seed,
+          // GS-warp: a warped run's board range starts at its first HAND-PLAYED hole ("50–67").
+          startHole: run.warpedThrough > 0 ? run.warpedThrough + 1 : undefined,
         })
       : state.endlessRuns;
   return {
@@ -626,7 +634,9 @@ export function reduce(state: UiState, action: Action): UiState {
       if (isMatchplayBoss(currentBoss(state.run))) {
         const setup = teamDuelSetupForRun(state.run);
         const bossId = setup?.opponentId ?? resolveBossId(state.run);
-        const homeEdge = setup?.homeEdge ?? false;
+        // The solo boss's home-turf edge was silently dropped on this watch path (headless playStop
+        // always applied it) — resolve it the same way, and carry the Ascension edge (GS-boss-scale).
+        const homeEdge = setup?.homeEdge ?? bossHasHomeEdge(bossId, state.course.meta?.themeId);
         const stop = setup
           ? playTeamMatchStop(
               state.course.holes,
@@ -636,6 +646,7 @@ export function reduce(state: UiState, action: Action): UiState {
               new Rng(`${state.course.seed}:play`),
               new Rng(`${state.course.seed}:boss`),
               homeEdge,
+              bossEdgeForRun(state.run),
             )
           : playMatchStop(
               state.course.holes,
@@ -643,6 +654,8 @@ export function reduce(state: UiState, action: Action): UiState {
               bossId,
               new Rng(`${state.course.seed}:play`),
               new Rng(`${state.course.seed}:boss`),
+              homeEdge,
+              bossEdgeForRun(state.run),
             );
         const { run, result } = finishStop(state.run, state.course, stop.player, { matchWon: stop.state.playerAdvances });
         const ended = run.status !== 'active';
@@ -683,6 +696,33 @@ export function reduce(state: UiState, action: Action): UiState {
       };
     }
 
+    case 'warpStop': {
+      // WARP (GS-warp): fast-forward this whole stop under the hidden auto-birdie rule. Gated on
+      // the pure `canWarpStop` (Unending only, contiguous prefix, whole stop under the proven
+      // best), so it can never open new ground or fire past the cap. A warped stop always
+      // survives, so this never reaches gameover; the result screen shows the (birdie-floored)
+      // card like any watched stop. NO `aceUpdates` — an auto-birdied prefix can't earn the
+      // Comet Rider — and `finishStop`'s warp opt already withheld the milestone shards;
+      // `endlessProgressUpdates` is safe (the best-holes cap means it's a no-op) and keeps the
+      // call-site shape identical to the other stop-scoring sites.
+      if (state.screen !== 'intro') return state;
+      if (!canWarpStop(state.run, state.endlessBestHoles, state.course.holes.length)) return state;
+      const { run, result, played } = playStopWarp(state.run);
+      return {
+        ...state,
+        run,
+        played,
+        lastResult: result,
+        match: undefined,
+        viewHole: 0,
+        screen: 'result',
+        bestStableford: Math.max(state.bestStableford, result.stableford),
+        bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        ...endlessProgressUpdates(state, run),
+        ...runEndUpdates(state, run),
+      };
+    }
+
     case 'playInteractive': {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       // Matchplay boss stop (GS-100): pre-play the boss's ball for the whole stop (its own real shots,
@@ -695,9 +735,13 @@ export function reduce(state: UiState, action: Action): UiState {
         const bossTents = state.course.meta?.effect === 'tradeMarket';
         const bossScorch = state.course.meta?.effect === 'meteorShower';
         const bossPatch = effectPatchKind(state.course.meta?.effect);
+        // The solo boss keeps its home-turf edge here too (it was dropped only on this interactive
+        // path — headless playStop always applied it), and both shapes carry the run's Ascension
+        // sharpening (GS-boss-scale) so the pre-played boss is the exact headless boss.
+        const soloHomeEdge = bossHasHomeEdge(bossId, state.course.meta?.themeId);
         const bossHoles = setup
-          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch)
-          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), false, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch);
+          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(state.run))
+          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), soloHomeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(state.run));
         match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false, setup, partnerHoles: setup ? [] : undefined };
       }
       return {
@@ -798,10 +842,13 @@ export function reduce(state: UiState, action: Action): UiState {
       const scorch = state.course.meta?.effect === 'meteorShower';
       const patch = effectPatchKind(state.course.meta?.effect);
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
+      // GS-ai-attack: past the bogey bar the endless auto driver hunts pins — the identical per-hole
+      // rule headless playStop applies, so an auto-finished hole stays byte-for-byte the sim's.
+      const attack = endlessAttackArmed(state.run, p.holeIndex);
       while (!p.done && guard++ < 40) {
         p = awaitingPutt(p)
           ? takePutt(p, state.run.loadout, state.holeRng)
-          : takeShot(p, autoDecision(p, state.run.loadout), state.run.loadout, state.holeRng, true, scramble, tents, scorch, patch);
+          : takeShot(p, autoDecision(p, state.run.loadout, attack), state.run.loadout, state.holeRng, true, scramble, tents, scorch, patch);
       }
       return { ...state, ...withBestBallPartner(state, p), scrambleChoice: undefined };
     }

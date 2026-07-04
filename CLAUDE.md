@@ -64,8 +64,9 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v16** (`endlessRuns` — the Unending-Universe
-  last-runs leaderboard); bump + add a migration when you persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
+  (localStorage is the only copy). Current schema is **v17** (GS-warp: `EndlessRunRecord.startHole`
+  + `RunSnapshot.warpedThrough`, both optional → a pure version stamp); bump + add a migration when
+  you persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
   caddies, ships are tables the sim reads. **New world / item / golfer = a new row, not an engine edit.**
@@ -191,6 +192,18 @@ For each system: the rule that constrains new work. Open the archive doc before 
   club set, showing holes reached + net + golfer. Pure/zero-rng display + a per-run record — the survival
   gate, the balance harness, and every existing seed are untouched. UI in `render/endlessCards.ts`
   (intro / end-of-hole / result / gameover), all gated on `holeGateArmed`.
+  **WARP fast-forwards only PROVEN holes under the hidden AUTOMATIC-BIRDIE rule (GS-warp):** the
+  intro's Warp button auto-plays the whole stop on the ordinary `:play` stream and FLOORS each hole
+  at a birdie (`warpBirdieHole` — the mirror of the pickup rule; a real eagle/ace stands), so a
+  warped stop can never bust — measurement proved no honest assist can deliver deep holes (the 41+
+  birdie bar compounds exponentially; see `reports/endless-ai-depth-2026-07-04.md`). Fairness by
+  scope, not by golf: `canWarpStop` allows warping ONLY while the run is a contiguous warp prefix
+  (`holesSurvived === warpedThrough`) AND the whole stop fits under `endlessBestHoles` — new ground
+  is always hand-played, so best-holes/milestones/unlocks stay un-farmable; a warped stop banks NO
+  milestone shards (`finishStop`'s `warp` opt) and never grants the ace ship (no `aceUpdates` in the
+  reducer's `warpStop`). The last-runs board ranks by FURTHEST HOLE (`endlessRecordsByDepth`, newest
+  10) and every row carries its honest hole RANGE (`recordRange` — "50–67" vs "1–49", ⚡-marked), so
+  a warped run can't masquerade as a solo one. Save v17.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
   ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),
@@ -327,7 +340,17 @@ For each system: the rule that constrains new work. Open the archive doc before 
   no other stream moves); journey lanes randomize with the seed. Characters/talents/
   ace rewards ride `loadout.perks` ids, rebuilt on resume (no save bump). Bosses: solo matchplay +
   Arc-II team duel (best-ball/scramble), played on a separate `:boss` rng so your ball stays a
-  non-boss stop.
+  non-boss stop. **Bosses SCALE with Ascension (GS-boss-scale):** every duel carries a run-derived
+  `BossEdge` (`bossEdgeForRun` — the ONE source for headless playStop AND the reducer's pre-play):
+  handicap/dispersion/distance sharpen per tier (knobs in `match.ts`), the boss bags the run's OWN
+  `bagTier` (gear parity), and from `BOSS_ATTACK_ASCENSION` they pin-hunt via GS-ai-attack; A0 + a
+  common bag is the classic boss, byte-for-byte. **The auto-AI pin-hunts under pressure
+  (GS-ai-attack):** `PlayHoleOptions.attackPin` (default off = byte-identical) aims a green-REACH
+  shot at the FLAG via the shared `attackTarget` rule — armed in the Unending Universe once the bar
+  is bogey-or-tighter (`endlessAttackArmed`, threaded identically through `playStop` and the
+  interactive `autoShotHole`/`autoDecision`, contract 2) and for high-Ascension bosses. And
+  `playHole` now takes `puttSkill` (`playerHoleOpts` passes `puttSkillOf`) so putter perks reach the
+  HEADLESS putt-out — they used to work only interactively, a silent auto ≢ interactive drift.
 - **Competition & leaderboards** (`docs/decisions/competition.md`). The field is a deterministic
   STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims. Survival in the voyage is your
   POSITION in one persistent field that thins to the final two (`arcCut`/`VOYAGE_SURVIVOR_TARGETS`) —

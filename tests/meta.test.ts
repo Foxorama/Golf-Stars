@@ -111,6 +111,7 @@ describe('meta wired into the run', () => {
       holesSurvived: 0,
       grossStrokes: 0,
       parPlayed: 0,
+      warpedThrough: 0,
       stopIndex: stops,
       distanceFromStart: distance,
       credits: 0,
