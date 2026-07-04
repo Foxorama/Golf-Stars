@@ -285,10 +285,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   the dead-straight inverse of ice's wild skid) — pure seeded per-kind streams, rest-lie conversion in
   `executeShot`, drawn + played from the SAME source. The route card states every hook (wind/carry chips
   computed from the physics tables; geometric hooks via `CourseEffectInfo.play`), so a lane reads pre-jump.
-  **Trade tents are now ONE surprise hole with FIVE randomised interactions (GS-tent-interactions):** the
-  tradeMarket route stamps its collidable tent ring on a single deterministic hole (`Hole.tents`, chosen
-  by a pure hash in `run.ts armTentHole` — zero generation rng), and each of the five tents carries an
-  `effect` dealt by a per-hole shuffle (`sim/tents.ts assignTentEffects`) so COLOUR never predicts effect.
+  **Trade tents ring EVERY hole of a tradeMarket stop, each with FIVE randomised interactions (GS-tent-interactions):** the
+  tradeMarket route stamps its collidable tent ring on all holes (`Hole.tents`, stamped by
+  `run.ts armTentHoles` — zero generation rng; a single surprise hole was too rare for a "trade market",
+  so the whole stop — 6 holes voyage / 4 unending / N future — is the trade-camp world), and each hole's five tents carry an
+  `effect` dealt by a per-hole shuffle (`sim/tents.ts assignTentEffects`) so COLOUR never predicts effect
+  and no two greens play alike.
   The bounce PHYSICS is identical for all tents EXCEPT the **marmot**, whose bite is a deterministic LOST
   BALL (stroke-and-distance) resolved in `executeShot` (so auto ≡ interactive); the other four are
   interactive-only META reactions layered in the reducer like the ace/unlock side-effects: **ow**/**watch**
@@ -299,7 +301,7 @@ For each system: the rule that constrains new work. Open the archive doc before 
   via `loadout.perks`). The speech bubble anchors on the tent CENTRE in course space, re-projected each
   frame (`ShotLog.tentHit.c`) — the fix for the old bubble that drifted with the ball. Every other hole/
   world stays byte-identical (all gates are `hole.tents` + effect-armed). `tests/tents.test.ts` +
-  `tests/starmart.test.ts` + `tests/journey-effects.test.ts` (one-hole invariant) + `tests/ui.test.ts`.
+  `tests/starmart.test.ts` + `tests/journey-effects.test.ts` (every-hole invariant) + `tests/ui.test.ts`.
   **The sky roster is 17 effects (GS-journey-weather adds 5):** `blizzard` (gale wind + ice — the storm-cold
   cousin of frostfall), `radiant` (carry↑ + wind↓ — a bomber's-paradise still, bright sky), `dustStorm`
   (wind↑ + carry↓ — grit that gusts AND drags), `solarWind` (steady wind↑, a third storm that isn't

@@ -300,9 +300,9 @@ export function currentCourse(run: Run): Course {
   // back holes a different theme of the same arc. Each half is generated independently and stitched,
   // every hole stamped with its own biome/themeId so it renders + plays as its world.
   if (spec.splitBiome && spec.holes >= 2) {
-    return armTentHole(applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect), effect);
+    return armTentHoles(applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect), effect);
   }
-  return armTentHole(
+  return armTentHoles(
     applyEffectPhysics(
       generateStopCourse(stopSeed(run), {
         holes: spec.holes,
@@ -321,24 +321,19 @@ export function currentCourse(run: Run): Course {
 }
 
 /**
- * Pitch the trade-market tent ring on exactly ONE hole of the stop (GS-tent-interactions). The
- * tradeMarket route used to arm collidable tents around EVERY green — a novelty that wore thin over a
- * full stop and turned the whole world into a bounce-house. Now it's a single surprise hole: pick the
- * index deterministically from the course seed (a pure hash — no rng draw, so the generated course is
- * byte-for-byte unchanged) and stamp `tents:true` on that hole only. A non-tradeMarket effect returns
- * the course untouched. Both the headless sim and the interactive driver read this one stamp, so they
- * agree on which hole carries the market.
+ * Pitch the trade-market tent ring on EVERY hole of the stop (GS-tent-interactions). Tents live only
+ * on a `tradeMarket` route, so the "market" is the whole world you've stopped in — a trade camp at
+ * each green for however many holes the mode runs (6 for a voyage stop, 4 for the Unending Universe,
+ * or whatever a future mode sets). A single surprise hole made the mechanic too rare to feel like a
+ * market; stamping the whole stop makes the tradeMarket lane read as its trade-camp world while the
+ * per-hole effect shuffle (`assignTentEffects`) keeps each green's colour→effect mapping distinct.
+ * `tents:true` is a pure post-generation stamp (no rng draw, so the generated course is byte-for-byte
+ * unchanged); both the headless sim and the interactive driver read it, so they agree on the tents. A
+ * non-tradeMarket effect returns the course untouched.
  */
-function armTentHole(course: Course, effect: string): Course {
+function armTentHoles(course: Course, effect: string): Course {
   if (effect !== 'tradeMarket' || course.holes.length === 0) return course;
-  let h = 2166136261;
-  const s = `${course.seed}:tenthole`;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const idx = (h >>> 0) % course.holes.length;
-  return { ...course, holes: course.holes.map((hole, i) => (i === idx ? { ...hole, tents: true } : hole)) };
+  return { ...course, holes: course.holes.map((hole) => ({ ...hole, tents: true })) };
 }
 
 /**
