@@ -411,6 +411,16 @@ For each system: the rule that constrains new work. Open the archive doc before 
   up-light SHEEN, so the corridor sits in a graded fairway→first-cut→rough transition, not a bright
   tube on top. Gated to parkland worlds (`arch !== 'void' && 'cetus'`); void/cetus edge their corridor
   with a glow rim / raised shelf, so they pass NO collar and stay byte-identical. Pure geometry, zero rng.
+  **HAZARDS ease into the turf the same way (GS-cetus-blend):** `styleSandFamily`/`styleLiquidFamily`
+  each lay a soft grassy MARGIN just outside the body (`mixHex(rough, sand|shore, 0.42)`, grouped UNDER
+  every body so a merged complex shares one seamless margin) — the land thinning toward the hazard, so a
+  bunker/lake reads set INTO the ground instead of a hard-edged sticker; blended toward the hazard (never
+  darker than the turf → not a floating shadow, the GS-inset-2 lesson). Pure geometry, zero rng. **And
+  void/cetus fairway+green STRIPES were retuned down (GS-cetus-blend):** their wide light↔dark VALUE
+  spread banded even a normal mow into discordant bright/dark stripes over the smooth luminous platform,
+  so `MOW_BLEND` now mutes them BELOW parkland (void 0.4 / cetus 0.42, dark eased to `k·0.72` on every
+  world) and `styleGreen` softens its stripe for those two worlds (0.52/0.36 vs the parkland 0.7/0.5) —
+  parkland stays byte-identical.
   The ANIMATED weather layer honours the same land: its pinned twinkle
   starfield masks off `landPolysCourseFor` (`WeatherOpts.starMask`; moving sky — shooting star/
   meteors/ambient air — stays unmasked); on a meteor-shower stop it also LANDS one meteor per cycle
