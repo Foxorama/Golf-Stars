@@ -91,3 +91,74 @@ run's bag tier and pin-hunting from A4. Knobs are constants in `match.ts`; see
 scramble "never seemed to make a difference" (they work — measured scramble Δ0.52, best-ball Δ0.85
 strokes/hole — but the player-side partner is an auto-AI ball a skilled human out-plays ~always,
 and the boss-side assist couldn't close the old fixed-skill gap).
+
+---
+
+## Addendum 2 (same day): warp with an N-ball CREW SCRAMBLE — and why hole 100+ is unreachable
+
+**Question.** Can warp auto-play with a scramble assist (N balls per stroke, keep the best), what
+does it do to depth, and how many balls would make 99.9% of warps reach hole 100+?
+
+**Method.** `scripts/warp-scramble-depth.ts`: a warp-hole prototype built from the exported engine
+pieces (`executeShot`/`pickBetterExec`/`layupTarget`/`aiClub`/`attackTarget`/`onePutt`) in
+`playHole`'s exact loop shape — every stroke (full swings AND putts, unlike the boss-duel scramble
+which is swings-only) plays N balls and keeps the best — driven through the real run loop
+(`startRun → finishStop → shop → travel`, greedy shop, shallowest lanes, shipped pin-attack rule).
+balls=1 reproduces the solo baseline (median 26), validating the harness.
+
+**The headline: no ball count reaches hole 100 — the birdie wall is structural, not a skill gap.**
+From hole 41 the bar is birdie-or-better on EVERY hole, so survival compounds exponentially:
+reaching hole 100 means ~60 consecutive birdies. Measured per-hole birdie-or-better rates on
+deep-galaxy holes (stop ~11, 300 seeds × 4 holes, attack armed):
+
+| balls/stroke | birdie-or-better | par-or-better | E[birdie streak] | P(60 straight birdies) |
+|---:|---:|---:|---:|---:|
+| 1 | 16.4% | 48.3% | 0.2 holes | ~1e-45 |
+| 2 | 31.1% | 67.2% | 0.5 | ~1e-29 |
+| 4 | 46.8% | 79.7% | 0.9 | ~1e-18 |
+| 8 | 62.5% | 88.3% | 1.7 | ~1e-11 |
+| 16 | 69.8% | 92.2% | 2.3 | ~1e-8 |
+| 32 | 76.1% | 93.7% | 3.2 | ~1e-4 % |
+
+Each DOUBLING of the crew buys ~7–15pp of birdie rate with a hard asymptote well under the
+~99.998%/hole that 99.9%-to-100 requires (some holes structurally refuse birdie to this AI: forced
+lay-up par 5s, green-miss chip situations, and the pickup rule — a max-score pickup always fails
+the gate, and even N compounded balls occasionally chain into one). Full-run sweeps confirm: at 32
+balls/stroke the MEDIAN death is ~hole 40 and nothing in 60 seeds passed hole 58. **Hole 100+ is
+not a warp-assist problem; it's the format's exponential design** (the same property the test
+"every seeded run terminates by the bar" celebrates).
+
+**What crew scramble IS good for: moving the MEDIAN, not the guarantee.** Full-run sweeps
+(2000 seeds per ball count; 1000 for 8; greedy shop, shallowest lanes, shipped attack rule):
+
+| balls/stroke | min | p0.1% | p1 | median | p90 | max | reach 24 | reach 32 | reach 36 | reach 40 | reach 48 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 (solo) | 0 | 1 | 9 | 27 | 34 | 43 | 75.5% | 25.4% | 5.5% | 1.4% | 0% |
+| 2 | 7 | 9 | 16 | 32 | 39 | 45 | 91.4% | 55.4% | 24.1% | 9.8% | 0% |
+| 3 | 7 | 13 | 17 | 33 | 40 | 50 | 95.0% | 68.7% | 36.9% | 18.1% | 0.1% |
+| 4 | 9 | 13 | 18 | 35 | 41 | 50 | 96.2% | 76.5% | 45.0% | 24.9% | 0.3% |
+| 8 | 12 | 14 | 20 | 37 | 43 | 55 | 97.9% | 85.1% | 58.2% | 38.1% | 1.4% |
+
+Two hard lessons in the tails:
+- **The 99.9% single-warp guarantee (p0.1%) barely moves**: hole ~1 solo → only ~13–14 even at 8
+  balls. Blow-ups are CORRELATED — all N balls share the same aim/club DECISION, so a bad plan
+  (a forced carry into a gale, a penalty-chain lie) kills the whole crew; more balls can't fix a
+  bad decision. The guarantee lever is course management (the same GS-cetus-6 gap), not crew size.
+- **Retries change the game**: a warp attempt is instant, so the practical metric is warps-needed,
+  not per-warp certainty. With 4 balls: hole 32 lands in ≤5 attempts at 99.9% confidence
+  (P=76.5%/attempt), hole 36 in ~12. Hole 40 stays expensive (~24) and 48+ is the exponential.
+
+**Design recommendation.**
+- Crew scramble as the warp assist is implementable in the engine as a `PlayHoleOptions`-style
+  N-ball option (zero draws when absent, so byte-compat is free) — the boss-duel scramble machinery
+  already proves the per-stroke best-of pattern; scramble the putts too (unlike the boss duel).
+- **Crew of 4, default warp target the bogey wall (hole ~32), hard cap at the player's proven
+  best.** That's a ~96% ride to hole 24 and ~77% to 32 per warp — with instant relaunch on a bust,
+  effectively guaranteed delivery to where the game gets real. Past 41 the format is DESIGNED to
+  kill everyone (birdie-or-better forever); that stretch is the endgame and should be hand-played.
+- Mark crew-warped runs on the `endlessRuns` board (or exclude the warped prefix from gross/net) —
+  a scrambled prefix isn't comparable to a solo card.
+- **How many balls for 99.9% to hole 100+: no finite crew.** Per-hole birdie caps near ~76% even
+  at 32 balls (table above) against the ~99.998%/hole that 60 consecutive gated birdies demand.
+  If "resume at 100+" ever becomes a product goal, it needs a different mechanism (e.g. a banked
+  checkpoint the format explicitly blesses), not a better AI or more balls.
