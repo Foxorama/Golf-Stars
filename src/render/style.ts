@@ -710,11 +710,17 @@ function styleGreen(
     const steep = Math.max(0, Math.min(1, (slope.mag - 0.15) / 0.5)); // 0 gentle → 1 full tilt
     const cols = 2 + Math.round(steep * 1); // 2 or 3 across
     const rows = 1 + Math.round(steep * 2); // 1..3 down the fall line
-    const colGap = span * 0.17;
-    const rowGap = span * 0.24;
-    const len = span * (0.3 - steep * 0.08); // finer (shorter) arrows as they get denser
-    const head = 4 - steep * 1.2;
-    const col = `rgba(255,255,255,${(0.42 + steep * 0.22).toFixed(3)})`;
+    // Arrow sizes are CAPPED IN PX, not purely span-proportional: prims live in screen space, so on
+    // the tight putt zoom the green spans hundreds of px and span-scaled chevrons ballooned into bold
+    // lines stretched across the whole green (the GS-putt-depth "overpowering angle lines" bug). The
+    // caps never bind at map zoom (a whole-hole green is far smaller than them), so the decision map
+    // is unchanged; at green zoom the grid stays a modest centred glyph. Count is still fixed per mag
+    // (camera-proof); sizes reading the projection is fine — pure geometry, zero rng.
+    const colGap = Math.min(span * 0.17, 30);
+    const rowGap = Math.min(span * 0.24, 42);
+    const len = Math.min(span * (0.3 - steep * 0.08), 34); // finer (shorter) arrows as they get denser
+    const head = Math.max(3, len * 0.2);
+    const col = `rgba(255,255,255,${(0.3 + steep * 0.14).toFixed(3)})`;
     for (let r = 0; r < rows; r++) {
       const roff = (r - (rows - 1) / 2) * rowGap;
       for (let ci = 0; ci < cols; ci++) {

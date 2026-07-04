@@ -361,6 +361,15 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `greenSlopeMax`, drawn from the SIDE slope rng so terrain is byte-identical and a CALM stop keeps the old
   draw), read via a finer/denser fall-line arrow grid on steeper greens (`styleGreen`, camera-proof off the
   deterministic mag). No new `_gs*` hook. Guarded by `tests/putt-depth.test.ts`.
+  **Putt-FEEL rules (GS-putt-feel):** the fall-line arrows are PX-CAPPED in `styleGreen` (prims are
+  screen-space — span-proportional chevrons ballooned into bold lines across the whole green at putt
+  zoom; the caps never bind at map zoom). The putt watch-cam reuses the putt screen's exact framing
+  (`puttViewRadius`, the `decisionRadius` pattern) so strike→watch never pops zoom, and the frame pads
+  for the break's lateral bow off `breakYd` (aim-INDEPENDENT — the camera holds still while nudging).
+  The ◄/► aim is per-putt scaled (`puttAimStep`/`puttAimMax` — the clamp always reaches past the ideal
+  borrow, so no putt is UI-unmakeable) with press-and-hold auto-repeat, and nudges update SURGICALLY
+  (`puttAimRefresh` swaps the map SVG + label in place — a full `render()` remounts the pace meter and
+  resets its sweep mid-aim).
 - **Render layer** (`docs/decisions/render.md`). ONE pure projector (`render/project.ts`) both
   renderers share — never reimplement the transform. ONE shared cell-shaded scene builder
   (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view. All

@@ -987,6 +987,14 @@ let puttAimResolved = 0; // the aim (yd) shown this render — read by the commi
 let lastPuttKey = ''; // `${holeIndex}:${putts}` — resets the aim for each new putt
 let decisionShotCount = -1; // shots taken when the current club selection was defaulted
 
+/** The aim readout inside the break-read row — split out so an aim nudge can update JUST this span
+ *  in place (the ◄/► buttons keep their listeners; see puttAimRefresh). */
+function puttAimLabel(breakYd: number, aim: number): string {
+  const fmt = (y: number) => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
+  const brkTxt = Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
+  return `Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)}</b><br><span style="opacity:.6;">slope ${brkTxt}</span>`;
+}
+
 /** The break-read row on the putt screen (GS-greens-3): the slope's break + ◄/► aim controls (or the
  *  caddy's read). `breakYd`/`aim` are signed (+ = right of the line); the player aims to cancel break. */
 function puttAimRow(breakYd: number, aim: number, reads: boolean): string {
@@ -997,7 +1005,7 @@ function puttAimRow(breakYd: number, aim: number, reads: boolean): string {
   }
   return `<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11.5px;margin:1px 0;">
       <button class="gs-btn gs-mini" data-putt-aim="-1" title="Aim left">◄</button>
-      <span style="min-width:120px;text-align:center;">Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)}</b><br><span style="opacity:.6;">slope ${brkTxt}</span></span>
+      <span id="puttaimlabel" style="min-width:120px;text-align:center;">${puttAimLabel(breakYd, aim)}</span>
       <button class="gs-btn gs-mini" data-putt-aim="1" title="Aim right">►</button>
     </div>`;
 }
@@ -1023,6 +1031,19 @@ let mapZoom = 1;
 // follow radius to match) and before any decision has rendered (resume) — those fall back to the
 // travel-framed reach.
 let decisionRadius: number | null = null;
+// The putt screen's framed radius — the putt cousin of decisionRadius: handed to the putt animation
+// so the strike→watch cut keeps the exact green zoom instead of popping out to a fixed radius (the
+// "weird zoom on the green" bug). Fixed per putt (aim-nudge-independent) so the camera holds still.
+let puttViewRadius: number | null = null;
+// Aim-nudge tuning for the CURRENT putt (set on each putt render). The ◄/► step scales with the read
+// so a big borrow doesn't take 30 taps, and the clamp always reaches past the ideal line — a steep
+// long putt used to need more aim than the old hard ±12yd window allowed (unmakeable by UI).
+let puttAimStep = 0.4;
+let puttAimMax = 12;
+// Surgical refresh for aim nudges: redraws the putt map SVG + the aim readout IN PLACE, without a
+// full render() — a full render remounts the pace meter (resetting its sweep) on every tap, which
+// made reading a long break slow and painful. Assigned by the putt branch; buttons call it.
+let puttAimRefresh: (() => void) | null = null;
 // Shop bag-inventory: the gear item the player tapped to inspect (its card shows for comparison with
 // the shop stock). View-only module state (like selClubId) — no reducer/save state, reset on buy.
 let inspectGearId: string | null = null;
@@ -1656,14 +1677,18 @@ function playingBody(animating: boolean): string {
     const puttAim = reads ? ideal : selPuttAim;
     puttAimResolved = puttAim; // read by the commit handler so the struck aim matches the drawn line
     const breakYd = puttBreakYd(play.ball, puttPin, slope, MANUAL_IDEAL_PACE);
-    const puttPath = puttPathPreview(play.ball, puttPin, slope, puttAim, MANUAL_IDEAL_PACE);
     // GS-putt-depth: how far up the line the putter can CONFIDENTLY read. A green-reading caddy (Mystic
     // Mole) sees the whole break; otherwise the confident read ends at the putter's range, and the line
     // fades beyond it. Same range the resolver uses (puttSkillOf), so the picture matches the physics.
     const puttLen = v.distToPin;
     const puttReadRange = puttSkillOf(state.run.loadout).puttRange ?? DEFAULT_PUTT_RANGE;
     const puttReadFrac = reads ? 1 : Math.min(1, puttReadRange / Math.max(1e-3, puttLen));
-    const puttSvg = renderHoleSVG(play.hole, {
+    // Frame the putt to cover the ball↔cup span PLUS the break's lateral swing — on a steep green the
+    // curved line used to bow outside the old distance-only radius. Keyed to breakYd (aim-independent)
+    // so the zoom holds perfectly still while the player nudges the read.
+    const puttRadius = Math.max(9, v.distToPin * 0.62 + Math.min(14, Math.abs(breakYd)) * 0.6);
+    puttViewRadius = puttRadius;
+    const buildPuttSvg = (aim: number) => renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
       // The putt screen is the ball↔cup line — the approach tracers belong to the whole-hole decision view.
@@ -1677,13 +1702,31 @@ function playingBody(animating: boolean): string {
       ball: play.ball,
       // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin.
       focus: puttMid,
-      viewRadius: Math.max(9, v.distToPin * 0.62),
+      viewRadius: puttRadius,
       focusBias: 0.5,
       // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
       up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
-      puttPath,
+      puttPath: puttPathPreview(play.ball, puttPin, slope, aim, MANUAL_IDEAL_PACE),
       puttReadFrac,
     });
+    const puttSvg = buildPuttSvg(puttAim);
+    // Aim-nudge tuning: the step scales with the read (≈8 taps from straight to the ideal borrow,
+    // floored at the old fine 0.4yd, capped at 1yd — the cup's HOLE_OUT_RADIUS keeps that precise
+    // enough), and the clamp always reaches comfortably past the ideal line so a steep long putt is
+    // never unmakeable because the UI ran out of aim.
+    puttAimStep = Math.max(0.4, Math.min(1, Math.abs(ideal) / 8));
+    puttAimMax = Math.max(12, Math.ceil(Math.abs(ideal) * 1.6));
+    // Nudging the aim redraws the map + readout IN PLACE (never a full render(), which would remount
+    // the pace meter and reset its sweep). Only the SVG child is swapped — the weather canvas mounted
+    // over the same .gs-bigmap survives.
+    puttAimRefresh = () => {
+      const aim = selPuttAim ?? 0;
+      puttAimResolved = aim;
+      const svgEl = document.querySelector('.gs-bigmap[data-weather="putt"] svg');
+      if (svgEl) svgEl.outerHTML = buildPuttSvg(aim);
+      const label = document.getElementById('puttaimlabel');
+      if (label) label.innerHTML = puttAimLabel(breakYd, aim);
+    };
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
     // the meter + Putt float in a bottom panel.
@@ -3589,6 +3632,7 @@ function render(): void {
       aceCelebratedHole = -1;
       birdCelebratedHole = -1;
       decisionRadius = null;
+      puttViewRadius = null;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
@@ -3886,12 +3930,44 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-putt-commit]').forEach((el) => {
     el.addEventListener('click', () => puttMeter?.commit());
   });
-  // ◄/► nudge the manual-putt AIM (GS-greens-3) to read the break, then re-render so the dotted
-  // break line + readout track. Step in yards; held within a sensible window.
+  // ◄/► nudge the manual-putt AIM (GS-greens-3) to read the break. A tap steps once; PRESS-AND-HOLD
+  // auto-repeats (doubling after a second) so a big borrow on a long steep putt doesn't take dozens
+  // of taps. Step/clamp are per-putt (puttAimStep/puttAimMax, scaled to the read). Updates are
+  // surgical (puttAimRefresh) — never a full render(), which would remount the pace meter mid-aim.
   app.querySelectorAll<HTMLElement>('[data-putt-aim]').forEach((el) => {
+    const dir = Number(el.dataset.puttAim);
+    const apply = (mult = 1) => {
+      selPuttAim = Math.max(-puttAimMax, Math.min(puttAimMax, (selPuttAim ?? 0) + dir * puttAimStep * mult));
+      puttAimRefresh?.();
+    };
+    let delay = 0;
+    let timer = 0;
+    let held = false;
+    const stop = () => {
+      clearTimeout(delay);
+      clearInterval(timer);
+      delay = timer = 0;
+    };
+    el.addEventListener('pointerdown', (e) => {
+      held = false;
+      // Capture the pointer so pointerup still lands here when the finger drifts off the button.
+      try { el.setPointerCapture((e as PointerEvent).pointerId); } catch { /* older browsers */ }
+      delay = window.setTimeout(() => {
+        held = true;
+        let ticks = 0;
+        timer = window.setInterval(() => apply(++ticks > 12 ? 2 : 1), 80);
+      }, 330);
+    });
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
     el.addEventListener('click', () => {
-      selPuttAim = Math.max(-12, Math.min(12, (selPuttAim ?? 0) + Number(el.dataset.puttAim) * 0.4));
-      render();
+      // The click that ends a hold-repeat must not add one more step on release.
+      if (held) {
+        held = false;
+        return;
+      }
+      sfx.click();
+      apply();
     });
   });
   // Fringe/apron (GS-fringe-putt): toggle between the putt meter (⛳) and the normal chip gesture (🏌).
@@ -4024,8 +4100,10 @@ function render(): void {
         // Start the watch-cam at the EXACT zoom the decision map was framed at (the player was just
         // looking at it — release must not skip-jump), falling back to the travel-framed reach when
         // no decision preceded this animation (resume, auto-advance). The radius holds for the whole
-        // animation; the follow-cam pans to keep up with the ball either way.
-        viewRadius: animatingPlay.shots.length ? decisionRadius ?? decisionReach(travel) : 25,
+        // animation; the follow-cam pans to keep up with the ball either way. A putts-only animation
+        // keeps the PUTT screen's framing the same way (puttViewRadius) — the old fixed 25 popped the
+        // camera out and back around every stroke on the green.
+        viewRadius: animatingPlay.shots.length ? decisionRadius ?? decisionReach(travel) : puttViewRadius ?? 25,
         focusBias: DMAP_BIAS,
         up: animUp,
         follow: true,
