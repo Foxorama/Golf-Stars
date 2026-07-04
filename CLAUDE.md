@@ -415,7 +415,13 @@ For each system: the rule that constrains new work. Open the archive doc before 
   each lay a soft grassy MARGIN just outside the body (`mixHex(rough, sand|shore, 0.42)`, grouped UNDER
   every body so a merged complex shares one seamless margin) — the land thinning toward the hazard, so a
   bunker/lake reads set INTO the ground instead of a hard-edged sticker; blended toward the hazard (never
-  darker than the turf → not a floating shadow, the GS-inset-2 lesson). Pure geometry, zero rng. **And
+  darker than the turf → not a floating shadow, the GS-inset-2 lesson). **The hazard INTERNALS blend too
+  (GS-hazard-blend-2):** water/lava deepen through a SMOOTH ramp of feathered `offsetPoly` rings
+  interpolating base→mid→deep (7 rings, shape-following — a river darkens toward its centreline, a lake
+  toward its middle) instead of the 2 hard contour bands that read as a topographic map; bunkers drop the
+  harsh full-width white rake BARS for a smoothly shaded bowl (inset rim shadow + a soft down-light sunlit
+  swell + faint rim-following rake arcs). All pure geometry — the liquid flow/glint draws still consume
+  the identical rng, so every seeded scene is byte-stable. **And
   void/cetus fairway+green STRIPES were retuned down (GS-cetus-blend):** their wide light↔dark VALUE
   spread banded even a normal mow into discordant bright/dark stripes over the smooth luminous platform,
   so `MOW_BLEND` now mutes them BELOW parkland (void 0.4 / cetus 0.42, dark eased to `k·0.72` on every
