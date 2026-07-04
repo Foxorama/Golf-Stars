@@ -578,18 +578,20 @@ function checkerStripes(poly: Vec[], colA: string, colB: string, cell: number): 
   return { t: 'clip', clip: poly, children };
 }
 
-/** Softened mowing tones (GS-cetus-5). The mowing bands used to fill with the FULL `s.light`/`s.dark`
- *  turf shades — maximum contrast, which on a thin wiggly corridor reads as a harsh striped snake
- *  ("Beetlejuice snakes"), not groomed grass. Blend each tone halfway back to the base so the stripes
- *  whisper the mow instead of shouting it. The value-crushed indigo worlds (void/cetus) keep a touch
- *  more contrast (they'd otherwise vanish into the base), tuned by `MOW_BLEND`. The DARK tone eases
- *  further back than the light one (GS-mow-blend) — the eye reads a dark cut as a shadow/edge, so it
- *  was the austere half of the stripe; muting it asymmetrically keeps the mow while losing the harsh
- *  line (void/cetus mute less, again for the crushed-value reason). */
-const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.66, cetus: 0.62 };
+/** Softened mowing tones (GS-cetus-5, retuned GS-cetus-blend). The mowing bands used to fill with the
+ *  FULL `s.light`/`s.dark` turf shades — maximum contrast, which on a thin wiggly corridor reads as a
+ *  harsh striped snake ("Beetlejuice snakes"), not groomed grass. Blend each tone back toward the base
+ *  so the stripes whisper the mow instead of shouting it. The value-crushed indigo/cyan worlds
+ *  (void/cetus) used to keep a WIDER spread (they'd otherwise vanish into the base), but their turf
+ *  palettes already carry a wide light↔dark VALUE spread, so even a normal blend banded them into hard
+ *  bright/dark stripes discordant with the smooth luminous platform — so they now mute BELOW parkland
+ *  (`MOW_BLEND`). The DARK tone eases further back than the light one for every world (GS-mow-blend) —
+ *  the eye reads a dark cut as a shadow/edge, the austere half of the stripe; muting it asymmetrically
+ *  keeps the mow while losing the harsh line. */
+const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.4, cetus: 0.42 };
 function mowTones(s: Shade, arch: BiomeArchetype): { hi: string; lo: string } {
   const k = MOW_BLEND[arch] ?? 0.5; // fraction of the way from base toward light/dark (1 = full old contrast)
-  const kLo = k * (MOW_BLEND[arch] !== undefined ? 0.85 : 0.72);
+  const kLo = k * 0.72; // the dark cut eases further back than the light one, on every world
   return { hi: mixHex(s.base, s.light, k), lo: mixHex(s.base, s.dark, kLo) };
 }
 
@@ -663,6 +665,7 @@ function styleGreen(
   s: Shade,
   collar: string,
   fringe: string,
+  arch: BiomeArchetype,
   slope?: { dir: Vec; mag: number },
 ): Prim[] {
   const c = centroidOf(poly);
@@ -675,9 +678,12 @@ function styleGreen(
     { t: 'poly', pts: poly, fill: s.base },
   ];
   // Softened like the fairway's mowTones (GS-mow-blend) — the green used to stripe at FULL
-  // light/dark contrast, the harshest cut on the map. A touch stronger than the fairway's 0.5
-  // blend (the green is the small showpiece surface), dark muted below light.
-  if (art.stripes) out.push(stripes(poly, mixHex(s.base, s.light, 0.7), mixHex(s.base, s.dark, 0.5), 6));
+  // light/dark contrast, the harshest cut on the map. A touch stronger than the fairway's blend
+  // (the green is the small showpiece surface), dark muted below light. The wide-value indigo/cyan
+  // worlds (void/cetus) mute further so their green doesn't band like the fairway used to
+  // (GS-cetus-blend) — their palettes carry a big light↔dark spread that a 0.7/0.5 cut over-shouts.
+  const softGreen = arch === 'void' || arch === 'cetus';
+  if (art.stripes) out.push(stripes(poly, mixHex(s.base, s.light, softGreen ? 0.52 : 0.7), mixHex(s.base, s.dark, softGreen ? 0.36 : 0.5), 6));
   const gb = bboxOf(poly);
   // Green SLOPE (GS-greens-3): shade the LOW side darker + the HIGH side lighter and lay fall-line
   // arrows pointing downhill, so the tilt reads at a glance (the graphic IS the slope the sim rolls
@@ -792,9 +798,16 @@ function insetEmboss(poly: Vec[], scale: number, tone: { wall: string; base: str
   return [{ t: 'clip', clip: poly, children: embossChildren(poly, scale, tone) }];
 }
 
-function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number): Prim[] {
+function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number, land: string): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
+  // GS-hazard-blend: a soft grassy MARGIN just outside the bunker — the land tone thinning toward sand
+  // — so the bunker eases into the surrounding turf the way the fairway collar does, instead of a hard
+  // tan blob dropped on the grass (the "no blending at all" tell). Blended toward sand (never darker
+  // than the turf, so it reads as thinning grass, not a floating shadow — the GS-inset-2 lesson).
+  // Grouped UNDER every body, so a merged bunker complex shares one continuous margin with no seam.
+  const margin = mixHex(land, SAND.base, 0.42);
+  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -5), fill: margin });
   // GS-inset-2: no drop shadow cast onto the surrounding turf — a bunker is DUG INTO the ground, it
   // doesn't float above it. The excavated read comes entirely from the inset emboss below (near
   // up-light rim in shadow, far floor sunlit), so the sand sits flush-then-down, not proud.
@@ -873,9 +886,15 @@ const LAVA_KINDS = new Set(['lava', 'lavariver']);
  * elongated body additionally gets lengthwise FLOW lines so it reads as flowing current/molten lava.
  * No per-body ink outline (that would re-draw a seam through an overlap); the shore is the edge.
  */
-function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number, scale = 4): Prim[] {
+function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => number, land: string, scale = 4): Prim[] {
   if (polys.length === 0) return [];
   const out: Prim[] = [];
+  // GS-hazard-blend: a soft MARGIN just outside the water/lava — the land tone easing toward the shore
+  // (a reedy/muddy bank for water, a charred scorch margin for lava) — so the body eases into the turf
+  // like the fairway collar instead of meeting the grass on a hard shore ring (the "no blending" tell).
+  // Grouped UNDER every body, so a lake + its feeder creek share one continuous margin with no seam.
+  const margin = mixHex(land, lp.shore, 0.42);
+  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -5.5), fill: margin });
   // GS-inset-2: no drop shadow on the turf — water/lava sits SUNK below its bank, it doesn't float
   // proud of the land. The sunk read comes from the inset bank emboss + depth rings below.
   for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -3), fill: lp.shore }); // 1
@@ -3708,7 +3727,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
     // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
-    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, greenSlopeScreen(hole, proj)));
+    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, arch, greenSlopeScreen(hole, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
   }
@@ -3761,12 +3780,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     for (const f of deepRoughHaz) prims.push(...styleDeepRough(projPoly(f.poly, proj), arch, patchRng(f.poly)));
     for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
   }
-  prims.push(...styleSandFamily(sandPolys, art, proj.scale));
+  prims.push(...styleSandFamily(sandPolys, art, proj.scale, rs.base));
   if (!rainbow) {
     for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
     // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
-    prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng, proj.scale));
-    prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng, proj.scale));
+    prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng, rs.base, proj.scale));
+    prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng, rs.base, proj.scale));
     for (const f of treeHaz) prims.push(...styleFlora(f.poly, proj, rng, arch));
   }
 
