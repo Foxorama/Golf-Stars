@@ -69,6 +69,17 @@ export function aceCreditBonus(
   return aceCount(played) * ACE_CREDIT_BONUS;
 }
 
+/** Holed eagle-or-better holes in a played stop (an ace counts) — GS-fuel-3's fuel siphon reads it
+ *  in `finishStop`. Picked-up holes never qualify. Pure. */
+export function eagleCount(
+  played: readonly { record: { par: number; strokes: number }; holed: boolean; pickedUp: boolean }[],
+): number {
+  return played.reduce(
+    (n, p) => n + (p.holed && !p.pickedUp && p.record.strokes <= p.record.par - 2 ? 1 : 0),
+    0,
+  );
+}
+
 /**
  * Fold the Ace's Touch talent into a loadout once per ace (GS-ace). It STACKS — each ace pushes the
  * perk id again so `loadoutFromPerks` rebuilds the exact stack on resume, and tightens dispersion a
@@ -248,6 +259,19 @@ export interface PlayerLoadout {
    * unchanged. Rebuilt from the perk id on resume, so no save bump.
    */
   rainbowRoad?: boolean;
+  /**
+   * Ion Thrusters (GS-fuel-3): fuel units shaved off EVERY journey jump's burn — a jump always
+   * costs at least 1 (run.ts `routeFuelCost`). Travel economy only, never shot physics; the
+   * journey map draws the retrofit's ion wake off this flag. Rebuilt from the perk id on resume
+   * (no save bump). 0/undefined = full burn, byte-for-byte unchanged.
+   */
+  fuelEfficiency?: number;
+  /**
+   * Reserve Tank (GS-fuel-3): extra ship-tank CAPACITY on top of the format's base tank (run.ts
+   * `tankCapacity`). The relic arrives FULL via `ShopItem.fuelBonus` (granted once in `buy` — the
+   * fuel itself lives on `Run.fuel`, already persisted). 0/undefined = base tank.
+   */
+  tankBonus?: number;
 }
 
 /** The driver club id (off-tee use is gated unless the Driver Dan caddy is owned). */
@@ -379,6 +403,11 @@ export interface ShopItem {
   talent?: boolean;
   /** A talent's themed zone archetype (GS-talents), so a boss in that world offers its signature talent. */
   archetype?: string;
+  /** Fuel units granted ONCE at purchase (GS-fuel-3, the Reserve Tank arrives full): run.ts `buy`
+   *  pours them in clamped to the new capacity. Deliberately NOT part of `apply` — resume rebuilds
+   *  the loadout from perk ids, but the fuel itself persists on `Run.fuel`, so re-applying would
+   *  double-grant. */
+  fuelBonus?: number;
   apply(loadout: PlayerLoadout): PlayerLoadout;
 }
 
@@ -459,6 +488,9 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'eagle-eye': ['economy'],
   'comeback-kid': ['economy'],
   'glass-cannon': ['economy'],
+  // Ship outfitting (GS-fuel-3) — travel economy, so 'economy'.
+  'ion-thrusters': ['economy'],
+  'reserve-tank': ['economy'],
   // GS-proshop-2 — new gameplay gear.
   'wind-cheater': ['control'], // weather forgiveness reads as control
   'spin-milled': ['skill'], // backspin/short-game touch
@@ -507,6 +539,27 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: 'A lucky silver ball-marker — +20% credits earned',
     rarity: 'rare',
     apply: (m) => ({ ...m, creditMult: m.creditMult * 1.2, perks: [...m.perks, 'lucky-coin'] }),
+  },
+  {
+    // Ship outfitting (GS-fuel-3): the travel-economy sibling pair. Ion Thrusters attack the BURN
+    // (every jump −1 unit, min 1 — run.ts routeFuelCost), the Reserve Tank attacks the CAPACITY.
+    // Both compound with GS-fuel-2's depth pricing: efficiency is worth more the deeper (dearer)
+    // the fuel, so they're mid/late-run economy picks, not day-one auto-buys.
+    id: 'ion-thrusters',
+    name: 'Ion Thrusters',
+    cost: 140,
+    desc: 'A retrofit ion drive — every journey jump burns 1 less ⛽ (min 1), and your ship trails a luminous ion wake',
+    rarity: 'epic',
+    apply: (m) => ({ ...m, fuelEfficiency: (m.fuelEfficiency ?? 0) + 1, perks: [...m.perks, 'ion-thrusters'] }),
+  },
+  {
+    id: 'reserve-tank',
+    name: 'Reserve Fuel Tank',
+    cost: 90,
+    desc: 'A strapped-on auxiliary tank — +4 ⛽ capacity, delivered full',
+    rarity: 'rare',
+    fuelBonus: 4,
+    apply: (m) => ({ ...m, tankBonus: (m.tankBonus ?? 0) + 4, perks: [...m.perks, 'reserve-tank'] }),
   },
   {
     id: 'pro-coach',

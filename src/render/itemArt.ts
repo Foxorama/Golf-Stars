@@ -49,6 +49,8 @@ export type ItemArtKind =
   | 'wedge'
   | 'coach'
   | 'trophy'
+  | 'thruster'
+  | 'fueltank'
   | 'caddy'
   | 'club';
 
@@ -101,6 +103,8 @@ const KIND_BY_ID: Record<string, ItemArtKind> = {
   'magma-balls': 'ball',
   'void-walkers': 'ball',
   'rainbow-ball': 'ball',
+  'ion-thrusters': 'thruster',
+  'reserve-tank': 'fueltank',
 };
 
 /** Resolve the art kind for an item id. Named caddies → 'caddy'; reward clubs → 'club'. */
@@ -372,6 +376,44 @@ function drawCoin(col: string, seed: string): string {
      <circle cx="75" cy="46" r="23" fill="none" stroke="#fff2b0" stroke-width="2" opacity="0.7"/>
      <text x="75" y="56" font-size="30" text-anchor="middle" fill="#7a5207" font-weight="bold" font-family="Georgia,serif">★</text>
      <path d="M 56 30 q 8 -6 16 -2" fill="none" stroke="#fff7d6" stroke-width="2.4" opacity="0.8"/>`,
+    col,
+  );
+}
+
+/** Ion Thrusters (GS-fuel-3): a rocket engine bell blasting a layered cyan ion stream — the shop
+ *  card of the wake the journey-map ship trails once it's fitted. */
+function drawThruster(col: string, seed: string): string {
+  const metal = mix(col, '#dbe4f0', 0.55);
+  const dark = mix(col, '#0b0d12', 0.6);
+  return frame(
+    `${sparkles(seed, '#7ff3ff', 5)}
+     <ellipse cx="75" cy="82" rx="38" ry="6" fill="rgba(0,0,0,0.3)"/>
+     <path d="M62 40 C 40 32 22 34 10 44 C 22 54 40 56 62 54 Z" fill="#8a7bff" opacity="0.3"/>
+     <path d="M62 42 C 44 37 30 38 18 44.5 C 30 51 44 52 62 52 Z" fill="#4fd0e0" opacity="0.6"/>
+     <path d="M62 44 C 50 41 40 41.5 30 45 C 40 48.5 50 49 62 50 Z" fill="#eaffff" opacity="0.9"/>
+     <circle cx="62" cy="46" r="6.5" fill="#7ff3ff" opacity="0.75"/>
+     <path d="M62 34 L92 28 L92 64 L62 58 Z" fill="${metal}" stroke="#11141b" stroke-width="2.4"/>
+     <path d="M62 34 L92 28 L92 34 L62 39 Z" fill="#ffffff" opacity="0.25"/>
+     <path d="M92 26 h20 a6 6 0 0 1 6 6 v28 a6 6 0 0 1 -6 6 h-20 Z" fill="${dark}" stroke="#11141b" stroke-width="2.4"/>
+     <rect x="96" y="34" width="16" height="5" rx="2.5" fill="${col}" opacity="0.8"/>
+     <rect x="96" y="43" width="16" height="5" rx="2.5" fill="${col}" opacity="0.5"/>
+     <circle cx="120" cy="32" r="2" fill="${mix(col, '#ffffff', 0.4)}"/>`,
+    col,
+  );
+}
+
+/** Reserve Fuel Tank (GS-fuel-3): a strapped-on auxiliary canister, delivered full. */
+function drawFuelTank(col: string, seed: string): string {
+  const body = mix(col, '#e8edf5', 0.35);
+  return frame(
+    `${sparkles(seed, col, 4)}
+     <ellipse cx="75" cy="82" rx="36" ry="6" fill="rgba(0,0,0,0.3)"/>
+     <rect x="42" y="30" width="66" height="42" rx="19" fill="${body}" stroke="#11141b" stroke-width="2.5"/>
+     <rect x="46" y="34" width="58" height="11" rx="6" fill="#ffffff" opacity="0.22"/>
+     <rect x="57" y="26" width="8" height="50" rx="3" fill="#2a3142" stroke="#11141b" stroke-width="1.6"/>
+     <rect x="86" y="26" width="8" height="50" rx="3" fill="#2a3142" stroke="#11141b" stroke-width="1.6"/>
+     <rect x="98" y="19" width="11" height="13" rx="3.5" fill="${mix(col, '#39415a', 0.5)}" stroke="#11141b" stroke-width="2"/>
+     <text x="75" y="59" font-size="17" text-anchor="middle">⛽</text>`,
     col,
   );
 }
@@ -768,6 +810,12 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
       break;
     case 'trophy':
       base = drawTrophy(col, seed);
+      break;
+    case 'thruster':
+      base = drawThruster(col, seed);
+      break;
+    case 'fueltank':
+      base = drawFuelTank(col, seed);
       break;
     case 'club':
       // Reward club id is `club:<set>:<type>` — the type selects the head (putter vs iron/wood).

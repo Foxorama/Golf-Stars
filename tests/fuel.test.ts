@@ -3,9 +3,12 @@ import {
   FUEL_PRICE_BASE,
   FUEL_PRICE_MAX,
   FUEL_PRICE_SLOPE,
+  buy,
   buyFuel,
   canTravel,
   cashOutShards,
+  currentCourse,
+  finishStop,
   fuelShortfall,
   fuelUnitCost,
   resumeRun,
@@ -20,6 +23,7 @@ import {
   type Route,
   type Run,
 } from '../src/sim/rpg/run';
+import type { PlayedHole } from '../src/sim/round';
 import { FORMATS, startingFuelFor, stopCount, getFormat, DEFAULT_STARTING_FUEL } from '../src/sim/rpg/formats';
 import { DEFAULT_EVENT, routeEvent } from '../src/sim/rpg/events';
 import { themeById } from '../src/sim/course/themes';
@@ -63,8 +67,8 @@ describe('the fuel tank (GS-fuel / GS-fuel-2)', () => {
 
   it('a jump burns its distance in fuel, unit for unit', () => {
     const run = startRun(2, 'unending');
-    expect(routeFuelCost(lane(1))).toBe(1);
-    expect(routeFuelCost(lane(3))).toBe(3);
+    expect(routeFuelCost(run, lane(1))).toBe(1);
+    expect(routeFuelCost(run, lane(3))).toBe(3);
     const after = travel(run, lane(3));
     expect(after.fuel).toBe(run.fuel - 3);
     // No credit charge while the tank covers it.
@@ -157,6 +161,81 @@ describe('the fuel tank (GS-fuel / GS-fuel-2)', () => {
     });
     expect(deep.run.status).toBe('ended');
     expect(deep.run.fuel).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('ship outfitting + the eagle siphon (GS-fuel-3)', () => {
+  /** A run rich enough to buy any relic outright. */
+  function richRun(seed: number): Run {
+    return { ...startRun(seed, 'unending'), credits: 10_000 };
+  }
+
+  it('Ion Thrusters shave a unit off every jump, floored at 1 — a jump is never free', () => {
+    const run = buy(richRun(11), 'ion-thrusters');
+    expect(run.loadout.fuelEfficiency).toBe(1);
+    expect(run.loadout.perks).toContain('ion-thrusters');
+    expect(routeFuelCost(run, lane(3))).toBe(2);
+    expect(routeFuelCost(run, lane(2))).toBe(1);
+    expect(routeFuelCost(run, lane(1))).toBe(1); // the floor
+    // The jump still covers its full DISTANCE — the drive saves fuel, not depth.
+    const after = travel(run, lane(3));
+    expect(after.fuel).toBe(run.fuel - 2);
+    expect(after.distanceFromStart).toBe(run.distanceFromStart + 3);
+  });
+
+  it('the Reserve Tank raises capacity by 4 and arrives full', () => {
+    const base = richRun(12);
+    const cap = tankCapacity(base);
+    const drained: Run = { ...base, fuel: 3 };
+    const run = buy(drained, 'reserve-tank');
+    expect(run.loadout.tankBonus).toBe(4);
+    expect(tankCapacity(run)).toBe(cap + 4);
+    expect(run.fuel).toBe(7); // +4 units poured in at purchase
+    // Near-full: the pour clamps to the new capacity, never spills past it.
+    const nearFull = buy({ ...base, fuel: cap + 2 }, 'reserve-tank');
+    expect(nearFull.fuel).toBe(cap + 4);
+    // A legacy over-capacity tank is never drained by the clamp.
+    const legacy = buy({ ...base, fuel: cap + 99 }, 'reserve-tank');
+    expect(legacy.fuel).toBe(cap + 99);
+    // And buyFuel now fills to the raised ceiling.
+    expect(buyFuel(run, 99).fuel).toBe(cap + 4);
+  });
+
+  it('both relics rebuild from perk ids on resume — and the tank fuel is never re-granted', () => {
+    let run = buy(buy(richRun(13), 'ion-thrusters'), 'reserve-tank');
+    run = { ...run, fuel: 5 };
+    const resumed = resumeRun(snapshotRun(run));
+    expect(resumed.loadout.fuelEfficiency).toBe(1);
+    expect(resumed.loadout.tankBonus).toBe(4);
+    expect(tankCapacity(resumed)).toBe(tankCapacity(run));
+    expect(routeFuelCost(resumed, lane(3))).toBe(2);
+    expect(resumed.fuel).toBe(5); // the +4 pour happened ONCE, at purchase
+  });
+
+  it('a holed eagle-or-better siphons one fuel cell in finishStop, capacity-clamped', () => {
+    const base = startRun(14, 'unending');
+    const course = currentCourse(base);
+    // Every hole an eagle (par − 2, holed): passes any endless bar and siphons per hole.
+    const eagles = course.holes.map((h) => ({
+      record: { par: h.par, strokes: h.par - 2 },
+      holed: true,
+      pickedUp: false,
+    })) as unknown as PlayedHole[];
+    const drained: Run = { ...base, fuel: 5 };
+    const { run: after } = finishStop(drained, course, eagles);
+    expect(after.fuel).toBe(Math.min(tankCapacity(base), 5 + course.holes.length));
+    // A warped stop never siphons (mirrors the milestone-shard rule)…
+    const { run: warped } = finishStop(drained, course, eagles, { warp: true });
+    expect(warped.fuel).toBe(5);
+    // …pars siphon nothing, and a legacy over-capacity tank is never drained by the clamp.
+    const pars = course.holes.map((h) => ({
+      record: { par: h.par, strokes: h.par },
+      holed: true,
+      pickedUp: false,
+    })) as unknown as PlayedHole[];
+    expect(finishStop(drained, course, pars).run.fuel).toBe(5);
+    const over: Run = { ...base, fuel: 99 };
+    expect(finishStop(over, course, eagles).run.fuel).toBe(99);
   });
 });
 

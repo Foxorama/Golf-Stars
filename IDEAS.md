@@ -28,10 +28,6 @@ Foundations are shipped; these are the live follow-ons.
   baseline auto-AI dies ~hole 24, so 60/80/100+ are meant to need a stacked build — verify a maxed human
   can actually reach 150); per-tier intro stingers ("the bar tightens…"); an endless leaderboard
   (best-holes daily); maybe a mercy token (one bar-miss forgiven) as a deep shop legendary.
-- **GS-fuel-3** — build hooks on the GS-fuel-2 economy: an Ion Thrusters shop perk (jumps cost −1 fuel,
-  min 1 — a `PlayerLoadout` field read by `routeFuelCost`; PARKED from GS-fuel-2 because a new catalogue
-  row perturbs seeded shop offers, so it wants its own PR + test sweep); an expanded-tank relic; fuel as
-  a performance reward (eagle/ace siphons a unit — golf extends the journey).
 
 **Course / greens / hazards**
 - **GS-greens-4** — template green COMPLEXES on top of the linear `greenSlope`: redan kick-feed, Biarritz
@@ -86,6 +82,11 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-fuel-3** — build hooks on the GS-fuel-2 fuel economy: Ion Thrusters (epic; every jump −1 ⛽,
+  min 1, and the journey-map ship trails a luminous ion wake), Reserve Fuel Tank (rare; +4 capacity,
+  arrives full via the one-shot `ShopItem.fuelBonus` grant in `buy`), and the eagle siphon (a holed
+  eagle-or-better refuels one cell in `finishStop` — great golf extends the journey; never on warp).
+  See `docs/decisions/rpg-meta-loop.md`.
 - **GS-intro-split** — the stop briefing is two mobile steps instead of one long scroll: step 1 the
   ARC (mode + win condition + the field of 20 competitors, "First Tee ▸" top + bottom-on-overflow +
   "Change golfer"), step 2 the HOLE (viewport-fit map + tap-to-open hazards/benefits popup + Tee Off
