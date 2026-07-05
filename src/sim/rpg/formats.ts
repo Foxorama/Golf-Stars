@@ -110,6 +110,21 @@ export interface RunFormat {
    * headless `playStop` and the interactive driver so auto ≡ interactive holds.
    */
   holeGate?: boolean;
+  /**
+   * The tank the run starts with (GS-fuel): every journey jump burns `distanceJump` units of ship
+   * fuel. The voyage starts with EXACTLY enough for its fixed stop count taken as single hops
+   * (stops − 1 travels × 1 unit) — deep jumps burn ahead of that budget and must be bought back;
+   * the Unending Universe starts with a 25-unit tank for its open-ended journey.
+   */
+  startingFuel?: number;
+}
+
+/** Fallback tank for a format with no `startingFuel` row (unknown ids fold into the default anyway). */
+export const DEFAULT_STARTING_FUEL = 25;
+
+/** The tank a run of this format starts with (GS-fuel). */
+export function startingFuelFor(format: RunFormat): number {
+  return format.startingFuel ?? DEFAULT_STARTING_FUEL;
 }
 
 export const FORMATS: Record<string, RunFormat> = {
@@ -124,6 +139,8 @@ export const FORMATS: Record<string, RunFormat> = {
     blurb: 'Endless survival — every hole has a score to beat',
     stops: [{ holes: 4, label: '4 holes' }],
     holeGate: true,
+    // GS-fuel: an endless journey gets a big (but finite) starting tank — refuel as you travel.
+    startingFuel: 25,
   },
   // The headline campaign (GS-voyage): a bounded, WINNABLE voyage of three arcs. Each arc is two
   // ordinary stops then a BOSS; clearing the final boss wins the run. Arc I + the FINAL are solo
@@ -137,6 +154,10 @@ export const FORMATS: Record<string, RunFormat> = {
     winnable: true,
     cutMult: 0.65,
     maxJump: 2,
+    // GS-fuel: exactly enough to finish the 9-stop voyage by single hops (8 travels × 1 unit) —
+    // machine-checked against stops.length in tests/fuel.test.ts, so a re-shaped voyage can't
+    // silently strand the frugal player.
+    startingFuel: 8,
     stops: [
       // --- Arc 1 ---
       { holes: 6, label: 'Orbit I' },

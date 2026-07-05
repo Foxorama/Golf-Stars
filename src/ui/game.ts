@@ -14,6 +14,8 @@ import {
   bank,
   bossEdgeForRun,
   buy,
+  buyFuel,
+  canTravel,
   canWarpStop,
   currentBoss,
   currentCourse,
@@ -32,6 +34,7 @@ import {
   shopOffer,
   snapshotRun,
   startRun,
+  strand,
   travel,
   bossRewards,
   grantTalent,
@@ -242,6 +245,8 @@ export type Action =
   | { type: 'rerollStarmart' } // pay shards to redraw the StarMart rack
   | { type: 'leaveStarmart' } // close the StarMart and keep playing the hole
   | { type: 'route'; routeId: number }
+  | { type: 'buyFuel'; units: number } // top the ship's tank up with credits (GS-fuel) — Pro Shop / journey depot
+  | { type: 'strand' } // out of fuel AND credits with no payable lane (GS-fuel): the run ends stranded
   | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
   | { type: 'viewHole'; hole: number }
   | { type: 'openMarket' } // visit the between-run Trade Market (buy ships/apparel/bags) (GS-clubhouse)
@@ -1056,6 +1061,9 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'travel') return state;
       const route = (state.routes ?? []).find((r) => r.id === action.routeId);
       if (!route) return state;
+      // GS-fuel: a lane whose fuel shortfall exceeds the purse can't be taken (the UI disables it;
+      // this guard keeps a stale click from throwing in `travel`).
+      if (!canTravel(state.run, route)) return state;
       const run = travel(state.run, route);
       return {
         ...state,
@@ -1068,6 +1076,30 @@ export function reduce(state: UiState, action: Action): UiState {
         match: undefined,
         bossReward: undefined,
         viewHole: 0,
+      };
+    }
+
+    case 'buyFuel': {
+      // Top the tank up with run credits (GS-fuel) — offered at the Pro Shop's fuel depot and on
+      // the journey screen. `buyFuel` clamps to tank space + affordability, so this can't overdraw.
+      if (state.screen !== 'shop' && state.screen !== 'travel') return state;
+      if (state.run.status !== 'active') return state;
+      return { ...state, run: buyFuel(state.run, action.units) };
+    }
+
+    case 'strand': {
+      // Out of fuel AND credits with no payable lane (GS-fuel): the run ends STRANDED. Mirrors
+      // 'bank' (it's the travel screen's forced exit); leftover pocket change converts to shards
+      // via cashOutShards' stranded rule.
+      if (state.screen !== 'travel' || state.run.status !== 'active') return state;
+      const run = strand(state.run);
+      return {
+        ...state,
+        run,
+        routes: undefined,
+        screen: 'gameover',
+        bestDistance: Math.max(state.bestDistance, run.distanceFromStart),
+        ...runEndUpdates(state, run),
       };
     }
 

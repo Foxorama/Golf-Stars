@@ -64,8 +64,8 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v17** (GS-warp: `EndlessRunRecord.startHole`
-  + `RunSnapshot.warpedThrough`, both optional → a pure version stamp); bump + add a migration when
+  (localStorage is the only copy). Current schema is **v18** (GS-fuel: `RunSnapshot.fuel`, optional
+  → a pure version stamp; v17 was GS-warp's stamp); bump + add a migration when
   you persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -204,6 +204,16 @@ For each system: the rule that constrains new work. Open the archive doc before 
   reducer's `warpStop`). The last-runs board ranks by FURTHEST HOLE (`endlessRecordsByDepth`, newest
   10) and every row carries its honest hole RANGE (`recordRange` — "50–67" vs "1–49", ⚡-marked), so
   a warped run can't masquerade as a solo one. Save v17.
+  **Ship FUEL meters the journey (GS-fuel):** every jump burns `distanceJump` units off `Run.fuel`
+  (`RunFormat.startingFuel` — voyage 8 = its single-hop travel count, machine-checked vs
+  `stops.length`; unending 25). ONE rule lives in `travel` (auto ≡ interactive by construction): a
+  short tank auto-buys the shortfall at `FUEL_UNIT_COST` (20 cr, paid before the toll), the explicit
+  `buyFuel` Fuel Depot (Pro Shop + journey screen) sells the same price, and a lane whose shortfall
+  beats the purse is LOCKED (`canTravel`; the reducer no-ops, the sheet disables Jump). All lanes
+  locked ⇒ the run ends `'stranded'` (`strand`; pocket change converts like a bank —
+  `cashOutShards`). Pure arithmetic, ZERO rng — every seeded stream is byte-identical; save v18
+  (`RunSnapshot.fuel`; a pre-fuel resume gets a fresh tank). The Clubhouse spaceport parks a
+  hand-placed (zero-rng) fuelling station between the front pads. `tests/fuel.test.ts` guards.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
   ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),

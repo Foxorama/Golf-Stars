@@ -19,7 +19,9 @@ describe('journey lane biome variety (GS-journey-variety)', () => {
 
   it('the three lanes land three DISTINCT archetypes, none the world you are on', () => {
     for (let seed = 1; seed <= 12; seed++) {
-      let run: Run = startRun(seed, 'voyage');
+      // A fat purse so hopping without playing can always cover fuel (GS-fuel) — this asserts the
+      // route DRAW, not the economy; the fuel gate has its own suite (tests/fuel.test.ts).
+      let run: Run = { ...startRun(seed, 'voyage'), credits: 10_000 };
       for (let hop = 0; hop < 6 && run.status === 'active'; hop++) {
         const routes = routeOptions(run);
         const here = currentTheme(run).archetype;
