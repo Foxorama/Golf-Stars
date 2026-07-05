@@ -1290,3 +1290,46 @@ so a warped run is honestly distinguishable at a glance without a second board.
 the whole 941-test suite passes with only the save-version literals bumped. Guarded by
 `tests/warp.test.ts` (birdie floor incl. pickups, scope gates, lock-step prefix, same-stream proof,
 milestone suppression, snapshot round-trip, reducer flow, range sorting, v17 migration).
+
+## GS-fuel — Ship fuel meters the journey; the depot, the auto-buy, and stranding (2026-07-05)
+
+**The ask.** Every jump on the journey map should cost fuel equal to its distance (1 step = 1 unit,
+2 steps = 2). The Voyage starts with exactly enough to finish on single hops; the Unending Universe
+starts with 25 units; both need a way to buy more. Plus a fuelling station on the Clubhouse
+spaceport panel.
+
+**The tank.** `Run.fuel`, seeded by `RunFormat.startingFuel` via `startingFuelFor` — voyage **8**
+(= its 9 stops − 1 travels, machine-checked against `stops.length` in `tests/fuel.test.ts` so a
+re-shaped campaign can't silently strand the frugal player), unending **25**, unknown ids fall to
+`DEFAULT_STARTING_FUEL` (25; they fold into the default format anyway). A jump burns
+`routeFuelCost(route)` = `distanceJump`, unit for unit.
+
+**One rule in `travel` (auto ≡ interactive by construction).** Rather than gate the jump in two
+places, `travel` itself owns the fuel rule: a short tank AUTO-BUYS the missing units at the flat
+depot price (`FUEL_UNIT_COST` = 20 credits — noticeable against ~12 cr/Stableford-point stop
+income, far from ruinous), paid BEFORE the toll (which stays floored at zero). Only when the purse
+can't cover the shortfall is the lane locked — `canTravel` says no, the reducer's `route` case
+no-ops, the route sheet disables the Jump button, and `travel` throws if called anyway. The
+headless `simulateRun` honours the strategy's pick while payable, else falls back to the cheapest
+payable lane. The explicit `buyFuel(run, units)` (Pro-Shop **Fuel Depot** card + the journey
+screen) is the same price — pre-buying is a legibility choice, not a discount — clamped to tank cap
+(`FUEL_TANK_MAX` 99) and purse.
+
+**Stranding.** With NO payable lane the run ends `'stranded'` (new `EndReason`; `strand(run)`, the
+reducer's `strand` action behind the travel screen's 🆘 banner). Design call: stranded credits
+convert to shards like a bank — running dry is a forced stop, not a missed cut, and the leftovers
+are below one fuel unit by definition, so it's a courtesy, not a loophole. In practice a player
+earns ~100+ credits per passed stop, so stranding only bites a player who spends the purse to zero
+AND drains the tank — real teeth, rarely felt.
+
+**Determinism + persistence.** The whole system is pure arithmetic on the Run — ZERO rng draws, so
+every seeded stream is byte-identical; the 971-test suite passes with only save-version literals
+bumped (plus one hop-without-playing variety test given a fat purse). `RunSnapshot.fuel` persists
+the gauge; save **v18** is a pure version stamp — a pre-fuel active run resumes with the format's
+fresh tank (generous; an old save can never resume already stranded).
+
+**Surfaces.** Header chip (`⛽ N`, red when ≤2), starmap planet labels (`+2 jump · ⛽2`), route
+sheet fuel chips (burn + auto-buy surcharge + out-of-range lock), Fuel Depot on shop + travel
+screens, stranded gameover heading, and the spaceport's hand-placed (zero-rng) fuelling station —
+amber pump island + fuel cells + neon ⛽ FUEL sign between the two front pads (re-shot
+`scripts/clubhouse-preview.mjs`).

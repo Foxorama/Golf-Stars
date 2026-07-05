@@ -41,7 +41,7 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, startingFuelFor, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
 import { endlessGateOverPar, endlessMilestoneShards, passesEndlessGate, warpBirdieHole } from './endless';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type BossEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
@@ -56,7 +56,7 @@ import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pick
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
-export type EndReason = 'cut' | 'banked' | 'won';
+export type EndReason = 'cut' | 'banked' | 'won' | 'stranded';
 
 export interface StopResult {
   stopIndex: number;
@@ -151,6 +151,10 @@ export interface Run {
    *  span is always a contiguous prefix from hole 1); the first hand-played hole is
    *  `warpedThrough + 1`, the leaderboard range's start. 0 = an unwarped run. Snapshotted. */
   warpedThrough: number;
+  /** Ship fuel in the tank (GS-fuel): every journey jump burns `distanceJump` units. Starts at the
+   *  format's tank (`startingFuelFor`); topped up with credits (`buyFuel` / travel's auto-refuel).
+   *  A run that can't cover any offered lane is STRANDED (endedReason 'stranded'). Snapshotted. */
+  fuel: number;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -219,6 +223,9 @@ export function startRun(
     parPlayed: 0,
     firedEventIds: [],
     warpedThrough: 0,
+    // The format's starting tank (GS-fuel): the voyage gets exactly its single-hop budget; the
+    // Unending Universe a 25-unit reserve. Every journey jump burns its distance in units.
+    fuel: startingFuelFor(getFormat(formatId)),
     status: 'active',
     history: [],
   };
@@ -1039,9 +1046,71 @@ export function routeOptions(run: Run): Route[] {
   });
 }
 
+// --- Ship fuel (GS-fuel) ------------------------------------------------------
+//
+// Every journey jump burns its DISTANCE in fuel units (a 1-hop = 1 unit, a deep 3-jump = 3). The
+// tank starts at the format's budget (voyage = its single-hop travel count; unending = 25) and is
+// topped up with run credits — explicitly at the Pro Shop / journey fuel depot (`buyFuel`), or
+// implicitly at the jump itself: `travel` auto-buys any shortfall at the same unit price, so the
+// player is never blocked while they can PAY. Only a lane whose shortfall exceeds the purse is
+// untravellable (`canTravel`); a stop where EVERY lane is untravellable strands the run (`strand`).
+// Zero rng — the whole system is pure arithmetic on the run, so every seeded stream is untouched.
+
+/** Credits per fuel unit — one price everywhere (depot top-ups and travel's auto-refuel alike). */
+export const FUEL_UNIT_COST = 20;
+/** Tank display/purchase cap — generous enough to never bind in practice. */
+export const FUEL_TANK_MAX = 99;
+
+/** Fuel a route's jump burns: its distance, unit for unit. */
+export function routeFuelCost(route: Pick<Route, 'distanceJump'>): number {
+  return Math.max(0, route.distanceJump);
+}
+
+/** Units missing from the tank for this jump (0 = the tank covers it). */
+export function fuelShortfall(run: Run, route: Pick<Route, 'distanceJump'>): number {
+  return Math.max(0, routeFuelCost(route) - Math.max(0, run.fuel));
+}
+
+/** Credits `travel` will auto-spend on missing fuel for this jump (0 = tank covers it). */
+export function travelRefuelCost(run: Run, route: Pick<Route, 'distanceJump'>): number {
+  return fuelShortfall(run, route) * FUEL_UNIT_COST;
+}
+
+/** Can this lane be taken — is the tank + purse enough for its jump? */
+export function canTravel(run: Run, route: Pick<Route, 'distanceJump'>): boolean {
+  return run.credits >= travelRefuelCost(run, route);
+}
+
+/**
+ * Buy fuel with run credits (the Pro Shop / journey-screen depot). Clamps to what fits in the tank
+ * AND what the purse affords, so the buttons always do the sensible thing; a no-op at 0 units.
+ */
+export function buyFuel(run: Run, units: number): Run {
+  const n = Math.min(
+    Math.max(0, Math.floor(units)),
+    Math.max(0, FUEL_TANK_MAX - run.fuel),
+    Math.floor(run.credits / FUEL_UNIT_COST),
+  );
+  if (n <= 0) return run;
+  return { ...run, credits: run.credits - n * FUEL_UNIT_COST, fuel: run.fuel + n };
+}
+
+/** Out of fuel AND credits with no travellable lane: the run ends STRANDED. Like a bank, the
+ *  pocket change converts to shards (see cashOutShards) — it's a forced stop, not a punishment
+ *  beat on top of one. */
+export function strand(run: Run): Run {
+  return { ...run, status: 'ended', endedReason: 'stranded' };
+}
+
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
 export function travel(run: Run, route: Route): Run {
   if (run.status !== 'active') throw new Error('travel: run is not active');
+  // GS-fuel: the jump burns its distance in fuel; a short tank auto-buys the missing units at the
+  // depot price. ONE rule for the headless sim and the interactive reducer (which guards with
+  // `canTravel` and disables the lane), so auto ≡ interactive holds by construction.
+  const refuel = travelRefuelCost(run, route);
+  if (run.credits < refuel) throw new Error('travel: not enough fuel (refuel or pick a shorter jump)');
+  const fuelAfter = Math.max(0, run.fuel - routeFuelCost(route));
   const ev = route.event;
   const arrivingStop = run.stopIndex + 1;
   // GS-routes: a credit TOLL bites up front (floored so it never strands you below zero).
@@ -1066,7 +1135,9 @@ export function travel(run: Run, route: Route): Run {
     loadout,
     stopIndex: arrivingStop,
     distanceFromStart: run.distanceFromStart + route.distanceJump,
-    credits: Math.max(0, run.credits - toll) + salvageCredits,
+    // The mandatory refuel is paid first (guarded above), then the toll bites (still floored).
+    credits: Math.max(0, run.credits - refuel - toll) + salvageCredits,
+    fuel: fuelAfter,
     // Carry the chosen route's event into the next stop (applied by finishStop).
     pendingEvent: ev,
     // Carry the chosen lane's WORLD into the next stop (GS-journey-biome) — the biome you arrive in is
@@ -1356,6 +1427,9 @@ export interface RunSnapshot {
   /** Holes fast-forwarded by warp (GS-warp), so a resume keeps the leaderboard range's start.
    *  0/absent for back-compat (an unwarped run). */
   warpedThrough?: number;
+  /** Ship fuel in the tank (GS-fuel), so a resume keeps the gauge. Absent on a pre-fuel snapshot →
+   *  the resume grants the format's fresh starting tank (generous, never strands an old save). */
+  fuel?: number;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -1379,6 +1453,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     firedEventIds: [...run.firedEventIds],
     characterId: run.loadout.characterId,
     warpedThrough: run.warpedThrough || undefined,
+    fuel: run.fuel,
   };
 }
 
@@ -1410,6 +1485,8 @@ export function resumeRun(snap: RunSnapshot): Run {
     parPlayed: snap.parPlayed ?? 0,
     firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
     warpedThrough: snap.warpedThrough ?? 0,
+    // A pre-fuel snapshot resumes with a fresh tank (GS-fuel) — generous, and never strands it.
+    fuel: snap.fuel ?? startingFuelFor(getFormat(snap.formatId ?? DEFAULT_FORMAT)),
     status: 'active',
     history: [],
   };
@@ -1435,7 +1512,11 @@ export const WIN_SHARD_BONUS = 60;
  * and gives leftover credits a terminal value instead of evaporating when the run ends.
  */
 export function cashOutShards(run: Run): number {
-  const keepsCredits = run.endedReason === 'banked' || run.endedReason === 'won';
+  // A STRANDED run (GS-fuel) also keeps its pocket change: running dry is a forced stop, not a
+  // missed cut, so the leftovers convert like a bank (they're below one fuel unit by definition,
+  // so this is a courtesy, not a loophole).
+  const keepsCredits =
+    run.endedReason === 'banked' || run.endedReason === 'won' || run.endedReason === 'stranded';
   return keepsCredits ? Math.floor(Math.max(0, run.credits) / CREDITS_PER_SHARD) : 0;
 }
 
@@ -1497,7 +1578,17 @@ export function simulateRun(
     if (run.status !== 'active') break;
     for (const id of strategy.shop?.(run) ?? []) run = buy(run, id);
     const routes = routeOptions(run);
-    const route = strategy.pickRoute?.(run, routes) ?? routes[0]!;
+    // GS-fuel: honour the strategy's pick while it's payable (travel auto-buys any shortfall);
+    // otherwise fall back to the cheapest payable lane, and with none the run is STRANDED — the
+    // same rule the interactive travel screen enforces.
+    const preferred = strategy.pickRoute?.(run, routes) ?? routes[0]!;
+    const route = canTravel(run, preferred)
+      ? preferred
+      : routes.filter((r) => canTravel(run, r)).sort((a, b) => a.distanceJump - b.distanceJump)[0];
+    if (!route) {
+      run = strand(run);
+      break;
+    }
     run = travel(run, route);
   }
   return { run, stops };

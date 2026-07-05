@@ -291,7 +291,8 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
     : '';
   const name = c.worldName ? (c.worldName.length > 15 ? `${c.worldName.slice(0, 14)}…` : c.worldName) : '';
   const nameLabel = name ? `<text x="${cx}" y="${cy + r + 16}" font-size="10" fill="#eaf0ff" text-anchor="middle" font-weight="700">${esc(name)}</text>` : '';
-  const jumpLabel = `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump ›</text>`;
+  // GS-fuel: a jump burns its distance in fuel — say so on the planet label so the bill reads pre-tap.
+  const jumpLabel = `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump · ⛽${c.distanceJump} ›</text>`;
 
   return `
     <g data-route-inspect="${c.id}" role="button" tabindex="0" aria-label="${esc(c.worldName ?? c.label)} — view jump" style="cursor:pointer;">

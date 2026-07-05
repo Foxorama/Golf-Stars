@@ -855,6 +855,47 @@ function spaceportArt(): string {
     <rect x="152" y="19" width="96" height="21" rx="6" fill="#0d1416" stroke="#1f3a35" stroke-width="1.4"/>
     <text x="200" y="34" text-anchor="middle" font-size="12" font-weight="800" fill="none" stroke="#2bf0c0" stroke-width="3" stroke-linejoin="round" opacity="0.4" font-family="Georgia,'Times New Roman',serif" font-style="italic">Spaceport</text>
     <text x="200" y="34" text-anchor="middle" font-size="12" font-weight="800" fill="#d9fff4" font-family="Georgia,'Times New Roman',serif" font-style="italic">Spaceport</text>
+    <!-- ══ THE FUELLING STATION (GS-fuel): a pump island on the front deck band between the two
+         front pads — where the fleet tanks up between runs. Warm amber against the teal pads (fuel
+         reads as fuel), cel-shaded like the clubhouse. Hand-placed, zero rng (byte-stable). -->
+    <g>
+      <!-- grounding shadow + service square painted on the deck -->
+      <ellipse cx="200" cy="203" rx="26" ry="5.5" fill="#000" opacity="0.3"/>
+      <ellipse cx="200" cy="201.5" rx="23" ry="4.6" fill="none" stroke="#ffce54" stroke-width="1" opacity="0.35" stroke-dasharray="4 3"/>
+      <!-- fuel-cell stack left of the pump: two glowing canisters banded like propane bottles -->
+      <g>
+        <rect x="178" y="188" width="8" height="12" rx="2.4" fill="#3d4f79" stroke="#10162a" stroke-width="0.8"/>
+        <rect x="178" y="191.4" width="8" height="2.6" fill="#ffce54" opacity="0.9"/>
+        <rect x="187.5" y="185" width="8.6" height="15" rx="2.6" fill="#4a5a86" stroke="#10162a" stroke-width="0.8"/>
+        <rect x="187.5" y="189" width="8.6" height="3" fill="#ffce54" opacity="0.9">
+          <animate attributeName="opacity" values="0.6;1;0.6" dur="2.4s" repeatCount="indefinite"/>
+        </rect>
+        <rect x="189" y="183.4" width="5.6" height="2.2" rx="1" fill="#2b3452"/>
+      </g>
+      <!-- the pump cabinet: two-tone hull metal, amber gauge screen, keypad ticks -->
+      <rect x="199" y="178" width="15" height="23" rx="2.6" fill="#39456a" stroke="#10162a" stroke-width="1"/>
+      <rect x="199" y="178" width="15" height="3.2" rx="1.6" fill="#516592"/>
+      <rect x="201.5" y="183" width="10" height="6.5" rx="1.2" fill="#1a1206" stroke="#7a6f52" stroke-width="0.6"/>
+      <rect x="202.5" y="184" width="5" height="1.6" fill="#ffce54">
+        <animate attributeName="width" values="2;8;2" dur="3.2s" repeatCount="indefinite"/>
+      </rect>
+      <circle cx="210.4" cy="187.6" r="0.9" fill="#ffce54"><animate attributeName="opacity" values="1;0.2;1" dur="1.3s" repeatCount="indefinite"/></circle>
+      <g fill="#9fb0cf" opacity="0.7">
+        <rect x="202" y="191.6" width="2.2" height="1.6"/><rect x="205.4" y="191.6" width="2.2" height="1.6"/><rect x="208.8" y="191.6" width="2.2" height="1.6"/>
+        <rect x="202" y="194.2" width="2.2" height="1.6"/><rect x="205.4" y="194.2" width="2.2" height="1.6"/><rect x="208.8" y="194.2" width="2.2" height="1.6"/>
+      </g>
+      <!-- hose looping off the pump to a nozzle resting in its holster -->
+      <path d="M214,182 Q222,183 222,190 Q222,197 217.5,198.5" fill="none" stroke="#10162a" stroke-width="2.2"/>
+      <path d="M214,182 Q222,183 222,190 Q222,197 217.5,198.5" fill="none" stroke="#5a6a96" stroke-width="1"/>
+      <rect x="214.6" y="196.6" width="5" height="3.4" rx="1.2" fill="#ffce54" stroke="#b98f4a" stroke-width="0.6"/>
+      <!-- neon FUEL sign on a post beside the island (kept small — under the Spaceport marquee) -->
+      <line x1="230" y1="200" x2="230" y2="181" stroke="#4a5262" stroke-width="1.6"/>
+      <ellipse cx="230" cy="176" rx="13" ry="7" fill="#ffce54" opacity="0.12">
+        <animate attributeName="opacity" values="0.1;0.2;0.1" dur="4.1s" repeatCount="indefinite"/>
+      </ellipse>
+      <rect x="219.5" y="171.5" width="21" height="9.5" rx="3" fill="#0d1416" stroke="#3a2f1f" stroke-width="1"/>
+      <text x="230" y="178.6" text-anchor="middle" font-size="6.2" font-weight="800" fill="#ffdf8a" font-family="Georgia,'Times New Roman',serif" font-style="italic">⛽ FUEL</text>
+    </g>
     ${PORT_PADS.map(padArt).join('')}
     <rect width="400" height="230" fill="url(#spVig)"/>
   </svg>`;

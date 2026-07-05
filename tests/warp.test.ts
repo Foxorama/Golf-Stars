@@ -176,11 +176,11 @@ describe('the warp reducer flow + the range leaderboard (GS-warp)', () => {
     expect(endlessRecordsByDepth(newestFirst, 2).map((r) => r.holes)).toEqual([49, 12]);
   });
 
-  it('save v16 → v17 migrates as a pure stamp and old records read as unwarped', () => {
+  it('save v16 migrates forward as pure stamps and old records read as unwarped', () => {
     const v16 = { ...defaultSave(), version: 16 } as unknown;
     const s = migrate(v16);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(17);
+    expect(SAVE_VERSION).toBe(18);
     expect(recordRange({ characterId: 'x', tier: 'common', holes: 23, gross: 90, par: 92, ascension: 0, seed: 1 })).toBe('1–23');
   });
 });
