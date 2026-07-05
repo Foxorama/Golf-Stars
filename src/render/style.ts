@@ -24,7 +24,7 @@ import { effectPatches as effectPatchesFor, type GroundPatch, type PatchKind } f
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
-import { contourIsolines } from './contour';
+import { contourIsolines, type Isoline } from './contour';
 import { unionPolys, dilateUnion } from './merge';
 import type { Projector } from './project';
 import {
@@ -734,9 +734,28 @@ function styleGreen(
       }
       if (relief.length) out.push({ t: 'clip', clip: poly, children: relief });
       if (slope.iso && slope.iso.length) {
-        const rings: Prim[] = slope.iso
-          .filter((line) => line.length > 1)
-          .map((line) => ({ t: 'path', pts: line, stroke: 'rgba(255,255,255,0.15)', sw: 1, round: true }));
+        // Elevation-CODED rings, in the biome's own turf tones: a ring above the surface's mid
+        // elevation strokes light (the green's light tone eased toward white), one below strokes
+        // dark (its dark tone eased toward shadow), intensity growing toward the crest/valley —
+        // so which side of the green is HIGH reads at a glance, in every world's palette (a flat
+        // white ring vanished on the pale frost/ice greens and glared on the dark ones). The
+        // wide-value void/cetus palettes mute further, the MOW_BLEND lesson. Deterministic off
+        // `frac` — counts/colours never read the projection.
+        const soft = softGreen ? 0.72 : 1;
+        // The light side needs a harder push than the dark: a pale ring on already-light turf
+        // washes out at the alpha where a dark ring already reads (the first preview's lesson).
+        const hiCol = mixHex(s.light, '#ffffff', 0.88);
+        const loCol = mixHex(s.dark, '#081018', 0.55);
+        const rings: Prim[] = [];
+        for (const ring of slope.iso) {
+          if (ring.pts.length < 2) continue;
+          const d = ring.frac * 2 - 1; // −1 valley … +1 crest
+          const w = Math.abs(d);
+          const col = d >= 0
+            ? hexAlpha(hiCol, (0.16 + 0.3 * w) * soft)
+            : hexAlpha(loCol, (0.14 + 0.24 * w) * soft);
+          rings.push({ t: 'path', pts: ring.pts, stroke: col, sw: 1, round: true });
+        }
         if (rings.length) out.push({ t: 'clip', clip: poly, children: rings });
       }
       const arrows: Prim[] = [];
@@ -1764,16 +1783,17 @@ interface GreenSlopeArt {
   /** Projected contour lobes: screen centre, px radius, signed peak slope (+ mound / − hollow). */
   lobes?: { c: Vec; rPx: number; h: number }[];
   /** Projected topo ISOLINES (GS-green-contour-2): level sets of the sim's height field, screen
-   *  space. The green-reading-book rings that make the surface read as sculpted ground. */
-  iso?: Vec[][];
+   *  space, each carrying its elevation `frac` (0 = the lowest ring, 1 = the highest) so the
+   *  green-reading-book rings colour-code high ground light and low ground dark. */
+  iso?: { pts: Vec[]; frac: number }[];
 }
 
 /** Course-space isolines per hole (GS-green-contour-2): the field never changes under a camera
  *  move, so the marching-squares pass runs once per hole and every follow-cam frame just re-projects
  *  — both a per-frame cost saving and a hard guarantee of camera-proof line counts. */
-const isoCache = new WeakMap<Hole, Vec[][]>();
+const isoCache = new WeakMap<Hole, Isoline[]>();
 
-function greenIsolinesCourse(hole: Hole, greenPolyCourse: Vec[]): Vec[][] {
+function greenIsolinesCourse(hole: Hole, greenPolyCourse: Vec[]): Isoline[] {
   let iso = isoCache.get(hole);
   if (!iso) {
     iso = contourIsolines(greenPolyCourse, hole.greenSlope, hole.greenContour ?? []);
@@ -1835,7 +1855,10 @@ function greenSlopeArt(hole: Hole, greenPolyCourse: Vec[], proj: Projector): Gre
     const e = proj.project([lb.c[0] + lb.r, lb.c[1]]);
     return { c, rPx: Math.hypot(e[0] - c[0], e[1] - c[1]), h: lb.h };
   });
-  const iso = greenIsolinesCourse(hole, greenPolyCourse).map((line) => line.map((p) => proj.project(p)));
+  const iso = greenIsolinesCourse(hole, greenPolyCourse).map((line) => ({
+    pts: line.pts.map((p) => proj.project(p)),
+    frac: line.frac,
+  }));
   return { ...plane, arrows, lobes: lobArt, iso };
 }
 

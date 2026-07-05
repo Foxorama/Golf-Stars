@@ -428,8 +428,11 @@ For each system: the rule that constrains new work. Open the archive doc before 
   pathless → the straight lerp). The ART reads the same numbers: `render/contour.ts contourIsolines`
   marching-squares `heightFieldAt` into topo rings (course-space grid + deterministic levels ⇒
   camera-proof; WeakMap-cached per hole; drawn via the open-polyline `path` prim — 'poly' closes with
-  a chord, never use it for open curves) and each lobe shades as directional relief under the shared
-  `LIGHT_UL` (lit-flank + shadow-flank glows; hollows inverted per the emboss rule).
+  a chord, never use it for open curves), ELEVATION-CODED in the biome's own green `Shade` (each
+  `Isoline.frac` 0→1; high rings stroke light toward white, low rings dark toward shadow, void/cetus
+  muted ×0.72 — never a flat white ring, it vanishes on pale greens and glares on dark ones), and
+  each lobe shades as directional relief under the shared `LIGHT_UL` (lit-flank + shadow-flank
+  glows; hollows inverted per the emboss rule).
   `tests/green-contour.test.ts` guards field↔height consistency, isolines, local-field roll and the
   curved-path contract.
   **Putt-FEEL rules (GS-putt-feel):** the fall-line arrows are PX-CAPPED in `styleGreen` (prims are
