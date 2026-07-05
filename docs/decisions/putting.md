@@ -227,3 +227,62 @@ on its side stream, threaded through resolver/preview/arrows; `tests/green-conto
 
 Catalogue growth shifts which items seeded shops draw (same rng COUNT — `weightedSample` draws one
 float per pick regardless of pool), and the full 957-test suite stayed green, balance suites included.
+
+
+## GS-green-contour-2 — the contours become real ground: physics + topo art (2026-07-05)
+
+**The ask.** "Make the contoured greens fully sick — art styling and physics to match the contours —
+and do the foundations well because we'll probably expand to contoured fairways later."
+
+**The shared field (`sim/contour.ts`).** The lobe math moved out of `round.ts` into a deliberately
+surface-AGNOSTIC module: `slopeFieldAt` (the old `greenSlopeAt` body — `round.ts` keeps the green-named
+re-export so nothing downstream changed) plus the NEW `heightFieldAt`, the field's closed-form
+POTENTIAL. Each lobe's height term is `h·r·e^((1−u²)/2)` — its radial derivative is exactly the lobe's
+slope profile, so gradient(height) ≡ −slope by construction (machine-checked numerically). Height is
+what unlocks the topo art; nothing in the module knows about greens, so a future contoured FAIRWAY is a
+new `Hole` lobe field handed to the same two functions (see IDEAS GS-contour-fairways).
+
+**Physics 1 — the roll reads the local ground.** This was the retune GS-green-contour explicitly
+deferred: `rollOut`'s green `slopeRun` now samples `greenSlopeAt` at each integration step's midpoint
+when the hole carries lobes — a ball rolling into a mound brakes climbing the near flank and runs out
+down the far one, so the landform the rings draw is the ground the approach actually rolls on. Scope
+kept tight on purpose: the roll stays a STRAIGHT line sampled per step (the deflection is putting-scale
+texture), so the roll-invariant (`dist(rest, touchdown) === |roll|`) and the renderer's straight
+run-out hold, and a plane-only hole reads back exactly the plane, byte-for-byte. Blast radius measured,
+not guessed: the full 991-test suite ran with only TWO seeded-fixture shifts — the green-slope backspin
+test (now asserts the strict <8yd climb on a lobe-stripped hole + a <12yd bound with contours live; a
+local hollow can honestly carry a check a touch further) and the ui.test ace fixture (re-pinned seed
+185 → 339). The death-spiral harnesses (biomes/characters) passed unchanged — contract 4 satisfied.
+
+**Physics 2 — the watched putt curls.** `PuttLog` gains an optional `path`: `manualPutt` samples the
+SAME `puttPathPreview` curve the aim screen draws, at the actually-struck aim/pace, then shears it
+linearly so it finishes exactly at the resolved rest point — the wobble (and a make's drop) eases in
+over the whole roll instead of teleporting at the end. The play view walks the path by ARC LENGTH with
+the existing ease, and traces the guide line along it, so a double-breaker visibly S-bends into the cup
+— the last place the graphic and the physics disagreed on a green. Auto `onePutt` fills no path → the
+classic straight lerp, byte-for-byte, and old shot logs replay fine (the field is optional).
+
+**Art — the green reads as sculpted terrain (`render/contour.ts` + `styleGreen`).**
+- **Topo isolines:** `contourIsolines` marching-squares `heightFieldAt` over a course-space grid inside
+  the green polygon, chains the segment soup by exact endpoint match (shared cell edges lerp to the
+  identical float — always lower-index-node-first), smooths one Chaikin round, and culls sub-3yd
+  specks. Levels are evenly spaced between the field's min/max INSIDE the polygon, count adapted to
+  relief amplitude (3–7). Camera-proof by construction: grid, levels, chaining and smoothing read only
+  course-space/deterministic values, and the whole pass is WeakMap-cached per hole with only the
+  projection running per frame. Drawn as thin `rgba(255,255,255,0.15)` rings clipped to the green —
+  the green-reading-book look; sw 1px so map zoom keeps them a whisper (the GS-putt-feel px lesson).
+- **Relief:** the old flat lit/shadow circle per lobe became a directional GLOW PAIR under the shared
+  upper-left sun (`LIGHT_UL`, the GS-inset light): a mound pools soft light on its up-light flank and
+  shadow on the down-light one; a hollow is the exact inverse (shadowed near rim, lit far wall — the
+  emboss rule). Ground, not stickers.
+- **New prim:** `path` — an OPEN stroked polyline in both emitters (`<polyline>` / no-closePath
+  canvas). A 'poly' with `fill:none` still CLOSES with a chord, which would slash straight across an
+  open isoline — that's why the new prim exists. First user is the rings; anything drawing open curves
+  should use it.
+
+**Verified.** `tests/green-contour.test.ts` grew four blocks (height≡−∇, isoline shape/closure/
+determinism, local-field roll behaviour + roll-invariant + plane byte-compat, curved-path contract);
+full suite 991 green including camera-stability and the balance harnesses; `scripts/putt-preview.mjs`
+re-shot (rings fan around the lobes exactly where the arrow field fans, relief reads as rolls, break
+line unchanged) and `scripts/gallery.mjs` re-shot (map zoom: greens keep their identity, rings stay
+subliminal). No new `_gs*` hook — all tuning is module constants, the test-hub guard is untouched.

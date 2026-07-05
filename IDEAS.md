@@ -31,8 +31,14 @@ Foundations are shipped; these are the live follow-ons.
 
 **Course / greens / hazards**
 - **GS-greens-4** — template green COMPLEXES on top of the linear `greenSlope`: redan kick-feed, Biarritz
-  swale, punchbowl gather, crowned/turtleback shed, false-front reject, two-tier. Likely a per-region
-  slope field + an approach settle-trickle.
+  swale, punchbowl gather, crowned/turtleback shed, false-front reject, two-tier. GS-green-contour-2
+  built the foundation (shared `sim/contour.ts` field + local-field roll + topo-isoline art) —
+  a template complex is now "author the lobe set", no new machinery.
+- **GS-contour-fairways** — contoured FAIRWAYS on the same field: a `Hole` lobe set over the corridor
+  feeding `sim/contour.ts` (`slopeFieldAt`/`heightFieldAt` are already surface-agnostic) so fairway
+  run-out kicks off mounds and gathers in hollows, drawn by the same `render/contour.ts` isolines.
+  Physics retune (every seeded landing moves) — own PR, re-run the death-spiral harness; consider
+  kick-plates on dogleg corners as the first authored use.
 - **GS-slope-perks** — abilities that bend the slope rules (backspin check-back uphill, cheaper green-read,
   uphill-magnet). The "until perks exist" caveat in the slope code is the hook.
 - **GS-split-fairways** — risky-short vs safe-long alternate fairways (the dogleg-grove machinery is the

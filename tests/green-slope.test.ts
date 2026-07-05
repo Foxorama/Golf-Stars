@@ -40,7 +40,11 @@ describe('green slope (GS-greens-3)', () => {
 
   it('backspin can never climb far up a slope (no weird uphill spin)', () => {
     for (let s = 0; s < 80; s++) {
-      const h = generateCourse(s + 43000, { biome: 'ice-ring', holes: 1 }).holes[0]!;
+      const gen = generateCourse(s + 43000, { biome: 'ice-ring', holes: 1 }).holes[0]!;
+      // The strict invariant is a PLANE property, asserted on a lobe-stripped hole: with contour
+      // lobes live (GS-green-contour-2) the roll honestly reads the LOCAL ground, and "uphill on
+      // the plane" can cross a hollow's dip — bounded separately below.
+      const h = { ...gen, greenContour: undefined };
       const sl = h.greenSlope!;
       const mag = Math.hypot(sl[0], sl[1]) || 1;
       const uphill: Vec = [-sl[0] / mag, -sl[1] / mag]; // toward the high side
@@ -51,6 +55,11 @@ describe('green slope (GS-greens-3)', () => {
       const moved: Vec = [r.rest[0] - h.green[0], r.rest[1] - h.green[1]];
       const climbed = moved[0] * uphill[0] + moved[1] * uphill[1];
       expect(climbed).toBeLessThan(8); // brakes hard uphill — never a long uphill spin
+      // WITH the contours the climb stays bounded: a local hollow can carry the check a touch past
+      // the plane's brake, but never a runaway uphill spin.
+      const rc = rollOut(gen, gen.green, down, -14, 'green');
+      const movedC: Vec = [rc.rest[0] - gen.green[0], rc.rest[1] - gen.green[1]];
+      expect(movedC[0] * uphill[0] + movedC[1] * uphill[1]).toBeLessThan(12);
     }
   });
 });
