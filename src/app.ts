@@ -1773,7 +1773,7 @@ function playingBody(animating: boolean): string {
         <div class="gs-hud gs-hud-bottom">
           ${caddyBadgeHTML(puttCaddyId())}
           <div class="gs-hud-controls gs-glass">
-            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` <span style="opacity:.85;">Past <b>${Math.round(puttReadRange)}y</b> the read goes <b>blind</b> — a better putter reads further.</span>` : ''}</p>
+            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` <span style="opacity:.85;">Your read line <b>ends at ${Math.round(puttReadRange)}y</b> — past it you're guessing; a better putter reads further.</span>` : ''}</p>
             ${puttAimRow(breakYd, puttAim, reads, doubleBreak)}
             <div id="puttmeter"></div>
             <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>

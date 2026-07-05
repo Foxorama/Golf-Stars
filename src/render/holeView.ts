@@ -400,28 +400,29 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
 
   // (Tee + flagstick are drawn by the shared scene builder, so the map and the play view agree.)
 
-  // Predicted putt break line (GS-greens-3): a dotted curve showing how the slope will curl the ball,
-  // with a small ✕ where the player's current aim is pointed (the high-side read).
+  // Predicted putt break line (GS-greens-3): a dotted curve showing how the slope will curl the ball.
   if (opts.puttPath && opts.puttPath.length > 1) {
     const pts = opts.puttPath.map((p) => place(p));
     const n = pts.length;
     const toPath = (seg: Vec[]) => seg.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
-    // GS-putt-depth: draw the CONFIDENT read (out to the putter's range) bright, then fade the rest to
-    // a faint guess. `puttReadFrac` undefined ⇒ the whole line is confident (back-compat / short putt).
+    // GS-putt-depth (retuned GS-putt-read): draw ONLY the confident read (out to the putter's range)
+    // — beyond it the line simply STOPS at a terminus dot. The old faint "guessing" tail still traced
+    // the whole break to the cup, which read as a free full-length read; with the blind stretch drawn
+    // as NOTHING, putter upgrades / the Mystic Mole visibly STRETCH the line. `puttReadFrac`
+    // undefined ⇒ the whole line is confident (back-compat / short putt).
     const frac = opts.puttReadFrac == null ? 1 : Math.max(0, Math.min(1, opts.puttReadFrac));
     const cut = Math.max(1, Math.round(frac * (n - 1)));
     const sure = pts.slice(0, cut + 1);
     parts.push(`<path d="${toPath(sure)}" fill="none" stroke="#ffe14a" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" stroke-linecap="round" />`);
     if (cut < n - 1) {
-      // Beyond the confident range — a faint, wider-dashed "you're guessing the rest" tail.
-      const guess = pts.slice(cut);
-      parts.push(`<path d="${toPath(guess)}" fill="none" stroke="#ffe14a" stroke-width="1.6" stroke-dasharray="2 5" opacity="0.32" stroke-linecap="round" />`);
-      // A small tick where the confident read ends.
+      // The read ends HERE — a filled terminus dot; the rest of the break is yours to judge.
       const edge = pts[cut]!;
-      parts.push(`<circle cx="${edge[0].toFixed(1)}" cy="${edge[1].toFixed(1)}" r="2.2" fill="#ffe14a" opacity="0.55" />`);
+      parts.push(`<circle cx="${edge[0].toFixed(1)}" cy="${edge[1].toFixed(1)}" r="2.6" fill="#ffe14a" opacity="0.85" />`);
+    } else {
+      // Full read: a small open ring where the ball finishes (at the cup on the ideal line).
+      const tip = pts[n - 1]!;
+      parts.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="0.9" />`);
     }
-    const tip = pts[n - 1]!;
-    parts.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="${cut < n - 1 ? '0.5' : '0.9'}" />`);
   }
 
   if (opts.ball) {

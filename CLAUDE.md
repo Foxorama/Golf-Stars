@@ -376,8 +376,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   distance past the putter's confident `puttRange` (`puttBandDistanceFactor`, floored, =1 within range →
   a tap-in is byte-for-byte the old flat band; the on-screen MAKE band draws the SAME shrunk window), so
   a long putt is a nervier stroke and a better putter (bigger `puttRange`, derived from `puttBoost` in
-  `puttSkillOf`) holds a wide band + reads further. The break line fades to a faint "blind" tail past the
-  read range (`RenderOptions.puttReadFrac`; a green-reading Mystic Mole sees the whole break → frac 1).
+  `puttSkillOf`) holds a wide band + reads further. **The break line STOPS DEAD at the confident read
+  (GS-putt-read):** a terminus dot ends it and the blind stretch draws NOTHING (the old faint tail to the
+  cup read as a free full-length read), so read range is a VISIBLE gear axis — putter perks stretch the
+  line (`puttSkillOf` boost→range cap 1.0), the common **Green-Reading Book** adds a flat `puttReadBonus`
+  +4y (manual-only, paired with a small `puttBoost` so auto still gains — contract 4), and a green-reading
+  Mystic Mole sees the whole break (`RenderOptions.puttReadFrac` 1).
   Only the PACE window is distance-scaled — the lateral wobble stays keyed to the putter's inherent band,
   and auto putting (`onePutt`, no slope/range) is untouched. And HARDER stops tilt the greens MORE: the
   slope-magnitude multiplier floor rises with wildness (`range(0.4+0.45·wildness, 1)`, still ≤ biome

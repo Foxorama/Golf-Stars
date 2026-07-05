@@ -83,6 +83,24 @@ describe('putter upgrades extend the confident range (GS-putt-depth)', () => {
     expect(grip.puttRange!).toBeGreaterThan(DEFAULT_PUTT_RANGE);
     expect(tour.puttRange!).toBeGreaterThan(grip.puttRange!);
   });
+
+  // GS-putt-read: the break line now STOPS at the confident range, so the read is a visible axis.
+  it('the Green-Reading Book adds its flat read bonus on top of any putter', () => {
+    const book = puttSkillOf(loadoutFromPerks(['green-reading-book']));
+    // +4y read straight up (the small puttBoost adds a touch more via the range formula).
+    expect(book.puttRange!).toBeGreaterThanOrEqual(DEFAULT_PUTT_RANGE + 4);
+    const tour = puttSkillOf(loadoutFromPerks(['tour-putter']));
+    const both = puttSkillOf(loadoutFromPerks(['tour-putter', 'green-reading-book']));
+    expect(both.puttRange!).toBeGreaterThanOrEqual(tour.puttRange! + 4);
+  });
+
+  it('a deep putter stack keeps stretching the read (the cap no longer binds at 0.7)', () => {
+    const three = puttSkillOf(loadoutFromPerks(['putting-grip', 'mallet-putter', 'tour-putter']));
+    const four = puttSkillOf(loadoutFromPerks(['putting-grip', 'mallet-putter', 'tour-putter', 'pinseeker-putter']));
+    expect(four.puttRange!).toBeGreaterThan(three.puttRange!);
+    // The full stack reaches the full +12y range bonus.
+    expect(four.puttRange!).toBe(DEFAULT_PUTT_RANGE + 12);
+  });
 });
 
 describe('harder stops tilt the greens more (GS-putt-depth)', () => {
