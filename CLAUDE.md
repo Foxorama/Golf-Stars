@@ -204,16 +204,22 @@ For each system: the rule that constrains new work. Open the archive doc before 
   reducer's `warpStop`). The last-runs board ranks by FURTHEST HOLE (`endlessRecordsByDepth`, newest
   10) and every row carries its honest hole RANGE (`recordRange` — "50–67" vs "1–49", ⚡-marked), so
   a warped run can't masquerade as a solo one. Save v17.
-  **Ship FUEL meters the journey (GS-fuel):** every jump burns `distanceJump` units off `Run.fuel`
-  (`RunFormat.startingFuel` — voyage 8 = its single-hop travel count, machine-checked vs
-  `stops.length`; unending 25). ONE rule lives in `travel` (auto ≡ interactive by construction): a
-  short tank auto-buys the shortfall at `FUEL_UNIT_COST` (20 cr, paid before the toll), the explicit
-  `buyFuel` Fuel Depot (Pro Shop + journey screen) sells the same price, and a lane whose shortfall
-  beats the purse is LOCKED (`canTravel`; the reducer no-ops, the sheet disables Jump). All lanes
-  locked ⇒ the run ends `'stranded'` (`strand`; pocket change converts like a bank —
-  `cashOutShards`). Pure arithmetic, ZERO rng — every seeded stream is byte-identical; save v18
-  (`RunSnapshot.fuel`; a pre-fuel resume gets a fresh tank). The Clubhouse spaceport parks a
-  hand-placed (zero-rng) fuelling station between the front pads. `tests/fuel.test.ts` guards.
+  **Ship FUEL meters the journey (GS-fuel, redesigned GS-fuel-2):** every jump burns `distanceJump`
+  units off `Run.fuel`; the starting tank IS the capacity (`tankCapacity` — voyage 8 = its
+  single-hop travel count, machine-checked vs `stops.length`; unending 12, sized to run dry
+  mid-run). Fuel is priced by DEPTH (`fuelUnitCost` = 10 + 2·distance, cap 60 — cheap near home,
+  dear in deep space) so "fill up here vs. gear now" is a real shop decision. ONE rule lives in
+  `travel` (auto ≡ interactive by construction): a short tank buys the shortfall at the LOCAL
+  price, paid before the toll — and the route sheet prints that exact bill ON the Jump button,
+  never silently; `buyFuel` (Fuel Depot: Pro Shop + journey screen) sells the same price,
+  capacity-clamped. A lane whose bill beats the purse is LOCKED (`canTravel`; reducer no-ops,
+  starmap dims the planet with `needs ⛽n ✕`, sheet disables Jump); all lanes locked ⇒ the run ends
+  `'stranded'` (`strand`; pocket change converts like a bank — `cashOutShards`). Fuel is drawn ONLY
+  via `render/fuel.ts fuelGaugeHTML` (segmented cell gauge, mini on the run header; `.gs-fuelbar`/
+  `.gs-fueldepot` tokens) — never a bare number. Pure arithmetic, ZERO rng — every seeded stream is
+  byte-identical; save v18 (`RunSnapshot.fuel`; a pre-fuel resume gets a fresh tank, an
+  over-capacity legacy tank keeps its fuel but can't buy past the cap). The Clubhouse spaceport
+  parks a hand-placed (zero-rng) fuelling station between the front pads. `tests/fuel.test.ts` guards.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
   ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),

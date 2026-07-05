@@ -36,7 +36,7 @@ import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybr
 import { CLUBS, clubById } from './sim/clubs';
 import { FORMATS, getFormat } from './sim/rpg/formats';
 import { getCharacter, type Character } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, canTravel, canWarpStop, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, FUEL_TANK_MAX, FUEL_UNIT_COST, fuelShortfall, holeGateArmed, routeFuelCost, snapshotRun, starmartRerollCost, STARMART_COST, teamDuelSetupForRun, travelRefuelCost, type TeamDuelSetup } from './sim/rpg/run';
+import { ASCENSION_MAX, ascensionCutBonus, canTravel, canWarpStop, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, fuelShortfall, fuelUnitCost, holeGateArmed, routeFuelCost, snapshotRun, starmartRerollCost, STARMART_COST, tankCapacity, teamDuelSetupForRun, travelRefuelCost, type TeamDuelSetup } from './sim/rpg/run';
 import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
 import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
@@ -46,6 +46,7 @@ import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
 import { matchScoreline, matchState, holeDuel, betterPlayedHole } from './sim/rpg/match';
 import { canBuyShip, shipCatalogue, shipRevealedInMarket, ACE_SHIP_ID, type Ship } from './sim/rpg/ships';
 import { shipCardSVG, shipSVG } from './render/shipArt';
+import { fuelColour, fuelGaugeHTML } from './render/fuel';
 import { apparelById, apparelForSlot, apparelRevealedInMarket, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
 import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
 import { clubhouseLoungeHTML, type LoungeGolfer } from './render/clubhouseLounge';
@@ -374,7 +375,7 @@ function header(): string {
     <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
       <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>${who}
       <span style="margin-left:auto;font-size:13px;color:var(--gs-dim);">
-        Stop <b style="color:var(--gs-ink);">${r.stopIndex + 1}</b> · Dist <b style="color:var(--gs-ink);">${r.distanceFromStart}</b> · Credits <b style="color:var(--gs-warn);">${r.credits}</b> · ⛽ <b style="color:${r.fuel <= 2 ? '#ff6b4a' : 'var(--gs-ink)'};">${r.fuel}</b>
+        Stop <b style="color:var(--gs-ink);">${r.stopIndex + 1}</b> · Dist <b style="color:var(--gs-ink);">${r.distanceFromStart}</b> · Credits <b style="color:var(--gs-warn);">${r.credits}</b> · ${fuelGaugeHTML(r.fuel, tankCapacity(r), { mini: true })}
         · Hcp <b style="color:var(--gs-ink);">${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
       </span>
     </header>`;
@@ -2352,29 +2353,45 @@ function bagInventoryHTML(): string {
     </div>`;
 }
 
-/** The FUEL DEPOT (GS-fuel) — the fixed refuelling counter shown at every Pro Shop and on the
- *  journey screen (never part of the rotating 4-card offer, so fuel is always purchasable). Shows
- *  the tank, sells units at the flat depot price, and the buttons grey out when the purse or the
- *  tank cap says no. `buyFuel` clamps anyway; the disabled state is just honest UI. */
+/** The FUEL DEPOT (GS-fuel, restyled GS-fuel-2) — the fixed refuelling counter shown at every Pro
+ *  Shop and on the journey screen (never part of the rotating 4-card offer, so fuel is always
+ *  purchasable). The LOCAL price is the headline — it rises with galaxy depth, so "fill up here or
+ *  gamble on gear" is the depot's whole question — over the segmented tank gauge and quick-buy
+ *  chips (+1 / +3 / fill the tank). Buttons grey out when the purse or capacity says no
+ *  (`buyFuel` clamps anyway; the disabled state is just honest UI). */
 function fuelDepotHTML(): string {
   const r = state.run;
-  const full = r.fuel >= FUEL_TANK_MAX;
-  const buyBtn = (units: number): string => {
-    const cost = units * FUEL_UNIT_COST;
-    const ok = !full && r.credits >= cost;
+  const cap = tankCapacity(r);
+  const price = fuelUnitCost(r);
+  const space = Math.max(0, cap - r.fuel);
+  const buyBtn = (units: number, label?: string): string => {
+    const n = Math.min(units, space);
+    const cost = n * price;
+    const ok = n > 0 && r.credits >= cost;
+    const text = `${label ?? `+${n} ⛽`} · ${cost} cr`;
     return ok
-      ? btn(`+${units} ⛽ (${cost} cr)`, { type: 'buyFuel', units }, { variant: 'ghost' })
-      : `<span style="font-size:12px;opacity:.45;border:1px solid var(--gs-line);border-radius:8px;padding:6px 10px;">+${units} ⛽ (${cost} cr)</span>`;
+      ? btn(text, { type: 'buyFuel', units: n }, { variant: 'ghost', borderColor: '#4fd0e066' })
+      : `<span class="gs-btn gs-btn--ghost" style="opacity:.4;cursor:not-allowed;flex:1 1 auto;font-size:13px;padding:9px 10px;text-align:center;">${text}</span>`;
   };
-  const low = r.fuel <= 2 ? ` <span style="color:#ff6b4a;font-weight:700;">· running low!</span>` : '';
+  const tankNote = space <= 0
+    ? `<span style="font-size:12px;font-weight:700;color:#4fd0e0;">tank full</span>`
+    : r.fuel <= 2
+      ? `<span style="font-size:12px;font-weight:800;color:var(--gs-danger);">running dry!</span>`
+      : '';
+  const rows = space > 0
+    ? `<div class="gs-fueldepot__row">${buyBtn(1)}${space > 1 ? buyBtn(3) : ''}${space > 3 ? buyBtn(space, `Fill +${space} ⛽`) : ''}</div>`
+    : '';
   return `
-    <div style="margin-top:12px;border:1px solid var(--gs-line);border-left:4px solid #4fd0e0;border-radius:10px;padding:9px 12px;background:#4fd0e008;">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:14px;font-weight:700;color:#4fd0e0;">⛽ Fuel Depot</span>
-        <span style="font-size:13px;">Tank <b>${r.fuel}</b>${full ? ' (full)' : ''}${low}</span>
-        <span style="margin-left:auto;display:flex;gap:6px;">${buyBtn(1)}${buyBtn(5)}</span>
+    <div class="gs-fueldepot">
+      <div class="gs-fueldepot__head">
+        <span class="gs-fueldepot__title">⛽ FUEL DEPOT</span>
+        ${fuelGaugeHTML(r.fuel, cap, { bare: true })}
+        <b style="font-size:13px;color:${fuelColour(r.fuel, cap)};">${r.fuel}/${cap}</b>
+        ${tankNote}
+        <span class="gs-fueldepot__price">${price} cr / unit here</span>
       </div>
-      <p style="font-size:11.5px;opacity:.55;margin:.35em 0 0;">Every journey jump burns its distance in fuel (a deep jump = 2–3 units). Short at the jump? The depot price is auto-charged when you launch — if you can cover it.</p>
+      ${rows}
+      <p class="gs-fueldepot__note">A jump burns its distance in fuel (a deep jump = 2–3 units). Fuel gets dearer the deeper you fly — launching short-tanked auto-charges the local price.</p>
     </div>`;
 }
 
@@ -3125,12 +3142,11 @@ function routeInfoOverlay(): string {
   if (carryMult > 1) tags.push(travelChip(`🎈 shots fly +${Math.round((carryMult - 1) * 100)}%`, '#2bb673'));
   else if (carryMult < 1) tags.push(travelChip(`⚓ shots fly −${Math.round((1 - carryMult) * 100)}%`, '#ff8b6b'));
   tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
-  // The jump's FUEL bill (GS-fuel): distance = units burned; a short tank shows the auto-refuel
-  // surcharge `travel` will charge, and an unpayable one reads as the blocker it is.
-  tags.push(travelChip(`⛽ −${routeFuelCost(r)} fuel`, state.run.fuel >= routeFuelCost(r) ? '#4fd0e0' : '#ff8b6b'));
+  // The jump's FUEL bill (GS-fuel-2): ONE tank-before → tank-after chip, and any shortfall is
+  // priced on the Jump button itself (below) — never a silent surcharge.
+  const fuelAfter = Math.max(0, state.run.fuel - routeFuelCost(r));
+  tags.push(travelChip(`⛽ ${state.run.fuel} → ${fuelAfter}`, state.run.fuel >= routeFuelCost(r) ? '#4fd0e0' : '#ff8b6b'));
   const shortfall = fuelShortfall(state.run, r);
-  if (shortfall > 0 && canTravel(state.run, r))
-    tags.push(travelChip(`⛽ +${shortfall} auto-bought (−${travelRefuelCost(state.run, r)} cr)`, '#ffb04a'));
 
   const markers = [
     r.bossAhead ? `<span style="color:#ff8b6b;font-weight:700;">⚔ Boss ahead</span>` : '',
@@ -3143,10 +3159,10 @@ function routeInfoOverlay(): string {
     ev.creditToll && credits < ev.creditToll
       ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⚠ You can't cover the ${ev.creditToll}-credit toll (you have ${credits}).</div>`
       : '';
-  // Not enough fuel AND not enough credits to auto-buy the shortfall (GS-fuel): this lane is locked.
+  // Not enough fuel AND not enough credits to buy the shortfall (GS-fuel): this lane is locked.
   const travellable = canTravel(state.run, r);
   const fuelWarn = !travellable
-    ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⛽ Not enough fuel for this ${routeFuelCost(r)}-unit jump — the missing ${fuelShortfall(state.run, r)} unit${fuelShortfall(state.run, r) === 1 ? '' : 's'} would cost ${travelRefuelCost(state.run, r)} cr (you have ${credits}). Pick a shorter jump.</div>`
+    ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⛽ Not enough fuel for this ${routeFuelCost(r)}-unit jump — the missing ${fuelShortfall(state.run, r)} unit${fuelShortfall(state.run, r) === 1 ? '' : 's'} would cost ${travelRefuelCost(state.run, r)} cr at this depot (you have ${credits}). Pick a shorter jump.</div>`
     : '';
 
   // A SALVAGE lane's club find (GS-journey-fx-3) gets its own loud, honest line — the exact club you'll
@@ -3205,7 +3221,16 @@ function routeInfoOverlay(): string {
           <button class="gs-btn gs-btn--block" data-route="close" style="flex:1 1 0;">Cancel</button>
           ${
             travellable
-              ? btn(`🚀 Jump to ${r.theme.name}`, { type: 'route', routeId: r.id }, { variant: 'primary', block: true, borderColor: accent })
+              ? btn(
+                  // A short tank prints its refuel bill ON the launch button (GS-fuel-2): the local
+                  // price is charged at lift-off, and the player commits to it with the tap — the
+                  // exact surcharge `travel` folds in, never a silent deduction.
+                  shortfall > 0
+                    ? `🚀 Refuel +${shortfall} ⛽ (−${travelRefuelCost(state.run, r)} cr) & jump`
+                    : `🚀 Jump to ${r.theme.name}`,
+                  { type: 'route', routeId: r.id },
+                  { variant: 'primary', block: true, borderColor: accent },
+                )
               : `<span class="gs-btn gs-btn--block" style="flex:1 1 0;opacity:.4;cursor:not-allowed;">⛽ Out of range</span>`
           }
         </div>
@@ -3233,6 +3258,9 @@ function travelScreen(): string {
     effectIcon: COURSE_EFFECTS[routeEffect(r.event)].icon,
     elite: r.elite,
     bossAhead: r.bossAhead,
+    // GS-fuel-2: a lane the tank + purse can't cover draws DIMMED with a red fuel bill, so the
+    // blocker reads on the map itself — not only after tapping into the sheet.
+    locked: !canTravel(state.run, r),
   }));
   // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
   // labelled with its zone name AND its real-sky position (GS-galaxy-map) — so the journey plots a
@@ -3287,12 +3315,13 @@ function travelScreen(): string {
          ${btn('🆘 Abandon ship & end the run', { type: 'strand' }, { variant: 'primary', block: true, borderColor: '#ff6b4a' })}
        </div>`
     : '';
-  const fuelCol = state.run.fuel <= 2 ? '#ff6b4a' : '#4fd0e0';
+  // The ship-status pill (GS-fuel-2): the segmented tank gauge rides the screen title, so the fuel
+  // question is on-screen before any lane is tapped — no more hunting a small number.
   return `
     ${header()}
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 3px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:2px 0 3px;">
       <h2 style="font-size:18px;margin:0;letter-spacing:0.6px;background:linear-gradient(90deg,#ffce54,#7fd6e6);-webkit-background-clip:text;background-clip:text;color:transparent;">◆ CHOOSE YOUR JUMP</h2>
-      <span style="flex:0 0 auto;font-size:11px;font-weight:700;color:#9fb0cf;border:1px solid var(--gs-line);border-radius:999px;padding:2px 9px;white-space:nowrap;">🛰 dist ${state.run.distanceFromStart} · <span style="color:${fuelCol};">⛽ ${state.run.fuel}</span></span>
+      <span style="flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:#9fb0cf;border:1px solid var(--gs-line);border-radius:999px;padding:3px 10px;white-space:nowrap;">🛰 dist ${state.run.distanceFromStart} · ${fuelGaugeHTML(state.run.fuel, tankCapacity(state.run))}</span>
     </div>
     <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing world up top to preview where you'll play &amp; its bet, then confirm the jump. Each jump burns its distance in ⛽ fuel. ${stakes} ${safeNote}</p>
     ${map}

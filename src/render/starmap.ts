@@ -54,6 +54,9 @@ export interface StarmapChoice {
   effectIcon?: string;
   elite?: boolean;
   bossAhead?: boolean;
+  /** GS-fuel-2: the tank + purse can't cover this jump — the world draws dimmed with a red fuel
+   *  bill (still tappable: the sheet explains and the depot below can fix it). */
+  locked?: boolean;
 }
 
 /** Per-biome world look (GS-journey-biome) — a colour + glyph + surface family so each lane's
@@ -291,8 +294,15 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
     : '';
   const name = c.worldName ? (c.worldName.length > 15 ? `${c.worldName.slice(0, 14)}…` : c.worldName) : '';
   const nameLabel = name ? `<text x="${cx}" y="${cy + r + 16}" font-size="10" fill="#eaf0ff" text-anchor="middle" font-weight="700">${esc(name)}</text>` : '';
-  // GS-fuel: a jump burns its distance in fuel — say so on the planet label so the bill reads pre-tap.
-  const jumpLabel = `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump · ⛽${c.distanceJump} ›</text>`;
+  // GS-fuel: a jump burns its distance in fuel — say so on the planet label so the bill reads
+  // pre-tap; a LOCKED lane (GS-fuel-2) swaps it for a red "needs ⛽" bill.
+  const jumpLabel = c.locked
+    ? // Kept SHORT — three planet labels share one row, and a wide string collides with its
+      // neighbours' (the sheet spells out the full bill on tap).
+      `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="#ff6b4a" font-weight="700" text-anchor="middle">needs ⛽${c.distanceJump} ✕</text>`
+    : `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump · ⛽${c.distanceJump} ›</text>`;
+  // The locked world's whole body dims (labels stay full-strength so the blocker reads).
+  const bodyOpacity = c.locked ? ' opacity="0.45"' : '';
 
   return `
     <g data-route-inspect="${c.id}" role="button" tabindex="0" aria-label="${esc(c.worldName ?? c.label)} — view jump" style="cursor:pointer;">
@@ -305,6 +315,7 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
         <clipPath id="${gid}c"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>
       </defs>
       <circle cx="${cx}" cy="${cy}" r="${r + 12}" fill="transparent" pointer-events="all"/>
+      <g${bodyOpacity}>
       ${boss}${heat}
       <!-- a soft "tap me" portal pulse in the rarity colour -->
       <circle cx="${cx}" cy="${cy}" r="${r + 4}" fill="none" stroke="${ring}" stroke-width="1.3" opacity="0.5">
@@ -328,6 +339,7 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
       <text x="${cx}" y="${cy + 7}" font-size="22" text-anchor="middle">${look.glyph}</text>
       ${markerRow}
       ${effectBadge}
+      </g>
       ${nameLabel}
       ${jumpLabel}
     </g>`;

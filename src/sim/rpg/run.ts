@@ -1046,20 +1046,37 @@ export function routeOptions(run: Run): Route[] {
   });
 }
 
-// --- Ship fuel (GS-fuel) ------------------------------------------------------
+// --- Ship fuel (GS-fuel, redesigned GS-fuel-2) --------------------------------
 //
 // Every journey jump burns its DISTANCE in fuel units (a 1-hop = 1 unit, a deep 3-jump = 3). The
-// tank starts at the format's budget (voyage = its single-hop travel count; unending = 25) and is
-// topped up with run credits — explicitly at the Pro Shop / journey fuel depot (`buyFuel`), or
-// implicitly at the jump itself: `travel` auto-buys any shortfall at the same unit price, so the
-// player is never blocked while they can PAY. Only a lane whose shortfall exceeds the purse is
-// untravellable (`canTravel`); a stop where EVERY lane is untravellable strands the run (`strand`).
-// Zero rng — the whole system is pure arithmetic on the run, so every seeded stream is untouched.
+// tank is a REAL capacity now (`tankCapacity` = the format's starting tank: voyage 8 = its
+// single-hop travel count, unending 12): it starts full and `buyFuel` can never stock past it.
+// Fuel is bought with run credits at a price that RISES with galaxy depth (`fuelUnitCost` — cheap
+// near home, dear in deep space), so "top the tank up here or spend the credits on gear and pay
+// deep-space prices later" is a real call at every depot — the choice the old flat-priced,
+// silently-auto-bought fuel never posed. `travel` still folds any shortfall into the jump bill at
+// the LOCAL price (ONE rule, so auto ≡ interactive holds by construction) — the UI surfaces that
+// surcharge on the Jump button itself, never silently. A lane whose bill beats the purse is LOCKED
+// (`canTravel`); a stop where EVERY lane is locked strands the run (`strand`). Zero rng — the
+// whole system is pure arithmetic on the run, so every seeded stream is untouched.
 
-/** Credits per fuel unit — one price everywhere (depot top-ups and travel's auto-refuel alike). */
-export const FUEL_UNIT_COST = 20;
-/** Tank display/purchase cap — generous enough to never bind in practice. */
-export const FUEL_TANK_MAX = 99;
+/** Fuel price at the home spaceport (credits per unit). */
+export const FUEL_PRICE_BASE = 10;
+/** Credits the unit price climbs per point of galaxy distance — deep-space fuel is dear. */
+export const FUEL_PRICE_SLOPE = 2;
+/** Ceiling on the unit price, however deep the run flies. */
+export const FUEL_PRICE_MAX = 60;
+
+/** The LOCAL fuel price (credits per unit) — one rule for the depot and travel's shortfall alike. */
+export function fuelUnitCost(run: Pick<Run, 'distanceFromStart'>): number {
+  return Math.min(FUEL_PRICE_MAX, FUEL_PRICE_BASE + FUEL_PRICE_SLOPE * Math.max(0, run.distanceFromStart));
+}
+
+/** The ship's tank capacity — the format's starting tank (GS-fuel-2). `buyFuel` clamps to it; a
+ *  legacy save resumed above it simply can't buy more until it burns back under. */
+export function tankCapacity(run: Pick<Run, 'formatId'>): number {
+  return startingFuelFor(getFormat(run.formatId));
+}
 
 /** Fuel a route's jump burns: its distance, unit for unit. */
 export function routeFuelCost(route: Pick<Route, 'distanceJump'>): number {
@@ -1071,9 +1088,9 @@ export function fuelShortfall(run: Run, route: Pick<Route, 'distanceJump'>): num
   return Math.max(0, routeFuelCost(route) - Math.max(0, run.fuel));
 }
 
-/** Credits `travel` will auto-spend on missing fuel for this jump (0 = tank covers it). */
+/** Credits `travel` will spend on missing fuel for this jump at the LOCAL price (0 = tank covers it). */
 export function travelRefuelCost(run: Run, route: Pick<Route, 'distanceJump'>): number {
-  return fuelShortfall(run, route) * FUEL_UNIT_COST;
+  return fuelShortfall(run, route) * fuelUnitCost(run);
 }
 
 /** Can this lane be taken — is the tank + purse enough for its jump? */
@@ -1082,17 +1099,19 @@ export function canTravel(run: Run, route: Pick<Route, 'distanceJump'>): boolean
 }
 
 /**
- * Buy fuel with run credits (the Pro Shop / journey-screen depot). Clamps to what fits in the tank
- * AND what the purse affords, so the buttons always do the sensible thing; a no-op at 0 units.
+ * Buy fuel with run credits at the LOCAL price (the Pro Shop / journey-screen depot). Clamps to
+ * what fits in the tank AND what the purse affords, so the buttons always do the sensible thing;
+ * a no-op at 0 units.
  */
 export function buyFuel(run: Run, units: number): Run {
+  const price = fuelUnitCost(run);
   const n = Math.min(
     Math.max(0, Math.floor(units)),
-    Math.max(0, FUEL_TANK_MAX - run.fuel),
-    Math.floor(run.credits / FUEL_UNIT_COST),
+    Math.max(0, tankCapacity(run) - run.fuel),
+    Math.floor(run.credits / price),
   );
   if (n <= 0) return run;
-  return { ...run, credits: run.credits - n * FUEL_UNIT_COST, fuel: run.fuel + n };
+  return { ...run, credits: run.credits - n * price, fuel: run.fuel + n };
 }
 
 /** Out of fuel AND credits with no travellable lane: the run ends STRANDED. Like a bank, the
@@ -1105,9 +1124,10 @@ export function strand(run: Run): Run {
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
 export function travel(run: Run, route: Route): Run {
   if (run.status !== 'active') throw new Error('travel: run is not active');
-  // GS-fuel: the jump burns its distance in fuel; a short tank auto-buys the missing units at the
-  // depot price. ONE rule for the headless sim and the interactive reducer (which guards with
-  // `canTravel` and disables the lane), so auto ≡ interactive holds by construction.
+  // GS-fuel: the jump burns its distance in fuel; a short tank buys the missing units at the LOCAL
+  // depot price (GS-fuel-2 — dearer the deeper you fly). ONE rule for the headless sim and the
+  // interactive reducer (which guards with `canTravel`, disables the lane, and prints this exact
+  // surcharge on the Jump button), so auto ≡ interactive holds by construction.
   const refuel = travelRefuelCost(run, route);
   if (run.credits < refuel) throw new Error('travel: not enough fuel (refuel or pick a shorter jump)');
   const fuelAfter = Math.max(0, run.fuel - routeFuelCost(route));

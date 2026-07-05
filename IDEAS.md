@@ -28,6 +28,10 @@ Foundations are shipped; these are the live follow-ons.
   baseline auto-AI dies ~hole 24, so 60/80/100+ are meant to need a stacked build — verify a maxed human
   can actually reach 150); per-tier intro stingers ("the bar tightens…"); an endless leaderboard
   (best-holes daily); maybe a mercy token (one bar-miss forgiven) as a deep shop legendary.
+- **GS-fuel-3** — build hooks on the GS-fuel-2 economy: an Ion Thrusters shop perk (jumps cost −1 fuel,
+  min 1 — a `PlayerLoadout` field read by `routeFuelCost`; PARKED from GS-fuel-2 because a new catalogue
+  row perturbs seeded shop offers, so it wants its own PR + test sweep); an expanded-tank relic; fuel as
+  a performance reward (eagle/ace siphons a unit — golf extends the journey).
 
 **Course / greens / hazards**
 - **GS-greens-4** — template green COMPLEXES on top of the linear `greenSlope`: redan kick-feed, Biarritz
