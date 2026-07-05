@@ -757,7 +757,9 @@ Two render-layer additions shipped with the contoured-greens upgrade (full story
   `path` is the right prim for any stroked open line. Supports `round` (cap+join) and `dash`.
 - **`render/contour.ts`** — topo isolines of the sim's contour height field (`sim/contour.ts
   heightFieldAt`), marching-squares over a COURSE-space grid, exact-endpoint chaining, one Chaikin
-  round. Fully camera-proof (grid/levels/chaining read no projection) and WeakMap-cached per hole in
+  round. Each `Isoline` carries its elevation `frac` (0 low … 1 high) and `styleGreen` colour-codes
+  off it in the biome's own green `Shade` — high rings light (toward white), low rings dark (toward
+  shadow), void/cetus muted ×0.72 — so the colouring is biome-appropriate by construction. Fully camera-proof (grid/levels/chaining read no projection) and WeakMap-cached per hole in
   `style.ts`; only the projection runs per frame. Poly-agnostic on purpose: a future contoured
   fairway hands its own polygon + field to the same function. Lobe RELIEF stays in `styleGreen`:
   a directional glow pair per lobe under the shared `LIGHT_UL` (mound lit toward the sun; hollow

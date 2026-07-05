@@ -151,12 +151,19 @@ describe('topo isolines (GS-green-contour-2)', () => {
   it('an isolated mound yields at least one CLOSED ring around its crest', () => {
     const iso = contourIsolines(square, undefined, mound);
     expect(iso.length).toBeGreaterThan(0);
-    const closed = iso.filter((l) => dist(l[0]!, l[l.length - 1]!) < 1e-6);
+    const closed = iso.filter((l) => dist(l.pts[0]!, l.pts[l.pts.length - 1]!) < 1e-6);
     expect(closed.length).toBeGreaterThan(0);
     // And the rings genuinely encircle the crest: some closed ring has points on both sides of it.
-    const ring = closed[0]!;
+    const ring = closed[0]!.pts;
     expect(Math.min(...ring.map((p) => p[0]))).toBeLessThan(0);
     expect(Math.max(...ring.map((p) => p[0]))).toBeGreaterThan(0);
+    // Elevation coding: every frac in [0,1], and HIGHER rings hug the crest tighter (smaller mean
+    // radius) — the colour code the renderer keys off frac is geometrically honest.
+    for (const l of iso) expect(l.frac).toBeGreaterThanOrEqual(0);
+    for (const l of iso) expect(l.frac).toBeLessThanOrEqual(1);
+    const meanR = (l: { pts: Vec[] }): number => l.pts.reduce((a, p) => a + Math.hypot(p[0], p[1]), 0) / l.pts.length;
+    const sorted = [...iso].sort((a, b) => a.frac - b.frac);
+    expect(meanR(sorted[sorted.length - 1]!)).toBeLessThan(meanR(sorted[0]!));
   });
 
   it('a pure plane yields straight, roughly parallel level lines; a flat field yields none', () => {
@@ -164,9 +171,14 @@ describe('topo isolines (GS-green-contour-2)', () => {
     expect(iso.length).toBeGreaterThan(1);
     // Level sets of a plane sloping along +x are vertical lines: x varies little within one line.
     for (const line of iso) {
-      const xs = line.map((p) => p[0]);
+      const xs = line.pts.map((p) => p[0]);
       expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(1);
     }
+    // Downhill is +x, so HIGHER levels (bigger frac) sit at smaller x — the light/dark code
+    // paints the uphill side light exactly where the fall-line arrows point away from.
+    const meanX = (l: { pts: Vec[] }): number => l.pts.reduce((a, p) => a + p[0], 0) / l.pts.length;
+    const sorted = [...iso].sort((a, b) => a.frac - b.frac);
+    expect(meanX(sorted[sorted.length - 1]!)).toBeLessThan(meanX(sorted[0]!));
     expect(contourIsolines(square, undefined, [])).toEqual([]);
     expect(contourIsolines(square, [0, 0], [])).toEqual([]);
   });

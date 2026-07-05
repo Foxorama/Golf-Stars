@@ -269,8 +269,19 @@ classic straight lerp, byte-for-byte, and old shot logs replay fine (the field i
   specks. Levels are evenly spaced between the field's min/max INSIDE the polygon, count adapted to
   relief amplitude (3–7). Camera-proof by construction: grid, levels, chaining and smoothing read only
   course-space/deterministic values, and the whole pass is WeakMap-cached per hole with only the
-  projection running per frame. Drawn as thin `rgba(255,255,255,0.15)` rings clipped to the green —
-  the green-reading-book look; sw 1px so map zoom keeps them a whisper (the GS-putt-feel px lesson).
+  projection running per frame. Drawn as thin sw-1px rings clipped to the green so map zoom keeps
+  them a whisper (the GS-putt-feel px lesson). **Rings are ELEVATION-CODED in the biome's own turf
+  tones (the S+ colouring pass):** each `Isoline` carries its `frac` (0 = the lowest level, 1 = the
+  highest), and `styleGreen` strokes rings above the surface's mid elevation LIGHT (the green
+  Shade's `light` eased 0.88 toward white) and rings below DARK (`dark` eased toward shadow),
+  intensity growing toward crest/valley — so which side of the green is HIGH reads at a glance in
+  every world's palette. A flat white ring vanished on the pale frost/ice greens and glared on dark
+  ones; deriving from the per-biome `Shade` makes the colouring biome-appropriate by construction,
+  and the light side pushes harder than the dark (a pale ring on already-light turf washes out at
+  the alpha where a dark ring already reads — the preview lesson). Void/cetus mute ×0.72 (the
+  MOW_BLEND lesson; their luminous platforms verified untouched in the gallery). The frac↔geometry
+  honesty is machine-checked: the highest ring hugs a mound's crest tightest, and on a pure plane
+  the high rings sit exactly where the fall-line arrows point away from.
 - **Relief:** the old flat lit/shadow circle per lobe became a directional GLOW PAIR under the shared
   upper-left sun (`LIGHT_UL`, the GS-inset light): a mound pools soft light on its up-light flank and
   shadow on the down-light one; a hollow is the exact inverse (shadowed near rim, lit far wall — the

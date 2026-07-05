@@ -101,6 +101,14 @@ function polylineLength(pts: Vec[]): number {
   return l;
 }
 
+/** One extracted isoline: a COURSE-space polyline plus WHERE its level sits in the surface's
+ *  elevation range (`frac` 0 = the lowest ring, 1 = the highest) — so the caller can colour-code
+ *  high ground light and low ground dark, the way a real relief map reads. */
+export interface Isoline {
+  pts: Vec[];
+  frac: number;
+}
+
 /**
  * The contour field's isolines inside `poly`, as COURSE-space polylines (closed rings carry their
  * first point again at the end). Levels are evenly spaced between the field's min/max over the
@@ -111,7 +119,7 @@ export function contourIsolines(
   plane: Vec | undefined,
   lobes: readonly ContourLobe[],
   opts: IsolineOpts = {},
-): Vec[][] {
+): Isoline[] {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -149,9 +157,10 @@ export function contourIsolines(
   const amp = hMax - hMin;
   const nLevels = Math.max(opts.minLevels ?? 3, Math.min(opts.maxLevels ?? 7, Math.round(amp / (opts.spacing ?? 2.6))));
   const at = (ix: number, iy: number): number => H[iy * (nx + 1) + ix]!;
-  const out: Vec[][] = [];
+  const out: Isoline[] = [];
   for (let li = 0; li < nLevels; li++) {
-    const lv = hMin + ((li + 0.5) / nLevels) * amp;
+    const frac = (li + 0.5) / nLevels;
+    const lv = hMin + frac * amp;
     const segs: [Vec, Vec][] = [];
     for (let iy = 0; iy < ny; iy++) {
       for (let ix = 0; ix < nx; ix++) {
@@ -191,7 +200,7 @@ export function contourIsolines(
       // them anyway, but dropping them keeps the SVG lean and the prim list honest.
       if (polylineLength(smooth) < 3) continue;
       if (!smooth.some((p) => pointInPoly(p, poly))) continue;
-      out.push(smooth);
+      out.push({ pts: smooth, frac });
     }
   }
   return out;
