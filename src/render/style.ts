@@ -688,15 +688,23 @@ function styleGreen(
   // worlds (void/cetus) mute further so their green doesn't band like the fairway used to
   // (GS-cetus-blend) — their palettes carry a big light↔dark spread that a 0.7/0.5 cut over-shouts.
   const softGreen = arch === 'void' || arch === 'cetus';
-  if (art.stripes) out.push(stripes(poly, mixHex(s.base, s.light, softGreen ? 0.52 : 0.7), mixHex(s.base, s.dark, softGreen ? 0.36 : 0.5), 6));
-  const gb = bboxOf(poly);
   // Green SLOPE (GS-greens-3): shade the LOW side darker + the HIGH side lighter and lay fall-line
   // arrows pointing downhill, so the tilt reads at a glance (the graphic IS the slope the sim rolls
   // on). `slope.dir` is the screen-space DOWNHILL unit; `mag` 0..~0.7 its steepness.
   const contoured = !!(slope?.arrows && slope.arrows.length > 0);
+  // A CONTOURED green mutes its mow stripe hard (S+ round 2): the full-contrast bands fought the
+  // relief art — gradient, rings and arrows all read against striped noise (the frost screenshot).
+  // The stripe stays as a whisper of turf texture; the relief owns the value range now.
+  if (art.stripes) {
+    const lm = contoured ? 0.26 : softGreen ? 0.52 : 0.7;
+    const dm = contoured ? 0.18 : softGreen ? 0.36 : 0.5;
+    out.push(stripes(poly, mixHex(s.base, s.light, lm), mixHex(s.base, s.dark, dm), 6));
+  }
+  const gb = bboxOf(poly);
   if (slope && (slope.mag > 0.05 || contoured)) {
     const span = Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY);
-    if (slope.mag > 0.05) {
+    if (slope.mag > 0.05 && !contoured) {
+      // Legacy plane-only green (old saves): the classic lit/shadow circle pair.
       const a = Math.min(0.5, slope.mag * 0.7);
       out.push({
         t: 'clip',
@@ -708,6 +716,36 @@ function styleGreen(
           { t: 'circle', c: [c[0] - slope.dir[0] * span * 0.34, c[1] - slope.dir[1] * span * 0.34], r: span * 0.6, fill: `rgba(255,255,255,${(a * 0.32).toFixed(3)})` },
         ],
       });
+    } else if (slope.mag > 0.05 && contoured) {
+      // S+ round 2: the giant soft circles read as a grey STAIN on pale turf (the frost screenshot),
+      // not as ground. Replace with a stepped LINEAR gradient along the fall line — three stacked
+      // half-plane washes each side of the centre, cumulative alpha ramping light (high side) →
+      // dark (low side). Stepped-not-smooth is the game's cel-shaded language, there is no circular
+      // edge to read as a blob, and it composes with the rings/relief instead of swallowing them.
+      const u = slope.dir; // downhill, screen space
+      const p: Vec = [-u[1], u[0]];
+      const BIG = span * 2.5;
+      const aBase = Math.min(0.36, slope.mag * 0.5);
+      const bands: Prim[] = [];
+      const halfPlane = (off: number, sideSign: number, fill: string): Prim => {
+        // The region on `sideSign`·downhill side of the line through c + u·off, as a big rect.
+        const o: Vec = [c[0] + u[0] * off * sideSign, c[1] + u[1] * off * sideSign];
+        return {
+          t: 'poly',
+          pts: [
+            [o[0] + p[0] * BIG, o[1] + p[1] * BIG],
+            [o[0] - p[0] * BIG, o[1] - p[1] * BIG],
+            [o[0] - p[0] * BIG + u[0] * BIG * sideSign, o[1] - p[1] * BIG + u[1] * BIG * sideSign],
+            [o[0] + p[0] * BIG + u[0] * BIG * sideSign, o[1] + p[1] * BIG + u[1] * BIG * sideSign],
+          ],
+          fill,
+        };
+      };
+      for (const [i, off] of [0.05, 0.22, 0.4].entries()) {
+        bands.push(halfPlane(span * off, 1, `rgba(6,12,24,${(aBase * (0.1 + i * 0.02)).toFixed(3)})`)); // low side sinks
+        bands.push(halfPlane(span * off, -1, `rgba(255,255,244,${(aBase * (0.09 + i * 0.02)).toFixed(3)})`)); // high side lifts
+      }
+      out.push({ t: 'clip', clip: poly, children: bands });
     }
     // GS-green-contour-2: the contoured green reads as SCULPTED ground, three layers deep —
     //  1. RELIEF: each lobe shades under the shared upper-left sun (LIGHT_UL, the GS-inset light):
@@ -725,8 +763,10 @@ function styleGreen(
         const s = Math.min(1, Math.abs(lb.h));
         const off = r * 0.36;
         const side = lb.h > 0 ? 1 : -1; // mound lit toward the sun; hollow lit on the far (down-light) wall
-        const litA = Math.min(0.2, 0.07 + s * 0.24);
-        const shA = Math.min(0.22, 0.08 + s * 0.26);
+        // Toned down (S+ round 2): the relief is an accent under the rings + fall-line gradient
+        // now, not the main event — stronger glows pooled into the plane wash and read as stains.
+        const litA = Math.min(0.14, 0.05 + s * 0.16);
+        const shA = Math.min(0.15, 0.05 + s * 0.17);
         relief.push(
           { t: 'glow', c: [lb.c[0] + LIGHT_UL[0] * off * side, lb.c[1] + LIGHT_UL[1] * off * side], r: r * 1.15, col: `rgba(255,255,238,${litA.toFixed(3)})` },
           { t: 'glow', c: [lb.c[0] - LIGHT_UL[0] * off * side, lb.c[1] - LIGHT_UL[1] * off * side], r: r * 1.08, col: `rgba(4,10,22,${shA.toFixed(3)})` },
@@ -752,9 +792,9 @@ function styleGreen(
           const d = ring.frac * 2 - 1; // −1 valley … +1 crest
           const w = Math.abs(d);
           const col = d >= 0
-            ? hexAlpha(hiCol, (0.16 + 0.3 * w) * soft)
-            : hexAlpha(loCol, (0.14 + 0.24 * w) * soft);
-          rings.push({ t: 'path', pts: ring.pts, stroke: col, sw: 1, round: true });
+            ? hexAlpha(hiCol, (0.22 + 0.34 * w) * soft)
+            : hexAlpha(loCol, (0.19 + 0.28 * w) * soft);
+          rings.push({ t: 'path', pts: ring.pts, stroke: col, sw: 1.15, round: true });
         }
         if (rings.length) out.push({ t: 'clip', clip: poly, children: rings });
       }
@@ -764,7 +804,7 @@ function styleGreen(
       const len = Math.max(3.5, Math.min(11, span * 0.08));
       const head = Math.max(1.6, len * 0.28);
       for (const ar of slope.arrows!) {
-        const col = `rgba(255,255,255,${(0.24 + Math.min(0.2, ar.mag * 0.35)).toFixed(3)})`;
+        const col = `rgba(255,255,255,${(0.2 + Math.min(0.16, ar.mag * 0.28)).toFixed(3)})`;
         const perp: Vec = [-ar.dir[1], ar.dir[0]];
         const base: Vec = [ar.p[0] - ar.dir[0] * len * 0.5, ar.p[1] - ar.dir[1] * len * 0.5];
         const tip: Vec = [ar.p[0] + ar.dir[0] * len * 0.5, ar.p[1] + ar.dir[1] * len * 0.5];
@@ -1833,7 +1873,9 @@ function greenSlopeArt(hole: Hole, greenPolyCourse: Vec[], proj: Projector): Gre
   const plane: GreenSlopeArt = base ?? { dir: [0, 1], mag: 0 };
   const gb = bboxOf(greenPolyCourse);
   const span = Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY);
-  const step = Math.max(6, span / 5); // course yards — a handful of reads across the surface
+  // Sparser than the original span/5 grid (S+ round 2): ~25 chevrons read as scattered clutter over
+  // the rings + gradient; a loose handful accents the field without shouting over it.
+  const step = Math.max(8, span / 3.4); // course yards — a loose handful of reads across the surface
   const arrows: { p: Vec; dir: Vec; mag: number }[] = [];
   for (let x = gb.minX + step * 0.5; x < gb.maxX; x += step) {
     for (let y = gb.minY + step * 0.5; y < gb.maxY; y += step) {

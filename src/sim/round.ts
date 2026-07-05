@@ -61,6 +61,11 @@ export interface ShotLog {
   rest: Vec;
   /** Roll-out distance (yards) from touchdown to rest. */
   roll: number;
+  /** The CURVED run-out travel on a contoured green (GS-green-contour-2 round 2): course-space
+   *  points from touchdown to exactly `rest`, present only when the roll actually bent (the curling
+   *  integrator steered it along the local fall line). The play view walks it by arc length so the
+   *  ball visibly breaks off a flank; absent ⇒ the classic straight run-out lerp. */
+  rollPath?: Vec[];
   /** True if this shot holed the ball (chip-in / hole-in-one). */
   holed: boolean;
   /** True when a wedge caddy (Dr Chipinski) dropped this approach for a chip-in. Render flavour. */
@@ -133,6 +138,11 @@ const SKIM_ROLL = 2.2;
  *  green run-per-yard is scaled by `1 + SLOPE_ROLL_K · (downhill·travelDir) · slopeMag`, floored so a
  *  steep uphill still creeps a hair. slopeMag rides in the green-slope vector's magnitude. */
 const SLOPE_ROLL_K = 0.95;
+/** How hard the green's SIDEWAYS slope steers a rolling ball (GS-green-contour-2 round 2): the
+ *  curling integrator bends the travel direction by `ROLL_CURL_K · perp-slope` per yard rolled on
+ *  the green. 0.06 lands a ~12yd roll across a 0.4 side slope ~1.5–2yd downhill of the straight
+ *  line — the putt-break scale, so an approach and a putt read the same ground the same way. */
+const ROLL_CURL_K = 0.06;
 
 /** Carry of the pitching wedge — at/below this, clubs start adding backspin. */
 export const BACKSPIN_CARRY = 106;
@@ -177,8 +187,13 @@ function rollPotential(nominalCarry: number, carry: number, rng: Rng, rollFracDe
  * CROSSES surfaces blends them (land rough → reach fairway → keep running, or vice versa). Hard
  * stops: it settles where it first trickles into a penalty (water/lava/void), or plugs in a bunker /
  * is caught by trees it ROLLS into (object interaction on the ground). Returns the SIGNED distance
- * actually travelled (so `dist(rest,touchdown) === |roll|`) + the rest point. Pure, no rng — a
- * deterministic geometry pass after the energy draw, so auto≡interactive is untouched. */
+ * actually travelled + the rest point. On a hole WITHOUT contour lobes the roll is a straight line
+ * (`dist(rest,touchdown) === |roll|` — the classic roll-invariant, byte-for-byte the old integrator).
+ * On a CONTOURED green (GS-green-contour-2 round 2) the run-out CURLS: each green step deflects the
+ * travel direction toward the local fall line's perpendicular component (the same physics that breaks
+ * a putt), `roll` becomes the ARC length, and the curved travel is returned as `path` so the play
+ * view can draw the ball breaking off a flank — physics you can SEE. Pure, no rng — a deterministic
+ * geometry pass after the energy draw, so auto≡interactive is untouched. */
 export function rollOut(
   hole: Hole,
   touchdown: Vec,
@@ -187,70 +202,136 @@ export function rollOut(
   tdLie: FeatureKind,
   immune?: ReadonlySet<string>,
   tents?: readonly TradeTent[],
-): { roll: number; rest: Vec } {
+): { roll: number; rest: Vec; path?: Vec[] } {
   const sign = K < 0 ? -1 : 1;
   const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
-  const at = (d: number): Vec => [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
   const STEP = 1.5; // yards per integration step
   // Trade-camp tents (GS-tents): a ball ROLLING into a tent footprint stops against it (like sand /
-  // the woods), so the run-out stays a straight line and the roll-invariant holds. A tent the ball is
-  // ALREADY on (a fresh aerial-bounce ricochet starts at the roof it hit) doesn't re-stop it.
+  // the woods). A tent the ball is ALREADY on (a fresh aerial-bounce ricochet starts at the roof it
+  // hit) doesn't re-stop it.
   const startTents = tents?.filter((t) => insideTent(t, touchdown));
   const hitsNewTent = (p: Vec): boolean =>
     !!tents && tents.some((t) => insideTent(t, p) && !startTents!.includes(t));
-  // Green SLOPE (GS-greens-3): how much the roll runs downhill / checks uphill. The travel direction
-  // is sign*dir; its projection onto the green's DOWNHILL vector scales the green's run-per-yard, so a
-  // ball rolling downhill runs out far and one rolling (or BACKSPINNING) uphill brakes hard and can't
-  // climb — no ball ever spins weirdly up a slope. Pure geometry, no rng, straight roll → the
-  // roll-invariant (dist(rest,touchdown) === |roll|) and the renderer's straight run-out hold.
-  // GS-green-contour-2: on a contoured green the run-out reads the LOCAL field (`greenSlopeAt`) at
-  // each step — the ball brakes climbing a mound and runs out down its far flank, so the landform
-  // the topo rings draw is the ground the ball actually rolls on. Sampled per step of the SAME
-  // straight line (the deflection stays putting-scale), so the roll-invariant and the renderer's
-  // straight run-out still hold; a plane-only hole reads back exactly the plane, byte-for-byte.
+  // Green SLOPE (GS-greens-3): how much the roll runs downhill / checks uphill. The travel direction's
+  // projection onto the green's DOWNHILL vector scales the green's run-per-yard, so a ball rolling
+  // downhill runs out far and one rolling (or BACKSPINNING) uphill brakes hard and can't climb.
+  // GS-green-contour-2: on a contoured green the LOCAL field (`greenSlopeAt`) is read per step.
   const slope = hole.greenSlope;
   const lobes = hole.greenContour;
-  const tdx = dir[0] * sign;
-  const tdy = dir[1] * sign;
-  const slopeRun = (k: string, pMid: Vec): number => {
-    if (k !== 'green' || (!slope && !(lobes && lobes.length))) return 1;
-    const s = lobes && lobes.length ? greenSlopeAt(pMid, slope, lobes) : slope!;
-    const along = tdx * s[0] + tdy * s[1]; // + = travelling downhill, − = uphill
+  const curling = !!(lobes && lobes.length); // contoured hole → the curling integrator below
+  const slopeRun = (k: string, pMid: Vec, tx: number, ty: number): number => {
+    if (k !== 'green' || (!slope && !curling)) return 1;
+    const s = curling ? greenSlopeAt(pMid, slope, lobes) : slope!;
+    const along = tx * s[0] + ty * s[1]; // + = travelling downhill, − = uphill
     return Math.max(0.32, 1 + SLOPE_ROLL_K * along);
   };
-  let budget = Math.abs(K); // remaining energy, in fairway-equivalent yards
+  if (!curling) {
+    // The classic STRAIGHT integrator, byte-for-byte for every lobe-less hole (old saves, synthetic
+    // test lanes, plane-only greens): walk fixed distances along one ray.
+    const at = (d: number): Vec => [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
+    const tdx = dir[0] * sign;
+    const tdy = dir[1] * sign;
+    let budget = Math.abs(K);
+    let dist = 0;
+    let guard = 0;
+    while (budget > 1e-3 && dist < cap && guard++ < 400) {
+      const k = lieAt(hole, at(dist + STEP * 0.5)); // the surface we're rolling onto
+      const kPen = lieInfo(k).penalty;
+      // Hazard-skip balls (GS-proshop-2): an IMMUNE penalty is skimmed across (low friction) instead
+      // of swallowing the ball. A non-immune penalty still stops it.
+      if (kPen && !(immune && immune.has(kPen))) {
+        dist += STEP; // trickled into a penalty hazard → settles there (+stroke downstream)
+        break;
+      }
+      if (!kPen && k !== tdLie && (k === 'bunker' || k === 'trees')) {
+        dist += STEP; // ran into sand / caught by the woods → stops
+        break;
+      }
+      if (hitsNewTent(at(dist + STEP))) {
+        dist += STEP; // trickled up against a trade-camp tent → stops there
+        break;
+      }
+      const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, at(dist + STEP * 0.5), tdx, tdy);
+      if (m <= 0) break;
+      const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
+      if (need >= budget) {
+        dist += budget * m; // spend the last of the energy
+        break;
+      }
+      dist += STEP;
+      budget -= need;
+    }
+    const roll = sign * Math.min(dist, cap);
+    return { roll, rest: [touchdown[0] + dir[0] * roll, touchdown[1] + dir[1] * roll] };
+  }
+  // CURLING integrator (contoured holes): the ball carries a live travel direction that bends toward
+  // the local downhill's perpendicular component while it's on the green — the run-out visibly breaks
+  // off a mound's flank the way a putt does. Off-green steps never bend (the fairway stays honest),
+  // so a roll that never touches the green is a straight line with the same step semantics.
+  let px = touchdown[0];
+  let py = touchdown[1];
+  let tx = dir[0] * sign;
+  let ty = dir[1] * sign;
+  const path: Vec[] = [[px, py]];
+  let bent = false;
+  let budget = Math.abs(K);
   let dist = 0;
   let guard = 0;
   while (budget > 1e-3 && dist < cap && guard++ < 400) {
-    const k = lieAt(hole, at(dist + STEP * 0.5)); // the surface we're rolling onto
+    const stepLeft = Math.min(STEP, cap - dist);
+    const mid: Vec = [px + tx * stepLeft * 0.5, py + ty * stepLeft * 0.5];
+    const k = lieAt(hole, mid);
     const kPen = lieInfo(k).penalty;
-    // Hazard-skip balls (GS-proshop-2): an IMMUNE penalty is skimmed across (low friction) instead of
-    // swallowing the ball — it keeps rolling toward dry ground. A non-immune penalty still stops it.
-    // `immune` absent ⇒ this is exactly the old behaviour (break on any penalty), byte-for-byte.
     if (kPen && !(immune && immune.has(kPen))) {
-      dist += STEP; // trickled into a penalty hazard → settles there (+stroke downstream)
+      px += tx * stepLeft;
+      py += ty * stepLeft;
+      dist += stepLeft;
+      path.push([px, py]);
       break;
     }
     if (!kPen && k !== tdLie && (k === 'bunker' || k === 'trees')) {
-      dist += STEP; // ran into sand / caught by the woods → stops
+      px += tx * stepLeft;
+      py += ty * stepLeft;
+      dist += stepLeft;
+      path.push([px, py]);
       break;
     }
-    if (hitsNewTent(at(dist + STEP))) {
-      dist += STEP; // trickled up against a trade-camp tent → stops there
+    if (hitsNewTent([px + tx * stepLeft, py + ty * stepLeft])) {
+      px += tx * stepLeft;
+      py += ty * stepLeft;
+      dist += stepLeft;
+      path.push([px, py]);
       break;
     }
-    const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, at(dist + STEP * 0.5)); // this surface's run per yard (immune hazard skims fast); slope-adjusted on the green
+    const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, mid, tx, ty);
     if (m <= 0) break;
-    const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
-    if (need >= budget) {
-      dist += budget * m; // spend the last of the energy
-      break;
-    }
-    dist += STEP;
+    const need = stepLeft / m;
+    const adv = need >= budget ? budget * m : stepLeft;
+    px += tx * adv;
+    py += ty * adv;
+    dist += adv;
+    path.push([px, py]);
+    if (need >= budget) break;
     budget -= need;
+    // Bend AFTER advancing (the struck line holds for the first step, like the putt's aim): on the
+    // green, the fall line's sideways component steers the travel direction. ROLL_CURL_K per yard —
+    // tuned to the putt-break scale, so an approach and a putt read the same ground the same way.
+    if (k === 'green') {
+      const s = greenSlopeAt([px, py], slope, lobes);
+      const perp = s[0] * -ty + s[1] * tx; // downhill's component along the travel's perp axis (−ty, tx)
+      if (Math.abs(perp) > 1e-6) {
+        const bend = ROLL_CURL_K * adv * perp;
+        const nx = tx + -ty * bend;
+        const ny = ty + tx * bend;
+        const nl = Math.hypot(nx, ny) || 1;
+        tx = nx / nl;
+        ty = ny / nl;
+        bent = true;
+      }
+    }
   }
   const roll = sign * Math.min(dist, cap);
-  return { roll, rest: [touchdown[0] + dir[0] * roll, touchdown[1] + dir[1] * roll] };
+  return { roll, rest: [px, py], path: bent ? path : undefined };
 }
 
 /**
@@ -1236,6 +1317,7 @@ export function executeShot(
   const tdPen = lieInfo(tdLie).penalty;
   let rest: Vec = touchdown;
   let roll = 0;
+  let rollPath: Vec[] | undefined;
   // Roll out unless it plugged in a non-immune penalty. An immune-hazard touchdown still rolls — it
   // skims across toward dry ground (rollOut treats the immune surface as a fast skim).
   if (!tdPen || (immune && immune.has(tdPen))) {
@@ -1263,6 +1345,7 @@ export function executeShot(
       const out = rollOut(hole, touchdown, rollDir, rollK, tdLie, immune, tents);
       roll = out.roll;
       rest = out.rest;
+      rollPath = out.path;
     }
   }
 
@@ -1285,6 +1368,7 @@ export function executeShot(
   }
   const li = lieInfo(restLie);
   const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };
+  if (rollPath) log.rollPath = rollPath;
   // Surface the tent CENTRE + effect (not just the ball's roof-contact point) so the renderer can anchor
   // the speech bubble ON the tent (GS-tent-interactions) and the interactive driver can fire the effect.
   if (tentHit) log.tentHit = { at: tentHit.point, c: tentHit.tent.c, effect: tentHit.tent.effect, dir: tentHit.dir };

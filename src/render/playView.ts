@@ -1274,6 +1274,24 @@ export function mountPlayView(
               const e2 = easeInOut((rt - p) / (1 - p)); // spin grabs → accelerates back, eases into rest
               ground = [peakPt[0] + (rest[0] - peakPt[0]) * e2, peakPt[1] + (rest[1] - peakPt[1]) * e2];
             }
+          } else if (shot.rollPath && shot.rollPath.length > 1) {
+            // GS-green-contour-2 round 2: the sim's run-out CURLED along the green's local fall
+            // line — walk its actual path by arc length (the putt-path treatment) so the ball
+            // visibly breaks off the flank instead of gliding a straight chord to rest.
+            const rp = shot.rollPath;
+            let total = 0;
+            for (let i = 1; i < rp.length; i++) total += Math.hypot(rp[i]![0] - rp[i - 1]![0], rp[i]![1] - rp[i - 1]![1]);
+            let want = easeOutCubic(rt) * total;
+            ground = rp[rp.length - 1]!;
+            for (let i = 1; i < rp.length; i++) {
+              const seg = Math.hypot(rp[i]![0] - rp[i - 1]![0], rp[i]![1] - rp[i - 1]![1]);
+              if (want <= seg || i === rp.length - 1) {
+                const f = seg > 1e-9 ? Math.min(1, want / seg) : 1;
+                ground = [rp[i - 1]![0] + (rp[i]![0] - rp[i - 1]![0]) * f, rp[i - 1]![1] + (rp[i]![1] - rp[i - 1]![1]) * f];
+                break;
+              }
+              want -= seg;
+            }
           } else {
             const e = easeOutCubic(rt);
             ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
