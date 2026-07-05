@@ -127,6 +127,38 @@
         padding: 12px 14px; margin: 8px 0;
         box-shadow: var(--gs-shadow);
       }
+      /* ── Ship fuel (GS-fuel-2): the segmented tank gauge + the Fuel Depot panel. The gauge is a
+             row of glowing fuel CELLS (--fuel-col set inline: cyan → amber → red as it drains) so
+             the tank reads at a glance on a phone; the mini variant rides the run header. The
+             depot is a proper spaceport counter — panel-framed, price up front — not a text box. ── */
+      .gs-fuelbar { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+      .gs-fuelbar__cells {
+        display: inline-flex; gap: 2px; padding: 2.5px 3px;
+        border: 1px solid var(--gs-line); border-radius: 5px; background: #0a0e16;
+      }
+      .gs-fuelbar__cell { width: 7px; height: 12px; border-radius: 2px; background: #1d2331; }
+      .gs-fuelbar__cell--lit { background: var(--fuel-col); box-shadow: 0 0 5px var(--fuel-col); }
+      .gs-fuelbar__n { font-size: 13px; }
+      .gs-fuelbar__over {
+        font-size: 10px; font-weight: 800; color: #4fd0e0; border: 1px solid #4fd0e055;
+        border-radius: 999px; padding: 0 5px;
+      }
+      .gs-fuelbar--mini { gap: 4px; }
+      .gs-fuelbar--mini .gs-fuelbar__cells { padding: 2px; gap: 1.5px; }
+      .gs-fuelbar--mini .gs-fuelbar__cell { width: 4.5px; height: 9px; border-radius: 1.5px; }
+      .gs-fuelbar--mini .gs-fuelbar__n { font-size: 12px; }
+      .gs-fueldepot {
+        display: flex; flex-direction: column; gap: 8px;
+        border: 1px solid #4fd0e044; border-left: 4px solid #4fd0e0aa;
+        border-radius: var(--gs-r-lg); padding: 10px 12px; margin: 12px 0 0;
+        background: linear-gradient(180deg, #12202a, #0e141d);
+      }
+      .gs-fueldepot__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .gs-fueldepot__title { font-size: 14px; font-weight: 800; color: #4fd0e0; letter-spacing: .03em; }
+      .gs-fueldepot__price { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--gs-dim); white-space: nowrap; }
+      .gs-fueldepot__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .gs-fueldepot__row .gs-btn { flex: 1 1 auto; font-size: 13px; padding: 9px 10px; text-align: center; }
+      .gs-fueldepot__note { font-size: 11.5px; opacity: .6; margin: 0; }
       /* ── Stop intro (GS-intro-split): two mobile-first steps — the ARC (mode + field of
              competitors) then the HOLE (map + hazards popup). Each step is built to hold one
              phone screen; the arc's bottom First-Tee is revealed by JS only when the field

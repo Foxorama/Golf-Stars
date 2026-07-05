@@ -1333,3 +1333,51 @@ sheet fuel chips (burn + auto-buy surcharge + out-of-range lock), Fuel Depot on 
 screens, stranded gameover heading, and the spaceport's hand-placed (zero-rng) fuelling station —
 amber pump island + fuel cells + neon ⛽ FUEL sign between the two front pads (re-shot
 `scripts/clubhouse-preview.mjs`).
+
+## GS-fuel-2 — Fuel becomes a decision: depth pricing, a real tank, the gauge (2026-07-05)
+
+**The critique (one session after GS-fuel shipped).** The v1 fuel system metered the journey but
+DECIDED nothing: the price was flat (20 cr everywhere, forever), the unending tank (25) rarely ran
+dry before the survival bar ended the run, and `travel`'s silent auto-buy meant the player never
+even saw the transaction — fuel was a deferred credit tax wearing a resource costume. And the
+presentation was a lone `⛽ 8` glyph in a text row plus an inline-styled text box — invisible on a
+phone, styleless against the game's design language.
+
+**The mechanics fix — an FTL-style price curve + a tank that binds.**
+- `fuelUnitCost(run)` = `FUEL_PRICE_BASE (10) + FUEL_PRICE_SLOPE (2) · distanceFromStart`, capped
+  at `FUEL_PRICE_MAX (60)`. Fuel near Earth is CHEAPER than v1; three arcs out it costs 3–6× as
+  much. That makes "fill the tank at this shop or buy the epic driver and pay deep-space prices
+  later" a genuine budget line — the classic roguelike money-vs-reach tension the flat price
+  couldn't create (buying early was never better, so there was nothing to decide).
+- The starting tank IS the capacity (`tankCapacity` = `startingFuelFor`): voyage 8 (unchanged —
+  exactly its single-hop budget), unending **12** (down from 25, sized to run dry around stop 5–6
+  when credits are meaningful). Capacity also bounds the stock-up-early exploit by construction.
+- `travel` keeps the ONE-rule shortfall purchase (auto ≡ interactive by construction) but at the
+  LOCAL price — and the route sheet prints the exact bill ON the launch button ("🚀 Refuel +2 ⛽
+  (−28 cr) & jump"), so the surcharge is a commitment the player taps, never a silent deduction.
+- Rejected alternatives: making `travel` throw without a manual depot visit (pure friction — same
+  decision, more taps, worse on mobile); fuel-efficiency shop perks (adding a catalogue row
+  perturbs seeded shop offers — parked in IDEAS); performance-based fuel rewards (scope).
+
+**Balance, verified.** 40-seed probes of `simulateRun` on both formats are BYTE-IDENTICAL to the
+pre-change code: the default auto-driver single-hops on a full tank and never touches the fuel
+gate, so no seeded stream or outcome moved (the suite confirms — zero test fallout beyond
+`tests/fuel.test.ts` itself). Unending strands 0/40 auto-runs (fuel is pressure, not a death
+trap); a deep-jump voyage strategy pays its way through and still finishes.
+
+**The presentation fix — one gauge, drawn everywhere.** `render/fuel.ts fuelGaugeHTML(fuel,
+capacity, {mini,bare})` is the ONLY way fuel is rendered: a row of spaceship fuel CELLS (one per
+capacity unit, lit to the tank level, cyan → amber → red via `fuelColour`; a legacy over-capacity
+save shows a `+n` reserve chip, never a longer bar). Mini variant on the run header (every
+screen), full variant on the journey screen's title pill and inside the restyled Fuel Depot — now
+a `.gs-fueldepot` design-token panel headlining the LOCAL price ("14 cr / unit here") with +1 /
++3 / fill-the-tank quick-buys and the "fuel gets dearer the deeper you fly" rule stated in one
+line. The starmap dims a fuel-locked world and swaps its jump label for a red `needs ⛽n ✕` (kept
+SHORT — three labels share a row; the first cut collided with neighbours), so the blocker reads on
+the map itself. Route-sheet chips collapse to one honest `⛽ before → after` readout.
+
+**Persistence.** No save bump: `RunSnapshot.fuel` (v18) already round-trips, the price is derived,
+and a legacy 25-fuel unending resume keeps its fuel — it just can't buy past the new capacity
+until it burns down. Eyes-on verified end-to-end (Playwright drive: title → run → shop → travel →
+jump; gauge burns 12 → 10 on a 2-jump) plus an edge-state fixture (all gauge fills, over-capacity,
+locked lanes).

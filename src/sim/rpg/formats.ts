@@ -111,18 +111,19 @@ export interface RunFormat {
    */
   holeGate?: boolean;
   /**
-   * The tank the run starts with (GS-fuel): every journey jump burns `distanceJump` units of ship
-   * fuel. The voyage starts with EXACTLY enough for its fixed stop count taken as single hops
-   * (stops − 1 travels × 1 unit) — deep jumps burn ahead of that budget and must be bought back;
-   * the Unending Universe starts with a 25-unit tank for its open-ended journey.
+   * The tank the run starts with — AND its capacity (GS-fuel-2: `tankCapacity`, the ceiling
+   * `buyFuel` stocks to): every journey jump burns `distanceJump` units of ship fuel. The voyage
+   * starts with EXACTLY enough for its fixed stop count taken as single hops (stops − 1 travels ×
+   * 1 unit) — deep jumps burn ahead of that budget and must be bought back; the Unending
+   * Universe's 12-unit tank runs dry mid-run, making the depth-priced depot a real budget line.
    */
   startingFuel?: number;
 }
 
 /** Fallback tank for a format with no `startingFuel` row (unknown ids fold into the default anyway). */
-export const DEFAULT_STARTING_FUEL = 25;
+export const DEFAULT_STARTING_FUEL = 12;
 
-/** The tank a run of this format starts with (GS-fuel). */
+/** The tank a run of this format starts with — and its capacity (GS-fuel / GS-fuel-2). */
 export function startingFuelFor(format: RunFormat): number {
   return format.startingFuel ?? DEFAULT_STARTING_FUEL;
 }
@@ -139,8 +140,10 @@ export const FORMATS: Record<string, RunFormat> = {
     blurb: 'Endless survival — every hole has a score to beat',
     stops: [{ holes: 4, label: '4 holes' }],
     holeGate: true,
-    // GS-fuel: an endless journey gets a big (but finite) starting tank — refuel as you travel.
-    startingFuel: 25,
+    // GS-fuel-2: a tank you actually MANAGE — the old 25-unit tank rarely bound before the run
+    // ended. Jumps burn 1–3 units, so this runs dry mid-run and refuelling at the depth-priced
+    // depot becomes a genuine call against spending the credits on gear.
+    startingFuel: 12,
   },
   // The headline campaign (GS-voyage): a bounded, WINNABLE voyage of three arcs. Each arc is two
   // ordinary stops then a BOSS; clearing the final boss wins the run. Arc I + the FINAL are solo

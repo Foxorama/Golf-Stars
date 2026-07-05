@@ -1,17 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import {
-  FUEL_TANK_MAX,
-  FUEL_UNIT_COST,
+  FUEL_PRICE_BASE,
+  FUEL_PRICE_MAX,
+  FUEL_PRICE_SLOPE,
   buyFuel,
   canTravel,
   cashOutShards,
   fuelShortfall,
+  fuelUnitCost,
   resumeRun,
   routeFuelCost,
   simulateRun,
   snapshotRun,
   startRun,
   strand,
+  tankCapacity,
   travel,
   travelRefuelCost,
   type Route,
@@ -20,6 +23,7 @@ import {
 import { FORMATS, startingFuelFor, stopCount, getFormat, DEFAULT_STARTING_FUEL } from '../src/sim/rpg/formats';
 import { DEFAULT_EVENT, routeEvent } from '../src/sim/rpg/events';
 import { themeById } from '../src/sim/course/themes';
+import { fuelGaugeHTML } from '../src/render/fuel';
 import { initState, reduce, type UiState } from '../src/ui/game';
 
 const TEST_THEME = themeById('crux')!;
@@ -29,16 +33,32 @@ function lane(distanceJump: number, event = DEFAULT_EVENT): Route {
   return { id: 0, distanceJump, label: 'test', event, theme: TEST_THEME };
 }
 
-describe('the fuel tank (GS-fuel)', () => {
-  it('the voyage starts with exactly enough fuel for single hops; unending with its 25-unit tank', () => {
+describe('the fuel tank (GS-fuel / GS-fuel-2)', () => {
+  it('the voyage starts with exactly enough fuel for single hops; unending with a 12-unit tank', () => {
     // Machine-check the "complete the journey on single stops" contract against the voyage's SHAPE,
     // so re-arranging the stops list can't silently strand the frugal player.
     expect(FORMATS.voyage!.startingFuel).toBe(stopCount(FORMATS.voyage!) - 1);
     expect(startRun(1, 'voyage').fuel).toBe(8);
-    expect(startRun(1, 'unending').fuel).toBe(25);
+    expect(startRun(1, 'unending').fuel).toBe(12);
     // Retired ids fold into the default format's tank.
     expect(startRun(1, 'flat').fuel).toBe(startingFuelFor(getFormat('flat')));
-    expect(DEFAULT_STARTING_FUEL).toBe(25);
+    expect(DEFAULT_STARTING_FUEL).toBe(12);
+  });
+
+  it('the starting tank IS the capacity (GS-fuel-2) — a run launches full', () => {
+    expect(tankCapacity(startRun(1, 'voyage'))).toBe(8);
+    expect(tankCapacity(startRun(1, 'unending'))).toBe(12);
+  });
+
+  it('fuel gets dearer the deeper you fly (GS-fuel-2), capped at the deep-space ceiling', () => {
+    const at = (distanceFromStart: number) => fuelUnitCost({ distanceFromStart });
+    expect(at(0)).toBe(FUEL_PRICE_BASE);
+    expect(at(5)).toBe(FUEL_PRICE_BASE + 5 * FUEL_PRICE_SLOPE);
+    // Monotonic non-decreasing, and capped however deep the run gets.
+    for (let d = 1; d < 60; d++) expect(at(d)).toBeGreaterThanOrEqual(at(d - 1));
+    expect(at(1000)).toBe(FUEL_PRICE_MAX);
+    // A junk negative distance never yields a below-base price.
+    expect(at(-3)).toBe(FUEL_PRICE_BASE);
   });
 
   it('a jump burns its distance in fuel, unit for unit', () => {
@@ -51,44 +71,52 @@ describe('the fuel tank (GS-fuel)', () => {
     expect(after.credits).toBe(run.credits);
   });
 
-  it('a short tank auto-buys the missing units at the depot price', () => {
-    const run: Run = { ...startRun(3, 'unending'), fuel: 1, credits: 100 };
+  it('a short tank buys the missing units at the LOCAL depot price', () => {
+    const run: Run = { ...startRun(3, 'unending'), fuel: 1, credits: 500, distanceFromStart: 10 };
+    const local = fuelUnitCost(run);
+    expect(local).toBe(FUEL_PRICE_BASE + 10 * FUEL_PRICE_SLOPE);
     expect(fuelShortfall(run, lane(3))).toBe(2);
-    expect(travelRefuelCost(run, lane(3))).toBe(2 * FUEL_UNIT_COST);
+    expect(travelRefuelCost(run, lane(3))).toBe(2 * local);
     const after = travel(run, lane(3));
     expect(after.fuel).toBe(0);
-    expect(after.credits).toBe(100 - 2 * FUEL_UNIT_COST);
+    expect(after.credits).toBe(500 - 2 * local);
   });
 
-  it('the auto-refuel is paid BEFORE a toll, which stays floored at zero', () => {
+  it('the refuel is paid BEFORE a toll, which stays floored at zero', () => {
     const toll = routeEvent('trade-lane');
     if (!toll?.creditToll) return; // event table changed — the ordering rule is covered above
-    const run: Run = { ...startRun(4, 'unending'), fuel: 0, credits: FUEL_UNIT_COST + 5 };
+    const run: Run = { ...startRun(4, 'unending'), fuel: 0, credits: FUEL_PRICE_BASE + 5 };
     const after = travel(run, lane(1, toll));
-    // 1 unit bought (20 cr), then the toll bites what's left (floored, never negative).
+    // 1 unit bought at the home price, then the toll bites what's left (floored, never negative).
     expect(after.fuel).toBe(0);
     expect(after.credits).toBe(Math.max(0, 5 - toll.creditToll!));
   });
 
   it('an unpayable jump is blocked: canTravel says no and travel throws', () => {
-    const broke: Run = { ...startRun(5, 'unending'), fuel: 0, credits: FUEL_UNIT_COST - 1 };
+    const broke: Run = { ...startRun(5, 'unending'), fuel: 0, credits: FUEL_PRICE_BASE - 1 };
     expect(canTravel(broke, lane(1))).toBe(false);
     expect(() => travel(broke, lane(1))).toThrow(/fuel/);
     // With exactly one unit's worth of credits the same lane opens.
-    expect(canTravel({ ...broke, credits: FUEL_UNIT_COST }, lane(1))).toBe(true);
+    expect(canTravel({ ...broke, credits: FUEL_PRICE_BASE }, lane(1))).toBe(true);
   });
 
-  it('buyFuel tops the tank up with credits, clamped to the purse and the tank cap', () => {
-    const run: Run = { ...startRun(6, 'unending'), fuel: 10, credits: 100 };
+  it('buyFuel tops the tank up at the local price, clamped to the purse and the capacity', () => {
+    const run: Run = { ...startRun(6, 'unending'), fuel: 5, credits: 100 };
+    const cap = tankCapacity(run);
     const five = buyFuel(run, 5);
-    expect(five.fuel).toBe(15);
-    expect(five.credits).toBe(100 - 5 * FUEL_UNIT_COST);
-    // Purse-clamped: 100 credits buys at most 5 units.
-    expect(buyFuel(run, 9).fuel).toBe(15);
-    // Tank-clamped at the cap; zero/negative is a no-op (the same object back).
-    expect(buyFuel({ ...run, fuel: FUEL_TANK_MAX }, 1)).toEqual({ ...run, fuel: FUEL_TANK_MAX });
+    expect(five.fuel).toBe(10);
+    expect(five.credits).toBe(100 - 5 * FUEL_PRICE_BASE);
+    // Purse-clamped: 100 credits at the 10-cr home price buys at most 10 — but capacity binds first.
+    expect(buyFuel(run, 99).fuel).toBe(cap);
+    // Deeper, the SAME purse buys fewer units (the price curve is the strategy).
+    const deep: Run = { ...run, distanceFromStart: 20 };
+    expect(buyFuel(deep, 99).fuel).toBe(5 + Math.floor(100 / fuelUnitCost(deep)));
+    // Capacity-clamped at the top; zero/negative is a no-op (the same object back).
+    expect(buyFuel({ ...run, fuel: cap }, 1)).toEqual({ ...run, fuel: cap });
     expect(buyFuel(run, 0)).toBe(run);
-    expect(buyFuel({ ...run, credits: FUEL_UNIT_COST - 1 }, 1).fuel).toBe(10);
+    expect(buyFuel({ ...run, credits: FUEL_PRICE_BASE - 1 }, 1).fuel).toBe(5);
+    // A legacy save resumed ABOVE the capacity simply can't buy more (never a negative clamp).
+    expect(buyFuel({ ...run, fuel: cap + 9 }, 3).fuel).toBe(cap + 9);
   });
 
   it('stranding ends the run and, like a bank, converts the pocket change to shards', () => {
@@ -116,7 +144,7 @@ describe('the fuel tank (GS-fuel)', () => {
       expect(['cut', 'stranded']).toContain(run.endedReason);
       expect(run.fuel).toBeGreaterThanOrEqual(0);
     }
-    // The voyage's headless driver finishes its campaign (auto-refuel covers deep jumps).
+    // The voyage's headless driver finishes its campaign (the jump-time refuel covers deep jumps).
     const v = simulateRun(2, { formatId: 'voyage' });
     expect(v.run.status).toBe('ended');
     expect(v.run.fuel).toBeGreaterThanOrEqual(0);
@@ -129,6 +157,27 @@ describe('the fuel tank (GS-fuel)', () => {
     });
     expect(deep.run.status).toBe('ended');
     expect(deep.run.fuel).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('the fuel gauge (GS-fuel-2)', () => {
+  it('draws one cell per unit of capacity, lit up to the tank level', () => {
+    const html = fuelGaugeHTML(3, 8);
+    expect(html.match(/gs-fuelbar__cell[" ]/g)!.length).toBe(8);
+    expect(html.match(/gs-fuelbar__cell--lit/g)!.length).toBe(3);
+    expect(html).toContain('aria-label="Fuel 3 of 8"');
+  });
+
+  it('a legacy over-capacity tank shows a reserve chip, never a longer bar', () => {
+    const html = fuelGaugeHTML(25, 12);
+    expect(html.match(/gs-fuelbar__cell--lit/g)!.length).toBe(12);
+    expect(html).toContain('gs-fuelbar__over');
+    expect(html).toContain('+13');
+  });
+
+  it('an empty or junk tank never draws a lit cell', () => {
+    expect(fuelGaugeHTML(0, 8)).not.toContain('--lit');
+    expect(fuelGaugeHTML(-3, 8)).not.toContain('--lit');
   });
 });
 
@@ -169,13 +218,15 @@ describe('the reducer plumbs fuel (GS-fuel)', () => {
     expect(reduce(s, { type: 'buyFuel', units: 1 })).toBe(s);
     s = reduce(s, { type: 'continue' });
     expect(s.screen).toBe('shop');
-    const fuelBefore = s.run.fuel;
-    const creditsBefore = s.run.credits;
-    s = reduce(s, { type: 'buyFuel', units: 1 });
-    if (creditsBefore >= 20) {
-      expect(s.run.fuel).toBe(fuelBefore + 1);
-      expect(s.run.credits).toBe(creditsBefore - 20);
-    }
+    // The run launches with a FULL tank (GS-fuel-2), so drain it to make room to buy.
+    const drained: UiState = { ...s, run: { ...s.run, fuel: 2, credits: 200 } };
+    const price = fuelUnitCost(drained.run);
+    const bought = reduce(drained, { type: 'buyFuel', units: 1 });
+    expect(bought.run.fuel).toBe(3);
+    expect(bought.run.credits).toBe(200 - price);
+    // A full tank refuses the top-up (capacity is real now).
+    const full: UiState = { ...s, run: { ...s.run, fuel: tankCapacity(s.run), credits: 200 } };
+    expect(reduce(full, { type: 'buyFuel', units: 1 }).run.fuel).toBe(tankCapacity(s.run));
   });
 
   it('an unpayable route click is a no-op; a payable one travels and burns the tank', () => {
