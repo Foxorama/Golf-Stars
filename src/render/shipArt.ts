@@ -303,11 +303,45 @@ function shipBody(look: ShipLook): string {
   }
 }
 
-/** Draw a ship as an SVG `<g>` translated to (cx,cy) and scaled (s≈width/40), with a gentle bob. */
-export function shipSVG(id: string | undefined, cx: number, cy: number, s: number): string {
+/**
+ * The Ion Thrusters retrofit's wake (GS-fuel-3) — the "fully sick" version of the stock exhaust: a
+ * long, layered ion stream trailing behind the hull (violet halo → cyan stream → white-hot core),
+ * flickering at engine frequency, with charge particles racing down the wake and a glowing nozzle
+ * ring where it leaves the ship. Authored in the same ±20u right-facing ship frame (the stock
+ * exhaust ends ~x −30; the wake reaches ~x −58) and layered UNDER the hull. Pure SVG + SMIL, no
+ * defs/gradients (SVG ids are document-global — a shared id would cross-tint co-mounted ships).
+ */
+function ionWake(): string {
+  const particle = (beg: string, dy: number, dur: string): string =>
+    `<circle cx="-20" cy="${dy}" r="1.1" fill="#eaffff" opacity="0">
+       <animate attributeName="opacity" values="0;0.9;0" dur="${dur}" begin="${beg}" repeatCount="indefinite"/>
+       <animateTransform attributeName="transform" type="translate" values="0 0;-34 ${dy > 2 ? 1.5 : -1.5}" dur="${dur}" begin="${beg}" repeatCount="indefinite"/>
+     </circle>`;
+  return `<g stroke="none">
+    <path d="M-17,-1 C-32,-6 -48,-5 -58,2 C-48,9 -32,8 -17,5 Z" fill="#8a7bff" opacity="0.22">
+      <animate attributeName="opacity" values="0.22;0.1;0.22" dur="1.1s" repeatCount="indefinite"/>
+    </path>
+    <path d="M-17,0 C-30,-4 -44,-3 -53,2 C-44,7 -30,7 -17,4 Z" fill="#4fd0e0" opacity="0.5">
+      <animate attributeName="opacity" values="0.55;0.3;0.55" dur="0.7s" repeatCount="indefinite"/>
+    </path>
+    <path d="M-17,1 C-27,-1 -37,-0.5 -45,2 C-37,4.5 -27,5 -17,3.4 Z" fill="#bfffff" opacity="0.75">
+      <animate attributeName="opacity" values="0.8;0.5;0.8" dur="0.45s" repeatCount="indefinite"/>
+    </path>
+    <circle cx="-18" cy="2" r="4" fill="#7ff3ff" opacity="0.45">
+      <animate attributeName="r" values="3.4;4.6;3.4" dur="0.9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="-18" cy="2" r="1.8" fill="#ffffff" opacity="0.85"/>
+    ${particle('0s', 1, '0.9s')}${particle('0.3s', 3.2, '1.1s')}${particle('0.6s', -0.6, '0.8s')}
+  </g>`;
+}
+
+/** Draw a ship as an SVG `<g>` translated to (cx,cy) and scaled (s≈width/40), with a gentle bob.
+ *  `opts.ion` (GS-fuel-3) trails the Ion Thrusters wake under the hull; absent = the classic ship,
+ *  byte-identical everywhere else this is mounted (clubhouse pads, market cards). */
+export function shipSVG(id: string | undefined, cx: number, cy: number, s: number, opts: { ion?: boolean } = {}): string {
   const look = (shipById(id) ?? shipById(DEFAULT_SHIP_ID))!.look;
   return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">
-    <g opacity="0.95"><animateTransform attributeName="transform" type="translate" values="0 0;0 -1.4;0 0" dur="3.2s" repeatCount="indefinite"/>${shipBody(look)}${bling(look.bling ?? 0)}</g>
+    <g opacity="0.95"><animateTransform attributeName="transform" type="translate" values="0 0;0 -1.4;0 0" dur="3.2s" repeatCount="indefinite"/>${shipBody(look)}${opts.ion ? ionWake() : ''}${bling(look.bling ?? 0)}</g>
   </g>`;
 }
 

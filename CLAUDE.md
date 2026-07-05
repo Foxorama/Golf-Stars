@@ -218,8 +218,16 @@ For each system: the rule that constrains new work. Open the archive doc before 
   via `render/fuel.ts fuelGaugeHTML` (segmented cell gauge, mini on the run header; `.gs-fuelbar`/
   `.gs-fueldepot` tokens) — never a bare number. Pure arithmetic, ZERO rng — every seeded stream is
   byte-identical; save v18 (`RunSnapshot.fuel`; a pre-fuel resume gets a fresh tank, an
-  over-capacity legacy tank keeps its fuel but can't buy past the cap). The Clubhouse spaceport
-  parks a hand-placed (zero-rng) fuelling station between the front pads. `tests/fuel.test.ts` guards.
+  over-capacity legacy tank keeps its fuel but can't buy past the cap). **Ship outfitting hangs off
+  that economy (GS-fuel-3),** all rebuilt from perk ids on resume (no save bump): Ion Thrusters
+  (`loadout.fuelEfficiency`, every jump −1 ⛽ FLOORED at 1 — a jump is never free; every ⛽ bill
+  honours it, and the journey-map ship trails `shipArt.ionWake` — drawn OVER the hull so it
+  replaces the stock flame, default-off so all other ship mounts are byte-identical), the Reserve
+  Tank (`loadout.tankBonus` capacity + arrives full via `ShopItem.fuelBonus`, poured ONCE in `buy`
+  — never in `apply`, or resume would double-grant), and the eagle siphon (`finishStop` refuels one
+  cell per holed eagle-or-better, capacity-clamped, never on warp — mirrors the milestone rule).
+  The Clubhouse spaceport parks a hand-placed (zero-rng) fuelling station between the front pads.
+  `tests/fuel.test.ts` guards.
   Milestones grant the earn-only **Evergreen** cosmetics (`unlockHoles` rows; `canBuy*` refuses them —
   bag@40 in the NEW 4th apparel slot `bag`, cap@60, pants@80, mythic Green Jacket@100, secret mythic
   ship@150; all hidden from the market until owned — GS-hide-unlocks, see the Trade Market bullet),

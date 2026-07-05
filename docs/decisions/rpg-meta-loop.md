@@ -1381,3 +1381,45 @@ and a legacy 25-fuel unending resume keeps its fuel — it just can't buy past t
 until it burns down. Eyes-on verified end-to-end (Playwright drive: title → run → shop → travel →
 jump; gauge burns 12 → 10 on a 2-jump) plus an edge-state fixture (all gauge fills, over-capacity,
 locked lanes).
+
+## GS-fuel-3 — Ship outfitting: Ion Thrusters, the Reserve Tank, the eagle siphon (2026-07-05)
+
+**The ask.** Hang BUILD hooks off the GS-fuel-2 economy (the ideas parked from that PR), and when
+the Ion Thrusters perk is owned, upgrade the journey-map ship's graphic with a proper ion drive.
+
+**Ion Thrusters** (epic, 140 cr): `loadout.fuelEfficiency` — every journey jump burns 1 less unit,
+FLOORED at 1 (`routeFuelCost(run, route)`, new run-aware signature; a jump is never free, so the
+1-hop lane keeps its cost and the discount rewards DEEP jumps — the lanes fuel pressure was pushing
+you away from). Travel economy only, never shot physics. Worth more the deeper (dearer) the fuel,
+so it's a mid-run economy pick, not a day-one auto-buy. Every ⛽ bill honours it: the starmap
+planet labels (`StarmapChoice.fuelCost`, may undercut `+n jump`), the route sheet's tank
+before→after chip plus a cyan "🌀 ion drive −n ⛽" chip, and a depot note.
+
+**Reserve Fuel Tank** (rare, 90 cr): `loadout.tankBonus` (+4) raises `tankCapacity`, and the relic
+ARRIVES FULL via `ShopItem.fuelBonus` — poured in ONCE by `buy()` (clamped to the just-raised cap,
+never draining a legacy over-capacity tank). Deliberately not part of `apply()`: resume rebuilds
+the loadout from perk ids, but the fuel itself persists on `Run.fuel`, so re-applying would
+double-grant — the ONE fuel-item gotcha, now documented on the field.
+
+**The eagle siphon**: `finishStop` refuels one cell per holed EAGLE-OR-BETTER (an ace counts;
+picked-up holes never do — `economy.eagleCount`, the `relicCreditBonus` sibling), capacity-clamped
+and never on a warped stop (mirrors the milestone-shard rule). Great golf literally extends the
+journey; applied in the shared `finishStop` so auto ≡ interactive by construction, and it can only
+ever HELP (contract 4 safe).
+
+**The ion wake (the "fully sick" bit).** `shipSVG(id, cx, cy, s, {ion})` grows an optional
+`ionWake()`: a long layered stream (violet halo → cyan → white-hot core) flickering at engine
+frequency, charge particles racing down the wake, a glowing nozzle ring. Drawn OVER the ship body
+so it REPLACES the stock orange flame (drawn under, the flame poked through mid-wake — caught
+eyes-on) but still inside the bob group so it moves with the hull; no defs/gradients (SVG ids are
+document-global — the GS-cetus-4/clubhouse lesson). Default-off → every other mount (clubhouse
+pads, market cards) is byte-identical. The journey map passes `StarmapOpts.ionThrusters` off the
+live loadout.
+
+**Blast radius, measured.** Adding catalogue rows reweights WHICH item seeded shops draw (never
+the rng count) — the full suite stayed green (980 tests; offer tests assert distributions, not
+exact stock). New art kinds `thruster`/`fueltank` in itemArt.ts give both relics bespoke cards.
+Zero rng anywhere; no save bump (both fields rebuild via `loadoutFromPerks`; the tank's fuel rides
+the persisted `Run.fuel`). Guards in `tests/fuel.test.ts` (GS-fuel-3 describe): the min-1 floor,
+capacity + arrives-full clamps (incl. legacy over-capacity), resume round-trip without re-grant,
+and the siphon (eagles yes / pars no / warp no / over-capacity never drained).

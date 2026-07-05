@@ -2392,6 +2392,15 @@ function fuelDepotHTML(): string {
       </div>
       ${rows}
       <p class="gs-fueldepot__note">A jump burns its distance in fuel (a deep jump = 2–3 units). Fuel gets dearer the deeper you fly — launching short-tanked auto-charges the local price.</p>
+      ${
+        (r.loadout.fuelEfficiency ?? 0) > 0
+          ? `<p class="gs-fueldepot__note" style="color:#7ff3ff;opacity:.85;">🌀 Ion thrusters fitted — every jump burns ${r.loadout.fuelEfficiency} less ⛽ (min 1).</p>`
+          : ''
+      }${
+        (r.loadout.tankBonus ?? 0) > 0
+          ? `<p class="gs-fueldepot__note" style="color:#4fd0e0;opacity:.85;">🛢 Reserve tank strapped on — capacity +${r.loadout.tankBonus}.</p>`
+          : ''
+      }
     </div>`;
 }
 
@@ -3144,8 +3153,11 @@ function routeInfoOverlay(): string {
   tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
   // The jump's FUEL bill (GS-fuel-2): ONE tank-before → tank-after chip, and any shortfall is
   // priced on the Jump button itself (below) — never a silent surcharge.
-  const fuelAfter = Math.max(0, state.run.fuel - routeFuelCost(r));
-  tags.push(travelChip(`⛽ ${state.run.fuel} → ${fuelAfter}`, state.run.fuel >= routeFuelCost(r) ? '#4fd0e0' : '#ff8b6b'));
+  const fuelAfter = Math.max(0, state.run.fuel - routeFuelCost(state.run, r));
+  tags.push(travelChip(`⛽ ${state.run.fuel} → ${fuelAfter}`, state.run.fuel >= routeFuelCost(state.run, r) ? '#4fd0e0' : '#ff8b6b'));
+  // Ion Thrusters (GS-fuel-3): show the drive earning its keep on every discounted jump.
+  if (routeFuelCost(state.run, r) < r.distanceJump)
+    tags.push(travelChip(`🌀 ion drive −${r.distanceJump - routeFuelCost(state.run, r)} ⛽`, '#7ff3ff'));
   const shortfall = fuelShortfall(state.run, r);
 
   const markers = [
@@ -3162,7 +3174,7 @@ function routeInfoOverlay(): string {
   // Not enough fuel AND not enough credits to buy the shortfall (GS-fuel): this lane is locked.
   const travellable = canTravel(state.run, r);
   const fuelWarn = !travellable
-    ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⛽ Not enough fuel for this ${routeFuelCost(r)}-unit jump — the missing ${fuelShortfall(state.run, r)} unit${fuelShortfall(state.run, r) === 1 ? '' : 's'} would cost ${travelRefuelCost(state.run, r)} cr at this depot (you have ${credits}). Pick a shorter jump.</div>`
+    ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⛽ Not enough fuel for this ${routeFuelCost(state.run, r)}-unit jump — the missing ${fuelShortfall(state.run, r)} unit${fuelShortfall(state.run, r) === 1 ? '' : 's'} would cost ${travelRefuelCost(state.run, r)} cr at this depot (you have ${credits}). Pick a shorter jump.</div>`
     : '';
 
   // A SALVAGE lane's club find (GS-journey-fx-3) gets its own loud, honest line — the exact club you'll
@@ -3261,6 +3273,8 @@ function travelScreen(): string {
     // GS-fuel-2: a lane the tank + purse can't cover draws DIMMED with a red fuel bill, so the
     // blocker reads on the map itself — not only after tapping into the sheet.
     locked: !canTravel(state.run, r),
+    // GS-fuel-3: the label's ⛽ bill honours the Ion Thrusters discount (it may undercut the jump).
+    fuelCost: routeFuelCost(state.run, r),
   }));
   // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
   // labelled with its zone name AND its real-sky position (GS-galaxy-map) — so the journey plots a
@@ -3280,6 +3294,8 @@ function travelScreen(): string {
     trail,
     choices,
     shipId: shipForCharacter(state, state.run.loadout.characterId),
+    // GS-fuel-3: an Ion Thrusters retrofit trails its luminous wake behind the YOU ship.
+    ionThrusters: (state.run.loadout.fuelEfficiency ?? 0) > 0,
   });
 
   // Push-your-luck cash-out (GS-bank): bank the run now to lock its credits in as permanent shards

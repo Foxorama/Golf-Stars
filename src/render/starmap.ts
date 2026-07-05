@@ -57,6 +57,9 @@ export interface StarmapChoice {
   /** GS-fuel-2: the tank + purse can't cover this jump — the world draws dimmed with a red fuel
    *  bill (still tappable: the sheet explains and the depot below can fix it). */
   locked?: boolean;
+  /** GS-fuel-3: the jump's actual ⛽ bill (Ion Thrusters may undercut the distance). Absent → the
+   *  distance, unit for unit (the classic GS-fuel rule). */
+  fuelCost?: number;
 }
 
 /** Per-biome world look (GS-journey-biome) — a colour + glyph + surface family so each lane's
@@ -105,6 +108,9 @@ export interface StarmapOpts {
   choices: StarmapChoice[];
   /** The cosmetic ship to draw as the "YOU" craft (GS-garage). Absent → the classic Woody Wagon. */
   shipId?: string;
+  /** GS-fuel-3: the Ion Thrusters retrofit is owned — the YOU ship trails its luminous ion wake
+   *  (render-only flair for a real economy perk; absent/false = the classic ship, byte-identical). */
+  ionThrusters?: boolean;
 }
 
 // ---- vertical chart geometry -----------------------------------------------------------------
@@ -294,13 +300,14 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
     : '';
   const name = c.worldName ? (c.worldName.length > 15 ? `${c.worldName.slice(0, 14)}…` : c.worldName) : '';
   const nameLabel = name ? `<text x="${cx}" y="${cy + r + 16}" font-size="10" fill="#eaf0ff" text-anchor="middle" font-weight="700">${esc(name)}</text>` : '';
-  // GS-fuel: a jump burns its distance in fuel — say so on the planet label so the bill reads
-  // pre-tap; a LOCKED lane (GS-fuel-2) swaps it for a red "needs ⛽" bill.
+  // GS-fuel: a jump burns fuel — say so on the planet label so the bill reads pre-tap (GS-fuel-3:
+  // the bill honours the Ion Thrusters discount); a LOCKED lane (GS-fuel-2) swaps in a red bill.
+  const fuelBill = c.fuelCost ?? c.distanceJump;
   const jumpLabel = c.locked
     ? // Kept SHORT — three planet labels share one row, and a wide string collides with its
       // neighbours' (the sheet spells out the full bill on tap).
-      `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="#ff6b4a" font-weight="700" text-anchor="middle">needs ⛽${c.distanceJump} ✕</text>`
-    : `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump · ⛽${c.distanceJump} ›</text>`;
+      `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="#ff6b4a" font-weight="700" text-anchor="middle">needs ⛽${fuelBill} ✕</text>`
+    : `<text x="${cx}" y="${cy + r + (name ? 28 : 16)}" font-size="8.5" fill="${ring}" text-anchor="middle">+${c.distanceJump} jump · ⛽${fuelBill} ›</text>`;
   // The locked world's whole body dims (labels stay full-strength so the blocker reads).
   const bodyOpacity = c.locked ? ' opacity="0.45"' : '';
 
@@ -524,7 +531,7 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     ${earthGlyph}
     ${launchPad}
     ${sparks}
-    ${shipSVG(opts.shipId, YOU_X, YOU_Y, 1.08)}
+    ${shipSVG(opts.shipId, YOU_X, YOU_Y, 1.08, { ion: opts.ionThrusters })}
     ${youLabel}
     ${fbranch.planets}
   </svg>`;

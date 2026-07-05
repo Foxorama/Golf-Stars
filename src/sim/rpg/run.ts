@@ -18,6 +18,7 @@ import {
   DRIVER_ID,
   SHOP_ITEMS,
   aceCount,
+  eagleCount,
   aceCreditBonus,
   canBuy,
   clubItem,
@@ -523,6 +524,14 @@ export function finishStop(
   // player reward an ace byte-for-byte identically.
   const loadout = grantAceTalent(run.loadout, aces);
 
+  // Great golf refuels the ship (GS-fuel-3): each holed EAGLE-OR-BETTER siphons one fuel cell,
+  // clamped to capacity (a legacy over-capacity tank is never drained by the clamp). Never on a
+  // WARPED stop (mirrors the milestone-shard rule — warped holes are auto-birdied, not earned).
+  // Applied here so the auto sim and the interactive player refuel identically; pure, zero rng.
+  const cap = tankCapacity(run);
+  const siphon = opts.warp ? 0 : eagleCount(played);
+  const fuel = run.fuel >= cap ? run.fuel : Math.min(cap, run.fuel + siphon);
+
   // Unending-Universe progress (GS-unending): advance the survived-hole counter and bank any crossed
   // milestone's shard bonus INSTANTLY through `bonusShards` (the same kept-even-on-a-bust channel the
   // route events use) — so a victory screen's reward can never be clawed back by a later death.
@@ -545,6 +554,7 @@ export function finishStop(
   const next: Run = {
     ...run,
     loadout,
+    fuel,
     credits: run.credits + creditsEarned,
     holesSurvived,
     grossStrokes: run.grossStrokes + grossAdded,
@@ -1059,6 +1069,12 @@ export function routeOptions(run: Run): Route[] {
 // surcharge on the Jump button itself, never silently. A lane whose bill beats the purse is LOCKED
 // (`canTravel`); a stop where EVERY lane is locked strands the run (`strand`). Zero rng — the
 // whole system is pure arithmetic on the run, so every seeded stream is untouched.
+//
+// GS-fuel-3 hangs BUILD hooks off that economy, all rebuilt from perk ids on resume (no save bump):
+// Ion Thrusters (`loadout.fuelEfficiency`) shave a unit off every jump's burn (min 1 — a jump is
+// never free), the Reserve Tank (`loadout.tankBonus`) raises capacity (+ arrives full via
+// `ShopItem.fuelBonus`, granted ONCE in `buy`), and great golf refuels the ship — `finishStop`
+// siphons one cell per holed eagle-or-better (capacity-clamped, never on a warped stop).
 
 /** Fuel price at the home spaceport (credits per unit). */
 export const FUEL_PRICE_BASE = 10;
@@ -1072,20 +1088,24 @@ export function fuelUnitCost(run: Pick<Run, 'distanceFromStart'>): number {
   return Math.min(FUEL_PRICE_MAX, FUEL_PRICE_BASE + FUEL_PRICE_SLOPE * Math.max(0, run.distanceFromStart));
 }
 
-/** The ship's tank capacity — the format's starting tank (GS-fuel-2). `buyFuel` clamps to it; a
- *  legacy save resumed above it simply can't buy more until it burns back under. */
-export function tankCapacity(run: Pick<Run, 'formatId'>): number {
-  return startingFuelFor(getFormat(run.formatId));
+/** The ship's tank capacity — the format's starting tank plus any Reserve Tank relic
+ *  (GS-fuel-2/-3). `buyFuel` clamps to it; a legacy save resumed above it simply can't buy more
+ *  until it burns back under. */
+export function tankCapacity(run: Pick<Run, 'formatId' | 'loadout'>): number {
+  return startingFuelFor(getFormat(run.formatId)) + Math.max(0, Math.floor(run.loadout.tankBonus ?? 0));
 }
 
-/** Fuel a route's jump burns: its distance, unit for unit. */
-export function routeFuelCost(route: Pick<Route, 'distanceJump'>): number {
-  return Math.max(0, route.distanceJump);
+/** Fuel a route's jump burns: its distance, unit for unit — less any Ion Thrusters efficiency
+ *  (GS-fuel-3), floored at 1 (a jump is never free). */
+export function routeFuelCost(run: Pick<Run, 'loadout'>, route: Pick<Route, 'distanceJump'>): number {
+  const jump = Math.max(0, route.distanceJump);
+  if (jump === 0) return 0;
+  return Math.max(1, jump - Math.max(0, Math.floor(run.loadout.fuelEfficiency ?? 0)));
 }
 
 /** Units missing from the tank for this jump (0 = the tank covers it). */
 export function fuelShortfall(run: Run, route: Pick<Route, 'distanceJump'>): number {
-  return Math.max(0, routeFuelCost(route) - Math.max(0, run.fuel));
+  return Math.max(0, routeFuelCost(run, route) - Math.max(0, run.fuel));
 }
 
 /** Credits `travel` will spend on missing fuel for this jump at the LOCAL price (0 = tank covers it). */
@@ -1130,7 +1150,7 @@ export function travel(run: Run, route: Route): Run {
   // surcharge on the Jump button), so auto ≡ interactive holds by construction.
   const refuel = travelRefuelCost(run, route);
   if (run.credits < refuel) throw new Error('travel: not enough fuel (refuel or pick a shorter jump)');
-  const fuelAfter = Math.max(0, run.fuel - routeFuelCost(route));
+  const fuelAfter = Math.max(0, run.fuel - routeFuelCost(run, route));
   const ev = route.event;
   const arrivingStop = run.stopIndex + 1;
   // GS-routes: a credit TOLL bites up front (floored so it never strands you below zero).
@@ -1184,7 +1204,16 @@ export function buy(run: Run, itemId: string): Run {
     if (have && have !== itemId) return run;
   }
   const cost = itemCost(item, owned);
-  return { ...run, credits: run.credits - cost, loadout: item.apply(run.loadout) };
+  const loadout = item.apply(run.loadout);
+  // GS-fuel-3: a fuel-granting item (the Reserve Tank arrives FULL) pours its units in ONCE, at
+  // purchase, clamped to the (possibly just-raised) capacity — never re-granted on resume
+  // (loadoutFromPerks rebuilds only the loadout; the fuel itself persists on Run.fuel), and never
+  // draining a legacy over-capacity tank.
+  let fuel = run.fuel;
+  if (item.fuelBonus) {
+    fuel = Math.max(run.fuel, Math.min(tankCapacity({ ...run, loadout }), run.fuel + item.fuelBonus));
+  }
+  return { ...run, credits: run.credits - cost, loadout, fuel };
 }
 
 // --- Shop offer (the rotating outfitter stock) ------------------------------
