@@ -420,9 +420,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   arrow field all sample. **The contours are REAL GROUND now (GS-green-contour-2):** the field math
   lives in the surface-agnostic `sim/contour.ts` (`slopeFieldAt` + `heightFieldAt`, the closed-form
   potential whose gradient is −slope — the intended foundation for contoured FAIRWAYS later);
-  `rollOut`'s green run-out samples the LOCAL field per step (still a straight line — the
-  roll-invariant holds; plane-only holes byte-identical; this was the sanctioned physics retune,
-  death-spiral harness re-run green); a manual putt's `PuttLog.path` carries its true curved travel
+  `rollOut`'s green run-out samples the LOCAL field per step AND CURLS along it (round 2): on a
+  contoured hole the curling integrator bends the travel toward the fall line's perpendicular
+  (`ROLL_CURL_K`, putt-break scale), `roll` is the ARC length (the straight roll-invariant holds
+  only on lobe-less holes — old saves/synthetic lanes byte-identical) and the curved travel rides
+  `ShotLog.rollPath`, walked by arc length in the play view — physics you can SEE. Both retunes
+  sanctioned, death-spiral harness re-run green; a manual putt's `PuttLog.path` carries its true curved travel
   (the preview curve at the struck aim/pace, wobble sheared in linearly, ending exactly at `to`) and
   the play view walks it by arc length so a double-breaker visibly curls (auto `onePutt` stays
   pathless → the straight lerp). The ART reads the same numbers: `render/contour.ts contourIsolines`
@@ -432,7 +435,12 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `Isoline.frac` 0→1; high rings stroke light toward white, low rings dark toward shadow, void/cetus
   muted ×0.72 — never a flat white ring, it vanishes on pale greens and glares on dark ones), and
   each lobe shades as directional relief under the shared `LIGHT_UL` (lit-flank + shadow-flank
-  glows; hollows inverted per the emboss rule).
+  glows; hollows inverted per the emboss rule). **A contoured green owns its value range (round 2):**
+  the GS-greens-3 lit/shadow CIRCLE pair is legacy plane-only art — on a contoured green it read as
+  a grey STAIN on pale turf, so the plane now shades as a stepped LINEAR gradient along the fall
+  line (stacked half-plane washes — cel-shaded, no circular edge), the green's mow stripe is muted
+  hard (0.26/0.18 — the stripe is texture, the relief owns the values), lobe glows are accents, and
+  the arrow field is sparse (span/3.4 grid). Never re-add a big soft shading blob to a green.
   `tests/green-contour.test.ts` guards field↔height consistency, isolines, local-field roll and the
   curved-path contract.
   **Putt-FEEL rules (GS-putt-feel):** the fall-line arrows are PX-CAPPED in `styleGreen` (prims are

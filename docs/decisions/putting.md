@@ -297,3 +297,47 @@ full suite 991 green including camera-stability and the balance harnesses; `scri
 re-shot (rings fan around the lobes exactly where the arrow field fans, relief reads as rolls, break
 line unchanged) and `scripts/gallery.mjs` re-shot (map zoom: greens keep their identity, rings stay
 subliminal). No new `_gs*` hook — all tuning is module constants, the test-hub guard is untouched.
+
+
+## GS-green-contour-2 round 2 — the stain dies, the roll curls (2026-07-05)
+
+Eyes-on feedback from a real device (frost world approach view): "I wouldn't call this S+ tier
+contouring, and I can't really see any green roll with improved physics." Both fair — diagnosis
+off the screenshot:
+
+- The **GS-greens-3 plane shading** (two giant soft lit/shadow circles) read as a grey STAIN over
+  the pale frost green — it dominated the surface, buried the topo rings, and its circular edge
+  read as dirt, not ground.
+- The green's **full-contrast mow stripe** fought every layer of relief art on top of it.
+- The **arrow field** (span/5 grid ≈ 25 chevrons) read as scattered clutter.
+- The roll physics was **invisible by construction**: a straight run-out whose only response to the
+  ground is its LENGTH can't be seen reacting.
+
+**Art fixes (all render-only, zero rng):**
+- On a contoured green the circle pair is GONE (it survives only for legacy plane-only holes). The
+  plane now shades as a stepped LINEAR gradient along the fall line — three stacked half-plane
+  washes per side, cumulative alpha ramping light (high) → dark (low), clipped to the green.
+  Stepped-not-smooth is the game's cel-shaded language and there is no circular edge to read as a
+  blob. RULE: never re-add a big soft shading blob to a green.
+- The green's stripe mutes to 0.26/0.18 mixes when contoured — turf texture, not value bands; the
+  relief owns the value range now.
+- Lobe glows tone down to accents (max ~0.15 alpha); rings step UP (sw 1.15, alphas ~+40%) since
+  they carry the sculpt; the arrow grid thins to span/3.4 (a loose handful, alpha down a notch).
+
+**Physics fix — the run-out CURLS (the headline):** `rollOut` on a contoured hole now runs a
+curling integrator: each green step bends the live travel direction toward the local fall line's
+perpendicular component (`ROLL_CURL_K` 0.06/yd — tuned to the putt-break scale, ~1.5–2yd of drift
+across a 12yd roll on a 0.4 side slope, so an approach and a putt read the same ground the same
+way). `roll` becomes the ARC length; the curved travel returns as `path` and rides
+`ShotLog.rollPath`, which the play view walks by arc length (the putt-path treatment) — the ball
+visibly breaks off a mound's flank on screen. Off-green steps never bend; a lobe-less hole (old
+saves, synthetic test lanes, plane-only greens) takes the ORIGINAL straight integrator byte-for-
+byte, preserving the classic roll-invariant exactly where it used to hold. On contoured holes the
+invariant relaxes to path-consistency: `dist(rest, touchdown) ≤ |roll|`, bounded below at 0.8·|roll|
+(a break, not an orbit) — `tests/green-slope.test.ts` + `tests/green-contour.test.ts` assert both,
+plus curl DIRECTION (a side-slope roll drifts downhill) and the fairway-never-bends rule.
+
+Blast radius: full suite 992 green with ONE fixture re-pin (the ui.test ace seed, 339 → 471 — the
+third re-pin of this feature family; the death-spiral harnesses passed unchanged). Previews
+re-shot: putt zoom reads as a clean yardage-book green (gradient + rings + sparse arrows, no
+stain); gallery map zoom and void/cetus untouched.

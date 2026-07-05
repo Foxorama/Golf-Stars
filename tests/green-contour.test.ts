@@ -212,9 +212,40 @@ describe('green roll-out reads the LOCAL contour field (GS-green-contour-2)', ()
     expect(offCrest).toBeGreaterThan(flat); // riding the far flank downhill runs out
   });
 
-  it('the roll stays a straight line (the roll-invariant survives the local field)', () => {
+  it('the curled roll is path-consistent: |roll| is the arc length, rest is the path end', () => {
     const r = rollOut(pad(mound, [0.2, 0.1]), [3, -6], [0.6, 0.8], 12, 'green');
-    expect(dist(r.rest, [3, -6])).toBeCloseTo(Math.abs(r.roll), 5);
+    // The chord can only be SHORTER than the arc (a straight roll is the degenerate equal case)…
+    expect(dist(r.rest, [3, -6])).toBeLessThanOrEqual(Math.abs(r.roll) + 1e-6);
+    // …and the curl is bounded — the run-out breaks like a putt, it doesn't orbit.
+    expect(dist(r.rest, [3, -6])).toBeGreaterThan(Math.abs(r.roll) * 0.8);
+    if (r.path) {
+      expect(r.path[0]).toEqual([3, -6]);
+      const last = r.path[r.path.length - 1]!;
+      expect(last[0]).toBeCloseTo(r.rest[0], 9);
+      expect(last[1]).toBeCloseTo(r.rest[1], 9);
+      let arc = 0;
+      for (let i = 1; i < r.path.length; i++) arc += dist(r.path[i - 1]!, r.path[i]!);
+      expect(arc).toBeCloseTo(Math.abs(r.roll), 5);
+    }
+  });
+
+  it('a roll across a side slope CURLS downhill and reports its curved path (round 2)', () => {
+    // Plane sloping down +x, travel +y: the ball must drift toward +x as it rolls. A negligible
+    // far-away lobe arms the curling integrator while leaving the field pure plane.
+    const farLobe: GreenLobe[] = [{ c: [1000, 1000], r: 4, h: 0.5 }];
+    const r = rollOut(pad(farLobe, [0.5, 0]), [0, 0], [0, 1], 12, 'green');
+    expect(r.rest[0]).toBeGreaterThan(0.5); // drifted downhill of the straight line
+    expect(r.path).toBeDefined();
+    expect(r.path![0]![0]).toBe(0); // leaves on the struck line…
+    expect(r.rest[0]).toBeLessThan(Math.abs(r.roll) * 0.5); // …and bends, never veers sideways
+    // Off the green nothing bends: the same plane under a FAIRWAY roll runs dead straight.
+    const fw: Hole = {
+      ...pad(farLobe, [0.5, 0]),
+      features: [{ kind: 'fairway', poly: [[-60, -60], [60, -60], [60, 60], [-60, 60]] }],
+    };
+    const rf = rollOut(fw, [0, 0], [0, 1], 12, 'fairway');
+    expect(rf.rest[0]).toBe(0);
+    expect(rf.path).toBeUndefined();
   });
 
   it('a plane-only hole is byte-identical to the pre-contour roll (greenContour absent vs [])', () => {

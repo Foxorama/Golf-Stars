@@ -32,8 +32,10 @@ describe('green slope (GS-greens-3)', () => {
       const up = rollOut(h, h.green, [-u[0], -u[1]], 9, 'green'); // rolling uphill
       downSum += Math.abs(down.roll);
       upSum += Math.abs(up.roll);
-      // The straight-roll invariant survives slope modulation.
-      expect(dist(down.rest, h.green)).toBeCloseTo(Math.abs(down.roll), 5);
+      // Path consistency on a contoured hole (GS-green-contour-2 round 2): |roll| is the ARC
+      // length, so the chord to rest can only be shorter — and the curl stays putt-scale bounded.
+      expect(dist(down.rest, h.green)).toBeLessThanOrEqual(Math.abs(down.roll) + 1e-6);
+      expect(dist(down.rest, h.green)).toBeGreaterThan(Math.abs(down.roll) * 0.8);
     }
     expect(downSum).toBeGreaterThan(upSum * 1.3); // downhill clearly outruns uphill on average
   });
