@@ -232,6 +232,20 @@ First-device feedback on GS-settings-nav reshaped the title:
     `index.html`. Feel verified eyes-on (Playwright, 414×896): arc, hole, and popup all render
     correctly with zero page errors.
 
+- **The Unending Universe skips the arc step after the first tee (GS-intro-endless, 2026-07).** In
+  the gate format the arc step's "field" slot is the running round card + last-runs board
+  (GS-golf-score) — the SAME summary the result screen shows at the end of every 4-hole stop. So the
+  loop read as: result summary → journey map → pick a route → *the summary again* (arc briefing) →
+  Next Tee → hole step. Two summary screens back-to-back on every jump, and the arc's objective line
+  (the survival bar) is already carried by the score card's "Next hole bar" footer. Fix: the intro
+  entry reset in `dispatch` (the `prevScreen !== 'intro'` guard) opens on `'hole'` instead of `'arc'`
+  when `holeGateArmed(run) && run.stopIndex > 0` — a route jump (or a mid-run resume) lands straight
+  on the hole map. Stop 0 keeps the arc step: coming from character select it IS the mode lobby
+  (win condition, Change golfer, the records board). The briefing isn't deleted — the hole step's
+  back button (relabelled "‹ Briefing" under the same condition, since there's no "back" when the
+  intro opened here) still opens it on demand, and its "Next Tee ▸" returns. View-state only: no
+  reducer/save/rng change, the Voyage path is untouched (`holeGateArmed` false → `'arc'` as before).
+
 - **The post-stop recap now matches the intro's bar (GS-result, 2026-07).** After the intro got the
   two-step polish, the AFTER-hole `resultScreen()` was the weakest beat in the Voyage loop: a plain
   16px `<h2>` verdict, a one-sentence "Stableford N vs cut M · gross X · +Y credits" summary, and the

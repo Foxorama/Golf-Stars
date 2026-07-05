@@ -548,6 +548,8 @@ For each system: the rule that constrains new work. Open the archive doc before 
   map (`.gs-holeintro-map svg{max-height:44vh}` so it holds one screen) + a tap-to-open hazards/benefits
   popup (`introTraitsOverlay`, the settings-sheet pattern; `data-introtraits` open/close) + Tee Off /
   Watch AI / Back. `introShared()` derives the world/notes/objective ONCE so the two steps never drift.
+  Exception (GS-intro-endless): the Unending Universe past stop 0 opens on `'hole'` — the arc briefing
+  duplicated the result screen's round summary on every route jump; it stays one "‹ Briefing" tap away.
   **The post-stop recap (`resultScreen`, GS-result) is built to the SAME bar as the intro:** a
   rarity-framed `.gs-panel.gs-result` (border/glow off `rarCol`/`rarityFlavour`) with a verdict badge
   over the world you just played (`zoneProfile`, mirroring the arc head), big `.gs-result-stat` tiles

@@ -280,10 +280,13 @@ function dispatch(action: Action): void {
       for (const id of MARKET_SECTION_IDS) collapsedMarketSections.add(id);
       marketShowOwned = false;
     }
-    // Entering the stop intro (from character-select, resume, or a route jump) always opens on the
-    // ARC step with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop.
+    // Entering the stop intro (from character-select, resume, or a route jump) opens on the ARC step
+    // with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop. The
+    // Unending Universe past its first tee skips straight to the HOLE step (GS-intro-endless): the
+    // arc briefing repeats the round summary the result screen just showed, so every route jump threw
+    // up the same card twice; it stays one "‹ Briefing" tap away on the hole step.
     if (state.screen === 'intro' && prevScreen !== 'intro') {
-      introStage = 'arc';
+      introStage = holeGateArmed(state.run) && state.run.stopIndex > 0 ? 'hole' : 'arc';
       introTraitsOpen = false;
     }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
@@ -950,7 +953,13 @@ function holeIntroScreen(): string {
             : ''
         }
         ${btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })}
-        <button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>
+        ${
+          // In the Unending Universe past stop 0 the intro OPENED here (GS-intro-endless) — there is
+          // no "back", but the arc briefing (round so far + last runs) stays one tap away.
+          holeGateArmed(state.run) && state.run.stopIndex > 0
+            ? `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Briefing</button>`
+            : `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>`
+        }
       </div>
     </article>`;
 }
