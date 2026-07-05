@@ -194,6 +194,14 @@ export interface PlayerLoadout {
    */
   puttBoost: number;
   /**
+   * Extra yards of confident putt READ range (GS-putt-read, Green-Reading Book): added straight onto
+   * `puttSkillOf`'s `puttRange`, so the drawn break line reaches further AND the full make band holds
+   * deeper into a long putt (the range is one number the resolver and the picture share — contract 5).
+   * Rebuilt from perks on resume (no save bump). Manual-putt only (`onePutt` never reads the range);
+   * items carrying it pair it with a small `puttBoost` so the auto sim still gains. 0/undefined = base.
+   */
+  puttReadBonus?: number;
+  /**
    * Green-reading caddy (GS-greens-3, Mystic Mole): the caddy reads the BREAK for you — the putt UI
    * snaps the aim to the ideal slope-compensated line + draws the read, so you only judge pace. Rebuilt
    * from perks on resume (no save bump). Interactive-only (the headless auto path never reads it).
@@ -416,10 +424,14 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   'lucky-coin': ['economy'],
   'fortune-chip': ['economy'],
   'auto-caddie': ['putting'],
+  'green-reading-book': ['putting'],
   'putting-grip': ['putting'],
   'mallet-putter': ['putting'],
   'tour-putter': ['putting'],
   'pinseeker-putter': ['putting'],
+  // Mystic Mole (GS-mux) reads the greens — tagged 'putting' (was missing, so green-themed stops
+  // never boosted him alongside the putters).
+  'mystic-mole': ['putting'],
   // Named caddies (GS-caddy) — tagged by their flavour so the theme bias still nudges them.
   'driver-dan': ['distance'],
   'dr-chipinski': ['skill'],
@@ -505,6 +517,23 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     apply: (m) => ({ ...m, handicap: Math.max(0, m.handicap - 6), perks: [...m.perks, 'pro-coach'] }),
   },
   {
+    // The common rung of the putting ladder (GS-putt-read): now the break line stops DEAD at your
+    // confident read, a cheap read-extender is a putt upgrade you can FEEL on stop one. The small
+    // puttBoost keeps it a real (if modest) upgrade for the headless auto sim too (contract 4) —
+    // `puttReadBonus` itself is manual-putt only.
+    id: 'green-reading-book',
+    name: 'Green-Reading Book',
+    cost: 70,
+    desc: 'A dog-eared guide to the galaxy’s greens — your confident read line stretches 4y further',
+    rarity: 'common',
+    apply: (m) => ({
+      ...m,
+      puttReadBonus: (m.puttReadBonus ?? 0) + 4,
+      puttBoost: (m.puttBoost ?? 0) + 0.05,
+      perks: [...m.perks, 'green-reading-book'],
+    }),
+  },
+  {
     id: 'putting-grip',
     name: 'Pro Putting Grip',
     cost: 90,
@@ -518,7 +547,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'mallet-putter',
     name: 'Counterbalance Mallet',
     cost: 130,
-    desc: 'A stable counter-weighted mallet — a solid lift to your putting make window & lag',
+    desc: 'A stable counter-weighted mallet — a solid lift to your make window, lag & read range',
     rarity: 'rare',
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.2, perks: [...m.perks, 'mallet-putter'] }),
   },
@@ -526,7 +555,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'tour-putter',
     name: 'Tour Putter',
     cost: 170,
-    desc: 'A precision flat-stick — a big lift to your putting make window & lag',
+    desc: 'A precision flat-stick — a big lift to your make window & lag, reads the break further',
     rarity: 'epic',
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.26, perks: [...m.perks, 'tour-putter'] }),
   },
@@ -536,7 +565,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'pinseeker-putter',
     name: 'Pinseeker Putter',
     cost: 340,
-    desc: 'A face-milled precision blade — the steadiest stroke in the galaxy, a huge make window',
+    desc: 'A face-milled precision blade — the steadiest stroke & longest break read in the galaxy',
     rarity: 'legendary',
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.4, perks: [...m.perks, 'pinseeker-putter'] }),
   },
@@ -1023,8 +1052,9 @@ export function puttSkillOf(
   loadout: PlayerLoadout,
 ): { makeChance?: number; lagFrac?: number; lagSd?: number; manualBand?: number; puttRange?: number } {
   const boost = loadout.puttBoost ?? 0;
+  const readBonus = loadout.puttReadBonus ?? 0;
   const caddie = loadout.perks.includes('auto-caddie');
-  if (boost === 0 && !caddie) return {};
+  if (boost === 0 && readBonus === 0 && !caddie) return {};
   // Auto-Caddie is a solid baseline on top of any putter upgrades (preserves its ~0.92 make).
   const b = caddie ? Math.max(boost, 0.6) : boost;
   return {
@@ -1034,7 +1064,9 @@ export function puttSkillOf(
     manualBand: Math.min(0.4, DEFAULT_MANUAL_BAND + b * 0.18),
     // GS-putt-depth: a better putter READS and HOLES from further — its confident range extends with
     // the boost, so the make band stays wide (and the break line stays solid) deeper into a long putt.
-    puttRange: DEFAULT_PUTT_RANGE + Math.min(0.7, b) * 12,
+    // The cap is 1.0 (GS-putt-read, was 0.7): now the break line STOPS DEAD at the range, a stacked
+    // putter build must keep visibly stretching it. `puttReadBonus` (Green-Reading Book) adds on top.
+    puttRange: DEFAULT_PUTT_RANGE + Math.min(1, b) * 12 + readBonus,
   };
 }
 

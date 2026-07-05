@@ -183,3 +183,47 @@ off the BOW (a double-breaker bows wider than its net); the read row says "doubl
 Guarded by `tests/green-contour.test.ts` (field shape, closed-form back-compat, S-curve reality,
 graphic≡physics at the finish, ideal-read holes with wobble stripped, generator emission + side
 stream). Full suite byte-identical-green.
+
+
+## GS-putt-read — the break line stops dead at the confident read + the read is shoppable (2026-07-05)
+
+**The ask.** "There's a semi-transparent arrow that still goes to the hole and it should be removed —
+only the short-range darker yellow arrow; shop upgrades etc. stretch out the more solid line."
+
+**The render change (holeView.ts).** GS-putt-depth drew the confident prefix bright and then a faint
+wide-dashed tail (opacity 0.32) tracing the REST of the break all the way to the cup, plus a half-faded
+finish ring at the hole. That tail undermined the whole read mechanic: it was still the true break
+curve, so a "blind" putt wasn't blind at all — you could aim off the ghost. Now the line simply STOPS:
+the bright dashed prefix ends at a filled terminus dot (`r 2.6`, opacity 0.85) and the blind stretch
+draws NOTHING; the open finish ring only appears on a FULL read (frac 1 — short putt, big putter, or
+the Mystic Mole). Past your read you are genuinely guessing, which makes read range a stat you can SEE
+grow. Pure render — zero sim/rng impact. Guarded in `tests/holeView.test.ts` (one break path, terminus
+dot XOR finish ring, prefix length scales with frac).
+
+**Green contours verified in.** GS-green-contour (generator v16) confirmed emitting 1–2 lobes per green
+on its side stream, threaded through resolver/preview/arrows; `tests/green-contour.test.ts` green and
+`scripts/putt-preview.mjs` re-shot — lobes + local fall-line fields + S-curving reads all visible.
+
+**The shop-item pass (all putting gear re-audited against the stopping line).**
+- Every `puttBoost` source (Pro Putting Grip .16 / Counterbalance Mallet .20 / Tour Putter .26 /
+  Pinseeker .40 / talent-putt .18 / Putting Coach meta .08·lvl / bag-set putters .10–.22 / Mole's .32)
+  already flows through `puttSkillOf` into `manualBand` + `puttRange`, and the putt screen reads that
+  SAME range for the drawn line — so every putter upgrade now visibly stretches the solid line. ✓
+- **Range cap raised 0.7 → 1.0** (`puttSkillOf`): the old cap meant a full putter stack (grip+mallet+
+  tour = 0.62) hit the ceiling before the Pinseeker even landed — the legendary would have added ~0
+  visible read. Now the full stack reaches the full +12y (range 18.5y). Manual-only (`onePutt` never
+  reads `puttRange`), so auto/headless is untouched.
+- **NEW common: Green-Reading Book** (70cr) — the putting axis started at rare, so early stops had no
+  putt buy and the new line mechanic had no cheap hook. It adds `puttReadBonus` +4y (a NEW loadout
+  field added flat onto `puttRange` — stretches the line AND holds the full make band deeper, one
+  number shared by picture + resolver, contract 5) plus a small +0.05 `puttBoost` so the headless AI
+  also gains (a power-up must raise Stableford — contract 4). Round-trips via its perk id
+  (`loadoutFromPerks`), no save bump. `puttSkillOf`'s empty-fast-path gate now includes the read bonus;
+  a read-only loadout returns base-equal make/lag values so auto behaviour is byte-identical.
+- **Mystic Mole tagged `putting`** in ITEM_TAGS (was missing — green-themed stops never boosted him
+  alongside the putters). Putter descs updated to sell the read stretch. Nothing removed: Penelope
+  (auto-putt) bypasses the meter entirely, Mole (full read + aim) remains the read apex above the Book,
+  and the four-putter ladder is distinct rung-by-rung — no redundancy introduced.
+
+Catalogue growth shifts which items seeded shops draw (same rng COUNT — `weightedSample` draws one
+float per pick regardless of pool), and the full 957-test suite stayed green, balance suites included.
