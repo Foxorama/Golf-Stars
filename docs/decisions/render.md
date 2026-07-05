@@ -746,3 +746,19 @@
 - Eyeballed high-res across verdant/ocean/frost/inferno (collar + sheen read as a cut corridor) and
   void/cetus (unchanged). Re-shoot `node scripts/gallery.mjs` after further `styleFairways` edits.
   The uniform-WIDTH read remains a generator concern (varying width / green taper), still out of scope.
+
+
+## GS-green-contour-2 — the `path` prim + `render/contour.ts` (2026-07-05)
+
+Two render-layer additions shipped with the contoured-greens upgrade (full story in `putting.md`):
+
+- **`path` prim** — an OPEN stroked polyline (`<polyline>` in SVG; no `closePath` on canvas). A
+  `poly` with `fill:'none'` still closes with a chord, so it must never be used for open curves;
+  `path` is the right prim for any stroked open line. Supports `round` (cap+join) and `dash`.
+- **`render/contour.ts`** — topo isolines of the sim's contour height field (`sim/contour.ts
+  heightFieldAt`), marching-squares over a COURSE-space grid, exact-endpoint chaining, one Chaikin
+  round. Fully camera-proof (grid/levels/chaining read no projection) and WeakMap-cached per hole in
+  `style.ts`; only the projection runs per frame. Poly-agnostic on purpose: a future contoured
+  fairway hands its own polygon + field to the same function. Lobe RELIEF stays in `styleGreen`:
+  a directional glow pair per lobe under the shared `LIGHT_UL` (mound lit toward the sun; hollow
+  inverted per the emboss rule).

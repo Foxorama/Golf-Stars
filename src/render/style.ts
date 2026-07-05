@@ -24,6 +24,7 @@ import { effectPatches as effectPatchesFor, type GroundPatch, type PatchKind } f
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { constellationFigure } from './constellations';
+import { contourIsolines } from './contour';
 import { unionPolys, dilateUnion } from './merge';
 import type { Projector } from './project';
 import {
@@ -52,6 +53,9 @@ export type Prim =
   | { t: 'poly'; pts: Vec[]; fill?: string; stroke?: string; sw?: number; dash?: number[] }
   | { t: 'circle'; c: Vec; r: number; fill?: string; stroke?: string; sw?: number }
   | { t: 'line'; a: Vec; b: Vec; stroke: string; sw: number; round?: boolean; dash?: number[] }
+  /** An OPEN stroked polyline (never closed/filled — a 'poly' closes with a chord, which would slash
+   *  straight across an open curve). Topo isolines (GS-green-contour-2) are the first user. */
+  | { t: 'path'; pts: Vec[]; stroke: string; sw: number; round?: boolean; dash?: number[] }
   /** A SOFT radial glow: `col` (rgba) at the centre fading to fully transparent at radius `r`. The
    *  intro's sky is built from screen-blended soft nebulae — this brings the same look in-game so a
    *  nebula reads as a luminous wash, not a hard-edged flat disc (the "weird static blob" bug). */
@@ -705,18 +709,36 @@ function styleGreen(
         ],
       });
     }
-    // GS-green-contour: shade each lobe's crest lit / hollow shadowed (soft, clipped) so the mounds
-    // read as raised rolls on the surface, then draw the LOCAL fall-line field instead of the single
-    // central grid — each chevron points down ITS OWN slope, so a double-breaking green shows arrows
-    // fanning around the mound exactly the way the putt will curl. Pure geometry, zero rng.
+    // GS-green-contour-2: the contoured green reads as SCULPTED ground, three layers deep —
+    //  1. RELIEF: each lobe shades under the shared upper-left sun (LIGHT_UL, the GS-inset light):
+    //     a mound pools soft light on its up-light flank and shadow on its down-light flank; a
+    //     hollow is the exact inverse (shadowed near rim, lit far wall — the emboss rule). Glow
+    //     prims, so the shading falls off smoothly like ground, not a stamped disc.
+    //  2. TOPO ISOLINES: level sets of the sim's own height field (`contourIsolines` — the very
+    //     surface the putt integrates), thin pale green-reading-book rings.
+    //  3. The LOCAL fall-line arrow field (below) — each chevron points down ITS OWN slope.
+    // All pure geometry, zero rng; counts read only course-space/deterministic values.
     if (contoured) {
-      const lobeShade: Prim[] = (slope.lobes ?? []).map((lb) => ({
-        t: 'circle',
-        c: lb.c,
-        r: Math.max(3, lb.rPx * 0.9),
-        fill: lb.h > 0 ? `rgba(255,255,255,${Math.min(0.16, Math.abs(lb.h) * 0.3).toFixed(3)})` : `rgba(0,0,0,${Math.min(0.18, Math.abs(lb.h) * 0.34).toFixed(3)})`,
-      }));
-      if (lobeShade.length) out.push({ t: 'clip', clip: poly, children: lobeShade });
+      const relief: Prim[] = [];
+      for (const lb of slope.lobes ?? []) {
+        const r = Math.max(3, lb.rPx);
+        const s = Math.min(1, Math.abs(lb.h));
+        const off = r * 0.36;
+        const side = lb.h > 0 ? 1 : -1; // mound lit toward the sun; hollow lit on the far (down-light) wall
+        const litA = Math.min(0.2, 0.07 + s * 0.24);
+        const shA = Math.min(0.22, 0.08 + s * 0.26);
+        relief.push(
+          { t: 'glow', c: [lb.c[0] + LIGHT_UL[0] * off * side, lb.c[1] + LIGHT_UL[1] * off * side], r: r * 1.15, col: `rgba(255,255,238,${litA.toFixed(3)})` },
+          { t: 'glow', c: [lb.c[0] - LIGHT_UL[0] * off * side, lb.c[1] - LIGHT_UL[1] * off * side], r: r * 1.08, col: `rgba(4,10,22,${shA.toFixed(3)})` },
+        );
+      }
+      if (relief.length) out.push({ t: 'clip', clip: poly, children: relief });
+      if (slope.iso && slope.iso.length) {
+        const rings: Prim[] = slope.iso
+          .filter((line) => line.length > 1)
+          .map((line) => ({ t: 'path', pts: line, stroke: 'rgba(255,255,255,0.15)', sw: 1, round: true }));
+        if (rings.length) out.push({ t: 'clip', clip: poly, children: rings });
+      }
       const arrows: Prim[] = [];
       // Px-capped sizes off the projected span (the GS-putt-feel lesson): legible glyphs at putt
       // zoom, a subtle stipple at map zoom — the caps never let them balloon into bold bars.
@@ -1741,6 +1763,23 @@ interface GreenSlopeArt {
   arrows?: { p: Vec; dir: Vec; mag: number }[];
   /** Projected contour lobes: screen centre, px radius, signed peak slope (+ mound / − hollow). */
   lobes?: { c: Vec; rPx: number; h: number }[];
+  /** Projected topo ISOLINES (GS-green-contour-2): level sets of the sim's height field, screen
+   *  space. The green-reading-book rings that make the surface read as sculpted ground. */
+  iso?: Vec[][];
+}
+
+/** Course-space isolines per hole (GS-green-contour-2): the field never changes under a camera
+ *  move, so the marching-squares pass runs once per hole and every follow-cam frame just re-projects
+ *  — both a per-frame cost saving and a hard guarantee of camera-proof line counts. */
+const isoCache = new WeakMap<Hole, Vec[][]>();
+
+function greenIsolinesCourse(hole: Hole, greenPolyCourse: Vec[]): Vec[][] {
+  let iso = isoCache.get(hole);
+  if (!iso) {
+    iso = contourIsolines(greenPolyCourse, hole.greenSlope, hole.greenContour ?? []);
+    isoCache.set(hole, iso);
+  }
+  return iso;
 }
 
 /** The green's downhill SLOPE as a SCREEN-space unit direction + magnitude (GS-greens-3), by
@@ -1796,7 +1835,8 @@ function greenSlopeArt(hole: Hole, greenPolyCourse: Vec[], proj: Projector): Gre
     const e = proj.project([lb.c[0] + lb.r, lb.c[1]]);
     return { c, rPx: Math.hypot(e[0] - c[0], e[1] - c[1]), h: lb.h };
   });
-  return { ...plane, arrows, lobes: lobArt };
+  const iso = greenIsolinesCourse(hole, greenPolyCourse).map((line) => line.map((p) => proj.project(p)));
+  return { ...plane, arrows, lobes: lobArt, iso };
 }
 
 /** Is a screen point within the (padded) view? Used to cull off-screen accents/tufts. */
@@ -4056,6 +4096,11 @@ export function scenePrimsToSvg(prims: Prim[], idPrefix = 'gs'): string {
         const cap = p.round ? ' stroke-linecap="round"' : '';
         return `<line x1="${n1(p.a[0])}" y1="${n1(p.a[1])}" x2="${n1(p.b[0])}" y2="${n1(p.b[1])}" stroke="${p.stroke}" stroke-width="${p.sw}"${cap}${dash} />`;
       }
+      case 'path': {
+        const dash = p.dash ? ` stroke-dasharray="${p.dash.join(' ')}"` : '';
+        const cap = p.round ? ' stroke-linecap="round" stroke-linejoin="round"' : '';
+        return `<polyline points="${ptsStr(p.pts)}" fill="none" stroke="${p.stroke}" stroke-width="${p.sw}"${cap}${dash} />`;
+      }
       case 'clip': {
         const id = `${idPrefix}c${clipId++}`;
         return (
@@ -4128,6 +4173,19 @@ export function drawScenePrims(ctx: CanvasRenderingContext2D, prims: Prim[]): vo
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.lineCap = 'butt';
+        break;
+      }
+      case 'path': {
+        path(p.pts); // NO closePath — an isoline is an open curve
+        ctx.strokeStyle = p.stroke;
+        ctx.lineWidth = p.sw;
+        ctx.lineCap = p.round ? 'round' : 'butt';
+        ctx.lineJoin = p.round ? 'round' : 'miter';
+        ctx.setLineDash(p.dash ?? []);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'miter';
         break;
       }
       case 'clip': {

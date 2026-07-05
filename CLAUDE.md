@@ -417,8 +417,21 @@ For each system: the rule that constrains new work. Open the archive doc before 
   `greenSlope` plane, and `greenSlopeAt` is the ONE local field the resolver's integrated break
   (`puttBreakProfile`; no lobes ⇒ the old closed form byte-for-byte), the S-curving preview line, the
   "double-breaks" read (`puttBreakBow`, also the putt-cam frame) AND the renderer's per-cell fall-line
-  arrow field all sample. PUTTING-ONLY by design: `rollOut` still reads the dominant plane — folding
-  lobes into approach roll is a physics retune (contract 4). `tests/green-contour.test.ts` guards.
+  arrow field all sample. **The contours are REAL GROUND now (GS-green-contour-2):** the field math
+  lives in the surface-agnostic `sim/contour.ts` (`slopeFieldAt` + `heightFieldAt`, the closed-form
+  potential whose gradient is −slope — the intended foundation for contoured FAIRWAYS later);
+  `rollOut`'s green run-out samples the LOCAL field per step (still a straight line — the
+  roll-invariant holds; plane-only holes byte-identical; this was the sanctioned physics retune,
+  death-spiral harness re-run green); a manual putt's `PuttLog.path` carries its true curved travel
+  (the preview curve at the struck aim/pace, wobble sheared in linearly, ending exactly at `to`) and
+  the play view walks it by arc length so a double-breaker visibly curls (auto `onePutt` stays
+  pathless → the straight lerp). The ART reads the same numbers: `render/contour.ts contourIsolines`
+  marching-squares `heightFieldAt` into topo rings (course-space grid + deterministic levels ⇒
+  camera-proof; WeakMap-cached per hole; drawn via the open-polyline `path` prim — 'poly' closes with
+  a chord, never use it for open curves) and each lobe shades as directional relief under the shared
+  `LIGHT_UL` (lit-flank + shadow-flank glows; hollows inverted per the emboss rule).
+  `tests/green-contour.test.ts` guards field↔height consistency, isolines, local-field roll and the
+  curved-path contract.
   **Putt-FEEL rules (GS-putt-feel):** the fall-line arrows are PX-CAPPED in `styleGreen` (prims are
   screen-space — span-proportional chevrons ballooned into bold lines across the whole green at putt
   zoom; the caps never bind at map zoom). The putt watch-cam reuses the putt screen's exact framing

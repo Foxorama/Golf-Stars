@@ -7,6 +7,7 @@
  */
 
 import { dist, pathLength, type FeatureKind, type GreenLobe, type Hole, type Vec } from './course/contract';
+import { slopeFieldAt } from './contour';
 import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
   combineShapeMods,
@@ -202,14 +203,19 @@ export function rollOut(
   // ball rolling downhill runs out far and one rolling (or BACKSPINNING) uphill brakes hard and can't
   // climb — no ball ever spins weirdly up a slope. Pure geometry, no rng, straight roll → the
   // roll-invariant (dist(rest,touchdown) === |roll|) and the renderer's straight run-out hold.
-  // (GS-green-contour lobes are putting-scale texture only: the run-out reads the dominant plane,
-  // so every seeded approach roll stays byte-identical.)
+  // GS-green-contour-2: on a contoured green the run-out reads the LOCAL field (`greenSlopeAt`) at
+  // each step — the ball brakes climbing a mound and runs out down its far flank, so the landform
+  // the topo rings draw is the ground the ball actually rolls on. Sampled per step of the SAME
+  // straight line (the deflection stays putting-scale), so the roll-invariant and the renderer's
+  // straight run-out still hold; a plane-only hole reads back exactly the plane, byte-for-byte.
   const slope = hole.greenSlope;
+  const lobes = hole.greenContour;
   const tdx = dir[0] * sign;
   const tdy = dir[1] * sign;
-  const slopeRun = (k: string): number => {
-    if (k !== 'green' || !slope) return 1;
-    const along = tdx * slope[0] + tdy * slope[1]; // + = travelling downhill, − = uphill
+  const slopeRun = (k: string, pMid: Vec): number => {
+    if (k !== 'green' || (!slope && !(lobes && lobes.length))) return 1;
+    const s = lobes && lobes.length ? greenSlopeAt(pMid, slope, lobes) : slope!;
+    const along = tdx * s[0] + tdy * s[1]; // + = travelling downhill, − = uphill
     return Math.max(0.32, 1 + SLOPE_ROLL_K * along);
   };
   let budget = Math.abs(K); // remaining energy, in fairway-equivalent yards
@@ -233,7 +239,7 @@ export function rollOut(
       dist += STEP; // trickled up against a trade-camp tent → stops there
       break;
     }
-    const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k); // this surface's run per yard (immune hazard skims fast); slope-adjusted on the green
+    const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, at(dist + STEP * 0.5)); // this surface's run per yard (immune hazard skims fast); slope-adjusted on the green
     if (m <= 0) break;
     const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
     if (need >= budget) {
@@ -298,6 +304,14 @@ export interface PuttLog {
   from: Vec;
   to: Vec;
   holed: boolean;
+  /**
+   * The CURVED travel of a manual putt (GS-green-contour-2), sampled course-space points from
+   * `from` to exactly `to`: the break-preview curve at the struck aim/pace with the wobble sheared
+   * in linearly — so the ball the player watches curls along the very break line they read, and a
+   * double-breaker visibly S-bends into (or past) the cup. Absent (auto `onePutt`, old logs) ⇒ the
+   * play view falls back to the classic straight lerp. Pure geometry, zero extra rng.
+   */
+  path?: Vec[];
 }
 
 export interface PlayedHole {
@@ -568,25 +582,13 @@ const BREAK_K = 0.18;
  * dominant `greenSlope` plane plus each contour lobe's radial gradient. A mound's (h > 0) downhill
  * points away from its crest, a hollow's (h < 0) toward its centre; each lobe's magnitude ramps
  * 0 → |h| out to its radius `r` and fades smoothly beyond, so the field is continuous everywhere.
- * The ONE field the putt resolver, the break-line preview, and the renderer's fall-line arrows all
- * sample — the graphic IS the physics. No lobes → exactly the plane. Pure, zero rng.
+ * The ONE field the putt resolver, the green roll-out, the break-line preview, and the renderer's
+ * fall-line arrows all sample — the graphic IS the physics. No lobes → exactly the plane. Pure,
+ * zero rng. (GS-green-contour-2: the math lives in the green-agnostic `sim/contour.ts` so future
+ * contoured FAIRWAYS share the same field; this is the green-named face of it.)
  */
 export function greenSlopeAt(p: Vec, slope?: Vec, lobes?: readonly GreenLobe[]): Vec {
-  let sx = slope ? slope[0] : 0;
-  let sy = slope ? slope[1] : 0;
-  if (lobes) {
-    for (const l of lobes) {
-      const dx = p[0] - l.c[0];
-      const dy = p[1] - l.c[1];
-      const d = Math.hypot(dx, dy);
-      if (d < 1e-6 || l.r < 1e-6) continue;
-      const u = d / l.r;
-      const m = l.h * u * Math.exp((1 - u * u) / 2); // 0 at the crest, peaks at |h| on the flank (u=1)
-      sx += (dx / d) * m;
-      sy += (dy / d) * m;
-    }
-  }
-  return [sx, sy];
+  return slopeFieldAt(p, slope, lobes);
 }
 
 /**
@@ -757,15 +759,29 @@ export function manualPutt(
   // double-breaker's net) — same wobble draw, so the rng stream is untouched either way.
   const breakYd = puttBreakYd(from, pinPt, slope, pace, lobes);
   const netLat = aim + breakYd + wobble;
+  // The watchable travel (GS-green-contour-2): the same preview curve the aim screen drew, at the
+  // ACTUAL struck aim/pace, then sheared linearly so it finishes exactly at the resolved rest point
+  // — the wobble (and a make's drop into the cup) ease in over the whole roll instead of teleporting
+  // at the end. Pure geometry off already-drawn numbers: the rng stream is untouched.
+  const curvedPathTo = (end: Vec): Vec[] => {
+    const pts = puttPathPreview(from, pinPt, slope, aim, pace, lobes);
+    const last = pts[pts.length - 1]!;
+    const ex = end[0] - last[0];
+    const ey = end[1] - last[1];
+    return pts.map((p, i) => {
+      const t = i / (pts.length - 1);
+      return [p[0] + ex * t, p[1] + ey * t] as Vec;
+    });
+  };
   // A make: pace inside the (distance-scaled) band AND the net lateral (aim + break + wobble) holds
   // within the cup.
   if (Math.abs(paceErr) <= effBand && Math.abs(netLat) <= HOLE_OUT_RADIUS) {
-    return { from, to: pinPt, holed: true };
+    return { from, to: pinPt, holed: true, path: curvedPathTo(pinPt) };
   }
   // Missed: it travels `pace × d` along the line with the net lateral offset (short/long + off-line).
   const travel = pace * d;
   const to: Vec = [from[0] + ux * travel + rperp[0] * netLat, from[1] + uy * travel + rperp[1] * netLat];
-  return { from, to, holed: dist(to, pinPt) <= HOLE_OUT_RADIUS };
+  return { from, to, holed: dist(to, pinPt) <= HOLE_OUT_RADIUS, path: curvedPathTo(to) };
 }
 
 /**

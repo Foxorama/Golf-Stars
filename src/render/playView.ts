@@ -1355,30 +1355,51 @@ export function mountPlayView(
       }
     } else if (puttIndex < putts.length) {
       // Putt phase: flat roll across the green, eased to a stop, into the cup.
+      // GS-green-contour-2: a manual putt carries its true CURVED travel (`PuttLog.path` — the
+      // break curve the aim screen drew, wobble sheared in), so the ball visibly curls with the
+      // contours instead of gliding a straight chord. Auto putts / old logs have no path → the
+      // classic straight lerp, byte-for-byte.
       const putt = putts[puttIndex]!;
       if (impactFiredPutt !== puttIndex) {
         impactFiredPutt = puttIndex;
         opts.onImpact?.('putt');
       }
-      const len = Math.hypot(putt.to[0] - putt.from[0], putt.to[1] - putt.from[1]);
+      const path = putt.path && putt.path.length > 1 ? putt.path : [putt.from, putt.to];
+      let len = 0;
+      for (let i = 1; i < path.length; i++) len += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
       const dur = Math.max(300, Math.min(750, len * proj.scale * 12));
       const t = Math.max(0, Math.min(1, (now - segStart) / dur));
       const e = easeOutCubic(t);
-      const cur: Vec = [
-        putt.from[0] + (putt.to[0] - putt.from[0]) * e,
-        putt.from[1] + (putt.to[1] - putt.from[1]) * e,
-      ];
+      // Walk the path by arc length so the eased pace reads the same on a curve as on a chord.
+      let cur: Vec = path[path.length - 1]!;
+      let want = e * len;
+      for (let i = 1; i < path.length; i++) {
+        const seg = Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
+        if (want <= seg || i === path.length - 1) {
+          const f = seg > 1e-9 ? Math.min(1, want / seg) : 1;
+          cur = [
+            path[i - 1]![0] + (path[i]![0] - path[i - 1]![0]) * f,
+            path[i - 1]![1] + (path[i]![1] - path[i - 1]![1]) * f,
+          ];
+          break;
+        }
+        want -= seg;
+      }
       lastGround = cur; // feed the follow-cam
       const gx = proj.project(cur);
 
-      // Putt line (aim guide) + rolling ball, both flat on the green.
+      // Putt line (aim guide) + rolling ball, both flat on the green — the guide traces the same
+      // curved path the ball rolls, so the picture and the physics agree stroke-for-stroke.
       const [fx, fy] = proj.project(putt.from);
       const [tx, ty] = proj.project(putt.to);
       ctx.strokeStyle = 'rgba(255,255,255,0.25)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(fx, fy);
-      ctx.lineTo(tx, ty);
+      for (let i = 1; i < path.length; i++) {
+        const [px, py] = proj.project(path[i]!);
+        ctx.lineTo(px, py);
+      }
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';

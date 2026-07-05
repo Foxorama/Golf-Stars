@@ -7,10 +7,14 @@ import {
   puttBreakProfile,
   puttBreakYd,
   puttPathPreview,
+  onePutt,
+  rollOut,
   MANUAL_IDEAL_PACE,
 } from '../src/sim/round';
+import { heightFieldAt, slopeFieldAt } from '../src/sim/contour';
+import { contourIsolines } from '../src/render/contour';
 import { Rng } from '../src/sim/rng';
-import { dist, type GreenLobe, type Vec } from '../src/sim/course/contract';
+import { dist, type GreenLobe, type Hole, type Vec } from '../src/sim/course/contract';
 import { generateCourse } from '../src/sim/course/generate';
 import { BIOMES } from '../src/sim/course/biomes';
 
@@ -109,6 +113,138 @@ describe('contoured greens double-break (GS-green-contour)', () => {
     const wide: GreenLobe = { c: [-3, 10], r: 6, h: 1.2 };
     const straight = manualPutt(new NoWobbleRng('gc:3'), from, pin, { pace: MANUAL_IDEAL_PACE, aim: 0 }, {}, undefined, [wide]);
     expect(straight.holed).toBe(false);
+  });
+});
+
+describe('the height field is the slope field’s potential (GS-green-contour-2)', () => {
+  const plane: Vec = [0.25, -0.15];
+  const lobes: GreenLobe[] = [
+    { c: [4, 8], r: 7, h: 0.5 },
+    { c: [-6, 2], r: 5, h: -0.35 },
+  ];
+
+  it('the numeric gradient of heightFieldAt is exactly -slopeFieldAt (downhill = -∇H)', () => {
+    const eps = 1e-5;
+    for (const p of [[0, 0], [3, 9], [-5, 1], [10, -4], [4.2, 8.3]] as Vec[]) {
+      const gx = (heightFieldAt([p[0] + eps, p[1]], plane, lobes) - heightFieldAt([p[0] - eps, p[1]], plane, lobes)) / (2 * eps);
+      const gy = (heightFieldAt([p[0], p[1] + eps], plane, lobes) - heightFieldAt([p[0], p[1] - eps], plane, lobes)) / (2 * eps);
+      const s = slopeFieldAt(p, plane, lobes);
+      expect(-gx).toBeCloseTo(s[0], 4);
+      expect(-gy).toBeCloseTo(s[1], 4);
+    }
+  });
+
+  it('a mound is high at its crest, a hollow low, relative to the surrounding surface', () => {
+    const crest = heightFieldAt([4, 8], undefined, lobes.slice(0, 1));
+    const far = heightFieldAt([100, 100], undefined, lobes.slice(0, 1));
+    expect(crest).toBeGreaterThan(far + 1);
+    const dip = heightFieldAt([-6, 2], undefined, lobes.slice(1));
+    expect(dip).toBeLessThan(heightFieldAt([100, 100], undefined, lobes.slice(1)) - 0.5);
+  });
+});
+
+describe('topo isolines (GS-green-contour-2)', () => {
+  // A generous square "green" with a bold central mound — the simplest sculpted surface.
+  const square: Vec[] = [[-15, -15], [15, -15], [15, 15], [-15, 15]];
+  const mound: GreenLobe[] = [{ c: [0, 0], r: 8, h: 0.6 }];
+
+  it('an isolated mound yields at least one CLOSED ring around its crest', () => {
+    const iso = contourIsolines(square, undefined, mound);
+    expect(iso.length).toBeGreaterThan(0);
+    const closed = iso.filter((l) => dist(l[0]!, l[l.length - 1]!) < 1e-6);
+    expect(closed.length).toBeGreaterThan(0);
+    // And the rings genuinely encircle the crest: some closed ring has points on both sides of it.
+    const ring = closed[0]!;
+    expect(Math.min(...ring.map((p) => p[0]))).toBeLessThan(0);
+    expect(Math.max(...ring.map((p) => p[0]))).toBeGreaterThan(0);
+  });
+
+  it('a pure plane yields straight, roughly parallel level lines; a flat field yields none', () => {
+    const iso = contourIsolines(square, [0.4, 0], []);
+    expect(iso.length).toBeGreaterThan(1);
+    // Level sets of a plane sloping along +x are vertical lines: x varies little within one line.
+    for (const line of iso) {
+      const xs = line.map((p) => p[0]);
+      expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(1);
+    }
+    expect(contourIsolines(square, undefined, [])).toEqual([]);
+    expect(contourIsolines(square, [0, 0], [])).toEqual([]);
+  });
+
+  it('deterministic and projection-free: two calls agree point-for-point', () => {
+    const a = contourIsolines(square, [0.2, 0.1], mound);
+    const b = contourIsolines(square, [0.2, 0.1], mound);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+});
+
+describe('green roll-out reads the LOCAL contour field (GS-green-contour-2)', () => {
+  /** One big all-green pad so the roll only ever feels the field. */
+  const pad = (lobes?: GreenLobe[], slope?: Vec): Hole => ({
+    par: 3,
+    tee: [0, -100],
+    green: [0, 0],
+    centreline: [[0, -100], [0, 0]],
+    features: [{ kind: 'green', poly: [[-60, -60], [60, -60], [60, 60], [-60, 60]] }],
+    hazards: [],
+    greenSlope: slope,
+    greenContour: lobes,
+  });
+  const mound: GreenLobe[] = [{ c: [0, 12], r: 8, h: 0.6 }];
+
+  it('a ball rolling INTO a mound brakes short of the flat roll; down its far flank it runs on', () => {
+    const flat = rollOut(pad(), [0, 0], [0, 1], 10, 'green').roll;
+    const intoMound = rollOut(pad(mound), [0, 0], [0, 1], 10, 'green').roll;
+    expect(intoMound).toBeLessThan(flat); // climbing the near flank costs energy
+    const offCrest = rollOut(pad(mound), [0, 13], [0, 1], 10, 'green').roll;
+    expect(offCrest).toBeGreaterThan(flat); // riding the far flank downhill runs out
+  });
+
+  it('the roll stays a straight line (the roll-invariant survives the local field)', () => {
+    const r = rollOut(pad(mound, [0.2, 0.1]), [3, -6], [0.6, 0.8], 12, 'green');
+    expect(dist(r.rest, [3, -6])).toBeCloseTo(Math.abs(r.roll), 5);
+  });
+
+  it('a plane-only hole is byte-identical to the pre-contour roll (greenContour absent vs [])', () => {
+    const a = rollOut(pad(undefined, [0.3, -0.1]), [0, 0], [0, 1], 10, 'green');
+    const b = rollOut(pad([], [0.3, -0.1]), [0, 0], [0, 1], 10, 'green');
+    expect(b).toEqual(a);
+  });
+});
+
+describe('the watched putt curls along the true break path (GS-green-contour-2)', () => {
+  const knobs: GreenLobe[] = [
+    { c: [-3, 15], r: 5, h: 0.6 },
+    { c: [3, 5], r: 5, h: 0.6 },
+  ];
+
+  it('manualPutt returns a path from exactly `from` to exactly `to`', () => {
+    const p = manualPutt(new Rng('gc2:1'), from, pin, { pace: 1.1, aim: -0.5 }, {}, [0.2, 0], knobs);
+    expect(p.path).toBeDefined();
+    expect(p.path![0]).toEqual(from);
+    const last = p.path![p.path!.length - 1]!;
+    expect(last[0]).toBeCloseTo(p.to[0], 9);
+    expect(last[1]).toBeCloseTo(p.to[1], 9);
+  });
+
+  it('a made double-breaker’s path S-bends on its way into the cup', () => {
+    const aim = idealPuttAim(from, pin, undefined, knobs);
+    const p = manualPutt(new NoWobbleRng('gc2:2'), from, pin, { pace: MANUAL_IDEAL_PACE, aim }, {}, undefined, knobs);
+    expect(p.holed).toBe(true);
+    // Lateral (x) along the path bows right of the start→cup chord then returns — a real curve,
+    // not a straight glide.
+    const xs = p.path!.map((pt) => pt[0]);
+    expect(Math.max(...xs)).toBeGreaterThan(0.3);
+    const last = p.path![p.path!.length - 1]!;
+    expect(last[0]).toBeCloseTo(pin[0], 6);
+    expect(last[1]).toBeCloseTo(pin[1], 6);
+  });
+
+  it('auto putts (onePutt) carry no path — the play view keeps its straight-lerp fallback', () => {
+    const log = onePutt(new Rng('gc2:3'), from, pin);
+    expect(log.path).toBeUndefined();
+    // …while a manual putt always carries its curve, even on a plane-only green.
+    expect(manualPutt(new Rng('gc2:4'), from, pin, { pace: 1 }, {}, undefined, undefined).path).toBeDefined();
   });
 });
 
