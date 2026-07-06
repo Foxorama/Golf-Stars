@@ -37,7 +37,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 16;
+export const GENERATOR_VERSION = 17;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -776,47 +776,38 @@ function generateHole(
   // (no rng involved), so every normal world's corridor is byte-identical.
   const segs = par === 3 ? 13 : lostRough ? ISLAND_SEGS : 19;
   const dense = densifyCentreline(centreline, segs);
-  // Fairway WIDTH PROFILE (GS-terrain) — a believable ribbon instead of a symmetric leaf. Three
-  // shaping pieces, each per-point along the hole, with a mean ≈ baseHalf so the death-spiral balance
-  // is preserved:
+  // Fairway WIDTH GRAMMAR (GS-fairway-width, replacing the single GS-terrain recipe): a per-hole
+  // width ARCHETYPE (`chooseWidthProfile` — classic / chute / neck / hourglass / wander / thin /
+  // broad) decides how thickness runs along the hole, so fairway width finally distinguishes holes
+  // the way real design does. On top of the profile:
   //  • an END ENVELOPE keeps the corridor FULL through the body and only EASES (never pinches to a
   //    point) toward the tee/green ends — combined with `ribbon`'s rounded nose caps, the start/end
   //    read as a turfed front edge and a soft finish, not the old pointed almond;
-  //  • LANDING-ZONE bulges (1–2 Gaussian swells at the driving/approach zones, 25–55 yd-wide in real
-  //    design) widen where you actually land;
-  //  • a gentle seeded WAVE + one localized PINCH for organic movement.
-  // Left/right half-widths then differ by a slow LATERAL asymmetry, so the fairway isn't a perfect
-  // mirror about its centreline (a real fairway bulges to one side).
-  const ampFrac = 0.1 + 0.16 * (1 - wildness);
-  const wavePhase = rng.range(0, Math.PI * 2);
-  const waveLobes = rng.range(1.6, 3.2);
-  const lz1 = rng.range(0.3, 0.42);
-  const lz2 = rng.range(0.62, 0.76);
-  const lzAmp = 0.16 + 0.12 * rng.float();
-  const pinchAt = rng.range(0.2, 0.8);
-  const pinchDepth = 0.2 * (1 - 0.5 * wildness) * rng.float();
+  //  • a slow LATERAL asymmetry splits left/right half-widths so the fairway isn't a perfect mirror
+  //    (damped by the profile where a squeeze must hold).
+  // The profile's own `floorFrac` floors the width — the squeezed archetypes dip well below the old
+  // 0.5 floor by design — with an absolute 5-yd half-width floor so a corridor never degenerates.
+  const wp = chooseWidthProfile(rng, par, wildness, !!lostRough);
   const asymPhase = rng.range(0, Math.PI * 2);
   const asymLobes = rng.range(0.6, 1.6);
-  const asymAmt = 0.12 + 0.1 * rng.float();
+  const asymAmt = (0.12 + 0.1 * rng.float()) * wp.asymScale;
   const envAt = (u: number): number => {
     const teeEase = Math.min(1, 0.74 + (u / 0.12) * 0.26); // 0.74 → 1 over the first 12%
     const grnEase = Math.min(1, 0.78 + ((1 - u) / 0.14) * 0.22); // taper the last 14% to 0.78
     return Math.min(teeEase, grnEase);
   };
+  const floorW = Math.max(baseHalf * wp.floorFrac, 5);
   const mid = dense.map((_, i) => {
     const u = i / (segs - 1);
-    const wave = Math.sin(wavePhase + u * Math.PI * waveLobes) * ampFrac;
-    const bulge = lzAmp * Math.exp(-((u - lz1) ** 2) / 0.02) + lzAmp * 0.85 * Math.exp(-((u - lz2) ** 2) / 0.02);
-    const pinch = Math.exp(-((u - pinchAt) ** 2) / 0.01) * pinchDepth;
-    return Math.max(baseHalf * 0.5, baseHalf * envAt(u) * (1 + wave + bulge - pinch));
+    return Math.max(floorW, baseHalf * envAt(u) * wp.at(u));
   });
   const leftHW = mid.map((w, i) => {
     const u = i / (segs - 1);
-    return Math.max(baseHalf * 0.42, w * (1 + asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
+    return Math.max(floorW * 0.85, w * (1 + asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
   });
   const rightHW = mid.map((w, i) => {
     const u = i / (segs - 1);
-    return Math.max(baseHalf * 0.42, w * (1 - asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
+    return Math.max(floorW * 0.85, w * (1 - asymAmt * Math.sin(asymPhase + u * Math.PI * asymLobes)));
   });
   // BROKEN fairway (GS-variety-2): carve 0–2 bands of native ROUGH across the mid-hole so the
   // corridor plays as "a couple of small fairways broken by rough", not one unbroken ribbon. Rough is
@@ -1401,7 +1392,7 @@ function generateHole(
   // void/cetus stops look as forgiving as they play.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
-  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, greenSlope, greenContour };
+  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, widthId: wp.id, greenSlope, greenContour };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */
@@ -1567,6 +1558,145 @@ function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, i
   }
   const id = lenTag ? `${lenTag}-${parWord}-${shapeTag}` : `${parWord}-${shapeTag}`;
   return { id, shape, side, lenMult, severity: shape === 'hairpin' ? 1.7 : 1 };
+}
+
+/** Smoothstep: 0 at `a`, 1 at `b`, C1-smooth between — the ramp the width profiles blend with. */
+function sstep(a: number, b: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Fairway WIDTH archetype (GS-fairway-width): how the corridor's thickness runs along the hole.
+ * `at(u)` is a width multiplier about `baseHalf` (the end envelope + lateral asymmetry are applied
+ * on top by `generateHole`); `floorFrac` is the profile's own width floor as a fraction of
+ * `baseHalf` — the squeezed profiles must be allowed to dip well below the classic 0.5 floor or
+ * their necks flatten out; `asymScale` damps the left/right asymmetry where a squeeze must hold.
+ */
+interface WidthProfile {
+  id: string;
+  at: (u: number) => number;
+  floorFrac: number;
+  asymScale: number;
+}
+
+/**
+ * Pick a fairway WIDTH archetype (GS-fairway-width) — the "every fairway is the same shape" fix.
+ * Real courses vary width DELIBERATELY, hole to hole: a tree-lined chute off the tee that opens out
+ * (Augusta's 18th), an approach that necks down into the green (Royal Lytham), a fairway pinched
+ * exactly at driving distance so you lay up short or thread it (Oakmont, links driving zones), a
+ * links ribbon that wanders wide-narrow-wide, a uniformly tight US-Open strip, and the huge shared
+ * meadows of St Andrews. The old generator gave every hole ONE recipe (full body + landing bulges +
+ * a soft pinch), so width never distinguished holes. Like the shape grammar, the width grammar is
+ * VARIETY, not difficulty: profiles appear at every wildness (the overall `widthScale` early→late
+ * lever still carries difficulty), and each profile's params are drawn seeded so no two chutes are
+ * identical. Lost-rough island holes (void/cetus) are EXEMPT — their width IS survival (the abyss
+ * is the penalty), so they keep the classic full-body profile ('island'). Par 3s use only the
+ * whole-hole profiles (classic/thin/broad/wander) — a 13-segment pitch corridor is too short for a
+ * chute/neck/hourglass story to read.
+ */
+function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boolean): WidthProfile {
+  // Every profile carries a seeded sine for organic edge movement (each draws its own phase/lobes).
+  const wave = (amp: number): ((u: number) => number) => {
+    const phase = rng.range(0, Math.PI * 2);
+    const lobes = rng.range(1.6, 3.2);
+    return (u) => Math.sin(phase + u * Math.PI * lobes) * amp;
+  };
+  // The pre-grammar recipe: full body, two landing-zone bulges, a gentle wave and one soft pinch.
+  const classic = (id = 'classic'): WidthProfile => {
+    const w = wave(0.1 + 0.16 * (1 - wildness));
+    const lz1 = rng.range(0.3, 0.42);
+    const lz2 = rng.range(0.62, 0.76);
+    const lzAmp = 0.16 + 0.12 * rng.float();
+    const pinchAt = rng.range(0.2, 0.8);
+    const pinchDepth = 0.2 * (1 - 0.5 * wildness) * rng.float();
+    return {
+      id,
+      at: (u) =>
+        1 +
+        w(u) +
+        lzAmp * Math.exp(-((u - lz1) ** 2) / 0.02) +
+        lzAmp * 0.85 * Math.exp(-((u - lz2) ** 2) / 0.02) -
+        Math.exp(-((u - pinchAt) ** 2) / 0.01) * pinchDepth,
+      floorFrac: 0.5,
+      asymScale: 1,
+    };
+  };
+  const thin = (): WidthProfile => {
+    // A uniformly tight ribbon, tee to green — the rough-lined US-Open strip.
+    const tw = rng.range(0.6, 0.76);
+    const w = wave(rng.range(0.05, 0.1));
+    return { id: 'thin', at: (u) => tw * (1 + w(u)), floorFrac: 0.4, asymScale: 0.6 };
+  };
+  const broad = (): WidthProfile => {
+    // A generous meadow — the St Andrews shared-fairway feel.
+    const bw = rng.range(1.24, 1.5);
+    const w = wave(rng.range(0.04, 0.09));
+    return { id: 'broad', at: (u) => bw * (1 + w(u)), floorFrac: 0.62, asymScale: 1 };
+  };
+  const wander = (): WidthProfile => {
+    // Strongly variable — wide bays alternating with narrow straits down the whole hole.
+    const amp = rng.range(0.26, 0.42);
+    const phase = rng.range(0, Math.PI * 2);
+    const lobes = rng.range(2.8, 4.8);
+    return { id: 'wander', at: (u) => 1 + amp * Math.sin(phase + u * Math.PI * lobes), floorFrac: 0.42, asymScale: 0.8 };
+  };
+  if (island) return classic('island'); // lost-rough pads: width is survival, no squeeze grammar
+  const roll = rng.float();
+  if (par === 3) {
+    if (roll < 0.4) return classic();
+    if (roll < 0.6) return thin();
+    if (roll < 0.8) return broad();
+    return wander();
+  }
+  if (roll < 0.28) return classic();
+  if (roll < 0.41) {
+    // CHUTE: a narrow tree-lined drive that lets out into a generous body, with an approach bulge.
+    const open = rng.range(0.2, 0.34);
+    const cw = rng.range(0.5, 0.68);
+    const body = rng.range(1.0, 1.16);
+    const w = wave(rng.range(0.05, 0.11));
+    const lz = rng.range(0.6, 0.74);
+    const lzAmp = 0.1 + 0.1 * rng.float();
+    return {
+      id: 'chute',
+      at: (u) => (cw + (body - cw) * sstep(open - 0.06, open + 0.12, u)) * (1 + w(u)) + lzAmp * Math.exp(-((u - lz) ** 2) / 0.02),
+      floorFrac: 0.34,
+      asymScale: 0.55,
+    };
+  }
+  if (roll < 0.54) {
+    // NECK: a full driving body that squeezes down for the approach into the green.
+    const start = rng.range(0.6, 0.74);
+    const nw = rng.range(0.45, 0.62);
+    const body = rng.range(1.0, 1.14);
+    const w = wave(rng.range(0.05, 0.11));
+    const lz = rng.range(0.3, 0.42);
+    const lzAmp = 0.1 + 0.1 * rng.float();
+    return {
+      id: 'neck',
+      at: (u) => (body - (body - nw) * sstep(start, start + 0.16, u)) * (1 + w(u)) + lzAmp * Math.exp(-((u - lz) ** 2) / 0.02),
+      floorFrac: 0.3,
+      asymScale: 0.55,
+    };
+  }
+  if (roll < 0.66) {
+    // HOURGLASS: wide either side of a waist pinched at the driving zone — lay up or thread it.
+    const waistAt = rng.range(0.42, 0.62);
+    const ww = rng.range(0.42, 0.58);
+    const body = rng.range(1.06, 1.24);
+    const sig = rng.range(0.012, 0.022);
+    const w = wave(rng.range(0.04, 0.1));
+    return {
+      id: 'hourglass',
+      at: (u) => (body - (body - ww) * Math.exp(-((u - waistAt) ** 2) / sig)) * (1 + w(u)),
+      floorFrac: 0.3,
+      asymScale: 0.5,
+    };
+  }
+  if (roll < 0.78) return wander();
+  if (roll < 0.89) return thin();
+  return broad();
 }
 
 /**
