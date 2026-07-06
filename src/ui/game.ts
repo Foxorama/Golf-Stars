@@ -28,6 +28,8 @@ import {
   playerHoleOpts,
   resumeRun,
   routeOptions,
+  canScanRoutes,
+  scanRoutes,
   scrambleOptsFor,
   teamDuelSetupForRun,
   shardsForRun,
@@ -245,6 +247,7 @@ export type Action =
   | { type: 'rerollStarmart' } // pay shards to redraw the StarMart rack
   | { type: 'leaveStarmart' } // close the StarMart and keep playing the hole
   | { type: 'route'; routeId: number }
+  | { type: 'scanRoutes' } // burn fuel to redraw the three onward lanes (GS-fuel-4 sector scan)
   | { type: 'buyFuel'; units: number } // top the ship's tank up with credits (GS-fuel) — Pro Shop / journey depot
   | { type: 'strand' } // out of fuel AND credits with no payable lane (GS-fuel): the run ends stranded
   | { type: 'bank' } // cash out the run (push-your-luck): bank credits→shards, end the run
@@ -1077,6 +1080,17 @@ export function reduce(state: UiState, action: Action): UiState {
         bossReward: undefined,
         viewHole: 0,
       };
+    }
+
+    case 'scanRoutes': {
+      // Sector scan (GS-fuel-4): burn fuel to redraw the three onward lanes. Travel-screen only;
+      // `scanRoutes` escalates the price per scan and always keeps ≥1 cell in the tank, and
+      // `routeOptions` re-keys its stream off the bumped count — pure, so a resume reproduces the
+      // scanned offer (the count + burnt fuel both persist on the run).
+      if (state.screen !== 'travel' || state.run.status !== 'active') return state;
+      if (!canScanRoutes(state.run)) return state;
+      const run = scanRoutes(state.run);
+      return { ...state, run, routes: routeOptions(run) };
     }
 
     case 'buyFuel': {

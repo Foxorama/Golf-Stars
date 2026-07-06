@@ -66,6 +66,11 @@ export interface RouteEvent {
   cutDelta: number;
   /** Credits paid UP FRONT on travel (a genuine cost — the rich/risky lanes charge admission). 0 = free. */
   creditToll?: number;
+  /** Fuel units siphoned ON ARRIVAL (GS-fuel-4) — the tanker/scow lanes refuel the ship from the
+   *  world instead of the depot. Granted in `travel` (auto ≡ interactive by construction), clamped
+   *  to tank capacity, never draining a legacy over-capacity tank. The desc MUST state it (⛽ —
+   *  machine-checked). 0/absent = none. */
+  fuelBonus?: number;
   /** Earliest arc this event can appear in (accents the arcs — high stakes come later). Default 1. */
   minArc?: Arc;
   /** A one-off dated event: offered at most once per run (tracked on the run). Default false. */
@@ -142,6 +147,21 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
     rarity: 'common',
     creditMult: 0.9,
     cutDelta: 0,
+    minArc: 1,
+  },
+  {
+    // GS-fuel-4: the first fuel-salvage lane — the world refuels the ship (granted in `travel`),
+    // trading pay for tank. Poor-but-safe, so "I'm running dry, take the scow lane" is a real pick.
+    id: 'fuel-scow',
+    label: 'Fuel Scow',
+    desc: 'Refuel +2 ⛽ on arrival · credits −5%. Syphon the sleepy scow’s surplus.',
+    lore: 'A rusted scow on a decade-long haul. She won’t miss a couple of cells.',
+    icon: '🛢️',
+    category: 'calm',
+    rarity: 'common',
+    creditMult: 0.95,
+    cutDelta: 0,
+    fuelBonus: 2,
     minArc: 1,
   },
   {
@@ -311,6 +331,21 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
   // ARC 2 — the journey hardens (minArc 2). Bigger swings, the first brutal lanes.
   // ============================================================================================
 
+  {
+    // GS-fuel-4: the mid-game fuel-salvage lane. 'derelict' keys the spaceJunk sky (wreckage
+    // tangles the turf), so the free fuel is paid for in trouble lies — no free lunch.
+    id: 'derelict-tanker',
+    label: 'Derelict Tanker',
+    desc: 'Refuel +3 ⛽ on arrival. Board the dead hulk and pump what’s left.',
+    lore: 'Her crew is long gone. Her reserve tanks, remarkably, are not.',
+    icon: '⛽',
+    category: 'calm',
+    rarity: 'rare',
+    creditMult: 1,
+    cutDelta: 0,
+    fuelBonus: 3,
+    minArc: 2,
+  },
   {
     id: 'solar-wind',
     label: 'Solar Wind',
@@ -586,6 +621,23 @@ export const ROUTE_EVENTS: readonly RouteEvent[] = [
     rarity: 'epic',
     creditMult: 1.95,
     cutDelta: 2,
+    minArc: 3,
+  },
+  {
+    // GS-fuel-4: the deep-space fuel play. At the arc-3 depot price (up to 60 cr/unit) the toll
+    // undercuts the pump hard — but 'caravan' keys the tradeMarket sky, so the bargain comes with
+    // tents ringing every green and a cut bump. An epic-grade gamble, not a hand-out.
+    id: 'fuel-caravan',
+    label: 'Fuel Caravan',
+    desc: 'Toll 70 · refuel +4 ⛽ on arrival · credits +25% · cut +1. Buy into the convoy’s wake.',
+    lore: 'Tankers in a guarded line, running the deep lanes. Protection costs; the fuel flows.',
+    icon: '🚚',
+    category: 'toll',
+    rarity: 'epic',
+    creditMult: 1.25,
+    cutDelta: 1,
+    creditToll: 70,
+    fuelBonus: 4,
     minArc: 3,
   },
   {

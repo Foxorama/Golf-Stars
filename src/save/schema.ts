@@ -13,7 +13,7 @@ import type { EndlessRunRecord } from '../sim/rpg/endless';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -340,8 +340,16 @@ export interface SaveV18 extends Omit<SaveV17, 'version'> {
   version: 18;
 }
 
+/** v19 stamps the sector scan (GS-fuel-4) onto the persisted shape: `RunSnapshot.routeScans` (scans
+ *  burnt at the parked stop, so a resume re-draws the exact lane offer the player paid fuel for).
+ *  Optional and absent on old data, so the migration is a pure version stamp; an old run resumes on
+ *  the classic scan-0 offer, which is true (it never scanned). */
+export interface SaveV19 extends Omit<SaveV18, 'version'> {
+  version: 19;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV18;
+export type Save = SaveV19;
 
 export function defaultSave(): Save {
   return {
@@ -652,6 +660,12 @@ function v17ToV18(s: SaveV17): SaveV18 {
   return { ...s, version: 18 };
 }
 
+/** v18 → v19: pure version stamp — the sector-scan field (`RunSnapshot.routeScans`) is optional and
+ *  absent on every pre-scan save; `resumeRun` reads that as the classic scan-0 lane offer. */
+function v18ToV19(s: SaveV18): SaveV19 {
+  return { ...s, version: 19 };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -677,6 +691,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 15) s = v15ToV16(s as unknown as SaveV15) as unknown as typeof s;
   if (s.version === 16) s = v16ToV17(s as unknown as SaveV16) as unknown as typeof s;
   if (s.version === 17) s = v17ToV18(s as unknown as SaveV17) as unknown as typeof s;
+  if (s.version === 18) s = v18ToV19(s as unknown as SaveV18) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.

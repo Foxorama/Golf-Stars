@@ -1423,3 +1423,65 @@ Zero rng anywhere; no save bump (both fields rebuild via `loadoutFromPerks`; the
 the persisted `Run.fuel`). Guards in `tests/fuel.test.ts` (GS-fuel-3 describe): the min-1 floor,
 capacity + arrives-full clamps (incl. legacy over-capacity), resume round-trip without re-grant,
 and the siphon (eagles yes / pars no / warp no / over-capacity never drained).
+
+## GS-fuel-4 — Fuel earns agency: sky-priced lanes, tanker salvage, the sector scan (2026-07-06)
+
+**The critique (the user's, one session after GS-fuel-3).** Three passes in, fuel still wasn't
+adding player CHOICE: a jump's burn was glued to its distance (cost tracked reward exactly, so the
+⛽ column never changed which lane you picked), fuel had exactly one use (jumping) and exactly two
+sources (the depot and the rare eagle) — so managing it well was bookkeeping, not strategy. GS-fuel-4
+attacks all three gaps without touching a single shot-physics or generation path.
+
+**1. The sky prices the passage (`EFFECT_FUEL` / `effectFuelDelta`).** The lane's course effect —
+the sky you fly into, already the wind/carry/patch play hook — now also carries a fuel delta:
+solarWind/comet **−1 ⛽** (a tailwind at your back), gravityWell/ionStorm **+1 ⛽** (climb out of the
+pull / batter through the storm). Folded into `routeFuelCost` (the ONE source), so the starmap
+labels, route-sheet chips, shortfall bill and lane locks all price it automatically; the burn still
+floors at 1 (a jump is never free). This DECOUPLES burn from distance — a tailwind Deep jump can
+undercut a headwind Short hop, so the three lanes finally differ on a second economic axis — and it
+retro-fixes `gravity-eddy`'s free lunch (+20% credits, cutDelta 0, no downside) with a themed cost.
+Derived + zero rng (a pure table off the already-drawn event), so no stream moves. FAIRNESS,
+machine-checked: no calm-CATEGORY lane maps to a headwind sky, so the guaranteed early-arc OUT is
+never fuel-taxed (`tests/fuel.test.ts`); tailwinds only ever help. The route sheet states the hook
+as an EFFECTIVE chip (`🌬 tailwind −1 ⛽` / `🌪 headwind +1 ⛽`) computed against the same floor the
+bill uses — a tailwind that can't bite on a 1-hop shows nothing — and the ion-drive chip now shows
+the drive's own saving under the sky, not the conflated total.
+
+**2. Fuel comes from the world (`RouteEvent.fuelBonus`).** Three tanker lanes, arc-tiered and
+rarity=stakes: the **Fuel Scow** (arc 1 common calm: +2 ⛽, credits −5% — poor-but-safe with tank
+instead of pay), the **Derelict Tanker** (arc 2 rare calm: +3 ⛽; 'derelict' keys the spaceJunk sky,
+so the free fuel costs you wreckage lies), and the **Fuel Caravan** (arc 3 epic toll: 70 cr toll →
++4 ⛽ + credits +25% + cut +1; 'caravan' keys the tradeMarket sky, tents on every green — at deep
+prices 4 units ≈ 240 cr, so the toll is a genuine bargain WITH strings). Granted on arrival in
+`travel` (auto ≡ interactive by construction), capacity-clamped, never draining a legacy over-full
+tank. Honesty machine-checked: every `fuelBonus` desc states `refuel +n ⛽`. Pool rows reweight
+WHICH events seeded runs draw (the GS-journey-fx-2 precedent) — one ace-fixture seed re-pinned
+(471 → 430), zero other fallout.
+
+**3. The sector scan (`scanRoutes`).** Fuel's first non-jump use: burn fuel to REDRAW the three
+lanes. Price escalates per scan at the same stop (1, 2, 3… — the shop/StarMart reroll precedent, so
+lane-fishing can't be spammed) and the scan always leaves ≥1 cell (`canScanRoutes`: fuel > cost —
+you can never scan yourself dry). `routeOptions` re-keys its stream per scan
+(`…:routes:N:scanK`; scan 0 keeps the classic key, byte-identical — contract 1 by construction),
+so the redraw is pure and a resume reproduces the offer you paid for: `Run.routeScans` is
+snapshotted (save **v19**, a pure stamp — unlike the shop reroll's UI-only count, scans burn a
+persisted resource, so the paid-for offer must survive a park). Reset on travel. Interactive-only
+like the shop reroll (the reducer's `scanRoutes` action; the headless driver never scans). When
+EVERY lane is out of range the scan rides inside the 🆘 stranded box as the last-ditch lifeline —
+eyes-on proved the tailwind alone can already rescue a would-be stranding (a locked board showed
+one `⛽2` lane through a stardust wake while its neighbours read `needs ⛽3 ✕`).
+
+**Anti-repeat approximation, documented:** `offerEventIds` (the "don't show last stop's lanes
+again" rule) recomputes a PAST stop's offer on its scan-0 stream — the final scan count isn't
+persisted per stop. Anti-repeat is a taste rule, not a contract; not worth a history-row field.
+
+**Balance, verified.** 40-seed `simulateRun` probes: 0/40 stranded on both formats (headwinds don't
+make the auto-driver stranding-prone); the death-spiral harnesses are untouched by construction
+(travel economy only — no dispersion/generator/hazard change). Suite: 1008 tests green with only
+save-version literals + the one ace seed re-pinned. Eyes-on (vite-node + Chromium off the real
+screen builders): travel screen + scan button, tailwind sheet, tanker sheet, stranded lifeline.
+
+**Rejected:** an "overdrive" (pay fuel to deepen a lane's jump) — a real depth throttle but it
+bends the voyage's `maxJump` fairness cap and the wildness ramp, so it needs its own balance pass
+(parked in IDEAS); making the scan redraw distances only (less interesting than fresh events);
+per-scan rarity sweetening (would turn the scan into a loot slot machine rather than a travel tool).

@@ -151,10 +151,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     requires a contiguous warp prefix fitting under `endlessBestHoles` — new ground is always
     hand-played; a warped stop banks NO milestone shards and never grants the ace ship; leaderboard
     rows carry their honest hole range.
-  - FUEL: every jump burns `distanceJump` off `Run.fuel`; ONE rule lives in `travel` (auto ≡
-    interactive by construction) — a short tank buys the shortfall at the LOCAL depth-scaled price,
-    printed on the Jump button, never silently. Unaffordable lane ⇒ locked; all locked ⇒ run ends
-    `'stranded'`. Fuel is drawn ONLY via `render/fuel.ts fuelGaugeHTML`, never a bare number.
+  - FUEL: every jump burns `routeFuelCost` off `Run.fuel` — distance ± the SKY's tail/headwind
+    (`effectFuelDelta`, derived + zero rng; a headwind sky never rides a calm-category lane —
+    machine-checked), floored at 1. ONE rule lives in `travel` (auto ≡ interactive by construction)
+    — a short tank buys the shortfall at the LOCAL depth-scaled price, printed on the Jump button,
+    never silently; tanker events (`RouteEvent.fuelBonus`, desc must state `refuel +n ⛽`) refuel on
+    arrival there too, capacity-clamped. Unaffordable lane ⇒ locked; all locked ⇒ run ends
+    `'stranded'` — the SECTOR SCAN is the lifeline: burn fuel to redraw the lanes (escalating
+    price, always leaves ≥1 cell; `Run.routeScans` re-keys `routeOptions`' stream and is
+    snapshotted so a resume keeps the offer you paid for; scan 0 = the classic stream,
+    byte-identical). Fuel is drawn ONLY via `render/fuel.ts fuelGaugeHTML`, never a bare number.
     Ship outfitting (thrusters/reserve tank/eagle siphon) rides perk ids — the Reserve Tank's
     fuel pours ONCE in `buy`, never in `apply` (resume would double-grant).
   - Milestone cosmetics are EARN-ONLY (`unlockHoles` rows; `canBuy*` refuses); a hole-in-one is the

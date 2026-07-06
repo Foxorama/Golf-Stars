@@ -41,7 +41,7 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
-import { defaultSave } from './save/schema';
+import { SAVE_VERSION, defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { setMusicScene, type MusicSceneId } from './render/music';
@@ -167,7 +167,7 @@ function recover(err: unknown): void {
 
 function persist(): void {
   writeSave({
-    version: 18,
+    version: SAVE_VERSION,
     bestStableford: state.bestStableford,
     bestDistance: state.bestDistance,
     shards: state.shards,

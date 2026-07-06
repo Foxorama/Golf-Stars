@@ -51,7 +51,7 @@ import { addUnlockedClubs } from './club-unlock';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { EFFECT_WIND_CAP, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
+import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
 import { salvageClubFind } from './salvage';
 import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
@@ -156,6 +156,11 @@ export interface Run {
    *  format's tank (`startingFuelFor`); topped up with credits (`buyFuel` / travel's auto-refuel).
    *  A run that can't cover any offered lane is STRANDED (endedReason 'stranded'). Snapshotted. */
   fuel: number;
+  /** SECTOR SCANS burnt at the CURRENT stop (GS-fuel-4): each scan spends fuel to redraw the three
+   *  onward lanes (`routeOptions` keys its rng stream off this count — 0 = the classic stream,
+   *  byte-identical). Reset to 0 by `travel`. Snapshotted, so a resume shows the offer you paid
+   *  for — unlike the shop reroll (pure UI state), scans burn a persisted run resource. */
+  routeScans: number;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -227,6 +232,7 @@ export function startRun(
     // The format's starting tank (GS-fuel): the voyage gets exactly its single-hop budget; the
     // Unending Universe a 25-unit reserve. Every journey jump burns its distance in units.
     fuel: startingFuelFor(getFormat(formatId)),
+    routeScans: 0,
     status: 'active',
     history: [],
   };
@@ -984,7 +990,9 @@ export function endlessAttackArmed(run: Run, holeIndex: number): boolean {
  * The bare event-ids a given stop's route draw produces — mirrors `routeOptions`'s draw order (3
  * distance rolls, then the arc event draw) so it can be recomputed for a PAST stop. Used only for
  * anti-repeat; pure and deterministic. (Uses the run's CURRENT firedEventIds, a harmless arc-3-only
- * approximation, since uniques don't gate arcs 1–2 where the small pool makes repeats most visible.)
+ * approximation, since uniques don't gate arcs 1–2 where the small pool makes repeats most visible.
+ * Likewise keys off the stop's ORIGINAL, un-scanned offer — a past stop's sector-scan count isn't
+ * persisted per stop (GS-fuel-4), and anti-repeat is a taste rule, not a contract.)
  */
 function offerEventIds(run: Run, stopIndex: number, distanceFromStart: number): string[] {
   const rng = new Rng(`${run.seed}:routes:${stopIndex}`);
@@ -995,9 +1003,13 @@ function offerEventIds(run: Run, stopIndex: number, distanceFromStart: number): 
   return drawArcRouteEvents(rng, arc, pool).map((e) => e.id);
 }
 
-/** The onward routes offered after a stop. Deterministic from the run + stop. */
+/** The onward routes offered after a stop. Deterministic from the run + stop — and from the stop's
+ *  SECTOR-SCAN count (GS-fuel-4): each scan re-keys the stream, so a scanned offer is a genuinely
+ *  fresh draw yet still pure (a resume reproduces exactly the lanes you paid for). Scan 0 keeps the
+ *  classic key, byte-identical (contract 1: the new draws are gated behind the feature being used). */
 export function routeOptions(run: Run): Route[] {
-  const rng = new Rng(`${run.seed}:routes:${run.stopIndex}`);
+  const scanKey = run.routeScans > 0 ? `:scan${run.routeScans}` : '';
+  const rng = new Rng(`${run.seed}:routes:${run.stopIndex}${scanKey}`);
   const labels: Record<number, string> = { 1: 'Short hop', 2: 'Cruise', 3: 'Deep jump' };
   // A bounded campaign caps the per-jump distance so its wildness/cut growth stays fair (GS-voyage);
   // endless formats default to the original 1–3 draw, keeping their RNG stream byte-identical.
@@ -1075,6 +1087,12 @@ export function routeOptions(run: Run): Route[] {
 // never free), the Reserve Tank (`loadout.tankBonus`) raises capacity (+ arrives full via
 // `ShopItem.fuelBonus`, granted ONCE in `buy`), and great golf refuels the ship — `finishStop`
 // siphons one cell per holed eagle-or-better (capacity-clamped, never on a warped stop).
+//
+// GS-fuel-4 makes fuel DECIDE things, three ways: the lane's SKY prices the passage
+// (`effectFuelDelta` — solar-wind/comet tailwinds −1 ⛽, gravity-well/ion-storm headwinds +1 ⛽ —
+// so burn is decoupled from distance and lanes differ on a second axis), fuel-salvage EVENTS
+// refuel on arrival (`RouteEvent.fuelBonus`, granted in `travel`), and the SECTOR SCAN burns fuel
+// to redraw the lanes (`scanRoutes` — fuel's first non-jump use, and the anti-stranding lifeline).
 
 /** Fuel price at the home spaceport (credits per unit). */
 export const FUEL_PRICE_BASE = 10;
@@ -1095,27 +1113,59 @@ export function tankCapacity(run: Pick<Run, 'formatId' | 'loadout'>): number {
   return startingFuelFor(getFormat(run.formatId)) + Math.max(0, Math.floor(run.loadout.tankBonus ?? 0));
 }
 
-/** Fuel a route's jump burns: its distance, unit for unit — less any Ion Thrusters efficiency
- *  (GS-fuel-3), floored at 1 (a jump is never free). */
-export function routeFuelCost(run: Pick<Run, 'loadout'>, route: Pick<Route, 'distanceJump'>): number {
+/** The fuel maths sees a route's jump AND (optionally) its event, whose sky prices the passage
+ *  (GS-fuel-4). Event-less partials (tests, bare previews) price as clear skies. */
+type FuelRoute = Pick<Route, 'distanceJump'> & Partial<Pick<Route, 'event'>>;
+
+/** Fuel a route's jump burns: its distance, unit for unit — plus the sky's tail/headwind
+ *  (GS-fuel-4: `effectFuelDelta`, so a lane's burn is no longer glued to its distance), less any
+ *  Ion Thrusters efficiency (GS-fuel-3) — floored at 1 (a jump is never free). */
+export function routeFuelCost(run: Pick<Run, 'loadout'>, route: FuelRoute): number {
   const jump = Math.max(0, route.distanceJump);
   if (jump === 0) return 0;
-  return Math.max(1, jump - Math.max(0, Math.floor(run.loadout.fuelEfficiency ?? 0)));
+  const sky = effectFuelDelta(routeEffect(route.event));
+  return Math.max(1, jump + sky - Math.max(0, Math.floor(run.loadout.fuelEfficiency ?? 0)));
 }
 
 /** Units missing from the tank for this jump (0 = the tank covers it). */
-export function fuelShortfall(run: Run, route: Pick<Route, 'distanceJump'>): number {
+export function fuelShortfall(run: Run, route: FuelRoute): number {
   return Math.max(0, routeFuelCost(run, route) - Math.max(0, run.fuel));
 }
 
 /** Credits `travel` will spend on missing fuel for this jump at the LOCAL price (0 = tank covers it). */
-export function travelRefuelCost(run: Run, route: Pick<Route, 'distanceJump'>): number {
+export function travelRefuelCost(run: Run, route: FuelRoute): number {
   return fuelShortfall(run, route) * fuelUnitCost(run);
 }
 
 /** Can this lane be taken — is the tank + purse enough for its jump? */
-export function canTravel(run: Run, route: Pick<Route, 'distanceJump'>): boolean {
+export function canTravel(run: Run, route: FuelRoute): boolean {
   return run.credits >= travelRefuelCost(run, route);
+}
+
+// --- Sector scan (GS-fuel-4): burn fuel to redraw the three onward lanes ------
+//
+// Fuel's first use besides jumping: a poor offer (or an unpayable one — the scan doubles as an
+// anti-stranding lifeline) can be re-rolled for fuel. The cost ESCALATES per scan at the same stop
+// (1, 2, 3… — the shop/StarMart reroll precedent, so lane-fishing can't be spammed) and always
+// leaves at least one cell in the tank (you can never scan yourself to a dry tank). Interactive-only
+// by design, like the shop reroll — the headless auto-driver never scans, so every seeded stream is
+// untouched; unlike the shop reroll the count lives ON the run (snapshotted), because the fuel it
+// burnt does too.
+
+/** Fuel the NEXT sector scan at this stop costs (escalates per scan: 1, 2, 3…). */
+export function scanFuelCost(run: Pick<Run, 'routeScans'>): number {
+  return 1 + Math.max(0, run.routeScans);
+}
+
+/** Can the ship scan for new routes — active run, and the tank keeps ≥1 cell after the burn? */
+export function canScanRoutes(run: Run): boolean {
+  return run.status === 'active' && run.fuel > scanFuelCost(run);
+}
+
+/** Burn fuel to redraw the onward lanes: `routeOptions` re-keys its stream off the bumped count. */
+export function scanRoutes(run: Run): Run {
+  if (!canScanRoutes(run)) throw new Error('scanRoutes: not enough fuel to scan');
+  return { ...run, fuel: run.fuel - scanFuelCost(run), routeScans: run.routeScans + 1 };
 }
 
 /**
@@ -1150,8 +1200,13 @@ export function travel(run: Run, route: Route): Run {
   // surcharge on the Jump button), so auto ≡ interactive holds by construction.
   const refuel = travelRefuelCost(run, route);
   if (run.credits < refuel) throw new Error('travel: not enough fuel (refuel or pick a shorter jump)');
-  const fuelAfter = Math.max(0, run.fuel - routeFuelCost(run, route));
+  const burnt = Math.max(0, run.fuel - routeFuelCost(run, route));
   const ev = route.event;
+  // A fuel-salvage lane (GS-fuel-4) siphons its units ON ARRIVAL — clamped to capacity, never
+  // draining a legacy over-capacity tank. One rule here, so auto ≡ interactive by construction.
+  const fuelAfter = ev.fuelBonus
+    ? Math.max(burnt, Math.min(tankCapacity(run), burnt + Math.max(0, Math.floor(ev.fuelBonus))))
+    : burnt;
   const arrivingStop = run.stopIndex + 1;
   // GS-routes: a credit TOLL bites up front (floored so it never strands you below zero).
   const toll = Math.max(0, ev.creditToll ?? 0);
@@ -1178,6 +1233,9 @@ export function travel(run: Run, route: Route): Run {
     // The mandatory refuel is paid first (guarded above), then the toll bites (still floored).
     credits: Math.max(0, run.credits - refuel - toll) + salvageCredits,
     fuel: fuelAfter,
+    // The sector-scan meter resets with the jump (GS-fuel-4): the next stop's offer opens on the
+    // classic scan-0 stream, and the escalating scan price starts over.
+    routeScans: 0,
     // Carry the chosen route's event into the next stop (applied by finishStop).
     pendingEvent: ev,
     // Carry the chosen lane's WORLD into the next stop (GS-journey-biome) — the biome you arrive in is
@@ -1479,6 +1537,9 @@ export interface RunSnapshot {
   /** Ship fuel in the tank (GS-fuel), so a resume keeps the gauge. Absent on a pre-fuel snapshot →
    *  the resume grants the format's fresh starting tank (generous, never strands an old save). */
   fuel?: number;
+  /** Sector scans burnt at the parked stop (GS-fuel-4), so a resume re-draws the exact lane offer
+   *  the player paid fuel for. 0/absent for back-compat (the classic scan-0 offer). */
+  routeScans?: number;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -1503,6 +1564,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     characterId: run.loadout.characterId,
     warpedThrough: run.warpedThrough || undefined,
     fuel: run.fuel,
+    routeScans: run.routeScans || undefined,
   };
 }
 
@@ -1536,6 +1598,9 @@ export function resumeRun(snap: RunSnapshot): Run {
     warpedThrough: snap.warpedThrough ?? 0,
     // A pre-fuel snapshot resumes with a fresh tank (GS-fuel) — generous, and never strands it.
     fuel: snap.fuel ?? startingFuelFor(getFormat(snap.formatId ?? DEFAULT_FORMAT)),
+    // Scans already burnt at the parked stop (GS-fuel-4) — so a resume re-draws the exact lane
+    // offer the player paid fuel for, not the original one. Absent on old snapshots → 0.
+    routeScans: snap.routeScans ?? 0,
     status: 'active',
     history: [],
   };
