@@ -7,65 +7,39 @@
  */
 
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
-import { mountPlayView, type GolferLook, type PlayViewHandle } from './render/playView';
-import { itemCardHTML, shotCardHTML } from './render/cards';
-import { itemArtSVG, drawGolfBag } from './render/itemArt';
+import { mountPlayView, type PlayViewHandle } from './render/playView';
+import { shotCardHTML } from './render/cards';
 import { renderHoleSVG } from './render/holeView';
 import { holeProjector, type ProjectOptions } from './render/project';
 import { createWeather } from './render/weather';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
-import { drawCaddy, hasCaddyArt, CADDY_LABEL, CADDY_VOICE } from './render/caddyArt';
+import { drawCaddy, hasCaddyArt, CADDY_VOICE } from './render/caddyArt';
 import { speakCaddy } from './render/speech';
-import { journeyMapHTML, type StarmapChoice } from './render/starmap';
-import { skyCoordForName } from './render/sky-coords';
-import type { EventCategory } from './sim/rpg/events';
-import { COURSE_EFFECTS, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './sim/rpg/effects';
-import { salvageClubFind } from './sim/rpg/salvage';
-import type { PatchKind } from './sim/patches';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { lieInfo, roughLieOf } from './sim/shot';
-import { archetypeFor, themeById } from './sim/course/themes';
-import { zoneProfile, difficultyPips, shopPro, proMood, proLine, sectionEvents } from './sim/course/zones';
-import { bearing, dist, type Hole, type Rarity, type Vec } from './sim/course/contract';
-import { type ShotSpread, type PlayedHole } from './sim/round';
+import { archetypeFor } from './sim/course/themes';
+import { bearing, dist, type Hole, type Vec } from './sim/course/contract';
+import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
-import { rarCol } from './sim/rpg/loot';
-import { ACE_CREDIT_BONUS, clubOfferNote, clubSetById, equippedGearTheme, isHybridType, isPuttingCaddy, itemCap, itemCost, maxPowerOf, namedCaddyOwned, ownedCount, REWARD_CLUB_TYPES, shopItem, usableBag } from './sim/rpg/economy';
-import { CLUBS, clubById } from './sim/clubs';
-import { FORMATS, getFormat } from './sim/rpg/formats';
-import { getCharacter, type Character } from './sim/rpg/characters';
-import { ASCENSION_MAX, ascensionCutBonus, canTravel, canWarpStop, cashOutShards, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, fuelShortfall, fuelUnitCost, holeGateArmed, routeFuelCost, snapshotRun, starmartRerollCost, STARMART_COST, tankCapacity, teamDuelSetupForRun, travelRefuelCost, type TeamDuelSetup } from './sim/rpg/run';
-import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed, nextEndlessUnlock } from './sim/rpg/endless';
-import { leaderboard, liveLeaderboard, runField, matchOpponentFor, livePosition } from './sim/rpg/league';
+import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
+import { getFormat } from './sim/rpg/formats';
+import { currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun } from './sim/rpg/run';
+import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed } from './sim/rpg/endless';
+import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
-import { arcSurvivorTarget } from './sim/rpg/competition';
-import { getGolfer, getArchetype } from './sim/rpg/golfers';
-import { isMatchplayBoss, isTeamDuelBoss } from './sim/rpg/formats';
-import { matchScoreline, matchState, holeDuel, betterPlayedHole } from './sim/rpg/match';
-import { canBuyShip, shipCatalogue, shipRevealedInMarket, ACE_SHIP_ID, type Ship } from './sim/rpg/ships';
-import { shipCardSVG, shipSVG } from './render/shipArt';
-import { fuelColour, fuelGaugeHTML } from './render/fuel';
-import { apparelById, apparelForSlot, apparelRevealedInMarket, canBuyApparel, equippedSet, type Apparel, type ApparelSlot } from './sim/rpg/apparel';
-import { apparelCardSVG, golferPreviewSVG } from './render/apparelArt';
-import { clubhouseLoungeHTML, type LoungeGolfer } from './render/clubhouseLounge';
-import { cosmeticRarCol, isMythic } from './sim/rpg/cosmetics';
-import { BAG_SETS, bagSet, bagSetUnlocked, bagSetRevealedInMarket, bagTierRank, canBuyBagSet, bagUnlockForClearedAscension, type BagSet, type BagTier } from './sim/rpg/bag';
-import { endlessScoreCard, endlessRecordsBoard } from './render/endlessCards';
+import { isTeamDuelBoss } from './sim/rpg/formats';
+import { betterPlayedHole } from './sim/rpg/match';
+import { ACE_SHIP_ID } from './sim/rpg/ships';
+import { bagTierRank, type BagTier } from './sim/rpg/bag';
+import { endlessScoreCard } from './render/endlessCards';
 import {
   initState,
   reduce,
-  rerollCost,
-  shipForCharacter,
-  hatForCharacter,
-  shirtForCharacter,
-  pantsForCharacter,
-  golfBagForCharacter,
   type Action,
   type UiState,
 } from './ui/game';
-import { CHARACTERS } from './sim/rpg/characters';
 import { loadSave, writeSave } from './save/storage';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
@@ -74,48 +48,51 @@ import { setMusicScene, type MusicSceneId } from './render/music';
 import { getSettings, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showVoyageVictory } from './render/celebrations';
-import { golferSVG, proAvatarSVG, characterScreen, ordinal, competitorsCard, leaderboardHTML, opponentBadge } from './render/golferCards';
+import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
+import { state, setState, btn, header, seedFromUrl, freshRunSeed } from './app/ctx';
+import {
+  burst,
+  caddyBadgeHTML,
+  caddyId,
+  currentEffect,
+  golferLook,
+  holeBiome,
+  holeThemeId,
+  lefty,
+  patchActive,
+  puttCaddyId,
+  rainbowActive,
+  scorchActive,
+  tentsActive,
+} from './app/helpers';
+import {
+  bestBallRevealHTML,
+  holeMatchProgressHTML,
+  liveLeaderChip,
+  matchHud,
+  teamDuel,
+  teamFormatLabel,
+  teamPartnerChar,
+} from './app/duelHud';
+import { installView, titleScreen } from './app/titleScreens';
+import { endlessRoundSoFar, introScreen, introTraitsOverlay, introView } from './app/introScreens';
+import { bossRewardScreen, gameoverScreen, resultScreen, victoryInfo } from './app/resultScreens';
+import { shopScreen, shopView, starmartScreen } from './app/shopScreens';
+import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketScreens';
+import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
+import { routeInfoOverlay, travelScreen, travelView } from './app/travelScreens';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
 // an imported module's top-level eval, not in app.ts.
 (window as unknown as { __gsStage?: string }).__gsStage = 'app-top';
 
-function seedFromUrl(): number | string | null {
-  const q = new URLSearchParams(location.search).get('seed');
-  if (q === null) return null;
-  const n = Number(q);
-  return Number.isFinite(n) && q.trim() !== '' ? n : q;
-}
 
-/** A fresh random seed for a new run (GS-fresh-start). The run stays fully deterministic FROM its
- *  seed — this only picks WHICH deterministic run you get, so every boot/new-run opens a different
- *  world + journey instead of the old fixed-1234 opener. `?seed=` pins it (repro/sharing/test hub);
- *  the sim itself never calls Math.random. */
-function freshRunSeed(): number {
-  return Math.floor(Math.random() * 1e9);
-}
-
-let state: UiState;
 let view: PlayViewHandle | null = null;
 /** The animated weather overlay over the aim/putt map (GS-journey-fx rework) — so the sky + air are
  *  alive while you line up, not only mid-flight. Torn down + remounted each render like `view`. */
 let weatherOverlay: { destroy(): void } | null = null;
 
-/** The captured PWA install prompt (beforeinstallprompt), if the browser offered one and the
- *  player hasn't installed/dismissed it. Surfaced as an "Install" button on the title. */
-let deferredInstall: (Event & { prompt?: () => void }) | null = null;
-function installDismissed(): boolean {
-  try {
-    return localStorage.getItem('gs_installNudge') === 'dismissed';
-  } catch {
-    return false;
-  }
-}
-function installButtonHTML(): string {
-  if (!deferredInstall || installDismissed()) return '';
-  return `<button class="gs-btn gs-btn--ghost" data-install="1">⬇ Install app</button>`;
-}
 
 /** Diagnostic breadcrumb the boot watchdog can read if the app never paints. */
 function stage(s: string): void {
@@ -152,7 +129,7 @@ function boot(): void {
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
-    state = initState(seed, meta, save.activeRun);
+    setState(initState(seed, meta, save.activeRun));
     stage('init');
     render();
     stage('rendered');
@@ -177,7 +154,7 @@ function recover(err: unknown): void {
     /* ignore */
   }
   try {
-    state = initState(freshRunSeed(), {});
+    setState(initState(freshRunSeed(), {}));
     render();
   } catch {
     const app = document.getElementById('app');
@@ -257,7 +234,7 @@ function dispatch(action: Action): void {
     const prevRunSeed = state.run.seed;
     const prevHoles = state.run.holesSurvived;
     const prevBestHoles = state.endlessBestHoles;
-    state = reduce(state, action);
+    setState(reduce(state, action));
     // Entering character select resets the difficulty pickers (GS-title-2 / GS-golf-score) — a fresh
     // choice per run, never a sticky leftover from the last one. The club set defaults to the owned
     // tier (the strongest bag you have; opt DOWN for a harder run).
@@ -272,14 +249,14 @@ function dispatch(action: Action): void {
       action.type === 'clubhouseBackToHall' ||
       action.type === 'openClubhouseHall'
     ) {
-      clubhouseSlot = null;
+      clubhouseView.slot = null;
     }
     // Opening the Trade Market re-collapses every catalogue section so it lands compact
     // (GS-market-accordion) and re-hides owned gear so it lands on the buyable rack (Show Owned off).
     if (action.type === 'openMarket') {
-      collapsedMarketSections.clear();
-      for (const id of MARKET_SECTION_IDS) collapsedMarketSections.add(id);
-      marketShowOwned = false;
+      marketView.collapsed.clear();
+      for (const id of MARKET_SECTION_IDS) marketView.collapsed.add(id);
+      marketView.showOwned = false;
     }
     // Entering the stop intro (from character-select, resume, or a route jump) opens on the ARC step
     // with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop. The
@@ -287,8 +264,8 @@ function dispatch(action: Action): void {
     // arc briefing repeats the round summary the result screen just showed, so every route jump threw
     // up the same card twice; it stays one "‹ Briefing" tap away on the hole step.
     if (state.screen === 'intro' && prevScreen !== 'intro') {
-      introStage = holeGateArmed(state.run) && state.run.stopIndex > 0 ? 'hole' : 'arc';
-      introTraitsOpen = false;
+      introView.stage = holeGateArmed(state.run) && state.run.stopIndex > 0 ? 'hole' : 'arc';
+      introView.traitsOpen = false;
     }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
     if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
@@ -352,640 +329,9 @@ function dispatch(action: Action): void {
   }
 }
 
-type BtnVariant = 'primary' | 'ghost' | 'on';
 
-const btn = (
-  label: string,
-  action: Action,
-  opts: { disabled?: boolean; borderColor?: string; block?: boolean; variant?: BtnVariant } = {},
-): string => {
-  const cls = ['gs-btn'];
-  if (opts.variant) cls.push(`gs-btn--${opts.variant}`);
-  if (opts.block) cls.push('gs-btn--block');
-  // A rarity/accent border (e.g. travel routes) overrides the class default and its hover tint.
-  const style = opts.borderColor ? ` style="--btn-border:${opts.borderColor};--btn-hover:${opts.borderColor};"` : '';
-  return `<button class="${cls.join(' ')}" data-action='${JSON.stringify(action)}'${opts.disabled ? ' disabled' : ''}${style}>${label}</button>`;
-};
 
-function header(): string {
-  const r = state.run;
-  const ch = getCharacter(r.loadout.characterId);
-  const who = ch ? ` <span style="font-size:13px;color:${ch.style.cap};">· ${ch.name}</span>` : '';
-  return `
-    <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
-      <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>${who}
-      <span style="margin-left:auto;font-size:13px;color:var(--gs-dim);">
-        Stop <b style="color:var(--gs-ink);">${r.stopIndex + 1}</b> · Dist <b style="color:var(--gs-ink);">${r.distanceFromStart}</b> · Credits <b style="color:var(--gs-warn);">${r.credits}</b> · ${fuelGaugeHTML(r.fuel, tankCapacity(r), { mini: true })}
-        · Hcp <b style="color:var(--gs-ink);">${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}
-      </span>
-    </header>`;
-}
 
-function titleScreen(): string {
-  // Headline the winnable campaign (GS-voyage) first, then the endless survival format. Each GAME
-  // tile (GS-title-2) is the SAME doorway component as the Market/Clubhouse tiles below — painted
-  // scene + title + one-line caption, whole tile the button — distinct only via the `--mc` accent
-  // (gold vs violet). No badge/launch-bar/progress text: one clean visual family across the title.
-  // Ascension is picked at golfer select, not here.
-  const modes = Object.values(FORMATS)
-    .slice()
-    .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
-    .map(
-      (f) => `
-      <button class="gs-navtile gs-navtile--game" style="--mc:${f.winnable ? '#ffce54' : '#b88aff'};" data-action='${JSON.stringify({ type: 'start', format: f.id })}'>
-        <span class="gs-navtile__art" aria-hidden="true">${f.winnable ? voyageTileArt() : unendingTileArt()}</span>
-        <span class="gs-navtile__cap">
-          <span class="gs-navtile__title">${f.winnable ? '🚀' : '🌌'} ${f.name}</span>
-          <span class="gs-navtile__sub">${f.blurb}</span>
-        </span>
-      </button>`,
-    )
-    .join('');
-  const best =
-    state.bestDistance > 0 || state.bestStableford > 0
-      ? `<span class="gs-chip" title="personal bests" style="font-size:12px;">🏁 Best dist <b>${state.bestDistance}</b> · SF <b>${state.bestStableford}</b></span>`
-      : '';
-  // Unending-Universe lifetime best rides the hero chips row (the tile itself stays caption-only;
-  // the full milestone trail lives with the earned gear in the Trade Market).
-  const endlessBest =
-    state.endlessBestHoles > 0
-      ? `<span class="gs-chip" title="Unending Universe best" style="font-size:12px;">∞ Best <b style="color:#4fe08a;">${state.endlessBestHoles}</b> holes</span>`
-      : '';
-  return `
-    <header class="gs-hero">
-      <h1 class="gs-hero-title">⛳ Golf Stars</h1>
-      <p class="gs-hero-tag">Voyage the galaxy · Make the cut · Travel deeper</p>
-      <div class="gs-hero-chips">
-        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;">✦ <b>${state.shards}</b> Star Shards</span>
-        ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
-        ${best}
-        ${endlessBest}
-        ${installButtonHTML()}
-      </div>
-    </header>
-    ${
-      state.resumable
-        ? `<div class="gs-panel" style="border-color:#2bb673;background:linear-gradient(180deg,#10241a,#0e1a14);">
-             <b style="font-size:14px;">Run in progress</b> — stop ${state.resumable.stopIndex + 1}, distance ${state.resumable.distanceFromStart}, ${state.resumable.credits} credits.
-             <div style="margin-top:6px;">${btn('▶ Continue run', { type: 'resume' }, { variant: 'primary' })}</div>
-           </div>`
-        : ''
-    }
-    <h2 class="gs-seclabel">${state.resumable ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-navtiles">${modes}</div>
-    <h2 class="gs-seclabel">Between runs</h2>
-    ${navTilesHTML()}`;
-}
-
-/** Painted backdrop for the Voyage game tile (GS-title-2): the campaign as a dotted gold route
- *  arcing across three worlds (the three arcs) to a pin flag on the far planet, a ship mid-jump.
- *  Same hand-placed byte-stable house style as the Market/Clubhouse doorway scenes. */
-function voyageTileArt(): string {
-  const stars = [
-    [18, 26], [44, 60], [70, 18], [104, 44], [148, 14], [186, 40], [214, 70],
-    [246, 18], [278, 48], [126, 78], [30, 104], [258, 96], [90, 96], [170, 60],
-  ]
-    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${0.9 + (i % 3) * 0.5}" fill="#ffffff" opacity="${0.4 + (i % 4) * 0.14}"/>`)
-    .join('');
-  return `<svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
-    <defs>
-      <radialGradient id="ntVoy" cx="80%" cy="18%" r="105%">
-        <stop offset="0%" stop-color="#3d3018"/><stop offset="45%" stop-color="#1c2038"/><stop offset="100%" stop-color="#0b0d1c"/>
-      </radialGradient>
-    </defs>
-    <rect width="300" height="150" fill="url(#ntVoy)"/>
-    ${stars}
-    <!-- three worlds, near → far, the route threading them -->
-    <circle cx="34" cy="124" r="20" fill="#4a9e58" opacity="0.9"/>
-    <circle cx="28" cy="118" r="20" fill="#63c26e" opacity="0.5"/>
-    <circle cx="150" cy="84" r="13" fill="#c2702e" opacity="0.9"/>
-    <circle cx="146" cy="80" r="13" fill="#e8a45e" opacity="0.5"/>
-    <circle cx="258" cy="40" r="24" fill="#6a4bb8" opacity="0.9"/>
-    <circle cx="250" cy="32" r="24" fill="#8f6fd8" opacity="0.45"/>
-    <path d="M46,112 C86,96 112,94 138,88 S204,64 236,50" fill="none" stroke="#ffce54" stroke-width="2"
-      stroke-dasharray="1.5 7" stroke-linecap="round" opacity="0.9"/>
-    <!-- the pin waits on the far world -->
-    <g transform="translate(256,14)">
-      <rect x="0" y="0" width="2" height="22" fill="#e8e8ea"/>
-      <path d="M2,1 L16,6 L2,11 Z" fill="#ff6b6b"/>
-    </g>
-    <!-- ship mid-jump along the route -->
-    <g transform="translate(96,96) rotate(66)">
-      <path d="M0,-11 C6,-7.5 6,7.5 0,12.5 C-6,7.5 -6,-7.5 0,-11 Z" fill="#dfe6f2"/>
-      <circle cx="0" cy="-1.5" r="2.8" fill="#9fd8e6"/>
-      <path d="M-5,6.5 L-10,13 L-2.5,10 Z" fill="#ff6b6b"/>
-      <path d="M5,6.5 L10,13 L2.5,10 Z" fill="#ff6b6b"/>
-      <path d="M-2.2,12.5 L0,21 L2.2,12.5 Z" fill="#ffc454" opacity="0.9"/>
-    </g>
-  </svg>`;
-}
-
-/** Painted backdrop for the Unending Universe game tile (GS-title-2): a star tunnel of receding
- *  rings pulling toward a bright singularity, a golf ball streaking in — no far shore. Hand-placed,
- *  byte-stable, same house style as the other doorway scenes. */
-function unendingTileArt(): string {
-  const stars = [
-    [16, 22], [48, 48], [80, 14], [118, 58], [160, 20], [204, 48], [242, 12],
-    [274, 42], [36, 88], [140, 96], [232, 88], [70, 118], [190, 122], [280, 112],
-  ]
-    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${0.8 + (i % 3) * 0.5}" fill="#ffffff" opacity="${0.35 + (i % 4) * 0.14}"/>`)
-    .join('');
-  // Receding rings pulling toward the bright core — the tunnel with no far end.
-  const rings = [
-    [58, 44, 0.16], [44, 33, 0.24], [32, 24, 0.34], [21, 15.5, 0.46], [12, 8.5, 0.6],
-  ]
-    .map(([rx, ry, o]) => `<ellipse cx="212" cy="66" rx="${rx}" ry="${ry}" fill="none" stroke="#b88aff" stroke-width="1.6" opacity="${o}"/>`)
-    .join('');
-  return `<svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
-    <defs>
-      <radialGradient id="ntUnd" cx="70%" cy="42%" r="95%">
-        <stop offset="0%" stop-color="#332052"/><stop offset="55%" stop-color="#191338"/><stop offset="100%" stop-color="#0a081a"/>
-      </radialGradient>
-      <radialGradient id="ntUndCore" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#f2ecff"/><stop offset="45%" stop-color="#c9a6ff" stop-opacity="0.8"/><stop offset="100%" stop-color="#b88aff" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="300" height="150" fill="url(#ntUnd)"/>
-    ${stars}
-    ${rings}
-    <circle cx="212" cy="66" r="15" fill="url(#ntUndCore)"/>
-    <!-- a golf ball streaks into the tunnel, trail behind it -->
-    <path d="M58,110 Q120,96 176,78" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.5" stroke-dasharray="3 5" stroke-linecap="round"/>
-    <circle cx="180" cy="77" r="4.4" fill="#f4f4f4"/>
-    <circle cx="178.6" cy="75.6" r="1.3" fill="#ffffff"/>
-  </svg>`;
-}
-
-/** The Pro Shop greeting block: the world's club pro + a pithy line on how the last section went. */
-function proGreetingHTML(): string {
-  const last = state.lastResult;
-  if (!last) return '';
-  const archetype = archetypeFor(last.themeId, last.biome);
-  const pro = shopPro(archetype);
-  const mood = proMood(last.stableford, last.cut);
-  // React to the section's drama (an ace, a blow-up, a birdie blitz) over the generic grade.
-  const events = sectionEvents(
-    (state.played ?? []).map((p) => ({
-      par: p.stat.par,
-      strokes: p.stat.strokes,
-      pickedUp: p.pickedUp,
-      holed: p.holed,
-    })),
-  );
-  const line = proLine(pro, mood, events, state.run.stopIndex);
-  return `
-    <div class="gs-panel" style="display:flex;gap:12px;align-items:center;margin:0 0 10px;">
-      <div style="flex:0 0 auto;">${proAvatarSVG(archetype)}</div>
-      <div style="flex:1 1 auto;min-width:0;">
-        <div style="font-weight:600;font-size:14px;">${pro.name}</div>
-        <div style="font-size:11px;opacity:.6;margin-bottom:6px;">${pro.title}</div>
-        <div style="font-size:13px;font-style:italic;opacity:.92;">&ldquo;${line}&rdquo;</div>
-      </div>
-    </div>`;
-}
-
-// --- Competition field & leaderboard (GS-100) --------------------------------
-
-/** A compact LIVE arc-leaderboard chip for the play HUD — updates the moment a hole is finished. */
-function liveLeaderChip(): string {
-  if (state.match) return ''; // a matchplay stop shows its duel HUD instead
-  // Endless survival is the per-hole par bar, not a field cut — an arc-leaderboard position has no
-  // bearing on survival there and implies a competition that doesn't exist. Voyage-only.
-  if (!getFormat(state.run.formatId).winnable) return '';
-  const played = state.stopPlayed ?? [];
-  const sf = playTotals(played.map((p) => p.record)).stableford;
-  const lp = livePosition(state.run, played.length, sf);
-  const col = lp.position <= 3 ? '#5fd45a' : lp.position <= lp.of / 2 ? '#ffce54' : '#ff6b6b';
-  const gap = lp.gapToLead > 0 ? ` · ${lp.gapToLead} back` : ' · leading';
-  return `<span title="Live arc leaderboard">🏆 <b style="color:${col};">${ordinal(lp.position)}</b>/${lp.of}${gap}</span>`;
-}
-
-/** The matchplay opponent id for the current boss stop (the leaderboard leader, with a fallback). */
-function currentOpponentId(): string | undefined {
-  if (state.match) return state.match.bossId;
-  return matchOpponentFor(state.run) ?? runField(state.run).golfers.find((g) => !g.isPlayer)?.id;
-}
-
-/** The live matchplay HUD shown on the play screen — scoreline vs the opponent. */
-function matchHud(): string {
-  const m = state.match;
-  if (!m) return '';
-  const st = matchState(m.duels, state.course.holes.length);
-  const opp = getGolfer(m.bossId);
-  const line =
-    st.thru === 0
-      ? 'Tee it up'
-      : st.holesUp > 0
-      ? `You ${matchScoreline(st)}`
-      : st.holesUp < 0
-      ? `${opp?.shortName ?? 'Boss'} ${Math.abs(st.holesUp)} UP`
-      : 'All square';
-  const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
-  // The boss is pre-played, so on the current hole you know their target — show "they made N here" so
-  // you can attack or protect accordingly (real matchplay: you can see the other ball). EXCEPT in a
-  // BEST-BALL duel (GS-team-duel): there every hole result — yours, your partner's, the other side's —
-  // is a hole-END reveal (the pair-cards screen), so mid-hole the HUD holds its tongue.
-  const play = state.play;
-  let target = '';
-  if (play && !play.done && m.setup?.format !== 'bestball') {
-    const bh = m.bossHoles[play.holeIndex];
-    if (bh) {
-      const rel = bh.record.strokes - play.hole.par;
-      const relTxt = rel === 0 ? 'par' : rel > 0 ? `+${rel}` : `${rel}`;
-      target = `<span style="font-size:10.5px;opacity:.85;">· ${opp?.shortName ?? 'Boss'} made <b>${bh.record.strokes}</b> (${relTxt})</span>`;
-    }
-  }
-  const modeTag = state.match?.setup ? `<span style="font-size:10px;opacity:.6;">${teamFormatLabel(state.match.setup.format)}</span>` : '';
-  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 9px;border:1px solid ${col};border-radius:8px;background:#0d1016cc;flex-wrap:wrap;">
-      <span style="font-size:11px;opacity:.7;">⚔ vs ${opp?.shortName ?? 'Boss'}</span>
-      ${modeTag}
-      <span style="font-size:13px;font-weight:800;color:${col};">${line}</span>
-      <span style="font-size:10.5px;opacity:.6;">thru ${st.thru}/${state.course.holes.length}</span>
-      ${target}
-    </div>`;
-}
-
-/** The label for the current duel's mode (GS-team-duel) — the team format, or plain matchplay. */
-function duelModeLabel(): string {
-  const setup = state.match?.setup;
-  return setup ? `${teamFormatLabel(setup.format)} duel` : 'Matchplay';
-}
-
-/** A line describing who carried the partner in a team duel (GS-team-duel), for the result screen. */
-function teamDuelCaption(): string {
-  const setup = state.match?.setup;
-  if (!setup) return '';
-  const partner = teamPartnerChar(setup);
-  if (!partner) return '';
-  const oppName = getGolfer(setup.opponentId)?.shortName ?? 'your rival';
-  return setup.partnerSide === 'player'
-    ? `<div style="font-size:11px;opacity:.7;margin-top:4px;">🤝 You played ${teamFormatLabel(setup.format)} with <b>${partner.name}</b> (you were the underdog).</div>`
-    : `<div style="font-size:11px;opacity:.7;margin-top:4px;">🤝 ${oppName} played ${teamFormatLabel(setup.format)} with <b>${partner.name}</b> — you went solo as the favourite.</div>`;
-}
-
-/** The matchplay duel result panel for the result screen (the hole-by-hole scoreline + verdict). */
-function matchResultPanel(): string {
-  const m = state.match;
-  if (!m) return '';
-  const st = matchState(m.duels, state.course.holes.length);
-  const opp = getGolfer(m.bossId);
-  const won = st.playerWon;
-  const halved = st.halved;
-  const verdict = won ? 'YOU WIN' : halved ? 'HALVED' : 'DEFEATED';
-  const col = won ? '#5fd45a' : halved ? '#ffce54' : '#ff6b6b';
-  const cells = m.duels
-    .map((d) => {
-      const c = d.winner === 'player' ? '#5fd45a' : d.winner === 'boss' ? '#ff6b6b' : '#6b7280';
-      return `<span title="Hole ${d.holeIndex + 1}: you ${d.playerStrokes} v ${d.bossStrokes}" style="width:16px;height:16px;border-radius:3px;background:${c}33;border:1px solid ${c};font-size:9px;display:inline-flex;align-items:center;justify-content:center;color:${c};">${
-        d.winner === 'player' ? 'W' : d.winner === 'boss' ? 'L' : '½'
-      }</span>`;
-    })
-    .join('');
-  return `<div style="border:1px solid ${col};border-radius:10px;padding:10px;background:linear-gradient(180deg,#160d12,#0d1016);margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        ${opponentBadge(m.bossId, duelModeLabel())}
-        <div style="text-align:right;"><div style="font-size:18px;font-weight:900;color:${col};">${verdict}</div>
-          <div style="font-size:13px;opacity:.85;">${matchScoreline(st)}</div></div>
-      </div>
-      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:9px;">${cells}</div>
-      <div style="font-size:11px;opacity:.6;margin-top:6px;">Hole-by-hole vs ${opp?.name ?? 'the leader'} — W win · L loss · ½ halved.</div>
-      ${teamDuelCaption()}
-    </div>`;
-}
-
-/** Live matchplay progress for the end-of-hole screen: the running scoreline + W/L/½ pips vs the boss,
- *  built from the holes finished so far against the boss's pre-played ball. */
-function holeMatchProgressHTML(playedSoFar: PlayedHole[]): string {
-  const m = state.match;
-  if (!m) return '';
-  const duels = playedSoFar.map((p, i) => holeDuel(i, state.course.holes[i]!.par, p, m.bossHoles[i]!));
-  const st = matchState(duels, state.course.holes.length);
-  const opp = getGolfer(m.bossId);
-  const line =
-    st.holesUp > 0 ? `You ${matchScoreline(st)}` : st.holesUp < 0 ? `${opp?.shortName ?? 'Boss'} ${Math.abs(st.holesUp)} UP` : 'All square';
-  const col = st.holesUp > 0 ? '#5fd45a' : st.holesUp < 0 ? '#ff6b6b' : '#ffce54';
-  const last = duels[duels.length - 1];
-  // In a player-side best-ball the counted score is the TEAM's (better of you + partner) — label it so.
-  const youLbl = m.setup?.format === 'bestball' && m.setup.partnerSide === 'player' ? 'your side' : 'you';
-  const lastLine = last
-    ? `<div style="font-size:11.5px;opacity:.8;margin-top:6px;">This hole: ${youLbl} <b>${last.playerStrokes}</b> v <b>${last.bossStrokes}</b> ${opp?.shortName ?? 'Boss'} — ${last.winner === 'player' ? '<span style="color:#5fd45a;">won</span>' : last.winner === 'boss' ? '<span style="color:#ff6b6b;">lost</span>' : 'halved'}</div>`
-    : '';
-  const cells = duels
-    .map((d) => {
-      const c = d.winner === 'player' ? '#5fd45a' : d.winner === 'boss' ? '#ff6b6b' : '#6b7280';
-      return `<span title="Hole ${d.holeIndex + 1}: you ${d.playerStrokes} v ${d.bossStrokes}" style="width:18px;height:18px;border-radius:3px;background:${c}33;border:1px solid ${c};font-size:10px;display:inline-flex;align-items:center;justify-content:center;color:${c};">${
-        d.winner === 'player' ? 'W' : d.winner === 'boss' ? 'L' : '½'
-      }</span>`;
-    })
-    .join('');
-  return `<div style="border:1px solid ${col};border-radius:10px;padding:10px;background:linear-gradient(180deg,#160d12,#0d1016);">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        ${opponentBadge(m.bossId, duelModeLabel())}
-        <div style="text-align:right;"><div style="font-size:17px;font-weight:900;color:${col};">${line}</div>
-          <div style="font-size:11px;opacity:.7;">thru ${st.thru}/${state.course.holes.length}</div></div>
-      </div>
-      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:9px;">${cells}</div>
-      ${lastLine}
-    </div>`;
-}
-
-// Two-step stop briefing (GS-intro-split). The old intro crammed the world header, the win
-// condition, the field of 20 AND the hole art + hazard list into one long mobile scroll. It's now
-// split so each step fits a phone and has its own primary action:
-//   'arc'  — the GAME (mode + objective) and the COMPETITION (boss note + the field of competitors),
-//            a big "First Tee ▸" at the top (and again at the bottom when the field overflows a
-//            screen), plus a "Change golfer" back-out.
-//   'hole' — the HOLE you're about to play: a big map, a tap-to-open hazards/benefits popup, and a
-//            "Tee Off" / "Watch AI" / "Back" action row, sized to hold one screen.
-// View-only module state (like settingsOpen / inspectRouteId) — reset to the arc step + closed
-// popup whenever we (re-)enter the intro, so a fresh stop always opens on the arc. No save/rng touch.
-let introStage: 'arc' | 'hole' = 'arc';
-let introTraitsOpen = false;
-
-/**
- * Shared derivation for BOTH intro steps: the world identity, the compact competition/route NOTES,
- * and the mode's OBJECTIVE line — computed once here so the arc step and the hole step can never
- * drift apart. Pure read of `state` (no rng, no mutation), like the rest of the render layer.
- */
-function introShared(): {
-  c: typeof state.course;
-  zone: ReturnType<typeof zoneProfile>;
-  theme: ReturnType<typeof themeById> | undefined;
-  col: string;
-  par: number;
-  rar: ReturnType<typeof rarityFlavour>;
-  diffPips: string;
-  notes: string[];
-  objective: string;
-  boss: ReturnType<typeof currentBoss>;
-} {
-  const c = state.course;
-  // The cut reflects any pending route event (GS-14), so the line is honest about the bar.
-  const cut = effectiveCut(state.run, c.holes.length);
-  const par = c.holes.reduce((s, h) => s + h.par, 0);
-  const ev = state.run.pendingEvent;
-  // Boss stop (GS-voyage): a louder note — and a team read (format + partner side) for a team duel.
-  const boss = currentBoss(state.run);
-  const duel = isTeamDuelBoss(boss) ? teamDuel() : undefined;
-  const split = state.course.meta.split;
-
-  // World identity (GS-19): the archetype's lore/profile, the per-stop theme name, difficulty.
-  const themeId = c.meta.themeId;
-  const zone = zoneProfile(archetypeFor(themeId, c.biome));
-  const theme = themeId ? themeById(themeId) : undefined;
-  const col = rarCol(c.rarity);
-  const diffPips = difficultyPips(zone.difficulty);
-  const rar = rarityFlavour(c.rarity);
-
-  // Contextual notes (boss / split / route event) — only when they apply, kept compact and ABOVE
-  // the CTA so a decision is never buried under the hole art.
-  const notes: string[] = [];
-  if (boss) {
-    const tag = duel
-      ? ` · ${teamFormatLabel(duel.format).toUpperCase()} DUEL`
-      : isMatchplayBoss(boss)
-      ? ' · MATCHPLAY'
-      : '';
-    // Team duel (GS-team-duel): say which side carries the partner (the underdog) + the rule.
-    let teamNote = '';
-    if (duel) {
-      const partner = teamPartnerChar(duel);
-      const youHavePartner = duel.partnerSide === 'player';
-      const oppName = getGolfer(duel.opponentId)?.shortName ?? 'your rival';
-      teamNote = partner
-        ? `<div style="font-size:12px;margin-top:5px;color:${partner.style.cap};">🤝 ${
-            youHavePartner
-              ? `You're the underdog — <b>${partner.name}</b> joins your bag`
-              : `You're the favourite — ${oppName} brings <b>${partner.name}</b> to even it up; you go it alone`
-          } · <b>${teamFormatLabel(duel.format)}</b> (${teamFormatRule(duel.format)}).</div>`
-        : '';
-    }
-    // Scouting line (GS-team-duel): the opponent's style read, so you know the matchup going in.
-    const oppId = duel?.opponentId ?? (isMatchplayBoss(boss) ? currentOpponentId() : undefined);
-    const scoutSub = oppId
-      ? `${opponentScouting(oppId)}${duel?.homeEdge ? ' · ⚑ on home turf — plays sharper here' : ''}`
-      : 'Your opponent — beat them hole by hole';
-    notes.push(`<div style="margin-top:10px;padding:9px 11px;border:1px solid ${boss.final ? '#ffce54' : '#c0392b'};
-        border-radius:9px;background:linear-gradient(180deg,#1a0e12,#120b10);">
-       <div style="font-size:11px;letter-spacing:.12em;color:${boss.final ? '#ffce54' : '#ff6b6b'};">
-         ${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'}${tag}</div>
-       <b style="font-size:16px;">${boss.name}</b>
-       <div style="font-size:12.5px;opacity:.85;margin-top:2px;">${boss.blurb}</div>
-       ${teamNote}
-       ${oppId ? `<div style="margin-top:8px;">${opponentBadge(oppId, scoutSub)}</div>` : ''}
-     </div>`);
-  }
-  if (split)
-    notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #7aa2ff;border-radius:8px;background:#ffffff08;font-size:12.5px;">
-       🌗 <b>Two worlds</b> — the first ${split.frontHoles} holes play one world, then you cross into another for the run home.</div>`);
-  if (ev && ev.id !== 'open-space')
-    notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid ${rarCol(ev.rarity)};border-radius:8px;background:#ffffff08;">
-       <b style="font-size:13px;">${ev.label}</b>
-       <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${eventDescFor(ev.desc)}</div>
-     </div>`);
-
-  const objective = `${(() => {
-    const format = getFormat(state.run.formatId);
-    if (duel)
-      return `⚔ Win the <b>${teamFormatLabel(duel.format)} duel</b> hole by hole — ${
-        duel.partnerSide === 'player' ? 'your partner has your back' : 'you give up the partner advantage'
-      }.`;
-    if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
-    if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
-    if (format.holeGate) {
-      // The Unending Universe (GS-unending): the stakes are the PER-HOLE survival bar. Say the
-      // bar for these exact holes (and flag mid-stop tightening, which happens every 8 holes).
-      const first = endlessGateOverPar(endlessHoleNumber(state.run, 0));
-      const last = endlessGateOverPar(endlessHoleNumber(state.run, c.holes.length - 1));
-      const bar =
-        first === last
-          ? `<b>${endlessGateLabel(first)}</b> or better on every hole`
-          : `<b>${endlessGateLabel(first)}</b> or better — tightening to <b>${endlessGateLabel(last)}</b> mid-set`;
-      return `💀 Holes ${endlessHoleNumber(state.run, 0)}–${endlessHoleNumber(state.run, c.holes.length - 1)} · survive ${bar}. One miss ends the run.`;
-    }
-    if (format.winnable) {
-      const target = arcSurvivorTarget(state.run.stopIndex, ascensionCutBonus(state.run.ascension));
-      return `🏁 Finish in the <b>top ${target}</b> of the field over ${c.holes.length} holes to advance.`;
-    }
-    return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to make the cut and travel on.`;
-  })()}${
-    state.run.ascension > 0 ? `<span style="color:#ffce54;"> · ⚔ Ascension A${state.run.ascension} (tougher cut, leaner purse)</span>` : ''
-  }`;
-
-  return { c, zone, theme, col, par, rar, diffPips, notes, objective, boss };
-}
-
-/** The stop briefing: the arc step or the hole step (GS-intro-split), chosen by view state. */
-function introScreen(): string {
-  return introStage === 'hole' ? holeIntroScreen() : arcIntroScreen();
-}
-
-/**
- * The Unending-Universe running GOLF ROUND (GS-golf-score) through a stop's holes so far: the run's
- * banked gross/par (prior stops) plus the SURVIVED prefix of this stop's holes — counted exactly as
- * `finishStop` will, so the mid-round card and the final record never disagree. `playedSoFar` includes
- * the hole just finished (which may be the busting one — it's excluded, like `holesSurvived`).
- */
-function endlessRoundSoFar(playedSoFar: PlayedHole[]): { holes: number; gross: number; par: number; tier: BagTier } {
-  const r = state.run;
-  let holes = r.holesSurvived;
-  let gross = r.grossStrokes;
-  let par = r.parPlayed;
-  for (let i = 0; i < playedSoFar.length; i++) {
-    if (!endlessHolePassed(r, i, playedSoFar[i]!)) break;
-    holes++;
-    gross += playedSoFar[i]!.record.strokes;
-    par += playedSoFar[i]!.record.par;
-  }
-  return { holes, gross, par, tier: r.bagTier ?? 'common' };
-}
-
-/**
- * STEP 1 — the arc: the game mode + win condition and the field of 20 competitors. A big "First
- * Tee ▸" up top drops to the hole step; a second one appears at the very bottom ONLY when the
- * field pushes the page past one screen (revealed post-render in `render()` by measuring overflow),
- * so it's there after you've scrolled the roster but never a redundant duplicate on a short screen.
- */
-function arcIntroScreen(): string {
-  const { c, zone, theme, col, par, rar, diffPips, notes, objective } = introShared();
-  // The Unending Universe is scored like a round of golf (GS-golf-score): the "field" slot shows your
-  // RUNNING round (gross/to-par/net) + the personal last-runs leaderboard grouped by starting club set,
-  // instead of the voyage's ghost competitor board. Gated to the gate format so the voyage is untouched.
-  const gate = holeGateArmed(state.run);
-  let field: string;
-  if (gate) {
-    const r = state.run;
-    field =
-      endlessScoreCard(
-        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-        { title: r.holesSurvived > 0 ? 'Round so far' : 'Your round', next: true },
-      ) + endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common' });
-  } else {
-    const board = leaderboard(state.run);
-    field = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
-  }
-  // Stop 0 is the first tee after character select — the ONLY intro where "Change golfer" makes
-  // sense (you've committed to this golfer for the run). Every later world intro (post pro-shop) is
-  // "Next Tee" with no back-out to character select (GS-intro-nav).
-  const firstStop = state.run.stopIndex === 0;
-  const teeLabel = firstStop ? 'First Tee' : 'Next Tee';
-  const firstTee = (id: string): string =>
-    `<button class="gs-btn gs-btn--primary gs-intro-first" id="${id}" data-intro-stage="hole">${teeLabel} <span aria-hidden="true">▸</span></button>`;
-  return `
-    ${header()}
-    <article class="gs-panel" style="border-color:${col}${rar.strong ? 'aa' : '66'};box-shadow:0 0 ${rar.glow}px ${col}${rar.strong ? '44' : '22'};">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-        <div style="min-width:0;">
-          <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gs-accent);opacity:.85;margin-bottom:2px;">Arc briefing</div>
-          <div style="font-size:21px;font-weight:800;line-height:1.1;">${zone.name}</div>
-          <div style="font-size:13px;color:var(--gs-accent);margin-top:2px;">${zone.signature}${theme ? ` · ${theme.name}` : ''}</div>
-          <div style="font-size:12.5px;opacity:.7;margin-top:3px;">${c.meta.name} · ${c.holes.length} holes · par ${par} · 🌪 ${c.meta.wildness.toFixed(2)}</div>
-          <div style="font-size:12px;margin-top:5px;color:${col};font-style:italic;opacity:.95;">${rar.glyph} ${rar.tagline}</div>
-        </div>
-        <div style="text-align:right;flex:0 0 auto;">
-          <span style="${rar.strong ? `background:${col};color:#0b0d12;font-weight:800;` : `color:${col};`}border:1px solid ${col};border-radius:6px;padding:${rar.strong ? '2px 9px' : '1px 7px'};font-size:11px;text-transform:uppercase;letter-spacing:1px;">${rar.glyph} ${c.rarity}</span>
-          <div style="font-size:10.5px;opacity:.65;margin-top:7px;letter-spacing:.06em;text-transform:uppercase;">Difficulty</div>
-          <div style="font-size:15px;letter-spacing:1px;color:var(--gs-danger);">${diffPips}</div>
-        </div>
-      </div>
-      <p style="font-size:14px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--gs-line-2);">${objective}</p>
-      <div class="gs-intro-ctarow">
-        ${firstTee('gs-firsttee-top')}
-        ${firstStop ? btn('‹ Change golfer', { type: 'backToCharacter' }, { variant: 'ghost' }) : ''}
-      </div>
-      ${notes.join('')}
-      ${field}
-      <div class="gs-intro-ctarow gs-intro-ctarow--bottom" id="gs-firsttee-bottomwrap" style="display:none;">
-        ${firstTee('gs-firsttee-bottom')}
-      </div>
-    </article>`;
-}
-
-/**
- * STEP 2 — the hole: a large map of the first hole, a tap-to-open hazards/benefits popup (the detail
- * that used to sprawl down the page), and the action row. Laid out as a flex column with a
- * viewport-capped map so it holds one phone screen; "Tee Off" starts play, "Watch AI" auto-plays,
- * "Back" returns to the arc step.
- */
-function holeIntroScreen(): string {
-  const { c, zone, col, diffPips, boss } = introShared();
-  const hole = c.holes[0]!;
-  const map = renderHoleSVG(hole, {
-    width: 300,
-    height: 360,
-    biome: holeBiome(hole),
-    themeId: holeThemeId(hole),
-    rainbow: rainbowActive(),
-  });
-  const chip = (icons: string[], label: string, accent: string): string =>
-    `<span class="gs-trait-chip" style="--tc:${accent};"><span class="gs-trait-chip-i">${icons.join(' ')}</span><span class="gs-trait-chip-l">${label}</span></span>`;
-  const bossRibbon = boss
-    ? `<div class="gs-holeintro-boss" style="border-color:${boss.final ? '#ffce54' : '#c0392b'};color:${boss.final ? '#ffce54' : '#ff6b6b'};">${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'} · ${boss.name}</div>`
-    : '';
-  return `
-    ${header()}
-    <article class="gs-panel gs-holeintro" style="border-color:${col}66;">
-      <div class="gs-holeintro-head">
-        <div style="min-width:0;">
-          <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gs-accent);opacity:.85;">First hole</div>
-          <div style="font-size:18px;font-weight:800;line-height:1.1;">${zone.name}</div>
-          <div style="font-size:12px;opacity:.72;margin-top:2px;">${zone.signature} · par ${hole.par} · ${c.meta.name}</div>
-        </div>
-        <div style="text-align:right;flex:0 0 auto;">
-          <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em;">Difficulty</div>
-          <div style="font-size:14px;color:var(--gs-danger);letter-spacing:1px;">${diffPips}</div>
-        </div>
-      </div>
-      ${bossRibbon}
-      <div class="gs-holeintro-map">${map}</div>
-      <button class="gs-traits-bar" data-introtraits="open" aria-label="Show hazards and benefits">
-        ${chip(zone.hazards.map((t) => t.icon), `${zone.hazards.length} hazards`, 'var(--gs-danger)')}
-        ${chip(zone.benefits.map((t) => t.icon), `${zone.benefits.length} benefits`, 'var(--gs-accent)')}
-        <span class="gs-traits-bar-more">Details ›</span>
-      </button>
-      <div class="gs-holeintro-ctas">
-        ${btn('🏌 Tee Off', { type: 'playInteractive' }, { variant: 'primary' })}
-        ${
-          // WARP (GS-warp): fast-forward this stop under the hidden auto-birdie rule — offered only
-          // while the whole stop sits under the player's proven best (canWarpStop), so the button
-          // vanishes exactly where the real golf begins.
-          canWarpStop(state.run, state.endlessBestHoles, state.course.holes.length)
-            ? btn(`⚡ Warp to hole ${state.run.holesSurvived + state.course.holes.length + 1}`, { type: 'warpStop' }, { variant: 'ghost' })
-            : ''
-        }
-        ${btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })}
-        ${
-          // In the Unending Universe past stop 0 the intro OPENED here (GS-intro-endless) — there is
-          // no "back", but the arc briefing (round so far + last runs) stays one tap away.
-          holeGateArmed(state.run) && state.run.stopIndex > 0
-            ? `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Briefing</button>`
-            : `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>`
-        }
-      </div>
-    </article>`;
-}
-
-/** The hazards/benefits popup for the hole step (GS-intro-split): every hazard AND benefit in one
- *  window, plus the world's inspiration + brief — so the detail is one tap away, not a long scroll. */
-function introTraitsOverlay(): string {
-  const { zone } = introShared();
-  return `
-    <div class="gs-sheet-backdrop" data-introtraits="close">
-      <div class="gs-sheet" data-introtraits="keep">
-        <div class="gs-sheet-head"><b style="font-size:17px;">${zone.name} — hazards &amp; benefits</b>
-          <button class="gs-mapbtn" data-introtraits="close" title="Close">✕</button></div>
-        <p style="font-size:12.5px;font-style:italic;opacity:.72;margin:0 0 6px;line-height:1.4;">${zone.inspiration}</p>
-        <p style="font-size:13px;opacity:.92;margin:0 0 12px;line-height:1.4;">${zone.brief}</p>
-        <div style="display:flex;gap:18px;flex-wrap:wrap;">
-          ${traitList('Hazards', 'var(--gs-danger)', zone.hazards)}
-          ${traitList('Benefits', 'var(--gs-accent)', zone.benefits)}
-        </div>
-        <div style="text-align:center;margin-top:12px;">
-          <button class="gs-btn gs-btn--primary" data-introtraits="close" style="padding:11px 26px;">Done</button>
-        </div>
-      </div>
-    </div>`;
-}
 
 // --- interactive playing screen ----------------------------------------------
 let animatedShots = 0; // shots of the current hole already animated
@@ -1070,29 +416,8 @@ let puttViewRadius: number | null = null;
 // full render() — a full render remounts the pace meter (resetting its sweep) on every tap, which
 // made reading a long break slow and painful. Assigned by the putt branch; buttons call it.
 let puttAimRefresh: (() => void) | null = null;
-// Shop bag-inventory: the gear item the player tapped to inspect (its card shows for comparison with
-// the shop stock). View-only module state (like selClubId) — no reducer/save state, reset on buy.
-let inspectGearId: string | null = null;
-// Trade Market accordion (GS-market-accordion): which catalogue sections the player has collapsed.
-// View-only module state (like inspectGearId) — toggled via [data-toggle-section] + re-render, never
-// persisted. Every section starts collapsed (re-seeded from MARKET_SECTION_IDS each time the market
-// opens) so the catalogue lands compact and browsable; the player expands the racks they want.
-const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'bag', 'bags'] as const;
-const collapsedMarketSections = new Set<string>(MARKET_SECTION_IDS);
-// Trade Market "Show Owned" toggle: view-only module state (like collapsedMarketSections). OFF by
-// default so the rack shows only gear you can still buy — the player flips it on to browse what they
-// already own. Toggled via [data-market-showowned] + re-render, never persisted / no rng impact.
-let marketShowOwned = false;
-// Clubhouse editor (GS-clubhouse-stage): which slot picker is open — tap a body part or the garage on
-// the character stage to reveal that slot's rack. View-only module state (like inspectGearId), toggled
-// via [data-clubslot] + re-render, reset when the Clubhouse opens/closes. null = the resting stage.
-type ClubSlot = ApparelSlot | 'ship';
-let clubhouseSlot: ClubSlot | null = null;
-// Travel screen (GS-journey-vertical): the route the player tapped on the star-chart to inspect — its
-// info sheet (world + bet + confirm/cancel) opens over the map. View-only module state (like
-// inspectGearId / settingsOpen): toggled via [data-route-inspect] + re-render, reset on leaving travel,
-// zero reducer/save/rng impact. The reducer's existing { type:'route' } action still commits the jump.
-let inspectRouteId: number | null = null;
+// The screen modules' view state (shopView / marketView / clubhouseView / travelView / introView /
+// installView) lives with its screen in src/app/*; the wiring below mutates those exported objects.
 let mapPan: [number, number] = [0, 0];
 // Shot-result popup: after a non-terminal shot settles, freeze on a result card + Continue
 // before the next decision, so each shot gets its own beat. Module-level (a timed view
@@ -1349,20 +674,6 @@ function lieChip(lie: string): string {
   return `<span class="gs-liechip" style="border-color:${col};color:${col};">${dot} <b style="color:var(--gs-ink);">${label}</b>${eff ? ` <span style="opacity:.85;">${eff}</span>` : ''}</span>`;
 }
 
-/** A list of zone traits (hazards/benefits), each an icon + line. */
-function traitList(title: string, accent: string, traits: { icon: string; text: string }[]): string {
-  const rows = traits
-    .map(
-      (t) =>
-        `<li style="display:flex;gap:7px;align-items:flex-start;margin:3px 0;font-size:12.5px;line-height:1.3;">
-           <span style="flex:0 0 auto;">${t.icon}</span><span style="opacity:.9;">${t.text}</span></li>`,
-    )
-    .join('');
-  return `<div style="flex:1 1 0;min-width:140px;">
-      <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${accent};font-weight:700;margin-bottom:2px;">${title}</div>
-      <ul style="list-style:none;padding:0;margin:0;">${rows}</ul>
-    </div>`;
-}
 
 // Decision/putt map geometry — portrait so the map fills the screen. The reach factor zooms the
 // follow-cam in on the contemplated shot (smaller = tighter); the playable corridor fills the
@@ -1428,22 +739,6 @@ function hazardLabel(kind: string): string {
   return 'the hazard';
 }
 
-/** A one-shot, assetless sparkle burst (CSS only) for the big beats — made cut, a holed shot.
- *  Skipped under reduced-motion. Deterministic spark layout (no Math.random). Needs a
- *  position:relative ancestor; pointer-events:none so it never blocks a tap. */
-function burst(): string {
-  if (getSettings().reducedMotion) return '';
-  const N = 16;
-  const sparks = Array.from({ length: N }, (_, i) => {
-    const ang = (i / N) * 360 + ((i * 37) % 30);
-    const d = 64 + ((i * 53) % 90);
-    const dx = Math.cos((ang * Math.PI) / 180) * d;
-    const dy = Math.sin((ang * Math.PI) / 180) * d;
-    const ch = ['✦', '⭐', '✧', '·'][i % 4];
-    return `<span class="gs-spark" style="--dx:${dx.toFixed(0)}px;--dy:${dy.toFixed(0)}px;animation-delay:${(i % 5) * 45}ms;">${ch}</span>`;
-  }).join('');
-  return `<div class="gs-burst" aria-hidden="true">${sparks}</div>`;
-}
 
 // The hole index whose ace has already been celebrated, so the full-screen overlay fires exactly
 // once per hole-in-one (the play-view onDone can re-fire on a re-render). Reset per hole in render().
@@ -1496,20 +791,6 @@ function zoneScoreChip(): string {
  *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
  *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
  *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through. */
-/** Per-rarity course flavour (GS-rarity-style): a glyph, a one-line tagline, and how boldly to frame
- *  the stop — so common→legendary read as DISTINCT finds, not just a colour swap. */
-function rarityFlavour(r: Rarity): { glyph: string; tagline: string; glow: number; strong: boolean } {
-  switch (r) {
-    case 'legendary':
-      return { glyph: '✦', tagline: 'A legendary world — the galaxy rarely yields its like.', glow: 34, strong: true };
-    case 'epic':
-      return { glyph: '◆', tagline: 'An epic find — a world worth the voyage.', glow: 28, strong: true };
-    case 'rare':
-      return { glyph: '◈', tagline: 'A rare stop — richer rewards, sterner test.', glow: 22, strong: false };
-    default:
-      return { glyph: '○', tagline: 'A common world to find your rhythm.', glow: 18, strong: false };
-  }
-}
 
 /** A short, fun label for a notable hole archetype (GS-shapes-2); '' for a plain straight/dogleg. */
 function shapeLabel(shapeId?: string): string {
@@ -2055,1454 +1336,10 @@ function shotPopupOverlay(): string {
     </div>`;
 }
 
-/** One big stat tile for the stop-result header (label over a large value), mirroring the intro's
- *  stat language + the Unending-Universe score card so the recap reads at a glance. */
-function resultStat(label: string, value: string, col: string, sub = ''): string {
-  return `<div class="gs-result-stat">
-    <div class="gs-result-stat-v" style="color:${col};">${value}</div>
-    <div class="gs-result-stat-l">${label}</div>
-    ${sub ? `<div class="gs-result-stat-s">${sub}</div>` : ''}
-  </div>`;
-}
 
-/** The round, hole by hole (GS-result): a clickable strip of hole cards — strokes, par and the
- *  score relative to par, tinted eagle-gold → blow-up-red (the `holePips` palette). Tapping a hole
- *  drives the replay below it (the `viewHole` action, selected hole ringed). This is the golf-soul
- *  journey of the stop, promoted out of the old collapsed `<details>` scorecard. */
-function roundStrip(): string {
-  if (!state.played || state.played.length === 0) return '';
-  const cards = state.played
-    .map((p, i) => {
-      const sel = i === state.viewHole;
-      const r = p.record;
-      const rel = r.strokes - r.par;
-      const col = p.pickedUp
-        ? '#b3402f'
-        : rel <= -2 ? '#ffd54a' : rel === -1 ? '#5fd45a' : rel === 0 ? '#9fd8e6' : rel === 1 ? '#ffc454' : '#ff6b6b';
-      const relLabel = p.pickedUp ? '✕' : rel === 0 ? 'E' : rel > 0 ? `+${rel}` : `${rel}`;
-      const name = p.pickedUp ? 'Picked up' : scoreName(r.par, r.strokes);
-      return `<button class="gs-round-hole${sel ? ' gs-round-hole--sel' : ''}" style="--hc:${col};"
-          data-action='${JSON.stringify({ type: 'viewHole', hole: i })}' title="Hole ${i + 1} · par ${r.par} · ${r.strokes} strokes — ${name}. Tap to replay.">
-        <span class="gs-round-no">H${i + 1}</span>
-        <span class="gs-round-strokes">${r.strokes}</span>
-        <span class="gs-round-par">par ${r.par}</span>
-        <span class="gs-round-name">${relLabel}</span>
-      </button>`;
-    })
-    .join('');
-  return `<div class="gs-round" role="group" aria-label="Your round, hole by hole — tap a hole to replay it">${cards}</div>`;
-}
 
-/**
- * The post-stop recap (GS-result): built to the same quality bar as the arc/hole intro — a
- * rarity-framed panel with a verdict badge over the world you just played, big stat tiles (Stableford
- * / gross / cut-or-place / credits), the round hole-by-hole (tap to replay), then the standings and a
- * full-width Continue. The Unending Universe keeps its golf-score card + records board; the Voyage/
- * match paths get the new tiles + round strip. Pure render off `state` — no rng, no save.
- */
-function resultScreen(): string {
-  const res = state.lastResult!;
-  const c = state.course;
-  const gate = holeGateArmed(state.run);
-  const passed = res.passed;
-  const col = rarCol(c.rarity);
-  const rar = rarityFlavour(c.rarity);
-  const zone = zoneProfile(archetypeFor(c.meta.themeId, c.biome));
-  const theme = c.meta.themeId ? themeById(c.meta.themeId) : undefined;
-  const par = c.holes.reduce((s, h) => s + h.par, 0);
 
-  const verdict = state.match
-    ? passed
-      ? 'MATCH WON'
-      : 'MATCH LOST'
-    : gate
-      ? passed
-        ? 'SET SURVIVED'
-        : 'THE UNIVERSE WINS'
-      : passed
-        ? 'MADE THE CUT'
-        : 'MISSED CUT';
-  const vcol = passed ? '#5fd45a' : '#ff6b6b';
 
-  // The continue-to-shop CTA — surfaced BOTH at the top (right of the verdict, no scroll needed) and
-  // full-width at the bottom (GS-result-nav). Same label/action either way.
-  const continueLabel = state.bossReward && state.bossReward.length ? '🏆 Claim your reward →' : 'Continue → shop';
-  const continueBtn = (variant: 'primary' | 'ghost'): string =>
-    btn(continueLabel, { type: 'continue' }, { variant });
-
-  const head = `<div class="gs-result-head">
-      <div style="min-width:0;">
-        <div class="gs-result-eyebrow">Stop ${res.stopIndex + 1} · ${passed ? 'cleared' : 'ended'}</div>
-        <div class="gs-result-world">${zone.name}</div>
-        <div class="gs-result-sub">${zone.signature}${theme ? ` · ${theme.name}` : ''} · par ${par} · ${c.holes.length} holes</div>
-      </div>
-      <div class="gs-result-vwrap">
-        <div class="gs-result-verdict" style="color:${vcol};border-color:${vcol};background:${vcol}12;">${verdict}</div>
-        <div class="gs-result-rar" style="color:${col};">${rar.glyph} ${c.rarity}</div>
-        <div class="gs-result-continue gs-result-continue--top">${continueBtn('primary')}</div>
-      </div>
-    </div>`;
-
-  // The scoring block: the Unending Universe stays on its golf-score card + records board; the
-  // Voyage/match paths get the stat tiles + the standings.
-  let body: string;
-  if (gate) {
-    const r = state.run;
-    const setLine = `<p style="font-size:12.5px;opacity:.82;margin:0;">This set · gross <b>${res.gross}</b> · <b>+${res.creditsEarned}</b> credits${
-      res.aces ? ` · ⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''
-    }</p>`;
-    body =
-      endlessScoreCard(
-        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-        { title: 'Round so far', next: true },
-      ) +
-      setLine +
-      endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your recent runs' });
-  } else {
-    const board = leaderboard(state.run);
-    const positional = board.mode === 'positional';
-    const me = board.standings.find((s) => s.isPlayer);
-    const target = board.survivorTarget ?? board.survivors ?? board.standings.length;
-    const made = res.stableford >= res.cut;
-    const tiles = [
-      resultStat('STABLEFORD', String(res.stableford), passed ? '#5fd45a' : '#ff6b6b'),
-      resultStat('GROSS', String(res.gross), 'var(--gs-ink)'),
-      // A positional voyage stop survives on your PLACE (not the Stableford cut) — show it; a
-      // matchplay boss is decided in the panel below, so give it the aces/credits slot instead.
-      ...(state.match
-        ? []
-        : positional && me
-          ? [resultStat('PLACE', ordinal(me.position), me.position <= target ? '#5fd45a' : '#ffc454', `of ${board.standings.length}`)]
-          : [resultStat('CUT', String(res.cut), made ? '#5fd45a' : '#ff6b6b', made ? 'made' : 'missed')]),
-      resultStat('CREDITS', `+${res.creditsEarned}`, '#ffce54', res.aces ? `⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''),
-    ].join('');
-    const through = positional ? (board.survivorTarget ? ` · top ${board.survivorTarget} advance` : '') : ` · ${board.survivors} make it through`;
-    const place = me
-      ? `<p style="font-size:13px;margin:0;">You're <b style="color:${me.position <= target ? '#5fd45a' : 'var(--gs-ink)'};">${ordinal(me.position)}</b> of ${board.standings.length}${through}.</p>`
-      : '';
-    body =
-      `<div class="gs-result-stats">${tiles}</div>` +
-      (state.match ? matchResultPanel() : '') +
-      place +
-      leaderboardHTML(board);
-  }
-
-  const replay = `<div class="gs-result-replay">
-      <div id="play" class="gs-replay" style="border:1px solid var(--gs-line);border-radius:var(--gs-r);overflow:hidden;box-shadow:var(--gs-shadow);"></div>
-      <div class="gs-result-replay-ctl">
-        ${btn('↻ Replay', { type: 'viewHole', hole: state.viewHole }, { variant: 'ghost' })}
-        <span>Hole ${state.viewHole + 1}${state.played ? ` of ${state.played.length}` : ''}</span>
-      </div>
-    </div>`;
-
-  return `
-    ${header()}
-    <article class="gs-panel gs-result" style="border-color:${col}${rar.strong ? 'aa' : '66'};box-shadow:0 0 ${rar.glow}px ${col}${rar.strong ? '44' : '22'};">
-      ${passed ? burst() : ''}
-      ${head}
-      ${body}
-      <div class="gs-result-secl">⛳ Your round — tap a hole to replay it</div>
-      ${roundStrip()}
-      ${replay}
-      <div class="gs-result-continue">${continueBtn('primary')}</div>
-    </article>`;
-}
-
-/** The boss-reward screen (GS-talents): pick ONE of a few thematic spoils after beating a boss — a
- *  run TALENT or a permanent Star-Shard reward. Clicking a card claims it and continues to the shop. */
-function bossRewardScreen(): string {
-  const rewards = state.bossReward ?? [];
-  const oppId = state.match?.bossId ?? currentOpponentId();
-  const opp = oppId ? getGolfer(oppId) : undefined;
-  const cards = rewards
-    .map((r, i) => {
-      const col = rarCol(r.rarity);
-      const icon = r.kind === 'shards' ? '✦' : '🌟';
-      return `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'pickBossReward', index: i })}'
-          style="cursor:pointer;flex:1 1 200px;min-width:200px;max-width:280px;border:1px solid ${col};border-radius:12px;
-          padding:14px;background:linear-gradient(180deg,${col}14,#0d1016);">
-        <div style="font-size:26px;line-height:1;">${icon}</div>
-        <div style="font-size:15px;font-weight:800;margin-top:8px;">${r.name}</div>
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:${col};margin-top:2px;">${
-          r.kind === 'shards' ? 'Permanent reward' : 'Run talent'
-        } · ${r.rarity}</div>
-        <div style="font-size:12.5px;opacity:.85;margin-top:8px;line-height:1.4;">${r.desc}</div>
-      </div>`;
-    })
-    .join('');
-  return `
-    ${header()}
-    <section style="max-width:680px;position:relative;">
-      ${burst()}
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        ${opp ? `<div style="line-height:0;border:2px solid #ffce54;border-radius:10px;background:#1a0e12;padding:2px;">${golferSVG(opp.look, 44, 54)}</div>` : ''}
-        <div>
-          <h2 style="font-size:20px;margin:.1em 0;color:#ffce54;">🏆 Victory Spoils</h2>
-          <p style="font-size:13px;opacity:.8;margin:0;">You beat ${opp?.name ?? 'the boss'} — choose your reward. A <b>talent</b> powers up the rest of this run; <b>Star Shards</b> are permanent.</p>
-        </div>
-      </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;">${cards}</div>
-    </section>`;
-}
-
-// A short headline for a club chip — the bag ids ('D','5W','PW','60') already read well; only the
-// long-form ids need a friendly cap.
-function shortClubLabel(id: string): string {
-  if (id === 'putter') return 'Putt';
-  if (id === 'chip') return 'Chip';
-  return id;
-}
-
-// The player's FULL bag inventory on the shop screen (GS-clubs-2): every club you carry shown with its
-// rarity, plus every reward-club SLOT you don't yet carry greyed out — so you can see at a glance what
-// is in the bag, what a shop club would replace, and which gaps a new club would fill. Pure render off
-// the live loadout (no hook, no save state).
-function bagInventoryHTML(): string {
-  const loadout = state.run.loadout;
-  const bag = loadout.bag;
-  // Universe of club TYPES: everything you carry, plus every rewardable slot (so empty slots read as
-  // greyed gaps). Larry never sees hybrids, so don't show empty hybrid slots he could never fill.
-  const types = new Set<string>(bag.map((c) => c.id));
-  for (const t of REWARD_CLUB_TYPES) {
-    if (loadout.noHybrids && isHybridType(t)) continue;
-    types.add(t);
-  }
-  // Club types for sale this stop, so an owned-or-empty slot can flag "available now".
-  const offered = new Set<string>(
-    (state.shopOffer ?? []).map((id) => shopItem(id)?.clubType).filter((t): t is string => !!t),
-  );
-  const carryOf = (t: string) => bag.find((c) => c.id === t)?.carry ?? clubById(t, CLUBS)?.carry ?? 0;
-  const chips = [...types]
-    .sort((a, b) => carryOf(b) - carryOf(a))
-    .map((t) => {
-      const owned = bag.find((c) => c.id === t);
-      const base = clubById(t, CLUBS);
-      const name = owned?.name ?? base?.name ?? t;
-      const carry = carryOf(t);
-      const rarity = owned?.rarity ?? 'common';
-      const col = owned ? rarCol(rarity) : '#5a6172';
-      const inShop = offered.has(t);
-      // Owned tier label: a reward club shows its rarity, a starting club reads "stock"; an empty slot reads "empty".
-      const tierLabel = owned ? (owned.set && owned.set !== 'starter' ? rarity : 'stock') : 'empty';
-      return `<div title="${name} · ~${carry} yd${owned ? ` · ${rarity}` : ' · not in bag'}"
-        style="display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-width:50px;
-        padding:5px 7px;border:1.5px solid ${owned ? col : col + '66'};border-radius:9px;
-        background:${owned ? col + '14' : '#ffffff05'};opacity:${owned ? 1 : 0.5};">
-        <span style="font-size:12.5px;font-weight:800;letter-spacing:.02em;">${shortClubLabel(t)}</span>
-        <span style="font-size:9.5px;opacity:.75;">${carry} yd</span>
-        <span style="font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:${col};">${inShop ? '🛒 ' : ''}${tierLabel}</span>
-      </div>`;
-    })
-    .join('');
-  // --- The gear/accessories line (GS-proshop-3): every non-club item you own — glove, ball, shoe,
-  // shaft, putter, caddy, relic — sits ABOVE the clubs. Tap one to pop its card so you can compare it
-  // with what's on sale. Owned ids, de-duped, in purchase order.
-  const gearIds = [...new Set(loadout.perks)].filter((id) => {
-    const it = shopItem(id);
-    return !!it && !it.clubType; // clubs live in the row below
-  });
-  const gearChips = gearIds
-    .map((id) => {
-      const it = shopItem(id)!;
-      const owned = ownedCount(state.run.loadout.perks, id);
-      const col = rarCol(it.rarity);
-      const sel = inspectGearId === id;
-      const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
-      const count = owned > 1 ? `<span style="font-size:9px;opacity:.8;">×${owned}</span>` : '';
-      return `<div data-inspect="${id}" title="${it.name} — tap to compare"
-        style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:2px;width:54px;
-        padding:4px;border:1.5px solid ${sel ? col : col + '88'};border-radius:9px;background:${sel ? col + '22' : col + '10'};
-        ${sel ? `box-shadow:0 0 8px ${col}66;` : ''}">
-        <div style="width:100%;border-radius:6px;overflow:hidden;pointer-events:none;">${itemArtSVG(id, it.rarity, setTheme)}</div>
-        <span style="font-size:8.5px;text-align:center;line-height:1.05;max-height:2.1em;overflow:hidden;">${it.name}</span>${count}
-      </div>`;
-    })
-    .join('');
-  const gearRow = gearIds.length
-    ? `<div style="font-size:11px;font-weight:700;opacity:.8;margin:0 0 5px;">🧤 Your gear — tap to compare</div>
-       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px;">${gearChips}</div>`
-    : '';
-  // The inline inspect card for the tapped gear item (full card, for side-by-side comparison).
-  let inspectCard = '';
-  if (inspectGearId) {
-    const it = shopItem(inspectGearId);
-    if (it && gearIds.includes(inspectGearId)) {
-      const owned = ownedCount(state.run.loadout.perks, inspectGearId);
-      const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
-      const card = itemCardHTML(
-        { ...it, cost: itemCost(it, owned) },
-        { owned: owned >= itemCap(it), count: owned, artSVG: itemArtSVG(it.id, it.rarity, setTheme) },
-      );
-      inspectCard = `<div style="display:flex;justify-content:center;margin:2px 0 9px;">${card}</div>`;
-    }
-  }
-  return `
-    <div style="margin:.2em 0 .9em;padding:9px 11px;border:1px solid var(--gs-line-2);border-radius:10px;background:#ffffff05;">
-      ${gearRow}
-      ${inspectCard}
-      ${(() => {
-        // A blinged golf-bag thumbnail beside the header once the default bag is upgraded (GS-bag-tiers).
-        const bt = loadout.bagTier ?? 'common';
-        const bs = bagSet(bt);
-        const art = bt !== 'common' && bs ? `<div style="width:48px;flex:0 0 auto;border-radius:7px;overflow:hidden;">${drawGolfBag(bs.tint, bt)}</div>` : '';
-        const label = bs ? `🎒 ${bs.name} — your bag` : '🎒 Your bag — equipped clubs &amp; empty slots';
-        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">${art}<div style="font-size:12px;font-weight:700;opacity:.85;">${label}</div></div>`;
-      })()}
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
-      <div style="font-size:10px;opacity:.55;margin-top:7px;">Coloured = equipped (border shows rarity). Greyed = an empty slot a reward club could fill. 🛒 = on sale in this shop.</div>
-    </div>`;
-}
-
-/** The FUEL DEPOT (GS-fuel, restyled GS-fuel-2) — the fixed refuelling counter shown at every Pro
- *  Shop and on the journey screen (never part of the rotating 4-card offer, so fuel is always
- *  purchasable). The LOCAL price is the headline — it rises with galaxy depth, so "fill up here or
- *  gamble on gear" is the depot's whole question — over the segmented tank gauge and quick-buy
- *  chips (+1 / +3 / fill the tank). Buttons grey out when the purse or capacity says no
- *  (`buyFuel` clamps anyway; the disabled state is just honest UI). */
-function fuelDepotHTML(): string {
-  const r = state.run;
-  const cap = tankCapacity(r);
-  const price = fuelUnitCost(r);
-  const space = Math.max(0, cap - r.fuel);
-  const buyBtn = (units: number, label?: string): string => {
-    const n = Math.min(units, space);
-    const cost = n * price;
-    const ok = n > 0 && r.credits >= cost;
-    const text = `${label ?? `+${n} ⛽`} · ${cost} cr`;
-    return ok
-      ? btn(text, { type: 'buyFuel', units: n }, { variant: 'ghost', borderColor: '#4fd0e066' })
-      : `<span class="gs-btn gs-btn--ghost" style="opacity:.4;cursor:not-allowed;flex:1 1 auto;font-size:13px;padding:9px 10px;text-align:center;">${text}</span>`;
-  };
-  const tankNote = space <= 0
-    ? `<span style="font-size:12px;font-weight:700;color:#4fd0e0;">tank full</span>`
-    : r.fuel <= 2
-      ? `<span style="font-size:12px;font-weight:800;color:var(--gs-danger);">running dry!</span>`
-      : '';
-  const rows = space > 0
-    ? `<div class="gs-fueldepot__row">${buyBtn(1)}${space > 1 ? buyBtn(3) : ''}${space > 3 ? buyBtn(space, `Fill +${space} ⛽`) : ''}</div>`
-    : '';
-  return `
-    <div class="gs-fueldepot">
-      <div class="gs-fueldepot__head">
-        <span class="gs-fueldepot__title">⛽ FUEL DEPOT</span>
-        ${fuelGaugeHTML(r.fuel, cap, { bare: true })}
-        <b style="font-size:13px;color:${fuelColour(r.fuel, cap)};">${r.fuel}/${cap}</b>
-        ${tankNote}
-        <span class="gs-fueldepot__price">${price} cr / unit here</span>
-      </div>
-      ${rows}
-      <p class="gs-fueldepot__note">A jump burns its distance in fuel (a deep jump = 2–3 units). Fuel gets dearer the deeper you fly — launching short-tanked auto-charges the local price.</p>
-      ${
-        (r.loadout.fuelEfficiency ?? 0) > 0
-          ? `<p class="gs-fueldepot__note" style="color:#7ff3ff;opacity:.85;">🌀 Ion thrusters fitted — every jump burns ${r.loadout.fuelEfficiency} less ⛽ (min 1).</p>`
-          : ''
-      }${
-        (r.loadout.tankBonus ?? 0) > 0
-          ? `<p class="gs-fueldepot__note" style="color:#4fd0e0;opacity:.85;">🛢 Reserve tank strapped on — capacity +${r.loadout.tankBonus}.</p>`
-          : ''
-      }
-    </div>`;
-}
-
-function shopScreen(): string {
-  const perks = state.run.loadout.perks;
-  const credits = state.run.credits;
-  const hasCaddy = !!namedCaddyOwned(perks);
-  // A reward club (GS-clubs-2) shows whether it UPGRADES a club you carry or is a NEW club, and which
-  // distance gap it fills — so the buy decision is legible at a glance.
-  const clubBadge = (it: NonNullable<ReturnType<typeof shopItem>>): { text: string; tone?: 'up' | 'new' } | undefined => {
-    if (!it.clubType) return undefined;
-    const note = clubOfferNote(it, state.run.loadout);
-    if (!note) return undefined;
-    if (note.kind === 'upgrade') {
-      if (note.putt) return { text: '▲ UPGRADE · putt', tone: 'up' };
-      return { text: note.gainYd ? `▲ UPGRADE · +${note.gainYd} yd` : '▲ UPGRADE', tone: 'up' };
-    }
-    const between =
-      note.longerName && note.shorterName
-        ? `${note.longerName}→${note.shorterName}`
-        : note.longerName
-        ? `under ${note.longerName}`
-        : note.shorterName
-        ? `over ${note.shorterName}`
-        : '';
-    return { text: `✚ NEW · ~${note.carry} yd${between ? ` (${between})` : ''}`, tone: 'new' };
-  };
-  const renderCard = (it: NonNullable<ReturnType<typeof shopItem>>): string => {
-    const owned = ownedCount(perks, it.id);
-    const maxed = owned >= itemCap(it);
-    const cost = itemCost(it, owned);
-    const afford = credits >= cost;
-    const buyable = !maxed && afford;
-    const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
-    const artSVG = itemArtSVG(it.id, it.rarity, setTheme);
-    const card = itemCardHTML({ ...it, cost }, { owned: maxed, affordable: afford, count: owned, badge: clubBadge(it), artSVG });
-    // Wrap the card so the whole thing is the buy button when purchasable.
-    return buyable
-      ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buy', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
-      : `<div style="margin:4px;">${card}</div>`;
-  };
-  // The stock was fixed on shop entry (state.shopOffer); cost/stack state is live. Gear and reward
-  // clubs (GS-clubs-2) share ONE 4-card rack — no separate row.
-  const stock = (state.shopOffer ?? [])
-    .map((id) => shopItem(id))
-    .filter((it): it is NonNullable<typeof it> => !!it)
-    // Once any named caddy is hired, the others vanish from the offer (you may keep only one).
-    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0)
-    .map(renderCard)
-    .join('');
-  return `
-    ${header()}
-    <h2 style="font-size:16px;">🏌 Pro Shop · ${credits} credits</h2>
-    ${proGreetingHTML()}
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — early stops stock cheap commons, deeper stops stock rare/epic power. Stackable upgrades cost more the more you own; rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up. Hire one caddy and the rest stay home.</p>
-    <div style="display:flex;flex-wrap:wrap;">${stock}</div>
-    ${fuelDepotHTML()}
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      ${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}
-      ${
-        credits >= rerollCost(state.shopRerolls ?? 0)
-          ? btn(`🎲 Reroll stock (${rerollCost(state.shopRerolls ?? 0)} cr)`, { type: 'rerollShop' }, { variant: 'ghost' })
-          : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ${rerollCost(state.shopRerolls ?? 0)} cr</span>`
-      }
-    </div>
-    ${bagInventoryHTML()}`;
-}
-
-/**
- * The StarMart pop-up shop (GS-tent-interactions): a mid-hole shop a StarMart trade-tent opens, spending
- * cross-run STAR SHARDS instead of run credits. It stocks only rare/epic/legendary (no commons) and
- * skews epic/legendary; items last the run like any Pro-Shop buy. Priced in shards by rarity (5/10/15).
- */
-function starmartScreen(): string {
-  const shards = state.shards;
-  const perks = state.run.loadout.perks;
-  const renderCard = (it: NonNullable<ReturnType<typeof shopItem>>): string => {
-    const owned = ownedCount(perks, it.id);
-    const maxed = owned >= itemCap(it);
-    const cost = STARMART_COST[it.rarity];
-    const afford = shards >= cost;
-    const buyable = !maxed && afford;
-    const setTheme = it.clubSet ? clubSetById(it.clubSet)?.theme : undefined;
-    const artSVG = itemArtSVG(it.id, it.rarity, setTheme);
-    const card = itemCardHTML(
-      { ...it, cost },
-      { owned: maxed, affordable: afford, count: owned, artSVG, costLabel: `${cost} ⭐`, unaffordableNote: 'NEED SHARDS' },
-    );
-    return buyable
-      ? `<div class="gs-clickcard" data-action='${JSON.stringify({ type: 'buyStarmart', id: it.id })}' style="cursor:pointer;margin:4px;">${card}</div>`
-      : `<div style="margin:4px;">${card}</div>`;
-  };
-  const stock = (state.starmartOffer ?? [])
-    .map((id) => shopItem(id))
-    .filter((it): it is NonNullable<typeof it> => !!it)
-    .map(renderCard)
-    .join('');
-  const rerollCostShards = starmartRerollCost(state.starmartRerolls ?? 0);
-  const empty = stock === '' ? `<p style="font-size:13px;opacity:.6;">Sold out! Nothing left on the rack — reroll or head back to your ball.</p>` : '';
-  return `
-    ${header()}
-    <h2 style="font-size:16px;">🛰 StarMart · ${shards} ⭐ shards</h2>
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">A trader's pop-up on the course! Spend your <b>Star Shards</b> on premium gear — rare, epic &amp; legendary only, no filler. Everything here lasts the rest of this run. Blue 5 ⭐ · Purple 10 ⭐ · Orange 15 ⭐.</p>
-    <div style="display:flex;flex-wrap:wrap;">${stock}</div>
-    ${empty}
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      ${btn('← Back to the hole', { type: 'leaveStarmart' }, { variant: 'primary' })}
-      ${
-        shards >= rerollCostShards
-          ? btn(`🎲 Reroll stock (${rerollCostShards} ⭐)`, { type: 'rerollStarmart' }, { variant: 'ghost' })
-          : `<span style="font-size:12px;opacity:.5;">🎲 Reroll needs ${rerollCostShards} ⭐</span>`
-      }
-    </div>`;
-}
-
-/** A ship card (GS-garage) — the vector ship over a rarity-ringed panel, with name/set + a footer
- *  (cost in the market, or a SELECT / SELECTED state in the garage). Clickable when `action` given. */
-function shipCardHTML(ship: Ship, footer: string, opts: { action?: Action; ring: string; dim?: boolean; glow?: boolean } = { ring: '#8aa0c0' }): string {
-  const inner = `
-    <div style="border:2px solid ${opts.ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${opts.ring}22, #0b0d12);text-align:center;width:130px;${opts.dim ? 'opacity:.55;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.ring}, 0 0 14px ${opts.ring}66;` : ''}">
-      ${shipCardSVG(ship.id, 116, 60)}
-      <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${ship.name}</div>
-      <div style="font-size:10px;opacity:.55;">${ship.set} · ${ship.rarity}</div>
-      <div style="font-size:11px;margin-top:3px;color:${opts.ring};font-weight:700;">${footer}</div>
-    </div>`;
-  return opts.action
-    ? `<div class="gs-clickcard" data-action='${JSON.stringify(opts.action)}' style="cursor:pointer;margin:5px;">${inner}</div>`
-    : `<div style="margin:5px;">${inner}</div>`;
-}
-
-/** One collapsible Trade-Market section (GS-market-accordion): a tap-to-toggle header (icon · title ·
- *  owned/total count · chevron) over a card rack, so the long catalogue stays navigable as it grows.
- *  Collapse state is module-local (`collapsedMarketSections`) + re-rendered — same view-only pattern as
- *  `inspectGearId` (native <details> can't be used: render() replaces app.innerHTML on every buy, which
- *  would reset the open state). Sections start collapsed on open (see collapsedMarketSections). Every
- *  section shares this chrome so the catalogue reads consistently. */
-function marketSection(
-  id: string,
-  icon: string,
-  title: string,
-  owned: number,
-  total: number,
-  blurb: string,
-  rack: string,
-): string {
-  const collapsed = collapsedMarketSections.has(id);
-  return `
-    <section class="gs-acc${collapsed ? ' gs-acc--collapsed' : ''}">
-      <button class="gs-acc__head" data-toggle-section="${id}" aria-expanded="${collapsed ? 'false' : 'true'}">
-        <span class="gs-acc__icon" aria-hidden="true">${icon}</span>
-        <span class="gs-acc__title">${title}</span>
-        <span class="gs-acc__count">${owned}/${total}</span>
-        <span class="gs-acc__chev" aria-hidden="true">▾</span>
-      </button>
-      <div class="gs-acc__body">
-        ${blurb ? `<p class="gs-acc__blurb">${blurb}</p>` : ''}
-        <div class="gs-acc__rack">${rack}</div>
-      </div>
-    </section>`;
-}
-
-/** The Trade Market (GS-clubhouse): spend Star Shards on cosmetic ships, clothing, and bag tiers. Buying
- *  grants GLOBAL ownership — you then outfit each golfer individually in the Clubhouse. The full browsable
- *  catalogue is split into uniform collapsible sections (GS-market-accordion) so it stays navigable. */
-function tradeMarketScreen(): string {
-  // Earned Unending-Universe unlocks (ships/apparel) and locked Ascension bag tiers stay OUT of the
-  // rack entirely until they're unlocked/owned (GS-hide-unlocks) — the market only shows what you can
-  // actually buy or already have, never spoiling a milestone reward.
-  // A section whose only items are owned goes empty once Show Owned is off — show this instead of a
-  // blank rack so the fold still reads (its count header still shows the owned/total tally).
-  const emptyRackNote = '<p class="gs-acc__blurb" style="opacity:.55;">You own everything here — flip on <b>Show Owned</b> above to browse it.</p>';
-  const ships = shipCatalogue().filter((s) => shipRevealedInMarket(s, state.ownedShips));
-  // Owned rides sink to the bottom of the rack (greyed out) so the buyable fleet reads first (stable
-  // sort keeps rarity order within each group). With Show Owned off they're dropped from the rack
-  // entirely — a fully-owned section shows a gentle note instead of an empty rack.
-  const shipCards =
-    ships
-      .filter((s) => marketShowOwned || !state.ownedShips.includes(s.id))
-      .sort((a, b) => Number(state.ownedShips.includes(a.id)) - Number(state.ownedShips.includes(b.id)))
-    .map((ship) => {
-      const ring = cosmeticRarCol(ship.rarity);
-      const owned = state.ownedShips.includes(ship.id);
-      const afford = canBuyShip(ship, state.shards, state.ownedShips);
-      let footer: string;
-      let action: Action | undefined;
-      if (owned) {
-        footer = '✓ owned';
-      } else if (afford) {
-        footer = `✦ ${ship.cost}`;
-        action = { type: 'buyShip', id: ship.id };
-      } else {
-        footer = `✦ ${ship.cost} — short`;
-      }
-      return shipCardHTML(ship, footer, { ring, dim: owned || !afford, glow: isMythic(ship.rarity) && !owned, action });
-    })
-    .join('') || emptyRackNote;
-  const shipsOwned = ships.filter((s) => state.ownedShips.includes(s.id)).length;
-
-  // One uniform collapsible clothing rack per slot (hats / shirts / pants / bag), each with its owned
-  // tally. Earned-only garments (Unending-Universe trophies) are hidden until owned, so a slot with
-  // nothing yet revealed (e.g. Caddy Bags before any are earned) drops out of the market entirely.
-  const apparelSection = (slot: ApparelSlot, icon: string, title: string, blurb: string) => {
-    const items = apparelForSlot(slot).filter((a) => apparelRevealedInMarket(a, state.ownedApparel));
-    if (!items.length) return '';
-    const owned = items.filter((a) => state.ownedApparel.includes(a.id)).length;
-    // With Show Owned off, owned garments drop out of the rack; on, they sink to the bottom (greyed)
-    // so the buyable rack still reads first. Stable sort keeps rarity order within each group.
-    const rack =
-      items
-        .filter((a) => marketShowOwned || !state.ownedApparel.includes(a.id))
-        .sort((a, b) => Number(state.ownedApparel.includes(a.id)) - Number(state.ownedApparel.includes(b.id)))
-        .map(marketApparelCardHTML)
-        .join('') || emptyRackNote;
-    return marketSection(slot, icon, title, owned, items.length, blurb, rack);
-  };
-
-  return `
-    <header style="border-left:4px solid #e08a2b;padding-left:10px;">
-      <h1 style="margin:0;font-size:22px;">🚀 Trade Market</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Spend Star Shards on ships, clothing &amp; bag tiers. Cosmetic only — buy it here, then outfit each golfer in the <b>Clubhouse</b>. Tap a section to fold it away.</p>
-    </header>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:.6em 0 .4em;flex-wrap:wrap;">
-      <h2 style="font-size:16px;margin:0;">✦ ${state.shards} Star Shards</h2>
-      <button class="gs-setrow" data-market-showowned="1" aria-pressed="${marketShowOwned}" style="width:auto;padding:6px 10px;gap:9px;border-top:none;border-radius:999px;background:#ffffff08;">
-        <span class="gs-setlabel"><b>Show Owned</b></span>
-        <span class="gs-toggle${marketShowOwned ? ' gs-toggle--on' : ''}" aria-hidden="true"><span class="gs-knob"></span></span>
-      </button>
-    </div>
-    ${marketSection(
-      'ships',
-      '🚀',
-      'Ships',
-      shipsOwned,
-      ships.length,
-      'The full fleet. The rarer the ride, the steeper the shard price — the Mothership is the grail.',
-      shipCards,
-    )}
-    ${apparelSection('hat', '🎩', 'Hats', 'Caps &amp; crowns. Complete a matching set across every slot for the full look.')}
-    ${apparelSection('shirt', '👕', 'Shirts', 'Tops &amp; jackets to suit each golfer.')}
-    ${apparelSection('pants', '👖', 'Pants', 'Trousers &amp; legwear to finish the outfit.')}
-    ${apparelSection('bag', '🎒', 'Caddy Bags', 'Cosmetic staff bags your golfer poses with in the Clubhouse — earned in the <b>Unending Universe</b>, never sold.')}
-    ${bagSetSection()}
-    <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-      ${btn('🏠 Clubhouse', { type: 'openClubhouseHall' }, { variant: 'ghost' })}
-      ${btn('← Back to title', { type: 'closeMarket' }, { variant: 'ghost' })}
-    </div>`;
-}
-
-/** The Clubhouse hall (GS-clubhouse / GS-clubhouse-lounge) — its own screen reached from the title's
- *  Clubhouse doorway. The four golfers loiter in a cosy bar + fireplace lounge wearing their own outfits;
- *  tap any of them to open their garage + wardrobe. They've shuffled to new spots since your last run. */
-function clubhouseHallScreen(): string {
-  const golfers: LoungeGolfer[] = CHARACTERS.map((ch) => ({
-    id: ch.id,
-    shortName: ch.shortName,
-    capColor: ch.style.cap,
-    hatId: hatForCharacter(state, ch.id),
-    shirtId: shirtForCharacter(state, ch.id),
-    pantsId: pantsForCharacter(state, ch.id),
-    shipId: shipForCharacter(state, ch.id),
-    skin: ch.style.skin,
-    shirtBase: ch.style.shirt,
-  }));
-  return `
-    <header style="border-left:4px solid #d8a24a;padding-left:10px;">
-      <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire, their rides parked at the spaceport below. Tap a golfer or their ship to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
-    </header>
-    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender)}</div>
-    <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
-}
-
-/** The two big title-screen doorways (GS-nav): the Trade Market on the left, the Clubhouse on the
- *  right, each a fat themed button with its own painted scene behind the label. */
-function navTilesHTML(): string {
-  return `
-    <div class="gs-navtiles">
-      <button class="gs-navtile gs-navtile--market" data-action='${JSON.stringify({ type: 'openMarket' })}'>
-        <span class="gs-navtile__art" aria-hidden="true">${marketTileArt()}</span>
-        <span class="gs-navtile__cap">
-          <span class="gs-navtile__title">🚀 Trade Market</span>
-          <span class="gs-navtile__sub">Spend ✦ Shards on ships &amp; threads</span>
-        </span>
-      </button>
-      <button class="gs-navtile gs-navtile--clubhouse" data-action='${JSON.stringify({ type: 'openClubhouseHall' })}'>
-        <span class="gs-navtile__art" aria-hidden="true">${clubhouseTileArt()}</span>
-        <span class="gs-navtile__cap">
-          <span class="gs-navtile__title">🏠 Clubhouse</span>
-          <span class="gs-navtile__sub">Outfit each of your golfers</span>
-        </span>
-      </button>
-    </div>`;
-}
-
-/** Painted backdrop for the Trade Market tile: an orbital trading post — a teal-lit docking ring
- *  around a modular hub with warm market windows, stacked cargo crates for wares, and a shuttle
- *  ferrying a crate in. Teal/amber scheme keeps it clearly apart from the violet Unending Universe
- *  doorway. Hand-placed (no rng) so it stays byte-stable. */
-function marketTileArt(): string {
-  const stars = [
-    [14, 18], [34, 40], [58, 22], [86, 52], [110, 30], [140, 16], [168, 46],
-    [196, 26], [220, 20], [248, 20], [272, 44], [40, 70], [128, 64], [96, 12],
-  ]
-    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${1 + (i % 3) * 0.5}" fill="#dff7f2" opacity="${0.4 + (i % 4) * 0.12}"/>`)
-    .join('');
-  // A stack of traded cargo containers — the wares of the space bazaar.
-  const crate = (x: number, y: number, w: number, h: number, fill: string) =>
-    `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="${fill}"/>` +
-    `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="none" stroke="#00000033" stroke-width="1"/>` +
-    `<line x1="${x + w * 0.5}" y1="${y}" x2="${x + w * 0.5}" y2="${y + h}" stroke="#00000022" stroke-width="1"/></g>`;
-  const cargo =
-    crate(28, 92, 27, 16, '#e0a53e') +
-    crate(57, 96, 22, 12, '#2f8f8a') +
-    crate(33, 78, 21, 13, '#c98a6a') +
-    crate(56, 84, 16, 11, '#e0a53e');
-  // Warm market windows glowing on the station hub.
-  const windows = [
-    [197, 54], [206, 54], [215, 54], [224, 54],
-    [197, 63], [206, 63], [215, 63], [224, 63],
-  ]
-    .map(([x, y]) => `<rect x="${x}" y="${y}" width="4" height="4" rx="0.6" fill="#ffd27a" opacity="0.92"/>`)
-    .join('');
-  return `<svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
-    <defs>
-      <radialGradient id="ntMkt" cx="66%" cy="30%" r="98%">
-        <stop offset="0%" stop-color="#17585c"/><stop offset="52%" stop-color="#0d2b38"/><stop offset="100%" stop-color="#06121c"/>
-      </radialGradient>
-      <radialGradient id="ntMktGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ffd98a" stop-opacity="0.5"/><stop offset="100%" stop-color="#ffd98a" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
-    <rect width="300" height="120" fill="url(#ntMkt)"/>
-    ${stars}
-    <!-- orbital trade station: a docking ring circling a modular hub with lit market windows -->
-    <g>
-      <circle cx="212" cy="56" r="30" fill="url(#ntMktGlow)"/>
-      <ellipse cx="212" cy="56" rx="48" ry="19" fill="none" stroke="#39d9c4" stroke-width="3.4" opacity="0.42"/>
-      <ellipse cx="212" cy="56" rx="48" ry="19" fill="none" stroke="#7ff0e0" stroke-width="1.2" opacity="0.6"/>
-      <circle cx="164" cy="56" r="3.4" fill="#39d9c4" opacity="0.85"/>
-      <circle cx="260" cy="56" r="3.4" fill="#39d9c4" opacity="0.85"/>
-      <rect x="192" y="42" width="40" height="30" rx="7" fill="#28454d"/>
-      <rect x="192" y="42" width="40" height="9" rx="7" fill="#35636d"/>
-      ${windows}
-      <rect x="211" y="30" width="2" height="12" fill="#5c7a80"/>
-      <circle cx="212" cy="29" r="2.4" fill="#ff8f5e"/>
-    </g>
-    ${cargo}
-    <!-- a shuttle ferrying a crate in toward the market -->
-    <g transform="translate(118,44) rotate(18)">
-      <path d="M0,-12 C6,-8 6,8 0,14 C-6,8 -6,-8 0,-12 Z" fill="#dfe6f2"/>
-      <circle cx="0" cy="-2" r="3.1" fill="#8fe6da"/>
-      <path d="M-6,7 L-11,15 L-3,11 Z" fill="#39d9c4"/>
-      <path d="M6,7 L11,15 L3,11 Z" fill="#39d9c4"/>
-      <rect x="-4" y="14" width="8" height="6" rx="1" fill="#e0a53e"/>
-    </g>
-  </svg>`;
-}
-
-/** Painted backdrop for the Clubhouse tile: a cosy clubhouse on the green under a dusk sky — building,
- *  lit windows, a pin flag on a rolling hill. Hand-placed (no rng) so it stays byte-stable. */
-function clubhouseTileArt(): string {
-  return `<svg viewBox="0 0 300 120" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
-    <defs>
-      <linearGradient id="ntSky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#23304a"/><stop offset="60%" stop-color="#3a4d55"/><stop offset="100%" stop-color="#5a6e3a"/>
-      </linearGradient>
-      <linearGradient id="ntGrass" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#5fb04a"/><stop offset="100%" stop-color="#2f7a33"/>
-      </linearGradient>
-    </defs>
-    <rect width="300" height="120" fill="url(#ntSky)"/>
-    <circle cx="248" cy="30" r="14" fill="#ffe6a6" opacity="0.85"/>
-    <path d="M0,84 Q90,58 170,74 T300,70 V120 H0 Z" fill="url(#ntGrass)"/>
-    <path d="M0,98 Q120,82 220,94 T300,92 V120 H0 Z" fill="#256a2a" opacity="0.7"/>
-    <g transform="translate(58,52)">
-      <rect x="0" y="14" width="78" height="40" fill="#6e4a2c"/>
-      <rect x="0" y="14" width="78" height="40" fill="#00000022"/>
-      <path d="M-8,16 L39,-8 L86,16 Z" fill="#8a3b2e"/>
-      <rect x="33" y="34" width="16" height="20" fill="#3a2716"/>
-      <rect x="10" y="24" width="13" height="11" fill="#ffd76b"/>
-      <rect x="55" y="24" width="13" height="11" fill="#ffd76b"/>
-    </g>
-    <g transform="translate(214,40)">
-      <rect x="0" y="0" width="2.5" height="44" fill="#d8d8d8"/>
-      <path d="M2.5,0 L24,7 L2.5,14 Z" fill="#ff6b6b"/>
-      <circle cx="1.2" cy="44" r="3.2" fill="#f4f4f4"/>
-    </g>
-  </svg>`;
-}
-
-/** A hangar-bay backdrop for the Clubhouse garage tile (GS-clubhouse-stage): a launch pad under an open
- *  star-bay, pillars + neon strips tinted by the parked ship's rarity, with the ship itself sat on the
- *  glowing pad. Deterministic (fixed star spots — the render layer bans Math.random). */
-function clubhouseGarageArt(shipId: string | undefined, accent: string): string {
-  const stars = [
-    [58, 20], [92, 12], [130, 26], [168, 15], [206, 24], [240, 18],
-    [74, 34], [150, 8], [190, 36], [116, 40],
-  ]
-    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 === 0 ? 1.4 : 0.9}" fill="#eaf2ff" opacity="${i % 2 ? 0.7 : 0.95}"/>`)
-    .join('');
-  const chevron = (y: number, o: number) =>
-    `<path d="M132,${y} L150,${y + 6} L168,${y} L168,${y + 3} L150,${y + 9} L132,${y + 3} Z" fill="${accent}" opacity="${o}"/>`;
-  return `<svg viewBox="0 0 300 130" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
-    <defs>
-      <linearGradient id="ghSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#080c1a"/><stop offset="100%" stop-color="#141d36"/></linearGradient>
-      <radialGradient id="ghGlow" cx="50%" cy="88%" r="62%"><stop offset="0%" stop-color="${accent}" stop-opacity="0.4"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></radialGradient>
-      <linearGradient id="ghFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#28324f"/><stop offset="100%" stop-color="#0b0f1d"/></linearGradient>
-    </defs>
-    <rect width="300" height="130" fill="url(#ghSky)"/>
-    ${stars}
-    <path d="M34,4 Q150,-16 266,4 L266,60 L34,60 Z" fill="#0a0f22" opacity="0.55"/>
-    <rect x="0" y="84" width="300" height="46" fill="url(#ghFloor)"/>
-    <ellipse cx="150" cy="106" rx="104" ry="19" fill="url(#ghGlow)"/>
-    <ellipse cx="150" cy="106" rx="74" ry="12.5" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.75" stroke-dasharray="6 6"/>
-    ${chevron(112, 0.8)}${chevron(118, 0.4)}
-    <rect x="14" y="4" width="11" height="118" fill="#18223c"/>
-    <rect x="275" y="4" width="11" height="118" fill="#18223c"/>
-    <rect x="25" y="10" width="3.4" height="104" rx="1.7" fill="${accent}" opacity="0.55"/>
-    <rect x="271.6" y="10" width="3.4" height="104" rx="1.7" fill="${accent}" opacity="0.55"/>
-    ${shipSVG(shipId, 150, 80, 2.2)}
-  </svg>`;
-}
-
-/** The open slot-picker below the character stage (GS-clubhouse-stage): when a body part or the garage is
- *  tapped, this reveals just that slot's owned rack (equip toggles / owned fleet). null = a resting hint. */
-function clubhousePicker(
-  ch: Character,
-  hatId: string | undefined,
-  shirtId: string | undefined,
-  pantsId: string | undefined,
-  shipId: string | undefined,
-  bagId: string | undefined,
-): string {
-  if (!clubhouseSlot) {
-    return `<p class="gs-clubhint">Tap ${ch.shortName}'s hat, shirt, pants, bag — or the garage — to change it.</p>`;
-  }
-  const meta: Record<ClubSlot, { icon: string; title: string }> = {
-    hat: { icon: '🎩', title: `Hats for ${ch.shortName}` },
-    shirt: { icon: '👕', title: `Shirts for ${ch.shortName}` },
-    pants: { icon: '👖', title: `Pants for ${ch.shortName}` },
-    bag: { icon: '🎒', title: `Golf bags for ${ch.shortName}` },
-    ship: { icon: '🛸', title: `${ch.shortName}'s garage` },
-  };
-  const m = meta[clubhouseSlot];
-  let body: string;
-  if (clubhouseSlot === 'ship') {
-    body = `<div class="gs-cpick__rack">${shipCatalogue()
-      .filter((s) => state.ownedShips.includes(s.id))
-      .map((ship) => {
-        const flying = ship.id === shipId;
-        return shipCardHTML(ship, flying ? '✓ FLYING' : 'Fly this', {
-          ring: flying ? '#ffce54' : cosmeticRarCol(ship.rarity),
-          glow: flying,
-          action: flying ? undefined : { type: 'selectShip', id: ship.id },
-        });
-      })
-      .join('')}</div>`;
-  } else {
-    const owned = apparelForSlot(clubhouseSlot).filter((a) => state.ownedApparel.includes(a.id));
-    // Golf bags are Unending-Universe trophies (GS-unending) — an empty rack points at the run, not the shop.
-    const emptyMsg =
-      clubhouseSlot === 'bag'
-        ? `<div class="gs-cpick__empty">No golf bags earned yet.<br><span style="font-size:12px;opacity:.75;">Survive 40 holes of the <b>Unending Universe</b> to earn the Evergreen Tour Bag.</span></div>`
-        : `<div class="gs-cpick__empty">No ${clubhouseSlot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
-    body = owned.length
-      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId, bagId)).join('')}</div>`
-      : emptyMsg;
-  }
-  return `
-    <section class="gs-cpick">
-      <div class="gs-cpick__head">
-        <span aria-hidden="true">${m.icon}</span>
-        <span class="gs-cpick__title">${m.title}</span>
-        <button class="gs-cpick__done" data-clubslot="${clubhouseSlot}">Done ✕</button>
-      </div>
-      ${body}
-    </section>`;
-}
-
-/** One character's Clubhouse (GS-clubhouse / GS-clubhouse-stage): a big full-body avatar you outfit by
- *  TAPPING the body part you want to change (hat / shirt / pants) plus a garage bay below you tap to pick
- *  the ride. Each tap reveals just that slot's owned rack. Outfitting is PER character — nothing shared. */
-function clubhouseScreen(): string {
-  const ch = getCharacter(state.manageCharacterId);
-  if (!ch) return titleScreen(); // safety: no character selected
-  const hatId = hatForCharacter(state, ch.id);
-  const shirtId = shirtForCharacter(state, ch.id);
-  const pantsId = pantsForCharacter(state, ch.id);
-  const shipId = shipForCharacter(state, ch.id);
-  const bagId = golfBagForCharacter(state, ch.id);
-  const preview = golferPreviewSVG(hatId, shirtId, pantsId, {
-    skin: ch.style.skin,
-    shirtBase: ch.style.shirt,
-    capColor: ch.style.cap,
-    uid: 'stage',
-    w: 190,
-    h: 210,
-    bagId,
-  });
-  const setName = equippedSet(hatId, shirtId, pantsId, bagId);
-  const setBadge = setName
-    ? `<div class="gs-clubset">✦ ${setName} set complete!</div>`
-    : '';
-  const ship = shipCatalogue().find((s) => s.id === shipId);
-  const shipAccent = ship ? cosmeticRarCol(ship.rarity) : '#8aa0c0';
-
-  const nameOf = (id: string | undefined, fallback: string) => apparelById(id)?.name ?? fallback;
-  // A tap zone over one body part: an invisible band with a floating "current item ✎" chip; the band
-  // that owns the open picker glows. Tapping toggles that slot's rack open/closed.
-  const zone = (slot: ApparelSlot, icon: string, label: string) => {
-    const active = clubhouseSlot === slot ? ' gs-czone--active' : '';
-    return `<button class="gs-czone gs-czone--${slot}${active}" data-clubslot="${slot}" aria-label="Change ${ch.shortName}'s ${slot}">
-      <span class="gs-czone__chip">${icon} ${label} <span class="gs-czone__pen">✎</span></span>
-    </button>`;
-  };
-  const shipActive = clubhouseSlot === 'ship' ? ' gs-garage--active' : '';
-
-  return `
-    <header style="border-left:4px solid ${ch.style.cap};padding-left:10px;">
-      <h1 style="margin:0;font-size:22px;">🏠 ${ch.name}'s Clubhouse</h1>
-      <p style="opacity:.75;font-size:13px;margin:.3em 0;">Tap ${ch.shortName} to restyle them, tap the garage to pick a ride.</p>
-    </header>
-    <div class="gs-cstage">
-      <div class="gs-cstage__figure">${preview}</div>
-      ${zone('hat', '🎩', nameOf(hatId, 'No hat'))}
-      ${zone('shirt', '👕', nameOf(shirtId, 'Default shirt'))}
-      ${zone('pants', '👖', nameOf(pantsId, 'Default pants'))}
-      ${zone('bag', '🎒', nameOf(bagId, 'No bag'))}
-    </div>
-    ${setBadge}
-    <button class="gs-garage${shipActive}" data-clubslot="ship" aria-label="Change ${ch.shortName}'s ride">
-      <span class="gs-garage__art" aria-hidden="true">${clubhouseGarageArt(shipId, shipAccent)}</span>
-      <span class="gs-garage__cap">
-        <span>
-          <span class="gs-garage__name">🛸 ${ship?.name ?? 'Ship'}</span>
-          <span class="gs-garage__sub">${ship ? `${ship.set} · ${ship.rarity}` : ''}</span>
-        </span>
-        <span class="gs-garage__edit">Change ride ✎</span>
-      </span>
-    </button>
-    ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId, bagId)}
-    <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-      ${btn('🏠 Back to Clubhouse', { type: 'clubhouseBackToHall' }, { variant: 'ghost' })}
-      ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
-      ${btn('← Back to title', { type: 'closeClubhouse' }, { variant: 'ghost' })}
-    </div>`;
-}
-
-/** A bag-set card (GS-bag-tiers): the blinged golf bag over a rarity panel, with a buy / owned /
- *  equipped / locked footer. Clickable only when it's a buyable, unlocked, affordable upgrade. */
-function bagSetCardHTML(set: BagSet): string {
-  const ring = rarCol(set.tier);
-  const currentRank = bagTierRank(state.bagTier);
-  const current = state.bagTier === set.tier;
-  const owned = bagTierRank(set.tier) <= currentRank && currentRank > 0;
-  const unlocked = bagSetUnlocked(set, state.maxAscension);
-  const afford = canBuyBagSet(set, state.bagTier, state.maxAscension, state.shards);
-  let footer: string;
-  let action: Action | undefined;
-  if (current) {
-    footer = '✓ EQUIPPED';
-  } else if (owned) {
-    footer = '✓ owned';
-  } else if (!unlocked) {
-    // Defensive only: a locked set is filtered out of the market until its gate clears
-    // (GS-hide-unlocks, `bagSetRevealedInMarket`), so a visible card is always unlocked/owned.
-    footer = `🔒 Clear ${set.gateLabel}`;
-  } else if (afford) {
-    footer = `✦ ${set.cost}`;
-    action = { type: 'buyBagTier', tier: set.tier };
-  } else {
-    footer = `✦ ${set.cost} — short`;
-  }
-  // Grey out anything that isn't the buyable frontier: locked gates, owned lower tiers, and
-  // can't-affords all dim; only the equipped tier (highlighted) and buyable upgrades stay bright.
-  const dim = !current && (!unlocked || owned || !afford);
-  const inner = `
-    <div title="${set.blurb}" style="border:2px solid ${current ? '#ffce54' : ring};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 28%, ${ring}22, #0b0d12);text-align:center;width:130px;${dim ? 'opacity:.55;' : ''}${current ? `box-shadow:0 0 0 2px #ffce54, 0 0 14px ${ring}66;` : ''}">
-      ${drawGolfBag(set.tint, set.tier)}
-      <div style="font-size:12.5px;font-weight:700;margin-top:3px;">${set.name}</div>
-      <div style="font-size:10px;opacity:.55;text-transform:capitalize;">${set.tier} · clear ${set.gateLabel}</div>
-      <div style="font-size:11px;margin-top:3px;color:${current ? '#ffce54' : ring};font-weight:700;">${footer}</div>
-    </div>`;
-  return action
-    ? `<div class="gs-clickcard" data-action='${JSON.stringify(action)}' style="cursor:pointer;margin:4px;">${inner}</div>`
-    : `<div style="margin:4px;">${inner}</div>`;
-}
-
-/** The Bag & Club Sets shop (GS-bag-tiers): permanent Star-Shard upgrades that lift EVERY golfer's
- *  starting bag to a higher loot rarity (better distance clubs + a steadier putter + blinged graphics),
- *  unlocked by CLEARING the Ascension gates. The won-bag also makes the Pro Shop skip lower-rarity clubs. */
-function bagSetSection(): string {
-  // Locked club-set upgrades stay hidden until their Ascension gate is cleared (GS-hide-unlocks) — the
-  // market only shows tiers you can actually buy now or already own. If none are revealed yet (a fresh
-  // common-bag player who's cleared no gate), the whole section drops out rather than teasing locked gear.
-  const sets = BAG_SETS.filter((s) => bagSetRevealedInMarket(s, state.maxAscension, state.bagTier));
-  if (!sets.length) return '';
-  const current = bagSet(state.bagTier);
-  const currentLabel = current ? `${current.name} (${state.bagTier})` : 'Starter bag (common)';
-  const moreToUnlock = BAG_SETS.some((s) => !bagSetUnlocked(s, state.maxAscension) && bagTierRank(s.tier) > bagTierRank(state.bagTier));
-  // Keep the roadmap generic so a not-yet-unlocked tier isn't named/spoiled before its gate is cleared.
-  const hint = moreToUnlock
-    ? 'Clear a higher Ascension gate to unlock the next tier.'
-    : 'Every bag tier is unlocked — outfit the deepest run.';
-  // "Owned" = every tier at or below the equipped one (the starter/common tier doesn't count).
-  const currentRank = bagTierRank(state.bagTier);
-  const owned = currentRank > 0 ? sets.filter((s) => bagTierRank(s.tier) <= currentRank).length : 0;
-  const blurb = `Permanent upgrades that re-outfit <b>every</b> golfer's starting bag in a higher rarity — longer woods, a steadier putter, and a blingier bag for the deep-Ascension grind. Buying one also stops the Pro Shop dangling clubs below your bag's rarity. Current: <b>${currentLabel}</b>. ${hint}`;
-  // A tier at or below the equipped one counts as owned — hidden with Show Owned off.
-  const rack =
-    sets.filter((s) => marketShowOwned || bagTierRank(s.tier) > currentRank).map(bagSetCardHTML).join('') ||
-    '<p class="gs-acc__blurb" style="opacity:.55;">You own every tier here — flip on <b>Show Owned</b> above to browse it.</p>';
-  return marketSection('bags', '🎒', 'Bag &amp; Club Sets', owned, sets.length, blurb, rack);
-}
-
-/** Shared apparel card chrome — the garment art over a rarity-ringed panel with a footer. */
-function apparelCardChrome(item: Apparel, footer: string, opts: { ring: string; accent: string; action?: Action; dim?: boolean; glow?: boolean }): string {
-  const inner = `
-    <div style="border:2px solid ${opts.accent};border-radius:12px;padding:8px 6px 6px;background:radial-gradient(circle at 50% 30%, ${opts.ring}22, #0b0d12);text-align:center;width:130px;${opts.dim ? 'opacity:.5;' : ''}${opts.glow ? `box-shadow:0 0 0 2px ${opts.accent}, 0 0 14px ${opts.ring}88;` : ''}">
-      ${apparelCardSVG(item.id, 104, 64)}
-      <div style="font-size:12.5px;font-weight:700;margin-top:2px;">${item.name}</div>
-      <div style="font-size:10px;opacity:.55;">${item.set} · ${item.rarity}</div>
-      <div style="font-size:11px;margin-top:3px;color:${opts.accent};font-weight:700;">${footer}</div>
-    </div>`;
-  return opts.action
-    ? `<div class="gs-clickcard" data-action='${JSON.stringify(opts.action)}' style="cursor:pointer;margin:4px;">${inner}</div>`
-    : `<div style="margin:4px;">${inner}</div>`;
-}
-
-/** A Trade-Market clothing card (GS-clubhouse) — buy if unowned & affordable, else "owned" / "short". */
-function marketApparelCardHTML(item: Apparel): string {
-  const ring = cosmeticRarCol(item.rarity);
-  const owned = state.ownedApparel.includes(item.id);
-  const afford = canBuyApparel(item, state.shards, state.ownedApparel);
-  let footer: string;
-  let action: Action | undefined;
-  if (owned) {
-    footer = '✓ owned';
-  } else if (item.unlockHoles) {
-    // Defensive only: an unowned Unending-Universe trophy is filtered out of the market entirely now
-    // (GS-hide-unlocks, `apparelRevealedInMarket`), so a visible unlockHoles card is always owned above.
-    footer = `🔒 Survive ${item.unlockHoles} holes · Unending Universe`;
-  } else if (afford) {
-    footer = `✦ ${item.cost}`;
-    action = { type: 'buyApparel', id: item.id };
-  } else {
-    footer = `✦ ${item.cost} — short`;
-  }
-  return apparelCardChrome(item, footer, { ring, accent: ring, action, dim: owned || !afford, glow: isMythic(item.rarity) && !owned });
-}
-
-/** A Clubhouse wardrobe card (GS-clubhouse) — an equip toggle for an OWNED garment on the managed
- *  golfer (worn → click to take off). Only ever rendered for owned pieces. */
-function clubhouseApparelCardHTML(
-  item: Apparel,
-  hatId: string | undefined,
-  shirtId: string | undefined,
-  pantsId: string | undefined,
-  bagId: string | undefined,
-): string {
-  const ring = cosmeticRarCol(item.rarity);
-  const wornId =
-    item.slot === 'hat' ? hatId : item.slot === 'shirt' ? shirtId : item.slot === 'bag' ? bagId : pantsId;
-  const worn = wornId === item.id;
-  const accent = worn ? '#ffce54' : ring;
-  const footer = worn ? '✓ WEARING' : 'Wear this';
-  return apparelCardChrome(item, footer, { ring, accent, action: { type: 'equipApparel', id: item.id }, glow: worn || isMythic(item.rarity) });
-}
-
-// The destination biome a lane flies into (GS-journey-biome) → a glyph + label + accent for the route
-// card, so picking a jump reads as choosing a world, not an unrelated surprise on arrival.
-const BIOME_BADGE: Record<string, { glyph: string; label: string; col: string }> = {
-  verdant: { glyph: '🌳', label: 'Verdant', col: '#5fd45a' },
-  desert: { glyph: '🏜️', label: 'Desert', col: '#e0b15a' },
-  frost: { glyph: '❄️', label: 'Frost', col: '#7fd6e6' },
-  inferno: { glyph: '🌋', label: 'Inferno', col: '#ff6b4a' },
-  void: { glyph: '🌌', label: 'Void', col: '#9a7bd0' },
-  crystal: { glyph: '💎', label: 'Crystal', col: '#9fe0f5' },
-  tempest: { glyph: '🌪️', label: 'Tempest', col: '#c8b8ff' },
-  fungal: { glyph: '🍄', label: 'Jungle', col: '#54dba0' },
-  ocean: { glyph: '🌊', label: 'Ocean', col: '#5fd49e' },
-  cetus: { glyph: '🐋', label: 'Cetus', col: '#5fd8dc' },
-};
-
-// The functional family of a route event → a short pill label + accent (distinct from the rarity ring).
-const EVENT_CATEGORY: Record<EventCategory, { label: string; col: string }> = {
-  calm: { label: 'SAFE', col: '#2bb673' },
-  payout: { label: 'PAYOUT', col: '#ffce54' },
-  toll: { label: 'GAMBLE', col: '#ff8b6b' },
-  salvage: { label: 'SALVAGE', col: '#4fd0e0' },
-};
-
-// A small pill token (label + accent) — shared by the travel screen + the route-info sheet.
-function travelChip(txt: string, col: string): string {
-  return `<span style="display:inline-block;font-size:11.5px;font-weight:700;color:${col};border:1px solid ${col}66;border-radius:5px;padding:1px 7px;">${txt}</span>`;
-}
-
-/** Route-event copy, kept honest per format (GS-unending): in the Unending Universe there is no
- *  Stableford cut — an event's `cutDelta` lands as course WILDNESS (`routeDifficulty`) instead, so
- *  its "cut +1" phrasing is rewritten to say what actually happens. Other formats read as authored. */
-function eventDescFor(desc: string): string {
-  if (!holeGateArmed(state.run)) return desc;
-  return desc.replace(/cut \+\d+/gi, 'wilder course').replace(/cut -\d+/gi, 'calmer course');
-}
-
-/** The route-info sheet (GS-journey-vertical): tapping a branch planet on the star-chart opens this
- *  bottom-sheet with the FULL jump detail — the world you'll play (biome + difficulty + weather), the
- *  bet's levers, and a confirm/cancel. Confirm dispatches the existing { type:'route' } action; cancel
- *  closes it so you can inspect another lane. A view overlay (module state), not reducer state. */
-function routeInfoOverlay(): string {
-  const r = (state.routes ?? []).find((x) => x.id === inspectRouteId);
-  if (!r) return '';
-  const ev = r.event;
-  const credits = state.run.credits;
-  const ring = rarCol(ev.rarity);
-  const accent = r.elite ? '#ffce54' : ring;
-  const cat = EVENT_CATEGORY[ev.category];
-  const b = BIOME_BADGE[r.theme.archetype] ?? { glyph: '🪐', label: r.theme.archetype, col: '#8aa0c0' };
-  const dd = routeDifficulty(ev);
-  const diff =
-    dd <= -0.1 ? { t: 'Gentler course', c: '#2bb673' }
-    : dd < 0.07 ? { t: 'Standard course', c: '#9fb0cf' }
-    : dd < 0.16 ? { t: 'Tougher course', c: '#ffb04a' }
-    : { t: 'Brutal course', c: '#ff6b4a' };
-  const eff = COURSE_EFFECTS[routeEffect(ev)];
-
-  // The lane's levers, each its own readable token.
-  const tags: string[] = [];
-  if (ev.creditMult !== 1) {
-    const pct = Math.round((ev.creditMult - 1) * 100);
-    tags.push(travelChip(`${pct > 0 ? '+' : ''}${pct}% credits`, pct >= 0 ? '#ffce54' : '#ff8b6b'));
-  }
-  // In the Unending Universe the cut lever doesn't exist — the difficulty line above already says
-  // what cutDelta really does there (a wilder/gentler generated course via routeDifficulty).
-  if (ev.cutDelta !== 0 && !holeGateArmed(state.run))
-    tags.push(travelChip(`cut ${ev.cutDelta > 0 ? '+' : ''}${ev.cutDelta}`, ev.cutDelta > 0 ? '#ff8b6b' : '#2bb673'));
-  if (ev.creditToll) {
-    const afford = credits >= ev.creditToll;
-    tags.push(travelChip(`−${ev.creditToll} toll${afford ? '' : ' ⚠'}`, '#ff8b6b'));
-  }
-  // The weather's play hooks (GS-journey-variety wind; GS-journey-fx-2 carry + ground twists): the
-  // sky is a real lever now — say EXACTLY what it does to your golf, computed from the same tables
-  // the physics read so the card can never drift from the course.
-  const windMult = effectWindMult(eff.id);
-  if (windMult > 1) tags.push(travelChip(`💨 winds +${Math.round((windMult - 1) * 100)}%`, '#ff8b6b'));
-  else if (windMult < 1) tags.push(travelChip(`🍃 still air −${Math.round((1 - windMult) * 100)}%`, '#2bb673'));
-  const carryMult = effectCarryMult(eff.id);
-  if (carryMult > 1) tags.push(travelChip(`🎈 shots fly +${Math.round((carryMult - 1) * 100)}%`, '#2bb673'));
-  else if (carryMult < 1) tags.push(travelChip(`⚓ shots fly −${Math.round((1 - carryMult) * 100)}%`, '#ff8b6b'));
-  tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
-  // The jump's FUEL bill (GS-fuel-2): ONE tank-before → tank-after chip, and any shortfall is
-  // priced on the Jump button itself (below) — never a silent surcharge.
-  const fuelAfter = Math.max(0, state.run.fuel - routeFuelCost(state.run, r));
-  tags.push(travelChip(`⛽ ${state.run.fuel} → ${fuelAfter}`, state.run.fuel >= routeFuelCost(state.run, r) ? '#4fd0e0' : '#ff8b6b'));
-  // Ion Thrusters (GS-fuel-3): show the drive earning its keep on every discounted jump.
-  if (routeFuelCost(state.run, r) < r.distanceJump)
-    tags.push(travelChip(`🌀 ion drive −${r.distanceJump - routeFuelCost(state.run, r)} ⛽`, '#7ff3ff'));
-  const shortfall = fuelShortfall(state.run, r);
-
-  const markers = [
-    r.bossAhead ? `<span style="color:#ff8b6b;font-weight:700;">⚔ Boss ahead</span>` : '',
-    r.elite ? `<span style="color:#ffce54;font-weight:700;">🔥 Harder path</span>` : '',
-  ]
-    .filter(Boolean)
-    .join('&nbsp;·&nbsp;');
-
-  const tollWarn =
-    ev.creditToll && credits < ev.creditToll
-      ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⚠ You can't cover the ${ev.creditToll}-credit toll (you have ${credits}).</div>`
-      : '';
-  // Not enough fuel AND not enough credits to buy the shortfall (GS-fuel): this lane is locked.
-  const travellable = canTravel(state.run, r);
-  const fuelWarn = !travellable
-    ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⛽ Not enough fuel for this ${routeFuelCost(state.run, r)}-unit jump — the missing ${fuelShortfall(state.run, r)} unit${fuelShortfall(state.run, r) === 1 ? '' : 's'} would cost ${travelRefuelCost(state.run, r)} cr at this depot (you have ${credits}). Pick a shorter jump.</div>`
-    : '';
-
-  // A SALVAGE lane's club find (GS-journey-fx-3) gets its own loud, honest line — the exact club you'll
-  // loot (resolved from the same private stream `travel` grants it on, so the preview can't lie), or the
-  // credit consolation when your bag is already full at that tier.
-  const findRarity = routeClubFind(ev);
-  let salvageLine = '';
-  if (findRarity) {
-    const found = salvageClubFind(state.run.loadout, findRarity, `salvage:${state.run.seed}:${state.run.stopIndex + 1}:${ev.id}`);
-    salvageLine = found.clubName
-      ? `<div style="font-size:12.5px;margin:4px 0 0;color:${rarCol(found.rarity ?? findRarity)};font-weight:600;">🎁 Salvage: loot the <b>${found.clubName}</b> · equips for the run</div>`
-      : `<div style="font-size:12.5px;margin:4px 0 0;color:#4fd0e0;font-weight:600;">🎁 Salvage: bag full — +${found.consolationCredits} credits instead</div>`;
-  }
-  // The effect's GEOMETRIC play hook (tents / craters / turf patches) gets its own loud line — the
-  // consequence you'll actually putt around, not just sky-dressing (GS-journey-fx-2).
-  const playLine = eff.play
-    ? `<div style="font-size:12.5px;margin:4px 0 0;color:#ffce54;font-weight:600;">🎯 ${eff.play}</div>`
-    : '';
-  const effLine =
-    eff.id !== 'none'
-      ? `<div style="font-size:13px;margin:8px 0 0;opacity:.9;">${eff.icon} <b>${eff.label}</b> · <span style="opacity:.75;">${eff.blurb}</span></div>${playLine}`
-      : '';
-
-  return `
-    <div class="gs-sheet-backdrop" data-route="close">
-      <div class="gs-sheet gs-routesheet" data-route="keep" style="--rs-accent:${accent};">
-        <div class="gs-sheet-head">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-            <div style="flex:0 0 auto;width:52px;height:52px;border-radius:13px;background:radial-gradient(circle at 35% 30%, ${b.col}44, #0c1020);border:2px solid ${accent};display:flex;align-items:center;justify-content:center;font-size:28px;">${b.glyph}</div>
-            <div style="min-width:0;">
-              <div style="font-size:12px;font-weight:700;color:${b.col};line-height:1.1;">${b.label} world</div>
-              <b style="font-size:19px;line-height:1.15;display:block;">${r.theme.name}</b>
-            </div>
-          </div>
-          <button class="gs-mapbtn" data-route="close" title="Close">✕</button>
-        </div>
-
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 10px;">
-          ${travelChip(ev.icon + ' ' + ev.label, accent)}
-          ${travelChip(ev.rarity.toUpperCase(), ring)}
-          ${travelChip(cat.label, cat.col)}
-          ${travelChip(diff.t, diff.c)}
-        </div>
-
-        <div style="font-size:13.5px;opacity:.95;margin-bottom:4px;">${eventDescFor(ev.desc)}</div>
-        <div style="font-size:12.5px;opacity:.6;font-style:italic;margin-bottom:6px;">${ev.lore}</div>
-        ${effLine}
-        ${salvageLine}
-
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">${tags.join('')}</div>
-        ${markers ? `<div style="font-size:12.5px;margin-top:8px;">${markers}</div>` : ''}
-        ${tollWarn}
-        ${fuelWarn}
-
-        <div style="display:flex;gap:9px;margin-top:16px;">
-          <button class="gs-btn gs-btn--block" data-route="close" style="flex:1 1 0;">Cancel</button>
-          ${
-            travellable
-              ? btn(
-                  // A short tank prints its refuel bill ON the launch button (GS-fuel-2): the local
-                  // price is charged at lift-off, and the player commits to it with the tap — the
-                  // exact surcharge `travel` folds in, never a silent deduction.
-                  shortfall > 0
-                    ? `🚀 Refuel +${shortfall} ⛽ (−${travelRefuelCost(state.run, r)} cr) & jump`
-                    : `🚀 Jump to ${r.theme.name}`,
-                  { type: 'route', routeId: r.id },
-                  { variant: 'primary', block: true, borderColor: accent },
-                )
-              : `<span class="gs-btn gs-btn--block" style="flex:1 1 0;opacity:.4;cursor:not-allowed;">⛽ Out of range</span>`
-          }
-        </div>
-      </div>
-    </div>`;
-}
-
-function travelScreen(): string {
-  const routeList = state.routes ?? [];
-  const credits = state.run.credits;
-
-  // The starmap (GS-routes, GS-journey-vertical): three tappable branch planets across the TOP → YOU →
-  // the travelled trail winding DOWN to Earth at the bottom. Tapping a planet opens its info sheet.
-  const zoneName = themeById(state.course.meta?.themeId ?? '')?.name ?? 'Deep Space';
-  const choices: StarmapChoice[] = routeList.map((r) => ({
-    id: r.id,
-    label: r.event.label,
-    icon: r.event.icon,
-    rarity: r.event.rarity,
-    distanceJump: r.distanceJump,
-    // The world this lane flies into (GS-journey-biome) — so the map planet reads the biome you'll play.
-    archetype: r.theme.archetype,
-    worldName: r.theme.name,
-    // The atmospheric effect this lane brings (GS-journey-fx) — previewed as a small planet badge.
-    effectIcon: COURSE_EFFECTS[routeEffect(r.event)].icon,
-    elite: r.elite,
-    bossAhead: r.bossAhead,
-    // GS-fuel-2: a lane the tank + purse can't cover draws DIMMED with a red fuel bill, so the
-    // blocker reads on the map itself — not only after tapping into the sheet.
-    locked: !canTravel(state.run, r),
-    // GS-fuel-3: the label's ⛽ bill honours the Ion Thrusters discount (it may undercut the jump).
-    fuelCost: routeFuelCost(state.run, r),
-  }));
-  // The travelled trail: every cleared stop BEFORE the current one (which is YOU), oldest → newest,
-  // labelled with its zone name AND its real-sky position (GS-galaxy-map) — so the journey plots a
-  // true path through the constellations as it builds. Each node wears its world's biome glyph
-  // (GS-journey-history) so a cleared step reads as the world you played.
-  const trail = state.run.history.slice(0, -1).map((h) => {
-    const name = themeById(h.themeId ?? '')?.name ?? 'Deep Space';
-    const sky = skyCoordForName(name);
-    const badge = BIOME_BADGE[archetypeFor(h.themeId, h.biome)];
-    return { label: name, ra: sky?.ra, dec: sky?.dec, glyph: badge?.glyph, col: badge?.col };
-  });
-  const map = journeyMapHTML({
-    seed: state.run.seed,
-    stopIndex: state.run.stopIndex,
-    distanceFromStart: state.run.distanceFromStart,
-    currentLabel: zoneName,
-    trail,
-    choices,
-    shipId: shipForCharacter(state, state.run.loadout.characterId),
-    // GS-fuel-3: an Ion Thrusters retrofit trails its luminous wake behind the YOU ship.
-    ionThrusters: (state.run.loadout.fuelEfficiency ?? 0) > 0,
-  });
-
-  // Push-your-luck cash-out (GS-bank): bank the run now to lock its credits in as permanent shards
-  // (busting at the next cut would forfeit them). Shown with the exact shard payout so the "push or
-  // bank" call is informed. Lives below the map (under Earth) — the secondary "quit while ahead" exit.
-  const cashOut = cashOutShards(state.run);
-  const banked =
-    state.run.bonusShards > 0
-      ? ` <span style="color:#4fd0e0;">(✦ ${state.run.bonusShards} salvage already banked)</span>`
-      : '';
-  const bankBtn =
-    state.run.stopIndex > 0
-      ? `<div style="margin-top:14px;border-top:1px solid var(--gs-line);padding-top:12px;">
-           <p style="opacity:.7;font-size:13px;margin:0 0 6px;">…or quit while you're ahead — cash your <b>${credits}</b> credits into permanent shards. Push deeper and a missed cut forfeits them.${banked}</p>
-           ${btn(`✦ Bank run & cash out${cashOut > 0 ? ` (+${cashOut} shards)` : ''}`, { type: 'bank' }, { variant: 'ghost', block: true })}
-         </div>`
-      : '';
-  const safeNote = routeList.some((r) => r.event.cutDelta <= 0)
-    ? "There's a safer option here."
-    : '<span style="color:#ff8b6b;">Out here, every lane is a gamble — or bank the run below.</span>';
-  // The Unending Universe (GS-unending) has no Stableford cut — deeper jumps buy shard pace at the
-  // price of WILDER worlds under an ever-tightening per-hole bar.
-  const stakes = holeGateArmed(state.run)
-    ? 'Deeper jumps land wilder worlds — and the survival bar keeps tightening.'
-    : 'Deeper jumps raise the cut.';
-  // GS-fuel: every lane burns its distance in fuel. With NO payable lane the run is STRANDED — the
-  // forced exit (mirrors bank; pocket change still converts). Otherwise the depot rides along so a
-  // low tank can be topped up before committing to a jump.
-  const anyLane = routeList.some((r) => canTravel(state.run, r));
-  const strandedBox = !anyLane
-    ? `<div style="margin-top:12px;border:1px solid #ff6b4a88;border-left:4px solid #ff6b4a;border-radius:10px;padding:10px 12px;background:#ff6b4a0d;">
-         <p style="font-size:13.5px;margin:0 0 8px;"><b style="color:#ff6b4a;">🆘 Stranded in deep space.</b> The tank holds <b>${state.run.fuel}</b> ⛽ and your <b>${credits}</b> credits can't buy any offered jump. The journey ends here — what's left in your pockets converts to shards.</p>
-         ${btn('🆘 Abandon ship & end the run', { type: 'strand' }, { variant: 'primary', block: true, borderColor: '#ff6b4a' })}
-       </div>`
-    : '';
-  // The ship-status pill (GS-fuel-2): the segmented tank gauge rides the screen title, so the fuel
-  // question is on-screen before any lane is tapped — no more hunting a small number.
-  return `
-    ${header()}
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:2px 0 3px;">
-      <h2 style="font-size:18px;margin:0;letter-spacing:0.6px;background:linear-gradient(90deg,#ffce54,#7fd6e6);-webkit-background-clip:text;background-clip:text;color:transparent;">◆ CHOOSE YOUR JUMP</h2>
-      <span style="flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:#9fb0cf;border:1px solid var(--gs-line);border-radius:999px;padding:3px 10px;white-space:nowrap;">🛰 dist ${state.run.distanceFromStart} · ${fuelGaugeHTML(state.run.fuel, tankCapacity(state.run))}</span>
-    </div>
-    <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing world up top to preview where you'll play &amp; its bet, then confirm the jump. Each jump burns its distance in ⛽ fuel. ${stakes} ${safeNote}</p>
-    ${map}
-    ${strandedBox}
-    ${anyLane ? fuelDepotHTML() : ''}
-    ${bankBtn}`;
-}
-
-/** Assemble the voyage-victory takeover's payload (GS-victory) from the finished run + the meta deltas
- *  `runEndUpdates` just banked. `lastClubUnlock` is set ONLY on a genuinely new Ascension clear (a higher
- *  `maxAscension`) — so its presence is the signal to hero the "new tier unlocked" banner. Presentation-
- *  only: resolves display strings + colours here, keeping `celebrations.ts` free of sim/loot imports. */
-function victoryInfo(): Parameters<typeof showVoyageVictory>[0] {
-  const r = state.run;
-  const unlock = state.lastClubUnlock; // present ⇔ a NEW tier was cleared this run
-  const isNewClear = unlock !== undefined;
-  const bagUnlock = bagUnlockForClearedAscension(r.ascension);
-  // A stable numeric confetti seed from the (number|string) run seed.
-  const seedNum = Number.isFinite(Number(r.seed))
-    ? Number(r.seed)
-    : [...String(r.seed)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 0);
-  return {
-    golferName: getCharacter(r.loadout.characterId)?.shortName ?? 'Your golfer',
-    ascension: r.ascension,
-    tierUnlocked: isNewClear && r.ascension < ASCENSION_MAX ? r.ascension + 1 : undefined,
-    atMaxAscension: r.ascension >= ASCENSION_MAX,
-    club:
-      unlock?.kind === 'club'
-        ? { name: unlock.clubName, rarity: unlock.rarity, color: rarCol(unlock.rarity) }
-        : undefined,
-    consolationShards: unlock?.kind === 'shards' ? unlock.shards : undefined,
-    bag: bagUnlock ? { name: bagUnlock.name, cost: bagUnlock.cost, color: rarCol(bagUnlock.tier) } : undefined,
-    shardsEarned: state.lastRunShards ?? 0,
-    shardsTotal: state.shards,
-    seed: seedNum,
-  };
-}
-
-function gameoverScreen(): string {
-  const r = state.run;
-  const earned = state.lastRunShards;
-  const banked = r.endedReason === 'banked';
-  const won = r.endedReason === 'won';
-  const stranded = r.endedReason === 'stranded';
-  const gate = holeGateArmed(r);
-  const heading = won
-    ? `<h2 style="font-size:22px;color:#ffce54;">🏆 Voyage complete — you won the Galactic Major!</h2>`
-    : banked
-    ? `<h2 style="font-size:20px;color:#5fd45a;">Banked — you quit while ahead</h2>`
-    : stranded
-    ? `<h2 style="font-size:20px;color:#ff6b4a;">🆘 Stranded — the ship ran dry in deep space</h2>`
-    : gate
-    ? `<h2 style="font-size:20px;color:#ff6b6b;">Run over — the universe caught you at hole ${r.holesSurvived + 1}</h2>`
-    : `<h2 style="font-size:20px;color:#ff6b6b;">Run over — stranded at the cut</h2>`;
-  const unlock =
-    won && r.ascension < ASCENSION_MAX
-      ? `<p style="font-size:14px;color:#ffce54;">⚔ Ascension <b>A${r.ascension}</b> cleared — <b>A${r.ascension + 1}</b> unlocked. Start the next voyage tougher.</p>`
-      : won && r.ascension >= ASCENSION_MAX
-      ? `<p style="font-size:14px;color:#ffce54;">⚔ You cleared the TOP Ascension (A${r.ascension}). Legendary.</p>`
-      : '';
-  // A cleared Ascension gate (A2/A6/A11) unlocks a new default-bag tier in the Trade Market (GS-bag-tiers).
-  const bagUnlock = won ? bagUnlockForClearedAscension(r.ascension) : undefined;
-  const bagNotice = bagUnlock
-    ? `<div style="margin:8px 0;padding:8px 11px;border-left:3px solid ${rarCol(bagUnlock.tier)};border-radius:8px;background:#ffffff08;display:flex;align-items:center;gap:9px;">
-         <div style="width:56px;flex:0 0 auto;">${drawGolfBag(bagUnlock.tint, bagUnlock.tier)}</div>
-         <div style="font-size:13px;"><b style="color:${rarCol(bagUnlock.tier)};">🎒 New bag unlocked!</b> Clearing ${bagUnlock.gateLabel} unlocks the <b>${bagUnlock.name}</b> at the Trade Market — upgrade <b>every</b> golfer's starting bag to ${bagUnlock.tier} for <b>✦ ${bagUnlock.cost}</b> Star Shards.</div>
-       </div>`
-    : '';
-  // Ascension victory club unlock (GS-ascension-clubs): the played golfer permanently gains a new
-  // starting club (or a Shard consolation if their bag is already full).
-  const clubUnlock = state.lastClubUnlock;
-  const golferName = getCharacter(r.loadout.characterId)?.shortName ?? 'your golfer';
-  const clubNotice =
-    won && clubUnlock
-      ? clubUnlock.kind === 'club'
-        ? `<div style="margin:8px 0;padding:8px 11px;border-left:3px solid ${rarCol(clubUnlock.rarity)};border-radius:8px;background:#ffffff08;">
-             <span style="font-size:13px;"><b style="color:${rarCol(clubUnlock.rarity)};">⛳ New club unlocked!</b> <b>${golferName}</b> permanently adds a ${clubUnlock.rarity} <b>${clubUnlock.clubName}</b> to their starting bag — kept for every future run with them.</span>
-           </div>`
-        : `<div style="margin:8px 0;padding:8px 11px;border-left:3px solid var(--gs-gold);border-radius:8px;background:#ffffff08;">
-             <span style="font-size:13px;"><b style="color:var(--gs-gold);">🎒 Bag complete!</b> <b>${golferName}</b> already carries every club, so your victory pays a bonus <b>✦ ${clubUnlock.shards}</b> Star Shards.</span>
-           </div>`
-      : '';
-  // The Unending Universe's final GOLF ROUND (GS-golf-score): the round card + the personal last-runs
-  // leaderboard (which now includes this just-finished run, prepended by `runEndUpdates`).
-  const endlessCard = gate
-    ? endlessScoreCard(
-        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-        { title: 'Final round' },
-      )
-    : '';
-  const endlessBoard = gate
-    ? endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your last runs' })
-    : '';
-  // The Unending Universe's ledger (GS-unending): the run's survived-hole count IS the score.
-  const endlessRecap = gate
-    ? `<p style="font-size:15px;">🌌 You survived <b>${r.holesSurvived}</b> hole${r.holesSurvived === 1 ? '' : 's'} of the Unending Universe${
-        r.holesSurvived >= state.endlessBestHoles && r.holesSurvived > 0 ? ' — <b style="color:#4fe08a;">a new best!</b>' : state.endlessBestHoles > 0 ? ` (best: ${state.endlessBestHoles})` : ''
-      }${(() => {
-        const next = nextEndlessUnlock(state.endlessBestHoles);
-        return next ? ` · next unlock: <b>${next.secret ? '? ? ?' : next.name}</b> at hole ${next.holes}` : '';
-      })()}.</p>`
-    : '';
-  const reached =
-    (won
-      ? `<p style="font-size:15px;">You cleared all three arcs${r.ascension > 0 ? ` at Ascension A${r.ascension}` : ''} and cashed out <b>${r.credits}</b> credits with a champion's bonus.</p>`
-      : `<p style="font-size:15px;">You reached <b>stop ${r.stopIndex + 1}</b>, distance <b>${r.distanceFromStart}</b>${banked ? `, and cashed out <b>${r.credits}</b> credits` : ''}.</p>`) +
-    endlessRecap +
-    unlock;
-  return `
-    ${header()}
-    ${heading}
-    ${endlessCard}
-    ${reached}
-    ${clubNotice}
-    ${bagNotice}
-    ${earned !== undefined ? `<p style="font-size:15px;color:#e08a2b;">✦ Earned <b>${earned}</b> Star Shards · ${state.shards} banked</p>` : ''}
-    ${gate ? '' : `<p style="opacity:.8;">Best ever: distance <b>${state.bestDistance}</b>, Stableford <b>${state.bestStableford}</b>.</p>`}
-    ${endlessBoard}
-    <div style="margin-top:8px;">
-      ${btn('🚀 Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
-      ${btn('🚀 New run', { type: 'restart', seed: freshRunSeed() }, { variant: 'primary' })}
-    </div>`;
-}
-
-/** Per-hole render keys (GS-variation): a split-biome stop's back holes carry their own biome/theme,
- *  so each hole renders + reads as its world; fall back to the course-level keys otherwise. */
-function holeBiome(h: { biome?: string }): string {
-  return h.biome ?? state.course.biome;
-}
-function holeThemeId(h: { themeId?: string }): string | undefined {
-  return h.themeId ?? state.course.meta.themeId;
-}
-/** The current stop's atmospheric course effect (GS-journey-fx), stamped on the course meta by the
- *  chosen route. Render-only flavour fed to both renderers. */
-function currentEffect(): string | undefined {
-  return state.course?.meta?.effect;
-}
-
-/** Rainbow Ball (GS-rainbow): whether the live loadout has armed Rainbow Road. Baked into the render
- *  options at the app boundary (like `lefty()`), so the renderer paints the rainbow ribbon + the sim's
- *  OOB-off-road rule (both keyed off the same loadout flag) stay in lock-step. */
-function rainbowActive(): boolean {
-  return !!state.run?.loadout?.rainbowRoad;
-}
-
-/** Trade-camp tents (GS-tents): whether the current stop's route armed the green's collidable tents.
- *  Baked into the render options (the ring is drawn in course space) — the sim's bounce is keyed off the
- *  SAME course effect (`playerHoleOpts`), so the graphic and the physics stay in lock-step. */
-function tentsActive(): boolean {
-  return currentEffect() === 'tradeMarket';
-}
-
-/** Meteor-strike scorch craters (GS-meteor-scorch): whether the current stop's route charred the turf.
- *  Baked into the render options exactly like the tents — the sim's lie conversion keys off the SAME
- *  course effect (`playerHoleOpts`), so the drawn craters and the physics stay in lock-step. */
-function scorchActive(): boolean {
-  return currentEffect() === 'meteorShower';
-}
-
-/** Effect ground patches (GS-journey-fx-2): which turf-patch family the current stop's route armed
- *  (comet stardust / frostfall ice / debris wreckage), or undefined. Baked into the render options
- *  exactly like the scorch craters — the sim's lie conversion keys off the SAME course effect. */
-function patchActive(): PatchKind | undefined {
-  return effectPatchKind(currentEffect());
-}
 
 /** Drive the ambient music layer (GS-audio-2) off the current screen: the stop's world theme
  *  while golf is on screen (playing/result — the hole under view picks the track, so a
@@ -3597,93 +1434,8 @@ function mountWeatherOverlay(el: HTMLElement, hole: Hole, up: Vec): void {
   };
 }
 
-/** The selected golfer's on-course look (GS-18), or undefined → the loader-crew cap cycle. A bought
- *  themed club set (GS-proshop-2) adds the `gear` glow so the golfer swings the club you bought. */
-function golferLook(): GolferLook | undefined {
-  const base = getCharacter(state.run.loadout.characterId)?.style;
-  if (!base) return undefined;
-  const gear = equippedGearTheme(state.run.loadout);
-  // Layer the PLAYED character's equipped cosmetic hat/shirt (GS-clubhouse) over their base colours.
-  const cid = state.run.loadout.characterId;
-  const hat = apparelById(hatForCharacter(state, cid))?.look;
-  const shirtStyle = apparelById(shirtForCharacter(state, cid))?.look;
-  const pantsStyle = apparelById(pantsForCharacter(state, cid))?.look;
-  return {
-    ...base,
-    ...(gear ? { gear: { theme: gear.theme, tint: gear.tint } } : {}),
-    ...(hat ? { hat } : {}),
-    ...(shirtStyle ? { shirtStyle } : {}),
-    ...(pantsStyle ? { pantsStyle } : {}),
-  };
-}
 
-/** The team-duel setup for the current stop (GS-team-duel) — prefers the live match state, else recompute. */
-function teamDuel(): TeamDuelSetup | undefined {
-  return state.match?.setup ?? teamDuelSetupForRun(state.run);
-}
 
-/** A friendly label for a team-duel format. */
-function teamFormatLabel(fmt: 'bestball' | 'scramble'): string {
-  return fmt === 'scramble' ? 'Scramble' : 'Best Ball';
-}
-
-/** A one-line rule reminder for a team-duel format. */
-function teamFormatRule(fmt: 'bestball' | 'scramble'): string {
-  return fmt === 'scramble'
-    ? 'both hit every shot, play on from the better ball'
-    : 'both play your own ball; the better hole score counts';
-}
-
-/** The partner Character for a side of the team duel (player or boss), from the setup. */
-function teamPartnerChar(setup: TeamDuelSetup): Character | undefined {
-  if (setup.partnerSide === 'player' && setup.playerPartnerId) return getCharacter(setup.playerPartnerId);
-  if (setup.partnerSide === 'boss' && setup.bossPartnerId) return getCharacter(setup.bossPartnerId);
-  return undefined;
-}
-
-/**
- * Best-ball end-of-hole REVEAL (GS-team-duel): the pair's two cards side by side — each ball's
- * strokes + score name — with the counting (better) one highlighted and badged. Ties keep the
- * player's ball (`betterPlayedHole` keeps the first). This is the moment the partner's hidden
- * parallel ball is shown, so the reveal lands with the hole, never mid-play.
- */
-function bestBallRevealHTML(raw: PlayedHole, partnerHole: PlayedHole, par: number): string {
-  const duel = teamDuel();
-  const partner = duel ? teamPartnerChar(duel) : undefined;
-  const youChar = getCharacter(state.run.loadout.characterId ?? '');
-  const partnerKept = partnerHole.record.strokes < raw.record.strokes;
-  const card = (label: string, h: PlayedHole, kept: boolean, accent: string): string => {
-    const rel = h.record.strokes - par;
-    const col = h.pickedUp ? '#ff6b6b' : rel < 0 ? '#5fd45a' : rel === 0 ? 'var(--gs-ink)' : rel === 1 ? '#ffce54' : '#ff6b6b';
-    return `<div style="flex:1 1 0;min-width:0;text-align:center;padding:12px 8px 9px;border-radius:10px;position:relative;
-        border:2px solid ${kept ? accent : 'var(--gs-line-2)'};background:${kept ? `${accent}1a` : '#0d1016'};
-        ${kept ? `box-shadow:0 0 14px ${accent}55;` : 'opacity:.62;'}">
-      ${kept ? `<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:${accent};color:#0b0d12;font-size:9px;font-weight:800;letter-spacing:.08em;border-radius:5px;padding:1px 7px;white-space:nowrap;">✓ COUNTS</div>` : ''}
-      <div style="font-size:11px;font-weight:700;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</div>
-      <div style="font-size:30px;font-weight:800;line-height:1.15;color:${col};">${h.pickedUp ? '—' : h.record.strokes}</div>
-      <div style="font-size:11px;opacity:.75;">${h.pickedUp ? 'Picked up' : scoreName(par, h.record.strokes)}</div>
-    </div>`;
-  };
-  return `<div style="max-width:460px;">
-      <div style="display:flex;gap:10px;align-items:stretch;">
-        ${card(`You · ${youChar?.name ?? 'Player'}`, raw, !partnerKept, youChar?.style.cap ?? '#5fd45a')}
-        ${card(partner?.name ?? 'Partner', partnerHole, partnerKept, partner?.style.cap ?? '#7aa2ff')}
-      </div>
-      <div style="font-size:11px;opacity:.65;margin-top:8px;text-align:center;">🤝 Best ball — the better score is the team's for the hole.</div>
-    </div>`;
-}
-
-/** A scouting note on the opponent — their style tagline (GS-team-duel / scouting line). */
-function opponentScouting(id: string): string {
-  const g = getGolfer(id);
-  if (!g) return '';
-  return getArchetype(g.archetypeId).tagline;
-}
-
-/** The hired named caddy's id (GS-caddy), or undefined — drawn in the play-view/putt-meter corner. */
-function caddyId(): string | undefined {
-  return namedCaddyOwned(state.run.loadout.perks);
-}
 
 /** Play a caddy's signature voice line + haptic when its effect fires in the play view (GS-caddy-
  *  voices) — wired to the play view's `onCaddyEffect`. Gated/guarded inside `speakCaddy`. */
@@ -3702,26 +1454,6 @@ function playTentBonk(text: string): void {
   speakCaddy(text, 'en-GB', { rate: 1.1, pitch: 1.2 });
 }
 
-/** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A
- *  distance/guard caddy like Driver Dan has no role on the green, so it doesn't appear there. */
-function puttCaddyId(): string | undefined {
-  const id = caddyId();
-  return isPuttingCaddy(id) ? id : undefined;
-}
-
-/** The framed gold caddy badge (the "cool outline") — shared by the decision and putting screens.
- *  The figure is drawn to the canvas in the render wiring (keyed off `data-caddy`). '' when none. */
-function caddyBadgeHTML(id: string | undefined): string {
-  return hasCaddyArt(id)
-    ? `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`
-    : '';
-}
-
-/** Left-handed mode (GS-lefty) — the live player setting. The sim reads it off `loadout.lefty`
- *  (synced from this in `render`), the renderers take it as an option, the CSS keys a modifier. */
-function lefty(): boolean {
-  return getSettings().leftHanded;
-}
 
 function render(): void {
   const app = document.getElementById('app');
@@ -3780,7 +1512,7 @@ function render(): void {
 
   // The route-info sheet is only meaningful on the travel screen; clear it the moment we leave so a
   // stale id (route ids repeat 1..3 each stop) can't auto-reopen a sheet on the next travel screen.
-  if (state.screen !== 'travel') inspectRouteId = null;
+  if (state.screen !== 'travel') travelView.inspectRouteId = null;
 
   const body =
     state.screen === 'title'
@@ -3828,20 +1560,20 @@ function render(): void {
   const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
-  const routeSheet = state.screen === 'travel' && inspectRouteId != null ? routeInfoOverlay() : '';
+  const routeSheet = state.screen === 'travel' && travelView.inspectRouteId != null ? routeInfoOverlay() : '';
   // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's
   // own markup so no screen can forget it. The full-bleed play view is the one exception: its
   // map-nav stack already carries a cog, and a second fixed button would collide with it.
   const cog = fullBleed ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
   // The hole-step hazards/benefits popup (GS-intro-split) rides over the page like the settings sheet.
-  const introTraits = state.screen === 'intro' && introStage === 'hole' && introTraitsOpen ? introTraitsOverlay() : '';
+  const introTraits = state.screen === 'intro' && introView.stage === 'hole' && introView.traitsOpen ? introTraitsOverlay() : '';
   app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}${introTraits}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Arc-intro "First Tee" at the BOTTOM only when the field overflows one screen (GS-intro-split):
   // measure after layout settles and reveal the second CTA so it's reachable without scrolling back
   // up — but never a redundant duplicate on a short screen. rAF so scrollHeight is post-layout.
-  if (state.screen === 'intro' && introStage === 'arc') {
+  if (state.screen === 'intro' && introView.stage === 'arc') {
     requestAnimationFrame(() => {
       const wrap = document.getElementById('gs-firsttee-bottomwrap');
       if (!wrap) return;
@@ -3858,7 +1590,7 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-inspect]').forEach((el) => {
     el.addEventListener('click', () => {
       const id = el.dataset.inspect!;
-      inspectGearId = inspectGearId === id ? null : id;
+      shopView.inspectGearId = shopView.inspectGearId === id ? null : id;
       render();
     });
   });
@@ -3866,15 +1598,15 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-toggle-section]').forEach((el) => {
     el.addEventListener('click', () => {
       const id = el.dataset.toggleSection!;
-      if (collapsedMarketSections.has(id)) collapsedMarketSections.delete(id);
-      else collapsedMarketSections.add(id);
+      if (marketView.collapsed.has(id)) marketView.collapsed.delete(id);
+      else marketView.collapsed.add(id);
       render();
     });
   });
   // Trade Market "Show Owned" toggle: flip whether already-owned gear appears in the racks (view-only).
   app.querySelectorAll<HTMLElement>('[data-market-showowned]').forEach((el) => {
     el.addEventListener('click', () => {
-      marketShowOwned = !marketShowOwned;
+      marketView.showOwned = !marketView.showOwned;
       sfx.click();
       haptic(HAPTICS.tap);
       render();
@@ -3884,7 +1616,7 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-clubslot]').forEach((el) => {
     el.addEventListener('click', () => {
       const slot = el.dataset.clubslot as ClubSlot;
-      clubhouseSlot = clubhouseSlot === slot ? null : slot;
+      clubhouseView.slot = clubhouseView.slot === slot ? null : slot;
       sfx.click();
       haptic(HAPTICS.tap);
       render();
@@ -3895,7 +1627,7 @@ function render(): void {
   // (not dataset) so it works on SVG <g> nodes too.
   app.querySelectorAll<HTMLElement>('[data-route-inspect]').forEach((el) => {
     el.addEventListener('click', () => {
-      inspectRouteId = Number(el.getAttribute('data-route-inspect'));
+      travelView.inspectRouteId = Number(el.getAttribute('data-route-inspect'));
       sfx.click();
       haptic(HAPTICS.tap);
       render();
@@ -3908,7 +1640,7 @@ function render(): void {
         e.stopPropagation();
         return;
       }
-      inspectRouteId = null;
+      travelView.inspectRouteId = null;
       render();
     });
   });
@@ -3968,11 +1700,11 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-install]').forEach((el) => {
     el.addEventListener('click', () => {
       try {
-        deferredInstall?.prompt?.();
+        installView.deferred?.prompt?.();
       } catch {
         /* ignore */
       }
-      deferredInstall = null;
+      installView.deferred = null;
       try {
         localStorage.setItem('gs_installNudge', 'dismissed');
       } catch {
@@ -3986,8 +1718,8 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-intro-stage]').forEach((el) => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
-      introStage = el.dataset.introStage === 'hole' ? 'hole' : 'arc';
-      introTraitsOpen = false;
+      introView.stage = el.dataset.introStage === 'hole' ? 'hole' : 'arc';
+      introView.traitsOpen = false;
       sfx.click();
       haptic(HAPTICS.tap);
       render();
@@ -3999,7 +1731,7 @@ function render(): void {
       const a = el.dataset.introtraits;
       if (a === 'keep') return; // clicks inside the sheet body don't close it
       e.stopPropagation();
-      introTraitsOpen = a === 'open';
+      introView.traitsOpen = a === 'open';
       sfx.click();
       render();
     });
@@ -4429,7 +2161,7 @@ export function start(): void {
   try {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
-      deferredInstall = e as Event & { prompt?: () => void };
+      installView.deferred = e as Event & { prompt?: () => void };
       if (state?.screen === 'title') render();
     });
   } catch {
