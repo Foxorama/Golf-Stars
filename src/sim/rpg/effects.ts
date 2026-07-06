@@ -159,6 +159,30 @@ export function effectPatchKind(effect: string | undefined): PatchKind | undefin
 }
 
 /**
+ * The effect's TRAVEL hook (GS-fuel-4): a fuel DELTA on the jump that flies into this sky, so the
+ * weather prices the voyage as well as the golf. A solar wind or a comet's wake at your back pushes
+ * the ship (−1 ⛽); climbing out of a gravity well or battering through an ion storm costs extra
+ * (+1 ⛽). Pure and derived (zero rng, no save state) — `routeFuelCost` folds it in, so every ⛽
+ * readout (starmap label, route sheet, launch button) prices it automatically, and the route card
+ * states the hook as a tailwind/headwind chip. This decouples a lane's fuel bill from its jump
+ * distance — the axis GS-fuel-2's critique said was missing ("cost tracks reward exactly, nothing
+ * to weigh"). Fairness: the headwind skies ride payout/toll gambles only (machine-checked in
+ * tests/fuel.test.ts — no calm-category OUT lane is ever fuel-taxed), and the burn still floors at
+ * 1 in `routeFuelCost`, so a tailwind never makes a jump free.
+ */
+export const EFFECT_FUEL: Partial<Record<CourseEffectId, number>> = {
+  solarWind: -1, // the particle stream at your back — the ship surfs it in
+  comet: -1, //     ride the comet's wake (the lore several comet lanes already promise)
+  gravityWell: 1, // climbing out of the giant's pull burns hard
+  ionStorm: 1, //   forked lightning batters the hull the whole way through
+};
+
+/** The fuel delta a course effect adds to a jump's burn (0 = none). */
+export function effectFuelDelta(effect: string | undefined): number {
+  return EFFECT_FUEL[(effect ?? 'none') as CourseEffectId] ?? 0;
+}
+
+/**
  * The CLUB FIND a route hands you (GS-journey-fx-3): a salvage / debris / wreck / mining lane
  * (`category: 'salvage'`) scavenges a club of this rarity that you don't already carry, equipped for
  * the rest of the run (resolved against the live loadout in `salvage.ts`, paid on travel). The rarity

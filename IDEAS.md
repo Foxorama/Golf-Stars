@@ -24,6 +24,9 @@ Foundations are shipped; these are the live follow-ons.
 - **GS-100 follow-ons** — shot-by-shot boss ANIMATION on the map (honour-gated away-player sequencing);
   a matchplay/boss cadence for the endless Unending Universe (voyage-only today); headless
   `simulateRun` playing the real duel (stroke-play today, for balance/tests).
+- **GS-fuel follow-ons** — the OVERDRIVE jump (pay extra ⛽ to deepen a lane's jump +1: a real depth
+  throttle, but it bends the voyage's `maxJump` fairness cap + the wildness ramp, so it needs its
+  own balance pass); a fuel-flavoured unique showpiece (a great tanker armada, arc 3, once per run).
 - **GS-unending follow-ons** — tune the birdie wall from real play (hole 41+ demands birdie-or-better;
   baseline auto-AI dies ~hole 24, so 60/80/100+ are meant to need a stacked build — verify a maxed human
   can actually reach 150); per-tier intro stingers ("the bar tightens…"); an endless leaderboard
@@ -88,6 +91,12 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-fuel-4** — fuel earns agency: the lane's SKY prices the passage (solar-wind/comet tailwinds
+  −1 ⛽, gravity-well/ion-storm headwinds +1 ⛽ — burn decoupled from distance, derived + zero rng),
+  tanker events refuel on arrival (scow/derelict/caravan, arc-tiered), and the SECTOR SCAN burns
+  fuel to redraw the three lanes (escalating price, never the last cell, resume-safe via
+  `Run.routeScans`, save v19) — doubling as the stranded lifeline. See
+  `docs/decisions/rpg-meta-loop.md`.
 - **GS-fuel-3** — build hooks on the GS-fuel-2 fuel economy: Ion Thrusters (epic; every jump −1 ⛽,
   min 1, and the journey-map ship trails a luminous ion wake), Reserve Fuel Tank (rare; +4 capacity,
   arrives full via the one-shot `ShopItem.fuelBonus` grant in `buy`), and the eagle siphon (a holed

@@ -444,11 +444,12 @@ describe('ui reducer', () => {
   });
 
   it('a hole-in-one unlocks the secret Comet Rider ship, through the full play flow (GS-ace-ship)', () => {
-    // Seed 471 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
+    // Seed 430 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
     // the ship lands in the global owned pool exactly when the ace is scored (auto-play path).
-    // (Re-pinned 185 → 339 → 471 across the GS-green-contour-2 physics passes: the green roll-out
-    // now reads the local contour field AND curls along it, legitimately shifting seeded landings.)
-    let s = started(471, 'voyage');
+    // (Re-pinned 185 → 339 → 471 across the GS-green-contour-2 physics passes, → 430 for GS-fuel-4:
+    // the new fuel-salvage events reweight which route events seeded runs draw, legitimately
+    // shifting the courses this run flies into.)
+    let s = started(430, 'voyage');
     expect(s.ownedShips).not.toContain('comet-rider'); // not owned at the off
     let sawAce = false;
     for (let stop = 0; stop < 4 && s.run.status === 'active'; stop++) {

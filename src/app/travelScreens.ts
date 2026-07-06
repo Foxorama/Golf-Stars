@@ -7,15 +7,17 @@
 import { btn, header, state } from './ctx';
 import { fuelDepotHTML } from './shopScreens';
 import type { EventCategory } from '../sim/rpg/events';
-import { COURSE_EFFECTS, effectCarryMult, effectWindMult, routeClubFind, routeDifficulty, routeEffect } from '../sim/rpg/effects';
+import { COURSE_EFFECTS, effectCarryMult, effectFuelDelta, effectWindMult, routeClubFind, routeDifficulty, routeEffect } from '../sim/rpg/effects';
 import { salvageClubFind } from '../sim/rpg/salvage';
 import { rarCol } from '../sim/rpg/loot';
 import {
+  canScanRoutes,
   canTravel,
   cashOutShards,
   fuelShortfall,
   holeGateArmed,
   routeFuelCost,
+  scanFuelCost,
   tankCapacity,
   travelRefuelCost,
 } from '../sim/rpg/run';
@@ -113,11 +115,21 @@ export function routeInfoOverlay(): string {
   tags.push(travelChip(`↗ +${r.distanceJump} distance`, '#9fb0cf'));
   // The jump's FUEL bill (GS-fuel-2): ONE tank-before → tank-after chip, and any shortfall is
   // priced on the Jump button itself (below) — never a silent surcharge.
-  const fuelAfter = Math.max(0, state.run.fuel - routeFuelCost(state.run, r));
-  tags.push(travelChip(`⛽ ${state.run.fuel} → ${fuelAfter}`, state.run.fuel >= routeFuelCost(state.run, r) ? '#4fd0e0' : '#ff8b6b'));
-  // Ion Thrusters (GS-fuel-3): show the drive earning its keep on every discounted jump.
-  if (routeFuelCost(state.run, r) < r.distanceJump)
-    tags.push(travelChip(`🌀 ion drive −${r.distanceJump - routeFuelCost(state.run, r)} ⛽`, '#7ff3ff'));
+  const fuelCost = routeFuelCost(state.run, r);
+  const fuelAfter = Math.max(0, state.run.fuel - fuelCost);
+  tags.push(travelChip(`⛽ ${state.run.fuel} → ${fuelAfter}`, state.run.fuel >= fuelCost ? '#4fd0e0' : '#ff8b6b'));
+  // The sky prices the passage (GS-fuel-4): a tail/headwind chip states the EFFECTIVE delta —
+  // computed against the same 1-unit floor `routeFuelCost` applies, so a tailwind that can't bite
+  // on a 1-hop shows nothing rather than a discount the bill doesn't give.
+  const skyBurn = Math.max(1, r.distanceJump + effectFuelDelta(eff.id)) - Math.max(1, r.distanceJump);
+  if (skyBurn < 0) tags.push(travelChip(`🌬 tailwind ${skyBurn} ⛽`, '#2bb673'));
+  else if (skyBurn > 0) tags.push(travelChip(`🌪 headwind +${skyBurn} ⛽`, '#ff8b6b'));
+  // Ion Thrusters (GS-fuel-3): the drive's OWN saving on this jump — what the bill would be under
+  // this sky without the retrofit, minus what it is.
+  const ionSave = Math.max(1, r.distanceJump + effectFuelDelta(eff.id)) - fuelCost;
+  if (ionSave > 0) tags.push(travelChip(`🌀 ion drive −${ionSave} ⛽`, '#7ff3ff'));
+  // A fuel-salvage lane (GS-fuel-4): the arrival siphon, loud and exact.
+  if (ev.fuelBonus) tags.push(travelChip(`⛽ +${ev.fuelBonus} on arrival`, '#4fd0e0'));
   const shortfall = fuelShortfall(state.run, r);
 
   const markers = [
@@ -285,9 +297,18 @@ export function travelScreen(): string {
   // forced exit (mirrors bank; pocket change still converts). Otherwise the depot rides along so a
   // low tank can be topped up before committing to a jump.
   const anyLane = routeList.some((r) => canTravel(state.run, r));
+  // The SECTOR SCAN (GS-fuel-4): burn fuel to redraw the three lanes — fuel's first use besides
+  // jumping. The price escalates per scan at this stop (reroll-precedent, so lane-fishing can't be
+  // spammed) and the scan always leaves ≥1 cell in the tank. When every lane is out of range it
+  // doubles as the last-ditch lifeline, so it rides INSIDE the stranded box there.
+  const scanCost = scanFuelCost(state.run);
+  const scanBtn = canScanRoutes(state.run)
+    ? btn(`📡 Scan new sectors — redraw the lanes (−${scanCost} ⛽)`, { type: 'scanRoutes' }, { variant: 'ghost', block: true })
+    : `<span class="gs-btn gs-btn--block" style="display:block;opacity:.4;cursor:not-allowed;">📡 Scan new sectors (needs ${scanCost + 1} ⛽ in the tank)</span>`;
   const strandedBox = !anyLane
     ? `<div style="margin-top:12px;border:1px solid #ff6b4a88;border-left:4px solid #ff6b4a;border-radius:10px;padding:10px 12px;background:#ff6b4a0d;">
-         <p style="font-size:13.5px;margin:0 0 8px;"><b style="color:#ff6b4a;">🆘 Stranded in deep space.</b> The tank holds <b>${state.run.fuel}</b> ⛽ and your <b>${credits}</b> credits can't buy any offered jump. The journey ends here — what's left in your pockets converts to shards.</p>
+         <p style="font-size:13.5px;margin:0 0 8px;"><b style="color:#ff6b4a;">🆘 Stranded in deep space.</b> The tank holds <b>${state.run.fuel}</b> ⛽ and your <b>${credits}</b> credits can't buy any offered jump.${canScanRoutes(state.run) ? ' One hope left: burn a cell to scan for closer worlds.' : " The journey ends here — what's left in your pockets converts to shards."}</p>
+         ${canScanRoutes(state.run) ? scanBtn : ''}
          ${btn('🆘 Abandon ship & end the run', { type: 'strand' }, { variant: 'primary', block: true, borderColor: '#ff6b4a' })}
        </div>`
     : '';
@@ -302,6 +323,7 @@ export function travelScreen(): string {
     <p style="opacity:.75;font-size:13px;margin:0 0 10px;">Tap a glowing world up top to preview where you'll play &amp; its bet, then confirm the jump. Each jump burns its distance in ⛽ fuel. ${stakes} ${safeNote}</p>
     ${map}
     ${strandedBox}
+    ${anyLane ? `<div style="margin-top:10px;">${scanBtn}</div>` : ''}
     ${anyLane ? fuelDepotHTML() : ''}
     ${bankBtn}`;
 }

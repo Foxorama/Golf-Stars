@@ -13,6 +13,10 @@ import {
   fuelUnitCost,
   resumeRun,
   routeFuelCost,
+  routeOptions,
+  canScanRoutes,
+  scanFuelCost,
+  scanRoutes,
   simulateRun,
   snapshotRun,
   startRun,
@@ -25,7 +29,8 @@ import {
 } from '../src/sim/rpg/run';
 import type { PlayedHole } from '../src/sim/round';
 import { FORMATS, startingFuelFor, stopCount, getFormat, DEFAULT_STARTING_FUEL } from '../src/sim/rpg/formats';
-import { DEFAULT_EVENT, routeEvent } from '../src/sim/rpg/events';
+import { DEFAULT_EVENT, eventPool, routeEvent } from '../src/sim/rpg/events';
+import { effectFuelDelta, routeEffect } from '../src/sim/rpg/effects';
 import { themeById } from '../src/sim/course/themes';
 import { fuelGaugeHTML } from '../src/render/fuel';
 import { initState, reduce, type UiState } from '../src/ui/game';
@@ -270,9 +275,140 @@ describe('save v17 → v18 (GS-fuel)', () => {
     } as unknown;
     const s = migrate(v17);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(18);
+    expect(SAVE_VERSION).toBe(19);
     expect(s.activeRun?.fuel).toBeUndefined(); // the stamp adds nothing…
     expect(resumeRun(s.activeRun!).fuel).toBe(8); // …and resume grants the voyage's fresh tank
+  });
+
+  it('v18 → v19 (GS-fuel-4) is a pure stamp; a pre-scan run resumes on the classic scan-0 offer', async () => {
+    const { migrate, defaultSave } = await import('../src/save/schema');
+    const v18 = {
+      ...defaultSave(),
+      version: 18,
+      activeRun: { seed: 7, formatId: 'unending', stopIndex: 2, distanceFromStart: 3, credits: 90, perks: [], fuel: 6 },
+    } as unknown;
+    const s = migrate(v18);
+    expect(s.version).toBe(19);
+    expect(s.activeRun?.routeScans).toBeUndefined(); // the stamp adds nothing…
+    expect(resumeRun(s.activeRun!).routeScans).toBe(0); // …and resume reads it as never-scanned
+  });
+});
+
+describe('the sky prices the passage (GS-fuel-4 tail/headwinds)', () => {
+  const tailwind = routeEvent('solar-wind')!; // → solarWind sky, −1 ⛽
+  const headwind = routeEvent('ion-storm')!; // → ionStorm sky, +1 ⛽
+
+  it('a tailwind sky shaves a unit, a headwind adds one — decoupling burn from distance', () => {
+    const run = startRun(51, 'unending');
+    expect(effectFuelDelta('solarWind')).toBe(-1);
+    expect(effectFuelDelta('comet')).toBe(-1);
+    expect(effectFuelDelta('gravityWell')).toBe(1);
+    expect(effectFuelDelta('ionStorm')).toBe(1);
+    expect(routeFuelCost(run, lane(2, tailwind))).toBe(1);
+    expect(routeFuelCost(run, lane(2, headwind))).toBe(3);
+    // The 1-unit floor holds — a tailwind never makes a jump free.
+    expect(routeFuelCost(run, lane(1, tailwind))).toBe(1);
+    // An event-less partial (clear skies) prices exactly as before.
+    expect(routeFuelCost(run, lane(2))).toBe(2);
+  });
+
+  it('travel, the shortfall bill and the lane lock all price the sky', () => {
+    const run = startRun(52, 'unending');
+    const after = travel(run, lane(2, headwind));
+    expect(after.fuel).toBe(run.fuel - 3);
+    expect(after.distanceFromStart).toBe(run.distanceFromStart + 2); // burn ≠ depth: full distance flown
+    const dry: Run = { ...run, fuel: 0, credits: 500 };
+    expect(fuelShortfall(dry, lane(2, headwind))).toBe(3);
+    expect(travelRefuelCost(dry, lane(2, headwind))).toBe(3 * fuelUnitCost(dry));
+    const broke: Run = { ...run, fuel: 2, credits: 0 };
+    expect(canTravel(broke, lane(2, tailwind))).toBe(true); // tailwind brings it in range…
+    expect(canTravel(broke, lane(2, headwind))).toBe(false); // …the headwind locks it
+  });
+
+  it('Ion Thrusters stack with the sky, still floored at 1', () => {
+    const run = buy({ ...startRun(53, 'unending'), credits: 10_000 }, 'ion-thrusters');
+    expect(routeFuelCost(run, lane(3, headwind))).toBe(3); // 3 +1 sky −1 drive
+    expect(routeFuelCost(run, lane(2, tailwind))).toBe(1); // 2 −1 sky −1 drive → floor
+  });
+
+  it('FAIRNESS machine-check: no calm-category OUT lane is ever fuel-taxed', () => {
+    for (const e of eventPool(999)) {
+      if (effectFuelDelta(routeEffect(e)) > 0) expect(e.category).not.toBe('calm');
+    }
+  });
+});
+
+describe('fuel-salvage lanes (GS-fuel-4)', () => {
+  it('the tanker events exist, arc-tiered, and every fuel grant is stated on the card desc', () => {
+    const arc1 = eventPool(0).map((e) => e.id);
+    expect(arc1).toContain('fuel-scow');
+    expect(arc1).not.toContain('derelict-tanker');
+    const deep = eventPool(999).map((e) => e.id);
+    expect(deep).toContain('derelict-tanker');
+    expect(deep).toContain('fuel-caravan');
+    // Honesty guard: a lane that refuels SAYS so, in the same ⛽ language every gauge uses.
+    for (const e of eventPool(999)) {
+      if (e.fuelBonus) expect(e.desc).toMatch(/refuel \+\d+ ⛽/i);
+    }
+  });
+
+  it('travel siphons the bonus on arrival, clamped to capacity, never draining an over-full tank', () => {
+    const scow = routeEvent('fuel-scow')!;
+    const run: Run = { ...startRun(61, 'unending'), fuel: 4 };
+    const after = travel(run, lane(1, scow));
+    expect(after.fuel).toBe(4 - 1 + 2); // burn the hop, then +2 from the scow
+    // Near-full: the siphon clamps to the tank, never spills.
+    const nearFull: Run = { ...run, fuel: tankCapacity(run) };
+    expect(travel(nearFull, lane(1, scow)).fuel).toBe(tankCapacity(run));
+    // A legacy over-capacity tank is never drained by the clamp.
+    const over: Run = { ...run, fuel: tankCapacity(run) + 9 };
+    expect(travel(over, lane(1, scow)).fuel).toBe(tankCapacity(run) + 9 - 1);
+  });
+});
+
+describe('the sector scan (GS-fuel-4)', () => {
+  it('burns escalating fuel to redraw the lanes, and always keeps a cell in the tank', () => {
+    const run: Run = { ...startRun(71, 'unending'), fuel: 4 };
+    expect(scanFuelCost(run)).toBe(1);
+    expect(canScanRoutes(run)).toBe(true);
+    const once = scanRoutes(run);
+    expect(once.fuel).toBe(3);
+    expect(once.routeScans).toBe(1);
+    expect(scanFuelCost(once)).toBe(2); // the reroll precedent: 1, 2, 3…
+    const twice = scanRoutes(once);
+    expect(twice.fuel).toBe(1);
+    // At 1 cell the next (3-unit) scan is refused — you can never scan yourself dry.
+    expect(canScanRoutes(twice)).toBe(false);
+    expect(() => scanRoutes(twice)).toThrow(/fuel/);
+    // The guard is strict: fuel === cost still refuses (≥1 cell must REMAIN).
+    expect(canScanRoutes({ ...run, fuel: 1, routeScans: 0 })).toBe(false);
+    expect(canScanRoutes({ ...run, fuel: 2, routeScans: 0 })).toBe(true);
+  });
+
+  it('a scan re-keys the route draw; scan 0 is the classic stream; travel resets the meter', () => {
+    const run: Run = { ...startRun(72, 'unending'), stopIndex: 1, fuel: 10 };
+    const original = routeOptions(run);
+    // Scan 0 is pure + repeatable (the classic stream, byte-identical).
+    expect(routeOptions(run)).toEqual(original);
+    const scanned = scanRoutes(run);
+    const redrawn = routeOptions(scanned);
+    // A fresh draw — deterministic (a resume reproduces it), and different from the original
+    // (event ids + distances both re-rolled; if this seed ever collides, pick another).
+    expect(routeOptions(scanned)).toEqual(redrawn);
+    expect(redrawn.map((r) => `${r.distanceJump}:${r.event.id}`)).not.toEqual(
+      original.map((r) => `${r.distanceJump}:${r.event.id}`),
+    );
+    // The jump resets the meter: the NEXT stop opens on its classic scan-0 offer.
+    expect(travel(scanned, redrawn[0]!).routeScans).toBe(0);
+  });
+
+  it('the scanned offer round-trips through snapshot/resume — you keep what you paid for', () => {
+    const run = scanRoutes({ ...startRun(73, 'unending'), stopIndex: 2, fuel: 8 });
+    const resumed = resumeRun(snapshotRun(run));
+    expect(resumed.routeScans).toBe(1);
+    expect(routeOptions(resumed).map((r) => r.event.id)).toEqual(routeOptions(run).map((r) => r.event.id));
+    // A pre-scan snapshot reads as never-scanned.
+    expect(resumeRun({ ...snapshotRun(run), routeScans: undefined }).routeScans).toBe(0);
   });
 });
 
@@ -315,10 +451,31 @@ describe('the reducer plumbs fuel (GS-fuel)', () => {
     // Drain the tank + purse: the same click must now bounce.
     const broke: UiState = { ...s, run: { ...s.run, fuel: 0, credits: 0 } };
     expect(reduce(broke, { type: 'route', routeId: route.id })).toBe(broke);
-    // With the real tank the jump proceeds and the gauge drops by the jump distance.
+    // With the real tank the jump proceeds and the gauge drops by the jump's full bill (its
+    // distance, plus any GS-fuel-4 sky tail/headwind) — and any arrival siphon pours back in.
     const after = reduce(s, { type: 'route', routeId: route.id });
     expect(after.screen).toBe('intro');
-    expect(after.run.fuel).toBe(Math.max(0, s.run.fuel - route.distanceJump));
+    const bonus = route.event.fuelBonus ?? 0;
+    expect(after.run.fuel).toBe(
+      Math.min(tankCapacity(s.run), Math.max(0, s.run.fuel - routeFuelCost(s.run, route)) + bonus),
+    );
+  });
+
+  it('scanRoutes burns fuel and redraws the lanes on the travel screen, nowhere else', () => {
+    const s = toTravel(51);
+    if (!s) return;
+    const scanned = reduce(s, { type: 'scanRoutes' });
+    expect(scanned.run.fuel).toBe(s.run.fuel - 1);
+    expect(scanned.run.routeScans).toBe(1);
+    expect(scanned.routes!.map((r) => `${r.distanceJump}:${r.event.id}`)).not.toEqual(
+      s.routes!.map((r) => `${r.distanceJump}:${r.event.id}`),
+    );
+    // A dry tank refuses (the scan never takes the last cell)…
+    const dry: UiState = { ...s, run: { ...s.run, fuel: 1 } };
+    expect(reduce(dry, { type: 'scanRoutes' })).toBe(dry);
+    // …and off the travel screen it's a no-op.
+    const title = initState(1);
+    expect(reduce(title, { type: 'scanRoutes' })).toBe(title);
   });
 
   it('strand ends the run from the travel screen with the stranded reason + banked shards', () => {
