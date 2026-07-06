@@ -114,10 +114,11 @@ these systems** — each bullet is the tip of a documented iceberg.
   - Corridor: wide-and-wild early → tight late, a `ribbon` off a smoothed template-grammar
     centreline; hazard placement + `validateFairness` key off the corridor's WIDEST point.
     WIDTH is a per-hole ARCHETYPE (`chooseWidthProfile`: classic/chute/neck/hourglass/wander/
-    thin/broad → `Hole.widthId`), variety-not-difficulty like the shape grammar; lost-rough
-    island holes are EXEMPT ('island' — width is survival there). Squeezed profiles floor at
-    their own `floorFrac` (abs 5-yd half-width min). Re-shoot `scripts/width-preview.mjs`
-    after touching it.
+    thin/broad → `Hole.widthId`), variety-not-difficulty like the shape grammar. Lost-rough
+    holes draw a WIDEN-ONLY island pool (island/-bays/-flare/-broadtee/-broad): width is
+    survival there, so every island `at(u) ≥ 1` (machine-checked) — islands only get wider,
+    never squeezed. Squeezed profiles floor at their own `floorFrac` (abs 5-yd half-width
+    min). Re-shoot `scripts/width-preview.mjs` after touching it.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
   - `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves
@@ -142,7 +143,7 @@ these systems** — each bullet is the tip of a documented iceberg.
   - OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
     shrink it casually).
   - All new generator draws gate on their feature being armed (contract 1); current
-    `GENERATOR_VERSION` 17.
+    `GENERATOR_VERSION` 18.
 - **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
   - The spine: `startRun → [playStop → buy* → travel]*` until the survival rule fails; pure and
     deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);

@@ -59,24 +59,38 @@ describe('island-hop gaps are completable with the common starter bag (GS-cetus-
   it('generateStopCourse never throws on void worlds at galaxy depth (crash guard)', () => {
     const voidThemes = THEMES.filter((t) => t.archetype === 'void');
     expect(voidThemes.length).toBeGreaterThan(0);
-    let rawThrows = 0;
     for (const theme of voidThemes) {
       const biomeRow = resolveBiome(theme);
       for (let dist = 8; dist <= 24; dist += 2) {
         for (let v = 0; v < 20; v++) {
           const seed = `unending:${theme.id}:${dist}:${v}`;
           const opts = { holes: 4, distanceFromStart: dist, biomeRow, themeId: theme.id, wildnessBoost: 0 };
-          try {
-            generateCourse(seed, opts);
-          } catch {
-            rawThrows++;
-          }
-          // The wrapper must ALWAYS succeed, including on the seeds where raw generateCourse throws.
+          // The wrapper must ALWAYS succeed, whatever raw generateCourse does on this seed.
           expect(() => generateStopCourse(seed, opts), `${theme.id} d${dist} v${v}`).not.toThrow();
         }
       }
     }
-    // Sanity: this fuzz must actually EXERCISE the throw path, else the guard proves nothing.
+    // Sanity: the guard proves nothing unless the throw path is genuinely exercised. GS-island-width's
+    // wider pads made raw sliver-pad throws rare enough that a small blind fuzz can't find one, so the
+    // known raw-throwing configs are PINNED here (re-hunt + re-pin when GENERATOR_VERSION bumps —
+    // scan `unending:<theme>:<dist>:<v>` seeds for raw throws like the sweep above, just deeper).
+    const THROWERS = [
+      { theme: 'omega-centauri', dist: 18, v: 116 },
+      { theme: 'southern-pinwheel', dist: 20, v: 72 },
+      { theme: 'southern-pinwheel', dist: 22, v: 81 },
+    ];
+    let rawThrows = 0;
+    for (const t of THROWERS) {
+      const theme = voidThemes.find((th) => th.id === t.theme)!;
+      const seed = `unending:${t.theme}:${t.dist}:${t.v}`;
+      const opts = { holes: 4, distanceFromStart: t.dist, biomeRow: resolveBiome(theme), themeId: t.theme, wildnessBoost: 0 };
+      try {
+        generateCourse(seed, opts);
+      } catch {
+        rawThrows++;
+      }
+      expect(() => generateStopCourse(seed, opts), `pinned ${seed}`).not.toThrow();
+    }
     expect(rawThrows).toBeGreaterThan(0);
   });
 

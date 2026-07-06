@@ -60,16 +60,21 @@ const server = await createServer({ server: { middlewareMode: true }, appType: '
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
 const { renderHoleSVG } = await server.ssrLoadModule('/src/render/holeView.ts');
 
-// Hunt holes per archetype across seeds/wildness on a couple of readable worlds.
-const ARCHES = ['chute', 'neck', 'hourglass', 'wander', 'thin', 'broad', 'classic'];
+// Hunt holes per archetype across seeds/wildness on a couple of readable worlds, plus the
+// lost-rough ISLAND pool (GS-island-width) on the void/cetus deep stops (wildness ≥ 0.55 arms it).
+const ARCHES = [
+  'chute', 'neck', 'hourglass', 'wander', 'thin', 'broad', 'classic',
+  'island', 'island-bays', 'island-flare', 'island-broadtee', 'island-broad',
+];
 const WANT = 3;
 const found = Object.fromEntries(ARCHES.map((a) => [a, []]));
-outer: for (let s = 0; s < 400; s++) {
-  const biome = s % 2 ? 'verdant-station' : 'dust-belt';
-  const wild = [0.15, 0.45, 0.8][s % 3];
+outer: for (let s = 0; s < 800; s++) {
+  const island = s % 4 === 3;
+  const biome = island ? (s % 8 === 3 ? 'void-garden' : 'cetus-deep') : s % 2 ? 'verdant-station' : 'dust-belt';
+  const wild = island ? [0.6, 0.8, 1][s % 3] : [0.15, 0.45, 0.8][s % 3];
   const course = generateCourse(90000 + s, { biome, holes: 4, wildness: wild });
   for (const h of course.holes) {
-    if (h.par < 4 && !['thin', 'broad', 'wander', 'classic'].includes(h.widthId)) continue;
+    if (h.par < 4 && !['thin', 'broad', 'wander', 'classic', 'island'].includes(h.widthId)) continue;
     const bucket = found[h.widthId];
     if (bucket && bucket.length < WANT) bucket.push({ hole: h, biome, wild });
     if (ARCHES.every((a) => found[a].length >= WANT)) break outer;
