@@ -37,7 +37,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 18;
+export const GENERATOR_VERSION = 19;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -49,6 +49,10 @@ const LAVA_RIVER_MIN_WILDNESS = 0.26; // below: a calm ember stop has no river
 const FROZEN_POND_MIN_WILDNESS = 0.26; // below: a calm frost stop has no pond crossing
 const WATER_CREEK_MIN_WILDNESS = 0.26; // below: a calm parkland stop has no creek crossing
 const DEEP_ROUGH_MIN_WILDNESS = 0.3; // below (incl. the stop-0 ceiling): doglegs stay cuttable — the forgiving opener
+// GS-rough-gradient: below this the off-corridor rough fill is UNIFORM (a wide, forgiving heavy-rough
+// buffer, trees pushed far out); at/above it each hole rolls a CHARACTER (tight tree chute / heavy-rough
+// gauntlet / mixed) so the wilder stops read "a lot more random".
+const ROUGH_CHAR_MIN_WILDNESS = 0.45;
 
 /** Penalty kinds that are SANCTIONED forced carries on the play corridor (GS-19/GS-mechanics): they
  *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
@@ -1105,6 +1109,88 @@ function generateHole(
     const lateral = fairwayHalfWidth + r + rng.range(5, 72);
     const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
     hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, rng) });
+  }
+
+  // ROUGH GRADIENT (GS-rough-gradient) — a distance-graded fill of the off-corridor rough, LAYERED on
+  // top of the scattered treeline above. The rough used to be too thin/patchy, so a sprayed ball just
+  // bounced through light rough and IGNORED the hole. This pass makes the rough READ as trouble that
+  // drives play back to the fairway: a HEAVY-ROUGH band (deeprough/fescue) HUGS the corridor edge and,
+  // beyond it, the world's TREES thicken with distance — "the further out, the more forest". The only
+  // difficulty lever here is the SHAPE (fairness is untouched — every kind is NON-penalty, so
+  // `validateFairness` ignores them and they may hug the edge):
+  //   • calm stops — a WIDE, recoverable heavy-rough buffer with the trees pushed far out, uniform hole
+  //     to hole, so a wild spray lands in deep rough it can hack out of, not the woods;
+  //   • wild stops (≥ ROUGH_CHAR_MIN_WILDNESS) — a per-hole CHARACTER roll ("a lot more random"): a
+  //     TIGHT tree chute (trees crowd the edge), a heavy-rough gauntlet (deep rough at the edge), or a
+  //     mixed hole; the forest also thickens with wildness.
+  // CRITICAL — this pass draws from a DEDICATED side stream (`roughRng`, keyed off the hole like the
+  // pin/slope/contour streams), NOT the main `rng`. So it perturbs NO existing draw: every penalty
+  // crossing/pond, green, grove and the whole terrain geometry stay byte-for-byte identical, and
+  // `validateCrossings`/`validateFairness` are unaffected — only the (non-penalty) rough hazards are
+  // ADDED. Scaled by the world's `treeDensity` so a scrub world stays scrubby (few trees, still a real
+  // heavy-rough band) and a jungle walls the fairway. Skipped on lost-rough worlds (off the fairway is
+  // already the abyss).
+  if (!lostRough) {
+    const roughRng = new Rng(`${rng.seed}:rough:${holeIndex}`);
+    const td = biome.treeDensity ?? 0;
+    // The heavier of the two near-band kinds. Land worlds use the `deeprough` hack-out lie; the OCEAN
+    // world's rough is a sandy dune shore (its deep-rough-cut is the SEA via the water pass), so it
+    // keeps a `fescue`-only band — no land `deeprough` lie — preserving its identity.
+    const heavyKind = biome.deepRough === 'water' ? 'fescue' : 'deeprough';
+    const charRoll = roughRng.float();
+    // Heavy-rough BUFFER: yards of heavy rough past the fairway edge before the forest begins.
+    let buffer: number;
+    if (wildness >= ROUGH_CHAR_MIN_WILDNESS) {
+      if (charRoll < 0.34) buffer = roughRng.range(2, 12); // tight tree chute — canopies at the edge
+      else if (charRoll < 0.64) buffer = roughRng.range(30, 54); // heavy-rough gauntlet — deep rough at the edge
+      else buffer = roughRng.range(12, 34); // mixed
+    } else {
+      buffer = (26 + 18 * (1 - wildness)) * roughRng.range(0.9, 1.15); // wide + forgiving, uniform
+    }
+    const STEPS = par === 3 ? 12 : 16;
+    // How far past the buffer the woods run (the back wall), grown by the world's tree density + wildness.
+    const forestReach = 24 + 28 * (td / (td + 1)) + wildness * 16;
+    // Keep a blob of radius r fully OUTSIDE the local corridor edge (blobPoly jitter ≤ 0.32) so the
+    // fairway route stays a clean mown lie — heavy rough LINES the fairway, never sits on it.
+    const standoff = (r: number) => r * 1.34 + 1;
+    for (let s = 0; s < STEPS; s++) {
+      const t = 0.05 + (s / (STEPS - 1)) * 0.92;
+      const along = centrePoint(centreline, t);
+      const perp = perpAt(centreline, t);
+      const idx = Math.max(0, Math.min(segs - 1, Math.round(t * (segs - 1))));
+      const edge = Math.max(leftHW[idx] ?? fairwayHalfWidth, rightHW[idx] ?? fairwayHalfWidth, 5);
+      // Bound the deepest trees near the old treeline's reach so playBounds (and the OB box, which is
+      // derived from all terrain) doesn't balloon the hole out on the wide heavy-rough character holes.
+      const maxLat = Math.min(edge + 96, edge + buffer + forestReach + 12);
+      for (const side of [-1, 1] as const) {
+        // HEAVY-ROUGH near band — deep rough / fescue hugging the edge, near-continuous so a miss is
+        // caught. A calm hole's wide buffer packs it with recoverable heavy rough (denser on the calm
+        // stops — the "more rough on low difficulty" ask); a tight-tree hole has almost none.
+        const nearMax = wildness < ROUGH_CHAR_MIN_WILDNESS ? 2 : 1;
+        const roughBlobs = buffer < 8 ? (roughRng.float() < 0.45 ? 1 : 0) : 1 + (roughRng.float() < 0.55 ? nearMax - 1 : 0);
+        for (let k = 0; k < roughBlobs; k++) {
+          const r = roughRng.range(6, 12);
+          const lat = edge + standoff(r) + roughRng.range(0, Math.max(2, buffer));
+          const c: Vec = [along[0] + perp[0] * side * lat, along[1] + perp[1] * side * lat];
+          const kind = roughRng.float() < 0.5 ? heavyKind : 'fescue';
+          hazards.push({ kind, poly: blobPoly(c, r, 10, 0.32, roughRng) });
+        }
+        // FOREST band — trees thickening with distance AND wildness: each candidate ring is likelier to
+        // plant the further out it sits, so the wall reads deepest at the back, and harder stops grow
+        // more forest. Ring count ∝ treeDensity; small canopies so a "tight" chute hugs close without
+        // poking onto the fairway.
+        const rings = td <= 0 ? 0 : Math.min(3, 1 + Math.round(td));
+        for (let ring = 0; ring < rings; ring++) {
+          const depthFrac = rings === 1 ? 0.5 : ring / (rings - 1);
+          const plantP = Math.min(0.95, 0.18 + td * 0.14 + depthFrac * 0.42 + wildness * 0.28);
+          if (roughRng.float() > plantP) continue;
+          const r = roughRng.range(3.5, 6);
+          const lat = Math.min(maxLat, edge + Math.max(buffer, standoff(r)) + depthFrac * forestReach + roughRng.range(0, 10));
+          const c: Vec = [along[0] + perp[0] * side * lat, along[1] + perp[1] * side * lat];
+          hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, roughRng) });
+        }
+      }
+    }
   }
 
   // Blocking GROVES on a dogleg's cut-the-corner line (GS-variety): tall stands of trees planted where

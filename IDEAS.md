@@ -52,6 +52,15 @@ Foundations are shipped; these are the live follow-ons.
   profile (lay up short of an hourglass waist / club down in a chute instead of bombing driver into a
   squeeze), then re-measure and re-tighten the death-spiral bars per archetype. The suite stayed
   green without it, but the AI currently plays every profile the same.
+- **GS-rough-gradient-rebalance** — the balance half of GS-rough-gradient (shipped: heavy rough hugs the
+  fairway + a distance-graded forest at all difficulties, real-golf feel first by design; the death-spiral
+  fences were relaxed to the interim reality with `TODO(GS-rough-gradient)` in
+  `tests/{biomes,themes,patches,characters}.test.ts`). The course is now meaningfully harder
+  (max-wildness `toPar/hole` ~1.0–1.4, floor-hit ~10% / ~20% for sparse bags). Rebalance and re-tighten
+  those fences: teach the auto reach-AI to play BACK to the fairway (punch out of trees / accept a
+  layup rather than bomb into forest) and/or enrich the starter bags — NEVER by softening the rough.
+  The gradient knobs (per-hole `buffer` character, `forestReach`, ring `plantP`, `ROUGH_CHAR_MIN_WILDNESS`)
+  are the tuning surface once the AI reads the rough.
 - **GS-more-worlds** — metal/asteroid (low-grav scrap), neon/cyber grid, toxic/acid swamp, lightning-storm:
   each a new archetype row + its 8 Record entries (the registry scales now).
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.

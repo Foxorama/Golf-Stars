@@ -137,13 +137,25 @@ these systems** — each bullet is the tip of a documented iceberg.
     stops; difficulty rides bend severity + hazard density, not which shapes exist.
   - DEEP ROUGH chokes a dogleg's cut-the-corner chord (biome opt-in `deepRough`; ocean uses water);
     fair by construction (far from the bent corridor), wildness-gated, zero-rng on straight holes.
+  - ROUGH GRADIENT (GS-rough-gradient): a distance-graded fill LINES every non-lost hole so a spray
+    can't ignore the hole — HEAVY rough (deeprough/fescue) HUGS the fairway edge, TREES thicken with
+    distance ("further out = more forest"). Calm stops = a WIDE recoverable buffer, trees far out;
+    wild stops (≥ `ROUGH_CHAR_MIN_WILDNESS` 0.45) roll a per-hole CHARACTER (tight tree chute /
+    heavy-rough gauntlet / mixed) so they read "a lot more random". All NON-penalty (fairness ignores
+    them); a `standoff` keeps every blob OFF the mown centreline route. Ocean keeps `fescue`-only (its
+    heavy rough is dune, its deep-rough-cut is the SEA). CRITICAL: drawn from a DEDICATED side stream
+    (`${seed}:rough:${holeIndex}`, like the pin/slope), so it perturbs ZERO main-`rng` draws — every
+    penalty crossing/green/grove + `validateCrossings`/`validateFairness` stay byte-identical; only
+    the non-penalty rough is ADDED. Balance was DELIBERATELY not re-tuned (rough first, rebalance
+    next): the death-spiral fences are relaxed to the interim reality with `TODO(GS-rough-gradient)`
+    — re-tighten them in the rebalance, never by softening the rough.
   - A hole gets a forced-carry crossing **or** greenside drama (sanctioned penalty rings +
     approach lake), never both. Corridors can break into mown segments (`brokenCorridor`, biome
     `roughBreaks`; skipped on lost-rough worlds).
   - OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
     shrink it casually).
   - All new generator draws gate on their feature being armed (contract 1); current
-    `GENERATOR_VERSION` 18.
+    `GENERATOR_VERSION` 19.
 - **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
   - The spine: `startRun → [playStop → buy* → travel]*` until the survival rule fails; pure and
     deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);
