@@ -229,6 +229,11 @@ these systems** — each bullet is the tip of a documented iceberg.
 - **Render layer** — `docs/decisions/render.md`
   - ONE pure projector (`render/project.ts`) both renderers share. ONE shared scene builder
     (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view.
+  - `style.ts` is the ORCHESTRATOR only (GS-style-split): `buildScene` keeps the seeded streams +
+    their draw ORDER, the two interpreters, and the unchanged public exports; the painters live in
+    per-domain `src/render/style/*` modules (shared / land / fairway / green / hazards / flora /
+    ground / platforms / effects). **A new painter = a new `style/` module**, and painter modules
+    never import style.ts (`shared.ts` is the dependency root — no cycles).
   - All scene randomness is mulberry32 seeded from `hashHole()` on documented streams — adding a
     draw must not perturb existing stream order. SVG clip/gradient ids are per-hole
     (`holeIdPrefix`) — document-global ids cross-clip co-mounted SVGs.
@@ -263,7 +268,7 @@ these systems** — each bullet is the tip of a documented iceberg.
   - The decision map's framing holds still for the whole shot decision; the shot animation starts
     at the decision map's exact `decisionRadius`. `playView`'s `spawnLandFX` answers the touchdown
     per lie/penalty — extend it with any new penalty kind.
-  - Re-shoot the gallery (`node scripts/gallery.mjs`) after any `style.ts` change.
+  - Re-shoot the gallery (`node scripts/gallery.mjs`) after any `style.ts` / `style/*` change.
 - **Audio** — `docs/decisions/audio.md`
   - ASSETLESS, always: every cue + music note is synthesized WebAudio — no downloaded audio file,
     ever. ONE shared `AudioContext`, two buses: SFX on `sound`, generative music on `music`.
