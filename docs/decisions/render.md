@@ -849,3 +849,32 @@ launch failure (full chromium → headless shell → system Chrome/Edge, each pl
 the Windows dev box the Playwright full-chromium download ships a broken side-by-side manifest
 (spawn UNKNOWN) while the headless shell runs fine — and merely existing on disk doesn't mean a
 binary can launch.
+
+## GS-fairway-2: the fairway art smoothing pass (2026-07-06)
+
+**The ask:** greens and hazards had had their blending passes (GS-green-contour-3,
+GS-hazard-blend-2); the fairway was the surface left behind — "looking a bit average". Close-up
+shots confirmed three tells, all in `styleFairways`:
+
+1. **The cut was a 3-step staircase.** Collar (−6) → fringe (−3) → base butted at hard tone jumps —
+   concentric-sticker rings, the same "ruled tape" tell the mowing bands had before GS-mow-blend.
+   Fix: one intermediate mix ring between each step (`mixHex(collar, fringe, .5)` at −4.4,
+   `mixHex(fringe, base, .5)` at −1.5), halving every jump into a smooth rough→collar→fringe→turf
+   grade.
+2. **The interior was one flat tone.** Fix (a): an EDGE-EASE — two nested inner strokes
+   (`mixHex(s.base, fringe, 0.4)`, sw 9/4, clipped to the segment) so the mown turf ramps into its
+   own mow line from whichever side the fringe sits (lighter on sandy worlds, darker on parkland).
+   Strokes, NOT deep filled insets: `offsetPoly` insets bigger than the local half-width FOLD on a
+   thin ribbon, while a clipped stroke hugs the edge safely at any width/zoom. Fix (b): the single
+   hard-edged 0.16 sheen band became TWO stacked softer washes (insets 3/6.5 shifted along
+   LIGHT_UL, alphas 0.09/0.08) so the crown light grades in instead of switching on at a line.
+3. **The mow was invisible on narrow-spread palettes.** Verdant (`#3f8c3f`↔`#56a850`), desert and
+   ocean mowed at a whisper while frost read best precisely because its grain showed. The parkland
+   `mowTones` default lifted 0.5 → 0.6 — still far below the full-contrast "Beetlejuice snakes"
+   look the blend was introduced to tame; the dark cut keeps its 0.72 ease and the void/cetus
+   `MOW_BLEND` overrides (0.4/0.42) are untouched.
+
+**Guarantees:** all pure geometry, zero rng draws, fixed prim counts (camera-proof); every addition
+gates on `collar`, so void/cetus (no collar — glow rim / raised shelf) and Rainbow Road are
+byte-for-byte identical. Full suite green (1009 tests); gallery re-shot across all ten worlds and
+play-zoom crops eyeballed on verdant + desert (smooth grade, no facets, no sheen line).

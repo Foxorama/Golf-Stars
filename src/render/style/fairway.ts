@@ -69,7 +69,11 @@ export function rainbowRibbon(poly: Vec[], phaseY: number, bandH: number): Prim[
  *  keeps the mow while losing the harsh line. */
 const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.4, cetus: 0.42 };
 function mowTones(s: Shade, arch: BiomeArchetype): { hi: string; lo: string } {
-  const k = MOW_BLEND[arch] ?? 0.5; // fraction of the way from base toward light/dark (1 = full old contrast)
+  // Parkland default lifted 0.5 → 0.6 (GS-fairway-2): at 0.5 the narrow-spread palettes (verdant's
+  // #3f8c3f↔#56a850, desert, ocean) mowed at a near-invisible whisper and the corridor read as one
+  // flat tone — the frost world read best precisely because its grain showed. Still well below the
+  // full-contrast stripes the blend was introduced to tame, and the dark cut keeps its 0.72 ease.
+  const k = MOW_BLEND[arch] ?? 0.6; // fraction of the way from base toward light/dark (1 = full old contrast)
   const kLo = k * 0.72; // the dark cut eases further back than the light one, on every world
   return { hi: mixHex(s.base, s.light, k), lo: mixHex(s.base, s.dark, kLo) };
 }
@@ -117,20 +121,44 @@ export function styleFairways(sps: Vec[][], art: ArtFeel, s: Shade, fringe: stri
   // raised shelf, so they omit it and stay byte-for-byte identical. Grouped like the fringe (every
   // collar UNDER every base), so a broken corridor's segments share one continuous first cut.
   if (collar) for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: collar });
+  // GS-fairway-2: feather the cut. The collar → fringe → base rings used to BUTT at hard tone jumps
+  // — a 3-step staircase that read as concentric stickers (the same "ruled tape" tell the mowing
+  // bands had before GS-mow-blend). One intermediate mix ring between each step halves every jump,
+  // so the corridor grades smoothly rough → collar → fringe → turf. Pure geometry, zero rng;
+  // gated on `collar` like the rest of the grounded-world dressing.
+  if (collar) for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -4.4), fill: mixHex(collar, fringe, 0.5) });
   // First-cut fringes UNDER all the bases, so the apron's fringe never paints over the corridor —
   // only the outermost edge (past the green) shows it, easing the cut grass into the rough.
   for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: fringe });
+  if (collar) for (const sp of sps) out.push({ t: 'poly', pts: offsetPoly(sp, -1.5), fill: mixHex(fringe, s.base, 0.5) });
   for (const sp of sps) out.push({ t: 'poly', pts: sp, fill: s.base });
   // Per-world mowing PATTERN (GS-variety-2), riding the MAIN corridor's band grid so the apron +
   // broken-fairway segments line up with the corridor instead of running out of phase.
   if (art.stripes && sps[0]) out.push(...fairwayStripes(sps, s, bboxOf(sps[0]), arch));
-  // GS-fairway: a gentle directional SHEEN — a soft lit band pooled on the up-light side (the shared
-  // LIGHT_UL) so the mown turf reads as gently crowned ground catching the sun, not a flat decal.
-  // Very low alpha; clipped to each segment; pure geometry, zero rng. Grounded worlds only.
+  // GS-fairway/GS-fairway-2: the interior modelling, clipped to each segment. Grounded worlds only.
+  //  • EDGE EASE — two nested inner strokes toned from the turf toward the fringe, so the mown
+  //    surface ramps into its own mow line from whichever side the fringe sits (lighter on the
+  //    sandy worlds, darker on parkland) instead of a flat fill stopping dead at a ring. Strokes,
+  //    not deep filled insets: an inset larger than the corridor's local half-width folds on a
+  //    thin ribbon, while a clipped stroke hugs the edge safely at any width/zoom.
+  //  • SHEEN — the directional lit band pooled on the up-light side (the shared LIGHT_UL) now
+  //    stacks as TWO softer washes instead of one 0.16 band, so the crown light grades in rather
+  //    than switching on at a visible line. All pure geometry, zero rng.
   if (collar) {
+    const edgeEase = mixHex(s.base, fringe, 0.4);
     for (const sp of sps) {
-      const lit = shiftPoly(offsetPoly(sp, 4), LIGHT_UL[0] * 4, LIGHT_UL[1] * 4);
-      out.push({ t: 'clip', clip: sp, children: [{ t: 'poly', pts: lit, fill: hexAlpha(s.light, 0.16) }] });
+      const lit1 = shiftPoly(offsetPoly(sp, 3), LIGHT_UL[0] * 3, LIGHT_UL[1] * 3);
+      const lit2 = shiftPoly(offsetPoly(sp, 6.5), LIGHT_UL[0] * 6.5, LIGHT_UL[1] * 6.5);
+      out.push({
+        t: 'clip',
+        clip: sp,
+        children: [
+          { t: 'poly', pts: sp, fill: 'none', stroke: hexAlpha(edgeEase, 0.32), sw: 9 },
+          { t: 'poly', pts: sp, fill: 'none', stroke: hexAlpha(edgeEase, 0.45), sw: 4 },
+          { t: 'poly', pts: lit1, fill: hexAlpha(s.light, 0.09) },
+          { t: 'poly', pts: lit2, fill: hexAlpha(s.light, 0.08) },
+        ],
+      });
     }
   }
   // ONE soft ink edge, on the main corridor only — no hard outline cuts back across it near the green.
