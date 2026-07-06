@@ -273,3 +273,34 @@ First-device feedback on GS-settings-nav reshaped the title:
   table is retired. CSS lives in the "Stop result" block in `index.html`. Verified eyes-on (Playwright,
   430×950) across a RARE island world and a COMMON glacier world: verdict, tiles, tinted round strip,
   and tap-to-replay all render correctly with zero page errors.
+
+## GS-app-split: app.ts stops being a god-file (2026-07-06)
+
+`app.ts` had grown to 4,449 lines — every screen builder, the play screen, the render wiring and
+boot in one file. CLAUDE.md itself called it "the likeliest source of regressions". Split it into
+`src/app/` modules, purely mechanical (zero behaviour change; whole suite + typecheck + build green):
+
+- **`ctx.ts`** — the live `state` ES-module binding (`setState()` is called only by app.ts's
+  boot/recover/dispatch; every screen module imports `state` and reads the current value via the
+  live binding), plus `btn`/`header` and `seedFromUrl`/`freshRunSeed` (still the one sanctioned
+  `Math.random`, still side-effect layer).
+- **`helpers.ts`** — the cross-screen presentational reads: per-hole render keys
+  (`holeBiome`/`holeThemeId`), the route-effect arm checks (`tentsActive`/`scorchActive`/
+  `patchActive`/`rainbowActive`), `golferLook`, the caddy badge helpers, `lefty`, `rarityFlavour`,
+  `burst`.
+- **`duelHud.ts`** — competition/matchplay/team-duel HUD blocks, used by the play screen AND the
+  intro/result screens.
+- **`titleScreens.ts` / `introScreens.ts` / `resultScreens.ts` / `shopScreens.ts` /
+  `marketScreens.ts` / `clubhouseScreens.ts` / `travelScreens.ts`** — one module per screen family.
+- **Per-screen view state moved WITH its screen** as an exported mutable view object
+  (`marketView.showOwned`, `introView.stage`, `clubhouseView.slot`, `travelView.inspectRouteId`,
+  `shopView.inspectGearId`, `installView.deferred`) — app.ts's dispatch/render wiring mutates the
+  object's FIELDS (cross-module `let` reassignment is illegal in ESM; object-field mutation isn't).
+- **Direction of imports**: screen modules import from `ctx`/`helpers`/each other, NEVER from
+  `app.ts` (no cycles). `app.ts` keeps what genuinely needs the DOM loop: boot/recover/persist/
+  dispatch, the full interactive play screen (gesture, map nav, putt-aim state), `render()` + its
+  wiring, and the canvas/weather/caddy mount side-effects.
+
+Rules of thumb this locked in: a NEW screen is a new `src/app/` module (never more app.ts); a
+helper used by 2+ screen families goes in `helpers.ts`; view-only UI state lives in the screen's
+exported view object so dispatch can reset it without owning it.

@@ -62,8 +62,8 @@ This game lives or dies on three axes — put every change through all three bef
   so Node/vitest can simulate the whole game. Rendering reads sim state; never the reverse.
 - **Deterministic seeded RNG only** (`src/sim/rng.ts`). `Math.random()` is banned in the sim AND in
   any deterministic render path (scene/SVG) — it breaks reproducible runs, daily seeds, and tests.
-  (The ONE sanctioned `Math.random` is `app.ts freshRunSeed()`, side-effect layer only; `?seed=`
-  pins it.)
+  (The ONE sanctioned `Math.random` is `src/app/ctx.ts freshRunSeed()`, side-effect layer only;
+  `?seed=` pins it.)
 - **Course contract** (`src/sim/course/contract.ts`) is frozen: the generator emits it, the
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
@@ -278,6 +278,12 @@ these systems** — each bullet is the tip of a documented iceberg.
   - The screen flow is a PURE reducer (`ui/game.ts`): `(UiState, Action) → UiState`, no DOM/time,
     fully unit-tested. `app.ts`/`main.ts` render state + dispatch; save persistence + canvas mounts
     + the intro cinematic are side-effects there, never in the reducer.
+  - The app shell is SPLIT (GS-app-split): `app.ts` keeps boot/dispatch/render wiring + the
+    interactive play screen; every other screen builder lives in `src/app/*` (title/intro/result/
+    shop/market/clubhouse/travel + `ctx.ts` with the live `state` binding, `duelHud`, `helpers`).
+    Screen modules read `state` from `ctx.ts` and NEVER dispatch or import app.ts (no cycles);
+    per-screen view state is an exported view object (`marketView`, `introView`, …) app.ts's
+    wiring mutates. A new screen = a new `src/app/` module, not more app.ts.
   - Visual theme is the design-token CSS in `index.html`, not the SVG layer. The play screen is
     full-bleed and never scrolls; pull-to-power is the only shot input.
   - The settings cog rides EVERY screen (appended once in `render()`); "Return to title" is
@@ -294,8 +300,8 @@ these systems** — each bullet is the tip of a documented iceberg.
   - The title is a hero wordmark + two GAME tiles reusing the doorway component
     (`.gs-navtile--game`; whole tile = the button, distinct only via the `--mc` accent — never
     regrow badges/launch bars/progress text). The Daily button is parked off the title for now.
-  - **`app.ts` is a 4,400-line god-file — the likeliest source of regressions; prefer extracting a
-    module over growing it, and re-read the relevant span before editing.**
+  - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
+    `src/app/` module over growing it, and re-read the relevant span before editing.**
 - **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;
   degrades safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached
   sprite, never per-element `shadowBlur`. The real title boots first, the intro overlays it.
