@@ -764,3 +764,37 @@ Two render-layer additions shipped with the contoured-greens upgrade (full story
   fairway hands its own polygon + field to the same function. Lobe RELIEF stays in `styleGreen`:
   a directional glow pair per lobe under the shared `LIGHT_UL` (mound lit toward the sun; hollow
   inverted per the emboss rule).
+
+## GS-inset-2 + GS-cetus-blend + GS-hazard-blend-2: the hazard-blending pass (2026-07)
+
+Three refinements that make carved features sit IN the land instead of floating on it. All pure
+geometry — zero rng draws/reorders, so void/cetus and every seeded scene stay byte-identical.
+
+- **GS-inset-2 — no drop shadow onto turf.** GS-inset's first cut cast a shadow on the surrounding
+  grass, which read as the feature FLOATING proud of the land (the "raised/bevelled outward" bug).
+  The depression is now a THIN lip, not a big shadow blob: the emboss width `w` is capped HARD by
+  the body radius (`half*0.14`) so it stays a slim rim at the zoomed-in PLAY scale — a
+  scale-proportional band ballooned into a distinct dark shadow across a third of the feature, worse
+  than the raised look it replaced. Sand drops its bright far-floor pool (the lit-pool-vs-shadow
+  contrast was the hard "distinct shadow"). For the same reason the GREEN is FLUSH with the fairway
+  (no cast shadow — only its own mown fringe/collar rings ease it in); the shelf/void-glow worlds
+  still model their raised corridor edge. The emboss is inlined as clip CHILDREN, never a nested
+  clip. Land tone-patches are small faint mottle, never viewport-spanning "spotlight" washes.
+  Palette source: the `*.wall`/`*.bank` tones.
+- **GS-cetus-blend — hazards ease into the turf; void/cetus mow stripes muted.**
+  `styleSandFamily`/`styleLiquidFamily` each lay a soft grassy MARGIN just outside the body
+  (`mixHex(rough, sand|shore, 0.42)`, grouped UNDER every body so a merged complex shares one
+  seamless margin) — the land thinning toward the hazard, so a bunker/lake reads set INTO the ground
+  instead of a hard-edged sticker. The margin is blended toward the HAZARD, never darker than the
+  turf — a darker ring is a floating shadow, the GS-inset-2 lesson. Separately, void/cetus
+  fairway+green STRIPES were retuned down: their wide light↔dark VALUE spread banded even a normal
+  mow into discordant bright/dark stripes over the smooth luminous platform, so `MOW_BLEND` now
+  mutes them BELOW parkland (void 0.4 / cetus 0.42, dark eased to `k·0.72` on every world) and
+  `styleGreen` softens its stripe for those two worlds (0.52/0.36 vs the parkland 0.7/0.5) —
+  parkland stays byte-identical.
+- **GS-hazard-blend-2 — the hazard INTERNALS blend too.** Water/lava deepen through a SMOOTH ramp of
+  feathered `offsetPoly` rings interpolating base→mid→deep (7 rings, shape-following — a river
+  darkens toward its centreline, a lake toward its middle) instead of the 2 hard contour bands that
+  read as a topographic map. Bunkers drop the harsh full-width white rake BARS for a smoothly shaded
+  bowl: inset rim shadow + a soft down-light sunlit swell + faint rim-following rake arcs. The
+  liquid flow/glint draws still consume the identical rng, so every seeded scene is byte-stable.
