@@ -13,6 +13,8 @@ import {
 } from '../src/sim/round';
 import { heightFieldAt, slopeFieldAt } from '../src/sim/contour';
 import { contourIsolines } from '../src/render/contour';
+import { greenSlopeArt } from '../src/render/style/green';
+import { holeProjector } from '../src/render/project';
 import { Rng } from '../src/sim/rng';
 import { dist, type GreenLobe, type Hole, type Vec } from '../src/sim/course/contract';
 import { generateCourse } from '../src/sim/course/generate';
@@ -188,6 +190,36 @@ describe('topo isolines (GS-green-contour-2)', () => {
     const b = contourIsolines(square, [0.2, 0.1], mound);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
+
+  it('closed rings know their side: a mound cap is hiInside, a hollow floor is not (GS-green-contour-3)', () => {
+    const isoM = contourIsolines(square, undefined, mound);
+    const closedM = isoM.filter((l) => l.closed);
+    expect(closedM.length).toBeGreaterThan(0);
+    // The tightest (highest) closed ring around a mound crest is a dome cap — terraces wash it LIGHT.
+    expect([...closedM].sort((a, b) => b.frac - a.frac)[0]!.hiInside).toBe(true);
+    const isoH = contourIsolines(square, undefined, [{ c: [0, 0], r: 8, h: -0.6 }]);
+    const closedH = isoH.filter((l) => l.closed);
+    expect(closedH.length).toBeGreaterThan(0);
+    // …and the deepest closed ring of a hollow is a floor — washed DARK.
+    expect([...closedH].sort((a, b) => a.frac - b.frac)[0]!.hiInside).toBe(false);
+    // Open lines carry no side (nothing to fill).
+    for (const l of isoM) if (!l.closed) expect(l.hiInside).toBeUndefined();
+  });
+
+  it('illuminated-contour chunk counts are camera-proof: two different projections agree (GS-green-contour-3)', () => {
+    const course = generateCourse(20260706, { holes: 9, biome: 'ice-ring', distanceFromStart: 30 });
+    const hole = course.holes.find((h) => h.greenContour && h.greenContour.length)!;
+    expect(hole).toBeDefined();
+    const green = hole.features.find((f) => f.kind === 'green')!.poly;
+    const a = greenSlopeArt(hole, green, holeProjector(hole, { width: 360, height: 640 }))!;
+    const b = greenSlopeArt(hole, green, holeProjector(hole, { width: 520, height: 400, up: [1, 0.4] }))!;
+    // Ring count, per-ring chunk counts and the arrow-field count never read the projection…
+    expect(a.iso!.map((r) => r.chunks.length)).toEqual(b.iso!.map((r) => r.chunks.length));
+    expect(a.iso!.map((r) => r.closed)).toEqual(b.iso!.map((r) => r.closed));
+    expect(a.arrows!.length).toBe(b.arrows!.length);
+    // …while each chunk's LIGHTING legitimately does (the shared sun lives in screen space).
+    for (const r of a.iso!) for (const ch of r.chunks) expect(Math.abs(ch.lit)).toBeLessThanOrEqual(1);
+  });
 });
 
 describe('green roll-out reads the LOCAL contour field (GS-green-contour-2)', () => {
@@ -204,20 +236,61 @@ describe('green roll-out reads the LOCAL contour field (GS-green-contour-2)', ()
   });
   const mound: GreenLobe[] = [{ c: [0, 12], r: 8, h: 0.6 }];
 
-  it('a ball rolling INTO a mound brakes short of the flat roll; down its far flank it runs on', () => {
-    const flat = rollOut(pad(), [0, 0], [0, 1], 10, 'green').roll;
-    const intoMound = rollOut(pad(mound), [0, 0], [0, 1], 10, 'green').roll;
-    expect(intoMound).toBeLessThan(flat); // climbing the near flank costs energy
-    const offCrest = rollOut(pad(mound), [0, 13], [0, 1], 10, 'green').roll;
-    expect(offCrest).toBeGreaterThan(flat); // riding the far flank downhill runs out
+  it('a ball rolling INTO a mound finishes short of the flat roll; down its far flank it runs on', () => {
+    // GS-green-contour-3 note: `roll` is the ARC length and now includes the landing kick + the
+    // gravity creep (a ball that climbs a flank trickles back down it), so "brakes short" is asserted
+    // on FORWARD PROGRESS (rest along the travel), not on the arc.
+    const flat = rollOut(pad(), [0, 0], [0, 1], 10, 'green');
+    const intoMound = rollOut(pad(mound), [0, 0], [0, 1], 10, 'green');
+    expect(intoMound.rest[1]).toBeLessThan(flat.rest[1]); // climbing the near flank costs energy
+    const offCrest = rollOut(pad(mound), [0, 13], [0, 1], 10, 'green');
+    expect(offCrest.rest[1] - 13).toBeGreaterThan(flat.rest[1]); // riding the far flank downhill runs out
+  });
+
+  it('the FIRST BOUNCE reads the landform: an upslope face kills the skip, a downslope flank kicks on (GS-green-contour-3)', () => {
+    // Same travel (+y), same energy: touching down on the mound's NEAR flank (landing into the
+    // upslope) must finish well short of touching down just past the crest (landing downhill).
+    const intoFace = rollOut(pad(mound), [0, 6], [0, 1], 8, 'green');
+    const downFlank = rollOut(pad(mound), [0, 14], [0, 1], 8, 'green');
+    expect(downFlank.rest[1] - 14).toBeGreaterThan(intoFace.rest[1] - 6);
+    // And the bounce DEFLECTS toward the fall line: a touchdown on a side flank leaves the struck
+    // line immediately (pure lobe field — no plane — so the drift is all landform).
+    const side = rollOut(pad([{ c: [8, 3], r: 8, h: 0.6 }]), [0, 0], [0, 1], 8, 'green');
+    expect(side.rest[0]).toBeLessThan(-0.3); // shed away from the crest on its left
+  });
+
+  it('gravity creep: a dead ball cannot rest on a steep flank — it sheds off mounds and gathers into hollows', () => {
+    // A near-dead drop on the mound's near flank trickles back DOWN the sculpt…
+    const shed = rollOut(pad(mound), [0, 6], [0, 1], 0.5, 'green');
+    expect(shed.rest[1]).toBeLessThan(6 - 1.5);
+    // …and the same drop beside a HOLLOW gathers toward its centre.
+    const hollow = rollOut(pad([{ c: [0, 12], r: 8, h: -0.6 }]), [0, 6], [0, 1], 0.5, 'green');
+    expect(hollow.rest[1]).toBeGreaterThan(6 + 1.5);
+    // The creep is a settle, not a second roll-out: bounded by its budget.
+    expect(dist(shed.rest, [0, 6])).toBeLessThanOrEqual(0.5 + 5 + 1e-6);
+    // A green's uniform PLANE tilt still holds a ball exactly as before (no lobe steepness → no creep).
+    const farLobe: GreenLobe[] = [{ c: [1000, 1000], r: 4, h: 0.5 }];
+    const planeOnly = rollOut(pad(farLobe, [0.6, 0]), [0, 0], [0, 1], 0.5, 'green');
+    expect(dist(planeOnly.rest, [0, 0])).toBeLessThan(1.5); // rests near the drop, despite the steep plane
+  });
+
+  it('gravity creep never carries the ball OFF the green (the collar catches it)', () => {
+    // A small green whose downhill flank runs straight off the edge: the creep must stop inside.
+    const smallGreen: Hole = {
+      ...pad(mound),
+      features: [{ kind: 'green', poly: [[-10, -2], [10, -2], [10, 20], [-10, 20]] }],
+    };
+    const r = rollOut(smallGreen, [0, 4], [0, 1], 0.5, 'green');
+    expect(r.rest[1]).toBeGreaterThan(-2); // still on the green — settled against the low edge
   });
 
   it('the curled roll is path-consistent: |roll| is the arc length, rest is the path end', () => {
     const r = rollOut(pad(mound, [0.2, 0.1]), [3, -6], [0.6, 0.8], 12, 'green');
     // The chord can only be SHORTER than the arc (a straight roll is the degenerate equal case)…
     expect(dist(r.rest, [3, -6])).toBeLessThanOrEqual(Math.abs(r.roll) + 1e-6);
-    // …and the curl is bounded — the run-out breaks like a putt, it doesn't orbit.
-    expect(dist(r.rest, [3, -6])).toBeGreaterThan(Math.abs(r.roll) * 0.8);
+    // …and the travel is bounded — a break plus a settle, never an orbit. (Was 0.8 before the
+    // gravity creep; a ball that climbs a flank and trickles back can legitimately shorten the chord.)
+    expect(dist(r.rest, [3, -6])).toBeGreaterThan(Math.abs(r.roll) * 0.3);
     if (r.path) {
       expect(r.path[0]).toEqual([3, -6]);
       const last = r.path[r.path.length - 1]!;

@@ -143,6 +143,23 @@ const SLOPE_ROLL_K = 0.95;
  *  the green. 0.06 lands a ~12yd roll across a 0.4 side slope ~1.5–2yd downhill of the straight
  *  line — the putt-break scale, so an approach and a putt read the same ground the same way. */
 const ROLL_CURL_K = 0.06;
+/** First-bounce landform response (GS-green-contour-3): a ball TOUCHING DOWN on a CONTOURED green
+ *  feels the local slope at the bounce itself — landing into an upslope face kills the skip, landing
+ *  on a downslope flank kicks it on, and the initial roll direction deflects toward the fall line.
+ *  Contoured greens only (the curling integrator), so every lobe-less hole stays byte-identical. */
+const LAND_KICK_K = 0.55; // roll-energy multiplier per unit of downhill-along-travel at touchdown
+const LAND_KICK_MIN = 0.45; // an upslope face can kill at most this much of the skip
+const LAND_KICK_MAX = 1.6; // a downslope flank can kick on at most this much
+const LAND_DEFLECT_K = 0.5; // how hard the bounce redirects toward the fall line's perp component
+/** Gravity CREEP (GS-green-contour-3): the ball cannot REST on a steep piece of the SCULPT — once
+ *  the roll energy is spent it trickles on down the LOBE field (the mound/hollow relief; the plane
+ *  is the green's uniform tilt, which a ball rests on exactly as before) until the sculpt flattens
+ *  below CREEP_MIN, the green's edge catches it (a green-hit never creeps off the putting surface),
+ *  or the creep budget is spent — so flanks visibly shed balls and hollows gather them, exactly what
+ *  the topo rings say the ground does. */
+const CREEP_MIN = 0.22; // lobe-field steepness below which the ball settles
+const CREEP_STEP = 1.0; // yards per creep step (direction re-read each step, so it curls into hollows)
+const CREEP_MAX = 5; // total creep budget (yards) — a settle, not a second roll-out
 
 /** Carry of the pitching wedge — at/below this, clubs start adding backspin. */
 export const BACKSPIN_CARRY = 106;
@@ -277,6 +294,26 @@ export function rollOut(
   let budget = Math.abs(K);
   let dist = 0;
   let guard = 0;
+  let blocked = false; // stopped against sand/woods/a tent/a penalty → the creep below never fires
+  // GS-green-contour-3 — the FIRST BOUNCE reads the landform: a touchdown ON the green scales the
+  // roll energy by the slope's along-travel component (into a face → the skip dies; onto a downslope
+  // flank → it kicks on) and deflects the initial travel toward the fall line. Deterministic, zero
+  // rng; only contoured holes reach this branch, so lobe-less holes are byte-identical.
+  if (tdLie === 'green') {
+    const s0 = greenSlopeAt(touchdown, slope, lobes);
+    const along0 = tx * s0[0] + ty * s0[1]; // + = landing travelling downhill
+    budget *= Math.max(LAND_KICK_MIN, Math.min(LAND_KICK_MAX, 1 + LAND_KICK_K * along0));
+    const perp0 = s0[0] * -ty + s0[1] * tx;
+    if (Math.abs(perp0) > 1e-6) {
+      const bend = LAND_DEFLECT_K * perp0;
+      const nx = tx + -ty * bend;
+      const ny = ty + tx * bend;
+      const nl = Math.hypot(nx, ny) || 1;
+      tx = nx / nl;
+      ty = ny / nl;
+      bent = true;
+    }
+  }
   while (budget > 1e-3 && dist < cap && guard++ < 400) {
     const stepLeft = Math.min(STEP, cap - dist);
     const mid: Vec = [px + tx * stepLeft * 0.5, py + ty * stepLeft * 0.5];
@@ -287,6 +324,7 @@ export function rollOut(
       py += ty * stepLeft;
       dist += stepLeft;
       path.push([px, py]);
+      blocked = true;
       break;
     }
     if (!kPen && k !== tdLie && (k === 'bunker' || k === 'trees')) {
@@ -294,6 +332,7 @@ export function rollOut(
       py += ty * stepLeft;
       dist += stepLeft;
       path.push([px, py]);
+      blocked = true;
       break;
     }
     if (hitsNewTent([px + tx * stepLeft, py + ty * stepLeft])) {
@@ -301,6 +340,7 @@ export function rollOut(
       py += ty * stepLeft;
       dist += stepLeft;
       path.push([px, py]);
+      blocked = true;
       break;
     }
     const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, mid, tx, ty);
@@ -328,6 +368,32 @@ export function rollOut(
         ty = ny / nl;
         bent = true;
       }
+    }
+  }
+  // GS-green-contour-3 — gravity CREEP: the ball cannot settle on a steep piece of the sculpt. Once
+  // the energy is spent (never after an obstacle stop) it trickles on down the LOBE field — the
+  // mound/hollow relief only, so a green's uniform plane tilt still holds a ball exactly as before —
+  // re-reading the fall line each step so it curls into hollows and off flanks, until the sculpt
+  // flattens, the green's edge catches it, or the small creep budget runs out. The creep is part of
+  // the travel: it extends `path` and counts into the arc length. Deterministic, zero rng.
+  if (!blocked && lieAt(hole, [px, py]) === 'green') {
+    let creep = 0;
+    let guard2 = 0;
+    while (creep < CREEP_MAX - 1e-9 && dist < cap && guard2++ < 12) {
+      const s = greenSlopeAt([px, py], undefined, lobes); // the SCULPT's gradient (no plane)
+      const m = Math.hypot(s[0], s[1]);
+      if (m < CREEP_MIN) break;
+      const step = Math.min(CREEP_STEP, CREEP_MAX - creep, cap - dist);
+      const nx = px + (s[0] / m) * step;
+      const ny = py + (s[1] / m) * step;
+      if (lieAt(hole, [nx, ny]) !== 'green') break; // the collar catches it — never creeps off the green
+      if (hitsNewTent([nx, ny])) break;
+      px = nx;
+      py = ny;
+      dist += step;
+      creep += step;
+      path.push([px, py]);
+      bent = true;
     }
   }
   const roll = sign * Math.min(dist, cap);

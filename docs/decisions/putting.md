@@ -341,3 +341,62 @@ Blast radius: full suite 992 green with ONE fixture re-pin (the ui.test ace seed
 third re-pin of this feature family; the death-spiral harnesses passed unchanged). Previews
 re-shot: putt zoom reads as a clean yardage-book green (gradient + rings + sparse arrows, no
 stain); gallery map zoom and void/cetus untouched.
+
+
+## GS-green-contour-3 — the landing feels the landform, the art becomes a relief map (2026-07-06)
+
+Review ask: "green roll / ball landing physics could be drastically improved, and the contoured
+layering + aesthetic colouration + biome matching massively improved." Reviewed off fresh preview
+shots (pro-gamer / UX / artist lenses); the findings and what shipped:
+
+**Physics 1 — the FIRST BOUNCE reads the landform.** Before, a ball dropped into an upslope face
+and one dropped onto a downslope flank bounced identically — slope only ever changed the
+subsequent roll length, so the landform was never *felt* at touchdown. Now `rollOut`'s curling
+branch (contoured greens only — every lobe-less hole is byte-identical) scales the roll energy by
+the touchdown slope's along-travel component (`LAND_KICK_K` 0.55, clamped 0.45–1.6: into a face →
+the skip dies; onto a downslope flank → it kicks on) and deflects the initial travel toward the
+fall line (`LAND_DEFLECT_K` 0.5). Deterministic, zero rng — the stream is untouched.
+
+**Physics 2 — gravity CREEP: balls cannot rest on a steep piece of the sculpt.** The art said
+"this bank sheds balls" while the sim let them stop mid-flank — the last graphic≠physics gap on a
+green. Once the roll energy is spent (never after an obstacle stop — sand/woods/tents/penalties
+hold their ball), the ball trickles down the **LOBE field only** (`greenSlopeAt(p, undefined,
+lobes)`): the plane is the green's uniform tilt, which holds a ball exactly as before — creep is
+the *sculpt* settling, so flanks shed and hollows gather, and a pure-plane contoured green is
+undisturbed. Direction re-reads each step (it curls into hollows), `CREEP_MIN` 0.22 / `CREEP_STEP`
+1yd / `CREEP_MAX` 5yd, and it **never leaves the green** (the collar catches it — a green-hit
+stays a green-hit, which is what kept the balance harnesses untouched). The creep extends
+`rollPath` and counts into the arc, so `roll` stays honest travel; the chord lower bound in the
+old path-consistency tests relaxed (a flank-climber legitimately trickles back toward its
+touchdown — orbit-guard now 0.3·|roll| on the fixed fixture, dropped on the randomized loop).
+Blast radius measured: the FULL 992-test suite passed with ZERO fixture re-pins (the death-spiral
++ character-balance harnesses unchanged — contract 4).
+
+**Art — the green reads as a lit relief map, in every biome's own palette.** Review findings: the
+rings were uniform hairlines (invisible on pale frost), nothing shaded *between* rings, the plane
+washes were fixed white/near-black rgba (greyed the pale palettes), and white fall-line arrows
+vanished on frost/crystal. Now (`styleGreen` + `greenSlopeArt` + `render/contour.ts`):
+- **TERRACES:** closed isolines carry `closed` + `hiInside` (centroid height vs level, course-space,
+  cached) and fill as stacked elevation washes — dome caps lift toward the biome's light turf,
+  hollow floors sink toward its dark; nesting rings stack alpha into real terraced steps. Fill
+  order is projected-area-descending (the single uniform projector scale keeps that order stable
+  under any camera).
+- **ILLUMINATED ISOLINES (the Tanaka rule):** each ring splits into fixed spans
+  (`ISO_CHUNK_SEGS` 7 — count reads only the cached course-space point count, camera-proof,
+  machine-checked against two different projections) lit by the midpoint's aspect under the shared
+  upper-left sun: sun-facing spans ease toward white and thin, shaded spans deepen and THICKEN —
+  rings read as carved lips, not scratches. Lighting reads the projection (screen-space like every
+  emboss); counts never do.
+- **BIOME-DERIVED relief everywhere:** the stepped plane washes (now 4 per side), the lobe glow
+  pair and the terrace fills all derive from the biome's green `Shade` (sink toward `s.dark`, lift
+  toward `s.light`) — never neutral white/black (the "grey stain"/"washed frost" lesson).
+  Void/cetus keep the ×0.72 mute.
+- **CONTRAST-PICKED arrows:** the fall-line arrow ink reads the turf's relative luminance — pale
+  greens (frost/crystal/ice, lum > 0.62) get dark ink arrows, dark greens keep near-white.
+  White-on-white arrows were the review's first finding.
+
+Guarded by `tests/green-contour.test.ts` (+4 blocks: landing kick, creep shed/gather/edge-catch +
+plane-tilt-undisturbed, closed/hiInside coding, camera-proof chunk counts); putt-preview + gallery
+re-shot (all ten worlds keep identity at map zoom; putt zoom shows the value ramp + lit rings).
+`scripts/putt-preview.mjs` also gained the gallery's multi-candidate chromium launcher (it was
+Linux-only). No new `_gs*` hook — all tuning is module constants.
