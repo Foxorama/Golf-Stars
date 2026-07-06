@@ -498,6 +498,18 @@ export const sfx = {
   reward(): void {
     [784, 1047, 1319].forEach((f, i) => tone(f, 0.16, { type: 'triangle', gain: 0.16, t: i * 0.06 }));
   },
+  /** Sector scan (GS-fuel-4) — a submarine sonar ping + echo under a rising radar sweep, capped by a
+   *  little three-blip data chirp as the fresh lanes resolve. Timed to the ~1s sweep overlay. */
+  scan(): void {
+    // The ping: a pure, high sine with a fast decay, and its fainter echo a beat later.
+    tone(1240, 0.5, { type: 'sine', gain: 0.16, sweepTo: 1080 });
+    tone(1240, 0.42, { type: 'sine', gain: 0.06, sweepTo: 1080, t: 0.26 });
+    // The sweep: an airy rising whoosh under the beam as it climbs the map.
+    noise(0.55, { gain: 0.05, type: 'bandpass', freq: 2600, q: 0.5, t: 0.08 });
+    tone(180, 0.6, { type: 'sine', gain: 0.05, sweepTo: 520, t: 0.05 });
+    // Contact: three quick data blips as the new worlds pop in.
+    [1568, 1760, 2093].forEach((f, i) => tone(f, 0.07, { type: 'triangle', gain: 0.1, t: 0.72 + i * 0.09 }));
+  },
   /** Voyage won (GS-victory) — the run-ending triumph: a rolling brass-ish fanfare climbing to a held
    *  major chord, capped by a long sparkle cascade. The grandest cue in the game after the ace, sized to
    *  carry the full-screen victory takeover. */

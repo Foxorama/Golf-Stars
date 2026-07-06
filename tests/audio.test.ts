@@ -137,3 +137,13 @@ describe('caddy-guard projectile cues (GS-audio-4)', () => {
     expect(() => sfx.land('trees', undefined, 'crystal', true)).not.toThrow();
   });
 });
+
+describe('the sector-scan sweep (GS-fuel-4)', () => {
+  it('the sonar cue and the sweep overlay are guarded headless no-ops (never a throw in node)', async () => {
+    expect(() => sfx.scan()).not.toThrow();
+    // The sweep is a DOM side-effect (the showVoyageVictory pattern): in node it must import clean
+    // and bail silently — the redrawn lanes are already settled by the reducer either way.
+    const { showSectorScan } = await import('../src/render/celebrations');
+    expect(() => showSectorScan()).not.toThrow();
+  });
+});

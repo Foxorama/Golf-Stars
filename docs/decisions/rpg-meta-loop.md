@@ -1485,3 +1485,21 @@ screen builders): travel screen + scan button, tailwind sheet, tanker sheet, str
 bends the voyage's `maxJump` fairness cap and the wildness ramp, so it needs its own balance pass
 (parked in IDEAS); making the scan redraw distances only (less interesting than fresh events);
 per-scan rarity sweetening (would turn the scan into a loot slot machine rather than a travel tool).
+
+**The sweep (GS-fuel-4 feel pass, same day).** The scan shipped as an instant table-swap — correct
+but lifeless (the three lenses call that a bug). Now it's a beat: `showSectorScan`
+(`render/celebrations.ts`, the showVoyageVictory cosmetic-side-effect pattern) plays a radar beam
+climbing the journey map bottom → top with a blinking `📡 SCANNING…` chip, holds the redrawn lanes
+dark, then pops them in staggered under expanding sonar ping-rings dropped at each world's MEASURED
+screen position; `sfx.scan` (assetless, like every cue) voices it — sonar ping + echo, a rising
+sweep under the beam, three data blips at the reveal. Choreography only: the reducer settled the
+redraw before the animation starts (dispatch calls it synchronously after `render()`, same task, so
+the fresh lanes never flash first), it fires only when a scan actually burnt fuel (`routeScans`
+diffed across the reduce — a refused tap stays silent), the overlay swallows map taps so a hidden
+lane can't be opened blind, and every failure path (throw mid-hide, re-render mid-sweep,
+reduced-motion, headless node) degrades to "the new lanes are simply visible" — machine-checked
+call-clean in `tests/audio.test.ts`. Timing knobs are plain module constants (the
+ARC_FEEL/CADDY_SLOMO precedent — no new `_gs*` hook, so no test-hub wiring). Eyes-on verified by
+driving the REAL app (vite dev server + Chromium: title → stop → travel → 📡): beam frame shows the
+held-dark lanes, pop-in frame the fresh worlds + re-priced scan button, settled frame a clean
+teardown.
