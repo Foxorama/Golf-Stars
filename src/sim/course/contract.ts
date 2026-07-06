@@ -114,6 +114,15 @@ export interface Hole {
    */
   shapeId?: string;
   /**
+   * Fairway WIDTH archetype id (GS-fairway-width): which width profile the generator drew —
+   * 'classic', 'chute' (narrow tee shot opening out), 'neck' (narrows before the green),
+   * 'hourglass' (pinched at the driving zone), 'wander' (strongly variable), 'thin' (a tight
+   * ribbon all the way), 'broad' (a generous meadow), or 'island' (lost-rough worlds, exempt from
+   * the grammar). Render/UI label + variety tests read it; the sim never branches on it (physics
+   * ride the corridor geometry). Optional for back-compat — a hole without one is unlabelled.
+   */
+  widthId?: string;
+  /**
    * Green SLOPE (GS-greens-3): the green's dominant tilt as a DOWNHILL vector in course space — its
    * direction is downhill (the fall line), its magnitude is steepness (~0 flat … ~1 severe). The sim
    * reads it so the approach roll runs out downhill / checks uphill (and never spins weirdly UP a

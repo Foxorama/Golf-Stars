@@ -137,6 +137,47 @@
   (`validateFairness`) still key off the corridor's WIDEST point (`max(leftHW, rightHW)` / the FIRST
   fairway feature), so penalty hazards stay provably clear; the apron now uses `ribbon` too (rounded
   back nose, no taper to a point). Re-shoot the gallery after any profile change.
+- **Fairway width is a per-hole ARCHETYPE grammar, not one recipe (GS-fairway-width,
+  `chooseWidthProfile`).** Player report: the GS-terrain profile (full body + landing bulges + one
+  soft pinch, every hole) homogenised the game — width never distinguished holes, and "the fun
+  factor is completely mitigated by the homogenisation". Real courses vary width DELIBERATELY,
+  hole to hole, and that's the model: a per-hole width archetype drawn like the shape grammar —
+  **classic** (the old recipe), **chute** (a narrow tree-lined drive that lets out into a generous
+  body + approach bulge — Augusta's 18th), **neck** (a full driving body squeezing down for the
+  approach into the green — Royal Lytham entrances), **hourglass** (wide either side of a waist
+  pinched at the driving zone, so you lay up short or thread it — Oakmont / links driving zones),
+  **wander** (a big multi-lobe sine — wide bays alternating narrow straits, links-style), **thin**
+  (a uniformly tight 0.6–0.76× ribbon — the rough-lined US-Open strip) and **broad** (a 1.24–1.5×
+  meadow — St Andrews). Stamped on `Hole.widthId` (optional contract field; the sim never branches
+  on it — physics ride the corridor geometry) and surfaced as a HUD chip (`widthLabel` in app.ts:
+  "Tight drive" / "Tight approach" / "Pinched waist" / …) so a squeeze is readable BEFORE the
+  drive. The mechanics: each profile is an `at(u)` width multiplier about `baseHalf`, composed
+  under the unchanged END ENVELOPE and lateral asymmetry (asymmetry DAMPED per profile via
+  `asymScale` so a squeeze holds); each carries its own `floorFrac` — the squeezed archetypes dip
+  well below the old universal 0.5 floor BY DESIGN (neck/hourglass 0.3, chute 0.34), with an
+  absolute 5-yd half-width floor so a corridor never degenerates. Like the shape grammar it is
+  VARIETY, not difficulty (all archetypes appear at every wildness — machine-checked; the
+  `widthScale = 2.0 − 1.25·wildness` early→late lever still carries difficulty and the per-profile
+  params are seeded so no two chutes match). Par 3s draw only whole-hole profiles
+  (classic/thin/broad/wander — a 13-segment pitch corridor is too short for a chute/neck story);
+  lost-rough island holes (void/cetus) are EXEMPT (`widthId 'island'`, the classic full-body
+  profile) because width IS survival there — the abyss is the penalty, and a squeezed island is a
+  ball-shredder. Everything downstream held for free: `fairwayHalfWidth` still keys off the WIDEST
+  point so hazard placement/`validateFairness` stay provably fair (a broad hole pushes hazards
+  further out — conservative), and the apron starts at the corridor's own end half-width so a neck
+  reads as a narrow entrance opening into the green complex. This is a DELIBERATE stream reflow
+  (the profile draws replace the old fixed draws, counts differ per archetype):
+  `GENERATOR_VERSION` 16→17, three pinned-seed fixtures re-pinned (ui viewHole 1234→1200, ace
+  430→699, and the tents non-penalty test now tolerates a deflected ball trickling into a REAL
+  hazard — "off the tent, into the lake" is course physics, not a tent penalty). Balance was
+  deliberately NOT re-tuned (the ask: real-golf feel first, AI/balance to follow) — but the full
+  suite stayed green anyway: death-spiral bars, fairness/crossing validators across every world ×
+  wildness, island-hop completability. Guarded by `tests/fairway-width.test.ts` (all archetypes
+  appear, calm-stop decoupling, chute/neck/hourglass geometry actually reads in the corridor
+  polys, thin < classic < broad ordering, island exemption, fairness sweep, determinism).
+  Re-shoot `scripts/width-preview.mjs` (a per-archetype sheet) after touching the grammar; the
+  balance/AI follow-up (teach the auto AI to lay up short of a waist, then re-tighten the bars)
+  is the deferred second half.
 - **More + bigger water and fairway breaks (GS-terrain), all pure biome DATA, wildness-gated:**
   • `waterCreek` — a `creek` band crosses the fairway as a FORCED CARRY (parkland/`verdant`), a new
     sanctioned crossing (`CROSSING_KINDS += 'creek'`, `LIE_INFO.creek` penalty:'water', styled as water):

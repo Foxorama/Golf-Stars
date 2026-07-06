@@ -46,6 +46,11 @@ Foundations are shipped; these are the live follow-ons.
   uphill-magnet). The "until perks exist" caveat in the slope code is the hook.
 - **GS-split-fairways** — risky-short vs safe-long alternate fairways (the dogleg-grove machinery is the
   start); centreline-bunker pinch + opposite greenside bunker (open-the-angle).
+- **GS-fairway-width-2** — the balance/AI half of GS-fairway-width (shipped: the width grammar —
+  classic/chute/neck/hourglass/wander/thin/broad, real-golf feel first by design): teach the auto AI
+  to read the width profile (lay up short of an hourglass waist / club down in a chute instead of
+  bombing driver into a squeeze), then re-measure and re-tighten the death-spiral bars per archetype.
+  The suite stayed green without it, but the AI currently plays every profile the same.
 - **GS-more-worlds** — metal/asteroid (low-grav scrap), neon/cyber grid, toxic/acid swamp, lightning-storm:
   each a new archetype row + its 8 Record entries (the registry scales now).
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.

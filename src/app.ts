@@ -829,6 +829,17 @@ function shapeLabel(shapeId?: string): string {
   return '';
 }
 
+/** A short label for a notable fairway-width archetype (GS-fairway-width); '' for the plain ones
+ *  (classic/wander read off the map; 'island' already has the lost-rough warning). */
+function widthLabel(widthId?: string): string {
+  if (widthId === 'chute') return '🌲 Tight drive';
+  if (widthId === 'neck') return '🎯 Tight approach';
+  if (widthId === 'hourglass') return '⏳ Pinched waist';
+  if (widthId === 'thin') return '📏 Ribbon fairway';
+  if (widthId === 'broad') return '🌾 Broad fairway';
+  return '';
+}
+
 function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
@@ -859,6 +870,7 @@ function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; dist
         <span>⛳ <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
         <span>Par <b>${play.hole.par}</b>·${len}y</span>
         ${shapeLabel(play.hole.shapeId) ? `<span style="color:var(--gs-info);">${shapeLabel(play.hole.shapeId)}</span>` : ''}
+        ${widthLabel(play.hole.widthId) ? `<span style="color:var(--gs-info);">${widthLabel(play.hole.widthId)}</span>` : ''}
         <span>${opts.distLabel}</span>
         ${zoneScoreChip()}
         ${liveLeaderChip()}

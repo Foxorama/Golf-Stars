@@ -96,8 +96,11 @@ describe('trade-camp tents (GS-tents)', () => {
             expect(ex.log.penalty).toBe('lost');
             expect(ex.ballAfter).toEqual(near);
           } else {
-            expect(ex.penaltyStrokes).toBe(0);
-            expect(ex.log.penalty).toBeUndefined();
+            // The tent ITSELF is non-penalty: it never pockets the ball ('lost' is the marmot's
+            // signature). A deflected ball may still trickle into a REAL hazard afterwards (off the
+            // tent, into the lake) — that's legitimate course physics, not a tent penalty.
+            expect(ex.log.penalty).not.toBe('lost');
+            if (!ex.log.penalty) expect(ex.penaltyStrokes).toBe(0);
           }
         }
       }

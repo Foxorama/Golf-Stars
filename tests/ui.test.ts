@@ -170,7 +170,9 @@ describe('ui reducer', () => {
   });
 
   it('viewHole selects and clamps within the played holes', () => {
-    let s = reduce(started(1234), { type: 'play' });
+    // Seed pinned to one whose first unending stop survives ≥3 holes (re-pinned 1234 → 1200 for
+    // GS-fairway-width: the width grammar reflows generated layouts, shifting seeded outcomes).
+    let s = reduce(started(1200), { type: 'play' });
     s = reduce(s, { type: 'viewHole', hole: 2 });
     expect(s.viewHole).toBe(2);
     s = reduce(s, { type: 'viewHole', hole: 999 });
@@ -444,12 +446,12 @@ describe('ui reducer', () => {
   });
 
   it('a hole-in-one unlocks the secret Comet Rider ship, through the full play flow (GS-ace-ship)', () => {
-    // Seed 430 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
+    // Seed 699 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
     // the ship lands in the global owned pool exactly when the ace is scored (auto-play path).
-    // (Re-pinned 185 → 339 → 471 across the GS-green-contour-2 physics passes, → 430 for GS-fuel-4:
-    // the new fuel-salvage events reweight which route events seeded runs draw, legitimately
-    // shifting the courses this run flies into.)
-    let s = started(430, 'voyage');
+    // (Re-pinned 185 → 339 → 471 across the GS-green-contour-2 physics passes, → 430 for GS-fuel-4,
+    // → 699 for GS-fairway-width: the width grammar reflows generated layouts, legitimately
+    // shifting which seeded runs ace.)
+    let s = started(699, 'voyage');
     expect(s.ownedShips).not.toContain('comet-rider'); // not owned at the off
     let sawAce = false;
     for (let stop = 0; stop < 4 && s.run.status === 'active'; stop++) {
