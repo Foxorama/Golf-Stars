@@ -100,9 +100,15 @@ export function styleGreen(
           fill,
         };
       };
-      for (const [i, off] of [0.05, 0.22, 0.4].entries()) {
-        bands.push(halfPlane(span * off, 1, `rgba(6,12,24,${(aBase * (0.1 + i * 0.02)).toFixed(3)})`)); // low side sinks
-        bands.push(halfPlane(span * off, -1, `rgba(255,255,244,${(aBase * (0.09 + i * 0.02)).toFixed(3)})`)); // high side lifts
+      // GS-green-contour-3: the washes are BIOME-DERIVED, not fixed white/near-black rgba — a
+      // neutral grey ramp greyed-out the pale frost/crystal palettes ("washed" was the review
+      // word) and sat dead on the warm desert olive. Sinking toward the world's own dark turf and
+      // lifting toward its own light keeps the ramp inside the biome's colour family.
+      const sinkCol = mixHex(s.dark, '#061018', 0.55);
+      const liftCol = mixHex(s.light, '#ffffff', 0.72);
+      for (const [i, off] of [0.05, 0.2, 0.36, 0.52].entries()) {
+        bands.push(halfPlane(span * off, 1, hexAlpha(sinkCol, aBase * (0.14 + i * 0.03)))); // low side sinks
+        bands.push(halfPlane(span * off, -1, hexAlpha(liftCol, aBase * (0.13 + i * 0.03)))); // high side lifts
       }
       out.push({ t: 'clip', clip: poly, children: bands });
     }
@@ -116,44 +122,80 @@ export function styleGreen(
     //  3. The LOCAL fall-line arrow field (below) — each chevron points down ITS OWN slope.
     // All pure geometry, zero rng; counts read only course-space/deterministic values.
     if (contoured) {
+      // GS-green-contour-3: the sculpted green is FOUR layers, all in the biome's own turf family —
+      //  1. TERRACES: closed topo rings fill as stacked elevation washes (dome caps lift toward the
+      //     world's light turf, hollow floors sink toward its dark) — nesting rings stack alpha, so
+      //     the relief steps up like a real terraced topo map instead of one flat value.
+      //  2. RELIEF: each lobe's directional glow pair under the shared upper-left sun (emboss rule),
+      //     tinted from the biome Shade — never neutral white/black (the "grey stain" lesson).
+      //  3. ILLUMINATED ISOLINES (Tanaka): each ring strokes in fixed chunks lit by their local
+      //     aspect — sun-facing spans brighten, shaded spans darken and thicken — so the rings read
+      //     as carved ground, not uniform hairlines that vanish on pale worlds.
+      //  4. The LOCAL fall-line arrow field, contrast-picked against the turf (dark ink arrows on
+      //     pale frost/crystal greens — white-on-white was invisible, the review's first finding).
+      const soft = softGreen ? 0.72 : 1;
+      const hiCol = mixHex(s.light, '#ffffff', 0.88);
+      const loCol = mixHex(s.dark, '#081018', 0.55);
+      if (slope.iso && slope.iso.length) {
+        const terraces: Prim[] = [];
+        // Big fills first so nested caps stack their washes (order by projected area — the single
+        // uniform projector scale keeps that ordering identical on every frame).
+        const closed = slope.iso.filter((r) => r.closed && r.pts.length > 3);
+        const areaOf = (pts: Vec[]): number => {
+          let a2 = 0;
+          for (let i = 0; i + 1 < pts.length; i++) a2 += pts[i]![0] * pts[i + 1]![1] - pts[i + 1]![0] * pts[i]![1];
+          return Math.abs(a2) / 2;
+        };
+        for (const ring of [...closed].sort((a, b) => areaOf(b.pts) - areaOf(a.pts))) {
+          const w = Math.abs(ring.frac * 2 - 1); // stronger toward crest/valley
+          const col = ring.hiInside
+            ? hexAlpha(hiCol, (0.08 + 0.09 * w) * soft)
+            : hexAlpha(loCol, (0.07 + 0.08 * w) * soft);
+          terraces.push({ t: 'poly', pts: ring.pts, fill: col });
+        }
+        if (terraces.length) out.push({ t: 'clip', clip: poly, children: terraces });
+      }
       const relief: Prim[] = [];
+      const reliefLit = mixHex(s.light, '#ffffff', 0.75);
+      const reliefShade = mixHex(s.dark, '#04101c', 0.6);
       for (const lb of slope.lobes ?? []) {
         const r = Math.max(3, lb.rPx);
-        const s = Math.min(1, Math.abs(lb.h));
+        const st = Math.min(1, Math.abs(lb.h));
         const off = r * 0.36;
         const side = lb.h > 0 ? 1 : -1; // mound lit toward the sun; hollow lit on the far (down-light) wall
         // Toned down (S+ round 2): the relief is an accent under the rings + fall-line gradient
         // now, not the main event — stronger glows pooled into the plane wash and read as stains.
-        const litA = Math.min(0.14, 0.05 + s * 0.16);
-        const shA = Math.min(0.15, 0.05 + s * 0.17);
+        const litA = Math.min(0.2, 0.07 + st * 0.18) * soft;
+        const shA = Math.min(0.21, 0.07 + st * 0.19) * soft;
         relief.push(
-          { t: 'glow', c: [lb.c[0] + LIGHT_UL[0] * off * side, lb.c[1] + LIGHT_UL[1] * off * side], r: r * 1.15, col: `rgba(255,255,238,${litA.toFixed(3)})` },
-          { t: 'glow', c: [lb.c[0] - LIGHT_UL[0] * off * side, lb.c[1] - LIGHT_UL[1] * off * side], r: r * 1.08, col: `rgba(4,10,22,${shA.toFixed(3)})` },
+          { t: 'glow', c: [lb.c[0] + LIGHT_UL[0] * off * side, lb.c[1] + LIGHT_UL[1] * off * side], r: r * 1.15, col: hexAlpha(reliefLit, litA) },
+          { t: 'glow', c: [lb.c[0] - LIGHT_UL[0] * off * side, lb.c[1] - LIGHT_UL[1] * off * side], r: r * 1.08, col: hexAlpha(reliefShade, shA) },
         );
       }
       if (relief.length) out.push({ t: 'clip', clip: poly, children: relief });
       if (slope.iso && slope.iso.length) {
-        // Elevation-CODED rings, in the biome's own turf tones: a ring above the surface's mid
-        // elevation strokes light (the green's light tone eased toward white), one below strokes
-        // dark (its dark tone eased toward shadow), intensity growing toward the crest/valley —
-        // so which side of the green is HIGH reads at a glance, in every world's palette (a flat
-        // white ring vanished on the pale frost/ice greens and glared on the dark ones). The
-        // wide-value void/cetus palettes mute further, the MOW_BLEND lesson. Deterministic off
-        // `frac` — counts/colours never read the projection.
-        const soft = softGreen ? 0.72 : 1;
-        // The light side needs a harder push than the dark: a pale ring on already-light turf
-        // washes out at the alpha where a dark ring already reads (the first preview's lesson).
-        const hiCol = mixHex(s.light, '#ffffff', 0.88);
-        const loCol = mixHex(s.dark, '#081018', 0.55);
+        // Illuminated elevation rings: the base colour still codes elevation in the biome's own
+        // turf tones (light above the mid elevation, dark below — the light side pushed harder,
+        // the first preview's lesson), and each fixed chunk now modulates by its ASPECT under the
+        // shared sun: lit spans ease further toward white and thin, shaded spans deepen and
+        // thicken (the Tanaka rule) — which is what makes a ring read as a carved lip instead of
+        // a scratch. Chunk counts come from the cached course-space rings (camera-proof); only
+        // colours read the projection, per the camera contract.
         const rings: Prim[] = [];
         for (const ring of slope.iso) {
           if (ring.pts.length < 2) continue;
           const d = ring.frac * 2 - 1; // −1 valley … +1 crest
           const w = Math.abs(d);
-          const col = d >= 0
-            ? hexAlpha(hiCol, (0.22 + 0.34 * w) * soft)
-            : hexAlpha(loCol, (0.19 + 0.28 * w) * soft);
-          rings.push({ t: 'path', pts: ring.pts, stroke: col, sw: 1.15, round: true });
+          const baseCol = d >= 0 ? hiCol : loCol;
+          const baseA = (d >= 0 ? 0.24 + 0.34 * w : 0.21 + 0.28 * w) * soft;
+          for (const ch of ring.chunks) {
+            if (ch.pts.length < 2) continue;
+            const lit = Math.max(-1, Math.min(1, ch.lit));
+            const col = lit >= 0 ? mixHex(baseCol, '#ffffff', lit * 0.55) : mixHex(baseCol, '#040c16', -lit * 0.5);
+            const a = Math.min(0.85, baseA * (1 + Math.abs(lit) * 0.55));
+            const sw = lit < 0 ? 1.15 + -lit * 0.75 : Math.max(0.85, 1.15 - lit * 0.25);
+            rings.push({ t: 'path', pts: ch.pts, stroke: hexAlpha(col, a), sw, round: true });
+          }
         }
         if (rings.length) out.push({ t: 'clip', clip: poly, children: rings });
       }
@@ -162,8 +204,12 @@ export function styleGreen(
       // zoom, a subtle stipple at map zoom — the caps never let them balloon into bold bars.
       const len = Math.max(3.5, Math.min(11, span * 0.08));
       const head = Math.max(1.6, len * 0.28);
+      // Contrast-picked arrow ink: on a PALE green (frost/crystal/ice) white arrows disappeared —
+      // read the turf's luminance and flip to the world's dark ink instead.
+      const paleTurf = lumOf(s.base) > 0.62;
+      const arrowCol = paleTurf ? mixHex(s.ink, '#04101c', 0.35) : mixHex(s.light, '#ffffff', 0.9);
       for (const ar of slope.arrows!) {
-        const col = `rgba(255,255,255,${(0.2 + Math.min(0.16, ar.mag * 0.28)).toFixed(3)})`;
+        const col = hexAlpha(arrowCol, 0.3 + Math.min(0.2, ar.mag * 0.32));
         const perp: Vec = [-ar.dir[1], ar.dir[0]];
         const base: Vec = [ar.p[0] - ar.dir[0] * len * 0.5, ar.p[1] - ar.dir[1] * len * 0.5];
         const tip: Vec = [ar.p[0] + ar.dir[0] * len * 0.5, ar.p[1] + ar.dir[1] * len * 0.5];
@@ -239,8 +285,31 @@ export interface GreenSlopeArt {
   lobes?: { c: Vec; rPx: number; h: number }[];
   /** Projected topo ISOLINES (GS-green-contour-2): level sets of the sim's height field, screen
    *  space, each carrying its elevation `frac` (0 = the lowest ring, 1 = the highest) so the
-   *  green-reading-book rings colour-code high ground light and low ground dark. */
-  iso?: { pts: Vec[]; frac: number }[];
+   *  green-reading-book rings colour-code high ground light and low ground dark.
+   *  GS-green-contour-3 adds the TERRACE + ILLUMINATION data: `closed`/`hiInside` mark fillable
+   *  dome caps and hollow floors, and `chunks` splits each ring into fixed spans (count read only
+   *  from the cached course-space point count — camera-proof) carrying the screen-space lighting
+   *  of their midpoint under the shared upper-left sun (−1 shadowed … +1 lit), so the rings shade
+   *  like sculpted ground (Tanaka-style illuminated contours), not uniform hairlines. */
+  iso?: {
+    pts: Vec[];
+    frac: number;
+    closed: boolean;
+    hiInside?: boolean;
+    chunks: { pts: Vec[]; lit: number }[];
+  }[];
+}
+
+/** Relative luminance (0..1) of a `#rrggbb` colour — picks arrow ink against pale vs dark turf
+ *  (GS-green-contour-3). Non-hex input reads as mid (0.5). */
+function lumOf(hex: string): number {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return 0.5;
+  const n = parseInt(m[1]!, 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 /** Course-space isolines per hole (GS-green-contour-2): the field never changes under a camera
@@ -312,9 +381,33 @@ export function greenSlopeArt(hole: Hole, greenPolyCourse: Vec[], proj: Projecto
     const e = proj.project([lb.c[0] + lb.r, lb.c[1]]);
     return { c, rPx: Math.hypot(e[0] - c[0], e[1] - c[1]), h: lb.h };
   });
-  const iso = greenIsolinesCourse(hole, greenPolyCourse).map((line) => ({
-    pts: line.pts.map((p) => proj.project(p)),
-    frac: line.frac,
-  }));
+  // Illuminated-contour chunks (GS-green-contour-3): split each cached course-space ring into fixed
+  // spans of ISO_CHUNK_SEGS segments — chunk COUNT reads only the cached point count, so it is
+  // camera-proof by construction — and light each span by its midpoint's slope: uphill facing the
+  // shared upper-left sun reads lit, the far side shadowed, scaled by local steepness so near-flat
+  // ground stays neutral. Lighting reads the projection (screen-space, like every emboss), which the
+  // camera contract allows for colours/sizes; counts never do.
+  const ISO_CHUNK_SEGS = 7;
+  const iso = greenIsolinesCourse(hole, greenPolyCourse).map((line) => {
+    const ptsPx = line.pts.map((p) => proj.project(p));
+    const chunks: { pts: Vec[]; lit: number }[] = [];
+    for (let i = 0; i + 1 < line.pts.length; i += ISO_CHUNK_SEGS) {
+      const end = Math.min(i + ISO_CHUNK_SEGS, line.pts.length - 1);
+      const midC = line.pts[Math.min(line.pts.length - 1, Math.floor((i + end) / 2))]!;
+      const sl = greenSlopeAt(midC, hole.greenSlope, lobes);
+      const m = Math.hypot(sl[0], sl[1]);
+      let lit = 0;
+      if (m > 1e-6) {
+        const a = proj.project(midC);
+        const b = proj.project([midC[0] - sl[0] / m, midC[1] - sl[1] / m]); // one yard UPHILL
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const l = Math.hypot(dx, dy) || 1;
+        lit = ((dx / l) * LIGHT_UL[0] + (dy / l) * LIGHT_UL[1]) * Math.min(1, m / 0.5);
+      }
+      chunks.push({ pts: ptsPx.slice(i, end + 1), lit });
+    }
+    return { pts: ptsPx, frac: line.frac, closed: line.closed, hiInside: line.hiInside, chunks };
+  });
   return { ...plane, arrows, lobes: lobArt, iso };
 }

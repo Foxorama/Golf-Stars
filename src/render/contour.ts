@@ -103,10 +103,18 @@ function polylineLength(pts: Vec[]): number {
 
 /** One extracted isoline: a COURSE-space polyline plus WHERE its level sits in the surface's
  *  elevation range (`frac` 0 = the lowest ring, 1 = the highest) — so the caller can colour-code
- *  high ground light and low ground dark, the way a real relief map reads. */
+ *  high ground light and low ground dark, the way a real relief map reads. GS-green-contour-3 adds
+ *  the two facts the TERRACE fills need: whether the ring closes on itself, and — for a closed ring
+ *  — whether its interior is ABOVE the ring's level (a dome cap to wash light) or below (a hollow
+ *  floor to wash dark). */
 export interface Isoline {
   pts: Vec[];
   frac: number;
+  /** True when the ring closes on itself (first point repeated at the end). */
+  closed: boolean;
+  /** Closed rings only: true = the interior sits above this level (a mound cap), false = below (a
+   *  hollow floor). Sampled from the height field at the ring's centroid — course-space, cached. */
+  hiInside?: boolean;
 }
 
 /**
@@ -200,7 +208,20 @@ export function contourIsolines(
       // them anyway, but dropping them keeps the SVG lean and the prim list honest.
       if (polylineLength(smooth) < 3) continue;
       if (!smooth.some((p) => pointInPoly(p, poly))) continue;
-      out.push({ pts: smooth, frac });
+      const iso: Isoline = { pts: smooth, frac, closed };
+      if (closed) {
+        // Dome cap or hollow floor? Ask the field at the ring's centroid (course-space, so the
+        // answer is camera-proof and cached with the rest of the pass).
+        let cx = 0;
+        let cy = 0;
+        const n = smooth.length - 1; // closed ring carries its first point twice
+        for (let i = 0; i < n; i++) {
+          cx += smooth[i]![0];
+          cy += smooth[i]![1];
+        }
+        iso.hiInside = heightFieldAt([cx / n, cy / n], plane, lobes) > lv;
+      }
+      out.push(iso);
     }
   }
   return out;

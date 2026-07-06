@@ -219,7 +219,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     `greenSlopeAt` is the ONE local field the resolver, preview line, read, AND arrow field sample.
     The field math is the surface-agnostic `sim/contour.ts`; `rollOut` samples it per step and
     CURLS along it (`roll` is ARC length; straight-roll invariance holds only on lobe-less holes).
-    A manual putt's `PuttLog.path` carries its true curved travel; auto stays pathless.
+    On CONTOURED greens the FIRST BOUNCE also reads the landform (energy kick + fall-line deflect
+    at touchdown) and gravity CREEP forbids resting on a steep piece of the SCULPT — creep reads
+    the LOBE field only (a plane tilt still holds a ball) and never leaves the green
+    (GS-green-contour-3; lobe-less holes stay byte-identical). A manual putt's `PuttLog.path`
+    carries its true curved travel; auto stays pathless.
+  - Contour ART is a lit relief map in the biome's own turf Shade: terraced closed-ring fills
+    (`Isoline.closed`/`hiInside`), Tanaka-lit isoline chunks (fixed course-space chunk counts —
+    camera-proof, machine-checked), biome-derived washes (never neutral white/black), and
+    fall-line arrows contrast-picked against the turf's luminance.
   - Harder stops tilt greens more (slope-magnitude floor rises with wildness, drawn from the SIDE
     slope rng — calm stops keep the old draw).
   - Putt-FEEL: fall-line arrows are PX-CAPPED in `styleGreen`; the putt watch-cam reuses the putt
