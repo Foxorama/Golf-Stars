@@ -37,7 +37,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 17;
+export const GENERATOR_VERSION = 18;
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -59,8 +59,10 @@ const CROSSING_KINDS = new Set(['lavariver', 'frozenpond', 'creek', 'barranca'])
  * Corridor half-width SCALE when the rough is lethal (void islands). Constant (does NOT shrink with
  * wildness like a normal corridor) and generous, so that even max-wildness driver spray usually
  * finds the island — "brutal but fair": a miss is genuinely lost, but the target is honest and big.
+ * Raised 2.4 → 2.6 with GS-island-width (the islands-only-get-WIDER rule): the lost worlds were the
+ * game's meanest, so their width pass both lifts the baseline and adds widen-only variety on top.
  */
-const VOID_ISLAND_SCALE = 2.4;
+const VOID_ISLAND_SCALE = 2.6;
 
 /**
  * Island-hop completability (GS-cetus-gaps): the void carries between a lost-rough hole's pads must
@@ -879,7 +881,10 @@ function generateHole(
   // Sized so a sensible tee shot holds it (≈110 yd wide at a ~165 yd hole) while a real miss finds the
   // deep. fairwayHalfWidth → the island radius so any (sand) greenside hazards still clear fairly.
   if (islandPar3) {
-    const islandR = greenR * 1.8 + 30;
+    // GS-island-width: seeded widen-ONLY variability (×1–1.25) so island greens vary from snug
+    // target to generous shelf — never below the old fixed size (islands only get wider). The
+    // draw is gated on islandPar3 (lost-rough armed), so every other world's stream is untouched.
+    const islandR = (greenR * 1.8 + 30) * rng.range(1, 1.25);
     corridorFeatures = [{ kind: 'fairway', poly: blobPoly(green, islandR, 14, 0.16, rng) }];
     fairwayHalfWidth = islandR;
   }
@@ -1590,12 +1595,17 @@ interface WidthProfile {
  * a soft pinch), so width never distinguished holes. Like the shape grammar, the width grammar is
  * VARIETY, not difficulty: profiles appear at every wildness (the overall `widthScale` early→late
  * lever still carries difficulty), and each profile's params are drawn seeded so no two chutes are
- * identical. Lost-rough island holes (void/cetus) are EXEMPT — their width IS survival (the abyss
- * is the penalty), so they keep the classic full-body profile ('island'). Par 3s use only the
- * whole-hole profiles (classic/thin/broad/wander) — a 13-segment pitch corridor is too short for a
- * chute/neck/hourglass story to read.
+ * identical. Par 3s use only the whole-hole profiles (classic/thin/broad/wander) — a 13-segment
+ * pitch corridor is too short for a chute/neck/hourglass story to read.
+ *
+ * Lost-rough island holes (void/cetus) get their OWN pool (GS-island-width) under one hard rule:
+ * ISLANDS ONLY GET WIDER. Width is survival there (the abyss is the penalty), so every island
+ * profile's `at(u)` is ≥ 1 — variety comes from bulging OUTWARD (landing bays, a flared green pad,
+ * a broad tee plateau), never from a squeeze — machine-checked by `tests/fairway-width.test.ts`.
+ * A lost par 3 keeps the plain 'island' recipe (its corridor is replaced by the green island blob).
+ * Exported for that widen-only guard; the generator is the only production caller.
  */
-function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boolean): WidthProfile {
+export function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boolean): WidthProfile {
   // Every profile carries a seeded sine for organic edge movement (each draws its own phase/lobes).
   const wave = (amp: number): ((u: number) => number) => {
     const phase = rng.range(0, Math.PI * 2);
@@ -1641,7 +1651,58 @@ function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boo
     const lobes = rng.range(2.8, 4.8);
     return { id: 'wander', at: (u) => 1 + amp * Math.sin(phase + u * Math.PI * lobes), floorFrac: 0.42, asymScale: 0.8 };
   };
-  if (island) return classic('island'); // lost-rough pads: width is survival, no squeeze grammar
+  if (island) {
+    // Islands ONLY get wider: a positive-only undulation (amp·(0.5 + 0.5·sin) ∈ [0, amp]) is the
+    // shared organic movement, so no island profile ever dips below the raised VOID_ISLAND_SCALE
+    // baseline (the old classic recipe's wave/pinch could dip to 0.5× — that squeeze is gone too).
+    const posWave = (amp: number): ((u: number) => number) => {
+      const phase = rng.range(0, Math.PI * 2);
+      const lobes = rng.range(1.6, 3.2);
+      return (u) => amp * (0.5 + 0.5 * Math.sin(phase + u * Math.PI * lobes));
+    };
+    if (par === 3) {
+      // The par-3 corridor is replaced by the green island blob — keep the honest plain label
+      // (and byte-stable draws) rather than a pool id the geometry doesn't use.
+      const w = posWave(rng.range(0.12, 0.24));
+      return { id: 'island', at: (u) => 1 + w(u), floorFrac: 0.7, asymScale: 1 };
+    }
+    const roll = rng.float();
+    if (roll < 0.26) {
+      const w = posWave(rng.range(0.12, 0.24));
+      return { id: 'island', at: (u) => 1 + w(u), floorFrac: 0.7, asymScale: 1 };
+    }
+    if (roll < 0.5) {
+      // LANDING BAYS: 1–2 big outward bulges — pads swell where you aim, the straits stay honest.
+      const w = posWave(rng.range(0.06, 0.14));
+      const nBays = rng.bool(0.6) ? 2 : 1;
+      const bays: { c: number; a: number }[] = [];
+      for (let b = 0; b < nBays; b++) {
+        bays.push({ c: nBays === 1 ? rng.range(0.35, 0.65) : b === 0 ? rng.range(0.28, 0.44) : rng.range(0.58, 0.74), a: rng.range(0.25, 0.5) });
+      }
+      return {
+        id: 'island-bays',
+        at: (u) => 1 + w(u) + bays.reduce((s, b) => s + b.a * Math.exp(-((u - b.c) ** 2) / 0.02), 0),
+        floorFrac: 0.7,
+        asymScale: 1,
+      };
+    }
+    if (roll < 0.7) {
+      // FLARE: the plateau grows toward the green — a generous, receptive approach pad.
+      const f = rng.range(0.2, 0.4);
+      const w = posWave(rng.range(0.05, 0.12));
+      return { id: 'island-flare', at: (u) => 1 + f * sstep(0.25, 0.85, u) + w(u), floorFrac: 0.7, asymScale: 1 };
+    }
+    if (roll < 0.88) {
+      // BROAD TEE: a big launch plateau easing back to the baseline for the run home.
+      const f = rng.range(0.2, 0.4);
+      const w = posWave(rng.range(0.05, 0.12));
+      return { id: 'island-broadtee', at: (u) => 1 + f * (1 - sstep(0.15, 0.75, u)) + w(u), floorFrac: 0.7, asymScale: 1 };
+    }
+    // BROAD: the whole island runs wider, gently undulating.
+    const b = rng.range(1.12, 1.3);
+    const w = posWave(rng.range(0.04, 0.1));
+    return { id: 'island-broad', at: (u) => b * (1 + w(u)), floorFrac: 0.7, asymScale: 1 };
+  }
   const roll = rng.float();
   if (par === 3) {
     if (roll < 0.4) return classic();

@@ -117,9 +117,12 @@ export interface Hole {
    * Fairway WIDTH archetype id (GS-fairway-width): which width profile the generator drew —
    * 'classic', 'chute' (narrow tee shot opening out), 'neck' (narrows before the green),
    * 'hourglass' (pinched at the driving zone), 'wander' (strongly variable), 'thin' (a tight
-   * ribbon all the way), 'broad' (a generous meadow), or 'island' (lost-rough worlds, exempt from
-   * the grammar). Render/UI label + variety tests read it; the sim never branches on it (physics
-   * ride the corridor geometry). Optional for back-compat — a hole without one is unlabelled.
+   * ribbon all the way), 'broad' (a generous meadow). Lost-rough worlds (void/cetus) draw from a
+   * WIDEN-ONLY island pool (GS-island-width — width is survival there, so islands only get wider):
+   * 'island' (baseline), 'island-bays' (outward landing bays), 'island-flare' (grows toward the
+   * green), 'island-broadtee' (a big launch plateau), 'island-broad' (the whole plateau wider).
+   * Render/UI label + variety tests read it; the sim never branches on it (physics ride the
+   * corridor geometry). Optional for back-compat — a hole without one is unlabelled.
    */
   widthId?: string;
   /**

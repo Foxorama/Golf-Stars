@@ -178,6 +178,32 @@
   Re-shoot `scripts/width-preview.mjs` (a per-archetype sheet) after touching the grammar; the
   balance/AI follow-up (teach the auto AI to lay up short of a waist, then re-tighten the bars)
   is the deferred second half.
+  - **Follow-up: the lost worlds joined the grammar under an ISLANDS-ONLY-GET-WIDER rule
+    (GS-island-width).** GS-fairway-width had exempted void/cetus entirely (flat 'island' classic) —
+    but the player wanted the variety THERE too, "expand the fairways to make them a bit wider,
+    just don't make them smaller". Three coupled changes, all widen-only: (1) `VOID_ISLAND_SCALE`
+    2.4 → 2.6 — the baseline island corridor itself is ~8% wider. (2) A dedicated ISLAND width
+    pool in `chooseWidthProfile` for lost par 4/5s — 'island' (baseline), 'island-bays' (1–2 big
+    outward landing bays that swell the pads), 'island-flare' (the plateau grows toward the green —
+    a receptive approach pad), 'island-broadtee' (a big launch plateau easing home), 'island-broad'
+    (the whole plateau 1.12–1.3×). THE RULE, machine-checked (`tests/fairway-width.test.ts` sweeps
+    `at(u)` over 300 seeds × a 41-point u-grid): every island profile's multiplier is ≥ 1
+    EVERYWHERE — the shared organic movement is a positive-only wave `amp·(0.5+0.5·sin)`, so
+    variety comes from bulging OUTWARD, never a squeeze (the old classic recipe's wave/pinch could
+    dip to 0.5× — that dip is gone too, so worst-case island width strictly improved on top of the
+    raised baseline). `chooseWidthProfile` is exported for that guard. (3) Island-green PAR 3s get
+    a seeded widen-only factor (×1–1.25) on the green-island blob — snug target to generous shelf,
+    never below the old fixed size; a lost par 3 keeps the plain 'island' widthId (the pool ids
+    would lie — the blob replaces the corridor). Determinism: all new/changed draws sit behind the
+    `lostRough` arm, so every NORMAL world is byte-identical (no fixture re-pins needed — the full
+    suite passed untouched except one); `GENERATOR_VERSION` 17→18. The one test change:
+    `tests/island-gaps.test.ts`' crash-guard fuzz asserts raw `generateCourse` throws somewhere in
+    its sweep (proving the `generateStopCourse` retry is exercised) — wider pads made raw
+    sliver-pad throws genuinely RARER (good), so a v<20 blind fuzz finds none; the known throwing
+    configs are now PINNED (re-hunt + re-pin them whenever GENERATOR_VERSION bumps) and the broad
+    sweep stays cheap. Void/cetus stay in `BALANCE_EXEMPT_BIOMES`; wider-only can only soften them
+    (zones.test's cetus bar + island-hop completability all held). `scripts/width-preview.mjs` now
+    hunts the island pool too (void/cetus rows) — re-shoot it after touching the island profiles.
 - **More + bigger water and fairway breaks (GS-terrain), all pure biome DATA, wildness-gated:**
   • `waterCreek` — a `creek` band crosses the fairway as a FORCED CARRY (parkland/`verdant`), a new
     sanctioned crossing (`CROSSING_KINDS += 'creek'`, `LIE_INFO.creek` penalty:'water', styled as water):
