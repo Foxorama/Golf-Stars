@@ -798,3 +798,54 @@ geometry — zero rng draws/reorders, so void/cetus and every seeded scene stay 
   read as a topographic map. Bunkers drop the harsh full-width white rake BARS for a smoothly shaded
   bowl: inset rim shadow + a soft down-light sunlit swell + faint rim-following rake arcs. The
   liquid flow/glint draws still consume the identical rng, so every seeded scene is byte-stable.
+
+## GS-style-split: style.ts split into per-domain painter modules (2026-07-06)
+
+**What:** `src/render/style.ts` had grown to ~4,270 lines — every painter, every helper and the
+orchestrator in one file, the render layer's god-file the way `app.ts` used to be the UI's. The
+GS-app-split treatment applied: `style.ts` (~820 lines) keeps ONLY the orchestration and the
+per-domain painters moved verbatim into `src/render/style/` modules:
+
+- `shared.ts` — the dependency ROOT (imports no other style/ module): the `Prim` vocabulary, the
+  `ArtFeel`/`_gsArt` escape-hatch, `mulberry32`/`hashHole`, the small geometry kit (`bboxOf`,
+  `offsetPoly`, `centroidOf`, `scalePoly`, `longAxis`, `projPoly`, `posHash`, `inView`,
+  `hexAlpha`…), the four mowing-stripe fills and the shared `LIGHT_UL` inset light.
+- `land.ts` — the land hull to the OB frame, the lost-rough `dilateUnion` platforms, the per-hole
+  WeakMap caches of the union-merged hazard families, `landPolysCourseFor` (the weather layer's
+  star-mask source).
+- `fairway.ts` — grouped `styleFairways` + per-world mow patterns, `styleTee`, the Rainbow Road
+  ribbon.
+- `green.ts` — `styleGreen` + the whole green-slope art pipeline (`greenSlopeArt`, projected
+  lobes, the cached topo isolines).
+- `hazards.ts` — the sand + liquid family painters (with `embossChildren`), scatter surfaces,
+  fescue, per-world deep rough, ravine, and the `WATER_KINDS`/`LAVA_KINDS` classification sets.
+- `flora.ts` — `styleFlora` + the eight per-archetype silhouettes, and `archetypeDecor`.
+- `ground.ts` — the `GROUND_COVER` table + `groundCover` pass, and the `EGGS` painters +
+  `easterEggs`.
+- `platforms.ts` — the cetus/void depth kit: `platformCliffs`, `raisedShelf`, `cetusOcean`
+  (whales), `cetusRiverPath`/`cetusRiver` (the star-river + waterfall).
+- `effects.ts` — tents/scorch/ground-patch showpieces, the wind streaks, the constellation
+  backdrop.
+
+**The load-bearing rule:** `buildScene` (still in style.ts) owns the SEEDED STREAMS and their draw
+order — main `rng`, celestial `crng`, and the dedicated ocean/river/cliff/cover/decor/egg streams
+are all seeded and threaded there, in the exact pre-split sequence. Painters are pure functions of
+their inputs; a painter module NEVER seeds a stream of its own and never imports style.ts (no
+cycles — `shared.ts` is the root, `land.ts` sits under `platforms.ts` for `landPolysCourseFor`).
+The public import surface is byte-compatible: consumers (`holeView`, `playView`, tests) still
+import everything from `./style`, which re-exports `Prim`/`ArtFeel`/`landPolysCourseFor`/
+`GROUND_COVER`/`easterEggs`/`cetusRiverPath` from the new modules.
+
+**Verification (byte-identical, not just green):** beyond `npx tsc --noEmit`, both Vite builds and
+the full 102-file suite (989 passing, incl. the seeded byte-stability, camera-stability and
+biome-identity guards), a throwaway fingerprint harness hashed `buildScene` JSON + the serialized
+SVG across 10 biomes × 6 seeds × 3 holes × 2 camera framings × 5 SceneOpts variants (base/theme/
+rainbow/effects/art-off) — 1,800 scene hashes plus `landPolysCourseFor` and a fixed-stream
+`cetusRiverPath` probe — before and after the split: **identical to the byte**. The gallery was
+re-shot and eyeballed across all ten worlds.
+
+**Drive-by:** `scripts/gallery.mjs` now probes a LIST of Chromium candidates and falls through on
+launch failure (full chromium → headless shell → system Chrome/Edge, each platform's layout): on
+the Windows dev box the Playwright full-chromium download ships a broken side-by-side manifest
+(spawn UNKNOWN) while the headless shell runs fine — and merely existing on disk doesn't mean a
+binary can launch.

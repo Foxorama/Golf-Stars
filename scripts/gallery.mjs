@@ -15,16 +15,57 @@ import { join } from 'node:path';
 const outPng = process.env.GALLERY_OUT ?? join(tmpdir(), 'gs-gallery.png');
 const outHtml = join(tmpdir(), 'gs-gallery.html');
 
-// Find the pre-installed Chromium (versioned dir; the binary, not just the cache folder).
-async function findChromium() {
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers';
+// Find launchable Chromium CANDIDATES, best first: the pre-installed full chromium (cloud
+// sandbox default + the local Playwright cache, each platform's layout), then the headless-shell
+// build (screenshots only — all we need; on one Windows box the full chromium download shipped a
+// broken side-by-side manifest while the headless shell ran fine), then a system Chrome/Edge.
+// The caller tries each in turn — existing on disk does not mean it can actually launch.
+async function chromiumCandidates() {
   const { readdirSync } = await import('node:fs');
-  for (const d of readdirSync(base)) {
-    if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-    const bin = join(base, d, 'chrome-linux', 'chrome');
-    if (existsSync(bin)) return bin;
+  const { homedir } = await import('node:os');
+  const bases = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    '/opt/pw-browsers',
+    join(homedir(), 'AppData', 'Local', 'ms-playwright'), // Windows Playwright cache
+    join(homedir(), 'Library', 'Caches', 'ms-playwright'), // macOS
+    join(homedir(), '.cache', 'ms-playwright'), // Linux
+  ].filter((b) => b && existsSync(b));
+  const out = [];
+  for (const base of bases) {
+    for (const d of readdirSync(base)) {
+      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
+      for (const rel of [
+        ['chrome-linux', 'chrome'],
+        ['chrome-win64', 'chrome.exe'],
+        ['chrome-win', 'chrome.exe'],
+        ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'],
+      ]) {
+        const bin = join(base, d, ...rel);
+        if (existsSync(bin)) out.push(bin);
+      }
+    }
+    for (const d of readdirSync(base)) {
+      if (!d.startsWith('chromium_headless_shell-')) continue;
+      for (const rel of [
+        ['chrome-headless-shell-linux64', 'chrome-headless-shell'],
+        ['chrome-headless-shell-win64', 'chrome-headless-shell.exe'],
+        ['chrome-headless-shell-mac-x64', 'chrome-headless-shell'],
+        ['chrome-headless-shell-mac-arm64', 'chrome-headless-shell'],
+      ]) {
+        const bin = join(base, d, ...rel);
+        if (existsSync(bin)) out.push(bin);
+      }
+    }
   }
-  return null;
+  for (const bin of [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  ]) {
+    if (existsSync(bin)) out.push(bin);
+  }
+  return out;
 }
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
@@ -60,14 +101,22 @@ for (const c of cases) {
 const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(4,240px);gap:8px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
 
-const chromePath = await findChromium();
-if (!chromePath) {
-  console.log('No Chromium found — wrote HTML only:', outHtml);
+const candidates = await chromiumCandidates();
+const { chromium } = await import('playwright-core');
+let browser = null;
+for (const chromePath of candidates) {
+  try {
+    browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+    break;
+  } catch (e) {
+    console.log('launch failed, trying next candidate:', chromePath, '—', String(e).split('\n')[0]);
+  }
+}
+if (!browser) {
+  console.log('No launchable Chromium — wrote HTML only:', outHtml);
   await server.close();
   process.exit(0);
 }
-const { chromium } = await import('playwright-core');
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1570, height: 940 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.screenshot({ path: outPng, fullPage: true });
