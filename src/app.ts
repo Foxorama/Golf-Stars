@@ -47,7 +47,7 @@ import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { setMusicScene, type MusicSceneId } from './render/music';
 import { getSettings, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
-import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showVoyageVictory } from './render/celebrations';
+import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
 import { state, setState, btn, header, seedFromUrl, freshRunSeed } from './app/ctx';
 import {
@@ -217,8 +217,16 @@ function dispatch(action: Action): void {
     puttMeter.destroy();
     puttMeter = null;
   }
-  // A light UI tick on navigation presses (the stroke + purchase actions get their own richer cue).
-  if (action.type !== 'shot' && action.type !== 'putt' && action.type !== 'buy' && action.type !== 'buyShip' && action.type !== 'buyApparel') {
+  // A light UI tick on navigation presses (the stroke + purchase actions get their own richer cues,
+  // and the sector scan owns its sonar ping — GS-fuel-4).
+  if (
+    action.type !== 'shot' &&
+    action.type !== 'putt' &&
+    action.type !== 'buy' &&
+    action.type !== 'buyShip' &&
+    action.type !== 'buyApparel' &&
+    action.type !== 'scanRoutes'
+  ) {
     sfx.click();
   }
   // Any reducer action dismisses a pending shot popup and cancels its timer.
@@ -234,6 +242,9 @@ function dispatch(action: Action): void {
     const prevRunSeed = state.run.seed;
     const prevHoles = state.run.holesSurvived;
     const prevBestHoles = state.endlessBestHoles;
+    // The sector-scan sweep (GS-fuel-4) fires only on a scan that actually BURNT fuel — a refused
+    // tap (dry tank, wrong screen) stays silent, so the sonar can never lie about a redraw.
+    const prevScans = state.run.routeScans;
     setState(reduce(state, action));
     // Entering character select resets the difficulty pickers (GS-title-2 / GS-golf-score) — a fresh
     // choice per run, never a sticky leftover from the last one. The club set defaults to the owned
@@ -285,6 +296,17 @@ function dispatch(action: Action): void {
     }
     persist();
     render();
+    // The sector-scan sweep (GS-fuel-4): a radar beam climbs the fresh journey map and the redrawn
+    // lanes pop in behind it. Called synchronously after render() (same task, before paint) so the
+    // new worlds never flash visible first; cosmetic only — the reducer already settled the redraw.
+    if (
+      action.type === 'scanRoutes' &&
+      state.screen === 'travel' &&
+      state.run.seed === prevRunSeed &&
+      state.run.routeScans === prevScans + 1
+    ) {
+      showSectorScan();
+    }
     // The voyage-victory takeover (GS-victory) overlays the settled gameover recap on a won run, then
     // dismisses back to it. A cosmetic side-effect (like the ace/bird celebrations) — no reducer/save touch.
     if (enteredGameover && state.run.endedReason === 'won') {

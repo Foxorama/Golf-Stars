@@ -831,3 +831,108 @@ function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', s
 
 /** A momentum rail: one pip per hole in the stop, coloured by the score already made (eagle gold →
  *  blow-up red), the current hole ringed, upcoming holes dim — so the run's shape reads at a glance. */
+
+// --- The sector-scan sweep (GS-fuel-4) -----------------------------------------------------------
+//
+// The scan is a fuel-priced gamble, so it deserves a beat, not an instant table-swap: a radar beam
+// climbs the journey map bottom → top, the three fresh lanes hold dark until the beam passes, then
+// pop in staggered under sonar ping-rings. Pure cosmetic side-effect over the ALREADY-settled
+// reducer state (the showVoyageVictory pattern): the redraw itself happened in `reduce`, this only
+// choreographs the reveal — so if any of it fails, the try/catch bails and the new lanes are simply
+// already on screen. Reduced-motion keeps the sonar cue but skips all visuals. Timing knobs are
+// plain module constants (the ARC_FEEL/CADDY_SLOMO precedent — no new _gs* hook to wire).
+
+const SCAN_SWEEP_MS = 780; // beam travel, bottom → top of the map
+const SCAN_REVEAL_STAGGER_MS = 130; // per-lane pop-in delay once the beam reaches the top
+const SCAN_TOTAL_MS = 1600; // hard cleanup ceiling (beam + reveals + ring fade)
+
+/** Play the sector-scan sweep over the travel screen's journey map. Call synchronously right after
+ *  the post-scan `render()` (same task, before paint) so the fresh lanes never flash visible first. */
+export function showSectorScan(): void {
+  try {
+    sfx.scan();
+    haptic(HAPTICS.tap);
+  } catch {
+    /* feel-only — never throw */
+  }
+  let hidden: SVGGElement[] = [];
+  try {
+    if (typeof document === 'undefined') return;
+    const map = document.querySelector<HTMLElement>('.gs-journey');
+    if (!map) return;
+    const worlds = Array.from(map.querySelectorAll<SVGGElement>('[data-route-inspect]'));
+    // Sound-only fallbacks: never hide lanes we can't reliably bring back.
+    if (getSettings().reducedMotion || worlds.length === 0) return;
+    hidden = worlds;
+
+    // Hold the fresh lanes dark until the beam finds them (same task as render → no visible flash).
+    for (const w of worlds) {
+      w.style.transition = 'none';
+      w.style.opacity = '0';
+    }
+
+    map.style.position = 'relative';
+    const overlay = document.createElement('div');
+    overlay.setAttribute('aria-hidden', 'true');
+    // Swallow taps for the sweep's moment so a hidden (opacity-0) world can't be opened blind.
+    overlay.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:auto;z-index:5;';
+    overlay.innerHTML = `
+      <style>
+        @keyframes gsScanBeam { from { top: 100%; } to { top: -12%; } }
+        @keyframes gsScanFade { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes gsScanRing { from { transform: scale(0.25); opacity: 0.9; } to { transform: scale(1); opacity: 0; } }
+        @keyframes gsScanBlink { 0%, 100% { opacity: 0.95; } 50% { opacity: 0.45; } }
+      </style>
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 20%, #4fd0e01a, transparent 70%);animation:gsScanFade ${SCAN_TOTAL_MS}ms ease-in forwards;"></div>
+      <div style="position:absolute;left:-4%;right:-4%;height:52px;top:100%;animation:gsScanBeam ${SCAN_SWEEP_MS}ms cubic-bezier(.3,.7,.4,1) forwards;">
+        <div style="position:absolute;inset:0;background:linear-gradient(to top, transparent, #4fd0e022 55%, #7ff3ff55 92%, transparent);"></div>
+        <div style="position:absolute;left:0;right:0;top:2px;height:2px;background:#aef6ff;box-shadow:0 0 9px 2px #4fd0e0cc, 0 0 26px 6px #4fd0e055;"></div>
+      </div>
+      <div data-scan-chip style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font:700 11px system-ui;letter-spacing:2px;color:#7ff3ff;text-shadow:0 0 8px #4fd0e0aa;animation:gsScanBlink 340ms linear infinite;">📡 SCANNING…</div>`;
+    map.appendChild(overlay);
+
+    // The beam reaches the choice row near the top — pop the worlds in staggered, each under an
+    // expanding sonar ring dropped at its live screen position (measured, so it can't drift).
+    const revealAt = SCAN_SWEEP_MS - 160;
+    worlds.forEach((w, i) => {
+      window.setTimeout(() => {
+        if (!w.isConnected) return; // a re-render replaced the map — the fresh DOM shows itself
+        w.style.transition = 'opacity 240ms ease-out';
+        w.style.opacity = '1';
+        if (!overlay.isConnected) return;
+        const mr = map.getBoundingClientRect();
+        const wr = w.getBoundingClientRect();
+        const ring = document.createElement('div');
+        const size = Math.max(wr.width, wr.height) * 1.5;
+        ring.style.cssText =
+          `position:absolute;left:${wr.left - mr.left + wr.width / 2 - size / 2}px;` +
+          `top:${wr.top - mr.top + wr.height / 2 - size / 2}px;width:${size}px;height:${size}px;` +
+          'border:2px solid #7ff3ff;border-radius:50%;box-shadow:0 0 12px #4fd0e088;' +
+          'animation:gsScanRing 460ms ease-out forwards;pointer-events:none;';
+        overlay.appendChild(ring);
+      }, revealAt + i * SCAN_REVEAL_STAGGER_MS);
+    });
+    window.setTimeout(() => overlay.querySelector('[data-scan-chip]')?.remove(), revealAt);
+
+    // Hard cleanup: whatever happened above, the overlay goes and every lane is visible again.
+    window.setTimeout(() => {
+      overlay.remove();
+      for (const w of worlds) {
+        if (!w.isConnected) continue;
+        w.style.transition = '';
+        w.style.opacity = '';
+      }
+    }, SCAN_TOTAL_MS);
+  } catch {
+    // Cosmetic only — but if the throw landed between the hide and the cleanup timer, bring the
+    // lanes straight back: the redrawn offer must never be LESS visible than with no animation.
+    for (const w of hidden) {
+      try {
+        w.style.transition = '';
+        w.style.opacity = '';
+      } catch {
+        /* detached node — the fresh DOM shows itself */
+      }
+    }
+  }
+}
