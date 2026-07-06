@@ -266,8 +266,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
     FLUSH with the fairway. Hazards get a soft grassy margin blended toward the hazard (never
     darker than turf); internals deepen through smooth feathered ramps, not hard bands. The fairway
-    takes a first-cut `collar` + sheen on parkland worlds only (void/cetus pass NO collar). All
-    pure geometry, zero rng.
+    takes a first-cut `collar` + a FEATHERED cut grade + edge-ease strokes + two-band sheen on
+    parkland worlds only (void/cetus pass NO collar; edge bands are clipped STROKES, never deep
+    `offsetPoly` insets — those fold on a thin ribbon). All pure geometry, zero rng
+    (GS-fairway-2).
   - Turf bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test).
   - The aim-cone overlay is SCALE-HONEST: every layout decision reads the projector's px-per-yard;
     blocked-zone shading probes the sim's OWN flight walks — never fork them, never hard-code px
