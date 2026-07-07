@@ -193,7 +193,12 @@ these systems** — each bullet is the tip of a documented iceberg.
   - The Clubhouse (hall lounge + per-golfer stage + spaceport) is purely cosmetic, seeded via `Rng`
     keyed off `clubhouseVisit` — zero sim/rng-stream impact. Mount figures/ships in TIGHT frames
     (golfer 72×210, ship 96×62); re-shoot `scripts/clubhouse-preview.mjs` after touching
-    `apparelArt.ts`/`clubhouseLounge.ts`.
+    `apparelArt.ts`/`clubhouseLounge.ts`. The spaceport is ONE cohesive floating golf-deck that reads
+    as the view out the bar's picture window (same sky/ringed-planet/moon as `loungeArt`, a warm "19th
+    Hole" clubhouse twin at its back): the four golfers are dealt across FOUR berths (`BERTHS`) — three
+    holo pads + one FUEL station — by the visit shuffle, so the fleet re-parks AND a different equipped
+    ride tops up at the pump each run. Every ride stays the `openClubhouse` button; the ONLY randomness
+    is the berth shuffle (which also picks the pump occupant). GS-clubhouse-starport-redesign.
   - Won Ascension gates unlock permanent bag TIERS (`applyBagTier`, baked at `startRun`/`resumeRun`;
     a Pro-Shop floor; no-op at `'common'`). A per-character Ascension clear unlocks one random club
     (`unlockedClubsByCharacter` stores TYPES, re-stamped by `applyBagTier`). `ASCENSION_MAX = 15`.
