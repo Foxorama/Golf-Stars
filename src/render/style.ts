@@ -582,7 +582,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       const c = centroidOf(poly);
       return mulberry32((hashHole(hole) ^ Math.floor(posHash(c[0], c[1]) * 0xffffffff)) >>> 0);
     };
-    for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), patchRng(f.poly)));
+    for (const f of fescueHaz) prims.push(...styleFescue(projPoly(f.poly, proj), arch, patchRng(f.poly)));
     // Deep rough (GS-deep-rough) rides the same per-patch stream as fescue (its mark count is
     // screen-px-sized), themed per world archetype so the tangle suits the biome.
     for (const f of deepRoughHaz) prims.push(...styleDeepRough(projPoly(f.poly, proj), arch, patchRng(f.poly)));
