@@ -20,7 +20,24 @@ import { boostDistanceClubs, type PlayerLoadout } from './economy';
 import { CLUBS, clubById, type Club } from '../clubs';
 import type { ClubShotMods, ShotMods } from '../round';
 
-/** Render-only visual identity for a golfer (cap/skin/shirt + a build scale). */
+/**
+ * A golfer's CHOSEN hairstyle (render-only, GS-avatar-gender). This is the ONE place a character's
+ * gender presentation lives — a hairstyle + colour + optional light stubble, all drawn ABOVE THE NECK.
+ * The body silhouette, torso, limbs and every cosmetic outfit are byte-identical for all golfers, so a
+ * garment (spacesuit included) drapes the same on everyone and stays fully gender-neutral. Styles are
+ * a length/shape spectrum (short `crop` → side-swept `sweep` → medium `tousled` → voluminous `coils`);
+ * any character could wear any of them — each row just picks the look that fits that golfer. A sealed
+ * helmet hides hair entirely, so all four read identical in a spacesuit.
+ */
+export interface GolferHair {
+  style: 'crop' | 'sweep' | 'tousled' | 'coils';
+  /** Hair colour (#rrggbb). */
+  color: string;
+  /** Optional light facial hair drawn as a faint jaw shade. */
+  facial?: 'stubble';
+}
+
+/** Render-only visual identity for a golfer (cap/skin/shirt + a build scale + hair). */
 export interface GolferStyle {
   /** Cap + shirt accent colour. */
   cap: string;
@@ -30,6 +47,8 @@ export interface GolferStyle {
   skin: string;
   /** Figure size scale (1 = default); a bigger hitter stands a touch taller. */
   build: number;
+  /** The golfer's chosen hairstyle (render-only; drawn only above the neck). Absent ⇒ no hair drawn. */
+  hair?: GolferHair;
 }
 
 /**
@@ -132,7 +151,8 @@ export const CHARACTERS: readonly Character[] = [
     blurb: 'A buttery, controlled fade on every shot — predictable shape, tidy dispersion.',
     pros: ['Tighter overall dispersion', 'Same shape every time'],
     cons: ['Everything drifts right — aim left to hold the line'],
-    style: { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 0.98 },
+    // Feminine presentation: voluminous natural coils framing the face.
+    style: { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 0.98, hair: { style: 'coils', color: '#1c1712' } },
     stats: { power: 2, accuracy: 5, touch: 4, consistency: 5 },
     // A shot-maker: a touch tighter across the bag because her ball flight is so repeatable.
     loadout: (m) => ({ ...m, bag: buildStartBag(BALANCED_BAG), dispersionMult: m.dispersionMult * 0.94 }),
@@ -152,11 +172,12 @@ export const CHARACTERS: readonly Character[] = [
     name: 'Huang-Woo Hook',
     shortName: 'Huang-Woo',
     origin: 'Busan, South Korea',
-    identity: 'he / him',
+    identity: 'he / she / they',
     blurb: 'A surgeon with the irons, but the big sticks fight a snap-hook left.',
     pros: ['Pinpoint irons — far fewer wild misses', 'Deadly approach play'],
     cons: ['Drives & woods hook left and spray wider'],
-    style: { cap: '#d23f4f', shirt: '#b23140', skin: '#e8c6a0', build: 1.0 },
+    // Open presentation (any pronouns): a modern side-swept textured cut that reads as anyone.
+    style: { cap: '#d23f4f', shirt: '#b23140', skin: '#e8c6a0', build: 1.0, hair: { style: 'sweep', color: '#14100c' } },
     stats: { power: 3, accuracy: 4, touch: 4, consistency: 3 },
     loadout: (m) => ({ ...m, bag: buildStartBag(BALANCED_BAG) }),
     // The big sticks fight a snap-hook: their LEFT zones balloon (a real chance of a duck-hook),
@@ -177,7 +198,8 @@ export const CHARACTERS: readonly Character[] = [
     blurb: 'Bombs it off the tee. Where it ends up is anyone’s guess.',
     pros: ['+14 yds on the distance clubs', 'Reaches par-5s in two'],
     cons: ['Wider dispersion — more orange & red misses, big clubs worst', 'Refuses to carry hybrids'],
-    style: { cap: '#e0a83f', shirt: '#c4882a', skin: '#d8a878', build: 1.08 },
+    // Masculine presentation: a short sandy crop with light stubble.
+    style: { cap: '#e0a83f', shirt: '#c4882a', skin: '#d8a878', build: 1.08, hair: { style: 'crop', color: '#b8843f', facial: 'stubble' } },
     stats: { power: 5, accuracy: 1, touch: 2, consistency: 2 },
     // +14 on the distance clubs, and NEVER carries a hybrid (so they never show up in his reward
     // offer) — his bag swaps the 3-Hybrid for a 3-Iron. distanceClubBonus carries the +14 onto any
@@ -201,7 +223,8 @@ export const CHARACTERS: readonly Character[] = [
     blurb: 'Zips the short irons back on a string — pin-seekers that bite and hold.',
     pros: ['Heavy backspin from 5-iron down — approaches stop dead', 'Tighter scoring clubs'],
     cons: ['Slightly shorter off the tee'],
-    style: { cap: '#9b5fd4', shirt: '#7d46b8', skin: '#a8714c', build: 1.0 },
+    // Androgynous presentation: a medium tousled crop.
+    style: { cap: '#9b5fd4', shirt: '#7d46b8', skin: '#a8714c', build: 1.0, hair: { style: 'tousled', color: '#2f2318' } },
     stats: { power: 2, accuracy: 4, touch: 5, consistency: 4 },
     // The balanced bag but −8 off the tee; distanceClubBonus carries the −8 onto reward distance clubs.
     loadout: (m) => ({

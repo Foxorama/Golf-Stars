@@ -8,6 +8,7 @@
  */
 
 import { apparelById, type ApparelLook } from '../sim/rpg/apparel';
+import type { GolferHair } from '../sim/rpg/characters';
 
 /** Lighten (amt>0, toward white) or darken (amt<0, toward black) a #rrggbb colour. Anything that
  *  isn't 6-digit hex passes through untouched. */
@@ -249,6 +250,117 @@ export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
 }
 
 /**
+ * Draw a golfer's CHOSEN hairstyle on the front-facing figure (GS-avatar-gender). This is the ONLY
+ * per-character gender-presentation cue, and it lives ENTIRELY above the neck — the body silhouette,
+ * torso, limbs and every garment are byte-identical for all golfers, so outfits stay gender-neutral
+ * (a spacesuit drapes the same on everyone; a sealed helmet hides hair, so all read identical in one).
+ *
+ * Authored in the figure's proportional frame: head centred at (cx, headY) with radius `headR`, `S`
+ * the figure scale. Returns three z-layers the caller threads into the stack: `back` (a rear mass drawn
+ * BEHIND the head), `top` (the scalp cap + face-framing side locks + fringe, over the skin, under any
+ * hat), and `face` (optional light stubble over the jaw). Styles run a length/shape spectrum — `crop`
+ * (short) → `sweep` (side-swept) → `tousled` (medium) → `coils` (voluminous) — any golfer could wear
+ * any of them; each character row just picks its look.
+ */
+function hairLayers(
+  hair: GolferHair,
+  cx: number,
+  headY: number,
+  headR: number,
+  S: number,
+): { back: string; top: string; face: string } {
+  const px = (n: number): number => n * S;
+  const f = (n: number): string => (Math.round(n * 10) / 10).toString();
+  const sw = (n: number): number => Math.max(0.7, n * S);
+  const col = hair.color;
+  const lo = shade(col, -0.3);
+  const hi = shade(col, 0.26);
+  const ink = `stroke="#0c1116" stroke-width="${sw(1.1)}" stroke-linejoin="round"`;
+
+  // Per-style geometry: how far the side locks fall below the head centre, how far the rear mass falls,
+  // the crown apex height, and the hairline height on the forehead (all in authored px).
+  const CFG: Record<GolferHair['style'], { side: number; back: number; crown: number; fringe: number }> = {
+    crop: { side: 0.5, back: 0, crown: 15, fringe: 6.6 },
+    sweep: { side: 3, back: 4, crown: 15, fringe: 6 },
+    tousled: { side: 4.5, back: 6.5, crown: 15.6, fringe: 5.4 },
+    coils: { side: 13, back: 13, crown: 15.2, fringe: 5 },
+  };
+  const c = CFG[hair.style];
+
+  const sxOuter = headR + px(0.6); // outer edge of the hair, a hair proud of the head
+  const sxInner = headR - px(3.6); // inner edge of a side lock → frames the face
+  const apexY = headY - px(c.crown); // top of the crown
+  const hlY = headY - px(c.fringe); // hairline on the forehead
+  const fx = px(9); // half-width of the fringe across the forehead
+  const botY = headY + px(c.side); // where the side locks end
+  const taper = px(1.4); // the inner bottom of a lock pulls in toward the face
+
+  // The fringe segment across the forehead, from the RIGHT hairline point (current pen) to the LEFT
+  // one — the silhouette detail that most distinguishes the styles.
+  let fringe: string;
+  switch (hair.style) {
+    case 'sweep': // an off-centre side sweep
+      fringe = `C ${f(cx + px(3))},${f(hlY + px(2.4))} ${f(cx - px(2.5))},${f(hlY - px(1.2))} ${f(cx - fx)},${f(hlY + px(1.8))}`;
+      break;
+    case 'tousled': // a spiky, textured hairline
+      fringe = `L ${f(cx + px(4.6))},${f(hlY + px(2.2))} L ${f(cx + px(2))},${f(hlY - px(1.2))} L ${f(cx - px(1))},${f(hlY + px(2))} L ${f(cx - px(4.2))},${f(hlY - px(0.8))} L ${f(cx - fx)},${f(hlY + px(1.4))}`;
+      break;
+    case 'coils': // a soft scalloped hairline
+      fringe = `Q ${f(cx + px(4.5))},${f(hlY - px(1.6))} ${f(cx + px(2.5))},${f(hlY + px(0.6))} Q ${f(cx)},${f(hlY - px(2))} ${f(cx - px(2.5))},${f(hlY + px(0.6))} Q ${f(cx - px(4.5))},${f(hlY - px(1.6))} ${f(cx - fx)},${f(hlY)}`;
+      break;
+    default: // crop — a clean shallow dip
+      fringe = `Q ${f(cx)},${f(hlY + px(1.4))} ${f(cx - fx)},${f(hlY)}`;
+  }
+
+  // ── TOP: crown + face-framing side locks + fringe (one filled outline over the skin) ──
+  const topPath =
+    `M ${f(cx - sxOuter)},${f(botY)} ` +
+    `L ${f(cx - sxOuter)},${f(headY - px(1))} ` +
+    `Q ${f(cx - headR - px(0.5))},${f(apexY + px(6))} ${f(cx - px(8.5))},${f(apexY + px(1))} ` +
+    `Q ${f(cx)},${f(apexY - px(1))} ${f(cx + px(8.5))},${f(apexY + px(1))} ` +
+    `Q ${f(cx + headR + px(0.5))},${f(apexY + px(6))} ${f(cx + sxOuter)},${f(headY - px(1))} ` +
+    `L ${f(cx + sxOuter)},${f(botY)} ` +
+    `L ${f(cx + sxInner - taper)},${f(botY)} ` +
+    `Q ${f(cx + sxInner)},${f(headY - px(2))} ${f(cx + fx)},${f(hlY)} ` +
+    `${fringe} ` +
+    `Q ${f(cx - sxInner)},${f(headY - px(2))} ${f(cx - sxInner + taper)},${f(botY)} Z`;
+  const topFill = `<path d="${topPath}" fill="${col}" ${ink}/>`;
+  // A soft highlight sweeping over the crown for roundness.
+  const sheen = `<path d="M ${f(cx - px(9))},${f(apexY + px(5))} Q ${f(cx - px(2))},${f(apexY - px(0.5))} ${f(cx + px(5))},${f(apexY + px(3))}" fill="none" stroke="${hi}" stroke-width="${sw(1.6)}" stroke-linecap="round" opacity="0.5"/>`;
+  // Coils get a few little texture bumps around the crown.
+  const texture =
+    hair.style === 'coils'
+      ? `<g fill="${hi}" opacity="0.45">` +
+        ([[-9, -12], [-3, -14.5], [4, -14], [9.5, -11], [-11, -6], [11, -6]] as [number, number][])
+          .map(([dx, dy]) => `<circle cx="${f(cx + px(dx))}" cy="${f(headY + px(dy))}" r="${f(px(1.7))}"/>`)
+          .join('') +
+        `</g>`
+      : '';
+
+  // ── BACK: a rear mass drawn behind the head (longer styles only) ──
+  let back = '';
+  if (c.back > 0) {
+    const backBot = headY + px(c.back);
+    back =
+      `<path d="M ${f(cx - headR - px(1))},${f(headY - px(2))} ` +
+      `Q ${f(cx - headR - px(3.5))},${f(backBot)} ${f(cx - headR + px(2.5))},${f(backBot)} ` +
+      `L ${f(cx + headR - px(2.5))},${f(backBot)} ` +
+      `Q ${f(cx + headR + px(3.5))},${f(backBot)} ${f(cx + headR + px(1))},${f(headY - px(2))} ` +
+      `Q ${f(cx)},${f(headY - headR - px(2.5))} ${f(cx - headR - px(1))},${f(headY - px(2))} Z" fill="${lo}" ${ink}/>`;
+  }
+
+  // ── FACE: optional light stubble over the jaw (a faint hair-toned wash) ──
+  const face =
+    hair.facial === 'stubble'
+      ? `<path d="M ${f(cx - px(8.5))},${f(headY + px(3.5))} Q ${f(cx)},${f(headY + px(11))} ${f(cx + px(8.5))},${f(headY + px(3.5))} ` +
+        `Q ${f(cx + px(6.5))},${f(headY + px(9))} ${f(cx)},${f(headY + px(10.5))} ` +
+        `Q ${f(cx - px(6.5))},${f(headY + px(9))} ${f(cx - px(8.5))},${f(headY + px(3.5))} Z" fill="${col}" opacity="0.18"/>`
+      : '';
+
+  return { back, top: topFill + sheen + texture, face };
+}
+
+/**
  * The full-body golfer preview — a cel-shaded character wearing the equipped hat + shirt + pants
  * (+ the bag propped at their side). This is the Clubhouse's hero rendering (stage + lounge), built
  * to look good on its own: gradient-shaded garments, a real face, shaped legs and shoes, and the
@@ -275,6 +387,9 @@ export function golferPreviewSVG(
     bagId?: string;
     /** Signature cap colour — worn when no cosmetic hat is equipped (mirrors on-course). */
     capColor?: string;
+    /** The golfer's chosen hairstyle (render-only). Drawn only above the neck and hidden by a sealed
+     *  helmet, so it never affects how a garment looks. Absent ⇒ no hair drawn. */
+    hair?: GolferHair;
     /** Unique id prefix for this figure's SVG defs — ids are DOCUMENT-global, so co-mounted figures
      *  need distinct prefixes. Defaults to a hash of the figure's inputs, which makes an accidental
      *  collision harmless (two figures hashing alike are wearing the identical look anyway). */
@@ -544,6 +659,13 @@ export function golferPreviewSVG(
       ? hatGlyph({ shape: 'cap', color: capColor, accent: shade(capColor, -0.3) }, cx, headY, headR, `dc${uid}`)
       : '';
 
+  // The golfer's chosen hairstyle (GS-avatar-gender) — the only per-character gender-presentation cue,
+  // drawn strictly above the neck. A SEALED helmet encloses the head, so it hides hair entirely: every
+  // golfer reads identical in a spacesuit, exactly as an unstyled space garment should.
+  const sealed = hat?.look.shape === 'helmet';
+  const hairL =
+    opts.hair && !sealed ? hairLayers(opts.hair, cx, headY, headR, S) : { back: '', top: '', face: '' };
+
   // The equipped golf bag (GS-unending) stands propped at the golfer's side, feet on the same floor
   // line, scaled with the figure — the caddy-bag flex without cluttering the pose.
   const bagG = bag ? bagGlyph(bag.look, cx - px(37), footY - px(16), `pb${uid}`, S * 1.2) : '';
@@ -555,6 +677,6 @@ export function golferPreviewSVG(
       : '';
 
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${ears}${head}${headShade}${face}${hatG}${flair}
+    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${hairL.back}${ears}${head}${headShade}${hairL.top}${face}${hairL.face}${hatG}${flair}
   </svg>`;
 }
