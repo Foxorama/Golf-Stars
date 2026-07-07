@@ -333,6 +333,9 @@ export function golferPreviewSVG(
     <linearGradient id="ptg${uid}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${shade(pantsCol, 0.22)}"/><stop offset="60%" stop-color="${pantsCol}"/><stop offset="100%" stop-color="${shade(pantsCol, -0.3)}"/>
     </linearGradient>
+    <linearGradient id="skg${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${shade(skin, 0.16)}"/><stop offset="55%" stop-color="${skin}"/><stop offset="100%" stop-color="${shade(skin, -0.22)}"/>
+    </linearGradient>
     <clipPath id="tor${uid}"><path d="${torsoPath}"/></clipPath>
     <clipPath id="hd${uid}"><circle cx="${f(cx)}" cy="${f(headY)}" r="${f(headR)}"/></clipPath>
   </defs>`;
@@ -420,41 +423,80 @@ export function golferPreviewSVG(
   const bootCol = pantsShape === 'spacepants' ? pantsAcc : '#232733';
   const shoes = shoe(lAnk, bootCol) + shoe(rAnk, bootCol);
 
-  // ── Arms: a relaxed A-pose whose SLEEVE follows the shirt. The old arms started well inside the
-  //    torso and so hid the sleeve behind it — every outfit then read as bare-skin pegs (the astronaut
-  //    "still had arms showing"). Now they anchor at the shoulder CORNER and draw over the torso edge,
-  //    so the sleeve is visible and reads as attached. Short-sleeve golf shirts (polo/tee/jersey) bare
-  //    the forearm; full-cover suits (spacesuit/nebula suit/green jacket) sleeve all the way down —
-  //    ending in a glove on the pressure suits, a bare hand at the jacket cuff.
+  // ── Arms: proper SHAPED limbs (not sticks). The old arms were thin <line> strokes floating beside
+  //    the torso with a visible gap at the shoulder — they read as bolted-on pegs. Now each arm is a
+  //    tapered filled limb whose deltoid root is drawn BEHIND the torso, so the shoulder swallows the
+  //    join and the arm grows out of the body. The sleeve shares the torso's own gradient (`shg`) so
+  //    the lighting runs continuous shoulder-to-cuff; a rim highlight down the outer edge gives it
+  //    roundness. Short-sleeve golf shirts (polo/tee/jersey) cap the sleeve at the upper arm and bare
+  //    a gradient-shaded forearm; full-cover suits/jacket (spacesuit/nebula/green jacket) sleeve to the
+  //    wrist — a pressure cuff + glove on the suits, a jacket cuff + bare hand on the blazer.
   const shirtShape = shirt?.look.shape;
   const fullSleeve = shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'blazer';
   const gloved = shirtShape === 'spacesuit' || shirtShape === 'cosmic';
-  const sleeveCol = shade(shirtCol, -0.05);
-  const handCol = gloved ? shade(shirtCol, 0.06) : skin;
+  const sleeveFill = `url(#shg${uid})`;
+  const skinFill = `url(#skg${uid})`;
+  const handCol = gloved ? shade(shirtCol, 0.08) : skin;
   const elbowY = shoY + px(27);
   const handY = hipY + px(4);
-  const shoX = (side: 1 | -1): number => cx + side * px(17.5); // shoulder corner
-  const wristX = (side: 1 | -1): number => cx + side * px(16.5);
-  const armSeg = (x1: number, y1: number, x2: number, y2: number, col: string, wd: number): string =>
-    `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${col}" stroke-width="${f(wd)}" stroke-linecap="round"/>`;
-  const arm = (side: 1 | -1): string => {
-    if (fullSleeve) {
-      // One continuous fabric arm: shoulder → elbow (bowed out past the torso) → wrist.
-      return (
-        armSeg(shoX(side), shoY + px(1), cx + side * px(20.5), elbowY, sleeveCol, px(7.6)) +
-        armSeg(cx + side * px(20.5), elbowY, wristX(side), handY, sleeveCol, px(6.4))
-      );
+  const armInk = `stroke="#0c1116" stroke-width="${sw(1.4)}" stroke-linejoin="round"`;
+  // A smooth tapered outline through a chain of {x,y,w=half-width} joints, rounding the final (wrist) end.
+  const limb = (joints: { x: number; y: number; w: number }[]): string => {
+    const n = joints.length;
+    const L: [number, number][] = [];
+    const R: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const p = joints[i]!;
+      let dx = 0;
+      let dy = 0;
+      if (i > 0) {
+        dx += p.x - joints[i - 1]!.x;
+        dy += p.y - joints[i - 1]!.y;
+      }
+      if (i < n - 1) {
+        dx += joints[i + 1]!.x - p.x;
+        dy += joints[i + 1]!.y - p.y;
+      }
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      L.push([p.x + nx * p.w, p.y + ny * p.w]);
+      R.push([p.x - nx * p.w, p.y - ny * p.w]);
     }
-    // Short sleeve capping just below the shoulder, then a bare forearm.
-    const hemX = cx + side * px(19.5);
-    const hemY = shoY + px(13);
-    return (
-      armSeg(shoX(side), shoY + px(1), hemX, hemY, sleeveCol, px(7.6)) +
-      armSeg(hemX, hemY, wristX(side), handY, skin, px(5.2))
-    );
+    const last = joints[n - 1]!;
+    const prev = joints[n - 2] ?? last;
+    const ddx = last.x - prev.x;
+    const ddy = last.y - prev.y;
+    const dl = Math.hypot(ddx, ddy) || 1;
+    const tipx = last.x + (ddx / dl) * last.w;
+    const tipy = last.y + (ddy / dl) * last.w;
+    let d = `M${f(L[0]![0])},${f(L[0]![1])} `;
+    for (let i = 1; i < n; i++) d += `L${f(L[i]![0])},${f(L[i]![1])} `;
+    d += `Q${f(tipx)},${f(tipy)} ${f(R[n - 1]![0])},${f(R[n - 1]![1])} `;
+    for (let i = n - 2; i >= 0; i--) d += `L${f(R[i]![0])},${f(R[i]![1])} `;
+    return `${d}Z`;
   };
-  const hand = (side: 1 | -1): string =>
-    `<circle cx="${f(wristX(side))}" cy="${f(handY)}" r="${f(px(3.6))}" fill="${handCol}" stroke="#0c1116" stroke-width="${sw(1)}"/>`;
+  const armUnit = (side: 1 | -1): string => {
+    const sx = (n: number): number => cx + side * px(n);
+    const shoulder = { x: sx(15.5), y: shoY + px(2), w: px(7) };
+    const upper = { x: sx(19), y: shoY + px(14), w: px(6.1) };
+    const elbow = { x: sx(18.5), y: elbowY, w: px(5.2) };
+    const wrist = { x: sx(16), y: handY, w: px(4.3) };
+    const rim = `<path d="M${f(sx(21.5))},${f(shoY + px(10))} Q${f(sx(23.6))},${f(elbowY - px(2))} ${f(sx(20.4))},${f(handY - px(4))}" fill="none" stroke="#ffffff" stroke-width="${sw(1.3)}" stroke-linecap="round" opacity="0.16"/>`;
+    const hand = `<ellipse cx="${f(wrist.x)}" cy="${f(handY + px(1))}" rx="${f(px(3.9))}" ry="${f(px(4.7))}" fill="${handCol}" stroke="#0c1116" stroke-width="${sw(1.2)}"/>`;
+    if (fullSleeve) {
+      const sleeve = `<path d="${limb([shoulder, upper, elbow, wrist])}" fill="${sleeveFill}" ${armInk}/>`;
+      const cuff = gloved
+        ? `<circle cx="${f(wrist.x)}" cy="${f(wrist.y - px(1.5))}" r="${f(px(4.2))}" fill="${shade(shirtCol, -0.2)}" ${armInk}/>`
+        : `<path d="M${f(wrist.x - px(4.6))},${f(wrist.y - px(3))} L${f(wrist.x + px(4.6))},${f(wrist.y - px(3))}" stroke="${shade(shirtCol, -0.3)}" stroke-width="${sw(2.2)}" stroke-linecap="round"/>`;
+      return sleeve + cuff + rim + hand;
+    }
+    // Short cap sleeve over the upper arm; gradient-shaded skin forearm below.
+    const skinArm = `<path d="${limb([shoulder, upper, elbow, wrist])}" fill="${skinFill}" ${armInk}/>`;
+    const hem = { x: sx(19.4), y: shoY + px(15.5), w: px(6.4) };
+    const sleeve = `<path d="${limb([shoulder, hem])}" fill="${sleeveFill}" ${armInk}/>`;
+    return skinArm + sleeve + rim + hand;
+  };
 
   // ── Torso + cel shading + garment detail ─────────────────────────────────────────────────
   const neck = `<rect x="${f(cx - px(3.6))}" y="${f(headY + headR - px(4))}" width="${f(px(7.2))}" height="${f(shoY - headY - headR + px(6))}" fill="${shade(skin, -0.12)}"/>`;
@@ -513,6 +555,6 @@ export function golferPreviewSVG(
       : '';
 
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${neck}${torso}${torsoShade}${detail}${belt}${arm(-1)}${arm(1)}${hand(-1)}${hand(1)}${ears}${head}${headShade}${face}${hatG}${flair}
+    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${ears}${head}${headShade}${face}${hatG}${flair}
   </svg>`;
 }
