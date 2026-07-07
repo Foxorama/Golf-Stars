@@ -740,6 +740,16 @@
     scaled by `S = h/210`, authored at the stage's h=210) with arms, so the figure reads as three clean tap
     bands here AND stays in proportion at the lounge's small `h=84` (a fixed head+neck used to stunt the small
     figure into a tiny chest + stretched legs). The `legsFull` flag it replaced is gone.
+  - **Arms are SHAPED limbs drawn BEHIND the torso (GS-avatar-arms).** The first pass hung each arm as two
+    thin `<line>` strokes beside the body — a gap at the shoulder made every outfit read as bolted-on pegs
+    (worst on the astronaut/full suits). Now `armUnit` builds a tapered filled outline through
+    shoulder→upper→elbow→wrist joints (`limb()`, a perpendicular-offset walk with a rounded wrist cap) and the
+    figure draws arms BEFORE the torso, so the deltoid root is swallowed by the shoulder and the arm grows out
+    of the body. The sleeve reuses the torso's own `shg` gradient (lighting runs continuous shoulder-to-cuff),
+    the bare forearm its own `skg` skin gradient, plus a faint outer rim highlight for roundness. Sleeve length
+    is shirt-shape keyed: short cap (polo/tee/jersey/default) → sleeve stops at the upper arm over a skin
+    forearm; full cover (spacesuit/cosmic/blazer) → sleeve to the wrist with a pressure-cuff+glove (suits) or a
+    jacket cuff+bare hand (blazer). Hand is a rounded ellipse tucked onto the wrist, not a floating ball.
     Over it sit three transparent tap zones (`.gs-czone--hat/--shirt/--pants`, absolutely positioned bands),
     each with a floating chip naming the worn piece + a ✎ pencil. Below the figure, a **garage bay** tile
     (`clubhouseGarageArt`: a hangar/launch-pad SVG scene — open star-bay, neon pillars tinted by the ride's
