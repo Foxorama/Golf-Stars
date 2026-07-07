@@ -1604,6 +1604,14 @@ export function shotSpread(
     lowFrac = lowFrac + (prof.meanFrac - lowFrac) * t;
     highFrac = highFrac - (highFrac - prof.meanFrac) * t;
   }
+  // The carry WINDOW is resolveShot's clamp: [intended·lowFrac, intended·highFrac]. Wind shifts the
+  // MEAN *within* that window (resolveShot clamps carryMean+noise to these UN-shifted bounds), it does
+  // NOT move the bounds — so the cone's near/far arcs are `low`/`high`, and only `expectedCarry` (the
+  // aim line) carries the wind bias. The arcs used to be drawn at `low+along`/`high+along`, which is a
+  // window the shot can never actually reach: harmless at full power (window >> wind) but at CHIP power
+  // the window is tiny and the wind term dominates, so the drawn cone diverged wildly from where the
+  // ball lands (a headwind chip drew a 2-4y cone for a shot that clamps to ~8y — "the arc overlay is
+  // way too long/short around the green"). Now the arcs mirror the sim's clamp exactly (GS-chip-cone).
   const low = intended * lowFrac;
   const high = intended * highFrac;
   const mean = Math.max(low, Math.min(high, intended * prof.meanFrac + along));
@@ -1622,8 +1630,8 @@ export function shotSpread(
     origin: from,
     bearing: shotBearing + (h * mods.angleBias * 180) / Math.PI,
     expectedCarry: mean,
-    carryLow: Math.max(0, low + along),
-    carryHigh: high + along,
+    carryLow: Math.max(0, low),
+    carryHigh: high,
     lateralSd: intended * prof.lateralFrac * dispMult,
     carrySd: intended * prof.carryFrac * dispMult,
     angleSd: sprayAngleRms(shape, angleSpread),

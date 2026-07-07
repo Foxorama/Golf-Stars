@@ -1160,12 +1160,15 @@ function playingBody(animating: boolean): string {
   // the green entirely, so the green/amber/red arc read "nowhere near where the ball lands". Scaling
   // the at-rest power to (distance-to-pin ÷ the club's full expected carry) puts the cone on the pin;
   // a normal approach (target past the club's reach) clamps the ratio to 1 — a full swing, as before.
-  // The player still pulls to override; the gesture charges from 0 on press regardless.
+  // The player still pulls to override; the gesture charges from 0 on press regardless. Floored just
+  // above the release-cancel threshold (not 0.25) so a genuinely SHORT greenside chip defaults to the
+  // pin instead of the shortest wedge's 25%-power overshoot (GS-chip-cone) — the honest cone then
+  // reads true right down to a few-yard chip.
   if (newShot && selClubId !== 'putter' && !selPutt) {
     const full = previewShot(play, { clubId: selClubId, aim: selAim, power: 1 }, state.run.loadout);
     if (full.expectedCarry > 1) {
       const want = dist(play.ball, pinOf(play.hole));
-      selPower = Math.max(0.25, Math.min(1, want / full.expectedCarry));
+      selPower = Math.max(0.1, Math.min(1, want / full.expectedCarry));
     }
   }
   // The gesture's aim/power feed the shot: a target along the (gesture-nudged) aim bearing, at the
