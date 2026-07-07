@@ -49,9 +49,20 @@ so it stays glued to the tent as the camera pans. The text is the struck tent's 
   `executeShot` — deterministic, auto ≡ interactive, negligible balance impact (a non-penalty carry on a
   route that isn't in the death-spiral harness; `tents.test.ts` proves non-marmot tents stay non-penalty).
   The **first-ever** marmot bonk unlocks the persistent **Marmot Bartender** (save **v15** `marmotBartender`)
-  — a marmot tends the 19th-hole bar and a golf ball sits on the counter (`clubhouseLounge.ts`, gated
-  cosmetic, re-shoot `scripts/clubhouse-preview.mjs`). The unlock is an interactive reducer reaction
-  (`applyTentReactions`), like the ace-ship unlock.
+  — a marmot tends the 19th-hole bar and a **tip jar** with a "Tips" sign sits on the right of the counter
+  (`clubhouseLounge.ts`, gated cosmetic, re-shoot `scripts/clubhouse-preview.mjs`). The unlock is an
+  interactive reducer reaction (`applyTentReactions`), like the ace-ship unlock. The marmot's spoken/bubble
+  line is **"Thanks for the tip!"** (`TENT_LINES.marmot`).
+
+  **The tip jar (GS-tent-tips, save `v20` `marmotTips`).** EVERY marmot bonk (not just the first) drops a
+  golf ball in the jar: `applyTentReactions` bumps a per-run `marmotTips` count, RESET to 0 when a new run
+  begins (`selectCharacter`). The clubhouse draws that many balls nested in the jar next time you're home,
+  so it visibly fills with a run's haul. When the jar **fills** (`marmotTips ≥ MARMOT_JAR_CAP`, 10) the
+  Marmot has taken the night off — it's out on the **spaceport par-3** playing golf (`marmotGolfer()` on the
+  deck green) — so the bar shows **no bartender** and an **empty** jar that visit. It's back behind the bar
+  the next run home (the jar reflecting that run's count, empty unless the Marmot was found again). All
+  purely a function of the last run's `marmotTips`, threaded `clubhouseLoungeHTML → loungeArt`/`spaceportArt`.
+  The count is earned in play, never granted retroactively (the `v19→v20` migration seeds it 0).
 - **fortune** — the fortune teller gifts a free **mulligan** on the NEXT tee shot: `mulliganPending` is
   set, and the next tee shot resolves TWO of the player's own balls and lets them keep the better line.
   This reuses the team-duel SCRAMBLE machinery wholesale (`resolveScrambleShot` with the player's own

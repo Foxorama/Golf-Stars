@@ -48,7 +48,7 @@ export function clubhouseHallScreen(): string {
       <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire, their rides parked at the spaceport below. Tap a golfer or their ship to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
     </header>
-    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender)}</div>
+    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender, state.marmotTips)}</div>
     <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
 }
 
