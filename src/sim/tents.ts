@@ -46,7 +46,7 @@ export const TENT_EFFECTS: readonly TentEffectId[] = ['ow', 'marmot', 'fortune',
 /** The speech-bubble line each tent pops when first bonked (render + voice). */
 export const TENT_LINES: Record<TentEffectId, string> = {
   ow: 'Ow!',
-  marmot: 'Thank you for this offering.',
+  marmot: 'Thanks for the tip!',
   fortune: 'I can see into your future!',
   watch: 'Hey — watch it!',
   starmart: 'Welcome to StarMart!',

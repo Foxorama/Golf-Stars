@@ -124,6 +124,7 @@ function boot(): void {
       clubhouseVisit: save.clubhouseVisit,
       endlessBestHoles: save.endlessBestHoles,
       marmotBartender: save.marmotBartender,
+      marmotTips: save.marmotTips,
       endlessRuns: save.endlessRuns,
     };
     const seed = seedFromUrl() ?? freshRunSeed();
@@ -187,6 +188,7 @@ function persist(): void {
     clubhouseVisit: state.clubhouseVisit,
     endlessBestHoles: state.endlessBestHoles,
     marmotBartender: state.marmotBartender,
+    marmotTips: state.marmotTips,
     endlessRuns: state.endlessRuns,
     // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
     // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the

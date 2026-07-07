@@ -204,15 +204,49 @@ function marmotBartender(): string {
   </g>`;
 }
 
-/** A golf ball keepsake on the bar (GS-tent-interactions), sat on the counter next to the drinks. */
-function barGolfBall(): string {
+/**
+ * Balls one tip jar holds before it's "full" (GS-tent-tips). Tuned to fill the jar's nest nicely — the
+ * count the Marmot must pocket in a single run to fill up and slip off to the spaceport par-3.
+ */
+export const MARMOT_JAR_CAP = 10;
+
+/** Ball nest slots inside the tip jar (dx from the jar centre, absolute y), packed bottom-up above the
+ *  "Tips" label — the first `balls` slots are drawn, so the jar visibly fills as tips come in. */
+const JAR_BALL_SLOTS: ReadonlyArray<readonly [number, number]> = [
+  [-4.4, 135.6], [0, 135.6], [4.4, 135.6],
+  [-2.2, 132], [2.2, 132],
+  [-4.4, 128.4], [0, 128.4], [4.4, 128.4],
+  [-2.2, 124.8], [2.2, 124.8],
+];
+
+/** The 19th-Hole TIP JAR on the bar (GS-tent-tips) — a glass jar with a "Tips" sign that gains a golf
+ *  ball for every ball the Marmot pockets from a trade tent this run. `balls` (0..CAP) nest inside; an
+ *  empty jar still shows (the fixture). Sits on the right of the counter worktop (top y=144). */
+function tipJar(balls: number): string {
+  const cx = 384;
+  const n = Math.max(0, Math.min(MARMOT_JAR_CAP, Math.round(balls)));
+  const nest = JAR_BALL_SLOTS.slice(0, n)
+    .map(
+      ([dx, y]) =>
+        `<circle cx="${(cx + dx).toFixed(1)}" cy="${y}" r="2.2" fill="#f4f6f8" stroke="#c9ced4" stroke-width="0.5"/>` +
+        `<circle cx="${(cx + dx - 0.7).toFixed(1)}" cy="${y - 0.7}" r="0.55" fill="#fff"/>`,
+    )
+    .join('');
   return `<g>
-    <ellipse cx="299" cy="143.4" rx="4" ry="1.5" fill="#000" opacity="0.28"/>
-    <circle cx="299" cy="140.6" r="3.4" fill="#f4f6f8"/>
-    <circle cx="298" cy="139.6" r="1" fill="#fff"/>
-    <g fill="#c9ced4">
-      <circle cx="299.6" cy="141.4" r="0.5"/><circle cx="300.6" cy="140" r="0.5"/><circle cx="298.4" cy="141.6" r="0.5"/>
-    </g>
+    <!-- grounding shadow on the worktop -->
+    <ellipse cx="${cx}" cy="144.2" rx="9" ry="1.9" fill="#000" opacity="0.28"/>
+    <!-- balls nested inside (drawn before the front glass so the glass tints them) -->
+    ${nest}
+    <!-- glass jar body: translucent so the balls read through it -->
+    <path d="M${cx - 8},124 Q${cx - 8},144 ${cx - 5},144 L${cx + 5},144 Q${cx + 8},144 ${cx + 8},124 Z" fill="#bcd2e6" opacity="0.26"/>
+    <path d="M${cx - 8},124 Q${cx - 8},144 ${cx - 5},144 L${cx + 5},144 Q${cx + 8},144 ${cx + 8},124" fill="none" stroke="#e8f2fb" stroke-width="0.9" opacity="0.5"/>
+    <line x1="${cx - 6}" y1="127" x2="${cx - 6}" y2="140" stroke="#ffffff" stroke-width="1" opacity="0.35"/>
+    <!-- rim / mouth of the jar -->
+    <rect x="${cx - 8.6}" y="121" width="17.2" height="3.6" rx="1.6" fill="#cfd6de" stroke="#8a9099" stroke-width="0.6"/>
+    <rect x="${cx - 7}" y="121.6" width="14" height="1" rx="0.5" fill="#eef3f7" opacity="0.7"/>
+    <!-- kraft-paper "Tips" sign across the jar front -->
+    <rect x="${cx - 7.6}" y="137.4" width="15.2" height="6.4" rx="1.2" fill="#f3e7c4" stroke="#b79a5c" stroke-width="0.5"/>
+    <text x="${cx}" y="142.3" text-anchor="middle" font-size="5" font-weight="800" fill="#6a4a1c" font-family="Georgia,'Times New Roman',serif" font-style="italic">Tips</text>
   </g>`;
 }
 
@@ -236,8 +270,10 @@ function stool(x: number): string {
  *  `<animate>` flickers give the fire, lamps and neon sign life. Layout: fireplace + armchair on the
  *  left, space-course window centre, the bar along the right, a patterned rug up front.
  *  `marmot` = the Marmot Bartender clubhouse unlock (GS-tent-interactions) is earned: a marmot tends
- *  the bar and a golf ball sits on the counter as a keepsake. */
-function loungeArt(marmot = false): string {
+ *  the bar and its "Tips" jar sits on the counter, filled with `tips` golf balls (GS-tent-tips). When the
+ *  jar filled last run the Marmot is `away` on the spaceport par-3 — the bar shows no marmot and an empty
+ *  jar that visit. */
+function loungeArt(marmot = false, tips = 0, away = false): string {
   const bottlesTop = [
     bottle(316, 76, 20, 6.5, '#4fae8a'),
     bottle(328, 76, 24, 6, '#c65a4a'),
@@ -493,7 +529,7 @@ function loungeArt(marmot = false): string {
     <!-- hanging stemware rack -->
     <rect x="308" y="120" width="84" height="2.5" fill="#4a3520"/>
     ${glasses}
-    ${marmot ? marmotBartender() : ''}
+    ${marmot && !away ? marmotBartender() : ''}
     <!-- counter: worktop, panelled front, brass foot rail -->
     <rect x="282" y="144" width="118" height="13" rx="3" fill="url(#clCounterTop)"/>
     <rect x="282" y="144" width="118" height="3" rx="1.5" fill="#c99a5c"/>
@@ -528,7 +564,7 @@ function loungeArt(marmot = false): string {
       <line x1="341" y1="141" x2="341" y2="144" stroke="#cfe0ef" stroke-width="1.2"/>
       <circle cx="339" cy="135.5" r="1.2" fill="#4fae8a"/>
     </g>
-    ${marmot ? barGolfBall() : ''}
+    ${marmot ? tipJar(away ? 0 : tips) : ''}
     ${stool(306)}${stool(348)}
 
     <!-- potted monstera between the painting and the bar -->
@@ -687,12 +723,47 @@ function fuelStationArt(): string {
   </g>`;
 }
 
+/** The Marmot out on the deck's par-3 (GS-tent-tips): when its tip jar filled up last run it slips away
+ *  from the bar to play golf. A small standing marmot in a red visor, addressing the ball waiting on the
+ *  green (at 206,150) with a club. Drawn on top of the turf so it reads against the mown ribbon. */
+function marmotGolfer(): string {
+  const x = 198;
+  const y = 151; // feet on the green, just left of the waiting ball
+  return `<g>
+    <ellipse cx="${x + 1}" cy="${y + 1.4}" rx="6.5" ry="2" fill="#000" opacity="0.28"/>
+    <!-- club: shaft from the paws down to the ball + a little head at the ball -->
+    <line x1="${x + 3}" y1="${y - 6}" x2="205.4" y2="149.6" stroke="#dde0e6" stroke-width="1" stroke-linecap="round"/>
+    <path d="M204.6,150.4 l3.2,0.5 l-0.5,1.7 l-3.2,-0.5 Z" fill="#8a9099"/>
+    <!-- tail + body + belly -->
+    <path d="M${x - 3.6},${y - 1} Q${x - 8},${y - 3} ${x - 6.4},${y - 6.5}" fill="none" stroke="#7a4e2c" stroke-width="2.4" stroke-linecap="round"/>
+    <ellipse cx="${x}" cy="${y - 4}" rx="4.4" ry="6" fill="#8a5a34"/>
+    <ellipse cx="${x + 0.4}" cy="${y - 2.4}" rx="3" ry="3.8" fill="#c79a68" opacity="0.85"/>
+    <!-- feet -->
+    <ellipse cx="${x - 2}" cy="${y + 0.6}" rx="1.8" ry="1" fill="#7a4e2c"/>
+    <ellipse cx="${x + 2}" cy="${y + 0.6}" rx="1.8" ry="1" fill="#7a4e2c"/>
+    <!-- arms reaching across to grip the club -->
+    <path d="M${x + 1.6},${y - 5.6} Q${x + 3.4},${y - 5.4} ${x + 3},${y - 6}" fill="none" stroke="#8a5a34" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- head + ears -->
+    <ellipse cx="${x + 1}" cy="${y - 10}" rx="4.4" ry="4" fill="#8a5a34"/>
+    <circle cx="${x - 1.4}" cy="${y - 12.8}" r="1.5" fill="#8a5a34"/>
+    <circle cx="${x + 3.4}" cy="${y - 12.8}" r="1.5" fill="#8a5a34"/>
+    <ellipse cx="${x + 1.6}" cy="${y - 8.6}" rx="2.4" ry="1.9" fill="#c79a68"/>
+    <ellipse cx="${x + 1.6}" cy="${y - 9.2}" rx="0.7" ry="0.55" fill="#2a1a10"/>
+    <circle cx="${x - 0.2}" cy="${y - 10.6}" r="0.7" fill="#1a120b"/>
+    <circle cx="${x + 2.6}" cy="${y - 10.6}" r="0.7" fill="#1a120b"/>
+    <!-- jaunty red visor cap -->
+    <path d="M${x - 3},${y - 12.4} Q${x + 1},${y - 15} ${x + 5},${y - 12.4}" fill="none" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M${x + 4.4},${y - 12.8} l3,0.4 l-0.4,1.6 l-3,-0.4 Z" fill="#c0392b" opacity="0.9"/>
+  </g>`;
+}
+
 /** The painted spaceport: ONE floating golf-deck platform (not the old busy orbital ring) adrift in
  *  the bar-window's own sky — blue→purple gradient, a ringed planet + a bright moon, a nebula wash and
  *  drifting asteroids. A hull-metal slab floats on an anti-grav glow; a par-3 putting green crowns it,
  *  the little space-clubhouse (warm windows + a 19th-Hole glow, echoing the bar) at its back, three
- *  holo pads + the fuel station ringing it. Hand-placed (no rng) so it's byte-stable, like the lounge. */
-function spaceportArt(): string {
+ *  holo pads + the fuel station ringing it. Hand-placed (no rng) so it's byte-stable, like the lounge.
+ *  `marmotAway` (GS-tent-tips) puts the Marmot on the green playing the par-3 when its tip jar filled up. */
+function spaceportArt(marmotAway = false): string {
   // A small cratered asteroid drifting near the deck.
   const asteroid = (x: number, y: number, sc: number, dur: string): string =>
     `<g transform="translate(${x},${y}) scale(${sc})">
@@ -865,6 +936,7 @@ function spaceportArt(): string {
       ${tree(146, 142, 0.85)}${tree(232, 158, 0.78)}
     </g>
     <ellipse cx="200" cy="150" rx="86" ry="26" fill="none" stroke="#1e5222" stroke-width="2.4"/>
+    ${marmotAway ? marmotGolfer() : ''}
     <!-- the pin on the green (behind the sign; the flag reads against the sky) -->
     <line x1="257" y1="143.5" x2="257" y2="122" stroke="#e8e2d2" stroke-width="1.6"/>
     <path d="M257,122 L273,126 L257,130 Z" fill="#ff6b6b"/>
@@ -889,12 +961,12 @@ function spaceportArt(): string {
 
 /** The spaceport panel: the painted deck + the four rides dealt across the berths by the visit shuffle
  *  (so which golfer is topping up at the fuel station changes every run home). */
-function spaceportHTML(golfers: LoungeGolfer[], rng: Rng): string {
+function spaceportHTML(golfers: LoungeGolfer[], rng: Rng, marmotAway = false): string {
   const berths = shuffle([...BERTHS], rng).slice(0, golfers.length);
   const ships = golfers.map((g, i) => shipAt(g, berths[i] ?? BERTHS[i % BERTHS.length]!)).join('');
   return `<div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:40/23;max-width:680px;
       margin:10px auto 0;border:1px solid #232c42;border-radius:16px;overflow:hidden;background:#0a0d1f;">
-      ${spaceportArt()}
+      ${spaceportArt(marmotAway)}
       ${ships}
     </div>`;
 }
@@ -905,17 +977,20 @@ function spaceportHTML(golfers: LoungeGolfer[], rng: Rng): string {
  * finished-run counter) reshuffles both arrangements each time home — the pad draws happen AFTER the spot
  * draws on the same Rng, so the lounge arrangement for a given visit is unchanged by the spaceport.
  */
-export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number, marmot = false): string {
+export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number, marmot = false, tips = 0): string {
   const rng = new Rng((visit >>> 0) * 2654435761 + 0x9e37); // spread the small counter across the seed space
   const spots = shuffle([...SPOTS], rng).slice(0, golfers.length);
   const figures = golfers.map((g, i) => golferAt(g, spots[i] ?? SPOTS[i % SPOTS.length]!)).join('');
+  // The Marmot's jar filled up last run (GS-tent-tips) → it's off playing the spaceport par-3, so the bar
+  // shows no marmot + an empty jar and the marmot appears on the deck's green instead.
+  const away = marmot && tips >= MARMOT_JAR_CAP;
   // Taller 4:3 frame that grows to fill the screen (was a squat 20:11 letterbox at 520px that left a lot
   // of dead space above/below on a phone). The extra height is foreground floor the golfers stand on.
   return `${loungeStyle()}
     <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:680px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
-      ${loungeArt(marmot)}
+      ${loungeArt(marmot, tips, away)}
       ${figures}
     </div>
-    ${spaceportHTML(golfers, rng)}`;
+    ${spaceportHTML(golfers, rng, away)}`;
 }

@@ -199,6 +199,10 @@ export interface UiState {
   /** The Marmot Bartender clubhouse unlock (GS-tent-interactions) — persisted; set the first time a
    *  ball bonks the marmot trade-tent, after which a marmot tends the 19th-hole bar. */
   marmotBartender: boolean;
+  /** Balls the Marmot pocketed in the CURRENT run (GS-tent-tips) — persisted; bumped on each marmot-tent
+   *  bonk, reset when a new run begins. Drawn as golf balls in the clubhouse tip jar; when it fills the
+   *  jar the Marmot is off playing the spaceport par-3 (bar + jar empty) until the next run. */
+  marmotTips: number;
   /** Finished Unending-Universe runs (GS-golf-score), newest first — the personal last-runs
    *  leaderboard: holes reached + golf score + golfer, grouped by starting CLUB SET. Persisted. */
   endlessRuns: EndlessRunRecord[];
@@ -287,6 +291,7 @@ export interface MetaProgress {
   clubhouseVisit?: number;
   endlessBestHoles?: number;
   marmotBartender?: boolean;
+  marmotTips?: number;
   endlessRuns?: EndlessRunRecord[];
 }
 
@@ -374,6 +379,7 @@ export function initState(
     clubhouseVisit: meta.clubhouseVisit ?? 0,
     endlessBestHoles: meta.endlessBestHoles ?? 0,
     marmotBartender: meta.marmotBartender ?? false,
+    marmotTips: meta.marmotTips ?? 0,
     endlessRuns: meta.endlessRuns ?? [],
   };
 }
@@ -426,7 +432,8 @@ function withBestBallPartner(state: UiState, play: HolePlay): { play: HolePlay; 
  * SHOT itself (the ricochet, and the marmot's lost ball) is already resolved in the shared physics, so
  * auto ≡ interactive holds; these are the interactive-only META reactions, layered on like the ace /
  * unlock side-effects:
- *   • marmot   → the first-ever bonk unlocks the persistent Marmot Bartender (clubhouse cosmetic);
+ *   • marmot   → the first-ever bonk unlocks the persistent Marmot Bartender (clubhouse cosmetic), and
+ *                EVERY bonk drops a ball in its tip jar (GS-tent-tips) — the running per-run count;
  *   • fortune  → grant a free mulligan for the NEXT tee shot;
  *   • starmart → opening the pop-up shop is deferred to AFTER the shot animation (app-layer `onDone`),
  *                so it isn't handled here.
@@ -435,7 +442,9 @@ function withBestBallPartner(state: UiState, play: HolePlay): { play: HolePlay; 
 function applyTentReactions(state: UiState, play: HolePlay): UiState {
   const effect = play.shots[play.shots.length - 1]?.tentHit?.effect;
   if (!effect) return state;
-  if (effect === 'marmot' && !state.marmotBartender) return { ...state, marmotBartender: true };
+  // Every marmot bonk drops a ball in the tip jar (GS-tent-tips) — the first-ever bonk ALSO unlocks the
+  // persistent Marmot Bartender. The running count is drawn as balls in the clubhouse jar next run home.
+  if (effect === 'marmot') return { ...state, marmotBartender: true, marmotTips: state.marmotTips + 1 };
   if (effect === 'fortune') return { ...state, mulliganPending: true };
   return state;
 }
@@ -608,7 +617,8 @@ export function reduce(state: UiState, action: Action): UiState {
         bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
       );
-      return { ...state, run, course: currentCourse(run), screen: 'intro' };
+      // A new run begins here — empty the Marmot's tip jar so it fills fresh this run (GS-tent-tips).
+      return { ...state, run, course: currentCourse(run), screen: 'intro', marmotTips: 0 };
     }
 
     case 'backToCharacter': {
@@ -1322,6 +1332,7 @@ export function reduce(state: UiState, action: Action): UiState {
           clubhouseVisit: state.clubhouseVisit,
           endlessBestHoles: state.endlessBestHoles,
           marmotBartender: state.marmotBartender,
+          marmotTips: state.marmotTips,
           endlessRuns: state.endlessRuns,
         },
         state.resumable,

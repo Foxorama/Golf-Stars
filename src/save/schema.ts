@@ -13,7 +13,7 @@ import type { EndlessRunRecord } from '../sim/rpg/endless';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -348,8 +348,18 @@ export interface SaveV19 extends Omit<SaveV18, 'version'> {
   version: 19;
 }
 
+/** v20 adds the Marmot's TIP JAR fill (GS-tent-tips): a running count of balls the Marmot pocketed from
+ *  trade tents during the run just finished, drawn as golf balls in the 19th-Hole tip jar. Reset each
+ *  new run; when it fills the jar the Marmot slips off to play the spaceport par-3 (bar + jar empty that
+ *  visit). Seeded at 0 for existing saves — the count is earned in play, never granted retroactively. */
+export interface SaveV20 extends Omit<SaveV19, 'version'> {
+  version: 20;
+  /** Balls the Marmot pocketed in the last run — the tip jar's fill (0 = empty jar). */
+  marmotTips: number;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV19;
+export type Save = SaveV20;
 
 export function defaultSave(): Save {
   return {
@@ -373,6 +383,7 @@ export function defaultSave(): Save {
     clubhouseVisit: 0,
     endlessBestHoles: 0,
     marmotBartender: false,
+    marmotTips: 0,
     endlessRuns: [],
   };
 }
@@ -666,6 +677,12 @@ function v18ToV19(s: SaveV18): SaveV19 {
   return { ...s, version: 19 };
 }
 
+/** v19 → v20: the tip jar starts empty — nobody has a run-worth of pocketed balls recorded yet, so the
+ *  count seeds at 0 (an unlocked Marmot Bartender simply gets an empty "Tips" jar until it pockets more). */
+function v19ToV20(s: SaveV19): SaveV20 {
+  return { ...s, version: 20, marmotTips: 0 };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -692,6 +709,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 16) s = v16ToV17(s as unknown as SaveV16) as unknown as typeof s;
   if (s.version === 17) s = v17ToV18(s as unknown as SaveV17) as unknown as typeof s;
   if (s.version === 18) s = v18ToV19(s as unknown as SaveV18) as unknown as typeof s;
+  if (s.version === 19) s = v19ToV20(s as unknown as SaveV19) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -699,7 +717,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV16>;
+  const v14 = s as unknown as Partial<SaveV20>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -731,6 +749,7 @@ export function migrate(raw: unknown): Save {
     clubhouseVisit: v14.clubhouseVisit ?? 0,
     endlessBestHoles: v14.endlessBestHoles ?? 0,
     marmotBartender: v14.marmotBartender ?? false,
+    marmotTips: v14.marmotTips ?? 0,
     endlessRuns: Array.isArray(v14.endlessRuns) ? v14.endlessRuns : [],
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,
