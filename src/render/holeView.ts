@@ -249,6 +249,143 @@ export function renderPuttOverlaySVG(hole: Hole, opts: RenderOptions = {}): stri
   return `<g id="${PUTT_OVERLAY_ID}">${puttOverlayParts((p) => proj.project(p), opts).join('')}</g>`;
 }
 
+/** Stable id for the aiming spray-cone overlay group — lets the interactive power-pull redraw only
+ *  the cone (renderShotOverlaySVG) rather than the whole scene (the shot-decision-lag fix, the
+ *  sibling of the putt overlay above). */
+export const SHOT_OVERLAY_ID = 'gs-shot-overlay';
+
+type Proj = ReturnType<typeof holeProjector>;
+
+/** Build the aiming spray-cone elements (bands, blocked zones, %/carry labels, aim line) for the
+ *  current spray, projected by `proj`. Assumes a valid `opts.spray`. Shared by the full-scene render
+ *  and the surgical overlay-only refresh so the drawn cone is byte-identical either way. */
+function shotConeParts(hole: Hole, proj: Proj, opts: RenderOptions, geom: SprayGeom): string[] {
+  const out: string[] = [];
+  const place = (p: Vec) => proj.project(p);
+  const pts = (poly: Vec[]) => polyPoints(poly, place);
+  const s = opts.spray!;
+  // The world archetype — so a blocked-zone TREE glyph matches the silhouette this world actually
+  // draws (round oak / mushroom / conifer / saguaro / …), never a hardcoded pine.
+  const arch = archetypeFor(opts.themeId, opts.biome ?? '');
+  const bands = sprayBands(s.shape, s.angleSpread, geom);
+  const drawn = bands.filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
+  // px-per-yard at the current framing — every layout decision below reads it (GS-spray-zoom),
+  // so the cone stays readable at any zoom level / shot distance.
+  const pxYd = Math.max(1e-6, proj.scale);
+  const rMid = s.carryLow + 0.5 * (s.carryHigh - s.carryLow);
+  // Arc smoothness follows the PROJECTED arc length (~8px per segment), not a fixed count — a
+  // zoomed-in cone stays a true curve, a distant one stays cheap.
+  const segsFor = (a0: number, a1: number): number =>
+    Math.max(6, Math.min(48, Math.ceil((Math.abs(a1 - a0) * s.carryHigh * pxYd) / 8)));
+  // Draw the miss bands first, the green centre last (so its outline sits on top).
+  const ordered = [...drawn.filter((b) => b.tier !== 'green'), ...drawn.filter((b) => b.tier === 'green')];
+  for (const b of ordered) {
+    out.push(
+      `<polygon points="${pts(spraySector(s, b.a0, b.a1, segsFor(b.a0, b.a1)))}" fill="${BAND_FILL[b.tier]}" stroke="${BAND_STROKE[b.tier]}" stroke-width="1" />`,
+    );
+  }
+  // Blocked zones (GS-spray-block / GS-spray-block-2): the slices of the cone a tall obstacle
+  // (tree canopy, or a trade-camp tent when the effect is armed) would interrupt, probed with the
+  // sim's own knockdown/bounce walks. A blocked slice shades from the object to the cone's FAR
+  // edge (the line is dead past it — no floating clear pocket); a line the whole swing flies over
+  // stays unshaded. Smoothed in SCREEN terms — slivers narrower than a few px are dropped,
+  // near-touching runs merge, near edges snap to the carry arc — so the shading reads as "that
+  // line is blocked", never a 1-px barcode. The clear remainder of the cone still draws its
+  // bands untouched: that's the safe line.
+  const blocked = sprayBlocking(hole, s, geom, {
+    minSpanRad: BLOCK_MIN_SPAN_PX / (pxYd * rMid),
+    mergeGapRad: BLOCK_MERGE_GAP_PX / (pxYd * rMid),
+    minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
+    snapYd: BLOCK_SNAP_PX / pxYd,
+    tents: opts.tradeTents && hole.tents ? tradeTents(hole) : undefined,
+  });
+  for (const region of blocked) {
+    const poly: Vec[] = [];
+    for (const sm of region.samples) poly.push(sprayPoint(s, sm.a, sm.r1)); // outer edge a0→a1
+    for (let i = region.samples.length - 1; i >= 0; i--) {
+      const sm = region.samples[i]!;
+      poly.push(sprayPoint(s, sm.a, sm.r0)); // inner edge a1→a0
+    }
+    out.push(
+      `<polygon points="${pts(poly)}" fill="${BLOCK_FILL}" stroke="${BLOCK_STROKE}" stroke-width="1" stroke-dasharray="3 2" />`,
+    );
+    // A glyph when the region is big enough to carry one (px-tested, so it never swamps a small
+    // patch): marks WHAT blocks the shading at a glance — tree canopy or a trade-camp tent roof.
+    const mid = region.samples[Math.floor(region.samples.length / 2)]!;
+    const wPx = (region.a1 - region.a0) * rMid * pxYd;
+    const dPx = (mid.r1 - mid.r0) * pxYd;
+    if (wPx >= 26 && dPx >= 16) {
+      const [gx, gy] = place(sprayPoint(s, mid.a, (mid.r0 + mid.r1) / 2));
+      out.push(
+        `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">${blockGlyph(region.src, arch)}</text>`,
+      );
+    }
+  }
+  // Per-zone % labels (the true share of shots — straight off the shape) at each band's mid-angle.
+  // A label only draws when its band is wide enough ON SCREEN to hold it (chip cones and low zooms
+  // shed them instead of collapsing into an overlapping smudge).
+  const zoneLabel = (a: number, r: number, txt: string, size: number): string => {
+    const [lx, ly] = place(sprayPoint(s, a, r));
+    return (
+      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="system-ui,sans-serif" font-size="${size}" font-weight="800" ` +
+      `fill="#fff" stroke="rgba(0,0,0,0.7)" stroke-width="2.5" paint-order="stroke" text-anchor="middle" dominant-baseline="middle">${txt}</text>`
+    );
+  };
+  for (const b of drawn) {
+    const txt = `${Math.round(b.prob * 100)}%`;
+    const size = b.tier === 'green' ? 13 : 10;
+    const bandPx = (b.a1 - b.a0) * rMid * pxYd; // the band's projected arc width where the label sits
+    if (bandPx < textWidthPx(txt, size) + 2) continue;
+    out.push(zoneLabel((b.a0 + b.a1) / 2, rMid, txt, size));
+  }
+  // Aim line to the expected-carry centre.
+  const [ox, oy] = place(s.origin);
+  const cFar = place(arcMid(s, s.expectedCarry));
+  out.push(
+    `<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${cFar[0].toFixed(1)}" y2="${cFar[1].toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1" stroke-dasharray="3 3" />`,
+  );
+  // Min / max carry labels on the near and far arcs (so the player reads the hole length). When
+  // the carry window projects thinner than the two labels (a chip, or a zoomed-out map) they'd
+  // collide — merge them into a single "lo–hi y" readout past the far arc instead.
+  const label = (r: number, txt: string, dy: number): string => {
+    const [lx, ly] = place(arcMid(s, r));
+    return (
+      `<text x="${lx.toFixed(1)}" y="${(ly + dy).toFixed(1)}" font-family="system-ui,sans-serif" font-size="10" font-weight="700" ` +
+      `fill="#fff" stroke="rgba(0,0,0,0.65)" stroke-width="2.5" paint-order="stroke" text-anchor="middle">${txt}</text>`
+    );
+  };
+  const lo = Math.round(s.carryLow);
+  const hi = Math.round(s.carryHigh);
+  if ((s.carryHigh - s.carryLow) * pxYd < CARRY_LABEL_MERGE_PX || lo === hi) {
+    out.push(label(s.carryHigh, lo === hi ? `${hi}y` : `${lo}–${hi}y`, -4));
+  } else {
+    out.push(label(s.carryHigh, `${hi}y`, -3), label(s.carryLow, `${lo}y`, 11));
+  }
+  return out;
+}
+
+/** Redraw ONLY the aiming spray-cone overlay for a new charge/aim, reusing the SAME focus/zoom
+ *  framing as the mounted decision map. Returns the `<g id="gs-shot-overlay">…</g>` group markup so
+ *  the pull-to-power gesture can swap this one element in place — the expensive scene (flora, rough
+ *  gradient, green contour art) is built once and left untouched. FOCUS/ZOOM MODE ONLY: the camera
+ *  holds still for the whole decision (framed on the stable full-power spread), so the projector
+ *  needs no whole-hole fit `extra` and rebuilds cheaply — byte-identical to the same group inside a
+ *  full renderHoleSVG. The caller falls back to a full render in whole-hole (fit) mode. */
+export function renderShotOverlaySVG(hole: Hole, opts: RenderOptions = {}): string {
+  const geom = resolveGeom(opts.sprayGeom);
+  const proj = holeProjector(hole, {
+    width: opts.width ?? 360,
+    height: opts.height ?? 640,
+    padding: opts.padding ?? 24,
+    focus: opts.focus,
+    viewRadius: opts.viewRadius,
+    focusBias: opts.focusBias,
+    up: opts.up,
+  });
+  const cone = opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0 ? shotConeParts(hole, proj, opts, geom) : [];
+  return `<g id="${SHOT_OVERLAY_ID}">${cone.join('')}</g>`;
+}
+
 /** Build the SVG markup for a hole. Pure: returns a string, touches no DOM. */
 export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const width = opts.width ?? 360;
@@ -286,7 +423,6 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
     up: opts.up,
   });
   const place = (p: Vec) => proj.project(p);
-  const pts = (poly: Vec[]) => polyPoints(poly, place);
 
   // The whole static world — rough texture, banded/striped surfaces, depth-banded water,
   // cell-shaded trees, OB boundary, centreline, tee + flag — is built ONCE by the shared
@@ -305,105 +441,10 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // then per-side ORANGE (hook/slice) and RED (duck-hook/shank) bands whose widths are PROPORTIONAL
   // to each zone's chance — so a 2% red is a quarter of an 8% orange, a 0% zone vanishes, and a
   // one-sided suppression reads as a lop-sided cone. Each band is labelled with its true % of shots.
+  // Wrapped in a stable-id group so the pull-to-power gesture can redraw JUST this cone
+  // (renderShotOverlaySVG) instead of rebuilding the whole scene per drag frame (the decision-lag fix).
   if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0) {
-    const s = opts.spray;
-    // The world archetype — so a blocked-zone TREE glyph matches the silhouette this world actually
-    // draws (round oak / mushroom / conifer / saguaro / …), never a hardcoded pine.
-    const arch = archetypeFor(opts.themeId, opts.biome ?? '');
-    const bands = sprayBands(s.shape, s.angleSpread, geom);
-    const drawn = bands.filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
-    // px-per-yard at the current framing — every layout decision below reads it (GS-spray-zoom),
-    // so the cone stays readable at any zoom level / shot distance.
-    const pxYd = Math.max(1e-6, proj.scale);
-    const rMid = s.carryLow + 0.5 * (s.carryHigh - s.carryLow);
-    // Arc smoothness follows the PROJECTED arc length (~8px per segment), not a fixed count — a
-    // zoomed-in cone stays a true curve, a distant one stays cheap.
-    const segsFor = (a0: number, a1: number): number =>
-      Math.max(6, Math.min(48, Math.ceil((Math.abs(a1 - a0) * s.carryHigh * pxYd) / 8)));
-    // Draw the miss bands first, the green centre last (so its outline sits on top).
-    const ordered = [...drawn.filter((b) => b.tier !== 'green'), ...drawn.filter((b) => b.tier === 'green')];
-    for (const b of ordered) {
-      parts.push(
-        `<polygon points="${pts(spraySector(s, b.a0, b.a1, segsFor(b.a0, b.a1)))}" fill="${BAND_FILL[b.tier]}" stroke="${BAND_STROKE[b.tier]}" stroke-width="1" />`,
-      );
-    }
-    // Blocked zones (GS-spray-block / GS-spray-block-2): the slices of the cone a tall obstacle
-    // (tree canopy, or a trade-camp tent when the effect is armed) would interrupt, probed with the
-    // sim's own knockdown/bounce walks. A blocked slice shades from the object to the cone's FAR
-    // edge (the line is dead past it — no floating clear pocket); a line the whole swing flies over
-    // stays unshaded. Smoothed in SCREEN terms — slivers narrower than a few px are dropped,
-    // near-touching runs merge, near edges snap to the carry arc — so the shading reads as "that
-    // line is blocked", never a 1-px barcode. The clear remainder of the cone still draws its
-    // bands untouched: that's the safe line.
-    const blocked = sprayBlocking(hole, s, geom, {
-      minSpanRad: BLOCK_MIN_SPAN_PX / (pxYd * rMid),
-      mergeGapRad: BLOCK_MERGE_GAP_PX / (pxYd * rMid),
-      minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
-      snapYd: BLOCK_SNAP_PX / pxYd,
-      tents: opts.tradeTents && hole.tents ? tradeTents(hole) : undefined,
-    });
-    for (const region of blocked) {
-      const poly: Vec[] = [];
-      for (const sm of region.samples) poly.push(sprayPoint(s, sm.a, sm.r1)); // outer edge a0→a1
-      for (let i = region.samples.length - 1; i >= 0; i--) {
-        const sm = region.samples[i]!;
-        poly.push(sprayPoint(s, sm.a, sm.r0)); // inner edge a1→a0
-      }
-      parts.push(
-        `<polygon points="${pts(poly)}" fill="${BLOCK_FILL}" stroke="${BLOCK_STROKE}" stroke-width="1" stroke-dasharray="3 2" />`,
-      );
-      // A glyph when the region is big enough to carry one (px-tested, so it never swamps a small
-      // patch): marks WHAT blocks the shading at a glance — tree canopy or a trade-camp tent roof.
-      const mid = region.samples[Math.floor(region.samples.length / 2)]!;
-      const wPx = (region.a1 - region.a0) * rMid * pxYd;
-      const dPx = (mid.r1 - mid.r0) * pxYd;
-      if (wPx >= 26 && dPx >= 16) {
-        const [gx, gy] = place(sprayPoint(s, mid.a, (mid.r0 + mid.r1) / 2));
-        parts.push(
-          `<text x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" font-size="12" text-anchor="middle" dominant-baseline="middle" opacity="0.9">${blockGlyph(region.src, arch)}</text>`,
-        );
-      }
-    }
-    // Per-zone % labels (the true share of shots — straight off the shape) at each band's mid-angle.
-    // A label only draws when its band is wide enough ON SCREEN to hold it (chip cones and low zooms
-    // shed them instead of collapsing into an overlapping smudge).
-    const zoneLabel = (a: number, r: number, txt: string, size: number): string => {
-      const [lx, ly] = place(sprayPoint(s, a, r));
-      return (
-        `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="system-ui,sans-serif" font-size="${size}" font-weight="800" ` +
-        `fill="#fff" stroke="rgba(0,0,0,0.7)" stroke-width="2.5" paint-order="stroke" text-anchor="middle" dominant-baseline="middle">${txt}</text>`
-      );
-    };
-    for (const b of drawn) {
-      const txt = `${Math.round(b.prob * 100)}%`;
-      const size = b.tier === 'green' ? 13 : 10;
-      const bandPx = (b.a1 - b.a0) * rMid * pxYd; // the band's projected arc width where the label sits
-      if (bandPx < textWidthPx(txt, size) + 2) continue;
-      parts.push(zoneLabel((b.a0 + b.a1) / 2, rMid, txt, size));
-    }
-    // Aim line to the expected-carry centre.
-    const [ox, oy] = place(s.origin);
-    const cFar = place(arcMid(s, s.expectedCarry));
-    parts.push(
-      `<line x1="${ox.toFixed(1)}" y1="${oy.toFixed(1)}" x2="${cFar[0].toFixed(1)}" y2="${cFar[1].toFixed(1)}" stroke="rgba(255,255,255,0.55)" stroke-width="1" stroke-dasharray="3 3" />`,
-    );
-    // Min / max carry labels on the near and far arcs (so the player reads the hole length). When
-    // the carry window projects thinner than the two labels (a chip, or a zoomed-out map) they'd
-    // collide — merge them into a single "lo–hi y" readout past the far arc instead.
-    const label = (r: number, txt: string, dy: number): string => {
-      const [lx, ly] = place(arcMid(s, r));
-      return (
-        `<text x="${lx.toFixed(1)}" y="${(ly + dy).toFixed(1)}" font-family="system-ui,sans-serif" font-size="10" font-weight="700" ` +
-        `fill="#fff" stroke="rgba(0,0,0,0.65)" stroke-width="2.5" paint-order="stroke" text-anchor="middle">${txt}</text>`
-      );
-    };
-    const lo = Math.round(s.carryLow);
-    const hi = Math.round(s.carryHigh);
-    if ((s.carryHigh - s.carryLow) * pxYd < CARRY_LABEL_MERGE_PX || lo === hi) {
-      parts.push(label(s.carryHigh, lo === hi ? `${hi}y` : `${lo}–${hi}y`, -4));
-    } else {
-      parts.push(label(s.carryHigh, `${hi}y`, -3), label(s.carryLow, `${lo}y`, 11));
-    }
+    parts.push(`<g id="${SHOT_OVERLAY_ID}">`, ...shotConeParts(hole, proj, opts, geom), `</g>`);
   }
 
   // Shot flight lines (optional): CURVED — a quadratic Bézier that launches along the shot bearing

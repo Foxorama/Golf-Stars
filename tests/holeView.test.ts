@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse } from '../src/sim/course/generate';
-import { renderHoleSVG } from '../src/render/holeView';
+import { renderHoleSVG, renderShotOverlaySVG, SHOT_OVERLAY_ID } from '../src/render/holeView';
+import { shotSpread } from '../src/sim/round';
+import { CLUBS } from '../src/sim/clubs';
 
 describe('holeView (pure SVG renderer)', () => {
   const hole = generateCourse(1234).holes[0]!;
@@ -73,6 +75,47 @@ describe('holeView (pure SVG renderer)', () => {
 
   it('is deterministic for a given hole', () => {
     expect(renderHoleSVG(hole)).toBe(renderHoleSVG(hole));
+  });
+
+  // The pull-to-power gesture redraws JUST the spray-cone overlay group (renderShotOverlaySVG)
+  // instead of rebuilding the whole scene per drag frame (the decision-lag fix). That surgical swap
+  // is only correct if the overlay-only render is BYTE-IDENTICAL to the same group inside a full
+  // renderHoleSVG for the same (focus) framing + spray — otherwise the cone would jump on the first
+  // nudge. Guard both here.
+  describe('shot-cone overlay byte-identity (renderShotOverlaySVG)', () => {
+    const driver = CLUBS.find((c) => c.id === 'D')!;
+    const spray = shotSpread(hole, hole.tee, 'tee', hole.green, driver, {});
+    // Focus/follow framing exactly as the decision map builds it (ball low, pin up-screen).
+    const up: [number, number] = [hole.green[0] - hole.tee[0], hole.green[1] - hole.tee[1]];
+    const focusOpts = {
+      width: 360,
+      height: 640,
+      focus: hole.tee,
+      viewRadius: Math.max(30, spray.carryHigh * 0.36),
+      focusBias: 0.84,
+      up,
+      biome: 'verdant',
+      themeId: 'lyra',
+    } as const;
+
+    const groupOf = (svg: string): string => {
+      const m = svg.match(new RegExp(`<g id="${SHOT_OVERLAY_ID}">.*?</g>`));
+      return m ? m[0] : '';
+    };
+
+    it('matches the group emitted by a full renderHoleSVG for the same framing + spray', () => {
+      const full = renderHoleSVG(hole, { ...focusOpts, spray });
+      const overlay = renderShotOverlaySVG(hole, { ...focusOpts, spray });
+      expect(overlay).toContain(`<g id="${SHOT_OVERLAY_ID}">`);
+      expect(overlay.length).toBeGreaterThan(`<g id="${SHOT_OVERLAY_ID}"></g>`.length);
+      expect(overlay).toBe(groupOf(full));
+    });
+
+    it('is deterministic', () => {
+      expect(renderShotOverlaySVG(hole, { ...focusOpts, spray })).toBe(
+        renderShotOverlaySVG(hole, { ...focusOpts, spray }),
+      );
+    });
   });
 
   // GS-putt-read: past the confident read the break line STOPS at a terminus dot — no faint

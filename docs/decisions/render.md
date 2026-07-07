@@ -917,3 +917,56 @@ unchanged (the camera-stability + biome-identity suites, which never arm rainbow
 new `_gs*`/`?param` hook (rainbow is baked from the loadout at the app boundary), so the test-hub
 guard is untouched. Full suite green (1033 tests); `scripts/rainbow-preview.mjs` added and eyeballed
 across verdant/inferno/frost.
+
+## GS-chip-cone / green-render batch — decision-lag, apron, all-biome contours, rough fit (2026-07-07)
+
+A play-test batch off two screenshots ("close putting/chipping still laggy", "green apron over the
+fairway", "not all biomes got contour overlays", "wedges chip weird distances / arc overlay too long or
+short", "deep rough & −28% hazards don't fit the biomes"). Five fixes, each isolated; all pure render
+except the chip-cone one (preview-only, no sim rng). Full suite stayed green (1033).
+
+- **Decision-lag — the shot cone redraws WITHOUT the scene.** The putt aim-nudge lag was fixed in #281,
+  but the SHOT-DECISION screen still called a full `render()` on every rAF frame of the pull-to-power
+  drag (`applyDrag → scheduleRender → render`), rebuilding the ENTIRE `buildScene` (flora, the heavy
+  GS-rough-gradient rough, green contour art, isolines) + reserialising a big SVG string per frame —
+  brutal on close chips/putts where the map is zoomed in and pinch-zoom re-rasterises each swap. Only
+  the aiming spray cone (+ power/legend HUD) moves per frame. Wrap the cone in a stable-id group
+  (`<g id="gs-shot-overlay">`), share its drawing via `shotConeParts()` so the full render and a new
+  `renderShotOverlaySVG()` are byte-identical, and have `applyDrag` swap just that group + two HUD spans
+  in place (`shotAimRefresh`). FOCUS/FOLLOW mode only — the camera is framed on the stable full-power
+  spread and holds still for the whole decision, so the overlay re-projects against the SAME framing;
+  whole-hole fit mode has no stable focus projector → `null` → full render. A `holeView` test asserts the
+  overlay group is byte-identical to the same group inside a full `renderHoleSVG`; a real-browser drive
+  confirmed the scene's first polygon is unchanged during a pull (no rebuild), the cone/HUD update, zero
+  console errors. The sibling of the #281 putt-overlay swap.
+- **Green apron no longer paints over the fairway.** The green's fringe/collar are OUTWARD offset rings
+  (`offsetPoly(poly, −6.5/−3.4)` grow the poly) meant to ease the green into the ROUGH, but they drew in
+  the feature loop AFTER the fairway pass — a green at the end of a fairway ribbon painted a dark apron
+  ring ON TOP of the bright fairway. Split those two rings out (`styleGreenSurround`) and draw them UNDER
+  the fairway pass; the fairway covers them at the green/fairway seam (its own collar handles that
+  junction), so the apron only shows in the rough. The green surface stays flush, on top.
+- **Contour relief on EVERY biome.** The relief map was gated on the fall-line ARROW field, which only
+  emits for cells steeper than 0.06 — so a gentle green on a low-`greenSlopeMax` world (frost/ocean at a
+  calm stop) had zero arrows and fell through to the flat legacy look. Every sculpted green has topo
+  ISOLINES (the generator gives each green ≥1 lobe on its own side stream; `contourIsolines` floors at 3
+  rings for any amplitude), so gate `contoured` on isolines instead — the relief now renders on every
+  biome; the chevrons still correctly stay OFF near-flat crests. (Rainbow Road still takes its own ribbon
+  branch and draws no green contour — deliberate, its unique look.)
+- **Rough/hazard blobs fit every world.** `styleFescue` hardcoded an olive body + tufts with no archetype
+  arg, so the SAME olive grass drew on frost snow / crystal scree / indigo void / ocean dune — and the
+  GS-rough-gradient pass pours fescue into every world's edge band + the whole ocean band. Derive the body
+  + tuft colours from the world's own rough Shade (`turfShade('rough', arch)`), a touch deeper than the
+  surrounding rough. And `DEEP_ROUGH` had no void/cetus row, so their calm-stop `deeprough` blobs fell
+  through to the verdant-green default — add an indigo cosmic-tangle (void) + sea-blue kelp (cetus) row.
+- **Chip cone matches the shot (`shotSpread`, preview-only).** The cone's near/far arcs were drawn at
+  `[low+along, high+along]` (the carry window SHIFTED by the wind term), but `resolveShot` clamps the
+  actual landing to the UN-shifted `[intended·lowFrac, intended·highFrac]` (wind only shifts the mean
+  INSIDE it). Harmless at full power (window ≫ wind), catastrophic at chip power (window tiny, wind
+  dominates) — a headwind chip drew a ~2–4y cone for a shot that clamps to ~8y while the aim line pointed
+  elsewhere. Draw the arcs at the true window `[low, high]`; only `expectedCarry` carries the wind bias,
+  inside the cone (verified across GW/60/64/SW at power 0.1..1). Also lowered the new-shot at-rest power
+  seed floor 0.25 → 0.1 so a short greenside chip defaults its preview to the pin.
+
+**Deferred (its own PR):** rough being too FORGIVING — a clean miss is only −10% carry and the heavy lies
+sit off the centreline, so you can bomb over everything and club choice never bites. That's the balance
+half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by the death-spiral harness.

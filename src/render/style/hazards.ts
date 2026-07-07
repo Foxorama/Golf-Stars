@@ -7,7 +7,7 @@
 import type { Vec } from '../../sim/course/contract';
 import { dist } from '../../sim/course/contract';
 import type { BiomeArchetype } from '../../sim/course/themes';
-import { fillFor, mixHex, SAND, WATER, LAVA } from '../palette';
+import { fillFor, mixHex, turfShade, SAND, WATER, LAVA } from '../palette';
 import {
   type Prim,
   type ArtFeel,
@@ -330,15 +330,23 @@ export function styleScatter(kind: string, poly: Vec[], art: ArtFeel, arch: Biom
   return out;
 }
 
-/** Thick FESCUE / native rough (GS-hazards-2): an olive-tan body with seeded upright grass blades so
- *  the deep rough reads as wispy native grass, not a flat blob. The blade COUNT scales with the
- *  PROJECTED patch size (blades are screen-px strokes), so this must run on its own per-patch
- *  stream (see the call site) — on the shared stream a zoom step changed the count and re-rolled
- *  every draw downstream (trees, water, lava — the decor-jitter bug). */
-export function styleFescue(poly: Vec[], rng: () => number): Prim[] {
+/** Thick FESCUE / native rough (GS-hazards-2): a deep native-grass body with seeded upright tufts so
+ *  the deep rough reads as wispy native growth, not a flat blob. PER-WORLD (GS-rough-biome-fit): the
+ *  body + tuft colours are DERIVED from the world's own rough Shade, not a hardcoded olive — fescue is
+ *  poured into EVERY world's edge band + the whole ocean band by the rough-gradient pass, so a single
+ *  olive tuft field clashed on frost/crystal/void/ocean. Deriving from `turfShade('rough', arch)` sits
+ *  the fescue naturally on each world's ground, a touch DEEPER than the surrounding rough so it still
+ *  reads as trouble. The tuft COUNT scales with the PROJECTED patch size (tufts are screen-px strokes),
+ *  so this must run on its own per-patch stream (see the call site) — on the shared stream a zoom step
+ *  changed the count and re-rolled every draw downstream (trees, water, lava — the decor-jitter bug). */
+export function styleFescue(poly: Vec[], arch: BiomeArchetype, rng: () => number): Prim[] {
+  const r = turfShade('rough', arch);
+  const body = mixHex(r.base, r.dark, 0.55); // a touch deeper than the surrounding rough
+  const tuftHi = mixHex(r.light, r.base, 0.35);
+  const tuftLo = r.dark;
   const out: Prim[] = [
-    { t: 'poly', pts: poly, fill: '#7c8c48' },
-    { t: 'poly', pts: poly, fill: 'none', stroke: 'rgba(40,52,20,0.4)', sw: 1 },
+    { t: 'poly', pts: poly, fill: body },
+    { t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(r.ink, 0.4), sw: 1 },
   ];
   const b = bboxOf(poly);
   const blades = Math.max(6, Math.round((b.maxX - b.minX) * (b.maxY - b.minY) * 0.012));
@@ -348,7 +356,7 @@ export function styleFescue(poly: Vec[], rng: () => number): Prim[] {
     const y = b.minY + rng() * (b.maxY - b.minY);
     const h = 2.5 + rng() * 3.5;
     const lean = (rng() - 0.5) * 2.2;
-    inner.push({ t: 'line', a: [x, y], b: [x + lean, y - h], stroke: rng() < 0.5 ? '#a7b86a' : '#6a7a3c', sw: 1, round: true });
+    inner.push({ t: 'line', a: [x, y], b: [x + lean, y - h], stroke: rng() < 0.5 ? tuftHi : tuftLo, sw: 1, round: true });
   }
   out.push({ t: 'clip', clip: poly, children: inner });
   return out;
@@ -357,8 +365,11 @@ export function styleFescue(poly: Vec[], rng: () => number): Prim[] {
 /** DEEP ROUGH look per world ARCHETYPE (GS-deep-rough) — a DARK, dense body (deeper than the world's
  *  fescue/rough so it reads as trouble at a glance) with a themed surface texture: tangled grass
  *  blades (grassy worlds), packed snow mounds (frost), upright shard splinters (crystal), or
- *  ember-flecked cinder clumps (inferno). Ocean never uses this (its deep rough is `water`); the
- *  lost-rough worlds (void/cetus) never arm it — so those three need no row. */
+ *  ember-flecked cinder clumps (inferno). Ocean never uses this (its deep rough is `water`).
+ *  void/cetus DO get deeprough blobs on a CALM stop — the rough-gradient pass runs whenever the hole
+ *  isn't lost-rough (wildness < 0.55), and with no biome.deepRough set it defaults heavyKind to
+ *  'deeprough' — so they need their own rows (GS-rough-biome-fit); without one they fell through to
+ *  the verdant-green default and painted green tangle on the indigo void / abyssal-blue cetus ground. */
 type DeepRoughMark = 'blade' | 'mound' | 'shard' | 'clump';
 interface DeepRoughLook {
   base: string;
@@ -378,6 +389,11 @@ const DEEP_ROUGH: Partial<Record<BiomeArchetype, DeepRoughLook>> = {
   crystal: { base: '#2c3652', shade: '#1a2238', ink: 'rgba(12,18,34,0.5)', mark: 'shard', markCols: ['#bfe0ea', '#7fa8c8'], glow: 'rgba(180,220,255,0.12)' },
   tempest: { base: '#2e3826', shade: '#1c2418', ink: 'rgba(8,14,6,0.5)', mark: 'blade', markCols: ['#3f4e30', '#6f7d58'] },
   fungal: { base: '#173a28', shade: '#0d2418', ink: 'rgba(4,18,10,0.5)', mark: 'clump', markCols: ['#2f7a54', '#5fd49e'], glow: 'rgba(120,240,180,0.13)' },
+  // A dark indigo cosmic tangle with a faint violet glow so it reads as trouble on the void's indigo
+  // garden ground (not the old verdant-green default).
+  void: { base: '#1a1038', shade: '#0f0822', ink: 'rgba(6,4,16,0.55)', mark: 'clump', markCols: ['#3a2a66', '#7a5fd0'], glow: 'rgba(150,120,255,0.12)' },
+  // A deep sea-blue kelp-tangle with a soft cyan glow, sitting on the cetus abyssal-blue clifftop rough.
+  cetus: { base: '#123048', shade: '#0b2032', ink: 'rgba(4,14,24,0.55)', mark: 'blade', markCols: ['#1e5068', '#57b4d8'], glow: 'rgba(90,200,255,0.12)' },
 };
 const DEEP_ROUGH_DEFAULT: DeepRoughLook = { base: '#2c4014', shade: '#1a2a0c', ink: 'rgba(10,20,4,0.5)', mark: 'blade', markCols: ['#3e5a1e', '#597e2c'] };
 
