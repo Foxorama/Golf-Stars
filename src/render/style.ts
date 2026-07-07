@@ -61,7 +61,7 @@ import {
 } from './style/shared';
 import { landHullCourse, lostPlatformsCourse, mergedHazardsFor } from './style/land';
 import { rainbowRibbon, styleFairways, styleTee } from './style/fairway';
-import { styleGreen, greenSlopeArt } from './style/green';
+import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
 import {
   styleSandFamily,
   styleLiquidFamily,
@@ -498,6 +498,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // face + cast shadow UNDER the fairway fill — so it reads with depth like the deep-stop pads. Deep
     // stops already sit on extruded platforms, so gate to !lostHole. Pure geometry (no rng).
     if (calmShelf) for (const sp of fairwaySps) prims.push(...raisedShelf(sp, proj.scale, shelfLook));
+    // GS-green-apron: the green's outward fringe/collar rings ease it into the ROUGH, but they grow
+    // PAST the green edge — a green at the end of a fairway ribbon painted a dark apron ring ON TOP of
+    // the bright fairway. Draw that surround HERE, UNDER the fairway pass (the fairway then covers it at
+    // the green/fairway junction, its own collar handling that seam) so the apron only ever shows in the
+    // rough. The green surface itself is still drawn flush, on top, in the feature loop below.
+    for (const f of hole.features) {
+      if (f.kind === 'green') prims.push(...styleGreenSurround(projPoly(f.poly, proj), collar, grFringe));
+    }
     prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined));
     // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
     // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
@@ -527,7 +535,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
     // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
-    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, collar, grFringe, arch, greenSlopeArt(hole, f.poly, proj)));
+    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, arch, greenSlopeArt(hole, f.poly, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
   }

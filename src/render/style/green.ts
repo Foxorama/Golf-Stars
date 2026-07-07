@@ -23,24 +23,32 @@ import {
   LIGHT_UL,
 } from './shared';
 
+/** The green's two OUTWARD ease-in rings — an outer first-cut fringe, then the darker collar/apron —
+ *  a uniform-width OFFSET (not a centroid scale) so a long ice-shelf or kidney green keeps an even
+ *  surround instead of ballooning at the ends. Split OUT of styleGreen (GS-green-apron) so the app can
+ *  draw them UNDER the fairway pass: they grow past the green edge, and a green sitting at the end of a
+ *  fairway ribbon painted them as a dark ring ON TOP of the bright fairway. Drawn under the fairway they
+ *  ease the green into the ROUGH (where they belong) and are simply covered where the fairway meets the
+ *  green — the fairway's own collar handles that junction. */
+export function styleGreenSurround(poly: Vec[], collar: string, fringe: string): Prim[] {
+  return [
+    { t: 'poly', pts: offsetPoly(poly, -6.5), fill: fringe },
+    { t: 'poly', pts: offsetPoly(poly, -3.4), fill: collar },
+  ];
+}
+
 export function styleGreen(
   poly: Vec[],
   art: ArtFeel,
   s: Shade,
-  collar: string,
-  fringe: string,
   arch: BiomeArchetype,
   slope?: GreenSlopeArt,
 ): Prim[] {
   const c = centroidOf(poly);
-  const out: Prim[] = [
-    // Two nested rings ease the green into the land: an outer first-cut fringe, then the darker
-    // collar/apron — a uniform-width OFFSET (not a centroid scale) so a long ice-shelf or kidney
-    // green keeps an even surround instead of ballooning at the ends.
-    { t: 'poly', pts: offsetPoly(poly, -6.5), fill: fringe },
-    { t: 'poly', pts: offsetPoly(poly, -3.4), fill: collar },
-    { t: 'poly', pts: poly, fill: s.base },
-  ];
+  // The outward fringe/collar rings that ease the green into the land are drawn separately, UNDER the
+  // fairway pass (styleGreenSurround) — so they never paint over the fairway. styleGreen starts at the
+  // green surface itself.
+  const out: Prim[] = [{ t: 'poly', pts: poly, fill: s.base }];
   // Softened like the fairway's mowTones (GS-mow-blend) — the green used to stripe at FULL
   // light/dark contrast, the harshest cut on the map. A touch stronger than the fairway's blend
   // (the green is the small showpiece surface), dark muted below light. The wide-value indigo/cyan
@@ -50,7 +58,14 @@ export function styleGreen(
   // Green SLOPE (GS-greens-3): shade the LOW side darker + the HIGH side lighter and lay fall-line
   // arrows pointing downhill, so the tilt reads at a glance (the graphic IS the slope the sim rolls
   // on). `slope.dir` is the screen-space DOWNHILL unit; `mag` 0..~0.7 its steepness.
-  const contoured = !!(slope?.arrows && slope.arrows.length > 0);
+  // A green counts as CONTOURED (draws the full relief map) when it has topo ISOLINES — present on
+  // EVERY sculpted green (the generator gives every green ≥1 contour lobe on its own side stream, and
+  // contourIsolines floors at 3 rings for any amplitude). It used to gate on the fall-line ARROWS,
+  // which are only emitted for cells steeper than 0.06 — so a GENTLE green (low-greenSlopeMax worlds
+  // like frost/ocean at a calm stop) had zero arrows and fell through to the flat legacy look, i.e.
+  // "not all biomes got contour overlays". Isolines exist there, so the relief now renders on all of
+  // them; the chevron field still correctly stays OFF near-flat crests (GS-green-contour-allbiomes).
+  const contoured = !!((slope?.iso && slope.iso.length > 0) || (slope?.arrows && slope.arrows.length > 0));
   // A CONTOURED green mutes its mow stripe hard (S+ round 2): the full-contrast bands fought the
   // relief art — gradient, rings and arrows all read against striped noise (the frost screenshot).
   // The stripe stays as a whisper of turf texture; the relief owns the value range now.
