@@ -161,10 +161,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);
     the **Unending Universe** is the ONLY endless format (`flat`/`ladder` retired — `getFormat`
     folds their ids).
-  - Endless survival is a per-hole par-relative bar (`endless.ts`), threaded IDENTICALLY through
-    `playStop` and the interactive `holeComplete` (contract 2). Presentation is a running golf
-    round (gross/to-par/NET via a club-set handicap); the starting CLUB SET is the mode's
-    difficulty axis; finished runs bank into the persisted `endlessRuns` leaderboard.
+  - Endless survival is a PER-SET (per set-of-four = per stop) CUMULATIVE bar (GS-set-survival,
+    `endless.ts`): the four-hole total `Σ(strokes−par)` must clear the set's allowance, RESET each
+    set — so one blow-up hole (capped at par+MAX_OVER_PAR) never ends the run, only a set boundary
+    does. Allowance ramps every two sets: +4 (sets 1–2) → +3 → +2 → +1 → E → −1 → −2 → −3, capped
+    at −4 (`ENDLESS_SET_STEPS`, keyed off `run.stopIndex` = holesSurvived/4). Threaded IDENTICALLY
+    through `playStop` (plays the FULL set, no early break) and the interactive `holeComplete`
+    (contract 2). DEPTH (sets cleared / holes reached) is the SOLE metric — there is NO run-total
+    score (gross/to-par/net removed); the leaderboard ranks purely on depth (ties → most recent).
+    The starting CLUB SET is the difficulty axis (a weaker bag makes the thresholds harder, no
+    handicap math); finished runs bank into the persisted `endlessRuns` leaderboard. `grossStrokes`/
+    `parPlayed` are retained on the Run/record for save-shape stability but never shown or ranked on.
   - WARP fast-forwards only PROVEN holes under the hidden automatic-birdie rule: `canWarpStop`
     requires a contiguous warp prefix fitting under `endlessBestHoles` — new ground is always
     hand-played; a warped stop banks NO milestone shards and never grants the ace ship; leaderboard

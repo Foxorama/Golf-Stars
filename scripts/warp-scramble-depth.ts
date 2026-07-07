@@ -37,7 +37,6 @@ import {
 } from '../src/sim/rpg/run';
 import type { Run } from '../src/sim/rpg/run';
 import { usableBag } from '../src/sim/rpg/economy';
-import { passesEndlessGate } from '../src/sim/rpg/endless';
 import type { PlayedHole } from '../src/sim/round';
 
 /** One hole with an N-ball scramble on every stroke (swings + putts). balls=1 ≈ the solo AI. */
@@ -147,12 +146,9 @@ function warpRun(seed: number, balls: number, maxStops = 100): number {
     const course = currentCourse(run);
     const rng = new Rng(`${course.seed}:play`);
     const opts = playerHoleOpts(run);
-    const played: PlayedHole[] = [];
-    for (let h = 0; h < course.holes.length; h++) {
-      const p = warpHole(course.holes[h]!, rng, opts, balls, endlessAttackArmed(run, h));
-      played.push(p);
-      if (!passesEndlessGate(p.record.par, p.record.strokes, p.holed, run.holesSurvived + h + 1)) break;
-    }
+    const attack = endlessAttackArmed(run);
+    // GS-set-survival: play the whole set of four (no mid-set death); finishStop scores the cumulative total.
+    const played: PlayedHole[] = course.holes.map((h) => warpHole(h, rng, opts, balls, attack));
     const fin = finishStop(run, course, played);
     run = fin.run;
     if (run.status !== 'active') break;

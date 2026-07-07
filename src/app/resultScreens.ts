@@ -115,13 +115,13 @@ export function resultScreen(): string {
   let body: string;
   if (gate) {
     const r = state.run;
-    const setLine = `<p style="font-size:12.5px;opacity:.82;margin:0;">This set · gross <b>${res.gross}</b> · <b>+${res.creditsEarned}</b> credits${
+    const setLine = `<p style="font-size:12.5px;opacity:.82;margin:0;">Set cleared · <b>+${res.creditsEarned}</b> credits${
       res.aces ? ` · ⛳ ${res.aces} ace${res.aces > 1 ? 's' : ''}` : ''
     }</p>`;
     body =
       endlessScoreCard(
-        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-        { title: 'Round so far', next: true },
+        { holesCleared: r.holesSurvived, stopIndex: r.stopIndex, tier: r.bagTier ?? 'common' },
+        { title: 'Your run', next: true },
       ) +
       setLine +
       endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common', title: 'Your recent runs' });
@@ -290,8 +290,8 @@ export function gameoverScreen(): string {
   // leaderboard (which now includes this just-finished run, prepended by `runEndUpdates`).
   const endlessCard = gate
     ? endlessScoreCard(
-        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-        { title: 'Final round' },
+        { holesCleared: r.holesSurvived, stopIndex: r.stopIndex, tier: r.bagTier ?? 'common' },
+        { title: 'Final run' },
       )
     : '';
   const endlessBoard = gate

@@ -16,9 +16,10 @@ import { eventDescFor } from './travelScreens';
 import { difficultyPips, zoneProfile } from '../sim/course/zones';
 import { archetypeFor, themeById } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
-import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleNumber, endlessHolePassed, holeGateArmed } from '../sim/rpg/run';
+import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed } from '../sim/rpg/run';
 import { getFormat, isMatchplayBoss, isTeamDuelBoss } from '../sim/rpg/formats';
-import { endlessGateLabel, endlessGateOverPar } from '../sim/rpg/endless';
+import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar } from '../sim/rpg/endless';
+import type { EndlessCardData } from '../render/endlessCards';
 import { arcSurvivorTarget } from '../sim/rpg/competition';
 import { leaderboard, runField } from '../sim/rpg/league';
 import { getGolfer } from '../sim/rpg/golfers';
@@ -26,7 +27,6 @@ import { competitorsCard, leaderboardHTML, opponentBadge } from '../render/golfe
 import { endlessRecordsBoard, endlessScoreCard } from '../render/endlessCards';
 import { renderHoleSVG } from '../render/holeView';
 import type { PlayedHole } from '../sim/round';
-import type { BagTier } from '../sim/rpg/bag';
 
 // View-only module state (like settingsOpen / travelView.inspectRouteId) — reset to the arc step +
 // closed popup whenever we (re-)enter the intro, so a fresh stop always opens on the arc. No
@@ -124,15 +124,13 @@ function introShared(): {
     if (boss && isMatchplayBoss(boss)) return '⚔ Win the <b>matchplay knockout</b> to advance — the field pairs best-vs-worst, so your finish so far set your opponent.';
     if (boss) return `🎯 <b>${cut} pts</b> over ${c.holes.length} holes to beat the boss.`;
     if (format.holeGate) {
-      // The Unending Universe (GS-unending): the stakes are the PER-HOLE survival bar. Say the
-      // bar for these exact holes (and flag mid-stop tightening, which happens every 8 holes).
-      const first = endlessGateOverPar(endlessHoleNumber(state.run, 0));
-      const last = endlessGateOverPar(endlessHoleNumber(state.run, c.holes.length - 1));
-      const bar =
-        first === last
-          ? `<b>${endlessGateLabel(first)}</b> or better on every hole`
-          : `<b>${endlessGateLabel(first)}</b> or better — tightening to <b>${endlessGateLabel(last)}</b> mid-set`;
-      return `💀 Holes ${endlessHoleNumber(state.run, 0)}–${endlessHoleNumber(state.run, c.holes.length - 1)} · survive ${bar}. One miss ends the run.`;
+      // The Unending Universe (GS-set-survival): the stakes are the whole SET OF FOUR's cumulative
+      // total. A blow-up hole won't end you — the four-hole total is what has to clear the allowance.
+      const setNo = state.run.stopIndex + 1;
+      const target = endlessSetGateOverPar(state.run.stopIndex);
+      const h0 = endlessHoleNumber(state.run, 0);
+      const h1 = endlessHoleNumber(state.run, c.holes.length - 1);
+      return `💀 Set ${setNo} · holes ${h0}–${h1}. Finish the set at <b>${endlessSetLabel(target)} or better</b> across the four holes to survive — one blow-up won't wreck you, the set total is what counts.`;
     }
     if (format.winnable) {
       const target = arcSurvivorTarget(state.run.stopIndex, ascensionCutBonus(state.run.ascension));
@@ -152,23 +150,18 @@ export function introScreen(): string {
 }
 
 /**
- * The Unending-Universe running GOLF ROUND (GS-golf-score) through a stop's holes so far: the run's
- * banked gross/par (prior stops) plus the SURVIVED prefix of this stop's holes — counted exactly as
- * `finishStop` will, so the mid-round card and the final record never disagree. `playedSoFar` includes
- * the hole just finished (which may be the busting one — it's excluded, like `holesSurvived`).
+ * The Unending-Universe progress card data (GS-set-survival) mid-stop: sets already cleared, plus THIS
+ * set's live cumulative to-par over the holes played so far (`playedSoFar` includes the hole just
+ * finished). No mid-set death anymore, so every played hole counts toward the running set total.
  */
-export function endlessRoundSoFar(playedSoFar: PlayedHole[]): { holes: number; gross: number; par: number; tier: BagTier } {
+export function endlessRoundSoFar(playedSoFar: PlayedHole[]): EndlessCardData {
   const r = state.run;
-  let holes = r.holesSurvived;
-  let gross = r.grossStrokes;
-  let par = r.parPlayed;
-  for (let i = 0; i < playedSoFar.length; i++) {
-    if (!endlessHolePassed(r, i, playedSoFar[i]!)) break;
-    holes++;
-    gross += playedSoFar[i]!.record.strokes;
-    par += playedSoFar[i]!.record.par;
-  }
-  return { holes, gross, par, tier: r.bagTier ?? 'common' };
+  return {
+    holesCleared: r.holesSurvived,
+    stopIndex: r.stopIndex,
+    tier: r.bagTier ?? 'common',
+    live: { setToPar: endlessSetToPar(playedSoFar), thru: playedSoFar.length },
+  };
 }
 
 /**
@@ -179,17 +172,17 @@ export function endlessRoundSoFar(playedSoFar: PlayedHole[]): { holes: number; g
  */
 function arcIntroScreen(): string {
   const { c, zone, theme, col, par, rar, diffPips, notes, objective } = introShared();
-  // The Unending Universe is scored like a round of golf (GS-golf-score): the "field" slot shows your
-  // RUNNING round (gross/to-par/net) + the personal last-runs leaderboard grouped by starting club set,
-  // instead of the voyage's ghost competitor board. Gated to the gate format so the voyage is untouched.
+  // The Unending Universe tracks DEPTH (GS-set-survival): the "field" slot shows your progress card
+  // (sets cleared + this set's target) + the personal last-runs leaderboard grouped by starting club
+  // set, instead of the voyage's ghost competitor board. Gated to the gate format (voyage untouched).
   const gate = holeGateArmed(state.run);
   let field: string;
   if (gate) {
     const r = state.run;
     field =
       endlessScoreCard(
-        { holes: r.holesSurvived, gross: r.grossStrokes, par: r.parPlayed, tier: r.bagTier ?? 'common' },
-        { title: r.holesSurvived > 0 ? 'Round so far' : 'Your round', next: true },
+        { holesCleared: r.holesSurvived, stopIndex: r.stopIndex, tier: r.bagTier ?? 'common' },
+        { title: r.holesSurvived > 0 ? 'Your run' : 'New run', next: true },
       ) + endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common' });
   } else {
     const board = leaderboard(state.run);
