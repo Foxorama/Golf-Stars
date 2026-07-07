@@ -484,14 +484,15 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push(...platformCliffs(roadSps, deepen, cliffRng, RAINBOW_CLIFF).prims);
   }
   if (voidGlow && !rainbow) for (const sp of fairwaySps) glowRings(sp);
+  // Rainbow Road: ONE continuous band grid (the main corridor's bbox) shared by the fairway, GREEN and
+  // TEE ribbons — so the rainbow bands run seamlessly tee→fairway→green as a single track instead of
+  // three separately-phased blobs with mismatched stripe scales at each seam (the "fairway/green don't
+  // mesh" read). Computed once here; the feature loop below reuses it for the green + tee.
+  const rainbowGrid = rainbow && fairwaySps[0] ? bboxOf(fairwaySps[0]) : null;
+  const rainbowBandY = rainbowGrid ? rainbowGrid.minY : 0;
+  const rainbowBandH = rainbowGrid ? Math.max(6, (rainbowGrid.maxY - rainbowGrid.minY) / 9) : 6;
   if (rainbow) {
-    // Rainbow Road: paint every fairway piece as a rainbow ribbon, all riding ONE continuous band grid
-    // (the main corridor's bbox) so the apron's bands line up with the corridor — one seamless road.
-    if (fairwaySps[0]) {
-      const fb = bboxOf(fairwaySps[0]);
-      const bandH = Math.max(6, (fb.maxY - fb.minY) / 9);
-      for (const sp of fairwaySps) prims.push(...rainbowRibbon(sp, fb.minY, bandH));
-    }
+    if (rainbowGrid) for (const sp of fairwaySps) prims.push(...rainbowRibbon(sp, rainbowBandY, rainbowBandH));
   } else {
     // Two-tier raised fairway SHELF (GS-cetus-6): on a CALM cetus/void stop (the whole play-bounds is
     // playable rough, so it can't be islands) lift the corridor onto a shelf above the rough — a rock
@@ -517,15 +518,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
     const sp = projPoly(f.poly, proj);
     if (rainbow) {
-      // The green & tee are part of the rainbow ribbon; scatter surfaces (ice/crystal/waste) are off
-      // the road → bare void, so they're dropped (they read as OOB, matching the sim's lie rule).
-      if (f.kind === 'green') {
-        const gb = bboxOf(sp);
-        prims.push(...rainbowRibbon(sp, gb.minY, Math.max(5, (gb.maxY - gb.minY) / 6)));
-      } else if (f.kind === 'tee') {
-        const tb = bboxOf(sp);
-        prims.push(...rainbowRibbon(sp, tb.minY, Math.max(4, (tb.maxY - tb.minY) / 4)));
-      }
+      // The green & tee are part of ONE continuous rainbow ribbon — they ride the SAME band grid as
+      // the fairway (computed above) so the stripes line up across every seam. Scatter surfaces
+      // (ice/crystal/waste) are off the road → bare void, so they're dropped (they read as OOB,
+      // matching the sim's lie rule).
+      if (f.kind === 'green' || f.kind === 'tee') prims.push(...rainbowRibbon(sp, rainbowBandY, rainbowBandH));
       continue;
     }
     if (voidGlow && f.kind === 'green') glowRings(sp);

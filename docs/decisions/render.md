@@ -918,6 +918,15 @@ new `_gs*`/`?param` hook (rainbow is baked from the loadout at the app boundary)
 guard is untouched. Full suite green (1033 tests); `scripts/rainbow-preview.mjs` added and eyeballed
 across verdant/inferno/frost.
 
+**GS-rainbow-road-2 follow-up (wide road, no hazards, prismatic pillars).** The polish above still
+drew the biome's THIN corridor, so a good shot rolled off into the void, and it kept the biome's
+bunkers/seams. The geometry fix lives in the sim (`applyRainbowRoad` widens the road + clears hazards
+in `currentCourse`; see competition.md), so the renderer just draws the wider hazard-free hole. Two
+render-only touches here: the green + tee ribbons ride the SAME band grid as the fairway (`rainbowGrid`
+computed once in `buildScene`, reused in the feature loop) — one continuous track, not three
+separately-phased blobs; and `RAINBOW_CLIFF` (`style/platforms.ts`) is recoloured to a prismatic
+jewel-hue descent so the support pillars stop reading as a Void asteroid copy. Both gated on `rainbow`.
+
 ## GS-chip-cone / green-render batch — decision-lag, apron, all-biome contours, rough fit (2026-07-07)
 
 A play-test batch off two screenshots ("close putting/chipping still laggy", "green apron over the

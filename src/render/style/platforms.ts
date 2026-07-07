@@ -256,21 +256,23 @@ export const VOID_CLIFF: CliffLook = {
   shadow: 'rgba(3,1,10,0.5)',
   contact: 'rgba(6,3,16,0.36)',
 };
-// Rainbow Road (GS-rainbow-polish): the ribbon floats on a PRISMATIC crystal cliff — a lit magenta
-// brink fading through violet into the deep indigo void, so the road reads as a raised glowing track
-// with real side-on depth (the same layered-cliff treatment Cetus/Void get), not a flat decal. The
-// bright bands whisper the rainbow of the road above; the low strata sink into space.
+// Rainbow Road (GS-rainbow-road-2): the ribbon rests on a PRISMATIC crystal buttress — the support
+// pillars must read as the rainbow world's OWN structure, not a recoloured void asteroid. So the
+// strata descend through genuinely DIFFERENT jewel hues (lit rose-magenta → violet → periwinkle →
+// teal-blue → deep blue → indigo abyss), an opalescent gradient that refracts the road's spectrum,
+// with prismatic pink/cyan lip highlights and dust. Distinct at a glance from Void's monochrome
+// violet cliff and Cetus's blue clifftop. Same geometry (`platformCliffs`), different rock.
 export const RAINBOW_CLIFF: CliffLook = {
-  strata: ['#7a4bb0', '#5e3a95', '#452c78', '#31215a', '#1f163d', '#100a22'],
-  deepMix: '#070417',
-  lipA: 'rgba(255,180,235,0.9)',
-  lipB: 'rgba(235,215,255,0.72)',
-  crackDark: 'rgba(10,4,26,0.5)',
-  crackLit: 'rgba(210,150,255,0.26)',
-  dustA: 'rgba(255,215,245,0.5)',
-  dustB: 'rgba(170,150,255,0.42)',
-  shadow: 'rgba(6,2,18,0.5)',
-  contact: 'rgba(10,4,26,0.36)',
+  strata: ['#ef5aa6', '#b057cf', '#6f64d8', '#4a80c0', '#2f4f86', '#141a44'],
+  deepMix: '#080622',
+  lipA: 'rgba(255,170,225,0.95)',
+  lipB: 'rgba(180,240,255,0.8)',
+  crackDark: 'rgba(10,4,30,0.5)',
+  crackLit: 'rgba(120,235,255,0.3)',
+  dustA: 'rgba(255,205,240,0.55)',
+  dustB: 'rgba(150,230,255,0.5)',
+  shadow: 'rgba(8,3,24,0.5)',
+  contact: 'rgba(12,5,32,0.36)',
 };
 
 /**

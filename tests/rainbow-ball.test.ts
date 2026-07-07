@@ -7,7 +7,10 @@ import {
 } from '../src/sim/rpg/economy';
 import { isRoadLie, ROAD_LIES } from '../src/sim/shot';
 import { generateCourse } from '../src/sim/course/generate';
+import { applyRainbowRoad } from '../src/sim/rpg/rainbow';
+import { startRun } from '../src/sim/rpg/run';
 import { playCourse, type PlayHoleOptions } from '../src/sim/round';
+import type { Vec } from '../src/sim/course/contract';
 import { playMatchStop, playTeamMatchStop, type TeamSetup } from '../src/sim/rpg/match';
 import { bossShotMods, GOLFERS } from '../src/sim/rpg/golfers';
 import { Rng } from '../src/sim/rng';
@@ -78,6 +81,46 @@ describe('GS-rainbow — the legendary Rainbow Ball', () => {
         }
       }
     }
+  });
+
+  it('applyRainbowRoad widens the road and clears every hazard (GS-rainbow-road-2)', () => {
+    const polyArea = (p: Vec[]): number => {
+      let a = 0;
+      for (let i = 0; i < p.length; i++) {
+        const q = p[(i + 1) % p.length]!;
+        a += p[i]![0] * q[1] - q[0] * p[i]![1];
+      }
+      return Math.abs(a) / 2;
+    };
+    for (let s = 0; s < 20; s++) {
+      const raw = generateCourse(`rainbow:widen:${s}`, { holes: 6, biome: 'verdant', wildness: 0.8 });
+      const rb = applyRainbowRoad(raw);
+      raw.holes.forEach((hole, i) => {
+        const out = rb.holes[i]!;
+        // Every hazard is cleared — a clean road/void boundary, no hidden traps under the wide ribbon.
+        expect(out.hazards.length).toBe(0);
+        // Each road surface is strictly larger than the one the generator drew (it grew outward).
+        for (const kind of ['fairway', 'green', 'tee'] as const) {
+          const before = hole.features.filter((f) => f.kind === kind);
+          const after = out.features.filter((f) => f.kind === kind);
+          const areaBefore = before.reduce((n, f) => n + polyArea(f.poly), 0);
+          const areaAfter = after.reduce((n, f) => n + polyArea(f.poly), 0);
+          if (areaBefore > 0) expect(areaAfter).toBeGreaterThan(areaBefore);
+        }
+      });
+    }
+  });
+
+  it('a rainbow run generates hazard-free courses via currentCourse (the in-game path)', async () => {
+    const { currentCourse } = await import('../src/sim/rpg/run');
+    // A run that owns the Rainbow Ball: every stop the sim + renderer see is a clean wide road.
+    let run = startRun(11, 'unending');
+    run = { ...run, loadout: { ...run.loadout, rainbowRoad: true } };
+    const course = currentCourse(run);
+    for (const hole of course.holes) expect(hole.hazards.length).toBe(0);
+    // Same run WITHOUT the ball keeps its ordinary hazards (the transform is gated on the flag).
+    const plain = currentCourse({ ...run, loadout: { ...run.loadout, rainbowRoad: false } });
+    expect(plain.holes.some((h) => h.hazards.length > 0)).toBe(true);
   });
 
   it('boss duels apply rainbow road to the boss too (best-ball & scramble fair)', () => {
