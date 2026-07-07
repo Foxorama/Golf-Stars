@@ -523,10 +523,15 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     // Under the per-club wildness model, longer clubs spray more — so pure distance is
     // double-edged. The small −5% dispersion keeps the Power Cell a genuine upgrade
     // (a power-up must improve scoring) rather than a wash.
+    // The +carry is recorded on `distanceClubBonus` too (like the talents / Driver Dan), so a reward
+    // club bought or salvaged LATER inherits this boost — otherwise a new club (even a higher tier one)
+    // lands short of the starting distance clubs the boost already grew (the "legendary 3W shorter than
+    // the epic 4W" bug). `boostDistanceClubs` grows the current bag; `distanceClubBonus` carries it forward.
     apply: (m) => ({
       ...m,
       bag: boostDistanceClubs(m.bag, 12),
       dispersionMult: m.dispersionMult * 0.95,
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 12,
       perks: [...m.perks, 'power-cell'],
     }),
   },
@@ -759,6 +764,8 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       ...m,
       bag: boostDistanceClubs(m.bag, 12),
       dispersionMult: m.dispersionMult * 0.96,
+      // Carry the +12 forward so later reward clubs inherit it too (see Power Cell / GS-clubs).
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 12,
       perks: [...m.perks, 'range-booster'],
     }),
   },
@@ -896,6 +903,8 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       ...m,
       bag: boostDistanceClubs(m.bag, 24),
       dispersionMult: m.dispersionMult * 0.9,
+      // Carry the +24 forward so a reward club bought after the Nova inherits it (see Power Cell / GS-clubs).
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 24,
       perks: [...m.perks, 'nova-driver'],
     }),
   },
@@ -1340,9 +1349,15 @@ export const CLUB_ITEMS: readonly ShopItem[] = CLUB_SETS.flatMap((set) =>
     const tierWord = set.rarity === 'common' ? 'A fresh' : `A ${set.rarity}`;
     const carry = base.carry + (isDistanceType(type) ? set.carryBonus : 0);
     const isPutt = type === 'putter';
+    // A DISTANCE club's real carry depends on the buyer's distance boosts (distanceClubBonus), which this
+    // static catalogue can't see — so the fixed `carry` here would understate an upgraded bag and read as
+    // "the higher-tier club hits shorter". The loadout-aware yardage lives on the shop card BADGE
+    // (clubOfferNote); the desc states it only for SCORING clubs, where the carry is boost-independent.
     const desc = isPutt
       ? `${tierWord} ${set.label} putter — a steadier, wider make-window · equips into your bag`
-      : `${tierWord} ${base.name} (~${carry} yd) · equips into your bag`;
+      : isDistanceType(type)
+        ? `${tierWord} ${base.name} · equips into your bag`
+        : `${tierWord} ${base.name} (~${carry} yd) · equips into your bag`;
     return {
       id,
       name: set.label ? `${set.label} ${base.name}` : base.name,
@@ -1398,6 +1413,45 @@ export function offerableClubs(loadout: PlayerLoadout): ShopItem[] {
     // Owned → only a real upgrade: a higher-rarity distance club (reach) or putter (make-window).
     return (isDistanceType(type) || type === 'putter') && rarityRank(it.rarity) > rarityRank(cur.rarity);
   });
+}
+
+/**
+ * The standalone "flat-stick" putter items — the shop putter LADDER whose value is a wider make-window
+ * (`puttBoost`). Unlike the reward-club putters (gated by `offerableClubs`), these are plain SHOP_ITEMS,
+ * so nothing stopped the shop offering one you'd effectively already outgrown: a player holding an epic
+ * bag putter (or the legendary Pinseeker) was still dangled the epic Tour Putter, which reads as a
+ * duplicate ("an epic putter for sale when I already have an epic putter"). Kept as an explicit list so
+ * the read-range Book and the green-reading caddies (also 'putting'-tagged) are never mistaken for one.
+ */
+export const FLATSTICK_ITEM_IDS: readonly string[] = ['putting-grip', 'mallet-putter', 'tour-putter', 'pinseeker-putter'];
+
+/**
+ * The rarity rank of the best putter the loadout already holds — the equipped bag putter AND any owned
+ * flat-stick item. The shop offers a flat-stick only as a STRICT rarity upgrade over this, mirroring the
+ * reward-club putter rule and the `bagTier` floor (a purple bag already flooring reward clubs): a putter
+ * you effectively own is never dangled again.
+ */
+export function putterFloorRank(loadout: PlayerLoadout): number {
+  let rank = 0;
+  const bagPutter = loadout.bag.find((c) => c.id === 'putter');
+  if (bagPutter) rank = Math.max(rank, rarityRank(bagPutter.rarity));
+  for (const id of loadout.perks ?? []) {
+    if (FLATSTICK_ITEM_IDS.includes(id)) {
+      const it = SHOP_ITEMS.find((s) => s.id === id);
+      if (it) rank = Math.max(rank, rarityRank(it.rarity));
+    }
+  }
+  return rank;
+}
+
+/**
+ * Is a shop item offerable given the player's putter holdings (GS-clubs)? Every non-flat-stick item
+ * passes; a flat-stick putter passes only when its rarity beats every putter already in the bag/owned,
+ * so the shop stops re-offering a putter tier you've already met. Pure — the offer filters call it.
+ */
+export function putterItemOfferable(item: ShopItem, loadout: PlayerLoadout): boolean {
+  if (!FLATSTICK_ITEM_IDS.includes(item.id)) return true;
+  return rarityRank(item.rarity) > putterFloorRank(loadout);
 }
 
 /**

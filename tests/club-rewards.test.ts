@@ -7,9 +7,11 @@ import {
   clubItemId,
   clubSetById,
   equipClub,
+  FLATSTICK_ITEM_IDS,
   loadoutFromPerks,
   netDispersion,
   offerableClubs,
+  putterItemOfferable,
   REWARD_CLUB_TYPES,
   shopItem,
   startingLoadout,
@@ -98,6 +100,38 @@ describe('club ownership / offer rules (GS-clubs-2)', () => {
   });
 });
 
+describe('flat-stick putter offer gate (GS-clubs)', () => {
+  it('a flat-stick putter is offered only as a STRICT rarity upgrade over the putter you hold', () => {
+    // Fresh common bag → every flat-stick tier is a genuine upgrade, so all are offerable.
+    const fresh = startingLoadout();
+    for (const id of FLATSTICK_ITEM_IDS) expect(putterItemOfferable(shopItem(id)!, fresh)).toBe(true);
+    // An EPIC bag putter (the Phoenix bag tier) → the epic Tour Putter reads as a duplicate and is gated
+    // out; only the legendary Pinseeker (a real upgrade) survives. (The reported bug: "an epic putter for
+    // sale when I already have an epic putter in my bag".)
+    const epicPutter = loadoutFromPerks([clubItemId('masters', 'putter')]);
+    expect(epicPutter.bag.find((c) => c.id === 'putter')!.rarity).toBe('epic');
+    expect(putterItemOfferable(shopItem('tour-putter')!, epicPutter)).toBe(false); // epic ≤ epic
+    expect(putterItemOfferable(shopItem('putting-grip')!, epicPutter)).toBe(false); // rare < epic
+    expect(putterItemOfferable(shopItem('pinseeker-putter')!, epicPutter)).toBe(true); // legendary > epic
+    // Owning a flat-stick counts too: with the legendary Pinseeker, no flat-stick is a further upgrade.
+    const pinseeker = loadoutFromPerks(['pinseeker-putter']);
+    for (const id of FLATSTICK_ITEM_IDS) expect(putterItemOfferable(shopItem(id)!, pinseeker)).toBe(false);
+    // Non-putter gear is never gated by this rule.
+    expect(putterItemOfferable(shopItem('gyro')!, pinseeker)).toBe(true);
+  });
+
+  it('the shop never surfaces a flat-stick putter you already hold at equal-or-higher rarity', () => {
+    // Give the run an epic bag putter and scan a spread of seeds/depths: no rare/epic flat-stick appears.
+    const base = startRun(11, undefined, {}, 'feather-fade');
+    const withEpicPutter = { ...base, loadout: loadoutFromPerks([clubItemId('masters', 'putter')], base.loadout) };
+    const gated = new Set(['putting-grip', 'mallet-putter', 'tour-putter']);
+    for (let s = 0; s < 120; s++) {
+      const r = { ...withEpicPutter, seed: s, stopIndex: 5, distanceFromStart: 16 };
+      for (const o of shopOffer(r)) expect(gated.has(o.item.id), `seed ${s} offered ${o.item.id}`).toBe(false);
+    }
+  });
+});
+
 describe('buying clubs equips them (GS-clubs)', () => {
   it('buying a higher-tier club REPLACES your current one (bag size unchanged)', () => {
     const run = rich(startRun(1, undefined, {}, 'feather-fade'));
@@ -131,6 +165,31 @@ describe('buying clubs equips them (GS-clubs)', () => {
     const run = rich(startRun(4, undefined, {}, 'feather-fade'));
     const once = buy(run, 'club:tour:3W');
     expect(buy(once, 'club:tour:3W')).toBe(once); // no-op
+  });
+
+  it('distance shop items feed distanceClubBonus so a later reward club inherits the boost (GS-clubs)', () => {
+    // The bug: Power Cell / Distance Balls / Nova Driver grew the CURRENT bag but not distanceClubBonus,
+    // so a reward club bought AFTER them landed short of the starting distance clubs — a higher-tier club
+    // hitting shorter than a lower-tier one already in the bag.
+    expect(loadoutFromPerks(['power-cell']).distanceClubBonus).toBe(12);
+    expect(loadoutFromPerks(['range-booster']).distanceClubBonus).toBe(12);
+    expect(loadoutFromPerks(['nova-driver']).distanceClubBonus).toBe(24);
+    // Buy all three distance boosts (+48), THEN a legendary Solar 3-wood: it inherits the +48.
+    const lo = loadoutFromPerks(['power-cell', 'range-booster', 'nova-driver', clubItemId('solar', '3W')]);
+    expect(lo.distanceClubBonus).toBe(48);
+    expect(carryOf(lo, '3W')).toBe(235 + 24 + 48); // base + solar tier + accumulated distance boost
+    // …and the legendary 3-wood now out-carries the boosted 4-wood/5-wood, not the reverse (issue #3).
+    expect(carryOf(lo, '3W')!).toBeGreaterThan(carryOf(lo, '4W')!);
+    expect(carryOf(lo, '4W')!).toBeGreaterThan(carryOf(lo, '5W')!);
+  });
+
+  it('the reward-club inheritance is purchase-order independent (resume rebuilds identically)', () => {
+    // loadoutFromPerks replays perks in purchase order; the 3W lands at the same carry whether it was
+    // bought before or after the distance boosts, because boostDistanceClubs grows an already-equipped
+    // club AND distanceClubBonus seeds a freshly-equipped one.
+    const before = carryOf(loadoutFromPerks([clubItemId('solar', '3W'), 'power-cell', 'nova-driver']), '3W');
+    const after = carryOf(loadoutFromPerks(['power-cell', 'nova-driver', clubItemId('solar', '3W')]), '3W');
+    expect(before).toBe(after);
   });
 });
 
