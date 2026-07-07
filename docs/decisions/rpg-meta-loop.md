@@ -596,14 +596,25 @@
   from the off (still epic-scarce). **ONE merged 4-card offer (no separate Reward-Clubs row):** `shopOffer`
   draws its `SHOP_OFFER_SIZE` from the COMBINED pool of perk gear ∪ `offerableClubs(loadout)`, one
   rarity-weighted stream (`${seed}:shop:${stop}`); the old separate `clubOffer`/`CLUB_OFFER_SIZE` are
-  GONE. **`clubOfferNote(item, loadout)`** is the pure helper the shop card's badge reads: `{kind:'upgrade',
+  GONE. The standalone flat-stick putter items (`FLATSTICK_ITEM_IDS`: putting-grip/mallet/tour/pinseeker)
+  are gated by `putterItemOfferable` — offered ONLY as a strict rarity upgrade over the best putter you
+  hold (bag putter's stamped rarity ∪ owned flat-sticks), so an epic bag putter never gets dangled the
+  epic Tour Putter (mirrors the reward-club putter rule + the `bagTier` floor). **`clubOfferNote(item, loadout)`** is the pure helper the shop card's badge reads: `{kind:'upgrade',
   gainYd}` for a club you carry, or `{kind:'new', carry, longerName, shorterName}` (the bag clubs that
   bracket the gap it fills) for a new club — `app.ts` renders it as a "▲ UPGRADE · +N yd" / "✚ NEW · ~N yd
   (X→Y)" pill so the buy decision reads at a glance. **Save-stable:** the bag is NOT serialised —
   `loadoutFromPerks` rebuilds it from the character's starting bag (via `startingLoadoutFor`) + the bought
   club perk ids, applied in purchase order so the latest tier wins. **`distanceClubBonus`** on the loadout
-  is the running flat carry bonus on distance clubs (character ±, Tour Bag +6/level) so a reward distance
-  club bought mid-run inherits the same bonus the starting distance clubs carry. CRITICAL ORDERING:
+  is the running flat carry bonus on distance clubs (character ±, Tour Bag +6/level, **and every shop
+  perk that grows the distance clubs** — Power Cell/Distance Balls +12, Nova Driver +24, Driver Dan +12,
+  the distance talents) so a reward distance club bought or salvaged mid-run inherits the same bonus the
+  starting distance clubs carry. **INVARIANT (GS-clubs):** any `apply()` that calls `boostDistanceClubs`
+  MUST also add the same delta to `distanceClubBonus` — `boostDistanceClubs` grows the *current* bag,
+  `distanceClubBonus` carries the boost *forward* to future reward clubs. Miss it and a higher-tier club
+  bought later lands SHORTER than the boosted starting clubs (the "legendary 3W shorter than the epic 4W"
+  bug). The static `CLUB_ITEMS.desc` can't see the buyer's bonus, so a DISTANCE club's card omits the
+  fixed `~N yd` — the loadout-aware carry lives on the `clubOfferNote` badge; scoring clubs (boost-
+  independent) keep the yardage in the desc. CRITICAL ORDERING:
   `startingLoadoutFor(meta, characterId) = applyMeta(meta, applyCharacter(characterId, startingLoadout()))`
   — character FIRST (sets the bag), meta SECOND (Tour Bag boosts THAT bag); `startRun`/`resumeRun`/the Sim
   Lab all use this one helper. `tests/club-rewards.test.ts` guards ownership/hybrid/driver rules,

@@ -33,6 +33,7 @@ import {
   netDispersion,
   offerableClubs,
   ownedCount,
+  putterItemOfferable,
   puttSkillOf,
   relicCreditBonus,
   shopItem,
@@ -1442,7 +1443,9 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
       (!it.prereq || perks.includes(it.prereq)) &&
       (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
       (it.caddy !== 'service' || hasCaddy) &&
-      (it.id !== 'driver-dan' || ownsDriver),
+      (it.id !== 'driver-dan' || ownsDriver) &&
+      // Don't dangle a flat-stick putter you've already met (GS-clubs) — strict rarity upgrade only.
+      putterItemOfferable(it, run.loadout),
   );
   // Reward CLUBS (GS-clubs-2) share the SAME 4-card offer now — no separate row. They're rare+
   // improvements (a distance upgrade, or a new club that fills a gap in the balanced bag), drawn
@@ -1503,7 +1506,8 @@ export function starmartOffer(run: Run, size = STARMART_OFFER_SIZE, salt = 0): S
       (!it.prereq || perks.includes(it.prereq)) &&
       (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
       (it.caddy !== 'service' || hasCaddy) &&
-      (it.id !== 'driver-dan' || ownsDriver),
+      (it.id !== 'driver-dan' || ownsDriver) &&
+      putterItemOfferable(it, run.loadout),
   );
   const clubs = offerableClubs(run.loadout).filter((c) => c.rarity !== 'common');
   const pool = [...gear, ...clubs];
