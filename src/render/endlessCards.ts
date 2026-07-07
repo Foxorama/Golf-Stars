@@ -63,7 +63,7 @@ export function endlessScoreCard(
   const nextLine = opts.next
     ? `<div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--gs-line-2);font-size:11.5px;opacity:.82;display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;">
          <span>⛳ Next hole bar: <b>${nextBar} or better</b></span>
-         ${nextM ? `<span>🌌 Next reward: hole <b>${nextM.holes}</b> (✦ ${nextM.shards})</span>` : '<span>🌌 Beyond every milestone</span>'}
+         ${nextM ? `<span>🌌 Next reward at hole <b>${nextM.holes}</b></span>` : '<span>🌌 Beyond every milestone</span>'}
        </div>`
     : '';
   return `

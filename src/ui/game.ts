@@ -665,7 +665,10 @@ export function reduce(state: UiState, action: Action): UiState {
               homeEdge,
               bossEdgeForRun(state.run),
             );
-        const { run, result } = finishStop(state.run, state.course, stop.player, { matchWon: stop.state.playerAdvances });
+        const { run, result } = finishStop(state.run, state.course, stop.player, {
+          matchWon: stop.state.playerAdvances,
+          prevBestHoles: state.endlessBestHoles,
+        });
         const ended = run.status !== 'active';
         return {
           ...state,
@@ -682,7 +685,7 @@ export function reduce(state: UiState, action: Action): UiState {
           ...aceUpdates(state, result, state.ownedShips),
         };
       }
-      const { run, result, played } = playStop(state.run);
+      const { run, result, played } = playStop(state.run, { prevBestHoles: state.endlessBestHoles });
       // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
       // the gameover/victory screen; a survived non-final stop goes to the result screen.
       const ended = run.status !== 'active';
@@ -927,7 +930,7 @@ export function reduce(state: UiState, action: Action): UiState {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
       // Stop complete (or survival bar missed) — score it exactly as the auto path does.
-      const { run, result } = finishStop(state.run, state.course, stopPlayed);
+      const { run, result } = finishStop(state.run, state.course, stopPlayed, { prevBestHoles: state.endlessBestHoles });
       const ended = run.status !== 'active';
       const endless = endlessProgressUpdates(state, run);
       return {

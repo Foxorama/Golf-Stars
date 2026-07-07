@@ -14,7 +14,9 @@ import { RARITY_C } from './loot';
  *     run ends on the spot. (The user-facing "8/7/6/5/4" ramp is exactly this ladder on a par-4.)
  *
  *   • MILESTONES — surviving 40/60/80/100/120/140 holes fires a victory takeover and banks a Star
- *     Shard bonus INSTANTLY (via `run.bonusShards`, so a later bust never claws it back).
+ *     Shard bonus INSTANTLY (via `run.bonusShards`, so a later bust never claws it back). The bonus is
+ *     LIFETIME-once, exactly like the cosmetic unlocks below: `finishStop` floors the crossing at the
+ *     reducer's persisted lifetime-best hole, so a milestone re-reached in a later run banks nothing.
  *
  *   • UNLOCKS — the Evergreen cosmetic set (bag → cap → pants → the Green Jacket) unlocks at
  *     40/60/80/100, and a SECRET mythic ship waits at hole 150. Unlocks are permanent (pushed into

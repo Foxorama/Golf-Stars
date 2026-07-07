@@ -967,7 +967,13 @@ in any death-spiral harness bar (those are biome/character-keyed and unchanged).
 **Milestones + the Evergreen set.** Crossing 40/60/80/100/120/140 survived holes fires a full-screen
 victory takeover (`showEndlessMilestone`, mirroring the voyage victory — cosmetic side-effect in
 `dispatch`, keyed off the pre/post `holesSurvived` diff) and banks a growing shard bonus INSTANTLY via
-`run.bonusShards` (a kept-even-on-a-bust channel — banked shards can't be clawed back by a later death). Permanent unlocks ride the LIFETIME best (`endlessBestHoles`, save v13): the earn-only
+`run.bonusShards` (a kept-even-on-a-bust channel — banked shards can't be clawed back by a later death).
+The shard bonus is now LIFETIME-once (GS-unending-rewards), exactly like the cosmetic unlocks below: the
+reducer passes its persisted `endlessBestHoles` as `finishStop`'s `prevBestHoles`, and the milestone
+floor `max(run.holesSurvived, prevBestHoles)` means a milestone already reached in a PRIOR run banks
+nothing when re-crossed (the celebration still fires; `showEndlessMilestone`'s shard line reads the
+lifetime-gated total, so a re-crossing shows ✦ 0). The headless sim omits `prevBestHoles`, so every
+seeded run stays byte-identical (per-run behaviour, floor 0). Permanent unlocks ride the LIFETIME best (`endlessBestHoles`, save v13): the earn-only
 **Evergreen** cosmetic set — Tour Bag @40 (a NEW 4th apparel slot `bag`, equipped per character via
 `golfBagByCharacter`, drawn beside the Clubhouse stage figure; on-course rendering deliberately skipped),
 Baggy Green Cap @60 (new `baggy` hat shape), Evergreen Pro Pants @80, THE GREEN JACKET @100 (mythic, new

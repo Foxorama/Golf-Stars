@@ -459,7 +459,7 @@ export function finishStop(
   run: Run,
   course: Course,
   played: PlayedHole[],
-  opts: { matchWon?: boolean; warp?: boolean } = {},
+  opts: { matchWon?: boolean; warp?: boolean; prevBestHoles?: number } = {},
 ): { run: Run; result: StopResult } {
   const totals = playTotals(played.map((p) => p.record));
   // The pending route event shifts this stop's cut + payout (GS-14); neutral if none.
@@ -544,7 +544,13 @@ export function finishStop(
   const holesSurvived = run.holesSurvived + (format.holeGate ? gateSurvived : 0);
   // A WARPED stop (GS-warp) never banks milestone shards — its holes were auto-birdied, not earned,
   // and warp is retryable/instant, so banking here would be a free shard farm every run.
-  const milestoneShards = format.holeGate && !opts.warp ? endlessMilestoneShards(run.holesSurvived, holesSurvived) : 0;
+  // Milestone shards are a LIFETIME-once reward, exactly like the Evergreen cosmetic unlocks: a
+  // milestone already reached in a PRIOR run banks NOTHING when it's re-crossed. `opts.prevBestHoles`
+  // is the reducer's persisted lifetime-best hole; flooring the crossing at it means only milestones
+  // beyond the lifetime best ever pay out. The headless sim omits it (⇒ 0), preserving the per-run,
+  // byte-identical behaviour every seeded test depends on.
+  const milestoneFloor = Math.max(run.holesSurvived, opts.prevBestHoles ?? 0);
+  const milestoneShards = format.holeGate && !opts.warp ? endlessMilestoneShards(milestoneFloor, holesSurvived) : 0;
   // Golf-round score (GS-golf-score): accumulate the GROSS strokes + PAR of exactly the holes that were
   // survived (a partial busting stop counts only its leading passes), so the running gross/to-par/net
   // stays in lock-step with `holesSurvived`. Zero for non-gate formats (the voyage never reads these).
@@ -896,7 +902,10 @@ export function playStopWarp(run: Run): { run: Run; result: StopResult; played: 
   return { run: { ...fin.run, warpedThrough: fin.run.holesSurvived }, result: fin.result, played };
 }
 
-export function playStop(run: Run): { run: Run; result: StopResult; played: PlayedHole[] } {
+export function playStop(
+  run: Run,
+  opts: { prevBestHoles?: number } = {},
+): { run: Run; result: StopResult; played: PlayedHole[] } {
   if (run.status !== 'active') throw new Error('playStop: run is not active');
   const course = currentCourse(run);
   // A matchplay boss stop (GS-matchplay) is a 1-on-1 knockout vs the player's rank-mirror, decided by
@@ -930,7 +939,10 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
           homeEdge,
           bossEdgeForRun(run),
         );
-    const { run: next, result } = finishStop(run, course, stop.player, { matchWon: stop.state.playerAdvances });
+    const { run: next, result } = finishStop(run, course, stop.player, {
+      matchWon: stop.state.playerAdvances,
+      prevBestHoles: opts.prevBestHoles,
+    });
     return { run: next, result, played: stop.player };
   }
   const rng = new Rng(`${course.seed}:play`);
@@ -948,11 +960,11 @@ export function playStop(run: Run): { run: Run; result: StopResult; played: Play
       played.push(p);
       if (!passesEndlessGate(p.record.par, p.record.strokes, p.holed, run.holesSurvived + i + 1)) break;
     }
-    const { run: next, result } = finishStop(run, course, played);
+    const { run: next, result } = finishStop(run, course, played, { prevBestHoles: opts.prevBestHoles });
     return { run: next, result, played };
   }
   const played = playCourse(course.holes, rng, playerHoleOpts(run));
-  const { run: next, result } = finishStop(run, course, played);
+  const { run: next, result } = finishStop(run, course, played, { prevBestHoles: opts.prevBestHoles });
   return { run: next, result, played };
 }
 

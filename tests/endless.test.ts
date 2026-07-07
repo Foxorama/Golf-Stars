@@ -195,6 +195,31 @@ describe('the Unending Universe run engine (GS-unending)', () => {
     expect(die.run.bonusShards).toBe(40);
   });
 
+  it('milestone shards are LIFETIME-once: a re-crossed milestone (prevBestHoles) banks nothing', () => {
+    const base = startRun(1, 'unending');
+    const course = currentCourse(base);
+    const pars = course.holes.map((h) => h.par);
+    const at36: Run = { ...base, holesSurvived: 36 };
+
+    // First time reaching hole 40 (lifetime best 0/36 below it) still pays the crossing.
+    const fresh = finishStop(at36, course, pars.map((p) => played(p, p)), { prevBestHoles: 36 });
+    expect(fresh.run.holesSurvived).toBe(40);
+    expect(fresh.run.bonusShards).toBe(40);
+
+    // Re-playing over already-conquered ground: the lifetime best is past hole 40, so re-crossing it
+    // banks NOTHING (the reward was earned once, in the run that first reached it).
+    const replay = finishStop(at36, course, pars.map((p) => played(p, p)), { prevBestHoles: 60 });
+    expect(replay.run.holesSurvived).toBe(40);
+    expect(replay.run.bonusShards).toBe(0);
+
+    // New ground beyond the lifetime best still pays: best 40, this stop reaches 60 → the hole-60 bonus.
+    // Holes 57–60 sit in the birdie-or-better tier, so they must be birdied to survive.
+    const at56: Run = { ...base, holesSurvived: 56 };
+    const beyond = finishStop(at56, course, pars.map((p) => played(p, p - 1)), { prevBestHoles: 40 });
+    expect(beyond.run.holesSurvived).toBe(60);
+    expect(beyond.run.bonusShards).toBe(60);
+  });
+
   it('playStop stops at the first failed hole and every seeded run terminates by the bar', () => {
     for (let seed = 0; seed < 12; seed++) {
       const { run, stops } = simulateRun(seed, { formatId: 'unending' });
