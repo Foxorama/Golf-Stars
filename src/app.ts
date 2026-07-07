@@ -9,7 +9,7 @@
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { shotCardHTML } from './render/cards';
-import { renderHoleSVG } from './render/holeView';
+import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID } from './render/holeView';
 import { holeProjector, type ProjectOptions } from './render/project';
 import { createWeather } from './render/weather';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
@@ -1073,14 +1073,33 @@ function playingBody(animating: boolean): string {
       puttReadFrac,
     });
     const puttSvg = buildPuttSvg(puttAim);
-    // Nudging the aim redraws the map + readout IN PLACE (never a full render(), which would remount
-    // the pace meter and reset its sweep). Only the SVG child is swapped — the weather canvas mounted
-    // over the same .gs-bigmap survives.
+    // Nudging the aim redraws the break line + readout IN PLACE (never a full render(), which would
+    // remount the pace meter and reset its sweep). Only the BREAK-LINE overlay group is swapped — NOT
+    // the whole scene: rebuilding the flora + green contour art (isolines, Tanaka lighting) on every
+    // hold-repeat tick is what made an aim nudge lag hard, brutally so when the page is pinch-zoomed
+    // (each swap re-rasterises the zoomed SVG). The framing is aim-independent, so the overlay reuses
+    // the exact focus/zoom the map was built at; the weather canvas over the same .gs-bigmap survives.
+    const puttUp: [number, number] = [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]];
     puttAimRefresh = () => {
       const aim = selPuttAim ?? 0;
       puttAimResolved = aim;
-      const svgEl = document.querySelector('.gs-bigmap[data-weather="putt"] svg');
-      if (svgEl) svgEl.outerHTML = buildPuttSvg(aim);
+      const overlay = document.getElementById(PUTT_OVERLAY_ID);
+      if (overlay) {
+        overlay.outerHTML = renderPuttOverlaySVG(play.hole, {
+          width: DMAP_W,
+          height: DMAP_H,
+          focus: puttMid,
+          viewRadius: puttRadius,
+          focusBias: 0.5,
+          up: puttUp,
+          puttPath: puttPathPreview(play.ball, puttPin, slope, aim, MANUAL_IDEAL_PACE, contour),
+          puttReadFrac,
+        });
+      } else {
+        // Overlay not found (defensive: first paint / DOM churn) — fall back to the full SVG swap.
+        const svgEl = document.querySelector('.gs-bigmap[data-weather="putt"] svg');
+        if (svgEl) svgEl.outerHTML = buildPuttSvg(aim);
+      }
       const label = document.getElementById('puttaimlabel');
       if (label) label.innerHTML = puttAimLabel(breakYd, aim, doubleBreak);
     };

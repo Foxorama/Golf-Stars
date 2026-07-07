@@ -113,10 +113,21 @@ change (every seeded test byte-identical). The final state:
   (`puttAimStreak`, `performance.now` in the side-effect layer — #247); (2) ◄/► PRESS-AND-HOLD
   auto-repeats (330ms delay, 80ms ticks, 2× after ~1s; pointer-captured so a drifting finger keeps
   repeating; the click that ends a hold is swallowed — #248); (3) every nudge is SURGICAL —
-  `puttAimRefresh` swaps the map `<svg>` (`outerHTML`, so the weather canvas over the same `.gs-bigmap`
-  survives) and the `#puttaimlabel` span in place (`puttAimLabel` is split out of `puttAimRow` for
-  this). The old handler called full `render()` per tap, which REMOUNTED the pace meter and reset its
-  sweep — that, plus flat 0.4yd taps, was the "slow and painful".
+  `puttAimRefresh` swaps ONLY the break-line overlay group (`#gs-putt-overlay`) via
+  `renderPuttOverlaySVG`, plus the `#puttaimlabel` span in place (`puttAimLabel` is split out of
+  `puttAimRow` for this). The old handler called full `render()` per tap, which REMOUNTED the pace
+  meter and reset its sweep — that, plus flat 0.4yd taps, was the "slow and painful".
+- **The nudge redraws the break line ONLY, never the scene (the putt-zoom-lag fix).** `puttAimRefresh`
+  originally swapped the ENTIRE map `<svg>` (`outerHTML = buildPuttSvg(aim)`), which re-ran `buildScene`
+  — flora, green contour art, Tanaka-lit isolines — and reparsed a huge SVG string on EVERY 80ms
+  hold-repeat tick. Cheap on paper, brutal when the page is pinch-zoomed (each swap re-rasterises the
+  zoomed SVG) and it starved the pace-meter rAF, so "putting is incredibly laggy" the moment you tap
+  direction or putt. Fix: the break line lives in a stable-id `<g id="gs-putt-overlay">` (holeView),
+  and the nudge swaps just that group. The framing is aim-INDEPENDENT (`puttMid`/`puttRadius`/`up` are
+  fixed per putt), so `renderPuttOverlaySVG` rebuilds only the cheap focus projector (no scene `extra`)
+  and re-projects the path — output is BYTE-IDENTICAL to the same group inside a full `renderHoleSVG`
+  (asserted for both the terminus-dot and finish-ring cases). Fallback to the full swap if the group is
+  somehow absent. Zero sim/rng changes; the full suite stays byte-identical-green.
 - **Verified eyes-on**: `scripts/putt-preview.mjs` + `scripts/gallery.mjs` re-shot (arrows modest at
   putt zoom, map zoom unchanged), plus a real-browser drive (build → play to a green → tap/hold the
   aim → commit): label updates without a meter remount, hold moved the aim 5.6yd in 1.4s, no page
