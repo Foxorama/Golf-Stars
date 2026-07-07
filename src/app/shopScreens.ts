@@ -14,7 +14,6 @@ import {
   isHybridType,
   itemCap,
   itemCost,
-  namedCaddyOwned,
   ownedCount,
   REWARD_CLUB_TYPES,
   shopItem,
@@ -222,7 +221,27 @@ export function fuelDepotHTML(): string {
 export function shopScreen(): string {
   const perks = state.run.loadout.perks;
   const credits = state.run.credits;
-  const hasCaddy = !!namedCaddyOwned(perks);
+  // The caddy-swap warning (GS-caddy-factions): clicking a new caddy while one is on the bag parks a
+  // `pendingFireCaddy`; show a "they won't be happy to be fired" confirmation before the hire lands.
+  const fireWarning = (() => {
+    const p = state.pendingFireCaddy;
+    if (!p) return '';
+    const oldName = shopItem(p.oldId)?.name ?? 'your caddy';
+    const newItem = shopItem(p.newId);
+    const newName = newItem?.name ?? 'the new caddy';
+    const cost = newItem ? itemCost(newItem, ownedCount(perks, p.newId)) : 0;
+    return `
+      <div class="gs-panel" style="margin:0 0 10px;padding:12px 14px;border:2px solid var(--gs-danger);border-radius:12px;background:color-mix(in srgb, var(--gs-danger) 12%, transparent);">
+        <div style="font-weight:800;font-size:14px;margin-bottom:5px;">⚠️ Fire ${oldName}?</div>
+        <div style="font-size:12.5px;line-height:1.45;opacity:.92;margin-bottom:10px;">
+          You can only keep <b>one</b> caddy on the bag. Hiring <b>${newName}</b> means giving <b>${oldName}</b> their marching orders — and nobody likes being sacked. ${oldName} will storm off and <b>won't work for you again for the rest of this run</b>.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${btn(`Fire ${oldName} · hire ${newName} (${cost} cr)`, { type: 'buy', id: p.newId, confirmFire: true }, { variant: 'primary' })}
+          ${btn(`Keep ${oldName}`, { type: 'cancelFireCaddy' }, { variant: 'ghost' })}
+        </div>
+      </div>`;
+  })();
   // A reward club (GS-clubs-2) shows whether it UPGRADES a club you carry or is a NEW club, and which
   // distance gap it fills — so the buy decision is legible at a glance.
   const clubBadge = (it: NonNullable<ReturnType<typeof shopItem>>): { text: string; tone?: 'up' | 'new' } | undefined => {
@@ -262,15 +281,18 @@ export function shopScreen(): string {
   const stock = (state.shopOffer ?? [])
     .map((id) => shopItem(id))
     .filter((it): it is NonNullable<typeof it> => !!it)
-    // Once any named caddy is hired, the others vanish from the offer (you may keep only one).
-    .filter((it) => it.caddy !== 'named' || !hasCaddy || ownedCount(perks, it.id) > 0)
+    // Named caddies STAY on the rack even once you've hired one (GS-caddy-factions) — hiring a new one
+    // fires the incumbent, so the swap must be offerable. Drop only the one you already own (nothing to
+    // buy) and any caddy you FIRED this run (they've stormed off and won't return until a future run).
+    .filter((it) => it.caddy !== 'named' || (ownedCount(perks, it.id) === 0 && !state.run.firedCaddies.includes(it.id)))
     .map(renderCard)
     .join('');
   return `
     ${header()}
     <h2 style="font-size:16px;">🏌 Pro Shop · ${credits} credits</h2>
     ${proGreetingHTML()}
-    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — early stops stock cheap commons, deeper stops stock rare/epic power. Stackable upgrades cost more the more you own; rare clubs (▲ upgrades or ✚ new gap-fillers) and a rare caddy may turn up. Hire one caddy and the rest stay home.</p>
+    ${fireWarning}
+    <p style="font-size:12px;opacity:.6;margin:.2em 0 .6em;">Click a card to buy. Stock rotates each stop — early stops stock cheap commons, deeper stops stock rare/epic power. Stackable upgrades cost more the more you own; rare clubs (▲ upgrades or ✚ new gap-fillers) and a legendary caddy may turn up. You can only keep one caddy — hire a new one and your current caddy is fired.</p>
     <div style="display:flex;flex-wrap:wrap;">${stock}</div>
     ${fuelDepotHTML()}
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">

@@ -126,6 +126,7 @@ function boot(): void {
       marmotBartender: save.marmotBartender,
       marmotTips: save.marmotTips,
       endlessRuns: save.endlessRuns,
+      reputationByCharacter: save.reputationByCharacter,
     };
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -190,6 +191,7 @@ function persist(): void {
     marmotBartender: state.marmotBartender,
     marmotTips: state.marmotTips,
     endlessRuns: state.endlessRuns,
+    reputationByCharacter: state.reputation,
     // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
     // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
     // moment anything dispatched from the title. While no real run is live, any resumable offer

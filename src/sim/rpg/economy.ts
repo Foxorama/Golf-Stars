@@ -425,14 +425,20 @@ export const CONVICT_SHEEP_GUARD: CaddyGuard = { side: 'right', kind: 'boomerang
  * shots, fewer misses, visibly tighter cone). Applied ONLY on the suggested club (override it and you
  * forfeit the boost). Tuned so it's a clear epic-tier scoring lift without trivialising the spray.
  */
-export const SAM_CONFIDENCE: ShapeMod = { hookL: -0.03, sliceR: -0.03, duckHookL: -0.015, shankR: -0.015 };
+// Buffed to legendary strength (GS-caddy-factions): every named caddy is now a legendary, so the four
+// that used to be epic (Sam/Sandy/Mole/Dan) get a small bump to stand shoulder-to-shoulder with the
+// others — more "which legendary do I want" choice, less "Dan's just the one that showed up".
+export const SAM_CONFIDENCE: ShapeMod = { hookL: -0.045, sliceR: -0.045, duckHookL: -0.022, shankR: -0.022 };
 
-/** Sandy the Sand-Saver's lie relief (GS-mux): recover ~60% of the way back to a neutral lie from
- *  rough/sand/waste/trees — a clear escape-artist power without trivialising trouble. */
-export const SANDY_LIE_RELIEF = 0.6;
-/** Mystic Mole's manual-putt boost (GS-mux): a strong make-band/lag lift on the existing putt-skill
- *  field, so manual putting sinks far more — a legendary-feeling green read at epic scarcity. */
-export const MOLE_PUTT_BOOST = 0.32;
+/** Sandy the Sand-Saver's lie relief (GS-mux, buffed GS-caddy-factions): recover ~72% of the way back
+ *  to a neutral lie from rough/sand/waste/trees — a legendary escape artist without trivialising trouble. */
+export const SANDY_LIE_RELIEF = 0.72;
+/** Mystic Mole's manual-putt boost (GS-mux, buffed GS-caddy-factions): a strong make-band/lag lift on
+ *  the existing putt-skill field, so manual putting sinks far more — a legendary green read. */
+export const MOLE_PUTT_BOOST = 0.38;
+/** Driver Dan's carry bump (GS-caddy-factions): a Long Haul Trucker hauls the ball further — his big
+ *  stick adds yards to your distance clubs on top of letting you swing it from anywhere. */
+export const DRIVER_DAN_CARRY = 12;
 
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
@@ -639,11 +645,17 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'driver-dan',
     name: 'Driver Dan',
-    cost: 240,
-    desc: 'Hand Dan the big stick anywhere — play your driver from ANY lie at full power',
-    rarity: 'epic',
+    cost: 260,
+    desc: 'Hand Dan the big stick anywhere — play your driver from ANY lie at full power, plus +12 yds on your distance clubs',
+    rarity: 'legendary',
     caddy: 'named',
-    apply: (m) => ({ ...m, driverAnywhere: true, perks: [...m.perks, 'driver-dan'] }),
+    apply: (m) => ({
+      ...m,
+      driverAnywhere: true,
+      bag: boostDistanceClubs(m.bag, DRIVER_DAN_CARRY),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + DRIVER_DAN_CARRY,
+      perks: [...m.perks, 'driver-dan'],
+    }),
   },
   {
     id: 'dr-chipinski',
@@ -675,18 +687,18 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'suggestible-sam',
     name: 'Suggestible Sam',
-    cost: 240,
-    desc: 'Reads the yardage & hands you the club — commit to his pick and swing freer (more great shots)',
-    rarity: 'epic',
+    cost: 260,
+    desc: 'Reads the yardage & hands you the club — commit to his pick and swing freer (a big lift in great shots)',
+    rarity: 'legendary',
     caddy: 'named',
     apply: (m) => ({ ...m, clubSuggest: true, confidenceMod: SAM_CONFIDENCE, perks: [...m.perks, 'suggestible-sam'] }),
   },
   {
     id: 'sandy-sandsaver',
     name: 'Sandy the Sand-Saver',
-    cost: 280,
+    cost: 290,
     desc: 'A grizzled escape artist — recover from rough, sand, waste & trees with far less distance & spray lost',
-    rarity: 'epic',
+    rarity: 'legendary',
     caddy: 'named',
     // GS-mux escape specialist: softens a BAD lie's carry + dispersion penalty toward neutral.
     apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, SANDY_LIE_RELIEF), perks: [...m.perks, 'sandy-sandsaver'] }),
@@ -694,9 +706,9 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     id: 'mystic-mole',
     name: 'Mystic Mole',
-    cost: 260,
+    cost: 280,
     desc: 'Lives under the greens & reads every break — he aims your putt on the perfect line, you judge the pace',
-    rarity: 'epic',
+    rarity: 'legendary',
     caddy: 'named',
     // GS-greens-3: READS THE BREAK — the putt UI snaps your aim to the slope-compensated line + draws
     // the read, so a sidehill putt is taken care of for you. Plus the make-band/lag boost he always had.

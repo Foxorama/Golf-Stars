@@ -68,7 +68,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v18**; bump + add a migration when you
+  (localStorage is the only copy). Current schema is **v21**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -231,8 +231,19 @@ these systems** — each bullet is the tip of a documented iceberg.
     ordinary stop cuts to 2; every earlier target floors at 4.
   - `league.ts` imports `run.ts`, never the reverse; the matchplay boss-id resolves in the UI reducer.
 - **Caddies** — `docs/decisions/caddies.md`
-  - One named caddy at a time; the first hire blocks the rest. Each folds ONE loadout field.
-    THE RULE (machine-checked): every `NAMED_CADDY_IDS` entry surfaces a `caddyEffects` row.
+  - One named caddy on the bag at a time, but hiring a NEW one FIRES the incumbent (GS-caddy-factions,
+    `buy` rebuilds the loadout minus the fired caddy's perk) — NOT a no-op. A fired caddy lands in
+    `Run.firedCaddies` and is never offered again THIS run (returns in future runs); the shop keeps the
+    OTHER caddies offerable so a swap is always possible. All caddies are LEGENDARY (equal scarcity —
+    no "Dan's just the one that showed up"); the four ex-epics (Dan/Sam/Sandy/Mole) got a small buff.
+    Each folds ONE loadout field. THE RULE (machine-checked): every `NAMED_CADDY_IDS` entry surfaces a
+    `caddyEffects` row AND a `factions.ts` faction.
+  - FACTIONS + REPUTATION (`src/sim/rpg/factions.ts`) are HIDDEN groundwork — nothing renders them yet.
+    Every caddy belongs to a faction; hiring earns `REP_ON_HIRE` (+1), firing costs `REP_ON_FIRE` (−3),
+    tracked PER CHARACTER (`reputationByCharacter`, save v21). Reputation is a UI/save concern moved by
+    the reducer's `buy` case — the sim `buy()` only does the fire mechanic (so auto ≡ interactive; the
+    headless/Lab path never touches reputation). The UI gates the fire behind a "they won't be happy"
+    confirmation (`pendingFireCaddy` → `confirmFire`); the sim fires unconditionally.
   - Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side` is a FAIRWAY
     side classified off the hole's `centreline` (`ShotInput.fairwaySide`), NOT the shot bearing.
   - The renderer draws the guard figure ONCE (the corner figure) — never also float the portrait badge.

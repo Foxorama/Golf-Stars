@@ -36,28 +36,48 @@ import { Rng } from '../src/sim/rng';
 const richRun = (seed: number) => ({ ...startRun(seed), credits: 1_000_000 });
 
 describe('named caddies — uniqueness & shop gating', () => {
-  it('the named caddies are all flagged caddy:"named" and are epic/legendary', () => {
+  it('the named caddies are all flagged caddy:"named" and are LEGENDARY (GS-caddy-factions)', () => {
     expect(NAMED_CADDY_IDS.slice().sort()).toEqual(
       ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'mystic-mole', 'sandy-sandsaver', 'space-ducks', 'suggestible-sam'].sort(),
     );
     for (const id of NAMED_CADDY_IDS) {
       const it = shopItem(id)!;
       expect(it.caddy).toBe('named');
-      expect(['epic', 'legendary']).toContain(it.rarity);
+      // Every caddy is now legendary so they all appear at the same scarcity — no "Dan's just the one
+      // that showed up" because he was epic (GS-caddy-factions).
+      expect(it.rarity).toBe('legendary');
     }
   });
 
-  it('you may hire only ONE named caddy — a second is a no-op', () => {
+  it('hiring a NEW caddy FIRES the incumbent (GS-caddy-factions) and keeps them out of the shop this run', () => {
     let run = buy(richRun(1), 'driver-dan');
     expect(run.loadout.driverAnywhere).toBe(true);
     expect(namedCaddyOwned(run.loadout.perks)).toBe('driver-dan');
-    const blocked = buy(run, 'space-ducks');
-    expect(blocked).toBe(run); // unchanged reference
-    expect(namedCaddyOwned(blocked.loadout.perks)).toBe('driver-dan');
-    expect(blocked.loadout.caddyGuard).toBeUndefined();
+    expect(run.firedCaddies).toEqual([]);
+
+    // Hire a second caddy → the first is fired, the new one takes the bag, the old effect is gone.
+    const swapped = buy(run, 'space-ducks');
+    expect(namedCaddyOwned(swapped.loadout.perks)).toBe('space-ducks');
+    expect(swapped.loadout.caddyGuard).toEqual(SPACE_DUCKS_GUARD);
+    expect(swapped.loadout.driverAnywhere).toBeFalsy(); // Dan's power left with him
+    expect(swapped.firedCaddies).toContain('driver-dan');
+    expect(swapped.loadout.perks).not.toContain('driver-dan');
+
+    // The fired caddy never returns to the shop for the rest of this run (across many seeds).
+    for (let seed = 0; seed < 60; seed++) {
+      const ids = shopOffer({ ...swapped, seed }).map((o) => o.item.id);
+      expect(ids).not.toContain('driver-dan');
+    }
   });
 
-  it('named caddies are random shop inclusions until one is hired, then never appear again', () => {
+  it('buying the caddy you already own is a no-op (no self-fire)', () => {
+    const run = buy(richRun(2), 'convict-sheep');
+    const again = buy(run, 'convict-sheep');
+    expect(again).toBe(run); // canBuy false (maxed) → unchanged reference
+    expect(again.firedCaddies).toEqual([]);
+  });
+
+  it('named caddies surface in the shop, and OTHER caddies stay offerable after a hire (for swapping)', () => {
     // No caddy yet → named caddies CAN show up in the rotating offer (rarity-weighted, so scarce —
     // assert they surface across enough seeds and a spread of stops, as a real run encounters them).
     let surfaced = 0;
@@ -70,12 +90,15 @@ describe('named caddies — uniqueness & shop gating', () => {
     }
     expect(surfaced).toBeGreaterThan(0);
 
-    // Once a caddy is hired → NO named caddy ever appears in the offer again.
+    // Once a caddy is hired → the one you OWN never re-appears, but the OTHERS still can (you can swap).
     const withCaddy = buy(richRun(0), 'space-ducks');
-    for (let seed = 0; seed < 120; seed++) {
-      const ids = shopOffer({ ...withCaddy, seed }).map((o) => o.item.id);
-      for (const c of NAMED_CADDY_IDS) expect(ids).not.toContain(c);
+    let othersSurfaced = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const ids = shopOffer({ ...withCaddy, seed, stopIndex: 1, distanceFromStart: 6 }).map((o) => o.item.id);
+      expect(ids).not.toContain('space-ducks'); // the one you own is maxed out
+      if (ids.some((id) => NAMED_CADDY_IDS.includes(id) && id !== 'space-ducks')) othersSurfaced++;
     }
+    expect(othersSurfaced).toBeGreaterThan(0);
   });
 
   it('Caddie Lesson (a "service" perk) is hidden until a named caddy is hired', () => {

@@ -72,7 +72,14 @@ import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlo
 import { canBuyShip, shipById, aceShipUnlock, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { getCharacter, characterShotMods } from '../sim/rpg/characters';
-import { shopItem, ownedCount, itemCap } from '../sim/rpg/economy';
+import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
+import {
+  adjustReputation,
+  factionForCaddy,
+  REP_ON_FIRE,
+  REP_ON_HIRE,
+  type ReputationByCharacter,
+} from '../sim/rpg/factions';
 import { playHole } from '../sim/round';
 import {
   autoDecision,
@@ -206,6 +213,14 @@ export interface UiState {
   /** Finished Unending-Universe runs (GS-golf-score), newest first — the personal last-runs
    *  leaderboard: holes reached + golf score + golfer, grouped by starting CLUB SET. Persisted. */
   endlessRuns: EndlessRunRecord[];
+  /** Character-specific caddy-faction REPUTATION (GS-caddy-factions): characterId → factionId → rep.
+   *  Persisted; moved by the shop when a caddy is hired (+1) or fired (−3). Deliberately HIDDEN — no
+   *  screen reads it yet; it's groundwork for future faction perks/events. */
+  reputation: ReputationByCharacter;
+  /** A pending caddy SWAP awaiting confirmation (GS-caddy-factions): the player clicked a new caddy
+   *  while one is already on the bag, so the shop shows a "they won't be happy to be fired" warning
+   *  before the hire goes through. Transient (never persisted); cleared on confirm/cancel. */
+  pendingFireCaddy?: { newId: string; oldId: string };
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -243,7 +258,8 @@ export type Action =
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
-  | { type: 'buy'; id: string }
+  | { type: 'buy'; id: string; confirmFire?: boolean } // confirmFire: the caddy-swap warning was accepted (GS-caddy-factions)
+  | { type: 'cancelFireCaddy' } // dismiss the caddy-swap "they won't be happy" warning without hiring (GS-caddy-factions)
   | { type: 'rerollShop' } // pay credits to redraw the outfitter's stock (GS-shop-reroll)
   | { type: 'leaveShop' }
   | { type: 'openStarmart' } // a StarMart tent's pop-up shop opens mid-hole (GS-tent-interactions)
@@ -293,6 +309,7 @@ export interface MetaProgress {
   marmotBartender?: boolean;
   marmotTips?: number;
   endlessRuns?: EndlessRunRecord[];
+  reputationByCharacter?: ReputationByCharacter;
 }
 
 /** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
@@ -381,6 +398,7 @@ export function initState(
     marmotBartender: meta.marmotBartender ?? false,
     marmotTips: meta.marmotTips ?? 0,
     endlessRuns: meta.endlessRuns ?? [],
+    reputation: meta.reputationByCharacter ?? {},
   };
 }
 
@@ -1000,7 +1018,44 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'buy': {
       if (state.screen !== 'shop') return state;
-      return { ...state, run: buy(state.run, action.id) };
+      const item = shopItem(action.id);
+      if (!item) return state;
+      // Hiring a NEW caddy while one is on the bag FIRES the incumbent (GS-caddy-factions). If the buy
+      // is actually affordable, gate it behind a confirmation ("they won't be happy") the first time —
+      // the shop renders the warning off `pendingFireCaddy`, and its Confirm button re-dispatches with
+      // `confirmFire`. A caddy you can't afford never trips the warning (canBuy is false).
+      const incumbent = namedCaddyOwned(state.run.loadout.perks);
+      const wouldFire =
+        item.caddy === 'named' &&
+        !!incumbent &&
+        incumbent !== action.id &&
+        canBuy(item, ownedCount(state.run.loadout.perks, action.id), state.run.credits);
+      if (wouldFire && !action.confirmFire) {
+        return { ...state, pendingFireCaddy: { newId: action.id, oldId: incumbent! } };
+      }
+      const run = buy(state.run, action.id);
+      // A no-op buy (unaffordable / maxed) leaves reputation untouched.
+      if (run === state.run) return state.pendingFireCaddy ? { ...state, pendingFireCaddy: undefined } : state;
+      // Move faction reputation: fire (−3 with the sacked caddy's faction) then hire (+1 with the new
+      // one). Character-specific; a no-op if the run has no golfer (shouldn't happen in the shop).
+      let reputation = state.reputation;
+      const cid = run.loadout.characterId;
+      if (item.caddy === 'named' && cid) {
+        const fired = run.firedCaddies.find((id) => !state.run.firedCaddies.includes(id));
+        if (fired) {
+          const oldFaction = factionForCaddy(fired);
+          if (oldFaction) reputation = adjustReputation(reputation, cid, oldFaction, REP_ON_FIRE);
+        }
+        const newFaction = factionForCaddy(action.id);
+        if (newFaction) reputation = adjustReputation(reputation, cid, newFaction, REP_ON_HIRE);
+      }
+      return { ...state, run, reputation, pendingFireCaddy: undefined };
+    }
+
+    case 'cancelFireCaddy': {
+      // Back out of a caddy swap — keep the caddy you have, hire nobody (GS-caddy-factions).
+      if (!state.pendingFireCaddy) return state;
+      return { ...state, pendingFireCaddy: undefined };
     }
 
     case 'rerollShop': {
@@ -1020,7 +1075,7 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'leaveShop': {
       if (state.screen !== 'shop') return state;
-      return { ...state, screen: 'travel', routes: routeOptions(state.run), shopOffer: undefined };
+      return { ...state, screen: 'travel', routes: routeOptions(state.run), shopOffer: undefined, pendingFireCaddy: undefined };
     }
 
     // --- StarMart pop-up shop (GS-tent-interactions): spend SHARDS mid-hole ------------------------
@@ -1334,6 +1389,7 @@ export function reduce(state: UiState, action: Action): UiState {
           marmotBartender: state.marmotBartender,
           marmotTips: state.marmotTips,
           endlessRuns: state.endlessRuns,
+          reputationByCharacter: state.reputation,
         },
         state.resumable,
       );

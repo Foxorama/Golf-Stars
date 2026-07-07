@@ -12,8 +12,9 @@ import type { BagTier } from '../sim/rpg/bag';
 import type { EndlessRunRecord } from '../sim/rpg/endless';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
+import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -358,8 +359,19 @@ export interface SaveV20 extends Omit<SaveV19, 'version'> {
   marmotTips: number;
 }
 
+/** v21 adds character-specific caddy-faction REPUTATION (GS-caddy-factions): hiring a caddy earns
+ *  standing with their faction, firing one burns it. Hidden groundwork — persisted + moved by the
+ *  reducer, but nothing in the UI reads it yet. Seeded empty for existing saves (earned in play). The
+ *  in-progress-run snapshot also gains an optional `firedCaddies` list, absent on old runs (nobody
+ *  fired). */
+export interface SaveV21 extends Omit<SaveV20, 'version'> {
+  version: 21;
+  /** characterId → factionId → reputation. Empty until a caddy is hired/fired. */
+  reputationByCharacter: ReputationByCharacter;
+}
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV20;
+export type Save = SaveV21;
 
 export function defaultSave(): Save {
   return {
@@ -385,6 +397,7 @@ export function defaultSave(): Save {
     marmotBartender: false,
     marmotTips: 0,
     endlessRuns: [],
+    reputationByCharacter: {},
   };
 }
 
@@ -683,6 +696,12 @@ function v19ToV20(s: SaveV19): SaveV20 {
   return { ...s, version: 20, marmotTips: 0 };
 }
 
+/** v20 → v21: nobody has courted a faction yet — reputation starts empty and is earned in play by
+ *  hiring/firing caddies. */
+function v20ToV21(s: SaveV20): SaveV21 {
+  return { ...s, version: 21, reputationByCharacter: {} };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -710,6 +729,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 17) s = v17ToV18(s as unknown as SaveV17) as unknown as typeof s;
   if (s.version === 18) s = v18ToV19(s as unknown as SaveV18) as unknown as typeof s;
   if (s.version === 19) s = v19ToV20(s as unknown as SaveV19) as unknown as typeof s;
+  if (s.version === 20) s = v20ToV21(s as unknown as SaveV20) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -717,7 +737,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV20>;
+  const v14 = s as unknown as Partial<SaveV21>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -751,6 +771,8 @@ export function migrate(raw: unknown): Save {
     marmotBartender: v14.marmotBartender ?? false,
     marmotTips: v14.marmotTips ?? 0,
     endlessRuns: Array.isArray(v14.endlessRuns) ? v14.endlessRuns : [],
+    reputationByCharacter:
+      v14.reputationByCharacter && typeof v14.reputationByCharacter === 'object' ? v14.reputationByCharacter : {},
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,
   };
