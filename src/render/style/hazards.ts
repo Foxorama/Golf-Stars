@@ -394,6 +394,8 @@ const DEEP_ROUGH: Partial<Record<BiomeArchetype, DeepRoughLook>> = {
   void: { base: '#1a1038', shade: '#0f0822', ink: 'rgba(6,4,16,0.55)', mark: 'clump', markCols: ['#3a2a66', '#7a5fd0'], glow: 'rgba(150,120,255,0.12)' },
   // A deep sea-blue kelp-tangle with a soft cyan glow, sitting on the cetus abyssal-blue clifftop rough.
   cetus: { base: '#123048', shade: '#0b2032', ink: 'rgba(4,14,24,0.55)', mark: 'blade', markCols: ['#1e5068', '#57b4d8'], glow: 'rgba(90,200,255,0.12)' },
+  // A rich gilded-emerald tangle with a faint golden glow — a lush hazard on Asgard's emerald fields.
+  asgard: { base: '#234a2e', shade: '#16321f', ink: 'rgba(8,20,10,0.5)', mark: 'blade', markCols: ['#2f6a40', '#d8b84a'], glow: 'rgba(255,210,120,0.12)' },
 };
 const DEEP_ROUGH_DEFAULT: DeepRoughLook = { base: '#2c4014', shade: '#1a2a0c', ink: 'rgba(10,20,4,0.5)', mark: 'blade', markCols: ['#3e5a1e', '#597e2c'] };
 

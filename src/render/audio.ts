@@ -190,7 +190,8 @@ export type TreeVoice =
   | 'saguaro' // desert cacti — a hollow drum tonk
   | 'scrub' // tempest wind-bent scrub — a whippy rustle
   | 'palm' // ocean palms — frond rustle + a coconut knock
-  | 'stone'; // cetus sea-stacks — a dense rock clack
+  | 'stone' // cetus sea-stacks — a dense rock clack
+  | 'chime'; // asgard golden-leaf ash — a resonant golden bell/horn ring
 
 export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
   verdant: 'wood',
@@ -203,6 +204,7 @@ export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
   fungal: 'squelch',
   ocean: 'palm',
   cetus: 'stone',
+  asgard: 'chime', // the golden groves ring like a struck bell
 };
 
 export function treeVoiceOf(arch?: string): TreeVoice {
@@ -258,6 +260,14 @@ function treeSound(v: TreeVoice): void {
       noise(0.04, { gain: 0.24, type: 'lowpass', freq: 900 }); // stone clack
       tone(150, 0.12, { type: 'sine', gain: 0.16, sweepTo: 65 }); // dense body thud
       noise(0.06, { gain: 0.08, type: 'lowpass', freq: 500, t: 0.07 }); // grit trickle
+      break;
+    case 'chime':
+      // A resonant golden bell struck by the ball, under a soft rising horn swell — the Golden Realm.
+      tone(783.99, 0.7, { type: 'sine', gain: 0.14 }); // the bell's fundamental, long ring
+      tone(1174.66, 0.55, { type: 'triangle', gain: 0.08, t: 0.01 }); // its shimmering fifth partial
+      tone(1567.98, 0.45, { type: 'sine', gain: 0.05, t: 0.02 }); // bright upper harmonic
+      tone(392, 0.5, { type: 'sawtooth', gain: 0.05, t: 0.03, sweepTo: 523.25 }); // a warm horn swell beneath
+      noise(0.03, { gain: 0.06, type: 'highpass', freq: 6000 }); // the metallic glint of the strike
       break;
   }
 }

@@ -72,6 +72,7 @@ const TREE_GLYPH: Record<BiomeArchetype, string> = {
   ocean: '🌴', // palm
   cetus: '🪨', // coastal sea-stack
   void: '🪨', // asteroid crag
+  asgard: '🍁', // Yggdrasil golden-leaf ash
 };
 const blockGlyph = (src: 'trees' | 'tents', arch: BiomeArchetype): string =>
   src === 'tents' ? TENT_GLYPH : TREE_GLYPH[arch];

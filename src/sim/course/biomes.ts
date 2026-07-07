@@ -361,6 +361,38 @@ export const BIOMES: readonly Biome[] = [
     roughBreaks: 0.8, // GS-variety-2 broken-fairway frequency
   },
   {
+    // GS-asgard: the Golden Realm atop Yggdrasil — a GRAND, FAIR reward world, the opposite of the
+    // brutal late-game worlds. Wide, generous fairways; a gentle DIVINE TAILWIND lifts every drive a
+    // touch farther (carry just over 1); calm blessed air; low-to-moderate hazards; moderate golden
+    // groves; grand, true greens. Reuses only existing lie/surface kinds (celestial reflecting pools
+    // are ordinary `water`; the gilded deep rough is `deeprough`). NOT a lost-rough world, NO forced
+    // carry. WEIGHT 0: reached only via a later tournament trigger, never the normal biome/route roll
+    // (no theme maps to it) — so `pickBiome` never lands here and cetus-deep stays the table's last row.
+    id: 'asgard-realm',
+    name: 'Asgard',
+    weight: 0,
+    carryMult: 1.08, // a gentle divine tailwind — drives carry a touch farther
+    carryJitter: 0,
+    windBase: 2, // calm, blessed air
+    windWild: 8,
+    hazardKinds: ['water'], // celestial reflecting pools (ordinary penalty water)
+    greensideKind: 'bunker',
+    scatter: [],
+    fairwayWidthMult: 1.14, // grand, generous corridors — a reward world, not a brutal one
+    doglegBias: 0.3,
+    treeDensity: 1.4, // moderate golden-leaf groves line the fairways
+    fairwayBunkers: 1.2,
+    deepRough: 'deeprough', // a gilded tangle guards the inside of the doglegs
+    ponds: 0.8, // the odd celestial pool flanks the corridor (low density, clear of the route)
+    potBunkers: 0.3,
+    fescue: 0.6, // golden native grass lines the deep rough
+    greenSize: 1.1, // grand, true greens
+    greenAspect: 1.8,
+    greenIrregular: 1.0,
+    greenSlopeMax: 0.4, // GS-greens-3 green tilt character
+    roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
+  },
+  {
     // GS-cetus: the Whale constellation's clifftop star-ocean. Plays the void's proven-fair island/
     // abyss model (off the clifftop plateau is lost to the star-ocean), reskinned as a luminous deep
     // sea — the render adds a river of stars pouring off the cliffs and whales surfacing below.

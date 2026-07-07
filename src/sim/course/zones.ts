@@ -239,6 +239,26 @@ export const ZONES: Record<BiomeArchetype, ZoneProfile> = {
     ],
     difficulty: 4,
   },
+  asgard: {
+    archetype: 'asgard',
+    name: 'Asgard',
+    signature: 'The Golden Realm',
+    inspiration:
+      'The Norse realm of the gods atop the world-tree Yggdrasil, reached by the shimmering Bifröst — Valhalla’s gilded halls over the emerald fields of Iðavöllr.',
+    brief:
+      'The grandest, fairest stop on the voyage — a reward, not a trial. Gilded emerald fields roll wide and generous beneath a royal twilight, a divine tailwind carries every drive a touch farther, and Yggdrasil’s golden groves frame true, forgiving greens. Golf as the gods play it.',
+    hazards: [
+      { icon: '🌳', text: 'Yggdrasil’s golden groves line the fairways' },
+      { icon: '💧', text: 'Celestial reflecting pools flank the corridor (penalty)' },
+      { icon: '🟡', text: 'Gilded greenside & fairway bunkers' },
+    ],
+    benefits: [
+      { icon: '🪽', text: 'A divine tailwind — drives carry a touch farther' },
+      { icon: '↔️', text: 'Grand, generous fairways — the widest on the voyage' },
+      { icon: '🎯', text: 'True, honest greens — a stage for heroes' },
+    ],
+    difficulty: 2,
+  },
 };
 
 export function zoneProfile(archetype: BiomeArchetype): ZoneProfile {
@@ -661,6 +681,50 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
       eagle: ['An eagle over the abyss — fearless carries.', 'Two under above the deep. The whales approve.'],
       blowup: ['The star-ocean swallowed one whole back there. It’s hungry. Onward.', 'One ball lost to the deep — let the whales keep it. Keep going.'],
       birdieBlitz: ['Birdies breaching everywhere — the whole pod is jealous.', 'A run of birdies over the deep. Luminous stuff.'],
+    },
+  },
+  asgard: {
+    name: 'Bragi Gullbeard',
+    title: 'Warden of the Golden Realm',
+    quips: {
+      scraped: [
+        'You scraped onto the sacred turf by the width of a god’s eyelash. Fortunate mortal.',
+        'The Aesir permit you passage — barely. Even Loki golfs tidier than that.',
+        'A pass, if we’re generous — and I, keeper of the finest links in the Nine Realms, am generous.',
+      ],
+      solid: [
+        'Respectable golf for one not born of Asgard. The fields approve.',
+        'Steady work on the gods’ own fairways — few walk them and score at all.',
+        'Solid. You are almost worthy of Iðavöllr’s green. Almost.',
+      ],
+      great: [
+        'Now THAT is golf fit for Valhalla’s feast-tables! The gods raise their horns.',
+        'Magnificent striking — Yggdrasil itself leaned in to watch.',
+        'Great play, mortal. The Bifröst gleams a little brighter for it.',
+      ],
+      stellar: [
+        'By Odin’s beard — I have wardened these golden links an age and rarely seen its equal!',
+        'Stellar. The skalds will sing this round in the mead-halls for a hundred winters.',
+        'Flawless upon the realm of the gods. Take your prize — you have earned a seat at the high table.',
+      ],
+    },
+    reactions: {
+      ace: [
+        'A hole-in-one in ASGARD?! Heimdall sounded the Gjallarhorn for that one!',
+        'An ACE on the gods’ own green — the halls of Valhalla ring with it!',
+      ],
+      eagle: [
+        'An eagle upon the golden fields — soaring, godlike stuff!',
+        'Two under in the Realm of the gods. The Aesir salute you.',
+      ],
+      blowup: [
+        'Even here one hole turned against you — the Norns weave a cruel thread now and then. Rise.',
+        'A blow-up on sacred ground. Shake it off, mortal — Valhalla forgives the bold.',
+      ],
+      birdieBlitz: [
+        'Birdies raining gold across Iðavöllr — a run worthy of the sagas!',
+        'A flurry of birdies in the Golden Realm. The gods are entertained.',
+      ],
     },
   },
 };

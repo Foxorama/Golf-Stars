@@ -88,6 +88,7 @@ export const OB_LOOK: Record<BiomeArchetype, ObLook> = {
   fungal: { post: '#caa8e8', cap: '#7af0c0', line: 'rgba(150,240,190,0.14)', glow: 'rgba(120,240,190,0.32)' }, // glowing spore lamps
   ocean: { post: '#f4f4f4', cap: '#ff6a3c', line: 'rgba(244,244,244,0.16)' }, // channel buoys
   cetus: { post: '#bfe8f0', cap: '#5fd8dc', line: 'rgba(150,235,245,0.16)', beacon: 'rgba(120,230,240,0.42)' }, // luminous sea-marks adrift
+  asgard: { post: '#e8d48a', cap: '#ffcf4a', line: 'rgba(232,212,138,0.18)', glow: 'rgba(255,210,110,0.34)' }, // gilded rune-pillars with a Bifröst-banner cap glow
 };
 
 /**
@@ -238,6 +239,16 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#3aa0aa',
     rough: { light: '#254c64', base: '#1a3a50', dark: '#112a3a', ink: '#061420' },
   },
+  // Asgard — GILDED EMERALD: jewel-green fairways with a golden sheen, luminous emerald greens, a gold
+  // apron collar. The rough is a rich gilded meadow (base mean ~75/255, comfortably clear of the deep
+  // royal-indigo space base ~21/255 — the ≥30 rough-vs-space brightness gap the frame test enforces).
+  asgard: {
+    fairway: { light: '#5ec878', base: '#3fa85e', dark: '#2f8248', ink: '#154020' },
+    green: { light: '#8ff0a0', base: '#6fe086', dark: '#4fb865', ink: '#1d5028' },
+    tee: { light: '#c4b256', base: '#a99a44', dark: '#877a34', ink: '#463f18' },
+    collar: '#c9a84a',
+    rough: { light: '#3f8a5a', base: '#2f6a48', dark: '#215034', ink: '#0f2c1e' },
+  },
 };
 
 /** Lum-only deepen tint so a rarer stop reads a touch richer (1 = neutral). */
@@ -303,6 +314,9 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   // Cetus — the star-ocean: an abyssal blue-black sea, a bioluminescent cyan bloom, a glowing
   // cliff-shore where the plateau meets the deep (the surrounding void IS the ocean the whales swim).
   cetus: { base: '#020a12', nebula: 'rgba(70,190,225,0.13)', edge: 'rgba(120,230,240,0.22)' },
+  // Asgard — the Golden Realm: a royal indigo→violet twilight (deep base) with a violet nebula and a
+  // warm GOLD horizon glow at the shore where the emerald fields meet the celestial sky.
+  asgard: { base: '#0e0a26', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(255,205,90,0.24)' },
 };
 
 /**

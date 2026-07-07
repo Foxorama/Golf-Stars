@@ -358,6 +358,7 @@ const WIND_COL: Record<BiomeArchetype, string> = {
   fungal: 'rgba(150,240,190,', // drifting glowing spores
   ocean: 'rgba(190,235,230,', // sea spray
   cetus: 'rgba(150,235,245,', // luminous sea-spray off the deep
+  asgard: 'rgba(255,240,190,', // pale divine gold-white — drifting light off the Golden Realm
 };
 
 /** Unit SCREEN direction the wind blows, from a hole's `Wind.dir` (course bearing) through the
