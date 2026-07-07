@@ -197,6 +197,58 @@ function polyPoints(poly: Vec[], project: (p: Vec) => Vec): string {
     .join(' ');
 }
 
+/** Stable id for the putt break-line overlay group — lets the interactive aim nudge redraw only
+ *  the break line (renderPuttOverlaySVG) rather than the whole scene (the putt-zoom-lag fix). */
+export const PUTT_OVERLAY_ID = 'gs-putt-overlay';
+
+/** Build the putt break-line elements (the dotted curl + terminus/finish marker) for the current
+ *  aim, projected by `place`. Returns [] when there's no putt path. Shared by the full-scene render
+ *  and the surgical overlay-only refresh so the drawn line is byte-identical either way. */
+function puttOverlayParts(place: (p: Vec) => Vec, opts: RenderOptions): string[] {
+  if (!opts.puttPath || opts.puttPath.length <= 1) return [];
+  const out: string[] = [];
+  const pts = opts.puttPath.map((p) => place(p));
+  const n = pts.length;
+  const toPath = (seg: Vec[]) => seg.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  // GS-putt-depth (retuned GS-putt-read): draw ONLY the confident read (out to the putter's range)
+  // — beyond it the line simply STOPS at a terminus dot. The old faint "guessing" tail still traced
+  // the whole break to the cup, which read as a free full-length read; with the blind stretch drawn
+  // as NOTHING, putter upgrades / the Mystic Mole visibly STRETCH the line. `puttReadFrac`
+  // undefined ⇒ the whole line is confident (back-compat / short putt).
+  const frac = opts.puttReadFrac == null ? 1 : Math.max(0, Math.min(1, opts.puttReadFrac));
+  const cut = Math.max(1, Math.round(frac * (n - 1)));
+  const sure = pts.slice(0, cut + 1);
+  out.push(`<path d="${toPath(sure)}" fill="none" stroke="#ffe14a" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" stroke-linecap="round" />`);
+  if (cut < n - 1) {
+    // The read ends HERE — a filled terminus dot; the rest of the break is yours to judge.
+    const edge = pts[cut]!;
+    out.push(`<circle cx="${edge[0].toFixed(1)}" cy="${edge[1].toFixed(1)}" r="2.6" fill="#ffe14a" opacity="0.85" />`);
+  } else {
+    // Full read: a small open ring where the ball finishes (at the cup on the ideal line).
+    const tip = pts[n - 1]!;
+    out.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="0.9" />`);
+  }
+  return out;
+}
+
+/** Redraw ONLY the putt break-line overlay for a new aim, reusing the SAME focus/zoom framing as the
+ *  mounted putt map. Returns the `<g id="gs-putt-overlay">…</g>` group markup, so the interactive
+ *  aim nudge can swap this one element in place — the expensive scene (flora, green contour art,
+ *  isolines) is built once and left untouched. Focus/zoom mode only (the putt screen always sets
+ *  `focus`), so the projector needs no whole-hole fit `extra` and is cheap to rebuild. */
+export function renderPuttOverlaySVG(hole: Hole, opts: RenderOptions = {}): string {
+  const proj = holeProjector(hole, {
+    width: opts.width ?? 360,
+    height: opts.height ?? 640,
+    padding: opts.padding ?? 24,
+    focus: opts.focus,
+    viewRadius: opts.viewRadius,
+    focusBias: opts.focusBias,
+    up: opts.up,
+  });
+  return `<g id="${PUTT_OVERLAY_ID}">${puttOverlayParts((p) => proj.project(p), opts).join('')}</g>`;
+}
+
 /** Build the SVG markup for a hole. Pure: returns a string, touches no DOM. */
 export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   const width = opts.width ?? 360;
@@ -401,29 +453,10 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // (Tee + flagstick are drawn by the shared scene builder, so the map and the play view agree.)
 
   // Predicted putt break line (GS-greens-3): a dotted curve showing how the slope will curl the ball.
-  if (opts.puttPath && opts.puttPath.length > 1) {
-    const pts = opts.puttPath.map((p) => place(p));
-    const n = pts.length;
-    const toPath = (seg: Vec[]) => seg.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
-    // GS-putt-depth (retuned GS-putt-read): draw ONLY the confident read (out to the putter's range)
-    // — beyond it the line simply STOPS at a terminus dot. The old faint "guessing" tail still traced
-    // the whole break to the cup, which read as a free full-length read; with the blind stretch drawn
-    // as NOTHING, putter upgrades / the Mystic Mole visibly STRETCH the line. `puttReadFrac`
-    // undefined ⇒ the whole line is confident (back-compat / short putt).
-    const frac = opts.puttReadFrac == null ? 1 : Math.max(0, Math.min(1, opts.puttReadFrac));
-    const cut = Math.max(1, Math.round(frac * (n - 1)));
-    const sure = pts.slice(0, cut + 1);
-    parts.push(`<path d="${toPath(sure)}" fill="none" stroke="#ffe14a" stroke-width="2" stroke-dasharray="3 3" opacity="0.9" stroke-linecap="round" />`);
-    if (cut < n - 1) {
-      // The read ends HERE — a filled terminus dot; the rest of the break is yours to judge.
-      const edge = pts[cut]!;
-      parts.push(`<circle cx="${edge[0].toFixed(1)}" cy="${edge[1].toFixed(1)}" r="2.6" fill="#ffe14a" opacity="0.85" />`);
-    } else {
-      // Full read: a small open ring where the ball finishes (at the cup on the ideal line).
-      const tip = pts[n - 1]!;
-      parts.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3" fill="none" stroke="#ffe14a" stroke-width="1.6" opacity="0.9" />`);
-    }
-  }
+  // Wrapped in a stable-id group so an aim nudge can redraw JUST this overlay (renderPuttOverlaySVG)
+  // instead of rebuilding the whole scene — the break line is the only thing that moves per nudge.
+  const puttParts = puttOverlayParts(place, opts);
+  if (puttParts.length) parts.push(`<g id="${PUTT_OVERLAY_ID}">`, ...puttParts, `</g>`);
 
   if (opts.ball) {
     const [bx, by] = place(opts.ball);
