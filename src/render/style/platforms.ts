@@ -256,6 +256,22 @@ export const VOID_CLIFF: CliffLook = {
   shadow: 'rgba(3,1,10,0.5)',
   contact: 'rgba(6,3,16,0.36)',
 };
+// Rainbow Road (GS-rainbow-polish): the ribbon floats on a PRISMATIC crystal cliff — a lit magenta
+// brink fading through violet into the deep indigo void, so the road reads as a raised glowing track
+// with real side-on depth (the same layered-cliff treatment Cetus/Void get), not a flat decal. The
+// bright bands whisper the rainbow of the road above; the low strata sink into space.
+export const RAINBOW_CLIFF: CliffLook = {
+  strata: ['#7a4bb0', '#5e3a95', '#452c78', '#31215a', '#1f163d', '#100a22'],
+  deepMix: '#070417',
+  lipA: 'rgba(255,180,235,0.9)',
+  lipB: 'rgba(235,215,255,0.72)',
+  crackDark: 'rgba(10,4,26,0.5)',
+  crackLit: 'rgba(210,150,255,0.26)',
+  dustA: 'rgba(255,215,245,0.5)',
+  dustB: 'rgba(170,150,255,0.42)',
+  shadow: 'rgba(6,2,18,0.5)',
+  contact: 'rgba(10,4,26,0.36)',
+};
 
 /**
  * Extrude each plateau DOWNWARD into a visible side-on FACE (GS-cetus-3, generalised GS-cetus-5) so a

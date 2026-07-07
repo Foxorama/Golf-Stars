@@ -814,7 +814,7 @@ per-domain painters moved verbatim into `src/render/style/` modules:
   WeakMap caches of the union-merged hazard families, `landPolysCourseFor` (the weather layer's
   star-mask source).
 - `fairway.ts` — grouped `styleFairways` + per-world mow patterns, `styleTee`, the Rainbow Road
-  ribbon.
+  ribbon (grooved/shaded bands + crown sheen, GS-rainbow-polish).
 - `green.ts` — `styleGreen` + the whole green-slope art pipeline (`greenSlopeArt`, projected
   lobes, the cached topo isolines).
 - `hazards.ts` — the sand + liquid family painters (with `embossChildren`), scatter surfaces,
@@ -823,9 +823,10 @@ per-domain painters moved verbatim into `src/render/style/` modules:
 - `ground.ts` — the `GROUND_COVER` table + `groundCover` pass, and the `EGGS` painters +
   `easterEggs`.
 - `platforms.ts` — the cetus/void depth kit: `platformCliffs`, `raisedShelf`, `cetusOcean`
-  (whales), `cetusRiverPath`/`cetusRiver` (the star-river + waterfall).
+  (whales), `cetusRiverPath`/`cetusRiver` (the star-river + waterfall), and the `CETUS_CLIFF`/
+  `VOID_CLIFF`/`RAINBOW_CLIFF` looks (Rainbow Road extrudes its road onto a prismatic cliff too).
 - `effects.ts` — tents/scorch/ground-patch showpieces, the wind streaks, the constellation
-  backdrop.
+  backdrop, and `rainbowSky` (the Rainbow Road aurora + coloured stars, GS-rainbow-polish).
 
 **The load-bearing rule:** `buildScene` (still in style.ts) owns the SEEDED STREAMS and their draw
 order — main `rng`, celestial `crng`, and the dedicated ocean/river/cliff/cover/decor/egg streams
@@ -878,3 +879,41 @@ shots confirmed three tells, all in `styleFairways`:
 gates on `collar`, so void/cetus (no collar — glow rim / raised shelf) and Rainbow Road are
 byte-for-byte identical. Full suite green (1009 tests); gallery re-shot across all ten worlds and
 play-zoom crops eyeballed on verdant + desert (smooth grade, no facets, no sheen line).
+
+## GS-rainbow-polish: the Rainbow Road becomes its own complete world (2026-07-07)
+
+The legendary Rainbow Ball (GS-rainbow) turns every hole into RAINBOW ROAD — a rainbow ribbon
+through the stars, off-road = OOB. Player feedback after shipping it, three parts:
+
+1. **The watch screen showed the ORIGINAL course.** The result-screen play view passed
+   `rainbow: rainbowActive()`, but the INTERACTIVE watch view (the `animatingPlay` `mountPlayView`
+   in `app.ts`, the one you see the moment you strike the ball) did not — so the ball flew over the
+   ordinary biome while the decision map showed rainbow road. One-line fix: thread
+   `rainbow: rainbowActive()` into that call too (both mounts now match). The play view already
+   built the rainbow scene and masked its animated starfield correctly (`landPolysCourseFor(hole,
+   true) → []`, stars everywhere off-road) — only the flag was missing.
+2. **The bands read flat/"rough" — no shading or blending.** `rainbowRibbon` painted hard poster
+   stripes. Now each band is GROOVED (a lit top lip `mixHex(col,#fff,.55)@.5` + a shaded bottom
+   `rgba(6,4,18,.28)`, so adjacent colours meet on a soft ridge, not a printed seam), the whole
+   surface takes the shared LIGHT_UL CROWN SHEEN (two soft up-light washes) and an inner edge shade
+   (`rgba(6,4,18,.30)` sw5) that darkens toward the rails — so the road reads as a crowned glowing
+   track. Still pure geometry, zero rng.
+3. **Give it the Cetus/Void layered-cliff treatment + its own starfield.** Two additions, both
+   gated to `rainbow`:
+   - **Layered cliff.** Each play surface (fairway/green/tee) is now extruded via the SAME
+     `platformCliffs` the lost-rough worlds use, with a new `RAINBOW_CLIFF` look (a lit magenta
+     brink fading through violet into the deep). Drawn FIRST (behind every ribbon — the ribbon caps
+     each plateau) off the dedicated `cliffRng` (previously unused on the rainbow path, so no other
+     stream is perturbed). The road now floats as a raised prismatic mesa with real side-on depth.
+   - **Bespoke starfield.** A dedicated `RAINBOW_SPACE` deep-space look (indigo-violet cosmos,
+     prismatic shore rim) replaces "whatever biome recoloured", plus a `rainbowSky` painter — soft
+     prismatic AURORA curtains bowing across the upper sky + coloured hero stars — drawn OVER the
+     shared starfield off its OWN stream (the shared celestial `crng` stars/planet/comet stay
+     byte-identical) and camera-proof (fixed loop counts). So Rainbow Road reads distinct from
+     Cetus's blue star-ocean and the Void's violet abyss.
+
+**Guarantees:** every addition gates on `rainbow`, so all ten archetypes are byte-for-byte
+unchanged (the camera-stability + biome-identity suites, which never arm rainbow, stay green). No
+new `_gs*`/`?param` hook (rainbow is baked from the loadout at the app boundary), so the test-hub
+guard is untouched. Full suite green (1033 tests); `scripts/rainbow-preview.mjs` added and eyeballed
+across verdant/inferno/frost.
