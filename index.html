@@ -281,6 +281,13 @@
       /* ── Nav doorways: the Trade Market / Clubhouse tiles on the title ────── */
       .gs-navtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 16px; }
       @media (max-width: 460px) { .gs-navtiles { grid-template-columns: 1fr; } }
+      /* Phones: tighten the title's vertical rhythm so all four stacked doorways + hero fit one
+         screen without a scroll (the tiles stack 1-up here, so 150px each overruns short phones). */
+      @media (max-width: 460px) {
+        .gs-seclabel { margin: 13px 0 6px; }
+        .gs-navtiles { margin: 8px 0 12px; }
+        .gs-hero-chips { margin-top: 8px; }
+      }
       .gs-navtile {
         position: relative; display: block; width: 100%; min-height: 134px; padding: 0;
         border-radius: var(--gs-r-lg); border: 1px solid var(--gs-line);
@@ -313,6 +320,13 @@
       .gs-navtile--game .gs-navtile__title,
       .gs-navtile--market .gs-navtile__title,
       .gs-navtile--clubhouse .gs-navtile__title { color: var(--mc); text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 40%, transparent); }
+      /* Phones: the four accent doorways stack 1-up, so 150px each overruns short screens — trim
+         their height (and the caption's top padding to match) so the whole title fits, no scroll.
+         Placed AFTER the 150px rule above so it wins on equal specificity. */
+      @media (max-width: 460px) {
+        .gs-navtile--game, .gs-navtile--market, .gs-navtile--clubhouse { min-height: 122px; }
+        .gs-navtile__cap { padding-top: 22px; padding-bottom: 10px; }
+      }
 
       /* ── Clubhouse: tap-to-restyle character stage + garage bay + slot picker ─ */
       .gs-cstage {
