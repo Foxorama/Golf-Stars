@@ -43,7 +43,7 @@ import {
   type ShopItem,
 } from './economy';
 import { RARITY_C } from './loot';
-import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, startingFuelFor, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { ASGARD_FORMAT, DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, startingFuelFor, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
 import { endlessMilestoneShards, endlessSetGateOverPar, endlessSetToPar, passesEndlessSet, warpBirdieHole } from './endless';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type BossEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
@@ -55,7 +55,7 @@ import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEve
 import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
 import { salvageClubFind } from './salvage';
 import { applyRainbowRoad } from './rainbow';
-import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
+import { ASGARD_THEME, themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
@@ -168,6 +168,11 @@ export interface Run {
    *  the rest of THIS run (they'll turn up in future runs). Snapshotted so a resume keeps the grudge.
    *  Empty on the default path (never fired anyone) → byte-for-byte unchanged. */
   firedCaddies: string[];
+  /** The Rainbow Ball has been SPENT on an Asgard tournament (GS-asgard): win or lose, the run loses the
+   *  Rainbow Ball (stripped from `loadout.perks` on the return) and the Pro Shop must never re-offer it
+   *  this run. Absent/false on every ordinary run → byte-for-byte unchanged. Snapshotted so a resume
+   *  keeps the block. */
+  rainbowConsumed?: boolean;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -1453,6 +1458,9 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
       (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
       (it.caddy !== 'service' || hasCaddy) &&
       (it.id !== 'driver-dan' || ownsDriver) &&
+      // The Rainbow Ball, once SPENT on an Asgard tournament (GS-asgard), never returns to the rack
+      // this run — the run has left Rainbow Road behind for good.
+      (it.id !== 'rainbow-ball' || !run.rainbowConsumed) &&
       // Don't dangle a flat-stick putter you've already met (GS-clubs) — strict rarity upgrade only.
       putterItemOfferable(it, run.loadout),
   );
@@ -1516,6 +1524,7 @@ export function starmartOffer(run: Run, size = STARMART_OFFER_SIZE, salt = 0): S
       (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
       (it.caddy !== 'service' || hasCaddy) &&
       (it.id !== 'driver-dan' || ownsDriver) &&
+      (it.id !== 'rainbow-ball' || !run.rainbowConsumed) && // spent on Asgard, never re-offered (GS-asgard)
       putterItemOfferable(it, run.loadout),
   );
   const clubs = offerableClubs(run.loadout).filter((c) => c.rarity !== 'common');
@@ -1584,6 +1593,9 @@ export interface RunSnapshot {
   /** Caddies fired this run (GS-caddy-factions), so a resume keeps them out of the shop. Absent on an
    *  old snapshot / a run that never fired anyone → nobody fired (byte-for-byte). */
   firedCaddies?: string[];
+  /** The Rainbow Ball was spent on an Asgard tournament (GS-asgard), so a resume keeps it stripped and
+   *  the shop keeps it off the rack. Absent on every ordinary run → byte-for-byte unchanged. */
+  rainbowConsumed?: boolean;
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -1610,6 +1622,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     fuel: run.fuel,
     routeScans: run.routeScans || undefined,
     firedCaddies: run.firedCaddies.length ? [...run.firedCaddies] : undefined,
+    rainbowConsumed: run.rainbowConsumed || undefined,
   };
 }
 
@@ -1647,8 +1660,29 @@ export function resumeRun(snap: RunSnapshot): Run {
     // offer the player paid fuel for, not the original one. Absent on old snapshots → 0.
     routeScans: snap.routeScans ?? 0,
     firedCaddies: snap.firedCaddies ? [...snap.firedCaddies] : [],
+    rainbowConsumed: snap.rainbowConsumed || undefined,
     status: 'active',
     history: [],
+  };
+}
+
+/**
+ * Build the ASGARD tournament run (GS-asgard) — a self-contained nine-hole stroke-play side event on the
+ * Golden Realm, spun off from the player's CURRENT run when they earn an eagle-or-better on Rainbow Road.
+ * It keeps their built-up bag (perks) MINUS the Rainbow Ball, so it plays Asgard's real geometry rather
+ * than the rainbow ribbon; the theme is forced to Asgard (`pendingTheme` object, never `themeById`), so
+ * `currentCourse` generates the `asgard-realm` biome. It is never travelled/shopped and never persisted
+ * (a mid-tournament quit falls back to the suspended run), so it needs no fuel/route state. Deterministic
+ * from the source run + stop.
+ */
+export function startAsgardRun(source: Run): Run {
+  const perks = source.loadout.perks.filter((p) => p !== 'rainbow-ball');
+  const loadout = loadoutFromPerks(perks, baseLoadoutForRun(source));
+  return {
+    ...startRun(`${source.seed}:asgard:${source.stopIndex}`, ASGARD_FORMAT, source.meta, source.loadout.characterId, source.ascension, source.bagTier, source.unlockedClubs),
+    loadout,
+    // The Golden Realm, forced as the destination world (the object, so it never needs a THEMES entry).
+    pendingTheme: ASGARD_THEME,
   };
 }
 

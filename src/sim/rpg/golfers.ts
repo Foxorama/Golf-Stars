@@ -363,6 +363,32 @@ const CHAMPIONS: readonly ChampRow[] = [
   { theme: 'cetus', name: 'Cassia Diphda', shortName: 'Diphda', archetypeId: 'escape', origin: 'Cetus' },
 ];
 
+// --- The Warriors Three (GS-asgard) -------------------------------------------
+
+/**
+ * Asgard's guardians (GS-asgard): the three named opponents of the Bifröst stroke-play tournament. They
+ * are NOT constellation champions (so they never enter the normal field/leaderboard) — bespoke elite
+ * challengers the reducer names directly. Strong but beatable: a booming bomber, a dashing all-rounder,
+ * and a grim, cold-blooded ice-man. `golferProfile`/`bossShotMods` give them real ghost scores for free.
+ */
+export const WARRIORS_THREE: readonly { id: string; name: string; shortName: string; archetypeId: string }[] = [
+  { id: 'warrior:volstagg', name: 'Volstagg the Lion', shortName: 'Volstagg', archetypeId: 'bomber' },
+  { id: 'warrior:fandral', name: 'Fandral the Dashing', shortName: 'Fandral', archetypeId: 'maverick' },
+  { id: 'warrior:hogun', name: 'Hogun the Grim', shortName: 'Hogun', archetypeId: 'iceman' },
+];
+
+function buildWarriorsThree(): Golfer[] {
+  return WARRIORS_THREE.map((w) => ({
+    id: w.id,
+    name: w.name,
+    shortName: w.shortName,
+    archetypeId: w.archetypeId,
+    tier: 'contender' as GolferTier,
+    origin: 'Asgard',
+    look: deriveLook(w.id, w.archetypeId),
+  }));
+}
+
 // --- The field (deterministically built named pack) ---------------------------
 
 const FIELD_FIRST = [
@@ -470,6 +496,7 @@ function buildChampions(): Golfer[] {
 export const GOLFERS: readonly Golfer[] = [
   ...buildChampions(),
   ...buildCharacterRivals(),
+  ...buildWarriorsThree(),
   ...buildField(),
 ];
 

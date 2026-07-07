@@ -35,6 +35,7 @@ import {
   shopOffer,
   snapshotRun,
   startRun,
+  startAsgardRun,
   strand,
   travel,
   bossRewards,
@@ -52,8 +53,9 @@ import {
 import { endlessUnlocksCrossed, addEndlessRecord, type EndlessRunRecord } from '../sim/rpg/endless';
 import { archetypeFor } from '../sim/course/themes';
 import { effectPatchKind } from '../sim/rpg/effects';
-import { isMatchplayBoss } from '../sim/rpg/formats';
+import { isMatchplayBoss, ASGARD_FORMAT } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
+import { warriorsThreeTotals } from '../sim/rpg/competition';
 import {
   playMatchStop,
   playTeamMatchStop,
@@ -109,7 +111,11 @@ export type Screen =
   | 'trademarket'
   | 'clubhouseHall'
   | 'clubhouse'
-  | 'starmart';
+  | 'starmart'
+  // GS-asgard: the Bifröst interlude — the Himinbjörg reveal map, then the win/lose result of the
+  // nine-hole stroke-play tournament against the Warriors Three.
+  | 'asgardMap'
+  | 'asgardResult';
 
 export interface UiState {
   run: Run;
@@ -223,6 +229,15 @@ export interface UiState {
    *  while one is already on the bag, so the shop shows a "they won't be happy to be fired" warning
    *  before the hire goes through. Transient (never persisted); cleared on confirm/cancel. */
   pendingFireCaddy?: { newId: string; oldId: string };
+  /** The suspended real run (GS-asgard): when an eagle-or-better on Rainbow Road opens the Bifröst, the
+   *  current run is snapshotted here while the Asgard tournament plays in `run`. Restored (perks edited)
+   *  on the tournament's end. The Asgard run is never persisted, so a mid-tournament quit resumes THIS. */
+  asgardReturn?: RunSnapshot;
+  /** The finished Asgard tournament result (GS-asgard) — shown on the result splash. */
+  asgardOutcome?: { won: boolean; playerTotal: number; par: number; field: { name: string; total: number }[] };
+  /** A one-shot banner shown on the journey map after returning from Asgard (GS-asgard): the victory or
+   *  the "better luck next time" note. Cleared when the player travels on. Transient. */
+  asgardBanner?: 'won' | 'lost';
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -259,6 +274,8 @@ export type Action =
   | { type: 'autoShotHole' } // AI-finish the current hole
   | { type: 'holeComplete' } // advance to next hole / score the stop
   | { type: 'continue' }
+  | { type: 'crossBifrost' } // GS-asgard: cross the Bifröst from the Himinbjörg map into the Asgard tournament
+  | { type: 'leaveAsgard' } // GS-asgard: leave the Golden Realm (win or lose) and resume the suspended run
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
   | { type: 'buy'; id: string; confirmFire?: boolean } // confirmFire: the caddy-swap warning was accepted (GS-caddy-factions)
   | { type: 'cancelFireCaddy' } // dismiss the caddy-swap "they won't be happy" warning without hiring (GS-caddy-factions)
@@ -597,6 +614,59 @@ function bossRewardFor(run: Run, course: UiState['course'], result: StopResult):
   return bossRewards(run, archetypeFor(course.meta?.themeId, course.biome));
 }
 
+/** The Thor's Hammer cosmetic id (GS-asgard) — the driver skin won by taking the Asgard tournament. */
+const THOR_HAMMER_ID = 'thors-hammer';
+
+/**
+ * The Rainbow-Ball eagle trigger (GS-asgard): a survived, NON-Asgard, ordinary stop where the Rainbow
+ * Ball is armed and the player made an EAGLE-OR-BETTER (a holed hole at ≥2 under — a hole-in-one,
+ * albatross or eagle) opens the Bifröst to the Golden Realm. Reducer-only + gated on the Rainbow Ball,
+ * so it adds no rng draws and the feature-off path is byte-for-byte unchanged.
+ */
+export function asgardPortalOpens(run: Run, played: PlayedHole[]): boolean {
+  return (
+    !!run.loadout.rainbowRoad &&
+    run.formatId !== ASGARD_FORMAT &&
+    played.some((p) => p.holed && p.record.strokes - p.record.par <= -2)
+  );
+}
+
+/** Divert a survived ordinary stop to the Himinbjörg map when the Rainbow-Ball eagle trigger fires
+ *  (GS-asgard); the current run is snapshotted for the post-tournament restore. A no-op otherwise. */
+function withAsgardPortal(next: UiState, run: Run, played: PlayedHole[]): UiState {
+  if (next.screen === 'result' && asgardPortalOpens(run, played)) {
+    return { ...next, screen: 'asgardMap', asgardReturn: snapshotRun(run) };
+  }
+  return next;
+}
+
+/**
+ * Resolve the Asgard STROKE-PLAY tournament (GS-asgard): the player's real nine-hole gross against the
+ * Warriors Three's deterministic ghost totals. Lowest total wins, ties to the player (a hard-won reward
+ * event). A win banks the Thor's Hammer cosmetic here; the Odin's Favour perk + the Rainbow-Ball removal
+ * land on the resumed run at `leaveAsgard`. Win OR lose, the player is handed back to their journey.
+ */
+function resolveAsgard(state: UiState, played: PlayedHole[]): UiState {
+  const pars = state.course.holes.map((h) => h.par);
+  const playerTotal = played.reduce((s, p) => s + p.record.strokes, 0);
+  const field = warriorsThreeTotals(`${state.run.seed}`, pars);
+  const won = playerTotal <= Math.min(...field.map((f) => f.total));
+  const ownedApparel =
+    won && !state.ownedApparel.includes(THOR_HAMMER_ID) ? [...state.ownedApparel, THOR_HAMMER_ID] : state.ownedApparel;
+  return {
+    ...state,
+    played,
+    stopPlayed: undefined,
+    play: undefined,
+    holeRng: undefined,
+    match: undefined,
+    viewHole: 0,
+    screen: 'asgardResult',
+    ownedApparel,
+    asgardOutcome: { won, playerTotal, par: pars.reduce((a, b) => a + b, 0), field },
+  };
+}
+
 export function reduce(state: UiState, action: Action): UiState {
   switch (action.type) {
     case 'start': {
@@ -727,11 +797,15 @@ export function reduce(state: UiState, action: Action): UiState {
         };
       }
       const { run, result, played } = playStop(state.run, { prevBestHoles: state.endlessBestHoles });
+      // The Asgard tournament (GS-asgard) is scored on total gross vs the Warriors Three, not the cut —
+      // resolve it here instead of the ordinary result flow (a watched Asgard stop still resolves).
+      if (state.run.formatId === ASGARD_FORMAT) return resolveAsgard(state, played);
       // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
       // the gameover/victory screen; a survived non-final stop goes to the result screen.
       const ended = run.status !== 'active';
       const endless = endlessProgressUpdates(state, run);
-      return {
+      // An eagle-or-better on Rainbow Road diverts to the Himinbjörg map instead (GS-asgard).
+      return withAsgardPortal({
         ...state,
         run,
         played,
@@ -745,7 +819,7 @@ export function reduce(state: UiState, action: Action): UiState {
         ...endless,
         ...runEndUpdates(state, run),
         ...aceUpdates(state, result, endless.ownedShips ?? state.ownedShips),
-      };
+      }, run, played);
     }
 
     case 'warpStop': {
@@ -969,11 +1043,15 @@ export function reduce(state: UiState, action: Action): UiState {
       if (nextIdx < total) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
+      // The Asgard tournament (GS-asgard) is decided on total gross vs the Warriors Three — resolve it
+      // here rather than through the ordinary Stableford-cut flow.
+      if (state.run.formatId === ASGARD_FORMAT) return resolveAsgard(state, stopPlayed);
       // Set complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed, { prevBestHoles: state.endlessBestHoles });
       const ended = run.status !== 'active';
       const endless = endlessProgressUpdates(state, run);
-      return {
+      // An eagle-or-better on Rainbow Road diverts to the Himinbjörg map instead (GS-asgard).
+      return withAsgardPortal({
         ...state,
         run,
         stopPlayed: undefined,
@@ -990,7 +1068,7 @@ export function reduce(state: UiState, action: Action): UiState {
         ...endless,
         ...runEndUpdates(state, run),
         ...aceUpdates(state, result, endless.ownedShips ?? state.ownedShips),
-      };
+      }, run, stopPlayed);
     }
 
     case 'continue': {
@@ -1006,6 +1084,63 @@ export function reduce(state: UiState, action: Action): UiState {
         screen: 'shop',
         shopOffer: shopOffer(state.run).map((o) => o.item.id),
         shopRerolls: 0,
+      };
+    }
+
+    case 'crossBifrost': {
+      // Cross the Bifröst from the Himinbjörg map into the Asgard tournament (GS-asgard). The suspended
+      // real run stays parked in `asgardReturn`; `run` becomes a fresh, self-contained nine-hole stroke
+      // -play run on the Golden Realm (the player's bag minus the Rainbow Ball). Drop straight onto the
+      // first hole — the Himinbjörg map WAS the between-stop screen.
+      if (state.screen !== 'asgardMap' || !state.asgardReturn) return state;
+      const run = startAsgardRun(state.run);
+      const course = currentCourse(run);
+      return {
+        ...state,
+        run,
+        course,
+        screen: 'playing',
+        holeRng: new Rng(`${course.seed}:play`),
+        stopPlayed: [],
+        play: beginHole(course.holes[0]!, 0),
+        match: undefined,
+        played: undefined,
+        lastResult: undefined,
+        mulliganPending: undefined,
+        starmartOffer: undefined,
+        starmartRerolls: undefined,
+        viewHole: 0,
+      };
+    }
+
+    case 'leaveAsgard': {
+      // Leave the Golden Realm (win or lose) and resume the suspended run at its journey map (GS-asgard).
+      // Win OR lose the run loses the Rainbow Ball for good (stripped from perks + `rainbowConsumed` so
+      // the shop never re-offers it); a WIN also grants the Odin's Favour perk. The Thor's Hammer cosmetic
+      // was already banked at `resolveAsgard`.
+      if (state.screen !== 'asgardResult' || !state.asgardReturn) return state;
+      const won = !!state.asgardOutcome?.won;
+      const perks = state.asgardReturn.perks.filter((p) => p !== 'rainbow-ball');
+      const editedPerks = won ? [...perks, 'talent-odins-favour'] : perks;
+      const run = resumeRun({ ...state.asgardReturn, perks: editedPerks, rainbowConsumed: true });
+      return {
+        ...state,
+        run,
+        course: currentCourse(run),
+        screen: 'travel',
+        routes: routeOptions(run),
+        asgardReturn: undefined,
+        asgardOutcome: undefined,
+        asgardBanner: won ? 'won' : 'lost',
+        played: undefined,
+        lastResult: undefined,
+        match: undefined,
+        bossReward: undefined,
+        stopPlayed: undefined,
+        play: undefined,
+        holeRng: undefined,
+        shopOffer: undefined,
+        viewHole: 0,
       };
     }
 
@@ -1158,6 +1293,7 @@ export function reduce(state: UiState, action: Action): UiState {
         routes: undefined,
         match: undefined,
         bossReward: undefined,
+        asgardBanner: undefined, // the Asgard return note is a one-shot on the journey map (GS-asgard)
         viewHole: 0,
       };
     }

@@ -68,7 +68,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v21**; bump + add a migration when you
+  (localStorage is the only copy). Current schema is **v22**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -190,6 +190,19 @@ these systems** — each bullet is the tip of a documented iceberg.
     fuel pours ONCE in `buy`, never in `apply` (resume would double-grant).
   - Milestone cosmetics are EARN-ONLY (`unlockHoles` rows; `canBuy*` refuses); a hole-in-one is the
     only way to earn the secret Comet Rider ship (`aceUpdates` on ANY ace, not a first-ace flag).
+  - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard): an eagle-or-better on RAINBOW ROAD
+    (`asgardPortalOpens`, reducer-only + gated on the ball → zero rng, feature-off byte-identical) opens
+    the Bifröst — instead of the result/shop it diverts to the Himinbjörg map, then a nine-hole STROKE-
+    play tournament vs the Warriors Three (three bespoke `contender` golfers; `warriorsThreeTotals` ghost
+    gross, lowest wins, ties→player). The real run is SUSPENDED (`asgardReturn` snapshot); the Asgard run
+    (`startAsgardRun`, format `asgard`, `pendingTheme` = the `ASGARD_THEME` object so it never needs a
+    THEMES entry) plays the player's bag MINUS the Rainbow Ball. It is NEVER persisted (`persist` parks
+    `asgardReturn` instead → a mid-tournament quit resumes the journey). Win OR lose, the return strips
+    `rainbow-ball` + sets `run.rainbowConsumed` (the shop never re-offers it); a WIN also banks the
+    Thor's Hammer cosmetic + the `talent-odins-favour` perk. Then it resumes at the travel screen.
+  - The cosmetic **`driver` apparel slot** (GS-thor) is the club skin the golfer swings; Thor's Hammer is
+    `secret` (earn-only, hidden until owned) and won on Asgard. Same EQUIP/reveal plumbing as the other
+    slots (save v22 `driverByCharacter`); rendered in the swing + leaning at the clubhouse fireplace.
   - Pro Shop rarity is VOYAGE-paced (`voyageRarityBias` keyed off the STOP; endless keeps
     `rarityDepthBias`) — it reweights WHICH item is drawn, never the rng COUNT. Every shop item is
     a one-shot; the `stackable` plumbing stays dormant for save back-compat.

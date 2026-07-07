@@ -1577,6 +1577,15 @@ export const TALENTS: readonly ShopItem[] = [
     desc: 'A hole-in-one earns a touch you keep — 8% tighter dispersion (stacks with every ace).',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.92, perks: [...m.perks, 'talent-ace'] }),
   },
+  // Odin's Favour (GS-asgard) — the victory prize for winning the Asgard tournament. Granted ONLY by the
+  // reducer on an Asgard win (its `'asgard'` archetype is matched by no real zone, so `talentsForArchetype`
+  // never offers it at a boss). A god's blessing of BOTH power and precision — +14 yds on the distance
+  // clubs and 10% tighter dispersion — kept for the rest of the run and rebuilt from `perks` on resume.
+  {
+    id: 'talent-odins-favour', name: "Odin's Favour", archetype: 'asgard', cost: 0, rarity: 'legendary', talent: true,
+    desc: "The Allfather's blessing — +14 yds on your distance clubs and 10% tighter dispersion for the rest of the run.",
+    apply: (m) => ({ ...m, bag: boostDistanceClubs(m.bag, 14), distanceClubBonus: (m.distanceClubBonus ?? 0) + 14, dispersionMult: m.dispersionMult * 0.9, perks: [...m.perks, 'talent-odins-favour'] }),
+  },
 ];
 
 const talentById = new Map(TALENTS.map((t) => [t.id, t]));

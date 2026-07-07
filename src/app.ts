@@ -24,7 +24,7 @@ import { bearing, dist, type Hole, type Vec } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
-import { getFormat } from './sim/rpg/formats';
+import { getFormat, ASGARD_FORMAT } from './sim/rpg/formats';
 import { currentBoss, effectiveCut, holeGateArmed, snapshotRun } from './sim/rpg/run';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
@@ -81,6 +81,7 @@ import { shopScreen, shopView, starmartScreen } from './app/shopScreens';
 import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketScreens';
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { routeInfoOverlay, travelScreen, travelView } from './app/travelScreens';
+import { asgardMapScreen, asgardResultScreen } from './app/asgardScreens';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -198,8 +199,13 @@ function persist(): void {
     // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
     // moment anything dispatched from the title. While no real run is live, any resumable offer
     // the state carries (a reload's, or one parked by 'toTitle') is kept instead of wiped.
+    // The Asgard tournament run (GS-asgard) is NEVER persisted — a mid-tournament quit resumes the
+    // SUSPENDED real run (the Asgard attempt is forfeited, the Rainbow Ball intact), so persist the
+    // parked snapshot instead of the ephemeral tournament run.
     activeRun:
-      state.run.status === 'active' && state.run.loadout.characterId
+      state.run.status === 'active' && state.run.formatId === ASGARD_FORMAT
+        ? state.asgardReturn
+        : state.run.status === 'active' && state.run.loadout.characterId
         ? snapshotRun(state.run)
         : state.resumable,
   });
@@ -1669,6 +1675,10 @@ function render(): void {
       ? clubhouseHallScreen()
       : state.screen === 'clubhouse'
       ? clubhouseScreen()
+      : state.screen === 'asgardMap'
+      ? asgardMapScreen()
+      : state.screen === 'asgardResult'
+      ? asgardResultScreen()
       : gameoverScreen();
 
   // The interactive play screen (decision / watching / putting — but not the hole-complete card) is

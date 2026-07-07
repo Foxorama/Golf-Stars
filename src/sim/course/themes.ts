@@ -204,6 +204,24 @@ export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
   asgard: ['distance', 'skill'], // a grand reward world — big carries down wide fairways, rewarded striking
 };
 
+/**
+ * ASGARD (GS-asgard) — the standalone theme the Bifröst tournament flies into. It is NOT part of the
+ * pickable `THEMES` pool (so it never turns up on a normal route or in `themeById`) — the reducer sets
+ * it as the Asgard run's `pendingTheme` OBJECT directly, so `currentTheme`/`resolveBiome` resolve the
+ * `asgard-realm` biome without it ever leaking into ordinary play. `kind: 'deepsky'` needs no champion.
+ */
+export const ASGARD_THEME: Theme = {
+  id: 'asgard',
+  name: 'Asgard',
+  kind: 'deepsky',
+  rarity: 'legendary',
+  arc: 3,
+  archetype: 'asgard',
+  anchor: 'Ásgarðr',
+  blurb: 'The Golden Realm atop Yggdrasil — cross the Bifröst and face the Warriors Three.',
+  unique: true,
+};
+
 /** How much an on-theme item's shop weight is multiplied (soft bias, not a filter). */
 export const ITEM_AFFINITY_BOOST = 2.2;
 
