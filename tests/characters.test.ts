@@ -116,13 +116,18 @@ describe('character balance — each viable, none dominant (CLAUDE.md balance ru
       // (proper doglegs with filled corners, greenside rings, approach lakes, broken fairways) nudge
       // the auto reach-AI's mean up a touch further — variety was deliberately prioritised over the
       // difficulty bar (tuned per-hole later).
-      expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.3);
+      // TODO(GS-rough-gradient): the deliberate rough/tree increase (drive play back to the fairway,
+      // balance to follow) lifted the sparsest-bag mean a touch further (~1.34). Interim fence bump —
+      // re-tighten in the post-rough rebalance, not by softening the rough.
+      expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.45);
       // REGRESSION FENCE, not the design target. The real floor-hit (par+MAX_OVER_PAR pick-up) rate for
-      // the sparse starter bags at MAX wildness is ~13–14% with the auto reach-AI — well above contract
-      // #4's aspirational "<5% blow-ups", which the sparse bags miss pending the GS-cetus-6 AI/scoring
-      // rebalance. This bar only catches the rate getting WORSE than today's ceiling; closing the gap to
-      // 5% is deferred balance work (a richer starter bag / a smarter reach-AI), NOT a test-threshold tweak.
-      expect(blow, `${ch.id} floor-hit rate ${(blow * 100).toFixed(1)}%`).toBeLessThan(0.2);
+      // the sparse starter bags at MAX wildness is ~20% with the auto reach-AI — well above contract #4's
+      // aspirational "<5% blow-ups", which the sparse bags miss pending the AI/scoring rebalance.
+      // TODO(GS-rough-gradient): the deliberate rough/tree increase lifted the sparsest bag's floor-hit
+      // rate from ~13–14% to ~20% at MAX wildness. This bar only catches the rate getting WORSE than
+      // today's ceiling; closing the gap to 5% is deferred balance work (a richer starter bag / a smarter
+      // reach-AI that plays back to the fairway), NOT by softening the rough.
+      expect(blow, `${ch.id} floor-hit rate ${(blow * 100).toFixed(1)}%`).toBeLessThan(0.25);
     }
   });
 

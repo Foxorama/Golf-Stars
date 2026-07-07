@@ -14,6 +14,20 @@ function fairwayHalf(h: Hole): number {
   return max;
 }
 
+/** Fine samples down the hole's mown centreline — the route the fairway follows. */
+function centrelineSamples(h: Hole): Vec[] {
+  const out: Vec[] = [];
+  for (let i = 0; i + 1 < h.centreline.length; i++) {
+    const a = h.centreline[i]!;
+    const b = h.centreline[i + 1]!;
+    for (let k = 0; k < 8; k++) {
+      const f = k / 8;
+      out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+    }
+  }
+  return out;
+}
+
 describe('deep rough (GS-deep-rough)', () => {
   it('deep rough is the DEEPEST recoverable land lie — non-penalty, harsher than fescue/rough', () => {
     expect(lieInfo('deeprough').penalty).toBeUndefined(); // a hack-out, never a lost card
@@ -22,21 +36,25 @@ describe('deep rough (GS-deep-rough)', () => {
     expect(lieInfo('deeprough').dispersionMult).toBeGreaterThan(lieInfo('fescue').dispersionMult);
   });
 
-  it('land worlds choke a dogleg CORNER with deep rough, OFF the corridor, staying valid + fair', () => {
+  it('land worlds LINE the rough with heavy deep rough, keeping the mown route clean + staying fair', () => {
+    // GS-rough-gradient: deep rough now HUGS the fairway edge (a heavy-rough band that drives play back
+    // to the fairway), not just the far dogleg corner — so it no longer sits entirely beyond the widest
+    // half-width. What still holds: it never sits ON the mown route (heavy rough LINES the fairway, it
+    // doesn't block it), and every structural fairness contract is intact (all kinds are non-penalty).
     let deep = 0;
     for (let s = 0; s < 40; s++) {
       for (const biome of ['verdant-station', 'dust-belt', 'ice-ring', 'ember-world', 'spore-jungle']) {
         const c = generateCourse(s + 40000, { biome, holes: 4, wildness: 0.7 });
         expect(validateCourse(c)).toEqual([]);
-        expect(validateFairness(c)).toEqual([]); // deep rough is non-penalty AND off the corridor
+        expect(validateFairness(c)).toEqual([]); // deep rough is non-penalty → fairness ignores it
         expect(validateCrossings(c)).toEqual([]);
         expect(validateGreenApproach(c)).toEqual([]); // deep rough never fouls a greenside ring's approach
         for (const h of c.holes) {
-          const half = fairwayHalf(h);
-          for (const z of h.hazards.filter((x) => x.kind === 'deeprough')) {
-            deep++;
-            // every deep-rough vertex stays clear of the corridor — the fairway route is untouched
-            for (const p of z.poly) expect(polylineDist(p as Vec, h.centreline)).toBeGreaterThan(half);
+          deep += countKind(c.holes, 'deeprough') > 0 ? 1 : 0;
+          // The mown route down the centreline is never heavy rough / trees — it lines the hole, not blocks it.
+          for (const p of centrelineSamples(h)) {
+            const lie = lieAt(h, p);
+            expect(lie === 'deeprough' || lie === 'fescue' || lie === 'trees').toBe(false);
           }
         }
       }
@@ -96,13 +114,22 @@ describe('deep rough (GS-deep-rough)', () => {
     }
   });
 
-  it('the forgiving OPENER stays cuttable: no deep rough below the wildness gate', () => {
+  it('calm stops now get a heavy-rough BUFFER too (GS-rough-gradient), but the mown route stays clean', () => {
+    // The forgiving opener no longer means "no deep rough" — the ask flipped: calm stops get MORE
+    // deep rough AROUND the fairway (a wide, recoverable buffer so a wild spray isn't punished hard).
+    // What still holds: that heavy rough LINES the fairway, it never blocks the mown centreline route.
     let deepCalm = 0;
     for (let s = 0; s < 80; s++) {
       const c = generateCourse(s + 44000, { biome: 'verdant-station', holes: 4, wildness: 0.15 });
       deepCalm += countKind(c.holes, 'deeprough');
+      for (const h of c.holes) {
+        for (const p of centrelineSamples(h)) {
+          const lie = lieAt(h, p);
+          expect(lie === 'deeprough' || lie === 'fescue' || lie === 'trees').toBe(false);
+        }
+      }
     }
-    expect(deepCalm).toBe(0);
+    expect(deepCalm).toBeGreaterThan(0); // a calm stop DOES carry a heavy-rough buffer now
   });
 
   it('is deterministic — same seed generates byte-identical deep rough', () => {

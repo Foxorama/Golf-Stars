@@ -93,7 +93,59 @@
   pass), no new `_gs*`/URL hook, so the test-hub guard needs nothing. Re-shoot
   `scripts/deeprough-preview.mjs` after any `styleDeepRough`/`DEEP_ROUGH` change; guarded by
   `tests/deep-rough.test.ts` (lie ordering, off-corridor placement + fairness, the cut-line is choked,
-  the ocean's sea carry, void/cetus untouched, the calm-opener gate, determinism).
+  the ocean's sea carry, void/cetus untouched, the calm-opener gate, determinism). NOTE: GS-rough-gradient
+  (below) later overturned the "deeprough only chokes the far corner, gated off calm" invariant — deep
+  rough now ALSO lines every fairway edge at all wildness, so `tests/deep-rough.test.ts`' placement/gate
+  assertions were retargeted to "the mown centreline route stays clean" (the cut-line-choked + ocean-sea
+  + void-untouched + determinism cases still hold).
+- **ROUGH GRADIENT — heavy rough hugs the fairway, trees thicken with distance (GS-rough-gradient).**
+  Player report: "it's far too easy to play straight through the rough and ignore the actual golf holes —
+  add a lot more trees and heavy rough to ALL difficulties." Off the fairway used to be mostly LIGHT
+  `rough` (carry 0.9) with only sparse scattered tree/fescue blobs, so a sprayed ball just bounced through
+  it and paid no real price for missing the hole. The fix is a new generator pass that FILLS the
+  off-corridor rough with a distance-graded mix: a HEAVY-ROUGH band (`deeprough`/`fescue`) hugging the
+  fairway edge (near-continuous, so a miss is caught), and beyond it the world's `trees` thickening the
+  further out you go ("the further away, the more forest"). The ONLY difficulty lever is the SHAPE, not
+  fairness (every kind is NON-penalty, so `validateFairness` ignores them and they may hug the edge):
+  - **Calm stops** — a WIDE, recoverable heavy-rough BUFFER with the trees pushed far out, uniform hole
+    to hole. A wild spray lands in deep rough it can hack out of, not the woods — "so a wild spray isn't
+    as punishing" on the easy stops (the explicit ask).
+  - **Wild stops** (≥ `ROUGH_CHAR_MIN_WILDNESS` 0.45) — a per-hole CHARACTER roll off the side stream:
+    a TIGHT tree chute (canopies crowd the edge), a heavy-rough gauntlet (deep rough at the edge), or a
+    mixed hole, and the forest also thickens with wildness. So the hard stops read "a lot more random".
+  - **World identity via `treeDensity`** — the forest ring count/plant probability scale by the world's
+    `treeDensity`, so desert stays scrubby (few trees, still a real heavy-rough band) and jungle/parkland
+    wall the fairway. The OCEAN keeps a `fescue`-only band (its heavy rough is a sandy DUNE shore; its
+    deep-rough-cut is the SEA), so it never uses the land `deeprough` lie — `heavyKind` keys off
+    `biome.deepRough === 'water'`.
+  - **A `standoff(r) = r·1.34 + 1`** keeps every blob fully OUTSIDE the LOCAL corridor edge (using the
+    per-point `leftHW`/`rightHW` half-widths, not just the global widest), so heavy rough LINES the
+    fairway but never sits on the mown centreline route — a sensible shot down the middle is always clean
+    (machine-checked in `tests/deep-rough.test.ts` + `tests/hazards2.test.ts`). Small tree canopies
+    (r 3.5–6) so a "tight" chute hugs close without poking onto the fairway. `maxLat` caps the deepest
+    trees near the old treeline's reach (`edge + 96`) so `playBounds` — and the OB box derived from all
+    terrain — doesn't balloon the hole out on the wide heavy-rough holes.
+  - **CRITICAL — DEDICATED side stream.** The whole pass draws from `new Rng(`${seed}:rough:${holeIndex}`)`
+    (the pin/slope/contour pattern), NOT the main terrain `rng`. So it perturbs ZERO existing draws: every
+    penalty crossing/pond, green, grove, the whole terrain GEOMETRY, and `validateCrossings`/
+    `validateFairness` stay byte-for-byte identical — only the (non-penalty) rough hazards are ADDED. This
+    is why the scattered legacy treeline/fescue passes were KEPT (unchanged, on the main stream): removing
+    them would have reflowed the main stream and re-surfaced a latent crossing-clamp edge case
+    ("creek crowds the green"). The side stream sidesteps all of that; the legacy scatter just reinforces
+    the same forest. `GENERATOR_VERSION` 18→19 (output changed — hazards added — even though geometry
+    didn't). The renderer needs NOTHING new: it already dispatches `trees`/`deeprough`/`fescue` per
+    archetype, so the gradient renders as that world's flora/tangle automatically.
+  - **Balance was DELIBERATELY not re-tuned** (the ask: rough/trees FIRST, "we will then go and rebalance
+    afterwards"). The course is meaningfully harder now — max-wildness `toPar/hole` sits ~1.0–1.4 and the
+    floor-hit (pick-up) rate roughly doubled to ~10% (≈20% for the sparsest character bags), just over the
+    old bars. The death-spiral fences in `tests/{biomes,themes,patches,characters}.test.ts` were relaxed
+    to this interim reality with a greppable `TODO(GS-rough-gradient)` on each — they are REGRESSION
+    FENCES (catch a WORSE spiral), not the design target. Re-tighten them in the follow-up rebalance (a
+    smarter reach-AI that plays back to the fairway / richer starter bags), NEVER by softening the rough.
+  - Guarded by the retargeted `tests/deep-rough.test.ts` + `tests/hazards2.test.ts` (heavy rough lines the
+    hole but the mown route stays clean; determinism), and the fairness/termination sweep in
+    `tests/biomes.test.ts` (byte-identical crossings → no new throws). Re-run `scripts/gallery.mjs` to
+    eyeball the denser forests after any tuning of the ring/buffer/reach knobs.
 - **Greens are VARIED organic shapes, NOT circles (GS-greens, `generate.ts`).** `greenPoly` builds the
   putting surface from a few seeded harmonics + an optional kidney lobe, stretched along a random long
   axis — so greens come as blobs, kidneys, long shelves, pears and punchbowls. The per-biome row sets

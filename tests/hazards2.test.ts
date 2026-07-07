@@ -1,7 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
-import { validateCourse, polylineDist, type Hole } from '../src/sim/course/contract';
-import { lieInfo } from '../src/sim/shot';
+import { validateCourse, type Hole, type Vec } from '../src/sim/course/contract';
+import { lieInfo, lieAt } from '../src/sim/shot';
+
+/** Fine samples down the hole's mown centreline — the route the fairway follows. */
+function centrelineSamples(h: Hole): Vec[] {
+  const out: Vec[] = [];
+  for (let i = 0; i + 1 < h.centreline.length; i++) {
+    const a = h.centreline[i]!;
+    const b = h.centreline[i + 1]!;
+    for (let k = 0; k < 8; k++) {
+      const f = k / 8;
+      out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+    }
+  }
+  return out;
+}
 
 function countKind(holes: Hole[], kind: string): number {
   return holes.reduce((n, h) => n + h.hazards.filter((z) => z.kind === kind).length, 0);
@@ -56,17 +70,15 @@ describe('hazard variety (GS-hazards-2)', () => {
     expect(ravineHoles).toBeGreaterThan(0);
   });
 
-  it('fescue lines the rough OUTSIDE the corridor (a sensible shot stays clear)', () => {
+  it('fescue lines the rough OFF the mown route (a sensible shot down the centre stays clear)', () => {
+    // GS-rough-gradient: the heavy-rough band now HUGS the fairway edge (it drives play back to the
+    // fairway), so fescue no longer sits entirely beyond 0.7× the widest half-width. The invariant that
+    // still holds — and is the one that matters — is that it LINES the hole without ever sitting on the
+    // mown centreline route, so a sensible shot down the middle is always clear of it.
     for (let s = 0; s < 40; s++) {
       const h = generateCourse(s + 23000, { biome: 'verdant-station', wildness: 0.7 }).holes[0]!;
-      const fw = h.features.find((f) => f.kind === 'fairway')!;
-      let half = 0;
-      for (const p of fw.poly) half = Math.max(half, polylineDist(p, h.centreline));
-      for (const fz of h.hazards.filter((z) => z.kind === 'fescue')) {
-        const cx = fz.poly.reduce((a, p) => a + p[0], 0) / fz.poly.length;
-        const cy = fz.poly.reduce((a, p) => a + p[1], 0) / fz.poly.length;
-        expect(polylineDist([cx, cy], h.centreline)).toBeGreaterThan(half * 0.7);
-      }
+      expect(h.hazards.some((z) => z.kind === 'fescue')).toBe(true); // fescue is present
+      for (const p of centrelineSamples(h)) expect(lieAt(h, p) === 'fescue').toBe(false);
     }
   });
 
