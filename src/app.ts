@@ -9,7 +9,7 @@
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { shotCardHTML } from './render/cards';
-import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID } from './render/holeView';
+import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { holeProjector, type ProjectOptions } from './render/project';
 import { createWeather } from './render/weather';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
@@ -443,6 +443,14 @@ let puttViewRadius: number | null = null;
 // full render() — a full render remounts the pace meter (resetting its sweep) on every tap, which
 // made reading a long break slow and painful. Assigned by the putt branch; buttons call it.
 let puttAimRefresh: (() => void) | null = null;
+// Surgical refresh for the pull-to-power gesture (the shot-decision sibling of puttAimRefresh): the
+// power pull redraws ONLY the spray-cone overlay group + the power/legend HUD text IN PLACE, never a
+// full render() — a full render rebuilt the whole scene (flora, rough gradient, green contour art)
+// on every rAF drag frame, which lagged hard on close chips/putts (the heavy GS-rough-gradient
+// scene, brutal when pinch-zoomed). Assigned by the shot-decision branch (focus/follow mode only,
+// where the camera holds still for the whole decision); null in whole-hole fit mode, where the
+// gesture falls back to scheduleRender(). See renderShotOverlaySVG.
+let shotAimRefresh: (() => void) | null = null;
 // The screen modules' view state (shopView / marketView / clubhouseView / travelView / introView /
 // installView) lives with its screen in src/app/*; the wiring below mutates those exported objects.
 let mapPan: [number, number] = [0, 0];
@@ -545,7 +553,11 @@ function wireShotGesture(app: HTMLElement): void {
       lastNotch = notch;
       haptic(6);
     }
-    scheduleRender();
+    // Surgical cone/HUD refresh (focus/follow mode) instead of a full scene rebuild per drag frame —
+    // the decision-lag fix. Whole-hole mode has no stable focus projector, so it falls back to a
+    // full render.
+    if (shotAimRefresh) shotAimRefresh();
+    else scheduleRender();
   };
   const detach = (): void => {
     window.removeEventListener('pointermove', move);
@@ -1164,7 +1176,6 @@ function playingBody(animating: boolean): string {
   // Feel escape-hatch: window._gsSpray scales the green centre wedge live (A/B the cone geometry).
   const sprayGeom = (window as unknown as { _gsSpray?: SprayGeomInput })._gsSpray;
   // % of shots per zone — straight off the shot's asymmetric shape, so the legend reads exactly true.
-  const sh = spray.shape;
   const pctRound = (x: number) => Math.round(x * 100);
   // Frame the map on the FULL-power PIN-AIM shot — NOT the live charge, and NOT the live drag
   // target either: carryHigh folds in the wind component ALONG the shot bearing, so framing on the
@@ -1222,15 +1233,17 @@ function playingBody(animating: boolean): string {
       ${canPuttFringe(play) ? `<button class="gs-btn gs-mini" data-putt-toggle="1" title="Putt from the fringe">⛳</button>` : ''}
     </div>`;
   // Power read-out: the bar fills as you pull DOWN on the map (the cone grows in step); past 100%
-  // (with Overdrive) it glows orange as an overpowered shot.
-  const powerPct = Math.round(selPower * 100);
-  const over = selPower > 1.001;
-  const powerCol = over ? '#ff8a3d' : selPower >= 0.66 ? '#5fd45a' : selPower >= 0.33 ? '#ffc454' : '#9fd8e6';
-  const aimNote = selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2 ? 'aim adjusted' : 'aim: pin';
-  const powerHud = `<div class="gs-power">
-      <div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
-      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · pull back to cancel' : 'pull DOWN on the map'}</span></div>
-    </div>`;
+  // (with Overdrive) it glows orange as an overpowered shot. Built by a shared inner-HTML builder so
+  // the surgical pull refresh (shotAimRefresh) can update it in place without a full render.
+  const powerHudInner = (): string => {
+    const powerPct = Math.round(selPower * 100);
+    const over = selPower > 1.001;
+    const powerCol = over ? '#ff8a3d' : selPower >= 0.66 ? '#5fd45a' : selPower >= 0.33 ? '#ffc454' : '#9fd8e6';
+    const aimNote = selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2 ? 'aim adjusted' : 'aim: pin';
+    return `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
+      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · pull back to cancel' : 'pull DOWN on the map'}</span></div>`;
+  };
+  const powerHud = `<div class="gs-power" id="gs-powerhud">${powerHudInner()}</div>`;
   // Condensed spray odds + carry range (the cone on the map carries the detail). Sam (if hired) adds a
   // compact green-depth + forced-carry read on its own line.
   let samRead = '';
@@ -1240,12 +1253,51 @@ function playingBody(animating: boolean): string {
     const carryTxt = fc ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> ${hazardLabel(fc.kind)}</span>` : '';
     samRead = `<div class="gs-legend-line" style="opacity:.9;">🎒 ${Math.round(gd.front)}·${Math.round(dist(play.ball, play.hole.green))}·${Math.round(gd.back)}y${carryTxt}</div>`;
   }
-  const legend = `<div class="gs-legend-line">
-      <span style="color:#5fd45a;">●</span> ${pctRound(sh.green)}% ·
-      <span style="color:#ffc454;">●</span> ${pctRound(sh.hookL)}/${pctRound(sh.sliceR)}% ·
-      <span style="color:#ff4c4c;">●</span> ${pctRound(sh.duckHookL)}/${pctRound(sh.shankR)}% ·
-      <b>${Math.round(spray.carryLow)}–${Math.round(spray.carryHigh)}y</b>
-    </div>`;
+  const legendInner = (sp: ShotSpread): string => {
+    const shp = sp.shape;
+    return `<span style="color:#5fd45a;">●</span> ${pctRound(shp.green)}% ·
+      <span style="color:#ffc454;">●</span> ${pctRound(shp.hookL)}/${pctRound(shp.sliceR)}% ·
+      <span style="color:#ff4c4c;">●</span> ${pctRound(shp.duckHookL)}/${pctRound(shp.shankR)}% ·
+      <b>${Math.round(sp.carryLow)}–${Math.round(sp.carryHigh)}y</b>`;
+  };
+  const legend = `<div class="gs-legend-line" id="gs-shotlegend">${legendInner(spray)}</div>`;
+  // Wire the surgical pull-to-power refresh (the decision-lag fix). FOCUS/FOLLOW mode only: the
+  // camera is framed on the stable full-power spread and holds still for the whole decision, so the
+  // cone overlay re-projects against the SAME framing without rebuilding the scene. Whole-hole fit
+  // mode has no stable focus projector (its fit folds in per-frame extras) → null → full render. The
+  // recomputed spray/HUD are byte-identical to what a full render() would draw for the same charge.
+  shotAimRefresh =
+    mapView === 'whole'
+      ? null
+      : () => {
+          const overlay = document.getElementById(SHOT_OVERLAY_ID);
+          if (!overlay) {
+            scheduleRender();
+            return;
+          }
+          const sprayNow = previewShot(
+            play,
+            { clubId: selClubId!, aim: selAim, target: selFreeTarget ?? undefined, power: selPower },
+            state.run.loadout,
+          );
+          overlay.outerHTML = renderShotOverlaySVG(play.hole, {
+            width: DMAP_W,
+            height: DMAP_H,
+            focus: mapOpts.focus,
+            viewRadius: mapOpts.viewRadius,
+            focusBias: mapOpts.focusBias,
+            up: mapOpts.up,
+            spray: sprayNow,
+            sprayGeom,
+            biome: holeBiome(play.hole),
+            themeId: holeThemeId(play.hole),
+            tradeTents: tentsActive(),
+          });
+          const hud = document.getElementById('gs-powerhud');
+          if (hud) hud.innerHTML = powerHudInner();
+          const leg = document.getElementById('gs-shotlegend');
+          if (leg) leg.innerHTML = legendInner(sprayNow);
+        };
   // The hired caddy, framed in the bottom-left so it stands out (GS-fullmap). The figure is drawn to
   // the canvas in the render wiring. Absent when no caddy is hired.
   const caddyBadge = caddyBadgeHTML(caddyId());
