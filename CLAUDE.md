@@ -280,7 +280,10 @@ these systems** — each bullet is the tip of a documented iceberg.
   - Contour ART is a lit relief map in the biome's own turf Shade: terraced closed-ring fills
     (`Isoline.closed`/`hiInside`), Tanaka-lit isoline chunks (fixed course-space chunk counts —
     camera-proof, machine-checked), biome-derived washes (never neutral white/black), and
-    fall-line arrows contrast-picked against the turf's luminance.
+    fall-line arrows contrast-picked against the turf's luminance. The relief renders on EVERY
+    biome — `contoured` gates on the ISOLINES (present on every sculpted green), NOT the fall-line
+    arrows (which vanish on a gentle low-`greenSlopeMax` green, the "no contour" bug). Rainbow Road
+    is the one exception: it takes its own ribbon branch and draws no green contour (deliberate).
   - Harder stops tilt greens more (slope-magnitude floor rises with wildness, drawn from the SIDE
     slope rng — calm stops keep the old draw).
   - Putt-FEEL: fall-line arrows are PX-CAPPED in `styleGreen`; the putt watch-cam reuses the putt
@@ -311,7 +314,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     sand/liquid families draw union-merged bodies (course-space, WeakMap-cached).
   - Carved features share ONE light (`LIGHT_UL` → `insetEmboss`/`embossChildren`). NO drop shadow
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
-    FLUSH with the fairway. Hazards get a soft grassy margin blended toward the hazard (never
+    FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER
+    the fairway pass, so they ease the green into the ROUGH and never paint over the corridor (the
+    apron-over-fairway bug). `deeprough`/`fescue` blobs are per-ARCHETYPE (`DEEP_ROUGH` has a row for
+    every world incl. void/cetus; fescue derives its body/tufts from `turfShade('rough', arch)`) — the
+    GS-rough-gradient pass pours them onto every world, so neither may hardcode one world's palette.
+    Hazards get a soft grassy margin blended toward the hazard (never
     darker than turf); internals deepen through smooth feathered ramps, not hard bands. The fairway
     takes a first-cut `collar` + a FEATHERED cut grade + edge-ease strokes + two-band sheen on
     parkland worlds only (void/cetus pass NO collar; edge bands are clipped STROKES, never deep
@@ -322,7 +330,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     blocked-zone shading probes the sim's OWN flight walks — never fork them, never hard-code px
     into the sim. A line is shaded BINARY (clear, or blocked from the object to the cone's far
     edge). The blocked-zone glyph is keyed to the WORLD archetype (`TREE_GLYPH` mirrors
-    `styleFlora`); tents stay ⛺.
+    `styleFlora`); tents stay ⛺. The cone's near/far ARCS are `shotSpread`'s `[low, high]` = exactly
+    `resolveShot`'s UN-shifted carry clamp; wind rides ONLY `expectedCarry` (the aim line), INSIDE the
+    cone — never add the wind term to the arcs (it draws a window the shot can't reach; invisible at
+    full power, wildly wrong at chip power — the "arc too long/short around the green" bug).
+  - The pull-to-power gesture redraws ONLY the spray-cone group (`#gs-shot-overlay` via
+    `renderShotOverlaySVG` / `shotConeParts`) + the power/legend HUD spans in place, NEVER a full
+    `render()` per drag frame — a full render rebuilds the whole `buildScene` (flora, rough gradient,
+    contour art) and lagged hard on close chips/putts. Focus/follow mode only (stable projector);
+    whole-hole fit mode falls back to `scheduleRender`. The sibling of the #281 putt-overlay swap.
   - Per-world identity is table+dispatch, never a fork: flora, OB markers, signature decor, ambient
     air, wind tint are ALL archetype-keyed (`tests/biome-identity.test.ts` guards full coverage); a
     flora variant must consume EXACTLY the classic two rng draws (extra variation via `posHash`).

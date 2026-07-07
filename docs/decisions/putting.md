@@ -133,6 +133,15 @@ change (every seeded test byte-identical). The final state:
   aim → commit): label updates without a meter remount, hold moved the aim 5.6yd in 1.4s, no page
   errors. Zero sim/rng changes — the full 921-test suite is byte-identical-green.
 
+**Contour relief renders on EVERY biome (2026-07-07).** Play-test: "not all biomes got contour
+overlays". The relief was gated on the fall-line ARROW field, which only emits for cells steeper than
+0.06 — a gentle green on a low-`greenSlopeMax` world (frost/ocean at a calm stop) had zero arrows and
+fell through to the flat legacy plane look. But every sculpted green has topo ISOLINES (the generator
+gives each green ≥1 lobe on its own side stream; `contourIsolines` floors at 3 rings for any amplitude),
+so `contoured` now gates on `slope.iso` instead of `slope.arrows`. The relief (terraces + Tanaka rings +
+gradient) renders on all biomes; the chevron field still correctly stays OFF near-flat crests (it reads
+the same 0.06 floor). Render-only, zero rng; full story in `render.md` (GS-chip-cone batch).
+
 
 ## GS-ai-attack putt fix — putter perks now reach the headless putt-out (2026-07-04)
 

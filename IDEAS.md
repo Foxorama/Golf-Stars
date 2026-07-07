@@ -61,6 +61,15 @@ Foundations are shipped; these are the live follow-ons.
   layup rather than bomb into forest) and/or enrich the starter bags — NEVER by softening the rough.
   The gradient knobs (per-hole `buffer` character, `forestReach`, ring `plantP`, `ROUGH_CHAR_MIN_WILDNESS`)
   are the tuning surface once the AI reads the rough.
+  PLAYTEST FINDING (2026-07-07) — the core of this rebalance: "clean open rough lets you skip the fairway;
+  different-sized clubs are meaningless if you don't have to play the fairway." Today the DEFAULT off-fairway
+  lie is plain `rough` at only −10% carry (`shot.ts LIE_INFO.rough`), the punishing lies (fescue −28%,
+  deeprough −50%, trees −40%) sit a blob-radius OFF the centreline (the `standoff`), and corridors are wide
+  early (`widthScale 2.0−1.25·wildness`), so bombing driver over everything has ~no positional cost and club
+  choice never bites. The fix is a POSITIONAL-golf pass (its own PR + death-spiral harness), NOT softening
+  rough: e.g. lift the plain-rough carry tax and/or wilds-spray so a miss actually costs a stroke of position,
+  place heavy rough/hazard so the aggressive line is genuinely gated, and reward the fairway lie — measured on
+  mean per-stop Stableford, contract 4. Do this WITH the reach-AI + starter-bag work above, not before it.
 - **GS-more-worlds** — metal/asteroid (low-grav scrap), neon/cyber grid, toxic/acid swamp, lightning-storm:
   each a new archetype row + its 8 Record entries (the registry scales now).
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.
