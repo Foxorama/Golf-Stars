@@ -4,22 +4,22 @@ import type { BagTier } from '../sim/rpg/bag';
 import {
   CLUB_SET_DIFFICULTIES,
   clubSetOf,
-  netStrokes,
   formatToPar,
   toParColour,
-  recordNetToPar,
   recordRange,
   bestEndlessRecord,
   endlessRecordsByDepth,
-  endlessGateOverPar,
-  endlessGateLabel,
+  endlessSetGateOverPar,
+  endlessSetLabel,
+  ENDLESS_SET_HOLES,
   ENDLESS_MILESTONES,
   type EndlessRunRecord,
 } from '../sim/rpg/endless';
 
-// The Unending Universe's GOLF-SCORE presentation (GS-golf-score): the running/final round scorecard
-// (gross · to-par · net) and the personal "last runs" leaderboard grouped by the STARTING CLUB SET
-// difficulty (green/blue/purple/orange). All pure string/SVG builders — they take their data as
+// The Unending Universe's DEPTH presentation (GS-set-survival): a compact progress card — sets cleared,
+// this set's running total vs its allowance, and the next reward — plus the personal "last runs"
+// leaderboard grouped by the STARTING CLUB SET (green/blue/purple/orange), ranked purely on how far you
+// got. There is no run-total score to chase. All pure string/SVG builders — they take their data as
 // arguments and read no module state — so they live out of the app.ts god-file (CLAUDE.md). Every
 // helper here is Unending-Universe only; the Voyage never calls them, so its screens are untouched.
 
@@ -41,30 +41,35 @@ function stat(label: string, value: string, col = 'var(--gs-ink)', sub = ''): st
   </div>`;
 }
 
+/** Data for the progress card. `stopIndex` is the CURRENT set's 0-based index (holesCleared / 4);
+ *  `live` is the in-progress set (its running to-par + holes played so far), absent on a static card. */
+export interface EndlessCardData {
+  holesCleared: number;
+  stopIndex: number;
+  tier: BagTier;
+  live?: { setToPar: number; thru: number };
+}
+
 /**
- * The Unending-Universe golf scorecard: HOLES reached, GROSS strokes, TO-PAR (hero), and NET (the
- * handicap-adjusted, cross-set-fair figure). Used mid-round (the running total) and at run's end (the
- * final card). Mobile-first — a capped-width flex row of big legible numbers that wraps on narrow
- * screens. `opts.next` appends the next survival bar + milestone line (the mode is still a survival
- * streak); `opts.title` overrides the "YOUR ROUND" heading.
+ * The Unending-Universe progress card (GS-set-survival): SETS cleared (the depth that IS the score),
+ * this set's TARGET allowance, and — mid-set — THIS SET's running four-hole to-par vs that target.
+ * No run-total gross/net: how far you get is the whole game. Mobile-first, a capped-width flex row of
+ * big legible numbers. `opts.next` appends the next-reward line; `opts.title` overrides the heading.
  */
-export function endlessScoreCard(
-  data: { holes: number; gross: number; par: number; tier: BagTier },
-  opts: { title?: string; next?: boolean } = {},
-): string {
-  const { holes, gross, par, tier } = data;
-  const toPar = gross - par;
-  const net = netStrokes(gross, holes, tier);
-  const netToPar = net - par;
-  const scratch = clubSetOf(tier).handicap18 === 0;
-  const title = opts.title ?? 'Your round';
-  const nextBar = endlessGateLabel(endlessGateOverPar(holes + 1));
-  const nextM = ENDLESS_MILESTONES.find((m) => m.holes > holes);
+export function endlessScoreCard(data: EndlessCardData, opts: { title?: string; next?: boolean } = {}): string {
+  const { holesCleared, stopIndex, tier, live } = data;
+  const sets = Math.floor(holesCleared / ENDLESS_SET_HOLES);
+  const target = endlessSetGateOverPar(stopIndex);
+  const title = opts.title ?? 'Your run';
+  const nextM = ENDLESS_MILESTONES.find((m) => m.holes > holesCleared);
   const nextLine = opts.next
     ? `<div style="margin-top:9px;padding-top:8px;border-top:1px solid var(--gs-line-2);font-size:11.5px;opacity:.82;display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;">
-         <span>⛳ Next hole bar: <b>${nextBar} or better</b></span>
+         <span>⛳ This set: <b>${endlessSetLabel(target)} or better</b> over 4 holes</span>
          ${nextM ? `<span>🌌 Next reward at hole <b>${nextM.holes}</b></span>` : '<span>🌌 Beyond every milestone</span>'}
        </div>`
+    : '';
+  const liveCell = live
+    ? stat('THIS SET', formatToPar(live.setToPar), toParColour(live.setToPar), `thru ${live.thru}/4`)
     : '';
   return `
     <div style="max-width:460px;border:1px solid var(--gs-line);border-radius:12px;background:#0d1016;padding:12px 14px;">
@@ -73,10 +78,9 @@ export function endlessScoreCard(
         ${clubSetChip(tier, { small: true })}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${stat('HOLES', String(holes), '#4fe08a')}
-        ${stat('GROSS', String(gross))}
-        ${stat('TO PAR', formatToPar(toPar), toParColour(toPar))}
-        ${stat('NET', scratch ? '—' : formatToPar(netToPar), scratch ? 'var(--gs-dim)' : toParColour(netToPar), scratch ? 'scratch' : `${net} strokes`)}
+        ${stat('SETS', String(sets), '#4fe08a', `${holesCleared} holes`)}
+        ${stat('TARGET', endlessSetLabel(target), toParColour(target), 'or better')}
+        ${liveCell}
       </div>
       ${nextLine}
     </div>`;
@@ -102,11 +106,11 @@ function difficultyStrip(records: readonly EndlessRunRecord[], currentTier?: Bag
 }
 
 /**
- * The personal LAST-RUNS leaderboard (GS-golf-score): a per-difficulty best-holes strip over the last
+ * The personal LAST-RUNS leaderboard (GS-set-survival): a per-difficulty best-holes strip over the last
  * `opts.limit` finished runs, newest first — each row the golfer (avatar + name), the starting club set
- * (colour), holes reached, and net-to-par. The furthest-reaching run wears a 🏅. Mobile-first: capped
- * width, compact rows. Empty history shows an inviting placeholder. `opts.currentTier` highlights the
- * category the player is about to play.
+ * (colour), and how far it got (holes reached + sets cleared). The furthest-reaching run wears a 🏅.
+ * Mobile-first: capped width, compact rows. Empty history shows an inviting placeholder.
+ * `opts.currentTier` highlights the category the player is about to play.
  */
 export function endlessRecordsBoard(
   records: readonly EndlessRunRecord[],
@@ -135,7 +139,6 @@ export function endlessRecordsBoard(
       const ch = getCharacter(r.characterId);
       const d = clubSetOf(r.tier);
       const isBest = best === r;
-      const nToPar = recordNetToPar(r);
       const medal = isBest ? '🏅' : `${i + 1}`;
       return `<div style="display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:8px;${
         isBest ? 'background:#1a2a22;border:1px solid var(--gs-accent);' : 'border:1px solid transparent;'
@@ -153,7 +156,7 @@ export function endlessRecordsBoard(
           <span style="font-size:16px;font-weight:800;color:#4fe08a;">${r.holes}</span>
           <span style="font-size:10px;opacity:.5;"> holes</span>
           <div style="font-size:10px;opacity:.75;white-space:nowrap;">${(r.startHole ?? 1) > 1 ? '⚡ ' : ''}holes ${recordRange(r)}</div>
-          <div style="font-size:10.5px;color:${toParColour(nToPar)};">${formatToPar(nToPar)} net</div>
+          <div style="font-size:10.5px;opacity:.6;">${Math.floor(r.holes / ENDLESS_SET_HOLES)} sets</div>
         </span>
       </div>`;
     })

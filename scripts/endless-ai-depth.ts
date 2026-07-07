@@ -9,7 +9,7 @@
  * starting club sets (the mode's difficulty axis). Pure sim only; re-run after any endless-AI,
  * dispersion, or balance tuning to see the ceiling move.
  */
-import { startRun, playStop, buy, shopOffer, routeOptions, travel } from '../src/sim/rpg/run';
+import { startRun, playStop, buy, shopOffer, routeOptions, travel, travelRefuelCost } from '../src/sim/rpg/run';
 import type { Run, Route } from '../src/sim/rpg/run';
 import type { BagTier } from '../src/sim/rpg/bag';
 
@@ -44,7 +44,14 @@ function playRun(seed: number, cfg: StrategyCfg, maxStops = 200): number {
     run = playStop(run).run;
     if (run.status !== 'active') break;
     if (cfg.greedyShop) run = greedyBuy(run);
-    run = travel(run, cfg.pickRoute(routeOptions(run)));
+    // Prefer the picked lane, but fall back to the cheapest affordable one — a real player never picks a
+    // lane they can't fuel (the game locks those); an all-unaffordable board strands the run.
+    const routes = routeOptions(run);
+    const pick = cfg.pickRoute(routes);
+    const affordable = routes.filter((r) => travelRefuelCost(run, r) <= run.credits);
+    const lane = (affordable.includes(pick) ? pick : affordable.sort((a, b) => a.distanceJump - b.distanceJump)[0]) ?? undefined;
+    if (!lane) break; // stranded
+    run = travel(run, lane);
   }
   return run.holesSurvived;
 }
@@ -63,8 +70,18 @@ const CONFIGS: StrategyCfg[] = [
   { name: 'orange| greedy  | shallowest', bagTier: 'legendary', greedyShop: true, pickRoute: shallowest },
 ];
 
-// Survival-bar tiers for the death histogram (endless.ts ENDLESS_GATE_STEPS on 8-hole blocks).
-const TIER_LABELS = ['1-8 quad', '9-16 triple', '17-24 double', '25-32 bogey', '33-40 par', '41+ birdie'];
+// Per-SET survival bands for the death histogram (endless.ts ENDLESS_SET_STEPS, two sets = 8 holes per band).
+const TIER_LABELS = [
+  'sets1-2 +4',
+  'sets3-4 +3',
+  'sets5-6 +2',
+  'sets7-8 +1',
+  'sets9-10 E',
+  'sets11-12 −1',
+  'sets13-14 −2',
+  'sets15-16 −3',
+  'sets17+ −4',
+];
 
 for (const cfg of CONFIGS) {
   const t0 = performance.now();

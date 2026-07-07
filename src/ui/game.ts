@@ -20,7 +20,6 @@ import {
   currentBoss,
   currentCourse,
   endlessAttackArmed,
-  endlessHolePassed,
   finishStop,
   holeGateArmed,
   playStop,
@@ -883,7 +882,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // Finish the hole: putt out if on the green, else swing (with auto putt-out on arrival).
       // GS-ai-attack: past the bogey bar the endless auto driver hunts pins — the identical per-hole
       // rule headless playStop applies, so an auto-finished hole stays byte-for-byte the sim's.
-      const attack = endlessAttackArmed(state.run, p.holeIndex);
+      const attack = endlessAttackArmed(state.run);
       while (!p.done && guard++ < 40) {
         p = awaitingPutt(p)
           ? takePutt(p, state.run.loadout, state.holeRng)
@@ -950,14 +949,13 @@ export function reduce(state: UiState, action: Action): UiState {
         };
       }
 
-      // The Unending Universe's survival bar (GS-unending): a hole that misses its required score
-      // ends the stop RIGHT HERE — score the partial stop exactly as the headless `playStop` does
-      // (it breaks its hole loop at the same failure), so auto ≡ interactive holds.
-      const gateFailed = holeGateArmed(state.run) && !endlessHolePassed(state.run, idx, teamHole);
-      if (nextIdx < total && !gateFailed) {
+      // The Unending Universe's survival bar (GS-set-survival) is judged on the whole SET of four, so a
+      // blow-up hole never ends the stop mid-way — play every hole, then `finishStop` scores the set's
+      // cumulative total (exactly as the headless `playStop` does), so auto ≡ interactive holds.
+      if (nextIdx < total) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
-      // Stop complete (or survival bar missed) — score it exactly as the auto path does.
+      // Set complete — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed, { prevBestHoles: state.endlessBestHoles });
       const ended = run.status !== 'active';
       const endless = endlessProgressUpdates(state, run);

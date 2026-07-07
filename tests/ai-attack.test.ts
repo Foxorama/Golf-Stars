@@ -65,16 +65,16 @@ describe('pin-hunting auto-AI (GS-ai-attack)', () => {
     expect(attackTarget(hole, [flag[0] - 300, flag[1]], bag, 0.1)).toBeNull();
   });
 
-  it('endlessAttackArmed: only the Unending Universe, only past the bogey bar', () => {
+  it('endlessAttackArmed: only the Unending Universe, only once the set allowance is bogey-tight', () => {
     const endless = startRun(5, 'unending');
     expect(ENDLESS_ATTACK_GATE).toBe(1);
-    expect(endlessAttackArmed(endless, 0)).toBe(false); // hole 1: quad bar
-    expect(endlessAttackArmed({ ...endless, holesSurvived: 23 }, 0)).toBe(false); // hole 24: double
-    expect(endlessAttackArmed({ ...endless, holesSurvived: 24 }, 0)).toBe(true); // hole 25: bogey
-    expect(endlessAttackArmed({ ...endless, holesSurvived: 24 }, 3)).toBe(true); // hole 28
-    expect(endlessAttackArmed({ ...endless, holesSurvived: 100 }, 0)).toBe(true); // birdie wall
+    // Per SET (stopIndex): +4 (sets 1-2), +3, +2, then +1 at set 7 (stopIndex 6) — where attack arms.
+    expect(endlessAttackArmed(endless)).toBe(false); // set 1: +4
+    expect(endlessAttackArmed({ ...endless, stopIndex: 5 })).toBe(false); // set 6: +2
+    expect(endlessAttackArmed({ ...endless, stopIndex: 6 })).toBe(true); // set 7: +1
+    expect(endlessAttackArmed({ ...endless, stopIndex: 20 })).toBe(true); // the −4 cap
     const voyage = startRun(5, 'voyage');
-    expect(endlessAttackArmed({ ...voyage, holesSurvived: 100 }, 0)).toBe(false);
+    expect(endlessAttackArmed({ ...voyage, stopIndex: 20 })).toBe(false);
   });
 
   it('auto ≡ interactive under attack: the auto driver resolves the identical hole', () => {

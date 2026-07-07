@@ -8,10 +8,12 @@ import { RARITY_C } from './loot';
  * The mode's spine reuses the whole meta-loop unchanged (4-hole stop → Pro Shop → journey lane →
  * next stop, forever); what THIS module owns is the survival law and the milestone ladder:
  *
- *   • SURVIVAL BAR — every hole carries a required score, PAR-RELATIVE so a par-3 and a par-5 are
- *     equally fair: quad bogey for holes 1–8, then triple / double / bogey / par per 8-hole block,
- *     and from hole 41 on only a BIRDIE (or better) keeps the run alive. Miss the bar once and the
- *     run ends on the spot. (The user-facing "8/7/6/5/4" ramp is exactly this ladder on a par-4.)
+ *   • SURVIVAL BAR — judged per SET OF FOUR (one stop), on the four-hole cumulative to-par, RESET each
+ *     set: the set survives if `Σ(strokes − par) ≤ the set's allowance`. The allowance ramps every two
+ *     sets — +4 (sets 1–2), +3, +2, +1, E, −1, −2, −3, capped at −4 (average birdie) forever. Because
+ *     it's the four-hole TOTAL, a single blow-up hole (capped at par + MAX_OVER_PAR) can be clawed back
+ *     by the other three, so the run only ever ends at a SET boundary — never on one bad hole. Depth
+ *     (sets cleared / holes reached) is the sole metric: there is no run-total score to chase.
  *
  *   • MILESTONES — surviving 40/60/80/100/120/140 holes fires a victory takeover and banks a Star
  *     Shard bonus INSTANTLY (via `run.bonusShards`, so a later bust never claws it back). The bonus is
@@ -27,48 +29,42 @@ import { RARITY_C } from './loot';
  * these same functions).
  */
 
-/** The survival bar tightens every this-many holes. */
-export const ENDLESS_TIER_HOLES = 8;
+/** A "set of four" IS one endless stop — survival is judged on the four-hole total, never a single hole. */
+export const ENDLESS_SET_HOLES = 4;
 
-/** Allowed strokes OVER PAR per 8-hole tier; the final entry (birdie-or-better) repeats forever. */
-export const ENDLESS_GATE_STEPS: readonly number[] = [4, 3, 2, 1, 0, -1];
+/** The survival threshold steps DOWN one stroke every this-many SETS (two sets per band). */
+export const ENDLESS_SETS_PER_STEP = 2;
 
-/** The strokes-over-par allowed on the n-th hole of the run (1-based, cumulative across stops). */
-export function endlessGateOverPar(holeNumber: number): number {
-  const tier = Math.floor((Math.max(1, Math.round(holeNumber)) - 1) / ENDLESS_TIER_HOLES);
-  return ENDLESS_GATE_STEPS[Math.min(tier, ENDLESS_GATE_STEPS.length - 1)]!;
+/**
+ * Cumulative strokes-OVER-PAR a whole SET (its four holes together) may finish at to survive, per
+ * step; the final entry (−4, i.e. four-under = average birdie) repeats forever (the cap). The user-
+ * facing ramp: +4 for sets 1–2, then +3 / +2 / +1 / E / −1 / −2 / −3 and capped at −4, each band two
+ * sets long. A single blow-up hole (capped at par + MAX_OVER_PAR) can be absorbed by the other three,
+ * so the run only ever ends at a SET boundary — never mid-set.
+ */
+export const ENDLESS_SET_STEPS: readonly number[] = [4, 3, 2, 1, 0, -1, -2, -3, -4];
+
+/** The cumulative over-par a SET must finish at or under, for a 0-based stop index (holesSurvived/4). */
+export function endlessSetGateOverPar(stopIndex: number): number {
+  const step = Math.floor(Math.max(0, Math.round(stopIndex)) / ENDLESS_SETS_PER_STEP);
+  return ENDLESS_SET_STEPS[Math.min(step, ENDLESS_SET_STEPS.length - 1)]!;
 }
 
-/** A golfer-readable name for a survival bar ("Bogey or better", not "+1"). */
-export function endlessGateLabel(overPar: number): string {
-  switch (overPar) {
-    case 4:
-      return 'Quad bogey';
-    case 3:
-      return 'Triple bogey';
-    case 2:
-      return 'Double bogey';
-    case 1:
-      return 'Bogey';
-    case 0:
-      return 'Par';
-    case -1:
-      return 'Birdie';
-    case -2:
-      return 'Eagle';
-    default:
-      return overPar > 0 ? `+${overPar}` : `${overPar}`;
-  }
+/** A set's cumulative to-par (Σ strokes − Σ par). Blow-ups are already capped at par + MAX_OVER_PAR by
+ *  the sim, so this is bounded and fair. A pickup just scores its capped strokes — it never auto-busts
+ *  the set (the four-hole total is what counts). Pure. */
+export function endlessSetToPar(played: readonly { record: { par: number; strokes: number } }[]): number {
+  return played.reduce((t, p) => t + (p.record.strokes - p.record.par), 0);
 }
 
-/** The most strokes that keep the run alive on the n-th hole (par-relative bar; floored at 1). */
-export function endlessRequiredStrokes(par: number, holeNumber: number): number {
-  return Math.max(1, par + endlessGateOverPar(holeNumber));
+/** Does a completed SET clear its survival threshold? (its cumulative to-par ≤ the set's allowance). */
+export function passesEndlessSet(setToPar: number, stopIndex: number): boolean {
+  return setToPar <= endlessSetGateOverPar(stopIndex);
 }
 
-/** Does a finished hole clear its survival bar? A pickup (never holed out) always fails. */
-export function passesEndlessGate(par: number, strokes: number, holed: boolean, holeNumber: number): boolean {
-  return holed && strokes <= endlessRequiredStrokes(par, holeNumber);
+/** A golfer-readable target for a set threshold ("+4", "E", "−2"). */
+export function endlessSetLabel(overPar: number): string {
+  return formatToPar(overPar);
 }
 
 // --- Warp: the hidden automatic-birdie rule (GS-warp) --------------------------
@@ -157,21 +153,17 @@ export function nextEndlessUnlock(bestHoles: number): EndlessUnlock | undefined 
   return ENDLESS_UNLOCKS.find((u) => bestHoles < u.holes);
 }
 
-// --- Golf scoring: gross / net / to-par (GS-golf-score) -----------------------
+// --- Starting club sets = the difficulty axis (GS-golf-score / GS-set-survival) ------------------
 //
-// The Unending Universe is now scored like a real round of golf: a running GROSS (total strokes over
-// the holes you've conquered), a TO-PAR figure ("−3", "+5", "E"), and a NET that applies a course
-// handicap so runs on different STARTING CLUB SETS are comparable. Survival is unchanged — you still
-// play until you miss a hole's par-relative bar; these are the presentation of how you played the holes
-// you reached. All pure arithmetic — no rng, no DOM — so both the headless sim and the interactive
-// driver read the identical numbers.
+// The four STARTING CLUB SETS are the mode's difficulty selector: a weaker rack makes the escalating
+// per-set survival thresholds genuinely harder to clear. They no longer feed a handicap/net SCORE —
+// depth (sets cleared) is the only thing the Unending Universe tracks, so there's nothing to net. The
+// set is purely how strong your bag starts.
 
 /**
- * The four STARTING CLUB SETS, tiered by loot rarity, that double as the mode's difficulty axis
- * (GS-golf-score): green (common starter clubs) → orange (legendary). A weaker set is the sterner
- * test — so it receives more handicap strokes, keeping NET scores fair to compare across sets. The
- * colour + label read straight off the shared rarity table, so a new tier is a new rarity row, nothing
- * here.
+ * The four STARTING CLUB SETS, tiered by loot rarity: green (common starter clubs) → orange
+ * (legendary Elite). The colour + label read straight off the shared rarity table, so a new tier is a
+ * new rarity row, nothing here.
  */
 export interface ClubSetDifficulty {
   tier: BagTier;
@@ -181,35 +173,18 @@ export interface ClubSetDifficulty {
   label: string;
   /** Rarity accent colour (the leaderboard's category colour). */
   col: string;
-  /** Course handicap: strokes given back over a full 18 holes (a weaker set gets more). */
-  handicap18: number;
 }
 
 export const CLUB_SET_DIFFICULTIES: readonly ClubSetDifficulty[] = [
-  { tier: 'common', key: 'green', label: 'Starter set', col: RARITY_C.common.col, handicap18: 18 },
-  { tier: 'rare', key: 'blue', label: 'Tour set', col: RARITY_C.rare.col, handicap18: 12 },
-  { tier: 'epic', key: 'purple', label: 'Pro set', col: RARITY_C.epic.col, handicap18: 6 },
-  { tier: 'legendary', key: 'orange', label: 'Elite set', col: RARITY_C.legendary.col, handicap18: 0 },
+  { tier: 'common', key: 'green', label: 'Starter set', col: RARITY_C.common.col },
+  { tier: 'rare', key: 'blue', label: 'Tour set', col: RARITY_C.rare.col },
+  { tier: 'epic', key: 'purple', label: 'Pro set', col: RARITY_C.epic.col },
+  { tier: 'legendary', key: 'orange', label: 'Elite set', col: RARITY_C.legendary.col },
 ];
 
 /** The club-set difficulty a run's starting bag tier maps to (absent/unknown ⇒ the green starter set). */
 export function clubSetOf(tier: BagTier | undefined): ClubSetDifficulty {
   return CLUB_SET_DIFFICULTIES.find((d) => d.tier === (tier ?? 'common')) ?? CLUB_SET_DIFFICULTIES[0]!;
-}
-
-/**
- * The handicap strokes received over `holes` holes on a given starting set — the full-18 allowance
- * prorated to how far the run got, rounded to whole strokes (real golf gives whole strokes). Scratch
- * (the legendary Elite set) always returns 0, so its net == gross.
- */
-export function clubSetHandicapStrokes(tier: BagTier | undefined, holes: number): number {
-  const h18 = clubSetOf(tier).handicap18;
-  return Math.round((h18 * Math.max(0, holes)) / 18);
-}
-
-/** Net strokes = gross minus the starting set's prorated handicap allowance (floored at 0). */
-export function netStrokes(gross: number, holes: number, tier: BagTier | undefined): number {
-  return Math.max(0, gross - clubSetHandicapStrokes(tier, holes));
 }
 
 /** A golf-readable to-par figure: "E" at level, "−3" under, "+5" over. */
@@ -233,11 +208,11 @@ export interface EndlessRunRecord {
   characterId: string;
   /** The STARTING CLUB SET the run began on — the leaderboard's difficulty category. */
   tier: BagTier;
-  /** Holes reached (the survival streak) — the headline result. */
+  /** Holes reached (the survival streak) — the headline result and the ONLY ranking key. */
   holes: number;
-  /** Total gross strokes over the holes reached. */
+  /** Total gross strokes / par over the holes reached. Retained for save-shape stability + possible
+   *  future recaps; NOT shown or ranked on — the Unending Universe tracks depth alone. */
   gross: number;
-  /** Total par of the holes reached (⇒ toPar = gross − par). */
   par: number;
   /** Ascension tier the run was played at (usually 0 in the endless format). */
   ascension: number;
@@ -255,16 +230,11 @@ export function recordRange(rec: EndlessRunRecord): string {
   return `${rec.startHole ?? 1}–${rec.holes}`;
 }
 
-/** The board view (GS-warp): the newest `n` runs, sorted by the highest hole reached (ties by
- *  better net-to-par, then newer first). Score is flavour; depth is the ranking. Pure. */
+/** The board view: the newest `n` runs, sorted by the highest hole reached — depth is the whole
+ *  ranking now (no score tiebreak), so ties fall back to newest-first. Pure. */
 export function endlessRecordsByDepth(records: readonly EndlessRunRecord[], n = 10): EndlessRunRecord[] {
   const newest = records.slice(0, n);
-  return [...newest].sort((a, b) => {
-    if (a.holes !== b.holes) return b.holes - a.holes;
-    const d = recordNetToPar(a) - recordNetToPar(b);
-    if (d !== 0) return d;
-    return newest.indexOf(a) - newest.indexOf(b);
-  });
+  return [...newest].sort((a, b) => (a.holes !== b.holes ? b.holes - a.holes : newest.indexOf(a) - newest.indexOf(b)));
 }
 
 /** Cap on stored records — we keep a rolling window and surface the most recent slice. */
@@ -275,16 +245,7 @@ export function addEndlessRecord(records: readonly EndlessRunRecord[], rec: Endl
   return [rec, ...records].slice(0, ENDLESS_RECORDS_KEPT);
 }
 
-/** A record's net-to-par (gross − handicap − par) — the fair, cross-set comparison figure. */
-export function recordNetToPar(rec: EndlessRunRecord): number {
-  return netStrokes(rec.gross, rec.holes, rec.tier) - rec.par;
-}
-
-/** The furthest-reaching record (ties broken by better net-to-par) — the "best effort". */
+/** The furthest-reaching record (ties → the most recent) — the "best effort". Depth is the only key. */
 export function bestEndlessRecord(records: readonly EndlessRunRecord[]): EndlessRunRecord | undefined {
-  return records.reduce<EndlessRunRecord | undefined>((best, r) => {
-    if (!best) return r;
-    if (r.holes !== best.holes) return r.holes > best.holes ? r : best;
-    return recordNetToPar(r) < recordNetToPar(best) ? r : best;
-  }, undefined);
+  return records.reduce<EndlessRunRecord | undefined>((best, r) => (!best || r.holes > best.holes ? r : best), undefined);
 }

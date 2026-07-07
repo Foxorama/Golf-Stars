@@ -1,33 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ENDLESS_GATE_STEPS,
+  ENDLESS_SET_STEPS,
+  ENDLESS_SET_HOLES,
+  ENDLESS_SETS_PER_STEP,
   ENDLESS_MILESTONES,
-  ENDLESS_TIER_HOLES,
   ENDLESS_UNLOCKS,
-  endlessGateLabel,
-  endlessGateOverPar,
+  endlessSetGateOverPar,
+  endlessSetLabel,
+  endlessSetToPar,
+  passesEndlessSet,
   endlessMilestoneShards,
   endlessMilestonesCrossed,
-  endlessRequiredStrokes,
   endlessUnlocksCrossed,
   endlessUnlocksEarned,
   nextEndlessUnlock,
-  passesEndlessGate,
   CLUB_SET_DIFFICULTIES,
   clubSetOf,
-  clubSetHandicapStrokes,
-  netStrokes,
   formatToPar,
   addEndlessRecord,
   bestEndlessRecord,
-  recordNetToPar,
   ENDLESS_RECORDS_KEPT,
   type EndlessRunRecord,
 } from '../src/sim/rpg/endless';
 import {
   currentCourse,
   endlessHoleNumber,
-  endlessHolePassed,
   finishStop,
   holeGateArmed,
   playStop,
@@ -56,43 +53,43 @@ function played(par: number, strokes: number, holed = true): PlayedHole {
   } as unknown as PlayedHole;
 }
 
-describe('the survival bar (GS-unending)', () => {
-  it('tightens one stroke every 8 holes: quad bogey → … → par → birdie forever', () => {
-    expect(endlessGateOverPar(1)).toBe(4);
-    expect(endlessGateOverPar(8)).toBe(4);
-    expect(endlessGateOverPar(9)).toBe(3);
-    expect(endlessGateOverPar(17)).toBe(2);
-    expect(endlessGateOverPar(25)).toBe(1);
-    expect(endlessGateOverPar(33)).toBe(0);
-    expect(endlessGateOverPar(40)).toBe(0);
-    expect(endlessGateOverPar(41)).toBe(-1);
-    expect(endlessGateOverPar(999)).toBe(-1); // birdie-or-better, forever
-    expect(ENDLESS_GATE_STEPS[ENDLESS_GATE_STEPS.length - 1]).toBe(-1);
-    expect(ENDLESS_TIER_HOLES).toBe(8);
+describe('the per-set survival bar (GS-set-survival)', () => {
+  it('tightens one stroke every two SETS: +4 → +3 → +2 → +1 → E → −1 → −2 → −3, capped at −4', () => {
+    // Keyed off the 0-based stop index (= holesSurvived / 4); two sets per band.
+    expect(endlessSetGateOverPar(0)).toBe(4); // set 1
+    expect(endlessSetGateOverPar(1)).toBe(4); // set 2
+    expect(endlessSetGateOverPar(2)).toBe(3); // set 3
+    expect(endlessSetGateOverPar(3)).toBe(3); // set 4
+    expect(endlessSetGateOverPar(4)).toBe(2); // set 5
+    expect(endlessSetGateOverPar(6)).toBe(1); // set 7
+    expect(endlessSetGateOverPar(8)).toBe(0); // set 9 — even
+    expect(endlessSetGateOverPar(10)).toBe(-1); // set 11
+    expect(endlessSetGateOverPar(12)).toBe(-2); // set 13
+    expect(endlessSetGateOverPar(14)).toBe(-3); // set 15
+    expect(endlessSetGateOverPar(16)).toBe(-4); // set 17 — the cap
+    expect(endlessSetGateOverPar(999)).toBe(-4); // −4 forever
+    expect(ENDLESS_SET_STEPS[ENDLESS_SET_STEPS.length - 1]).toBe(-4);
+    expect(ENDLESS_SET_HOLES).toBe(4);
+    expect(ENDLESS_SETS_PER_STEP).toBe(2);
   });
 
-  it('is par-relative and readable: the user-facing 8/7/6/5/4 ramp on a par 4', () => {
-    // The spec's numbers ARE this ladder on a par-4: 8 → 7 → 6 → 5 → 4, then birdie.
-    expect(endlessRequiredStrokes(4, 1)).toBe(8);
-    expect(endlessRequiredStrokes(4, 9)).toBe(7);
-    expect(endlessRequiredStrokes(4, 17)).toBe(6);
-    expect(endlessRequiredStrokes(4, 25)).toBe(5);
-    expect(endlessRequiredStrokes(4, 33)).toBe(4);
-    expect(endlessRequiredStrokes(4, 41)).toBe(3);
-    // A par-3 and a par-5 shift with their par (fair by construction).
-    expect(endlessRequiredStrokes(3, 1)).toBe(7);
-    expect(endlessRequiredStrokes(5, 41)).toBe(4);
-    expect(endlessGateLabel(4)).toBe('Quad bogey');
-    expect(endlessGateLabel(0)).toBe('Par');
-    expect(endlessGateLabel(-1)).toBe('Birdie');
-  });
-
-  it('passes only a HOLED score at or under the bar — a pickup always fails', () => {
-    expect(passesEndlessGate(4, 8, true, 1)).toBe(true); // quad bogey holed at the buzzer
-    expect(passesEndlessGate(4, 8, false, 1)).toBe(false); // picked up at par+4 → never holed → dead
-    expect(passesEndlessGate(4, 9, true, 1)).toBe(false);
-    expect(passesEndlessGate(4, 3, true, 41)).toBe(true); // birdie tier
-    expect(passesEndlessGate(4, 4, true, 41)).toBe(false); // par no longer survives
+  it('scores the four-hole cumulative total, not a single hole', () => {
+    const set = [
+      { record: { par: 4, strokes: 8 } }, // +4 blow-up (capped)
+      { record: { par: 4, strokes: 3 } }, // −1
+      { record: { par: 4, strokes: 3 } }, // −1
+      { record: { par: 4, strokes: 3 } }, // −1
+    ];
+    expect(endlessSetToPar(set)).toBe(1); // +4 −1 −1 −1 = +1
+    // Set 1 allowance is +4: the blow-up is absorbed by the three birdies → the set SURVIVES.
+    expect(passesEndlessSet(1, 0)).toBe(true);
+    // Four flat pars (E) survive +4/+3/+2/+1/E bands but MISS the −1 band and tighter.
+    expect(passesEndlessSet(0, 8)).toBe(true); // set 9, E
+    expect(passesEndlessSet(0, 10)).toBe(false); // set 11, −1
+    // Labels read like a scorecard target.
+    expect(endlessSetLabel(4)).toBe('+4');
+    expect(endlessSetLabel(0)).toBe('E');
+    expect(endlessSetLabel(-4)).toBe('−4');
   });
 });
 
@@ -170,36 +167,52 @@ describe('milestones & unlocks (GS-unending)', () => {
   });
 });
 
-describe('the Unending Universe run engine (GS-unending)', () => {
-  it('finishStop counts survived holes, banks milestone shards instantly, and ends on a miss', () => {
+describe('the Unending Universe run engine (GS-set-survival)', () => {
+  it('finishStop scores the whole set, banks milestone shards on a cleared set, and ends on a missed set', () => {
     const base = startRun(1, 'unending');
     const course = currentCourse(base);
     expect(course.holes.length).toBe(4);
     const pars = course.holes.map((h) => h.par);
 
-    // Four holed pars at holes 37–40 (bar: par) → stop passed, milestone 40 banked.
-    const at36: Run = { ...base, holesSurvived: 36 };
+    // Set 10 (stopIndex 9) allowance is EVEN: four pars clear it → holes 36→40, milestone 40 banked.
+    const at36: Run = { ...base, holesSurvived: 36, stopIndex: 9 };
     const pass = finishStop(at36, course, pars.map((p) => played(p, p)));
     expect(pass.result.passed).toBe(true);
     expect(pass.run.status).toBe('active');
     expect(pass.run.holesSurvived).toBe(40);
     expect(pass.run.bonusShards).toBe(40); // the hole-40 bonus, banked mid-run
 
-    // A bogey on hole 41 (bar: birdie) dies mid-stop — the partial stop still banks hole 40's crossing.
-    const at39: Run = { ...base, holesSurvived: 39 };
-    const die = finishStop(at39, course, [played(pars[0]!, pars[0]!), played(pars[1]!, pars[1]! + 1)]);
+    // Set 11 (stopIndex 10) needs −1 for the set: four pars (E) miss it → the run ends, no new holes.
+    const at40: Run = { ...base, holesSurvived: 40, stopIndex: 10 };
+    const die = finishStop(at40, course, pars.map((p) => played(p, p)));
     expect(die.result.passed).toBe(false);
     expect(die.run.status).toBe('ended');
     expect(die.run.endedReason).toBe('cut');
-    expect(die.run.holesSurvived).toBe(40); // the failed hole never counts
-    expect(die.run.bonusShards).toBe(40);
+    expect(die.run.holesSurvived).toBe(40); // the busted set never counts
+  });
+
+  it('a single blow-up hole no longer wrecks the set — the four-hole total is what counts', () => {
+    const base = startRun(1, 'unending');
+    const course = currentCourse(base);
+    const pars = course.holes.map((h) => h.par);
+    // Set 1 (stopIndex 0, allowance +4): one quad-bogey blow-up (+4) clawed back by three birdies (−3)
+    // → cumulative +1 ≤ +4 → the set SURVIVES (the whole point of the redesign).
+    const at0: Run = { ...base, holesSurvived: 0, stopIndex: 0 };
+    const res = finishStop(at0, course, [
+      played(pars[0]!, pars[0]! + 4),
+      played(pars[1]!, pars[1]! - 1),
+      played(pars[2]!, pars[2]! - 1),
+      played(pars[3]!, pars[3]! - 1),
+    ]);
+    expect(res.result.passed).toBe(true);
+    expect(res.run.holesSurvived).toBe(4);
   });
 
   it('milestone shards are LIFETIME-once: a re-crossed milestone (prevBestHoles) banks nothing', () => {
     const base = startRun(1, 'unending');
     const course = currentCourse(base);
     const pars = course.holes.map((h) => h.par);
-    const at36: Run = { ...base, holesSurvived: 36 };
+    const at36: Run = { ...base, holesSurvived: 36, stopIndex: 9 }; // set 10, allowance E
 
     // First time reaching hole 40 (lifetime best 0/36 below it) still pays the crossing.
     const fresh = finishStop(at36, course, pars.map((p) => played(p, p)), { prevBestHoles: 36 });
@@ -212,47 +225,42 @@ describe('the Unending Universe run engine (GS-unending)', () => {
     expect(replay.run.holesSurvived).toBe(40);
     expect(replay.run.bonusShards).toBe(0);
 
-    // New ground beyond the lifetime best still pays: best 40, this stop reaches 60 → the hole-60 bonus.
-    // Holes 57–60 sit in the birdie-or-better tier, so they must be birdied to survive.
-    const at56: Run = { ...base, holesSurvived: 56 };
+    // New ground beyond the lifetime best still pays: best 40, this set (stopIndex 14, allowance −3)
+    // is birdied out (−4) → holes 56→60, the hole-60 bonus banks.
+    const at56: Run = { ...base, holesSurvived: 56, stopIndex: 14 };
     const beyond = finishStop(at56, course, pars.map((p) => played(p, p - 1)), { prevBestHoles: 40 });
     expect(beyond.run.holesSurvived).toBe(60);
     expect(beyond.run.bonusShards).toBe(60);
   });
 
-  it('playStop stops at the first failed hole and every seeded run terminates by the bar', () => {
+  it('every seeded run terminates by the set bar, crediting whole sets only', () => {
     for (let seed = 0; seed < 12; seed++) {
       const { run, stops } = simulateRun(seed, { formatId: 'unending' });
       expect(run.status).toBe('ended');
       expect(run.endedReason).toBe('cut');
       expect(stops[stops.length - 1]!.passed).toBe(false);
-      // The ledger equals 4 per survived stop plus the dying stop's leading passes.
+      // The ledger is exactly 4 per CLEARED set; the busted set adds nothing (no mid-set credit).
       const survivedStops = stops.filter((s) => s.passed).length;
-      expect(run.holesSurvived).toBeGreaterThanOrEqual(survivedStops * 4);
-      expect(run.holesSurvived).toBeLessThan(survivedStops * 4 + 4);
+      expect(run.holesSurvived).toBe(survivedStops * 4);
     }
   });
 
-  it('playStop is reproducible and the gate verdict matches endlessHolePassed hole-for-hole', () => {
+  it('playStop plays the full set, is reproducible, and its verdict matches passesEndlessSet', () => {
     const run = startRun(77, 'unending');
     const a = playStop(run);
     const b = playStop(run);
     expect(a.result).toEqual(b.result);
-    expect(a.played.length).toBeLessThanOrEqual(4);
-    for (let i = 0; i < a.played.length; i++) {
-      const pass = endlessHolePassed(run, i, a.played[i]!);
-      // Every hole but a failing last one passed; a short stop's last hole is the death.
-      expect(pass).toBe(!(i === a.played.length - 1 && !a.result.passed));
-    }
+    expect(a.played.length).toBe(4); // always the whole set now — no early break
+    expect(a.result.passed).toBe(passesEndlessSet(endlessSetToPar(a.played), run.stopIndex));
   });
 
   it('holesSurvived round-trips through snapshot/resume (the bar survives a reload)', () => {
     let run = startRun(5, 'unending');
-    run = { ...run, holesSurvived: 23, stopIndex: 6, distanceFromStart: 9 };
+    run = { ...run, holesSurvived: 24, stopIndex: 6, distanceFromStart: 9 };
     const resumed = resumeRun(snapshotRun(run));
-    expect(resumed.holesSurvived).toBe(23);
+    expect(resumed.holesSurvived).toBe(24);
     expect(holeGateArmed(resumed)).toBe(true);
-    expect(endlessHoleNumber(resumed, 0)).toBe(24);
+    expect(endlessHoleNumber(resumed, 0)).toBe(25);
   });
 
   it('the default format is the Unending Universe; the voyage is untouched by the gate', () => {
@@ -331,27 +339,12 @@ describe('the reducer plumbs progression + unlocks (GS-unending)', () => {
   });
 });
 
-describe('golf scoring: gross / net / to-par (GS-golf-score)', () => {
-  it('the four starting club sets map to green/blue/purple/orange with a decreasing handicap', () => {
+describe('starting club sets = the difficulty axis (GS-set-survival)', () => {
+  it('the four sets map to green/blue/purple/orange rarities (no handicap/net anymore)', () => {
     expect(CLUB_SET_DIFFICULTIES.map((d) => d.key)).toEqual(['green', 'blue', 'purple', 'orange']);
     expect(CLUB_SET_DIFFICULTIES.map((d) => d.tier)).toEqual(['common', 'rare', 'epic', 'legendary']);
-    // A weaker set is the sterner test → gets MORE handicap strokes; the legendary Elite set is scratch.
-    const hcaps = CLUB_SET_DIFFICULTIES.map((d) => d.handicap18);
-    for (let i = 1; i < hcaps.length; i++) expect(hcaps[i]!).toBeLessThan(hcaps[i - 1]!);
-    expect(clubSetOf('legendary').handicap18).toBe(0);
     expect(clubSetOf(undefined).key).toBe('green'); // absent ⇒ the starter set
-  });
-
-  it('prorates the handicap allowance to holes played and floors net at 0', () => {
-    // Green gives a full 18 over 18 holes → one stroke per hole; prorated for a partial round.
-    expect(clubSetHandicapStrokes('common', 18)).toBe(18);
-    expect(clubSetHandicapStrokes('common', 9)).toBe(9);
-    expect(clubSetHandicapStrokes('epic', 18)).toBe(6);
-    expect(clubSetHandicapStrokes('legendary', 40)).toBe(0);
-    // Net = gross − allowance; scratch net == gross; never negative.
-    expect(netStrokes(80, 18, 'common')).toBe(62);
-    expect(netStrokes(80, 18, 'legendary')).toBe(80);
-    expect(netStrokes(5, 18, 'common')).toBe(0);
+    expect((clubSetOf('common') as unknown as Record<string, unknown>).handicap18).toBeUndefined(); // net scoring is gone
   });
 
   it('formats a to-par figure like a golf scorecard', () => {
@@ -361,7 +354,7 @@ describe('golf scoring: gross / net / to-par (GS-golf-score)', () => {
   });
 });
 
-describe('the last-runs leaderboard records (GS-golf-score)', () => {
+describe('the last-runs leaderboard records (GS-set-survival)', () => {
   const rec = (over: Partial<EndlessRunRecord> = {}): EndlessRunRecord => ({
     characterId: 'feather-fade',
     tier: 'common',
@@ -380,40 +373,39 @@ describe('the last-runs leaderboard records (GS-golf-score)', () => {
     expect(recs[0]!.seed).toBe(ENDLESS_RECORDS_KEPT + 4); // the most recent is first
   });
 
-  it('picks the furthest-reaching run as the best, breaking ties on net-to-par', () => {
-    const a = rec({ seed: 1, holes: 20, gross: 90, par: 82 });
-    const b = rec({ seed: 2, holes: 30, gross: 130, par: 120 }); // further → best
-    const c = rec({ seed: 3, holes: 30, gross: 128, par: 120 }); // same holes, better score
+  it('picks the furthest-reaching run as the best; ties keep the most recent (depth is the only key)', () => {
+    const a = rec({ seed: 1, holes: 20 });
+    const b = rec({ seed: 2, holes: 30 }); // further → best
+    const c = rec({ seed: 3, holes: 30 }); // same depth
     expect(bestEndlessRecord([a, b])).toBe(b);
-    expect(bestEndlessRecord([b, c])).toBe(c);
+    // Records are stored newest-first, so a tie resolves to the earlier (more recent) entry.
+    expect(bestEndlessRecord([b, c])).toBe(b);
     expect(bestEndlessRecord([])).toBeUndefined();
-  });
-
-  it('net-to-par rewards a harder set for the same raw round', () => {
-    const green = rec({ tier: 'common', holes: 18, gross: 80, par: 72 });
-    const orange = rec({ tier: 'legendary', holes: 18, gross: 80, par: 72 });
-    expect(recordNetToPar(green)).toBeLessThan(recordNetToPar(orange));
   });
 });
 
-describe('finishStop accumulates the golf round (GS-golf-score)', () => {
-  it('adds gross + par over the SURVIVED holes only, and round-trips through snapshot/resume', () => {
-    const course = currentCourse(startRun(3, 'unending'));
-    const pars = course.holes.map((h) => h.par);
+describe('finishStop banks a cleared set (GS-set-survival)', () => {
+  it('banks the whole set gross + par on a cleared set (0 on a bust) and round-trips through resume', () => {
     const base = startRun(3, 'unending');
-    // Two clean pars then a blow-up that busts the bar mid-stop (holes 1–8 bar = quad bogey).
-    const res = finishStop(base, course, [
-      played(pars[0]!, pars[0]!),
-      played(pars[1]!, pars[1]!),
-      played(pars[2]!, pars[2]! + 9, false), // picked up — fails the gate, excluded from the round
-    ]);
-    expect(res.run.holesSurvived).toBe(2);
-    expect(res.run.grossStrokes).toBe(pars[0]! + pars[1]!);
-    expect(res.run.parPlayed).toBe(pars[0]! + pars[1]!);
-    // Snapshot/resume keeps the running round total.
-    const resumed = resumeRun(snapshotRun(res.run));
-    expect(resumed.grossStrokes).toBe(res.run.grossStrokes);
-    expect(resumed.parPlayed).toBe(res.run.parPlayed);
+    const course = currentCourse(base);
+    const pars = course.holes.map((h) => h.par);
+    const total = pars.reduce((a, b) => a + b, 0);
+    // Set 1 (stopIndex 0, allowance +4): four pars clear it → the whole four-hole set banks.
+    const pass = finishStop(base, course, pars.map((p) => played(p, p)));
+    expect(pass.result.passed).toBe(true);
+    expect(pass.run.holesSurvived).toBe(4);
+    expect(pass.run.grossStrokes).toBe(total);
+    expect(pass.run.parPlayed).toBe(total);
+    const resumed = resumeRun(snapshotRun(pass.run));
+    expect(resumed.grossStrokes).toBe(pass.run.grossStrokes);
+    expect(resumed.parPlayed).toBe(pass.run.parPlayed);
+
+    // A busted set (stopIndex 10 needs −1, four pars miss) banks nothing.
+    const at40: Run = { ...base, holesSurvived: 40, stopIndex: 10 };
+    const bust = finishStop(at40, course, pars.map((p) => played(p, p)));
+    expect(bust.result.passed).toBe(false);
+    expect(bust.run.holesSurvived).toBe(40);
+    expect(bust.run.grossStrokes).toBe(base.grossStrokes); // unchanged
   });
 
   it('a voyage run never accumulates the endless round (stays 0)', () => {

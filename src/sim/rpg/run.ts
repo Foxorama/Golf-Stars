@@ -43,7 +43,7 @@ import {
 } from './economy';
 import { RARITY_C } from './loot';
 import { DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, startingFuelFor, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
-import { endlessGateOverPar, endlessMilestoneShards, passesEndlessGate, warpBirdieHole } from './endless';
+import { endlessMilestoneShards, endlessSetGateOverPar, endlessSetToPar, passesEndlessSet, warpBirdieHole } from './endless';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type BossEdge, type TeamSetup, type TeamFormat } from './match';
 import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
 import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
@@ -487,34 +487,22 @@ export function finishStop(
   const cut = effectiveCut(run, course.holes.length);
   const format = getFormat(run.formatId);
   const isBossStop = !!bossAt(format, run.stopIndex);
-  // The Unending Universe's PER-HOLE survival bar (GS-unending): every played hole must clear its
-  // par-relative required score (endless.ts), numbered cumulatively across the whole run. The driver
-  // stops at the first failure, so `played` may be a PARTIAL stop — count the leading passes.
-  let gateSurvived = 0;
-  if (format.holeGate) {
-    // Read the canonical scoring `record` (the same numbers Stableford scores) + the holed flag.
-    while (
-      gateSurvived < played.length &&
-      passesEndlessGate(
-        played[gateSurvived]!.record.par,
-        played[gateSurvived]!.record.strokes,
-        played[gateSurvived]!.holed,
-        run.holesSurvived + gateSurvived + 1,
-      )
-    ) {
-      gateSurvived++;
-    }
-  }
+  // The Unending Universe's PER-SET survival bar (GS-set-survival): the whole set of four is scored on
+  // its CUMULATIVE to-par (Σ strokes − Σ par), which must clear the set's allowance (ramping every two
+  // sets, endless.ts). Reset each set — a single blow-up hole can be absorbed by the other three, so the
+  // run only ever ends at a set boundary. `run.stopIndex` (= holesSurvived / 4) keys the allowance.
+  const setToPar = format.holeGate ? endlessSetToPar(played) : 0;
+  const setSurvived = !!format.holeGate && passesEndlessSet(setToPar, run.stopIndex);
   // Survival rule (GS-positional-cut): a WINNABLE campaign (the voyage) is a FIELD competition — you
   // survive an ordinary stop by finishing in the TOP-N of the arc leaderboard (top 18, then top 16),
   // not by clearing an abstract Stableford line, so the leaderboard is what decides your fate. The boss
-  // stop passes on the DUEL (matchWon). The Unending Universe (GS-unending) passes only when EVERY
-  // hole of the stop cleared its per-hole bar.
+  // stop passes on the DUEL (matchWon). The Unending Universe (GS-set-survival) passes only when the
+  // four-hole set total cleared its allowance.
   const passed =
     opts.matchWon !== undefined
       ? opts.matchWon
       : format.holeGate
-      ? gateSurvived === course.holes.length
+      ? setSurvived
       : format.winnable && !isBossStop
       ? playerSurvivesStop(run, course, totals.stableford)
       : totals.stableford >= cut;
@@ -561,7 +549,7 @@ export function finishStop(
   // Unending-Universe progress (GS-unending): advance the survived-hole counter and bank any crossed
   // milestone's shard bonus INSTANTLY through `bonusShards` (the same kept-even-on-a-bust channel the
   // route events use) — so a victory screen's reward can never be clawed back by a later death.
-  const holesSurvived = run.holesSurvived + (format.holeGate ? gateSurvived : 0);
+  const holesSurvived = run.holesSurvived + (setSurvived ? course.holes.length : 0);
   // A WARPED stop (GS-warp) never banks milestone shards — its holes were auto-birdied, not earned,
   // and warp is retryable/instant, so banking here would be a free shard farm every run.
   // Milestone shards are a LIFETIME-once reward, exactly like the Evergreen cosmetic unlocks: a
@@ -571,15 +559,15 @@ export function finishStop(
   // byte-identical behaviour every seeded test depends on.
   const milestoneFloor = Math.max(run.holesSurvived, opts.prevBestHoles ?? 0);
   const milestoneShards = format.holeGate && !opts.warp ? endlessMilestoneShards(milestoneFloor, holesSurvived) : 0;
-  // Golf-round score (GS-golf-score): accumulate the GROSS strokes + PAR of exactly the holes that were
-  // survived (a partial busting stop counts only its leading passes), so the running gross/to-par/net
-  // stays in lock-step with `holesSurvived`. Zero for non-gate formats (the voyage never reads these).
+  // Retained gross/par bookkeeping (GS-set-survival): a CLEARED set banks its four holes' gross + par;
+  // a busted set (the run ends) banks nothing, so the totals stay in lock-step with `holesSurvived`.
+  // These are no longer shown or ranked on (depth is the metric) — kept only for save-shape stability.
   let grossAdded = 0;
   let parAdded = 0;
-  if (format.holeGate) {
-    for (let i = 0; i < gateSurvived; i++) {
-      grossAdded += played[i]!.record.strokes;
-      parAdded += played[i]!.record.par;
+  if (setSurvived) {
+    for (const p of played) {
+      grossAdded += p.record.strokes;
+      parAdded += p.record.par;
     }
   }
 
@@ -913,10 +901,9 @@ export function playStopWarp(run: Run): { run: Run; result: StopResult; played: 
   if (!getFormat(run.formatId).holeGate) return playStop(run);
   const course = currentCourse(run);
   const rng = new Rng(`${course.seed}:play`);
-  const holeOpts = playerHoleOpts(run);
-  const played = course.holes.map((h, i) =>
-    warpBirdieHole(playHole(h, rng, endlessAttackArmed(run, i) ? { ...holeOpts, attackPin: true } : holeOpts)),
-  );
+  const base = playerHoleOpts(run);
+  const holeOpts = endlessAttackArmed(run) ? { ...base, attackPin: true } : base;
+  const played = course.holes.map((h) => warpBirdieHole(playHole(h, rng, holeOpts)));
   const fin = finishStop(run, course, played, { warp: true });
   // The warp prefix extends in lock-step with the survived count (every warped hole survives).
   return { run: { ...fin.run, warpedThrough: fin.run.holesSurvived }, result: fin.result, played };
@@ -966,20 +953,16 @@ export function playStop(
     return { run: next, result, played: stop.player };
   }
   const rng = new Rng(`${course.seed}:play`);
-  // The Unending Universe (GS-unending) dies at the FIRST hole that misses its survival bar, so the
-  // auto sim plays hole by hole on the same sequential `:play` stream and stops there — an exact
-  // prefix of the full-stop stream, so it resolves byte-for-byte like the interactive driver (which
-  // also plays this stream hole by hole and stops at the same failure).
+  // The Unending Universe (GS-set-survival) is judged on the whole SET of four, so the auto sim plays
+  // every hole of the stop (no mid-set death) on the same sequential `:play` stream and hands the full
+  // set to `finishStop` — byte-for-byte like the interactive driver, which also plays every hole and
+  // scores the set at the end. GS-ai-attack: once the set's allowance is bogey-tight the auto-AI hunts
+  // pins (armed per SET, so it's on for the whole stop or none) — the same rule the interactive auto
+  // driver reads via `endlessAttackArmed`.
   if (getFormat(run.formatId).holeGate) {
-    const holeOpts = playerHoleOpts(run);
-    const played: PlayedHole[] = [];
-    for (let i = 0; i < course.holes.length; i++) {
-      // GS-ai-attack: once the survival bar tightens to bogey-or-better, the auto-AI hunts pins —
-      // the same per-hole rule the interactive auto driver reads via `endlessAttackArmed`.
-      const p = playHole(course.holes[i]!, rng, endlessAttackArmed(run, i) ? { ...holeOpts, attackPin: true } : holeOpts);
-      played.push(p);
-      if (!passesEndlessGate(p.record.par, p.record.strokes, p.holed, run.holesSurvived + i + 1)) break;
-    }
+    const base = playerHoleOpts(run);
+    const holeOpts = endlessAttackArmed(run) ? { ...base, attackPin: true } : base;
+    const played = playCourse(course.holes, rng, holeOpts);
     const { run: next, result } = finishStop(run, course, played, { prevBestHoles: opts.prevBestHoles });
     return { run: next, result, played };
   }
@@ -995,27 +978,22 @@ export function holeGateArmed(run: Run): boolean {
   return !!getFormat(run.formatId).holeGate;
 }
 
-/** The cumulative (1-based) hole NUMBER of the current stop's `holeIndex`-th hole — the number the
- *  survival bar is keyed off. Valid before the stop is scored (holesSurvived is the pre-stop count). */
+/** The cumulative (1-based) hole NUMBER of the current stop's `holeIndex`-th hole — for display
+ *  ("holes 25–28"). Valid before the stop is scored (holesSurvived is the pre-stop count). */
 export function endlessHoleNumber(run: Run, holeIndex: number): number {
   return run.holesSurvived + holeIndex + 1;
 }
 
-/** Did this finished hole clear its Unending-Universe survival bar? Shared by the interactive driver
- *  so its end-of-run verdict is byte-for-byte the headless `playStop`'s. */
-export function endlessHolePassed(run: Run, holeIndex: number, played: PlayedHole): boolean {
-  return passesEndlessGate(played.record.par, played.record.strokes, played.holed, endlessHoleNumber(run, holeIndex));
-}
-
-/** The survival bar (strokes over par) at/below which the endless auto-AI turns pin-hunter. */
+/** The set allowance (cumulative strokes over par) at/below which the endless auto-AI turns pin-hunter. */
 export const ENDLESS_ATTACK_GATE = 1;
 
-/** Should the auto-AI hunt pins on this hole (GS-ai-attack)? Armed only in the Unending Universe,
- *  once the hole's survival bar is bogey-or-tighter — safe play can't buy pars/birdies at the rate
- *  the deep bar demands. One rule for headless `playStop` AND the interactive auto driver
- *  (`autoShotHole`), so auto ≡ interactive holds; every voyage/calm-bar hole is byte-identical. */
-export function endlessAttackArmed(run: Run, holeIndex: number): boolean {
-  return holeGateArmed(run) && endlessGateOverPar(endlessHoleNumber(run, holeIndex)) <= ENDLESS_ATTACK_GATE;
+/** Should the auto-AI hunt pins this SET (GS-ai-attack)? Armed only in the Unending Universe, once the
+ *  set's allowance is bogey-tight or tighter — safe play can't buy the pars/birdies a deep set demands.
+ *  Per SET (constant across the stop's four holes), so it's on for the whole set or none. One rule for
+ *  headless `playStop` AND the interactive auto driver (`autoShotHole`), so auto ≡ interactive holds;
+ *  every voyage/calm-set hole is byte-identical. */
+export function endlessAttackArmed(run: Run): boolean {
+  return holeGateArmed(run) && endlessSetGateOverPar(run.stopIndex) <= ENDLESS_ATTACK_GATE;
 }
 
 /**

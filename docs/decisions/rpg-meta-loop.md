@@ -941,7 +941,47 @@ clubs* to *one* golfer's bag.
   a `HARD_ARCHETYPES` world yet spread across ≥4 archetypes, and later stops STILL land hard worlds
   (the filter is stop-0 only).
 
-## The Unending Universe — the endless survival format (GS-unending)
+## GS-set-survival (2026-07-07) — per-SET cumulative survival, and total score retired
+
+**The problem.** The original per-hole bar (GS-unending, below) had two flaws in play: (1) a single
+blow-up hole ended the run outright, which felt arbitrary on a wild course; and (2) the deep bar was
+"birdie-or-better on EVERY hole forever", an exponential wall the reports showed was practically
+unreachable (76%/hole birdie needed even at hole 32). The mode also presented a running GROSS/TO-PAR/NET
+scoreline, but score is meaningless here — the only thing that matters is how FAR you get.
+
+**What changed.** Survival is now judged PER SET OF FOUR (one stop), on the four-hole CUMULATIVE to-par,
+RESET each set: the set survives iff `Σ(strokes − par) ≤ the set's allowance`. Because a hole caps at
+`par + MAX_OVER_PAR (4)`, a blow-up can be clawed back by the other three, so the run only ever ends at a
+SET boundary — never on one bad hole. The allowance ramps one stroke every TWO sets (`ENDLESS_SET_STEPS
+= [4,3,2,1,0,-1,-2,-3,-4]`, `endlessSetGateOverPar(stopIndex)` with `stopIndex = holesSurvived/4`):
+**+4** sets 1–2, then +3 / +2 / +1 / E / −1 / −2 / −3, capped at **−4** (average birdie) forever. A
+cumulative −4 is elite-but-fair (variance-forgiving), where the old per-hole −1 wall was not.
+
+**Total score retired.** DEPTH (sets cleared / holes reached) is the sole metric. The running
+gross/to-par/net card, the club-set HANDICAP, and `netStrokes`/`clubSetHandicapStrokes`/`recordNetToPar`
+are gone; the leaderboard ranks purely on holes reached (ties → most recent). The starting CLUB SET is
+still the difficulty axis, but now it bites through the thresholds (a weaker bag makes E/−1/… harder to
+average), not through a handicap sum. `grossStrokes`/`parPlayed` stay on the Run/record for save-shape
+stability (no migration) but are never shown or ranked on. `EndlessRunRecord` shape is unchanged.
+
+**Determinism + auto ≡ interactive.** Both drivers now play the WHOLE set (no early break) on the single
+`${course.seed}:play` stream, then `finishStop` scores the cumulative total via `passesEndlessSet` —
+identical between the headless `playStop` (`playCourse` of all four) and the interactive `holeComplete`
+(which stops ending the stop mid-way; the set is scored only at the fourth hole). `endlessAttackArmed`
+is now per-SET (constant across the stop: armed once the set allowance is `≤ ENDLESS_ATTACK_GATE (1)`,
+i.e. set 7 onward), so it's on for the whole set or none. `endlessHolePassed` and the per-hole
+`endlessGateOverPar`/`endlessRequiredStrokes`/`passesEndlessGate`/`endlessGateLabel` are removed.
+
+**Measured (auto-AI, the difficulty FLOOR; `scripts/endless-ai-depth.ts`).** A smooth escalation, no
+death spiral: ~96% clear the gentle +4 on-ramp (sets 1–2), deaths cluster in the tightening +2/+1/E
+bands (sets 5–10), and only strong upgraded builds reach hole 32+ (~25% purple). The −4 cap is an elite
+ceiling the greedy auto-AI essentially never touches — headroom for an attacking human. Mean depth rises
+with the club set (green ~20 → purple ~23), confirming upgrades + the set choice still matter. NO new
+`_gs*`/URL hook → the test-hub guard needs nothing. Guarded by the reworked `tests/endless.test.ts`
+(the ramp, the four-hole cumulative, blow-up absorption, whole-set crediting, every seeded run
+terminates on a cleared-set count) + `tests/ai-attack.test.ts` (per-set attack arming).
+
+## The Unending Universe — the endless survival format (GS-unending, SUPERSEDED by GS-set-survival above)
 
 **What shipped.** The two original endless roguelites (`flat` 6-hole stops, `ladder` 3→6→9→9→18) were
 RETIRED and replaced by one endless mode: **Unending Universe** (`FORMATS.unending`, the new

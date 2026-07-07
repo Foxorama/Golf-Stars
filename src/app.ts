@@ -25,8 +25,8 @@ import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
 import { getFormat } from './sim/rpg/formats';
-import { currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun } from './sim/rpg/run';
-import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessMilestoneShards, endlessRequiredStrokes, endlessUnlocksCrossed } from './sim/rpg/endless';
+import { currentBoss, effectiveCut, holeGateArmed, snapshotRun } from './sim/rpg/run';
+import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { isTeamDuelBoss } from './sim/rpg/formats';
@@ -344,7 +344,7 @@ function dispatch(action: Action): void {
                   secret: u.secret,
                 }
               : undefined,
-            bar: `${endlessGateLabel(endlessGateOverPar(state.run.holesSurvived + 1))} or better`,
+            bar: `Next set: ${endlessSetLabel(endlessSetGateOverPar(state.run.stopIndex))} or better`,
             seed: state.run.seed,
           },
           () => render(),
@@ -794,17 +794,18 @@ function holePips(): string {
 }
 
 function zoneScoreChip(): string {
-  // The Unending Universe (GS-unending): the number that matters is THIS hole's survival score, not a
-  // stop Stableford — show the strokes left under the bar, going amber → red as they burn down.
+  // The Unending Universe (GS-set-survival): the number that matters is THIS SET's running four-hole
+  // total vs its allowance — show how far under/over you are through the holes played so far, and the
+  // target the whole set has to hit. A blow-up hole never ends the run, so this is a budget, not a
+  // death clock: it goes amber → red as the set total pushes past the allowance with holes still to go.
   if (holeGateArmed(state.run)) {
     const done = state.stopPlayed ?? [];
-    const idx = state.play?.holeIndex ?? done.length;
-    const par = state.course.holes[idx]?.par ?? 4;
-    const holeNo = endlessHoleNumber(state.run, idx);
-    const req = endlessRequiredStrokes(par, holeNo);
-    const left = req - (state.play?.strokes ?? 0);
-    const col = left >= 3 ? '#5fd45a' : left === 2 ? '#ffc454' : '#ff6b6b';
-    return `<span class="gs-shotscore" style="color:${col};" title="hole ${holeNo} of the run — hole out in ${req} (${endlessGateLabel(endlessGateOverPar(holeNo))}) or the run ends">💀 ≤${req}</span>`;
+    const setSoFar = endlessSetToPar(done); // completed holes of this set (current hole not yet scored)
+    const target = endlessSetGateOverPar(state.run.stopIndex);
+    const room = target - setSoFar; // over-par budget left for the rest of the set (current hole included)
+    const col = room >= 3 ? '#5fd45a' : room >= 0 ? '#ffc454' : '#ff6b6b';
+    const soFar = setSoFar > 0 ? `+${setSoFar}` : setSoFar === 0 ? 'E' : `−${-setSoFar}`;
+    return `<span class="gs-shotscore" style="color:${col};" title="this set of 4: you're ${soFar} through ${done.length}, needing ${endlessSetLabel(target)} or better for the whole set — a blow-up won't end the run, the four-hole total is what counts">🎯 ${soFar} · need ${endlessSetLabel(target)}</span>`;
   }
   const done = state.stopPlayed ?? [];
   const sf = playTotals(done.map((p) => p.record)).stableford;
