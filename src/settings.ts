@@ -24,6 +24,9 @@ export interface Settings {
   leftHanded: boolean;
   /** Skip the tap-to-continue on the per-shot result — auto-advance after a short beat. */
   fastShots: boolean;
+  /** Last Ascension difficulty picked on character select (GS-title-2) — so the picker defaults to
+   *  the tier you chose last, not always A0. Clamped to the unlocked max when read. */
+  lastAscension: number;
 }
 
 const KEY = 'gs_settings';
@@ -45,6 +48,7 @@ function defaults(): Settings {
     reducedMotion: prefersReducedMotion(),
     leftHanded: false,
     fastShots: false,
+    lastAscension: 0,
   };
 }
 

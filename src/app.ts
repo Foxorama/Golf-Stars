@@ -45,7 +45,7 @@ import { SAVE_VERSION, defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { setMusicScene, type MusicSceneId } from './render/music';
-import { getSettings, toggleSetting, type Settings } from './settings';
+import { getSettings, setSetting, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
@@ -250,11 +250,12 @@ function dispatch(action: Action): void {
     // tap (dry tank, wrong screen) stays silent, so the sonar can never lie about a redraw.
     const prevScans = state.run.routeScans;
     setState(reduce(state, action));
-    // Entering character select resets the difficulty pickers (GS-title-2 / GS-golf-score) — a fresh
-    // choice per run, never a sticky leftover from the last one. The club set defaults to the owned
-    // tier (the strongest bag you have; opt DOWN for a harder run).
+    // Entering character select seeds the difficulty pickers (GS-title-2 / GS-golf-score). Ascension
+    // defaults to the LAST tier you chose (persisted pref), clamped to what's now unlocked — so it
+    // doesn't snap back to A0 every run. The club set defaults to the owned tier (the strongest bag
+    // you have; opt DOWN for a harder run).
     if (action.type === 'start') {
-      selAscension = 0;
+      selAscension = Math.max(0, Math.min(state.maxAscension, getSettings().lastAscension));
       selClubSet = state.bagTier;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
@@ -1805,6 +1806,8 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-asc]').forEach((el) => {
     el.addEventListener('click', () => {
       selAscension = Number(el.dataset.asc);
+      // Remember the pick so the picker defaults here next run instead of snapping back to A0.
+      setSetting('lastAscension', selAscension);
       sfx.click();
       haptic(HAPTICS.tap);
       render();
