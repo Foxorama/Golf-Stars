@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
-import { shipForCharacter, hatForCharacter, shirtForCharacter, pantsForCharacter } from '../src/ui/game';
+import { shipForCharacter, hatForCharacter, shirtForCharacter, pantsForCharacter, driverForCharacter } from '../src/ui/game';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 
 /** Drive a whole stop via the interactive reducer flow (attacking every shot). */
@@ -363,6 +363,21 @@ describe('ui reducer', () => {
     // Another golfer is unaffected.
     s = reduce(s, { type: 'equipApparel', id: 'trousers-classic' });
     expect(pantsForCharacter(s, 'huang-woo-hook')).toBeUndefined();
+  });
+
+  it("equips the earned Thor's Hammer driver per character; toggles it off (GS-thor)", () => {
+    // Thor's Hammer is secret/earn-only — never bought, so seed it owned (a later phase grants it).
+    let s = initState(7, { ownedApparel: ['thors-hammer'] });
+    s = reduce(s, { type: 'openClubhouse', characterId: 'feather-fade' });
+    s = reduce(s, { type: 'equipApparel', id: 'thors-hammer' });
+    expect(driverForCharacter(s, 'feather-fade')).toBe('thors-hammer');
+    expect(hatForCharacter(s, 'feather-fade')).toBeUndefined(); // the driver is its own slot
+    // Clicking the worn driver again takes it off.
+    s = reduce(s, { type: 'equipApparel', id: 'thors-hammer' });
+    expect(driverForCharacter(s, 'feather-fade')).toBeUndefined();
+    // Another golfer is unaffected.
+    s = reduce(s, { type: 'equipApparel', id: 'thors-hammer' });
+    expect(driverForCharacter(s, 'huang-woo-hook')).toBeUndefined();
   });
 
   it('clothing/ship buys are guarded; equipping is Clubhouse-only and owned-only (GS-clubhouse)', () => {

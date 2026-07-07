@@ -254,6 +254,39 @@ function tipJar(balls: number): string {
   </g>`;
 }
 
+/**
+ * Thor's Hammer (GS-thor) leaning against the RIGHT jamb of the fireplace stone surround — earned by
+ * winning an Asgard tournament, shown only once OWNED. A rune-etched gilded warhammer stood base-down on
+ * the hearthstone, its head up against the chimney breast, wreathed in flickering electric-blue lightning
+ * (the shipArt Thunderbolt idiom). Drawn AFTER the fireplace block so it sits on top; STATIC positions
+ * (no lounge Rng draws) so it never perturbs the seeded golfer placement — the lounge reads identically
+ * with or without it, only the hammer is added.
+ */
+function thorHammerHearth(): string {
+  const flick = (dur: string, begin: string): string =>
+    `<animate attributeName="opacity" values="0;1;0;0.7;0;0.9;0" dur="${dur}" begin="${begin}" repeatCount="indefinite"/>`;
+  const bolt = (d: string, dur: string, begin: string): string => `
+    <path d="${d}" fill="none" stroke="#59b6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0">${flick(dur, begin)}</path>
+    <path d="${d}" fill="none" stroke="#eaf6ff" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0">${flick(dur, begin)}</path>`;
+  return `<g transform="translate(96,169) rotate(-7)">
+    <ellipse cx="0" cy="1" rx="7" ry="2" fill="#000" opacity="0.3"/>
+    <ellipse cx="0" cy="-62" rx="15" ry="16" fill="#59b6ff" opacity="0.14">
+      <animate attributeName="opacity" values="0.08;0.2;0.1;0.18;0.08" dur="2.6s" repeatCount="indefinite"/>
+    </ellipse>
+    <g>
+      ${bolt('M9,-70 L15,-73 L11,-66 L18,-68', '0.7s', '0s')}
+      ${bolt('M-9,-69 L-16,-72 L-11,-65 L-18,-67', '0.6s', '0.3s')}
+      ${bolt('M10,-58 L17,-56 L13,-52', '0.5s', '0.15s')}
+    </g>
+    <rect x="-1.8" y="-62" width="3.6" height="62" rx="1.6" fill="#6b4a24" stroke="#2e1d0c" stroke-width="1"/>
+    <rect x="-2.1" y="-16" width="4.2" height="15" rx="1.6" fill="#2f2010"/>
+    <rect x="-10" y="-72" width="20" height="13.5" rx="1.8" fill="#c9a24a" stroke="#2e1d0c" stroke-width="1.2"/>
+    <rect x="-10" y="-72" width="4.6" height="13.5" fill="#ecd591"/>
+    <rect x="5.4" y="-72" width="4.6" height="13.5" fill="#ecd591"/>
+    <path d="M0,-68.5 L3,-65.2 L0,-61.8 L-3,-65.2 Z" fill="none" stroke="#7a5a22" stroke-width="1"/>
+  </g>`;
+}
+
 /** A bar stool: cushioned seat, chrome legs, a foot ring — parked in front of the counter. */
 function stool(x: number): string {
   return `<g>
@@ -276,8 +309,8 @@ function stool(x: number): string {
  *  `marmot` = the Marmot Bartender clubhouse unlock (GS-tent-interactions) is earned: a marmot tends
  *  the bar and its "Tips" jar sits on the counter, filled with `tips` golf balls (GS-tent-tips). When the
  *  jar filled last run the Marmot is `away` on the spaceport par-3 — the bar shows no marmot and an empty
- *  jar that visit. */
-function loungeArt(marmot = false, tips = 0, away = false): string {
+ *  jar that visit. `thorHammer` = Thor's Hammer (GS-thor) is owned, so it leans against the fireplace. */
+function loungeArt(marmot = false, tips = 0, away = false, thorHammer = false): string {
   const bottlesTop = [
     bottle(316, 76, 20, 6.5, '#4fae8a'),
     bottle(328, 76, 24, 6, '#c65a4a'),
@@ -425,6 +458,7 @@ function loungeArt(marmot = false, tips = 0, away = false): string {
       <path d="M8,1 Q13,0 12,-4" fill="none" stroke="#3a3f4d" stroke-width="2" stroke-linecap="round"/>
       <path d="M-9.4,-1.6 Q-8.4,-0.8 -7.4,-1.6" fill="none" stroke="#1d2029" stroke-width="0.7"/>
     </g>
+    ${thorHammer ? thorHammerHearth() : ''}
 
     <!-- ══ dartboard + floor lamp + leather armchair ══ -->
     <g transform="translate(146,50)">
@@ -981,7 +1015,13 @@ function spaceportHTML(golfers: LoungeGolfer[], rng: Rng, marmotAway = false): s
  * finished-run counter) reshuffles both arrangements each time home — the pad draws happen AFTER the spot
  * draws on the same Rng, so the lounge arrangement for a given visit is unchanged by the spaceport.
  */
-export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number, marmot = false, tips = 0): string {
+export function clubhouseLoungeHTML(
+  golfers: LoungeGolfer[],
+  visit: number,
+  marmot = false,
+  tips = 0,
+  thorHammer = false,
+): string {
   const rng = new Rng((visit >>> 0) * 2654435761 + 0x9e37); // spread the small counter across the seed space
   const spots = shuffle([...SPOTS], rng).slice(0, golfers.length);
   const figures = golfers.map((g, i) => golferAt(g, spots[i] ?? SPOTS[i % SPOTS.length]!)).join('');
@@ -993,7 +1033,7 @@ export function clubhouseLoungeHTML(golfers: LoungeGolfer[], visit: number, marm
   return `${loungeStyle()}
     <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:680px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
-      ${loungeArt(marmot, tips, away)}
+      ${loungeArt(marmot, tips, away, thorHammer)}
       ${figures}
     </div>
     ${spaceportHTML(golfers, rng, away)}`;

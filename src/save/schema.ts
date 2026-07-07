@@ -14,7 +14,7 @@ import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -370,8 +370,18 @@ export interface SaveV21 extends Omit<SaveV20, 'version'> {
   reputationByCharacter: ReputationByCharacter;
 }
 
+/** v22 adds the per-character cosmetic DRIVER equip map (GS-thor): the new 'driver' apparel slot — the
+ *  club skin each golfer swings (e.g. Thor's Hammer), outfitted in the Clubhouse like hat/shirt/pants/bag.
+ *  Seeded empty for existing saves (the driver is earned, never granted retroactively). */
+export type SaveV22 = Omit<SaveV21, 'version'> & {
+  version: 22;
+  /** The cosmetic driver each character swings (GS-thor): characterId → apparel id ('driver' slot).
+   *  Absent → the plain club head. Outfitted in the Clubhouse like the other slots. */
+  driverByCharacter: Record<string, string>;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV21;
+export type Save = SaveV22;
 
 export function defaultSave(): Save {
   return {
@@ -390,6 +400,7 @@ export function defaultSave(): Save {
     shirtByCharacter: {},
     pantsByCharacter: {},
     golfBagByCharacter: {},
+    driverByCharacter: {},
     bagTier: 'common',
     unlockedClubsByCharacter: {},
     clubhouseVisit: 0,
@@ -702,6 +713,12 @@ function v20ToV21(s: SaveV20): SaveV21 {
   return { ...s, version: 21, reputationByCharacter: {} };
 }
 
+/** v21 → v22: seed an empty per-character driver map — nobody has earned a cosmetic driver (Thor's
+ *  Hammer) yet; it's won on Asgard, never granted retroactively. */
+function v21ToV22(s: SaveV21): SaveV22 {
+  return { ...s, version: 22, driverByCharacter: {} };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -730,6 +747,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 18) s = v18ToV19(s as unknown as SaveV18) as unknown as typeof s;
   if (s.version === 19) s = v19ToV20(s as unknown as SaveV19) as unknown as typeof s;
   if (s.version === 20) s = v20ToV21(s as unknown as SaveV20) as unknown as typeof s;
+  if (s.version === 21) s = v21ToV22(s as unknown as SaveV21) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -737,7 +755,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV21>;
+  const v14 = s as unknown as Partial<SaveV22>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -764,6 +782,7 @@ export function migrate(raw: unknown): Save {
     shirtByCharacter: sanitize(v14.shirtByCharacter, ownedApparel),
     pantsByCharacter: sanitize(v14.pantsByCharacter, ownedApparel),
     golfBagByCharacter: sanitize(v14.golfBagByCharacter, ownedApparel),
+    driverByCharacter: sanitize(v14.driverByCharacter, ownedApparel),
     bagTier,
     unlockedClubsByCharacter: v14.unlockedClubsByCharacter ?? {},
     clubhouseVisit: v14.clubhouseVisit ?? 0,

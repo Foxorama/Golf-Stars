@@ -171,6 +171,9 @@ export interface GolferLook {
   shirtStyle?: ApparelLook;
   /** Equipped cosmetic PANTS (GS-pants-outfit) — overrides the default legs with their own shape/palette. */
   pantsStyle?: ApparelLook;
+  /** Equipped cosmetic DRIVER (GS-thor) — swaps the plain club head for its own skin (a mythic warhammer,
+   *  Thor's Hammer). Takes precedence over the in-run `gear` themed head when both are present. */
+  driver?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 function lookFromColor(color: string): GolferLook {
@@ -325,9 +328,13 @@ function drawGolfer(
     ctx.fill();
   }
 
-  // Club shaft + head (behind the arms). A bought themed club set (GS-proshop-2) tints the head and
-  // gives it a glow + a small theme accent, so the gear you bought visibly changes the swing.
+  // Club shaft + head (behind the arms). An equipped cosmetic DRIVER (GS-thor) swaps the plain club head
+  // for a mythic WARHAMMER wreathed in lightning; else a bought themed club set (GS-proshop-2) tints the
+  // head + glows; else a plain club head. The driver skin takes precedence over the in-run gear theme.
   const gear = look.gear;
+  if (look.driver) {
+    drawWarhammer(ctx, hands, head, ang, swing, follow, alpha, look.driver);
+  } else {
   ctx.strokeStyle = gear ? gear.tint : '#d9dee8';
   ctx.lineWidth = 2.4;
   ctx.beginPath();
@@ -369,6 +376,7 @@ function drawGolfer(
     ctx.arc(head[0], head[1], 2.4, 0, Math.PI * 2);
     ctx.fill();
   }
+  }
 
   // Arms (shoulders → hands).
   ctx.strokeStyle = look.skin;
@@ -395,6 +403,109 @@ function drawGolfer(
   }
 
   ctx.restore();
+}
+
+/**
+ * Draw the mythic WARHAMMER driver skin (GS-thor: Thor's Hammer) in place of the plain club head. A short
+ * thick haft (leather-wrapped grip near the hands), a chunky rune-etched gilded hammer head crossing the
+ * shaft end, and electric-blue forked lightning that crackles around the head through the downswing +
+ * follow-through. Authored in the figure's local frame (same units as `drawGolfer`); the head is drawn in
+ * a frame rotated to the club angle so the striking faces cross the shaft. Deterministic (no Math.random —
+ * the flicker rides the swing/follow phase), assetless.
+ */
+function drawWarhammer(
+  ctx: CanvasRenderingContext2D,
+  hands: Vec,
+  head: Vec,
+  ang: number,
+  swing: number,
+  follow: number,
+  alpha: number,
+  look: ApparelLook,
+): void {
+  const gold = look.color || '#c9a24a';
+  const boltCol = look.accent || '#59b6ff';
+  const dark = '#7a5a22';
+  // Thick wooden haft hands → head, with a dark leather grip wrap near the hands.
+  ctx.strokeStyle = '#6b4a24';
+  ctx.lineWidth = 3.2;
+  ctx.beginPath();
+  ctx.moveTo(hands[0], hands[1]);
+  ctx.lineTo(head[0], head[1]);
+  ctx.stroke();
+  ctx.strokeStyle = '#2f2010';
+  ctx.lineWidth = 3.6;
+  ctx.beginPath();
+  ctx.moveTo(hands[0], hands[1]);
+  ctx.lineTo(hands[0] + (head[0] - hands[0]) * 0.28, hands[1] + (head[1] - hands[1]) * 0.28);
+  ctx.stroke();
+
+  // The hammer head — drawn in a frame rotated to the club angle (local +x runs along the shaft toward
+  // the head), so the block crosses the shaft end like a real maul.
+  ctx.save();
+  ctx.translate(head[0], head[1]);
+  ctx.rotate(ang);
+  // Soft electric aura behind the head.
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.45;
+  ctx.fillStyle = boltCol;
+  ctx.beginPath();
+  ctx.ellipse(1, 0, 8.5, 8.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // Head block (gilded, dark edge) with lighter struck faces top & bottom + a rune-etched diamond.
+  ctx.fillStyle = gold;
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(-2.6, -5.6, 7.2, 11.2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ecd591';
+  ctx.fillRect(-2.6, -5.6, 7.2, 1.7);
+  ctx.fillRect(-2.6, 3.9, 7.2, 1.7);
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(1, -2.6);
+  ctx.lineTo(2.6, 0);
+  ctx.lineTo(1, 2.6);
+  ctx.lineTo(-0.6, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  // Forked lightning crackling around the head — only through the downswing + follow-through, brightest
+  // at contact. The flicker rides the swing/follow phase (deterministic, no rng), so it reads as electric.
+  const zap = clamp01((swing > 0.5 ? (swing - 0.5) / 0.5 : 0) + follow);
+  if (zap > 0.02) {
+    const flick = 0.35 + 0.65 * Math.abs(Math.sin((swing + follow) * 23));
+    ctx.save();
+    ctx.translate(head[0], head[1]);
+    ctx.rotate(ang);
+    ctx.globalAlpha = alpha * zap * flick;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const bolts: number[][][] = [
+      [[5, -4], [9, -6], [7, -9], [11, -10.5]],
+      [[5, 4], [10, 5], [8, 8], [12, 9.5]],
+      [[-3, -5], [-7, -6], [-5, -9], [-8.5, -11]],
+    ];
+    for (const pts of bolts) {
+      const trace = (): void => {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p[0]!, p[1]!) : ctx.moveTo(p[0]!, p[1]!)));
+        ctx.stroke();
+      };
+      ctx.strokeStyle = boltCol; // wide electric-blue glow
+      ctx.lineWidth = 2.2;
+      trace();
+      ctx.strokeStyle = '#eaf6ff'; // hot white core
+      ctx.lineWidth = 0.8;
+      trace();
+    }
+    ctx.restore();
+  }
 }
 
 /**

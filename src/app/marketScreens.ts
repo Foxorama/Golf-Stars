@@ -20,7 +20,7 @@ import { drawGolfBag } from '../render/itemArt';
 // time the market opens — see app.ts's dispatch) and "Show Owned" starts OFF, so the market lands
 // compact and on the buyable racks. View-only module state, toggled via [data-toggle-section] /
 // [data-market-showowned] + re-render, never persisted.
-export const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'bag', 'bags'] as const;
+export const MARKET_SECTION_IDS = ['ships', 'hat', 'shirt', 'pants', 'driver', 'bag', 'bags'] as const;
 export const marketView = {
   showOwned: false,
   collapsed: new Set<string>(MARKET_SECTION_IDS),
@@ -151,6 +151,7 @@ export function tradeMarketScreen(): string {
     ${apparelSection('hat', '🎩', 'Hats', 'Caps &amp; crowns. Complete a matching set across every slot for the full look.')}
     ${apparelSection('shirt', '👕', 'Shirts', 'Tops &amp; jackets to suit each golfer.')}
     ${apparelSection('pants', '👖', 'Pants', 'Trousers &amp; legwear to finish the outfit.')}
+    ${apparelSection('driver', '🔨', 'Clubs', 'Legendary driver skins your golfer swings — earned on the course, never sold.')}
     ${apparelSection('bag', '🎒', 'Caddy Bags', 'Cosmetic staff bags your golfer poses with in the Clubhouse — earned in the <b>Unending Universe</b>, never sold.')}
     ${bagSetSection()}
     <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">

@@ -173,6 +173,9 @@ export interface UiState {
   /** The cosmetic golf bag each character carries (GS-unending): characterId → apparel id ('bag'
    *  slot). Absent → no bag on the stage. Outfitted in the Clubhouse like the other slots. */
   golfBagByCharacter: Record<string, string>;
+  /** The cosmetic driver each character swings (GS-thor): characterId → apparel id ('driver' slot).
+   *  Absent → the plain club head. Outfitted in the Clubhouse like the other slots. */
+  driverByCharacter: Record<string, string>;
   /** The character whose Clubhouse (garage + wardrobe) is open for outfitting (transient — not saved). */
   manageCharacterId?: string;
   /** Matchplay duel state on a boss stop (GS-100): the opponent + their pre-played ball + the duel. */
@@ -301,6 +304,7 @@ export interface MetaProgress {
   shirtByCharacter?: Record<string, string>;
   pantsByCharacter?: Record<string, string>;
   golfBagByCharacter?: Record<string, string>;
+  driverByCharacter?: Record<string, string>;
   bagTier?: BagTier;
   unlockedClubsByCharacter?: Record<string, string[]>;
   clubhouseVisit?: number;
@@ -356,6 +360,15 @@ export function golfBagForCharacter(
   return pick && s.ownedApparel.includes(pick) ? pick : undefined;
 }
 
+/** The cosmetic driver a character swings (GS-thor) — its Clubhouse pick if owned, else none. */
+export function driverForCharacter(
+  s: { driverByCharacter: Record<string, string>; ownedApparel: string[] },
+  characterId: string | undefined,
+): string | undefined {
+  const pick = characterId ? s.driverByCharacter[characterId] : undefined;
+  return pick && s.ownedApparel.includes(pick) ? pick : undefined;
+}
+
 /**
  * Build the initial UI state. Always lands on the TITLE screen (pick a format, or resume
  * a saved run if one is offered). A placeholder run backs the title until a format is
@@ -391,6 +404,7 @@ export function initState(
     shirtByCharacter: meta.shirtByCharacter ?? {},
     pantsByCharacter: meta.pantsByCharacter ?? {},
     golfBagByCharacter: meta.golfBagByCharacter ?? {},
+    driverByCharacter: meta.driverByCharacter ?? {},
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
     clubhouseVisit: meta.clubhouseVisit ?? 0,
     endlessBestHoles: meta.endlessBestHoles ?? 0,
@@ -1299,7 +1313,9 @@ export function reduce(state: UiState, action: Action): UiState {
             ? 'shirtByCharacter'
             : item.slot === 'bag'
               ? 'golfBagByCharacter'
-              : 'pantsByCharacter';
+              : item.slot === 'driver'
+                ? 'driverByCharacter'
+                : 'pantsByCharacter';
       const current = state[map][cid];
       const next = { ...state[map] };
       if (current === action.id) delete next[cid];
@@ -1380,6 +1396,7 @@ export function reduce(state: UiState, action: Action): UiState {
           shirtByCharacter: state.shirtByCharacter,
           pantsByCharacter: state.pantsByCharacter,
           golfBagByCharacter: state.golfBagByCharacter,
+          driverByCharacter: state.driverByCharacter,
           bagTier: state.bagTier,
           unlockedClubsByCharacter: state.unlockedClubsByCharacter,
           clubhouseVisit: state.clubhouseVisit,

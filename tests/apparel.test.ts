@@ -4,6 +4,7 @@ import {
   APPAREL_COST,
   apparelById,
   apparelForSlot,
+  apparelRevealedInMarket,
   canBuyApparel,
   equippedSet,
 } from '../src/sim/rpg/apparel';
@@ -34,8 +35,25 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(new Set(APPAREL.map((a) => a.id)).size).toBe(APPAREL.length);
     for (const a of APPAREL) {
       expect(a.look.shape).toBeTruthy();
-      expect(a.cost).toBe(APPAREL_COST[a.rarity]);
+      // A secret earn-only piece (GS-thor) is never bought, so it costs 0; everything else is tier-priced.
+      if (a.secret) expect(a.cost).toBe(0);
+      else expect(a.cost).toBe(APPAREL_COST[a.rarity]);
     }
+  });
+
+  it("Thor's Hammer is a secret, earn-only mythic DRIVER (GS-thor) — never buyable, hidden until owned", () => {
+    const hammer = apparelById('thors-hammer')!;
+    expect(hammer.slot).toBe('driver');
+    expect(hammer.rarity).toBe('mythic');
+    expect(hammer.secret).toBe(true);
+    expect(hammer.cost).toBe(0);
+    // The driver slot resolves it (and it's the mythic in that slot).
+    expect(apparelForSlot('driver').map((a) => a.id)).toContain('thors-hammer');
+    // Never buyable, even with a fortune in shards.
+    expect(canBuyApparel(hammer, 999999, [])).toBe(false);
+    // Hidden from the Trade Market until owned, then revealed (the one reveal predicate per catalogue).
+    expect(apparelRevealedInMarket(hammer, [])).toBe(false);
+    expect(apparelRevealedInMarket(hammer, ['thors-hammer'])).toBe(true);
   });
 
   it('the traditional space suit (helmet + suit + legs) is a legendary Astronaut set', () => {

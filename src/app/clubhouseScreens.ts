@@ -9,6 +9,7 @@ import { titleScreen } from './titleScreens';
 import { apparelCardChrome, shipCardHTML } from './marketScreens';
 import { CHARACTERS, getCharacter, type Character } from '../sim/rpg/characters';
 import {
+  driverForCharacter,
   golfBagForCharacter,
   hatForCharacter,
   pantsForCharacter,
@@ -49,7 +50,7 @@ export function clubhouseHallScreen(): string {
       <h1 style="margin:0;font-size:22px;">🏠 The Clubhouse</h1>
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire, their rides parked at the spaceport below. Tap a golfer or their ship to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
     </header>
-    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender, state.marmotTips)}</div>
+    <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender, state.marmotTips, state.ownedApparel.includes('thors-hammer'))}</div>
     <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
 }
 
@@ -95,15 +96,17 @@ function clubhousePicker(
   pantsId: string | undefined,
   shipId: string | undefined,
   bagId: string | undefined,
+  driverId: string | undefined,
 ): string {
   if (!clubhouseView.slot) {
-    return `<p class="gs-clubhint">Tap ${ch.shortName}'s hat, shirt, pants, bag — or the garage — to change it.</p>`;
+    return `<p class="gs-clubhint">Tap ${ch.shortName}'s hat, shirt, pants, bag, driver — or the garage — to change it.</p>`;
   }
   const meta: Record<ClubSlot, { icon: string; title: string }> = {
     hat: { icon: '🎩', title: `Hats for ${ch.shortName}` },
     shirt: { icon: '👕', title: `Shirts for ${ch.shortName}` },
     pants: { icon: '👖', title: `Pants for ${ch.shortName}` },
     bag: { icon: '🎒', title: `Golf bags for ${ch.shortName}` },
+    driver: { icon: '🔨', title: `Drivers for ${ch.shortName}` },
     ship: { icon: '🛸', title: `${ch.shortName}'s garage` },
   };
   const m = meta[clubhouseView.slot];
@@ -122,13 +125,15 @@ function clubhousePicker(
       .join('')}</div>`;
   } else {
     const owned = apparelForSlot(clubhouseView.slot).filter((a) => state.ownedApparel.includes(a.id));
-    // Golf bags are Unending-Universe trophies (GS-unending) — an empty rack points at the run, not the shop.
+    // Golf bags + drivers are earned trophies (GS-unending / GS-thor) — an empty rack points at the game, not the shop.
     const emptyMsg =
       clubhouseView.slot === 'bag'
         ? `<div class="gs-cpick__empty">No golf bags earned yet.<br><span style="font-size:12px;opacity:.75;">Survive 40 holes of the <b>Unending Universe</b> to earn the Evergreen Tour Bag.</span></div>`
-        : `<div class="gs-cpick__empty">No ${clubhouseView.slot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
+        : clubhouseView.slot === 'driver'
+          ? `<div class="gs-cpick__empty">No driver skins earned yet.<br><span style="font-size:12px;opacity:.75;">Win a tournament on the storms of <b>Asgard</b> to earn Thor's Hammer.</span></div>`
+          : `<div class="gs-cpick__empty">No ${clubhouseView.slot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
     body = owned.length
-      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId, bagId)).join('')}</div>`
+      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId, bagId, driverId)).join('')}</div>`
       : emptyMsg;
   }
   return `
@@ -153,6 +158,7 @@ export function clubhouseScreen(): string {
   const pantsId = pantsForCharacter(state, ch.id);
   const shipId = shipForCharacter(state, ch.id);
   const bagId = golfBagForCharacter(state, ch.id);
+  const driverId = driverForCharacter(state, ch.id);
   const preview = golferPreviewSVG(hatId, shirtId, pantsId, {
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
@@ -162,6 +168,7 @@ export function clubhouseScreen(): string {
     w: 190,
     h: 210,
     bagId,
+    driverId,
   });
   const setName = equippedSet(hatId, shirtId, pantsId, bagId);
   const setBadge = setName
@@ -192,6 +199,7 @@ export function clubhouseScreen(): string {
       ${zone('shirt', '👕', nameOf(shirtId, 'Default shirt'))}
       ${zone('pants', '👖', nameOf(pantsId, 'Default pants'))}
       ${zone('bag', '🎒', nameOf(bagId, 'No bag'))}
+      ${zone('driver', '🔨', nameOf(driverId, 'Default driver'))}
     </div>
     ${setBadge}
     <button class="gs-garage${shipActive}" data-clubslot="ship" aria-label="Change ${ch.shortName}'s ride">
@@ -204,7 +212,7 @@ export function clubhouseScreen(): string {
         <span class="gs-garage__edit">Change ride ✎</span>
       </span>
     </button>
-    ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId, bagId)}
+    ${clubhousePicker(ch, hatId, shirtId, pantsId, shipId, bagId, driverId)}
     <div style="margin-top:14px;text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
       ${btn('🏠 Back to Clubhouse', { type: 'clubhouseBackToHall' }, { variant: 'ghost' })}
       ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
@@ -220,10 +228,19 @@ function clubhouseApparelCardHTML(
   shirtId: string | undefined,
   pantsId: string | undefined,
   bagId: string | undefined,
+  driverId: string | undefined,
 ): string {
   const ring = cosmeticRarCol(item.rarity);
   const wornId =
-    item.slot === 'hat' ? hatId : item.slot === 'shirt' ? shirtId : item.slot === 'bag' ? bagId : pantsId;
+    item.slot === 'hat'
+      ? hatId
+      : item.slot === 'shirt'
+        ? shirtId
+        : item.slot === 'bag'
+          ? bagId
+          : item.slot === 'driver'
+            ? driverId
+            : pantsId;
   const worn = wornId === item.id;
   const accent = worn ? '#ffce54' : ring;
   const footer = worn ? '✓ WEARING' : 'Wear this';

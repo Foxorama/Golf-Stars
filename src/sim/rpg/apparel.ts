@@ -15,7 +15,7 @@
 import type { CosmeticRarity } from './cosmetics';
 import { COSMETIC_RARITY } from './cosmetics';
 
-export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag';
+export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
 
 /** Hat silhouettes the drawer renders (canvas + SVG share these shape names). `baggy` is the soft
  *  slouched-crown cap of the Evergreen set (GS-unending). */
@@ -26,10 +26,13 @@ export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic' 
 export type PantsShape = 'trousers' | 'shorts' | 'knickers' | 'leggings' | 'spacepants' | 'nebula';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
 export type BagShape = 'staffbag';
+/** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
+ *  golfer swings. `thorHammer` is the mythic warhammer with crackling lightning. */
+export type DriverShape = 'thorHammer';
 
 /** The vector look a garment renders as — a shape family + palette + optional aura for the top tiers. */
 export interface ApparelLook {
-  shape: HatShape | ShirtShape | PantsShape | BagShape;
+  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape;
   /** Primary fabric colour. */
   color: string;
   /** Secondary trim / brim / stripe colour. */
@@ -55,6 +58,10 @@ export interface Apparel {
    *  Universe. Hidden from the Trade Market until OWNED (GS-hide-unlocks — see `apparelRevealedInMarket`);
    *  `canBuyApparel` refuses it. */
   unlockHoles?: number;
+  /** Earned, never bought (GS-thor): a secret reward (won an Asgard tournament). Hidden from the Trade
+   *  Market until OWNED (GS-hide-unlocks — same reveal gate as `unlockHoles`); `canBuyApparel` refuses
+   *  it. Mirrors `Ship.secret`. */
+  secret?: boolean;
   look: ApparelLook;
 }
 
@@ -333,6 +340,23 @@ export const APPAREL: readonly Apparel[] = [
     unlockHoles: 100,
     look: { shape: 'blazer', color: '#0f5132', accent: '#f2d06b', glow: '#4fe08a' },
   },
+
+  // ===== THE DRIVER SLOT (GS-thor) ====================================================
+  // A cosmetic CLUB skin the golfer swings — the first is Thor's Hammer, a mythic warhammer wreathed in
+  // lightning. SECRET + earned (never bought): granted for winning an Asgard tournament (wired in a later
+  // phase). Hidden from the Trade Market until owned. Kept LAST so the per-slot `.find(mythic)` ordering
+  // of the other slots is undisturbed.
+  {
+    id: 'thors-hammer',
+    name: "Thor's Hammer",
+    slot: 'driver',
+    set: 'Thor',
+    rarity: 'mythic',
+    blurb: 'Mjölnir reforged as a driver — a rune-etched warhammer crackling with caught lightning. Won on the storms of Asgard.',
+    cost: 0, // never bought — earned by winning an Asgard tournament
+    secret: true,
+    look: { shape: 'thorHammer', color: '#c9a24a', accent: '#59b6ff', glow: '#59b6ff' },
+  },
 ];
 
 const BY_ID: Record<string, Apparel> = Object.fromEntries(APPAREL.map((a) => [a.id, a]));
@@ -351,14 +375,14 @@ export function apparelForSlot(slot: ApparelSlot): Apparel[] {
 /** Can this garment be bought? (Affordable + not already owned + actually FOR SALE — an
  *  Unending-Universe unlock (GS-unending) is earned, never bought.) */
 export function canBuyApparel(item: Apparel | undefined, shards: number, owned: readonly string[]): boolean {
-  return !!item && !item.unlockHoles && shards >= item.cost && !owned.includes(item.id);
+  return !!item && !item.unlockHoles && !item.secret && shards >= item.cost && !owned.includes(item.id);
 }
 
 /** Should this garment appear in the Trade Market at all (GS-hide-unlocks)? An earned Unending-Universe
  *  unlock stays OUT of the rack until it's owned — the market never spoils the milestone reward. Ordinary
  *  for-sale garments are always shown. */
 export function apparelRevealedInMarket(item: Apparel, owned: readonly string[]): boolean {
-  return !item.unlockHoles || owned.includes(item.id);
+  return !(item.unlockHoles || item.secret) || owned.includes(item.id);
 }
 
 /**
