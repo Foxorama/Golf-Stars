@@ -351,8 +351,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
     character-less placeholder run (it wipes saves).
-  - Character select fits ONE screen in every mode; Ascension is picked WITH the golfer
-    (`[data-asc]` view state, reducer-clamped), never on the title.
+  - Character select fits ONE screen in every mode (equal-height cards via `grid-auto-rows:1fr`);
+    Ascension is picked WITH the golfer (`[data-asc]` view state, reducer-clamped), never on the
+    title, defaulting to your LAST pick (`Settings.lastAscension`). The difficulty/club chips scroll
+    on ONE fixed-height strip (`.gs-ascpick-chips`) so more tiers never reflow the roster; the whole
+    card is the button (its CTA is a footer label, not a nested button). GS-select-layout.
   - The stop intro is TWO mobile steps on one reducer screen (`'intro'` + view state `introStage`);
     `introShared()` derives world/notes/objective ONCE so the steps never drift. The Unending
     Universe past stop 0 opens on `'hole'`.

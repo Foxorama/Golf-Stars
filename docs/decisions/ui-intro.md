@@ -86,12 +86,29 @@ First-device feedback on GS-settings-nav reshaped the title:
   rows ballooned the Voyage tile (two rows of buttons under the launch button), and the difficulty
   is really a per-run, per-golfer decision — so it's picked WITH the golfer. `characterScreen` takes
   `opts.ascension = { max, sel }` and renders a `⚔ Difficulty` chip row (`[data-asc]`); the picked
-  tier is app-layer VIEW state (`selAscension`, reset to 0 on every 'start' — never sticky across
-  runs, never persisted) baked into every golfer card's `selectCharacter` action; the reducer clamps
+  tier is app-layer VIEW state (`selAscension`) baked into every golfer card's `selectCharacter`
+  action; the reducer clamps
   (`min(maxAscension, ascension)`) so a forged action can't start above the unlocked ladder. The
   unlock ladder itself stays ACCOUNT-wide (`maxAscension` — the bag-tier gates key off it); only the
   choice point is per-character. `start` still accepts an `ascension` (clamped) as the base the
   select screen overrides — kept for tests/back-compat.
+- **Select-screen layout polish (GS-select-layout, 2026-07).** Device feedback flagged four
+  irritations on the golfer screen, all fixed without touching the reducer:
+  - **Difficulty defaults to your LAST pick, not always A0.** `selAscension` is seeded on 'start'
+    from a persisted pref (`Settings.lastAscension`, clamped to `maxAscension`) and the `[data-asc]`
+    click writes it back via `setSetting`. Still app-layer view state, still reducer-clamped — the
+    pref is a convenience default, not a source of truth. (Club-set still defaults to the owned tier.)
+  - **The `⚔ Difficulty` / `🎒 Club set` chips ride a single scrolling strip.** Chips moved into a
+    `.gs-ascpick-chips` flex child (`flex:1 1 auto; min-width:0; overflow-x:auto`) so a veteran's
+    A0…A15 ladder scrolls sideways on ONE fixed-height line instead of wrapping to extra rows that
+    grew the screen and shoved the roster down.
+  - **Equal-height cards.** `.gs-charwrap` gained `grid-auto-rows: 1fr`, so per-golfer content
+    variance (the earned-clubs `unlockedStrip`, longer hints) no longer leaves cards mismatched —
+    every card stretches to the tallest, CTA pinned to the bottom via `margin-top:auto`.
+  - **The CTA is a footer LABEL, not a nested button.** The card was a `<button>` with a boxed
+    `.gs-charcard-cta` inside, reading as "tap area PLUS a separate advance button". Deboxed to a
+    top-divider + accent-text affordance (`Tap · Voyage as …  →`) so the whole card obviously IS the
+    one control.
 - **The Daily Challenge button is PARKED (removed from the title), not deleted from the engine** —
   string seeds still work (`?seed=daily-YYYY-MM-DD` reproduces it); only the `dailySeed`/`dailyLabel`
   helpers went. Bring it back as its own surface when it earns a place.

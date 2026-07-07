@@ -182,16 +182,16 @@ export function characterScreen(
         ${hint}
         <ul class="gs-charcard-pc">${pros}${cons}</ul>
         ${unlocks}
-        <span class="gs-charcard-cta" style="--cc:${cap};">${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>
+        <span class="gs-charcard-cta" style="--cc:${cap};"><span style="opacity:.7;font-weight:700;">Tap ·</span> ${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>
       </button>`;
   }).join('');
   const ascRow = opts.ascension
     ? `<div class="gs-ascpick">
         <span class="gs-ascpick-l">⚔ Difficulty</span>
-        ${Array.from({ length: opts.ascension.max + 1 }, (_, a) => {
+        <div class="gs-ascpick-chips">${Array.from({ length: opts.ascension.max + 1 }, (_, a) => {
           const on = a === opts.ascension!.sel;
           return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip" data-asc="${a}">A${a}</button>`;
-        }).join('')}
+        }).join('')}</div>
         <span class="gs-ascpick-hint">harder cut, leaner purse — win your top tier to unlock the next</span>
       </div>`
     : '';
@@ -201,12 +201,12 @@ export function characterScreen(
   const clubRow = opts.clubSet
     ? `<div class="gs-ascpick">
         <span class="gs-ascpick-l">🎒 Club set</span>
-        ${CLUB_SET_DIFFICULTIES.map((d) => {
+        <div class="gs-ascpick-chips">${CLUB_SET_DIFFICULTIES.map((d) => {
           const locked = bagTierRank(d.tier) > bagTierRank(opts.clubSet!.owned);
           const on = d.tier === opts.clubSet!.sel;
           return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip"${locked ? ' disabled' : ` data-clubset="${d.tier}"`}
             style="--cc:${d.col};${on ? `border-color:${d.col};color:${d.col};` : ''}${locked ? 'opacity:.4;' : ''}">${locked ? '🔒 ' : ''}${d.label}</button>`;
-        }).join('')}
+        }).join('')}</div>
         <span class="gs-ascpick-hint">a weaker set is the sterner test — net scoring keeps the leaderboard fair; unlock better bags in the Voyage</span>
       </div>`
     : '';
