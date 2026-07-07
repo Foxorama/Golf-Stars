@@ -2008,6 +2008,7 @@ function render(): void {
         width: animW,
         height: animH,
         biome: holeBiome(play.hole), themeId: holeThemeId(play.hole), effect: currentEffect(),
+        rainbow: rainbowActive(),
         tradeTents: tentsActive(),
         meteorScorch: scorchActive(),
         groundPatch: patchActive(),

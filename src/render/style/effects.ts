@@ -288,6 +288,64 @@ export function constellationBackdrop(themeId: string, W: number, H: number): Pr
   return prims;
 }
 
+/** The Rainbow Road sky's aurora hues (GS-rainbow-polish) — a prismatic sweep, warm→cool. */
+const RAINBOW_SKY_HUES = ['#ff4d7d', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#7d6bff', '#c46bff'];
+
+/**
+ * The Rainbow Road's bespoke starfield flourish (GS-rainbow-polish): drawn OVER the shared deep-space
+ * base + starfield so the legendary ball reads as its own cosmic world, distinct from Cetus's blue
+ * star-ocean and the Void's violet abyss. A stack of soft prismatic AURORA ribbons bowing across the
+ * upper sky (the intro cinematic's screen-blended nebula, rainbow-hued) plus a scatter of coloured
+ * hero stars twinkling through it. Screen-space, off a DEDICATED rng stream so it never perturbs the
+ * shared celestial `crng` (the stars/planet/comet stay byte-identical), and camera-proof — every loop
+ * is a fixed count, no projection is read. `accents` scales the density like every other art layer.
+ */
+export function rainbowSky(W: number, H: number, accents: number, rng: () => number): Prim[] {
+  if (accents <= 0) return [];
+  const prims: Prim[] = [];
+  // Broad prismatic nebula blooms low-alpha across the sky — the deep glow the aurora rides over.
+  for (let i = 0; i < 4; i++) {
+    const hue = RAINBOW_SKY_HUES[(i * 2) % RAINBOW_SKY_HUES.length]!;
+    prims.push({
+      t: 'glow',
+      c: [W * (0.12 + rng() * 0.76), H * (0.05 + rng() * 0.4)],
+      r: (0.26 + rng() * 0.24) * Math.max(W, H),
+      col: hexAlpha(hue, 0.1),
+    });
+  }
+  // Aurora curtains: each hue a gently bowed band sweeping the top third of the sky, stacked so the
+  // colours bleed into one another like a real aurora. Two soft strokes per hue (a wide dim wash + a
+  // brighter core) so the ribbon glows rather than reading as a hard drawn line.
+  const bands = RAINBOW_SKY_HUES.length;
+  const baseY = H * 0.1;
+  const spanY = H * 0.34;
+  for (let i = 0; i < bands; i++) {
+    const hue = RAINBOW_SKY_HUES[i]!;
+    const y = baseY + (spanY * i) / (bands - 1);
+    const sag = (rng() - 0.5) * H * 0.14; // the band bows up or down across the width
+    const yEnd = y - sag * 0.5;
+    const yMid = y + sag;
+    // A wide dim wash (curtain body) then a tighter bright core — two eased strokes read as glow.
+    // The bow is approximated by two straight glowing segments; round caps blend the mid joint.
+    for (const [sw, a] of [[16, 0.05], [7, 0.09]] as const) {
+      prims.push({ t: 'line', a: [0, yEnd], b: [W * 0.5, yMid], stroke: hexAlpha(hue, a), sw, round: true });
+      prims.push({ t: 'line', a: [W * 0.5, yMid], b: [W, yEnd], stroke: hexAlpha(hue, a), sw, round: true });
+    }
+  }
+  // Coloured hero stars twinkling through the aurora — the prismatic counterpart to the white/blue
+  // salt of the shared field, so even the point-stars read "rainbow world".
+  const starN = Math.round(26 * accents);
+  for (let i = 0; i < starN; i++) {
+    const hue = RAINBOW_SKY_HUES[(rng() * RAINBOW_SKY_HUES.length) | 0]!;
+    const sx = rng() * W;
+    const sy = rng() * H * 0.6; // keep them up in the sky, clear of the road below
+    const r = 0.6 + rng() * 1.4;
+    prims.push({ t: 'glow', c: [sx, sy], r: r * 4, col: hexAlpha(hue, 0.5) });
+    prims.push({ t: 'circle', c: [sx, sy], r, fill: 'rgba(255,255,255,0.95)' });
+  }
+  return prims;
+}
+
 /** Per-world WIND look (GS-wind): the colour of the weather streaking across the hole. */
 const WIND_COL: Record<BiomeArchetype, string> = {
   inferno: 'rgba(255,150,70,', // solar wind / embers

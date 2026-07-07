@@ -305,6 +305,19 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   cetus: { base: '#020a12', nebula: 'rgba(70,190,225,0.13)', edge: 'rgba(120,230,240,0.22)' },
 };
 
+/**
+ * The Rainbow Road's OWN deep-space look (GS-rainbow-polish): a distinct cosmic backdrop so the
+ * legendary ball reads as its own bespoke world, not "whatever biome it landed on painted rainbow".
+ * A rich indigo-violet void (deeper + more saturated than any archetype's, closer to the intro
+ * cinematic's night sky) with a warm prismatic nebula wash and a bright multi-hue shore rim — the
+ * matching backdrop for the aurora sky + rainbow-cliff ribbon painted over it.
+ */
+export const RAINBOW_SPACE: SpaceLook = {
+  base: '#070417',
+  nebula: 'rgba(150,90,225,0.12)',
+  edge: 'rgba(190,150,255,0.22)',
+};
+
 /** A world's deep-space look, rarity-deepened (the hex base only; the rgba glows pass through). */
 export function spaceLookFor(archetype: BiomeArchetype, deepen = 1): SpaceLook {
   const s = ARCHETYPE_SPACE[archetype];

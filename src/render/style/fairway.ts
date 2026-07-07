@@ -29,25 +29,42 @@ const RAINBOW_BANDS = ['#ff3b5c', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#
  * bands clipped to its polygon — perpendicular-to-play after the projector rotates tee→green up, so
  * the bands read like a Mario-Kart Rainbow Road track — then cap it with a glowing white rail. Pure
  * geometry (no rng); `phaseY`/`bandH` let several fairway pieces share one continuous band grid.
+ *
+ * GS-rainbow-polish: the flat poster bands used to read "pretty rough" — so each band is now GROOVED
+ * (a lit top edge + a shaded bottom edge, so it reads as a raised ridge of track, not a printed
+ * stripe), the whole surface takes a directional CROWN SHEEN (a soft up-light wash, the same
+ * `LIGHT_UL` the fairways use) and an inner EDGE SHADE that darkens toward the rails so the road
+ * reads as a crowned, glowing surface with depth. Still all pure geometry, zero rng.
  */
 export function rainbowRibbon(poly: Vec[], phaseY: number, bandH: number): Prim[] {
   const b = bboxOf(poly);
+  const bandOf = (i: number) =>
+    RAINBOW_BANDS[((i % RAINBOW_BANDS.length) + RAINBOW_BANDS.length) % RAINBOW_BANDS.length]!;
   const children: Prim[] = [];
   const i0 = Math.floor((b.minY - phaseY) / bandH);
   for (let i = i0; phaseY + i * bandH < b.maxY; i++) {
     const y0 = phaseY + i * bandH;
     const y1 = y0 + bandH + 0.6; // overlap a hair so no seam shows
+    const col = bandOf(i);
     children.push({
       t: 'poly',
-      pts: [
-        [b.minX, y0],
-        [b.maxX, y0],
-        [b.maxX, y1],
-        [b.minX, y1],
-      ],
-      fill: RAINBOW_BANDS[((i % RAINBOW_BANDS.length) + RAINBOW_BANDS.length) % RAINBOW_BANDS.length]!,
+      pts: [[b.minX, y0], [b.maxX, y0], [b.maxX, y1], [b.minX, y1]],
+      fill: col,
     });
+    // GROOVE the band: a thin lit lip along its top, a thin shade along its bottom, so adjacent
+    // colours meet on a soft ridge instead of a hard poster seam (the "no shading" read).
+    const lip = Math.max(0.8, bandH * 0.16);
+    children.push({ t: 'poly', pts: [[b.minX, y0], [b.maxX, y0], [b.maxX, y0 + lip], [b.minX, y0 + lip]], fill: hexAlpha(mixHex(col, '#ffffff', 0.55), 0.5) });
+    children.push({ t: 'poly', pts: [[b.minX, y1 - lip], [b.maxX, y1 - lip], [b.maxX, y1], [b.minX, y1]], fill: 'rgba(6,4,18,0.28)' });
   }
+  // A directional crown sheen (the shared up-light), pooled to the up-light side so the road reads
+  // as a raised crowned surface catching the starlight — two soft washes so it grades in, not a line.
+  const lit1 = shiftPoly(offsetPoly(poly, 2.5), LIGHT_UL[0] * 3, LIGHT_UL[1] * 3);
+  const lit2 = shiftPoly(offsetPoly(poly, 5.5), LIGHT_UL[0] * 6, LIGHT_UL[1] * 6);
+  children.push({ t: 'poly', pts: lit1, fill: 'rgba(255,255,255,0.10)' });
+  children.push({ t: 'poly', pts: lit2, fill: 'rgba(255,255,255,0.07)' });
+  // An inner edge shade hugging the rails (darkens toward the road's edges → a crowned, not flat, top).
+  children.push({ t: 'poly', pts: poly, fill: 'none', stroke: 'rgba(6,4,18,0.30)', sw: 5 });
   return [
     // A dark under-edge so the road reads as a solid track floating in space (the void shows beyond).
     { t: 'poly', pts: offsetPoly(poly, 2), fill: 'rgba(8,6,22,0.55)' },

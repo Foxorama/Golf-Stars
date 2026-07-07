@@ -34,6 +34,7 @@ import {
   collarFor,
   landFillFor,
   spaceLookFor,
+  RAINBOW_SPACE,
   mixHex,
   OB,
   OB_LOOK,
@@ -82,12 +83,14 @@ import {
   cetusRiver,
   CETUS_CLIFF,
   VOID_CLIFF,
+  RAINBOW_CLIFF,
 } from './style/platforms';
 import {
   styleTents,
   styleScorch,
   stylePatches,
   constellationBackdrop,
+  rainbowSky,
   windStreaks,
 } from './style/effects';
 
@@ -216,7 +219,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const lostHole = (hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false) && !rainbow;
   const landPlatformsCourse: Vec[][] = lostHole ? lostPlatformsCourse(hole) : [landBox];
   const landPlatforms = landPlatformsCourse.map((p) => projPoly(p, proj));
-  const space = spaceLookFor(arch, deepen);
+  // Rainbow Road gets its OWN bespoke deep-space look (GS-rainbow-polish) — a distinct indigo-violet
+  // cosmos with a prismatic shore rim — so the legendary ball reads as its own world, not the
+  // underlying biome recoloured. Every other world keeps its archetype space, byte-for-byte.
+  const space = rainbow ? RAINBOW_SPACE : spaceLookFor(arch, deepen);
   // A SEPARATE rng stream for celestial scatter (so the terrain/tree/water/lava placement that
   // reads off the main `rng` stays byte-identical) keyed off the same hole hash.
   const crng = mulberry32((hashHole(hole) ^ 0x5747a2) >>> 0);
@@ -291,6 +297,16 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'line', a: [hx, hy], b: [hx + Math.cos(ang) * len, hy + Math.sin(ang) * len], stroke: 'rgba(214,230,255,0.4)', sw: 1.4, round: true });
       prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
     }
+  }
+
+  // --- 2a. Rainbow Road's bespoke aurora sky (GS-rainbow-polish) --------------
+  // Prismatic aurora curtains + coloured hero stars OVER the shared starfield, so the legendary ball
+  // reads as its own cosmic world — a distinct starfield from Cetus's blue deep and the Void's violet
+  // abyss. Drawn off a DEDICATED stream so the shared celestial `crng` (stars/planet/comet) stays
+  // byte-identical, and camera-proof (fixed loop counts, no projection read). Gated to rainbow only.
+  if (rainbow) {
+    const skyRng = mulberry32((hashHole(hole) ^ 0x00a1b0a7) >>> 0);
+    prims.push(...rainbowSky(W, H, art.accents, skyRng));
   }
 
   // --- 2b. The Cetus star-ocean: whales surfacing in the deep beyond the cliffs (GS-cetus) ----
@@ -456,6 +472,17 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // Fairways draw as ONE grouped pass FIRST (under tee/green/scatter) so the green apron blends into
   // the main corridor — see `styleFairways`. Everything else keeps its original per-feature order.
   const fairwaySps = hole.features.filter((f) => f.kind === 'fairway').map((f) => projPoly(f.poly, proj));
+  // Rainbow Road: extrude EVERY play surface (fairway/green/tee) into a prismatic layered CLIFF
+  // (GS-rainbow-polish) — the same side-on depth treatment Cetus/Void get — so the road reads as a
+  // raised glowing track floating in space, not a flat decal. Drawn FIRST (behind every ribbon: the
+  // ribbon caps each plateau), off the dedicated `cliffRng` (unused on the rainbow path otherwise) so
+  // no other stream is perturbed; `platformCliffs` is camera-proof (fixed loop counts).
+  if (rainbow) {
+    const roadSps = hole.features
+      .filter((f) => f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee')
+      .map((f) => projPoly(f.poly, proj));
+    prims.push(...platformCliffs(roadSps, deepen, cliffRng, RAINBOW_CLIFF).prims);
+  }
   if (voidGlow && !rainbow) for (const sp of fairwaySps) glowRings(sp);
   if (rainbow) {
     // Rainbow Road: paint every fairway piece as a rainbow ribbon, all riding ONE continuous band grid
