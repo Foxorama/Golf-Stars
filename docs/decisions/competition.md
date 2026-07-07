@@ -300,4 +300,27 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   flavour). NO new `_gs*`/URL hook (content-as-data + a loadout-derived render option), so the test-hub
   guard needs nothing — the Sim Lab absorbs the item automatically. Eyes-on verified (Playwright render
   of the rainbow-road hole + the item card).
+  - **GS-rainbow-road-2 (the road becomes a real world, not a recoloured biome).** Player feedback
+    after playing it: the ribbon was too THIN (a good shot landed on it and rolled off into the void —
+    "disappeared as if in the void"), it carried BUNKERS that don't belong in space, the fairway/green
+    seams didn't mesh, and the support pillars looked like a Void asteroid. Fixed WITHOUT touching the
+    generator or its rng, so a base run is still byte-for-byte identical:
+    - **A pure post-generation course transform, `applyRainbowRoad` (`sim/rpg/rainbow.ts`), applied by
+      `currentCourse` ONLY when `loadout.rainbowRoad` is armed** (after generation + validation, like
+      `applyEffectPhysics`). It (1) GROWS the fairway/green/tee polygons outward (a mitred sim-side
+      offset — the pure twin of the renderer's `offsetPoly`) into a fair, landable ribbon whose width
+      matches the difficulty of flying it (like Cetus/Void's generous island platforms), and (2) CLEARS
+      every hazard — off-road is already OOB, so a bunker/tree is redundant AND, once the road widens
+      over it, a hidden trap the renderer wouldn't draw (a graphic≠physics bug). Because it reshapes the
+      actual `hole.features`, the sim's `lieAt`, `playBounds` (which now expands with the wider road, so
+      a road tile can never fall in the OB box) and the renderer's ribbon all read ONE geometry — the
+      "graphic IS physics" contract holds. `currentCourse` is the single hole source for the sim, the
+      renderer, bosses and the field, so the widened hole reaches all of them; the transform is rng-free
+      + gated, so no determinism/save impact (rainbow rebuilds from the perk id on resume as before).
+    - **Render mesh + prismatic pillars.** The green + tee ribbons now ride the SAME band grid as the
+      fairway (one continuous track, no mismatched stripe scales at the seams — `style.ts`), and
+      `RAINBOW_CLIFF` (`style/platforms.ts`) descends through genuinely different jewel hues (lit
+      rose-magenta → violet → periwinkle → teal → deep blue → indigo) so the support pillars read as the
+      rainbow world's own prismatic crystal, not the Void's monochrome violet. Re-shoot
+      `scripts/rainbow-preview.mjs` (now applies `applyRainbowRoad` + rasterizes to PNG) after touching it.
 

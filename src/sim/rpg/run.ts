@@ -54,6 +54,7 @@ import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
 import { salvageClubFind } from './salvage';
+import { applyRainbowRoad } from './rainbow';
 import { themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
@@ -338,27 +339,35 @@ export function currentCourse(run: Run): Course {
   // resume), so no new run/save state. Stop 0 / no event ⇒ boost 0, effect 'none' (byte-for-byte old).
   const wildnessBoost = routeDifficulty(run.pendingEvent);
   const effect = routeEffect(run.pendingEvent);
+  // Rainbow Road (GS-rainbow-road-2): when the legendary Rainbow Ball is armed the whole run plays as
+  // RAINBOW ROAD, so reshape every generated stop into a fair, wide ribbon with no hazards (see
+  // `applyRainbowRoad`). Applied LAST — a pure, rng-free post-generation transform on the finished,
+  // already-validated course, gated on the loadout flag — so a base run is byte-for-byte unchanged and
+  // both the sim and the renderer read the one widened geometry (the "graphic IS physics" contract).
+  const finish = (c: Course): Course => (run.loadout?.rainbowRoad ? applyRainbowRoad(c) : c);
   // GS-variation: a split-biome stop CROSSES TWO WORLDS — the front holes are this stop's theme, the
   // back holes a different theme of the same arc. Each half is generated independently and stitched,
   // every hole stamped with its own biome/themeId so it renders + plays as its world.
   if (spec.splitBiome && spec.holes >= 2) {
-    return armTentHoles(applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect), effect);
+    return finish(armTentHoles(applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect), effect));
   }
-  return armTentHoles(
-    applyEffectPhysics(
-      generateStopCourse(stopSeed(run), {
-        holes: spec.holes,
-        parCap: spec.parCap,
-        distanceFromStart: run.distanceFromStart,
-        // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
-        biomeRow: resolveBiome(theme),
-        themeId: theme.id,
-        wildnessBoost,
+  return finish(
+    armTentHoles(
+      applyEffectPhysics(
+        generateStopCourse(stopSeed(run), {
+          holes: spec.holes,
+          parCap: spec.parCap,
+          distanceFromStart: run.distanceFromStart,
+          // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
+          biomeRow: resolveBiome(theme),
+          themeId: theme.id,
+          wildnessBoost,
+          effect,
+        }),
         effect,
-      }),
+      ),
       effect,
     ),
-    effect,
   );
 }
 
