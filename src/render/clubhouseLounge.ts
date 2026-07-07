@@ -556,52 +556,72 @@ function loungeArt(marmot = false): string {
 }
 
 /* ══════════════════════════ THE SPACEPORT (GS-clubhouse-spaceport) ══════════════════════════
- * The parking lot below the lounge: a floating landing RING wrapped around a little putting green,
- * one lit pad per golfer with their equipped ride parked on it. Tapping a ride opens that golfer's
- * Clubhouse (same action as tapping the golfer) — the ship IS the button, a brass nameplate at its
- * nose. Pads are re-dealt by the same visit-seeded shuffle, so the fleet re-parks between runs. */
+ * The view out the clubhouse window, made whole: a single floating golf-deck platform adrift in the
+ * same blue→purple sky, ringed planet and moon the bar's picture window looks onto — so the lounge
+ * above and this panel read as ONE place (you're seeing the deck the clubhouse sits on). A par-3
+ * putting green crowns the deck; the little space-clubhouse (warm windows + a 19th-Hole glow, echoing
+ * the bar) sits at its back. Four berths ring the green — THREE holo landing pads and ONE fuelling
+ * station — and the four golfers' equipped rides are dealt across them by the visit-seeded shuffle.
+ * So each run home the fleet re-parks AND a different ride is the one topping up at the pump. Every
+ * ship is the button into that golfer's Clubhouse (nameplate at the nose). Hand-placed, zero rng in
+ * the art (byte-stable, like the lounge); the ONLY randomness is which golfer lands on which berth. */
 
-/** A landing pad on the ring: centre + painted size (art units of the 400×230 panel), depth scale. */
-interface Pad {
+/** A parking berth on the deck: the ship's bottom-anchor point (art units of the 400×230 panel), a
+ *  depth scale, and whether it's a holo landing pad or the fuel pump (the pump ship parks nose-in). */
+interface Berth {
   x: number;
   y: number;
-  rx: number;
-  ry: number;
   s: number;
+  kind: 'pad' | 'fuel';
 }
 
-/** Two pads on the back band of the ring, two up front (drawn bigger — nearer the camera). */
-const PORT_PADS: Pad[] = [
-  { x: 98, y: 86, rx: 27, ry: 9.5, s: 0.72 }, // back-left
-  { x: 302, y: 86, rx: 27, ry: 9.5, s: 0.72 }, // back-right
-  { x: 124, y: 196, rx: 37, ry: 12.5, s: 1 }, // front-left
-  { x: 276, y: 196, rx: 37, ry: 12.5, s: 1 }, // front-right
+/** The four berths ringing the deck green: two small pads on the back band, one big pad front-left,
+ *  and the FUEL station front-right. Their draw order is fixed; the visit shuffle picks who parks
+ *  where (and so who's at the pump). The pad discs + the pump are painted at these same anchors in
+ *  `spaceportArt`, so ship and berth line up. */
+const BERTHS: Berth[] = [
+  { x: 92, y: 118, s: 0.72, kind: 'pad' }, // back-left pad
+  { x: 308, y: 118, s: 0.72, kind: 'pad' }, // back-right pad
+  { x: 108, y: 200, s: 1.02, kind: 'pad' }, // front-left pad
+  { x: 300, y: 198, s: 1.0, kind: 'fuel' }, // fuelling station, front-right
 ];
 
-/** One parked ride: the equipped ship hovering over its pad, nameplate at the nose, whole thing the
- *  button into that golfer's Clubhouse. Anchored to the pad in % of the panel; container-query sized. */
-function shipAt(g: LoungeGolfer, pad: Pad): string {
+/** Pad-disc geometry per pad berth (centre + painted radii), keyed by the berth's anchor so the
+ *  holo pad sits right under the hovering ship. Back pads are smaller (further from camera). */
+const PAD_ART: Record<string, { x: number; y: number; rx: number; ry: number }> = {
+  '92,118': { x: 92, y: 112, rx: 25, ry: 8.5 },
+  '308,118': { x: 308, y: 112, rx: 25, ry: 8.5 },
+  '108,200': { x: 108, y: 191, rx: 34, ry: 12 },
+};
+
+/** One parked ride: the equipped ship hovering over its berth, nameplate at the nose, whole thing the
+ *  button into that golfer's Clubhouse. Anchored in % of the panel; container-query sized. A fuel-berth
+ *  ride hangs a little "⛽ Fuelling" tag instead of the "Garage" hint on hover, and glows warm-amber. */
+function shipAt(g: LoungeGolfer, berth: Berth): string {
   const action = JSON.stringify({ type: 'openClubhouse', characterId: g.id });
   const ship = shipById(g.shipId) ?? shipById(DEFAULT_SHIP_ID)!;
   const art = `<svg viewBox="0 0 96 62" role="img" aria-hidden="true">${shipSVG(ship.id, 48, 36, 1.2)}</svg>`;
-  const left = ((pad.x / 400) * 100).toFixed(1);
-  const top = (((pad.y + pad.ry + 6) / 230) * 100).toFixed(1);
-  const w = (24 * pad.s).toFixed(1);
-  const z = Math.round(pad.y);
+  const left = ((berth.x / 400) * 100).toFixed(1);
+  const top = ((berth.y / 230) * 100).toFixed(1);
+  const w = (24 * berth.s).toFixed(1);
+  const z = Math.round(berth.y);
+  const fuel = berth.kind === 'fuel';
+  const hint = fuel ? '⛽ Fuelling' : 'Garage 🚀';
+  const glowCol = fuel ? '#ffce54' : `${g.capColor}55`;
   return `<button class="gs-port-ship" data-action='${action}' aria-label="Open ${g.shortName}'s garage"
     style="position:absolute;left:${left}%;top:${top}%;z-index:${z};width:${w}cqw;
       transform:translate(-50%,-100%);transform-origin:bottom center;
       filter:${popFilter(ship.rarity)};">
-    <span class="gs-manage-hint">Garage 🚀</span>
-    <span class="gs-port-glow" style="background:radial-gradient(ellipse at 50% 50%, ${g.capColor}55, #0000 70%);"></span>
+    <span class="gs-manage-hint">${hint}</span>
+    <span class="gs-port-glow" style="background:radial-gradient(ellipse at 50% 50%, ${glowCol}, #0000 70%);"></span>
     ${art}
     ${nameplate(g.shortName, g.capColor)}
   </button>`;
 }
 
 /** One holo landing pad: a recessed disc lit from within, a breathing teal projection ring and ice
- *  guide ticks — energy-field markings, not painted tarmac (the gold road-paint read as a raceway). */
-function padArt(p: Pad): string {
+ *  guide ticks — energy-field markings, not painted tarmac. */
+function padArt(p: { x: number; y: number; rx: number; ry: number }): string {
   const tick = (dx: number, dy: number): string =>
     `<line x1="${p.x + dx * p.rx * 0.8}" y1="${p.y + dy * p.ry * 0.8}" x2="${p.x + dx * p.rx * 0.96}" y2="${p.y + dy * p.ry * 0.96}" stroke="#7fd6ff" stroke-width="1.4" opacity="0.8"/>`;
   return `<g>
@@ -619,32 +639,58 @@ function padArt(p: Pad): string {
   </g>`;
 }
 
-/** The painted spaceport: an orbital station RING floating in deep space — blue-steel hull deck with
- *  radial plating seams and a pulsing energy conduit (NOT road markings — the first cut's asphalt +
- *  dashed gold centreline read as a raceway), holo landing pads, a glass bio-dome over the putting
- *  green in the hub, anti-grav emitters beneath, nebulae and drifting asteroids around it.
- *  Hand-placed (no rng) so it's byte-stable, like the lounge. */
+/** The fuelling station on the front-right deck: a recessed service disc + a pump cabinet with an
+ *  amber gauge, a hose looping out to the parked ship, fuel-cell canisters and a neon ⛽ FUEL post.
+ *  Warm amber against the teal pads so fuel reads as fuel. Drawn at the fuel berth's anchor (300,198). */
+function fuelStationArt(): string {
+  return `<g>
+    <!-- recessed service disc (matches the holo pads' footprint) + amber field wash -->
+    <ellipse cx="300" cy="188" rx="34" ry="12" fill="#000" opacity="0.3"/>
+    <ellipse cx="300" cy="186.5" rx="32" ry="11" fill="#171426" stroke="#5a4a2a" stroke-width="1.2"/>
+    <ellipse cx="300" cy="186.5" rx="23" ry="7.6" fill="#ffce54" opacity="0.1">
+      <animate attributeName="opacity" values="0.06;0.16;0.06" dur="2.8s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="300" cy="186.5" rx="20" ry="6.4" fill="none" stroke="#ffce54" stroke-width="1" opacity="0.4" stroke-dasharray="4 3"/>
+    <!-- pump cabinet on the right of the disc: two-tone hull metal, amber gauge screen, keypad ticks -->
+    <rect x="320" y="168" width="15" height="23" rx="2.6" fill="#39456a" stroke="#10162a" stroke-width="1"/>
+    <rect x="320" y="168" width="15" height="3.2" rx="1.6" fill="#516592"/>
+    <rect x="322.5" y="173" width="10" height="6.5" rx="1.2" fill="#1a1206" stroke="#7a6f52" stroke-width="0.6"/>
+    <rect x="323.5" y="174" width="5" height="1.6" fill="#ffce54">
+      <animate attributeName="width" values="2;8;2" dur="3.2s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="331.4" cy="177.6" r="0.9" fill="#ffce54"><animate attributeName="opacity" values="1;0.2;1" dur="1.3s" repeatCount="indefinite"/></circle>
+    <g fill="#9fb0cf" opacity="0.7">
+      <rect x="323" y="181.6" width="2.2" height="1.6"/><rect x="326.4" y="181.6" width="2.2" height="1.6"/><rect x="329.8" y="181.6" width="2.2" height="1.6"/>
+      <rect x="323" y="184.2" width="2.2" height="1.6"/><rect x="326.4" y="184.2" width="2.2" height="1.6"/><rect x="329.8" y="184.2" width="2.2" height="1.6"/>
+    </g>
+    <!-- fuel-cell canisters stacked beside the pump, glowing amber bands -->
+    <rect x="336" y="180" width="7" height="11" rx="2.2" fill="#3d4f79" stroke="#10162a" stroke-width="0.8"/>
+    <rect x="336" y="183" width="7" height="2.4" fill="#ffce54" opacity="0.9"/>
+    <rect x="343.5" y="177" width="7.6" height="14" rx="2.4" fill="#4a5a86" stroke="#10162a" stroke-width="0.8"/>
+    <rect x="343.5" y="181" width="7.6" height="2.8" fill="#ffce54" opacity="0.9">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="2.4s" repeatCount="indefinite"/>
+    </rect>
+    <!-- hose looping off the pump toward the parked ship's tank (to the left) + nozzle -->
+    <path d="M320,174 Q308,175 302,180 Q297,184 293,184" fill="none" stroke="#10162a" stroke-width="2.4"/>
+    <path d="M320,174 Q308,175 302,180 Q297,184 293,184" fill="none" stroke="#5a6a96" stroke-width="1.1"/>
+    <rect x="289" y="182.4" width="5" height="3.4" rx="1.2" fill="#ffce54" stroke="#b98f4a" stroke-width="0.6"/>
+    <!-- neon ⛽ FUEL post beside the island -->
+    <line x1="332" y1="168" x2="332" y2="150" stroke="#4a5262" stroke-width="1.6"/>
+    <ellipse cx="332" cy="146" rx="14" ry="7.5" fill="#ffce54" opacity="0.14">
+      <animate attributeName="opacity" values="0.1;0.22;0.1" dur="4.1s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="320.5" y="141" width="23" height="10" rx="3" fill="#0d1416" stroke="#3a2f1f" stroke-width="1"/>
+    <text x="332" y="148.4" text-anchor="middle" font-size="6.4" font-weight="800" fill="#ffdf8a" font-family="Georgia,'Times New Roman',serif" font-style="italic">⛽ FUEL</text>
+  </g>`;
+}
+
+/** The painted spaceport: ONE floating golf-deck platform (not the old busy orbital ring) adrift in
+ *  the bar-window's own sky — blue→purple gradient, a ringed planet + a bright moon, a nebula wash and
+ *  drifting asteroids. A hull-metal slab floats on an anti-grav glow; a par-3 putting green crowns it,
+ *  the little space-clubhouse (warm windows + a 19th-Hole glow, echoing the bar) at its back, three
+ *  holo pads + the fuel station ringing it. Hand-placed (no rng) so it's byte-stable, like the lounge. */
 function spaceportArt(): string {
-  // Rim lights sit ON the outer ellipse (cx 200, cy 138, rx 188, ry 74) — all cool tones.
-  const rim = [
-    [388, 138], [363, 175], [294, 202], [106, 202], [37, 175], [12, 138],
-    [37, 101], [106, 74], [200, 64], [294, 74], [363, 101],
-  ]
-    .map(
-      ([x, y], i) =>
-        `<circle cx="${x}" cy="${y}" r="1.7" fill="${i % 2 ? '#b39dff' : '#7fd6ff'}"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.6s" begin="${(i * 0.24).toFixed(2)}s" repeatCount="indefinite"/></circle>`,
-    )
-    .join('');
-  // Hull plating seams every 30° across the deck band (inner ellipse 108×42 → outer 188×74).
-  const seams = [15, 45, 75, 105, 135, 165, 195, 225, 255, 285, 315, 345]
-    .map((deg) => {
-      const a = (deg * Math.PI) / 180;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
-      return `<line x1="${(200 + 108 * c).toFixed(1)}" y1="${(138 + 42 * s).toFixed(1)}" x2="${(200 + 188 * c).toFixed(1)}" y2="${(138 + 74 * s).toFixed(1)}" stroke="#10162a" stroke-width="1.2" opacity="0.55"/>`;
-    })
-    .join('');
-  // A small cratered asteroid drifting near the ring.
+  // A small cratered asteroid drifting near the deck.
   const asteroid = (x: number, y: number, sc: number, dur: string): string =>
     `<g transform="translate(${x},${y}) scale(${sc})">
       <g><animateTransform attributeName="transform" type="translate" values="0 0;0 -2.4;0 0" dur="${dur}" repeatCount="indefinite"/>
@@ -653,7 +699,7 @@ function spaceportArt(): string {
         <path d="M-5,-5 L2,-7 L5,-4 L-3,-3 Z" fill="#4a5470" opacity="0.7"/>
       </g>
     </g>`;
-  // A tiny cel garden tree under the dome (grounding shadow, trunk, two-tone canopy).
+  // A tiny cel garden tree on the green (grounding shadow, trunk, two-tone canopy).
   const tree = (x: number, y: number, sc: number): string =>
     `<g transform="translate(${x},${y}) scale(${sc})">
       <ellipse cx="0" cy="1.6" rx="6.5" ry="2" fill="#000" opacity="0.25"/>
@@ -661,250 +707,188 @@ function spaceportArt(): string {
       <circle cx="0" cy="-9" r="6" fill="#2f7a33"/>
       <circle cx="-2" cy="-11" r="3.4" fill="#3f9a43"/>
     </g>`;
-  // An anti-grav emitter hanging off the ring's underside: a nub + flickering light cone.
+  // An anti-grav emitter under the deck's front rim: a nub + flickering thrust cone.
   const emitter = (x: number, y: number): string =>
     `<rect x="${x - 3}" y="${y - 2}" width="6" height="4" rx="1.4" fill="#3d4f79"/>
-     <path d="M${x - 2.6},${y + 2} L${x + 2.6},${y + 2} L${x + 5.5},${y + 12} L${x - 5.5},${y + 12} Z" fill="#7f8bff" opacity="0.3">
+     <path d="M${x - 2.6},${y + 2} L${x + 2.6},${y + 2} L${x + 5.5},${y + 13} L${x - 5.5},${y + 13} Z" fill="#7f8bff" opacity="0.3">
        <animate attributeName="opacity" values="0.18;0.4;0.24;0.38;0.18" dur="1.7s" repeatCount="indefinite"/>
      </path>`;
+  // Rim lights running around the deck's top edge (ellipse cx200 cy150 rx168 ry46) — cool tones.
+  const rim = [10, 40, 70, 110, 140, 170, 200, 230, 250, 290, 320, 350]
+    .map((deg, i) => {
+      const a = (deg * Math.PI) / 180;
+      const x = (200 + 168 * Math.cos(a)).toFixed(1);
+      const y = (150 + 46 * Math.sin(a)).toFixed(1);
+      return `<circle cx="${x}" cy="${y}" r="1.5" fill="${i % 2 ? '#b39dff' : '#7fd6ff'}"><animate attributeName="opacity" values="0.25;1;0.25" dur="2.6s" begin="${(i * 0.22).toFixed(2)}s" repeatCount="indefinite"/></circle>`;
+    })
+    .join('');
   return `<svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid slice"
       style="position:absolute;inset:0;width:100%;height:100%;">
     <defs>
+      <!-- sky matches the bar's picture window (clWinSky): night blue rising to nebula purple -->
       <linearGradient id="spSky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#070a1a"/><stop offset="60%" stop-color="#131230"/><stop offset="100%" stop-color="#201a42"/>
+        <stop offset="0%" stop-color="#0c1338"/><stop offset="55%" stop-color="#211d4c"/><stop offset="100%" stop-color="#33245e"/>
       </linearGradient>
       <linearGradient id="spDeck" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#2b3452"/><stop offset="55%" stop-color="#364266"/><stop offset="100%" stop-color="#1d2440"/>
+        <stop offset="0%" stop-color="#38456c"/><stop offset="55%" stop-color="#2b3556"/><stop offset="100%" stop-color="#1b2340"/>
       </linearGradient>
-      <radialGradient id="spRough" cx="50%" cy="42%" r="70%">
-        <stop offset="0%" stop-color="#338038"/><stop offset="100%" stop-color="#26602a"/>
+      <linearGradient id="spDeckSide" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#222b48"/><stop offset="100%" stop-color="#10152a"/>
+      </linearGradient>
+      <radialGradient id="spTurf" cx="46%" cy="38%" r="72%">
+        <stop offset="0%" stop-color="#4aa84e"/><stop offset="100%" stop-color="#2c6f30"/>
       </radialGradient>
-      <clipPath id="spCourseClip"><ellipse cx="200" cy="138" rx="106" ry="40.5"/></clipPath>
+      <clipPath id="spGreenClip"><ellipse cx="200" cy="150" rx="86" ry="26"/></clipPath>
       <radialGradient id="spNebA" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#2bf0c0" stop-opacity="0.14"/><stop offset="100%" stop-color="#2bf0c0" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#2bf0c0" stop-opacity="0.13"/><stop offset="100%" stop-color="#2bf0c0" stop-opacity="0"/>
       </radialGradient>
       <radialGradient id="spNebB" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ff4fd8" stop-opacity="0.12"/><stop offset="100%" stop-color="#ff4fd8" stop-opacity="0"/>
+        <stop offset="0%" stop-color="#ff4fd8" stop-opacity="0.11"/><stop offset="100%" stop-color="#ff4fd8" stop-opacity="0"/>
       </radialGradient>
-      <linearGradient id="spDome" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#cfeaff" stop-opacity="0.26"/><stop offset="55%" stop-color="#9fdcef" stop-opacity="0.1"/><stop offset="100%" stop-color="#9fdcef" stop-opacity="0.04"/>
-      </linearGradient>
       <radialGradient id="spVig" cx="50%" cy="48%" r="72%">
         <stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="80%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity="0.4"/>
       </radialGradient>
     </defs>
     <rect width="400" height="230" fill="url(#spSky)"/>
     <!-- nebulae washes behind everything -->
-    <ellipse cx="310" cy="44" rx="130" ry="52" fill="url(#spNebA)"/>
-    <ellipse cx="80" cy="70" rx="110" ry="48" fill="url(#spNebB)"/>
-    <ellipse cx="200" cy="210" rx="180" ry="40" fill="url(#spNebB)" opacity="0.6"/>
-    <!-- starfield (a few twinkling) + a ringed neighbour planet + one shooting star -->
+    <ellipse cx="312" cy="40" rx="130" ry="52" fill="url(#spNebA)"/>
+    <ellipse cx="70" cy="60" rx="112" ry="50" fill="url(#spNebB)"/>
+    <ellipse cx="200" cy="214" rx="180" ry="42" fill="url(#spNebB)" opacity="0.6"/>
+    <!-- starfield (a few twinkling) + one shooting star -->
     <g fill="#fff">
       <circle cx="30" cy="26" r="1"/><circle cx="66" cy="14" r="0.7"/><circle cx="118" cy="30" r="0.8"/>
       <circle cx="152" cy="12" r="0.7"/><circle cx="258" cy="16" r="0.8"/><circle cx="300" cy="30" r="0.7"/>
       <circle cx="342" cy="12" r="0.9"/><circle cx="382" cy="34" r="0.7"/><circle cx="14" cy="70" r="0.7"/>
-      <circle cx="388" cy="76" r="0.8"/><circle cx="206" cy="8" r="0.7"/><circle cx="92" cy="50" r="0.6"/>
+      <circle cx="388" cy="72" r="0.8"/><circle cx="206" cy="8" r="0.7"/><circle cx="96" cy="48" r="0.6"/>
       <circle cx="240" cy="34" r="0.9"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.9s" repeatCount="indefinite"/></circle>
       <circle cx="178" cy="22" r="0.8"><animate attributeName="opacity" values="1;0.2;1" dur="3.7s" repeatCount="indefinite"/></circle>
-      <circle cx="8" cy="120" r="0.8"><animate attributeName="opacity" values="0.3;1;0.3" dur="3.1s" repeatCount="indefinite"/></circle>
-      <circle cx="394" cy="180" r="0.7"><animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite"/></circle>
-    </g>
-    <g transform="translate(52,30)">
-      <circle r="9" fill="#c65a4a"/><circle cx="-2.5" cy="-2.5" r="9" fill="#d8755f" opacity="0.5"/>
-      <ellipse rx="15" ry="3.6" fill="none" stroke="#ffe6a6" stroke-width="1.4" transform="rotate(-16)" opacity="0.85"/>
+      <circle cx="8" cy="118" r="0.8"><animate attributeName="opacity" values="0.3;1;0.3" dur="3.1s" repeatCount="indefinite"/></circle>
+      <circle cx="394" cy="150" r="0.7"><animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite"/></circle>
     </g>
     <g opacity="0.8">
-      <line x1="292" y1="22" x2="318" y2="34" stroke="#fff" stroke-width="1">
+      <line x1="292" y1="20" x2="320" y2="33" stroke="#fff" stroke-width="1">
         <animate attributeName="opacity" values="0;1;0;0" dur="7s" repeatCount="indefinite"/>
       </line>
     </g>
-    ${asteroid(24, 186, 1, '5.2s')}${asteroid(384, 118, 0.7, '6.4s')}
-    <!-- anti-grav under-glow, so the ring reads as floating -->
-    <ellipse cx="200" cy="216" rx="176" ry="9" fill="#7f8bff" opacity="0.12">
-      <animate attributeName="opacity" values="0.08;0.16;0.08" dur="4.4s" repeatCount="indefinite"/>
+    <!-- the ringed golden planet + a bright moon, straight off the bar window so it's the same vista -->
+    <g transform="translate(58,40)">
+      <circle r="15" fill="#d8a24a"/><circle cx="-4" cy="-4" r="15" fill="#e8bd6e" opacity="0.55"/>
+      <ellipse rx="25" ry="6" fill="none" stroke="#ffe6a6" stroke-width="2" transform="rotate(-18)" opacity="0.9"/>
+      <ellipse rx="25" ry="6" fill="none" stroke="#c98a3e" stroke-width="0.8" transform="rotate(-18)" opacity="0.6"/>
+    </g>
+    <g transform="translate(340,52)">
+      <circle r="9" fill="#eef2ff"/><circle r="9" fill="#c9d2ec" opacity="0.4"/>
+      <circle cx="3" cy="-2" r="2" fill="#b9c2e0" opacity="0.6"/><circle cx="-3" cy="3" r="1.4" fill="#b9c2e0" opacity="0.5"/>
+    </g>
+    ${asteroid(26, 176, 1, '5.2s')}${asteroid(376, 116, 0.7, '6.4s')}
+    <!-- ══ THE FLOATING GOLF DECK: an anti-grav slab, its top a hull-metal apron with the green on top ══ -->
+    <!-- anti-grav under-glow so the slab reads as floating -->
+    <ellipse cx="200" cy="206" rx="150" ry="14" fill="#7f8bff" opacity="0.16">
+      <animate attributeName="opacity" values="0.1;0.2;0.1" dur="4.4s" repeatCount="indefinite"/>
     </ellipse>
-    <!-- the station RING: hull-metal deck annulus + plating seams + energy conduit -->
-    <path fill-rule="evenodd" fill="url(#spDeck)" stroke="#4a5878" stroke-width="1.4"
-      d="M12,138 a188,74 0 1,0 376,0 a188,74 0 1,0 -376,0 Z
-         M92,138 a108,42 0 1,0 216,0 a108,42 0 1,0 -216,0 Z"/>
-    ${seams}
-    <ellipse cx="200" cy="138" rx="150" ry="59" fill="none" stroke="#10162a" stroke-width="1" opacity="0.4"/>
-    <ellipse cx="200" cy="138" rx="108" ry="42" fill="none" stroke="#0f1424" stroke-width="2.4" opacity="0.8"/>
-    <ellipse cx="200" cy="138" rx="136" ry="53" fill="none" stroke="#2bf0c0" stroke-width="2" opacity="0.2">
-      <animate attributeName="opacity" values="0.12;0.3;0.12" dur="3.6s" repeatCount="indefinite"/>
+    <!-- slab thickness (the front rim you see under the deck top) -->
+    <path d="M32,150 A168,46 0 0 0 368,150 L368,166 A168,46 0 0 1 32,166 Z" fill="url(#spDeckSide)" stroke="#10152a" stroke-width="1.2"/>
+    <!-- anti-grav emitters hanging off the front rim -->
+    ${emitter(96, 178)}${emitter(200, 190)}${emitter(304, 178)}
+    <!-- deck top -->
+    <ellipse cx="200" cy="150" rx="168" ry="46" fill="url(#spDeck)" stroke="#4a5878" stroke-width="1.4"/>
+    <!-- faint plating rings on the apron -->
+    <ellipse cx="200" cy="150" rx="140" ry="38" fill="none" stroke="#10162a" stroke-width="1" opacity="0.4"/>
+    <ellipse cx="200" cy="150" rx="150" ry="41" fill="none" stroke="#2bf0c0" stroke-width="1.4" opacity="0.16">
+      <animate attributeName="opacity" values="0.1;0.24;0.1" dur="3.6s" repeatCount="indefinite"/>
     </ellipse>
     ${rim}
-    ${emitter(60, 187)}${emitter(200, 213)}${emitter(340, 187)}
-    <!-- ══ THE SPACE-GOLF CLUBHOUSE: the pro-shop / 19th-hole HQ on the back deck, flanked by the
-         grav-beacon (left) and control tower (right); the putting green parks in front of it. Drawn
-         BEFORE the dome garden so the green's back edge occludes the plinth (building sits behind the
-         green, reading as the hub everyone parks around). Warm lit, to pop against the cool station. -->
+    <!-- ══ THE SPACE-GOLF CLUBHOUSE at the back of the deck: warm-lit twin of the bar you were just in,
+         so the picture window above literally looks out from HERE. Drawn before the green so the green's
+         back fringe tucks against its plinth. -->
     <g>
-      <ellipse cx="200" cy="78" rx="60" ry="32" fill="#ffcf8a" opacity="0.13"/>
-      <ellipse cx="200" cy="97" rx="52" ry="6" fill="#000" opacity="0.32"/>
+      <ellipse cx="200" cy="92" rx="58" ry="26" fill="#ffcf8a" opacity="0.12"/>
+      <ellipse cx="200" cy="118" rx="50" ry="6" fill="#000" opacity="0.3"/>
       <!-- deck plinth -->
-      <rect x="152" y="91" width="96" height="8" rx="2.5" fill="#39456a" stroke="#10162a" stroke-width="1"/>
-      <rect x="152" y="91" width="96" height="2.4" fill="#516592"/>
-      <!-- lower side wings + their windows -->
+      <rect x="156" y="112" width="88" height="8" rx="2.5" fill="#39456a" stroke="#10162a" stroke-width="1"/>
+      <rect x="156" y="112" width="88" height="2.4" fill="#516592"/>
+      <!-- lower side wings + warm windows -->
       <g fill="#d8cdb4" stroke="#7a6f52" stroke-width="0.8">
-        <rect x="156" y="76" width="20" height="16"/>
-        <rect x="224" y="76" width="20" height="16"/>
+        <rect x="160" y="98" width="18" height="15"/>
+        <rect x="222" y="98" width="18" height="15"/>
       </g>
-      <g fill="#ffd98a"><rect x="161" y="81" width="10" height="8" rx="1"/><rect x="229" y="81" width="10" height="8" rx="1"/></g>
+      <g fill="#ffd98a"><rect x="164.5" y="102" width="9" height="8" rx="1"/><rect x="226.5" y="102" width="9" height="8" rx="1"/></g>
       <!-- main hall -->
-      <rect x="170" y="64" width="60" height="28" fill="#ece2cd" stroke="#7a6f52" stroke-width="1"/>
-      <rect x="170" y="64" width="60" height="4" fill="#f6efdd"/>
-      <g fill="#cabf9f"><rect x="170" y="64" width="2.4" height="28"/><rect x="227.6" y="64" width="2.4" height="28"/></g>
-      <!-- tall warm windows (with mullions) + a glowing arched doorway -->
-      <g fill="#ffd98a" stroke="#b98f4a" stroke-width="0.6">
-        <rect x="177" y="70" width="10" height="15" rx="1"/>
-        <rect x="213" y="70" width="10" height="15" rx="1"/>
-      </g>
-      <g stroke="#b98f4a" stroke-width="0.5" opacity="0.85">
-        <line x1="182" y1="70" x2="182" y2="85"/><line x1="177" y1="77.5" x2="187" y2="77.5"/>
-        <line x1="218" y1="70" x2="218" y2="85"/><line x1="213" y1="77.5" x2="223" y2="77.5"/>
-      </g>
-      <path d="M194,92 L194,74 Q200,69 206,74 L206,92 Z" fill="#ffcf7a" stroke="#b98f4a" stroke-width="0.7"/>
-      <line x1="200" y1="72" x2="200" y2="92" stroke="#b98f4a" stroke-width="0.6" opacity="0.7"/>
-      <!-- eave board + pitched green roof (ridge highlight + shaded slope) -->
-      <rect x="166" y="61" width="68" height="4" rx="1.5" fill="#c9bd9c"/>
-      <path d="M162,64 L200,50 L238,64 Z" fill="#2f7a33" stroke="#1e5222" stroke-width="1"/>
-      <path d="M200,50 L238,64 L231,64 L200,52.6 Z" fill="#000" opacity="0.14"/>
-      <path d="M163,63 L200,50.6 L237,63" fill="none" stroke="#4bbe52" stroke-width="1.1" opacity="0.6"/>
-      <!-- golf-pin flag finial on the ridge (kept below the neon Spaceport sign) -->
-      <line x1="200" y1="50" x2="200" y2="43" stroke="#cfd6de" stroke-width="1"/>
-      <path d="M200,43 L208,45.4 L200,47.8 Z" fill="#ff6b6b"/>
+      <rect x="174" y="90" width="52" height="23" fill="#ece2cd" stroke="#7a6f52" stroke-width="1"/>
+      <rect x="174" y="90" width="52" height="3.5" fill="#f6efdd"/>
+      <g fill="#cabf9f"><rect x="174" y="90" width="2.2" height="23"/><rect x="223.8" y="90" width="2.2" height="23"/></g>
+      <!-- a big warm PICTURE window (the bar's window, seen from outside) + a tall window -->
+      <rect x="180" y="96" width="15" height="11" rx="1" fill="#ffd98a" stroke="#b98f4a" stroke-width="0.7"/>
+      <g stroke="#b98f4a" stroke-width="0.5" opacity="0.8"><line x1="187.5" y1="96" x2="187.5" y2="107"/><line x1="180" y1="101.5" x2="195" y2="101.5"/></g>
+      <rect x="205" y="96" width="9" height="11" rx="1" fill="#ffd98a" stroke="#b98f4a" stroke-width="0.6"/>
+      <line x1="209.5" y1="96" x2="209.5" y2="107" stroke="#b98f4a" stroke-width="0.5" opacity="0.7"/>
+      <!-- glowing arched doorway -->
+      <path d="M198,113 L198,109 Q200.5,106.5 203,109 L203,113 Z" fill="#ffcf7a" stroke="#b98f4a" stroke-width="0.6"/>
+      <!-- eave board + pitched green roof (ridge highlight + shaded slope) + pin finial -->
+      <rect x="170" y="83" width="60" height="4" rx="1.5" fill="#c9bd9c"/>
+      <path d="M167,86 L200,73 L233,86 Z" fill="#2f7a33" stroke="#1e5222" stroke-width="1"/>
+      <path d="M200,73 L233,86 L227,86 L200,75.4 Z" fill="#000" opacity="0.14"/>
+      <path d="M168,85 L200,73.4 L232,85" fill="none" stroke="#4bbe52" stroke-width="1.1" opacity="0.6"/>
+      <line x1="200" y1="73" x2="200" y2="66" stroke="#cfd6de" stroke-width="1"/>
+      <path d="M200,66 L208,68.4 L200,70.8 Z" fill="#ff6b6b"/>
+      <!-- "19th Hole" neon marquee across the facade under the eave — the bar's own sign, seen from
+           outside, so the picture window above looks out from THIS clubhouse -->
+      <ellipse cx="200" cy="90.5" rx="30" ry="6" fill="#ff9ad6" opacity="0.14"/>
+      <rect x="178" y="86.4" width="44" height="6.6" rx="1.5" fill="#2a0f22" stroke="#5a2440" stroke-width="0.5"/>
+      <text x="200" y="91.4" text-anchor="middle" font-size="5" font-weight="800" fill="#ffd6ef" font-family="Georgia,'Times New Roman',serif" font-style="italic">19th Hole</text>
     </g>
-    <!-- the bio-dome GARDEN in the hub: a real par-3 — rough base, a mown fairway ribbon running
-         tee → green, fringe + cup, guarding bunkers, a pond, trees and moon-rocks (the old flat
-         oval + concentric rings read as a stadium pitch, not golf) -->
-    <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="url(#spRough)"/>
-    <g clip-path="url(#spCourseClip)">
-      <!-- rough mottle -->
-      <g fill="#1e5222" opacity="0.18">
-        <ellipse cx="130" cy="135" rx="18" ry="6"/><ellipse cx="215" cy="160" rx="22" ry="7"/>
-        <ellipse cx="286" cy="142" rx="16" ry="5"/><ellipse cx="180" cy="118" rx="14" ry="4.5"/>
-      </g>
-      <g fill="#54b458" opacity="0.1">
-        <ellipse cx="160" cy="148" rx="20" ry="6"/><ellipse cx="256" cy="152" rx="14" ry="4.5"/>
-      </g>
-      <!-- pond, teal-rimmed, with a glint -->
-      <path d="M132,116 Q146,108 158,114 Q166,118 158,123 Q142,127 132,122 Q126,119 132,116 Z" fill="#3f8fc9"/>
-      <path d="M132,116 Q146,108 158,114 Q166,118 158,123 Q142,127 132,122 Q126,119 132,116 Z" fill="none" stroke="#7fd6ff" stroke-width="1" opacity="0.5"/>
-      <path d="M138,116 Q146,113 152,116" stroke="#cfeaff" stroke-width="1" fill="none" opacity="0.6"/>
-      <!-- mown fairway ribbon, tee → green, banded stripes along its length -->
-      <path d="M128,155 Q168,152 200,141 Q228,132 250,130" fill="none" stroke="#3f9a43" stroke-width="17" stroke-linecap="round"/>
-      <path d="M128,155 Q168,152 200,141 Q228,132 250,130" fill="none" stroke="#ffffff" stroke-width="17" stroke-dasharray="11 11" opacity="0.07"/>
+    <!-- ══ THE PUTTING GREEN crowning the deck: a real par-3 — turf, mown ribbon, fringe + cup, a
+         guarding bunker, tee + ball, a couple of garden trees. Golf, front and centre. -->
+    <ellipse cx="200" cy="150" rx="86" ry="26" fill="url(#spTurf)"/>
+    <g clip-path="url(#spGreenClip)">
+      <!-- turf mottle -->
+      <g fill="#215723" opacity="0.2"><ellipse cx="150" cy="156" rx="18" ry="5"/><ellipse cx="242" cy="146" rx="16" ry="4.5"/></g>
+      <g fill="#5ec062" opacity="0.12"><ellipse cx="176" cy="144" rx="20" ry="5"/><ellipse cx="238" cy="158" rx="14" ry="4"/></g>
+      <!-- mown fairway ribbon tee → green with faint stripes -->
+      <path d="M138,160 Q176,156 210,148 Q234,143 252,142" fill="none" stroke="#3f9a43" stroke-width="15" stroke-linecap="round"/>
+      <path d="M138,160 Q176,156 210,148 Q234,143 252,142" fill="none" stroke="#ffffff" stroke-width="15" stroke-dasharray="10 10" opacity="0.07"/>
       <!-- the green + fringe + cup -->
-      <ellipse cx="258" cy="129" rx="25" ry="10.5" fill="#5cc160"/>
-      <ellipse cx="258" cy="129" rx="25" ry="10.5" fill="none" stroke="#3f9a43" stroke-width="2.5" opacity="0.9"/>
-      <ellipse cx="252" cy="126" rx="10" ry="3.4" fill="#7fd47f" opacity="0.5"/>
-      <ellipse cx="263" cy="131" rx="1.9" ry="0.9" fill="#123c14"/>
-      <!-- bunkers guarding the green -->
-      <path d="M228,141 Q238,137 246,141 Q240,146 230,145 Q226,143 228,141 Z" fill="#d8c690"/>
-      <path d="M231,141 Q238,138.6 243,141.4 Q238,143.6 232,143 Z" fill="#e6d6a4"/>
-      <ellipse cx="280" cy="118" rx="8" ry="3" fill="#d8c690"/>
-      <ellipse cx="279" cy="117.4" rx="5.4" ry="1.9" fill="#e6d6a4"/>
+      <ellipse cx="252" cy="142" rx="22" ry="9" fill="#5cc160"/>
+      <ellipse cx="252" cy="142" rx="22" ry="9" fill="none" stroke="#3f9a43" stroke-width="2.4" opacity="0.9"/>
+      <ellipse cx="247" cy="139.5" rx="8.5" ry="2.8" fill="#7fd47f" opacity="0.5"/>
+      <ellipse cx="257" cy="143.5" rx="1.8" ry="0.8" fill="#123c14"/>
+      <!-- greenside bunker -->
+      <path d="M224,152 Q234,148 242,152 Q236,156 226,155.4 Q222,154 224,152 Z" fill="#d8c690"/>
+      <path d="M227,152 Q234,149.6 239,152 Q234,154 228,153.6 Z" fill="#e6d6a4"/>
       <!-- tee pad + markers, and the ball waiting mid-fairway -->
-      <rect x="118" y="151" width="17" height="7" rx="3" fill="#4aa84e"/>
-      <circle cx="120.5" cy="152.6" r="0.8" fill="#e8e2d2"/><circle cx="126" cy="157.2" r="0.8" fill="#e8e2d2"/>
-      <circle cx="222" cy="136" r="1.7" fill="#fff"/>
-      ${tree(116, 128, 0.9)}${tree(172, 112, 1.05)}${tree(292, 148, 0.95)}${tree(240, 158, 0.8)}
-      <!-- a couple of moon-rocks in the rough -->
-      <path d="M186,124 L190,120 L195,122 L194,126 L188,127 Z" fill="#8a93a6"/>
-      <path d="M188,124 L190,121 L193,122.4 Z" fill="#aab3c6"/>
+      <rect x="130" y="157" width="15" height="6" rx="3" fill="#4aa84e"/>
+      <circle cx="132.5" cy="158.4" r="0.8" fill="#e8e2d2"/><circle cx="137.5" cy="161.6" r="0.8" fill="#e8e2d2"/>
+      <circle cx="206" cy="150" r="1.6" fill="#fff"/>
+      ${tree(146, 142, 0.85)}${tree(232, 158, 0.78)}
     </g>
-    <ellipse cx="200" cy="138" rx="106" ry="40.5" fill="none" stroke="#1e5222" stroke-width="2.5"/>
-    <!-- the pin on the green -->
-    <line x1="263" y1="131" x2="263" y2="106" stroke="#e8e2d2" stroke-width="1.6"/>
-    <path d="M263,106 L281,110.5 L263,115 Z" fill="#ff6b6b"/>
-    <!-- the glass bio-dome sealing the green in: shell, meridian seams, a specular sweep -->
-    <path d="M94,138 A106,44 0 0 1 306,138 A106,40.5 0 0 1 94,138 Z" fill="url(#spDome)" stroke="#9fdcef" stroke-width="1.2" opacity="0.9"/>
-    <path d="M94,138 A106,44 0 0 1 306,138" fill="none" stroke="#cfeaff" stroke-width="0.8" opacity="0.5"/>
-    <g fill="none" stroke="#9fdcef" stroke-width="0.7" opacity="0.3">
-      <path d="M148,102 Q144,120 146,138"/>
-      <path d="M200,94 Q200,116 200,138"/>
-      <path d="M252,102 Q256,120 254,138"/>
-    </g>
-    <path d="M124,116 A96,40 0 0 1 172,98" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.22"/>
-    <!-- control tower on the back band, dish + beacon -->
-    <g>
-      <rect x="349" y="66" width="5" height="32" fill="#4a5262"/>
-      <line x1="345" y1="98" x2="358" y2="98" stroke="#2b3452" stroke-width="2.5"/>
-      <ellipse cx="351.5" cy="62" rx="16" ry="7" fill="#364266" stroke="#10162a" stroke-width="1"/>
-      <ellipse cx="351.5" cy="59.5" rx="12.5" ry="4.2" fill="#9fdcef" opacity="0.85"/>
-      <ellipse cx="347" cy="58.6" rx="4" ry="1.4" fill="#fff" opacity="0.5"/>
-      <path d="M363,58 Q370,52 368,45 L372,44 Q375,53 365,60 Z" fill="#8a93a6"/>
-      <circle cx="351.5" cy="51" r="2" fill="#ff5a4d"><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>
-    </g>
-    <!-- grav-beacon on the back-left band: pulsing orb + radar ping -->
-    <g>
-      <line x1="52" y1="98" x2="52" y2="72" stroke="#4a5262" stroke-width="2"/>
-      <circle cx="52" cy="68" r="3.6" fill="#2bf0c0">
-        <animate attributeName="opacity" values="0.5;1;0.5" dur="1.8s" repeatCount="indefinite"/>
-      </circle>
-      <circle cx="52" cy="68" r="6" fill="none" stroke="#2bf0c0" stroke-width="1">
-        <animate attributeName="r" values="5;12" dur="1.8s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0.5;0" dur="1.8s" repeatCount="indefinite"/>
-      </circle>
-    </g>
-    <!-- neon gate sign over the back of the ring -->
-    <ellipse cx="200" cy="30" rx="52" ry="14" fill="#2bf0c0" opacity="0.13">
-      <animate attributeName="opacity" values="0.13;0.2;0.13" dur="5.2s" repeatCount="indefinite"/>
+    <ellipse cx="200" cy="150" rx="86" ry="26" fill="none" stroke="#1e5222" stroke-width="2.4"/>
+    <!-- the pin on the green (behind the sign; the flag reads against the sky) -->
+    <line x1="257" y1="143.5" x2="257" y2="122" stroke="#e8e2d2" stroke-width="1.6"/>
+    <path d="M257,122 L273,126 L257,130 Z" fill="#ff6b6b"/>
+    <!-- ══ neon SPACEPORT marquee arcing over the deck, on a pair of posts on the back apron -->
+    <line x1="132" y1="120" x2="132" y2="46" stroke="#31405f" stroke-width="2"/>
+    <line x1="268" y1="120" x2="268" y2="46" stroke="#31405f" stroke-width="2"/>
+    <ellipse cx="200" cy="40" rx="66" ry="16" fill="#2bf0c0" opacity="0.12">
+      <animate attributeName="opacity" values="0.12;0.2;0.12" dur="5.2s" repeatCount="indefinite"/>
     </ellipse>
-    <rect x="152" y="19" width="96" height="21" rx="6" fill="#0d1416" stroke="#1f3a35" stroke-width="1.4"/>
-    <text x="200" y="34" text-anchor="middle" font-size="12" font-weight="800" fill="none" stroke="#2bf0c0" stroke-width="3" stroke-linejoin="round" opacity="0.4" font-family="Georgia,'Times New Roman',serif" font-style="italic">Spaceport</text>
-    <text x="200" y="34" text-anchor="middle" font-size="12" font-weight="800" fill="#d9fff4" font-family="Georgia,'Times New Roman',serif" font-style="italic">Spaceport</text>
-    <!-- ══ THE FUELLING STATION (GS-fuel): a pump island on the front deck band between the two
-         front pads — where the fleet tanks up between runs. Warm amber against the teal pads (fuel
-         reads as fuel), cel-shaded like the clubhouse. Hand-placed, zero rng (byte-stable). -->
-    <g>
-      <!-- grounding shadow + service square painted on the deck -->
-      <ellipse cx="200" cy="203" rx="26" ry="5.5" fill="#000" opacity="0.3"/>
-      <ellipse cx="200" cy="201.5" rx="23" ry="4.6" fill="none" stroke="#ffce54" stroke-width="1" opacity="0.35" stroke-dasharray="4 3"/>
-      <!-- fuel-cell stack left of the pump: two glowing canisters banded like propane bottles -->
-      <g>
-        <rect x="178" y="188" width="8" height="12" rx="2.4" fill="#3d4f79" stroke="#10162a" stroke-width="0.8"/>
-        <rect x="178" y="191.4" width="8" height="2.6" fill="#ffce54" opacity="0.9"/>
-        <rect x="187.5" y="185" width="8.6" height="15" rx="2.6" fill="#4a5a86" stroke="#10162a" stroke-width="0.8"/>
-        <rect x="187.5" y="189" width="8.6" height="3" fill="#ffce54" opacity="0.9">
-          <animate attributeName="opacity" values="0.6;1;0.6" dur="2.4s" repeatCount="indefinite"/>
-        </rect>
-        <rect x="189" y="183.4" width="5.6" height="2.2" rx="1" fill="#2b3452"/>
-      </g>
-      <!-- the pump cabinet: two-tone hull metal, amber gauge screen, keypad ticks -->
-      <rect x="199" y="178" width="15" height="23" rx="2.6" fill="#39456a" stroke="#10162a" stroke-width="1"/>
-      <rect x="199" y="178" width="15" height="3.2" rx="1.6" fill="#516592"/>
-      <rect x="201.5" y="183" width="10" height="6.5" rx="1.2" fill="#1a1206" stroke="#7a6f52" stroke-width="0.6"/>
-      <rect x="202.5" y="184" width="5" height="1.6" fill="#ffce54">
-        <animate attributeName="width" values="2;8;2" dur="3.2s" repeatCount="indefinite"/>
-      </rect>
-      <circle cx="210.4" cy="187.6" r="0.9" fill="#ffce54"><animate attributeName="opacity" values="1;0.2;1" dur="1.3s" repeatCount="indefinite"/></circle>
-      <g fill="#9fb0cf" opacity="0.7">
-        <rect x="202" y="191.6" width="2.2" height="1.6"/><rect x="205.4" y="191.6" width="2.2" height="1.6"/><rect x="208.8" y="191.6" width="2.2" height="1.6"/>
-        <rect x="202" y="194.2" width="2.2" height="1.6"/><rect x="205.4" y="194.2" width="2.2" height="1.6"/><rect x="208.8" y="194.2" width="2.2" height="1.6"/>
-      </g>
-      <!-- hose looping off the pump to a nozzle resting in its holster -->
-      <path d="M214,182 Q222,183 222,190 Q222,197 217.5,198.5" fill="none" stroke="#10162a" stroke-width="2.2"/>
-      <path d="M214,182 Q222,183 222,190 Q222,197 217.5,198.5" fill="none" stroke="#5a6a96" stroke-width="1"/>
-      <rect x="214.6" y="196.6" width="5" height="3.4" rx="1.2" fill="#ffce54" stroke="#b98f4a" stroke-width="0.6"/>
-      <!-- neon FUEL sign on a post beside the island (kept small — under the Spaceport marquee) -->
-      <line x1="230" y1="200" x2="230" y2="181" stroke="#4a5262" stroke-width="1.6"/>
-      <ellipse cx="230" cy="176" rx="13" ry="7" fill="#ffce54" opacity="0.12">
-        <animate attributeName="opacity" values="0.1;0.2;0.1" dur="4.1s" repeatCount="indefinite"/>
-      </ellipse>
-      <rect x="219.5" y="171.5" width="21" height="9.5" rx="3" fill="#0d1416" stroke="#3a2f1f" stroke-width="1"/>
-      <text x="230" y="178.6" text-anchor="middle" font-size="6.2" font-weight="800" fill="#ffdf8a" font-family="Georgia,'Times New Roman',serif" font-style="italic">⛽ FUEL</text>
-    </g>
-    ${PORT_PADS.map(padArt).join('')}
+    <rect x="140" y="30" width="120" height="22" rx="7" fill="#0d1416" stroke="#1f3a35" stroke-width="1.4"/>
+    <text x="200" y="45" text-anchor="middle" font-size="13" font-weight="800" fill="none" stroke="#2bf0c0" stroke-width="3" stroke-linejoin="round" opacity="0.4" font-family="Georgia,'Times New Roman',serif" font-style="italic" letter-spacing="1.5">SPACEPORT</text>
+    <text x="200" y="45" text-anchor="middle" font-size="13" font-weight="800" fill="#d9fff4" font-family="Georgia,'Times New Roman',serif" font-style="italic" letter-spacing="1.5">
+      SPACEPORT
+      <animate attributeName="opacity" values="1;1;0.78;1;0.94;1" dur="6s" repeatCount="indefinite"/>
+    </text>
+    <!-- the three holo landing pads + the fuel station (ships overlay these as buttons) -->
+    ${Object.values(PAD_ART).map(padArt).join('')}
+    ${fuelStationArt()}
     <rect width="400" height="230" fill="url(#spVig)"/>
   </svg>`;
 }
 
-/** The spaceport panel: painted ring + the four rides parked on visit-shuffled pads. */
+/** The spaceport panel: the painted deck + the four rides dealt across the berths by the visit shuffle
+ *  (so which golfer is topping up at the fuel station changes every run home). */
 function spaceportHTML(golfers: LoungeGolfer[], rng: Rng): string {
-  const pads = shuffle([...PORT_PADS], rng).slice(0, golfers.length);
-  const ships = golfers.map((g, i) => shipAt(g, pads[i] ?? PORT_PADS[i % PORT_PADS.length]!)).join('');
+  const berths = shuffle([...BERTHS], rng).slice(0, golfers.length);
+  const ships = golfers.map((g, i) => shipAt(g, berths[i] ?? BERTHS[i % BERTHS.length]!)).join('');
   return `<div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:40/23;max-width:680px;
       margin:10px auto 0;border:1px solid #232c42;border-radius:16px;overflow:hidden;background:#0a0d1f;">
       ${spaceportArt()}

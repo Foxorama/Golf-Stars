@@ -1077,6 +1077,27 @@ rides.
   guarding bunkers; a teal-rimmed pond; cel garden trees (`tree()` helper) and moon-rocks, all inside
   a `spCourseClip` ellipse clip. Gotcha: a round fairway cap + two bright symmetric tee markers reads
   as a WORM WITH EYES — markers are small, white and staggered.
+- **Fourth pass — one cohesive deck + a ship at the pump (GS-clubhouse-starport-redesign).** The
+  accreted second/third passes had bolted a clubhouse building, a control tower, a grav-beacon, a
+  fuel pump and TWO neon signs onto the orbital ring + bio-dome — a busy, incoherent picture, and the
+  fuel station stood empty. Rebuilt as ONE scene that reads as *the view out the bar's picture window*:
+  the sky, ringed golden planet and bright moon are lifted straight from `loungeArt`'s window so the
+  lounge and the panel are the same vista. The orbital ring/bio-dome are gone, replaced by a single
+  floating GOLF-DECK slab (anti-grav under-glow + a `spDeckSide` front rim for thickness + edge rim
+  lights) with an open-air par-3 green on top (`spTurf` + `spGreenClip`: ribbon, fringe/cup, bunker,
+  tee, ball, trees) and a small warm CLUBHOUSE at its back — a twin of the bar, warm picture windows +
+  a pink **"19th Hole"** facade marquee, so the window above literally looks out from here. One neon
+  **SPACEPORT** marquee on posts is the only station sign. Control tower / grav-beacon / dome cut.
+- **Berths, not pads — and a ship at the pump.** The four parking spots are now a `Berth` list
+  (`BERTHS`): THREE holo landing pads (`PAD_ART`, drawn by the reused `padArt`) + ONE fuelling station
+  (`fuelStationArt`: recessed amber service disc, pump cabinet + gauge, canisters, hose to the parked
+  ship, ⛽ FUEL neon). The visit-seeded shuffle deals the four golfers across the berths, so each run
+  home the fleet re-parks AND a DIFFERENT equipped ride is the one topping up at the pump — the
+  "randomly equipped ship in the fuel station" the same way the golfers change position. Every ride is
+  still the `openClubhouse` button (nameplate at the nose); the fuel-berth ship swaps its hover hint to
+  "⛽ Fuelling" and glows warm-amber instead of cap-colour. Determinism unchanged: still zero
+  sim/rng-stream impact, no save bump, no hook — the ONLY randomness is the berth shuffle (which now
+  also decides the pump occupant). Re-shoot `clubhouse-preview.mjs` after touching the deck art.
 
 ## Hide unlock-gated gear from the Trade Market until it's unlockable (GS-hide-unlocks)
 - **The problem.** The Trade Market rendered the FULL catalogue including gear you can't touch yet:
