@@ -179,3 +179,48 @@
   Mole: spectacled mole on a dirt mound with a putter), are mutually-exclusive named caddies
   (`NAMED_CADDY_IDS` auto-derives), and rebuild from perks on resume (no save bump).
 
+## Legendary caddies, fire-and-replace, and factions (GS-caddy-factions)
+- **Problem:** Driver Dan was the only EPIC caddy in a field of legendaries, so he showed up at (much)
+  higher shop frequency than everyone else — "basically an always pick given how rare the others are."
+  The caddies had also drifted in power (the four ex-epics were the weaker set). Fix: **all caddies are
+  now LEGENDARY** (one rarity → equal appearance odds), and the four ex-epics get a small buff so the
+  choice is "which legendary do I want", not "which one turned up":
+  - **Driver Dan** (`driver-dan`): keeps `driverAnywhere` AND now hauls +`DRIVER_DAN_CARRY` (12) yds on
+    the distance clubs (a Long Haul Trucker hauls further) — `boostDistanceClubs` + `distanceClubBonus`
+    so a mid-run distance club inherits it. Distance only (the power-cell lesson: extra carry on scoring
+    clubs overshoots).
+  - **Suggestible Sam** (`suggestible-sam`): `SAM_CONFIDENCE` bumped (−0.045/−0.045 hook/slice,
+    −0.022/−0.022 duck/shank) — a bigger green-zone lift on his suggested club.
+  - **Sandy the Sand-Saver** (`sandy-sandsaver`): `SANDY_LIE_RELIEF` 0.6 → **0.72** (a stronger escape;
+    also lifts the thematic `talent-dunewalker`/`talent-mycelial`, which share the constant).
+  - **Mystic Mole** (`mystic-mole`): `MOLE_PUTT_BOOST` 0.32 → **0.38**.
+  All four buffs only ever RAISE scoring (they can't trip the death-spiral bar), and the no-caddy auto
+  path is byte-for-byte unchanged — so the whole seeded suite + the harness pass untouched.
+- **Fire-and-replace.** Hiring a NEW named caddy while one is on the bag used to be a NO-OP (the first
+  hire blocked the rest). Now it **FIRES the incumbent**: `buy()` rebuilds the loadout over the run's
+  base (`baseLoadoutForRun`) MINUS the fired caddy's perk, then applies the newcomer, and logs the
+  sacked caddy in `Run.firedCaddies`. A fired caddy is **never offered again this run** (they've stormed
+  off) but returns in FUTURE runs (`firedCaddies` is per-run, snapshotted for resume). The shop keeps
+  every OTHER (non-owned, non-fired) caddy offerable so a swap is always on the table — `shopOffer`/
+  `starmartOffer` dropped the old `!hasCaddy` "hide them all once you hire one" filter for a
+  `!firedCaddies.includes(id)` one (the owned caddy still drops via the maxed-count check). Determinism:
+  `firedCaddies` is empty on the default path → byte-for-byte; the sim `buy()` fires unconditionally
+  (headless auto ≡ interactive — the Lab/harness need no confirmation).
+- **The player warning.** Firing someone is a real cost, so the UI gates it: clicking a new caddy while
+  one is hired parks `UiState.pendingFireCaddy` and the Pro Shop renders a red "⚠️ Fire X? …they won't
+  be happy about it, and won't work for you again this run" panel with Confirm (`buy` +`confirmFire`) /
+  Keep-X (`cancelFireCaddy`) buttons. The confirmation is REDUCER state (pure), not a `window.confirm`
+  side-effect. The headless sim skips it (it just fires).
+- **Factions + reputation** (`src/sim/rpg/factions.ts`) — deliberately **hidden groundwork** for future
+  faction perks/events; nothing in the UI reads it yet. Every named caddy maps to a `FACTIONS` row
+  (`CADDY_FACTION`), machine-checked in `tests/factions.test.ts` (the sibling of the `caddyEffects`
+  rule — a caddy without a faction reds CI). The six starting factions: **The Putters Guild**
+  (Penelope + Mystic Mole — putting specialists), **Space Pirates** (Convict Sheep), **Lords & Ladies**
+  (Space Ducks), **The Long Haul Truckers** (Driver Dan + Suggestible Sam), **Para-Spatial Medics**
+  (Dr Chipinski), **The Other Guys** (Sandy — the unaffiliated escape artist). Hiring earns
+  `REP_ON_HIRE` (+1) with a caddy's faction; firing costs `REP_ON_FIRE` (−3). Reputation is
+  **character-specific** (`reputationByCharacter`: characterId → factionId → rep, save **v21**), so each
+  golfer courts (or burns) crews independently. It's a SAVE/UI concern moved by the reducer's `buy`
+  case — the sim `buy()` only does the fire mechanic (keeping auto ≡ interactive and the Lab path
+  reputation-free). `adjustReputation`/`reputationWith` are pure immutable helpers.
+

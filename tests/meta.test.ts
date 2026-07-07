@@ -114,6 +114,7 @@ describe('meta wired into the run', () => {
       warpedThrough: 0,
       fuel: 0,
       routeScans: 0,
+      firedCaddies: [],
       stopIndex: stops,
       distanceFromStart: distance,
       credits: 0,

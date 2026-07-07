@@ -161,6 +161,11 @@ export interface Run {
    *  byte-identical). Reset to 0 by `travel`. Snapshotted, so a resume shows the offer you paid
    *  for — unlike the shop reroll (pure UI state), scans burn a persisted run resource. */
   routeScans: number;
+  /** Caddies FIRED this run (GS-caddy-factions): hiring a new named caddy while one is on the bag
+   *  sacks the incumbent, whose id lands here. A fired caddy sulks off and is never offered again for
+   *  the rest of THIS run (they'll turn up in future runs). Snapshotted so a resume keeps the grudge.
+   *  Empty on the default path (never fired anyone) → byte-for-byte unchanged. */
+  firedCaddies: string[];
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -233,9 +238,24 @@ export function startRun(
     // Unending Universe a 25-unit reserve. Every journey jump burns its distance in units.
     fuel: startingFuelFor(getFormat(formatId)),
     routeScans: 0,
+    firedCaddies: [],
     status: 'active',
     history: [],
   };
+}
+
+/**
+ * The base loadout a run's shop perks sit ON (GS-caddy-factions) — the golfer + meta + bag-tier +
+ * ascension-unlock stack, rebuilt the SAME way `startRun`/`resumeRun` build it. Used to reconstruct
+ * the loadout MINUS a perk (e.g. when a caddy is fired) by replaying the remaining perks over it.
+ */
+export function baseLoadoutForRun(run: Run): PlayerLoadout {
+  return startingLoadoutFor(
+    run.meta,
+    run.loadout.characterId,
+    run.bagTier ?? DEFAULT_BAG_TIER,
+    run.unlockedClubs ?? [],
+  );
 }
 
 /** Deterministic seed for the course at the current stop. */
@@ -1268,12 +1288,27 @@ export function buy(run: Run, itemId: string): Run {
   if (!item) return run;
   const owned = ownedCount(run.loadout.perks, itemId);
   if (!canBuy(item, owned, run.credits)) return run;
-  // Named caddies are mutually exclusive (GS-caddy): you may hire only one. A second is a no-op.
+  const cost = itemCost(item, owned);
+  // Named caddies are still one-at-a-time (GS-caddy) — but hiring a NEW one now FIRES the incumbent
+  // (GS-caddy-factions) rather than being a no-op. Rebuild the loadout WITHOUT the fired caddy's perk
+  // (over the run's base), then apply the newcomer; the sacked caddy is logged so the shop won't
+  // offer them again this run. The sim fires unconditionally (headless/auto ≡ interactive); the UI
+  // gates it behind a "they won't be happy" confirmation before dispatching this.
   if (item.caddy === 'named') {
     const have = namedCaddyOwned(run.loadout.perks);
-    if (have && have !== itemId) return run;
+    if (have && have !== itemId) {
+      const rebuilt = loadoutFromPerks(
+        run.loadout.perks.filter((p) => p !== have),
+        baseLoadoutForRun(run),
+      );
+      return {
+        ...run,
+        credits: run.credits - cost,
+        loadout: item.apply(rebuilt),
+        firedCaddies: run.firedCaddies.includes(have) ? run.firedCaddies : [...run.firedCaddies, have],
+      };
+    }
   }
-  const cost = itemCost(item, owned);
   const loadout = item.apply(run.loadout);
   // GS-fuel-3: a fuel-granting item (the Reserve Tank arrives FULL) pours its units in ONCE, at
   // purchase, clamped to the (possibly just-raised) capacity — never re-granted on resume
@@ -1417,14 +1452,17 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
   // with one (the balanced bag), so he's eligible from the off; he still only appears at his epic
   // rarity in the rotation, so owning a driver is a gate, not a guaranteed early show.
   const ownsDriver = run.loadout.bag.some((c) => c.id === DRIVER_ID);
-  // Hide maxed items, gate prereq tier-ladders, and handle caddies (GS-caddy): named caddies are
-  // random rarity-weighted inclusions UNTIL you hire one, after which NO named caddy appears again;
-  // generic caddy 'service' perks only surface once a named caddy has been hired.
+  // Hide maxed items, gate prereq tier-ladders, and handle caddies (GS-caddy / GS-caddy-factions):
+  // named caddies are random rarity-weighted inclusions, and they STAY offerable even once you've
+  // hired one — hiring a new caddy FIRES the incumbent (a real swap decision), so the others must
+  // keep showing. The one you already own drops out via the maxed check; a caddy you FIRED this run
+  // never comes back (they're sulking). Generic caddy 'service' perks only surface once a named caddy
+  // has been hired.
   const gear = SHOP_ITEMS.filter(
     (it) =>
       ownedCount(perks, it.id) < itemCap(it) &&
       (!it.prereq || perks.includes(it.prereq)) &&
-      (it.caddy !== 'named' || !hasCaddy) &&
+      (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
       (it.caddy !== 'service' || hasCaddy) &&
       (it.id !== 'driver-dan' || ownsDriver),
   );
@@ -1485,7 +1523,7 @@ export function starmartOffer(run: Run, size = STARMART_OFFER_SIZE, salt = 0): S
       it.rarity !== 'common' &&
       ownedCount(perks, it.id) < itemCap(it) &&
       (!it.prereq || perks.includes(it.prereq)) &&
-      (it.caddy !== 'named' || !hasCaddy) &&
+      (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
       (it.caddy !== 'service' || hasCaddy) &&
       (it.id !== 'driver-dan' || ownsDriver),
   );
@@ -1552,6 +1590,9 @@ export interface RunSnapshot {
   /** Sector scans burnt at the parked stop (GS-fuel-4), so a resume re-draws the exact lane offer
    *  the player paid fuel for. 0/absent for back-compat (the classic scan-0 offer). */
   routeScans?: number;
+  /** Caddies fired this run (GS-caddy-factions), so a resume keeps them out of the shop. Absent on an
+   *  old snapshot / a run that never fired anyone → nobody fired (byte-for-byte). */
+  firedCaddies?: string[];
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -1577,6 +1618,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     warpedThrough: run.warpedThrough || undefined,
     fuel: run.fuel,
     routeScans: run.routeScans || undefined,
+    firedCaddies: run.firedCaddies.length ? [...run.firedCaddies] : undefined,
   };
 }
 
@@ -1613,6 +1655,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     // Scans already burnt at the parked stop (GS-fuel-4) — so a resume re-draws the exact lane
     // offer the player paid fuel for, not the original one. Absent on old snapshots → 0.
     routeScans: snap.routeScans ?? 0,
+    firedCaddies: snap.firedCaddies ? [...snap.firedCaddies] : [],
     status: 'active',
     history: [],
   };
