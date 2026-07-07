@@ -58,6 +58,7 @@ export const PRO_LOOK: Record<BiomeArchetype, { cap: string; shirt: string; aura
   fungal: { cap: '#2fae82', shirt: '#7d46b8', aura: '#7af0c0', skin: '#d2b89c' },
   ocean: { cap: '#46b487', shirt: '#2f7faa', aura: '#7fe6b8', skin: '#e0c2a0' },
   cetus: { cap: '#3aa0aa', shirt: '#216578', aura: '#7af0ff', skin: '#dcc0a4' },
+  asgard: { cap: '#e8c65a', shirt: '#2f8b57', aura: '#ffe08a', skin: '#e7c9a4' },
 };
 
 /** A compact inline-SVG bust of a world's club pro — assetless house style, tinted per archetype. */

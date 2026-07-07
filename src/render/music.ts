@@ -117,6 +117,12 @@ export const MUSIC_TRACKS: Record<MusicSceneId, MusicTrack> = {
     chords: [[0, 2, 4], [5, 7, 9], [3, 5, 7], [4, 6, 8]],
     padType: 'sine', arpType: 'sine', arpDensity: 0.1, bassDensity: 0.25, shimmer: 0.35, gain: 0.28,
   },
+  asgard: {
+    // A slow, heroic hymn — a Norse-horn motif over a bright mixolydian pad, grand but restrained.
+    name: 'Halls of Asgard', bpm: 56, root: 98, scale: MIXO,
+    chords: [[0, 2, 4], [3, 5, 7], [4, 6, 8], [0, 2, 4]],
+    padType: 'sawtooth', arpType: 'triangle', arpDensity: 0.16, bassDensity: 0.55, shimmer: 0.4, gain: 0.3,
+  },
 };
 
 // --- Engine state ------------------------------------------------------------------------------

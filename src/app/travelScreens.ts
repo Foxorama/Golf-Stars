@@ -312,10 +312,21 @@ export function travelScreen(): string {
          ${btn('🆘 Abandon ship & end the run', { type: 'strand' }, { variant: 'primary', block: true, borderColor: '#ff6b4a' })}
        </div>`
     : '';
+  // A one-shot note after returning from the Asgard interlude (GS-asgard): win or lose, the Rainbow
+  // Ball is spent and the voyage is back on its true worlds. Cleared the moment the player jumps on.
+  const asgardBanner = state.asgardBanner
+    ? `<div style="margin:2px 0 10px;border-radius:10px;padding:10px 12px;border:1px solid ${state.asgardBanner === 'won' ? 'rgba(255,210,110,0.45)' : 'var(--gs-line-2)'};background:${state.asgardBanner === 'won' ? 'rgba(255,210,110,0.1)' : 'transparent'};font-size:13px;line-height:1.5;">
+         ${state.asgardBanner === 'won'
+           ? "🏆 <b style=\"color:#ffd97a;\">You conquered Asgard!</b> Thor's Hammer awaits in your Clubhouse wardrobe, and Odin's Favour rides with you."
+           : '⚡ <b>The Bifröst fades.</b> Better luck next time — but the tale of your great shot will be told in the halls of Asgard.'}
+         <span style="color:var(--gs-dim);"> The Rainbow Ball is spent; your worlds are true once more.</span>
+       </div>`
+    : '';
   // The ship-status pill (GS-fuel-2): the segmented tank gauge rides the screen title, so the fuel
   // question is on-screen before any lane is tapped — no more hunting a small number.
   return `
     ${header()}
+    ${asgardBanner}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:2px 0 3px;">
       <h2 style="font-size:18px;margin:0;letter-spacing:0.6px;background:linear-gradient(90deg,#ffce54,#7fd6e6);-webkit-background-clip:text;background-clip:text;color:transparent;">◆ CHOOSE YOUR JUMP</h2>
       <span style="flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:#9fb0cf;border:1px solid var(--gs-line);border-radius:999px;padding:3px 10px;white-space:nowrap;">🛰 dist ${state.run.distanceFromStart} · ${fuelGaugeHTML(state.run.fuel, tankCapacity(state.run))}</span>

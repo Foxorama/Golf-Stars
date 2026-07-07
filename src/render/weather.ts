@@ -73,6 +73,7 @@ export const WIND_RGBA: Record<string, string> = {
   fungal: '150,240,190', // drifting glowing spores
   ocean: '190,235,230', // sea spray
   cetus: '150,235,245', // luminous spray off the deep
+  asgard: '255,240,190', // pale divine gold-white
 };
 
 /**
@@ -112,6 +113,7 @@ export const AMBIENT: Record<string, AmbientCfg> = {
   fungal: { mode: 'rise', cols: ['150,240,190', '190,150,255'], density: 0.55, spd: 8, r: [0.7, 1.7], a: 0.5, glow: true }, // glow-spores
   ocean: { mode: 'drift', cols: ['235,250,255'], density: 0.45, spd: 30, r: [0.5, 1.2], a: 0.3 }, // sea-spray flecks
   cetus: { mode: 'rise', cols: ['122,240,255', '190,250,255'], density: 0.35, spd: 10, r: [0.6, 1.6], a: 0.55, glow: true }, // bioluminescent motes
+  asgard: { mode: 'drift', cols: ['255,225,140', '255,240,190'], density: 0.3, spd: 7, r: [0.8, 1.9], a: 0.55, glow: true }, // drifting divine gold light-motes
 };
 
 export interface WeatherOpts {

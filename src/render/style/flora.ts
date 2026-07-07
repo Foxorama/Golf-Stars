@@ -52,6 +52,8 @@ export function styleFlora(poly: Vec[], proj: Projector, rng: () => number, arch
       return floraPalm(x, y, rr, tint, cc);
     case 'cetus':
       return floraSeaStack(x, y, rr, tint, cc);
+    case 'asgard':
+      return floraGoldAsh(x, y, rr, tint, cc);
     default:
       break; // verdant (and any unknown) → the classic parkland canopy, byte-identical
   }
@@ -265,6 +267,26 @@ function floraSeaStack(x: number, y: number, rr: number, tint: number, key: Vec)
   }
   return out;
 }
+/** Asgard YGGDRASIL GOLDEN-LEAF ASH: a pale ash trunk under a rounded golden canopy that glows from
+ *  within, brighter gold leaf-clusters catching the twilight — the sacred groves of the Golden Realm. */
+function floraGoldAsh(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
+  const body = tint < 0.33 ? '#c9a63e' : tint < 0.66 ? '#d8b84a' : '#e6c85a'; // golden foliage
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.7], r: rr * 0.66, fill: CANOPY.shadow }, // cast shadow
+    { t: 'glow', c: [x, y - rr * 0.2], r: rr * 2.2, col: 'rgba(255,215,120,0.24)' }, // divine golden halo
+    { t: 'line', a: [x, y + rr * 0.95], b: [x, y - rr * 0.15], stroke: '#8a734a', sw: rr * 0.3, round: true }, // pale ash trunk
+    { t: 'circle', c: [x, y], r: rr, fill: '#8a6a2e', stroke: 'rgba(58,42,14,0.7)', sw: 1 }, // warm core shadow
+    { t: 'circle', c: [x - rr * 0.12, y - rr * 0.12], r: rr * 0.82, fill: body }, // golden body
+    { t: 'circle', c: [x - rr * 0.3, y - rr * 0.32], r: rr * 0.5, fill: '#ffe89a' }, // lit gold cap
+  ];
+  // Glowing leaf-clusters across the crown (position-hashed — no rng).
+  for (let i = 0; i < 3; i++) {
+    const u = posHash(key[0], key[1], i) - 0.5;
+    out.push({ t: 'circle', c: [x + u * rr * 1.4, y - rr * (0.1 + posHash(key[0], key[1], i + 3) * 0.5)], r: rr * 0.14, fill: 'rgba(255,240,180,0.9)' });
+  }
+  return out;
+}
+
 /**
  * Archetype SIGNATURE ground decor (GS-biome-feel) — the Cetus treatment (whales/star-river),
  * generalised: each world gets a bespoke seeded decor pass so its ground reads as a PLACE, not a
@@ -571,6 +593,70 @@ export function archetypeDecor(
         out.push({ t: 'line', a: [s[0], s[1] - r * 0.2], b: [s[0], s[1] - r * 1.1], stroke: '#a8845a', sw: 1.4, round: true }); // a lone palm
         out.push({ t: 'line', a: [s[0], s[1] - r * 1.1], b: [s[0] - r * 0.5, s[1] - r * 1.25], stroke: '#2f9a4a', sw: 1.2, round: true });
         out.push({ t: 'line', a: [s[0], s[1] - r * 1.1], b: [s[0] + r * 0.5, s[1] - r * 1.2], stroke: '#2f9a4a', sw: 1.2, round: true });
+      }
+      break;
+    }
+    case 'asgard': {
+      // The Golden Realm's skyline: the Bifröst rainbow bridge arcing overhead, a gilded Valhalla
+      // hall + the great Yggdrasil world-tree on the horizon, and floating rune-stones adrift in the
+      // twilight beyond the fields. Sky pieces are SCREEN-space (fixed loop counts, positions off the
+      // dedicated rng — never the projection), so they're camera-proof exactly like the void's
+      // black-hole eye / tempest's storm eye; the rune-stones are placed in COURSE space (rejected off
+      // the land, shape off posHash) like the void islets. Everything pushed UNCONDITIONALLY.
+      // The Bifröst: six prismatic bands bowing across the upper sky (centre below-frame so it arcs high).
+      const bx = W * (0.5 + (rng() - 0.5) * 0.2);
+      const by = H * (0.78 + rng() * 0.1);
+      const R0 = Math.max(W, H) * (0.5 + rng() * 0.12);
+      const HUES = ['rgba(255,90,120,', 'rgba(255,170,70,', 'rgba(255,232,90,', 'rgba(90,220,130,', 'rgba(90,190,255,', 'rgba(170,120,255,'];
+      const bandW = Math.max(2, R0 * 0.022);
+      for (let i = 0; i < HUES.length; i++) {
+        const r = R0 - i * bandW;
+        const seg = 16;
+        for (let k = 0; k < seg; k++) {
+          const a0 = Math.PI + (k / seg) * Math.PI;
+          const a1 = Math.PI + ((k + 1) / seg) * Math.PI;
+          out.push({ t: 'line', a: [bx + Math.cos(a0) * r, by + Math.sin(a0) * r], b: [bx + Math.cos(a1) * r, by + Math.sin(a1) * r], stroke: HUES[i]! + '0.30)', sw: bandW, round: true });
+        }
+      }
+      // A gilded Valhalla longhouse silhouette on the far skyline.
+      const vx = W * (0.14 + rng() * 0.44);
+      const vy = H * (0.24 + rng() * 0.08);
+      const vw = Math.max(26, W * 0.12);
+      const vh = vw * 0.5;
+      out.push({ t: 'glow', c: [vx, vy], r: vw * 1.4, col: 'rgba(255,210,110,0.22)' });
+      out.push({ t: 'poly', pts: [[vx - vw * 0.5, vy + vh * 0.5], [vx + vw * 0.5, vy + vh * 0.5], [vx + vw * 0.5, vy - vh * 0.1], [vx - vw * 0.5, vy - vh * 0.1]], fill: '#3a2f1e', stroke: 'rgba(255,210,120,0.5)', sw: 1 });
+      out.push({ t: 'poly', pts: [[vx - vw * 0.6, vy - vh * 0.1], [vx + vw * 0.6, vy - vh * 0.1], [vx, vy - vh * 0.85]], fill: '#e8c65a', stroke: 'rgba(120,90,30,0.6)', sw: 1 }); // gabled golden roof
+      for (let k = 0; k < 4; k++) out.push({ t: 'line', a: [vx - vw * 0.34 + k * vw * 0.23, vy + vh * 0.44], b: [vx - vw * 0.34 + k * vw * 0.23, vy - vh * 0.04], stroke: 'rgba(255,225,150,0.5)', sw: 1.4, round: true }); // lit pillars
+      // Yggdrasil — the great golden world-tree looming on the horizon.
+      const yx = W * (0.72 + rng() * 0.16);
+      const yBase = H * (0.4 + rng() * 0.06);
+      const yTop = yBase - H * (0.28 + rng() * 0.06);
+      const yh = yBase - yTop;
+      out.push({ t: 'glow', c: [yx, (yBase + yTop) / 2], r: yh * 0.8, col: 'rgba(255,220,130,0.16)' });
+      out.push({ t: 'line', a: [yx, yBase], b: [yx, yTop], stroke: 'rgba(40,30,18,0.85)', sw: Math.max(2, yh * 0.05), round: true }); // trunk
+      for (let k = 0; k < 4; k++) {
+        const a = -Math.PI / 2 + (k - 1.5) * 0.5;
+        out.push({ t: 'line', a: [yx, yTop + yh * 0.18], b: [yx + Math.cos(a) * yh * 0.34, yTop + yh * 0.18 + Math.sin(a) * yh * 0.34], stroke: 'rgba(40,30,18,0.7)', sw: Math.max(1.4, yh * 0.03), round: true });
+      }
+      out.push({ t: 'circle', c: [yx, yTop], r: yh * 0.34, fill: 'rgba(210,175,70,0.6)' }); // golden crown
+      out.push({ t: 'circle', c: [yx - yh * 0.12, yTop - yh * 0.06], r: yh * 0.22, fill: 'rgba(255,225,140,0.5)' }); // lit crown
+      // Floating rune-stones adrift beyond the fields — course-space, rejected off the land.
+      const spanX = cb.maxX - cb.minX || 1;
+      const spanY = cb.maxY - cb.minY || 1;
+      const cxw = (cb.minX + cb.maxX) / 2;
+      const cyw = (cb.minY + cb.maxY) / 2;
+      const want = 4 + Math.floor(rng() * 3);
+      for (let i = 0, placed = 0; i < want * 14 && placed < want; i++) {
+        const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.6, cyw + (rng() - 0.5) * spanY * 1.6];
+        if (landPolysCourse.some((lp) => pointInPoly(c, lp))) continue;
+        placed++;
+        const s = proj.project(c);
+        const r = Math.max(5, Math.min(20, (5 + rng() * 6) * proj.scale)); // sized in yards, clamped px
+        const rk = posHash(c[0], c[1]); // course-space variety (camera-stable)
+        out.push({ t: 'glow', c: s, r: r * 1.8, col: 'rgba(255,210,120,0.16)' });
+        out.push({ t: 'poly', pts: [[s[0] - r * 0.42, s[1] + r * 0.9], [s[0] - r * 0.5, s[1] - r * 0.8], [s[0] + r * 0.5, s[1] - r * 0.95], [s[0] + r * 0.42, s[1] + r * 0.85]], fill: '#4a4436', stroke: 'rgba(255,220,140,0.55)', sw: 1 }); // monolith
+        out.push({ t: 'line', a: [s[0], s[1] - r * 0.5], b: [s[0], s[1] + r * 0.5], stroke: 'rgba(255,232,150,0.85)', sw: 1.3, round: true }); // glowing carved rune
+        out.push({ t: 'line', a: [s[0] - r * 0.28, s[1] - r * 0.2 + rk * r * 0.3], b: [s[0] + r * 0.28, s[1] + r * 0.1], stroke: 'rgba(255,232,150,0.8)', sw: 1.2, round: true });
       }
       break;
     }

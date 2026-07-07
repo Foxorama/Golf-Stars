@@ -48,7 +48,11 @@ export type BiomeArchetype =
   // GS-cetus: the Whale constellation's realm — clifftop plateaus over a starry ocean. Off the
   // clifftop is lost to the star-ocean (the void's island/abyss model, reskinned); a river of stars
   // pours off the cliffs as a waterfall where space whales surface.
-  | 'cetus'; // star-ocean clifftops — island plateaus over a starry sea, whales breaching below
+  | 'cetus' // star-ocean clifftops — island plateaus over a starry sea, whales breaching below
+  // GS-asgard: the Golden Realm atop Yggdrasil, reached by the Bifröst — a GRAND, FAIR reward
+  // world (opulent gilded emerald fields under a royal twilight). NOT a normal route destination:
+  // reached only via a later tournament trigger, so no theme maps to it (weight 0 in `BIOMES`).
+  | 'asgard'; // the Golden Realm — grand, fair, celestial: wide fairways, a gentle divine tailwind
 
 /**
  * Per-theme biome flavour (GS-17b) — bounded MULTIPLIERS on the archetype baseline that give a
@@ -133,6 +137,7 @@ const ARCHETYPE_BIOME: Record<BiomeArchetype, string> = {
   fungal: 'spore-jungle',
   ocean: 'tidal-archipelago',
   cetus: 'cetus-deep',
+  asgard: 'asgard-realm',
 };
 
 /** The biome id a theme generates its course from. */
@@ -196,6 +201,25 @@ export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
   fungal: ['economy', 'skill'], // lush, growthy — like verdant's cousin
   ocean: ['control', 'distance'], // carry the sea, flight the lagoons
   cetus: ['control', 'skill'], // hit the clifftop plateau or it's lost to the star-ocean — precision
+  asgard: ['distance', 'skill'], // a grand reward world — big carries down wide fairways, rewarded striking
+};
+
+/**
+ * ASGARD (GS-asgard) — the standalone theme the Bifröst tournament flies into. It is NOT part of the
+ * pickable `THEMES` pool (so it never turns up on a normal route or in `themeById`) — the reducer sets
+ * it as the Asgard run's `pendingTheme` OBJECT directly, so `currentTheme`/`resolveBiome` resolve the
+ * `asgard-realm` biome without it ever leaking into ordinary play. `kind: 'deepsky'` needs no champion.
+ */
+export const ASGARD_THEME: Theme = {
+  id: 'asgard',
+  name: 'Asgard',
+  kind: 'deepsky',
+  rarity: 'legendary',
+  arc: 3,
+  archetype: 'asgard',
+  anchor: 'Ásgarðr',
+  blurb: 'The Golden Realm atop Yggdrasil — cross the Bifröst and face the Warriors Three.',
+  unique: true,
 };
 
 /** How much an on-theme item's shop weight is multiplied (soft bias, not a filter). */

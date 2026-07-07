@@ -539,3 +539,88 @@ export function journeyMapHTML(opts: StarmapOpts): string {
   return `<div class="gs-journey gs-journey--v">${svg}</div>
   <div class="gs-journey-here">📍 You're at <b>${esc(opts.currentLabel)}</b> · dist ${opts.distanceFromStart} · tap a world up top to choose your jump</div>`;
 }
+
+// ==== The Bifröst (GS-asgard) ===================================================================
+/**
+ * The Himinbjörg → Bifröst → Asgard reveal map: a bespoke twin of the journey map for the Asgard
+ * interlude. Himinbjörg (Heimdall's rainbow watchtower) stands where Earth would be at the bottom; the
+ * Bifröst rainbow bridge sweeps up to the shining Golden Realm at the top. Self-contained SVG, byte-stable
+ * from the seed (no Math.random — the twinkles are seeded), reusing the `.gs-journey` starfield frame.
+ */
+export function asgardBridgeHTML(opts: { seed: number | string }): string {
+  const BW = 320;
+  const BH = 430;
+  const rnd = mulberry32(hashSeed(opts.seed));
+  const hues = ['#ff5a7d', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#a06bff'];
+
+  // Seeded twinkles behind everything.
+  const twinkles = Array.from({ length: 16 }, () => {
+    const tx = (rnd() * BW).toFixed(1);
+    const ty = (16 + rnd() * (BH - 40)).toFixed(1);
+    const rr = (0.6 + rnd() * 1.2).toFixed(1);
+    const dur = (2.2 + rnd() * 3).toFixed(1);
+    const beg = (rnd() * 3).toFixed(1);
+    return `<circle cx="${tx}" cy="${ty}" r="${rr}" fill="#e9e0ff"><animate attributeName="opacity" values="0.2;0.9;0.2" dur="${dur}s" begin="${beg}s" repeatCount="indefinite"/></circle>`;
+  }).join('');
+
+  // The Bifröst: six hued bands bowing from the watchtower (bottom) up to Asgard (top), narrowing with
+  // distance, over a soft white glow. Energy pulses stream UP toward the Golden Realm.
+  const centre = (dx: number): string => `M${160 + dx},352 C ${118 + dx},278 ${206 + dx},176 ${160 + dx * 0.5},98`;
+  const glow = `<path d="${centre(0)}" fill="none" stroke="#ffffff" stroke-width="26" opacity="0.06" stroke-linecap="round"/>`;
+  const bands = hues
+    .map((h, i) => {
+      const dx = (i - 2.5) * 6;
+      return `<path d="${centre(dx)}" fill="none" stroke="${h}" stroke-width="6" stroke-linecap="round" opacity="0.7"><animate attributeName="opacity" values="0.55;0.85;0.55" dur="${(3 + i * 0.3).toFixed(1)}s" repeatCount="indefinite"/></path>`;
+    })
+    .join('');
+  const pulses = [0, 1, 2]
+    .map((k) => `<circle r="2.6" fill="#fbf4ff" opacity="0"><animate attributeName="opacity" values="0;0.95;0.95;0" keyTimes="0;0.1;0.85;1" dur="3.4s" begin="${(k * 1.1).toFixed(1)}s" repeatCount="indefinite"/><animateMotion dur="3.4s" begin="${(k * 1.1).toFixed(1)}s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="linear" path="${centre(0)}"/></circle>`)
+    .join('');
+
+  // ASGARD — the shining Golden Realm on a floating isle at the top: a lit base, a cluster of golden
+  // spires, and a warm halo.
+  const ax = 160;
+  const ay = 84;
+  const asgard = `
+    <ellipse cx="${ax}" cy="${ay}" rx="70" ry="52" fill="#ffcf5a" opacity="0.12"><animate attributeName="rx" values="66;78;66" dur="4.5s" repeatCount="indefinite"/></ellipse>
+    <ellipse cx="${ax}" cy="${ay}" rx="52" ry="38" fill="#ffe08a" opacity="0.1"/>
+    <ellipse cx="${ax}" cy="${ay + 20}" rx="46" ry="12" fill="#2a2140"/>
+    <ellipse cx="${ax}" cy="${ay + 18}" rx="44" ry="10" fill="#4a3a6e" opacity="0.85"/>
+    ${[-30, -14, 2, 18, 34]
+      .map((o, i) => {
+        const h = [22, 34, 46, 30, 20][i]!;
+        const w = [8, 9, 11, 9, 7][i]!;
+        const bx2 = ax + o;
+        const top = ay + 14 - h;
+        return `<rect x="${bx2 - w / 2}" y="${top}" width="${w}" height="${h}" fill="#caa23e"/><polygon points="${bx2 - w / 2 - 1},${top} ${bx2 + w / 2 + 1},${top} ${bx2},${top - w}" fill="#ffe08a"/>`;
+      })
+      .join('')}
+    <ellipse cx="${ax - 12}" cy="${ay - 8}" rx="16" ry="7" fill="#fff6d8" opacity="0.5"/>
+    <text x="${ax}" y="${ay - 40}" font-size="15" fill="#ffe08a" text-anchor="middle" font-weight="800" letter-spacing="3">ASGARD</text>`;
+
+  // HIMINBJÖRG — Heimdall's watchtower at the foot of the bridge (where Earth would sit): a golden spire
+  // on a platform, the guardian, and the Gjallarhorn.
+  const hx = 160;
+  const hy = 356;
+  const himin = `
+    <ellipse cx="${hx}" cy="${hy + 20}" rx="40" ry="9" fill="#ffce54" opacity="0.14"/>
+    <rect x="${hx - 30}" y="${hy + 12}" width="60" height="10" rx="2" fill="#4a3a6e"/>
+    <rect x="${hx - 11}" y="${hy - 30}" width="22" height="46" fill="#b98f34"/>
+    <rect x="${hx - 11}" y="${hy - 30}" width="6" height="46" fill="#d8ac48"/>
+    <polygon points="${hx - 15},${hy - 30} ${hx + 15},${hy - 30} ${hx},${hy - 50}" fill="#ffe08a"/>
+    <circle cx="${hx}" cy="${hy - 8}" r="4.4" fill="#3bd1ff" opacity="0.9"><animate attributeName="opacity" values="0.5;1;0.5" dur="2.2s" repeatCount="indefinite"/></circle>
+    <path d="M${hx + 14},${hy - 20} q14,-2 16,8 q-2,-6 -12,-4" fill="#ffe6a0" stroke="#b98f34" stroke-width="1"/>
+    <ellipse cx="${hx}" cy="${hy - 40}" rx="8" ry="3.5" fill="#fff6d8" opacity="0.45"/>
+    <text x="${hx}" y="${hy + 40}" font-size="12" fill="#ffd97a" text-anchor="middle" font-weight="800">Himinbjörg</text>
+    <text x="${hx}" y="${hy + 54}" font-size="8.5" fill="#9aa7c2" text-anchor="middle">the rainbow watch · home</text>`;
+
+  const svg = `<svg viewBox="0 0 ${BW} ${BH}" width="100%" role="img" aria-label="The Bifröst — Himinbjörg below, Asgard above" style="display:block;width:100%;height:auto;">
+    ${twinkles}
+    ${glow}
+    ${bands}
+    ${pulses}
+    ${asgard}
+    ${himin}
+  </svg>`;
+  return `<div class="gs-journey gs-journey--v">${svg}</div>`;
+}

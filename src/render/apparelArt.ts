@@ -228,6 +228,38 @@ function bagGlyph(look: ApparelLook, cx: number, cy: number, uid: string, scale 
   return `<g transform="translate(${cx} ${cy}) scale(${scale.toFixed(3)})">${a}${clubs}${body}${sparkles([[-9, -14], [9, 6]])}</g>`;
 }
 
+/**
+ * Draw a DRIVER-club glyph (the cosmetic driver slot, GS-thor) — a mythic WARHAMMER stood on its haft:
+ * a rune-etched gilded hammer head crossing the top of a leather-gripped shaft, wreathed in flickering
+ * electric-blue forked lightning. The lightning reuses the shipArt Thunderbolt idiom (a wide `#59b6ff`
+ * glow under a white core, `<animate>` opacity flicker). Authored in a ~34u frame about (cx,cy); `scale`
+ * fits it elsewhere (the card icon, the mannequin's side prop).
+ */
+function driverGlyph(look: ApparelLook, cx: number, cy: number, uid: string, scale = 1): string {
+  const { color = '#c9a24a', accent = '#59b6ff', glow } = look;
+  const ink = 'stroke="#0c1116" stroke-width="1" stroke-linejoin="round"';
+  const a = glow ? aura(0, -7, 22, glow, `dvg${uid}`) : '';
+  // The Thunderbolt flick/bolt idiom (render/shipArt.ts chopper case): a wide electric-blue glow under a
+  // thin white core, each flickering on its own phase.
+  const flick = (dur: string, begin: string): string =>
+    `<animate attributeName="opacity" values="0;1;0;0.7;0;0.9;0" dur="${dur}" begin="${begin}" repeatCount="indefinite"/>`;
+  const bolt = (d: string, dur: string, begin: string): string => `
+    <path d="${d}" fill="none" stroke="${accent}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0">${flick(dur, begin)}</path>
+    <path d="${d}" fill="none" stroke="#eaf6ff" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" opacity="0">${flick(dur, begin)}</path>`;
+  const bolts = `<g>
+    ${bolt('M9,-13 L14,-15 L11,-10 L17,-11', '0.7s', '0s')}
+    ${bolt('M-9,-12 L-15,-14 L-11,-9 L-17,-10', '0.6s', '0.3s')}
+    ${bolt('M10,-3 L16,-1 L13,3', '0.5s', '0.15s')}</g>`;
+  // Leather-gripped haft, then the chunky gilded head crossing its top (lighter struck faces + rune diamond).
+  const haft = `<rect x="-1.4" y="-9" width="2.8" height="27" rx="1.3" fill="#6b4a24" ${ink}/>
+    <rect x="-1.7" y="8" width="3.4" height="9" rx="1.3" fill="#2f2010"/>`;
+  const head = `<rect x="-9" y="-15" width="18" height="12.5" rx="1.6" fill="${color}" ${ink}/>
+    <rect x="-9" y="-15" width="4.2" height="12.5" fill="#ecd591"/>
+    <rect x="4.8" y="-15" width="4.2" height="12.5" fill="#ecd591"/>
+    <path d="M0,-12 L2.8,-8.7 L0,-5.4 L-2.8,-8.7 Z" fill="none" stroke="#7a5a22" stroke-width="0.9"/>`;
+  return `<g transform="translate(${cx} ${cy}) scale(${scale.toFixed(3)})">${a}${bolts}${haft}${head}${sparkles([[-12, -14], [12, 2]])}</g>`;
+}
+
 /** A framed `<svg>` icon of a garment for a wardrobe card. */
 export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
   const item = apparelById(id);
@@ -245,7 +277,9 @@ export function apparelCardSVG(id: string | undefined, w = 96, h = 72): string {
         ? shirtGlyph(item.look, cx, cy, uid)
         : item.slot === 'bag'
           ? bagGlyph(item.look, cx, cy - 2, uid, 1.4)
-          : pantsGlyph(item.look, cx, cy, uid);
+          : item.slot === 'driver'
+            ? driverGlyph(item.look, cx, cy + 2, uid, 1.4)
+            : pantsGlyph(item.look, cx, cy, uid);
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${item.name}" style="display:block;">${glyph}</svg>`;
 }
 
@@ -385,6 +419,8 @@ export function golferPreviewSVG(
     w?: number;
     h?: number;
     bagId?: string;
+    /** The equipped cosmetic driver (GS-thor) — propped at the golfer's other side (mirrors on-course). */
+    driverId?: string;
     /** Signature cap colour — worn when no cosmetic hat is equipped (mirrors on-course). */
     capColor?: string;
     /** The golfer's chosen hairstyle (render-only). Drawn only above the neck and hidden by a sealed
@@ -400,7 +436,7 @@ export function golferPreviewSVG(
   const uid =
     opts.uid ??
     `p${Math.abs(
-      [hatId, shirtId, pantsId, opts.bagId, skin, shirtBase, capColor, w, h]
+      [hatId, shirtId, pantsId, opts.bagId, opts.driverId, skin, shirtBase, capColor, w, h]
         .join('|')
         .split('')
         .reduce((a, c) => (Math.imul(a, 33) + c.charCodeAt(0)) | 0, 5381),
@@ -409,6 +445,7 @@ export function golferPreviewSVG(
   const shirt = apparelById(shirtId);
   const pants = apparelById(pantsId);
   const bag = apparelById(opts.bagId);
+  const driver = apparelById(opts.driverId);
   const cx = w / 2;
   const S = h / 210;
   const px = (n: number): number => n * S; // scale an authored length to this figure
@@ -669,6 +706,9 @@ export function golferPreviewSVG(
   // The equipped golf bag (GS-unending) stands propped at the golfer's side, feet on the same floor
   // line, scaled with the figure — the caddy-bag flex without cluttering the pose.
   const bagG = bag ? bagGlyph(bag.look, cx - px(37), footY - px(16), `pb${uid}`, S * 1.2) : '';
+  // The equipped cosmetic driver (GS-thor) stands propped at the golfer's OTHER side (opposite the bag),
+  // scaled with the figure — the warhammer flex, its lightning crackling beside the pose.
+  const driverG = driver ? driverGlyph(driver.look, cx + px(37), footY - px(18), `pd${uid}`, S * 1.15) : '';
 
   // Mythic/legendary outfits shed a few sparkles around the whole figure.
   const flair =
@@ -677,6 +717,6 @@ export function golferPreviewSVG(
       : '';
 
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${hairL.back}${ears}${head}${headShade}${hairL.top}${face}${hairL.face}${hatG}${flair}
+    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${hairL.back}${ears}${head}${headShade}${hairL.top}${face}${hairL.face}${hatG}${driverG}${flair}
   </svg>`;
 }

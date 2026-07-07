@@ -260,6 +260,36 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
     return frame(W, H, inner, ['#021019', '#073246'], gid);
   }
 
+  if (archetype === 'asgard') {
+    let inner = stars(rng, W, H, 20, 0.5);
+    // The Bifröst rainbow bridge arcing across the sky (centre below-frame so it bows high).
+    const abx = W * 0.5;
+    const aby = H * 1.15;
+    const aR = W * 0.62;
+    const hues = ['#ff5a7d', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#a06bff'];
+    for (let i = 0; i < hues.length; i++) {
+      const r = aR - i * 5;
+      inner += `<path d="M ${n1(abx - r)} ${n1(aby)} A ${n1(r)} ${n1(r)} 0 0 1 ${n1(abx + r)} ${n1(aby)}" fill="none" stroke="${hues[i]}" stroke-width="3.5" opacity="0.55"/>`;
+    }
+    // A warm celestial sun-glow, and a gilded Valhalla hall silhouette on the horizon.
+    inner += body(W * 0.2, H * 0.24, 12, '#ffe488', { glow: 'rgba(255,220,130,0.28)', shade: false });
+    const vx = W * 0.72;
+    const vy = H * 0.5;
+    inner += `<polygon points="${n1(vx - 26)},${n1(vy)} ${n1(vx + 26)},${n1(vy)} ${n1(vx + 26)},${n1(vy - 15)} ${n1(vx - 26)},${n1(vy - 15)}" fill="#3a2f1e"/>`;
+    inner += `<polygon points="${n1(vx - 30)},${n1(vy - 15)} ${n1(vx + 30)},${n1(vy - 15)} ${n1(vx)},${n1(vy - 33)}" fill="#e8c65a"/>`;
+    for (let k = 0; k < 4; k++) inner += `<line x1="${n1(vx - 18 + k * 12)}" y1="${n1(vy)}" x2="${n1(vx - 18 + k * 12)}" y2="${n1(vy - 13)}" stroke="rgba(255,225,150,0.5)" stroke-width="1.6"/>`;
+    // Gilded emerald fields rolling below, framed by golden groves.
+    inner += ridge(rng, W, H, H * 0.66, 10, '#2f7a48');
+    inner += ridge(rng, W, H, H * 0.78, 8, '#3f9a5e');
+    for (let i = 0; i < 4; i++) {
+      const x = W * (0.12 + i * 0.2 + rng() * 0.05);
+      const y = H * (0.84 + rng() * 0.06);
+      inner += `<line x1="${n1(x)}" y1="${n1(y)}" x2="${n1(x)}" y2="${n1(y - 13)}" stroke="#7a5a34" stroke-width="3" stroke-linecap="round"/>`;
+      inner += `<circle cx="${n1(x)}" cy="${n1(y - 16)}" r="9" fill="#d8b84a"/><circle cx="${n1(x - 3)}" cy="${n1(y - 19)}" r="5" fill="#ffe89a"/>`;
+    }
+    return frame(W, H, inner, ['#1a1440', '#4a3f7a'], gid);
+  }
+
   // void
   let inner = stars(rng, W, H, 34, 1);
   // A nebula smear.

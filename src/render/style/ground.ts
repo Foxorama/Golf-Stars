@@ -112,6 +112,15 @@ export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
     sparkle: 'rgba(255,255,255,0.7)',
     tuft: { cols: ['#9aa85a', '#c2cf7e'], style: 'blade' }, // dune marram grass
   },
+  // Asgard — a gilded MEADOW: rich emerald grass mottle strewn with golden pollen flecks and rare
+  // gold glints, its blade tufts tipped in gold (Iðavöllr, the golden field of the gods).
+  asgard: {
+    mottleLight: 'rgba(200,235,150,0.09)',
+    mottleDark: 'rgba(10,30,10,0.15)',
+    grain: ['rgba(240,225,150,0.5)', 'rgba(24,54,24,0.5)'],
+    sparkle: 'rgba(255,232,150,0.85)',
+    tuft: { cols: ['#2f7a48', '#c9a84e'], style: 'blade' }, // emerald grass, gold-tipped
+  },
 };
 
 /**

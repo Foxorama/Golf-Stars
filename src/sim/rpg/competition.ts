@@ -28,6 +28,7 @@ import {
   getGolfer,
   golferProfile,
   championFor,
+  WARRIORS_THREE,
   type Golfer,
   type GolferTier,
   type GolferLook,
@@ -294,6 +295,39 @@ export function ghostHoleStableford(
   // Sum of three uniforms ≈ a bell, mean 0, scaled by volatility.
   const noise = (rng.float() + rng.float() + rng.float() - 1.5) * vol * 2;
   return Math.round(clamp(base + noise, 0, 5));
+}
+
+/**
+ * A golfer's ghost GROSS score for one hole (GS-asgard) — the STROKE-PLAY counterpart of
+ * `ghostHoleStableford`, for the Asgard tournament where the LOWEST total wins. Better skill trends
+ * further under par; a per-round `form` streak shifts the whole card, and inconsistent golfers bounce
+ * around more. Clamped to [1, par+4] (a blow-up cap in the spirit of MAX_OVER_PAR). Deterministic from
+ * holeKey+golfer, on its own `:strokes:` stream, so it never touches the Stableford field's draws.
+ */
+export function ghostHoleStrokes(golferId: string, holeKey: string, par: number, form = 0): number {
+  const p = golferProfile(golferId);
+  // Expected score-to-par per hole: skill ~0.5 ≈ +0.14, skill ~0.8 ≈ −0.55 (a few under over nine).
+  let toPar = 0.75 - 1.55 * clamp(p.skill, 0, 1);
+  toPar -= form * 0.4; // a hot streak shaves strokes across the round
+  const vol = 0.55 + (1 - p.consistency) * 0.9;
+  const rng = new Rng(`${holeKey}:strokes:${golferId}`);
+  const noise = (rng.float() + rng.float() + rng.float() - 1.5) * vol;
+  return Math.round(clamp(par + toPar + noise, 1, par + 4));
+}
+
+/**
+ * The Warriors Three's total gross over a set of holes (GS-asgard) — a deterministic nine-hole score per
+ * opponent for the Asgard stroke-play tournament, each carrying a per-tournament FORM streak. The reducer
+ * compares these to the player's real gross; the player WINS by matching or beating the lowest of the
+ * three. Pure & deterministic from the tournament seed + the hole pars.
+ */
+export function warriorsThreeTotals(seed: string, pars: readonly number[]): { id: string; name: string; total: number }[] {
+  return WARRIORS_THREE.map((w) => {
+    const form = golferForm(w.id, `${seed}:form`);
+    let total = 0;
+    pars.forEach((par, i) => (total += ghostHoleStrokes(w.id, `${seed}:${i}`, par, form)));
+    return { id: w.id, name: w.shortName, total };
+  });
 }
 
 /** Does a golfer's home zone match this hole's theme/archetype? */
