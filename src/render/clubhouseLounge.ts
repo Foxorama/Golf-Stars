@@ -62,13 +62,16 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
   return arr;
 }
 
-/** A small engraved brass nameplate, the golfer's name inked in their signature colour. */
+/** A small engraved brass nameplate: the name inked in a dark engraved fill (always legible on brass,
+ *  unlike arbitrary cap colours which wash out), with the golfer's signature colour carried as a small
+ *  inlaid gem so identity survives without costing readability. */
 function nameplate(name: string, col: string): string {
-  return `<span style="display:inline-block;margin-top:1px;padding:2px 8px;border-radius:3px;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;margin-top:1px;padding:2px 8px;border-radius:3px;
     background:linear-gradient(180deg,#e8c266,#a97b25);border:1px solid #5c3f12;
     box-shadow:inset 0 1px 0 #fff6cf,0 1px 2px #0008;font-size:clamp(8px,2.1cqw,11.5px);font-weight:800;letter-spacing:.02em;
-    color:${col};text-shadow:0 1px 0 #fff5;white-space:nowrap;font-family:Georgia,'Times New Roman',serif;">
-    ${name}</span>`;
+    color:#2a1a05;text-shadow:0 1px 0 #ffe6ab;white-space:nowrap;font-family:Georgia,'Times New Roman',serif;">
+    <span style="width:.52em;height:.52em;border-radius:50%;flex:none;background:${col};
+      box-shadow:0 0 0 1px #0007,inset 0 0 1px 1px #fff8;"></span>${name}</span>`;
 }
 
 /** The rarity of the best cosmetic in a set of worn/flown ids — drives the "pop" glow: rare+ gear
