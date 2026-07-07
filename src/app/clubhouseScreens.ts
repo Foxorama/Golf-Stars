@@ -42,6 +42,7 @@ export function clubhouseHallScreen(): string {
     shipId: shipForCharacter(state, ch.id),
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
+    hair: ch.style.hair,
   }));
   return `
     <header style="border-left:4px solid #d8a24a;padding-left:10px;">
@@ -156,6 +157,7 @@ export function clubhouseScreen(): string {
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
     capColor: ch.style.cap,
+    hair: ch.style.hair,
     uid: 'stage',
     w: 190,
     h: 210,

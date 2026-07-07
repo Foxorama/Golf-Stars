@@ -13,6 +13,7 @@
  */
 
 import { Rng } from '../sim/rng';
+import type { GolferHair } from '../sim/rpg/characters';
 import { golferPreviewSVG } from './apparelArt';
 import { shipSVG } from './shipArt';
 import { apparelById } from '../sim/rpg/apparel';
@@ -32,6 +33,8 @@ export interface LoungeGolfer {
   shipId: string;
   skin: string;
   shirtBase: string;
+  /** The golfer's chosen hairstyle (render-only; drawn only above the neck). */
+  hair?: GolferHair;
 }
 
 /** A place a golfer can stand: feet anchored at (x%, y%) of the room, scaled for depth. */
@@ -103,6 +106,7 @@ function golferAt(g: LoungeGolfer, spot: Spot): string {
     skin: g.skin,
     shirtBase: g.shirtBase,
     capColor: g.capColor,
+    hair: g.hair,
     uid: `lg${g.id.replace(/[^a-z0-9]/gi, '')}`,
     w: 72,
     h: 210,

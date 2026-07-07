@@ -1046,6 +1046,40 @@ course view is a tiny profile glimpsed mid-swing anyway.
   visits — re-shoot it after touching `apparelArt.ts` or `clubhouseLounge.ts`. No new hook, no save
   bump, no reducer change; full suite green (the change is render-string-only).
 
+## Golfer gender presentation via hair only (GS-avatar-gender)
+
+The four golfers all drew as one identical, featureless (bald) body — the roster carried pronoun
+identities (`Character.identity`) but nothing on screen reflected them. Brief: make each golfer read a
+little more as their gender **while keeping every cosmetic fully gender-neutral and equally good on
+everyone** — explicitly no bust/curve shaping, "all spacesuits are non-gendered so the look should be
+non-gendered too." So the load-bearing decision: **gender presentation lives ONLY in the head layer.**
+
+- **Hair is the whole mechanism.** A render-only `GolferStyle.hair` (`GolferHair`: `style` +
+  `color` + optional `facial:'stubble'`) threads through `golferPreviewSVG`'s `opts.hair` into a new
+  `hairLayers()` in `apparelArt.ts`, which returns three z-layers the figure assembler slots in: `back`
+  (a rear mass behind the head), `top` (scalp cap + face-framing side locks + fringe, over the skin and
+  under any hat), and `face` (a faint stubble wash). Everything is authored in the figure's existing
+  proportional head frame (`cx`/`headY`/`headR`/`S`), so it scales cleanly from the 190-wide stage to the
+  72-wide lounge figure.
+- **The body and every garment are byte-identical for all four.** `torsoPath`, the limbs, the legs and
+  the shirt/pants/spacesuit glyphs are untouched — a garment drapes over the same silhouette for
+  everyone, which is what keeps outfits inclusive. There is no per-gender body branch anywhere, by
+  design; if that ever felt necessary the honest move is to NOT ship it (the brief said as much).
+- **A sealed helmet hides hair.** `sealed = hat.look.shape === 'helmet'` skips all hair, so the moment
+  any golfer dons the astronaut suit they read as an identical sealed astronaut — the non-gendered
+  spacesuit made literal. Other hats (cap/bucket/visor/tophat/crown/baggy/halo) sit on top and the hair
+  shows below the brim, as real hair does.
+- **Style is a length/shape spectrum, not a gender switch:** `crop` (short) → `sweep` (side-swept) →
+  `tousled` (medium) → `coils` (voluminous). Any golfer could wear any of them; each row just picks the
+  look that fits. Current picks: Feather `coils` (she/her), Bo `tousled` (they/them), Larry `crop` +
+  stubble (he/him), Huang-Woo `sweep` (identity opened to `he / she / they`).
+- **Scope + guarantees.** Render-only, no rng, no save bump, no reducer/hook change; sim stays pure
+  (the type lives in `sim/rpg/characters.ts`, the drawing in `render/apparelArt.ts` — render reads sim,
+  never the reverse). Only the front-facing clubhouse/wardrobe figure gained hair; the on-course profile
+  `drawGolfer` and the select-card `golferSVG` stick figures are deliberately left plain (out of scope).
+  Eyes-on via the existing `scripts/clubhouse-preview.mjs` (its lounge golfers now carry hair); full
+  suite green.
+
 ## The Clubhouse spaceport + figure scale fix (GS-clubhouse-spaceport)
 
 Two eyes-on complaints after the glow-up shipped: the lounge golfers still read as dolls next to the

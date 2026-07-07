@@ -199,6 +199,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     holo pads + one FUEL station — by the visit shuffle, so the fleet re-parks AND a different equipped
     ride tops up at the pump each run. Every ride stays the `openClubhouse` button; the ONLY randomness
     is the berth shuffle (which also picks the pump occupant). GS-clubhouse-starport-redesign.
+  - GENDER PRESENTATION lives ONLY in the head layer (GS-avatar-gender): each golfer's `GolferStyle.hair`
+    (a chosen hairstyle + optional stubble, `golferPreviewSVG` opts.hair → `hairLayers`) is drawn strictly
+    ABOVE THE NECK. The body silhouette, torso, limbs and every cosmetic garment are byte-identical for all
+    golfers, so outfits stay fully gender-neutral (no chest/curve shaping — ever) and drape the same on
+    everyone. A SEALED helmet (`hat.look.shape === 'helmet'`) hides hair, so all four read identical in a
+    spacesuit. Hairstyles are a length/shape spectrum any golfer could wear; the row just picks the look.
   - Won Ascension gates unlock permanent bag TIERS (`applyBagTier`, baked at `startRun`/`resumeRun`;
     a Pro-Shop floor; no-op at `'common'`). A per-character Ascension clear unlocks one random club
     (`unlockedClubsByCharacter` stores TYPES, re-stamped by `applyBagTier`). `ASCENSION_MAX = 15`.
