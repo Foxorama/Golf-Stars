@@ -26,7 +26,7 @@ import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
 import { getFormat } from './sim/rpg/formats';
 import { currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed, snapshotRun } from './sim/rpg/run';
-import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessRequiredStrokes, endlessUnlocksCrossed } from './sim/rpg/endless';
+import { endlessGateLabel, endlessGateOverPar, endlessMilestonesCrossed, endlessMilestoneShards, endlessRequiredStrokes, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
 import { isTeamDuelBoss } from './sim/rpg/formats';
@@ -318,14 +318,14 @@ function dispatch(action: Action): void {
     // side-effect pattern as the voyage victory; the shards/unlocks were already banked by the reducer.
     if (state.run.seed === prevRunSeed && state.run.holesSurvived > prevHoles && holeGateArmed(state.run)) {
       const crossed = endlessMilestonesCrossed(prevHoles, state.run.holesSurvived);
-      // Unlock reveals key off the LIFETIME best (a re-crossed milestone banks shards again, but an
-      // already-owned Evergreen piece isn't re-announced).
+      // Shards AND cosmetic unlocks are LIFETIME-once: a re-crossed milestone still fires the
+      // celebration, but banks nothing (the sim's lifetime gate paid 0) and re-announces no reward.
+      const shards = endlessMilestoneShards(prevBestHoles, state.endlessBestHoles);
       const unlocked = endlessUnlocksCrossed(prevBestHoles, state.endlessBestHoles);
       const secret = unlocked.find((u) => u.secret);
       const top = crossed[crossed.length - 1];
       if (top || secret) {
         const holes = secret && (!top || secret.holes > top.holes) ? secret.holes : top!.holes;
-        const shards = crossed.reduce((s, m) => s + m.shards, 0);
         const u = secret ?? unlocked[unlocked.length - 1];
         showEndlessMilestone(
           {

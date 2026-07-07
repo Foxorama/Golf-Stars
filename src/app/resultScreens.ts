@@ -303,7 +303,8 @@ export function gameoverScreen(): string {
         r.holesSurvived >= state.endlessBestHoles && r.holesSurvived > 0 ? ' — <b style="color:#4fe08a;">a new best!</b>' : state.endlessBestHoles > 0 ? ` (best: ${state.endlessBestHoles})` : ''
       }${(() => {
         const next = nextEndlessUnlock(state.endlessBestHoles);
-        return next ? ` · next unlock: <b>${next.secret ? '? ? ?' : next.name}</b> at hole ${next.holes}` : '';
+        // Tease only the LEVEL, never the reward itself — naming it spoils the surprise (GS-unending).
+        return next ? ` · next reward unlocks at hole <b>${next.holes}</b>` : '';
       })()}.</p>`
     : '';
   const reached =
