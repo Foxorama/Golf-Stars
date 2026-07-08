@@ -301,14 +301,17 @@ export function ghostHoleStableford(
  * A golfer's ghost GROSS score for one hole (GS-asgard) — the STROKE-PLAY counterpart of
  * `ghostHoleStableford`, for the Asgard tournament where the LOWEST total wins. Better skill trends
  * further under par; a per-round `form` streak shifts the whole card, and inconsistent golfers bounce
- * around more. Clamped to [1, par+4] (a blow-up cap in the spirit of MAX_OVER_PAR). Deterministic from
+ * around more. `edge` (GS-asgard-scaling) is a per-hole stroke sharpening applied deeper/harder into a
+ * run so the field keeps pace with an upgraded bag (subtracted straight off the expected to-par).
+ * Clamped to [1, par+4] (a blow-up cap in the spirit of MAX_OVER_PAR). Deterministic from
  * holeKey+golfer, on its own `:strokes:` stream, so it never touches the Stableford field's draws.
  */
-export function ghostHoleStrokes(golferId: string, holeKey: string, par: number, form = 0): number {
+export function ghostHoleStrokes(golferId: string, holeKey: string, par: number, form = 0, edge = 0): number {
   const p = golferProfile(golferId);
   // Expected score-to-par per hole: skill ~0.5 ≈ +0.14, skill ~0.8 ≈ −0.55 (a few under over nine).
   let toPar = 0.75 - 1.55 * clamp(p.skill, 0, 1);
   toPar -= form * 0.4; // a hot streak shaves strokes across the round
+  toPar -= edge; // GS-asgard-scaling: a deeper/harder tournament sharpens the whole field
   const vol = 0.55 + (1 - p.consistency) * 0.9;
   const rng = new Rng(`${holeKey}:strokes:${golferId}`);
   const noise = (rng.float() + rng.float() + rng.float() - 1.5) * vol;
@@ -316,30 +319,50 @@ export function ghostHoleStrokes(golferId: string, holeKey: string, par: number,
 }
 
 /**
+ * How much the Warriors Three SHARPEN for a tournament reached deep in a run / at a high Ascension
+ * (GS-asgard-scaling) — a per-hole stroke `edge` fed to `ghostHoleStrokes` so encountering the Bifröst
+ * LATE, with an upgraded bag and banked talents, stays a real fight instead of a roflstomp. DEPTH (stops
+ * cleared — the "upgraded clubs" proxy the player actually feels) is the primary lever; Ascension adds on
+ * top. Pure; returns 0 at a fresh, base-difficulty encounter, so that field is byte-identical to the
+ * pre-scaling one. Capped so the field never trends into unbeatable territory (ties go to the player).
+ */
+export const WARRIORS_DEPTH_STEP = 0.03; // per stop cleared before the tournament
+export const WARRIORS_DEPTH_CAP = 10; // stops past which depth stops sharpening them further
+export const WARRIORS_ASC_STEP = 0.015; // per Ascension level
+export const WARRIORS_EDGE_CAP = 0.42; // absolute per-hole ceiling (~4 strokes over the nine)
+export function warriorsEdge(depth: number, ascension = 0): number {
+  const d = clamp(depth, 0, WARRIORS_DEPTH_CAP);
+  const raw = WARRIORS_DEPTH_STEP * d + WARRIORS_ASC_STEP * Math.max(0, ascension);
+  return clamp(raw, 0, WARRIORS_EDGE_CAP);
+}
+
+/**
  * The Warriors Three's total gross over a set of holes (GS-asgard) — a deterministic nine-hole score per
  * opponent for the Asgard stroke-play tournament, each carrying a per-tournament FORM streak. The reducer
  * compares these to the player's real gross; the player WINS by matching or beating the lowest of the
- * three. Pure & deterministic from the tournament seed + the hole pars.
+ * three. `edge` (GS-asgard-scaling, default 0) sharpens the field for a deep/high-Ascension encounter —
+ * see `warriorsEdge`. Pure & deterministic from the tournament seed + the hole pars (+ edge).
  */
-export function warriorsThreeTotals(seed: string, pars: readonly number[]): { id: string; name: string; total: number }[] {
-  return warriorsThreeThru(seed, pars, pars.length);
+export function warriorsThreeTotals(seed: string, pars: readonly number[], edge = 0): { id: string; name: string; total: number }[] {
+  return warriorsThreeThru(seed, pars, pars.length, edge);
 }
 
 /**
  * Each Warrior's cumulative ghost gross THRU the first `holes` holes (GS-asgard) — the running-board
- * counterpart of `warriorsThreeTotals`, drawn on the IDENTICAL `:strokes:`/`:form` streams, so the
- * between-hole standings and the final result agree score-for-score. `holes` defaults to the full card
- * (making `warriorsThreeTotals` a thin alias). Pure & deterministic.
+ * counterpart of `warriorsThreeTotals`, drawn on the IDENTICAL `:strokes:`/`:form` streams (and the SAME
+ * `edge`), so the between-hole standings and the final result agree score-for-score. `holes` defaults to
+ * the full card (making `warriorsThreeTotals` a thin alias). Pure & deterministic.
  */
 export function warriorsThreeThru(
   seed: string,
   pars: readonly number[],
   holes: number = pars.length,
+  edge = 0,
 ): { id: string; name: string; total: number }[] {
   return WARRIORS_THREE.map((w) => {
     const form = golferForm(w.id, `${seed}:form`);
     let total = 0;
-    for (let i = 0; i < holes; i++) total += ghostHoleStrokes(w.id, `${seed}:${i}`, pars[i]!, form);
+    for (let i = 0; i < holes; i++) total += ghostHoleStrokes(w.id, `${seed}:${i}`, pars[i]!, form, edge);
     return { id: w.id, name: w.shortName, total };
   });
 }

@@ -55,7 +55,7 @@ import { archetypeFor } from '../sim/course/themes';
 import { effectPatchKind } from '../sim/rpg/effects';
 import { isMatchplayBoss, ASGARD_FORMAT } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
-import { warriorsThreeTotals } from '../sim/rpg/competition';
+import { warriorsThreeTotals, warriorsEdge } from '../sim/rpg/competition';
 import {
   playMatchStop,
   playTeamMatchStop,
@@ -641,6 +641,17 @@ function withAsgardPortal(next: UiState, run: Run, played: PlayedHole[]): UiStat
 }
 
 /**
+ * The Warriors Three's per-hole SHARPENING for THIS tournament (GS-asgard-scaling): scaled off how deep
+ * into the journey (the parked real run's `stopIndex` — the "upgraded clubs" proxy) and at what Ascension
+ * the Bifröst was reached, so a late-run encounter with an upgraded bag stays a contest. The suspended
+ * run lives in `asgardReturn`; the fresh Asgard run resets `stopIndex` to 0, so read the depth from the
+ * snapshot (its ascension is the same value the Asgard run carries). Zero at a shallow, base encounter. */
+export function asgardFieldEdge(state: UiState): number {
+  const src = state.asgardReturn;
+  return warriorsEdge(src?.stopIndex ?? 0, src?.ascension ?? state.run.ascension);
+}
+
+/**
  * Resolve the Asgard STROKE-PLAY tournament (GS-asgard): the player's real nine-hole gross against the
  * Warriors Three's deterministic ghost totals. Lowest total wins, ties to the player (a hard-won reward
  * event). A win banks the Thor's Hammer cosmetic here; the Odin's Favour perk + the Rainbow-Ball removal
@@ -649,7 +660,7 @@ function withAsgardPortal(next: UiState, run: Run, played: PlayedHole[]): UiStat
 function resolveAsgard(state: UiState, played: PlayedHole[]): UiState {
   const pars = state.course.holes.map((h) => h.par);
   const playerTotal = played.reduce((s, p) => s + p.record.strokes, 0);
-  const field = warriorsThreeTotals(`${state.run.seed}`, pars);
+  const field = warriorsThreeTotals(`${state.run.seed}`, pars, asgardFieldEdge(state));
   const won = playerTotal <= Math.min(...field.map((f) => f.total));
   const ownedApparel =
     won && !state.ownedApparel.includes(THOR_HAMMER_ID) ? [...state.ownedApparel, THOR_HAMMER_ID] : state.ownedApparel;

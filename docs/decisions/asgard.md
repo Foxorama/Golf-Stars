@@ -63,8 +63,22 @@ ice-man — three bespoke `contender` golfers in `GOLFERS`, never in the normal 
 competition doctrine (a field is a statistical ghost, not N ball-sims), `warriorsThreeTotals` gives each
 opponent a deterministic nine-hole gross from `ghostHoleStrokes` (the stroke-play twin of
 `ghostHoleStableford`, on its own `:strokes:` stream). The player plays REAL golf; **lowest total wins,
-ties to the player** (a hard-won reward event should reward the shot that earned it). Balance rides purely
-on the opponents' archetype skill against an easy Asgard course — no home boost, no handicap math.
+ties to the player** (a hard-won reward event should reward the shot that earned it). Balance rides on the
+opponents' archetype skill against an easy Asgard course — no home boost, no handicap math.
+
+**Difficulty scaling (GS-asgard-scaling).** The base archetype scores stay flat, so a first-arc encounter
+plays as it always did — but reaching the Bifröst LATE, with an upgraded bag and banked talents, would
+otherwise be a roflstomp of a big set-piece boss. `warriorsEdge(depth, ascension)` folds a per-hole stroke
+`edge` into `ghostHoleStrokes` (subtracted straight off expected to-par) so the whole field trends further
+under par the deeper/harder the run. DEPTH (the parked real run's `stopIndex` — the "upgraded clubs" proxy
+the player actually feels) is the PRIMARY lever; Ascension adds on top. It's bounded on both ends: 0 at a
+shallow/base encounter (that field is byte-identical to the pre-scaling one, so every seeded test that
+passes `edge=0` is unchanged), depth stops biting past `WARRIORS_DEPTH_CAP`, and the total edge caps at
+`WARRIORS_EDGE_CAP` (~4 strokes over nine — the best-of-three target moves from about −5 fresh to −8/−9
+deep) so it stays a fight, never unbeatable — ties still go to the
+player. The reducer derives the edge once (`asgardFieldEdge`, off `asgardReturn`'s depth/Ascension) and
+feeds it to BOTH the final `warriorsThreeTotals` and the between-hole `warriorsThreeThru` board, so the
+running standings and the verdict agree score-for-score.
 
 ### Suspend / resume — the load-bearing decision
 There is no run-stack in the engine, only a single `resumable` slot. The interlude needed to pause the
@@ -125,7 +139,9 @@ by the hub with `intro:'0'` so they land past the boot cinematic in one click.
 
 ## Follow-ups / known scope edges
 - The portal is ordinary-stop only (boss stops don't open it).
-- The Warriors Three difficulty is tuned by feel against the archetype skills; if it proves too easy/hard
-  in play, retune `ghostHoleStrokes`' `toPar` coefficients (it's the one lever), not the Asgard course.
+- The Warriors Three difficulty is tuned by feel: the flat floor lives in `ghostHoleStrokes`' `toPar`
+  coefficients; the depth/Ascension ramp lives in `warriorsEdge`' constants (`WARRIORS_DEPTH_STEP`/`_CAP`,
+  `WARRIORS_ASC_STEP`, `WARRIORS_EDGE_CAP`). Retune those, not the Asgard course. If it proves too hard
+  deep in a run, lower the steps or the cap; too easy, raise them.
 - The Himinbjörg map is a dedicated `asgardBridgeHTML`, not a parameterised `journeyMapHTML`, to keep the
   heavily-loaded journey map untouched.

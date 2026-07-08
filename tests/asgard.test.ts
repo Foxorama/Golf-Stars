@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { initState, reduce, asgardPortalOpens, type UiState } from '../src/ui/game';
 import { startRun, startAsgardRun, snapshotRun, baseLoadoutForRun, currentCourse, shopOffer } from '../src/sim/rpg/run';
 import { loadoutFromPerks } from '../src/sim/rpg/economy';
-import { warriorsThreeTotals, warriorsThreeThru } from '../src/sim/rpg/competition';
+import { warriorsThreeTotals, warriorsThreeThru, warriorsEdge, WARRIORS_EDGE_CAP, WARRIORS_DEPTH_CAP } from '../src/sim/rpg/competition';
 import { WARRIORS_THREE } from '../src/sim/rpg/golfers';
 import { ASGARD_THEME } from '../src/sim/course/themes';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
@@ -86,6 +86,31 @@ describe('GS-asgard: the Bifröst tournament', () => {
       });
       prev = thru;
     }
+  });
+
+  it('warriorsEdge scales with depth and Ascension, floored at 0 and capped', () => {
+    // A fresh, base-difficulty encounter adds nothing (the field stays byte-identical to pre-scaling).
+    expect(warriorsEdge(0, 0)).toBe(0);
+    // Deeper into the run sharpens the field; a higher Ascension sharpens it further at equal depth.
+    expect(warriorsEdge(6, 0)).toBeGreaterThan(warriorsEdge(2, 0));
+    expect(warriorsEdge(6, 8)).toBeGreaterThan(warriorsEdge(6, 0));
+    // Bounded: depth stops biting past the cap, and the total edge never exceeds the ceiling.
+    expect(warriorsEdge(WARRIORS_DEPTH_CAP + 20, 0)).toBe(warriorsEdge(WARRIORS_DEPTH_CAP, 0));
+    expect(warriorsEdge(999, 15)).toBeLessThanOrEqual(WARRIORS_EDGE_CAP);
+    // Negative inputs never make the field WORSE than the base.
+    expect(warriorsEdge(-5, -5)).toBe(0);
+  });
+
+  it('a scaled tournament trends the Warriors further under par than an unscaled one', () => {
+    const pars = [4, 3, 5, 4, 4, 3, 5, 4, 4];
+    const base = warriorsThreeTotals('scale', pars, 0);
+    const deep = warriorsThreeTotals('scale', pars, warriorsEdge(WARRIORS_DEPTH_CAP, 10));
+    // Same three warriors, same order — only the numbers sharpen.
+    expect(deep.map((w) => w.id)).toEqual(base.map((w) => w.id));
+    const sum = (fs: { total: number }[]) => fs.reduce((s, f) => s + f.total, 0);
+    expect(sum(deep)).toBeLessThan(sum(base));
+    // The running board uses the SAME edge, so the full-card prefix still equals the totals.
+    expect(warriorsThreeThru('scale', pars, pars.length, warriorsEdge(WARRIORS_DEPTH_CAP, 10))).toEqual(deep);
   });
 
   it('playing the tournament to the end lands on the result screen with a verdict', () => {

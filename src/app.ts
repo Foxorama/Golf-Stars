@@ -37,6 +37,7 @@ import { ACE_SHIP_ID } from './sim/rpg/ships';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
 import { endlessScoreCard } from './render/endlessCards';
 import {
+  asgardFieldEdge,
   initState,
   reduce,
   type Action,
@@ -1016,7 +1017,7 @@ function playingBody(animating: boolean): string {
     const progress = state.run.formatId === ASGARD_FORMAT
       ? // The Asgard tournament (GS-asgard) is STROKE PLAY vs the Warriors Three, not the 20-golfer
         // Stableford field — show the running lowest-gross standings, its own event.
-        asgardLiveBoardHTML(playedSoFar, state.course.holes.map((h) => h.par), `${state.run.seed}`)
+        asgardLiveBoardHTML(playedSoFar, state.course.holes.map((h) => h.par), `${state.run.seed}`, asgardFieldEdge(state))
       : state.match
       ? holeMatchProgressHTML(playedSoFar)
       : holeGateArmed(state.run)
