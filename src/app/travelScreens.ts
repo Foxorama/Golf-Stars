@@ -1,14 +1,13 @@
 /**
  * The journey screens (GS-routes / GS-journey-vertical / GS-fuel): the star-chart travel screen
  * with its three tappable branch planets, the route-info bottom sheet with the full jump detail
- * (bet levers, weather hooks, salvage preview, fuel bill), and the bank/stranded exits.
+ * (bet levers, weather hooks, salvage gamble, fuel bill), and the bank/stranded exits.
  */
 
 import { btn, header, state } from './ctx';
 import { fuelDepotHTML } from './shopScreens';
 import type { EventCategory } from '../sim/rpg/events';
 import { COURSE_EFFECTS, effectCarryMult, effectFuelDelta, effectWindMult, routeClubFind, routeDifficulty, routeEffect } from '../sim/rpg/effects';
-import { salvageClubFind } from '../sim/rpg/salvage';
 import { rarCol } from '../sim/rpg/loot';
 import {
   canScanRoutes,
@@ -149,16 +148,16 @@ export function routeInfoOverlay(): string {
     ? `<div style="font-size:12px;color:#ff8b6b;margin-top:6px;">⛽ Not enough fuel for this ${routeFuelCost(state.run, r)}-unit jump — the missing ${fuelShortfall(state.run, r)} unit${fuelShortfall(state.run, r) === 1 ? '' : 's'} would cost ${travelRefuelCost(state.run, r)} cr at this depot (you have ${credits}). Pick a shorter jump.</div>`
     : '';
 
-  // A SALVAGE lane's club find (GS-journey-fx-3) gets its own loud, honest line — the exact club you'll
-  // loot (resolved from the same private stream `travel` grants it on, so the preview can't lie), or the
-  // credit consolation when your bag is already full at that tier.
+  // A SALVAGE lane's club find (GS-journey-fx-3, GS-salvage-mystery) is a BLIND gamble — the card
+  // previews only the TIER, never the exact club. The find rolls when you ARRIVE (off the private
+  // `salvage:<seed>:<arrivingStop>:<eventId>` stream `travel` grants it on), and that stream is keyed
+  // to the destination, so each salvage stop is its own roll: skip it here and the next lane's loot may
+  // differ. We deliberately don't resolve the club for the preview — knowing it in advance killed the
+  // gamble and made every salvage lane read as the same fixed reward.
   const findRarity = routeClubFind(ev);
   let salvageLine = '';
   if (findRarity) {
-    const found = salvageClubFind(state.run.loadout, findRarity, `salvage:${state.run.seed}:${state.run.stopIndex + 1}:${ev.id}`);
-    salvageLine = found.clubName
-      ? `<div style="font-size:12.5px;margin:4px 0 0;color:${rarCol(found.rarity ?? findRarity)};font-weight:600;">🎁 Salvage: loot the <b>${found.clubName}</b> · equips for the run</div>`
-      : `<div style="font-size:12.5px;margin:4px 0 0;color:#4fd0e0;font-weight:600;">🎁 Salvage: bag full — +${found.consolationCredits} credits instead</div>`;
+    salvageLine = `<div style="font-size:12.5px;margin:4px 0 0;color:${rarCol(findRarity)};font-weight:600;">🎁 Salvage: a mystery <b>${findRarity.toUpperCase()}</b> club find — rolled on arrival, unknown until you commit (a credit payout if your bag's already stocked). Grab it here; the next salvage may be something else.</div>`;
   }
   // The effect's GEOMETRIC play hook (tents / craters / turf patches) gets its own loud line — the
   // consequence you'll actually putt around, not just sky-dressing (GS-journey-fx-2).

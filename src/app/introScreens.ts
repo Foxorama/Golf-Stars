@@ -16,6 +16,7 @@ import { eventDescFor } from './travelScreens';
 import { difficultyPips, zoneProfile } from '../sim/course/zones';
 import { archetypeFor, themeById } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
+import { routeClubFind } from '../sim/rpg/effects';
 import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed } from '../sim/rpg/run';
 import { getFormat, isMatchplayBoss, isTeamDuelBoss } from '../sim/rpg/formats';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar } from '../sim/rpg/endless';
@@ -114,6 +115,24 @@ function introShared(): {
        <b style="font-size:13px;">${ev.label}</b>
        <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${eventDescFor(ev.desc)}</div>
      </div>`);
+  // The SALVAGE gamble pays off (GS-salvage-mystery): if this stop arrived via a salvage lane, reveal
+  // the club the blind roll actually landed — the "you looted X" moment the tier-only route card held
+  // back. `state.salvageReveal` is the transient find computed at travel from the pre-jump bag.
+  const reveal = state.salvageReveal;
+  if (reveal && routeClubFind(ev)) {
+    const col = rarCol(reveal.rarity ?? ev!.rarity);
+    notes.push(
+      reveal.clubName
+        ? `<div style="margin-top:8px;padding:7px 11px;border-left:3px solid ${col};border-radius:8px;background:#ffffff08;">
+             <b style="font-size:13px;color:${col};">🎁 Salvage haul: the ${reveal.rarity} <b>${reveal.clubName}</b>!</b>
+             <div style="font-size:12.5px;opacity:.82;margin-top:1px;">Scavenged from the wreck and equipped for the rest of the run.</div>
+           </div>`
+        : `<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #4fd0e0;border-radius:8px;background:#ffffff08;">
+             <b style="font-size:13px;color:#4fd0e0;">🎁 Salvage: +${reveal.consolationCredits} credits</b>
+             <div style="font-size:12.5px;opacity:.82;margin-top:1px;">Your bag was already stocked at that tier, so the haul cashed out.</div>
+           </div>`,
+    );
+  }
 
   const objective = `${(() => {
     const format = getFormat(state.run.formatId);

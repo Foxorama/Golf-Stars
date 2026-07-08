@@ -250,9 +250,13 @@ these systems** — each bullet is the tip of a documented iceberg.
   - Trade tents ring EVERY hole of a tradeMarket stop; effects are dealt per hole so colour never
     predicts. Only the marmot changes the shot (deterministic lost ball in `executeShot`, auto ≡
     interactive); the other four are interactive-only reducer meta.
-  - A `salvage` lane loots a CLUB (private stream, rarity floored at rare, resume-safe as a shop
-    perk id, only ever raises Stableford). Route events carry no `shardBonus` — shards are run-END
-    rewards; `run.bonusShards` moves only via endless milestones.
+  - A `salvage` lane loots a CLUB (private stream keyed to the DESTINATION
+    `salvage:<seed>:<arrivingStop>:<eventId>`, rarity floored at rare, resume-safe as a shop perk id,
+    only ever raises Stableford). It's a BLIND gamble (GS-salvage-mystery): the route card previews only
+    the TIER, never the exact club — each salvage stop is its own roll, so skip it and the next lane's loot
+    may differ. The grant still resolves from that same stream in `travel` (auto ≡ interactive), so the
+    mystery is presentation-only. Route events carry no `shardBonus` — shards are run-END rewards;
+    `run.bonusShards` moves only via endless milestones.
   - The three route lanes land DISTINCT archetypes, never the current one (filtered redraw, not a
     retry loop). A fresh run opens RANDOM + non-hard (stop 0 skips `HARD_ARCHETYPES`; same single
     draw off a filtered pool). Characters/talents/ace rewards ride `loadout.perks` ids, rebuilt on
