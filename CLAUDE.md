@@ -273,6 +273,13 @@ these systems** — each bullet is the tip of a documented iceberg.
   - Voyage survival is your POSITION in one persistent field thinning to the final two;
     `competition.ts` is the single source for the drawn board AND real survival. Only the FINAL
     ordinary stop cuts to 2; every earlier target floors at 4.
+  - LOW-Ascension ghost-field EASE (GS-green-ease): `voyageFieldEase(ascension)` hands the whole AI
+    field back `VOYAGE_EASE_A0` (0.66) SF/hole at A0 — held across A0–A4, faded to 0 by A8 — so a
+    green-bag player shooting ~even par is competitive at the gentle tiers (cut-survival ≈84→61% A0→A4)
+    instead of getting positionally cut mid-field, while BELOW-par golf still misses the cut. It's
+    `ghostHoleStableford`'s `ease` param (default 0 = original field, byte-identical; applied to `base`,
+    ZERO extra rng), carried on `ArcStopSlice.fieldEase` (voyage-only) so survival AND the live
+    leaderboard apply the SAME ease. Eases the CUT only — the matchplay BOSSES stay the hard climax.
   - `league.ts` imports `run.ts`, never the reverse; the matchplay boss-id resolves in the UI reducer.
 - **Caddies** — `docs/decisions/caddies.md`
   - One named caddy on the bag at a time, but hiring a NEW one FIRES the incumbent (GS-caddy-factions,

@@ -273,10 +273,33 @@ export function golferForm(golferId: string, formKey: string): number {
 }
 
 /**
+ * The ghost field's low-Ascension EASE (GS-green-ease): a per-hole Stableford the whole AI field GIVES
+ * BACK at the gentle end of the ladder, so a green-bag player shooting around even par is genuinely
+ * competitive at A0–A4 instead of drowning mid-field. The field median is calibrated ~2.1–2.2 SF/hole,
+ * which puts an even-par (2.0/hole) player mid-pack and out of the top-2 that reaches the final — the
+ * ease lowers that bar. It RAMPS OFF with Ascension (a real difficulty gradient the positional-cut
+ * targets alone never delivered — their floors swallow the per-level squeeze) and reaches 0 by
+ * `VOYAGE_EASE_ZERO_AT`, so the deep ladder is byte-identical to the pre-ease field. Applied to `base` BEFORE
+ * the noise draws, so it consumes ZERO extra rng and never reorders the stream (contract 1) — it changes
+ * the field's SCORES, not its determinism; `ease = 0` is byte-for-byte the original field.
+ */
+export const VOYAGE_EASE_A0 = 0.66; // SF/hole shaved off every ghost at A0 (calibrated: even-par ≈ 84% survival, below-par still cut)
+export const VOYAGE_EASE_ZERO_AT = 8; // the ease has fully faded by this Ascension (deep ladder unchanged)
+export function voyageFieldEase(ascension: number): number {
+  const a = Math.max(0, Math.round(ascension));
+  if (a >= VOYAGE_EASE_ZERO_AT) return 0;
+  // Hold most of the cushion across A0–A4 (the green-bag band, only a gentle gradient), then fade to
+  // nothing by A8 so the deep ladder is byte-identical to the pre-ease field.
+  const band = a <= 4 ? 1 - a * 0.03 : Math.max(0, (VOYAGE_EASE_ZERO_AT - a) / (VOYAGE_EASE_ZERO_AT - 4)) * 0.88;
+  return VOYAGE_EASE_A0 * band;
+}
+
+/**
  * One golfer's ghost Stableford for one hole. Deterministic from `holeKey`+golfer. `homeMatch` lifts a
  * champion in their zone; `pressure` (0..1, ramps toward a boss) lifts the clutch and sinks the chokers;
  * `form` (GS-streaks) is the golfer's per-stop hot/cold streak (see `golferForm`), constant across the
- * stop's holes. The per-hole spread widens for inconsistent/streaky golfers, so they bounce around too.
+ * stop's holes. `ease` (GS-green-ease, default 0) shaves the whole field's score at low Ascension — see
+ * `voyageFieldEase`. The per-hole spread widens for inconsistent/streaky golfers, so they bounce around too.
  */
 export function ghostHoleStableford(
   golferId: string,
@@ -284,12 +307,14 @@ export function ghostHoleStableford(
   homeMatch: boolean,
   pressure = 0,
   form = 0,
+  ease = 0,
 ): number {
   const p = golferProfile(golferId);
   let base = golferBaseline(p.skill);
   if (homeMatch) base += HOME_BOOST;
   base += (p.nerve - 0.5) * pressure * 0.8;
   base += form;
+  base -= ease; // GS-green-ease: the field gives back a little at the gentle end of the ladder
   const vol = 0.35 + (1 - p.consistency) * 0.7 - (homeMatch ? 0.1 : 0);
   const rng = new Rng(`${holeKey}:${golferId}`);
   // Sum of three uniforms ≈ a bell, mean 0, scaled by volatility.
@@ -531,6 +556,8 @@ export interface ArcStopSlice {
   isBoss: boolean;
   /** Top-N (by cumulative total) who advance past this ordinary stop; undefined = no cut (boss). */
   target?: number;
+  /** GS-green-ease: SF/hole shaved off every ghost this stop (low-Ascension cushion; 0 = original field). */
+  fieldEase?: number;
 }
 
 /** Per-golfer Stableford for one stop: the player's real SF, each ghost's form-shifted ghost SF. A boss
@@ -548,9 +575,10 @@ export function sliceScores(field: Field, seed: number | string, slice: ArcStopS
       continue;
     }
     const form = golferForm(g.id, formKey);
+    const ease = slice.fieldEase ?? 0;
     let sf = 0;
     for (let i = 0; i < slice.holeCount; i++) {
-      sf += ghostHoleStableford(g.id, `${seed}:gl:${slice.stopIndex}:${i}`, homeMatches(g, slice.themeId, slice.archetype), pressure, form);
+      sf += ghostHoleStableford(g.id, `${seed}:gl:${slice.stopIndex}:${i}`, homeMatches(g, slice.themeId, slice.archetype), pressure, form, ease);
     }
     out.set(g.id, sf);
   }

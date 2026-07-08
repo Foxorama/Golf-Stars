@@ -56,7 +56,7 @@ import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effe
 import { salvageClubFind, type SalvageFind } from './salvage';
 import { applyRainbowRoad } from './rainbow';
 import { ASGARD_THEME, themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
-import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
+import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, voyageFieldEase, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked' | 'won' | 'stranded';
@@ -662,6 +662,10 @@ export function arcSlices(
 ): ArcStopSlice[] {
   const format = getFormat(run.formatId);
   const ascCut = ascensionCutBonus(run.ascension);
+  // GS-green-ease: the ghost field gives back a little at the gentle end of the ladder so a green-bag,
+  // near-even-par player is competitive at A0–A4. Voyage-only (the positional cut) and 0 above A8, so
+  // endless + the deep ladder are byte-identical.
+  const fieldEase = format.winnable ? voyageFieldEase(run.ascension) : 0;
   const make = (stopIndex: number, themeId: string | undefined, biome: string, holeCount: number, playerSF: number): ArcStopSlice => ({
     stopIndex,
     themeId,
@@ -670,6 +674,7 @@ export function arcSlices(
     playerSF,
     isBoss: !!bossAt(format, stopIndex),
     target: arcSurvivorTarget(stopIndex, ascCut),
+    fieldEase,
   });
   const slices: ArcStopSlice[] = [];
   for (const h of run.history) {

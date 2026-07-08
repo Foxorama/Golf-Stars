@@ -35,6 +35,7 @@ import {
   stopPosInArc,
   isArcBossSlot,
   stopPressure,
+  voyageFieldEase,
   PLAYER_ID,
   type Field,
   type Standing,
@@ -295,12 +296,15 @@ export function liveLeaderboard(run: Run, holesPlayed: number, playerStopSF: num
     totals.set(PLAYER_ID, (totals.get(PLAYER_ID) ?? 0) + playerStopSF);
     stopScores.set(PLAYER_ID, playerStopSF);
     const formKey = stopFormKey(run, run.stopIndex);
+    // GS-green-ease: the low-Ascension ghost-field cushion — MUST match arcSlices' ease so the live
+    // partial and the committed cumulative board (leaderboard→arcCut) agree golfer-for-golfer.
+    const ease = getFormat(run.formatId).winnable ? voyageFieldEase(run.ascension) : 0;
     for (const g of field.golfers) {
       if (g.isPlayer || eliminated.get(g.id)) continue; // an eliminated golfer is out — no partial
       const form = golferForm(g.id, formKey);
       let sf = 0;
       for (let i = 0; i < holesPlayed; i++) {
-        sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure, form);
+        sf += ghostHoleStableford(g.id, ghostHoleKey(run, run.stopIndex, i), homeMatches(g, themeId, archetype), pressure, form, ease);
       }
       totals.set(g.id, (totals.get(g.id) ?? 0) + sf);
       stopScores.set(g.id, sf);
