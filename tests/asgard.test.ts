@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { initState, reduce, asgardPortalOpens, type UiState } from '../src/ui/game';
 import { startRun, startAsgardRun, snapshotRun, baseLoadoutForRun, currentCourse, shopOffer } from '../src/sim/rpg/run';
 import { loadoutFromPerks } from '../src/sim/rpg/economy';
-import { warriorsThreeTotals } from '../src/sim/rpg/competition';
+import { warriorsThreeTotals, warriorsThreeThru } from '../src/sim/rpg/competition';
 import { WARRIORS_THREE } from '../src/sim/rpg/golfers';
 import { ASGARD_THEME } from '../src/sim/course/themes';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
@@ -67,6 +67,24 @@ describe('GS-asgard: the Bifröst tournament', () => {
     for (const w of a) {
       expect(w.total).toBeGreaterThan(pars.length); // nobody shoots impossibly low
       expect(w.total).toBeLessThan(pars.reduce((s, p) => s + p, 0) + pars.length * 4);
+    }
+  });
+
+  it('warriorsThreeThru is a prefix of the full totals, on the identical stream', () => {
+    const pars = [4, 3, 5, 4, 4, 3, 5, 4, 4];
+    // Thru the full card equals warriorsThreeTotals (same names, same ids, same numbers).
+    expect(warriorsThreeThru('t', pars)).toEqual(warriorsThreeTotals('t', pars));
+    // Each running prefix is monotonic non-decreasing (gross only accrues) and bounded by the final.
+    const full = warriorsThreeThru('t', pars);
+    let prev = warriorsThreeThru('t', pars, 0);
+    expect(prev.every((w) => w.total === 0)).toBe(true);
+    for (let n = 1; n <= pars.length; n++) {
+      const thru = warriorsThreeThru('t', pars, n);
+      thru.forEach((w, i) => {
+        expect(w.total).toBeGreaterThanOrEqual(prev[i]!.total);
+        expect(w.total).toBeLessThanOrEqual(full[i]!.total);
+      });
+      prev = thru;
     }
   });
 
