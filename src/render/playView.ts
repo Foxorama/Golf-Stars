@@ -327,6 +327,31 @@ function drawGolfer(
     ctx.arc(5, -35, 1.1, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Valkyrie cuirass (GS-valkyrie 'valkyrie'): a gold shoulder pauldron, a central ridge, and a winged
+  // gold chest boss, so the burnished plate reads even at swing size.
+  if (look.shirtStyle?.shape === 'valkyrie') {
+    const gold = look.shirtStyle.accent ?? '#ffe08a';
+    ctx.fillStyle = gold;
+    ctx.beginPath();
+    ctx.arc(8, -50, 3.4, Math.PI * 0.75, Math.PI * 1.95); // shoulder pauldron
+    ctx.fill();
+    ctx.strokeStyle = gold; // central ridge
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(4, -46);
+    ctx.lineTo(4, -34);
+    ctx.stroke();
+    ctx.beginPath(); // winged chest boss
+    ctx.arc(4, -43, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(1.6, -43.6);
+    ctx.lineTo(-1.2, -44.6);
+    ctx.moveTo(6.4, -43.6);
+    ctx.lineTo(9.2, -44.6);
+    ctx.stroke();
+  }
 
   // Club shaft + head (behind the arms). An equipped cosmetic DRIVER (GS-thor) swaps the plain club head
   // for a mythic WARHAMMER wreathed in lightning; else a bought themed club set (GS-proshop-2) tints the
@@ -682,6 +707,43 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.ellipse(hx, hy - r - 4, r, 2.4, 0, 0, Math.PI * 2);
       ctx.stroke();
       break;
+    case 'wingedHelm': {
+      // The Asgardian Valkyrie helm (GS-valkyrie): a feathered silver wing swept up each side (behind
+      // the dome), a steel dome, a gold brow band + nasal guard, and a gold rivet emblem. Mirrors the
+      // wardrobe SVG (`apparelArt.ts hatGlyph 'wingedHelm'`).
+      ctx.save();
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 0.7;
+      ctx.fillStyle = '#eef2f8';
+      for (const d of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(hx + d * 4.5, hy - 5);
+        ctx.bezierCurveTo(hx + d * 10, hy - 6.5, hx + d * 14, hy - 10, hx + d * 15.5, hy - 15);
+        ctx.bezierCurveTo(hx + d * 13.5, hy - 12.5, hx + d * 12, hy - 12.8, hx + d * 11, hy - 11.2);
+        ctx.bezierCurveTo(hx + d * 10.2, hy - 9.8, hx + d * 8.8, hy - 10, hx + d * 7.6, hy - 9);
+        ctx.bezierCurveTo(hx + d * 6.6, hy - 7.6, hx + d * 5.4, hy - 6.6, hx + d * 4.5, hy - 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+      // Steel dome.
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(hx, hy - 3, r, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Gold brow band, nasal guard, emblem.
+      ctx.fillStyle = accent;
+      ctx.fillRect(hx - r, hy - 3.4, r * 2, 2.4);
+      ctx.fillRect(hx - 1.2, hy - 1.2, 2.4, 5.4);
+      ctx.beginPath();
+      ctx.arc(hx, hy - 6.1, 1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
     case 'baggy':
       // The baggy green (GS-unending): a soft crown that slouches back off the brow, over a short
       // front brim, with a gold emblem dot. Mirrors the wardrobe SVG's slouched silhouette.
@@ -766,6 +828,28 @@ function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: strin
         ctx.fill();
       }
       break;
+    case 'greaves': {
+      legs(color, 6.5); // crimson-leather leggings
+      // Gold shin greaves over the lower half of each leg.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (const [fx, fy] of feet) {
+        ctx.moveTo(hip[0] + (fx - hip[0]) * 0.5, hip[1] + (fy - hip[1]) * 0.5);
+        ctx.lineTo(fx, fy);
+      }
+      ctx.stroke();
+      // War-skirt tassets hanging off the hip.
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(hip[0] - 6, hip[1]);
+      ctx.lineTo(hip[0] + 8, hip[1]);
+      ctx.lineTo(hip[0] + 3, hip[1] + 8);
+      ctx.lineTo(hip[0] - 2, hip[1] + 8);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
     case 'trousers':
     default:
       legs(color, 6.5);

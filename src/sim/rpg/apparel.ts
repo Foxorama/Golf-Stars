@@ -18,12 +18,31 @@ import { COSMETIC_RARITY } from './cosmetics';
 export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
 
 /** Hat silhouettes the drawer renders (canvas + SVG share these shape names). `baggy` is the soft
- *  slouched-crown cap of the Evergreen set (GS-unending). */
-export type HatShape = 'cap' | 'bucket' | 'visor' | 'tophat' | 'crown' | 'helmet' | 'halo' | 'baggy';
-/** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest. */
-export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic' | 'blazer';
-/** Pants silhouettes the drawer renders. */
-export type PantsShape = 'trousers' | 'shorts' | 'knickers' | 'leggings' | 'spacepants' | 'nebula';
+ *  slouched-crown cap of the Evergreen set (GS-unending). `wingedHelm` is the Asgardian Valkyrie helm —
+ *  a steel dome with a nasal guard and a feathered wing swept up each side (GS-valkyrie). */
+export type HatShape =
+  | 'cap'
+  | 'bucket'
+  | 'visor'
+  | 'tophat'
+  | 'crown'
+  | 'helmet'
+  | 'halo'
+  | 'baggy'
+  | 'wingedHelm';
+/** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
+ *  `valkyrie` is a burnished cuirass — pauldrons, a central ridge and a winged chest boss (GS-valkyrie). */
+export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic' | 'blazer' | 'valkyrie';
+/** Pants silhouettes the drawer renders. `greaves` is armoured legwear — war-skirt tassets over the hips
+ *  and gold shin greaves (GS-valkyrie). */
+export type PantsShape =
+  | 'trousers'
+  | 'shorts'
+  | 'knickers'
+  | 'leggings'
+  | 'spacepants'
+  | 'nebula'
+  | 'greaves';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
 export type BagShape = 'staffbag';
 /** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
@@ -290,6 +309,43 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'Woven from caught starlight. The legs of the Supernova set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'nebula', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
+
+  // ===== THE VALKYRIE SET (GS-valkyrie) ===============================================
+  // An Asgardian Valkyrie / Viking battle-dress: a winged steel helm, a burnished bronze cuirass with
+  // gold pauldrons + a winged chest boss, and armoured legs with war-skirt tassets over gold shin
+  // greaves. A three-piece LEGENDARY set (shard-bought, not earned) that ties the wardrobe to the
+  // game's Asgard interlude alongside the secret Thor's Hammer. Deep-crimson cloth, burnished bronze
+  // and gold trim throughout, wreathed in a warm gold aura.
+  {
+    id: 'helm-valkyrie',
+    name: 'Valkyrie Helm',
+    slot: 'hat',
+    set: 'Valkyrie',
+    rarity: 'legendary',
+    blurb: 'A winged steel warhelm with a golden nasal guard. Fit for a chooser of the slain.',
+    cost: APPAREL_COST.legendary,
+    look: { shape: 'wingedHelm', color: '#c6ccd6', accent: '#e6b93f', glow: '#ffd873' },
+  },
+  {
+    id: 'cuirass-valkyrie',
+    name: 'Valkyrie Cuirass',
+    slot: 'shirt',
+    set: 'Valkyrie',
+    rarity: 'legendary',
+    blurb: 'Burnished bronze plate with gold pauldrons and a winged chest boss. The heart of the set.',
+    cost: APPAREL_COST.legendary,
+    look: { shape: 'valkyrie', color: '#b8823a', accent: '#ffe08a', glow: '#ffd873' },
+  },
+  {
+    id: 'greaves-valkyrie',
+    name: 'Valkyrie Greaves',
+    slot: 'pants',
+    set: 'Valkyrie',
+    rarity: 'legendary',
+    blurb: 'Crimson-leather warskirt over gold shin greaves. Completes the Valkyrie battle-dress.',
+    cost: APPAREL_COST.legendary,
+    look: { shape: 'greaves', color: '#7a2f34', accent: '#e6b93f', glow: '#ffd873' },
   },
 
   // ===== THE EVERGREEN SET (GS-unending) ==============================================
