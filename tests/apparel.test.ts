@@ -73,6 +73,34 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(equippedSet(helmet.id, suit.id, legs.id)).toBe('Astronaut');
   });
 
+  it('the Valkyrie helm + cuirass + greaves are a buyable legendary head-to-toe set (GS-valkyrie)', () => {
+    const helm = apparelById('helm-valkyrie')!;
+    const cuirass = apparelById('cuirass-valkyrie')!;
+    const greaves = apparelById('greaves-valkyrie')!;
+    expect(helm.slot).toBe('hat');
+    expect(cuirass.slot).toBe('shirt');
+    expect(greaves.slot).toBe('pants');
+    for (const piece of [helm, cuirass, greaves]) {
+      expect(piece.set).toBe('Valkyrie');
+      expect(piece.rarity).toBe('legendary');
+      // Shard-bought, not an earned trophy — always in the market, buyable when affordable.
+      expect(piece.unlockHoles).toBeUndefined();
+      expect(piece.secret).toBeUndefined();
+      expect(piece.cost).toBe(APPAREL_COST.legendary);
+      expect(apparelRevealedInMarket(piece, [])).toBe(true);
+      expect(canBuyApparel(piece, APPAREL_COST.legendary, [])).toBe(true);
+      expect(piece.look.glow).toBeTruthy(); // legendary aura
+    }
+    // Distinct armoured shapes so the set reads as battle-dress, not reskinned basics.
+    expect(helm.look.shape).toBe('wingedHelm');
+    expect(cuirass.look.shape).toBe('valkyrie');
+    expect(greaves.look.shape).toBe('greaves');
+    // All three slots → the Valkyrie set reports complete; any missing piece does not.
+    expect(equippedSet(helm.id, cuirass.id, greaves.id)).toBe('Valkyrie');
+    expect(equippedSet(helm.id, cuirass.id, undefined)).toBeUndefined();
+    expect(equippedSet(helm.id, 'polo-classic', greaves.id)).toBeUndefined();
+  });
+
   it('the mythic Supernova hat + shirt + pants form one super-cool head-to-toe set', () => {
     const crown = apparelById('crown-supernova')!;
     const suit = apparelById('suit-supernova')!;

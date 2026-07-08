@@ -96,6 +96,21 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         <path d="M-5,-1.5 A5 4 0 0 1 5,-1.5 Z" fill="${color}" opacity="0.8"/>
         <ellipse cx="0" cy="-11" rx="7" ry="2.4" fill="none" stroke="${color}" stroke-width="2"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></ellipse>`;
       break;
+    case 'wingedHelm': {
+      // The Asgardian Valkyrie helm (GS-valkyrie): a feathered silver wing swept up each side (drawn
+      // first, behind the dome), a steel dome hugging the head, a gold brow band, a nasal guard down
+      // the face, and a small gold rivet emblem.
+      const wing = (d: number): string =>
+        `<path d="M${d * 4.5},-5 C${d * 10},-6.5 ${d * 14},-10 ${d * 15.5},-15 C${d * 13.5},-12.5 ${d * 12},-12.8 ${d * 11},-11.2 C${d * 10.2},-9.8 ${d * 8.8},-10 ${d * 7.6},-9 C${d * 6.6},-7.6 ${d * 5.4},-6.6 ${d * 4.5},-5 Z" fill="#eef2f8" stroke="#0c1116" stroke-width="0.7" stroke-linejoin="round"/>
+         <path d="M${d * 6},-6.4 C${d * 9},-8 ${d * 11.5},-10.4 ${d * 13},-13.4" fill="none" stroke="#b9c2cf" stroke-width="0.5" opacity="0.85"/>`;
+      g = `${wing(-1)}${wing(1)}
+        <path d="M-7,-3 A7 7 0 0 1 7,-3 Z" fill="${color}" ${ink}/>
+        <path d="M-5.4,-8.2 A7 7 0 0 1 1.6,-9.4 Q-2.6,-7.2 -5.4,-8.2 Z" fill="#ffffff" opacity="0.25"/>
+        <rect x="-7" y="-3.4" width="14" height="2.4" rx="1" fill="${accent}" ${ink}/>
+        <rect x="-1.2" y="-1.2" width="2.4" height="5.4" rx="1.1" fill="${accent}" ${ink}/>
+        <circle cx="0" cy="-6.1" r="1" fill="${accent}" stroke="#0c1116" stroke-width="0.5"/>`;
+      break;
+    }
     case 'baggy':
       // The baggy green (GS-unending): a soft, slouched crown that droops over one side, stitched
       // panel seams, a short brim, and a gold-thread emblem front and centre.
@@ -125,6 +140,23 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
   const { shape, accent = '#0c1116' } = look;
   let detail = '';
   switch (shape) {
+    case 'valkyrie': {
+      // The Valkyrie cuirass (GS-valkyrie): gold pauldrons on the shoulders, a central ridge, two
+      // scaled plate bands across the belly, and a winged gold chest boss with a crimson star.
+      const gold = look.accent ?? '#ffe08a';
+      const ink = 'stroke="#0c1116" stroke-width="0.7" stroke-linejoin="round"';
+      detail = `<path d="M-11,-9 Q-13.4,-4.6 -9,-2.6 Q-6,-5.6 -7,-9 Z" fill="${gold}" ${ink}/>
+        <path d="M11,-9 Q13.4,-4.6 9,-2.6 Q6,-5.6 7,-9 Z" fill="${gold}" ${ink}/>
+        <line x1="0" y1="-9" x2="0" y2="8" stroke="${gold}" stroke-width="1" opacity="0.65"/>
+        <g fill="none" stroke="${gold}" stroke-width="0.8" opacity="0.7"><path d="M-6,2 Q0,5 6,2"/><path d="M-5,6 Q0,8.6 5,6"/></g>
+        <g transform="translate(0 -4)">
+          <path d="M-2.4,0 Q-6,-1.8 -8.4,-3.2 Q-5.2,-1.2 -2.6,-1.4 Z" fill="${gold}" ${ink}/>
+          <path d="M2.4,0 Q6,-1.8 8.4,-3.2 Q5.2,-1.2 2.6,-1.4 Z" fill="${gold}" ${ink}/>
+          <circle r="2.5" fill="${gold}" ${ink}/>
+          <path d="M0,-1.5 L0.5,-0.4 L1.6,-0.3 L0.7,0.4 L0.9,1.5 L0,0.8 L-0.9,1.5 L-0.7,0.4 L-1.6,-0.3 L-0.5,-0.4 Z" fill="#7a2f34"/>
+        </g>`;
+      break;
+    }
     case 'polo':
       detail = `<path d="M-4,-9 L0,-4 L4,-9" fill="none" stroke="${accent}" stroke-width="1.6"/>
         <line x1="0" y1="-4" x2="0" y2="3" stroke="${accent}" stroke-width="1"/>
@@ -197,6 +229,18 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
     detail = `<circle cx="${cx - 4.5}" cy="${legBottom - 1}" r="1.3" fill="${accent}"/><circle cx="${cx + 4.5}" cy="${legBottom - 1}" r="1.3" fill="${accent}"/>`;
   } else if (shape === 'nebula') {
     detail = `<g fill="#fff"><circle cx="${cx - 4}" cy="${cy + 1}" r="0.8"/><circle cx="${cx + 3}" cy="${cy + 5}" r="0.7"/><circle cx="${cx + 5}" cy="${cy - 4}" r="0.6"/></g>`;
+  } else if (shape === 'greaves') {
+    // Valkyrie greaves (GS-valkyrie): war-skirt tassets hanging off the waist + gold shin plates.
+    const plate = shade(accent, 0.14);
+    detail = `<g fill="${accent}" stroke="#0c1116" stroke-width="0.6" stroke-linejoin="round">
+        <path d="M${cx - 8},${cy - 7} L${cx - 3},${cy - 7} L${cx - 4.6},${cy} Z"/>
+        <path d="M${cx - 2.6},${cy - 7} L${cx + 2.6},${cy - 7} L${cx + 1.6},${cy} L${cx - 1.6},${cy} Z"/>
+        <path d="M${cx + 3},${cy - 7} L${cx + 8},${cy - 7} L${cx + 4.6},${cy} Z"/>
+      </g>
+      <g fill="${plate}" stroke="#0c1116" stroke-width="0.6" stroke-linejoin="round">
+        <rect x="${cx - 6.4}" y="${legBottom - 6}" width="4" height="6.4" rx="1.1"/>
+        <rect x="${cx + 2.4}" y="${legBottom - 6}" width="4" height="6.4" rx="1.1"/>
+      </g>`;
   }
   const flair = shape === 'nebula' ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]]) : '';
   return a + body + band + detail + flair;
@@ -563,6 +607,20 @@ export function golferPreviewSVG(
       legDetail = boot(lAnk) + boot(rAnk);
     } else if (pantsShape === 'nebula') {
       legDetail = `<g fill="#fff"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(14))}" r="${f(px(1.1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(24))}" r="${f(px(0.9))}"/><circle cx="${f(lAnk)}" cy="${f(ankleY - px(10))}" r="${f(px(0.9))}"/><circle cx="${f(rAnk - px(1))}" cy="${f(ankleY - px(20))}" r="${f(px(0.7))}"/></g>`;
+    } else if (pantsShape === 'greaves') {
+      // Valkyrie greaves (GS-valkyrie): war-skirt tassets over the hips + gold shin greave plates.
+      const plate = shade(pantsAcc, 0.14);
+      const tas = (x0: number, x1: number): string =>
+        `<path d="M${f(x0)},${f(hipY)} L${f(x1)},${f(hipY)} L${f((x0 + x1) / 2)},${f(hipY + px(12))} Z" fill="${pantsAcc}" ${ink}/>`;
+      const greave = (x: number): string =>
+        `<rect x="${f(x - px(4))}" y="${f(ankleY - px(15))}" width="${f(px(8))}" height="${f(px(13))}" rx="${f(px(1.6))}" fill="${plate}" ${ink}/>
+         <rect x="${f(x - px(4))}" y="${f(ankleY - px(15))}" width="${f(px(8))}" height="${f(px(2.6))}" rx="${f(px(1.3))}" fill="${shade(pantsAcc, 0.34)}" stroke="none"/>`;
+      legDetail =
+        tas(cx - px(11), cx - px(3.6)) +
+        tas(cx - px(3.6), cx + px(3.6)) +
+        tas(cx + px(3.6), cx + px(11)) +
+        greave(lAnk) +
+        greave(rAnk);
     } else {
       // Trousers/leggings: a pinstripe (or legging seam) down each outer leg sells the tailoring.
       const op = slim ? 0.9 : 0.55;

@@ -713,6 +713,22 @@
     is dropped. A defensive backfill drops any per-character entry referencing an unowned item. Tests:
     `tests/ships.test.ts` (full catalogue ordering), `tests/save.test.ts` (v10 migration + per-character seeding +
     unowned-drop), `tests/ui.test.ts` (buy-global / equip-per-character / guards / per-character independence).
+- **The Valkyrie set — an Asgardian battle-dress (GS-valkyrie).** A three-piece LEGENDARY clothing set
+  (helm + cuirass + greaves), the first apparel that ties the wardrobe to the game's Asgard interlude
+  alongside the secret Thor's Hammer driver. Pure CONTENT + render — no sim, save, hook or economy change:
+  it rides every existing apparel rail (`ownedApparel` pool, `APPAREL_COST.legendary` = 280 shards each,
+  `equippedSet`, the `apparelForSlot`-driven Market/Clubhouse racks). Three new `APPAREL` rows and three new
+  shape names — `HatShape 'wingedHelm'` (a steel dome with a nasal guard + a feathered silver wing swept up
+  each side), `ShirtShape 'valkyrie'` (a burnished-bronze cuirass — gold pauldrons, a central ridge, a winged
+  gold chest boss with a crimson star), `PantsShape 'greaves'` (crimson-leather leggings under war-skirt
+  tassets + gold shin greaves) — each drawn in BOTH render paths that key off `ApparelLook.shape`: the
+  wardrobe/clubhouse SVG (`apparelArt.ts` — `hatGlyph`/`shirtDetail`/`pantsGlyph` + the `golferPreviewSVG`
+  mannequin legs) and the on-course canvas swing figure (`playView.ts` — `drawHat`/`drawGolfer` chest
+  detail/`drawPants`), so what you buy is what you wear. Deep-crimson cloth, burnished bronze and gold trim
+  throughout, wreathed in a warm gold legendary aura; all three slots equipped → `equippedSet` reports the
+  Valkyrie set complete. Test: `tests/apparel.test.ts` (buyable-legendary + three-slot set completion +
+  distinct armour shapes).
+
 - **A third apparel slot — PANTS (GS-pants-outfit, save v11).** Apparel was a two-slot wardrobe (hat +
   shirt); pants make the golfer dressable head-to-toe. The work was deliberately a CONTENT + plumbing change,
   not an engine one — pants reuse every existing rail:
