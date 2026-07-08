@@ -212,9 +212,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     `asgardReturn` instead → a mid-tournament quit resumes the journey). Win OR lose, the return strips
     `rainbow-ball` + sets `run.rainbowConsumed` (the shop never re-offers it); a WIN also banks the
     Thor's Hammer cosmetic + the `talent-odins-favour` perk. Then it resumes at the travel screen.
-  - The cosmetic **`driver` apparel slot** (GS-thor) is the club skin the golfer swings; Thor's Hammer is
-    `secret` (earn-only, hidden until owned) and won on Asgard. Same EQUIP/reveal plumbing as the other
-    slots (save v22 `driverByCharacter`); rendered in the swing + leaning at the clubhouse fireplace.
+  - The cosmetic **`driver` apparel slot** (GS-thor) is the club skin the golfer swings ON THE DRIVER SHOT
+    ONLY — `playView` strips `look.driver` when `shot.club.id !== 'D'` so irons/wedges/chips swing the plain
+    (or gear-themed) club; the clubhouse/market previews show it unconditionally. Thor's Hammer is `secret`
+    (earn-only, hidden until owned) and won on Asgard. Same EQUIP/reveal plumbing as the other slots (save
+    v22 `driverByCharacter`); rendered in the swing + leaning at the clubhouse fireplace.
   - Pro Shop rarity is VOYAGE-paced (`voyageRarityBias` keyed off the STOP; endless keeps
     `rarityDepthBias`) — it reweights WHICH item is drawn, never the rng COUNT. Every shop item is
     a one-shot; the `stackable` plumbing stays dormant for save back-compat.
