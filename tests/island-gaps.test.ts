@@ -75,9 +75,9 @@ describe('island-hop gaps are completable with the common starter bag (GS-cetus-
     // known raw-throwing configs are PINNED here (re-hunt + re-pin when GENERATOR_VERSION bumps —
     // scan `unending:<theme>:<dist>:<v>` seeds for raw throws like the sweep above, just deeper).
     const THROWERS = [
-      { theme: 'omega-centauri', dist: 18, v: 116 },
-      { theme: 'southern-pinwheel', dist: 20, v: 72 },
-      { theme: 'southern-pinwheel', dist: 22, v: 81 },
+      { theme: 'aquila', dist: 30, v: 100 },
+      { theme: 'omega-centauri', dist: 32, v: 31 },
+      { theme: 'orion-nebula', dist: 32, v: 18 },
     ];
     let rawThrows = 0;
     for (const t of THROWERS) {

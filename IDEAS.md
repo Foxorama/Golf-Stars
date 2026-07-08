@@ -42,6 +42,16 @@ Foundations are shipped; these are the live follow-ons.
   run-out kicks off mounds and gathers in hollows, drawn by the same `render/contour.ts` isolines.
   Physics retune (every seeded landing moves) — own PR, re-run the death-spiral harness; consider
   kick-plates on dogleg corners as the first authored use.
+- **GS-variety-3-followup** — the bigger levers from the hole-design research
+  (`reports/hole-variety-research-2026-07-08.md`) not yet built. GS-variety-3 shipped the quick wins
+  (straight rises with wildness so deep stops aren't all-bends; drivable par-4s persist; island STORIES
+  for void/cetus). Still open, high value: **named TEMPLATE holes** as recognizable set-pieces
+  (Redan kick-feed / Cape diagonal carry / Biarritz swale / Short-and-guarded — overlaps GS-greens-4 for
+  the green complexes); an **anti-repeat scheduler** (thread the previous hole's shape/length-class/
+  dogleg-direction into `chooseTemplate` and bias the next AWAY, so consecutive holes contrast — needs
+  prev-hole state threaded through `generateHole`); **angle-of-attack** difficulty (couple the tucked
+  pin's side to the fairway side that opens it, so tee-shot PLACEMENT matters, not just power); and the
+  research's "difficulty budget" idea (cap the length+bend share, spend the rest on greens/hazards).
 - **GS-slope-perks** — abilities that bend the slope rules (backspin check-back uphill, cheaper green-read,
   uphill-magnet). The "until perks exist" caveat in the slope code is the hook.
 - **GS-split-fairways** — risky-short vs safe-long alternate fairways (the dogleg-grove machinery is the

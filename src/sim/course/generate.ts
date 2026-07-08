@@ -37,7 +37,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 19;
+export const GENERATOR_VERSION = 20; // GS-variety-3: shape/length variety + island stories at depth
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -82,6 +82,12 @@ const ISLAND_GAP_MAX_YD_CALM = 100; // per-gap ceiling at the arming threshold (
 const ISLAND_GAP_MAX_YD_WILD = 150; // per-gap ceiling at wildness 1 — ~60% of a nominal driver
 const ISLAND_PAD_MIN_U = 0.09; // min pad between gaps (u-space) — ≥3 dense points at ISLAND_SEGS
 const ISLAND_PAD_MIN_YD = 30; // …and never shorter than a landable shelf in (carry-relative) yards
+// A void carry must READ as a real gap (GS-variety-3): the render dilates each pad by 14 course-yd,
+// so two pads closer than ~28 yd BRIDGE into one landmass — the carry would render as solid ground
+// (graphic ≠ physics). Floor every gap to an absolute course-yd width comfortably past that so every
+// island hop is genuinely visible. Absolute (NOT carry-relative) — the dilation bridge is a fixed
+// course distance, and it's always well under the carryable ceiling so completability is untouched.
+const ISLAND_GAP_MIN_YD = 36;
 const ISLAND_GAP_SPAN: [number, number] = [0.2, 0.85]; // gaps live here: real tee + green pads
 /** Denser corridor sampling on lost-rough holes so a legal min-width pad ALWAYS keeps ≥3 points. */
 const ISLAND_SEGS = 37;
@@ -331,6 +337,8 @@ function brokenCorridor(dense: Vec[], leftHW: number[], rightHW: number[], gapBa
  * (GS-cetus-gaps). PURE geometry over already-drawn (centre, half-width) pairs — zero rng draws, so
  * every seeded stream is byte-identical; only the derived band edges move. Guarantees:
  *   • every gap ≤ `maxGapU` (the wildness-ramped, common-driver-carryable ceiling);
+ *   • every gap ≥ `minGapU` (GS-variety-3: a carry the render can't bridge into solid land — see
+ *     ISLAND_GAP_MIN_YD; clamped under `maxGapU` so it can never make a gap uncarryable);
  *   • every pad between two gaps ≥ `minPadU` (a landable shelf that also survives
  *     `brokenCorridor`'s ≥3-point rule — the raw draws could overlap or leave a sliver pad that was
  *     silently DROPPED, fusing two gaps into one uncarryable mega-void);
@@ -342,10 +350,12 @@ function separateIslandGaps(
   raw: { c: number; h: number }[],
   maxGapU: number,
   minPadU: number,
+  minGapU: number,
   span: [number, number],
 ): [number, number][] {
+  const loHalf = Math.min(minGapU, maxGapU) / 2; // never floor a gap above its carryable ceiling
   const bands = raw
-    .map((b) => ({ c: b.c, h: Math.min(b.h, maxGapU / 2) }))
+    .map((b) => ({ c: b.c, h: Math.max(loHalf, Math.min(b.h, maxGapU / 2)) }))
     .sort((a, b) => a.c - b.c);
   const pads = (bands.length - 1) * minPadU;
   const width = bands.reduce((s, b) => s + 2 * b.h, 0);
@@ -840,13 +850,41 @@ function generateHole(
   // void isn't a hazard poly so the fairness validators are silent on a lost corridor's shape —
   // `validateIslandHops` proves the chain instead. par-5 gets one more pad than par-4.
   if (lostRough && par >= 4) {
-    const nIsl = (par === 5 ? 2 : 1) + (rng.float() < 0.5 ? 1 : 0); // par-4: 2–3 pads, par-5: 3–4 pads
+    // ISLAND STORIES (GS-variety-3): the deep void/cetus par 4/5 used to be ONE recipe — 2–4 pads
+    // spread EVENLY down a 1.4×-bending chain — so every one read the same "wiggly chain of blobs".
+    // Draw a STORY so the island-hop layout genuinely varies (research §D3/§B: risk-reward optionality
+    // + distinct hole identities): a long RUNWAY to one heroic approach carry, a single-carry
+    // ISLAND-GREEN, an early CAPE bite-off, a busy chain of STEPPING-STONES, or an irregular STAGGERED
+    // run. The chosen shape grammar (dogleg/cape/S — GS-cetus-5) rides on TOP, so a "runway" can be a
+    // gentle drift while a "stepping-stones" S-bends between pads. All stories still route through
+    // `separateIslandGaps` and are proved completable by `validateIslandHops` — the variety can never
+    // break the common-driver carry budget.
+    const story = rng.float();
     const rawGaps: { c: number; h: number }[] = [];
-    for (let g = 0; g < nIsl; g++) {
-      const frac = nIsl === 1 ? 0.5 : 0.34 + (0.7 - 0.34) * (g / (nIsl - 1));
-      const center = frac + rng.range(-0.035, 0.035);
-      const halfw = rng.range(0.05, 0.08); // a bit wider than a fair-rough break — a real void carry
-      rawGaps.push({ c: center, h: halfw });
+    const addGap = (c: number, h: number): number => rawGaps.push({ c, h });
+    if (story < 0.22) {
+      // RUNWAY: a long continuous plateau to drive on, then one (par-4) or two (par-5) big carries
+      // clustered near the green — the heroic "cross the abyss to the island" finish.
+      const n = par === 5 ? 2 : 1;
+      for (let g = 0; g < n; g++) addGap(0.6 + g * 0.15 + rng.range(-0.03, 0.03), rng.range(0.06, 0.085));
+    } else if (story < 0.42) {
+      // ISLAND-GREEN: a generous landing plateau, then a SINGLE demanding carry to a green island
+      // (the TPC-17 feel). par-5 adds one early hop so it still takes three shots.
+      if (par === 5) addGap(rng.range(0.34, 0.44), rng.range(0.05, 0.07));
+      addGap(rng.range(0.62, 0.74), rng.range(0.07, 0.09));
+    } else if (story < 0.62) {
+      // CAPE: a heroic carry straight off the tee (bite off as much void as you dare), then a long run
+      // home to the green — inverse of the island-green.
+      addGap(rng.range(0.24, 0.36), rng.range(0.06, 0.085));
+      if (par === 5) addGap(rng.range(0.58, 0.7), rng.range(0.05, 0.07));
+    } else if (story < 0.82) {
+      // STEPPING-STONES: a busy chain of short, frequent hops — the tactical, fiddly island run.
+      const n = par === 5 ? 4 : 3;
+      for (let g = 0; g < n; g++) addGap(0.3 + (0.72 - 0.3) * (g / (n - 1)) + rng.range(-0.02, 0.02), rng.range(0.045, 0.065));
+    } else {
+      // STAGGERED: gaps at irregular positions and varied sizes — no two carries the same distance.
+      const n = par === 5 ? 3 : 2;
+      for (let g = 0; g < n; g++) addGap(rng.range(0.26, 0.76), rng.range(0.05, 0.085));
     }
     // Gap ceiling in carry-relative yards (shot carry scales with the biome's carryMult, so the bar
     // is `yd × carryMult` in course units): gentler just past the arming threshold, up to ~60% of a
@@ -859,7 +897,10 @@ function generateHole(
     const arcLen = pathLength(centreline) || length;
     const maxGapU = (maxGapYd * biome.carryMult) / arcLen;
     const minPadU = Math.max(ISLAND_PAD_MIN_U, (ISLAND_PAD_MIN_YD * biome.carryMult) / arcLen);
-    gapBands.push(...separateIslandGaps(rawGaps, maxGapU, minPadU, ISLAND_GAP_SPAN));
+    // Absolute (course-yd) min gap — the render's dilation bridge is a fixed course distance, not a
+    // carry-relative one — so every hop stays a visible void carry (graphic ≡ physics).
+    const minGapU = ISLAND_GAP_MIN_YD / arcLen;
+    gapBands.push(...separateIslandGaps(rawGaps, maxGapU, minPadU, minGapU, ISLAND_GAP_SPAN));
   }
   const corridorSegs = brokenCorridor(dense, leftHW, rightHW, gapBands);
   if (corridorSegs.length === 0) corridorSegs.push(ribbon(dense, leftHW, rightHW)); // never carve it all away
@@ -1587,7 +1628,11 @@ function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, i
   let lenMult: number;
   let lenTag: string;
   if (par === 4) {
-    const pDriv = 0.12 + 0.12 * (1 - wildness); // drivable shows up more on the calm early stops
+    // GS-variety-3: keep the DRIVABLE par-4 a live change-of-pace at EVERY wildness. A short, heroic
+    // "have a go at the green" hole is one of the most interesting in golf (research §B), yet the old
+    // ramp HALVED its frequency deep in (0.24 → 0.12) — exactly where the game most needed variety.
+    // Now it barely tapers, so a wild stop still gets the occasional thrilling drivable hole.
+    const pDriv = 0.15 + 0.06 * (1 - wildness);
     if (lenRoll < pDriv) {
       lenMult = rng.range(0.66, 0.8); // drivable short par-4
       lenTag = 'drivable';
@@ -1624,10 +1669,21 @@ function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, i
   // wildness hole is no longer always a gentle straight-or-slight-dogleg. Wildness still turns the
   // dial UP (more capes/hairpins deep in), and the BEND SEVERITY is what ramps with difficulty
   // (`buildCentreline`'s dogFac), so calm stops stay fair-but-shapely while deep ones bite.
-  const hairP = 0.05 + biome.doglegBias * 0.18 + wildness * 0.12;
-  const capeP = 0.11 + biome.doglegBias * 0.24 + wildness * 0.12;
-  const sP = Math.min(0.42, 0.15 + biome.doglegBias * 0.45 + wildness * 0.2); // S-curve / double-dogleg
-  const straightP = Math.max(0.08, 0.26 - biome.doglegBias * 0.55 - wildness * 0.12);
+  // GS-variety-3: a hard hole need NOT bend (research §D4: "difficulty ≠ length + bend"). The old mix
+  // crushed the workhorse SIMPLE shapes at high wildness — for a bendy world (void bend 0.45) it left
+  // ~8% straight, ~0% plain dogleg, and ~92% cape/hairpin/double, so every deep stop (worst on the
+  // long, low-gravity worlds — void/cetus/Rainbow Road) read as one long severe-bend clone. The fix is
+  // SURGICAL: `straightP` now RISES with wildness (the deep stops gain straight holes — defended by
+  // length, tighter width, the rough gradient and a tilted green — instead of losing them), while the
+  // CALM stops keep GS-variety-2's rich early shape vocabulary (straight stays ~its old low share, so
+  // the opening holes are still shapely and dispersion-sensitive gear still bites). The heroic shapes
+  // stay common but no longer crowd out the plain dogleg; difficulty still rides BEND SEVERITY
+  // (`buildCentreline`'s dogFac), length, corridor tightness, rough and green tilt.
+  const bend = biome.doglegBias;
+  const hairP = 0.05 + bend * 0.1 + wildness * 0.03; // severe corner — still rare, a touch more deep in
+  const capeP = 0.1 + bend * 0.16 + wildness * 0.03; // heroic diagonal carry
+  const sP = 0.12 + bend * 0.22 + wildness * 0.03; // S-curve / double-dogleg
+  const straightP = Math.min(0.3, Math.max(0.08, 0.06 + wildness * 0.2 - bend * 0.06)); // straight rises with difficulty
   const sd = side > 0 ? 'r' : 'l';
   let shape: ShapeKind;
   let shapeTag: string;
