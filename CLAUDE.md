@@ -134,7 +134,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     are completable by construction (`separateIslandGaps` + `validateIslandHops`). Both worlds are
     in `BALANCE_EXEMPT_BIOMES` (deliberately brutal, skipped by the death-spiral harnesses).
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
-    stops; difficulty rides bend severity + hazard density, not which shapes exist.
+    stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
+    need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,
+    defended by length/width/rough/green tilt) so a wild stop stops reading as all-severe-bends — the
+    worst-hit worlds were the long low-gravity ones (void/cetus/Rainbow Road). DRIVABLE par-4s persist
+    at every wildness (a heroic change-of-pace, no longer halved deep in). Lost-rough par 4/5 draw an
+    island STORY (`runway`/`island-green`/`cape`/`stepping-stones`/`staggered`) so the pad chain varies
+    in count + position, not one even chain; every gap is floored to `ISLAND_GAP_MIN_YD` (past the
+    render's dilation bridge) so a void carry always READS as a real gap (graphic ≡ physics), still
+    clamped completable (`separateIslandGaps`/`validateIslandHops`). `GENERATOR_VERSION` 20.
   - DEEP ROUGH chokes a dogleg's cut-the-corner chord (biome opt-in `deepRough`; ocean uses water);
     fair by construction (far from the bent corridor), wildness-gated, zero-rng on straight holes.
   - ROUGH GRADIENT (GS-rough-gradient): a distance-graded fill LINES every non-lost hole so a spray
