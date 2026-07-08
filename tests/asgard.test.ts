@@ -7,6 +7,8 @@ import { WARRIORS_THREE } from '../src/sim/rpg/golfers';
 import { ASGARD_THEME } from '../src/sim/course/themes';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
 import type { PlayedHole } from '../src/sim/round';
+import { titleScreen } from '../src/app/titleScreens';
+import { setState } from '../src/app/ctx';
 
 /** A run carrying the Rainbow Ball (rainbowRoad armed). */
 function rainbowRun(seed: number | string = 'rb') {
@@ -32,6 +34,16 @@ describe('GS-asgard: the Bifröst tournament', () => {
     expect(asgardPortalOpens(plain, [hole(3, 5)])).toBe(false);
     // The Asgard run itself never re-triggers.
     expect(asgardPortalOpens(startAsgardRun(armed), [hole(3, 5)])).toBe(false);
+  });
+
+  it('the Asgard interlude is NOT offered as a selectable game mode on the title', () => {
+    setState(initState('title', {}, undefined));
+    const html = titleScreen();
+    expect(html).not.toContain('"format":"asgard"'); // no start action for the interlude
+    expect(html).not.toContain('Warriors Three');
+    // the real modes are still there
+    expect(html).toContain('"format":"voyage"');
+    expect(html).toContain('"format":"unending"');
   });
 
   it('startAsgardRun spins off a 9-hole Asgard run without the Rainbow Ball', () => {
