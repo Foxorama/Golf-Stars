@@ -1039,7 +1039,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'rainbow-ball',
     name: 'Rainbow Ball',
     cost: 360,
-    desc: 'Turns every hole into RAINBOW ROAD through the stars — the fairway & green are your rainbow ribbon, and anything off the fairway, bunkers or green is OUT OF BOUNDS. Gloriously unbalanced.',
+    desc: 'Race the rainbow road at your own peril! Warning: unbalanced course. Travel here only if you are worthy…',
     rarity: 'legendary',
     apply: (m) => ({ ...m, rainbowRoad: true, perks: [...m.perks, 'rainbow-ball'] }),
   },
