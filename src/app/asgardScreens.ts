@@ -53,13 +53,13 @@ function asgardBoardHTML(rows: AsgardRow[], par: number): string {
  * far, lowest total leading. This is the stroke-play twin of the ordinary 20-golfer Stableford field —
  * on the Golden Realm the between-hole screen must read as ITS OWN event, never the normal arc board.
  */
-export function asgardLiveBoardHTML(playedSoFar: PlayedHole[], pars: readonly number[], seed: string): string {
+export function asgardLiveBoardHTML(playedSoFar: PlayedHole[], pars: readonly number[], seed: string, edge = 0): string {
   const thru = playedSoFar.length;
   const playerTotal = playedSoFar.reduce((s, p) => s + p.record.strokes, 0);
   const parThru = pars.slice(0, thru).reduce((a, b) => a + b, 0);
   const rows: AsgardRow[] = [
     { name: 'You', total: playerTotal, you: true },
-    ...warriorsThreeThru(seed, pars, thru).map((f) => ({ name: f.name, total: f.total, you: false })),
+    ...warriorsThreeThru(seed, pars, thru, edge).map((f) => ({ name: f.name, total: f.total, you: false })),
   ];
   const sorted = [...rows].sort((a, b) => a.total - b.total || (a.you ? -1 : 1));
   const place = sorted.findIndex((r) => r.you) + 1;
