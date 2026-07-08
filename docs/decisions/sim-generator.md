@@ -256,6 +256,44 @@
     sweep stays cheap. Void/cetus stay in `BALANCE_EXEMPT_BIOMES`; wider-only can only soften them
     (zones.test's cetus bar + island-hop completability all held). `scripts/width-preview.mjs` now
     hunts the island pool too (void/cetus rows) — re-shoot it after touching the island profiles.
+  - **Follow-up: the auto AI now READS the width (GS-fairway-width-2 — the deferred AI/balance half).**
+    GS-fairway-width shipped the width GRAMMAR but "the AI played every profile the same" — a positioning
+    drive bombed a full club straight at the green regardless of a waist/strait in the landing zone. Now
+    the auto reach-AI reads the corridor the generator actually drew and plays POSITION OVER POWER off a
+    genuine pinch: `widthLayupTarget` (in `round.ts`, inside the shared `safeTarget`, so auto ≡ interactive
+    by construction — contract 2) checks the natural full-drive landing; if it comes down in a genuinely
+    TIGHT driving-zone pinch AND a meaningfully wider bay sits within a modest lay-up short of it, it aims
+    at the bay instead (a shorter club, tighter cone, held fairway). `corridorHalfWidthAt` MEASURES the
+    fairway polygon perpendicular half-width (the tighter of the two sides, via a ray↔edge cast) — it reads
+    the drawn ribbon, so it can never drift from the width profile, and returns a wide cap off-fairway (a
+    broken-corridor gap never reads as a bay). Pure geometry, ZERO rng — the shot stream is byte-identical
+    per shot; only the AI's target/club choice shifts, so no feature flag and no test-hub hook (like the
+    flight-profile constants, `WIDTH_LAYUP` is a module const, not a `_gs*` window flag).
+    - **Tuning is the whole story — it is NOT a free win.** Laying up trades distance for a cleaner lie,
+      which only PAYS when the corridor is tight AND the rough punishing (deep stops). At calm/mid wildness
+      the corridor is wide (the `widthScale = 2.0 − 1.25·wildness` early-lever), so a lay-up there LOSES
+      strokes. An early, eager config (lay up to any bay 1.35× wider within 60 yd of a `< 18`-yd pinch)
+      improved the max-wildness bar but LOWERED mean per-stop Stableford on the common mid-wildness case
+      (default bag 10.705 → 10.68) — a contract-4 fail. The fix is the LOW `pinchHalfWidth` (10): a corridor
+      that tight only occurs at high wildness (the driving zone shrinks with the ramp), so the lay-up fires
+      on the brutal deep stops it helps and stays QUIET on the wide corridors where it would cost. Final
+      config (`meanLandFrac 0.88`, `layupYards 34`, `widenFactor 1.35`, `pinchHalfWidth 10`): mean per-stop
+      Stableford RISES (default 10.705 → 10.715, characters ~flat — contract 4 satisfied), max-wildness
+      `toPar/hole` 0.783 → 0.769 and floor-hit 7.55% → 7.36% on the BIOMES bar. Re-measure both the ship
+      gate (mean SF) AND the max-wildness bar if the knobs are ever retuned — the two pull opposite ways.
+    - **Fences re-tightened where the gain is real** (the GS-rough-gradient interim relaxations): the
+      `biomes.test` floor-hit fence 0.12 → 0.10 (measured 7.36%), and `themes.test`/re-measured to ~0.95 so
+      its `toPar` fence returns to the <1.0 target (par+1 was the rough-gradient interim). `patches.test`
+      (a small, noisy 12-seed × seeded-biome subset) moved ~flat (the width-AI perturbs it a hair) so its
+      fence stays at the conservative par+1.1. The SPARSE-bag CHARACTER fences stay relaxed: a sparse bag
+      often has no club to lay up WITH, so width-reading barely moves them (worst `toPar` ~1.27) — closing
+      that gap is the broader GS-rough-gradient-rebalance (richer starter bags / a general play-back-to-the-
+      fairway reach-AI), never by softening the rough. Guarded by `tests/fairway-width.test.ts`'s
+      "width-aware auto AI" block (the measurement tracks a real hourglass pinch; the lay-up is forward,
+      never past the green, deterministic, and only ever pulls back to a WIDER bay; wide calm corridors are
+      left alone). The remaining AI half — teaching the reach-AI to read the width for CLUB SELECTION in a
+      chute/thin ribbon (a tighter cone), and re-tightening the sparse-bag bars — rides GS-fairway-width-2's
+      sibling, GS-rough-gradient-rebalance.
 - **More + bigger water and fairway breaks (GS-terrain), all pure biome DATA, wildness-gated:**
   • `waterCreek` — a `creek` band crosses the fairway as a FORCED CARRY (parkland/`verdant`), a new
     sanctioned crossing (`CROSSING_KINDS += 'creek'`, `LIE_INFO.creek` penalty:'water', styled as water):

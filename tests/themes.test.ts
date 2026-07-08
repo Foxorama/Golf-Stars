@@ -214,10 +214,10 @@ describe('rarity-tiered, theme-flavoured biomes (GS-17b)', () => {
         }
       }
     }
-    // TODO(GS-rough-gradient): the deliberate rough/tree increase nudged the max-wildness mean just over
-    // par+1 (~1.005). Interim REGRESSION FENCE, not the target — re-tighten to <1.0 in the post-rough
-    // rebalance, not by softening the rough.
-    expect((strokes - par) / holes).toBeLessThan(1.1);
+    // Re-tightened to the <1.0 target (GS-fairway-width-2): with the width-aware reach-AI the
+    // max-wildness mean across every theme now measures ~0.95 (par+1 was the rough-gradient interim),
+    // so the fence returns to par+1. Closing the sparse-bag gap further is GS-rough-gradient-rebalance.
+    expect((strokes - par) / holes).toBeLessThan(1.0);
     expect(blowups / holes).toBeLessThan(0.05);
   });
 });

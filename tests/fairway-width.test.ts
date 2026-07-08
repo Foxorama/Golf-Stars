@@ -1,7 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings, chooseWidthProfile } from '../src/sim/course/generate';
-import { validateCourse, pointInPoly, type Hole, type Vec } from '../src/sim/course/contract';
+import { validateCourse, pointInPoly, dist, type Hole, type Vec } from '../src/sim/course/contract';
+import { layupTarget, corridorHalfWidthAt, biomeCarryMult } from '../src/sim/round';
+import { CLUBS } from '../src/sim/clubs';
 import { Rng } from '../src/sim/rng';
+
+/** Centreline fraction (0..1, arc length) nearest a point — mirrors round.ts nearestCentrelineT. */
+function nearestT(hole: Hole, p: Vec): number {
+  let bestT = 0;
+  let bestD = Infinity;
+  for (let i = 0; i <= 60; i++) {
+    const t = i / 60;
+    const d = dist(alongAt(hole.centreline, t).p, p);
+    if (d < bestD) {
+      bestD = d;
+      bestT = t;
+    }
+  }
+  return bestT;
+}
 
 /** Point a fraction t (by arc length) along the centreline (mirrors the generator's centrePoint). */
 function alongAt(line: Vec[], t: number): { p: Vec; perp: Vec } {
@@ -195,3 +212,116 @@ describe('fairway width grammar (GS-fairway-width)', () => {
     expect(ids(4242)).toEqual(ids(4242));
   });
 });
+
+describe('width-aware auto AI (GS-fairway-width-2)', () => {
+  it('corridorHalfWidthAt tracks the drawn corridor: positive, finite, and pinches on an hourglass', () => {
+    let hourglassesSeen = 0;
+    for (let s = 0; s < 240 && hourglassesSeen < 8; s++) {
+      const c = generateCourse(s + 71000, { biome: 'verdant-station', holes: 4, wildness: 1 });
+      for (const h of c.holes) {
+        const w = corridorHalfWidthAt(h, 0.5);
+        expect(Number.isFinite(w)).toBe(true);
+        expect(w).toBeGreaterThan(0);
+        if (h.widthId === 'hourglass') {
+          hourglassesSeen++;
+          let min = Infinity;
+          let max = 0;
+          for (let i = 2; i <= 18; i++) {
+            const ww = corridorHalfWidthAt(h, i / 20);
+            min = Math.min(min, ww);
+            max = Math.max(max, ww);
+          }
+          // A waist really is a waist: the tightest station is clearly narrower than the widest.
+          expect(min).toBeLessThan(max * 0.75);
+        }
+      }
+    }
+    expect(hourglassesSeen).toBeGreaterThan(0);
+  });
+
+  it('the auto AI lays up off a genuine driving-zone pinch — always forward, never past the green, always to a WIDER bay', () => {
+    // PINCH_HALF_WIDTH mirrors round.ts WIDTH_LAYUP.pinchHalfWidth (the width path fires only when the
+    // natural landing reads narrower than this). A penalty-crossing lay-up reads the wide cap here, so
+    // gating on it cleanly isolates true WIDTH lay-ups from river lay-ups.
+    const PINCH_HALF_WIDTH = 10;
+    let widthLaidUp = 0;
+    let checked = 0;
+    for (let s = 0; s < 240; s++) {
+      // Raw generateCourse can throw on a rare seed (the retry wrapper handles it in production) — skip.
+      let c;
+      try {
+        c = generateCourse(s + 72000, { holes: 4, wildness: 1 });
+      } catch {
+        continue;
+      }
+      const carryMult = biomeCarryMult(c.holes[0]!);
+      for (const h of c.holes) {
+        if (h.par < 4) continue;
+        const tee = h.tee;
+        const tgt = layupTarget(h, tee, 'tee', CLUBS, carryMult);
+        // Determinism: a pure function of the hole/ball/bag.
+        expect(layupTarget(h, tee, 'tee', CLUBS, carryMult)).toEqual(tgt);
+        // Progress toward the green, and never aimed past it.
+        expect(dist(tgt, h.green)).toBeLessThanOrEqual(dist(tee, h.green) + 1e-6);
+        checked++;
+        const reach = maxNominalReach(carryMult);
+        const distToGreen = dist(tee, h.green);
+        // Reconstruct the sim's natural-landing station EXACTLY (round.ts stationAtDistance: t-based,
+        // straight distance from the ball to the centreline point, meanLandFrac 0.88).
+        const wNat = corridorHalfWidthAt(h, stationT(h, tee, reach * 0.88));
+        const shortOfFull = dist(tee, tgt) < Math.min(reach, distToGreen) * 0.9 && dist(tee, tgt) < distToGreen * 0.95;
+        // A genuine WIDTH lay-up: the natural landing is a real pinch AND the aim pulled back short.
+        if (shortOfFull && wNat < PINCH_HALF_WIDTH) {
+          widthLaidUp++;
+          const wLayup = corridorHalfWidthAt(h, nearestT(h, tgt));
+          // It only ever pulls back to a WIDER landing zone (position over power), never a tighter one.
+          expect(wLayup).toBeGreaterThanOrEqual(wNat - 1e-6);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+    // The behaviour is LIVE: some brutal-corridor holes trigger the width lay-up.
+    expect(widthLaidUp).toBeGreaterThan(0);
+  });
+
+  it('wide calm corridors are left alone: the AI does not lay up when the fairway is generous', () => {
+    // At low wildness the driving zone is broad, so the pinch trigger never fires — the safe line is
+    // the green itself (or a penalty carry, but these calm verdant holes are penalty-light).
+    let layups = 0;
+    let total = 0;
+    for (let s = 0; s < 120; s++) {
+      const c = generateCourse(s + 73000, { biome: 'verdant-station', holes: 4, wildness: 0.12 });
+      const carryMult = biomeCarryMult(c.holes[0]!);
+      for (const h of c.holes) {
+        if (h.par < 4) continue;
+        total++;
+        const tgt = layupTarget(h, h.tee, 'tee', CLUBS, carryMult);
+        const distToGreen = dist(h.tee, h.green);
+        if (dist(h.tee, tgt) < Math.min(maxNominalReach(carryMult), distToGreen) * 0.9 && dist(h.tee, tgt) < distToGreen * 0.95) layups++;
+      }
+    }
+    expect(total).toBeGreaterThan(50);
+    // Calm stops almost never trigger a width lay-up (the wide corridor holds a full drive).
+    expect(layups / total).toBeLessThan(0.05);
+  });
+});
+
+/** Max nominal carry the default bag can fly (yards), scaled by the biome — mirrors round.ts maxReachOf
+ *  from the tee (lie carryMult = 1). */
+function maxNominalReach(carryMult: number): number {
+  let max = 0;
+  for (const c of CLUBS) if (c.id !== 'putter') max = Math.max(max, c.carry);
+  return max * carryMult;
+}
+
+/** The centreline fraction whose point is ~`d` yards (straight) from `ball` toward the green —
+ *  a faithful copy of round.ts stationAtDistance so a test reconstructs the sim's landing station. */
+function stationT(hole: Hole, ball: Vec, d: number): number {
+  const t0 = nearestT(hole, ball);
+  if (d <= 0) return t0;
+  for (let i = 1; i <= 60; i++) {
+    const t = t0 + ((1 - t0) * i) / 60;
+    if (dist(ball, alongAt(hole.centreline, t).p) >= d) return t;
+  }
+  return 1;
+}

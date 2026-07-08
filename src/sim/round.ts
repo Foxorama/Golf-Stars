@@ -2077,7 +2077,7 @@ function firstCentrelineCrossing(hole: Hole, fromT: number): { nearT: number; fa
  * near bank; otherwise (a side hazard clipping the chord) lay up onto the penalty-free centreline.
  */
 function safeTarget(hole: Hole, ball: Vec, pinPt: Vec, maxReach: number): Vec {
-  if (clearLine(hole, ball, pinPt)) return pinPt;
+  if (clearLine(hole, ball, pinPt)) return widthLayupTarget(hole, ball, pinPt, maxReach) ?? pinPt;
   const t0 = nearestCentrelineT(hole, ball);
   const cross = firstCentrelineCrossing(hole, t0);
   if (cross) {
@@ -2087,6 +2087,130 @@ function safeTarget(hole: Hole, ball: Vec, pinPt: Vec, maxReach: number): Vec {
   }
   // Side hazard → advance along the (penalty-free) centreline toward the green.
   return pointAlong(hole.centreline, Math.min(1, t0 + 0.2));
+}
+
+// --- Width-aware positioning (GS-fairway-width-2) --------------------------------
+// The auto AI reads the corridor's WIDTH PROFILE the generator drew (chute/neck/hourglass/wander/…)
+// the way a real player does: a full bomb that would come down in a NARROW pinch (an hourglass
+// waist, a wander strait) is a wasted stroke of position — a shorter club that lands in the WIDE
+// bay just short of the pinch holds the fairway, and with the rough-gradient's punishing off-fairway
+// lies that clean lie is worth more than the yards it gives up. So on an out-of-reach POSITIONING
+// drive down a clean (penalty-free) line, if the natural landing sits in a genuine pinch and a
+// meaningfully wider landing zone lies within a modest lay-up short of it, aim there instead. This
+// is pure geometry (no rng) applied inside the shared `safeTarget`, so the headless sim and the
+// interactive "safe"/auto-finish line stay byte-for-byte in step (contract 2), and it never fires on
+// a reachable approach (that's green-coverage's job) or a lost-rough island (its clean line to the
+// green is never penalty-free — the abyss keeps `clearLine` false — so width IS survival, untouched).
+const WIDTH_LAYUP = {
+  /** Fraction of `maxReach` a full positioning drive is expected to actually carry (mean, a touch
+   *  short of nominal — long clubs sit ~0.9× and lose a little more to the angled-miss cosθ). */
+  meanLandFrac: 0.88,
+  /** How far short of the natural landing the AI will look for a wider bay (yards). */
+  layupYards: 34,
+  /** A candidate bay must be at least this much wider than the natural landing to be worth the
+   *  lay-up — so the AI only pulls back for a GENUINE pinch, not a few yards of ordinary taper. */
+  widenFactor: 1.35,
+  /** Don't bother pinch-avoiding unless the natural landing is genuinely tight (half-width yards);
+   *  a landing already this wide holds a sensible drive, so bombing on is correct (byte-identical).
+   *  Deliberately LOW: a corridor this tight only occurs at high wildness (the driving zone shrinks
+   *  with the `widthScale` ramp), so the lay-up fires on the brutal deep stops it helps and stays
+   *  quiet on the wide calm/mid corridors where trading distance for a marginally-wider bay would
+   *  LOSE strokes — measured on mean per-stop Stableford (contract 4: the change RAISES it, +0.01/stop
+   *  on the default bag, and improves the max-wildness toPar bar 0.78 → 0.77). */
+  pinchHalfWidth: 10,
+  /** Cap on the measured corridor half-width — beyond this a "bay" is effectively open (a gap in the
+   *  fairway / off the poly), so it doesn't count as a target to lay up to. */
+  wideCap: 60,
+} as const;
+
+/**
+ * Width-aware lay-up (GS-fairway-width-2): returns a penalty-free centreline point SHORT of a
+ * driving-zone pinch when laying up to a wider bay is the better position, else null (bomb on).
+ * Pure — measures the corridor the generator actually drew, adds no rng.
+ */
+function widthLayupTarget(hole: Hole, ball: Vec, pinPt: Vec, maxReach: number): Vec | null {
+  // Only POSITIONING drives: if the green is reachable this is an approach — leave the club to the
+  // green-coverage suggester and keep the shot byte-identical.
+  if (maxReach <= 0 || dist(ball, pinPt) <= maxReach) return null;
+  const t0 = nearestCentrelineT(hole, ball);
+  const meanReach = maxReach * WIDTH_LAYUP.meanLandFrac;
+  const tNat = stationAtDistance(hole, ball, t0, meanReach);
+  if (tNat <= t0 + 1e-3) return null;
+  const wNat = corridorHalfWidthAt(hole, tNat);
+  // A comfortably wide natural landing → bomb on (no pinch to dodge).
+  if (wNat >= WIDTH_LAYUP.pinchHalfWidth) return null;
+  const minT = stationAtDistance(hole, ball, t0, meanReach - WIDTH_LAYUP.layupYards);
+  let bestT: number | null = null;
+  let bestW = wNat * WIDTH_LAYUP.widenFactor;
+  const STEPS = 8;
+  for (let i = 1; i <= STEPS; i++) {
+    const t = tNat + ((minT - tNat) * i) / STEPS;
+    if (t <= t0 + 1e-3) break;
+    const w = corridorHalfWidthAt(hole, t);
+    // A reading AT the cap means the station is off-fairway (a broken-corridor gap), never a real bay.
+    if (w > bestW && w < WIDTH_LAYUP.wideCap) {
+      bestW = w;
+      bestT = t;
+    }
+  }
+  return bestT === null ? null : pointAlong(hole.centreline, bestT);
+}
+
+/** The centreline fraction (≥ t0) whose point is ~`targetDist` yards from the ball, walking forward
+ *  toward the green. Clamped to [t0, 1]. Pure. */
+function stationAtDistance(hole: Hole, ball: Vec, t0: number, targetDist: number): number {
+  if (targetDist <= 0) return t0;
+  const STEPS = 60;
+  for (let i = 1; i <= STEPS; i++) {
+    const t = t0 + ((1 - t0) * i) / STEPS;
+    if (dist(ball, pointAlong(hole.centreline, t)) >= targetDist) return t;
+  }
+  return 1;
+}
+
+/**
+ * Half-width (yards) of the fairway corridor at centreline fraction `t` — the tighter of the two
+ * perpendicular distances from the centreline to the fairway polygon's edge, i.e. how far a shot can
+ * miss to the closer side and still hold the short grass. Measures the polygon the generator drew
+ * (so it can never drift from the ribbon), returns the wide cap when the centreline point sits off
+ * the fairway (a broken-corridor gap) so such a station never reads as a lay-up bay. Pure.
+ */
+export function corridorHalfWidthAt(hole: Hole, t: number): number {
+  const fw = hole.features.find((f) => f.kind === 'fairway');
+  if (!fw || fw.poly.length < 3) return WIDTH_LAYUP.wideCap;
+  const c = pointAlong(hole.centreline, t);
+  const a = pointAlong(hole.centreline, Math.max(0, t - 0.03));
+  const b = pointAlong(hole.centreline, Math.min(1, t + 0.03));
+  let dx = b[0] - a[0];
+  let dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len;
+  dy /= len;
+  const perp: Vec = [dy, -dx]; // right-perpendicular unit
+  const right = rayEdgeDist(c, perp, fw.poly);
+  const left = rayEdgeDist(c, [-perp[0], -perp[1]], fw.poly);
+  return Math.min(right, left, WIDTH_LAYUP.wideCap);
+}
+
+/** Distance from `o` along unit ray `d` to the first crossing of the closed polygon's edges
+ *  (WIDTH_LAYUP.wideCap if none within it). Pure. */
+function rayEdgeDist(o: Vec, d: Vec, poly: Vec[]): number {
+  let best: number = WIDTH_LAYUP.wideCap;
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % n]!;
+    const sx = b[0] - a[0];
+    const sy = b[1] - a[1];
+    const denom = d[0] * sy - d[1] * sx;
+    if (Math.abs(denom) < 1e-9) continue; // parallel
+    const qpx = a[0] - o[0];
+    const qpy = a[1] - o[1];
+    const tRay = (qpx * sy - qpy * sx) / denom; // distance along the ray (|d| = 1)
+    const uSeg = (qpx * d[1] - qpy * d[0]) / denom;
+    if (tRay > 1e-6 && tRay < best && uSeg >= 0 && uSeg <= 1) best = tRay;
+  }
+  return best;
 }
 
 /** Push a fraction `t` further along the centreline by ~`yards` (toward the green). */

@@ -118,7 +118,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     holes draw a WIDEN-ONLY island pool (island/-bays/-flare/-broadtee/-broad): width is
     survival there, so every island `at(u) ≥ 1` (machine-checked) — islands only get wider,
     never squeezed. Squeezed profiles floor at their own `floorFrac` (abs 5-yd half-width
-    min). Re-shoot `scripts/width-preview.mjs` after touching it.
+    min). Re-shoot `scripts/width-preview.mjs` after touching it. The auto AI READS this width
+    (GS-fairway-width-2, `widthLayupTarget`/`corridorHalfWidthAt` in `round.ts`): a positioning
+    drive that would come down in a GENUINELY TIGHT driving-zone pinch lays up to the wider bay
+    just short (position over power, auto ≡ interactive — it lives in the shared `safeTarget`).
+    Gated LOW (`pinchHalfWidth` 10) so it fires only on the brutal deep-stop corridors — RAISES
+    mean per-stop Stableford (contract 4), never fires on wide calm corridors. Pure, zero rng.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
   - `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves

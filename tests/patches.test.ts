@@ -139,9 +139,10 @@ describe('effect ground patches (GS-journey-fx-2)', () => {
           }
         }
       }
-      // TODO(GS-rough-gradient): the deliberate rough/tree increase pushed the worst patch family's
-      // max-wildness mean to ~par+1. Interim REGRESSION FENCE, not the target — re-tighten to <1.0 in the
-      // post-rough rebalance, not by softening the rough.
+      // TODO(GS-rough-gradient): the worst patch family's max-wildness mean measures ~0.88 here (a
+      // small, noisy 12-seed × seeded-biome subset). GS-fairway-width-2's width-aware AI left it ~flat
+      // (it fires only on the tightest driving-zone pinches), so this fence stays at the conservative
+      // par+1.1 — closing to <1.0 with real headroom is the post-rough rebalance, not by softening rough.
       expect((strokes - par) / holes, `${kind} to-par bar`).toBeLessThan(1.1);
       expect(blowups / holes, `${kind} blow-up bar`).toBeLessThan(0.05);
     }

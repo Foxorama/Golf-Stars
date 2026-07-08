@@ -117,8 +117,10 @@ describe('character balance — each viable, none dominant (CLAUDE.md balance ru
       // the auto reach-AI's mean up a touch further — variety was deliberately prioritised over the
       // difficulty bar (tuned per-hole later).
       // TODO(GS-rough-gradient): the deliberate rough/tree increase (drive play back to the fairway,
-      // balance to follow) lifted the sparsest-bag mean a touch further (~1.34). Interim fence bump —
-      // re-tighten in the post-rough rebalance, not by softening the rough.
+      // balance to follow) lifted the sparsest-bag mean a touch further (~1.27). GS-fairway-width-2's
+      // width-aware reach-AI reads the corridor but fires only on the tightest driving-zone pinches, so
+      // it barely moves the SPARSE bags (they lack a club to lay up WITH) — worst ~1.27. This fence stays
+      // relaxed; closing the sparse-bag gap is GS-rough-gradient-rebalance, not by softening the rough.
       expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.45);
       // REGRESSION FENCE, not the design target. The real floor-hit (par+MAX_OVER_PAR pick-up) rate for
       // the sparse starter bags at MAX wildness is ~20% with the auto reach-AI — well above contract #4's

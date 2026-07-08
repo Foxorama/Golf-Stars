@@ -56,12 +56,13 @@ Foundations are shipped; these are the live follow-ons.
   uphill-magnet). The "until perks exist" caveat in the slope code is the hook.
 - **GS-split-fairways** — risky-short vs safe-long alternate fairways (the dogleg-grove machinery is the
   start); centreline-bunker pinch + opposite greenside bunker (open-the-angle).
-- **GS-fairway-width-2** — the balance/AI half of GS-fairway-width (shipped: the width grammar —
-  classic/chute/neck/hourglass/wander/thin/broad, real-golf feel first by design; GS-island-width
-  then extended it to the lost worlds under a widen-only rule): teach the auto AI to read the width
-  profile (lay up short of an hourglass waist / club down in a chute instead of bombing driver into a
-  squeeze), then re-measure and re-tighten the death-spiral bars per archetype. The suite stayed
-  green without it, but the AI currently plays every profile the same.
+- **GS-fairway-width-2b (follow-on)** — GS-fairway-width-2 shipped the LAY-UP half (the auto AI reads
+  the corridor width and lays up off a genuinely tight driving-zone pinch — position over power). Still
+  open: teach the reach-AI to read width for CLUB SELECTION in a chute/thin ribbon (a shorter club's
+  tighter cone holds the tight drive), and re-tighten the SPARSE-BAG character death-spiral fences — a
+  sparse bag has no club to lay up WITH, so width-reading barely moved them. This half overlaps
+  GS-rough-gradient-rebalance (richer starter bags / a general play-back-to-the-fairway reach-AI); do
+  them together.
 - **GS-rough-gradient-rebalance** — the balance half of GS-rough-gradient (shipped: heavy rough hugs the
   fairway + a distance-graded forest at all difficulties, real-golf feel first by design; the death-spiral
   fences were relaxed to the interim reality with `TODO(GS-rough-gradient)` in
@@ -125,6 +126,14 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-fairway-width-2** — the auto AI now READS the width grammar: a positioning drive that would come
+  down in a genuinely tight driving-zone pinch lays up to the wider bay short of it (`widthLayupTarget`/
+  `corridorHalfWidthAt` in `round.ts`, inside the shared `safeTarget` so auto ≡ interactive; pure, zero
+  rng). Gated LOW so it fires only on brutal deep-stop corridors — RAISES mean per-stop Stableford
+  (contract 4) and improved the max-wildness BIOMES bar (`toPar/hole` 0.78 → 0.77, floor-hit 7.55% →
+  7.36%). Re-tightened the biomes floor-hit + themes `toPar` fences the rough-gradient had relaxed.
+  Club-selection width-reading + the sparse-bag rebalance remain (GS-fairway-width-2b /
+  GS-rough-gradient-rebalance). See `docs/decisions/sim-generator.md`.
 - **GS-fuel-4** — fuel earns agency: the lane's SKY prices the passage (solar-wind/comet tailwinds
   −1 ⛽, gravity-well/ion-storm headwinds +1 ⛽ — burn decoupled from distance, derived + zero rng),
   tanker events refuel on arrival (scow/derelict/caravan, arc-tiered), and the SECTOR SCAN burns
