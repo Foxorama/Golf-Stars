@@ -125,6 +125,7 @@ function boot(): void {
       golfBagByCharacter: save.golfBagByCharacter,
       driverByCharacter: save.driverByCharacter,
       bagTier: save.bagTier,
+      bagTierByCharacter: save.bagTierByCharacter,
       unlockedClubsByCharacter: save.unlockedClubsByCharacter,
       clubhouseVisit: save.clubhouseVisit,
       endlessBestHoles: save.endlessBestHoles,
@@ -218,6 +219,7 @@ function persist(): void {
     golfBagByCharacter: state.golfBagByCharacter,
     driverByCharacter: state.driverByCharacter,
     bagTier: state.bagTier,
+    bagTierByCharacter: state.bagTierByCharacter,
     unlockedClubsByCharacter: state.unlockedClubsByCharacter,
     clubhouseVisit: state.clubhouseVisit,
     endlessBestHoles: state.endlessBestHoles,
@@ -295,6 +297,7 @@ function dispatch(action: Action): void {
     if (action.type === 'start') {
       selAscension = Math.max(0, Math.min(state.maxAscension, getSettings().lastAscension));
       selClubSet = state.bagTier;
+      selClubSetTouched = false;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -1387,6 +1390,10 @@ let selAscension = 0;
 // — the mode's difficulty axis. View state like `selAscension`: the [data-clubset] chips set it, every
 // golfer card's select action bakes it in, and 'start' resets it to the owned tier. The reducer clamps.
 let selClubSet: BagTier = 'common';
+// Whether the player has TAPPED a club-set chip on THIS character-select visit (GS-wardrobe-bagtier).
+// The strip is a per-run override; when untouched, each golfer plays its own wardrobe-set tier instead,
+// so an untouched strip (seeded to the owned tier) must NOT clobber a per-golfer pick.
+let selClubSetTouched = false;
 
 /** The settings sheet: player-owned feel/control prefs (sound, haptics, fast shots, swing gesture,
  *  left-handed, reduced motion), plus — anywhere but the title itself — a "Return to title" escape
@@ -1695,7 +1702,11 @@ function render(): void {
           // The Unending Universe picks its STARTING CLUB SET here (GS-golf-score) — the mode's
           // difficulty axis. Bounded to the owned tier (green always); the reducer re-clamps.
           clubSet: holeGateArmed(state.run)
-            ? { owned: state.bagTier, sel: bagTierRank(selClubSet) <= bagTierRank(state.bagTier) ? selClubSet : state.bagTier }
+            ? {
+                owned: state.bagTier,
+                sel: bagTierRank(selClubSet) <= bagTierRank(state.bagTier) ? selClubSet : state.bagTier,
+                touched: selClubSetTouched,
+              }
             : undefined,
         })
       : state.screen === 'intro'
@@ -1948,6 +1959,7 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-clubset]').forEach((el) => {
     el.addEventListener('click', () => {
       selClubSet = el.dataset.clubset as BagTier;
+      selClubSetTouched = true;
       sfx.click();
       haptic(HAPTICS.tap);
       render();

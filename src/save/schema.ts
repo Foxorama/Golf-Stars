@@ -14,7 +14,7 @@ import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -381,8 +381,18 @@ export type SaveV22 = Omit<SaveV21, 'version'> & {
   driverByCharacter: Record<string, string>;
 };
 
+/** v23 adds the per-golfer starting bag-tier map (GS-wardrobe-bagtier): each golfer's chosen
+ *  Unending-Universe difficulty, picked in the Clubhouse wardrobe's bag slot. Absent → the owned
+ *  `bagTier` (the best unlocked bag). Seeded empty for existing saves (everyone follows the owned tier
+ *  until they pick otherwise). */
+export type SaveV23 = Omit<SaveV22, 'version'> & {
+  version: 23;
+  /** characterId → BagTier. Absent entry → the owned `bagTier`. Clamped to the owned tier at read time. */
+  bagTierByCharacter: Record<string, BagTier>;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV22;
+export type Save = SaveV23;
 
 export function defaultSave(): Save {
   return {
@@ -403,6 +413,7 @@ export function defaultSave(): Save {
     golfBagByCharacter: {},
     driverByCharacter: {},
     bagTier: 'common',
+    bagTierByCharacter: {},
     unlockedClubsByCharacter: {},
     clubhouseVisit: 0,
     endlessBestHoles: 0,
@@ -720,6 +731,12 @@ function v21ToV22(s: SaveV21): SaveV22 {
   return { ...s, version: 22, driverByCharacter: {} };
 }
 
+/** v22 → v23: seed an empty per-golfer bag-tier map — every golfer follows the owned bag tier until the
+ *  player picks a per-golfer difficulty in the wardrobe (GS-wardrobe-bagtier). */
+function v22ToV23(s: SaveV22): SaveV23 {
+  return { ...s, version: 23, bagTierByCharacter: {} };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -749,6 +766,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 19) s = v19ToV20(s as unknown as SaveV19) as unknown as typeof s;
   if (s.version === 20) s = v20ToV21(s as unknown as SaveV20) as unknown as typeof s;
   if (s.version === 21) s = v21ToV22(s as unknown as SaveV21) as unknown as typeof s;
+  if (s.version === 22) s = v22ToV23(s as unknown as SaveV22) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -756,7 +774,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV22>;
+  const v14 = s as unknown as Partial<SaveV23>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -785,6 +803,8 @@ export function migrate(raw: unknown): Save {
     golfBagByCharacter: sanitize(v14.golfBagByCharacter, ownedApparel),
     driverByCharacter: sanitize(v14.driverByCharacter, ownedApparel),
     bagTier,
+    bagTierByCharacter:
+      v14.bagTierByCharacter && typeof v14.bagTierByCharacter === 'object' ? v14.bagTierByCharacter : {},
     unlockedClubsByCharacter: v14.unlockedClubsByCharacter ?? {},
     clubhouseVisit: v14.clubhouseVisit ?? 0,
     endlessBestHoles: v14.endlessBestHoles ?? 0,

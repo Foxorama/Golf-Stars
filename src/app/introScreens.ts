@@ -48,6 +48,7 @@ function introShared(): {
   rar: ReturnType<typeof rarityFlavour>;
   diffPips: string;
   notes: string[];
+  salvageNote: string;
   objective: string;
   boss: ReturnType<typeof currentBoss>;
 } {
@@ -117,21 +118,27 @@ function introShared(): {
      </div>`);
   // The SALVAGE gamble pays off (GS-salvage-mystery): if this stop arrived via a salvage lane, reveal
   // the club the blind roll actually landed — the "you looted X" moment the tier-only route card held
-  // back. `state.salvageReveal` is the transient find computed at travel from the pre-jump bag.
+  // back. `state.salvageReveal` is the transient find computed at travel from the pre-jump bag. Kept as
+  // its OWN note (not folded into `notes`) so BOTH intro steps can surface it — the Unending Universe
+  // past stop 0 opens straight on the hole step, where the arc-only `notes` never render, so a salvage
+  // find would otherwise stay invisible until the bag/shop (the reported bug).
   const reveal = state.salvageReveal;
+  let salvageNote = '';
   if (reveal && routeClubFind(ev)) {
-    const col = rarCol(reveal.rarity ?? ev!.rarity);
-    notes.push(
-      reveal.clubName
-        ? `<div style="margin-top:8px;padding:7px 11px;border-left:3px solid ${col};border-radius:8px;background:#ffffff08;">
-             <b style="font-size:13px;color:${col};">🎁 Salvage haul: the ${reveal.rarity} <b>${reveal.clubName}</b>!</b>
-             <div style="font-size:12.5px;opacity:.82;margin-top:1px;">Scavenged from the wreck and equipped for the rest of the run.</div>
-           </div>`
-        : `<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #4fd0e0;border-radius:8px;background:#ffffff08;">
-             <b style="font-size:13px;color:#4fd0e0;">🎁 Salvage: +${reveal.consolationCredits} credits</b>
-             <div style="font-size:12.5px;opacity:.82;margin-top:1px;">Your bag was already stocked at that tier, so the haul cashed out.</div>
-           </div>`,
-    );
+    const scol = rarCol(reveal.rarity ?? ev!.rarity);
+    salvageNote = reveal.clubName
+      ? `<div style="margin-top:10px;padding:10px 12px;border:1px solid ${scol}aa;border-left:4px solid ${scol};border-radius:10px;
+             background:linear-gradient(180deg,${scol}1f,#ffffff08);box-shadow:0 0 14px ${scol}33;">
+           <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:${scol};font-weight:800;">🎁 Salvage haul</div>
+           <b style="font-size:15px;color:${scol};">The ${reveal.rarity} ${reveal.clubName}!</b>
+           <div style="font-size:12.5px;opacity:.85;margin-top:2px;">Scavenged from the wreck and slotted into your bag for the rest of the run.</div>
+         </div>`
+      : `<div style="margin-top:10px;padding:10px 12px;border:1px solid #4fd0e0aa;border-left:4px solid #4fd0e0;border-radius:10px;
+             background:linear-gradient(180deg,#4fd0e01f,#ffffff08);box-shadow:0 0 14px #4fd0e033;">
+           <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#4fd0e0;font-weight:800;">🎁 Salvage haul</div>
+           <b style="font-size:15px;color:#4fd0e0;">+${reveal.consolationCredits} credits</b>
+           <div style="font-size:12.5px;opacity:.85;margin-top:2px;">Your bag was already stocked at that tier, so the haul cashed out.</div>
+         </div>`;
   }
 
   const objective = `${(() => {
@@ -160,7 +167,7 @@ function introShared(): {
     state.run.ascension > 0 ? `<span style="color:#ffce54;"> · ⚔ Ascension A${state.run.ascension} (tougher cut, leaner purse)</span>` : ''
   }`;
 
-  return { c, zone, theme, col, par, rar, diffPips, notes, objective, boss };
+  return { c, zone, theme, col, par, rar, diffPips, notes, salvageNote, objective, boss };
 }
 
 /** The stop briefing: the arc step or the hole step (GS-intro-split), chosen by view state. */
@@ -190,7 +197,7 @@ export function endlessRoundSoFar(playedSoFar: PlayedHole[]): EndlessCardData {
  * so it's there after you've scrolled the roster but never a redundant duplicate on a short screen.
  */
 function arcIntroScreen(): string {
-  const { c, zone, theme, col, par, rar, diffPips, notes, objective } = introShared();
+  const { c, zone, theme, col, par, rar, diffPips, notes, salvageNote, objective } = introShared();
   // The Unending Universe tracks DEPTH (GS-set-survival): the "field" slot shows your progress card
   // (sets cleared + this set's target) + the personal last-runs leaderboard grouped by starting club
   // set, instead of the voyage's ghost competitor board. Gated to the gate format (voyage untouched).
@@ -237,6 +244,7 @@ function arcIntroScreen(): string {
         ${firstStop ? btn('‹ Change golfer', { type: 'backToCharacter' }, { variant: 'ghost' }) : ''}
       </div>
       ${notes.join('')}
+      ${salvageNote}
       ${field}
       <div class="gs-intro-ctarow gs-intro-ctarow--bottom" id="gs-firsttee-bottomwrap" style="display:none;">
         ${firstTee('gs-firsttee-bottom')}
@@ -251,7 +259,7 @@ function arcIntroScreen(): string {
  * "Back" returns to the arc step.
  */
 function holeIntroScreen(): string {
-  const { c, zone, col, diffPips, boss } = introShared();
+  const { c, zone, col, diffPips, salvageNote, boss } = introShared();
   const hole = c.holes[0]!;
   const map = renderHoleSVG(hole, {
     width: 300,
@@ -280,6 +288,7 @@ function holeIntroScreen(): string {
         </div>
       </div>
       ${bossRibbon}
+      ${salvageNote}
       <div class="gs-holeintro-map">${map}</div>
       <button class="gs-traits-bar" data-introtraits="open" aria-label="Show hazards and benefits">
         ${chip(zone.hazards.map((t) => t.icon), `${zone.hazards.length} hazards`, 'var(--gs-danger)')}

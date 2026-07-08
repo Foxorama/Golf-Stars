@@ -174,6 +174,10 @@ export interface GolferLook {
   /** Equipped cosmetic DRIVER (GS-thor) — swaps the plain club head for its own skin (a mythic warhammer,
    *  Thor's Hammer). Takes precedence over the in-run `gear` themed head when both are present. */
   driver?: ApparelLook;
+  /** Equipped cosmetic BAG (GS-wardrobe-bagtier) — a staff bag propped behind the golfer at address, so
+   *  the caddy bag you outfit in the Clubhouse actually shows on the course. Absent → no bag prop (the
+   *  clubs still carry their bag-tier gear skin). */
+  bag?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 function lookFromColor(color: string): GolferLook {
@@ -258,6 +262,17 @@ function drawGolfer(
   ctx.beginPath();
   ctx.ellipse(6, 1, 16, 4, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // The equipped cosmetic BAG (GS-wardrobe-bagtier) stands propped BEHIND the golfer (their −x side,
+  // clear of the target-side swing arc), planted on the same ground line — so the caddy bag you outfit
+  // in the Clubhouse shows on the course. Drawn before the body so the figure overlaps it if close.
+  if (look.bag) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; // its own little ground shadow
+    ctx.beginPath();
+    ctx.ellipse(-18, 1, 7, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawGolfBag(ctx, -18, -8, 0.62, look.bag);
+  }
 
   // Legs (a planted stance). A cosmetic PANTS (GS-pants-outfit) overrides the bare leg colour with its
   // own shape/palette; with nothing equipped the original dark legs draw byte-for-byte unchanged.
@@ -692,21 +707,77 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.ellipse(hx - 1.5, hy - 3, 2, 1.3, 0, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case 'halo':
+    case 'supernova': {
+      // The mythic Supernova crown (GS-supernova): a jewelled violet circlet bursting into starlight
+      // rays (violet→hot-pink→starlight gradient) with a star-core gem — the set-matched twin of the
+      // wardrobe SVG (`apparelArt.ts hatGlyph 'supernova'`). Authored against the canonical r=7 head.
+      const s = r / 7;
+      const tip = '#fff0a0';
+      const cx = hx;
+      const cy = hy - 3.4 * s;
+      const rb = 4.0 * s;
+      const rays: [number, number, number][] = [
+        [0, 12.5, 1.8], [33, 10, 1.5], [-33, 10, 1.5],
+        [63, 8.2, 1.3], [-63, 8.2, 1.3], [94, 6, 1.05], [-94, 6, 1.05],
+      ];
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 0.5;
+      for (const [deg, len, w] of rays) {
+        const t = (deg * Math.PI) / 180;
+        const dx = Math.sin(t);
+        const dy = -Math.cos(t);
+        const px = Math.cos(t);
+        const py = Math.sin(t);
+        const bx = cx + rb * dx;
+        const by = cy + rb * dy;
+        const tx = cx + (rb + len * s) * dx;
+        const ty = cy + (rb + len * s) * dy;
+        const grad = ctx.createLinearGradient(bx, by, tx, ty);
+        grad.addColorStop(0, color);
+        grad.addColorStop(0.52, accent);
+        grad.addColorStop(1, tip);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(bx - w * s * px, by - w * s * py);
+        ctx.lineTo(tx, ty);
+        ctx.lineTo(bx + w * s * px, by + w * s * py);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      // Violet circlet band across the brow.
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(hx, hy - 1, r + 1, 0, Math.PI * 2);
+      ctx.arc(hx, hy, r, Math.PI * 1.06, Math.PI * 1.94);
+      ctx.arc(hx, hy, r * 0.72, Math.PI * 1.94, Math.PI * 1.06, true);
+      ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.ellipse(hx + 1, hy - 1, r - 2, r - 3, 0, Math.PI * 0.9, Math.PI * 2.1);
-      ctx.fill();
-      // The glowing halo ring above.
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(hx, hy - r - 4, r, 2.4, 0, 0, Math.PI * 2);
       ctx.stroke();
+      // Hot-pink rim highlight along the band.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(hx, hy, r * 0.86, Math.PI * 1.08, Math.PI * 1.92);
+      ctx.stroke();
+      // Star-core gem at the brow.
+      const gx = hx;
+      const gy = hy - 1.2 * s;
+      ctx.fillStyle = tip;
+      ctx.beginPath();
+      ctx.moveTo(gx, gy - 3 * s);
+      ctx.lineTo(gx + 0.9 * s, gy - 0.9 * s);
+      ctx.lineTo(gx + 3 * s, gy);
+      ctx.lineTo(gx + 0.9 * s, gy + 0.9 * s);
+      ctx.lineTo(gx, gy + 3 * s);
+      ctx.lineTo(gx - 0.9 * s, gy + 0.9 * s);
+      ctx.lineTo(gx - 3 * s, gy);
+      ctx.lineTo(gx - 0.9 * s, gy - 0.9 * s);
+      ctx.closePath();
+      ctx.fill();
       break;
+    }
     case 'wingedHelm': {
       // The Asgardian Valkyrie helm (GS-valkyrie): a feathered silver wing swept up each side (behind
       // the dome), a steel dome, a gold brow band + nasal guard, and a gold rivet emblem. Mirrors the
@@ -763,6 +834,69 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
     default:
       break;
   }
+}
+
+/**
+ * Draw a cosmetic GOLF BAG (GS-wardrobe-bagtier) propped beside the golfer — the canvas mirror of the
+ * wardrobe SVG `bagGlyph`: a tapered staff-bag body with gold trim + pocket + strap, three clubs standing
+ * out the top, and a soft aura for the glowing tiers. Authored in a ~34u-tall glyph frame about (cx,cy),
+ * fitted by `scale`. Kept in sync with `apparelArt.ts bagGlyph` so what you outfit is what you carry.
+ */
+function drawGolfBag(ctx: CanvasRenderingContext2D, cx: number, cy: number, scale: number, look: ApparelLook): void {
+  const { color, accent = '#d9b74a', glow } = look;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  if (glow) {
+    ctx.save();
+    ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.5;
+    const g = ctx.createRadialGradient(0, -3, 2, 0, -3, 20);
+    g.addColorStop(0, glow);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, -3, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Clubs poking out of the top.
+  ctx.strokeStyle = '#b9c2cf';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(-3.5, -11); ctx.lineTo(-5.5, -19);
+  ctx.moveTo(0.5, -11); ctx.lineTo(0.5, -21);
+  ctx.moveTo(4, -11); ctx.lineTo(6, -18);
+  ctx.stroke();
+  ctx.fillStyle = '#dfe6f0';
+  ctx.strokeStyle = '#0c1116';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(-5.9, -19.6, 1.7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0.5, -21); ctx.lineTo(4.4, -19.6); ctx.lineTo(0.5, -18.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(6.4, -18.5, 1.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Bag body (tapered), gold top ring, trim band, pocket, strap, drawstring ring.
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#0c1116';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-6.5, -11); ctx.lineTo(6.5, -11); ctx.lineTo(5.4, 13);
+  ctx.quadraticCurveTo(0, 15.4, -5.4, 13); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.ellipse(0, -11, 6.5, 2.3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillRect(-4.6, -4, 9.2, 2);
+  ctx.beginPath();
+  ctx.moveTo(-4.2, 0); ctx.lineTo(4.2, 0); ctx.lineTo(3.6, 8);
+  ctx.quadraticCurveTo(0, 9.6, -3.6, 8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(-6, -9); ctx.quadraticCurveTo(-11, 0, -5.6, 10); ctx.stroke();
+  ctx.strokeStyle = '#0f5132';
+  ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.arc(0, 4, 1.9, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
 }
 
 /**

@@ -91,11 +91,46 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         <ellipse cx="-2" cy="-1.6" rx="2" ry="1.1" fill="#fff" opacity="0.55"/>
         <path d="M-6.4,-4.6 A8.5 8.5 0 0 1 0.5,-9.4 Q-4.4,-7.4 -6.4,-4.6 Z" fill="#ffffff" opacity="0.3"/>`;
       break;
-    case 'halo':
-      g = `<circle cx="0" cy="-1" r="8" fill="${accent}" ${ink}/>
-        <path d="M-5,-1.5 A5 4 0 0 1 5,-1.5 Z" fill="${color}" opacity="0.8"/>
-        <ellipse cx="0" cy="-11" rx="7" ry="2.4" fill="none" stroke="${color}" stroke-width="2"><animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/></ellipse>`;
+    case 'supernova': {
+      // The mythic Supernova crown (GS-supernova): a jewelled violet circlet hugging the brow that
+      // ERUPTS into a burst of starlight rays, each fading violet→hot-pink→starlight so the crown
+      // reads as an exploding star. Set-matched to the Supernova suit/leggings (deep-violet body,
+      // hot-pink accent, magenta glow) with a bright star-core gem front-and-centre. The rays are
+      // computed from a small polar table so the burst stays perfectly symmetric.
+      const tip = '#fff0a0'; // starlight highlight (shared with the canvas mirror)
+      const C: [number, number] = [0, -3.4];
+      const rb = 4.0; // ray roots sit just off the circlet
+      const rays: [number, number, number][] = [
+        [0, 12.5, 1.8], [33, 10, 1.5], [-33, 10, 1.5],
+        [63, 8.2, 1.3], [-63, 8.2, 1.3], [94, 6, 1.05], [-94, 6, 1.05],
+      ];
+      const spikes = rays
+        .map(([deg, len, w]) => {
+          const t = (deg * Math.PI) / 180;
+          const dx = Math.sin(t);
+          const dy = -Math.cos(t);
+          const px = Math.cos(t);
+          const py = Math.sin(t);
+          const bx = C[0] + rb * dx;
+          const by = C[1] + rb * dy;
+          const tx = C[0] + (rb + len) * dx;
+          const ty = C[1] + (rb + len) * dy;
+          const p = (x: number, y: number) => `${x.toFixed(1)},${y.toFixed(1)}`;
+          return `<path d="M${p(bx - w * px, by - w * py)} L${p(tx, ty)} L${p(bx + w * px, by + w * py)} Z" fill="url(#sn${uid})" stroke="#0c1116" stroke-width="0.5" stroke-linejoin="round"><animate attributeName="opacity" values="0.7;1;0.7" dur="${(1.8 + (deg % 5) * 0.2).toFixed(1)}s" repeatCount="indefinite"/></path>`;
+        })
+        .join('');
+      g = `<defs><linearGradient id="sn${uid}" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="${color}"/><stop offset="52%" stop-color="${accent}"/><stop offset="100%" stop-color="${tip}"/>
+        </linearGradient></defs>
+        ${spikes}
+        <path d="M-6.6,-2 A7 7 0 0 1 6.6,-2 L5.1,0.9 A6.2 6.2 0 0 1 -5.1,0.9 Z" fill="${color}" ${ink}/>
+        <path d="M-6.2,-1.3 A6.4 6.4 0 0 1 6.2,-1.3" fill="none" stroke="${accent}" stroke-width="1" opacity="0.9"/>
+        <g transform="translate(0 -1.2)">
+          <path d="M0,-3.1 L0.9,-0.9 L3.1,0 L0.9,0.9 L0,3.1 L-0.9,0.9 L-3.1,0 L-0.9,-0.9 Z" fill="${tip}" stroke="#0c1116" stroke-width="0.4"/>
+          <circle r="0.8" fill="#fff"/>
+        </g>`;
       break;
+    }
     case 'wingedHelm': {
       // The Asgardian Valkyrie helm (GS-valkyrie): a feathered silver wing swept up each side (drawn
       // first, behind the dome), a steel dome hugging the head, a gold brow band, a nasal guard down
@@ -124,8 +159,8 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       g = '';
   }
   const flair =
-    shape === 'halo'
-      ? sparkles([[-9, -6], [9, -4], [0, 6]])
+    shape === 'supernova'
+      ? sparkles([[-11, -9], [11, -8], [0, -18], [-6, 5]])
       : shape === 'baggy'
         ? sparkles([[-8, -8], [8, -6]])
         : '';
