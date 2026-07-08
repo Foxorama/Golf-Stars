@@ -349,13 +349,14 @@ export interface SaveV19 extends Omit<SaveV18, 'version'> {
   version: 19;
 }
 
-/** v20 adds the Marmot's TIP JAR fill (GS-tent-tips): a running count of balls the Marmot pocketed from
- *  trade tents during the run just finished, drawn as golf balls in the 19th-Hole tip jar. Reset each
- *  new run; when it fills the jar the Marmot slips off to play the spaceport par-3 (bar + jar empty that
- *  visit). Seeded at 0 for existing saves — the count is earned in play, never granted retroactively. */
+/** v20 adds the Marmot's TIP JAR fill (GS-tent-tips): a running total of balls the Marmot has pocketed
+ *  from trade tents, drawn as golf balls in the 19th-Hole tip jar. It ACCUMULATES across runs (never
+ *  reset per run); the clubhouse renders the fill-to-a-half-dozen-then-cash-out cycle off `marmotTips %
+ *  (CAP + 1)`, and on the cash-out visit the Marmot slips off to play the spaceport par-3 (bar + jar
+ *  empty). Seeded at 0 for existing saves — the count is earned in play, never granted retroactively. */
 export interface SaveV20 extends Omit<SaveV19, 'version'> {
   version: 20;
-  /** Balls the Marmot pocketed in the last run — the tip jar's fill (0 = empty jar). */
+  /** Running total of balls the Marmot has pocketed — the tip jar's fill cycles off it (GS-tent-tips). */
   marmotTips: number;
 }
 

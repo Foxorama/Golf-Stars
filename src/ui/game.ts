@@ -481,7 +481,8 @@ function withBestBallPartner(state: UiState, play: HolePlay): { play: HolePlay; 
  * auto ≡ interactive holds; these are the interactive-only META reactions, layered on like the ace /
  * unlock side-effects:
  *   • marmot   → the first-ever bonk unlocks the persistent Marmot Bartender (clubhouse cosmetic), and
- *                EVERY bonk drops a ball in its tip jar (GS-tent-tips) — the running per-run count;
+ *                EVERY bonk drops a ball in its tip jar (GS-tent-tips) — a running total that ACCUMULATES
+ *                across runs (the clubhouse renders the fill-to-a-half-dozen-then-cash-out cycle off it);
  *   • fortune  → grant a free mulligan for the NEXT tee shot;
  *   • starmart → opening the pop-up shop is deferred to AFTER the shot animation (app-layer `onDone`),
  *                so it isn't handled here.
@@ -491,7 +492,8 @@ function applyTentReactions(state: UiState, play: HolePlay): UiState {
   const effect = play.shots[play.shots.length - 1]?.tentHit?.effect;
   if (!effect) return state;
   // Every marmot bonk drops a ball in the tip jar (GS-tent-tips) — the first-ever bonk ALSO unlocks the
-  // persistent Marmot Bartender. The running count is drawn as balls in the clubhouse jar next run home.
+  // persistent Marmot Bartender. The count is a running total (never reset per run); the clubhouse draws
+  // its fill-then-cash-out cycle off it, so the jar accumulates toward a half-dozen across runs.
   if (effect === 'marmot') return { ...state, marmotBartender: true, marmotTips: state.marmotTips + 1 };
   if (effect === 'fortune') return { ...state, mulliganPending: true };
   return state;
@@ -729,8 +731,10 @@ export function reduce(state: UiState, action: Action): UiState {
         bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
       );
-      // A new run begins here — empty the Marmot's tip jar so it fills fresh this run (GS-tent-tips).
-      return { ...state, run, course: currentCourse(run), screen: 'intro', marmotTips: 0 };
+      // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
+      // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
+      // cycle off this running total (`marmotTips % (CAP + 1)`), so the reducer just keeps counting.
+      return { ...state, run, course: currentCourse(run), screen: 'intro' };
     }
 
     case 'backToCharacter': {
