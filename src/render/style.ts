@@ -76,6 +76,7 @@ import {
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
+import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
   platformCliffs,
   raisedShelf,
@@ -101,6 +102,8 @@ export type { Prim, ArtFeel } from './style/shared';
 export { landPolysCourseFor } from './style/land';
 export { GROUND_COVER, easterEggs } from './style/ground';
 export type { GroundCoverLook } from './style/ground';
+export { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
+export type { ReliefLook } from './style/relief';
 export { cetusRiverPath } from './style/platforms';
 
 export interface SceneOpts {
@@ -343,6 +346,17 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, VOID_CLIFF).prims);
   }
 
+  // --- 3c. Biome RELIEF: directional rolling-terrain depth (GS-biome-relief) ---
+  // Soft paired highlight/shadow lobes lit from the shared upper-left sun give every world's ground
+  // real rolling-terrain FORM instead of a flat tinted slab — the fix for "they all look incredibly
+  // flat and lifeless". PURE geometry (zero rng — posHash variety only), so no existing seeded stream
+  // is perturbed and the mound count is camera-proof. Clipped to the land / lost-rough platforms and
+  // drawn UNDER the mown turf + cover + decor (which read crisp on top), so the undulation lives in the
+  // rough where the flat read was worst. Rainbow's road relief rides ON the ribbon instead (section 5b2).
+  if (!rainbow && art.texture > 0) {
+    prims.push(...biomeRelief(landPlatformsCourse, BIOME_RELIEF[arch], proj, art.texture));
+  }
+
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
   // The main `rng` is consumed here in the SAME order as before (patches → tufts → flowers) so the
   // downstream terrain/tree/water/lava draws that read off it stay byte-for-byte unchanged; only the
@@ -535,6 +549,18 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, arch, greenSlopeArt(hole, f.poly, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
+  }
+
+  // --- 5b2. Rainbow Road surface relief (GS-biome-relief) ---------------------
+  // A gentle prismatic sheen of lit rises + violet hollows drawn ON the road ribbon (its bands are
+  // opaque, so the relief rides over them) so the legendary track reads as a rolling, glowing road
+  // rather than a flat decal. Clipped to the road surfaces; pure geometry (zero rng), so the rainbow
+  // art stream stays byte-stable.
+  if (rainbow && art.texture > 0) {
+    const roadPolys = hole.features
+      .filter((f) => f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee')
+      .map((f) => f.poly);
+    prims.push(...biomeRelief(roadPolys, RAINBOW_RELIEF, proj, art.texture));
   }
 
   // --- 5b. The Cetus river of stars + its cliff waterfall (GS-cetus) ----------

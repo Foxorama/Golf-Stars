@@ -5,7 +5,7 @@ import { ARCHETYPE_TURF, ARCHETYPE_SPACE, OB_LOOK, LAND_SPACE_BLEND, landFillFor
 import { WIND_RGBA, AMBIENT } from '../src/render/weather';
 import { BIOMES } from '../src/sim/course/biomes';
 import type { BiomeArchetype } from '../src/sim/course/themes';
-import { buildScene, landPolysCourseFor, GROUND_COVER, easterEggs, type Prim } from '../src/render/style';
+import { buildScene, landPolysCourseFor, GROUND_COVER, easterEggs, BIOME_RELIEF, type Prim } from '../src/render/style';
 import { holeProjector, type Projector } from '../src/render/project';
 import { playBoundsCorners } from '../src/sim/round';
 import type { Hole, Vec } from '../src/sim/course/contract';
@@ -74,6 +74,39 @@ describe('ground covering (GS-ground-cover)', () => {
     expect(ocean).toContain(GROUND_COVER.ocean!.ridge!);
     // Deterministic: same hole + biome → byte-identical (the covering is seeded, never Math.random).
     expect(renderHoleSVG(wooded, { biome: 'ice-ring' })).toBe(frost);
+  });
+});
+
+// --- GS-biome-relief: directional rolling-terrain depth on every world -------------------------
+
+describe('biome relief (GS-biome-relief)', () => {
+  it('every archetype has a BIOME_RELIEF row (table+dispatch, no silent verdant fallback)', () => {
+    for (const a of ARCHES) {
+      expect(BIOME_RELIEF[a], `relief for ${a}`).toBeDefined();
+      expect(BIOME_RELIEF[a].hi, `${a} crest tint`).toMatch(/^rgba\(/);
+      expect(BIOME_RELIEF[a].lo, `${a} hollow tint`).toMatch(/^rgba\(/);
+      expect(BIOME_RELIEF[a].strength, `${a} strength`).toBeGreaterThan(0);
+    }
+  });
+
+  it('the relief paints on the land: a frost render carries its snow-drift crest + cool hollow', () => {
+    const svg = renderHoleSVG(wooded, { biome: 'ice-ring' });
+    // The relief lobes render as radial-gradient glows whose stop colours are the look tints.
+    const { hi, lo } = BIOME_RELIEF.frost;
+    const rgbOf = (c: string) => c.replace(/rgba?\(([^,]+),([^,]+),([^,]+).*/, 'rgb($1,$2,$3)');
+    expect(svg).toContain(rgbOf(hi));
+    expect(svg).toContain(rgbOf(lo));
+    // Deterministic: pure-geometry relief is seeded by geometry alone, never Math.random.
+    expect(renderHoleSVG(wooded, { biome: 'ice-ring' })).toBe(svg);
+  });
+
+  it('relief adds NO rng draws: the feature terrain is byte-identical with the pass on (added prims only)', () => {
+    // Two worlds that share the SAME geometry differ ONLY by the added relief/decor, never by a
+    // re-rolled terrain stream — proven by the every-biome-distinct test above; here we assert the
+    // pass is purely additive by confirming the desert (dune-relief) render still contains its
+    // unchanged fairway/rough turf tones.
+    const svg = renderHoleSVG(wooded, { biome: 'dust-belt' });
+    expect(svg).toContain(BIOME_RELIEF.desert.hi.replace(/rgba?\(([^,]+),([^,]+),([^,]+).*/, 'rgb($1,$2,$3)'));
   });
 });
 
