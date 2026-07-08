@@ -83,7 +83,7 @@ import { shopScreen, shopView, starmartScreen } from './app/shopScreens';
 import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketScreens';
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { routeInfoOverlay, travelScreen, travelView } from './app/travelScreens';
-import { asgardMapScreen, asgardResultScreen } from './app/asgardScreens';
+import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -983,6 +983,15 @@ function playingBody(animating: boolean): string {
     const holePts = stablefordPoints(par, kept.record.strokes);
     const d = kept.pickedUp ? 99 : kept.record.strokes - par;
     const scoreCol = d < 0 ? '#5fd45a' : d === 0 ? 'var(--gs-ink)' : d === 1 ? '#ffce54' : '#ff6b6b';
+    // The Asgard tournament (GS-asgard) is STROKE PLAY, so the banner counts GROSS and to-par, not
+    // Stableford points — the running gross total is what decides it against the Warriors Three.
+    const isAsgard = state.run.formatId === ASGARD_FORMAT;
+    const grossSoFar = playedSoFar.reduce((s, p) => s + p.record.strokes, 0);
+    const toParSoFar = grossSoFar - playedSoFar.reduce((s, p) => s + p.record.par, 0);
+    const toParTag = (v: number): string => (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`);
+    const holeLine = isAsgard
+      ? `${kept.pickedUp ? 'no return' : d === 0 ? 'level par' : `${toParTag(d)} to par`} this hole`
+      : `+${holePts} pt${holePts === 1 ? '' : 's'} this hole`;
     const isAce = play.holed && play.strokes === 1;
     // After the celebration overlay lifts, the end-of-hole screen confirms the ace reward in place.
     const aceNote = isAce
@@ -997,14 +1006,18 @@ function playingBody(animating: boolean): string {
         <div style="flex:1 1 auto;min-width:0;">
           <div style="font-size:10.5px;opacity:.5;letter-spacing:.1em;">HOLE ${play.holeIndex + 1}${partnerHole ? ' · TEAM BALL' : ''}</div>
           <div style="font-size:18px;font-weight:800;">${name}${lastIsHoled ? ' 🎉' : ''}</div>
-          <div style="font-size:12px;opacity:.7;margin-top:1px;">+${holePts} pt${holePts === 1 ? '' : 's'} this hole</div>
+          <div style="font-size:12px;opacity:.7;margin-top:1px;">${holeLine}</div>
         </div>
         <div style="text-align:center;border-left:1px solid var(--gs-line-2);padding-left:14px;">
-          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--gs-accent);">${stopPts}</div>
-          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">STOP PTS</div>
+          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--gs-accent);">${isAsgard ? grossSoFar : stopPts}</div>
+          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : 'STOP PTS'}</div>
         </div>
       </div>`;
-    const progress = state.match
+    const progress = state.run.formatId === ASGARD_FORMAT
+      ? // The Asgard tournament (GS-asgard) is STROKE PLAY vs the Warriors Three, not the 20-golfer
+        // Stableford field — show the running lowest-gross standings, its own event.
+        asgardLiveBoardHTML(playedSoFar, state.course.holes.map((h) => h.par), `${state.run.seed}`)
+      : state.match
       ? holeMatchProgressHTML(playedSoFar)
       : holeGateArmed(state.run)
       ? // The Unending Universe (GS-golf-score): the running GOLF ROUND scorecard replaces the ghost

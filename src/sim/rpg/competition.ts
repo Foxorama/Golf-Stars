@@ -322,10 +322,24 @@ export function ghostHoleStrokes(golferId: string, holeKey: string, par: number,
  * three. Pure & deterministic from the tournament seed + the hole pars.
  */
 export function warriorsThreeTotals(seed: string, pars: readonly number[]): { id: string; name: string; total: number }[] {
+  return warriorsThreeThru(seed, pars, pars.length);
+}
+
+/**
+ * Each Warrior's cumulative ghost gross THRU the first `holes` holes (GS-asgard) — the running-board
+ * counterpart of `warriorsThreeTotals`, drawn on the IDENTICAL `:strokes:`/`:form` streams, so the
+ * between-hole standings and the final result agree score-for-score. `holes` defaults to the full card
+ * (making `warriorsThreeTotals` a thin alias). Pure & deterministic.
+ */
+export function warriorsThreeThru(
+  seed: string,
+  pars: readonly number[],
+  holes: number = pars.length,
+): { id: string; name: string; total: number }[] {
   return WARRIORS_THREE.map((w) => {
     const form = golferForm(w.id, `${seed}:form`);
     let total = 0;
-    pars.forEach((par, i) => (total += ghostHoleStrokes(w.id, `${seed}:${i}`, par, form)));
+    for (let i = 0; i < holes; i++) total += ghostHoleStrokes(w.id, `${seed}:${i}`, pars[i]!, form);
     return { id: w.id, name: w.shortName, total };
   });
 }

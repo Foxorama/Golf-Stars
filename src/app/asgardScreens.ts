@@ -8,6 +8,8 @@
 import { state, btn } from './ctx';
 import { asgardBridgeHTML } from '../render/starmap';
 import { WARRIORS_THREE } from '../sim/rpg/golfers';
+import { warriorsThreeThru } from '../sim/rpg/competition';
+import type { PlayedHole } from '../sim/round';
 
 const GOLD = '#ffd97a';
 
@@ -15,6 +17,62 @@ const GOLD = '#ffd97a';
 function toPar(strokes: number, par: number): string {
   const d = strokes - par;
   return d === 0 ? 'E' : d > 0 ? `+${d}` : `${d}`;
+}
+
+/** A stroke-play row on an Asgard board — the player and each Warrior with a cumulative gross total. */
+interface AsgardRow {
+  name: string;
+  total: number;
+  you: boolean;
+}
+
+/** The shared Asgard leaderboard body (GS-asgard): rows sorted lowest-gross-first (ties to the player),
+ *  medalled, with the player's row highlighted and a to-par tag off `par` (the par of the holes counted
+ *  so far — the full nine on the result, the holes-played prefix on the running between-hole board). */
+function asgardBoardHTML(rows: AsgardRow[], par: number): string {
+  return [...rows]
+    .sort((a, b) => a.total - b.total || (a.you ? -1 : 1))
+    .map((r, i) => {
+      const place = i + 1;
+      const hi = r.you ? `background:rgba(255,210,110,0.16);` : '';
+      const nameCol = r.you ? GOLD : 'var(--gs-ink)';
+      const medal = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `${place}.`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;${hi}">
+        <span style="width:22px;text-align:center;">${medal}</span>
+        <b style="flex:1;color:${nameCol};font-size:14px;">${r.name}</b>
+        <span style="font-variant-numeric:tabular-nums;font-weight:700;color:${nameCol};">${r.total}</span>
+        <span style="width:34px;text-align:right;font-size:12px;color:var(--gs-dim);font-variant-numeric:tabular-nums;">${toPar(r.total, par)}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+/**
+ * The running Warriors-Three stroke-play standings shown BETWEEN holes of the Asgard tournament
+ * (GS-asgard): the player's real cumulative gross vs each warrior's ghost gross THRU the holes played so
+ * far, lowest total leading. This is the stroke-play twin of the ordinary 20-golfer Stableford field —
+ * on the Golden Realm the between-hole screen must read as ITS OWN event, never the normal arc board.
+ */
+export function asgardLiveBoardHTML(playedSoFar: PlayedHole[], pars: readonly number[], seed: string): string {
+  const thru = playedSoFar.length;
+  const playerTotal = playedSoFar.reduce((s, p) => s + p.record.strokes, 0);
+  const parThru = pars.slice(0, thru).reduce((a, b) => a + b, 0);
+  const rows: AsgardRow[] = [
+    { name: 'You', total: playerTotal, you: true },
+    ...warriorsThreeThru(seed, pars, thru).map((f) => ({ name: f.name, total: f.total, you: false })),
+  ];
+  const sorted = [...rows].sort((a, b) => a.total - b.total || (a.you ? -1 : 1));
+  const place = sorted.findIndex((r) => r.you) + 1;
+  const ord = place === 1 ? '1st' : place === 2 ? '2nd' : place === 3 ? '3rd' : `${place}th`;
+  const placeCol = place === 1 ? '#5fd45a' : place <= 2 ? '#ffce54' : '#ff6b6b';
+  return `
+    <p style="font-size:13px;margin:.4em 0 .5em;">You're <b style="color:${placeCol};">${ord}</b> of ${rows.length} · ${thru} hole${thru === 1 ? '' : 's'} in · stroke play.</p>
+    <div class="gs-glass" style="padding:8px;border-radius:12px;border:1px solid rgba(255,210,110,0.3);">
+      <div style="display:flex;align-items:center;padding:2px 10px 6px;font-size:10.5px;letter-spacing:.08em;color:var(--gs-dim);text-transform:uppercase;">
+        <span style="flex:1;">⚔ Warriors Three · thru ${thru}</span><span>Gross</span>
+      </div>
+      ${asgardBoardHTML(rows, parThru)}
+    </div>`;
 }
 
 /**
@@ -53,25 +111,13 @@ export function asgardResultScreen(): string {
   const o = state.asgardOutcome;
   if (!o) return `<div style="text-align:center;padding:40px;">${btn('Return to your journey', { type: 'leaveAsgard' }, { variant: 'primary' })}</div>`;
 
-  const rows = [
-    { name: 'You', total: o.playerTotal, you: true },
-    ...o.field.map((f) => ({ name: f.name, total: f.total, you: false })),
-  ].sort((a, b) => a.total - b.total || (a.you ? -1 : 1));
-
-  const board = rows
-    .map((r, i) => {
-      const place = i + 1;
-      const hi = r.you ? `background:rgba(255,210,110,0.16);` : '';
-      const nameCol = r.you ? GOLD : 'var(--gs-ink)';
-      const medal = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `${place}.`;
-      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;${hi}">
-        <span style="width:22px;text-align:center;">${medal}</span>
-        <b style="flex:1;color:${nameCol};font-size:14px;">${r.name}</b>
-        <span style="font-variant-numeric:tabular-nums;font-weight:700;color:${nameCol};">${r.total}</span>
-        <span style="width:34px;text-align:right;font-size:12px;color:var(--gs-dim);font-variant-numeric:tabular-nums;">${toPar(r.total, o.par)}</span>
-      </div>`;
-    })
-    .join('');
+  const board = asgardBoardHTML(
+    [
+      { name: 'You', total: o.playerTotal, you: true },
+      ...o.field.map((f) => ({ name: f.name, total: f.total, you: false })),
+    ],
+    o.par,
+  );
 
   const prizes = o.won
     ? `<div class="gs-glass" style="margin:12px 0;padding:14px 16px;border-radius:12px;border:1px solid rgba(89,182,255,0.4);text-align:left;">
