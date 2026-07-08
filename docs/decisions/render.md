@@ -302,7 +302,20 @@
   the three call sites: the decision `renderHoleSVG`, the `wireMapAiming` projector (tap/drag aim
   unprojects against the SAME params or aiming drifts), and the play-view animation mount. The
   animation uses the same focus + an eased follow-cam (rebuilt per frame) so it tracks the ball and
-  matches the decision map's zoom (no jump — also closed the decision↔animation projector mismatch). `Projector.unproject` is the inverse (screen→course) that
+  matches the decision map's zoom (no jump — also closed the decision↔animation projector mismatch).
+  - **Putt-watch static frame (GS-putt-watch-lag).** A follow-cam rebuilds the projector every frame,
+    which defeats playView's `cachedProj` scene cache (`proj !== cachedProj` is always true against a
+    fresh projector object) and so re-runs the whole heavy `buildScene` — flora, rough gradient, green
+    contour art — 60×/sec. On a SHOT that's the price of tracking a flying ball, but a PUTTS-ONLY watch
+    doesn't need to follow: the putt aim screen already framed the entire ball↔cup span at
+    `puttViewRadius` (midpoint-centred, `focusBias 0.5`), so the ball can simply roll across that same
+    frame held STILL. The animation mount passes `follow: hadShots` — off for a green putt — plus the
+    matching `focus`/`viewRadius`/`focusBias`, so the projector never changes and `buildScene` runs
+    ONCE for the whole roll instead of once per frame. This was the putt-watch chug the user reported,
+    worst on the frost/ice greens (their sparkle + relief art paint heaviest per frame). Measured 19→1
+    `buildScene` calls on a short 2-yd putt via a temporary counter at the `drawStatic` invocation;
+    longer putts roll more frames, so the saved rebuilds scale up. A putt roll stays inside the framed
+    span (`puttViewRadius` folds in the break bow with margin), so holding still doesn't clip it. `Projector.unproject` is the inverse (screen→course) that
   powers tap/drag aiming. The spray cone is drawn as a true ARC SECTOR (curved near/far edges at
   `carryLow`/`carryHigh`, swept ±`z·angleSd`) with min/max carry labels, matching the angular physics.
 - **Map navigation — overview / zoom / pan (GS-mapnav).** The follow-cam frames only the contemplated

@@ -364,6 +364,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     `render()` per drag frame — a full render rebuilds the whole `buildScene` (flora, rough gradient,
     contour art) and lagged hard on close chips/putts. Focus/follow mode only (stable projector);
     whole-hole fit mode falls back to `scheduleRender`. The sibling of the #281 putt-overlay swap.
+  - The PUTTS-ONLY watch-cam holds a STATIC frame (`follow: hadShots` in the animation mount — off for
+    a green putt), centred on the ball↔cup midpoint at `puttViewRadius` exactly like the putt aim
+    screen. The follow-cam rebuilds the projector every frame, which defeats playView's `cachedProj`
+    scene cache and re-ran the whole heavy `buildScene` 60×/sec — the putt-watch chug (worst on
+    frost/ice greens). A putt's whole span is already framed, so no follow is needed and the scene
+    builds ONCE (verified 19→1 on a short putt; larger on a long one). Shots still follow the ball in
+    flight. (GS-putt-watch-lag.)
   - Per-world identity is table+dispatch, never a fork: flora, OB markers, signature decor, ambient
     air, wind tint are ALL archetype-keyed (`tests/biome-identity.test.ts` guards full coverage); a
     flora variant must consume EXACTLY the classic two rng draws (extra variation via `posHash`).
