@@ -38,6 +38,7 @@ import {
   startAsgardRun,
   strand,
   travel,
+  salvageFindFor,
   bossRewards,
   grantTalent,
   starmartOffer,
@@ -51,6 +52,7 @@ import {
   type TeamDuelSetup,
 } from '../sim/rpg/run';
 import { endlessUnlocksCrossed, addEndlessRecord, type EndlessRunRecord } from '../sim/rpg/endless';
+import type { SalvageFind } from '../sim/rpg/salvage';
 import { archetypeFor } from '../sim/course/themes';
 import { effectPatchKind } from '../sim/rpg/effects';
 import { isMatchplayBoss, ASGARD_FORMAT } from '../sim/rpg/formats';
@@ -127,6 +129,11 @@ export interface UiState {
   lastResult?: StopResult;
   /** Onward routes, populated on the travel screen. */
   routes?: Route[];
+  /** The club a SALVAGE lane just looted on arrival (GS-salvage-mystery) — a TRANSIENT reveal (never
+   *  persisted), computed from the PRE-travel loadout in the `route` action so the blind gamble pays off
+   *  with a "you looted X" moment on the stop intro. `undefined` when the arriving lane wasn't salvage.
+   *  Recomputed each jump; a page-reload resume simply shows no reveal (the club is still in the bag). */
+  salvageReveal?: SalvageFind;
   /**
    * The outfitter's stock for this stop (item ids), fixed on entry so buying doesn't
    * reshuffle the cards. Live cost/stack state is recomputed from `run` at render time.
@@ -1297,6 +1304,10 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-fuel: a lane whose fuel shortfall exceeds the purse can't be taken (the UI disables it;
       // this guard keeps a stale click from throwing in `travel`).
       if (!canTravel(state.run, route)) return state;
+      // GS-salvage-mystery: resolve the salvage reveal from the PRE-travel loadout (once `travel` has
+      // run, the bag is mutated and the find can't be recomputed) — the same `salvageFindFor` source
+      // `travel` grants from, so the reveal on the intro is exactly what got equipped.
+      const salvageReveal = salvageFindFor(state.run, route);
       const run = travel(state.run, route);
       return {
         ...state,
@@ -1306,6 +1317,7 @@ export function reduce(state: UiState, action: Action): UiState {
         played: undefined,
         lastResult: undefined,
         routes: undefined,
+        salvageReveal,
         match: undefined,
         bossReward: undefined,
         asgardBanner: undefined, // the Asgard return note is a one-shot on the journey map (GS-asgard)

@@ -53,7 +53,7 @@ import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } f
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
 import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
-import { salvageClubFind } from './salvage';
+import { salvageClubFind, type SalvageFind } from './salvage';
 import { applyRainbowRoad } from './rainbow';
 import { ASGARD_THEME, themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
@@ -1216,6 +1216,21 @@ export function strand(run: Run): Run {
   return { ...run, status: 'ended', endedReason: 'stranded' };
 }
 
+/**
+ * Resolve the SALVAGE club find a route hands you on arrival (GS-journey-fx-3, GS-salvage-mystery) —
+ * `undefined` for any non-salvage lane. THE SINGLE SOURCE: `travel` grants from it, and the UI reveals
+ * from it (the reveal, unlike a preview, is computed here from the PRE-travel `run` so it can't be
+ * recomputed after `travel` has already mutated the bag). Keyed to the DESTINATION stream
+ * (`salvage:<seed>:<arrivingStop>:<eventId>`), so each salvage stop is its own blind roll — skip it and
+ * the next lane's loot may differ. Pure & deterministic in `run` + `route` (never a shared sim/render
+ * stream), so it perturbs no existing draw order (contract 1).
+ */
+export function salvageFindFor(run: Run, route: Route): SalvageFind | undefined {
+  const findRarity = routeClubFind(route.event);
+  if (!findRarity) return undefined;
+  return salvageClubFind(run.loadout, findRarity, `salvage:${run.seed}:${run.stopIndex + 1}:${route.event.id}`);
+}
+
 /** Travel a chosen route to the next stop (deeper = harder, better rewards). */
 export function travel(run: Run, route: Route): Run {
   if (run.status !== 'active') throw new Error('travel: run is not active');
@@ -1236,16 +1251,16 @@ export function travel(run: Run, route: Route): Run {
   // GS-routes: a credit TOLL bites up front (floored so it never strands you below zero).
   const toll = Math.max(0, ev.creditToll ?? 0);
   // GS-journey-fx-3: a SALVAGE lane scavenges a club you don't already carry, equipped for the rest of
-  // the run — a reward you feel THIS run, in place of the old trivial shard drip. Resume-safe for free:
-  // the find is a shop CLUB_ITEM, so applying it records the item's perk id and `loadoutFromPerks`
-  // re-equips it on resume. Deterministic on a PRIVATE stream (never a shared sim/render stream), so
-  // attaching it perturbs no existing draw order (contract 1). If the bag already holds every candidate
-  // at that rarity, it pays a rarity-scaled credit consolation so the lane never comes up empty.
-  const findRarity = routeClubFind(ev);
+  // the run — a reward you feel THIS run, in place of the old trivial shard drip. Resolved by the shared
+  // `salvageFindFor` (the single source the UI reveal also reads), keyed to the DESTINATION so each
+  // salvage stop is its own blind roll (GS-salvage-mystery). Resume-safe for free: the find is a shop
+  // CLUB_ITEM, so applying it records the item's perk id and `loadoutFromPerks` re-equips it on resume.
+  // If the bag already holds every candidate at that rarity, it pays a rarity-scaled credit consolation
+  // so the lane never comes up empty.
+  const found = salvageFindFor(run, route);
   let loadout = run.loadout;
   let salvageCredits = 0;
-  if (findRarity) {
-    const found = salvageClubFind(loadout, findRarity, `salvage:${run.seed}:${arrivingStop}:${ev.id}`);
+  if (found) {
     const item = found.clubItemId ? clubItem(found.clubItemId) : undefined;
     if (item) loadout = item.apply(loadout);
     else salvageCredits = found.consolationCredits ?? 0;

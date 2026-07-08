@@ -166,9 +166,15 @@
   runs on a PRIVATE `Rng` stream (`salvage:<seed>:<arrivingStop>:<eventId>`), never a shared sim/render
   stream, so attaching a find perturbs no existing draw order (the whole seeded suite stayed byte-identical).
   (3) **can't spiral** — paid at travel (touches neither generation nor the shot stream), and a found club
-  only ever RAISES Stableford. The route card previews the EXACT club off the same stream, so it can't lie.
-  Shards are a run-END reward now (`shardsForRun`: distance/win/bank); `run.bonusShards` moves only via
-  endless milestones (GS-unending). No new `_gs*`/URL hook → the test-hub guard needs no new control.
+  only ever RAISES Stableford. **The find is a BLIND gamble (GS-salvage-mystery):** the route card previews
+  only the TIER, never the exact club — knowing it in advance killed the gamble and made every salvage lane
+  read as the same fixed reward. Because the private stream is keyed to the DESTINATION
+  (`salvage:<seed>:<arrivingStop>:<eventId>`), each salvage stop is its own roll: skip it here and the next
+  lane's loot may differ. The grant still resolves from that same stream in `travel` (the single auto ≡
+  interactive source), so the mystery is presentation-only — determinism (contract 1) and auto ≡ interactive
+  (contract 2) are untouched. Shards are a run-END reward now (`shardsForRun`: distance/win/bank);
+  `run.bonusShards` moves only via endless milestones (GS-unending). No new `_gs*`/URL hook → the test-hub
+  guard needs no new control.
 - **The route draw is a per-ARC rarity SLOT model (GS-routes, `drawArcRouteEvents`).** Not a flat
   rarity-weighted shuffle — the loot feel ramps with the journey via `ARC_SLOTS[arcForDistance(dist)]`.
   Each slot names a BASE rarity + a GATED upgrade `chain` (`chain[k]` = P(climb one more tier | climbed
