@@ -2121,12 +2121,26 @@ function render(): void {
         20,
         ...animatingPlay.shots.map((s) => Math.hypot(s.rest[0] - s.from[0], s.rest[1] - s.from[1])),
       );
-      const focus = animatingPlay.shots[0]?.from ?? animatingPlay.putts[0]?.from ?? play.ball;
-      // Orient pin-up from the shot's origin (fixed for the whole animation so the world doesn't
-      // spin mid-flight) — matches the decision map the player just aimed on (origin→pin up).
-      const animPin = pinOf(play.hole);
-      const animUp: [number, number] = [animPin[0] - focus[0], animPin[1] - focus[1]];
       const hadShots = animatingPlay.shots.length > 0;
+      const animPin = pinOf(play.hole);
+      // A PUTTS-ONLY watch (rolling the ball out on the green) needs NO follow-cam: the putt screen
+      // already framed the WHOLE ball↔cup span (puttViewRadius, midpoint-centred), so the ball simply
+      // rolls across a STATIC frame — exactly the putt aim screen held still (the documented "reuses
+      // the putt screen's framing"). Crucially a static camera lets playView's scene cache HOLD: the
+      // follow-cam rebuilds the projector every frame, which re-ran the whole heavy `buildScene`
+      // (flora, rough gradient, green contour art) 60×/sec — the putt-watch chug, worst on the
+      // frost/ice greens whose sparkle + relief art paint heaviest. Off the green (a real shot in the
+      // batch) still follows the ball in flight. (GS-putt-watch-lag.)
+      const focus: [number, number] = hadShots
+        ? (animatingPlay.shots[0]?.from ?? animatingPlay.putts[0]?.from ?? play.ball)
+        : // Centre on the ball↔cup MIDPOINT, matching the putt screen's `puttMid` frame exactly.
+          [
+            ((animatingPlay.putts[0]?.from ?? play.ball)[0] + animPin[0]) / 2,
+            ((animatingPlay.putts[0]?.from ?? play.ball)[1] + animPin[1]) / 2,
+          ];
+      // Orient pin-up from the focus (fixed for the whole animation so the world doesn't spin
+      // mid-flight) — matches the decision / putt map the player just aimed on (origin→pin up).
+      const animUp: [number, number] = [animPin[0] - focus[0], animPin[1] - focus[1]];
       // Fill the WHOLE full-bleed map (the `.gs-bigmap` is absolute inset:0 = the viewport), so the
       // watch screen has no letterboxed dead space below the canvas. The canvas can't aspect-scale
       // via CSS like the SVG map can, so we size it to the container's real pixels and let the
@@ -2154,10 +2168,14 @@ function render(): void {
         // animation; the follow-cam pans to keep up with the ball either way. A putts-only animation
         // keeps the PUTT screen's framing the same way (puttViewRadius) — the old fixed 25 popped the
         // camera out and back around every stroke on the green.
-        viewRadius: animatingPlay.shots.length ? decisionRadius ?? decisionReach(travel) : puttViewRadius ?? 25,
-        focusBias: DMAP_BIAS,
+        viewRadius: hadShots ? decisionRadius ?? decisionReach(travel) : puttViewRadius ?? 25,
+        // Putts-only: centre the ball↔cup span (bias 0.5) exactly like the putt screen; a shot
+        // watch keeps the low decision-map bias so more of the hole ahead stays in view.
+        focusBias: hadShots ? DMAP_BIAS : 0.5,
         up: animUp,
-        follow: true,
+        // Follow the ball only when there's a real shot in flight; a green putt holds the frame
+        // still so the heavy scene builds ONCE, not every frame (GS-putt-watch-lag).
+        follow: hadShots,
         onImpact: (kind, quality, clubId) => {
           // Contact cue — fires at the strike moment (the windup has already played).
           if (kind === 'shot') {
