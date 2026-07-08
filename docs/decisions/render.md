@@ -992,3 +992,34 @@ except the chip-cone one (preview-only, no sim rng). Full suite stayed green (10
 **Deferred (its own PR):** rough being too FORGIVING — a clean miss is only −10% carry and the heavy lies
 sit off the centreline, so you can bomb over everything and club choice never bites. That's the balance
 half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by the death-spiral harness.
+
+## GS-biome-relief: rolling-terrain DEPTH on every world (2026-07-08)
+
+- **The ask.** Player: "can we add depth to all biomes? it needs to be biome specific and including
+  Cetus/void/Asgard/rainbow road — they look good, but they all look incredibly flat and lifeless."
+  Prior passes (GS-rough-frame → GS-ground-cover → GS-rough-cover-2) gave the rough its ground COLOUR
+  and a surface TEXTURE (mottle/grain/tufts), but no large-scale FORM — so a whole world still pressed
+  flat under its texture. The missing cue is directional terrain relief.
+- **The fix (`style/relief.ts`, `biomeRelief` + `BIOME_RELIEF`).** Over the covering, lay soft PAIRED
+  highlight/shadow lobes across the land, both lit from the shared upper-left sun (`LIGHT_UL`): a lit
+  crest offset UP-light, a shaded hollow offset DOWN-light. The pairing is the whole trick — a lone
+  bright tonal blob reads as a "spotlight" pasted on the hole (the documented failure mode of the old
+  big section-4 tone patches, which is exactly why those were dialled down to near-invisible 0.03/0.07
+  alpha); a highlight MARRIED to an offset shadow reads as a rise with volume. Mounds sit on a jittered
+  COURSE-space grid (~3–4 per axis, radius overlapping for smooth undulation), clipped to the land.
+- **Per-world, never neutral (`BIOME_RELIEF`, one row per archetype, machine-checked like the other
+  biome tables).** Crest/hollow tints are keyed to each world's ground so the relief SELLS the biome:
+  warm dune light + brown shadow (desert/ocean), snow-white crest + cool-blue hollow (frost), ember rise
+  + charred hollow (inferno), luminous indigo rise + abyssal hollow (void), aqua clifftop swells (cetus),
+  gilded meadow-rolls (asgard). Neutral white/black highlights are banned — they'd read as spotlights or
+  smudges, not terrain. Rainbow Road takes its own `RAINBOW_RELIEF`, drawn ON the ribbon (its bands are
+  opaque) as a gentle prismatic sheen so the track rolls without muddying the spectrum.
+- **Determinism + camera (why it's cheap to trust).** The pass is PURE geometry — it draws ZERO rng, so
+  it perturbs NO existing seeded stream (contract 1) and every prior seeded/byte test stays identical; it
+  only ADDS prims. Per-mound variety is `posHash` of the COURSE-space cell, never rng, never the
+  projection. The mound COUNT is a function of the land's course-space bbox (yards) and a course-space
+  inside-poly test — camera-independent — and every mound is pushed UNCONDITIONALLY, so a follow-cam
+  pan/zoom never shifts the prim count (`tests/camera-stability.test.ts` still green). Drawn UNDER the
+  mown turf + cover + decor (section 3c), so the undulation lives in the rough where the flat read was
+  worst and the crisp fairway/green/stripes paint over it. Rides `art.texture` (0 turns it off) — no new
+  `window._gs*` hook, so no test-hub sync obligation. Re-shoot `scripts/gallery.mjs` after touching it.

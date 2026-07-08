@@ -334,6 +334,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     tone (machine-checked). The rough is the biome's ground COVERING (`GROUND_COVER` table — every
     archetype has a row EXCEPT void/cetus, machine-checked). Easter-egg props (`EGGS`) hide in the
     rough on their own stream, off-corridor, camera-proof; void/cetus excluded.
+  - DEPTH: over the covering, `biomeRelief` (`style/relief.ts`, `BIOME_RELIEF` table — EVERY
+    archetype has a row, machine-checked) lays directionally-lit relief mounds so the ground reads as
+    ROLLING terrain, not a flat slab (GS-biome-relief). Paired hi/lo lobes offset along `LIGHT_UL`
+    (a lit crest + an offset shaded hollow = a rise with volume; a lone bright blob is the "spotlight"
+    bug); tints are per-world (dunes/snow drifts/scorched swells/cosmic rises/gilded rolls), never
+    neutral. PURE geometry (ZERO rng — `posHash` variety only) → perturbs no seeded stream (contract
+    1) and the mound count is a function of the COURSE-space land bbox, never the projection
+    (camera-proof). Clipped to the land/lost-platforms and drawn UNDER the mown turf (undulation lives
+    in the rough); Rainbow Road rides its own `RAINBOW_RELIEF` sheen ON the ribbon. Rides `art.texture`
+    (no new `_gs*` hook). Re-shoot the gallery after touching it.
   - Platforms + hazard families merge through `render/merge.ts`: platforms are
     `dilateUnion(…, 14)` (never a mitred `offsetPoly` outset — it folds at concave bends);
     sand/liquid families draw union-merged bodies (course-space, WeakMap-cached).
