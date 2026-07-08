@@ -40,11 +40,16 @@ look assembly). Cosmetic-only → zero sim/rng impact, so no contract is touched
 - **`secret` items.** Thor's Hammer is `secret: true` (mirrors `Ship.secret`): `canBuyApparel` refuses it
   and `apparelRevealedInMarket` hides it until owned — the same "one reveal predicate" the Unending
   milestone unlocks use, so the market never spoils the reward.
-- **Render.** In the swing, `drawWarhammer` swaps the plain club head for a gilded rune-etched maul with
-  phase-gated forked lightning (deterministic off the swing/follow phase — no `Math.random`, assetless),
-  taking precedence over the in-run gear tint. It also draws on the wardrobe card, the clubhouse stage,
-  and leaning against the fireplace right-jamb (static coords, gated on ownership so it never perturbs the
-  seeded lounge).
+- **Render.** In the swing, `drawWarhammer` swaps the plain club head for a big gilded rune-etched maul —
+  a flared-face Mjölnir with a bright rim, a storm-core that stays lit through the whole swing, and layered
+  forked lightning (deterministic off the swing/follow phase — no `Math.random`, assetless), taking
+  precedence over the in-run gear tint. It reads as a hammer from any swing angle: the head was scaled up
+  and the always-on aura + core keep it recognisable even when it smears through a fast downswing (the
+  original was too small + spun too fast to read). **The skin is the DRIVER'S head ONLY** — on course
+  `playView` strips `look.driver` off every non-driver shot (`shot.club.id !== 'D'`) so an iron/wedge/chip
+  swings the plain (or gear-themed) club; the earlier build wrongly drew the warhammer for every club. It
+  also draws on the wardrobe card, the clubhouse stage, and leaning against the fireplace right-jamb (static
+  coords, gated on ownership so it never perturbs the seeded lounge) — those show the cosmetic unconditionally.
 
 ## 3. The interlude (phase 3)
 
