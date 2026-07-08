@@ -107,6 +107,32 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   is the guard); Ascension still tightens every step above the floor. No rng involvement — targets
   change who is cut, never a draw. Tests: `tests/competition.test.ts` (pre-final floor across
   A1/A2/A5/A7/A15, final stays 2).
+- **The low-Ascension ghost-field EASE — a green-bag player shooting par is competitive at A0–A4
+  (GS-green-ease).** The competition is calibrated around the field median (~2.1–2.2 SF/hole), which
+  is the whole point of it being a hard tournament — but it also meant an even-par (2.0 SF/hole) player
+  sat MID-PACK (≈11th–14th of 20) and got positionally CUT before ever reaching the final, at EVERY
+  Ascension tier: the per-level `ascensionCutBonus` squeeze on `arcSurvivorTarget` is swallowed almost
+  entirely by the target floors (pre-final 4, final 2), so A0 and A4 played essentially the same brutal
+  cut, and a green-bag player who wasn't beating the field median by a couple of shots per stop was
+  eliminated for playing par golf (measured: even-par cut-survival ≈ 0% across A0–A4). `voyageFieldEase
+  (ascension)` (`competition.ts`) now hands the WHOLE AI field a per-hole Stableford back at the gentle
+  end of the ladder — `VOYAGE_EASE_A0 = 0.66` SF/hole at A0, held across the green-bag band A0–A4 with a
+  gentle downward gradient (a real difficulty ramp the target floors never delivered), fading to 0 by
+  `VOYAGE_EASE_ZERO_AT = 8` so the deep ladder + every A8+ seeded test is byte-identical to the pre-ease
+  field. Calibrated so an even-par player's cut-survival is ≈84/80/75/70/61% across A0–A4 while a
+  BELOW-par (bogey, ~1.7 SF/hole) player still misses the cut ~99% of the time — the fix lifts par golf
+  over the cut line WITHOUT letting sub-par golf cruise (the "don't over-tune it easy" bar). CRITICAL —
+  it is threaded as `ghostHoleStableford`'s new `ease` param (default 0 = the original field, byte-for-
+  byte), applied to `base` BEFORE the noise draws, so it consumes ZERO extra rng and never reorders the
+  stream (contract 1): it changes the field's SCORES, not its determinism. Carried on each `ArcStopSlice`
+  as `fieldEase` (set in `run.arcSlices`, voyage-only) so `sliceScores`/`arcCut` (survival) AND
+  `league.liveLeaderboard` (the live mid-stop board) apply the IDENTICAL ease — the displayed board and
+  the real cut can never disagree. NOTE — this eases the CUT (reaching the final), not the matchplay
+  BOSSES: the three duels are still the genuine, hard climax (GS-boss-scale, A0+common byte-identical),
+  so a literal "even-par wins the whole voyage 70–80%" would ALSO need a boss ease — deliberately NOT
+  done here (it would break the byte-identical classic boss and risk over-easing). Tune via
+  `VOYAGE_EASE_A0`/`VOYAGE_EASE_ZERO_AT`. Tests: `tests/competition.test.ts` (ease curve, byte-identical
+  default, A0≫A8 survival).
 - **Boss-reward TALENTS — pick a run buff or a permanent reward (GS-talents).** Beating a NON-final boss
   opens a reward screen: choose ONE of a thematic run **talent**, a generic run talent, or a permanent
   **Star-Shard** bonus (the "talent or permanent reward for this run" ask). Talents (`TALENTS` in

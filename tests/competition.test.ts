@@ -13,6 +13,8 @@ import {
   bossOpponentFor,
   arcCut,
   arcSurvivorTarget,
+  buildVoyageField,
+  voyageFieldEase,
   type ArcStopSlice,
   golferBaseline,
   golferForm,
@@ -124,6 +126,68 @@ describe('ghostHoleStableford', () => {
     expect(golferBaseline(0)).toBeCloseTo(0.6);
     expect(golferBaseline(1)).toBeCloseTo(2.6);
     expect(golferBaseline(0.5)).toBeCloseTo(1.6);
+  });
+});
+
+describe('low-Ascension ghost-field ease (GS-green-ease)', () => {
+  const keys = Array.from({ length: 400 }, (_, i) => `h:${i}`);
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
+  it('voyageFieldEase is a positive low-A cushion that fades to 0 by A8', () => {
+    expect(voyageFieldEase(0)).toBeGreaterThan(0);
+    // A gentle downward gradient across the green-bag band A0..A4.
+    for (const a of [1, 2, 3, 4]) expect(voyageFieldEase(a)).toBeLessThan(voyageFieldEase(a - 1));
+    // Fully faded by A8, and clamped there for the whole deep ladder (feature-off = byte-identical).
+    expect(voyageFieldEase(8)).toBe(0);
+    expect(voyageFieldEase(12)).toBe(0);
+    expect(voyageFieldEase(15)).toBe(0);
+    // Never over-eases: at most ~1 SF/hole even at A0.
+    expect(voyageFieldEase(0)).toBeLessThanOrEqual(1);
+  });
+
+  it('ease defaults to 0 (byte-identical) and lowers the field mean when armed', () => {
+    // Omitting `ease` === passing 0 — the original field, byte-for-byte.
+    for (const k of keys.slice(0, 20)) {
+      expect(ghostHoleStableford('field:marco-vance', k, false, 0, 0)).toBe(
+        ghostHoleStableford('field:marco-vance', k, false, 0),
+      );
+    }
+    // An armed ease shaves the field's scoring level (the whole point) — ease is the 6th arg (after form).
+    const plain = mean(keys.map((k) => ghostHoleStableford('champ:scorpius', k, false, 0, 0, 0)));
+    const eased = mean(keys.map((k) => ghostHoleStableford('champ:scorpius', k, false, 0, 0, voyageFieldEase(0))));
+    expect(eased).toBeLessThan(plain);
+  });
+
+  it('an even-par player survives the cut far more often at A0 than at A8', () => {
+    // A flat even-par (2 SF/hole) card over the six ordinary voyage stops. Spread the archetype across
+    // the stops (as a real voyage does) so no single champion's home zone stacks a boost on every hole.
+    const holeCounts = [6, 7, 0, 6, 7, 0, 6, 7]; // 0 = boss (no positional cut)
+    const archs = ['verdant', 'desert', 'frost', 'inferno', 'ocean', 'crystal', 'tempest', 'fungal'] as const;
+    const surviveRate = (ascension: number): number => {
+      let alive = 0;
+      const N = 120;
+      for (let s = 0; s < N; s++) {
+        const seed = `ease:${s}`;
+        const field = buildVoyageField(seed, { name: 'You', look: LOOK, characterId: 'feather-fade' });
+        const fieldEase = voyageFieldEase(ascension);
+        const slices: ArcStopSlice[] = holeCounts.map((hc, i) => ({
+          stopIndex: i,
+          archetype: archs[i]!,
+          holeCount: hc || 9,
+          playerSF: hc ? 2 * hc : 0,
+          isBoss: hc === 0,
+          target: arcSurvivorTarget(i, ascension),
+          fieldEase,
+        }));
+        if (arcCut(field, seed, slices).playerAlive) alive++;
+      }
+      return alive / N;
+    };
+    const a0 = surviveRate(0);
+    const a8 = surviveRate(8);
+    expect(a0).toBeGreaterThan(0.6); // green-bag even-par is genuinely competitive at A0
+    expect(a8).toBeLessThan(0.15); // the deep ladder stays brutal (the pre-ease field)
+    expect(a0).toBeGreaterThan(a8 + 0.4);
   });
 });
 
