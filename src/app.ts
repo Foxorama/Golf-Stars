@@ -25,7 +25,9 @@ import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
 import { getFormat, ASGARD_FORMAT } from './sim/rpg/formats';
-import { currentBoss, effectiveCut, holeGateArmed, snapshotRun } from './sim/rpg/run';
+import { currentBoss, effectiveCut, holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
+import { shopItem } from './sim/rpg/economy';
+import { CHARACTERS } from './sim/rpg/characters';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
@@ -134,12 +136,39 @@ function boot(): void {
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
     setState(initState(seed, meta, save.activeRun));
+    applyDebugParams(); // GS-asgard: test-hub-only `?rainbow=` / `?asgard=` jumps (dormant in the live game)
     stage('init');
     render();
     stage('rendered');
   } catch (err) {
     recover(err);
   }
+}
+
+/**
+ * TEST-HUB debug jumps (GS-asgard) — driven ONLY by the hub's Demo controls via URL params; the live
+ * game never sets them, so they're dormant in production exactly like `?seed=`/`?intro=`. They let QA
+ * reach the hard-to-earn Rainbow-Road → Asgard flow in one click, without grinding for the Rainbow Ball
+ * or an eagle:
+ *   • `?rainbow=1` — start a fresh run with the Rainbow Ball armed, so every hole is Rainbow Road (eagles
+ *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
+ *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
+ *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
+ * Both compose, and both reuse the real reducer to build an honest run — nothing forks the game's logic.
+ */
+function applyDebugParams(): void {
+  const rainbow = new URLSearchParams(location.search).get('rainbow');
+  const asgard = new URLSearchParams(location.search).get('asgard');
+  if (!rainbow && !asgard) return;
+  // Build a genuine interactive run with the first golfer, via the same reducer path the UI uses.
+  let s = reduce(state, { type: 'start', format: 'unending' });
+  s = reduce(s, { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+  let run = s.run;
+  if (rainbow) run = { ...run, loadout: shopItem('rainbow-ball')!.apply(run.loadout) };
+  s = { ...s, run, course: currentCourse(run) };
+  // Open the Bifröst directly: suspend this run and reveal the Himinbjörg map.
+  if (asgard) s = { ...s, screen: 'asgardMap', asgardReturn: snapshotRun(run) };
+  setState(s);
 }
 
 /**
