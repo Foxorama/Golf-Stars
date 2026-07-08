@@ -5,7 +5,7 @@
  */
 
 import { btn, state } from './ctx';
-import { FORMATS } from '../sim/rpg/formats';
+import { FORMATS, ASGARD_FORMAT } from '../sim/rpg/formats';
 
 /** The captured PWA install prompt (beforeinstallprompt), if the browser offered one and the
  *  player hasn't installed/dismissed it. Surfaced as an "Install" button on the title. Set by
@@ -32,6 +32,9 @@ export function titleScreen(): string {
   // Ascension is picked at golfer select, not here.
   const modes = Object.values(FORMATS)
     .slice()
+    // The Asgard tournament (GS-asgard) is an INTERLUDE format, reached only via the Rainbow-Road
+    // eagle trigger — never a selectable game mode on the title.
+    .filter((f) => f.id !== ASGARD_FORMAT)
     .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
     .map(
       (f) => `
