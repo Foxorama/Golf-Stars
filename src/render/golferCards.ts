@@ -146,8 +146,10 @@ export function characterScreen(
     ascension?: { max: number; sel: number };
     /** The Unending Universe's STARTING CLUB SET picker (GS-golf-score): `owned` is the highest tier the
      *  player can play (every tier at or below it is selectable; green is always available), `sel` the
-     *  chosen difficulty. Absent for the voyage (it always plays the full owned tier). */
-    clubSet?: { owned: BagTier; sel: BagTier };
+     *  chosen difficulty. Absent for the voyage (it always plays the full owned tier). `touched` — has the
+     *  player tapped a chip THIS visit (GS-wardrobe-bagtier)? Only then does the pick ride the select action
+     *  as an explicit override; untouched, each golfer plays its own wardrobe-set tier. */
+    clubSet?: { owned: BagTier; sel: BagTier; touched?: boolean };
   } = {},
 ): string {
   const verb = opts.winnable === false ? 'Survive as' : 'Voyage as';
@@ -165,7 +167,7 @@ export function characterScreen(
       type: 'selectCharacter',
       characterId: ch.id,
       ...(opts.ascension ? { ascension: opts.ascension.sel } : {}),
-      ...(opts.clubSet ? { bagTier: opts.clubSet.sel } : {}),
+      ...(opts.clubSet && opts.clubSet.touched ? { bagTier: opts.clubSet.sel } : {}),
     };
     return `
       <button class="gs-charcard" data-action='${JSON.stringify(action)}'
@@ -208,7 +210,7 @@ export function characterScreen(
           return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip"${locked ? ' disabled' : ` data-clubset="${d.tier}"`}
             style="--cc:${d.col};${on ? `border-color:${d.col};color:${d.col};` : ''}${locked ? 'opacity:.4;' : ''}">${locked ? '🔒 ' : ''}${d.label}</button>`;
         }).join('')}</div>
-        <span class="gs-ascpick-hint">a weaker set is the sterner test — net scoring keeps the leaderboard fair; unlock better bags in the Voyage</span>
+        <span class="gs-ascpick-hint">a weaker set is the sterner test; each golfer keeps its own pick in the Clubhouse wardrobe — set it here for this run</span>
       </div>`
     : '';
   return `

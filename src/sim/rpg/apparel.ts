@@ -19,7 +19,8 @@ export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
 
 /** Hat silhouettes the drawer renders (canvas + SVG share these shape names). `baggy` is the soft
  *  slouched-crown cap of the Evergreen set (GS-unending). `wingedHelm` is the Asgardian Valkyrie helm —
- *  a steel dome with a nasal guard and a feathered wing swept up each side (GS-valkyrie). */
+ *  a steel dome with a nasal guard and a feathered wing swept up each side (GS-valkyrie). `supernova` is
+ *  the mythic Supernova crown — a jewelled circlet erupting into a burst of starlight rays (GS-supernova). */
 export type HatShape =
   | 'cap'
   | 'bucket'
@@ -27,7 +28,7 @@ export type HatShape =
   | 'tophat'
   | 'crown'
   | 'helmet'
-  | 'halo'
+  | 'supernova'
   | 'baggy'
   | 'wingedHelm';
 /** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
@@ -161,9 +162,9 @@ export const APPAREL: readonly Apparel[] = [
     slot: 'hat',
     set: 'Supernova',
     rarity: 'mythic',
-    blurb: 'A halo of caught starlight. The crown of the Supernova set.',
+    blurb: 'A dying star crowned in violet, erupting into rays of caught starlight. The crown of the Supernova set.',
     cost: APPAREL_COST.mythic,
-    look: { shape: 'halo', color: '#ff7bf0', accent: '#fff0a0', glow: '#ff4fd8' },
+    look: { shape: 'supernova', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
   },
 
   // ===== SHIRTS ========================================================================

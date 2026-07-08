@@ -11,7 +11,7 @@ import { effectPatchKind } from '../sim/rpg/effects';
 import { getCharacter } from '../sim/rpg/characters';
 import { equippedGearTheme, isPuttingCaddy, namedCaddyOwned } from '../sim/rpg/economy';
 import { apparelById } from '../sim/rpg/apparel';
-import { driverForCharacter, hatForCharacter, pantsForCharacter, shirtForCharacter } from '../ui/game';
+import { driverForCharacter, golfBagForCharacter, hatForCharacter, pantsForCharacter, shirtForCharacter } from '../ui/game';
 import type { GolferLook } from '../render/playView';
 import { CADDY_LABEL, hasCaddyArt } from '../render/caddyArt';
 import { getSettings } from '../settings';
@@ -72,6 +72,8 @@ export function golferLook(): GolferLook | undefined {
   const pantsStyle = apparelById(pantsForCharacter(state, cid))?.look;
   // The equipped cosmetic DRIVER (GS-thor) — swaps the plain club head for its own skin (Thor's Hammer).
   const driver = apparelById(driverForCharacter(state, cid))?.look;
+  // The equipped cosmetic BAG (GS-wardrobe-bagtier) — propped beside the golfer on the course.
+  const bag = apparelById(golfBagForCharacter(state, cid))?.look;
   return {
     ...base,
     ...(gear ? { gear: { theme: gear.theme, tint: gear.tint } } : {}),
@@ -79,6 +81,7 @@ export function golferLook(): GolferLook | undefined {
     ...(shirtStyle ? { shirtStyle } : {}),
     ...(pantsStyle ? { pantsStyle } : {}),
     ...(driver ? { driver } : {}),
+    ...(bag ? { bag } : {}),
   };
 }
 

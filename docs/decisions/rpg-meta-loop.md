@@ -670,10 +670,16 @@
     rotating ship market, the wardrobe is the FULL catalogue (you pick the look you want); a piece is bought once
     with shards (`APPAREL_COST` per tier: common 15 … legendary 280, **mythic 500**) and equipped per slot
     (clicking the worn piece again takes it OFF — `equipApparel` toggles). Sets: the traditional **Astronaut** set
-    (legendary Helmet + Space Suit) and the **Supernova** mythic set (glowing halo-Crown + nebula Suit, 500 each —
-    the "super cool" pair); plus standalone basics (cap/bucket/visor/tophat/gold-crown, polo/striped/jersey).
-    `equippedSet(hat, shirt)` flags a completed multi-piece set. Hats render as 7 canvas/SVG SHAPES (cap/bucket/
-    visor/tophat/crown/helmet/halo), shirts as 5 (polo/striped/jersey/spacesuit/cosmic).
+    (legendary Helmet + Space Suit) and the **Supernova** mythic set (a radiant starburst Crown + nebula Suit +
+    Leggings, 500 each — the "super cool" trio); plus standalone basics (cap/bucket/visor/tophat/gold-crown,
+    polo/striped/jersey). `equippedSet(hat, shirt)` flags a completed multi-piece set. Hats render as canvas/SVG
+    SHAPES (cap/bucket/visor/tophat/crown/helmet/supernova/…), shirts as 5 (polo/striped/jersey/spacesuit/cosmic).
+    **GS-supernova**: the Supernova Crown was a lone pink-and-yellow `halo` bubble that clashed with the deep-violet
+    nebula suit/leggings. Re-themed to the SET palette (violet `#3a1d6e` body, hot-pink `#ff7bf0` accent, magenta
+    `#ff4fd8` glow, starlight `#fff0a0` tips) and redrawn as a NEW `supernova` shape — a jewelled circlet erupting
+    into a symmetric burst of starlight rays (computed from a polar ray table, gradient violet→pink→starlight) with
+    a star-core gem. Retired `halo` (was Supernova-exclusive). Mirrored in BOTH `apparelArt.ts hatGlyph` (SVG) and
+    `playView.ts drawHat` (canvas); re-shoot `cosmetics-preview.mjs`.
   - **The golfer WEARS what you buy.** `GolferLook` (playView) gained `hat?`/`shirtStyle?: ApparelLook`; the
     canvas `drawGolfer` draws the hat shape (replacing the default cap) + the shirt colour/glow/spacesuit chest
     panel, and `app.ts golferLook()` layers the equipped hat/shirt over the character's base style. The wardrobe
@@ -789,14 +795,14 @@
     rarity, the parked ship via `shipSVG`) is a fourth tap target for the ride.
   - **Hats size to the head they sit on (GS-wardrobe-cosmetics).** The SVG `hatGlyph` (apparelArt.ts) used
     to draw FIXED ~11u shapes anchored 6u above the head, so an *enclosing* hat (the astronaut `helmet`,
-    the supernova `halo`) landed as a small bubble perched on top of the big stage/lounge head instead of
+    the old supernova `halo`, since redrawn as the `supernova` starburst) landed as a small bubble perched on top of the big stage/lounge head instead of
     covering it. `hatGlyph(look, cx, cy, r, uid)` is now HEAD-RADIUS parameterized: shapes are authored in a
     canonical head-centre frame at R0=7 — the SAME numbers as the on-course `drawHat` (playView.ts) — then a
     single `scale(r/R0)` fits them to the real head (`headR` in the preview, a chosen `hatR` in the card), so
     the helmet encloses the head exactly as on-course. GOTCHA: the SVG preview is FRONT-facing (the figure
     looks at you) while `drawHat`'s canvas is PROFILE (down-the-line, brim points +x); brimmed hats
     (cap/visor) therefore keep symmetric front brims in the SVG — do NOT "sync" them to point sideways, the
-    viewpoints differ on purpose. Enclosing/symmetric hats (helmet/halo/tophat/crown/bucket) match both ways.
+    viewpoints differ on purpose. Enclosing/symmetric hats (helmet/supernova/tophat/crown/bucket) match both ways.
   - **Reveal-one interaction.** Tapping a body part or the garage opens `clubhousePicker` — just THAT slot's
     owned rack (the same `clubhouseApparelCardHTML` equip toggles / `shipCardHTML` fleet as before; empty
     apparel slots show a Trade-Market buy button). The open slot is `clubhouseSlot: ApparelSlot | 'ship' | null`,
@@ -1140,7 +1146,7 @@ non-gendered too." So the load-bearing decision: **gender presentation lives ONL
   design; if that ever felt necessary the honest move is to NOT ship it (the brief said as much).
 - **A sealed helmet hides hair.** `sealed = hat.look.shape === 'helmet'` skips all hair, so the moment
   any golfer dons the astronaut suit they read as an identical sealed astronaut — the non-gendered
-  spacesuit made literal. Other hats (cap/bucket/visor/tophat/crown/baggy/halo) sit on top and the hair
+  spacesuit made literal. Other hats (cap/bucket/visor/tophat/crown/baggy/supernova) sit on top and the hair
   shows below the brim, as real hair does.
 - **Style is a length/shape spectrum, not a gender switch:** `crop` (short) → `sweep` (side-swept) →
   `tousled` (medium) → `coils` (voluminous). Any golfer could wear any of them; each row just picks the

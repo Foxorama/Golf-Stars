@@ -169,9 +169,14 @@ export interface UiState {
   maxAscensionByCharacter: Record<string, number>;
   /** Lifetime holes-in-one made across every run (GS-ace) — a permanent, cross-run record. */
   lifetimeAces: number;
-  /** The owned permanent default-bag tier (GS-bag-tiers) — baked into every new run's starting bag.
-   *  'common' = the un-upgraded starter bag. */
+  /** The owned permanent default-bag tier (GS-bag-tiers) — the BEST bag you've unlocked, and the ceiling
+   *  every per-golfer pick is clamped to. 'common' = the un-upgraded starter bag. */
   bagTier: BagTier;
+  /** Per-golfer starting bag tier (GS-wardrobe-bagtier): characterId → BagTier, chosen in the Clubhouse
+   *  wardrobe so each golfer can run its OWN Unending-Universe difficulty. Absent → the owned `bagTier`
+   *  (the best unlocked bag). Always clamped to the owned tier — a weaker pick is the sterner test, never
+   *  a free upgrade. The Voyage ignores it (its difficulty is Ascension) and always plays the owned tier. */
+  bagTierByCharacter: Record<string, BagTier>;
   /** Owned cosmetic ships (GS-garage) — always includes the default Woody Wagon. Global ownership. */
   ownedShips: string[];
   /** Owned cosmetic apparel ids (GS-cosmetics) — hats + shirts bought at the Trade Market. Global. */
@@ -310,6 +315,7 @@ export type Action =
   | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt/pants with shards (global ownership) (GS-cosmetics)
   | { type: 'equipApparel'; id: string } // wear an owned hat/shirt/pants on the managed character (toggles off)
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
+  | { type: 'setCharacterBagTier'; tier: BagTier } // pick the managed golfer's Unending-Universe starting bag tier (GS-wardrobe-bagtier)
   | { type: 'toTitle' } // back to the title from anywhere (GS-settings-nav) — an underway run stays resumable
   | { type: 'restart'; seed?: number | string };
 
@@ -330,6 +336,7 @@ export interface MetaProgress {
   golfBagByCharacter?: Record<string, string>;
   driverByCharacter?: Record<string, string>;
   bagTier?: BagTier;
+  bagTierByCharacter?: Record<string, BagTier>;
   unlockedClubsByCharacter?: Record<string, string[]>;
   clubhouseVisit?: number;
   endlessBestHoles?: number;
@@ -393,6 +400,17 @@ export function driverForCharacter(
   return pick && s.ownedApparel.includes(pick) ? pick : undefined;
 }
 
+/** The starting bag tier a character plays (GS-wardrobe-bagtier) — its Clubhouse wardrobe pick CLAMPED to
+ *  the owned tier (never a free upgrade above what's unlocked), else the owned tier itself. This is the
+ *  Unending-Universe difficulty axis, now per-golfer. */
+export function bagTierForCharacter(
+  s: { bagTierByCharacter: Record<string, BagTier>; bagTier: BagTier },
+  characterId: string | undefined,
+): BagTier {
+  const pick = characterId ? s.bagTierByCharacter[characterId] : undefined;
+  return pick && bagTierRank(pick) <= bagTierRank(s.bagTier) ? pick : s.bagTier;
+}
+
 /**
  * Build the initial UI state. Always lands on the TITLE screen (pick a format, or resume
  * a saved run if one is offered). A placeholder run backs the title until a format is
@@ -421,6 +439,7 @@ export function initState(
     maxAscensionByCharacter: meta.maxAscensionByCharacter ?? {},
     lifetimeAces: meta.lifetimeAces ?? 0,
     bagTier,
+    bagTierByCharacter: meta.bagTierByCharacter ?? {},
     ownedShips: meta.ownedShips && meta.ownedShips.length ? meta.ownedShips : [DEFAULT_SHIP_ID],
     ownedApparel: meta.ownedApparel ?? [],
     shipByCharacter: meta.shipByCharacter ?? {},
@@ -724,11 +743,21 @@ export function reduce(state: UiState, action: Action): UiState {
       // any set they OWN (down to the green starter set, always available), a weaker set being the sterner
       // test. Clamped to the owned tier so it can never exceed `state.bagTier` (no free bag upgrade), and
       // ignored entirely for the voyage, which always plays the full owned tier.
+      // Per-golfer difficulty (GS-wardrobe-bagtier): the tier comes from the Clubhouse wardrobe
+      // (`bagTierByCharacter`), overridden by an EXPLICIT char-select strip pick this visit (`action.bagTier`,
+      // sent only when the player taps a chip). Clamped to the owned tier — never a free upgrade. Only the
+      // hole-gate Unending Universe reads it; the Voyage always plays the full owned tier (its difficulty is
+      // Ascension). An explicit strip pick WRITES THROUGH to the golfer so it sticks as their new default.
       const owned = state.bagTier;
+      const picked = action.bagTier ?? state.bagTierByCharacter[action.characterId];
       const bagTier: BagTier =
-        holeGateArmed(state.run) && action.bagTier && bagTierRank(action.bagTier) <= bagTierRank(owned)
-          ? action.bagTier
+        holeGateArmed(state.run) && picked && bagTierRank(picked) <= bagTierRank(owned)
+          ? picked
           : owned;
+      const bagTierByCharacter =
+        action.bagTier && holeGateArmed(state.run)
+          ? { ...state.bagTierByCharacter, [action.characterId]: bagTier }
+          : state.bagTierByCharacter;
       const run = startRun(
         state.run.seed,
         state.run.formatId,
@@ -741,7 +770,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
       // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
       // cycle off this running total (`marmotTips % (CAP + 1)`), so the reducer just keeps counting.
-      return { ...state, run, course: currentCourse(run), screen: 'intro' };
+      return { ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter };
     }
 
     case 'backToCharacter': {
@@ -1486,6 +1515,20 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, [map]: next };
     }
 
+    case 'setCharacterBagTier': {
+      // Pick the MANAGED golfer's Unending-Universe starting bag tier from the Clubhouse wardrobe
+      // (GS-wardrobe-bagtier) — the per-golfer difficulty axis. Clamped to the owned tier (never above
+      // what's unlocked); picking the owned tier CLEARS the override so the golfer follows your best bag
+      // as you unlock better ones. Meta only (no run/rng touch), so seeded runs are untouched.
+      if (state.screen !== 'clubhouse' || !state.manageCharacterId) return state;
+      if (bagTierRank(action.tier) > bagTierRank(state.bagTier)) return state;
+      const cid = state.manageCharacterId;
+      const next = { ...state.bagTierByCharacter };
+      if (action.tier === state.bagTier) delete next[cid];
+      else next[cid] = action.tier;
+      return { ...state, bagTierByCharacter: next };
+    }
+
     case 'buyBagTier': {
       // Spend Star Shards on a permanent default-bag upgrade (GS-bag-tiers). Guarded: must be at the
       // Trade Market, the tier unlocked (Ascension gate cleared), strictly higher than the current bag,
@@ -1561,6 +1604,7 @@ export function reduce(state: UiState, action: Action): UiState {
           golfBagByCharacter: state.golfBagByCharacter,
           driverByCharacter: state.driverByCharacter,
           bagTier: state.bagTier,
+          bagTierByCharacter: state.bagTierByCharacter,
           unlockedClubsByCharacter: state.unlockedClubsByCharacter,
           clubhouseVisit: state.clubhouseVisit,
           endlessBestHoles: state.endlessBestHoles,

@@ -9,6 +9,7 @@ import { titleScreen } from './titleScreens';
 import { apparelCardChrome, shipCardHTML } from './marketScreens';
 import { CHARACTERS, getCharacter, type Character } from '../sim/rpg/characters';
 import {
+  bagTierForCharacter,
   driverForCharacter,
   golfBagForCharacter,
   hatForCharacter,
@@ -16,6 +17,8 @@ import {
   shipForCharacter,
   shirtForCharacter,
 } from '../ui/game';
+import { CLUB_SET_DIFFICULTIES } from '../sim/rpg/endless';
+import { bagTierRank } from '../sim/rpg/bag';
 import { clubhouseLoungeHTML, type LoungeGolfer } from '../render/clubhouseLounge';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { apparelById, apparelForSlot, equippedSet, type Apparel, type ApparelSlot } from '../sim/rpg/apparel';
@@ -124,17 +127,23 @@ function clubhousePicker(
       })
       .join('')}</div>`;
   } else {
+    // The bag slot carries the per-golfer Unending-Universe DIFFICULTY (GS-wardrobe-bagtier) above its
+    // cosmetic-skin rack — pick which starting bag tier this golfer plays, a weaker bag being the sterner
+    // test. Cosmetic slots (hat/shirt/pants/driver) render only their rack.
+    const bagDifficulty = clubhouseView.slot === 'bag' ? clubhouseBagDifficultyHTML(ch) : '';
     const owned = apparelForSlot(clubhouseView.slot).filter((a) => state.ownedApparel.includes(a.id));
     // Golf bags + drivers are earned trophies (GS-unending / GS-thor) — an empty rack points at the game, not the shop.
     const emptyMsg =
       clubhouseView.slot === 'bag'
-        ? `<div class="gs-cpick__empty">No golf bags earned yet.<br><span style="font-size:12px;opacity:.75;">Survive 40 holes of the <b>Unending Universe</b> to earn the Evergreen Tour Bag.</span></div>`
+        ? `<div class="gs-cpick__empty">No cosmetic bag skins earned yet.<br><span style="font-size:12px;opacity:.75;">Survive 40 holes of the <b>Unending Universe</b> to earn the Evergreen Tour Bag — until then your clubs wear their bag-tier skin on the course.</span></div>`
         : clubhouseView.slot === 'driver'
           ? `<div class="gs-cpick__empty">No driver skins earned yet.<br><span style="font-size:12px;opacity:.75;">Win a tournament on the storms of <b>Asgard</b> to earn Thor's Hammer.</span></div>`
           : `<div class="gs-cpick__empty">No ${clubhouseView.slot}s owned yet.<br>${btn('🚀 Buy some at the Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}</div>`;
-    body = owned.length
-      ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId, bagId, driverId)).join('')}</div>`
-      : emptyMsg;
+    body =
+      bagDifficulty +
+      (owned.length
+        ? `<div class="gs-cpick__rack">${owned.map((a) => clubhouseApparelCardHTML(a, hatId, shirtId, pantsId, bagId, driverId)).join('')}</div>`
+        : emptyMsg);
   }
   return `
     <section class="gs-cpick">
@@ -217,6 +226,27 @@ export function clubhouseScreen(): string {
       ${btn('🏠 Back to Clubhouse', { type: 'clubhouseBackToHall' }, { variant: 'ghost' })}
       ${btn('🚀 Buy more at Trade Market', { type: 'openMarket' }, { variant: 'ghost' })}
       ${btn('← Back to title', { type: 'closeClubhouse' }, { variant: 'ghost' })}
+    </div>`;
+}
+
+/** The per-golfer Unending-Universe difficulty picker (GS-wardrobe-bagtier) shown atop the bag slot's
+ *  rack. Chips for every club-set tier at or below the owned tier (the best bag you've unlocked); locked
+ *  tiers show 🔒. The lit chip is THIS golfer's stored pick; tapping one sets it (a weaker bag is the
+ *  sterner test). Reuses the character-select `.gs-ascpick` chip styling. */
+function clubhouseBagDifficultyHTML(ch: Character): string {
+  const owned = state.bagTier;
+  const sel = bagTierForCharacter(state, ch.id);
+  const chips = CLUB_SET_DIFFICULTIES.map((d) => {
+    const locked = bagTierRank(d.tier) > bagTierRank(owned);
+    const on = d.tier === sel;
+    const act = locked ? '' : ` data-action='${JSON.stringify({ type: 'setCharacterBagTier', tier: d.tier })}'`;
+    return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip"${locked ? ' disabled' : act}
+      style="--cc:${d.col};${on ? `border-color:${d.col};color:${d.col};` : ''}${locked ? 'opacity:.4;' : ''}">${locked ? '🔒 ' : ''}${d.label}</button>`;
+  }).join('');
+  return `<div class="gs-ascpick" style="margin:0 0 12px;padding:10px 11px;border:1px solid var(--gs-line);border-radius:12px;background:#ffffff06;">
+      <span class="gs-ascpick-l">⚔ ${ch.shortName}'s bag rarity</span>
+      <div class="gs-ascpick-chips">${chips}</div>
+      <span class="gs-ascpick-hint">the Unending-Universe difficulty for ${ch.shortName} — a weaker bag is the sterner test. The Voyage always plays your best bag; unlock better bags by winning Ascension gates.</span>
     </div>`;
 }
 
