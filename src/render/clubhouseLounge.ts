@@ -209,18 +209,21 @@ function marmotBartender(): string {
 }
 
 /**
- * Balls one tip jar holds before it's "full" (GS-tent-tips). Tuned to fill the jar's nest nicely — the
- * count the Marmot must pocket in a single run to fill up and slip off to the spaceport par-3.
+ * Balls a tip jar holds when FULL (GS-tent-tips) — a half-dozen. The Marmot's tips ACCUMULATE across
+ * runs (the persisted `marmotTips` total is no longer reset each run): the jar fills 1→CAP over
+ * successive marmot bonks, and the bonk that would overflow a full jar empties it — the Marmot has
+ * cashed out its half-dozen and taken the night off on the spaceport par-3 — after which it refills.
+ * Sized to the nest below so a full jar reads full.
  */
-export const MARMOT_JAR_CAP = 10;
+export const MARMOT_JAR_CAP = 6;
 
 /** Ball nest slots inside the tip jar (dx from the jar centre, absolute y), packed bottom-up above the
- *  "Tips" label — the first `balls` slots are drawn, so the jar visibly fills as tips come in. */
+ *  "Tips" label — the first `balls` slots are drawn, so the jar visibly fills as tips come in. A neat
+ *  3-2-1 pyramid of a half-dozen (= a FULL jar at `MARMOT_JAR_CAP`). */
 const JAR_BALL_SLOTS: ReadonlyArray<readonly [number, number]> = [
   [-4.4, 135.6], [0, 135.6], [4.4, 135.6],
-  [-2.2, 132], [2.2, 132],
-  [-4.4, 128.4], [0, 128.4], [4.4, 128.4],
-  [-2.2, 124.8], [2.2, 124.8],
+  [-2.6, 131.4], [2.6, 131.4],
+  [0, 127.2],
 ];
 
 /** The 19th-Hole TIP JAR on the bar (GS-tent-tips) — a glass jar with a "Tips" sign that gains a golf
@@ -307,10 +310,11 @@ function stool(x: number): string {
  *  `<animate>` flickers give the fire, lamps and neon sign life. Layout: fireplace + armchair on the
  *  left, space-course window centre, the bar along the right, a patterned rug up front.
  *  `marmot` = the Marmot Bartender clubhouse unlock (GS-tent-interactions) is earned: a marmot tends
- *  the bar and its "Tips" jar sits on the counter, filled with `tips` golf balls (GS-tent-tips). When the
- *  jar filled last run the Marmot is `away` on the spaceport par-3 — the bar shows no marmot and an empty
- *  jar that visit. `thorHammer` = Thor's Hammer (GS-thor) is owned, so it leans against the fireplace. */
-function loungeArt(marmot = false, tips = 0, away = false, thorHammer = false): string {
+ *  the bar and its "Tips" jar sits on the counter, filled with `balls` golf balls (GS-tent-tips — the
+ *  jar's current fill, 0..CAP). When the jar has just cashed out the Marmot is `away` on the spaceport
+ *  par-3 — the bar shows no marmot and an empty jar that visit. `thorHammer` = Thor's Hammer (GS-thor)
+ *  is owned, so it leans against the fireplace. */
+function loungeArt(marmot = false, balls = 0, away = false, thorHammer = false): string {
   const bottlesTop = [
     bottle(316, 76, 20, 6.5, '#4fae8a'),
     bottle(328, 76, 24, 6, '#c65a4a'),
@@ -602,7 +606,7 @@ function loungeArt(marmot = false, tips = 0, away = false, thorHammer = false): 
       <line x1="341" y1="141" x2="341" y2="144" stroke="#cfe0ef" stroke-width="1.2"/>
       <circle cx="339" cy="135.5" r="1.2" fill="#4fae8a"/>
     </g>
-    ${marmot ? tipJar(away ? 0 : tips) : ''}
+    ${marmot ? tipJar(balls) : ''}
     ${stool(306)}${stool(348)}
 
     <!-- potted monstera between the painting and the bar -->
@@ -1025,15 +1029,19 @@ export function clubhouseLoungeHTML(
   const rng = new Rng((visit >>> 0) * 2654435761 + 0x9e37); // spread the small counter across the seed space
   const spots = shuffle([...SPOTS], rng).slice(0, golfers.length);
   const figures = golfers.map((g, i) => golferAt(g, spots[i] ?? SPOTS[i % SPOTS.length]!)).join('');
-  // The Marmot's jar filled up last run (GS-tent-tips) → it's off playing the spaceport par-3, so the bar
-  // shows no marmot + an empty jar and the marmot appears on the deck's green instead.
-  const away = marmot && tips >= MARMOT_JAR_CAP;
+  // The Marmot's tips ACCUMULATE across runs (GS-tent-tips): the jar fills 1→CAP over successive bonks,
+  // and the bonk that would overflow a FULL jar empties it — the Marmot has cashed out its half-dozen
+  // and is off playing the spaceport par-3 (so the bar shows no bartender + an empty jar that visit),
+  // after which it refills. `tips` is the running total; the visible fill is that total modulo the
+  // fill-then-empty cycle (`CAP + 1`), so `balls === 0` (past the first bonk) IS the cash-out visit.
+  const balls = tips % (MARMOT_JAR_CAP + 1);
+  const away = marmot && tips > 0 && balls === 0;
   // Taller 4:3 frame that grows to fill the screen (was a squat 20:11 letterbox at 520px that left a lot
   // of dead space above/below on a phone). The extra height is foreground floor the golfers stand on.
   return `${loungeStyle()}
     <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:680px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
-      ${loungeArt(marmot, tips, away, thorHammer)}
+      ${loungeArt(marmot, balls, away, thorHammer)}
       ${figures}
     </div>
     ${spaceportHTML(golfers, rng, away)}`;

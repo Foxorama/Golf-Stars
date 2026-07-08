@@ -55,14 +55,18 @@ so it stays glued to the tent as the camera pans. The text is the struck tent's 
   line is **"Thanks for the tip!"** (`TENT_LINES.marmot`).
 
   **The tip jar (GS-tent-tips, save `v20` `marmotTips`).** EVERY marmot bonk (not just the first) drops a
-  golf ball in the jar: `applyTentReactions` bumps a per-run `marmotTips` count, RESET to 0 when a new run
-  begins (`selectCharacter`). The clubhouse draws that many balls nested in the jar next time you're home,
-  so it visibly fills with a run's haul. When the jar **fills** (`marmotTips ≥ MARMOT_JAR_CAP`, 10) the
-  Marmot has taken the night off — it's out on the **spaceport par-3** playing golf (`marmotGolfer()` on the
-  deck green) — so the bar shows **no bartender** and an **empty** jar that visit. It's back behind the bar
-  the next run home (the jar reflecting that run's count, empty unless the Marmot was found again). All
-  purely a function of the last run's `marmotTips`, threaded `clubhouseLoungeHTML → loungeArt`/`spaceportArt`.
-  The count is earned in play, never granted retroactively (the `v19→v20` migration seeds it 0).
+  golf ball in the jar: `applyTentReactions` bumps `marmotTips`, a running total that **ACCUMULATES across
+  runs** (a new run does NOT reset it — the original per-run reset emptied the jar between marmot encounters,
+  which fall roughly one-per-run, so the jar only ever showed ~1 ball and the fill-up payoff was unreachable).
+  The clubhouse renders the fill-then-cash-out cycle off the total: `balls = marmotTips % (MARMOT_JAR_CAP + 1)`
+  nested in the jar, so it fills **1 → CAP (a half-dozen, `MARMOT_JAR_CAP` = 6)** over successive bonks and
+  reads FULL at CAP with the Marmot still tending bar. The bonk that would **overflow** a full jar cashes it
+  out (`balls === 0`, `marmotTips > 0`): the Marmot has pocketed its half-dozen and taken the night off — it's
+  out on the **spaceport par-3** playing golf (`marmotGolfer()` on the deck green) — so the bar shows **no
+  bartender** and an **empty** jar that visit, then it refills. All purely a function of `marmotTips`, threaded
+  `clubhouseLoungeHTML → loungeArt`/`spaceportArt`. The count is earned in play, never granted retroactively
+  (the `v19→v20` migration seeds it 0). *(Fix: previously reset per run + `CAP` 10 — unreachable — so the jar
+  emptied after a single ball; now it fills to a half-dozen across runs before cashing out.)*
 - **fortune** — the fortune teller gifts a free **mulligan** on the NEXT tee shot: `mulliganPending` is
   set, and the next tee shot resolves TWO of the player's own balls and lets them keep the better line.
   This reuses the team-duel SCRAMBLE machinery wholesale (`resolveScrambleShot` with the player's own
