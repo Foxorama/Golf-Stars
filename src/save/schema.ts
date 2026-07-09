@@ -10,11 +10,13 @@ import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
 import type { EndlessRunRecord } from '../sim/rpg/endless';
-import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { DEFAULT_SHIP_ID, SHIPS } from '../sim/rpg/ships';
+import { APPAREL } from '../sim/rpg/apparel';
+import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 24;
+export const SAVE_VERSION = 25;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -400,8 +402,20 @@ export type SaveV24 = Omit<SaveV23, 'version'> & {
   version: 24;
 };
 
+/** v25 cuts every Trade Market price 40% (GS-trade-rebalance) and, on the migration, REFUNDS the
+ *  difference on already-owned cosmetics + the owned bag tier straight into `shards` — plus stamps a
+ *  one-off `priceRefund` notice so the game can tell the player about the change + the credit. The
+ *  field is present only until the player dismisses the notice (then cleared); absent on new saves
+ *  (`defaultSave` never sets it) and on returning players who owned nothing to refund. */
+export type SaveV25 = Omit<SaveV24, 'version'> & {
+  version: 25;
+  /** Star Shards refunded by the 40% Trade Market price cut — drives the one-off "prices dropped, here's
+   *  your refund" notice. Cleared to `undefined` once the player closes it. */
+  priceRefund?: number;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV24;
+export type Save = SaveV25;
 
 export function defaultSave(): Save {
   return {
@@ -753,6 +767,44 @@ function v23ToV24(s: SaveV23): SaveV24 {
   return { ...s, version: 24 };
 }
 
+/** The Trade Market prices BEFORE the GS-trade-rebalance 40% cut — snapshotted here so the refund is
+ *  computed against the historical prices, immune to any future price edit to the live catalogues. The
+ *  live catalogues are used only to identify which owned ids exist / were earned (never bought) / their
+ *  rarity — none of which the price cut changed. */
+const OLD_APPAREL_TIER_COST: Record<CosmeticRarity, number> = { common: 15, rare: 50, epic: 120, legendary: 280, mythic: 500 };
+const OLD_SHIP_TIER_COST: Record<CosmeticRarity, number> = { common: 0, rare: 60, epic: 140, legendary: 300, mythic: 1000 };
+const OLD_SHIP_COST_BY_ID: Record<string, number> = { 'chopper-thunderbolt': 1250 };
+const OLD_BAG_COST: Record<Exclude<BagTier, 'common'>, number> = { rare: 500, epic: 2000, legendary: 10000 };
+/** The refund on one item = 40% of its old price (= old − new after the 40% cut). All current prices
+ *  divide cleanly, so this is an exact integer. */
+const priceRefundOf = (oldCost: number): number => Math.round(oldCost * 0.4);
+
+/** v24 → v25: cut the Trade Market 40% and refund the difference on everything the player already owns
+ *  (cosmetics + the owned bag tier) into `shards`, stamping a one-off `priceRefund` notice. Earned/free
+ *  rides & garments (live `cost === 0`) are skipped — they were never paid for. A player who owned
+ *  nothing gets no refund and no notice (`priceRefund` stays absent). Runs exactly once (the migration
+ *  is version-gated), so the credit can't double-apply. */
+function v24ToV25(s: SaveV24): SaveV25 {
+  let refund = 0;
+  for (const id of s.ownedShips ?? []) {
+    const ship = SHIPS.find((x) => x.id === id);
+    if (!ship || ship.cost === 0) continue; // default wagon / earned aces — free, nothing to refund
+    refund += priceRefundOf(OLD_SHIP_COST_BY_ID[id] ?? OLD_SHIP_TIER_COST[ship.rarity]);
+  }
+  for (const id of s.ownedApparel ?? []) {
+    const item = APPAREL.find((x) => x.id === id);
+    if (!item || item.cost === 0) continue; // earned/secret garments (e.g. Thor's Hammer) — never bought
+    refund += priceRefundOf(OLD_APPAREL_TIER_COST[item.rarity]);
+  }
+  if (s.bagTier && s.bagTier !== 'common') refund += priceRefundOf(OLD_BAG_COST[s.bagTier]);
+  return {
+    ...s,
+    version: 25,
+    shards: (s.shards ?? 0) + refund,
+    priceRefund: refund > 0 ? refund : undefined,
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -784,6 +836,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 21) s = v21ToV22(s as unknown as SaveV21) as unknown as typeof s;
   if (s.version === 22) s = v22ToV23(s as unknown as SaveV22) as unknown as typeof s;
   if (s.version === 23) s = v23ToV24(s as unknown as SaveV23) as unknown as typeof s;
+  if (s.version === 24) s = v24ToV25(s as unknown as SaveV24) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -791,7 +844,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV23>;
+  const v14 = s as unknown as Partial<SaveV25>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -830,6 +883,7 @@ export function migrate(raw: unknown): Save {
     endlessRuns: Array.isArray(v14.endlessRuns) ? v14.endlessRuns : [],
     reputationByCharacter:
       v14.reputationByCharacter && typeof v14.reputationByCharacter === 'object' ? v14.reputationByCharacter : {},
+    priceRefund: typeof v14.priceRefund === 'number' && v14.priceRefund > 0 ? v14.priceRefund : undefined,
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,
   };

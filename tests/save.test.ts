@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(24);
+    expect(SAVE_VERSION).toBe(25);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});
@@ -91,7 +91,10 @@ describe('save schema', () => {
     expect(s.version).toBe(SAVE_VERSION);
     expect(s.bagTierByCharacter).toEqual({}); // everyone follows the owned tier until they pick otherwise
     expect(s.bagTier).toBe('epic');
-    expect(s.shards).toBe(41);
+    // The v24→v25 Trade Market cut refunds 40% of the owned epic bag (old 2000 → +800). Thor's Hammer
+    // is earned (cost 0) → no refund.
+    expect(s.shards).toBe(41 + 800);
+    expect(s.priceRefund).toBe(800);
     expect(s.driverByCharacter).toEqual({ 'feather-fade': 'thors-hammer' });
   });
 
@@ -115,6 +118,45 @@ describe('save schema', () => {
     expect(s.shards).toBe(33);
     // The history field is optional and absent here → resume treats it as an empty history (unchanged).
     expect((s.activeRun as { history?: unknown }).history).toBeUndefined();
+  });
+
+  it('migrates a v24 blob forward to v25 (refunds 40% of owned Trade Market items, stamps the notice)', () => {
+    const v24 = {
+      ...defaultSave(),
+      version: 24 as const,
+      shards: 100,
+      // wagon-classic is free (skipped); racer-redline old 60 → +24; chopper-thunderbolt old 1250 → +500.
+      ownedShips: [DEFAULT_SHIP_ID, 'racer-redline', 'chopper-thunderbolt'],
+      // cap-classic old 15 → +6; thors-hammer is EARNED (cost 0) → skipped, never refunded.
+      ownedApparel: ['cap-classic', 'thors-hammer'],
+      // epic bag tier old 2000 → +800.
+      bagTier: 'epic' as const,
+    } as unknown as Parameters<typeof migrate>[0];
+    delete (v24 as Record<string, unknown>).priceRefund;
+    const s = migrate(v24);
+    expect(s.version).toBe(SAVE_VERSION);
+    const refund = 24 + 500 + 6 + 800; // = 1330
+    expect(s.priceRefund).toBe(refund);
+    expect(s.shards).toBe(100 + refund);
+    // Ownership + bag tier are untouched by the refund.
+    expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline', 'chopper-thunderbolt']);
+    expect(s.bagTier).toBe('epic');
+  });
+
+  it('migrates a v24 blob with nothing purchased → no refund, no notice (only the free starter wagon)', () => {
+    const v24 = {
+      ...defaultSave(),
+      version: 24 as const,
+      shards: 42,
+      ownedShips: [DEFAULT_SHIP_ID],
+      ownedApparel: [],
+      bagTier: 'common' as const,
+    } as unknown as Parameters<typeof migrate>[0];
+    delete (v24 as Record<string, unknown>).priceRefund;
+    const s = migrate(v24);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.priceRefund).toBeUndefined(); // nothing to refund → no notice
+    expect(s.shards).toBe(42);
   });
 
   it('round-trips an active run’s finished-stop history through export/import (GS-voyage-field)', () => {
@@ -255,9 +297,10 @@ describe('save schema', () => {
     expect(s.version).toBe(SAVE_VERSION);
     expect(s.endlessBestHoles).toBe(0);
     expect(s.golfBagByCharacter).toEqual({});
-    // Everything else rides through untouched.
+    // Everything else rides through untouched — bar the v24→v25 Trade Market refund: racer-redline
+    // (old 60 → +24), cap-classic (old 15 → +6), rare bag (old 500 → +200) = +230.
     expect(s.clubhouseVisit).toBe(4);
-    expect(s.shards).toBe(77);
+    expect(s.shards).toBe(77 + 230);
     expect(s.bagTier).toBe('rare');
     expect(s.shipByCharacter).toEqual({ 'feather-fade': 'racer-redline' });
   });
@@ -348,8 +391,9 @@ describe('save schema', () => {
     const s = migrate(v11);
     expect(s.version).toBe(SAVE_VERSION);
     expect(s.clubhouseVisit).toBe(0);
-    // Everything else rides through untouched.
-    expect(s.shards).toBe(88);
+    // Everything else rides through untouched — bar the v24→v25 Trade Market refund: wagon-gold
+    // (old 140 → +56), cap-classic (+6) & pants-astro (old 280 → +112), rare bag (+200) = +374.
+    expect(s.shards).toBe(88 + 374);
     expect(s.maxAscension).toBe(4);
     expect(s.bagTier).toBe('rare');
     expect(s.pantsByCharacter).toEqual({ 'feather-fade': 'pants-astro' });
@@ -375,7 +419,9 @@ describe('save schema', () => {
     };
     const s = migrate(v10);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(s.shards).toBe(140);
+    // v24→v25 Trade Market refund: wagon-gold (old 140 → +56), cap-classic (+6) & polo-classic (+6),
+    // epic bag (old 2000 → +800) = +868.
+    expect(s.shards).toBe(140 + 868);
     expect(s.bagTier).toBe('epic');
     expect(s.ownedApparel).toEqual(['cap-classic', 'polo-classic']);
     // Existing per-character ship/hat/shirt are untouched; pants start empty (nothing equipped yet).
@@ -406,7 +452,9 @@ describe('save schema', () => {
     };
     const s = migrate(v9);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(s.shards).toBe(95);
+    // v24→v25 Trade Market refund: wagon-gold (+56), cap-classic (+6) & suit-space (old 280 → +112),
+    // rare bag (+200) = +374.
+    expect(s.shards).toBe(95 + 374);
     expect(s.maxAscension).toBe(3);
     expect(s.bagTier).toBe('rare');
     expect(s.ownedApparel).toEqual(['cap-classic', 'suit-space']);
@@ -446,7 +494,8 @@ describe('save schema', () => {
     };
     const s = migrate(v8);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(s.shards).toBe(95);
+    // v24→v25 Trade Market refund: wagon-gold (+56), cap-classic (+6), rare bag (+200) = +262.
+    expect(s.shards).toBe(95 + 262);
     expect(s.bagTier).toBe('rare');
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'wagon-gold']);
     expect(s.ownedApparel).toEqual(['cap-classic']);
@@ -471,7 +520,8 @@ describe('save schema', () => {
     };
     const s = migrate(v6);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(s.shards).toBe(70);
+    // v24→v25 Trade Market refund: racer-redline (old 60 → +24); no apparel, common bag = +24.
+    expect(s.shards).toBe(70 + 24);
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID, 'racer-redline']);
     expect(s.shipByCharacter[CHARACTERS[0]!.id]).toBe('racer-redline');
     expect(s.ownedApparel).toEqual([]);

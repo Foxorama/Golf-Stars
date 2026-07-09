@@ -243,6 +243,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     tiers). Cosmetics split BUY (Trade Market, global ownership) vs EQUIP (Clubhouse, per
     character); every unlock-gated item is HIDDEN until unlockable — ONE reveal predicate per
     catalogue drives the filter. `CosmeticRarity` (mythic tier) stays OUT of the sim's loot `Rarity`.
+    Trade Market prices (ships/apparel/bag tiers) are tuned only in their three tables; the Pro Shop
+    (credits) is a SEPARATE economy — never touch it for a Trade Market rebalance. A price change with
+    a player refund is a SAVE MIGRATION with OLD prices snapshotted in the step (never read live —
+    migrations must be edit-proof), stamping a one-off `priceRefund` notice cleared on dismiss
+    (GS-trade-rebalance).
   - The Clubhouse (hall lounge + per-golfer stage + spaceport) is purely cosmetic, seeded via `Rng`
     keyed off `clubhouseVisit` — zero sim/rng-stream impact. Mount figures/ships in TIGHT frames
     (golfer 72×210, ship 96×62); re-shoot `scripts/clubhouse-preview.mjs` after touching

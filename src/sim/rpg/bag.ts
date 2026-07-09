@@ -11,9 +11,12 @@
  * default bag at run start.
  *
  * Unlocked by CLEARING an Ascension gate (a won voyage at that tier bumps `maxAscension` to gate+1):
- *   • rare      "Planet"        — after clearing A2  (maxAscension ≥ 3)  · 500 shards
- *   • epic      "Phoenix Flames"— after clearing A6  (maxAscension ≥ 7)  · 2,000 shards
- *   • legendary "Solar Storm"   — after clearing A11 (maxAscension ≥ 12) · 10,000 shards
+ *   • rare      "Planet"        — after clearing A2  (maxAscension ≥ 3)  · 300 shards
+ *   • epic      "Phoenix Flames"— after clearing A6  (maxAscension ≥ 7)  · 1,200 shards
+ *   • legendary "Solar Storm"   — after clearing A11 (maxAscension ≥ 12) · 6,000 shards
+ *
+ * Prices were cut 40% in the GS-trade-rebalance (with a one-off refund migration) — see
+ * `docs/decisions/rpg-meta-loop.md`.
  *
  * Pure & data-driven. The owned tier is permanent meta (persisted in the save, like Star Shards), baked
  * into the loadout at `startRun`/`resumeRun`. The default (common) tier is a no-op, so a feature-off
@@ -66,7 +69,7 @@ export const BAG_SETS: readonly BagSet[] = [
     tier: 'rare',
     name: 'Planet Bag & Set',
     blurb: 'A rare Planet-line bag & full club set — every starter club reborn in Planet blue.',
-    cost: 500,
+    cost: 300,
     unlockMaxAscension: 3,
     gateLabel: 'A2',
     distanceSet: 'tour',
@@ -78,7 +81,7 @@ export const BAG_SETS: readonly BagSet[] = [
     tier: 'epic',
     name: 'Phoenix Flames Bag & Set',
     blurb: 'An epic Phoenix Flames bag & set — longer woods, a steadier putter, wreathed in fire.',
-    cost: 2000,
+    cost: 1200,
     unlockMaxAscension: 7,
     gateLabel: 'A6',
     distanceSet: 'masters',
@@ -90,7 +93,7 @@ export const BAG_SETS: readonly BagSet[] = [
     tier: 'legendary',
     name: 'Solar Storm Bag & Set',
     blurb: 'The legendary Solar Storm bag & set — the apex bag, blazing gold across the galaxy.',
-    cost: 10000,
+    cost: 6000,
     unlockMaxAscension: 12,
     gateLabel: 'A11',
     distanceSet: 'solar',

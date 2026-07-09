@@ -22,13 +22,13 @@ describe('apparel catalogue (GS-cosmetics)', () => {
       expect(hats.some((h) => h.rarity === tier)).toBe(true); // a hat at every tier
       expect(pants.some((p) => p.rarity === tier)).toBe(true); // a pair of pants at every tier
     }
-    // Exactly one mythic per slot, and they cost the headline 500 shards.
+    // Exactly one mythic per slot, and they cost the headline 300 shards (post GS-trade-rebalance cut).
     const mythicHat = hats.find((h) => h.rarity === 'mythic')!;
     const mythicShirt = shirts.find((s) => s.rarity === 'mythic')!;
     const mythicPants = pants.find((p) => p.rarity === 'mythic')!;
-    expect(mythicHat.cost).toBe(500);
-    expect(mythicShirt.cost).toBe(500);
-    expect(mythicPants.cost).toBe(500);
+    expect(mythicHat.cost).toBe(300);
+    expect(mythicShirt.cost).toBe(300);
+    expect(mythicPants.cost).toBe(300);
   });
 
   it('every garment has a unique id, a render look, and a tier-priced cost', () => {
@@ -183,8 +183,8 @@ describe('apparel catalogue (GS-cosmetics)', () => {
 
   it('canBuyApparel gates on affordability + ownership', () => {
     const cap = apparelById('cap-classic')!;
-    expect(canBuyApparel(cap, 15, [])).toBe(true); // exactly affordable
-    expect(canBuyApparel(cap, 14, [])).toBe(false); // one short
+    expect(canBuyApparel(cap, 9, [])).toBe(true); // exactly affordable (common, post-cut)
+    expect(canBuyApparel(cap, 8, [])).toBe(false); // one short
     expect(canBuyApparel(cap, 999, ['cap-classic'])).toBe(false); // already owned
     expect(canBuyApparel(undefined, 999, [])).toBe(false);
   });

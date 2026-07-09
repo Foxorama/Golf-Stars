@@ -23,9 +23,9 @@ const carryOf = (lo: { bag: { id: string; carry: number }[] }, id: string) => lo
 describe('bag tiers (GS-bag-tiers)', () => {
   it('the table gates each tier on the right Ascension clear + Shard price', () => {
     expect(BAG_SETS.map((s) => [s.tier, s.cost, s.unlockMaxAscension, s.gateLabel])).toEqual([
-      ['rare', 500, 3, 'A2'],
-      ['epic', 2000, 7, 'A6'],
-      ['legendary', 10000, 12, 'A11'],
+      ['rare', 300, 3, 'A2'],
+      ['epic', 1200, 7, 'A6'],
+      ['legendary', 6000, 12, 'A11'],
     ]);
   });
 
@@ -113,8 +113,8 @@ describe('bag-tier unlock + purchase gating', () => {
     expect(bagSetUnlocked(planet, 2)).toBe(false); // A2 not yet cleared (maxAscension < 3)
     expect(bagSetUnlocked(planet, 3)).toBe(true);
     expect(canBuyBagSet(planet, 'common', 2, 9999)).toBe(false); // locked
-    expect(canBuyBagSet(planet, 'common', 3, 499)).toBe(false); // too poor
-    expect(canBuyBagSet(planet, 'common', 3, 500)).toBe(true);
+    expect(canBuyBagSet(planet, 'common', 3, 299)).toBe(false); // too poor (post-cut 300)
+    expect(canBuyBagSet(planet, 'common', 3, 300)).toBe(true);
     // Already at a higher tier → not a purchase.
     expect(canBuyBagSet(planet, 'epic', 12, 999999)).toBe(false);
     expect(bagTierRank('common') < bagTierRank('rare')).toBe(true);
@@ -125,7 +125,7 @@ describe('bag-tier unlock + purchase gating', () => {
     s = { ...s, screen: 'trademarket' };
     s = reduce(s, { type: 'buyBagTier', tier: 'epic' });
     expect(s.bagTier).toBe('epic');
-    expect(s.shards).toBe(3000); // 5000 − 2000
+    expect(s.shards).toBe(3800); // 5000 − 1200 (epic bag, post GS-trade-rebalance cut)
     // Start a voyage → the run is built with the epic bag.
     s = { ...s, screen: 'title' };
     s = reduce(s, { type: 'start', format: 'voyage' });
