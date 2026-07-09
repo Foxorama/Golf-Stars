@@ -109,6 +109,20 @@ First-device feedback on GS-settings-nav reshaped the title:
     `.gs-charcard-cta` inside, reading as "tap area PLUS a separate advance button". Deboxed to a
     top-divider + accent-text affordance (`Tap · Voyage as …  →`) so the whole card obviously IS the
     one control.
+- **Difficulty PILLS + club-unlock badges (GS-diffpills, 2026-07).** Device feedback: the scrolling
+  chip strips ate a row and the club-set axis was buried in the Unending Universe only. The chip strips
+  are now TWO native-`<select>` dropdown **pills** on one compact row (`.gs-selpill`, `[data-selasc]` +
+  `[data-selclubset]`): ⚔ Ascension (voyage, when tiers are unlocked) + 🎒 Club set / bag. The OS supplies
+  the picker on tap (a real "pull box"), so an A0…A15 ladder never reflows the roster. The club-set pill
+  now shows on **every mode** (only when a better-than-common bag is owned — otherwise no choice), so a
+  per-run bag downgrade is one tap from the Voyage too (it feeds `startRun` for all formats, GS-wardrobe-
+  bagtier). Changing a pill re-renders the roster (updating the badges below) and rides each card's
+  `selectCharacter` action; the club-set pick only overrides + write-throughs when CHANGED (`selClubSetTouched`).
+  Each VOYAGE card now carries a club-UNLOCK badge tied to the SELECTED Ascension (off `maxAscensionByCharacter`,
+  passed as `opts.unlockLadder`): 🔓 *win A_n → new club* when a win at the picked tier grows THAT golfer's
+  bag (`sel ≥ their cleared count`), 🔒 *next club: win A_k* when the tier's already cleared (k = their next
+  uncleared tier), ★ *bag complete* when `unlockableClubTypes` is empty — answering "which difficulty do I
+  play THIS golfer at to unlock a club?" right on the card. Endless grants no club unlocks, so no badge there.
 - **The Daily Challenge button is PARKED (removed from the title), not deleted from the engine** —
   string seeds still work (`?seed=daily-YYYY-MM-DD` reproduces it); only the `dailySeed`/`dailyLabel`
   helpers went. Bring it back as its own surface when it earns a place.
