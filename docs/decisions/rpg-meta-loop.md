@@ -716,7 +716,12 @@
     forking down to a lower belly-plate/core; solarflare → flames rising from the ACTUAL hem far higher + embers).
     Pants fill inline in `golferPreviewSVG` (nebula/riftgreaves → starfields down both legs; emberlegs → fire in two
     stacked clusters per leg + rising embers). The SHOP CARD path passes NO `worn`, so the compact card art is
-    byte-identical — cards must NOT change. SVG-only (the on-course canvas figure is small; left unchanged).
+    byte-identical — cards must NOT change. Extended `worn` across the WHOLE range: striped → bands run the full
+    torso; jersey → number panel + flank racing-stripes + hem band; spacesuit → utility belt + hip pouches; blazer →
+    lapels to the hem + lower button + hip pockets; valkyrie → a fauld of scaled bands; polo → subtle side seams. And
+    the ON-COURSE canvas `drawGolfer` gained the details it was missing (cosmic starfield + swooshes, striped bands,
+    jersey number + flank stripes, polo collar/placket, all centred on the diagonal torso capsule via `torsoX(y)`;
+    nebula pants → a full-leg starfield) so the worn look matches in BOTH renderers.
   - **The golfer WEARS what you buy.** `GolferLook` (playView) gained `hat?`/`shirtStyle?: ApparelLook`; the
     canvas `drawGolfer` draws the hat shape (replacing the default cap) + the shirt colour/glow/spacesuit chest
     panel, and `app.ts golferLook()` layers the equipped hat/shirt over the character's base style. The wardrobe

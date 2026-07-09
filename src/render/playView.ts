@@ -310,6 +310,82 @@ function drawGolfer(
   ctx.moveTo(2, -30);
   ctx.lineTo(S[0], S[1]);
   ctx.stroke();
+  // The torso is a diagonal capsule hip(2,-30)→shoulder(8,-50); `torsoX(y)` is its centreline x at a
+  // given height, so patterned shirts (GS-worn-coverage) paint ON the torso, not floating beside it.
+  const torsoX = (y: number): number => 2 - (y + 30) * 0.3;
+  const sShape = look.shirtStyle?.shape;
+  // Nebula suit (GS-cosmic 'cosmic'): a starfield + magenta swooshes down the torso, so the Supernova
+  // suit reads as living nebula on-course, not a plain purple torso. Mirrors the wardrobe SVG's worn fill.
+  if (sShape === 'cosmic') {
+    const acc = look.shirtStyle?.accent ?? '#ff7bf0';
+    ctx.fillStyle = '#fff';
+    for (const [dx, y, rr] of [[-2, -47, 0.9], [2, -44, 0.7], [-1, -40, 0.8], [3, -36, 0.7], [-2, -33, 0.7], [1, -49, 0.6], [-3, -43, 0.5]] as [number, number, number][]) {
+      ctx.beginPath();
+      ctx.arc(torsoX(y) + dx, y, rr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.strokeStyle = acc;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(torsoX(-45) - 4, -45);
+    ctx.quadraticCurveTo(torsoX(-43), -48, torsoX(-41) + 4, -41);
+    ctx.moveTo(torsoX(-37) - 4, -37);
+    ctx.quadraticCurveTo(torsoX(-35), -39, torsoX(-33) + 4, -33);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Striped tee ('striped'): bands run the whole torso, centred on the torso line.
+  if (sShape === 'striped') {
+    ctx.strokeStyle = look.shirtStyle?.accent ?? '#f4f1e6';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    for (let y = -47; y <= -32; y += 3.4) {
+      const c = torsoX(y);
+      ctx.moveTo(c - 6, y);
+      ctx.lineTo(c + 6, y);
+    }
+    ctx.stroke();
+  }
+  // Neon jersey ('jersey'): a number panel high on the chest + racing stripes down both flanks.
+  if (sShape === 'jersey') {
+    const acc = look.shirtStyle?.accent ?? '#2bf0c0';
+    const py = -44;
+    ctx.fillStyle = acc;
+    ctx.fillRect(torsoX(py) - 4.5, py - 4, 9, 8.5);
+    ctx.fillStyle = '#0c1116';
+    ctx.font = 'bold 7px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('7', torsoX(py), py);
+    ctx.strokeStyle = acc;
+    ctx.lineWidth = 1.4;
+    for (const off of [-5.5, 5.5]) {
+      ctx.beginPath();
+      ctx.moveTo(torsoX(-48) + off, -48);
+      ctx.lineTo(torsoX(-32) + off, -32);
+      ctx.stroke();
+    }
+  }
+  // Polo ('polo'): collar V + placket + buttons, so the plain polo reads as a collared shirt on-course.
+  if (sShape === 'polo') {
+    ctx.strokeStyle = look.shirtStyle?.accent ?? '#1d4a7a';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(torsoX(-49) - 3, -49);
+    ctx.lineTo(torsoX(-46), -45);
+    ctx.lineTo(torsoX(-49) + 3, -49);
+    ctx.moveTo(torsoX(-45), -45);
+    ctx.lineTo(torsoX(-39), -39);
+    ctx.stroke();
+    ctx.fillStyle = look.shirtStyle?.accent ?? '#1d4a7a';
+    for (const y of [-43, -40]) {
+      ctx.beginPath();
+      ctx.arc(torsoX(y), y, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   // Spacesuit chest control panel — a small accented box that sells the "suit" read.
   if (look.shirtStyle?.shape === 'spacesuit') {
     ctx.fillStyle = '#cdd6e2';
@@ -1318,11 +1394,14 @@ function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: strin
       break;
     case 'nebula':
       legs(color, 6.5);
-      ctx.fillStyle = '#fff'; // a couple of starfield specks
+      ctx.fillStyle = '#fff'; // a starfield running the length of both legs (GS-worn-coverage)
       for (const [fx, fy] of feet) {
-        ctx.beginPath();
-        ctx.arc(hip[0] + (fx - hip[0]) * 0.4, hip[1] + (fy - hip[1]) * 0.4, 0.9, 0, Math.PI * 2);
-        ctx.fill();
+        for (const [fr, rr] of [[0.2, 0.9], [0.42, 0.7], [0.62, 0.8], [0.82, 0.6]] as [number, number][]) {
+          const dx = fr > 0.5 ? 1.2 : -1.2;
+          ctx.beginPath();
+          ctx.arc(hip[0] + (fx - hip[0]) * fr + dx, hip[1] + (fy - hip[1]) * fr, rr, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       break;
     case 'emberlegs': {
@@ -2354,3 +2433,4 @@ export function mountPlayView(
     },
   };
 }
+

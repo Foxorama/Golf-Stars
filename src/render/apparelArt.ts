@@ -315,25 +315,78 @@ function shirtDetail(
           <circle r="2.5" fill="${gold}" ${ink}/>
           <path d="M0,-1.5 L0.5,-0.4 L1.6,-0.3 L0.7,0.4 L0.9,1.5 L0,0.8 L-0.9,1.5 L-0.7,0.4 L-1.6,-0.3 L-0.5,-0.4 Z" fill="#7a2f34"/>
         </g>`;
+      if (worn) {
+        // Worn: the fauld — scaled plate bands + a central ridge continue down to the hem so the cuirass
+        // armours the whole torso, not just the chest (GS-worn-coverage).
+        const b = worn.bottom;
+        detail += `<line x1="0" y1="8" x2="0" y2="${(b - 2).toFixed(1)}" stroke="${gold}" stroke-width="1" opacity="0.6"/>
+          <g fill="none" stroke="${gold}" stroke-width="0.9" opacity="0.65">
+            <path d="M-6.5,${(b - 15).toFixed(1)} Q0,${(b - 12).toFixed(1)} 6.5,${(b - 15).toFixed(1)}"/>
+            <path d="M-6,${(b - 10).toFixed(1)} Q0,${(b - 7).toFixed(1)} 6,${(b - 10).toFixed(1)}"/>
+            <path d="M-5,${(b - 5).toFixed(1)} Q0,${(b - 2.5).toFixed(1)} 5,${(b - 5).toFixed(1)}"/></g>
+          <g fill="${gold}" opacity="0.85"><circle cx="0" cy="${(b - 13).toFixed(1)}" r="0.8"/><circle cx="0" cy="${(b - 8).toFixed(1)}" r="0.8"/></g>`;
+      }
       break;
     }
     case 'polo':
       detail = `<path d="M-4,-9 L0,-4 L4,-9" fill="none" stroke="${accent}" stroke-width="1.6"/>
         <line x1="0" y1="-4" x2="0" y2="3" stroke="${accent}" stroke-width="1"/>
         <circle cx="0" cy="-1" r="0.8" fill="${accent}"/><circle cx="0" cy="2" r="0.8" fill="${accent}"/>`;
+      if (worn) {
+        // Worn: soft side seams + a hem line give the polo body definition down to the waist so it reads
+        // as a finished shirt, not a flat colour block (GS-worn-coverage) — kept subtle so it stays a polo.
+        const t = worn.top;
+        const b = worn.bottom;
+        detail += `<g stroke="${accent}" stroke-width="0.8" opacity="0.38" stroke-linecap="round" fill="none">
+            <path d="M-9,${(t + 4).toFixed(1)} Q-9.8,${((t + b) / 2).toFixed(1)} -9,${(b - 2).toFixed(1)}"/>
+            <path d="M9,${(t + 4).toFixed(1)} Q9.8,${((t + b) / 2).toFixed(1)} 9,${(b - 2).toFixed(1)}"/>
+            <line x1="-8" y1="${(b - 3).toFixed(1)}" x2="8" y2="${(b - 3).toFixed(1)}"/></g>`;
+      }
       break;
     case 'striped':
-      detail = `<g stroke="${accent}" stroke-width="2.4"><line x1="-12" y1="-2" x2="12" y2="-2"/><line x1="-12" y1="3" x2="12" y2="3"/><line x1="-12" y1="8" x2="12" y2="8"/></g>`;
+      if (worn) {
+        // Worn: the bands run the WHOLE shirt, evenly spaced top-to-hem (GS-worn-coverage) — the shop
+        // icon's three upper stripes left the tall worn body plain below the chest.
+        const lines: string[] = [];
+        for (let y = worn.top + 2; y <= worn.bottom - 1; y += 4.4) {
+          lines.push(`<line x1="-13" y1="${y.toFixed(1)}" x2="13" y2="${y.toFixed(1)}"/>`);
+        }
+        detail = `<g stroke="${accent}" stroke-width="2.6" stroke-linecap="round">${lines.join('')}</g>`;
+      } else {
+        detail = `<g stroke="${accent}" stroke-width="2.4"><line x1="-12" y1="-2" x2="12" y2="-2"/><line x1="-12" y1="3" x2="12" y2="3"/><line x1="-12" y1="8" x2="12" y2="8"/></g>`;
+      }
       break;
     case 'jersey':
-      detail = `<rect x="-6" y="-3" width="12" height="12" rx="1.5" fill="${accent}" opacity="0.85"/>
+      if (worn) {
+        // Worn: the chest number panel stays high, with racing stripes down both flanks + a hem band, so
+        // the sports jersey fills the torso instead of floating one badge mid-chest (GS-worn-coverage).
+        const t = worn.top;
+        const b = worn.bottom;
+        detail = `<rect x="-10.5" y="${(t + 2).toFixed(1)}" width="2.6" height="${(b - t - 4).toFixed(1)}" rx="1" fill="${accent}" opacity="0.8"/>
+          <rect x="7.9" y="${(t + 2).toFixed(1)}" width="2.6" height="${(b - t - 4).toFixed(1)}" rx="1" fill="${accent}" opacity="0.8"/>
+          <rect x="-8" y="${(b - 6).toFixed(1)}" width="16" height="2.4" rx="1" fill="${accent}" opacity="0.7"/>
+          <rect x="-6" y="${(t + 3).toFixed(1)}" width="12" height="12" rx="1.5" fill="${accent}" opacity="0.9"/>
+          <text x="0" y="${(t + 12.5).toFixed(1)}" font-size="9" font-weight="800" text-anchor="middle" fill="#0c1116" font-family="system-ui,sans-serif">7</text>`;
+      } else {
+        detail = `<rect x="-6" y="-3" width="12" height="12" rx="1.5" fill="${accent}" opacity="0.85"/>
         <text x="0" y="7" font-size="9" font-weight="800" text-anchor="middle" fill="#0c1116" font-family="system-ui,sans-serif">7</text>`;
+      }
       break;
     case 'spacesuit':
       detail = `<rect x="-5" y="-2" width="10" height="8" rx="1.4" fill="#cdd6e2" stroke="#0c1116" stroke-width="0.8"/>
         <circle cx="-2" cy="1" r="1.1" fill="${accent}"/><circle cx="2" cy="1" r="1.1" fill="#2bf0c0"/>
         <rect x="-3" y="3.4" width="6" height="1.4" fill="#ffd36b"/>
         <path d="M-12,-6 Q-14,1 -11,8" fill="none" stroke="#cdd6e2" stroke-width="1.4"/>`;
+      if (worn) {
+        // Worn: a utility belt + hip pouches + segment seams run down to the hem so the pressure suit
+        // reads as engineered head-to-waist, not plain below the chest panel (GS-worn-coverage).
+        const b = worn.bottom;
+        detail += `<rect x="-9" y="${(b - 13).toFixed(1)}" width="18" height="3" rx="1.2" fill="#cdd6e2" stroke="#0c1116" stroke-width="0.6"/>
+          <rect x="-1.6" y="${(b - 13).toFixed(1)}" width="3.2" height="3" fill="#ffd36b"/>
+          <rect x="-8.5" y="${(b - 9).toFixed(1)}" width="5" height="6" rx="1" fill="#cdd6e2" stroke="#0c1116" stroke-width="0.6"/>
+          <rect x="3.5" y="${(b - 9).toFixed(1)}" width="5" height="6" rx="1" fill="#cdd6e2" stroke="#0c1116" stroke-width="0.6"/>
+          <g stroke="#aeb6c6" stroke-width="0.7" opacity="0.7"><line x1="-6" y1="${(b - 16).toFixed(1)}" x2="6" y2="${(b - 16).toFixed(1)}"/></g>`;
+      }
       break;
     case 'cosmic':
       if (worn) {
@@ -364,6 +417,17 @@ function shirtDetail(
         <path d="M6,-10 L1,-4.5 L2.6,5 L5.4,-1" fill="none" stroke="${accent}" stroke-width="1.3"/>
         <circle cx="0" cy="6" r="1" fill="${accent}"/>
         <g transform="translate(-6.5 1)"><circle r="2.1" fill="${accent}"/><path d="M0,-1.3 L0.4,-0.4 L1.3,-0.3 L0.6,0.3 L0.8,1.2 L0,0.7 L-0.8,1.2 L-0.6,0.3 L-1.3,-0.3 L-0.4,-0.4 Z" fill="#0f5132"/></g>`;
+      if (worn) {
+        // Worn: the jacket tailors down the full torso — the lapel edges continue to the hem, a second
+        // button, and two hip pockets, so the blazer body isn't a plain colour block (GS-worn-coverage).
+        const b = worn.bottom;
+        detail += `<g fill="none" stroke="${accent}" stroke-width="1" opacity="0.75">
+            <path d="M-2.6,4 L-3.4,${(b - 2).toFixed(1)}"/><path d="M2.6,4 L3.4,${(b - 2).toFixed(1)}"/></g>
+          <circle cx="0" cy="${(b - 12).toFixed(1)}" r="1" fill="${accent}"/>
+          <g fill="none" stroke="${accent}" stroke-width="0.9" opacity="0.7">
+            <path d="M-9,${(b - 9).toFixed(1)} L-3.5,${(b - 9).toFixed(1)} L-3.5,${(b - 5).toFixed(1)} L-9,${(b - 5).toFixed(1)}"/>
+            <path d="M9,${(b - 9).toFixed(1)} L3.5,${(b - 9).toFixed(1)} L3.5,${(b - 5).toFixed(1)} L9,${(b - 5).toFixed(1)}"/></g>`;
+      }
       break;
     case 'riftplate': {
       // The Punched Galaxy warplate (GS-punched-galaxy): a cosmic warlord's cuirass barely containing a
