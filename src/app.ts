@@ -1694,20 +1694,25 @@ function render(): void {
           modeName: getFormat(state.run.formatId).name,
           winnable: !!getFormat(state.run.formatId).winnable,
           // The Voyage's difficulty is picked here, with the golfer (GS-title-2) — only when
-          // tiers are actually unlocked (a fresh account just plays A0, no row to parse).
+          // tiers are actually unlocked (a fresh account just plays A0, no dropdown to show).
           ascension:
             getFormat(state.run.formatId).winnable && state.maxAscension > 0
               ? { max: state.maxAscension, sel: selAscension }
               : undefined,
-          // The Unending Universe picks its STARTING CLUB SET here (GS-golf-score) — the mode's
-          // difficulty axis. Bounded to the owned tier (green always); the reducer re-clamps.
-          clubSet: holeGateArmed(state.run)
-            ? {
-                owned: state.bagTier,
-                sel: bagTierRank(selClubSet) <= bagTierRank(state.bagTier) ? selClubSet : state.bagTier,
-                touched: selClubSetTouched,
-              }
-            : undefined,
+          // The STARTING CLUB SET / bag pill (GS-golf-score / GS-wardrobe-bagtier) shows on EVERY mode now,
+          // but only when a better-than-common bag is owned (otherwise there's no choice to make). Bounded
+          // to the owned tier (green always); the reducer re-clamps. Overrides per-run only when changed.
+          clubSet:
+            bagTierRank(state.bagTier) > 0
+              ? {
+                  owned: state.bagTier,
+                  sel: bagTierRank(selClubSet) <= bagTierRank(state.bagTier) ? selClubSet : state.bagTier,
+                  touched: selClubSetTouched,
+                }
+              : undefined,
+          // Per-golfer Ascension-clear ladder (GS-ascension-clubs display) — drives each Voyage card's
+          // "does a win here unlock a new club?" badge. Voyage-only (endless grants no club unlocks).
+          unlockLadder: getFormat(state.run.formatId).winnable ? state.maxAscensionByCharacter : undefined,
         })
       : state.screen === 'intro'
       ? introScreen()
@@ -1942,11 +1947,12 @@ function render(): void {
       render();
     });
   });
-  // Ascension difficulty chips on character select (GS-title-2): pure view state — the picked
-  // tier re-renders lit and rides every golfer card's select action.
-  app.querySelectorAll<HTMLElement>('[data-asc]').forEach((el) => {
-    el.addEventListener('click', () => {
-      selAscension = Number(el.dataset.asc);
+  // Ascension difficulty DROPDOWN on character select (GS-diffpills): a native-select pill — the picked
+  // tier re-renders the roster (updating each card's club-unlock badge) and rides every golfer card's
+  // select action. `change` fires on the OS picker's commit; re-render surgically keeps the pill's value.
+  app.querySelectorAll<HTMLSelectElement>('[data-selasc]').forEach((el) => {
+    el.addEventListener('change', () => {
+      selAscension = Number(el.value);
       // Remember the pick so the picker defaults here next run instead of snapping back to A0.
       setSetting('lastAscension', selAscension);
       sfx.click();
@@ -1954,11 +1960,12 @@ function render(): void {
       render();
     });
   });
-  // Starting club-set chips on character select (GS-golf-score): the Unending Universe's difficulty
-  // axis — pure view state, re-renders lit, rides every golfer card's select action (reducer clamps).
-  app.querySelectorAll<HTMLElement>('[data-clubset]').forEach((el) => {
-    el.addEventListener('click', () => {
-      selClubSet = el.dataset.clubset as BagTier;
+  // Starting club-set / bag DROPDOWN on character select (GS-diffpills): now on every mode — the sterner-
+  // bag difficulty axis. Changing it marks the pick touched so it overrides the golfer's wardrobe default
+  // for this run (and write-throughs on select); the reducer clamps to the owned tier.
+  app.querySelectorAll<HTMLSelectElement>('[data-selclubset]').forEach((el) => {
+    el.addEventListener('change', () => {
+      selClubSet = el.value as BagTier;
       selClubSetTouched = true;
       sfx.click();
       haptic(HAPTICS.tap);

@@ -449,10 +449,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
     character-less placeholder run (it wipes saves).
   - Character select fits ONE screen in every mode (equal-height cards via `grid-auto-rows:1fr`);
-    Ascension is picked WITH the golfer (`[data-asc]` view state, reducer-clamped), never on the
-    title, defaulting to your LAST pick (`Settings.lastAscension`). The difficulty/club chips scroll
-    on ONE fixed-height strip (`.gs-ascpick-chips`) so more tiers never reflow the roster; the whole
-    card is the button (its CTA is a footer label, not a nested button). GS-select-layout.
+    Ascension is picked WITH the golfer, never on the title, defaulting to your LAST pick
+    (`Settings.lastAscension`). Difficulty is TWO native-select DROPDOWN pills on one compact row
+    (GS-diffpills, `.gs-selpill` / `[data-selasc]` + `[data-selclubset]`): ⚔ Ascension (voyage, when
+    tiers are unlocked) + 🎒 Club set / bag — the club-set pill shows on EVERY mode now (only when a
+    better-than-common bag is owned) so a per-run bag downgrade is one tap from any format. The pills
+    are view state (reducer-clamped); the club-set pick overrides + write-throughs only when CHANGED.
+    Each VOYAGE card carries a club-UNLOCK badge tied to the selected Ascension (GS-ascension-clubs
+    display, off `maxAscensionByCharacter`): 🔓 "win A_n → new club" when a win at the picked tier
+    grows THAT golfer's bag, 🔒 "next club: win A_k" when the tier's already cleared (k = their next
+    uncleared tier), ★ "bag complete" when full — so it's obvious which difficulty to play which golfer
+    at to unlock clubs. The whole card is the button (its CTA is a footer label). GS-select-layout.
   - The stop intro is TWO mobile steps on one reducer screen (`'intro'` + view state `introStage`);
     `introShared()` derives world/notes/objective ONCE so the steps never drift. The Unending
     Universe past stop 0 opens on `'hole'`.

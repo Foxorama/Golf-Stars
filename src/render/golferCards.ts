@@ -6,6 +6,7 @@ import { PLAYER_ID, type Field } from '../sim/rpg/competition';
 import { type Leaderboard } from '../sim/rpg/league';
 import { CLUB_SET_DIFFICULTIES } from '../sim/rpg/endless';
 import { bagTierRank, type BagTier } from '../sim/rpg/bag';
+import { unlockableClubTypes } from '../sim/rpg/club-unlock';
 
 // Golfer presentation: the player/competitor avatar SVG art, the character-select cards, and the
 // arc competition views (field strip + leaderboard table). All pure string/SVG builders — they take
@@ -112,16 +113,43 @@ export function statBar(label: string, n: number, col: string): string {
 
 /** The per-character unlocked-clubs strip on the select card (GS-victory / GS-ascension-clubs): winning
  *  an Ascension with a golfer permanently grows THEIR starting bag, so each card surfaces what that golfer
- *  has earned — the character-specific progression made visible before you pick. Empty ⇒ nothing rendered. */
-function unlockedStrip(unlockedTypes: readonly string[], col: string): string {
+ *  has earned — the character-specific progression made visible before you pick.
+ *
+ *  `unlock` (GS-ascension-clubs display) ties it to the SELECTED difficulty on the Voyage: a golfer earns a
+ *  club by WINNING at an Ascension tier they haven't cleared (`cleared` = `maxAscensionByCharacter`, the
+ *  count of tiers cleared, so their next uncleared tier is A`cleared`). It answers the user's question —
+ *  "which difficulty do I play THIS golfer at to unlock a club?" — right on the card:
+ *    · bag already full            → ★ Bag complete (nothing left to unlock)
+ *    · selected tier ≥ next uncleared → 🔓 a win here unlocks a new club
+ *    · selected tier < next uncleared → 🔒 already cleared; next club is at A`cleared`
+ *  Rendered whenever there's a badge OR earned clubs; absent on non-winnable formats (no `unlock`). */
+function unlockedStrip(
+  unlockedTypes: readonly string[],
+  col: string,
+  unlock?: { sel: number; cleared: number },
+  characterId?: string,
+): string {
   const names = unlockedTypes.map((t) => clubById(t, CLUBS)?.name).filter((n): n is string => !!n);
-  if (names.length === 0) return '';
+  let badge = '';
+  if (unlock) {
+    const bagFull = unlockableClubTypes(characterId, unlockedTypes).length === 0;
+    badge = bagFull
+      ? `<span class="gs-unlock-badge gs-unlock-badge--full">★ Bag complete</span>`
+      : unlock.sel >= unlock.cleared
+        ? `<span class="gs-unlock-badge gs-unlock-badge--go">🔓 Win A${unlock.sel} → new club</span>`
+        : `<span class="gs-unlock-badge gs-unlock-badge--wait">🔒 Next club: win A${unlock.cleared}</span>`;
+  }
+  if (names.length === 0 && !badge) return '';
   const chips = names
     .map((n) => `<span style="display:inline-block;font-size:10.5px;line-height:1.5;padding:1px 8px;border-radius:999px;background:${col}1e;border:1px solid ${col}59;color:var(--gs-ink);">${n}</span>`)
     .join('');
   return `
-    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid var(--gs-line-2);">
-      <span style="font-size:10px;letter-spacing:.06em;font-weight:800;color:${col};opacity:.92;">⛳ UNLOCKED · ${names.length}</span>${chips}
+    <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--gs-line-2);">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:10px;letter-spacing:.06em;font-weight:800;color:${col};opacity:.92;">⛳ UNLOCKED · ${names.length}</span>
+        ${badge}
+      </div>
+      ${chips ? `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:6px;">${chips}</div>` : ''}
     </div>`;
 }
 
@@ -144,12 +172,16 @@ export function characterScreen(
     modeName?: string;
     winnable?: boolean;
     ascension?: { max: number; sel: number };
-    /** The Unending Universe's STARTING CLUB SET picker (GS-golf-score): `owned` is the highest tier the
-     *  player can play (every tier at or below it is selectable; green is always available), `sel` the
-     *  chosen difficulty. Absent for the voyage (it always plays the full owned tier). `touched` — has the
-     *  player tapped a chip THIS visit (GS-wardrobe-bagtier)? Only then does the pick ride the select action
-     *  as an explicit override; untouched, each golfer plays its own wardrobe-set tier. */
+    /** The STARTING CLUB SET / bag picker (GS-golf-score / GS-wardrobe-bagtier), now on EVERY mode: `owned`
+     *  is the highest tier the player can play (every tier at or below it is selectable; green always), `sel`
+     *  the chosen difficulty. Absent when only the common bag is owned (no choice to make). `touched` — has
+     *  the player changed the pill THIS visit? Only then does the pick ride the select action as an explicit
+     *  override; untouched, each golfer plays its own wardrobe-set tier. */
     clubSet?: { owned: BagTier; sel: BagTier; touched?: boolean };
+    /** Per-golfer Ascension-clear ladder (GS-ascension-clubs display): characterId → tiers cleared
+     *  (`maxAscensionByCharacter`). Drives the per-card "does a win here unlock a new club?" badge on the
+     *  Voyage. Absent for non-winnable formats (the Unending Universe grants no club unlocks). */
+    unlockLadder?: Record<string, number>;
   } = {},
 ): string {
   const verb = opts.winnable === false ? 'Survive as' : 'Voyage as';
@@ -160,7 +192,12 @@ export function characterScreen(
     const cap = ch.style.cap;
     const pros = ch.pros.map((p) => `<li><span class="gs-pc-i" style="color:var(--gs-accent);">✓</span> <span style="color:var(--gs-ink);">${p}</span></li>`).join('');
     const cons = ch.cons.map((c) => `<li><span class="gs-pc-i" style="color:var(--gs-warn);">▲</span> <span style="color:var(--gs-dim);">${c}</span></li>`).join('');
-    const unlocks = unlockedStrip(unlockedByCharacter[ch.id] ?? [], cap);
+    const unlocks = unlockedStrip(
+      unlockedByCharacter[ch.id] ?? [],
+      cap,
+      opts.unlockLadder ? { sel: opts.ascension?.sel ?? 0, cleared: opts.unlockLadder[ch.id] ?? 0 } : undefined,
+      ch.id,
+    );
     // The phone-sized card swaps the blurb + full pros/cons for this one-line strength · quirk hint.
     const hint = `<p class="gs-charcard-hint"><span style="color:var(--gs-accent);">✓</span> ${ch.pros[0] ?? ''} <span style="color:var(--gs-warn);">▲</span> ${ch.cons[0] ?? ''}</p>`;
     const action = {
@@ -188,38 +225,46 @@ export function characterScreen(
         <span class="gs-charcard-cta" style="--cc:${cap};"><span style="opacity:.7;font-weight:700;">Tap ·</span> ${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>
       </button>`;
   }).join('');
-  const ascRow = opts.ascension
-    ? `<div class="gs-ascpick">
-        <span class="gs-ascpick-l">⚔ Difficulty</span>
-        <div class="gs-ascpick-chips">${Array.from({ length: opts.ascension.max + 1 }, (_, a) => {
-          const on = a === opts.ascension!.sel;
-          return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip" data-asc="${a}">A${a}</button>`;
-        }).join('')}</div>
-        <span class="gs-ascpick-hint">harder cut, leaner purse — win your top tier to unlock the next</span>
-      </div>`
+  // The two DIFFICULTY pills (GS-diffpills) — compact native-select dropdowns that fit one mobile row and
+  // don't reflow the roster: ⚔ Ascension (the voyage's difficulty, only when tiers are unlocked) and
+  // 🎒 Club set / bag (EVERY mode now — the sterner-bag axis, only when a better bag is owned so there's a
+  // real choice). Both ride each golfer card's select action; the club-set pill only overrides when changed.
+  const ascPill = opts.ascension
+    ? `<label class="gs-selpill" style="--cc:var(--gs-gold);">
+        <span class="gs-selpill-l">⚔ Difficulty</span>
+        <select class="gs-selpill-sel" data-selasc aria-label="Ascension difficulty">${Array.from({ length: opts.ascension.max + 1 }, (_, a) =>
+          `<option value="${a}"${a === opts.ascension!.sel ? ' selected' : ''}>A${a}${a === 0 ? ' · classic' : ''}</option>`,
+        ).join('')}</select>
+        <span class="gs-selpill-caret" aria-hidden="true">▾</span>
+      </label>`
     : '';
-  // The Unending Universe's STARTING CLUB SET picker (GS-golf-score) — the mode's difficulty axis. Every
-  // set at or below the owned tier is selectable (green always); locked sets show 🔒. A weaker set is
-  // the sterner test but nets more handicap strokes, so scores compare fairly across sets.
-  const clubRow = opts.clubSet
-    ? `<div class="gs-ascpick">
-        <span class="gs-ascpick-l">🎒 Club set</span>
-        <div class="gs-ascpick-chips">${CLUB_SET_DIFFICULTIES.map((d) => {
-          const locked = bagTierRank(d.tier) > bagTierRank(opts.clubSet!.owned);
-          const on = d.tier === opts.clubSet!.sel;
-          return `<button class="gs-btn ${on ? 'gs-btn--on' : 'gs-btn--ghost'} gs-ascpick-chip"${locked ? ' disabled' : ` data-clubset="${d.tier}"`}
-            style="--cc:${d.col};${on ? `border-color:${d.col};color:${d.col};` : ''}${locked ? 'opacity:.4;' : ''}">${locked ? '🔒 ' : ''}${d.label}</button>`;
-        }).join('')}</div>
-        <span class="gs-ascpick-hint">a weaker set is the sterner test; each golfer keeps its own pick in the Clubhouse wardrobe — set it here for this run</span>
-      </div>`
+  const clubPill = opts.clubSet
+    ? `<label class="gs-selpill" style="--cc:${CLUB_SET_DIFFICULTIES.find((d) => d.tier === opts.clubSet!.sel)?.col ?? 'var(--gs-info)'};">
+        <span class="gs-selpill-l">🎒 Club set</span>
+        <select class="gs-selpill-sel" data-selclubset aria-label="Starting club set">${CLUB_SET_DIFFICULTIES.filter(
+          (d) => bagTierRank(d.tier) <= bagTierRank(opts.clubSet!.owned),
+        )
+          .map((d) => `<option value="${d.tier}"${d.tier === opts.clubSet!.sel ? ' selected' : ''}>${d.label}</option>`)
+          .join('')}</select>
+        <span class="gs-selpill-caret" aria-hidden="true">▾</span>
+      </label>`
     : '';
+  const diffRow =
+    ascPill || clubPill
+      ? `<div class="gs-diffrow">${ascPill}${clubPill}
+          <span class="gs-diffrow-hint">${
+            opts.ascension
+              ? 'harder Ascension = leaner purse; a win at your top tier unlocks a golfer’s next club'
+              : 'a weaker bag is the sterner test'
+          }</span>
+        </div>`
+      : '';
   return `
     <header class="gs-charhead" style="border-left:4px solid #5fd45a;padding-left:10px;">
       <h1>Choose your golfer</h1>
       <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
     </header>
-    ${ascRow}
-    ${clubRow}
+    ${diffRow}
     <div class="gs-charwrap">${cards}</div>`;
 }
 

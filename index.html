@@ -225,6 +225,29 @@
       }
       .gs-ascpick-chip { flex: 0 0 auto; padding: 6px 11px; font-size: 12.5px; margin: 0; }
       .gs-ascpick-hint { flex-basis: 100%; font-size: 10.5px; opacity: .55; }
+      /* ── Character-select difficulty PILLS (GS-diffpills): compact native-select dropdowns that fit one
+         mobile row and never reflow the roster below (the OS supplies the picker on tap). ── */
+      .gs-diffrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0 2px; }
+      .gs-selpill {
+        position: relative; display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 8px 5px 11px; border-radius: 999px;
+        border: 1px solid var(--cc, var(--gs-line)); background: var(--gs-bg-2); box-shadow: var(--gs-shadow);
+      }
+      .gs-selpill-l { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--cc, var(--gs-gold)); white-space: nowrap; }
+      .gs-selpill-sel {
+        appearance: none; -webkit-appearance: none; background: transparent; border: 0; outline: none;
+        color: var(--gs-ink); font: 800 13px/1 system-ui, sans-serif; padding: 3px 17px 3px 2px; cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .gs-selpill-sel option { color: #111; background: #fff; }
+      .gs-selpill-caret { position: absolute; right: 10px; pointer-events: none; opacity: .65; font-size: 10px; color: var(--cc, var(--gs-ink)); }
+      .gs-diffrow-hint { flex-basis: 100%; font-size: 10.5px; opacity: .55; }
+      /* The per-golfer club-unlock badge on the select card (GS-ascension-clubs display): does a win at the
+         selected Ascension grow THIS golfer's bag? green = yes, dim = already cleared, gold = bag full. */
+      .gs-unlock-badge { font-size: 10px; font-weight: 800; letter-spacing: .02em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+      .gs-unlock-badge--go { color: #07120a; background: var(--gs-accent); }
+      .gs-unlock-badge--wait { color: var(--gs-dim); background: #ffffff10; border: 1px solid var(--gs-line-2); }
+      .gs-unlock-badge--full { color: #1a1400; background: var(--gs-gold); }
       .gs-chip {
         display: inline-flex; align-items: center; gap: 6px;
         font-size: 13px; padding: 4px 10px; border-radius: 999px;
