@@ -739,25 +739,20 @@ export function reduce(state: UiState, action: Action): UiState {
       // what's unlocked. The golfer's permanently-unlocked clubs (GS-ascension-clubs) grow their
       // starting bag.
       const asc = Math.max(0, Math.min(state.maxAscension, action.ascension ?? state.run.ascension));
-      // Starting CLUB SET = the Unending Universe's difficulty axis (GS-golf-score): the player may pick
-      // any set they OWN (down to the green starter set, always available), a weaker set being the sterner
-      // test. Clamped to the owned tier so it can never exceed `state.bagTier` (no free bag upgrade), and
-      // ignored entirely for the voyage, which always plays the full owned tier.
-      // Per-golfer difficulty (GS-wardrobe-bagtier): the tier comes from the Clubhouse wardrobe
-      // (`bagTierByCharacter`), overridden by an EXPLICIT char-select strip pick this visit (`action.bagTier`,
-      // sent only when the player taps a chip). Clamped to the owned tier — never a free upgrade. Only the
-      // hole-gate Unending Universe reads it; the Voyage always plays the full owned tier (its difficulty is
-      // Ascension). An explicit strip pick WRITES THROUGH to the golfer so it sticks as their new default.
+      // Per-golfer bag tier (GS-wardrobe-bagtier): the golfer's Clubhouse wardrobe pick is the STARTING
+      // BAG for EVERY mode now — Voyage included — so you can pair a weaker bag with an easier tier to
+      // test it. An EXPLICIT char-select strip pick this visit (`action.bagTier`, sent only when the
+      // player taps a chip — the strip shows for the Unending Universe) overrides it for this run and
+      // WRITES THROUGH to the golfer so it sticks across modes. All clamped to the owned tier (never a
+      // free upgrade). Default (no per-golfer entry) = the owned tier, so the un-touched path is
+      // byte-identical to the old owned-tier behaviour.
       const owned = state.bagTier;
       const picked = action.bagTier ?? state.bagTierByCharacter[action.characterId];
       const bagTier: BagTier =
-        holeGateArmed(state.run) && picked && bagTierRank(picked) <= bagTierRank(owned)
-          ? picked
-          : owned;
-      const bagTierByCharacter =
-        action.bagTier && holeGateArmed(state.run)
-          ? { ...state.bagTierByCharacter, [action.characterId]: bagTier }
-          : state.bagTierByCharacter;
+        picked && bagTierRank(picked) <= bagTierRank(owned) ? picked : owned;
+      const bagTierByCharacter = action.bagTier
+        ? { ...state.bagTierByCharacter, [action.characterId]: bagTier }
+        : state.bagTierByCharacter;
       const run = startRun(
         state.run.seed,
         state.run.formatId,
@@ -1544,6 +1539,10 @@ export function reduce(state: UiState, action: Action): UiState {
         course: currentCourse(run),
         shards: state.shards - set.cost,
         bagTier: set.tier,
+        // Buying a new best bag AUTO-SETS every golfer to it (GS-wardrobe-bagtier) — clear all per-golfer
+        // overrides so each character defaults to the fresh tier; the player re-picks a weaker bag per
+        // golfer in the wardrobe afterwards.
+        bagTierByCharacter: {},
       };
     }
 
