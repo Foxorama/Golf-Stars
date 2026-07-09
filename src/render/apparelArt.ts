@@ -191,6 +191,58 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         </g>`;
       break;
     }
+    case 'supernova': {
+      // The mythic Supernova crown (GS-solar-flames): a jewelled violet circlet on the brow erupting into
+      // a DETONATING STAR — a white-hot core inside an expanding nebula SHELL (soft violet/pink puffs),
+      // ragged filaments fanning wide (violet→hot-pink→starlight) and bright star-KNOTS strung along the
+      // shockwave rim. Set-matched to the deep-violet nebula Suit/Leggings (violet body, hot-pink accent,
+      // magenta glow). Deliberately distinct from the Punched Galaxy starburst: a rounded exploding shell,
+      // not rigid triangular rays. Filaments/knots come off small polar tables so the burst stays symmetric.
+      const tip = '#fff4c2'; // white-gold nova core light (shared with the canvas mirror)
+      const C: [number, number] = [0, -4.4];
+      const rb = 4.2; // filament roots sit just off the circlet
+      // [deg from vertical, length, halfWidth] — a wide, ragged fan (alternating long/short) reads as a shell.
+      const fil: [number, number, number][] = [
+        [0, 12.5, 1.2], [24, 11, 1.1], [-24, 11, 1.1],
+        [46, 8.4, 1.4], [-46, 8.4, 1.4], [70, 9.6, 0.95], [-70, 9.6, 0.95],
+        [96, 6.2, 1.1], [-96, 6.2, 1.1], [120, 5, 0.8], [-120, 5, 0.8],
+      ];
+      const p = (x: number, y: number): string => `${x.toFixed(1)},${y.toFixed(1)}`;
+      const shell = ([[0, -11, 3.4], [-7, -9, 3.0], [7, -9, 3.0], [-10, -4.5, 2.6], [10, -4.5, 2.6], [-6, -1, 2.2], [6, -1, 2.2]] as [number, number, number][])
+        .map(([sx, sy, sr], i) => `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="${i % 2 ? accent : color}" opacity="0.4"/>`)
+        .join('');
+      const spikes = fil
+        .map(([deg, len, w]) => {
+          const t = (deg * Math.PI) / 180;
+          const dx = Math.sin(t);
+          const dy = -Math.cos(t);
+          const px = Math.cos(t);
+          const py = Math.sin(t);
+          const bx = C[0] + rb * dx;
+          const by = C[1] + rb * dy;
+          const tx = C[0] + (rb + len) * dx;
+          const ty = C[1] + (rb + len) * dy;
+          return `<path d="M${p(bx - w * px, by - w * py)} L${p(tx, ty)} L${p(bx + w * px, by + w * py)} Z" fill="url(#nv${uid})" stroke="#0c1116" stroke-width="0.4" stroke-linejoin="round"><animate attributeName="opacity" values="0.65;1;0.65" dur="${(1.9 + (deg % 5) * 0.2).toFixed(1)}s" repeatCount="indefinite"/></path>`;
+        })
+        .join('');
+      const knots = ([[-9, -9, 0.9], [9, -9, 0.9], [-12, -3.5, 0.75], [12, -3.5, 0.75], [-4.5, -13, 0.8], [4.5, -13, 0.8], [0, -15.5, 0.7]] as [number, number, number][])
+        .map(([kx, ky, kr], i) => `<circle cx="${kx}" cy="${ky}" r="${kr}" fill="${i % 2 ? '#fff' : tip}"><animate attributeName="opacity" values="0.4;1;0.4" dur="${(1.4 + i * 0.2).toFixed(1)}s" repeatCount="indefinite"/></circle>`)
+        .join('');
+      g = `<defs><linearGradient id="nv${uid}" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="${color}"/><stop offset="48%" stop-color="#8a3ad6"/><stop offset="76%" stop-color="${accent}"/><stop offset="100%" stop-color="${tip}"/>
+        </linearGradient>
+        <radialGradient id="nc${uid}"><stop offset="0%" stop-color="#fff"/><stop offset="40%" stop-color="${tip}"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></radialGradient></defs>
+        ${shell}${spikes}${knots}
+        <path d="M-6.6,-2 A7 7 0 0 1 6.6,-2 L5.1,0.9 A6.2 6.2 0 0 1 -5.1,0.9 Z" fill="${color}" ${ink}/>
+        <path d="M-6.2,-1.3 A6.4 6.4 0 0 1 6.2,-1.3" fill="none" stroke="${accent}" stroke-width="1" opacity="0.9"/>
+        <circle cx="-4.4" cy="-1.1" r="0.6" fill="${tip}"/><circle cx="4.4" cy="-1.1" r="0.6" fill="${tip}"/>
+        <g transform="translate(${C[0]} ${C[1]})">
+          <circle r="4.4" fill="url(#nc${uid})"><animate attributeName="r" values="3.8;4.8;3.8" dur="2s" repeatCount="indefinite"/></circle>
+          <path d="M0,-3.6 L1,-1 L3.6,0 L1,1 L0,3.6 L-1,1 L-3.6,0 L-1,-1 Z" fill="${tip}" stroke="#0c1116" stroke-width="0.3"/>
+          <circle r="1.1" fill="#fff"/>
+        </g>`;
+      break;
+    }
     case 'wingedHelm': {
       // The Asgardian Valkyrie helm (GS-valkyrie): a feathered silver wing swept up each side (drawn
       // first, behind the dome), a steel dome hugging the head, a gold brow band, a nasal guard down
@@ -219,7 +271,7 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       g = '';
   }
   const flair =
-    shape === 'starburst'
+    shape === 'starburst' || shape === 'supernova'
       ? sparkles([[-11, -9], [11, -8], [0, -18], [-6, 5]])
       : shape === 'baggy'
         ? sparkles([[-8, -8], [8, -6]])
@@ -324,6 +376,56 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
         <g fill="#fff" opacity="0.85"><circle cx="-8.5" cy="-1.6" r="0.7"/><circle cx="8.6" cy="-2.6" r="0.6"/><circle cx="-3.2" cy="8" r="0.6"/><circle cx="3.8" cy="-8.6" r="0.5"/></g>`;
       break;
     }
+    case 'solarflare': {
+      // The Solar Flames robe (GS-solar-flames): a blazing coronal SUN-CORE on the chest (soft glow → red
+      // disc → hot-gold inner → white pip) ringed by short coronal spikes, with purple-black solar FLAMES
+      // licking up the hem (dark→violet→magenta→red→hot, stacked solid fills so no shared gradient id can
+      // cross-tint co-mounted lounge figures — the riftplate rule) and red embers rising. Set-matched to
+      // the flame crown (deep purple-black body, red coronal accent). Mirrors the canvas `drawGolfer`.
+      const cor = look.accent ?? '#ff4d2a';
+      const corHi = '#ffb648';
+      const p = (x: number, y: number): string => `${x.toFixed(1)},${y.toFixed(1)}`;
+      const flamePath = (bx: number, by: number, h: number, w: number, c: number): string =>
+        `M${p(bx - w, by)} Q${p(bx - w * 0.78, by - h * 0.5)} ${p(bx - w * 0.12 + c * 0.4, by - h * 0.72)}` +
+        ` Q${p(bx + c * 0.9, by - h * 0.92)} ${p(bx + c, by - h)}` +
+        ` Q${p(bx + w * 0.55 + c * 0.4, by - h * 0.52)} ${p(bx + w * 0.82, by - h * 0.34)}` +
+        ` Q${p(bx + w, by - h * 0.15)} ${p(bx + w, by)} Z`;
+      const hemY = 10.5;
+      const flames: [number, number, number, number][] = [
+        [0, 9.5, 2.6, 0], [-5, 8, 2.2, -0.8], [5, 8, 2.2, 0.8], [-9, 6, 1.8, -1.5], [9, 6, 1.8, 1.5],
+      ];
+      const flameGs = flames
+        .map(([x, h, w, c], i) => {
+          const back = `<path d="${flamePath(x, hemY, h * 1.12, w * 1.16, c)}" fill="#160826"/>`;
+          const bodyF = `<path d="${flamePath(x, hemY, h, w, c)}" fill="#6a24b8" stroke="#0c1116" stroke-width="0.3" stroke-linejoin="round"/>`;
+          const mid = `<path d="${flamePath(x, hemY, h * 0.82, w * 0.72, c * 0.85)}" fill="#b8309a"/>`;
+          const lick = `<path d="${flamePath(x, hemY, h * 0.58, w * 0.5, c * 0.7)}" fill="${cor}"><animate attributeName="opacity" values="0.55;1;0.7;0.55" dur="${(1.1 + i * 0.16).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+          const inner = `<path d="${flamePath(x, hemY, h * 0.34, w * 0.3, c * 0.5)}" fill="${corHi}"><animate attributeName="opacity" values="0.25;0.9;0.4;0.25" dur="${(0.9 + i * 0.13).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+          return back + bodyF + mid + lick + inner;
+        })
+        .join('');
+      const embers = ([[-7, 2], [7, 3], [-3, -0.5], [4, -1], [0, 4]] as [number, number][])
+        .map(([ex, ey], i) => `<circle cx="${ex}" cy="${ey}" r="${(0.5 + (i % 2) * 0.3).toFixed(1)}" fill="${i % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/><animate attributeName="cy" values="${ey};${(ey - 3).toFixed(1)}" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/></circle>`)
+        .join('');
+      // Coronal sun-core on the upper chest — soft glow, coronal spikes ring, red disc, hot inner, white pip.
+      const spikes = Array.from({ length: 8 }, (_, k) => {
+        const t = (k * Math.PI) / 4;
+        const x0 = Math.cos(t) * 3.2;
+        const y0 = -3 + Math.sin(t) * 3.2;
+        const x1 = Math.cos(t) * 5.4;
+        const y1 = -3 + Math.sin(t) * 5.4;
+        const nx = -Math.sin(t) * 0.9;
+        const ny = Math.cos(t) * 0.9;
+        return `<path d="M${p(x0 - nx, y0 - ny)} L${p(x1, y1)} L${p(x0 + nx, y0 + ny)} Z" fill="${cor}" opacity="0.85"/>`;
+      }).join('');
+      const core = `<circle cx="0" cy="-3" r="5" fill="${cor}" opacity="0.35"><animate attributeName="r" values="4.4;5.6;4.4" dur="1.8s" repeatCount="indefinite"/></circle>
+        ${spikes}
+        <circle cx="0" cy="-3" r="3" fill="${cor}" stroke="#0c1116" stroke-width="0.4"/>
+        <circle cx="0" cy="-3" r="1.8" fill="${corHi}"/>
+        <circle cx="0" cy="-3" r="0.7" fill="#fff"/>`;
+      detail = flameGs + core + embers;
+      break;
+    }
     default:
       detail = '';
   }
@@ -341,7 +443,7 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   const bodyPath = `M${cx - 13},${cy - 9} L${cx - 6},${cy - 11} L${cx},${cy - 7} L${cx + 6},${cy - 11} L${cx + 13},${cy - 9} L${cx + 10},${cy - 3} L${cx + 9},${cy + 12} L${cx - 9},${cy + 12} L${cx - 10},${cy - 3} Z`;
   const base = `<path d="${bodyPath}" fill="${color}" ${ink}/>`;
   const flair =
-    shape === 'cosmic' || shape === 'blazer' || shape === 'riftplate'
+    shape === 'cosmic' || shape === 'blazer' || shape === 'riftplate' || shape === 'solarflare'
       ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]])
       : '';
   return a + base + shirtDetail(look, cx, cy) + flair;
@@ -383,6 +485,36 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       crack(`M${cx - 4.6},${cy - 6} L${cx - 5.2},${cy + 1} L${cx - 3.6},${legBottom - 5}`) +
       crack(`M${cx + 4.6},${cy - 6} L${cx + 5.2},${cy + 1} L${cx + 3.6},${legBottom - 5}`) +
       `<g fill="#fff"><circle cx="${cx - 3.4}" cy="${cy + 2}" r="0.7"/><circle cx="${cx + 3.6}" cy="${cy + 6}" r="0.6"/><circle cx="${cx + 5}" cy="${cy - 4}" r="0.5"/></g>`;
+  } else if (shape === 'emberlegs') {
+    // The Solar Flames leggings (GS-solar-flames): purple-black solar FLAMES licking up each leg
+    // (dark→violet→magenta→red→hot, stacked solid fills — the shirt's idiom) with red embers rising.
+    // Set-matched to the flame crown + robe. Mirrors the canvas `drawPants`.
+    const cor = look.accent ?? '#ff4d2a';
+    const corHi = '#ffb648';
+    const P = (x: number, y: number): string => `${x.toFixed(1)},${y.toFixed(1)}`;
+    const flamePath = (bx: number, by: number, h: number, w: number, c: number): string =>
+      `M${P(bx - w, by)} Q${P(bx - w * 0.78, by - h * 0.5)} ${P(bx - w * 0.12 + c * 0.4, by - h * 0.72)}` +
+      ` Q${P(bx + c * 0.9, by - h * 0.92)} ${P(bx + c, by - h)}` +
+      ` Q${P(bx + w * 0.55 + c * 0.4, by - h * 0.52)} ${P(bx + w * 0.82, by - h * 0.34)}` +
+      ` Q${P(bx + w, by - h * 0.15)} ${P(bx + w, by)} Z`;
+    const by = legBottom - 1;
+    const flames: [number, number, number, number][] = [
+      [cx - 5, 11, 1.9, -0.3], [cx - 2.8, 7, 1.3, 0.5], [cx + 5, 11, 1.9, 0.3], [cx + 2.8, 7, 1.3, -0.5],
+    ];
+    const flameGs = flames
+      .map(([x, h, w, c], i) => {
+        const back = `<path d="${flamePath(x, by, h * 1.12, w * 1.16, c)}" fill="#160826"/>`;
+        const bodyF = `<path d="${flamePath(x, by, h, w, c)}" fill="#6a24b8" stroke="#0c1116" stroke-width="0.3" stroke-linejoin="round"/>`;
+        const mid = `<path d="${flamePath(x, by, h * 0.8, w * 0.72, c * 0.85)}" fill="#b8309a"/>`;
+        const lick = `<path d="${flamePath(x, by, h * 0.56, w * 0.5, c * 0.7)}" fill="${cor}"><animate attributeName="opacity" values="0.55;1;0.7;0.55" dur="${(1.1 + i * 0.17).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+        const inner = `<path d="${flamePath(x, by, h * 0.32, w * 0.3, c * 0.5)}" fill="${corHi}"><animate attributeName="opacity" values="0.25;0.9;0.4;0.25" dur="${(0.9 + i * 0.14).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+        return back + bodyF + mid + lick + inner;
+      })
+      .join('');
+    const embers = ([[cx - 6, cy - 2], [cx + 6, cy - 4], [cx - 3, cy + 3], [cx + 3, cy + 1]] as [number, number][])
+      .map(([ex, ey], i) => `<circle cx="${ex}" cy="${ey}" r="${(0.5 + (i % 2) * 0.25).toFixed(2)}" fill="${i % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.22).toFixed(2)}s" repeatCount="indefinite"/></circle>`)
+      .join('');
+    detail = flameGs + embers;
   } else if (shape === 'greaves') {
     // Valkyrie greaves (GS-valkyrie): war-skirt tassets hanging off the waist + gold shin plates.
     const plate = shade(accent, 0.14);
@@ -397,7 +529,9 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       </g>`;
   }
   const flair =
-    shape === 'nebula' || shape === 'riftgreaves' ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]]) : '';
+    shape === 'nebula' || shape === 'riftgreaves' || shape === 'emberlegs'
+      ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]])
+      : '';
   return a + body + band + detail + flair;
 }
 
@@ -783,6 +917,35 @@ export function golferPreviewSVG(
         greave(lAnk) +
         greave(rAnk) +
         `<g fill="#fff" opacity="0.9"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(16))}" r="${f(px(1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(26))}" r="${f(px(0.8))}"/><circle cx="${f(cx)}" cy="${f(hipY + px(8))}" r="${f(px(0.7))}"/></g>`;
+    } else if (pantsShape === 'emberlegs') {
+      // The Solar Flames leggings (GS-solar-flames): purple-black solar flames licking up each shin
+      // (dark→violet→magenta→red→hot, stacked solid fills — the shirt's idiom) with red embers rising.
+      const cor = pantsAcc; // red coronal (accent)
+      const corHi = '#ffb648';
+      const flamePath = (bx: number, by: number, h: number, w: number, c: number): string =>
+        `M${f(bx - w)},${f(by)} Q${f(bx - w * 0.78)},${f(by - h * 0.5)} ${f(bx - w * 0.12 + c * 0.4)},${f(by - h * 0.72)}` +
+        ` Q${f(bx + c * 0.9)},${f(by - h * 0.92)} ${f(bx + c)},${f(by - h)}` +
+        ` Q${f(bx + w * 0.55 + c * 0.4)},${f(by - h * 0.52)} ${f(bx + w * 0.82)},${f(by - h * 0.34)}` +
+        ` Q${f(bx + w)},${f(by - h * 0.15)} ${f(bx + w)},${f(by)} Z`;
+      const legFire = (ankC: number): string => {
+        const by = ankleY - px(1);
+        const specs: [number, number, number, number][] = [
+          [ankC, px(21), px(3.6), 0],
+          [ankC + px(3), px(13), px(2.5), px(1.2)],
+        ];
+        return specs
+          .map(([x, h, w, c]) => {
+            const back = `<path d="${flamePath(x, by, h * 1.12, w * 1.16, c)}" fill="#160826"/>`;
+            const bodyF = `<path d="${flamePath(x, by, h, w, c)}" fill="#6a24b8" stroke="#0c1116" stroke-width="${sw(0.5)}" stroke-linejoin="round"/>`;
+            const mid = `<path d="${flamePath(x, by, h * 0.8, w * 0.72, c * 0.85)}" fill="#b8309a"/>`;
+            const lick = `<path d="${flamePath(x, by, h * 0.56, w * 0.5, c * 0.7)}" fill="${cor}"/>`;
+            const inner = `<path d="${flamePath(x, by, h * 0.32, w * 0.3, c * 0.5)}" fill="${corHi}"/>`;
+            return back + bodyF + mid + lick + inner;
+          })
+          .join('');
+      };
+      const embers = `<g><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(14))}" r="${f(px(1.1))}" fill="${cor}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(22))}" r="${f(px(0.9))}" fill="${corHi}"/><circle cx="${f(lAnk)}" cy="${f(ankleY - px(16))}" r="${f(px(0.8))}" fill="${corHi}"/><circle cx="${f(rAnk - px(1))}" cy="${f(ankleY - px(24))}" r="${f(px(0.8))}" fill="${cor}"/></g>`;
+      legDetail = legFire(lAnk) + legFire(rAnk) + embers;
     } else if (pantsShape === 'greaves') {
       // Valkyrie greaves (GS-valkyrie): war-skirt tassets over the hips + gold shin greave plates.
       const plate = shade(pantsAcc, 0.14);
@@ -819,7 +982,11 @@ export function golferPreviewSVG(
   //    wrist — a pressure cuff + glove on the suits, a jacket cuff + bare hand on the blazer.
   const shirtShape = shirt?.look.shape;
   const fullSleeve =
-    shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'blazer' || shirtShape === 'riftplate';
+    shirtShape === 'spacesuit' ||
+    shirtShape === 'cosmic' ||
+    shirtShape === 'blazer' ||
+    shirtShape === 'riftplate' ||
+    shirtShape === 'solarflare';
   const gloved = shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'riftplate';
   const sleeveFill = `url(#shg${uid})`;
   const skinFill = `url(#skg${uid})`;

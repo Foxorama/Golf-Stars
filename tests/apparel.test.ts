@@ -110,8 +110,9 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(leggings.set).toBe('Supernova');
     expect(leggings.slot).toBe('pants');
     expect(leggings.rarity).toBe('mythic');
-    // The Supernova crown is the crown of solar flames — set-matched to the nebula suit/leggings.
-    expect(crown.look.shape).toBe('solarCrown');
+    // The Supernova crown is now the detonating-star crown (GS-solar-flames) — set-matched to the
+    // nebula suit/leggings. The old flame crown moved out to the Solar Flames set (asserted below).
+    expect(crown.look.shape).toBe('supernova');
     expect(suit.look.shape).toBe('cosmic');
     expect(leggings.look.shape).toBe('nebula');
     // The Supernova set spans all three slots — only the full kit reports complete.
@@ -121,6 +122,28 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(equippedSet(crown.id, 'polo-classic', leggings.id)).toBeUndefined();
     // Rookie basics (many standalone pieces) never read as a "set".
     expect(equippedSet('cap-classic', 'polo-classic', 'trousers-classic')).toBeUndefined();
+  });
+
+  it('the mythic Solar Flames hat + shirt + pants form one head-to-toe set (GS-solar-flames)', () => {
+    const crown = apparelById('crown-solarflames')!;
+    const robe = apparelById('suit-solarflames')!;
+    const leggings = apparelById('leggings-solarflames')!;
+    expect(crown.set).toBe('Solar Flames');
+    expect(robe.set).toBe('Solar Flames');
+    expect(leggings.set).toBe('Solar Flames');
+    expect(crown.rarity).toBe('mythic');
+    expect(robe.rarity).toBe('mythic');
+    expect(leggings.rarity).toBe('mythic');
+    // The flame crown (the former Supernova crown) now heads Solar Flames, paired with the solar-flame
+    // robe + ember leggings.
+    expect(crown.look.shape).toBe('solarCrown');
+    expect(robe.look.shape).toBe('solarflare');
+    expect(leggings.look.shape).toBe('emberlegs');
+    // The set spans all three slots — only the full kit reports complete.
+    expect(equippedSet(crown.id, robe.id, leggings.id)).toBe('Solar Flames');
+    expect(equippedSet(crown.id, robe.id, undefined)).toBeUndefined(); // missing the pants
+    // Cross-set pieces never assemble a set (the flame crown does NOT complete Supernova).
+    expect(equippedSet('crown-solarflames', 'suit-supernova', 'leggings-supernova')).toBeUndefined();
   });
 
   it('the mythic Punched Galaxy hat + shirt + pants form one super-epic head-to-toe set (GS-punched-galaxy)', () => {
