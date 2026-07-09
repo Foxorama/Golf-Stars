@@ -91,12 +91,12 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         <ellipse cx="-2" cy="-1.6" rx="2" ry="1.1" fill="#fff" opacity="0.55"/>
         <path d="M-6.4,-4.6 A8.5 8.5 0 0 1 0.5,-9.4 Q-4.4,-7.4 -6.4,-4.6 Z" fill="#ffffff" opacity="0.3"/>`;
       break;
-    case 'supernova': {
-      // The mythic Supernova crown (GS-supernova): a jewelled violet circlet hugging the brow that
-      // ERUPTS into a burst of starlight rays, each fading violet→hot-pink→starlight so the crown
-      // reads as an exploding star. Set-matched to the Supernova suit/leggings (deep-violet body,
-      // hot-pink accent, magenta glow) with a bright star-core gem front-and-centre. The rays are
-      // computed from a small polar table so the burst stays perfectly symmetric.
+    case 'starburst': {
+      // The Punched Galaxy crown (GS-punched-galaxy, was the Supernova crown): a jewelled violet circlet
+      // hugging the brow that ERUPTS into a burst of starlight rays, each fading violet→hot-pink→starlight
+      // so the crown reads as a galaxy caught mid-detonation. Set-matched to the Punched Galaxy warplate/
+      // greaves (deep-violet body, hot-pink accent, magenta glow) with a bright star-core gem
+      // front-and-centre. The rays are computed from a small polar table so the burst stays symmetric.
       const tip = '#fff0a0'; // starlight highlight (shared with the canvas mirror)
       const C: [number, number] = [0, -3.4];
       const rb = 4.0; // ray roots sit just off the circlet
@@ -131,6 +131,63 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         </g>`;
       break;
     }
+    case 'solarCrown': {
+      // The mythic Supernova crown (GS-supernova-flame): a dark circlet erupting into a CROWN OF SOLAR
+      // FLAMES — purple-and-black tongues of fire licking upward, each fading black→royal-purple→red
+      // coronal at the tip, with red embers flickering around the burst. Set-matched to the Supernova
+      // suit/leggings (deep-violet nebula). Flames root along the circlet crest (a small polar table) so
+      // the crown stays symmetric; the SVG flicker lives in <animate> (the canvas mirror is static).
+      const cor = accent; // red coronal
+      const corHi = '#ffb648'; // hot coronal-tip highlight
+      const rb = 6.6; // circlet crest radius the flames root along
+      // [x, height, halfWidth, curl] — outer flames lean OUTWARD (curl sign follows x) so the crown fans
+      // like real fire; the centre flame stands tallest and straight.
+      const flames: [number, number, number, number][] = [
+        [0, 14, 3.0, 0],
+        [-2.7, 11.5, 2.5, -0.7], [2.7, 11.5, 2.5, 0.7],
+        [-4.9, 8.6, 2.1, -1.4], [4.9, 8.6, 2.1, 1.4],
+        [-6.6, 5.6, 1.6, -1.9], [6.6, 5.6, 1.6, 1.9],
+      ];
+      const p = (x: number, y: number): string => `${x.toFixed(1)},${y.toFixed(1)}`;
+      // A licking flame tongue: base-left up the inner edge to a curled tip, back down a bellied outer
+      // edge. `c` leans the tip; the sides bow so it reads as fire, not a rigid spike.
+      const flamePath = (bx: number, by: number, h: number, w: number, c: number): string =>
+        `M${p(bx - w, by)}` +
+        ` Q${p(bx - w * 0.78, by - h * 0.5)} ${p(bx - w * 0.12 + c * 0.4, by - h * 0.72)}` +
+        ` Q${p(bx + c * 0.9, by - h * 0.92)} ${p(bx + c, by - h)}` +
+        ` Q${p(bx + w * 0.55 + c * 0.4, by - h * 0.52)} ${p(bx + w * 0.82, by - h * 0.34)}` +
+        ` Q${p(bx + w, by - h * 0.15)} ${p(bx + w, by)} Z`;
+      const flameGs = flames
+        .map(([x, h, w, c], i) => {
+          const by = -Math.sqrt(Math.max(0, rb * rb - x * x));
+          const back = `<path d="${flamePath(x, by, h * 1.08, w * 1.16, c)}" fill="#160826"/>`;
+          const body = `<path d="${flamePath(x, by, h, w, c)}" fill="url(#sf${uid})" stroke="#0c1116" stroke-width="0.4" stroke-linejoin="round"/>`;
+          const lick = `<path d="${flamePath(x, by, h * 0.66, w * 0.5, c * 0.7)}" fill="${cor}" opacity="0.9"><animate attributeName="opacity" values="0.4;1;0.55;0.9;0.4" dur="${(1.1 + i * 0.15).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+          const inner = `<path d="${flamePath(x, by, h * 0.4, w * 0.28, c * 0.5)}" fill="${corHi}" opacity="0.85"><animate attributeName="opacity" values="0.2;0.9;0.4;0.2" dur="${(0.9 + i * 0.13).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+          return back + body + lick + inner;
+        })
+        .join('');
+      const embers = ([[-8.5, -10], [8.5, -9], [0, -18], [-4.5, -14], [5, -13], [2.5, -20]] as [number, number][])
+        .map(([ex, ey], i) => {
+          const dur = (0.9 + i * 0.19).toFixed(2);
+          return `<circle cx="${ex}" cy="${ey}" r="${(0.5 + (i % 2) * 0.3).toFixed(1)}" fill="${i % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${dur}s" repeatCount="indefinite"/><animate attributeName="cy" values="${ey};${(ey - 3.4).toFixed(1)}" dur="${dur}s" repeatCount="indefinite"/></circle>`;
+        })
+        .join('');
+      g = `<defs><linearGradient id="sf${uid}" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#160826"/><stop offset="30%" stop-color="${color}"/><stop offset="52%" stop-color="#6a24b8"/>
+          <stop offset="70%" stop-color="#b8309a"/><stop offset="84%" stop-color="${cor}"/><stop offset="100%" stop-color="${corHi}"/>
+        </linearGradient></defs>
+        ${flameGs}${embers}
+        <path d="M-6.7,-2 A7 7 0 0 1 6.7,-2 L5.4,1 A6.4 6.4 0 0 1 -5.4,1 Z" fill="${color}" ${ink}/>
+        <path d="M-5.6,-1.5 A5.9 5.9 0 0 1 5.6,-1.5" fill="none" stroke="${shade(color, 0.28)}" stroke-width="0.6" opacity="0.7"/>
+        <circle cx="-4" cy="-1" r="0.62" fill="${cor}"/><circle cx="4" cy="-1" r="0.62" fill="${cor}"/>
+        <g transform="translate(0 -2.4)">
+          <circle r="2" fill="${cor}" opacity="0.4"><animate attributeName="r" values="1.7;2.4;1.7" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.25;0.5;0.25" dur="1.5s" repeatCount="indefinite"/></circle>
+          <path d="M0,-2.4 L0.65,-0.65 L2.4,0 L0.65,0.65 L0,2.4 L-0.65,0.65 L-2.4,0 L-0.65,-0.65 Z" fill="${corHi}"/>
+          <circle r="0.55" fill="#fff"/>
+        </g>`;
+      break;
+    }
     case 'wingedHelm': {
       // The Asgardian Valkyrie helm (GS-valkyrie): a feathered silver wing swept up each side (drawn
       // first, behind the dome), a steel dome hugging the head, a gold brow band, a nasal guard down
@@ -159,7 +216,7 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       g = '';
   }
   const flair =
-    shape === 'supernova'
+    shape === 'starburst'
       ? sparkles([[-11, -9], [11, -8], [0, -18], [-6, 5]])
       : shape === 'baggy'
         ? sparkles([[-8, -8], [8, -6]])
@@ -223,6 +280,47 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
         <circle cx="0" cy="6" r="1" fill="${accent}"/>
         <g transform="translate(-6.5 1)"><circle r="2.1" fill="${accent}"/><path d="M0,-1.3 L0.4,-0.4 L1.3,-0.3 L0.6,0.3 L0.8,1.2 L0,0.7 L-0.8,1.2 L-0.6,0.3 L-1.3,-0.3 L-0.4,-0.4 Z" fill="#0f5132"/></g>`;
       break;
+    case 'riftplate': {
+      // The Punched Galaxy warplate (GS-punched-galaxy): a cosmic warlord's cuirass barely containing a
+      // caged star — angular dark pauldrons + a gorget V-plate + a diamond core housing framing a glowing
+      // STAR-CORE, with jagged GALAXY-CRACK energy forking out across the chest (accent + a cyan inner
+      // spark) and red-hot coronal embers flickering. Styled after a cosmic end-boss's power-up.
+      const acc = look.accent ?? '#ff7bf0';
+      const body = look.color ?? '#2a1257';
+      const plate = shade(body, -0.3);
+      const gorget = shade(body, -0.1);
+      const cyan = '#8fefff';
+      const inkP = 'stroke="#0c1116" stroke-width="0.7" stroke-linejoin="round"';
+      const crack = (d: string): string =>
+        `<path d="${d}" fill="none" stroke="${acc}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>` +
+        `<path d="${d}" fill="none" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+      const embers = ([[-8, -6], [7.5, -5], [-6.5, 5.5], [6.5, 6], [0, -8.5]] as [number, number][])
+        .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="0.7" fill="${i % 2 ? '#ffd07a' : acc}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.21).toFixed(2)}s" repeatCount="indefinite"/></circle>`)
+        .join('');
+      detail = `
+        <path d="M-11.5,-9 L-5.5,-10.5 L-4,-3.5 L-10,-1.8 Z" fill="${plate}" ${inkP}/>
+        <path d="M11.5,-9 L5.5,-10.5 L4,-3.5 L10,-1.8 Z" fill="${plate}" ${inkP}/>
+        <path d="M-10.6,-8.4 L-5.4,-9.6 M9.6,-8.4 L4.6,-9.6" stroke="${acc}" stroke-width="0.6" opacity="0.8"/>
+        <path d="M-5.5,-10.5 L0,-6.2 L5.5,-10.5 L4.6,-2.2 L-4.6,-2.2 Z" fill="${gorget}" ${inkP}/>
+        <g>
+          ${crack('M0,-1 L-3,-4.5 L-7.5,-5.5 L-10,-8.5')}
+          ${crack('M0,-1 L3,-4.5 L7.5,-5.5 L10,-8.5')}
+          ${crack('M0,-1 L-2,3 L-4.5,7.8')}
+          ${crack('M0,-1 L2,3 L5,7.8')}
+          ${crack('M0,-1 L-6,-0.4 L-10.5,1.2')}
+          ${crack('M0,-1 L6,-0.4 L10.5,1.2')}
+        </g>
+        <path d="M0,-1 L-1.6,-4 L-4.2,-4.6" fill="none" stroke="${cyan}" stroke-width="0.7" stroke-linecap="round" opacity="0.85"/>
+        <path d="M0,-1 L1.7,2.4 L3.6,3.4" fill="none" stroke="${cyan}" stroke-width="0.7" stroke-linecap="round" opacity="0.85"/>
+        <path d="M0,-6.4 L2.9,-1 L0,4.4 L-2.9,-1 Z" fill="${plate}" ${inkP}/>
+        <circle cx="0" cy="-1" r="3.4" fill="${acc}" opacity="0.5"><animate attributeName="r" values="3;4;3" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0.6;0.3" dur="1.8s" repeatCount="indefinite"/></circle>
+        <circle cx="0" cy="-1" r="2.3" fill="${acc}"/>
+        <circle cx="0" cy="-1" r="1.4" fill="#ffd9f6"/>
+        <circle cx="0" cy="-1" r="0.7" fill="#fff"/>
+        ${embers}
+        <g fill="#fff" opacity="0.85"><circle cx="-8.5" cy="-1.6" r="0.7"/><circle cx="8.6" cy="-2.6" r="0.6"/><circle cx="-3.2" cy="8" r="0.6"/><circle cx="3.8" cy="-8.6" r="0.5"/></g>`;
+      break;
+    }
     default:
       detail = '';
   }
@@ -240,7 +338,9 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   const bodyPath = `M${cx - 13},${cy - 9} L${cx - 6},${cy - 11} L${cx},${cy - 7} L${cx + 6},${cy - 11} L${cx + 13},${cy - 9} L${cx + 10},${cy - 3} L${cx + 9},${cy + 12} L${cx - 9},${cy + 12} L${cx - 10},${cy - 3} Z`;
   const base = `<path d="${bodyPath}" fill="${color}" ${ink}/>`;
   const flair =
-    shape === 'cosmic' || shape === 'blazer' ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]]) : '';
+    shape === 'cosmic' || shape === 'blazer' || shape === 'riftplate'
+      ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]])
+      : '';
   return a + base + shirtDetail(look, cx, cy) + flair;
 }
 
@@ -264,6 +364,22 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
     detail = `<circle cx="${cx - 4.5}" cy="${legBottom - 1}" r="1.3" fill="${accent}"/><circle cx="${cx + 4.5}" cy="${legBottom - 1}" r="1.3" fill="${accent}"/>`;
   } else if (shape === 'nebula') {
     detail = `<g fill="#fff"><circle cx="${cx - 4}" cy="${cy + 1}" r="0.8"/><circle cx="${cx + 3}" cy="${cy + 5}" r="0.7"/><circle cx="${cx + 5}" cy="${cy - 4}" r="0.6"/></g>`;
+  } else if (shape === 'riftgreaves') {
+    // The Punched Galaxy greaves (GS-punched-galaxy): galaxy-crack energy forking down each leg (accent
+    // + a white core) over angular cosmic shin plates, with a scatter of starfield specks — the legs of
+    // the warplate.
+    const acc = look.accent ?? '#ff7bf0';
+    const plate = shade(color, -0.3);
+    const inkP = 'stroke="#0c1116" stroke-width="0.6" stroke-linejoin="round"';
+    const crack = (d: string): string =>
+      `<path d="${d}" fill="none" stroke="${acc}" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="${d}" fill="none" stroke="#fff" stroke-width="0.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+    detail =
+      `<rect x="${cx - 6.4}" y="${legBottom - 6}" width="4.2" height="6.2" rx="1" fill="${plate}" ${inkP}/>` +
+      `<rect x="${cx + 2.2}" y="${legBottom - 6}" width="4.2" height="6.2" rx="1" fill="${plate}" ${inkP}/>` +
+      crack(`M${cx - 4.6},${cy - 6} L${cx - 5.2},${cy + 1} L${cx - 3.6},${legBottom - 5}`) +
+      crack(`M${cx + 4.6},${cy - 6} L${cx + 5.2},${cy + 1} L${cx + 3.6},${legBottom - 5}`) +
+      `<g fill="#fff"><circle cx="${cx - 3.4}" cy="${cy + 2}" r="0.7"/><circle cx="${cx + 3.6}" cy="${cy + 6}" r="0.6"/><circle cx="${cx + 5}" cy="${cy - 4}" r="0.5"/></g>`;
   } else if (shape === 'greaves') {
     // Valkyrie greaves (GS-valkyrie): war-skirt tassets hanging off the waist + gold shin plates.
     const plate = shade(accent, 0.14);
@@ -277,7 +393,8 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
         <rect x="${cx + 2.4}" y="${legBottom - 6}" width="4" height="6.4" rx="1.1"/>
       </g>`;
   }
-  const flair = shape === 'nebula' ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]]) : '';
+  const flair =
+    shape === 'nebula' || shape === 'riftgreaves' ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]]) : '';
   return a + body + band + detail + flair;
 }
 
@@ -642,6 +759,27 @@ export function golferPreviewSVG(
       legDetail = boot(lAnk) + boot(rAnk);
     } else if (pantsShape === 'nebula') {
       legDetail = `<g fill="#fff"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(14))}" r="${f(px(1.1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(24))}" r="${f(px(0.9))}"/><circle cx="${f(lAnk)}" cy="${f(ankleY - px(10))}" r="${f(px(0.9))}"/><circle cx="${f(rAnk - px(1))}" cy="${f(ankleY - px(20))}" r="${f(px(0.7))}"/></g>`;
+    } else if (pantsShape === 'riftgreaves') {
+      // Punched Galaxy greaves (GS-punched-galaxy): galaxy-crack energy forking down each thigh (accent
+      // + a white core) over angular cosmic shin plates, with a scatter of starfield specks — the legs
+      // that match the warplate.
+      const plate = shade(pantsCol, -0.3);
+      const crack = (hipC: number, ankC: number): string => {
+        const d = `M${f(hipC)},${f(hipY + px(2))} L${f((hipC + ankC) / 2 - px(1))},${f((hipY + ankleY) / 2)} L${f(ankC)},${f(ankleY - px(4))}`;
+        return (
+          `<path d="${d}" fill="none" stroke="${pantsAcc}" stroke-width="${sw(1.3)}" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `<path d="${d}" fill="none" stroke="#fff" stroke-width="${sw(0.5)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`
+        );
+      };
+      const greave = (x: number): string =>
+        `<rect x="${f(x - px(4))}" y="${f(ankleY - px(14))}" width="${f(px(8))}" height="${f(px(12))}" rx="${f(px(1.6))}" fill="${plate}" ${ink}/>` +
+        `<rect x="${f(x - px(4))}" y="${f(ankleY - px(14))}" width="${f(px(8))}" height="${f(px(2.4))}" rx="${f(px(1.2))}" fill="${pantsAcc}" stroke="none" opacity="0.85"/>`;
+      legDetail =
+        crack(lHip, lAnk) +
+        crack(rHip, rAnk) +
+        greave(lAnk) +
+        greave(rAnk) +
+        `<g fill="#fff" opacity="0.9"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(16))}" r="${f(px(1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(26))}" r="${f(px(0.8))}"/><circle cx="${f(cx)}" cy="${f(hipY + px(8))}" r="${f(px(0.7))}"/></g>`;
     } else if (pantsShape === 'greaves') {
       // Valkyrie greaves (GS-valkyrie): war-skirt tassets over the hips + gold shin greave plates.
       const plate = shade(pantsAcc, 0.14);
@@ -677,8 +815,9 @@ export function golferPreviewSVG(
   //    a gradient-shaded forearm; full-cover suits/jacket (spacesuit/nebula/green jacket) sleeve to the
   //    wrist — a pressure cuff + glove on the suits, a jacket cuff + bare hand on the blazer.
   const shirtShape = shirt?.look.shape;
-  const fullSleeve = shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'blazer';
-  const gloved = shirtShape === 'spacesuit' || shirtShape === 'cosmic';
+  const fullSleeve =
+    shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'blazer' || shirtShape === 'riftplate';
+  const gloved = shirtShape === 'spacesuit' || shirtShape === 'cosmic' || shirtShape === 'riftplate';
   const sleeveFill = `url(#shg${uid})`;
   const skinFill = `url(#skg${uid})`;
   const handCol = gloved ? shade(shirtCol, 0.08) : skin;

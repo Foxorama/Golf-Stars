@@ -19,8 +19,10 @@ export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
 
 /** Hat silhouettes the drawer renders (canvas + SVG share these shape names). `baggy` is the soft
  *  slouched-crown cap of the Evergreen set (GS-unending). `wingedHelm` is the Asgardian Valkyrie helm —
- *  a steel dome with a nasal guard and a feathered wing swept up each side (GS-valkyrie). `supernova` is
- *  the mythic Supernova crown — a jewelled circlet erupting into a burst of starlight rays (GS-supernova). */
+ *  a steel dome with a nasal guard and a feathered wing swept up each side (GS-valkyrie). `starburst` is
+ *  the Punched Galaxy crown — a jewelled circlet erupting into a burst of starlight rays (GS-punched-galaxy;
+ *  was the Supernova crown, moved into the new set). `solarCrown` is the mythic Supernova crown — a crown
+ *  of purple-and-black solar FLAMES with red coronal energy flickering at the tips (GS-supernova-flame). */
 export type HatShape =
   | 'cap'
   | 'bucket'
@@ -28,14 +30,26 @@ export type HatShape =
   | 'tophat'
   | 'crown'
   | 'helmet'
-  | 'supernova'
+  | 'starburst'
+  | 'solarCrown'
   | 'baggy'
   | 'wingedHelm';
 /** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
- *  `valkyrie` is a burnished cuirass — pauldrons, a central ridge and a winged chest boss (GS-valkyrie). */
-export type ShirtShape = 'polo' | 'striped' | 'jersey' | 'spacesuit' | 'cosmic' | 'blazer' | 'valkyrie';
+ *  `valkyrie` is a burnished cuirass — pauldrons, a central ridge and a winged chest boss (GS-valkyrie).
+ *  `riftplate` is the Punched Galaxy warplate — a dark cosmic cuirass shot through with glowing galaxy-crack
+ *  energy erupting from a chest star-core, styled after a cosmic end-boss warlord (GS-punched-galaxy). */
+export type ShirtShape =
+  | 'polo'
+  | 'striped'
+  | 'jersey'
+  | 'spacesuit'
+  | 'cosmic'
+  | 'blazer'
+  | 'valkyrie'
+  | 'riftplate';
 /** Pants silhouettes the drawer renders. `greaves` is armoured legwear — war-skirt tassets over the hips
- *  and gold shin greaves (GS-valkyrie). */
+ *  and gold shin greaves (GS-valkyrie). `riftgreaves` is the Punched Galaxy legwear — dark cosmic leggings
+ *  cracked with glowing galaxy energy down each leg over angular shin plates (GS-punched-galaxy). */
 export type PantsShape =
   | 'trousers'
   | 'shorts'
@@ -43,7 +57,8 @@ export type PantsShape =
   | 'leggings'
   | 'spacepants'
   | 'nebula'
-  | 'greaves';
+  | 'greaves'
+  | 'riftgreaves';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
 export type BagShape = 'staffbag';
 /** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
@@ -162,9 +177,19 @@ export const APPAREL: readonly Apparel[] = [
     slot: 'hat',
     set: 'Supernova',
     rarity: 'mythic',
-    blurb: 'A dying star crowned in violet, erupting into rays of caught starlight. The crown of the Supernova set.',
+    blurb: 'A dying star worn as a crown of fire — purple-black solar flames licking upward, red coronal energy flickering at every tip. The crown of the Supernova set.',
     cost: APPAREL_COST.mythic,
-    look: { shape: 'supernova', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
+    look: { shape: 'solarCrown', color: '#241042', accent: '#ff4d2a', glow: '#b23cff' },
+  },
+  {
+    id: 'crown-galaxy',
+    name: 'Punched Galaxy Crown',
+    slot: 'hat',
+    set: 'Punched Galaxy',
+    rarity: 'mythic',
+    blurb: 'A galaxy caught mid-detonation, crowning the brow — a jewelled violet circlet erupting into rays of caught starlight. The crown of the Punched Galaxy set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'starburst', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
   },
 
   // ===== SHIRTS ========================================================================
@@ -227,6 +252,16 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'A living nebula stitched into fabric. The body of the Supernova set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'cosmic', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
+  {
+    id: 'suit-galaxy',
+    name: 'Punched Galaxy Warplate',
+    slot: 'shirt',
+    set: 'Punched Galaxy',
+    rarity: 'mythic',
+    blurb: 'A cosmic warlord’s cuirass, cracked from within by a caged star — galaxy energy blazing out of every seam. The body of the Punched Galaxy set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'riftplate', color: '#2a1257', accent: '#ff7bf0', glow: '#ff4fd8' },
   },
 
   // ===== PANTS =========================================================================
@@ -310,6 +345,16 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'Woven from caught starlight. The legs of the Supernova set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'nebula', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
+  {
+    id: 'leggings-galaxy',
+    name: 'Punched Galaxy Greaves',
+    slot: 'pants',
+    set: 'Punched Galaxy',
+    rarity: 'mythic',
+    blurb: 'Star-forged greaves, galaxy energy fracturing down each leg over angular cosmic plate. The legs of the Punched Galaxy set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'riftgreaves', color: '#2a1257', accent: '#ff7bf0', glow: '#ff4fd8' },
   },
 
   // ===== THE VALKYRIE SET (GS-valkyrie) ===============================================
