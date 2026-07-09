@@ -367,6 +367,58 @@ function drawGolfer(
     ctx.lineTo(9.2, -44.6);
     ctx.stroke();
   }
+  // Punched Galaxy warplate (GS-punched-galaxy 'riftplate'): a glowing star-core on the chest with
+  // galaxy-crack energy forking out of it + a dark shoulder plate, so the cosmic cuirass reads at swing
+  // size. Mirrors the wardrobe SVG (`apparelArt.ts shirtDetail 'riftplate'`).
+  if (look.shirtStyle?.shape === 'riftplate') {
+    const acc = look.shirtStyle.accent ?? '#ff7bf0';
+    const cx = 5;
+    const cy = -41;
+    // Soft core glow.
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillStyle = acc;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Dark shoulder plate.
+    ctx.fillStyle = '#160826';
+    ctx.strokeStyle = '#0c1116';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(9, -52);
+    ctx.lineTo(13, -50.5);
+    ctx.lineTo(11.5, -46.5);
+    ctx.lineTo(8, -48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Galaxy-crack energy lines radiating from the core (accent, then a thin white core over the same path).
+    const cracks = (): void => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy); ctx.lineTo(cx - 4, cy - 4); ctx.lineTo(cx - 7, cy - 3);
+      ctx.moveTo(cx, cy); ctx.lineTo(cx + 3, cy - 4.5); ctx.lineTo(cx + 6, cy - 5.5);
+      ctx.moveTo(cx, cy); ctx.lineTo(cx - 2, cy + 5); ctx.lineTo(cx - 3.5, cy + 9);
+      ctx.moveTo(cx, cy); ctx.lineTo(cx + 3, cy + 4.5); ctx.lineTo(cx + 5, cy + 8);
+    };
+    ctx.strokeStyle = acc;
+    ctx.lineWidth = 1.2;
+    cracks();
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.5;
+    ctx.stroke(); // white core over the same current path
+    // Core orb.
+    ctx.fillStyle = acc;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Club shaft + head (behind the arms). An equipped cosmetic DRIVER (GS-thor) swaps the plain club head
   // for a mythic WARHAMMER wreathed in lightning; else a bought themed club set (GS-proshop-2) tints the
@@ -707,10 +759,10 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.ellipse(hx - 1.5, hy - 3, 2, 1.3, 0, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case 'supernova': {
-      // The mythic Supernova crown (GS-supernova): a jewelled violet circlet bursting into starlight
-      // rays (violet→hot-pink→starlight gradient) with a star-core gem — the set-matched twin of the
-      // wardrobe SVG (`apparelArt.ts hatGlyph 'supernova'`). Authored against the canonical r=7 head.
+    case 'starburst': {
+      // The Punched Galaxy crown (GS-punched-galaxy, was the Supernova crown): a jewelled violet circlet
+      // bursting into starlight rays (violet→hot-pink→starlight gradient) with a star-core gem — the
+      // set-matched twin of the wardrobe SVG (`apparelArt.ts hatGlyph 'starburst'`). Canonical r=7 head.
       const s = r / 7;
       const tip = '#fff0a0';
       const cx = hx;
@@ -775,6 +827,110 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.lineTo(gx - 3 * s, gy);
       ctx.lineTo(gx - 0.9 * s, gy - 0.9 * s);
       ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'solarCrown': {
+      // The mythic Supernova crown (GS-supernova-flame): a dark circlet erupting into a CROWN OF SOLAR
+      // FLAMES — purple-black tongues fading to red coronal tips, red embers, a hot core gem. The
+      // set-matched twin of the wardrobe SVG (`apparelArt.ts hatGlyph 'solarCrown'`); the SVG carries the
+      // flicker, the canvas is a static snapshot. Authored against the canonical r=7 head.
+      const s = r / 7;
+      const cor = accent; // red coronal
+      const corHi = '#ffb648';
+      const rb = 6.6 * s;
+      const flames: [number, number, number, number][] = [
+        [0, 14, 3.0, 0],
+        [-2.7, 11.5, 2.5, -0.7], [2.7, 11.5, 2.5, 0.7],
+        [-4.9, 8.6, 2.1, -1.4], [4.9, 8.6, 2.1, 1.4],
+        [-6.6, 5.6, 1.6, -1.9], [6.6, 5.6, 1.6, 1.9],
+      ];
+      const flame = (
+        bx: number, by: number, h: number, w: number, c: number, fill: string | CanvasGradient,
+      ): void => {
+        ctx.beginPath();
+        ctx.moveTo(bx - w, by);
+        ctx.quadraticCurveTo(bx - w * 0.78, by - h * 0.5, bx - w * 0.12 + c * 0.4, by - h * 0.72);
+        ctx.quadraticCurveTo(bx + c * 0.9, by - h * 0.92, bx + c, by - h);
+        ctx.quadraticCurveTo(bx + w * 0.55 + c * 0.4, by - h * 0.52, bx + w * 0.82, by - h * 0.34);
+        ctx.quadraticCurveTo(bx + w, by - h * 0.15, bx + w, by);
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+      };
+      for (const [x, h0, w0, c0] of flames) {
+        const bx = hx + x * s;
+        const by = hy - Math.sqrt(Math.max(0, rb * rb - x * s * (x * s)));
+        const h = h0 * s;
+        const w = w0 * s;
+        const c = c0 * s;
+        flame(bx, by, h * 1.08, w * 1.16, c, '#160826'); // dark back-flame for depth
+        const grad = ctx.createLinearGradient(bx, by, bx + c, by - h);
+        grad.addColorStop(0, '#160826');
+        grad.addColorStop(0.3, color);
+        grad.addColorStop(0.52, '#6a24b8');
+        grad.addColorStop(0.7, '#b8309a');
+        grad.addColorStop(0.84, cor);
+        grad.addColorStop(1, corHi);
+        ctx.strokeStyle = '#0c1116';
+        ctx.lineWidth = 0.4;
+        flame(bx, by, h, w, c, grad);
+        ctx.stroke();
+        flame(bx, by, h * 0.66, w * 0.5, c * 0.7, cor); // inner red lick
+        flame(bx, by, h * 0.4, w * 0.28, c * 0.5, corHi); // hot core lick
+      }
+      // Dark circlet band across the brow.
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(hx, hy, r, Math.PI * 1.06, Math.PI * 1.94);
+      ctx.arc(hx, hy, r * 0.72, Math.PI * 1.94, Math.PI * 1.06, true);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Ember gems set in the band.
+      ctx.fillStyle = cor;
+      for (const ex of [-4, 4]) {
+        ctx.beginPath();
+        ctx.arc(hx + ex * s, hy - 1 * s, 0.62 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // A few static embers floating above the burst.
+      const embers: [number, number, number, boolean][] = [
+        [-8.5, -10, 0.6, false], [8.5, -9, 0.7, true], [0, -18, 0.6, false], [5, -13, 0.7, true],
+      ];
+      for (const [ex, ey, er, hot] of embers) {
+        ctx.fillStyle = hot ? corHi : cor;
+        ctx.beginPath();
+        ctx.arc(hx + ex * s, hy + ey * s, er * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // A small coronal sun-spark rising from the band centre (a 4-point star, not a round "eye").
+      const scx = hx;
+      const scy = hy - 2.4 * s;
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.4;
+      ctx.fillStyle = cor;
+      ctx.beginPath();
+      ctx.arc(scx, scy, 2 * s, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = corHi;
+      ctx.beginPath();
+      ctx.moveTo(scx, scy - 2.4 * s);
+      ctx.lineTo(scx + 0.65 * s, scy - 0.65 * s);
+      ctx.lineTo(scx + 2.4 * s, scy);
+      ctx.lineTo(scx + 0.65 * s, scy + 0.65 * s);
+      ctx.lineTo(scx, scy + 2.4 * s);
+      ctx.lineTo(scx - 0.65 * s, scy + 0.65 * s);
+      ctx.lineTo(scx - 2.4 * s, scy);
+      ctx.lineTo(scx - 0.65 * s, scy - 0.65 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(scx, scy, 0.55 * s, 0, Math.PI * 2);
       ctx.fill();
       break;
     }
@@ -962,6 +1118,53 @@ function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: strin
         ctx.fill();
       }
       break;
+    case 'riftgreaves': {
+      // Punched Galaxy greaves (GS-punched-galaxy): cosmic leggings with galaxy-crack energy down each
+      // thigh (accent + white core) over dark angular shin plates + star specks. Mirrors the wardrobe SVG.
+      legs(color, 6.5);
+      const crackPath = (): void => {
+        ctx.beginPath();
+        for (const [fx, fy] of feet) {
+          const side = fx > hip[0] ? 1 : -1;
+          ctx.moveTo(hip[0] + (fx - hip[0]) * 0.1, hip[1] + (fy - hip[1]) * 0.1);
+          ctx.lineTo(hip[0] + (fx - hip[0]) * 0.34 + side * 1.6, hip[1] + (fy - hip[1]) * 0.34);
+          ctx.lineTo(hip[0] + (fx - hip[0]) * 0.58, hip[1] + (fy - hip[1]) * 0.58);
+        }
+      };
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.4;
+      crackPath();
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5;
+      ctx.stroke(); // white core over the same path
+      // Dark shin plates over the lower legs, with an accent rim at the knee.
+      ctx.strokeStyle = '#160826';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      for (const [fx, fy] of feet) {
+        ctx.moveTo(hip[0] + (fx - hip[0]) * 0.6, hip[1] + (fy - hip[1]) * 0.6);
+        ctx.lineTo(fx, fy);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (const [fx, fy] of feet) {
+        const tx = hip[0] + (fx - hip[0]) * 0.6;
+        const ty = hip[1] + (fy - hip[1]) * 0.6;
+        ctx.moveTo(tx - 2.5, ty);
+        ctx.lineTo(tx + 2.5, ty);
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#fff'; // star specks
+      for (const [fx, fy] of feet) {
+        ctx.beginPath();
+        ctx.arc(hip[0] + (fx - hip[0]) * 0.44, hip[1] + (fy - hip[1]) * 0.44, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
     case 'greaves': {
       legs(color, 6.5); // crimson-leather leggings
       // Gold shin greaves over the lower half of each leg.

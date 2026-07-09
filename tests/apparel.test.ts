@@ -110,6 +110,10 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(leggings.set).toBe('Supernova');
     expect(leggings.slot).toBe('pants');
     expect(leggings.rarity).toBe('mythic');
+    // The Supernova crown is the crown of solar flames — set-matched to the nebula suit/leggings.
+    expect(crown.look.shape).toBe('solarCrown');
+    expect(suit.look.shape).toBe('cosmic');
+    expect(leggings.look.shape).toBe('nebula');
     // The Supernova set spans all three slots — only the full kit reports complete.
     expect(equippedSet(crown.id, suit.id, leggings.id)).toBe('Supernova');
     expect(equippedSet(crown.id, suit.id, undefined)).toBeUndefined(); // missing the pants
@@ -117,6 +121,28 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(equippedSet(crown.id, 'polo-classic', leggings.id)).toBeUndefined();
     // Rookie basics (many standalone pieces) never read as a "set".
     expect(equippedSet('cap-classic', 'polo-classic', 'trousers-classic')).toBeUndefined();
+  });
+
+  it('the mythic Punched Galaxy hat + shirt + pants form one super-epic head-to-toe set (GS-punched-galaxy)', () => {
+    const crown = apparelById('crown-galaxy')!;
+    const warplate = apparelById('suit-galaxy')!;
+    const greaves = apparelById('leggings-galaxy')!;
+    expect(crown.set).toBe('Punched Galaxy');
+    expect(warplate.set).toBe('Punched Galaxy');
+    expect(greaves.set).toBe('Punched Galaxy');
+    expect(crown.rarity).toBe('mythic');
+    expect(warplate.rarity).toBe('mythic');
+    expect(greaves.rarity).toBe('mythic');
+    // The starburst crown (the former Supernova crown) now heads the Punched Galaxy set, paired with
+    // the galaxy-crack warplate + greaves.
+    expect(crown.look.shape).toBe('starburst');
+    expect(warplate.look.shape).toBe('riftplate');
+    expect(greaves.look.shape).toBe('riftgreaves');
+    // The set spans all three slots — only the full kit reports complete.
+    expect(equippedSet(crown.id, warplate.id, greaves.id)).toBe('Punched Galaxy');
+    expect(equippedSet(crown.id, warplate.id, undefined)).toBeUndefined(); // missing the pants
+    // Cross-set pieces never assemble a set (the Supernova crown does NOT complete Punched Galaxy).
+    expect(equippedSet('crown-supernova', warplate.id, greaves.id)).toBeUndefined();
   });
 
   it('two-slot sets (Gentleman = hat + pants) complete with just their two pieces', () => {

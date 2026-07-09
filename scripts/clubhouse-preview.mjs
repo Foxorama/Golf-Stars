@@ -22,13 +22,14 @@ const stageOutfits = [
   [undefined,undefined,undefined,'Bare + signature cap'],
   ['helmet-astro','suit-space','pants-astro','Astronaut'],
   ['crown-supernova','suit-supernova','leggings-supernova','Supernova'],
+  ['crown-galaxy','suit-galaxy','leggings-galaxy','Punched Galaxy'],
   ['tophat-ace','tee-striped','knickers-ace','Gentleman mix'],
   ['bucket-safari','jersey-neon','shorts-safari','Shorts + jersey'],
   ['cap-baggy-green','jacket-green','pants-evergreen','Evergreen'],
 ];
 const stages = stageOutfits.map(([h,s,p,l],i) =>
   '<div style="background:#1a2233;display:inline-block;padding:8px;margin:4px;text-align:center;">'
-  + golferPreviewSVG(h,s,p,{skin:'#f0c49a',shirtBase:'#3f7fd0',capColor:'#d8a24a',uid:'st'+i,w:150,h:210,bagId:i===6?'bag-evergreen':undefined})
+  + golferPreviewSVG(h,s,p,{skin:'#f0c49a',shirtBase:'#3f7fd0',capColor:'#d8a24a',uid:'st'+i,w:150,h:210,bagId:l==='Evergreen'?'bag-evergreen':undefined})
   + '<div style="font:12px sans-serif;color:#ccc;">'+l+'</div></div>').join('');
 const small = golferPreviewSVG('tophat-ace','tee-striped','trousers-classic',{skin:'#e6b98a',shirtBase:'#c65a4a',capColor:'#ff6b4a',uid:'sm',w:66,h:88});
 const golfers = [
