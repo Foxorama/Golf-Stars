@@ -246,7 +246,7 @@ function clubhouseBagDifficultyHTML(ch: Character): string {
   return `<div class="gs-ascpick" style="margin:0 0 12px;padding:10px 11px;border:1px solid var(--gs-line);border-radius:12px;background:#ffffff06;">
       <span class="gs-ascpick-l">⚔ ${ch.shortName}'s bag rarity</span>
       <div class="gs-ascpick-chips">${chips}</div>
-      <span class="gs-ascpick-hint">the Unending-Universe difficulty for ${ch.shortName} — a weaker bag is the sterner test. The Voyage always plays your best bag; unlock better bags by winning Ascension gates.</span>
+      <span class="gs-ascpick-hint">${ch.shortName}'s starting bag in <b>every mode</b> (Voyage &amp; Unending) — a weaker bag is the sterner test. Buying a better bag resets everyone to it; unlock better bags by winning Ascension gates.</span>
     </div>`;
 }
 

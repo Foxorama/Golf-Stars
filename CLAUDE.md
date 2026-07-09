@@ -222,14 +222,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     (or gear-themed) club; the clubhouse/market previews show it unconditionally. Thor's Hammer is `secret`
     (earn-only, hidden until owned) and won on Asgard. Same EQUIP/reveal plumbing as the other slots (save
     v22 `driverByCharacter`); rendered in the swing + leaning at the clubhouse fireplace.
-  - **Per-golfer bag rarity / difficulty** (GS-wardrobe-bagtier, save v23 `bagTierByCharacter`): the
-    Unending-Universe difficulty axis is now PER GOLFER, chosen in the Clubhouse wardrobe's BAG slot
+  - **Per-golfer bag rarity / difficulty** (GS-wardrobe-bagtier, save v23 `bagTierByCharacter`): each
+    golfer's STARTING BAG in EVERY mode (Voyage + Unending), chosen in the Clubhouse wardrobe's BAG slot
     (`bagTierForCharacter` reads it, clamped ≤ the owned `bagTier` — never a free upgrade; picking the
-    owned tier CLEARS the override so a golfer follows your best bag as you unlock better ones). Fed into
-    `startRun` by `selectCharacter`; the char-select club-set strip stays a per-run OVERRIDE sent only when
-    TAPPED (`selClubSetTouched`) so an untouched strip can't clobber a golfer's stored pick — an explicit
-    strip pick write-throughs to the golfer. Voyage ignores it (its difficulty is Ascension); default path
-    (empty map ⇒ owned tier ⇒ common) is byte-identical. Meta only, no rng.
+    owned tier CLEARS the override so a golfer defaults to the owned tier). Fed into `startRun` by
+    `selectCharacter` for ALL formats. Buying a new bag tier (`buyBagTier`) RESETS the whole map (`{}`) so
+    every golfer auto-jumps to the fresh best tier; the player re-picks a weaker bag per golfer afterwards.
+    The char-select club-set strip (Unending only) stays a per-run OVERRIDE sent only when TAPPED
+    (`selClubSetTouched`) so an untouched strip can't clobber a golfer's stored pick — an explicit strip
+    pick write-throughs to the golfer. Default path (empty map ⇒ owned tier ⇒ common) is byte-identical.
+    Meta only, no rng.
   - The equipped cosmetic **BAG** now shows ON THE COURSE (GS-wardrobe-bagtier, `GolferLook.bag`): a staff
     bag propped BEHIND the golfer (−x, clear of the target-side swing arc), the canvas `drawGolfBag` mirror
     of the wardrobe SVG `bagGlyph`. With no cosmetic bag the clubs still carry their bag-TIER gear skin

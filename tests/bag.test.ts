@@ -134,6 +134,52 @@ describe('bag-tier unlock + purchase gating', () => {
     expect(s.run.loadout.bag.every((c) => c.rarity === 'epic')).toBe(true);
   });
 
+  it('a per-golfer wardrobe bag tier is used in EVERY mode, incl. the Voyage (GS-wardrobe-bagtier)', () => {
+    let s: UiState = initState(1, { maxAscension: 7, shards: 5000 });
+    s = reduce({ ...s, screen: 'trademarket' }, { type: 'buyBagTier', tier: 'epic' });
+    expect(s.bagTier).toBe('epic');
+    // Set feather-fade DOWN to the common starter set in the wardrobe.
+    s = { ...s, screen: 'clubhouse', manageCharacterId: 'feather-fade' };
+    s = reduce(s, { type: 'setCharacterBagTier', tier: 'common' });
+    expect(s.bagTierByCharacter['feather-fade']).toBe('common');
+    // A VOYAGE with feather-fade now plays the common bag (used to always play the owned epic tier).
+    s = reduce({ ...s, screen: 'title' }, { type: 'start', format: 'voyage' });
+    s = reduce(s, { type: 'selectCharacter', characterId: 'feather-fade' });
+    expect(s.run.bagTier).toBe('common');
+    expect(s.run.loadout.bag.every((c) => c.rarity === 'common')).toBe(true);
+    // A different golfer with no wardrobe pick still gets the owned epic bag.
+    s = reduce({ ...s, screen: 'title' }, { type: 'start', format: 'voyage' });
+    s = reduce(s, { type: 'selectCharacter', characterId: 'longshot-larry' });
+    expect(s.run.bagTier).toBe('epic');
+  });
+
+  it('picking the owned tier clears a golfer override; buying a new tier resets EVERY golfer to it', () => {
+    let s: UiState = initState(1, { maxAscension: 7, shards: 5000 });
+    s = reduce({ ...s, screen: 'trademarket' }, { type: 'buyBagTier', tier: 'rare' });
+    s = { ...s, screen: 'clubhouse', manageCharacterId: 'feather-fade' };
+    // A weaker pick stores an override…
+    s = reduce(s, { type: 'setCharacterBagTier', tier: 'common' });
+    expect(s.bagTierByCharacter['feather-fade']).toBe('common');
+    // …and re-picking the owned tier clears it (the golfer follows the owned bag again).
+    s = reduce(s, { type: 'setCharacterBagTier', tier: 'rare' });
+    expect(s.bagTierByCharacter['feather-fade']).toBeUndefined();
+    // Re-set an override, then BUY a higher tier — every golfer resets to the fresh best bag.
+    s = reduce(s, { type: 'setCharacterBagTier', tier: 'common' });
+    s = reduce({ ...s, screen: 'trademarket' }, { type: 'buyBagTier', tier: 'epic' });
+    expect(s.bagTier).toBe('epic');
+    expect(s.bagTierByCharacter).toEqual({});
+  });
+
+  it('a golfer bag tier can never exceed the owned tier (no free upgrade)', () => {
+    let s: UiState = initState(1, { maxAscension: 3, shards: 5000 });
+    s = reduce({ ...s, screen: 'trademarket' }, { type: 'buyBagTier', tier: 'rare' });
+    s = { ...s, screen: 'clubhouse', manageCharacterId: 'feather-fade' };
+    // Epic is above the owned rare tier → the reducer refuses the pick.
+    s = reduce(s, { type: 'setCharacterBagTier', tier: 'epic' });
+    expect(s.bagTierByCharacter['feather-fade']).toBeUndefined();
+    expect(s.bagTier).toBe('rare');
+  });
+
   it('the reducer refuses a locked or unaffordable bag tier', () => {
     let s: UiState = initState(1, { maxAscension: 2, shards: 100000 });
     s = { ...s, screen: 'trademarket' };

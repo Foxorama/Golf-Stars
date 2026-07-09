@@ -1315,7 +1315,10 @@ legendary rarity, reusing `RARITY_C` colours). Picked on character-select for en
 chip row mirroring the voyage's `data-asc` ascension row), **bounded to the owned `bagTier`** (green always;
 higher tiers only if unlocked in the voyage) — so it can never grant a free bag upgrade, and `common`
 selection is the historical default (byte-identical). The reducer re-clamps (`bagTierRank`). The voyage
-ignores the chip and always plays the full owned tier.
+shows no per-run chip, but it is NO LONGER locked to the owned tier: it honours the golfer's per-golfer
+wardrobe bag tier (GS-wardrobe-bagtier, `bagTierByCharacter`) like every other mode — so you can pair a
+weaker bag with an easier Ascension to test it. A per-run endless chip pick write-throughs to that same
+per-golfer store; buying a new bag tier resets the store so every golfer defaults to the fresh best bag.
 
 **The last-runs leaderboard** (`endlessRuns`, save v16). A finished endless run banks one
 `EndlessRunRecord` (golfer, club set, holes reached, gross, par, ascension, seed) — prepended newest-first,
