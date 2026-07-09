@@ -546,6 +546,14 @@
   nothing. Eyes-on: `scripts/weather-preview.mjs` + `scripts/patches-preview.mjs` both cover the new set.
 - **Loadout is rebuilt from owned perks** (`loadoutFromPerks`): the save stores the perk *ids*, not
   the derived bag/mods, so `resumeRun(snapshot)` reconstructs it. Keeps the save version-stable.
+- **`RunSnapshot.history` persists the finished-stop `StopResult`s** (save **v24**): the positional
+  cut, the arc leaderboard scores AND the boss team-duel underdog side are all computed from
+  `run.history` (`arcSlices`/`survivalField`/`teamPartnerSide`). `resumeRun` USED to rebuild an EMPTY
+  history — so a resumed voyage zeroed the whole arc board (player + field, positions kept but scores
+  gone) and, because the underdog is decided by leaderboard RANK, flipped a boss scramble/best-ball
+  partner from the boss to the PLAYER. The snapshot now carries the history verbatim (absent on
+  pre-v24 saves → the old empty-history behaviour, but no NEW save can carry the bug). Guarded by
+  `tests/team-duel.test.ts` (partner side + board survive a snapshot→resume) + `tests/save.test.ts`.
 - **Playable golfers (GS-18, `characters.ts`).** A character-select step (a `'character'` UI screen
   between format pick and intro) lets you choose 1 of 4 golfers, each a clear strength + clear quirk
   so the loop FEELS different per run. Two pure levers, both CONTENT AS DATA: a `loadout(base)` tweak

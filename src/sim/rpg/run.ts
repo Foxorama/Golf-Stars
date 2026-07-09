@@ -1616,6 +1616,13 @@ export interface RunSnapshot {
   /** The Rainbow Ball was spent on an Asgard tournament (GS-asgard), so a resume keeps it stripped and
    *  the shop keeps it off the rack. Absent on every ordinary run → byte-for-byte unchanged. */
   rainbowConsumed?: boolean;
+  /** Every stop finished so far this run (GS-voyage-field): the completed `StopResult`s the positional
+   *  cut + team-duel setup are computed from. WITHOUT it a resumed run rebuilt an EMPTY history, which
+   *  zeroed the whole arc leaderboard (player + field) and — since the underdog side is decided by
+   *  leaderboard rank — flipped a boss team-duel's scramble partner to the player. Absent on old
+   *  snapshots → the pre-fix empty history (a resume there still resets the board, but no new save
+   *  carries the bug). */
+  history?: StopResult[];
 }
 
 export function snapshotRun(run: Run): RunSnapshot {
@@ -1643,6 +1650,9 @@ export function snapshotRun(run: Run): RunSnapshot {
     routeScans: run.routeScans || undefined,
     firedCaddies: run.firedCaddies.length ? [...run.firedCaddies] : undefined,
     rainbowConsumed: run.rainbowConsumed || undefined,
+    // Persist the completed-stop history (GS-voyage-field) so a resume rebuilds the SAME arc
+    // leaderboard + team-duel underdog side. Absent when nothing's been finished yet (byte-stable).
+    history: run.history.length ? run.history.map((h) => ({ ...h })) : undefined,
   };
 }
 
@@ -1682,7 +1692,10 @@ export function resumeRun(snap: RunSnapshot): Run {
     firedCaddies: snap.firedCaddies ? [...snap.firedCaddies] : [],
     rainbowConsumed: snap.rainbowConsumed || undefined,
     status: 'active',
-    history: [],
+    // Restore the finished-stop history (GS-voyage-field) so the positional cut, the arc leaderboard
+    // scores and the boss team-duel underdog side reconstruct exactly as they were. Old snapshots
+    // (pre-history field) resume empty, as before.
+    history: snap.history ? snap.history.map((h) => ({ ...h })) : [],
   };
 }
 
