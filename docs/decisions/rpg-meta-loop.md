@@ -678,27 +678,36 @@
     rotating ship market, the wardrobe is the FULL catalogue (you pick the look you want); a piece is bought once
     with shards (`APPAREL_COST` per tier: common 15 … legendary 280, **mythic 500**) and equipped per slot
     (clicking the worn piece again takes it OFF — `equipApparel` toggles). Sets: the traditional **Astronaut** set
-    (legendary Helmet + Space Suit); the **Supernova** mythic set (a flame Crown + nebula Suit + Leggings, 500
-    each — GS-supernova-flame below); the **Punched Galaxy** mythic set (a starburst Crown + galaxy-crack Warplate +
-    Greaves, 500 each — GS-punched-galaxy below); plus standalone basics (cap/bucket/visor/tophat/gold-crown,
-    polo/striped/jersey). `equippedSet(hat, shirt)` flags a completed multi-piece set. Hats render as canvas/SVG
-    SHAPES (cap/bucket/visor/tophat/crown/helmet/starburst/solarCrown/…), shirts as 6 (polo/striped/jersey/
-    spacesuit/cosmic/riftplate).
-    **GS-supernova / GS-punched-galaxy**: the mythic wardrobe is now TWO sibling sets. The original starburst
+    (legendary Helmet + Space Suit); the **Supernova** mythic set (a detonating-star Crown + nebula Suit + Leggings,
+    500 each — GS-solar-flames below); the **Solar Flames** mythic set (a flame Crown + solar-flame Robe + ember
+    Leggings, 500 each — GS-solar-flames); the **Punched Galaxy** mythic set (a starburst Crown + galaxy-crack
+    Warplate + Greaves, 500 each — GS-punched-galaxy below); plus standalone basics (cap/bucket/visor/tophat/
+    gold-crown, polo/striped/jersey). `equippedSet(hat, shirt)` flags a completed multi-piece set. Hats render as
+    canvas/SVG SHAPES (cap/bucket/visor/tophat/crown/helmet/starburst/solarCrown/supernova/…), shirts as 7 (polo/
+    striped/jersey/spacesuit/cosmic/riftplate/solarflare).
+    **GS-supernova / GS-punched-galaxy**: the mythic wardrobe split into sibling sets. The original starburst
     Crown (a jewelled violet circlet bursting into a symmetric polar-table ray fan, gradient violet→pink→starlight,
     with a star-core gem) reads as a galaxy caught mid-detonation, so it moved to head the new **Punched Galaxy**
     set (shape renamed `supernova`→`starburst`; `crown-galaxy`), paired with a NEW `riftplate` Warplate + a NEW
     `riftgreaves` Greaves — a cosmic end-boss look (One Punch Man's Lord Boros power-up): dark cosmic plate cracked
     from within by a caged star-core, galaxy-crack energy (accent + cyan spark) forking across the chest + down each
-    leg, over angular pauldrons/shin plates. The **Supernova** set KEEPS the nebula Suit (`cosmic`) + Leggings
-    (`nebula`) and gets a NEW `solarCrown` (`crown-supernova`, id + set unchanged) — a jewelled pointed CIRCLET
-    (a real crown, no faceplate, so the face stays clear) erupting into a crown of purple-and-black solar FLAMES
-    (fanned licking tongues off a polar table, fanning WIDE shoulder-to-shoulder, gradient
-    black→violet→magenta→red coronal→hot tip) with red embers flickering and a coronal sun-spark core, so it
-    finally matches the nebula body. All mirrored in BOTH
-    `apparelArt.ts` (SVG: hatGlyph/shirtDetail/pantsGlyph/golferPreviewSVG) and `playView.ts` (canvas: drawHat +
-    the drawGolfer riftplate chest block + drawPants riftgreaves); SVG carries the flicker `<animate>`, the canvas
-    is a static snapshot. Retired the old pink-and-yellow `halo`. Re-shoot `cosmetics-preview.mjs`.
+    leg, over angular pauldrons/shin plates.
+    **GS-solar-flames**: the mythic `solarCrown` flame crown (purple-and-black solar-flame tongues fanning WIDE,
+    gradient black→violet→magenta→red coronal→hot tip, with flickering embers + a coronal sun-spark) looked great
+    but still clashed with the nebula body it was set to. So the flame crown MOVED OUT to head a brand-new
+    **Solar Flames** set (id `crown-solarflames`, `crown-supernova`→`crown-solarflames`) paired with a NEW
+    `solarflare` Robe (a coronal SUN-CORE blazing on the chest — soft glow → red disc → hot-gold inner → white pip,
+    ringed by coronal spikes — with solar flames licking up the hem + rising embers) and NEW `emberlegs` Leggings
+    (solar flames licking up each shin + embers). The **Supernova** set KEEPS the nebula Suit (`cosmic`) + Leggings
+    (`nebula`) and its crown is now a NEW `supernova` shape (`crown-supernova`, id + set unchanged) — a jewelled
+    violet circlet erupting into a DETONATING STAR: a white-hot core (radial glow + 4-point spark + white pip)
+    inside an expanding nebula SHELL of soft violet/pink puffs, ragged filaments fanning wide off a polar table
+    (violet→hot-pink→starlight) and bright star-KNOTS strung along the shockwave rim — deliberately a rounded
+    exploding shell, NOT the Punched Galaxy's rigid rays, so it finally matches the nebula body. All mirrored in
+    BOTH `apparelArt.ts` (SVG: hatGlyph/shirtDetail/pantsGlyph/golferPreviewSVG) and `playView.ts` (canvas: drawHat +
+    the drawGolfer solarflare chest block + drawPants emberlegs); SVG carries the flicker `<animate>`, the canvas
+    is a static snapshot. The flame set's flames use STACKED SOLID fills (no shared gradient id) so co-mounted
+    lounge figures never cross-tint (the riftplate rule). Re-shoot `cosmetics-preview.mjs` + `clubhouse-preview.mjs`.
   - **The golfer WEARS what you buy.** `GolferLook` (playView) gained `hat?`/`shirtStyle?: ApparelLook`; the
     canvas `drawGolfer` draws the hat shape (replacing the default cap) + the shirt colour/glow/spacesuit chest
     panel, and `app.ts golferLook()` layers the equipped hat/shirt over the character's base style. The wardrobe
@@ -821,7 +830,7 @@
     the helmet encloses the head exactly as on-course. GOTCHA: the SVG preview is FRONT-facing (the figure
     looks at you) while `drawHat`'s canvas is PROFILE (down-the-line, brim points +x); brimmed hats
     (cap/visor) therefore keep symmetric front brims in the SVG — do NOT "sync" them to point sideways, the
-    viewpoints differ on purpose. Enclosing/symmetric hats (helmet/starburst/solarCrown/tophat/crown/bucket) match both ways.
+    viewpoints differ on purpose. Enclosing/symmetric hats (helmet/starburst/solarCrown/supernova/tophat/crown/bucket) match both ways.
   - **Reveal-one interaction.** Tapping a body part or the garage opens `clubhousePicker` — just THAT slot's
     owned rack (the same `clubhouseApparelCardHTML` equip toggles / `shipCardHTML` fleet as before; empty
     apparel slots show a Trade-Market buy button). The open slot is `clubhouseSlot: ApparelSlot | 'ship' | null`,
@@ -1165,7 +1174,7 @@ non-gendered too." So the load-bearing decision: **gender presentation lives ONL
   design; if that ever felt necessary the honest move is to NOT ship it (the brief said as much).
 - **A sealed helmet hides hair.** `sealed = hat.look.shape === 'helmet'` skips all hair, so the moment
   any golfer dons the astronaut suit they read as an identical sealed astronaut — the non-gendered
-  spacesuit made literal. Other hats (cap/bucket/visor/tophat/crown/baggy/starburst/solarCrown) sit on top and the hair
+  spacesuit made literal. Other hats (cap/bucket/visor/tophat/crown/baggy/starburst/solarCrown/supernova) sit on top and the hair
   shows below the brim, as real hair does.
 - **Style is a length/shape spectrum, not a gender switch:** `crop` (short) → `sweep` (side-swept) →
   `tousled` (medium) → `coils` (voluminous). Any golfer could wear any of them; each row just picks the

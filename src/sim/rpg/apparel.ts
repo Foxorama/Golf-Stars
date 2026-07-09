@@ -21,8 +21,12 @@ export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
  *  slouched-crown cap of the Evergreen set (GS-unending). `wingedHelm` is the Asgardian Valkyrie helm —
  *  a steel dome with a nasal guard and a feathered wing swept up each side (GS-valkyrie). `starburst` is
  *  the Punched Galaxy crown — a jewelled circlet erupting into a burst of starlight rays (GS-punched-galaxy;
- *  was the Supernova crown, moved into the new set). `solarCrown` is the mythic Supernova crown — a crown
- *  of purple-and-black solar FLAMES with red coronal energy flickering at the tips (GS-supernova-flame). */
+ *  was the Supernova crown, moved into the new set). `solarCrown` is the crown of purple-and-black solar
+ *  FLAMES with red coronal energy flickering at the tips — the head of the new SOLAR FLAMES set (was the
+ *  Supernova crown, re-homed so the flame look stops clashing with the nebula body; GS-solar-flames).
+ *  `supernova` is the mythic Supernova crown that replaces it — a jewelled violet circlet erupting into a
+ *  DETONATING star: a white-hot core inside an expanding nebula shell of violet filaments + bright knots,
+ *  set-matched to the deep-violet nebula Suit/Leggings (GS-solar-flames). */
 export type HatShape =
   | 'cap'
   | 'bucket'
@@ -32,12 +36,15 @@ export type HatShape =
   | 'helmet'
   | 'starburst'
   | 'solarCrown'
+  | 'supernova'
   | 'baggy'
   | 'wingedHelm';
 /** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
  *  `valkyrie` is a burnished cuirass — pauldrons, a central ridge and a winged chest boss (GS-valkyrie).
  *  `riftplate` is the Punched Galaxy warplate — a dark cosmic cuirass shot through with glowing galaxy-crack
- *  energy erupting from a chest star-core, styled after a cosmic end-boss warlord (GS-punched-galaxy). */
+ *  energy erupting from a chest star-core, styled after a cosmic end-boss warlord (GS-punched-galaxy).
+ *  `solarflare` is the SOLAR FLAMES body — a dark purple-black robe with a blazing coronal sun-core on
+ *  the chest and solar flames licking up the hem, matched to the flame crown (GS-solar-flames). */
 export type ShirtShape =
   | 'polo'
   | 'striped'
@@ -46,10 +53,13 @@ export type ShirtShape =
   | 'cosmic'
   | 'blazer'
   | 'valkyrie'
-  | 'riftplate';
+  | 'riftplate'
+  | 'solarflare';
 /** Pants silhouettes the drawer renders. `greaves` is armoured legwear — war-skirt tassets over the hips
  *  and gold shin greaves (GS-valkyrie). `riftgreaves` is the Punched Galaxy legwear — dark cosmic leggings
- *  cracked with glowing galaxy energy down each leg over angular shin plates (GS-punched-galaxy). */
+ *  cracked with glowing galaxy energy down each leg over angular shin plates (GS-punched-galaxy).
+ *  `emberlegs` is the SOLAR FLAMES legwear — dark leggings with solar flames licking up each leg and
+ *  red embers flickering, matched to the flame crown + robe (GS-solar-flames). */
 export type PantsShape =
   | 'trousers'
   | 'shorts'
@@ -58,7 +68,8 @@ export type PantsShape =
   | 'spacepants'
   | 'nebula'
   | 'greaves'
-  | 'riftgreaves';
+  | 'riftgreaves'
+  | 'emberlegs';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
 export type BagShape = 'staffbag';
 /** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
@@ -177,7 +188,17 @@ export const APPAREL: readonly Apparel[] = [
     slot: 'hat',
     set: 'Supernova',
     rarity: 'mythic',
-    blurb: 'A dying star worn as a crown of fire — purple-black solar flames licking upward, red coronal energy flickering at every tip. The crown of the Supernova set.',
+    blurb: 'A star caught at the instant it dies — a white-hot core detonating inside an expanding nebula shell of violet filaments and bright knots, crowning the brow. The crown of the Supernova set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'supernova', color: '#3a1d6e', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
+  {
+    id: 'crown-solarflames',
+    name: 'Solar Flare Crown',
+    slot: 'hat',
+    set: 'Solar Flames',
+    rarity: 'mythic',
+    blurb: 'A dying star worn as a crown of fire — purple-black solar flames licking upward, red coronal energy flickering at every tip. The crown of the Solar Flames set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'solarCrown', color: '#241042', accent: '#ff4d2a', glow: '#b23cff' },
   },
@@ -262,6 +283,16 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'A cosmic warlord’s cuirass, cracked from within by a caged star — galaxy energy blazing out of every seam. The body of the Punched Galaxy set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'riftplate', color: '#2a1257', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
+  {
+    id: 'suit-solarflames',
+    name: 'Solar Flames Robe',
+    slot: 'shirt',
+    set: 'Solar Flames',
+    rarity: 'mythic',
+    blurb: 'A robe of banked starfire — a coronal sun-core blazing on the chest, purple-black solar flames licking up the hem. The body of the Solar Flames set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'solarflare', color: '#241042', accent: '#ff4d2a', glow: '#b23cff' },
   },
 
   // ===== PANTS =========================================================================
@@ -355,6 +386,16 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'Star-forged greaves, galaxy energy fracturing down each leg over angular cosmic plate. The legs of the Punched Galaxy set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'riftgreaves', color: '#2a1257', accent: '#ff7bf0', glow: '#ff4fd8' },
+  },
+  {
+    id: 'leggings-solarflames',
+    name: 'Solar Flames Leggings',
+    slot: 'pants',
+    set: 'Solar Flames',
+    rarity: 'mythic',
+    blurb: 'Leggings sheathed in living fire — solar flames licking up each leg, red embers rising off them. The legs of the Solar Flames set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'emberlegs', color: '#241042', accent: '#ff4d2a', glow: '#b23cff' },
   },
 
   // ===== THE VALKYRIE SET (GS-valkyrie) ===============================================

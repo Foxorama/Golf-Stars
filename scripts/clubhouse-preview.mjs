@@ -22,6 +22,7 @@ const stageOutfits = [
   [undefined,undefined,undefined,'Bare + signature cap'],
   ['helmet-astro','suit-space','pants-astro','Astronaut'],
   ['crown-supernova','suit-supernova','leggings-supernova','Supernova'],
+  ['crown-solarflames','suit-solarflames','leggings-solarflames','Solar Flames'],
   ['crown-galaxy','suit-galaxy','leggings-galaxy','Punched Galaxy'],
   ['tophat-ace','tee-striped','knickers-ace','Gentleman mix'],
   ['bucket-safari','jersey-neon','shorts-safari','Shorts + jersey'],

@@ -45,6 +45,7 @@ const apparel = APPAREL.map((a) => tile(apparelCardSVG(a.id, 110, 70), a.name+' 
 const sets = [
   ['helmet-astro','suit-space','pants-astro','Astronaut set'],
   ['crown-supernova','suit-supernova','leggings-supernova','Supernova (mythic)'],
+  ['crown-solarflames','suit-solarflames','leggings-solarflames','Solar Flames (mythic)'],
   ['crown-galaxy','suit-galaxy','leggings-galaxy','Punched Galaxy (mythic)'],
   ['tophat-ace','tee-striped','knickers-ace','Mix & match'],
 ].map(([h,s,p,l]) => tile(golferPreviewSVG(h,s,p,{w:120,h:150}), l, '#ffce54')).join('');
