@@ -384,20 +384,26 @@
       .gs-czone:focus-visible { outline: none; }
       .gs-czone:focus-visible::before { border-color: var(--gs-info); }
       .gs-czone--active::before { border-color: var(--gs-warn); background: #ffc45416; }
-      .gs-czone--hat   { top: 1%;  height: 27%; justify-content: flex-end; }
-      .gs-czone--shirt { top: 28%; height: 30%; justify-content: flex-start; }
-      /* Pants owns the whole legs band for tapping, but its chip rides the TOP of it (upper legs) so
-         it never collides with the bag/driver chips parked down at the feet corners. */
-      .gs-czone--pants { top: 58%; height: 41%; justify-content: center; align-items: flex-start; padding-top: 6px; }
+      /* Chips zig-zag down the figure — hat-R, shirt-L, pants-R, bag-L, driver-R — so none crosses the
+         face/torso centre and each slot's tap-band wraps ONLY its own body part (no band spilling over a
+         neighbour's item glyph). */
+      .gs-czone--hat   { top: 0%;  height: 24%; justify-content: flex-end; }
+      .gs-czone--shirt { top: 24%; height: 26%; justify-content: flex-start; }
+      /* Pants labels the LEGS only (not the feet): its chip rides the RIGHT edge at mid-leg height so it
+         clears the body centre AND leaves the feet corners free for the bag/driver chips + item glyphs
+         (its active highlight no longer envelops them). */
+      .gs-czone--pants { top: 50%; height: 20%; justify-content: flex-end; align-items: center; }
+      .gs-czone--pants::before { inset: 6px 6px 6px 8%; border-radius: 22px; }
+      .gs-czone--pants .gs-czone__chip { max-width: 96%; }
       /* The golf-bag prop stands at the figure's left; its tap band owns the lower-LEFT corner and its
          chip sits at the bottom, beside the propped bag (GS-unending). Widened to ~46% so the longer
          earned-bag names no longer truncate to "Evergreen Tou…". */
-      .gs-czone--bag   { top: 68%; height: 31%; right: 54%; justify-content: flex-start; align-items: flex-end; padding-bottom: 6px; z-index: 4; }
+      .gs-czone--bag   { top: 70%; height: 29%; right: 54%; justify-content: flex-start; align-items: flex-end; padding-bottom: 6px; z-index: 4; }
       .gs-czone--bag::before { inset: 6px 8% 6px 6px; border-radius: 22px; }
       .gs-czone--bag .gs-czone__chip { max-width: 96%; }
       /* The driver (the swung club) mirrors the bag on the figure's RIGHT — lower-right corner, chip at
          the bottom beside the propped club (GS-thor). Same widened band so "Thor's Hammer" reads whole. */
-      .gs-czone--driver { top: 68%; height: 31%; left: 54%; justify-content: flex-end; align-items: flex-end; padding-bottom: 6px; z-index: 4; }
+      .gs-czone--driver { top: 70%; height: 29%; left: 54%; justify-content: flex-end; align-items: flex-end; padding-bottom: 6px; z-index: 4; }
       .gs-czone--driver::before { inset: 6px 6px 6px 8%; border-radius: 22px; }
       .gs-czone--driver .gs-czone__chip { max-width: 96%; }
       .gs-czone__chip {
