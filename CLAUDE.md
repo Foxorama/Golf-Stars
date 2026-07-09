@@ -379,6 +379,12 @@ these systems** — each bullet is the tip of a documented iceberg.
   - Platforms + hazard families merge through `render/merge.ts`: platforms are
     `dilateUnion(…, 14)` (never a mitred `offsetPoly` outset — it folds at concave bends);
     sand/liquid families draw union-merged bodies (course-space, WeakMap-cached).
+  - A crossing river/lava flow/crevice's DRAWN bank is roughened so it reads as a natural hazard,
+    not a uniform band-aid (GS-hazard-edges, `roughenHazardEdge`): course-space, `posHash`-derived,
+    MEAN-ZERO about the true edge + amplitude-capped (≤40% of the body's narrow span) → RENDER-ONLY,
+    the sim penalty poly (fairness/carry/aim-cone) is untouched and the graphic still tracks physics.
+    WATER meanders in smooth curves, LAVA cracks into jagged crust, a CREVICE cracks hardest.
+    ZERO rng (byte-stable streams), camera-proof, WeakMap-cached per body.
   - Carved features share ONE light (`LIGHT_UL` → `insetEmboss`/`embossChildren`). NO drop shadow
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
     FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER

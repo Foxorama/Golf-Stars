@@ -19,6 +19,7 @@ import {
   extentAlong,
   shiftPoly,
   hexAlpha,
+  posHash,
   LIGHT_UL,
 } from './shared';
 
@@ -106,6 +107,153 @@ export function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number, lan
   }
   return out;
 }
+// ---------------------------------------------------------------------------
+// Organic edge roughening (GS-hazard-edges)
+// ---------------------------------------------------------------------------
+/**
+ * The band-aid problem: a river / lava flow / crevice that CROSSES the fairway (or runs long and
+ * thin) was drawn straight off the sim's crossing band, whose two long sides are near-parallel and
+ * near-straight — so it read as a uniform-width sticky plaster laid across the hole, not a natural
+ * hazard whose banks bulge, pinch and break up.
+ *
+ * This roughens the DRAWN outline of such a body so its sides read like a real bank: WATER meanders
+ * in smooth curves, LAVA breaks up into a jagged crust, a CREVICE cracks in sharp teeth. Crucially
+ * it is RENDER-ONLY and does NOT touch the sim geometry:
+ *   • It runs in COURSE space keyed off `posHash` — ZERO rng draws, so no seeded scene stream is
+ *     perturbed and the result is identical across a moving camera (course-space in → deterministic
+ *     out → projected fresh each frame, exactly like `biomeRelief`).
+ *   • The displacement is MEAN-ZERO about the true edge (banks bulge OUT and pinch IN in equal
+ *     measure), and its amplitude is capped to a few yards — the same order as the shore/margin the
+ *     liquid family already paints outside the sim poly — so the drawn edge still tracks the sim's
+ *     penalty boundary (the graphic stays the physics). Fairness/carry reads run off the SIM poly,
+ *     never this decorated outline.
+ * Amplitude is also clamped to a fraction of the body's narrow dimension so a thin creek can never
+ * pinch shut, and tiny bodies are left alone (wobble would swamp them).
+ */
+export type RoughStyle = 'water' | 'lava' | 'crevice';
+
+interface RoughSpec {
+  spacing: number; // course-yd between inserted edge samples (roughening resolution)
+  wavelength: number; // course-yd of the smooth base meander
+  amp: number; // peak bank displacement, yd (capped by the body's narrow dimension)
+  jag: number; // 0 = pure smooth curve, 1 = pure sharp teeth
+}
+const ROUGH_SPECS: Record<RoughStyle, RoughSpec> = {
+  // A river's banks meander in long smooth curves — no teeth.
+  water: { spacing: 8, wavelength: 22, amp: 3.4, jag: 0.15 },
+  // A lava flow's crust breaks up: a curving flow overlaid with a jagged, cracked edge.
+  lava: { spacing: 6.5, wavelength: 15, amp: 3.1, jag: 0.5 },
+  // A crevice / ravine cracks hardest — sharp, high-contrast teeth along both walls.
+  crevice: { spacing: 5.5, wavelength: 10, amp: 4.2, jag: 0.66 },
+};
+
+/** Smooth 2-D value noise in [-1, 1] (bilinear-interpolated `posHash` on a smoothstep lattice) —
+ *  gives a body's bank a continuous, curving displacement instead of per-vertex hash confetti. */
+function smoothNoise(x: number, y: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const fx = x - xi;
+  const fy = y - yi;
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fy * fy * (3 - 2 * fy);
+  const a = posHash(xi, yi);
+  const b = posHash(xi + 1, yi);
+  const c = posHash(xi, yi + 1);
+  const d = posHash(xi + 1, yi + 1);
+  const ab = a + (b - a) * u;
+  const cd = c + (d - c) * u;
+  return (ab + (cd - ab) * v) * 2 - 1;
+}
+
+/** Signed area (local copy — `shared.ts` keeps its own private) → winding, so a bank knows which way
+ *  is OUTWARD. */
+function roughSignedArea(pts: Vec[]): number {
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    a += pts[j]![0] * pts[i]![1] - pts[i]![0] * pts[j]![1];
+  }
+  return a / 2;
+}
+
+/** Insert samples along every edge at ~`spacing` course-yd so the roughening has resolution to bend
+ *  a long straight bank; original vertices are kept. */
+function densify(poly: Vec[], spacing: number): Vec[] {
+  const n = poly.length;
+  const out: Vec[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = poly[i]!;
+    const c = poly[(i + 1) % n]!;
+    out.push(a);
+    const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    const segs = Math.min(28, Math.max(1, Math.round(len / spacing)));
+    for (let s = 1; s < segs; s++) {
+      const t = s / segs;
+      out.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t]);
+    }
+  }
+  return out;
+}
+
+/** Unit OUTWARD normal at each vertex (edge-normal bisector, oriented by winding). */
+function outwardNormals(pts: Vec[]): Vec[] {
+  const n = pts.length;
+  const sign = roughSignedArea(pts) >= 0 ? 1 : -1;
+  const out: Vec[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n]!;
+    const cur = pts[i]!;
+    const next = pts[(i + 1) % n]!;
+    let e1x = cur[0] - prev[0];
+    let e1y = cur[1] - prev[1];
+    let e2x = next[0] - cur[0];
+    let e2y = next[1] - cur[1];
+    const l1 = Math.hypot(e1x, e1y) || 1;
+    const l2 = Math.hypot(e2x, e2y) || 1;
+    e1x /= l1; e1y /= l1; e2x /= l2; e2y /= l2;
+    let bx = -e1y - e2y; // sum of the two edges' LEFT normals
+    let by = e1x + e2x;
+    const bl = Math.hypot(bx, by) || 1;
+    bx /= bl; by /= bl;
+    // Interior points along `+b·sign` (see offsetPoly); outward is its negation.
+    out.push([-bx * sign, -by * sign]);
+  }
+  return out;
+}
+
+/** Roughen a hazard body's drawn outline (course space, deterministic, zero rng) — see the block
+ *  comment above. Returns the body unchanged when it's too small to roughen safely. */
+export function roughenHazardEdge(poly: Vec[], style: RoughStyle): Vec[] {
+  if (poly.length < 3) return poly;
+  const b = bboxOf(poly);
+  const minDim = Math.min(b.maxX - b.minX, b.maxY - b.minY);
+  if (minDim < 5) return poly; // too thin — wobble would swamp it / pinch it shut
+  const spec = ROUGH_SPECS[style];
+  const cap = Math.min(spec.amp, minDim * 0.4); // never displace a bank more than 40% of the narrow span
+  const dense = densify(poly, spec.spacing);
+  if (dense.length < 6) return poly;
+  const norms = outwardNormals(dense);
+  return dense.map((p, i) => {
+    const base = smoothNoise(p[0] / spec.wavelength, p[1] / spec.wavelength); // smooth meander
+    const teeth = posHash(p[0] * 0.9 + 11.3, p[1] * 0.9 + 4.7, i) * 2 - 1; // sharp per-sample cracks
+    let d = base * (1 - spec.jag) + teeth * spec.jag;
+    if (d > 1) d = 1;
+    else if (d < -1) d = -1;
+    const nrm = norms[i]!;
+    return [p[0] + nrm[0] * d * cap, p[1] + nrm[1] * d * cap] as Vec;
+  });
+}
+
+/** Per-body cache of the roughened course-space outline (keyed on the input poly, which is stable
+ *  per hole) so the per-frame follow-cam rebuild pays the roughening once, not 60×/sec. */
+const roughCache = new WeakMap<Vec[], Vec[]>();
+export function roughenHazardCached(poly: Vec[], style: RoughStyle): Vec[] {
+  const hit = roughCache.get(poly);
+  if (hit) return hit;
+  const out = roughenHazardEdge(poly, style);
+  roughCache.set(poly, out);
+  return out;
+}
+
 /**
  * A liquid's depth/detail palette. Water and lava share the same banded-depth machinery — only the
  * tones differ — so a lake and a crossing river of the same liquid are drawn identically and read
