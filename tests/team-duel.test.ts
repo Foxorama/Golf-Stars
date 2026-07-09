@@ -13,7 +13,19 @@ import {
   type TeamSetup,
 } from '../src/sim/rpg/match';
 import { resolveTeamFormat, isTeamDuelBoss, getFormat, bossAt } from '../src/sim/rpg/formats';
-import { startRun, currentCourse, teamDuelSetupForRun, underdogSide, playStop, scrambleOptsFor } from '../src/sim/rpg/run';
+import {
+  startRun,
+  currentCourse,
+  teamDuelSetupForRun,
+  underdogSide,
+  playStop,
+  scrambleOptsFor,
+  snapshotRun,
+  resumeRun,
+  currentBoss,
+  type StopResult,
+} from '../src/sim/rpg/run';
+import { leaderboard } from '../src/sim/rpg/league';
 import { initState, reduce, type UiState } from '../src/ui/game';
 import { shotView, holeResult } from '../src/sim/rpg/play';
 
@@ -152,6 +164,50 @@ describe('team-duel run wiring (GS-team-duel)', () => {
     // scrambleOptsFor only arms the player's solo ball when it's a SCRAMBLE underdog.
     if (setup.format === 'scramble') expect(scrambleOptsFor(run)?.partnerMods).toBeTypeOf('function');
     else expect(scrambleOptsFor(run)).toBeUndefined();
+  });
+
+  it('a resumed run keeps its finished-stop history — the arc board + underdog side survive (GS-voyage-field)', () => {
+    // The reported bug: after a crash + "continue run", the whole arc leaderboard reset to zero AND a
+    // boss team-duel's scramble partner flipped from the boss to the player. Root cause: `resumeRun`
+    // rebuilt an EMPTY history, so the positional cut (which computes both from `run.history`) lost
+    // every score and — since the underdog is decided by leaderboard RANK — defaulted the player to the
+    // underdog. Build a run parked at the Arc-II team boss (stop 5) where the PLAYER dominated the arc,
+    // so the FAVOURITE is the player and the boss (underdog) carries the partner; then round-trip it.
+    const base = startRun(11, 'voyage', {}, 'feather-fade');
+    const history: StopResult[] = [];
+    for (let i = 0; i < 5; i++) {
+      history.push({
+        stopIndex: i,
+        distanceFromStart: (i + 1) * 5,
+        biome: 'meadow',
+        rarity: 'common',
+        stableford: 99, // a runaway leader → the player is the arc favourite
+        gross: 20,
+        cut: 8,
+        passed: true,
+        creditsEarned: 0,
+        aces: 0,
+      });
+    }
+    const run = { ...base, stopIndex: 5, distanceFromStart: 30, history };
+    expect(isTeamDuelBoss(currentBoss(run))).toBe(true);
+
+    // With the real history the player is the favourite → the BOSS gets the partner.
+    const before = teamDuelSetupForRun(run)!;
+    expect(before.partnerSide).toBe('boss');
+    // The bug's signature: strip the history and the underdog default flips to the player.
+    expect(teamDuelSetupForRun({ ...run, history: [] })!.partnerSide).toBe('player');
+
+    // The fix: snapshot → resume preserves the history verbatim, so neither the board nor the
+    // underdog side moves.
+    const resumed = resumeRun(snapshotRun(run));
+    expect(resumed.history).toEqual(run.history);
+    expect(teamDuelSetupForRun(resumed)!.partnerSide).toBe('boss');
+
+    // And the arc leaderboard totals are identical across the resume — no score reset.
+    const totalsOf = (r: typeof run) =>
+      new Map(leaderboard(r).standings.map((s) => [s.golferId, s.total]));
+    expect(totalsOf(resumed)).toEqual(totalsOf(run));
   });
 
   it('a headless team-duel boss stop completes and passes on the match (not a Stableford cut)', () => {

@@ -14,7 +14,7 @@ import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 23;
+export const SAVE_VERSION = 24;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -391,8 +391,17 @@ export type SaveV23 = Omit<SaveV22, 'version'> & {
   bagTierByCharacter: Record<string, BagTier>;
 };
 
+/** v24 stamps the resumable-run FINISHED-STOP HISTORY (GS-voyage-field) onto the persisted shape:
+ *  `RunSnapshot.history` (the completed `StopResult`s the positional cut, arc leaderboard and boss
+ *  team-duel underdog side are computed from). Optional and absent on old data, so the migration is a
+ *  pure version stamp; a pre-history run resumes with an empty history exactly as it did before the fix
+ *  (still zeroing that resumed board — but no NEW save can carry the bug forward). */
+export type SaveV24 = Omit<SaveV23, 'version'> & {
+  version: 24;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV23;
+export type Save = SaveV24;
 
 export function defaultSave(): Save {
   return {
@@ -737,6 +746,13 @@ function v22ToV23(s: SaveV22): SaveV23 {
   return { ...s, version: 23, bagTierByCharacter: {} };
 }
 
+/** v23 → v24: pure version stamp — the finished-stop history (`RunSnapshot.history`) is optional and
+ *  absent on every pre-history save; `resumeRun` reads that as an empty history (the pre-fix behaviour,
+ *  which zeroed a resumed run's arc board). */
+function v23ToV24(s: SaveV23): SaveV24 {
+  return { ...s, version: 24 };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -767,6 +783,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 20) s = v20ToV21(s as unknown as SaveV20) as unknown as typeof s;
   if (s.version === 21) s = v21ToV22(s as unknown as SaveV21) as unknown as typeof s;
   if (s.version === 22) s = v22ToV23(s as unknown as SaveV22) as unknown as typeof s;
+  if (s.version === 23) s = v23ToV24(s as unknown as SaveV23) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
