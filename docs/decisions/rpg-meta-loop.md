@@ -708,6 +708,15 @@
     the drawGolfer solarflare chest block + drawPants emberlegs); SVG carries the flicker `<animate>`, the canvas
     is a static snapshot. The flame set's flames use STACKED SOLID fills (no shared gradient id) so co-mounted
     lounge figures never cross-tint (the riftplate rule). Re-shoot `cosmetics-preview.mjs` + `clubhouse-preview.mjs`.
+  - **GS-worn-coverage**: the shop CARD silhouette is small, but the WORN full-body torso/legs are far taller —
+    so a detail motif authored to fill the card left the worn body half-empty (the mythic Supernova/Solar-Flames/
+    Punched-Galaxy suits + leggings read as a small patch on a big dark torso). Fix: `shirtDetail` takes an optional
+    `worn` extent (the torso's reach in AUTHORED units, passed ONLY from `golferPreviewSVG`); the detailed shapes
+    draw an EXPANDED layout that fills it (cosmic → a full starfield + drifting swooshes; riftplate → galaxy-cracks
+    forking down to a lower belly-plate/core; solarflare → flames rising from the ACTUAL hem far higher + embers).
+    Pants fill inline in `golferPreviewSVG` (nebula/riftgreaves → starfields down both legs; emberlegs → fire in two
+    stacked clusters per leg + rising embers). The SHOP CARD path passes NO `worn`, so the compact card art is
+    byte-identical — cards must NOT change. SVG-only (the on-course canvas figure is small; left unchanged).
   - **The golfer WEARS what you buy.** `GolferLook` (playView) gained `hat?`/`shirtStyle?: ApparelLook`; the
     canvas `drawGolfer` draws the hat shape (replacing the default cap) + the shirt colour/glow/spacesuit chest
     panel, and `app.ts golferLook()` layers the equipped hat/shirt over the character's base style. The wardrobe

@@ -286,7 +286,17 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
  *  in a canonical frame about the chest centre and fitted by a single scale, so the wardrobe icon
  *  (s=1) and the full-body figure (s tracks the figure size) read identically instead of the detail
  *  shrinking into a speck on a big torso. */
-function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
+function shirtDetail(
+  look: ApparelLook,
+  cx: number,
+  cy: number,
+  s = 1,
+  /** When the garment is WORN on the full-body figure, the torso is much taller than the shop card's
+   *  little silhouette, so the compact card motif leaves the body half-empty (GS-worn-coverage). Pass
+   *  the torso's reach in AUTHORED units (relative to this detail's centre) and the detailed mythic
+   *  shapes draw an EXPANDED layout that fills it. Absent ⇒ the compact card motif (card stays identical). */
+  worn?: { top: number; bottom: number; halfW: number },
+): string {
   const { shape, accent = '#0c1116' } = look;
   let detail = '';
   switch (shape) {
@@ -326,8 +336,25 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
         <path d="M-12,-6 Q-14,1 -11,8" fill="none" stroke="#cdd6e2" stroke-width="1.4"/>`;
       break;
     case 'cosmic':
-      detail = `<g fill="#fff"><circle cx="-4" cy="-2" r="0.9"/><circle cx="3" cy="1" r="0.7"/><circle cx="-1" cy="6" r="0.8"/><circle cx="6" cy="-4" r="0.6"/><circle cx="-6" cy="4" r="0.6"/></g>
+      if (worn) {
+        // Worn: a full nebula STARFIELD spanning the whole torso — a scatter of stars top-to-hem plus
+        // three drifting nebula swooshes, so the living-nebula suit reads across the body, not one patch.
+        const b = worn.bottom;
+        const t = worn.top;
+        const stars: [number, number, number][] = [
+          [-5, t + 2.5, 0.9], [3, t + 5, 0.7], [-2, t + 10, 0.8], [6, t + 7.5, 0.6], [-6, t + 13, 0.6],
+          [1, t + 17, 0.85], [5, t + 21, 0.7], [-4, t + 24, 0.65], [3, t + 28, 0.8], [-6, b - 6, 0.6],
+          [6, b - 3, 0.7], [0, b - 1, 0.6], [-3, t + 6, 0.5], [7, t + 15, 0.55], [-7, t + 20, 0.55], [2, b - 8, 0.6],
+        ];
+        detail =
+          `<g fill="#fff">${stars.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>` +
+          `<path d="M-8,${(t + 6).toFixed(1)} Q0,${(t + 1).toFixed(1)} 8,${(t + 9).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1.5" opacity="0.85"/>` +
+          `<path d="M-8,${(t + 19).toFixed(1)} Q0,${(t + 14).toFixed(1)} 8,${(t + 22).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.75"/>` +
+          `<path d="M-7,${(b - 5).toFixed(1)} Q0,${(b - 9).toFixed(1)} 7,${(b - 3).toFixed(1)}" fill="none" stroke="${accent}" stroke-width="1.2" opacity="0.6"/>`;
+      } else {
+        detail = `<g fill="#fff"><circle cx="-4" cy="-2" r="0.9"/><circle cx="3" cy="1" r="0.7"/><circle cx="-1" cy="6" r="0.8"/><circle cx="6" cy="-4" r="0.6"/><circle cx="-6" cy="4" r="0.6"/></g>
         <path d="M-9,2 Q0,-3 9,5" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.8"/>`;
+      }
       break;
     case 'blazer':
       // The tailored jacket (GS-unending's Green Jacket): notched gold-trimmed lapels down to a
@@ -377,6 +404,23 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
         <circle cx="0" cy="-1" r="0.7" fill="#fff"/>
         ${embers}
         <g fill="#fff" opacity="0.85"><circle cx="-8.5" cy="-1.6" r="0.7"/><circle cx="8.6" cy="-2.6" r="0.6"/><circle cx="-3.2" cy="8" r="0.6"/><circle cx="3.8" cy="-8.6" r="0.5"/></g>`;
+      if (worn) {
+        // Worn: the caged star's galaxy-crack energy forks all the way DOWN the torso to the hem, over a
+        // lower belly plate, with more embers + starfield — so the warplate fills the whole body, not just
+        // the chest (GS-worn-coverage).
+        const b = worn.bottom;
+        const lp = (b - 12).toFixed(1); // lower plate centre
+        detail += `
+          ${crack(`M0,-1 L-1.6,7 L-3,15 L-2.2,${(b - 3).toFixed(1)}`)}
+          ${crack(`M0,-1 L1.8,7 L3.2,15 L2.4,${(b - 3).toFixed(1)}`)}
+          ${crack(`M0,4 L-4.5,9 L-6.5,${(b - 7).toFixed(1)}`)}
+          ${crack(`M0,4 L4.5,9 L6.5,${(b - 7).toFixed(1)}`)}
+          <path d="M0,${(b - 17).toFixed(1)} L3.1,${lp} L0,${(b - 7).toFixed(1)} L-3.1,${lp} Z" fill="${plate}" ${inkP}/>
+          <circle cx="0" cy="${lp}" r="2.4" fill="${acc}" opacity="0.5"><animate attributeName="r" values="2;2.9;2" dur="1.9s" repeatCount="indefinite"/></circle>
+          <circle cx="0" cy="${lp}" r="1.5" fill="${acc}"/><circle cx="0" cy="${lp}" r="0.7" fill="#fff"/>
+          <g fill="#fff" opacity="0.85"><circle cx="-6.5" cy="${(b - 15).toFixed(1)}" r="0.6"/><circle cx="6.8" cy="${(b - 9).toFixed(1)}" r="0.55"/><circle cx="-4" cy="${(b - 3).toFixed(1)}" r="0.6"/><circle cx="4.4" cy="${(b - 19).toFixed(1)}" r="0.5"/><circle cx="7.2" cy="${(b - 21).toFixed(1)}" r="0.5"/><circle cx="-7.2" cy="${(b - 5).toFixed(1)}" r="0.5"/></g>
+          <g><circle cx="-5" cy="${(b - 12).toFixed(1)}" r="0.7" fill="${acc}"><animate attributeName="opacity" values="0;1;0" dur="1.3s" repeatCount="indefinite"/></circle><circle cx="5.5" cy="${(b - 16).toFixed(1)}" r="0.6" fill="#ffd07a"><animate attributeName="opacity" values="0;1;0" dur="1.6s" repeatCount="indefinite"/></circle></g>`;
+      }
       break;
     }
     case 'solarflare': {
@@ -393,10 +437,15 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
         ` Q${p(bx + c * 0.9, by - h * 0.92)} ${p(bx + c, by - h)}` +
         ` Q${p(bx + w * 0.55 + c * 0.4, by - h * 0.52)} ${p(bx + w * 0.82, by - h * 0.34)}` +
         ` Q${p(bx + w, by - h * 0.15)} ${p(bx + w, by)} Z`;
-      const hemY = 10.5;
-      const flames: [number, number, number, number][] = [
-        [0, 9.5, 2.6, 0], [-5, 8, 2.2, -0.8], [5, 8, 2.2, 0.8], [-9, 6, 1.8, -1.5], [9, 6, 1.8, 1.5],
-      ];
+      // Worn: the flames rise from the ACTUAL hem (bottom of the tall torso) and lick much higher, so
+      // the robe reads as sheathed in fire top-to-toe instead of one small band mid-chest (GS-worn-coverage).
+      const hemY = worn ? worn.bottom - 0.5 : 10.5;
+      const flames: [number, number, number, number][] = worn
+        ? [
+            [0, 22, 3.0, 0], [-5.5, 18.5, 2.6, -0.9], [5.5, 18.5, 2.6, 0.9], [-9, 14, 2.2, -1.6],
+            [9, 14, 2.2, 1.6], [-2.8, 16, 1.6, -0.4], [2.8, 16, 1.6, 0.4],
+          ]
+        : [[0, 9.5, 2.6, 0], [-5, 8, 2.2, -0.8], [5, 8, 2.2, 0.8], [-9, 6, 1.8, -1.5], [9, 6, 1.8, 1.5]];
       const flameGs = flames
         .map(([x, h, w, c], i) => {
           const back = `<path d="${flamePath(x, hemY, h * 1.12, w * 1.16, c)}" fill="#160826"/>`;
@@ -407,8 +456,11 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
           return back + bodyF + mid + lick + inner;
         })
         .join('');
-      const embers = ([[-7, 2], [7, 3], [-3, -0.5], [4, -1], [0, 4]] as [number, number][])
-        .map(([ex, ey], i) => `<circle cx="${ex}" cy="${ey}" r="${(0.5 + (i % 2) * 0.3).toFixed(1)}" fill="${i % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/><animate attributeName="cy" values="${ey};${(ey - 3).toFixed(1)}" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/></circle>`)
+      const emberPts: [number, number][] = worn
+        ? [[-7, hemY - 5], [7, hemY - 3], [-4, hemY - 12], [5, hemY - 15], [0, hemY - 8], [-6, hemY - 19], [6, hemY - 21], [3, hemY - 2], [-3, 3], [5, 2]]
+        : [[-7, 2], [7, 3], [-3, -0.5], [4, -1], [0, 4]];
+      const embers = emberPts
+        .map(([ex, ey], i) => `<circle cx="${ex}" cy="${ey.toFixed(1)}" r="${(0.5 + (i % 2) * 0.3).toFixed(1)}" fill="${i % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/><animate attributeName="cy" values="${ey.toFixed(1)};${(ey - 3).toFixed(1)}" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/></circle>`)
         .join('');
       // Coronal sun-core on the upper chest — soft glow, coronal spikes ring, red disc, hot inner, white pip.
       const spikes = Array.from({ length: 8 }, (_, k) => {
@@ -898,7 +950,17 @@ export function golferPreviewSVG(
          <rect x="${f(x - px(4.6))}" y="${f(footY - px(14))}" width="${f(px(9.2))}" height="${f(px(2.6))}" rx="${f(px(1.3))}" fill="${shade(pantsAcc, 0.3)}" stroke="none"/>`;
       legDetail = boot(lAnk) + boot(rAnk);
     } else if (pantsShape === 'nebula') {
-      legDetail = `<g fill="#fff"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(14))}" r="${f(px(1.1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(24))}" r="${f(px(0.9))}"/><circle cx="${f(lAnk)}" cy="${f(ankleY - px(10))}" r="${f(px(0.9))}"/><circle cx="${f(rAnk - px(1))}" cy="${f(ankleY - px(20))}" r="${f(px(0.7))}"/></g>`;
+      // A full starfield down BOTH legs (GS-worn-coverage) — the worn leggings are long, so the four
+      // specks of the shop icon left them near-empty; now stars run hip-to-ankle like the nebula suit.
+      const legStars = (hipC: number, ankC: number, o: number): string =>
+        [0.1, 0.27, 0.44, 0.61, 0.78, 0.93]
+          .map((fr, i) => {
+            const x = hipC + (ankC - hipC) * fr + (i % 2 ? px(2.2) : -px(2.2));
+            const y = hipY + (ankleY - hipY) * fr;
+            return `<circle cx="${f(x)}" cy="${f(y)}" r="${f(px(0.55 + ((i + o) % 3) * 0.22))}"/>`;
+          })
+          .join('');
+      legDetail = `<g fill="#fff">${legStars(lHip, lAnk, 0)}${legStars(rHip, rAnk, 1)}</g>`;
     } else if (pantsShape === 'riftgreaves') {
       // Punched Galaxy greaves (GS-punched-galaxy): galaxy-crack energy forking down each thigh (accent
       // + a white core) over angular cosmic shin plates, with a scatter of starfield specks — the legs
@@ -914,12 +976,21 @@ export function golferPreviewSVG(
       const greave = (x: number): string =>
         `<rect x="${f(x - px(4))}" y="${f(ankleY - px(14))}" width="${f(px(8))}" height="${f(px(12))}" rx="${f(px(1.6))}" fill="${plate}" ${ink}/>` +
         `<rect x="${f(x - px(4))}" y="${f(ankleY - px(14))}" width="${f(px(8))}" height="${f(px(2.4))}" rx="${f(px(1.2))}" fill="${pantsAcc}" stroke="none" opacity="0.85"/>`;
+      // A starfield runs the full length of both thighs (GS-worn-coverage), matching the warplate.
+      const legStars = (hipC: number, ankC: number, o: number): string =>
+        [0.14, 0.32, 0.5, 0.66]
+          .map((fr, i) => {
+            const x = hipC + (ankC - hipC) * fr + (i % 2 ? px(2.4) : -px(2));
+            const y = hipY + (ankleY - hipY) * fr;
+            return `<circle cx="${f(x)}" cy="${f(y)}" r="${f(px(0.55 + ((i + o) % 3) * 0.2))}"/>`;
+          })
+          .join('');
       legDetail =
         crack(lHip, lAnk) +
         crack(rHip, rAnk) +
         greave(lAnk) +
         greave(rAnk) +
-        `<g fill="#fff" opacity="0.9"><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(16))}" r="${f(px(1))}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(26))}" r="${f(px(0.8))}"/><circle cx="${f(cx)}" cy="${f(hipY + px(8))}" r="${f(px(0.7))}"/></g>`;
+        `<g fill="#fff" opacity="0.9">${legStars(lHip, lAnk, 0)}${legStars(rHip, rAnk, 1)}</g>`;
     } else if (pantsShape === 'emberlegs') {
       // The Solar Flames leggings (GS-solar-flames): purple-black solar flames licking up each shin
       // (dark→violet→magenta→red→hot, stacked solid fills — the shirt's idiom) with red embers rising.
@@ -930,25 +1001,44 @@ export function golferPreviewSVG(
         ` Q${f(bx + c * 0.9)},${f(by - h * 0.92)} ${f(bx + c)},${f(by - h)}` +
         ` Q${f(bx + w * 0.55 + c * 0.4)},${f(by - h * 0.52)} ${f(bx + w * 0.82)},${f(by - h * 0.34)}` +
         ` Q${f(bx + w)},${f(by - h * 0.15)} ${f(bx + w)},${f(by)} Z`;
-      const legFire = (ankC: number): string => {
-        const by = ankleY - px(1);
-        const specs: [number, number, number, number][] = [
-          [ankC, px(21), px(3.6), 0],
-          [ankC + px(3), px(13), px(2.5), px(1.2)],
+      // Fire climbs the WHOLE leg in two stacked clusters (shin + knee/thigh), not just the ankle
+      // (GS-worn-coverage), with embers rising the length of each leg.
+      const flameStack = (x: number, by: number, h: number, w: number, c: number): string => {
+        const back = `<path d="${flamePath(x, by, h * 1.12, w * 1.16, c)}" fill="#160826"/>`;
+        const bodyF = `<path d="${flamePath(x, by, h, w, c)}" fill="#6a24b8" stroke="#0c1116" stroke-width="${sw(0.5)}" stroke-linejoin="round"/>`;
+        const mid = `<path d="${flamePath(x, by, h * 0.8, w * 0.72, c * 0.85)}" fill="#b8309a"/>`;
+        const lick = `<path d="${flamePath(x, by, h * 0.56, w * 0.5, c * 0.7)}" fill="${cor}"/>`;
+        const inner = `<path d="${flamePath(x, by, h * 0.32, w * 0.3, c * 0.5)}" fill="${corHi}"/>`;
+        return back + bodyF + mid + lick + inner;
+      };
+      const legFire = (hipC: number, ankC: number): string => {
+        const xAt = (y: number): number => hipC + (ankC - hipC) * ((y - hipY) / (ankleY - hipY));
+        const clusters: [number, number][] = [
+          [ankleY - px(1), 1], // shin
+          [(hipY + ankleY) / 2 + px(3), 0.82], // knee/thigh
         ];
-        return specs
-          .map(([x, h, w, c]) => {
-            const back = `<path d="${flamePath(x, by, h * 1.12, w * 1.16, c)}" fill="#160826"/>`;
-            const bodyF = `<path d="${flamePath(x, by, h, w, c)}" fill="#6a24b8" stroke="#0c1116" stroke-width="${sw(0.5)}" stroke-linejoin="round"/>`;
-            const mid = `<path d="${flamePath(x, by, h * 0.8, w * 0.72, c * 0.85)}" fill="#b8309a"/>`;
-            const lick = `<path d="${flamePath(x, by, h * 0.56, w * 0.5, c * 0.7)}" fill="${cor}"/>`;
-            const inner = `<path d="${flamePath(x, by, h * 0.32, w * 0.3, c * 0.5)}" fill="${corHi}"/>`;
-            return back + bodyF + mid + lick + inner;
+        return clusters
+          .map(([by, sc]) => {
+            const x0 = xAt(by);
+            const specs: [number, number, number, number][] = [
+              [x0, px(20 * sc), px(3.2 * sc), 0],
+              [x0 + px(2.4 * sc), px(12 * sc), px(2.1 * sc), px(1)],
+              [x0 - px(2.2 * sc), px(10 * sc), px(1.9 * sc), -px(0.9)],
+            ];
+            return specs.map(([x, h, w, c]) => flameStack(x, by, h, w, c)).join('');
           })
           .join('');
       };
-      const embers = `<g><circle cx="${f(lHip - px(1))}" cy="${f(hipY + px(14))}" r="${f(px(1.1))}" fill="${cor}"/><circle cx="${f(rHip + px(1))}" cy="${f(hipY + px(22))}" r="${f(px(0.9))}" fill="${corHi}"/><circle cx="${f(lAnk)}" cy="${f(ankleY - px(16))}" r="${f(px(0.8))}" fill="${corHi}"/><circle cx="${f(rAnk - px(1))}" cy="${f(ankleY - px(24))}" r="${f(px(0.8))}" fill="${cor}"/></g>`;
-      legDetail = legFire(lAnk) + legFire(rAnk) + embers;
+      const legEmbers = (hipC: number, ankC: number, o: number): string =>
+        [0.16, 0.36, 0.56, 0.72, 0.88]
+          .map((fr, i) => {
+            const x = hipC + (ankC - hipC) * fr + (i % 2 ? px(2.4) : -px(2.4));
+            const y = hipY + (ankleY - hipY) * fr;
+            return `<circle cx="${f(x)}" cy="${f(y)}" r="${f(px(0.6 + ((i + o) % 2) * 0.25))}" fill="${(i + o) % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.2).toFixed(2)}s" repeatCount="indefinite"/></circle>`;
+          })
+          .join('');
+      legDetail =
+        legFire(lHip, lAnk) + legFire(rHip, rAnk) + `<g>${legEmbers(lHip, lAnk, 0)}${legEmbers(rHip, rAnk, 1)}</g>`;
     } else if (pantsShape === 'greaves') {
       // Valkyrie greaves (GS-valkyrie): war-skirt tassets over the hips + gold shin greave plates.
       const plate = shade(pantsAcc, 0.14);
@@ -1063,8 +1153,16 @@ export function golferPreviewSVG(
     <rect x="${f(cx + px(7))}" y="${f(shoY - px(6))}" width="${f(px(14))}" height="${f(hipY - shoY + px(12))}" fill="#000000" opacity="0.14"/>
     <rect x="${f(cx - px(20))}" y="${f(hipY - px(4))}" width="${f(px(40))}" height="${f(px(5))}" fill="#000000" opacity="0.12"/>
   </g>`;
+  // The worn torso is far taller than the shop card's little silhouette, so pass its reach (in authored
+  // units, relative to the detail centre) — the detailed mythic shirts expand to fill it (GS-worn-coverage).
+  const dCy = shoY + px(12);
+  const dS = S * 1.75;
   const detail = shirt
-    ? `<g clip-path="url(#tor${uid})">${shirtDetail(shirt.look, cx, shoY + px(12), S * 1.75)}</g>`
+    ? `<g clip-path="url(#tor${uid})">${shirtDetail(shirt.look, cx, dCy, dS, {
+        top: (shoY - px(3) - dCy) / dS,
+        bottom: (hipY - px(1) - dCy) / dS,
+        halfW: px(13) / dS,
+      })}</g>`
     : '';
   // Belt across the shirt hem (skipped for shorts — their waistband reads on its own).
   const belt =
