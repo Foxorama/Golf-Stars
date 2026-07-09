@@ -4,6 +4,7 @@ import {
   SPACE_DUCKS_GUARD,
   SAM_CONFIDENCE,
   NAMED_CADDY_IDS,
+  PARROT_PREVIEW_CHANCE,
   loadoutFromPerks,
   namedCaddyOwned,
   netDispersion,
@@ -11,6 +12,7 @@ import {
   startingLoadout,
   usableBag,
 } from '../src/sim/rpg/economy';
+import { characterShotMods } from '../src/sim/rpg/characters';
 import { beginHole, shotView, takeShot } from '../src/sim/rpg/play';
 import {
   buy,
@@ -26,7 +28,7 @@ import {
   resolveShot,
   type SprayShape,
 } from '../src/sim/shot';
-import { executeShot, forcedCarry, pinOf, playCourse, shotSpread, CHIPIN_RANGE } from '../src/sim/round';
+import { executeShot, forcedCarry, pinOf, playCourse, playHole, shotSpread, CHIPIN_RANGE } from '../src/sim/round';
 import { CLUBS } from '../src/sim/clubs';
 import { generateCourse } from '../src/sim/course/generate';
 import { playTotals } from '../src/sim/score';
@@ -38,7 +40,7 @@ const richRun = (seed: number) => ({ ...startRun(seed), credits: 1_000_000 });
 describe('named caddies — uniqueness & shop gating', () => {
   it('the named caddies are all flagged caddy:"named" and are LEGENDARY (GS-caddy-factions)', () => {
     expect(NAMED_CADDY_IDS.slice().sort()).toEqual(
-      ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'mystic-mole', 'sandy-sandsaver', 'space-ducks', 'suggestible-sam'].sort(),
+      ['auto-caddie', 'convict-sheep', 'dr-chipinski', 'driver-dan', 'mystic-mole', 'prognostic-parrot', 'sandy-sandsaver', 'space-ducks', 'suggestible-sam'].sort(),
     );
     for (const id of NAMED_CADDY_IDS) {
       const it = shopItem(id)!;
@@ -508,5 +510,64 @@ describe('caddies hold the "a power-up must not hurt scoring" invariant', () => 
     expect(meanStableford(['dr-chipinski'])).toBeGreaterThanOrEqual(base - 0.1);
     expect(meanStableford(['space-ducks'])).toBeGreaterThanOrEqual(base - 0.1);
     expect(meanStableford(['convict-sheep'])).toBeGreaterThanOrEqual(base - 0.1);
+  });
+});
+
+describe('Prognostic Parrot — foresight scramble (GS-caddy-parrot)', () => {
+  it('is a legendary named caddy that arms previewScramble to the 33% chance', () => {
+    const item = shopItem('prognostic-parrot')!;
+    expect(item.caddy).toBe('named');
+    expect(item.rarity).toBe('legendary');
+    expect(PARROT_PREVIEW_CHANCE).toBe(0.33);
+    const lo = loadoutFromPerks(['prognostic-parrot']);
+    expect(lo.previewScramble).toBe(PARROT_PREVIEW_CHANCE);
+    // A stock loadout never arms it (byte-for-byte off path).
+    expect(startingLoadout().previewScramble).toBeUndefined();
+  });
+
+  it('the OFF path (no parrot) draws ZERO extra rng — byte-for-byte the solo hole', () => {
+    const c = generateCourse('parrot:eq', { holes: 6, distanceFromStart: 5 });
+    // previewScramble undefined vs 0 both mean "no proc, no draw" and equal the plain solo hole.
+    const solo = playHole(c.holes[0]!, new Rng('z'), { shotMods: characterShotMods('feather-fade') });
+    const off1 = playHole(c.holes[0]!, new Rng('z'), { shotMods: characterShotMods('feather-fade'), previewScramble: undefined });
+    const off2 = playHole(c.holes[0]!, new Rng('z'), { shotMods: characterShotMods('feather-fade'), previewScramble: 0 });
+    expect(off1).toEqual(solo);
+    expect(off2).toEqual(solo);
+  });
+
+  it('a proc consumes the SAME rng stream regardless of the partner mods (foresight is player-owned)', () => {
+    // At chance 1 the parrot ALWAYS procs → best-of-two every full swing, deterministic per seed.
+    const c = generateCourse('parrot:det', { holes: 6, distanceFromStart: 7 });
+    const a = playHole(c.holes[0]!, new Rng('p'), { shotMods: characterShotMods('feather-fade'), previewScramble: 1 });
+    const b = playHole(c.holes[0]!, new Rng('p'), { shotMods: characterShotMods('feather-fade'), previewScramble: 1 });
+    expect(a).toEqual(b); // pure + deterministic
+  });
+
+  it('the foresight scramble scores at least as well as solo, on average better', () => {
+    const mods = characterShotMods('feather-fade');
+    let solo = 0;
+    let parrot = 0;
+    const N = 40;
+    for (let s = 0; s < N; s++) {
+      const c = generateCourse(`prt:${s}`, { holes: 9, distanceFromStart: 8 });
+      const a = playCourse(c.holes, new Rng(`prt:${s}:p`), { shotMods: mods });
+      // Chance 1 = the parrot foresees EVERY shot (best-of-two), the strongest form of the effect.
+      const b = playCourse(c.holes, new Rng(`prt:${s}:p`), { shotMods: mods, previewScramble: 1 });
+      solo += playTotals(a.map((p) => p.record)).stableford;
+      parrot += playTotals(b.map((p) => p.record)).stableford;
+    }
+    expect(parrot).toBeGreaterThan(solo); // a power-up must RAISE mean Stableford (contract 4)
+  });
+
+  it('a team scramble gates the parrot OFF (no double proc): team scramble is byte-for-byte with or without the parrot armed', () => {
+    const c = generateCourse('parrot:team', { holes: 6, distanceFromStart: 6 });
+    const partner = characterShotMods('huang-woo-hook');
+    const withTeam = playHole(c.holes[0]!, new Rng('t'), { shotMods: characterShotMods('feather-fade'), scramble: { partnerMods: partner } });
+    const withBoth = playHole(c.holes[0]!, new Rng('t'), {
+      shotMods: characterShotMods('feather-fade'),
+      scramble: { partnerMods: partner },
+      previewScramble: 1, // ignored while a team scramble is active (matches !opts.scramble gate)
+    });
+    expect(withBoth).toEqual(withTeam);
   });
 });

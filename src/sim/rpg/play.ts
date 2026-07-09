@@ -329,6 +329,9 @@ export interface ScrambleShot {
   /** True when this "two balls" is a fortune-teller MULLIGAN (GS-tent-interactions), not a team
    *  scramble — both balls are the player's OWN swing, so the choice card labels them "Tee shot A/B". */
   mulligan?: boolean;
+  /** True when this "two balls" is a Prognostic Parrot FORESIGHT (GS-caddy-parrot): the parrot saw the
+   *  shot, so both balls are the player's OWN swing and the card reads a pirate "Shot A/B" foresight. */
+  preview?: boolean;
 }
 
 /**

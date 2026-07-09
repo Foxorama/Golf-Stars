@@ -503,6 +503,10 @@ export interface PlayHoleOptions {
   /** Co-op SCRAMBLE (GS-scramble, boss stops): a partner golfer hits a second ball each full shot
    *  and the TEAM keeps the better one (one stroke). Absent ⇒ ordinary solo play (no extra rng). */
   scramble?: ScrambleOpts;
+  /** Prognostic Parrot foresight (GS-caddy-parrot): 0..1 per-full-swing chance to FORESEE the shot —
+   *  take a second swing of the SAME golfer (shotMods) and keep the better ball. The proc + partner
+   *  draws fire ONLY when armed AND no team `scramble` is active, so undefined/0 is byte-for-byte. */
+  previewScramble?: number;
   /** Left-handed mode (GS-lefty): mirror the player's lateral tendencies in world space. Passed to
    *  every executeShot; undefined/false is byte-for-byte right-handed. */
   lefty?: boolean;
@@ -1078,17 +1082,28 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       meteorScorch: opts.meteorScorch,
       groundPatch: opts.groundPatch,
     };
+    // Scramble partner shot-mods for THIS swing, if any: a team-duel partner (GS-scramble) OR the
+    // Prognostic Parrot foresight (GS-caddy-parrot) — a per-swing proc that takes a SECOND swing of the
+    // player's OWN golfer (opts.shotMods) and keeps the better. The proc draw fires ONLY when the parrot
+    // is armed AND no team scramble is active (`!opts.scramble` short-circuits before rng), so a normal
+    // hole's stream is byte-for-byte unchanged; the interactive reducer draws the identical proc + shots.
+    const parrotProc = !opts.scramble && !!opts.previewScramble && rng.bool(opts.previewScramble);
+    const scramblePartnerMods: ShotMods | undefined = opts.scramble
+      ? opts.scramble.partnerMods
+      : parrotProc
+      ? opts.shotMods
+      : undefined;
     const playerEx: ExecResult = executeShot(hole, ball, lie, tgt, club, execOpts, rng);
-    // Scramble (GS-scramble): the partner hits a second ball (same club/target, their own swing
-    // shape) and the team keeps the better — fewer penalties / closer to the flag. The partner draw
-    // fires ONLY when scramble is armed, so a normal hole's rng stream is byte-for-byte unchanged.
-    const ex: ExecResult = opts.scramble
-      ? pickBetterExec(
-          playerEx,
-          executeShot(hole, ball, lie, tgt, club, { ...execOpts, shotMods: opts.scramble.partnerMods }, rng),
-          flag,
-        ).ex
-      : playerEx;
+    // Keep the better of the two balls — fewer penalties / closer to the flag. The partner draw fires
+    // ONLY when a scramble (team or parrot) is armed for this swing, so an un-scrambled hole is unchanged.
+    const ex: ExecResult =
+      opts.scramble || parrotProc
+        ? pickBetterExec(
+            playerEx,
+            executeShot(hole, ball, lie, tgt, club, { ...execOpts, shotMods: scramblePartnerMods }, rng),
+            flag,
+          ).ex
+        : playerEx;
     strokes += 1 + ex.penaltyStrokes;
     penalties += ex.penaltyStrokes;
 

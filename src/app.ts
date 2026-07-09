@@ -1466,14 +1466,18 @@ function scrambleChoiceOverlay(): string {
         data-action='${JSON.stringify({ type: 'chooseScrambleBall', pick })}'
         style="text-align:center;font-size:14px;padding:11px;">${ex.holed ? '🏁 Holed — take it' : 'Play this →'}</button>
     </div>`;
-  // A fortune-teller MULLIGAN (GS-tent-interactions) reuses this "choose your ball" card, but both balls
-  // are the player's OWN tee shot — so it's titled as a mulligan and the two options read "Tee shot A/B".
+  // A fortune-teller MULLIGAN (GS-tent-interactions) and a Prognostic Parrot FORESIGHT (GS-caddy-parrot)
+  // both reuse this "choose your ball" card, but both balls are the player's OWN swing — so each is
+  // titled for its source and the two options read "A/B" rather than naming a partner.
   const isMulligan = !!sc.mulligan;
+  const isPreview = !!sc.preview;
   const heading = isMulligan
     ? { title: '🔮 FORTUNE\'S MULLIGAN — PICK YOUR TEE SHOT', sub: 'The fortune teller gifted a second tee shot — keep whichever line you like best.' }
+    : isPreview
+    ? { title: '🦜 PROGNOSTIC PARROT — PICK YOUR SHOT', sub: 'The captain foresaw the shot & played it twice — keep whichever ball you like best.' }
     : { title: '🤝 SCRAMBLE — CHOOSE YOUR BALL', sub: `You and ${partner?.name ?? 'your partner'} both hit — play on from the better lie.` };
-  const labelA = isMulligan ? 'Tee shot A' : 'Your ball';
-  const labelB = isMulligan ? 'Tee shot B' : `${partner?.name ?? 'Partner'}'s ball`;
+  const labelA = isPreview ? 'Vision A' : isMulligan ? 'Tee shot A' : 'Your ball';
+  const labelB = isPreview ? 'Vision B' : isMulligan ? 'Tee shot B' : `${partner?.name ?? 'Partner'}'s ball`;
   return `
     <div style="position:fixed;inset:0;background:rgba(5,7,11,0.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;overflow:auto;">
       <div style="display:flex;flex-direction:column;gap:11px;max-width:360px;width:100%;">
@@ -1484,7 +1488,7 @@ function scrambleChoiceOverlay(): string {
         <div style="border-radius:10px;overflow:hidden;border:1px solid var(--gs-line-2);line-height:0;align-self:center;">${map}</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           ${option(labelA, sc.player, sc.playerDistToPin, 'player', '#5fd45a')}
-          ${option(labelB, sc.partner, sc.partnerDistToPin, 'partner', isMulligan ? '#c39bd3' : partner?.style.cap ?? '#7aa2ff')}
+          ${option(labelB, sc.partner, sc.partnerDistToPin, 'partner', isPreview ? '#ffce54' : isMulligan ? '#c39bd3' : partner?.style.cap ?? '#7aa2ff')}
         </div>
       </div>
     </div>`;

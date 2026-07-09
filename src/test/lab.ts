@@ -274,6 +274,12 @@ export function caddyEffects(loadout: PlayerLoadout): CaddyEffect[] {
     out.push({ id: 'lieRelief', label: 'Lie relief', detail: `bad-lie penalty eased ${pct(loadout.lieRelief)} toward neutral` });
   if (loadout.puttBoost)
     out.push({ id: 'puttBoost', label: 'Putt boost', detail: `+${fmtNum(loadout.puttBoost)} make-band / lag` });
+  if (loadout.previewScramble)
+    out.push({
+      id: 'previewScramble',
+      label: 'Foresight',
+      detail: `${pct(loadout.previewScramble)} chance to play the shot twice & keep the better`,
+    });
   return out;
 }
 

@@ -32,6 +32,8 @@ describe('caddy factions — data contract (GS-caddy-factions)', () => {
     expect(factionById('putters-guild')?.name).toBe('The Putters Guild');
     expect(members('putters-guild').sort()).toEqual(['auto-caddie', 'mystic-mole'].sort()); // putting specialists
     expect(members('space-pirates')).toEqual(['convict-sheep']);
+    expect(factionById('planet-pirates')?.name).toBe('Planet Pirates');
+    expect(members('planet-pirates')).toEqual(['prognostic-parrot']); // the foreseeing pirate captain
     expect(members('lords-and-ladies')).toEqual(['space-ducks']);
     expect(members('long-haul-truckers').sort()).toEqual(['driver-dan', 'suggestible-sam'].sort());
     expect(members('para-spatial-medics')).toEqual(['dr-chipinski']);

@@ -149,6 +149,15 @@ export interface PlayerLoadout {
    */
   lieRelief?: number;
   /**
+   * Prognostic Parrot caddy foresight (GS-caddy-parrot): 0..1, the per-full-swing chance the parrot
+   * FORESEES the shot — you take a SECOND swing of your own golfer (both balls are your character's) and
+   * keep the better (the scramble effect). Threaded IDENTICALLY through the auto sim (playHole/playStop)
+   * and the interactive driver (the reducer's shot/auto-finish paths) so auto≡interactive holds: the
+   * proc + partner draws fire ONLY when armed, so undefined/0 is byte-for-byte unchanged. Rebuilt from
+   * perks on resume (no save bump).
+   */
+  previewScramble?: number;
+  /**
    * Left-handed mode (GS-lefty): a player SETTING (not a perk/purchase) baked onto the loadout at the
    * app boundary so the pure sim can read it. Mirrors the golfer's lateral shot tendencies in world
    * space — hook/slice and any character bias curve the opposite way — threaded IDENTICALLY through
@@ -440,6 +449,11 @@ export const MOLE_PUTT_BOOST = 0.38;
  *  stick adds yards to your distance clubs on top of letting you swing it from anywhere. */
 export const DRIVER_DAN_CARRY = 12;
 
+/** The Prognostic Parrot's foresight proc (GS-caddy-parrot): the per-full-swing chance the pirate
+ *  captain SEES the shot before it happens, so you take a second swing of your OWN golfer and keep the
+ *  better ball (the scramble effect). A 33% chance — a legendary swing without being a free re-roll. */
+export const PARROT_PREVIEW_CHANCE = 0.33;
+
 /** Default geometric cost ramp for stackables — each copy you own makes the next dearer. */
 export const STACK_COST_GROWTH = 1.5;
 
@@ -718,6 +732,18 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     // GS-greens-3: READS THE BREAK — the putt UI snaps your aim to the slope-compensated line + draws
     // the read, so a sidehill putt is taken care of for you. Plus the make-band/lag boost he always had.
     apply: (m) => ({ ...m, greenRead: true, puttBoost: (m.puttBoost ?? 0) + MOLE_PUTT_BOOST, perks: [...m.perks, 'mystic-mole'] }),
+  },
+  {
+    id: 'prognostic-parrot',
+    name: 'Prognostic Parrot',
+    cost: 300,
+    desc: 'A pirate captain who foresees the shot — 33% chance to play it TWICE (both your own swing) & keep the better',
+    rarity: 'legendary',
+    caddy: 'named',
+    // GS-caddy-parrot (Planet Pirates): a per-shot chance to FORESEE the swing → take two balls (both
+    // the player's own golfer) and keep the better — the scramble effect, self-partnered. Only ever
+    // raises scoring (best-of-two ≥ solo), so it can't trip the death-spiral bar.
+    apply: (m) => ({ ...m, previewScramble: Math.max(m.previewScramble ?? 0, PARROT_PREVIEW_CHANCE), perks: [...m.perks, 'prognostic-parrot'] }),
   },
 
   // --- One-shot upgrades (GS-proshop-variety) ---------------------------------
