@@ -287,6 +287,58 @@ function shipBody(look: ShipLook): string {
           <text x="-13.4" y="-12.2" font-size="4.6" font-weight="800" fill="#ffd76b" font-family="system-ui,sans-serif">∞</text>
         </g>`;
     }
+    case 'pegasus': {
+      // The Pegasus (GS-pegasus) — the Asgardian battle-steed matched to the Valkyrie apparel set: a
+      // galloping winged horse of burnished bronze with a golden mane, harness and hooves, and great
+      // feathered wings that slowly beat. A tail of streaming starlight trails behind like a valkyrie's
+      // charge across the sky. Authored right-facing in the ±20u frame; layered wing-behind → body →
+      // wing-front so the near wing reads over the barrel.
+      const shimmer = (dur: string) =>
+        `<animate attributeName="opacity" values="0.6;1;0.75;1;0.6" dur="${dur}" repeatCount="indefinite"/>`;
+      // A feathered wing rooted at the withers (~x-1,y-5), sweeping up and back; it slowly beats by
+      // rotating about the root. `up` flips the near/far wing a touch so they don't overlap exactly.
+      const wing = (up: number, begin: string, fill: string) => `
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="${-6 + up} -1 -5;${8 + up} -1 -5;${-6 + up} -1 -5" dur="2.1s" begin="${begin}" repeatCount="indefinite"/>
+          <path d="M-1,-5 Q-14,-18 -28,-16 Q-16,-11 -22,-8 Q-11,-10 -16,-5 Q-7,-6 -1,-2 Z" fill="${fill}" stroke="${accent}" stroke-width="0.6" stroke-linejoin="round">${shimmer('2.4s')}</path>
+          <path d="M-1,-5 Q-11,-14 -21,-12.5 Q-13,-8.5 -17,-6 Q-8,-6.5 -1,-3 Z" fill="#ffffff" opacity="0.5"/>
+        </g>`;
+      // The streaming star-tail plume trailing back-left off the rump.
+      const tail = `
+        <g stroke="none">
+          <path d="M-11,-1 Q-24,-5 -32,-10 Q-22,-2 -30,-1 Q-22,1 -30,5 Q-22,4 -28,9 Q-20,3 -11,3 Z" fill="${flame}" opacity="0.85">${shimmer('1.6s')}</path>
+          <path d="M-11,0 Q-20,-2 -26,-5 Q-19,0 -24,1.4 Q-19,2 -24,6 Q-18,2.4 -11,2.4 Z" fill="#ffffff" opacity="0.55"/>
+        </g>`;
+      return `
+        ${tail}
+        ${wing(-2, '0s', body)}
+        <g stroke="#3a2708" stroke-width="1" stroke-linejoin="round" stroke-linecap="round">
+          <!-- galloping legs (folded, mid-stride) -->
+          <path d="M6,4 L11,10 L9,11" fill="none"/>
+          <path d="M3,4.5 L6,11 L4,12" fill="none"/>
+          <path d="M-6,4 L-10,10 L-12,10.4" fill="none"/>
+          <path d="M-3,4.5 L-5,11 L-7,11.6" fill="none"/>
+          <!-- barrel body -->
+          <path d="M-12,0 Q-9,-6 0,-6 Q9,-6 11,-1 Q10,5 0,5.6 Q-10,5.6 -12,0 Z" fill="${body}"/>
+          <!-- gold saddle-girth harness band -->
+          <path d="M-3,-5.6 Q-3,0 -2,5.4" fill="none" stroke="${accent}" stroke-width="1.4"/>
+          <!-- arched neck sweeping up to the head -->
+          <path d="M7,-3 Q11,-9 13,-11 Q16,-9 15,-5 Q13,-3 9,-1 Z" fill="${body}"/>
+          <!-- head + muzzle, an ear pricked up -->
+          <path d="M13,-11 Q18,-11 18.5,-7.5 Q18,-6 15.5,-6 Q13.5,-7 13,-9 Z" fill="${body}"/>
+          <path d="M13.5,-11 L13,-14.5 L15.4,-11.8 Z" fill="${body}"/>
+          <circle cx="16.6" cy="-8.4" r="0.7" fill="#2a1c08"/>
+          <!-- gold hooves -->
+          <g fill="${accent}" stroke="none"><circle cx="9" cy="11" r="1.1"/><circle cx="4" cy="12" r="1.1"/><circle cx="-12" cy="10.5" r="1.1"/><circle cx="-7" cy="11.7" r="1.1"/></g>
+        </g>
+        <!-- golden streaming mane along the neck crest -->
+        <g stroke="${flame}" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.95">
+          <path d="M14,-11 Q10,-10 8,-6">${shimmer('1.9s')}</path>
+          <path d="M12,-9 Q8,-8 6,-4"/>
+          <path d="M10,-6.5 Q6,-6 4,-2.5"/>
+        </g>
+        ${wing(2, '0.35s', glass)}`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `

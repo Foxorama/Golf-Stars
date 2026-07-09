@@ -776,6 +776,15 @@
   throughout, wreathed in a warm gold legendary aura; all three slots equipped → `equippedSet` reports the
   Valkyrie set complete. Test: `tests/apparel.test.ts` (buyable-legendary + three-slot set completion +
   distinct armour shapes).
+  - **The Pegasus ship (GS-pegasus).** A matching winged war-steed for the Valkyrie set — a valkyrie rides a
+    winged mount, so the fleet gains one. Pure ship CONTENT (`ships.ts`): one new LEGENDARY `SHIPS` row in a
+    new `Valkyrie` set (`cost: TIER_COST.legendary` = 180 shards), and one new `ShipLook.kind` `'pegasus'`
+    drawn in the sole ship renderer (`shipArt.ts`) — a galloping bronze-and-gold horse with great feathered
+    wings that slowly beat, gold mane/harness/hooves, and a streaming starlight tail, authored right-facing in
+    the shared ±20u frame and layered wing-behind → body → wing-front. Rides every existing Trade-Market /
+    Clubhouse ship rail; no sim, save, hook or economy change. Palette drawn from the Valkyrie apparel
+    (burnished bronze `#b8823a`, gold `#e6b93f`, warm gold glow `#ffd873`). Covered by `tests/ships.test.ts`
+    (catalogue ordering + every ship has a render `look.kind`).
 
 - **A third apparel slot — PANTS (GS-pants-outfit, save v11).** Apparel was a two-slot wardrobe (hat +
   shirt); pants make the golfer dressable head-to-toe. The work was deliberately a CONTENT + plumbing change,

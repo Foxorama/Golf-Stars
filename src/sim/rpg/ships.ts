@@ -21,7 +21,7 @@ import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 export interface ShipLook {
   /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated); `infinity` is
    *  the hole-150 Unending-Universe grail (GS-unending) — the most animated craft in the fleet. */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity';
+  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity' | 'pegasus';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -172,6 +172,16 @@ export const SHIPS: readonly Ship[] = [
     blurb: 'A motorcycle golf buggy — two glowing hover-wheels, a bag on the tail, a jet trail. All attitude.',
     cost: TIER_COST.legendary,
     look: { kind: 'moto', body: '#2a2f3a', glass: '#bfe9ff', flame: '#ff3ea5', accent: '#28e0d0', bling: 2 },
+  },
+  // --- The VALKYRIE set: the Asgardian battle-steed to match the Valkyrie apparel (GS-pegasus) ---
+  {
+    id: 'pegasus-valkyrie',
+    name: 'Pegasus',
+    set: 'Valkyrie',
+    rarity: 'legendary',
+    blurb: 'A winged war-steed of bronze and gold, mane streaming starlight. Rides with the Valkyrie battle-dress.',
+    cost: TIER_COST.legendary,
+    look: { kind: 'pegasus', body: '#b8823a', glass: '#f2e6c4', flame: '#ffd873', accent: '#e6b93f', bling: 2 },
   },
   // --- The MYTHIC grail: the rarest, flashiest ride in the galaxy ---
   {
