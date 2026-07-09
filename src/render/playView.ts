@@ -1022,21 +1022,19 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       break;
     }
     case 'supernova': {
-      // The mythic Supernova crown (GS-solar-flames): a jewelled violet circlet erupting into a DETONATING
-      // STAR — a white-hot core inside a nebula shell of soft violet/pink puffs, ragged filaments fanning
-      // wide (violet→hot-pink→starlight) and bright star-knots along the shockwave rim. Set-matched to the
-      // nebula Suit/Leggings; the twin of the wardrobe SVG (`apparelArt.ts hatGlyph 'supernova'`). r=7 head.
+      // The mythic Supernova crown (GS-solar-flames): an opaque violet crown CAP worn over the head top
+      // (so the crown fits the head, not a floating orb) with a DETONATING STAR bursting from it — rays
+      // rooted along the HEAD CREST fanning radially to frame the head, a nebula shell of violet/pink
+      // puffs, bright star-knots, and a white-hot core gem at the crown apex. Set-matched to the nebula
+      // Suit/Leggings; the twin of the wardrobe SVG (`apparelArt.ts hatGlyph 'supernova'`). r=7 head.
       const s = r / 7;
       const tip = '#fff4c2';
-      const bcx = hx;
-      const bcy = hy - 4.4 * s;
-      const rb = 4.2 * s;
-      // Nebula shell puffs (soft, behind the burst).
+      const rb = 7.6; // rays root along the head crest so the burst hugs the head (like the flame crown)
+      // Nebula shell puffs (soft, nestled just above the crest, behind the burst).
       ctx.save();
       ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.4;
       const puffs: [number, number, number, boolean][] = [
-        [0, -11, 3.4, false], [-7, -9, 3, true], [7, -9, 3, true], [-10, -4.5, 2.6, false],
-        [10, -4.5, 2.6, false], [-6, -1, 2.2, true], [6, -1, 2.2, true],
+        [0, -10, 2.9, false], [-5, -8.8, 2.5, true], [5, -8.8, 2.5, true], [-8.2, -6, 2.1, false], [8.2, -6, 2.1, false],
       ];
       for (const [ux, uy, ur, pink] of puffs) {
         ctx.fillStyle = pink ? accent : color;
@@ -1045,41 +1043,65 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
         ctx.fill();
       }
       ctx.restore();
-      // Ragged filaments — tapered slivers with a violet→pink→starlight gradient.
+      // Radial rays rooted along the head crest — a sunburst fanning around the upper head.
       const fil: [number, number, number][] = [
-        [0, 12.5, 1.2], [24, 11, 1.1], [-24, 11, 1.1], [46, 8.4, 1.4], [-46, 8.4, 1.4],
-        [70, 9.6, 0.95], [-70, 9.6, 0.95], [96, 6.2, 1.1], [-96, 6.2, 1.1], [120, 5, 0.8], [-120, 5, 0.8],
+        [0, 9.5, 1.35], [-2.7, 8.8, 1.2], [2.7, 8.8, 1.2], [-4.9, 7.6, 1.1], [4.9, 7.6, 1.1],
+        [-6.4, 6.2, 1.0], [6.4, 6.2, 1.0], [-7.3, 4.8, 0.85], [7.3, 4.8, 0.85],
       ];
       ctx.strokeStyle = '#0c1116';
       ctx.lineWidth = 0.4;
-      for (const [deg, len, w] of fil) {
-        const t = (deg * Math.PI) / 180;
-        const dx = Math.sin(t);
-        const dy = -Math.cos(t);
-        const px = Math.cos(t);
-        const py = Math.sin(t);
-        const bx = bcx + rb * dx;
-        const by = bcy + rb * dy;
-        const tx = bcx + (rb + len * s) * dx;
-        const ty = bcy + (rb + len * s) * dy;
-        const grad = ctx.createLinearGradient(bx, by, tx, ty);
+      for (const [x, len, w] of fil) {
+        const by = -Math.sqrt(Math.max(0, rb * rb - x * x));
+        const ux = x / rb;
+        const uy = by / rb;
+        const rootx = hx + x * s;
+        const rooty = hy + by * s;
+        const tx = hx + (x + len * ux) * s;
+        const ty = hy + (by + len * uy) * s;
+        const px = -uy;
+        const py = ux;
+        const grad = ctx.createLinearGradient(rootx, rooty, tx, ty);
         grad.addColorStop(0, color);
         grad.addColorStop(0.48, '#8a3ad6');
         grad.addColorStop(0.76, accent);
         grad.addColorStop(1, tip);
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.moveTo(bx - w * s * px, by - w * s * py);
+        ctx.moveTo(rootx - w * s * px, rooty - w * s * py);
         ctx.lineTo(tx, ty);
-        ctx.lineTo(bx + w * s * px, by + w * s * py);
+        ctx.lineTo(rootx + w * s * px, rooty + w * s * py);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
       }
-      // Bright star-knots strung along the shockwave rim.
+      // Opaque crown cap covering the head top (the WORN part), violet gradient bottom→top.
+      const capg = ctx.createLinearGradient(hx, hy - 2 * s, hx, hy - 7 * s);
+      capg.addColorStop(0, mixHex(color, '#000000', 0.45));
+      capg.addColorStop(1, mixHex(color, '#ffffff', 0.14));
+      ctx.fillStyle = capg;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(hx, hy, 7 * s, Math.atan2(-2, -6.7), Math.atan2(-2, 6.7), false);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Hot-pink rim highlight along the brow + two starlight gems.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(hx, hy, 6.4 * s, Math.atan2(-2.6, -6.2), Math.atan2(-2.6, 6.2), false);
+      ctx.stroke();
+      for (const gx of [-4.6, 4.6]) {
+        ctx.fillStyle = tip;
+        ctx.beginPath();
+        ctx.arc(hx + gx * s, hy - 3.4 * s, 0.6 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Bright star-knots strung through the burst.
       const knots: [number, number, number, boolean][] = [
-        [-9, -9, 0.9, false], [9, -9, 0.9, false], [-12, -3.5, 0.75, true], [12, -3.5, 0.75, true],
-        [-4.5, -13, 0.8, true], [4.5, -13, 0.8, true], [0, -15.5, 0.7, false],
+        [-3.6, -13, 0.8, true], [3.6, -13, 0.8, true], [-9.5, -9, 0.75, false], [9.5, -9, 0.75, false],
+        [0, -15.5, 0.7, false], [-12, -5.5, 0.7, false], [12, -5.5, 0.7, false],
       ];
       for (const [kx, ky, kr, white] of knots) {
         ctx.fillStyle = white ? '#fff' : tip;
@@ -1087,48 +1109,35 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
         ctx.arc(hx + kx * s, hy + ky * s, kr * s, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Violet circlet band across the brow, hot-pink rim highlight.
-      ctx.fillStyle = color;
-      ctx.strokeStyle = '#0c1116';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(hx, hy, r, Math.PI * 1.06, Math.PI * 1.94);
-      ctx.arc(hx, hy, r * 0.72, Math.PI * 1.94, Math.PI * 1.06, true);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(hx, hy, r * 0.86, Math.PI * 1.08, Math.PI * 1.92);
-      ctx.stroke();
-      // White-hot core: a soft radial glow, a 4-point star, a white pip.
-      const cg = ctx.createRadialGradient(bcx, bcy, 0, bcx, bcy, 4.4 * s);
+      // White-hot core gem at the crown apex: a soft radial glow, a 4-point star, a white pip.
+      const bcx = hx;
+      const bcy = hy - 6.6 * s;
+      const cg = ctx.createRadialGradient(bcx, bcy, 0, bcx, bcy, 4 * s);
       cg.addColorStop(0, '#ffffff');
       cg.addColorStop(0.4, tip);
       cg.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = cg;
       ctx.beginPath();
-      ctx.arc(bcx, bcy, 4.4 * s, 0, Math.PI * 2);
+      ctx.arc(bcx, bcy, 4 * s, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = tip;
       ctx.strokeStyle = '#0c1116';
       ctx.lineWidth = 0.3;
       ctx.beginPath();
-      ctx.moveTo(bcx, bcy - 3.6 * s);
-      ctx.lineTo(bcx + 1 * s, bcy - 1 * s);
-      ctx.lineTo(bcx + 3.6 * s, bcy);
-      ctx.lineTo(bcx + 1 * s, bcy + 1 * s);
-      ctx.lineTo(bcx, bcy + 3.6 * s);
-      ctx.lineTo(bcx - 1 * s, bcy + 1 * s);
-      ctx.lineTo(bcx - 3.6 * s, bcy);
-      ctx.lineTo(bcx - 1 * s, bcy - 1 * s);
+      ctx.moveTo(bcx, bcy - 3.4 * s);
+      ctx.lineTo(bcx + 0.9 * s, bcy - 0.9 * s);
+      ctx.lineTo(bcx + 3.4 * s, bcy);
+      ctx.lineTo(bcx + 0.9 * s, bcy + 0.9 * s);
+      ctx.lineTo(bcx, bcy + 3.4 * s);
+      ctx.lineTo(bcx - 0.9 * s, bcy + 0.9 * s);
+      ctx.lineTo(bcx - 3.4 * s, bcy);
+      ctx.lineTo(bcx - 0.9 * s, bcy - 0.9 * s);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(bcx, bcy, 1.1 * s, 0, Math.PI * 2);
+      ctx.arc(bcx, bcy, 1 * s, 0, Math.PI * 2);
       ctx.fill();
       break;
     }
