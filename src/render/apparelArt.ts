@@ -192,54 +192,57 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       break;
     }
     case 'supernova': {
-      // The mythic Supernova crown (GS-solar-flames): a jewelled violet circlet on the brow erupting into
-      // a DETONATING STAR — a white-hot core inside an expanding nebula SHELL (soft violet/pink puffs),
-      // ragged filaments fanning wide (violet→hot-pink→starlight) and bright star-KNOTS strung along the
-      // shockwave rim. Set-matched to the deep-violet nebula Suit/Leggings (violet body, hot-pink accent,
-      // magenta glow). Deliberately distinct from the Punched Galaxy starburst: a rounded exploding shell,
-      // not rigid triangular rays. Filaments/knots come off small polar tables so the burst stays symmetric.
+      // The mythic Supernova crown (GS-solar-flames): an opaque violet crown CAP worn over the head top
+      // (so it FITS the head, not a floating orb — the original left too much bare face) with a DETONATING
+      // STAR bursting from it: rays rooted along the HEAD CREST fan out radially to frame the head (the
+      // flame crown's trick), a nebula SHELL of violet/pink puffs nestles above, bright star-KNOTS strew
+      // the burst, and a white-hot core gem sits at the crown apex. Set-matched to the deep-violet nebula
+      // Suit/Leggings (violet body, hot-pink accent). Distinct from the Punched Galaxy starburst (rigid
+      // rays off a floating circlet) — this hugs the head. Rays/knots off small tables so it stays symmetric.
       const tip = '#fff4c2'; // white-gold nova core light (shared with the canvas mirror)
-      const C: [number, number] = [0, -4.4];
-      const rb = 4.2; // filament roots sit just off the circlet
-      // [deg from vertical, length, halfWidth] — a wide, ragged fan (alternating long/short) reads as a shell.
+      const rb = 7.6; // rays root along the HEAD CREST (like the flame crown) so the burst hugs the head
+      // [x, length, halfWidth] — a wide radial sunburst fanning around the upper head, framing the face.
       const fil: [number, number, number][] = [
-        [0, 12.5, 1.2], [24, 11, 1.1], [-24, 11, 1.1],
-        [46, 8.4, 1.4], [-46, 8.4, 1.4], [70, 9.6, 0.95], [-70, 9.6, 0.95],
-        [96, 6.2, 1.1], [-96, 6.2, 1.1], [120, 5, 0.8], [-120, 5, 0.8],
+        [0, 9.5, 1.35], [-2.7, 8.8, 1.2], [2.7, 8.8, 1.2],
+        [-4.9, 7.6, 1.1], [4.9, 7.6, 1.1], [-6.4, 6.2, 1.0], [6.4, 6.2, 1.0],
+        [-7.3, 4.8, 0.85], [7.3, 4.8, 0.85],
       ];
       const p = (x: number, y: number): string => `${x.toFixed(1)},${y.toFixed(1)}`;
-      const shell = ([[0, -11, 3.4], [-7, -9, 3.0], [7, -9, 3.0], [-10, -4.5, 2.6], [10, -4.5, 2.6], [-6, -1, 2.2], [6, -1, 2.2]] as [number, number, number][])
+      // Nebula shell — soft violet/pink clumps nestled just above the crest, between the rays.
+      const shell = ([[0, -10, 2.9], [-5, -8.8, 2.5], [5, -8.8, 2.5], [-8.2, -6, 2.1], [8.2, -6, 2.1]] as [number, number, number][])
         .map(([sx, sy, sr], i) => `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="${i % 2 ? accent : color}" opacity="0.4"/>`)
         .join('');
       const spikes = fil
-        .map(([deg, len, w]) => {
-          const t = (deg * Math.PI) / 180;
-          const dx = Math.sin(t);
-          const dy = -Math.cos(t);
-          const px = Math.cos(t);
-          const py = Math.sin(t);
-          const bx = C[0] + rb * dx;
-          const by = C[1] + rb * dy;
-          const tx = C[0] + (rb + len) * dx;
-          const ty = C[1] + (rb + len) * dy;
-          return `<path d="M${p(bx - w * px, by - w * py)} L${p(tx, ty)} L${p(bx + w * px, by + w * py)} Z" fill="url(#nv${uid})" stroke="#0c1116" stroke-width="0.4" stroke-linejoin="round"><animate attributeName="opacity" values="0.65;1;0.65" dur="${(1.9 + (deg % 5) * 0.2).toFixed(1)}s" repeatCount="indefinite"/></path>`;
+        .map(([x, len, w], i) => {
+          const by = -Math.sqrt(Math.max(0, rb * rb - x * x)); // root on the head crest
+          const ux = x / rb;
+          const uy = by / rb; // outward radial unit
+          const tx = x + len * ux;
+          const ty = by + len * uy;
+          const px = -uy; // perpendicular to the ray
+          const py = ux;
+          return `<path d="M${p(x - w * px, by - w * py)} L${p(tx, ty)} L${p(x + w * px, by + w * py)} Z" fill="url(#nv${uid})" stroke="#0c1116" stroke-width="0.4" stroke-linejoin="round"><animate attributeName="opacity" values="0.65;1;0.65" dur="${(1.9 + (i % 5) * 0.2).toFixed(1)}s" repeatCount="indefinite"/></path>`;
         })
         .join('');
-      const knots = ([[-9, -9, 0.9], [9, -9, 0.9], [-12, -3.5, 0.75], [12, -3.5, 0.75], [-4.5, -13, 0.8], [4.5, -13, 0.8], [0, -15.5, 0.7]] as [number, number, number][])
+      const knots = ([[-3.6, -13, 0.8], [3.6, -13, 0.8], [-9.5, -9, 0.75], [9.5, -9, 0.75], [0, -15.5, 0.7], [-12, -5.5, 0.7], [12, -5.5, 0.7]] as [number, number, number][])
         .map(([kx, ky, kr], i) => `<circle cx="${kx}" cy="${ky}" r="${kr}" fill="${i % 2 ? '#fff' : tip}"><animate attributeName="opacity" values="0.4;1;0.4" dur="${(1.4 + i * 0.2).toFixed(1)}s" repeatCount="indefinite"/></circle>`)
         .join('');
       g = `<defs><linearGradient id="nv${uid}" x1="0" y1="1" x2="0" y2="0">
           <stop offset="0%" stop-color="${color}"/><stop offset="48%" stop-color="#8a3ad6"/><stop offset="76%" stop-color="${accent}"/><stop offset="100%" stop-color="${tip}"/>
         </linearGradient>
-        <radialGradient id="nc${uid}"><stop offset="0%" stop-color="#fff"/><stop offset="40%" stop-color="${tip}"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></radialGradient></defs>
-        ${shell}${spikes}${knots}
-        <path d="M-6.6,-2 A7 7 0 0 1 6.6,-2 L5.1,0.9 A6.2 6.2 0 0 1 -5.1,0.9 Z" fill="${color}" ${ink}/>
-        <path d="M-6.2,-1.3 A6.4 6.4 0 0 1 6.2,-1.3" fill="none" stroke="${accent}" stroke-width="1" opacity="0.9"/>
-        <circle cx="-4.4" cy="-1.1" r="0.6" fill="${tip}"/><circle cx="4.4" cy="-1.1" r="0.6" fill="${tip}"/>
-        <g transform="translate(${C[0]} ${C[1]})">
-          <circle r="4.4" fill="url(#nc${uid})"><animate attributeName="r" values="3.8;4.8;3.8" dur="2s" repeatCount="indefinite"/></circle>
-          <path d="M0,-3.6 L1,-1 L3.6,0 L1,1 L0,3.6 L-1,1 L-3.6,0 L-1,-1 Z" fill="${tip}" stroke="#0c1116" stroke-width="0.3"/>
-          <circle r="1.1" fill="#fff"/>
+        <radialGradient id="nc${uid}"><stop offset="0%" stop-color="#fff"/><stop offset="40%" stop-color="${tip}"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></radialGradient>
+        <linearGradient id="ncap${uid}" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="${shade(color, -0.45)}"/><stop offset="100%" stop-color="${shade(color, 0.14)}"/>
+        </linearGradient></defs>
+        ${shell}${spikes}
+        <path d="M-6.7,-2 A7 7 0 0 1 6.7,-2 Z" fill="url(#ncap${uid})" ${ink}/>
+        <path d="M-6.2,-2.6 A6.4 6.4 0 0 1 6.2,-2.6" fill="none" stroke="${accent}" stroke-width="1" opacity="0.9"/>
+        <circle cx="-4.6" cy="-3.4" r="0.6" fill="${tip}"/><circle cx="4.6" cy="-3.4" r="0.6" fill="${tip}"/>
+        ${knots}
+        <g transform="translate(0 -6.6)">
+          <circle r="4" fill="url(#nc${uid})"><animate attributeName="r" values="3.4;4.4;3.4" dur="2s" repeatCount="indefinite"/></circle>
+          <path d="M0,-3.4 L0.9,-0.9 L3.4,0 L0.9,0.9 L0,3.4 L-0.9,0.9 L-3.4,0 L-0.9,-0.9 Z" fill="${tip}" stroke="#0c1116" stroke-width="0.3"/>
+          <circle r="1" fill="#fff"/>
         </g>`;
       break;
     }
