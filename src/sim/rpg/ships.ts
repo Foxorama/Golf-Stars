@@ -7,7 +7,7 @@
  * and a render `look` the vector drawer (`render/shipArt.ts`) keys off. New ship = new row.
  *
  * The Trade Market shows the FULL catalogue (GS-clubhouse) — every ship is browsable and buyable the
- * moment you can afford it; scarcity lives in the Shard PRICE (the mythic Mothership is the 1,000-shard
+ * moment you can afford it; scarcity lives in the Shard PRICE (the mythic Mothership is the 600-shard
  * grail), not in a rotating offer. Everyone starts owning the classic station wagon (`DEFAULT_SHIP_ID`),
  * free. Ownership is global; which ship each character FLIES is chosen per golfer in the Clubhouse.
  *
@@ -63,13 +63,15 @@ export const DEFAULT_SHIP_ID = 'wagon-classic';
  *  never sold, hidden from the Trade Market until owned; granted by the reducer on any ace. */
 export const ACE_SHIP_ID = 'comet-rider';
 
-/** Shard prices per rarity tier (the Trade Market economy). Mythic is the 1,000-shard grail. */
+/** Shard prices per rarity tier (the Trade Market economy). Mythic is the 600-shard grail.
+ *  Prices were cut 40% in the GS-trade-rebalance (with a one-off refund migration) — see
+ *  `docs/decisions/rpg-meta-loop.md`. */
 const TIER_COST: Record<CosmeticRarity, number> = {
   common: 0,
-  rare: 60,
-  epic: 140,
-  legendary: 300,
-  mythic: 1000,
+  rare: 36,
+  epic: 84,
+  legendary: 180,
+  mythic: 600,
 };
 
 export const SHIPS: readonly Ship[] = [
@@ -187,7 +189,7 @@ export const SHIPS: readonly Ship[] = [
     set: 'Mythic',
     rarity: 'mythic',
     blurb: 'A hot-rod space chopper — fat wheels, a bag stood between the bars, wreathed in flame and forked lightning.',
-    cost: 1250, // the top of the fleet — a hand-built showpiece above the Mothership grail
+    cost: 750, // the top of the fleet — a hand-built showpiece above the Mothership grail
     look: { kind: 'chopper', body: '#16181f', glass: '#cfe9ff', flame: '#ff7a1a', accent: '#7fe049', bling: 3 },
   },
   // --- The SECRET grail (GS-unending): earned at hole 150 of the Unending Universe, never sold.

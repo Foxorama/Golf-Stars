@@ -24,7 +24,7 @@ describe('ships catalogue (GS-garage / GS-clubhouse)', () => {
     for (const s of SHIPS) expect(s.look.kind).toBeTruthy();
   });
 
-  it('a priced ship costs more for a rarer tier, topped by a 1,000-shard mythic UFO', () => {
+  it('a priced ship costs more for a rarer tier, topped by a 600-shard mythic UFO', () => {
     const rare = SHIPS.find((s) => s.rarity === 'rare')!;
     const epic = SHIPS.find((s) => s.rarity === 'epic')!;
     const leg = SHIPS.find((s) => s.rarity === 'legendary')!;
@@ -32,7 +32,7 @@ describe('ships catalogue (GS-garage / GS-clubhouse)', () => {
     expect(epic.cost).toBeGreaterThan(rare.cost);
     expect(leg.cost).toBeGreaterThan(epic.cost);
     expect(myth).toBeTruthy();
-    expect(myth.cost).toBe(1000); // the headline grail
+    expect(myth.cost).toBe(600); // the headline grail (post GS-trade-rebalance cut)
     expect(myth.cost).toBeGreaterThan(leg.cost);
     // The mythic ride is the animated UFO saucer with its "Hole 19" flag.
     expect(myth.look.kind).toBe('ufo');

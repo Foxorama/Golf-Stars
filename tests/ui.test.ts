@@ -269,7 +269,7 @@ describe('ui reducer', () => {
     // Buying grants ownership only — it does NOT auto-fly (outfitting is done in the Clubhouse).
     s = reduce(s, { type: 'buyShip', id: 'racer-redline' });
     expect(s.ownedShips).toContain('racer-redline');
-    expect(s.shards).toBe(before - 60);
+    expect(s.shards).toBe(before - 36); // rare ship, post GS-trade-rebalance cut
     expect(shipForCharacter(s, 'feather-fade')).toBe(DEFAULT_SHIP_ID); // still on the default wagon
     s = reduce(s, { type: 'closeMarket' });
     expect(s.screen).toBe('title');
@@ -326,7 +326,7 @@ describe('ui reducer', () => {
     s = reduce(s, { type: 'buyApparel', id: 'cap-classic' });
     s = reduce(s, { type: 'buyApparel', id: 'polo-classic' });
     expect(s.ownedApparel).toEqual(['cap-classic', 'polo-classic']);
-    expect(s.shards).toBe(before - 30);
+    expect(s.shards).toBe(before - 18); // two common garments @ 9 each, post GS-trade-rebalance cut
     expect(hatForCharacter(s, 'feather-fade')).toBeUndefined(); // nothing worn yet
     // Wear them on one golfer in the Clubhouse.
     s = reduce(s, { type: 'closeMarket' });
@@ -381,10 +381,10 @@ describe('ui reducer', () => {
   });
 
   it('clothing/ship buys are guarded; equipping is Clubhouse-only and owned-only (GS-clubhouse)', () => {
-    let s = initState(7, { shards: 10 }); // can't afford even a common (15)
+    let s = initState(7, { shards: 5 }); // can't afford even a common (9, post GS-trade-rebalance cut)
     s = reduce(s, { type: 'openMarket' });
     expect(reduce(s, { type: 'buyApparel', id: 'cap-classic' })).toBe(s); // too poor → no-op
-    // The mythic Supernova suit is the 500-shard splurge — unaffordable here.
+    // The mythic Supernova suit is the 300-shard splurge — unaffordable here.
     expect(reduce(s, { type: 'buyApparel', id: 'suit-supernova' })).toBe(s);
     // Equipping an unowned piece (or outside the Clubhouse) is a no-op.
     expect(reduce(s, { type: 'equipApparel', id: 'cap-classic' })).toBe(s);

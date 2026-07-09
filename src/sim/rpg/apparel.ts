@@ -111,13 +111,15 @@ export interface Apparel {
   look: ApparelLook;
 }
 
-/** Shard prices per rarity tier (the wardrobe economy). Mythic is the headline 500-shard splurge. */
+/** Shard prices per rarity tier (the wardrobe economy). Mythic is the headline 300-shard splurge.
+ *  Prices were cut 40% in the GS-trade-rebalance (with a one-off refund migration) — see
+ *  `docs/decisions/rpg-meta-loop.md`. */
 export const APPAREL_COST: Record<CosmeticRarity, number> = {
-  common: 15,
-  rare: 50,
-  epic: 120,
-  legendary: 280,
-  mythic: 500,
+  common: 9,
+  rare: 30,
+  epic: 72,
+  legendary: 168,
+  mythic: 300,
 };
 
 export const APPAREL: readonly Apparel[] = [

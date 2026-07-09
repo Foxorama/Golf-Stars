@@ -1698,3 +1698,40 @@ ARC_FEEL/CADDY_SLOMO precedent — no new `_gs*` hook, so no test-hub wiring). E
 driving the REAL app (vite dev server + Chromium: title → stop → travel → 📡): beam frame shows the
 held-dark lanes, pop-in frame the fresh worlds + re-priced scan button, settled frame a clean
 teardown.
+
+## GS-trade-rebalance — Trade Market prices cut 40%, with a one-off refund (2026-07-09)
+
+The purchasable Trade Market catalogue had grown organically and the Star-Shard prices were out of
+balance. **Every Trade Market price is cut 40%** (× 0.6) — and only the Trade Market: the in-run Pro
+Shop (credits, `economy.ts`) is untouched. The three price tables:
+- Ships (`ships.ts TIER_COST`): rare 60→36, epic 140→84, legendary 300→180, mythic 1000→600; the
+  hand-priced Thunderbolt 1250→750.
+- Apparel (`apparel.ts APPAREL_COST`): common 15→9, rare 50→30, epic 120→72, legendary 280→168,
+  mythic 500→300.
+- Bag & club sets (`bag.ts BAG_SETS`): Planet 500→300, Phoenix 2000→1200, Solar 10000→6000.
+
+Every price divides cleanly by 5, so the cut is exact integers and the refund (40% of the old price =
+old − new) is exact too. Earned/free items (`cost: 0` — the default wagon, ace ships, Thor's Hammer)
+never move and never refund.
+
+**The refund is a save migration (v24 → v25), not a runtime spend.** A migration runs exactly once per
+save (version-gated), so it's the only place the credit can't double-apply. `v24ToV25` walks the
+player's `ownedShips` + `ownedApparel` + owned `bagTier` and adds 40% of each item's OLD price back to
+`shards`. The old prices are **snapshotted as consts inside the migration** — a migration must be
+deterministic regardless of future price edits, so it never reads the live tables for the *amount*
+(only to resolve which owned ids exist / are earned / their rarity, all of which the cut didn't touch).
+A bag tier is treated as the single owned item (the top tier you hold); stepping rare→epic→legendary
+without a refund on upgrade means a step-buyer is refunded only on their current tier — an accepted
+simplification (the save carries no purchase history, and the owned tier is the item the player sees
+re-priced).
+
+**The one-off notice.** The migration also stamps `SaveV25.priceRefund` = the refunded amount (only
+when > 0 — a player who bought nothing gets no refund and no notice; new saves never set it). It rides
+through `MetaProgress` → `UiState.priceRefund`; `app.ts` shows a dismissable "Trade Market Update —
+prices dropped 40%, here's your refund" card (`priceNoticeOverlay`, reusing the settings-sheet chrome)
+over any screen (the boot title, in practice). Its "Got it" button dispatches `dismissPriceNotice`,
+which clears the flag; the next `persist` writes the cleared save so it never returns. No new
+`window._gs*` hook or `?param`, so no test-hub wiring. Covered by `tests/save.test.ts` (refund maths
+per owned item, the nothing-owned no-notice case) + the existing price/affordability assertions
+retuned across apparel/bag/ships/ui tests; the migrate → initState → dismiss round-trip was driven
+end-to-end against the real reducer.

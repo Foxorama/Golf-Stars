@@ -245,6 +245,11 @@ export interface UiState {
    *  current run is snapshotted here while the Asgard tournament plays in `run`. Restored (perks edited)
    *  on the tournament's end. The Asgard run is never persisted, so a mid-tournament quit resumes THIS. */
   asgardReturn?: RunSnapshot;
+  /** A one-off Trade Market price-cut notice (GS-trade-rebalance): the Star Shards refunded by the 40%
+   *  price cut, stamped by the save migration. When set (> 0), the app shows a dismissable "prices
+   *  dropped, here's your refund" card; closing it dispatches `dismissPriceNotice`, which clears it (and
+   *  persist writes the cleared save, so it never shows again). Absent on new saves / nothing-to-refund. */
+  priceRefund?: number;
   /** The finished Asgard tournament result (GS-asgard) — shown on the result splash. */
   asgardOutcome?: { won: boolean; playerTotal: number; par: number; field: { name: string; total: number }[] };
   /** A one-shot banner shown on the journey map after returning from Asgard (GS-asgard): the victory or
@@ -314,6 +319,7 @@ export type Action =
   | { type: 'selectShip'; id: string } // fly a different owned ship on the managed character (Clubhouse)
   | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt/pants with shards (global ownership) (GS-cosmetics)
   | { type: 'equipApparel'; id: string } // wear an owned hat/shirt/pants on the managed character (toggles off)
+  | { type: 'dismissPriceNotice' } // close the one-off Trade Market price-cut / refund notice (GS-trade-rebalance)
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
   | { type: 'setCharacterBagTier'; tier: BagTier } // pick the managed golfer's Unending-Universe starting bag tier (GS-wardrobe-bagtier)
   | { type: 'toTitle' } // back to the title from anywhere (GS-settings-nav) — an underway run stays resumable
@@ -344,6 +350,9 @@ export interface MetaProgress {
   marmotTips?: number;
   endlessRuns?: EndlessRunRecord[];
   reputationByCharacter?: ReputationByCharacter;
+  /** Star Shards refunded by the GS-trade-rebalance 40% Trade Market price cut — set by the save
+   *  migration, drives the one-off "prices dropped, here's your refund" notice. */
+  priceRefund?: number;
 }
 
 /** The ship a character flies (GS-clubhouse) — its Clubhouse pick if owned, else the default wagon. */
@@ -455,6 +464,7 @@ export function initState(
     marmotTips: meta.marmotTips ?? 0,
     endlessRuns: meta.endlessRuns ?? [],
     reputation: meta.reputationByCharacter ?? {},
+    priceRefund: meta.priceRefund,
   };
 }
 
@@ -1559,6 +1569,13 @@ export function reduce(state: UiState, action: Action): UiState {
       if (action.tier === state.bagTier) delete next[cid];
       else next[cid] = action.tier;
       return { ...state, bagTierByCharacter: next };
+    }
+
+    case 'dismissPriceNotice': {
+      // Close the one-off Trade Market price-cut / refund notice (GS-trade-rebalance). Clearing it to
+      // undefined means the next persist writes a save without the flag, so it never shows again.
+      if (state.priceRefund == null) return state;
+      return { ...state, priceRefund: undefined };
     }
 
     case 'buyBagTier': {

@@ -133,6 +133,7 @@ function boot(): void {
       marmotTips: save.marmotTips,
       endlessRuns: save.endlessRuns,
       reputationByCharacter: save.reputationByCharacter,
+      priceRefund: save.priceRefund,
     };
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
@@ -227,6 +228,9 @@ function persist(): void {
     marmotTips: state.marmotTips,
     endlessRuns: state.endlessRuns,
     reputationByCharacter: state.reputation,
+    // The one-off Trade Market price-cut notice (GS-trade-rebalance): persisted while pending so a
+    // reload before dismissal still shows it; cleared to undefined once the player closes it.
+    priceRefund: state.priceRefund,
     // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
     // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
     // moment anything dispatched from the title. While no real run is live, any resumable offer
@@ -1435,6 +1439,33 @@ function settingsOverlay(): string {
 }
 
 /**
+ * The one-off Trade Market price-cut notice (GS-trade-rebalance) — shown once, over any screen, when
+ * the save migration refunded shards for the 40% price drop. A single "Got it" close button dispatches
+ * `dismissPriceNotice`, which clears the flag so it never returns. Reuses the settings sheet chrome.
+ */
+function priceNoticeOverlay(): string {
+  const refund = state.priceRefund ?? 0;
+  return `
+    <div class="gs-sheet-backdrop" style="align-items:center;">
+      <div class="gs-sheet" style="max-width:380px;text-align:center;">
+        <div style="font-size:34px;margin:2px 0 6px;">🛰️</div>
+        <b style="font-size:19px;">Trade Market Update</b>
+        <p style="margin:12px 0 6px;color:var(--gs-ink);line-height:1.5;">
+          Every Trade Market price — ships, apparel, and club sets — has been cut by <b>40%</b>.
+        </p>
+        <p style="margin:6px 0 4px;line-height:1.5;">
+          You've been refunded the difference on everything you already own:
+        </p>
+        <div style="font-size:24px;font-weight:800;color:var(--gs-gold, #e08a2b);margin:10px 0 4px;">
+          ✦ +${refund.toLocaleString()} Star Shards
+        </div>
+        <div style="opacity:.7;font-size:13px;margin-bottom:14px;">added to your balance</div>
+        <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'dismissPriceNotice' })}' style="padding:11px 30px;">Got it</button>
+      </div>
+    </div>`;
+}
+
+/**
  * The interactive SCRAMBLE ball-choice screen (GS-team-duel): both balls just hit from the same spot
  * are shown — on an inline map (player line + partner line) and as two info cards with lie + distance
  * to the pin — and the player CONFIRMS which to play on from. A real scramble decision: take the safe
@@ -1756,7 +1787,10 @@ function render(): void {
   const cog = fullBleed ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
   // The hole-step hazards/benefits popup (GS-intro-split) rides over the page like the settings sheet.
   const introTraits = state.screen === 'intro' && introView.stage === 'hole' && introView.traitsOpen ? introTraitsOverlay() : '';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}${introTraits}`;
+  // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
+  // until the player closes it — it's stamped by the save migration and shown on the boot title.
+  const priceNotice = state.priceRefund != null ? priceNoticeOverlay() : '';
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}${introTraits}${priceNotice}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Arc-intro "First Tee" at the BOTTOM only when the field overflows one screen (GS-intro-split):

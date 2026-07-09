@@ -275,20 +275,20 @@ describe('save v17 → v18 (GS-fuel)', () => {
     } as unknown;
     const s = migrate(v17);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(24);
+    expect(SAVE_VERSION).toBe(25);
     expect(s.activeRun?.fuel).toBeUndefined(); // the stamp adds nothing…
     expect(resumeRun(s.activeRun!).fuel).toBe(8); // …and resume grants the voyage's fresh tank
   });
 
   it('v18 → v19 (GS-fuel-4) is a pure stamp; a pre-scan run resumes on the classic scan-0 offer', async () => {
-    const { migrate, defaultSave } = await import('../src/save/schema');
+    const { migrate, defaultSave, SAVE_VERSION } = await import('../src/save/schema');
     const v18 = {
       ...defaultSave(),
       version: 18,
       activeRun: { seed: 7, formatId: 'unending', stopIndex: 2, distanceFromStart: 3, credits: 90, perks: [], fuel: 6 },
     } as unknown;
     const s = migrate(v18);
-    expect(s.version).toBe(24);
+    expect(s.version).toBe(SAVE_VERSION);
     expect(s.activeRun?.routeScans).toBeUndefined(); // the stamp adds nothing…
     expect(resumeRun(s.activeRun!).routeScans).toBe(0); // …and resume reads it as never-scanned
   });
