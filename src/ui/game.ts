@@ -972,6 +972,23 @@ export function reduce(state: UiState, action: Action): UiState {
         );
         return { ...state, scrambleChoice: { ...two, mulligan: true }, mulliganPending: false };
       }
+      // Prognostic Parrot FORESIGHT (GS-caddy-parrot): a per-full-swing proc where the pirate captain
+      // SEES the shot — resolve TWO of the player's OWN swings and let them keep the better, reusing the
+      // scramble choice card. The proc draw fires ONLY when the parrot is hired, so a normal hole's rng
+      // stream is unchanged; the headless playHole draws the identical proc + partner (auto ≡ interactive).
+      if (state.run.loadout.previewScramble && state.holeRng.bool(state.run.loadout.previewScramble)) {
+        const foreseen = resolveScrambleShot(
+          state.play,
+          { clubId: action.clubId, aim: action.aim, target: action.target, power: action.power },
+          state.run.loadout,
+          state.holeRng,
+          characterShotMods(state.run.loadout.characterId),
+          tents,
+          scorch,
+          patch,
+        );
+        return { ...state, scrambleChoice: { ...foreseen, preview: true } };
+      }
       // Auto putt-out only when the Auto-Caddie legendary is owned; otherwise putting is manual.
       const auto = !!state.run.loadout.autoPutt;
       const play = takeShot(
@@ -1017,10 +1034,30 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-ai-attack: past the bogey bar the endless auto driver hunts pins — the identical per-hole
       // rule headless playStop applies, so an auto-finished hole stays byte-for-byte the sim's.
       const attack = endlessAttackArmed(state.run);
+      const preview = state.run.loadout.previewScramble;
       while (!p.done && guard++ < 40) {
-        p = awaitingPutt(p)
-          ? takePutt(p, state.run.loadout, state.holeRng)
-          : takeShot(p, autoDecision(p, state.run.loadout, attack), state.run.loadout, state.holeRng, true, scramble, tents, scorch, patch);
+        if (awaitingPutt(p)) {
+          p = takePutt(p, state.run.loadout, state.holeRng);
+          continue;
+        }
+        // Prognostic Parrot foresight (GS-caddy-parrot) in the watch/auto-finish loop: the identical
+        // proc + two-swing draws headless playHole does, auto-keeping the better (auto ≡ interactive).
+        // Gated off during a team scramble (`!scramble`), matching playHole's `!opts.scramble`.
+        if (!scramble && preview && state.holeRng.bool(preview)) {
+          const foreseen = resolveScrambleShot(
+            p,
+            autoDecision(p, state.run.loadout, attack),
+            state.run.loadout,
+            state.holeRng,
+            characterShotMods(state.run.loadout.characterId),
+            tents,
+            scorch,
+            patch,
+          );
+          p = autoCommitScrambleBall(foreseen, state.run.loadout, state.holeRng, true);
+          continue;
+        }
+        p = takeShot(p, autoDecision(p, state.run.loadout, attack), state.run.loadout, state.holeRng, true, scramble, tents, scorch, patch);
       }
       return { ...state, ...withBestBallPartner(state, p), scrambleChoice: undefined };
     }

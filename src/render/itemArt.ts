@@ -704,6 +704,25 @@ const CADDY_FIGURES: Record<string, () => string> = {
      <g fill="#9fd8e6"><circle cx="54" cy="42" r="2.8"/><circle cx="66" cy="42" r="2.8"/></g>
      <line x1="58.8" y1="42" x2="61.2" y2="42" stroke="#1a1d24" stroke-width="1.4"/>
      <circle cx="60" cy="50" r="3" fill="#ff9db0"/>`,
+  // Prognostic Parrot — bipedal green parrot pirate captain, tricorne + eyepatch, foreseeing through a spyglass.
+  'prognostic-parrot': () =>
+    `${groundShadow(58)}
+     <path d="M58 62 L50 86 M58 62 L66 86" stroke="#e8902a" stroke-width="5" stroke-linecap="round" fill="none"/>
+     <g stroke="#e8902a" stroke-width="1.8" stroke-linecap="round" fill="none"><path d="M50 86 l-4 3 M50 86 l0 4 M50 86 l4 3 M66 86 l-4 3 M66 86 l0 4 M66 86 l4 3"/></g>
+     <line x1="58" y1="63" x2="56" y2="34" stroke="#37a05a" stroke-width="16" stroke-linecap="round"/>
+     <line x1="58" y1="60" x2="57" y2="42" stroke="#7ed957" stroke-width="7" stroke-linecap="round"/>
+     <path d="M50 40 Q41 53 48 68 L55 60 Q50 50 54 42 Z" fill="#2f8f47"/>
+     <g stroke="#4b7bd6" stroke-width="2" stroke-linecap="round"><path d="M48 66 l3 -2"/><path d="M46 60 l3 -2"/><path d="M45 54 l3 -2"/></g>
+     <line x1="58" y1="44" x2="76" y2="30" stroke="#37a05a" stroke-width="4.2" stroke-linecap="round"/>
+     <g transform="rotate(-30 80 28)"><rect x="72" y="25" width="15" height="6.5" rx="2.5" fill="#c8912f"/><rect x="85" y="24" width="4.5" height="8.5" rx="1.5" fill="#e8b64a"/></g>
+     <g fill="#ffce54"><circle cx="99" cy="19" r="2.2"/><circle cx="105" cy="25" r="1.4"/><circle cx="95" cy="27" r="1.2"/></g>
+     <circle cx="56" cy="30" r="9.2" fill="#37a05a"/>
+     <path d="M64 28 q7 1 4.5 6 q-3.5 1 -6.5 -2 Z" fill="#f0b429"/>
+     <circle cx="57" cy="28" r="2.2" fill="#1a1d24"/>
+     <line x1="49" y1="26" x2="59" y2="27" stroke="#1a1d24" stroke-width="1.8"/>
+     <path d="M44 25 Q56 11 69 22 Q57 19 44 25 Z" fill="#2b2f3a"/>
+     <path d="M45 24 Q56 17 68 22" stroke="#d9a441" stroke-width="1.6" fill="none"/>
+     <circle cx="52" cy="19" r="2.4" fill="#d9a441"/>`,
 };
 
 /** A bespoke caddy figure (GS-proshop-2), or the generic bag glyph for an unknown caddy id. */

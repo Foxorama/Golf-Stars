@@ -525,4 +525,17 @@ describe('StarMart + tent reactions (GS-tent-interactions)', () => {
     expect(t.scrambleChoice).toBeUndefined();
     expect(t.play!.shots.length).toBe(1); // the hole advanced from the kept ball
   });
+
+  it('the Prognostic Parrot foresight turns a shot into a two-ball pick (GS-caddy-parrot)', () => {
+    let s = reduce(started(21, 'voyage'), { type: 'playInteractive' });
+    // Arm the parrot at chance 1 so the foresight ALWAYS procs on the next full swing.
+    s = { ...s, run: { ...s.run, loadout: { ...s.run.loadout, previewScramble: 1 } } };
+    const v = shotView(s.play!, s.run.loadout);
+    s = reduce(s, { type: 'shot', clubId: v.attackClubId, aim: 'attack' });
+    expect(s.scrambleChoice?.preview).toBe(true); // the pirate saw the shot → choose your vision
+    expect(s.scrambleChoice?.mulligan).toBeFalsy();
+    const t = reduce(s, { type: 'chooseScrambleBall', pick: 'partner' });
+    expect(t.scrambleChoice).toBeUndefined();
+    expect(t.play!.shots.length).toBe(1); // advanced from the chosen (second) vision
+  });
 });

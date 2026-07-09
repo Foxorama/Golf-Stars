@@ -878,6 +878,9 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     // same effect-derived gate, so the sim's lie conversion and the drawn patches agree.
     groundPatch: effectPatchKind(routeEffect(run.pendingEvent)),
     scramble: scrambleOptsFor(run),
+    // Prognostic Parrot foresight (GS-caddy-parrot): the parrot's per-shot second-swing proc, applied
+    // by playHole with the player's OWN golfer as the partner. Undefined without the parrot ⇒ no draw.
+    previewScramble: run.loadout.previewScramble,
   };
 }
 

@@ -317,6 +317,15 @@ these systems** — each bullet is the tip of a documented iceberg.
   - Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side` is a FAIRWAY
     side classified off the hole's `centreline` (`ShotInput.fairwaySide`), NOT the shot bearing.
   - The renderer draws the guard figure ONCE (the corner figure) — never also float the portrait badge.
+  - The **Prognostic Parrot** (GS-caddy-parrot, faction **Planet Pirates**) reuses the SCRAMBLE machinery:
+    `loadout.previewScramble` (0.33) is a per-full-swing proc where the pirate captain FORESEES the shot →
+    you play a SECOND ball with the player's OWN golfer (`opts.shotMods`, never a partner) and keep the
+    better (`pickBetterExec`). Threaded IDENTICALLY through the auto sim (`playHole`, gated `!opts.scramble`
+    so a team duel wins) and the interactive reducer (`'shot'` shows the foresight choice card via
+    `resolveScrambleShot`+`{preview:true}`; `autoShotHole`/watch auto-keeps like headless) — the proc is ONE
+    `rng.bool(chance)` drawn BEFORE the shot in BOTH, so undefined/0 is byte-for-byte and best-of-two only
+    ever RAISES Stableford (contract 4 by construction). It's NOT a guard/projectile caddy, so no
+    `_gsFeel.forceRedirect` case — just the `caddyEffects` row + faction the RULE demands.
 - **Putting** — `docs/decisions/putting.md`
   - Manual pace-meter by default; AUTO only via the Penelope Putter caddy. `takePutt(…, control?)`:
     control → manual, none → `onePutt` (auto/tests, byte-for-byte). Fringe-putt is interactive-only.

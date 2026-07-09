@@ -214,8 +214,9 @@
 - **Factions + reputation** (`src/sim/rpg/factions.ts`) — deliberately **hidden groundwork** for future
   faction perks/events; nothing in the UI reads it yet. Every named caddy maps to a `FACTIONS` row
   (`CADDY_FACTION`), machine-checked in `tests/factions.test.ts` (the sibling of the `caddyEffects`
-  rule — a caddy without a faction reds CI). The six starting factions: **The Putters Guild**
-  (Penelope + Mystic Mole — putting specialists), **Space Pirates** (Convict Sheep), **Lords & Ladies**
+  rule — a caddy without a faction reds CI). The starting factions: **The Putters Guild**
+  (Penelope + Mystic Mole — putting specialists), **Space Pirates** (Convict Sheep), **Planet Pirates**
+  (Prognostic Parrot — the foreseeing pirate captain), **Lords & Ladies**
   (Space Ducks), **The Long Haul Truckers** (Driver Dan + Suggestible Sam), **Para-Spatial Medics**
   (Dr Chipinski), **The Other Guys** (Sandy — the unaffiliated escape artist). Hiring earns
   `REP_ON_HIRE` (+1) with a caddy's faction; firing costs `REP_ON_FIRE` (−3). Reputation is
@@ -223,4 +224,42 @@
   golfer courts (or burns) crews independently. It's a SAVE/UI concern moved by the reducer's `buy`
   case — the sim `buy()` only does the fire mechanic (keeping auto ≡ interactive and the Lab path
   reputation-free). `adjustReputation`/`reputationWith` are pure immutable helpers.
+
+## The Prognostic Parrot — foresight scramble (GS-caddy-parrot)
+- **The fantasy.** A bipedal space parrot, pirate captain of the **Planet Pirates**. Its ability is a 33%
+  chance to *see your shot before it happens* — mechanically, the game's own SCRAMBLE effect turned on the
+  player's solo ball: the shot is played TWICE and you keep the better result. Both balls are the player's
+  OWN golfer (not a partner golfer), so it's your swing you're improving on, not someone else's.
+- **Why it's a self-partnered scramble, not a new mechanic.** The scramble machinery (`pickBetterExec` +
+  `ScrambleOpts` + the interactive `resolveScrambleShot`/`commitScrambleBall` choice card, and the mulligan
+  that already reuses it with the player's own mods) is exactly "play two balls, keep the better." The
+  parrot rides it with `partnerMods = characterShotMods(loadout.characterId)` — the same golfer, a second
+  swing. No new physics, no new choice UI: the fortune-teller mulligan already proved the "pick your own
+  A/B ball" card works, so the parrot's foresight card is that card with pirate copy (`ScrambleShot.preview`
+  → "🦜 PROGNOSTIC PARROT — PICK YOUR SHOT", options "Vision A/B").
+- **The proc + determinism (the caddy-field contract).** A new `loadout.previewScramble` (0..1;
+  `PARROT_PREVIEW_CHANCE` 0.33) is the per-full-swing chance. On EVERY full swing, when armed AND no team
+  scramble is already active, ONE `rng.bool(previewScramble)` decides the proc; a proc then plays the
+  player ball + a second own-golfer ball and keeps the better. The proc draw is placed BEFORE the shot
+  draws in BOTH the headless `playHole` (`!opts.scramble && !!opts.previewScramble && rng.bool(...)`) and
+  the interactive reducer (`'shot'` and `autoShotHole`), so the stream is identical across auto and
+  interactive (contract 2), and — crucially — the `&&` short-circuits mean an UNARMED loadout draws NOTHING
+  extra, so every existing seeded test stays byte-for-byte (contract 1). Gated `!opts.scramble`, a boss
+  TEAM scramble wins and the parrot is silent that stop (a team scramble armed with the parrot is
+  byte-for-byte the plain team scramble — guarded).
+- **Balance (contract 4) is free.** Best-of-two dominates solo by `pickBetterExec`'s order (holed > fewer
+  penalties > closer), so the parrot can only ever RAISE mean per-stop Stableford — a power-up that lifts
+  scoring by construction, never a death-spiral risk. Proven by a chance-1 best-of-two harness over 40
+  seeds scoring strictly above solo (`tests/caddies.test.ts`).
+- **Interactive: you still choose.** On the human path the proc shows the foresight choice card
+  (`resolveScrambleShot` → `{preview:true}`) so you pick which vision to play; the watch/auto-finish loop
+  and the headless sim auto-keep the better (`autoCommitScrambleBall`/`pickBetterExec`) — the same
+  rng-stream-identical, selection-differs split the existing scramble already lives under.
+- **Not a guard/projectile caddy.** No in-flight redirect, so no `_gsFeel.forceRedirect` Demo case and no
+  playView corner-projectile — it's like Dr Chipinski (a transient effect, shown in the gold badge). It
+  DOES fold a loadout field, so it satisfies THE RULE: a `caddyEffects` "Foresight" Lab row + a
+  `factions.ts` Planet Pirates faction (both machine-checked). Assetless art: a green pirate-captain
+  parrot (tricorne + eyepatch + curved beak, raising a brass spyglass with foresight sparkles) in both
+  `render/itemArt.ts` (shop card) and `render/caddyArt.ts` (corner figure + a swaggering "Arr! I saw that
+  coming!" `CADDY_VOICE` line). Rebuilds from perks on resume (no save bump).
 

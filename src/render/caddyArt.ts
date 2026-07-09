@@ -20,7 +20,8 @@ export type CaddyArtId =
   | 'convict-sheep'
   | 'suggestible-sam'
   | 'sandy-sandsaver'
-  | 'mystic-mole';
+  | 'mystic-mole'
+  | 'prognostic-parrot';
 
 const ART_IDS: readonly string[] = [
   'auto-caddie',
@@ -31,6 +32,7 @@ const ART_IDS: readonly string[] = [
   'suggestible-sam',
   'sandy-sandsaver',
   'mystic-mole',
+  'prognostic-parrot',
 ];
 
 /** Does this caddy id have a drawable figure? */
@@ -48,6 +50,7 @@ export const CADDY_LABEL: Record<CaddyArtId, string> = {
   'suggestible-sam': 'Suggestible Sam',
   'sandy-sandsaver': 'Sandy',
   'mystic-mole': 'Mystic Mole',
+  'prognostic-parrot': 'Prognostic Parrot',
 };
 
 /** Which caddies actively fire a projectile mid-flight (Space Ducks laser, Convict Sheep boomerang). */
@@ -80,6 +83,8 @@ export const CADDY_VOICE: Partial<Record<CaddyArtId, CaddyVoice>> = {
   'convict-sheep': { bubble: "She'll be right, mate.", speech: "She'll be right, mate.", lang: 'en-AU', rate: 0.96, pitch: 0.92 },
   // Space Ducks' plummy British cheer.
   'space-ducks': { bubble: 'Tally ho — good shot!', speech: 'Tally ho, good shot!', lang: 'en-GB', rate: 1.0, pitch: 1.12 },
+  // The Prognostic Parrot's swaggering pirate-captain foresight.
+  'prognostic-parrot': { bubble: 'Arr — I saw that comin\'!', speech: 'Arr! I saw that coming!', lang: 'en-GB', rate: 0.98, pitch: 1.18 },
 };
 
 /**
@@ -250,6 +255,9 @@ export function drawCaddy(
       break;
     case 'mystic-mole':
       anchorLocal = drawMole(ctx, t);
+      break;
+    case 'prognostic-parrot':
+      anchorLocal = drawParrot(ctx, t);
       break;
     case 'auto-caddie':
     default:
@@ -693,6 +701,127 @@ function drawSuggestibleSam(ctx: CanvasRenderingContext2D, t: number): Vec {
   ctx.fill();
   ctx.fillRect(-1, -53, 9, 2.4); // brim
   return [13, -46];
+}
+
+// --- Prognostic Parrot (foresees the shot, GS-caddy-parrot) ------------------
+function drawParrot(ctx: CanvasRenderingContext2D, t: number): Vec {
+  // Scaly bird legs + talons.
+  ctx.strokeStyle = '#e8902a';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-3, -18);
+  ctx.lineTo(-6, 0);
+  ctx.moveTo(3, -18);
+  ctx.lineTo(6, 0);
+  ctx.stroke();
+  ctx.lineWidth = 1.6;
+  for (const fx of [-6, 6]) {
+    ctx.beginPath();
+    ctx.moveTo(fx, 0);
+    ctx.lineTo(fx - 3, 2);
+    ctx.moveTo(fx, 0);
+    ctx.lineTo(fx + 3, 2);
+    ctx.stroke();
+  }
+  // Green parrot torso + brighter belly.
+  ctx.strokeStyle = '#37a05a';
+  ctx.lineWidth = 15;
+  ctx.beginPath();
+  ctx.moveTo(0, -18);
+  ctx.lineTo(-1, -42);
+  ctx.stroke();
+  ctx.strokeStyle = '#7ed957';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(-1, -38);
+  ctx.stroke();
+  // Folded wing with blue flight-feather flecks.
+  ctx.fillStyle = '#2f8f47';
+  ctx.beginPath();
+  ctx.moveTo(-7, -38);
+  ctx.quadraticCurveTo(-15, -26, -9, -12);
+  ctx.lineTo(-3, -18);
+  ctx.quadraticCurveTo(-7, -28, -3, -36);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#4b7bd6';
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 3; i++) {
+    const y = -16 - i * 6;
+    ctx.beginPath();
+    ctx.moveTo(-10, y);
+    ctx.lineTo(-7, y - 1.5);
+    ctx.stroke();
+  }
+  // Arm raising a brass spyglass (the foresight). Anchor = the far lens.
+  ctx.strokeStyle = '#37a05a';
+  ctx.lineWidth = 3.8;
+  ctx.beginPath();
+  ctx.moveTo(-1, -40);
+  ctx.lineTo(14, -48);
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(14, -48);
+  ctx.rotate(-0.5);
+  ctx.fillStyle = '#c8912f';
+  ctx.fillRect(0, -3, 13, 6);
+  ctx.fillStyle = '#e8b64a';
+  ctx.fillRect(12, -3.5, 4, 7);
+  ctx.restore();
+  // Foresight sparkle out of the lens.
+  const twk = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.008));
+  ctx.fillStyle = `rgba(255,206,84,${twk})`;
+  for (const [sx, sy, r] of [
+    [30, -54, 1.8],
+    [35, -49, 1.2],
+    [28, -48, 1.1],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Head + curved beak + eyepatch.
+  ctx.fillStyle = '#37a05a';
+  ctx.beginPath();
+  ctx.arc(-1, -50, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f0b429';
+  ctx.beginPath();
+  ctx.moveTo(6, -52);
+  ctx.quadraticCurveTo(13, -51, 10, -45);
+  ctx.quadraticCurveTo(6, -45, 4, -48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1a1d24';
+  ctx.beginPath();
+  ctx.arc(0, -52, 2, 0, Math.PI * 2); // eye
+  ctx.fill();
+  ctx.strokeStyle = '#1a1d24';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-9, -54);
+  ctx.lineTo(2, -52); // eyepatch strap
+  ctx.stroke();
+  // Pirate tricorne hat with gold trim + badge.
+  ctx.fillStyle = '#2b2f3a';
+  ctx.beginPath();
+  ctx.moveTo(-12, -56);
+  ctx.quadraticCurveTo(-1, -72, 11, -55);
+  ctx.quadraticCurveTo(-1, -60, -12, -56);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#d9a441';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-11, -56);
+  ctx.quadraticCurveTo(-1, -63, 10, -55);
+  ctx.stroke();
+  ctx.fillStyle = '#d9a441';
+  ctx.beginPath();
+  ctx.arc(-5, -60, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  return [30, -54];
 }
 
 /**
