@@ -73,6 +73,7 @@ import {
   styleFescue,
   styleDeepRough,
   styleRavine,
+  roughenHazardCached,
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
@@ -579,8 +580,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // creek + its mouth lake into one water body. Merging in COURSE space keeps the merged-body count
   // (and thus the family passes' rng draw counts) camera-proof.
   const merged = mergedHazardsFor(hole);
-  const waterPolys: Vec[][] = merged.water.map((p) => projPoly(p, proj));
-  const lavaPolys: Vec[][] = merged.lava.map((p) => projPoly(p, proj));
+  // GS-hazard-edges: roughen the DRAWN bank of each liquid body (course space, zero rng) so a
+  // crossing river/lava flow reads as a natural meandering/cracked hazard, not a uniform band-aid.
+  const waterPolys: Vec[][] = merged.water.map((p) => projPoly(roughenHazardCached(p, 'water'), proj));
+  const lavaPolys: Vec[][] = merged.lava.map((p) => projPoly(roughenHazardCached(p, 'lava'), proj));
   const sandPolys: Vec[][] = merged.sand.map((p) => projPoly(p, proj));
   const treeHaz: Feature[] = [];
   const fescueHaz: Feature[] = [];
@@ -609,7 +612,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // Deep rough (GS-deep-rough) rides the same per-patch stream as fescue (its mark count is
     // screen-px-sized), themed per world archetype so the tangle suits the biome.
     for (const f of deepRoughHaz) prims.push(...styleDeepRough(projPoly(f.poly, proj), arch, patchRng(f.poly)));
-    for (const f of ravineHaz) prims.push(...styleRavine(projPoly(f.poly, proj), rng));
+    // GS-hazard-edges: a ravine/crevice cracks in sharp jagged teeth along both walls.
+    for (const f of ravineHaz) prims.push(...styleRavine(projPoly(roughenHazardCached(f.poly, 'crevice'), proj), rng));
   }
   prims.push(...styleSandFamily(sandPolys, art, proj.scale, rs.base));
   if (!rainbow) {

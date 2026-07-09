@@ -1023,3 +1023,35 @@ half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by
   mown turf + cover + decor (section 3c), so the undulation lives in the rough where the flat read was
   worst and the crisp fairway/green/stripes paint over it. Rides `art.texture` (0 turns it off) — no new
   `window._gs*` hook, so no test-hub sync obligation. Re-shoot `scripts/gallery.mjs` after touching it.
+
+## GS-hazard-edges: crossing rivers/lava/crevices read as banks, not band-aids (2026-07-09)
+
+- **The ask.** Player: "the rivers and lava flows and large crack/crevice hazards that cut across the
+  fairway or form a long thin length look more like a band-aid than an actual hazard — the sides
+  would be more curved, jagged or rough depending on the hazard." The sim's crossing bands
+  (`crossingBand`/`riverChannel`, and the barranca) have near-parallel, near-straight long sides — a
+  provably-fair forced-carry geometry — so drawn verbatim they read as a uniform-width sticking
+  plaster laid across the hole, not a hazard whose banks bulge, pinch and break up.
+- **The fix (`style/hazards.ts` `roughenHazardEdge` + `roughenHazardCached`).** Roughen the DRAWN
+  outline of each liquid/crevice body in COURSE space before projecting: densify the perimeter, then
+  displace each sample along its outward normal by a `posHash`-derived field. Three characters
+  (`ROUGH_SPECS`): WATER meanders in smooth low-frequency curves (`jag` 0.15), LAVA breaks into a
+  jagged cracked crust (0.5), a CREVICE/ravine cracks hardest in sharp teeth (0.66). The smooth base
+  is bilinear-interpolated value noise (`smoothNoise`) so a bank curves continuously; the jagged
+  component is raw per-sample `posHash` confetti. Wired at the three draw sites in `style.ts`
+  (`merged.water`→'water', `merged.lava`→'lava', barranca→'crevice').
+- **Why it doesn't touch the physics (the whole point).** RENDER-ONLY: the sim's penalty polygon is
+  untouched, so fairness-by-construction (`validateCrossings`/`validateFairness`), carry reads and
+  the aim-cone all still run off the SMOOTH sim geometry. The displacement is MEAN-ZERO about the
+  true edge (banks bulge out and pinch in equally) and amplitude-capped to a few yards — the same
+  order as the shore/margin the liquid family already paints OUTSIDE the sim poly — so the drawn edge
+  still tracks the penalty boundary (the graphic stays the physics). Amplitude is additionally
+  clamped to ≤40% of the body's narrow dimension so a thin creek can never pinch shut, and bodies
+  under 5 yd narrow are left alone (wobble would swamp them).
+- **Determinism + camera + cost.** PURE geometry keyed off `posHash` of COURSE-space positions —
+  ZERO rng draws, so it perturbs NO seeded scene stream (contract 1) and every byte/seeded test stays
+  identical; it only reshapes existing bodies (the liquid family's flow/glint rng draw COUNT is
+  independent of vertex count, so the stream is byte-stable). Course-space in → deterministic out →
+  projected fresh each frame, so it's camera-proof (`tests/camera-stability.test.ts` still green).
+  Cached per input poly (`roughCache` WeakMap; merged bodies + barranca polys are stable per hole) so
+  the per-frame follow-cam rebuild pays the roughening once, not 60×/sec. No new `window._gs*` hook.
