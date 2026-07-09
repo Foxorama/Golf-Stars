@@ -132,21 +132,24 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       break;
     }
     case 'solarCrown': {
-      // The mythic Supernova crown (GS-supernova-flame): a dark circlet erupting into a CROWN OF SOLAR
-      // FLAMES — purple-and-black tongues of fire licking upward, each fading black→royal-purple→red
-      // coronal at the tip, with red embers flickering around the burst. Set-matched to the Supernova
-      // suit/leggings (deep-violet nebula). Flames root along the circlet crest (a small polar table) so
-      // the crown stays symmetric; the SVG flicker lives in <animate> (the canvas mirror is static).
+      // The mythic Supernova crown (GS-supernova-flame): a jewelled, pointed CIRCLET erupting into a
+      // CROWN OF SOLAR FLAMES — purple-and-black tongues of fire licking upward, each fading
+      // black→royal-purple→red coronal at the tip, with red embers flickering around the burst. The
+      // circlet is a real crown (no faceplate) that rests on the brow, so the golfer's face stays clear;
+      // the fire fans WIDE, shoulder-to-shoulder. Set-matched to the Supernova suit/leggings (deep-violet
+      // nebula). Flames root along the circlet crest (a small polar table) so the crown stays symmetric;
+      // the SVG flicker lives in <animate> (the canvas mirror is static).
       const cor = accent; // red coronal
       const corHi = '#ffb648'; // hot coronal-tip highlight
-      const rb = 6.6; // circlet crest radius the flames root along
+      const rb = 7.6; // circlet crest radius the flames root along
       // [x, height, halfWidth, curl] — outer flames lean OUTWARD (curl sign follows x) so the crown fans
-      // like real fire; the centre flame stands tallest and straight.
+      // wide, shoulder-to-shoulder, like real fire; the centre flame stands tallest and straight.
       const flames: [number, number, number, number][] = [
         [0, 14, 3.0, 0],
-        [-2.7, 11.5, 2.5, -0.7], [2.7, 11.5, 2.5, 0.7],
-        [-4.9, 8.6, 2.1, -1.4], [4.9, 8.6, 2.1, 1.4],
-        [-6.6, 5.6, 1.6, -1.9], [6.6, 5.6, 1.6, 1.9],
+        [-3.0, 12, 2.6, -0.9], [3.0, 12, 2.6, 0.9],
+        [-5.5, 9.6, 2.2, -1.9], [5.5, 9.6, 2.2, 1.9],
+        [-7.6, 7.2, 1.9, -3.0], [7.6, 7.2, 1.9, 3.0],
+        [-9.0, 5.0, 1.5, -3.8], [9.0, 5.0, 1.5, 3.8],
       ];
       const p = (x: number, y: number): string => `${x.toFixed(1)},${y.toFixed(1)}`;
       // A licking flame tongue: base-left up the inner edge to a curled tip, back down a bellied outer
@@ -178,10 +181,10 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
           <stop offset="70%" stop-color="#b8309a"/><stop offset="84%" stop-color="${cor}"/><stop offset="100%" stop-color="${corHi}"/>
         </linearGradient></defs>
         ${flameGs}${embers}
-        <path d="M-6.7,-2 A7 7 0 0 1 6.7,-2 L5.4,1 A6.4 6.4 0 0 1 -5.4,1 Z" fill="${color}" ${ink}/>
-        <path d="M-5.6,-1.5 A5.9 5.9 0 0 1 5.6,-1.5" fill="none" stroke="${shade(color, 0.28)}" stroke-width="0.6" opacity="0.7"/>
-        <circle cx="-4" cy="-1" r="0.62" fill="${cor}"/><circle cx="4" cy="-1" r="0.62" fill="${cor}"/>
-        <g transform="translate(0 -2.4)">
+        <path d="M-6.4,-2.2 L-6.4,-3.2 L-5.1,-4.4 L-3.8,-3.0 L-2.5,-5.0 L-1.2,-3.4 L0,-5.6 L1.2,-3.4 L2.5,-5.0 L3.8,-3.0 L5.1,-4.4 L6.4,-3.2 L6.4,-2.2 Q0,-1.5 -6.4,-2.2 Z" fill="${color}" ${ink}/>
+        <path d="M-6.1,-2.9 Q0,-4.0 6.1,-2.9" fill="none" stroke="${shade(color, 0.3)}" stroke-width="0.6" opacity="0.75"/>
+        <circle cx="-5.1" cy="-4.4" r="0.62" fill="${cor}"/><circle cx="5.1" cy="-4.4" r="0.62" fill="${cor}"/><circle cx="-2.5" cy="-5.0" r="0.62" fill="${corHi}"/><circle cx="2.5" cy="-5.0" r="0.62" fill="${corHi}"/>
+        <g transform="translate(0 -5.2)">
           <circle r="2" fill="${cor}" opacity="0.4"><animate attributeName="r" values="1.7;2.4;1.7" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.25;0.5;0.25" dur="1.5s" repeatCount="indefinite"/></circle>
           <path d="M0,-2.4 L0.65,-0.65 L2.4,0 L0.65,0.65 L0,2.4 L-0.65,0.65 L-2.4,0 L-0.65,-0.65 Z" fill="${corHi}"/>
           <circle r="0.55" fill="#fff"/>

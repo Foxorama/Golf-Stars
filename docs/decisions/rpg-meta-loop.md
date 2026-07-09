@@ -691,9 +691,11 @@
     `riftgreaves` Greaves — a cosmic end-boss look (One Punch Man's Lord Boros power-up): dark cosmic plate cracked
     from within by a caged star-core, galaxy-crack energy (accent + cyan spark) forking across the chest + down each
     leg, over angular pauldrons/shin plates. The **Supernova** set KEEPS the nebula Suit (`cosmic`) + Leggings
-    (`nebula`) and gets a NEW `solarCrown` (`crown-supernova`, id + set unchanged) — a crown of purple-and-black
-    solar FLAMES (fanned licking tongues off a polar table, gradient black→violet→magenta→red coronal→hot tip) with
-    red embers flickering and a coronal sun-spark core, so it finally matches the nebula body. All mirrored in BOTH
+    (`nebula`) and gets a NEW `solarCrown` (`crown-supernova`, id + set unchanged) — a jewelled pointed CIRCLET
+    (a real crown, no faceplate, so the face stays clear) erupting into a crown of purple-and-black solar FLAMES
+    (fanned licking tongues off a polar table, fanning WIDE shoulder-to-shoulder, gradient
+    black→violet→magenta→red coronal→hot tip) with red embers flickering and a coronal sun-spark core, so it
+    finally matches the nebula body. All mirrored in BOTH
     `apparelArt.ts` (SVG: hatGlyph/shirtDetail/pantsGlyph/golferPreviewSVG) and `playView.ts` (canvas: drawHat +
     the drawGolfer riftplate chest block + drawPants riftgreaves); SVG carries the flicker `<animate>`, the canvas
     is a static snapshot. Retired the old pink-and-yellow `halo`. Re-shoot `cosmetics-preview.mjs`.

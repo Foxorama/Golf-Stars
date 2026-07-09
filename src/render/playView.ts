@@ -20,6 +20,7 @@ import { effectPatches as effectPatchesFor, inPatch, PATCH_SPECS, type PatchKind
 import { TENT_LINES } from '../sim/tents';
 import { archetypeFor } from '../sim/course/themes';
 import type { ApparelLook } from '../sim/rpg/apparel';
+import { mixHex } from './palette';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, landPolysCourseFor, type Prim } from './style';
 import { createWeather, type WeatherHandle } from './weather';
@@ -831,19 +832,21 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       break;
     }
     case 'solarCrown': {
-      // The mythic Supernova crown (GS-supernova-flame): a dark circlet erupting into a CROWN OF SOLAR
-      // FLAMES — purple-black tongues fading to red coronal tips, red embers, a hot core gem. The
-      // set-matched twin of the wardrobe SVG (`apparelArt.ts hatGlyph 'solarCrown'`); the SVG carries the
-      // flicker, the canvas is a static snapshot. Authored against the canonical r=7 head.
+      // The mythic Supernova crown (GS-supernova-flame): a jewelled, pointed CIRCLET (no faceplate —
+      // the face stays clear) erupting into a CROWN OF SOLAR FLAMES that fan WIDE, shoulder-to-shoulder
+      // — purple-black tongues fading to red coronal tips, red embers, a hot core gem. The set-matched
+      // twin of the wardrobe SVG (`apparelArt.ts hatGlyph 'solarCrown'`); the SVG carries the flicker,
+      // the canvas is a static snapshot. Authored against the canonical r=7 head.
       const s = r / 7;
       const cor = accent; // red coronal
       const corHi = '#ffb648';
-      const rb = 6.6 * s;
+      const rb = 7.6 * s;
       const flames: [number, number, number, number][] = [
         [0, 14, 3.0, 0],
-        [-2.7, 11.5, 2.5, -0.7], [2.7, 11.5, 2.5, 0.7],
-        [-4.9, 8.6, 2.1, -1.4], [4.9, 8.6, 2.1, 1.4],
-        [-6.6, 5.6, 1.6, -1.9], [6.6, 5.6, 1.6, 1.9],
+        [-3.0, 12, 2.6, -0.9], [3.0, 12, 2.6, 0.9],
+        [-5.5, 9.6, 2.2, -1.9], [5.5, 9.6, 2.2, 1.9],
+        [-7.6, 7.2, 1.9, -3.0], [7.6, 7.2, 1.9, 3.0],
+        [-9.0, 5.0, 1.5, -3.8], [9.0, 5.0, 1.5, 3.8],
       ];
       const flame = (
         bx: number, by: number, h: number, w: number, c: number, fill: string | CanvasGradient,
@@ -879,21 +882,38 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
         flame(bx, by, h * 0.66, w * 0.5, c * 0.7, cor); // inner red lick
         flame(bx, by, h * 0.4, w * 0.28, c * 0.5, corHi); // hot core lick
       }
-      // Dark circlet band across the brow.
+      // Pointed crown circlet resting on the brow (no faceplate). Peaks: centre -5.6, inner ±5.0,
+      // outer ±4.4; a gently-bowed base tucks it onto the forehead so the face stays clear.
+      const cp: [number, number][] = [
+        [-6.4, -2.2], [-6.4, -3.2], [-5.1, -4.4], [-3.8, -3.0], [-2.5, -5.0], [-1.2, -3.4],
+        [0, -5.6], [1.2, -3.4], [2.5, -5.0], [3.8, -3.0], [5.1, -4.4], [6.4, -3.2], [6.4, -2.2],
+      ];
       ctx.fillStyle = color;
       ctx.strokeStyle = '#0c1116';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(hx, hy, r, Math.PI * 1.06, Math.PI * 1.94);
-      ctx.arc(hx, hy, r * 0.72, Math.PI * 1.94, Math.PI * 1.06, true);
+      cp.forEach(([px, py], i) => {
+        if (i === 0) ctx.moveTo(hx + px * s, hy + py * s);
+        else ctx.lineTo(hx + px * s, hy + py * s);
+      });
+      ctx.quadraticCurveTo(hx, hy - 1.5 * s, hx - 6.4 * s, hy - 2.2 * s); // bowed base
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      // Ember gems set in the band.
-      ctx.fillStyle = cor;
-      for (const ex of [-4, 4]) {
+      // Metallic rim highlight along the base.
+      ctx.strokeStyle = mixHex(color, '#ffffff', 0.3);
+      ctx.lineWidth = 0.6 * s;
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(hx - 6.1 * s, hy - 2.9 * s);
+      ctx.quadraticCurveTo(hx, hy - 4.0 * s, hx + 6.1 * s, hy - 2.9 * s);
+      ctx.stroke();
+      ctx.globalAlpha = ctx.globalAlpha / 0.75;
+      // Ember gems set at the crown points.
+      for (const [ex, ey, hot] of [[-5.1, -4.4, false], [5.1, -4.4, false], [-2.5, -5.0, true], [2.5, -5.0, true]] as [number, number, boolean][]) {
+        ctx.fillStyle = hot ? corHi : cor;
         ctx.beginPath();
-        ctx.arc(hx + ex * s, hy - 1 * s, 0.62 * s, 0, Math.PI * 2);
+        ctx.arc(hx + ex * s, hy + ey * s, 0.62 * s, 0, Math.PI * 2);
         ctx.fill();
       }
       // A few static embers floating above the burst.
@@ -906,9 +926,9 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
         ctx.arc(hx + ex * s, hy + ey * s, er * s, 0, Math.PI * 2);
         ctx.fill();
       }
-      // A small coronal sun-spark rising from the band centre (a 4-point star, not a round "eye").
+      // A small coronal sun-spark at the crown's centre point (a 4-point star, not a round "eye").
       const scx = hx;
-      const scy = hy - 2.4 * s;
+      const scy = hy - 5.2 * s;
       ctx.save();
       ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.4;
       ctx.fillStyle = cor;
