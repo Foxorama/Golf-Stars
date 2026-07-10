@@ -168,6 +168,34 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(equippedSet('crown-supernova', warplate.id, greaves.id)).toBeUndefined();
   });
 
+  it('the mythic Space Pirate Parrot tricorn + plumage + tailfeathers form one head-to-toe set (GS-space-pirate-parrot)', () => {
+    const tricorn = apparelById('tricorn-parrot')!;
+    const top = apparelById('top-parrot')!;
+    const legs = apparelById('legs-parrot')!;
+    expect(tricorn.slot).toBe('hat');
+    expect(top.slot).toBe('shirt');
+    expect(legs.slot).toBe('pants');
+    for (const piece of [tricorn, top, legs]) {
+      expect(piece.set).toBe('Space Pirate Parrot');
+      expect(piece.rarity).toBe('mythic');
+      // Shard-bought, not an earned trophy — always in the market, buyable when affordable.
+      expect(piece.unlockHoles).toBeUndefined();
+      expect(piece.secret).toBeUndefined();
+      expect(piece.cost).toBe(APPAREL_COST.mythic);
+      expect(apparelRevealedInMarket(piece, [])).toBe(true);
+      expect(canBuyApparel(piece, APPAREL_COST.mythic, [])).toBe(true);
+      expect(piece.look.glow).toBeTruthy(); // mythic aura
+    }
+    // Distinct swashbuckling shapes — a galaxy tricorn (with eye patch), macaw plumage, tailfeathers.
+    expect(tricorn.look.shape).toBe('tricorn');
+    expect(top.look.shape).toBe('parrot');
+    expect(legs.look.shape).toBe('parrotpants');
+    // All three slots → the set reports complete; any missing piece does not.
+    expect(equippedSet(tricorn.id, top.id, legs.id)).toBe('Space Pirate Parrot');
+    expect(equippedSet(tricorn.id, top.id, undefined)).toBeUndefined();
+    expect(equippedSet(tricorn.id, 'polo-classic', legs.id)).toBeUndefined();
+  });
+
   it('two-slot sets (Gentleman = hat + pants) complete with just their two pieces', () => {
     // Gentleman defines only a hat (tophat) + pants (plus-fours) — no shirt — so both = complete.
     expect(equippedSet('tophat-ace', undefined, 'knickers-ace')).toBe('Gentleman');
