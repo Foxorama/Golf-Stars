@@ -9,7 +9,7 @@ import type { Hole, Vec } from '../../sim/course/contract';
 import { dist, pointInPoly, polylineDist } from '../../sim/course/contract';
 import { mixHex } from '../palette';
 import type { Projector } from '../project';
-import { type Prim, type Box, bboxOf, offsetPoly, projPoly } from './shared';
+import { type Prim, type Box, bboxOf, offsetPoly, projPoly, posHash } from './shared';
 import { landPolysCourseFor } from './land';
 
 // ---------------------------------------------------------------------------
@@ -290,6 +290,81 @@ export const RAINBOW_CLIFF: CliffLook = {
   shadow: 'rgba(8,3,24,0.5)',
   contact: 'rgba(12,5,32,0.36)',
 };
+
+/**
+ * SHIP-HULL cross-section underside (GS-ship-deck) — the derelict world's replacement for the void's
+ * geological `platformCliffs` strata. Each floating hull SECTION is a chunk of a torn-apart starship, so
+ * its underside must read as SHIP STRUCTURE, not rock: a dark riveted hull wall carrying horizontal DECK
+ * lines (the interior decks the section was sliced through), vertical structural FRAMES (the ship's ribs)
+ * with rivet rows, a lit steel deck-rim LIP, a ragged TORN bottom edge (ripped metal, not a clean cliff
+ * foot), and the odd severed conduit still sparking cyan. Same screen-space extrusion geometry as
+ * `platformCliffs` (convex-hull front edge dropped down), different MATERIAL. Pure geometry, ZERO rng
+ * (`posHash` jitter + projected-size counts only) → perturbs no stream; gated to the derelict at the call
+ * site. `deepen` (rarity) darkens the hull like the cliffs.
+ */
+export function styleShipHull(platforms: Vec[][], deepen: number): Prim[] {
+  const prims: Prim[] = [];
+  const look = SHIP_CLIFF;
+  const dk = Math.min(0.24, Math.max(0, deepen - 1) * 0.24);
+  const strata = look.strata.map((c, i) => mixHex(c, look.deepMix, dk * (i / 5)));
+  const plateTop = strata[1]!; // upper hull plate (lit steel)
+  const bodyDark = strata[strata.length - 1]!; // deep hull, into shadow
+  for (const plat of platforms) {
+    const hull = convexHull(plat);
+    if (hull.length < 3) continue;
+    const top = frontEdge(hull);
+    if (top.length < 2) continue;
+    const bb = bboxOf(plat);
+    const cx = (bb.minX + bb.maxX) / 2;
+    const w = bb.maxX - bb.minX;
+    const hullH = Math.max(30, Math.min(150, w * 0.42));
+    // The deck rim pushed straight down (a faint outward splay so the wall reads solid). `t` ∈ [0,1].
+    const dropped = (t: number): Vec[] => top.map((p) => [p[0] + (p[0] - cx) * 0.05 * t, p[1] + hullH * t] as Vec);
+    // A ragged TORN bottom edge — the hull was ripped, not cut. posHash sawtooth (zero rng).
+    const bottom = dropped(1).map((p, i) => [p[0], p[1] + (posHash(p[0], p[1], i + 1) - 0.35) * hullH * 0.2] as Vec);
+    const face: Vec[] = [...top, ...bottom.slice().reverse()];
+    // Soft cast shadow into the void at the hull foot.
+    prims.push({ t: 'poly', pts: [...dropped(0.9), ...dropped(1.42).slice().reverse()], fill: look.shadow });
+    // Solid hull backing (no clip gaps), then a lit upper plate band → a dark-into-shadow gradient.
+    prims.push({ t: 'poly', pts: face, fill: bodyDark });
+    const children: Prim[] = [];
+    children.push({ t: 'poly', pts: [...top, ...dropped(0.5).slice().reverse()], fill: plateTop });
+    children.push({ t: 'poly', pts: [...dropped(0), ...dropped(0.15).slice().reverse()], fill: look.contact }); // contact shadow under the rim
+    // Horizontal DECK lines — the interior decks the section was sliced through.
+    for (const t of [0.34, 0.58, 0.8]) {
+      const line = dropped(t);
+      children.push({ t: 'path', pts: line, stroke: 'rgba(150,188,222,0.2)', sw: 1, round: false });
+      children.push({ t: 'path', pts: line.map((p) => [p[0], p[1] + 1.5] as Vec), stroke: 'rgba(3,7,13,0.42)', sw: 1, round: false });
+    }
+    // Vertical structural FRAMES (the ship's ribs) with rivet rows. Count off the projected width,
+    // camera-clamped; no rng, so a zoom step can't perturb any seeded stream.
+    const frames = Math.min(9, Math.max(2, Math.round(w / 26)));
+    for (let i = 1; i <= frames; i++) {
+      const u = i / (frames + 1);
+      const tp = sampleAlong(top, u);
+      const bt: Vec = [tp[0] + (tp[0] - cx) * 0.05, tp[1] + hullH];
+      children.push({ t: 'line', a: tp, b: bt, stroke: 'rgba(3,6,11,0.5)', sw: Math.max(2, w * 0.011), round: false });
+      children.push({ t: 'line', a: [tp[0] + 1.3, tp[1]], b: [bt[0] + 1.3, bt[1]], stroke: 'rgba(120,152,184,0.2)', sw: 1, round: false });
+      const rv = 4;
+      for (let k = 1; k <= rv; k++) {
+        const f = k / (rv + 1);
+        children.push({ t: 'circle', c: [tp[0] + (bt[0] - tp[0]) * f, tp[1] + (bt[1] - tp[1]) * f], r: 0.8, fill: look.dustB });
+      }
+    }
+    // Severed conduits still sparking faint cyan along the torn bottom.
+    for (let i = 0; i < bottom.length; i += 3) {
+      const p = bottom[i]!;
+      if (posHash(p[0], p[1], 9) < 0.2) children.push({ t: 'circle', c: p, r: 1.1, fill: look.crackLit });
+    }
+    prims.push({ t: 'clip', clip: face, children });
+    // Lit steel LIP along the deck rim so the section catches the starlight (drawn over the fill).
+    for (let i = 1; i < top.length; i++) {
+      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: look.lipA, sw: 2.4, round: true });
+      prims.push({ t: 'line', a: top[i - 1]!, b: top[i]!, stroke: look.lipB, sw: 1, round: true });
+    }
+  }
+  return prims;
+}
 
 /**
  * Extrude each plateau DOWNWARD into a visible side-on FACE (GS-cetus-3, generalised GS-cetus-5) so a

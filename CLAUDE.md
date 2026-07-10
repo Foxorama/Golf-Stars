@@ -162,6 +162,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     (course-length-spaced count → camera-proof), so a severed piece reads ripped, not clean-cut. (3) DRIFTING
     JUNK — `render/shipDrift.ts` (the cetusFlow twin: play-view only, rides `now` + `_gsFeel.shipDriftSpeed`,
     SVG map byte-identical) tumbles torn hull-plates through the open space around the wreck.
+  - SHIP DECK LOOK (GS-ship-deck): the derelict is DRESSED as a ship interior, all pure geometry + zero
+    rng (posHash/course-length counts → camera-proof), gated to the `derelict` archetype so every other
+    world is byte-identical. (1) DECK PLATING — `style/ship.ts styleShipDeck` lays riveted metal deck over
+    the corridor (transverse panel seams + longitudinal plate joints + a painted hazard-caution edge
+    stripe + directional deck chevrons + scuffs/scorch), built in course space off `hole.centreline` and
+    clipped to the corridor polys. (2) HULL SECTIONS — `style/platforms.ts styleShipHull` REPLACES the
+    void's geological `platformCliffs` strata under the derelict's lost pads with a SHIP-HULL cross-section
+    (dark riveted hull wall + horizontal interior-deck lines + vertical structural frames + a lit steel
+    deck-rim + a ragged torn bottom), so a floating section reads as a chunk of wrecked STARSHIP, not a
+    rock island. (3) BULKHEADS — `style/walls.ts styleShipWalls` draws the corridor walls with real
+    presence (inward deck shadow so the corridor reads sunk, dark-steel body, lit cap, buttress ribs,
+    rivets). A new derelict painter = a new `style/` module or the platforms domain; never import style.ts.
   - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
     METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand

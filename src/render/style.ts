@@ -77,16 +77,17 @@ import {
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
 import { styleShipWalls, styleTornHull } from './style/walls';
+import { styleShipDeck } from './style/ship';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
   platformCliffs,
+  styleShipHull,
   raisedShelf,
   cetusOcean,
   cetusRiver,
   CETUS_CLIFF,
   VOID_CLIFF,
-  SHIP_CLIFF,
   RAINBOW_CLIFF,
 } from './style/platforms';
 import {
@@ -353,11 +354,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   if (arch === 'void' && lostHole && !rainbow) {
     prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, VOID_CLIFF).prims);
   }
-  // Derelict hull sections (GS-derelict): extrude each floating deck section into a cold riveted METAL
-  // cross-section underside (torn hull-plate, not asteroid rock) so the ship-in-pieces reads as 3D
-  // slabs adrift in space. Same gating/stream as the void pads.
+  // Derelict hull sections (GS-derelict / GS-ship-deck): extrude each floating deck section into a
+  // SHIP-HULL cross-section — riveted hull wall, horizontal interior-deck lines, vertical structural
+  // frames, a lit steel deck-rim, a ragged torn bottom — so the ship-in-pieces reads as chunks of a
+  // wrecked STARSHIP adrift in space, not the void's geological rock slabs. Zero rng (posHash only).
   if (arch === 'derelict' && lostHole && !rainbow) {
-    prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, SHIP_CLIFF).prims);
+    prims.push(...styleShipHull(landPlatforms, deepen));
     // Torn broken-metal edges (GS-ship-feel): the hull sections are ripped in half, so their outlines
     // bristle with twisted shard teeth. Course-space platforms, projected; pure geometry, zero rng.
     prims.push(...styleTornHull(landPlatformsCourse, proj));
@@ -539,6 +541,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       if (f.kind === 'green') prims.push(...styleGreenSurround(projPoly(f.poly, proj), collar, grFringe));
     }
     prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined));
+    // Derelict corridor → riveted metal DECK PLATING (GS-ship-deck): panel seams, a painted hazard-
+    // caution edge stripe, directional deck chevrons, and the scuffs/scorch of abandonment, clipped to
+    // the corridor. Pure geometry, zero rng; gated to the derelict so every other world is untouched.
+    if (arch === 'derelict') prims.push(...styleShipDeck(hole, fairwaySps, proj));
     // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
     // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
     if (voidGlow) for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(165,175,255,0.5)', sw: 1.6 });
