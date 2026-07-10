@@ -319,6 +319,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     the reducer's `buy` case — the sim `buy()` only does the fire mechanic (so auto ≡ interactive; the
     headless/Lab path never touches reputation). The UI gates the fire behind a "they won't be happy"
     confirmation (`pendingFireCaddy` → `confirmFire`); the sim fires unconditionally.
+  - CREDIT TOKENS are faction-branded too (GS-credit-factions): each of the four credit-boost shop items
+    is ISSUED BY a distinct faction (`CREDIT_ITEM_FACTION`) — Sponsor's Badge +15% → Sponsors' Syndicate,
+    Lucky Ball Marker +20% → Fortune Cartel, Birdie Hunter → Birdie Hunters, Eagle Eye → Eagle Order —
+    machine-checked DISTINCT. The card wears its house CREST on a medallion (`factionCrest`/
+    `drawCreditToken`; `itemArtSVG` intercepts a credit id before the base gear switch). Pure render +
+    data, zero rng, no save bump — the `apply`/mechanic is untouched. A new credit item = a
+    `CREDIT_ITEM_FACTION` row + a `FACTION_CREST` emblem.
   - Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side` is a FAIRWAY
     side classified off the hole's `centreline` (`ShotInput.fairwaySide`), NOT the shot bearing.
   - The renderer draws the guard figure ONCE (the corner figure) — never also float the portrait badge.

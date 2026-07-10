@@ -204,6 +204,15 @@ describe('GS-proshop-2 — procedural item art', () => {
     }
   });
 
+  it('the four credit tokens render DISTINCT faction medallions (GS-credit-factions)', () => {
+    // The +15% / +20% / birdie / eagle tokens each wear their issuing house's crest, so the two
+    // ex-coins and the two ex-trophies are no longer look-alikes.
+    const ids = ['fortune-chip', 'lucky-coin', 'birdie-hunter', 'eagle-eye'];
+    const svgs = ids.map((id) => itemArtSVG(id, shopItem(id)!.rarity));
+    for (const svg of svgs) expect(svg).toContain('<svg');
+    expect(new Set(svgs).size).toBe(ids.length);
+  });
+
   it('EVERY named caddy has a bespoke portrait (never the generic bag glyph)', () => {
     // The machine-checked rule: add a named caddy without bespoke shop art and this reds.
     for (const id of NAMED_CADDY_IDS) expect(CADDY_ART_IDS).toContain(id);

@@ -225,6 +225,34 @@
   case — the sim `buy()` only does the fire mechanic (keeping auto ≡ interactive and the Lab path
   reputation-free). `adjustReputation`/`reputationWith` are pure immutable helpers.
 
+## Credit tokens get factions + faction crests (GS-credit-factions)
+- **Problem.** The four credit-boost Pro Shop items looked like generic re-skins of each other — the
+  +15% Sponsor's Badge and +20% Lucky Ball Marker were both a gold-coin-with-a-star; Birdie Hunter and
+  Eagle Eye were both a gold trophy. Nothing said *whose* money this was, and the cards weren't unique.
+- **Fix.** Every credit token is now ISSUED BY a galaxy faction, and wears that house's CREST on a
+  struck-metal medallion — so each reads as "factionally specific" at a glance:
+  - **Sponsor's Badge** (`fortune-chip`, +15%) → **The Sponsors' Syndicate** — corporate backers.
+    Crest: a shield holding a rising-growth arrow crowned by a star (blue-chrome).
+  - **Lucky Ball Marker** (`lucky-coin`, +20%) → **The Fortune Cartel** — casino-world high rollers.
+    Crest: a horseshoe cradling a four-leaf clover (casino green).
+  - **Birdie Hunter** (`birdie-hunter`, per-birdie bounty) → **The Birdie Hunters** — a big-game lodge.
+    Crest: a bird framed dead-centre in a hunter's crosshair (lodge amber).
+  - **Eagle Eye** (`eagle-eye`, per-eagle bounty) → **The Eagle Order** — raptor-eyed marksmen.
+    Crest: an heraldic spread eagle with a piercing eye (raptor gold).
+- **Where it lives.** The token→faction map is `CREDIT_ITEM_FACTION` in `src/sim/rpg/factions.ts` (pure
+  data, no imports, no cycle), machine-checked in `tests/factions.test.ts`: every key is a real shop
+  item, every value a real `FACTIONS` row, and the four factions are DISTINCT (the brief's "different
+  faction per item"). The crest ART (`factionCrest` + `drawCreditToken` in `src/render/itemArt.ts`) is
+  keyed off the faction id, so `itemArtSVG` intercepts a credit-token id BEFORE the base gear switch and
+  renders the medallion instead of a coin/trophy — the whole card is the crest, so it skips the corner
+  roundel. The item descriptions name the issuing house too. Pure/deterministic, zero rng, zero sim
+  impact — a render + data change only (no save bump; the mechanic/`apply` is untouched).
+- **Same pass, better base art.** Two long-standing eyesores got redrawn while the shop cards were open:
+  the **glove** (was a mitten-ish blob) is now a proper tour glove — four seamed fingers, a thumb, a
+  wrist cuff with a Velcro strap tab, perforation dots and a snap; the **driver** (`drawShaft`) gained a
+  rubber grip, a ferrule, and a pear head with a crown sheen + milled-face lines so it reads as forged
+  gear, not a stick with a blob. Re-shoot `node scripts/shop-cards-preview.mjs` after touching either.
+
 ## The Prognostic Parrot — foresight scramble (GS-caddy-parrot)
 - **The fantasy.** A bipedal space parrot, pirate captain of the **Planet Pirates**. Its ability is a 33%
   chance to *see your shot before it happens* — mechanically, the game's own SCRAMBLE effect turned on the

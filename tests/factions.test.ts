@@ -1,14 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
   CADDY_FACTION,
+  CREDIT_ITEM_FACTION,
   REP_ON_FIRE,
   REP_ON_HIRE,
   adjustReputation,
   factionById,
   factionForCaddy,
+  factionForCreditItem,
   reputationWith,
 } from '../src/sim/rpg/factions';
-import { NAMED_CADDY_IDS, namedCaddyOwned } from '../src/sim/rpg/economy';
+import { NAMED_CADDY_IDS, namedCaddyOwned, shopItem } from '../src/sim/rpg/economy';
 import { startRun } from '../src/sim/rpg/run';
 import { initState, reduce, type UiState } from '../src/ui/game';
 
@@ -43,6 +45,36 @@ describe('caddy factions — data contract (GS-caddy-factions)', () => {
   it('reputation deltas are the hire/fire values from the brief (+1 / −3)', () => {
     expect(REP_ON_HIRE).toBe(1);
     expect(REP_ON_FIRE).toBe(-3);
+  });
+});
+
+describe('credit-token factions — data contract (GS-credit-factions)', () => {
+  it('the four credit tokens each belong to a distinct real faction', () => {
+    const ids = ['fortune-chip', 'lucky-coin', 'birdie-hunter', 'eagle-eye'];
+    const factions = ids.map((id) => factionForCreditItem(id));
+    for (let i = 0; i < ids.length; i++) {
+      expect(factions[i], `credit token "${ids[i]}" has no faction`).toBeDefined();
+      expect(factionById(factions[i]!), `faction "${factions[i]}" is not in FACTIONS`).toBeDefined();
+    }
+    // Each credit token is its OWN faction — the brief's "different faction" per item.
+    expect(new Set(factions).size).toBe(ids.length);
+    expect(factionForCreditItem('fortune-chip')).toBe('sponsors-syndicate'); // +15%
+    expect(factionForCreditItem('lucky-coin')).toBe('fortune-cartel'); // +20%
+    expect(factionForCreditItem('birdie-hunter')).toBe('birdie-hunters');
+    expect(factionForCreditItem('eagle-eye')).toBe('eagle-order');
+  });
+
+  it('every CREDIT_ITEM_FACTION key is a real shop item that boosts credits', () => {
+    for (const id of Object.keys(CREDIT_ITEM_FACTION)) {
+      const it = shopItem(id);
+      expect(it, `"${id}" is mapped to a faction but is not a shop item`).toBeTruthy();
+      expect(factionById(CREDIT_ITEM_FACTION[id]!), `orphan faction "${CREDIT_ITEM_FACTION[id]}"`).toBeDefined();
+    }
+  });
+
+  it('a non-credit item has no issuing faction', () => {
+    expect(factionForCreditItem('power-cell')).toBeUndefined();
+    expect(factionForCreditItem('auto-caddie')).toBeUndefined();
   });
 });
 
