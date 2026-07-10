@@ -9,16 +9,14 @@
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
-import { holeProjector, type ProjectOptions } from './render/project';
-import { createWeather } from './render/weather';
+import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
-import { drawCaddy, hasCaddyArt, CADDY_VOICE } from './render/caddyArt';
-import { speakCaddy } from './render/speech';
+import { drawCaddy, hasCaddyArt } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
-import { bearing, dist, type Hole, type Vec } from './sim/course/contract';
+import { bearing, dist } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
@@ -44,7 +42,6 @@ import { loadSave, writeSave } from './save/storage';
 import { SAVE_VERSION, defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
-import { setMusicScene, type MusicSceneId } from './render/music';
 import { getSettings, setSetting, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
@@ -79,6 +76,7 @@ import { routeInfoOverlay, travelScreen, travelView } from './app/travelScreens'
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
+import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -1205,120 +1203,6 @@ let selClubSetTouched = false;
 
 
 
-/** Drive the ambient music layer (GS-audio-2) off the current screen: the stop's world theme
- *  while golf is on screen (playing/result — the hole under view picks the track, so a
- *  split-biome stop's back holes switch), the clubhouse lull everywhere else. A cheap no-op when
- *  the scene hasn't changed, so it's safe on render()'s hot path (power-pull re-renders). */
-function syncMusic(): void {
-  let sceneId: MusicSceneId = 'menu';
-  const hole =
-    state.screen === 'playing' && state.play
-      ? state.play.hole
-      : state.screen === 'result' && state.played
-        ? state.course.holes[state.viewHole] ?? state.course.holes[0]
-        : undefined;
-  if (hole) sceneId = archetypeFor(holeThemeId(hole), holeBiome(hole));
-  setMusicScene(sceneId);
-}
-
-/** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads
- *  identically across screens (a quiet hand-off from lining up to watching the shot). */
-function weatherSeed(hole: Hole): number {
-  return (Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed;
-}
-
-/**
- * Mount the animated, SCREEN-SPACE weather overlay over the aim/putt map (GS-journey-fx rework) so the
- * sky + air are alive while you line up — not just during ball flight (the in-flight view draws the
- * SAME weather from the shared module). `up` orients the wind to read true relative to the shot. A
- * transparent, pointer-events-none canvas so the pull-to-shot gesture passes straight through.
- */
-function mountWeatherOverlay(el: HTMLElement, hole: Hole, up: Vec): void {
-  const cw = Math.round(el.clientWidth || DMAP_W);
-  const ch = Math.round(el.clientHeight || DMAP_H);
-  if (cw < 2 || ch < 2) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const cv = document.createElement('canvas');
-  cv.width = cw * dpr;
-  cv.height = ch * dpr;
-  cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:10px;';
-  el.appendChild(cv);
-  const ctx = cv.getContext('2d');
-  if (!ctx) return;
-  ctx.scale(dpr, dpr);
-  // Wind screen-direction via a projector oriented the same way the map is (shot pointing up).
-  const proj = holeProjector(hole, { width: cw, height: ch, focus: hole.tee, up, viewRadius: 80, focusBias: DMAP_BIAS });
-  const rad = ((hole.wind?.dir ?? 0) * Math.PI) / 180;
-  const a = proj.project(hole.tee);
-  const b = proj.project([hole.tee[0] + Math.sin(rad), hole.tee[1] + Math.cos(rad)]);
-  let wdx = b[0] - a[0];
-  let wdy = b[1] - a[1];
-  const wl = Math.hypot(wdx, wdy) || 1;
-  // Star-mask (GS-rough-frame): this overlay sits on the SVG decision map, whose land now fills to
-  // the OB frame — but the local projector above is only wind-orientation, NOT the map's exact fit,
-  // so a projected land mask would lie. Land dominates the aim framing on every normal hole, so the
-  // pinned twinkle stars are simply kept off the whole overlay there; a lost-rough hole or Rainbow
-  // Road is mostly open deep, where the twinkle belongs (unmasked). Shooting star/meteors/ambient
-  // air stay on either way — motion sells them as sky, not ground.
-  const landDominant = !rainbowActive() && !(hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false);
-  const overlayMask: Vec[][] = [
-    [
-      [0, 0],
-      [cw, 0],
-      [cw, ch],
-      [0, ch],
-    ],
-  ];
-  const w = createWeather({
-    effect: currentEffect() ?? 'none',
-    width: cw,
-    height: ch,
-    archetype: archetypeFor(holeThemeId(hole), holeBiome(hole) ?? ''),
-    windSpd: hole.wind?.spd ?? 0,
-    windDir: [wdx / wl, wdy / wl],
-    seed: weatherSeed(hole),
-    starMask: () => (landDominant ? overlayMask : null),
-  });
-  const reduced = getSettings().reducedMotion;
-  let raf = 0;
-  let live = true;
-  const tick = (now: number): void => {
-    if (!live || !cv.isConnected) return;
-    ctx.clearRect(0, 0, cw, ch);
-    w.draw(ctx, now);
-    if (!reduced) raf = requestAnimationFrame(tick);
-  };
-  tick(performance.now());
-  weatherOverlay = {
-    destroy() {
-      live = false;
-      cancelAnimationFrame(raf);
-      cv.remove();
-    },
-  };
-}
-
-
-
-
-/** Play a caddy's signature voice line + haptic when its effect fires in the play view (GS-caddy-
- *  voices) — wired to the play view's `onCaddyEffect`. Gated/guarded inside `speakCaddy`. */
-function playCaddyVoice(id: string): void {
-  const v = CADDY_VOICE[id as keyof typeof CADDY_VOICE];
-  if (!v) return;
-  speakCaddy(v.speech, v.lang, { rate: v.rate, pitch: v.pitch });
-  haptic(HAPTICS.caddy);
-}
-
-/** Ball bonks a trade-camp tent (GS-tents): the canvas already pops an "Ow!"/"Watch it!" bubble — back
- *  it with a soft bonk sound, a haptic, and a spoken yelp (a startled trader). Pure feel; guarded. */
-function playTentBonk(text: string): void {
-  sfx.bonk();
-  haptic(HAPTICS.tap);
-  speakCaddy(text, 'en-GB', { rate: 1.1, pitch: 1.2 });
-}
-
-
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -1774,7 +1658,11 @@ function render(): void {
     if (wEl) {
       const ball = state.play.ball;
       const pin = pinOf(state.play.hole);
-      mountWeatherOverlay(wEl, state.play.hole, [pin[0] - ball[0], pin[1] - ball[1]]);
+      weatherOverlay = mountWeatherOverlay(wEl, state.play.hole, [pin[0] - ball[0], pin[1] - ball[1]], {
+        width: DMAP_W,
+        height: DMAP_H,
+        focusBias: DMAP_BIAS,
+      });
     }
   }
 
