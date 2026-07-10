@@ -39,7 +39,7 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
-import { SAVE_VERSION, defaultSave } from './save/schema';
+import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { getSettings, setSetting, toggleSetting, type Settings } from './settings';
@@ -77,6 +77,7 @@ import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
+import { metaFromSave, persist } from './app/persist';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -100,33 +101,7 @@ function boot(): void {
     stage('boot:start');
     const save = loadSave();
     stage('loaded');
-    const meta = {
-      bestStableford: save.bestStableford,
-      bestDistance: save.bestDistance,
-      shards: save.shards,
-      metaUpgrades: save.metaUpgrades,
-      maxAscension: save.maxAscension,
-      maxAscensionByCharacter: save.maxAscensionByCharacter,
-      lifetimeAces: save.lifetimeAces,
-      ownedShips: save.ownedShips,
-      ownedApparel: save.ownedApparel,
-      shipByCharacter: save.shipByCharacter,
-      hatByCharacter: save.hatByCharacter,
-      shirtByCharacter: save.shirtByCharacter,
-      pantsByCharacter: save.pantsByCharacter,
-      golfBagByCharacter: save.golfBagByCharacter,
-      driverByCharacter: save.driverByCharacter,
-      bagTier: save.bagTier,
-      bagTierByCharacter: save.bagTierByCharacter,
-      unlockedClubsByCharacter: save.unlockedClubsByCharacter,
-      clubhouseVisit: save.clubhouseVisit,
-      endlessBestHoles: save.endlessBestHoles,
-      marmotBartender: save.marmotBartender,
-      marmotTips: save.marmotTips,
-      endlessRuns: save.endlessRuns,
-      reputationByCharacter: save.reputationByCharacter,
-      priceRefund: save.priceRefund,
-    };
+    const meta = metaFromSave(save);
     const seed = seedFromUrl() ?? freshRunSeed();
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
@@ -191,52 +166,6 @@ function recover(err: unknown): void {
         '<main style="font-family:system-ui;color:#e8e8ea;background:#0b0d12;padding:24px;min-height:100vh;">⛳ Something went wrong and the save was reset. Refresh to start fresh.</main>';
     }
   }
-}
-
-function persist(): void {
-  writeSave({
-    version: SAVE_VERSION,
-    bestStableford: state.bestStableford,
-    bestDistance: state.bestDistance,
-    shards: state.shards,
-    metaUpgrades: state.metaUpgrades,
-    maxAscension: state.maxAscension,
-    maxAscensionByCharacter: state.maxAscensionByCharacter,
-    lifetimeAces: state.lifetimeAces,
-    ownedShips: state.ownedShips,
-    ownedApparel: state.ownedApparel,
-    shipByCharacter: state.shipByCharacter,
-    hatByCharacter: state.hatByCharacter,
-    shirtByCharacter: state.shirtByCharacter,
-    pantsByCharacter: state.pantsByCharacter,
-    golfBagByCharacter: state.golfBagByCharacter,
-    driverByCharacter: state.driverByCharacter,
-    bagTier: state.bagTier,
-    bagTierByCharacter: state.bagTierByCharacter,
-    unlockedClubsByCharacter: state.unlockedClubsByCharacter,
-    clubhouseVisit: state.clubhouseVisit,
-    endlessBestHoles: state.endlessBestHoles,
-    marmotBartender: state.marmotBartender,
-    marmotTips: state.marmotTips,
-    endlessRuns: state.endlessRuns,
-    reputationByCharacter: state.reputation,
-    // The one-off Trade Market price-cut notice (GS-trade-rebalance): persisted while pending so a
-    // reload before dismissal still shows it; cleared to undefined once the player closes it.
-    priceRefund: state.priceRefund,
-    // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
-    // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
-    // moment anything dispatched from the title. While no real run is live, any resumable offer
-    // the state carries (a reload's, or one parked by 'toTitle') is kept instead of wiped.
-    // The Asgard tournament run (GS-asgard) is NEVER persisted — a mid-tournament quit resumes the
-    // SUSPENDED real run (the Asgard attempt is forfeited, the Rainbow Ball intact), so persist the
-    // parked snapshot instead of the ephemeral tournament run.
-    activeRun:
-      state.run.status === 'active' && state.run.formatId === ASGARD_FORMAT
-        ? state.asgardReturn
-        : state.run.status === 'active' && state.run.loadout.characterId
-        ? snapshotRun(state.run)
-        : state.resumable,
-  });
 }
 
 function dispatch(action: Action): void {
