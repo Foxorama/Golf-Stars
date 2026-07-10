@@ -143,6 +143,9 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
   // A couple of splash motes, seeded for a stable jitter.
   const splash: [number, number, number][] = [];
   for (let i = 0; i < 4; i++) splash.push([prng() * 2 - 1, prng(), 2.5 + prng() * 3.5]);
+  // Source-spring bubbles — seeded angle/phase/size, swirled up out of the spring each frame.
+  const srcMotes: [number, number, number][] = [];
+  for (let i = 0; i < 8; i++) srcMotes.push([prng(), prng(), prng()]);
 
   const starCol = (hue: number): string =>
     hue < 0.5 ? 'rgba(255,255,255,0.9)' : hue < 0.78 ? 'rgba(180,242,255,0.85)' : 'rgba(210,220,255,0.8)';
@@ -231,24 +234,51 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
       ctx.globalAlpha = 1;
     }
 
-    // --- The SOURCE spring, gently pulsing where the star-water wells up out of the plateau. ---
+    // --- The SOURCE spring: star-water WELLS UP out of the plateau — a soft welling glow, expanding
+    //     ripple rings, a swirl of bubbling motes rising off it, and a small shimmering core. Reads as
+    //     a living origin the river flows FROM, not a flat blue coin painted on the turf. ---
     const source = screen[0]!;
-    const srcW = Math.max(3.5, hwPx[0]! * 2.1);
-    const pulse = 0.8 + 0.2 * Math.sin(now * 0.004);
-    const sg = ctx.createRadialGradient(source[0], source[1], 0, source[0], source[1], srcW * 2.2 * pulse);
-    sg.addColorStop(0, 'rgba(120,225,255,0.35)');
-    sg.addColorStop(1, 'rgba(120,225,255,0)');
+    const srcW = Math.max(3.5, hwPx[0]! * 1.95);
+    const pulse = 0.85 + 0.15 * Math.sin(now * 0.004);
+    // Welling glow — a two-stop bloom that dissolves into the channel rather than a hard disc.
+    const sg = ctx.createRadialGradient(source[0], source[1], 0, source[0], source[1], srcW * 2.4 * pulse);
+    sg.addColorStop(0, 'rgba(150,235,255,0.42)');
+    sg.addColorStop(0.5, 'rgba(90,205,250,0.18)');
+    sg.addColorStop(1, 'rgba(90,205,250,0)');
     ctx.fillStyle = sg;
     ctx.beginPath();
-    ctx.arc(source[0], source[1], srcW * 2.2 * pulse, 0, Math.PI * 2);
+    ctx.arc(source[0], source[1], srcW * 2.4 * pulse, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'rgba(60,150,205,0.6)';
+    // Upwelling ripple rings — expand + fade on a loop so the spring visibly bubbles up.
+    for (let i = 0; i < 3; i++) {
+      const t = frac(now * 0.0007 * (flow || 1) + i / 3);
+      ctx.globalAlpha = clamp01((1 - t) * 0.5);
+      ctx.strokeStyle = 'rgba(180,242,255,1)';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.arc(source[0], source[1], srcW * (0.32 + t * 1.5), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // Bubbling motes — swirl up and outward from the core, fading as they rise.
+    for (const [ma, mp, ms] of srcMotes) {
+      const t = frac(mp + now * 0.0009 * (flow || 1));
+      const ang = ma * Math.PI * 2 + t * 1.3;
+      const rad = srcW * (0.15 + t * 1.05);
+      const bx = source[0] + Math.cos(ang) * rad;
+      const by = source[1] + Math.sin(ang) * rad;
+      ctx.globalAlpha = clamp01((1 - t) * 0.85);
+      ctx.fillStyle = 'rgba(224,250,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(bx, by, 0.5 + ms * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Shimmering core — small, bright, twinkling; the eye of the spring.
+    const coreP = 0.85 + 0.15 * Math.sin(now * 0.011);
+    ctx.fillStyle = 'rgba(234,252,255,0.95)';
     ctx.beginPath();
-    ctx.arc(source[0], source[1], srcW, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(220,248,255,0.9)';
-    ctx.beginPath();
-    ctx.arc(source[0], source[1], srcW * 0.5, 0, Math.PI * 2);
+    ctx.arc(source[0], source[1], srcW * 0.4 * coreP, 0, Math.PI * 2);
     ctx.fill();
 
     // --- The WATERFALL: only when the river reaches the plateau edge AND the drop lands off the land
