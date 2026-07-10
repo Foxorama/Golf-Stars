@@ -26,7 +26,9 @@ export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
  *  Supernova crown, re-homed so the flame look stops clashing with the nebula body; GS-solar-flames).
  *  `supernova` is the mythic Supernova crown that replaces it — a jewelled violet circlet erupting into a
  *  DETONATING star: a white-hot core inside an expanding nebula shell of violet filaments + bright knots,
- *  set-matched to the deep-violet nebula Suit/Leggings (GS-solar-flames). */
+ *  set-matched to the deep-violet nebula Suit/Leggings (GS-solar-flames). `tricorn` is the galaxy-themed
+ *  pirate tricorn of the SPACE PIRATE PARROT set — a cocked three-corner hat washed in nebula + starlight
+ *  with gold trim, a star emblem, AND a built-in eye patch drawn over one eye (GS-space-pirate-parrot). */
 export type HatShape =
   | 'cap'
   | 'bucket'
@@ -38,7 +40,8 @@ export type HatShape =
   | 'solarCrown'
   | 'supernova'
   | 'baggy'
-  | 'wingedHelm';
+  | 'wingedHelm'
+  | 'tricorn';
 /** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
  *  `valkyrie` is a burnished cuirass — pauldrons, a central ridge and a winged chest boss (GS-valkyrie).
  *  `riftplate` is the Punched Galaxy warplate — a dark cosmic cuirass shot through with glowing galaxy-crack
@@ -54,7 +57,8 @@ export type ShirtShape =
   | 'blazer'
   | 'valkyrie'
   | 'riftplate'
-  | 'solarflare';
+  | 'solarflare'
+  | 'parrot';
 /** Pants silhouettes the drawer renders. `greaves` is armoured legwear — war-skirt tassets over the hips
  *  and gold shin greaves (GS-valkyrie). `riftgreaves` is the Punched Galaxy legwear — dark cosmic leggings
  *  cracked with glowing galaxy energy down each leg over angular shin plates (GS-punched-galaxy).
@@ -69,7 +73,8 @@ export type PantsShape =
   | 'nebula'
   | 'greaves'
   | 'riftgreaves'
-  | 'emberlegs';
+  | 'emberlegs'
+  | 'parrotpants';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
 export type BagShape = 'staffbag';
 /** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
@@ -398,6 +403,43 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'Leggings sheathed in living fire — solar flames licking up each leg, red embers rising off them. The legs of the Solar Flames set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'emberlegs', color: '#241042', accent: '#ff4d2a', glow: '#b23cff' },
+  },
+
+  // ===== THE SPACE PIRATE PARROT SET (GS-space-pirate-parrot) ==========================
+  // A swashbuckling cosmic-macaw kit: a galaxy-washed pirate TRICORN (gold trim, a star emblem and a
+  // built-in eye patch), a plumage TOP of iridescent scalloped macaw feathers over a deep cosmic-blue
+  // body, and matching feathered TAIL-FEATHER LEGGINGS. A mythic three-piece set (shard-bought), teal/
+  // gold/magenta plumage over cosmic navy, wreathed in a tropical-teal aura. Kept with the other mythic
+  // sets, before the earned/secret blocks, so the per-slot `.find(mythic)` ordering is undisturbed.
+  {
+    id: 'tricorn-parrot',
+    name: 'Galaxy Pirate Tricorn',
+    slot: 'hat',
+    set: 'Space Pirate Parrot',
+    rarity: 'mythic',
+    blurb: 'A cocked three-corner hat cut from the night sky — nebula-washed felt, gold buccaneer trim, a starlight emblem, and a black eye patch for the captain of the cosmic seas. The crown of the Space Pirate Parrot set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'tricorn', color: '#241a5e', accent: '#ffcf4a', glow: '#7a5cff' },
+  },
+  {
+    id: 'top-parrot',
+    name: 'Space Parrot Plumage',
+    slot: 'shirt',
+    set: 'Space Pirate Parrot',
+    rarity: 'mythic',
+    blurb: 'A stunning macaw in the void — rows of iridescent teal, gold and magenta feathers over a deep cosmic-blue body, flecked with starlight. The plumage of the Space Pirate Parrot set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'parrot', color: '#12204a', accent: '#ffc23a', glow: '#37e0c4' },
+  },
+  {
+    id: 'legs-parrot',
+    name: 'Space Parrot Tailfeathers',
+    slot: 'pants',
+    set: 'Space Pirate Parrot',
+    rarity: 'mythic',
+    blurb: 'Long macaw tail-feathers sweeping down each leg — teal, gold and magenta plumes over cosmic navy, tipped with stars. The tailfeathers of the Space Pirate Parrot set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'parrotpants', color: '#0e1a3e', accent: '#ff5a9e', glow: '#37e0c4' },
   },
 
   // ===== THE VALKYRIE SET (GS-valkyrie) ===============================================

@@ -270,15 +270,49 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         <circle cx="0.6" cy="-5.6" r="1.6" fill="none" stroke="${accent}" stroke-width="0.9"/>
         <path d="M0.6,-6.8 L0.6,-4.4 M-0.6,-5.6 L1.8,-5.6" stroke="${accent}" stroke-width="0.7"/>`;
       break;
+    case 'tricorn': {
+      // The galaxy pirate TRICORN (GS-space-pirate-parrot): a cocked three-corner felt hat washed in
+      // nebula + starlight, gold buccaneer trim along the cocked brim, a starlight emblem front-and-
+      // centre, AND a built-in black EYE PATCH drawn over one eye (with a strap across the brow). The
+      // eye sits at ~(±2.4, -0.2) in this canonical r=7 frame — the patch covers the +x one. Mirrors
+      // the canvas `drawHat 'tricorn'`.
+      const trim = accent; // gold trim
+      const star = '#fff0c0'; // starlight
+      const body = `M-11.5,-1.8 L-8,-9.6 Q-6,-7 -4.2,-6.6 Q-2,-11 0,-11.6 Q2,-11 4.2,-6.6 Q6,-7 8,-9.6 L11.5,-1.8 Q0,1.8 -11.5,-1.8 Z`;
+      // Starfield + a soft nebula wash confined to the felt.
+      const starPts: [number, number, number][] = [
+        [-6.5, -4.5, 0.55], [-3, -7.5, 0.5], [2.5, -8, 0.55], [6, -5, 0.5], [-8.5, -3, 0.45],
+        [8.5, -3.2, 0.45], [0, -6, 0.4],
+      ];
+      const stars = `<g fill="#ffffff">${starPts.map(([x, y, rr]) => `<circle cx="${x}" cy="${y}" r="${rr}"/>`).join('')}</g>`;
+      const nebula = `<path d="M-9,-3 Q-3,-8 3,-5 Q8,-3.6 9.5,-6" fill="none" stroke="${glow ?? '#7a5cff'}" stroke-width="1.6" stroke-linecap="round" opacity="0.5"/>`;
+      // Eye patch over one eye + a strap across the brow (drawn last so it reads clearly over the face).
+      const patch = `<g>
+        <path d="M-4.8,-2.4 L4.6,-0.6" stroke="#0c0a14" stroke-width="0.9" stroke-linecap="round"/>
+        <ellipse cx="2.6" cy="0.6" rx="2.15" ry="2.45" fill="#100c1a" stroke="#0c1116" stroke-width="0.6"/>
+        <ellipse cx="1.9" cy="-0.1" rx="0.7" ry="0.9" fill="#ffffff" opacity="0.14"/>
+      </g>`;
+      g = `<path d="${body}" fill="${color}" ${ink}/>
+        ${nebula}${stars}
+        <path d="M-11.5,-1.8 L-8,-9.6 Q-6,-7 -4.2,-6.6 Q-2,-11 0,-11.6 Q2,-11 4.2,-6.6 Q6,-7 8,-9.6 L11.5,-1.8" fill="none" stroke="${trim}" stroke-width="1.1" stroke-linejoin="round"/>
+        <g transform="translate(0 -4.4)">
+          <path d="M0,-2.8 L0.8,-0.8 L2.8,0 L0.8,0.8 L0,2.8 L-0.8,0.8 L-2.8,0 L-0.8,-0.8 Z" fill="${star}" stroke="#0c1116" stroke-width="0.4"/>
+          <circle r="0.7" fill="#fff"/>
+        </g>
+        ${patch}`;
+      break;
+    }
     default:
       g = '';
   }
   const flair =
     shape === 'starburst' || shape === 'supernova'
       ? sparkles([[-11, -9], [11, -8], [0, -18], [-6, 5]])
-      : shape === 'baggy'
-        ? sparkles([[-8, -8], [8, -6]])
-        : '';
+      : shape === 'tricorn'
+        ? sparkles([[-10, -8], [10, -7]])
+        : shape === 'baggy'
+          ? sparkles([[-8, -8], [8, -6]])
+          : '';
   return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">${a}${g}${flair}</g>`;
 }
 
@@ -545,6 +579,36 @@ function shirtDetail(
       detail = flameGs + core + embers;
       break;
     }
+    case 'parrot': {
+      // The Space Parrot plumage (GS-space-pirate-parrot): rows of iridescent scalloped macaw feathers
+      // (teal → gold → magenta, cycling per row) shingled down the cosmic-blue body, with white star
+      // specks flecked over them and a starlight gem on the breast. Mirrors the canvas `drawGolfer`.
+      const plume = ['#2fd6c8', '#ffc23a', '#ff5a9e'];
+      const scale = (x: number, y: number, r: number, col: string): string =>
+        `<path d="M${(x - r).toFixed(1)},${y.toFixed(1)} A${r.toFixed(2)},${r.toFixed(2)} 0 0 0 ${(x + r).toFixed(1)},${y.toFixed(1)} Z" fill="${col}" stroke="#0c1116" stroke-width="0.3" stroke-linejoin="round"/>`;
+      const rows = (yTop: number, yBottom: number, halfW: number): string => {
+        const r = 2.4;
+        const step = r * 1.32;
+        let out = '';
+        let row = 0;
+        for (let y = yTop; y <= yBottom; y += step, row++) {
+          const col = plume[row % plume.length]!;
+          const off = (row % 2) * r; // stagger alternate rows
+          for (let x = -halfW + off; x <= halfW; x += r * 2) out += scale(x, y, r, col);
+        }
+        return out;
+      };
+      const starPts: [number, number, number][] = worn
+        ? [[-6, worn.top + 3, 0.7], [5, worn.top + 9, 0.6], [-4, worn.top + 16, 0.65], [6, worn.top + 22, 0.6], [-6, worn.bottom - 6, 0.6], [3, worn.bottom - 2, 0.55]]
+        : [[-6, -6, 0.6], [5, -2, 0.55], [-3, 4, 0.6], [6, 7, 0.5]];
+      const stars = `<g fill="#ffffff">${starPts.map(([x, y, rr]) => `<circle cx="${x}" cy="${y.toFixed(1)}" r="${rr}"/>`).join('')}</g>`;
+      const gemY = worn ? worn.top + 5 : -6;
+      const gem = `<g transform="translate(0 ${gemY.toFixed(1)})">
+        <path d="M0,-2.4 L0.7,-0.7 L2.4,0 L0.7,0.7 L0,2.4 L-0.7,0.7 L-2.4,0 L-0.7,-0.7 Z" fill="#fff0c0" stroke="#0c1116" stroke-width="0.3"/>
+        <circle r="0.6" fill="#fff"/></g>`;
+      detail = worn ? rows(worn.top + 2, worn.bottom - 1, worn.halfW) + stars + gem : rows(-8, 10, 8.5) + stars + gem;
+      break;
+    }
     default:
       detail = '';
   }
@@ -562,7 +626,7 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   const bodyPath = `M${cx - 13},${cy - 9} L${cx - 6},${cy - 11} L${cx},${cy - 7} L${cx + 6},${cy - 11} L${cx + 13},${cy - 9} L${cx + 10},${cy - 3} L${cx + 9},${cy + 12} L${cx - 9},${cy + 12} L${cx - 10},${cy - 3} Z`;
   const base = `<path d="${bodyPath}" fill="${color}" ${ink}/>`;
   const flair =
-    shape === 'cosmic' || shape === 'blazer' || shape === 'riftplate' || shape === 'solarflare'
+    shape === 'cosmic' || shape === 'blazer' || shape === 'riftplate' || shape === 'solarflare' || shape === 'parrot'
       ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]])
       : '';
   return a + base + shirtDetail(look, cx, cy) + flair;
@@ -634,6 +698,25 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       .map(([ex, ey], i) => `<circle cx="${ex}" cy="${ey}" r="${(0.5 + (i % 2) * 0.25).toFixed(2)}" fill="${i % 2 ? corHi : cor}"><animate attributeName="opacity" values="0;1;0" dur="${(1 + i * 0.22).toFixed(2)}s" repeatCount="indefinite"/></circle>`)
       .join('');
     detail = flameGs + embers;
+  } else if (shape === 'parrotpants') {
+    // The Space Parrot tailfeathers (GS-space-pirate-parrot): long macaw tail-plumes sweeping down each
+    // leg (teal/gold/magenta) over cosmic navy, tipped with star specks. Mirrors the canvas `drawPants`.
+    const plume = ['#2fd6c8', '#ffc23a', '#ff5a9e'];
+    const feather = (x: number, yTop: number, len: number, w: number, col: string): string =>
+      `<path d="M${x.toFixed(1)},${yTop.toFixed(1)} Q${(x - w).toFixed(1)},${(yTop + len * 0.55).toFixed(1)} ${x.toFixed(1)},${(yTop + len).toFixed(1)} Q${(x + w).toFixed(1)},${(yTop + len * 0.55).toFixed(1)} ${x.toFixed(1)},${yTop.toFixed(1)} Z" fill="${col}" stroke="#0c1116" stroke-width="0.3" stroke-linejoin="round"/>` +
+      `<line x1="${x.toFixed(1)}" y1="${(yTop + 1).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(yTop + len - 1).toFixed(1)}" stroke="#0c1116" stroke-width="0.3" opacity="0.5"/>`;
+    const legFeathers = (lx: number, row0: number): string => {
+      const specs: [number, number, number, number][] = [
+        [lx, cy - 6, legBottom - (cy - 6), 2.3],
+        [lx - 2.5, cy - 3, (legBottom - (cy - 3)) * 0.74, 1.6],
+        [lx + 2.5, cy - 3, (legBottom - (cy - 3)) * 0.74, 1.6],
+      ];
+      return specs.map(([x, yt, len, w], i) => feather(x, yt, len, w, plume[(i + row0) % 3]!)).join('');
+    };
+    detail =
+      legFeathers(cx - 3.5, 0) +
+      legFeathers(cx + 3.5, 1) +
+      `<g fill="#fff"><circle cx="${cx - 3.5}" cy="${cy + 1}" r="0.6"/><circle cx="${cx + 3.5}" cy="${cy + 4}" r="0.6"/><circle cx="${cx - 5.5}" cy="${cy + 6}" r="0.5"/><circle cx="${cx + 5.5}" cy="${cy - 2}" r="0.5"/></g>`;
   } else if (shape === 'greaves') {
     // Valkyrie greaves (GS-valkyrie): war-skirt tassets hanging off the waist + gold shin plates.
     const plate = shade(accent, 0.14);
@@ -648,7 +731,7 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       </g>`;
   }
   const flair =
-    shape === 'nebula' || shape === 'riftgreaves' || shape === 'emberlegs'
+    shape === 'nebula' || shape === 'riftgreaves' || shape === 'emberlegs' || shape === 'parrotpants'
       ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]])
       : '';
   return a + body + band + detail + flair;
@@ -1103,6 +1186,36 @@ export function golferPreviewSVG(
           .join('');
       legDetail =
         legFire(lHip, lAnk) + legFire(rHip, rAnk) + `<g>${legEmbers(lHip, lAnk, 0)}${legEmbers(rHip, rAnk, 1)}</g>`;
+    } else if (pantsShape === 'parrotpants') {
+      // The Space Parrot tailfeathers (GS-space-pirate-parrot): long macaw tail-plumes sweeping the full
+      // length of each leg (teal/gold/magenta) over the cosmic-navy legs, tipped with star specks.
+      const plume = ['#2fd6c8', '#ffc23a', '#ff5a9e'];
+      const feather = (x: number, yTop: number, len: number, w: number, col: string): string =>
+        `<path d="M${f(x)},${f(yTop)} Q${f(x - w)},${f(yTop + len * 0.55)} ${f(x)},${f(yTop + len)} Q${f(x + w)},${f(yTop + len * 0.55)} ${f(x)},${f(yTop)} Z" fill="${col}" stroke="#0c1116" stroke-width="${sw(0.6)}" stroke-linejoin="round"/>` +
+        `<line x1="${f(x)}" y1="${f(yTop + px(1.5))}" x2="${f(x)}" y2="${f(yTop + len - px(1.5))}" stroke="#0c1116" stroke-width="${sw(0.6)}" opacity="0.5"/>`;
+      const legPlumes = (hipC: number, ankC: number, row0: number): string => {
+        const mid = (hipC + ankC) / 2;
+        const top = hipY + px(1);
+        const len = ankleY - top;
+        const specs: [number, number, number, number, string][] = [
+          [mid, top, len, px(3.6), plume[row0 % 3]!],
+          [mid - px(3.4), top + px(3), len * 0.76, px(2.4), plume[(row0 + 1) % 3]!],
+          [mid + px(3.4), top + px(3), len * 0.76, px(2.4), plume[(row0 + 2) % 3]!],
+        ];
+        return specs.map(([x, yt, l, w, col]) => feather(x, yt, l, w, col)).join('');
+      };
+      const legStars = (hipC: number, ankC: number, o: number): string =>
+        [0.22, 0.48, 0.72]
+          .map((fr, i) => {
+            const x = hipC + (ankC - hipC) * fr + (i % 2 ? px(2) : -px(2));
+            const y = hipY + (ankleY - hipY) * fr;
+            return `<circle cx="${f(x)}" cy="${f(y)}" r="${f(px(0.6 + ((i + o) % 2) * 0.2))}"/>`;
+          })
+          .join('');
+      legDetail =
+        legPlumes(lHip, lAnk, 0) +
+        legPlumes(rHip, rAnk, 1) +
+        `<g fill="#fff">${legStars(lHip, lAnk, 0)}${legStars(rHip, rAnk, 1)}</g>`;
     } else if (pantsShape === 'greaves') {
       // Valkyrie greaves (GS-valkyrie): war-skirt tassets over the hips + gold shin greave plates.
       const plate = shade(pantsAcc, 0.14);

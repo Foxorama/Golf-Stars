@@ -563,6 +563,46 @@ function drawGolfer(
     ctx.arc(ccx, ccy, 0.7, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Space Parrot plumage (GS-space-pirate-parrot 'parrot'): rows of scalloped iridescent macaw feathers
+  // (teal/gold/magenta) shingled down the torso + star specks + a breast gem. Mirrors the wardrobe SVG.
+  if (sShape === 'parrot') {
+    const plume = ['#2fd6c8', '#ffc23a', '#ff5a9e'];
+    const r = 1.9;
+    const step = r * 1.35;
+    let row = 0;
+    for (let y = -49; y <= -31; y += step, row++) {
+      ctx.fillStyle = plume[row % 3]!;
+      const c = torsoX(y);
+      const off = (row % 2) * r;
+      for (let x = c - 5.5 + off; x <= c + 5.5; x += r * 2) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI, false); // lower semicircle bulging down = a feather scale
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#fff'; // star specks
+    for (const [dx, y] of [[-3, -46], [3, -42], [-2, -37], [3, -33]] as [number, number][]) {
+      ctx.beginPath();
+      ctx.arc(torsoX(y) + dx, y, 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Starlight breast gem (a small 4-point star).
+    const gx = torsoX(-45);
+    const gy = -45;
+    ctx.fillStyle = '#fff0c0';
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - 2.2);
+    ctx.lineTo(gx + 0.7, gy - 0.7);
+    ctx.lineTo(gx + 2.2, gy);
+    ctx.lineTo(gx + 0.7, gy + 0.7);
+    ctx.lineTo(gx, gy + 2.2);
+    ctx.lineTo(gx - 0.7, gy + 0.7);
+    ctx.lineTo(gx - 2.2, gy);
+    ctx.lineTo(gx - 0.7, gy - 0.7);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // Club shaft + head (behind the arms). An equipped cosmetic DRIVER (GS-thor) swaps the plain club head
   // for a mythic WARHAMMER wreathed in lightning; else a bought themed club set (GS-proshop-2) tints the
@@ -1270,6 +1310,102 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.arc(hx, hy - r + 1, 1.3, 0, Math.PI * 2); // gold emblem
       ctx.fill();
       break;
+    case 'tricorn': {
+      // The galaxy pirate TRICORN (GS-space-pirate-parrot): a cocked three-corner felt hat washed in
+      // nebula + starlight, gold buccaneer trim along the cocked brim, a starlight emblem, and a built-in
+      // black EYE PATCH over one eye. Mirrors the wardrobe SVG (`apparelArt.ts hatGlyph 'tricorn'`);
+      // authored against the canonical r=7 head, scaled by s.
+      const s = r / 7;
+      const P = (x: number, y: number): [number, number] => [hx + x * s, hy + y * s];
+      const felt = (): void => {
+        ctx.beginPath();
+        let p = P(-11.5, -1.8); ctx.moveTo(p[0], p[1]);
+        p = P(-8, -9.6); ctx.lineTo(p[0], p[1]);
+        let c1 = P(-6, -7); let e = P(-4.2, -6.6); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+        c1 = P(-2, -11); e = P(0, -11.6); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+        c1 = P(2, -11); e = P(4.2, -6.6); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+        c1 = P(6, -7); e = P(8, -9.6); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+        p = P(11.5, -1.8); ctx.lineTo(p[0], p[1]);
+        c1 = P(0, 1.8); e = P(-11.5, -1.8); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+        ctx.closePath();
+      };
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1;
+      ctx.lineJoin = 'round';
+      felt();
+      ctx.fill();
+      ctx.stroke();
+      // Nebula wash swoosh.
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.5;
+      ctx.strokeStyle = glow ?? '#7a5cff';
+      ctx.lineWidth = 1.6 * s;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      let q = P(-9, -3); ctx.moveTo(q[0], q[1]);
+      let cc = P(-3, -8); let ee = P(3, -5); ctx.quadraticCurveTo(cc[0], cc[1], ee[0], ee[1]);
+      cc = P(8, -3.6); ee = P(9.5, -6); ctx.quadraticCurveTo(cc[0], cc[1], ee[0], ee[1]);
+      ctx.stroke();
+      ctx.restore();
+      // Starfield on the felt.
+      ctx.fillStyle = '#ffffff';
+      for (const [sx, sy, sr] of [[-6.5, -4.5, 0.55], [-3, -7.5, 0.5], [2.5, -8, 0.55], [6, -5, 0.5], [-8.5, -3, 0.45], [8.5, -3.2, 0.45], [0, -6, 0.4]] as [number, number, number][]) {
+        ctx.beginPath();
+        ctx.arc(hx + sx * s, hy + sy * s, sr * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Gold trim re-tracing the cocked upper brim.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.1 * s;
+      ctx.beginPath();
+      q = P(-11.5, -1.8); ctx.moveTo(q[0], q[1]);
+      q = P(-8, -9.6); ctx.lineTo(q[0], q[1]);
+      cc = P(-6, -7); ee = P(-4.2, -6.6); ctx.quadraticCurveTo(cc[0], cc[1], ee[0], ee[1]);
+      cc = P(-2, -11); ee = P(0, -11.6); ctx.quadraticCurveTo(cc[0], cc[1], ee[0], ee[1]);
+      cc = P(2, -11); ee = P(4.2, -6.6); ctx.quadraticCurveTo(cc[0], cc[1], ee[0], ee[1]);
+      cc = P(6, -7); ee = P(8, -9.6); ctx.quadraticCurveTo(cc[0], cc[1], ee[0], ee[1]);
+      q = P(11.5, -1.8); ctx.lineTo(q[0], q[1]);
+      ctx.stroke();
+      // Starlight emblem (a 4-point star) front-and-centre.
+      const ex = hx;
+      const ey = hy - 4.4 * s;
+      ctx.fillStyle = '#fff0c0';
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 0.4 * s;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey - 2.8 * s);
+      ctx.lineTo(ex + 0.8 * s, ey - 0.8 * s);
+      ctx.lineTo(ex + 2.8 * s, ey);
+      ctx.lineTo(ex + 0.8 * s, ey + 0.8 * s);
+      ctx.lineTo(ex, ey + 2.8 * s);
+      ctx.lineTo(ex - 0.8 * s, ey + 0.8 * s);
+      ctx.lineTo(ex - 2.8 * s, ey);
+      ctx.lineTo(ex - 0.8 * s, ey - 0.8 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(ex, ey, 0.7 * s, 0, Math.PI * 2);
+      ctx.fill();
+      // Eye patch over one eye (the +x eye), with a strap across the brow.
+      ctx.strokeStyle = '#0c0a14';
+      ctx.lineWidth = 0.9 * s;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      q = P(-4.8, -2.4); ctx.moveTo(q[0], q[1]);
+      q = P(4.6, -0.6); ctx.lineTo(q[0], q[1]);
+      ctx.stroke();
+      ctx.fillStyle = '#100c1a';
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 0.6 * s;
+      ctx.beginPath();
+      ctx.ellipse(hx + 2.6 * s, hy + 0.6 * s, 2.15 * s, 2.45 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
     default:
       break;
   }
@@ -1483,6 +1619,46 @@ function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: strin
         ctx.beginPath();
         ctx.arc(hip[0] + (fx - hip[0]) * 0.44, hip[1] + (fy - hip[1]) * 0.44, 0.9, 0, Math.PI * 2);
         ctx.fill();
+      }
+      break;
+    }
+    case 'parrotpants': {
+      // Space Parrot tailfeathers (GS-space-pirate-parrot): cosmic-navy legs draped in long macaw
+      // tail-plumes (teal/gold/magenta) + star specks. Mirrors the wardrobe SVG (`pantsGlyph`).
+      legs(color, 6.5);
+      const plume = ['#2fd6c8', '#ffc23a', '#ff5a9e'];
+      const feather = (x0: number, y0: number, x1: number, y1: number, w: number, col: string): void => {
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = (-dy / len) * w;
+        const ny = (dx / len) * w;
+        const mx = (x0 + x1) / 2;
+        const my = (y0 + y1) / 2;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.quadraticCurveTo(mx + nx, my + ny, x1, y1);
+        ctx.quadraticCurveTo(mx - nx, my - ny, x0, y0);
+        ctx.closePath();
+        ctx.fill();
+      };
+      let li = 0;
+      for (const [fx, fy] of feet) {
+        const ex = hip[0] + (fx - hip[0]) * 0.82;
+        const ey = hip[1] + (fy - hip[1]) * 0.82;
+        feather(hip[0], hip[1], fx, fy, 2.6, plume[li % 3]!);
+        feather(hip[0], hip[1], ex - 2, ey, 1.7, plume[(li + 1) % 3]!);
+        feather(hip[0], hip[1], ex + 2, ey, 1.7, plume[(li + 2) % 3]!);
+        li++;
+      }
+      ctx.fillStyle = '#fff'; // star specks along the plumes
+      for (const [fx, fy] of feet) {
+        for (const fr of [0.3, 0.6]) {
+          ctx.beginPath();
+          ctx.arc(hip[0] + (fx - hip[0]) * fr + (fr > 0.4 ? 1 : -1), hip[1] + (fy - hip[1]) * fr, 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       break;
     }
