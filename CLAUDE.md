@@ -449,6 +449,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     at the decision map's exact `decisionRadius`. `playView`'s `spawnLandFX` answers the touchdown
     per lie/penalty — extend it with any new penalty kind.
   - Re-shoot the gallery (`node scripts/gallery.mjs`) after any `style.ts` / `style/*` change.
+  - Shop/reward CLUB cards draw a per-FAMILY head (GS-club-icons, `render/itemArt.ts`): `clubFamilyOf`
+    → `clubHead` (driver/wood/hybrid/iron/wedge/putter), shaft + head share ONE `HOSEL` anchor so the
+    shaft meets the HEEL (centre = the old shovel look). Gear-shaft items resolve via `SHAFT_FAMILY`,
+    reward clubs off their `<type>`; `itemArtKind` stays `'shaft'` (per-id emblems keep them distinct).
+    Pure SVG, no rng/save bump. Eyeball with `scripts/club-icons-preview.mjs`.
 - **Audio** — `docs/decisions/audio.md`
   - ASSETLESS, always: every cue + music note is synthesized WebAudio — no downloaded audio file,
     ever. ONE shared `AudioContext`, two buses: SFX on `sound`, generative music on `music`.

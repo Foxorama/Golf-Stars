@@ -1744,3 +1744,34 @@ which clears the flag; the next `persist` writes the cleared save so it never re
 per owned item, the nothing-owned no-notice case) + the existing price/affordability assertions
 retuned across apparel/bag/ships/ui tests; the migrate → initState → dismiss round-trip was driven
 end-to-end against the real reducer.
+
+## GS-club-icons — Per-family club silhouettes on the shop cards (2026-07-10)
+
+**The critique (the user's, one screenshot).** Every club item in the Pro Shop / reward pool drew the
+SAME `render/itemArt.ts drawShaft` glyph: a single rounded head at the end of a diagonal shaft. With
+the shaft driving into the MIDDLE of that rounded blob, it read as a **shovel**, not a club — and a
+Grooved Driver Face, Matched Fairway Woods, a Tuned Hybrid Set and a Blueprint Iron Set were pictorially
+identical. The ask: separate, correct graphics for drivers, woods, hybrids and irons, used
+appropriately.
+
+**The fix — a family, then a head.** `clubFamilyOf(type)` classifies a bag club TYPE id
+(`D`/`3W`/`5H`/`7i`/`SW`/`60`/`chip`/`putter`) into a `ClubFamily`
+(`driver`/`wood`/`hybrid`/`iron`/`wedge`/`putter`); `clubHead(family, col)` draws the matching
+silhouette, and `clubShaft` + `clubHead` share a single **HOSEL anchor** (`HOSEL_X`/`HOSEL_Y`) so the
+shaft always meets the HEEL of the head — never the centre, which was the shovel tell. The six heads:
+a deep bulbous titanium **driver** on a flat sole, a shallower compact **wood** on sole rails, a stubby
+upright **hybrid**, a thin grooved cavity-back **iron** blade with a distinct hosel neck, a lofted
+grooved **wedge** with a wide sole flange, and a flat **putter** mallet with an alignment line. Each
+rounded head sits on a FLAT sole (the resting-club cue that most kills the paddle/shovel read); the
+irons/wedges are unmistakably thin blades.
+
+**Wired both paths.** The gear-shaft shop items resolve their family through `SHAFT_FAMILY` (driver ←
+power-cell/overdrive/distance-driver/nova-driver; wood ← distance-woods; hybrid ← distance-hybrids;
+iron ← gyro/distance-control/distance-irons/pro-irons/quantum-shafts — the whole-bag shaft upgrades
+default to the flagship driver); reward clubs (`club:<set>:<type>`) pick the family off their `<type>`
+in `drawThemedClub`, which keeps its themed aura (planet ring / phoenix / solar) behind the same shared
+club graphic. `itemArtKind` is UNCHANGED (family items still report `'shaft'`), so the emblem-roundel
+and per-id distinctness guards in `tests/proshop-expansion.test.ts` still hold — power-cell/overdrive
+share the driver head but stay distinct via their function emblems. Pure SVG, no rng, no save bump; the
+on-course golfer swing (`equippedGearTheme`) is a separate renderer and untouched. Eyeballed via
+`scripts/club-icons-preview.mjs` (all six families × rarity tints, gear + reward paths).

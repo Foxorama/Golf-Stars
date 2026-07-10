@@ -387,33 +387,127 @@ function ballGlyph(cx: number, cy: number, r: number, fill = '#ffffff', stroke =
 
 // --- The per-kind drawings ---------------------------------------------------
 
-function drawShaft(col: string, seed: string): string {
-  // A tour driver on the diagonal: rubber grip, graphite shaft, ferrule, and a glinting pear head with
-  // a crown sheen + a milled face insert — a club that looks forged, not a stick with a blob on it.
-  const head = mix(col, '#e8edf5', 0.32);
-  const crown = mix(col, '#ffffff', 0.5);
+// --- Club heads by FAMILY (GS-club-icons) ------------------------------------
+// The old single "shaft" glyph drew ONE rounded blob for every club item, and with the shaft driving
+// into the middle of that blob it read as a SHOVEL. Now each club family gets its own head silhouette,
+// authored in WORLD coords anchored at a shared HOSEL so the shaft always meets the HEEL (never the
+// centre — that was the shovel tell): the driver is a deep bulbous titanium pear, a wood a shallower
+// compact pear on sole rails, a hybrid a stubby rounded rescue head, an iron a thin grooved cavity
+// blade, a wedge a lofted grooved blade with a wide sole flange, a putter a flat mallet. Pure SVG.
+
+export type ClubFamily = 'driver' | 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
+
+/** Classify a bag club TYPE id ('D','3W','5H','7i','SW','60','chip','putter') into a family. */
+export function clubFamilyOf(type: string): ClubFamily {
+  if (type === 'putter') return 'putter';
+  if (type === 'D') return 'driver';
+  if (/W$/.test(type)) return 'wood';
+  if (/H$/.test(type)) return 'hybrid';
+  if (/i$/.test(type)) return 'iron';
+  return 'wedge'; // PW, GW, SW, 60°, 64°, chip
+}
+
+/** Which club family each shaft/gear shop item illustrates (default: driver — the flagship stick). */
+const SHAFT_FAMILY: Record<string, ClubFamily> = {
+  'power-cell': 'driver',
+  overdrive: 'driver',
+  'distance-driver': 'driver',
+  'nova-driver': 'driver',
+  'distance-woods': 'wood',
+  'distance-hybrids': 'hybrid',
+  gyro: 'iron',
+  'distance-control': 'iron',
+  'distance-irons': 'iron',
+  'pro-irons': 'iron',
+  'quantum-shafts': 'iron',
+};
+
+// The shared hosel anchor: the shaft ends here and every head hangs off it, soled near y≈84.
+const HOSEL_X = 99;
+const HOSEL_Y = 61;
+
+/** The rubber grip + graphite shaft, ending at the hosel; a ferrule caps the join. */
+function clubShaft(col: string): string {
   const grip = mix(col, '#1b1f29', 0.15);
-  return frame(
-    `${sparkles(seed, col, 5)}
-     <!-- grip -->
-     <line x1="24" y1="14" x2="40" y2="25" stroke="${grip}" stroke-width="9" stroke-linecap="round"/>
+  const steel = mix(col, '#c9d2e0', 0.5);
+  return `
+     <line x1="24" y1="14" x2="40" y2="24" stroke="${grip}" stroke-width="9" stroke-linecap="round"/>
      <g stroke="#0b0d12" stroke-width="0.8" opacity="0.5"><path d="M27 15 l-3 4 M31 18 l-3 4 M35 21 l-3 4"/></g>
-     <!-- shaft -->
-     <line x1="38" y1="24" x2="104" y2="68" stroke="#1b1f29" stroke-width="6.5" stroke-linecap="round"/>
-     <line x1="38" y1="24" x2="104" y2="68" stroke="${mix(col, '#c9d2e0', 0.5)}" stroke-width="3.2" stroke-linecap="round"/>
-     <line x1="39" y1="23" x2="96" y2="61" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
-     <!-- ferrule -->
-     <rect x="99" y="61" width="8" height="6" rx="2" transform="rotate(34 103 64)" fill="#0b0d12"/>
-     <!-- driver head -->
-     <g transform="translate(110 74) rotate(28)">
-       <path d="M -18 -13 Q 8 -18 15 -1 Q 12 15 -14 12 Q -22 4 -18 -13 Z" fill="${head}" stroke="#11141b" stroke-width="2"/>
-       <path d="M -15 -10 Q 6 -14 11 -2 Q 4 -6 -12 -4 Z" fill="${crown}" opacity="0.55"/>
-       <path d="M -16 6 L -6 13 L -14 12 Z" fill="${col}" opacity="0.6"/>
-       <g stroke="#11141b" stroke-width="0.7" opacity="0.6"><path d="M -13 -3 l 10 -1 M -13 1 l 11 -1 M -13 5 l 10 -1"/></g>
-     </g>
-     <path d="M 94 60 l 9 -6 l 3 6 z" fill="#ffffff" opacity="0.75"/>`,
-    col,
-  );
+     <line x1="38" y1="23" x2="${HOSEL_X}" y2="${HOSEL_Y}" stroke="#1b1f29" stroke-width="6.5" stroke-linecap="round"/>
+     <line x1="38" y1="23" x2="${HOSEL_X}" y2="${HOSEL_Y}" stroke="${steel}" stroke-width="3.2" stroke-linecap="round"/>
+     <line x1="39" y1="22" x2="${HOSEL_X - 8}" y2="${HOSEL_Y - 7}" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
+     <rect x="${HOSEL_X - 5}" y="${HOSEL_Y - 3}" width="8" height="7" rx="2" transform="rotate(37 ${HOSEL_X} ${HOSEL_Y})" fill="#0b0d12"/>`;
+}
+
+/** The head silhouette for a family, drawn in world coords hanging off the shared hosel. */
+function clubHead(family: ClubFamily, col: string): string {
+  const head = mix(col, '#e8edf5', 0.34);
+  const crown = mix(col, '#ffffff', 0.55);
+  const face = mix(col, '#aeb8c8', 0.42);
+  const dark = '#11141b';
+  const groove = mix(col, '#11141b', 0.4);
+  switch (family) {
+    case 'driver':
+      // Big deep titanium head sitting on a FLAT sole (the resting-club cue) — tall leading face on
+      // the heel side, crown doming back to a rounded toe. The widest, deepest of the three.
+      return `<g>
+        <path d="M 98 60 C 93 64 92 72 96 78 L 100 83 L 130 83 C 140 83 144 70 137 62 C 130 56 112 55 103 57 C 100 58 99 59 98 60 Z" fill="${head}" stroke="${dark}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 104 60 C 114 57 127 58 134 63" fill="none" stroke="${crown}" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+        <path d="M 96 65 L 100 66 L 100 82 L 97 79 C 94 74 94 69 96 65 Z" fill="${face}" opacity="0.75"/>
+        <path d="M 96 64 L 100 62" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity="0.55"/>
+        <circle cx="120" cy="67" r="1.5" fill="${crown}" opacity="0.75"/>
+      </g>`;
+    case 'wood':
+      // Shallower, compact head on a flat sole with a pair of sole rails — reads distinctly smaller
+      // and flatter than the driver.
+      return `<g>
+        <path d="M 99 61 C 95 64 94 71 98 76 L 101 80 L 124 80 C 132 80 135 68 129 62 C 122 57 107 56 99 61 Z" fill="${head}" stroke="${dark}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 104 61 C 112 58 122 59 128 63" fill="none" stroke="${crown}" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+        <path d="M 97 65 L 101 66 L 101 79 L 99 76 C 96 72 96 68 97 65 Z" fill="${face}" opacity="0.75"/>
+        <g stroke="${face}" stroke-width="1.3" stroke-linecap="round" opacity="0.85"><path d="M 106 79 L 122 76"/><path d="M 106 81.5 L 120 78.8"/></g>
+      </g>`;
+    case 'hybrid':
+      // Stubby, upright rescue head on a flat sole with a single rail — the smallest, chunkiest of the
+      // three rounded heads.
+      return `<g>
+        <path d="M 99 61 C 95 64 95 71 99 76 L 102 79 L 118 79 C 125 79 127 67 121 62 C 115 57 104 57 99 61 Z" fill="${head}" stroke="${dark}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 104 61 C 110 58 118 59 123 63" fill="none" stroke="${crown}" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+        <path d="M 98 65 L 102 66 L 102 78 L 100 75 C 97 71 97 68 98 65 Z" fill="${face}" opacity="0.75"/>
+        <path d="M 106 78 L 118 75.5" stroke="${face}" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/>
+      </g>`;
+    case 'iron':
+      // Thin cavity-back blade with a distinct hosel neck + grooved face — clearly a bladed iron.
+      return `<g>
+        <path d="M 98 58 L 103 60 L 101 66 L 96 64 Z" fill="${head}" stroke="${dark}" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M 100 63 L 106 66 L 128 82 L 122 85 L 99 71 Z" fill="${head}" stroke="${dark}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 103 65 L 124 80" stroke="${crown}" stroke-width="1" opacity="0.5"/>
+        <g stroke="${groove}" stroke-width="0.9" stroke-linecap="round" opacity="0.75">
+          <path d="M 104 70 L 118 80"/><path d="M 107 68.5 L 121 78.5"/><path d="M 110 67 L 124 77"/><path d="M 113 65.5 L 126 75"/>
+        </g>
+      </g>`;
+    case 'wedge':
+      // Lofted grooved blade laid open, with a wider sole flange — reads as a scoring wedge.
+      return `<g>
+        <path d="M 98 58 L 103 59 L 102 66 L 97 65 Z" fill="${head}" stroke="${dark}" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M 100 63 L 108 64 L 132 74 Q 137 78 131 82 L 101 74 Q 95 70 100 63 Z" fill="${head}" stroke="${dark}" stroke-width="2" stroke-linejoin="round"/>
+        <g stroke="${groove}" stroke-width="0.9" stroke-linecap="round" opacity="0.75">
+          <path d="M 104 66 L 126 74"/><path d="M 103 69 L 127 76.5"/><path d="M 103 72 L 126 78.5"/>
+        </g>
+        <path d="M 101 76 Q 108 82 131 82" fill="none" stroke="${dark}" stroke-width="1" opacity="0.4"/>
+      </g>`;
+    case 'putter':
+      // Flat mallet blade with an alignment line.
+      return `<g>
+        <rect x="97" y="72" width="40" height="12" rx="3" fill="${head}" stroke="${dark}" stroke-width="2"/>
+        <rect x="100" y="72" width="6" height="12" fill="${face}" opacity="0.6"/>
+        <line x1="118" y1="72" x2="118" y2="84" stroke="${col}" stroke-width="2"/>
+      </g>`;
+  }
+}
+
+/** Draw a full club (grip + shaft + family head) inside the shop-card frame. */
+function drawShaft(col: string, seed: string, family: ClubFamily = 'driver'): string {
+  return frame(`${sparkles(seed, col, 5)}${clubShaft(col)}${clubHead(family, col)}`, col);
 }
 
 function drawBall(id: string, col: string, seed: string): string {
@@ -868,24 +962,23 @@ function drawCaddyFigure(id: string, col: string, seed: string): string {
   return frame(`${sparkles(seed, col, 5)}${fig()}`, col);
 }
 
-/** Reward club, themed by its set (planet / phoenix / solarstorm). The head glows with the theme.
- *  `clubType` selects the head silhouette: a PUTTER gets a flat mallet blade + alignment line; every
- *  other type keeps the swept iron/wood blade. */
+/** Reward club, themed by its set (planet / phoenix / solarstorm). The head glows with the theme, and
+ *  `clubType` picks the family silhouette (driver / wood / hybrid / iron / wedge / putter) so a reward
+ *  driver looks like a driver and a reward wedge like a wedge — never the same generic blade. */
 function drawThemedClub(theme: string | undefined, col: string, seed: string, clubType?: string): string {
-  const head = mix(col, '#e8edf5', 0.4);
+  const family = clubType ? clubFamilyOf(clubType) : 'driver';
   let aura = '';
-  let badge = '';
   if (theme === 'planet') {
     // A ringed planet behind the club.
-    aura = `<g transform="translate(40 32)"><circle cx="0" cy="0" r="15" fill="${mix(col, '#7fb0ff', 0.4)}" opacity="0.85"/>
+    aura = `<g transform="translate(40 30)"><circle cx="0" cy="0" r="15" fill="${mix(col, '#7fb0ff', 0.4)}" opacity="0.85"/>
       <ellipse cx="0" cy="0" rx="24" ry="8" fill="none" stroke="${mix(col, '#cfe3ff', 0.5)}" stroke-width="2.5" transform="rotate(-20)"/>
       <circle cx="-5" cy="-5" r="5" fill="#fff" opacity="0.3"/></g>`;
   } else if (theme === 'phoenix') {
-    aura = `<g transform="translate(40 34)" opacity="0.9">
+    aura = `<g transform="translate(40 32)" opacity="0.9">
       <path d="M 0 -16 q 14 6 8 22 q 8 -4 6 -16 q 10 12 -2 26 q -16 6 -22 -10 q -2 -16 10 -22 z" fill="#ff7a3c"/>
       <path d="M 0 -8 q 8 4 5 14 q 5 -3 3 -11 q 6 8 -2 16 q -10 3 -13 -7 q -1 -10 7 -12 z" fill="#ffd23c"/></g>`;
   } else if (theme === 'solarstorm') {
-    aura = `<g transform="translate(42 32)">
+    aura = `<g transform="translate(42 30)">
       <circle cx="0" cy="0" r="14" fill="#ffd23c"/>
       <g stroke="#ffb01e" stroke-width="2.4" stroke-linecap="round">
         ${Array.from({ length: 10 }, (_, i) => {
@@ -898,29 +991,8 @@ function drawThemedClub(theme: string | undefined, col: string, seed: string, cl
         }).join('')}
       </g>
       <circle cx="-4" cy="-4" r="4" fill="#fff7d6" opacity="0.7"/></g>`;
-    badge = `<g stroke="#ffd23c" stroke-width="1.5" fill="none" opacity="0.6"><path d="M 96 64 q 8 -3 14 2"/></g>`;
   }
-  // A PUTTER reads as a flat mallet blade with an alignment line, not the swept iron face.
-  const headSvg =
-    clubType === 'putter'
-      ? `<g transform="translate(110 74) rotate(33)">
-       <rect x="-16" y="-7" width="30" height="13" rx="3" fill="${head}" stroke="#11141b" stroke-width="2"/>
-       <line x1="-1" y1="-7" x2="-1" y2="6" stroke="${col}" stroke-width="2"/>
-       <rect x="-16" y="-7" width="5" height="13" rx="2" fill="${col}" opacity="0.5"/>
-     </g>`
-      : `<g transform="translate(110 74) rotate(33)">
-       <path d="M -14 -12 Q 6 -16 12 0 Q 8 14 -12 11 Z" fill="${head}" stroke="#11141b" stroke-width="2"/>
-       <ellipse cx="-2" cy="-2" rx="3" ry="4" fill="${col}" opacity="0.5"/>
-     </g>`;
-  return frame(
-    `${sparkles(seed, col, 4)}${aura}
-     <line x1="58" y1="22" x2="108" y2="72" stroke="#1b1f29" stroke-width="8" stroke-linecap="round"/>
-     <line x1="58" y1="22" x2="108" y2="72" stroke="${mix(col, '#c9d2e0', 0.55)}" stroke-width="4" stroke-linecap="round"/>
-     <rect x="50" y="14" width="15" height="9" rx="3" transform="rotate(33 57 18)" fill="#222633"/>
-     ${headSvg}
-     ${badge}`,
-    col,
-  );
+  return frame(`${sparkles(seed, col, 4)}${aura}${clubShaft(col)}${clubHead(family, col)}`, col);
 }
 
 /**
@@ -941,7 +1013,7 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
   let base: string;
   switch (kind) {
     case 'shaft':
-      base = drawShaft(col, seed);
+      base = drawShaft(col, seed, SHAFT_FAMILY[id] ?? 'driver');
       break;
     case 'ball':
       base = drawBall(id, col, seed);
