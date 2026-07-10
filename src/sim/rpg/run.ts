@@ -10,53 +10,89 @@
  */
 
 import { Rng } from '../rng';
-import { generateCourse } from '../course/generate';
-import { playCourse, playHole, type PlayedHole, type PlayHoleOptions } from '../round';
+import { playCourse, playHole, type PlayedHole, type PlayHoleOptions, type ScrambleOpts } from '../round';
 import { playTotals } from '../score';
 import type { Course, Rarity } from '../course/contract';
 import {
-  DRIVER_ID,
-  SHOP_ITEMS,
   aceCount,
   eagleCount,
   aceCreditBonus,
-  canBuy,
   clubItem,
   creditsForStop,
   cutLine,
   grantAceTalent,
-  itemCap,
-  itemCost,
-  itemTags,
   loadoutFromPerks,
-  namedCaddyOwned,
   netDispersion,
-  offerableClubs,
-  ownedCount,
-  putterItemOfferable,
   puttSkillOf,
   relicCreditBonus,
   shopItem,
   talentsForArchetype,
-  startingLoadout,
   type PlayerLoadout,
   type ShopItem,
 } from './economy';
-import { RARITY_C } from './loot';
-import { ASGARD_FORMAT, DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, startingFuelFor, stopCount, stopSpecFor, type BossSpec, type StopSpec } from './formats';
+import { ASGARD_FORMAT, DEFAULT_FORMAT, bossAt, getFormat, isFinalStop, isMatchplayBoss, isTeamDuelBoss, resolveTeamFormat, startingFuelFor, stopSpecFor, type BossSpec } from './formats';
 import { endlessMilestoneShards, endlessSetGateOverPar, endlessSetToPar, passesEndlessSet, warpBirdieHole } from './endless';
 import { playMatchStop, playTeamMatchStop, bossHasHomeEdge, type BossEdge, type TeamSetup, type TeamFormat } from './match';
-import { applyMeta, metaStartingCredits, type MetaUpgrades } from './meta';
-import { applyBagTier, DEFAULT_BAG_TIER, type BagTier } from './bag';
-import { addUnlockedClubs } from './club-unlock';
-import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
-import type { ScrambleOpts } from '../round';
-import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, effectBiomeAffinity, WEATHER_AFFINITY_BOOST, routeClubFind, routeDifficulty, routeEffect } from './effects';
+import { metaStartingCredits, type MetaUpgrades } from './meta';
+import { DEFAULT_BAG_TIER, type BagTier } from './bag';
+import { characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
+import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, type RouteEvent } from './events';
+import { effectPatchKind, routeClubFind, routeEffect } from './effects';
 import { salvageClubFind, type SalvageFind } from './salvage';
-import { applyRainbowRoad } from './rainbow';
-import { ASGARD_THEME, themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
+import { ASGARD_THEME, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
 import { buildField, buildVoyageField, arcCut, arcIndexOf, arcSurvivorTarget, bossOpponentFor, voyageFieldEase, type ArcStopSlice, type Field, type PlayerInfo } from './competition';
+
+// --- Extracted sibling modules (GS-refactor-split) ---------------------------
+// run.ts is the barrel: the reducer spine stays here; these siblings hold cohesive sections split
+// out of this file (loadout / course / fuel / shop / serialise). The pieces the spine uses are
+// imported here; the full public surface of each is re-exported below, so 'sim/rpg/run' stays the
+// single import path (every existing importer is unchanged). Each sibling imports only TYPES back
+// from run.ts (erased at compile), so there is no runtime import cycle.
+import { startingLoadoutFor, baseLoadoutForRun, ASCENSION_MAX, ascensionCutBonus, ascensionCreditPenalty } from './runLoadout';
+import { currentCourse, currentTheme, routeTheme } from './runCourse';
+import { tankCapacity, routeFuelCost, travelRefuelCost, canTravel, strand } from './runFuel';
+import { buy } from './runShop';
+
+export {
+  startingLoadoutFor,
+  baseLoadoutForRun,
+  ASCENSION_MAX,
+  ascensionCutBonus,
+  ascensionCreditPenalty,
+} from './runLoadout';
+export { stopSeed, generateStopCourse, currentTheme, routeTheme, currentCourse } from './runCourse';
+export {
+  FUEL_PRICE_BASE,
+  FUEL_PRICE_SLOPE,
+  FUEL_PRICE_MAX,
+  fuelUnitCost,
+  tankCapacity,
+  routeFuelCost,
+  fuelShortfall,
+  travelRefuelCost,
+  canTravel,
+  scanFuelCost,
+  canScanRoutes,
+  scanRoutes,
+  buyFuel,
+  strand,
+} from './runFuel';
+export {
+  buy,
+  SHOP_OFFER_SIZE,
+  rarityDepthBias,
+  voyageRarityBias,
+  voyageShopProgress,
+  shopRarityBias,
+  shopOffer,
+  STARMART_OFFER_SIZE,
+  STARMART_COST,
+  starmartRerollCost,
+  starmartOffer,
+} from './runShop';
+export type { ShopOffer, ShardShopOffer } from './runShop';
+export { snapshotRun, resumeRun } from './runSerialise';
+export type { RunSnapshot } from './runSerialise';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked' | 'won' | 'stranded';
@@ -178,37 +214,6 @@ export interface Run {
   history: StopResult[];
 }
 
-/**
- * The starting loadout for a run: the chosen golfer's signature bag/shape (GS-18, GS-clubs) FIRST,
- * then the permanent meta-upgrades baked ON TOP — so Tour Bag (+yds) lands on the character's own
- * sparse starting bag rather than a discarded default one, and the meta order is identical on resume.
- * One source of truth for `startRun` + `resumeRun` (and the Sim Lab) so they reconstruct it the same.
- */
-export function startingLoadoutFor(
-  meta: MetaUpgrades,
-  characterId?: string,
-  bagTier: BagTier = DEFAULT_BAG_TIER,
-  unlockedClubs: readonly string[] = [],
-): PlayerLoadout {
-  // The character's ascension-victory club unlocks (GS-ascension-clubs) are added AFTER meta (so they
-  // inherit the final distanceClubBonus) but BEFORE the bag tier, so they re-stamp to the live rarity
-  // with the rest of the bag. The bag tier re-stamps LAST, reading the final distanceClubBonus (character
-  // + meta Tour Bag) when rebuilding the distance clubs — and a 'common' tier is a no-op (byte-for-byte).
-  const base = addUnlockedClubs(applyMeta(meta, applyCharacter(characterId, startingLoadout())), unlockedClubs);
-  return applyBagTier(base, bagTier);
-}
-
-/** Ascension ladder (GS-ascension): a fixed-length campaign gets harder above the base difficulty,
- *  unlocked one tier at a time by winning. Each level adds a flat per-stop cut and thins the purse.
- *  Raised to 15 (GS-bag-tiers) so the deepest bag unlock (clear A11 → legendary bag) is reachable. */
-export const ASCENSION_MAX = 15;
-export function ascensionCutBonus(level: number): number {
-  return Math.max(0, Math.round(level));
-}
-export function ascensionCreditPenalty(level: number): number {
-  return Math.max(0, Math.round(level)) * 8;
-}
-
 export function startRun(
   seed: number | string,
   formatId: string = DEFAULT_FORMAT,
@@ -248,249 +253,6 @@ export function startRun(
     firedCaddies: [],
     status: 'active',
     history: [],
-  };
-}
-
-/**
- * The base loadout a run's shop perks sit ON (GS-caddy-factions) — the golfer + meta + bag-tier +
- * ascension-unlock stack, rebuilt the SAME way `startRun`/`resumeRun` build it. Used to reconstruct
- * the loadout MINUS a perk (e.g. when a caddy is fired) by replaying the remaining perks over it.
- */
-export function baseLoadoutForRun(run: Run): PlayerLoadout {
-  return startingLoadoutFor(
-    run.meta,
-    run.loadout.characterId,
-    run.bagTier ?? DEFAULT_BAG_TIER,
-    run.unlockedClubs ?? [],
-  );
-}
-
-/** Deterministic seed for the course at the current stop. */
-export function stopSeed(run: Run): string {
-  return `${run.seed}:stop:${run.stopIndex}`;
-}
-
-/**
- * Generate a stop's course, RETRYING with a reseeded variant if the generator throws (GS-cetus-gaps
- * hardening). `generateCourse` proves fairness by construction and THROWS on a violation rather than
- * shipping an unfair hole — but a rare void island-hop config (~0.1% at galaxy depth) can still trip
- * `validateIslandHops` (a dropped sliver pad fuses two void carries into one over-long gap). At the RPG
- * boundary that uncaught throw crashes the whole run, so here we never let it escape: a thrown seed is
- * ALWAYS an unfair course we'd never show, so deterministically reseeding and regenerating is strictly
- * better than a hard crash. Deterministic (same run → same retry ladder, so auto ≡ interactive and
- * resume both hold), and byte-for-byte unchanged on the 99.9% happy path (attempt 0 succeeds). Only if
- * every retry fails — astronomically unlikely (~0.001^N) — does the last throw propagate, preserving the
- * invariant that an invalid course is never dealt. The proper fix is `separateIslandGaps` respecting the
- * validator's merge threshold in the same units; this is the safe production guard until then.
- */
-export function generateStopCourse(seed: string, opts: Parameters<typeof generateCourse>[1]): Course {
-  const MAX_RETRIES = 8;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      return generateCourse(attempt === 0 ? seed : `${seed}:regen${attempt}`, opts);
-    } catch (err) {
-      if (attempt === MAX_RETRIES - 1) throw err;
-    }
-  }
-  // Unreachable (the loop either returns or rethrows on the last attempt), but satisfies the type.
-  return generateCourse(seed, opts);
-}
-
-/**
- * The star-travel theme the current stop flies into (GS-17). The lane you chose at the previous
- * travel screen determines the world (GS-journey-biome) — so honour `pendingTheme` if set. At stop 0
- * (no jump taken yet) or on an old resume it falls back to the deterministic `themeForStop` draw,
- * keeping the very first stop byte-for-byte identical to the old behaviour.
- */
-export function currentTheme(run: Run): Theme {
-  return run.pendingTheme ?? themeForStop(run.seed, run.stopIndex, run.distanceFromStart);
-}
-
-/**
- * The world a route lane flies into (GS-journey-biome). Drawn from the ARC of the distance the jump
- * REACHES (`reachedDistance`), so a deeper jump lands a later-arc, wilder world. Keyed by route id on
- * its own rng stream, so attaching it to `routeOptions` leaves the existing `:routes:` draw order
- * (distances + events) byte-for-byte unchanged. Pure & deterministic.
- *
- * `avoid` (GS-journey-variety) is a set of biome ARCHETYPES this lane must steer clear of — the
- * other lanes' worlds plus the world you're standing on — so the three branch planets read as three
- * genuinely different destinations instead of "ember world, ember world, ember world". A colliding
- * first draw is replaced by ONE rarity-weighted redraw over the arc pool FILTERED to permitted
- * archetypes (this lane's own stream — extra draws perturb nothing else), so distinctness is
- * guaranteed whenever the arc offers enough archetypes (every arc has ≥7; the avoid set is ≤3).
- * Only if the filter empties the pool does the first draw stand.
- *
- * `effect` (GS-weather-affinity) is the lane's SKY, if known: when it's a weather with a biome affinity
- * (`effectBiomeAffinity`) the draw is softly biased toward a fitting world, so a blizzard tends to reach
- * a cold world and a dust storm a desert. It's a WEIGHT boost inside the same single draw (same rng
- * count), applied to the first pick AND the avoid-redraw alike; an absent/affinity-less effect makes the
- * boost a no-op, so those lanes stay byte-for-byte the pre-affinity draw. Weather itself is unchanged —
- * this only nudges which WORLD a weathered lane flies into, on this lane's own (separate) rng stream.
- */
-export function routeTheme(
-  seed: number | string,
-  stopIndex: number,
-  routeId: number,
-  reachedDistance: number,
-  avoid?: ReadonlySet<BiomeArchetype>,
-  effect?: string,
-): Theme {
-  const rng = new Rng(`${seed}:routetheme:${stopIndex}:${routeId}`);
-  const arc = arcForDistance(reachedDistance);
-  const affinity = effectBiomeAffinity(effect);
-  const boost = affinity
-    ? (t: Theme): number => (affinity.includes(t.archetype) ? WEATHER_AFFINITY_BOOST : 1)
-    : undefined;
-  const first = pickTheme(rng, arc, boost);
-  if (!avoid || !avoid.has(first.archetype)) return first;
-  const cands = themesForArc(arc).filter((t) => !avoid.has(t.archetype));
-  return cands.length > 0 ? pickThemeFrom(rng, cands, boost) : first;
-}
-
-/** The course awaiting the player at the current stop (shaped by the run format + theme). */
-export function currentCourse(run: Run): Course {
-  const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
-  const theme = currentTheme(run);
-  // The chosen journey route (GS-journey-fx) makes the world it flew into wilder/gentler AND brings an
-  // atmospheric effect — both derived from the CURRENT stop's pending event (already round-tripped on
-  // resume), so no new run/save state. Stop 0 / no event ⇒ boost 0, effect 'none' (byte-for-byte old).
-  const wildnessBoost = routeDifficulty(run.pendingEvent);
-  const effect = routeEffect(run.pendingEvent);
-  // Rainbow Road (GS-rainbow-road-2): when the legendary Rainbow Ball is armed the whole run plays as
-  // RAINBOW ROAD, so reshape every generated stop into a fair, wide ribbon with no hazards (see
-  // `applyRainbowRoad`). Applied LAST — a pure, rng-free post-generation transform on the finished,
-  // already-validated course, gated on the loadout flag — so a base run is byte-for-byte unchanged and
-  // both the sim and the renderer read the one widened geometry (the "graphic IS physics" contract).
-  const finish = (c: Course): Course => (run.loadout?.rainbowRoad ? applyRainbowRoad(c) : c);
-  // GS-variation: a split-biome stop CROSSES TWO WORLDS — the front holes are this stop's theme, the
-  // back holes a different theme of the same arc. Each half is generated independently and stitched,
-  // every hole stamped with its own biome/themeId so it renders + plays as its world.
-  if (spec.splitBiome && spec.holes >= 2) {
-    return finish(armTentHoles(applyEffectPhysics(stitchSplitCourse(run, spec.holes, spec.parCap, theme, wildnessBoost, effect), effect), effect));
-  }
-  return finish(
-    armTentHoles(
-      applyEffectPhysics(
-        generateStopCourse(stopSeed(run), {
-          holes: spec.holes,
-          parCap: spec.parCap,
-          distanceFromStart: run.distanceFromStart,
-          // The theme resolves to a rarity-tiered, flavoured biome (GS-17b) and tags the course (GS-17).
-          biomeRow: resolveBiome(theme),
-          themeId: theme.id,
-          wildnessBoost,
-          effect,
-        }),
-        effect,
-      ),
-      effect,
-    ),
-  );
-}
-
-/**
- * Pitch the trade-market tent ring on EVERY hole of the stop (GS-tent-interactions). Tents live only
- * on a `tradeMarket` route, so the "market" is the whole world you've stopped in — a trade camp at
- * each green for however many holes the mode runs (6 for a voyage stop, 4 for the Unending Universe,
- * or whatever a future mode sets). A single surprise hole made the mechanic too rare to feel like a
- * market; stamping the whole stop makes the tradeMarket lane read as its trade-camp world while the
- * per-hole effect shuffle (`assignTentEffects`) keeps each green's colour→effect mapping distinct.
- * `tents:true` is a pure post-generation stamp (no rng draw, so the generated course is byte-for-byte
- * unchanged); both the headless sim and the interactive driver read it, so they agree on the tents. A
- * non-tradeMarket effect returns the course untouched.
- */
-function armTentHoles(course: Course, effect: string): Course {
-  if (effect !== 'tradeMarket' || course.holes.length === 0) return course;
-  return { ...course, holes: course.holes.map((hole) => ({ ...hole, tents: true })) };
-}
-
-/**
- * The course effect's NUMERIC physics hooks (GS-journey-variety wind; GS-journey-fx-2 carry): scale
- * every hole's generated wind by `effectWindMult` (clamped to the generator's own max band) and fold
- * `effectCarryMult` in as a `biomeMods` carry row — the SAME mechanism low-gravity biomes use, so
- * `biomeCarryMult` feeds the HUD range preview, club suggestions, AI and shot physics one identical
- * number. Both are PURE post-generation transforms (no rng, no geometry), so `validateFairness`/
- * `validateCrossings` are untouched and auto ≡ interactive holds by construction (the transformed
- * numbers ARE the course data). A neutral effect returns the course object UNCHANGED (byte-for-byte
- * the old path).
- */
-function applyEffectPhysics(course: Course, effect: string): Course {
-  const wind = effectWindMult(effect);
-  const carry = effectCarryMult(effect);
-  if (wind === 1 && carry === 1) return course;
-  return {
-    ...course,
-    holes: course.holes.map((h) => {
-      let out = h;
-      if (wind !== 1 && out.wind) {
-        out = { ...out, wind: { ...out.wind, spd: Math.min(EFFECT_WIND_CAP, Math.max(0, out.wind.spd * wind)) } };
-      }
-      if (carry !== 1) {
-        out = { ...out, biomeMods: [...(out.biomeMods ?? []), { kind: 'carry', value: carry, note: effect }] };
-      }
-      return out;
-    }),
-  };
-}
-
-/** Stamp every hole of a course with its biome/theme render keys (GS-variation). Pure. */
-function stampHoles(course: Course): Course {
-  return { ...course, holes: course.holes.map((h) => ({ ...h, biome: course.biome, themeId: course.meta.themeId })) };
-}
-
-/**
- * Build a two-world stop (GS-variation): front holes from `themeA`, back holes from a DISTINCT theme
- * of the same arc, concatenated into one Course. Holes carry their own biome/themeId so both renderer
- * and per-hole physics (biomeMods) read the right world. Deterministic from the run + stop. The
- * course's top-level identity is the front theme (the card leads with it); `meta.split` flags it.
- */
-function stitchSplitCourse(
-  run: Run,
-  holes: number,
-  parCap: StopSpec['parCap'],
-  themeA: Theme,
-  wildnessBoost = 0,
-  effect = 'none',
-): Course {
-  const front = Math.ceil(holes / 2);
-  const back = holes - front;
-  const arc = arcForDistance(run.distanceFromStart);
-  // A second, distinct theme of the same arc — distinct by ARCHETYPE, not just id (GS-journey-variety),
-  // so the two halves read as two visibly different worlds: a colliding draw is replaced by one
-  // rarity-weighted redraw over the arc pool minus the front archetype (arcs have ≥7 archetypes).
-  const pick = new Rng(`${run.seed}:split:${run.stopIndex}`);
-  let themeB = pickTheme(pick, arc);
-  if (themeB.archetype === themeA.archetype) {
-    const cands = themesForArc(arc).filter((t) => t.archetype !== themeA.archetype);
-    if (cands.length > 0) themeB = pickThemeFrom(pick, cands);
-  }
-  const a = stampHoles(
-    generateStopCourse(`${stopSeed(run)}:front`, {
-      holes: front,
-      parCap,
-      distanceFromStart: run.distanceFromStart,
-      biomeRow: resolveBiome(themeA),
-      themeId: themeA.id,
-      wildnessBoost,
-      effect,
-    }),
-  );
-  const b = stampHoles(
-    generateStopCourse(`${stopSeed(run)}:back`, {
-      holes: back,
-      parCap,
-      distanceFromStart: run.distanceFromStart,
-      biomeRow: resolveBiome(themeB),
-      themeId: themeB.id,
-      wildnessBoost,
-      effect,
-    }),
-  );
-  return {
-    ...a,
-    holes: [...a.holes, ...b.holes],
-    // Lead with the front theme's identity; flag the split + record the back theme for the UI.
-    meta: { ...a.meta, themeId: themeA.id, split: { backThemeId: themeB.id, frontHoles: front } },
   };
 }
 
@@ -1117,129 +879,6 @@ export function routeOptions(run: Run): Route[] {
   });
 }
 
-// --- Ship fuel (GS-fuel, redesigned GS-fuel-2) --------------------------------
-//
-// Every journey jump burns its DISTANCE in fuel units (a 1-hop = 1 unit, a deep 3-jump = 3). The
-// tank is a REAL capacity now (`tankCapacity` = the format's starting tank: voyage 8 = its
-// single-hop travel count, unending 12): it starts full and `buyFuel` can never stock past it.
-// Fuel is bought with run credits at a price that RISES with galaxy depth (`fuelUnitCost` — cheap
-// near home, dear in deep space), so "top the tank up here or spend the credits on gear and pay
-// deep-space prices later" is a real call at every depot — the choice the old flat-priced,
-// silently-auto-bought fuel never posed. `travel` still folds any shortfall into the jump bill at
-// the LOCAL price (ONE rule, so auto ≡ interactive holds by construction) — the UI surfaces that
-// surcharge on the Jump button itself, never silently. A lane whose bill beats the purse is LOCKED
-// (`canTravel`); a stop where EVERY lane is locked strands the run (`strand`). Zero rng — the
-// whole system is pure arithmetic on the run, so every seeded stream is untouched.
-//
-// GS-fuel-3 hangs BUILD hooks off that economy, all rebuilt from perk ids on resume (no save bump):
-// Ion Thrusters (`loadout.fuelEfficiency`) shave a unit off every jump's burn (min 1 — a jump is
-// never free), the Reserve Tank (`loadout.tankBonus`) raises capacity (+ arrives full via
-// `ShopItem.fuelBonus`, granted ONCE in `buy`), and great golf refuels the ship — `finishStop`
-// siphons one cell per holed eagle-or-better (capacity-clamped, never on a warped stop).
-//
-// GS-fuel-4 makes fuel DECIDE things, three ways: the lane's SKY prices the passage
-// (`effectFuelDelta` — solar-wind/comet tailwinds −1 ⛽, gravity-well/ion-storm headwinds +1 ⛽ —
-// so burn is decoupled from distance and lanes differ on a second axis), fuel-salvage EVENTS
-// refuel on arrival (`RouteEvent.fuelBonus`, granted in `travel`), and the SECTOR SCAN burns fuel
-// to redraw the lanes (`scanRoutes` — fuel's first non-jump use, and the anti-stranding lifeline).
-
-/** Fuel price at the home spaceport (credits per unit). */
-export const FUEL_PRICE_BASE = 10;
-/** Credits the unit price climbs per point of galaxy distance — deep-space fuel is dear. */
-export const FUEL_PRICE_SLOPE = 2;
-/** Ceiling on the unit price, however deep the run flies. */
-export const FUEL_PRICE_MAX = 60;
-
-/** The LOCAL fuel price (credits per unit) — one rule for the depot and travel's shortfall alike. */
-export function fuelUnitCost(run: Pick<Run, 'distanceFromStart'>): number {
-  return Math.min(FUEL_PRICE_MAX, FUEL_PRICE_BASE + FUEL_PRICE_SLOPE * Math.max(0, run.distanceFromStart));
-}
-
-/** The ship's tank capacity — the format's starting tank plus any Reserve Tank relic
- *  (GS-fuel-2/-3). `buyFuel` clamps to it; a legacy save resumed above it simply can't buy more
- *  until it burns back under. */
-export function tankCapacity(run: Pick<Run, 'formatId' | 'loadout'>): number {
-  return startingFuelFor(getFormat(run.formatId)) + Math.max(0, Math.floor(run.loadout.tankBonus ?? 0));
-}
-
-/** The fuel maths sees a route's jump AND (optionally) its event, whose sky prices the passage
- *  (GS-fuel-4). Event-less partials (tests, bare previews) price as clear skies. */
-type FuelRoute = Pick<Route, 'distanceJump'> & Partial<Pick<Route, 'event'>>;
-
-/** Fuel a route's jump burns: its distance, unit for unit — plus the sky's tail/headwind
- *  (GS-fuel-4: `effectFuelDelta`, so a lane's burn is no longer glued to its distance), less any
- *  Ion Thrusters efficiency (GS-fuel-3) — floored at 1 (a jump is never free). */
-export function routeFuelCost(run: Pick<Run, 'loadout'>, route: FuelRoute): number {
-  const jump = Math.max(0, route.distanceJump);
-  if (jump === 0) return 0;
-  const sky = effectFuelDelta(routeEffect(route.event));
-  return Math.max(1, jump + sky - Math.max(0, Math.floor(run.loadout.fuelEfficiency ?? 0)));
-}
-
-/** Units missing from the tank for this jump (0 = the tank covers it). */
-export function fuelShortfall(run: Run, route: FuelRoute): number {
-  return Math.max(0, routeFuelCost(run, route) - Math.max(0, run.fuel));
-}
-
-/** Credits `travel` will spend on missing fuel for this jump at the LOCAL price (0 = tank covers it). */
-export function travelRefuelCost(run: Run, route: FuelRoute): number {
-  return fuelShortfall(run, route) * fuelUnitCost(run);
-}
-
-/** Can this lane be taken — is the tank + purse enough for its jump? */
-export function canTravel(run: Run, route: FuelRoute): boolean {
-  return run.credits >= travelRefuelCost(run, route);
-}
-
-// --- Sector scan (GS-fuel-4): burn fuel to redraw the three onward lanes ------
-//
-// Fuel's first use besides jumping: a poor offer (or an unpayable one — the scan doubles as an
-// anti-stranding lifeline) can be re-rolled for fuel. The cost ESCALATES per scan at the same stop
-// (1, 2, 3… — the shop/StarMart reroll precedent, so lane-fishing can't be spammed) and always
-// leaves at least one cell in the tank (you can never scan yourself to a dry tank). Interactive-only
-// by design, like the shop reroll — the headless auto-driver never scans, so every seeded stream is
-// untouched; unlike the shop reroll the count lives ON the run (snapshotted), because the fuel it
-// burnt does too.
-
-/** Fuel the NEXT sector scan at this stop costs (escalates per scan: 1, 2, 3…). */
-export function scanFuelCost(run: Pick<Run, 'routeScans'>): number {
-  return 1 + Math.max(0, run.routeScans);
-}
-
-/** Can the ship scan for new routes — active run, and the tank keeps ≥1 cell after the burn? */
-export function canScanRoutes(run: Run): boolean {
-  return run.status === 'active' && run.fuel > scanFuelCost(run);
-}
-
-/** Burn fuel to redraw the onward lanes: `routeOptions` re-keys its stream off the bumped count. */
-export function scanRoutes(run: Run): Run {
-  if (!canScanRoutes(run)) throw new Error('scanRoutes: not enough fuel to scan');
-  return { ...run, fuel: run.fuel - scanFuelCost(run), routeScans: run.routeScans + 1 };
-}
-
-/**
- * Buy fuel with run credits at the LOCAL price (the Pro Shop / journey-screen depot). Clamps to
- * what fits in the tank AND what the purse affords, so the buttons always do the sensible thing;
- * a no-op at 0 units.
- */
-export function buyFuel(run: Run, units: number): Run {
-  const price = fuelUnitCost(run);
-  const n = Math.min(
-    Math.max(0, Math.floor(units)),
-    Math.max(0, tankCapacity(run) - run.fuel),
-    Math.floor(run.credits / price),
-  );
-  if (n <= 0) return run;
-  return { ...run, credits: run.credits - n * price, fuel: run.fuel + n };
-}
-
-/** Out of fuel AND credits with no travellable lane: the run ends STRANDED. Like a bank, the
- *  pocket change converts to shards (see cashOutShards) — it's a forced stop, not a punishment
- *  beat on top of one. */
-export function strand(run: Run): Run {
-  return { ...run, status: 'ended', endedReason: 'stranded' };
-}
-
 /**
  * Resolve the SALVAGE club find a route hands you on arrival (GS-journey-fx-3, GS-salvage-mystery) —
  * `undefined` for any non-salvage lane. THE SINGLE SOURCE: `travel` grants from it, and the UI reveals
@@ -1310,412 +949,9 @@ export function travel(run: Run, route: Route): Run {
   };
 }
 
-/**
- * Buy a shop item. Uniques are buyable once; stackables repeatedly at a rising price up
- * to their cap. No-op (returns the same run) if at the cap or unaffordable at the next
- * price — the offer constraint is a UI concern, so the headless sim can buy any item.
- */
-export function buy(run: Run, itemId: string): Run {
-  const item = shopItem(itemId);
-  if (!item) return run;
-  const owned = ownedCount(run.loadout.perks, itemId);
-  if (!canBuy(item, owned, run.credits)) return run;
-  const cost = itemCost(item, owned);
-  // Named caddies are still one-at-a-time (GS-caddy) — but hiring a NEW one now FIRES the incumbent
-  // (GS-caddy-factions) rather than being a no-op. Rebuild the loadout WITHOUT the fired caddy's perk
-  // (over the run's base), then apply the newcomer; the sacked caddy is logged so the shop won't
-  // offer them again this run. The sim fires unconditionally (headless/auto ≡ interactive); the UI
-  // gates it behind a "they won't be happy" confirmation before dispatching this.
-  if (item.caddy === 'named') {
-    const have = namedCaddyOwned(run.loadout.perks);
-    if (have && have !== itemId) {
-      const rebuilt = loadoutFromPerks(
-        run.loadout.perks.filter((p) => p !== have),
-        baseLoadoutForRun(run),
-      );
-      return {
-        ...run,
-        credits: run.credits - cost,
-        loadout: item.apply(rebuilt),
-        firedCaddies: run.firedCaddies.includes(have) ? run.firedCaddies : [...run.firedCaddies, have],
-      };
-    }
-  }
-  const loadout = item.apply(run.loadout);
-  // GS-fuel-3: a fuel-granting item (the Reserve Tank arrives FULL) pours its units in ONCE, at
-  // purchase, clamped to the (possibly just-raised) capacity — never re-granted on resume
-  // (loadoutFromPerks rebuilds only the loadout; the fuel itself persists on Run.fuel), and never
-  // draining a legacy over-capacity tank.
-  let fuel = run.fuel;
-  if (item.fuelBonus) {
-    fuel = Math.max(run.fuel, Math.min(tankCapacity({ ...run, loadout }), run.fuel + item.fuelBonus));
-  }
-  return { ...run, credits: run.credits - cost, loadout, fuel };
-}
-
-// --- Shop offer (the rotating outfitter stock) ------------------------------
-
-export interface ShopOffer {
-  item: ShopItem;
-  /** Price of the next copy right now. */
-  cost: number;
-  /** Copies already owned (stack depth; 0 or 1 for a unique). */
-  owned: number;
-}
-
-export const SHOP_OFFER_SIZE = 4;
-
-// Rarity RAMPS with the voyage (GS-proshop). The catalogue is count-skewed toward rare/epic, so a
-// flat rarity-weighted draw showed lots of rare/epic up front and only dribbled commons in later as
-// the rare/epic uniques sold out — exactly backwards from how loot should feel. Now each rarity's
-// base drop weight (RARITY_C) is multiplied by `b^order`, where `b` lerps from <1 EARLY (commons-
-// heavy foundational kit, epics/legendaries scarce) to >1 DEEP (rare/epic/legendary power), keyed
-// off galaxy distance — the same depth signal the cut line ramps off. This shifts WHICH items are
-// drawn, not the rng draw count, so the offer stays deterministic and resume-stable.
-const RARITY_RAMP_DEPTH = 18; // galaxy distance at which the rarity tilt reaches its deep extreme
-const RARITY_TILT_EARLY = 0.22; // tilt base at the start — strongly favours commons so the FIRST/SECOND Pro Shops stock foundational common/rare kit, not rare/epic. The catalogue + reward-club pool is heavily count-skewed toward rare/epic, so a low tilt is needed to keep the early draw common-dominant (measured ~61% common / 37% rare / 2% epic at stop 0, ramping to rare/epic-heavy deep).
-const RARITY_TILT_DEEP = 2.15; // tilt base deep in the run — favours rare/epic/legendary (raised to surface more epic/legendary rewards)
-
-/**
- * Depth-scaled rarity multiplier for the shop draw (early → commons, deep → rare/epic). Used by the
- * ENDLESS formats (flat/ladder), which climb toward the deep extreme as galaxy distance grows.
- */
-export function rarityDepthBias(rarity: Rarity, distanceFromStart: number): number {
-  const p = Math.max(0, Math.min(1, distanceFromStart / RARITY_RAMP_DEPTH));
-  const b = RARITY_TILT_EARLY + (RARITY_TILT_DEEP - RARITY_TILT_EARLY) * p;
-  return Math.pow(b, RARITY_C[rarity].order);
-}
-
-// The VOYAGE rarity schedule (GS-voyage-rarity). The bounded voyage is only ~8 shops long and never
-// reaches the endless ramp's deep distance, so keying its rarity off raw galaxy distance left the last
-// shop stuck around blue-heavy / 18% epic / 6% legendary — legendaries barely showed. Instead the
-// voyage runs its OWN progress curve keyed off the STOP (the arc/boss structure the player actually
-// reads), so the mix scales the way the campaign is paced:
-//   • shop 1 (stop 0)         → mostly GREEN with a BLUE; epics/legendaries essentially absent.
-//   • between boss 1 & 2 (2–4) → a SMALL chance of purple AND the first orange.
-//   • after boss 2 (5–7)       → a HIGHER chance, ending "halfish blue / halfish purple with a shot at
-//                                a legendary" at the final pre-boss shop.
-// Two knobs give independent control the single `b^order` couples away: `b` lerps the rare/epic base,
-// and `legTilt` gates the legendary tail separately so it stays a real rarity (a taste between the
-// bosses, a genuine chance — not a flood — at the end). Bosses sit at stops 2 & 5, so the curve is
-// sampled at those thresholds by design. Byte-for-byte irrelevant to the endless formats (they never
-// call this) and to determinism (it reweights WHICH item is drawn, never the rng draw COUNT).
-const VOYAGE_TILT_EARLY = 0.16; // rare/epic base at the first shop — strong commons bias (mostly green + a blue)
-const VOYAGE_TILT_DEEP = 3.2; // rare/epic base at the last pre-boss shop — halfish blue / halfish purple
-const VOYAGE_LEG_EARLY = 0.0; // legendary tail multiplier at the start — no legendaries in the opening shops
-const VOYAGE_LEG_DEEP = 0.62; // legendary tail multiplier deep — a real (bounded) shot at orange late, not a flood
-const VOYAGE_TILT_EASE = 1.5; // ease-in on the rare/epic ramp so arc 1 stays green/blue and purple opens after boss 1
-const VOYAGE_LEG_OPEN = 0.12; // voyage progress at which the legendary tail starts opening (just after boss 1 / stop 2)
-
-/**
- * Rarity multiplier for a VOYAGE shop draw, keyed off the stop (arc/boss pacing) rather than galaxy
- * distance. `progress` is 0 at the first shop → 1 at the final pre-boss shop. Commons stay flat (×1);
- * rare/epic ramp on `b^order`; the legendary tail rides a SEPARATE, later-opening multiplier so it
- * only tastes in around boss 1 and reaches a genuine (bounded) chance by the end.
- */
-export function voyageRarityBias(rarity: Rarity, progress: number): number {
-  const p = Math.max(0, Math.min(1, progress));
-  const order = RARITY_C[rarity].order;
-  if (order === 0) return 1; // commons flat
-  const eased = Math.pow(p, VOYAGE_TILT_EASE);
-  const b = VOYAGE_TILT_EARLY + (VOYAGE_TILT_DEEP - VOYAGE_TILT_EARLY) * eased;
-  const base = Math.pow(b, order);
-  if (rarity !== 'legendary') return base;
-  // Legendary rides the rare/epic ramp PLUS its own tail gate: 0 until `VOYAGE_LEG_OPEN`, then lerps
-  // up to VOYAGE_LEG_DEEP so orange opens around boss 1 and peaks (bounded) at the final shop.
-  const lp = Math.max(0, Math.min(1, (p - VOYAGE_LEG_OPEN) / (1 - VOYAGE_LEG_OPEN)));
-  return base * (VOYAGE_LEG_EARLY + (VOYAGE_LEG_DEEP - VOYAGE_LEG_EARLY) * lp);
-}
-
-/** Voyage shop progress 0..1 keyed off the stop — 0 at the first shop, 1 at the final pre-boss shop. */
-export function voyageShopProgress(stopIndex: number, stops: number): number {
-  // Shops sit at stops 0..(stops-2); the final stop is the boss with no shop after it.
-  const lastShop = Math.max(1, stops - 2);
-  return Math.max(0, Math.min(1, stopIndex / lastShop));
-}
-
-/**
- * The rarity multiplier the shop draw applies for THIS run. A winnable voyage uses its own stop-keyed
- * schedule (`voyageRarityBias`); the endless formats keep the galaxy-distance ramp (`rarityDepthBias`).
- */
-export function shopRarityBias(run: Run, rarity: Rarity): number {
-  const format = getFormat(run.formatId);
-  if (format.winnable) {
-    return voyageRarityBias(rarity, voyageShopProgress(run.stopIndex, stopCount(format)));
-  }
-  return rarityDepthBias(rarity, run.distanceFromStart);
-}
-
-/**
- * Weighted draw of `n` distinct items (rarer = less likely), without replacement. An optional
- * `weight` multiplier per item lets the active theme bias the offer toward on-theme gear (GS-17d).
- */
-function weightedSample(
-  rng: Rng,
-  items: readonly ShopItem[],
-  n: number,
-  weight: (it: ShopItem) => number = () => 1,
-): ShopItem[] {
-  const pool = [...items];
-  const out: ShopItem[] = [];
-  while (out.length < n && pool.length > 0) {
-    const total = pool.reduce((s, it) => s + RARITY_C[it.rarity].weight * weight(it), 0);
-    let r = rng.float() * total;
-    let idx = 0;
-    for (; idx < pool.length - 1; idx++) {
-      r -= RARITY_C[pool[idx]!.rarity].weight * weight(pool[idx]!);
-      if (r <= 0) break;
-    }
-    out.push(pool.splice(idx, 1)[0]!);
-  }
-  return out;
-}
-
-/**
- * The outfitter's stock at the current stop: a seeded, rarity-weighted subset of the
- * catalogue. Deterministic from the run seed + stop, so the same run shows the same shop
- * (and a resume reproduces it). Items already maxed (owned uniques / capped stackables)
- * drop out, so every slot is something you can still pursue. Costs reflect current stacks.
- */
-export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer[] {
-  const perks = run.loadout.perks;
-  const hasCaddy = !!namedCaddyOwned(perks);
-  // Driver Dan (GS-clubs) only turns up once the golfer actually OWNS a driver. Everyone now starts
-  // with one (the balanced bag), so he's eligible from the off; he still only appears at his epic
-  // rarity in the rotation, so owning a driver is a gate, not a guaranteed early show.
-  const ownsDriver = run.loadout.bag.some((c) => c.id === DRIVER_ID);
-  // Hide maxed items, gate prereq tier-ladders, and handle caddies (GS-caddy / GS-caddy-factions):
-  // named caddies are random rarity-weighted inclusions, and they STAY offerable even once you've
-  // hired one — hiring a new caddy FIRES the incumbent (a real swap decision), so the others must
-  // keep showing. The one you already own drops out via the maxed check; a caddy you FIRED this run
-  // never comes back (they're sulking). Generic caddy 'service' perks only surface once a named caddy
-  // has been hired.
-  const gear = SHOP_ITEMS.filter(
-    (it) =>
-      ownedCount(perks, it.id) < itemCap(it) &&
-      (!it.prereq || perks.includes(it.prereq)) &&
-      (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
-      (it.caddy !== 'service' || hasCaddy) &&
-      (it.id !== 'driver-dan' || ownsDriver) &&
-      // The Rainbow Ball, once SPENT on an Asgard tournament (GS-asgard), never returns to the rack
-      // this run — the run has left Rainbow Road behind for good.
-      (it.id !== 'rainbow-ball' || !run.rainbowConsumed) &&
-      // Don't dangle a flat-stick putter you've already met (GS-clubs) — strict rarity upgrade only.
-      putterItemOfferable(it, run.loadout),
-  );
-  // Reward CLUBS (GS-clubs-2) share the SAME 4-card offer now — no separate row. They're rare+
-  // improvements (a distance upgrade, or a new club that fills a gap in the balanced bag), drawn
-  // from the same rarity-weighted pool as the gear so they're appropriately scarce.
-  const pool = [...gear, ...offerableClubs(run.loadout)];
-  // A reroll (GS-shop-reroll) salts the seed so the draw changes; salt 0 keeps the original stock
-  // byte-for-byte (so existing tests + a fresh shop entry are unchanged).
-  const rng = new Rng(salt ? `${run.seed}:shop:${run.stopIndex}:r${salt}` : `${run.seed}:shop:${run.stopIndex}`);
-  // The current stop's theme biases the outfitter toward on-theme gear (GS-17d), and the rarity mix
-  // RAMPS with galaxy distance (GS-proshop): commons early, rare/epic/legendary deep.
-  const archetype = currentTheme(run).archetype;
-  const weight = (it: ShopItem) =>
-    itemThemeWeight(itemTags(it.id), archetype) * shopRarityBias(run, it.rarity);
-  return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => {
-    const owned = ownedCount(perks, item.id);
-    return { item, cost: itemCost(item, owned), owned };
-  });
-}
-
-// --- StarMart: the trade-tent pop-up shop (GS-tent-interactions) -------------
-// One of the five trade tents opens a StarMart window mid-hole — a shop that spends cross-run STAR
-// SHARDS instead of run credits. It stocks only the good stuff (NO commons) and skews epic/legendary,
-// at a flat shard price per rarity. Items last the run like any Pro-Shop buy (they round-trip through
-// `loadout.perks`), so no save bump. The offer is a pure, seeded, resume-stable draw off the run + stop.
-
-/** How many cards the StarMart window shows. */
-export const STARMART_OFFER_SIZE = 4;
-/** Flat StarMart shard price by rarity — blue 5, purple 10, orange 15 (commons never appear). */
-export const STARMART_COST: Record<Rarity, number> = { common: 0, rare: 5, epic: 10, legendary: 15 };
-/** Rarity draw boost for the StarMart — counteracts the catalogue's base scarcity so epic/legendary
- *  show up far more than in the credit Pro Shop (the "epic & legendary have a higher chance" ask). */
-const STARMART_RARITY_BOOST: Record<Rarity, number> = { common: 0, rare: 1, epic: 5, legendary: 8 };
-/** Shard cost of the next StarMart reroll (a gentle ramp). */
-export function starmartRerollCost(rerolls: number): number {
-  return 3 + Math.max(0, rerolls) * 2;
-}
-
-export interface ShardShopOffer {
-  item: ShopItem;
-  /** Price in STAR SHARDS (by rarity). */
-  cost: number;
-}
-
-/**
- * The StarMart window's stock for the current stop (GS-tent-interactions): a seeded, rarity-weighted
- * draw over the Pro-Shop catalogue + reward clubs, with COMMONS excluded and epic/legendary boosted.
- * Priced in shards by rarity. Deterministic from the run seed + stop (a resume/re-open reproduces it);
- * a reroll salts the seed. Owned/maxed items and gated caddies drop out exactly like `shopOffer`.
- */
-export function starmartOffer(run: Run, size = STARMART_OFFER_SIZE, salt = 0): ShardShopOffer[] {
-  const perks = run.loadout.perks;
-  const hasCaddy = !!namedCaddyOwned(perks);
-  const ownsDriver = run.loadout.bag.some((c) => c.id === DRIVER_ID);
-  const gear = SHOP_ITEMS.filter(
-    (it) =>
-      it.rarity !== 'common' &&
-      ownedCount(perks, it.id) < itemCap(it) &&
-      (!it.prereq || perks.includes(it.prereq)) &&
-      (it.caddy !== 'named' || !run.firedCaddies.includes(it.id)) &&
-      (it.caddy !== 'service' || hasCaddy) &&
-      (it.id !== 'driver-dan' || ownsDriver) &&
-      (it.id !== 'rainbow-ball' || !run.rainbowConsumed) && // spent on Asgard, never re-offered (GS-asgard)
-      putterItemOfferable(it, run.loadout),
-  );
-  const clubs = offerableClubs(run.loadout).filter((c) => c.rarity !== 'common');
-  const pool = [...gear, ...clubs];
-  const rng = new Rng(salt ? `${run.seed}:starmart:${run.stopIndex}:r${salt}` : `${run.seed}:starmart:${run.stopIndex}`);
-  const weight = (it: ShopItem) => STARMART_RARITY_BOOST[it.rarity];
-  return weightedSample(rng, pool, Math.min(size, pool.length), weight).map((item) => ({
-    item,
-    cost: STARMART_COST[item.rarity],
-  }));
-}
-
 /** Voluntarily bank the run (cash out) — ends it with reason 'banked'. */
 export function bank(run: Run): Run {
   return { ...run, status: 'ended', endedReason: 'banked' };
-}
-
-// --- Serialisation (for the save layer) -------------------------------------
-
-export interface RunSnapshot {
-  seed: number;
-  /** Run format id (optional for back-compat with v1-era snapshots → flat). */
-  formatId?: string;
-  stopIndex: number;
-  distanceFromStart: number;
-  credits: number;
-  /** Owned perks; the loadout is rebuilt from these (over the meta base) on resume. */
-  perks: string[];
-  /** Permanent meta-upgrade levels (GS-12); the resume base is rebuilt from these. */
-  meta?: MetaUpgrades;
-  /** Ascension difficulty tier (GS-ascension); 0/absent for back-compat. */
-  ascension?: number;
-  /** Permanent default-bag tier (GS-bag-tiers), so a resume rebuilds the upgraded starting bag.
-   *  Absent ⇒ the un-upgraded common bag (old snapshots). */
-  bagTier?: BagTier;
-  /** The character's ascension-victory club unlocks (GS-ascension-clubs), so a resume rebuilds the
-   *  grown starting bag. Absent ⇒ none (old snapshots / a fresh roster). */
-  unlockedClubs?: string[];
-  /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
-  pendingEventId?: string;
-  /** The pending destination-world theme id (GS-journey-biome), so a resume keeps the stop's biome.
-   *  Absent on an old snapshot → `currentTheme` falls back to the deterministic draw. */
-  pendingThemeId?: string;
-  /** Permanent shards banked mid-run by route events (GS-routes); 0/absent for back-compat. */
-  bonusShards?: number;
-  /** Cumulative holes survived (GS-unending), so a resume keeps the survival bar + milestone
-   *  progress. 0/absent for back-compat (non-gate formats never advance it). */
-  holesSurvived?: number;
-  /** Cumulative gross strokes + par over the survived holes (GS-golf-score), so a resume keeps the
-   *  running golf-round score. 0/absent for back-compat. */
-  grossStrokes?: number;
-  parPlayed?: number;
-  /** Unique one-off event ids already fired (GS-17c), so a resume can't re-offer them. */
-  firedEventIds?: string[];
-  /** The selected golfer (GS-18) — re-applied to the loadout on resume. */
-  characterId?: string;
-  /** Holes fast-forwarded by warp (GS-warp), so a resume keeps the leaderboard range's start.
-   *  0/absent for back-compat (an unwarped run). */
-  warpedThrough?: number;
-  /** Ship fuel in the tank (GS-fuel), so a resume keeps the gauge. Absent on a pre-fuel snapshot →
-   *  the resume grants the format's fresh starting tank (generous, never strands an old save). */
-  fuel?: number;
-  /** Sector scans burnt at the parked stop (GS-fuel-4), so a resume re-draws the exact lane offer
-   *  the player paid fuel for. 0/absent for back-compat (the classic scan-0 offer). */
-  routeScans?: number;
-  /** Caddies fired this run (GS-caddy-factions), so a resume keeps them out of the shop. Absent on an
-   *  old snapshot / a run that never fired anyone → nobody fired (byte-for-byte). */
-  firedCaddies?: string[];
-  /** The Rainbow Ball was spent on an Asgard tournament (GS-asgard), so a resume keeps it stripped and
-   *  the shop keeps it off the rack. Absent on every ordinary run → byte-for-byte unchanged. */
-  rainbowConsumed?: boolean;
-  /** Every stop finished so far this run (GS-voyage-field): the completed `StopResult`s the positional
-   *  cut + team-duel setup are computed from. WITHOUT it a resumed run rebuilt an EMPTY history, which
-   *  zeroed the whole arc leaderboard (player + field) and — since the underdog side is decided by
-   *  leaderboard rank — flipped a boss team-duel's scramble partner to the player. Absent on old
-   *  snapshots → the pre-fix empty history (a resume there still resets the board, but no new save
-   *  carries the bug). */
-  history?: StopResult[];
-}
-
-export function snapshotRun(run: Run): RunSnapshot {
-  return {
-    seed: run.seed,
-    formatId: run.formatId,
-    stopIndex: run.stopIndex,
-    distanceFromStart: run.distanceFromStart,
-    credits: run.credits,
-    perks: [...run.loadout.perks],
-    meta: { ...run.meta },
-    ascension: run.ascension,
-    bagTier: run.bagTier,
-    unlockedClubs: run.unlockedClubs ? [...run.unlockedClubs] : undefined,
-    pendingEventId: run.pendingEvent?.id,
-    pendingThemeId: run.pendingTheme?.id,
-    bonusShards: run.bonusShards,
-    holesSurvived: run.holesSurvived,
-    grossStrokes: run.grossStrokes,
-    parPlayed: run.parPlayed,
-    firedEventIds: [...run.firedEventIds],
-    characterId: run.loadout.characterId,
-    warpedThrough: run.warpedThrough || undefined,
-    fuel: run.fuel,
-    routeScans: run.routeScans || undefined,
-    firedCaddies: run.firedCaddies.length ? [...run.firedCaddies] : undefined,
-    rainbowConsumed: run.rainbowConsumed || undefined,
-    // Persist the completed-stop history (GS-voyage-field) so a resume rebuilds the SAME arc
-    // leaderboard + team-duel underdog side. Absent when nothing's been finished yet (byte-stable).
-    history: run.history.length ? run.history.map((h) => ({ ...h })) : undefined,
-  };
-}
-
-export function resumeRun(snap: RunSnapshot): Run {
-  const meta = snap.meta ?? {};
-  const bagTier = snap.bagTier ?? DEFAULT_BAG_TIER;
-  return {
-    seed: snap.seed,
-    formatId: snap.formatId ?? DEFAULT_FORMAT,
-    stopIndex: snap.stopIndex,
-    distanceFromStart: snap.distanceFromStart,
-    credits: snap.credits,
-    // Perks (incl. reward clubs, GS-clubs) sit on top of the golfer+meta+bag-tier starting loadout,
-    // rebuilt the SAME way `startRun` builds it, so the bag (upgraded starting clubs + bought clubs)
-    // reconstructs identically.
-    loadout: loadoutFromPerks(
-      snap.perks ?? [],
-      startingLoadoutFor(meta, snap.characterId, bagTier, snap.unlockedClubs ?? []),
-    ),
-    meta,
-    ascension: snap.ascension ?? 0,
-    bagTier,
-    unlockedClubs: snap.unlockedClubs ? [...snap.unlockedClubs] : [],
-    pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
-    pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
-    bonusShards: snap.bonusShards ?? 0,
-    holesSurvived: snap.holesSurvived ?? 0,
-    grossStrokes: snap.grossStrokes ?? 0,
-    parPlayed: snap.parPlayed ?? 0,
-    firedEventIds: snap.firedEventIds ? [...snap.firedEventIds] : [],
-    warpedThrough: snap.warpedThrough ?? 0,
-    // A pre-fuel snapshot resumes with a fresh tank (GS-fuel) — generous, and never strands it.
-    fuel: snap.fuel ?? startingFuelFor(getFormat(snap.formatId ?? DEFAULT_FORMAT)),
-    // Scans already burnt at the parked stop (GS-fuel-4) — so a resume re-draws the exact lane
-    // offer the player paid fuel for, not the original one. Absent on old snapshots → 0.
-    routeScans: snap.routeScans ?? 0,
-    firedCaddies: snap.firedCaddies ? [...snap.firedCaddies] : [],
-    rainbowConsumed: snap.rainbowConsumed || undefined,
-    status: 'active',
-    // Restore the finished-stop history (GS-voyage-field) so the positional cut, the arc leaderboard
-    // scores and the boss team-duel underdog side reconstruct exactly as they were. Old snapshots
-    // (pre-history field) resume empty, as before.
-    history: snap.history ? snap.history.map((h) => ({ ...h })) : [],
-  };
 }
 
 /**
