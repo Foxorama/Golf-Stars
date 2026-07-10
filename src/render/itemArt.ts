@@ -73,6 +73,10 @@ const KIND_BY_ID: Record<string, ItemArtKind> = {
   'pro-irons': 'shaft',
   'quantum-shafts': 'shaft',
   'nova-driver': 'shaft',
+  'distance-driver': 'shaft',
+  'distance-woods': 'shaft',
+  'distance-hybrids': 'shaft',
+  'distance-irons': 'shaft',
   'precision-chip': 'glove',
   'anti-duck-hook': 'glove',
   'hook-corrector': 'glove',
@@ -161,6 +165,11 @@ function curveArrow(col: string, dir: 1 | -1, crossed = false): string {
     </g>${slash}`;
 }
 
+/** Tightening-window brackets around a club-family initial — the per-category distance-control emblem. */
+function familyControlEmblem(col: string, letter: string): string {
+  return `<g stroke="${col}" stroke-width="1.7" fill="none" stroke-linecap="round"><path d="M -10 -9 v 18 M 10 -9 v 18"/></g><text x="0" y="4.5" font-size="12" font-weight="700" fill="${col}" stroke="none" text-anchor="middle" font-family="system-ui, sans-serif">${letter}</text>`;
+}
+
 /** The per-id function emblem (vector symbol authored around the roundel origin, ±11). */
 const EMBLEM: Record<string, (col: string) => string> = {
   // Shafts ----------------------------------------------------------------
@@ -171,6 +180,12 @@ const EMBLEM: Record<string, (col: string) => string> = {
     `<g stroke="${c}" stroke-width="1.7" fill="none" stroke-linecap="round"><path d="M -9 -8 v 16 M 9 -8 v 16"/><path d="M -7 0 h 6 M -1 0 l -3 -3 m 3 3 l -3 3"/><path d="M 7 0 h -6 M 1 0 l 3 -3 m -3 3 l 3 3"/></g>`, // tightening window
   overdrive: (c) =>
     `<g stroke="${c}" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M -8 -6 l 5 6 l -5 6"/><path d="M 0 -6 l 5 6 l -5 6"/></g>`, // speed chevrons
+  // Per-category distance control (GS-proshop-distance-items): the tightening-window brackets + the
+  // club-family initial, so the four cards read Driver / Woods / Hybrids / Irons at a glance.
+  'distance-driver': (c) => familyControlEmblem(c, 'D'),
+  'distance-woods': (c) => familyControlEmblem(c, 'W'),
+  'distance-hybrids': (c) => familyControlEmblem(c, 'H'),
+  'distance-irons': (c) => familyControlEmblem(c, 'I'),
   // Gloves ----------------------------------------------------------------
   'precision-chip': (c) =>
     `<g stroke="${c}" stroke-width="1.6" fill="none"><circle r="8"/><path d="M 0 -11 v 5 M 0 11 v -5 M -11 0 h 5 M 11 0 h -5"/></g><circle r="1.8" fill="${c}"/>`, // crosshair

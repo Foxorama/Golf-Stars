@@ -7,6 +7,7 @@
  */
 
 import { CLUBS, clubById, type Club } from '../clubs';
+import type { FlightClass } from '../flight';
 import type { Rarity } from '../course/contract';
 import { combineShapeMods, type CaddyGuard, type ShapeMod } from '../shot';
 import { DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE } from '../round';
@@ -188,6 +189,19 @@ export interface PlayerLoadout {
   minCarryBoost: number;
   /** Wedge distance-control: fraction the wedge carry window is tightened toward the mean (point 6). */
   wedgeWindow: number;
+  /**
+   * Per-club-FAMILY min-carry boost (GS-proshop-distance-items): the category-specific Pro Shop
+   * control items (Driver / Woods / Hybrids / Irons) each raise the lower carry clamp of just their
+   * family, on TOP of the family-agnostic `minCarryBoost`. Keyed by `FlightClass`. Absent/empty = none,
+   * so a base loadout is byte-for-byte unchanged; rebuilt from perk ids on resume (no save bump).
+   */
+  minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
+  /**
+   * Driver control trade-off (GS-proshop-distance-items): fraction shaved off the DRIVER's top carry —
+   * the negative that balances the Driver control item's large min-carry boost (you groove the distance
+   * but give up some top-end bomb). 0/undefined = none.
+   */
+  driverMaxCarryCut?: number;
   /**
    * Overdrive (GS-power): extra power FRACTION the interactive pull-to-power gesture may dial PAST a
    * full swing — `0.1` lets you charge to 110% power for more carry (at the club's full spray). The
@@ -377,6 +391,16 @@ export function boostDistanceClubs(bag: Club[], add: number): Club[] {
   return bag.map((c) => (c.carry >= DISTANCE_CLUB_CARRY ? { ...c, carry: c.carry + add } : { ...c }));
 }
 
+/** Immutably add `amt` to a club FAMILY's min-carry boost (GS-proshop-distance-items). Pure; the
+ *  category-specific Pro Shop control items fold through this so a rebuild-from-perks is exact. */
+export function addFamilyMinCarry(
+  cur: Partial<Record<FlightClass, number>> | undefined,
+  cls: FlightClass,
+  amt: number,
+): Partial<Record<FlightClass, number>> {
+  return { ...(cur ?? {}), [cls]: (cur?.[cls] ?? 0) + amt };
+}
+
 export interface ShopItem {
   id: string;
   name: string;
@@ -497,6 +521,11 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   // Distance-control (carry-window) upgrades — 'distance'.
   'distance-control': ['distance'],
   'wedge-touch': ['control'],
+  // Per-category distance control (GS-proshop-distance-items): precision within a family → 'control'.
+  'distance-driver': ['control'],
+  'distance-woods': ['control'],
+  'distance-hybrids': ['control'],
+  'distance-irons': ['control'],
   'flop-wedge': ['control'], // high-spin short game reads as control
   'pro-irons': ['control'], // premium precision iron set
   'quantum-shafts': ['control'], // legendary precision set
@@ -877,6 +906,61 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
       ...m,
       wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.32),
       perks: [...m.perks, 'wedge-touch'],
+    }),
+  },
+
+  // --- Per-category distance control (GS-proshop-distance-items) -------------------------------
+  // Each raises the MIN carry of ONE club family toward its max — a lot more control over where the
+  // ball lands and stops, category by category. Woods/Hybrids/Irons are pure precision (no downside
+  // to their family). The Driver gets the biggest boost (it hits furthest, so the widest window to
+  // close) but PAYS for it: a shave off the top end — you groove the distance, you give up some bomb.
+  {
+    id: 'distance-driver',
+    name: 'Grooved Driver Face',
+    cost: 180,
+    desc: 'A deep-milled driver face — a BIG jump in min driver carry (fewer weak drives), at the cost of a little top-end distance',
+    rarity: 'epic',
+    apply: (m) => ({
+      ...m,
+      minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'driver', 0.18),
+      driverMaxCarryCut: (m.driverMaxCarryCut ?? 0) + 0.06,
+      perks: [...m.perks, 'distance-driver'],
+    }),
+  },
+  {
+    id: 'distance-woods',
+    name: 'Matched Fairway Woods',
+    cost: 110,
+    desc: 'Length-matched fairway woods — raises your MIN wood carry so long woods land where you aim, no trade-off',
+    rarity: 'rare',
+    apply: (m) => ({
+      ...m,
+      minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'wood', 0.13),
+      perks: [...m.perks, 'distance-woods'],
+    }),
+  },
+  {
+    id: 'distance-hybrids',
+    name: 'Tuned Hybrid Set',
+    cost: 110,
+    desc: 'Weight-tuned hybrids — raises your MIN hybrid carry so rescue clubs stop coming up short, no trade-off',
+    rarity: 'rare',
+    apply: (m) => ({
+      ...m,
+      minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'hybrid', 0.13),
+      perks: [...m.perks, 'distance-hybrids'],
+    }),
+  },
+  {
+    id: 'distance-irons',
+    name: 'Blueprint Iron Set',
+    cost: 170,
+    desc: 'Precision-forged blueprint irons — raises your MIN iron carry so approaches hold their number, no trade-off',
+    rarity: 'epic',
+    apply: (m) => ({
+      ...m,
+      minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'iron', 0.16),
+      perks: [...m.perks, 'distance-irons'],
     }),
   },
   {

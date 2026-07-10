@@ -448,6 +448,18 @@
   are loadout fields (`minCarryBoost`/`wedgeWindow`), resolved per club by `carryControlFor` and applied
   IDENTICALLY in `resolveShot` (the clamp) and `shotSpread` (the previewed `carryLow`/`carryHigh`), so
   the cone's distance labels read true. They only ever tighten distance → never lower scoring (guarded).
+- **Per-CATEGORY distance control (GS-proshop-distance-items).** Four Pro Shop items each raise the min
+  carry of ONE club FAMILY toward its max — resolved by `flightClassOf` (driver/wood/hybrid/iron), so a
+  `carryControlFor(clubId, carry, opts)` call only tightens the matching family. They ride two new loadout
+  fields: `minCarryBoostByClass` (a `Partial<Record<FlightClass, number>>`, additive per family, folded via
+  `addFamilyMinCarry`) and `driverMaxCarryCut` (the Driver item's trade-off). **Woods/Hybrids/Irons** are
+  pure precision (rare / rare / epic, no downside). **Driver** (epic) gets the biggest boost (+0.18 min) but
+  PAYS: `driverMaxCarryCut` (0.06) shaves the top clamp (floored at `meanFrac`, so the mean carry holds —
+  you groove the distance, you give up some top-end bomb). All threaded IDENTICALLY through `resolveShot`
+  (the `maxCarryFracCut` clamp) and `shotSpread` (the previewed window), and through the auto sim
+  (`playHole`) + interactive driver (`takeShot`/`previewShot`) so auto ≡ interactive. Consume ZERO extra
+  rng (pure clamp-fraction tweaks) — feature-off is byte-for-byte, rebuilt from perk ids on resume (no save
+  bump). `tests/distance-items.test.ts` guards per-family isolation, the driver trade-off, and contract 4.
 - **Interactive suggested club = GREEN COVERAGE (`suggestPlayerClub`, GS-mechanics #6).** The player's
   🎯 suggestion is NOT the auto `aiClub` (shortest-that-reaches, tuned for balance — leave it alone):
   green unreachable → longest usable club; reachable → the LONGEST club whose **EXPECTED** carry still
