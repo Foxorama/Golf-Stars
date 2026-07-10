@@ -48,8 +48,11 @@ export interface CetusFlowHandle {
   readonly active: boolean;
   /** Paint one frame. `now` = the play view's virtual clock (ms); `speed` scales the flow rate
    *  (`_gsFeel.cetusFlowSpeed`, 0 freezes it). Cheap: re-projects a short polyline + advances the
-   *  seeded particles — no scene rebuild. */
-  draw(ctx: CanvasRenderingContext2D, proj: Projector, now: number, accents: number, speed: number): void;
+   *  seeded particles — no scene rebuild. `overlayOnly` (the aim/putt screen's weather canvas, which
+   *  sits ON TOP of the static SVG map) skips the opaque channel BED — the SVG already draws the
+   *  static river underneath, so we layer only the MOVING star-motes + waterfall over it and never
+   *  cover the ball marker / aim cone the SVG drew below (the play-view watch keeps the full bed). */
+  draw(ctx: CanvasRenderingContext2D, proj: Projector, now: number, accents: number, speed: number, overlayOnly?: boolean): void;
 }
 
 /** Unit tangent at index i of a polyline, from its neighbours (local copy of the style helper). */
@@ -144,7 +147,7 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
   const starCol = (hue: number): string =>
     hue < 0.5 ? 'rgba(255,255,255,0.9)' : hue < 0.78 ? 'rgba(180,242,255,0.85)' : 'rgba(210,220,255,0.8)';
 
-  function draw(ctx: CanvasRenderingContext2D, proj: Projector, now: number, accents: number, speed: number): void {
+  function draw(ctx: CanvasRenderingContext2D, proj: Projector, now: number, accents: number, speed: number, overlayOnly?: boolean): void {
     const scale = proj.scale;
     const screen = line.map((p) => proj.project(p));
     const hwPx = hw.map((h) => Math.max(1, h * scale));
@@ -155,40 +158,44 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
     ctx.lineCap = 'round';
 
     // --- The channel: a dark deep-water bed with a soft bank glow + shoreline (the static container,
-    //     drawn each frame so suppressing the map's static river loses nothing). ---
-    const ribbon = projPoly(ribbonVar(line, hw), proj);
-    // Bank glow — the luminous water lighting the turf either side.
-    for (let i = 1; i < screen.length; i++) {
-      const w = ((hwPx[i - 1]! + hwPx[i]!) / 2) * 1.8 + 4;
-      ctx.strokeStyle = 'rgba(95,225,252,0.10)';
-      ctx.lineWidth = w;
+    //     drawn each frame so suppressing the map's static river loses nothing). Skipped in overlayOnly
+    //     mode: the aim/putt canvas sits over the SVG map, whose static river IS the bed underneath —
+    //     an opaque bed here would blot out the ball marker + aim cone the SVG drew below. ---
+    if (!overlayOnly) {
+      const ribbon = projPoly(ribbonVar(line, hw), proj);
+      // Bank glow — the luminous water lighting the turf either side.
+      for (let i = 1; i < screen.length; i++) {
+        const w = ((hwPx[i - 1]! + hwPx[i]!) / 2) * 1.8 + 4;
+        ctx.strokeStyle = 'rgba(95,225,252,0.10)';
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(screen[i - 1]![0], screen[i - 1]![1]);
+        ctx.lineTo(screen[i]![0], screen[i]![1]);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(8,30,48,0.92)';
       ctx.beginPath();
-      ctx.moveTo(screen[i - 1]![0], screen[i - 1]![1]);
-      ctx.lineTo(screen[i]![0], screen[i]![1]);
+      ctx.moveTo(ribbon[0]![0], ribbon[0]![1]);
+      for (let i = 1; i < ribbon.length; i++) ctx.lineTo(ribbon[i]![0], ribbon[i]![1]);
+      ctx.closePath();
+      ctx.fill();
+      // Star-water surface tone down the channel + a soft shoreline.
+      for (let i = 1; i < screen.length; i++) {
+        ctx.strokeStyle = 'rgba(60,150,205,0.7)';
+        ctx.lineWidth = Math.max(1, ((hwPx[i - 1]! + hwPx[i]!) / 2) * 1.1);
+        ctx.beginPath();
+        ctx.moveTo(screen[i - 1]![0], screen[i - 1]![1]);
+        ctx.lineTo(screen[i]![0], screen[i]![1]);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(170,235,250,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ribbon[0]![0], ribbon[0]![1]);
+      for (let i = 1; i < ribbon.length; i++) ctx.lineTo(ribbon[i]![0], ribbon[i]![1]);
+      ctx.closePath();
       ctx.stroke();
     }
-    ctx.fillStyle = 'rgba(8,30,48,0.92)';
-    ctx.beginPath();
-    ctx.moveTo(ribbon[0]![0], ribbon[0]![1]);
-    for (let i = 1; i < ribbon.length; i++) ctx.lineTo(ribbon[i]![0], ribbon[i]![1]);
-    ctx.closePath();
-    ctx.fill();
-    // Star-water surface tone down the channel + a soft shoreline.
-    for (let i = 1; i < screen.length; i++) {
-      ctx.strokeStyle = 'rgba(60,150,205,0.7)';
-      ctx.lineWidth = Math.max(1, ((hwPx[i - 1]! + hwPx[i]!) / 2) * 1.1);
-      ctx.beginPath();
-      ctx.moveTo(screen[i - 1]![0], screen[i - 1]![1]);
-      ctx.lineTo(screen[i]![0], screen[i]![1]);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(170,235,250,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(ribbon[0]![0], ribbon[0]![1]);
-    for (let i = 1; i < ribbon.length; i++) ctx.lineTo(ribbon[i]![0], ribbon[i]![1]);
-    ctx.closePath();
-    ctx.stroke();
 
     // --- FLOWING stars: the river actually moves. Each seeded star drifts source→spill; it fades in
     //     as it wells up and fades out as it pours over the lip, so the whole channel streams. ---
