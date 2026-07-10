@@ -250,6 +250,11 @@ export interface PlayViewOptions {
    *  origin→pin so the pin stays at the top even on a shot played back toward the green. */
   up?: Vec;
   follow?: boolean;
+  /** Draw the animated world-decor twins — the moving Cetus star-waterfall + the derelict's drifting
+   *  space junk (GS-cetus-flow / GS-ship-feel). Default true. Set FALSE for the putts-only green watch:
+   *  the tight green zoom made the drifting ship SECTIONS float weirdly over the cup (they're readable
+   *  from the shot/decision framing, not a 25-yd putt view). A shot watch keeps them on. */
+  ambientDrift?: boolean;
   /** The selected golfer's look (GS-18). Absent → the loader-crew cap cycle (result-screen replay). */
   golferLook?: GolferLook;
   /** The hired named caddy id (GS-caddy) — the actual hired caddy. A GUARD caddy (Space Ducks /
@@ -522,13 +527,16 @@ export function mountPlayView(
   // scene's STATIC river (`animateCetus`) and draws the SAME channel geometry as a live, flowing
   // waterfall over the scene (below). Cheap: it re-projects a short polyline + advances seeded
   // particles per frame — no scene rebuild — so it doesn't chug the follow-cam. Absent elsewhere.
+  // Skip the world-decor twins on the putts-only green watch (GS-cetus-flow / GS-ship-feel): the tight
+  // putt zoom floated the drifting ship SECTIONS weirdly over the cup. A shot watch keeps them on.
+  const ambientDrift = opts.ambientDrift !== false;
   const isCetus = archetypeFor(opts.themeId, opts.biome ?? '') === 'cetus' && !opts.rainbow;
-  const cetusFlow = isCetus ? createCetusFlow(hole) : null;
+  const cetusFlow = isCetus && ambientDrift ? createCetusFlow(hole) : null;
   // The derelict's DRIFTING SPACE JUNK (GS-ship-feel): torn hull-plates tumble through the open space
   // around the wreck. Same cheap per-frame model as the cetus flow (re-project + advance seeded chunks,
   // no scene rebuild), play-view only, so the SVG map stays byte-identical. Absent on every other world.
   const isDerelict = archetypeFor(opts.themeId, opts.biome ?? '') === 'derelict' && !opts.rainbow;
-  const shipDrift = isDerelict ? createShipDrift(hole) : null;
+  const shipDrift = isDerelict && ambientDrift ? createShipDrift(hole) : null;
   const flowAccents = artFeel().accents;
 
   let cachedProj: typeof proj | null = null;

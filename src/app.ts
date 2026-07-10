@@ -373,6 +373,12 @@ let mapZoom = 1;
 // follow radius to match) and before any decision has rendered (resume) — those fall back to the
 // travel-framed reach.
 let decisionRadius: number | null = null;
+// The framing for the aim/putt weather overlay's animated world-decor (moving Cetus river / drifting
+// ship junk / meteor strikes, GS-cetus-flow / GS-ship-feel / GS-meteor-strikes). Set by the shot-
+// decision + putt branches to the SVG map's exact projector options so the overlay canvas lines the
+// decor up pixel-for-pixel with the map beneath. `drift` is off on the putt screen (the tight green
+// zoom floats the ship debris weirdly). null (whole-hole fit / no decision yet) ⇒ no aligned decor.
+let overlayDecor: { mapProj: ProjectOptions; drift: boolean; meteorScorch: boolean } | null = null;
 // The putt screen's framed radius — the putt cousin of decisionRadius: handed to the putt animation
 // so the strike→watch cut keeps the exact green zoom instead of popping out to a fixed radius (the
 // "weird zoom on the green" bug). Fixed per putt (aim-nudge-independent) so the camera holds still.
@@ -882,6 +888,15 @@ function playingBody(animating: boolean): string {
     // (each swap re-rasterises the zoomed SVG). The framing is aim-independent, so the overlay reuses
     // the exact focus/zoom the map was built at; the weather canvas over the same .gs-bigmap survives.
     const puttUp: [number, number] = [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]];
+    // Arm the putt overlay's animated decor — meteor STRIKES keep animating on the craters (sky, fine
+    // zoomed in), but `drift` is OFF: the course-space Cetus river / ship junk float weirdly on the
+    // tight green zoom (the reported "very small … looks super weird" bug). The projector is the putt
+    // map's exact focus/zoom so a strike still lands on a drawn crater.
+    overlayDecor = {
+      mapProj: { width: DMAP_W, height: DMAP_H, focus: puttMid, viewRadius: puttRadius, focusBias: 0.5, up: puttUp },
+      drift: false,
+      meteorScorch: scorchActive(),
+    };
     puttAimRefresh = () => {
       const aim = selPuttAim ?? 0;
       puttAimResolved = aim;
@@ -980,6 +995,11 @@ function playingBody(animating: boolean): string {
   // Remember the follow-cam radius the player is LOOKING AT — the shot animation starts at this
   // exact zoom so releasing the gesture never skip-jumps to a different framing (GS-power).
   decisionRadius = mapOpts.viewRadius ?? null;
+  // Arm the aim-overlay's animated world-decor (moving Cetus river / drifting ship junk / meteor
+  // strikes) — but only in FOCUS/FOLLOW mode: the whole-hole fit folds `extra` points into its
+  // projector that the overlay can't reproduce, so it would misalign (the SVG keeps its static decor
+  // there). The decor lines up pixel-for-pixel with this exact map projector.
+  overlayDecor = mapOpts.focus ? { mapProj: mapOpts, drift: true, meteorScorch: scorchActive() } : null;
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
     shotColor: golferLook()?.cap, // GS-tracer: the player's shot tracer reads the chosen golfer's colour.
@@ -1190,6 +1210,10 @@ function render(): void {
   // The route-info sheet is only meaningful on the travel screen; clear it the moment we leave so a
   // stale id (route ids repeat 1..3 each stop) can't auto-reopen a sheet on the next travel screen.
   if (state.screen !== 'travel') travelView.inspectRouteId = null;
+
+  // Reset the aim-overlay decor framing each render; the decision/putt branches below re-arm it when
+  // they draw a focus-mode map (whole-hole fit can't be aligned, so it stays null → no aligned decor).
+  overlayDecor = null;
 
   const body =
     state.screen === 'title'
@@ -1587,11 +1611,16 @@ function render(): void {
     if (wEl) {
       const ball = state.play.ball;
       const pin = pinOf(state.play.hole);
-      weatherOverlay = mountWeatherOverlay(wEl, state.play.hole, [pin[0] - ball[0], pin[1] - ball[1]], {
-        width: DMAP_W,
-        height: DMAP_H,
-        focusBias: DMAP_BIAS,
-      });
+      weatherOverlay = mountWeatherOverlay(
+        wEl,
+        state.play.hole,
+        [pin[0] - ball[0], pin[1] - ball[1]],
+        { width: DMAP_W, height: DMAP_H, focusBias: DMAP_BIAS },
+        // Animate the world-decor twins over the aim/putt map too (GS-cetus-flow / GS-ship-feel /
+        // GS-meteor-strikes) — armed by the decision/putt branch with the map's exact projector so the
+        // river/junk/craters line up beneath. null in whole-hole fit (can't align) ⇒ sky-only overlay.
+        overlayDecor ?? undefined,
+      );
     }
   }
 
@@ -1712,6 +1741,9 @@ function render(): void {
         // Follow the ball only when there's a real shot in flight; a green putt holds the frame
         // still so the heavy scene builds ONCE, not every frame (GS-putt-watch-lag).
         follow: hadShots,
+        // Draw the moving Cetus river / drifting ship junk only on a SHOT watch — a putts-only green
+        // watch is zoomed to ~25 yds, where the drifting ship SECTIONS floated weirdly over the cup.
+        ambientDrift: hadShots,
         onImpact: (kind, quality, clubId) => {
           // Contact cue — fires at the strike moment (the windup has already played).
           if (kind === 'shot') {

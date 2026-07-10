@@ -9,8 +9,12 @@ import { state } from './ctx';
 import { currentEffect, holeBiome, holeThemeId, rainbowActive } from './helpers';
 import { archetypeFor } from '../sim/course/themes';
 import { setMusicScene, type MusicSceneId } from '../render/music';
-import { holeProjector } from '../render/project';
+import { holeProjector, type Projector, type ProjectOptions } from '../render/project';
 import { createWeather } from '../render/weather';
+import { createCetusFlow } from '../render/cetusFlow';
+import { createShipDrift } from '../render/shipDrift';
+import { meteorScorch } from '../sim/scorch';
+import { artFeel } from '../render/style';
 import { CADDY_VOICE } from '../render/caddyArt';
 import { speakCaddy } from '../render/speech';
 import { sfx } from '../render/audio';
@@ -40,6 +44,42 @@ function weatherSeed(hole: Hole): number {
   return (Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed;
 }
 
+/** A `_gsFeel` flow-speed sub-field (cetusFlowSpeed / shipDriftSpeed), defaulting to 1 — the same
+ *  escape-hatch the play view reads, so the aim-overlay decor honours the identical tunable. */
+function feelSpeed(key: 'cetusFlowSpeed' | 'shipDriftSpeed'): number {
+  const f = (window as unknown as { _gsFeel?: Record<string, number> })._gsFeel ?? {};
+  const v = f[key];
+  return typeof v === 'number' ? v : 1;
+}
+
+/**
+ * A projector that maps course space onto the OVERLAY CANVAS pixels so an animated decor twin (the
+ * Cetus star-waterfall, the derelict's drifting junk, a meteor strike) sits EXACTLY on the static SVG
+ * map beneath it (GS-cetus-flow / GS-ship-feel / GS-meteor-strikes on the aim/putt screen). The SVG
+ * has a fixed `viewBox` (DMAP_W×DMAP_H) that CSS scales into the container by the default
+ * `preserveAspectRatio` (meet — uniform, centred), so we build the map's OWN projector at the viewBox
+ * size and compose the meet-fit letterbox transform onto the canvas's real pixels. Only valid in
+ * FOCUS mode (the SVG's whole-hole fit folds in `extra` points this can't see) — the caller gates it.
+ */
+function alignedProjector(hole: Hole, mapProj: ProjectOptions, cw: number, ch: number): Projector {
+  const vbW = mapProj.width ?? 360;
+  const vbH = mapProj.height ?? 640;
+  const base = holeProjector(hole, mapProj);
+  const s = Math.min(cw / vbW, ch / vbH); // meet-fit: scale the viewBox uniformly to fit the canvas
+  const ox = (cw - vbW * s) / 2;
+  const oy = (ch - vbH * s) / 2;
+  return {
+    width: cw,
+    height: ch,
+    scale: base.scale * s,
+    project: (p) => {
+      const q = base.project(p);
+      return [ox + q[0] * s, oy + q[1] * s];
+    },
+    unproject: (px, py) => base.unproject((px - ox) / s, (py - oy) / s),
+  };
+}
+
 /**
  * Mount the animated, SCREEN-SPACE weather overlay over the aim/putt map (GS-journey-fx rework) so the
  * sky + air are alive while you line up — not just during ball flight (the in-flight view draws the
@@ -55,6 +95,16 @@ export function mountWeatherOverlay(
   hole: Hole,
   up: Vec,
   dims: { width: number; height: number; focusBias: number },
+  align?: {
+    /** The SVG map's projector options (focus/viewRadius/focusBias/up + viewBox width/height) so the
+     *  overlay's course-space decor lines up pixel-for-pixel with the map beneath. FOCUS mode only. */
+    mapProj: ProjectOptions;
+    /** Draw the world-decor twins (moving Cetus river / drifting ship junk). Off on the putt screen —
+     *  the tight green zoom floats the debris weirdly (GS bug: "very small … looks super weird"). */
+    drift: boolean;
+    /** The route brought a meteor shower with scorch craters — animate a strike diving into them. */
+    meteorScorch: boolean;
+  },
 ): { destroy(): void } | null {
   const cw = Math.round(el.clientWidth || dims.width);
   const ch = Math.round(el.clientHeight || dims.height);
@@ -68,6 +118,17 @@ export function mountWeatherOverlay(
   const ctx = cv.getContext('2d');
   if (!ctx) return null;
   ctx.scale(dpr, dpr);
+  // Course-space decor twins over the aim/putt map (GS-cetus-flow / GS-ship-feel / GS-meteor-strikes):
+  // the play view animated these only while WATCHING a shot — on the static aim/putt screen the river,
+  // debris and craters sat frozen. Build a projector aligned to the SVG map (focus mode only) and draw
+  // the SAME moving decor over it, so the world is just as alive while you line up.
+  const arch = archetypeFor(holeThemeId(hole), holeBiome(hole) ?? '');
+  const aligned = align ? alignedProjector(hole, align.mapProj, cw, ch) : null;
+  const cetusFlow = aligned && align!.drift && arch === 'cetus' && !rainbowActive() ? createCetusFlow(hole) : null;
+  const shipDrift = aligned && align!.drift && arch === 'derelict' && !rainbowActive() ? createShipDrift(hole) : null;
+  // The meteor-shower's scorch craters, projected through the aligned projector so a strike lands
+  // exactly on a drawn crater (createWeather ignores this unless the effect IS the meteor shower).
+  const scorchMarks = aligned && align!.meteorScorch ? meteorScorch(hole) : [];
   // Wind screen-direction via a projector oriented the same way the map is (shot pointing up).
   const proj = holeProjector(hole, { width: cw, height: ch, focus: hole.tee, up, viewRadius: 80, focusBias: dims.focusBias });
   const rad = ((hole.wind?.dir ?? 0) * Math.PI) / 180;
@@ -100,6 +161,13 @@ export function mountWeatherOverlay(
     windDir: [wdx / wl, wdy / wl],
     seed: weatherSeed(hole),
     starMask: () => (landDominant ? overlayMask : null),
+    // Meteor STRIKES on the aim/putt screen too (GS-meteor-strikes): with an aligned projector the
+    // craters' screen positions are honest, so a meteor can dive into one while you line up — not
+    // only mid-flight. Empty/absent → no strikes (the old aim-overlay behaviour).
+    strikeTargets:
+      aligned && scorchMarks.length
+        ? () => scorchMarks.map((m) => ({ c: aligned.project(m.c), r: Math.max(4, m.r * aligned.scale) }))
+        : undefined,
   });
   const reduced = getSettings().reducedMotion;
   let raf = 0;
@@ -108,6 +176,15 @@ export function mountWeatherOverlay(
     if (!live || !cv.isConnected) return;
     ctx.clearRect(0, 0, cw, ch);
     w.draw(ctx, now);
+    // The animated world-decor twins, over the weather but sharing this pointer-through canvas. The
+    // Cetus river draws in OVERLAY mode (no opaque bed — the SVG's static river is the bed beneath, so
+    // the ball marker + aim cone stay readable); the ship junk draws normally (it floats in the space
+    // off the deck, never over the cone). Both no-op when their world/handle is absent.
+    if (aligned) {
+      const accents = artFeel().accents;
+      cetusFlow?.draw(ctx, aligned, now, accents, feelSpeed('cetusFlowSpeed'), true);
+      shipDrift?.draw(ctx, aligned, now, accents, feelSpeed('shipDriftSpeed'));
+    }
     if (!reduced) raf = requestAnimationFrame(tick);
   };
   tick(performance.now());

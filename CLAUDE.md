@@ -566,6 +566,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical; PERF-neutral (geometry cached
     at mount, per-frame = re-project a short polyline + ~90 capped particles, NO `buildScene` rebuild —
     it replaces the equal static river the follow-cam rebuilt). Speed rides `_gsFeel.cetusFlowSpeed`.
+  - AIM-OVERLAY DECOR (GS-overlay-decor): the animated world-decor twins (Cetus flow, derelict ship
+    drift) AND meteor STRIKES used to move only while WATCHING a shot — on the static aim/putt screen
+    the river/junk/craters sat frozen. `mountWeatherOverlay` (`app/playFx.ts`) now draws them over the
+    aim/putt map too, through a `alignedProjector` that composes the SVG map's OWN projector with the
+    CSS meet-fit letterbox transform, so the decor lines up pixel-for-pixel with the map beneath. Only
+    in FOCUS/FOLLOW mode (armed via `overlayDecor` in `app.ts`); whole-hole fit folds `extra` points the
+    overlay can't reproduce, so it stays static there. The Cetus river draws in `overlayOnly` mode (skips
+    the opaque channel BED — the SVG's static river IS the bed, so the ball marker + aim cone stay
+    readable under only the moving motes/waterfall). `drift` is OFF on the putt screen + the putts-only
+    green watch (`ambientDrift`): the tight ~25-yd zoom floated the ship SECTIONS weirdly over the cup.
+    Browser-only side layer (never the sim); no new hook (reuses `_gsFeel.cetus/shipDriftSpeed`).
   - The decision map's framing holds still for the whole shot decision; the shot animation starts
     at the decision map's exact `decisionRadius`. `playView`'s `spawnLandFX` answers the touchdown
     per lie/penalty — extend it with any new penalty kind.

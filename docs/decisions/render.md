@@ -658,6 +658,52 @@
   `_gsFeel.cetusFlowSpeed` sub-field (1 default, 0 freezes) — a feel tunable, no test-hub hook. Eyeball
   with `scripts/cetus-flow-preview.mjs`.
 
+## GS-overlay-decor: the animated world-decor also moves on the aim/putt screen (2026-07-10)
+
+- **The moving decor twins were watch-only (the bug).** `render/cetusFlow.ts` (the flowing Cetus
+  star-waterfall), `render/shipDrift.ts` (the derelict's drifting hull junk + the "Starlit Wanderer"
+  sections) and the meteor STRIKES were all wired into the Canvas2D play view (`playView.ts`) — the
+  animated WATCH. The DECISION/AIM and PUTT screens are the static SVG map (`holeView.ts`) with a
+  screen-space WEATHER overlay canvas on top (`app/playFx.mountWeatherOverlay`). That overlay drew only
+  sky + air (twinkling stars, wind, meteor STREAKS) but NOT the course-space decor, so on the screen the
+  player stares at most, the "starry waterfall" and the "drifting ship debris" sat frozen (player
+  report: "only animated in the watching mode"). Meteor craters had the same gap — a strike dove in only
+  mid-flight (the overlay's local projector was wind-orientation only, so it "would lie about crater
+  positions", per the old code comment).
+- **Why it couldn't just draw them.** The decor is COURSE-space (a star must sit on the river channel,
+  a strike on a drawn crater), but the overlay canvas fills the `.gs-bigmap` container while the SVG map
+  is a fixed `viewBox` (360×640) CSS-scaled INTO that container by the default `preserveAspectRatio`
+  (meet — uniform + centred, letterboxed). The overlay's old projector deliberately gave up on matching
+  the map's fit (it only oriented the wind), so a course-projected mote would drift OFF the drawn river.
+- **The fix: a letterbox-aligned projector.** `playFx.alignedProjector(hole, mapProj, cw, ch)` builds
+  the map's OWN `holeProjector` at the viewBox size, then composes the meet-fit transform
+  (`s = min(cw/vbW, ch/vbH)`, centred offset `ox/oy`) onto the canvas pixels — so `project` lands
+  pixel-for-pixel on the SVG content beneath, and `unproject`/`scale` follow. `app.ts` arms it via a new
+  `overlayDecor` module var set by the decision + putt branches to the SVG map's EXACT projector options
+  — but ONLY in FOCUS/FOLLOW mode: the whole-hole fit folds `extra` points (playBounds, shots, the
+  spray arc) into its projector that the overlay can't reproduce, so it stays static there (the SVG keeps
+  its own static decor). `mountWeatherOverlay` then: (a) feeds `createWeather.strikeTargets` off the
+  aligned projector so a meteor dives into a real crater on the aim/putt screen too; (b) draws
+  `createCetusFlow` / `createShipDrift` each frame over the weather.
+- **Z-order — the Cetus `overlayOnly` mode.** The overlay canvas sits ON TOP of the SVG (its ball
+  marker + aim cone). The Cetus flow normally paints an opaque channel BED (`rgba(8,30,48,0.92)`) —
+  which would blot the ball/cone out. So `cetusFlow.draw(…, overlayOnly=true)` SKIPS the bed block: the
+  SVG's own static `cetusRiver` IS the bed underneath (kept, not suppressed), and we layer only the
+  MOVING star-motes + waterfall over it. The play-view watch keeps `overlayOnly` false (full bed,
+  static river suppressed via `animateCetus`) — unchanged. The ship drift needs no such mode: its junk
+  floats in the space OFF the deck (chunks skip land; sections ride the side margins), never over the cone.
+- **Putt suppression (the second report).** "the ship debris … shows when putting and it's then very
+  small because of the zoom in and looks super weird." The putt view is a ~25-yd green zoom; the
+  screen-space ship SECTIONS floated absurdly over the cup there. So `drift` is OFF on the putt overlay
+  (`overlayDecor.drift = false`) AND on the putts-only green WATCH (a new `PlayViewOptions.ambientDrift`,
+  set `hadShots` at the animation mount — a shot watch keeps the decor, a green putt drops it). Meteor
+  strikes stay on the putt overlay (sky, fine zoomed in).
+- **Determinism / purity.** All of this is the browser SIDE layer (`app/`, render overlays) — never the
+  sim; no seeded stream is touched and no test exercises it, so the suite is byte-identical. No new hook:
+  the flow/drift speeds reuse the existing `_gsFeel.cetusFlowSpeed` / `.shipDriftSpeed` sub-fields. Verified
+  eyes-on with a letterbox-aligned harness (static SVG scene + overlay decor): the Cetus motes ride the
+  static river with the ball marker clear, and the ship junk drifts off the deck; both animate frame-to-frame.
+
 ## GS-rough-cover-2 + GS-egg: rough that reads as rough, and easter eggs to find (2026-07-03)
 
 - **The flat-slab roughs get characterful TUFTS (GS-rough-cover-2, `style.ts`/`palette.ts`).** Player
