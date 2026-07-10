@@ -205,18 +205,39 @@ export function styleShipDeck(hole: Hole, sps: Vec[][], proj: Projector, halfSpa
   if (total < 4) return [];
   const detail: Prim[] = [];
   const hw = corridorHalf(hole, 16);
+  // The fairway ribbon caps each end with a rounded NOSE that bulges ~0.92·half-width PAST the
+  // centreline endpoints (see `ribbon()` in generate.ts). Sampling the deck only over [0, total] left
+  // those tee/green caps as bare turf — the "unfinished corridor" read. So EXTRAPOLATE the deck past
+  // both ends by `pad` (≥ the nose depth); everything is clipped to the section, so the overrun is
+  // trimmed to the true corridor shape and the plating now fills right up to the rounded caps.
+  const pad = Math.max(12, hw);
+  const sMin = -pad;
+  const sMax = total + pad;
+  const span = sMax - sMin;
 
+  // Point + tangent at arc `s`, extrapolating LINEARLY along the endpoint tangent past either end.
+  const atE = (s: number): { p: Vec; t: Vec } => {
+    if (s < 0) {
+      const e = atArc(cl, cum, 0);
+      return { p: [e.p[0] + e.t[0] * s, e.p[1] + e.t[1] * s], t: e.t };
+    }
+    if (s > total) {
+      const e = atArc(cl, cum, total);
+      return { p: [e.p[0] + e.t[0] * (s - total), e.p[1] + e.t[1] * (s - total)], t: e.t };
+    }
+    return atArc(cl, cum, s);
+  };
   // A lateral offset of the centreline at arc `s` by `d` course-yd (right = +perp).
   const lat = (s: number, d: number): Vec => {
-    const { p, t } = atArc(cl, cum, s);
+    const { p, t } = atE(s);
     return [p[0] - t[1] * d, p[1] + t[0] * d];
   };
-  // A ribbon polygon running the corridor between two lateral offsets (course space → screen).
-  const ribbon = (dInner: number, dOuter: number, steps = 40): Vec[] => {
+  // A ribbon polygon running the FULL padded corridor between two lateral offsets (course → screen).
+  const ribbon = (dInner: number, dOuter: number, steps = 48): Vec[] => {
     const a: Vec[] = [];
     const b: Vec[] = [];
     for (let k = 0; k <= steps; k++) {
-      const s = (k / steps) * total;
+      const s = sMin + (k / steps) * span;
       a.push(proj.project(lat(s, dInner)));
       b.push(proj.project(lat(s, dOuter)));
     }
@@ -232,7 +253,7 @@ export function styleShipDeck(hole: Hole, sps: Vec[][], proj: Projector, halfSpa
   // The walkway's two painted guide edges + faded chevrons marching up the centre.
   for (const d of [-hw * 0.34, hw * 0.34]) {
     const pts: Vec[] = [];
-    for (let k = 0; k <= 40; k++) pts.push(proj.project(lat((k / 40) * total, d)));
+    for (let k = 0; k <= 48; k++) pts.push(proj.project(lat(sMin + (k / 48) * span, d)));
     detail.push({ t: 'path', pts, stroke: DECK.walkLine, sw: 1.4, round: true });
   }
 
@@ -242,9 +263,9 @@ export function styleShipDeck(hole: Hole, sps: Vec[][], proj: Projector, halfSpa
   // transverse grooves are kept thin/low-contrast; the offset joints + the lengthwise walkway dominate.
   const rowH = 13;
   const plateW = hw * 0.62; // ~3 plates across the corridor
-  const nRows = Math.max(1, Math.floor(total / rowH));
+  const nRows = Math.max(1, Math.floor(span / rowH));
   for (let i = 0; i <= nRows; i++) {
-    const s = (i / (nRows + 1)) * total;
+    const s = sMin + (i / (nRows + 1)) * span;
     // A thin transverse panel groove across the corridor (drawn long, clipped to the section).
     const a = proj.project(lat(s, -halfSpan));
     const b = proj.project(lat(s, halfSpan));
@@ -253,7 +274,7 @@ export function styleShipDeck(hole: Hole, sps: Vec[][], proj: Projector, halfSpa
     const off = i % 2 === 0 ? 0 : plateW * 0.5;
     for (let d = -halfSpan + off; d < halfSpan; d += plateW) {
       if (Math.abs(d) < hw * 0.34) continue; // leave the central walkway lane clear of joints
-      const s1 = Math.min(total, s + rowH);
+      const s1 = Math.min(sMax, s + rowH);
       const j0 = proj.project(lat(s, d));
       const j1 = proj.project(lat(s1, d));
       detail.push({ t: 'line', a: j0, b: j1, stroke: DECK.seam, sw: 1, round: false });
@@ -264,7 +285,7 @@ export function styleShipDeck(hole: Hole, sps: Vec[][], proj: Projector, halfSpa
   // --- CONDUIT / CABLE TRAYS running the length of each wall --------------------
   for (const d of [-hw * 0.82, hw * 0.82]) {
     const pts: Vec[] = [];
-    for (let k = 0; k <= 40; k++) pts.push(proj.project(lat((k / 40) * total, d)));
+    for (let k = 0; k <= 48; k++) pts.push(proj.project(lat(sMin + (k / 48) * span, d)));
     detail.push({ t: 'path', pts, stroke: DECK.conduitDk, sw: 3, round: true });
     detail.push({ t: 'path', pts, stroke: DECK.conduit, sw: 1.4, round: true });
   }
