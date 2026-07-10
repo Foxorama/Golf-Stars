@@ -86,6 +86,67 @@ const INT = {
   grateVoid: '#05080e', // the darkness of a level below
 };
 
+/** Centroid of a polygon. */
+function centroid(poly: Vec[]): Vec {
+  let x = 0;
+  let y = 0;
+  for (const p of poly) {
+    x += p[0];
+    y += p[1];
+  }
+  return [x / poly.length, y / poly.length];
+}
+
+/**
+ * JAGGED, BROKEN platform silhouette (GS-ship-interior) — the derelict's hull SECTIONS are a ship torn
+ * apart, so their outline must read SHARP and RIPPED, not the smooth rounded pill the dilation produces.
+ * Densify each platform edge and displace every point along its outward radial by a `posHash` sawtooth:
+ * sharp alternating teeth (bent plate + snapped spar) with the odd deeper OUTWARD spike, and shallow
+ * INWARD nicks — biased OUTWARD and hard-capped to a fraction of the section's inradius so the polygon
+ * stays simple (a self-touch would break the clip → the cetus dropped-content bug). Pure geometry, ZERO
+ * rng (posHash on course coords), cached per hole → camera-proof and cheap under the per-frame follow-cam.
+ * The jagged poly is used for the fill, the hull cross-section, the torn teeth, the interior clip AND the
+ * weather star-mask, so the torn edge is consistent everywhere (stars show through the rips — as they should).
+ */
+const jagCache = new WeakMap<Hole, Vec[][]>();
+export function jagShipPlatforms(hole: Hole, polys: Vec[][]): Vec[][] {
+  const hit = jagCache.get(hole);
+  if (hit) return hit;
+  const out = polys.map((poly) => {
+    if (poly.length < 3) return poly;
+    const c = centroid(poly);
+    // Section inradius-ish → the jag amplitude cap (keeps the poly simple + scales to the section size).
+    let rMin = Infinity;
+    for (const p of poly) rMin = Math.min(rMin, Math.hypot(p[0] - c[0], p[1] - c[1]));
+    const cap = Math.max(4, Math.min(20, rMin * 0.5));
+    // Densify to ~15-yd resolution — a FEW big angular teeth read as torn metal plate; many tiny ones
+    // read as fur. Coarser than the shard pass, so the break is clean and sharp.
+    const dense: Vec[] = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]!;
+      const b = poly[(i + 1) % poly.length]!;
+      dense.push(a);
+      const segs = Math.min(12, Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 15)));
+      for (let s = 1; s < segs; s++) dense.push([a[0] + (b[0] - a[0]) * (s / segs), a[1] + (b[1] - a[1]) * (s / segs)]);
+    }
+    return dense.map((p, i) => {
+      let ox = p[0] - c[0];
+      let oy = p[1] - c[1];
+      const l = Math.hypot(ox, oy) || 1;
+      ox /= l;
+      oy /= l;
+      const h = posHash(p[0], p[1], 2);
+      // Big angular zigzag: a snapped plate juts OUT, the next is bitten IN — sharp, not fuzzy.
+      let amp = (i % 2 === 0 ? 1 : -0.7) * (0.5 + h * 0.5) * cap;
+      if (posHash(p[0], p[1], 5) > 0.8) amp += (0.7 + posHash(p[0], p[1], 6) * 0.5) * cap; // a torn spar juts far out
+      amp = Math.max(-cap * 0.7, Math.min(cap * 1.4, amp)); // deep outward spikes ok; inward nicks stay shallow (poly simple)
+      return [p[0] + ox * amp, p[1] + oy * amp] as Vec;
+    });
+  });
+  jagCache.set(hole, out);
+  return out;
+}
+
 /** Cumulative arc lengths of a polyline (for even arc-length sampling). */
 function arcTable(line: Vec[]): { cum: number[]; total: number } {
   const cum = [0];

@@ -17,8 +17,10 @@ import { pointInPoly } from '../sim/course/contract';
 import type { Projector } from './project';
 import { mulberry32, hashHole } from './style/shared';
 import { landPolysCourseFor } from './style/land';
+import { drawWreck, type WreckKind } from './shipWreck';
 
 const DRIFT_SEED = 0x00d817f7;
+const SHIP_NAME = 'STARLIT WANDERER';
 
 interface Chunk {
   /** Base course position (the drift wraps around this within the hole band). */
@@ -35,6 +37,28 @@ interface Chunk {
   sides: number;
   /** A wire still sparking on this chunk. */
   live: boolean;
+}
+
+/** A LARGE drifting ship-SECTION (bridge/wing/engine) — the mangled remains of the "Starlit Wanderer".
+ *  Drawn in SCREEN space (like the distant planet/comet), so it reads as a big hull FAR OFF drifting
+ *  through the space beside the corridor at a fixed, readable size in BOTH the whole-hole map and the
+ *  zoomed follow-cam (a course-yd size would balloon to fill the screen when zoomed in). Anchored toward
+ *  a screen MARGIN (the empty space either side of the corridor) and drifting slowly across it. */
+interface Section {
+  /** Screen anchor as a fraction of width/height (kept toward a margin). */
+  fx: number;
+  fy: number;
+  /** Drift velocity (screen px per virtual second). */
+  vx: number;
+  vy: number;
+  spin: number;
+  phase: number;
+  /** Section reach as a fraction of min(W,H). */
+  sizeFrac: number;
+  kind: WreckKind;
+  /** The bridge carries the ship name. */
+  name?: string;
+  alpha: number;
 }
 
 export interface ShipDriftHandle {
@@ -80,13 +104,52 @@ export function createShipDrift(hole: Hole): ShipDriftHandle {
   const land = landPolysCourseFor(hole, false);
   const onLand = (p: Vec): boolean => land.some((lp) => pointInPoly(p, lp));
 
+  // LARGE drifting SECTIONS of the "Starlit Wanderer" (GS-ship-wreck): a bridge (with the ship name),
+  // a torn wing, an engine cluster — distant hulls drifting through the space beside the corridor. Drawn
+  // SCREEN-space (see `Section`) so they hold a readable size at every zoom, anchored to a side MARGIN
+  // (the empty space either side of the hallway) and drifting slowly across it. Seeded once here.
+  const pool: WreckKind[] = ['wing', 'engine'];
+  const sections: Section[] = [];
+  for (let i = 0; i < 3; i++) {
+    const isBridge = i === 0;
+    const kind: WreckKind = isBridge ? 'bridge' : pool[(rng() * pool.length) | 0]!;
+    const side = i % 2 === 0 ? 1 : 0; // right / left margin
+    sections.push({
+      fx: side ? 0.78 + rng() * 0.16 : 0.06 + rng() * 0.16, // hug a side margin, clear of the central corridor
+      fy: 0.12 + rng() * 0.7,
+      vx: (rng() - 0.5) * 4,
+      vy: (rng() < 0.5 ? -1 : 1) * (6 + rng() * 10), // drift up/down the side, slowly
+      spin: (rng() - 0.5) * 0.08,
+      phase: rng() * Math.PI * 2 + (isBridge ? Math.PI : 0),
+      // SMALL, detailed pieces (a little model drifting by), not a frame-filling hull.
+      sizeFrac: isBridge ? 0.2 + rng() * 0.05 : 0.13 + rng() * 0.04,
+      kind,
+      name: isBridge ? SHIP_NAME : undefined,
+      // Crisp + solid (they're small, so they never wash the scene); a touch translucent for depth.
+      alpha: isBridge ? 0.92 : 0.82,
+    });
+  }
+
   return {
     active: true,
     draw(ctx, proj, now, accents, speed) {
       if (accents <= 0 || speed <= 0) return;
       const cap = Math.min(N, Math.max(6, Math.round(N * Math.min(1, accents))));
       const t = (now / 1000) * speed;
+      const W = proj.width;
+      const H = proj.height;
+      const m = Math.min(W, H);
       ctx.save();
+      // Big sections FIRST (behind the small tumbling junk), drifting in the side margins (screen space).
+      for (const sc of sections) {
+        const S = sc.sizeFrac * m;
+        const wrapW = W + 2 * S;
+        const wrapH = H + 2 * S;
+        const x = -S + (((sc.fx * W + sc.vx * t + S) % wrapW) + wrapW) % wrapW;
+        const y = -S + (((sc.fy * H + sc.vy * t + S) % wrapH) + wrapH) % wrapH;
+        const rot = sc.phase + sc.spin * t;
+        drawWreck(ctx, sc.kind, x, y, S, rot, sc.alpha * Math.min(1, accents), t, sc.name);
+      }
       for (let i = 0; i < cap; i++) {
         const c = chunks[i]!;
         // Drift + WRAP within the band so the field loops seamlessly.

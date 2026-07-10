@@ -388,6 +388,12 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // exactly like the void's lost rough (a +1 NON-replay drop-back onto the hull section, so a miss into
   // the stars bites but never cascades into a ball-shredder), reusing the proven `voidlost` mechanic.
   shiprough: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'voidlost', label: 'Lost to space' },
+  // The derelict ship's ACID-ETCHED DECK BREACHES (GS-ship-interior): corrosion has eaten holes clean
+  // through the hull deck, opening to the void. Landing in one loses the ball to space — a penalty
+  // exactly like the off-deck lost rough (a +1 NON-replay drop back onto the deck, `voidlost`), so the
+  // only on-corridor hazard the ship has bites without a death cascade. Placed off the central fair
+  // lane (validateFairness) + greenside as a sanctioned ring, so a sensible line is always clean.
+  breach: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'voidlost', label: 'Breached deck' },
   ice: { carryMult: 1.02, dispersionMult: 1.5, label: 'Ice' }, // slick: hard to control
   crystal: { carryMult: 1.05, dispersionMult: 0.85, label: 'Crystal' }, // true & fast
   // Meteor-strike scorch (GS-meteor-scorch): charred, baked crust under a meteor-shower sky. The

@@ -310,9 +310,9 @@ export function styleShipHull(platforms: Vec[][], deepen: number): Prim[] {
   const plateTop = strata[1]!; // upper hull plate (lit steel)
   const bodyDark = strata[strata.length - 1]!; // deep hull, into shadow
   for (const plat of platforms) {
-    const hull = convexHull(plat);
-    if (hull.length < 3) continue;
-    const top = frontEdge(hull);
+    // Use the platform's OWN (jagged, on the derelict) front edge — NOT its convex hull — so the hull
+    // cross-section is as SHARP and TORN as the section silhouette above it, never a smooth rounded arc.
+    const top = frontEdge(plat);
     if (top.length < 2) continue;
     const bb = bboxOf(plat);
     const cx = (bb.minX + bb.maxX) / 2;
@@ -320,8 +320,12 @@ export function styleShipHull(platforms: Vec[][], deepen: number): Prim[] {
     const hullH = Math.max(30, Math.min(150, w * 0.42));
     // The deck rim pushed straight down (a faint outward splay so the wall reads solid). `t` ∈ [0,1].
     const dropped = (t: number): Vec[] => top.map((p) => [p[0] + (p[0] - cx) * 0.05 * t, p[1] + hullH * t] as Vec);
-    // A ragged TORN bottom edge — the hull was ripped, not cut. posHash sawtooth (zero rng).
-    const bottom = dropped(1).map((p, i) => [p[0], p[1] + (posHash(p[0], p[1], i + 1) - 0.35) * hullH * 0.2] as Vec);
+    // A hard RIPPED bottom edge — the hull was torn off, not cut: a deep, sharp posHash sawtooth (some
+    // teeth hang far below, some are bitten right up) so the underside reads shredded (zero rng).
+    const bottom = dropped(1).map((p, i) => {
+      const tear = (posHash(p[0], p[1], i + 1) - 0.4) * hullH * 0.5 + (posHash(p[0], p[1], i + 9) > 0.8 ? hullH * 0.28 : 0);
+      return [p[0], p[1] + tear] as Vec;
+    });
     const face: Vec[] = [...top, ...bottom.slice().reverse()];
     // Soft cast shadow into the void at the hull foot.
     prims.push({ t: 'poly', pts: [...dropped(0.9), ...dropped(1.42).slice().reverse()], fill: look.shadow });
@@ -335,6 +339,25 @@ export function styleShipHull(platforms: Vec[][], deepen: number): Prim[] {
       const line = dropped(t);
       children.push({ t: 'path', pts: line, stroke: 'rgba(150,188,222,0.2)', sw: 1, round: false });
       children.push({ t: 'path', pts: line.map((p) => [p[0], p[1] + 1.5] as Vec), stroke: 'rgba(3,7,13,0.42)', sw: 1, round: false });
+    }
+    // EXPOSED LOWER-DECK COMPARTMENTS (GS-ship-interior): rectangular rooms sliced open to the vacuum —
+    // a dark void punched into the hull face with a lit deck-floor line + ceiling, so the broken section
+    // reads as decks laid bare, not a solid slab. Count off the projected width (camera-proof), posHash
+    // placement (zero rng). Drawn INSIDE the clipped face, so a compartment near the torn bottom is itself
+    // ripped open.
+    const rooms = Math.min(7, Math.max(2, Math.round(w / 34)));
+    for (let i = 1; i <= rooms; i++) {
+      const u = (i - 0.5) / rooms;
+      const tp = sampleAlong(top, u);
+      const rw = w * (0.04 + posHash(tp[0], tp[1], 3) * 0.05); // room half-width
+      const y0 = tp[1] + hullH * (0.28 + posHash(tp[0], tp[1], 4) * 0.14);
+      const rh = hullH * (0.18 + posHash(tp[0], tp[1], 8) * 0.22);
+      const rx = tp[0] + (tp[0] - cx) * 0.03;
+      const room: Vec[] = [[rx - rw, y0], [rx + rw, y0], [rx + rw, y0 + rh], [rx - rw, y0 + rh]];
+      children.push({ t: 'poly', pts: room, fill: '#04070c' }); // the dark open compartment (space beyond)
+      children.push({ t: 'line', a: [rx - rw, y0], b: [rx + rw, y0], stroke: 'rgba(150,188,222,0.28)', sw: 1, round: false }); // lit deck ceiling
+      children.push({ t: 'line', a: [rx - rw, y0 + rh], b: [rx + rw, y0 + rh], stroke: 'rgba(3,7,13,0.6)', sw: 1.4, round: false }); // deck floor in shadow
+      if (posHash(tp[0], tp[1], 7) < 0.4) children.push({ t: 'line', a: [rx, y0], b: [rx, y0 + rh], stroke: 'rgba(95,212,208,0.22)', sw: 1, round: false }); // a surviving conduit
     }
     // Vertical structural FRAMES (the ship's ribs) with rivet rows. Count off the projected width,
     // camera-clamped; no rng, so a zoom step can't perturb any seeded stream.

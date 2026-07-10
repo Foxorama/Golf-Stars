@@ -92,18 +92,18 @@ export function mergedHazardsFor(hole: Hole): { sand: Vec[][]; water: Vec[][]; l
   return out;
 }
 
-/** The derelict world's BREACHES (GS-ship-interior): its bunker/pot/sand HAZARD bodies become acid-
- *  etched holes eaten through the deck to space, union-merged so touching pits fuse into one breach.
- *  (`waste` scatter is a FEATURE, not a hazard, handled separately as a steel deck plate.) Course
- *  space, cached per hole (camera-proof body counts). Render-only: the sim plays them exactly as
- *  before, so a breach is an ordinary awkward sand lie, not a lost ball. */
+/** The derelict world's BREACHES (GS-ship-interior): acid-etched holes eaten through the deck to
+ *  space — `breach` HAZARDS (a lost-ball penalty), union-merged so touching pits fuse into one. Also
+ *  folds any `bunker`/`pot`/`sand` (a rare fair-placement fallback) so a stray sand body still reads
+ *  as a breach, never a beach. (`waste` scatter is a FEATURE → a steel deck plate, handled
+ *  separately.) Course space, cached per hole (camera-proof body counts). */
 const derelictBreachCache = new WeakMap<Hole, Vec[][]>();
 export function derelictBreachesFor(hole: Hole): Vec[][] {
   const hit = derelictBreachCache.get(hole);
   if (hit) return hit;
   const breaches: Vec[][] = [];
   for (const f of hole.hazards) {
-    if (f.kind === 'bunker' || f.kind === 'pot' || f.kind === 'sand') breaches.push(f.poly);
+    if (f.kind === 'breach' || f.kind === 'bunker' || f.kind === 'pot' || f.kind === 'sand') breaches.push(f.poly);
   }
   const out = unionPolys(breaches);
   derelictBreachCache.set(hole, out);

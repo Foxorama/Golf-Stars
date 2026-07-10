@@ -77,7 +77,7 @@ import {
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
 import { styleShipWalls, styleTornHull } from './style/walls';
-import { styleShipDeck, styleShipBreaches, styleShipPlates, styleShipInterior } from './style/ship';
+import { styleShipDeck, styleShipBreaches, styleShipPlates, styleShipInterior, jagShipPlatforms } from './style/ship';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
@@ -229,7 +229,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // (penalty un-armed → off-fairway plays as ordinary rough) keeps the normal rough landmass.
   // Generalised from the island-green par 3 (GS-cetus-2) to every armed hole (GS-rough-frame).
   const lostHole = (hole.biomeMods?.some((m) => m.kind === 'roughLie') ?? false) && !rainbow;
-  const landPlatformsCourse: Vec[][] = lostHole ? lostPlatformsCourse(hole) : [landBox];
+  const rawPlatformsCourse: Vec[][] = lostHole ? lostPlatformsCourse(hole) : [landBox];
+  // Derelict (GS-ship-interior): rip the smooth rounded pill into a SHARP, JAGGED, broken-hull
+  // silhouette so a floating SECTION reads as a piece of a ship torn apart. Used for the fill, hull
+  // cross-section, torn teeth AND the interior clip, so the torn edge is consistent. Zero rng. Gated to
+  // LOST holes — a calm derelict stop is one continuous deck (its OB frame is the rectangle), not a
+  // set of floating sections, so its rough hull stays whole.
+  const landPlatformsCourse: Vec[][] =
+    arch === 'derelict' && !rainbow && lostHole ? jagShipPlatforms(hole, rawPlatformsCourse) : rawPlatformsCourse;
   const landPlatforms = landPlatformsCourse.map((p) => projPoly(p, proj));
   // Rainbow Road gets its OWN bespoke deep-space look (GS-rainbow-polish) — a distinct indigo-violet
   // cosmos with a prismatic shore rim — so the legendary ball reads as its own world, not the

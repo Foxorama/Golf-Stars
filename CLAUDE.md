@@ -146,8 +146,9 @@ these systems** — each bullet is the tip of a documented iceberg.
   - SHIP CORRIDORS (GS-ship-corridor): the derelict does NOT play the void's wide, blobby survival
     islands — it plays STRAIGHT, CONSTANT-WIDTH metal HALLWAYS you shoot DOWN. Gated on `biome.walls`
     (`const ship`, the derelict is the only walls world → every other world byte-identical): (a)
-    `SHIP_CORRIDOR_SCALE` (1.25, fixed — no wildness ramp, no VOID_ISLAND_SCALE) sets a tight hallway
-    half-width; (b) `chooseWidthProfile`'s `ship` branch returns a `'ship-corridor'` UNIFORM profile
+    `SHIP_CORRIDOR_SCALE` (1.6, fixed — no wildness ramp, no VOID_ISLAND_SCALE) sets the hallway
+    half-width (widened from 1.25 so wall bounces cost less distance + you can cut corners, and the
+    corridor SHOULDER has room for breach hazards — GS-ship-interior); (b) `chooseWidthProfile`'s `ship` branch returns a `'ship-corridor'` UNIFORM profile
     (`floorFrac` 1, near-symmetric — no landing bays, no widen-only bulges); (c) `buildCentreline`'s
     `sp()` resamples at ONE point/segment for the ship (`sharp` → 2 elsewhere), so runs are DEAD STRAIGHT
     and turns are HARD ANGULAR junctions, and the island 1.4× bend swing is skipped. The hull-SECTION
@@ -184,12 +185,33 @@ these systems** — each bullet is the tip of a documented iceberg.
     deck-plate band flanking the hallway with bulkhead RIBS (doorway gaps), conduit runs, adjacent
     ROOMS/compartments (sunk floors, consoles, lamps) + lower-level GRATING glimpses — clipped to the
     platform, so a room past the hull tear is sliced open in cross-section. (2) `styleShipBreaches`
-    reskins the derelict's "bunkers" (bunker/pot/sand HAZARDS, union-merged via `derelictBreachesFor`) as
-    ACID-ETCHED HOLES eaten through the deck to space (acid-green corrosion + a caustic etch rim + the cut
-    deck thickness + a star-lit void interior) — render-only, the sim still plays them as ordinary sand
-    (an awkward lie, NOT lost; the bright acid ring reads it apart from the plain-black OB). (3) the
+    draws the derelict's `breach` HAZARDS (union-merged via `derelictBreachesFor`) as ACID-ETCHED HOLES
+    eaten through the deck to space (acid-green corrosion + a caustic etch rim + the cut deck thickness +
+    a star-lit void interior); the bright acid ring reads them apart from the plain-black OB. (3) the
     derelict's `waste`/`sand` SCATTER FEATURE draws as an intact riveted steel DECK PLATE (`styleShipPlates`
     in the feature loop) — a firm lie, never the default tan beach-sand patch. So the ship has NO bunkers.
+    (4) JAGGED PLATFORMS — `jagShipPlatforms` rips the smooth rounded pill of each LOST hull section into a
+    SHARP torn silhouette (densify + posHash outward-biased teeth, capped so the poly stays simple for the
+    clip), used for the fill, hull cross-section, torn teeth AND the interior clip; `styleShipHull` follows
+    the JAGGED front edge (not a convex hull), tears its bottom hard, and cuts open EXPOSED lower-deck
+    compartments (dark voids to vacuum). Gated to LOST holes (a calm stop is one continuous deck).
+  - BREACHES ARE A PENALTY (GS-ship-interior, sim): the derelict's only on-corridor hazard is the acid
+    `breach` lie — a lost-ball penalty (`voidlost`, the +1 non-replay drop, reusing shiprough's mechanic).
+    The walled corridor otherwise loses no balls, so breaches force care. Placed in a dedicated ship block
+    in the corridor SHOULDER — OUT past the central fair lane (`half*0.5`) but INSIDE the bulkheads, so a
+    sensible centred shot is clean yet a drift toward a wall falls through; every breach is proven clear of
+    the central lane before it's kept (a strict mirror of `validateFairness`), so `generateCourse` never
+    throws. `greensideKind: 'breach'` rings calm greens via the SANCTIONED greenside ring (gated `!ship ||
+    !lostRough` so a lost island-green never floats breaches in space); `fairwayBunkers: 0` (no sand).
+    Ship-only + gated → every other world byte-identical. `GENERATOR_VERSION` 22.
+  - DRIFTING WRECK PIECES (GS-ship-wreck, `render/shipWreck.ts` + `render/shipDrift.ts`): SMALL, detailed,
+    weathered chunks of the ship "STARLIT WANDERER" drift through the space beside the corridor — a BRIDGE
+    (window grids, nav lights, dying ember, the ship NAME sprayed + WEATHERED + CLIPPED to the hull, not a
+    flat decal), a solar WING, an ENGINE cluster. Canvas2D play-view only (the animated twin of the static
+    map debris), drawn SCREEN-space in the side MARGINS at a fixed readable size (a course-yd size balloons
+    when zoomed; kept small so it never obscures the course). Motion rides the virtual clock (zero rng, map
+    byte-identical). CRITICAL: the piece frame is `ctx.scale(S)`, so every stroke width is a PIXEL value ÷ S
+    (a raw lineWidth balloons into a giant blurred halo).
   - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
     METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
