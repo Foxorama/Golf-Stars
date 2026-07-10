@@ -592,6 +592,11 @@ export interface ShotInput {
   /** Wedge distance-control (point 6): pull BOTH carry clamps toward the mean by this fraction
    *  (0..1), tightening the wedge's carry window so it lands the chosen distance. */
   carryWindowTighten?: number;
+  /** Driver distance-control trade-off (GS-proshop-distance-items): shave this fraction of intended
+   *  off the UPPER carry clamp — the negative that balances the driver's large min-carry boost (you
+   *  groove the distance but give up some top-end bomb). Floored at the mean so a full swing still
+   *  averages the same. Undefined/0 = no cut (byte-for-byte unchanged). */
+  maxCarryFracCut?: number;
   /** A named caddy's in-flight ball guard (GS-caddy): redirects an off-fairway miss back onto the
    *  fairway. Absent (the default) consumes NO extra rng, so a guard-less shot is byte-for-byte the
    *  same — the interception draw only fires when a caddy is watching AND `offFairway` says it's a miss. */
@@ -687,6 +692,9 @@ export function resolveShot(input: ShotInput): ShotResult {
   // tweaks on the club's [low, high] fractions — the AUTO sim and the preview apply the same ones.
   let lowFrac = prof.lowFrac;
   let highFrac = prof.highFrac;
+  // Driver trade-off first: cut the TOP clamp (never below the mean, so the average carry holds),
+  // then raise the LOW clamp — the boost clamps to the already-lowered high so the window can't invert.
+  if (input.maxCarryFracCut) highFrac = Math.max(prof.meanFrac, highFrac - input.maxCarryFracCut);
   if (input.minCarryFracBoost) lowFrac = Math.min(highFrac, lowFrac + input.minCarryFracBoost);
   if (input.carryWindowTighten) {
     const t = clamp01(input.carryWindowTighten);

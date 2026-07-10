@@ -166,9 +166,11 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
   // The asymmetric spray shape (GS-dispersion-2): the loadout's shaping upgrades folded with this
   // club's character skew, and the loadout's distance-control carry-window tweaks by club category.
   const shape = resolveShape(opts.loadout?.shapeMod, mods.shape);
-  const cw = carryControlFor(club.carry, {
+  const cw = carryControlFor(club.id, club.carry, {
     minCarryBoost: opts.loadout?.minCarryBoost,
     wedgeWindow: opts.loadout?.wedgeWindow,
+    minCarryBoostByClass: opts.loadout?.minCarryBoostByClass,
+    driverMaxCarryCut: opts.loadout?.driverMaxCarryCut,
   });
   const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
 
@@ -205,6 +207,7 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       shape,
       minCarryFracBoost: cw.minCarryFracBoost,
       carryWindowTighten: cw.carryWindowTighten,
+      maxCarryFracCut: cw.maxCarryFracCut,
       guard,
       offFairway,
       lieRelief,

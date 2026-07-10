@@ -35,7 +35,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, ARC_FEEL, flightBlockedBy, flightKnockdown, flightObstacles, flightProfileOf, type FlightProfile } from './flight';
+import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -429,21 +429,40 @@ export const WEDGE_CONTROL_CARRY = 110;
 
 /** Loadout-level distance-control settings (GS-dispersion-2, points 5 & 6), resolved per club. */
 export interface CarryControlOpts {
-  /** Raise the lower carry clamp of NON-wedge clubs by this fraction (driver/woods/irons). */
+  /** Raise the lower carry clamp of NON-wedge clubs by this fraction (driver/woods/hybrids/irons). */
   minCarryBoost?: number;
   /** Tighten the carry window of WEDGES toward the mean by this fraction (0..1). */
   wedgeWindow?: number;
+  /**
+   * Per-club-FAMILY min-carry boost (GS-proshop-distance-items): raises the lower carry clamp of just
+   * that family (driver/wood/hybrid/iron), on TOP of the family-agnostic `minCarryBoost`. Keyed by
+   * `FlightClass`, so the Pro Shop can sell a Driver / Woods / Hybrids / Irons control item that only
+   * tightens its own category. Absent = none.
+   */
+  minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
+  /** Driver-only trade-off (GS-proshop-distance-items): fraction shaved off the driver's TOP carry —
+   *  the negative that balances the driver control item's large min-carry boost. 0/undefined = none. */
+  driverMaxCarryCut?: number;
 }
 
-/** Resolve the per-club carry-window tweaks from the loadout-level controls + the club's carry. */
+/** Resolve the per-club carry-window tweaks from the loadout-level controls + the club's family/carry.
+ *  The wedge branch keys off the (learned) carry so it matches the existing behaviour byte-for-byte;
+ *  the per-family boost + driver cut key off the club's `FlightClass` so each Pro Shop control item
+ *  only touches its own category. */
 export function carryControlFor(
+  clubId: string,
   nominalCarry: number,
   opts: CarryControlOpts,
-): { minCarryFracBoost?: number; carryWindowTighten?: number } {
+): { minCarryFracBoost?: number; carryWindowTighten?: number; maxCarryFracCut?: number } {
   if (nominalCarry <= WEDGE_CONTROL_CARRY) {
     return opts.wedgeWindow ? { carryWindowTighten: opts.wedgeWindow } : {};
   }
-  return opts.minCarryBoost ? { minCarryFracBoost: opts.minCarryBoost } : {};
+  const cls = flightClassOf(clubId);
+  const minBoost = (opts.minCarryBoost ?? 0) + (opts.minCarryBoostByClass?.[cls] ?? 0);
+  const out: { minCarryFracBoost?: number; maxCarryFracCut?: number } = {};
+  if (minBoost) out.minCarryFracBoost = minBoost;
+  if (cls === 'driver' && opts.driverMaxCarryCut) out.maxCarryFracCut = opts.driverMaxCarryCut;
+  return out;
 }
 
 /** A single putt's roll on the green, for the play view to animate (flat, no arc). */
@@ -497,6 +516,10 @@ export interface PlayHoleOptions {
   minCarryBoost?: number;
   /** Wedge distance-control: tighten the wedge carry window toward the mean (point 6). */
   wedgeWindow?: number;
+  /** Per-family min-carry boost (GS-proshop-distance-items): Driver/Woods/Hybrids/Irons control items. */
+  minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
+  /** Driver control trade-off (GS-proshop-distance-items): shave the driver's top carry. */
+  driverMaxCarryCut?: number;
   /** Suggestible Sam's confidence shape boost (GS-caddy): applied when the AI happens to club the
    *  same club Sam would suggest, so auto-finish/headless play matches the interactive driver. */
   confidence?: ShapeMod;
@@ -1068,6 +1091,8 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       shapeMod: opts.shapeMod,
       minCarryBoost: opts.minCarryBoost,
       wedgeWindow: opts.wedgeWindow,
+      minCarryBoostByClass: opts.minCarryBoostByClass,
+      driverMaxCarryCut: opts.driverMaxCarryCut,
       guard: opts.guard,
       lieRelief: opts.lieRelief,
       chipIn: opts.chipIn,
@@ -1173,6 +1198,10 @@ export interface ExecOpts {
   minCarryBoost?: number;
   /** Wedge distance-control: tighten the wedge carry window (point 6). */
   wedgeWindow?: number;
+  /** Per-family min-carry boost (GS-proshop-distance-items): Driver/Woods/Hybrids/Irons control items. */
+  minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
+  /** Driver control trade-off (GS-proshop-distance-items): shave the driver's top carry. */
+  driverMaxCarryCut?: number;
   /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail onto the fairway. */
   guard?: CaddyGuard;
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
@@ -1302,7 +1331,7 @@ export function executeShot(
   // the combine is a no-op and the shape is byte-for-byte unchanged. Carry-window by club category.
   const confident = opts.confidence && opts.suggestedClubId === club.id ? opts.confidence : undefined;
   const shape = resolveShape(combineShapeMods(opts.shapeMod, confident), mods.shape);
-  const cw = carryControlFor(nominalCarry, opts);
+  const cw = carryControlFor(club.id, nominalCarry, opts);
   // Greenside save target (GS-caddy): when a guard fires on a miss NEAR the green, drop the ball ON the
   // green (partway from the green centre to the pin — always inside the star-shaped green) instead of
   // recentring on the fairway, the most useful save. "Near" = within the green's own radius + a greenside
@@ -1330,6 +1359,7 @@ export function executeShot(
     shape,
     minCarryFracBoost: cw.minCarryFracBoost,
     carryWindowTighten: cw.carryWindowTighten,
+    maxCarryFracCut: cw.maxCarryFracCut,
     guard: opts.guard,
     // Caddy-guard fairway test (GS-caddy): closes the guard over THIS hole so resolveShot stays
     // course-agnostic. Off the fairway = any lie that isn't fairway or green (rough/sand/void/water/…).
@@ -1578,6 +1608,10 @@ export function shotSpread(
     shapeMod?: ShapeMod;
     minCarryBoost?: number;
     wedgeWindow?: number;
+    /** Per-family min-carry boost (GS-proshop-distance-items): Driver/Woods/Hybrids/Irons control items. */
+    minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
+    /** Driver control trade-off (GS-proshop-distance-items): shave the driver's top carry. */
+    driverMaxCarryCut?: number;
     /** Sam's confidence shape boost — folded into the cone iff `club.id === suggestedClubId`. */
     confidence?: ShapeMod;
     suggestedClubId?: string;
@@ -1610,9 +1644,10 @@ export function shotSpread(
   const along = w.along * TUNABLES.windCarryPerMph * (1 - Math.max(0, Math.min(1, opts.windResist ?? 0)));
   // Carry window mirrors resolveShot's clamp (distance-control / wedge-window), so the preview's
   // min/max carry read exactly what the shot will do.
-  const cw = carryControlFor(nominal, opts);
+  const cw = carryControlFor(club.id, nominal, opts);
   let lowFrac = prof.lowFrac;
   let highFrac = prof.highFrac;
+  if (cw.maxCarryFracCut) highFrac = Math.max(prof.meanFrac, highFrac - cw.maxCarryFracCut);
   if (cw.minCarryFracBoost) lowFrac = Math.min(highFrac, lowFrac + cw.minCarryFracBoost);
   if (cw.carryWindowTighten) {
     const t = Math.max(0, Math.min(1, cw.carryWindowTighten));
