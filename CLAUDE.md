@@ -273,6 +273,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     hooks (tents, scorch craters, ground patches) are pure seeded per-kind streams drawn + played
     from the SAME source. The route card states every hook. A new course effect = a
     `COURSE_EFFECTS` row + a `routeEffect` mapping + a `weather.ts` showpiece on its OWN stream.
+  - Weather is biome-INDEPENDENT (it rides the route EVENT, gated by journey ARC via `minArc`, never by
+    the world), but a SOFT thematic affinity (GS-weather-affinity, `EFFECT_BIOME_AFFINITY`) biases a
+    weathered lane's DESTINATION toward a fitting world — a blizzard leans cold, a dust storm desert/scrap.
+    It's a `pickThemeFrom` WEIGHT boost inside the lane's own (separate) theme rng draw, SAME draw count,
+    so the `:routes:` stream (distances + events) is byte-identical and an affinity-LESS sky (moonlight,
+    nebula, …) draws exactly as before. Soft not hard: a fitting world is only ~most-likely, mismatches
+    stay possible. A new weather with a thematic home = one `EFFECT_BIOME_AFFINITY` row (guarded in
+    `tests/journey-effects.test.ts`). Because a biome only meets an arc's weather, keep each archetype
+    spanning ≥2 arcs (constellation `stars`) so it isn't locked to one arc's skies.
   - Trade tents ring EVERY hole of a tradeMarket stop; effects are dealt per hole so colour never
     predicts. Only the marmot changes the shot (deterministic lost ball in `executeShot`, auto ≡
     interactive); the other four are interactive-only reducer meta.

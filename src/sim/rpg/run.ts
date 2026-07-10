@@ -52,7 +52,7 @@ import { addUnlockedClubs } from './club-unlock';
 import { applyCharacter, characterShotMods, scramblePartnerId, bossPartnerId } from './characters';
 import type { ScrambleOpts } from '../round';
 import { DEFAULT_EVENT, drawArcRouteEvents, eventPool, routeEvent, type RouteEvent } from './events';
-import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, routeClubFind, routeDifficulty, routeEffect } from './effects';
+import { EFFECT_WIND_CAP, effectFuelDelta, effectWindMult, effectCarryMult, effectPatchKind, effectBiomeAffinity, WEATHER_AFFINITY_BOOST, routeClubFind, routeDifficulty, routeEffect } from './effects';
 import { salvageClubFind, type SalvageFind } from './salvage';
 import { applyRainbowRoad } from './rainbow';
 import { ASGARD_THEME, themeForStop, themeById, resolveBiome, itemThemeWeight, pickTheme, pickThemeFrom, themesForArc, arcForDistance, archetypeFor, type BiomeArchetype, type Theme } from '../course/themes';
@@ -319,6 +319,13 @@ export function currentTheme(run: Run): Theme {
  * archetypes (this lane's own stream — extra draws perturb nothing else), so distinctness is
  * guaranteed whenever the arc offers enough archetypes (every arc has ≥7; the avoid set is ≤3).
  * Only if the filter empties the pool does the first draw stand.
+ *
+ * `effect` (GS-weather-affinity) is the lane's SKY, if known: when it's a weather with a biome affinity
+ * (`effectBiomeAffinity`) the draw is softly biased toward a fitting world, so a blizzard tends to reach
+ * a cold world and a dust storm a desert. It's a WEIGHT boost inside the same single draw (same rng
+ * count), applied to the first pick AND the avoid-redraw alike; an absent/affinity-less effect makes the
+ * boost a no-op, so those lanes stay byte-for-byte the pre-affinity draw. Weather itself is unchanged —
+ * this only nudges which WORLD a weathered lane flies into, on this lane's own (separate) rng stream.
  */
 export function routeTheme(
   seed: number | string,
@@ -326,13 +333,18 @@ export function routeTheme(
   routeId: number,
   reachedDistance: number,
   avoid?: ReadonlySet<BiomeArchetype>,
+  effect?: string,
 ): Theme {
   const rng = new Rng(`${seed}:routetheme:${stopIndex}:${routeId}`);
   const arc = arcForDistance(reachedDistance);
-  const first = pickTheme(rng, arc);
+  const affinity = effectBiomeAffinity(effect);
+  const boost = affinity
+    ? (t: Theme): number => (affinity.includes(t.archetype) ? WEATHER_AFFINITY_BOOST : 1)
+    : undefined;
+  const first = pickTheme(rng, arc, boost);
   if (!avoid || !avoid.has(first.archetype)) return first;
   const cands = themesForArc(arc).filter((t) => !avoid.has(t.archetype));
-  return cands.length > 0 ? pickThemeFrom(rng, cands) : first;
+  return cands.length > 0 ? pickThemeFrom(rng, cands, boost) : first;
 }
 
 /** The course awaiting the player at the current stop (shaped by the run format + theme). */
@@ -1089,7 +1101,9 @@ export function routeOptions(run: Run): Route[] {
   // biomes and you (pool permitting) never fly straight back into the world you just played.
   const avoid = new Set<BiomeArchetype>([currentTheme(run).archetype]);
   return withEvents.map((r, i) => {
-    const theme = routeTheme(run.seed, run.stopIndex, r.id, run.distanceFromStart + r.distanceJump, avoid);
+    // GS-weather-affinity: bias this lane's world toward its SKY (a blizzard lane leans cold, a dust
+    // storm lane leans desert) — a soft nudge on the lane's own theme stream, weather still event-driven.
+    const theme = routeTheme(run.seed, run.stopIndex, r.id, run.distanceFromStart + r.distanceJump, avoid, routeEffect(r.event));
     avoid.add(theme.archetype);
     return {
       ...r,

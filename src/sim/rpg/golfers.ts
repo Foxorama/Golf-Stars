@@ -364,6 +364,9 @@ const CHAMPIONS: readonly ChampRow[] = [
   // GS-more-worlds: champions of the two spectrum-bracketing worlds.
   { theme: 'hydra', name: 'Halden Alphard', shortName: 'Alphard', archetypeId: 'escape', origin: 'Hydra' }, // a bog escape-artist
   { theme: 'antlia', name: 'Axel Antliae', shortName: 'Antliae', archetypeId: 'bomber', origin: 'Antlia' }, // a low-grav bomber
+  // GS-weather-affinity: champions of each world's second (arc-2) constellation.
+  { theme: 'piscis-austrinus', name: 'Fenna Fomalhaut', shortName: 'Fomalhaut', archetypeId: 'plotter', origin: 'Piscis Austrinus' }, // reads the heavy, still mire air
+  { theme: 'pyxis', name: 'Petra Pyxidis', shortName: 'Pyxidis', archetypeId: 'bomber', origin: 'Pyxis' }, // a low-grav belt bomber
 ];
 
 // --- The Warriors Three (GS-asgard) -------------------------------------------

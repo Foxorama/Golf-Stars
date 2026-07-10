@@ -352,10 +352,16 @@ const CONSTELLATIONS: readonly ConstRow[] = [
   // cetus — the Whale's clifftop star-ocean (arc 2 via 7 stars)
   { id: 'cetus', name: 'Cetus', abbr: 'Cet', rarity: 'rare', stars: 7, archetype: 'cetus', anchor: 'Diphda', blurb: 'The Whale, sounding the deep star-ocean off the clifftops.', flavour: { wind: 1.05, scatter: 1.1 } },
   // GS-more-worlds — the two spectrum-bracketing worlds, spread across the arcs by star count.
+  // GS-weather-affinity gave each a SECOND constellation at 6★ (arc 2) so both worlds span two arcs and
+  // meet a wider spread of skies (swamp was arc-3-only, metal arc-1-only — each saw only its arc's weather).
   // swamp — Hydra, the great water-serpent, coiled through the toxic mire (arc 3 via 17 stars)
   { id: 'hydra', name: 'Hydra', abbr: 'Hya', rarity: 'common', stars: 17, archetype: 'swamp', anchor: 'Alphard', blurb: 'The Water-Serpent, coiled through the acid mire — the heaviest air in the galaxy.', flavour: { wind: 0.8, dogleg: 1.2 } },
+  // swamp — Piscis Austrinus, the Southern Fish, drifting the still acid shallows (arc 2 via 6 stars)
+  { id: 'piscis-austrinus', name: 'Piscis Austrinus', abbr: 'PsA', rarity: 'rare', stars: 6, archetype: 'swamp', anchor: 'Fomalhaut', blurb: 'The Southern Fish, adrift in the still, heavy air of the acid shallows.', flavour: { wind: 0.85, scatter: 1.1 } },
   // metal — Antlia, the Air Pump, a derelict machine adrift in the scrap belt (arc 1 via 4 stars)
   { id: 'antlia', name: 'Antlia', abbr: 'Ant', rarity: 'rare', stars: 4, archetype: 'metal', anchor: 'Alpha Antliae', blurb: 'The Air Pump — a machine long dead, drifting a belt of scrapped hulls and low gravity.', flavour: { carry: 1.04, scatter: 1.1 } },
+  // metal — Pyxis, the Mariner's Compass, a scrapped instrument tumbling the belt (arc 2 via 6 stars)
+  { id: 'pyxis', name: 'Pyxis', abbr: 'Pyx', rarity: 'rare', stars: 6, archetype: 'metal', anchor: 'Alpha Pyxidis', blurb: 'The Mariner’s Compass — a dead instrument tumbling the derelict scrap belt.', flavour: { carry: 1.03, scatter: 1.12 } },
 ];
 
 /** Deep-sky + naked-eye galaxy showpieces: rare destinations gated by rarity. */
@@ -460,11 +466,15 @@ export function arcForDistance(distanceFromStart: number): Arc {
  * `pickTheme`). Exposed for GS-journey-variety, where the caller pre-filters the arc pool to the
  * archetypes a lane may still land on. The pool must be non-empty.
  */
-export function pickThemeFrom(rng: Rng, pool: readonly Theme[]): Theme {
-  const total = pool.reduce((s, t) => s + RARITY_C[t.rarity].weight, 0);
+export function pickThemeFrom(rng: Rng, pool: readonly Theme[], weightBoost?: (t: Theme) => number): Theme {
+  // GS-weather-affinity: an optional per-theme weight multiplier lets a caller BIAS the draw (e.g. a
+  // weathered lane toward a fitting world) while keeping the SAME single rng.float() — draw count is
+  // unchanged, so an absent boost is byte-for-byte the classic draw and the stream never reorders.
+  const w = (t: Theme): number => RARITY_C[t.rarity].weight * (weightBoost ? weightBoost(t) : 1);
+  const total = pool.reduce((s, t) => s + w(t), 0);
   let r = rng.float() * total;
   for (let i = 0; i < pool.length - 1; i++) {
-    r -= RARITY_C[pool[i]!.rarity].weight;
+    r -= w(pool[i]!);
     if (r <= 0) return pool[i]!;
   }
   return pool[pool.length - 1]!;
@@ -475,14 +485,14 @@ export function pickThemeFrom(rng: Rng, pool: readonly Theme[]): Theme {
  * legendary) from the themes of the stop's arc. Deterministic in the supplied rng. Falls back
  * to lower arcs if a tier is somehow empty (it never is — 9/18/20 themes).
  */
-export function pickTheme(rng: Rng, arc: Arc): Theme {
+export function pickTheme(rng: Rng, arc: Arc, weightBoost?: (t: Theme) => number): Theme {
   let pool = themesForArc(arc);
   let a = arc;
   while (pool.length === 0 && a > 1) {
     a = (a - 1) as Arc;
     pool = themesForArc(a);
   }
-  return pickThemeFrom(rng, pool);
+  return pickThemeFrom(rng, pool, weightBoost);
 }
 
 /**

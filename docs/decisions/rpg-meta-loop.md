@@ -1775,3 +1775,54 @@ and per-id distinctness guards in `tests/proshop-expansion.test.ts` still hold �
 share the driver head but stay distinct via their function emblems. Pure SVG, no rng, no save bump; the
 on-course golfer swing (`equippedGearTheme`) is a separate renderer and untouched. Eyeballed via
 `scripts/club-icons-preview.mjs` (all six families × rarity tints, gear + reward paths).
+
+## GS-weather-affinity — soft thematic weather↔biome bias (+ arc-spread the new worlds)
+
+**The report.** After GS-more-worlds added Toxic Mire (`swamp`) and Scrap Belt (`metal`), a player hit
+a blizzard "the moment the new worlds showed up" and had "never seen blizzard on the old worlds." Two
+independent facts, no code bug:
+
+- **Weather is biome-INDEPENDENT** — the course `effect` comes from the chosen route EVENT
+  (`routeEffect(run.pendingEvent)`), never from the world. The render layer reads the archetype only for
+  the wind TINT + ambient air; the effect list is drawn per-lane, blind to the biome.
+- **Both are ARC-gated.** Weather events carry `minArc` (blizzard was `snow-squall` @arc 2, `blizzard`
+  @arc 3, dust storm/solar wind @arc 2, dark matter @arc 3, radiant @arc 1). Worlds are gated by a
+  constellation's `stars` (`arcForStars`). Toxic Mire (Hydra, 17★) was **arc-3-only**; the newer skies
+  live deep too — so reaching the new world and unlocking blizzard happened on the same jump. The old
+  worlds could always draw blizzard at depth; the player just hadn't rolled it. The deeper truth the
+  report exposed: the newer weather EVENTS were added to the shared pool, so they now appear on the
+  ORIGINAL worlds too (a blizzard on a green or lava world) — correct by architecture, jarring to play.
+
+**Two fixes, both determinism-safe.**
+
+1. **Arc-spread the two new worlds.** Each new archetype had exactly ONE constellation, pinning it to a
+   single arc (swamp→3, metal→1) so it only ever met that arc's skies. Added a second 6★ (arc-2)
+   constellation each — **Piscis Austrinus** (swamp, Fomalhaut) and **Pyxis** (metal, α Pyxidis) — so
+   swamp spans arcs 2–3 and metal arcs 1–2. Each needed the full constellation kit: a `CONSTELLATIONS`
+   row, a `CONSTELLATION_FIGURES` stick-figure, a real-sky `THEME_SKY` coord, and a `champion` golfer
+   (the "one champion per constellation" rule). Re-pinned the constellation count (39→41) and arc split
+   (`[14,13,12]`→`[14,15,12]`). The archetype itself already existed, so every other archetype-keyed
+   table (physics/palette/flora/music/…) was already covered.
+
+2. **Soft weather↔biome affinity.** `EFFECT_BIOME_AFFINITY` names the world archetypes each *weather-y*
+   sky reads true on (blizzard→frost/cetus, dust storm→desert/metal, radiant→bright open worlds, …).
+   `routeTheme` up-weights those archetypes in its theme draw via a new optional `weightBoost` on
+   `pickThemeFrom`/`pickTheme`. Crucially it is a WEIGHT change inside the **same single `rng.float()`**
+   — the draw COUNT is unchanged, `routeTheme` runs on its own per-lane stream, so the `:routes:` stream
+   (distances + events) and every sim/generation stream stay byte-for-byte identical. An affinity-LESS
+   sky (moonlight, nebula, meteor, comet, eclipse, ion/solar storm, trade, debris — the purely
+   atmospheric ones, fine anywhere) makes the boost a no-op, so those lanes are literally the
+   pre-affinity draw. `WEATHER_AFFINITY_BOOST = 8` was tuned so a fitting world is the single
+   most-likely destination for a weathered lane (~50%, ~4× the ~12% base share of the two-ish fitting
+   archetypes) while any SPECIFIC mismatch (blizzard on lava) drops to a rare few-percent — the "soft,
+   not a rule" the design asked for (hard biome-locking was explicitly rejected). Weather stays event-
+   driven and biome-independent; this only nudges which WORLD a weathered lane tends to reach.
+
+**Why biome-toward-weather, not the reverse.** Both `pendingEvent` and `pendingTheme` come from the
+SAME chosen lane, so biasing the lane's biome by its event makes the pair co-appear whichever lane the
+player picks. Biasing the EVENT instead would perturb the shared `:routes:` stream (determinism break
+across the whole suite); the theme stream is separate and safe to re-weight. Auto ≡ interactive holds
+for free — both drive through the shared `routeOptions`/`routeTheme`. Guarded in
+`tests/journey-effects.test.ts` (cold skies over-represent cold worlds; affinity-less skies byte-
+identical; every physics-y sky carries an affinity set). The `avoid`-set lane-distinctness is untouched
+(the boost only re-weights within the already-filtered pool).
