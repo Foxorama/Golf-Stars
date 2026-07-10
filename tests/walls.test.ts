@@ -5,10 +5,11 @@ import { wallReflect, wallFlightHit, wallRollHit, segHit, WALL_HEIGHT, type Ship
 import { flightProfileOf } from '../src/sim/flight';
 import type { Vec } from '../src/sim/course/contract';
 
-// GS-ship-walls: the derelict world's collidable metal corridor walls — a low ball bounces back onto the
-// deck, a lofted shot clears; hit two walls, bounce twice. Pure geometry, zero rng, stamped by the
-// generator from the ribbon edges. These guard the reflect maths, the arc-height gate, multi-bounce,
-// generation (present on the derelict, absent + byte-identical everywhere else), and determinism.
+// GS-ship-walls: the derelict world's collidable metal corridor bulkheads — every ball leaving the deck
+// sideways bounces back; NOTHING clears them (they stand 72 yd, above the 60-yd shot-apex cap); hit two
+// walls, bounce twice. Pure geometry, zero rng, stamped by the generator from the ribbon edges. These
+// guard the reflect maths, the arc-height gate, multi-bounce, generation (present on the derelict,
+// absent + byte-identical everywhere else), and determinism.
 
 const prof = flightProfileOf('D');
 
@@ -49,6 +50,18 @@ describe('GS-ship-walls — flight ricochet', () => {
     const flat: ShipWall = { a: [-100, 120], b: [100, 120], normal: [0, -1], height: 0.1 };
     expect(wallFlightHit([tall], from, landing, 0, 240, 240, prof)).not.toBeNull();
     expect(wallFlightHit([flat], from, landing, 0, 240, 240, prof)).toBeNull();
+  });
+
+  it('a REAL bulkhead (WALL_HEIGHT) cannot be cleared — a full-power lofted wedge still bounces', () => {
+    // WALL_HEIGHT stands above the 60-yd apex cap, so no club at any power flies over. A high, short
+    // wedge (the loftiest arc in the game) crossing the bulkhead must still ricochet back onto the deck.
+    const bulk: ShipWall = { a: [-100, 60], b: [100, 60], normal: [0, -1], height: WALL_HEIGHT };
+    for (const club of ['SW', 'PW', '9i', 'D'] as const) {
+      const p = flightProfileOf(club);
+      const hit = wallFlightHit([bulk], [0, 0], [0, 120], 0, 120, 120, p);
+      expect(hit, club).not.toBeNull();
+      expect(hit!.dir[1], club).toBeLessThan(0); // bounced back toward the deck
+    }
   });
 
   it('hits TWO facing walls → bounces twice', () => {

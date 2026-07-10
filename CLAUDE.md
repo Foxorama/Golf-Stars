@@ -152,11 +152,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     JUNK — `render/shipDrift.ts` (the cetusFlow twin: play-view only, rides `now` + `_gsFeel.shipDriftSpeed`,
     SVG map byte-identical) tumbles torn hull-plates through the open space around the wreck.
   - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
-    METAL walls (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
-    `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). A low
-    flat ball crossing a wall RICOCHETS back inward toward the deck (`wallFlightHit`, arc-height gated per
-    wall — a lofted shot clears); a second crossing off the reflected line bounces again (hit two walls,
-    bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡ interactive)
+    METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
+    `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
+    `WALL_HEIGHT` = 72 yd — ABOVE the 60-yd shot-apex cap (`ARC_FEEL.peakMax`) — so NOTHING clears them: every
+    ball that leaves the deck sideways RICOCHETS back onto the corridor (`wallFlightHit`; the per-wall
+    arc-height gate is kept generic but never fires on a real bulkhead). A second crossing off the reflected
+    line bounces again (hit two walls, bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡ interactive)
     and a rolling ball stops against a wall in `rollOut` (a new `walls` param). Walls break at the island
     gaps (open hull) so a star-carry stays open, and only ever SAVE a ball that would be lost to space
     (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts` (`styleShipWalls`,

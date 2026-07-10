@@ -1,8 +1,9 @@
 /**
- * Ship-corridor WALLS (GS-ship-walls) — the derelict world's signature: sideways METAL walls lining
- * the hull-deck corridor that a low, flat ball RICOCHETS off, bouncing back toward the deck instead
- * of sailing off into open space. A lofted shot clears the wall (arc-height gated, exactly like the
- * trade-camp tents). If a bounce sends the ball into the OTHER wall, it bounces again — hit two
+ * Ship-corridor WALLS (GS-ship-walls, redesigned GS-ship-corridor) — the derelict world's signature:
+ * towering METAL BULKHEADS lining the hull-deck corridor. They stand TALLER than any golf shot can
+ * fly (see `WALL_HEIGHT` below), so there is NO hitting over them — every ball that leaves the deck
+ * sideways RICOCHETS off the bulkhead and comes back onto the corridor. You are sealed inside the
+ * ship's passageway. If a bounce sends the ball into the OTHER wall, it bounces again — hit two
  * walls, bounce twice. The floor and walls are metal, so a bounce runs LIVELY (a firm ricochet).
  *
  * PURE & deterministic (no rng — a function of the hole geometry, like the tents / OB box), so it
@@ -21,8 +22,14 @@ import { arcApex, arcHeight, ARC_FEEL, flightApexT, flightControl, flightGround,
 
 export type { ShipWall };
 
-/** Wall height (yards). Taller than a tent roof — a real barrier a flat shot can't skip. */
-export const WALL_HEIGHT = 13;
+/**
+ * Wall height (yards). A golf shot's apex is hard-capped at `ARC_FEEL.peakMax` (60 yd) in `flight.ts`,
+ * so a bulkhead standing at 72 yd is UN-CLEARABLE by any club at any power — the ball can never sail
+ * over it, it always bounces back onto the deck. This is the whole point of the derelict ship: you play
+ * golf INSIDE its corridors, walled in on both sides. (Was 13 yd, a "tall tent" a lofted wedge could
+ * skip; a dead ship's bulkheads rise to the overhead, so nothing gets over them.)
+ */
+export const WALL_HEIGHT = 72;
 /** Bounce run-out energy floor (fairway-equivalent yards) so a metal ricochet is lively, not dead. */
 export const WALL_BOUNCE_MIN = 8;
 
@@ -70,9 +77,11 @@ export interface WallHit {
 
 /**
  * Walk the curved flight path; return the wall ricochet (with the FINAL reflected direction after up
- * to two bounces) or null if the ball flies clean over every wall or never crosses one. Same curved
- * Bézier the renderer draws (no rng). Only a ball crossing OUTWARD (into a wall's face, toward space)
- * bounces; the FIRST wall the path crosses below the wall height wins.
+ * to two bounces) or null if the ball never crosses a wall. Same curved Bézier the renderer draws (no
+ * rng). Only a ball crossing OUTWARD (into a wall's face, toward space) bounces; the FIRST wall the
+ * path crosses below the wall height wins. The per-wall arc-height gate is kept for generality, but
+ * generated derelict bulkheads (`WALL_HEIGHT` = 72 yd) tower over the 60-yd apex cap, so in practice
+ * NOTHING clears them — every outward shot bounces back onto the deck.
  */
 export function wallFlightHit(
   walls: readonly ShipWall[],
