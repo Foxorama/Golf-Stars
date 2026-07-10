@@ -18,6 +18,7 @@ import { Rng } from '../rng';
 import { RARITIES, RARITY_C } from '../rpg/loot';
 import { BIOMES, pickBiome, type Biome } from './biomes';
 import { lieInfo, lieAt } from '../shot';
+import { WALL_HEIGHT } from '../walls';
 import {
   bearing,
   dist,
@@ -32,6 +33,7 @@ import {
   type GreenLobe,
   type Hole,
   type Rarity,
+  type ShipWall,
   type Vec,
   type Wind,
 } from './contract';
@@ -330,6 +332,43 @@ function brokenCorridor(dense: Vec[], leftHW: number[], rightHW: number[], gapBa
   }
   flush();
   return segs;
+}
+
+/**
+ * Ship-corridor WALLS (GS-ship-walls): line the two long corridor edges with collidable metal wall
+ * segments, from the EXACT ribbon edges (`dense[i] ± normal·halfWidth[i]`) so the sim bounces off the
+ * wall the renderer draws. Walls break at the `gapBands` (the torn-open hull sections / island gaps) so
+ * a carry across space stays open. Inward normals point toward the centreline (a low ball heading out
+ * toward space bounces back onto the deck). Pure geometry, zero rng.
+ */
+function buildShipWalls(dense: Vec[], leftHW: number[], rightHW: number[], gapBands: [number, number][], height: number): ShipWall[] {
+  const n = dense.length;
+  if (n < 2) return [];
+  const inGap = (u: number) => gapBands.some(([a, b]) => u >= a && u <= b);
+  // Left normal + inward normals, matching `ribbon`'s frame ([-dy, dx] is the left normal).
+  const frame = (i: number): { nx: number; ny: number } => {
+    const prev = dense[Math.max(0, i - 1)]!;
+    const next = dense[Math.min(n - 1, i + 1)]!;
+    let dx = next[0] - prev[0];
+    let dy = next[1] - prev[1];
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    return { nx: -dy, ny: dx };
+  };
+  const leftEdge: Vec[] = dense.map((p, i) => { const f = frame(i); return [p[0] + f.nx * leftHW[i]!, p[1] + f.ny * leftHW[i]!]; });
+  const rightEdge: Vec[] = dense.map((p, i) => { const f = frame(i); return [p[0] - f.nx * rightHW[i]!, p[1] - f.ny * rightHW[i]!]; });
+  const walls: ShipWall[] = [];
+  const unit = (a: Vec, b: Vec): Vec => { const dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
+  for (let i = 0; i < n - 1; i++) {
+    // A wall segment spans dense[i]→dense[i+1]; skip it if either endpoint sits in a gap (open hull).
+    if (inGap(i / (n - 1)) || inGap((i + 1) / (n - 1))) continue;
+    // Left wall: inward normal points toward the centreline (opposite the left normal).
+    { const t = unit(leftEdge[i]!, leftEdge[i + 1]!); walls.push({ a: leftEdge[i]!, b: leftEdge[i + 1]!, normal: [t[1], -t[0]], height }); }
+    // Right wall: inward normal points the other way.
+    { const t = unit(rightEdge[i]!, rightEdge[i + 1]!); walls.push({ a: rightEdge[i]!, b: rightEdge[i + 1]!, normal: [-t[1], t[0]], height }); }
+  }
+  return walls;
 }
 
 /**
@@ -1524,7 +1563,12 @@ function generateHole(
   // void/cetus stops look as forgiving as they play.
   if (lostRough) biomeMods.push({ kind: 'roughLie', note: lostRough });
 
-  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, widthId: wp.id, greenSlope, greenContour };
+  // Ship-corridor WALLS (GS-ship-walls): line the derelict's hull-deck corridor with collidable metal
+  // walls off the SAME ribbon edges. Skipped for island-green par 3s (a blob target, no ribbon). Pure
+  // geometry, zero rng — the whole feature is gated on `biome.walls`, so every other world is untouched.
+  const walls = biome.walls && !islandPar3 ? buildShipWalls(dense, leftHW, rightHW, gapBands, WALL_HEIGHT) : undefined;
+
+  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, widthId: wp.id, greenSlope, greenContour, ...(walls && walls.length ? { walls } : {}) };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */

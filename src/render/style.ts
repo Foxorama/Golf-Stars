@@ -76,6 +76,7 @@ import {
   roughenHazardCached,
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
+import { styleShipWalls } from './style/walls';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
@@ -655,6 +656,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // road under Rainbow Road (they'd be in the OOB void).
   // Tents live on ONE stamped hole of the stop (GS-tent-interactions) — draw only when this hole carries them.
   if (opts.tradeTents && !rainbow && hole.tents) prims.push(...styleTents(tradeTentsFor(hole), proj));
+
+  // --- 6d. Ship-corridor walls (GS-ship-walls) --------------------------------
+  // The derelict world's collidable metal corridor walls, drawn from the SAME `hole.walls` the sim
+  // bounces off (the graphic IS the physics). Course space (projected), over the deck, under the
+  // flag/motes. Pure geometry; off under Rainbow Road.
+  if (!rainbow && hole.walls) prims.push(...styleShipWalls(hole.walls, proj));
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);

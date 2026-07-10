@@ -152,6 +152,24 @@ export interface Hole {
    * source of truth. Absent/false ⇒ no tents (byte-for-byte the plain hole). Pure, no rng.
    */
   tents?: boolean;
+  /**
+   * Ship-corridor WALLS (GS-ship-walls): the derelict world's collidable metal walls lining the hull-
+   * deck corridor. Stamped by the generator from the SAME ribbon edges it draws (so the sim bounces off
+   * exactly the wall the renderer paints), only on wall biomes. Absent ⇒ no walls (byte-for-byte the
+   * plain hole). Pure, no rng. The collision/reflect logic lives in `sim/walls.ts`.
+   */
+  walls?: ShipWall[];
+}
+
+/** A collidable ship-corridor wall segment (GS-ship-walls). See `sim/walls.ts`. */
+export interface ShipWall {
+  /** Segment endpoints (course space) — sits ON the drawn corridor edge. */
+  a: Vec;
+  b: Vec;
+  /** Unit INWARD normal (points toward the corridor interior / centreline). */
+  normal: Vec;
+  /** Wall height (yards): a flight below this bounces; a lofted shot clears. */
+  height: number;
 }
 
 export interface CourseMeta {

@@ -38,6 +38,8 @@ import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
+import { wallFlightHit, wallRollHit, WALL_BOUNCE_MIN, type WallHit } from './walls';
+import type { ShipWall } from './course/contract';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
 
@@ -86,6 +88,10 @@ export interface ShotLog {
    *  reaction), and the reflected roll direction `dir`. Non-penalty for every tent EXCEPT the marmot,
    *  whose bite resolves as a lost ball above. */
   tentHit?: { at: Vec; c: Vec; effect: TentEffectId; dir: Vec };
+  /** Ship-corridor wall ricochet (GS-ship-walls): the impact `at`, reflected `dir`, and how many walls
+   *  were struck (`bounces` — 1, or 2 for "hit two walls, bounce twice"). The play view fires a metal
+   *  clang + spark here; the flight/roll already follow the reflected result. */
+  wallHit?: { at: Vec; dir: Vec; bounces: number };
 }
 
 /** Per-yard roll MULTIPLIER of each surface (its "run"): how far the ball travels per unit of roll
@@ -220,6 +226,7 @@ export function rollOut(
   tdLie: FeatureKind,
   immune?: ReadonlySet<string>,
   tents?: readonly TradeTent[],
+  walls?: readonly ShipWall[],
 ): { roll: number; rest: Vec; path?: Vec[] } {
   const sign = K < 0 ? -1 : 1;
   const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
@@ -267,6 +274,10 @@ export function rollOut(
       }
       if (hitsNewTent(at(dist + STEP))) {
         dist += STEP; // trickled up against a trade-camp tent → stops there
+        break;
+      }
+      if (walls && wallRollHit(walls, at(dist), at(dist + STEP))) {
+        dist += STEP; // ran up against a ship-corridor wall → stops against it (stays on the deck)
         break;
       }
       const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, at(dist + STEP * 0.5), tdx, tdy);
@@ -337,6 +348,14 @@ export function rollOut(
       break;
     }
     if (hitsNewTent([px + tx * stepLeft, py + ty * stepLeft])) {
+      px += tx * stepLeft;
+      py += ty * stepLeft;
+      dist += stepLeft;
+      path.push([px, py]);
+      blocked = true;
+      break;
+    }
+    if (walls && wallRollHit(walls, [px, py], [px + tx * stepLeft, py + ty * stepLeft])) {
       px += tx * stepLeft;
       py += ty * stepLeft;
       dist += stepLeft;
@@ -1417,6 +1436,21 @@ export function executeShot(
   // stops dead at the tent (no ricochet run-out) and replays from the shot's origin below.
   const tentLost = tentHit?.tent.effect === 'marmot';
 
+  // Ship-corridor wall ricochet (GS-ship-walls): a low, flat ball heading off the derelict's hull deck
+  // toward open space bounces back off a metal corridor wall (up to two bounces — hit two walls, bounce
+  // twice). Same curved path the renderer draws (no rng), gated on `hole.walls` (the derelict only), so
+  // auto ≡ interactive holds and every other world is byte-for-byte unchanged. A wall bounce is skipped
+  // if the ball was already knocked into the woods or bounced off a tent (one aerial deflection wins).
+  let wallHit: WallHit | null = null;
+  if (hole.walls && hole.walls.length && !knockedDown && !tentHit) {
+    wallHit = wallFlightHit(hole.walls, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
+    if (wallHit) {
+      result.landing = wallHit.point;
+      result.carry = wallHit.carry;
+      result.apex = arcApex(wallHit.carry, nominalCarry, ARC_FEEL, flight.peakMult);
+    }
+  }
+
   // Touchdown → bounce & roll out (unless it plugs in a penalty surface). The run-out integrates
   // the surfaces it crosses: the ball keeps the same roll ENERGY but spends it fast in rough and
   // slowly on fairway/ice, so landing in the rough and trickling onto the fairway (or running off
@@ -1448,6 +1482,11 @@ export function executeShot(
       // The marmot keeps the ball — it stops dead at the tent (no ricochet). Every other tent bounces
       // forward off the roof with a lively energy floor.
       rollK = tentLost ? 0 : Math.max(Math.abs(energy), TENT_BOUNCE_MIN);
+    } else if (wallHit) {
+      // Ship-wall ricochet: run out along the reflected (inward) direction with a lively metal-bounce
+      // energy floor, so the ball skips back onto the deck rather than dying at the wall.
+      rollDir = wallHit.dir;
+      rollK = Math.max(Math.abs(energy), WALL_BOUNCE_MIN);
     } else {
       const dx = touchdown[0] - from[0];
       const dy = touchdown[1] - from[1];
@@ -1455,7 +1494,7 @@ export function executeShot(
       rollDir = [dx / len, dy / len];
     }
     if (rollK !== 0) {
-      const out = rollOut(hole, touchdown, rollDir, rollK, tdLie, immune, tents);
+      const out = rollOut(hole, touchdown, rollDir, rollK, tdLie, immune, tents, hole.walls);
       roll = out.roll;
       rest = out.rest;
       rollPath = out.path;
@@ -1485,6 +1524,7 @@ export function executeShot(
   // Surface the tent CENTRE + effect (not just the ball's roof-contact point) so the renderer can anchor
   // the speech bubble ON the tent (GS-tent-interactions) and the interactive driver can fire the effect.
   if (tentHit) log.tentHit = { at: tentHit.point, c: tentHit.tent.c, effect: tentHit.tent.effect, dir: tentHit.dir };
+  if (wallHit) log.wallHit = { at: wallHit.point, dir: wallHit.dir, bounces: wallHit.bounces };
 
   let ballAfter: Vec = rest;
   let lieAfter: FeatureKind = restLie;
