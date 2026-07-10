@@ -384,6 +384,10 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // cliffs. A penalty exactly like the void's lost rough (a +1 NON-replay drop-back-on-the-plateau,
   // so the miss bites but never cascades into a ball-shredder), reskinned as the deep sea.
   cetusdeep: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'cetuslost', label: 'Lost to the star-ocean' },
+  // The derelict ship's "lost rough" (GS-derelict): off the mown hull deck is OPEN SPACE. A penalty
+  // exactly like the void's lost rough (a +1 NON-replay drop-back onto the hull section, so a miss into
+  // the stars bites but never cascades into a ball-shredder), reusing the proven `voidlost` mechanic.
+  shiprough: { carryMult: 1.0, dispersionMult: 1.0, penalty: 'voidlost', label: 'Lost to space' },
   ice: { carryMult: 1.02, dispersionMult: 1.5, label: 'Ice' }, // slick: hard to control
   crystal: { carryMult: 1.05, dispersionMult: 0.85, label: 'Crystal' }, // true & fast
   // Meteor-strike scorch (GS-meteor-scorch): charred, baked crust under a meteor-shower sky. The

@@ -85,6 +85,7 @@ import {
   cetusRiver,
   CETUS_CLIFF,
   VOID_CLIFF,
+  SHIP_CLIFF,
   RAINBOW_CLIFF,
 } from './style/platforms';
 import {
@@ -350,6 +351,12 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // rectangle isn't given an odd rectangular underside; own cliff stream, so other streams are stable.
   if (arch === 'void' && lostHole && !rainbow) {
     prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, VOID_CLIFF).prims);
+  }
+  // Derelict hull sections (GS-derelict): extrude each floating deck section into a cold riveted METAL
+  // cross-section underside (torn hull-plate, not asteroid rock) so the ship-in-pieces reads as 3D
+  // slabs adrift in space. Same gating/stream as the void pads.
+  if (arch === 'derelict' && lostHole && !rainbow) {
+    prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, SHIP_CLIFF).prims);
   }
 
   // --- 3c. Biome RELIEF: directional rolling-terrain depth (GS-biome-relief) ---

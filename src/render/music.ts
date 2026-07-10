@@ -135,6 +135,15 @@ export const MUSIC_TRACKS: Record<MusicSceneId, MusicTrack> = {
     chords: [[0, 2, 4], [3, 4, 0], [2, 4, 1], [0, 2, 4]],
     padType: 'sawtooth', arpType: 'triangle', arpDensity: 0.26, bassDensity: 0.7, shimmer: 0.14, gain: 0.24,
   },
+  derelict: {
+    // Hollow, gaunt, melancholic — a dead ship drifting silent and alone through the empty stars. A very
+    // slow, very low sine pad breathing a minor progression that barely moves and always sinks back to the
+    // tonic (an endless, going-nowhere drift), the sparsest cold plucks, and the odd distant shimmer like a
+    // faint signal from a long-dead console. Unique root+scale+bpm fingerprint (87.31|AEOLIAN|52).
+    name: 'Ghost in the Hull', bpm: 52, root: 87.31, scale: AEOLIAN,
+    chords: [[0, 2, 4], [5, 7, 9], [3, 5, 7], [0, 2, 4]],
+    padType: 'sine', arpType: 'triangle', arpDensity: 0.07, bassDensity: 0.26, shimmer: 0.2, gain: 0.25,
+  },
 };
 
 // --- Engine state ------------------------------------------------------------------------------

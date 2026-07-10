@@ -279,6 +279,26 @@ export const ZONES: Record<BiomeArchetype, ZoneProfile> = {
     ],
     difficulty: 3,
   },
+  derelict: {
+    archetype: 'derelict',
+    name: 'The Derelict',
+    signature: 'Golf inside a dead ship',
+    inspiration:
+      'A vast starship long dead and adrift, broken into drifting hull sections — you golf through its silent metal corridors and carry the ball across the gaps of open space from one severed piece to the next.',
+    brief:
+      'You play IN and AROUND the wreck. The mown deck is the only ground — off it is open space, and the ship is torn into pieces, so a hole is a chain of hull sections split by star-gaps you must carry. Low gravity lets the ball bomb across the voids; the air is dead and windless. Cold, silent, and haunted — miss the deck and the ball is lost to the stars.',
+    hazards: [
+      { icon: '🌌', text: 'Off the deck is OPEN SPACE — a miss is lost to the stars' },
+      { icon: '🕳️', text: 'The hull is broken into pieces — carry the gaps between sections' },
+      { icon: '🟡', text: 'Hull-breach sand-drifts ring the pads' },
+    ],
+    benefits: [
+      { icon: '🪶', text: 'Low gravity — the ball carries far across the voids' },
+      { icon: '🍃', text: 'Dead, windless air — no gale to fight' },
+      { icon: '🛠️', text: 'Firm riveted deck-plate runs the ball true' },
+    ],
+    difficulty: 5,
+  },
   asgard: {
     archetype: 'asgard',
     name: 'Asgard',
@@ -785,6 +805,38 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
       eagle: ['An eagle in low grav — a monster bomb and a golden touch!', 'Two under over the scrap. The belt hums with it.'],
       blowup: ['A crater ate one whole back there. The belt takes its tithe. Onward.', 'One vanished into the chasm — let the hull-plates keep it. Keep going.'],
       birdieBlitz: ['Birdies sparking all over the belt — a run of pure salvage.', 'A flurry of birdies over the scrap. Electric stuff.'],
+    },
+  },
+  derelict: {
+    name: 'Marlow Vane',
+    title: 'Derelict salvage-pro',
+    quips: {
+      scraped: [
+        'Kept it off the deck by a hull-plate’s width. The stars nearly swallowed one whole.',
+        'Scraped across the gaps by a rivet. Out here a pass is a small miracle — take it.',
+        'The wreck almost kept your ball as a souvenir. Barely through. Grab some salvage.',
+      ],
+      solid: [
+        'Steady work over a dead ship. Most spray it all into the dark.',
+        'Carried the gaps clean and held the deck. Respectable salvage, that.',
+        'Solid golf through the wreck. The old hull hums a little for it.',
+      ],
+      great: [
+        'Now THAT’S golf in a graveyard! Threaded the corridors, cleared every gap.',
+        'Great striking across the voids — never once flirted with the stars.',
+        'You golfed a dead ship like it was alive again. Beautiful.',
+      ],
+      stellar: [
+        'Untouchable through the wreck — you made the silence sing.',
+        'Stellar. You carried a broken ship across the dark like it was nothing.',
+        'Flawless over the derelict. Even the ghosts stopped to watch.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one aboard a DEAD SHIP?! The whole hull rang like a bell for the first time in an age.', 'An ACE through the wreck — the silence broke just for you.'],
+      eagle: ['An eagle across the voids — a monster carry and a golden touch!', 'Two under through the derelict. The dark hums with it.'],
+      blowup: ['One drifted off into the stars back there. The wreck takes its tithe. Onward.', 'The gap ate a ball whole. Let the dark keep it — keep moving.'],
+      birdieBlitz: ['Birdies flaring all through the wreck — a run of pure salvage.', 'A flurry of birdies aboard the ghost ship. Electric, in a dead place.'],
     },
   },
   asgard: {

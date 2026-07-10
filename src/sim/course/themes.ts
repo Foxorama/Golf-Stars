@@ -52,6 +52,10 @@ export type BiomeArchetype =
   // GS-more-worlds: two further exotic worlds bracketing the gravity spectrum, each a distinct PLAYSTYLE.
   | 'swamp' // toxic mire — the HEAVIEST air in the galaxy (the ball flies short), still + humid, acid bog
   | 'metal' // scrap belt — the lowest NON-abyss gravity (big bombs) over a solid derelict-metal graveyard
+  // GS-derelict: a dead starship adrift in the deep. You golf IN and AROUND the wreck — off the mown
+  // hull deck is OPEN SPACE (the void's island/abyss model), the ship is broken into pieces so you
+  // shoot the ball across gaps of stars from one section to the next. Cold, silent, haunted.
+  | 'derelict' // derelict ship — metal corridors over open space, hull sections split by star-gaps you carry
   // GS-asgard: the Golden Realm atop Yggdrasil, reached by the Bifröst — a GRAND, FAIR reward
   // world (opulent gilded emerald fields under a royal twilight). NOT a normal route destination:
   // reached only via a later tournament trigger, so no theme maps to it (weight 0 in `BIOMES`).
@@ -142,6 +146,7 @@ const ARCHETYPE_BIOME: Record<BiomeArchetype, string> = {
   cetus: 'cetus-deep',
   swamp: 'toxic-mire',
   metal: 'scrap-belt',
+  derelict: 'derelict-ship',
   asgard: 'asgard-realm',
 };
 
@@ -208,6 +213,7 @@ export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
   cetus: ['control', 'skill'], // hit the clifftop plateau or it's lost to the star-ocean — precision
   swamp: ['control', 'putting'], // heavy air + acid everywhere — control the short flight, hole the boggy greens
   metal: ['distance', 'control'], // low-grav bombs down a hazard-strewn belt — power tamed by control
+  derelict: ['control', 'skill'], // thread the wreck's corridors + carry the star-gaps to the next hull section — precision
   asgard: ['distance', 'skill'], // a grand reward world — big carries down wide fairways, rewarded striking
 };
 
@@ -400,6 +406,13 @@ const FEATURES: readonly FeatureRow[] = [
   { id: 'helix-nebula', name: 'Helix Nebula', kind: 'deepsky', rarity: 'epic', archetype: 'void', anchor: 'NGC 7293', blurb: 'The Eye of God — a dying star’s exhaled shell.', flavour: { dogleg: 1.2, carry: 1.1, scatter: 1.3 } },
   { id: 'sombrero-galaxy', name: 'Sombrero Galaxy', kind: 'deepsky', rarity: 'epic', archetype: 'desert', anchor: 'M104', blurb: 'A brilliant bulge ringed by a broad dark brim.', flavour: { dogleg: 1.2, bunkers: 1.2 } },
 
+  // GS-derelict: the derelict-ship world is reached via two deep-sky WRECKS (like the void's showpieces),
+  // spanning arcs 2 (rare) and 3 (epic) so a haunted hulk can drift into a mid or deep voyage. No stick
+  // figure / champion needed (deepsky), and no constellation-count change. The world's identity is the
+  // metal wreck itself (ZONES.derelict + the render), not the sky-anchor.
+  { id: 'ghost-nebula', name: 'Ghost Nebula', kind: 'deepsky', rarity: 'rare', archetype: 'derelict', anchor: 'vdB 141', blurb: 'A pale shape haunts the dust — a wreck drifting where a ship once died.', flavour: { wind: 0.6, carry: 1.05, scatter: 1.1 } },
+  { id: 'skull-nebula', name: 'Skull Nebula', kind: 'deepsky', rarity: 'epic', archetype: 'derelict', anchor: 'NGC 246', blurb: 'A dead star’s shattered shell, hollow-eyed in the deep — and the hulk adrift inside it.', flavour: { carry: 1.08, dogleg: 1.1, scatter: 1.15 } },
+
   // The two naked-eye galaxies — pinned to arc 3 as late-game grandeur
   { id: 'milky-way-core', name: 'Milky Way Core', kind: 'galaxy', rarity: 'epic', archetype: 'void', anchor: 'Galactic Centre', blurb: 'The blazing heart of our own galaxy, in Sagittarius.', arc: 3, flavour: { carry: 1.18, jitter: 0.14, scatter: 1.4 } },
   { id: 'magellanic-clouds', name: 'Magellanic Clouds', kind: 'galaxy', rarity: 'epic', archetype: 'void', anchor: 'LMC / SMC', blurb: 'Two dwarf galaxies circling the south celestial pole.', arc: 3, flavour: { carry: 1.14, jitter: 0.1, scatter: 1.3 } },
@@ -500,7 +513,7 @@ export function pickTheme(rng: Rng, arc: Arc, weightBoost?: (t: Theme) => number
  * the lava world and the storm world. The FIRST stop's draw skips them — a voyage tees off on a
  * readable world; the journey supplies the heat (route lanes CAN land these from stop 1 on).
  */
-export const HARD_ARCHETYPES: ReadonlySet<BiomeArchetype> = new Set(['inferno', 'tempest', 'void', 'cetus']);
+export const HARD_ARCHETYPES: ReadonlySet<BiomeArchetype> = new Set(['inferno', 'tempest', 'void', 'cetus', 'derelict']);
 
 /** Convenience: the theme a run's current stop flies into, from its distance. Stop 0 (the tee-off
  *  world — no route chosen yet) draws from the arc pool MINUS the hard archetypes: the same single

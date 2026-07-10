@@ -57,6 +57,7 @@ export const BIOME_RELIEF: Record<BiomeArchetype, ReliefLook> = {
   cetus: { hi: 'rgba(122,232,240,0.15)', lo: 'rgba(5,26,38,0.30)', strength: 1 }, // luminous clifftop swells
   swamp: { hi: 'rgba(160,200,100,0.11)', lo: 'rgba(6,16,4,0.30)', strength: 0.95 }, // boggy hummocks
   metal: { hi: 'rgba(255,190,120,0.13)', lo: 'rgba(10,6,3,0.30)', strength: 1.15 }, // buckled scrap-plate swells
+  derelict: { hi: 'rgba(150,185,215,0.13)', lo: 'rgba(6,9,16,0.34)', strength: 1.1 }, // buckled cold hull-plating swells
   asgard: { hi: 'rgba(255,232,150,0.14)', lo: 'rgba(12,38,20,0.22)', strength: 1.1 }, // gilded meadow rolls
 };
 

@@ -207,6 +207,7 @@ export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
   cetus: 'stone',
   swamp: 'squelch', // dead sodden bog cypress — a wet blorp, like the mushrooms
   metal: 'clang', // rusted scrap masts — a struck-metal clang
+  derelict: 'clang', // struck hull spars / girders ring with a hollow metal clang
   asgard: 'chime', // the golden groves ring like a struck bell
 };
 

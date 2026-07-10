@@ -201,9 +201,9 @@ export const EFFECT_BIOME_AFFINITY: Partial<Record<CourseEffectId, readonly Biom
   dustStorm: ['desert', 'metal'], //   a grit wall rolls over the dunes and the scrap belt
   radiant: ['desert', 'crystal', 'verdant'], // a brilliant star bathes the bright, open worlds
   aurora: ['frost', 'crystal', 'void'], //     charged colour ribbons over the polar / crystalline / deep worlds
-  solarWind: ['void', 'tempest', 'metal'], //  a stiff particle breeze streams through open space + the derelict belt
-  darkMatter: ['void', 'cetus'], //    an unseen mass warps the starlight of the deep dark worlds
-  gravityWell: ['void', 'metal'], //   a giant's pull hangs heavy over the low-gravity worlds
+  solarWind: ['void', 'tempest', 'metal', 'derelict'], //  a stiff particle breeze streams through open space + the derelict belt/wreck
+  darkMatter: ['void', 'cetus', 'derelict'], //    an unseen mass warps the starlight of the deep dark worlds + the drifting wreck
+  gravityWell: ['void', 'metal', 'derelict'], //   a giant's pull hangs heavy over the low-gravity worlds + the tumbling hulk
 };
 
 /**

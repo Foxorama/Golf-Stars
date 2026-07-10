@@ -84,7 +84,7 @@ export function rainbowRibbon(poly: Vec[], phaseY: number, bandH: number): Prim[
  *  (`MOW_BLEND`). The DARK tone eases further back than the light one for every world (GS-mow-blend) —
  *  the eye reads a dark cut as a shadow/edge, the austere half of the stripe; muting it asymmetrically
  *  keeps the mow while losing the harsh line. */
-const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.4, cetus: 0.42 };
+const MOW_BLEND: Partial<Record<BiomeArchetype, number>> = { void: 0.4, cetus: 0.42, derelict: 0.42 };
 function mowTones(s: Shade, arch: BiomeArchetype): { hi: string; lo: string } {
   // Parkland default lifted 0.5 → 0.6 (GS-fairway-2): at 0.5 the narrow-spread palettes (verdant's
   // #3f8c3f↔#56a850, desert, ocean) mowed at a near-invisible whisper and the corridor read as one

@@ -25,7 +25,7 @@ import { playTotals } from '../src/sim/score';
 import { playCourse } from '../src/sim/round';
 import { currentCourse, currentTheme, startRun } from '../src/sim/rpg/run';
 
-const ARCHETYPES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void', 'crystal', 'tempest', 'fungal', 'ocean', 'cetus', 'swamp', 'metal'];
+const ARCHETYPES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void', 'crystal', 'tempest', 'fungal', 'ocean', 'cetus', 'swamp', 'metal', 'derelict'];
 
 describe('theme table integrity', () => {
   it('every theme has a unique, stable id', () => {

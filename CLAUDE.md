@@ -136,8 +136,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     crossings always win); SAME-family overlaps are legal and render union-merged.
   - An ARMED lost-rough island hole strips every void-stranded hazard (`clearVoidHazards` — the
     abyss is the only penalty there); void/cetus deep par 4/5 are ISLAND-HOP pad chains whose gaps
-    are completable by construction (`separateIslandGaps` + `validateIslandHops`). Both worlds are
-    in `BALANCE_EXEMPT_BIOMES` (deliberately brutal, skipped by the death-spiral harnesses).
+    are completable by construction (`separateIslandGaps` + `validateIslandHops`). Void/cetus AND the
+    **derelict-ship** (GS-derelict — a dead starship: off the mown hull DECK is open space, par 4/5 break
+    into a chain of hull SECTIONS split by star-gaps you carry) are all in `BALANCE_EXEMPT_BIOMES`
+    (deliberately brutal, skipped by the death-spiral harnesses). The derelict reuses the proven island
+    machinery: a `shiprough` lie ("Lost to space") whose penalty IS `voidlost` (the +1 non-replay drop),
+    `SHIP_CLIFF` metal undersides, a `derelict` archetype (deep-sky themes Ghost/Skull Nebula, no
+    champion/figure). The metal FEEL — collidable walls, sharp corners, animated space junk — is layered
+    on by follow-ups (GS-ship-walls / GS-ship-feel), not this row.
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,

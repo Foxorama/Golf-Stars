@@ -86,6 +86,7 @@ const cases = [
   { biome: 'cetus-deep', themeId: 'cetus', label: 'Cetus · Cetus' },
   { biome: 'toxic-mire', themeId: 'hydra', label: 'Swamp · Hydra' },
   { biome: 'scrap-belt', themeId: 'antlia', label: 'Metal · Antlia' },
+  { biome: 'derelict-ship', themeId: 'skull-nebula', label: 'Derelict · Skull Nebula' },
 ];
 const seeds = [7, 4242];
 

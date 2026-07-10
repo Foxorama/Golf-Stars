@@ -634,6 +634,9 @@ const DEEP_ROUGH: Partial<Record<BiomeArchetype, DeepRoughLook>> = {
   swamp: { base: '#26361a', shade: '#16220e', ink: 'rgba(6,14,4,0.5)', mark: 'blade', markCols: ['#3a4a1e', '#5f7a34'], glow: 'rgba(120,180,60,0.11)' },
   // A rust-brown rebar/scrap thicket with a faint ember-orange glow — a jagged tangle on the belt.
   metal: { base: '#3a2416', shade: '#241610', ink: 'rgba(10,5,2,0.55)', mark: 'shard', markCols: ['#8a5a3a', '#c98a4a'], glow: 'rgba(255,140,60,0.10)' },
+  // A dark gunmetal thicket of twisted torn hull-plate + severed cabling with a faint cold-cyan glow —
+  // a jagged tangle of wreckage on the derelict's steel ground.
+  derelict: { base: '#2a3138', shade: '#191d22', ink: 'rgba(6,9,12,0.55)', mark: 'shard', markCols: ['#5c6773', '#8fb0c0'], glow: 'rgba(95,212,208,0.10)' },
 };
 const DEEP_ROUGH_DEFAULT: DeepRoughLook = { base: '#2c4014', shade: '#1a2a0c', ink: 'rgba(10,20,4,0.5)', mark: 'blade', markCols: ['#3e5a1e', '#597e2c'] };
 
