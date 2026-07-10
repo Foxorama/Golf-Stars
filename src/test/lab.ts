@@ -170,7 +170,6 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
     minCarryBoost: opts.loadout?.minCarryBoost,
     wedgeWindow: opts.loadout?.wedgeWindow,
     minCarryBoostByClass: opts.loadout?.minCarryBoostByClass,
-    driverMaxCarryCut: opts.loadout?.driverMaxCarryCut,
   });
   const rng = makeRng(opts.seed ?? `lab:disp:${clubId}:${n}`);
 
@@ -207,7 +206,7 @@ export function dispersionStudy(clubId: string, opts: DispersionOpts = {}): Disp
       shape,
       minCarryFracBoost: cw.minCarryFracBoost,
       carryWindowTighten: cw.carryWindowTighten,
-      maxCarryFracCut: cw.maxCarryFracCut,
+      driverPowerFloor: opts.loadout?.driverPowerFloor,
       guard,
       offFairway,
       lieRelief,

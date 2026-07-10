@@ -15,7 +15,7 @@ import type { FeatureKind, Hole, Vec, Wind } from './course/contract';
 import { bearing, pointInPoly } from './course/contract';
 import type { Club } from './clubs';
 import { clubDist, type ClubStats } from './clubs';
-import { arcApex, ARC_FEEL, flightProfileOf } from './flight';
+import { arcApex, ARC_FEEL, flightClassOf, flightProfileOf } from './flight';
 import type { Rng } from './rng';
 
 // --- Feel tunables -----------------------------------------------------------
@@ -55,6 +55,21 @@ export const TUNABLES = {
 } as const;
 
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
+
+/**
+ * Driver POWER-FLOOR remap (GS-proshop-distance-items, Grooved Driver Face): the driver's power gesture
+ * spans `[floor, 1]` of full carry instead of `[0, 1]` — 1% power lands at the raised MIN carry, full
+ * power at the max. So the driver can no longer be dialed SHORT (you switch clubs to lay up around a
+ * hazard or on a short hole), while its MAX carry and the full-power swing are UNCHANGED (power 1 →
+ * 1). Overdrive (power > 1) stays proportionally overdriven. Only remaps a DRIVER with a floor set;
+ * floor 0/undefined or a non-driver returns power untouched, so every other club and the feature-off
+ * path is byte-for-byte. Pure.
+ */
+export function driverPowerFloorRemap(power: number, floor: number | undefined, isDriver: boolean): number {
+  if (!floor || !isDriver) return power;
+  const f = Math.max(0, Math.min(0.99, floor));
+  return f + power * (1 - f);
+}
 
 export interface DispersionProfile {
   /** Mean carry as a fraction of intended (full) carry. */
@@ -592,11 +607,11 @@ export interface ShotInput {
   /** Wedge distance-control (point 6): pull BOTH carry clamps toward the mean by this fraction
    *  (0..1), tightening the wedge's carry window so it lands the chosen distance. */
   carryWindowTighten?: number;
-  /** Driver distance-control trade-off (GS-proshop-distance-items): shave this fraction of intended
-   *  off the UPPER carry clamp — the negative that balances the driver's large min-carry boost (you
-   *  groove the distance but give up some top-end bomb). Floored at the mean so a full swing still
-   *  averages the same. Undefined/0 = no cut (byte-for-byte unchanged). */
-  maxCarryFracCut?: number;
+  /** Driver power-floor (GS-proshop-distance-items, Grooved Driver Face): 0..1 fraction of full carry
+   *  the driver's power gesture floors at — the power range becomes [floor·full, full] so the driver
+   *  can't be dialed short (max carry unchanged). Only applied to the driver; undefined/0 = no floor
+   *  (byte-for-byte unchanged). */
+  driverPowerFloor?: number;
   /** A named caddy's in-flight ball guard (GS-caddy): redirects an off-fairway miss back onto the
    *  fairway. Absent (the default) consumes NO extra rng, so a guard-less shot is byte-for-byte the
    *  same — the interception draw only fires when a caddy is watching AND `offFairway` says it's a miss. */
@@ -667,7 +682,9 @@ export function resolveShot(input: ShotInput): ShotResult {
   // shot byte-for-byte unchanged; a pure scalar, no extra rng. The carry-window clamps below are
   // fractions of `intended`, so they scale with power; the angular spread is keyed off the club's
   // nominal carry (unchanged), so a soft shot's cone is small and a full swing's is the full cone.
-  const power = input.power ?? 1;
+  // The driver power-floor (GS-proshop-distance-items) remaps the gesture into [floor, 1] so the driver
+  // can't be dialed short — a no-op at full power and for every non-driver, so byte-for-byte unchanged.
+  const power = driverPowerFloorRemap(input.power ?? 1, input.driverPowerFloor, flightClassOf(club.id) === 'driver');
   const intended = nominal * relief.carryMult * biomeMult * power;
 
   // Reduced weather impact (GS-proshop-2): scale the wind breakdown down by `windResist`. Both the
@@ -692,9 +709,6 @@ export function resolveShot(input: ShotInput): ShotResult {
   // tweaks on the club's [low, high] fractions — the AUTO sim and the preview apply the same ones.
   let lowFrac = prof.lowFrac;
   let highFrac = prof.highFrac;
-  // Driver trade-off first: cut the TOP clamp (never below the mean, so the average carry holds),
-  // then raise the LOW clamp — the boost clamps to the already-lowered high so the window can't invert.
-  if (input.maxCarryFracCut) highFrac = Math.max(prof.meanFrac, highFrac - input.maxCarryFracCut);
   if (input.minCarryFracBoost) lowFrac = Math.min(highFrac, lowFrac + input.minCarryFracBoost);
   if (input.carryWindowTighten) {
     const t = clamp01(input.carryWindowTighten);

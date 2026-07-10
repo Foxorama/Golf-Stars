@@ -858,7 +858,7 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     minCarryBoost: run.loadout.minCarryBoost,
     wedgeWindow: run.loadout.wedgeWindow,
     minCarryBoostByClass: run.loadout.minCarryBoostByClass,
-    driverMaxCarryCut: run.loadout.driverMaxCarryCut,
+    driverPowerFloor: run.loadout.driverPowerFloor,
     driverAnywhere: run.loadout.driverAnywhere,
     guard: run.loadout.caddyGuard,
     chipIn: run.loadout.chipInBoost,

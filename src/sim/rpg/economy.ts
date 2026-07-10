@@ -197,11 +197,13 @@ export interface PlayerLoadout {
    */
   minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
   /**
-   * Driver control trade-off (GS-proshop-distance-items): fraction shaved off the DRIVER's top carry —
-   * the negative that balances the Driver control item's large min-carry boost (you groove the distance
-   * but give up some top-end bomb). 0/undefined = none.
+   * Driver power-floor (GS-proshop-distance-items, Grooved Driver Face): 0..1 fraction of full carry the
+   * driver's power gesture FLOORS at — the power range becomes [floor·full, full], so 1% power lands at
+   * the raised min carry and full power at the max (max carry UNCHANGED). The trade-off is you can't dial
+   * the driver short — you switch clubs to lay up around a hazard or on a short hole. Interactive-only in
+   * effect (the auto sim plays full swings → remap no-op); 0/undefined = no floor (byte-for-byte).
    */
-  driverMaxCarryCut?: number;
+  driverPowerFloor?: number;
   /**
    * Overdrive (GS-power): extra power FRACTION the interactive pull-to-power gesture may dial PAST a
    * full swing — `0.1` lets you charge to 110% power for more carry (at the club's full spray). The
@@ -911,19 +913,22 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
 
   // --- Per-category distance control (GS-proshop-distance-items) -------------------------------
   // Each raises the MIN carry of ONE club family toward its max — a lot more control over where the
-  // ball lands and stops, category by category. Woods/Hybrids/Irons are pure precision (no downside
-  // to their family). The Driver gets the biggest boost (it hits furthest, so the widest window to
-  // close) but PAYS for it: a shave off the top end — you groove the distance, you give up some bomb.
+  // ball lands and stops, category by category. Woods/Hybrids/Irons are pure precision (no downside to
+  // their family). The Driver keeps its MAX carry (average even rises), but its power gesture FLOORS at
+  // the raised min — you get fine control over a high carry band, and the trade-off is you can't dial
+  // the driver short (switch clubs to lay up around a hazard or on a short hole).
   {
     id: 'distance-driver',
     name: 'Grooved Driver Face',
     cost: 180,
-    desc: 'A deep-milled driver face — a BIG jump in min driver carry (fewer weak drives), at the cost of a little top-end distance',
+    desc: "A deep-milled driver face — grooves your driver into a tight high-carry band (min carry way up, max unchanged). The catch: you can't hit it short, so club down to lay up",
     rarity: 'epic',
     apply: (m) => ({
       ...m,
       minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'driver', 0.18),
-      driverMaxCarryCut: (m.driverMaxCarryCut ?? 0) + 0.06,
+      // The power gesture now spans [0.84·full, full] — 1% power ≈ the raised min carry, so short driver
+      // shots are off the table. `Math.max` keeps a rebuild-from-perks idempotent (never stacks lower).
+      driverPowerFloor: Math.max(m.driverPowerFloor ?? 0, 0.84),
       perks: [...m.perks, 'distance-driver'],
     }),
   },
