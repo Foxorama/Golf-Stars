@@ -67,40 +67,72 @@ function embossChildren(
   return children;
 }
 
-export function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number, land: string): Prim[] {
+/**
+ * A bunker's excavated-bowl palette (GS-rusted-bunkers). Every world plays SAND as ordinary sand
+ * (`SAND`); the Scrap Belt (metal) instead digs RUST pits — flaky iron-oxide, no pale beach tan — so
+ * the hazard fits the corroded machine graveyard the way the toxic pools fit the mire. Render-only:
+ * the sim still plays these as `bunker`/`waste`/`pot`/`sand` lies, so escape difficulty is untouched.
+ */
+interface SandPalette {
+  base: string; // lit body fill
+  rim: string; // sunlit far-floor glow of the bowl
+  shadow: string; // lip-shadow rim against the land
+  rake: string; // concentric rake-arc strokes
+  wall: string; // inset near-rim shadow (dug-in lip)
+}
+const SAND_LOOK: SandPalette = { base: SAND.base, rim: SAND.rim, shadow: SAND.shadow, rake: 'rgba(255,248,224,0.14)', wall: SAND.wall };
+/** RUSTED PIT — the Scrap Belt's bunker: a flaky orange-rust body (brighter/oranger than the dark
+ *  iron rough so it still reads as a hazard, not just more rough), a rust-lit floor, dark corroded
+ *  rake grooves (warm-dark, never the pale sand rake), and a deep iron lip-shadow. */
+const RUST_SAND: SandPalette = {
+  base: '#a5623a', // flaky orange rust pit
+  rim: '#d38a52', // sunlit lifted rust flakes
+  shadow: '#6e4022', // deep iron lip against the rough
+  rake: 'rgba(60,34,18,0.30)', // corroded rake grooves (dark, not white)
+  wall: 'rgba(28,14,6,0.34)', // dug-in rust lip
+};
+/** The bunker palette for a world (GS-rusted-bunkers): the Scrap Belt (metal) digs RUST pits, every
+ *  other world keeps ordinary sand. Zero rng — a pure colour swap, so every non-metal world is
+ *  byte-identical and metal's sand draw count is unchanged. */
+export function sandLookFor(arch: BiomeArchetype): SandPalette {
+  return arch === 'metal' ? RUST_SAND : SAND_LOOK;
+}
+
+export function styleSandFamily(polys: Vec[][], art: ArtFeel, scale: number, land: string, arch: BiomeArchetype): Prim[] {
   if (polys.length === 0) return [];
+  const sp = sandLookFor(arch);
   const out: Prim[] = [];
-  // GS-hazard-blend: a soft grassy MARGIN just outside the bunker — the land tone thinning toward sand
-  // — so the bunker eases into the surrounding turf the way the fairway collar does, instead of a hard
-  // tan blob dropped on the grass (the "no blending at all" tell). Blended toward sand (never darker
-  // than the turf, so it reads as thinning grass, not a floating shadow — the GS-inset-2 lesson).
+  // GS-hazard-blend: a soft grassy MARGIN just outside the bunker — the land tone thinning toward the
+  // pit body — so the bunker eases into the surrounding turf the way the fairway collar does, instead
+  // of a hard blob dropped on the grass (the "no blending at all" tell). Blended toward the pit (never
+  // darker than the turf, so it reads as thinning grass, not a floating shadow — the GS-inset-2 lesson).
   // Grouped UNDER every body, so a merged bunker complex shares one continuous margin with no seam.
-  const margin = mixHex(land, SAND.base, 0.42);
+  const margin = mixHex(land, sp.base, 0.42);
   for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -5), fill: margin });
   // GS-inset-2: no drop shadow cast onto the surrounding turf — a bunker is DUG INTO the ground, it
   // doesn't float above it. The excavated read comes entirely from the inset emboss below (near
-  // up-light rim in shadow, far floor sunlit), so the sand sits flush-then-down, not proud.
-  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -2.6), fill: SAND.shadow }); // 1: sandy lip against the grass
-  for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: SAND.base }); // 2
+  // up-light rim in shadow, far floor sunlit), so the pit sits flush-then-down, not proud.
+  for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -2.6), fill: sp.shadow }); // 1: pit lip against the grass
+  for (const poly of polys) out.push({ t: 'poly', pts: poly, fill: sp.base }); // 2
   for (const poly of polys) {
     const c = centroidOf(poly);
     const b = bboxOf(poly);
     const half = Math.max(3, Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.5);
     const detail: Prim[] = [];
-    // GS-hazard-blend-2: a smoothly SHADED bowl instead of harsh straight white rake lines across the
-    // sand (the "awkward white lines" tell). Inset rim shadow (dug in) + a soft sunlit swell on the
+    // GS-hazard-blend-2: a smoothly SHADED bowl instead of harsh straight rake lines across the pit
+    // (the "awkward white lines" tell). Inset rim shadow (dug in) + a soft sunlit swell on the
     // DOWN-light floor (opposite the shadowed rim), so the bunker reads as a gently scooped bowl that
-    // blends, not a flat pale patch scored with white bars.
-    detail.push(...embossChildren(poly, scale, { wall: SAND.wall, base: SAND.base }));
+    // blends, not a flat patch scored with bars.
+    detail.push(...embossChildren(poly, scale, { wall: sp.wall, base: sp.base }));
     // Soft sunlit floor, pooled toward the down-light side (away from the up-light rim shadow) — low
     // alpha so it's a gentle swell, not a distinct pool (the GS-inset-2 lesson).
     const litC: Vec = [c[0] - LIGHT_UL[0] * half * 0.32, c[1] - LIGHT_UL[1] * half * 0.32];
-    detail.push({ t: 'glow', c: litC, r: half * 1.4, col: hexAlpha(SAND.rim, 0.4) });
-    // Subtle rake arcs that FOLLOW the rim (concentric, thin, low-alpha warm) — reads as a raked bowl
-    // that blends into the sand, unlike the old full-width near-white bars.
+    detail.push({ t: 'glow', c: litC, r: half * 1.4, col: hexAlpha(sp.rim, 0.4) });
+    // Subtle rake arcs that FOLLOW the rim (concentric, thin, low-alpha) — reads as a raked bowl that
+    // blends into the body, unlike the old full-width near-white bars. Warm-dark grooves on rust.
     if (art.stripes) {
       for (let i = 1; i <= 3; i++) {
-        detail.push({ t: 'poly', pts: offsetPoly(poly, half * 0.24 * i), fill: 'none', stroke: 'rgba(255,248,224,0.14)', sw: Math.max(0.6, scale * 0.32) });
+        detail.push({ t: 'poly', pts: offsetPoly(poly, half * 0.24 * i), fill: 'none', stroke: sp.rake, sw: Math.max(0.6, scale * 0.32) });
       }
     }
     out.push({ t: 'clip', clip: poly, children: detail });
@@ -433,6 +465,19 @@ function scatterLook(
   arch: BiomeArchetype,
 ): { base: string; highlight: string; facet1: string; facet2: string; faceted: boolean; glow?: string } {
   const faceted = kind === 'crystal' || kind === 'ice';
+  // Scrap Belt (GS-rusted-bunkers / grey-steel-scrap): the firm 'waste' flats are RIVETED STEEL
+  // PLATES, not pale beach sand — a brushed grey-steel body with a bright lit seam, so they read as
+  // salvaged hull plate laid on the rust (and give the corroded world a cool grey third colour beside
+  // the muted-teal fairway and rust rough). Non-faceted (a plate, not a gem). Render-only, no rng.
+  if (kind === 'waste' && arch === 'metal') {
+    return {
+      base: '#8b9099', // brushed steel plate
+      highlight: 'rgba(214,224,234,0.22)', // lit plate seam / rivet-line sheen
+      facet1: 'rgba(235,242,250,0.4)',
+      facet2: 'rgba(120,130,140,0.3)',
+      faceted: false,
+    };
+  }
   if (faceted && arch === 'inferno') {
     return {
       base: '#7a2a16', // charred obsidian body

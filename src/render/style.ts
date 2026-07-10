@@ -622,7 +622,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // GS-hazard-edges: a ravine/crevice cracks in sharp jagged teeth along both walls.
     for (const f of ravineHaz) prims.push(...styleRavine(projPoly(roughenHazardCached(f.poly, 'crevice'), proj), rng));
   }
-  prims.push(...styleSandFamily(sandPolys, art, proj.scale, rs.base));
+  prims.push(...styleSandFamily(sandPolys, art, proj.scale, rs.base, arch));
   if (!rainbow) {
     for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
     // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
