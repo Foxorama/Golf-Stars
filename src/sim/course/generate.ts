@@ -39,7 +39,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 21; // GS-ship-corridor: derelict plays straight constant-width ship hallways
+export const GENERATOR_VERSION = 22; // GS-ship-interior: wider ship corridors + acid-breach lost-ball penalties replace bunkers
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -79,7 +79,7 @@ const VOID_ISLAND_SCALE = 2.6;
  * cross-section: a passage you play DOWN, not an island you land ON. Balance-exempt world (a
  * deliberately brutal lost ship), so this is a look-and-feel choice, not a balance one.
  */
-const SHIP_CORRIDOR_SCALE = 1.25;
+const SHIP_CORRIDOR_SCALE = 1.6;
 
 /**
  * Island-hop completability (GS-cetus-gaps): the void carries between a lost-rough hole's pads must
@@ -1090,8 +1090,10 @@ function generateHole(
         placed = true;
       }
     }
-    if (!placed) {
-      // Couldn't find a fair spot for the penalty kind — a sand bunker is always fair.
+    if (!placed && !ship) {
+      // Couldn't find a fair spot for the penalty kind — a sand bunker is always fair. (The derelict
+      // has NO sand: an unplaceable greenside breach is simply omitted — its greenside danger comes
+      // from the sanctioned breach RING below + the shoulder breaches instead.)
       hazards.push({ kind: 'bunker', poly: blobPoly(place(rng.range(0, Math.PI * 2)), r, 9, 0.2, rng) });
     }
   }
@@ -1176,6 +1178,31 @@ function generateHole(
     const lateral = fairwayHalfWidth + r * 0.3 + rng.range(0, 5);
     const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
     hazards.push({ kind: 'bunker', poly: blobPoly(c, r, 10, 0.22, rng) });
+  }
+
+  // SHIP DECK BREACHES (GS-ship-interior): the derelict's ONLY on-corridor hazard — acid has eaten
+  // holes clean through the hull deck, opening to the void (a `breach` = a +1 lost-ball drop). Placed
+  // in the corridor SHOULDER, OUT past the central fair lane (`half*0.5`) but INSIDE the bulkheads, so
+  // a sensible centred shot is always clean yet a shot drifting toward a wall can fall through and be
+  // lost — the "be careful" the walled ship otherwise lacks. Reachable (unlike a flanking penalty
+  // BEYOND the wall). Every vertex is proven clear of the central lane before it's kept (a strict
+  // mirror of `validateFairness`, padded), so `generateCourse` never throws. Ship-only + gated → every
+  // other world byte-identical; the wider corridor (SHIP_CORRIDOR_SCALE) gives the shoulder real room.
+  if (ship && !islandPar3) {
+    const nBreach = Math.round(1 + wildness * 2.5);
+    const fairHalf = fairwayHalfWidth * 0.55; // stricter than the validator's half*0.5 → safe margin
+    for (let i = 0; i < nBreach; i++) {
+      const t = rng.range(0.26, 0.86);
+      const side = rng.bool() ? 1 : -1;
+      const r = rng.range(3.5, Math.max(4, fairwayHalfWidth * 0.15));
+      const along = centrePoint(centreline, t);
+      const perp = perpAt(centreline, t);
+      const lateral = fairwayHalfWidth * 0.62 + rng.range(0, fairwayHalfWidth * 0.22);
+      const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+      const poly = blobPoly(c, r, 10, 0.2, rng);
+      const fair = poly.every((p) => polylineDist(p, centreline) > fairHalf + 1 || segDist(p, tee, green) > fairHalf + 1);
+      if (fair) hazards.push({ kind: 'breach', poly });
+    }
   }
 
   // Impact CRATERS (desert signature, GS-mechanics): big round sand bunkers pocking the landing
@@ -1462,7 +1489,11 @@ function generateHole(
     : biome.hazardKinds.includes('water')
       ? 'water'
       : biome.hazardKinds.find((k) => lieInfo(k).penalty);
-  if (noCrossing && !islandPar3 && ringKind && rng.float() < 0.34 + wildness * 0.3) {
+  // Ship gate (GS-ship-interior): a greenside breach ring only makes sense on a CALM derelict hole,
+  // where off-green is solid deck for the breach to sit in — on a LOST (island-pad) hole the ring
+  // would float breaches out in the open space around the green, and off-deck is already lost anyway.
+  const ringAllowed = !ship || !lostRough;
+  if (noCrossing && !islandPar3 && ringAllowed && ringKind && rng.float() < 0.34 + wildness * 0.3) {
     const appFrom = centrePoint(centreline, 0.84);
     let adx = green[0] - appFrom[0];
     let ady = green[1] - appFrom[1];

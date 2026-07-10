@@ -94,7 +94,9 @@ export function styleTornHull(platforms: readonly Vec[][], proj: Projector): Pri
       const a = poly[i]!;
       const b = poly[(i + 1) % poly.length]!;
       const edgeLen = dist(a, b);
-      const teeth = Math.min(4, Math.floor(edgeLen / 7)); // spaced by course length
+      // Sparse now (the jagged silhouette carries the torn read): a few sharp shards + cyan sparks as
+      // accent, not a dense fringe. Spaced wide so it doesn't fuzz up the already-jagged outline.
+      const teeth = Math.min(2, Math.floor(edgeLen / 18)); // spaced by course length
       for (let k = 1; k <= teeth; k++) {
         const t = (k - posHash(a[0], a[1], k) * 0.5) / (teeth + 1);
         const base: Vec = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];

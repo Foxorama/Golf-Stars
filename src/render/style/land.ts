@@ -92,6 +92,24 @@ export function mergedHazardsFor(hole: Hole): { sand: Vec[][]; water: Vec[][]; l
   return out;
 }
 
+/** The derelict world's BREACHES (GS-ship-interior): acid-etched holes eaten through the deck to
+ *  space — `breach` HAZARDS (a lost-ball penalty), union-merged so touching pits fuse into one. Also
+ *  folds any `bunker`/`pot`/`sand` (a rare fair-placement fallback) so a stray sand body still reads
+ *  as a breach, never a beach. (`waste` scatter is a FEATURE → a steel deck plate, handled
+ *  separately.) Course space, cached per hole (camera-proof body counts). */
+const derelictBreachCache = new WeakMap<Hole, Vec[][]>();
+export function derelictBreachesFor(hole: Hole): Vec[][] {
+  const hit = derelictBreachCache.get(hole);
+  if (hit) return hit;
+  const breaches: Vec[][] = [];
+  for (const f of hole.hazards) {
+    if (f.kind === 'breach' || f.kind === 'bunker' || f.kind === 'pot' || f.kind === 'sand') breaches.push(f.poly);
+  }
+  const out = unionPolys(breaches);
+  derelictBreachCache.set(hole, out);
+  return out;
+}
+
 /**
  * The hole's full LAND footprint in COURSE space (GS-rough-frame) — the single source `buildScene`
  * draws AND the play view's animated weather layer masks its twinkle starfield with, so the pinned

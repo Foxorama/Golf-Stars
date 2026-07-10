@@ -520,12 +520,12 @@ export const BIOMES: readonly Biome[] = [
     windBase: 0, // a sealed, dead ship — no wind aboard
     windWild: 3,
     hazardKinds: ['void'], // the gaps between hull sections are open space (a lost-rough world strips these on armed holes)
-    greensideKind: 'bunker', // hull-breach sand-drifts ring the calm-stop greens
+    greensideKind: 'breach', // GS-ship-interior: acid-etched deck BREACHES (lost-ball penalty) ring the greens, not sand
     scatter: [{ kind: 'waste', freqPerHole: 1.0, rMin: 6, rMax: 12 }], // firm riveted deck plates run true
     fairwayWidthMult: 0.95, // ship corridors (the island scale widens the deep/wild pads fairly)
     doglegBias: 0.3, // the deck runs straighter than most worlds (sharp ship-corner turns arrive in GS-ship-feel)
     treeDensity: 0, // nothing grows aboard a dead ship
-    fairwayBunkers: 0.4, // the odd hull-breach sand-drift
+    fairwayBunkers: 0, // GS-ship-interior: no sand — corridor danger is acid deck BREACHES, placed in a dedicated ship block
     lostRough: 'shiprough', // signature: off the deck is lost to open space
     walls: true, // signature: metal corridor walls bounce a low ball back onto the deck (GS-ship-walls)
     sharpCorners: true, // signature: the corridor bends at angular ship-hallway corners, not smooth curves (GS-ship-feel)
