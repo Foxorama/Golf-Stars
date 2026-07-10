@@ -93,61 +93,77 @@ function navLight(ctx: CanvasRenderingContext2D, x: number, y: number, col: stri
   }
 }
 
-/** The command BRIDGE of the Starlit Wanderer: an elongated hull nose, a raised bridge tower with a lit
- *  viewport, TWO rows of cabin windows down the flanks, red/green nav lights, a torn aft with a dying
- *  engine ember — a detailed little ship, with the name sprayed along the port hull. */
+/** The command BRIDGE section of the Starlit Wanderer, torn off the ship: a wide, blunt command PROW
+ *  (up-frame) crowned by a raised bridge tower with a bright wraparound VIEWPORT — the unmistakable
+ *  "bridge" cue — tapering back to a jaggedly TORN stern (down-frame) where it was ripped free. A single
+ *  row of cabin windows runs the STARBOARD flank; the battered PORT flank wears the ship's name. */
 function drawBridge(ctx: CanvasRenderingContext2D, t: number, s: number, name?: string): void {
   const blink = Math.floor(t * 1.2) % 2 === 0;
-  // Main fuselage: a pointed nose (up-frame) down to a torn aft (down-frame, jagged).
+  // Hull outline: blunt command prow at top, tapering to a torn/jagged stern at the bottom.
   const body: [number, number][] = [
-    [0, -1.2], [0.2, -0.95], [0.3, -0.4], [0.32, 0.4], [0.26, 0.72],
-    [0.12, 0.6], [0.04, 0.86], [-0.06, 0.62], [-0.2, 0.78], [-0.28, 0.42],
-    [-0.32, 0.4], [-0.3, -0.4], [-0.2, -0.95],
+    [-0.30, -0.62], [-0.20, -0.86], [0.20, -0.86], [0.30, -0.62],
+    [0.38, 0.08], [0.35, 0.54], [0.17, 0.40], [0.07, 0.66],
+    [-0.05, 0.38], [-0.22, 0.62], [-0.37, 0.38], [-0.39, 0.08],
   ];
   tornPoly(ctx, body, HULL, RIM, 1.6, s);
-  // A lit dorsal spine plate down the centre (volume).
-  tornPoly(ctx, [[-0.12, -0.9], [0.12, -0.9], [0.16, 0.4], [-0.16, 0.4]], HULL_LIT, 'rgba(150,180,210,0.35)', 0.8, s);
-  // The raised BRIDGE TOWER near the nose, with a bright wraparound viewport band.
-  tornPoly(ctx, [[-0.2, -0.86], [0.2, -0.86], [0.15, -0.5], [-0.15, -0.5]], HULL_LIT, RIM, 1.2, s);
-  ctx.fillStyle = WIN;
-  ctx.fillRect(-0.17, -0.8, 0.34, 0.055); // the main bridge window
-  ctx.fillStyle = 'rgba(200,245,255,0.9)';
-  ctx.fillRect(-0.17, -0.8, 0.34, 0.02); // a hot upper glint on the glass
-  // TWO rows of cabin windows down each flank (some dead) — the detail that says "ship".
-  for (let r = 0; r < 2; r++) {
-    const wx = 0.15 + r * 0.07;
-    for (let i = 0; i < 9; i++) {
-      const y = -0.36 + i * 0.11;
-      const dead = ((i * 3 + r * 5 + Math.floor(t * 1.5)) % 6) === 0;
-      ctx.fillStyle = dead ? WIN_DEAD : WIN;
-      ctx.fillRect(-wx - 0.017, y, 0.034, 0.045); // port
-      ctx.fillRect(wx - 0.017, y, 0.034, 0.045); // starboard
-    }
+  // A sunken inner DECK recess so the bridge tower reads raised off a floor you'd stand on.
+  tornPoly(ctx, [[-0.29, -0.52], [0.29, -0.52], [0.31, 0.18], [-0.31, 0.18]], HULL_DARK, SEAM, 0.7, s);
+  // Structural deck ribs across the section (volume + reads as a deck).
+  for (const y of [-0.30, -0.06, 0.16]) stroke(ctx, -0.32, y, 0.32, y, SEAM, 0.7, s);
+  // A lit gantry catwalk down the deck centreline.
+  tornPoly(ctx, [[-0.045, -0.5], [0.045, -0.5], [0.07, 0.16], [-0.07, 0.16]], HULL_LIT, 'rgba(150,180,210,0.35)', 0.7, s);
+
+  // ── The raised BRIDGE TOWER at the prow, capped by a wraparound VIEWPORT band of lit panes.
+  tornPoly(ctx, [[-0.235, -0.84], [0.235, -0.84], [0.18, -0.46], [-0.18, -0.46]], HULL_LIT, RIM, 1.3, s);
+  const vy = -0.80, vh = 0.115, vx = -0.205, vw = 0.41;
+  ctx.fillStyle = 'rgba(8,14,20,0.96)'; // the dark window recess
+  ctx.fillRect(vx, vy, vw, vh);
+  const panes = 7;
+  const pw = vw / panes;
+  for (let i = 0; i < panes; i++) {
+    const dead = ((i + Math.floor(t * 1.5)) % 8) === 0;
+    ctx.fillStyle = dead ? WIN_DEAD : WIN;
+    ctx.fillRect(vx + i * pw + 0.006, vy + 0.016, pw - 0.011, vh - 0.03);
   }
-  // Hull panel seams.
-  for (const y of [-0.4, 0, 0.34]) stroke(ctx, -0.31, y, 0.31, y, SEAM, 0.6, s);
-  // Antenna spars off the nose + a nose beacon.
-  for (const [dx, len] of [[-0.05, 0.34], [0.05, 0.24]] as [number, number][]) stroke(ctx, dx, -1.16, dx + 0.02, -1.16 - len, RIM_DIM, 0.7, s);
+  ctx.fillStyle = 'rgba(210,248,255,0.9)'; // hot glint along the top of the glass
+  ctx.fillRect(vx, vy + 0.01, vw, 0.013);
+  // Cabin windows down the STARBOARD flank only (a clean single row — the port flank is for the name).
+  for (let i = 0; i < 7; i++) {
+    const y = -0.30 + i * 0.10;
+    const dead = ((i * 2 + Math.floor(t * 1.5)) % 6) === 0;
+    ctx.fillStyle = dead ? WIN_DEAD : WIN;
+    ctx.fillRect(0.245, y, 0.05, 0.05);
+  }
+  // Antenna mast + sensor dish off the prow, with a red beacon at the tip.
+  stroke(ctx, 0.0, -0.85, 0.02, -1.12, RIM_DIM, 0.8, s);
+  stroke(ctx, -0.13, -0.7, -0.24, -0.86, RIM_DIM, 0.7, s);
+  ctx.strokeStyle = RIM_DIM; ctx.lineWidth = 0.7 / s;
+  ctx.beginPath(); ctx.arc(-0.26, -0.9, 0.05, Math.PI * 0.1, Math.PI * 1.1); ctx.stroke();
   ctx.fillStyle = NAV_R;
-  ctx.beginPath(); ctx.arc(0.05, -1.34, 0.02, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0.02, -1.14, 0.02, 0, Math.PI * 2); ctx.fill();
   // Port/starboard nav lights (red left, green right) blinking out of phase.
-  navLight(ctx, -0.32, -0.1, NAV_R, blink);
-  navLight(ctx, 0.32, -0.1, NAV_G, !blink);
-  // A dying engine ember + spark at the torn aft.
-  const eg = ctx.createRadialGradient(0, 0.7, 0, 0, 0.7, 0.16);
-  eg.addColorStop(0, `rgba(255,150,60,${(0.4 + 0.2 * Math.sin(t * 4)).toFixed(2)})`);
+  navLight(ctx, -0.34, -0.36, NAV_R, blink);
+  navLight(ctx, 0.34, -0.36, NAV_G, !blink);
+
+  // ── Torn stern: exposed structural ribs, a dying reactor ember + spark where it was severed.
+  for (const rx of [-0.16, 0.0, 0.16]) stroke(ctx, rx, 0.30, rx + (rx > 0 ? 0.03 : -0.03), 0.6, HULL_DARK, 1.2, s);
+  const eg = ctx.createRadialGradient(-0.02, 0.5, 0, -0.02, 0.5, 0.2);
+  eg.addColorStop(0, `rgba(255,150,60,${(0.42 + 0.22 * Math.sin(t * 4)).toFixed(2)})`);
   eg.addColorStop(1, 'rgba(255,120,40,0)');
   ctx.fillStyle = eg;
-  ctx.beginPath(); ctx.arc(0, 0.7, 0.16, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-0.02, 0.5, 0.2, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = SPARK;
-  ctx.beginPath(); ctx.arc(-0.14, 0.66, 0.014 + 0.008 * Math.sin(t * 6), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0.12, 0.46, 0.014 + 0.008 * Math.sin(t * 6), 0, Math.PI * 2); ctx.fill();
+
   if (name) sprayName(ctx, name, body, s);
 }
 
-/** The ship name in HYPER-COLOURED spray paint up the port hull — CLIPPED to the fuselage so it sits on
- *  the metal (not a decal floating over the edge) and WEATHERED so it fits the wreck: faded, flaking off
- *  in chips that reveal bare hull, scratched, with a couple of letters half-gone. Deterministic wear (no
- *  rng, no time) so it doesn't shimmer. Still legible — just old. */
+/** The ship name in HYPER-COLOURED spray paint running the length of the battered PORT flank — the
+ *  broken, damaged side. CLIPPED to the hull so it sits on the metal (not a decal floating over the
+ *  edge), aligned to the long axis so it reads as hull lettering, and WEATHERED so it fits the wreck:
+ *  a dark under-shadow for punch against the busy hull, faded rainbow paint, chips flaked off to bare
+ *  metal, scratches, and a heavier burn toward the torn stern where the last letters are half-gone.
+ *  Deterministic wear (no rng, no time) so it never shimmers. Still legible — just old. */
 function sprayName(ctx: CanvasRenderingContext2D, name: string, body: [number, number][], s: number): void {
   ctx.save();
   // Clip to the hull: paint only shows where there's metal under it.
@@ -155,53 +171,60 @@ function sprayName(ctx: CanvasRenderingContext2D, name: string, body: [number, n
   body.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
   ctx.closePath();
   ctx.clip();
-  ctx.translate(-0.22, 0.52);
-  ctx.rotate(-1.4);
-  const h = 0.15; // cap height in local units (scales with the piece)
-  ctx.font = `900 ${h}px "Arial Black", system-ui, sans-serif`;
+  // Anchor near the torn stern on the PORT flank, rotate so the text reads UP the hull toward the prow,
+  // parallel to the long axis (upright hull letters, not a diagonal scrawl).
+  ctx.translate(-0.325, 0.56);
+  ctx.rotate(-Math.PI / 2);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  const w = ctx.measureText(name).width;
+  // Size the cap height so the whole name fits the flank length, then re-measure.
+  const flank = 1.16;
+  let h = 0.16;
+  ctx.font = `900 ${h}px "Arial Black", system-ui, sans-serif`;
+  let w = ctx.measureText(name).width;
+  if (w > flank) { h *= flank / w; ctx.font = `900 ${h}px "Arial Black", system-ui, sans-serif`; w = ctx.measureText(name).width; }
   const grad = ctx.createLinearGradient(0, 0, w, 0);
   grad.addColorStop(0, '#ff3fb0');
   grad.addColorStop(0.4, '#8b5cff');
   grad.addColorStop(0.7, '#33e0ff');
   grad.addColorStop(1, '#ffe14a');
-  // A faint sprayed HALO behind (weathered paint bleeds into the hull), then the letters faded (old
-  // paint isn't fully opaque). Offset ghosts, not shadowBlur (which balloons under the ctx scale).
-  ctx.fillStyle = 'rgba(120,230,255,0.16)';
-  for (const [ox, oy] of [[-0.01, 0], [0.01, 0], [0, -0.01], [0, 0.01]] as [number, number][]) ctx.fillText(name, ox, oy);
-  ctx.globalAlpha *= 0.82; // faded
+  // A dark under-shadow (offset toward the light-away side) so the letters punch off the busy hull,
+  // then a faint sprayed halo, then the faded paint. Offset ghosts, never shadowBlur (balloons here).
+  ctx.fillStyle = 'rgba(4,8,12,0.55)';
+  ctx.fillText(name, 0.012, 0.012);
+  ctx.fillStyle = 'rgba(120,230,255,0.14)';
+  for (const [ox, oy] of [[-0.008, 0], [0.008, 0], [0, -0.008], [0, 0.008]] as [number, number][]) ctx.fillText(name, ox, oy);
+  ctx.globalAlpha *= 0.9; // lightly faded — legibility first, it's the hero element
   ctx.fillStyle = grad;
   ctx.fillText(name, 0, 0);
-  ctx.globalAlpha /= 0.82;
-  // FLAKING: knock chips of paint OUT with the bare-hull colour, so the letters read as peeling. A
-  // fixed pseudo-scatter (index hash) keyed to the text box → stable, weathered, never shimmering.
+  ctx.globalAlpha /= 0.9;
+  // FLAKING: a few chips knocked out to bare hull so the paint reads as peeling — kept sparse so the
+  // name stays readable. Fixed pseudo-scatter (index hash) keyed to the text box → stable, no shimmer.
   ctx.fillStyle = HULL;
   const hash = (n: number) => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 12; i++) {
     const cx = hash(i + 1) * w;
-    const cy = (hash(i + 7) - 0.5) * h * 1.3;
-    const cw = h * (0.06 + hash(i + 3) * 0.16);
-    const ch = h * (0.1 + hash(i + 5) * 0.5);
+    const cy = (hash(i + 7) - 0.5) * h * 1.1;
+    const cw = h * (0.05 + hash(i + 3) * 0.12);
+    const ch = h * (0.08 + hash(i + 5) * 0.32);
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate((hash(i + 9) - 0.5) * 1.2);
+    ctx.rotate((hash(i + 9) - 0.5) * 1.1);
     ctx.fillRect(-cw / 2, -ch / 2, cw, ch);
     ctx.restore();
   }
   // A couple of deep SCRATCHES gouged across the paint (bare hull, thin).
   ctx.strokeStyle = HULL;
-  ctx.lineWidth = 1.4 / s;
-  for (const [x0, y0, x1, y1] of [[w * 0.18, -h * 0.7, w * 0.34, h * 0.7], [w * 0.62, -h * 0.6, w * 0.7, h * 0.65]] as [number, number, number, number][]) {
+  ctx.lineWidth = 1.3 / s;
+  for (const [x0, y0, x1, y1] of [[w * 0.2, -h * 0.7, w * 0.32, h * 0.7], [w * 0.66, -h * 0.6, w * 0.74, h * 0.65]] as [number, number, number, number][]) {
     ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
   }
-  // A heavier BURN/wear patch fading one end (the aft letters are more gone).
-  const burn = ctx.createLinearGradient(w * 0.72, 0, w, 0);
-  burn.addColorStop(0, 'rgba(26,32,40,0)');
-  burn.addColorStop(1, 'rgba(26,32,40,0.7)');
+  // A heavier BURN/wear patch fading the stern end (the last letters are more gone) — the damaged side.
+  const burn = ctx.createLinearGradient(w * 0.02, 0, w * -0.14, 0);
+  burn.addColorStop(0, 'rgba(20,26,34,0)');
+  burn.addColorStop(1, 'rgba(20,26,34,0.65)');
   ctx.fillStyle = burn;
-  ctx.fillRect(w * 0.72, -h, w * 0.3, h * 2);
+  ctx.fillRect(w * -0.16, -h, w * 0.2, h * 2);
   ctx.restore();
 }
 
