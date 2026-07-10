@@ -65,7 +65,7 @@ import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
 import {
   styleSandFamily,
   styleLiquidFamily,
-  WATER_LIQ,
+  waterLiqFor,
   LAVA_LIQ,
   WATER_KINDS,
   LAVA_KINDS,
@@ -626,7 +626,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   if (!rainbow) {
     for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
     // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
-    prims.push(...styleLiquidFamily(waterPolys, WATER_LIQ, rng, rs.base, proj.scale));
+    prims.push(...styleLiquidFamily(waterPolys, waterLiqFor(arch), rng, rs.base, proj.scale));
     prims.push(...styleLiquidFamily(lavaPolys, LAVA_LIQ, rng, rs.base, proj.scale));
     for (const f of treeHaz) prims.push(...styleFlora(f.poly, proj, rng, arch));
   }

@@ -267,6 +267,9 @@ interface LiquidPalette {
   flow: string; // lengthwise flow streaks (current / molten flow)
   glint: string; // sparkle on a still lake
   bank: string; // GS-inset: shadow the raised bank casts on the up-light shore
+  /** Emissive halo (rgba) bleeding OUTWARD past the shore — a luminous liquid glows onto the land
+   *  (the Toxic Mire's acid pools). Absent → an ordinary, non-glowing liquid (water/lava). */
+  glow?: string;
 }
 export const WATER_LIQ: LiquidPalette = {
   shore: WATER.shallow,
@@ -286,9 +289,35 @@ export const LAVA_LIQ: LiquidPalette = {
   glint: LAVA.core,
   bank: LAVA.bank,
 };
+/**
+ * TOXIC POOL (GS-toxic-pools) — the Toxic Mire's signature hazard. Its penalty water reskins as a
+ * vibrant, GLOWING acid pool in a hyper-acidic neon green→teal ramp: a caustic acid-lime shore, a
+ * neon-green body deepening to a still-luminous teal core (never a muddy dark centre, so it reads as
+ * chemical, not swamp water), bright acid current streaks + caustic glints, and an emissive neon
+ * HALO that bleeds onto the surrounding bog. Render-only — the sim still plays this as ordinary
+ * `water` penalty, so fairness/carry are untouched; it consumes the exact same rng draws as WATER_LIQ
+ * (the halo is a fixed, zero-rng prim), so every non-swamp world stays byte-identical.
+ */
+export const TOXIC_LIQ: LiquidPalette = {
+  shore: '#c6f542', // caustic acid-lime rim
+  base: '#26e06e', // neon toxic green body
+  mid: '#12c39a', // green→teal transition
+  deep: '#0aa7a0', // luminous deep teal core (stays bright — it glows, not muddies)
+  flow: 'rgba(210,255,150,0.42)', // bright acid current streaks
+  glint: 'rgba(225,255,180,0.85)', // caustic surface glints
+  bank: 'rgba(6,26,14,0.34)', // dark toxic shadow under the up-light bank
+  glow: 'rgba(96,255,150,0.30)', // emissive neon halo bleeding onto the mire
+};
 
 export const WATER_KINDS = new Set(['water', 'frozenpond', 'creek']);
 export const LAVA_KINDS = new Set(['lava', 'lavariver']);
+
+/** The water-liquid palette for a world (GS-toxic-pools): the Toxic Mire (swamp) draws GLOWING neon
+ *  acid pools; every other world keeps the ordinary blue water. Lava is per-kind (`LAVA_LIQ`), never
+ *  per-world, so it isn't routed through here. */
+export function waterLiqFor(arch: BiomeArchetype): LiquidPalette {
+  return arch === 'swamp' ? TOXIC_LIQ : WATER_LIQ;
+}
 
 /**
  * Draw a whole FAMILY of same-liquid penalty bodies (all the water, or all the lava on a hole) in
@@ -311,6 +340,18 @@ export function styleLiquidFamily(polys: Vec[][], lp: LiquidPalette, rng: () => 
   // like the fairway collar instead of meeting the grass on a hard shore ring (the "no blending" tell).
   // Grouped UNDER every body, so a lake + its feeder creek share one continuous margin with no seam.
   const margin = mixHex(land, lp.shore, 0.42);
+  // GS-toxic-pools: a luminous liquid (the acid pool) casts an emissive halo that bleeds OUTWARD past
+  // the shore onto the land — pushed UNDER every body so it only reads in the ring beyond the pool
+  // edge (a glow from within). Fixed prim, ZERO rng, so the seeded flow/glint draws below are
+  // untouched and a non-glowing liquid (water/lava, no `lp.glow`) is byte-identical.
+  if (lp.glow) {
+    for (const poly of polys) {
+      const c = centroidOf(poly);
+      let r = 0;
+      for (const p of poly) r += dist(p, c);
+      out.push({ t: 'glow', c, r: (r / poly.length) * 1.7, col: lp.glow });
+    }
+  }
   for (const poly of polys) out.push({ t: 'poly', pts: offsetPoly(poly, -5.5), fill: margin });
   // GS-inset-2: no drop shadow on the turf — water/lava sits SUNK below its bank, it doesn't float
   // proud of the land. The sunk read comes from the inset bank emboss + depth rings below.
