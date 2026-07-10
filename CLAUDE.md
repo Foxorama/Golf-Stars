@@ -445,6 +445,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     flora variant must consume EXACTLY the classic two rng draws (extra variation via `posHash`).
   - The weather layer's pinned starfield masks off `landPolysCourseFor`; meteor strikes re-burn
     EXISTING scorch marks fed by the play view's LIVE projector (never the aim overlay's).
+  - The Cetus star-waterfall MOVES in the Canvas2D play view (GS-cetus-flow, `render/cetusFlow.ts`):
+    the play view sets `SceneOpts.animateCetus` to suppress the static `cetusRiver` and instead draws
+    a live flow over the scene — stars drift source→spill, curtain streaks fall, the splash churns —
+    on the SAME course-space channel `cetusRiverPath` emits. Motion rides the virtual clock (`now`),
+    ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical; PERF-neutral (geometry cached
+    at mount, per-frame = re-project a short polyline + ~90 capped particles, NO `buildScene` rebuild —
+    it replaces the equal static river the follow-cam rebuilt). Speed rides `_gsFeel.cetusFlowSpeed`.
   - The decision map's framing holds still for the whole shot decision; the shot animation starts
     at the decision map's exact `decisionRadius`. `playView`'s `spawnLandFX` answers the touchdown
     per lie/penalty — extend it with any new penalty kind.

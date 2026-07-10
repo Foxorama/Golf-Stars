@@ -23,7 +23,9 @@ import type { ApparelLook } from '../sim/rpg/apparel';
 import { mixHex } from './palette';
 import { holeProjector } from './project';
 import { buildScene, drawScenePrims, landPolysCourseFor, type Prim } from './style';
+import { artFeel } from './style/shared';
 import { createWeather, type WeatherHandle } from './weather';
+import { createCetusFlow } from './cetusFlow';
 import {
   drawCaddy,
   drawCaddyProjectile,
@@ -84,6 +86,9 @@ interface PlayFeel extends FlightFeel {
   spaceFX: boolean;
   /** Animated wind streaks drifting across the hole (GS-wind), themed + scaled by wind speed. */
   wind: boolean;
+  /** Flow rate of the moving Cetus star-waterfall (GS-cetus-flow) — multiplies the river drift +
+   *  curtain fall speed. 1 = default, 0 freezes it (a static river). Cetus-only; ignored elsewhere. */
+  cetusFlowSpeed: number;
   /**
    * DEMO/test hook (GS-caddy) — force a caddy-guard interception on EVERY shot so the boomerang/laser
    * throw can be watched on demand, instead of only on a rare right/left miss. '' = off (default, the
@@ -116,6 +121,7 @@ const BASE_FEEL: PlayFeel = {
   followMs: 440,
   spaceFX: true,
   wind: true,
+  cetusFlowSpeed: 1,
   forceRedirect: '',
 };
 
@@ -2019,11 +2025,19 @@ export function mountPlayView(
   // cell-shaded trees, OB, centreline, tee + flag) comes from the SAME shared scene builder
   // the SVG map uses, so the two renderers agree. Cache by projector identity: a whole-hole
   // fit builds once; follow-cam rebuilds the projector per frame, so the scene rebuilds too.
+  // The moving Cetus star-waterfall (GS-cetus-flow): on a Cetus hole the play view suppresses the
+  // scene's STATIC river (`animateCetus`) and draws the SAME channel geometry as a live, flowing
+  // waterfall over the scene (below). Cheap: it re-projects a short polyline + advances seeded
+  // particles per frame — no scene rebuild — so it doesn't chug the follow-cam. Absent elsewhere.
+  const isCetus = archetypeFor(opts.themeId, opts.biome ?? '') === 'cetus' && !opts.rainbow;
+  const cetusFlow = isCetus ? createCetusFlow(hole) : null;
+  const flowAccents = artFeel().accents;
+
   let cachedProj: typeof proj | null = null;
   let cachedScene: Prim[] = [];
   function drawStatic(): void {
     if (proj !== cachedProj) {
-      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch, groundPatch: opts.groundPatch });
+      cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch, groundPatch: opts.groundPatch, animateCetus: isCetus });
       cachedProj = proj;
     }
     drawScenePrims(ctx, cachedScene);
@@ -2124,6 +2138,9 @@ export function mountPlayView(
 
     drawStatic();
     weather.draw(ctx, now);
+    // The moving Cetus star-waterfall (GS-cetus-flow), over the scene + weather but UNDER the ball,
+    // FX and HUD (drawn later) so the ball still flies clearly over the river of stars.
+    cetusFlow?.draw(ctx, proj, now, flowAccents, F.cetusFlowSpeed);
 
     // A GUARD caddy stands in the bottom-left corner the whole hole (GS-caddy) — its muzzle anchor is
     // where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. Only guards

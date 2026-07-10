@@ -640,6 +640,23 @@
   brink line at the lip, streaks/droplets inside the curtain, mist + ripples at the foot. Same
   dedicated river stream; all draws stay unconditional (the `paint` gate only chooses pushes).
   `tests/cetus.test.ts`'s river sentinel colour updated (`rgba(60,150,205,0.7)`).
+- **The star-waterfall MOVES in the play view (GS-cetus-flow, `render/cetusFlow.ts`).** The static
+  `cetusRiver` (GS-cetus-7) is a printed decal — right for the SVG map, but a "starry waterfall"
+  should FLOW. So the animated Canvas2D play view suppresses the static river (`SceneOpts.animateCetus`,
+  set only by `playView`) and draws `createCetusFlow(hole)` over the scene instead: seeded star-motes
+  DRIFT source→spill down the channel (fading in at the spring, out over the lip), the curtain's
+  star-streaks FALL top→bottom, and the splash pool churns with expanding ripple rings. It reproduces
+  the EXACT course-space channel `cetusRiverPath` emits (same `0x00cef10e` seed) so the flow sits on
+  the same geometry the map prints; `fallLenFor` mirrors `platformCliffs`' cliff-height so the curtain
+  reaches the same foot. Layered over the scene + weather but UNDER the ball/FX/HUD (the ball still
+  flies clearly over it). **Determinism:** motion rides the play view's virtual clock (`now` ms), never
+  an rng draw — no seeded stream is touched, and `animateCetus` off (the SVG map + every test) is
+  byte-identical. **Perf** (the explicit worry — heavy cetus decor + follow-cam rebuilds): geometry is
+  a pure fn of the hole, computed ONCE at mount in course space; each frame only re-projects a 24-pt
+  polyline + advances ~90 capped particles — NO `buildScene` rebuild — and it REPLACES the equal-weight
+  static river the follow-cam used to rebuild each frame, so it's perf-neutral. Flow rate rides a
+  `_gsFeel.cetusFlowSpeed` sub-field (1 default, 0 freezes) — a feel tunable, no test-hub hook. Eyeball
+  with `scripts/cetus-flow-preview.mjs`.
 
 ## GS-rough-cover-2 + GS-egg: rough that reads as rough, and easter eggs to find (2026-07-03)
 

@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
 import { validateCourse } from '../src/sim/course/contract';
 import { renderHoleSVG } from '../src/render/holeView';
+import { buildScene } from '../src/render/style';
+import { holeProjector } from '../src/render/project';
+import { createCetusFlow } from '../src/render/cetusFlow';
 import { lieInfo, PEN_INFO } from '../src/sim/shot';
 import { archetypeBiome } from '../src/sim/course/themes';
 import { biomeById } from '../src/sim/course/biomes';
@@ -42,5 +45,29 @@ describe('Cetus — the star-ocean clifftop world (GS-cetus)', () => {
     expect(a).toContain(RIVER);
     // The SAME hole rendered as another world has no cetus decor (gated to arch === 'cetus').
     expect(renderHoleSVG(hole, { width: 320, height: 480, biome: 'verdant-station' })).not.toContain(RIVER);
+  });
+
+  it('suppresses the STATIC river for the animated play view, keeping the cliff (GS-cetus-flow)', () => {
+    const c = generateCourse(7, { biome: 'cetus-deep', holes: 4, wildness: 0.5 });
+    const hole = c.holes.find((h) => h.par >= 4) ?? c.holes[0]!;
+    const proj = holeProjector(hole, { width: 320, height: 480 });
+    const RIVER = 'rgba(60,150,205,0.7)'; // the star-river channel water
+    const CLIFF = 'rgba(150,232,255,0.9)'; // CETUS_CLIFF lit lip — the plateau extrusion stays either way
+    const base = JSON.stringify(buildScene(hole, proj, { width: 320, height: 480, biome: 'cetus-deep', themeId: 'cetus' }));
+    const anim = JSON.stringify(buildScene(hole, proj, { width: 320, height: 480, biome: 'cetus-deep', themeId: 'cetus', animateCetus: true }));
+    expect(base).toContain(RIVER); // default: static river present
+    expect(base).toContain(CLIFF);
+    expect(anim).not.toContain(RIVER); // animated: static river yielded to the moving overlay
+    expect(anim).toContain(CLIFF); // …but the clifftop plateau it pours over is still drawn
+  });
+
+  it('the moving-waterfall handle activates on a par 4/5 corridor, not a par-3 island (GS-cetus-flow)', () => {
+    const c = generateCourse(7, { biome: 'cetus-deep', holes: 4, wildness: 0.5 });
+    const long = c.holes.find((h) => h.par >= 4);
+    const par3 = c.holes.find((h) => h.par === 3);
+    if (long) expect(createCetusFlow(long).active).toBe(true);
+    if (par3) expect(createCetusFlow(par3).active).toBe(false);
+    // Deterministic: two handles off the same hole agree on activeness (geometry is a pure fn).
+    if (long) expect(createCetusFlow(long).active).toBe(createCetusFlow(long).active);
   });
 });

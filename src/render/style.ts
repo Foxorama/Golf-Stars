@@ -132,6 +132,11 @@ export interface SceneOpts {
    *  COURSE space from the SAME `effectPatches(hole, kind)` the sim reads (the graphic IS the
    *  physics). Baked at the app boundary from the course effect. */
   groundPatch?: PatchKind;
+  /** Suppress the STATIC Cetus star-river/waterfall (GS-cetus-flow) so the animated Canvas2D play view
+   *  can draw a MOVING one over the scene (`render/cetusFlow.ts`) instead. Default (undefined/false)
+   *  keeps the static river — the SVG map + every seeded test stay byte-identical. Set only by the
+   *  play view; pure decor either way (the sim never samples the river). */
+  animateCetus?: boolean;
 }
 /**
  * Build the full static scene for a hole as a flat list of screen-space prims, in paint order:
@@ -567,7 +572,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // --- 5b. The Cetus river of stars + its cliff waterfall (GS-cetus) ----------
   // The luminous star-river threads the rough beside the fairway and pours off the cliff into the
   // ocean. Gated to cetus + own `org` stream, drawn over the land but under the hazards/flag.
-  if (arch === 'cetus' && !rainbow) prims.push(...cetusRiver(hole, proj, art.accents, riverRng, cetusFaces, landPlatformsCourse));
+  // The static star-river is drawn UNLESS the play view has asked to animate it (GS-cetus-flow): then
+  // `cetusFlow.ts` re-draws the SAME channel geometry as a MOVING waterfall over the scene instead.
+  if (arch === 'cetus' && !rainbow && !opts.animateCetus) prims.push(...cetusRiver(hole, proj, art.accents, riverRng, cetusFaces, landPlatformsCourse));
 
   // --- 6. Hazards (drawn on top, per the layer rule) --------------------------
   // Draw order is layered so substances read correctly where they overlap (deep/wild holes pile
