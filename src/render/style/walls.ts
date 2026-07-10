@@ -11,18 +11,25 @@ import type { Projector } from '../project';
 import { type Prim, posHash } from './shared';
 
 const WALL = {
-  base: '#2a333c', // dark steel body
-  mid: '#47535e', // lit face
-  top: '#8fb0c0', // cold steel-lit cap
-  rivet: '#1a2028',
-  shadow: 'rgba(0,0,0,0.32)',
+  deckShadow: 'rgba(2,4,8,0.4)', // the wall's shadow thrown INWARD across the deck (corridor reads sunk)
+  outer: '#0c1015', // near-black outer edge against space
+  base: '#232b34', // dark steel body
+  mid: '#414d58', // lit steel face
+  top: '#9fc0d2', // cold steel-lit cap along the top of the bulkhead
+  buttress: 'rgba(6,10,15,0.6)', // structural rib buttressing the wall inward
+  rivet: '#12181e',
 };
 
-/** Draw the ship-corridor walls (course space → screen). Returns [] if the hole has none. */
+/**
+ * Draw the ship-corridor BULKHEADS (course space → screen). These are the tall metal walls that hem the
+ * corridor in — impassable in the sim (`sim/walls.ts`), so they're drawn with real presence: an inward
+ * cast SHADOW on the deck (the corridor reads sunk between walls), a thick dark steel BODY, a bright
+ * cold-steel lit CAP along the top, periodic structural BUTTRESS ribs, and rivets. Returns [] if none.
+ */
 export function styleShipWalls(walls: readonly ShipWall[] | undefined, proj: Projector): Prim[] {
   if (!walls || !walls.length) return [];
   const out: Prim[] = [];
-  const thick = Math.max(2.4, Math.min(9, 1.3 * proj.scale));
+  const thick = Math.max(3.4, Math.min(13, 1.9 * proj.scale));
   for (const w of walls) {
     const a = proj.project(w.a);
     const b = proj.project(w.b);
@@ -33,17 +40,33 @@ export function styleShipWalls(walls: readonly ShipWall[] | undefined, proj: Pro
     const il = Math.hypot(inx, iny) || 1;
     inx /= il;
     iny /= il;
-    // Outward shadow (a touch toward space), then the body, then the lit inward cap.
-    out.push({ t: 'line', a: [a[0] - inx * thick * 0.4, a[1] - iny * thick * 0.4], b: [b[0] - inx * thick * 0.4, b[1] - iny * thick * 0.4], stroke: WALL.shadow, sw: thick + 1.5, round: true });
-    out.push({ t: 'line', a, b, stroke: WALL.base, sw: thick + 1, round: true });
-    out.push({ t: 'line', a, b, stroke: WALL.mid, sw: thick, round: true });
-    out.push({ t: 'line', a: [a[0] + inx * thick * 0.32, a[1] + iny * thick * 0.32], b: [b[0] + inx * thick * 0.32, b[1] + iny * thick * 0.32], stroke: WALL.top, sw: Math.max(1, thick * 0.34), round: true });
-    // Rivets — spaced by COURSE length (camera-proof prim count).
+    const off = (d: number): [Vec, Vec] => [[a[0] + inx * d, a[1] + iny * d], [b[0] + inx * d, b[1] + iny * d]];
+    // 1) A soft shadow thrown INWARD onto the deck, so the corridor reads as a channel sunk between
+    //    towering bulkheads rather than a flat strip with an edge line.
+    const [s1, s2] = off(thick * 1.5);
+    out.push({ t: 'line', a: s1, b: s2, stroke: WALL.deckShadow, sw: thick * 2.2, round: true });
+    // 2) The bulkhead body: near-black outer edge (against space) → dark steel → lit steel face.
+    out.push({ t: 'line', a, b, stroke: WALL.outer, sw: thick + 2.5, round: true });
+    const [b1, b2] = off(thick * 0.2);
+    out.push({ t: 'line', a: b1, b: b2, stroke: WALL.base, sw: thick + 0.5, round: true });
+    const [m1, m2] = off(thick * 0.42);
+    out.push({ t: 'line', a: m1, b: m2, stroke: WALL.mid, sw: thick * 0.8, round: true });
+    // 3) The lit CAP along the top inner rim — the crest of the wall catching the cold starlight.
+    const [c1, c2] = off(thick * 0.72);
+    out.push({ t: 'line', a: c1, b: c2, stroke: WALL.top, sw: Math.max(1.1, thick * 0.3), round: true });
+    // 4) Structural BUTTRESS ribs + rivets — spaced by COURSE length (camera-proof prim count).
     const segLen = dist(w.a, w.b);
-    const rivets = Math.min(8, Math.max(1, Math.round(segLen / 4)));
+    const ribs = Math.min(7, Math.max(1, Math.round(segLen / 8)));
+    for (let k = 1; k <= ribs; k++) {
+      const t = k / (ribs + 1);
+      const px = a[0] + (b[0] - a[0]) * t;
+      const py = a[1] + (b[1] - a[1]) * t;
+      out.push({ t: 'line', a: [px, py], b: [px + inx * thick * 1.1, py + iny * thick * 1.1], stroke: WALL.buttress, sw: Math.max(1.4, thick * 0.34), round: true });
+    }
+    const rivets = Math.min(10, Math.max(1, Math.round(segLen / 4)));
     for (let k = 0; k <= rivets; k++) {
       const t = k / (rivets + 1);
-      out.push({ t: 'circle', c: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], r: Math.max(0.7, thick * 0.16), fill: WALL.rivet });
+      out.push({ t: 'circle', c: [a[0] + (b[0] - a[0]) * t + inx * thick * 0.28, a[1] + (b[1] - a[1]) * t + iny * thick * 0.28], r: Math.max(0.7, thick * 0.15), fill: WALL.rivet });
     }
   }
   return out;
