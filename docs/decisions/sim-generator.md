@@ -450,16 +450,19 @@
   the cone's distance labels read true. They only ever tighten distance → never lower scoring (guarded).
 - **Per-CATEGORY distance control (GS-proshop-distance-items).** Four Pro Shop items each raise the min
   carry of ONE club FAMILY toward its max — resolved by `flightClassOf` (driver/wood/hybrid/iron), so a
-  `carryControlFor(clubId, carry, opts)` call only tightens the matching family. They ride two new loadout
-  fields: `minCarryBoostByClass` (a `Partial<Record<FlightClass, number>>`, additive per family, folded via
-  `addFamilyMinCarry`) and `driverMaxCarryCut` (the Driver item's trade-off). **Woods/Hybrids/Irons** are
-  pure precision (rare / rare / epic, no downside). **Driver** (epic) gets the biggest boost (+0.18 min) but
-  PAYS: `driverMaxCarryCut` (0.06) shaves the top clamp (floored at `meanFrac`, so the mean carry holds —
-  you groove the distance, you give up some top-end bomb). All threaded IDENTICALLY through `resolveShot`
-  (the `maxCarryFracCut` clamp) and `shotSpread` (the previewed window), and through the auto sim
-  (`playHole`) + interactive driver (`takeShot`/`previewShot`) so auto ≡ interactive. Consume ZERO extra
-  rng (pure clamp-fraction tweaks) — feature-off is byte-for-byte, rebuilt from perk ids on resume (no save
-  bump). `tests/distance-items.test.ts` guards per-family isolation, the driver trade-off, and contract 4.
+  `carryControlFor(clubId, carry, opts)` call only tightens the matching family (via new loadout field
+  `minCarryBoostByClass`, a `Partial<Record<FlightClass, number>>`, additive per family, folded by
+  `addFamilyMinCarry`). **Woods/Hybrids/Irons** are pure precision (rare / rare / epic, no downside).
+  **Driver** (epic) keeps its MAX carry (average even rises) but pays a different trade-off: a `driverPowerFloor`
+  (0.84) remaps the driver's POWER gesture into `[floor·full, full]` — 1% power lands at the raised min carry,
+  full power at the max — so the driver can no longer be dialed SHORT (club down to lay up around a hazard or
+  on a short hole). The floor is a POWER remap (`driverPowerFloorRemap`), NOT a carry-window clamp, applied
+  in `resolveShot` (the intended-carry) and `shotSpread` (the previewed cone) — and in `executeShot`'s
+  upwind aim so the aim matches the floored carry. Interactive-only in effect (the auto sim plays full
+  swings → remap no-op; power 1 and every non-driver are byte-for-byte). All threaded IDENTICALLY through
+  the auto sim (`playHole`) + interactive driver (`takeShot`/`previewShot`) so auto ≡ interactive; ZERO
+  extra rng, rebuilt from perk ids on resume (no save bump). `tests/distance-items.test.ts` guards per-family
+  isolation, the driver power-floor (max held, low-power can't dial short), and contract 4.
 - **Interactive suggested club = GREEN COVERAGE (`suggestPlayerClub`, GS-mechanics #6).** The player's
   🎯 suggestion is NOT the auto `aiClub` (shortest-that-reaches, tuned for balance — leave it alone):
   green unreachable → longest usable club; reachable → the LONGEST club whose **EXPECTED** carry still

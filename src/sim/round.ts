@@ -16,6 +16,7 @@ import {
   lieAt,
   lieInfo,
   reliedLie,
+  driverPowerFloorRemap,
   playsLike,
   playWind,
   PEN_INFO,
@@ -440,29 +441,24 @@ export interface CarryControlOpts {
    * tightens its own category. Absent = none.
    */
   minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
-  /** Driver-only trade-off (GS-proshop-distance-items): fraction shaved off the driver's TOP carry —
-   *  the negative that balances the driver control item's large min-carry boost. 0/undefined = none. */
-  driverMaxCarryCut?: number;
 }
 
 /** Resolve the per-club carry-window tweaks from the loadout-level controls + the club's family/carry.
  *  The wedge branch keys off the (learned) carry so it matches the existing behaviour byte-for-byte;
- *  the per-family boost + driver cut key off the club's `FlightClass` so each Pro Shop control item
- *  only touches its own category. */
+ *  the per-family boost keys off the club's `FlightClass` so each Pro Shop control item only touches its
+ *  own category. (The driver power-floor is a POWER remap, applied in `resolveShot`/`shotSpread`, not a
+ *  carry-window clamp — so it lives outside this function.) */
 export function carryControlFor(
   clubId: string,
   nominalCarry: number,
   opts: CarryControlOpts,
-): { minCarryFracBoost?: number; carryWindowTighten?: number; maxCarryFracCut?: number } {
+): { minCarryFracBoost?: number; carryWindowTighten?: number } {
   if (nominalCarry <= WEDGE_CONTROL_CARRY) {
     return opts.wedgeWindow ? { carryWindowTighten: opts.wedgeWindow } : {};
   }
   const cls = flightClassOf(clubId);
   const minBoost = (opts.minCarryBoost ?? 0) + (opts.minCarryBoostByClass?.[cls] ?? 0);
-  const out: { minCarryFracBoost?: number; maxCarryFracCut?: number } = {};
-  if (minBoost) out.minCarryFracBoost = minBoost;
-  if (cls === 'driver' && opts.driverMaxCarryCut) out.maxCarryFracCut = opts.driverMaxCarryCut;
-  return out;
+  return minBoost ? { minCarryFracBoost: minBoost } : {};
 }
 
 /** A single putt's roll on the green, for the play view to animate (flat, no arc). */
@@ -518,8 +514,9 @@ export interface PlayHoleOptions {
   wedgeWindow?: number;
   /** Per-family min-carry boost (GS-proshop-distance-items): Driver/Woods/Hybrids/Irons control items. */
   minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
-  /** Driver control trade-off (GS-proshop-distance-items): shave the driver's top carry. */
-  driverMaxCarryCut?: number;
+  /** Driver power-floor (GS-proshop-distance-items): the driver's power gesture floors at this fraction
+   *  of full carry — the power range is [floor·full, full], so the driver can't be dialed short. */
+  driverPowerFloor?: number;
   /** Suggestible Sam's confidence shape boost (GS-caddy): applied when the AI happens to club the
    *  same club Sam would suggest, so auto-finish/headless play matches the interactive driver. */
   confidence?: ShapeMod;
@@ -1092,7 +1089,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       minCarryBoost: opts.minCarryBoost,
       wedgeWindow: opts.wedgeWindow,
       minCarryBoostByClass: opts.minCarryBoostByClass,
-      driverMaxCarryCut: opts.driverMaxCarryCut,
+      driverPowerFloor: opts.driverPowerFloor,
       guard: opts.guard,
       lieRelief: opts.lieRelief,
       chipIn: opts.chipIn,
@@ -1200,8 +1197,9 @@ export interface ExecOpts {
   wedgeWindow?: number;
   /** Per-family min-carry boost (GS-proshop-distance-items): Driver/Woods/Hybrids/Irons control items. */
   minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
-  /** Driver control trade-off (GS-proshop-distance-items): shave the driver's top carry. */
-  driverMaxCarryCut?: number;
+  /** Driver power-floor (GS-proshop-distance-items): the driver's power gesture floors at this fraction
+   *  of full carry — the power range is [floor·full, full], so the driver can't be dialed short. */
+  driverPowerFloor?: number;
   /** Named-caddy in-flight guard (GS-caddy): redirect a miss tail onto the fairway. */
   guard?: CaddyGuard;
   /** Escape-specialist caddy lie relief (GS-mux), 0..1: softens a bad lie's carry/spray penalty. */
@@ -1316,8 +1314,12 @@ export function executeShot(
   const power = opts.power ?? 1;
   const shotBearing = bearingDeg(from, target);
   // Wind compensation scales by the POWERED carry (a soft shot drifts less in the wind) so the
-  // upwind aim stays correct at any power. Power 1 leaves this byte-for-byte unchanged.
-  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult * power, opts.windResist);
+  // upwind aim stays correct at any power. The driver power-floor remap is applied here too so the
+  // aim matches the floored carry resolveShot will produce (a no-op at full power / non-driver /
+  // no floor, so byte-for-byte unchanged). `resolveShot` below re-derives it from the RAW power, so
+  // the floor is applied exactly once on each side.
+  const aimPower = driverPowerFloorRemap(power, opts.driverPowerFloor, flightClassOf(club.id) === 'driver');
+  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult * aimPower, opts.windResist);
   // Character per-club shape: keyed by the club's nominal carry (a hooky driver, striped irons,
   // back-spun wedges). `dispMult === 1` passes the original dispersionMult through UNTOUCHED so a
   // characterless shot stays byte-for-byte (undefined stays undefined, never `undefined * 1`).
@@ -1359,7 +1361,7 @@ export function executeShot(
     shape,
     minCarryFracBoost: cw.minCarryFracBoost,
     carryWindowTighten: cw.carryWindowTighten,
-    maxCarryFracCut: cw.maxCarryFracCut,
+    driverPowerFloor: opts.driverPowerFloor,
     guard: opts.guard,
     // Caddy-guard fairway test (GS-caddy): closes the guard over THIS hole so resolveShot stays
     // course-agnostic. Off the fairway = any lie that isn't fairway or green (rough/sand/void/water/…).
@@ -1610,8 +1612,9 @@ export function shotSpread(
     wedgeWindow?: number;
     /** Per-family min-carry boost (GS-proshop-distance-items): Driver/Woods/Hybrids/Irons control items. */
     minCarryBoostByClass?: Partial<Record<FlightClass, number>>;
-    /** Driver control trade-off (GS-proshop-distance-items): shave the driver's top carry. */
-    driverMaxCarryCut?: number;
+    /** Driver power-floor (GS-proshop-distance-items): floors the driver's power gesture so the previewed
+     *  cone reads the raised min carry at low power (the driver can't be dialed short). */
+    driverPowerFloor?: number;
     /** Sam's confidence shape boost — folded into the cone iff `club.id === suggestedClubId`. */
     confidence?: ShapeMod;
     suggestedClubId?: string;
@@ -1628,7 +1631,9 @@ export function shotSpread(
   } = {},
 ): ShotSpread {
   const carryMult = opts.carryMult ?? biomeCarryMult(hole);
-  const power = opts.power ?? 1;
+  // The driver power-floor (GS-proshop-distance-items) remaps the gesture into [floor, 1] so the previewed
+  // cone reads the raised min carry at low power — identical to resolveShot, so the cone stays true.
+  const power = driverPowerFloorRemap(opts.power ?? 1, opts.driverPowerFloor, flightClassOf(club.id) === 'driver');
   const li = lieInfo(lie);
   const relief = reliedLie(li, opts.lieRelief);
   const shotBearing = bearingDeg(from, target);
@@ -1647,7 +1652,6 @@ export function shotSpread(
   const cw = carryControlFor(club.id, nominal, opts);
   let lowFrac = prof.lowFrac;
   let highFrac = prof.highFrac;
-  if (cw.maxCarryFracCut) highFrac = Math.max(prof.meanFrac, highFrac - cw.maxCarryFracCut);
   if (cw.minCarryFracBoost) lowFrac = Math.min(highFrac, lowFrac + cw.minCarryFracBoost);
   if (cw.carryWindowTighten) {
     const t = Math.max(0, Math.min(1, cw.carryWindowTighten));

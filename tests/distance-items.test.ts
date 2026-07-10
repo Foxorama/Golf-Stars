@@ -15,22 +15,30 @@ import type { Vec } from '../src/sim/course/contract';
 /**
  * GS-proshop-distance-items — the four per-CATEGORY distance-control Pro Shop items. Each raises the
  * MIN carry of ONE club family toward its max (fewer weak, coming-up-short shots), category by
- * category. Woods/Hybrids/Irons are pure precision; the Driver gets the biggest boost but pays with a
- * shave off its top-end carry (a real trade-off, per the design).
+ * category. Woods/Hybrids/Irons are pure precision. The Driver keeps its MAX carry but its power
+ * gesture FLOORS at the raised min — you can't dial the driver short (switch clubs to lay up).
  */
 
 const ITEMS = ['distance-driver', 'distance-woods', 'distance-hybrids', 'distance-irons'];
 
 /** A shotSpread threading the loadout's per-family carry-control fields (mirrors the real play path). */
-function spread(hole: ReturnType<typeof generateCourse>['holes'][number], from: Vec, lie: string, clubId: string, perks: string[]) {
+function spread(
+  hole: ReturnType<typeof generateCourse>['holes'][number],
+  from: Vec,
+  lie: string,
+  clubId: string,
+  perks: string[],
+  power = 1,
+) {
   const lo = loadoutFromPerks(perks);
   const club = CLUBS.find((c) => c.id === clubId)!;
   return shotSpread(hole, from, lie as never, hole.green, club, {
     dispersionMult: netDispersion(lo),
+    power,
     minCarryBoost: lo.minCarryBoost,
     wedgeWindow: lo.wedgeWindow,
     minCarryBoostByClass: lo.minCarryBoostByClass,
-    driverMaxCarryCut: lo.driverMaxCarryCut,
+    driverPowerFloor: lo.driverPowerFloor,
   });
 }
 
@@ -43,16 +51,20 @@ describe('GS-proshop-distance-items — the four items resolve and fold their fi
     expect(loadoutFromPerks(['distance-irons']).minCarryBoostByClass).toEqual({ iron: 0.16 });
   });
 
-  it('only the Driver item carries the top-end trade-off', () => {
-    expect(loadoutFromPerks(['distance-driver']).driverMaxCarryCut).toBeCloseTo(0.06);
-    expect(loadoutFromPerks(['distance-woods']).driverMaxCarryCut).toBeUndefined();
-    expect(loadoutFromPerks(['distance-irons']).driverMaxCarryCut).toBeUndefined();
+  it('only the Driver item carries the power-floor trade-off', () => {
+    expect(loadoutFromPerks(['distance-driver']).driverPowerFloor).toBeCloseTo(0.84);
+    expect(loadoutFromPerks(['distance-woods']).driverPowerFloor).toBeUndefined();
+    expect(loadoutFromPerks(['distance-irons']).driverPowerFloor).toBeUndefined();
+  });
+
+  it('the Driver item is idempotent on a rebuild (the floor never stacks lower)', () => {
+    expect(loadoutFromPerks(['distance-driver', 'distance-driver']).driverPowerFloor).toBeCloseTo(0.84);
   });
 
   it('a base loadout carries none of the new fields (byte-for-byte default)', () => {
     const lo = startingLoadout();
     expect(lo.minCarryBoostByClass).toBeUndefined();
-    expect(lo.driverMaxCarryCut).toBeUndefined();
+    expect(lo.driverPowerFloor).toBeUndefined();
   });
 
   it('the four fold together onto one loadout without clobbering each other', () => {
@@ -95,25 +107,33 @@ describe('GS-proshop-distance-items — each item tightens ONLY its own family',
   });
 });
 
-describe('GS-proshop-distance-items — the Driver trade-off', () => {
+describe('GS-proshop-distance-items — the Driver power-floor trade-off', () => {
   const hole = generateCourse(4242).holes[0]!;
 
-  it('the Driver item raises the min carry AND shaves the max (the trade-off), only on the driver', () => {
-    const base = spread(hole, hole.tee, 'tee', 'D', []);
-    const boosted = spread(hole, hole.tee, 'tee', 'D', ['distance-driver']);
-    // Min carry jumps up (fewer weak drives)…
+  it('a FULL-power driver keeps its max carry and raises its min (no top-end cut)', () => {
+    const base = spread(hole, hole.tee, 'tee', 'D', [], 1);
+    const boosted = spread(hole, hole.tee, 'tee', 'D', ['distance-driver'], 1);
+    // Max carry is UNCHANGED (the old top-end shave is gone).
+    expect(boosted.carryHigh).toBeCloseTo(base.carryHigh, 6);
+    // Min carry rises (fewer weak drives).
     expect(boosted.carryLow).toBeGreaterThan(base.carryLow);
-    // …and the top end is shaved (the negative attribute).
-    expect(boosted.carryHigh).toBeLessThan(base.carryHigh);
-    // The window is genuinely tighter overall.
-    expect(boosted.carryHigh - boosted.carryLow).toBeLessThan(base.carryHigh - base.carryLow);
   });
 
-  it('the Woods item has NO top-end cut (pure precision, no trade-off)', () => {
-    const base = spread(hole, hole.tee, 'tee', '3W', []);
-    const boosted = spread(hole, hole.tee, 'tee', '3W', ['distance-woods']);
-    expect(boosted.carryHigh).toBeCloseTo(base.carryHigh, 6); // max untouched
-    expect(boosted.carryLow).toBeGreaterThan(base.carryLow); // only the floor rises
+  it('a LOW-power driver can no longer be dialed short — it floors near the full-power carry', () => {
+    // Base: 1% power gives a tiny carry (you CAN hit the driver short).
+    const base = spread(hole, hole.tee, 'tee', 'D', [], 0.01);
+    const boosted = spread(hole, hole.tee, 'tee', 'D', ['distance-driver'], 0.01);
+    // With the item, a 1% pull still carries a big fraction of a full driver — you can't lay up with it.
+    expect(boosted.expectedCarry).toBeGreaterThan(base.expectedCarry * 5);
+    const full = spread(hole, hole.tee, 'tee', 'D', ['distance-driver'], 1);
+    // 1% power lands within the [floor, full] band (≈ the floor), not near zero.
+    expect(boosted.expectedCarry).toBeGreaterThan(full.expectedCarry * 0.7);
+  });
+
+  it('the floor is DRIVER-only — a wood at low power still plays short', () => {
+    const woodBase = spread(hole, hole.tee, 'tee', '3W', [], 0.1);
+    const woodItem = spread(hole, hole.tee, 'tee', '3W', ['distance-driver'], 0.1);
+    expect(woodItem.expectedCarry).toBeCloseTo(woodBase.expectedCarry, 6); // the driver floor doesn't touch woods
   });
 });
 
@@ -130,7 +150,7 @@ function meanStableford(perks: string[], n = 250): number {
       minCarryBoost: lo.minCarryBoost,
       wedgeWindow: lo.wedgeWindow,
       minCarryBoostByClass: lo.minCarryBoostByClass,
-      driverMaxCarryCut: lo.driverMaxCarryCut,
+      driverPowerFloor: lo.driverPowerFloor,
     });
     sf += playTotals(played.map((p) => p.record)).stableford;
   }
@@ -139,7 +159,7 @@ function meanStableford(perks: string[], n = 250): number {
 
 describe('GS-proshop-distance-items — a power-up must not lower scoring (contract 4)', () => {
   const base = meanStableford([]);
-  it('no single item lowers mean per-stop Stableford — even the driver with its trade-off', () => {
+  it('no single item lowers mean per-stop Stableford (the driver keeps its max → average rises)', () => {
     for (const id of ITEMS) {
       expect(meanStableford([id]), id).toBeGreaterThanOrEqual(base - 0.2);
     }
