@@ -8,8 +8,8 @@ import { ARCHETYPE_TURF, ARCHETYPE_SPACE } from '../src/render/palette';
 import { zoneHeroSVG } from '../src/render/zoneHero';
 import { championFor } from '../src/sim/rpg/golfers';
 
-const NEW: BiomeArchetype[] = ['crystal', 'tempest', 'fungal', 'ocean', 'cetus'];
-const NEW_BIOMES = ['crystal-spires', 'tempest-reach', 'spore-jungle', 'tidal-archipelago', 'cetus-deep'];
+const NEW: BiomeArchetype[] = ['crystal', 'tempest', 'fungal', 'ocean', 'cetus', 'swamp', 'metal'];
+const NEW_BIOMES = ['crystal-spires', 'tempest-reach', 'spore-jungle', 'tidal-archipelago', 'cetus-deep', 'toxic-mire', 'scrap-belt'];
 
 function countKind(holes: Hole[], kind: string): number {
   return holes.reduce((n, h) => n + h.hazards.filter((z) => z.kind === kind).length + h.features.filter((f) => f.kind === kind).length, 0);

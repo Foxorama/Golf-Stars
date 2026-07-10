@@ -81,8 +81,14 @@ Foundations are shipped; these are the live follow-ons.
   rough: e.g. lift the plain-rough carry tax and/or wilds-spray so a miss actually costs a stroke of position,
   place heavy rough/hazard so the aggressive line is genuinely gated, and reward the fairway lie — measured on
   mean per-stop Stableford, contract 4. Do this WITH the reach-AI + starter-bag work above, not before it.
-- **GS-more-worlds** — metal/asteroid (low-grav scrap), neon/cyber grid, toxic/acid swamp, lightning-storm:
-  each a new archetype row + its 8 Record entries (the registry scales now).
+- **GS-more-worlds** — new exotic archetypes, each a new row + its ~14 Record entries (the registry scales).
+  SHIPPED (2 of 4): **Toxic Mire** (`swamp`/Hydra) — the HEAVIEST air in the galaxy (the ball flies short),
+  still + humid, acid bog everywhere; and **Scrap Belt** (`metal`/Antlia) — the lowest NON-abyss gravity
+  (big low-grav bombs + debris jitter) over a solid derelict-metal graveyard (craters + a hull-plate
+  chasm carry). They bracket the gravity spectrum (0.88 ↔ 1.32) with maximally-different visuals; both
+  clear the death-spiral + fairness harnesses. Remaining: **neon/cyber grid** and **lightning-storm**
+  (the latter overlaps Tempest — needs a distinct physical niche, e.g. static-charge scatter or a
+  chain-lightning hazard, or drop it). See `reports/new-worlds-swamp-metal-2026-07-10.md`.
 - **GS-hazard-vocab** — internal OB, railway-sleeper/bulkhead carom, chocolate-drop mounds, gorse.
 - **GS-weather-play** — deeper per-sky gameplay signatures beyond GS-journey-variety's wind hook.
   SHIPPED: meteor-strike scorch lies (GS-meteor-scorch); GS-journey-fx-2 — every effect now carries a

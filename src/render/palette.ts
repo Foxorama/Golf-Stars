@@ -42,6 +42,8 @@ export const BIOME_ROUGH: Record<string, string> = {
   'spore-jungle': '#3a6446',
   'tidal-archipelago': '#cfba85',
   'cetus-deep': '#1a3a50',
+  'toxic-mire': '#4a5a2c',
+  'scrap-belt': '#7a4a2c',
 };
 
 /** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
@@ -88,6 +90,8 @@ export const OB_LOOK: Record<BiomeArchetype, ObLook> = {
   fungal: { post: '#caa8e8', cap: '#7af0c0', line: 'rgba(150,240,190,0.14)', glow: 'rgba(120,240,190,0.32)' }, // glowing spore lamps
   ocean: { post: '#f4f4f4', cap: '#ff6a3c', line: 'rgba(244,244,244,0.16)' }, // channel buoys
   cetus: { post: '#bfe8f0', cap: '#5fd8dc', line: 'rgba(150,235,245,0.16)', beacon: 'rgba(120,230,240,0.42)' }, // luminous sea-marks adrift
+  swamp: { post: '#6a5a3a', cap: '#9fd84a', line: 'rgba(120,180,60,0.16)', glow: 'rgba(150,220,80,0.30)' }, // rotting bog-marker posts, sickly acid-lamp caps
+  metal: { post: '#8a5e3a', cap: '#ff8a2a', line: 'rgba(180,120,70,0.16)', glow: 'rgba(255,150,60,0.28)' }, // rusted girder posts with hazard-orange warning caps
   asgard: { post: '#e8d48a', cap: '#ffcf4a', line: 'rgba(232,212,138,0.18)', glow: 'rgba(255,210,110,0.34)' }, // gilded rune-pillars with a Bifröst-banner cap glow
 };
 
@@ -239,6 +243,26 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#3aa0aa',
     rough: { light: '#254c64', base: '#1a3a50', dark: '#112a3a', ink: '#061420' },
   },
+  // Swamp — SICKLY BOG: muddy chartreuse fairways and pale acid-green greens over a murky olive-brown
+  // muck rough (base mean ~69/255, comfortably clear of the near-black green-space base ~12/255 — the
+  // ≥30 rough-vs-space brightness gap the frame test enforces).
+  swamp: {
+    fairway: { light: '#7f9a42', base: '#6a8236', dark: '#506128', ink: '#26300f' },
+    green: { light: '#9ec857', base: '#83b040', dark: '#66902f', ink: '#2f4013' },
+    tee: { light: '#758c3c', base: '#5f7830', dark: '#4a5f26', ink: '#232e10' },
+    collar: '#6a8a34',
+    rough: { light: '#5a6c36', base: '#4a5a2c', dark: '#38461f', ink: '#1c2610' },
+  },
+  // Metal — SCRAP BELT: a verdigris/patina-green salvaged-turf fairway laid over the scrap, bright
+  // patina greens, and a bare RUSTED-IRON rough (base mean ~80/255, well clear of the near-black
+  // metallic space base ~10/255). The fairway-green over rust-rough contrast sells the machine graveyard.
+  metal: {
+    fairway: { light: '#52c49a', base: '#3f9e7e', dark: '#2f7a60', ink: '#164034' },
+    green: { light: '#6fe0b8', base: '#52d0a0', dark: '#3faf80', ink: '#175040' },
+    tee: { light: '#4a9e84', base: '#3f8a72', dark: '#316b58', ink: '#153029' },
+    collar: '#4aa88a',
+    rough: { light: '#96603a', base: '#7a4a2c', dark: '#5e381f', ink: '#301c10' },
+  },
   // Asgard — GILDED EMERALD: jewel-green fairways with a golden sheen, luminous emerald greens, a gold
   // apron collar. The rough is a rich gilded meadow (base mean ~75/255, comfortably clear of the deep
   // royal-indigo space base ~21/255 — the ≥30 rough-vs-space brightness gap the frame test enforces).
@@ -314,6 +338,12 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   // Cetus — the star-ocean: an abyssal blue-black sea, a bioluminescent cyan bloom, a glowing
   // cliff-shore where the plateau meets the deep (the surrounding void IS the ocean the whales swim).
   cetus: { base: '#020a12', nebula: 'rgba(70,190,225,0.13)', edge: 'rgba(120,230,240,0.22)' },
+  // Swamp — a fetid green-black gloom lit by a toxic-green miasma nebula, with a sickly chartreuse
+  // shore glow where the mire meets the murk.
+  swamp: { base: '#0b1206', nebula: 'rgba(120,180,60,0.12)', edge: 'rgba(160,205,90,0.18)' },
+  // Metal — a cold metallic near-black lit by a rust-orange scrap nebula, with a warm metallic-lit
+  // shore where the derelict plates meet the vacuum.
+  metal: { base: '#0c0a08', nebula: 'rgba(190,110,55,0.12)', edge: 'rgba(215,155,95,0.19)' },
   // Asgard — the Golden Realm: a royal indigo→violet twilight (deep base) with a violet nebula and a
   // warm GOLD horizon glow at the shore where the emerald fields meet the celestial sky.
   asgard: { base: '#0e0a26', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(255,205,90,0.24)' },
@@ -435,6 +465,8 @@ export const ACCENTS: Record<string, Accent> = {
   'spore-jungle': { flowers: ['#7af0c0', '#b07eff', '#ffe14a'], mote: '#9fffd0' },
   'tidal-archipelago': { flowers: ['#7fe6b8', '#ffe14a', '#ff9ab8'], mote: '#bfe8ff' },
   'cetus-deep': { flowers: ['#7af0ff', '#9fd8ff', '#c8fbff'], mote: '#bff4ff' },
+  'toxic-mire': { flowers: ['#9fd84a', '#c8e07a', '#7aa83a'], mote: '#c8e888' }, // sickly bog blooms
+  'scrap-belt': { flowers: ['#ff8a2a', '#ffbf6a', '#d98c4c'], mote: '#ffcf8a' }, // rust flecks & sparks
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };
 
