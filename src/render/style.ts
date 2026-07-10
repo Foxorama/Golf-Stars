@@ -59,7 +59,7 @@ import {
   fadeCol,
   n1,
 } from './style/shared';
-import { landHullCourse, lostPlatformsCourse, mergedHazardsFor } from './style/land';
+import { landHullCourse, lostPlatformsCourse, mergedHazardsFor, derelictBreachesFor } from './style/land';
 import { rainbowRibbon, styleFairways, styleTee } from './style/fairway';
 import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
 import {
@@ -77,7 +77,7 @@ import {
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
 import { styleShipWalls, styleTornHull } from './style/walls';
-import { styleShipDeck } from './style/ship';
+import { styleShipDeck, styleShipBreaches, styleShipPlates, styleShipInterior } from './style/ship';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
@@ -376,6 +376,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push(...biomeRelief(landPlatformsCourse, BIOME_RELIEF[arch], proj, art.texture));
   }
 
+  // --- 3d. Derelict SHIP INTERIOR beside the corridor (GS-ship-interior) --------
+  // Dress the grey platform flanking the mown hallway as the guts of a large ship — deck plating,
+  // bulkhead ribs, conduit runs, adjacent rooms/compartments with doorways + lower-level grates — so
+  // the derelict reads as being INSIDE a vessel, not a lone grey track. Drawn on the base UNDER the
+  // corridor deck + walls; clipped to the platforms (a room past the hull tear is sliced in
+  // cross-section). Pure geometry, zero rng; gated to the derelict so every other world is untouched.
+  if (arch === 'derelict' && !rainbow) prims.push(...styleShipInterior(hole, landPlatforms, proj));
+
   // --- 4. Land detail (tone, tufts, flowers, ground sparkle) — clipped to land -
   // The main `rng` is consumed here in the SAME order as before (patches → tufts → flowers) so the
   // downstream terrain/tree/water/lava draws that read off it stay byte-for-byte unchanged; only the
@@ -571,6 +579,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
     if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, arch, greenSlopeArt(hole, f.poly, proj)));
     else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
+    // The derelict's `waste`/`sand` scatter reads as an intact riveted steel DECK PLATE (a firm lie),
+    // NOT the default tan sand patch — a beach-sand flat on a steel hull was the odd "bunker" look.
+    else if (arch === 'derelict' && (f.kind === 'waste' || f.kind === 'sand')) prims.push(...styleShipPlates([f.poly], proj));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
   }
 
@@ -639,7 +650,16 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // GS-hazard-edges: a ravine/crevice cracks in sharp jagged teeth along both walls.
     for (const f of ravineHaz) prims.push(...styleRavine(projPoly(roughenHazardCached(f.poly, 'crevice'), proj), rng));
   }
-  prims.push(...styleSandFamily(sandPolys, art, proj.scale, rs.base, arch));
+  // The derelict reskins its "bunkers" (GS-ship-interior): bunker/pot hazards become ACID BREACHES
+  // eaten through the deck to space — a corroded ship reads nothing like a beach. Render-only (the
+  // sim still plays them as sand); gated to the derelict so every other world keeps its ordinary
+  // bunkers byte-for-byte. (`waste` scatter is a feature → steel deck plate, handled in the feature
+  // loop below.)
+  if (arch === 'derelict' && !rainbow) {
+    prims.push(...styleShipBreaches(derelictBreachesFor(hole), proj, proj.scale));
+  } else {
+    prims.push(...styleSandFamily(sandPolys, art, proj.scale, rs.base, arch));
+  }
   if (!rainbow) {
     for (const f of scatterHaz) prims.push(...styleScatter(f.kind, projPoly(f.poly, proj), art, arch));
     // Liquids ON TOP of sand so water/lava is never occluded by an overlapping sand body.
