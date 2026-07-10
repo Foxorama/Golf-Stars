@@ -191,7 +191,8 @@ export type TreeVoice =
   | 'scrub' // tempest wind-bent scrub — a whippy rustle
   | 'palm' // ocean palms — frond rustle + a coconut knock
   | 'stone' // cetus sea-stacks — a dense rock clack
-  | 'chime'; // asgard golden-leaf ash — a resonant golden bell/horn ring
+  | 'chime' // asgard golden-leaf ash — a resonant golden bell/horn ring
+  | 'clang'; // metal scrap masts/girders — a struck-metal clang with a reverberant ring
 
 export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
   verdant: 'wood',
@@ -204,6 +205,8 @@ export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
   fungal: 'squelch',
   ocean: 'palm',
   cetus: 'stone',
+  swamp: 'squelch', // dead sodden bog cypress — a wet blorp, like the mushrooms
+  metal: 'clang', // rusted scrap masts — a struck-metal clang
   asgard: 'chime', // the golden groves ring like a struck bell
 };
 
@@ -268,6 +271,13 @@ function treeSound(v: TreeVoice): void {
       tone(1567.98, 0.45, { type: 'sine', gain: 0.05, t: 0.02 }); // bright upper harmonic
       tone(392, 0.5, { type: 'sawtooth', gain: 0.05, t: 0.03, sweepTo: 523.25 }); // a warm horn swell beneath
       noise(0.03, { gain: 0.06, type: 'highpass', freq: 6000 }); // the metallic glint of the strike
+      break;
+    case 'clang':
+      // The ball rings off a hollow rusted girder — a hard metallic clang with a dissonant, decaying ring.
+      noise(0.02, { gain: 0.26, type: 'bandpass', freq: 1800, q: 1.4 }); // the sharp struck-metal CLANG
+      tone(320, 0.5, { type: 'square', gain: 0.1, sweepTo: 150 }); // hollow girder body ringing down
+      tone(523.25, 0.4, { type: 'triangle', gain: 0.06, t: 0.01 }); // a clashing overtone (dented metal)
+      noise(0.35, { gain: 0.06, type: 'bandpass', freq: 3200, q: 0.7, t: 0.04 }); // rattly scrap reverberation
       break;
   }
 }

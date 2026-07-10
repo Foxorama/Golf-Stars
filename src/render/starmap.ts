@@ -75,6 +75,9 @@ const BIOME_LOOK: Record<string, { col: string; glyph: string; family: SurfaceFa
   fungal: { col: '#54dba0', glyph: '🍄', family: 'lush' },
   ocean: { col: '#5fd49e', glyph: '🌊', family: 'lush' },
   cetus: { col: '#5fd8dc', glyph: '🐋', family: 'lush' },
+  swamp: { col: '#9fd84a', glyph: '☣️', family: 'lush' },
+  metal: { col: '#d98c4c', glyph: '🛰️', family: 'plain' },
+  asgard: { col: '#ffcf4a', glyph: '🌈', family: 'lush' },
 };
 type SurfaceFamily = 'lush' | 'arid' | 'icy' | 'molten' | 'gas' | 'plain';
 

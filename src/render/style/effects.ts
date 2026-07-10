@@ -358,6 +358,8 @@ const WIND_COL: Record<BiomeArchetype, string> = {
   fungal: 'rgba(150,240,190,', // drifting glowing spores
   ocean: 'rgba(190,235,230,', // sea spray
   cetus: 'rgba(150,235,245,', // luminous sea-spray off the deep
+  swamp: 'rgba(150,200,90,', // drifting toxic spores / miasma
+  metal: 'rgba(190,160,120,', // blown metal filings / scrap dust
   asgard: 'rgba(255,240,190,', // pale divine gold-white — drifting light off the Golden Realm
 };
 

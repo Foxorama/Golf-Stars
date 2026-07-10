@@ -49,6 +49,9 @@ export type BiomeArchetype =
   // clifftop is lost to the star-ocean (the void's island/abyss model, reskinned); a river of stars
   // pours off the cliffs as a waterfall where space whales surface.
   | 'cetus' // star-ocean clifftops — island plateaus over a starry sea, whales breaching below
+  // GS-more-worlds: two further exotic worlds bracketing the gravity spectrum, each a distinct PLAYSTYLE.
+  | 'swamp' // toxic mire — the HEAVIEST air in the galaxy (the ball flies short), still + humid, acid bog
+  | 'metal' // scrap belt — the lowest NON-abyss gravity (big bombs) over a solid derelict-metal graveyard
   // GS-asgard: the Golden Realm atop Yggdrasil, reached by the Bifröst — a GRAND, FAIR reward
   // world (opulent gilded emerald fields under a royal twilight). NOT a normal route destination:
   // reached only via a later tournament trigger, so no theme maps to it (weight 0 in `BIOMES`).
@@ -137,6 +140,8 @@ const ARCHETYPE_BIOME: Record<BiomeArchetype, string> = {
   fungal: 'spore-jungle',
   ocean: 'tidal-archipelago',
   cetus: 'cetus-deep',
+  swamp: 'toxic-mire',
+  metal: 'scrap-belt',
   asgard: 'asgard-realm',
 };
 
@@ -201,6 +206,8 @@ export const ARCHETYPE_AFFINITY: Record<BiomeArchetype, readonly string[]> = {
   fungal: ['economy', 'skill'], // lush, growthy — like verdant's cousin
   ocean: ['control', 'distance'], // carry the sea, flight the lagoons
   cetus: ['control', 'skill'], // hit the clifftop plateau or it's lost to the star-ocean — precision
+  swamp: ['control', 'putting'], // heavy air + acid everywhere — control the short flight, hole the boggy greens
+  metal: ['distance', 'control'], // low-grav bombs down a hazard-strewn belt — power tamed by control
   asgard: ['distance', 'skill'], // a grand reward world — big carries down wide fairways, rewarded striking
 };
 
@@ -344,6 +351,11 @@ const CONSTELLATIONS: readonly ConstRow[] = [
   { id: 'eridanus', name: 'Eridanus', abbr: 'Eri', rarity: 'common', stars: 9, archetype: 'ocean', anchor: 'Achernar', blurb: 'The great celestial River, pouring to the deep south.', flavour: { wind: 1.15, dogleg: 1.1 } },
   // cetus — the Whale's clifftop star-ocean (arc 2 via 7 stars)
   { id: 'cetus', name: 'Cetus', abbr: 'Cet', rarity: 'rare', stars: 7, archetype: 'cetus', anchor: 'Diphda', blurb: 'The Whale, sounding the deep star-ocean off the clifftops.', flavour: { wind: 1.05, scatter: 1.1 } },
+  // GS-more-worlds — the two spectrum-bracketing worlds, spread across the arcs by star count.
+  // swamp — Hydra, the great water-serpent, coiled through the toxic mire (arc 3 via 17 stars)
+  { id: 'hydra', name: 'Hydra', abbr: 'Hya', rarity: 'common', stars: 17, archetype: 'swamp', anchor: 'Alphard', blurb: 'The Water-Serpent, coiled through the acid mire — the heaviest air in the galaxy.', flavour: { wind: 0.8, dogleg: 1.2 } },
+  // metal — Antlia, the Air Pump, a derelict machine adrift in the scrap belt (arc 1 via 4 stars)
+  { id: 'antlia', name: 'Antlia', abbr: 'Ant', rarity: 'rare', stars: 4, archetype: 'metal', anchor: 'Alpha Antliae', blurb: 'The Air Pump — a machine long dead, drifting a belt of scrapped hulls and low gravity.', flavour: { carry: 1.04, scatter: 1.1 } },
 ];
 
 /** Deep-sky + naked-eye galaxy showpieces: rare destinations gated by rarity. */

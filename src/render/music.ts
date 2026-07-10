@@ -123,6 +123,18 @@ export const MUSIC_TRACKS: Record<MusicSceneId, MusicTrack> = {
     chords: [[0, 2, 4], [3, 5, 7], [4, 6, 8], [0, 2, 4]],
     padType: 'sawtooth', arpType: 'triangle', arpDensity: 0.16, bassDensity: 0.55, shimmer: 0.4, gain: 0.3,
   },
+  swamp: {
+    // A low, murky, unsettling drone — a dark phrygian pad breathing under sparse, sickly plucks.
+    name: 'Miasma', bpm: 60, root: 82.41, scale: PHRYGIAN,
+    chords: [[0, 2, 4], [1, 3, 5], [0, 2, 4], [1, 3, 5]],
+    padType: 'sawtooth', arpType: 'sine', arpDensity: 0.1, bassDensity: 0.5, shimmer: 0.08, gain: 0.24,
+  },
+  metal: {
+    // A gritty industrial pulse — a bluesy minor-pentatonic riff over a driving sawtooth, metallic pings.
+    name: 'Scrapyard Drift', bpm: 96, root: 116.54, scale: MIN_PENT,
+    chords: [[0, 2, 4], [3, 4, 0], [2, 4, 1], [0, 2, 4]],
+    padType: 'sawtooth', arpType: 'triangle', arpDensity: 0.26, bassDensity: 0.7, shimmer: 0.14, gain: 0.24,
+  },
 };
 
 // --- Engine state ------------------------------------------------------------------------------

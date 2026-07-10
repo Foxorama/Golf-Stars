@@ -59,6 +59,8 @@ export const PRO_LOOK: Record<BiomeArchetype, { cap: string; shirt: string; aura
   fungal: { cap: '#2fae82', shirt: '#7d46b8', aura: '#7af0c0', skin: '#d2b89c' },
   ocean: { cap: '#46b487', shirt: '#2f7faa', aura: '#7fe6b8', skin: '#e0c2a0' },
   cetus: { cap: '#3aa0aa', shirt: '#216578', aura: '#7af0ff', skin: '#dcc0a4' },
+  swamp: { cap: '#7a9a36', shirt: '#4a5f28', aura: '#9fd84a', skin: '#d2b89c' },
+  metal: { cap: '#c2702e', shirt: '#5a3a22', aura: '#ff8a3b', skin: '#d8a06a' },
   asgard: { cap: '#e8c65a', shirt: '#2f8b57', aura: '#ffe08a', skin: '#e7c9a4' },
 };
 

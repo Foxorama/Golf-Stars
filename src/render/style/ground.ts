@@ -121,6 +121,27 @@ export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
     sparkle: 'rgba(255,232,150,0.85)',
     tuft: { cols: ['#2f7a48', '#c9a84e'], style: 'blade' }, // emerald grass, gold-tipped
   },
+  // Swamp — a murky muck floor: dark tonal mottle, rotting-matter grain, and reed BLADE tufts, with a
+  // rare sickly acid glint. Denser so the mire reads as a wet, tangled bog rather than a flat slab.
+  swamp: {
+    mottleLight: 'rgba(150,200,90,0.09)',
+    mottleDark: 'rgba(8,16,4,0.24)',
+    grain: ['rgba(130,165,70,0.4)', 'rgba(28,36,14,0.55)'],
+    sparkle: 'rgba(180,230,90,0.7)', // an acid glint on the wet muck
+    tuft: { cols: ['#3a4a1e', '#6f8a3a'], style: 'blade' }, // marsh reeds
+    density: 1.4,
+  },
+  // Metal — a riveted scrap floor: rust mottle, plate-seam combing ridges, weld-spark glints and bent
+  // rebar SHARD tufts, so the bare rough reads as a field of oxidised hull-plate, not flat rust.
+  metal: {
+    mottleLight: 'rgba(255,180,120,0.10)',
+    mottleDark: 'rgba(18,10,4,0.26)',
+    grain: ['rgba(255,170,90,0.4)', 'rgba(30,18,10,0.55)'],
+    ridge: 'rgba(210,150,90,0.22)', // plate seams / weld lines
+    sparkle: 'rgba(255,200,120,0.85)', // weld sparks
+    tuft: { cols: ['#5a3a22', '#a86a3a'], style: 'shard' }, // bent rebar splinters
+    density: 1.4,
+  },
 };
 
 /**

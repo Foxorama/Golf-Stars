@@ -25,7 +25,7 @@ import { playTotals } from '../src/sim/score';
 import { playCourse } from '../src/sim/round';
 import { currentCourse, currentTheme, startRun } from '../src/sim/rpg/run';
 
-const ARCHETYPES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void', 'crystal', 'tempest', 'fungal', 'ocean', 'cetus'];
+const ARCHETYPES: BiomeArchetype[] = ['verdant', 'desert', 'frost', 'inferno', 'void', 'crystal', 'tempest', 'fungal', 'ocean', 'cetus', 'swamp', 'metal'];
 
 describe('theme table integrity', () => {
   it('every theme has a unique, stable id', () => {
@@ -68,11 +68,11 @@ describe('arc gating', () => {
     expect(arcForStars(STAR_ARC_BREAKS.arc3Min)).toBe(3);
   });
 
-  it('the 36 constellations split across the arcs (GS-worlds added the new exotic worlds)', () => {
+  it('the constellations split across the arcs (GS-more-worlds added Hydra + Antlia)', () => {
     const consts = THEMES.filter((t) => t.kind === 'constellation');
-    expect(consts.length).toBe(37);
+    expect(consts.length).toBe(39);
     const counts = [1, 2, 3].map((a) => consts.filter((t) => t.arc === a).length);
-    expect(counts).toEqual([13, 13, 11]);
+    expect(counts).toEqual([14, 13, 12]); // Antlia (4★) → arc 1, Hydra (17★) → arc 3
   });
 
   it('deep-sky/galaxy showpieces are gated to the later arcs (rare→2, epic→3)', () => {

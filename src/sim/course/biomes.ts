@@ -418,6 +418,76 @@ export const BIOMES: readonly Biome[] = [
     greenSlopeMax: 0.5, // GS-greens-3 green tilt character
     roughBreaks: 0.0, // GS-variety-2 broken-fairway frequency
   },
+  // --- GS-more-worlds: two exotic worlds bracketing the gravity spectrum ------
+  {
+    // Toxic Mire (Hydra) — the HEAVIEST air in the galaxy: the ball flies short, so this world plays
+    // the OPPOSITE end from the low-grav belts. Still, muggy, almost windless; acid bog everywhere
+    // (ordinary penalty `water`, reskinned sickly green in the render). The heavy air is FAIR by
+    // construction — `generate.ts` scales hole LENGTH by carryMult, so shorter holes keep every carry
+    // carry-relative (the auto-AI reaches exactly as it does elsewhere); the SIGNATURE is the murky,
+    // water-choked, dead-mangrove character, not an unfair reach. Reuses only proven-fair mechanics
+    // (a creek crossing + flanking ponds like verdant; a boggy `deeprough` cut, never `water`, so a
+    // dogleg is a hack-out and never a heavy-air forced carry). NOT a lost-rough world.
+    id: 'toxic-mire',
+    name: 'Toxic Mire',
+    weight: 9,
+    carryMult: 0.88, // signature: the densest, heaviest air — the ball flies SHORT (holes shrink to match)
+    carryJitter: 0,
+    windBase: 1, // still, humid, oppressive — the calmest windy world (the inverse of Tempest/Ocean)
+    windWild: 6,
+    hazardKinds: ['water'], // acid pools + mires (reskinned sickly green by the render)
+    greensideKind: 'water', // acid pools guard the greens
+    scatter: [],
+    fairwayWidthMult: 1.06, // a touch wider so the heavy air + water stays fair
+    doglegBias: 0.42, // the Water-Serpent's coils — winding corridors
+    treeDensity: 1.6, // dead mangroves / bog cypress line the mire
+    fairwayBunkers: 0.4, // the odd silt bank (a bog has little sand)
+    waterCreek: true, // signature: an acid channel crosses the fairway (forced carry)
+    deepRough: 'deeprough', // a boggy reed/bramble tangle chokes a cut corner (non-penalty hack-out)
+    ponds: 1.7, // bog pools flank the landing zones — an offline miss is in the acid
+    fescue: 1.3, // dense reeds line the deep rough
+    fairwayBreaks: 0.5, // the odd muddy silt flat cuts the fairway
+    potBunkers: 0.2,
+    greenSize: 1.0, // soft, blobby waterlogged greens
+    greenAspect: 1.7,
+    greenIrregular: 1.35,
+    greenSlopeMax: 0.35, // waterlogged and flat — low tilt
+    roughBreaks: 0.7,
+  },
+  {
+    // Scrap Belt (Antlia) — the lowest NON-abyss gravity: big bombs + tumbling-debris carry jitter, in
+    // the near-vacuum calm of the void, but played over SOLID derelict-metal ground (no island-hop, no
+    // lost-rough — the distinction from the void). A machine graveyard: blast-crater bunkers pock the
+    // landing zones, scrap-waste bands slash the fairways, and a chasm between drifting hull-plates
+    // crosses as a barranca. Every mechanic is proven-fair (craters/waste sand + a sanctioned barranca
+    // carry, exactly like the Dust Belt), so it clears the death-spiral bar despite the low gravity
+    // (holes lengthen with carryMult to keep the reach honest).
+    id: 'scrap-belt',
+    name: 'Scrap Belt',
+    weight: 9,
+    carryMult: 1.32, // signature: the lowest playable gravity — everything bombs (holes lengthen to match)
+    carryJitter: 0.06, // tumbling scrap-debris pockets jostle the carry
+    windBase: 2, // near-vacuum — a faint solar breeze, calm like the void
+    windWild: 6,
+    hazardKinds: ['waste', 'bunker'], // scrap-plate flats + blast-crater sand (non-penalty, like the desert)
+    greensideKind: 'bunker', // crater bunkers guard the greens
+    scatter: [{ kind: 'waste', freqPerHole: 1.4, rMin: 7, rMax: 14 }], // riveted scrap-plate flats (true, firm)
+    fairwayWidthMult: 1.05,
+    doglegBias: 0.32,
+    treeDensity: 0.3, // sparse rusted antenna masts / girders stand in for trees
+    fairwayBunkers: 1.8, // crater + scrap bunkers dot the belt
+    craters: 2.0, // signature: impact-blast craters pock the landing zones (a navigable crater field)
+    barranca: true, // signature: a chasm between drifting hull-plates crosses the fairway (forced carry)
+    deepRough: 'deeprough', // a rebar/scrap thicket chokes a cut corner
+    fairwayBreaks: 1.0, // scrap-waste bands slash clean across the fairway
+    fescue: 0.4, // wiry scrap-weed in the deep rough
+    potBunkers: 0.5,
+    greenSize: 0.95, // small, angular plate-metal greens
+    greenAspect: 1.9,
+    greenIrregular: 1.35,
+    greenSlopeMax: 0.5,
+    roughBreaks: 0.4,
+  },
 ];
 
 const TOTAL_WEIGHT = BIOMES.reduce((s, b) => s + b.weight, 0);

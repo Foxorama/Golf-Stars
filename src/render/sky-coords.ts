@@ -233,6 +233,14 @@ export const THEME_SKY: Record<string, SkyCoord> = {
   "cetus": {
     "ra": 31.6,
     "dec": -5.9
+  },
+  "hydra": {
+    "ra": 141.897,
+    "dec": -8.659
+  },
+  "antlia": {
+    "ra": 157.234,
+    "dec": -31.068
   }
 };
 

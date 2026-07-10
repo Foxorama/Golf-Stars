@@ -361,6 +361,9 @@ const CHAMPIONS: readonly ChampRow[] = [
   { theme: 'delphinus', name: 'Della Rotanev', shortName: 'Rotanev', archetypeId: 'sand', origin: 'Delphinus' },
   { theme: 'eridanus', name: 'Eira Achernar', shortName: 'Achernar', archetypeId: 'plotter', origin: 'Eridanus' },
   { theme: 'cetus', name: 'Cassia Diphda', shortName: 'Diphda', archetypeId: 'escape', origin: 'Cetus' },
+  // GS-more-worlds: champions of the two spectrum-bracketing worlds.
+  { theme: 'hydra', name: 'Halden Alphard', shortName: 'Alphard', archetypeId: 'escape', origin: 'Hydra' }, // a bog escape-artist
+  { theme: 'antlia', name: 'Axel Antliae', shortName: 'Antliae', archetypeId: 'bomber', origin: 'Antlia' }, // a low-grav bomber
 ];
 
 // --- The Warriors Three (GS-asgard) -------------------------------------------

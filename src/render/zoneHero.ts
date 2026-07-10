@@ -290,6 +290,51 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
     return frame(W, H, inner, ['#1a1440', '#4a3f7a'], gid);
   }
 
+  if (archetype === 'swamp') {
+    let inner = stars(rng, W, H, 8, 0.28);
+    // A sickly green miasma glow low in the murky sky.
+    inner += body(W * 0.24, H * 0.26, 13, '#a4c85c', { glow: 'rgba(150,200,60,0.28)', shade: false });
+    // Layered dark mire banks.
+    inner += ridge(rng, W, H, H * 0.6, 6, '#2c3a18');
+    inner += ridge(rng, W, H, H * 0.74, 10, '#3a4a1e');
+    // A glowing acid pool reflecting on the near bank.
+    inner += `<ellipse cx="${n1(W * 0.6)}" cy="${n1(H * 0.86)}" rx="${n1(W * 0.28)}" ry="8" fill="rgba(150,210,70,0.35)"/>`;
+    inner += `<ellipse cx="${n1(W * 0.6)}" cy="${n1(H * 0.86)}" rx="${n1(W * 0.18)}" ry="5" fill="rgba(190,230,110,0.4)"/>`;
+    // Dead bog cypress silhouettes leaning over the mire, dripping moss.
+    for (let i = 0; i < 4; i++) {
+      const x = W * (0.14 + i * 0.22 + rng() * 0.05);
+      const y = H * (0.82 + rng() * 0.06);
+      inner += `<line x1="${n1(x)}" y1="${n1(y)}" x2="${n1(x + (rng() - 0.5) * 6)}" y2="${n1(y - 20)}" stroke="#8a8674" stroke-width="3" stroke-linecap="round"/>`;
+      inner += `<circle cx="${n1(x)}" cy="${n1(y - 22)}" r="7" fill="#5f7a2e"/><circle cx="${n1(x - 2)}" cy="${n1(y - 25)}" r="4" fill="#86a84a"/>`;
+      inner += `<line x1="${n1(x + 3)}" y1="${n1(y - 20)}" x2="${n1(x + 4)}" y2="${n1(y - 12)}" stroke="rgba(140,160,90,0.7)" stroke-width="1.2"/>`;
+    }
+    return frame(W, H, inner, ['#12200c', '#2c3a1a'], gid);
+  }
+
+  if (archetype === 'metal') {
+    let inner = stars(rng, W, H, 16, 0.5);
+    // A rust-orange scrap nebula smear + a cold distant sun.
+    inner += `<ellipse cx="${n1(W * 0.32)}" cy="${n1(H * 0.34)}" rx="${n1(W * 0.32)}" ry="${n1(H * 0.26)}" fill="rgba(200,110,50,0.14)"/>`;
+    inner += body(W * 0.76, H * 0.24, 11, '#d9a060', { glow: 'rgba(220,140,70,0.22)', shade: true });
+    // A big half-buried derelict hull-wreck looming on the horizon.
+    const hx = W * 0.34;
+    const hy = H * 0.56;
+    inner += `<polygon points="${n1(hx - 60)},${n1(hy + 20)} ${n1(hx + 64)},${n1(hy + 26)} ${n1(hx + 52)},${n1(hy - 18)} ${n1(hx - 44)},${n1(hy - 28)}" fill="#3a2418" stroke="rgba(200,140,80,0.5)" stroke-width="1.5"/>`;
+    for (let k = 0; k < 4; k++) inner += `<circle cx="${n1(hx - 34 + k * 26)}" cy="${n1(hy)}" r="3.2" fill="rgba(255,180,90,0.45)"/>`;
+    inner += `<line x1="${n1(hx - 40)}" y1="${n1(hy - 24)}" x2="${n1(hx - 54)}" y2="${n1(hy - 52)}" stroke="rgba(140,90,50,0.6)" stroke-width="2.4" stroke-linecap="round"/>`;
+    // Rusted scrap-plate ground below + a leaning lattice mast in the foreground.
+    inner += ridge(rng, W, H, H * 0.72, 8, '#5e381f');
+    inner += ridge(rng, W, H, H * 0.84, 6, '#7a4a2c');
+    const mx = W * 0.8;
+    const my = H * 0.9;
+    inner += `<line x1="${n1(mx - 8)}" y1="${n1(my)}" x2="${n1(mx + 4)}" y2="${n1(my - 34)}" stroke="#8a5a34" stroke-width="3.5" stroke-linecap="round"/>`;
+    inner += `<line x1="${n1(mx + 8)}" y1="${n1(my)}" x2="${n1(mx + 4)}" y2="${n1(my - 34)}" stroke="#8a5a34" stroke-width="3.5" stroke-linecap="round"/>`;
+    inner += `<circle cx="${n1(mx + 4)}" cy="${n1(my - 38)}" r="3" fill="#ff5a2a"/>`;
+    // Drifting sparks.
+    for (let i = 0; i < 5; i++) inner += `<circle cx="${n1(rng() * W)}" cy="${n1(H * (0.5 + rng() * 0.3))}" r="1" fill="rgba(255,200,120,0.8)"/>`;
+    return frame(W, H, inner, ['#0e0a08', '#2a1a10'], gid);
+  }
+
   // void
   let inner = stars(rng, W, H, 34, 1);
   // A nebula smear.

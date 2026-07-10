@@ -239,6 +239,46 @@ export const ZONES: Record<BiomeArchetype, ZoneProfile> = {
     ],
     difficulty: 4,
   },
+  swamp: {
+    archetype: 'swamp',
+    name: 'Toxic Mire',
+    signature: 'Heavy air & acid bog',
+    inspiration:
+      'The Water-Serpent Hydra coiled through a fetid star-swamp — a humid, low-pressure sink where the air hangs thick and the ball flies short.',
+    brief:
+      'The heaviest air in the galaxy: dense and muggy, so the ball drops out of the sky short — club up and trust nothing. Acid pools and mires choke the corridors, dead mangroves lean over winding fairways, and a channel of glowing acid cuts the odd hole. Still and windless, but the short flight and the ever-present bog make every yard a fight.',
+    hazards: [
+      { icon: '☣️', text: 'Acid pools & mires flank the fairways (penalty)' },
+      { icon: '🫧', text: 'An acid channel crosses the odd hole (forced carry)' },
+      { icon: '🌿', text: 'Boggy reed tangle & dead-mangrove rough' },
+    ],
+    benefits: [
+      { icon: '🍃', text: 'Almost windless — no gale to read' },
+      { icon: '🎯', text: 'Short holes to match the heavy air — reachable' },
+      { icon: '💧', text: 'Soft, waterlogged greens hold the ball' },
+    ],
+    difficulty: 4,
+  },
+  metal: {
+    archetype: 'metal',
+    name: 'Scrap Belt',
+    signature: 'Low gravity & scrap',
+    inspiration:
+      'The dead Air Pump of Antlia adrift in a graveyard of scrapped starships — a low-gravity belt of rusted hull-plate and blast-crater over cold, calm vacuum.',
+    brief:
+      'The lowest gravity you can still play on: everything bombs, and tumbling debris jostles the carry. But this is no abyss — you play over solid derelict metal. Blast craters pock the landing zones, scrap-waste bands slash the fairways, and a chasm between drifting hull-plates crosses the odd hole. Calm vacuum air, but the low grav and the scrap make positioning wild.',
+    hazards: [
+      { icon: '🕳️', text: 'A hull-plate chasm crosses the odd hole (forced carry)' },
+      { icon: '🟡', text: 'Blast-crater bunkers pock the landing zones' },
+      { icon: '🌀', text: 'Debris jitter jostles the carry — a touch unpredictable' },
+    ],
+    benefits: [
+      { icon: '🪶', text: 'Low gravity — the ball carries +~32%' },
+      { icon: '🍃', text: 'Near-vacuum calm — almost no wind' },
+      { icon: '🛠️', text: 'Firm scrap-plate flats run the ball true' },
+    ],
+    difficulty: 3,
+  },
   asgard: {
     archetype: 'asgard',
     name: 'Asgard',
@@ -681,6 +721,70 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
       eagle: ['An eagle over the abyss — fearless carries.', 'Two under above the deep. The whales approve.'],
       blowup: ['The star-ocean swallowed one whole back there. It’s hungry. Onward.', 'One ball lost to the deep — let the whales keep it. Keep going.'],
       birdieBlitz: ['Birdies breaching everywhere — the whole pod is jealous.', 'A run of birdies over the deep. Luminous stuff.'],
+    },
+  },
+  swamp: {
+    name: 'Murk Bellweather',
+    title: 'Toxic Mire bog pro',
+    quips: {
+      scraped: [
+        'The bog nearly kept your ball as a keepsake. Scraped through by a bubble’s width.',
+        'Half your shots came up short in this soup — but a pass is a pass. Wipe the acid off first.',
+        'Held the fairway by a reed. The mire is patient, friend — buy something and move along.',
+      ],
+      solid: [
+        'Clubbed up and kept it dry, mostly. Solid golf in air this heavy.',
+        'Steady through the murk. Most drown in a section like that.',
+        'Respectable. You read the short flight and stayed out of the acid.',
+      ],
+      great: [
+        'You made this soup look like sea-level! Great, dry, clean golf.',
+        'Threaded the mire beautifully — the acid went hungry.',
+        'Lovely work in the heavy air. The bog barely got a taste.',
+      ],
+      stellar: [
+        'Untouchable in the thickest air in the galaxy. The serpent is impressed.',
+        'Stellar — you golfed a swamp like a garden. Astonishing.',
+        'Flawless through the mire. Not one drop of acid on your ball.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one through THIS soup?! Even the mire held its breath.', 'An ACE in the heavy air — the swamp will whisper of it.'],
+      eagle: ['An eagle out of the bog — soaring, in air that flies short!', 'Two under in the mire. The serpent uncoils to watch.'],
+      blowup: ['The acid ate one whole back there. It’s always hungry down here. Onward.', 'One sank into the mire — let the bog keep it. Keep swinging.'],
+      birdieBlitz: ['Birdies bubbling up all over the mire — a hot streak in the soup.', 'A run of birdies through the murk. Rare and lovely.'],
+    },
+  },
+  metal: {
+    name: 'Rusty Colefax',
+    title: 'Scrap Belt salvage pro',
+    quips: {
+      scraped: [
+        'The debris jitter nearly flung one into a crater. Scraped through by a bolt’s width.',
+        'Bombed it miles, landed it anywhere — but you made the cut. Grab some gear off the scrap.',
+        'Held it together over the junk by a rivet. A pass is a pass out here.',
+      ],
+      solid: [
+        'Tamed the low grav nicely. Solid golf over a graveyard of ships.',
+        'Kept the bombs on the plates and out of the craters. Respectable.',
+        'Steady over the scrap. Most spray it all over the belt.',
+      ],
+      great: [
+        'Now THAT’S how you golf a scrapyard! Long and dead straight.',
+        'Great control of the big carries — the craters stayed empty.',
+        'Threaded the hull-plates beautifully. Clean salvage, that.',
+      ],
+      stellar: [
+        'Untouchable over the belt — you bent the low grav to your will.',
+        'Stellar. You golfed a machine graveyard like a driving range.',
+        'Flawless over the scrap. Even the dead Air Pump would applaud.',
+      ],
+    },
+    reactions: {
+      ace: ['A hole-in-one across the SCRAP BELT?! The whole graveyard rang like a bell.', 'An ACE over the junk — the derelicts salute you.'],
+      eagle: ['An eagle in low grav — a monster bomb and a golden touch!', 'Two under over the scrap. The belt hums with it.'],
+      blowup: ['A crater ate one whole back there. The belt takes its tithe. Onward.', 'One vanished into the chasm — let the hull-plates keep it. Keep going.'],
+      birdieBlitz: ['Birdies sparking all over the belt — a run of pure salvage.', 'A flurry of birdies over the scrap. Electric stuff.'],
     },
   },
   asgard: {

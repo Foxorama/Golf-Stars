@@ -84,6 +84,8 @@ const cases = [
   { biome: 'spore-jungle', themeId: 'lacerta', label: 'Fungal · Lacerta' },
   { biome: 'tidal-archipelago', themeId: 'delphinus', label: 'Ocean · Delphinus' },
   { biome: 'cetus-deep', themeId: 'cetus', label: 'Cetus · Cetus' },
+  { biome: 'toxic-mire', themeId: 'hydra', label: 'Swamp · Hydra' },
+  { biome: 'scrap-belt', themeId: 'antlia', label: 'Metal · Antlia' },
 ];
 const seeds = [7, 4242];
 

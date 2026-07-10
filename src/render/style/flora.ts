@@ -54,6 +54,10 @@ export function styleFlora(poly: Vec[], proj: Projector, rng: () => number, arch
       return floraSeaStack(x, y, rr, tint, cc);
     case 'asgard':
       return floraGoldAsh(x, y, rr, tint, cc);
+    case 'swamp':
+      return floraBogCypress(x, y, rr, tint, cc);
+    case 'metal':
+      return floraScrapMast(x, y, rr, tint, cc);
     default:
       break; // verdant (and any unknown) → the classic parkland canopy, byte-identical
   }
@@ -284,6 +288,79 @@ function floraGoldAsh(x: number, y: number, rr: number, tint: number, key: Vec):
     const u = posHash(key[0], key[1], i) - 0.5;
     out.push({ t: 'circle', c: [x + u * rr * 1.4, y - rr * (0.1 + posHash(key[0], key[1], i + 3) * 0.5)], r: rr * 0.14, fill: 'rgba(255,240,180,0.9)' });
   }
+  return out;
+}
+
+/** Toxic-Mire DEAD BOG CYPRESS: a pale, gnarled grey trunk flaring into kneed buttress roots, a sparse
+ *  drooping sickly-olive canopy with hanging moss/vines, over a murky green reflection puddle. */
+function floraBogCypress(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
+  const foliage = tint < 0.33 ? '#5f7a2e' : tint < 0.66 ? '#6f8a36' : '#4e6a26'; // sickly olive
+  const bark = '#8a8674'; // bleached dead-grey bark
+  const lean = (posHash(key[0], key[1]) - 0.5) * rr * 0.5;
+  const topX = x + lean;
+  const topY = y - rr * 2.1;
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.55], r: rr * 0.85, fill: 'rgba(30,44,18,0.28)' }, // murky reflection puddle
+    { t: 'glow', c: [x, y - rr * 0.2], r: rr * 1.9, col: 'rgba(120,170,60,0.12)' }, // miasma haze
+    // Kneed buttress roots flaring at the base.
+    { t: 'line', a: [x - rr * 0.5, y + rr * 0.4], b: [x - rr * 0.1, y - rr * 0.3], stroke: bark, sw: rr * 0.16, round: true },
+    { t: 'line', a: [x + rr * 0.5, y + rr * 0.4], b: [x + rr * 0.12, y - rr * 0.3], stroke: bark, sw: rr * 0.16, round: true },
+    { t: 'line', a: [x, y + rr * 0.4], b: [topX, topY], stroke: bark, sw: rr * 0.3, round: true }, // trunk
+    // A couple of bare, drooping upper limbs.
+    { t: 'line', a: [x + lean * 0.6, y - rr * 1.2], b: [x + lean * 0.6 - rr * 0.95, y - rr * 1.5], stroke: bark, sw: rr * 0.13, round: true },
+    { t: 'line', a: [x + lean * 0.85, y - rr * 1.6], b: [x + lean * 0.85 + rr * 0.85, y - rr * 1.85], stroke: bark, sw: rr * 0.12, round: true },
+    // Sparse drooping canopy tufts (position-hashed — no rng).
+    { t: 'circle', c: [topX, topY], r: rr * 0.62, fill: foliage, stroke: 'rgba(20,30,10,0.6)', sw: 1 },
+    { t: 'circle', c: [topX - rr * 0.5, topY + rr * 0.35], r: rr * 0.4, fill: foliage },
+    { t: 'circle', c: [topX + rr * 0.45, topY + rr * 0.2], r: rr * 0.38, fill: foliage },
+    { t: 'circle', c: [topX - rr * 0.18, topY - rr * 0.24], r: rr * 0.34, fill: '#86a84a' }, // lit tuft
+  ];
+  // Hanging moss / vines drooping off the limbs.
+  for (let i = 0; i < 3; i++) {
+    const hx = topX + (posHash(key[0], key[1], i) - 0.5) * rr * 1.6;
+    const hy = topY + rr * (0.2 + posHash(key[0], key[1], i + 3) * 0.3);
+    out.push({ t: 'line', a: [hx, hy], b: [hx + (posHash(key[0], key[1], i + 6) - 0.5) * rr * 0.3, hy + rr * (0.6 + posHash(key[0], key[1], i + 9) * 0.7)], stroke: 'rgba(140,160,90,0.7)', sw: 1.3, round: true });
+  }
+  return out;
+}
+
+/** Scrap-Belt RUSTED MAST: a leaning riveted lattice girder with cross-braces and guy-wires, topped by a
+ *  blinking hazard light — the derelict "trees" of the machine graveyard, over a small cast shadow. */
+function floraScrapMast(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
+  const rust = tint < 0.33 ? '#8a5a34' : tint < 0.66 ? '#9a6238' : '#7a4a2c';
+  const lean = (posHash(key[0], key[1]) - 0.5) * rr * 0.4;
+  const h = rr * 2.6;
+  const topX = x + lean;
+  const topY = y - h;
+  // Two slightly-splayed legs meeting at the top (a lattice mast).
+  const legL0: Vec = [x - rr * 0.4, y + rr * 0.35];
+  const legR0: Vec = [x + rr * 0.4, y + rr * 0.35];
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.45], r: rr * 0.6, fill: 'rgba(0,0,0,0.22)' }, // cast shadow
+    { t: 'line', a: legL0, b: [topX, topY], stroke: rust, sw: rr * 0.2, round: true },
+    { t: 'line', a: legR0, b: [topX, topY], stroke: rust, sw: rr * 0.2, round: true },
+  ];
+  // Cross-braces (an X-lattice) up the mast.
+  for (let k = 0; k < 3; k++) {
+    const t0 = 0.12 + k * 0.28;
+    const t1 = t0 + 0.24;
+    const lx0 = legL0[0] + (topX - legL0[0]) * t0;
+    const ly0 = legL0[1] + (topY - legL0[1]) * t0;
+    const rx0 = legR0[0] + (topX - legR0[0]) * t0;
+    const ry0 = legR0[1] + (topY - legR0[1]) * t0;
+    const lx1 = legL0[0] + (topX - legL0[0]) * t1;
+    const ly1 = legL0[1] + (topY - legL0[1]) * t1;
+    const rx1 = legR0[0] + (topX - legR0[0]) * t1;
+    const ry1 = legR0[1] + (topY - legR0[1]) * t1;
+    out.push({ t: 'line', a: [lx0, ly0], b: [rx1, ry1], stroke: rust, sw: Math.max(1, rr * 0.08), round: true });
+    out.push({ t: 'line', a: [rx0, ry0], b: [lx1, ly1], stroke: rust, sw: Math.max(1, rr * 0.08), round: true });
+  }
+  // A guy-wire tethering the leaning mast, and the hazard light on top.
+  out.push({ t: 'line', a: [topX, topY], b: [x + rr * 1.2, y + rr * 0.35], stroke: 'rgba(120,110,90,0.5)', sw: 0.9, round: true });
+  out.push({ t: 'line', a: [topX, topY], b: [topX, topY - rr * 0.3], stroke: rust, sw: rr * 0.1, round: true }); // finial
+  const lit = posHash(key[0], key[1], 4) < 0.5;
+  out.push({ t: 'glow', c: [topX, topY - rr * 0.34], r: rr * 0.9, col: lit ? 'rgba(255,90,40,0.4)' : 'rgba(255,150,60,0.18)' });
+  out.push({ t: 'circle', c: [topX, topY - rr * 0.34], r: rr * 0.16, fill: lit ? '#ff5a2a' : '#7a2a12' }); // blinking hazard lamp
   return out;
 }
 
@@ -658,6 +735,96 @@ export function archetypeDecor(
         out.push({ t: 'line', a: [s[0], s[1] - r * 0.5], b: [s[0], s[1] + r * 0.5], stroke: 'rgba(255,232,150,0.85)', sw: 1.3, round: true }); // glowing carved rune
         out.push({ t: 'line', a: [s[0] - r * 0.28, s[1] - r * 0.2 + rk * r * 0.3], b: [s[0] + r * 0.28, s[1] + r * 0.1], stroke: 'rgba(255,232,150,0.8)', sw: 1.2, round: true });
       }
+      break;
+    }
+    case 'swamp': {
+      // Bubbling acid pools + rising gas wisps + half-sunk dead logs pooling in the mire's muck.
+      const pools = 4 + Math.floor(rng() * 3);
+      for (let i = 0; i < pools; i++) {
+        const g = groundPt();
+        const r = (0.05 + rng() * 0.07) * Math.min(W, H);
+        if (!g) continue;
+        const p = g.s;
+        clipped.push({ t: 'glow', c: p, r: r * 1.5, col: 'rgba(140,200,60,0.16)' }); // acid glow
+        clipped.push({ t: 'circle', c: p, r, fill: 'rgba(90,150,50,0.22)', stroke: 'rgba(160,210,80,0.4)', sw: 1 }); // the pool
+        // A few rising bubbles on the pool (position-hashed).
+        for (let k = 0; k < 3; k++) {
+          const u = posHash(g.c[0], g.c[1], k) - 0.5;
+          clipped.push({ t: 'circle', c: [p[0] + u * r * 1.2, p[1] - posHash(g.c[0], g.c[1], k + 3) * r * 0.8], r: 1 + posHash(g.c[0], g.c[1], k + 6) * 1.6, fill: 'rgba(190,230,110,0.75)' });
+        }
+      }
+      const logs = 3 + Math.floor(rng() * 2);
+      for (let i = 0; i < logs; i++) {
+        const g = groundPt();
+        const ang = rng() * Math.PI;
+        if (!g) continue;
+        const p = g.s;
+        const len = 6 + posHash(g.c[0], g.c[1]) * 9;
+        const dx = Math.cos(ang);
+        const dy = Math.sin(ang) * 0.5;
+        clipped.push({ t: 'line', a: [p[0] - dx * len, p[1] - dy * len], b: [p[0] + dx * len, p[1] + dy * len], stroke: '#4a4030', sw: 2.6, round: true }); // sunken dead log
+        clipped.push({ t: 'line', a: [p[0] - dx * len * 0.6, p[1] - dy * len * 0.6 - 1], b: [p[0] + dx * len * 0.7, p[1] + dy * len * 0.7 - 1], stroke: 'rgba(120,150,80,0.5)', sw: 1, round: true }); // mossy top
+      }
+      break;
+    }
+    case 'metal': {
+      // Scattered hull-plates + bolts strewn on the ground, drifting scrap debris beyond the land, a
+      // half-buried ship-wreck hull on the far skyline, and a few sparks. Ground pieces are clipped;
+      // the wreck is screen-space (fixed counts, off the dedicated rng — camera-proof like the void eye).
+      const plates = 4 + Math.floor(rng() * 3);
+      for (let i = 0; i < plates; i++) {
+        const g = groundPt();
+        const s = 3 + rng() * 5;
+        if (!g) continue;
+        const p = g.s;
+        const rot = posHash(g.c[0], g.c[1]) * Math.PI;
+        const c1 = Math.cos(rot);
+        const s1 = Math.sin(rot);
+        // A rusted rectangular hull-plate, tilted.
+        const plate: Vec[] = [
+          [p[0] - c1 * s * 1.4 - s1 * s, p[1] - s1 * s * 1.4 + c1 * s],
+          [p[0] + c1 * s * 1.4 - s1 * s, p[1] + s1 * s * 1.4 + c1 * s],
+          [p[0] + c1 * s * 1.4 + s1 * s, p[1] + s1 * s * 1.4 - c1 * s],
+          [p[0] - c1 * s * 1.4 + s1 * s, p[1] - s1 * s * 1.4 - c1 * s],
+        ];
+        clipped.push({ t: 'poly', pts: plate, fill: '#6a4028', stroke: 'rgba(30,16,8,0.6)', sw: 0.8 });
+        clipped.push({ t: 'line', a: plate[0]!, b: plate[1]!, stroke: 'rgba(210,150,90,0.5)', sw: 0.9, round: true }); // lit edge
+        // Rivets along the plate.
+        for (let k = 0; k < 3; k++) clipped.push({ t: 'circle', c: [p[0] + (posHash(g.c[0], g.c[1], k) - 0.5) * s * 2, p[1] + (posHash(g.c[0], g.c[1], k + 3) - 0.5) * s * 1.4], r: 0.8, fill: 'rgba(40,24,12,0.8)' });
+      }
+      // Drifting scrap debris chunks in the vacuum beyond the land (course-space, rejected off the land).
+      const spanX = cb.maxX - cb.minX || 1;
+      const spanY = cb.maxY - cb.minY || 1;
+      const cxw = (cb.minX + cb.maxX) / 2;
+      const cyw = (cb.minY + cb.maxY) / 2;
+      const want = 4 + Math.floor(rng() * 3);
+      for (let i = 0, placed = 0; i < want * 14 && placed < want; i++) {
+        const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.7, cyw + (rng() - 0.5) * spanY * 1.7];
+        if (landPolysCourse.some((lp) => pointInPoly(c, lp))) continue;
+        placed++;
+        const s = proj.project(c);
+        const r = Math.max(3, Math.min(16, (4 + rng() * 6) * proj.scale));
+        const pts: Vec[] = [];
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2;
+          const rk = r * (0.6 + posHash(c[0], c[1], k) * 0.6);
+          pts.push([s[0] + Math.cos(a) * rk, s[1] + Math.sin(a) * rk * 0.85]);
+        }
+        out.push({ t: 'glow', c: s, r: r * 1.6, col: 'rgba(255,150,60,0.10)' });
+        out.push({ t: 'poly', pts, fill: '#5a3a24', stroke: 'rgba(200,140,80,0.5)', sw: 1 });
+        out.push({ t: 'circle', c: [s[0] + r * 0.2, s[1] - r * 0.2], r: 1, fill: 'rgba(255,200,140,0.8)' }); // glint
+      }
+      // A half-buried derelict ship-wreck hull looming on the far skyline (screen-space).
+      const wx = W * (0.14 + rng() * 0.6);
+      const wy = H * (0.1 + rng() * 0.12);
+      const ww = Math.max(30, W * 0.16);
+      const wh = ww * 0.34;
+      out.push({ t: 'glow', c: [wx, wy], r: ww * 1.1, col: 'rgba(200,120,60,0.14)' });
+      out.push({ t: 'poly', pts: [[wx - ww * 0.5, wy + wh * 0.4], [wx + ww * 0.5, wy + wh * 0.5], [wx + ww * 0.42, wy - wh * 0.3], [wx - ww * 0.34, wy - wh * 0.5]], fill: '#3a2418', stroke: 'rgba(200,140,80,0.5)', sw: 1 }); // broken hull
+      for (let k = 0; k < 4; k++) out.push({ t: 'circle', c: [wx - ww * 0.3 + k * ww * 0.2, wy], r: ww * 0.03, fill: 'rgba(255,180,90,0.4)' }); // lit portholes
+      out.push({ t: 'line', a: [wx - ww * 0.4, wy - wh * 0.4], b: [wx - ww * 0.55, wy - wh * 0.9], stroke: 'rgba(140,90,50,0.6)', sw: 1.6, round: true }); // snapped mast
+      // A couple of sparks drifting up from the wreck.
+      for (let k = 0; k < 3; k++) out.push({ t: 'circle', c: [wx + (posHash(wx, wy, k) - 0.5) * ww * 0.6, wy - wh * (0.4 + posHash(wx, wy, k + 3) * 0.6)], r: 1, fill: 'rgba(255,200,120,0.8)' });
       break;
     }
     default:
