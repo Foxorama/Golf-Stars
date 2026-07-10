@@ -807,7 +807,7 @@ function generateHole(
   const length = baseLen * biome.carryMult * tpl.lenMult;
 
   // Everything downstream (corridor, hazards, scatter, green, apron) derives from this centreline.
-  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, tpl, !!lostRough);
+  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, tpl, !!lostRough, !!biome.sharpCorners);
   const green: Vec = centreline[centreline.length - 1]!;
 
   // Fairway corridor: WIDE and generous on early/easy stops, tightening as wildness climbs —
@@ -1962,8 +1962,15 @@ function buildCentreline(
   par: number,
   tpl: HoleTemplate,
   island = false,
+  sharp = false,
 ): Vec[] {
   const tee: Vec = [0, 0];
+  // SHARP ship-corridor corners (GS-ship-feel): drop the Catmull-Rom sampling to 2 points/segment so the
+  // corridor bends at ANGULAR corners (a spaceship hallway) instead of smooth arcs. The control points
+  // (and thus the rng draws) are IDENTICAL — only how many smoothing samples they're resampled into
+  // changes — so a non-sharp world is byte-for-byte unchanged, and 2 (not 1) keeps a slight ease so the
+  // ribbon never folds at a corner. `sp(p)` = the per-segment sample count for a given shape.
+  const sp = (p: number): number => (sharp ? 2 : p);
   // Bend severity floor raised (GS-variety-2): the old `0.35 + 0.65·wildness` left calm doglegs
   // nearly straight — "every early hole is the same gentle curve". A proper dogleg bends properly
   // even on a calm stop; wildness still steepens it toward the self-cross cap. The cap is loosened a
@@ -1988,32 +1995,32 @@ function buildCentreline(
     case 'straight': {
       if (par === 3) return [tee, endDrift()];
       // Gentle landing-zone drift — visually straight, a touch of movement.
-      return smoothCurve([tee, bendAt(0.5, side, 0.28), endDrift()], 5);
+      return smoothCurve([tee, bendAt(0.5, side, 0.28), endDrift()], sp(5));
     }
     case 'dogleg': {
       if (par === 3) {
         // A gentle angled (Redan-ish) par-3 — the green sits a little to one side.
         const mag = Math.min(0.16 * length, baseMag * rng.range(0.3, 0.6) + 0.06 * length);
-        return smoothCurve([tee, [side * mag, length * 0.55], endDrift()], 4);
+        return smoothCurve([tee, [side * mag, length * 0.55], endDrift()], sp(4));
       }
       // Single dogleg, left or right; the green sits to the inside of the bend.
-      return smoothCurve([tee, bendAt(rng.range(0.42, 0.58), side, 1.0), [side * 0.12 * length * rng.float(), length]], 5);
+      return smoothCurve([tee, bendAt(rng.range(0.42, 0.58), side, 1.0), [side * 0.12 * length * rng.float(), length]], sp(5));
     }
     case 'cape': {
       // Heroic diagonal: a sharp EARLY corner (the bite-off temptation), green tucked to the inside.
       const corner = rng.range(0.34, 0.46);
-      return smoothCurve([tee, bendAt(corner, side, 1.15), [side * 0.18 * length * rng.range(0.4, 1), length]], 5);
+      return smoothCurve([tee, bendAt(corner, side, 1.15), [side * 0.18 * length * rng.range(0.4, 1), length]], sp(5));
     }
     case 'hairpin': {
       // Severe single corner near mid-hole — a true shot-shaper's hole. Magnitude pushed toward the cap.
       const corner = rng.range(0.44, 0.56);
       const mag = Math.min(cap, baseMag * tpl.severity * rng.range(0.7, 1.0));
-      return smoothCurve([tee, [side * mag, length * corner], [side * 0.2 * length * rng.range(0.3, 0.9), length]], 6);
+      return smoothCurve([tee, [side * mag, length * corner], [side * 0.2 * length * rng.range(0.3, 0.9), length]], sp(6));
     }
     case 'double': {
       // S-curve, or a same-way double on the wilder/doglegging worlds — the real shot-shaping test.
       const s2: number = rng.float() < biome.doglegBias * 0.5 ? side : -side;
-      return smoothCurve([tee, bendAt(0.33, side, 0.85), bendAt(0.66, s2, 0.85), endDrift()], 5);
+      return smoothCurve([tee, bendAt(0.33, side, 0.85), bendAt(0.66, s2, 0.85), endDrift()], sp(5));
     }
   }
   return [tee, endDrift()];

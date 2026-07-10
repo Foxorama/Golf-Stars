@@ -76,7 +76,7 @@ import {
   roughenHazardCached,
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
-import { styleShipWalls } from './style/walls';
+import { styleShipWalls, styleTornHull } from './style/walls';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
@@ -358,6 +358,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // slabs adrift in space. Same gating/stream as the void pads.
   if (arch === 'derelict' && lostHole && !rainbow) {
     prims.push(...platformCliffs(landPlatforms, deepen, cliffRng, SHIP_CLIFF).prims);
+    // Torn broken-metal edges (GS-ship-feel): the hull sections are ripped in half, so their outlines
+    // bristle with twisted shard teeth. Course-space platforms, projected; pure geometry, zero rng.
+    prims.push(...styleTornHull(landPlatformsCourse, proj));
   }
 
   // --- 3c. Biome RELIEF: directional rolling-terrain depth (GS-biome-relief) ---

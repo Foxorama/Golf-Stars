@@ -26,6 +26,7 @@ import { buildScene, drawScenePrims, landPolysCourseFor, type Prim } from './sty
 import { artFeel } from './style/shared';
 import { createWeather, type WeatherHandle } from './weather';
 import { createCetusFlow } from './cetusFlow';
+import { createShipDrift } from './shipDrift';
 import {
   drawCaddy,
   drawCaddyProjectile,
@@ -89,6 +90,9 @@ interface PlayFeel extends FlightFeel {
   /** Flow rate of the moving Cetus star-waterfall (GS-cetus-flow) — multiplies the river drift +
    *  curtain fall speed. 1 = default, 0 freezes it (a static river). Cetus-only; ignored elsewhere. */
   cetusFlowSpeed: number;
+  /** Drift rate of the derelict world's floating space junk (GS-ship-feel) — multiplies the tumble +
+   *  drift speed. 1 = default, 0 freezes it. Derelict-only; ignored elsewhere. */
+  shipDriftSpeed: number;
   /**
    * DEMO/test hook (GS-caddy) — force a caddy-guard interception on EVERY shot so the boomerang/laser
    * throw can be watched on demand, instead of only on a rare right/left miss. '' = off (default, the
@@ -122,6 +126,7 @@ const BASE_FEEL: PlayFeel = {
   spaceFX: true,
   wind: true,
   cetusFlowSpeed: 1,
+  shipDriftSpeed: 1,
   forceRedirect: '',
 };
 
@@ -2044,6 +2049,11 @@ export function mountPlayView(
   // particles per frame — no scene rebuild — so it doesn't chug the follow-cam. Absent elsewhere.
   const isCetus = archetypeFor(opts.themeId, opts.biome ?? '') === 'cetus' && !opts.rainbow;
   const cetusFlow = isCetus ? createCetusFlow(hole) : null;
+  // The derelict's DRIFTING SPACE JUNK (GS-ship-feel): torn hull-plates tumble through the open space
+  // around the wreck. Same cheap per-frame model as the cetus flow (re-project + advance seeded chunks,
+  // no scene rebuild), play-view only, so the SVG map stays byte-identical. Absent on every other world.
+  const isDerelict = archetypeFor(opts.themeId, opts.biome ?? '') === 'derelict' && !opts.rainbow;
+  const shipDrift = isDerelict ? createShipDrift(hole) : null;
   const flowAccents = artFeel().accents;
 
   let cachedProj: typeof proj | null = null;
@@ -2154,6 +2164,7 @@ export function mountPlayView(
     // The moving Cetus star-waterfall (GS-cetus-flow), over the scene + weather but UNDER the ball,
     // FX and HUD (drawn later) so the ball still flies clearly over the river of stars.
     cetusFlow?.draw(ctx, proj, now, flowAccents, F.cetusFlowSpeed);
+    shipDrift?.draw(ctx, proj, now, flowAccents, F.shipDriftSpeed);
 
     // A GUARD caddy stands in the bottom-left corner the whole hole (GS-caddy) — its muzzle anchor is
     // where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. Only guards

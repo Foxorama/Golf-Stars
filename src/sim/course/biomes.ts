@@ -137,6 +137,14 @@ export interface Biome {
    * them. Pure geometry, zero rng — every other world is byte-identical.
    */
   walls?: boolean;
+  /**
+   * SHARP ship-corridor corners (GS-ship-feel): the world's corridor bends at ANGULAR corners (like a
+   * spaceship hallway) instead of smooth curves — `buildCentreline` drops the Catmull-Rom smoothing to a
+   * low sample count for this world only. Pure geometry, zero rng (same control points, fewer smoothing
+   * samples), so every other world is byte-identical. Kept mild enough that the ribbon never folds
+   * (proven by the fairness/termination sweeps).
+   */
+  sharpCorners?: boolean;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -520,6 +528,7 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 0.4, // the odd hull-breach sand-drift
     lostRough: 'shiprough', // signature: off the deck is lost to open space
     walls: true, // signature: metal corridor walls bounce a low ball back onto the deck (GS-ship-walls)
+    sharpCorners: true, // signature: the corridor bends at angular ship-hallway corners, not smooth curves (GS-ship-feel)
     greenSize: 0.9, // small angular plate-metal landing pads
     greenAspect: 1.85,
     greenIrregular: 1.3,

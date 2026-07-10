@@ -142,7 +142,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     (deliberately brutal, skipped by the death-spiral harnesses). The derelict reuses the proven island
     machinery: a `shiprough` lie ("Lost to space") whose penalty IS `voidlost` (the +1 non-replay drop),
     `SHIP_CLIFF` metal undersides, a `derelict` archetype (deep-sky themes Ghost/Skull Nebula, no
-    champion/figure). Sharp ship-corner corridors + animated drifting junk are a follow-up (GS-ship-feel).
+    champion/figure).
+  - SHIP FEEL (GS-ship-feel): three pure-geometry, zero-rng touches that sell "a ship coming apart adrift".
+    (1) SHARP CORNERS — `biome.sharpCorners` drops `buildCentreline`'s Catmull-Rom sampling to 2/segment
+    (`sp()`), so the corridor bends at ANGULAR ship-hallway corners not smooth arcs; SAME control points/rng
+    (every other world byte-identical), mild enough the ribbon never folds (1200-seed fairness sweep clean).
+    (2) TORN EDGES — `styleTornHull` bristles twisted-metal shard teeth along each lost hull-SECTION outline
+    (course-length-spaced count → camera-proof), so a severed piece reads ripped, not clean-cut. (3) DRIFTING
+    JUNK — `render/shipDrift.ts` (the cetusFlow twin: play-view only, rides `now` + `_gsFeel.shipDriftSpeed`,
+    SVG map byte-identical) tumbles torn hull-plates through the open space around the wreck.
   - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
     METAL walls (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). A low
