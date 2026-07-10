@@ -241,6 +241,14 @@ export const THEME_SKY: Record<string, SkyCoord> = {
   "antlia": {
     "ra": 157.234,
     "dec": -31.068
+  },
+  "piscis-austrinus": {
+    "ra": 344.413,
+    "dec": -29.622
+  },
+  "pyxis": {
+    "ra": 130.898,
+    "dec": -33.186
   }
 };
 

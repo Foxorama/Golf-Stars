@@ -68,11 +68,13 @@ describe('arc gating', () => {
     expect(arcForStars(STAR_ARC_BREAKS.arc3Min)).toBe(3);
   });
 
-  it('the constellations split across the arcs (GS-more-worlds added Hydra + Antlia)', () => {
+  it('the constellations split across the arcs (GS-more-worlds + GS-weather-affinity)', () => {
     const consts = THEMES.filter((t) => t.kind === 'constellation');
-    expect(consts.length).toBe(39);
+    expect(consts.length).toBe(41);
     const counts = [1, 2, 3].map((a) => consts.filter((t) => t.arc === a).length);
-    expect(counts).toEqual([14, 13, 12]); // Antlia (4★) → arc 1, Hydra (17★) → arc 3
+    // GS-weather-affinity added Piscis Austrinus (swamp) + Pyxis (metal) at 6★ → arc 2, so each new
+    // world spans two arcs (swamp arc 2+3, metal arc 1+2) and meets a wider spread of skies.
+    expect(counts).toEqual([14, 15, 12]);
   });
 
   it('deep-sky/galaxy showpieces are gated to the later arcs (rare→2, epic→3)', () => {

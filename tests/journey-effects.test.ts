@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { routeDifficulty, routeEffect, effectWindMult, effectCarryMult, effectPatchKind, COURSE_EFFECTS, EFFECT_WIND, EFFECT_CARRY, EFFECT_PATCH, EFFECT_WIND_CAP, type CourseEffectId } from '../src/sim/rpg/effects';
+import { routeDifficulty, routeEffect, effectWindMult, effectCarryMult, effectPatchKind, effectBiomeAffinity, COURSE_EFFECTS, EFFECT_WIND, EFFECT_CARRY, EFFECT_PATCH, EFFECT_WIND_CAP, type CourseEffectId } from '../src/sim/rpg/effects';
 import { DEFAULT_EVENT, ROUTE_EVENTS, UNIQUE_EVENTS, type RouteEvent } from '../src/sim/rpg/events';
-import { startRun, currentCourse, playerHoleOpts } from '../src/sim/rpg/run';
+import { startRun, currentCourse, playerHoleOpts, routeTheme } from '../src/sim/rpg/run';
 import { biomeCarryMult } from '../src/sim/round';
 import { PATCH_SPECS } from '../src/sim/patches';
 
@@ -160,6 +160,48 @@ describe('route effect mapping (GS-journey-fx)', () => {
     }
     // Every patch family points at a real spec (the lie rows are guarded in tests/patches.test.ts).
     for (const kind of Object.values(EFFECT_PATCH)) expect(PATCH_SPECS[kind!]).toBeDefined();
+  });
+});
+
+describe('the soft weather↔biome affinity (GS-weather-affinity)', () => {
+  const N = 3000;
+  const DEEP = 20; // arc 3, where the widest weather set (incl. blizzard) lives
+  // Share of lanes landing an archetype in `set` when the lane carries `effect`.
+  const share = (effect: string | undefined, set: ReadonlySet<string>): number => {
+    let hit = 0;
+    for (let i = 0; i < N; i++) if (set.has(routeTheme(`aff:${i}`, 3, i % 3, DEEP, undefined, effect).archetype)) hit++;
+    return hit / N;
+  };
+
+  it('a weathered sky over-represents its fitting worlds (blizzard→cold, dust storm→desert/scrap)', () => {
+    const cold = new Set(['frost', 'cetus', 'crystal']);
+    const dusty = new Set(['desert', 'metal']);
+    const baseCold = share(undefined, cold);
+    const baseDusty = share(undefined, dusty);
+    // A cold sky clearly favours cold worlds over the neutral baseline (a big lift, but still soft).
+    expect(share('blizzard', cold)).toBeGreaterThan(baseCold * 2);
+    expect(share('frostfall', cold)).toBeGreaterThan(baseCold * 2);
+    expect(share('dustStorm', dusty)).toBeGreaterThan(baseDusty * 2);
+    // …yet it stays SOFT — a fitting world is not guaranteed (mismatches remain possible).
+    expect(share('blizzard', cold)).toBeLessThan(0.85);
+  });
+
+  it('an affinity-less sky draws BYTE-IDENTICALLY to no weather (only weathered lanes shift)', () => {
+    expect(effectBiomeAffinity('moonlight')).toBeUndefined();
+    expect(effectBiomeAffinity('nebula')).toBeUndefined();
+    expect(effectBiomeAffinity(undefined)).toBeUndefined();
+    for (let i = 0; i < 1500; i++) {
+      const withSky = routeTheme(`byte:${i}`, 3, i % 3, DEEP, undefined, 'moonlight').id;
+      const noSky = routeTheme(`byte:${i}`, 3, i % 3, DEEP, undefined, undefined).id;
+      expect(withSky, `lane ${i}`).toBe(noSky);
+    }
+  });
+
+  it('affinity sets name real archetypes and the physics-y skies all carry one', () => {
+    for (const id of ['blizzard', 'frostfall', 'dustStorm', 'radiant', 'aurora', 'solarWind', 'darkMatter', 'gravityWell'] as CourseEffectId[]) {
+      expect(effectBiomeAffinity(id), id).toBeDefined();
+      expect(effectBiomeAffinity(id)!.length).toBeGreaterThan(0);
+    }
   });
 });
 

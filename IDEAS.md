@@ -132,6 +132,12 @@ Foundations are shipped; these are the live follow-ons.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-weather-affinity** — soft thematic weather↔biome bias: a weathered lane (blizzard/dust storm/…)
+  now leans toward a fitting world (`EFFECT_BIOME_AFFINITY` + a `pickThemeFrom` weight boost on
+  `routeTheme`'s own stream — same draw count, `:routes:` byte-identical, affinity-less skies unchanged).
+  Weather stays event-driven + biome-independent; this only nudges WHICH world a weathered lane reaches.
+  Also arc-spread the two new worlds (added Piscis Austrinus @swamp + Pyxis @metal, 6★/arc 2) so neither
+  is locked to one arc's skies. `docs/decisions/rpg-meta-loop.md`.
 - **GS-fairway-width-2** — the auto AI now READS the width grammar: a positioning drive that would come
   down in a genuinely tight driving-zone pinch lays up to the wider bay short of it (`widthLayupTarget`/
   `corridorHalfWidthAt` in `round.ts`, inside the shared `safeTarget` so auto ≡ interactive; pure, zero

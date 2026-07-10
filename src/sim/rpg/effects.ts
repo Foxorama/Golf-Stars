@@ -28,6 +28,7 @@
 import type { RouteEvent } from './events';
 import type { PatchKind } from '../patches';
 import type { Rarity } from '../course/contract';
+import type { BiomeArchetype } from '../course/themes';
 
 /** The atmospheric flavour a lane brings to the world it flies into. Render-only, except where a
  *  documented play hook says otherwise (tents; scorch; `effectWindMult`; `effectCarryMult`;
@@ -180,6 +181,45 @@ export const EFFECT_FUEL: Partial<Record<CourseEffectId, number>> = {
 /** The fuel delta a course effect adds to a jump's burn (0 = none). */
 export function effectFuelDelta(effect: string | undefined): number {
   return EFFECT_FUEL[(effect ?? 'none') as CourseEffectId] ?? 0;
+}
+
+/**
+ * The effect's SOFT BIOME AFFINITY (GS-weather-affinity): the world archetypes a given sky READS TRUE
+ * on, so the journey biases a lane's destination toward a thematically-fitting world — a blizzard
+ * favours a cold world, a dust storm a desert or scrap belt, a radiant burst a bright open one. It is
+ * a BIAS, not a rule: `routeTheme` up-weights matching archetypes in its (separate, per-lane) theme
+ * rng draw WITHOUT changing the draw COUNT, so a mismatch (a blizzard on a green world) stays possible
+ * but rare, and the main `:routes:` stream (distances + events) is byte-for-byte untouched. Only the
+ * physics-y / weather-y skies below carry an affinity — the purely atmospheric ones (moonlight, nebula,
+ * meteor shower, comet, eclipse, ion/solar storm, trade camp, debris) read fine ANYWHERE, so they carry
+ * none and their lanes stay byte-identical to the pre-affinity draw. Weather stays biome-INDEPENDENT by
+ * construction (it rides the route event); this only nudges WHICH world a weathered lane tends to reach.
+ */
+export const EFFECT_BIOME_AFFINITY: Partial<Record<CourseEffectId, readonly BiomeArchetype[]>> = {
+  blizzard: ['frost', 'cetus'], //     a whiteout gale belongs to the ice worlds
+  frostfall: ['frost', 'cetus', 'crystal'], // glittering frost sifts onto the cold + crystalline worlds
+  dustStorm: ['desert', 'metal'], //   a grit wall rolls over the dunes and the scrap belt
+  radiant: ['desert', 'crystal', 'verdant'], // a brilliant star bathes the bright, open worlds
+  aurora: ['frost', 'crystal', 'void'], //     charged colour ribbons over the polar / crystalline / deep worlds
+  solarWind: ['void', 'tempest', 'metal'], //  a stiff particle breeze streams through open space + the derelict belt
+  darkMatter: ['void', 'cetus'], //    an unseen mass warps the starlight of the deep dark worlds
+  gravityWell: ['void', 'metal'], //   a giant's pull hangs heavy over the low-gravity worlds
+};
+
+/**
+ * How strongly a matching-archetype world is up-weighted in a weathered lane's theme draw. Tuned so a
+ * fitting world is the single most-likely destination for a weathered lane (~50%, a ~4× lift over the
+ * ~12% base share of the two-ish fitting archetypes) WITHOUT going hard: any SPECIFIC mismatch (a
+ * blizzard on a lava world) drops to a rare few-percent, while the aggregate still leaves room for
+ * surprise — the "soft, not a rule" the design asks for. Raise toward a near-rule, lower toward pure
+ * chance. Verified in tests/journey-effects.test.ts (a cold sky over-represents cold worlds, an
+ * affinity-less sky stays byte-identical to the pre-affinity draw).
+ */
+export const WEATHER_AFFINITY_BOOST = 8;
+
+/** The set of world archetypes a sky reads true on (undefined ⇒ no affinity ⇒ byte-identical draw). */
+export function effectBiomeAffinity(effect: string | undefined): readonly BiomeArchetype[] | undefined {
+  return EFFECT_BIOME_AFFINITY[(effect ?? 'none') as CourseEffectId];
 }
 
 /**
