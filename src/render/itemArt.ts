@@ -14,6 +14,7 @@
 
 import type { Rarity } from '../sim/course/contract';
 import { rarCol, RARITY_C } from '../sim/rpg/loot';
+import { factionForCreditItem } from '../sim/rpg/factions';
 
 const W = 150;
 const H = 96;
@@ -217,6 +218,91 @@ const EMBLEM: Record<string, (col: string) => string> = {
     `<g fill="none" stroke="${c}" stroke-width="1.6"><circle r="9"/><path d="M 0 -12 v 5 M 0 12 v -5 M -12 0 h 5 M 12 0 h -5"/></g><circle r="2" fill="${c}"/>`, // reticle
 };
 
+// --- Faction credit TOKENS (GS-credit-factions) ------------------------------
+// The four credit-boost items are each ISSUED by a galaxy faction (see sim/rpg/factions.ts
+// CREDIT_ITEM_FACTION): the Sponsors' Syndicate (+15%), the Fortune Cartel (+20%), the Birdie Hunters
+// (per-birdie bounty), the Eagle Order (per-eagle bounty). Instead of a generic coin/trophy they wear
+// their house's CREST on a struck medallion, so each reads as "factionally specific" at a glance.
+
+/** The house accent colour for each credit-issuing faction (the medallion's metal + rim). */
+const FACTION_ACCENT: Record<string, string> = {
+  'sponsors-syndicate': '#4bb3ff', // corporate blue-chrome
+  'fortune-cartel': '#37c76a', // casino green
+  'birdie-hunters': '#e6a93a', // lodge amber
+  'eagle-order': '#d9a441', // raptor gold
+};
+
+/**
+ * A faction CREST symbol, authored around the origin at roughly ±13 so it scales cleanly into the
+ * token medallion. `c` is the crest's line/fill colour (a bright tint of the house accent).
+ */
+const FACTION_CREST: Record<string, (c: string) => string> = {
+  // Sponsors' Syndicate — a backer's patch: a shield holding a rising-growth arrow crowned by a star.
+  'sponsors-syndicate': (c) => `<g>
+    <path d="M0 -13 L12 -9 L12 3 Q12 11 0 15 Q-12 11 -12 3 L-12 -9 Z" fill="${c}" opacity="0.14"/>
+    <path d="M0 -13 L12 -9 L12 3 Q12 11 0 15 Q-12 11 -12 3 L-12 -9 Z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/>
+    <g stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M-7 4 L-1 -2 L3 2 L8 -5"/><path d="M8 -5 l-4 0 m4 0 l0 4"/></g>
+    <path d="M0 -11 l1.4 3.1 3.4 .3 -2.6 2.2 .8 3.3 -3 -1.8 -3 1.8 .8 -3.3 -2.6 -2.2 3.4 -.3 Z" fill="${c}"/>
+  </g>`,
+  // Fortune Cartel — a lucky horseshoe cradling a four-leaf clover.
+  'fortune-cartel': (c) => `<g>
+    <path d="M-9 9 Q-13 -11 0 -12.5 Q13 -11 9 9" fill="none" stroke="${c}" stroke-width="2.8" stroke-linecap="round"/>
+    <circle cx="-9" cy="9" r="1.7" fill="${c}"/><circle cx="9" cy="9" r="1.7" fill="${c}"/>
+    <g fill="${c}"><circle cx="0" cy="-3.4" r="3"/><circle cx="-3.4" cy="0.4" r="3"/><circle cx="3.4" cy="0.4" r="3"/><circle cx="0" cy="4.2" r="3"/></g>
+    <path d="M0 3 Q1.5 8 4 10" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>
+  </g>`,
+  // Birdie Hunters — a bird framed dead-centre in a hunter's crosshair.
+  'birdie-hunters': (c) => `<g>
+    <circle r="12.5" fill="none" stroke="${c}" stroke-width="1.3" opacity="0.7"/>
+    <circle r="7.5" fill="none" stroke="${c}" stroke-width="1"/>
+    <g stroke="${c}" stroke-width="1.7" stroke-linecap="round"><path d="M0 -14 v4 M0 14 v-4 M-14 0 h4 M14 0 h-4"/></g>
+    <path d="M-6.5 1.5 Q-3 -4 0 -1 Q3 -4 6.5 1.5" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>
+  </g>`,
+  // Eagle Order — an heraldic spread eagle with a piercing eye.
+  'eagle-order': (c) => `<g>
+    <circle r="13" fill="none" stroke="${c}" stroke-width="1.1" opacity="0.55"/>
+    <path d="M0 -2 Q-11 -9 -13.5 -0.5 Q-9 -3 -6 -0.5 Q-11 1.5 -12.5 8 Q-6.5 3 -1 4 Z" fill="${c}"/>
+    <path d="M0 -2 Q11 -9 13.5 -0.5 Q9 -3 6 -0.5 Q11 1.5 12.5 8 Q6.5 3 1 4 Z" fill="${c}"/>
+    <path d="M0 -3 v7" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="0" cy="-7" r="3.2" fill="${c}"/>
+    <circle cx="0" cy="-7" r="1.3" fill="#0b0d12"/>
+    <path d="M0 -9 l3 -1.5" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>
+  </g>`,
+};
+
+/** A faction crest symbol (empty for an unknown faction). Exported for the corner-sigil reuse. */
+export function factionCrest(factionId: string, col: string): string {
+  return FACTION_CREST[factionId]?.(col) ?? '';
+}
+
+/**
+ * A struck-metal MEDALLION bearing a faction's crest — the card for the four credit-boost tokens
+ * (GS-credit-factions). Metallic disc in the house accent, crest embossed on the face, a soft house
+ * corona so it reads as a prized commission. Pure, deterministic.
+ */
+function drawCreditToken(factionId: string, col: string, seed: string): string {
+  const accent = FACTION_ACCENT[factionId] ?? col;
+  const cx = 72;
+  const cy = 47;
+  const rim = mix(accent, '#ffffff', 0.4);
+  const face = mix(accent, '#0b0d12', 0.52);
+  const crest = factionCrest(factionId, mix(accent, '#ffffff', 0.55));
+  // A soft house-tinted corona (stacked translucent discs, no gradient def → no shared-id collision).
+  const corona = [30, 23, 16]
+    .map((r, i) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${accent}" opacity="${(0.05 + i * 0.04).toFixed(2)}"/>`)
+    .join('');
+  return frame(
+    `${sparkles(seed, accent, 6)}${corona}
+     <ellipse cx="${cx}" cy="84" rx="30" ry="6" fill="rgba(0,0,0,0.32)"/>
+     <circle cx="${cx}" cy="${cy}" r="33" fill="${face}" stroke="${rim}" stroke-width="3"/>
+     <circle cx="${cx}" cy="${cy}" r="33" fill="${mix(accent, '#ffffff', 0.3)}" opacity="0.08"/>
+     <circle cx="${cx}" cy="${cy}" r="26.5" fill="none" stroke="${mix(accent, '#ffffff', 0.5)}" stroke-width="1.2" opacity="0.6"/>
+     <path d="M ${cx - 20} ${cy - 20} A 33 33 0 0 1 ${cx + 20} ${cy - 20}" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" opacity="0.28"/>
+     <g transform="translate(${cx} ${cy}) scale(1.55)">${crest}</g>`,
+    col,
+  );
+}
+
 /** Legendary "awesome" flair: a radiant gold corona burst + extra glints behind the gear. */
 function legendaryFlair(col: string): string {
   const gold = mix(col, '#ffe6a0', 0.4);
@@ -287,18 +373,30 @@ function ballGlyph(cx: number, cy: number, r: number, fill = '#ffffff', stroke =
 // --- The per-kind drawings ---------------------------------------------------
 
 function drawShaft(col: string, seed: string): string {
-  // A driver: graphite shaft + a glinting head, on the diagonal.
-  const head = mix(col, '#e8edf5', 0.35);
+  // A tour driver on the diagonal: rubber grip, graphite shaft, ferrule, and a glinting pear head with
+  // a crown sheen + a milled face insert — a club that looks forged, not a stick with a blob on it.
+  const head = mix(col, '#e8edf5', 0.32);
+  const crown = mix(col, '#ffffff', 0.5);
+  const grip = mix(col, '#1b1f29', 0.15);
   return frame(
     `${sparkles(seed, col, 5)}
-     <line x1="30" y1="20" x2="104" y2="70" stroke="#1b1f29" stroke-width="9" stroke-linecap="round"/>
-     <line x1="30" y1="20" x2="104" y2="70" stroke="${mix(col, '#c9d2e0', 0.5)}" stroke-width="5" stroke-linecap="round"/>
-     <rect x="22" y="11" width="16" height="9" rx="3" transform="rotate(34 30 16)" fill="#222633"/>
-     <g transform="translate(108 74) rotate(34)">
-       <path d="M -14 -12 Q 6 -16 12 0 Q 8 14 -12 11 Z" fill="${head}" stroke="#11141b" stroke-width="2"/>
-       <ellipse cx="-2" cy="-2" rx="3" ry="4" fill="#11141b" opacity="0.5"/>
+     <!-- grip -->
+     <line x1="24" y1="14" x2="40" y2="25" stroke="${grip}" stroke-width="9" stroke-linecap="round"/>
+     <g stroke="#0b0d12" stroke-width="0.8" opacity="0.5"><path d="M27 15 l-3 4 M31 18 l-3 4 M35 21 l-3 4"/></g>
+     <!-- shaft -->
+     <line x1="38" y1="24" x2="104" y2="68" stroke="#1b1f29" stroke-width="6.5" stroke-linecap="round"/>
+     <line x1="38" y1="24" x2="104" y2="68" stroke="${mix(col, '#c9d2e0', 0.5)}" stroke-width="3.2" stroke-linecap="round"/>
+     <line x1="39" y1="23" x2="96" y2="61" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.5"/>
+     <!-- ferrule -->
+     <rect x="99" y="61" width="8" height="6" rx="2" transform="rotate(34 103 64)" fill="#0b0d12"/>
+     <!-- driver head -->
+     <g transform="translate(110 74) rotate(28)">
+       <path d="M -18 -13 Q 8 -18 15 -1 Q 12 15 -14 12 Q -22 4 -18 -13 Z" fill="${head}" stroke="#11141b" stroke-width="2"/>
+       <path d="M -15 -10 Q 6 -14 11 -2 Q 4 -6 -12 -4 Z" fill="${crown}" opacity="0.55"/>
+       <path d="M -16 6 L -6 13 L -14 12 Z" fill="${col}" opacity="0.6"/>
+       <g stroke="#11141b" stroke-width="0.7" opacity="0.6"><path d="M -13 -3 l 10 -1 M -13 1 l 11 -1 M -13 5 l 10 -1"/></g>
      </g>
-     <path d="M 96 64 l 8 -5 l 3 6 z" fill="#ffffff" opacity="0.7"/>`,
+     <path d="M 94 60 l 9 -6 l 3 6 z" fill="#ffffff" opacity="0.75"/>`,
     col,
   );
 }
@@ -352,16 +450,39 @@ function drawBall(id: string, col: string, seed: string): string {
 }
 
 function drawGlove(col: string, seed: string): string {
-  const g = mix(col, '#f2f4f8', 0.55);
+  // A proper golf glove (back-of-hand view): four seamed fingers, a thumb, a wrist cuff with a
+  // Velcro strap tab, perforation dots + a snap closure — reads unmistakably as tour leather, not a mitten.
+  const leather = mix(col, '#f2f4f8', 0.58);
+  const cuff = mix(col, '#dfe4ec', 0.4);
+  const seam = mix(col, '#11141b', 0.42);
+  const snap = mix(col, '#ffffff', 0.2);
   return frame(
     `${sparkles(seed, col, 4)}
-     <g transform="translate(54 18)">
-       <path d="M 6 24 v -16 a4 4 0 0 1 8 0 v 14 M 16 22 v -20 a4 4 0 0 1 8 0 v 18 M 26 22 v -22 a4 4 0 0 1 8 0 v 20 M 36 24 v -16 a4 4 0 0 1 8 0 v 16"
-         fill="${g}" stroke="#11141b" stroke-width="2" stroke-linejoin="round"/>
-       <path d="M 4 22 q -8 2 -8 12 q 0 22 22 26 q 26 4 28 -18 l 0 -20 q -2 -6 -8 -4 l 0 6 q -2 4 -6 2 l 0 -8 q -2 -5 -8 -3 l 0 8 q -2 4 -6 2 l 0 -8 q -2 -5 -8 -3 z"
-         fill="${g}" stroke="#11141b" stroke-width="2" stroke-linejoin="round"/>
-       <path d="M 4 36 q 2 -6 8 -6" fill="none" stroke="${mix(col, '#11141b', 0.4)}" stroke-width="2"/>
-       <circle cx="22" cy="30" r="3.4" fill="${col}"/>
+     <g transform="translate(52 14) rotate(-4)">
+       <!-- fingers (closed leather capsules, middle longest) -->
+       <g fill="${leather}" stroke="#11141b" stroke-width="1.8" stroke-linejoin="round">
+         <path d="M4 30 v-14 a4 4 0 0 1 8 0 v14 Z"/>
+         <path d="M13 30 v-20 a4 4 0 0 1 8 0 v20 Z"/>
+         <path d="M22 30 v-23 a4 4 0 0 1 8 0 v23 Z"/>
+         <path d="M31 30 v-17 a4 4 0 0 1 8 0 v17 Z"/>
+       </g>
+       <!-- back of hand + wrist -->
+       <path d="M2 27 q-9 1 -9 12 l0 9 q0 11 12 14 q13 3 24 0 q10 -3 10 -14 l0 -11 q0 -6 -6 -6 l-31 0 q-4 0 -4 4 Z"
+         fill="${leather}" stroke="#11141b" stroke-width="1.9" stroke-linejoin="round"/>
+       <!-- thumb -->
+       <path d="M-6 41 q-9 -1 -10 9 q-1 8 8 9 q6 1 9 -5 Z" fill="${leather}" stroke="#11141b" stroke-width="1.9" stroke-linejoin="round"/>
+       <!-- finger seams -->
+       <g stroke="${seam}" stroke-width="1" fill="none" opacity="0.75"><path d="M8 17 v12 M17 13 v16 M26 11 v18 M35 15 v14"/></g>
+       <!-- back perforation dots -->
+       <g fill="${seam}" opacity="0.5"><circle cx="7" cy="41" r="1"/><circle cx="13" cy="45" r="1"/><circle cx="19" cy="41" r="1"/><circle cx="25" cy="45" r="1"/><circle cx="13" cy="53" r="1"/><circle cx="21" cy="53" r="1"/></g>
+       <!-- wrist cut-line -->
+       <path d="M-4 52 q1 12 14 15 q13 3 24 0 q9 -3 9 -12" fill="none" stroke="${seam}" stroke-width="1.3" opacity="0.6"/>
+       <!-- Velcro strap tab -->
+       <path d="M40 45 l15 4 l-2 8 l-14 -3 Z" fill="${cuff}" stroke="#11141b" stroke-width="1.8" stroke-linejoin="round"/>
+       <g stroke="${seam}" stroke-width="0.8" opacity="0.55"><path d="M42 48 l11 3 M41 52 l11 3"/></g>
+       <!-- snap closure -->
+       <circle cx="20" cy="60" r="3.2" fill="${snap}" stroke="#11141b" stroke-width="1.2"/>
+       <circle cx="20" cy="60" r="1" fill="#11141b" opacity="0.5"/>
      </g>`,
     col,
   );
@@ -793,8 +914,15 @@ function drawThemedClub(theme: string | undefined, col: string, seed: string, cl
  */
 export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): string {
   const col = rarCol(rarity);
-  const kind = itemArtKind(id);
   const seed = id;
+  // Credit-boost tokens are a class of their own: a faction crest medallion (GS-credit-factions).
+  // The whole card IS the emblem, so they skip the base gear glyph + the corner roundel.
+  const creditFaction = factionForCreditItem(id);
+  if (creditFaction) {
+    const token = drawCreditToken(creditFaction, col, seed);
+    return rarity === 'legendary' ? withOverlay(token, legendaryFlair(col)) : token;
+  }
+  const kind = itemArtKind(id);
   let base: string;
   switch (kind) {
     case 'shaft':
