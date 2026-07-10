@@ -1072,3 +1072,32 @@ half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by
   projected fresh each frame, so it's camera-proof (`tests/camera-stability.test.ts` still green).
   Cached per input poly (`roughCache` WeakMap; merged bodies + barranca polys are stable per hole) so
   the per-frame follow-cam rebuild pays the roughening once, not 60×/sec. No new `window._gs*` hook.
+
+## GS-toxic-pools: the Toxic Mire's water is a glowing acid pool, not blue water (2026-07-10)
+
+- **The ask.** Player: make the Toxic Mire biome "really stand out and be unique" — its hazards
+  should be "properly vibrant glowing toxic pools in a superb neon green/teal hyper acidic
+  colouration", and those toxic pools should REPLACE the water hazards on this biome. The world was
+  already themed sickly-green everywhere it counts (miasma ambient/weather, dead bog-cypress flora,
+  chartreuse muck turf), but its penalty water still drew in the shared blue `WATER_LIQ` palette — a
+  blue lake in an acid bog read as a bug, and nothing about the hazards said "acid".
+- **The fix (`style/hazards.ts` `TOXIC_LIQ` + `waterLiqFor`).** A new `LiquidPalette`, `TOXIC_LIQ`, a
+  hyper-acidic neon ramp: a caustic acid-lime shore (`#c6f542`), a neon-green body (`#26e06e`)
+  deepening through green-teal to a STILL-LUMINOUS teal core (`#0aa7a0` — never a muddy dark centre,
+  so it reads chemical, not swamp water), bright acid current streaks + caustic glints, and — new to
+  the liquid family — an EMISSIVE `glow` field: a neon halo (`rgba(96,255,150,0.30)`) pushed UNDER
+  every pool body so it only shows in the ring beyond the shore, bleeding onto the bog like a pool
+  lit from within. `waterLiqFor(arch)` routes the swamp archetype to `TOXIC_LIQ` and every other
+  world to the classic `WATER_LIQ`; it's threaded at the single water draw site in `style.ts`
+  (`styleLiquidFamily(waterPolys, waterLiqFor(arch), …)`). Lava stays per-KIND (`LAVA_LIQ`), never
+  routed through here. The touchdown FX matches: `playView.spawnLandFX` throws a NEON-GREEN caustic
+  splash on the swamp world instead of the blue one (`archetypeFor(themeId, biome) === 'swamp'`).
+- **Why it's a pure reskin (the whole point).** RENDER-ONLY — the sim still plays these bodies as
+  ordinary `water` penalty, so fairness-by-construction (`validateFairness`/`validateCrossings`),
+  carry reads and the aim-cone are all untouched; "replacing water with toxic pools" is a palette
+  swap behind the frozen course contract, not a new hazard kind. The `glow` prim is FIXED per body
+  (centroid + mean radius, zero rng), so `styleLiquidFamily` consumes the exact same flow/glint rng
+  draws as before — every non-swamp world is byte-identical, and the swamp's seeded scene stream is
+  unchanged too (only the tones + the added halo differ). Verified: a toxic-mire hole carries the
+  neon/lime/teal tones + the halo and NOT the old blue `#3f8fe0`; a verdant hole is unchanged; all
+  1105 tests green. A new luminous liquid = a `LiquidPalette` with a `glow` + a `waterLiqFor` row.

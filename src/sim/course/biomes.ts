@@ -422,7 +422,7 @@ export const BIOMES: readonly Biome[] = [
   {
     // Toxic Mire (Hydra) — the HEAVIEST air in the galaxy: the ball flies short, so this world plays
     // the OPPOSITE end from the low-grav belts. Still, muggy, almost windless; acid bog everywhere
-    // (ordinary penalty `water`, reskinned sickly green in the render). The heavy air is FAIR by
+    // (ordinary penalty `water`, rendered as GLOWING neon-green/teal toxic pools — GS-toxic-pools). The heavy air is FAIR by
     // construction — `generate.ts` scales hole LENGTH by carryMult, so shorter holes keep every carry
     // carry-relative (the auto-AI reaches exactly as it does elsewhere); the SIGNATURE is the murky,
     // water-choked, dead-mangrove character, not an unfair reach. Reuses only proven-fair mechanics
@@ -435,7 +435,7 @@ export const BIOMES: readonly Biome[] = [
     carryJitter: 0,
     windBase: 1, // still, humid, oppressive — the calmest windy world (the inverse of Tempest/Ocean)
     windWild: 6,
-    hazardKinds: ['water'], // acid pools + mires (reskinned sickly green by the render)
+    hazardKinds: ['water'], // acid pools + mires (rendered as GLOWING neon-green/teal toxic pools — GS-toxic-pools)
     greensideKind: 'water', // acid pools guard the greens
     scatter: [],
     fairwayWidthMult: 1.06, // a touch wider so the heavy air + water stays fair

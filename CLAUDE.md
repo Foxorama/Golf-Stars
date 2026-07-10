@@ -415,6 +415,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     the sim penalty poly (fairness/carry/aim-cone) is untouched and the graphic still tracks physics.
     WATER meanders in smooth curves, LAVA cracks into jagged crust, a CREVICE cracks hardest.
     ZERO rng (byte-stable streams), camera-proof, WeakMap-cached per body.
+  - The water LIQUID palette is per-WORLD via `waterLiqFor(arch)` (GS-toxic-pools): the Toxic Mire
+    (swamp) draws GLOWING neon-green/teal ACID pools (`TOXIC_LIQ` — caustic acid-lime shore, neon body,
+    luminous teal core, + an emissive `glow` halo the liquid family paints UNDER each body), every
+    other world keeps the classic blue `WATER_LIQ`; lava stays per-KIND (`LAVA_LIQ`). RENDER-ONLY —
+    the sim still plays these as ordinary `water` penalty (fairness/carry untouched), and the `glow`
+    prim is fixed/zero-rng so `styleLiquidFamily` draws the same flow/glint stream (feature-off worlds
+    byte-identical). `spawnLandFX` throws a matching neon acid splash on swamp. A new luminous liquid =
+    a `LiquidPalette` with `glow` + a `waterLiqFor` row.
   - Carved features share ONE light (`LIGHT_UL` → `insetEmboss`/`embossChildren`). NO drop shadow
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
     FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER

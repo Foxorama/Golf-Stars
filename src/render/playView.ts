@@ -1992,7 +1992,11 @@ export function mountPlayView(
     } else if (penalty === 'cetuslost') {
       burst(14, ['122,240,255', '235,252,255', '150,222,255'], { up: 1.4, grav: 0.08 }); // into the star-ocean
     } else if (penalty === 'water' || lie === 'water' || lie === 'creek' || lie === 'frozenpond') {
-      burst(14, ['150,210,255', '235,246,255', '111,179,236'], { up: 1.5, grav: 0.09 }); // splash
+      // GS-toxic-pools: the Toxic Mire's water is a glowing acid pool, so it throws a NEON-GREEN
+      // caustic splash instead of the ordinary blue one (every other world keeps the blue splash).
+      const toxic = archetypeFor(opts.themeId, opts.biome ?? '') === 'swamp' && !opts.rainbow;
+      if (toxic) burst(14, ['96,255,150', '210,255,150', '38,224,110'], { up: 1.5, grav: 0.09 }); // acid splash
+      else burst(14, ['150,210,255', '235,246,255', '111,179,236'], { up: 1.5, grav: 0.09 }); // splash
     } else if (penalty === 'ravine' || lie === 'barranca') {
       burst(10, ['138,111,74', '107,90,72'], { up: 0.8, grav: 0.07 }); // rockfall dust
     } else if (lie === 'bunker' || lie === 'pot' || lie === 'waste' || lie === 'sand') {
