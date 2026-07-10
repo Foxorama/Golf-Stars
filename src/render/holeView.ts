@@ -74,6 +74,7 @@ const TREE_GLYPH: Record<BiomeArchetype, string> = {
   void: '🪨', // asteroid crag
   swamp: '🌾', // dead mangrove / bog reeds
   metal: '📡', // rusted scrap mast / antenna
+  derelict: '🛰️', // a broken antenna spar / dead dish jutting from the hull
   asgard: '🍁', // Yggdrasil golden-leaf ash
 };
 const blockGlyph = (src: 'trees' | 'tents', arch: BiomeArchetype): string =>

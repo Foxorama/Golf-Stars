@@ -41,6 +41,18 @@ Object.assign(out, GALAXY_OVERRIDE);
 // its real figure centroid (J2000), the same hand-anchor approach the galaxies use above.
 out['cetus'] = { ra: 31.6, dec: -5.9 };
 
+// GS-more-worlds / GS-weather-affinity: these four constellation themes were added to the THEMES table
+// but aren't cards in the harvested catalogue, so pin them to their real figure centroids (J2000).
+out['hydra'] = { ra: 141.897, dec: -8.659 };
+out['antlia'] = { ra: 157.234, dec: -31.068 };
+out['piscis-austrinus'] = { ra: 344.413, dec: -29.622 };
+out['pyxis'] = { ra: 130.898, dec: -33.186 };
+
+// GS-derelict: the two deep-sky WRECKS the derelict-ship world flies into aren't catalogue cards —
+// hand-pin them to their real J2000 positions, like Cetus / the galaxies above.
+out['ghost-nebula'] = { ra: 319.1, dec: 68.28 }; // vdB 141 / Sh2-136, in Cepheus
+out['skull-nebula'] = { ra: 11.76, dec: -11.87 }; // NGC 246, the Skull Nebula, in Cetus
+
 const body = `/**
  * Real-sky coordinates per voyage THEME (GS-galaxy-map) — GENERATED from data/night-sky-cards.json
  * by scripts/gen-sky-coords.mjs. Equatorial J2000: \`ra\` in degrees (0–360), \`dec\` in degrees

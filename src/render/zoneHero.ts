@@ -335,6 +335,35 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
     return frame(W, H, inner, ['#0e0a08', '#2a1a10'], gid);
   }
 
+  if (archetype === 'derelict') {
+    let inner = stars(rng, W, H, 30, 0.9);
+    // A cold, faint steel nebula wash — the emptiest sky.
+    inner += `<ellipse cx="${n1(W * 0.28)}" cy="${n1(H * 0.32)}" rx="${n1(W * 0.34)}" ry="${n1(H * 0.28)}" fill="rgba(110,150,190,0.10)"/>`;
+    // The DEAD MOTHERSHIP: a huge hull, SEVERED into two drifting halves over the void.
+    const sx = W * 0.5;
+    const sy = H * 0.44;
+    const sw = W * 0.3;
+    const sh = sw * 0.28;
+    inner += `<ellipse cx="${n1(sx)}" cy="${n1(sy)}" rx="${n1(sw * 1.05)}" ry="${n1(sh * 1.6)}" fill="rgba(120,150,185,0.08)"/>`;
+    inner += `<polygon points="${n1(sx - sw)},${n1(sy + sh)} ${n1(sx - sw * 0.1)},${n1(sy + sh * 0.8)} ${n1(sx - sw * 0.22)},${n1(sy - sh * 0.7)} ${n1(sx - sw * 0.92)},${n1(sy - sh)}" fill="#1a2028" stroke="rgba(150,180,210,0.5)" stroke-width="1.4"/>`;
+    inner += `<polygon points="${n1(sx + sw * 0.16)},${n1(sy + sh * 0.9)} ${n1(sx + sw)},${n1(sy + sh * 1.1)} ${n1(sx + sw * 0.9)},${n1(sy - sh * 0.4)} ${n1(sx + sw * 0.1)},${n1(sy - sh * 0.6)}" fill="#161c23" stroke="rgba(150,180,210,0.45)" stroke-width="1.4"/>`;
+    // The torn split between the halves, cold conduits glinting.
+    inner += `<line x1="${n1(sx - sw * 0.1)}" y1="${n1(sy + sh * 0.8)}" x2="${n1(sx - sw * 0.22)}" y2="${n1(sy - sh * 0.7)}" stroke="rgba(95,212,208,0.4)" stroke-width="1.4"/>`;
+    // Dark portholes (lights out) + one dying red beacon + a snapped mast.
+    for (let k = 0; k < 5; k++) inner += `<circle cx="${n1(sx - sw * 0.7 + k * sw * 0.3)}" cy="${n1(sy)}" r="2.4" fill="rgba(30,44,58,0.9)"/>`;
+    inner += `<circle cx="${n1(sx + sw * 0.6)}" cy="${n1(sy - sh * 0.3)}" r="3" fill="#ff5a4a"/>`;
+    inner += `<line x1="${n1(sx - sw * 0.55)}" y1="${n1(sy - sh * 0.9)}" x2="${n1(sx - sw * 0.72)}" y2="${n1(sy - sh * 2.2)}" stroke="rgba(120,150,185,0.5)" stroke-width="2" stroke-linecap="round"/>`;
+    // A lone hull SECTION drifting below with a flag — the deck you golf, adrift in space.
+    const ix = W * 0.34;
+    const iy = H * 0.78;
+    inner += `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="42" ry="12" fill="rgba(120,150,185,0.16)"/>`;
+    inner += `<polygon points="${n1(ix - 36)},${n1(iy)} ${n1(ix + 36)},${n1(iy)} ${n1(ix + 24)},${n1(iy + 11)} ${n1(ix - 24)},${n1(iy + 11)}" fill="#333d47" stroke="#5d6b78" stroke-width="1.5"/>`;
+    inner += `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="32" ry="7" fill="#557f82"/>`;
+    inner += `<line x1="${n1(ix + 6)}" y1="${n1(iy)}" x2="${n1(ix + 6)}" y2="${n1(iy - 16)}" stroke="#c8d4dc" stroke-width="1.5"/>`;
+    inner += `<polygon points="${n1(ix + 6)},${n1(iy - 16)} ${n1(ix + 15)},${n1(iy - 13)} ${n1(ix + 6)},${n1(iy - 10)}" fill="#ff5a4a"/>`;
+    return frame(W, H, inner, ['#04060b', '#0e141c'], gid);
+  }
+
   // void
   let inner = stars(rng, W, H, 34, 1);
   // A nebula smear.

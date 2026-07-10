@@ -249,6 +249,14 @@ export const THEME_SKY: Record<string, SkyCoord> = {
   "pyxis": {
     "ra": 130.898,
     "dec": -33.186
+  },
+  "ghost-nebula": {
+    "ra": 319.1,
+    "dec": 68.28
+  },
+  "skull-nebula": {
+    "ra": 11.76,
+    "dec": -11.87
   }
 };
 

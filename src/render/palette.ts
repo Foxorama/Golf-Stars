@@ -24,6 +24,7 @@ export const FILL: Record<string, string> = {
   void: '#160a26',
   voidrough: '#0a0518',
   cetusdeep: '#06283a',
+  shiprough: '#080b12',
   ice: '#bfe6f0',
   crystal: '#9fd8e6',
 };
@@ -44,6 +45,7 @@ export const BIOME_ROUGH: Record<string, string> = {
   'cetus-deep': '#1a3a50',
   'toxic-mire': '#4a5a2c',
   'scrap-belt': '#7a4a2c',
+  'derelict-ship': '#48535e',
 };
 
 /** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
@@ -92,6 +94,9 @@ export const OB_LOOK: Record<BiomeArchetype, ObLook> = {
   cetus: { post: '#bfe8f0', cap: '#5fd8dc', line: 'rgba(150,235,245,0.16)', beacon: 'rgba(120,230,240,0.42)' }, // luminous sea-marks adrift
   swamp: { post: '#6a5a3a', cap: '#9fd84a', line: 'rgba(120,180,60,0.16)', glow: 'rgba(150,220,80,0.30)' }, // rotting bog-marker posts, sickly acid-lamp caps
   metal: { post: '#8a5e3a', cap: '#ff8a2a', line: 'rgba(180,120,70,0.16)', glow: 'rgba(255,150,60,0.28)' }, // rusted girder posts with hazard-orange warning caps
+  // Derelict — no ground to plant a stake in (off the deck is open space): a FLOATING emergency beacon,
+  // a dead red warning light adrift where the hull ends. Cold steel post for the calm-stop hull edges.
+  derelict: { post: '#6a7a86', cap: '#ff5a4a', line: 'rgba(150,175,200,0.16)', beacon: 'rgba(255,90,74,0.42)' },
   asgard: { post: '#e8d48a', cap: '#ffcf4a', line: 'rgba(232,212,138,0.18)', glow: 'rgba(255,210,110,0.34)' }, // gilded rune-pillars with a Bifröst-banner cap glow
 };
 
@@ -265,6 +270,18 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#568576',
     rough: { light: '#96603a', base: '#7a4a2c', dark: '#5e381f', ink: '#301c10' },
   },
+  // Derelict — COLD DEAD STEEL: the mown "fairway" is a lit deck-plating walkway (a desaturated steel-
+  // teal with a faint emergency-cyan cast), the "green" a slightly brighter landing pad, over a bare
+  // gunmetal HULL rough (base mean ~83/255, well clear of the cold blue-black space base ~8/255 — the
+  // ≥30 rough-vs-space brightness gap the frame test enforces). No parkland lime anywhere: this reads as
+  // the inside of a wreck, lit by dying emergency light, not a mown lawn.
+  derelict: {
+    fairway: { light: '#63797d', base: '#4a5f63', dark: '#374a4e', ink: '#152023' },
+    green: { light: '#72a0a2', base: '#557f82', dark: '#406366', ink: '#183034' },
+    tee: { light: '#5a6d70', base: '#455659', dark: '#374749', ink: '#141d1f' },
+    collar: '#4a6266',
+    rough: { light: '#5c6773', base: '#48535e', dark: '#363f48', ink: '#1a1f26' },
+  },
   // Asgard — GILDED EMERALD: jewel-green fairways with a golden sheen, luminous emerald greens, a gold
   // apron collar. The rough is a rich gilded meadow (base mean ~75/255, comfortably clear of the deep
   // royal-indigo space base ~21/255 — the ≥30 rough-vs-space brightness gap the frame test enforces).
@@ -346,6 +363,9 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   // Metal — a cold metallic near-black lit by a rust-orange scrap nebula, with a warm metallic-lit
   // shore where the derelict plates meet the vacuum.
   metal: { base: '#0c0a08', nebula: 'rgba(190,110,55,0.12)', edge: 'rgba(215,155,95,0.19)' },
+  // Derelict — a cold blue-black vacuum, a faint dead-steel nebula wash, and a cold steel-lit rim where
+  // the broken hull sections meet the stars. Bleak, silent, haunted — the emptiest sky short of the void.
+  derelict: { base: '#05070d', nebula: 'rgba(90,120,160,0.10)', edge: 'rgba(140,170,205,0.18)' },
   // Asgard — the Golden Realm: a royal indigo→violet twilight (deep base) with a violet nebula and a
   // warm GOLD horizon glow at the shore where the emerald fields meet the celestial sky.
   asgard: { base: '#0e0a26', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(255,205,90,0.24)' },
@@ -469,6 +489,7 @@ export const ACCENTS: Record<string, Accent> = {
   'cetus-deep': { flowers: ['#7af0ff', '#9fd8ff', '#c8fbff'], mote: '#bff4ff' },
   'toxic-mire': { flowers: ['#9fd84a', '#c8e07a', '#7aa83a'], mote: '#c8e888' }, // sickly bog blooms
   'scrap-belt': { flowers: ['#ff8a2a', '#ffbf6a', '#d98c4c'], mote: '#ffcf8a' }, // rust flecks & sparks
+  'derelict-ship': { flowers: ['#ff5a4a', '#5fd4d0', '#ffb04a'], mote: '#9fd0e0' }, // dead emergency lights, live wiring sparks, cold motes
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };
 

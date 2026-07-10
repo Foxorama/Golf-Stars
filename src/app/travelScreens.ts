@@ -44,6 +44,7 @@ const BIOME_BADGE: Record<string, { glyph: string; label: string; col: string }>
   fungal: { glyph: '🍄', label: 'Jungle', col: '#54dba0' },
   ocean: { glyph: '🌊', label: 'Ocean', col: '#5fd49e' },
   cetus: { glyph: '🐋', label: 'Cetus', col: '#5fd8dc' },
+  derelict: { glyph: '🛸', label: 'Derelict', col: '#8fb0c0' },
 };
 
 // The functional family of a route event → a short pill label + accent (distinct from the rarity ring).

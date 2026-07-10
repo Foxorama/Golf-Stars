@@ -153,6 +153,19 @@ export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
     steel: { fill: 'rgba(150,160,170,0.16)', frac: 0.34 }, // grey steel-plate patches amongst the rust
     density: 1.4,
   },
+  // Derelict — a cold riveted HULL floor: dim steel mottle, plate-seam combing ridges, the odd dying
+  // cyan wiring glint and bent-spar SHARD tufts, so a calm-stop hull deck reads as a field of dead
+  // gunmetal plating (armed lost holes skip ground cover — off the deck is open space there).
+  derelict: {
+    mottleLight: 'rgba(150,185,215,0.09)',
+    mottleDark: 'rgba(6,10,16,0.28)',
+    grain: ['rgba(150,180,210,0.4)', 'rgba(10,16,24,0.55)', 'rgba(95,212,208,0.30)'], // steel filings + a live-wire cyan fleck
+    ridge: 'rgba(150,180,210,0.20)', // plate seams / bulkhead lines
+    sparkle: 'rgba(120,220,215,0.7)', // dying wiring sparks
+    tuft: { cols: ['#3a464f', '#6a7a86'], style: 'shard' }, // bent hull spars / torn plate splinters
+    steel: { fill: 'rgba(120,140,160,0.14)', frac: 0.3 }, // brushed-steel plate patches
+    density: 1.3,
+  },
 };
 
 /**

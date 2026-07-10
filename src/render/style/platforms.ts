@@ -256,6 +256,22 @@ export const VOID_CLIFF: CliffLook = {
   shadow: 'rgba(3,1,10,0.5)',
   contact: 'rgba(6,3,16,0.36)',
 };
+// Derelict (GS-derelict): each hull SECTION is a slab of broken ship floating in space, so its
+// underside reads as a cold riveted METAL cross-section — dark gunmetal strata descending to black, a
+// cold steel-lit top rim, cyan-tinged cracks (severed conduits) rather than rock veins. Same geometry
+// as the void/cetus cliffs (`platformCliffs`), different material: torn hull-plate, not asteroid rock.
+export const SHIP_CLIFF: CliffLook = {
+  strata: ['#5d6b78', '#47535e', '#333d47', '#232b33', '#161c22', '#0a0e13'],
+  deepMix: '#04070c',
+  lipA: 'rgba(150,190,225,0.85)',
+  lipB: 'rgba(210,232,250,0.7)',
+  crackDark: 'rgba(4,7,12,0.55)',
+  crackLit: 'rgba(95,212,208,0.2)', // severed conduits glow faint cyan in the cross-section
+  dustA: 'rgba(190,205,225,0.45)',
+  dustB: 'rgba(140,165,200,0.38)',
+  shadow: 'rgba(2,5,10,0.5)',
+  contact: 'rgba(4,8,14,0.34)',
+};
 // Rainbow Road (GS-rainbow-road-2): the ribbon rests on a PRISMATIC crystal buttress — the support
 // pillars must read as the rainbow world's OWN structure, not a recoloured void asteroid. So the
 // strata descend through genuinely DIFFERENT jewel hues (lit rose-magenta → violet → periwinkle →

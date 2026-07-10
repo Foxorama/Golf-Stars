@@ -58,6 +58,8 @@ export function styleFlora(poly: Vec[], proj: Projector, rng: () => number, arch
       return floraBogCypress(x, y, rr, tint, cc);
     case 'metal':
       return floraScrapMast(x, y, rr, tint, cc);
+    case 'derelict':
+      return floraHullSpar(x, y, rr, tint, cc);
     default:
       break; // verdant (and any unknown) → the classic parkland canopy, byte-identical
   }
@@ -361,6 +363,45 @@ function floraScrapMast(x: number, y: number, rr: number, tint: number, key: Vec
   const lit = posHash(key[0], key[1], 4) < 0.5;
   out.push({ t: 'glow', c: [topX, topY - rr * 0.34], r: rr * 0.9, col: lit ? 'rgba(255,90,40,0.4)' : 'rgba(255,150,60,0.18)' });
   out.push({ t: 'circle', c: [topX, topY - rr * 0.34], r: rr * 0.16, fill: lit ? '#ff5a2a' : '#7a2a12' }); // blinking hazard lamp
+  return out;
+}
+
+/** Derelict HULL SPAR: a snapped, leaning gunmetal antenna spar with a torn top and a DEAD (dark) beacon
+ *  lamp — the wreck's cold "trees", jutting broken from the deck. Cold steel, not the belt's warm rust. */
+function floraHullSpar(x: number, y: number, rr: number, tint: number, key: Vec): Prim[] {
+  const steel = tint < 0.33 ? '#5c6773' : tint < 0.66 ? '#6a7580' : '#4a545e';
+  const lean = (posHash(key[0], key[1]) - 0.5) * rr * 0.7; // leans further — it's broken, not standing proud
+  const h = rr * 2.3;
+  const topX = x + lean;
+  const topY = y - h;
+  const legL0: Vec = [x - rr * 0.36, y + rr * 0.35];
+  const legR0: Vec = [x + rr * 0.36, y + rr * 0.35];
+  const out: Prim[] = [
+    { t: 'circle', c: [x, y + rr * 0.45], r: rr * 0.55, fill: 'rgba(0,0,0,0.24)' }, // cast shadow
+    { t: 'line', a: legL0, b: [topX, topY], stroke: steel, sw: rr * 0.19, round: true },
+    { t: 'line', a: legR0, b: [topX, topY], stroke: steel, sw: rr * 0.19, round: true },
+  ];
+  // A couple of cross-braces up the spar (fewer than the intact scrap mast — this one is failing).
+  for (let k = 0; k < 2; k++) {
+    const t0 = 0.16 + k * 0.34;
+    const t1 = t0 + 0.28;
+    const lx0 = legL0[0] + (topX - legL0[0]) * t0;
+    const ly0 = legL0[1] + (topY - legL0[1]) * t0;
+    const rx0 = legR0[0] + (topX - legR0[0]) * t0;
+    const ry0 = legR0[1] + (topY - legR0[1]) * t0;
+    const lx1 = legL0[0] + (topX - legL0[0]) * t1;
+    const ly1 = legL0[1] + (topY - legL0[1]) * t1;
+    const rx1 = legR0[0] + (topX - legR0[0]) * t1;
+    const ry1 = legR0[1] + (topY - legR0[1]) * t1;
+    out.push({ t: 'line', a: [lx0, ly0], b: [rx1, ry1], stroke: steel, sw: Math.max(1, rr * 0.07), round: true });
+    out.push({ t: 'line', a: [rx0, ry0], b: [lx1, ly1], stroke: steel, sw: Math.max(1, rr * 0.07), round: true });
+  }
+  // A snapped, dangling severed cable off the broken top, and a DEAD beacon lamp (it went dark long ago).
+  out.push({ t: 'line', a: [topX, topY], b: [topX + rr * 0.5, topY + rr * 0.9], stroke: 'rgba(120,140,160,0.5)', sw: 1, round: true });
+  out.push({ t: 'line', a: [topX, topY], b: [topX + lean * 0.4, topY - rr * 0.34], stroke: steel, sw: rr * 0.11, round: true }); // bent finial
+  const flicker = posHash(key[0], key[1], 4) < 0.18; // almost always dead; the rare one still weakly flickers
+  out.push({ t: 'glow', c: [topX + lean * 0.4, topY - rr * 0.38], r: rr * (flicker ? 0.7 : 0.35), col: flicker ? 'rgba(255,90,74,0.28)' : 'rgba(90,110,130,0.14)' });
+  out.push({ t: 'circle', c: [topX + lean * 0.4, topY - rr * 0.38], r: rr * 0.14, fill: flicker ? '#ff5a4a' : '#3a2224' }); // dead/dying warning lamp
   return out;
 }
 
@@ -831,6 +872,59 @@ export function archetypeDecor(
       out.push({ t: 'line', a: [wx - ww * 0.4, wy - wh * 0.4], b: [wx - ww * 0.55, wy - wh * 0.9], stroke: 'rgba(140,90,50,0.6)', sw: 1.6, round: true }); // snapped mast
       // A couple of sparks drifting up from the wreck.
       for (let k = 0; k < 3; k++) out.push({ t: 'circle', c: [wx + (posHash(wx, wy, k) - 0.5) * ww * 0.6, wy - wh * (0.4 + posHash(wx, wy, k + 3) * 0.6)], r: 1, fill: 'rgba(255,200,120,0.8)' });
+      break;
+    }
+    case 'derelict': {
+      // The DERELICT (GS-derelict): torn hull-plate wreckage drifting in open space around the play
+      // sections — the broken ship in pieces — and a vast DEAD mothership hulk looming on the skyline,
+      // hollow-dark and silent, the thing you are golfing the corpse of. Course-space debris rejected off
+      // every land platform (so the junk sits in the gaps/void, never on the deck); a follow-up
+      // (GS-ship-feel) sets this drifting. Pure seeded geometry on the passed decor stream.
+      const spanX = cb.maxX - cb.minX || 1;
+      const spanY = cb.maxY - cb.minY || 1;
+      const cxw = (cb.minX + cb.maxX) / 2;
+      const cyw = (cb.minY + cb.maxY) / 2;
+      const want = 6 + Math.floor(rng() * 4);
+      for (let i = 0, placed = 0; i < want * 16 && placed < want; i++) {
+        const c: Vec = [cxw + (rng() - 0.5) * spanX * 1.8, cyw + (rng() - 0.5) * spanY * 1.8];
+        if (landPolysCourse.some((lp) => pointInPoly(c, lp))) continue;
+        placed++;
+        const s = proj.project(c);
+        const r = Math.max(3, Math.min(18, (4 + rng() * 7) * proj.scale));
+        // A jagged, torn plate of hull — angular, not a rounded rock (twisted broken metal).
+        const pts: Vec[] = [];
+        const sides = 4 + (posHash(c[0], c[1], 7) < 0.5 ? 0 : 1);
+        for (let k = 0; k < sides; k++) {
+          const a = (k / sides) * Math.PI * 2 + posHash(c[0], c[1], k + 11) * 0.5;
+          const rk = r * (0.5 + posHash(c[0], c[1], k) * 0.8); // wildly uneven radius = torn edge
+          pts.push([s[0] + Math.cos(a) * rk, s[1] + Math.sin(a) * rk * 0.82]);
+        }
+        out.push({ t: 'glow', c: s, r: r * 1.5, col: 'rgba(150,180,210,0.07)' });
+        out.push({ t: 'poly', pts, fill: '#3a444e', stroke: 'rgba(150,180,210,0.5)', sw: 1 });
+        out.push({ t: 'line', a: pts[0]!, b: pts[1]!, stroke: 'rgba(190,210,230,0.55)', sw: 1.1, round: true }); // cold starlit edge
+        // A rivet or two, and the rare live-wire cyan glint.
+        for (let k = 0; k < 2; k++) out.push({ t: 'circle', c: [s[0] + (posHash(c[0], c[1], k) - 0.5) * r, s[1] + (posHash(c[0], c[1], k + 3) - 0.5) * r * 0.8], r: 0.8, fill: 'rgba(12,18,24,0.85)' });
+        if (posHash(c[0], c[1], 14) < 0.22) out.push({ t: 'circle', c: [s[0] + r * 0.2, s[1] - r * 0.2], r: 1, fill: 'rgba(95,212,208,0.8)' }); // a wire still sparking
+      }
+      // The DEAD MOTHERSHIP on the far skyline — a huge hollow-dark hull, unlit but for one failing red
+      // emergency light, a snapped spine and a torn-open flank. The ghost the level is haunted by.
+      const wx = W * (0.12 + rng() * 0.62);
+      const wy = H * (0.07 + rng() * 0.12);
+      const ww = Math.max(46, W * 0.26);
+      const wh = ww * 0.3;
+      out.push({ t: 'glow', c: [wx, wy], r: ww * 1.0, col: 'rgba(120,150,185,0.10)' });
+      // Long broken hull body (two halves, split — the ship is severed).
+      out.push({ t: 'poly', pts: [[wx - ww * 0.5, wy + wh * 0.5], [wx - ww * 0.05, wy + wh * 0.4], [wx - ww * 0.12, wy - wh * 0.35], [wx - ww * 0.46, wy - wh * 0.5]], fill: '#1a2028', stroke: 'rgba(140,170,200,0.45)', sw: 1 });
+      out.push({ t: 'poly', pts: [[wx + ww * 0.08, wy + wh * 0.45], [wx + ww * 0.5, wy + wh * 0.55], [wx + ww * 0.46, wy - wh * 0.2], [wx + ww * 0.05, wy - wh * 0.3]], fill: '#161c23', stroke: 'rgba(140,170,200,0.4)', sw: 1 });
+      // The torn gap between the two halves (the split that broke the ship).
+      out.push({ t: 'line', a: [wx - ww * 0.05, wy + wh * 0.4], b: [wx - ww * 0.12, wy - wh * 0.35], stroke: 'rgba(95,212,208,0.35)', sw: 1.2, round: true });
+      out.push({ t: 'line', a: [wx + ww * 0.08, wy + wh * 0.45], b: [wx + ww * 0.05, wy - wh * 0.3], stroke: 'rgba(95,212,208,0.3)', sw: 1.2, round: true });
+      // A few DARK portholes (the lights are out), and a single failing red beacon.
+      for (let k = 0; k < 5; k++) out.push({ t: 'circle', c: [wx - ww * 0.34 + k * ww * 0.16, wy + wh * 0.05], r: ww * 0.022, fill: 'rgba(30,44,58,0.9)' });
+      out.push({ t: 'glow', c: [wx + ww * 0.3, wy - wh * 0.1], r: ww * 0.09, col: 'rgba(255,90,74,0.3)' });
+      out.push({ t: 'circle', c: [wx + ww * 0.3, wy - wh * 0.1], r: ww * 0.022, fill: '#ff5a4a' }); // the one light still dying
+      // The snapped spine/mast.
+      out.push({ t: 'line', a: [wx - ww * 0.3, wy - wh * 0.45], b: [wx - ww * 0.42, wy - wh * 0.95], stroke: 'rgba(120,150,185,0.5)', sw: 1.6, round: true });
       break;
     }
     default:

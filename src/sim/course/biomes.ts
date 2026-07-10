@@ -488,6 +488,36 @@ export const BIOMES: readonly Biome[] = [
     greenSlopeMax: 0.5,
     roughBreaks: 0.4,
   },
+  {
+    // Derelict (GS-derelict) — a DEAD STARSHIP adrift in the deep. Unlike the Scrap Belt (solid metal
+    // ground), the wreck is BROKEN INTO PIECES over open space: it plays the void's proven-fair island/
+    // abyss model (`lostRough` → off the mown hull deck is lost to the stars), so par 4/5 holes become a
+    // CHAIN of hull sections separated by star-gaps you carry from one piece to the next. Low gravity
+    // (near-vacuum, the wreck tumbles slowly), no wind (a sealed dead ship). The metal FEEL — sideways
+    // walls that bounce the ball, twisted broken-hull edges, drifting space junk, the spooky music — is
+    // layered on by the render + a follow-up (GS-ship-walls / GS-ship-feel); this row is the physics.
+    // Balance-exempt like void/cetus (a deliberately brutal lost world; structural fairness still holds).
+    id: 'derelict-ship',
+    name: 'Derelict',
+    weight: 8,
+    carryMult: 1.3, // low gravity — the wreck drifts in near-vacuum, so the ball bombs across the gaps
+    carryJitter: 0.05, // tumbling debris / venting atmosphere jostles the carry
+    windBase: 0, // a sealed, dead ship — no wind aboard
+    windWild: 3,
+    hazardKinds: ['void'], // the gaps between hull sections are open space (a lost-rough world strips these on armed holes)
+    greensideKind: 'bunker', // hull-breach sand-drifts ring the calm-stop greens
+    scatter: [{ kind: 'waste', freqPerHole: 1.0, rMin: 6, rMax: 12 }], // firm riveted deck plates run true
+    fairwayWidthMult: 0.95, // ship corridors (the island scale widens the deep/wild pads fairly)
+    doglegBias: 0.3, // the deck runs straighter than most worlds (sharp ship-corner turns arrive in GS-ship-feel)
+    treeDensity: 0, // nothing grows aboard a dead ship
+    fairwayBunkers: 0.4, // the odd hull-breach sand-drift
+    lostRough: 'shiprough', // signature: off the deck is lost to open space
+    greenSize: 0.9, // small angular plate-metal landing pads
+    greenAspect: 1.85,
+    greenIrregular: 1.3,
+    greenSlopeMax: 0.5,
+    roughBreaks: 0.0, // lost worlds keep an unbroken pad/corridor
+  },
 ];
 
 const TOTAL_WEIGHT = BIOMES.reduce((s, b) => s + b.weight, 0);
@@ -506,7 +536,7 @@ export function biomeById(id: string): Biome | undefined {
  * (validateCourse/Fairness/Crossings) are NOT relaxed — they still pass for these worlds.
  * TODO(GS-cetus-6): rebalance the island-hop AI/scoring, then remove this exemption.
  */
-export const BALANCE_EXEMPT_BIOMES: ReadonlySet<string> = new Set(['void-garden', 'cetus-deep']);
+export const BALANCE_EXEMPT_BIOMES: ReadonlySet<string> = new Set(['void-garden', 'cetus-deep', 'derelict-ship']);
 
 /** Pick a biome by weight using a [0,1) roll. */
 export function pickBiome(roll01: number): Biome {
