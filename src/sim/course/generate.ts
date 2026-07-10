@@ -39,7 +39,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 20; // GS-variety-3: shape/length variety + island stories at depth
+export const GENERATOR_VERSION = 21; // GS-ship-corridor: derelict plays straight constant-width ship hallways
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -69,6 +69,17 @@ const CROSSING_KINDS = new Set(['lavariver', 'frozenpond', 'creek', 'barranca'])
  * game's meanest, so their width pass both lifts the baseline and adds widen-only variety on top.
  */
 const VOID_ISLAND_SCALE = 2.6;
+
+/**
+ * Ship-corridor half-width SCALE (GS-ship-corridor) — the DERELICT world's own width baseline. Unlike
+ * the void's wide, blobby survival islands, a dead ship's corridor is a TIGHT, CONSTANT-WIDTH hallway
+ * walled on both sides by impassable bulkheads (`sim/walls.ts`), so it doesn't need the generous
+ * island scale (a sideways miss ricochets back off the wall instead of being lost). A fixed, modest
+ * scale — no wildness ramp, no widen-only bulges — gives every derelict hole the same clean corridor
+ * cross-section: a passage you play DOWN, not an island you land ON. Balance-exempt world (a
+ * deliberately brutal lost ship), so this is a look-and-feel choice, not a balance one.
+ */
+const SHIP_CORRIDOR_SCALE = 1.25;
 
 /**
  * Island-hop completability (GS-cetus-gaps): the void carries between a lost-rough hole's pads must
@@ -796,6 +807,13 @@ function generateHole(
   // hazard, so it needs no flanking penalty hazards. The island is sized generous (below) to stay fair.
   const islandPar3 = !!lostRough && par === 3;
 
+  // SHIP corridor (GS-ship-corridor): the derelict world plays DOWN a straight, constant-width metal
+  // hallway walled by impassable bulkheads, not across the void's wide landing islands. `ship` gates
+  // every corridor-shaping decision below (width scale, width profile, straight-run centreline) so the
+  // derelict reads as a ship passage; it's the ONLY `walls` world, and the whole branch is gated on it,
+  // so every other world's geometry + rng stream is byte-for-byte unchanged.
+  const ship = !!biome.walls;
+
   // Hole ARCHETYPE (GS-shapes-2): pick a design template that couples a SHAPE (straight drift / single
   // dogleg L-R / S-curve double / heroic CAPE diagonal / severe HAIRPIN) with a LENGTH CLASS (drivable
   // par-4, short/long par-3, reachable/three-shot par-5) so holes stop being one length + one bend.
@@ -807,7 +825,7 @@ function generateHole(
   const length = baseLen * biome.carryMult * tpl.lenMult;
 
   // Everything downstream (corridor, hazards, scatter, green, apron) derives from this centreline.
-  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, tpl, !!lostRough, !!biome.sharpCorners);
+  const centreline: Vec[] = buildCentreline(length, wildness, biome, rng, par, tpl, !!lostRough, !!biome.sharpCorners, ship);
   const green: Vec = centreline[centreline.length - 1]!;
 
   // Fairway corridor: WIDE and generous on early/easy stops, tightening as wildness climbs —
@@ -822,7 +840,9 @@ function generateHole(
   // corridor is built from a densified centreline so its edge can vary smoothly.
   // When lost-rough is armed, widen the corridor into a fair "island" so a sensible shot still has
   // somewhere to land — you play TO the fairway or lose the ball, but the target is honest.
-  const widthScale = lostRough ? VOID_ISLAND_SCALE : 2.0 - 1.25 * wildness;
+  // The derelict's hallway is a fixed, modest width (walled on both sides), never the void's wide
+  // island scale — so its corridor reads as a passage you play DOWN, not an island you land ON.
+  const widthScale = ship ? SHIP_CORRIDOR_SCALE : lostRough ? VOID_ISLAND_SCALE : 2.0 - 1.25 * wildness;
   const baseHalf = (par === 3 ? 16 : 22) * biome.fairwayWidthMult * widthScale * rng.range(0.9, 1.2);
   // Denser so the ribbon edge and rounded caps read smoothly. Lost-rough holes sample DENSER still
   // (GS-cetus-gaps): at 19 points (u-step ≈ 0.056) a legal min-width island pad could hold <3 dense
@@ -842,7 +862,7 @@ function generateHole(
   //    (damped by the profile where a squeeze must hold).
   // The profile's own `floorFrac` floors the width — the squeezed archetypes dip well below the old
   // 0.5 floor by design — with an absolute 5-yd half-width floor so a corridor never degenerates.
-  const wp = chooseWidthProfile(rng, par, wildness, !!lostRough);
+  const wp = chooseWidthProfile(rng, par, wildness, !!lostRough, ship);
   const asymPhase = rng.range(0, Math.PI * 2);
   const asymLobes = rng.range(0.6, 1.6);
   const asymAmt = (0.12 + 0.1 * rng.float()) * wp.asymScale;
@@ -1791,13 +1811,22 @@ interface WidthProfile {
  * A lost par 3 keeps the plain 'island' recipe (its corridor is replaced by the green island blob).
  * Exported for that widen-only guard; the generator is the only production caller.
  */
-export function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boolean): WidthProfile {
+export function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boolean, ship = false): WidthProfile {
   // Every profile carries a seeded sine for organic edge movement (each draws its own phase/lobes).
   const wave = (amp: number): ((u: number) => number) => {
     const phase = rng.range(0, Math.PI * 2);
     const lobes = rng.range(1.6, 3.2);
     return (u) => Math.sin(phase + u * Math.PI * lobes) * amp;
   };
+  // SHIP CORRIDOR (GS-ship-corridor): a straight, near-constant-width metal hallway — the derelict's
+  // signature. No landing bays, no widen-only bulges: a passage of uniform cross-section, walled by
+  // impassable bulkheads. A whisper of edge movement (buckled plating), otherwise dead straight in
+  // width. Nearly symmetric (a corridor doesn't lean). Drawn before the island/land pools; the derelict
+  // is the only world that sets `ship`, so no other world's profile pick is touched.
+  if (ship) {
+    const w = wave(0.04);
+    return { id: 'ship-corridor', at: (u) => 1 + w(u), floorFrac: 1, asymScale: 0.2 };
+  }
   // The pre-grammar recipe: full body, two landing-zone bulges, a gentle wave and one soft pinch.
   const classic = (id = 'classic'): WidthProfile => {
     const w = wave(0.1 + 0.16 * (1 - wildness));
@@ -1963,6 +1992,7 @@ function buildCentreline(
   tpl: HoleTemplate,
   island = false,
   sharp = false,
+  ship = false,
 ): Vec[] {
   const tee: Vec = [0, 0];
   // SHARP ship-corridor corners (GS-ship-feel): drop the Catmull-Rom sampling to 2 points/segment so the
@@ -1970,7 +2000,10 @@ function buildCentreline(
   // (and thus the rng draws) are IDENTICAL — only how many smoothing samples they're resampled into
   // changes — so a non-sharp world is byte-for-byte unchanged, and 2 (not 1) keeps a slight ease so the
   // ribbon never folds at a corner. `sp(p)` = the per-segment sample count for a given shape.
-  const sp = (p: number): number => (sharp ? 2 : p);
+  // The SHIP corridor (GS-ship-corridor) resamples at ONE point/segment — i.e. straight lines through
+  // the raw control points, so its runs are DEAD STRAIGHT and its turns are HARD ANGULAR junctions (a
+  // spaceship hallway with 90°-ish elbows), the sharpest read of `sharp`. Same control points/rng.
+  const sp = (p: number): number => (ship ? 1 : sharp ? 2 : p);
   // Bend severity floor raised (GS-variety-2): the old `0.35 + 0.65·wildness` left calm doglegs
   // nearly straight — "every early hole is the same gentle curve". A proper dogleg bends properly
   // even on a calm stop; wildness still steepens it toward the self-cross cap. The cap is loosened a
@@ -1978,7 +2011,10 @@ function buildCentreline(
   const dogFac = 0.5 + 0.5 * wildness;
   // Lost-rough par 4/5 chains bend HARDER (GS-cetus-5) — the island-hop route swings between pads for
   // real drama. `island` is false for every normal hole, so their bend magnitude is byte-identical.
-  const baseMag = biome.doglegBias * dogFac * length * (island ? 1.4 : 1);
+  // The SHIP corridor (GS-ship-corridor) does the OPPOSITE: it runs mostly STRAIGHT down the hull, so
+  // it skips the 1.4× island swing — its variety is the odd HARD ANGULAR junction (crisp corners via
+  // `sharp` sampling), not a sweeping bend, exactly like a real spaceship passageway.
+  const baseMag = biome.doglegBias * dogFac * length * (island && !ship ? 1.4 : 1);
   const cap = 0.44 * length;
   const endDrift = (): Vec => [rng.range(-0.06, 0.06) * length, length];
 

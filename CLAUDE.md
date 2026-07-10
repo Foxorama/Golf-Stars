@@ -143,6 +143,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     machinery: a `shiprough` lie ("Lost to space") whose penalty IS `voidlost` (the +1 non-replay drop),
     `SHIP_CLIFF` metal undersides, a `derelict` archetype (deep-sky themes Ghost/Skull Nebula, no
     champion/figure).
+  - SHIP CORRIDORS (GS-ship-corridor): the derelict does NOT play the void's wide, blobby survival
+    islands — it plays STRAIGHT, CONSTANT-WIDTH metal HALLWAYS you shoot DOWN. Gated on `biome.walls`
+    (`const ship`, the derelict is the only walls world → every other world byte-identical): (a)
+    `SHIP_CORRIDOR_SCALE` (1.25, fixed — no wildness ramp, no VOID_ISLAND_SCALE) sets a tight hallway
+    half-width; (b) `chooseWidthProfile`'s `ship` branch returns a `'ship-corridor'` UNIFORM profile
+    (`floorFrac` 1, near-symmetric — no landing bays, no widen-only bulges); (c) `buildCentreline`'s
+    `sp()` resamples at ONE point/segment for the ship (`sharp` → 2 elsewhere), so runs are DEAD STRAIGHT
+    and turns are HARD ANGULAR junctions, and the island 1.4× bend swing is skipped. The hull-SECTION
+    star-gaps (lost par 4/5) remain — a chain of straight corridor pieces across breached hull. The
+    walled corridor + impassable bulkheads mean a sideways miss ricochets back, never lost, so the tight
+    hallway stays fair. `GENERATOR_VERSION` 21.
   - SHIP FEEL (GS-ship-feel): three pure-geometry, zero-rng touches that sell "a ship coming apart adrift".
     (1) SHARP CORNERS — `biome.sharpCorners` drops `buildCentreline`'s Catmull-Rom sampling to 2/segment
     (`sp()`), so the corridor bends at ANGULAR ship-hallway corners not smooth arcs; SAME control points/rng
