@@ -2163,6 +2163,9 @@ function render(): void {
           phase === 'fire' ? sfx.redirectFire(kind, travelMs) : sfx.redirectHit(kind),
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
+        // Ship-corridor wall clang (GS-ship-walls): force the world's struck-metal tree voice ('clang'
+        // on the derelict) so a wall ricochet rings like hollow hull steel.
+        onWallBounce: () => sfx.land('fairway', undefined, archetypeFor(holeThemeId(hole), holeBiome(hole)), true),
       });
     }
   }
@@ -2218,6 +2221,8 @@ function render(): void {
         lefty: lefty(),
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
+        // Ship-corridor wall clang (GS-ship-walls): the world's struck-metal voice on a wall ricochet.
+        onWallBounce: () => sfx.land('fairway', undefined, archetypeFor(holeThemeId(play.hole), holeBiome(play.hole)), true),
         focus,
         // Start the watch-cam at the EXACT zoom the decision map was framed at (the player was just
         // looking at it — release must not skip-jump), falling back to the travel-framed reach when

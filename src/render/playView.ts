@@ -1736,6 +1736,9 @@ export interface PlayViewOptions {
    *  the bonk sound + speak the yelp. The arg is the exact bubble text shown on-canvas ("Ow!" /
    *  "Watch it!") so the spoken line matches. Pure feel hook; never affects the sim. */
   onTentHit?: (text: string) => void;
+  /** Ship-corridor wall ricochet (GS-ship-walls): the ball just clanged off a metal wall (arg = how
+   *  many walls it hit). Wired to a metallic clang + haptic; the flight/roll already show the bounce. */
+  onWallBounce?: (bounces: number) => void;
   /** Called once the final shot has landed. */
   onDone?: () => void;
   /** Fired once per segment at the STRIKE moment (club–ball contact / putter tap) — the cue point
@@ -1889,6 +1892,7 @@ export function mountPlayView(
   // ball instead of staying on the tent. Storing the world point + re-projecting fixes that.
   let tentCallout: { at: Vec; text: string; until: number } | null = null;
   let tentFiredShot = -1; // shot whose tent-hit callout has fired
+  let wallFiredShot = -1; // shot whose ship-wall clang has fired (GS-ship-walls)
 
   function reset(_now: number): void {
     shotIndex = 0;
@@ -1914,6 +1918,7 @@ export function mountPlayView(
     caddyCallout = null;
     tentCallout = null;
     tentFiredShot = -1;
+    wallFiredShot = -1;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -2382,6 +2387,15 @@ export function mountPlayView(
             tentCallout = { at: shot.tentHit.c, text, until: now + TENT_CALLOUT_MS };
             shake = Math.max(shake, 0.3);
             opts.onTentHit?.(text);
+          }
+          // Ship-corridor wall ricochet (GS-ship-walls): the flight ENDS at the wall it clanged off
+          // (the sim set the landing there), so touchdown IS the impact — throw a metallic spark + a
+          // hull clang here, harder for a double bounce. The flight/roll already show it bouncing back.
+          if (shot.wallHit && wallFiredShot !== shotIndex) {
+            wallFiredShot = shotIndex;
+            spawnLandFX([tdx, tdy], 'junk'); // a shower of sparks + a scrap rattle off the steel wall
+            shake = Math.max(shake, shot.wallHit.bounces >= 2 ? 0.5 : 0.32);
+            opts.onWallBounce?.(shot.wallHit.bounces);
           }
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
           if ((shot.roll ?? 0) < -0.3) {

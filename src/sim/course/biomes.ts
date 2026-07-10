@@ -130,6 +130,13 @@ export interface Biome {
    * links worlds break more; barren worlds (void/desert) stay unbroken. Default ~0.6 if absent.
    */
   roughBreaks?: number;
+  /**
+   * Ship-corridor WALLS (GS-ship-walls): the world's corridor is lined by collidable METAL walls that
+   * a low, flat ball ricochets off (bouncing back toward the deck), a lofted shot clears. The generator
+   * stamps `hole.walls` from the ribbon edges when set; the derelict ship is the only world that uses
+   * them. Pure geometry, zero rng — every other world is byte-identical.
+   */
+  walls?: boolean;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -512,6 +519,7 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0, // nothing grows aboard a dead ship
     fairwayBunkers: 0.4, // the odd hull-breach sand-drift
     lostRough: 'shiprough', // signature: off the deck is lost to open space
+    walls: true, // signature: metal corridor walls bounce a low ball back onto the deck (GS-ship-walls)
     greenSize: 0.9, // small angular plate-metal landing pads
     greenAspect: 1.85,
     greenIrregular: 1.3,

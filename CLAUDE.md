@@ -142,8 +142,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     (deliberately brutal, skipped by the death-spiral harnesses). The derelict reuses the proven island
     machinery: a `shiprough` lie ("Lost to space") whose penalty IS `voidlost` (the +1 non-replay drop),
     `SHIP_CLIFF` metal undersides, a `derelict` archetype (deep-sky themes Ghost/Skull Nebula, no
-    champion/figure). The metal FEEL — collidable walls, sharp corners, animated space junk — is layered
-    on by follow-ups (GS-ship-walls / GS-ship-feel), not this row.
+    champion/figure). Sharp ship-corner corridors + animated drifting junk are a follow-up (GS-ship-feel).
+  - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
+    METAL walls (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
+    `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). A low
+    flat ball crossing a wall RICOCHETS back inward toward the deck (`wallFlightHit`, arc-height gated per
+    wall — a lofted shot clears); a second crossing off the reflected line bounces again (hit two walls,
+    bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡ interactive)
+    and a rolling ball stops against a wall in `rollOut` (a new `walls` param). Walls break at the island
+    gaps (open hull) so a star-carry stays open, and only ever SAVE a ball that would be lost to space
+    (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts` (`styleShipWalls`,
+    camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's struck-metal voice
+    + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the course contract.
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,
