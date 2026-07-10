@@ -45,6 +45,13 @@ export interface GroundCoverLook {
   tuft?: { cols: string[]; style: 'blade' | 'shard' | 'clump' };
   /** Texture-density multiplier (default 1) — bumped on worlds whose rough read as a flat slab. */
   density?: number;
+  /**
+   * GS-scrap-steel: a contrasting tonal patch mixed into a FRACTION of the mottle so a monotone
+   * rough breaks up with a second colour (the Scrap Belt's grey steel plates strewn amongst the
+   * rust). Applied by course-space `posHash` (zero rng — no stream perturbation, camera-proof) to
+   * `steel.frac` of the mottle patches. Absent → the classic two-tone mottle, byte-identical.
+   */
+  steel?: { fill: string; frac: number };
 }
 export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
   verdant: {
@@ -133,13 +140,17 @@ export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
   },
   // Metal — a riveted scrap floor: rust mottle, plate-seam combing ridges, weld-spark glints and bent
   // rebar SHARD tufts, so the bare rough reads as a field of oxidised hull-plate, not flat rust.
+  // GS-scrap-steel: a grey STEEL tone is threaded through the mottle (steel plates strewn amongst the
+  // rust), the grain (steel filings) and the shards (a bare-metal splinter) so the rust reads broken
+  // up by a second colour rather than one flat rust wash.
   metal: {
     mottleLight: 'rgba(255,180,120,0.10)',
     mottleDark: 'rgba(18,10,4,0.26)',
-    grain: ['rgba(255,170,90,0.4)', 'rgba(30,18,10,0.55)'],
+    grain: ['rgba(255,170,90,0.4)', 'rgba(30,18,10,0.55)', 'rgba(148,158,166,0.42)'], // rust flecks + bare-steel filings
     ridge: 'rgba(210,150,90,0.22)', // plate seams / weld lines
     sparkle: 'rgba(255,200,120,0.85)', // weld sparks
-    tuft: { cols: ['#5a3a22', '#a86a3a'], style: 'shard' }, // bent rebar splinters
+    tuft: { cols: ['#5a3a22', '#8a929a'], style: 'shard' }, // bent rebar + bare-steel splinters
+    steel: { fill: 'rgba(150,160,170,0.16)', frac: 0.34 }, // grey steel-plate patches amongst the rust
     density: 1.4,
   },
 };
@@ -193,7 +204,11 @@ export function groundCover(
       const rk = r * (0.68 + posHash(g.c[0], g.c[1], k) * 0.55);
       pts.push([g.s[0] + Math.cos(a) * rk, g.s[1] + Math.sin(a) * rk * 0.82]);
     }
-    out.push({ t: 'poly', pts, fill: light ? look.mottleLight : look.mottleDark });
+    // GS-scrap-steel: a fraction of patches (posHash-picked — zero rng, camera-proof) paint the
+    // contrasting STEEL tone instead of the world's own light/dark mottle, breaking a monotone rough
+    // up with a second colour (grey steel plates strewn amongst the Scrap Belt's rust).
+    const steel = look.steel && posHash(g.c[0], g.c[1], 6) < look.steel.frac ? look.steel.fill : null;
+    out.push({ t: 'poly', pts, fill: steel ?? (light ? look.mottleLight : look.mottleDark) });
   }
   // 2. Fine grain — the covering's speckle (snow crumbs / shells / lichen / cinders / gravel).
   const grains = Math.min(150, Math.round((span / 5) * texture * dens));

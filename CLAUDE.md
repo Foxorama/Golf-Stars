@@ -423,6 +423,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     prim is fixed/zero-rng so `styleLiquidFamily` draws the same flow/glint stream (feature-off worlds
     byte-identical). `spawnLandFX` throws a matching neon acid splash on swamp. A new luminous liquid =
     a `LiquidPalette` with `glow` + a `waterLiqFor` row.
+  - The BUNKER palette is per-WORLD via `sandLookFor(arch)` (GS-rusted-bunkers), the sand twin of
+    `waterLiqFor`: the Scrap Belt (metal) digs flaky orange-RUST pits (`RUST_SAND` — no pale beach
+    tan, dark corroded rake grooves) so the hazard fits the corroded machine graveyard; every other
+    world keeps ordinary `SAND`. Its firm `waste` SCATTER flats reskin to brushed grey-STEEL plates
+    (a `scatterLook` metal-waste case), and the rough/background carry grey steel too (`GROUND_COVER.
+    metal.steel` mottle patches + a steel grain fleck + a bare-steel shard, and grey plates/debris in
+    `styleFlora` metal) so the rust reads broken up by a cool third colour beside the MUTED-verdigris
+    fairway (`ARCHETYPE_TURF.metal` — a greyed patina teal, not a vibrant lime). ALL render-only, zero
+    rng (colour swaps + posHash-picked steel), so the sim plays these as ordinary sand/waste lies and
+    every non-metal world is byte-identical. `spawnLandFX` throws a rust-flake puff on metal. A new
+    world bunker skin = a `SandPalette` + a `sandLookFor` row.
   - Carved features share ONE light (`LIGHT_UL` → `insetEmboss`/`embossChildren`). NO drop shadow
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
     FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER

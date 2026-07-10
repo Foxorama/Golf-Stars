@@ -1101,3 +1101,37 @@ half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by
   unchanged too (only the tones + the added halo differ). Verified: a toxic-mire hole carries the
   neon/lime/teal tones + the halo and NOT the old blue `#3f8fe0`; a verdant hole is unchanged; all
   1105 tests green. A new luminous liquid = a `LiquidPalette` with a `glow` + a `waterLiqFor` row.
+
+## GS-rusted-bunkers: the Scrap Belt fits its rust — rust pits, steel plates, muted verdigris (2026-07-10)
+
+- **The ask.** Player, on the Scrap Belt (metal) world: the verdigris fairway is "a vibrant green
+  colour" that doesn't fit the rusted landscape, and its bunkers are pale beach SAND that "don't fit"
+  a machine graveyard. Make the fairway blend, make the bunkers RUSTED, and mix "a bit more grey
+  steel scrap" into the rust background/rough for a second colour that breaks up the monotone.
+- **Three coordinated reskins, all render-only, all zero-rng.**
+  1. **Muted verdigris fairway (`palette.ts ARCHETYPE_TURF.metal`).** The old fairway `#3f9e7e` (a
+     bright patina lime) → `#5a8578`, a greyed/darkened oxidised-copper teal; green/tee/collar toned
+     to match (the green kept a touch fresher so the target still reads). Teal-over-rust is
+     complementary hues, so it stays readable while reading as weathered patina, not mown parkland.
+  2. **Rusted bunkers (`style/hazards.ts` `SandPalette` + `sandLookFor`, the sand twin of
+     `waterLiqFor`).** `styleSandFamily` now takes `arch` and selects a `SandPalette`; metal gets
+     `RUST_SAND` — a flaky orange-rust body (`#a5623a`, brighter/oranger than the dark iron rough so
+     it still reads as a pit), a rust-lit floor glow, dark corroded rake grooves (never the pale sand
+     rake) and a deep iron lip. Every other world keeps `SAND` (`SAND_LOOK`). `spawnLandFX` throws a
+     rust-flake puff on metal (same `archetypeFor === 'metal'` guard the toxic splash uses).
+  3. **Grey steel as the third colour.** The Scrap Belt's firm `waste` SCATTER flats were the
+     surprise — they draw from `hole.features` via `styleScatter`/`fillFor('waste')` (pale tan
+     `#c2b280`), a SEPARATE path from the sand family, so they stayed sandy after the bunker swap. A
+     `scatterLook` metal-`waste` case reskins them to brushed grey-STEEL plates (`#8b9099` + a lit
+     seam) — riveted hull plate laid on the rust, and the most prominent home for the requested grey.
+     The rough/background carry it too: `GROUND_COVER.metal` gains a `steel` mottle tone (a fraction
+     of patches, posHash-picked), a bare-steel grain fleck, and a bare-steel shard tuft; `styleFlora`
+     metal paints a fraction of its strewn hull-plates and drifting vacuum debris as grey steel (cold
+     glint, no rust halo). All picked by course-space `posHash` — zero rng, camera-proof.
+- **Why it's safe.** RENDER-ONLY — the sim still plays bunkers/waste as their ordinary lies, so
+  escape difficulty, fairness and carry are untouched. Nothing adds or reorders an rng draw: the
+  bunker/scatter changes are pure colour swaps on existing draws, and every steel accent is
+  `posHash`-keyed (deterministic geometry, not rng). Every non-metal world is byte-identical.
+  Verified on the scrap gallery: pale-tan `#c2b280` gone (0 px), grey steel present, rust bunkers +
+  muted-teal fairway; all 1105 tests green. A new world bunker skin = a `SandPalette` + a
+  `sandLookFor` row.

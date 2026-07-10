@@ -253,14 +253,16 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#6a8a34',
     rough: { light: '#5a6c36', base: '#4a5a2c', dark: '#38461f', ink: '#1c2610' },
   },
-  // Metal — SCRAP BELT: a verdigris/patina-green salvaged-turf fairway laid over the scrap, bright
-  // patina greens, and a bare RUSTED-IRON rough (base mean ~80/255, well clear of the near-black
-  // metallic space base ~10/255). The fairway-green over rust-rough contrast sells the machine graveyard.
+  // Metal — SCRAP BELT: a MUTED oxidised-copper verdigris salvaged-turf fairway that sits with the
+  // rust (greyed, darkened patina — a weathered teal, not a vibrant lime), a slightly fresher patina
+  // green so the target still reads, and a bare RUSTED-IRON rough (base mean ~80/255, well clear of
+  // the near-black metallic space base ~10/255). The muted-teal-over-rust contrast (complementary
+  // hues, not a bright-green sticker) sells a corroded machine graveyard, not a mown parkland.
   metal: {
-    fairway: { light: '#52c49a', base: '#3f9e7e', dark: '#2f7a60', ink: '#164034' },
-    green: { light: '#6fe0b8', base: '#52d0a0', dark: '#3faf80', ink: '#175040' },
-    tee: { light: '#4a9e84', base: '#3f8a72', dark: '#316b58', ink: '#153029' },
-    collar: '#4aa88a',
+    fairway: { light: '#70a091', base: '#5a8578', dark: '#41625a', ink: '#182b26' },
+    green: { light: '#82c2a6', base: '#63ab8f', dark: '#4a8570', ink: '#1c3d33' },
+    tee: { light: '#658b7d', base: '#54786c', dark: '#3f5c52', ink: '#172823' },
+    collar: '#568576',
     rough: { light: '#96603a', base: '#7a4a2c', dark: '#5e381f', ink: '#301c10' },
   },
   // Asgard — GILDED EMERALD: jewel-green fairways with a golden sheen, luminous emerald greens, a gold

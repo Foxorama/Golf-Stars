@@ -787,8 +787,11 @@ export function archetypeDecor(
           [p[0] + c1 * s * 1.4 + s1 * s, p[1] + s1 * s * 1.4 - c1 * s],
           [p[0] - c1 * s * 1.4 + s1 * s, p[1] - s1 * s * 1.4 - c1 * s],
         ];
-        clipped.push({ t: 'poly', pts: plate, fill: '#6a4028', stroke: 'rgba(30,16,8,0.6)', sw: 0.8 });
-        clipped.push({ t: 'line', a: plate[0]!, b: plate[1]!, stroke: 'rgba(210,150,90,0.5)', sw: 0.9, round: true }); // lit edge
+        // GS-scrap-steel: a fraction of the plates (posHash-picked, zero rng) are bare GREY STEEL
+        // amongst the rusted ones, so the strewn scrap reads as a mix of metals, not all rust.
+        const steelPlate = posHash(g.c[0], g.c[1], 9) < 0.4;
+        clipped.push({ t: 'poly', pts: plate, fill: steelPlate ? '#7c848c' : '#6a4028', stroke: 'rgba(30,16,8,0.6)', sw: 0.8 });
+        clipped.push({ t: 'line', a: plate[0]!, b: plate[1]!, stroke: steelPlate ? 'rgba(200,210,220,0.5)' : 'rgba(210,150,90,0.5)', sw: 0.9, round: true }); // lit edge
         // Rivets along the plate.
         for (let k = 0; k < 3; k++) clipped.push({ t: 'circle', c: [p[0] + (posHash(g.c[0], g.c[1], k) - 0.5) * s * 2, p[1] + (posHash(g.c[0], g.c[1], k + 3) - 0.5) * s * 1.4], r: 0.8, fill: 'rgba(40,24,12,0.8)' });
       }
@@ -810,9 +813,12 @@ export function archetypeDecor(
           const rk = r * (0.6 + posHash(c[0], c[1], k) * 0.6);
           pts.push([s[0] + Math.cos(a) * rk, s[1] + Math.sin(a) * rk * 0.85]);
         }
-        out.push({ t: 'glow', c: s, r: r * 1.6, col: 'rgba(255,150,60,0.10)' });
-        out.push({ t: 'poly', pts, fill: '#5a3a24', stroke: 'rgba(200,140,80,0.5)', sw: 1 });
-        out.push({ t: 'circle', c: [s[0] + r * 0.2, s[1] - r * 0.2], r: 1, fill: 'rgba(255,200,140,0.8)' }); // glint
+        // GS-scrap-steel: some drifting chunks are grey steel (posHash, zero rng) — a cold glint and
+        // no rust halo — so the background debris field mixes bare metal with the rusted hulls.
+        const steelChunk = posHash(c[0], c[1], 9) < 0.4;
+        out.push({ t: 'glow', c: s, r: r * 1.6, col: steelChunk ? 'rgba(170,190,210,0.08)' : 'rgba(255,150,60,0.10)' });
+        out.push({ t: 'poly', pts, fill: steelChunk ? '#6d757d' : '#5a3a24', stroke: steelChunk ? 'rgba(190,205,220,0.5)' : 'rgba(200,140,80,0.5)', sw: 1 });
+        out.push({ t: 'circle', c: [s[0] + r * 0.2, s[1] - r * 0.2], r: 1, fill: steelChunk ? 'rgba(220,235,245,0.85)' : 'rgba(255,200,140,0.8)' }); // glint
       }
       // A half-buried derelict ship-wreck hull looming on the far skyline (screen-space).
       const wx = W * (0.14 + rng() * 0.6);

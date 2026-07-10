@@ -2000,7 +2000,11 @@ export function mountPlayView(
     } else if (penalty === 'ravine' || lie === 'barranca') {
       burst(10, ['138,111,74', '107,90,72'], { up: 0.8, grav: 0.07 }); // rockfall dust
     } else if (lie === 'bunker' || lie === 'pot' || lie === 'waste' || lie === 'sand') {
-      burst(10, ['233,216,166', '196,173,111'], { up: 1.0, grav: 0.07 }); // sand puff
+      // GS-rusted-bunkers: the Scrap Belt digs RUST pits, so it kicks up a rust-flake puff instead of
+      // the pale sand one (every other world keeps the sand puff — mirrors the toxic-splash swap).
+      const rusted = archetypeFor(opts.themeId, opts.biome ?? '') === 'metal' && !opts.rainbow;
+      if (rusted) burst(10, ['165,98,58', '211,138,82', '110,64,34'], { up: 1.0, grav: 0.07 }); // rust-flake puff
+      else burst(10, ['233,216,166', '196,173,111'], { up: 1.0, grav: 0.07 }); // sand puff
     } else if (lie === 'ice') {
       burst(8, ['255,255,255', '205,238,247'], { up: 0.3, spread: 1.5, grav: 0.02 }); // icy skitter
     } else if (lie === 'crystal') {
