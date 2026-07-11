@@ -637,7 +637,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     else if (f.kind === 'fescue') fescueHaz.push(f);
     else if (f.kind === 'deeprough') deepRoughHaz.push(f);
     else if (f.kind === 'barranca') ravineHaz.push(f);
-    else if (!WATER_KINDS.has(f.kind) && !LAVA_KINDS.has(f.kind) && f.kind !== 'bunker' && f.kind !== 'waste' && f.kind !== 'sand' && f.kind !== 'pot') scatterHaz.push(f);
+    // `breach` is EXCLUDED here (GS-ship-interior): the derelict's acid breaches are drawn by
+    // `styleShipBreaches` (acid-etched hole to space). Left in scatter, `styleScatter` also painted
+    // each one with the unknown-surface fallback fill — a PURPLE blob over the acid hole (the "acid
+    // void holes render as purple zones" bug). Breach is derelict-only, so dropping it here is safe.
+    else if (!WATER_KINDS.has(f.kind) && !LAVA_KINDS.has(f.kind) && f.kind !== 'bunker' && f.kind !== 'waste' && f.kind !== 'sand' && f.kind !== 'pot' && f.kind !== 'breach') scatterHaz.push(f);
   }
   // Rainbow Road: SAND is on the road (in-play, see `ROAD_LIES`) so bunkers/craters still draw; every
   // OTHER hazard (rough fescue, ravines, exotic scatter, water/lava, trees) is OFF the road → the bare

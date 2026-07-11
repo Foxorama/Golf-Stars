@@ -32,6 +32,13 @@ export type { ShipWall };
 export const WALL_HEIGHT = 72;
 /** Bounce run-out energy floor (fairway-equivalent yards) so a metal ricochet is lively, not dead. */
 export const WALL_BOUNCE_MIN = 8;
+/**
+ * Energy kept across a ROLLING ricochet (GS-ship-pinball). A ball rolling into a bulkhead doesn't
+ * stop dead — it bounces off and keeps rolling, wall-to-wall, until friction + the per-bounce loss
+ * bleed the momentum away. Metal is lively (0.82), so a fast ball pinballs several times; a slow one
+ * dies after a bounce or two. <1 guarantees the pinball always terminates.
+ */
+export const WALL_ROLL_RESTITUTION = 0.82;
 
 const norm = (v: Vec): Vec => {
   const m = Math.hypot(v[0], v[1]) || 1;
@@ -146,15 +153,27 @@ export function wallFlightHit(
   return firstHit;
 }
 
-/** Whether the segment `a→b` crosses any wall from its inner side to its outer side (a rolling ball
- *  running up against a wall). Returns the wall it first hits, or null. Pure. */
-export function wallRollHit(walls: readonly ShipWall[], a: Vec, b: Vec): ShipWall | null {
+/** The wall a rolling segment `a→b` crosses OUTWARD (toward space) plus the impact point — the
+ *  ricochet the pinball run-out reflects off. Returns the NEAREST such wall to `a`, or null. Pure. */
+export function wallRollBounce(walls: readonly ShipWall[], a: Vec, b: Vec): { wall: ShipWall; point: Vec } | null {
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const L = Math.hypot(dx, dy) || 1;
   const tvx = dx / L, tvy = dy / L;
+  let best: { wall: ShipWall; point: Vec } | null = null;
+  let bestD = Infinity;
   for (const w of walls) {
-    if (tvx * w.normal[0] + tvy * w.normal[1] >= -0.02) continue; // rolling inward / parallel → no stop
-    if (segHit(a, b, w.a, w.b)) return w;
+    if (tvx * w.normal[0] + tvy * w.normal[1] >= -0.02) continue; // rolling inward / parallel → no bounce
+    const x = segHit(a, b, w.a, w.b);
+    if (!x) continue;
+    const d = dist(a, x);
+    if (d < bestD) { bestD = d; best = { wall: w, point: x }; }
   }
-  return null;
+  return best;
+}
+
+/** Whether the segment `a→b` crosses any wall from its inner side to its outer side (a rolling ball
+ *  running up against a wall). Returns the wall it first hits, or null. Pure. Thin wrapper over
+ *  `wallRollBounce` for callers that only need the wall (the aim probe / tests). */
+export function wallRollHit(walls: readonly ShipWall[], a: Vec, b: Vec): ShipWall | null {
+  return wallRollBounce(walls, a, b)?.wall ?? null;
 }

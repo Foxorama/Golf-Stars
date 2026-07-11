@@ -194,7 +194,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     platform, so a room past the hull tear is sliced open in cross-section. (2) `styleShipBreaches`
     draws the derelict's `breach` HAZARDS (union-merged via `derelictBreachesFor`) as ACID-ETCHED HOLES
     eaten through the deck to space (acid-green corrosion + a caustic etch rim + the cut deck thickness +
-    a star-lit void interior); the bright acid ring reads them apart from the plain-black OB. (3) the
+    a star-lit void interior); the bright acid ring reads them apart from the plain-black OB. CRITICAL:
+    `breach` is EXCLUDED from `style.ts`'s generic `scatterHaz` bucket — left in, `styleScatter` ALSO
+    painted each breach with the unknown-surface fallback fill (`fillFor` → purple `#6a4f8a`), a PURPLE
+    blob over the acid hole (the "acid void holes render as purple zones" bug); `styleShipBreaches` is now
+    the ONLY breach painter. (3) the
     derelict's `waste`/`sand` SCATTER FEATURE draws as an intact riveted steel DECK PLATE (`styleShipPlates`
     in the feature loop) — a firm lie, never the default tan beach-sand patch. So the ship has NO bunkers.
     (4) JAGGED PLATFORMS — `jagShipPlatforms` rips the smooth rounded pill of each LOST hull section into a
@@ -224,13 +228,21 @@ these systems** — each bullet is the tip of a documented iceberg.
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
     `WALL_HEIGHT` = 72 yd — ABOVE the 60-yd shot-apex cap (`ARC_FEEL.peakMax`) — so NOTHING clears them: every
     ball that leaves the deck sideways RICOCHETS back onto the corridor (`wallFlightHit`; the per-wall
-    arc-height gate is kept generic but never fires on a real bulkhead). A second crossing off the reflected
-    line bounces again (hit two walls, bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡ interactive)
-    and a rolling ball stops against a wall in `rollOut` (a new `walls` param). Walls break at the island
-    gaps (open hull) so a star-carry stays open, and only ever SAVE a ball that would be lost to space
-    (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts` (`styleShipWalls`,
-    camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's struck-metal voice
-    + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the course contract.
+    arc-height gate is kept generic but never fires on a real bulkhead) — a hook/arc that crosses a wall
+    is interrupted mid-flight, same as a tree. A second crossing off the reflected line bounces again (hit
+    two walls, bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡
+    interactive). ON THE GROUND it's a PINBALL (GS-ship-pinball): a rolling ball REFLECTS off a wall
+    (`wallRollBounce` + `wallReflect`) and keeps rolling — wall to wall — until friction + a per-bounce
+    metal loss (`WALL_ROLL_RESTITUTION` 0.82) bleed the momentum away, NEVER the old dead stop. A walled
+    hole routes through `rollOut`'s position-tracking integrator (the curling one, kick/bend gated to
+    genuinely-contoured greens so a plane green stays byte-identical to the straight walk); non-walled
+    holes take the straight/curling paths byte-for-byte. Walls also BLOCK THE AIM CONE like a treeline
+    (`sprayBlocking` `walls` opt → a 🧱 glyph on the shaded slice) so a bounce is never a surprise. Walls
+    break at the island gaps (open hull) so a star-carry stays open, and only ever SAVE a ball that would
+    be lost to space (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts`
+    (`styleShipWalls`, camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's
+    struck-metal voice + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the
+    course contract.
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,

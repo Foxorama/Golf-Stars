@@ -37,7 +37,7 @@ import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
-import { wallFlightHit, wallRollHit, WALL_BOUNCE_MIN, type WallHit } from './walls';
+import { wallFlightHit, wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -267,13 +267,18 @@ export function rollOut(
   const slope = hole.greenSlope;
   const lobes = hole.greenContour;
   const curling = !!(lobes && lobes.length); // contoured hole → the curling integrator below
+  // Ship-corridor PINBALL (GS-ship-pinball): a hole with collidable bulkheads routes through the
+  // position-tracking integrator too, so a rolling ball REFLECTS off a wall and keeps rolling (wall
+  // to wall) until its momentum bleeds away — never the old dead stop. Walls are derelict-only, so a
+  // non-walled hole takes the byte-for-byte straight/curling paths exactly as before.
+  const walled = !!(walls && walls.length);
   const slopeRun = (k: string, pMid: Vec, tx: number, ty: number): number => {
     if (k !== 'green' || (!slope && !curling)) return 1;
     const s = curling ? greenSlopeAt(pMid, slope, lobes) : slope!;
     const along = tx * s[0] + ty * s[1]; // + = travelling downhill, − = uphill
     return Math.max(0.32, 1 + SLOPE_ROLL_K * along);
   };
-  if (!curling) {
+  if (!curling && !walled) {
     // The classic STRAIGHT integrator, byte-for-byte for every lobe-less hole (old saves, synthetic
     // test lanes, plane-only greens): walk fixed distances along one ray.
     const at = (d: number): Vec => [touchdown[0] + dir[0] * sign * d, touchdown[1] + dir[1] * sign * d];
@@ -299,10 +304,7 @@ export function rollOut(
         dist += STEP; // trickled up against a trade-camp tent → stops there
         break;
       }
-      if (walls && wallRollHit(walls, at(dist), at(dist + STEP))) {
-        dist += STEP; // ran up against a ship-corridor wall → stops against it (stays on the deck)
-        break;
-      }
+      // NB: no wall check here — a walled hole is routed to the pinball integrator below.
       const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, at(dist + STEP * 0.5), tdx, tdy);
       if (m <= 0) break;
       const need = STEP / m; // energy to cross STEP on this surface (rough costs more, ice less)
@@ -334,7 +336,7 @@ export function rollOut(
   // roll energy by the slope's along-travel component (into a face → the skip dies; onto a downslope
   // flank → it kicks on) and deflects the initial travel toward the fall line. Deterministic, zero
   // rng; only contoured holes reach this branch, so lobe-less holes are byte-identical.
-  if (tdLie === 'green') {
+  if (curling && tdLie === 'green') {
     const s0 = greenSlopeAt(touchdown, slope, lobes);
     const along0 = tx * s0[0] + ty * s0[1]; // + = landing travelling downhill
     budget *= Math.max(LAND_KICK_MIN, Math.min(LAND_KICK_MAX, 1 + LAND_KICK_K * along0));
@@ -378,15 +380,42 @@ export function rollOut(
       blocked = true;
       break;
     }
-    if (walls && wallRollHit(walls, [px, py], [px + tx * stepLeft, py + ty * stepLeft])) {
-      px += tx * stepLeft;
-      py += ty * stepLeft;
-      dist += stepLeft;
-      path.push([px, py]);
-      blocked = true;
-      break;
-    }
     const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, mid, tx, ty);
+    // Ship-corridor PINBALL (GS-ship-pinball): a rolling ball that runs into a bulkhead REFLECTS off
+    // it and keeps rolling — wall to wall, until friction + the per-bounce loss stop it. It advances
+    // to the impact point (spending that leg's energy), loses a slice to the metal (restitution), then
+    // carries on along the reflected line. A ball is only ever saved from going off the deck, so this
+    // only ever RAISES the score (contract 4). Walls are derelict-only → non-walled holes never reach
+    // this branch (routed to the straight integrator above), so they stay byte-for-byte identical.
+    if (walls && m > 0) {
+      const wb = wallRollBounce(walls, [px, py], [px + tx * stepLeft, py + ty * stepLeft]);
+      if (wb) {
+        const dw = Math.hypot(wb.point[0] - px, wb.point[1] - py);
+        const need = dw / m;
+        if (need >= budget) {
+          // Not enough momentum to reach the wall this step — settle where the energy runs out.
+          const adv = budget * m;
+          px += tx * adv;
+          py += ty * adv;
+          dist += adv;
+          path.push([px, py]);
+          break;
+        }
+        budget -= need;
+        dist += dw;
+        // Land just shy of the wall so the next step doesn't immediately re-cross it, reflect the
+        // travel back onto the deck, and bleed a slice of momentum to the metal bounce.
+        const refl = wallReflect(wb.wall.normal, [tx, ty]);
+        tx = refl[0];
+        ty = refl[1];
+        px = wb.point[0] + tx * 0.05;
+        py = wb.point[1] + ty * 0.05;
+        budget *= WALL_ROLL_RESTITUTION;
+        path.push([px, py]);
+        bent = true;
+        continue;
+      }
+    }
     if (m <= 0) break;
     const need = stepLeft / m;
     const adv = need >= budget ? budget * m : stepLeft;
@@ -399,7 +428,9 @@ export function rollOut(
     // Bend AFTER advancing (the struck line holds for the first step, like the putt's aim): on the
     // green, the fall line's sideways component steers the travel direction. ROLL_CURL_K per yard —
     // tuned to the putt-break scale, so an approach and a putt read the same ground the same way.
-    if (k === 'green') {
+    // Only on a genuinely contoured green — a plane-only walled ship green stays honest (matches the
+    // straight integrator), so routing it here for the pinball changes nothing but the wall bounce.
+    if (curling && k === 'green') {
       const s = greenSlopeAt([px, py], slope, lobes);
       const perp = s[0] * -ty + s[1] * tx; // downhill's component along the travel's perp axis (−ty, tx)
       if (Math.abs(perp) > 1e-6) {
@@ -1392,9 +1423,9 @@ export interface BlockedRegion {
   a1: number;
   /** Per-angle radial intervals, evenly spaced a0→a1 — the region's drawable boundary. */
   samples: BlockedSample[];
-  /** What interrupts the flight here — picks the render glyph (🌲/⛺). A run is 'tents' only when
-   *  NO tree contributes to it (a mixed grove+tent run reads as woods). */
-  src: 'trees' | 'tents';
+  /** What interrupts the flight here — picks the render glyph (🌲/⛺/🧱). A run is 'tents'/'walls' only
+   *  when NO tree contributes to it (a mixed grove run reads as woods). */
+  src: 'trees' | 'tents' | 'walls';
 }
 
 export interface SprayBlockingOpts {
@@ -1414,6 +1445,11 @@ export interface SprayBlockingOpts {
    *  `tradeTents(hole)` the sim collides with in `executeShot`, and only when the trade-market
    *  course effect is armed (the call sites gate it). Absent ⇒ tents never shade. */
   tents?: readonly TradeTent[];
+  /** Ship-corridor bulkheads (GS-ship-walls) to probe as tall obstacles alongside the trees — pass
+   *  the hole's own `walls` (the derelict only). A cone angle whose flight would ricochet off a wall
+   *  shades from the impact out, marked with the wall glyph, so the player SEES the bounce coming.
+   *  Absent ⇒ walls never shade. */
+  walls?: readonly ShipWall[];
 }
 
 /**
@@ -1449,7 +1485,8 @@ export function sprayBlocking(
   if (s.expectedCarry <= 0 || s.angleSpread <= 0 || s.carryHigh <= 0) return [];
   const obstacles = flightObstacles(hole);
   const tents = opts.tents && opts.tents.length ? opts.tents : undefined;
-  if (obstacles.length === 0 && !tents) return [];
+  const walls = opts.walls && opts.walls.length ? opts.walls : undefined;
+  if (obstacles.length === 0 && !tents && !walls) return [];
   const bands = sprayBands(s.shape, s.angleSpread, geom).filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
   if (bands.length === 0) return [];
   let aMin = Infinity;
@@ -1491,13 +1528,13 @@ export function sprayBlocking(
   // in `executeShot` too). Blocked ⇒ the interval runs from where the ball comes DOWN (the object)
   // to the cone's far edge; no interruption at any radius ⇒ the line is clear, nothing shades.
   const intervals: ({ r0: number; r1: number } | null)[] = [];
-  const causes: ('trees' | 'tents' | null)[] = [];
+  const causes: ('trees' | 'tents' | 'walls' | null)[] = [];
   const angles: number[] = [];
   for (let i = 0; i <= N; i++) {
     const a = aMin + (span * i) / N;
     angles.push(a);
     let hitAt = -1;
-    let cause: 'trees' | 'tents' = 'trees';
+    let cause: 'trees' | 'tents' | 'walls' = 'trees';
     for (let k = 0; k < K; k++) {
       const r = rLow + rStep * k;
       const landing = landAt(a, r);
@@ -1510,6 +1547,15 @@ export function sprayBlocking(
       if (th) {
         hitAt = th.carry;
         cause = 'tents';
+        break;
+      }
+      // Ship-corridor bulkhead (GS-ship-walls): the SAME curved-flight ricochet check the sim
+      // resolves shots with — a cone line whose arc would cross a wall reads BLOCKED from the impact
+      // out, so a bounce is never a surprise.
+      const wh = walls ? wallFlightHit(walls, s.origin, landing, s.bearing, r, s.nominalCarry, s.flight) : null;
+      if (wh) {
+        hitAt = wh.carry;
+        cause = 'walls';
         break;
       }
     }
@@ -1560,18 +1606,18 @@ export function sprayBlocking(
       const samples: BlockedSample[] = [];
       let treeHits = 0;
       let tentHits = 0;
+      let wallHits = 0;
       for (let k = i; k < j; k++) {
         const iv = intervals[k]!;
         samples.push({ a: angles[k]!, r0: iv.r0, r1: iv.r1 });
         if (causes[k] === 'trees') treeHits++;
         else if (causes[k] === 'tents') tentHits++;
+        else if (causes[k] === 'walls') wallHits++;
       }
-      regions.push({
-        a0: angles[i]!,
-        a1: angles[j - 1]!,
-        samples,
-        src: tentHits > 0 && treeHits === 0 ? 'tents' : 'trees',
-      });
+      // A mixed run reads as the more "solid" cause: a grove wins (trees), then tents, then walls —
+      // so a purely-wall run (the derelict) glyphs as a wall, never mislabelled woods.
+      const src = treeHits > 0 ? 'trees' : tentHits > 0 ? 'tents' : wallHits > 0 ? 'walls' : 'trees';
+      regions.push({ a0: angles[i]!, a1: angles[j - 1]!, samples, src });
     }
     i = j;
   }
