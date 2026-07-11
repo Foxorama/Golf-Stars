@@ -77,8 +77,9 @@ const TREE_GLYPH: Record<BiomeArchetype, string> = {
   derelict: '🛰️', // a broken antenna spar / dead dish jutting from the hull
   asgard: '🍁', // Yggdrasil golden-leaf ash
 };
-const blockGlyph = (src: 'trees' | 'tents', arch: BiomeArchetype): string =>
-  src === 'tents' ? TENT_GLYPH : TREE_GLYPH[arch];
+const WALL_GLYPH = '🧱'; // a ship-corridor bulkhead — a wall the shot ricochets off, never through
+const blockGlyph = (src: 'trees' | 'tents' | 'walls', arch: BiomeArchetype): string =>
+  src === 'walls' ? WALL_GLYPH : src === 'tents' ? TENT_GLYPH : TREE_GLYPH[arch];
 
 // --- Zoom-aware overlay layout (GS-spray-zoom) --------------------------------
 // Every overlay layout decision below reads the projector's px-per-yard scale, so the cone stays
@@ -302,6 +303,7 @@ function shotConeParts(hole: Hole, proj: Proj, opts: RenderOptions, geom: SprayG
     minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
     snapYd: BLOCK_SNAP_PX / pxYd,
     tents: opts.tradeTents && hole.tents ? tradeTents(hole) : undefined,
+    walls: hole.walls,
   });
   for (const region of blocked) {
     const poly: Vec[] = [];

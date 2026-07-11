@@ -203,7 +203,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     the central lane before it's kept (a strict mirror of `validateFairness`), so `generateCourse` never
     throws. `greensideKind: 'breach'` rings calm greens via the SANCTIONED greenside ring (gated `!ship ||
     !lostRough` so a lost island-green never floats breaches in space); `fairwayBunkers: 0` (no sand).
-    Ship-only + gated → every other world byte-identical. `GENERATOR_VERSION` 22.
+    On a LOST (island-hop) derelict hole `clearVoidHazards` strips every penalty pool as usual, but
+    EXEMPTS a breach that sits ON a hull-section pad (it's a hole eaten through the deck you're playing
+    ON — the on-corridor danger the walled ship needs; only a breach stranded out in a star-gap is
+    stripped) — so breaches show on the deep stops too, not just calm ones. Ship-only + gated → every
+    other world byte-identical. `GENERATOR_VERSION` 22.
   - DRIFTING WRECK PIECES (GS-ship-wreck, `render/shipWreck.ts` + `render/shipDrift.ts`): SMALL, detailed,
     weathered chunks of the ship "STARLIT WANDERER" drift through the space beside the corridor — a BRIDGE
     (window grids, nav lights, dying ember, the ship NAME sprayed + WEATHERED + CLIPPED to the hull, not a
@@ -219,11 +223,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     ball that leaves the deck sideways RICOCHETS back onto the corridor (`wallFlightHit`; the per-wall
     arc-height gate is kept generic but never fires on a real bulkhead). A second crossing off the reflected
     line bounces again (hit two walls, bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡ interactive)
-    and a rolling ball stops against a wall in `rollOut` (a new `walls` param). Walls break at the island
-    gaps (open hull) so a star-carry stays open, and only ever SAVE a ball that would be lost to space
-    (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts` (`styleShipWalls`,
-    camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's struck-metal voice
-    + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the course contract.
+    and a rolling ball stops against a wall in `rollOut` (a new `walls` param). CRITICAL: a bounce/roll
+    contact point sits ON the wall LINE = the corridor EDGE, which reads as OFF-deck (`shiprough`/lost) —
+    so a ricochet is always SEATED a few yd INSIDE the deck off the bulkhead (`seatInsideWall`/`WALL_INSET`
+    along the inward normal): the flight-bounce touchdown (else the penalty touchdown skips the run-out and
+    scores the SAVED ball LOST) and the roll-stop rest alike. Walls break at the island gaps (open hull) so
+    a star-carry stays open, and only ever SAVE a ball that would be lost to space (they raise Stableford —
+    contract 4 by construction). The AIM CONE reads them too (`sprayBlocking`'s `walls` opt off `hole.walls`
+    → a `src:'walls'` blocked run, 🧱 glyph): a landing whose flight would ricochet off a wall is
+    UNREACHABLE, so the cone shades it exactly as the sim resolves it. Drawn by `style/walls.ts`
+    (`styleShipWalls`, camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's
+    struck-metal voice + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the
+    course contract.
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,
@@ -566,17 +577,20 @@ these systems** — each bullet is the tip of a documented iceberg.
     ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical; PERF-neutral (geometry cached
     at mount, per-frame = re-project a short polyline + ~90 capped particles, NO `buildScene` rebuild —
     it replaces the equal static river the follow-cam rebuilt). Speed rides `_gsFeel.cetusFlowSpeed`.
-  - AIM-OVERLAY DECOR (GS-overlay-decor): the animated world-decor twins (Cetus flow, derelict ship
-    drift) AND meteor STRIKES used to move only while WATCHING a shot — on the static aim/putt screen
-    the river/junk/craters sat frozen. `mountWeatherOverlay` (`app/playFx.ts`) now draws them over the
-    aim/putt map too, through a `alignedProjector` that composes the SVG map's OWN projector with the
-    CSS meet-fit letterbox transform, so the decor lines up pixel-for-pixel with the map beneath. Only
-    in FOCUS/FOLLOW mode (armed via `overlayDecor` in `app.ts`); whole-hole fit folds `extra` points the
-    overlay can't reproduce, so it stays static there. The Cetus river draws in `overlayOnly` mode (skips
-    the opaque channel BED — the SVG's static river IS the bed, so the ball marker + aim cone stay
-    readable under only the moving motes/waterfall). `drift` is OFF on the putt screen + the putts-only
-    green watch (`ambientDrift`): the tight ~25-yd zoom floated the ship SECTIONS weirdly over the cup.
-    Browser-only side layer (never the sim); no new hook (reuses `_gsFeel.cetus/shipDriftSpeed`).
+  - AIM-OVERLAY DECOR (GS-overlay-decor): the animated Cetus flow + meteor STRIKES used to move only
+    while WATCHING a shot — on the static aim/putt screen the river/craters sat frozen.
+    `mountWeatherOverlay` (`app/playFx.ts`) now draws them over the aim/putt map too, through a
+    `alignedProjector` that composes the SVG map's OWN projector with the CSS meet-fit letterbox
+    transform, so the decor lines up pixel-for-pixel with the map beneath. Only in FOCUS/FOLLOW mode
+    (armed via `overlayDecor` in `app.ts`); whole-hole fit folds `extra` points the overlay can't
+    reproduce, so it stays static there. The Cetus river draws in `overlayOnly` mode (skips the opaque
+    channel BED — the SVG's static river IS the bed, so the ball marker + aim cone stay readable under
+    only the moving motes/waterfall). The derelict's DRIFTING SHIP JUNK is deliberately NOT on this
+    zoomed aim/putt overlay — its big SCREEN-SPACE wreck sections floated weirdly over the tight
+    decision-map zoom (the reported bug). The wreckage still lives: STATIC on the whole-hole SVG map,
+    and ANIMATED in the follow-cam while WATCHING a shot (`playView`'s `ambientDrift = hadShots`, off on
+    the putts-only green watch) — just never over the lining-up map. Browser-only side layer (never the
+    sim); no new hook (reuses `_gsFeel.cetus/shipDriftSpeed`).
   - The decision map's framing holds still for the whole shot decision; the shot animation starts
     at the decision map's exact `decisionRadius`. `playView`'s `spawnLandFX` answers the touchdown
     per lie/penalty — extend it with any new penalty kind.

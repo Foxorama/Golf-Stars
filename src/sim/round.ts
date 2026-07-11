@@ -37,7 +37,7 @@ import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
-import { wallFlightHit, wallRollHit, WALL_BOUNCE_MIN, type WallHit } from './walls';
+import { wallFlightHit, wallRollHit, seatInsideWall, WALL_BOUNCE_MIN, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -299,9 +299,14 @@ export function rollOut(
         dist += STEP; // trickled up against a trade-camp tent → stops there
         break;
       }
-      if (walls && wallRollHit(walls, at(dist), at(dist + STEP))) {
-        dist += STEP; // ran up against a ship-corridor wall → stops against it (stays on the deck)
-        break;
+      const hitWall = walls ? wallRollHit(walls, at(dist), at(dist + STEP)) : null;
+      if (hitWall) {
+        // Ran up against a ship-corridor wall → stop at the last spot INSIDE the deck (don't advance
+        // onto the wall line, which reads as off-deck / lost to space), then seat the ball a margin in
+        // off the bulkhead so it rests firmly on the hull deck.
+        const roll = sign * Math.min(dist, cap);
+        const rest = seatInsideWall(hitWall, [touchdown[0] + dir[0] * roll, touchdown[1] + dir[1] * roll]);
+        return { roll, rest };
       }
       const m = kPen ? SKIM_ROLL : (SURFACE_ROLL[k] ?? 0.6) * slopeRun(k, at(dist + STEP * 0.5), tdx, tdy);
       if (m <= 0) break;
@@ -378,10 +383,12 @@ export function rollOut(
       blocked = true;
       break;
     }
-    if (walls && wallRollHit(walls, [px, py], [px + tx * stepLeft, py + ty * stepLeft])) {
-      px += tx * stepLeft;
-      py += ty * stepLeft;
-      dist += stepLeft;
+    const hitWall = walls ? wallRollHit(walls, [px, py], [px + tx * stepLeft, py + ty * stepLeft]) : null;
+    if (hitWall) {
+      // Ran up against a ship-corridor wall → stop at the last spot INSIDE the deck (don't advance onto
+      // the wall line, which reads as off-deck / lost to space), seated a margin in off the bulkhead so
+      // the ball rests firmly on the hull deck.
+      [px, py] = seatInsideWall(hitWall, [px, py]);
       path.push([px, py]);
       blocked = true;
       break;
@@ -1084,7 +1091,11 @@ export function executeShot(
   if (hole.walls && hole.walls.length && !knockedDown && !tentHit) {
     wallHit = wallFlightHit(hole.walls, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
     if (wallHit) {
-      result.landing = wallHit.point;
+      // Seat the touchdown a few yards INSIDE the deck (off the wall face), not on the bulkhead line
+      // itself — a point exactly on the wall reads as off-deck (lost to space), which would skip the
+      // run-out below (a penalty touchdown never rolls) and score the SAVED ball as LOST. Nudged along
+      // the wall's inward normal, the touchdown lands on the hull deck and rolls out inward.
+      result.landing = seatInsideWall(wallHit.wall, wallHit.point);
       result.carry = wallHit.carry;
       result.apex = arcApex(wallHit.carry, nominalCarry, ARC_FEEL, flight.peakMult);
     }
@@ -1392,9 +1403,10 @@ export interface BlockedRegion {
   a1: number;
   /** Per-angle radial intervals, evenly spaced a0→a1 — the region's drawable boundary. */
   samples: BlockedSample[];
-  /** What interrupts the flight here — picks the render glyph (🌲/⛺). A run is 'tents' only when
-   *  NO tree contributes to it (a mixed grove+tent run reads as woods). */
-  src: 'trees' | 'tents';
+  /** What interrupts the flight here — picks the render glyph (🌲/⛺/🧱). A run is 'walls' only when a
+   *  ship-corridor bulkhead is the SOLE blocker (no tree/tent), 'tents' only when no tree contributes
+   *  (a mixed grove+tent run reads as woods). */
+  src: 'trees' | 'tents' | 'walls';
 }
 
 export interface SprayBlockingOpts {
@@ -1414,6 +1426,11 @@ export interface SprayBlockingOpts {
    *  `tradeTents(hole)` the sim collides with in `executeShot`, and only when the trade-market
    *  course effect is armed (the call sites gate it). Absent ⇒ tents never shade. */
   tents?: readonly TradeTent[];
+  /** Ship-corridor bulkheads (GS-ship-walls) to probe as un-clearable walls — pass `hole.walls`. A
+   *  landing whose flight would ricochet off a wall is UNREACHABLE (the ball bounces back onto the
+   *  deck), so the cone shades it blocked, exactly the way the sim resolves it in `executeShot`.
+   *  Absent ⇒ walls never shade (every non-derelict world). */
+  walls?: readonly ShipWall[];
 }
 
 /**
@@ -1449,7 +1466,8 @@ export function sprayBlocking(
   if (s.expectedCarry <= 0 || s.angleSpread <= 0 || s.carryHigh <= 0) return [];
   const obstacles = flightObstacles(hole);
   const tents = opts.tents && opts.tents.length ? opts.tents : undefined;
-  if (obstacles.length === 0 && !tents) return [];
+  const walls = opts.walls && opts.walls.length ? opts.walls : undefined;
+  if (obstacles.length === 0 && !tents && !walls) return [];
   const bands = sprayBands(s.shape, s.angleSpread, geom).filter((b) => b.prob > 0 && b.a1 - b.a0 > 1e-6);
   if (bands.length === 0) return [];
   let aMin = Infinity;
@@ -1491,13 +1509,13 @@ export function sprayBlocking(
   // in `executeShot` too). Blocked ⇒ the interval runs from where the ball comes DOWN (the object)
   // to the cone's far edge; no interruption at any radius ⇒ the line is clear, nothing shades.
   const intervals: ({ r0: number; r1: number } | null)[] = [];
-  const causes: ('trees' | 'tents' | null)[] = [];
+  const causes: ('trees' | 'tents' | 'walls' | null)[] = [];
   const angles: number[] = [];
   for (let i = 0; i <= N; i++) {
     const a = aMin + (span * i) / N;
     angles.push(a);
     let hitAt = -1;
-    let cause: 'trees' | 'tents' = 'trees';
+    let cause: 'trees' | 'tents' | 'walls' = 'trees';
     for (let k = 0; k < K; k++) {
       const r = rLow + rStep * k;
       const landing = landAt(a, r);
@@ -1510,6 +1528,15 @@ export function sprayBlocking(
       if (th) {
         hitAt = th.carry;
         cause = 'tents';
+        break;
+      }
+      // Ship-corridor bulkhead (GS-ship-walls): a landing whose flight would ricochet off a wall can't
+      // be reached — the ball bounces back onto the deck. Shade it blocked from the wall crossing out,
+      // using the SAME `wallFlightHit` the sim resolves the shot with (the graphic IS the physics).
+      const wh = walls ? wallFlightHit(walls, s.origin, landing, s.bearing, r, s.nominalCarry, s.flight) : null;
+      if (wh) {
+        hitAt = wh.carry;
+        cause = 'walls';
         break;
       }
     }
@@ -1560,18 +1587,21 @@ export function sprayBlocking(
       const samples: BlockedSample[] = [];
       let treeHits = 0;
       let tentHits = 0;
+      let wallHits = 0;
       for (let k = i; k < j; k++) {
         const iv = intervals[k]!;
         samples.push({ a: angles[k]!, r0: iv.r0, r1: iv.r1 });
         if (causes[k] === 'trees') treeHits++;
         else if (causes[k] === 'tents') tentHits++;
+        else if (causes[k] === 'walls') wallHits++;
       }
-      regions.push({
-        a0: angles[i]!,
-        a1: angles[j - 1]!,
-        samples,
-        src: tentHits > 0 && treeHits === 0 ? 'tents' : 'trees',
-      });
+      // A run reads as a wall only when a bulkhead is its SOLE blocker; a tent run only when no tree
+      // contributes; otherwise it's woods (the harshest/most-general read).
+      const src: 'trees' | 'tents' | 'walls' =
+        wallHits > 0 && treeHits === 0 && tentHits === 0 ? 'walls'
+        : tentHits > 0 && treeHits === 0 ? 'tents'
+        : 'trees';
+      regions.push({ a0: angles[i]!, a1: angles[j - 1]!, samples, src });
     }
     i = j;
   }

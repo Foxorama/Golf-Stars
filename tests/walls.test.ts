@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
 import { validateCourse } from '../src/sim/course/contract';
-import { wallReflect, wallFlightHit, wallRollHit, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
+import { wallReflect, wallFlightHit, wallRollHit, seatInsideWall, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
 import { flightProfileOf } from '../src/sim/flight';
-import type { Vec } from '../src/sim/course/contract';
+import { executeShot, shotSpread, sprayBlocking } from '../src/sim/round';
+import { CLUBS } from '../src/sim/clubs';
+import { Rng } from '../src/sim/rng';
+import type { Vec, Hole } from '../src/sim/course/contract';
 
 // GS-ship-walls: the derelict world's collidable metal corridor bulkheads — every ball leaving the deck
 // sideways bounces back; NOTHING clears them (they stand 72 yd, above the 60-yd shot-apex cap); hit two
@@ -116,5 +119,77 @@ describe('GS-ship-walls — generation', () => {
         expect(validateCrossings(a)).toEqual([]);
       }
     }
+  });
+});
+
+/** A wildness-1 derelict par 4/5 with corridor walls — the deep, lost-rough stop a player actually meets. */
+function lostWalledHole(): Hole {
+  const c = generateCourse(4242, { biome: 'derelict-ship', holes: 9, wildness: 1 });
+  const h = c.holes.find((h) => (h.walls?.length ?? 0) > 0 && h.par >= 4);
+  if (!h) throw new Error('no walled derelict par 4/5');
+  return h;
+}
+
+describe('GS-ship-walls — a bounce SAVES the ball (never lost to space)', () => {
+  const driver = CLUBS.find((c) => c.id === 'D')!;
+
+  it('a ball that ricochets off a wall is seated back on the deck, not scored lost', () => {
+    const hole = lostWalledHole();
+    let bounced = 0;
+    let lostAfterBounce = 0;
+    for (let i = 0; i < 400; i++) {
+      const rng = new Rng('wallsave' + i);
+      const res = executeShot(hole, hole.tee, 'tee', hole.green, driver, {}, rng);
+      if (res.log.wallHit) {
+        bounced++;
+        // The whole point of the bulkheads: a bounce only ever SAVES a ball. A ricochet that came to
+        // rest ON the wall line (the corridor edge) used to read as off-deck (lost to space) — the bug.
+        if (res.log.penalty === 'voidlost') lostAfterBounce++;
+      }
+    }
+    expect(bounced).toBeGreaterThan(0);
+    expect(lostAfterBounce).toBe(0);
+  });
+});
+
+describe('seatInsideWall', () => {
+  it('nudges a point INWARD along the wall normal', () => {
+    const wall: ShipWall = { a: [-10, 20], b: [10, 20], normal: [0, -1], height: WALL_HEIGHT };
+    const seated = seatInsideWall(wall, [0, 20], 3);
+    expect(seated[1]).toBe(17); // moved 3 yd along the −y inward normal, off the wall line
+    expect(seated[0]).toBe(0);
+  });
+});
+
+describe('GS-ship-walls — the aim cone reads the walls', () => {
+  const driver = CLUBS.find((c) => c.id === 'D')!;
+
+  it('shades a wall-blocked run (src:walls) that vanishes without the walls opt', () => {
+    const hole = lostWalledHole();
+    // A full driver down a bending, narrow ship corridor will ricochet off a wall somewhere in its cone.
+    const s = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { power: 1 });
+    const withWalls = sprayBlocking(hole, s, undefined, { walls: hole.walls });
+    const without = sprayBlocking(hole, s, undefined, {});
+    expect(withWalls.some((r) => r.src === 'walls')).toBe(true);
+    // The derelict grows nothing, so the ONLY blocker is the bulkheads — take them away and the cone clears.
+    expect(without.length).toBe(0);
+  });
+});
+
+describe('GS-ship-interior — deck breaches survive on LOST derelict holes', () => {
+  it('a breach on a hull-section pad is kept (not stripped as void junk)', () => {
+    let lost = 0;
+    let withBreach = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const c = generateCourse(seed * 137, { biome: 'derelict-ship', holes: 9, wildness: 0.9 });
+      for (const h of c.holes) {
+        if (!(h.biomeMods?.some((m) => m.kind === 'roughLie') ?? false)) continue; // lost holes only
+        lost++;
+        if (h.hazards.some((z) => z.kind === 'breach')) withBreach++;
+      }
+    }
+    expect(lost).toBeGreaterThan(0);
+    // Most lost par 4/5 corridors keep at least one deck breach (island par 3s have no corridor).
+    expect(withBreach).toBeGreaterThan(lost * 0.4);
   });
 });

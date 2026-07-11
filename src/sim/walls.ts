@@ -32,11 +32,26 @@ export type { ShipWall };
 export const WALL_HEIGHT = 72;
 /** Bounce run-out energy floor (fairway-equivalent yards) so a metal ricochet is lively, not dead. */
 export const WALL_BOUNCE_MIN = 8;
+/**
+ * How far INSIDE the deck (yards) a wall-stopped ball settles, off the bulkhead face. The wall line
+ * sits on the corridor EDGE — a point exactly on it reads as OFF the deck (`shiprough`/lost to space),
+ * so a ricochet that came to rest flush against the wall would be scored LOST despite bouncing. Seating
+ * the ball a few yards in off the wall keeps a saved ball on the hull deck (the walls only ever save a
+ * ball — contract 4). Small vs the corridor half-width, so it never crosses to the opposite wall.
+ */
+export const WALL_INSET = 3;
 
 const norm = (v: Vec): Vec => {
   const m = Math.hypot(v[0], v[1]) || 1;
   return [v[0] / m, v[1] / m];
 };
+
+/** Seat a point `p` that hit `wall` a safe margin INSIDE the deck, along the wall's inward normal, so a
+ *  ball ricocheting off / rolling into a bulkhead rests ON the hull deck, never on the wall line (which
+ *  reads as off-deck / lost to space). Pure. */
+export function seatInsideWall(wall: ShipWall, p: Vec, inset = WALL_INSET): Vec {
+  return [p[0] + wall.normal[0] * inset, p[1] + wall.normal[1] * inset];
+}
 
 /**
  * Reflect a horizontal travel direction `d` off a wall with inward normal `N`. A ball moving INTO the

@@ -12,7 +12,6 @@ import { setMusicScene, type MusicSceneId } from '../render/music';
 import { holeProjector, type Projector, type ProjectOptions } from '../render/project';
 import { createWeather } from '../render/weather';
 import { createCetusFlow } from '../render/cetusFlow';
-import { createShipDrift } from '../render/shipDrift';
 import { meteorScorch } from '../sim/scorch';
 import { artFeel } from '../render/style';
 import { CADDY_VOICE } from '../render/caddyArt';
@@ -44,9 +43,9 @@ function weatherSeed(hole: Hole): number {
   return (Math.round(hole.tee[0] * 7 + hole.green[1] * 13 + hole.par * 101) >>> 0) ^ 0x51ed;
 }
 
-/** A `_gsFeel` flow-speed sub-field (cetusFlowSpeed / shipDriftSpeed), defaulting to 1 — the same
- *  escape-hatch the play view reads, so the aim-overlay decor honours the identical tunable. */
-function feelSpeed(key: 'cetusFlowSpeed' | 'shipDriftSpeed'): number {
+/** A `_gsFeel` flow-speed sub-field (cetusFlowSpeed), defaulting to 1 — the same escape-hatch the play
+ *  view reads, so the aim-overlay Cetus river honours the identical tunable. */
+function feelSpeed(key: 'cetusFlowSpeed'): number {
   const f = (window as unknown as { _gsFeel?: Record<string, number> })._gsFeel ?? {};
   const v = f[key];
   return typeof v === 'number' ? v : 1;
@@ -125,7 +124,10 @@ export function mountWeatherOverlay(
   const arch = archetypeFor(holeThemeId(hole), holeBiome(hole) ?? '');
   const aligned = align ? alignedProjector(hole, align.mapProj, cw, ch) : null;
   const cetusFlow = aligned && align!.drift && arch === 'cetus' && !rainbowActive() ? createCetusFlow(hole) : null;
-  const shipDrift = aligned && align!.drift && arch === 'derelict' && !rainbowActive() ? createShipDrift(hole) : null;
+  // The derelict's drifting ship junk is deliberately NOT animated on this zoomed aim/putt overlay: its
+  // big SCREEN-SPACE wreck sections floated weirdly over the tight decision-map zoom (GS bug). The
+  // wreckage still lives — statically on the whole-hole SVG map, and animated in the follow-cam while
+  // WATCHING a shot (playView's `ambientDrift`) — just not over the lining-up map.
   // The meteor-shower's scorch craters, projected through the aligned projector so a strike lands
   // exactly on a drawn crater (createWeather ignores this unless the effect IS the meteor shower).
   const scorchMarks = aligned && align!.meteorScorch ? meteorScorch(hole) : [];
@@ -183,7 +185,6 @@ export function mountWeatherOverlay(
     if (aligned) {
       const accents = artFeel().accents;
       cetusFlow?.draw(ctx, aligned, now, accents, feelSpeed('cetusFlowSpeed'), true);
-      shipDrift?.draw(ctx, aligned, now, accents, feelSpeed('shipDriftSpeed'));
     }
     if (!reduced) raf = requestAnimationFrame(tick);
   };

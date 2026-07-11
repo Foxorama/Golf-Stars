@@ -777,7 +777,12 @@ function dedupeHazardOverlaps(hazards: Feature[]): Feature[] {
 function clearVoidHazards(hazards: Feature[], pads: Feature[]): Feature[] {
   return hazards.filter((h) => {
     if (CROSSING_KINDS.has(h.kind)) return true;
-    if (lieInfo(h.kind).penalty) return false; // the abyss is the only penalty on an island hole
+    // A ship-deck BREACH (GS-ship-interior) is the exception to "no penalty in the void": it's a hole
+    // eaten clean THROUGH the hull deck, so it BELONGS on a pad — that's the on-corridor danger the
+    // walled ship otherwise lacks. Keep a breach sitting ON a hull-section pad; strip only one stranded
+    // out in a star-gap (which would read as a pool floating in space, the very thing this filter fixes).
+    if (h.kind === 'breach') return pads.some((p) => polysOverlap(h.poly, p.poly));
+    if (lieInfo(h.kind).penalty) return false; // the abyss is the only OTHER penalty on an island hole
     return pads.some((p) => polysOverlap(h.poly, p.poly));
   });
 }
