@@ -7,10 +7,12 @@
  *   • ONE-LINE top bar — character name · (voyage) Arc / (endless) Hole · credits · the settings cog.
  *   • The journey MAP fills the entire rest of the screen (panning internally on a long voyage, never a
  *     page scroll — the first stop shows with no scroll at all).
- *   • STICKY map chrome, absolutely anchored to the map viewport so it never scrolls with the chart:
- *       — a 📡 SCANNER icon top-right (redraw the lanes for fuel),
- *       — the ⛽ FUEL gauge climbing the right edge from the bottom-right corner (tap → the fuel depot),
- *       — a 🚪 EXIT icon bottom-left (bank your run and return to port).
+ *   • A BRIDGE HUD (GS-journey-hud) frames the chart like a starship command deck: glowing corner
+ *     brackets + a bottom console bezel that houses the 🚪 EXIT door (left) and the 📡 SCANNER command
+ *     dial (bottom-CENTRE), with the ⛽ FUEL gauge climbing a right-edge pillar (count on top) that
+ *     meets the console at the corner. The whole frame recolours to the flown ship (`hudThemeForShip`)
+ *     via `--hud-*` custom properties, so a per-fleet livery is a table row (see `render/hudTheme.ts`).
+ *     All absolutely anchored to the map viewport so the frame stays put while the chart pans inside it.
  *   • Tapping a world raises an INFO CARD over the bottom HALF of the screen — the world + weather with
  *     fun lore/history, its Boons & Rewards and Hazards & Conditions laid out clearly, and the Jump
  *     action. Comparing worlds is: tap one, read, tap the next.
@@ -45,6 +47,7 @@ import { skyCoordForName } from '../render/sky-coords';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipForCharacter } from '../ui/game';
 import { fuelGaugeHTML } from '../render/fuel';
+import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
 
 // The travel screen's view-only module state (like shopView.inspectGearId / settingsOpen): which world is
 // SELECTED (its detail fills the bottom-half card; a tap on a world picks it, ✕ / another world swaps it),
@@ -313,6 +316,7 @@ export function travelScreen(): string {
     const badge = BIOME_BADGE[archetypeFor(h.themeId, h.biome)];
     return { label: name, ra: sky?.ra, dec: sky?.dec, glyph: badge?.glyph, col: badge?.col };
   });
+  const shipId = shipForCharacter(state, r.loadout.characterId);
   const map = journeyMapHTML({
     seed: r.seed,
     stopIndex: r.stopIndex,
@@ -320,26 +324,49 @@ export function travelScreen(): string {
     currentLabel: zoneName,
     trail,
     choices,
-    shipId: shipForCharacter(state, r.loadout.characterId),
+    shipId,
     ionThrusters: (r.loadout.fuelEfficiency ?? 0) > 0,
   });
+  // The bridge HUD's livery follows the flown ship (GS-journey-hud) — id → set → the standard cyan
+  // console. Piped into the frame as CSS custom properties so a new fleet livery is a table row.
+  const hud = hudThemeForShip(shipId);
 
-  // ---- sticky map chrome: scanner (top-right), fuel column (right edge, from the bottom), exit
-  // (bottom-left). Absolutely anchored to the map viewport so they stay put while the chart pans. -----
+  // ---- the bridge HUD: a command-console FRAME around the star map (GS-journey-hud). Corner brackets
+  // wrap the chart; a bottom console bezel houses the EXIT door (left) + the SCANNER (centre command
+  // dial); the full FUEL gauge climbs a right-edge pillar that meets the console at the corner. All
+  // absolutely anchored to the map viewport so the frame stays put while the chart pans inside it. -----
   const scanCost = scanFuelCost(r);
   const scanner = canScanRoutes(r)
-    ? `<button class="gs-travel__scan" data-action='${JSON.stringify({ type: 'scanRoutes' })}' title="Scan for closer worlds (−${scanCost} ⛽)" aria-label="Scan for new routes, costs ${scanCost} fuel"><span class="gs-travel__scan-ico">📡</span><span class="gs-travel__scan-cost">−${scanCost}⛽</span></button>`
-    : `<button class="gs-travel__scan gs-travel__scan--off" disabled title="Not enough fuel to scan" aria-label="Scanner offline — needs ${scanCost + 1} fuel"><span class="gs-travel__scan-ico">📡</span><span class="gs-travel__scan-cost">${scanCost + 1}⛽</span></button>`;
+    ? `<button class="gs-travel__scan" data-action='${JSON.stringify({ type: 'scanRoutes' })}' title="Scan for closer worlds (−${scanCost} ⛽)" aria-label="Scan for new routes, costs ${scanCost} fuel"><span class="gs-travel__scan-ico">📡</span><span class="gs-travel__scan-lbl">SCAN</span><span class="gs-travel__scan-cost">−${scanCost}⛽</span></button>`
+    : `<button class="gs-travel__scan gs-travel__scan--off" disabled title="Not enough fuel to scan" aria-label="Scanner offline — needs ${scanCost + 1} fuel"><span class="gs-travel__scan-ico">📡</span><span class="gs-travel__scan-lbl">SCAN</span><span class="gs-travel__scan-cost">${scanCost + 1}⛽</span></button>`;
 
-  // The fuel column doubles as the depot button (tap → buy fuel).
+  // The fuel pillar doubles as the depot button (tap → buy fuel).
   const fuelRail = `<button class="gs-travel__fuel" data-depot="toggle" title="Fuel — tap to top up" aria-label="Fuel gauge — tap to open the fuel depot">${fuelGaugeHTML(r.fuel, tankCapacity(r), { vertical: true })}</button>`;
 
   // The exit: bank now and return to port. Offered once underway (there are shards to bank) OR when
   // stranded (the only way out). A tap opens the confirm sheet rather than ending the run on one touch.
   const canExit = r.stopIndex > 0 || !anyLane;
   const exit = canExit
-    ? `<button class="gs-travel__exit" data-exit-confirm="1" title="End the run and bank" aria-label="End the run and bank your credits">🚪</button>`
+    ? `<button class="gs-travel__exit" data-exit-confirm="1" title="End the run and bank" aria-label="End the run and bank your credits"><span class="gs-travel__exit-ico">🚪</span><span class="gs-travel__exit-lbl">EXIT</span></button>`
     : '';
+
+  // Assemble the frame: decorative corner brackets (aria-hidden) + the L-shaped console (bottom bezel +
+  // right fuel pillar). `pointer-events` is off on the frame so map taps pass through; only the console
+  // controls catch touches. The whole thing recolours to the ship via the `--hud-*` custom properties.
+  const hudFrame = `
+    <div class="gs-hud gs-hud--${hud.variant}" style="${hudThemeVars(hud)}">
+      <div class="gs-hud__frame" aria-hidden="true">
+        <span class="gs-hud__corner gs-hud__corner--tl"></span>
+        <span class="gs-hud__corner gs-hud__corner--tr"></span>
+        <span class="gs-hud__corner gs-hud__corner--bl"></span>
+        <span class="gs-hud__corner gs-hud__corner--br"></span>
+      </div>
+      <div class="gs-hud__console">
+        <div class="gs-hud__slot gs-hud__slot--exit">${exit}</div>
+        <div class="gs-hud__slot gs-hud__slot--scan">${scanner}</div>
+      </div>
+      <div class="gs-hud__fueldock">${fuelRail}</div>
+    </div>`;
 
   // ---- the bottom-half overlays (mutually exclusive, priority: exit-confirm > depot > world card) ----
   let sheet = '';
@@ -392,9 +419,7 @@ export function travelScreen(): string {
       <div class="gs-travel__viewport">
         <div class="gs-travel__map">${map}</div>
         ${asgardBanner}
-        ${scanner}
-        ${fuelRail}
-        ${exit}
+        ${hudFrame}
         ${sheet}
       </div>
     </div>`;
