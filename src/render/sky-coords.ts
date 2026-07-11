@@ -257,6 +257,18 @@ export const THEME_SKY: Record<string, SkyCoord> = {
   "skull-nebula": {
     "ra": 11.76,
     "dec": -11.87
+  },
+  "cetus-a": {
+    "ra": 40.67,
+    "dec": -0.013
+  },
+  "medusa-nebula": {
+    "ra": 112.263,
+    "dec": 13.247
+  },
+  "antlia-cluster": {
+    "ra": 157.5,
+    "dec": -35.324
   }
 };
 

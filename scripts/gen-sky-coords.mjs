@@ -53,6 +53,13 @@ out['pyxis'] = { ra: 130.898, dec: -33.186 };
 out['ghost-nebula'] = { ra: 319.1, dec: 68.28 }; // vdB 141 / Sh2-136, in Cepheus
 out['skull-nebula'] = { ra: 11.76, dec: -11.87 }; // NGC 246, the Skull Nebula, in Cetus
 
+// GS-biome-frequency: the three arc-3 deep-sky destinations that lift cetus / derelict / metal to
+// toxic-mire frequency in the deep game aren't catalogue cards either — hand-pin their real J2000
+// positions, like Cetus / the galaxies / the wrecks above.
+out['cetus-a'] = { ra: 40.67, dec: -0.013 }; // M77 / NGC 1068, the Whale's galaxy, in Cetus
+out['medusa-nebula'] = { ra: 112.263, dec: 13.247 }; // Abell 21, the Medusa Nebula, in Gemini
+out['antlia-cluster'] = { ra: 157.5, dec: -35.324 }; // Abell S0636, the Antlia Cluster, in Antlia
+
 const body = `/**
  * Real-sky coordinates per voyage THEME (GS-galaxy-map) — GENERATED from data/night-sky-cards.json
  * by scripts/gen-sky-coords.mjs. Equatorial J2000: \`ra\` in degrees (0–360), \`dec\` in degrees

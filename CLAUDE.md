@@ -111,6 +111,13 @@ these systems** — each bullet is the tip of a documented iceberg.
 
 - **Generator & sim** — `docs/decisions/sim-generator.md`
   - Biomes are physics-only data rows; the render palette is keyed by biome id in the render layer.
+  - A world's APPEARANCE RATE is its themes' summed rarity weight per arc; a world with themes in
+    only one arc (or only epic-weight ones) is near-unreachable in the deep game where a run spends
+    most of its stops. Every archetype must carry ≥1 arc-3 theme at ~toxic-mire (swamp) weight or a
+    long voyage can skip it entirely (GS-biome-frequency: cetus/derelict/metal each got one COMMON,
+    arc-3-pinned deep-sky destination — the frequency lever is rarity WEIGHT, not a loot statement).
+    Lifting a world = a new theme ROW (+ a `gen-sky-coords.mjs` J2000 anchor for the journey map),
+    never an engine edit.
   - Corridor: wide-and-wild early → tight late, a `ribbon` off a smoothed template-grammar
     centreline; hazard placement + `validateFairness` key off the corridor's WIDEST point.
     WIDTH is a per-hole ARCHETYPE (`chooseWidthProfile`: classic/chute/neck/hourglass/wander/
