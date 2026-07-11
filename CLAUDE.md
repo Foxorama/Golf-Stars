@@ -415,12 +415,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     depot); the exit is bank/end run (two-step confirm). The frame RECOLOURS to the flown ship via
     `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-bhud`; a per-fleet
     livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE is a
-    `.gs-bhud--<variant>` block — never a layout edit. The **Infinity Ace** (GS-infinity-hud, the hole-150
-    Unending grail) is the first non-`standard` variant: `variant:'infinity'` unlocks `.gs-bhud--infinity`
-    — a rotating living-aurora ring (@property `--gs-aur-angle`, the ship's gold→emerald→aquamarine→violet
-    palette), gold double-rim, breathing corner brackets + an ∞ crest crowning the frame; all decoration on
-    the existing markup (frame ::before/::after) with animations disabled under reduced-motion (degrades to
-    a static gold-aurora console). Eyeball via `scripts/travel-preview.mjs QS="?ship=infinity-ace"`. Its base class MUST stay `.gs-bhud`, NOT
+    `.gs-bhud--<variant>` block, and a FULL bespoke reskin adds a `render/hudChrome.ts` row (bridge
+    ICONS + labels + frame ORNAMENTS) — never a layout edit. The **Infinity Ace** (GS-infinity-hud, the
+    hole-150 Unending grail) is the first non-`standard` variant and the reference full reskin:
+    `variant:'infinity'` unlocks `.gs-bhud--infinity` (a rotating living-aurora ring — @property
+    `--gs-aur-angle`, the ship's gold→emerald→aquamarine→violet palette — gold double-rim + inner wash,
+    breathing corner L-brackets) AND `hudChromeFor('infinity')` swaps the three controls for a
+    sensor-sweep SCANNER, an airlock EJECT hatch, and a plasma-cell fuel glyph (via `fuelGaugeHTML`'s
+    new `icon` opt), plus injected ornaments — a crowned ∞ title plate, ticked instrument side rails,
+    glowing corner nodes. `chrome` is `null` for every other ship (classic 📡/🚪/⛽ console, byte-
+    identical); all ornaments are `pointer-events:none` (map taps still pass), and every animation is off
+    under reduced-motion (degrades to a rich STATIC gold-aurora bridge). The icon SVGs read the `--aur*`
+    props the variant CSS defines. Eyeball via `scripts/travel-preview.mjs QS="?ship=infinity-ace"`. Its base class MUST stay `.gs-bhud`, NOT
     `.gs-hud` (the play screen's own HUD class): a shared `.gs-hud` here once stretched the play screen's
     `.gs-glass` chrome into a full-screen map-blur (GS-hud-class-collision, guarded by the play-HUD layout
     test in `tests/build.test.ts`). `.gs-bhud` is `pointer-events:none` so map taps
