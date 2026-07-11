@@ -193,4 +193,54 @@ describe('build output (real browser)', () => {
     },
     60_000,
   );
+
+  // A JS-clean page can still be visually unplayable. The GS-journey-hud redesign reused the `.gs-hud`
+  // class the PLAY screen already owns for the travel BRIDGE hud, whose `inset:0` then stretched the play
+  // screen's top info-chip (`.gs-hud-top.gs-glass`) + bottom controls (`.gs-hud-bottom`) to fill the whole
+  // viewport — a full-screen `backdrop-filter:blur` panel that smeared the entire map into a dark, unfocused
+  // blur while the app threw NO error (so every existing test stayed green). This measures the real layout:
+  // the play HUD chrome must be small strips at the top and bottom, never blanketing the map. Guards the
+  // class of CSS-collision regression that headless-sim + "does it throw" browser checks are blind to.
+  it.runIf(chromePath)(
+    'the play HUD chrome does not blanket the map (no full-screen blur overlay)',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        await page.goto('file://' + dist + '?intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        const click = async (t: string) => {
+          await page.locator('button', { hasText: t }).first().click();
+          await page.waitForTimeout(350);
+        };
+        await click('The Voyage');
+        await click('Voyage as Feather');
+        await click('First Tee');
+        await click('Tee Off');
+        await page.waitForTimeout(400);
+        // Measure every HUD chrome element on the play screen. Each must be a compact strip — never
+        // taller than half the viewport (pre-fix, the collided `inset:0` made these ~99% tall).
+        const geo = await page.evaluate(() => {
+          const vh = window.innerHeight;
+          const pick = (sel: string) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            return { hFrac: r.height / vh, top: r.top };
+          };
+          return { vh, top: pick('.gs-hud-top'), bottom: pick('.gs-hud-bottom') };
+        });
+        // The play screen must actually be mounted (both chrome pieces present).
+        expect(geo.top, 'top info chip present').not.toBeNull();
+        expect(geo.bottom, 'bottom controls present').not.toBeNull();
+        // Neither may blanket the map — the bug stretched both to ~full height.
+        expect(geo.top!.hFrac, `top chip height ${(geo.top!.hFrac * 100).toFixed(0)}% of viewport`).toBeLessThan(0.5);
+        expect(geo.bottom!.hFrac, `bottom controls height ${(geo.bottom!.hFrac * 100).toFixed(0)}% of viewport`).toBeLessThan(0.5);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
 });

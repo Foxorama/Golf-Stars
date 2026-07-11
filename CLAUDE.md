@@ -408,14 +408,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     (`.gs-journey--v` PANS at intrinsic size — never scales down, so the zoom-out-to-unusable bug can't
     return; a fresh stop shows with NO scroll). STICKY chrome is absolutely anchored to
     `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map) as a BRIDGE HUD
-    (GS-journey-hud, `.gs-hud`): a starship command FRAME — glowing corner brackets + an L-shaped console
+    (GS-journey-hud, `.gs-bhud`): a starship command FRAME — glowing corner brackets + an L-shaped console
     (bottom bezel + right fuel pillar) that COMPLETES the page. The 🚪 EXIT door docks the console LEFT,
     the 📡 SCAN command dial sits bottom-CENTRE (moved from top-right), the ⛽ FUEL gauge (vertical
     `fuelGaugeHTML({vertical})`, COUNT on top / ⛽ at the FOOT) climbs the right pillar (tap → the fuel
     depot); the exit is bank/end run (two-step confirm). The frame RECOLOURS to the flown ship via
-    `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-hud`; a per-fleet
+    `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-bhud`; a per-fleet
     livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE later
-    is a `.gs-hud--<variant>` block — never a layout edit. `.gs-hud` is `pointer-events:none` so map taps
+    is a `.gs-bhud--<variant>` block — never a layout edit. Its base class MUST stay `.gs-bhud`, NOT
+    `.gs-hud` (the play screen's own HUD class): a shared `.gs-hud` here once stretched the play screen's
+    `.gs-glass` chrome into a full-screen map-blur (GS-hud-class-collision, guarded by the play-HUD layout
+    test in `tests/build.test.ts`). `.gs-bhud` is `pointer-events:none` so map taps
     pass through; only the console controls catch touches. Tapping a world (`data-route-inspect`) raises
     `laneCard` over the bottom HALF (z-index above the HUD) — world + weather LORE (`BIOME_LORE` +
     theme/effect blurbs), Boons & Rewards vs Hazards & Conditions chips, the Jump action. Only ONE bottom

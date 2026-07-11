@@ -354,18 +354,18 @@ export function travelScreen(): string {
   // right fuel pillar). `pointer-events` is off on the frame so map taps pass through; only the console
   // controls catch touches. The whole thing recolours to the ship via the `--hud-*` custom properties.
   const hudFrame = `
-    <div class="gs-hud gs-hud--${hud.variant}" style="${hudThemeVars(hud)}">
-      <div class="gs-hud__frame" aria-hidden="true">
-        <span class="gs-hud__corner gs-hud__corner--tl"></span>
-        <span class="gs-hud__corner gs-hud__corner--tr"></span>
-        <span class="gs-hud__corner gs-hud__corner--bl"></span>
-        <span class="gs-hud__corner gs-hud__corner--br"></span>
+    <div class="gs-bhud gs-bhud--${hud.variant}" style="${hudThemeVars(hud)}">
+      <div class="gs-bhud__frame" aria-hidden="true">
+        <span class="gs-bhud__corner gs-bhud__corner--tl"></span>
+        <span class="gs-bhud__corner gs-bhud__corner--tr"></span>
+        <span class="gs-bhud__corner gs-bhud__corner--bl"></span>
+        <span class="gs-bhud__corner gs-bhud__corner--br"></span>
       </div>
-      <div class="gs-hud__console">
-        <div class="gs-hud__slot gs-hud__slot--exit">${exit}</div>
-        <div class="gs-hud__slot gs-hud__slot--scan">${scanner}</div>
+      <div class="gs-bhud__console">
+        <div class="gs-bhud__slot gs-bhud__slot--exit">${exit}</div>
+        <div class="gs-bhud__slot gs-bhud__slot--scan">${scanner}</div>
       </div>
-      <div class="gs-hud__fueldock">${fuelRail}</div>
+      <div class="gs-bhud__fueldock">${fuelRail}</div>
     </div>`;
 
   // ---- the bottom-half overlays (mutually exclusive, priority: exit-confirm > depot > world card) ----

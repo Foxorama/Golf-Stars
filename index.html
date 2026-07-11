@@ -1177,17 +1177,21 @@
       .gs-travel .gs-journey-here { display: none; }
 
       /* ── The bridge HUD (GS-journey-hud): a starship command-console FRAME wrapping the star map.
-             Glowing corner brackets + an L-shaped console (bottom bezel + right fuel pillar) house the
-             three controls. Absolutely anchored to the viewport (NOT the scrolling chart) so the frame
-             stays put while the map pans. The whole frame recolours to the flown ship via the `--hud-*`
-             custom properties (`render/hudTheme.ts`) — accent, accent2, glow, ink; a per-fleet livery is
-             a table row, and a `.gs-hud--<variant>` block here could reshape the frame per fleet. ── */
-      .gs-hud {
+             Its base class is `.gs-bhud` — NOT `.gs-hud`: the play screen already owns `.gs-hud`, and an
+             earlier `.gs-hud` here (with `inset:0`) stretched the play HUD's `.gs-glass` chrome over the
+             whole map into a full-screen blur (GS-hud-class-collision). Keep bridge classes namespaced
+             `gs-bhud*` so they can never bleed onto the play screen. Glowing corner brackets + an L-shaped
+             console (bottom bezel + right fuel pillar) house the three controls. Absolutely anchored to the
+             viewport (NOT the scrolling chart) so the frame stays put while the map pans. The whole frame
+             recolours to the flown ship via the `--hud-*` custom properties (`render/hudTheme.ts`) —
+             accent, accent2, glow, ink; a per-fleet livery is a table row, and a `.gs-bhud--<variant>`
+             block here could reshape the frame per fleet. ── */
+      .gs-bhud {
         position: absolute; inset: 0; z-index: 5; pointer-events: none;
         --hud-accent: #5fd6e6; --hud-accent2: #3a6a86; --hud-glow: rgba(60,150,210,0.30); --hud-ink: #cfe6f2;
       }
       /* The decorative frame: a faint inset rim + glow, with prominent glowing L-brackets at the corners. */
-      .gs-hud__frame {
+      .gs-bhud__frame {
         position: absolute; inset: 3px; border-radius: 13px; pointer-events: none;
         border: 1px solid color-mix(in srgb, var(--hud-accent) 30%, transparent);
         box-shadow:
@@ -1195,25 +1199,25 @@
           inset 0 0 1px color-mix(in srgb, var(--hud-accent) 45%, transparent),
           0 0 22px -10px var(--hud-accent);
       }
-      .gs-hud__corner { position: absolute; width: 24px; height: 24px; }
-      .gs-hud__corner::before, .gs-hud__corner::after {
+      .gs-bhud__corner { position: absolute; width: 24px; height: 24px; }
+      .gs-bhud__corner::before, .gs-bhud__corner::after {
         content: ''; position: absolute; background: var(--hud-accent);
         box-shadow: 0 0 7px -1px var(--hud-accent); border-radius: 1px;
       }
-      .gs-hud__corner::before { height: 2.5px; width: 100%; top: 0; }   /* horizontal arm */
-      .gs-hud__corner::after  { width: 2.5px; height: 100%; left: 0; }  /* vertical arm */
-      .gs-hud__corner--tl { top: 4px; left: 4px; }
-      .gs-hud__corner--tr { top: 4px; right: 4px; }
-      .gs-hud__corner--tr::before, .gs-hud__corner--tr::after { left: auto; right: 0; }
-      .gs-hud__corner--bl { bottom: 4px; left: 4px; }
-      .gs-hud__corner--bl::before, .gs-hud__corner--bl::after { top: auto; bottom: 0; }
-      .gs-hud__corner--br { bottom: 4px; right: 4px; }
-      .gs-hud__corner--br::before { top: auto; bottom: 0; }
-      .gs-hud__corner--br::after { top: auto; left: auto; bottom: 0; right: 0; }
+      .gs-bhud__corner::before { height: 2.5px; width: 100%; top: 0; }   /* horizontal arm */
+      .gs-bhud__corner::after  { width: 2.5px; height: 100%; left: 0; }  /* vertical arm */
+      .gs-bhud__corner--tl { top: 4px; left: 4px; }
+      .gs-bhud__corner--tr { top: 4px; right: 4px; }
+      .gs-bhud__corner--tr::before, .gs-bhud__corner--tr::after { left: auto; right: 0; }
+      .gs-bhud__corner--bl { bottom: 4px; left: 4px; }
+      .gs-bhud__corner--bl::before, .gs-bhud__corner--bl::after { top: auto; bottom: 0; }
+      .gs-bhud__corner--br { bottom: 4px; right: 4px; }
+      .gs-bhud__corner--br::before { top: auto; bottom: 0; }
+      .gs-bhud__corner--br::after { top: auto; left: auto; bottom: 0; right: 0; }
 
       /* Bottom console bezel — the dashboard the controls are mounted on. Full width; the exit docks
          left, the scanner command-dial sits dead-centre; the fuel pillar rises from its right end. */
-      .gs-hud__console {
+      .gs-bhud__console {
         position: absolute; left: 10px; right: 10px; bottom: 10px; height: 54px;
         display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 8px;
         pointer-events: auto; border-radius: 13px;
@@ -1225,13 +1229,13 @@
           inset 0 0 18px color-mix(in srgb, var(--hud-glow) 40%, transparent),
           0 -6px 22px rgba(0,0,0,0.42);
       }
-      .gs-hud__slot { display: flex; align-items: center; }
-      .gs-hud__slot--exit { justify-self: start; }
-      .gs-hud__slot--scan { justify-self: center; }
+      .gs-bhud__slot { display: flex; align-items: center; }
+      .gs-bhud__slot--exit { justify-self: start; }
+      .gs-bhud__slot--scan { justify-self: center; }
 
       /* The right FUEL pillar — the tank gauge climbing out of the console's right corner. Shares the
          bezel look so it reads as one continuous L-console; overlaps the console's right end. */
-      .gs-hud__fueldock {
+      .gs-bhud__fueldock {
         position: absolute; right: 12px; bottom: 12px; pointer-events: auto; z-index: 1;
       }
 
