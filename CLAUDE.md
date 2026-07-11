@@ -738,6 +738,18 @@ these systems** — each bullet is the tip of a documented iceberg.
 
 ## Change, versioning & deploy
 - `main` is branch-protected. Each change: branch → edit → commit → push → PR → merge → sync.
+- **Run `npm run check` before every push — NOT just `npm test`.** `check` = `typecheck && test &&
+  build`, the exact CI gate in order. `npm test` (vitest) transpiles with esbuild and does NOT
+  type-check, so a green suite says nothing about `tsc` (missing required args, unused vars, wrong
+  types) — that's exactly how #347 shipped "green" and failed CI at the typecheck step. A green
+  vitest run ≠ type-clean ≠ builds.
+- **CSS classes / DOM ids are GLOBAL; the app is split across many `src/app/*` + `src/render/*`
+  modules that can't see each other's names.** New screen chrome gets its OWN class prefix (the
+  bridge HUD is `.gs-bhud*`, NOT the play screen's `.gs-hud`). Before adding a `.gs-foo {` rule, grep
+  `gs-foo` across `src/` — reusing another screen's class silently restyles it (the #353 full-screen
+  map-blur was `.gs-hud` shared between the play HUD and the journey HUD). If it renders a new screen,
+  add a browser layout smoke test (`tests/build.test.ts` pattern) — the pure-sim suite is blind to
+  CSS/DOM. See `reports/regression-postmortem-2026-07-11.md`.
 - **Default to shipping all the way.** When a change is complete and tests are green, take it to done:
   open the PR, enable auto-merge (`enable_pr_auto_merge` — GitHub lands it when the required `test`
   check passes and deletes the branch), then sync `main`. Only stop short if the work is WIP, the
