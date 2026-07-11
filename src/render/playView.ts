@@ -40,6 +40,7 @@ import {
   easeOutCubic,
   flightDurationMs,
   sampleCurvedFlight,
+  samplePolylineFlight,
   DEFAULT_FLIGHT_FEEL,
   type FlightFeel,
 } from './trajectory';
@@ -378,6 +379,8 @@ export function mountPlayView(
   let tentCallout: { at: Vec; text: string; until: number } | null = null;
   let tentFiredShot = -1; // shot whose tent-hit callout has fired
   let wallFiredShot = -1; // shot whose ship-wall clang has fired (GS-ship-walls)
+  let wallSparkShot = -1; // shot whose per-bounce sparks are being tracked (GS-ship-pinball-flight)
+  let wallSparkNext = 1; // index of the next interior flight-path vertex to spark as the ball crosses it
 
   function reset(_now: number): void {
     shotIndex = 0;
@@ -404,6 +407,8 @@ export function mountPlayView(
     tentCallout = null;
     tentFiredShot = -1;
     wallFiredShot = -1;
+    wallSparkShot = -1;
+    wallSparkNext = 1;
   }
 
   function spawnImpact(at: Vec, power: number): void {
@@ -832,6 +837,35 @@ export function mountPlayView(
                 sI.ground[1] + (touchdown[1] - sI.ground[1]) * e,
               ];
             }
+          } else if (shot.flightPath && shot.flightPath.length > 1) {
+            // Ship-corridor PINBALL flight (GS-ship-pinball-flight): walk the sim's STRAIGHT reflected
+            // polyline — the ball flies straight and cracks off the bulkheads down the hallway, never the
+            // parkland banana. Same segments the aim/physics used (graphic ≡ physics).
+            const fp = shot.flightPath;
+            const s = samplePolylineFlight(fp, tg, peak, apexT);
+            ground = s.ground;
+            height = s.height;
+            // Fire a metal spark + hull clang at EACH interior bounce vertex the instant the ball reaches it
+            // (by arc length) — the crack off the bulkhead lands where the ricochet actually is, mid-flight,
+            // not at the far landing. (The old single touchdown clang is skipped for ship shots below.)
+            if (wallSparkShot !== shotIndex) {
+              wallSparkShot = shotIndex;
+              wallSparkNext = 1;
+            }
+            let total = 0;
+            for (let i = 1; i < fp.length; i++) total += Math.hypot(fp[i]![0] - fp[i - 1]![0], fp[i]![1] - fp[i - 1]![1]);
+            let acc = 0;
+            for (let i = 1; i < fp.length - 1; i++) {
+              acc += Math.hypot(fp[i]![0] - fp[i - 1]![0], fp[i]![1] - fp[i - 1]![1]);
+              const frac = total > 0 ? acc / total : 1;
+              if (i >= wallSparkNext && tg >= frac) {
+                const [vx, vy] = proj.project(fp[i]!);
+                spawnLandFX([vx, vy], 'junk'); // shower of sparks + a scrap rattle off the steel bulkhead
+                shake = Math.max(shake, 0.34);
+                opts.onWallBounce?.(1);
+                wallSparkNext = i + 1;
+              }
+            }
           } else {
             const s = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak, apexT);
             ground = s.ground;
@@ -882,10 +916,11 @@ export function mountPlayView(
             shake = Math.max(shake, 0.3);
             opts.onTentHit?.(text);
           }
-          // Ship-corridor wall ricochet (GS-ship-walls): the flight ENDS at the wall it clanged off
-          // (the sim set the landing there), so touchdown IS the impact — throw a metallic spark + a
-          // hull clang here, harder for a double bounce. The flight/roll already show it bouncing back.
-          if (shot.wallHit && wallFiredShot !== shotIndex) {
+          // Ship-corridor wall ricochet (GS-ship-walls): the PINBALL flight (GS-ship-pinball-flight) already
+          // sparked + clanged at each bulkhead vertex mid-flight (above), so a ship shot with a `flightPath`
+          // skips this touchdown clang — its landing is deep in the corridor, NOT a wall. This fallback only
+          // fires for a legacy wall-hit with no stored polyline (never, on the ship now).
+          if (shot.wallHit && !shot.flightPath && wallFiredShot !== shotIndex) {
             wallFiredShot = shotIndex;
             spawnLandFX([tdx, tdy], 'junk'); // a shower of sparks + a scrap rattle off the steel wall
             shake = Math.max(shake, shot.wallHit.bounces >= 2 ? 0.5 : 0.32);
