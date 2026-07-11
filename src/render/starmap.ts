@@ -60,6 +60,9 @@ export interface StarmapChoice {
   /** GS-fuel-3: the jump's actual ⛽ bill (Ion Thrusters may undercut the distance). Absent → the
    *  distance, unit for unit (the classic GS-fuel rule). */
   fuelCost?: number;
+  /** GS-journey-cockpit: this world is the SELECTED lane — draw a bright selection halo + brighten it,
+   *  so the map and the dock detail agree on which jump you're reading. Absent → the classic look. */
+  selected?: boolean;
 }
 
 /** Per-biome world look (GS-journey-biome) — a colour + glyph + surface family so each lane's
@@ -283,6 +286,13 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
          <animate attributeName="opacity" values="0.6;0.12;0.6" dur="1.8s" repeatCount="indefinite"/></circle>
        <circle cx="${cx}" cy="${cy}" r="${r + 12}" fill="#ff4a3a" opacity="0.06"/>`
     : '';
+  // GS-journey-cockpit: the SELECTED world wears a steady bright ring + a soft filled glow (in its rarity
+  // colour) OUTSIDE the atmosphere, so at a glance you know which lane the dock is detailing.
+  const selection = c.selected
+    ? `<circle cx="${cx}" cy="${cy}" r="${r + 16}" fill="${ring}" opacity="0.09"/>
+       <circle cx="${cx}" cy="${cy}" r="${r + 8}" fill="none" stroke="${ring}" stroke-width="2.6" opacity="0.95"/>
+       <circle cx="${cx}" cy="${cy}" r="${r + 8}" fill="none" stroke="#ffffff" stroke-width="0.8" opacity="0.55"/>`
+    : '';
   const heat =
     c.elite && !c.bossAhead
       ? `<circle cx="${cx}" cy="${cy}" r="${r + 7}" fill="none" stroke="#ffb04a" stroke-width="1.6" opacity="0.4">
@@ -326,6 +336,7 @@ function worldPlanet(cx: number, cy: number, c: StarmapChoice): string {
         <clipPath id="${gid}c"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>
       </defs>
       <circle cx="${cx}" cy="${cy}" r="${r + 12}" fill="transparent" pointer-events="all"/>
+      ${selection}
       <g${bodyOpacity}>
       ${boss}${heat}
       <!-- a soft "tap me" portal pulse in the rarity colour -->

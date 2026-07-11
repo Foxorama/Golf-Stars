@@ -292,6 +292,41 @@
     star-drift (uniform 180px = one tile, nebulae pinned) gated behind `prefers-reduced-motion`, and a
     cockpit-window frame glow. No new `_gs*`/URL hook → the test-hub guard needs nothing. Verified
     eyes-on (Playwright renders of both the top and the scrolled-to-Earth view).
+  - **The travel screen is ONE fixed-viewport COCKPIT (GS-journey-cockpit, 2026-07-11, `travelScreens.ts`/
+    `starmap.ts`/`app.ts`/`index.html`).** GS-journey-vertical fixed the map but left the SCREEN a tall
+    vertical stack — a heavy `header()` (Stop/Dist/Credits/fuel/**Hcp/Best dist/Best SF**), a `◆ CHOOSE
+    YOUR JUMP` title with a **duplicate** fuel/dist pill, a 4-line instruction paragraph, THEN the map,
+    THEN (scrolled far below, disconnected) the sector-scan button, the fuel depot, and the bank exit. The
+    page scrolled, the map scrolled INSIDE it (double scroll), and comparing the three lanes meant opening
+    a bottom-sheet modal, reading it, CLOSING it, and repeating — three windows to compare three options.
+    Reworked into the play-screen's proven fixed layout (`.gs-travel`, `height:calc(100dvh − 46px − insets);
+    overflow:hidden`, a flex COLUMN): a **compact status strip** (golfer · Stop · dist · fuel gauge ·
+    credits — the decision-irrelevant Hcp/Best/duplicate-pill/paragraph all cut), the **map filling the
+    slack** (`.gs-travel__map` flex:1; the `.gs-journey--v` inside keeps its intrinsic tall size and PANS
+    internally — `flex:1 1 auto; min-height:0; max-height:none` — so the old zoom-out-to-unusable failure
+    can't return, it scrolls not scales), and a docked **control bar** carrying everything in reach.
+    - **Selection is INLINE, not a modal (kills the compare-by-opening-windows problem).** The old
+      `routeInfoOverlay()` bottom-sheet + `inspectRouteId` + its `[data-route]` backdrop wiring are DELETED.
+      `travelView.selectedRouteId` (view-only module state, same reset-on-leave-travel rule) now holds the
+      SELECTED lane; tapping a map world OR a dock rail cell (both still `data-route-inspect="<id>"`, the
+      test's tap-target contract preserved) just re-selects and re-renders. The selected world wears a
+      bright rarity-coloured **selection halo** on the map (`StarmapChoice.selected` → a steady ring in
+      `worldPlanet`), and its FULL bet fills the dock detail zone — swaps in place, zero windows.
+    - **A COMPARISON RAIL answers "compare three at a glance" directly.** `.gs-travel__rail` is three
+      side-by-side cells (`laneCell`), each reading the world (biome glyph + name), a 4-segment DIFFICULTY
+      bar, and the two numbers that decide the bet (⛽ fuel bill + credit swing), with ⚔/🔥 stakes flagged —
+      all visible at once, no tap needed; the whole cell is the same select target. Below it, `laneDetail`
+      renders the selected lane's honest, physics-derived readout (world/difficulty, the credit/wind/carry/
+      fuel/salvage lever chips + the sky effect's real play hook, computed from the SAME tables the physics
+      read, as the old sheet did) and any toll/fuel warning.
+    - **Scan + depot + bank are IN the dock, in reach.** The `🚀 Jump` primary (the selected lane, with the
+      GS-fuel-2 refuel-&-jump bill still printed on it when short-tanked), `📡 Scan`, a `⛽ Fuel` toggle that
+      expands `fuelDepotHTML()` inline (a `[data-depot]` view flag, `travelView.depotOpen`), and a compact
+      `✦ Bank` share one action row; the STRANDED box (no payable lane) replaces the detail with its
+      scan/abandon lifeline. The reducer's `{ type:'route' }` / `scanRoutes` / `bank` / `strand` actions are
+      UNCHANGED — this is a pure app/render reshuffle, ZERO reducer/save/sim/rng impact. No new `_gs*`/URL
+      hook → the test-hub guard needs nothing. Verified eyes-on (Playwright `scripts/travel-preview.mjs`
+      renders the cockpit at 400×860 + 390×740 + depot-open; full suite + `journey-map`/`build` green).
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a
