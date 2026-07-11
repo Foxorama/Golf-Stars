@@ -81,6 +81,33 @@ export function sampleCurvedFlight(
   return { ground: flightGround(from, control, landing, tt), height: arcHeight(apex, tt, apexT) };
 }
 
+/**
+ * Sample the ship-corridor PINBALL flight at progress `t`: the ground walks the STRAIGHT-segment polyline
+ * the sim resolved (`shot.flightPath`, tee → each bulkhead ricochet → landing) BY ARC LENGTH, so the ball
+ * tracks the exact reflected path the sim computed — the graphic IS the physics (contract 5). The height is
+ * the same family-shaped arc as the banana, spanning the whole polyline (one rise-and-fall over the carom).
+ * Used only on the derelict, where the flight cracks off metal instead of curving. Pure.
+ */
+export function samplePolylineFlight(path: Vec[], t: number, apex: number, apexT = 0.5): FlightSample {
+  const tt = Math.max(0, Math.min(1, t));
+  const height = arcHeight(apex, tt, apexT);
+  if (path.length < 2) return { ground: path[0] ?? [0, 0], height };
+  let total = 0;
+  for (let i = 1; i < path.length; i++) total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
+  let want = total * tt;
+  for (let i = 1; i < path.length; i++) {
+    const seg = Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
+    if (want <= seg || i === path.length - 1) {
+      const u = seg > 1e-9 ? Math.min(1, want / seg) : 0;
+      const a = path[i - 1]!;
+      const b = path[i]!;
+      return { ground: [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u], height };
+    }
+    want -= seg;
+  }
+  return { ground: path[path.length - 1]!, height };
+}
+
 export function easeOutCubic(t: number): number {
   const u = 1 - Math.max(0, Math.min(1, t));
   return 1 - u * u * u;

@@ -227,16 +227,25 @@ these systems** — each bullet is the tip of a documented iceberg.
     METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
     `WALL_HEIGHT` = 72 yd — ABOVE the 60-yd shot-apex cap (`ARC_FEEL.peakMax`) — so NOTHING clears them: every
-    ball that leaves the deck sideways RICOCHETS back onto the corridor — a hook/arc that crosses a wall is
-    interrupted mid-flight, same as a tree, then a second crossing off the reflected line bounces again (hit
-    two walls, bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡
-    interactive). THE FLIGHT BOUNCE keys off the DRAWN DECK, not a wall SEGMENT (GS-ship-wall-bounce,
-    `flightWallBounce`): it bounces at the FIRST flight point that leaves a SOLID stretch of hull, so it can
-    never leak past the corridor's hard-corner openings / chain ends the way the per-segment `wallFlightHit`
-    did (~11% of drives used to visibly arc past a wall into space — there's no wall SEGMENT at those leak
-    points, which is exactly why segment collision missed them). A forward carry over a torn-hull star-gap
-    flies clean because the centreline runs continuously through the gap → a NON-solid station (`corridorSolidAt`).
-    `wallFlightHit` now feeds ONLY the aim cone (below). ON THE GROUND it's a PINBALL (GS-ship-pinball): a rolling ball REFLECTS off a wall
+    ball that leaves the deck sideways RICOCHETS back onto the corridor. Resolved in the shared `executeShot`
+    right after the tent branch (auto ≡ interactive).
+  - SHIP PINBALL FLIGHT (GS-ship-pinball-flight, `round.ts shipFlightPath`): the derelict does NOT fly the
+    parkland fade/hook BANANA — a corridor ball flies a STRAIGHT line and CRACKS off each bulkhead, caroming
+    down the metal hallway to its airborne landing (a spaceship corridor, not a gentle curve — the whole feel
+    of the world). The sim marches the straight shot line, reflecting off the DRAWN DECK edge at the first
+    SOLID-station departure (`firstSolidDeparture` + `inwardReflect`, which forces a `WALL_MIN_INWARD` turn so
+    a grazing hit can't machine-gun a bounce loop), then CONTINUES the flight along the reflected line up to
+    `maxBounces` — the full carry is spent along the reflected polyline (a bounce-cap hit LANDS at the last
+    on-deck ricochet, never extends into space). A forward torn-hull star-gap is a NON-solid station, so a
+    sanctioned carry flies clean. The exact reflected polyline is stored on `ShotLog.flightPath`; the renderer
+    draws THOSE straight segments (`samplePolylineFlight`), so the graphic IS the physics (contract 5). ALWAYS
+    taken on a walled hole so even a clean drive is straight, never a banana; a 0-bounce ship shot keeps its
+    exact old landing + roll energy (byte-identical outcome, render-only straight path), a bounced one carries
+    on down the deck with a lively metal floor. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate → every
+    other world byte-identical), and it only ever keeps a would-be-lost ball IN the corridor (Stableford can only
+    rise — contract 4; plain corridors keep ~99% of drives in, gapped island-hop holes still punish a blind
+    driver into a carry-gap). This SUPERSEDED the old banana-walk `flightWallBounce` (removed); `wallFlightHit`
+    now feeds ONLY the aim cone (below). ON THE GROUND it's a PINBALL (GS-ship-pinball): a rolling ball REFLECTS off a wall
     (`wallRollBounce` + `wallReflect`) and keeps rolling — wall to wall — until friction + a per-bounce
     metal loss (`WALL_ROLL_RESTITUTION` 0.82) bleed the momentum away, NEVER the old dead stop. A walled
     hole routes through `rollOut`'s position-tracking integrator (the curling one, kick/bend gated to
@@ -251,15 +260,15 @@ these systems** — each bullet is the tip of a documented iceberg.
   - SHIP-CORRIDOR CONTAINMENT (GS-ship-corridor-contain, `round.ts`): the promise "a sideways miss ricochets
     back, NEVER lost to space" is guaranteed BY CONSTRUCTION, not by the per-segment collision. The pre-built
     wall SEGMENTS are two parallel rails per corridor section — they do NOT close a fence around a deck that
-    ZIGZAGS with hard-angular corners, so the curved flight banana + the pinball roll reach off-hull spots
+    ZIGZAGS with hard-angular corners, so a flight + the pinball roll reach off-hull spots
     through the corner OPENINGS between adjacent rails and past the chain ends (measured before the fix: ~25%
     of full-power derelict drives lost to space DESPITE the walls, most resting a few yards off the edge — the
     root of five failed "fix the walls" attempts). THE FIX: the DECK the renderer draws IS the real bulkhead
-    (graphic ≡ physics). `executeShot` runs two deck-boundary layers on walled holes: (a) `flightWallBounce`
-    (GS-ship-wall-bounce) — walk the curved flight and ricochet at the FIRST point it leaves a SOLID stretch of
-    hull off the deck edge (a real mid-air bounce, lands back inside, sparks), replacing the leaky per-segment
-    `wallFlightHit` as the flight collision; it catches every sideways escape (100% of first-departure leaks
-    gone; lost-to-space rate more than halved); (b) a rest BACKSTOP (`containToDeck`) — any ball still off the
+    (graphic ≡ physics). `executeShot` runs two deck-boundary layers on walled holes: (a) `shipFlightPath`
+    (GS-ship-pinball-flight) — march the STRAIGHT shot line and ricochet off the DECK edge at each SOLID-station
+    departure (a real mid-air carom, continues down the corridor, sparks), the straight-pinball flight that
+    replaced the leaky per-segment `wallFlightHit` AND the old banana-walk `flightWallBounce`; it catches every
+    sideways escape (100% of first-departure leaks gone; plain corridors keep ~99% of drives in); (b) a rest BACKSTOP (`containToDeck`) — any ball still off the
     hull at a solid station (a rare post-gap-transition drift) is pulled to the nearest deck, appended to the
     run-out path so it visibly rolls back. "SOLID station" = the centreline point
     nearest the ball is itself ON the deck; a rest whose station centreline is off-deck is a sanctioned
