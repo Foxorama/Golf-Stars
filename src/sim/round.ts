@@ -37,7 +37,7 @@ import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightControl, flightGround, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
-import { wallFlightHit, wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
+import { wallFlightHit, wallRollBounce, wallReflect, segHit, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -1113,16 +1113,12 @@ export function executeShot(
   // if the ball was already knocked into the woods or bounced off a tent (one aerial deflection wins).
   let wallHit: WallHit | null = null;
   if (hole.walls && hole.walls.length && !knockedDown && !tentHit) {
-    wallHit = wallFlightHit(hole.walls, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
-    // The per-segment collision misses escapes through the corridor's hard-corner openings (the wall
-    // rails don't close the fence on a hole that zigzags this hard). When it does, but the arc still
-    // LANDS lost-to-space on a solid stretch of deck, ricochet off the DECK BOUNDARY the renderer draws
-    // (GS-ship-corridor-contain) — the ball clangs off the hull edge and drops back inside, never sails
-    // into open space. Pure geometry, zero rng, derelict-only.
-    if (!wallHit) {
-      const bb = flightBoundaryBounce(hole, from, result.landing, result.shotBearing);
-      if (bb) wallHit = { wall: bb.wall, point: bb.point, dir: bb.dir, carry: bb.carry, t: bb.t, bounces: 1 };
-    }
+    // Robust deck-boundary ricochet (GS-ship-wall-bounce): bounce at the FIRST point the flight leaves the
+    // hull deck beside a bulkhead it crossed outward. Keys off the DRAWN DECK + the wall's line, not a
+    // segment crossing, so it catches the hard-corner-opening / chain-end leaks the per-segment
+    // `wallFlightHit` missed (the drives that used to arc past a wall into space). A forward gap carry
+    // flies clean (travel ∥ the flanking walls → no outward crossing). Pure geometry, zero rng.
+    wallHit = flightWallBounce(hole, from, result.landing, result.shotBearing, result.carry);
     if (wallHit) {
       result.landing = wallHit.point;
       result.carry = wallHit.carry;
@@ -1925,35 +1921,77 @@ function inwardReflect(hole: Hole, at: Vec, travel: Vec): { dir: Vec; wall: Ship
 }
 
 /**
- * Walk the curved flight; if it LANDS lost-to-space at a station where the corridor is solid, find where
- * the arc first crossed off the hull deck and return that ricochet (impact + inward direction + struck
- * wall) — the robust, deck-boundary counterpart of `wallFlightHit` that never misses an escape through a
- * hard-corner opening. null when the ball lands safe / in a real hazard / in a sanctioned torn-hull gap.
+ * Robust deck-boundary FLIGHT ricochet (GS-ship-wall-bounce) — the derelict's signature bounce, done
+ * right. Walk the curved flight the renderer draws; the FIRST point where the ball leaves the hull DECK
+ * (lost-to-space) at a station where the corridor is SOLID is where it clangs off the metal — reflect it
+ * straight back inside. Unlike the per-segment `wallFlightHit`, this keys off the DRAWN DECK, not a wall
+ * SEGMENT crossing, so it CANNOT leak through the hard-corner openings or past the chain ends between the
+ * two wall rails — exactly the ~11% of drives that used to visibly arc past a wall into space (the leak
+ * points have NO wall segment nearby, which is why per-segment collision missed them). Because a bulkhead
+ * towers over the shot-apex cap, EVERY sideways escape bounces; there is no height gate.
+ *
+ * A sanctioned FORWARD carry over a torn-hull GAP is left alone by construction: the smoothed centreline
+ * runs CONTINUOUSLY through a gap even though the deck is torn there, so a ball over the gap reads a
+ * non-solid station (`corridorSolidAt` false) and flies clean; only a ball drifting sideways off a SOLID
+ * stretch of hull — whose nearest centreline point is still on the deck — ricochets. The reflection uses
+ * the nearest DRAWN wall's angle (`inwardReflect`), with a toward-centreline fallback so it always comes
+ * back inside even where the wall rail is broken. Pure geometry, ZERO rng, derelict-only — every other
+ * world never has `hole.walls`, so this is byte-for-byte irrelevant there (contracts 1 & 2). It only ever
+ * pulls a ball BACK onto the deck, so Stableford can only rise (contract 4).
  */
-function flightBoundaryBounce(
+function flightWallBounce(
   hole: Hole,
   from: Vec,
   landing: Vec,
   bearingDeg: number,
-  steps = 40,
-): { point: Vec; dir: Vec; carry: number; t: number; wall: ShipWall } | null {
+  carry: number,
+  steps = 48,
+): WallHit | null {
   const walls = hole.walls;
-  if (!walls || !walls.length) return null;
-  if (!isLostToSpace(lieAt(hole, landing))) return null; // lands on the deck or in a real hazard
-  if (!corridorSolidAt(hole, landing)) return null; // lands in a torn-hull gap → a sanctioned carry
+  if (!walls || !walls.length || carry <= 0) return null;
   const control = flightControl(from, landing, bearingDeg);
   let prev = from;
+  let prevLost = isLostToSpace(lieAt(hole, from));
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const pos = flightGround(from, control, landing, t);
-    if (isLostToSpace(lieAt(hole, pos)) && !isLostToSpace(lieAt(hole, prev)) && corridorSolidAt(hole, pos)) {
+    const lost = isLostToSpace(lieAt(hole, pos));
+    // A crossing off the deck at a SOLID station = a sideways escape off a continuous stretch of hull —
+    // an unclearable bulkhead is there, so bounce. Off the deck at a non-solid station = a forward carry
+    // over a torn-hull gap (the deck resumes across the star-gap), which is sanctioned — keep flying.
+    if (lost && !prevLost && corridorSolidAt(hole, pos)) {
       const dx = pos[0] - prev[0];
       const dy = pos[1] - prev[1];
       const l = Math.hypot(dx, dy) || 1;
-      const { dir, wall } = inwardReflect(hole, prev, [dx / l, dy / l]);
-      return { point: prev, dir, carry: dist(from, prev), t, wall: wall ?? walls[0]! };
+      const travel: Vec = [dx / l, dy / l];
+      // Clang off the deck edge — reflect inward (nearest wall angle, centreline fallback so it can never
+      // ricochet back off the deck), landing at the last on-deck point so the run-out skips back inside.
+      const { dir, wall } = inwardReflect(hole, prev, travel);
+      const first: WallHit = { wall: wall ?? walls[0]!, point: prev, dir, carry: dist(from, prev), t, bounces: 1 };
+      // Second AIRBORNE bounce (pinball) — a hard, low shot can clip one wall in the air and reach the
+      // facing wall before it comes down. Probe the reflected remaining flight for another wall crossing.
+      const remaining = Math.max(0, carry - first.carry);
+      if (remaining > 2) {
+        const p0 = first.point;
+        const p1: Vec = [p0[0] + first.dir[0] * remaining, p0[1] + first.dir[1] * remaining];
+        let best: { x: Vec; w: ShipWall } | null = null;
+        let bestD = Infinity;
+        for (const w of walls) {
+          if (w === first.wall) continue;
+          if (first.dir[0] * w.normal[0] + first.dir[1] * w.normal[1] >= -0.02) continue;
+          const x = segHit(p0, p1, w.a, w.b);
+          if (!x) continue;
+          const dd = dist(p0, x);
+          if (dd < bestD) { bestD = dd; best = { x, w }; }
+        }
+        if (best) {
+          return { wall: best.w, point: best.x, dir: wallReflect(best.w.normal, first.dir), carry: first.carry + bestD, t, bounces: 2 };
+        }
+      }
+      return first;
     }
     prev = pos;
+    prevLost = lost;
   }
   return null;
 }
