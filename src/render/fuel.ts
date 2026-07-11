@@ -21,6 +21,9 @@ export interface FuelGaugeOpts {
   mini?: boolean;
   /** Hide the numeric readout (the cells alone carry it, e.g. inside the depot panel). */
   bare?: boolean;
+  /** Vertical variant (GS-journey-map-redesign): a fuel COLUMN that climbs the right edge of the
+   *  journey map, the tank filling from the bottom up. Same cell/lit/over contract as the row. */
+  vertical?: boolean;
 }
 
 /** The segmented tank gauge: `fuel` lit cells of `capacity`. */
@@ -35,5 +38,6 @@ export function fuelGaugeHTML(fuel: number, capacity: number, opts: FuelGaugeOpt
   ).join('');
   const overChip = over > 0 ? `<span class="gs-fuelbar__over">+${over}</span>` : '';
   const label = opts.bare ? '' : `<b class="gs-fuelbar__n" style="color:${col};">${Math.max(0, Math.floor(fuel))}</b>`;
-  return `<span class="gs-fuelbar${opts.mini ? ' gs-fuelbar--mini' : ''}" style="--fuel-col:${col};" role="img" aria-label="Fuel ${Math.max(0, Math.floor(fuel))} of ${cap}">⛽<span class="gs-fuelbar__cells">${cells}</span>${overChip}${label}</span>`;
+  const mods = `${opts.mini ? ' gs-fuelbar--mini' : ''}${opts.vertical ? ' gs-fuelbar--vert' : ''}`;
+  return `<span class="gs-fuelbar${mods}" style="--fuel-col:${col};" role="img" aria-label="Fuel ${Math.max(0, Math.floor(fuel))} of ${cap}">⛽<span class="gs-fuelbar__cells">${cells}</span>${overChip}${label}</span>`;
 }

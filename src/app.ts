@@ -1212,6 +1212,7 @@ function render(): void {
   if (state.screen !== 'travel') {
     travelView.selectedRouteId = null;
     travelView.depotOpen = false;
+    travelView.exitOpen = false;
   }
 
   // Reset the aim-overlay decor framing each render; the decision/putt branches below re-arm it when
@@ -1341,22 +1342,45 @@ function render(): void {
       render();
     });
   });
-  // Travel star-chart (GS-journey-cockpit): tap a branch world (or a dock comparison-rail cell) to SELECT
-  // that lane — its full bet swaps into the dock detail in place, no window to open/close. getAttribute
-  // (not dataset) so it works on SVG <g> nodes too. The Jump/Scan/Bank actions are normal [data-action]s.
+  // Travel star-map (GS-journey-map-redesign): tap a branch world to SELECT it — its info card rises over
+  // the bottom half of the screen. getAttribute (not dataset) so it works on SVG <g> nodes too. Selecting
+  // a world dismisses any open fuel-depot / exit sheet so only one bottom overlay is ever up.
   app.querySelectorAll<HTMLElement>('[data-route-inspect]').forEach((el) => {
     el.addEventListener('click', () => {
       travelView.selectedRouteId = Number(el.getAttribute('data-route-inspect'));
+      travelView.depotOpen = false;
+      travelView.exitOpen = false;
       sfx.click();
       haptic(HAPTICS.tap);
       render();
     });
   });
-  // Travel dock: toggle the fuel-depot expansion (a view flag, not a game action).
+  // Close the world info card (✕ / tap the same world again) → back to the full map.
+  app.querySelectorAll<HTMLElement>('[data-route-close]').forEach((el) => {
+    el.addEventListener('click', () => {
+      travelView.selectedRouteId = null;
+      sfx.click();
+      render();
+    });
+  });
+  // Travel map chrome: the fuel gauge / depot ✕ toggle the fuel-depot sheet (a view flag). Opening it
+  // dismisses the exit sheet so the two never stack.
   app.querySelectorAll<HTMLElement>('[data-depot]').forEach((el) => {
     el.addEventListener('click', () => {
       travelView.depotOpen = !travelView.depotOpen;
+      if (travelView.depotOpen) travelView.exitOpen = false;
       sfx.click();
+      render();
+    });
+  });
+  // The 🚪 exit icon → the end-run / bank confirm sheet ("1" opens, "0" / ✕ closes). Bank/Abandon are
+  // normal [data-action]s inside it; a deliberate two-step so one touch never ends the run.
+  app.querySelectorAll<HTMLElement>('[data-exit-confirm]').forEach((el) => {
+    el.addEventListener('click', () => {
+      travelView.exitOpen = el.getAttribute('data-exit-confirm') === '1';
+      if (travelView.exitOpen) travelView.depotOpen = false;
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });
