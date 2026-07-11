@@ -24,6 +24,10 @@ export interface FuelGaugeOpts {
   /** Vertical variant (GS-journey-map-redesign): a fuel COLUMN that climbs the right edge of the
    *  journey map, the tank filling from the bottom up. Same cell/lit/over contract as the row. */
   vertical?: boolean;
+  /** Icon markup for the gauge glyph — a ship's bridge livery (GS-infinity-hud) can swap the default
+   *  ⛽ for a themed cell/plasma glyph. Emoji or inline-SVG string; defaults to `⛽` so every other
+   *  caller is byte-identical. */
+  icon?: string;
 }
 
 /** The segmented tank gauge: `fuel` lit cells of `capacity`. */
@@ -36,7 +40,7 @@ export function fuelGaugeHTML(fuel: number, capacity: number, opts: FuelGaugeOpt
     { length: cap },
     (_, i) => `<span class="gs-fuelbar__cell${i < lit ? ' gs-fuelbar__cell--lit' : ''}"></span>`,
   ).join('');
-  const ico = `<span class="gs-fuelbar__ico">⛽</span>`;
+  const ico = `<span class="gs-fuelbar__ico">${opts.icon ?? '⛽'}</span>`;
   const cellsHtml = `<span class="gs-fuelbar__cells">${cells}</span>`;
   const overChip = over > 0 ? `<span class="gs-fuelbar__over">+${over}</span>` : '';
   const label = opts.bare ? '' : `<b class="gs-fuelbar__n" style="color:${col};">${Math.max(0, Math.floor(fuel))}</b>`;
