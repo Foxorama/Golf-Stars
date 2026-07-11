@@ -5,6 +5,7 @@ import { wallReflect, wallFlightHit, wallRollHit, wallRollBounce, segHit, WALL_H
 import { rollOut, shotSpread, sprayBlocking, executeShot, biomeCarryMult, containToDeck } from '../src/sim/round';
 import { flightProfileOf, flightControl, flightGround } from '../src/sim/flight';
 import { lieAt, lieInfo } from '../src/sim/shot';
+import { SPACE_DUCKS_GUARD, CONVICT_SHEEP_GUARD } from '../src/sim/rpg/shopItems';
 import { Rng } from '../src/sim/rng';
 import { CLUBS } from '../src/sim/clubs';
 import type { Hole } from '../src/sim/course/contract';
@@ -304,6 +305,51 @@ describe('GS-ship-wall-bounce — the flight ricochets off the DRAWN deck, never
     }
     expect(walled).toBeGreaterThan(0);
     expect(checked).toBeGreaterThan(200);
+  });
+});
+
+describe('GS-ship-wall-caddy — a caddy guard SAVES a miss on a walled corridor (never lost, never zigzag)', () => {
+  // The derelict's wall bounce and a caddy GUARD (Space Ducks laser / Convict Sheep boomerang) both act
+  // on a miss, and used to fight: the guard recentres the miss onto the aim-BEARING line, which on a
+  // BENDING ship corridor lands in open space; the wall bounce then re-processed that fictional curve-back
+  // arc, re-intercepting ~81% of caddy saves and flinging ~7% back into space — a guaranteed save that
+  // ended LOST. Now a redirect snaps to the deck spine, skips the wall bounce, and is sticky. A guard save
+  // on a walled hole must ALWAYS finish on the deck.
+  it('no guard redirect on a walled derelict hole ends lost to space', () => {
+    const DR = CLUBS.find((c) => c.id === 'D')!;
+    let redirects = 0;
+    for (const guard of [SPACE_DUCKS_GUARD, CONVICT_SHEEP_GUARD]) {
+      for (let s = 1; s < 30; s++) {
+        for (const wildness of [0.6, 0.8, 1]) {
+          const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+          for (const hole of course.holes) {
+            if (!(hole.walls?.length) || hole.par < 4) continue;
+            const carryMult = biomeCarryMult(hole);
+            const bend = hole.centreline[1] ?? hole.green;
+            const fx = bend[0] - hole.tee[0];
+            const fy = bend[1] - hole.tee[1];
+            const fl = Math.hypot(fx, fy) || 1;
+            for (const ang of [-0.2, -0.1, 0, 0.1, 0.2]) {
+              const ca = Math.cos(ang), sa = Math.sin(ang);
+              const dx = (fx / fl) * ca - (fy / fl) * sa;
+              const dy = (fx / fl) * sa + (fy / fl) * ca;
+              const target: Vec = [hole.tee[0] + dx * 210, hole.tee[1] + dy * 210];
+              for (let k = 0; k < 6; k++) {
+                const rng = new Rng(70000 + s * 31 + k + Math.round(wildness * 10) + Math.round(ang * 100));
+                const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1, guard }, rng);
+                if (!r.log.result.redirect) continue;
+                redirects++;
+                // A caddy guard PROMISES a save onto the short grass — it may never end lost to space, and
+                // it may never also register a wall bounce (that double-processing was the bad interaction).
+                expect(r.log.penalty, `guard ${guard.kind} seed ${s} w${wildness} lost`).not.toBe('voidlost');
+                expect(r.log.wallHit, `guard ${guard.kind} seed ${s} redirect+wallHit conflict`).toBeFalsy();
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(redirects).toBeGreaterThan(500); // the scenario actually exercises the guard a lot
   });
 });
 
