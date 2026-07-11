@@ -1022,3 +1022,54 @@ tuning value. For any future "walled" or otherwise-contained world: make the DRA
 physics boundary and back the invariant with a rest-time containment guarantee, rather than trying to seal
 a parallel-rail fence. And reproduce the failure headlessly with real generated geometry FIRST — the bug
 was invisible to synthetic straight-wall unit tests and obvious the moment real zigzag corridors were swept.
+
+## GS-ship-wall-bounce — the FLIGHT bounces off the drawn deck, not a wall segment (6th pass)
+
+**The report (with a marked-up screenshot).** GS-ship-corridor-contain (above) fixed the *rest* — no ball
+comes to rest off the hull at a solid station. But the containment backstop moves the resting point; it
+does NOT change the **flight animation**. So a drive drifting off a solid stretch of hull still *visibly
+arced past the bulkhead into open space* and then snapped back — the ball "treated the deck edge as if the
+wall weren't there." The player's exact words: "it should have hit and bounced off the corridor wall
+instead of arcing." The primary flight collision was still the per-segment `wallFlightHit`, which leaks
+through the same hard-corner openings / chain ends the containment pass documented — and `flightBoundaryBounce`
+only fired when the shot *landed* lost-to-space, so a ball that leaked off a solid section but sailed on to
+land in a torn-hull gap (or bulged out and back) never bounced.
+
+**Reproduction.** A headless sweep (46,040 seeded derelict drives) reconstructing the exact curved flight the
+renderer draws found **~11% of drives had a flight arc that crossed off a SOLID stretch of hull without any
+registered bounce** — the visible "arced past the wall" bug — and **8.7% still ended lost-to-space**, ~half of
+those (2,089) *after* the flight crossed a solid section it should have bounced off (it kept going into a gap
+and was lost there — an unfair loss the walls were meant to prevent).
+
+**The fix — `flightWallBounce` (deck-boundary flight collision).** Replace `wallFlightHit` as the physics
+flight collision in `executeShot`. Walk the curved flight; bounce at the **first point the ball leaves the
+hull deck (`isLostToSpace`) at a SOLID station** (`corridorSolidAt` — nearest centreline point is on-deck).
+Reflect inward off the nearest drawn wall's angle with a toward-centreline fallback (`inwardReflect`), so it
+always comes back inside even where the wall rail is broken. Because a bulkhead towers over the shot-apex cap
+there is no height gate — every sideways escape bounces. This keys off the DRAWN DECK, not a wall SEGMENT, so
+it cannot leak through the corner openings / chain ends (there is no wall segment at a leak point — which is
+exactly why per-segment collision missed it, and why keying the bounce off wall *proximity* also fails: an
+early experiment doing that regressed the catch rate).
+
+**Why a forward gap carry still flies clean.** The smoothed centreline runs CONTINUOUSLY through a torn-hull
+star-gap even though the deck is torn there, so a ball over the gap reads a NON-solid station and is left
+alone; only a ball off a continuous stretch of hull (nearest centreline still on-deck) ricochets. This is the
+same solid-vs-gap discriminator the containment pass uses, applied per flight step instead of only at landing.
+`wallFlightHit` is retained solely to feed the **aim cone** (`sprayBlocking`) — deliberately left on the
+cheaper per-segment check (the cone probes N×K hypothetical flights per aim frame; `corridorSolidAt`'s
+centreline search is too costly there). The physics bounce is now a strict superset of what the cone flags, so
+the only divergence is a *pleasant* surprise (a ball the cone showed clear is saved back onto the deck), never
+the frustrating direction (cone blocked but ball flies clean).
+
+**Verification.** After the fix: **100% of first-departure flight leaks gone** (a solid-stretch escape always
+bounces) and **lost-to-space more than halved (4,015 → 1,823 across 46,040 drives)**. The residual losses are
+legit gap under-clubs plus rare post-gap-transition drifts (the ball already legitimately over a gap, then
+passing beside a later section) — the `containToDeck` rest backstop still guarantees none rests off a solid
+station. Full suite green (1,121 → 1,122) with a new end-to-end regression in `tests/walls.test.ts` that
+reconstructs every resolved drive's flight and asserts none leaves a SOLID stretch of hull without a bounce.
+`flightBoundaryBounce` is removed (subsumed). Pure geometry, ZERO rng, derelict-only — byte-for-byte elsewhere.
+
+**The lesson (compounding the 5th-pass lesson).** "Make the drawn surface the physics boundary" applies to the
+FLIGHT, not just the REST — a containment pass that only corrects the resting point leaves the animation lying
+about the wall. If the graphic shows an impassable wall, every phase of the ball's travel (flight AND roll)
+must bounce off the drawn edge, not a pre-built segment.

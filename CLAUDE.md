@@ -227,11 +227,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
     `WALL_HEIGHT` = 72 yd — ABOVE the 60-yd shot-apex cap (`ARC_FEEL.peakMax`) — so NOTHING clears them: every
-    ball that leaves the deck sideways RICOCHETS back onto the corridor (`wallFlightHit`; the per-wall
-    arc-height gate is kept generic but never fires on a real bulkhead) — a hook/arc that crosses a wall
-    is interrupted mid-flight, same as a tree. A second crossing off the reflected line bounces again (hit
+    ball that leaves the deck sideways RICOCHETS back onto the corridor — a hook/arc that crosses a wall is
+    interrupted mid-flight, same as a tree, then a second crossing off the reflected line bounces again (hit
     two walls, bounce twice). Resolved in the shared `executeShot` right after the tent branch (auto ≡
-    interactive). ON THE GROUND it's a PINBALL (GS-ship-pinball): a rolling ball REFLECTS off a wall
+    interactive). THE FLIGHT BOUNCE keys off the DRAWN DECK, not a wall SEGMENT (GS-ship-wall-bounce,
+    `flightWallBounce`): it bounces at the FIRST flight point that leaves a SOLID stretch of hull, so it can
+    never leak past the corridor's hard-corner openings / chain ends the way the per-segment `wallFlightHit`
+    did (~11% of drives used to visibly arc past a wall into space — there's no wall SEGMENT at those leak
+    points, which is exactly why segment collision missed them). A forward carry over a torn-hull star-gap
+    flies clean because the centreline runs continuously through the gap → a NON-solid station (`corridorSolidAt`).
+    `wallFlightHit` now feeds ONLY the aim cone (below). ON THE GROUND it's a PINBALL (GS-ship-pinball): a rolling ball REFLECTS off a wall
     (`wallRollBounce` + `wallReflect`) and keeps rolling — wall to wall — until friction + a per-bounce
     metal loss (`WALL_ROLL_RESTITUTION` 0.82) bleed the momentum away, NEVER the old dead stop. A walled
     hole routes through `rollOut`'s position-tracking integrator (the curling one, kick/bend gated to
@@ -250,20 +255,23 @@ these systems** — each bullet is the tip of a documented iceberg.
     through the corner OPENINGS between adjacent rails and past the chain ends (measured before the fix: ~25%
     of full-power derelict drives lost to space DESPITE the walls, most resting a few yards off the edge — the
     root of five failed "fix the walls" attempts). THE FIX: the DECK the renderer draws IS the real bulkhead
-    (graphic ≡ physics). `executeShot` runs two deck-boundary layers on walled holes: (a) `flightBoundaryBounce`
-    — if a shot LANDS lost-to-space at a station where the corridor is SOLID, ricochet it off the deck edge the
-    arc first crossed (a real mid-air bounce, lands back inside, sparks) when the segment `wallFlightHit` missed
-    it; (b) a rest BACKSTOP (`containToDeck`) — any ball still off the hull at a solid station is pulled to the
-    nearest deck, appended to the run-out path so it visibly rolls back. "SOLID station" = the centreline point
+    (graphic ≡ physics). `executeShot` runs two deck-boundary layers on walled holes: (a) `flightWallBounce`
+    (GS-ship-wall-bounce) — walk the curved flight and ricochet at the FIRST point it leaves a SOLID stretch of
+    hull off the deck edge (a real mid-air bounce, lands back inside, sparks), replacing the leaky per-segment
+    `wallFlightHit` as the flight collision; it catches every sideways escape (100% of first-departure leaks
+    gone; lost-to-space rate more than halved); (b) a rest BACKSTOP (`containToDeck`) — any ball still off the
+    hull at a solid station (a rare post-gap-transition drift) is pulled to the nearest deck, appended to the
+    run-out path so it visibly rolls back. "SOLID station" = the centreline point
     nearest the ball is itself ON the deck; a rest whose station centreline is off-deck is a sanctioned
     torn-hull GAP (a forward carry) and stays lost, and a `breach` rest is a deliberate hazard (excluded via
     `isLostToSpace`). The margin-seat is RE-VALIDATED so it never lands in a thin space sliver between a `waste`
     plate and the fairway. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate → every other world
     byte-identical), and it only ever moves a ball ONTO the deck (Stableford can only rise, contract 4). The
     LESSON for any future "walled / contained" world: a pre-built segment fence can't contain a ball on a
-    bending, breaking corridor — make the DRAWN PLAYABLE SURFACE the physics boundary and back it with a
-    rest-time containment guarantee. Regression: end-to-end seeded drives in `tests/walls.test.ts` assert no
-    resting ball is still `containToDeck`-able (the synthetic reflection tests never caught it).
+    bending, breaking corridor — make the DRAWN PLAYABLE SURFACE the physics boundary (in flight AND at rest),
+    never a segment crossing. Regression: end-to-end seeded drives in `tests/walls.test.ts` assert (1) no
+    resting ball is still `containToDeck`-able and (2) no reconstructed flight leaves a SOLID stretch of hull
+    without a registered bounce (the synthetic reflection tests never caught either).
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,

@@ -15,13 +15,15 @@
  * Walls only ever SAVE a ball that would be lost to space (off-deck is the `voidlost` penalty), so
  * they only raise mean per-stop Stableford — the death-spiral bar can only improve (contract 4).
  *
- * NB — these per-segment collisions are the FEEL layer (a believable mid-air / rolling ricochet), NOT the
- * containment GUARANTEE. Two parallel wall rails per corridor section can't form a closed fence on a hull
- * that zigzags with hard-angular corners, so a share of shots leak off-hull through the corner openings and
- * past the chain ends. The guarantee "a sideways miss is never lost to space" is enforced separately, in
- * `round.ts` `executeShot`, by treating the DRAWN DECK as the true bulkhead: `flightBoundaryBounce` +
- * `containToDeck` (GS-ship-corridor-contain — see docs/decisions/sim-generator.md). Change the wall FEEL
- * here; do NOT try to make these segments watertight — that's the trap the first four attempts fell into.
+ * NB — these per-segment collisions are NOT the physics flight bounce anymore, and NOT the containment
+ * GUARANTEE. Two parallel wall rails per corridor section can't form a closed fence on a hull that zigzags
+ * with hard-angular corners, so a share of shots leak off-hull through the corner openings and past the chain
+ * ends. The real derelict physics treats the DRAWN DECK as the true bulkhead, in `round.ts` `executeShot`:
+ * `flightWallBounce` bounces the FLIGHT at the first point it leaves a SOLID stretch of hull
+ * (GS-ship-wall-bounce), and `containToDeck` is the rest backstop (GS-ship-corridor-contain — see
+ * docs/decisions/sim-generator.md). `wallFlightHit` here now feeds ONLY the aim cone (`sprayBlocking`),
+ * where the cheaper per-segment check is enough and the deck-boundary search would be too costly. Change the
+ * wall FEEL / cone here; do NOT try to make these segments watertight — that's the trap five attempts fell into.
  */
 
 import type { Vec, ShipWall } from './course/contract';
