@@ -111,18 +111,22 @@ let segLab: HTMLButtonElement;
 // ── DEMO: drive the real game ────────────────────────────────────────────────────────────
 const seedInput = h('input', { type: 'number', value: 1234, title: 'run seed' });
 
-/** Build the game URL with the declarative hooks (`?seed=`, `?intro=`, and the GS-asgard test jumps). */
-function buildGameUrl(opts: { seed?: string; intro?: '0' | '1'; rainbow?: '1'; asgard?: '1' } = {}): string {
+type ScreenJump = 'travel' | 'shop' | 'starmart' | 'trademarket' | 'clubhouse';
+type GameOpts = { seed?: string; intro?: '0' | '1'; rainbow?: '1'; asgard?: '1'; screen?: ScreenJump };
+
+/** Build the game URL with the declarative hooks (`?seed=`, `?intro=`, and the GS-asgard / deep-link jumps). */
+function buildGameUrl(opts: GameOpts = {}): string {
   const p = new URLSearchParams();
   const seed = opts.seed ?? String(seedInput.value || '').trim();
   if (seed) p.set('seed', seed); // hook: ?seed=
   if (opts.intro) p.set('intro', opts.intro); // hook: ?intro=
   if (opts.rainbow) p.set('rainbow', opts.rainbow); // hook: ?rainbow= (GS-asgard test jump — arm Rainbow Road)
   if (opts.asgard) p.set('asgard', opts.asgard); // hook: ?asgard= (GS-asgard test jump — open the Bifröst)
+  if (opts.screen) p.set('screen', opts.screen); // hook: ?screen= (GS-screen-deeplink — mount a between-stop screen)
   const q = p.toString();
   return `index.html${q ? '?' + q : ''}`;
 }
-function loadGame(opts: { seed?: string; intro?: '0' | '1'; rainbow?: '1'; asgard?: '1' } = {}): void {
+function loadGame(opts: GameOpts = {}): void {
   setView('game');
   frame.src = buildGameUrl(opts);
 }
@@ -191,6 +195,13 @@ function demoGroup(): HTMLElement {
     h('div', { class: 'row' }, h('label', {}, 'Asgard'),
       h('button', { class: 'act', onclick: () => loadGame({ asgard: '1', intro: '0' }) }, '⚡ Open the Bifröst (?asgard=1)'),
       h('button', { class: 'ghost', onclick: () => loadGame({ rainbow: '1', intro: '0' }) }, '🌈 Arm Rainbow Ball (?rainbow=1)')),
+    h('div', { class: 'row' }, h('label', {}, 'Screen'),
+      h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'travel', intro: '0' }) }, '🗺 Travel'),
+      h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'shop', intro: '0' }) }, '🏌 Pro Shop'),
+      h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'starmart', intro: '0' }) }, '🛒 StarMart'),
+      h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'trademarket', intro: '0' }) }, '🚀 Trade Market'),
+      h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'clubhouse', intro: '0' }) }, '🏛 Clubhouse')),
+    h('p', { class: 'note' }, 'Screen (GS-screen-deeplink): jump STRAIGHT to a between-stop screen (travel map, Pro Shop, StarMart, Trade Market, Clubhouse) without playing a full stop — the hook the browser layout smoke tests use so the highest-risk uncovered surfaces are reachable headlessly. TEST-ONLY URL param; the live game never sets it.'),
     h('p', { class: 'note' }, 'Asgard (GS-asgard): “Open the Bifröst” jumps STRAIGHT to the Himinbjörg map → the nine-hole tournament vs the Warriors Three → win/lose → return. “Arm Rainbow Ball” starts a run on Rainbow Road so you can score an eagle and trigger the Bifröst yourself. These two are TEST-ONLY URL params — the live game never sets them.'),
     h('p', { class: 'note' }, 'Guard throw forces the caddy interception (boomerang/laser) on EVERY shot so you can watch it — start a run and take a shot. Live _gsFeel / _gsIntro / _gsSpray / _gsArt flags apply on the next render/shot; seed & intro reload the frame.'),
   ]);

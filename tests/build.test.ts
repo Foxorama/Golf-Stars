@@ -243,4 +243,94 @@ describe('build output (real browser)', () => {
     },
     60_000,
   );
+
+  // The travel / shop / market / clubhouse surfaces were the highest-risk UNCOVERED layer: the journey map
+  // alone was redesigned three times in one day (#349/#351/#353), and the #353 full-screen blur shipped
+  // green because no test could reach a between-stop screen — doing so headlessly meant playing a whole stop
+  // (shot animations + watch/continue screens), which is flaky to script. The `?screen=` deep-link
+  // (GS-screen-deeplink) mounts each screen directly off the real reducer transitions, so these smoke tests
+  // can finally guard the class of CSS/DOM regression the sim suite and "does it throw" checks are blind to.
+  // Each: the screen mounts (its own marker present), the app never faulted (no pageerror, no recovered
+  // __gsErr), and we were NOT bounced back to the title (a rejected reducer jump falls back there).
+  // Distinctive markers — a CSS selector unique to the screen, or a text string it renders. Deliberately
+  // NOT `.gs-cog` (the settings cog rides every screen, including the title, so it proves nothing).
+  const SCREENS: { screen: string; sel?: string; text?: string; label: string }[] = [
+    { screen: 'travel', sel: '.gs-journey', label: 'the journey star-map' },
+    { screen: 'shop', text: 'Pro Shop', label: 'the Pro Shop' },
+    { screen: 'starmart', text: 'StarMart', label: 'the StarMart pop-up' },
+    { screen: 'trademarket', text: 'Trade Market', label: 'the Trade Market' },
+    { screen: 'clubhouse', text: 'The Clubhouse', label: 'the Clubhouse hall' },
+  ];
+  for (const { screen, sel, text, label } of SCREENS) {
+    it.runIf(chromePath)(
+      `?screen=${screen} mounts ${label} cleanly (no crash, not bounced to title)`,
+      async () => {
+        const { chromium } = await import('playwright-core');
+        const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+        try {
+          const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+          const errors: string[] = [];
+          page.on('pageerror', (e) => errors.push(e.message));
+          await page.goto('file://' + dist + `?screen=${screen}&intro=0&seed=42`, { waitUntil: 'load' });
+          await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+          const info = await page.evaluate((mk: { sel?: string; text?: string }) => {
+            const app = document.getElementById('app')!;
+            const t = app.textContent || '';
+            return {
+              err: (window as unknown as { __gsErr?: string }).__gsErr ?? null,
+              hasSel: mk.sel ? !!app.querySelector(mk.sel) : true,
+              hasText: mk.text ? t.includes(mk.text) : true,
+              text: t,
+            };
+          }, { sel, text });
+          expect(errors, `pageerror on ?screen=${screen}: ${errors[0] ?? ''}`).toEqual([]);
+          expect(info.err, `recovered error on ?screen=${screen}`).toBeNull();
+          expect(info.hasSel, `${label} did not mount (selector ${sel} absent) on ?screen=${screen}`).toBe(true);
+          expect(info.hasText, `${label} did not mount (text "${text}" absent) on ?screen=${screen}`).toBe(true);
+          // A rejected reducer jump would leave us on the title character-picker; the deep-link must not.
+          expect(info.text).not.toContain('Choose your game');
+        } finally {
+          await browser.close();
+        }
+      },
+      60_000,
+    );
+  }
+
+  // The travel screen's map is INTENTIONALLY full-bleed — so the #353-class guard here is different from the
+  // play screen's: the bridge HUD console (`.gs-bhud`) must stay `pointer-events:none` (CLAUDE.md invariant —
+  // map taps pass through to the worlds; only its console controls catch touches), and the journey chart must
+  // actually fill the viewport rather than collapse to a sliver (the "zoomed-out-to-unusable" bug the redesign
+  // was meant to kill). Both are invisible to the sim suite and to a bare "does it throw" boot check.
+  it.runIf(chromePath)(
+    'the travel bridge HUD lets map taps through and the star-map fills the screen',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        await page.goto('file://' + dist + '?screen=travel&intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        const geo = await page.evaluate(() => {
+          const vh = window.innerHeight;
+          const hud = document.querySelector('.gs-bhud');
+          const map = document.querySelector('.gs-journey');
+          return {
+            hudPresent: !!hud,
+            hudPE: hud ? getComputedStyle(hud).pointerEvents : null,
+            mapHFrac: map ? map.getBoundingClientRect().height / vh : 0,
+          };
+        });
+        expect(geo.hudPresent, 'bridge HUD present').toBe(true);
+        // The class-collision failure mode is chrome that swallows the whole viewport; the invariant that
+        // proves it is safe is `pointer-events:none` on the frame (so taps reach the map beneath).
+        expect(geo.hudPE, `bridge HUD pointer-events is "${geo.hudPE}", must be none so map taps pass through`).toBe('none');
+        // The map must fill most of the screen — not collapse to an unusable sliver.
+        expect(geo.mapHFrac, `journey map height ${(geo.mapHFrac * 100).toFixed(0)}% of viewport`).toBeGreaterThan(0.6);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
 });

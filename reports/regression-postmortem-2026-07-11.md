@@ -91,3 +91,22 @@ running the full CI gate locally.**
   (shot animations + watch/continue screens), which is flaky to script reliably. This is the next
   guard to build (likely by exposing a deterministic deep-link/test hook to mount a screen), and it
   is the highest-risk uncovered surface: the journey map was redesigned three times in one day.
+
+## Update (2026-07-11) — the travel/shop gap is now closed (GS-screen-deeplink)
+
+The follow-up above shipped. A `?screen=travel|shop|starmart|trademarket|clubhouse` deep-link
+(`applyDebugParams` → `jumpToScreen` in `src/app.ts`, the exact test-only-URL-param pattern the
+GS-asgard `?rainbow=`/`?asgard=` jumps already used) mounts each between-stop / between-run screen
+**directly off the real reducer transitions** — no forked logic, no playing a whole stop. Because
+the screen is built the honest way (`leaveShop → travel`, `openMarket`, `openClubhouseHall`, and the
+same `shopOffer`/`starmartOffer` the reducer itself builds), a real render bug can't hide behind it.
+
+Six new browser layout guards in `tests/build.test.ts` now drive `?screen=…` for all five screens
+and assert: the screen mounts (its own distinctive marker), the app never faulted (no `pageerror`,
+no recovered `__gsErr`), and we were not bounced back to the title. Plus a travel-specific guard —
+the bridge HUD stays `pointer-events:none` (map taps pass through) and the star-map fills the
+viewport — the exact `.gs-hud`-collision / zoomed-out-to-a-sliver failure modes the redesign churn
+risked. **CI already installs Chromium and runs `npm test`, so these run on every push/PR with no
+workflow change** — the layout regressions that used to need eyes-on play are now caught
+automatically. As a new URL-param hook it also got a Test-Hub control (a "Screen" button row in the
+Demo rail), keeping `tests/test-hub.test.ts`'s parity guard green.

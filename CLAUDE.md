@@ -749,7 +749,12 @@ these systems** — each bullet is the tip of a documented iceberg.
   `gs-foo` across `src/` — reusing another screen's class silently restyles it (the #353 full-screen
   map-blur was `.gs-hud` shared between the play HUD and the journey HUD). If it renders a new screen,
   add a browser layout smoke test (`tests/build.test.ts` pattern) — the pure-sim suite is blind to
-  CSS/DOM. See `reports/regression-postmortem-2026-07-11.md`.
+  CSS/DOM. Between-stop/run screens are reachable in a headless browser WITHOUT playing a stop via the
+  `?screen=travel|shop|starmart|trademarket|clubhouse` deep-link (GS-screen-deeplink, `jumpToScreen` in
+  `app.ts` — a test-only URL param like `?rainbow=`/`?asgard=`, driven from the hub's Demo rail; it
+  mounts each screen off the REAL reducer transitions, so a render bug can't hide behind it). CI installs
+  Chromium + runs `npm test`, so these guards run on every push/PR. See
+  `reports/regression-postmortem-2026-07-11.md`.
 - **Default to shipping all the way.** When a change is complete and tests are green, take it to done:
   open the PR, enable auto-merge (`enable_pr_auto_merge` — GitHub lands it when the required `test`
   check passes and deletes the branch), then sync `main`. Only stop short if the work is WIP, the
