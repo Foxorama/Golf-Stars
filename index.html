@@ -1277,6 +1277,77 @@
       }
       .gs-travel__fuel:hover { border-color: color-mix(in srgb, var(--hud-accent) 60%, transparent); filter: brightness(1.1); }
 
+      /* ── The INFINITY ACE bridge (GS-infinity-hud): the hole-150 Unending-Universe grail, so its command
+             console is the ONE livery with a bespoke FRAME SHAPE, not just a recolour — the first real use
+             of the `.gs-bhud--<variant>` hook the base HUD reserved. A "living aurora" ring rotates the
+             ship's own gold→emerald→aquamarine→violet palette around the whole frame; a gold double-rim
+             blooms behind it; the corner brackets breathe; and an ∞ crest crowns the frame's top edge.
+             Everything is decoration layered on the existing markup (frame ::before/::after, corner glow,
+             console tint) — zero layout change — and every animation is disabled under reduced-motion,
+             where it degrades to a rich STATIC gold-aurora console. Aurora hues are local custom props so
+             the ring is self-contained; the base `--hud-*` gold still drives scan/fuel/ink. ── */
+      @property --gs-aur-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+      .gs-bhud--infinity {
+        --aur1: #ffd76b;  /* gold — the phoenix body */
+        --aur2: #4fe08a;  /* emerald trim */
+        --aur3: #7fffd4;  /* aquamarine exhaust */
+        --aur4: #c585ff;  /* violet aurora shimmer */
+      }
+      /* The frame gains a warmer gold double-rim + a deeper inner bloom (the grail glows harder). */
+      .gs-bhud--infinity .gs-bhud__frame {
+        inset: 2px; border-radius: 14px;
+        border-color: color-mix(in srgb, var(--aur1) 52%, transparent);
+        box-shadow:
+          inset 0 0 46px color-mix(in srgb, var(--hud-glow) 85%, transparent),
+          inset 0 0 2px color-mix(in srgb, var(--aur3) 70%, transparent),
+          0 0 40px -8px var(--aur1);
+      }
+      /* The living-aurora RING — a rotating conic gradient of the ship's palette, masked to a thin border
+         so it traces the frame like an aurora. `@property` animates the gradient's ANGLE (no element
+         transform → the square corners never swing out). Falls back to a static gradient where unsupported. */
+      .gs-bhud--infinity .gs-bhud__frame::before {
+        content: ''; position: absolute; inset: -1px; border-radius: 15px; padding: 1.6px;
+        background: conic-gradient(from var(--gs-aur-angle),
+          var(--aur1), var(--aur2), var(--aur3), var(--aur4), var(--aur1));
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        filter: drop-shadow(0 0 5px color-mix(in srgb, var(--aur3) 55%, transparent));
+        opacity: .92; pointer-events: none;
+        animation: gs-aurora-spin 7s linear infinite;
+      }
+      @keyframes gs-aurora-spin { to { --gs-aur-angle: 360deg; } }
+      /* The ∞ crest crowning the frame's top edge — the ship's pennant, etched into the bridge. */
+      .gs-bhud--infinity .gs-bhud__frame::after {
+        content: '∞'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+        font-size: 16px; font-weight: 900; line-height: 1; padding: 0 8px;
+        color: var(--aur1); background: linear-gradient(180deg, #0c1220, #080b12);
+        border-radius: 8px; letter-spacing: 1px;
+        text-shadow: 0 0 8px color-mix(in srgb, var(--aur1) 80%, transparent), 0 0 14px color-mix(in srgb, var(--aur3) 50%, transparent);
+        animation: gs-crest-pulse 3.2s ease-in-out infinite;
+      }
+      @keyframes gs-crest-pulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+      /* The corner brackets brighten to gold and breathe — the bridge is alive. */
+      .gs-bhud--infinity .gs-bhud__corner::before, .gs-bhud--infinity .gs-bhud__corner::after {
+        background: var(--aur1); box-shadow: 0 0 10px 0 var(--aur1), 0 0 3px 0 var(--aur3);
+        animation: gs-corner-breathe 3.2s ease-in-out infinite;
+      }
+      @keyframes gs-corner-breathe { 0%,100% { opacity: .8; } 50% { opacity: 1; } }
+      /* The console bezel + fuel pillar take a warm gold aurora edge to match the ring. */
+      .gs-bhud--infinity .gs-bhud__console, .gs-bhud--infinity .gs-travel__fuel {
+        border-color: color-mix(in srgb, var(--aur1) 46%, var(--gs-line));
+        box-shadow:
+          inset 0 1px 0 color-mix(in srgb, var(--aur1) 34%, transparent),
+          inset 0 0 20px color-mix(in srgb, var(--hud-glow) 50%, transparent),
+          0 -6px 24px rgba(0,0,0,0.42);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .gs-bhud--infinity .gs-bhud__frame::before,
+        .gs-bhud--infinity .gs-bhud__frame::after,
+        .gs-bhud--infinity .gs-bhud__corner::before,
+        .gs-bhud--infinity .gs-bhud__corner::after { animation: none; }
+      }
+
       .gs-travel__asgard {
         position: absolute; z-index: 6; top: 12px; left: 34px; right: 34px;
         border: 1px solid var(--gs-line-2); border-radius: 10px; padding: 7px 10px;
