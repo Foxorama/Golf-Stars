@@ -496,6 +496,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     `CREDIT_ITEM_FACTION` row + a `FACTION_CREST` emblem.
   - Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side` is a FAIRWAY
     side classified off the hole's `centreline` (`ShotInput.fairwaySide`), NOT the shot bearing.
+  - On a WALLED derelict corridor a guard save is DECK-AWARE (GS-ship-wall-caddy, `executeShot`): the
+    guard recentres a miss onto the aim-BEARING line, which runs off into space on a BENDING ship
+    corridor, and the wall bounce then re-processed that fictional curve-back arc (~81% of caddy saves
+    double-handled, ~7% flung back into space — the "caddy interacts really badly" bug). So on a walled
+    hole a redirect (a) snaps its landing to the nearest ON-DECK centreline point (the deck spine) when
+    the recentre lands in space, (b) SKIPS the flight wall bounce (the guard's placement is final), and
+    (c) is STICKY — a still-lost redirected rest is seated back on the deck. Guard-only + walled-only →
+    byte-identical everywhere else; a caddy save now finishes on the deck ~98% fairway, 0% lost.
   - The renderer draws the guard figure ONCE (the corner figure) — never also float the portrait badge.
   - The **Prognostic Parrot** (GS-caddy-parrot, faction **Planet Pirates**) reuses the SCRAMBLE machinery:
     `loadout.previewScramble` (0.33) is a per-full-swing proc where the pirate captain FORESEES the shot →

@@ -1106,13 +1106,34 @@ export function executeShot(
   // stops dead at the tent (no ricochet run-out) and replays from the shot's origin below.
   const tentLost = tentHit?.tent.effect === 'marmot';
 
+  // Caddy-GUARD redirect on a walled corridor (GS-ship-wall-caddy): a Space Duck laser / Convict Sheep
+  // boomerang recentres an off-deck miss onto the fairway LINE — but that "line" is the original aim
+  // BEARING, which on a BENDING ship corridor runs straight off into open space while the hull deck bends
+  // away (94% of the caddy-save losses on walled holes were the redirected landing itself sitting in
+  // space). The guard is meant to SAVE the ball, so when its recentred landing is off the deck, snap it to
+  // the corridor's DECK SPINE (the nearest on-deck centreline point to the ORIGINAL miss's progress) — a
+  // guaranteed-safe fairway save at the right distance down the hole. A greenside save (landing already on
+  // the green/deck) is left untouched. Then the flight-time wall bounce is SKIPPED for a redirected shot
+  // (below): the landing is already safe, and bouncing the fictional curve-back arc off a wall used to
+  // re-intercept ~81% of caddy saves and fling ~7% back into space. Derelict-only + guard-only, so every
+  // other world (and every guard-less shot) is byte-for-byte identical.
+  if (result.redirect && hole.walls && hole.walls.length && isLostToSpace(lieAt(hole, result.landing))) {
+    const safe = nearestSolidCentre(hole, result.redirect.originalLanding);
+    if (safe) {
+      result.landing = safe;
+      result.carry = dist(from, safe);
+      result.apex = arcApex(result.carry, nominalCarry, ARC_FEEL, flight.peakMult);
+    }
+  }
+
   // Ship-corridor wall ricochet (GS-ship-walls): a low, flat ball heading off the derelict's hull deck
   // toward open space bounces back off a metal corridor wall (up to two bounces — hit two walls, bounce
   // twice). Same curved path the renderer draws (no rng), gated on `hole.walls` (the derelict only), so
   // auto ≡ interactive holds and every other world is byte-for-byte unchanged. A wall bounce is skipped
-  // if the ball was already knocked into the woods or bounced off a tent (one aerial deflection wins).
+  // if the ball was already knocked into the woods or bounced off a tent (one aerial deflection wins), or
+  // when a caddy GUARD redirected the shot (handled just above — the guard's placement is final).
   let wallHit: WallHit | null = null;
-  if (hole.walls && hole.walls.length && !knockedDown && !tentHit) {
+  if (hole.walls && hole.walls.length && !knockedDown && !tentHit && !result.redirect) {
     // Robust deck-boundary ricochet (GS-ship-wall-bounce): bounce at the FIRST point the flight leaves the
     // hull deck beside a bulkhead it crossed outward. Keys off the DRAWN DECK + the wall's line, not a
     // segment crossing, so it catches the hard-corner-opening / chain-end leaks the per-segment
@@ -1191,6 +1212,19 @@ export function executeShot(
       roll += dist(rest, saved);
       rest = saved;
     }
+  }
+
+  // Caddy-GUARD save is STICKY on a walled hole (GS-ship-wall-caddy): the guard fires on EVERY qualifying
+  // miss with no chance roll — it PROMISES a save onto the short grass. On the derelict, the placed ball
+  // can still roll off the deck spine into a torn-hull star-gap (`containToDeck` above leaves a gap-station
+  // rest lost, as it should for an ordinary shot). But a caddy-placed ball rolling into the abyss breaks
+  // the guarantee, so seat a still-lost redirected shot back on its on-deck placement. Guard-only +
+  // walled-only + only ever moves a ball ONTO the deck (Stableford can only rise) → byte-identical
+  // everywhere else.
+  if (result.redirect && hole.walls && hole.walls.length && isLostToSpace(lieAt(hole, rest))) {
+    rollPath = rollPath && rollPath.length ? [...rollPath, result.landing] : [touchdown, result.landing];
+    roll += dist(rest, result.landing);
+    rest = result.landing;
   }
 
   let restLie = lieAt(hole, rest);
@@ -1895,6 +1929,22 @@ function nearestCentrePoint(hole: Hole, p: Vec): Vec {
  *  (a torn-hull gap has an off-deck centreline). */
 function corridorSolidAt(hole: Hole, p: Vec): boolean {
   return !isLostToSpace(lieAt(hole, nearestCentrePoint(hole, p)));
+}
+
+/** The nearest centreline point to `p` that is ON the hull deck (not lost-to-space) — the corridor's safe
+ *  spine. Used to land a caddy-guard save on the actual deck when the guard's bearing-line recentre falls
+ *  into space on a bending ship corridor (GS-ship-wall-caddy). null if the whole centreline is off-deck
+ *  (never, in practice — a corridor always has solid stations). Pure, zero rng. */
+function nearestSolidCentre(hole: Hole, p: Vec): Vec | null {
+  let best: Vec | null = null;
+  let bestD = Infinity;
+  for (let i = 0; i <= 200; i++) {
+    const q = pointAlong(hole.centreline, i / 200);
+    if (isLostToSpace(lieAt(hole, q))) continue;
+    const d = dist(q, p);
+    if (d < bestD) { bestD = d; best = q; }
+  }
+  return best;
 }
 
 /** The inward ricochet direction at `at` for a ball travelling `travel` into the hull edge: reflect it
