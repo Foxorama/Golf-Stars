@@ -36,8 +36,14 @@ export function fuelGaugeHTML(fuel: number, capacity: number, opts: FuelGaugeOpt
     { length: cap },
     (_, i) => `<span class="gs-fuelbar__cell${i < lit ? ' gs-fuelbar__cell--lit' : ''}"></span>`,
   ).join('');
+  const ico = `<span class="gs-fuelbar__ico">⛽</span>`;
+  const cellsHtml = `<span class="gs-fuelbar__cells">${cells}</span>`;
   const overChip = over > 0 ? `<span class="gs-fuelbar__over">+${over}</span>` : '';
   const label = opts.bare ? '' : `<b class="gs-fuelbar__n" style="color:${col};">${Math.max(0, Math.floor(fuel))}</b>`;
   const mods = `${opts.mini ? ' gs-fuelbar--mini' : ''}${opts.vertical ? ' gs-fuelbar--vert' : ''}`;
-  return `<span class="gs-fuelbar${mods}" style="--fuel-col:${col};" role="img" aria-label="Fuel ${Math.max(0, Math.floor(fuel))} of ${cap}">⛽<span class="gs-fuelbar__cells">${cells}</span>${overChip}${label}</span>`;
+  // The vertical journey gauge reads top-down like a real tank readout: the NUMBER on top, the cells
+  // draining beneath it, the ⛽ icon anchored at the foot (GS-journey-hud swap). The row/mini variants
+  // keep the classic ⛽ → cells → number order.
+  const inner = opts.vertical ? `${label}${cellsHtml}${overChip}${ico}` : `${ico}${cellsHtml}${overChip}${label}`;
+  return `<span class="gs-fuelbar${mods}" style="--fuel-col:${col};" role="img" aria-label="Fuel ${Math.max(0, Math.floor(fuel))} of ${cap}">${inner}</span>`;
 }

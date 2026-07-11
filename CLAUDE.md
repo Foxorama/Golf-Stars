@@ -399,15 +399,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     fixed `.gs-cog` sits top-right of the same row), then the MAP fills the entire rest of the viewport
     (`.gs-journey--v` PANS at intrinsic size — never scales down, so the zoom-out-to-unusable bug can't
     return; a fresh stop shows with NO scroll). STICKY chrome is absolutely anchored to
-    `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map): 📡 SCANNER
-    top-right, the ⛽ FUEL gauge (vertical `fuelGaugeHTML({vertical})`) climbing the right edge from the
-    bottom-right corner (tap → the fuel depot), 🚪 EXIT bottom-left (bank/end run, two-step confirm).
-    Tapping a world (`data-route-inspect`) raises `laneCard` over the bottom HALF — world + weather LORE
-    (`BIOME_LORE` + theme/effect blurbs), Boons & Rewards vs Hazards & Conditions chips, the Jump action.
-    Only ONE bottom overlay at a time (`travelView.selectedRouteId`/`depotOpen`/`exitOpen`, priority
-    exit > depot > card). Pure app/render — the `{type:'route'}`/`scanRoutes`/`bank`/`strand`/`buyFuel`
-    actions are UNCHANGED (no reducer/save/rng impact, no `_gs*`/URL hook). Re-shoot
-    `scripts/travel-preview.mjs` (`?select=N`/`?depot=1`/`?exit=1` variants) after touching it.
+    `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map) as a BRIDGE HUD
+    (GS-journey-hud, `.gs-hud`): a starship command FRAME — glowing corner brackets + an L-shaped console
+    (bottom bezel + right fuel pillar) that COMPLETES the page. The 🚪 EXIT door docks the console LEFT,
+    the 📡 SCAN command dial sits bottom-CENTRE (moved from top-right), the ⛽ FUEL gauge (vertical
+    `fuelGaugeHTML({vertical})`, COUNT on top / ⛽ at the FOOT) climbs the right pillar (tap → the fuel
+    depot); the exit is bank/end run (two-step confirm). The frame RECOLOURS to the flown ship via
+    `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-hud`; a per-fleet
+    livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE later
+    is a `.gs-hud--<variant>` block — never a layout edit. `.gs-hud` is `pointer-events:none` so map taps
+    pass through; only the console controls catch touches. Tapping a world (`data-route-inspect`) raises
+    `laneCard` over the bottom HALF (z-index above the HUD) — world + weather LORE (`BIOME_LORE` +
+    theme/effect blurbs), Boons & Rewards vs Hazards & Conditions chips, the Jump action. Only ONE bottom
+    overlay at a time (`travelView.selectedRouteId`/`depotOpen`/`exitOpen`, priority exit > depot > card).
+    Pure app/render — the `{type:'route'}`/`scanRoutes`/`bank`/`strand`/`buyFuel` actions are UNCHANGED
+    (no reducer/save/rng impact, no `_gs*`/URL hook). Re-shoot `scripts/travel-preview.mjs`
+    (`?select=N`/`?depot=1`/`?exit=1` variants) after touching it.
   - Route choice carries destination biome + an event that is economy/cut/meta only — **NEVER
     generation rng**. Every non-none course effect carries a REAL play hook, machine-checked
     (`tests/journey-effects.test.ts`): wind/carry multipliers are pure post-gen scales; geometric
