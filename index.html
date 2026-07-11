@@ -147,6 +147,13 @@
       .gs-fuelbar--mini .gs-fuelbar__cells { padding: 2px; gap: 1.5px; }
       .gs-fuelbar--mini .gs-fuelbar__cell { width: 4.5px; height: 9px; border-radius: 1.5px; }
       .gs-fuelbar--mini .gs-fuelbar__n { font-size: 12px; }
+      /* Vertical variant (GS-journey-map-redesign): a fuel COLUMN — the ⛽ at top, cells stacked and
+         filling from the BOTTOM up (column-reverse, since the lit cells lead the DOM), number at the
+         foot. Rides the right edge of the journey map. */
+      .gs-fuelbar--vert { flex-direction: column; gap: 4px; }
+      .gs-fuelbar--vert .gs-fuelbar__cells { flex-direction: column-reverse; padding: 3px; gap: 3px; }
+      .gs-fuelbar--vert .gs-fuelbar__cell { width: 13px; height: 8px; border-radius: 2px; }
+      .gs-fuelbar--vert .gs-fuelbar__n { font-size: 12px; }
       .gs-fueldepot {
         display: flex; flex-direction: column; gap: 8px;
         border: 1px solid #4fd0e044; border-left: 4px solid #4fd0e0aa;
@@ -1127,10 +1134,11 @@
       }
       .gs-journey-here b { color: #ffce54; }
 
-      /* ── Journey cockpit (GS-journey-cockpit): the travel screen as ONE fixed viewport — a compact
-             status strip, the star map filling the middle (panning internally, never a page scroll), and
-             a docked control bar (comparison rail + selected bet + jump/scan/depot/bank). Mirrors the
-             play screen's fixed-height flex column so nothing ever scrolls off the phone. ── */
+      /* ── Journey map (GS-journey-map-redesign): the travel screen as ONE full-screen star map framed by
+             sticky glass chrome. A one-line top bar (character · progress · credits; the cog sits fixed
+             top-right), then the MAP fills the whole rest of the viewport. Tapping a world raises a
+             bottom-half info card. Scanner / fuel / exit float over the map and never scroll with it.
+             Mirrors the play screen's fixed-height flex column so nothing ever scrolls off the phone. ── */
       .gs-travel {
         display: flex; flex-direction: column; gap: 8px;
         /* 46px = .gs-main's vertical padding (18+28); insets mirror .gs-main so the math stays exact. */
@@ -1138,66 +1146,131 @@
         height: calc(100dvh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         overflow: hidden;
       }
-      .gs-travel__strip {
-        flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
-        /* Right padding clears the fixed settings cog (42px @ ~12px) so the stats never slide under it. */
-        gap: 10px 14px; flex-wrap: wrap; padding: 6px 52px 8px 10px;
-        border-bottom: 1px solid var(--gs-line-2); border-radius: 2px;
+      /* One-line top bar: name (flexes/ellipsis) · arc-or-hole · credits. Right padding clears the fixed
+         settings cog (42px @ ~12px) so it reads as the same row's top-right control. */
+      .gs-travel__topbar {
+        flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 0;
+        padding: 4px 52px 8px 10px; border-bottom: 1px solid var(--gs-line-2);
       }
-      .gs-travel__stats { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--gs-dim); flex-wrap: wrap; }
-      .gs-travel__stats b { color: var(--gs-ink); }
-      .gs-travel__asgard { flex: 0 0 auto; border: 1px solid var(--gs-line-2); border-radius: 10px; padding: 8px 11px; font-size: 12.5px; line-height: 1.45; }
-      /* The map fills the slack and scrolls INTERNALLY (the SVG keeps its intrinsic tall size — never
-         scaled down, so the old zoom-out-to-unusable bug can't come back; it pans instead). */
-      .gs-travel__map { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+      .gs-topbar__who {
+        font-size: 15px; font-weight: 800; min-width: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .gs-topbar__prog {
+        flex: 0 0 auto; font-size: 12.5px; color: var(--gs-dim);
+        border: 1px solid var(--gs-line); border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+      }
+      .gs-topbar__prog b { color: var(--gs-ink); }
+      .gs-topbar__credits { flex: 0 0 auto; margin-left: auto; font-size: 14px; font-weight: 700; }
+      .gs-topbar__credits b { color: var(--gs-warn); }
+
+      /* The map viewport fills all remaining height; the chart pans INSIDE it, chrome floats OVER it. */
+      .gs-travel__viewport { position: relative; flex: 1 1 auto; min-height: 0; }
+      .gs-travel__map { position: absolute; inset: 0; display: flex; flex-direction: column; }
+      /* The chart keeps its intrinsic tall size (never scaled down — the old zoom-out bug can't return);
+         a short first stop fits with no scroll, a long voyage pans internally. */
+      .gs-travel .gs-journey { flex: 1 1 auto; min-height: 0; border-radius: 12px; }
       .gs-travel .gs-journey--v { flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; }
       .gs-travel .gs-journey-here { display: none; }
 
-      /* The dock: comparison rail + selected detail + actions. Capped with an internal scroll as a
-         safety on very short screens, but tuned to sit inside one phone with the map. */
-      .gs-travel__dock {
-        flex: 0 0 auto; max-height: 52vh; overflow-y: auto; scrollbar-width: thin;
-        display: flex; flex-direction: column; gap: 8px; padding-top: 2px;
+      /* Sticky map chrome — absolutely anchored to the viewport (NOT the scrolling chart) so scanner,
+         fuel and exit stay put while the map pans, and never overlap each other. */
+      .gs-travel__scan, .gs-travel__exit, .gs-travel__fuel {
+        position: absolute; z-index: 5; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        border: 1px solid var(--gs-line); background: rgba(14,18,28,0.72); backdrop-filter: blur(6px);
+        color: var(--gs-ink); cursor: pointer; box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+        transition: transform .08s ease, border-color .16s ease, filter .16s ease;
       }
-      /* Comparison rail: three lanes side-by-side so all options read at a glance (the user's core ask). */
-      .gs-travel__rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-      .gs-lane {
-        display: flex; flex-direction: column; gap: 5px; align-items: stretch; text-align: left;
-        padding: 7px 8px; border-radius: 10px; cursor: pointer;
-        border: 1px solid var(--gs-line); background: var(--gs-bg-2); color: var(--gs-ink);
-        font: inherit; transition: border-color .12s, background .12s, transform .06s;
+      .gs-travel__scan:active, .gs-travel__exit:active, .gs-travel__fuel:active { transform: scale(0.94); }
+      .gs-travel__scan:hover, .gs-travel__exit:hover, .gs-travel__fuel:hover { border-color: #46506a; filter: brightness(1.12); }
+      /* Scanner — top-right of the map. */
+      .gs-travel__scan {
+        top: 10px; right: 10px; display: flex; flex-direction: column; align-items: center; gap: 1px;
+        width: 48px; padding: 6px 0 4px; border-radius: 14px; line-height: 1;
       }
-      .gs-lane:hover { border-color: var(--gs-line-2); }
-      .gs-lane:active { transform: translateY(1px); }
-      .gs-lane--sel {
-        border-color: var(--lane); background: color-mix(in srgb, var(--lane) 12%, var(--gs-bg-2));
-        box-shadow: inset 0 0 0 1px var(--lane), 0 2px 12px color-mix(in srgb, var(--lane) 30%, transparent);
+      .gs-travel__scan-ico { font-size: 20px; }
+      .gs-travel__scan-cost { font-size: 9.5px; font-weight: 700; color: #7fd6e6; }
+      .gs-travel__scan--off { opacity: .5; cursor: not-allowed; }
+      .gs-travel__scan--off .gs-travel__scan-cost { color: var(--gs-danger); }
+      /* Fuel column — climbs the RIGHT edge from the bottom-right corner. */
+      .gs-travel__fuel {
+        right: 10px; bottom: 10px; padding: 8px 6px; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
       }
-      .gs-lane--locked { opacity: .55; }
-      .gs-lane__top { display: flex; align-items: center; gap: 5px; min-width: 0; }
-      .gs-lane__glyph {
-        flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid;
-        display: inline-flex; align-items: center; justify-content: center; font-size: 13px;
-        background: radial-gradient(circle at 35% 30%, #ffffff14, #0c1020);
+      /* Exit door — bottom-LEFT corner. */
+      .gs-travel__exit {
+        left: 10px; bottom: 10px; width: 46px; height: 46px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center; font-size: 22px;
+        border-color: #ff6b4a55;
       }
-      .gs-lane__name { font-size: 12px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .gs-lane__stakes { margin-left: auto; font-size: 11px; }
-      .gs-lane__bar { display: flex; gap: 3px; }
-      .gs-lane__foot { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-      /* Selected-lane detail zone. */
-      .gs-dock__detail {
-        border: 1px solid var(--gs-line); border-top: 2px solid var(--rs-accent, var(--gs-line));
-        border-radius: 10px; padding: 9px 11px; background: var(--gs-bg-2);
+      .gs-travel__exit:hover { border-color: #ff6b4a; }
+
+      .gs-travel__asgard {
+        position: absolute; z-index: 5; top: 10px; left: 10px; right: 66px;
+        border: 1px solid var(--gs-line-2); border-radius: 10px; padding: 7px 10px;
+        font-size: 12px; line-height: 1.4; background: rgba(10,14,22,0.82); backdrop-filter: blur(6px);
       }
-      .gs-dock__title { display: flex; align-items: center; gap: 9px; }
-      .gs-dock__warn { font-size: 12px; color: #ff8b6b; margin-top: 7px; line-height: 1.4; }
-      .gs-dock__actions { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
-      .gs-dock__actions .gs-btn { flex: 1 1 auto; text-align: center; }
-      .gs-dock__actions .gs-btn--primary { flex: 3 1 55%; font-size: 15px; }
-      .gs-dock__stranded {
-        border: 1px solid #ff6b4a88; border-left: 4px solid #ff6b4a; border-radius: 10px;
-        padding: 10px 12px; background: #ff6b4a0d;
+
+      /* ── The bottom-half sheet: world info card, fuel depot, or exit-confirm (mutually exclusive). Slides
+             up over the lower half of the map with its own internal scroll. ── */
+      .gs-travel__card, .gs-travel__sheet {
+        position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+        max-height: 60%; display: flex; flex-direction: column;
+        background: linear-gradient(180deg, rgba(17,20,27,0.97), rgba(10,12,17,0.99));
+        border-top: 2px solid var(--rs-accent, var(--gs-line));
+        border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+        animation: gs-sheet-up .18s ease;
       }
+      @keyframes gs-sheet-up { from { transform: translateY(14px); opacity: .4; } to { transform: none; opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { .gs-travel__card, .gs-travel__sheet { animation: none; } }
+      .gs-travel__cardclose {
+        position: absolute; top: 8px; right: 8px; z-index: 2; width: 30px; height: 30px; border-radius: 50%;
+        border: 1px solid var(--gs-line); background: rgba(20,24,34,0.9); color: var(--gs-dim);
+        font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      }
+      .gs-travel__cardclose:hover { color: var(--gs-ink); border-color: #46506a; }
+      .gs-card__scroll, .gs-sheet__body { overflow-y: auto; scrollbar-width: thin; padding: 12px 14px 4px; }
+      .gs-sheet__body { padding: 14px 14px 12px; }
+      .gs-card__scroll::-webkit-scrollbar, .gs-sheet__body::-webkit-scrollbar { width: 5px; }
+      .gs-card__scroll::-webkit-scrollbar-thumb, .gs-sheet__body::-webkit-scrollbar-thumb { background: var(--gs-line); border-radius: 3px; }
+
+      .gs-card__hero { display: flex; align-items: center; gap: 10px; padding-right: 34px; }
+      .gs-card__glyph {
+        flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid;
+        display: inline-flex; align-items: center; justify-content: center; font-size: 22px;
+        background: radial-gradient(circle at 35% 30%, #ffffff18, #0c1020);
+      }
+      .gs-card__heading { min-width: 0; flex: 1 1 auto; }
+      .gs-card__sub { font-size: 11px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-card__name { font-size: 19px; line-height: 1.15; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-card__lore { font-size: 12.5px; line-height: 1.5; color: var(--gs-dim); margin: 9px 0 0; }
+      .gs-card__blurb { color: #cdd6e6; font-style: italic; }
+      .gs-card__desc { font-size: 12.5px; line-height: 1.45; margin-top: 7px; opacity: .92; }
+      .gs-card__weather {
+        font-size: 12.5px; line-height: 1.4; margin-top: 8px; padding: 6px 9px;
+        border-radius: 8px; background: #ffffff08; border: 1px solid var(--gs-line-2);
+      }
+      .gs-card__weather span { opacity: .8; }
+      .gs-card__play { font-size: 12px; margin-top: 7px; color: #ffce54; font-weight: 600; line-height: 1.4; }
+      .gs-card__groups { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 11px; }
+      @media (max-width: 460px) { .gs-card__groups { grid-template-columns: 1fr; gap: 8px; } }
+      .gs-card__glabel { font-size: 11px; font-weight: 800; letter-spacing: .4px; margin-bottom: 5px; text-transform: uppercase; }
+      .gs-card__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+      .gs-card__none { font-size: 12px; color: var(--gs-dim); opacity: .7; }
+      .gs-card__warn { font-size: 12px; color: #ff8b6b; margin-top: 9px; line-height: 1.4; }
+      .gs-card__cta { flex: 0 0 auto; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--gs-line-2); }
+      .gs-card__cta .gs-btn { width: 100%; text-align: center; font-size: 15px; }
+
+      .gs-tchip {
+        display: inline-block; font-size: 11.5px; font-weight: 700; border: 1px solid;
+        border-radius: 6px; padding: 2px 8px; white-space: nowrap;
+      }
+      .gs-tchip--diff { align-self: flex-start; flex: 0 0 auto; }
+
+      .gs-sheet__title { font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+      .gs-sheet__note { font-size: 13px; line-height: 1.5; color: var(--gs-dim); margin: 0 0 12px; }
+      .gs-sheet__actions { display: flex; flex-direction: column; gap: 8px; }
+      .gs-sheet__actions .gs-btn { width: 100%; text-align: center; }
     </style>
   </head>
   <body>

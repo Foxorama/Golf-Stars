@@ -327,6 +327,40 @@
       UNCHANGED — this is a pure app/render reshuffle, ZERO reducer/save/sim/rng impact. No new `_gs*`/URL
       hook → the test-hub guard needs nothing. Verified eyes-on (Playwright `scripts/travel-preview.mjs`
       renders the cockpit at 400×860 + 390×740 + depot-open; full suite + `journey-map`/`build` green).
+  - **The travel screen is now a FULL-SCREEN MAP framed by sticky glass chrome (GS-journey-map-redesign,
+    2026-07-11, `travelScreens.ts`/`fuel.ts`/`app.ts`/`index.html`).** The cockpit above still spent the
+    top third on a status strip + comparison rail + a docked detail whose Jump/Scan/Depot/Bank stacked
+    UNDER the map — so on the first stop the dock pushed the page into SCROLL, the rail duplicated the map's
+    three worlds, and the world "info" had shrunk to a terse chip row with no flavour. This redesign makes
+    the MAP the screen and everything else float over it:
+    - **A ONE-LINE top bar** (`topBar()` → `.gs-travel__topbar`): `⛳ <name>` (in the golfer's cap colour,
+      min-width:0 + ellipsis) · a progress pill that reads the MODE — voyage → `🗺️ Arc n/3`
+      (`arcIndexOf(stopIndex)+1`), endless → `🕳️ Hole n` (`holesSurvived+1`) · `💰 credits`. Right-padded
+      52px so the fixed `.gs-cog` reads as the same row's top-right control (kept global, not re-drawn).
+    - **The map fills all remaining height** (`.gs-travel__viewport` position:relative flex:1; the
+      `.gs-journey--v` chart still pans at intrinsic size, so a fresh stop shows with NO scroll and a long
+      voyage scrolls INSIDE the viewport, chrome staying put).
+    - **STICKY chrome, absolutely anchored to the viewport** (never the scrolling chart, so it can't drift
+      or overlap on scroll — the user's explicit ask): 📡 SCANNER top-right (a `data-action:scanRoutes`
+      glass button with its ⛽ cost, disabled state when unaffordable), the ⛽ FUEL COLUMN up the right edge
+      from the bottom-right corner (a NEW vertical `fuelGaugeHTML({vertical})` — `.gs-fuelbar--vert`, cells
+      column-reverse so the tank fills from the bottom; the button `data-depot`-toggles the depot), and a
+      🚪 EXIT bottom-left (opens a two-step bank/abandon confirm — one touch never ends a run).
+    - **Tapping a world raises `laneCard` over the bottom HALF** (`.gs-travel__card`, max-height 60%, slides
+      up, own scroll + a pinned Jump CTA + a ✕). It restores the FLAVOUR the cockpit cut: the theme's
+      `blurb` + a couple of `BIOME_LORE` history sentences + the weather effect's `label`/`blurb`, then the
+      levers split into clear **✦ Boons & Rewards** vs **⚠ Hazards & Conditions** chip groups (credits,
+      salvage, fuel bonus/tailwind/ion vs difficulty, wind, carry, toll, dist, fuel bill/headwind), plus
+      the geometric play hook + any toll/fuel warning — all still computed from the SAME physics tables, so
+      the card can't drift from the course. Comparing worlds is tap-one-read-tap-the-next.
+    - **One bottom overlay at a time**, priority exit-confirm > fuel-depot > world-card
+      (`travelView.exitOpen`/`depotOpen`/`selectedRouteId`; selecting/opening one dismisses the others via
+      the `app.ts` handlers). Selection now DEFAULTS to none, so the screen opens on the clean full map.
+      The old `.gs-lane`/`.gs-dock`/`travelStrip`/`laneCell`/`laneDetail` are gone. Reducer actions
+      (`route`/`scanRoutes`/`bank`/`strand`/`buyFuel`) UNCHANGED — pure app/render, no `_gs*`/URL hook, no
+      save/rng impact. `fuelGaugeHTML`'s vertical variant keeps the row contract (fuel tests green).
+      Verified eyes-on (`scripts/travel-preview.mjs` default + `?select` card + `?exit` + `?depot`); full
+      suite (1119) + typecheck green.
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a

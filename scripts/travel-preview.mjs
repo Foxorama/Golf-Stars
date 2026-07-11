@@ -32,7 +32,10 @@ ${styleBlock}
 
   // A real run for a real character (real bag/loadout/course), then patched to a deep mid-voyage travel stop.
   let s = initState(4242);
-  s = reduce(s, { type: 'selectCharacter', characterId: 'larry' });
+  // selectCharacter only lands from the character screen (the reducer guards on it), and it's what bakes
+  // the golfer into run.loadout — so set the screen first, else the name falls back to "Voyager".
+  s = { ...s, screen: 'character' };
+  s = reduce(s, { type: 'selectCharacter', characterId: 'longshot-larry' });
   const run = s.run;
   run.stopIndex = 6;
   run.distanceFromStart = 21;
@@ -49,10 +52,11 @@ ${styleBlock}
 
   s = { ...s, screen: 'travel', routes: routeOptions(run) };
   setState(s);
-  if (new URLSearchParams(location.search).get('depot')) {
-    const tv = await import('/src/app/travelScreens.ts');
-    tv.travelView.depotOpen = true;
-  }
+  const qp = new URLSearchParams(location.search);
+  const tv = await import('/src/app/travelScreens.ts');
+  if (qp.get('depot')) tv.travelView.depotOpen = true;
+  if (qp.get('exit')) tv.travelView.exitOpen = true;
+  if (qp.get('select')) tv.travelView.selectedRouteId = Number(qp.get('select'));
   const app = document.getElementById('app');
   app.innerHTML = '<main class="gs-main">' + travelScreen() + '</main>';
   window.__done = true;

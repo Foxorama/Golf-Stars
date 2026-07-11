@@ -372,15 +372,21 @@ these systems** — each bullet is the tip of a documented iceberg.
     a Pro-Shop floor; no-op at `'common'`). A per-character Ascension clear unlocks one random club
     (`unlockedClubsByCharacter` stores TYPES, re-stamped by `applyBagTier`). `ASCENSION_MAX = 15`.
   - The reducer's exported `runEndUpdates` is the SINGLE source for all run-end sites.
-  - The travel screen is ONE fixed-viewport COCKPIT (GS-journey-cockpit, `travelScreens.ts`): a compact
-    status strip + the star map filling the slack (`.gs-travel__map`; the `.gs-journey--v` inside PANS at
-    intrinsic size — never scales down, so the zoom-out-to-unusable bug can't return) + a docked control bar.
-    Lane selection is INLINE (`travelView.selectedRouteId` — the old `routeInfoOverlay` bottom-sheet is
-    gone): tap a map world or a dock RAIL cell (both `data-route-inspect`) → its bet swaps into the dock
-    detail in place, so comparing three lanes is three taps, zero windows. The rail compares all three at a
-    glance (biome · difficulty bar · ⛽ · credit±); Jump/Scan/⛽-depot/Bank ride the dock's action row. Pure
-    app/render — the `{type:'route'}`/`scanRoutes`/`bank`/`strand` actions are UNCHANGED (no reducer/save/rng
-    impact, no `_gs*`/URL hook). Re-shoot `scripts/travel-preview.mjs` after touching it.
+  - The travel screen is ONE FULL-SCREEN STAR MAP framed by sticky glass chrome (GS-journey-map-redesign,
+    `travelScreens.ts`; superseded the GS-journey-cockpit status-strip + comparison-rail + docked-sheet).
+    A ONE-LINE top bar (`.gs-travel__topbar`: character name · voyage Arc / endless Hole · credits; the
+    fixed `.gs-cog` sits top-right of the same row), then the MAP fills the entire rest of the viewport
+    (`.gs-journey--v` PANS at intrinsic size — never scales down, so the zoom-out-to-unusable bug can't
+    return; a fresh stop shows with NO scroll). STICKY chrome is absolutely anchored to
+    `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map): 📡 SCANNER
+    top-right, the ⛽ FUEL gauge (vertical `fuelGaugeHTML({vertical})`) climbing the right edge from the
+    bottom-right corner (tap → the fuel depot), 🚪 EXIT bottom-left (bank/end run, two-step confirm).
+    Tapping a world (`data-route-inspect`) raises `laneCard` over the bottom HALF — world + weather LORE
+    (`BIOME_LORE` + theme/effect blurbs), Boons & Rewards vs Hazards & Conditions chips, the Jump action.
+    Only ONE bottom overlay at a time (`travelView.selectedRouteId`/`depotOpen`/`exitOpen`, priority
+    exit > depot > card). Pure app/render — the `{type:'route'}`/`scanRoutes`/`bank`/`strand`/`buyFuel`
+    actions are UNCHANGED (no reducer/save/rng impact, no `_gs*`/URL hook). Re-shoot
+    `scripts/travel-preview.mjs` (`?select=N`/`?depot=1`/`?exit=1` variants) after touching it.
   - Route choice carries destination biome + an event that is economy/cut/meta only — **NEVER
     generation rng**. Every non-none course effect carries a REAL play hook, machine-checked
     (`tests/journey-effects.test.ts`): wind/carry multipliers are pure post-gen scales; geometric
