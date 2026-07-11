@@ -1,0 +1,276 @@
+/**
+ * Shared reducer HELPERS + meta-progression UPDATES (extracted from game.ts, GS-refactor-split).
+ *
+ * The pure functions the `reduce` switch leans on but that aren't themselves action handlers: the
+ * best-ball partner / trade-tent reaction layering, the four run-end / endless / ace update bags every
+ * stop-scoring site shares, the boss-reward offer, and the whole Asgard-interlude cluster (portal
+ * trigger, field scaling, tournament resolution). Byte-for-byte identical to when these lived in
+ * game.ts — a pure move; game.ts re-exports the public ones (`runEndUpdates`, `endlessProgressUpdates`,
+ * `asgardPortalOpens`, `asgardFieldEdge`) so existing importers/tests are unchanged.
+ */
+
+import type { PlayedHole } from '../sim/round';
+import { playHole } from '../sim/round';
+import {
+  ASCENSION_MAX,
+  bossRewards,
+  currentBoss,
+  holeGateArmed,
+  playerHoleOpts,
+  shardsForRun,
+  snapshotRun,
+  type BossReward,
+  type Run,
+  type StopResult,
+} from '../sim/rpg/run';
+import { addEndlessRecord, endlessUnlocksCrossed } from '../sim/rpg/endless';
+import { archetypeFor } from '../sim/course/themes';
+import { ASGARD_FORMAT } from '../sim/rpg/formats';
+import { matchOpponentFor, runField } from '../sim/rpg/league';
+import { warriorsThreeTotals, warriorsEdge } from '../sim/rpg/competition';
+import { ascensionClubReward } from '../sim/rpg/club-unlock';
+import { aceShipUnlock } from '../sim/rpg/ships';
+import type { HolePlay } from '../sim/rpg/play';
+import type { MatchUi, UiState } from './gameState';
+
+/** The matchplay opponent for a boss stop (GS-100): the leaderboard leader, or — if the arc has no
+ *  scores yet (a fresh resume) — the field's top-rated non-player as a deterministic fallback. */
+export function resolveBossId(run: Run): string {
+  return matchOpponentFor(run) ?? runField(run).golfers.find((g) => !g.isPlayer)?.id ?? '';
+}
+
+/**
+ * Best-ball partner resolution (GS-team-duel): the moment the PLAYER's ball is holed out, the
+ * partner's parallel ball plays on the SAME `:play` rng — so the end-of-hole screen can reveal both
+ * cards side by side (the kept one highlighted) instead of the partner's score materialising
+ * invisibly at `holeComplete`. The rng ORDER is unchanged from the auto sim (`bestBallHole`: the
+ * player's full hole, then the partner's whole hole after it) — only the action the partner's draws
+ * land in moved earlier. No-op on solo/scramble duels and on an already-resolved hole, so every
+ * other path's stream is byte-for-byte untouched.
+ */
+export function withBestBallPartner(state: UiState, play: HolePlay): { play: HolePlay; match?: MatchUi } {
+  const setup = state.match?.setup;
+  if (
+    !play.done ||
+    !state.match ||
+    !state.holeRng ||
+    setup?.partnerSide !== 'player' ||
+    setup.format !== 'bestball' ||
+    (state.match.partnerHoles ?? []).length !== play.holeIndex
+  ) {
+    return { play, match: state.match };
+  }
+  const partnerHole = playHole(state.course.holes[play.holeIndex]!, state.holeRng, {
+    ...playerHoleOpts(state.run),
+    shotMods: setup.playerPartnerMods,
+  });
+  return {
+    play,
+    match: { ...state.match, partnerHoles: [...(state.match.partnerHoles ?? []), partnerHole] },
+  };
+}
+
+/**
+ * Fire a struck trade-tent's non-shot REACTION (GS-tent-interactions) after a shot resolves. The
+ * SHOT itself (the ricochet, and the marmot's lost ball) is already resolved in the shared physics, so
+ * auto ≡ interactive holds; these are the interactive-only META reactions, layered on like the ace /
+ * unlock side-effects:
+ *   • marmot   → the first-ever bonk unlocks the persistent Marmot Bartender (clubhouse cosmetic), and
+ *                EVERY bonk drops a ball in its tip jar (GS-tent-tips) — a running total that ACCUMULATES
+ *                across runs (the clubhouse renders the fill-to-a-half-dozen-then-cash-out cycle off it);
+ *   • fortune  → grant a free mulligan for the NEXT tee shot;
+ *   • starmart → opening the pop-up shop is deferred to AFTER the shot animation (app-layer `onDone`),
+ *                so it isn't handled here.
+ * `ow`/`watch` are pure flavour (the bubble + voice), so no state change. Reads the LAST shot only.
+ */
+export function applyTentReactions(state: UiState, play: HolePlay): UiState {
+  const effect = play.shots[play.shots.length - 1]?.tentHit?.effect;
+  if (!effect) return state;
+  // Every marmot bonk drops a ball in the tip jar (GS-tent-tips) — the first-ever bonk ALSO unlocks the
+  // persistent Marmot Bartender. The count is a running total (never reset per run); the clubhouse draws
+  // its fill-then-cash-out cycle off it, so the jar accumulates toward a half-dozen across runs.
+  if (effect === 'marmot') return { ...state, marmotBartender: true, marmotTips: state.marmotTips + 1 };
+  if (effect === 'fortune') return { ...state, mulliganPending: true };
+  return state;
+}
+
+/** Winning at your current top Ascension tier unlocks the next (GS-ascension), capped at the max. */
+function unlockedAscension(state: UiState, run: Run): number {
+  if (run.endedReason !== 'won') return state.maxAscension;
+  return Math.min(ASCENSION_MAX, Math.max(state.maxAscension, run.ascension + 1));
+}
+
+/**
+ * The meta-progression deltas every run-end site shares (GS-12 / GS-ascension / GS-ascension-clubs):
+ * banked shards, the Trade-Market reseed, the Ascension tier unlock, and — on a NEW Ascension clear —
+ * the character's ascension-victory club unlock (or a Shard consolation if their bag is already full).
+ * One source of truth so all four end sites (auto/interactive × ordinary/matchplay) reward a win
+ * identically. Returns the unchanged fields while the run is still active (a survived non-final stop).
+ * Exported so tests can assert the win reward directly (a natural voyage win is too rare to drive in a
+ * unit test).
+ */
+export function runEndUpdates(state: UiState, run: Run): Partial<UiState> {
+  if (run.status === 'active') {
+    return { lastRunShards: undefined, lastClubUnlock: undefined };
+  }
+  const earned = shardsForRun(run);
+  const maxAscension = unlockedAscension(state, run);
+  const characterId = run.loadout.characterId;
+  const owned = (characterId && state.unlockedClubsByCharacter[characterId]) || [];
+  // The club reward is PER CHARACTER (GS-ascension-clubs fix): a golfer earns a club when THEY clear an
+  // Ascension tier they hadn't cleared before — tracked in `maxAscensionByCharacter`, independent of
+  // which OTHER golfer first pushed the global `maxAscension`. Before this fix the gate was the global
+  // `maxAscension > state.maxAscension`, so only the FIRST golfer to clear a tier ever got a club; every
+  // later golfer clearing the same tier was silently denied. Now each golfer has its own unlock ladder;
+  // re-clearing a tier THIS golfer already holds grants nothing (a missed cut / bank just banks shards).
+  const charBest = (characterId && state.maxAscensionByCharacter[characterId]) || 0;
+  const charCleared =
+    run.endedReason === 'won' && characterId
+      ? Math.min(ASCENSION_MAX, Math.max(charBest, run.ascension + 1))
+      : charBest;
+  const newCharClear = charCleared > charBest && !!characterId;
+  const reward = newCharClear
+    ? ascensionClubReward(characterId, state.bagTier, owned, `${run.seed}:${run.ascension}`)
+    : undefined;
+  const gotClub = reward?.kind === 'club' && !!characterId;
+  const bonusShards = reward?.kind === 'shards' ? reward.shards : 0;
+  // Bank the finished Unending-Universe run into the last-runs leaderboard (GS-golf-score): its holes
+  // reached + golf-round gross/par + golfer + starting club set. Recorded once, here at the single
+  // shared run-end site, so every end path (auto/interactive) logs it exactly once; a non-gate voyage
+  // run adds nothing. A characterless placeholder never reaches this (runs only end after a stop).
+  const endlessRuns =
+    holeGateArmed(run) && characterId
+      ? addEndlessRecord(state.endlessRuns, {
+          characterId,
+          tier: run.bagTier ?? 'common',
+          holes: run.holesSurvived,
+          gross: run.grossStrokes,
+          par: run.parPlayed,
+          ascension: run.ascension,
+          seed: run.seed,
+          // GS-warp: a warped run's board range starts at its first HAND-PLAYED hole ("50–67").
+          startHole: run.warpedThrough > 0 ? run.warpedThrough + 1 : undefined,
+        })
+      : state.endlessRuns;
+  return {
+    shards: state.shards + earned + bonusShards,
+    lastRunShards: earned,
+    maxAscension,
+    maxAscensionByCharacter: newCharClear
+      ? { ...state.maxAscensionByCharacter, [characterId!]: charCleared }
+      : state.maxAscensionByCharacter,
+    unlockedClubsByCharacter: gotClub
+      ? { ...state.unlockedClubsByCharacter, [characterId!]: [...owned, (reward as { clubType: string }).clubType] }
+      : state.unlockedClubsByCharacter,
+    lastClubUnlock: reward,
+    endlessRuns,
+    // A finished run bumps the lounge counter so the golfers have shuffled around by the time you're home.
+    clubhouseVisit: state.clubhouseVisit + 1,
+  };
+}
+
+/**
+ * Unending-Universe progression (GS-unending): applied at EVERY stop-scoring site (not just run end,
+ * since milestones cross mid-run while the run survives). Lifts the persisted lifetime-best hole count
+ * and grants any newly-crossed cosmetic unlock into the owned pools — the same ownership arrays the
+ * Trade Market/Clubhouse already read, so an earned Evergreen piece equips exactly like a bought one.
+ * Pure function of the counters; the milestone SHARD bonus is banked by the sim (`finishStop` →
+ * `run.bonusShards`), not here. A no-op ({}) for non-gate formats or a non-record run.
+ */
+export function endlessProgressUpdates(state: UiState, run: Run): Partial<UiState> {
+  const holes = run.holesSurvived ?? 0;
+  if (!holeGateArmed(run) || holes <= state.endlessBestHoles) return {};
+  let ownedApparel = state.ownedApparel;
+  let ownedShips = state.ownedShips;
+  for (const u of endlessUnlocksCrossed(state.endlessBestHoles, holes)) {
+    if (u.kind === 'apparel' && !ownedApparel.includes(u.id)) ownedApparel = [...ownedApparel, u.id];
+    if (u.kind === 'ship' && !ownedShips.includes(u.id)) ownedShips = [...ownedShips, u.id];
+  }
+  return { endlessBestHoles: holes, ownedApparel, ownedShips };
+}
+
+/**
+ * Ace-driven state deltas for a scored stop (GS-ace): the lifetime hole-in-one tally + the secret
+ * Comet Rider ship unlock (GS-ace-ship, granted on ANY ace the player doesn't already own — so a
+ * player who aced before this shipped still earns it on their next ace). `baseOwnedShips` is the
+ * owned list AFTER any endless-milestone unlock at this same site, so the two ship grants compose
+ * rather than clobber; spread this LAST at each scoring site. Pure.
+ */
+export function aceUpdates(state: UiState, result: StopResult, baseOwnedShips: string[]): Partial<UiState> {
+  const owned = aceShipUnlock(baseOwnedShips, result.aces);
+  return {
+    lifetimeAces: state.lifetimeAces + result.aces,
+    ...(owned !== baseOwnedShips ? { ownedShips: owned } : {}),
+  };
+}
+
+/** Boss-reward choices to offer after a stop, if it was a survived (non-final) boss win (GS-talents).
+ *  Themed to the stop's zone. Undefined for an ordinary stop, a missed cut, or a run-winning final boss. */
+export function bossRewardFor(run: Run, course: UiState['course'], result: StopResult): BossReward[] | undefined {
+  if (!result.passed || run.status !== 'active' || !currentBoss(run)) return undefined;
+  return bossRewards(run, archetypeFor(course.meta?.themeId, course.biome));
+}
+
+/** The Thor's Hammer cosmetic id (GS-asgard) — the driver skin won by taking the Asgard tournament. */
+const THOR_HAMMER_ID = 'thors-hammer';
+
+/**
+ * The Rainbow-Ball eagle trigger (GS-asgard): a survived, NON-Asgard, ordinary stop where the Rainbow
+ * Ball is armed and the player made an EAGLE-OR-BETTER (a holed hole at ≥2 under — a hole-in-one,
+ * albatross or eagle) opens the Bifröst to the Golden Realm. Reducer-only + gated on the Rainbow Ball,
+ * so it adds no rng draws and the feature-off path is byte-for-byte unchanged.
+ */
+export function asgardPortalOpens(run: Run, played: PlayedHole[]): boolean {
+  return (
+    !!run.loadout.rainbowRoad &&
+    run.formatId !== ASGARD_FORMAT &&
+    played.some((p) => p.holed && p.record.strokes - p.record.par <= -2)
+  );
+}
+
+/** Divert a survived ordinary stop to the Himinbjörg map when the Rainbow-Ball eagle trigger fires
+ *  (GS-asgard); the current run is snapshotted for the post-tournament restore. A no-op otherwise. */
+export function withAsgardPortal(next: UiState, run: Run, played: PlayedHole[]): UiState {
+  if (next.screen === 'result' && asgardPortalOpens(run, played)) {
+    return { ...next, screen: 'asgardMap', asgardReturn: snapshotRun(run) };
+  }
+  return next;
+}
+
+/**
+ * The Warriors Three's per-hole SHARPENING for THIS tournament (GS-asgard-scaling): scaled off how deep
+ * into the journey (the parked real run's `stopIndex` — the "upgraded clubs" proxy) and at what Ascension
+ * the Bifröst was reached, so a late-run encounter with an upgraded bag stays a contest. The suspended
+ * run lives in `asgardReturn`; the fresh Asgard run resets `stopIndex` to 0, so read the depth from the
+ * snapshot (its ascension is the same value the Asgard run carries). Zero at a shallow, base encounter. */
+export function asgardFieldEdge(state: UiState): number {
+  const src = state.asgardReturn;
+  return warriorsEdge(src?.stopIndex ?? 0, src?.ascension ?? state.run.ascension);
+}
+
+/**
+ * Resolve the Asgard STROKE-PLAY tournament (GS-asgard): the player's real nine-hole gross against the
+ * Warriors Three's deterministic ghost totals. Lowest total wins, ties to the player (a hard-won reward
+ * event). A win banks the Thor's Hammer cosmetic here; the Odin's Favour perk + the Rainbow-Ball removal
+ * land on the resumed run at `leaveAsgard`. Win OR lose, the player is handed back to their journey.
+ */
+export function resolveAsgard(state: UiState, played: PlayedHole[]): UiState {
+  const pars = state.course.holes.map((h) => h.par);
+  const playerTotal = played.reduce((s, p) => s + p.record.strokes, 0);
+  const field = warriorsThreeTotals(`${state.run.seed}`, pars, asgardFieldEdge(state));
+  const won = playerTotal <= Math.min(...field.map((f) => f.total));
+  const ownedApparel =
+    won && !state.ownedApparel.includes(THOR_HAMMER_ID) ? [...state.ownedApparel, THOR_HAMMER_ID] : state.ownedApparel;
+  return {
+    ...state,
+    played,
+    stopPlayed: undefined,
+    play: undefined,
+    holeRng: undefined,
+    match: undefined,
+    viewHole: 0,
+    screen: 'asgardResult',
+    ownedApparel,
+    asgardOutcome: { won, playerTotal, par: pars.reduce((a, b) => a + b, 0), field },
+  };
+}

@@ -599,7 +599,11 @@ these systems** — each bullet is the tip of a documented iceberg.
 - **UI layer** — `docs/decisions/ui-intro.md`
   - The screen flow is a PURE reducer (`ui/game.ts`): `(UiState, Action) → UiState`, no DOM/time,
     fully unit-tested. `app.ts`/`main.ts` render state + dispatch; save persistence + canvas mounts
-    + the intro cinematic are side-effects there, never in the reducer.
+    + the intro cinematic are side-effects there, never in the reducer. `game.ts` is the re-export
+    BARREL + the `reduce` switch (GS-refactor-split): the state/action TYPES live in `gameState.ts`,
+    the per-golfer cosmetic resolvers in `gameCosmetics.ts`, and the shared run-end/endless/ace/Asgard
+    UPDATE helpers in `gameUpdates.ts` (siblings never import game.ts — no cycle). Extend a sibling,
+    not the barrel; every `import … from '../ui/game'` still resolves through the re-exports.
   - The app shell is SPLIT (GS-app-split): `app.ts` keeps boot/dispatch/render wiring + the
     interactive play screen; every other screen builder lives in `src/app/*` (title/intro/result/
     shop/market/clubhouse/travel + `ctx.ts` with the live `state` binding, `duelHud`, `helpers`).
