@@ -413,6 +413,20 @@ const FEATURES: readonly FeatureRow[] = [
   { id: 'ghost-nebula', name: 'Ghost Nebula', kind: 'deepsky', rarity: 'rare', archetype: 'derelict', anchor: 'vdB 141', blurb: 'A pale shape haunts the dust — a wreck drifting where a ship once died.', flavour: { wind: 0.6, carry: 1.05, scatter: 1.1 } },
   { id: 'skull-nebula', name: 'Skull Nebula', kind: 'deepsky', rarity: 'epic', archetype: 'derelict', anchor: 'NGC 246', blurb: 'A dead star’s shattered shell, hollow-eyed in the deep — and the hulk adrift inside it.', flavour: { carry: 1.08, dogleg: 1.1, scatter: 1.15 } },
 
+  // GS-biome-frequency: three of the exotic worlds — the Cetus star-ocean, the derelict ship and the
+  // metal scrap belt — were locked to arc 2 (cetus, metal) or an epic-only trickle (derelict), so a
+  // DEEP run (mostly arc 3) barely met them: cetus/metal literally had NO arc-3 theme, derelict only
+  // the epic Skull Nebula (weight 9). That made a 150-hole voyage go without ever seeing them. The fix
+  // is content-as-data (the sanctioned "new row" pattern, exactly as GS-weather-affinity gave swamp/
+  // metal a second constellation): one COMMON (weight 60), arc-3-pinned deep-sky destination per world,
+  // bringing each to toxic-mire (swamp) frequency in the deep game — where hydra (common, arc 3) already
+  // sits. Deep-sky (no stick figure) needs no champion/constellation-figure; each carries a real J2000
+  // anchor (see scripts/gen-sky-coords.mjs) so the journey starmap still plots it. Common rarity is the
+  // frequency lever, not a loot statement — most wrecks/whales/scrapfields are ordinary deep places.
+  { id: 'cetus-a', name: 'Cetus A', kind: 'deepsky', rarity: 'common', arc: 3, archetype: 'cetus', anchor: 'M77', blurb: 'The Whale’s own galaxy, blazing at the bottom of the deepest star-ocean.', flavour: { wind: 1.05, scatter: 1.1 } },
+  { id: 'medusa-nebula', name: 'Medusa Nebula', kind: 'deepsky', rarity: 'common', arc: 3, archetype: 'derelict', anchor: 'Abell 21', blurb: 'An ancient dead star’s tattered shroud — and the common hulks that drift its silence.', flavour: { wind: 0.6, carry: 1.05, scatter: 1.1 } },
+  { id: 'antlia-cluster', name: 'Antlia Cluster', kind: 'deepsky', rarity: 'common', arc: 3, archetype: 'metal', anchor: 'Abell S0636', blurb: 'A deep swarm of dead machines and scrapped hulls, tumbling the low-gravity belt.', flavour: { carry: 1.04, scatter: 1.1 } },
+
   // The two naked-eye galaxies — pinned to arc 3 as late-game grandeur
   { id: 'milky-way-core', name: 'Milky Way Core', kind: 'galaxy', rarity: 'epic', archetype: 'void', anchor: 'Galactic Centre', blurb: 'The blazing heart of our own galaxy, in Sagittarius.', arc: 3, flavour: { carry: 1.18, jitter: 0.14, scatter: 1.4 } },
   { id: 'magellanic-clouds', name: 'Magellanic Clouds', kind: 'galaxy', rarity: 'epic', archetype: 'void', anchor: 'LMC / SMC', blurb: 'Two dwarf galaxies circling the south celestial pole.', arc: 3, flavour: { carry: 1.14, jitter: 0.1, scatter: 1.3 } },
