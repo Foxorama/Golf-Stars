@@ -72,7 +72,7 @@ import { bossRewardScreen, gameoverScreen, resultScreen, victoryInfo } from './a
 import { shopScreen, shopView, starmartScreen } from './app/shopScreens';
 import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketScreens';
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
-import { routeInfoOverlay, travelScreen, travelView } from './app/travelScreens';
+import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
@@ -1207,9 +1207,12 @@ function render(): void {
     animatingPlay = pendingAnimation(state.play);
   }
 
-  // The route-info sheet is only meaningful on the travel screen; clear it the moment we leave so a
-  // stale id (route ids repeat 1..3 each stop) can't auto-reopen a sheet on the next travel screen.
-  if (state.screen !== 'travel') travelView.inspectRouteId = null;
+  // The lane selection + depot toggle are only meaningful on the travel screen; clear them the moment we
+  // leave so a stale id (route ids repeat 1..3 each stop) can't carry over to the next travel screen.
+  if (state.screen !== 'travel') {
+    travelView.selectedRouteId = null;
+    travelView.depotOpen = false;
+  }
 
   // Reset the aim-overlay decor framing each render; the decision/putt branches below re-arm it when
   // they draw a focus-mode map (whole-hole fit can't be aligned, so it stays null → no aligned decor).
@@ -1274,7 +1277,6 @@ function render(): void {
   const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
-  const routeSheet = state.screen === 'travel' && travelView.inspectRouteId != null ? routeInfoOverlay() : '';
   // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's
   // own markup so no screen can forget it. The full-bleed play view is the one exception: its
   // map-nav stack already carries a cog, and a second fixed button would collide with it.
@@ -1284,7 +1286,7 @@ function render(): void {
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
   // until the player closes it — it's stamped by the save migration and shown on the boot title.
   const priceNotice = state.priceRefund != null ? priceNoticeOverlay() : '';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${routeSheet}${introTraits}${priceNotice}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${priceNotice}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Arc-intro "First Tee" at the BOTTOM only when the field overflows one screen (GS-intro-split):
@@ -1339,25 +1341,22 @@ function render(): void {
       render();
     });
   });
-  // Travel star-chart: tap a branch planet to open its route-info sheet; tap the backdrop / close /
-  // Cancel to dismiss it (the sheet's Confirm is a normal [data-action] route dispatch). getAttribute
-  // (not dataset) so it works on SVG <g> nodes too.
+  // Travel star-chart (GS-journey-cockpit): tap a branch world (or a dock comparison-rail cell) to SELECT
+  // that lane — its full bet swaps into the dock detail in place, no window to open/close. getAttribute
+  // (not dataset) so it works on SVG <g> nodes too. The Jump/Scan/Bank actions are normal [data-action]s.
   app.querySelectorAll<HTMLElement>('[data-route-inspect]').forEach((el) => {
     el.addEventListener('click', () => {
-      travelView.inspectRouteId = Number(el.getAttribute('data-route-inspect'));
+      travelView.selectedRouteId = Number(el.getAttribute('data-route-inspect'));
       sfx.click();
       haptic(HAPTICS.tap);
       render();
     });
   });
-  app.querySelectorAll<HTMLElement>('[data-route]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      // The sheet card itself is data-route="keep" — clicks inside it must NOT close it.
-      if (el.getAttribute('data-route') === 'keep') {
-        e.stopPropagation();
-        return;
-      }
-      travelView.inspectRouteId = null;
+  // Travel dock: toggle the fuel-depot expansion (a view flag, not a game action).
+  app.querySelectorAll<HTMLElement>('[data-depot]').forEach((el) => {
+    el.addEventListener('click', () => {
+      travelView.depotOpen = !travelView.depotOpen;
+      sfx.click();
       render();
     });
   });

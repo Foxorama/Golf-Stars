@@ -360,6 +360,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     a Pro-Shop floor; no-op at `'common'`). A per-character Ascension clear unlocks one random club
     (`unlockedClubsByCharacter` stores TYPES, re-stamped by `applyBagTier`). `ASCENSION_MAX = 15`.
   - The reducer's exported `runEndUpdates` is the SINGLE source for all run-end sites.
+  - The travel screen is ONE fixed-viewport COCKPIT (GS-journey-cockpit, `travelScreens.ts`): a compact
+    status strip + the star map filling the slack (`.gs-travel__map`; the `.gs-journey--v` inside PANS at
+    intrinsic size — never scales down, so the zoom-out-to-unusable bug can't return) + a docked control bar.
+    Lane selection is INLINE (`travelView.selectedRouteId` — the old `routeInfoOverlay` bottom-sheet is
+    gone): tap a map world or a dock RAIL cell (both `data-route-inspect`) → its bet swaps into the dock
+    detail in place, so comparing three lanes is three taps, zero windows. The rail compares all three at a
+    glance (biome · difficulty bar · ⛽ · credit±); Jump/Scan/⛽-depot/Bank ride the dock's action row. Pure
+    app/render — the `{type:'route'}`/`scanRoutes`/`bank`/`strand` actions are UNCHANGED (no reducer/save/rng
+    impact, no `_gs*`/URL hook). Re-shoot `scripts/travel-preview.mjs` after touching it.
   - Route choice carries destination biome + an event that is economy/cut/meta only — **NEVER
     generation rng**. Every non-none course effect carries a REAL play hook, machine-checked
     (`tests/journey-effects.test.ts`): wind/carry multipliers are pure post-gen scales; geometric

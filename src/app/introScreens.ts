@@ -29,7 +29,7 @@ import { endlessRecordsBoard, endlessScoreCard } from '../render/endlessCards';
 import { renderHoleSVG } from '../render/holeView';
 import type { PlayedHole } from '../sim/round';
 
-// View-only module state (like settingsOpen / travelView.inspectRouteId) — reset to the arc step +
+// View-only module state (like settingsOpen / travelView.selectedRouteId) — reset to the arc step +
 // closed popup whenever we (re-)enter the intro, so a fresh stop always opens on the arc. No
 // save/rng touch. app.ts's dispatch/render own the resets + `[data-intro-stage]` wiring.
 export const introView = { stage: 'arc' as 'arc' | 'hole', traitsOpen: false };
