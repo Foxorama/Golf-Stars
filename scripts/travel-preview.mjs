@@ -50,9 +50,15 @@ ${styleBlock}
   // The current stop is the last history entry in app.ts's slice(0,-1) logic — add one for "YOU".
   run.history.push({ stopIndex: 6, distanceFromStart: 21, biome: 'inferno', themeId: 'scorpius', rarity: 'rare', stableford: 18, gross: 32, cut: 12, passed: true, creditsEarned: 120, aces: 0 });
 
+  const qp = new URLSearchParams(location.search);
+  // ?ship=<id> flies a given ship so its bridge HUD livery can be eyeballed (e.g. ?ship=infinity-ace).
+  const shipId = qp.get('ship');
+  if (shipId) {
+    s = { ...s, ownedShips: [...s.ownedShips, shipId], shipByCharacter: { ...s.shipByCharacter, 'longshot-larry': shipId } };
+  }
+
   s = { ...s, screen: 'travel', routes: routeOptions(run) };
   setState(s);
-  const qp = new URLSearchParams(location.search);
   const tv = await import('/src/app/travelScreens.ts');
   if (qp.get('depot')) tv.travelView.depotOpen = true;
   if (qp.get('exit')) tv.travelView.exitOpen = true;

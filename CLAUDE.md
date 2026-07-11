@@ -414,8 +414,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     `fuelGaugeHTML({vertical})`, COUNT on top / ⛽ at the FOOT) climbs the right pillar (tap → the fuel
     depot); the exit is bank/end run (two-step confirm). The frame RECOLOURS to the flown ship via
     `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-bhud`; a per-fleet
-    livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE later
-    is a `.gs-bhud--<variant>` block — never a layout edit. Its base class MUST stay `.gs-bhud`, NOT
+    livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE is a
+    `.gs-bhud--<variant>` block — never a layout edit. The **Infinity Ace** (GS-infinity-hud, the hole-150
+    Unending grail) is the first non-`standard` variant: `variant:'infinity'` unlocks `.gs-bhud--infinity`
+    — a rotating living-aurora ring (@property `--gs-aur-angle`, the ship's gold→emerald→aquamarine→violet
+    palette), gold double-rim, breathing corner brackets + an ∞ crest crowning the frame; all decoration on
+    the existing markup (frame ::before/::after) with animations disabled under reduced-motion (degrades to
+    a static gold-aurora console). Eyeball via `scripts/travel-preview.mjs QS="?ship=infinity-ace"`. Its base class MUST stay `.gs-bhud`, NOT
     `.gs-hud` (the play screen's own HUD class): a shared `.gs-hud` here once stretched the play screen's
     `.gs-glass` chrome into a full-screen map-blur (GS-hud-class-collision, guarded by the play-HUD layout
     test in `tests/build.test.ts`). `.gs-bhud` is `pointer-events:none` so map taps

@@ -49,6 +49,20 @@ const SHIP_HUD: Record<string, Partial<HudTheme>> = {
   'set:Speeder': { accent: '#ff5fbf', accent2: '#28e0d0', glow: 'rgba(255,90,190,0.24)', ink: '#ffd6f0' },
   'set:Valkyrie': { accent: '#ffd36b', accent2: '#b8823a', glow: 'rgba(230,185,63,0.28)', ink: '#fff0c8' },
   'set:Mythic': { accent: '#c585ff', accent2: '#5b3b8a', glow: 'rgba(150,90,220,0.30)', ink: '#eadcff' },
+
+  // The INFINITY ACE (GS-infinity-hud) — the hole-150 Unending grail, so its bridge is the ONE livery
+  // that ships a bespoke frame SHAPE, not just a tint. `variant: 'infinity'` unlocks the animated
+  // `.gs-bhud--infinity` block in index.html: a living-aurora ring (gold→emerald→aquamarine→violet, the
+  // ship's own palette), a gold double-rim, pulsing corner brackets, and an ∞ crest at the frame crown.
+  // Its four base colours are the golden-phoenix / aurora hues so a reduced-motion (or older) browser
+  // still renders a rich static gold-aurora console — the grail always reads a cut above the fleet.
+  'infinity-ace': {
+    variant: 'infinity',
+    accent: '#ffd76b',
+    accent2: '#4fe0b0',
+    glow: 'rgba(240,200,90,0.36)',
+    ink: '#fff2c8',
+  },
 };
 
 /** Resolve the HUD livery for the ship currently flown (id → set → standard). Always a full theme. */
