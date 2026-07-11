@@ -61,6 +61,9 @@ const BLOCK_STROKE = 'rgba(150,220,140,0.45)';
  *  silhouette actually drawn (styleFlora) — a fixed conifer 🌲 stamped pines over lyra's round oaks and
  *  every other non-frost world (the "pine trees where there are none" bug). Tents are always ⛺. */
 const TENT_GLYPH = '⛺';
+/** Ship-corridor bulkhead (GS-ship-walls): a shaded cone slice here means the shot ricochets off a
+ *  metal wall and bounces back onto the deck — a barrier glyph so the player reads the bounce. */
+const WALL_GLYPH = '🧱';
 const TREE_GLYPH: Record<BiomeArchetype, string> = {
   verdant: '🌳', // round parkland oak
   fungal: '🍄', // glowing mushroom stand
@@ -77,8 +80,8 @@ const TREE_GLYPH: Record<BiomeArchetype, string> = {
   derelict: '🛰️', // a broken antenna spar / dead dish jutting from the hull
   asgard: '🍁', // Yggdrasil golden-leaf ash
 };
-const blockGlyph = (src: 'trees' | 'tents', arch: BiomeArchetype): string =>
-  src === 'tents' ? TENT_GLYPH : TREE_GLYPH[arch];
+const blockGlyph = (src: 'trees' | 'tents' | 'walls', arch: BiomeArchetype): string =>
+  src === 'tents' ? TENT_GLYPH : src === 'walls' ? WALL_GLYPH : TREE_GLYPH[arch];
 
 // --- Zoom-aware overlay layout (GS-spray-zoom) --------------------------------
 // Every overlay layout decision below reads the projector's px-per-yard scale, so the cone stays
@@ -302,6 +305,9 @@ function shotConeParts(hole: Hole, proj: Proj, opts: RenderOptions, geom: SprayG
     minDepthYd: BLOCK_MIN_DEPTH_PX / pxYd,
     snapYd: BLOCK_SNAP_PX / pxYd,
     tents: opts.tradeTents && hole.tents ? tradeTents(hole) : undefined,
+    // Ship-corridor bulkheads (GS-ship-walls): the derelict's collidable walls block the aim cone
+    // like a treeline, so a shot that would ricochet reads blocked. Absent on every other world.
+    walls: hole.walls,
   });
   for (const region of blocked) {
     const poly: Vec[] = [];

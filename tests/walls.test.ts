@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
 import { validateCourse } from '../src/sim/course/contract';
-import { wallReflect, wallFlightHit, wallRollHit, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
+import { wallReflect, wallFlightHit, wallRollHit, wallRollBounce, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
+import { rollOut, shotSpread, sprayBlocking } from '../src/sim/round';
 import { flightProfileOf } from '../src/sim/flight';
+import { CLUBS } from '../src/sim/clubs';
+import type { Hole } from '../src/sim/course/contract';
 import type { Vec } from '../src/sim/course/contract';
 
 // GS-ship-walls: the derelict world's collidable metal corridor bulkheads — every ball leaving the deck
@@ -83,6 +86,86 @@ describe('GS-ship-walls — flight ricochet', () => {
   it('wallRollHit stops a ball rolling OUTWARD into a wall, ignores one rolling inward', () => {
     expect(wallRollHit([wall], [0, 18], [0, 25])).toBe(wall); // rolling out (+y) into the −y-normal wall
     expect(wallRollHit([wall], [0, 25], [0, 18])).toBeNull(); // rolling inward (−y) → no stop
+  });
+
+  it('wallRollBounce returns the wall AND the impact point (the ricochet the pinball reflects off)', () => {
+    const b = wallRollBounce([wall], [0, 18], [0, 25]);
+    expect(b).not.toBeNull();
+    expect(b!.wall).toBe(wall);
+    expect(b!.point[1]).toBeCloseTo(20, 3); // hit the wall at y=20
+    expect(wallRollBounce([wall], [0, 25], [0, 18])).toBeNull(); // rolling inward → no bounce
+  });
+});
+
+describe('GS-ship-pinball — the rolling ball bounces wall-to-wall, never a dead stop', () => {
+  // A synthetic chute: two facing walls forming a corridor along y, so a ball rolling out the side
+  // bounces back and forth. rollOut needs a real Hole to read lies from — a bare fairway box works.
+  function chuteHole(): Hole {
+    const box: Vec[] = [[-40, -40], [40, -40], [40, 400], [-40, 400]];
+    return {
+      par: 4,
+      tee: [0, 0],
+      green: [0, 360],
+      pin: [0, 360],
+      centreline: [[0, 0], [0, 360]],
+      features: [{ kind: 'fairway', poly: box }],
+      hazards: [],
+      wind: null,
+      biomeMods: { carry: 1, roll: 1 },
+      shapeId: 'straight',
+      widthId: 'ship-corridor',
+      walls: [
+        { a: [20, -100], b: [20, 500], normal: [-1, 0], height: WALL_HEIGHT }, // right wall, inward −x
+        { a: [-20, -100], b: [-20, 500], normal: [1, 0], height: WALL_HEIGHT }, // left wall, inward +x
+      ],
+    } as unknown as Hole;
+  }
+
+  it('a ball rolling into a bulkhead reflects and keeps rolling (stays inside the corridor)', () => {
+    const hole = chuteHole();
+    // Start mid-corridor, roll OUTWARD toward the right wall at a shallow forward angle with real pace.
+    const start: Vec = [10, 40];
+    const dir: Vec = [0.7, 0.71]; // toward +x (the right wall) and forward
+    const withWalls = rollOut(hole, start, dir, 60, 'fairway', undefined, undefined, hole.walls);
+    // It must NOT escape the corridor — reflected back inside |x| ≤ 20.
+    expect(Math.abs(withWalls.rest[0])).toBeLessThanOrEqual(20.5);
+    // And it bounced (a curved path is returned, with more than the straight 2 points).
+    expect(withWalls.path && withWalls.path.length).toBeGreaterThan(2);
+    // Without walls the same roll sails clean out past the wall line (proof the walls did the saving).
+    const noWalls = rollOut(hole, start, dir, 60, 'fairway', undefined, undefined, undefined);
+    expect(noWalls.rest[0]).toBeGreaterThan(20.5);
+  });
+
+  it('a lobe-less non-walled roll is byte-for-byte the straight integrator (no regression)', () => {
+    const hole = chuteHole();
+    const a = rollOut(hole, [0, 40], [0, 1], 30, 'fairway');
+    // A straight forward roll never touches a wall → identical with or without the walls param.
+    const b = rollOut(hole, [0, 40], [0, 1], 30, 'fairway', undefined, undefined, hole.walls);
+    expect(a.rest).toEqual(b.rest);
+    expect(a.roll).toEqual(b.roll);
+    expect(a.path).toBeUndefined(); // straight integrator returns no path
+  });
+});
+
+describe('GS-ship-walls — the aim cone reads the wall (blocks like a treeline)', () => {
+  it('a shot aimed into a bulkhead shades a blocked region tagged "walls"', () => {
+    // A derelict corridor hole with real walls.
+    let hole: Hole | undefined;
+    for (let s = 1; s < 60 && !hole; s++) {
+      const c = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness: 0.3 });
+      hole = c.holes.find((h) => (h.walls?.length ?? 0) > 0 && h.par >= 4);
+    }
+    expect(hole, 'a walled derelict hole exists').toBeTruthy();
+    const D = CLUBS.find((c) => c.id === 'D')!;
+    // Aim at a nearby wall's midpoint so the cone crosses it.
+    const w = hole!.walls!.find((x) => Math.hypot(x.a[0] - hole!.tee[0], x.a[1] - hole!.tee[1]) < 220) ?? hole!.walls![0]!;
+    const target: Vec = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
+    const s = shotSpread(hole!, hole!.tee, 'tee', target, D, {});
+    const blocked = sprayBlocking(hole!, s, undefined, { walls: hole!.walls });
+    expect(blocked.length).toBeGreaterThan(0);
+    expect(blocked.some((r) => r.src === 'walls')).toBe(true);
+    // Absent the walls opt, the same cone shades nothing (walls are the only obstacle here).
+    expect(sprayBlocking(hole!, s, undefined, {}).length).toBe(0);
   });
 });
 
