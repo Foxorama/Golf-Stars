@@ -6,15 +6,15 @@
  * livery is four colours (+ an optional frame `variant` class) keyed by ship id, falling back to the
  * cosmetic SET, falling back to the standard cyan console. The travel screen pipes the resolved theme
  * into the HUD as CSS custom properties (`--hud-accent` / `--hud-accent2` / `--hud-glow` / `--hud-ink`)
- * and stamps `gs-hud--<variant>` on the frame — so a NEW livery (or, later, a per-ship frame SHAPE) is a
+ * and stamps `gs-bhud--<variant>` on the frame — so a NEW livery (or, later, a per-ship frame SHAPE) is a
  * new row here, never a layout edit. Pure data + string → no DOM, no rng, no sim coupling.
  */
 
 import { shipById } from '../sim/rpg/ships';
 
 export interface HudTheme {
-  /** CSS variant class suffix (`gs-hud--<variant>`) — the future hook for per-fleet frame SHAPES, not
-   *  just colours. Every livery is `standard` today; add a `.gs-hud--racer` block to reshape a fleet. */
+  /** CSS variant class suffix (`gs-bhud--<variant>`) — the future hook for per-fleet frame SHAPES, not
+   *  just colours. Every livery is `standard` today; add a `.gs-bhud--racer` block to reshape a fleet. */
   variant: string;
   /** Primary console accent — frame border, corner brackets, glow rim, active readouts. */
   accent: string;
@@ -39,7 +39,7 @@ export const DEFAULT_HUD_THEME: HudTheme = {
  * Per-ship / per-set HUD liveries. Keyed `<shipId>` first (an exact ride), then `set:<Set>` (a whole
  * fleet), then the standard console. The SET rows below give each fleet a distinct bridge tint TODAY;
  * drop in a `<shipId>` row to give one hero ship its own command deck. To add a per-fleet frame shape
- * later, set a `variant` here and add a matching `.gs-hud--<variant>` block in index.html.
+ * later, set a `variant` here and add a matching `.gs-bhud--<variant>` block in index.html.
  */
 const SHIP_HUD: Record<string, Partial<HudTheme>> = {
   'set:Wagon': { accent: '#e0b15a', accent2: '#8a5a2b', glow: 'rgba(200,140,60,0.26)', ink: '#f2e2c4' },
