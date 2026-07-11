@@ -243,6 +243,27 @@ these systems** — each bullet is the tip of a documented iceberg.
     (`styleShipWalls`, camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's
     struck-metal voice + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the
     course contract.
+  - SHIP-CORRIDOR CONTAINMENT (GS-ship-corridor-contain, `round.ts`): the promise "a sideways miss ricochets
+    back, NEVER lost to space" is guaranteed BY CONSTRUCTION, not by the per-segment collision. The pre-built
+    wall SEGMENTS are two parallel rails per corridor section — they do NOT close a fence around a deck that
+    ZIGZAGS with hard-angular corners, so the curved flight banana + the pinball roll reach off-hull spots
+    through the corner OPENINGS between adjacent rails and past the chain ends (measured before the fix: ~25%
+    of full-power derelict drives lost to space DESPITE the walls, most resting a few yards off the edge — the
+    root of five failed "fix the walls" attempts). THE FIX: the DECK the renderer draws IS the real bulkhead
+    (graphic ≡ physics). `executeShot` runs two deck-boundary layers on walled holes: (a) `flightBoundaryBounce`
+    — if a shot LANDS lost-to-space at a station where the corridor is SOLID, ricochet it off the deck edge the
+    arc first crossed (a real mid-air bounce, lands back inside, sparks) when the segment `wallFlightHit` missed
+    it; (b) a rest BACKSTOP (`containToDeck`) — any ball still off the hull at a solid station is pulled to the
+    nearest deck, appended to the run-out path so it visibly rolls back. "SOLID station" = the centreline point
+    nearest the ball is itself ON the deck; a rest whose station centreline is off-deck is a sanctioned
+    torn-hull GAP (a forward carry) and stays lost, and a `breach` rest is a deliberate hazard (excluded via
+    `isLostToSpace`). The margin-seat is RE-VALIDATED so it never lands in a thin space sliver between a `waste`
+    plate and the fairway. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate → every other world
+    byte-identical), and it only ever moves a ball ONTO the deck (Stableford can only rise, contract 4). The
+    LESSON for any future "walled / contained" world: a pre-built segment fence can't contain a ball on a
+    bending, breaking corridor — make the DRAWN PLAYABLE SURFACE the physics boundary and back it with a
+    rest-time containment guarantee. Regression: end-to-end seeded drives in `tests/walls.test.ts` assert no
+    resting ball is still `containToDeck`-able (the synthetic reflection tests never caught it).
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,

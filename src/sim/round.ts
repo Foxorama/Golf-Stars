@@ -6,7 +6,7 @@
  * any bug reproduces by its seed. The renderer will later animate exactly these shots.
  */
 
-import { dist, pathLength, type FeatureKind, type Hole, type Vec } from './course/contract';
+import { dist, pathLength, segDist, type FeatureKind, type Hole, type Vec } from './course/contract';
 import { CLUBS, clubDist, suggestClub, type Club, type ClubStats } from './clubs';
 import {
   combineShapeMods,
@@ -35,7 +35,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
+import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightControl, flightGround, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
 import { wallFlightHit, wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
@@ -1114,6 +1114,15 @@ export function executeShot(
   let wallHit: WallHit | null = null;
   if (hole.walls && hole.walls.length && !knockedDown && !tentHit) {
     wallHit = wallFlightHit(hole.walls, from, result.landing, result.shotBearing, result.carry, nominalCarry, flight);
+    // The per-segment collision misses escapes through the corridor's hard-corner openings (the wall
+    // rails don't close the fence on a hole that zigzags this hard). When it does, but the arc still
+    // LANDS lost-to-space on a solid stretch of deck, ricochet off the DECK BOUNDARY the renderer draws
+    // (GS-ship-corridor-contain) — the ball clangs off the hull edge and drops back inside, never sails
+    // into open space. Pure geometry, zero rng, derelict-only.
+    if (!wallHit) {
+      const bb = flightBoundaryBounce(hole, from, result.landing, result.shotBearing);
+      if (bb) wallHit = { wall: bb.wall, point: bb.point, dir: bb.dir, carry: bb.carry, t: bb.t, bounces: 1 };
+    }
     if (wallHit) {
       result.landing = wallHit.point;
       result.carry = wallHit.carry;
@@ -1168,6 +1177,23 @@ export function executeShot(
       roll = out.roll;
       rest = out.rest;
       rollPath = out.path;
+    }
+  }
+
+  // Ship-corridor wall-SAVE backstop (GS-ship-corridor-contain): a walled corridor's impassable bulkheads
+  // must never let a ball be LOST TO SPACE sideways off a solid stretch of hull deck. If the ball still
+  // ends up off the hull at a station where the corridor is SOLID (something the ricochet maths + pinball
+  // roll-out couldn't catch on the hard-cornered layout), pull it back onto the nearest deck — the ball
+  // clangs off the bulkhead and stays inside. A rest in a genuine torn-hull GAP is a sanctioned forward
+  // carry and is left lost. Pure geometry, zero rng, derelict-only (byte-for-byte elsewhere), and it only
+  // ever moves a ball ONTO the deck, so Stableford can only rise (contract 4).
+  if (hole.walls && hole.walls.length) {
+    const saved = containToDeck(hole, rest);
+    if (saved) {
+      // Extend the run-out path so the render walks the ball back onto the deck instead of snapping.
+      rollPath = rollPath && rollPath.length ? [...rollPath, saved] : [touchdown, saved];
+      roll += dist(rest, saved);
+      rest = saved;
     }
   }
 
@@ -1828,6 +1854,138 @@ function nearestCentrelineT(hole: Hole, ball: Vec): number {
     }
   }
   return bestT;
+}
+
+// --- Ship-corridor containment (GS-ship-corridor-contain) ------------------------------------------
+// The derelict's bulkheads are IMPASSABLE, so the walled corridor must never LOSE a ball to space by
+// letting it slip sideways off a solid stretch of hull deck — the invariant "a sideways miss ricochets
+// back, never lost". The per-segment wall collision (`wallFlightHit` + the pinball roll-out) can't
+// guarantee that on the zigzagging, hull-broken corridor: the curved flight banana and the run-out both
+// reach off-deck spots through the HARD-CORNER openings between adjacent wall rails and past the ends of
+// the wall chain (measured: ~25% of full-power derelict drives were lost to space DESPITE the walls, most
+// resting within a few yards of the deck edge). The pre-built wall SEGMENTS simply don't form a closed
+// fence around a corridor that bends this hard. So here the DECK the renderer draws is treated as the real
+// bulkhead (graphic ≡ physics): detect a ball that has left the SOLID deck and ricochet / pull it straight
+// back on. A rest in a genuine torn-hull GAP (the centreline itself is off the deck there — a sanctioned
+// FORWARD carry between hull sections) is left lost. Pure geometry, ZERO rng, gated on `hole.walls`, and it
+// only ever moves a ball ONTO the deck — every non-derelict world is byte-for-byte unchanged and Stableford
+// can only rise (contract 4). See docs/decisions/sim-generator.md (GS-ship-walls / GS-ship-corridor-contain).
+const CONTAIN_STEP = 2; // yards per inward probe step when walking a lost ball back onto the deck
+const CONTAIN_MARGIN = 4; // extra yards past the recovered deck edge so the ball rests clear of the razor edge
+
+/** A lie in which the ball is LOST TO SPACE off the hull (`shiprough`/void-rough), NEVER an on-deck
+ *  hazard like a `breach` — a breach is a deliberate penalty and must stay lost. */
+function isLostToSpace(lie: FeatureKind): boolean {
+  return lie !== 'breach' && lieInfo(lie).penalty === 'voidlost';
+}
+
+/** The centreline point nearest `p`, found on a FINE sample (own local search — never touches the
+ *  coarser `nearestCentrelineT` the AI reads, so no seeded path shifts). */
+function nearestCentrePoint(hole: Hole, p: Vec): Vec {
+  let bestT = 0;
+  let bestD = Infinity;
+  for (let i = 0; i <= 160; i++) {
+    const t = i / 160;
+    const d = dist(pointAlong(hole.centreline, t), p);
+    if (d < bestD) {
+      bestD = d;
+      bestT = t;
+    }
+  }
+  return pointAlong(hole.centreline, bestT);
+}
+
+/** The corridor is SOLID at `p`'s station iff the centreline point nearest `p` is itself on the deck
+ *  (a torn-hull gap has an off-deck centreline). */
+function corridorSolidAt(hole: Hole, p: Vec): boolean {
+  return !isLostToSpace(lieAt(hole, nearestCentrePoint(hole, p)));
+}
+
+/** The inward ricochet direction at `at` for a ball travelling `travel` into the hull edge: reflect it
+ *  off the nearest DRAWN wall (so the bounce angle matches the bulkhead the renderer shows), but if that
+ *  reflection would still point off the deck (a mis-oriented corner segment), fall back to straight toward
+ *  the centreline — the ricochet must always come back onto the deck. Returns the dir + the struck wall. */
+function inwardReflect(hole: Hole, at: Vec, travel: Vec): { dir: Vec; wall: ShipWall | null } {
+  const walls = hole.walls ?? [];
+  let bw: ShipWall | null = null;
+  let bd = Infinity;
+  for (const w of walls) {
+    const d = segDist(at, w.a, w.b);
+    if (d < bd) {
+      bd = d;
+      bw = w;
+    }
+  }
+  let dir = bw ? wallReflect(bw.normal, travel) : travel;
+  const c = nearestCentrePoint(hole, at);
+  const tl = Math.hypot(c[0] - at[0], c[1] - at[1]) || 1;
+  const toC: Vec = [(c[0] - at[0]) / tl, (c[1] - at[1]) / tl];
+  if (dir[0] * toC[0] + dir[1] * toC[1] < 0.05) dir = toC; // never ricochet back off the deck
+  return { dir, wall: bw };
+}
+
+/**
+ * Walk the curved flight; if it LANDS lost-to-space at a station where the corridor is solid, find where
+ * the arc first crossed off the hull deck and return that ricochet (impact + inward direction + struck
+ * wall) — the robust, deck-boundary counterpart of `wallFlightHit` that never misses an escape through a
+ * hard-corner opening. null when the ball lands safe / in a real hazard / in a sanctioned torn-hull gap.
+ */
+function flightBoundaryBounce(
+  hole: Hole,
+  from: Vec,
+  landing: Vec,
+  bearingDeg: number,
+  steps = 40,
+): { point: Vec; dir: Vec; carry: number; t: number; wall: ShipWall } | null {
+  const walls = hole.walls;
+  if (!walls || !walls.length) return null;
+  if (!isLostToSpace(lieAt(hole, landing))) return null; // lands on the deck or in a real hazard
+  if (!corridorSolidAt(hole, landing)) return null; // lands in a torn-hull gap → a sanctioned carry
+  const control = flightControl(from, landing, bearingDeg);
+  let prev = from;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const pos = flightGround(from, control, landing, t);
+    if (isLostToSpace(lieAt(hole, pos)) && !isLostToSpace(lieAt(hole, prev)) && corridorSolidAt(hole, pos)) {
+      const dx = pos[0] - prev[0];
+      const dy = pos[1] - prev[1];
+      const l = Math.hypot(dx, dy) || 1;
+      const { dir, wall } = inwardReflect(hole, prev, [dx / l, dy / l]);
+      return { point: prev, dir, carry: dist(from, prev), t, wall: wall ?? walls[0]! };
+    }
+    prev = pos;
+  }
+  return null;
+}
+
+/** Pull an off-hull rest point back onto the nearest deck (stepping toward the centreline), or null if
+ *  `p` is already on the deck / in a real hazard / in a sanctioned torn-hull gap. The wall-SAVE guarantee:
+ *  after every shot on a walled hole this backstops any escape the ricochet maths missed. */
+export function containToDeck(hole: Hole, p: Vec): Vec | null {
+  if (!isLostToSpace(lieAt(hole, p))) return null; // on the deck, or in a real hazard → nothing to save
+  const c = nearestCentrePoint(hole, p);
+  if (isLostToSpace(lieAt(hole, c))) return null; // corridor broken here → a sanctioned carry, stays lost
+  const dx = c[0] - p[0];
+  const dy = c[1] - p[1];
+  const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L;
+  const uy = dy / L;
+  const onDeck = (q: Vec): boolean => {
+    const lk = lieAt(hole, q);
+    return !isLostToSpace(lk) && !lieInfo(lk).penalty;
+  };
+  for (let d = CONTAIN_STEP; d <= L; d += CONTAIN_STEP) {
+    const q: Vec = [p[0] + ux * d, p[1] + uy * d];
+    if (!onDeck(q)) continue;
+    // Seat it a margin deeper toward the centre so it never rests on the razor edge — but the corridor
+    // can hold a THIN sliver of space between two deck patches (a `waste` plate beside the fairway), so
+    // the deeper point is re-validated: if the margin push would cross back into space, seat at the deck
+    // point we actually reached. Guarantees the returned point is genuinely ON the deck.
+    const extra = Math.min(CONTAIN_MARGIN, L - d);
+    const deep: Vec = [q[0] + ux * extra, q[1] + uy * extra];
+    return onDeck(deep) ? deep : q;
+  }
+  return c;
 }
 
 /**
