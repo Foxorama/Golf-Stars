@@ -22,6 +22,7 @@ import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
 import { getFormat, ASGARD_FORMAT } from './sim/rpg/formats';
 import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
+import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
 import { CHARACTERS } from './sim/rpg/characters';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessUnlocksCrossed } from './sim/rpg/endless';
@@ -124,12 +125,20 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- * Both compose, and both reuse the real reducer to build an honest run — nothing forks the game's logic.
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse` (GS-screen-deeplink) — mount a between-stop
+ *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
+ *     shop / market / clubhouse surfaces WITHOUT playing a full stop (shot animations + watch screens
+ *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
+ *     redesigned three times in one day with no layout guard. Reuses the real reducer transitions
+ *     where they exist (leaveShop → travel, openMarket, openClubhouseHall) so nothing forks the logic.
+ * All three compose, and all reuse the real reducer to build an honest run — nothing forks the game's logic.
  */
 function applyDebugParams(): void {
   const rainbow = new URLSearchParams(location.search).get('rainbow');
   const asgard = new URLSearchParams(location.search).get('asgard');
-  if (!rainbow && !asgard) return;
+  const screen = new URLSearchParams(location.search).get('screen');
+  if (!rainbow && !asgard && !screen) return;
+  const title = state; // the pristine title state (initState) — where between-RUN screens open from.
   // Build a genuine interactive run with the first golfer, via the same reducer path the UI uses.
   let s = reduce(state, { type: 'start', format: 'unending' });
   s = reduce(s, { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
@@ -138,7 +147,37 @@ function applyDebugParams(): void {
   s = { ...s, run, course: currentCourse(run) };
   // Open the Bifröst directly: suspend this run and reveal the Himinbjörg map.
   if (asgard) s = { ...s, screen: 'asgardMap', asgardReturn: snapshotRun(run) };
+  // Jump straight to a between-stop / between-run screen for the layout smoke tests (GS-screen-deeplink).
+  if (screen) s = jumpToScreen(title, s, screen);
   setState(s);
+}
+
+/**
+ * GS-screen-deeplink — map a `?screen=` value to the honest UiState for that screen. Every branch either
+ * reuses a real reducer transition (leaveShop → travel, openMarket, openClubhouseHall) or builds the SAME
+ * state the reducer's own transition builds (shop offer / starmart offer), so the deep-link mounts a
+ * genuine screen — never a hand-forged one that could paper over a real render bug. The between-STOP
+ * screens (travel / shop / starmart) open off the built run `s`; the between-RUN screens (trademarket /
+ * clubhouse) open off the pristine `title` state, which is the screen their reducer guards require.
+ */
+function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
+  const run = s.run;
+  const withShop = (): UiState => ({ ...s, screen: 'shop', shopOffer: shopOffer(run).map((o) => o.item.id), shopRerolls: 0 });
+  switch (screen) {
+    case 'shop':
+      return withShop();
+    case 'travel':
+      // The honest path: build the shop, then leave it — the shop → travel reducer transition sets routes.
+      return reduce(withShop(), { type: 'leaveShop' });
+    case 'starmart':
+      return { ...s, screen: 'starmart', starmartOffer: starmartOffer(run).map((o) => o.item.id), starmartRerolls: 0 };
+    case 'trademarket':
+      return reduce(title, { type: 'openMarket' });
+    case 'clubhouse':
+      return reduce(title, { type: 'openClubhouseHall' });
+    default:
+      return s; // unknown value → land on the normal title (no crash)
+  }
 }
 
 /**
