@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
 import { validateCourse } from '../src/sim/course/contract';
 import { wallReflect, wallFlightHit, wallRollHit, wallRollBounce, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
-import { rollOut, shotSpread, sprayBlocking } from '../src/sim/round';
+import { rollOut, shotSpread, sprayBlocking, executeShot, biomeCarryMult, containToDeck } from '../src/sim/round';
 import { flightProfileOf } from '../src/sim/flight';
+import { lieAt } from '../src/sim/shot';
+import { Rng } from '../src/sim/rng';
 import { CLUBS } from '../src/sim/clubs';
 import type { Hole } from '../src/sim/course/contract';
 import type { Vec } from '../src/sim/course/contract';
@@ -166,6 +168,67 @@ describe('GS-ship-walls — the aim cone reads the wall (blocks like a treeline)
     expect(blocked.some((r) => r.src === 'walls')).toBe(true);
     // Absent the walls opt, the same cone shades nothing (walls are the only obstacle here).
     expect(sprayBlocking(hole!, s, undefined, {}).length).toBe(0);
+  });
+});
+
+describe('GS-ship-corridor-contain — a sideways miss ricochets back, never lost to space', () => {
+  // The invariant the derelict's impassable bulkheads promise: a ball can only be LOST TO SPACE by a
+  // sanctioned FORWARD carry (a torn-hull star-gap), NEVER by drifting sideways off a solid stretch of
+  // hull deck. Before this fix ~25% of full-power derelict drives were lost to space DESPITE the walls —
+  // the per-segment wall rails don't close the fence on a corridor that zigzags with hard-angular corners.
+  // `executeShot` now contains the ball back onto the deck (the deck the renderer draws IS the bulkhead).
+  // Because the sim ALREADY applies that containment, no resting ball may still be containable — a leftover
+  // off-hull rest at a SOLID station (one `containToDeck` can recover) is exactly the bug. These end-to-end
+  // seeded drives are the regression the synthetic reflection tests above could never catch.
+  const DR = CLUBS.find((c) => c.id === 'D')!;
+
+  it('no seeded derelict drive comes to rest off the hull at a solid corridor station', () => {
+    let checked = 0;
+    let walledHoles = 0;
+    for (let s = 1; s < 40; s++) {
+      for (const wildness of [0.4, 0.7, 1]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of course.holes) {
+          if (!(hole.walls?.length && hole.walls.length > 0) || hole.par < 4) continue;
+          walledHoles++;
+          const carryMult = biomeCarryMult(hole);
+          // Aim down the corridor toward the first bend; the seeded angular spray sends a share of these
+          // drives sideways into the bulkheads — exactly the shots that used to leak into space.
+          const bend = hole.centreline[1] ?? hole.green;
+          const fx = bend[0] - hole.tee[0];
+          const fy = bend[1] - hole.tee[1];
+          const fl = Math.hypot(fx, fy) || 1;
+          const target: Vec = [hole.tee[0] + (fx / fl) * 210, hole.tee[1] + (fy / fl) * 210];
+          for (let k = 0; k < 10; k++) {
+            const rng = new Rng(90000 + s * 31 + k + Math.round(wildness * 10));
+            const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1 }, rng);
+            checked++;
+            // A resting ball the containment could still pull back onto the deck means a lateral escape
+            // slipped through — the invariant is broken. Genuine torn-hull gaps return null (left lost).
+            expect(containToDeck(hole, r.log.rest), `seed ${s} w${wildness} k${k} rest ${r.log.rest}`).toBeNull();
+          }
+        }
+      }
+    }
+    expect(walledHoles).toBeGreaterThan(0);
+    expect(checked).toBeGreaterThan(200);
+  });
+
+  it('a recovered ball is always seated ON the deck — never in a between-plates space sliver', () => {
+    const DECK_LIES = ['fairway', 'rough', 'tee', 'green', 'bunker', 'waste', 'sand'];
+    for (let s = 1; s < 40; s++) {
+      const course = generateCourse(s + 500, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness: 0.8 });
+      for (const hole of course.holes) {
+        if (!(hole.walls?.length)) continue;
+        for (const w of hole.walls) {
+          // A point just OUTSIDE each drawn bulkhead (off the deck, toward space).
+          const mid: Vec = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
+          const outside: Vec = [mid[0] - w.normal[0] * 8, mid[1] - w.normal[1] * 8];
+          const saved = containToDeck(hole, outside);
+          if (saved) expect(DECK_LIES, `hole seed ${s + 500} saved ${saved}`).toContain(lieAt(hole, saved));
+        }
+      }
+    }
   });
 });
 

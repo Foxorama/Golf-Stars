@@ -14,6 +14,14 @@
  *
  * Walls only ever SAVE a ball that would be lost to space (off-deck is the `voidlost` penalty), so
  * they only raise mean per-stop Stableford — the death-spiral bar can only improve (contract 4).
+ *
+ * NB — these per-segment collisions are the FEEL layer (a believable mid-air / rolling ricochet), NOT the
+ * containment GUARANTEE. Two parallel wall rails per corridor section can't form a closed fence on a hull
+ * that zigzags with hard-angular corners, so a share of shots leak off-hull through the corner openings and
+ * past the chain ends. The guarantee "a sideways miss is never lost to space" is enforced separately, in
+ * `round.ts` `executeShot`, by treating the DRAWN DECK as the true bulkhead: `flightBoundaryBounce` +
+ * `containToDeck` (GS-ship-corridor-contain — see docs/decisions/sim-generator.md). Change the wall FEEL
+ * here; do NOT try to make these segments watertight — that's the trap the first four attempts fell into.
  */
 
 import type { Vec, ShipWall } from './course/contract';

@@ -958,3 +958,67 @@ stepping-stone runways. TODO(GS-variety-3-followup): the bigger levers from the 
 the table — named TEMPLATE holes (Redan/Cape/Biarritz/Short) as set-pieces, an anti-repeat scheduler
 (bias each hole off the previous hole's shape/length/direction), angle-of-attack pin↔fairway-side
 coupling, and moving more difficulty into greens (firmness/false fronts). Logged in IDEAS.md.
+
+## GS-ship-corridor-contain — the derelict's side walls actually contain the ball (5th time's the charm)
+
+**The report.** The derelict spaceship's signature is a walled hull-deck corridor: impassable metal
+bulkheads line both sides, and the game promises "a sideways miss ricochets back onto the deck, never
+lost to space" (that promise is what makes a tight, wind-blown, low-gravity hallway *fair*). Across four
+prior attempts (GS-ship-walls #327/#329, GS-ship-corridor #330, GS-ship-pinball #350) the walls still
+leaked: players kept losing balls that drifted into the side walls. This is the 5th pass, and it's a
+root-cause fix, not another tuning nudge.
+
+**Reproduction (the thing the earlier passes lacked).** A headless sweep firing full-power driver
+tee-shots down real derelict corridors and classifying each rest showed **~25% of drives were LOST TO
+SPACE despite the fully-walled corridor** — and, crucially, most rested only a few yards off the deck
+edge. Two distinct leaks, one root cause:
+- **Open boundary (~79% of the leaks).** A straight line tee→rest crossed ZERO walls yet the rest was
+  off-deck. The corridor is a hard ZIGZAG (a 4-point centreline can swing ±130 yd with sharp-angular
+  "ship junction" corners). The pre-built walls are two PARALLEL RAILS per corridor section; at a convex
+  hard corner the rails from adjacent sections don't meet, and past the chain ends they simply stop — so
+  the curved flight banana and the run-out reach off-hull spots THROUGH the corner openings and around
+  the ends without ever crossing a wall SEGMENT. Parallel rails are not a closed fence.
+- **Detection/reflection miss (~21%).** A wall did sit between tee and rest, but `wallFlightHit`'s
+  segment walk / the pinball roll bounced the ball inward only for it to trickle off again, or reflected
+  a grazing hit nearly parallel to the wall so it slid along the razor edge and off.
+
+**The fix — the drawn deck IS the bulkhead (graphic ≡ physics).** Stop trying to make the segment fence
+watertight on a corridor that bends this hard; instead treat the DECK the renderer draws as the physics
+boundary, and add two deck-boundary layers in the shared `executeShot` (so auto ≡ interactive, and
+gated on `hole.walls` so every non-derelict world is byte-for-byte unchanged, zero rng):
+1. `flightBoundaryBounce` — when a shot LANDS lost-to-space at a station where the corridor is SOLID and
+   the segment `wallFlightHit` didn't catch it, walk the same curved arc, find where it first left the
+   hull deck, and ricochet it off THAT edge (reflect off the nearest drawn wall for a believable angle,
+   forced inward toward the centreline so it can never point back off the deck). The ball lands back
+   inside and sparks at the wall — a real mid-air bounce, no sail into open space.
+2. `containToDeck` rest BACKSTOP — after the roll, any ball still off the hull at a solid station is
+   pulled to the nearest deck (stepping toward the centreline) and the recovered point is appended to the
+   run-out path so the ball visibly rolls back on. This is the *guarantee*: whatever the ricochet maths
+   miss, the ball ends on the deck.
+
+**"Solid station" vs a sanctioned gap.** A ball is only contained if the corridor is SOLID under it —
+defined as: the centreline point nearest the ball is itself ON the deck. A rest whose nearest centreline
+point is off-deck sits in a genuine torn-hull STAR-GAP (the island-hop forward carry) and is correctly
+left lost. A `breach` rest is a deliberate on-deck acid-hole hazard and is excluded (`isLostToSpace`
+gates on the `voidlost`-penalty off-hull lies `shiprough`/`voidrough`, never `breach`).
+
+**The one subtle bug inside the fix.** The backstop seats the recovered ball a small margin PAST the deck
+edge toward the centreline so it doesn't rest on the razor edge. But the generator can leave a thin (~2 yd)
+sliver of SPACE between a `waste` steel-plate and the fairway — and the un-validated margin push shoved the
+ball straight into that sliver (a "saved" ball that was still lost). Fix: re-validate the margin-seated
+point and fall back to the deck point actually reached if the push would cross back into space.
+
+**Verification.** After the fix: **0 genuine lateral losses across 444,744** seeded shots (multiple clubs,
+powers, tee + mid-corridor lies, wildness 0.2→1.0), down from thousands. Visual health: 84% of wall-bounce
+shots visibly LAND on the deck and 98.5% come to REST on the deck (the remainder are legit gap/breach
+carries). Full suite green (1119 → 1121 with two new end-to-end regressions in `tests/walls.test.ts` that
+assert no resting ball is still `containToDeck`-able and that a recovered ball is never seated in space —
+the synthetic reflection unit tests could never catch a real-geometry leak).
+
+**The transferable lesson (why five attempts failed).** Each earlier pass improved the SEGMENT collision
+(bounce it back harder, pinball it, raise the wall). None could win, because a pre-built segment fence
+fundamentally cannot contain a ball on a bending, breaking corridor — the openings are structural, not a
+tuning value. For any future "walled" or otherwise-contained world: make the DRAWN PLAYABLE SURFACE the
+physics boundary and back the invariant with a rest-time containment guarantee, rather than trying to seal
+a parallel-rail fence. And reproduce the failure headlessly with real generated geometry FIRST — the bug
+was invisible to synthetic straight-wall unit tests and obvious the moment real zigzag corridors were swept.
