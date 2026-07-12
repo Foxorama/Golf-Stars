@@ -412,16 +412,22 @@ these systems** — each bullet is the tip of a documented iceberg.
   - The reducer's exported `runEndUpdates` is the SINGLE source for all run-end sites.
   - The travel screen is ONE FULL-SCREEN STAR MAP framed by sticky glass chrome (GS-journey-map-redesign,
     `travelScreens.ts`; superseded the GS-journey-cockpit status-strip + comparison-rail + docked-sheet).
-    A ONE-LINE top bar (`.gs-travel__topbar`: character name · voyage Arc / endless Hole · credits; the
-    fixed `.gs-cog` sits top-right of the same row), then the MAP fills the entire rest of the viewport
-    (`.gs-journey--v` PANS at intrinsic size — never scales down, so the zoom-out-to-unusable bug can't
-    return; a fresh stop shows with NO scroll). STICKY chrome is absolutely anchored to
-    `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map) as a BRIDGE HUD
-    (GS-journey-hud, `.gs-bhud`): a starship command FRAME — glowing corner brackets + an L-shaped console
-    (bottom bezel + right fuel pillar) that COMPLETES the page. The 🚪 EXIT door docks the console LEFT,
-    the 📡 SCAN command dial sits bottom-CENTRE (moved from top-right), the ⛽ FUEL gauge (vertical
-    `fuelGaugeHTML({vertical})`, COUNT on top / ⛽ at the FOOT) climbs the right pillar (tap → the fuel
-    depot); the exit is bank/end run (two-step confirm). The frame RECOLOURS to the flown ship via
+    The MAP fills the ENTIRE viewport (`.gs-journey--v` PANS at intrinsic size — never scales down, so the
+    zoom-out-to-unusable bug can't return; a fresh stop shows with NO scroll). STICKY chrome is absolutely
+    anchored to `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map) as a
+    BRIDGE HUD (GS-journey-hud, `.gs-bhud`): a starship command FRAME — glowing corner brackets + an
+    L-shaped console (bottom bezel + right fuel pillar) that COMPLETES the page. The 🚪 EXIT door docks the
+    console LEFT, the 📡 SCAN command dial sits bottom-CENTRE (moved from top-right), the ⛽ FUEL gauge
+    (vertical `fuelGaugeHTML({vertical})`, COUNT on top / ⛽ at the FOOT) climbs the right pillar (tap → the
+    fuel depot); the exit is bank/end run (two-step confirm). The old separate `.gs-travel__topbar` status
+    strip + the floating `.gs-cog` are GONE (GS-journey-map-hud-consolidate): the golfer identity + run
+    progress dock into a top-LEFT glass pod (`.gs-bhud__idpod`) and the credits + settings cog into a
+    top-RIGHT pod (`.gs-bhud__statpod`) — the top-edge twin of the bottom console, so all four edges of the
+    frame are furnished and the screen reads as ONE command deck, not a strip over a disconnected map. The
+    docked `.gs-bhud__cog` dispatches the same `data-open-settings` as the global cog, which `app.ts`
+    SUPPRESSES on the travel screen (like the full-bleed play view) so there's no double button. The pods
+    recolour to the ship via the SAME `--hud-*` props and leave the frame's top CENTRE clear for a livery
+    title plate (the Infinity Ace nameplate). The frame RECOLOURS to the flown ship via
     `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-bhud`; a per-fleet
     livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE is a
     `.gs-bhud--<variant>` block, and a FULL bespoke reskin adds a `render/hudChrome.ts` row (bridge
