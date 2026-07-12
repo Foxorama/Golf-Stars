@@ -1149,24 +1149,6 @@
         height: calc(100dvh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         overflow: hidden;
       }
-      /* One-line top bar: name (flexes/ellipsis) · arc-or-hole · credits. Right padding clears the fixed
-         settings cog (42px @ ~12px) so it reads as the same row's top-right control. */
-      .gs-travel__topbar {
-        flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 0;
-        padding: 4px 52px 8px 10px; border-bottom: 1px solid var(--gs-line-2);
-      }
-      .gs-topbar__who {
-        font-size: 15px; font-weight: 800; min-width: 0;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      .gs-topbar__prog {
-        flex: 0 0 auto; font-size: 12.5px; color: var(--gs-dim);
-        border: 1px solid var(--gs-line); border-radius: 999px; padding: 2px 9px; white-space: nowrap;
-      }
-      .gs-topbar__prog b { color: var(--gs-ink); }
-      .gs-topbar__credits { flex: 0 0 auto; margin-left: auto; font-size: 14px; font-weight: 700; }
-      .gs-topbar__credits b { color: var(--gs-warn); }
-
       /* The map viewport fills all remaining height; the chart pans INSIDE it, chrome floats OVER it. */
       .gs-travel__viewport { position: relative; flex: 1 1 auto; min-height: 0; }
       .gs-travel__map { position: absolute; inset: 0; display: flex; flex-direction: column; }
@@ -1214,6 +1196,48 @@
       .gs-bhud__corner--br { bottom: 4px; right: 4px; }
       .gs-bhud__corner--br::before { top: auto; bottom: 0; }
       .gs-bhud__corner--br::after { top: auto; left: auto; bottom: 0; right: 0; }
+
+      /* Top console pods (GS-journey-map-hud-consolidate) — the top-edge twin of the bottom console. The
+         golfer identity + progress dock top-LEFT, credits + settings top-RIGHT, both as glass bezels that
+         match the console/fuel look so the whole frame reads as one furnished command deck. The centre is
+         left clear for a livery title plate (the Infinity Ace's nameplate). Anchored to the frame, inside
+         the corner brackets; `pointer-events:auto` so the cog catches touches while `.gs-bhud` stays none. */
+      .gs-bhud__idpod, .gs-bhud__statpod {
+        position: absolute; top: 10px; height: 34px; display: flex; align-items: center; gap: 8px;
+        padding: 0 10px; pointer-events: auto; border-radius: 12px; max-width: 46%;
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 34%, var(--gs-line));
+        background: linear-gradient(180deg, rgba(13,18,27,0.82), rgba(8,11,17,0.93));
+        backdrop-filter: blur(7px);
+        box-shadow:
+          inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 22%, transparent),
+          inset 0 0 14px color-mix(in srgb, var(--hud-glow) 34%, transparent),
+          0 3px 16px rgba(0,0,0,0.4);
+      }
+      .gs-bhud__idpod { left: 12px; min-width: 0; max-width: 56%; }
+      .gs-bhud__statpod { right: 12px; padding-right: 4px; }
+      .gs-bhud__who {
+        font-size: 14px; font-weight: 800; min-width: 0; display: flex; align-items: baseline; gap: 4px;
+      }
+      .gs-bhud__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-bhud__prog {
+        flex: 0 0 auto; font-size: 11.5px; color: var(--gs-dim);
+        border: 1px solid var(--gs-line); border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+      }
+      .gs-bhud__prog b { color: var(--gs-ink); }
+      .gs-bhud__credits { flex: 0 0 auto; font-size: 14px; font-weight: 700; white-space: nowrap; }
+      .gs-bhud__credits b { color: var(--gs-warn); }
+      /* The cog docks into the status pod (replacing the fixed global cog on this screen). */
+      .gs-bhud__cog {
+        flex: 0 0 auto; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+        font-size: 17px; line-height: 1; border-radius: 50%; cursor: pointer; color: var(--gs-dim);
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 30%, var(--gs-line));
+        background: radial-gradient(circle at 40% 35%, #232838, #14171f);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .25s ease, color .16s ease, border-color .16s ease, filter .16s ease;
+      }
+      .gs-bhud__cog:hover { color: var(--gs-ink); border-color: color-mix(in srgb, var(--hud-accent) 60%, transparent); filter: brightness(1.1); transform: rotate(50deg); }
+      .gs-bhud__cog:active { transform: scale(0.94); }
+      .gs-bhud__cog:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
 
       /* Bottom console bezel — the dashboard the controls are mounted on. Full width; the exit docks
          left, the scanner command-dial sits dead-centre; the fuel pillar rises from its right end. */
@@ -1386,13 +1410,16 @@
       @keyframes gs-corner-breathe { 0%,100% { opacity: .78; } 50% { opacity: 1; } }
 
       /* ── Console + controls: the L-console goes gold, the three controls become bridge instruments ── */
-      .gs-bhud--infinity .gs-bhud__console, .gs-bhud--infinity .gs-travel__fuel {
+      .gs-bhud--infinity .gs-bhud__console, .gs-bhud--infinity .gs-travel__fuel,
+      .gs-bhud--infinity .gs-bhud__idpod, .gs-bhud--infinity .gs-bhud__statpod {
         border-color: color-mix(in srgb, var(--aur1) 46%, var(--gs-line));
         box-shadow:
           inset 0 1px 0 color-mix(in srgb, var(--aur1) 34%, transparent),
           inset 0 0 20px color-mix(in srgb, var(--hud-glow) 50%, transparent),
-          0 -6px 24px rgba(0,0,0,0.42);
+          0 3px 18px rgba(0,0,0,0.42);
       }
+      /* The docked cog picks up the gold rim so it reads as part of the bridge, not a stray button. */
+      .gs-bhud--infinity .gs-bhud__cog { border-color: color-mix(in srgb, var(--aur1) 44%, var(--gs-line)); }
       /* An aurora hairline running along the console's top lip. */
       .gs-bhud--infinity .gs-bhud__console::before {
         content: ''; position: absolute; left: 16px; right: 16px; top: 0; height: 1.5px; border-radius: 2px; pointer-events: none;
@@ -1443,7 +1470,7 @@
       }
 
       .gs-travel__asgard {
-        position: absolute; z-index: 6; top: 12px; left: 34px; right: 34px;
+        position: absolute; z-index: 6; top: 52px; left: 34px; right: 34px;
         border: 1px solid var(--gs-line-2); border-radius: 10px; padding: 7px 10px;
         font-size: 12px; line-height: 1.4; background: rgba(10,14,22,0.82); backdrop-filter: blur(6px);
       }

@@ -264,22 +264,34 @@ function laneCard(r: Route): string {
     </div>`;
 }
 
-// ---- the one-line top bar (character · progress · credits; the settings cog sits fixed top-right) ----
-function topBar(): string {
+// ---- the bridge's TOP console: golfer identity + progress (top-left) · credits + settings (top-right) ---
+// GS-journey-map-hud-consolidate: the character name, run progress, credits and settings cog used to sit in
+// a separate strip ABOVE the framed map (with the cog floating over the top-right corner), so the screen
+// read as a status bar + a disconnected map. They now dock INTO the bridge HUD as two glass pods — the
+// top-edge twin of the bottom EXIT/SCAN console — leaving the frame's top CENTRE clear for a livery title
+// plate (the Infinity Ace's nameplate). The cog dispatches the same `data-open-settings` as the global cog
+// it replaces here (suppressed on travel in app.ts). Pure render; recolours to the ship via `--hud-*`.
+function bridgeStatusPods(): string {
   const r = state.run;
   const ch = getCharacter(r.loadout.characterId);
-  const who = ch ? `<span style="color:${ch.style.cap};">${ch.name}</span>` : 'Voyager';
+  const who = ch
+    ? `<b class="gs-bhud__name" style="color:${ch.style.cap};">${ch.name}</b>`
+    : '<b class="gs-bhud__name">Voyager</b>';
   const format = getFormat(r.formatId);
   // Voyage → which of the 3 arcs you're climbing; endless → the hole you're up to. The one fact that
-  // orients "how deep am I" for the mode being played.
+  // orients "how deep am I" for the mode being played. Tinted to the current course's rarity so the
+  // pill keeps the load-bearing signal the old strip's left border carried.
   const progress = format.winnable
-    ? `<span class="gs-topbar__prog">🗺️ Arc <b>${arcIndexOf(r.stopIndex) + 1}</b>/3</span>`
-    : `<span class="gs-topbar__prog">🕳️ Hole <b>${r.holesSurvived + 1}</b></span>`;
+    ? `<span class="gs-bhud__prog" style="border-color:${rarCol(state.course.rarity)}66;">🗺️ Arc <b>${arcIndexOf(r.stopIndex) + 1}</b>/3</span>`
+    : `<span class="gs-bhud__prog" style="border-color:${rarCol(state.course.rarity)}66;">🕳️ Hole <b>${r.holesSurvived + 1}</b></span>`;
   return `
-    <div class="gs-travel__topbar" style="border-left:3px solid ${rarCol(state.course.rarity)};">
-      <span class="gs-topbar__who">⛳ ${who}</span>
+    <div class="gs-bhud__idpod">
+      <span class="gs-bhud__who">⛳ ${who}</span>
       ${progress}
-      <span class="gs-topbar__credits">💰 <b>${r.credits}</b></span>
+    </div>
+    <div class="gs-bhud__statpod">
+      <span class="gs-bhud__credits">💰 <b>${r.credits}</b></span>
+      <button class="gs-bhud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
     </div>`;
 }
 
@@ -371,6 +383,7 @@ export function travelScreen(): string {
         <span class="gs-bhud__corner gs-bhud__corner--br"></span>
       </div>
       ${chrome?.frame ?? ''}
+      ${bridgeStatusPods()}
       <div class="gs-bhud__console">
         <div class="gs-bhud__slot gs-bhud__slot--exit">${exit}</div>
         <div class="gs-bhud__slot gs-bhud__slot--scan">${scanner}</div>
@@ -425,7 +438,6 @@ export function travelScreen(): string {
 
   return `
     <div class="gs-travel gs-travel--map">
-      ${topBar()}
       <div class="gs-travel__viewport">
         <div class="gs-travel__map">${map}</div>
         ${asgardBanner}

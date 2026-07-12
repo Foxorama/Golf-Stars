@@ -1318,9 +1318,10 @@ function render(): void {
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
   // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's
-  // own markup so no screen can forget it. The full-bleed play view is the one exception: its
-  // map-nav stack already carries a cog, and a second fixed button would collide with it.
-  const cog = fullBleed ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
+  // own markup so no screen can forget it. Two exceptions carry their OWN cog and would collide with a
+  // second fixed one: the full-bleed play view (its map-nav stack has a cog) and the travel bridge HUD
+  // (GS-journey-map-hud-consolidate — the cog docks into the HUD's top-right status pod).
+  const cog = fullBleed || state.screen === 'travel' ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
   // The hole-step hazards/benefits popup (GS-intro-split) rides over the page like the settings sheet.
   const introTraits = state.screen === 'intro' && introView.stage === 'hole' && introView.traitsOpen ? introTraitsOverlay() : '';
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
