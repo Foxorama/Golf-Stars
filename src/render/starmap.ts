@@ -126,7 +126,11 @@ export interface StarmapOpts {
 // lets the map fill the vertical screen space instead of sitting as a short strip. Generous spreads +
 // bigger worlds read as a vast voyage and fill the cockpit window (GS-journey-fill).
 const W = 320; // viewBox width (px, user units); the SVG scales to the container via width:100%
-const CHOICE_Y = 84; // the three destination worlds sit across the top
+// The three destination worlds sit across the top. Kept just clear of the viewBox top (~14px above the
+// widest world aura at CHOICE_Y − (r+16) = 56 − 42): the SVG's own top edge is the chart's top, so a
+// bigger CHOICE_Y is dead padding between the HUD's top brackets and the worlds — this pulls the worlds
+// UP tight to the frame so that gap closes (GS-journey-worlds-top).
+const CHOICE_Y = 56;
 const YOU_Y = 214; // YOU sits below the choices; lanes rise from here to each world
 const YOU_X = W / 2;
 const FIRST_DROP = 78; // YOU → the most-recent cleared world
