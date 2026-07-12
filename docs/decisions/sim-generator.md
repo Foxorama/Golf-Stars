@@ -1073,3 +1073,36 @@ reconstructs every resolved drive's flight and asserts none leaves a SOLID stret
 FLIGHT, not just the REST — a containment pass that only corrects the resting point leaves the animation lying
 about the wall. If the graphic shows an impassable wall, every phase of the ball's travel (flight AND roll)
 must bounce off the drawn edge, not a pre-built segment.
+
+## GS-ship-wall-bounce (render) — the wall GRAPHIC finally sits on the bounce line
+
+**The report (two screenshots).** "The walls bounce well, but two things: (1) the black wall graphic
+doesn't match where the ball bounces — it bounces off the fairway/ship deck edge instead; (2) there's a
+hidden bounce-back wall out in space — you can't actually go OOB except through the star-gaps."
+
+**The diagnosis.** Both symptoms are ONE gap. The ball can only land/rest on the fairway CORRIDOR poly,
+and `hole.walls` sit exactly on that corridor edge — that IS the bounce line, and containment guarantees
+a return there (a 140-yd sideways miss still rests on the fairway). But the RENDERER draws the hull deck
+~14 yd WIDER: `lostPlatformsCourse = dilateUnion(fairway, +14)`, plus the extruded hull cross-section and
+a bright jagged torn-hull deck-rim (`SHIP_CLIFF.lip*`). So the outermost bright edge you SEE is ~14 yd
+OUTSIDE the bounce line; the ball bounces "early," inside the visible ship, and that dead margin (where
+`lieAt`→`shiprough` = lost) reads as landable deck. Symptom 1 = the bright torn rim, not the wall, reads
+as the boundary; symptom 2 = containment pulling a ball out of that grey margin reads as an invisible
+wall in space (the only true OOB is the star-gaps, which is correct — the player was happy with that).
+
+**The decision (asked).** Keep the physics boundary; make the WALL you SEE coincide with it. (The other
+options — widen play to the whole hull, or shrink the hull to the corridor — were rejected in favour of
+the lowest-risk render-only fix that keeps the dramatic wide-ship look.)
+
+**The fix (render-only, derelict-LOST-only).** `styleShipWalls(…, bold)` draws, on a lost hole, an
+UNMISTAKABLE bulkhead on `hole.walls`: a thicker/brighter lit CREST tracing the exact bounce line, plus
+an OUTWARD cast shadow that sinks the dead-hull margin behind it so it recedes as backdrop. `SHIP_CLIFF`
+lip alpha is dropped (0.85/0.7 → 0.5/0.42) so the outer torn rim no longer out-shines the crest. Calm
+derelict holes (off-corridor is fair rough, the walls don't bounce) keep the subtle interior-partition
+look byte-identical, so nothing there is misrepresented as impassable. Zero rng, camera-proof (constant
+prim additions), every other world untouched.
+
+**The lesson.** When "the drawn surface IS the physics" but the drawn surface is a DILATED/decorated
+super-set of the collision poly, the graphic lies again — from the other side. The bounce line needs a
+graphic that sits ON it and out-shines the decorative silhouette drawn past it, or the eye locks onto the
+wrong edge.

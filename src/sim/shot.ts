@@ -644,6 +644,14 @@ export interface ShotInput {
    *  to the fairway (e.g. a recovery aimed across from the rough), which fired the ducks on right-side
    *  misses and knocked them further offline. Absent ⇒ the old bearing-relative sign (byte-for-byte). */
   fairwaySide?: (landing: Vec) => 'left' | 'right';
+  /** Course-aware FAIRWAY-SPINE snap for a caddy-guard fairway save (GS-caddy-snapback): given a would-be
+   *  off-fairway miss, returns the point on the fairway to drop the ball on (the nearest on-fairway spine
+   *  point), or null. The caller closes it over the hole. Used so the Space Ducks / Convict Sheep bring a
+   *  miss ALL THE WAY back to the short grass no matter how far offline it went — a big deliberate miss
+   *  (bearing pointing away from the fairway) comes home to the fairway, not merely a de-spread version of
+   *  the errant aim line. Absent/null ⇒ recentre onto the shot BEARING (the old behaviour, byte-for-byte
+   *  for a hole-less unit call). */
+  fairwaySnap?: (landing: Vec) => Vec | null;
   /**
    * Left-handed mode (GS-lefty): mirror the player's lateral shot tendencies in WORLD space. A
    * left-handed golfer is the mirror image of a right-handed one — their hook curves right, their
@@ -792,10 +800,18 @@ export function resolveShot(input: ShotInput): ShotResult {
         landing = onGreen;
         carry = Math.hypot(onGreen[0] - from[0], onGreen[1] - from[1]);
       } else {
-        // Fairway save: recentre the angle onto the bearing line, same carry.
+        // Fairway save: bring the ball home to the SHORT GRASS. When the caller supplies a fairway-spine
+        // snap (GS-caddy-snapback), drop it on the nearest fairway point to the would-be miss — so however
+        // far offline the miss went (even a deliberate aim way off the fairway, whose bearing points into
+        // space), it comes back onto the fairway, not merely a de-spread version of the errant aim line.
+        // Falls back to recentring the angle onto the bearing for a hole-less unit call. The single
+        // sampleGreenAngle draw is consumed EITHER way so the guard's rng draw count is stable.
         sprayAngle = sampleGreenAngle(angleSd, rng);
         thetaRand = (input.angleBias ?? 0) + sprayAngle;
-        landing = landAt(thetaRand);
+        const recentred = landAt(thetaRand);
+        const snapped = input.fairwaySnap ? input.fairwaySnap(origLanding) : null;
+        landing = snapped ?? recentred;
+        carry = Math.hypot(landing[0] - from[0], landing[1] - from[1]);
       }
       redirect = {
         kind: input.guard.kind,

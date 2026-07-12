@@ -990,6 +990,26 @@ function fairwaySideOf(centreline: Vec[], p: Vec): 'left' | 'right' {
   return lateral < 0 ? 'left' : 'right';
 }
 
+/** The point on the fairway SPINE (centreline) nearest `p` that actually sits on short grass (fairway or
+ *  green) — the home a caddy-guard fairway save snaps a miss back to (GS-caddy-snapback). Skips centreline
+ *  stations that fall in a rough gap / off a broken corridor, so the ball always lands on true fairway.
+ *  null if the whole centreline is off the short grass (never in practice). Pure, zero rng. */
+function nearestFairwayPoint(hole: Hole, p: Vec): Vec | null {
+  let best: Vec | null = null;
+  let bestD = Infinity;
+  for (let i = 0; i <= 200; i++) {
+    const q = pointAlong(hole.centreline, i / 200);
+    const k = lieAt(hole, q);
+    if (k !== 'fairway' && k !== 'green') continue;
+    const d = dist(q, p);
+    if (d < bestD) {
+      bestD = d;
+      best = q;
+    }
+  }
+  return best;
+}
+
 /**
  * Resolve ONE full shot — wind-compensated aim, flight, bounce/roll-out, penalty, and
  * hole-out — given an explicit `target` and `club`. Shared by the AI (playHole) and the
@@ -1065,6 +1085,9 @@ export function executeShot(
     // shot bearing, so the guard covers its true world side (fixes ducks firing on right-of-fairway misses
     // aimed across from the rough). Built only with a guard, so a guard-less shot is byte-for-byte unchanged.
     fairwaySide: opts.guard ? (p: Vec) => fairwaySideOf(hole.centreline, p) : undefined,
+    // Caddy-guard fairway-spine snap (GS-caddy-snapback): bring a saved miss all the way home to the
+    // fairway, however far offline it went. Built only with a guard → a guard-less shot is byte-for-byte.
+    fairwaySnap: opts.guard ? (p: Vec) => nearestFairwayPoint(hole, p) : undefined,
     greenAim,
     lieRelief: opts.lieRelief,
     lefty: opts.lefty,

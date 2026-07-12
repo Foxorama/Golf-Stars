@@ -701,7 +701,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // The derelict world's collidable metal corridor walls, drawn from the SAME `hole.walls` the sim
   // bounces off (the graphic IS the physics). Course space (projected), over the deck, under the
   // flag/motes. Pure geometry; off under Rainbow Road.
-  if (!rainbow && hole.walls) prims.push(...styleShipWalls(hole.walls, proj));
+  if (!rainbow && hole.walls) prims.push(...styleShipWalls(hole.walls, proj, lostHole));
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------
   const motes = Math.round(4 * art.accents);

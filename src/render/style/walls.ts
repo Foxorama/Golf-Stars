@@ -25,11 +25,19 @@ const WALL = {
  * corridor in — impassable in the sim (`sim/walls.ts`), so they're drawn with real presence: an inward
  * cast SHADOW on the deck (the corridor reads sunk between walls), a thick dark steel BODY, a bright
  * cold-steel lit CAP along the top, periodic structural BUTTRESS ribs, and rivets. Returns [] if none.
+ *
+ * `bold` (GS-ship-wall-bounce): on a LOST hole the wall IS the true play boundary — the ball bounces off
+ * it and the ~14-yd of jagged hull deck DRAWN beyond it is dead space you can never land on (`lieAt`
+ * reads it `shiprough` = lost). So there the bulkhead is drawn UNMISTAKABLE — a taller lit crest tracing
+ * the exact bounce line, plus an OUTWARD cast shadow that sinks the dead-hull margin behind it, so the
+ * eye reads "the walled walkway ends HERE" and stops treating the outer torn-hull silhouette as the
+ * boundary. On a CALM hole (off-corridor is fair rough, the wall doesn't bounce) the subtle interior
+ * partition look is kept, so nothing there is misrepresented as impassable.
  */
-export function styleShipWalls(walls: readonly ShipWall[] | undefined, proj: Projector): Prim[] {
+export function styleShipWalls(walls: readonly ShipWall[] | undefined, proj: Projector, bold = false): Prim[] {
   if (!walls || !walls.length) return [];
   const out: Prim[] = [];
-  const thick = Math.max(3.4, Math.min(13, 1.9 * proj.scale));
+  const thick = Math.max(bold ? 4.4 : 3.4, Math.min(bold ? 16 : 13, (bold ? 2.5 : 1.9) * proj.scale));
   for (const w of walls) {
     const a = proj.project(w.a);
     const b = proj.project(w.b);
@@ -41,19 +49,31 @@ export function styleShipWalls(walls: readonly ShipWall[] | undefined, proj: Pro
     inx /= il;
     iny /= il;
     const off = (d: number): [Vec, Vec] => [[a[0] + inx * d, a[1] + iny * d], [b[0] + inx * d, b[1] + iny * d]];
+    // 0) BOLD only: an OUTWARD cast shadow onto the dead-hull margin beyond the wall, so the drawn deck
+    //    out there recedes ("behind / below the walled walkway") instead of reading as more landable deck.
+    //    Two fading bands approximate a soft drop-shadow away from the corridor. Zero rng, camera-proof.
+    if (bold) {
+      const outward = (d: number): [Vec, Vec] => off(-d);
+      const [f1, f2] = outward(thick * 2.6);
+      out.push({ t: 'line', a: f1, b: f2, stroke: 'rgba(2,4,8,0.5)', sw: thick * 3.6, round: true });
+      const [f3, f4] = outward(thick * 1.05);
+      out.push({ t: 'line', a: f3, b: f4, stroke: 'rgba(3,6,11,0.66)', sw: thick * 2, round: true });
+    }
     // 1) A soft shadow thrown INWARD onto the deck, so the corridor reads as a channel sunk between
     //    towering bulkheads rather than a flat strip with an edge line.
     const [s1, s2] = off(thick * 1.5);
-    out.push({ t: 'line', a: s1, b: s2, stroke: WALL.deckShadow, sw: thick * 2.2, round: true });
+    out.push({ t: 'line', a: s1, b: s2, stroke: bold ? 'rgba(2,4,8,0.5)' : WALL.deckShadow, sw: thick * (bold ? 2.6 : 2.2), round: true });
     // 2) The bulkhead body: near-black outer edge (against space) → dark steel → lit steel face.
-    out.push({ t: 'line', a, b, stroke: WALL.outer, sw: thick + 2.5, round: true });
+    out.push({ t: 'line', a, b, stroke: WALL.outer, sw: thick + (bold ? 4.5 : 2.5), round: true });
     const [b1, b2] = off(thick * 0.2);
     out.push({ t: 'line', a: b1, b: b2, stroke: WALL.base, sw: thick + 0.5, round: true });
     const [m1, m2] = off(thick * 0.42);
     out.push({ t: 'line', a: m1, b: m2, stroke: WALL.mid, sw: thick * 0.8, round: true });
-    // 3) The lit CAP along the top inner rim — the crest of the wall catching the cold starlight.
+    // 3) The lit CAP along the top inner rim — the crest of the wall catching the cold starlight. Bold
+    //    thickens + brightens it so this crest, not the outer torn-hull rim, reads as the boundary line.
     const [c1, c2] = off(thick * 0.72);
-    out.push({ t: 'line', a: c1, b: c2, stroke: WALL.top, sw: Math.max(1.1, thick * 0.3), round: true });
+    out.push({ t: 'line', a: c1, b: c2, stroke: WALL.top, sw: Math.max(1.1, thick * (bold ? 0.46 : 0.3)), round: true });
+    if (bold) out.push({ t: 'line', a: c1, b: c2, stroke: 'rgba(224,240,250,0.9)', sw: Math.max(0.8, thick * 0.16), round: true });
     // 4) Structural BUTTRESS ribs + rivets — spaced by COURSE length (camera-proof prim count).
     const segLen = dist(w.a, w.b);
     const ribs = Math.min(7, Math.max(1, Math.round(segLen / 8)));
