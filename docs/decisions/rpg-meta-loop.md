@@ -361,6 +361,35 @@
       save/rng impact. `fuelGaugeHTML`'s vertical variant keeps the row contract (fuel tests green).
       Verified eyes-on (`scripts/travel-preview.mjs` default + `?select` card + `?exit` + `?depot`); full
       suite (1119) + typecheck green.
+    - **Later HUD tweaks (2026-07-12, GS-journey-map-hud-tweaks, `starmap.ts`/`index.html`/`travelScreens.ts`).**
+      Two eyes-on fixes on the framed map:
+      (1) **Star DEPTH.** The void read SPARSE — one flat scatter of ~14 identical SVG twinkles over a
+      single-speed CSS star tile. Now the sky is layered: the SVG twinkles spread across THREE depth planes
+      (a faint far dust in cool `#bcc8ea`, a mid field, a handful of bright NEAR `#f2f5ff` stars each wearing
+      a soft breathing halo), count nudged 14→20 (depth, not density, does the work — kept restrained so it
+      never overpowers); and the `.gs-journey` CSS background gains a SECOND parallax star layer — a dimmer
+      130px tile that drifts LESS per cycle than the 180px near tile (same 54s), so it moves slower in px/sec
+      = a genuinely deeper plane. Nebulae stay pinned. Still fully seeded/deterministic (the twinkle stream
+      is `journeyMapHTML`'s own local `rnd`, no sim/save/rng-stream impact).
+      (2) **Console → a SHORT premium COMMAND BAR (the settled design).** The scanner + fuel read as widgets
+      tacked onto a dashboard BACKGROUND. This went through THREE rejected takes before landing, worth recording
+      so nobody re-treads them: (a) a floating vertical fuel PILLAR + a poking scanner keystone — still read as
+      instruments sitting ON TOP of the dash; (b) a flat one-ROW console with a HORIZONTAL fuel crammed into a
+      fixed grid slot — no room to GROW on a capacity upgrade (shrinks illegibly), plus separate dark "moulded
+      housing" boxes that still read as boxes ON the bar; (c) a 128px `clip-path` SCULPTED panel with three
+      humps the controls embed into — genuinely cohesive AND variant-agnostic (the livery `background` fills the
+      shape), BUT it was TALL because the vertical fuel forced the height, and it covered too much MAP. The
+      LESSON: the vertical fuel gauge was the thing forcing height; drop it and the whole problem dissolves. The
+      LANDING: a SHORT (~60px) ship-tinted GLASS command bar that keeps the map the hero — a drop shadow floats
+      it off the chart; it seats three instruments as one cluster with a clear hierarchy (two dark RECESSED
+      readouts — EXIT left, FUEL right — flanking one glowing raised COMMAND dial, SCAN, the focal centre). The
+      fuel returns to a COMPACT HORIZONTAL `fuelGaugeHTML({icon})` readout (⛽ · cells · big count) recessed like
+      an instrument screen — it grows along its WIDTH now, and the count is authoritative. Cohesion comes from
+      the shared glass frame + consistent control language + the deliberate readout/command hierarchy, not from
+      a sculpt. Variant `.gs-bhud__console::before` top-lip accents (wagon chrome lip, racer stripe) work again
+      on the flat bar. Map bottom-pad + feather-mask returned to the short-bar clearance (~82px). Verified via
+      `scripts/travel-preview.mjs QS="?ship=…"` (wagon / infinity) at 400 + 360 px; `npm run check` green. Pure
+      app/render + CSS — no reducer/save/rng/`_gs*`/URL hook.
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a

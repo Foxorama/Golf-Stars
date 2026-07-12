@@ -353,16 +353,21 @@ export function travelScreen(): string {
   const exitLbl = chrome?.exitLabel ?? 'EXIT';
 
   // ---- the bridge HUD: a command-console FRAME around the star map (GS-journey-hud). Corner brackets
-  // wrap the chart; a bottom console bezel houses the EXIT door (left) + the SCANNER (centre command
-  // dial); the full FUEL gauge climbs a right-edge pillar that meets the console at the corner. All
-  // absolutely anchored to the map viewport so the frame stays put while the chart pans inside it. -----
+  // wrap the chart; the bottom is a SHORT, premium command BAR (GS-journey-map-hud-tweaks) — one cohesive
+  // ship-tinted glass strip that keeps the map the hero (no tall dashboard eating the chart). It seats
+  // three instruments as one cluster: the 🚪 EXIT switch (left), the glowing 📡 SCAN command dial (centre
+  // focal point), and the ⛽ FUEL lit readout (right). Anchored to the map viewport so the frame stays put
+  // while the chart pans inside it. -----
   const scanCost = scanFuelCost(r);
   const scanner = canScanRoutes(r)
     ? `<button class="gs-travel__scan" data-action='${JSON.stringify({ type: 'scanRoutes' })}' title="Scan for closer worlds (−${scanCost} ⛽)" aria-label="Scan for new routes, costs ${scanCost} fuel"><span class="gs-travel__scan-ico">${scanIco}</span><span class="gs-travel__scan-lbl">${scanLbl}</span><span class="gs-travel__scan-cost">−${scanCost}⛽</span></button>`
     : `<button class="gs-travel__scan gs-travel__scan--off" disabled title="Not enough fuel to scan" aria-label="Scanner offline — needs ${scanCost + 1} fuel"><span class="gs-travel__scan-ico">${scanIco}</span><span class="gs-travel__scan-lbl">${scanLbl}</span><span class="gs-travel__scan-cost">${scanCost + 1}⛽</span></button>`;
 
-  // The fuel pillar doubles as the depot button (tap → buy fuel).
-  const fuelRail = `<button class="gs-travel__fuel" data-depot="toggle" title="Fuel — tap to top up" aria-label="Fuel gauge — tap to open the fuel depot">${fuelGaugeHTML(r.fuel, tankCapacity(r), { vertical: true, icon: chrome?.fuelIcon })}</button>`;
+  // The fuel gauge is the RIGHT readout of the command bar (GS-journey-map-hud-tweaks) — a compact
+  // horizontal lit gauge (⛽ · segment cells · big count) recessed into the bar like an instrument screen,
+  // so the whole console stays SHORT (the map is the hero) yet the readout grows along its width as tank
+  // capacity upgrades. It doubles as the depot button (tap → buy fuel).
+  const fuelRail = `<button class="gs-travel__fuel" data-depot="toggle" title="Fuel — tap to top up" aria-label="Fuel gauge — tap to open the fuel depot">${fuelGaugeHTML(r.fuel, tankCapacity(r), { icon: chrome?.fuelIcon })}</button>`;
 
   // The exit: bank now and return to port. Offered once underway (there are shards to bank) OR when
   // stranded (the only way out). A tap opens the confirm sheet rather than ending the run on one touch.
@@ -388,8 +393,8 @@ export function travelScreen(): string {
       <div class="gs-bhud__console">
         <div class="gs-bhud__slot gs-bhud__slot--exit">${exit}</div>
         <div class="gs-bhud__slot gs-bhud__slot--scan">${scanner}</div>
+        <div class="gs-bhud__slot gs-bhud__slot--fuel">${fuelRail}</div>
       </div>
-      <div class="gs-bhud__fueldock">${fuelRail}</div>
     </div>`;
 
   // ---- the bottom-half overlays (mutually exclusive, priority: exit-confirm > depot > world card) ----
