@@ -280,12 +280,14 @@ function dispatch(action: Action): void {
       marketView.showOwned = false;
     }
     // Entering the stop intro (from character-select, resume, or a route jump) opens on the ARC step
-    // with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop. The
-    // Unending Universe past its first tee skips straight to the HOLE step (GS-intro-endless): the
-    // arc briefing repeats the round summary the result screen just showed, so every route jump threw
-    // up the same card twice; it stays one "‹ Briefing" tap away on the hole step.
+    // with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop. Past the
+    // first tee EVERY format now skips straight to the HOLE step (map + Tee Off), so a route jump lands
+    // one tap from teeing off instead of on a briefing/leaderboard the player just saw (GS-intro-endless
+    // for the Unending Universe; GS-intro-voyage extends the same skip to the Voyage). Stop 0 keeps the
+    // arc step — coming from character select it IS the mode lobby ("Change golfer"). The briefing stays
+    // one "‹ Briefing" tap away on the hole step.
     if (state.screen === 'intro' && prevScreen !== 'intro') {
-      introView.stage = holeGateArmed(state.run) && state.run.stopIndex > 0 ? 'hole' : 'arc';
+      introView.stage = state.run.stopIndex > 0 ? 'hole' : 'arc';
       introView.traitsOpen = false;
     }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).

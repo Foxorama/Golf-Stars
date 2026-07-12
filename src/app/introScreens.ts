@@ -307,9 +307,10 @@ function holeIntroScreen(): string {
         }
         ${btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })}
         ${
-          // In the Unending Universe past stop 0 the intro OPENED here (GS-intro-endless) — there is
-          // no "back", but the arc briefing (round so far + last runs) stays one tap away.
-          holeGateArmed(state.run) && state.run.stopIndex > 0
+          // Past stop 0 the intro OPENED here (GS-intro-endless / GS-intro-voyage) for every format —
+          // there is no "back", but the arc briefing (field/leaderboard, round so far) stays one tap
+          // away. Stop 0 came from the arc step, so it keeps a plain "‹ Back".
+          state.run.stopIndex > 0
             ? `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Briefing</button>`
             : `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>`
         }

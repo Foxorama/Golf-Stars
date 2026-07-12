@@ -275,7 +275,22 @@ First-device feedback on GS-settings-nav reshaped the title:
   (win condition, Change golfer, the records board). The briefing isn't deleted — the hole step's
   back button (relabelled "‹ Briefing" under the same condition, since there's no "back" when the
   intro opened here) still opens it on demand, and its "Next Tee ▸" returns. View-state only: no
-  reducer/save/rng change, the Voyage path is untouched (`holeGateArmed` false → `'arc'` as before).
+  reducer/save/rng change.
+
+- **The Voyage skips the arc step too, matching the Unending Universe (GS-intro-voyage, 2026-07).**
+  The GS-intro-endless skip above was gated to `holeGateArmed` (the Unending Universe only), so the
+  Voyage still read as: result recap → pro shop → journey map → pick a world → arc briefing/leaderboard
+  → Next Tee → hole step — the same one-tap-too-many the endless loop already shed. The Voyage's arc
+  step is the ghost competitor board (`leaderboardHTML`/`competitorsCard`), a field/standings screen
+  the player has already been looking at across the run, so landing on it after every world pick is the
+  same redundant beat. Fix: drop the `holeGateArmed(run) &&` clause from the intro-entry stage reset —
+  the gate is now simply `run.stopIndex > 0`, so **every** format past its first tee opens straight on
+  the `'hole'` step (map + Tee Off), one tap from teeing off. Stop 0 (from character select) still
+  opens on `'arc'` for both formats. The hole step's "‹ Briefing" back button relabels on the same
+  `run.stopIndex > 0` condition, so the Voyage's competitor board is one tap away exactly like the
+  endless records board. Still view-state only: no reducer/save/rng change, the two `playInteractive`/
+  `play` actions still fire from `'intro'` unchanged, and stop 0's arc-step flow (the build smoke test's
+  First Tee → Tee Off) is byte-identical.
 
 - **The post-stop recap now matches the intro's bar (GS-result, 2026-07).** After the intro got the
   two-step polish, the AFTER-hole `resultScreen()` was the weakest beat in the Voyage loop: a plain
