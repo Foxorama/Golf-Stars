@@ -787,8 +787,11 @@ these systems** — each bullet is the tip of a documented iceberg.
     uncleared tier), ★ "bag complete" when full — so it's obvious which difficulty to play which golfer
     at to unlock clubs. The whole card is the button (its CTA is a footer label). GS-select-layout.
   - The stop intro is TWO mobile steps on one reducer screen (`'intro'` + view state `introStage`);
-    `introShared()` derives world/notes/objective ONCE so the steps never drift. The Unending
-    Universe past stop 0 opens on `'hole'`.
+    `introShared()` derives world/notes/objective ONCE so the steps never drift. Past stop 0 EVERY
+    format opens on the `'hole'` step (map + Tee Off), so a route jump lands one tap from teeing off
+    instead of on a briefing/leaderboard the player just saw (GS-intro-endless for the Unending
+    Universe, GS-intro-voyage for the Voyage); the briefing stays one `‹ Briefing` tap away. Stop 0
+    (from character select) keeps the `'arc'` step — it's the mode lobby with `Change golfer`.
   - The post-stop recap (`resultScreen`) is a pure render off `state` — rarity-framed panel, stat
     tiles, clickable hole-by-hole strip.
   - The title is a hero wordmark + two GAME tiles reusing the doorway component
