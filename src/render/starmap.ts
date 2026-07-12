@@ -507,13 +507,27 @@ export function journeyMapHTML(opts: StarmapOpts): string {
     <text x="${YOU_X}" y="${YOU_Y + 34}" font-size="8.5" fill="#9aa7c2" text-anchor="middle">${esc(opts.currentLabel)} · dist ${opts.distanceFromStart}</text>`;
 
   // ---- the living sky: seeded twinkles + a couple of shooting stars behind everything ---------
-  const twinkles = Array.from({ length: 14 }, () => {
+  // Twinkles are spread across THREE depth planes so the void reads with depth, not one flat scatter: a
+  // faint FAR dust (tiny, dim, cool), a MID field, and a few bright NEAR stars carrying a soft breathing
+  // halo. Kept deliberately restrained — mostly small + dim, only a handful bright — so the sky stays calm
+  // and never busy (the count sits just above the old sparse 14, the depth does the rest of the work).
+  const twinkles = Array.from({ length: 20 }, () => {
     const tx = (rnd() * W).toFixed(1);
     const ty = (18 + rnd() * (H - 36)).toFixed(1);
-    const rr = (0.6 + rnd() * 1.1).toFixed(1);
+    const d = rnd();
+    const near = d > 0.88;
+    const mid = !near && d > 0.52;
+    const rr = near ? (1.5 + rnd() * 0.6).toFixed(1) : mid ? (0.9 + rnd() * 0.4).toFixed(1) : (0.5 + rnd() * 0.3).toFixed(1);
+    const hi = near ? 0.95 : mid ? 0.7 : 0.42;
+    const lo = near ? 0.4 : mid ? 0.24 : 0.14;
+    const col = near ? '#f2f5ff' : mid ? '#dfe7ff' : '#bcc8ea';
     const dur = (2.2 + rnd() * 3).toFixed(1);
     const beg = (rnd() * 3).toFixed(1);
-    return `<circle cx="${tx}" cy="${ty}" r="${rr}" fill="#dfe7ff"><animate attributeName="opacity" values="0.25;0.95;0.25" dur="${dur}s" begin="${beg}s" repeatCount="indefinite"/></circle>`;
+    // A NEAR star wears a soft breathing halo so it reads as the closest plane (depth), not just a bigger dot.
+    const halo = near
+      ? `<circle cx="${tx}" cy="${ty}" r="${(Number(rr) * 2.6).toFixed(1)}" fill="${col}" opacity="0.12"><animate attributeName="opacity" values="0.05;0.18;0.05" dur="${dur}s" begin="${beg}s" repeatCount="indefinite"/></circle>`
+      : '';
+    return `${halo}<circle cx="${tx}" cy="${ty}" r="${rr}" fill="${col}"><animate attributeName="opacity" values="${lo};${hi};${lo}" dur="${dur}s" begin="${beg}s" repeatCount="indefinite"/></circle>`;
   }).join('');
   // Occasional streaks: mostly invisible, flaring across a short diagonal on a long cycle (keyTimes keep
   // them rare so the sky feels calm, then a shooting star catches your eye).

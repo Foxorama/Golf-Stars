@@ -1091,24 +1091,36 @@
         /* A viewport-window frame glow so the chart reads like a cockpit screen looking out on the void. */
         box-shadow: inset 0 0 34px rgba(10,18,40,0.85), inset 0 1px 0 rgba(150,180,255,0.08), 0 6px 24px rgba(0,0,0,0.35);
         background-image:
+          /* NEAR/MID twinkle field (180px tile, brighter, drifts a full tile per cycle). */
           radial-gradient(1.3px 1.3px at 18px 24px, rgba(223,231,255,0.75), transparent),
           radial-gradient(1px 1px at 64px 78px, rgba(223,231,255,0.55), transparent),
           radial-gradient(1px 1px at 112px 36px, rgba(207,223,255,0.6), transparent),
           radial-gradient(1.5px 1.5px at 150px 104px, rgba(223,231,255,0.6), transparent),
           radial-gradient(1px 1px at 40px 132px, rgba(191,230,255,0.5), transparent),
           radial-gradient(1px 1px at 96px 162px, rgba(223,231,255,0.45), transparent),
+          /* FAR parallax dust (130px tile, dimmer + drifts SLOWER in px/sec, so it reads as a deeper
+             plane) — fills the sparse void with distant stars without adding bright foreground noise. */
+          radial-gradient(0.9px 0.9px at 26px 20px, rgba(198,210,248,0.36), transparent),
+          radial-gradient(0.8px 0.8px at 84px 52px, rgba(190,205,245,0.30), transparent),
+          radial-gradient(1px 1px at 58px 96px, rgba(205,215,250,0.34), transparent),
+          radial-gradient(0.8px 0.8px at 112px 108px, rgba(186,202,242,0.28), transparent),
+          radial-gradient(0.9px 0.9px at 14px 74px, rgba(200,212,248,0.32), transparent),
+          radial-gradient(0.8px 0.8px at 100px 12px, rgba(192,206,245,0.30), transparent),
+          /* Pinned nebulae — no drift, so the star planes read as motion against a still deep field. */
           radial-gradient(120% 120% at 50% 8%, rgba(58,95,176,0.32), transparent 55%),
           radial-gradient(90% 70% at 78% 42%, rgba(122,90,196,0.16), transparent 60%),
           radial-gradient(120% 90% at 50% 100%, rgba(63,120,90,0.22), transparent 60%);
-        background-size: 180px 180px, 180px 180px, 180px 180px, 180px 180px, 180px 180px, 180px 180px, 100% 100%, 100% 100%, 100% 100%;
-        background-repeat: repeat, repeat, repeat, repeat, repeat, repeat, no-repeat, no-repeat, no-repeat;
-        /* A slow, seamless downward star-drift (each star tile is 180px, so a 180px shift loops with no
-           jump) — the nebulae stay pinned, so it reads as gently flying through the field, not sliding. */
+        background-size: 180px 180px, 180px 180px, 180px 180px, 180px 180px, 180px 180px, 180px 180px, 130px 130px, 130px 130px, 130px 130px, 130px 130px, 130px 130px, 130px 130px, 100% 100%, 100% 100%, 100% 100%;
+        background-repeat: repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, no-repeat, no-repeat, no-repeat;
+        /* A slow, seamless downward star-drift — each tile shifts exactly one tile-height per cycle so it
+           loops with no jump. The FAR tile (130px) shifts less than the NEAR tile (180px) in the same time,
+           so it moves slower = parallax depth; the nebulae stay pinned, so it reads as gently flying
+           through a layered field, not one flat sheet sliding. */
         animation: gs-sky-drift 54s linear infinite;
       }
       @keyframes gs-sky-drift {
-        from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 50% 8%, 78% 42%, 50% 100%; }
-        to   { background-position: 0 180px, 0 180px, 0 180px, 0 180px, 0 180px, 0 180px, 50% 8%, 78% 42%, 50% 100%; }
+        from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 50% 8%, 78% 42%, 50% 100%; }
+        to   { background-position: 0 180px, 0 180px, 0 180px, 0 180px, 0 180px, 0 180px, 0 130px, 0 130px, 0 130px, 0 130px, 0 130px, 0 130px, 50% 8%, 78% 42%, 50% 100%; }
       }
       @media (prefers-reduced-motion: reduce) { .gs-journey { animation: none; } }
       /* Vertical chart: cap the height and scroll inside when the trail grows past it (starts scrolled to
@@ -1156,9 +1168,9 @@
          a short first stop fits with no scroll, a long voyage pans internally. */
       .gs-travel .gs-journey { flex: 1 1 auto; min-height: 0; border-radius: 12px; }
       /* Inset the SCROLLABLE map so its content clears the sticky bridge chrome that floats OVER it: a
-         top pad past the id/stat pod row (top ~44+32), a bottom pad past the console + fuel pillar
-         (bottom ~64 + the scanner's 14px overhang). Without it a long voyage scrolled to the top slid the
-         route worlds UP under the pods, and Earth at the bottom poked past the console outside the frame. */
+         top pad past the id/stat pod row (top ~44+32), a bottom pad past the console row (bottom ~66 + the
+         scanner's ~8px keystone overhang). Without it a long voyage scrolled to the top slid the route
+         worlds UP under the pods, and Earth at the bottom poked past the console outside the frame. */
       .gs-travel .gs-journey--v {
         flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; padding: 66px 6px 90px;
         /* Feather the map (+ its starfield, both live on this element) into the sticky chrome at top and
@@ -1174,8 +1186,8 @@
              Its base class is `.gs-bhud` — NOT `.gs-hud`: the play screen already owns `.gs-hud`, and an
              earlier `.gs-hud` here (with `inset:0`) stretched the play HUD's `.gs-glass` chrome over the
              whole map into a full-screen blur (GS-hud-class-collision). Keep bridge classes namespaced
-             `gs-bhud*` so they can never bleed onto the play screen. Glowing corner brackets + an L-shaped
-             console (bottom bezel + right fuel pillar) house the three controls. Absolutely anchored to the
+             `gs-bhud*` so they can never bleed onto the play screen. Glowing corner brackets + a single
+             bottom console row seat the three controls (exit · scanner · fuel). Absolutely anchored to the
              viewport (NOT the scrolling chart) so the frame stays put while the map pans. The whole frame
              recolours to the flown ship via the `--hud-*` custom properties (`render/hudTheme.ts`) —
              accent, accent2, glow, ink; a per-fleet livery is a table row, and a `.gs-bhud--<variant>`
@@ -1258,11 +1270,12 @@
       .gs-bhud__cog:active { transform: scale(0.94); }
       .gs-bhud__cog:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
 
-      /* Bottom console bezel — the dashboard the controls are mounted on. Full width; the exit docks
-         left, the scanner command-dial sits dead-centre; the fuel pillar rises from its right end. */
+      /* Bottom console bezel — the ONE dashboard row all three controls are seated in (GS-journey-map-hud-
+         consolidate). Full width; the exit docks left, the scanner command-dial sits dead-centre, the fuel
+         gauge is the right instrument — so nothing floats over the dash, it's all one console. */
       .gs-bhud__console {
-        position: absolute; left: 10px; right: 10px; bottom: 10px; height: 54px;
-        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 8px;
+        position: absolute; left: 10px; right: 10px; bottom: 10px; height: 56px;
+        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 10px; gap: 6px;
         pointer-events: auto; border-radius: 13px;
         border: 1px solid color-mix(in srgb, var(--hud-accent) 34%, var(--gs-line));
         background: linear-gradient(180deg, rgba(13,18,27,0.82), rgba(8,11,17,0.93));
@@ -1272,15 +1285,10 @@
           inset 0 0 18px color-mix(in srgb, var(--hud-glow) 40%, transparent),
           0 -6px 22px rgba(0,0,0,0.42);
       }
-      .gs-bhud__slot { display: flex; align-items: center; }
+      .gs-bhud__slot { display: flex; align-items: center; min-width: 0; }
       .gs-bhud__slot--exit { justify-self: start; }
       .gs-bhud__slot--scan { justify-self: center; }
-
-      /* The right FUEL pillar — the tank gauge climbing out of the console's right corner. Shares the
-         bezel look so it reads as one continuous L-console; overlaps the console's right end. */
-      .gs-bhud__fueldock {
-        position: absolute; right: 12px; bottom: 12px; pointer-events: auto; z-index: 1;
-      }
+      .gs-bhud__slot--fuel { justify-self: end; }
 
       /* Shared button chrome for the three console controls. */
       .gs-travel__scan, .gs-travel__exit, .gs-travel__fuel {
@@ -1288,13 +1296,17 @@
         cursor: pointer; transition: transform .08s ease, border-color .16s ease, filter .16s ease, box-shadow .16s ease;
       }
       .gs-travel__scan:active, .gs-travel__exit:active, .gs-travel__fuel:active { transform: scale(0.94); }
-      /* Scanner — the CENTRE command dial: a raised, glowing round-rect keystone of the console. */
+      /* Scanner — the CENTRE command dial: a glowing round-rect keystone SEATED in the console (a gentle
+         raise, not a tower poking above the dash). A soft socket ring ties it to the bezel it sits in. */
       .gs-travel__scan {
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0px;
-        width: 62px; height: 62px; margin-top: -14px; border-radius: 16px; line-height: 1;
+        width: 58px; height: 58px; margin-top: -8px; border-radius: 16px; line-height: 1;
         border: 1.5px solid color-mix(in srgb, var(--hud-accent) 62%, transparent);
         background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--hud-accent) 20%, #0c1220), #080b12);
-        box-shadow: 0 0 16px -4px var(--hud-accent), inset 0 0 12px color-mix(in srgb, var(--hud-glow) 60%, transparent);
+        box-shadow:
+          0 0 16px -4px var(--hud-accent),
+          inset 0 0 12px color-mix(in srgb, var(--hud-glow) 60%, transparent),
+          0 0 0 4px color-mix(in srgb, var(--hud-accent) 12%, transparent);
       }
       .gs-travel__scan:hover { filter: brightness(1.12); box-shadow: 0 0 22px -3px var(--hud-accent), inset 0 0 14px color-mix(in srgb, var(--hud-glow) 70%, transparent); }
       .gs-travel__scan-ico { font-size: 22px; }
@@ -1311,14 +1323,22 @@
       .gs-travel__exit:hover { border-color: #ff6b4a; filter: brightness(1.1); }
       .gs-travel__exit-ico { font-size: 20px; }
       .gs-travel__exit-lbl { font-size: 8px; font-weight: 800; letter-spacing: .8px; color: #ff8b6b; margin-top: 1px; }
-      /* Fuel gauge button — the pillar tank readout (count on top, ⛽ at foot). */
+      /* Fuel gauge — the RIGHT dashboard instrument, a horizontal tank readout (⛽ · cells · count) SEATED
+         in the console bezel (a recessed socket, NOT a second raised pillar box), so it reads as part of
+         the dash beside the exit + scanner. The cells keep their own drain colour (cyan→amber→red); the
+         socket takes the ship's `--hud-accent` so the housing ties it to the console. */
       .gs-travel__fuel {
-        display: flex; align-items: center; justify-content: center; padding: 7px 6px; border-radius: 12px;
-        border: 1px solid color-mix(in srgb, var(--hud-accent) 34%, var(--gs-line));
-        background: linear-gradient(180deg, rgba(13,18,27,0.82), rgba(8,11,17,0.93)); backdrop-filter: blur(7px);
-        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 22%, transparent), 0 3px 14px rgba(0,0,0,0.4);
+        display: flex; align-items: center; justify-content: center; gap: 4px;
+        max-width: 100%; overflow: hidden; padding: 5px 7px; border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 26%, transparent);
+        background: color-mix(in srgb, var(--hud-accent) 7%, rgba(6,9,14,0.55));
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.25);
       }
-      .gs-travel__fuel:hover { border-color: color-mix(in srgb, var(--hud-accent) 60%, transparent); filter: brightness(1.1); }
+      .gs-travel__fuel:hover { border-color: color-mix(in srgb, var(--hud-accent) 55%, transparent); filter: brightness(1.1); }
+      /* Keep the seated gauge compact so a big tank still fits the row on a narrow phone. */
+      .gs-travel__fuel .gs-fuelbar { gap: 4px; }
+      .gs-travel__fuel .gs-fuelbar__cells { gap: 1.5px; padding: 2px 2.5px; }
+      .gs-travel__fuel .gs-fuelbar__cell { width: 5px; height: 11px; }
 
       /* ══ Bespoke fleet bridges (GS-fleet-bridges) ══════════════════════════════════════════════════
              Every ship's journey HUD is its own command deck, not a tinted default. The SHARED base below

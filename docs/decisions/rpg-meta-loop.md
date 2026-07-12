@@ -361,6 +361,25 @@
       save/rng impact. `fuelGaugeHTML`'s vertical variant keeps the row contract (fuel tests green).
       Verified eyes-on (`scripts/travel-preview.mjs` default + `?select` card + `?exit` + `?depot`); full
       suite (1119) + typecheck green.
+    - **Later HUD tweaks (2026-07-12, GS-journey-map-hud-tweaks, `starmap.ts`/`index.html`/`travelScreens.ts`).**
+      Two eyes-on fixes on the framed map:
+      (1) **Star DEPTH.** The void read SPARSE — one flat scatter of ~14 identical SVG twinkles over a
+      single-speed CSS star tile. Now the sky is layered: the SVG twinkles spread across THREE depth planes
+      (a faint far dust in cool `#bcc8ea`, a mid field, a handful of bright NEAR `#f2f5ff` stars each wearing
+      a soft breathing halo), count nudged 14→20 (depth, not density, does the work — kept restrained so it
+      never overpowers); and the `.gs-journey` CSS background gains a SECOND parallax star layer — a dimmer
+      130px tile that drifts LESS per cycle than the 180px near tile (same 54s), so it moves slower in px/sec
+      = a genuinely deeper plane. Nebulae stay pinned. Still fully seeded/deterministic (the twinkle stream
+      is `journeyMapHTML`'s own local `rnd`, no sim/save/rng-stream impact).
+      (2) **Console INTEGRATION.** The scanner + fuel "sat ON the dashboard, not part of it": the ⛽ gauge was
+      a TALL vertical `fuelGaugeHTML({vertical})` PILLAR floating up the right edge (`.gs-bhud__fueldock`,
+      absolute, 145px tall over a 54px bezel), and the 📡 scanner keystone poked 14px above the bezel. Fixed
+      by making the console ONE seated dashboard ROW: the fuel is now the RIGHT grid slot (`.gs-bhud__slot--fuel`,
+      `justify-self:end`) as a HORIZONTAL gauge recessed into a subtle `--hud-accent` socket (compact cells so
+      a big tank still fits a 360px phone; cells keep their semantic drain colour), the scanner drops to a
+      gentle `-8px` seated raise + a soft socket ring, and the separate `.gs-bhud__fueldock` is gone. All
+      variants (wagon / standard / infinity) verified via `scripts/travel-preview.mjs QS="?ship=…"` at 400 +
+      360 px; `npm run check` green. Pure app/render + CSS — no reducer/save/rng/`_gs*`/URL hook.
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a
