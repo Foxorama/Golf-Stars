@@ -1294,10 +1294,53 @@
         content: ''; position: absolute; left: 16px; right: 16px; top: 0; height: 1.5px; border-radius: 2px; pointer-events: none;
         background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--hud-accent) 75%, transparent), transparent); opacity: .85;
       }
-      .gs-bhud__slot { display: flex; align-items: center; min-width: 0; }
+      /* The three functional controls sit in a stacking context ABOVE the decorative deck (below). */
+      .gs-bhud__slot { display: flex; align-items: center; min-width: 0; position: relative; z-index: 1; }
       .gs-bhud__slot--exit { justify-self: start; }
       .gs-bhud__slot--scan { justify-self: center; }
       .gs-bhud__slot--fuel { justify-self: end; }
+
+      /* ── The console DECK (GS-fleet-dashboards): a bespoke instrument cluster dropped into the console's
+             LEFT gap — the reliably-clear ~90px between the exit switch and the centre command dial (the
+             fuel readout owns the right gap, growing with tank capacity). This is what makes each dashboard
+             read as its OWN cockpit: a steering wheel + speed dial for the wagon, a redline tach + toggles
+             for the racer, an oscilloscope for the neon bike, rune stones for the Valkyrie, … Injected by
+             `render/hudChrome.ts` ONLY for a ship with a builder (the standard console gets none → byte-
+             identical). Absolutely anchored between exit and dial, painted BELOW the controls (z-index 0),
+             `pointer-events:none` so map taps + buttons are untouched, and it clips if the gap is tight. ── */
+      /* `left:58px` clears the 46px exit switch (10px pad → its right edge sits at ~56px); `right` stops
+         short of the centre command dial. The exit is CONDITIONAL (hidden on a fresh run's first travel
+         screen — `stopIndex 0` with lanes still open), so when it's absent the console gets `--noexit` and
+         the deck slides left into the freed space instead of leaving a dead strip. */
+      .gs-bhud__deck {
+        position: absolute; z-index: 0; top: 6px; bottom: 6px; left: 58px; right: calc(50% + 40px);
+        display: flex; align-items: center; justify-content: center; gap: 9px;
+        pointer-events: none; overflow: hidden; opacity: .92;
+        -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+        mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+      }
+      .gs-bhud__console--noexit .gs-bhud__deck { left: 14px; }
+      .gs-bdeck { display: block; flex: 0 0 auto; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--hud-glow) 60%, transparent)); }
+      .gs-bdeck--wheel   { width: 40px; height: 40px; }
+      .gs-bdeck--gauge   { width: 30px; height: 30px; }
+      .gs-bdeck--switches{ width: 34px; height: 28px; }
+      .gs-bdeck--leds    { width: 30px; height: 12px; }
+      .gs-bdeck--faders  { width: 26px; height: 30px; }
+      .gs-bdeck--knob    { width: 30px; height: 30px; }
+      .gs-bdeck--wave    { width: 52px; height: 26px; }
+      .gs-bdeck--runes   { width: 42px; height: 26px; }
+      /* Instrument MOTION — each device animates the way its real-world twin would. Reduced-motion freezes
+         them all (added to the shared media query below). */
+      .gs-bdeck__rock { transform-box: view-box; transform-origin: 20px 20px; animation: gs-wheel-rock 5s ease-in-out infinite; }
+      @keyframes gs-wheel-rock { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+      .gs-bdeck__knob { transform-box: view-box; transform-origin: 14px 14px; animation: gs-spin-slow 6s linear infinite; }
+      .gs-bdeck__wave { stroke-dasharray: 4 3; animation: gs-wave-drift 1.1s linear infinite; }
+      @keyframes gs-wave-drift { to { stroke-dashoffset: -14; } }
+      .gs-bdeck__leds circle { animation: gs-blink 1.3s steps(1,end) infinite; }
+      .gs-bdeck__leds circle:nth-child(2) { animation-delay: .3s; }
+      .gs-bdeck__leds circle:nth-child(3) { animation-delay: .6s; }
+      .gs-bdeck__leds circle:nth-child(4) { animation-delay: .9s; }
+      .gs-bdeck__leds circle:nth-child(5) { animation-delay: 1.05s; }
 
       .gs-travel__scan, .gs-travel__exit, .gs-travel__fuel {
         -webkit-tap-highlight-color: transparent; touch-action: manipulation; color: var(--gs-ink);
@@ -1715,6 +1758,7 @@
       @media (prefers-reduced-motion: reduce) {
         .gs-bico__sweep, .gs-bico__orbit, .gs-bico__needle, .gs-bico__ping, .gs-bico__lights circle,
         .gs-bico__sweep2, .gs-bico__spark,
+        .gs-bdeck__rock, .gs-bdeck__knob, .gs-bdeck__wave, .gs-bdeck__leds circle,
         .gs-bhud__node, .gs-bhud__titleplate, .gs-bhud__dice, .gs-bhud__ring, .gs-bhud__ring--saucer,
         .gs-bhud__flames, .gs-bhud__frame::before, .gs-bhud__frame::after,
         .gs-bhud__corner::before, .gs-bhud__corner::after { animation: none; }

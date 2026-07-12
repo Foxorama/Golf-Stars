@@ -378,8 +378,10 @@ export function travelScreen(): string {
 
   // Assemble the frame: decorative corner brackets (aria-hidden) + any livery ornaments (title plate,
   // side rails, corner nodes — GS-infinity-hud) + the L-shaped console (bottom bezel + right fuel
-  // pillar). `pointer-events` is off on the frame + ornaments so map taps pass through; only the console
-  // controls catch touches. The whole thing recolours to the ship via the `--hud-*` custom properties.
+  // pillar). The console also carries the livery's bespoke instrument DECK (GS-fleet-dashboards) — a
+  // steering wheel / gauge / switch cluster dropped into its left gap so each dashboard reads as its own
+  // cockpit. `pointer-events` is off on the frame + ornaments + deck so map taps pass through; only the
+  // console controls catch touches. The whole thing recolours to the ship via the `--hud-*` custom props.
   const hudFrame = `
     <div class="gs-bhud gs-bhud--${hud.variant}" style="${hudThemeVars(hud)}">
       <div class="gs-bhud__frame" aria-hidden="true">
@@ -390,7 +392,8 @@ export function travelScreen(): string {
       </div>
       ${chrome?.frame ?? ''}
       ${bridgeStatusPods()}
-      <div class="gs-bhud__console">
+      <div class="gs-bhud__console${exit ? '' : ' gs-bhud__console--noexit'}">
+        ${chrome?.deck ?? ''}
         <div class="gs-bhud__slot gs-bhud__slot--exit">${exit}</div>
         <div class="gs-bhud__slot gs-bhud__slot--scan">${scanner}</div>
         <div class="gs-bhud__slot gs-bhud__slot--fuel">${fuelRail}</div>
