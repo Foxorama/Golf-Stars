@@ -1301,18 +1301,109 @@
       }
       .gs-travel__fuel:hover { border-color: color-mix(in srgb, var(--hud-accent) 60%, transparent); filter: brightness(1.1); }
 
-      /* ══ The INFINITY ACE bridge (GS-infinity-hud) ═════════════════════════════════════════════════
-             The hole-150 Unending-Universe grail — the hardest ship in the game to unlock — so its journey
-             screen is a FULL bespoke command bridge, not a tinted default: the ONE livery that swaps the
-             console's icons + labels (via `render/hudChrome.ts`) AND reshapes the whole frame. A rotating
-             "living aurora" ring traces the ship's gold→emerald→aquamarine→violet palette around the
-             viewport; a crowned title plate names the ship; aurora side rails + glowing corner nodes give
-             the frame real substance; and the three controls become a sensor-sweep scanner, an airlock
-             EJECT hatch, and a plasma-cell fuel pillar. All decoration layers on the existing markup +
-             the injected ornaments (all `pointer-events:none`, so map taps still pass through — the
-             bridge invariant holds); every animation is disabled under reduced-motion, degrading to a
-             rich STATIC gold-aurora bridge. Aurora hues are local custom props the SVG icons also read. ══ */
+      /* ══ Bespoke fleet bridges (GS-fleet-bridges) ══════════════════════════════════════════════════
+             Every ship's journey HUD is its own command deck, not a tinted default. The SHARED base below
+             (title plate, side rails, corner nodes, wings, themed SVG instruments) is driven by the livery
+             `--hud-*` props; each `.gs-bhud--<variant>` block re-tints/reshapes it into a fitting bridge —
+             a woody road-trip dash, a redline racer cockpit, an industrial freighter, an alien saucer, a
+             neon bike, an Asgardian war-bridge, the Mothership's saucer deck, a golf-ball comet, a flaming
+             chopper, the Infinity Ace's phoenix-aurora canopy. Ornaments are injected by
+             `render/hudChrome.ts` ONLY for a ship with a builder, so an unknown ship (the standard cyan
+             console) shows none of this and stays byte-identical. All decoration is `pointer-events:none`
+             (map taps pass — the CLAUDE.md bridge invariant); every animation is disabled under
+             reduced-motion. ══ */
       @property --gs-aur-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
+      /* Themed SVG instruments sit crisp inside their button spans (emoji fall back to the font size). */
+      .gs-bhud .gs-travel__scan-ico, .gs-bhud .gs-travel__exit-ico { display: flex; align-items: center; justify-content: center; }
+      .gs-bico { display: block; }
+      .gs-bico--scan { width: 30px; height: 30px; }
+      .gs-bico--exit { width: 24px; height: 24px; }
+      .gs-bico--fuel { width: 14px; height: 17px; }
+      /* Shared instrument MOTION — the dial that fits the instrument. Reduced-motion kills them all below. */
+      .gs-bico__sweep { transform-box: view-box; transform-origin: 14px 14px; animation: gs-radar-sweep 2.6s linear infinite; }
+      .gs-bico__orbit { transform-box: view-box; transform-origin: 14px 14px; animation: gs-radar-sweep 3.4s linear infinite; }
+      @keyframes gs-radar-sweep { to { transform: rotate(360deg); } }
+      .gs-bico__needle { transform-box: view-box; transform-origin: 14px 16px; animation: gs-needle-rev 2.8s ease-in-out infinite; }
+      @keyframes gs-needle-rev { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(40deg); } }
+      .gs-bico__ping { transform-box: view-box; transform-origin: 14px 10px; animation: gs-ping 1.9s ease-out infinite; }
+      @keyframes gs-ping { 0% { opacity: 1; transform: scale(.5); } 70%,100% { opacity: .15; transform: scale(1.5); } }
+      .gs-bico__lights circle { animation: gs-blink 1.3s steps(1,end) infinite; }
+      .gs-bico__lights circle:nth-child(2) { animation-delay: .26s; }
+      .gs-bico__lights circle:nth-child(3) { animation-delay: .52s; }
+      .gs-bico__lights circle:nth-child(4) { animation-delay: .78s; }
+      .gs-bico__lights circle:nth-child(5) { animation-delay: 1.04s; }
+      @keyframes gs-blink { 0%,49% { opacity: 1; } 50%,100% { opacity: .25; } }
+      .gs-bico__sweep2 { animation: gs-tailflick 1.6s ease-in-out infinite; }
+      @keyframes gs-tailflick { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+      .gs-bico__spark { animation: gs-spark-flick 1.8s ease-in-out infinite; }
+      @keyframes gs-spark-flick { 0%,100% { opacity: 1; } 45% { opacity: .5; } 70% { opacity: .9; } }
+      @keyframes gs-spin-slow { to { transform: rotate(360deg); } }
+
+      /* Hanging title plate — NAMES the bridge after the actual ship (render/hudChrome.ts). */
+      .gs-bhud__titleplate {
+        position: absolute; top: 2px; left: 50%; transform: translateX(-50%); z-index: 3;
+        display: flex; align-items: center; gap: 7px; pointer-events: none; max-width: 80%;
+        padding: 3px 12px 4px; border-radius: 0 0 11px 11px;
+        background: linear-gradient(180deg, rgba(14,18,27,0.95), rgba(9,12,18,0.62));
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 42%, transparent); border-top: none;
+        box-shadow: 0 4px 15px -6px var(--hud-accent), inset 0 -1px 0 color-mix(in srgb, var(--hud-accent) 26%, transparent);
+      }
+      .gs-bhud__titletext {
+        font-size: 10.5px; font-weight: 900; letter-spacing: 1.6px; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis; color: var(--hud-ink);
+        text-shadow: 0 0 8px color-mix(in srgb, var(--hud-accent) 55%, transparent);
+      }
+      .gs-bhud__titleglyph {
+        font-size: 11px; line-height: 1; flex: 0 0 auto; color: var(--hud-accent);
+        text-shadow: 0 0 7px color-mix(in srgb, var(--hud-accent) 60%, transparent);
+      }
+      .gs-bhud__titlewing {
+        width: 20px; height: 2px; border-radius: 2px; flex: 0 0 auto;
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--hud-accent2) 80%, transparent), var(--hud-accent));
+        box-shadow: 0 0 5px -1px var(--hud-accent2);
+      }
+      .gs-bhud__titlewing--r { transform: scaleX(-1); }
+
+      /* Instrument side rails — thin ticked scales down the inner edges. */
+      .gs-bhud__rail {
+        position: absolute; top: 58px; bottom: 74px; width: 3px; z-index: 1; pointer-events: none; opacity: .5; border-radius: 3px;
+        background: linear-gradient(180deg, transparent,
+          color-mix(in srgb, var(--hud-accent2) 55%, transparent) 12%,
+          color-mix(in srgb, var(--hud-accent) 46%, transparent) 50%,
+          color-mix(in srgb, var(--hud-accent2) 55%, transparent) 88%, transparent);
+      }
+      .gs-bhud__rail::after {
+        content: ''; position: absolute; left: -2px; right: -2px; top: 0; bottom: 0;
+        background: repeating-linear-gradient(180deg, transparent 0 12px, color-mix(in srgb, var(--hud-accent) 70%, transparent) 12px 13.4px);
+        opacity: .5;
+      }
+      .gs-bhud__rail--l { left: 9px; }
+      .gs-bhud__rail--r { right: 9px; }
+
+      /* Corner nodes — glowing bolt-studs pinning the frame corners. */
+      .gs-bhud__node {
+        position: absolute; width: 6px; height: 6px; border-radius: 50%; z-index: 2; pointer-events: none;
+        background: radial-gradient(circle, #fff, var(--hud-accent) 55%, transparent 76%);
+        box-shadow: 0 0 8px 1px var(--hud-accent);
+      }
+      .gs-bhud__node--tl { top: 5px; left: 5px; }
+      .gs-bhud__node--tr { top: 5px; right: 5px; }
+      .gs-bhud__node--bl { bottom: 5px; left: 5px; }
+      .gs-bhud__node--br { bottom: 5px; right: 5px; }
+
+      /* Swept feather WINGS flanking the nameplate (Infinity Ace gold + Valkyrie bronze). */
+      .gs-bhud__wing {
+        position: absolute; top: 3px; width: 92px; height: 30px; z-index: 1; pointer-events: none; opacity: .5;
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--hud-accent) 58%, transparent));
+        clip-path: polygon(0 50%, 100% 2%, 100% 20%, 26% 50%, 100% 42%, 100% 60%, 44% 60%, 100% 82%, 100% 100%, 0 58%);
+        filter: drop-shadow(0 0 5px color-mix(in srgb, var(--hud-accent) 45%, transparent));
+      }
+      .gs-bhud__wing--l { right: calc(50% + 42px); }
+      .gs-bhud__wing--r { left: calc(50% + 42px); transform: scaleX(-1); }
+
+      /* ══ The INFINITY ACE bridge (GS-infinity-hud) — the hole-150 grail, the reference full reskin: a
+             rotating living-aurora ring, a phoenix-wing CANOPY over the viewscreen, gold everything. ══ */
       .gs-bhud--infinity {
         --aur1: #ffd76b;  /* gold — the phoenix body */
         --aur2: #4fe08a;  /* emerald trim */
@@ -1351,88 +1442,56 @@
           radial-gradient(120% 40% at 50% 100%, color-mix(in srgb, var(--aur2) 12%, transparent), transparent 70%);
       }
 
-      /* ── Frame ornaments (injected by hudChrome.ts): a crowned title plate, side rails, corner nodes ── */
-      /* The title plate hangs from the top edge like a bridge nameplate — ∞ INFINITY ACE ∞. */
+      /* ── Infinity overrides on the shared ornaments: aurora tint + breathing life. ── */
       .gs-bhud--infinity .gs-bhud__titleplate {
-        position: absolute; top: 2px; left: 50%; transform: translateX(-50%); z-index: 2;
-        display: flex; align-items: center; gap: 9px; pointer-events: none;
-        padding: 3px 13px 4px; border-radius: 0 0 11px 11px;
-        background: linear-gradient(180deg, rgba(14,18,27,0.95), rgba(9,12,18,0.66));
-        border: 1px solid color-mix(in srgb, var(--aur1) 46%, transparent); border-top: none;
+        gap: 9px; padding: 3px 13px 4px;
+        border-color: color-mix(in srgb, var(--aur1) 46%, transparent);
         box-shadow: 0 4px 16px -5px var(--aur1), inset 0 -1px 0 color-mix(in srgb, var(--aur3) 32%, transparent);
         animation: gs-title-glow 3.6s ease-in-out infinite;
       }
-      .gs-bhud--infinity .gs-bhud__titletext {
-        font-size: 11px; font-weight: 900; letter-spacing: 2px; white-space: nowrap; color: var(--aur1);
-        text-shadow: 0 0 9px color-mix(in srgb, var(--aur1) 72%, transparent), 0 0 2px rgba(0,0,0,.5);
-      }
+      .gs-bhud--infinity .gs-bhud__titletext { font-size: 11px; letter-spacing: 2px; color: var(--aur1);
+        text-shadow: 0 0 9px color-mix(in srgb, var(--aur1) 72%, transparent), 0 0 2px rgba(0,0,0,.5); }
+      .gs-bhud--infinity .gs-bhud__titleglyph { color: var(--aur1); text-shadow: 0 0 8px color-mix(in srgb, var(--aur1) 70%, transparent); }
       .gs-bhud--infinity .gs-bhud__titlewing {
-        width: 24px; height: 2px; border-radius: 2px;
-        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--aur2) 80%, transparent), var(--aur1));
+        width: 24px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--aur2) 80%, transparent), var(--aur1));
         box-shadow: 0 0 6px -1px var(--aur2);
       }
-      .gs-bhud--infinity .gs-bhud__titlewing--r { transform: scaleX(-1); }
       @keyframes gs-title-glow { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.16); } }
-      /* Instrument side rails — thin ticked aurora scales down the inner edges, bridge-console detail. */
-      .gs-bhud--infinity .gs-bhud__rail {
-        position: absolute; top: 60px; bottom: 74px; width: 3px; z-index: 1; pointer-events: none; opacity: .55;
-        border-radius: 3px;
+      .gs-bhud--infinity .gs-bhud__rail { opacity: .55;
         background: linear-gradient(180deg, transparent,
-          color-mix(in srgb, var(--aur2) 55%, transparent) 12%,
-          color-mix(in srgb, var(--aur1) 48%, transparent) 50%,
-          color-mix(in srgb, var(--aur2) 55%, transparent) 88%, transparent);
-      }
+          color-mix(in srgb, var(--aur2) 55%, transparent) 12%, color-mix(in srgb, var(--aur1) 48%, transparent) 50%,
+          color-mix(in srgb, var(--aur2) 55%, transparent) 88%, transparent); }
       .gs-bhud--infinity .gs-bhud__rail::after {
-        content: ''; position: absolute; left: -2px; right: -2px; top: 0; bottom: 0;
-        background: repeating-linear-gradient(180deg, transparent 0 12px,
-          color-mix(in srgb, var(--aur3) 75%, transparent) 12px 13.4px);
-        opacity: .5;
-      }
-      .gs-bhud--infinity .gs-bhud__rail--l { left: 9px; }
-      .gs-bhud--infinity .gs-bhud__rail--r { right: 9px; }
-      /* Corner nodes — glowing gold bolt-studs pinning the frame's four corners. */
+        background: repeating-linear-gradient(180deg, transparent 0 12px, color-mix(in srgb, var(--aur3) 75%, transparent) 12px 13.4px); }
       .gs-bhud--infinity .gs-bhud__node {
-        position: absolute; width: 7px; height: 7px; border-radius: 50%; z-index: 2; pointer-events: none;
-        background: radial-gradient(circle, #fff, var(--aur1) 55%, transparent 76%);
-        box-shadow: 0 0 9px 1px var(--aur1);
-        animation: gs-node-pulse 3.2s ease-in-out infinite;
+        width: 7px; height: 7px; background: radial-gradient(circle, #fff, var(--aur1) 55%, transparent 76%);
+        box-shadow: 0 0 9px 1px var(--aur1); animation: gs-node-pulse 3.2s ease-in-out infinite;
       }
-      .gs-bhud--infinity .gs-bhud__node--tl { top: 5px; left: 5px; }
-      .gs-bhud--infinity .gs-bhud__node--tr { top: 5px; right: 5px; }
-      .gs-bhud--infinity .gs-bhud__node--bl { bottom: 5px; left: 5px; }
-      .gs-bhud--infinity .gs-bhud__node--br { bottom: 5px; right: 5px; }
       @keyframes gs-node-pulse { 0%,100% { opacity: .7; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.18); } }
+      /* The phoenix-wing CANOPY — a soft aurora dome arcing over the top of the viewscreen. */
+      .gs-bhud--infinity .gs-bhud__canopy {
+        position: absolute; top: 2px; left: 6px; right: 6px; height: 40%; z-index: 0; pointer-events: none;
+        border-radius: 13px 13px 46% 46% / 13px 13px 70px 70px;
+        background: radial-gradient(120% 120% at 50% -24%, color-mix(in srgb, var(--aur1) 15%, transparent), transparent 62%);
+      }
       /* The corner L-brackets brighten to gold and breathe — the bridge is alive. */
       .gs-bhud--infinity .gs-bhud__corner::before, .gs-bhud--infinity .gs-bhud__corner::after {
         background: var(--aur1); box-shadow: 0 0 10px 0 var(--aur1), 0 0 3px 0 var(--aur3);
         animation: gs-corner-breathe 3.2s ease-in-out infinite;
       }
       @keyframes gs-corner-breathe { 0%,100% { opacity: .78; } 50% { opacity: 1; } }
-
-      /* ── Console + controls: the L-console goes gold, the three controls become bridge instruments ── */
+      /* Console + controls go gold; the scanner glows, the exit is a warm airlock. */
       .gs-bhud--infinity .gs-bhud__console, .gs-bhud--infinity .gs-travel__fuel,
       .gs-bhud--infinity .gs-bhud__idpod, .gs-bhud--infinity .gs-bhud__statpod {
         border-color: color-mix(in srgb, var(--aur1) 46%, var(--gs-line));
-        box-shadow:
-          inset 0 1px 0 color-mix(in srgb, var(--aur1) 34%, transparent),
-          inset 0 0 20px color-mix(in srgb, var(--hud-glow) 50%, transparent),
-          0 3px 18px rgba(0,0,0,0.42);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--aur1) 34%, transparent),
+          inset 0 0 20px color-mix(in srgb, var(--hud-glow) 50%, transparent), 0 3px 18px rgba(0,0,0,0.42);
       }
-      /* The docked cog picks up the gold rim so it reads as part of the bridge, not a stray button. */
       .gs-bhud--infinity .gs-bhud__cog { border-color: color-mix(in srgb, var(--aur1) 44%, var(--gs-line)); }
-      /* An aurora hairline running along the console's top lip. */
       .gs-bhud--infinity .gs-bhud__console::before {
         content: ''; position: absolute; left: 16px; right: 16px; top: 0; height: 1.5px; border-radius: 2px; pointer-events: none;
-        background: linear-gradient(90deg, transparent, var(--aur2), var(--aur1), var(--aur3), transparent);
-        opacity: .8;
+        background: linear-gradient(90deg, transparent, var(--aur2), var(--aur1), var(--aur3), transparent); opacity: .8;
       }
-      /* Themed icon SVGs sit crisply inside their button spans. */
-      .gs-bhud--infinity .gs-travel__scan-ico, .gs-bhud--infinity .gs-travel__exit-ico { display: flex; align-items: center; justify-content: center; }
-      .gs-bhud--infinity .gs-bico { display: block; }
-      .gs-bhud--infinity .gs-bico--scan { width: 30px; height: 30px; }
-      .gs-bhud--infinity .gs-bico--exit { width: 24px; height: 24px; }
-      .gs-bhud--infinity .gs-bico--fuel { width: 14px; height: 17px; }
-      /* Scanner: the sweep wedge rotates like a real radar; the dial glows gold. */
       .gs-bhud--infinity .gs-travel__scan {
         border-color: color-mix(in srgb, var(--aur1) 70%, transparent);
         background: radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--aur1) 22%, #0c1220), #060910);
@@ -1440,12 +1499,7 @@
       }
       .gs-bhud--infinity .gs-travel__scan-lbl { color: var(--aur1); }
       .gs-bhud--infinity .gs-travel__scan-cost { color: var(--aur3); }
-      .gs-bhud--infinity .gs-bico__sweep {
-        transform-box: view-box; transform-origin: 14px 14px;
-        animation: gs-radar-sweep 2.4s linear infinite;
-      }
-      @keyframes gs-radar-sweep { to { transform: rotate(360deg); } }
-      /* Exit: an airlock hatch — warm-red identity, gold-touched ring. */
+      .gs-bhud--infinity .gs-bico__sweep { animation-duration: 2.4s; }
       .gs-bhud--infinity .gs-travel__exit {
         width: 50px; height: 50px; border-radius: 14px;
         border-color: color-mix(in srgb, #ff6b4a 62%, var(--aur1) 22%);
@@ -1453,20 +1507,168 @@
       }
       .gs-bhud--infinity .gs-travel__exit:hover { border-color: #ff8b6b; }
       .gs-bhud--infinity .gs-travel__exit-lbl { color: #ffb08b; }
-      /* Fuel: a plasma-cell glyph + gold-glowing lit cells (the drain colour still tells the low-fuel story). */
       .gs-bhud--infinity .gs-fuelbar__ico { display: flex; align-items: center; }
-      .gs-bhud--infinity .gs-bico__spark { animation: gs-spark-flick 1.8s ease-in-out infinite; }
-      @keyframes gs-spark-flick { 0%,100% { opacity: 1; } 45% { opacity: .5; } 70% { opacity: .9; } }
       .gs-bhud--infinity .gs-fuelbar__cell--lit { box-shadow: 0 0 5px -1px color-mix(in srgb, var(--aur1) 65%, transparent); }
 
+      /* ══ WAGON — a warm woody road-trip dashboard: walnut console, chrome lip, hanging fuzzy dice. ══ */
+      .gs-bhud--wagon .gs-bhud__frame { border-radius: 12px; border-color: color-mix(in srgb, var(--hud-accent) 40%, #6b4a24); }
+      .gs-bhud--wagon .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 11px; pointer-events: none; opacity: .5;
+        background: repeating-linear-gradient(96deg, rgba(120,70,30,0.10) 0 6px, rgba(90,52,22,0.05) 6px 13px),
+          radial-gradient(120% 45% at 50% 100%, rgba(210,150,70,0.10), transparent 70%);
+      }
+      .gs-bhud--wagon .gs-bhud__console {
+        background: repeating-linear-gradient(92deg, rgba(120,74,34,0.16) 0 4px, transparent 4px 9px),
+          linear-gradient(180deg, rgba(34,24,15,0.86), rgba(20,14,9,0.94));
+      }
+      .gs-bhud--wagon .gs-bhud__console::before {
+        content: ''; position: absolute; left: 14px; right: 14px; top: 0; height: 1.5px; border-radius: 2px; pointer-events: none;
+        background: linear-gradient(90deg, transparent, #d8b26a, #fff2cf, #d8b26a, transparent); opacity: .7;
+      }
+      .gs-bhud--wagon .gs-bhud__dice {
+        position: absolute; top: 27px; left: 50%; width: 28px; height: 14px; z-index: 2; pointer-events: none;
+        transform: translateX(-50%); animation: gs-sway 4s ease-in-out infinite; transform-origin: 50% -14px;
+      }
+      .gs-bhud--wagon .gs-bhud__dice::before, .gs-bhud--wagon .gs-bhud__dice::after {
+        content: ''; position: absolute; top: 0; width: 11px; height: 11px; border-radius: 3px;
+        background: linear-gradient(135deg, #fff, #f0c9c9);
+        box-shadow: 0 0 6px rgba(255,170,170,0.5), inset 0 0 0 1px rgba(170,50,50,0.45);
+      }
+      .gs-bhud--wagon .gs-bhud__dice::before { left: 0; transform: rotate(-16deg); }
+      .gs-bhud--wagon .gs-bhud__dice::after { right: 0; transform: rotate(14deg); }
+      @keyframes gs-sway { 0%,100% { transform: translateX(-50%) rotate(-5deg); } 50% { transform: translateX(-50%) rotate(5deg); } }
+
+      /* ══ RACER — a redline speeder cockpit: carbon-fibre weave, a checkered speed-stripe, red lip. ══ */
+      .gs-bhud--racer .gs-bhud__frame { border-radius: 9px; border-color: color-mix(in srgb, var(--hud-accent) 48%, transparent); }
+      .gs-bhud--racer .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 8px; pointer-events: none; opacity: .4;
+        background: repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 3px, transparent 3px 6px),
+          repeating-linear-gradient(-45deg, rgba(0,0,0,0.16) 0 3px, transparent 3px 6px),
+          radial-gradient(120% 40% at 50% 0%, rgba(255,70,60,0.10), transparent 70%);
+      }
+      .gs-bhud--racer .gs-bhud__stripe {
+        position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 46px; height: 40px; z-index: 1; pointer-events: none; opacity: .5;
+        background: repeating-linear-gradient(90deg, #e4e4e4 0 5px, #16181d 5px 10px);
+        -webkit-mask: linear-gradient(180deg, #000, transparent 90%); mask: linear-gradient(180deg, #000, transparent 90%);
+      }
+      .gs-bhud--racer .gs-travel__scan { border-color: color-mix(in srgb, var(--hud-accent) 66%, transparent); }
+      .gs-bhud--racer .gs-bhud__console::before {
+        content: ''; position: absolute; left: 14px; right: 14px; top: 0; height: 1.5px; pointer-events: none;
+        background: linear-gradient(90deg, transparent, #ff5a4a, #ffd0c0, #ff5a4a, transparent); opacity: .75;
+      }
+
+      /* ══ HAULER — an industrial freighter bridge: riveted steel plate, hazard caution stripe. ══ */
+      .gs-bhud--hauler .gs-bhud__frame { border-radius: 8px; border-width: 1.5px; border-color: color-mix(in srgb, var(--hud-accent) 40%, #445544); }
+      .gs-bhud--hauler .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 7px; pointer-events: none; opacity: .6;
+        background: linear-gradient(180deg, rgba(60,72,52,0.10), rgba(20,26,18,0.10)),
+          radial-gradient(circle at 8px 8px, rgba(180,200,160,0.28) 0 1.4px, transparent 2px),
+          radial-gradient(circle at calc(100% - 8px) 8px, rgba(180,200,160,0.28) 0 1.4px, transparent 2px),
+          radial-gradient(circle at 8px calc(100% - 8px), rgba(180,200,160,0.28) 0 1.4px, transparent 2px),
+          radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), rgba(180,200,160,0.28) 0 1.4px, transparent 2px);
+      }
+      .gs-bhud--hauler .gs-bhud__console { background: linear-gradient(180deg, rgba(24,30,22,0.86), rgba(14,18,12,0.94)); }
+      .gs-bhud--hauler .gs-bhud__console::before {
+        content: ''; position: absolute; left: 12px; right: 12px; top: 0; height: 3px; pointer-events: none; opacity: .7;
+        background: repeating-linear-gradient(45deg, #d9b038 0 6px, #201a10 6px 12px);
+      }
+      .gs-bhud--hauler .gs-bhud__titletext { letter-spacing: 2.4px; }
+
+      /* ══ EXOTIC — an alien saucer probe deck: bio-green pulse bloom + a floating orbital ring. ══ */
+      .gs-bhud--exotic .gs-bhud__frame { border-radius: 16px; border-color: color-mix(in srgb, var(--hud-accent) 44%, transparent); }
+      .gs-bhud--exotic .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 15px; pointer-events: none;
+        background: radial-gradient(120% 60% at 50% 100%, color-mix(in srgb, var(--hud-accent) 14%, transparent), transparent 65%);
+        animation: gs-bio-pulse 3.4s ease-in-out infinite;
+      }
+      @keyframes gs-bio-pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+      .gs-bhud--exotic .gs-bhud__ring {
+        position: absolute; top: 30px; left: 50%; width: 132px; height: 34px; margin-left: -66px; border-radius: 50%; z-index: 1; pointer-events: none;
+        border: 1px dashed color-mix(in srgb, var(--hud-accent) 62%, transparent); opacity: .4;
+        animation: gs-spin-slow 11s linear infinite;
+      }
+
+      /* ══ SPEEDER — a neon night-bike HUD: double neon rim, scanlines, minimal. ══ */
+      .gs-bhud--speeder .gs-bhud__frame {
+        border-radius: 7px; border-color: color-mix(in srgb, var(--hud-accent) 60%, transparent);
+        box-shadow: inset 0 0 26px color-mix(in srgb, var(--hud-glow) 60%, transparent), 0 0 20px -8px var(--hud-accent);
+      }
+      .gs-bhud--speeder .gs-bhud__frame::before {
+        content: ''; position: absolute; inset: 4px; border-radius: 5px; pointer-events: none;
+        border: 1px solid color-mix(in srgb, var(--hud-accent2) 60%, transparent);
+        box-shadow: 0 0 8px -2px var(--hud-accent2);
+      }
+      .gs-bhud--speeder .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 6px; pointer-events: none; opacity: .25;
+        background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(255,255,255,0.05) 2px 3px);
+      }
+
+      /* ══ VALKYRIE — an Asgardian runic war-bridge: bronze rune-tick inner border + bronze wings. ══ */
+      .gs-bhud--valkyrie .gs-bhud__frame { border-radius: 10px; border-color: color-mix(in srgb, var(--hud-accent) 48%, #6b4a1e); }
+      .gs-bhud--valkyrie .gs-bhud__frame::before {
+        content: ''; position: absolute; inset: 5px; border-radius: 7px; pointer-events: none; opacity: .6;
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 40%, transparent);
+        background: repeating-linear-gradient(90deg, transparent 0 14px, color-mix(in srgb, var(--hud-accent) 45%, transparent) 14px 15.5px) top/100% 4px no-repeat,
+          repeating-linear-gradient(90deg, transparent 0 14px, color-mix(in srgb, var(--hud-accent) 45%, transparent) 14px 15.5px) bottom/100% 4px no-repeat;
+      }
+      .gs-bhud--valkyrie .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 9px; pointer-events: none;
+        background: radial-gradient(120% 45% at 50% 0%, color-mix(in srgb, var(--hud-accent) 12%, transparent), transparent 70%);
+      }
+      .gs-bhud--valkyrie .gs-bhud__wing--bronze { opacity: .6; }
+
+      /* ══ MYTHIC (Mothership) — the grand saucer deck: violet bloom + a chasing saucer light-ring. ══ */
+      .gs-bhud--mythic .gs-bhud__frame { border-radius: 15px; border-color: color-mix(in srgb, var(--hud-accent) 46%, transparent); }
+      .gs-bhud--mythic .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 14px; pointer-events: none;
+        background: radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--hud-accent) 14%, transparent), transparent 68%);
+      }
+      .gs-bhud--mythic .gs-bhud__ring--saucer {
+        position: absolute; top: 34px; left: 50%; width: 150px; height: 5px; margin-left: -75px; z-index: 1; pointer-events: none; border-radius: 5px; opacity: .7;
+        background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--hud-accent) 90%, transparent) 0 4px, transparent 4px 12px);
+        -webkit-mask: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent); mask: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+        animation: gs-ring-chase 1.6s linear infinite;
+      }
+      @keyframes gs-ring-chase { to { background-position: 12px 0; } }
+
+      /* ══ COMET (Comet Rider) — a dimpled golf-ball cockpit: dimple texture + comet-tail streaks. ══ */
+      .gs-bhud--comet .gs-bhud__frame { border-radius: 13px; border-color: color-mix(in srgb, var(--hud-accent) 50%, transparent); }
+      .gs-bhud--comet .gs-bhud__frame::after {
+        content: ''; position: absolute; inset: 1px; border-radius: 12px; pointer-events: none; opacity: .3;
+        background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--hud-accent) 16%, transparent), transparent 60%),
+          radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.6px) 0 0 / 12px 12px;
+      }
+      .gs-bhud--comet .gs-bhud__tail {
+        position: absolute; top: 6px; width: 70px; height: 3px; z-index: 1; pointer-events: none; opacity: .55; border-radius: 3px;
+        background: linear-gradient(90deg, transparent, var(--hud-accent)); box-shadow: 0 0 7px -1px var(--hud-accent);
+      }
+      .gs-bhud--comet .gs-bhud__tail--l { left: 6px; }
+      .gs-bhud--comet .gs-bhud__tail--r { right: 6px; transform: scaleX(-1); }
+
+      /* ══ CHOPPER (Thunderbolt) — a hot-rod bridge wreathed in flame licks + a lightning-orange lip. ══ */
+      .gs-bhud--chopper .gs-bhud__frame { border-radius: 9px; border-color: color-mix(in srgb, var(--hud-accent) 46%, #3a1c0c); }
+      .gs-bhud--chopper .gs-bhud__flames {
+        position: absolute; left: 8px; right: 8px; bottom: 70px; height: 26px; z-index: 1; pointer-events: none; opacity: .5;
+        background: radial-gradient(60% 100% at 20% 100%, color-mix(in srgb, var(--hud-accent) 55%, transparent), transparent 70%),
+          radial-gradient(50% 100% at 45% 100%, #ff9a2a 0%, transparent 68%),
+          radial-gradient(60% 100% at 72% 100%, color-mix(in srgb, var(--hud-accent) 50%, transparent), transparent 70%),
+          radial-gradient(50% 100% at 90% 100%, #ff5a1a 0%, transparent 66%);
+        -webkit-mask: linear-gradient(0deg, #000, transparent); mask: linear-gradient(0deg, #000, transparent);
+        animation: gs-flicker 1.2s ease-in-out infinite; transform-origin: 50% 100%;
+      }
+      @keyframes gs-flicker { 0%,100% { opacity: .5; transform: scaleY(1); } 50% { opacity: .78; transform: scaleY(1.12); } }
+      .gs-bhud--chopper .gs-bhud__console::before {
+        content: ''; position: absolute; left: 14px; right: 14px; top: 0; height: 1.5px; pointer-events: none;
+        background: linear-gradient(90deg, transparent, #ff7a1a, #ffd0a0, #c585ff, transparent); opacity: .75;
+      }
+
+      /* Every bespoke bridge freezes to a rich STATIC deck under reduced-motion. */
       @media (prefers-reduced-motion: reduce) {
-        .gs-bhud--infinity .gs-bhud__frame::before,
-        .gs-bhud--infinity .gs-bhud__titleplate,
-        .gs-bhud--infinity .gs-bhud__node,
-        .gs-bhud--infinity .gs-bhud__corner::before,
-        .gs-bhud--infinity .gs-bhud__corner::after,
-        .gs-bhud--infinity .gs-bico__sweep,
-        .gs-bhud--infinity .gs-bico__spark { animation: none; }
+        .gs-bico__sweep, .gs-bico__orbit, .gs-bico__needle, .gs-bico__ping, .gs-bico__lights circle,
+        .gs-bico__sweep2, .gs-bico__spark,
+        .gs-bhud__node, .gs-bhud__titleplate, .gs-bhud__dice, .gs-bhud__ring, .gs-bhud__ring--saucer,
+        .gs-bhud__flames, .gs-bhud__frame::before, .gs-bhud__frame::after,
+        .gs-bhud__corner::before, .gs-bhud__corner::after { animation: none; }
       }
 
       .gs-travel__asgard {

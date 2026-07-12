@@ -37,25 +37,38 @@ export const DEFAULT_HUD_THEME: HudTheme = {
 
 /**
  * Per-ship / per-set HUD liveries. Keyed `<shipId>` first (an exact ride), then `set:<Set>` (a whole
- * fleet), then the standard console. The SET rows below give each fleet a distinct bridge tint TODAY;
- * drop in a `<shipId>` row to give one hero ship its own command deck. To add a per-fleet frame shape
- * later, set a `variant` here and add a matching `.gs-bhud--<variant>` block in index.html.
+ * fleet), then the standard console. EVERY set now carries a `variant` (GS-fleet-bridges) so flying a
+ * different fleet gives a genuinely different command bridge — a table `.gs-bhud--<variant>` CSS block +
+ * a `hudChrome.ts` builder, never a layout edit. A `<shipId>` row overrides the set to give a hero ship
+ * (Comet Rider, Thunderbolt, Infinity Ace) its OWN deck within a shared set.
  */
 const SHIP_HUD: Record<string, Partial<HudTheme>> = {
-  'set:Wagon': { accent: '#e0b15a', accent2: '#8a5a2b', glow: 'rgba(200,140,60,0.26)', ink: '#f2e2c4' },
-  'set:Racer': { accent: '#ff6b5a', accent2: '#7a2622', glow: 'rgba(210,70,60,0.26)', ink: '#ffd8cc' },
-  'set:Hauler': { accent: '#8fd46a', accent2: '#39502c', glow: 'rgba(90,170,70,0.24)', ink: '#e0f2cc' },
-  'set:Exotic': { accent: '#5fe0a8', accent2: '#1c5a3c', glow: 'rgba(70,200,150,0.26)', ink: '#d6fff0' },
-  'set:Speeder': { accent: '#ff5fbf', accent2: '#28e0d0', glow: 'rgba(255,90,190,0.24)', ink: '#ffd6f0' },
-  'set:Valkyrie': { accent: '#ffd36b', accent2: '#b8823a', glow: 'rgba(230,185,63,0.28)', ink: '#fff0c8' },
-  'set:Mythic': { accent: '#c585ff', accent2: '#5b3b8a', glow: 'rgba(150,90,220,0.30)', ink: '#eadcff' },
+  // Woody road-trip dash — warm amber, chrome trim, fuzzy dice.
+  'set:Wagon': { variant: 'wagon', accent: '#e0b15a', accent2: '#8a5a2b', glow: 'rgba(200,140,60,0.26)', ink: '#f2e2c4' },
+  // Redline speeder cockpit — carbon + racing red, checkered stripe.
+  'set:Racer': { variant: 'racer', accent: '#ff6b5a', accent2: '#7a2622', glow: 'rgba(210,70,60,0.26)', ink: '#ffd8cc' },
+  // Industrial freighter bridge — rugged cargo green, caution stripes, rivets.
+  'set:Hauler': { variant: 'hauler', accent: '#8fd46a', accent2: '#39502c', glow: 'rgba(90,170,70,0.24)', ink: '#e0f2cc' },
+  // Alien saucer probe deck — bio-green glow, a floating orbital ring.
+  'set:Exotic': { variant: 'exotic', accent: '#5fe0a8', accent2: '#1c5a3c', glow: 'rgba(70,200,150,0.26)', ink: '#d6fff0' },
+  // Neon night-bike HUD — pink + cyan, scanlines, minimal.
+  'set:Speeder': { variant: 'speeder', accent: '#ff5fbf', accent2: '#28e0d0', glow: 'rgba(255,90,190,0.24)', ink: '#ffd6f0' },
+  // Asgardian runic war-bridge — bronze + gold, rune ticks, bronze wings.
+  'set:Valkyrie': { variant: 'valkyrie', accent: '#ffd36b', accent2: '#b8823a', glow: 'rgba(230,185,63,0.28)', ink: '#fff0c8' },
+  // The grand flying-saucer bridge (Mothership) — violet + chrome, a spinning saucer light-ring.
+  'set:Mythic': { variant: 'mythic', accent: '#c585ff', accent2: '#5b3b8a', glow: 'rgba(150,90,220,0.30)', ink: '#eadcff' },
 
-  // The INFINITY ACE (GS-infinity-hud) — the hole-150 Unending grail, so its bridge is the ONE livery
-  // that ships a bespoke frame SHAPE, not just a tint. `variant: 'infinity'` unlocks the animated
-  // `.gs-bhud--infinity` block in index.html: a living-aurora ring (gold→emerald→aquamarine→violet, the
-  // ship's own palette), a gold double-rim, pulsing corner brackets, and an ∞ crest at the frame crown.
-  // Its four base colours are the golden-phoenix / aurora hues so a reduced-motion (or older) browser
-  // still renders a rich static gold-aurora console — the grail always reads a cut above the fleet.
+  // ── Hero-ship overrides within a shared set ──
+  // The Comet Rider (GS-ace-ship) — a dimpled golf-ball comet: icy white-blue, a swept comet tail.
+  'comet-rider': { variant: 'comet', accent: '#bfe3ff', accent2: '#3f6a8a', glow: 'rgba(150,210,255,0.28)', ink: '#eaf6ff' },
+  // The Thunderbolt (mythic chopper) — a hot-rod bridge wreathed in flame + forked lightning.
+  'chopper-thunderbolt': { variant: 'chopper', accent: '#ff7a1a', accent2: '#7a3410', glow: 'rgba(255,120,30,0.30)', ink: '#ffd9b0' },
+
+  // The INFINITY ACE (GS-infinity-hud) — the hole-150 Unending grail, the reference bespoke reskin: a
+  // living-aurora ring (gold→emerald→aquamarine→violet, the ship's own palette), a phoenix-wing canopy,
+  // pulsing corner brackets, and an ∞ crest at the frame crown. Its four base colours are the golden-
+  // phoenix / aurora hues so a reduced-motion (or older) browser still renders a rich static gold-aurora
+  // bridge — the grail always reads a cut above the fleet.
   'infinity-ace': {
     variant: 'infinity',
     accent: '#ffd76b',

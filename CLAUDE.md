@@ -427,21 +427,29 @@ these systems** — each bullet is the tip of a documented iceberg.
     docked `.gs-bhud__cog` dispatches the same `data-open-settings` as the global cog, which `app.ts`
     SUPPRESSES on the travel screen (like the full-bleed play view) so there's no double button. The pods
     recolour to the ship via the SAME `--hud-*` props and leave the frame's top CENTRE clear for a livery
-    title plate (the Infinity Ace nameplate). The frame RECOLOURS to the flown ship via
-    `hudThemeForShip` (`render/hudTheme.ts`) → `--hud-*` custom properties on `.gs-bhud`; a per-fleet
-    livery is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan), a per-fleet frame SHAPE is a
-    `.gs-bhud--<variant>` block, and a FULL bespoke reskin adds a `render/hudChrome.ts` row (bridge
-    ICONS + labels + frame ORNAMENTS) — never a layout edit. The **Infinity Ace** (GS-infinity-hud, the
-    hole-150 Unending grail) is the first non-`standard` variant and the reference full reskin:
+    title plate. The frame RECOLOURS + RESHAPES to the flown ship via `hudThemeForShip`
+    (`render/hudTheme.ts`) → `--hud-*` custom properties + a `variant` on `.gs-bhud`; a per-fleet livery
+    is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan) with a `variant`, its frame SHAPE a
+    `.gs-bhud--<variant>` block, its bespoke CHROME a `render/hudChrome.ts` builder (bridge ICONS + labels
+    + frame ORNAMENTS) — never a layout edit. **GS-fleet-bridges**: EVERY set now carries a `variant`, so
+    flying a different ship gives a genuinely different command deck — a wagon's woody road-trip dash
+    (compass/fuzzy-dice), a racer's redline carbon cockpit (tachometer/checkered stripe), a hauler's
+    riveted freighter, an alien saucer's orbital-ring probe deck, a neon bike's double-rim speedo, the
+    Asgardian Pegasus's runic war-bridge (rune-ring/shield/bronze wings), the Mothership's chasing
+    light-ring saucer deck, the Comet Rider's dimpled golf-ball cockpit, the Thunderbolt's flame-lick
+    chopper — each with its own scanner/exit/fuel instruments and its ship NAME on the title plate
+    (`hudChromeFor(variant, ship)`). The SHARED ornament + instrument BASE (title plate / rails / nodes /
+    wings / themed SVG icons, all reading `--hud-*`) lives once; each `.gs-bhud--<variant>` re-tints or
+    reshapes it. The **Infinity Ace** (GS-infinity-hud, the hole-150 grail) is the reference full reskin:
     `variant:'infinity'` unlocks `.gs-bhud--infinity` (a rotating living-aurora ring — @property
     `--gs-aur-angle`, the ship's gold→emerald→aquamarine→violet palette — gold double-rim + inner wash,
-    breathing corner L-brackets) AND `hudChromeFor('infinity')` swaps the three controls for a
+    a phoenix-wing CANOPY, breathing corner L-brackets) AND its chrome swaps the controls for a
     sensor-sweep SCANNER, an airlock EJECT hatch, and a plasma-cell fuel glyph (via `fuelGaugeHTML`'s
-    new `icon` opt), plus injected ornaments — a crowned ∞ title plate, ticked instrument side rails,
-    glowing corner nodes. `chrome` is `null` for every other ship (classic 📡/🚪/⛽ console, byte-
-    identical); all ornaments are `pointer-events:none` (map taps still pass), and every animation is off
-    under reduced-motion (degrades to a rich STATIC gold-aurora bridge). The icon SVGs read the `--aur*`
-    props the variant CSS defines. Eyeball via `scripts/travel-preview.mjs QS="?ship=infinity-ace"`. Its base class MUST stay `.gs-bhud`, NOT
+    `icon` opt); its icons read the `--aur*` props. `hudChromeFor` returns `null` only for an UNKNOWN ship
+    (the classic 📡/🚪/⛽ cyan console, byte-identical); all ornaments are `pointer-events:none` (map taps
+    still pass), and every animation is off under reduced-motion (degrades to a rich STATIC deck). Pure
+    render + data (no reducer/save/rng/`_gs*`/URL hook). Eyeball any bridge via `scripts/travel-preview.mjs
+    QS="?ship=<id>"` (wagon-classic / racer-redline / ufo-mothership / infinity-ace / …). Its base class MUST stay `.gs-bhud`, NOT
     `.gs-hud` (the play screen's own HUD class): a shared `.gs-hud` here once stretched the play screen's
     `.gs-glass` chrome into a full-screen map-blur (GS-hud-class-collision, guarded by the play-HUD layout
     test in `tests/build.test.ts`). `.gs-bhud` is `pointer-events:none` so map taps

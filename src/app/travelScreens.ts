@@ -49,6 +49,7 @@ import { shipForCharacter } from '../ui/game';
 import { fuelGaugeHTML } from '../render/fuel';
 import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
 import { hudChromeFor } from '../render/hudChrome';
+import { shipById } from '../sim/rpg/ships';
 
 // The travel screen's view-only module state (like shopView.inspectGearId / settingsOpen): which world is
 // SELECTED (its detail fills the bottom-half card; a tap on a world picks it, ✕ / another world swaps it),
@@ -345,7 +346,7 @@ export function travelScreen(): string {
   // livery (GS-infinity-hud) can also supply bespoke CHROME — themed console icons/labels + frame
   // ornaments; `chrome` is null for the classic emoji console, so every other ship is byte-identical.
   const hud = hudThemeForShip(shipId);
-  const chrome = hudChromeFor(hud.variant);
+  const chrome = hudChromeFor(hud.variant, shipById(shipId));
   const scanIco = chrome?.scanIcon ?? '📡';
   const scanLbl = chrome?.scanLabel ?? 'SCAN';
   const exitIco = chrome?.exitIcon ?? '🚪';
