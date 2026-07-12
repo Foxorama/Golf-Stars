@@ -353,19 +353,22 @@ export function travelScreen(): string {
   const exitLbl = chrome?.exitLabel ?? 'EXIT';
 
   // ---- the bridge HUD: a command-console FRAME around the star map (GS-journey-hud). Corner brackets
-  // wrap the chart; ONE bottom console bezel is the dashboard row, seating all three controls side by
-  // side — the EXIT door (left), the SCANNER command dial (centre), the FUEL gauge (right) — so the
-  // instruments read as part of the dash, not floating over it. Anchored to the map viewport so the frame
-  // stays put while the chart pans inside it. -----
+  // wrap the chart; the bottom console is ONE sculpted instrument PANEL (GS-journey-map-hud-tweaks) — a
+  // single clip-path shape whose top edge RISES into three moulded humps over a full-width base (a left
+  // EXIT pod, a centre SCANNER binnacle, a right FUEL pod), so the ship's livery material flows unbroken
+  // across the whole dash and the controls sit EMBEDDED in it as recessed wells, forming one cohesive
+  // dashboard (like a car/plane panel) rather than widgets tacked onto a background. Anchored to the map
+  // viewport so the frame stays put while the chart pans inside it. -----
   const scanCost = scanFuelCost(r);
   const scanner = canScanRoutes(r)
     ? `<button class="gs-travel__scan" data-action='${JSON.stringify({ type: 'scanRoutes' })}' title="Scan for closer worlds (−${scanCost} ⛽)" aria-label="Scan for new routes, costs ${scanCost} fuel"><span class="gs-travel__scan-ico">${scanIco}</span><span class="gs-travel__scan-lbl">${scanLbl}</span><span class="gs-travel__scan-cost">−${scanCost}⛽</span></button>`
     : `<button class="gs-travel__scan gs-travel__scan--off" disabled title="Not enough fuel to scan" aria-label="Scanner offline — needs ${scanCost + 1} fuel"><span class="gs-travel__scan-ico">${scanIco}</span><span class="gs-travel__scan-lbl">${scanLbl}</span><span class="gs-travel__scan-cost">${scanCost + 1}⛽</span></button>`;
 
-  // The fuel gauge is the RIGHT instrument of the console dashboard row (GS-journey-map-hud-consolidate) —
-  // a horizontal readout seated in the bezel alongside the exit + scanner, not a tall pillar floating over
-  // the frame. It doubles as the depot button (tap → buy fuel).
-  const fuelRail = `<button class="gs-travel__fuel" data-depot="toggle" title="Fuel — tap to top up" aria-label="Fuel gauge — tap to open the fuel depot">${fuelGaugeHTML(r.fuel, tankCapacity(r), { icon: chrome?.fuelIcon })}</button>`;
+  // The fuel gauge is the VERTICAL tank column housed in the console's right-edge fuel TOWER
+  // (GS-journey-map-hud-tweaks) — a bay moulded into the dashboard that grows TALLER as tank capacity
+  // upgrades, so a bigger tank never has to shrink to fit a fixed slot. It doubles as the depot button
+  // (tap → buy fuel).
+  const fuelRail = `<button class="gs-travel__fuel" data-depot="toggle" title="Fuel — tap to top up" aria-label="Fuel gauge — tap to open the fuel depot">${fuelGaugeHTML(r.fuel, tankCapacity(r), { vertical: true, icon: chrome?.fuelIcon })}</button>`;
 
   // The exit: bank now and return to port. Offered once underway (there are shards to bank) OR when
   // stranded (the only way out). A tap opens the confirm sheet rather than ending the run on one touch.
