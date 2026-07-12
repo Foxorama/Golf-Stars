@@ -408,6 +408,39 @@ describe('Convict Sheep — boomerang EVERY ball that would miss the fairway RIG
   });
 });
 
+describe('Caddy guard snaps a save HOME to the fairway however far offline it went (GS-caddy-snapback)', () => {
+  it('a shot aimed WAY off the fairway is still returned onto it when a fairway-spine snap is supplied', () => {
+    // Aim well RIGHT of the fairway strip: the shot BEARING points into the rough, so the old
+    // recentre-onto-the-bearing save leaves the ball off the fairway. `fairwaySnap` (the nearest point
+    // of the fairway strip |x| <= FW_HALF) brings it all the way home instead.
+    const FAR_AIM: Vec = [220, 100];
+    const worldSide = (p: Vec): 'left' | 'right' => (p[0] < 0 ? 'left' : 'right');
+    const fairwaySnap = (p: Vec): Vec => [Math.max(-FW_HALF, Math.min(FW_HALF, p[0])), p[1]];
+    let saved = 0;
+    let savedOnFairway = 0;
+    let withoutSnapLeftOff = 0;
+    for (let s = 0; s < 400; s++) {
+      const g = resolveShot({
+        from: FROM, aim: FAR_AIM, club: driver, lie: 'fairway', shape: wideMiss,
+        guard: CONVICT_SHEEP_GUARD, offFairway, fairwaySide: worldSide, fairwaySnap, rng: new Rng(`snap:${s}`),
+      });
+      if (g.redirect?.kind === 'boomerang') {
+        saved++;
+        if (!offFairway(g.landing)) savedOnFairway++;
+      }
+      // The SAME shot without the snap → the old recentre-on-bearing leaves the save out in the rough.
+      const g2 = resolveShot({
+        from: FROM, aim: FAR_AIM, club: driver, lie: 'fairway', shape: wideMiss,
+        guard: CONVICT_SHEEP_GUARD, offFairway, fairwaySide: worldSide, rng: new Rng(`snap:${s}`),
+      });
+      if (g2.redirect?.kind === 'boomerang' && offFairway(g2.landing)) withoutSnapLeftOff++;
+    }
+    expect(saved).toBeGreaterThan(50); // the far-right aim really does trigger the boomerang a lot
+    expect(savedOnFairway).toBe(saved); // WITH the spine-snap, every saved ball comes home to the fairway
+    expect(withoutSnapLeftOff).toBeGreaterThan(0); // WITHOUT it, the bearing-recentre stranded saves in the rough
+  });
+});
+
 describe('a guard classifies by FAIRWAY side, not the aim line (GS-caddy fix)', () => {
   it('the ducks leave a RIGHT-of-fairway miss for the sheep even when the aim line is offset in the rough', () => {
     // The reported bug: from the right rough, aiming straight down the hole (an aim line PARALLEL to the

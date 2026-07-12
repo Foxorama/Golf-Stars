@@ -263,8 +263,11 @@ export const VOID_CLIFF: CliffLook = {
 export const SHIP_CLIFF: CliffLook = {
   strata: ['#5d6b78', '#47535e', '#333d47', '#232b33', '#161c22', '#0a0e13'],
   deepMix: '#04070c',
-  lipA: 'rgba(150,190,225,0.85)',
-  lipB: 'rgba(210,232,250,0.7)',
+  // GS-ship-wall-bounce: the torn-hull deck rim sits ~14 yd OUTSIDE the real bounce line (the bulkhead),
+  // so it's toned down from a bright starlit edge to a dimmer one — it must NOT out-shine the bold wall
+  // crest and be misread as the play boundary (the ball never reaches it; it's dead hull past the wall).
+  lipA: 'rgba(150,190,225,0.5)',
+  lipB: 'rgba(210,232,250,0.42)',
   crackDark: 'rgba(4,7,12,0.55)',
   crackLit: 'rgba(95,212,208,0.2)', // severed conduits glow faint cyan in the cross-section
   dustA: 'rgba(190,205,225,0.45)',

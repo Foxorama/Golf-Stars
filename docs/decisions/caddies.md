@@ -291,3 +291,26 @@
   `render/itemArt.ts` (shop card) and `render/caddyArt.ts` (corner figure + a swaggering "Arr! I saw that
   coming!" `CADDY_VOICE` line). Rebuilds from perks on resume (no save bump).
 
+
+## GS-caddy-snapback — a fairway save comes HOME to the fairway, however far offline
+
+The Space Ducks (left) / Convict Sheep (right) guards knock EVERY off-side miss back onto the short
+grass. But the FAIRWAY save (`resolveShot`) recentred the sampled miss angle onto the shot BEARING —
+fine when the player aimed AT the fairway (bearing ≈ fairway line), but when they deliberately aimed
+WAY off (a trick shot, a recovery angle), the bearing pointed into the rough, so a de-spread version of
+it still landed off the fairway. The guard "fired" but the ball didn't come home — it read as the save
+doing nothing.
+
+Fix: `ShotInput.fairwaySnap` — a course-aware closure the caller (`round.ts`) closes over the hole as
+`nearestFairwayPoint(hole, p)` (the nearest centreline station that actually sits on fairway/green,
+skipping rough-gap / broken-corridor stations). The fairway-save branch drops the ball on that spine
+point instead of the recentred bearing landing, so however far offline the miss went it returns to the
+short grass. Greenside saves are unchanged (`greenAim` still lands ON the green). The single
+`sampleGreenAngle` rng draw is still consumed (draw count stable, and it's the fallback for a hole-less
+unit call with no `fairwaySnap`). Guard-only ⇒ a guard-less shot is byte-for-byte; resolved in the
+shared `resolveShot` ⇒ auto ≡ interactive. On a walled derelict hole the fairway spine IS the deck
+spine, so this subsumes the old GS-ship-wall-caddy in-space snap (that stays as a rest backstop). This
+was the "make Ducks/Sheep bounce the ball back to the fairway regardless of how far it went" ask —
+because the snapped landing is now far from the miss, the redirect cinematic's arc-back reads as a real
+deflection instead of a tiny nudge. Regression: `tests/caddies.test.ts` fires a far-right aim and
+asserts every saved ball lands on the fairway WITH the snap and is stranded in the rough WITHOUT it.

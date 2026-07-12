@@ -256,7 +256,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     be lost to space (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts`
     (`styleShipWalls`, camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's
     struck-metal voice + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the
-    course contract.
+    course contract. WALL GRAPHIC = BOUNCE LINE (GS-ship-wall-bounce): on a LOST hole the ball bounces at the
+    fairway-corridor edge (`hole.walls`), but the DRAWN hull deck is `dilateUnion(fairway,+14)` — ~14 yd of
+    dead space you can never land on (`lieAt`→`shiprough`) lies past the bounce line, and its bright torn-hull
+    rim was misread as the boundary. So on a lost hole `styleShipWalls(…, bold=true)` draws an UNMISTAKABLE
+    bulkhead — a thick lit crest tracing the exact bounce line + an OUTWARD cast shadow sinking the dead-hull
+    margin behind it — and `SHIP_CLIFF.lip*` is dimmed so the outer torn rim no longer out-shines it. Render-
+    only, derelict-LOST-only (calm derelict holes, where off-corridor is fair rough and walls don't bounce,
+    keep the subtle partition look byte-identical; every other world unaffected), zero rng, camera-proof.
   - SHIP-CORRIDOR CONTAINMENT (GS-ship-corridor-contain, `round.ts`): the promise "a sideways miss ricochets
     back, NEVER lost to space" is guaranteed BY CONSTRUCTION, not by the per-segment collision. The pre-built
     wall SEGMENTS are two parallel rails per corridor section — they do NOT close a fence around a deck that
@@ -547,6 +554,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     `CREDIT_ITEM_FACTION` row + a `FACTION_CREST` emblem.
   - Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side` is a FAIRWAY
     side classified off the hole's `centreline` (`ShotInput.fairwaySide`), NOT the shot bearing.
+  - A Space Ducks / Convict Sheep FAIRWAY save snaps the ball HOME to the fairway SPINE, not the aim line
+    (GS-caddy-snapback, `ShotInput.fairwaySnap` closed over `nearestFairwayPoint`): the old recentre-onto-
+    the-BEARING left a save in the rough whenever the miss was aimed far off the fairway (the bearing points
+    into the rough, so a de-spread version of it still lands off). Now however far offline the miss went, it
+    comes back onto the short grass. Greenside saves still land ON the green (`greenAim`). Guard-only (a
+    guard-less shot passes `undefined` → byte-for-byte), consumes the SAME single `sampleGreenAngle` draw
+    (draw count stable), resolved in the shared `resolveShot` (auto ≡ interactive). On a walled derelict the
+    fairway spine IS the deck spine, so this subsumes the old GS-ship-wall-caddy snap (kept as a backstop).
   - On a WALLED derelict corridor a guard save is DECK-AWARE (GS-ship-wall-caddy, `executeShot`): the
     guard recentres a miss onto the aim-BEARING line, which runs off into space on a BENDING ship
     corridor, and the wall bounce then re-processed that fictional curve-back arc (~81% of caddy saves
