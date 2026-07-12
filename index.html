@@ -1308,6 +1308,10 @@
              `render/hudChrome.ts` ONLY for a ship with a builder (the standard console gets none → byte-
              identical). Absolutely anchored between exit and dial, painted BELOW the controls (z-index 0),
              `pointer-events:none` so map taps + buttons are untouched, and it clips if the gap is tight. ── */
+      /* `left:58px` clears the 46px exit switch (10px pad → its right edge sits at ~56px); `right` stops
+         short of the centre command dial. The exit is CONDITIONAL (hidden on a fresh run's first travel
+         screen — `stopIndex 0` with lanes still open), so when it's absent the console gets `--noexit` and
+         the deck slides left into the freed space instead of leaving a dead strip. */
       .gs-bhud__deck {
         position: absolute; z-index: 0; top: 6px; bottom: 6px; left: 58px; right: calc(50% + 40px);
         display: flex; align-items: center; justify-content: center; gap: 9px;
@@ -1315,6 +1319,7 @@
         -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
         mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
       }
+      .gs-bhud__console--noexit .gs-bhud__deck { left: 14px; }
       .gs-bdeck { display: block; flex: 0 0 auto; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--hud-glow) 60%, transparent)); }
       .gs-bdeck--wheel   { width: 40px; height: 40px; }
       .gs-bdeck--gauge   { width: 30px; height: 30px; }

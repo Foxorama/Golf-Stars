@@ -392,7 +392,7 @@ export function travelScreen(): string {
       </div>
       ${chrome?.frame ?? ''}
       ${bridgeStatusPods()}
-      <div class="gs-bhud__console">
+      <div class="gs-bhud__console${exit ? '' : ' gs-bhud__console--noexit'}">
         ${chrome?.deck ?? ''}
         <div class="gs-bhud__slot gs-bhud__slot--exit">${exit}</div>
         <div class="gs-bhud__slot gs-bhud__slot--scan">${scanner}</div>
