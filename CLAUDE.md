@@ -416,26 +416,20 @@ these systems** — each bullet is the tip of a documented iceberg.
     zoom-out-to-unusable bug can't return; a fresh stop shows with NO scroll). STICKY chrome is absolutely
     anchored to `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map) as a
     BRIDGE HUD (GS-journey-hud, `.gs-bhud`): a starship command FRAME — glowing corner brackets + a bottom
-    command CONSOLE (`.gs-bhud__console`) that COMPLETES the page. The console is ONE SCULPTED dashboard, not a
-    flat bar with widgets dropped on it (GS-journey-map-hud-tweaks — the fix for "controls tacked onto a
-    dashboard background, connected by nothing but placement"): a SINGLE `clip-path` panel whose top edge RISES
-    into three humps over a full-width base — a left EXIT pod, a centre SCANNER binnacle, a right FUEL pod — so
-    the flown ship's livery material (the wagon's wood, etc., set as the console `background`) flows UNBROKEN
-    across every hump and the three controls sit EMBEDDED as recessed WELLS, one cohesive car/plane-style dash.
-    THE RULES for the next editor: the sculpt is on `.gs-bhud__console` ITSELF (not a child housing), so a new
-    livery needs ZERO shape edits — its `background` just fills the polygon; the pods are edge-anchored + the
-    binnacle is `50%`-centred so the shape stays responsive; depth is INSET box-shadow ONLY (outer shadows are
-    clipped away, so the frame's own glow rings it); a variant's `.gs-bhud__console::before` top-lip accent
-    (wagon chrome lip, racer stripe) is clipped off by the sculpt — the shape + material carry identity instead.
-    The 🚪 EXIT is a recessed switch (LEFT), the 📡 SCAN dial a round recessed FACE sunk in the centre binnacle,
-    the ⛽ FUEL gauge the VERTICAL `fuelGaugeHTML({vertical})` tank column sunk into the right pod — vertical so
-    it has room to GROW (the user's ask), growing DOWNWARD into the solid base as capacity upgrades (full
-    headroom past ~base-8 + a few upgrades is a deliberately-DEFERRED later problem); tap → the fuel depot. The
-    fuel cells keep the semantic cyan→amber→red drain colour; the sculpt rims itself in `--hud-accent` (Infinity
-    Ace re-tints the console rim gold). The map's bottom-pad + feather-mask clear the taller (~128px) panel. The
-    exit is bank/end run (two-step confirm). (This SUPERSEDED two rejected takes — a floating fuel PILLAR + a
-    poking scanner keystone; then a flat one-ROW console with a horizontal fuel crammed into a fixed no-grow
-    slot.) The old separate `.gs-travel__topbar` status
+    command BAR (`.gs-bhud__console`) that COMPLETES the page. It is deliberately SHORT (~60px) so the MAP stays
+    the hero (GS-journey-map-hud-tweaks — a tall sculpted dashboard tried earlier ate half the chart and was
+    rejected). It's a premium ship-tinted GLASS strip floating above the map on a drop shadow, seating three
+    instruments as ONE cluster with a clear hierarchy: two dark RECESSED readouts — the 🚪 EXIT switch (left,
+    bank/end run, two-step confirm) and the ⛽ FUEL lit readout (right) — flanking one glowing raised COMMAND
+    dial, the 📡 SCAN (centre focal point). The FUEL is a compact HORIZONTAL `fuelGaugeHTML({icon})` (⛽ · segment
+    cells · big count) recessed like an instrument screen; it grows along its WIDTH as capacity upgrades and the
+    count is the authoritative value (this is the settled answer to the fuel-sizing saga — a vertical tower/pod
+    made the bar too tall; a short bar + horizontal readout keeps the map the hero). Recolours to the flown ship
+    via `--hud-*`; each `.gs-bhud--<variant>` re-tints the glass + its own top-rail `::before` (wagon chrome
+    lip / racer stripe work again on a flat bar), so a livery is still a table row. The map's bottom-pad +
+    feather-mask clear the ~60px bar. (This SUPERSEDED three rejected takes — a floating fuel PILLAR + poking
+    scanner keystone; a flat row with fuel crammed in a fixed no-grow slot; a 128px `clip-path` sculpted panel
+    that covered too much map.) The old separate `.gs-travel__topbar` status
     strip + the floating `.gs-cog` are GONE (GS-journey-map-hud-consolidate): the golfer identity + run
     progress dock into a top-LEFT glass pod (`.gs-bhud__idpod`) and the credits + settings cog into a
     top-RIGHT pod (`.gs-bhud__statpod`) — the top-edge twin of the bottom console, so all four edges of the

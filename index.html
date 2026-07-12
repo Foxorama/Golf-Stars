@@ -1168,17 +1168,17 @@
          a short first stop fits with no scroll, a long voyage pans internally. */
       .gs-travel .gs-journey { flex: 1 1 auto; min-height: 0; border-radius: 12px; }
       /* Inset the SCROLLABLE map so its content clears the sticky bridge chrome that floats OVER it: a
-         top pad past the id/stat pod row (top ~44+32), a bottom pad past the sculpted console panel (its
-         full height ~128 + 10 offset). Without it a long voyage scrolled to the top slid the route worlds
-         UP under the pods, and Earth at the bottom poked past the console outside the frame. */
+         top pad past the id/stat pod row (top ~44+32), a bottom pad past the short command bar (its ~60px
+         height + 10 offset + a little air). Without it a long voyage scrolled to the top slid the route
+         worlds UP under the pods, and Earth at the bottom poked past the console outside the frame. */
       .gs-travel .gs-journey--v {
-        flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; padding: 66px 6px 140px;
+        flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; padding: 66px 6px 88px;
         /* Feather the map (+ its starfield, both live on this element) into the sticky chrome at top and
            bottom, so a world scrolling up toward the pods or a trail node sliding down past the console
            DISSOLVES rather than hard-cutting under the bar or poking out below the frame (the bottom-left
            overspill bug). The opaque band sits inside the pad zones, so nothing important is faded. */
-        -webkit-mask: linear-gradient(180deg, transparent 0, #000 62px, #000 calc(100% - 128px), transparent 100%);
-        mask: linear-gradient(180deg, transparent 0, #000 62px, #000 calc(100% - 128px), transparent 100%);
+        -webkit-mask: linear-gradient(180deg, transparent 0, #000 62px, #000 calc(100% - 82px), transparent 100%);
+        mask: linear-gradient(180deg, transparent 0, #000 62px, #000 calc(100% - 82px), transparent 100%);
       }
       .gs-travel .gs-journey-here { display: none; }
 
@@ -1270,84 +1270,80 @@
       .gs-bhud__cog:active { transform: scale(0.94); }
       .gs-bhud__cog:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
 
-      /* The bottom command CONSOLE — ONE sculpted instrument PANEL, not a flat bar with widgets dropped on
-         it (GS-journey-map-hud-tweaks). A single clip-path shape whose top edge RISES into three moulded
-         humps over a full-width base — a left EXIT pod, a centre SCANNER binnacle, a right FUEL pod — so the
-         ship's livery material (set on THIS element by each `.gs-bhud--<variant>`) flows UNBROKEN across
-         every hump and the console reads as one cohesive dashboard the controls sit EMBEDDED in. Because the
-         shape is on the console itself, a new livery needs no housing edits — its `background` just fills the
-         sculpt. Depth is inset-only (outer shadows are clipped away); the frame's own glow rings it. */
+      /* The bottom COMMAND BAR (GS-journey-map-hud-tweaks) — a SHORT, premium ship-tinted glass strip that
+         keeps the MAP the hero (an earlier 128px sculpted dashboard ate half the chart). It floats above the
+         map on a drop shadow and seats three instruments as ONE cluster with a clear hierarchy: two dark
+         RECESSED readouts (EXIT left, FUEL right) flanking one glowing raised COMMAND dial (SCAN, the focal
+         centre). Recolours to the flown ship via `--hud-*`; each `.gs-bhud--<variant>` re-tints the material
+         + its own top-rail `::before`, so a livery is still a table row. */
       .gs-bhud__console {
-        position: absolute; left: 10px; right: 10px; bottom: 10px; height: 128px;
-        display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; padding: 0 6px;
-        pointer-events: none;
-        background: linear-gradient(180deg, rgba(15,20,30,0.94), rgba(8,11,17,0.98));
-        backdrop-filter: blur(7px);
-        /* The sculpt: bottom edge full-width; the top rises into a left pod, a centre binnacle, a right pod,
-           dipping to a solid base between them. Edge-anchored pods + a 50%-centred binnacle keep it
-           responsive; chamfered shoulders read as the panel swelling up AROUND each control. */
-        clip-path: polygon(
-          0 128px, 0 11px, 54px 11px, 68px 24px, 80px 40px, 92px 50px,
-          calc(50% - 70px) 50px, calc(50% - 58px) 38px, calc(50% - 46px) 20px, calc(50% - 32px) 5px,
-          calc(50% + 32px) 5px, calc(50% + 46px) 20px, calc(50% + 58px) 38px, calc(50% + 70px) 50px,
-          calc(100% - 92px) 50px, calc(100% - 80px) 40px, calc(100% - 68px) 24px, calc(100% - 54px) 11px, 100% 11px, 100% 128px
-        );
+        position: absolute; left: 10px; right: 10px; bottom: 10px; height: 60px;
+        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 0 10px;
+        pointer-events: auto; border-radius: 16px;
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 40%, var(--gs-line));
+        background: linear-gradient(180deg, color-mix(in srgb, var(--hud-accent) 7%, rgba(15,20,30,0.92)), rgba(8,11,17,0.96));
+        backdrop-filter: blur(9px);
         box-shadow:
-          inset 0 2px 0 color-mix(in srgb, var(--hud-accent) 32%, transparent),
-          inset 0 0 0 1px color-mix(in srgb, var(--hud-accent) 20%, transparent),
-          inset 0 0 26px color-mix(in srgb, var(--hud-glow) 42%, transparent);
+          inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 44%, transparent),
+          inset 0 0 22px color-mix(in srgb, var(--hud-glow) 42%, transparent),
+          0 8px 26px rgba(0,0,0,0.5);
       }
-      /* Positioning cells — transparent; they place each control INSIDE its hump. `align-items:start` +
-         a per-control top margin drops the control into the raised zone; the panel material shows above and
-         around it, so it reads as sunk into the dash. Only the controls catch touches. */
-      .gs-bhud__slot { display: flex; align-items: flex-start; min-width: 0; pointer-events: none; }
-      .gs-bhud__slot--exit { justify-self: start; padding-left: 8px; }
+      /* A bright accent hairline along the top edge — the "power rail" that makes the bar read as a live
+         instrument. Variants replace this ::before with their own lip/stripe. */
+      .gs-bhud__console::before {
+        content: ''; position: absolute; left: 16px; right: 16px; top: 0; height: 1.5px; border-radius: 2px; pointer-events: none;
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--hud-accent) 75%, transparent), transparent); opacity: .85;
+      }
+      .gs-bhud__slot { display: flex; align-items: center; min-width: 0; }
+      .gs-bhud__slot--exit { justify-self: start; }
       .gs-bhud__slot--scan { justify-self: center; }
-      .gs-bhud__slot--fuel { justify-self: end; padding-right: 8px; }
+      .gs-bhud__slot--fuel { justify-self: end; }
 
-      /* Shared chrome for the three embedded controls — each a recessed WELL sunk into the panel face
-         (dark dished fill + a hard inner top shadow), so the dashboard material appears to close around it. */
       .gs-travel__scan, .gs-travel__exit, .gs-travel__fuel {
-        pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation; color: var(--gs-ink);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation; color: var(--gs-ink);
         cursor: pointer; transition: transform .08s ease, border-color .16s ease, filter .16s ease, box-shadow .16s ease;
       }
       .gs-travel__scan:active, .gs-travel__exit:active, .gs-travel__fuel:active { transform: scale(0.94); }
-      /* Scanner — the dial FACE sunk into the centre binnacle: a round recessed gauge screen. */
+      /* SCAN — the centre focal COMMAND dial: a glowing round-rect that reads as the bar's primary control. */
       .gs-travel__scan {
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0px;
-        width: 60px; height: 58px; margin-top: 9px; border-radius: 50%; line-height: 1;
-        border: 1px solid color-mix(in srgb, var(--hud-accent) 34%, transparent);
-        background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--hud-accent) 15%, #0a0f18), #05080e);
-        box-shadow: inset 0 3px 8px rgba(0,0,0,0.65), inset 0 0 10px color-mix(in srgb, var(--hud-glow) 40%, transparent), 0 0 9px -4px var(--hud-accent);
+        width: 62px; height: 48px; border-radius: 13px; line-height: 1;
+        border: 1.5px solid color-mix(in srgb, var(--hud-accent) 68%, transparent);
+        background: radial-gradient(120% 120% at 50% 26%, color-mix(in srgb, var(--hud-accent) 26%, #0b111c), #06090f);
+        box-shadow: 0 0 18px -5px var(--hud-accent), inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 46%, transparent), inset 0 0 12px color-mix(in srgb, var(--hud-glow) 55%, transparent);
       }
-      .gs-travel__scan:hover { filter: brightness(1.14); }
-      .gs-travel__scan-ico { font-size: 20px; }
+      .gs-travel__scan:hover { filter: brightness(1.12); box-shadow: 0 0 24px -4px var(--hud-accent), inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 56%, transparent), inset 0 0 15px color-mix(in srgb, var(--hud-glow) 66%, transparent); }
+      .gs-travel__scan-ico { font-size: 19px; }
       .gs-travel__scan-lbl { font-size: 8px; font-weight: 800; letter-spacing: 1px; color: var(--hud-ink); margin-top: 1px; }
-      .gs-travel__scan-cost { font-size: 8.5px; font-weight: 700; color: var(--hud-accent); margin-top: 1px; }
+      .gs-travel__scan-cost { font-size: 8.5px; font-weight: 700; color: var(--hud-accent); margin-top: 0.5px; }
       .gs-travel__scan--off { opacity: .5; cursor: not-allowed; }
       .gs-travel__scan--off .gs-travel__scan-cost { color: var(--gs-danger); }
-      /* Exit — a switch recessed into the LEFT pod, matching the embedded instruments. */
+      /* EXIT — a compact recessed switch at the left. */
       .gs-travel__exit {
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0px;
-        width: 48px; height: 48px; margin-top: 15px; border-radius: 12px; line-height: 1;
+        width: 46px; height: 44px; border-radius: 11px; line-height: 1;
         border: 1px solid #ff6b4a55;
-        background: radial-gradient(circle at 50% 36%, rgba(42,18,14,0.55), rgba(9,12,19,0.7));
-        box-shadow: inset 0 2px 6px rgba(0,0,0,0.55);
+        background: linear-gradient(180deg, rgba(40,18,14,0.5), rgba(9,12,19,0.66));
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
       }
       .gs-travel__exit:hover { border-color: #ff6b4a; filter: brightness(1.1); }
-      .gs-travel__exit-ico { font-size: 20px; }
-      .gs-travel__exit-lbl { font-size: 8px; font-weight: 800; letter-spacing: .8px; color: #ff8b6b; margin-top: 1px; }
-      /* Fuel — the vertical tank column sunk into the RIGHT pod (the pod is its housing, so the button has
-         no bezel: just the tappable stack of cells filling bottom-up + the count). It grows DOWNWARD into
-         the solid base as capacity upgrades (full expansion room is a later refinement). */
+      .gs-travel__exit-ico { font-size: 18px; }
+      .gs-travel__exit-lbl { font-size: 7.5px; font-weight: 800; letter-spacing: .6px; color: #ff8b6b; margin-top: 1.5px; }
+      /* FUEL — a lit horizontal readout screen recessed into the bar (⛽ · segment cells · big count). It
+         grows along its WIDTH as capacity upgrades; the count stays the authoritative value. */
       .gs-travel__fuel {
-        display: flex; align-items: center; justify-content: center; margin-top: 13px; padding: 0; border: none; background: none;
+        display: flex; align-items: center; gap: 5px; max-width: 100%; overflow: hidden;
+        padding: 5px 9px; border-radius: 11px;
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 28%, transparent);
+        background: linear-gradient(180deg, rgba(4,7,12,0.66), rgba(8,11,17,0.5));
+        box-shadow: inset 0 1px 4px rgba(0,0,0,0.6), inset 0 0 9px color-mix(in srgb, var(--hud-glow) 26%, transparent);
       }
-      .gs-travel__fuel:hover { filter: brightness(1.12); }
-      /* Slightly tighter vertical cells so a base-8 tank (and a few upgrades) embeds cleanly in the pod. */
-      .gs-travel__fuel .gs-fuelbar--vert { gap: 2px; }
-      .gs-travel__fuel .gs-fuelbar--vert .gs-fuelbar__cells { gap: 2px; padding: 2.5px; }
-      .gs-travel__fuel .gs-fuelbar--vert .gs-fuelbar__cell { width: 13px; height: 6px; }
+      .gs-travel__fuel:hover { border-color: color-mix(in srgb, var(--hud-accent) 52%, transparent); filter: brightness(1.08); }
+      .gs-travel__fuel .gs-fuelbar { gap: 5px; }
+      .gs-travel__fuel .gs-fuelbar__cells { gap: 1.5px; padding: 2px 3px; }
+      .gs-travel__fuel .gs-fuelbar__cell { width: 4.5px; height: 12px; border-radius: 1.5px; }
+      .gs-travel__fuel .gs-fuelbar__n { font-size: 15px; }
+      .gs-travel__fuel .gs-fuelbar__ico { font-size: 13px; }
 
       /* ══ Bespoke fleet bridges (GS-fleet-bridges) ══════════════════════════════════════════════════
              Every ship's journey HUD is its own command deck, not a tinted default. The SHARED base below
@@ -1535,9 +1531,10 @@
           inset 0 0 20px color-mix(in srgb, var(--hud-glow) 50%, transparent), 0 3px 18px rgba(0,0,0,0.42);
       }
       .gs-bhud--infinity .gs-bhud__console {
-        box-shadow: inset 0 2px 0 color-mix(in srgb, var(--aur1) 40%, transparent),
-          inset 0 0 0 1px color-mix(in srgb, var(--aur1) 26%, transparent),
-          inset 0 0 26px color-mix(in srgb, var(--hud-glow) 50%, transparent);
+        border-color: color-mix(in srgb, var(--aur1) 48%, var(--gs-line));
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--aur1) 46%, transparent),
+          inset 0 0 22px color-mix(in srgb, var(--hud-glow) 50%, transparent),
+          0 8px 26px rgba(0,0,0,0.5);
       }
       .gs-bhud--infinity .gs-bhud__cog { border-color: color-mix(in srgb, var(--aur1) 44%, var(--gs-line)); }
       .gs-bhud--infinity .gs-bhud__console::before {

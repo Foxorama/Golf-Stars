@@ -371,26 +371,25 @@
       130px tile that drifts LESS per cycle than the 180px near tile (same 54s), so it moves slower in px/sec
       = a genuinely deeper plane. Nebulae stay pinned. Still fully seeded/deterministic (the twinkle stream
       is `journeyMapHTML`'s own local `rnd`, no sim/save/rng-stream impact).
-      (2) **Console = ONE SCULPTED DASHBOARD.** The scanner + fuel read as widgets tacked onto a dashboard
-      BACKGROUND, connected by nothing but placement. Two intermediate takes were rejected in review: a
-      floating vertical fuel PILLAR + a poking scanner keystone (still "on top of" the dash); then a flat
-      one-ROW console with a HORIZONTAL fuel gauge crammed into a fixed slot (no room to GROW on a capacity
-      upgrade — it would shrink illegibly) plus separate dark "moulded housing" boxes (still read as boxes ON
-      the bar, a different material from it). The landing: the console is now a SINGLE `clip-path` panel whose
-      top edge RISES into three humps over a full-width base — a left EXIT pod, a centre SCANNER binnacle, a
-      right FUEL pod — so the ship's livery material (the wagon's wood, etc., set as the console `background`)
-      flows UNBROKEN across every hump and the three controls sit EMBEDDED as recessed wells, one cohesive
-      car/plane-style dash. KEY CSS facts for the next editor: the sculpt is on `.gs-bhud__console` ITSELF (not
-      a child/housing), so a livery needs zero housing edits — its `background` just fills the shape; the pods
-      are edge-anchored + the binnacle is 50%-centred so the polygon stays responsive; depth is INSET box-
-      shadow only (outer shadows are clipped away by `clip-path`, so the frame's own glow does the outer ring);
-      the fuel is BACK to the vertical `fuelGaugeHTML({vertical})` column (the user's ask — a vertical tank has
-      room to grow), sunk into the right pod and growing DOWNWARD into the solid base (full expansion headroom
-      past ~base-8 + a few upgrades is a deliberately-deferred LATER problem). Variant `.gs-bhud__console::before`
-      top-lip accents (wagon chrome lip, racer stripe) are now clipped off by the sculpt — acceptable, the
-      shape + material carry identity. Map bottom-pad + feather-mask bumped to clear the taller (~128px) panel.
-      Verified via `scripts/travel-preview.mjs QS="?ship=…"` (wagon / infinity) at 400 + 360 px; `npm run
-      check` green. Pure app/render + CSS — no reducer/save/rng/`_gs*`/URL hook.
+      (2) **Console → a SHORT premium COMMAND BAR (the settled design).** The scanner + fuel read as widgets
+      tacked onto a dashboard BACKGROUND. This went through THREE rejected takes before landing, worth recording
+      so nobody re-treads them: (a) a floating vertical fuel PILLAR + a poking scanner keystone — still read as
+      instruments sitting ON TOP of the dash; (b) a flat one-ROW console with a HORIZONTAL fuel crammed into a
+      fixed grid slot — no room to GROW on a capacity upgrade (shrinks illegibly), plus separate dark "moulded
+      housing" boxes that still read as boxes ON the bar; (c) a 128px `clip-path` SCULPTED panel with three
+      humps the controls embed into — genuinely cohesive AND variant-agnostic (the livery `background` fills the
+      shape), BUT it was TALL because the vertical fuel forced the height, and it covered too much MAP. The
+      LESSON: the vertical fuel gauge was the thing forcing height; drop it and the whole problem dissolves. The
+      LANDING: a SHORT (~60px) ship-tinted GLASS command bar that keeps the map the hero — a drop shadow floats
+      it off the chart; it seats three instruments as one cluster with a clear hierarchy (two dark RECESSED
+      readouts — EXIT left, FUEL right — flanking one glowing raised COMMAND dial, SCAN, the focal centre). The
+      fuel returns to a COMPACT HORIZONTAL `fuelGaugeHTML({icon})` readout (⛽ · cells · big count) recessed like
+      an instrument screen — it grows along its WIDTH now, and the count is authoritative. Cohesion comes from
+      the shared glass frame + consistent control language + the deliberate readout/command hierarchy, not from
+      a sculpt. Variant `.gs-bhud__console::before` top-lip accents (wagon chrome lip, racer stripe) work again
+      on the flat bar. Map bottom-pad + feather-mask returned to the short-bar clearance (~82px). Verified via
+      `scripts/travel-preview.mjs QS="?ship=…"` (wagon / infinity) at 400 + 360 px; `npm run check` green. Pure
+      app/render + CSS — no reducer/save/rng/`_gs*`/URL hook.
 - **The route you pick DETERMINES the next biome (GS-journey-biome, `run.ts`).** A jump used to set
   only distance + a credit/cut event, while the stop's WORLD was a separate deterministic draw
   (`themeForStop`) — so you chose a lane and arrived in an unrelated biome. Now each `Route` carries a
