@@ -427,7 +427,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     docked `.gs-bhud__cog` dispatches the same `data-open-settings` as the global cog, which `app.ts`
     SUPPRESSES on the travel screen (like the full-bleed play view) so there's no double button. The pods
     recolour to the ship via the SAME `--hud-*` props and leave the frame's top CENTRE clear for a livery
-    title plate. The frame RECOLOURS + RESHAPES to the flown ship via `hudThemeForShip`
+    title plate. TOP-BAND SPACING (GS-journey-map-hud-spacing): the ship-name title plate owns the very top
+    ROW; the id/stat pods dock a ROW BELOW it (`top:44px`) so the livery name never overlaps the golfer
+    name / credits, clearing the centre-hanging ornaments too (wagon dice ~41px, racer stripe ~40px, feather
+    wings) — the `standard` no-plate console rides its pods back up to `top:12px`. The scrollable map
+    (`.gs-travel .gs-journey--v`) is INSET (top pad past the pods, bottom pad past the console+fuel pillar)
+    AND feather-MASKED top+bottom, so a long voyage's route worlds never slide up UNDER the pods and Earth
+    never pokes past the console outside the frame (both dissolve into the chrome instead). The frame
+    RECOLOURS + RESHAPES to the flown ship via `hudThemeForShip`
     (`render/hudTheme.ts`) → `--hud-*` custom properties + a `variant` on `.gs-bhud`; a per-fleet livery
     is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan) with a `variant`, its frame SHAPE a
     `.gs-bhud--<variant>` block, its bespoke CHROME a `render/hudChrome.ts` builder (bridge ICONS + labels

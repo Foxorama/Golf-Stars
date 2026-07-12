@@ -1155,7 +1155,19 @@
       /* The chart keeps its intrinsic tall size (never scaled down — the old zoom-out bug can't return);
          a short first stop fits with no scroll, a long voyage pans internally. */
       .gs-travel .gs-journey { flex: 1 1 auto; min-height: 0; border-radius: 12px; }
-      .gs-travel .gs-journey--v { flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; }
+      /* Inset the SCROLLABLE map so its content clears the sticky bridge chrome that floats OVER it: a
+         top pad past the id/stat pod row (top ~44+32), a bottom pad past the console + fuel pillar
+         (bottom ~64 + the scanner's 14px overhang). Without it a long voyage scrolled to the top slid the
+         route worlds UP under the pods, and Earth at the bottom poked past the console outside the frame. */
+      .gs-travel .gs-journey--v {
+        flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; padding: 66px 6px 90px;
+        /* Feather the map (+ its starfield, both live on this element) into the sticky chrome at top and
+           bottom, so a world scrolling up toward the pods or a trail node sliding down past the console
+           DISSOLVES rather than hard-cutting under the bar or poking out below the frame (the bottom-left
+           overspill bug). The opaque band sits inside the pad zones, so nothing important is faded. */
+        -webkit-mask: linear-gradient(180deg, transparent 0, #000 62px, #000 calc(100% - 84px), transparent 100%);
+        mask: linear-gradient(180deg, transparent 0, #000 62px, #000 calc(100% - 84px), transparent 100%);
+      }
       .gs-travel .gs-journey-here { display: none; }
 
       /* ── The bridge HUD (GS-journey-hud): a starship command-console FRAME wrapping the star map.
@@ -1203,7 +1215,11 @@
          left clear for a livery title plate (the Infinity Ace's nameplate). Anchored to the frame, inside
          the corner brackets; `pointer-events:auto` so the cog catches touches while `.gs-bhud` stays none. */
       .gs-bhud__idpod, .gs-bhud__statpod {
-        position: absolute; top: 10px; height: 34px; display: flex; align-items: center; gap: 8px;
+        /* A SECOND row BELOW the hanging title plate (top:2px) + its centre-hanging ornaments (the wagon
+           dice at 41px, the racer stripe at 40px, the feather wings). Docking the pods at 44px clears all of
+           them so the ship NAME never overlaps the golfer name / credits (the top-crowding bug). The map is
+           padded to match (`.gs-travel .gs-journey--v`) so the worlds start below this whole top band. */
+        position: absolute; top: 44px; height: 32px; display: flex; align-items: center; gap: 8px;
         padding: 0 10px; pointer-events: auto; border-radius: 12px; max-width: 46%;
         border: 1px solid color-mix(in srgb, var(--hud-accent) 34%, var(--gs-line));
         background: linear-gradient(180deg, rgba(13,18,27,0.82), rgba(8,11,17,0.93));
@@ -1214,7 +1230,10 @@
           0 3px 16px rgba(0,0,0,0.4);
       }
       .gs-bhud__idpod { left: 12px; min-width: 0; max-width: 56%; }
-      .gs-bhud__statpod { right: 12px; padding-right: 4px; }
+      .gs-bhud__statpod { right: 12px; padding-right: 4px; max-width: 40%; }
+      /* The standard cyan console (an unknown/base ship) hangs NO title plate, so there's nothing above the
+         pods to clear — they ride back up at the top edge instead of leaving an empty band. */
+      .gs-bhud--standard .gs-bhud__idpod, .gs-bhud--standard .gs-bhud__statpod { top: 12px; }
       .gs-bhud__who {
         font-size: 14px; font-weight: 800; min-width: 0; display: flex; align-items: baseline; gap: 4px;
       }
