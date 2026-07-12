@@ -464,7 +464,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     chopper — each with its own scanner/exit/fuel instruments and its ship NAME on the title plate
     (`hudChromeFor(variant, ship)`). The SHARED ornament + instrument BASE (title plate / rails / nodes /
     wings / themed SVG icons, all reading `--hud-*`) lives once; each `.gs-bhud--<variant>` re-tints or
-    reshapes it. The **Infinity Ace** (GS-infinity-hud, the hole-150 grail) is the reference full reskin:
+    reshapes it. **GS-fleet-dashboards**: each livery also drops a bespoke `HudChrome.deck` — a physical
+    instrument CLUSTER (`.gs-bhud__deck`) — into the console's LEFT gap (the reliably-clear ~90px between
+    the exit switch and the centre command dial; the fuel readout owns the right gap, growing with tank
+    capacity), so a dashboard reads as its OWN cockpit, not the same three pills recoloured: a woody
+    STEERING WHEEL + speed dial (wagon), a redline tach + toggle bank (racer), rune stones + a bronze gauge
+    (Valkyrie), a saucer light-ring dial (Mothership), an oscilloscope (neon bike / Infinity Ace), … built
+    from a shared `DECK` instrument kit (wheel/gauge/redline/switches/leds/faders/knob/wave/runes/saucer/
+    dimple SVGs, all reading `--hud-*`) composed via `deckRow(...)`. The deck is pure decorative SVG —
+    absolutely anchored between exit and dial, painted BELOW the controls (`.gs-bhud__slot` gets
+    `z-index:1`), `pointer-events:none` so map taps + buttons are untouched, mask-faded + `overflow:hidden`
+    so it clips if the gap is tight. `''` for the standard console → byte-identical. A new fleet's deck is a
+    `deckRow` of kit pieces + `.gs-bdeck*` CSS, never a layout edit. The **Infinity Ace** (GS-infinity-hud, the hole-150 grail) is the reference full reskin:
     `variant:'infinity'` unlocks `.gs-bhud--infinity` (a rotating living-aurora ring — @property
     `--gs-aur-angle`, the ship's gold→emerald→aquamarine→violet palette — gold double-rim + inner wash,
     a phoenix-wing CANOPY, breathing corner L-brackets) AND its chrome swaps the controls for a

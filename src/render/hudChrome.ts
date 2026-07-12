@@ -37,6 +37,14 @@ export interface HudChrome {
   /** Decorative frame ornaments injected inside `.gs-bhud` (title plate, side rails, corner nodes, a
    *  wing/crest). All `aria-hidden` + pointer-events:none so map taps still pass through. */
   frame: string;
+  /** The console DECK cluster (GS-fleet-dashboards): a bespoke instrument panel dropped into the console's
+   *  LEFT gap (between the exit switch and the centre command dial — the one reliably-clear ~90px on every
+   *  console, since the fuel readout owns the right gap). This is what makes each dashboard read as its OWN
+   *  cockpit rather than the same three pills recoloured: a woody steering wheel + speed dial for the wagon,
+   *  a tach + toggle bank for the racer, an oscilloscope for the neon bike, rune stones for the Valkyrie, …
+   *  Pure decorative SVG (`pointer-events:none`, painted BELOW the real controls) so map taps + the buttons
+   *  are untouched; it clips gracefully if the gap is tight. `''` for the standard console (byte-identical). */
+  deck: string;
 }
 
 // ── shared ornament markup ─────────────────────────────────────────────────────────────────────────
@@ -223,6 +231,106 @@ const ICON = {
      <path class="gs-bico__spark" d="M10 9 C7 12 8 14 10 18 C12 14 13 12 10 9 Z" fill="${B}"/>`),
 };
 
+// ── the console DECK instrument kit (GS-fleet-dashboards) ──────────────────────────────────────────────
+// A small library of physical cockpit instruments — a steering wheel, round gauges with sweeping needles,
+// toggle-switch banks, blinking LED strips, faders, rotary knobs, an oscilloscope, rune stones. Each is a
+// compact inline SVG reading the SAME livery props (A/B/K), so it recolours to whatever fleet flies it; the
+// matching `.gs-bdeck*` CSS (index.html) sizes + animates them. A variant's `deck` is a `deckRow(...)` of one
+// or two of these, dropped into the console's left gap — a proper instrument panel, not a lone glyph.
+function svgd(cls: string, vb: string, body: string): string {
+  return `<svg class="gs-bdeck ${cls}" viewBox="${vb}" aria-hidden="true">${body}</svg>`;
+}
+/** Lay a cluster of instruments in a flex row inside the console's left-gap deck. */
+function deckRow(...items: string[]): string {
+  return `<span class="gs-bhud__deck" aria-hidden="true">${items.join('')}</span>`;
+}
+
+const DECK = {
+  // A three-spoke STEERING WHEEL — the wagon's hero instrument. The rim/spokes rock gently (a road-trip
+  // wheel held light in the hands); the chrome hub reads the ink colour.
+  wheel: svgd('gs-bdeck--wheel', '0 0 40 40',
+    `<g class="gs-bdeck__rock">
+       <circle cx="20" cy="20" r="18" fill="none" stroke="${A}" stroke-width="3"/>
+       <circle cx="20" cy="20" r="18" fill="none" stroke="${B}" stroke-width="1" opacity=".55"/>
+       <circle cx="20" cy="20" r="14.5" fill="none" stroke="${B}" stroke-width="1" opacity=".4"/>
+       <line x1="20" y1="24.5" x2="20" y2="37.5" stroke="${A}" stroke-width="3" stroke-linecap="round"/>
+       <line x1="16" y1="17.4" x2="4.5" y2="11" stroke="${A}" stroke-width="3" stroke-linecap="round"/>
+       <line x1="24" y1="17.4" x2="35.5" y2="11" stroke="${A}" stroke-width="3" stroke-linecap="round"/>
+       <circle cx="20" cy="20" r="5" fill="none" stroke="${A}" stroke-width="2.4"/>
+       <circle cx="20" cy="20" r="2.6" fill="${K}"/>
+     </g>`),
+  // A round GAUGE with a lower tick arc + a sweeping needle (reuses the shared needle motion). The generic
+  // dashboard dial — speedo / temp / load, tinted by the livery.
+  gauge: svgd('gs-bdeck--gauge', '0 0 28 28',
+    `<circle cx="14" cy="14" r="12" fill="none" stroke="${B}" stroke-width="1.4" opacity=".6"/>
+     <circle cx="14" cy="14" r="12" fill="none" stroke="${A}" stroke-width="1" opacity=".3"/>
+     <g stroke="${A}" stroke-width="1" opacity=".55">
+       <line x1="4.4" y1="20" x2="6.2" y2="18.8"/><line x1="5.2" y1="10.5" x2="7" y2="11.6"/>
+       <line x1="14" y1="4.4" x2="14" y2="6.6"/>
+       <line x1="22.8" y1="10.5" x2="21" y2="11.6"/><line x1="23.6" y1="20" x2="21.8" y2="18.8"/></g>
+     <g class="gs-bico__needle"><line x1="14" y1="16" x2="20" y2="8.4" stroke="${A}" stroke-width="1.8" stroke-linecap="round"/></g>
+     <circle cx="14" cy="16" r="2" fill="${A}"/>`),
+  // A REDLINE gauge — the racer/chopper tach: the same dial with a hot red danger arc up top.
+  redline: svgd('gs-bdeck--gauge', '0 0 28 28',
+    `<circle cx="14" cy="14" r="12" fill="none" stroke="${B}" stroke-width="1.4" opacity=".55"/>
+     <path d="M17 3.6 A12 12 0 0 1 24.3 11" fill="none" stroke="#ff5a4a" stroke-width="2"/>
+     <g stroke="${A}" stroke-width="1" opacity=".5">
+       <line x1="4.4" y1="20" x2="6.2" y2="18.8"/><line x1="5.2" y1="10.5" x2="7" y2="11.6"/>
+       <line x1="14" y1="4.4" x2="14" y2="6.6"/></g>
+     <g class="gs-bico__needle"><line x1="14" y1="16" x2="20.5" y2="9" stroke="${A}" stroke-width="1.8" stroke-linecap="round"/></g>
+     <circle cx="14" cy="16" r="2" fill="${A}"/>`),
+  // A TOGGLE-SWITCH bank — three little flip switches, the middle one thrown UP (lit). Static, reads as a
+  // real control cluster.
+  switches: svgd('gs-bdeck--switches', '0 0 34 28',
+    `<g fill="none" stroke="${B}" stroke-width="1.2">
+       <rect x="3" y="4" width="7" height="20" rx="3.5"/><rect x="13.5" y="4" width="7" height="20" rx="3.5"/><rect x="24" y="4" width="7" height="20" rx="3.5"/></g>
+     <circle cx="6.5" cy="19" r="3" fill="${B}"/>
+     <circle cx="17" cy="9" r="3" fill="${A}"/><circle cx="17" cy="9" r="3" fill="none" stroke="${A}" stroke-width="1" opacity=".6"/>
+     <circle cx="27.5" cy="19" r="3" fill="${B}"/>`),
+  // A blinking LED indicator STRIP — four status lamps that chase (the `gs-bdeck__leds` class blinks them).
+  leds: svgd('gs-bdeck--leds', '0 0 32 12',
+    `<g class="gs-bdeck__leds">
+       <circle cx="4" cy="6" r="3" fill="${A}"/><circle cx="13.3" cy="6" r="3" fill="${K}"/>
+       <circle cx="22.6" cy="6" r="3" fill="${A}"/><circle cx="31.9" cy="6" r="3" fill="${K}"/></g>`),
+  // Vertical FADERS — two channel sliders with lit handles partway up (a mixing-desk feel).
+  faders: svgd('gs-bdeck--faders', '0 0 26 30',
+    `<g stroke="${B}" stroke-width="1.2"><line x1="7" y1="3" x2="7" y2="27"/><line x1="19" y1="3" x2="19" y2="27"/></g>
+     <rect x="3.5" y="9" width="7" height="4.5" rx="1.5" fill="${A}"/>
+     <rect x="15.5" y="16" width="7" height="4.5" rx="1.5" fill="${A}"/>`),
+  // A rotary KNOB — a dial with a pointer + a ring of set-dots; turns slowly (`gs-bdeck__knob`).
+  knob: svgd('gs-bdeck--knob', '0 0 28 28',
+    `<circle cx="14" cy="14" r="11" fill="none" stroke="${B}" stroke-width="1" opacity=".5"/>
+     <g class="gs-bdeck__knob">
+       <circle cx="14" cy="14" r="7.5" fill="none" stroke="${A}" stroke-width="1.8"/>
+       <line x1="14" y1="14" x2="14" y2="7" stroke="${A}" stroke-width="1.8" stroke-linecap="round"/></g>
+     <g fill="${A}" opacity=".7"><circle cx="14" cy="2.6" r="1"/><circle cx="25.4" cy="14" r="1"/><circle cx="14" cy="25.4" r="1"/><circle cx="2.6" cy="14" r="1"/></g>`),
+  // An OSCILLOSCOPE waveform — a glowing trace that drifts (`gs-bdeck__wave`), the neon/aurora bridges' monitor.
+  wave: svgd('gs-bdeck--wave', '0 0 52 26',
+    `<rect x="1" y="1" width="50" height="24" rx="3" fill="none" stroke="${B}" stroke-width="1" opacity=".5"/>
+     <line x1="2" y1="13" x2="50" y2="13" stroke="${B}" stroke-width=".8" opacity=".35"/>
+     <path class="gs-bdeck__wave" d="M2 13 L8 13 L11 6 L15 20 L19 9 L23 16 L27 13 L33 13 L36 7 L40 19 L44 11 L50 13" fill="none" stroke="${A}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`),
+  // A spinning saucer LIGHT-RING dial — the Mothership's probe read-out.
+  saucer: svgd('gs-bdeck--knob', '0 0 28 28',
+    `<ellipse cx="14" cy="14" rx="12" ry="5" fill="none" stroke="${A}" stroke-width="1.4"/>
+     <g class="gs-bdeck__leds"><circle cx="3" cy="14" r="1.5" fill="${A}"/><circle cx="8" cy="17.4" r="1.5" fill="${K}"/>
+       <circle cx="14" cy="19" r="1.5" fill="${A}"/><circle cx="20" cy="17.4" r="1.5" fill="${K}"/><circle cx="25" cy="14" r="1.5" fill="${A}"/></g>
+     <circle cx="14" cy="14" r="3" fill="none" stroke="${B}" stroke-width="1.2"/>`),
+  // Three RUNE STONES — the Valkyrie war-bridge's seer tablets, each scribed with a bind-rune.
+  runes: svgd('gs-bdeck--runes', '0 0 44 26',
+    `<g fill="none" stroke="${A}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+       <rect x="2" y="4" width="11" height="18" rx="2" opacity=".5" stroke="${B}"/>
+       <path d="M5 8 L5 18 M5 8 L10 12 L5 15"/>
+       <rect x="16.5" y="4" width="11" height="18" rx="2" opacity=".5" stroke="${B}"/>
+       <path d="M19.5 7 L19.5 19 M19.5 7 L24.5 11 M19.5 13 L24.5 19"/>
+       <rect x="31" y="4" width="11" height="18" rx="2" opacity=".5" stroke="${B}"/>
+       <path d="M36.5 7 L36.5 19 M33.5 9 L39.5 9"/></g>`),
+  // A tight dimple RADAR — the Comet Rider's golf-ball tracker: a sweep over a dimpled disc.
+  dimple: svgd('gs-bdeck--gauge', '0 0 28 28',
+    `<circle cx="14" cy="14" r="12" fill="none" stroke="${A}" stroke-width="1.4"/>
+     <g fill="${B}" opacity=".55"><circle cx="10" cy="10" r="1.1"/><circle cx="18" cy="10" r="1.1"/><circle cx="14" cy="14" r="1.1"/><circle cx="10" cy="18" r="1.1"/><circle cx="18" cy="18" r="1.1"/></g>
+     <g class="gs-bico__sweep"><path d="M14 14 L14 2.5 A11.5 11.5 0 0 1 23 7 Z" fill="${A}" opacity=".28"/></g>`),
+};
+
 // ── per-variant bridge builders ──────────────────────────────────────────────────────────────────────
 // Each names the bridge after the ACTUAL ship (`ship.name`) and dresses it with fitting instruments.
 type ChromeBuilder = (ship: Ship) => HudChrome;
@@ -236,6 +344,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.infRadar,
     exitIcon: ICON.airlock,
     fuelIcon: ICON.plasma,
+    deck: deckRow(DECK.wave, DECK.leds),
     frame: ornaments(
       titlePlate(s.name, '∞', '∞'),
       `<span class="gs-bhud__wing gs-bhud__wing--l" aria-hidden="true"></span>
@@ -250,6 +359,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.compass,
     exitIcon: ICON.cardoor,
     fuelIcon: ICON.jerrycan,
+    deck: deckRow(DECK.wheel, DECK.gauge),
     frame: ornaments(
       titlePlate(s.name, '🧭', '🎲'),
       `<span class="gs-bhud__dice" aria-hidden="true"></span>`,
@@ -262,6 +372,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.tacho,
     exitIcon: ICON.airlock,
     fuelIcon: ICON.drum,
+    deck: deckRow(DECK.redline, DECK.switches),
     frame: ornaments(
       titlePlate(s.name, '»', '«'),
       `<span class="gs-bhud__stripe" aria-hidden="true"></span>`,
@@ -274,6 +385,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.dish,
     exitIcon: ICON.bulkhead,
     fuelIcon: ICON.drum,
+    deck: deckRow(DECK.switches, DECK.gauge),
     frame: ornaments(titlePlate(s.name, '▤', '▤')),
   }),
   // The Exotic saucer — an alien probe bridge: orbital scanner, teleport exit, bio-cell, a floating ring.
@@ -283,6 +395,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.orbit,
     exitIcon: ICON.teleport,
     fuelIcon: ICON.biocell,
+    deck: deckRow(DECK.knob, DECK.faders),
     frame: ornaments(
       titlePlate(s.name, '◌', '◌'),
       `<span class="gs-bhud__ring" aria-hidden="true"></span>`,
@@ -295,6 +408,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.speedo,
     exitIcon: ICON.killswitch,
     fuelIcon: ICON.flametank,
+    deck: deckRow(DECK.wave, DECK.leds),
     frame: ornaments(titlePlate(s.name, '⟫', '⟪')),
   }),
   // The Valkyrie Pegasus — an Asgardian runic war-bridge: rune scanner, shield gate, rune crystal, wings.
@@ -304,6 +418,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.rune,
     exitIcon: ICON.shield,
     fuelIcon: ICON.runecrystal,
+    deck: deckRow(DECK.runes, DECK.gauge),
     frame: ornaments(
       titlePlate(s.name, 'ᚨ', 'ᚱ'),
       `<span class="gs-bhud__wing gs-bhud__wing--l gs-bhud__wing--bronze" aria-hidden="true"></span>
@@ -317,6 +432,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.ufoRing,
     exitIcon: ICON.teleport,
     fuelIcon: ICON.reactor,
+    deck: deckRow(DECK.saucer, DECK.gauge),
     frame: ornaments(
       titlePlate(s.name, '⏣', '⏣'),
       `<span class="gs-bhud__ring gs-bhud__ring--saucer" aria-hidden="true"></span>`,
@@ -329,6 +445,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.comet,
     exitIcon: ICON.airlock,
     fuelIcon: ICON.plasma,
+    deck: deckRow(DECK.dimple, DECK.faders),
     frame: ornaments(
       titlePlate(s.name, '☄', '☄'),
       `<span class="gs-bhud__tail gs-bhud__tail--l" aria-hidden="true"></span>
@@ -342,6 +459,7 @@ const BUILDERS: Record<string, ChromeBuilder> = {
     scanIcon: ICON.bolt,
     exitIcon: ICON.killswitch,
     fuelIcon: ICON.flametank,
+    deck: deckRow(DECK.redline, DECK.knob),
     frame: ornaments(
       titlePlate(s.name, '⚡', '⚡'),
       `<span class="gs-bhud__flames" aria-hidden="true"></span>`,
