@@ -42,7 +42,7 @@ import {
   type RunSnapshot,
 } from '../sim/rpg/run';
 import { effectPatchKind } from '../sim/rpg/effects';
-import { isMatchplayBoss, ASGARD_FORMAT } from '../sim/rpg/formats';
+import { isMatchplayBoss, ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import {
   playMatchStop,
   playTeamMatchStop,
@@ -79,6 +79,7 @@ import {
   endlessProgressUpdates,
   resolveAsgard,
   resolveBossId,
+  resolveStrokePlay,
   runEndUpdates,
   withAsgardPortal,
   withBestBallPartner,
@@ -201,6 +202,10 @@ export function reduce(state: UiState, action: Action): UiState {
       const bagTierByCharacter = action.bagTier
         ? { ...state.bagTierByCharacter, [action.characterId]: bagTier }
         : state.bagTierByCharacter;
+      // STAR TOUR (GS-star-tour): a stroke-play run pins the course + weather picked on the star map so
+      // `startRun` bakes them onto the run and `currentCourse` serves the fixed layout. Only for the
+      // strokeplay format with a pending pick — every other mode passes undefined (byte-for-byte).
+      const pick = state.run.formatId === STROKEPLAY_FORMAT ? state.starTourPick : undefined;
       const run = startRun(
         state.run.seed,
         state.run.formatId,
@@ -209,6 +214,8 @@ export function reduce(state: UiState, action: Action): UiState {
         asc,
         bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
+        pick?.courseId,
+        pick?.effect,
       );
       // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
       // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
@@ -238,6 +245,40 @@ export function reduce(state: UiState, action: Action): UiState {
         resumable: undefined,
         viewHole: 0,
       };
+    }
+
+    case 'openStarTour': {
+      // GS-star-tour: open the free-roam star map course picker. Reachable from the title and from the
+      // post-round recap / a between-run screen. A placeholder strokeplay run backs the map (character +
+      // pinned course layer on at `pickStarTourCourse` → `selectCharacter`), exactly as the title's
+      // generic `start` backs character select. The parked Voyage/Unending resume is left untouched —
+      // Star Tour is a side mode that never consumes it (the placeholder run has no character, so
+      // persist never snapshots it over the resumable offer).
+      if (!['title', 'gameover', 'strokeResult', 'starTour'].includes(state.screen)) return state;
+      const run = startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades);
+      return {
+        ...state,
+        run,
+        screen: 'starTour',
+        starTourPick: undefined,
+        played: undefined,
+        lastResult: undefined,
+        lastStrokeRecord: undefined,
+        strokeIsRecord: undefined,
+        viewHole: 0,
+      };
+    }
+
+    case 'pickStarTourCourse': {
+      // GS-star-tour: a course + weather chosen on the star map. Remember the pick and step to character
+      // select; `selectCharacter` bakes it onto the run. Guarded to the star map.
+      if (state.screen !== 'starTour') return state;
+      return { ...state, starTourPick: { courseId: action.courseId, effect: action.effect }, screen: 'character' };
+    }
+
+    case 'exitStarTour': {
+      if (state.screen !== 'starTour') return state;
+      return { ...state, screen: 'title', starTourPick: undefined };
     }
 
     case 'play': {
@@ -291,6 +332,9 @@ export function reduce(state: UiState, action: Action): UiState {
         };
       }
       const { run, result, played } = playStop(state.run, { prevBestHoles: state.endlessBestHoles });
+      // Star Tour (GS-star-tour): a watched round is scored to the personal course-record boards, not the
+      // Stableford cut/travel flow — resolve it like Asgard and land on the record recap.
+      if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, played);
       // The Asgard tournament (GS-asgard) is scored on total gross vs the Warriors Three, not the cut —
       // resolve it here instead of the ordinary result flow (a watched Asgard stop still resolves).
       if (state.run.formatId === ASGARD_FORMAT) return resolveAsgard(state, played);
@@ -574,6 +618,8 @@ export function reduce(state: UiState, action: Action): UiState {
       if (nextIdx < total) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
+      // Star Tour (GS-star-tour): the 18-hole round is complete — bank it to the course-record boards.
+      if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, stopPlayed);
       // The Asgard tournament (GS-asgard) is decided on total gross vs the Warriors Three — resolve it
       // here rather than through the ordinary Stableford-cut flow.
       if (state.run.formatId === ASGARD_FORMAT) return resolveAsgard(state, stopPlayed);

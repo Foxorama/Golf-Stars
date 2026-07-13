@@ -18,8 +18,10 @@ import { archetypeFor, themeById } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
 import { routeClubFind } from '../sim/rpg/effects';
 import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed } from '../sim/rpg/run';
-import { getFormat, isMatchplayBoss, isTeamDuelBoss } from '../sim/rpg/formats';
-import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar } from '../sim/rpg/endless';
+import { getFormat, isMatchplayBoss, isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
+import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
+import { staticCourseSpec } from '../sim/course/staticCourses';
 import type { EndlessCardData } from '../render/endlessCards';
 import { arcSurvivorTarget } from '../sim/rpg/competition';
 import { leaderboard, runField } from '../sim/rpg/league';
@@ -143,6 +145,13 @@ function introShared(): {
 
   const objective = `${(() => {
     const format = getFormat(state.run.formatId);
+    if (format.id === STROKEPLAY_FORMAT) {
+      // Star Tour (GS-star-tour): a stroke-play round chasing a personal course record.
+      const best = bestStrokeFor(state.strokePlayBest, state.run.staticCourseId ?? '');
+      return best
+        ? `⛳ 18 holes, stroke play — beat your course record of <b style="color:${toParColour(best.toPar)};">${formatToPar(best.toPar)}</b>.`
+        : `⛳ 18 holes, stroke play — set the first course record on ${c.holes.length} holes.`;
+    }
     if (duel)
       return `⚔ Win the <b>${teamFormatLabel(duel.format)} duel</b> hole by hole — ${
         duel.partnerSide === 'player' ? 'your partner has your back' : 'you give up the partner advantage'
@@ -168,6 +177,32 @@ function introShared(): {
   }`;
 
   return { c, zone, theme, col, par, rar, diffPips, notes, salvageNote, objective, boss };
+}
+
+/** Star Tour (GS-star-tour): the personal course-record card for the intro's field slot — this
+ *  course's best + your best rounds overall. */
+function strokeRecordsCard(): string {
+  const courseId = state.run.staticCourseId ?? '';
+  const here = bestStrokeFor(state.strokePlayBest, courseId);
+  const board = bestStrokeRounds(state.strokePlayBest, 5);
+  const rows = board.length
+    ? board
+        .map((r, i) => {
+          const s = staticCourseSpec(r.courseId);
+          const isHere = r.courseId === courseId;
+          return `<div class="gs-st-boardrow${isHere ? ' gs-st-boardrow--you' : ''}"><span class="gs-st-boardrank">${i + 1}</span><span class="gs-st-boardname">${s?.name ?? r.courseId}</span><span class="gs-st-boardscore" style="color:${toParColour(r.toPar)};">${formatToPar(r.toPar)}</span></div>`;
+        })
+        .join('')
+    : `<div class="gs-st-boardempty">No records yet — this round could be your first.</div>`;
+  return `
+    <div class="gs-panel gs-st-introcard">
+      <div class="gs-st-introcard__row">
+        <span class="gs-st-introcard__label">Your record here</span>
+        <span class="gs-st-introcard__score" style="color:${here ? toParColour(here.toPar) : '#8791a3'};">${here ? formatToPar(here.toPar) : '—'}</span>
+      </div>
+      <div class="gs-st-sheet__wxlabel" style="margin-top:8px;">Best rounds overall</div>
+      <div class="gs-st-board">${rows}</div>
+    </div>`;
 }
 
 /** The stop briefing: the arc step or the hole step (GS-intro-split), chosen by view state. */
@@ -203,7 +238,11 @@ function arcIntroScreen(): string {
   // set, instead of the voyage's ghost competitor board. Gated to the gate format (voyage untouched).
   const gate = holeGateArmed(state.run);
   let field: string;
-  if (gate) {
+  if (state.run.formatId === STROKEPLAY_FORMAT) {
+    // Star Tour (GS-star-tour): the "field" slot shows the personal course records instead of a ghost
+    // field — this course's best and your best rounds overall.
+    field = strokeRecordsCard();
+  } else if (gate) {
     const r = state.run;
     field =
       endlessScoreCard(
@@ -305,7 +344,11 @@ function holeIntroScreen(): string {
             ? btn(`⚡ Warp to hole ${state.run.holesSurvived + state.course.holes.length + 1}`, { type: 'warpStop' }, { variant: 'ghost' })
             : ''
         }
-        ${btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })}
+        ${
+          // Star Tour (GS-star-tour): a course record must be EARNED by real play, so the auto-AI
+          // "Watch" is hidden — every other mode keeps it.
+          state.run.formatId === STROKEPLAY_FORMAT ? '' : btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })
+        }
         ${
           // Past stop 0 the intro OPENED here (GS-intro-endless / GS-intro-voyage) for every format —
           // there is no "back", but the arc briefing (field/leaderboard, round so far) stays one tap
