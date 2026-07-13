@@ -757,6 +757,10 @@ function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread): Pr
 let aceCelebratedHole = -1;
 // Same one-shot guard for the eagle/albatross fly-over celebration (a non-ace −2 / −3 hole-out).
 let birdCelebratedHole = -1;
+// Star Tour (GS-star-tour) auto-advance guard: the hole whose holeComplete has already been scheduled,
+// so the "skip the between-hole card, go straight to the next tee" transition fires exactly once per
+// hole even though render() runs many times while the ball rests in the cup. Reset per hole in render().
+let strokeAutoAdvancedHole = -1;
 
 function playingBody(animating: boolean): string {
   const play = state.play!;
@@ -1503,11 +1507,37 @@ function render(): void {
       awaitingShotPopup = false;
       aceCelebratedHole = -1;
       birdCelebratedHole = -1;
+      strokeAutoAdvancedHole = -1;
       decisionRadius = null;
       puttViewRadius = null;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
+  }
+
+  // Star Tour (GS-star-tour): a solo stroke-play round has NO between-hole scoring interstitial. Once a
+  // hole is holed out — and any ace/eagle celebration + the settle beat have cleared — go STRAIGHT to the
+  // next tee. Unlike the Voyage (a Stableford cut to make) and the Unending Universe (a survival bar),
+  // there is no field to place against and no cut to review, so the end-of-hole leaderboard/points card
+  // the other formats show is just a needless tap between the player and the next hole. `holeComplete`
+  // advances to the next hole (or resolves the round → strokeResult on the 18th). Fire once per hole
+  // (`strokeAutoAdvancedHole`), only when the animation is finished (`animatingPlay === null`) and no
+  // hold/celebration timer is pending (`!popupTimer`) — so the ball-in-the-cup frame + any celebration
+  // still play first. The scheduled dispatch repaints the next tee; the frozen last frame holds until then.
+  if (
+    state.screen === 'playing' &&
+    state.play?.done &&
+    animatingPlay === null &&
+    !popupTimer &&
+    state.run.formatId === STROKEPLAY_FORMAT &&
+    strokeAutoAdvancedHole !== state.play.holeIndex
+  ) {
+    strokeAutoAdvancedHole = state.play.holeIndex;
+    popupTimer = window.setTimeout(() => {
+      popupTimer = 0;
+      dispatch({ type: 'holeComplete' });
+    }, 0);
+    return;
   }
 
   // The lane selection + depot toggle are only meaningful on the travel screen; clear them the moment we
