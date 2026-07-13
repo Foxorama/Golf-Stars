@@ -1173,3 +1173,53 @@ generator — it needed no contract change and no new structural geometry, yet i
 directly answers "the same 2–3 holes". Build the variety MACHINERY (this, then per-biome profiles, then
 structural archetypes) before adding biomes, so every future world is a genuinely different course for
 free instead of another reskin.
+
+---
+
+## GS-biome-profile — a world owns a COURSE IDENTITY, not just a reskin
+
+**The problem (Task 2 of the `reports/biome-hole-layout-variety-2026-07-13.md` plan).** GS-compose made a
+STOP a designed routing, but every world still drew its holes from the SAME global distributions — one
+par mix, one `doglegBias`-derived shape mix, one width-archetype pool. So a desert and a jungle, stripped
+of palette, played the same golf. A biome could reskin the skeleton (gravity, wind, hazard colour) but
+not own a DESIGN LANGUAGE.
+
+**The fix.** Three OPTIONAL `Biome` fields let a world weight the levers that decide how its holes play:
+- **`parMix`** `{p3,p4,p5}` — relative weights for the composed par sequence (`planCourse`). A desert
+  leans par-5 (long), a tight jungle leans par-4, an exposed links leans par-3.
+- **`shapeWeights`** — relative weights over the par-4/5 shape vocabulary (straight/dogleg/cape/double/
+  hairpin), REPLACING the single `doglegBias` formula in `chooseTemplate`, so a world bends
+  characteristically (desert straight+cape carries, jungle doglegs+S-curves).
+- **`widthWeights`** — relative weights over the par-4/5 width pool (classic/chute/neck/hourglass/
+  wander/thin/broad) in `chooseWidthProfile`, so a world's fairways run wide (desert broad/wander) or
+  tight (jungle chute/neck/thin).
+
+**Byte-stability by construction.** All three DEFAULT to the old behaviour exactly, so a world without
+them is byte-for-byte unchanged and only an opted-in world reflows: `DEFAULT_PAR_MIX = {p3:.25,p4:.53,
+p5:.22}` reproduces `round(n·.25)`/`round(n·.22)`; the default width weights `{classic:.28,chute:.13,
+neck:.13,hourglass:.12,wander:.12,thin:.11,broad:.11}` cumulate to the OLD fixed chain
+`.28/.41/.54/.66/.78/.89` (`cumWeights`); and `shapeWeights` absent keeps the old `straightP/hairP/
+capeP/sP` formula. The weighted picks reuse the SAME already-drawn `shapeRoll`/`roll`/par draws (no extra
+draws), so the machinery adds nothing to a default world's stream. Both weighted helpers apply to par-4/5
+LAND holes only — the island/ship/par-3 pools keep their own recipes (width is survival on an island).
+
+**The three proof worlds** (retuned; others untouched):
+- **Dust Belt** — LONG, OPEN, HEROIC: more par-5s (`parMix {.18,.5,.32}`), straight/cape lines over the
+  dunes, broad/wandering fairways. Difficulty is length + wind + sand.
+- **Spore Jungle** — TIGHT, TWISTY, TECHNICAL: par-4 heavy (`{.28,.6,.12}`), doglegs + S-curves,
+  chute/neck/thin corridors. The challenge is threading the line, tuned back from an early
+  hairpin/thin-heavy build that spiked the max-wildness pick-up rate to ~15%.
+- **Ice Ring** — EXPOSED LINKS: more par-3s (`{.32,.5,.18}`), sweeping S-curves the gale pushes,
+  wander/thin wind-scoured shelves.
+
+**Balance.** A profile RETUNES that world's generation at all wildness, so its death-spiral/fairness bars
+were re-measured: the `biomes.test` aggregate holds (toPar/hole 0.759 < 1.0, blow-ups 7.73% < 10%, zero
+fairness fails), the composed bar holds (0.642 / 7.32%), and the retuned worlds individually stay under
+the fairness/termination sweeps. The reflow re-pinned two fixtures (the `ui` ace seed 107→63, and the
+`scorch` conversion sample widened 60→80 seeds because dust-belt/ice-ring shifted their crater/green
+placement). `GENERATOR_VERSION` 23→24. Guarded by `tests/biome-profile.test.ts` (the three worlds draw
+genuinely different par/shape/width/length distributions; a profile-less world is byte-identical).
+
+**Next (Task 3+).** A per-biome DIFFICULTY VECTOR (which levers ramp with depth — tightness vs wind vs
+green-complexity — decoupling length from difficulty) and generalised STRUCTURAL archetypes
+(split-fairway, then island/walled lifted from special cases into a registry a world picks from as data).

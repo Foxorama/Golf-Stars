@@ -51,7 +51,10 @@ describe('meteor-strike scorch marks (GS-meteor-scorch)', () => {
 
   it('a ball at REST on a crater plays the scorch lie; off it, never (and never a penalty)', () => {
     let scorched = 0;
-    for (let seed = 0; seed < 60; seed++) {
+    // 80 seeds (was 60): the GS-biome-profile retune of dust-belt/ice-ring (both in this rotation)
+    // reflowed their crater/green placement, so the same sample yields slightly fewer resting-on-mark
+    // shots; widening the sample restores the conversion margin without weakening the property.
+    for (let seed = 0; seed < 80; seed++) {
       const hole = generateCourse(seed + 500, { biome: BIOMES[seed % BIOMES.length]!, wildness: 0.6 }).holes[0]!;
       const marks = meteorScorch(hole);
       if (marks.length === 0) continue;

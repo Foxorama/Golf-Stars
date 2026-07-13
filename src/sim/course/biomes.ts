@@ -145,6 +145,29 @@ export interface Biome {
    * (proven by the fairness/termination sweeps).
    */
   sharpCorners?: boolean;
+  /**
+   * PER-BIOME DESIGN PROFILE (GS-biome-profile) — the levers that give a world its own COURSE
+   * IDENTITY instead of the same skeleton reskinned. All OPTIONAL; absent ⇒ the generator's global
+   * defaults (byte-for-byte the old output), so only a world that opts in changes. Setting any of
+   * these RETUNES that world's generated layouts (a deliberate stream reflow for THAT biome —
+   * re-run the death-spiral/fairness harness for it; other worlds are untouched).
+   *
+   *  • `parMix` — relative weights for the COMPOSED par sequence (`planCourse`), so a world owns a
+   *    rhythm: a desert leans long (more par-5s), a tight jungle leans par-4, an exposed links leans
+   *    par-3. Weights are normalised; absent ⇒ the default ~25/53/22 proportions.
+   *  • `shapeWeights` — relative weights over the par-4/5 SHAPE vocabulary
+   *    (`straight`/`dogleg`/`cape`/`double`/`hairpin`), replacing the `doglegBias`-derived mix so a
+   *    world's holes bend in a characteristic way (desert = straight+cape carries, jungle =
+   *    doglegs+doubles). Absent ⇒ the global `doglegBias` formula. Keys must be valid shape kinds.
+   *  • `widthWeights` — relative weights over the par-4/5 WIDTH archetype pool
+   *    (`classic`/`chute`/`neck`/`hourglass`/`wander`/`thin`/`broad`), so a world's fairways run
+   *    characteristically wide or tight (desert = broad/wander, jungle = chute/neck/thin). Absent ⇒
+   *    the global pool thresholds. Lost-rough island / ship-corridor pools are NOT weighted (width is
+   *    survival there). Keys must be valid width-archetype ids.
+   */
+  parMix?: { p3: number; p4: number; p5: number };
+  shapeWeights?: Partial<Record<string, number>>;
+  widthWeights?: Partial<Record<string, number>>;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -201,6 +224,12 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 0.85,
     greenSlopeMax: 0.32, // GS-greens-3 green tilt character
     roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-profile): a LONG, OPEN, HEROIC desert — more par-5s, straight/cape lines you
+    // bomb across the dunes, and generous broad/wandering fairways. Difficulty is length + wind + sand,
+    // not tight twisty corridors.
+    parMix: { p3: 0.18, p4: 0.5, p5: 0.32 },
+    shapeWeights: { straight: 0.32, dogleg: 0.22, cape: 0.28, double: 0.1, hairpin: 0.08 },
+    widthWeights: { classic: 0.18, chute: 0.05, neck: 0.07, hourglass: 0.1, wander: 0.22, thin: 0.06, broad: 0.32 },
   },
   {
     id: 'ice-ring',
@@ -227,6 +256,12 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.0,
     greenSlopeMax: 0.7, // GS-greens-3 green tilt character
     roughBreaks: 0.6, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-profile): an EXPOSED LINKS on the ice — more short par-3s (wind-shot holes),
+    // sweeping S-curves the gale pushes, and wandering wind-scoured shelf fairways. The wind does the
+    // damage, not severe corners.
+    parMix: { p3: 0.32, p4: 0.5, p5: 0.18 },
+    shapeWeights: { straight: 0.24, dogleg: 0.22, cape: 0.12, double: 0.3, hairpin: 0.12 },
+    widthWeights: { classic: 0.16, chute: 0.08, neck: 0.1, hourglass: 0.12, wander: 0.3, thin: 0.18, broad: 0.06 },
   },
   {
     id: 'ember-world',
@@ -347,6 +382,12 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.2,
     greenSlopeMax: 0.45, // GS-greens-3 green tilt character
     roughBreaks: 1.0, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-profile): a TIGHT, TWISTY, TECHNICAL jungle — mostly par-4s (no room for long
+    // bombers), winding doglegs + S-curves through the mushroom stands, and narrow chute/neck/thin
+    // corridors. The challenge is threading the line, not length.
+    parMix: { p3: 0.28, p4: 0.6, p5: 0.12 },
+    shapeWeights: { straight: 0.2, dogleg: 0.34, cape: 0.14, double: 0.24, hairpin: 0.08 },
+    widthWeights: { classic: 0.22, chute: 0.24, neck: 0.18, hourglass: 0.08, wander: 0.08, thin: 0.1, broad: 0.1 },
   },
   {
     id: 'tidal-archipelago',

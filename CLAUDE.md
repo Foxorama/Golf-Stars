@@ -111,6 +111,18 @@ these systems** — each bullet is the tip of a documented iceberg.
 
 - **Generator & sim** — `docs/decisions/sim-generator.md`
   - Biomes are physics-only data rows; the render palette is keyed by biome id in the render layer.
+  - A world can own a COURSE IDENTITY via optional `Biome` profile fields (GS-biome-profile), not just
+    scalar skins: `parMix` (the composed par rhythm — desert leans par-5, jungle par-4, ice par-3),
+    `shapeWeights` (per-world par-4/5 shape vocabulary, replacing the single `doglegBias` mix — desert =
+    straight+cape, jungle = doglegs+doubles), `widthWeights` (per-world width-archetype pool — desert
+    broad/wander, jungle chute/neck/thin). ALL OPTIONAL: the defaults reproduce the old global
+    thresholds/proportions BYTE-FOR-BYTE (`cumWeights` default = the old `[.28/.41/.54/.66/.78/.89]`
+    width chain; `DEFAULT_PAR_MIX` = round(n·.25)/round(n·.22)), so a world without them is unchanged
+    and only an opted-in world reflows (re-run its death-spiral/fairness bars — other worlds untouched).
+    A new world's FEEL is now these rows, not an engine edit. Currently set on dust-belt (long/open),
+    spore-jungle (tight/twisty), ice-ring (exposed links); guarded by `tests/biome-profile.test.ts`.
+    `widthWeights`/`shapeWeights` apply to par-4/5 land holes only (island/ship/par-3 pools keep their
+    own recipes). `GENERATOR_VERSION` 24.
   - A multi-hole stop is COMPOSED, not IID-sampled (GS-compose, `course/compose.ts planCourse`): the
     run path (`runCourse`, `opts.compose`) plans a par SEQUENCE (proportions track the generator's own
     ~25/55/20 mix, a par-3+par-5 guaranteed, never 3 identical pars in a row), 1–2 SIGNATURE holes (a
