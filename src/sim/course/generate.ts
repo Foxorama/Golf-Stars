@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 23; // GS-compose: composition layer (planned par sequence + signature holes + difficulty arc) on the run path
+export const GENERATOR_VERSION = 24; // GS-biome-profile: per-biome par/shape/width profiles (dust-belt/ice-ring/spore-jungle own distinct routings)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -875,7 +875,7 @@ function generateHole(
   //    (damped by the profile where a squeeze must hold).
   // The profile's own `floorFrac` floors the width — the squeezed archetypes dip well below the old
   // 0.5 floor by design — with an absolute 5-yd half-width floor so a corridor never degenerates.
-  const wp = chooseWidthProfile(rng, par, wildness, !!lostRough, ship);
+  const wp = chooseWidthProfile(rng, par, wildness, !!lostRough, ship, biome.widthWeights);
   const asymPhase = rng.range(0, Math.PI * 2);
   const asymLobes = rng.range(0.6, 1.6);
   const asymAmt = (0.12 + 0.1 * rng.float()) * wp.asymScale;
@@ -1680,6 +1680,23 @@ function smoothCurve(ctrl: Vec[], per: number): Vec[] {
 /** The structural shapes the template grammar can draw (GS-shapes-2). */
 type ShapeKind = 'straight' | 'dogleg' | 'double' | 'hairpin' | 'cape';
 
+const SHAPE_ORDER: ShapeKind[] = ['straight', 'hairpin', 'cape', 'double', 'dogleg'];
+
+/** Cumulative normalised thresholds for a fixed key order (missing/0-weight keys collapse out). */
+function cumWeights(order: readonly string[], weights: Partial<Record<string, number>>): number[] {
+  const vals = order.map((k) => Math.max(0, weights[k] ?? 0));
+  const total = vals.reduce((s, v) => s + v, 0) || 1;
+  let acc = 0;
+  return vals.map((v) => (acc += v / total));
+}
+
+/** Pick a hole SHAPE from per-biome weights using an already-drawn roll (GS-biome-profile). */
+function pickWeightedShape(roll: number, weights: Partial<Record<string, number>>): ShapeKind {
+  const cum = cumWeights(SHAPE_ORDER, weights);
+  for (let i = 0; i < SHAPE_ORDER.length; i++) if (roll < cum[i]!) return SHAPE_ORDER[i]!;
+  return SHAPE_ORDER[SHAPE_ORDER.length - 1]!;
+}
+
 /**
  * A drawn hole-design template (GS-shapes-2): a SHAPE coupled with a LENGTH multiplier, so the
  * generator stops emitting one length + one gentle bend. `id` is the human/UI label stamped on
@@ -1801,30 +1818,32 @@ function chooseTemplate(
   // the opening holes are still shapely and dispersion-sensitive gear still bites). The heroic shapes
   // stay common but no longer crowd out the plain dogleg; difficulty still rides BEND SEVERITY
   // (`buildCentreline`'s dogFac), length, corridor tightness, rough and green tilt.
-  const bend = biome.doglegBias;
-  const hairP = 0.05 + bend * 0.1 + wildness * 0.03; // severe corner — still rare, a touch more deep in
-  const capeP = 0.1 + bend * 0.16 + wildness * 0.03; // heroic diagonal carry
-  const sP = 0.12 + bend * 0.22 + wildness * 0.03; // S-curve / double-dogleg
-  const straightP = Math.min(0.3, Math.max(0.08, 0.06 + wildness * 0.2 - bend * 0.06)); // straight rises with difficulty
   const sd = side > 0 ? 'r' : 'l';
   let shape: ShapeKind;
-  let shapeTag: string;
-  if (shapeRoll < straightP) {
-    shape = 'straight';
-    shapeTag = 'straight';
-  } else if (shapeRoll < straightP + hairP) {
-    shape = 'hairpin';
-    shapeTag = `hairpin-${sd}`;
-  } else if (shapeRoll < straightP + hairP + capeP) {
-    shape = 'cape';
-    shapeTag = `cape-${sd}`;
-  } else if (shapeRoll < straightP + hairP + capeP + sP) {
-    shape = 'double';
-    shapeTag = `double-${sd}`;
+  if (biome.shapeWeights) {
+    // PER-BIOME shape vocabulary (GS-biome-profile): pick from the world's own weights over the five
+    // kinds, so a world bends in a characteristic way (desert = straight+cape, jungle = doglegs+
+    // doubles) rather than the one global `doglegBias` mix. Uses the already-drawn `shapeRoll` (no
+    // extra draw). Only worlds that set `shapeWeights` take this path; the rest are byte-identical.
+    shape = pickWeightedShape(shapeRoll, biome.shapeWeights);
   } else {
-    shape = 'dogleg';
-    shapeTag = `dogleg-${sd}`;
+    const bend = biome.doglegBias;
+    const hairP = 0.05 + bend * 0.1 + wildness * 0.03; // severe corner — still rare, a touch more deep in
+    const capeP = 0.1 + bend * 0.16 + wildness * 0.03; // heroic diagonal carry
+    const sP = 0.12 + bend * 0.22 + wildness * 0.03; // S-curve / double-dogleg
+    const straightP = Math.min(0.3, Math.max(0.08, 0.06 + wildness * 0.2 - bend * 0.06)); // rises with difficulty
+    shape =
+      shapeRoll < straightP
+        ? 'straight'
+        : shapeRoll < straightP + hairP
+          ? 'hairpin'
+          : shapeRoll < straightP + hairP + capeP
+            ? 'cape'
+            : shapeRoll < straightP + hairP + capeP + sP
+              ? 'double'
+              : 'dogleg';
   }
+  let shapeTag: string = shape === 'straight' ? 'straight' : `${shape}-${sd}`;
   // Adjacent-shape contrast (GS-compose): if this hole drew the SAME shape family as its predecessor,
   // rotate to a distinct one (zero extra draws — a deterministic remap) so a composed stop doesn't
   // run two identical-looking holes back to back. Only fires when the loop passes a matching
@@ -1877,7 +1896,14 @@ interface WidthProfile {
  * A lost par 3 keeps the plain 'island' recipe (its corridor is replaced by the green island blob).
  * Exported for that widen-only guard; the generator is the only production caller.
  */
-export function chooseWidthProfile(rng: Rng, par: number, wildness: number, island: boolean, ship = false): WidthProfile {
+export function chooseWidthProfile(
+  rng: Rng,
+  par: number,
+  wildness: number,
+  island: boolean,
+  ship = false,
+  weights?: Partial<Record<string, number>>,
+): WidthProfile {
   // Every profile carries a seeded sine for organic edge movement (each draws its own phase/lobes).
   const wave = (amp: number): ((u: number) => number) => {
     const phase = rng.range(0, Math.PI * 2);
@@ -1991,8 +2017,17 @@ export function chooseWidthProfile(rng: Rng, par: number, wildness: number, isla
     if (roll < 0.8) return broad();
     return wander();
   }
-  if (roll < 0.28) return classic();
-  if (roll < 0.41) {
+  // PER-BIOME width pool (GS-biome-profile): the default weights reproduce the old fixed thresholds
+  // (classic .28, chute .13, neck .13, hourglass .12, wander .12, thin .11, broad .11 → cumulative
+  // .28/.41/.54/.66/.78/.89/1.0) EXACTLY, so a world without `widthWeights` is byte-for-byte unchanged;
+  // a world that sets them runs characteristically wide (desert: broad/wander) or tight (jungle:
+  // chute/neck/thin). Only the roll→profile mapping changes; each chosen builder draws its own params.
+  const wc = cumWeights(
+    ['classic', 'chute', 'neck', 'hourglass', 'wander', 'thin', 'broad'],
+    weights ?? { classic: 0.28, chute: 0.13, neck: 0.13, hourglass: 0.12, wander: 0.12, thin: 0.11, broad: 0.11 },
+  );
+  if (roll < wc[0]!) return classic();
+  if (roll < wc[1]!) {
     // CHUTE: a narrow tree-lined drive that lets out into a generous body, with an approach bulge.
     const open = rng.range(0.2, 0.34);
     const cw = rng.range(0.5, 0.68);
@@ -2007,7 +2042,7 @@ export function chooseWidthProfile(rng: Rng, par: number, wildness: number, isla
       asymScale: 0.55,
     };
   }
-  if (roll < 0.54) {
+  if (roll < wc[2]!) {
     // NECK: a full driving body that squeezes down for the approach into the green.
     const start = rng.range(0.6, 0.74);
     const nw = rng.range(0.45, 0.62);
@@ -2022,7 +2057,7 @@ export function chooseWidthProfile(rng: Rng, par: number, wildness: number, isla
       asymScale: 0.55,
     };
   }
-  if (roll < 0.66) {
+  if (roll < wc[3]!) {
     // HOURGLASS: wide either side of a waist pinched at the driving zone — lay up or thread it.
     const waistAt = rng.range(0.42, 0.62);
     const ww = rng.range(0.42, 0.58);
@@ -2036,8 +2071,8 @@ export function chooseWidthProfile(rng: Rng, par: number, wildness: number, isla
       asymScale: 0.5,
     };
   }
-  if (roll < 0.78) return wander();
-  if (roll < 0.89) return thin();
+  if (roll < wc[4]!) return wander();
+  if (roll < wc[5]!) return thin();
   return broad();
 }
 
@@ -2167,6 +2202,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
       parCap: opts.parCap,
       // A drivable/long signature is nonsense on a lost-rough island world or a walled ship corridor.
       signatures: !biome.lostRough && !biome.walls,
+      parMix: biome.parMix, // per-biome par rhythm (GS-biome-profile); absent ⇒ the default mix
     });
     let prevFamily: string | undefined;
     for (let i = 0; i < holeCount; i++) {

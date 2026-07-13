@@ -47,15 +47,18 @@ const ARC_AMP = 0.14;
  * Plan a whole stop (GS-compose). Returns one `HolePlan` per hole. Pure & deterministic off a
  * dedicated `${seed}:compose` stream, so it perturbs no other generator stream.
  */
+/** Default par proportions — the generator's own ~25/53/22 mix (round(n·0.25) par-3s, round(n·0.22) par-5s). */
+const DEFAULT_PAR_MIX = { p3: 0.25, p4: 0.53, p5: 0.22 };
+
 export function planCourse(
   seed: string | number,
   holeCount: number,
   wildness: number,
-  opts: { parCap?: 3 | 4 | 5; signatures?: boolean } = {},
+  opts: { parCap?: 3 | 4 | 5; signatures?: boolean; parMix?: { p3: number; p4: number; p5: number } } = {},
 ): HolePlan[] {
   const rng = new Rng(`${seed}:compose`);
   const n = Math.max(1, holeCount);
-  const pars = planPars(rng, n, opts.parCap);
+  const pars = planPars(rng, n, opts.parCap, opts.parMix ?? DEFAULT_PAR_MIX);
   const wilds = planWildness(rng, n, wildness);
   const plans: HolePlan[] = pars.map((par, i) => ({ par, wildness: wilds[i]! }));
   // Signature length holes (a heroic drivable par-4, a stout long hole) — skipped on lost/ship worlds
@@ -71,12 +74,14 @@ export function planCourse(
  * enough to hold them, and no par repeats three times in a row (consecutive PAIRS are fine — real
  * courses have back-to-back par-4s — but a triple reads as "the same hole again").
  */
-function planPars(rng: Rng, n: number, parCap?: 3 | 4 | 5): (3 | 4 | 5)[] {
+function planPars(rng: Rng, n: number, parCap: 3 | 4 | 5 | undefined, mix: { p3: number; p4: number; p5: number }): (3 | 4 | 5)[] {
   const cap = parCap ?? 5;
   if (cap === 3) return Array.from({ length: n }, () => 3 as const);
 
-  let p3 = Math.min(n, Math.max(n >= 4 ? 1 : 0, Math.round(n * 0.25)));
-  let p5 = cap >= 5 ? Math.min(n - p3, Math.max(n >= 5 ? 1 : 0, Math.round(n * 0.22))) : 0;
+  // Proportions from the (normalised) mix — the default reproduces round(n·0.25)/round(n·0.22) exactly.
+  const total = mix.p3 + mix.p4 + mix.p5 || 1;
+  let p3 = Math.min(n, Math.max(n >= 4 ? 1 : 0, Math.round((n * mix.p3) / total)));
+  let p5 = cap >= 5 ? Math.min(n - p3, Math.max(n >= 5 ? 1 : 0, Math.round((n * mix.p5) / total))) : 0;
   let p4 = n - p3 - p5;
   // Guarantee at least one par-4 (the workhorse) when there's room, trimming the longest bucket.
   if (p4 < 1 && n >= 3) {
