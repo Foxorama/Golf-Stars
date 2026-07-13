@@ -363,6 +363,145 @@ describe('GS-ship-wall-caddy — a caddy guard SAVES a miss on a walled corridor
   });
 });
 
+describe('GS-ship-space-boundary — a ball flung FAR past the bulkheads flies free, never reeled back', () => {
+  // The containment promise is "graphic IS physics": a ball is held in by a bulkhead you can SEE. A ball
+  // only a few yards past the hull edge is caught by the wall; but a ball flung FAR out into open space —
+  // beyond any bulkhead, through a torn-hull gap opening or clean past the wall ends — has NOTHING to
+  // bounce off, so it flies FREE (stays lost) instead of being reeled back onto the fairway by an invisible
+  // "far space boundary" (the bug: derelict drives were reaching 40–175 yd off the nearest wall out in the
+  // void, then getting pulled back / ricocheting off nothing). Both the flight ricochet and the rest
+  // backstop are gated on real wall proximity.
+  const DR = CLUBS.find((c) => c.id === 'D')!;
+  const segDistLocal = (p: Vec, a: Vec, b: Vec): number => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const L2 = dx * dx + dy * dy || 1;
+    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t));
+  };
+  const nearestWall = (h: Hole, p: Vec): number => Math.min(...h.walls!.map((w) => segDistLocal(p, w.a, w.b)));
+  const lost = (h: Hole, p: Vec) => { const k = lieAt(h, p); return k !== 'breach' && lieInfo(k).penalty === 'voidlost'; };
+
+  it('containToDeck reels a near-wall miss back but leaves a deep-space ball free', () => {
+    for (let s = 1; s < 25; s++) {
+      const course = generateCourse(s + 500, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness: 0.8 });
+      for (const hole of course.holes) {
+        if (!(hole.walls?.length)) continue;
+        const w = hole.walls[Math.floor(hole.walls.length / 2)]!;
+        const mid: Vec = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
+        // Just outside the bulkhead (a real near-edge miss) → tucked back onto the deck.
+        const near: Vec = [mid[0] - w.normal[0] * 8, mid[1] - w.normal[1] * 8];
+        if (lost(hole, near)) expect(containToDeck(hole, near), `seed ${s} near-wall not saved`).not.toBeNull();
+        // Far out past the bulkhead into open space → nothing to bounce off, flies free. Only assert when
+        // the point is genuinely far from EVERY wall (a folded section could put another rail nearby).
+        const far: Vec = [mid[0] - w.normal[0] * 90, mid[1] - w.normal[1] * 90];
+        if (lost(hole, far) && nearestWall(hole, far) > 30) expect(containToDeck(hole, far), `seed ${s} deep-space reeled back`).toBeNull();
+      }
+    }
+  });
+
+  it('no seeded derelict drive ricochets off empty space or is reeled back from far out', () => {
+    let checked = 0;
+    let flungFree = 0;
+    for (let s = 1; s < 30; s++) {
+      for (const wildness of [0.6, 0.9, 1]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of course.holes) {
+          if (!(hole.walls?.length) || hole.par < 4) continue;
+          const carryMult = biomeCarryMult(hole);
+          const bend = hole.centreline[1] ?? hole.green;
+          const fx = bend[0] - hole.tee[0];
+          const fy = bend[1] - hole.tee[1];
+          const fl = Math.hypot(fx, fy) || 1;
+          // Aim hard sideways off the corridor — the shots that used to fly out into space and boomerang back.
+          for (const ang of [-1.1, -0.8, 0.8, 1.1]) {
+            const ca = Math.cos(ang), sa = Math.sin(ang);
+            const dx = (fx / fl) * ca - (fy / fl) * sa;
+            const dy = (fx / fl) * sa + (fy / fl) * ca;
+            const target: Vec = [hole.tee[0] + dx * 230, hole.tee[1] + dy * 230];
+            for (let k = 0; k < 5; k++) {
+              const rng = new Rng(5000 + s * 7 + k);
+              const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1 }, rng);
+              checked++;
+              const fp = r.log.flightPath ?? [];
+              // (1) NO flight bounce-vertex sits far from a real bulkhead — every ricochet is off a drawn wall.
+              for (let i = 1; i < fp.length - 1; i++) {
+                expect(nearestWall(hole, fp[i]!), `seed ${s} ang${ang} k${k}: flight bounce ${nearestWall(hole, fp[i]!).toFixed(0)}yd from any wall`).toBeLessThanOrEqual(28);
+              }
+              // (2) a ball that flew far out into open space is NOT reeled back: any off-hull rest far from
+              // every bulkhead must stay LOST (containToDeck leaves it free), never pulled onto the fairway.
+              const restLost = lost(hole, r.log.rest);
+              if (restLost) {
+                flungFree++;
+              } else if (nearestWall(hole, r.log.rest) > 30) {
+                // On-deck rest genuinely far from any wall is fine only if it's really on the deck (a wide
+                // stretch near a gap), NOT a far-space point reeled in — prove it's not containToDeck-recoverable.
+                expect(containToDeck(hole, r.log.rest), `seed ${s} ang${ang} k${k}: far on-deck rest still containable`).toBeNull();
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+    expect(flungFree, 'sideways drives into open space actually fly free now').toBeGreaterThan(50);
+  });
+
+  it('a wall bounce can redirect the ball OUT a platform gap and be lost, but plain corridors contain', () => {
+    // The two stated behaviours: (1) a bulkhead bounces the ball back onto the fairway; (2) an AWKWARD
+    // bounce that redirects the ball out through a torn-hull gap between platforms flies free into space.
+    // A plain (un-gapped) corridor almost never does (2) — its continuous walls contain the ball.
+    const gapped = (h: Hole): boolean => {
+      for (let i = 0; i <= 120; i++) {
+        const t = i / 120;
+        const seg = t * (h.centreline.length - 1);
+        const i0 = Math.min(h.centreline.length - 2, Math.floor(seg));
+        const u = seg - i0;
+        const a = h.centreline[i0]!, b = h.centreline[i0 + 1]!;
+        if (lost(h, [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u])) return true;
+      }
+      return false;
+    };
+    let bouncedOnDeck = 0, bouncedThenLostGapped = 0, plainTotal = 0, plainBouncedLost = 0;
+    for (let s = 1; s < 45; s++) {
+      for (const wildness of [0.5, 0.8, 1]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of course.holes) {
+          if (!(hole.walls?.length) || hole.par < 4) continue;
+          const isGap = gapped(hole);
+          const carryMult = biomeCarryMult(hole);
+          const bend = hole.centreline[1] ?? hole.green;
+          const fx = bend[0] - hole.tee[0];
+          const fy = bend[1] - hole.tee[1];
+          const fl = Math.hypot(fx, fy) || 1;
+          for (const ang of [-0.6, -0.35, -0.15, 0.15, 0.35, 0.6]) {
+            const ca = Math.cos(ang), sa = Math.sin(ang);
+            const dx = (fx / fl) * ca - (fy / fl) * sa;
+            const dy = (fx / fl) * sa + (fy / fl) * ca;
+            const target: Vec = [hole.tee[0] + dx * 230, hole.tee[1] + dy * 230];
+            for (let k = 0; k < 6; k++) {
+              const rng = new Rng(3000 + s * 13 + k + Math.round(ang * 100));
+              const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1 }, rng);
+              const bounced = (r.log.wallHit?.bounces ?? 0) > 0;
+              const restLost = lost(hole, r.log.rest);
+              if (bounced && !restLost) bouncedOnDeck++;
+              if (isGap) { if (bounced && restLost) bouncedThenLostGapped++; }
+              else { plainTotal++; if (bounced && restLost) plainBouncedLost++; }
+            }
+          }
+        }
+      }
+    }
+    // (1) walls bounce a lot of balls back onto the deck.
+    expect(bouncedOnDeck, 'wall bounces that land back on the deck').toBeGreaterThan(500);
+    // (2) awkward bounces DO shoot the platform gaps into space (fair, readable losses).
+    expect(bouncedThenLostGapped, 'awkward wall bounces that shoot a platform gap and are lost').toBeGreaterThan(200);
+    // (2b) but a plain corridor's continuous walls contain — a bounce almost never ends lost there.
+    expect(plainTotal).toBeGreaterThan(500);
+    expect(plainBouncedLost / plainTotal, `plain-corridor bounce-then-lost ${(100 * plainBouncedLost / plainTotal).toFixed(1)}%`).toBeLessThan(0.03);
+  });
+});
+
 describe('GS-ship-walls — generation', () => {
   it('stamps walls on the derelict corridor, and NONE on other worlds', () => {
     const ship = generateCourse(4242, { biome: 'derelict-ship', holes: 9, wildness: 0.8 });
