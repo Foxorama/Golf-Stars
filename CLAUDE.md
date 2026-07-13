@@ -123,6 +123,23 @@ these systems** — each bullet is the tip of a documented iceberg.
     spore-jungle (tight/twisty), ice-ring (exposed links); guarded by `tests/biome-profile.test.ts`.
     `widthWeights`/`shapeWeights` apply to par-4/5 land holes only (island/ship/par-3 pools keep their
     own recipes). `GENERATOR_VERSION` 24.
+  - SPLIT-FAIRWAY (GS-split-fairway) is the first genuinely NEW hole STRUCTURE since island-hop/walled:
+    an opt-in par-4/5 offers a SECOND mown route to the green — a bold alternate lane beside the primary
+    corridor (diverging through the driving zone on a bell taper, rejoining before the approach), the two
+    split by a central non-penalty WASTE median (commit to a side, don't bail out in the middle). FAIR +
+    CHEAP by construction: the auto-AI still plays the PRIMARY centreline (so auto ≡ interactive and the
+    death-spiral bar hold untouched — the split is purely a player-facing choice), the lane is a NON-first
+    `fairway` feature + the median is non-penalty (so `validateFairness`, keyed off the FIRST fairway,
+    can't be violated — NO new validator), and the whole thing draws from a DEDICATED side stream
+    (`:split:`) so the base terrain is byte-identical (only the lane + median are ADDED). Applied AFTER
+    the hazard dedupe so the median survives AND any flanking penalty overlapping the alternate lane is
+    STRIPPED (route B is penalty-free too; a forced-carry crossing spans both routes and is kept). Offset
+    off the corridor's WIDEST reach (`fairwayHalfWidth`) so the lanes never overlap. `Biome.splitFairway`
+    is the opt-in frequency (set on verdant/tempest — parkland/links love alternate fairways); renders via
+    the existing fairway+waste painters (no style.ts change). Marker: `Hole.splitFairway`. Guarded by
+    `tests/split-fairway.test.ts`; eyeball geometry with `scripts/split-preview.mjs`. `GENERATOR_VERSION`
+    26. (Next structural archetypes — generalising island-hop/walled into a data registry a world picks
+    from — remain future work.)
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays

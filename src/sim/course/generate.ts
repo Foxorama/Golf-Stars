@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 25; // GS-biome-difficulty: per-biome green-difficulty vector (ice/ember/crystal get harder via their greens, not length)
+export const GENERATOR_VERSION = 26; // GS-split-fairway: a second mown route to the green (alternate lane + waste median) on opt-in worlds
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -794,6 +794,54 @@ function clearVoidHazards(hazards: Feature[], pads: Feature[]): Feature[] {
   });
 }
 
+/**
+ * SPLIT-FAIRWAY geometry (GS-split-fairway): build a SECOND mown lane beside the primary corridor plus
+ * a central non-penalty WASTE median dividing them — the first genuinely NEW hole STRUCTURE since
+ * island-hop/walled. The lane diverges from the main centreline through the driving zone (a bell taper:
+ * flush with the corridor at both ends, bulging out to its crest in the middle) and rejoins before the
+ * approach, so it's a real ALTERNATE route to the green: a bold, tighter short line vs the safe main
+ * corridor. Both are mown `fairway`; the median is a non-penalty `waste` in the gap (commit to a side —
+ * don't bail out in the middle). Pure geometry off a dedicated side rng. Fair by construction: the lane
+ * is a NON-first `fairway` feature (so `validateFairness`/`fairwayHalfWidthOf`, which key off the FIRST
+ * fairway feature, are untouched) and the median is non-penalty, so nothing here can violate fairness.
+ */
+function buildSplitLane(centreline: Vec[], corridorHalf: number, rng: Rng): { lane: Feature; median: Feature } {
+  const s: 1 | -1 = rng.bool() ? 1 : -1;
+  const uStart = rng.range(0.14, 0.2);
+  const uEnd = rng.range(0.56, 0.66);
+  const laneHalf = Math.max(9, corridorHalf * rng.range(0.5, 0.68)); // the bold lane is tighter than main
+  const medianGap = rng.range(12, 18); // clear space between the two fairway bodies (the waste sits here)
+  // Offset off the centreline of the lane's CREST, based on the primary corridor's WIDEST reach
+  // (`corridorHalf` = `fairwayHalfWidth`) so the lane never overlaps the main fairway even where it
+  // bulges: inner lane edge = corridorHalf + medianGap, always clear of the primary corridor.
+  const offset = (corridorHalf + laneHalf + medianGap) * s;
+  const at = (u: number): { c: Vec; perp: Vec } => ({ c: centrePoint(centreline, u), perp: perpAt(centreline, u) });
+  const bell = (i: number, n: number): number => Math.sin(Math.PI * (i / (n - 1))); // 0 at ends → 1 middle
+  const N = 9;
+  const laneLine: Vec[] = [];
+  for (let i = 0; i < N; i++) {
+    const u = uStart + (uEnd - uStart) * (i / (N - 1));
+    const { c, perp } = at(u);
+    const k = bell(i, N);
+    laneLine.push([c[0] + perp[0] * offset * k, c[1] + perp[1] * offset * k]);
+  }
+  const laneHWs = laneLine.map((_, i) => Math.max(laneHalf * 0.55, laneHalf * (0.55 + 0.45 * bell(i, N))));
+  const lane: Feature = { kind: 'fairway', poly: ribbon(laneLine, laneHWs, laneHWs, true, true) };
+  // Median waste seated in the middle of the gap (constant offset, width tapering at its own ends).
+  const medOff = (corridorHalf + medianGap / 2) * s;
+  const medHalf = medianGap * 0.4;
+  const medN = 7;
+  const medLine: Vec[] = [];
+  for (let i = 0; i < medN; i++) {
+    const u = uStart + 0.05 + (uEnd - uStart - 0.1) * (i / (medN - 1));
+    const { c, perp } = at(u);
+    medLine.push([c[0] + perp[0] * medOff, c[1] + perp[1] * medOff]);
+  }
+  const medHWs = medLine.map((_, i) => Math.max(3, medHalf * (0.4 + 0.6 * bell(i, medN))));
+  const median: Feature = { kind: 'waste', poly: ribbon(medLine, medHWs, medHWs, true, true) };
+  return { lane, median };
+}
+
 function generateHole(
   rng: Rng,
   biome: Biome,
@@ -1096,6 +1144,30 @@ function generateHole(
   }
   features.push(teeBox, greenF);
   const hazards: Feature[] = [];
+
+  // SPLIT-FAIRWAY (GS-split-fairway): a SECOND mown route to the green + a central non-penalty waste
+  // median, on a DEDICATED side stream so the base terrain is byte-identical (only the lane + median
+  // are ADDED). Gated to opt-in worlds, par 4/5, and a normal (not lost/ship/broken) corridor. A
+  // structural VARIETY archetype: appears across wildness, a touch likelier deep (a route choice
+  // matters more once the main line tightens). The lane is a NON-first fairway feature and the median
+  // is non-penalty, so `validateFairness` (keyed off the FIRST fairway) can't be violated — fair by
+  // construction, no new validator. The auto-AI still plays the primary centreline, so auto ≡
+  // interactive and the death-spiral bar hold by construction; the split is a player-facing choice.
+  // (Coexists with a broken corridor — the across-line rough breaks and the off-to-the-side alternate
+  // lane are geometrically independent.) The lane (a non-first fairway feature) + the median (a waste
+  // hazard) are ADDED here; the median goes through the normal cross-family dedupe below (so it yields
+  // to the "no sand-over-water" invariant on the rare overlap — the lane still makes it a split), and
+  // route B is swept clear of flanking penalties AFTER the dedupe.
+  let splitParts: { lane: Feature; median: Feature } | null = null;
+  if (biome.splitFairway && par >= 4 && !lostRough && !ship) {
+    const splitRng = new Rng(`${rng.seed}:split:${holeIndex}`);
+    const p = Math.min(0.85, biome.splitFairway * (0.55 + 0.5 * wildness));
+    if (splitRng.bool(p)) {
+      splitParts = buildSplitLane(centreline, fairwayHalfWidth, splitRng);
+      features.push(splitParts.lane);
+      hazards.push(splitParts.median);
+    }
+  }
 
   // Greenside hazards (1–2), hugging the ACTUAL green edge (ray-march, so they sit just off any
   // shape — a long shelf or kidney). A penalty-kind greenside hazard must still clear the approach
@@ -1627,6 +1699,19 @@ function generateHole(
     cleanHazards = clearVoidHazards(cleanHazards, pads);
   }
 
+  // SPLIT-FAIRWAY route-B fairness sweep (GS-split-fairway), AFTER dedupe. Flanking penalty ponds are
+  // placed clear of the PRIMARY corridor only, so one can land on the ALTERNATE lane — strip any
+  // (non-crossing) penalty overlapping route B so the bold route is fair too (a forced-carry crossing
+  // spans the whole hole, so BOTH routes carry it — those are kept). Zero rng (post-filter). The median
+  // itself already went through the dedupe above (it yields to the cross-family invariant on a clash).
+  const splitFairway = !!splitParts;
+  if (splitParts) {
+    const lanePoly = splitParts.lane.poly;
+    cleanHazards = cleanHazards.filter(
+      (hz) => !(lieInfo(hz.kind).penalty && !CROSSING_KINDS.has(hz.kind) && polysOverlap(hz.poly, lanePoly)),
+    );
+  }
+
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.
   const wind: Wind = {
     dir: rng.range(0, 360),
@@ -1647,7 +1732,7 @@ function generateHole(
   // geometry, zero rng — the whole feature is gated on `biome.walls`, so every other world is untouched.
   const walls = biome.walls && !islandPar3 ? buildShipWalls(dense, leftHW, rightHW, gapBands, WALL_HEIGHT) : undefined;
 
-  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, widthId: wp.id, greenSlope, greenContour, ...(walls && walls.length ? { walls } : {}) };
+  return { par, tee, green, pin, centreline, features, hazards: cleanHazards, wind, biomeMods, shapeId: tpl.id, widthId: wp.id, greenSlope, greenContour, ...(walls && walls.length ? { walls } : {}), ...(splitFairway ? { splitFairway: true } : {}) };
 }
 
 /** Point a fraction `t` (by ARC LENGTH) along an N-point centreline polyline (GS-shapes). */

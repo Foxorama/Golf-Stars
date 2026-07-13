@@ -159,6 +159,16 @@ export interface Hole {
    * plain hole). Pure, no rng. The collision/reflect logic lives in `sim/walls.ts`.
    */
   walls?: ShipWall[];
+  /**
+   * SPLIT-FAIRWAY marker (GS-split-fairway): this hole offers a SECOND mown route to the green — a
+   * parallel alternate lane diverging from the primary corridor through the driving zone and rejoining
+   * before the approach, the two split by a central non-penalty WASTE median. The primary corridor
+   * (the FIRST fairway feature) is unchanged — it's the line the auto-AI plays and `validateFairness`
+   * proves — so the split is purely an ADDITIVE player choice (bold short lane vs safe main line).
+   * Render/UI/test read this; the sim never branches on it (physics ride the features/lie read).
+   * Optional — absent ⇒ an ordinary single-corridor hole.
+   */
+  splitFairway?: boolean;
 }
 
 /** A collidable ship-corridor wall segment (GS-ship-walls). See `sim/walls.ts`. */

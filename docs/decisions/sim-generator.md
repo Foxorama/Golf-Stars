@@ -1263,3 +1263,56 @@ far more than the desert; the desert's greens are byte-identical; heavy-tuck pin
 **Next.** The remaining difficulty axes — FIRMNESS (bouncy/soft greens) and FORCED-CARRY frequency/length
 — touch the MAIN physics stream, so they're a heavier reflow deferred to a later pass; and the structural
 archetypes (split-fairway, generalised island/walled) are Task 4.
+
+---
+
+## GS-split-fairway — the first genuinely NEW hole STRUCTURE since island-hop/walled
+
+**Task 4 of the plan.** The diagnosis (`reports/biome-hole-layout-variety-2026-07-13.md`) named the root
+cause: STRUCTURE lives in engine code, so a data-only world can only reskin the one tee→green corridor.
+The two worlds that feel structurally different — void/cetus (island-hop) and the derelict (walled) —
+each needed a bespoke engine branch. Split-fairway is the third such structure, but built to be
+FAIR + AI-SAFE + BYTE-STABLE by construction so it slots in as a mostly-additive, opt-in feature.
+
+**The archetype.** An opt-in par-4/5 offers a SECOND mown route to the green: a bold alternate LANE
+beside the primary corridor (diverging through the driving zone on a bell taper — flush with the
+corridor at both ends, bulging out to its crest in the middle — and rejoining before the approach),
+the two lanes split by a central non-penalty WASTE median. The strategic read: commit to the safe main
+line or the bold (tighter, shorter-feeling) lane — but don't bail out into the waste in the middle.
+
+**Why it's safe by construction** (the design that let a NEW structure land without a marathon of
+regressions):
+- **The auto-AI is UNCHANGED.** It still plays the PRIMARY centreline (the first fairway feature), so
+  `auto ≡ interactive` (contract 2) and the no-death-spiral bar (contract 4) hold untouched — the split
+  is purely a PLAYER-facing choice the AI never needs to navigate. Measured: verdant/tempest toPar and
+  blow-up rates barely move (the median catches a few sprays, the lane saves a few — they cancel).
+- **Fairness can't be violated — NO new validator.** The lane is a NON-first `fairway` feature (so
+  `validateFairness`/`fairwayHalfWidthOf`, which key off the FIRST fairway feature, are untouched) and
+  the median is non-penalty `waste`. `validateFairness` empty across every seed/world/wildness.
+- **Byte-stable.** The whole thing is DECIDED and drawn from a dedicated `:split:` side stream, gated on
+  `biome.splitFairway` (opt-in) — so every non-opted world is byte-for-byte identical, and an opted
+  world's base terrain (main rng) is untouched; only the lane + median are ADDED. The full suite passed
+  with ZERO fixture re-pins (the added off-corridor features didn't shift any sampled trajectory).
+
+**Two subtleties that needed care:**
+1. **The median must survive, and route B must be fair too.** Flanking penalty PONDS are placed clear of
+   the PRIMARY corridor only — so one can land on the alternate lane, making the bold route secretly
+   unfair, and `dedupeHazardOverlaps` could also delete the median where it overlaps a pond. Fix: the
+   lane + median are APPLIED AFTER the dedupe — the median is pushed post-dedupe (never deduped), and any
+   NON-crossing penalty overlapping the alternate lane is STRIPPED (route B is swept penalty-free). A
+   forced-carry crossing spans the whole hole, so BOTH routes carry it — those are kept.
+2. **Offset off the corridor's WIDEST reach, not `baseHalf`.** The primary ribbon bulges above `baseHalf`
+   (envelope + asymmetry + width profile), so seating the lane off `baseHalf` let it overlap the corridor
+   where it widened. Basing the offset on `fairwayHalfWidth` (= max of the per-point half-widths)
+   guarantees the lane's inner edge clears the primary corridor everywhere.
+
+`Biome.splitFairway` is the opt-in per-hole frequency (set on verdant 0.35 / tempest 0.4 — parkland +
+storm-links love alternate fairways), scaled lightly by wildness (~30–36% of par-4/5 on those worlds).
+Renders via the EXISTING fairway + waste painters (no `style.ts` change). Marker `Hole.splitFairway` for
+render/UI/tests (the sim never branches on it — physics ride the features/lie read). `GENERATOR_VERSION`
+25→26. Guarded by `tests/split-fairway.test.ts` (opt-in per world, a real separated lane + waste median,
+fairness across seeds/worlds, determinism, no death-spiral); eyeball the geometry with
+`scripts/split-preview.mjs`.
+
+**Next.** Generalising island-hop / walled from their bespoke branches into a data-driven STRUCTURE
+registry a world picks from (so future structural worlds are data, not engine edits) remains future work.

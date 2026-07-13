@@ -186,6 +186,17 @@ export interface Biome {
    * firmness / forced-carry axes (which touch the main physics stream) are a later pass.
    */
   difficulty?: { greenTilt?: number; greenComplexity?: number; pinTuck?: number };
+  /**
+   * SPLIT-FAIRWAY frequency (GS-split-fairway) — per-hole base probability that a par-4/5 offers a
+   * SECOND mown route to the green (a bold alternate lane beside the main corridor, the two split by a
+   * central non-penalty waste median). A structural VARIETY archetype, the first genuinely NEW hole
+   * shape since island-hop/walled: it's a real strategic choice (bold short lane vs safe main line),
+   * fair by construction (the primary corridor — what the auto-AI plays and `validateFairness` proves —
+   * is unchanged; the lane + median are ADDITIVE, drawn from a dedicated side stream so the base terrain
+   * is byte-identical). Opt-in per world (links/parkland worlds love alternate fairways); absent/0 ⇒ no
+   * split (byte-for-byte the old hole). Scaled lightly by wildness at generation.
+   */
+  splitFairway?: number;
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -215,6 +226,7 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.1,
     greenSlopeMax: 0.45, // GS-greens-3 green tilt character
     roughBreaks: 0.9, // GS-variety-2 broken-fairway frequency
+    splitFairway: 0.35, // GS-split-fairway: classic parkland alternate fairways (bold short lane vs safe line)
   },
   {
     id: 'dust-belt',
@@ -385,6 +397,7 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.1,
     greenSlopeMax: 0.5, // GS-greens-3 green tilt character
     roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
+    splitFairway: 0.4, // GS-split-fairway: storm-links alternate fairways (a windward line vs a leeward line)
   },
   {
     id: 'spore-jungle',
