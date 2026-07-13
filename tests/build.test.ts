@@ -297,6 +297,57 @@ describe('build output (real browser)', () => {
     );
   }
 
+  // ANIMATED DECOR VIEW-INVARIANCE (GS-decor-view-states). The derelict's drifting hull junk/sections (and
+  // weather, the Cetus river) are drawn independently on the aim/putt overlay AND the watch play view. When
+  // any element is anchored to the SCREEN instead of the WORLD — as the big ship SECTIONS once were
+  // (fx*W, sizeFrac*min(W,H)) — it renders at a different scale + path in each view state and JUMPS the
+  // instant the camera switches. This is pure canvas math the headless sim can't see. `window.__gsDecorProbe`
+  // renders the decor at one wall-clock through two projectors that differ ONLY by a camera PAN; a
+  // world-anchored element must shift on screen by exactly the pan, so re-aligning frame A by the pan
+  // reproduces frame B (high IoU). A screen-anchored element would stay put and the IoU would collapse.
+  it.runIf(chromePath)(
+    'derelict drift decor is world-anchored — it does not jump between view states',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        // The probe builds its own derelict hole, so we don't have to play a whole voyage to reach one.
+        const probe = await page.evaluate(() => {
+          const fn = (window as unknown as { __gsDecorProbe?: (o: unknown) => unknown }).__gsDecorProbe;
+          if (!fn) return null;
+          return fn({ dist: 16, now: 9_000 }) as {
+            moveRatio: number; alignedOverlap: number; staticOverlap: number;
+            decorPixelsA: number; decorPixelsB: number; shift: [number, number];
+          };
+        });
+        expect(errors, `pageerror during decor probe: ${errors[0] ?? ''}`).toEqual([]);
+        expect(probe, 'window.__gsDecorProbe not installed at boot').not.toBeNull();
+        // Decor must actually have drawn in both frames (otherwise the metrics are vacuous).
+        expect(probe!.decorPixelsA, 'decor drew in frame A').toBeGreaterThan(200);
+        expect(probe!.decorPixelsB, 'decor drew in frame B').toBeGreaterThan(200);
+        // The camera genuinely panned (a non-trivial screen shift), so the invariance test isn't vacuous.
+        const panPx = Math.hypot(probe!.shift[0], probe!.shift[1]);
+        expect(panPx, 'camera pan produced a screen shift').toBeGreaterThan(4);
+        // The proof: the decor lines up FAR better after realigning by the camera pan than left static —
+        // i.e. it MOVED WITH the world. A screen-anchored element (the old ship SECTIONS) would line up
+        // with NO realign instead, dragging moveRatio to ≤1. Robust to edge culling / thin features: it's
+        // a differential, not an absolute-overlap threshold.
+        expect(
+          probe!.moveRatio,
+          `decor move-with-camera ratio ${probe!.moveRatio.toFixed(2)} (aligned ${probe!.alignedOverlap} vs static ${probe!.staticOverlap}) — ≤1 means decor is screen-anchored and jumps between views`,
+        ).toBeGreaterThan(3);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
   // The travel screen's map is INTENTIONALLY full-bleed — so the #353-class guard here is different from the
   // play screen's: the bridge HUD console (`.gs-bhud`) must stay `pointer-events:none` (CLAUDE.md invariant —
   // map taps pass through to the worlds; only its console controls catch touches), and the journey chart must

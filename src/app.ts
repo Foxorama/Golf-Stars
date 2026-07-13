@@ -8,6 +8,7 @@
 
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
+import { installDecorProbe } from './render/decorProbe';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, awaitingPutt, canPuttFringe } from './sim/rpg/play';
@@ -100,6 +101,7 @@ function stage(s: string): void {
 function boot(): void {
   try {
     stage('boot:start');
+    installDecorProbe(); // GS-decor-view-states: test-only `window.__gsDecorProbe` for the CI view-invariance check
     const save = loadSave();
     stage('loaded');
     const meta = metaFromSave(save);
