@@ -135,6 +135,14 @@ export interface RenderOptions {
    *  up to it is drawn bright/solid-dashed; the rest fades to a faint guess — so a longer putt than
    *  your putter's range reads "blind" past the confident length, and better putters read further. */
   puttReadFrac?: number;
+  /** Predicted approach roll/check path (course-space points landing→rest, GS-backspin-line) — the
+   *  "backspin helper line", drawn from the aim-line touchdown so the player sees where a spinning
+   *  wedge will check back and curl on a contoured green. Lives in the shot-cone overlay group. */
+  spinPath?: Vec[];
+  /** GS-backspin-line: the fraction (0..1) of the spin path drawn with confidence. The prefix up to it
+   *  is solid; the rest STOPS at a terminus dot — spin-read gear (Spin Guide / Trajectory Computer)
+   *  stretches it. Undefined ⇒ full read (a short/self-evident roll). */
+  spinReadFrac?: number;
   /** Spray cone display-geometry override (the `window._gsSpray` escape hatch). */
   sprayGeom?: SprayGeomInput;
   /** Zoom-and-follow: centre the map on this point (the ball) instead of fitting the whole hole. */
@@ -374,6 +382,69 @@ function shotConeParts(hole: Hole, proj: Proj, opts: RenderOptions, geom: SprayG
   return out;
 }
 
+/** Backspin helper line parts (GS-backspin-line): a small ring at the touchdown + the predicted
+ *  roll/check curve, drawn in cool cyan so it reads apart from the yellow putt break line and the
+ *  green/amber/red spray cone. The confident prefix (out to the spin-read range) is solid; the rest
+ *  STOPS at a terminus dot (spin-read gear stretches it). Full read ⇒ an open ring where it settles.
+ *  Shares the shot-overlay group so the pull-to-power gesture redraws it with the cone. */
+const SPIN_LINE_INK = '#7fe0ff';
+const SPIN_LINE_HALO = '#06222b'; // dark backing so the cyan reads over the green cone + fall-line arrows
+function spinOverlayParts(place: (p: Vec) => Vec, opts: RenderOptions): string[] {
+  if (!opts.spinPath || opts.spinPath.length < 2) return [];
+  const pts = opts.spinPath.map((p) => place(p));
+  const n = pts.length;
+  const out: string[] = [];
+  const toPath = (seg: Vec[]) => seg.map((p, i) => `${i ? 'L' : 'M'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  const frac = opts.spinReadFrac == null ? 1 : Math.max(0, Math.min(1, opts.spinReadFrac));
+  // Cut the confident prefix by ARC LENGTH, not point index: a straight (non-contoured) roll is only
+  // 2 points, so an index cut would always land on the last point and the read gearing would never
+  // show a terminus. Interpolating at `frac · totalLength` puts the terminus exactly at the read reach.
+  const segLen: number[] = [];
+  let total = 0;
+  for (let i = 1; i < n; i++) {
+    const l = Math.hypot(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]);
+    segLen.push(l);
+    total += l;
+  }
+  const sure: Vec[] = [pts[0]!];
+  let isFull = frac >= 1 || total < 1e-6;
+  if (!isFull) {
+    const targetLen = frac * total;
+    let acc = 0;
+    for (let i = 1; i < n; i++) {
+      const l = segLen[i - 1]!;
+      if (acc + l >= targetLen) {
+        const t = l < 1e-6 ? 0 : (targetLen - acc) / l;
+        sure.push([pts[i - 1]![0] + (pts[i]![0] - pts[i - 1]![0]) * t, pts[i - 1]![1] + (pts[i]![1] - pts[i - 1]![1]) * t]);
+        break;
+      }
+      sure.push(pts[i]!);
+      acc += l;
+    }
+  } else {
+    for (let i = 1; i < n; i++) sure.push(pts[i]!);
+  }
+  const d = toPath(sure);
+  const land = pts[0]!;
+  const tip = sure[sure.length - 1]!;
+  // A dark halo under the whole confident line + a hollow ring at the touchdown, so both stay legible
+  // over the spray cone. The bright cyan overpaints on top.
+  out.push(`<path d="${d}" fill="none" stroke="${SPIN_LINE_HALO}" stroke-width="4" opacity="0.5" stroke-linecap="round" />`);
+  out.push(`<circle cx="${land[0].toFixed(1)}" cy="${land[1].toFixed(1)}" r="3.2" fill="none" stroke="${SPIN_LINE_HALO}" stroke-width="3" opacity="0.5" />`);
+  out.push(`<circle cx="${land[0].toFixed(1)}" cy="${land[1].toFixed(1)}" r="3.2" fill="none" stroke="${SPIN_LINE_INK}" stroke-width="1.6" opacity="0.95" />`);
+  out.push(`<path d="${d}" fill="none" stroke="${SPIN_LINE_INK}" stroke-width="2" stroke-dasharray="2 3" opacity="0.95" stroke-linecap="round" />`);
+  if (!isFull) {
+    // The read ends HERE — a filled terminus dot; the rest of the roll is yours to judge.
+    out.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3.1" fill="${SPIN_LINE_HALO}" opacity="0.55" />`);
+    out.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="2.4" fill="${SPIN_LINE_INK}" opacity="0.95" />`);
+  } else {
+    // Full read: a bright open ring where the ball settles after the check + curl.
+    out.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3.4" fill="none" stroke="${SPIN_LINE_HALO}" stroke-width="3" opacity="0.5" />`);
+    out.push(`<circle cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="3.4" fill="none" stroke="${SPIN_LINE_INK}" stroke-width="1.8" opacity="0.95" />`);
+  }
+  return out;
+}
+
 /** Redraw ONLY the aiming spray-cone overlay for a new charge/aim, reusing the SAME focus/zoom
  *  framing as the mounted decision map. Returns the `<g id="gs-shot-overlay">…</g>` group markup so
  *  the pull-to-power gesture can swap this one element in place — the expensive scene (flora, rough
@@ -393,7 +464,8 @@ export function renderShotOverlaySVG(hole: Hole, opts: RenderOptions = {}): stri
     up: opts.up,
   });
   const cone = opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0 ? shotConeParts(hole, proj, opts, geom) : [];
-  return `<g id="${SHOT_OVERLAY_ID}">${cone.join('')}</g>`;
+  const spin = spinOverlayParts((p) => proj.project(p), opts);
+  return `<g id="${SHOT_OVERLAY_ID}">${[...cone, ...spin].join('')}</g>`;
 }
 
 /** Build the SVG markup for a hole. Pure: returns a string, touches no DOM. */
@@ -453,8 +525,12 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // one-sided suppression reads as a lop-sided cone. Each band is labelled with its true % of shots.
   // Wrapped in a stable-id group so the pull-to-power gesture can redraw JUST this cone
   // (renderShotOverlaySVG) instead of rebuilding the whole scene per drag frame (the decision-lag fix).
-  if (opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0) {
-    parts.push(`<g id="${SHOT_OVERLAY_ID}">`, ...shotConeParts(hole, proj, opts, geom), `</g>`);
+  // The backspin helper line (GS-backspin-line) shares this stable-id group so the pull-to-power
+  // gesture redraws it together with the cone; it can also stand alone (a wedge with no drawable cone).
+  const coneParts = opts.spray && opts.spray.expectedCarry > 0 && opts.spray.angleSpread > 0 ? shotConeParts(hole, proj, opts, geom) : [];
+  const spinParts = spinOverlayParts((p) => proj.project(p), opts);
+  if (coneParts.length || spinParts.length) {
+    parts.push(`<g id="${SHOT_OVERLAY_ID}">`, ...coneParts, ...spinParts, `</g>`);
   }
 
   // Shot flight lines (optional): CURVED — a quadratic Bézier that launches along the shot bearing

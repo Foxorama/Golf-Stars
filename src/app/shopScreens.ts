@@ -276,6 +276,8 @@ function upgradeLines(): UpLine[] {
   // Weather & spin
   if ((l.windResist ?? 0) > 0) out.push({ icon: '🌬', label: `${Math.round((l.windResist ?? 0) * 100)}% less wind` });
   if ((l.backspinBoost ?? 0) > 0) out.push({ icon: '🌀', label: 'More backspin — approaches bite' });
+  if (l.spinReadFull) out.push({ icon: '🎯', label: 'Reads the FULL approach roll' });
+  else if ((l.spinReadBonus ?? 0) > 0) out.push({ icon: '🎯', label: `Backspin-line read +${l.spinReadBonus} yd` });
   // Hazard skips / novelty
   if (l.hazardImmune?.length) out.push({ icon: '🛡', label: `Skips ${[...new Set(l.hazardImmune)].join(' / ')}` });
   if (l.rainbowRoad) out.push({ icon: '🌈', label: 'Rainbow Road ball' });

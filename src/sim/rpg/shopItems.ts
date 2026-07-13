@@ -176,6 +176,8 @@ export const ITEM_TAGS: Record<string, readonly string[]> = {
   // GS-proshop-2 — new gameplay gear.
   'wind-cheater': ['control'], // weather forgiveness reads as control
   'spin-milled': ['skill'], // backspin/short-game touch
+  'spin-guide': ['skill'], // backspin-line read + short-game touch
+  'spin-computer': ['skill'], // full backspin-line read + short-game touch
   'floater-balls': ['control'], // hazard forgiveness
   'magma-balls': ['control'],
   'void-walkers': ['control'],
@@ -747,6 +749,41 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: 'Freshly milled grooves rip backspin — your approaches bite and check up instead of running on',
     rarity: 'rare',
     apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.07, perks: [...m.perks, 'spin-milled'] }),
+  },
+  {
+    // The common rung of the backspin-line ladder (GS-backspin-line): with contoured greens + spin
+    // gear an approach's check-back is hard to judge, so the shot screen now draws a SHORT roll/check
+    // guide line. This card stretches that confident read AND rips a little more spin (a small
+    // backspinBoost keeps it a real upgrade for the headless auto sim too — the Green-Reading-Book
+    // pattern). `spinReadBonus` itself is render-only.
+    id: 'spin-guide',
+    name: 'Spin Guide Card',
+    cost: 70,
+    desc: 'A wedge yardage-book — extends the approach roll/check line + rips a touch more backspin',
+    rarity: 'common',
+    apply: (m) => ({
+      ...m,
+      spinReadBonus: (m.spinReadBonus ?? 0) + 4,
+      backspinBoost: (m.backspinBoost ?? 0) + 0.04,
+      perks: [...m.perks, 'spin-guide'],
+    }),
+  },
+  {
+    // The apex of the backspin-line ladder (GS-backspin-line): a rangefinder that computes the WHOLE
+    // predicted roll — every yard of check and contour curl, right to where it settles — so a big spinning
+    // approach on a wild contoured green reads all the way home. Full read (like the Mystic Mole's break
+    // read), plus a little more spin so it's a genuine short-game upgrade for the auto sim (contract 4).
+    id: 'spin-computer',
+    name: 'Spin Trajectory Computer',
+    cost: 150,
+    desc: 'Computes the FULL approach roll — reads the whole check + contour curl to where it stops',
+    rarity: 'rare',
+    apply: (m) => ({
+      ...m,
+      spinReadFull: true,
+      backspinBoost: (m.backspinBoost ?? 0) + 0.05,
+      perks: [...m.perks, 'spin-computer'],
+    }),
   },
   {
     // Hazard-skip ball: WATER. The ball skims clean across water (and creeks / frozen ponds, which

@@ -10,7 +10,7 @@ import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { type ProjectOptions } from './render/project';
-import { shotView, previewShot, awaitingPutt, canPuttFringe } from './sim/rpg/play';
+import { shotView, previewShot, previewBackspin, awaitingPutt, canPuttFringe } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
@@ -1021,6 +1021,9 @@ function playingBody(animating: boolean): string {
   // you charge. The cone the player sees is this powered shot; releasing fires it (GS-power).
   const decision = { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined, power: selPower };
   const spray = previewShot(play, decision, state.run.loadout);
+  // Backspin helper line (GS-backspin-line): the predicted roll/check from where this shot lands, so a
+  // spinning wedge onto a contoured green reads before you hit it. Null for non-backspin clubs (no line).
+  const spinPreview = previewBackspin(play, spray, state.run.loadout);
   // Feel escape-hatch: window._gsSpray scales the green centre wedge live (A/B the cone geometry).
   const sprayGeom = (window as unknown as { _gsSpray?: SprayGeomInput })._gsSpray;
   // % of shots per zone — straight off the shot's asymmetric shape, so the legend reads exactly true.
@@ -1059,6 +1062,8 @@ function playingBody(animating: boolean): string {
       groundPatch: patchActive(),
     ball: play.ball,
     spray,
+    spinPath: spinPreview?.path,
+    spinReadFrac: spinPreview?.readFrac,
     fitSpray: frameSpray, // whole-map fit holds still while the live cone charges/aims
     sprayGeom,
     ...mapOpts,
@@ -1133,6 +1138,7 @@ function playingBody(animating: boolean): string {
             { clubId: selClubId!, aim: selAim, target: selFreeTarget ?? undefined, power: selPower },
             state.run.loadout,
           );
+          const spinNow = previewBackspin(play, sprayNow, state.run.loadout);
           overlay.outerHTML = renderShotOverlaySVG(play.hole, {
             width: DMAP_W,
             height: DMAP_H,
@@ -1141,6 +1147,8 @@ function playingBody(animating: boolean): string {
             focusBias: mapOpts.focusBias,
             up: mapOpts.up,
             spray: sprayNow,
+            spinPath: spinNow?.path,
+            spinReadFrac: spinNow?.readFrac,
             sprayGeom,
             biome: holeBiome(play.hole),
             themeId: holeThemeId(play.hole),

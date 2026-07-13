@@ -1,0 +1,199 @@
+import { describe, it, expect } from 'vitest';
+import {
+  backspinRoll,
+  clubRollFraction,
+  hasBackspin,
+  rollOut,
+  shotSpread,
+  type ShotSpread,
+} from '../src/sim/round';
+import { lieAt } from '../src/sim/shot';
+import { beginHole, previewShot, previewBackspin } from '../src/sim/rpg/play';
+import {
+  startingLoadout,
+  loadoutFromPerks,
+  spinReadOf,
+  DEFAULT_SPIN_READ,
+} from '../src/sim/rpg/economy';
+import { CLUBS } from '../src/sim/clubs';
+import { generateCourse } from '../src/sim/course/generate';
+import { renderHoleSVG, renderShotOverlaySVG, SHOT_OVERLAY_ID } from '../src/render/holeView';
+import type { Vec } from '../src/sim/course/contract';
+
+const hole = generateCourse(1234).holes[0]!;
+const lob = CLUBS.find((c) => c.id === '60')!; // 56-yd wedge — a genuine backspin check
+const driver = CLUBS.find((c) => c.id === 'D')!;
+
+/** The bearing→direction the sim/backspinRoll share ([sin, cos]), for independent re-derivation. */
+function dirOf(s: ShotSpread): Vec {
+  const br = (s.bearing * Math.PI) / 180;
+  return [Math.sin(br), Math.cos(br)];
+}
+
+describe('spinReadOf — the backspin-line gear axis (GS-backspin-line)', () => {
+  it('a base loadout still gets the short always-on guide reach', () => {
+    const r = spinReadOf(startingLoadout());
+    expect(r.readYd).toBe(DEFAULT_SPIN_READ);
+    expect(r.full).toBe(false);
+  });
+
+  it('Spin Guide Card stretches the confident read; Trajectory Computer reads it all', () => {
+    const guide = spinReadOf(loadoutFromPerks(['spin-guide']));
+    expect(guide.readYd).toBe(DEFAULT_SPIN_READ + 4);
+    expect(guide.full).toBe(false);
+
+    const computer = spinReadOf(loadoutFromPerks(['spin-computer']));
+    expect(computer.full).toBe(true);
+  });
+
+  it('the two items round-trip their perk ids into their loadout fields (no save bump)', () => {
+    const base = startingLoadout();
+    expect(base.spinReadBonus).toBeUndefined();
+    expect(base.spinReadFull).toBeUndefined();
+
+    const guide = loadoutFromPerks(['spin-guide']);
+    expect(guide.spinReadBonus).toBe(4);
+    expect(guide.backspinBoost).toBeCloseTo(0.04, 6); // a genuine short-game sweetener for the auto sim
+
+    const computer = loadoutFromPerks(['spin-computer']);
+    expect(computer.spinReadFull).toBe(true);
+    expect(computer.backspinBoost).toBeCloseTo(0.05, 6);
+  });
+});
+
+describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
+  const spray = shotSpread(hole, hole.tee, 'tee', hole.green, lob, { power: 1 });
+
+  it('is null for a non-backspin club (driver) — no check line to draw', () => {
+    const big = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { power: 1 });
+    expect(hasBackspin(big.nominalCarry)).toBe(false);
+    expect(backspinRoll(hole, big)).toBeNull();
+  });
+
+  it('a lofted wedge checks BACK (rollYd < 0) toward the player', () => {
+    expect(hasBackspin(spray.nominalCarry)).toBe(true);
+    expect(clubRollFraction(spray.nominalCarry)).toBeLessThan(0); // the 60° spins back
+    const roll = backspinRoll(hole, spray);
+    expect(roll).not.toBeNull();
+    expect(roll!.rollYd).toBeLessThan(0);
+    expect(roll!.path.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the landing anchors the path at origin + dir·expectedCarry', () => {
+    const roll = backspinRoll(hole, spray)!;
+    const dir = dirOf(spray);
+    const expLand: Vec = [
+      spray.origin[0] + dir[0] * spray.expectedCarry,
+      spray.origin[1] + dir[1] * spray.expectedCarry,
+    ];
+    expect(roll.landing[0]).toBeCloseTo(expLand[0], 4);
+    expect(roll.landing[1]).toBeCloseTo(expLand[1], 4);
+    expect(roll.path[0]![0]).toBeCloseTo(roll.landing[0], 4);
+    expect(roll.path[0]![1]).toBeCloseTo(roll.landing[1], 4);
+  });
+
+  it('the graphic IS the physics — the line is the SAME rollOut the sim resolves (contract 5)', () => {
+    const dir = dirOf(spray);
+    const landing: Vec = [
+      spray.origin[0] + dir[0] * spray.expectedCarry,
+      spray.origin[1] + dir[1] * spray.expectedCarry,
+    ];
+    const K = spray.expectedCarry * clubRollFraction(spray.nominalCarry); // mean energy, no rng
+    const truth = rollOut(hole, landing, dir, K, lieAt(hole, landing));
+    const roll = backspinRoll(hole, spray)!;
+    expect(roll.rollYd).toBeCloseTo(truth.roll, 6);
+    const truthPath = truth.path ?? [landing, truth.rest];
+    expect(roll.path.length).toBe(truthPath.length);
+    expect(roll.path[roll.path.length - 1]![0]).toBeCloseTo(truth.rest[0], 6);
+    expect(roll.path[roll.path.length - 1]![1]).toBeCloseTo(truth.rest[1], 6);
+  });
+
+  it('is deterministic — zero rng, identical every call', () => {
+    const a = backspinRoll(hole, spray)!;
+    const b = backspinRoll(hole, spray)!;
+    expect(a.rollYd).toBe(b.rollYd);
+    expect(a.path).toEqual(b.path);
+  });
+
+  it('more backspinBoost checks it DEEPER (the spin gear does what it says)', () => {
+    const plain = backspinRoll(hole, spray, { backspinBoost: 0 })!;
+    const spun = backspinRoll(hole, spray, { backspinBoost: 0.1 })!;
+    expect(spun.rollYd).toBeLessThan(plain.rollYd); // more negative = more check back
+  });
+});
+
+describe('previewBackspin — the read fraction from gear (GS-backspin-line)', () => {
+  const play = beginHole(hole);
+  const decision = { clubId: '60', aim: 'attack' as const, power: 1 };
+  const spray = previewShot(play, decision, startingLoadout());
+
+  it('a base loadout reads only a short prefix of a long roll (< full)', () => {
+    const roll = backspinRoll(hole, spray)!;
+    // Choose a shot whose |roll| exceeds the base reach so the read is genuinely partial.
+    if (Math.abs(roll.rollYd) > DEFAULT_SPIN_READ) {
+      const p = previewBackspin(play, spray, startingLoadout())!;
+      expect(p.readFrac).toBeLessThan(1);
+      expect(p.readFrac).toBeGreaterThan(0);
+    }
+  });
+
+  it('the Trajectory Computer reads the whole roll (frac = 1)', () => {
+    const p = previewBackspin(play, spray, loadoutFromPerks(['spin-computer']));
+    expect(p).not.toBeNull();
+    expect(p!.readFrac).toBe(1);
+  });
+
+  it('is null for a driver (non-backspin club) — no line', () => {
+    const dSpray = previewShot(play, { clubId: 'D', aim: 'attack', power: 1 }, startingLoadout());
+    expect(previewBackspin(play, dSpray, startingLoadout())).toBeNull();
+  });
+});
+
+describe('spin overlay render (GS-backspin-line)', () => {
+  // A wedge approach LANDING near the green (fly past, spin back) so the check is big enough that a
+  // base read is genuinely PARTIAL — the terminus-dot branch actually fires.
+  const G = hole.green;
+  const teeToG: Vec = [G[0] - hole.tee[0], G[1] - hole.tee[1]];
+  const L = Math.hypot(teeToG[0], teeToG[1]) || 1;
+  const u: Vec = [teeToG[0] / L, teeToG[1] / L];
+  const play = { ...beginHole(hole), ball: [G[0] - u[0] * 40, G[1] - u[1] * 40] as Vec, lie: 'fairway' as const };
+  const spray = previewShot(play, { clubId: '64', aim: 'attack', power: 1 }, startingLoadout());
+  const preview = previewBackspin(play, spray, startingLoadout())!;
+  const opts = {
+    focus: play.ball,
+    viewRadius: 34,
+    spray,
+    spinPath: preview.path,
+    spinReadFrac: preview.readFrac,
+  };
+
+  it('a base read of a big spinning check is partial (terminus before the settle point)', () => {
+    expect(preview.readFrac).toBeLessThan(1);
+  });
+
+  it('draws the cyan check line with a filled terminus dot inside the shot-overlay group', () => {
+    const svg = renderShotOverlaySVG(hole, opts);
+    expect(svg).toContain(`id="${SHOT_OVERLAY_ID}"`);
+    expect(svg).toContain('#7fe0ff'); // the distinct spin-line ink
+    expect(svg).toContain('fill="#7fe0ff"'); // the terminus dot (partial read)
+  });
+
+  it('a full read (Trajectory Computer) draws an open settle ring, no terminus dot', () => {
+    const full = previewBackspin(play, spray, loadoutFromPerks(['spin-computer']))!;
+    const svg = renderShotOverlaySVG(hole, { ...opts, spinReadFrac: full.readFrac });
+    expect(full.readFrac).toBe(1);
+    expect(svg).not.toContain('fill="#7fe0ff"'); // full read → open ring, not a filled terminus
+  });
+
+  it('renders byte-identically to the same group inside a full renderHoleSVG', () => {
+    const full = renderHoleSVG(hole, { width: 360, height: 640, ...opts });
+    const group = renderShotOverlaySVG(hole, { width: 360, height: 640, ...opts });
+    const inner = group.replace(/^<g[^>]*>/, '').replace(/<\/g>$/, '');
+    expect(full).toContain(inner);
+  });
+
+  it('draws NO spin parts when spinPath is absent (feature-off byte-stable)', () => {
+    const svg = renderShotOverlaySVG(hole, { focus: play.ball, viewRadius: 60, spray });
+    expect(svg).not.toContain('#7fe0ff');
+  });
+});

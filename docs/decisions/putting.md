@@ -420,3 +420,56 @@ plane-tilt-undisturbed, closed/hiInside coding, camera-proof chunk counts); putt
 re-shot (all ten worlds keep identity at map zoom; putt zoom shows the value ramp + lit rings).
 `scripts/putt-preview.mjs` also gained the gallery's multi-candidate chromium launcher (it was
 Linux-only). No new `_gs*` hook — all tuning is module constants.
+
+
+## GS-backspin-line — the backspin helper line (2026-07-13)
+
+**The ask.** "With the contoured greens and backspin upgrades, backspin is incredibly hard to manage
+now. Add a backspin helper line similar to the putting line — a very short guide line to start with,
+then a couple of pro shop upgrades to make it better with higher backspin and more contoured greens."
+
+**The model — the full-shot twin of the putt read.** A wedge/short-iron approach flies PAST the pin
+and spins BACK; on a contoured green the roll also curls off the sculpt. Both were invisible until the
+ball landed. GS-backspin-line draws that predicted roll-out on the shot-decision screen: a short cyan
+line from the aim-line touchdown to where the ball settles, with the confident prefix drawn solid and
+a terminus dot where the read runs out (exactly the putt-read idiom, a distinct cyan `#7fe0ff` so it
+never reads as the yellow break line or the green/amber/red spray cone; a dark halo keeps it legible
+over the cone + fall-line arrows).
+
+**Graphic ≡ physics (contract 5).** `backspinRoll(hole, spray, opts)` (round.ts) is PURE: it takes the
+aim spread's `expectedCarry` landing, computes the MEAN roll energy (`carry · (clubRollFraction +
+rollFracDelta − backspinBoost)` — the `rollPotential` body at the rng.range midpoint 1.0, NO draw
+taken), and feeds it through the SAME `rollOut` the sim resolves — so the drawn check + contour curl is
+byte-for-byte the roll the shot will take (a test reconstructs `rollOut` independently and asserts
+equality). Returns null for a non-backspin club (driver/long irons), a landing that plugs in a penalty,
+or a negligible roll (`|roll| < SPIN_LINE_MIN` 1.0). Zero rng, so the headless auto path is untouched.
+(The rare ship-corridor pinball flight + tent ricochet aren't reproduced — the line is a helper, the
+actual bounce is the truth; the ground roll still passes `hole.walls`.)
+
+**Read range is a shoppable gear axis (like the putt line).** `spinReadOf(loadout)` (economy.ts)
+returns `{readYd, full}`: a short base reach every wedge shows with no upgrade (`DEFAULT_SPIN_READ` 2.5)
++ `spinReadBonus`, and `spinReadFull` for the whole roll. `previewBackspin(state, spray, loadout)`
+(play.ts) turns that into a `readFrac = full ? 1 : readYd / |roll|`. The overlay cuts the confident
+prefix by ARC LENGTH, interpolating the terminus point — a straight (non-contoured) roll is only 2
+points, so an index cut would always land on the last point and the gearing would never show (the putt
+path has 12 samples and never hit this). Two items, each a genuine short-game upgrade so the auto sim
+gains too (the Green-Reading-Book pattern; contract 4):
+- **Spin Guide Card** (common, 70cr): `spinReadBonus +4` + `backspinBoost +0.04`.
+- **Spin Trajectory Computer** (rare, 150cr): `spinReadFull` + `backspinBoost +0.05`.
+
+Both round-trip via their perk ids (`loadoutFromPerks`) — no save bump. `spinReadBonus`/`spinReadFull`
+are render-only (a base loadout leaves them undefined, byte-for-byte).
+
+**Wiring.** The overlay parts (`spinOverlayParts`, holeView) live in the SHARED `#gs-shot-overlay`
+group with the spray cone, so the pull-to-power surgical refresh (`shotAimRefresh`) redraws the line as
+power/aim change (`spinPath`/`spinReadFrac` in `RenderOptions`). app.ts computes `previewBackspin` off
+the same `spray` it already builds for the cone (no extra shot resolve) in both the full render and the
+refresh. The Pro Shop upgrade digest (`shopScreens.ts`) gains a 🎯 line.
+
+**Verified.** `tests/backspin-line.test.ts` (17): the gear axis (`spinReadOf` base/guide/computer +
+perk round-trip), `backspinRoll` (null for driver, checks back for a lofted wedge, landing anchor,
+graphic≡physics vs an independent `rollOut`, determinism, deeper check with more `backspinBoost`),
+`previewBackspin` read fractions, and the overlay render (partial → filled terminus, full → open settle
+ring, absent → no spin parts). `scripts/backspin-line-preview.mjs` eyeballs four gear tiers on a
+contoured green: the wedge lands at ~61y and spins back toward the 49y flag, base reads ~half the check
+(terminus dot), the Computer reads it all (settle ring). Full suite green; no new `_gs*` hook.
