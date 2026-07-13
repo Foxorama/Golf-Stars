@@ -297,6 +297,59 @@
       .gs-acc--collapsed .gs-acc__body { display: none; }
       .gs-acc__blurb { font-size: 12px; opacity: .6; margin: .2em 0 .6em; text-align: center; }
       .gs-acc__rack { display: flex; flex-wrap: wrap; justify-content: center; }
+      /* Pro Shop accordion (GS-pro-shop-redesign): a per-panel rarity accent tints the header edge so
+         the shop / bag / upgrades panels read as distinct cards. */
+      .gs-acc--shop { border-color: color-mix(in srgb, var(--acc-accent, var(--gs-line)) 40%, var(--gs-line)); }
+      .gs-acc--shop .gs-acc__head { border-left: 3px solid var(--acc-accent, transparent); }
+      .gs-acc--shop .gs-acc__icon { color: var(--acc-accent, inherit); }
+
+      /* ── Pro Shop splash hero (GS-pro-shop-redesign): the fun top panel — pro greeting + credits +
+             the Travel-onward CTA, so the next action lives at the very top of the screen. ─────── */
+      .gs-shophero {
+        border: 1px solid var(--gs-line); border-left: 4px solid var(--acc, var(--gs-accent));
+        border-radius: var(--gs-r-lg); box-shadow: var(--gs-shadow);
+        background:
+          radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--acc, var(--gs-accent)) 16%, transparent), transparent 60%),
+          linear-gradient(180deg, #171c27, var(--gs-bg-2));
+        padding: 12px 14px; margin: 6px 0 12px; display: flex; flex-direction: column; gap: 11px;
+      }
+      .gs-shophero__pro { display: flex; gap: 12px; align-items: center; }
+      .gs-shophero__ava { flex: 0 0 auto; }
+      .gs-shophero__say { flex: 1 1 auto; min-width: 0; }
+      .gs-shophero__name { font-weight: 700; font-size: 15px; }
+      .gs-shophero__role { font-size: 11px; opacity: .6; margin-bottom: 5px; }
+      .gs-shophero__line { font-size: 13px; font-style: italic; opacity: .92; line-height: 1.4; }
+      .gs-shophero__bar {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding-top: 10px; border-top: 1px solid var(--gs-line-2);
+      }
+      .gs-shophero__purse {
+        font-size: 13px; font-weight: 700; color: var(--gs-dim);
+        display: inline-flex; align-items: baseline; gap: 4px;
+      }
+      .gs-shophero__purse b { color: var(--gs-warn); font-size: 17px; }
+      .gs-shophero__cta { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+      /* ── Fuel depot state tag + upgrades digest (GS-pro-shop-redesign) ─────── */
+      .gs-fueldepot__state { font-size: 12px; font-weight: 800; }
+      .gs-upchips { display: flex; flex-wrap: wrap; gap: 7px; }
+      .gs-upchip {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; font-weight: 600; padding: 5px 10px 5px 8px;
+        border: 1px solid var(--gs-line); border-radius: 999px; background: #ffffff08;
+      }
+      .gs-upchip__i { font-size: 14px; line-height: 1; }
+      .gs-updetail__toggle {
+        display: block; margin: 11px 0 0; padding: 6px 2px; border: 0; background: none;
+        color: var(--gs-info); font: 600 12px/1.2 inherit; cursor: pointer;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+      }
+      .gs-updetail__toggle:hover { text-decoration: underline; }
+      .gs-updetail__body {
+        margin-top: 6px; padding: 10px 12px; border: 1px solid var(--gs-line-2);
+        border-radius: 10px; background: #ffffff05;
+      }
+      .gs-updetail__body ul { list-style: none; }
 
       /* ── Settings cog (fixed, top-right) ─────────────────────────────────── */
       .gs-cog {
