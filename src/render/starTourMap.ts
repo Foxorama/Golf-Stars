@@ -13,6 +13,7 @@
  */
 
 import { THEME_SKY } from './sky-coords';
+import { shipSVG } from './shipArt';
 
 /** One course plotted on the chart. */
 export interface StarTourWorld {
@@ -31,11 +32,25 @@ export interface StarTourMapOpts {
   seed: string;
   worlds: StarTourWorld[];
   selectedId?: string;
+  /** The player's ship (GS-star-tour-2): the character's cosmetic ride, flown around the chart. */
+  shipId?: string;
+  /** Ship position (chart coords) + heading (degrees, 0 = nose up). The app animates these each frame
+   *  by rewriting `#gs-st-ship`'s transform; this initial value seeds the first paint. */
+  shipX?: number;
+  shipY?: number;
+  shipHeading?: number;
 }
 
 /** The chart's intrinsic size (bigger than any viewport → it pans). */
 export const CHART_W = 1600;
 export const CHART_H = 1040;
+
+/** The clubhouse SPACEPORT (GS-star-tour-2): the player's home base, where the ship starts docked and
+ *  the view opens centred. A fixed chart position below the constellation field. */
+export const SPACEPORT_POS = { x: CHART_W * 0.5, y: CHART_H * 0.8 };
+
+/** How big the ship draws on the chart (shipSVG scale ≈ width/40). */
+const SHIP_SCALE = 1.25;
 
 /** Per-archetype look on the star map: planet body colour, rarity-ish accent, and a glyph. Self-
  *  contained (mirrors the journey map's BIOME_LOOK spirit, no coupling to the render palette). */
@@ -129,6 +144,40 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
     </g>`;
 }
 
+/** The clubhouse spaceport station — the ship's home dock, drawn as a ringed orbital platform with a
+ *  lit landing pad and a "HOME" beacon. Not tappable (it's a landmark, not a course). */
+function spaceportGlyph(): string {
+  const { x, y } = SPACEPORT_POS;
+  return `
+    <g transform="translate(${x},${y})" aria-hidden="true">
+      <circle r="46" fill="#39d9c4" opacity="0.06"/>
+      <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#39d9c4" stroke-width="2.5" opacity="0.45"/>
+      <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#7ff0e0" stroke-width="1" opacity="0.6"/>
+      <circle cx="-42" cy="0" r="3" fill="#39d9c4"/><circle cx="42" cy="0" r="3" fill="#39d9c4"/>
+      <rect x="-16" y="-13" width="32" height="24" rx="5" fill="#28454d"/>
+      <rect x="-16" y="-13" width="32" height="7" rx="5" fill="#35636d"/>
+      <rect x="-11" y="-3" width="4" height="4" rx="0.6" fill="#ffd27a"/>
+      <rect x="-4" y="-3" width="4" height="4" rx="0.6" fill="#ffd27a"/>
+      <rect x="3" y="-3" width="4" height="4" rx="0.6" fill="#ffd27a"/>
+      <rect x="-11" y="4" width="4" height="4" rx="0.6" fill="#ffd27a"/>
+      <rect x="-1" y="-24" width="2" height="11" fill="#5c7a80"/>
+      <circle cx="0" cy="-25" r="2.6" fill="#ff8f5e"><animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite"/></circle>
+      <text x="0" y="34" font-size="12" text-anchor="middle" fill="#7ff0e0" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;letter-spacing:.1em;">SPACEPORT</text>
+    </g>`;
+}
+
+/** The player's ship group (GS-star-tour-2) — positioned + rotated by the app each frame via its
+ *  transform. Drawn at the origin (shipSVG at 0,0) so the wrapping transform is pure translate+rotate. */
+function shipGroup(opts: StarTourMapOpts): string {
+  const x = opts.shipX ?? SPACEPORT_POS.x;
+  const y = opts.shipY ?? SPACEPORT_POS.y;
+  const h = opts.shipHeading ?? 0;
+  return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${h.toFixed(1)})" style="pointer-events:none;">
+    <circle r="30" fill="#7fe0ff" opacity="0.08"/>
+    ${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}
+  </g>`;
+}
+
 /** Build the full star-chart SVG (intrinsic-sized; the app pans it inside the viewport). */
 export function starTourMapSVG(opts: StarTourMapOpts): string {
   const rnd = mulberry32(hashSeed(opts.seed));
@@ -168,6 +217,8 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     <rect width="${CHART_W}" height="${CHART_H}" fill="url(#stSky)"/>
     ${grid}
     ${stars}
+    ${spaceportGlyph()}
     ${worlds}
+    ${shipGroup(opts)}
   </svg>`;
 }

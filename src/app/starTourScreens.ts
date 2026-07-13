@@ -1,16 +1,17 @@
 /**
- * STAR TOUR course-picker screen (GS-star-tour).
+ * STAR TOUR course-picker screen (GS-star-tour / GS-star-tour-2).
  *
- * A full-screen, free-roam celestial star map: every 18-hole Star Tour course sits at its
- * constellation's real sky position, and the player flies their ship (a fixed centre reticle) around
- * the chart — which pans by native scroll — to pick a world. Tapping a world raises a bottom DOSSIER
- * sheet (course flavour, difficulty, your record, a weather picker, and Fly-here-&-play). With no
- * world selected the sheet shows the personal course-record boards.
+ * A full-screen, free-roam celestial star map you FLY: the player's ship (their character's cosmetic
+ * ride) starts docked at the clubhouse SPACEPORT and flies wherever you tap — orienting toward the
+ * point and cruising there. Tapping a WORLD flies the ship to it and, on arrival, opens the course
+ * DOSSIER (flavour, difficulty, your record, a weather picker, Fly-here-&-play). The chart pans by
+ * native scroll + drag. A bottom-left GOLFER pod swaps the character (and thus the ship); a bottom-
+ * right pill toggles the course-record boards.
  *
- * Its cockpit chrome uses its OWN class prefix `.gs-sthud` (NOT the play screen's `.gs-hud` nor the
- * journey map's `.gs-bhud`) so it can never collide with another screen's styles (CLAUDE.md: new
- * screen chrome gets its own prefix). Pure render off `state` + this module's view object; the app
- * wires the taps. No reducer/save/rng impact — the course pick is a `pickStarTourCourse` action.
+ * Character select comes BEFORE this screen (GS-star-tour-2), so `run.loadout.characterId` is set and
+ * the ship is the golfer's own. Cockpit chrome uses its OWN class prefix `.gs-sthud` (never the play
+ * screen's `.gs-hud` nor the journey map's `.gs-bhud` — the class-collision rule). The ship's motion is
+ * an app-layer rAF animation (starTourView holds its position); the reducer stays pure.
  */
 
 import { state } from './ctx';
@@ -19,15 +20,33 @@ import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
 import { starTourMapSVG, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
+import { shipForCharacter } from '../ui/gameCosmetics';
+import { getCharacter } from '../sim/rpg/characters';
+import { shipById } from '../sim/rpg/ships';
 
 /** View state for the star map (mutated by app.ts; reset on entry). */
 export const starTourView = {
-  /** The world whose dossier is open, or null for the welcome/records sheet. */
+  /** The world whose dossier is open, or null. */
   selectedId: null as string | null,
   /** The weather sky chosen for the round (a CourseEffectId). */
   effect: 'none' as CourseEffectId,
-  /** Set once the viewport has been auto-centred on first mount (app.ts). */
+  /** The course-record boards panel is open. */
+  recordsOpen: false,
+  /** Set once the viewport has been auto-centred on the spaceport (app.ts). */
   centred: false,
+  /** The chart scroll offset, preserved across re-renders (each render rebuilds the viewport node, so
+   *  the browser scroll is lost otherwise). Updated on pan/scroll and while the camera follows the ship. */
+  scrollX: null as number | null,
+  scrollY: null as number | null,
+  /** Ship position (chart coords) + heading (deg, 0 = up) — animated by app.ts; null = dock at port. */
+  shipX: null as number | null,
+  shipY: null as number | null,
+  heading: 0,
+  /** Current flight target (chart coords), or null when idle. */
+  targetX: null as number | null,
+  targetY: null as number | null,
+  /** The course id to open on arrival (a flight triggered by tapping a world), or null (free flight). */
+  flyingTo: null as string | null,
 };
 
 /** The weather skies offered on the star map — atmospheric choices (the trade-camp / mechanic effects
@@ -72,9 +91,15 @@ export function starTourWorlds(): StarTourWorld[] {
   });
 }
 
-/** The cockpit HUD frame: corner brackets, title plate, centre ship reticle, bottom console. Its own
- *  `.gs-sthud` prefix; `pointer-events:none` so map scroll/taps pass through, only the buttons catch. */
+/** The cockpit HUD frame: corner brackets, title plate, an EXIT switch, the top-right stat pod, plus
+ *  the bottom dock (golfer swap + records toggle). Its own `.gs-sthud` prefix; `pointer-events:none`
+ *  so map scroll/taps pass through — only the buttons catch pointers. */
 function stHud(): string {
+  const charId = state.run.loadout.characterId;
+  const ch = charId ? getCharacter(charId) : undefined;
+  const shipId = shipForCharacter(state, charId);
+  const ship = shipById(shipId);
+  const accent = ch?.style.cap ?? '#7fe0ff';
   return `
     <div class="gs-sthud" aria-hidden="false">
       <div class="gs-sthud__frame"></div>
@@ -84,15 +109,15 @@ function stHud(): string {
         <span class="gs-sthud__shards">✦ <b>${state.shards}</b></span>
         <button class="gs-sthud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
       </div>
-      <div class="gs-sthud__reticle" aria-hidden="true">
-        <svg viewBox="-30 -30 60 60" width="60" height="60">
-          <circle r="26" fill="none" stroke="#7fe0ff" stroke-width="1" opacity="0.35"/>
-          <path d="M0,-14 C7,-9 7,9 0,15 C-7,9 -7,-9 0,-14 Z" fill="#dfe6f2"/>
-          <circle cx="0" cy="-2" r="3.2" fill="#8fe6ff"/>
-          <path d="M-6,8 L-11,16 L-3,12 Z" fill="#7fe0ff"/>
-          <path d="M6,8 L11,16 L3,12 Z" fill="#7fe0ff"/>
-          <path d="M-2.4,15 L0,25 L2.4,15 Z" fill="#ffc454" opacity="0.9"><animate attributeName="opacity" values="0.5;1;0.5" dur="1.1s" repeatCount="indefinite"/></path>
-        </svg>
+      <div class="gs-sthud__dock">
+        <button class="gs-sthud__golfer" data-action='{"type":"openStarTour"}' title="Change golfer">
+          <span class="gs-sthud__golfer-dot" style="background:${accent};"></span>
+          <span class="gs-sthud__golfer-txt">
+            <b>${ch?.name ?? 'Pick golfer'}</b>
+            <span>🚀 ${ship?.name ?? 'ship'} · change ▸</span>
+          </span>
+        </button>
+        <button class="gs-sthud__records" data-startour-records="1">🏆 Records</button>
       </div>
     </div>`;
 }
@@ -129,8 +154,8 @@ function dossier(w: StarTourWorld): string {
     </div>`;
 }
 
-/** The default sheet (no world selected) — a welcome + the personal course-record boards. */
-function welcomeSheet(): string {
+/** The course-record boards panel (toggled by the dock pill). */
+function recordsSheet(): string {
   const board = bestStrokeRounds(state.strokePlayBest, 5);
   const rows = board.length
     ? board
@@ -142,13 +167,13 @@ function welcomeSheet(): string {
     : `<div class="gs-st-boardempty">Fly to a world and play its 18 to set your first course record.</div>`;
   const played = Object.keys(state.strokePlayBest).length;
   return `
-    <div class="gs-st-sheet gs-st-sheet--welcome">
+    <div class="gs-st-sheet gs-st-sheet--records">
+      <button class="gs-st-sheet__close" data-startour-records="0" aria-label="Close">✕</button>
       <div class="gs-st-sheet__head">
         <h2 class="gs-st-sheet__title">Course records</h2>
         <span class="gs-st-tier" style="--tc:#7fe0ff;">${played}/${starTourWorlds().length} played</span>
       </div>
-      <div class="gs-st-hint">🕹 Drag to fly around &middot; tap a world to play its 18</div>
-      <div class="gs-st-sheet__wxlabel">Your best rounds</div>
+      <div class="gs-st-sheet__wxlabel">Your best rounds overall</div>
       <div class="gs-st-board">${rows}</div>
     </div>`;
 }
@@ -157,8 +182,16 @@ function welcomeSheet(): string {
 export function starTourScreen(): string {
   const worlds = starTourWorlds();
   const sel = starTourView.selectedId ? worlds.find((w) => w.id === starTourView.selectedId) : undefined;
-  const chart = starTourMapSVG({ seed: `startour:${state.run.seed}`, worlds, selectedId: sel?.id });
-  const sheet = sel ? dossier(sel) : welcomeSheet();
+  const chart = starTourMapSVG({
+    seed: `startour:${state.run.seed}`,
+    worlds,
+    selectedId: sel?.id,
+    shipId: shipForCharacter(state, state.run.loadout.characterId),
+    shipX: starTourView.shipX ?? undefined,
+    shipY: starTourView.shipY ?? undefined,
+    shipHeading: starTourView.heading,
+  });
+  const sheet = sel ? dossier(sel) : starTourView.recordsOpen ? recordsSheet() : '';
   return `
     <div class="gs-startour">
       <div class="gs-startour__viewport" id="gs-st-viewport">${chart}</div>

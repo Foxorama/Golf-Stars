@@ -202,10 +202,6 @@ export function reduce(state: UiState, action: Action): UiState {
       const bagTierByCharacter = action.bagTier
         ? { ...state.bagTierByCharacter, [action.characterId]: bagTier }
         : state.bagTierByCharacter;
-      // STAR TOUR (GS-star-tour): a stroke-play run pins the course + weather picked on the star map so
-      // `startRun` bakes them onto the run and `currentCourse` serves the fixed layout. Only for the
-      // strokeplay format with a pending pick — every other mode passes undefined (byte-for-byte).
-      const pick = state.run.formatId === STROKEPLAY_FORMAT ? state.starTourPick : undefined;
       const run = startRun(
         state.run.seed,
         state.run.formatId,
@@ -214,9 +210,13 @@ export function reduce(state: UiState, action: Action): UiState {
         asc,
         bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
-        pick?.courseId,
-        pick?.effect,
       );
+      // STAR TOUR (GS-star-tour-2): the golfer is chosen BEFORE the star map, so a strokeplay selection
+      // flows to the map (to pick a world + fly the golfer's own ship) rather than straight to a stop
+      // intro. The course pins on at `pickStarTourCourse`. Every other mode goes to the intro as before.
+      if (state.run.formatId === STROKEPLAY_FORMAT) {
+        return { ...state, run, course: currentCourse(run), screen: 'starTour', bagTierByCharacter };
+      }
       // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
       // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
       // cycle off this running total (`marmotTips % (CAP + 1)`), so the reducer just keeps counting.
@@ -254,12 +254,19 @@ export function reduce(state: UiState, action: Action): UiState {
       // generic `start` backs character select. The parked Voyage/Unending resume is left untouched —
       // Star Tour is a side mode that never consumes it (the placeholder run has no character, so
       // persist never snapshots it over the resumable offer).
-      if (!['title', 'gameover', 'strokeResult', 'starTour'].includes(state.screen)) return state;
-      const run = startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades);
+      // GS-star-tour-2: CHARACTER FIRST — the Star Tour tile opens character select, then the golfer
+      // choice flows to the star map (so the map can fly the golfer's own cosmetic ship). The corner
+      // "change golfer" button on the map re-enters here too. EXCEPTION: coming back from a round's
+      // recap ("Star map") keeps the SAME golfer and lands straight on the map — you just picked them.
+      if (!['title', 'gameover', 'strokeResult', 'starTour', 'character'].includes(state.screen)) return state;
+      const keepGolfer = state.screen === 'strokeResult' && !!state.run.loadout.characterId;
+      const run = keepGolfer
+        ? startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, state.run.loadout.characterId, state.run.ascension, state.run.bagTier, state.run.unlockedClubs)
+        : startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades);
       return {
         ...state,
         run,
-        screen: 'starTour',
+        screen: keepGolfer ? 'starTour' : 'character',
         starTourPick: undefined,
         played: undefined,
         lastResult: undefined,
@@ -270,10 +277,12 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'pickStarTourCourse': {
-      // GS-star-tour: a course + weather chosen on the star map. Remember the pick and step to character
-      // select; `selectCharacter` bakes it onto the run. Guarded to the star map.
-      if (state.screen !== 'starTour') return state;
-      return { ...state, starTourPick: { courseId: action.courseId, effect: action.effect }, screen: 'character' };
+      // GS-star-tour: a course + weather chosen on the star map. The golfer is ALREADY picked (character
+      // select came first, GS-star-tour-2), so pin the course + weather onto the run and tee up the
+      // round intro. Guarded to the star map.
+      if (state.screen !== 'starTour' || !state.run.loadout.characterId) return state;
+      const run = { ...state.run, staticCourseId: action.courseId, staticEffect: action.effect ?? 'none' };
+      return { ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0 };
     }
 
     case 'exitStarTour': {
