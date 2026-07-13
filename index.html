@@ -471,11 +471,27 @@
       }
       .gs-sthud__shards { font-size: 12px; color: var(--gs-gold); }
       .gs-sthud__cog { background: none; border: none; color: #bfeaff; font-size: 17px; cursor: pointer; padding: 0 2px; }
-      .gs-sthud__reticle {
-        position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-        width: 60px; height: 60px; pointer-events: none; opacity: .9;
-        filter: drop-shadow(0 0 8px rgba(84,200,255,.5));
+      /* Bottom dock: the golfer-swap pod (lower-left) + records toggle (lower-right). */
+      .gs-sthud__dock {
+        position: absolute; left: 12px; right: 12px; bottom: 14px; z-index: 7; pointer-events: none;
+        display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
       }
+      .gs-sthud__golfer {
+        pointer-events: auto; display: flex; align-items: center; gap: 9px; cursor: pointer; text-align: left;
+        background: rgba(10,20,32,.86); border: 1px solid rgba(84,200,255,.3); border-radius: 12px; padding: 8px 12px;
+        color: #eaf4ff; max-width: 62%;
+      }
+      .gs-sthud__golfer:hover { border-color: #54c8ff; }
+      .gs-sthud__golfer-dot { width: 12px; height: 12px; border-radius: 999px; flex: 0 0 auto; box-shadow: 0 0 8px currentColor; }
+      .gs-sthud__golfer-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+      .gs-sthud__golfer-txt b { font-size: 13px; }
+      .gs-sthud__golfer-txt span { font-size: 10.5px; color: #7fa6c4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-sthud__records {
+        pointer-events: auto; cursor: pointer; flex: 0 0 auto;
+        background: rgba(10,20,32,.86); border: 1px solid rgba(255,206,84,.4); color: #ffde8a;
+        border-radius: 999px; padding: 9px 14px; font: 700 13px/1 system-ui;
+      }
+      .gs-sthud__records:hover { border-color: #ffce54; }
       .gs-st-hint { font-size: 12px; color: #7fa6c4; margin: 2px 0 12px; }
       /* The bottom dossier / records sheet */
       .gs-st-sheet {

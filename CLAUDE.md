@@ -895,17 +895,24 @@ these systems** — each bullet is the tip of a documented iceberg.
     Trade-Market/Clubhouse doorways (2-up `.gs-navtiles`). Voyage + Unending are auto-listed from
     `FORMATS`; Star Tour is a BESPOKE tile (`openStarTour`, not the generic `start`) because it opens
     its own course-picker star map first — so `strokeplay` is EXCLUDED from the auto-list.
-  - STAR TOUR star map (GS-star-tour, `app/starTourScreens.ts` + `render/starTourMap.ts`): a full-bleed,
-    free-roam celestial chart — every course plotted at its constellation's real J2000 sky position
-    (`THEME_SKY`), the player's ship a fixed centre reticle, the chart PANS by native scroll +
-    pointer-drag (`wireStarTourDrag`; a moved drag sets `starTourDragged` so the trailing click doesn't
-    select a world). Tapping a world raises a bottom DOSSIER (flavour, tier, your record, a WEATHER
-    picker, Fly-here-&-play → `pickStarTourCourse`); no selection shows the course-record boards. Its
-    cockpit chrome uses its OWN class prefix `.gs-sthud` (NOT `.gs-hud`/`.gs-bhud` — the class-collision
-    rule). The round then flows character-select → `intro` (Star-Tour-branched objective/field, Watch
-    hidden so a record is EARNED) → play → `strokeResult` recap (`app/strokeResultScreens.ts`). Reducer:
-    `openStarTour`/`pickStarTourCourse`/`exitStarTour` + `resolveStrokePlay` (banks the record like
-    Asgard resolves its tournament). Deep-linkable via `?screen=startour`/`?screen=strokeresult`
+  - STAR TOUR star map (GS-star-tour / GS-star-tour-2, `app/starTourScreens.ts` + `render/starTourMap.ts`):
+    a full-bleed, free-roam celestial chart — every course plotted at its constellation's real J2000 sky
+    position (`THEME_SKY`), the chart PANS by native scroll + pointer-drag (`wireStarTourDrag`; a moved
+    drag sets `starTourDragged` so the trailing click doesn't fly). CHARACTER SELECT COMES FIRST
+    (GS-star-tour-2): `openStarTour` opens the roster, `selectCharacter` (strokeplay branch) then lands on
+    the map, so the run carries the golfer and the map flies THEIR cosmetic ship (`shipForCharacter` →
+    `shipSVG`). You FLY the ship: a TAP orients + cruises it there (an app-layer rAF loop in `stepStarTour`
+    moving `starTourView.shipX/Y/heading`, chase-cam following, scroll preserved across renders via
+    `starTourView.scrollX/Y`); tapping a WORLD flies to it and OPENS its DOSSIER on arrival (flavour, tier,
+    record, WEATHER picker, Fly-here-&-play → `pickStarTourCourse` pins the course on the golfer's run →
+    `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there). A bottom-left
+    GOLFER pod (`openStarTour` again = change golfer → back to the roster; a recap "Star map" KEEPS the
+    golfer) + a bottom-right RECORDS toggle. Cockpit chrome uses its OWN class prefix `.gs-sthud` (NOT
+    `.gs-hud`/`.gs-bhud` — the class-collision rule). `intro` is Star-Tour-branched (objective/field, Watch
+    hidden so a record is EARNED); the round resolves to `strokeResult` (`app/strokeResultScreens.ts`).
+    The in-round HUD shows STROKE scoring (running to-par + gross), not the Stableford-vs-cut chip.
+    Reducer: `openStarTour`/`pickStarTourCourse`/`exitStarTour` + `resolveStrokePlay` (banks the record
+    like Asgard resolves its tournament). Deep-linkable via `?screen=startour`/`?screen=strokeresult`
     (GS-screen-deeplink, real reducer transitions); guarded by `tests/startour-flow.test.ts` +
     `tests/build.test.ts` browser smoke. Star Tour never consumes the parked Voyage/Unending resume.
     The Daily button is parked off the title for now.

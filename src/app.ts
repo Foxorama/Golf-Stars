@@ -78,7 +78,7 @@ import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 import { starTourScreen, starTourView, starTourWorlds } from './app/starTourScreens';
 import { strokeResultScreen } from './app/strokeResultScreens';
-import { worldPos, CHART_W, CHART_H } from './render/starTourMap';
+import { worldPos, CHART_W, CHART_H, SPACEPORT_POS } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
@@ -182,16 +182,15 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
     case 'clubhouse':
       return reduce(title, { type: 'openClubhouseHall' });
     case 'startour':
-      // GS-star-tour: the free-roam star map opens off the title via the real reducer transition.
-      return reduce(title, { type: 'openStarTour' });
+      // GS-star-tour-2: character select comes first, then the star map — mount it via the real
+      // transitions (openStarTour → pick a golfer → land on the map).
+      return reduce(reduce(title, { type: 'openStarTour' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
     case 'strokeresult': {
-      // GS-star-tour: mount the round recap the honest way — build a strokeplay run through the real
-      // transitions, then auto-play + resolve it exactly as the reducer's own `play` path does, so the
-      // deep-link can't paper over a render bug.
-      const intro = reduce(
-        reduce(reduce(title, { type: 'openStarTour' }), { type: 'pickStarTourCourse', courseId: 'verdant-18' }),
-        { type: 'selectCharacter', characterId: CHARACTERS[0]!.id },
-      );
+      // GS-star-tour: mount the round recap the honest way — golfer → map → pick a course → auto-play +
+      // resolve it exactly as the reducer's own `play` path does, so the deep-link can't paper over a
+      // render bug.
+      const map = reduce(reduce(title, { type: 'openStarTour' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const intro = reduce(map, { type: 'pickStarTourCourse', courseId: 'verdant-18' });
       return reduce(intro, { type: 'play' });
     }
     default:
@@ -277,17 +276,25 @@ function dispatch(action: Action): void {
     // defaults to the LAST tier you chose (persisted pref), clamped to what's now unlocked — so it
     // doesn't snap back to A0 every run. The club set defaults to the owned tier (the strongest bag
     // you have; opt DOWN for a harder run).
-    if (action.type === 'start' || action.type === 'pickStarTourCourse') {
+    if (action.type === 'start' || action.type === 'openStarTour') {
       selAscension = Math.max(0, Math.min(state.maxAscension, getSettings().lastAscension));
       selClubSet = state.bagTier;
       selClubSetTouched = false;
     }
-    // Entering the Star Tour star map (GS-star-tour): reset its view so it opens fresh (no stale
-    // selection) and the viewport re-centres on first mount.
+    // Entering Star Tour (GS-star-tour-2): character select comes first, so `openStarTour` opens the
+    // roster; reset the star map's whole view (selection, weather, ship at the spaceport) so a fresh
+    // tour docks at home and re-centres on the port.
     if (action.type === 'openStarTour') {
       starTourView.selectedId = null;
       starTourView.effect = 'none';
+      starTourView.recordsOpen = false;
       starTourView.centred = false;
+      starTourView.shipX = null;
+      starTourView.shipY = null;
+      starTourView.heading = 0;
+      starTourView.targetX = null;
+      starTourView.targetY = null;
+      starTourView.flyingTo = null;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -1266,6 +1273,99 @@ function wireStarTourDrag(vp: HTMLElement): void {
   vp.addEventListener('pointercancel', end);
 }
 
+// STAR TOUR ship flight (GS-star-tour-2): the ship orients toward a tapped point/world and cruises
+// there; on reaching a WORLD its dossier opens. Pure app-layer animation — the reducer stays clean;
+// `starTourView` holds the ship's position so it survives re-renders. Only ever runs on the star map.
+const stAnim = { raf: 0 };
+
+/** Set a flight to a chart point (free roam — no dossier on arrival). */
+function flyStarTourToPoint(x: number, y: number): void {
+  starTourView.targetX = Math.max(20, Math.min(CHART_W - 20, x));
+  starTourView.targetY = Math.max(20, Math.min(CHART_H - 20, y));
+  starTourView.flyingTo = null;
+  sfx.click();
+  startStarTourAnim();
+}
+
+/** Set a flight to a world; its dossier opens when the ship arrives. */
+function flyStarTourToWorld(id: string | null): void {
+  if (!id) return;
+  const w = starTourWorlds().find((x) => x.id === id);
+  if (!w) return;
+  const p = worldPos(w);
+  starTourView.targetX = p.x;
+  starTourView.targetY = p.y;
+  starTourView.flyingTo = id;
+  starTourView.selectedId = null; // close any open dossier while we fly
+  sfx.click();
+  haptic(HAPTICS.tap);
+  render(); // reflect the closed dossier immediately, then fly
+}
+
+/** Lerp an angle (degrees) toward a target by fraction f, taking the short way round. */
+function lerpAngle(a: number, b: number, f: number): number {
+  let d = ((b - a + 540) % 360) - 180;
+  return a + d * f;
+}
+
+/** (Re)start the single ship-animation rAF loop. Idempotent — cancels any in-flight frame first. */
+function startStarTourAnim(): void {
+  if (state.screen !== 'starTour') return;
+  if (stAnim.raf) cancelAnimationFrame(stAnim.raf);
+  stAnim.raf = requestAnimationFrame(stepStarTour);
+}
+
+function stepStarTour(): void {
+  if (state.screen !== 'starTour') {
+    stAnim.raf = 0;
+    return;
+  }
+  const v = starTourView;
+  if (v.shipX == null || v.shipY == null) {
+    v.shipX = SPACEPORT_POS.x;
+    v.shipY = SPACEPORT_POS.y;
+  }
+  const wasFlying = v.targetX != null && v.targetY != null;
+  if (wasFlying) {
+    const dx = v.targetX! - v.shipX;
+    const dy = v.targetY! - v.shipY;
+    const d = Math.hypot(dx, dy);
+    // Orient the nose toward the target (0° = up in the ship art), turning the short way.
+    v.heading = lerpAngle(v.heading, (Math.atan2(dx, -dy) * 180) / Math.PI, 0.28);
+    if (d < 3.5) {
+      v.shipX = v.targetX!;
+      v.shipY = v.targetY!;
+      v.targetX = null;
+      v.targetY = null;
+      if (v.flyingTo) {
+        // Arrived at a world → open its course dossier (the "course info screen loads on arrival").
+        v.selectedId = v.flyingTo;
+        v.flyingTo = null;
+        stAnim.raf = 0;
+        sfx.click();
+        render(); // rebuilds the DOM (dossier up) + restarts the loop via the post-render block
+        return;
+      }
+    } else {
+      const step = Math.max(7, d * 0.14);
+      const f = Math.min(1, step / d);
+      v.shipX += dx * f;
+      v.shipY += dy * f;
+    }
+  }
+  const vp = document.getElementById('gs-st-viewport');
+  // Chase-cam: while flying, ease the viewport toward keeping the ship centred so you watch it cruise.
+  if (wasFlying && vp) {
+    const tx = v.shipX - vp.clientWidth / 2;
+    const ty = v.shipY - vp.clientHeight / 2;
+    vp.scrollLeft += (tx - vp.scrollLeft) * 0.16;
+    vp.scrollTop += (ty - vp.scrollTop) * 0.16;
+  }
+  const el = document.getElementById('gs-st-ship');
+  if (el) el.setAttribute('transform', `translate(${v.shipX.toFixed(1)} ${v.shipY.toFixed(1)}) rotate(${v.heading.toFixed(1)})`);
+  stAnim.raf = requestAnimationFrame(stepStarTour);
+}
+
 
 
 function render(): void {
@@ -1435,22 +1535,26 @@ function render(): void {
     if (vp) {
       if (!starTourView.centred) {
         requestAnimationFrame(() => {
-          const worlds = starTourWorlds();
-          let sx = 0;
-          let sy = 0;
-          for (const w of worlds) {
-            const p = worldPos(w);
-            sx += p.x;
-            sy += p.y;
-          }
-          const cx = worlds.length ? sx / worlds.length : CHART_W / 2;
-          const cy = worlds.length ? sy / worlds.length : CHART_H / 2;
-          vp.scrollLeft = cx - vp.clientWidth / 2;
-          vp.scrollTop = cy - vp.clientHeight / 2;
+          // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2).
+          starTourView.scrollX = SPACEPORT_POS.x - vp.clientWidth / 2;
+          starTourView.scrollY = SPACEPORT_POS.y - vp.clientHeight / 2;
+          vp.scrollLeft = starTourView.scrollX;
+          vp.scrollTop = starTourView.scrollY;
           starTourView.centred = true;
         });
+      } else if (starTourView.scrollX != null && starTourView.scrollY != null) {
+        // Restore the preserved scroll — the viewport is a fresh node each render, so the browser
+        // scroll is otherwise lost and the chart snaps to its top-left corner.
+        vp.scrollLeft = starTourView.scrollX;
+        vp.scrollTop = starTourView.scrollY;
       }
+      // Keep the preserved offset in sync with any native scroll (wheel / touch / scrollbar).
+      vp.addEventListener('scroll', () => {
+        starTourView.scrollX = vp.scrollLeft;
+        starTourView.scrollY = vp.scrollTop;
+      });
       wireStarTourDrag(vp);
+      startStarTourAnim();
     }
   }
 
@@ -1528,22 +1632,34 @@ function render(): void {
       render();
     });
   });
-  // Star Tour star map (GS-star-tour): tap a world to open its dossier, tap a weather chip to set the
-  // sky, ✕ to close the sheet. getAttribute (not dataset) so the SVG <g> world targets work.
-  app.querySelectorAll<HTMLElement>('[data-startour-course]').forEach((el) => {
-    el.addEventListener('click', () => {
-      // A pan-drag ends in a click too — swallow it so flying past a world doesn't select it.
-      if (starTourDragged) {
-        starTourDragged = false;
-        return;
-      }
-      const id = el.getAttribute('data-startour-course');
-      starTourView.selectedId = starTourView.selectedId === id ? null : id;
-      sfx.click();
-      haptic(HAPTICS.tap);
-      render();
-    });
-  });
+  // Star Tour star map (GS-star-tour-2): a TAP flies the ship. Tapping a WORLD flies to it and opens the
+  // dossier on arrival; tapping empty space flies there (free roam). Handled on the VIEWPORT so the tap
+  // point maps to chart coords; a world hit is detected via closest() (works on SVG <g> too). A drag
+  // (starTourDragged) is a pan, not a tap. Weather chips + close/records are ordinary buttons.
+  {
+    const vp = document.getElementById('gs-st-viewport');
+    if (vp && state.screen === 'starTour') {
+      vp.addEventListener('click', (e) => {
+        if (starTourDragged) {
+          starTourDragged = false;
+          return;
+        }
+        const target = e.target as Element;
+        // Ignore taps on the HUD controls that overlay the map (they have their own handlers).
+        if (target.closest('.gs-sthud__back, .gs-sthud__statpod, .gs-sthud__dock, .gs-st-sheet')) return;
+        const worldEl = target.closest('[data-startour-course]');
+        if (worldEl) {
+          flyStarTourToWorld(worldEl.getAttribute('data-startour-course'));
+          return;
+        }
+        // Free flight to the tapped chart point (SVG is rendered 1:1 at intrinsic size).
+        const rect = vp.getBoundingClientRect();
+        const cx = e.clientX - rect.left + vp.scrollLeft;
+        const cy = e.clientY - rect.top + vp.scrollTop;
+        flyStarTourToPoint(cx, cy);
+      });
+    }
+  }
   app.querySelectorAll<HTMLElement>('[data-startour-weather]').forEach((el) => {
     el.addEventListener('click', () => {
       starTourView.effect = (el.getAttribute('data-startour-weather') ?? 'none') as CourseEffectId;
@@ -1554,6 +1670,13 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-startour-close]').forEach((el) => {
     el.addEventListener('click', () => {
       starTourView.selectedId = null;
+      sfx.click();
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-startour-records]').forEach((el) => {
+    el.addEventListener('click', () => {
+      starTourView.recordsOpen = el.getAttribute('data-startour-records') === '1';
       sfx.click();
       render();
     });
