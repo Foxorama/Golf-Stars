@@ -168,6 +168,24 @@ export interface Biome {
   parMix?: { p3: number; p4: number; p5: number };
   shapeWeights?: Partial<Record<string, number>>;
   widthWeights?: Partial<Record<string, number>>;
+  /**
+   * PER-BIOME DIFFICULTY VECTOR (GS-biome-difficulty) — the GREEN/PUTTING axis. The single `wildness`
+   * scalar ramps every lever together (width, bend, hazards, length via gravity), so depth reads as
+   * "the hole gets longer". This lets a world get harder via its GREENS instead: two worlds at the SAME
+   * wildness can be hard in different ways — a desert stays long-but-smooth (no `difficulty`), an ice
+   * world's shelves turn treacherous with depth. All levers ride the existing GREEN SIDE STREAMS
+   * (`:slope:`/`:contour:`/`:pin:`), so the terrain stream is byte-for-byte unchanged and only a world
+   * that opts in reflows its greens (re-run its death-spiral bar). Bounded — slope/lobe stay under the
+   * world's `greenSlopeMax` ceiling and the pin stays inside the green, so it's harder, never unfair.
+   *  • `greenTilt`       — multiplier on how the plane SLOPE magnitude ramps with wildness (default 1).
+   *  • `greenComplexity` — multiplier on the CONTOUR ramp (2nd-lobe probability + lobe strength) with
+   *                        wildness, so deep greens double-break (default 1).
+   *  • `pinTuck`         — additive EDGE-WARD pin push scaled by wildness (default 0 = the centred
+   *                        22–62% range), so deep pins tuck into corners for longer, breakier putts.
+   * Absent ⇒ all defaults ⇒ byte-for-byte the old greens. This is the GREEN axis of the vector;
+   * firmness / forced-carry axes (which touch the main physics stream) are a later pass.
+   */
+  difficulty?: { greenTilt?: number; greenComplexity?: number; pinTuck?: number };
 }
 
 export const BIOMES: readonly Biome[] = [
@@ -262,6 +280,9 @@ export const BIOMES: readonly Biome[] = [
     parMix: { p3: 0.32, p4: 0.5, p5: 0.18 },
     shapeWeights: { straight: 0.24, dogleg: 0.22, cape: 0.12, double: 0.3, hairpin: 0.12 },
     widthWeights: { classic: 0.16, chute: 0.08, neck: 0.1, hourglass: 0.12, wander: 0.3, thin: 0.18, broad: 0.06 },
+    // GS-biome-difficulty: the ice SHELVES are the test — deep stops turn treacherous underfoot
+    // (steeper tilt, double-breaking contours, pins tucked on the shelves) rather than just longer.
+    difficulty: { greenTilt: 1.35, greenComplexity: 1.4, pinTuck: 0.6 },
   },
   {
     id: 'ember-world',
@@ -287,6 +308,9 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.45,
     greenSlopeMax: 0.6, // GS-greens-3 green tilt character
     roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
+    // GS-biome-difficulty: jagged broken basalt greens get wilder with depth (double-breaking contours,
+    // pins tucked in the lava-rock folds) — the approach + putt is the danger, not raw length.
+    difficulty: { greenComplexity: 1.35, greenTilt: 1.2, pinTuck: 0.5 },
   },
   {
     id: 'void-garden',
@@ -335,6 +359,9 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.4,
     greenSlopeMax: 0.55, // GS-greens-3 green tilt character
     roughBreaks: 0.5, // GS-variety-2 broken-fairway frequency
+    // GS-biome-difficulty: a PRECISION world — the challenge deep in is a tucked pin on a fast faceted
+    // green you must flag, not brute length. Heavy pin-tuck, moderate contour, tilt left to the ceiling.
+    difficulty: { pinTuck: 0.8, greenComplexity: 1.2 },
   },
   {
     id: 'tempest-reach',

@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 24; // GS-biome-profile: per-biome par/shape/width profiles (dust-belt/ice-ring/spore-jungle own distinct routings)
+export const GENERATOR_VERSION = 25; // GS-biome-difficulty: per-biome green-difficulty vector (ice/ember/crystal get harder via their greens, not length)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -261,11 +261,14 @@ function rayPolyDist(c: Vec, dir: Vec, poly: Vec[]): number {
  * (never on the lip) yet meaningfully off-centre (front/back/tucked), for any green shape. Drawn
  * from a SIDE rng so it never perturbs the main terrain stream.
  */
-function pinInGreen(c: Vec, poly: Vec[], rng: Rng): Vec {
+function pinInGreen(c: Vec, poly: Vec[], rng: Rng, tuck = 0): Vec {
   const ang = rng.range(0, Math.PI * 2);
   const dir: Vec = [Math.cos(ang), Math.sin(ang)];
   const edge = rayPolyDist(c, dir, poly);
-  const frac = 0.22 + 0.4 * rng.float();
+  // `tuck` (GS-biome-difficulty) pushes the pin further toward the edge (a nastier, breakier position),
+  // added AFTER the rng.float() draw so the draw is byte-stable; clamped to 0.85 so the flag stays
+  // genuinely inside the green (validateCourse's pin-in-green invariant holds for any star shape).
+  const frac = Math.min(0.85, 0.22 + 0.4 * rng.float() + Math.max(0, tuck));
   return [c[0] + dir[0] * edge * frac, c[1] + dir[1] * edge * frac];
 }
 
@@ -1009,8 +1012,14 @@ function generateHole(
   // Flag inside the (arbitrary-shape) green via ray-march from the centre (GS-6/GS-greens): always
   // genuinely inside (never on the lip) yet off-centre, for ANY shape. Drawn from a SIDE rng keyed
   // by hole index so the flag is deterministic without perturbing the main terrain stream.
+  // Per-biome DIFFICULTY vector (GS-biome-difficulty) — the GREEN axis. All default to no-op (the
+  // greens are byte-for-byte the old draws), so only a world that sets `difficulty` reflows its greens.
+  const diff = biome.difficulty;
+  const tiltMul = diff?.greenTilt ?? 1;
+  const cplxMul = diff?.greenComplexity ?? 1;
+  const pinTuck = (diff?.pinTuck ?? 0) * wildness * 0.22; // edge-ward push, scaled by depth
   const pinRng = new Rng(`${rng.seed}:pin:${holeIndex}`);
-  const pin: Vec = pinInGreen(green, greenPolygon, pinRng);
+  const pin: Vec = pinInGreen(green, greenPolygon, pinRng, pinTuck);
 
   // Green SLOPE (GS-greens-3): a downhill fall-line direction + a magnitude up to the biome's
   // greenSlopeMax. Drawn from a SIDE rng (like the pin) so adding it leaves the main terrain stream
@@ -1021,7 +1030,10 @@ function generateHole(
   // ceiling (green-slope test holds), and drawn from the SIDE slope rng so the terrain stream is intact.
   const slopeRng = new Rng(`${rng.seed}:slope:${holeIndex}`);
   const slopeAng = slopeRng.range(0, Math.PI * 2);
-  const slopeMag = (biome.greenSlopeMax ?? 0.5) * slopeRng.range(0.4 + 0.45 * wildness, 1);
+  // `greenTilt` (GS-biome-difficulty) raises how fast the slope floor climbs with wildness; clamped so
+  // the range stays valid (min < max) and tiltMul=1 reproduces the old `0.4 + 0.45·wildness` exactly.
+  const slopeFloor = Math.min(0.92, 0.4 + 0.45 * wildness * tiltMul);
+  const slopeMag = (biome.greenSlopeMax ?? 0.5) * slopeRng.range(slopeFloor, 1);
   const greenSlope: Vec = [Math.cos(slopeAng) * slopeMag, Math.sin(slopeAng) * slopeMag];
 
   // Green CONTOUR (GS-green-contour): 1–2 radial mounds/hollows layered over the plane, so putts
@@ -1031,8 +1043,11 @@ function generateHole(
   // green gets one gentle roll so greens never read as flat planes. Lobe strength is capped by the
   // biome's greenSlopeMax like the plane, and its footprint is sized to the green so the break is
   // readable at putt zoom — fairness rides the aim clamp always reaching past the ideal borrow.
+  // `greenComplexity` (GS-biome-difficulty) ramps the CONTOUR: a 2nd lobe is likelier and lobes hit
+  // harder as wildness climbs. Both terms clamp so cplxMul=1 reproduces the old draws byte-for-byte
+  // (2nd-lobe prob `0.3 + 0.45·wildness` ≤ 0.75 < 0.95; strength `0.55 + 0.45·wildness` ≤ 1.0).
   const contourRng = new Rng(`${rng.seed}:contour:${holeIndex}`);
-  const nLobes = contourRng.bool(0.3 + 0.45 * wildness) ? 2 : 1;
+  const nLobes = contourRng.bool(Math.min(0.95, 0.3 + 0.45 * wildness * cplxMul)) ? 2 : 1;
   const greenContour: GreenLobe[] = [];
   for (let li = 0; li < nLobes; li++) {
     const la = contourRng.range(0, Math.PI * 2);
@@ -1041,7 +1056,7 @@ function generateHole(
     const lh =
       (biome.greenSlopeMax ?? 0.5) *
       contourRng.range(0.3, 0.75) *
-      (0.55 + 0.45 * wildness) *
+      Math.min(1, 0.55 + 0.45 * wildness * cplxMul) *
       (contourRng.bool() ? 1 : -1); // mound or hollow
     greenContour.push({ c: [green[0] + Math.cos(la) * ld, green[1] + Math.sin(la) * ld], r: lr, h: lh });
   }
