@@ -151,6 +151,10 @@ export function currentCourse(run: Run): Course {
           themeId: theme.id,
           wildnessBoost,
           effect,
+          // Compose the stop into a designed routing (GS-compose): planned par sequence, a signature
+          // short/long hole, adjacent-shape contrast and a mean-preserving difficulty arc — so a
+          // multi-hole stop stops reading as the same 2–3 holes repeated.
+          compose: true,
         }),
         effect,
       ),
@@ -244,6 +248,7 @@ function stitchSplitCourse(
       themeId: themeA.id,
       wildnessBoost,
       effect,
+      compose: true, // GS-compose: design the half's routing (par sequence, signature, difficulty arc)
     }),
   );
   const b = stampHoles(
@@ -255,6 +260,7 @@ function stitchSplitCourse(
       themeId: themeB.id,
       wildnessBoost,
       effect,
+      compose: true, // GS-compose: design the half's routing (par sequence, signature, difficulty arc)
     }),
   );
   return {

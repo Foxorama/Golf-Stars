@@ -37,6 +37,7 @@ describe('run formats (GS-9)', () => {
       distanceFromStart: 0,
       biomeRow: resolveBiome(theme),
       themeId: theme.id,
+      compose: true, // the run path composes every stop (GS-compose)
     });
     expect(course).toEqual(direct);
     // Every later stop repeats the 4-hole spec (the run ends by the survival bar, not length).
