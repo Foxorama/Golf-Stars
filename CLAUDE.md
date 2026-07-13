@@ -918,11 +918,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     keeps its top up; docked heading is nose-UP (`SHIP_DOCK_HEADING` = −90). An engine PLUME (`thrustTrail`,
     trailing off the tail, coloured off the ship's flame/accent) fades in via a `.gs-st-thrusting` class the
     rAF loop toggles while cruising, so the ship reads as flying, not sliding. FLIGHT SPEED
-    (GS-star-tour-map-improvements) is a near-CONSTANT flat cruise (`STAR_TOUR_BASE_STEP` × the flown ship's
-    RARITY via `starTourShipSpeedMult` — common .9 / rare 1 / epic 1.1 / legendary 1.2 / mythic 1.3), NOT the
-    old `d*0.14` that rocketed distant hops off way too fast; only a haul with more than `STAR_TOUR_LONG_HAUL`
-    (750) chart units still to go earns a gentle acceleration on top, so short/medium flights stay deliberate
-    on the small map. Tapping a WORLD flies to it
+    (GS-star-tour-map-improvements) is a near-CONSTANT flat cruise (`STAR_TOUR_BASE_STEP` 5.25 × the flown
+    ship's RARITY via `starTourShipSpeedMult` — common .9 / rare 1 / epic 1.1 / legendary 1.2 / mythic 1.3),
+    NOT the old `d*0.14` that rocketed distant hops off way too fast; only a haul with more than
+    `STAR_TOUR_LONG_HAUL` (750) chart units still to go earns a gentle acceleration (`*0.0375`) on top, so
+    short/medium flights stay deliberate on the small map. Base + accel were both dialled down 25% (7→5.25,
+    .05→.0375) for a calmer, more readable cruise — the reduction rides EVERY rarity uniformly (the mult is
+    applied on top). Tapping a WORLD flies to it
     and OPENS its DOSSIER on arrival (flavour, tier,
     record, WEATHER picker, Fly-here-&-play → `pickStarTourCourse` pins the course on the golfer's run →
     `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there). A bottom-left
@@ -938,14 +940,21 @@ these systems** — each bullet is the tip of a documented iceberg.
     NO run economy: Star Tour is a records chase with no credits/fuel/handicap/stop/distance — so `header()`
     (the between-hole recap) is `STROKEPLAY_FORMAT`-branched to show the course + running to-par instead of
     the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard), never the
-    ghost competitor leaderboard. The Daily button is parked off the title for now. WORLD ICONS
-    (GS-star-tour-map-improvements, `render/starTourMap.ts planetBody`/`planetSurface`) are richly-drawn,
-    per-world UNIQUE planets — an atmosphere halo, a seeded surface by archetype FAMILY
-    (`SURFACE_FAMILY`: lush continents / rocky craters / gas bands+storm / fiery lava cracks / crystal
-    facets), an optional Saturn RING (back arc behind + near arc in front) and 0–2 MOONS, a lit rim, and
-    the archetype emoji as a small emblem. Everything past the archetype PALETTE is `mulberry32`-seeded off
-    the world id (per-world circular clip ids via `idSafe`), so the two verdant / two desert / two void / …
-    courses that used to render as IDENTICAL flat emoji discs now each look distinct. Pure + byte-stable
+    ghost competitor leaderboard. The Daily button is parked off the title for now. DESTINATION ICONS
+    (GS-star-tour-destinations, `render/starTourMap.ts`) — the star map is a DIFFERENT interface from the
+    journey map: a course is the PLACE it's named for, not a biome skin, so the icon is drawn per
+    DESTINATION, not shared across every course of an archetype. Two levers: (1) a per-destination PALETTE
+    (`worldLook`, a bounded HSL hue/sat/light shift seeded off `themeId`) so two same-biome courses (both
+    void, both verdant, …) never share a colour — Pegasus Rift and Sagittarius Core diverge; (2) a
+    celestial KIND (`celestialKind`, inferred from name + archetype) drives the SHAPE: a `galaxy` (spiral
+    disc + arms + black-hole heart, for a "Core"/nucleus), a `rift` (dark lens torn by a jagged luminous
+    crack + debris sparks, for void/"Rift"/"Abyss"), a `wreck` (broken starship hull — nose + drifted tail,
+    engine bell, dead/flickering windows, antenna, debris, nebula haze — for a derelict/"Wreck"/"Ship"), or
+    a `planet` (the richly-drawn disc: atmosphere halo, seeded surface by `SURFACE_FAMILY`, optional Saturn
+    RING + 0–2 MOONS, lit rim, archetype emoji emblem — for everything else). Tier shows as a soft coloured
+    aura for every kind + a crisp ring for planets only (the freer shapes skip it to stay legible).
+    Everything past the palette is `mulberry32`-seeded off the world id (per-world circular clip ids via
+    `idSafe`). A new evocative course name picks up the right shape with no data plumbing. Pure + byte-stable
     (the map has its OWN seeded stream, not the sim rng). Eyeball via `scripts/startour-preview.mjs`.
   - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
     `src/app/` module over growing it, and re-read the relevant span before editing.**

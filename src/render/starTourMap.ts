@@ -162,6 +162,77 @@ function shadeHex(hex: string, amt: number): string {
   return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
 
+/** #rrggbb → [h(0..360), s(0..1), l(0..1)]. */
+function hexToHsl(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  const d = max - min;
+  if (d > 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return [h, s, l];
+}
+
+/** [h(0..360), s(0..1), l(0..1)] → #rrggbb. */
+function hslToHex(h: number, s: number, l: number): string {
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(1, s));
+  l = Math.max(0, Math.min(1, l));
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const to = (v: number) => Math.round((v + m) * 255);
+  return '#' + ((1 << 24) | (to(r) << 16) | (to(g) << 8) | to(b)).toString(16).slice(1);
+}
+
+/** Shift a colour's hue/saturation/lightness — the per-DESTINATION recolour so two courses of the same
+ *  archetype (both void, both verdant, …) never share a palette. */
+function shiftHsl(hex: string, dHue: number, dSat: number, dLight: number): string {
+  const [h, s, l] = hexToHsl(hex);
+  return hslToHex(h + dHue, s + dSat, l + dLight);
+}
+
+/** The star map is a DIFFERENT interface from the journey map: a course is a DESTINATION, not a biome
+ *  skin. So the palette is derived per DESTINATION (seeded off its themeId/id), not shared across every
+ *  course of the same archetype — Pegasus Rift and Sagittarius Core are both void yet must read as
+ *  distinct places. The archetype supplies the base colour + emblem glyph (so it still reads its biome
+ *  at a glance); a bounded hue/sat/light shift makes each destination its own. Pure + mulberry32-seeded
+ *  → byte-stable. */
+function worldLook(w: StarTourWorld): { col: string; hi: string; glyph: string } {
+  const base = WORLD_LOOK[w.archetype] ?? WORLD_LOOK.verdant!;
+  const rnd = mulberry32(hashSeed('stlook:' + (w.themeId || w.id)));
+  const dHue = (rnd() - 0.5) * 76; // ±38° — enough to separate two same-biome worlds, not so far it
+  //                                  leaves the archetype's colour family.
+  const dSat = (rnd() - 0.5) * 0.22;
+  const dLight = (rnd() - 0.5) * 0.14;
+  return {
+    col: shiftHsl(base.col, dHue, dSat, dLight),
+    hi: shiftHsl(base.hi, dHue, dSat, dLight),
+    glyph: base.glyph,
+  };
+}
+
 /** The seeded surface features drawn INSIDE a planet's disc, per family. Returns clip-bounded markup
  *  (the caller wraps it in a per-world circular clip). Pure + mulberry32-seeded → byte-stable. */
 function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, rnd: () => number): string {
@@ -297,18 +368,178 @@ function planetBody(w: StarTourWorld, r: number, look: { col: string; hi: string
     <text x="0" y="${rr(r * 0.34)}" font-size="${rr(r * 0.82)}" text-anchor="middle" opacity="0.92" style="paint-order:stroke;stroke:${shadeHex(col, -0.4)};stroke-width:1.4px;">${glyph}</text>`;
 }
 
-/** One tappable world planet + label. */
+/** What KIND of celestial body a destination is drawn as — the star map is exploration, so a course is
+ *  the place it's named for, not a generic "world": a galactic CORE is a spiral galaxy, a RIFT is a tear
+ *  in space, a derelict is a broken SHIP hull, everything else is a themed planet. Inferred from the
+ *  name + archetype (no data plumbing), so a new evocative course name picks up the right shape. */
+type CelestialKind = 'galaxy' | 'rift' | 'wreck' | 'planet';
+function celestialKind(w: StarTourWorld): CelestialKind {
+  const name = w.name.toLowerCase();
+  if (w.archetype === 'derelict' || name.includes('wreck') || name.includes('ship')) return 'wreck';
+  if (name.includes('core') || name.includes('galaxy') || name.includes('nucleus')) return 'galaxy';
+  if (w.archetype === 'void' || name.includes('rift') || name.includes('abyss')) return 'rift';
+  return 'planet';
+}
+
+/** A spiral GALAXY seen from a shallow angle — a luminous tilted disc, two or three sweeping arms of
+ *  scattered stars, and a blazing core with a dark black-hole heart ringed in light (for a galactic-core
+ *  destination). Coloured off the per-destination palette so two galaxies never match. Pure + seeded. */
+function galaxyBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stgalaxy:' + w.id));
+  const rr = (v: number) => v.toFixed(1);
+  const { col, hi } = look;
+  const tilt = -30 + rnd() * 24;
+  const armN = 2 + (rnd() < 0.5 ? 1 : 0);
+  const start = rnd() * Math.PI * 2;
+  let arms = '';
+  for (let a = 0; a < armN; a++) {
+    const phase = start + (a / armN) * Math.PI * 2;
+    const turns = 1.05 + rnd() * 0.5;
+    const stars = 12 + ((rnd() * 6) | 0);
+    for (let i = 0; i < stars; i++) {
+      const t = i / stars;
+      const ang = phase + t * turns * Math.PI * 2;
+      const rad = r * (0.16 + t * 1.15);
+      const x = Math.cos(ang) * rad;
+      const y = Math.sin(ang) * rad * 0.42; // squashed disc → a shallow viewing angle
+      const sr = (0.4 + rnd() * 1.1) * (1 - t * 0.5);
+      const tint = i % 4 === 0 ? '#ffffff' : hi;
+      arms += `<circle cx="${rr(x)}" cy="${rr(y)}" r="${rr(sr)}" fill="${tint}" opacity="${(0.85 - t * 0.55).toFixed(2)}"/>`;
+    }
+  }
+  return `<g transform="rotate(${rr(tilt)})">
+    <ellipse rx="${rr(r * 1.3)}" ry="${rr(r * 0.56)}" fill="${col}" opacity="0.22"/>
+    <ellipse rx="${rr(r * 0.98)}" ry="${rr(r * 0.4)}" fill="${hi}" opacity="0.16"/>
+    ${arms}
+    <ellipse rx="${rr(r * 0.4)}" ry="${rr(r * 0.26)}" fill="${shadeHex(hi, 0.35)}" opacity="0.85"/>
+    <ellipse rx="${rr(r * 0.22)}" ry="${rr(r * 0.14)}" fill="#fff4d6" opacity="0.95"/>
+    <circle r="${rr(r * 0.1)}" fill="#07040e"/>
+    <circle r="${rr(r * 0.13)}" fill="none" stroke="#ffe8b0" stroke-width="${rr(r * 0.05)}" opacity="0.9"/>
+  </g>`;
+}
+
+/** A RIFT in spacetime — a dark void lens torn open by a jagged luminous crack, spilling energy and
+ *  flinging a few sparks of debris (for a void/rift destination: "miss the pad and you are gone"). The
+ *  crack + halo take the per-destination colour, so Pegasus Rift and any other rift diverge. Seeded. */
+function riftBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('strift:' + w.id));
+  const rr = (v: number) => v.toFixed(1);
+  const { col, hi } = look;
+  const tilt = -70 + rnd() * 140;
+  const glow = shadeHex(hi, 0.25);
+  const segs = 5;
+  let d = `M0,${rr(-r * 1.1)}`;
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    const y = -r * 1.1 + t * r * 2.2;
+    const x = (rnd() - 0.5) * r * 0.55;
+    d += ` L${rr(x)},${rr(y)}`;
+  }
+  let sparks = '';
+  const sparkN = 4 + ((rnd() * 3) | 0);
+  for (let i = 0; i < sparkN; i++) {
+    const side = rnd() < 0.5 ? -1 : 1;
+    const sx = side * r * (0.5 + rnd() * 1.1);
+    const sy = (rnd() - 0.5) * r * 1.8;
+    const sr = 0.6 + rnd() * 1.1;
+    sparks += `<circle cx="${rr(sx)}" cy="${rr(sy)}" r="${rr(sr)}" fill="${i % 2 ? '#ffffff' : hi}" opacity="0.75"/>`;
+  }
+  return `<g transform="rotate(${rr(tilt)})">
+    <ellipse rx="${rr(r * 0.72)}" ry="${rr(r * 1.18)}" fill="${col}" opacity="0.32"/>
+    <ellipse rx="${rr(r * 0.42)}" ry="${rr(r * 1.02)}" fill="#05040a" opacity="0.6"/>
+    ${sparks}
+    <path d="${d}" fill="none" stroke="${glow}" stroke-width="${rr(r * 0.5)}" stroke-linecap="round" opacity="0.45"/>
+    <path d="${d}" fill="none" stroke="${hi}" stroke-width="${rr(r * 0.22)}" stroke-linecap="round" opacity="0.85"/>
+    <path d="${d}" fill="none" stroke="#ffffff" stroke-width="${rr(r * 0.07)}" stroke-linecap="round" opacity="0.95"/>
+  </g>`;
+}
+
+/** A derelict STARSHIP wreck adrift in a faint nebula haze — a torn hull broken into a nose section and
+ *  a drifted tail with a dead engine bell, dark windows (one still flickering), a bent antenna, and a
+ *  couple of tumbling debris chunks (for The Ghost Wreck and any derelict). The haze tints to the
+ *  destination palette; the hull is cold metal. Seeded → byte-stable. */
+function wreckBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stwreck:' + w.id));
+  const rr = (v: number) => v.toFixed(1);
+  const haze = look.hi;
+  const hull = '#8f97a1';
+  const hullDk = '#4c545e';
+  const hullLt = '#c8d0da';
+  const tilt = -24 + rnd() * 34;
+  // Forward hull: a torn-tailed nose section pointing +x, tapering to a nose tip.
+  const fwd = `<path d="M${rr(-r * 0.15)},${rr(-r * 0.3)} L${rr(r * 0.55)},${rr(-r * 0.26)} Q${rr(r * 1.05)},${rr(-r * 0.05)} ${rr(r * 1.05)},0 Q${rr(r * 1.05)},${rr(r * 0.05)} ${rr(r * 0.55)},${rr(r * 0.26)} L${rr(-r * 0.15)},${rr(r * 0.3)} L${rr(-r * 0.02)},${rr(r * 0.12)} L${rr(-r * 0.18)},0 L${rr(-r * 0.02)},${rr(-r * 0.14)} Z" fill="${hull}"/>`;
+  // Windows along the forward hull top — mostly dead, one flickering.
+  let windows = '';
+  for (let i = 0; i < 3; i++) {
+    const wx = r * (0.05 + i * 0.28);
+    const lit = i === 1;
+    windows += `<rect x="${rr(wx)}" y="${rr(-r * 0.16)}" width="${rr(r * 0.11)}" height="${rr(r * 0.11)}" rx="${rr(r * 0.03)}" fill="${lit ? '#ffd98a' : '#20262e'}">${lit ? `<animate attributeName="opacity" values="1;0.2;1" dur="2.6s" repeatCount="indefinite"/>` : ''}</rect>`;
+  }
+  // Aft hull: drifted away + rotated, with a dead engine bell at its tail.
+  const aft = `<g transform="translate(${rr(-r * 0.55)},${rr(r * 0.16)}) rotate(${rr(14 + rnd() * 12)})">
+      <path d="M${rr(r * 0.32)},${rr(-r * 0.24)} L${rr(-r * 0.34)},${rr(-r * 0.2)} L${rr(-r * 0.34)},${rr(r * 0.2)} L${rr(r * 0.32)},${rr(r * 0.24)} L${rr(r * 0.18)},0 Z" fill="${hullDk}"/>
+      <rect x="${rr(-r * 0.5)}" y="${rr(-r * 0.16)}" width="${rr(r * 0.18)}" height="${rr(r * 0.32)}" rx="${rr(r * 0.04)}" fill="${hull}"/>
+      <ellipse cx="${rr(-r * 0.52)}" cy="0" rx="${rr(r * 0.05)}" ry="${rr(r * 0.18)}" fill="#1a1f26"/>
+    </g>`;
+  // Dorsal fin + a bent antenna on the forward hull.
+  const rig = `<path d="M${rr(r * 0.2)},${rr(-r * 0.26)} L${rr(r * 0.34)},${rr(-r * 0.62)} L${rr(r * 0.42)},${rr(-r * 0.26)} Z" fill="${hullDk}"/>
+      <path d="M${rr(r * 0.7)},${rr(-r * 0.2)} L${rr(r * 0.9)},${rr(-r * 0.5)}" stroke="${hullLt}" stroke-width="1" opacity="0.8"/><circle cx="${rr(r * 0.9)}" cy="${rr(-r * 0.5)}" r="1.2" fill="#ff8f5e"/>`;
+  // Tumbling debris chunks.
+  let debris = '';
+  const debN = 2 + (rnd() < 0.5 ? 1 : 0);
+  for (let i = 0; i < debN; i++) {
+    const dx = (rnd() - 0.3) * r * 1.8;
+    const dy = (rnd() - 0.5) * r * 1.9;
+    const dsz = r * (0.06 + rnd() * 0.07);
+    debris += `<rect x="${rr(dx)}" y="${rr(dy)}" width="${rr(dsz)}" height="${rr(dsz * 0.7)}" fill="${hullDk}" transform="rotate(${rr(rnd() * 90)} ${rr(dx)} ${rr(dy)})"/>`;
+  }
+  return `
+    <ellipse rx="${rr(r * 1.55)}" ry="${rr(r * 0.95)}" fill="${haze}" opacity="0.12"/>
+    <ellipse rx="${rr(r * 1.0)}" ry="${rr(r * 0.6)}" fill="${haze}" opacity="0.1"/>
+    ${debris}
+    <g transform="rotate(${rr(tilt)})">
+      ${aft}
+      ${fwd}
+      <path d="M${rr(-r * 0.15)},${rr(-r * 0.3)} L${rr(r * 0.55)},${rr(-r * 0.26)} Q${rr(r * 1.05)},${rr(-r * 0.05)} ${rr(r * 1.05)},0" fill="none" stroke="${hullLt}" stroke-width="1" opacity="0.7"/>
+      ${rig}
+      ${windows}
+    </g>`;
+}
+
+/** Draw the destination's celestial body by its KIND. */
+function celestialBody(w: StarTourWorld, r: number, look: { col: string; hi: string; glyph: string }): string {
+  switch (celestialKind(w)) {
+    case 'galaxy':
+      return galaxyBody(w, r, look);
+    case 'rift':
+      return riftBody(w, r, look);
+    case 'wreck':
+      return wreckBody(w, r, look);
+    default:
+      return planetBody(w, r, look);
+  }
+}
+
+/** One tappable destination + label. The tier is shown as a soft coloured aura for every kind, plus a
+ *  crisp ring for planets (a disc reads well ringed); the freer galaxy/rift/wreck shapes skip the hard
+ *  ring so their silhouette stays legible. */
 function worldGlyph(w: StarTourWorld, selected: boolean): string {
   const { x, y } = worldPos(w);
-  const look = WORLD_LOOK[w.archetype] ?? WORLD_LOOK.verdant!;
+  const look = worldLook(w);
+  const kind = celestialKind(w);
   const r = selected ? 24 : 19;
   const tierCol = TIER_COL[w.tier];
   const record = w.hasRecord
-    ? `<g transform="translate(${r * 0.75},${-r * 0.75})"><circle r="8" fill="#0a0d1c"/><text x="0" y="3.4" font-size="11" text-anchor="middle" fill="#ffce54">★</text></g>`
+    ? `<g transform="translate(${r * 0.9},${-r * 0.9})"><circle r="8" fill="#0a0d1c"/><text x="0" y="3.4" font-size="11" text-anchor="middle" fill="#ffce54">★</text></g>`
     : '';
   const best =
     w.hasRecord && w.bestToPar !== undefined
       ? `<text x="0" y="${r + 30}" font-size="12" text-anchor="middle" fill="${w.bestToPar < 0 ? '#5fd45a' : w.bestToPar === 0 ? '#cdd3df' : '#ffce54'}" font-weight="700">${toParLabel(w.bestToPar)}</text>`
+      : '';
+  const tierHalo = `<circle r="${r + 5}" fill="${tierCol}" opacity="0.12"/>`;
+  const tierRing =
+    kind === 'planet'
+      ? `<circle r="${r}" fill="none" stroke="${tierCol}" stroke-width="2.2" opacity="0.85"/>`
       : '';
   const ring = selected
     ? `<circle r="${r + 9}" fill="none" stroke="#7fe0ff" stroke-width="2.5" opacity="0.9"><animate attributeName="r" values="${r + 7};${r + 12};${r + 7}" dur="2.4s" repeatCount="indefinite"/></circle>`
@@ -316,8 +547,9 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
   return `
     <g class="gs-st-world" data-startour-course="${w.id}" role="button" tabindex="0" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" style="cursor:pointer;">
       ${ring}
-      ${planetBody(w, r, look)}
-      <circle r="${r}" fill="none" stroke="${tierCol}" stroke-width="2.2" opacity="0.85"/>
+      ${tierHalo}
+      ${celestialBody(w, r, look)}
+      ${tierRing}
       ${record}
       <text x="0" y="${-r - 8}" font-size="13" text-anchor="middle" fill="#e6ecf5" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">${w.name}</text>
       ${best}
