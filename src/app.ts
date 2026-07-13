@@ -1348,8 +1348,9 @@ function wireStarTourGestures(vp: HTMLElement): void {
 const stAnim = { raf: 0 };
 
 /** The flat per-frame cruise step (chart units) at rare (1.0×) speed — the "current slow speed" the
- *  small map wants. Rarity scales it via `starTourShipSpeedMult()`. */
-const STAR_TOUR_BASE_STEP = 7;
+ *  small map wants. Rarity scales it via `starTourShipSpeedMult()`. Dialled down 25% (7 → 5.25) for a
+ *  more deliberate, readable cruise on the small map. */
+const STAR_TOUR_BASE_STEP = 5.25;
 /** Only a flight with more than this much distance remaining earns a gentle acceleration on top of the
  *  flat cruise; shorter/medium hops stay at the constant base speed. */
 const STAR_TOUR_LONG_HAUL = 750;
@@ -1442,7 +1443,7 @@ function stepStarTour(): void {
       // scaled by the flown ship's RARITY (commons slower, mythic faster) and only a genuinely long
       // haul earns a gentle acceleration so a cross-galaxy jump isn't a slog — anything under
       // STAR_TOUR_LONG_HAUL cruises flat.
-      const accel = d > STAR_TOUR_LONG_HAUL ? (d - STAR_TOUR_LONG_HAUL) * 0.05 : 0;
+      const accel = d > STAR_TOUR_LONG_HAUL ? (d - STAR_TOUR_LONG_HAUL) * 0.0375 : 0;
       const step = (STAR_TOUR_BASE_STEP + accel) * starTourShipSpeedMult();
       const f = Math.min(1, step / d);
       v.shipX += dx * f;
