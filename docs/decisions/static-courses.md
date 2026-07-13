@@ -11,34 +11,46 @@ shot-plan, and replay — the same course every time, like a real-world signatur
 
 ## The decision
 
-A static course is just a **named, pinned seed + generation options**, resolved through the *same*
-`generateCourse` pipeline as everything else. Because the whole engine is deterministic
-(`(seed, opts, GENERATOR_VERSION) → identical Course`), a pinned seed already *is* "the same course
-every play." We did **not** hand-author literal `Hole` geometry as frozen JSON:
+A static course has **two representations of one identity**, and we keep both:
 
-- Hand-authored polygons would bypass the five generator validators (`validateCourse` /
-  `validateFairness` / `validateCrossings` / `validateGreenApproach` / `validateIslandHops`) that
-  make a course fair *by construction* — the exact machinery that keeps the game honest.
-- Frozen JSON can't pick up new contract fields as the renderer/sim evolve; a regenerated course is
-  always contract-current.
-- A pinned seed is a few lines and stays in-idiom with the seeded-determinism architecture (contract 1).
+1. **A frozen JSON data file** (`src/sim/course/static/<id>.json`) — the *default* served to players.
+   It is byte-identical **forever**, even across `GENERATOR_VERSION` bumps that would re-roll a
+   from-seed course. This is what "static" should mean for a course you learn and replay.
+2. **A pinned spec** (`seed` + `GenerateOptions`) that rebuilds the course through the *same*
+   `generateCourse` pipeline as everything else — the **redesign / season / rebalance** path. Because
+   the engine is deterministic, the spec reproduces the design; running the freezer script re-bakes
+   the JSON from it.
 
-Trade-off, stated plainly: a `GENERATOR_VERSION` bump *re-rolls* the exact geometry (it does for
-every course in the game). "Static" here means **fixed within a released version**, not frozen
-against engine changes. If a course ever needs to be frozen forever regardless of version, serialize
-its built `Course` to a data file — but that's premature until a mode needs it.
+Why keep both rather than just one:
+
+- **Frozen-only** (hand-authored polygons) would bypass the five generator validators (`validateCourse`
+  / `validateFairness` / `validateCrossings` / `validateGreenApproach` / `validateIslandHops`) that make
+  a course fair *by construction*, and couldn't be re-tuned without hand-editing geometry.
+- **Spec-only** (build from seed at runtime) drifts on every `GENERATOR_VERSION` bump — the opposite of
+  "the same course every play" for a course players are meant to memorise.
+- Keeping both gives a truly stable artifact **and** a one-command regeneration for a seasonal redesign
+  or a "this doesn't play well, re-roll it" pass. The freezer re-validates the (rounded) course through
+  all five validators, so a redesign can never freeze an unfair hole.
+
+Precision: course-space is YARDS and the generator emits ~15-digit floats. The freezer rounds every
+number to **3 decimals** (0.001 yd — imperceptible) before writing, then re-validates, and the JSON is
+**minified** (a generated artifact, never hand-edited) — ~262 KB vs ~1.3 MB raw (gzips to ~the same).
 
 ## Shape
 
-`src/sim/course/staticCourses.ts` — content, not code:
-
-- `StaticCourseSpec { id, name, seed, opts }` and a `STATIC_COURSES` catalogue array. **A new static
-  course is a new row**, never an engine edit.
-- `buildStaticCourse(spec | id)` mirrors `generateStopCourse`'s retry ladder (a pinned seed a later
-  version happens to trip re-rolls deterministically rather than throwing into the caller) and stamps
-  the spec's `name` over the generator's random star-name. The canonical rows all succeed on attempt 0
-  today, so the ladder is a forward-compat guard, not a live path.
-- `metalEighteen()` / `METAL_18_ID` — the flagship row.
+- `src/sim/course/staticCourseSpecs.ts` — the GENERATION half (no frozen-data import, so the freezer
+  can bootstrap): `StaticCourseSpec { id, name, seed, opts }`, the `STATIC_COURSES` catalogue, and
+  `regenerateStaticCourse(spec | id)` (builds through `generateCourse`, mirrors `generateStopCourse`'s
+  retry ladder as a forward-compat guard, stamps the spec's `name` over the random star-name). **A new
+  static course is a new row here**, never an engine edit.
+- `src/sim/course/staticCourses.ts` — the PLAYABLE half, re-exports the specs + serves data:
+  - `buildStaticCourse(id)` / `metalEighteen()` → the **frozen** data (deep-cloned per call, so the
+    run path's in-place hole stamping can't corrupt the shared singleton; falls back to regeneration if
+    a spec has no frozen file yet).
+  - `buildStaticCourse(id, { regenerate: true })` / `regenerateStaticCourse(id)` → rebuild from spec.
+- `src/sim/course/static/<id>.json` — the frozen data, produced by the freezer.
+- `scripts/gen-static-courses.mjs` (`npm run gen:courses [id]`) — regenerates + rounds + re-validates
+  + rewrites the frozen JSON. Run it deliberately after a spec change, then commit the JSON.
 
 ### `metal-18` — "Antlia Scrapworks"
 
@@ -57,5 +69,8 @@ branch, no shared rng stream is touched — so every current mode is byte-for-by
 determinism contract holds trivially). The module is inert content sitting ready; the future mode
 opts in by calling `buildStaticCourse`. No new `_gs*`/URL hook, so no test-hub wiring is needed.
 
-Guarded by `tests/static-courses.test.ts` (18 holes, biome, par 71 F35/B36, mix, no-triple,
-determinism, all validators clean, catalogue lookups).
+Guarded by `tests/static-courses.test.ts` (frozen: 18 holes, biome, par 71 F35/B36, mix, no-triple,
+3-decimal rounding, byte-stability, independent deep copies, all validators clean; regenerate: valid
+par-71 rebuild + deterministic; catalogue lookups + unknown-id throws). The test does **not** assert
+frozen == regenerated — that would defeat freezing (a version bump would force a re-freeze); the two
+are validated independently, and the frozen file is re-baked deliberately via `npm run gen:courses`.

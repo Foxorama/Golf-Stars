@@ -357,15 +357,19 @@ these systems** — each bullet is the tip of a documented iceberg.
     shrink it casually).
   - All new generator draws gate on their feature being armed (contract 1); current
     `GENERATOR_VERSION` 19.
-  - A STATIC course is a named, pinned seed built through the SAME `generateCourse` pipeline
-    (GS-static-courses, `course/staticCourses.ts` — `docs/decisions/static-courses.md`): a
-    `StaticCourseSpec` row (`id`/`name`/`seed`/`opts`) resolved by `buildStaticCourse`, so a full
-    designed round is byte-identical every play (within a `GENERATOR_VERSION`, like every seeded
-    course). Flagship `metal-18` "Antlia Scrapworks" = the `scrap-belt` (metal) archetype, `{holes:18,
-    compose:true,wildness:0.5}` → composed par 71 (F35/B36). A new static course is a new ROW, never a
-    frozen JSON blob (regeneration keeps it contract-current + fairness-validated). DELIBERATELY UNWIRED
-    — nothing in the run/format path imports it, so every existing mode is byte-for-byte unchanged; a
-    future mode opts in via `buildStaticCourse`. No `_gs*`/URL hook (no test-hub wiring).
+  - A STATIC course has TWO representations of one identity (GS-static-courses, `course/staticCourses.ts`
+    + `staticCourseSpecs.ts` — `docs/decisions/static-courses.md`): (1) a FROZEN JSON data file
+    (`course/static/<id>.json`) served by DEFAULT (`buildStaticCourse(id)`/`metalEighteen`), byte-identical
+    FOREVER even across `GENERATOR_VERSION` bumps — deep-cloned per call so the run path's in-place hole
+    stamping can't corrupt the shared singleton; (2) a pinned `StaticCourseSpec` (`seed`/`opts`) that
+    REBUILDS through the SAME `generateCourse` pipeline (`buildStaticCourse(id,{regenerate:true})` /
+    `regenerateStaticCourse` / `npm run gen:courses`) — the seasonal-redesign / rebalance path, which
+    re-validates the rounded course so a redesign can't freeze an unfair hole. Flagship `metal-18` "Antlia
+    Scrapworks" = the `scrap-belt` (metal) archetype, `{holes:18,compose:true,wildness:0.5}` → composed
+    par 71 (F35/B36). Freezer rounds coords to 3 decimals + minifies (~262 KB). The catalogue is a ROW,
+    never hand-authored geometry. DELIBERATELY UNWIRED — nothing in the run/format path imports it, so
+    every existing mode is byte-for-byte unchanged; a future mode opts in via `buildStaticCourse`. No
+    `_gs*`/URL hook (no test-hub wiring).
 - **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
   - The spine: `startRun → [playStop → buy* → travel]*` until the survival rule fails; pure and
     deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);
