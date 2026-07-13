@@ -123,6 +123,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     spore-jungle (tight/twisty), ice-ring (exposed links); guarded by `tests/biome-profile.test.ts`.
     `widthWeights`/`shapeWeights` apply to par-4/5 land holes only (island/ship/par-3 pools keep their
     own recipes). `GENERATOR_VERSION` 24.
+  - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
+    `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
+    with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays
+    long-but-smooth (no `difficulty`), an ice/ember/crystal world's greens turn treacherous deep in.
+    All ride the existing GREEN SIDE STREAMS (`:slope:`/`:contour:`/`:pin:`) and every lever CLAMPS so
+    the defaults reproduce the old draws byte-for-byte (terrain + non-opted worlds unchanged); bounded
+    so it's harder-never-unfair (slope/lobe stay under `greenSlopeMax`, the pin stays inside the green).
+    This is the GREEN axis only; firmness / forced-carry axes (main physics stream) are a later pass.
+    Guarded by `tests/biome-difficulty.test.ts`. `GENERATOR_VERSION` 25.
   - A multi-hole stop is COMPOSED, not IID-sampled (GS-compose, `course/compose.ts planCourse`): the
     run path (`runCourse`, `opts.compose`) plans a par SEQUENCE (proportions track the generator's own
     ~25/55/20 mix, a par-3+par-5 guaranteed, never 3 identical pars in a row), 1–2 SIGNATURE holes (a

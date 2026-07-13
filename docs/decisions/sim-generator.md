@@ -1223,3 +1223,43 @@ genuinely different par/shape/width/length distributions; a profile-less world i
 **Next (Task 3+).** A per-biome DIFFICULTY VECTOR (which levers ramp with depth — tightness vs wind vs
 green-complexity — decoupling length from difficulty) and generalised STRUCTURAL archetypes
 (split-fairway, then island/walled lifted from special cases into a registry a world picks from as data).
+
+---
+
+## GS-biome-difficulty — a world can get hard via its GREENS, not just length
+
+**The problem (Task 3 of the plan).** The single `wildness` scalar ramps every difficulty lever together
+(width tightens, bends steepen, hazards multiply, and — because the deep worlds are the low-gravity ones
+— holes lengthen), so depth reads as "the hole gets longer". Two worlds at the same depth feel hard the
+same way.
+
+**The fix — a per-biome DIFFICULTY VECTOR, starting with the GREEN axis.** `Biome.difficulty` carries
+multipliers on how the GREEN levers ramp with wildness, so a world can make its GREENS the test instead
+of its length: `greenTilt` (plane-slope magnitude ramp), `greenComplexity` (2nd-lobe probability + lobe
+strength ramp) and `pinTuck` (an edge-ward pin push scaled by depth). A desert with no `difficulty`
+stays long-but-smooth; an ice world's shelves turn treacherous deep in — same depth, different hardness.
+
+**Why the green axis is the SAFE first axis.** The slope, contour and pin all draw from DEDICATED side
+streams (`:slope:`/`:contour:`/`:pin:`), exactly like the pin has since GS-6 — so nudging them leaves the
+TERRAIN stream (corridor, hazards, crossings, fairness) byte-for-byte identical, and only a world that
+opts in reflows its GREENS. Every lever CLAMPS so the default reproduces the old draw exactly
+(`slopeFloor = min(.92, .4+.45·wildness·tilt)` — tilt=1 gives ≤.85, clamp never bites; the 2nd-lobe prob
+`min(.95, .3+.45·wildness·cplx)` and lobe strength `min(1, .55+.45·wildness·cplx)` reproduce the old
+`.75`/`1.0` maxima at cplx=1; `pinTuck` defaults 0 = the old centred 22–62% range). And it's bounded so
+it's harder-never-unfair: slope/lobe magnitude stay ≤ `greenSlopeMax`, and the tuck clamps the pin to
+≤85% of the ray-to-edge so `validateCourse`'s pin-in-green invariant holds for any star shape.
+
+**Set on three GREEN-HARD worlds** (contrast to dust-belt, which is length-hard with no `difficulty`):
+ice-ring (`{tilt 1.35, cplx 1.4, tuck 0.6}` — lethal shelves), ember-world (`{cplx 1.35, tilt 1.2, tuck
+0.5}` — broken basalt), crystal-spires (`{tuck 0.8, cplx 1.2}` — precision to a tucked pin). Balance
+re-measured: ice-ring rose 0.76 → 0.833 toPar/hole (the biggest, still < 1.0, blow-ups 8.1%); the
+`biomes.test` aggregate holds (0.770 / 7.88%) and the composed bar holds (0.659 / 7.05%), fairness clean.
+Note the auto-sim `onePutt` under-counts the felt cost — the harder greens bite most in INTERACTIVE
+putting (the pace meter + break reads), so the true player-facing difficulty gain is larger than the auto
+toPar shows. `GENERATOR_VERSION` 24→25; the reflow re-pinned one fixture (the `ui` ace seed 63→138).
+Guarded by `tests/biome-difficulty.test.ts` (ice greens steepen/gain lobes/tuck harder from calm→deep,
+far more than the desert; the desert's greens are byte-identical; heavy-tuck pins stay legal).
+
+**Next.** The remaining difficulty axes — FIRMNESS (bouncy/soft greens) and FORCED-CARRY frequency/length
+— touch the MAIN physics stream, so they're a heavier reflow deferred to a later pass; and the structural
+archetypes (split-fairway, generalised island/walled) are Task 4.
