@@ -385,8 +385,15 @@ these systems** — each bullet is the tip of a documented iceberg.
     below) are UNFROZEN spec rows — `buildStaticCourse(id)` regenerates them on demand (line 58, "no frozen
     file yet ⇒ build from source"), keeping the bundle lean (freezing ~10 more would add ~2.5 MB) at the
     cost of re-rolling on a `GENERATOR_VERSION` bump (acceptable for a casual records chase). A tour course
-    row carries star-map metadata (`themeId`/`archetype`/`tier`/`blurb`) that does NOT feed generation. No
-    `_gs*`/URL hook (no test-hub wiring).
+    row carries star-map metadata (`themeId`/`archetype`/`tier`/`blurb`) that does NOT feed generation. Every
+    tour row (NOT frozen `metal-18`) sets `opts.wildnessMix` = `STAR_TOUR_MIX` `{medium 0.6, hard 0.85}`
+    (GS-star-tour-difficulty): each hole rolls its wildness INDEPENDENTLY from that discrete set via the
+    composer's `planWildnessMix` (gated on `GenerateOptions.wildnessMix`), so a Star Tour round mixes
+    medium/hard holes and may come out all-one-level — fine for a solo stroke-play records chase with no
+    death-spiral cut. `meta.wildness` = the mix midpoint `STAR_TOUR_WILDNESS` (0.725) for the intro number.
+    OPT-IN + Star-Tour-only: the Voyage/Unending never pass a mix, so their mean-preserving arc AND byte
+    output are untouched (no `GENERATOR_VERSION` bump — no fixed-opts output changed). No `_gs*`/URL hook
+    (no test-hub wiring).
   - STAR TOUR — the third game mode (GS-star-tour, format `strokeplay`, `formats.ts` `STROKEPLAY_FORMAT`):
     a single 18-hole STROKE-PLAY round on a player-CHOSEN static course, ranked into personal course-record
     leaderboards. `Run.staticCourseId`/`staticEffect` pin the course + weather; `currentCourse` branches on
