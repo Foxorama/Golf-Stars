@@ -21,7 +21,7 @@ import { bearing, dist } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
-import { getFormat, ASGARD_FORMAT } from './sim/rpg/formats';
+import { getFormat, ASGARD_FORMAT, STROKEPLAY_FORMAT } from './sim/rpg/formats';
 import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
 import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
@@ -77,8 +77,8 @@ import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } fr
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 import { starTourScreen, starTourView, starTourWorlds } from './app/starTourScreens';
-import { strokeResultScreen } from './app/strokeResultScreens';
-import { worldPos, CHART_W, CHART_H, SPACEPORT_POS } from './render/starTourMap';
+import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
+import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
@@ -291,10 +291,12 @@ function dispatch(action: Action): void {
       starTourView.centred = false;
       starTourView.shipX = null;
       starTourView.shipY = null;
-      starTourView.heading = 0;
+      starTourView.heading = SHIP_DOCK_HEADING;
+      starTourView.flip = 1;
       starTourView.targetX = null;
       starTourView.targetY = null;
       starTourView.flyingTo = null;
+      starTourView.zoom = 1;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -832,7 +834,11 @@ function playingBody(animating: boolean): string {
           <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : 'STOP PTS'}</div>
         </div>
       </div>`;
-    const progress = state.run.formatId === ASGARD_FORMAT
+    const progress = state.run.formatId === STROKEPLAY_FORMAT
+      ? // Star Tour (GS-star-tour): a solo records chase — show the running stroke scorecard, not the
+        // voyage's ghost competitor board (there is no field to place against).
+        strokePlayProgressHTML(playedSoFar)
+      : state.run.formatId === ASGARD_FORMAT
       ? // The Asgard tournament (GS-asgard) is STROKE PLAY vs the Warriors Three, not the 20-golfer
         // Stableford field — show the running lowest-gross standings, its own event.
         asgardLiveBoardHTML(playedSoFar, state.course.holes.map((h) => h.par), `${state.run.seed}`, asgardFieldEdge(state))
@@ -1236,41 +1242,100 @@ let selClubSetTouched = false;
 // click that ends the drag doesn't accidentally select the world it lands on. Reset on each pointerdown.
 let starTourDragged = false;
 
-/** Wire pointer-drag-to-fly on the Star Tour chart viewport (native scroll already covers touch +
- *  wheel). A drag past a few px pans by adjusting scroll and marks `starTourDragged` so the trailing
- *  click is swallowed by the world handler. Re-wired each render (the node is replaced). */
-function wireStarTourDrag(vp: HTMLElement): void {
-  let dragging = false;
-  let sx = 0;
-  let sy = 0;
-  let l0 = 0;
-  let t0 = 0;
+/** Star Tour chart zoom bounds (pinch / scroll). */
+const ST_ZOOM_MIN = 0.5;
+const ST_ZOOM_MAX = 2.6;
+
+/** Wire pan + PINCH-ZOOM on the Star Tour chart viewport. The viewport is `touch-action:none`, so we
+ *  drive both gestures ourselves via pointer events (native touch-scroll used to jitter into the drag
+ *  handler on a second finger — the "flicker jump" pinch bug — and there was no zoom at all). One
+ *  finger drags (pans scroll); two fingers pinch-zoom about their midpoint, resizing the SVG's px size
+ *  (viewBox fixed, so ship/world chart-coords are unchanged) and re-anchoring scroll to hold the focal
+ *  point. A drag/pinch past a few px marks `starTourDragged` so the trailing click doesn't fly the ship.
+ *  Re-wired each render (the node is replaced). */
+function wireStarTourGestures(vp: HTMLElement): void {
+  const chart = vp.querySelector<SVGElement>('.gs-startour__chart');
+  const pointers = new Map<number, { x: number; y: number }>();
+  let drag: { sx: number; sy: number; l0: number; t0: number } | null = null;
+  let pinch: { startDist: number; startZoom: number } | null = null;
   vp.style.cursor = 'grab';
+
+  const setZoom = (z: number, focalClientX: number, focalClientY: number): void => {
+    z = Math.max(ST_ZOOM_MIN, Math.min(ST_ZOOM_MAX, z));
+    const oldZoom = starTourView.zoom || 1;
+    if (!chart || z === oldZoom) return;
+    const rect = vp.getBoundingClientRect();
+    const fx = focalClientX - rect.left;
+    const fy = focalClientY - rect.top;
+    const ratio = z / oldZoom;
+    const nl = (vp.scrollLeft + fx) * ratio - fx;
+    const nt = (vp.scrollTop + fy) * ratio - fy;
+    chart.setAttribute('width', (CHART_W * z).toFixed(0));
+    chart.setAttribute('height', (CHART_H * z).toFixed(0));
+    starTourView.zoom = z;
+    vp.scrollLeft = nl;
+    vp.scrollTop = nt;
+    starTourView.scrollX = vp.scrollLeft;
+    starTourView.scrollY = vp.scrollTop;
+  };
+
   vp.addEventListener('pointerdown', (e) => {
-    if (e.button !== undefined && e.button !== 0) return;
-    dragging = true;
-    starTourDragged = false;
-    sx = e.clientX;
-    sy = e.clientY;
-    l0 = vp.scrollLeft;
-    t0 = vp.scrollTop;
-    vp.style.cursor = 'grabbing';
+    if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // NB: deliberately NO setPointerCapture — capturing the pointer retargets the trailing `click` to
+    // the viewport, so `target.closest('[data-startour-course]')` misses the tapped world and every
+    // world-tap degrades to a free flight (dossier never opens). vp is full-bleed, so move/up land on
+    // it without capture anyway.
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinch = { startDist: Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1, startZoom: starTourView.zoom || 1 };
+      drag = null;
+      starTourDragged = true; // a pinch is never a tap
+    } else if (pointers.size === 1) {
+      drag = { sx: e.clientX, sy: e.clientY, l0: vp.scrollLeft, t0: vp.scrollTop };
+      starTourDragged = false;
+      vp.style.cursor = 'grabbing';
+    }
   });
   vp.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - sx;
-    const dy = e.clientY - sy;
-    if (Math.abs(dx) + Math.abs(dy) > 5) starTourDragged = true;
-    vp.scrollLeft = l0 - dx;
-    vp.scrollTop = t0 - dy;
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pointers.size >= 2) {
+      const [a, b] = [...pointers.values()];
+      const dist = Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1;
+      setZoom(pinch.startZoom * (dist / pinch.startDist), (a!.x + b!.x) / 2, (a!.y + b!.y) / 2);
+      starTourDragged = true;
+      return;
+    }
+    if (drag) {
+      const dx = e.clientX - drag.sx;
+      const dy = e.clientY - drag.sy;
+      if (Math.abs(dx) + Math.abs(dy) > 5) starTourDragged = true;
+      vp.scrollLeft = drag.l0 - dx;
+      vp.scrollTop = drag.t0 - dy;
+      starTourView.scrollX = vp.scrollLeft;
+      starTourView.scrollY = vp.scrollTop;
+    }
   });
-  const end = (): void => {
-    dragging = false;
-    vp.style.cursor = 'grab';
+  const up = (e: PointerEvent): void => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (pointers.size === 0) {
+      drag = null;
+      vp.style.cursor = 'grab';
+    }
   };
-  vp.addEventListener('pointerup', end);
-  vp.addEventListener('pointerleave', end);
-  vp.addEventListener('pointercancel', end);
+  vp.addEventListener('pointerup', up);
+  vp.addEventListener('pointercancel', up);
+  // Desktop: Ctrl/⌘ + wheel zooms about the cursor; a plain wheel keeps native scroll.
+  vp.addEventListener(
+    'wheel',
+    (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom((starTourView.zoom || 1) * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
+    },
+    { passive: false },
+  );
 }
 
 // STAR TOUR ship flight (GS-star-tour-2): the ship orients toward a tapped point/world and cruises
@@ -1278,11 +1343,23 @@ function wireStarTourDrag(vp: HTMLElement): void {
 // `starTourView` holds the ship's position so it survives re-renders. Only ever runs on the star map.
 const stAnim = { raf: 0 };
 
+/** Set the hull flip for a flight: mirror vertically (−1) when heading LEFT so a wheeled/keeled ship
+ *  keeps its top up rather than reading belly-up (a spaceship has no "up", but these are drawn as
+ *  vehicles). Held constant for the whole flight (decided at launch off the target's side) so it never
+ *  snaps mid-cruise as the ship crosses straight-up/down. */
+function setStarTourFlip(targetX: number): void {
+  const fromX = starTourView.shipX ?? SPACEPORT_POS.x;
+  if (targetX < fromX - 2) starTourView.flip = -1;
+  else if (targetX > fromX + 2) starTourView.flip = 1;
+  // near-vertical: keep the current flip
+}
+
 /** Set a flight to a chart point (free roam — no dossier on arrival). */
 function flyStarTourToPoint(x: number, y: number): void {
   starTourView.targetX = Math.max(20, Math.min(CHART_W - 20, x));
   starTourView.targetY = Math.max(20, Math.min(CHART_H - 20, y));
   starTourView.flyingTo = null;
+  setStarTourFlip(starTourView.targetX);
   sfx.click();
   startStarTourAnim();
 }
@@ -1297,6 +1374,7 @@ function flyStarTourToWorld(id: string | null): void {
   starTourView.targetY = p.y;
   starTourView.flyingTo = id;
   starTourView.selectedId = null; // close any open dossier while we fly
+  setStarTourFlip(p.x);
   sfx.click();
   haptic(HAPTICS.tap);
   render(); // reflect the closed dossier immediately, then fly
@@ -1330,8 +1408,9 @@ function stepStarTour(): void {
     const dx = v.targetX! - v.shipX;
     const dy = v.targetY! - v.shipY;
     const d = Math.hypot(dx, dy);
-    // Orient the nose toward the target (0° = up in the ship art), turning the short way.
-    v.heading = lerpAngle(v.heading, (Math.atan2(dx, -dy) * 180) / Math.PI, 0.28);
+    // Orient the nose ALONG the flight. The ship art faces +x (right), so heading = atan2(dy,dx); the
+    // old atan2(dx,−dy) assumed a 0=up hull and rendered a downward flight upside-down (GS-star-tour).
+    v.heading = lerpAngle(v.heading, (Math.atan2(dy, dx) * 180) / Math.PI, 0.28);
     if (d < 3.5) {
       v.shipX = v.targetX!;
       v.shipY = v.targetY!;
@@ -1355,14 +1434,22 @@ function stepStarTour(): void {
   }
   const vp = document.getElementById('gs-st-viewport');
   // Chase-cam: while flying, ease the viewport toward keeping the ship centred so you watch it cruise.
+  // Scroll is in rendered px = chart-coord × zoom.
   if (wasFlying && vp) {
-    const tx = v.shipX - vp.clientWidth / 2;
-    const ty = v.shipY - vp.clientHeight / 2;
+    const z = v.zoom || 1;
+    const tx = v.shipX * z - vp.clientWidth / 2;
+    const ty = v.shipY * z - vp.clientHeight / 2;
     vp.scrollLeft += (tx - vp.scrollLeft) * 0.16;
     vp.scrollTop += (ty - vp.scrollTop) * 0.16;
+    v.scrollX = vp.scrollLeft;
+    v.scrollY = vp.scrollTop;
   }
   const el = document.getElementById('gs-st-ship');
-  if (el) el.setAttribute('transform', `translate(${v.shipX.toFixed(1)} ${v.shipY.toFixed(1)}) rotate(${v.heading.toFixed(1)})`);
+  if (el) {
+    el.setAttribute('transform', `translate(${v.shipX.toFixed(1)} ${v.shipY.toFixed(1)}) rotate(${v.heading.toFixed(1)}) scale(1 ${v.flip})`);
+    // Fire the engine plume (a `.gs-st-thrust` in the group) only while actually cruising.
+    el.classList.toggle('gs-st-thrusting', wasFlying);
+  }
   stAnim.raf = requestAnimationFrame(stepStarTour);
 }
 
@@ -1535,9 +1622,11 @@ function render(): void {
     if (vp) {
       if (!starTourView.centred) {
         requestAnimationFrame(() => {
-          // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2).
-          starTourView.scrollX = SPACEPORT_POS.x - vp.clientWidth / 2;
-          starTourView.scrollY = SPACEPORT_POS.y - vp.clientHeight / 2;
+          // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2). Scroll is
+          // rendered px = chart-coord × zoom.
+          const z = starTourView.zoom || 1;
+          starTourView.scrollX = SPACEPORT_POS.x * z - vp.clientWidth / 2;
+          starTourView.scrollY = SPACEPORT_POS.y * z - vp.clientHeight / 2;
           vp.scrollLeft = starTourView.scrollX;
           vp.scrollTop = starTourView.scrollY;
           starTourView.centred = true;
@@ -1553,7 +1642,7 @@ function render(): void {
         starTourView.scrollX = vp.scrollLeft;
         starTourView.scrollY = vp.scrollTop;
       });
-      wireStarTourDrag(vp);
+      wireStarTourGestures(vp);
       startStarTourAnim();
     }
   }
@@ -1652,10 +1741,12 @@ function render(): void {
           flyStarTourToWorld(worldEl.getAttribute('data-startour-course'));
           return;
         }
-        // Free flight to the tapped chart point (SVG is rendered 1:1 at intrinsic size).
+        // Free flight to the tapped chart point. The SVG renders at zoom×intrinsic, so divide the
+        // content offset by zoom to recover chart coords.
         const rect = vp.getBoundingClientRect();
-        const cx = e.clientX - rect.left + vp.scrollLeft;
-        const cy = e.clientY - rect.top + vp.scrollTop;
+        const z = starTourView.zoom || 1;
+        const cx = (e.clientX - rect.left + vp.scrollLeft) / z;
+        const cy = (e.clientY - rect.top + vp.scrollTop) / z;
         flyStarTourToPoint(cx, cy);
       });
     }

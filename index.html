@@ -437,9 +437,16 @@
       .gs-startour { position: fixed; inset: 0; overflow: hidden; background: #05060f; z-index: 1; }
       .gs-startour__viewport {
         position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; background: #05060f;
+        -webkit-overflow-scrolling: touch; background: #05060f;
+        /* We drive pan + pinch-zoom ourselves via pointer events (GS-star-tour), so disable native
+           touch panning/zoom — it used to jitter into the drag handler on a second finger (the pinch
+           "flicker jump"). Wheel + scrollbar still scroll (touch-action only gates touch). */
+        touch-action: none;
       }
       .gs-startour__chart { display: block; }
+      /* Engine plume — hidden on a docked/idle ship, faded in by the rAF loop while cruising. */
+      .gs-st-thrust { opacity: 0; transition: opacity .18s ease-out; }
+      #gs-st-ship.gs-st-thrusting .gs-st-thrust { opacity: 1; }
       /* Cockpit chrome — OWN prefix `.gs-sthud` (never .gs-hud/.gs-bhud) so it can't restyle another
          screen (CLAUDE.md class-collision rule). Overlays the map; only its controls catch pointers. */
       .gs-sthud { position: absolute; inset: 0; pointer-events: none; z-index: 5; }

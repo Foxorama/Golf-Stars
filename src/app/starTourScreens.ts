@@ -17,7 +17,7 @@
 import { state } from './ctx';
 import { STATIC_COURSES, staticCourseSpec } from '../sim/course/staticCourses';
 import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
-import { starTourMapSVG, type StarTourWorld } from '../render/starTourMap';
+import { starTourMapSVG, SHIP_DOCK_HEADING, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
@@ -38,15 +38,20 @@ export const starTourView = {
    *  the browser scroll is lost otherwise). Updated on pan/scroll and while the camera follows the ship. */
   scrollX: null as number | null,
   scrollY: null as number | null,
-  /** Ship position (chart coords) + heading (deg, 0 = up) — animated by app.ts; null = dock at port. */
+  /** Ship position (chart coords) + heading (deg, 0 = nose along +x — the right-facing ship art) —
+   *  animated by app.ts; null = dock at port. `flip` (+1/−1) mirrors the hull when it flies LEFT so a
+   *  wheeled craft never reads belly-up. */
   shipX: null as number | null,
   shipY: null as number | null,
-  heading: 0,
+  heading: SHIP_DOCK_HEADING,
+  flip: 1,
   /** Current flight target (chart coords), or null when idle. */
   targetX: null as number | null,
   targetY: null as number | null,
   /** The course id to open on arrival (a flight triggered by tapping a world), or null (free flight). */
   flyingTo: null as string | null,
+  /** Chart zoom (pinch/scroll), 1 = intrinsic. Preserved across re-renders like the scroll offset. */
+  zoom: 1,
 };
 
 /** The weather skies offered on the star map — atmospheric choices (the trade-camp / mechanic effects
@@ -190,6 +195,8 @@ export function starTourScreen(): string {
     shipX: starTourView.shipX ?? undefined,
     shipY: starTourView.shipY ?? undefined,
     shipHeading: starTourView.heading,
+    shipFlip: starTourView.flip,
+    zoom: starTourView.zoom,
   });
   const sheet = sel ? dossier(sel) : starTourView.recordsOpen ? recordsSheet() : '';
   return `

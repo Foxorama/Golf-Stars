@@ -13,6 +13,10 @@ import { getCharacter } from '../sim/rpg/characters';
 import { rarCol } from '../sim/rpg/loot';
 import { fuelGaugeHTML } from '../render/fuel';
 import { tankCapacity } from '../sim/rpg/run';
+import { STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { staticCourseSpec } from '../sim/course/staticCourses';
+import { playTotals } from '../sim/score';
+import { formatToPar, toParColour } from '../sim/rpg/endless';
 
 export let state: UiState;
 
@@ -55,6 +59,22 @@ export function header(): string {
   const r = state.run;
   const ch = getCharacter(r.loadout.characterId);
   const who = ch ? ` <span style="font-size:13px;color:${ch.style.cap};">· ${ch.name}</span>` : '';
+  // Star Tour (GS-star-tour) is a records chase, NOT the voyage economy: it has no credits, fuel,
+  // handicap, stop count or distance to track. Show the course + the running to-par instead of the
+  // voyage stat rail, so a stroke-play recap never surfaces a meaningless "Credits 0 · Fuel …" line.
+  if (r.formatId === STROKEPLAY_FORMAT) {
+    const spec = staticCourseSpec(r.staticCourseId ?? '');
+    const played = state.stopPlayed ?? [];
+    const totals = playTotals(played.map((p) => p.record));
+    const thru = played.length;
+    return `
+      <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
+        <h1 style="margin:0;font-size:22px;">✦ Star Tour</h1>${who}
+        <span style="margin-left:auto;font-size:13px;color:var(--gs-dim);">
+          ${spec?.name ?? 'Course'} · <b style="color:${toParColour(totals.toPar)};">${formatToPar(totals.toPar)}</b> thru <b style="color:var(--gs-ink);">${thru}</b>/${state.course.holes.length}
+        </span>
+      </header>`;
+  }
   return `
     <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
       <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>${who}

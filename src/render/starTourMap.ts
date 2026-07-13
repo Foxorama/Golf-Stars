@@ -14,6 +14,7 @@
 
 import { THEME_SKY } from './sky-coords';
 import { shipSVG } from './shipArt';
+import { shipById, DEFAULT_SHIP_ID, type ShipLook } from '../sim/rpg/ships';
 
 /** One course plotted on the chart. */
 export interface StarTourWorld {
@@ -34,12 +35,22 @@ export interface StarTourMapOpts {
   selectedId?: string;
   /** The player's ship (GS-star-tour-2): the character's cosmetic ride, flown around the chart. */
   shipId?: string;
-  /** Ship position (chart coords) + heading (degrees, 0 = nose up). The app animates these each frame
-   *  by rewriting `#gs-st-ship`'s transform; this initial value seeds the first paint. */
+  /** Ship position (chart coords) + heading (degrees, 0 = nose along +x, matching the right-facing
+   *  ship art). The app animates these each frame by rewriting `#gs-st-ship`'s transform; this initial
+   *  value seeds the first paint. `shipFlip` (+1 / −1) mirrors the hull vertically when it flies LEFT so
+   *  a wheeled/keeled craft never reads belly-up (a spaceship has no "up", but these are drawn vehicles). */
   shipX?: number;
   shipY?: number;
   shipHeading?: number;
+  shipFlip?: number;
+  /** Chart zoom (pinch/scroll). 1 = intrinsic size; the SVG's px width/height scale by this while the
+   *  viewBox stays fixed, so ship/world chart-coords are unchanged and only the render size grows. */
+  zoom?: number;
 }
+
+/** The ship's docked heading (GS-star-tour): nose UP (−90° in the +x-facing art frame), poised toward
+ *  the constellation field above the home spaceport. */
+export const SHIP_DOCK_HEADING = -90;
 
 /** The chart's intrinsic size (bigger than any viewport → it pans). */
 export const CHART_W = 1600;
@@ -166,46 +177,156 @@ function spaceportGlyph(): string {
     </g>`;
 }
 
-/** The player's ship group (GS-star-tour-2) — positioned + rotated by the app each frame via its
- *  transform. Drawn at the origin (shipSVG at 0,0) so the wrapping transform is pure translate+rotate. */
+/** The engine THRUST wake (GS-star-tour) — a layered ion plume trailing behind the hull so the ship
+ *  reads as FLYING, not sliding. Authored in the ±20u right-facing ship frame trailing off the tail
+ *  (−x), coloured off the ship's own flame/accent for cohesion; SMIL flicker + charge particles racing
+ *  down the wake. Wrapped in `.gs-st-thrust` — the app fades it in only while the engines are firing
+ *  (a `.gs-st-thrusting` class on `#gs-st-ship`), so a docked/idle ship shows no plume. */
+function thrustTrail(look: ShipLook): string {
+  const { flame, accent } = look;
+  const flick = (dur: string): string =>
+    `<animate attributeName="opacity" values="0.9;0.4;0.75;0.45;0.9" dur="${dur}" repeatCount="indefinite"/>`;
+  const particle = (beg: string, dy: number, dur: string): string =>
+    `<circle cx="-22" cy="${dy}" r="1.2" fill="#eaffff" opacity="0">
+       <animate attributeName="opacity" values="0;0.95;0" dur="${dur}" begin="${beg}" repeatCount="indefinite"/>
+       <animateTransform attributeName="transform" type="translate" values="0 0;-32 ${dy > 1 ? 1.4 : -1.4}" dur="${dur}" begin="${beg}" repeatCount="indefinite"/>
+     </circle>`;
+  return `<g class="gs-st-thrust" stroke="none">
+    <path d="M-15,-3.4 C-34,-9 -52,-7 -63,1 C-52,9 -34,11 -15,5.4 Z" fill="${flame}" opacity="0.26">${flick('1.0s')}</path>
+    <path d="M-15,-1.8 C-31,-6 -46,-4.5 -54,1 C-46,7.5 -31,7.5 -15,3.8 Z" fill="${accent}" opacity="0.5">${flick('0.6s')}</path>
+    <path d="M-15,0 C-26,-2.2 -37,-1 -45,1.2 C-37,4.2 -26,5 -15,2.6 Z" fill="#ffffff" opacity="0.82">${flick('0.4s')}</path>
+    <circle cx="-15" cy="1" r="4.6" fill="#bfffff" opacity="0.5"><animate attributeName="r" values="3.6;5.2;3.6" dur="0.5s" repeatCount="indefinite"/></circle>
+    <circle cx="-15" cy="1" r="2" fill="#ffffff" opacity="0.9"/>
+    ${particle('0s', 0.6, '0.7s')}${particle('0.24s', 2.6, '0.9s')}${particle('0.5s', -1.2, '0.6s')}
+  </g>`;
+}
+
+/** The player's ship group (GS-star-tour-2) — positioned, rotated + flipped by the app each frame via
+ *  its transform. Drawn at the origin (shipSVG at 0,0) so the wrapping transform is a pure
+ *  translate+rotate+scale. The ship art faces +x (right), so heading 0 = flying right; the app feeds
+ *  `atan2(dy,dx)` so the nose always points along the flight (the old code fed a 0=up heading into a
+ *  right-facing hull, which is why a downward flight rendered upside-down). */
 function shipGroup(opts: StarTourMapOpts): string {
   const x = opts.shipX ?? SPACEPORT_POS.x;
   const y = opts.shipY ?? SPACEPORT_POS.y;
-  const h = opts.shipHeading ?? 0;
-  return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${h.toFixed(1)})" style="pointer-events:none;">
+  const h = opts.shipHeading ?? SHIP_DOCK_HEADING;
+  const flip = opts.shipFlip ?? 1;
+  const look = (shipById(opts.shipId) ?? shipById(DEFAULT_SHIP_ID)!).look;
+  return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${h.toFixed(1)}) scale(1 ${flip})" style="pointer-events:none;">
     <circle r="30" fill="#7fe0ff" opacity="0.08"/>
+    <g transform="scale(${SHIP_SCALE})">${thrustTrail(look)}</g>
     ${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}
   </g>`;
 }
 
-/** Build the full star-chart SVG (intrinsic-sized; the app pans it inside the viewport). */
+/** Star tints — most stars are white, but a galaxy reads richer with a scatter of blue-white giants,
+ *  warm gold suns and the odd red one. Weighted so white dominates. */
+const STAR_TINTS = ['#ffffff', '#ffffff', '#ffffff', '#dbe6ff', '#bcd4ff', '#fff0cf', '#ffd8a8', '#ffc0b0'];
+
+/** Deep-space nebula clouds — soft, luminous colour washes that give the chart a galaxy/system feel
+ *  instead of a flat black field. Fixed positions/hues (only ONE star map mounts at a time, so the
+ *  document-global gradient ids are safe — unlike the co-mounted hole SVGs). */
+function nebulaClouds(rnd: () => number): { defs: string; body: string } {
+  const HUES = [
+    ['#3b6bd6', '#7f3bd6'], // blue → violet
+    ['#2fa39a', '#1f5f8a'], // teal → deep blue
+    ['#c23b8f', '#5a2a8a'], // magenta → purple
+    ['#d67f3b', '#8a3a2a'], // amber → rust
+    ['#3b8fd6', '#2a5a8a'], // sky blue
+  ];
+  let defs = '';
+  let body = '';
+  for (let i = 0; i < 5; i++) {
+    const cx = (0.12 + rnd() * 0.76) * CHART_W;
+    const cy = (0.08 + rnd() * 0.82) * CHART_H;
+    const rx = (150 + rnd() * 220).toFixed(0);
+    const ry = (110 + rnd() * 170).toFixed(0);
+    const rot = (rnd() * 180).toFixed(0);
+    const [a, b] = HUES[i % HUES.length]!;
+    const id = `stNeb${i}`;
+    defs += `<radialGradient id="${id}" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="${a}" stop-opacity="0.30"/>
+      <stop offset="45%" stop-color="${b}" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="${b}" stop-opacity="0"/>
+    </radialGradient>`;
+    body += `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${rx}" ry="${ry}" fill="url(#${id})" transform="rotate(${rot} ${cx.toFixed(0)} ${cy.toFixed(0)})"/>`;
+  }
+  return { defs, body };
+}
+
+/** The galaxy's core band — a soft diagonal river of light dense with dust, sweeping across the chart
+ *  like the Milky Way. A wide translucent stroke + a brighter core, plus a knot of glow at its heart. */
+function galaxyBand(): string {
+  const y0 = CHART_H * 0.28;
+  const y1 = CHART_H * 0.66;
+  const path = `M0,${y0.toFixed(0)} C${(CHART_W * 0.35).toFixed(0)},${(y0 - 60).toFixed(0)} ${(CHART_W * 0.62).toFixed(0)},${(y1 + 40).toFixed(0)} ${CHART_W},${y1.toFixed(0)}`;
+  const cx = CHART_W * 0.5;
+  const cy = (y0 + y1) / 2 - 6;
+  return `
+    <g opacity="0.6">
+      <path d="${path}" fill="none" stroke="url(#stBand)" stroke-width="230" stroke-linecap="round"/>
+      <path d="${path}" fill="none" stroke="url(#stBand)" stroke-width="90" stroke-linecap="round" opacity="0.8"/>
+      <ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="200" ry="60" fill="url(#stCore)" transform="rotate(-16 ${cx.toFixed(0)} ${cy.toFixed(0)})"/>
+    </g>`;
+}
+
+/** Build the full star-chart SVG (intrinsic-sized; the app pans it inside the viewport). `opts.zoom`
+ *  scales the rendered px size (viewBox fixed → chart coords unchanged). */
 export function starTourMapSVG(opts: StarTourMapOpts): string {
   const rnd = mulberry32(hashSeed(opts.seed));
-  // Seeded starfield — three depth planes of twinkles.
+  const zoom = opts.zoom ?? 1;
+  const neb = nebulaClouds(rnd);
+  // Seeded starfield — four depth planes of tinted twinkles (denser + more colourful than a flat white
+  // field), some slowly pulsing so the sky feels alive.
   let stars = '';
-  for (let plane = 0; plane < 3; plane++) {
-    const n = [120, 80, 40][plane]!;
-    const rBase = [0.6, 1.0, 1.6][plane]!;
-    const opBase = [0.3, 0.5, 0.7][plane]!;
+  const counts = [260, 170, 90, 34];
+  const rBases = [0.55, 0.9, 1.4, 2.1];
+  const opBases = [0.32, 0.5, 0.72, 0.92];
+  for (let plane = 0; plane < counts.length; plane++) {
+    const n = counts[plane]!;
+    const rBase = rBases[plane]!;
+    const opBase = opBases[plane]!;
     for (let i = 0; i < n; i++) {
       const sx = (rnd() * CHART_W).toFixed(1);
       const sy = (rnd() * CHART_H).toFixed(1);
       const sr = (rBase + rnd() * rBase).toFixed(2);
-      stars += `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="#ffffff" opacity="${(opBase * (0.6 + rnd() * 0.4)).toFixed(2)}"/>`;
+      const tint = STAR_TINTS[(rnd() * STAR_TINTS.length) | 0]!;
+      const op = (opBase * (0.6 + rnd() * 0.4)).toFixed(2);
+      // The nearest plane's brightest stars twinkle; the rest stay steady (perf + calm).
+      const twinkle =
+        plane >= 2 && rnd() < 0.35
+          ? `<animate attributeName="opacity" values="${op};${(Number(op) * 0.4).toFixed(2)};${op}" dur="${(2.4 + rnd() * 3).toFixed(1)}s" repeatCount="indefinite"/>`
+          : '';
+      stars += `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="${tint}" opacity="${op}">${twinkle}</circle>`;
     }
   }
-  // A faint RA/Dec grid so it reads as a real star chart.
+  // A handful of bright hero stars with a soft halo + a diffraction cross — the anchors the eye reads
+  // as nearby suns.
+  let heroes = '';
+  for (let i = 0; i < 10; i++) {
+    const hx = (rnd() * CHART_W).toFixed(1);
+    const hy = (rnd() * CHART_H).toFixed(1);
+    const tint = STAR_TINTS[(rnd() * STAR_TINTS.length) | 0]!;
+    const s = (2.4 + rnd() * 2).toFixed(1);
+    heroes += `<g transform="translate(${hx} ${hy})">
+      <circle r="${(Number(s) * 3).toFixed(1)}" fill="${tint}" opacity="0.10"/>
+      <path d="M0,-${(Number(s) * 3.4).toFixed(1)} L0,${(Number(s) * 3.4).toFixed(1)} M-${(Number(s) * 3.4).toFixed(1)},0 L${(Number(s) * 3.4).toFixed(1)},0" stroke="${tint}" stroke-width="0.7" opacity="0.35"/>
+      <circle r="${s}" fill="#ffffff"/>
+      <circle r="${(Number(s) * 1.8).toFixed(1)}" fill="${tint}" opacity="0.4"/>
+    </g>`;
+  }
+  // A faint RA/Dec grid so it reads as a real star chart (kept subtle under the richer sky).
   let grid = '';
   for (let gx = 1; gx < 8; gx++) {
     const x = (gx / 8) * CHART_W;
-    grid += `<line x1="${x}" y1="0" x2="${x}" y2="${CHART_H}" stroke="#2a3350" stroke-width="1" opacity="0.4"/>`;
+    grid += `<line x1="${x}" y1="0" x2="${x}" y2="${CHART_H}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
   for (let gy = 1; gy < 5; gy++) {
     const y = (gy / 5) * CHART_H;
-    grid += `<line x1="0" y1="${y}" x2="${CHART_W}" y2="${y}" stroke="#2a3350" stroke-width="1" opacity="0.4"/>`;
+    grid += `<line x1="0" y1="${y}" x2="${CHART_W}" y2="${y}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
   const worlds = opts.worlds.map((w) => worldGlyph(w, w.id === opts.selectedId)).join('');
-  return `<svg class="gs-startour__chart" viewBox="0 0 ${CHART_W} ${CHART_H}" width="${CHART_W}" height="${CHART_H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Star Tour chart">
+  return `<svg class="gs-startour__chart" viewBox="0 0 ${CHART_W} ${CHART_H}" width="${(CHART_W * zoom).toFixed(0)}" height="${(CHART_H * zoom).toFixed(0)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Star Tour chart">
     <defs>
       <radialGradient id="stSky" cx="50%" cy="42%" r="80%">
         <stop offset="0%" stop-color="#141a33"/><stop offset="55%" stop-color="#0c1024"/><stop offset="100%" stop-color="#05060f"/>
@@ -213,10 +334,24 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
       <radialGradient id="stWorldShade" cx="36%" cy="32%" r="72%">
         <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/><stop offset="55%" stop-color="#ffffff" stop-opacity="0"/><stop offset="100%" stop-color="#000000" stop-opacity="0.4"/>
       </radialGradient>
+      <linearGradient id="stBand" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#6f7fd6" stop-opacity="0"/>
+        <stop offset="50%" stop-color="#9fb0ff" stop-opacity="0.16"/>
+        <stop offset="100%" stop-color="#6f7fd6" stop-opacity="0"/>
+      </linearGradient>
+      <radialGradient id="stCore" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#fff2d6" stop-opacity="0.5"/>
+        <stop offset="40%" stop-color="#ffd9a0" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#ffd9a0" stop-opacity="0"/>
+      </radialGradient>
+      ${neb.defs}
     </defs>
     <rect width="${CHART_W}" height="${CHART_H}" fill="url(#stSky)"/>
+    ${neb.body}
+    ${galaxyBand()}
     ${grid}
     ${stars}
+    ${heroes}
     ${spaceportGlyph()}
     ${worlds}
     ${shipGroup(opts)}

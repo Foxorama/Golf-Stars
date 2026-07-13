@@ -897,13 +897,28 @@ these systems** — each bullet is the tip of a documented iceberg.
     its own course-picker star map first — so `strokeplay` is EXCLUDED from the auto-list.
   - STAR TOUR star map (GS-star-tour / GS-star-tour-2, `app/starTourScreens.ts` + `render/starTourMap.ts`):
     a full-bleed, free-roam celestial chart — every course plotted at its constellation's real J2000 sky
-    position (`THEME_SKY`), the chart PANS by native scroll + pointer-drag (`wireStarTourDrag`; a moved
-    drag sets `starTourDragged` so the trailing click doesn't fly). CHARACTER SELECT COMES FIRST
+    position (`THEME_SKY`) over a deep-space backdrop (seeded nebula washes + a Milky-Way band + tinted/
+    hero stars, all mulberry32-seeded, never Math.random). The viewport is `touch-action:none` and drives
+    BOTH gestures itself (`wireStarTourGestures`): one finger PANS (scroll), two fingers PINCH-ZOOM about
+    their midpoint (`starTourView.zoom`, the SVG's px width/height scale while the viewBox stays fixed, so
+    ship/world chart-coords are unchanged — only scroll conversions multiply by zoom; ⌘/Ctrl+wheel zooms on
+    desktop). This SUPERSEDED the old native-scroll `wireStarTourDrag`, whose second finger jittered into
+    the drag handler (the pinch "flicker jump" bug, no zoom at all). A moved drag/pinch sets
+    `starTourDragged` so the trailing click doesn't fly; the tap handler must NOT `setPointerCapture` (it
+    retargets the click off the world `<g>`, degrading every world-tap to a free flight). CHARACTER SELECT
+    COMES FIRST
     (GS-star-tour-2): `openStarTour` opens the roster, `selectCharacter` (strokeplay branch) then lands on
     the map, so the run carries the golfer and the map flies THEIR cosmetic ship (`shipForCharacter` →
     `shipSVG`). You FLY the ship: a TAP orients + cruises it there (an app-layer rAF loop in `stepStarTour`
     moving `starTourView.shipX/Y/heading`, chase-cam following, scroll preserved across renders via
-    `starTourView.scrollX/Y`); tapping a WORLD flies to it and OPENS its DOSSIER on arrival (flavour, tier,
+    `starTourView.scrollX/Y`). The ship art faces +x, so heading = `atan2(dy,dx)` (0 = flying right) —
+    NOT the old `atan2(dx,−dy)` 0=up heading fed into a right-facing hull, which rendered a downward flight
+    upside-down. A LEFTWARD flight mirrors the hull vertically (`starTourView.flip` = −1, decided at launch
+    off the target side, held for the whole flight so it never snaps mid-cruise) so a wheeled/keeled craft
+    keeps its top up; docked heading is nose-UP (`SHIP_DOCK_HEADING` = −90). An engine PLUME (`thrustTrail`,
+    trailing off the tail, coloured off the ship's flame/accent) fades in via a `.gs-st-thrusting` class the
+    rAF loop toggles while cruising, so the ship reads as flying, not sliding. Tapping a WORLD flies to it
+    and OPENS its DOSSIER on arrival (flavour, tier,
     record, WEATHER picker, Fly-here-&-play → `pickStarTourCourse` pins the course on the golfer's run →
     `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there). A bottom-left
     GOLFER pod (`openStarTour` again = change golfer → back to the roster; a recap "Star map" KEEPS the
@@ -915,7 +930,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     like Asgard resolves its tournament). Deep-linkable via `?screen=startour`/`?screen=strokeresult`
     (GS-screen-deeplink, real reducer transitions); guarded by `tests/startour-flow.test.ts` +
     `tests/build.test.ts` browser smoke. Star Tour never consumes the parked Voyage/Unending resume.
-    The Daily button is parked off the title for now.
+    NO run economy: Star Tour is a records chase with no credits/fuel/handicap/stop/distance — so `header()`
+    (the between-hole recap) is `STROKEPLAY_FORMAT`-branched to show the course + running to-par instead of
+    the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard), never the
+    ghost competitor leaderboard. The Daily button is parked off the title for now.
   - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
     `src/app/` module over growing it, and re-read the relevant span before editing.**
 - **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;
