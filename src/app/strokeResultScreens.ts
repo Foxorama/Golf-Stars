@@ -8,9 +8,10 @@
 import { state } from './ctx';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
-import { scoreName } from '../sim/score';
+import { scoreName, playTotals } from '../sim/score';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
+import type { PlayedHole } from '../sim/round';
 
 /** Colour a per-hole score by name (eagle+ gold, birdie green, par ink, bogey amber, worse red). */
 function holeCellColour(par: number, strokes: number): string {
@@ -37,6 +38,32 @@ function scorecardStrip(): string {
     })
     .join('');
   return `<div class="gs-str-strip">${cells}</div>`;
+}
+
+/** The between-hole progress board for a Star Tour round (GS-star-tour): the running to-par + gross
+ *  over the holes finished so far, plus a compact hole-by-hole strip — the record-chase equivalent of
+ *  the voyage's ghost leaderboard, which has no place in a solo stroke-play round. */
+export function strokePlayProgressHTML(played: PlayedHole[]): string {
+  const totals = playTotals(played.map((p) => p.record));
+  const cells = played
+    .map((p, i) => {
+      const { par, strokes } = p.record;
+      const name = p.holed ? scoreName(par, strokes) : '—';
+      return `<div class="gs-str-cell" title="Hole ${i + 1} · ${name}">
+        <span class="gs-str-cell__n">${i + 1}</span>
+        <span class="gs-str-cell__s" style="color:${holeCellColour(par, strokes)};">${strokes}</span>
+        <span class="gs-str-cell__p">${par}</span>
+      </div>`;
+    })
+    .join('');
+  return `
+    <div class="gs-panel" style="padding:12px 14px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;">
+        <span style="font-size:12px;letter-spacing:.08em;opacity:.6;">ROUND SO FAR</span>
+        <span style="font-size:15px;font-weight:800;color:${toParColour(totals.toPar)};">${formatToPar(totals.toPar)} <span style="font-size:11px;opacity:.6;font-weight:600;">· ${totals.gross} thru ${played.length}</span></span>
+      </div>
+      <div class="gs-str-strip">${cells}</div>
+    </div>`;
 }
 
 export function strokeResultScreen(): string {
