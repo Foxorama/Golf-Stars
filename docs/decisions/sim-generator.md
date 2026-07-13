@@ -1106,3 +1106,70 @@ prim additions), every other world untouched.
 super-set of the collision poly, the graphic lies again — from the other side. The bounce line needs a
 graphic that sits ON it and out-shines the decorative silhouette drawn past it, or the eye locks onto the
 wrong edge.
+
+---
+
+## GS-compose — a stop is a COMPOSED routing, not IID hole samples
+
+**Player report.** *"Almost every biome has the exact same effective course layout, and increased
+difficulty is almost always 'the hole gets longer'. I want to expand biomes into full 9/18-hole
+courses, but they'd feel like the same 2–3 holes played over and over."*
+
+**Diagnosis (see `reports/biome-hole-layout-variety-2026-07-13.md` for the full write-up).** Two root
+causes. (1) STRUCTURE lives in engine code, not biome data — every hole is one tee→green corridor of
+one of five centreline shapes, and a biome can only reskin it with scalars, so a data-only world is a
+reskin. (2) A stop is `for (i…) generateHole(…)` — N INDEPENDENT, identically-distributed draws, with
+no routing, sequencing, signature holes, or difficulty shape. Nine IID samples from one distribution
+read as the same 2–3 holes repeated, and because the single `wildness` scalar pushes every lever at
+once while the deep worlds are the low-gravity (long) ones, difficulty reads as "longer". This section
+is the FIRST of a phased plan (composition first — highest felt win, lowest risk); per-biome
+par/length/shape profiles, a per-biome difficulty vector, and generalised structural archetypes follow.
+
+**The composition layer (`src/sim/course/compose.ts planCourse`).** A pure, deterministic planner on a
+dedicated `${seed}:compose` side stream decides WHAT each hole should be; `generateHole` consumes the
+plan. Four levers:
+- **Par SEQUENCE** — a multiset whose proportions track the generator's own natural mix (~25% par-3,
+  ~22% par-5, rest par-4), with a par-3 AND par-5 guaranteed once the stop is long enough, then ORDERED
+  by a greedy triple-avoiding scheduler (place the most-remaining par that won't form a run of three,
+  rng tie-break). Consecutive PAIRS are fine (real courses have back-to-back par-4s); a TRIPLE reads as
+  "the same hole again" and is forbidden whenever the counts allow (they do for any sane mix). The
+  single-swap breaker tried first couldn't clear a triple near the tail — the scheduler always can.
+- **SIGNATURE holes** — one heroic DRIVABLE par-4 (golf's most exciting hole) and, on a stop ≥6, one
+  stout LONG hole, chosen from the eligible pars. Fed to `chooseTemplate` as a forced `lengthClass`.
+  Skipped on lost-rough island worlds and walled ship corridors (a drivable island-hop is nonsense) and
+  on par-capped ladders (no length room).
+- **Adjacent-SHAPE contrast** — the generation loop tracks the previous hole's shape family and passes
+  it as `avoidShape`; if `chooseTemplate` draws the same family it rotates to a distinct one via a
+  fixed-order deterministic remap (ZERO extra draws). Only the composed loop passes `avoidShape`, so the
+  uncomposed shape distribution is byte-for-byte unchanged.
+- **Difficulty ARC** — per-hole wildness opens gentle and builds toward the finish (a linear tee→green
+  ramp) with a seeded ±0.16 breather/spike jitter so it isn't a flat monotone climb. It is
+  MEAN-PRESERVING: the offsets are re-centred to sum to zero, so the stop's AVERAGE wildness equals the
+  course wildness the death-spiral bar is tuned against — the arc changes hole-to-hole TEXTURE, not
+  average difficulty. Amplitude `ARC_AMP=0.14` (per-hole delta ≈ ±0.09). At `wildness=1` the upper
+  clamp bites, pulling the mean slightly DOWN (easier), so composition can never generate a hole wilder
+  than the tested-safe max.
+
+**Determinism / byte-stability.** Composition is OPT-IN via `GenerateOptions.compose`. Absent (every
+direct `generateCourse` test, every single-hole slice, the whole balance/fairness harness) the planner
+is never called and generation is byte-for-byte the old IID path — so no existing property/balance test
+moved. `generateHole` still draws its `parRoll` even when a plan overrides par (stream position stable),
+and each length branch in `chooseTemplate` still draws exactly one `range()` whether or not a
+`lengthClass` forces it (draw COUNT stable). Only the run path (`runCourse.currentCourse` +
+`stitchSplitCourse`, both halves) and `tests/compose.test.ts` opt in. `GENERATOR_VERSION` 22→23. The
+run-path reflow legitimately shifted exactly TWO pinned fixtures: `formats.test`'s
+currentCourse≡direct-generation check (the `direct` call now passes `compose:true` to mirror
+production) and `ui.test`'s ace seed (699→107 — a reflow shifts which seeds ace, the same re-pin the
+width grammar needed).
+
+**Balance guard.** The IID death-spiral bar (`tests/biomes.test`) tests the UNCOMPOSED path, so
+`tests/compose.test.ts` adds a COMPOSED bar with the same fences (`toPar/hole < 1.0`, blow-ups < 10%)
+over non-exempt worlds at `holes:9, wildness:1` through the production `generateStopCourse` (retrying
+the ~0.05% raw fairness edge case, which composition does NOT increase — measured identical 0.05% both
+ways). The mean-preserving arc + proportion-matched par mix keep it comfortably under the bar.
+
+**The lesson for the phased plan.** Composition sits ABOVE the frozen contract and the per-hole
+generator — it needed no contract change and no new structural geometry, yet it's the change that most
+directly answers "the same 2–3 holes". Build the variety MACHINERY (this, then per-biome profiles, then
+structural archetypes) before adding biomes, so every future world is a genuinely different course for
+free instead of another reskin.

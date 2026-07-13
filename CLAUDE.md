@@ -111,6 +111,18 @@ these systems** — each bullet is the tip of a documented iceberg.
 
 - **Generator & sim** — `docs/decisions/sim-generator.md`
   - Biomes are physics-only data rows; the render palette is keyed by biome id in the render layer.
+  - A multi-hole stop is COMPOSED, not IID-sampled (GS-compose, `course/compose.ts planCourse`): the
+    run path (`runCourse`, `opts.compose`) plans a par SEQUENCE (proportions track the generator's own
+    ~25/55/20 mix, a par-3+par-5 guaranteed, never 3 identical pars in a row), 1–2 SIGNATURE holes (a
+    heroic drivable par-4, a stout long hole — skipped on lost/ship worlds), adjacent-SHAPE contrast
+    (a hole rotates off its predecessor's family, zero extra draws), and a MEAN-PRESERVING difficulty
+    ARC (per-hole wildness opens gentle → builds to the finish with a seeded breather/spike jitter; the
+    offsets sum to ~0 so the stop's average wildness = the course wildness the death-spiral bar is tuned
+    to). OPT-IN: `compose` absent ⇒ byte-for-byte the old IID generator (the planner is never called), so
+    every DIRECT `generateCourse` test/slice is unchanged — only the run path + `tests/compose.test.ts`
+    opt in. Balance guarded by a composed death-spiral bar (`tests/compose.test.ts`, same fences as the
+    IID bar); it's an internal generator opt, NOT a `_gs*`/URL hook, so no test-hub wiring.
+    `GENERATOR_VERSION` 23.
   - A world's APPEARANCE RATE is its themes' summed rarity weight per arc; a world with themes in
     only one arc (or only epic-weight ones) is near-unreachable in the deep game where a run spends
     most of its stops. Every archetype must carry ≥1 arc-3 theme at ~toxic-mire (swamp) weight or a

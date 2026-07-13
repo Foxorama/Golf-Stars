@@ -17,6 +17,7 @@
 import { Rng } from '../rng';
 import { RARITIES, RARITY_C } from '../rpg/loot';
 import { BIOMES, pickBiome, type Biome } from './biomes';
+import { planCourse, shapeFamilyOf, type HolePlan } from './compose';
 import { lieInfo, lieAt } from '../shot';
 import { WALL_HEIGHT } from '../walls';
 import {
@@ -39,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 22; // GS-ship-interior: wider ship corridors + acid-breach lost-ball penalties replace bunkers
+export const GENERATOR_VERSION = 23; // GS-compose: composition layer (planned par sequence + signature holes + difficulty arc) on the run path
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -135,6 +136,14 @@ export interface GenerateOptions {
   effect?: string;
   /** Cap every hole's par (3 = all par-3s). Omit for the normal 3/4/5 mix. */
   parCap?: 3 | 4 | 5;
+  /**
+   * COMPOSE the stop (GS-compose): plan par sequence, a signature short/long hole, and a
+   * mean-preserving difficulty arc across the holes instead of drawing each hole IID — so a
+   * multi-hole stop plays like a designed routing, not the same 2–3 holes repeated. OPT-IN: absent
+   * ⇒ byte-for-byte the old IID generation (the planner is never called). The run path turns it on;
+   * direct `generateCourse` tests leave it off. No effect on a single-hole slice.
+   */
+  compose?: boolean;
 }
 
 const NAME_PREFIX = ['Kepler', 'Vega', 'Lyra', 'Orion', 'Cygnus', 'Helix', 'Pulsar', 'Nyx'];
@@ -788,11 +797,15 @@ function generateHole(
   wildness: number,
   holeIndex: number,
   parCap?: 3 | 4 | 5,
+  plan?: HolePlan,
 ): Hole {
   const parRoll = rng.float();
-  // Always draw parRoll (keeps the RNG stream identical whether or not a cap is set),
-  // then clamp to the cap so an all-par-3 ladder stop is just min(par, 3).
-  const par = Math.min(parRoll < 0.25 ? 3 : parRoll < 0.8 ? 4 : 5, parCap ?? 5);
+  // Always draw parRoll (keeps the RNG stream identical whether or not a cap is set), then clamp to
+  // the cap so an all-par-3 ladder stop is just min(par, 3). When a compose PLAN is supplied
+  // (GS-compose) its par overrides the roll — the draw still fires (stream position stable) but the
+  // composed stop follows the planned par sequence instead of an IID draw.
+  const rolledPar = parRoll < 0.25 ? 3 : parRoll < 0.8 ? 4 : 5;
+  const par = Math.min(plan?.par ?? rolledPar, parCap ?? 5);
 
   const tee: Vec = [0, 0];
 
@@ -818,7 +831,7 @@ function generateHole(
   // dogleg L-R / S-curve double / heroic CAPE diagonal / severe HAIRPIN) with a LENGTH CLASS (drivable
   // par-4, short/long par-3, reachable/three-shot par-5) so holes stop being one length + one bend.
   // The picker draws first (length class, shape, side) so the RNG order downstream is stable.
-  const tpl = chooseTemplate(rng, par, biome, wildness, !!lostRough);
+  const tpl = chooseTemplate(rng, par, biome, wildness, !!lostRough, plan?.lengthClass, plan?.avoidShape);
   // Hole length (yards): par baseline × world gravity × the template's length multiplier. Low gravity
   // (carryMult > 1) lengthens holes so they stay challenging despite the longer carries.
   const baseLen = par === 3 ? 165 : par === 4 ? 400 : 530;
@@ -1690,7 +1703,15 @@ interface HoleTemplate {
  * so you can genuinely have a go at the green. Draw order (length roll, shape roll, side) is fixed so
  * the downstream RNG stream is stable. A void island stays a straight, honest target.
  */
-function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, island: boolean): HoleTemplate {
+function chooseTemplate(
+  rng: Rng,
+  par: number,
+  biome: Biome,
+  wildness: number,
+  island: boolean,
+  lengthClass?: 'drivable' | 'long',
+  avoidShape?: string,
+): HoleTemplate {
   const side: 1 | -1 = rng.bool() ? 1 : -1;
   // Par-3 island (void/cetus deep): a single generous target island — a straight carry, no corridor
   // to shape. Par 4/5 islands FALL THROUGH to the full shape grammar below (GS-cetus-5): a lost-rough
@@ -1727,27 +1748,33 @@ function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, i
     // "have a go at the green" hole is one of the most interesting in golf (research §B), yet the old
     // ramp HALVED its frequency deep in (0.24 → 0.12) — exactly where the game most needed variety.
     // Now it barely tapers, so a wild stop still gets the occasional thrilling drivable hole.
+    // A compose `lengthClass` (GS-compose) FORCES the signature length (drivable / long); each branch
+    // still draws exactly one range() so the rng draw count is stable whether or not a plan is set.
     const pDriv = 0.15 + 0.06 * (1 - wildness);
-    if (lenRoll < pDriv) {
+    const driv = lengthClass === 'drivable' || (lengthClass !== 'long' && lenRoll < pDriv);
+    const long = !driv && (lengthClass === 'long' || (lengthClass !== 'drivable' && lenRoll >= 0.82));
+    if (driv) {
       lenMult = rng.range(0.66, 0.8); // drivable short par-4
       lenTag = 'drivable';
-    } else if (lenRoll < 0.82) {
-      lenMult = rng.range(0.9, 1.1);
-      lenTag = '';
-    } else {
+    } else if (long) {
       lenMult = rng.range(1.12, 1.24); // long, stout par-4
       lenTag = 'long';
+    } else {
+      lenMult = rng.range(0.9, 1.1);
+      lenTag = '';
     }
   } else {
-    if (lenRoll < 0.3) {
+    const long = lengthClass === 'long' || lenRoll >= 0.8;
+    const reachable = !long && lenRoll < 0.3;
+    if (reachable) {
       lenMult = rng.range(0.84, 0.96); // reachable in two
       lenTag = 'reachable';
-    } else if (lenRoll < 0.8) {
-      lenMult = rng.range(1.0, 1.12);
-      lenTag = '';
-    } else {
+    } else if (long) {
       lenMult = rng.range(1.16, 1.3); // a genuine three-shotter
       lenTag = 'three-shot';
+    } else {
+      lenMult = rng.range(1.0, 1.12);
+      lenTag = '';
     }
   }
   const parWord = par === 4 ? 'par-4' : 'par-5';
@@ -1797,6 +1824,14 @@ function chooseTemplate(rng: Rng, par: number, biome: Biome, wildness: number, i
   } else {
     shape = 'dogleg';
     shapeTag = `dogleg-${sd}`;
+  }
+  // Adjacent-shape contrast (GS-compose): if this hole drew the SAME shape family as its predecessor,
+  // rotate to a distinct one (zero extra draws — a deterministic remap) so a composed stop doesn't
+  // run two identical-looking holes back to back. Only fires when the loop passes a matching
+  // `avoidShape`; the uncomposed path never does, so its shape distribution is byte-for-byte unchanged.
+  if (avoidShape && shape === avoidShape) {
+    shape = (['dogleg', 'cape', 'double', 'straight', 'hairpin'] as ShapeKind[]).find((s) => s !== avoidShape)!;
+    shapeTag = shape === 'straight' ? 'straight' : `${shape}-${sd}`;
   }
   const id = lenTag ? `${lenTag}-${parWord}-${shapeTag}` : `${parWord}-${shapeTag}`;
   return { id, shape, side, lenMult, severity: shape === 'hairpin' ? 1.7 : 1 };
@@ -2123,7 +2158,28 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
   const name = `${rng.pick(NAME_PREFIX)} ${rng.pick(NAME_SUFFIX)}`;
 
   const holes: Hole[] = [];
-  for (let i = 0; i < holeCount; i++) holes.push(generateHole(rng, biome, wildness, i, opts.parCap));
+  if (opts.compose && holeCount >= 2) {
+    // COMPOSE the stop (GS-compose): a planned par sequence + signature holes + a mean-preserving
+    // difficulty arc, with adjacent-shape contrast threaded through the loop (the only place that
+    // knows the shape a hole actually drew). Opt-in — the IID path below is byte-for-byte the old
+    // generator.
+    const plans = planCourse(seed, holeCount, wildness, {
+      parCap: opts.parCap,
+      // A drivable/long signature is nonsense on a lost-rough island world or a walled ship corridor.
+      signatures: !biome.lostRough && !biome.walls,
+    });
+    let prevFamily: string | undefined;
+    for (let i = 0; i < holeCount; i++) {
+      const hole = generateHole(rng, biome, plans[i]!.wildness, i, opts.parCap, {
+        ...plans[i]!,
+        avoidShape: prevFamily,
+      });
+      holes.push(hole);
+      prevFamily = shapeFamilyOf(hole.shapeId);
+    }
+  } else {
+    for (let i = 0; i < holeCount; i++) holes.push(generateHole(rng, biome, wildness, i, opts.parCap));
+  }
 
   const course: Course = {
     seed: rng.seed,
