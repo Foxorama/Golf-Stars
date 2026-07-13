@@ -5,7 +5,7 @@
  */
 
 import { btn, state } from './ctx';
-import { FORMATS, ASGARD_FORMAT } from '../sim/rpg/formats';
+import { FORMATS, ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 
 /** The captured PWA install prompt (beforeinstallprompt), if the browser offered one and the
  *  player hasn't installed/dismissed it. Surfaced as an "Install" button on the title. Set by
@@ -33,8 +33,10 @@ export function titleScreen(): string {
   const modes = Object.values(FORMATS)
     .slice()
     // The Asgard tournament (GS-asgard) is an INTERLUDE format, reached only via the Rainbow-Road
-    // eagle trigger — never a selectable game mode on the title.
-    .filter((f) => f.id !== ASGARD_FORMAT)
+    // eagle trigger — never a selectable game mode on the title. Star Tour (GS-star-tour) is launched
+    // from its own star-map course picker, not this generic `start` tile, so it's excluded here too
+    // (wired as a bespoke tile in a later pass).
+    .filter((f) => f.id !== ASGARD_FORMAT && f.id !== STROKEPLAY_FORMAT)
     .sort((a, b) => Number(!!b.winnable) - Number(!!a.winnable))
     .map(
       (f) => `

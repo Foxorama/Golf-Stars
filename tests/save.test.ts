@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(26);
+    expect(SAVE_VERSION).toBe(27);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});

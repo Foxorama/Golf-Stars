@@ -34,6 +34,7 @@ import {
   type Theme,
 } from '../course/themes';
 import { getFormat, stopSpecFor, type StopSpec } from './formats';
+import { buildStaticCourse } from '../course/staticCourses';
 import type { Run } from './run';
 
 /** Deterministic seed for the course at the current stop. */
@@ -120,6 +121,20 @@ export function routeTheme(
 
 /** The course awaiting the player at the current stop (shaped by the run format + theme). */
 export function currentCourse(run: Run): Course {
+  // STAR TOUR (GS-star-tour): a stroke-play round plays a PINNED static course, not a generated stop.
+  // Serve the fixed designed 18-hole layout and apply the chosen weather sky as pure physics
+  // (`applyEffectPhysics` — wind/carry only, no geometry change, so the course records stay comparable).
+  // The weather is stamped on the meta so the renderer/HUD read it. Gated on `staticCourseId`, which no
+  // other format sets → the generated path below is byte-for-byte unchanged.
+  if (run.staticCourseId) {
+    const effect = run.staticEffect ?? 'none';
+    const course = buildStaticCourse(run.staticCourseId);
+    const withEffect = applyEffectPhysics(course, effect);
+    return armTentHoles(
+      { ...withEffect, meta: { ...withEffect.meta, effect } },
+      effect,
+    );
+  }
   const spec = stopSpecFor(getFormat(run.formatId), run.stopIndex);
   const theme = currentTheme(run);
   // The chosen journey route (GS-journey-fx) makes the world it flew into wilder/gentler AND brings an

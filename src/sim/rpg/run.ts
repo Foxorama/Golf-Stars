@@ -156,6 +156,13 @@ export interface Run {
    *  club types won as ascension-victory rewards on past runs with this golfer. Stable for the run's
    *  duration (they only grow at a win, which ends the run); kept for resume so the bag rebuilds. */
   unlockedClubs?: string[];
+  /** STAR TOUR (GS-star-tour): the pinned static course id this run plays. When set, `currentCourse`
+   *  serves `buildStaticCourse(id)` — the fixed designed 18-hole layout — instead of a generated stop.
+   *  Absent on every other format → byte-for-byte the generated path. Snapshotted so a round resumes. */
+  staticCourseId?: string;
+  /** STAR TOUR (GS-star-tour): the weather sky chosen for the round (a `CourseEffectId`) — applied to the
+   *  static course as pure physics (wind/carry) by `currentCourse`. Absent/'none' = calm. Snapshotted. */
+  staticEffect?: string;
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
@@ -222,6 +229,8 @@ export function startRun(
   ascension = 0,
   bagTier: BagTier = DEFAULT_BAG_TIER,
   unlockedClubs: readonly string[] = [],
+  staticCourseId?: string,
+  staticEffect?: string,
 ): Run {
   const rng = new Rng(seed);
   const asc = Math.max(0, Math.min(ASCENSION_MAX, Math.round(ascension)));
@@ -230,6 +239,10 @@ export function startRun(
     formatId,
     stopIndex: 0,
     distanceFromStart: 0,
+    // STAR TOUR (GS-star-tour): the pinned course + weather for a stroke-play round. Absent on every
+    // other format, so the generated-stop path is byte-for-byte unchanged.
+    ...(staticCourseId ? { staticCourseId } : {}),
+    ...(staticEffect && staticEffect !== 'none' ? { staticEffect } : {}),
     // Permanent meta-progression bakes into the starting credits + loadout (GS-12); the chosen
     // golfer's shape/bag tweak (GS-18) is the base it builds on (see startingLoadoutFor). Ascension
     // thins the starting purse (floored so it never strands you with nothing). The default-bag tier

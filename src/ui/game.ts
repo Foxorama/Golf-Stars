@@ -143,6 +143,7 @@ export function initState(
     marmotTips: meta.marmotTips ?? 0,
     endlessRuns: meta.endlessRuns ?? [],
     reputation: meta.reputationByCharacter ?? {},
+    strokePlayBest: meta.strokePlayBest ?? {},
     priceRefund: meta.priceRefund,
   };
 }
@@ -1102,6 +1103,7 @@ export function reduce(state: UiState, action: Action): UiState {
           marmotTips: state.marmotTips,
           endlessRuns: state.endlessRuns,
           reputationByCharacter: state.reputation,
+          strokePlayBest: state.strokePlayBest,
         },
         state.resumable,
       );

@@ -68,7 +68,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v23**; bump + add a migration when you
+  (localStorage is the only copy). Current schema is **v27**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -367,9 +367,24 @@ these systems** — each bullet is the tip of a documented iceberg.
     re-validates the rounded course so a redesign can't freeze an unfair hole. Flagship `metal-18` "Antlia
     Scrapworks" = the `scrap-belt` (metal) archetype, `{holes:18,compose:true,wildness:0.5}` → composed
     par 71 (F35/B36). Freezer rounds coords to 3 decimals + minifies (~262 KB). The catalogue is a ROW,
-    never hand-authored geometry. DELIBERATELY UNWIRED — nothing in the run/format path imports it, so
-    every existing mode is byte-for-byte unchanged; a future mode opts in via `buildStaticCourse`. No
+    never hand-authored geometry. `metal-18` is the ONLY frozen course; the STAR TOUR courses (GS-star-tour,
+    below) are UNFROZEN spec rows — `buildStaticCourse(id)` regenerates them on demand (line 58, "no frozen
+    file yet ⇒ build from source"), keeping the bundle lean (freezing ~10 more would add ~2.5 MB) at the
+    cost of re-rolling on a `GENERATOR_VERSION` bump (acceptable for a casual records chase). A tour course
+    row carries star-map metadata (`themeId`/`archetype`/`tier`/`blurb`) that does NOT feed generation. No
     `_gs*`/URL hook (no test-hub wiring).
+  - STAR TOUR — the third game mode (GS-star-tour, format `strokeplay`, `formats.ts` `STROKEPLAY_FORMAT`):
+    a single 18-hole STROKE-PLAY round on a player-CHOSEN static course, ranked into personal course-record
+    leaderboards. `Run.staticCourseId`/`staticEffect` pin the course + weather; `currentCourse` branches on
+    `staticCourseId` (which NO other format sets → generated path byte-for-byte unchanged) to serve
+    `buildStaticCourse(id)` and apply the chosen weather sky as PURE physics (`applyEffectPhysics` — wind/
+    carry only, NO geometry change, so records stay comparable across weather). The round is resolved like
+    Asgard (a bespoke reducer path, not the Stableford-cut/travel flow) — the single stop IS the whole run.
+    Records live in `sim/rpg/strokePlay.ts` (`StrokePlayBest` = courseId → best round, a MAP so a course's
+    all-time best is never evicted; ranked by TO-PAR asc, ties → fewer strokes): two boards, per-course best
+    + best-rounds-overall. Persisted in save v27 (`strokePlayBest`). Threaded through both the auto
+    (`playCourse`+`playTotals`) and interactive drivers (contract 2). The mode does NOT touch Voyage/Unending
+    behaviour.
 - **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
   - The spine: `startRun → [playStop → buy* → travel]*` until the survival rule fails; pure and
     deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);
