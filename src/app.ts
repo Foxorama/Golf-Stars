@@ -1356,6 +1356,19 @@ function render(): void {
       render();
     });
   });
+  // Pro Shop accordions (GS-pro-shop-redesign): tap a panel header (Pro Shop / Golf Bag / Upgrades, or the
+  // nested upgrade-detail toggle) to expand/collapse it. Independent set, so the shop and bag can BOTH be
+  // open to compare — view-only, re-rendered, never persisted.
+  app.querySelectorAll<HTMLElement>('[data-shop-panel]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.shopPanel!;
+      if (shopView.open.has(id)) shopView.open.delete(id);
+      else shopView.open.add(id);
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
   // Trade Market accordion: tap a section header to collapse/expand its card rack (view-only).
   app.querySelectorAll<HTMLElement>('[data-toggle-section]').forEach((el) => {
     el.addEventListener('click', () => {
