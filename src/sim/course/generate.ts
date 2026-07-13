@@ -144,6 +144,13 @@ export interface GenerateOptions {
    * direct `generateCourse` tests leave it off. No effect on a single-hole slice.
    */
   compose?: boolean;
+  /**
+   * Per-hole DIFFICULTY MIX (GS-star-tour-difficulty): with `compose` on, each hole draws its wildness
+   * at random from these discrete levels instead of the mean-preserving arc — so a composed course
+   * mixes (e.g.) medium and hard holes, and can come out all one level. Used by the Star Tour records
+   * mode; absent ⇒ the arc, byte-for-byte the old composition (contract 1). Ignored without `compose`.
+   */
+  wildnessMix?: readonly number[];
 }
 
 const NAME_PREFIX = ['Kepler', 'Vega', 'Lyra', 'Orion', 'Cygnus', 'Helix', 'Pulsar', 'Nyx'];
@@ -2224,6 +2231,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
       // A drivable/long signature is nonsense on a lost-rough island world or a walled ship corridor.
       signatures: !biome.lostRough && !biome.walls,
       parMix: biome.parMix, // per-biome par rhythm (GS-biome-profile); absent ⇒ the default mix
+      wildnessMix: opts.wildnessMix, // Star Tour per-hole medium/hard mix (GS-star-tour-difficulty); absent ⇒ the arc
     });
     let prevFamily: string | undefined;
     for (let i = 0; i < holeCount; i++) {

@@ -54,12 +54,25 @@ export function planCourse(
   seed: string | number,
   holeCount: number,
   wildness: number,
-  opts: { parCap?: 3 | 4 | 5; signatures?: boolean; parMix?: { p3: number; p4: number; p5: number } } = {},
+  opts: {
+    parCap?: 3 | 4 | 5;
+    signatures?: boolean;
+    parMix?: { p3: number; p4: number; p5: number };
+    /**
+     * Per-hole DIFFICULTY MIX (GS-star-tour-difficulty): when set, each hole draws its wildness at
+     * random from these discrete levels instead of the smooth mean-preserving arc — so a course mixes
+     * (say) medium and hard holes and can legitimately come out all-medium or all-hard. Used by the
+     * Star Tour records mode, which wants real golf-course teeth rather than the calm arc the Voyage's
+     * death-spiral balance is tuned to. Absent ⇒ the arc, byte-for-byte the old composition.
+     */
+    wildnessMix?: readonly number[];
+  } = {},
 ): HolePlan[] {
   const rng = new Rng(`${seed}:compose`);
   const n = Math.max(1, holeCount);
   const pars = planPars(rng, n, opts.parCap, opts.parMix ?? DEFAULT_PAR_MIX);
-  const wilds = planWildness(rng, n, wildness);
+  const mix = opts.wildnessMix && opts.wildnessMix.length > 0 ? opts.wildnessMix : undefined;
+  const wilds = mix ? planWildnessMix(rng, n, mix) : planWildness(rng, n, wildness);
   const plans: HolePlan[] = pars.map((par, i) => ({ par, wildness: wilds[i]! }));
   // Signature length holes (a heroic drivable par-4, a stout long hole) — skipped on lost/ship worlds
   // (a drivable island-hop is nonsense) and on par-capped ladders (no length room). The caller passes
@@ -129,6 +142,20 @@ function planWildness(rng: Rng, n: number, wildness: number): number[] {
   });
   const mean = raw.reduce((s, v) => s + v, 0) / n;
   return raw.map((v) => Math.max(0.05, Math.min(1, wildness + ARC_AMP * (v - mean))));
+}
+
+/**
+ * The per-hole DIFFICULTY MIX (GS-star-tour-difficulty): each hole INDEPENDENTLY draws one of the
+ * discrete `levels` at random — NOT a mean-preserving arc — so the course mixes those difficulty
+ * levels hole to hole and can come out entirely one level. Clamped to the generator's [0.05, 1]
+ * wildness range. Used by Star Tour (solo records mode); the Voyage never passes a mix, so its arc
+ * (and its death-spiral balance) is untouched.
+ */
+function planWildnessMix(rng: Rng, n: number, levels: readonly number[]): number[] {
+  return Array.from({ length: n }, () => {
+    const w = levels[rng.int(0, levels.length - 1)]!;
+    return Math.max(0.05, Math.min(1, w));
+  });
 }
 
 /**

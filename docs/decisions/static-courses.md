@@ -62,6 +62,33 @@ number to **3 decimals** (0.001 yd — imperceptible) before writing, then re-va
 - Seed `gs-static:metal-18`. Total ~9,255 yd — long because the low-gravity `carryMult` scales holes
   up to keep every carry *carry-relative* (the auto-AI reaches exactly as elsewhere; fair by design).
 
+### Star Tour hole difficulty — medium/hard mix (GS-star-tour-difficulty)
+
+The Star Tour spec rows (every catalogue entry *except* the frozen `metal-18`) originally rode a low
+per-course `wildness` (0.38–0.58) fed through the composer's **mean-preserving difficulty arc**
+(`planWildness`) — so a whole 18-hole round played *calm*. A real course has teeth, and the higher
+difficulties are what make a solo records chase interesting, so each Star Tour hole now rolls its
+wildness **independently** from a discrete `{ medium 0.6, hard 0.85 }` set (`STAR_TOUR_MIX`) via the
+composer's new `planWildnessMix`, selected by `GenerateOptions.wildnessMix` → `planCourse`. A course
+therefore mixes medium and hard holes and can legitimately come out **all-medium or all-hard** — which
+is fine here: Star Tour is stroke play with no death-spiral survival cut to protect (the Voyage never
+passes a mix, so its arc *and* its balance are byte-for-byte untouched — contract 1).
+
+- The per-hole roll is IID off the same `${seed}:compose` stream (same draw *count* as the arc — a new
+  opt-in path, not a reordering of an existing one), so the whole thing stays deterministic and the
+  no-mix path is unchanged.
+- `meta.wildness` (the intro/scorecard 🌪 number) is set to the mix midpoint `STAR_TOUR_WILDNESS` (0.725)
+  as a representative course value; the mix is what actually drives each hole's geometry.
+- `metal-18` is **excluded** — it is served from frozen JSON and its opts are frozen, so it keeps its
+  designed mid-wildness (0.5) routing.
+- No `GENERATOR_VERSION` bump: the generator's byte output for any *fixed* opts (including every frozen
+  file and every Voyage stop) is unchanged; only the Star Tour spec opts changed, and those courses are
+  unfrozen (they re-roll on a version bump regardless).
+
+Guarded by `tests/compose.test.ts` (a `wildnessMix` plans only the discrete levels, both appear across
+seeds, deterministic, empty-mix falls back to the arc) and `tests/static-courses.test.ts` (every spec
+still regenerates to a fair, contract-valid course at the higher wildness).
+
 ## Why this changes nothing for existing modes
 
 **Nothing in the run/format path imports `staticCourses.ts`.** No format row, no `currentCourse`
