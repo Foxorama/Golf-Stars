@@ -241,32 +241,16 @@ describe('GS-ship-pinball-flight — the derelict flies STRAIGHT segments that c
   //   1. EVERY derelict shot flies straight — a `flightPath` polyline is always stored (never the banana).
   //   2. A bounced shot's polyline has ≥3 vertices (tee → bulkhead(s) → landing); a clean drive is 2 (a
   //      straight line). And each vertex is a real turn (the segments genuinely change direction on a bounce).
-  //   3. On a PLAIN corridor (no torn-hull star-gap on the centreline), the bounces CONTAIN the ball: the
-  //      lost-to-space rate is tiny — the corridor walls keep it in. (Driving into a carry-GAP on an island-
-  //      hop hole is a real, sanctioned loss and is excluded here; the resting-containment test above is the
-  //      hard sideways-leak guard. Chasing a watertight per-point flight check is the trap five attempts fell
-  //      into — the centreline runs continuously through a pad/gap chain, so `nearest-centre-on-deck` can't
-  //      classify a point 3 yd off it, and the RESTING containment is the invariant that actually matters.)
+  // Containment itself is NOT asserted here: since GS-ship-calm-space made the derelict UNIFORMLY walled-space
+  // at every wildness (off the deck is always lost, and the hull tears into star-gap sections + side-wall
+  // openings at all difficulties), a bounced ball shooting a sanctioned gap into space is now common and CORRECT
+  // (REQ2 below). The real "no sideways leak off a SOLID stretch" guarantee is the resting-containment test above
+  // (`GS-ship-corridor-contain`); chasing a per-point flight lost-rate is the trap five attempts fell into.
   const DR = CLUBS.find((c) => c.id === 'D')!;
-  const lost = (h: Hole, p: Vec) => { const k = lieAt(h, p); return k !== 'breach' && lieInfo(k).penalty === 'voidlost'; };
-  // A hole whose centreline itself passes through space (a torn-hull star-gap you must carry) — island-hop.
-  const gapped = (h: Hole): boolean => {
-    for (let i = 0; i <= 120; i++) {
-      const t = i / 120;
-      const seg = t * (h.centreline.length - 1);
-      const i0 = Math.min(h.centreline.length - 2, Math.floor(seg));
-      const u = seg - i0;
-      const a = h.centreline[i0]!, b = h.centreline[i0 + 1]!;
-      if (lost(h, [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u])) return true;
-    }
-    return false;
-  };
 
-  it('every derelict shot flies a straight polyline; a bounced one turns; plain corridors keep the ball IN', () => {
+  it('every derelict shot flies a straight polyline; a bounced one turns at each bulkhead', () => {
     let checked = 0;
     let walled = 0;
-    let plainN = 0;
-    let plainLost = 0;
     let bouncedSeen = 0;
     for (let s = 1; s < 40; s++) {
       for (const wildness of [0.4, 0.7, 1]) {
@@ -274,7 +258,6 @@ describe('GS-ship-pinball-flight — the derelict flies STRAIGHT segments that c
         for (const hole of course.holes) {
           if (!(hole.walls?.length) || hole.par < 4) continue;
           walled++;
-          const isGapped = gapped(hole);
           const carryMult = biomeCarryMult(hole);
           const bend = hole.centreline[1] ?? hole.green;
           const fx = bend[0] - hole.tee[0];
@@ -298,11 +281,6 @@ describe('GS-ship-pinball-flight — the derelict flies STRAIGHT segments that c
               const bounces = r.log.wallHit?.bounces ?? 0;
               expect(fp!.length, `seed ${s} ang${ang} k${k}: ${bounces} bounces but ${fp!.length}-pt path`).toBeGreaterThanOrEqual(bounces > 0 ? 3 : 2);
               if (bounces > 0) bouncedSeen++;
-              // (3) plain-corridor containment.
-              if (!isGapped) {
-                plainN++;
-                if (r.log.penalty === 'voidlost') plainLost++;
-              }
             }
           }
         }
@@ -311,10 +289,6 @@ describe('GS-ship-pinball-flight — the derelict flies STRAIGHT segments that c
     expect(walled).toBeGreaterThan(0);
     expect(checked).toBeGreaterThan(200);
     expect(bouncedSeen).toBeGreaterThan(50); // the scenario actually exercises the ricochet a lot
-    // Plain corridors (no carry-gap) keep the ball IN — the walls contain the pinball. A tiny residue is the
-    // corridor's own far end past the green; the sideways-leak guarantee is the resting-containment test.
-    expect(plainN).toBeGreaterThan(200);
-    expect(plainLost / plainN, `plain-corridor lost-to-space ${(100 * plainLost / plainN).toFixed(1)}%`).toBeLessThan(0.05);
   });
 });
 
@@ -447,28 +421,19 @@ describe('GS-ship-space-boundary — a ball flung FAR past the bulkheads flies f
     expect(flungFree, 'sideways drives into open space actually fly free now').toBeGreaterThan(50);
   });
 
-  it('a wall bounce can redirect the ball OUT a platform gap and be lost, but plain corridors contain', () => {
+  it('a wall bounce lands many balls back on the deck, and awkward bounces shoot gaps into space', () => {
     // The two stated behaviours: (1) a bulkhead bounces the ball back onto the fairway; (2) an AWKWARD
     // bounce that redirects the ball out through a torn-hull gap between platforms flies free into space.
-    // A plain (un-gapped) corridor almost never does (2) — its continuous walls contain the ball.
-    const gapped = (h: Hole): boolean => {
-      for (let i = 0; i <= 120; i++) {
-        const t = i / 120;
-        const seg = t * (h.centreline.length - 1);
-        const i0 = Math.min(h.centreline.length - 2, Math.floor(seg));
-        const u = seg - i0;
-        const a = h.centreline[i0]!, b = h.centreline[i0 + 1]!;
-        if (lost(h, [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u])) return true;
-      }
-      return false;
-    };
-    let bouncedOnDeck = 0, bouncedThenLostGapped = 0, plainTotal = 0, plainBouncedLost = 0;
+    // (The old "plain corridors almost never do (2)" sub-check retired with GS-ship-calm-space: the derelict
+    // is now uniformly walled-space with hull-section + side-wall gaps at EVERY wildness, so a bounce shooting
+    // a sanctioned gap is common and correct. The "no leak off a SOLID stretch" guarantee is the
+    // resting-containment test.)
+    let bouncedOnDeck = 0, bouncedThenLost = 0;
     for (let s = 1; s < 45; s++) {
       for (const wildness of [0.5, 0.8, 1]) {
         const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
         for (const hole of course.holes) {
           if (!(hole.walls?.length) || hole.par < 4) continue;
-          const isGap = gapped(hole);
           const carryMult = biomeCarryMult(hole);
           const bend = hole.centreline[1] ?? hole.green;
           const fx = bend[0] - hole.tee[0];
@@ -485,8 +450,7 @@ describe('GS-ship-space-boundary — a ball flung FAR past the bulkheads flies f
               const bounced = (r.log.wallHit?.bounces ?? 0) > 0;
               const restLost = lost(hole, r.log.rest);
               if (bounced && !restLost) bouncedOnDeck++;
-              if (isGap) { if (bounced && restLost) bouncedThenLostGapped++; }
-              else { plainTotal++; if (bounced && restLost) plainBouncedLost++; }
+              if (bounced && restLost) bouncedThenLost++;
             }
           }
         }
@@ -495,10 +459,59 @@ describe('GS-ship-space-boundary — a ball flung FAR past the bulkheads flies f
     // (1) walls bounce a lot of balls back onto the deck.
     expect(bouncedOnDeck, 'wall bounces that land back on the deck').toBeGreaterThan(500);
     // (2) awkward bounces DO shoot the platform gaps into space (fair, readable losses).
-    expect(bouncedThenLostGapped, 'awkward wall bounces that shoot a platform gap and are lost').toBeGreaterThan(200);
-    // (2b) but a plain corridor's continuous walls contain — a bounce almost never ends lost there.
-    expect(plainTotal).toBeGreaterThan(500);
-    expect(plainBouncedLost / plainTotal, `plain-corridor bounce-then-lost ${(100 * plainBouncedLost / plainTotal).toFixed(1)}%`).toBeLessThan(0.03);
+    expect(bouncedThenLost, 'awkward wall bounces that shoot a gap and are lost').toBeGreaterThan(200);
+  });
+});
+
+describe('GS-ship-calm-space — the derelict is walled space at EVERY wildness, not just deep in', () => {
+  // The ship is sealed corridors at all difficulties: off the mown hull deck is ALWAYS open space
+  // (`shiprough`), even on a CALM stop, so the bulkheads always have space to bounce a ball back from —
+  // a calm derelict is a tighter walled corridor, never a parkland-with-rough where a ball sails "over"
+  // a decorative wall into fair rough. Other lost-rough worlds (void/cetus) keep the 0.55 threshold and
+  // play as ordinary fair rough when calm (byte-for-byte unchanged).
+  const offCorridorLies = (h: Hole) => {
+    const i = Math.floor(h.centreline.length / 2);
+    const a = h.centreline[Math.max(0, i - 1)]!, b = h.centreline[Math.min(h.centreline.length - 1, i + 1)]!;
+    const mid = h.centreline[i]!;
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+    return [30, 55, 80].map((d) => lieAt(h, [mid[0] + nx * d, mid[1] + ny * d]));
+  };
+
+  it('a CALM derelict hole is space off the deck (walls contain), while calm void/cetus stay fair rough', () => {
+    let shipHoles = 0, shipSpace = 0, shipFairRough = 0;
+    for (let s = 1; s < 40; s++) {
+      for (const wildness of [0.1, 0.25, 0.4]) { // all BELOW the old 0.55 lost-rough threshold
+        const c = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const h of c.holes) {
+          if (!(h.walls?.length) || h.par < 4) continue;
+          shipHoles++;
+          for (const k of offCorridorLies(h)) {
+            if (k === 'shiprough') shipSpace++;
+            else if (k === 'rough' || k === 'deeprough' || k === 'fescue') shipFairRough++;
+          }
+        }
+      }
+    }
+    expect(shipHoles, 'calm derelict par-4/5 holes exist').toBeGreaterThan(50);
+    // Off the deck is space, essentially never fair rough, even on a calm stop.
+    expect(shipSpace).toBeGreaterThan(100);
+    expect(shipFairRough, 'no fair rough off a calm derelict corridor').toBe(0);
+    // Other lost-rough worlds are UNCHANGED: calm void/cetus off-fairway is ordinary fair rough, not lost.
+    for (const biome of ['void-garden', 'cetus-deep']) {
+      let fair = 0, space = 0;
+      for (let s = 1; s < 30; s++) {
+        const c = generateCourse(s, { biome, holes: 9, wildness: 0.3 });
+        for (const h of c.holes) {
+          if (h.par < 4) continue;
+          for (const k of offCorridorLies(h)) {
+            if (k === 'rough' || k === 'deeprough' || k === 'fescue') fair++;
+            else if (lieInfo(k).penalty === 'voidlost') space++;
+          }
+        }
+      }
+      expect(fair, `calm ${biome} keeps fair rough`).toBeGreaterThan(space);
+    }
   });
 });
 

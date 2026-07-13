@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 25; // GS-biome-difficulty: per-biome green-difficulty vector (ice/ember/crystal get harder via their greens, not length)
+export const GENERATOR_VERSION = 26; // GS-ship-calm-space: the derelict is walled space at EVERY wildness (calm off-deck is lost too), so its bulkheads always contain
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -816,7 +816,13 @@ function generateHole(
   // Computed up-front because it ALSO keeps the hole straight: a bending lost-ball ISLAND is a ball
   // shredder (a dogleg pushes the AI's line off the island into the void), so void island holes stay
   // an honest straight target — their challenge is the abyss off the fairway, not the shape.
-  const lostRough = biome.lostRough && wildness >= LOST_ROUGH_MIN_WILDNESS ? biome.lostRough : undefined;
+  // The derelict SHIP is walled space at EVERY difficulty (GS-ship-calm-space): off the mown hull deck is
+  // ALWAYS open space (`shiprough`), even on a calm stop, so the metal bulkheads always have space to bounce
+  // a ball back from — a calm derelict is a tighter walled corridor, never a parkland-with-rough where a
+  // ball sails "over" a decorative wall into fair rough (the graphic-lies bug). Other lost-rough worlds
+  // (void/cetus) keep the 0.55 threshold and play as ordinary fair rough when calm — byte-for-byte unchanged.
+  const lostRoughMinWild = biome.walls ? 0 : LOST_ROUGH_MIN_WILDNESS;
+  const lostRough = biome.lostRough && wildness >= lostRoughMinWild ? biome.lostRough : undefined;
   // Island-green PAR 3 (GS-cetus-2): on a lost-rough world (the void / Cetus), a par 3 has no fairway
   // corridor at all — just the tee and a GENEROUS green-centred landing island floating in the deep.
   // You carry the abyss to the island or lose the ball to it. A true island green; the deep is the

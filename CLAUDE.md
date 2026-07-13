@@ -182,7 +182,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     (deliberately brutal, skipped by the death-spiral harnesses). The derelict reuses the proven island
     machinery: a `shiprough` lie ("Lost to space") whose penalty IS `voidlost` (the +1 non-replay drop),
     `SHIP_CLIFF` metal undersides, a `derelict` archetype (deep-sky themes Ghost/Skull Nebula, no
-    champion/figure).
+    champion/figure). Unlike void/cetus (which arm lost-rough only at `wildness ≥ LOST_ROUGH_MIN_WILDNESS`
+    0.55, playing as FAIR rough when calm), the derelict is walled SPACE at EVERY wildness
+    (GS-ship-calm-space, `lostRoughMinWild = biome.walls ? 0 : 0.55`): off the deck is ALWAYS `shiprough`,
+    even on a calm stop, so the bulkheads always have space to bounce a ball back from — a calm derelict is
+    a tighter walled corridor, never a parkland-with-rough where a ball sails "over" a decorative wall into
+    fair rough. Gated on `biome.walls` (derelict-only), so void/cetus stay byte-for-byte. `GENERATOR_VERSION` 26.
   - SHIP CORRIDORS (GS-ship-corridor): the derelict does NOT play the void's wide, blobby survival
     islands — it plays STRAIGHT, CONSTANT-WIDTH metal HALLWAYS you shoot DOWN. Gated on `biome.walls`
     (`const ship`, the derelict is the only walls world → every other world byte-identical): (a)

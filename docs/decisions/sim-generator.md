@@ -1145,6 +1145,46 @@ do not wrap the whole starfield. Regression (`tests/walls.test.ts`, `GS-ship-spa
 far past the bulkheads is not reeled back, and no flight bounce-vertex sits far from a drawn wall. Pure
 geometry, ZERO rng, derelict-only (`hole.walls` gate) — every other world byte-for-byte unchanged.
 
+## GS-ship-calm-space — the derelict is walled space at EVERY wildness (calm off-deck is lost too)
+
+**The report.** *"Almost perfect in the harder difficulty versions of derelict ship, but in the calm
+version the walls don't exist and you can hit it directly over the wall into the rough sections."*
+
+**The diagnosis.** Walls (`hole.walls`) are stamped on every derelict par-4/5 hole at all wildness, but a
+wall only *bounces* a ball when the off-corridor lie is `shiprough` (lost to space) — the containment
+(`shipFlightPath` / `containToDeck`) is gated on `isLostToSpace`. Lost-rough was armed only at
+`wildness ≥ LOST_ROUGH_MIN_WILDNESS` (0.55), a threshold SHARED with void/cetus ("below: play as ordinary
+fair rough"). So a calm derelict stop had fair, playable ROUGH off the corridor, nothing went lost, the
+bulkheads never fired, and the subtly-drawn wall read as something you could fly right over — a
+graphic-lies-about-physics gap, the exact class of bug the whole ship-wall saga fought. Measured (seed 7):
+off-corridor lie was `rough`/`deeprough`/`fescue` at wildness 0.15–0.5, only `shiprough` at 0.8.
+
+**The decision (asked).** The player chose "calm plays like the hard version" — walled space at every
+difficulty. The derelict's identity is sealed corridors in the deep, and a calm parkland-with-rough reskin
+loses it.
+
+**The fix (`lostRoughMinWild = biome.walls ? 0 : LOST_ROUGH_MIN_WILDNESS`).** Arm the derelict's lost-rough
+at ALL wildness — off the deck is always `shiprough`, so the bulkheads always contain. Gated on `biome.walls`
+(the derelict is the only walls world), so void/cetus keep the 0.55 threshold and are byte-for-byte unchanged.
+`GENERATOR_VERSION` 26. Verified: 1,600 calm derelict courses generate with **zero validator/`validateIslandHops`
+throws** — the calm island-hop holes are completable by construction (fair-but-brutal, and the derelict is
+`BALANCE_EXEMPT` so no death-spiral gate applies). Off-corridor is `shiprough` at every calm wildness, zero
+fair rough; void/cetus calm stays fair rough.
+
+**Test fallout (honest, not loosened).** Two `walls.test.ts` proxies asserted "plain (continuous-wall)
+corridors contain ~99%." That population barely exists now — the derelict is uniformly walled-space with
+hull-section + side-wall gaps at every wildness, so a bounce shooting a sanctioned gap into space is common
+and CORRECT (the awkward-bounce-out-a-gap the player also wanted). The real "no sideways leak off a SOLID
+stretch" guarantee is unchanged and still guarded by `GS-ship-corridor-contain`'s resting-containment test
+(no ball rests off a solid stretch containably). The proxies were retired and replaced with the still-true
+behaviours (walls bounce many balls onto the deck; awkward bounces shoot gaps) plus a `GS-ship-calm-space`
+guard (calm derelict is space off the deck; calm void/cetus stay fair rough).
+
+**The lesson.** A world's off-fairway PENALTY and its difficulty RAMP are separable knobs. Sharing one
+`wildness` threshold across worlds that want different calm feels (void = gentle fair rough, ship = always
+sealed) couples them wrongly; a per-world floor (`biome.walls ? 0 : …`) decouples them for one world without
+touching the others' streams.
+
 ---
 
 ## GS-compose — a stop is a COMPOSED routing, not IID hole samples
