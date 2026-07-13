@@ -125,6 +125,178 @@ function toParLabel(toPar: number): string {
   return toPar === 0 ? 'E' : toPar > 0 ? `+${toPar}` : `−${-toPar}`;
 }
 
+/** The surface CHARACTER a world's planet is painted with (GS-star-tour-map-improvements). Keyed by
+ *  archetype so a world still reads its biome at a glance, but the individual craters/bands/continents
+ *  are seeded per world so two courses of the SAME archetype never look alike. */
+type SurfaceFamily = 'lush' | 'rocky' | 'gas' | 'fiery' | 'crystal';
+const SURFACE_FAMILY: Record<string, SurfaceFamily> = {
+  verdant: 'lush',
+  fungal: 'lush',
+  swamp: 'lush',
+  desert: 'rocky',
+  metal: 'rocky',
+  derelict: 'rocky',
+  frost: 'rocky',
+  ocean: 'gas',
+  tempest: 'gas',
+  cetus: 'gas',
+  void: 'gas',
+  inferno: 'fiery',
+  crystal: 'crystal',
+};
+
+/** Sanitise a world id into an SVG-id-safe suffix (clip ids are per-world — many worlds co-mount). */
+function idSafe(s: string): string {
+  return s.replace(/[^A-Za-z0-9_-]/g, '');
+}
+
+/** Nudge a #rrggbb hex toward white (amt>0) or black (amt<0) by |amt| (0..1) — for surface shading. */
+function shadeHex(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const t = amt < 0 ? 0 : 255;
+  const p = Math.min(1, Math.abs(amt));
+  const mix = (c: number) => Math.round(c + (t - c) * p);
+  const r = mix((n >> 16) & 255);
+  const g = mix((n >> 8) & 255);
+  const b = mix(n & 255);
+  return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
+
+/** The seeded surface features drawn INSIDE a planet's disc, per family. Returns clip-bounded markup
+ *  (the caller wraps it in a per-world circular clip). Pure + mulberry32-seeded → byte-stable. */
+function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, rnd: () => number): string {
+  let s = '';
+  const rr = (v: number) => v.toFixed(1);
+  if (fam === 'lush') {
+    // Organic continents (hi) over darker seas — a couple of blobby land masses.
+    const seas = shadeHex(col, -0.22);
+    s += `<circle r="${rr(r)}" fill="${seas}" opacity="0.35"/>`;
+    const n = 2 + ((rnd() * 2) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2;
+      const d = rnd() * r * 0.5;
+      const cx = Math.cos(a) * d;
+      const cy = Math.sin(a) * d;
+      const rx = r * (0.28 + rnd() * 0.28);
+      const ry = r * (0.2 + rnd() * 0.24);
+      const rot = (rnd() * 180) | 0;
+      s += `<ellipse cx="${rr(cx)}" cy="${rr(cy)}" rx="${rr(rx)}" ry="${rr(ry)}" fill="${hi}" opacity="0.62" transform="rotate(${rot} ${rr(cx)} ${rr(cy)})"/>`;
+    }
+  } else if (fam === 'rocky') {
+    // Impact craters — dark pits with a lit rim, scattered across the face.
+    const pit = shadeHex(col, -0.3);
+    const rim = shadeHex(col, 0.28);
+    const n = 3 + ((rnd() * 3) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2;
+      const d = rnd() * r * 0.62;
+      const cx = Math.cos(a) * d;
+      const cy = Math.sin(a) * d;
+      const cr = r * (0.1 + rnd() * 0.14);
+      s += `<circle cx="${rr(cx)}" cy="${rr(cy)}" r="${rr(cr)}" fill="${pit}" opacity="0.55"/>`;
+      s += `<circle cx="${rr(cx - cr * 0.24)}" cy="${rr(cy - cr * 0.24)}" r="${rr(cr * 0.72)}" fill="${rim}" opacity="0.32"/>`;
+    }
+  } else if (fam === 'gas') {
+    // Latitudinal cloud bands + a great storm spot.
+    const n = 3 + ((rnd() * 2) | 0);
+    for (let i = 0; i < n; i++) {
+      const cy = -r * 0.6 + (i / (n - 1)) * r * 1.2;
+      const ry = r * (0.1 + rnd() * 0.1);
+      const fill = i % 2 === 0 ? hi : shadeHex(col, -0.16);
+      s += `<ellipse cx="0" cy="${rr(cy)}" rx="${rr(r * 1.05)}" ry="${rr(ry)}" fill="${fill}" opacity="0.4"/>`;
+    }
+    const sa = rnd() * Math.PI * 2;
+    const sd = r * (0.2 + rnd() * 0.3);
+    const scx = Math.cos(sa) * sd;
+    const scy = Math.sin(sa) * sd * 0.5;
+    const sr = r * (0.16 + rnd() * 0.12);
+    s += `<ellipse cx="${rr(scx)}" cy="${rr(scy)}" rx="${rr(sr * 1.3)}" ry="${rr(sr)}" fill="${shadeHex(hi, 0.15)}" opacity="0.7"/>`;
+    s += `<ellipse cx="${rr(scx)}" cy="${rr(scy)}" rx="${rr(sr * 0.6)}" ry="${rr(sr * 0.45)}" fill="#ffffff" opacity="0.5"/>`;
+  } else if (fam === 'fiery') {
+    // A molten face — glowing cracks branching from a hot core.
+    const hot = shadeHex(hi, 0.2);
+    s += `<circle r="${rr(r)}" fill="${shadeHex(col, -0.3)}" opacity="0.4"/>`;
+    const n = 3 + ((rnd() * 3) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2;
+      const x1 = Math.cos(a) * r * 0.15;
+      const y1 = Math.sin(a) * r * 0.15;
+      const x2 = Math.cos(a) * r * (0.7 + rnd() * 0.25);
+      const y2 = Math.sin(a) * r * (0.7 + rnd() * 0.25);
+      const mx = (x1 + x2) / 2 + (rnd() - 0.5) * r * 0.3;
+      const my = (y1 + y2) / 2 + (rnd() - 0.5) * r * 0.3;
+      s += `<path d="M${rr(x1)},${rr(y1)} Q${rr(mx)},${rr(my)} ${rr(x2)},${rr(y2)}" fill="none" stroke="${hot}" stroke-width="${rr(r * 0.09)}" stroke-linecap="round" opacity="0.85"/>`;
+    }
+    s += `<circle r="${rr(r * 0.22)}" fill="#fff2c0" opacity="0.85"/>`;
+  } else {
+    // crystal — faceted gem shards radiating from the centre.
+    const n = 4 + ((rnd() * 3) | 0);
+    const start = rnd() * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+      const a0 = start + (i / n) * Math.PI * 2;
+      const a1 = a0 + (Math.PI * 2) / n;
+      const mr = r * (0.7 + rnd() * 0.3);
+      const x1 = Math.cos(a0) * mr;
+      const y1 = Math.sin(a0) * mr;
+      const x2 = Math.cos(a1) * mr * 0.9;
+      const y2 = Math.sin(a1) * mr * 0.9;
+      const fill = i % 2 === 0 ? hi : shadeHex(hi, -0.2);
+      s += `<path d="M0,0 L${rr(x1)},${rr(y1)} L${rr(x2)},${rr(y2)} Z" fill="${fill}" opacity="0.5" stroke="${shadeHex(hi, 0.35)}" stroke-width="0.6"/>`;
+    }
+  }
+  return s;
+}
+
+/** A richly-drawn, per-world UNIQUE planet body (GS-star-tour-map-improvements). Replaces the old flat
+ *  disc + emoji: an atmosphere halo, a seeded surface (craters / bands / continents / lava / facets by
+ *  archetype family), an optional Saturn ring + moons, a lit rim, and the archetype emoji as a small
+ *  emblem. Everything past the palette is seeded off the world id, so the two verdant / two desert /
+ *  … courses that used to render identically now each look distinct. Pure + mulberry32-seeded. */
+function planetBody(w: StarTourWorld, r: number, look: { col: string; hi: string; glyph: string }): string {
+  const rnd = mulberry32(hashSeed('stworld:' + w.id));
+  const fam = SURFACE_FAMILY[w.archetype] ?? 'rocky';
+  const { col, hi, glyph } = look;
+  const rr = (v: number) => v.toFixed(1);
+  const clipId = `stwClip-${idSafe(w.id)}`;
+
+  // Optional planetary RING (~42%) — a tilted ellipse, back arc behind the body, near arc in front.
+  const ringed = rnd() < 0.42;
+  const ringTilt = -34 + rnd() * 22;
+  const rrx = r * 1.95;
+  const rry = r * 0.5;
+  const ringW = r * 0.26;
+  const ringCol = shadeHex(hi, 0.1);
+  const ringLine = shadeHex(hi, 0.45);
+  const ringBack = ringed
+    ? `<g transform="rotate(${rr(ringTilt)})"><ellipse rx="${rr(rrx)}" ry="${rr(rry)}" fill="none" stroke="${ringCol}" stroke-width="${rr(ringW)}" opacity="0.4"/><ellipse rx="${rr(rrx)}" ry="${rr(rry)}" fill="none" stroke="${ringLine}" stroke-width="1" opacity="0.6"/></g>`
+    : '';
+  const ringFront = ringed
+    ? `<g transform="rotate(${rr(ringTilt)})"><path d="M${rr(-rrx)},0 A ${rr(rrx)} ${rr(rry)} 0 0 0 ${rr(rrx)},0" fill="none" stroke="${ringCol}" stroke-width="${rr(ringW)}" opacity="0.55"/><path d="M${rr(-rrx)},0 A ${rr(rrx)} ${rr(rry)} 0 0 0 ${rr(rrx)},0" fill="none" stroke="${ringLine}" stroke-width="1" opacity="0.75"/></g>`
+    : '';
+
+  // Seeded MOONS (0–2), parked to the sides so they never crowd the name (top) or record (bottom).
+  const moonN = rnd() < 0.35 ? 0 : rnd() < 0.72 ? 1 : 2;
+  let moons = '';
+  for (let i = 0; i < moonN; i++) {
+    const side = rnd() < 0.5 ? -1 : 1;
+    const mx = side * r * (1.5 + rnd() * 0.5);
+    const my = (-0.35 + rnd() * 0.55) * r;
+    const mr = r * (0.15 + rnd() * 0.08);
+    moons += `<g transform="translate(${rr(mx)} ${rr(my)})"><circle r="${rr(mr)}" fill="#c6ccd8"/><circle r="${rr(mr)}" fill="url(#stWorldShade)"/><circle cx="${rr(mr * 0.3)}" cy="${rr(mr * 0.2)}" r="${rr(mr * 0.28)}" fill="#8f97a6" opacity="0.5"/></g>`;
+  }
+
+  return `
+    ${moons}
+    <circle r="${rr(r + 7)}" fill="${hi}" opacity="0.14"/>
+    ${ringBack}
+    <clipPath id="${clipId}"><circle r="${rr(r)}"/></clipPath>
+    <circle r="${rr(r)}" fill="${col}"/>
+    <g clip-path="url(#${clipId})">${planetSurface(fam, r, col, hi, rnd)}</g>
+    <circle r="${rr(r)}" fill="url(#stWorldShade)"/>
+    ${ringFront}
+    <text x="0" y="${rr(r * 0.34)}" font-size="${rr(r * 0.82)}" text-anchor="middle" opacity="0.92" style="paint-order:stroke;stroke:${shadeHex(col, -0.4)};stroke-width:1.4px;">${glyph}</text>`;
+}
+
 /** One tappable world planet + label. */
 function worldGlyph(w: StarTourWorld, selected: boolean): string {
   const { x, y } = worldPos(w);
@@ -144,11 +316,8 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
   return `
     <g class="gs-st-world" data-startour-course="${w.id}" role="button" tabindex="0" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" style="cursor:pointer;">
       ${ring}
-      <circle r="${r + 6}" fill="${look.col}" opacity="0.14"/>
-      <circle r="${r}" fill="${look.col}"/>
-      <circle r="${r}" fill="url(#stWorldShade)"/>
+      ${planetBody(w, r, look)}
       <circle r="${r}" fill="none" stroke="${tierCol}" stroke-width="2.2" opacity="0.85"/>
-      <text x="0" y="${r * 0.4}" font-size="${r * 1.1}" text-anchor="middle">${look.glyph}</text>
       ${record}
       <text x="0" y="${-r - 8}" font-size="13" text-anchor="middle" fill="#e6ecf5" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">${w.name}</text>
       ${best}
