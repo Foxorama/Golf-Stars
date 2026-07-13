@@ -11,8 +11,8 @@ import { bearing, dist, type Hole } from '../sim/course/contract';
 import { lieInfo, roughLieOf } from '../sim/shot';
 import { playTotals } from '../sim/score';
 import { currentBoss, effectiveCut, holeGateArmed } from '../sim/rpg/run';
-import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar } from '../sim/rpg/endless';
-import { isTeamDuelBoss } from '../sim/rpg/formats';
+import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
+import { isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import { shotView } from '../sim/rpg/play';
 
 /** The aim readout inside the break-read row — split out so an aim nudge can update JUST this span
@@ -110,6 +110,14 @@ function holePips(): string {
 /** Running stop score vs the cut-to-beat, coloured by how the run is tracking:
  *  🟢 beating the cut · 🟠 within striking distance · 🔴 well short. */
 function zoneScoreChip(): string {
+  // Star Tour (GS-star-tour): a stroke-play round shows the RUNNING SCORE — total to-par + gross over
+  // the holes finished so far — not a Stableford-vs-cut points chip (there's no cut to make, you're
+  // chasing a low number). Coloured under-green → over-red like the record boards.
+  if (state.run.formatId === STROKEPLAY_FORMAT) {
+    const done = state.stopPlayed ?? [];
+    const totals = playTotals(done.map((p) => p.record));
+    return `<span class="gs-shotscore" style="color:${toParColour(totals.toPar)};" title="running score — total strokes vs par through ${done.length} holes">🏌 ${formatToPar(totals.toPar)} · ${totals.gross} thru ${done.length}</span>`;
+  }
   // The Unending Universe (GS-set-survival): the number that matters is THIS SET's running four-hole
   // total vs its allowance — show how far under/over you are through the holes played so far, and the
   // target the whole set has to hit. A blow-up hole never ends the run, so this is a budget, not a
