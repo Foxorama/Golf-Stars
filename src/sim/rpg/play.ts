@@ -14,6 +14,7 @@ import { type Club } from '../clubs';
 import {
   aiClub,
   attackTarget,
+  backspinRoll,
   biomeCarryMult,
   executeShot,
   HOLE_OUT_RADIUS,
@@ -26,6 +27,7 @@ import {
   puttOutFrom,
   shotSpread,
   suggestPlayerClub,
+  type BackspinRoll,
   type ExecOpts,
   type ExecResult,
   type PuttControl,
@@ -34,10 +36,11 @@ import {
   type PuttLog,
   type ShotLog,
 } from '../round';
+import type { TradeTent } from '../tents';
 import type { HoleRecord } from '../score';
 import type { HoleStat } from '../stats';
 import type { Rng } from '../rng';
-import { netDispersion, puttSkillOf, usableBag, type PlayerLoadout } from './economy';
+import { netDispersion, puttSkillOf, spinReadOf, usableBag, type PlayerLoadout } from './economy';
 import { characterShotMods } from './characters';
 
 export type AimMode = 'attack' | 'safe';
@@ -163,6 +166,33 @@ export function previewShot(
       ? suggestPlayerClub(state.hole, state.ball, state.lie, bag, { carryMult, dispersionMult }).id
       : undefined,
   });
+}
+
+/** The backspin helper line for a contemplated shot (GS-backspin-line): the predicted mean roll/check
+ *  path from the aim-line touchdown + the fraction of it the player's spin-read gear draws confidently.
+ *  Pure render aid — takes the already-computed `spray` (from `previewShot`) so it costs no extra shot
+ *  resolve, threads the SAME character `rollFracDelta` + `loadout.backspinBoost` the sim rolls with (so
+ *  the drawn line IS the physics), and reads `spinReadOf` for the confident reach. Null for
+ *  non-backspin clubs / a landing that plugs / a negligible roll. Interactive-only; zero rng. */
+export function previewBackspin(
+  state: HolePlay,
+  spray: ShotSpread,
+  loadout: PlayerLoadout,
+  tents?: readonly TradeTent[],
+): { landing: Vec; path: Vec[]; readFrac: number } | null {
+  const shotMods = characterShotMods(loadout.characterId);
+  const rollFracDelta = shotMods ? shotMods(spray.nominalCarry).rollFracDelta : 0;
+  const roll: BackspinRoll | null = backspinRoll(state.hole, spray, {
+    rollFracDelta,
+    backspinBoost: loadout.backspinBoost,
+    immune: loadout.hazardImmune ? new Set(loadout.hazardImmune) : undefined,
+    tents,
+  });
+  if (!roll) return null;
+  const read = spinReadOf(loadout);
+  const arc = Math.abs(roll.rollYd);
+  const readFrac = read.full || arc < 1e-3 ? 1 : Math.max(0, Math.min(1, read.readYd / arc));
+  return { landing: roll.landing, path: roll.path, readFrac };
 }
 
 /** The decision the AI would make (mirrors playHole): lay up to the corridor, AI club — or, with

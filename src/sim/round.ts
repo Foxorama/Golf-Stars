@@ -1499,6 +1499,62 @@ export function shotSpread(
   };
 }
 
+// --- Backspin helper line (GS-backspin-line) ---------------------------------
+/** The previewed MEAN roll-out of a contemplated wedge/short-iron shot — the "backspin helper line".
+ *  Course-space, so the renderer draws the check/curl exactly where the ball will settle. */
+export interface BackspinRoll {
+  /** Where the ball first lands — the aim-line touchdown at `expectedCarry`. */
+  landing: Vec;
+  /** The rolled/checked travel path landing→rest (≥2 points; curls on contoured greens, byte-for-byte
+   *  the SAME `rollOut` path the sim resolves, so the graphic IS the physics — contract 5). */
+  path: Vec[];
+  /** Signed roll (yd): + runs forward, − checks back toward the player. */
+  rollYd: number;
+}
+
+/** Below this |roll| (yd) the ball effectively stops dead — not worth drawing a helper line for. */
+const SPIN_LINE_MIN = 1.0;
+
+/**
+ * Deterministic MEAN roll-out of a contemplated shot — the backspin helper line (GS-backspin-line).
+ * Mirrors `executeShot`'s roll block at the mean roll energy (rng.range midpoint 1.0, NO draw taken),
+ * so it is a PURE render aid: the same `clubRollFraction` + character `rollFracDelta` − `backspinBoost`
+ * the sim uses, fed through the SAME `rollOut` — the drawn check + contour curl is exactly the physics.
+ * Returns null for non-backspin clubs (driver/long irons), a landing that plugs in a penalty, or a
+ * negligible roll. Zero rng. (The rare ship-corridor pinball flight + tent ricochet are not reproduced
+ * — the line is a helper, the actual bounce is the truth.) */
+export function backspinRoll(
+  hole: Hole,
+  spray: ShotSpread,
+  opts: {
+    /** Character per-club roll bias (− = more check). */
+    rollFracDelta?: number;
+    /** Spin gear (Spin-Milled etc.): subtracted from the roll fraction — more check. */
+    backspinBoost?: number;
+    /** Hazard-skip balls: penalty kinds the ball skims across instead of resting in. */
+    immune?: ReadonlySet<string>;
+    tents?: readonly TradeTent[];
+  } = {},
+): BackspinRoll | null {
+  const nominal = spray.nominalCarry;
+  const carry = spray.expectedCarry;
+  if (!hasBackspin(nominal) || carry <= 0) return null;
+  const br = (spray.bearing * Math.PI) / 180;
+  const dir: Vec = [Math.sin(br), Math.cos(br)];
+  const landing: Vec = [spray.origin[0] + dir[0] * carry, spray.origin[1] + dir[1] * carry];
+  // The MEAN roll energy: rollPotential's `carry · frac` at the rng.range(0.85,1.15) midpoint 1.0.
+  const frac = clubRollFraction(nominal) + (opts.rollFracDelta ?? 0) - (opts.backspinBoost ?? 0);
+  const K = Math.max(-MAX_CHECK, Math.min(MAX_ROLL, carry * frac));
+  if (Math.abs(K) < SPIN_LINE_MIN) return null;
+  const tdLie = lieAt(hole, landing);
+  const tdPen = lieInfo(tdLie).penalty;
+  if (tdPen && !(opts.immune && opts.immune.has(tdPen))) return null; // plugs in a hazard — nothing to roll
+  const out = rollOut(hole, landing, dir, K, tdLie, opts.immune, opts.tents, hole.walls);
+  if (Math.abs(out.roll) < SPIN_LINE_MIN) return null;
+  const path = out.path && out.path.length >= 2 ? out.path : [landing, out.rest];
+  return { landing, path, rollYd: out.roll };
+}
+
 // --- Blocked-shot spray overlay (GS-spray-block) ------------------------------
 /** One angular sample of a blocked region: the landing radii [r0, r1] (yards) at band angle `a`
  *  (radians off the bearing, in the same pre-mirror band space `sprayBands` uses) where a ball

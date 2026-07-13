@@ -295,6 +295,19 @@ export interface PlayerLoadout {
    */
   backspinBoost?: number;
   /**
+   * Extra yards of confident BACKSPIN-line read (GS-backspin-line): added onto `spinReadOf`'s base
+   * range, so the drawn approach roll/check line reaches further into the predicted roll. Rebuilt from
+   * perks on resume (no save bump). Render-only (a pure aim aid — the headless sim never reads it); the
+   * items carrying it pair a small `backspinBoost` so the auto sim still gains. 0/undefined = base.
+   */
+  spinReadBonus?: number;
+  /**
+   * Full BACKSPIN-line read (GS-backspin-line, Spin Trajectory Computer): the helper line traces the
+   * WHOLE predicted roll — every yard of check and contour curl — instead of stopping at the confident
+   * range. Rebuilt from perks on resume (no save bump). Render-only. Undefined/false = ranged read.
+   */
+  spinReadFull?: boolean;
+  /**
    * Hazard-skip balls (GS-proshop-2, Floater / Magma-Skimmer / Void-Walker): the penalty kinds the
    * ball IGNORES. A ball that would rest in one of these (water/lava/void family) instead SKIMS across
    * and settles on the nearest dry ground with NO penalty stroke (a free carry when you clear it; a
@@ -482,6 +495,23 @@ export function puttSkillOf(
     // The cap is 1.0 (GS-putt-read, was 0.7): now the break line STOPS DEAD at the range, a stacked
     // putter build must keep visibly stretching it. `puttReadBonus` (Green-Reading Book) adds on top.
     puttRange: DEFAULT_PUTT_RANGE + Math.min(1, b) * 12 + readBonus,
+  };
+}
+
+/** Base confident reach (yd) of the backspin helper line — the "very short guide line" every wedge
+ *  shot shows with NO upgrade. Spin gear (`spinReadBonus`) extends it; the Trajectory Computer reads
+ *  the whole roll. Rendered only on the interactive shot-decision screen (never in the sim). */
+export const DEFAULT_SPIN_READ = 2.5;
+
+/**
+ * Backspin-line read from the loadout (GS-backspin-line). Returns the confident reach (yards) of the
+ * drawn approach roll/check line + whether the whole roll is read. A base loadout gets the short base
+ * reach (the always-on guide line); `spinReadBonus` stretches it and `spinReadFull` traces it all. This
+ * is a render/aim aid only — the pure sim never calls it, so it needs no empty-fast-path guard. */
+export function spinReadOf(loadout: PlayerLoadout): { readYd: number; full: boolean } {
+  return {
+    readYd: DEFAULT_SPIN_READ + (loadout.spinReadBonus ?? 0),
+    full: !!loadout.spinReadFull,
   };
 }
 
