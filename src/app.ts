@@ -76,6 +76,10 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
+import { starTourScreen, starTourView, starTourWorlds } from './app/starTourScreens';
+import { strokeResultScreen } from './app/strokeResultScreens';
+import { worldPos, CHART_W, CHART_H } from './render/starTourMap';
+import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
@@ -177,6 +181,19 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       return reduce(title, { type: 'openMarket' });
     case 'clubhouse':
       return reduce(title, { type: 'openClubhouseHall' });
+    case 'startour':
+      // GS-star-tour: the free-roam star map opens off the title via the real reducer transition.
+      return reduce(title, { type: 'openStarTour' });
+    case 'strokeresult': {
+      // GS-star-tour: mount the round recap the honest way — build a strokeplay run through the real
+      // transitions, then auto-play + resolve it exactly as the reducer's own `play` path does, so the
+      // deep-link can't paper over a render bug.
+      const intro = reduce(
+        reduce(reduce(title, { type: 'openStarTour' }), { type: 'pickStarTourCourse', courseId: 'verdant-18' }),
+        { type: 'selectCharacter', characterId: CHARACTERS[0]!.id },
+      );
+      return reduce(intro, { type: 'play' });
+    }
     default:
       return s; // unknown value → land on the normal title (no crash)
   }
@@ -260,10 +277,17 @@ function dispatch(action: Action): void {
     // defaults to the LAST tier you chose (persisted pref), clamped to what's now unlocked — so it
     // doesn't snap back to A0 every run. The club set defaults to the owned tier (the strongest bag
     // you have; opt DOWN for a harder run).
-    if (action.type === 'start') {
+    if (action.type === 'start' || action.type === 'pickStarTourCourse') {
       selAscension = Math.max(0, Math.min(state.maxAscension, getSettings().lastAscension));
       selClubSet = state.bagTier;
       selClubSetTouched = false;
+    }
+    // Entering the Star Tour star map (GS-star-tour): reset its view so it opens fresh (no stale
+    // selection) and the viewport re-centres on first mount.
+    if (action.type === 'openStarTour') {
+      starTourView.selectedId = null;
+      starTourView.effect = 'none';
+      starTourView.centred = false;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -1201,6 +1225,47 @@ let selClubSet: BagTier = 'common';
 // so an untouched strip (seeded to the owned tier) must NOT clobber a per-golfer pick.
 let selClubSetTouched = false;
 
+// STAR TOUR (GS-star-tour): set true while a pan-drag on the star map exceeds the tap threshold, so the
+// click that ends the drag doesn't accidentally select the world it lands on. Reset on each pointerdown.
+let starTourDragged = false;
+
+/** Wire pointer-drag-to-fly on the Star Tour chart viewport (native scroll already covers touch +
+ *  wheel). A drag past a few px pans by adjusting scroll and marks `starTourDragged` so the trailing
+ *  click is swallowed by the world handler. Re-wired each render (the node is replaced). */
+function wireStarTourDrag(vp: HTMLElement): void {
+  let dragging = false;
+  let sx = 0;
+  let sy = 0;
+  let l0 = 0;
+  let t0 = 0;
+  vp.style.cursor = 'grab';
+  vp.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    dragging = true;
+    starTourDragged = false;
+    sx = e.clientX;
+    sy = e.clientY;
+    l0 = vp.scrollLeft;
+    t0 = vp.scrollTop;
+    vp.style.cursor = 'grabbing';
+  });
+  vp.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    if (Math.abs(dx) + Math.abs(dy) > 5) starTourDragged = true;
+    vp.scrollLeft = l0 - dx;
+    vp.scrollTop = t0 - dy;
+  });
+  const end = (): void => {
+    dragging = false;
+    vp.style.cursor = 'grab';
+  };
+  vp.addEventListener('pointerup', end);
+  vp.addEventListener('pointerleave', end);
+  vp.addEventListener('pointercancel', end);
+}
+
 
 
 function render(): void {
@@ -1322,18 +1387,26 @@ function render(): void {
       ? asgardMapScreen()
       : state.screen === 'asgardResult'
       ? asgardResultScreen()
+      : state.screen === 'starTour'
+      ? starTourScreen()
+      : state.screen === 'strokeResult'
+      ? strokeResultScreen()
       : gameoverScreen();
 
   // The interactive play screen (decision / watching / putting — but not the hole-complete card) is
   // full-bleed: the map fills the page, so drop the page frame's padding/max-width for it.
-  const fullBleed = state.screen === 'playing' && !!state.play && !state.play.done;
+  // The Star Tour star map (GS-star-tour) is full-bleed too — the chart fills the page and pans.
+  const fullBleed = (state.screen === 'playing' && !!state.play && !state.play.done) || state.screen === 'starTour';
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
   // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's
   // own markup so no screen can forget it. Two exceptions carry their OWN cog and would collide with a
   // second fixed one: the full-bleed play view (its map-nav stack has a cog) and the travel bridge HUD
   // (GS-journey-map-hud-consolidate — the cog docks into the HUD's top-right status pod).
-  const cog = fullBleed || state.screen === 'travel' ? '' : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
+  const cog =
+    fullBleed || state.screen === 'travel' || state.screen === 'starTour'
+      ? ''
+      : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
   // The hole-step hazards/benefits popup (GS-intro-split) rides over the page like the settings sheet.
   const introTraits = state.screen === 'intro' && introView.stage === 'hole' && introView.traitsOpen ? introTraitsOverlay() : '';
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
@@ -1352,6 +1425,33 @@ function render(): void {
       const overflows = document.documentElement.scrollHeight - window.innerHeight > 8;
       wrap.style.display = overflows ? 'flex' : 'none';
     });
+  }
+
+  // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'
+  // centroid; then wire pointer-drag-to-fly (native scroll already handles touch + wheel). Re-wired
+  // each render (innerHTML replaced the node), so a fresh element always gets its listeners.
+  if (state.screen === 'starTour') {
+    const vp = document.getElementById('gs-st-viewport');
+    if (vp) {
+      if (!starTourView.centred) {
+        requestAnimationFrame(() => {
+          const worlds = starTourWorlds();
+          let sx = 0;
+          let sy = 0;
+          for (const w of worlds) {
+            const p = worldPos(w);
+            sx += p.x;
+            sy += p.y;
+          }
+          const cx = worlds.length ? sx / worlds.length : CHART_W / 2;
+          const cy = worlds.length ? sy / worlds.length : CHART_H / 2;
+          vp.scrollLeft = cx - vp.clientWidth / 2;
+          vp.scrollTop = cy - vp.clientHeight / 2;
+          starTourView.centred = true;
+        });
+      }
+      wireStarTourDrag(vp);
+    }
   }
 
   // Wire actions.
@@ -1424,6 +1524,36 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-route-close]').forEach((el) => {
     el.addEventListener('click', () => {
       travelView.selectedRouteId = null;
+      sfx.click();
+      render();
+    });
+  });
+  // Star Tour star map (GS-star-tour): tap a world to open its dossier, tap a weather chip to set the
+  // sky, ✕ to close the sheet. getAttribute (not dataset) so the SVG <g> world targets work.
+  app.querySelectorAll<HTMLElement>('[data-startour-course]').forEach((el) => {
+    el.addEventListener('click', () => {
+      // A pan-drag ends in a click too — swallow it so flying past a world doesn't select it.
+      if (starTourDragged) {
+        starTourDragged = false;
+        return;
+      }
+      const id = el.getAttribute('data-startour-course');
+      starTourView.selectedId = starTourView.selectedId === id ? null : id;
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-startour-weather]').forEach((el) => {
+    el.addEventListener('click', () => {
+      starTourView.effect = (el.getAttribute('data-startour-weather') ?? 'none') as CourseEffectId;
+      sfx.click();
+      render();
+    });
+  });
+  app.querySelectorAll<HTMLElement>('[data-startour-close]').forEach((el) => {
+    el.addEventListener('click', () => {
+      starTourView.selectedId = null;
       sfx.click();
       render();
     });

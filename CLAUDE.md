@@ -889,9 +889,26 @@ these systems** — each bullet is the tip of a documented iceberg.
     (from character select) keeps the `'arc'` step — it's the mode lobby with `Change golfer`.
   - The post-stop recap (`resultScreen`) is a pure render off `state` — rarity-framed panel, stat
     tiles, clickable hole-by-hole strip.
-  - The title is a hero wordmark + two GAME tiles reusing the doorway component
+  - The title is a hero wordmark + THREE GAME tiles (GS-star-tour) reusing the doorway component
     (`.gs-navtile--game`; whole tile = the button, distinct only via the `--mc` accent — never
-    regrow badges/launch bars/progress text). The Daily button is parked off the title for now.
+    regrow badges/launch bars/progress text) in a 3-across row (`.gs-navtiles--games`), over the two
+    Trade-Market/Clubhouse doorways (2-up `.gs-navtiles`). Voyage + Unending are auto-listed from
+    `FORMATS`; Star Tour is a BESPOKE tile (`openStarTour`, not the generic `start`) because it opens
+    its own course-picker star map first — so `strokeplay` is EXCLUDED from the auto-list.
+  - STAR TOUR star map (GS-star-tour, `app/starTourScreens.ts` + `render/starTourMap.ts`): a full-bleed,
+    free-roam celestial chart — every course plotted at its constellation's real J2000 sky position
+    (`THEME_SKY`), the player's ship a fixed centre reticle, the chart PANS by native scroll +
+    pointer-drag (`wireStarTourDrag`; a moved drag sets `starTourDragged` so the trailing click doesn't
+    select a world). Tapping a world raises a bottom DOSSIER (flavour, tier, your record, a WEATHER
+    picker, Fly-here-&-play → `pickStarTourCourse`); no selection shows the course-record boards. Its
+    cockpit chrome uses its OWN class prefix `.gs-sthud` (NOT `.gs-hud`/`.gs-bhud` — the class-collision
+    rule). The round then flows character-select → `intro` (Star-Tour-branched objective/field, Watch
+    hidden so a record is EARNED) → play → `strokeResult` recap (`app/strokeResultScreens.ts`). Reducer:
+    `openStarTour`/`pickStarTourCourse`/`exitStarTour` + `resolveStrokePlay` (banks the record like
+    Asgard resolves its tournament). Deep-linkable via `?screen=startour`/`?screen=strokeresult`
+    (GS-screen-deeplink, real reducer transitions); guarded by `tests/startour-flow.test.ts` +
+    `tests/build.test.ts` browser smoke. Star Tour never consumes the parked Voyage/Unending resume.
+    The Daily button is parked off the title for now.
   - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
     `src/app/` module over growing it, and re-read the relevant span before editing.**
 - **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;

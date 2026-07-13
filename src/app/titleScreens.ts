@@ -80,9 +80,66 @@ export function titleScreen(): string {
         : ''
     }
     <h2 class="gs-seclabel">${state.resumable ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-navtiles">${modes}</div>
+    <div class="gs-navtiles gs-navtiles--games">${modes}${starTourTileHTML()}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
+}
+
+/** The third game tile (GS-star-tour): the free-roam Star Tour, launched from its own star-map course
+ *  picker (not the generic `start` path), so it's a bespoke tile rather than an auto-listed format. */
+function starTourTileHTML(): string {
+  return `
+    <button class="gs-navtile gs-navtile--game gs-navtile--startour" style="--mc:#54c8ff;" data-action='${JSON.stringify({ type: 'openStarTour' })}'>
+      <span class="gs-navtile__art" aria-hidden="true">${starTourTileArt()}</span>
+      <span class="gs-navtile__cap">
+        <span class="gs-navtile__title">🗺 Star Tour</span>
+        <span class="gs-navtile__sub">Pick a world, play its 18 — chase course records</span>
+      </span>
+    </button>`;
+}
+
+/** Painted backdrop for the Star Tour tile: a constellation star chart with a route reticle over a
+ *  ringed world, a ship swooping in — the free-roam map you fly to pick a course. Hand-placed
+ *  (byte-stable), same doorway house style. */
+function starTourTileArt(): string {
+  const stars = [
+    [20, 24], [52, 52], [88, 18], [120, 60], [158, 26], [198, 52], [236, 18],
+    [268, 46], [40, 92], [150, 96], [228, 92], [76, 116], [186, 120], [280, 108],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${0.8 + (i % 3) * 0.5}" fill="#dff2ff" opacity="${0.4 + (i % 4) * 0.13}"/>`)
+    .join('');
+  // A faint constellation line joining a few of the stars — the "chart" feel.
+  const lines = `<path d="M20,24 L52,52 L120,60 L158,26 M120,60 L150,96" fill="none" stroke="#54c8ff" stroke-width="1" opacity="0.4"/>`;
+  return `<svg viewBox="0 0 300 138" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <radialGradient id="ntTour" cx="60%" cy="34%" r="100%">
+        <stop offset="0%" stop-color="#0f3a52"/><stop offset="52%" stop-color="#0c1e38"/><stop offset="100%" stop-color="#060b1c"/>
+      </radialGradient>
+    </defs>
+    <rect width="300" height="138" fill="url(#ntTour)"/>
+    ${stars}
+    ${lines}
+    <!-- a ringed destination world with a selection reticle -->
+    <g transform="translate(210,86)">
+      <ellipse cx="0" cy="0" rx="34" ry="10" fill="none" stroke="#54c8ff" stroke-width="2" opacity="0.5"/>
+      <circle cx="0" cy="0" r="18" fill="#2f7a86"/>
+      <circle cx="0" cy="0" r="18" fill="url(#ntTour)" opacity="0.4"/>
+      <circle cx="-6" cy="-6" r="18" fill="#7fe0e6" opacity="0.25"/>
+      <circle cx="0" cy="0" r="27" fill="none" stroke="#7fe0ff" stroke-width="1.4" stroke-dasharray="4 5" opacity="0.85"/>
+      <line x1="0" y1="-31" x2="0" y2="-24" stroke="#7fe0ff" stroke-width="1.4"/>
+      <line x1="0" y1="24" x2="0" y2="31" stroke="#7fe0ff" stroke-width="1.4"/>
+      <line x1="-31" y1="0" x2="-24" y2="0" stroke="#7fe0ff" stroke-width="1.4"/>
+      <line x1="24" y1="0" x2="31" y2="0" stroke="#7fe0ff" stroke-width="1.4"/>
+    </g>
+    <!-- the ship swooping toward the world -->
+    <g transform="translate(84,58) rotate(38)">
+      <path d="M0,-11 C6,-7.5 6,7.5 0,12.5 C-6,7.5 -6,-7.5 0,-11 Z" fill="#dfe6f2"/>
+      <circle cx="0" cy="-1.5" r="2.8" fill="#8fe6ff"/>
+      <path d="M-5,6.5 L-10,13 L-2.5,10 Z" fill="#54c8ff"/>
+      <path d="M5,6.5 L10,13 L2.5,10 Z" fill="#54c8ff"/>
+      <path d="M-2.2,12.5 L0,21 L2.2,12.5 Z" fill="#ffc454" opacity="0.9"/>
+    </g>
+  </svg>`;
 }
 
 /** Painted backdrop for the Voyage game tile (GS-title-2): the campaign as a dotted gold route

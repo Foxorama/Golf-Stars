@@ -24,6 +24,8 @@ import {
   type StopResult,
 } from '../sim/rpg/run';
 import { addEndlessRecord, endlessUnlocksCrossed } from '../sim/rpg/endless';
+import { addStrokeRecord, isNewCourseRecord, type StrokePlayRecord } from '../sim/rpg/strokePlay';
+import { playTotals } from '../sim/score';
 import { archetypeFor } from '../sim/course/themes';
 import { ASGARD_FORMAT } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
@@ -246,6 +248,53 @@ export function withAsgardPortal(next: UiState, run: Run, played: PlayedHole[]):
 export function asgardFieldEdge(state: UiState): number {
   const src = state.asgardReturn;
   return warriorsEdge(src?.stopIndex ?? 0, src?.ascension ?? state.run.ascension);
+}
+
+/**
+ * Resolve a STAR TOUR round (GS-star-tour): the player's finished 18-hole stroke-play round on a pinned
+ * static course, banked into the personal course-record leaderboards. Scored on total gross (via
+ * `playTotals`), ranked by to-par into `strokePlayBest` (a per-course best map, so a course's all-time
+ * record is never lost). A hole-in-one still counts toward the lifetime ace tally + the Comet Rider ship
+ * (like every other mode). The single stop IS the whole run, so the run ends here (endedReason 'banked')
+ * and the player lands on the strokeResult recap — never the Stableford-cut/travel flow. Records only:
+ * no shard payout, no Ascension/club unlock (those are the campaign's rewards).
+ */
+export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState {
+  const run = state.run;
+  const totals = playTotals(played.map((p) => p.record));
+  const record: StrokePlayRecord = {
+    courseId: run.staticCourseId ?? 'unknown',
+    characterId: run.loadout.characterId ?? '',
+    tier: run.bagTier ?? 'common',
+    strokes: totals.gross,
+    par: totals.totalPar,
+    toPar: totals.toPar,
+    effect: run.staticEffect ?? 'none',
+    seed: run.seed,
+  };
+  const strokeIsRecord = isNewCourseRecord(state.strokePlayBest, record);
+  const strokePlayBest = addStrokeRecord(state.strokePlayBest, record);
+  // A hole-in-one is a hole holed in one stroke — still earns the lifetime ace + the secret Comet Rider.
+  const aces = played.filter((p) => p.holed && p.record.strokes === 1).length;
+  const ownedShips = aceShipUnlock(state.ownedShips, aces);
+  return {
+    ...state,
+    run: { ...run, status: 'ended', endedReason: 'banked' },
+    played,
+    stopPlayed: undefined,
+    play: undefined,
+    holeRng: undefined,
+    match: undefined,
+    viewHole: 0,
+    screen: 'strokeResult',
+    strokePlayBest,
+    lastStrokeRecord: record,
+    strokeIsRecord,
+    lifetimeAces: state.lifetimeAces + aces,
+    ...(ownedShips !== state.ownedShips ? { ownedShips } : {}),
+    // A finished round bumps the lounge counter so the golfers have shuffled by the time you're home.
+    clubhouseVisit: state.clubhouseVisit + 1,
+  };
 }
 
 /**

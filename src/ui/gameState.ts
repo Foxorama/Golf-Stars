@@ -12,7 +12,7 @@ import type { Course } from '../sim/course/contract';
 import type { PlayedHole, PuttControl } from '../sim/round';
 import type { BossReward, Route, Run, RunSnapshot, StopResult, TeamDuelSetup } from '../sim/rpg/run';
 import type { EndlessRunRecord } from '../sim/rpg/endless';
-import type { StrokePlayBest } from '../sim/rpg/strokePlay';
+import type { StrokePlayBest, StrokePlayRecord } from '../sim/rpg/strokePlay';
 import type { SalvageFind } from '../sim/rpg/salvage';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
@@ -39,7 +39,10 @@ export type Screen =
   // GS-asgard: the Bifröst interlude — the Himinbjörg reveal map, then the win/lose result of the
   // nine-hole stroke-play tournament against the Warriors Three.
   | 'asgardMap'
-  | 'asgardResult';
+  | 'asgardResult'
+  // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
+  | 'starTour'
+  | 'strokeResult';
 
 export interface UiState {
   run: Run;
@@ -180,6 +183,13 @@ export interface UiState {
   /** A one-shot banner shown on the journey map after returning from Asgard (GS-asgard): the victory or
    *  the "better luck next time" note. Cleared when the player travels on. Transient. */
   asgardBanner?: 'won' | 'lost';
+  /** STAR TOUR (GS-star-tour): the course + weather the player has selected on the star map, carried
+   *  from `pickStarTourCourse` through character select into `startRun`. Transient (not persisted). */
+  starTourPick?: { courseId: string; effect?: string };
+  /** STAR TOUR (GS-star-tour): the just-finished round's banked record — shown on the strokeResult recap
+   *  with `strokeIsRecord` (did it set a NEW course best?). Transient. */
+  lastStrokeRecord?: StrokePlayRecord;
+  strokeIsRecord?: boolean;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -218,6 +228,9 @@ export type Action =
   | { type: 'continue' }
   | { type: 'crossBifrost' } // GS-asgard: cross the Bifröst from the Himinbjörg map into the Asgard tournament
   | { type: 'leaveAsgard' } // GS-asgard: leave the Golden Realm (win or lose) and resume the suspended run
+  | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
+  | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
+  | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
   | { type: 'buy'; id: string; confirmFire?: boolean } // confirmFire: the caddy-swap warning was accepted (GS-caddy-factions)
   | { type: 'cancelFireCaddy' } // dismiss the caddy-swap "they won't be happy" warning without hiring (GS-caddy-factions)
