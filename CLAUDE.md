@@ -168,8 +168,9 @@ these systems** — each bullet is the tip of a documented iceberg.
     (every other world byte-identical), mild enough the ribbon never folds (1200-seed fairness sweep clean).
     (2) TORN EDGES — `styleTornHull` bristles twisted-metal shard teeth along each lost hull-SECTION outline
     (course-length-spaced count → camera-proof), so a severed piece reads ripped, not clean-cut. (3) DRIFTING
-    JUNK — `render/shipDrift.ts` (the cetusFlow twin: play-view only, rides `now` + `_gsFeel.shipDriftSpeed`,
-    SVG map byte-identical) tumbles torn hull-plates through the open space around the wreck.
+    JUNK — `render/shipDrift.ts` (the cetusFlow twin: play-view only, rides the SHARED WALL clock +
+    `_gsFeel.shipDriftSpeed`, SVG map byte-identical) tumbles torn hull-plates through the open space
+    around the wreck; all its pieces are course-anchored (GS-decor-view-states).
   - SHIP DECK LOOK (GS-ship-deck): the derelict is DRESSED as a ship interior, all pure geometry + zero
     rng (posHash/course-length counts → camera-proof), gated to the `derelict` archetype so every other
     world is byte-identical. (1) DECK PLATING — `style/ship.ts styleShipDeck` reads the corridor
@@ -219,10 +220,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     weathered chunks of the ship "STARLIT WANDERER" drift through the space beside the corridor — a BRIDGE
     (window grids, nav lights, dying ember, the ship NAME sprayed + WEATHERED + CLIPPED to the hull, not a
     flat decal), a solar WING, an ENGINE cluster. Canvas2D play-view only (the animated twin of the static
-    map debris), drawn SCREEN-space in the side MARGINS at a fixed readable size (a course-yd size balloons
-    when zoomed; kept small so it never obscures the course). Motion rides the virtual clock (zero rng, map
-    byte-identical). CRITICAL: the piece frame is `ctx.scale(S)`, so every stroke width is a PIXEL value ÷ S
-    (a raw lineWidth balloons into a giant blurred halo).
+    map debris). The big hull SECTIONS are WORLD-ANCHORED (GS-decor-view-states, `shipDriftModel`): a
+    course-space base + a course-yd/s drift + a course-YARD size, projected each frame exactly like the
+    small tumbling chunks and the static SVG twin — NOT the old screen-fraction anchor (`fx*W`,
+    `sizeFrac*min(W,H)`) that held a fixed on-screen size but decoupled from the world, so it rendered a
+    DIFFERENT scale + drift path in every view state and JUMPED on the aim→watch switch. They now zoom with
+    the world (bigger in the tight follow-cam, smaller in the whole-hole map). CRITICAL: `drawWreck`'s piece
+    frame is `ctx.scale(S)`, so every stroke width is a PIXEL value ÷ S (a raw lineWidth balloons into a
+    giant blurred halo). Zero rng, map byte-identical.
   - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
     METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
     `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
@@ -733,10 +738,25 @@ these systems** — each bullet is the tip of a documented iceberg.
   - The Cetus star-waterfall MOVES in the Canvas2D play view (GS-cetus-flow, `render/cetusFlow.ts`):
     the play view sets `SceneOpts.animateCetus` to suppress the static `cetusRiver` and instead draws
     a live flow over the scene — stars drift source→spill, curtain streaks fall, the splash churns —
-    on the SAME course-space channel `cetusRiverPath` emits. Motion rides the virtual clock (`now`),
-    ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical; PERF-neutral (geometry cached
-    at mount, per-frame = re-project a short polyline + ~90 capped particles, NO `buildScene` rebuild —
-    it replaces the equal static river the follow-cam rebuilt). Speed rides `_gsFeel.cetusFlowSpeed`.
+    on the SAME course-space channel `cetusRiverPath` emits. Motion rides the SHARED WALL clock
+    (GS-decor-view-states), ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical;
+    PERF-neutral (geometry cached at mount, per-frame = re-project a short polyline + ~90 capped particles,
+    NO `buildScene` rebuild — it replaces the equal static river the follow-cam rebuilt). Speed rides
+    `_gsFeel.cetusFlowSpeed`.
+  - DECOR IS VIEW-STATE-INVARIANT (GS-decor-view-states): the four gameplay views (aim / watch / chip /
+    putt) draw the animated decor through DIFFERENT projectors on DIFFERENT canvases, so any element that
+    is a pure function of `(worldPosition, wallClock)` reads IDENTICALLY in all four and never jumps on a
+    view switch — the projector just reframes it WITH the world. Two rules make that hold: (a) world decor
+    (Cetus river, ship junk + hull sections, meteor craters) is COURSE-anchored — projected + `proj.scale`-
+    sized each frame, NEVER screen-fraction anchored (`fx*W`, `sizeFrac*min(W,H)`); (b) ALL ambient decor
+    rides the SHARED WALL clock (`performance.now()` / the raw rAF timestamp — `playFx.ts`'s overlay AND
+    `playView.ts`'s watch), NOT the slo-mo virtual `vnow` (which stays for the ball/caddy/shake cinematic
+    only) — a per-mount clock that reset to 0 made the whole sky/river/junk teleport at the aim→watch cut.
+    Weather is screen-space SKY (viewport-anchored, at infinity) but continuous via the shared clock + the
+    two play canvases being the SAME full-bleed size. GUARDED: `tests/decor-consistency.test.ts` proves the
+    ship-drift MODEL is course-space + holds no screen-space fields; `tests/build.test.ts`'s headless-
+    Chromium `window.__gsDecorProbe` pans the camera and asserts the decor centroid moves WITH the world
+    (world-anchored), not against it. A new animated decor twin obeys BOTH rules or it will jump.
   - AIM-OVERLAY DECOR (GS-overlay-decor): the animated world-decor twins (Cetus flow, derelict ship
     drift) AND meteor STRIKES used to move only while WATCHING a shot — on the static aim/putt screen
     the river/junk/craters sat frozen. `mountWeatherOverlay` (`app/playFx.ts`) now draws them over the

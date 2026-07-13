@@ -1181,3 +1181,67 @@ half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by
   Verified on the scrap gallery: pale-tan `#c2b280` gone (0 px), grey steel present, rust bunkers +
   muted-teal fairway; all 1105 tests green. A new world bunker skin = a `SandPalette` + a
   `sandLookFor` row.
+
+## GS-decor-view-states — animated decor that doesn't jump between the four gameplay views
+
+**The report.** Animated graphical decor kept getting implemented so it "works differently in each
+mode or works in some modes and not in others" — most visibly the derelict's drifting hull debris,
+which had a **different scale and a different flight path** in each view and so **jumped around** when
+a shot released and the camera cut from aiming to watching. Weather was the other loud offender.
+
+**Why.** There are two entirely separate render paths, and each drew the decor independently:
+
+- **Aim / chip / putt** — a static **SVG** map plus a transparent **overlay canvas** (`mountWeatherOverlay`,
+  `app/playFx.ts`) that draws the decor through an `alignedProjector` (the SVG's 360×640 viewBox meet-fit
+  into the canvas), a **static** camera, driven by **`performance.now()`** (wall clock).
+- **Watch** — one **Canvas2D** `mountPlayView`, decor drawn through the base scene's **per-frame follow-cam**
+  projector, driven by the **virtual clock `vnow`** that **starts at 0 each mount** and runs in slo-mo
+  during caddy saves.
+
+Every decor element is a function of `(projector, now)`; the two paths disagreed on **both**. Four
+independent causes, all confirmed in code:
+
+1. **Clock origin mismatch (dominant).** Aim fed a huge real-time value; the watch fed `vnow≈0`. Every
+   drift/twinkle/meteor phase teleported at the cut. This alone popped weather, the river, and all debris.
+2. **The big ship SECTIONS were pure screen-space** (`shipDrift.ts`): size `sizeFrac*min(W,H)`, position
+   `fx*W, fy*H`, drift in screen px/s — not tied to the world at all, and canvas-size-dependent. Exactly
+   the "different scale + different flight path" report.
+3. **Course-anchored decor** (river, small junk chunks) reads `proj.scale`, which differs between the two
+   projectors (letterboxed-viewBox fit vs direct-viewport fit) → a scale pop.
+4. **Screen-space weather** is seeded to canvas `W×H`.
+
+The two states that *didn't* glitch only avoided it by switching decor OFF (whole-hole aim → no aligned
+decor; putt watch → `ambientDrift:false`) — a workaround, not a fix.
+
+**The fix — make decor a pure function of `(worldPosition, wallClock)`.** Then the four views differ only
+by projector, which *correctly* reframes world decor with the world, and nothing pops:
+
+1. **One shared wall clock.** `playView.ts` draws weather + Cetus flow + ship drift + meteor strikes off
+   the raw rAF timestamp (`realNow` = the same `performance.now()` origin the overlay uses), NOT `vnow`.
+   `vnow` stays for the ball/caddy/shake cinematic only — and the ambient world rightly no longer slows to
+   a crawl during a caddy slow-mo. Fixes cause #1 for every element.
+2. **World-anchor the ship sections.** `shipDriftModel(hole)` now seeds each big hull section in COURSE
+   space (a base off the deck, a yard/s drift, a course-YARD size), projected + `proj.scale`-sized each
+   frame exactly like the small chunks and the static SVG debris twin. They zoom with the world (bigger in
+   the tight follow-cam, smaller whole-hole) — the deliberate trade for consistency, chosen over the old
+   fixed-screen-size "distant hull" look. Kills cause #2.
+3. **Weather stays sky, but continuous.** It's genuinely a viewport-anchored sky layer (at infinity); the
+   shared clock (cause #1) makes its animation phase continuous, and because the aim overlay canvas and the
+   watch canvas are the SAME full-bleed `.gs-bigmap` size, its screen-space layout already matches (cause
+   #4 is moot). No weather layout refactor needed.
+
+**Tests (the report asked for browser coverage in CI too).**
+
+- `tests/decor-consistency.test.ts` (node): `shipDriftModel` is deterministic and purely course-space —
+  every element seeded in yards within the hole band, sections carry NO screen-space fields (`fx/fy/vx/vy/
+  sizeFrac`), and `driftPos` is a pure, projector-free, band-wrapping function. This is the regression
+  guard against any future screen-anchored decor.
+- `tests/build.test.ts` (headless Chromium, runs in CI): `window.__gsDecorProbe` renders the derelict
+  decor at one wall-clock through two projectors that differ ONLY by a camera PAN. World-anchored decor's
+  centroid must move by exactly the pan (`centroidErr` ≈ 0); a screen-anchored element would hold the
+  centroid still and blow the error out toward `|shift|`. Asserts `centroidErr < 2.5px` plus a secondary
+  pan-realigned mask IoU floor. `__gsDecorProbe` is a double-underscore QA hook (like `__gsErr`), so the
+  test-hub sync guard ignores it — it is not a player-facing `_gs*` feel flag.
+
+**The rule for any new animated decor twin:** obey BOTH — course-anchor it if it represents a world
+object, and drive it off the shared wall clock — or it will render differently in each view and jump.

@@ -648,11 +648,17 @@ export function mountPlayView(
     }
 
     drawStatic();
-    weather.draw(ctx, now);
+    // Ambient world/sky decor rides the shared WALL clock (`realNow` = the raw rAF timestamp, the SAME
+    // `performance.now()` source the aim/putt overlay feeds) — NOT the slo-mo virtual `now`/`vnow` the
+    // ball + caddy cinematic uses (GS-decor-view-states). Two reasons: (1) it stays PHASE-CONTINUOUS
+    // across the aim→watch view switch, so the weather/river/junk never teleport when you release a shot
+    // (the old vnow started at 0 each mount → a jump); (2) the ambient world shouldn't slow to a crawl
+    // during a caddy save's slow-mo — only the shot does.
+    weather.draw(ctx, realNow);
     // The moving Cetus star-waterfall (GS-cetus-flow), over the scene + weather but UNDER the ball,
     // FX and HUD (drawn later) so the ball still flies clearly over the river of stars.
-    cetusFlow?.draw(ctx, proj, now, flowAccents, F.cetusFlowSpeed);
-    shipDrift?.draw(ctx, proj, now, flowAccents, F.shipDriftSpeed);
+    cetusFlow?.draw(ctx, proj, realNow, flowAccents, F.cetusFlowSpeed);
+    shipDrift?.draw(ctx, proj, realNow, flowAccents, F.shipDriftSpeed);
 
     // A GUARD caddy stands in the bottom-left corner the whole hole (GS-caddy) — its muzzle anchor is
     // where the Space Ducks laser / Convict Sheep boomerang launches from on a redirect. Only guards
