@@ -135,6 +135,66 @@ export const STATIC_COURSES: readonly StaticCourseSpec[] = [
     themeId: 'pegasus', archetype: 'void', tier: 'brutal',
     blurb: 'The Winged Horse soars the void — island pads over the abyss; miss the pad and you are gone.',
   },
+  {
+    id: 'cetus-18', name: 'Cetus Shelf', seed: 'gs-static:cetus-18',
+    opts: { biome: 'cetus-deep', themeId: 'cetus', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'cetus', archetype: 'cetus', tier: 'brutal',
+    blurb: 'The Whale sounds the star-ocean — clifftop plateaus over a starry sea, whales breaching below.',
+  },
+  {
+    id: 'derelict-18', name: 'The Ghost Wreck', seed: 'gs-static:derelict-18',
+    opts: { biome: 'derelict-ship', themeId: 'ghost-nebula', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'ghost-nebula', archetype: 'derelict', tier: 'brutal',
+    blurb: 'A dead starship adrift in the Ghost Nebula — shoot the metal corridors across gaps of stars.',
+  },
+  {
+    id: 'inferno2-18', name: 'Scorpius Sting', seed: 'gs-static:inferno2-18',
+    opts: { biome: 'ember-world', themeId: 'scorpius', holes: 18, compose: true, wildness: 0.56 },
+    themeId: 'scorpius', archetype: 'inferno', tier: 'brutal',
+    blurb: 'The Scorpion, red heart Antares — hooking doglegs that sting, blast-crater sand deep in.',
+  },
+  {
+    id: 'verdant2-18', name: 'Centaurus Fairways', seed: 'gs-static:verdant2-18',
+    opts: { biome: 'verdant-station', themeId: 'centaurus', holes: 18, compose: true, wildness: 0.42 },
+    themeId: 'centaurus', archetype: 'verdant', tier: 'gentle',
+    blurb: 'The Centaur wraps the Cross, home to our nearest star — broad, tree-lined parkland.',
+  },
+  {
+    id: 'void2-18', name: 'Sagittarius Core', seed: 'gs-static:void2-18',
+    opts: { biome: 'void-garden', themeId: 'sagittarius', holes: 18, compose: true, wildness: 0.58 },
+    themeId: 'sagittarius', archetype: 'void', tier: 'brutal',
+    blurb: 'The Archer aims at the black hole at the galaxy heart — the wildest carries over the abyss.',
+  },
+  {
+    id: 'frost2-18', name: 'Gemini Ice', seed: 'gs-static:frost2-18',
+    opts: { biome: 'ice-ring', themeId: 'gemini', holes: 18, compose: true, wildness: 0.52 },
+    themeId: 'gemini', archetype: 'frost', tier: 'testing',
+    blurb: 'The Twins frozen side by side — slick ice-ring links where the read never sits still.',
+  },
+  {
+    id: 'desert2-18', name: 'Leo Savannah', seed: 'gs-static:desert2-18',
+    opts: { biome: 'dust-belt', themeId: 'leo', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'leo', archetype: 'desert', tier: 'testing',
+    blurb: 'The Lion of the savannah, the little king — tight, windy dust with lion-mane bunkering.',
+  },
+  {
+    id: 'ocean2-18', name: 'Delphinus Tides', seed: 'gs-static:ocean2-18',
+    opts: { biome: 'tidal-archipelago', themeId: 'delphinus', holes: 18, compose: true, wildness: 0.48 },
+    themeId: 'delphinus', archetype: 'ocean', tier: 'testing',
+    blurb: 'The Dolphin breaches the tidal sea of stars — sea channels and flanking lagoons.',
+  },
+  {
+    id: 'metal2-18', name: 'Pyxis Foundry', seed: 'gs-static:metal2-18',
+    opts: { biome: 'scrap-belt', themeId: 'pyxis', holes: 18, compose: true, wildness: 0.52 },
+    themeId: 'pyxis', archetype: 'metal', tier: 'testing',
+    blurb: "The Mariner's Compass tumbles the scrap belt — low-gravity bombs over rusted machine hulls.",
+  },
+  {
+    id: 'crystal2-18', name: 'Triangulum Wedge', seed: 'gs-static:crystal2-18',
+    opts: { biome: 'crystal-spires', themeId: 'triangulum', holes: 18, compose: true, wildness: 0.48 },
+    themeId: 'triangulum', archetype: 'crystal', tier: 'testing',
+    blurb: 'A sharp crystal wedge of three bright stars — true, fast lies that punish a loose swing.',
+  },
 ];
 
 /** Look up a static course spec by id (undefined if unknown). */
