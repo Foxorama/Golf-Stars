@@ -1994,6 +1994,30 @@ function nearestCentrelineT(hole: Hole, ball: Vec): number {
 // can only rise (contract 4). See docs/decisions/sim-generator.md (GS-ship-walls / GS-ship-corridor-contain).
 const CONTAIN_STEP = 2; // yards per inward probe step when walking a lost ball back onto the deck
 const CONTAIN_MARGIN = 4; // extra yards past the recovered deck edge so the ball rests clear of the razor edge
+/**
+ * How far off the nearest DRAWN bulkhead a lost ball may sit and still be tucked back onto the deck
+ * (GS-ship-space-boundary). The whole containment promise is "graphic IS physics": a ball is held in by
+ * a bulkhead you can SEE. A ball only a few yards past the hull edge is caught by the wall (well within
+ * this margin — it covers the drawn +14 yd dead-hull dilation and the small hard-corner NOTCHES between
+ * rail ends where balls used to leak). But a ball flung FAR out into open space — beyond any bulkhead,
+ * through a torn-hull gap opening or clean past the wall ends — has NOTHING to bounce off, so it flies
+ * FREE (stays lost), instead of being reeled back onto the fairway by an invisible "far space boundary".
+ * Measured: derelict drives were reaching 40–175 yd off the nearest wall out in the void and getting
+ * pulled back; 22 yd cleanly separates a real near-edge miss (contain) from a genuine space excursion (lose).
+ */
+const CONTAIN_MAX_WALL_DIST = 22;
+
+/** Distance (yards) from `p` to the nearest DRAWN bulkhead segment, or Infinity if the hole has no walls. */
+function nearestWallDist(hole: Hole, p: Vec): number {
+  const walls = hole.walls;
+  if (!walls || !walls.length) return Infinity;
+  let best = Infinity;
+  for (const w of walls) {
+    const d = segDist(p, w.a, w.b);
+    if (d < best) best = d;
+  }
+  return best;
+}
 
 /** A lie in which the ball is LOST TO SPACE off the hull (`shiprough`/void-rough), NEVER an on-deck
  *  hazard like a `breach` — a breach is a deliberate penalty and must stay lost. */
@@ -2094,7 +2118,10 @@ function firstSolidDeparture(hole: Hole, a: Vec, b: Vec): { prev: Vec; dir: Vec;
     const t = i / steps;
     const pos: Vec = [a[0] + dx * t, a[1] + dy * t];
     const lost = isLostToSpace(lieAt(hole, pos));
-    if (lost && !prevLost && corridorSolidAt(hole, pos)) {
+    // Only ricochet off a DRAWN bulkhead (GS-ship-space-boundary): a departure at a torn-hull gap opening
+    // (walls removed for that span) or clean past the wall ends has no bulkhead to bounce off, so the ball
+    // flies FREE through the opening rather than caroming off an invisible boundary out in space.
+    if (lost && !prevLost && corridorSolidAt(hole, pos) && nearestWallDist(hole, prev) <= CONTAIN_MAX_WALL_DIST) {
       const l = Math.hypot(pos[0] - prev[0], pos[1] - prev[1]) || 1;
       const travel: Vec = [(pos[0] - prev[0]) / l, (pos[1] - prev[1]) / l];
       const { dir, wall } = inwardReflect(hole, prev, travel);
@@ -2172,6 +2199,9 @@ function shipFlightPath(hole: Hole, from: Vec, landing0: Vec, maxBounces = 8): S
  *  after every shot on a walled hole this backstops any escape the ricochet maths missed. */
 export function containToDeck(hole: Hole, p: Vec): Vec | null {
   if (!isLostToSpace(lieAt(hole, p))) return null; // on the deck, or in a real hazard → nothing to save
+  // No bulkhead within reach → the ball is out in open space (through a torn-hull gap opening or past the
+  // wall ends), so it flies FREE, never reeled back by an invisible boundary (GS-ship-space-boundary).
+  if (nearestWallDist(hole, p) > CONTAIN_MAX_WALL_DIST) return null;
   const c = nearestCentrePoint(hole, p);
   if (isLostToSpace(lieAt(hole, c))) return null; // corridor broken here → a sanctioned carry, stays lost
   const dx = c[0] - p[0];

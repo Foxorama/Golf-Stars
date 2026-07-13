@@ -319,13 +319,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     nearest the ball is itself ON the deck; a rest whose station centreline is off-deck is a sanctioned
     torn-hull GAP (a forward carry) and stays lost, and a `breach` rest is a deliberate hazard (excluded via
     `isLostToSpace`). The margin-seat is RE-VALIDATED so it never lands in a thin space sliver between a `waste`
-    plate and the fairway. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate → every other world
-    byte-identical), and it only ever moves a ball ONTO the deck (Stableford can only rise, contract 4). The
+    plate and the fairway. BUT the boundary is a DRAWN bulkhead you can SEE (GS-ship-space-boundary): both the
+    flight ricochet (`firstSolidDeparture`) and the rest backstop (`containToDeck`) are gated on a real wall
+    within `CONTAIN_MAX_WALL_DIST` (22 yd) of the departure/rest point. A near-edge miss (a few yards off a
+    solid stretch, covering the +14 yd drawn dead-hull dilation and the hard-corner NOTCHES) is still caught;
+    but a ball flung FAR out into open space — beyond every bulkhead, through a torn-hull gap OPENING or clean
+    past the wall ends — has nothing to bounce off, so it flies FREE (stays lost) rather than caroming off
+    nothing / being reeled onto the fairway by an invisible "far space boundary" (the bug: derelict drives were
+    reaching 40–175 yd off the nearest wall out in the void, then boomeranging back). "Contained" means a
+    bulkhead is THERE; open space is a real loss. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate →
+    every other world byte-identical), and containment still only ever moves a ball ONTO the deck. The
     LESSON for any future "walled / contained" world: a pre-built segment fence can't contain a ball on a
     bending, breaking corridor — make the DRAWN PLAYABLE SURFACE the physics boundary (in flight AND at rest),
-    never a segment crossing. Regression: end-to-end seeded drives in `tests/walls.test.ts` assert (1) no
-    resting ball is still `containToDeck`-able and (2) no reconstructed flight leaves a SOLID stretch of hull
-    without a registered bounce (the synthetic reflection tests never caught either).
+    never a segment crossing — but only where a bulkhead actually EXISTS; past the walls the ball is genuinely
+    lost. Regression: end-to-end seeded drives in `tests/walls.test.ts` assert (1) no resting ball off a SOLID
+    walled stretch is still `containToDeck`-able, (2) a ball flung far past the bulkheads flies free (no reel-
+    back), and (3) no flight bounce-vertex sits far from a drawn wall (no ricochet off empty space).
   - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,

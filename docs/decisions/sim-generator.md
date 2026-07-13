@@ -1107,6 +1107,44 @@ super-set of the collision poly, the graphic lies again — from the other side.
 graphic that sits ON it and out-shines the decorative silhouette drawn past it, or the eye locks onto the
 wrong edge.
 
+## GS-ship-space-boundary — past the bulkheads, the ball flies FREE (the containment was over-reaching)
+
+**The report (three screenshots).** *"The void zones between the hulls are correctly lost balls, but
+beyond that, the far space boundary is kicking the ball back instead of letting the ball fly free."* The
+purple flight/roll trails looped WAY out into the starfield — well past the visible ship — and boomeranged
+back onto the deck, off an invisible wall where no bulkhead is drawn.
+
+**The diagnosis.** GS-ship-corridor-contain (5th pass) and GS-ship-wall-bounce (6th) made the DRAWN DECK
+the physics boundary via a `corridorSolidAt` discriminator — "the centreline point nearest the ball is on
+the deck." That is a great *forward* discriminator (solid hull section vs. torn-hull star-gap), but it is
+UNBOUNDED sideways: a ball 145 yd out in open space, abeam a solid section, still has its nearest
+centreline point on the deck, so both the flight ricochet (`firstSolidDeparture`) and the rest backstop
+(`containToDeck`) treated it as "contained" and reeled it home. Headless sweep (27,468 sideways derelict
+drives): **519 flew >40 yd (up to 145 yd) off the nearest *drawn* wall then got pulled back; 9,157 flight
+bounce-vertices ricocheted off empty space** (up to 54 yd from any bulkhead) — the invisible far boundary.
+
+**The fix (`CONTAIN_MAX_WALL_DIST` = 22 yd).** Gate BOTH containment layers on a real bulkhead within 22 yd
+of the departure/rest point (`nearestWallDist`). Near-edge misses — a few yards off a solid stretch, which
+covers the +14 yd drawn dead-hull dilation AND the hard-corner NOTCHES between rail ends — still get caught.
+But a ball flung far past every bulkhead (through a torn-hull gap OPENING, or clean past the wall chain ends)
+has nothing to bounce off, so it flies FREE / stays lost. Result: reeled-from-far-space **519 → 0**, flight
+ricochets off empty space **9,157 → 0**, and **3,568 sideways drives now correctly fly free** into the void.
+
+**Why this is NOT the failed "proximity-as-primary" experiment (GS-ship-wall-bounce, above).** That pass
+noted keying the bounce *off wall proximity* regressed the catch rate — because at a hard-corner opening
+there is no wall segment, so a proximity-primary test misses exactly the leaks the deck discriminator
+catches. The distinction: `corridorSolidAt` stays the PRIMARY catch; wall proximity is only an UPPER BOUND
+layered on top to *exclude* genuine open-space excursions. A corner notch is a few yards wide, so its
+departure point is still well within 22 yd of the adjacent rail ends → still caught. Verified: plain-corridor
+lost-to-space held at **2.41%** (<5% bar) — the notch/chain-end catch did not regress; only far-space losses
+(which the player WANTS) were added.
+
+**The design amendment.** "A sideways miss ricochets back, NEVER lost to space" is now bounded: contained
+where a bulkhead EXISTS, free past it. Open space is a real, fair loss — the walls line the corridor, they
+do not wrap the whole starfield. Regression (`tests/walls.test.ts`, `GS-ship-space-boundary`): a ball flung
+far past the bulkheads is not reeled back, and no flight bounce-vertex sits far from a drawn wall. Pure
+geometry, ZERO rng, derelict-only (`hole.walls` gate) — every other world byte-for-byte unchanged.
+
 ---
 
 ## GS-compose — a stop is a COMPOSED routing, not IID hole samples
