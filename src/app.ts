@@ -76,7 +76,7 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds } from './app/starTourScreens';
+import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult } from './app/starTourScreens';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -1347,6 +1347,13 @@ function wireStarTourGestures(vp: HTMLElement): void {
 // `starTourView` holds the ship's position so it survives re-renders. Only ever runs on the star map.
 const stAnim = { raf: 0 };
 
+/** The flat per-frame cruise step (chart units) at rare (1.0×) speed — the "current slow speed" the
+ *  small map wants. Rarity scales it via `starTourShipSpeedMult()`. */
+const STAR_TOUR_BASE_STEP = 7;
+/** Only a flight with more than this much distance remaining earns a gentle acceleration on top of the
+ *  flat cruise; shorter/medium hops stay at the constant base speed. */
+const STAR_TOUR_LONG_HAUL = 750;
+
 /** Set the hull flip for a flight: mirror vertically (−1) when heading LEFT so a wheeled/keeled ship
  *  keeps its top up rather than reading belly-up (a spaceship has no "up", but these are drawn as
  *  vehicles). Held constant for the whole flight (decided at launch off the target's side) so it never
@@ -1430,7 +1437,13 @@ function stepStarTour(): void {
         return;
       }
     } else {
-      const step = Math.max(7, d * 0.14);
+      // Near-CONSTANT cruise (GS-star-tour-map-improvements): the small map wants a deliberate flat
+      // speed, not the old `d * 0.14` that made distant hops rocket off way too fast. The base step is
+      // scaled by the flown ship's RARITY (commons slower, mythic faster) and only a genuinely long
+      // haul earns a gentle acceleration so a cross-galaxy jump isn't a slog — anything under
+      // STAR_TOUR_LONG_HAUL cruises flat.
+      const accel = d > STAR_TOUR_LONG_HAUL ? (d - STAR_TOUR_LONG_HAUL) * 0.05 : 0;
+      const step = (STAR_TOUR_BASE_STEP + accel) * starTourShipSpeedMult();
       const f = Math.min(1, step / d);
       v.shipX += dx * f;
       v.shipY += dy * f;

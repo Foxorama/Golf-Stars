@@ -23,6 +23,7 @@ import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
+import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 
 /** View state for the star map (mutated by app.ts; reset on entry). */
 export const starTourView = {
@@ -53,6 +54,24 @@ export const starTourView = {
   /** Chart zoom (pinch/scroll), 1 = intrinsic. Preserved across re-renders like the scroll offset. */
   zoom: 1,
 };
+
+/** Ship cruise speed by RARITY (GS-star-tour-map-improvements): the flown ship's rarity scales its
+ *  per-frame cruise step around the flat "current slow speed" the small map wants — commons cruise a
+ *  touch slower, the mythic grail a touch faster. Multiplies the flight loop's constant base step (the
+ *  app owns the base + long-haul acceleration; this table owns only the rarity feel). */
+const RARITY_SPEED_MULT: Record<CosmeticRarity, number> = {
+  common: 0.9,
+  rare: 1.0,
+  epic: 1.1,
+  legendary: 1.2,
+  mythic: 1.3,
+};
+
+/** The current golfer's ship-rarity cruise multiplier for the star-map flight (1.0 if no ship). */
+export function starTourShipSpeedMult(): number {
+  const ship = shipById(shipForCharacter(state, state.run.loadout.characterId));
+  return ship ? RARITY_SPEED_MULT[ship.rarity] : 1.0;
+}
 
 /** The weather skies offered on the star map — atmospheric choices (the trade-camp / mechanic effects
  *  are excluded so a record round is never decided by a tent bounce). Ordered calm → wild. */
