@@ -29,8 +29,7 @@ export interface Faction {
  *  credit-issuing houses that back the tour's economy. Ordered roughly by how "establishment" they are. */
 export const FACTIONS: readonly Faction[] = [
   { id: 'putters-guild', name: 'The Putters Guild', blurb: 'Masters of the short stick and the perfect read.' },
-  { id: 'space-pirates', name: 'Space Pirates', blurb: 'Convict crews who plunder the fairways of the outer rim.' },
-  { id: 'planet-pirates', name: 'Planet Pirates', blurb: 'Buccaneer crews who raid whole worlds — and foresee every putt.' },
+  { id: 'space-bandits', name: 'Space Bandits', blurb: 'Outlaw crews who plunder the outer-rim fairways and raid whole worlds — some even foresee every putt.' },
   { id: 'lords-and-ladies', name: 'Lords & Ladies', blurb: 'The refined gentry of the galactic tour.' },
   { id: 'long-haul-truckers', name: 'The Long Haul Truckers', blurb: 'Big rigs, big drives, big distances hauled across the void.' },
   { id: 'para-spatial-medics', name: 'Para-Spatial Medics', blurb: 'On call across space and time — they always answer.' },
@@ -50,10 +49,10 @@ export const CADDY_FACTION: Readonly<Record<string, string>> = {
   // The Putters Guild — short-game specialists (auto-putt / green read).
   'auto-caddie': 'putters-guild', // Penelope Putter
   'mystic-mole': 'putters-guild',
-  // Space Pirates — the Convict Sheep and their boomerangs.
-  'convict-sheep': 'space-pirates',
-  // Planet Pirates — the Prognostic Parrot, a bipedal pirate captain who foresees the shot.
-  'prognostic-parrot': 'planet-pirates',
+  // Space Bandits — the Convict Sheep and their boomerangs, plus the Prognostic Parrot, a bipedal
+  // pirate captain who foresees the shot (the merged pirate crew: ex-Space-Pirates + ex-Planet-Pirates).
+  'convict-sheep': 'space-bandits',
+  'prognostic-parrot': 'space-bandits',
   // Lords & Ladies — the top-hatted Space Ducks.
   'space-ducks': 'lords-and-ladies',
   // The Long Haul Truckers — distance haulers.

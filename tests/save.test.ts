@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(25);
+    expect(SAVE_VERSION).toBe(26);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});
@@ -73,7 +73,8 @@ describe('save schema', () => {
     expect(s.driverByCharacter).toEqual({}); // nobody has earned a cosmetic driver yet
     expect(s.shards).toBe(27);
     expect(s.clubhouseVisit).toBe(5);
-    expect(s.reputationByCharacter).toEqual({ 'longshot-larry': { 'space-pirates': 1 } });
+    // The v25→v26 pirate-faction merge folds the old `space-pirates` standing into `space-bandits`.
+    expect(s.reputationByCharacter).toEqual({ 'longshot-larry': { 'space-bandits': 1 } });
   });
 
   it('migrates a v22 blob forward to v23 (seeds an empty per-golfer bag-tier map, preserves everything else)', () => {
@@ -190,9 +191,33 @@ describe('save schema', () => {
   });
 
   it('preserves caddy-faction reputation through export/import', () => {
-    const save = { ...defaultSave(), reputationByCharacter: { 'longshot-larry': { 'long-haul-truckers': 2, 'space-pirates': -3 } } };
+    const save = { ...defaultSave(), reputationByCharacter: { 'longshot-larry': { 'long-haul-truckers': 2, 'space-bandits': -3 } } };
     expect(importSave(exportSave(save)).reputationByCharacter).toEqual({
-      'longshot-larry': { 'long-haul-truckers': 2, 'space-pirates': -3 },
+      'longshot-larry': { 'long-haul-truckers': 2, 'space-bandits': -3 },
+    });
+  });
+
+  it('migrates a v25 blob forward to v26 (merges the two pirate factions into Space Bandits)', () => {
+    const v25 = {
+      ...defaultSave(),
+      version: 25 as const,
+      shards: 12,
+      reputationByCharacter: {
+        // A golfer who courted BOTH old pirate crews — the standings sum onto space-bandits.
+        'longshot-larry': { 'space-pirates': 2, 'planet-pirates': -3, 'long-haul-truckers': 5 },
+        // A golfer with only one pirate crew — folds straight across.
+        'backspin-bo': { 'planet-pirates': 4 },
+        // A golfer with no pirate standing — untouched.
+        'feather-fade': { 'putters-guild': 1 },
+      },
+    } as unknown as Parameters<typeof migrate>[0];
+    const s = migrate(v25);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.shards).toBe(12);
+    expect(s.reputationByCharacter).toEqual({
+      'longshot-larry': { 'space-bandits': -1, 'long-haul-truckers': 5 }, // 2 + (−3) = −1, no dead keys
+      'backspin-bo': { 'space-bandits': 4 },
+      'feather-fade': { 'putters-guild': 1 },
     });
   });
 

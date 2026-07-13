@@ -33,9 +33,12 @@ describe('caddy factions — data contract (GS-caddy-factions)', () => {
     const members = (factionId: string) => Object.keys(CADDY_FACTION).filter((c) => CADDY_FACTION[c] === factionId);
     expect(factionById('putters-guild')?.name).toBe('The Putters Guild');
     expect(members('putters-guild').sort()).toEqual(['auto-caddie', 'mystic-mole'].sort()); // putting specialists
-    expect(members('space-pirates')).toEqual(['convict-sheep']);
-    expect(factionById('planet-pirates')?.name).toBe('Planet Pirates');
-    expect(members('planet-pirates')).toEqual(['prognostic-parrot']); // the foreseeing pirate captain
+    expect(factionById('space-bandits')?.name).toBe('Space Bandits');
+    // The merged pirate crew: the Convict Sheep + the foreseeing Prognostic Parrot in one faction.
+    expect(members('space-bandits').sort()).toEqual(['convict-sheep', 'prognostic-parrot'].sort());
+    // The two pre-merge pirate factions no longer exist.
+    expect(factionById('space-pirates')).toBeUndefined();
+    expect(factionById('planet-pirates')).toBeUndefined();
     expect(members('lords-and-ladies')).toEqual(['space-ducks']);
     expect(members('long-haul-truckers').sort()).toEqual(['driver-dan', 'suggestible-sam'].sort());
     expect(members('para-spatial-medics')).toEqual(['dr-chipinski']);
@@ -126,8 +129,8 @@ describe('the shop hire/fire reputation flow (reducer, GS-caddy-factions)', () =
     expect(cancelled.pendingFireCaddy).toBeUndefined();
     expect(namedCaddyOwned(cancelled.run.loadout.perks)).toBe('convict-sheep');
     expect(cancelled.run.firedCaddies).toEqual([]);
-    // Only the original hire's reputation stands.
-    expect(reputationWith(cancelled.reputation, 'backspin-bo', 'space-pirates')).toBe(1);
+    // Only the original hire's reputation stands (the Convict Sheep answer to the Space Bandits).
+    expect(reputationWith(cancelled.reputation, 'backspin-bo', 'space-bandits')).toBe(1);
     expect(reputationWith(cancelled.reputation, 'backspin-bo', 'lords-and-ladies')).toBe(0);
   });
 });
