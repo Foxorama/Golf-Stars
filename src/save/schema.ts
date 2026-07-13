@@ -16,7 +16,7 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 25;
+export const SAVE_VERSION = 26;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -414,8 +414,17 @@ export type SaveV25 = Omit<SaveV24, 'version'> & {
   priceRefund?: number;
 };
 
+/** v26 merges the two pirate factions into one (Space Pirates + Planet Pirates → Space Bandits). The
+ *  only persisted trace of either is a per-character REPUTATION key, so the migration folds any
+ *  `space-pirates` + `planet-pirates` standing into `space-bandits` (summing them) and drops the dead
+ *  keys — a returning player keeps the (hidden) crew standing they'd built. Pure version stamp for any
+ *  save that never courted a pirate crew. Shape is unchanged (reputation is a free-form id→number map). */
+export type SaveV26 = Omit<SaveV25, 'version'> & {
+  version: 26;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV25;
+export type Save = SaveV26;
 
 export function defaultSave(): Save {
   return {
@@ -805,6 +814,33 @@ function v24ToV25(s: SaveV24): SaveV25 {
   };
 }
 
+/** The retired pirate faction ids and the merged id they fold into (v26 — Space Bandits merge). Named
+ *  here so the migration is immune to any later rename of the live faction rows. */
+const MERGED_PIRATE_IDS = ['space-pirates', 'planet-pirates'] as const;
+const SPACE_BANDITS_ID = 'space-bandits';
+
+/** v25 → v26: merge the two pirate factions' per-character reputation into `space-bandits`. For each
+ *  character, sum any `space-pirates` + `planet-pirates` standing onto `space-bandits` and drop the old
+ *  keys. A character who never courted a pirate crew is untouched; the rest of the save is preserved. */
+function v25ToV26(s: SaveV25): SaveV26 {
+  const merged: ReputationByCharacter = {};
+  for (const [charId, factions] of Object.entries(s.reputationByCharacter ?? {})) {
+    const next: Record<string, number> = {};
+    let banditRep = 0;
+    for (const [factionId, rep] of Object.entries(factions ?? {})) {
+      if ((MERGED_PIRATE_IDS as readonly string[]).includes(factionId)) banditRep += rep;
+      else next[factionId] = rep;
+    }
+    // Fold the summed pirate standing onto any existing space-bandits standing (there won't be one on a
+    // real v25 save, but be defensive against an edited/forward-stamped blob).
+    if (banditRep !== 0 || SPACE_BANDITS_ID in next) {
+      next[SPACE_BANDITS_ID] = (next[SPACE_BANDITS_ID] ?? 0) + banditRep;
+    }
+    merged[charId] = next;
+  }
+  return { ...s, version: 26, reputationByCharacter: merged };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -837,6 +873,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 22) s = v22ToV23(s as unknown as SaveV22) as unknown as typeof s;
   if (s.version === 23) s = v23ToV24(s as unknown as SaveV23) as unknown as typeof s;
   if (s.version === 24) s = v24ToV25(s as unknown as SaveV24) as unknown as typeof s;
+  if (s.version === 25) s = v25ToV26(s as unknown as SaveV25) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.

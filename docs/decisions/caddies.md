@@ -215,8 +215,9 @@
   faction perks/events; nothing in the UI reads it yet. Every named caddy maps to a `FACTIONS` row
   (`CADDY_FACTION`), machine-checked in `tests/factions.test.ts` (the sibling of the `caddyEffects`
   rule — a caddy without a faction reds CI). The starting factions: **The Putters Guild**
-  (Penelope + Mystic Mole — putting specialists), **Space Pirates** (Convict Sheep), **Planet Pirates**
-  (Prognostic Parrot — the foreseeing pirate captain), **Lords & Ladies**
+  (Penelope + Mystic Mole — putting specialists), **Space Bandits** (the merged pirate crew — the
+  Convict Sheep + the foreseeing Prognostic Parrot; was two factions, Space Pirates + Planet Pirates,
+  folded into one), **Lords & Ladies**
   (Space Ducks), **The Long Haul Truckers** (Driver Dan + Suggestible Sam), **Para-Spatial Medics**
   (Dr Chipinski), **The Other Guys** (Sandy — the unaffiliated escape artist). Hiring earns
   `REP_ON_HIRE` (+1) with a caddy's faction; firing costs `REP_ON_FIRE` (−3). Reputation is
@@ -254,7 +255,8 @@
   gear, not a stick with a blob. Re-shoot `node scripts/shop-cards-preview.mjs` after touching either.
 
 ## The Prognostic Parrot — foresight scramble (GS-caddy-parrot)
-- **The fantasy.** A bipedal space parrot, pirate captain of the **Planet Pirates**. Its ability is a 33%
+- **The fantasy.** A bipedal space parrot, pirate captain of the **Space Bandits** (the merged pirate
+  crew — see the faction note above). Its ability is a 33%
   chance to *see your shot before it happens* — mechanically, the game's own SCRAMBLE effect turned on the
   player's solo ball: the shot is played TWICE and you keep the better result. Both balls are the player's
   OWN golfer (not a partner golfer), so it's your swing you're improving on, not someone else's.
@@ -286,7 +288,7 @@
 - **Not a guard/projectile caddy.** No in-flight redirect, so no `_gsFeel.forceRedirect` Demo case and no
   playView corner-projectile — it's like Dr Chipinski (a transient effect, shown in the gold badge). It
   DOES fold a loadout field, so it satisfies THE RULE: a `caddyEffects` "Foresight" Lab row + a
-  `factions.ts` Planet Pirates faction (both machine-checked). Assetless art: a green pirate-captain
+  `factions.ts` Space Bandits faction (both machine-checked). Assetless art: a green pirate-captain
   parrot (tricorne + eyepatch + curved beak, raising a brass spyglass with foresight sparkles) in both
   `render/itemArt.ts` (shop card) and `render/caddyArt.ts` (corner figure + a swaggering "Arr! I saw that
   coming!" `CADDY_VOICE` line). Rebuilds from perks on resume (no save bump).

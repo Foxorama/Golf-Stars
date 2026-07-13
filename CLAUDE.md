@@ -587,7 +587,8 @@ these systems** — each bullet is the tip of a documented iceberg.
     (c) is STICKY — a still-lost redirected rest is seated back on the deck. Guard-only + walled-only →
     byte-identical everywhere else; a caddy save now finishes on the deck ~98% fairway, 0% lost.
   - The renderer draws the guard figure ONCE (the corner figure) — never also float the portrait badge.
-  - The **Prognostic Parrot** (GS-caddy-parrot, faction **Planet Pirates**) reuses the SCRAMBLE machinery:
+  - The **Prognostic Parrot** (GS-caddy-parrot, faction **Space Bandits** — the merged pirate crew that
+    also fields the Convict Sheep) reuses the SCRAMBLE machinery:
     `loadout.previewScramble` (0.33) is a per-full-swing proc where the pirate captain FORESEES the shot →
     you play a SECOND ball with the player's OWN golfer (`opts.shotMods`, never a partner) and keep the
     better (`pickBetterExec`). Threaded IDENTICALLY through the auto sim (`playHole`, gated `!opts.scramble`

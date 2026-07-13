@@ -404,7 +404,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     desc: 'A pirate captain who foresees the shot — 33% chance to play it TWICE (both your own swing) & keep the better',
     rarity: 'legendary',
     caddy: 'named',
-    // GS-caddy-parrot (Planet Pirates): a per-shot chance to FORESEE the swing → take two balls (both
+    // GS-caddy-parrot (Space Bandits): a per-shot chance to FORESEE the swing → take two balls (both
     // the player's own golfer) and keep the better — the scramble effect, self-partnered. Only ever
     // raises scoring (best-of-two ≥ solo), so it can't trip the death-spiral bar.
     apply: (m) => ({ ...m, previewScramble: Math.max(m.previewScramble ?? 0, PARROT_PREVIEW_CHANCE), perks: [...m.perks, 'prognostic-parrot'] }),
