@@ -41,6 +41,7 @@ export function metaFromSave(save: Save) {
     marmotTips: save.marmotTips,
     endlessRuns: save.endlessRuns,
     reputationByCharacter: save.reputationByCharacter,
+    strokePlayBest: save.strokePlayBest,
     priceRefund: save.priceRefund,
   };
 }
@@ -73,6 +74,7 @@ export function persist(): void {
     marmotTips: state.marmotTips,
     endlessRuns: state.endlessRuns,
     reputationByCharacter: state.reputation,
+    strokePlayBest: state.strokePlayBest,
     // The one-off Trade Market price-cut notice (GS-trade-rebalance): persisted while pending so a
     // reload before dismissal still shows it; cleared to undefined once the player closes it.
     priceRefund: state.priceRefund,

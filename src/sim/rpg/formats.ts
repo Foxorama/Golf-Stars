@@ -156,6 +156,18 @@ export const FORMATS: Record<string, RunFormat> = {
     // depot becomes a genuine call against spending the credits on gear.
     startingFuel: 12,
   },
+  // STAR TOUR (GS-star-tour): a single 18-hole STROKE-PLAY round on a player-chosen static course,
+  // flown to on the free-roam star map. No travel/shop/survival — you play the round and it's banked to
+  // the personal course-record leaderboards. The course + weather are pinned on the run (`staticCourseId`
+  // / `staticEffect`), so `currentCourse` serves the fixed designed layout instead of a generated stop;
+  // the reducer resolves the round (`resolveStrokePlay`) rather than the Stableford-cut flow, exactly as
+  // the Asgard interlude does. Not winnable/holeGate — the single stop is the whole run.
+  strokeplay: {
+    id: 'strokeplay',
+    name: 'Star Tour',
+    blurb: 'Pick a world, play its 18 — chase your course records',
+    stops: [{ holes: 18, label: '18 holes · stroke play' }],
+  },
   // The headline campaign (GS-voyage): a bounded, WINNABLE voyage of three arcs. Each arc is two
   // ordinary stops then a BOSS; clearing the final boss wins the run. Arc I + the FINAL are solo
   // matchplay duels; Arc II is a TEAM duel (GS-team-duel) — best-ball or scramble, random per run,
@@ -208,6 +220,11 @@ export const FORMATS: Record<string, RunFormat> = {
  * to their suspended run afterward, so `finishStop`'s ordinary Stableford path is a harmless no-op here.
  */
 export const ASGARD_FORMAT = 'asgard';
+
+/** The Star Tour stroke-play format id (GS-star-tour): a single 18-hole round on a chosen static course,
+ *  reached via the free-roam star map. The reducer resolves the round to the course-record leaderboards
+ *  (like Asgard) rather than the ordinary Stableford-cut/travel flow. */
+export const STROKEPLAY_FORMAT = 'strokeplay';
 
 export const DEFAULT_FORMAT = 'unending';
 

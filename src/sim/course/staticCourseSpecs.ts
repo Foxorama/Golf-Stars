@@ -13,6 +13,11 @@
 
 import { generateCourse, type GenerateOptions } from './generate';
 import type { Course } from './contract';
+import type { BiomeArchetype } from './themes';
+
+/** Difficulty tier of a Star Tour course — a label the star map + scorecard read (not a generation
+ *  input; the geometry difficulty rides `opts.wildness`). */
+export type StaticCourseTier = 'gentle' | 'testing' | 'brutal';
 
 /** A named, fixed course: a pinned seed + generation options → the same full round every play. */
 export interface StaticCourseSpec {
@@ -24,6 +29,16 @@ export interface StaticCourseSpec {
   seed: string;
   /** Generation options. `holes` + `biome` are the identity; `compose` gives a designed routing. */
   opts: GenerateOptions;
+  /** The constellation/theme this course sits on (a THEMES id) — keys its J2000 sky position on the
+   *  Star Tour star map, its constellation backdrop, and its display flavour. Absent = no star-map
+   *  placement (the flagship metal-18 predates this and keeps its frozen opts untouched). */
+  themeId?: string;
+  /** The world archetype the star map paints this course's planet + glyph from. */
+  archetype?: BiomeArchetype;
+  /** Difficulty tier label for the star map / scorecard. */
+  tier?: StaticCourseTier;
+  /** One-line course flavour for the star-map dossier. */
+  blurb?: string;
 }
 
 /** Id of the flagship metal (Scrap Belt) 18-hole course. */
@@ -45,7 +60,80 @@ export const STATIC_COURSES: readonly StaticCourseSpec[] = [
     id: METAL_18_ID,
     name: 'Antlia Scrapworks',
     seed: 'gs-static:metal-18',
+    // NOTE: opts is FROZEN — metal-18 has a frozen JSON generated from exactly these opts, so it must
+    // never change (no themeId injected here or the frozen file drifts). The star-map metadata lives on
+    // the spec fields below, which don't feed generation.
     opts: { biome: 'scrap-belt', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'antlia',
+    archetype: 'metal',
+    tier: 'testing',
+    blurb: 'A full round over the low-gravity scrap belt — bomb it off the derelict-metal graveyard.',
+  },
+  // --- Star Tour courses (GS-star-tour): one designed 18-hole round per world, populating the star
+  // map. Each is content-as-data — a pinned seed + biome + a wildness that sets its difficulty tier.
+  // They are NOT frozen (no JSON file), so `buildStaticCourse` regenerates them on demand through the
+  // live generator (lean bundle; deterministic per GENERATOR_VERSION). `themeId` sets both the render
+  // backdrop and the star-map placement. Validated in tests/static-courses.test.ts (every row must
+  // regenerate to a fair, contract-valid course).
+  {
+    id: 'verdant-18', name: 'Lyra Meadows', seed: 'gs-static:verdant-18',
+    opts: { biome: 'verdant-station', themeId: 'lyra', holes: 18, compose: true, wildness: 0.38 },
+    themeId: 'lyra', archetype: 'verdant', tier: 'gentle',
+    blurb: "Orpheus' harp coaxes the green to grow — wide, welcoming parkland to learn your swing on.",
+  },
+  {
+    id: 'desert-18', name: 'Vela Dunes', seed: 'gs-static:desert-18',
+    opts: { biome: 'dust-belt', themeId: 'vela', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'vela', archetype: 'desert', tier: 'testing',
+    blurb: 'The Sails of Argo billow over endless dust — long, open, and forever into the wind.',
+  },
+  {
+    id: 'frost-18', name: 'Cygnus Links', seed: 'gs-static:frost-18',
+    opts: { biome: 'ice-ring', themeId: 'cygnus', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'cygnus', archetype: 'frost', tier: 'testing',
+    blurb: 'The Swan glides the icy Milky Way — exposed links golf where the crosswind never rests.',
+  },
+  {
+    id: 'inferno-18', name: 'Orion Forge', seed: 'gs-static:inferno-18',
+    opts: { biome: 'ember-world', themeId: 'orion', holes: 18, compose: true, wildness: 0.54 },
+    themeId: 'orion', archetype: 'inferno', tier: 'testing',
+    blurb: 'The Hunter between blue Rigel and doomed Betelgeuse — molten doglegs and blast-crater sand.',
+  },
+  {
+    id: 'crystal-18', name: 'Coronae Prism', seed: 'gs-static:crystal-18',
+    opts: { biome: 'crystal-spires', themeId: 'corona-borealis', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'corona-borealis', archetype: 'crystal', tier: 'testing',
+    blurb: 'The Northern Crown, a jewelled arc — true, fast crystal lies that reward pure precision.',
+  },
+  {
+    id: 'tempest-18', name: 'Draco Gale', seed: 'gs-static:tempest-18',
+    opts: { biome: 'tempest-reach', themeId: 'draco', holes: 18, compose: true, wildness: 0.58 },
+    themeId: 'draco', archetype: 'tempest', tier: 'brutal',
+    blurb: 'The Dragon coiled in the eye of the storm — the wildest crosswinds in the galaxy.',
+  },
+  {
+    id: 'fungal-18', name: 'Vulpecula Hollows', seed: 'gs-static:fungal-18',
+    opts: { biome: 'spore-jungle', themeId: 'vulpecula', holes: 18, compose: true, wildness: 0.52 },
+    themeId: 'vulpecula', archetype: 'fungal', tier: 'testing',
+    blurb: 'The Fox slinks through luminous spore-groves — the densest tree-lined chutes anywhere.',
+  },
+  {
+    id: 'ocean-18', name: 'Eridanus Atolls', seed: 'gs-static:ocean-18',
+    opts: { biome: 'tidal-archipelago', themeId: 'eridanus', holes: 18, compose: true, wildness: 0.5 },
+    themeId: 'eridanus', archetype: 'ocean', tier: 'testing',
+    blurb: 'The great celestial River pours to the deep south — sea channels and island-hopping golf.',
+  },
+  {
+    id: 'swamp-18', name: 'Hydra Mire', seed: 'gs-static:swamp-18',
+    opts: { biome: 'toxic-mire', themeId: 'hydra', holes: 18, compose: true, wildness: 0.54 },
+    themeId: 'hydra', archetype: 'swamp', tier: 'testing',
+    blurb: 'The Water-Serpent coils the acid mire — the heaviest air in the galaxy, so the ball flies short.',
+  },
+  {
+    id: 'void-18', name: 'Pegasus Rift', seed: 'gs-static:void-18',
+    opts: { biome: 'void-garden', themeId: 'pegasus', holes: 18, compose: true, wildness: 0.55 },
+    themeId: 'pegasus', archetype: 'void', tier: 'brutal',
+    blurb: 'The Winged Horse soars the void — island pads over the abyss; miss the pad and you are gone.',
   },
 ];
 

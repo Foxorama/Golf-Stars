@@ -12,6 +12,7 @@ import type { Course } from '../sim/course/contract';
 import type { PlayedHole, PuttControl } from '../sim/round';
 import type { BossReward, Route, Run, RunSnapshot, StopResult, TeamDuelSetup } from '../sim/rpg/run';
 import type { EndlessRunRecord } from '../sim/rpg/endless';
+import type { StrokePlayBest } from '../sim/rpg/strokePlay';
 import type { SalvageFind } from '../sim/rpg/salvage';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
@@ -154,6 +155,9 @@ export interface UiState {
   /** Finished Unending-Universe runs (GS-golf-score), newest first — the personal last-runs
    *  leaderboard: holes reached + golf score + golfer, grouped by starting CLUB SET. Persisted. */
   endlessRuns: EndlessRunRecord[];
+  /** STAR TOUR course records (GS-star-tour): the player's best 18-hole stroke-play round on each static
+   *  course, keyed by course id. Drives the per-course + best-rounds-overall boards. Persisted. */
+  strokePlayBest: StrokePlayBest;
   /** Character-specific caddy-faction REPUTATION (GS-caddy-factions): characterId → factionId → rep.
    *  Persisted; moved by the shop when a caddy is hired (+1) or fired (−3). Deliberately HIDDEN — no
    *  screen reads it yet; it's groundwork for future faction perks/events. */
@@ -271,6 +275,7 @@ export interface MetaProgress {
   marmotTips?: number;
   endlessRuns?: EndlessRunRecord[];
   reputationByCharacter?: ReputationByCharacter;
+  strokePlayBest?: StrokePlayBest;
   /** Star Shards refunded by the GS-trade-rebalance 40% Trade Market price cut — set by the save
    *  migration, drives the one-off "prices dropped, here's your refund" notice. */
   priceRefund?: number;

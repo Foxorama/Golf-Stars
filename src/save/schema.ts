@@ -10,13 +10,14 @@ import type { RunSnapshot } from '../sim/rpg/run';
 import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
 import type { EndlessRunRecord } from '../sim/rpg/endless';
+import type { StrokePlayBest } from '../sim/rpg/strokePlay';
 import { DEFAULT_SHIP_ID, SHIPS } from '../sim/rpg/ships';
 import { APPAREL } from '../sim/rpg/apparel';
 import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 26;
+export const SAVE_VERSION = 27;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -423,8 +424,19 @@ export type SaveV26 = Omit<SaveV25, 'version'> & {
   version: 26;
 };
 
+/** v27 adds the STAR TOUR personal course-record leaderboards (GS-star-tour): the player's best-ever
+ *  18-hole stroke-play round on EACH static course, keyed by course id. Drives both Star Tour boards
+ *  (per-course best + best rounds overall). Seeded empty for existing saves — records are earned in
+ *  play, never granted. Purely additive; existing fields untouched. */
+export type SaveV27 = Omit<SaveV26, 'version'> & {
+  version: 27;
+  /** courseId → the best round ever finished on that course. A course's record is only ever replaced by
+   *  a better one, never evicted. Empty until the first Star Tour round is played. */
+  strokePlayBest: StrokePlayBest;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV26;
+export type Save = SaveV27;
 
 export function defaultSave(): Save {
   return {
@@ -453,6 +465,7 @@ export function defaultSave(): Save {
     marmotTips: 0,
     endlessRuns: [],
     reputationByCharacter: {},
+    strokePlayBest: {},
   };
 }
 
@@ -841,6 +854,12 @@ function v25ToV26(s: SaveV25): SaveV26 {
   return { ...s, version: 26, reputationByCharacter: merged };
 }
 
+/** v26 → v27: seed an empty Star Tour course-record map — no rounds played yet; records are earned in
+ *  play. Everything else is preserved untouched. */
+function v26ToV27(s: SaveV26): SaveV27 {
+  return { ...s, version: 27, strokePlayBest: {} };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -874,6 +893,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 23) s = v23ToV24(s as unknown as SaveV23) as unknown as typeof s;
   if (s.version === 24) s = v24ToV25(s as unknown as SaveV24) as unknown as typeof s;
   if (s.version === 25) s = v25ToV26(s as unknown as SaveV25) as unknown as typeof s;
+  if (s.version === 26) s = v26ToV27(s as unknown as SaveV26) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -881,7 +901,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV25>;
+  const v14 = s as unknown as Partial<SaveV27>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -920,6 +940,8 @@ export function migrate(raw: unknown): Save {
     endlessRuns: Array.isArray(v14.endlessRuns) ? v14.endlessRuns : [],
     reputationByCharacter:
       v14.reputationByCharacter && typeof v14.reputationByCharacter === 'object' ? v14.reputationByCharacter : {},
+    strokePlayBest:
+      v14.strokePlayBest && typeof v14.strokePlayBest === 'object' ? v14.strokePlayBest : {},
     priceRefund: typeof v14.priceRefund === 'number' && v14.priceRefund > 0 ? v14.priceRefund : undefined,
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,

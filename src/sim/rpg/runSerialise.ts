@@ -38,6 +38,10 @@ export interface RunSnapshot {
   /** The character's ascension-victory club unlocks (GS-ascension-clubs), so a resume rebuilds the
    *  grown starting bag. Absent ⇒ none (old snapshots / a fresh roster). */
   unlockedClubs?: string[];
+  /** STAR TOUR (GS-star-tour): the pinned static course id + weather sky, so a stroke-play round resumes
+   *  on the same course. Absent on every other format → byte-for-byte the generated path. */
+  staticCourseId?: string;
+  staticEffect?: string;
   /** The pending route event id (GS-14), so a resume mid-jump keeps the stop's modifier. */
   pendingEventId?: string;
   /** The pending destination-world theme id (GS-journey-biome), so a resume keeps the stop's biome.
@@ -92,6 +96,8 @@ export function snapshotRun(run: Run): RunSnapshot {
     ascension: run.ascension,
     bagTier: run.bagTier,
     unlockedClubs: run.unlockedClubs ? [...run.unlockedClubs] : undefined,
+    staticCourseId: run.staticCourseId,
+    staticEffect: run.staticEffect,
     pendingEventId: run.pendingEvent?.id,
     pendingThemeId: run.pendingTheme?.id,
     bonusShards: run.bonusShards,
@@ -131,6 +137,8 @@ export function resumeRun(snap: RunSnapshot): Run {
     ascension: snap.ascension ?? 0,
     bagTier,
     unlockedClubs: snap.unlockedClubs ? [...snap.unlockedClubs] : [],
+    ...(snap.staticCourseId ? { staticCourseId: snap.staticCourseId } : {}),
+    ...(snap.staticEffect ? { staticEffect: snap.staticEffect } : {}),
     pendingEvent: snap.pendingEventId ? routeEvent(snap.pendingEventId) : undefined,
     pendingTheme: snap.pendingThemeId ? themeById(snap.pendingThemeId) : undefined,
     bonusShards: snap.bonusShards ?? 0,
