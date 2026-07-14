@@ -434,10 +434,29 @@
       }
 
       /* ── Star Tour: the free-roam star map course picker (GS-star-tour) ───────── */
-      .gs-startour { position: fixed; inset: 0; overflow: hidden; background: #05060f; z-index: 1; }
+      /* Deep-space starfield backdrop (GS-star-map-bigger-canvas): the chart is bigger than any phone
+         screen and pans, but when zoomed all the way out it fits with letterbox margins. Rather than
+         leave those margins flat black, the container + viewport carry a matching deep-space gradient
+         with a faint tiled starfield, so the WHOLE screen reads as continuous starry space — the chart's
+         own dense starfield sits in the middle, this fills everything around it. Fixed to the element
+         (not scrolled), so it reads as distant background stars behind the moving chart. */
+      .gs-st-space {
+        background-color: #05060f;
+        background-image:
+          radial-gradient(1.4px 1.4px at 38px 52px, rgba(255,255,255,0.85), transparent),
+          radial-gradient(1px 1px at 150px 128px, rgba(206,224,255,0.7), transparent),
+          radial-gradient(1.2px 1.2px at 244px 210px, rgba(255,255,255,0.75), transparent),
+          radial-gradient(1px 1px at 92px 268px, rgba(255,240,207,0.6), transparent),
+          radial-gradient(1.6px 1.6px at 312px 76px, rgba(255,255,255,0.9), transparent),
+          radial-gradient(1px 1px at 356px 296px, rgba(188,212,255,0.6), transparent),
+          radial-gradient(ellipse 120% 100% at 50% 42%, #141a33 0%, #0c1024 55%, #05060f 100%);
+        background-size: 384px 340px, 384px 340px, 384px 340px, 384px 340px, 384px 340px, 384px 340px, cover;
+        background-repeat: repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
+      }
+      .gs-startour { position: fixed; inset: 0; overflow: hidden; z-index: 1; }
       .gs-startour__viewport {
         position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch; background: #05060f;
+        -webkit-overflow-scrolling: touch;
         /* We drive pan + pinch-zoom ourselves via pointer events (GS-star-tour), so disable native
            touch panning/zoom — it used to jitter into the drag handler on a second finger (the pinch
            "flicker jump"). Wheel + scrollbar still scroll (touch-action only gates touch). */
