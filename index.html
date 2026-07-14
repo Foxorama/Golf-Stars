@@ -447,58 +447,48 @@
       /* Engine plume — hidden on a docked/idle ship, faded in by the rAF loop while cruising. */
       .gs-st-thrust { opacity: 0; transition: opacity .18s ease-out; }
       #gs-st-ship.gs-st-thrusting .gs-st-thrust { opacity: 1; }
-      /* Cockpit chrome — OWN prefix `.gs-sthud` (never .gs-hud/.gs-bhud) so it can't restyle another
-         screen (CLAUDE.md class-collision rule). Overlays the map; only its controls catch pointers. */
-      .gs-sthud { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
-      .gs-sthud__frame {
-        position: absolute; inset: 8px; border-radius: 14px; pointer-events: none;
-        border: 1px solid rgba(84, 200, 255, .22);
-        box-shadow: inset 0 0 40px rgba(84, 200, 255, .07);
-      }
-      .gs-sthud__frame::before, .gs-sthud__frame::after {
-        content: ''; position: absolute; width: 26px; height: 26px; border: 2px solid #54c8ff; opacity: .8;
-      }
-      .gs-sthud__frame::before { top: -1px; left: -1px; border-right: none; border-bottom: none; border-radius: 14px 0 0 0; }
-      .gs-sthud__frame::after { bottom: -1px; right: -1px; border-left: none; border-top: none; border-radius: 0 0 14px 0; }
-      .gs-sthud__plate {
-        position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-        padding: 5px 18px; border-radius: 999px; font: 800 13px/1 system-ui, sans-serif; letter-spacing: .18em;
-        color: #bfeaff; background: linear-gradient(180deg, rgba(20,40,58,.85), rgba(10,20,32,.85));
-        border: 1px solid rgba(84,200,255,.4); box-shadow: 0 0 18px rgba(84,200,255,.25);
-      }
-      .gs-sthud__back {
-        position: absolute; top: 12px; left: 14px; pointer-events: auto; z-index: 9;
-        background: rgba(10,20,32,.85); border: 1px solid rgba(84,200,255,.4); color: #bfeaff;
-        border-radius: 999px; padding: 6px 14px; font: 700 13px/1 system-ui; cursor: pointer;
-      }
-      .gs-sthud__back:hover { border-color: #54c8ff; }
-      .gs-sthud__statpod {
-        position: absolute; top: 12px; right: 14px; display: flex; align-items: center; gap: 8px; pointer-events: auto;
-        padding: 5px 10px; border-radius: 999px; background: rgba(10,20,32,.8); border: 1px solid rgba(84,200,255,.3);
-      }
-      .gs-sthud__shards { font-size: 12px; color: var(--gs-gold); }
-      .gs-sthud__cog { background: none; border: none; color: #bfeaff; font-size: 17px; cursor: pointer; padding: 0 2px; }
-      /* Bottom dock: the golfer-swap pod (lower-left) + records toggle (lower-right). */
-      .gs-sthud__dock {
-        position: absolute; left: 12px; right: 12px; bottom: 14px; z-index: 7; pointer-events: none;
-        display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
-      }
+      /* Cockpit chrome (GS-star-tour-hud): the star map REUSES the journey bridge HUD (`.gs-bhud`) so it
+         recolours to the flown ship identically and inherits the same fleet ornaments — see the `.gs-bhud`
+         block below + `render/hudTheme.ts`. A `.gs-bhud--st` context modifier swaps the travel controls
+         (fuel/scan/credits/hole) for Star Tour's own: a records stat pod, the golfer-swap CENTRE command,
+         a records readout, and the EXIT switch in the bottom-left console slot. Star-Tour CONTENT keeps the
+         `.gs-sthud__` prefix; the FRAME/theme/ornaments are the shared `.gs-bhud`. (This SUPERSEDED the old
+         standalone `.gs-sthud` frame — same class-collision guard: never `.gs-hud`, the play screen's.) */
+      .gs-bhud--st .gs-bhud__shards { flex: 0 0 auto; font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--gs-gold); }
+      .gs-bhud--st .gs-bhud__shards b { color: var(--gs-gold); }
+      /* Push the console DECK further left so it clears the wider golfer pill in the centre slot (the
+         travel deck stops at 50%+40px for the 62px scan dial; the golfer pill is up to ~180px). */
+      .gs-bhud--st .gs-bhud__deck { right: calc(50% + 100px); }
+      /* CENTRE command — the golfer swap, styled like the journey scan dial (glowing round-rect reading
+         the livery `--hud-*`) but a wider pill so the golfer name + ship fit. */
       .gs-sthud__golfer {
         pointer-events: auto; display: flex; align-items: center; gap: 9px; cursor: pointer; text-align: left;
-        background: rgba(10,20,32,.86); border: 1px solid rgba(84,200,255,.3); border-radius: 12px; padding: 8px 12px;
-        color: #eaf4ff; max-width: 62%;
+        max-width: 190px; height: 48px; padding: 0 14px; border-radius: 13px; color: var(--gs-ink); line-height: 1;
+        border: 1.5px solid color-mix(in srgb, var(--hud-accent) 62%, transparent);
+        background: radial-gradient(120% 120% at 50% 26%, color-mix(in srgb, var(--hud-accent) 22%, #0b111c), #06090f);
+        box-shadow: 0 0 18px -5px var(--hud-accent), inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 44%, transparent), inset 0 0 12px color-mix(in srgb, var(--hud-glow) 52%, transparent);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .08s ease, border-color .16s ease, filter .16s ease, box-shadow .16s ease;
       }
-      .gs-sthud__golfer:hover { border-color: #54c8ff; }
+      .gs-sthud__golfer:active { transform: scale(0.95); }
+      .gs-sthud__golfer:hover { filter: brightness(1.12); box-shadow: 0 0 24px -4px var(--hud-accent), inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 56%, transparent), inset 0 0 15px color-mix(in srgb, var(--hud-glow) 64%, transparent); }
       .gs-sthud__golfer-dot { width: 12px; height: 12px; border-radius: 999px; flex: 0 0 auto; box-shadow: 0 0 8px currentColor; }
-      .gs-sthud__golfer-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-      .gs-sthud__golfer-txt b { font-size: 13px; }
-      .gs-sthud__golfer-txt span { font-size: 10.5px; color: #7fa6c4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-sthud__golfer-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.18; }
+      .gs-sthud__golfer-txt b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .gs-sthud__golfer-txt span { font-size: 10px; color: var(--hud-ink); opacity: .82; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* RIGHT readout — the records toggle, recessed like the journey fuel readout. */
       .gs-sthud__records {
-        pointer-events: auto; cursor: pointer; flex: 0 0 auto;
-        background: rgba(10,20,32,.86); border: 1px solid rgba(255,206,84,.4); color: #ffde8a;
-        border-radius: 999px; padding: 9px 14px; font: 700 13px/1 system-ui;
+        pointer-events: auto; cursor: pointer; flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
+        height: 44px; padding: 0 13px; border-radius: 11px; font: 700 12.5px/1 system-ui; color: var(--gs-gold);
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 28%, transparent);
+        background: linear-gradient(180deg, rgba(4,7,12,0.66), rgba(8,11,17,0.5));
+        box-shadow: inset 0 1px 4px rgba(0,0,0,0.6), inset 0 0 9px color-mix(in srgb, var(--hud-glow) 26%, transparent);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .08s ease, border-color .16s ease, filter .16s ease;
       }
-      .gs-sthud__records:hover { border-color: #ffce54; }
+      .gs-sthud__records:active { transform: scale(0.94); }
+      .gs-sthud__records:hover { border-color: color-mix(in srgb, var(--hud-accent) 52%, transparent); filter: brightness(1.08); }
+      .gs-sthud__records[aria-pressed="true"] { border-color: color-mix(in srgb, var(--gs-gold) 60%, transparent); box-shadow: inset 0 1px 4px rgba(0,0,0,0.6), 0 0 14px -4px var(--gs-gold); }
       .gs-st-hint { font-size: 12px; color: #7fa6c4; margin: 2px 0 12px; }
       /* The bottom dossier / records sheet */
       .gs-st-sheet {

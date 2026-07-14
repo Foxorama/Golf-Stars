@@ -1814,8 +1814,9 @@ function render(): void {
           return;
         }
         const target = e.target as Element;
-        // Ignore taps on the HUD controls that overlay the map (they have their own handlers).
-        if (target.closest('.gs-sthud__back, .gs-sthud__statpod, .gs-sthud__dock, .gs-st-sheet')) return;
+        // Ignore taps on the HUD controls that overlay the map (they have their own handlers). The HUD
+        // is the shared bridge frame (GS-star-tour-hud) — `.gs-bhud` covers exit/golfer/records/cog.
+        if (target.closest('.gs-bhud, .gs-st-sheet')) return;
         const worldEl = target.closest('[data-startour-course]');
         if (worldEl) {
           flyStarTourToWorld(worldEl.getAttribute('data-startour-course'));
