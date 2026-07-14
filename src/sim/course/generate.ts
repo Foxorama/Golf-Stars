@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 33; // GS-biome-variety: Toxic Mire winding serpent-coil identity (S-curve/hairpin coils + claustrophobic corridors + acid pools)
+export const GENERATOR_VERSION = 34; // GS-biome-variety: Scrap Belt low-grav-bomber identity (crater-field hourglass pinches + barranca cape carries + scrap-plate roughFill)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
