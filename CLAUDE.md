@@ -123,6 +123,19 @@ these systems** — each bullet is the tip of a documented iceberg.
     spore-jungle (tight/twisty), ice-ring (exposed links); guarded by `tests/biome-profile.test.ts`.
     `widthWeights`/`shapeWeights` apply to par-4/5 land holes only (island/ship/par-3 pools keep their
     own recipes). `GENERATOR_VERSION` 24.
+  - GS-biome-variety (in progress) — the player ask: "almost every hole/biome looks the same, difficulty
+    is just length; give each world unique shapes + FILL the rough so you can't direct-line the green."
+    The fix is per-world profiles on the WHOLE rotation (not just the three GS-biome-profile worlds) +
+    denser off-corridor hazards, world by world (one PR each, GENERATOR_VERSION bumped): distinct
+    `shapeWeights` (kill the wandering-snake read — real doglegs/capes/pinches), `widthWeights` leaning on
+    the SQUEEZE archetypes (`hourglass`/`neck`/`chute`) so a pinch forces a LAYUP + iron approach
+    (difficulty from strategy, not length or trick greens), and bumped `treeDensity`/`ponds`/`potBunkers`/
+    scatter so the rough bites. Difficulty is deliberately raised — the death-spiral/tents balance fences
+    are RELAXED with `TODO(GS-biome-variety)` (the GS-rough-gradient pattern), NEVER the structural
+    fairness contracts (`validateFairness`/`Crossings`/`Course` stay green by construction). The
+    `tests/fairway-width.test.ts` GRAMMAR sample moved off verdant → `asgard-realm` (the neutral
+    default-weights reference we never re-profile). Done: verdant-station (strategic parkland). Cetus
+    (waterfalls) + Derelict (walls) are handled LAST + minimally.
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays

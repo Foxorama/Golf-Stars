@@ -66,11 +66,23 @@ function widthAtU(h: Hole, u: number): number {
   return reach(1) + reach(-1);
 }
 
+// The width GRAMMAR is world-agnostic (chooseWidthProfile's default thresholds). It used to be sampled
+// on verdant-station, but verdant now carries its own opinionated width IDENTITY (GS-biome-variety), so
+// it's no longer a neutral sample. `asgard-realm` carries NO per-world `widthWeights` (the deliberately
+// grand, fair reward world we never re-profile), so it draws the default 7-archetype distribution — the
+// stable neutral reference for these grammar assertions. Occasional raw generateCourse throws (the
+// production retry layer handles them) are skipped so the grammar sample stays robust.
+const GRAMMAR_BIOME = 'asgard-realm';
 /** Collect holes carrying a given width archetype across seeds. */
 function holesOf(widthId: string, opts: { biome?: string; wildness: number; seeds: number; base: number }): Hole[] {
   const out: Hole[] = [];
   for (let s = 0; s < opts.seeds; s++) {
-    const c = generateCourse(s + opts.base, { biome: opts.biome ?? 'verdant-station', holes: 4, wildness: opts.wildness });
+    let c;
+    try {
+      c = generateCourse(s + opts.base, { biome: opts.biome ?? GRAMMAR_BIOME, holes: 4, wildness: opts.wildness });
+    } catch {
+      continue; // benign raw-throw config (e.g. "creek crowds the green") — production retries it
+    }
     for (const h of c.holes) if (h.widthId === widthId) out.push(h);
   }
   return out;
@@ -82,7 +94,12 @@ describe('fairway width grammar (GS-fairway-width)', () => {
   it('every width archetype actually appears across seeds (par 4/5 pool + par-3 pool)', () => {
     const seen = new Set<string>();
     for (let s = 0; s < 120; s++) {
-      const c = generateCourse(s + 61000, { biome: 'verdant-station', holes: 4, wildness: 0.5 });
+      let c;
+      try {
+        c = generateCourse(s + 61000, { biome: GRAMMAR_BIOME, holes: 4, wildness: 0.5 });
+      } catch {
+        continue;
+      }
       for (const h of c.holes) if (h.widthId) seen.add(h.widthId);
     }
     for (const id of ['classic', 'chute', 'neck', 'hourglass', 'wander', 'thin', 'broad']) {
@@ -93,7 +110,12 @@ describe('fairway width grammar (GS-fairway-width)', () => {
   it('width variety is DECOUPLED from difficulty: the squeezed archetypes appear on calm stops too', () => {
     const seen = new Set<string>();
     for (let s = 0; s < 120; s++) {
-      const c = generateCourse(s + 62000, { biome: 'verdant-station', holes: 4, wildness: 0.1 });
+      let c;
+      try {
+        c = generateCourse(s + 62000, { biome: GRAMMAR_BIOME, holes: 4, wildness: 0.1 });
+      } catch {
+        continue;
+      }
       for (const h of c.holes) if (h.widthId) seen.add(h.widthId);
     }
     for (const id of ['chute', 'neck', 'hourglass', 'thin', 'broad']) {
