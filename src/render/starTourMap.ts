@@ -1189,25 +1189,43 @@ function earthGlyph(): string {
     </g>`;
 }
 
-/** The clubhouse spaceport station — the ship's home dock, drawn as a ringed orbital platform with a
- *  lit landing pad and a beacon. Not tappable (it's a landmark, not a course). */
+/** The clubhouse SPACEPORT station (GS-star-tour-port) — the ship's home dock AND the way OUT of the star
+ *  map: it's a TAPPABLE target (`data-startour-port`), and flying home to it docks the ship and opens the
+ *  Clubhouse. Drawn as a proper orbital station — a ringed platform, a central hub with lit windows,
+ *  extended docking gantries with landing pads + guide lights, and a beacon mast — so it reads as a real
+ *  port you return to, not just a label. A "⇩ DOCK · CLUBHOUSE" hint spells out that tapping leaves. */
 function spaceportGlyph(): string {
   const { x, y } = SPACEPORT_POS;
+  const pad = (px: number, py: number) =>
+    `<g transform="translate(${px},${py})">
+       <rect x="-7" y="-5" width="14" height="10" rx="2.5" fill="#22424a" stroke="#4a8f96" stroke-width="1"/>
+       <rect x="-7" y="-5" width="14" height="3" rx="2" fill="#3a7078"/>
+       <circle cx="-4" cy="2.5" r="1.1" fill="#7ff0e0"/><circle cx="0" cy="2.5" r="1.1" fill="#7ff0e0"/><circle cx="4" cy="2.5" r="1.1" fill="#7ff0e0"/>
+     </g>`;
   return `
-    <g transform="translate(${x},${y})" aria-hidden="true">
-      <circle r="46" fill="#39d9c4" opacity="0.06"/>
-      <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#39d9c4" stroke-width="2.5" opacity="0.45"/>
-      <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#7ff0e0" stroke-width="1" opacity="0.6"/>
-      <circle cx="-42" cy="0" r="3" fill="#39d9c4"/><circle cx="42" cy="0" r="3" fill="#39d9c4"/>
-      <rect x="-16" y="-13" width="32" height="24" rx="5" fill="#28454d"/>
-      <rect x="-16" y="-13" width="32" height="7" rx="5" fill="#35636d"/>
-      <rect x="-11" y="-3" width="4" height="4" rx="0.6" fill="#ffd27a"/>
-      <rect x="-4" y="-3" width="4" height="4" rx="0.6" fill="#ffd27a"/>
-      <rect x="3" y="-3" width="4" height="4" rx="0.6" fill="#ffd27a"/>
-      <rect x="-11" y="4" width="4" height="4" rx="0.6" fill="#ffd27a"/>
-      <rect x="-1" y="-24" width="2" height="11" fill="#5c7a80"/>
-      <circle cx="0" cy="-25" r="2.6" fill="#ff8f5e"><animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite"/></circle>
-      <text x="0" y="34" font-size="12" text-anchor="middle" fill="#7ff0e0" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;letter-spacing:.1em;">SPACEPORT</text>
+    <g class="gs-st-port" data-startour-port="1" role="button" aria-label="Dock at the spaceport and enter the Clubhouse" transform="translate(${x},${y})" style="cursor:pointer;">
+      <circle r="62" fill="#39d9c4" opacity="0.05"/>
+      <circle class="gs-st-port__halo" r="54" fill="none" stroke="#39d9c4" stroke-width="1" opacity="0.25"/>
+      <ellipse cx="0" cy="0" rx="52" ry="17" fill="none" stroke="#39d9c4" stroke-width="2.5" opacity="0.4"/>
+      <ellipse cx="0" cy="0" rx="52" ry="17" fill="none" stroke="#7ff0e0" stroke-width="1" opacity="0.55"/>
+      <!-- docking gantries out to the landing pads -->
+      <line x1="-18" y1="0" x2="-46" y2="0" stroke="#4a8f96" stroke-width="2.5"/>
+      <line x1="18" y1="0" x2="46" y2="0" stroke="#4a8f96" stroke-width="2.5"/>
+      ${pad(-52, 0)}${pad(52, 0)}
+      <!-- central hub -->
+      <rect x="-19" y="-15" width="38" height="30" rx="6" fill="#28454d" stroke="#4a8f96" stroke-width="1.2"/>
+      <rect x="-19" y="-15" width="38" height="9" rx="6" fill="#35636d"/>
+      <rect x="-13" y="-3" width="4.5" height="4.5" rx="0.6" fill="#ffd27a"/>
+      <rect x="-5.5" y="-3" width="4.5" height="4.5" rx="0.6" fill="#ffd27a"/>
+      <rect x="2" y="-3" width="4.5" height="4.5" rx="0.6" fill="#ffd27a"/>
+      <rect x="9.5" y="-3" width="4.5" height="4.5" rx="0.6" fill="#ffe0a0"/>
+      <rect x="-13" y="5" width="4.5" height="4.5" rx="0.6" fill="#ffd27a"/>
+      <rect x="-5.5" y="5" width="4.5" height="4.5" rx="0.6" fill="#ffd27a"/>
+      <!-- beacon mast -->
+      <rect x="-1.2" y="-28" width="2.4" height="13" fill="#5c7a80"/>
+      <circle cx="0" cy="-29" r="2.8" fill="#ff8f5e"><animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite"/></circle>
+      <text x="0" y="42" font-size="12" text-anchor="middle" fill="#7ff0e0" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;letter-spacing:.1em;">SPACEPORT</text>
+      <text x="0" y="56" font-size="9.5" text-anchor="middle" fill="#cfe" font-weight="600" opacity="0.85" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;letter-spacing:.08em;">⇩ DOCK · CLUBHOUSE</text>
     </g>`;
 }
 

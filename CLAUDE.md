@@ -949,7 +949,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     and OPENS its DOSSIER on arrival (flavour, tier,
     record, WEATHER picker, Fly-here-&-play → `pickStarTourCourse` pins the course on the golfer's run →
     `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there, slightly more
-    zoomed OUT than intrinsic — `ST_OPEN_ZOOM`). The cockpit HUD REUSES the journey bridge HUD
+    zoomed OUT than intrinsic — `ST_OPEN_ZOOM`). The SPACEPORT is the map's way OUT (GS-star-tour-port): it's
+    a TAPPABLE station (`data-startour-port`, drawn as a proper docking port with gantries/pads + a "DOCK ·
+    CLUBHOUSE" hint) — flying home to it DOCKS the ship (`flyStarTourToPort` → `dockingAtPort`, arrival
+    dispatches `openClubhouseHall`) and opens the Clubhouse; the Clubhouse hall's "🚀 Depart to Star Tour"
+    button (`openStarTour`, now reachable from `clubhouseHall`) flies you back out — the spaceport ↔ clubhouse
+    loop. The cockpit HUD REUSES the journey bridge HUD
     (GS-star-tour-hud, `stHud`): the star map renders a `.gs-bhud gs-bhud--st gs-bhud--<variant>` frame
     piped `hudThemeForShip`/`hudThemeVars` + `hudChromeFor`, so it recolours to the flown ship AND inherits
     the identical fleet ornaments (title plate = ship name, rails, nodes, wings, deck) — a themed bridge is

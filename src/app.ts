@@ -296,6 +296,7 @@ function dispatch(action: Action): void {
       starTourView.targetX = null;
       starTourView.targetY = null;
       starTourView.flyingTo = null;
+      starTourView.dockingAtPort = false;
       // Open slightly more zoomed OUT than the intrinsic 1× (GS-star-tour-map-improvements) so more of the
       // sky is in frame on arrival; the cover-zoom clamp still raises it if a tall viewport would letterbox.
       starTourView.zoom = ST_OPEN_ZOOM;
@@ -1428,6 +1429,7 @@ function flyStarTourToPoint(x: number, y: number): void {
   starTourView.targetX = Math.max(20, Math.min(CHART_W - 20, x));
   starTourView.targetY = Math.max(20, Math.min(CHART_H - 20, y));
   starTourView.flyingTo = null;
+  starTourView.dockingAtPort = false;
   setStarTourFlip(starTourView.targetX);
   sfx.click();
   startStarTourAnim();
@@ -1442,11 +1444,26 @@ function flyStarTourToWorld(id: string | null): void {
   starTourView.targetX = p.x;
   starTourView.targetY = p.y;
   starTourView.flyingTo = id;
+  starTourView.dockingAtPort = false;
   starTourView.selectedId = null; // close any open dossier while we fly
   setStarTourFlip(p.x);
   sfx.click();
   haptic(HAPTICS.tap);
   render(); // reflect the closed dossier immediately, then fly
+}
+
+/** Fly home to the SPACEPORT (GS-star-tour-port): on arrival the ship docks and the Clubhouse opens — the
+ *  star map's way OUT. */
+function flyStarTourToPort(): void {
+  starTourView.targetX = SPACEPORT_POS.x;
+  starTourView.targetY = SPACEPORT_POS.y;
+  starTourView.flyingTo = null;
+  starTourView.dockingAtPort = true;
+  starTourView.selectedId = null;
+  setStarTourFlip(SPACEPORT_POS.x);
+  sfx.click();
+  haptic(HAPTICS.tap);
+  render();
 }
 
 /** Lerp an angle (degrees) toward a target by fraction f, taking the short way round. */
@@ -1604,6 +1621,14 @@ function stepStarTour(): void {
       v.targetY = null;
       // Visiting any station (a world, Earth, the spaceport) tops the tank to full (GS-star-tour-fuel).
       if (starTourStationNear(v.shipX, v.shipY)) v.fuel = STAR_TOUR_FUEL_CAP;
+      if (v.dockingAtPort) {
+        // Docked home at the spaceport (GS-star-tour-port) → into the Clubhouse (the map's way out).
+        v.dockingAtPort = false;
+        stAnim.raf = 0;
+        sfx.click();
+        dispatch({ type: 'openClubhouseHall' });
+        return;
+      }
       if (v.flyingTo) {
         // Arrived at a world → open its course dossier (the "course info screen loads on arrival").
         v.selectedId = v.flyingTo;
@@ -1980,6 +2005,11 @@ function render(): void {
         const worldEl = target.closest('[data-startour-course]');
         if (worldEl) {
           flyStarTourToWorld(worldEl.getAttribute('data-startour-course'));
+          return;
+        }
+        // Tapping the SPACEPORT (GS-star-tour-port) flies home + docks → the Clubhouse (the map's way out).
+        if (target.closest('[data-startour-port]')) {
+          flyStarTourToPort();
           return;
         }
         // Free flight to the tapped chart point. The SVG renders at zoom×intrinsic, so divide the

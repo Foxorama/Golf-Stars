@@ -258,7 +258,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // choice flows to the star map (so the map can fly the golfer's own cosmetic ship). The corner
       // "change golfer" button on the map re-enters here too. EXCEPTION: coming back from a round's
       // recap ("Star map") keeps the SAME golfer and lands straight on the map — you just picked them.
-      if (!['title', 'gameover', 'strokeResult', 'starTour', 'character'].includes(state.screen)) return state;
+      // GS-star-tour-port: also reachable from the Clubhouse hall's "Depart to Star Tour" button (the
+      // spaceport ↔ clubhouse loop), which re-enters character select before the map.
+      if (!['title', 'gameover', 'strokeResult', 'starTour', 'character', 'clubhouseHall'].includes(state.screen)) return state;
       const keepGolfer = state.screen === 'strokeResult' && !!state.run.loadout.characterId;
       const run = keepGolfer
         ? startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, state.run.loadout.characterId, state.run.ascension, state.run.bagTier, state.run.unlockedClubs)
@@ -963,8 +965,15 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'openClubhouseHall': {
       // Enter the Clubhouse — the hall where all four golfers wait, each a doorway to their own
       // garage + wardrobe. Reachable between runs (title / game over) and straight from the Trade
-      // Market ("try it on") so a shopper can jump to outfitting without a title round-trip.
-      if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'trademarket') return state;
+      // Market ("try it on") so a shopper can jump to outfitting without a title round-trip. Also from the
+      // Star Tour star map (GS-star-tour-port): docking home at the spaceport opens the Clubhouse.
+      if (
+        state.screen !== 'title' &&
+        state.screen !== 'gameover' &&
+        state.screen !== 'trademarket' &&
+        state.screen !== 'starTour'
+      )
+        return state;
       return { ...state, screen: 'clubhouseHall' };
     }
 

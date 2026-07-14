@@ -82,6 +82,9 @@ export const starTourView = {
   targetY: null as number | null,
   /** The course id to open on arrival (a flight triggered by tapping a world), or null (free flight). */
   flyingTo: null as string | null,
+  /** Flying home to the SPACEPORT (GS-star-tour-port): on arrival the ship docks and the Clubhouse opens
+   *  (the map's way OUT). Set by tapping the spaceport, cleared by any other fly. */
+  dockingAtPort: false,
   /** Chart zoom (pinch/scroll), 1 = intrinsic. Preserved across re-renders like the scroll offset. */
   zoom: 1,
   /** Ship fuel (GS-star-tour-fuel), 0..STAR_TOUR_FUEL_CAP. Drains while cruising, tops up at stations. */
