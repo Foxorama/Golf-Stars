@@ -1246,9 +1246,34 @@ let selClubSetTouched = false;
 // click that ends the drag doesn't accidentally select the world it lands on. Reset on each pointerdown.
 let starTourDragged = false;
 
-/** Star Tour chart zoom bounds (pinch / scroll). */
-const ST_ZOOM_MIN = 0.5;
+/** Star Tour chart zoom bounds (pinch / scroll). The MIN is dynamic (`starTourCoverZoom`) — a static
+ *  floor let a pinch-out shrink the chart smaller than the viewport, so the SVG sat at the top-left and
+ *  the viewport's black background showed around it (the "zoomed but left a heap of black space" bug). */
 const ST_ZOOM_MAX = 2.6;
+
+/** The smallest zoom at which the chart still COVERS the viewport in BOTH axes: below this the rendered
+ *  SVG (`CHART_W×CHART_H × zoom` px) is smaller than the viewport and bare space shows around it. A
+ *  covering zoom must clear the width ratio AND the height ratio, so the floor is the LARGER of the two.
+ *  Guards against a zero-sized viewport (pre-layout) by falling back to 0 so the caller's own max wins. */
+function starTourCoverZoom(vp: HTMLElement): number {
+  const w = vp.clientWidth;
+  const h = vp.clientHeight;
+  if (w <= 0 || h <= 0) return 0;
+  return Math.max(w / CHART_W, h / CHART_H);
+}
+
+/** Force the chart's rendered size to at least cover the viewport (used on mount + resize): if the
+ *  current zoom letterboxes, bump it to the cover floor and resize the SVG in place. */
+function clampStarTourZoomToCover(vp: HTMLElement): void {
+  const chart = vp.querySelector<SVGElement>('.gs-startour__chart');
+  const zMin = starTourCoverZoom(vp);
+  if (!chart || zMin <= 0) return;
+  if ((starTourView.zoom || 1) < zMin) {
+    starTourView.zoom = zMin;
+    chart.setAttribute('width', (CHART_W * zMin).toFixed(0));
+    chart.setAttribute('height', (CHART_H * zMin).toFixed(0));
+  }
+}
 
 /** Wire pan + PINCH-ZOOM on the Star Tour chart viewport. The viewport is `touch-action:none`, so we
  *  drive both gestures ourselves via pointer events (native touch-scroll used to jitter into the drag
@@ -1265,7 +1290,12 @@ function wireStarTourGestures(vp: HTMLElement): void {
   vp.style.cursor = 'grab';
 
   const setZoom = (z: number, focalClientX: number, focalClientY: number): void => {
-    z = Math.max(ST_ZOOM_MIN, Math.min(ST_ZOOM_MAX, z));
+    // Floor at the cover zoom so a pinch-out never shrinks the chart smaller than the viewport (which
+    // would letterbox it in black). Keep the ceiling above the floor for tall/narrow viewports where
+    // the cover fit itself exceeds ST_ZOOM_MAX.
+    const zMin = starTourCoverZoom(vp);
+    const zMax = Math.max(ST_ZOOM_MAX, zMin);
+    z = Math.max(zMin, Math.min(zMax, z));
     const oldZoom = starTourView.zoom || 1;
     if (!chart || z === oldZoom) return;
     const rect = vp.getBoundingClientRect();
@@ -1666,6 +1696,9 @@ function render(): void {
     if (vp) {
       if (!starTourView.centred) {
         requestAnimationFrame(() => {
+          // Never open (or re-open) below the cover zoom — a tall/narrow viewport at the intrinsic 1×
+          // would already letterbox the chart.
+          clampStarTourZoomToCover(vp);
           // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2). Scroll is
           // rendered px = chart-coord × zoom.
           const z = starTourView.zoom || 1;
@@ -1676,6 +1709,9 @@ function render(): void {
           starTourView.centred = true;
         });
       } else if (starTourView.scrollX != null && starTourView.scrollY != null) {
+        // Re-clamp on every re-render: an orientation change / resize can lift the cover floor above the
+        // held zoom, which would reintroduce the black margin until the next pinch.
+        clampStarTourZoomToCover(vp);
         // Restore the preserved scroll — the viewport is a fresh node each render, so the browser
         // scroll is otherwise lost and the chart snaps to its top-left corner.
         vp.scrollLeft = starTourView.scrollX;
