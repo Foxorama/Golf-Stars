@@ -288,23 +288,27 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 1,
     frozenPond: true, // signature: a meltwater channel crosses the fairway (forced carry)
     deepRough: 'deeprough', // deep wind-packed snowdrift buries a cut corner
-    ponds: 1.0, // frozen lakes flank the landing zones
-    potBunkers: 0.6, // frozen-faced pot bunkers ring the ice greens
+    ponds: 1.4, // more frozen lakes flank the shelves — the gale pushes an offline shot onto the ice
+    potBunkers: 1.0, // frozen-faced pot bunkers pinch the shelf landing zones + ring the ice greens
     fescue: 0.5, // frosted tussock grass in the deep rough
+    roughFill: 'fescue', // GS-biome-variety: wind-scoured FESCUE / frozen marram fills the exposed shelf rough (recoverable — the wind + ice are the teeth)
     greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
     greenAspect: 2.6,
     greenIrregular: 1.0,
     greenSlopeMax: 0.7, // GS-greens-3 green tilt character
     roughBreaks: 0.6, // GS-variety-2 broken-fairway frequency
-    // IDENTITY (GS-biome-profile): an EXPOSED LINKS on the ice — more short par-3s (wind-shot holes),
-    // sweeping S-curves the gale pushes, and wandering wind-scoured shelf fairways. The wind does the
+    // IDENTITY (GS-biome-profile / GS-biome-variety): an EXPOSED LINKS on the ice — more short par-3s
+    // (wind-shot holes), sweeping S-curves the gale pushes, and wandering wind-scoured shelf fairways
+    // with the odd hourglass pinch. The WIND (the game's brutalest) + the flanking ice + the pots do the
     // damage, not severe corners.
     parMix: { p3: 0.32, p4: 0.5, p5: 0.18 },
     shapeWeights: { straight: 0.24, dogleg: 0.22, cape: 0.12, double: 0.3, hairpin: 0.12 },
-    widthWeights: { classic: 0.16, chute: 0.08, neck: 0.1, hourglass: 0.12, wander: 0.3, thin: 0.18, broad: 0.06 },
-    // GS-biome-difficulty: the ice SHELVES are the test — deep stops turn treacherous underfoot
-    // (steeper tilt, double-breaking contours, pins tucked on the shelves) rather than just longer.
-    difficulty: { greenTilt: 1.35, greenComplexity: 1.4, pinTuck: 0.6 },
+    widthWeights: { classic: 0.16, chute: 0.08, neck: 0.1, hourglass: 0.16, wander: 0.24, thin: 0.18, broad: 0.08 },
+    // GS-biome-difficulty: the ice SHELVES stay a distinct test — deep stops turn treacherous underfoot
+    // (steeper tilt, double-breaking contours, pins tucked on the shelves). MODERATED (GS-biome-variety:
+    // 1.35/1.4/0.6 → 1.15/1.2/0.4) so difficulty leans on the wind + hazards above, not putting-punishment
+    // — still clearly the treacherous-green world (well above the smooth desert), just less extreme.
+    difficulty: { greenTilt: 1.15, greenComplexity: 1.2, pinTuck: 0.4 },
   },
   {
     id: 'ember-world',
