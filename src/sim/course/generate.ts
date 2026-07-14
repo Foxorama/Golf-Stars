@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 36; // GS-green-diversity: bigger + distinct greens per world for putting difficulty + uniqueness (size/aspect/slope + difficulty vectors; terrain stream unperturbed)
+export const GENERATOR_VERSION = 37; // GS-green-diversity: bigger + distinct island/deck-pad greens for void/cetus/derelict (green levers only; island/waterfall/wall machinery untouched)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
