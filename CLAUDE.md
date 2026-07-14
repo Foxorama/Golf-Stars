@@ -165,6 +165,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     so it's harder-never-unfair (slope/lobe stay under `greenSlopeMax`, the pin stays inside the green).
     This is the GREEN axis only; firmness / forced-carry axes (main physics stream) are a later pass.
     Guarded by `tests/biome-difficulty.test.ts`. `GENERATOR_VERSION` 25.
+  - GREEN DIVERSITY (GS-green-diversity) — the player ask: "small greens are too EASY to putt (if you hit
+    one you're near the pin); bigger, more varied greens are HARDER (you can be on the green but 60 ft away
+    across a ridge) — do a lot more green diversity for difficulty + uniqueness." So every rotation world
+    got a DISTINCT, mostly BIGGER green identity via the existing scalar levers: `greenSize` (the poster
+    lever — desert/earth HUGE smooth 1.5, most worlds 1.1–1.25, up from 0.85–1.0), `greenAspect` (long
+    shelves — ice 2.6, tempest 2.3), `greenIrregular` (kept per-world for silhouette variety — jagged ember
+    1.45, smooth desert 0.85), `greenSlopeMax` (steeper), and a `difficulty` vector on nearly every world
+    (ice restored to the steepest 1.35/1.35/0.55; the DESERT deliberately keeps NO vector — its putting
+    test is pure SIZE on a big SMOOTH green, and it's also the biome-difficulty test's smooth reference).
+    CRITICAL — cheap by construction: `greenSize`/`greenAspect` are a post-multiply / fixed-draw PARAM (not
+    an rng-count change) and slope/contour/pin ride the per-hole SIDE streams, so this pass reflows ZERO
+    main-terrain draws (crossings/shapes/widths byte-identical) — only `greenIrregular` would perturb the
+    stream, so it was LEFT per-world. Bigger greens are EASIER to hit (so the auto death-spiral bars don't
+    trip — the auto sim's putting is simplified) but HARDER to putt for a human (longer lag, more break) —
+    the intended asymmetry. Only the ace-ship fixture seed re-pinned (79 → 25). `GENERATOR_VERSION` 36.
+    Void/Cetus/Derelict greens ride the careful island/wall PR.
   - A multi-hole stop is COMPOSED, not IID-sampled (GS-compose, `course/compose.ts planCourse`): the
     run path (`runCourse`, `opts.compose`) plans a par SEQUENCE (proportions track the generator's own
     ~25/55/20 mix, a par-3+par-5 guaranteed, never 3 identical pars in a row), 1–2 SIGNATURE holes (a
