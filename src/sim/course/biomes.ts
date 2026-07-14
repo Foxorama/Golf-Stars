@@ -416,14 +416,24 @@ export const BIOMES: readonly Biome[] = [
     deepRough: 'deeprough', // deep storm-flattened moor grass grabs a cut corner
     fairwayWidthMult: 1.05, // a touch wider to keep the gale fair
     doglegBias: 0.3,
-    treeDensity: 0.4, // wind-bent scrub
-    fairwayBunkers: 1.4,
-    potBunkers: 0.4,
+    treeDensity: 0.9, // GS-biome-variety: wind-bent scrub stands, denser (the exposed moor was near-bare)
+    fairwayBunkers: 1.8, // exposed sand scrapes bite the wide landing zones
+    potBunkers: 1.2, // signature: FIELDS of deep links pot bunkers guard the wide targets (the classic links defence)
+    ponds: 1.6, // signature: big storm lakes flank the corridors — the gale pushes an offline shot into the water
+    roughFill: 'fescue', // GS-biome-variety: wispy storm-moor FESCUE fills the exposed rough (recoverable, not brutal — the wind is the teeth)
     greenSize: 1.05,
     greenAspect: 2.2, // long, storm-scoured shelves
     greenIrregular: 1.1,
     greenSlopeMax: 0.5, // GS-greens-3 green tilt character
     roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-variety): an EXPOSED WIND-LINKS on the gas giant — WIDE, sweeping fairways
+    // (broad/wander) with the odd hourglass driving-zone pinch, but the WIND is the defence: it pushes an
+    // offline shot into the FLANKING STORM LAKES and FIELDS of pot bunkers guarding the generous targets.
+    // Difficulty is wind + hazards on a wide canvas, NOT a tight corridor (a gale down a chute is unfair).
+    // Sweeping doglegs/S-curves the gale bends; par-4 dominant with wind-shot par-3s.
+    parMix: { p3: 0.26, p4: 0.52, p5: 0.22 },
+    shapeWeights: { straight: 0.24, dogleg: 0.28, cape: 0.2, double: 0.2, hairpin: 0.08 },
+    widthWeights: { classic: 0.18, chute: 0.06, neck: 0.08, hourglass: 0.16, wander: 0.24, thin: 0.06, broad: 0.22 },
   },
   {
     id: 'spore-jungle',
