@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 32; // GS-biome-variety: Tidal Archipelago heroic water-carry identity (cape carries + lagoon-threaded hourglass/neck + palm/beach rough)
+export const GENERATOR_VERSION = 33; // GS-biome-variety: Toxic Mire winding serpent-coil identity (S-curve/hairpin coils + claustrophobic corridors + acid pools)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
