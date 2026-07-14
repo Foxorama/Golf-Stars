@@ -1258,7 +1258,8 @@ let starTourDragged = false;
  *  pull ALL the way back to see the whole wide map — essential on a tall portrait phone where the old
  *  COVER floor (`max(w/CHART_W, h/CHART_H)`) forced a heavy zoom-in just to cover the viewport height and
  *  made zoom-out nearly impossible (GS-star-map-zoom-out). Below the fit floor the chart is centred
- *  (letterboxed) by CSS `margin:auto`, so there's no more top-left black-corner bug to guard against. */
+ *  (letterboxed) via JS-computed margins (`applyStarTourChartSize`) — not flexbox (its stretch distorted
+ *  the SVG's aspect and broke pan/pinch/ship-motion), so the scroll-pan model is preserved. */
 const ST_ZOOM_MAX = 2.6;
 
 /** The smallest zoom at which the WHOLE chart still FITS inside the viewport (SVG = `CHART_W×CHART_H ×
@@ -1272,20 +1273,44 @@ function starTourFitZoom(vp: HTMLElement): number {
   return Math.min(w / CHART_W, h / CHART_H);
 }
 
-/** Keep the chart's rendered size within the fit floor / max ceiling (used on mount + resize): if the
- *  current zoom is below the fit floor (whole chart no longer fits) or above the max, clamp it and resize
- *  the SVG in place. Never forces a zoom-IN — the default open zoom (`ST_OPEN_ZOOM`) sits above fit. */
-function clampStarTourZoom(vp: HTMLElement): void {
+/** The letterbox margin (px) that CENTRES the chart on each axis when the scaled chart is SMALLER than the
+ *  viewport (zoomed out past cover); 0 on an axis the chart fills/overflows (so scroll-pan is unchanged).
+ *  The chart's on-screen origin is therefore `(margin - scroll)` — the tap/focal math must add these. */
+function starTourChartMargins(vp: HTMLElement, z: number): { mx: number; my: number } {
+  const sw = CHART_W * z;
+  const sh = CHART_H * z;
+  return {
+    mx: sw < vp.clientWidth ? (vp.clientWidth - sw) / 2 : 0,
+    my: sh < vp.clientHeight ? (vp.clientHeight - sh) / 2 : 0,
+  };
+}
+
+/** Size the SVG to the CURRENT `starTourView.zoom` and apply the centring margins in one place, so the
+ *  rendered px size + letterbox offset never drift apart. Returns the applied margins for callers that
+ *  need them (focal-preserving zoom). */
+function applyStarTourChartSize(vp: HTMLElement): { mx: number; my: number } {
   const chart = vp.querySelector<SVGElement>('.gs-startour__chart');
-  const zFit = starTourFitZoom(vp);
-  if (!chart || zFit <= 0) return;
-  const zMax = Math.max(ST_ZOOM_MAX, zFit);
-  const z = Math.max(zFit, Math.min(zMax, starTourView.zoom || 1));
-  if (z !== (starTourView.zoom || 1)) {
-    starTourView.zoom = z;
+  const z = starTourView.zoom || 1;
+  const m = starTourChartMargins(vp, z);
+  if (chart) {
     chart.setAttribute('width', (CHART_W * z).toFixed(0));
     chart.setAttribute('height', (CHART_H * z).toFixed(0));
+    chart.style.marginLeft = `${m.mx.toFixed(0)}px`;
+    chart.style.marginTop = `${m.my.toFixed(0)}px`;
   }
+  return m;
+}
+
+/** Keep the chart's rendered size within the fit floor / max ceiling (used on mount + resize): if the
+ *  current zoom is below the fit floor (whole chart no longer fits) or above the max, clamp it; then
+ *  (re)size the SVG + re-centre. Never forces a zoom-IN — the default open zoom (`ST_OPEN_ZOOM`) sits
+ *  above fit. */
+function clampStarTourZoom(vp: HTMLElement): void {
+  const zFit = starTourFitZoom(vp);
+  if (zFit <= 0) return;
+  const zMax = Math.max(ST_ZOOM_MAX, zFit);
+  starTourView.zoom = Math.max(zFit, Math.min(zMax, starTourView.zoom || 1));
+  applyStarTourChartSize(vp);
 }
 
 /** Wire pan + PINCH-ZOOM on the Star Tour chart viewport. The viewport is `touch-action:none`, so we
@@ -1304,7 +1329,7 @@ function wireStarTourGestures(vp: HTMLElement): void {
 
   const setZoom = (z: number, focalClientX: number, focalClientY: number): void => {
     // Floor at the FIT zoom so a pinch-out can pull all the way back to the whole map (letterboxed +
-    // centred by CSS below fit) but never smaller than that — no point zooming past "everything visible".
+    // centred below fit) but never smaller than that — no point zooming past "everything visible".
     // Keep the ceiling above the floor for the degenerate case where the fit itself exceeds ST_ZOOM_MAX.
     const zMin = starTourFitZoom(vp);
     const zMax = Math.max(ST_ZOOM_MAX, zMin);
@@ -1314,14 +1339,16 @@ function wireStarTourGestures(vp: HTMLElement): void {
     const rect = vp.getBoundingClientRect();
     const fx = focalClientX - rect.left;
     const fy = focalClientY - rect.top;
-    const ratio = z / oldZoom;
-    const nl = (vp.scrollLeft + fx) * ratio - fx;
-    const nt = (vp.scrollTop + fy) * ratio - fy;
-    chart.setAttribute('width', (CHART_W * z).toFixed(0));
-    chart.setAttribute('height', (CHART_H * z).toFixed(0));
+    // Focal-preserving zoom, MARGIN-AWARE (the chart's on-screen origin is `margin - scroll`, so the
+    // chart point under the focus is `(focus + scroll - margin) / zoom`). Recover that point at the old
+    // zoom/margin, then re-solve scroll at the new zoom/margin so it stays under the focus.
+    const m0 = starTourChartMargins(vp, oldZoom);
+    const px = (fx + vp.scrollLeft - m0.mx) / oldZoom;
+    const py = (fy + vp.scrollTop - m0.my) / oldZoom;
     starTourView.zoom = z;
-    vp.scrollLeft = nl;
-    vp.scrollTop = nt;
+    const m1 = applyStarTourChartSize(vp);
+    vp.scrollLeft = m1.mx + px * z - fx; // browser clamps ≥0; when centred (margin>0) scroll pins to 0
+    vp.scrollTop = m1.my + py * z - fy;
     starTourView.scrollX = vp.scrollLeft;
     starTourView.scrollY = vp.scrollTop;
   };
@@ -1506,8 +1533,9 @@ function beginStarTourRefuel(vp: HTMLElement | null): void {
   // Enter from whichever side of the VISIBLE region the ship has more runway toward, so the truck has room
   // to fly in on-screen. Fall back to a fixed offset if the viewport isn't measurable yet.
   const z = v.zoom || 1;
-  const leftEdge = vp ? vp.scrollLeft / z : shipX - 320;
-  const rightEdge = vp ? (vp.scrollLeft + vp.clientWidth) / z : shipX + 320;
+  const m = vp ? starTourChartMargins(vp, z) : { mx: 0, my: 0 };
+  const leftEdge = vp ? (vp.scrollLeft - m.mx) / z : shipX - 320;
+  const rightEdge = vp ? (vp.scrollLeft - m.mx + vp.clientWidth) / z : shipX + 320;
   const enterRight = shipX - leftEdge < rightEdge - shipX;
   const sideDir = enterRight ? 1 : -1;
   const edgeX = enterRight ? rightEdge + 70 : leftEdge - 70;
@@ -1664,12 +1692,14 @@ function stepStarTour(): void {
       if (v.fuel <= 0) beginStarTourRefuel(vp); // ran dry in deep space → the tanker comes to you
     }
   }
-  // Chase-cam: while flying (or watching the tanker), ease the viewport to keep the ship centred. Scroll
-  // is in rendered px = chart-coord × zoom.
+  // Chase-cam: while flying (or watching the tanker), ease the viewport to keep the ship centred. The
+  // chart point's on-screen x is `margin − scroll + coord×zoom`, so centring the ship needs
+  // scroll = margin + shipX×zoom − half-viewport (margin is 0 unless the map is zoomed out to letterbox).
   if ((cruising || v.refuel) && vp) {
     const z = v.zoom || 1;
-    const tx = v.shipX * z - vp.clientWidth / 2;
-    const ty = v.shipY * z - vp.clientHeight / 2;
+    const m = starTourChartMargins(vp, z);
+    const tx = m.mx + v.shipX * z - vp.clientWidth / 2;
+    const ty = m.my + v.shipY * z - vp.clientHeight / 2;
     vp.scrollLeft += (tx - vp.scrollLeft) * 0.16;
     vp.scrollTop += (ty - vp.scrollTop) * 0.16;
     v.scrollX = vp.scrollLeft;
@@ -1890,11 +1920,13 @@ function render(): void {
           // Keep the open zoom within the fit floor / max ceiling (only matters on a viewport too small
           // to fit the whole chart even at ST_OPEN_ZOOM).
           clampStarTourZoom(vp);
-          // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2). Scroll is
-          // rendered px = chart-coord × zoom.
+          // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2). The chart
+          // point's on-screen x is `margin - scroll + coord×zoom`, so to seat the spaceport at the
+          // viewport centre, scroll = margin + coord×zoom − half-viewport (margin is 0 unless letterboxed).
           const z = starTourView.zoom || 1;
-          starTourView.scrollX = SPACEPORT_POS.x * z - vp.clientWidth / 2;
-          starTourView.scrollY = SPACEPORT_POS.y * z - vp.clientHeight / 2;
+          const m = starTourChartMargins(vp, z);
+          starTourView.scrollX = m.mx + SPACEPORT_POS.x * z - vp.clientWidth / 2;
+          starTourView.scrollY = m.my + SPACEPORT_POS.y * z - vp.clientHeight / 2;
           vp.scrollLeft = starTourView.scrollX;
           vp.scrollTop = starTourView.scrollY;
           starTourView.centred = true;
@@ -2018,12 +2050,13 @@ function render(): void {
           flyStarTourToPort();
           return;
         }
-        // Free flight to the tapped chart point. The SVG renders at zoom×intrinsic, so divide the
-        // content offset by zoom to recover chart coords.
+        // Free flight to the tapped chart point. The SVG renders at zoom×intrinsic and is offset by the
+        // letterbox margin when zoomed out, so recover chart coords as `(client − rect − margin + scroll) / zoom`.
         const rect = vp.getBoundingClientRect();
         const z = starTourView.zoom || 1;
-        const cx = (e.clientX - rect.left + vp.scrollLeft) / z;
-        const cy = (e.clientY - rect.top + vp.scrollTop) / z;
+        const m = starTourChartMargins(vp, z);
+        const cx = (e.clientX - rect.left - m.mx + vp.scrollLeft) / z;
+        const cy = (e.clientY - rect.top - m.my + vp.scrollTop) / z;
         flyStarTourToPoint(cx, cy);
       });
     }
