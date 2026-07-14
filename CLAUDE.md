@@ -429,6 +429,18 @@ these systems** — each bullet is the tip of a documented iceberg.
   - A hole gets a forced-carry crossing **or** greenside drama (sanctioned penalty rings +
     approach lake), never both. Corridors can break into mown segments (`brokenCorridor`, biome
     `roughBreaks`; skipped on lost-rough worlds).
+  - APPROACH DEFENCE (GS-approach-hazards): every earlier hazard pass clusters on the LANDING zone
+    (`t ≈ 0.28–0.75`), so the last third + the FRONT of the green were nearly hazard-free and a long
+    approach was a free swing ("hazards are incredibly tee-heavy; very few in front of the green"). A
+    dedicated pass now guards the run-in on par 4/5 non-lost worlds: a FRONT bunker short of the green
+    (ray-marched to the real front edge, slid to a side so a tucked back pin sits behind it — "carry the
+    front bunker to the back pin") + 1–2 cross-bunkers pinching the last third (`t 0.72–0.9`). Sand/pot
+    class → NON-penalty (a stance tax, never a lost card) so they may bite the approach line and
+    `validateFairness` ignores them. Drawn from a DEDICATED side stream (`${seed}:approach:`, the
+    rough-gradient pattern) → perturbs ZERO main-`rng` draws (penalty crossings/ponds/greens + every later
+    hole byte-identical; only non-penalty approach bunkers ADDED). `GENERATOR_VERSION` 38. Part of the
+    hazard-DISTRIBUTION follow-up to GS-biome-variety (the sibling green-END-variety + in-fairway-water/
+    split-fairway passes are next).
   - OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
     shrink it casually).
   - All new generator draws gate on their feature being armed (contract 1); current

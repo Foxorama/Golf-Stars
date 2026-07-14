@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 37; // GS-green-diversity: bigger + distinct island/deck-pad greens for void/cetus/derelict (green levers only; island/waterfall/wall machinery untouched)
+export const GENERATOR_VERSION = 38; // GS-approach-hazards: green-defending bunkers in the last third + front of green (side stream, non-penalty)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -1508,6 +1508,53 @@ function generateHole(
     const dir: Vec = [Math.cos(ang), Math.sin(ang)];
     const d = rayPolyDist(green, dir, greenPolygon) + r + rng.range(2, 6);
     hazards.push({ kind: 'pot', poly: blobPoly([green[0] + dir[0] * d, green[1] + dir[1] * d], r, 9, 0.18, rng) });
+  }
+
+  // APPROACH DEFENCE (GS-approach-hazards): the last third + the FRONT of the green were nearly
+  // hazard-free — every earlier pass clusters on the LANDING zone (t ≈ 0.28–0.75), so a long approach
+  // was a free swing at an undefended green ("hazards are incredibly tee-heavy; very few in front of the
+  // green or in the last third"). This pass guards the run-in: a FRONT bunker short of the green on the
+  // play line (a running approach must carry it, or flight one in), plus cross-bunkers pinching the last
+  // third. Sand/pot class → NON-PENALTY (a stance tax, never a lost card), so they may bite the approach
+  // line and `validateFairness` ignores them. Drawn from a DEDICATED side stream (the rough-gradient
+  // pattern), so it perturbs ZERO main-`rng` draws — every penalty crossing/pond/green + every later hole
+  // stays byte-identical; only these non-penalty approach hazards are ADDED. Par 4/5, non-lost worlds
+  // only (a floating island green has no approach fairway to defend, and the derelict has no sand).
+  if (par >= 4 && !lostRough) {
+    const apRng = new Rng(`${rng.seed}:approach:${holeIndex}`);
+    const apKind = (biome.potBunkers ?? 0) > 0 && apRng.bool(0.5) ? 'pot' : 'bunker';
+    // Approach direction into the green (the final centreline segment).
+    const pre = centrePoint(centreline, 0.9);
+    let adx = green[0] - pre[0];
+    let ady = green[1] - pre[1];
+    const al = Math.hypot(adx, ady) || 1;
+    adx /= al;
+    ady /= al;
+    const aperp: Vec = [-ady, adx];
+    // (1) FRONT guard: a bunker short of the green front, slid to one side so a tucked back pin sits
+    //     BEHIND it — the classic "carry the front bunker to the back pin" approach. Ray-marched to the
+    //     green's real front edge so it hugs whatever shape the green is. Likelier on the wilder stops.
+    if (apRng.bool(0.6 + wildness * 0.25)) {
+      const r = apRng.range(5, 8);
+      const frontD = rayPolyDist(green, [-adx, -ady], greenPolygon) + r + apRng.range(2, 7);
+      const off = apRng.range(-0.5, 0.5) * greenR; // slide across the front so it guards a side/corner
+      const c: Vec = [green[0] - adx * frontD + aperp[0] * off, green[1] - ady * frontD + aperp[1] * off];
+      hazards.push({ kind: apKind, poly: blobPoly(c, r, 9, 0.22, apRng) });
+    }
+    // (2) LAST-THIRD cross hazards: 1–2 bunkers pinching the approach short of the green, so the layup
+    //     zone + the run-in are defended (not just the driving zone). More on the wilder stops.
+    const crossN = 1 + Math.round(wildness * 1.5);
+    for (let i = 0; i < crossN; i++) {
+      const t = apRng.range(0.72, 0.9);
+      const along = centrePoint(centreline, t);
+      const perp = perpAt(centreline, t);
+      const side = apRng.bool() ? 1 : -1;
+      const r = apRng.range(4.5, 8);
+      // bite in from the fairway edge toward the line — a bunker in/at the approach corridor
+      const lateral = fairwayHalfWidth * apRng.range(0.25, 0.95);
+      const c: Vec = [along[0] + perp[0] * side * lateral, along[1] + perp[1] * side * lateral];
+      hazards.push({ kind: apKind, poly: blobPoly(c, r, 9, 0.24, apRng) });
+    }
   }
 
   // Thick FESCUE / native rough (GS-hazards-2): non-penalty deep-rough patches lining the rough
