@@ -209,6 +209,7 @@ export const TREE_VOICES: Record<BiomeArchetype, TreeVoice> = {
   metal: 'clang', // rusted scrap masts — a struck-metal clang
   derelict: 'clang', // struck hull spars / girders ring with a hollow metal clang
   asgard: 'chime', // the golden groves ring like a struck bell
+  earth: 'wood', // the treeless links has essentially no trees; on the rare one, an ordinary wooden knock
 };
 
 export function treeVoiceOf(arch?: string): TreeVoice {

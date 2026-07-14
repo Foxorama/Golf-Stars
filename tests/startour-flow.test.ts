@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { initState, reduce, type UiState } from '../src/ui/game';
 import { CHARACTERS } from '../src/sim/rpg/characters';
 import { STROKEPLAY_FORMAT } from '../src/sim/rpg/formats';
+import { STATIC_COURSES, buildStaticCourse } from '../src/sim/course/staticCourses';
+import { starTourMapSVG, worldPos, EARTH_POS, type StarTourWorld } from '../src/render/starTourMap';
 
 /** Drive a Star Tour round to the strokeResult recap (openStarTour → CHARACTER → star map → pick a
  *  course → intro → play 18 → holeComplete×18). Character select comes FIRST (GS-star-tour-2). */
@@ -105,5 +107,44 @@ describe('Star Tour reducer flow (GS-star-tour-2)', () => {
     expect(s.screen).toBe('starTour');
     s = reduce(s, { type: 'exitStarTour' });
     expect(s.screen).toBe('title');
+  });
+});
+
+describe('Earth — the Old Course at St Andrews (GS-earth)', () => {
+  it('the catalogue carries a home Earth course with the real par-72 routing', () => {
+    const spec = STATIC_COURSES.find((c) => c.id === 'standrews-18')!;
+    expect(spec).toBeTruthy();
+    expect(spec.themeId).toBe('earth');
+    expect(spec.archetype).toBe('earth');
+    expect(spec.opts.biome).toBe('earth-links');
+    // The pinned real Old-Course par sequence: par 72, out 36 / in 36.
+    const c = buildStaticCourse('standrews-18');
+    const pars = c.holes.map((h) => h.par);
+    expect(pars).toEqual([4, 4, 4, 4, 5, 4, 4, 3, 4, 4, 3, 4, 4, 5, 4, 4, 4, 4]);
+    expect(pars.reduce((a, b) => a + b, 0)).toBe(72);
+    expect(pars.slice(0, 9).reduce((a, b) => a + b, 0)).toBe(36);
+    expect(c.biome).toBe('earth-links');
+    expect(c.meta.name).toBe('The Old Course, St Andrews');
+  });
+
+  it('is playable as a full Star Tour stroke-play round, banked as a course record', () => {
+    const s = playRound('standrews-18');
+    expect(s.screen).toBe('strokeResult');
+    expect(s.played).toHaveLength(18);
+    expect(s.lastStrokeRecord!.courseId).toBe('standrews-18');
+    expect(s.lastStrokeRecord!.par).toBe(72);
+    expect(s.strokePlayBest['standrews-18']).toEqual(s.lastStrokeRecord);
+  });
+
+  it('sits on the home Earth landmark and is the tappable Old Course target (not a constellation)', () => {
+    const earth: StarTourWorld = { id: 'standrews-18', name: 'The Old Course, St Andrews', archetype: 'earth', tier: 'testing', themeId: 'earth', hasRecord: false };
+    // Its map position IS the Earth blue-marble landmark, not the RA/Dec projection.
+    expect(worldPos(earth)).toEqual(EARTH_POS);
+    // Rendered onto the chart, the Earth glyph carries the single tappable course target + its label.
+    const svg = starTourMapSVG({ seed: 'earth-map', worlds: [earth], selectedId: 'standrews-18' });
+    expect((svg.match(/data-startour-course="standrews-18"/g) ?? []).length).toBe(1);
+    expect(svg).toContain('THE OLD COURSE');
+    // It is NOT drawn as a generic constellation planet (that class is only the constellation worlds).
+    expect((svg.match(/class="gs-st-world"/g) ?? []).length).toBe(0);
   });
 });

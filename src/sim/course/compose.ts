@@ -66,11 +66,25 @@ export function planCourse(
      * death-spiral balance is tuned to. Absent ⇒ the arc, byte-for-byte the old composition.
      */
     wildnessMix?: readonly number[];
+    /**
+     * PINNED PAR SEQUENCE (GS-hole-plan): an explicit, hole-by-hole par list that REPLACES the random
+     * par multiset + contrast ordering (`planPars`) entirely — so a course can dictate its exact
+     * routing rhythm (a real-course replica, a designed layout) instead of a distribution sample. Hole
+     * `i` takes `parSequence[i % parSequence.length]`, so a shorter sequence tiles and a longer one is
+     * truncated; the canonical use pins all N holes 1:1. Takes precedence over `parCap`/`parMix`. When
+     * set the par-planning rng draws are SKIPPED (the sequence is authored, not rolled) — this is only
+     * ever passed by a pinned static course, so no existing course's stream is perturbed (contract 1).
+     * Absent ⇒ the old random par plan, byte-for-byte.
+     */
+    parSequence?: readonly (3 | 4 | 5)[];
   } = {},
 ): HolePlan[] {
   const rng = new Rng(`${seed}:compose`);
   const n = Math.max(1, holeCount);
-  const pars = planPars(rng, n, opts.parCap, opts.parMix ?? DEFAULT_PAR_MIX);
+  const seq = opts.parSequence && opts.parSequence.length > 0 ? opts.parSequence : undefined;
+  const pars = seq
+    ? Array.from({ length: n }, (_, i) => seq[i % seq.length]!)
+    : planPars(rng, n, opts.parCap, opts.parMix ?? DEFAULT_PAR_MIX);
   const mix = opts.wildnessMix && opts.wildnessMix.length > 0 ? opts.wildnessMix : undefined;
   const wilds = mix ? planWildnessMix(rng, n, mix) : planWildness(rng, n, wildness);
   const plans: HolePlan[] = pars.map((par, i) => ({ par, wildness: wilds[i]! }));

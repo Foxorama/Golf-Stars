@@ -63,6 +63,7 @@ export const PRO_LOOK: Record<BiomeArchetype, { cap: string; shirt: string; aura
   metal: { cap: '#c2702e', shirt: '#5a3a22', aura: '#ff8a3b', skin: '#d8a06a' },
   derelict: { cap: '#6a7a86', shirt: '#3a464f', aura: '#9fd0e0', skin: '#c8b8b0' },
   asgard: { cap: '#e8c65a', shirt: '#2f8b57', aura: '#ffe08a', skin: '#e7c9a4' },
+  earth: { cap: '#b8453a', shirt: '#2f5a8b', aura: '#c2b877', skin: '#e7b894' }, // a traditional links caddie — tartan-red cap, navy jumper, dune-gold aura
 };
 
 /** A compact inline-SVG bust of a world's club pro — assetless house style, tinted per archetype. */

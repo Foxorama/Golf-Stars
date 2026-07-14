@@ -99,6 +99,26 @@ describe('course composition planner (GS-compose)', () => {
     expect(planCourse(3, 9, 0.6, { wildnessMix: [] })).toEqual(planCourse(3, 9, 0.6, {}));
   });
 
+  it('a pinned parSequence dictates the exact par of every hole (GS-hole-plan)', () => {
+    // The real Old Course at St Andrews par-72 rhythm: 4·8 / 5 / 4·2 / 3 / 4 | 4·3 / 5 / 4·5.
+    const STA: (3 | 4 | 5)[] = [4, 4, 4, 4, 5, 4, 4, 3, 4, 4, 3, 4, 4, 5, 4, 4, 4, 4];
+    const plans = planCourse('st-andrews', 18, 0.5, { parSequence: STA });
+    expect(plans.map((p) => p.par)).toEqual(STA);
+    expect(plans.reduce((s, p) => s + p.par, 0)).toBe(72);
+    // Deterministic, and independent of the world's parMix / parCap (the sequence wins).
+    expect(planCourse('st-andrews', 18, 0.5, { parSequence: STA })).toEqual(plans);
+    expect(planCourse('st-andrews', 18, 0.5, { parSequence: STA, parCap: 3, parMix: { p3: 1, p4: 0, p5: 0 } }).map((p) => p.par)).toEqual(STA);
+  });
+
+  it('a parSequence tiles when shorter than the hole count and truncates when longer', () => {
+    expect(planCourse(1, 5, 0.5, { parSequence: [3, 5] }).map((p) => p.par)).toEqual([3, 5, 3, 5, 3]);
+    expect(planCourse(1, 2, 0.5, { parSequence: [4, 5, 3, 4] }).map((p) => p.par)).toEqual([4, 5]);
+  });
+
+  it('an empty parSequence falls back to the random par plan (byte-for-byte)', () => {
+    expect(planCourse(9, 9, 0.6, { parSequence: [] })).toEqual(planCourse(9, 9, 0.6, {}));
+  });
+
   it('marks a drivable signature on a long enough stop', () => {
     let drivable = 0;
     for (let s = 0; s < 100; s++) {

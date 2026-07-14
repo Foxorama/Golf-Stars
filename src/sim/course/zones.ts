@@ -319,6 +319,27 @@ export const ZONES: Record<BiomeArchetype, ZoneProfile> = {
     ],
     difficulty: 2,
   },
+  earth: {
+    archetype: 'earth',
+    name: 'Earth — The Old Course',
+    signature: 'The home of golf',
+    inspiration:
+      'The Old Course at St Andrews on the Fife coast of Scotland — the birthplace of the game, played over the same wild links for six hundred years.',
+    brief:
+      'Home. The one true-Earth stop on the whole voyage: a genuine Scottish links laid over ancient dunes by the North Sea. No exotic gravity, no fantasy surfaces — just firm, treeless ground, a wind off the water, deep revetted pot bunkers waiting to swallow a stray ball, and the enormous shared double greens. Wide off the tee, brutal if you find the sand. Play it as the game was born to be played.',
+    hazards: [
+      { icon: '🕳️', text: 'Deep revetted POT bunkers — a sideways hack-out from the sand' },
+      { icon: '💧', text: 'The Swilcan Burn crosses the fairway (a forced carry)' },
+      { icon: '🌾', text: 'Wispy fescue & thick gorse line the rough' },
+      { icon: '🌬️', text: 'A stiff seaside wind is always in play' },
+    ],
+    benefits: [
+      { icon: '🌍', text: 'Real Earth gravity — honest, familiar carries' },
+      { icon: '↔️', text: 'Famously HUGE shared fairways — wide off the tee' },
+      { icon: '⛳', text: 'Vast double greens — big targets to find (then read)' },
+    ],
+    difficulty: 3,
+  },
 };
 
 export function zoneProfile(archetype: BiomeArchetype): ZoneProfile {
@@ -880,6 +901,50 @@ export const PROS: Record<BiomeArchetype, ShopPro> = {
       birdieBlitz: [
         'Birdies raining gold across Iðavöllr — a run worthy of the sagas!',
         'A flurry of birdies in the Golden Realm. The gods are entertained.',
+      ],
+    },
+  },
+  earth: {
+    name: 'Auld Tam',
+    title: 'St Andrews links caddie',
+    quips: {
+      scraped: [
+        'Aye, ye got roond — but the auld wind near had ye. Mind thae pot bunkers next time, laddie.',
+        "Scraped hame by the skin o' yer teeth. The Old Course disnae give much away.",
+        'A wee bit ragged, but ye made the cut. Get yersel some kit afore we gang back oot.',
+      ],
+      solid: [
+        'No bad at aw. Ye kept it oot the sand and oot the burn — that\'s links gowf.',
+        'Steady roond. The auld toun approves — mostly.',
+        "Solid stuff. Ye read the wind better than maist that come through here.",
+      ],
+      great: [
+        'Now THAT was gowf! The auld grey toun tips its bonnet to ye.',
+        'Braw playin\' — ye handled the Old Course like ye were born on it.',
+        'Great striking, son. Even the gulls stopped tae watch.',
+      ],
+      stellar: [
+        "In aw ma years cairryin' bags on thae links, I\'ve rarely seen its equal. Pure dead brilliant.",
+        'Stellar. They\'ll be talkin\' aboot this roond in the Dunvegan for years.',
+        'Flawless on the home of gowf itsel. Away and lift the claret — ye\'ve earned it.',
+      ],
+    },
+    reactions: {
+      ace: [
+        'A hole-in-one on the OLD COURSE?! The whole toun heard that roar, laddie!',
+        'An ace at St Andrews — six hunner years o\' gowf and ye just wrote yer name in it!',
+      ],
+      eagle: [
+        'An eagle on the auld links — bonnie, bonnie stuff!',
+        'Twa under on the home of gowf. Auld Tom himsel would raise a dram tae that.',
+      ],
+      blowup: [
+        'Intae the Hell Bunker, wis it? Happens tae the best o\' them. Dust yersel doon.',
+        'The Old Course bit ye on the yin hole. She\'s a thrawn auld lady. On ye go.',
+      ],
+      birdieBlitz: [
+        'A rush o\' birdies doon the stretch — the auld links is fair singin\' for ye!',
+        'Birdie efter birdie on the home of gowf. Magic, son. Pure magic.',
       ],
     },
   },

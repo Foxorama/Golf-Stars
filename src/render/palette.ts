@@ -46,6 +46,7 @@ export const BIOME_ROUGH: Record<string, string> = {
   'toxic-mire': '#4a5a2c',
   'scrap-belt': '#7a4a2c',
   'derelict-ship': '#48535e',
+  'earth-links': '#a89a5a', // sandy-golden fescue/marram links rough
 };
 
 /** Tree look (shared by both renderers so a treeline reads identically): a lit canopy, a
@@ -98,6 +99,7 @@ export const OB_LOOK: Record<BiomeArchetype, ObLook> = {
   // a dead red warning light adrift where the hull ends. Cold steel post for the calm-stop hull edges.
   derelict: { post: '#6a7a86', cap: '#ff5a4a', line: 'rgba(150,175,200,0.16)', beacon: 'rgba(255,90,74,0.42)' },
   asgard: { post: '#e8d48a', cap: '#ffcf4a', line: 'rgba(232,212,138,0.18)', glow: 'rgba(255,210,110,0.34)' }, // gilded rune-pillars with a Bifröst-banner cap glow
+  earth: { post: '#f4f4f4', cap: '#d64545', line: 'rgba(244,244,244,0.16)' }, // the classic white boundary stakes of a real course (St Andrews' out-of-bounds)
 };
 
 /**
@@ -248,6 +250,17 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#3aa0aa',
     rough: { light: '#254c64', base: '#1a3a50', dark: '#112a3a', ink: '#061420' },
   },
+  // Earth — HOME LINKS (GS-earth): firm, sun-cured Scottish links turf — a golden-sage fescue fairway
+  // (drier and more olive-gold than verdant's lush emerald), a true bentgrass putting green, over a
+  // sandy-golden FESCUE/MARRAM rough (base mean ~137/255, far clear of the dusk-sea space base ~27/255).
+  // The distinct golden turf reads as a windswept seaside course, not the exotic worlds' saturated skins.
+  earth: {
+    fairway: { light: '#84b45a', base: '#6a9a44', dark: '#527a34', ink: '#243812' },
+    green: { light: '#7fd86e', base: '#63c257', dark: '#4aa244', ink: '#1e4a22' },
+    tee: { light: '#8ca846', base: '#78933a', dark: '#5f7830', ink: '#2c3a16' },
+    collar: '#5a9440',
+    rough: { light: '#c2b877', base: '#a89a5a', dark: '#8a7c44', ink: '#4a4020' },
+  },
   // Swamp — SICKLY BOG: muddy chartreuse fairways and pale acid-green greens over a murky olive-brown
   // muck rough (base mean ~69/255, comfortably clear of the near-black green-space base ~12/255 — the
   // ≥30 rough-vs-space brightness gap the frame test enforces).
@@ -369,6 +382,10 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   // Asgard — the Golden Realm: a royal indigo→violet twilight (deep base) with a violet nebula and a
   // warm GOLD horizon glow at the shore where the emerald fields meet the celestial sky.
   asgard: { base: '#0e0a26', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(255,205,90,0.24)' },
+  // Earth — HOME: a soft North-Sea DUSK beyond the links, not the deep void of space. A dark dusk-blue
+  // base under a gentle sea-blue haze, with a warm golden-links shore glow where the fairways meet the
+  // twilight sky and the sea. (base mean ~27 — the ≥30 rough-vs-space gap holds against the golden rough.)
+  earth: { base: '#0b1a2c', nebula: 'rgba(90,140,200,0.10)', edge: 'rgba(206,220,150,0.19)' },
 };
 
 /**
@@ -490,6 +507,7 @@ export const ACCENTS: Record<string, Accent> = {
   'toxic-mire': { flowers: ['#9fd84a', '#c8e07a', '#7aa83a'], mote: '#c8e888' }, // sickly bog blooms
   'scrap-belt': { flowers: ['#ff8a2a', '#ffbf6a', '#d98c4c'], mote: '#ffcf8a' }, // rust flecks & sparks
   'derelict-ship': { flowers: ['#ff5a4a', '#5fd4d0', '#ffb04a'], mote: '#9fd0e0' }, // dead emergency lights, live wiring sparks, cold motes
+  'earth-links': { flowers: ['#e88aa8', '#ffd34a', '#8ab0e0'], mote: '#e2ecc8' }, // sea-pink thrift, gorse yellow, harebell blue on the dunes
 };
 export const ACCENT_DEFAULT: Accent = { flowers: ['#ff7eb6', '#ffe14a', '#ffffff'], mote: '#cfe8ff' };
 

@@ -61,6 +61,19 @@ const STAR_TOUR_MIX: readonly number[] = [STAR_TOUR_MEDIUM, STAR_TOUR_HARD];
 const STAR_TOUR_WILDNESS = (STAR_TOUR_MEDIUM + STAR_TOUR_HARD) / 2; // 0.725 — the meta/intro representative
 
 /**
+ * THE OLD COURSE AT ST ANDREWS (GS-earth) — the one real-world course, the home planet's destination.
+ * Its real par-72 routing, pinned hole-by-hole via `parSequence` (GS-hole-plan) so the layout carries
+ * the actual Old-Course rhythm — an out-and-back links of fourteen par-4s bracketing two par-3s (the
+ * Short 8th, the High 11th) and two par-5s (the Long 5th, the Long 14th): 36 out, 36 back. Unlike the
+ * other Star Tour courses it does NOT use `STAR_TOUR_MIX` — a real course wants the designed difficulty
+ * ARC (the composer's mean-preserving build), so the round opens gentle and builds through the famous
+ * closing stretch (the Road Hole 17th) at a fair, championship-links `wildness` rather than a random
+ * medium/hard scatter.
+ */
+const ST_ANDREWS_PARS: readonly (3 | 4 | 5)[] = [4, 4, 4, 4, 5, 4, 4, 3, 4, 4, 3, 4, 4, 5, 4, 4, 4, 4]; // par 72 (out 36 / in 36)
+const ST_ANDREWS_WILDNESS = 0.5; // a fair championship links — teeth via the arc + pots + wind, not chaos
+
+/**
  * The static course catalogue. Content, not code — a new static course is a new row here (then run
  * `npm run gen:courses` to freeze it).
  *
@@ -210,6 +223,16 @@ export const STATIC_COURSES: readonly StaticCourseSpec[] = [
     opts: { biome: 'crystal-spires', themeId: 'triangulum', holes: 18, compose: true, wildness: STAR_TOUR_WILDNESS, wildnessMix: STAR_TOUR_MIX },
     themeId: 'triangulum', archetype: 'crystal', tier: 'testing',
     blurb: 'A sharp crystal wedge of three bright stars — true, fast lies that punish a loose swing.',
+  },
+  // --- HOME (GS-earth): the Old Course at St Andrews. The star map's Earth landmark IS this course's
+  // destination (`themeId: 'earth'` places it at the home planet, not a constellation). No `opts.themeId`
+  // (the biome `earth-links` keys the render), a PINNED real par-72 routing, and the designed difficulty
+  // arc (no `wildnessMix`). Regenerated on demand like the other tour rows (no frozen JSON).
+  {
+    id: 'standrews-18', name: 'The Old Course, St Andrews', seed: 'gs-static:standrews-18',
+    opts: { biome: 'earth-links', holes: 18, compose: true, wildness: ST_ANDREWS_WILDNESS, parSequence: ST_ANDREWS_PARS },
+    themeId: 'earth', archetype: 'earth', tier: 'testing',
+    blurb: 'The home of golf on the Fife coast — a true Scottish links of pot bunkers, gorse and the wind off the North Sea, played over the same wild ground for six centuries.',
   },
 ];
 

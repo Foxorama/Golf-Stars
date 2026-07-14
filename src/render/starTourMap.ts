@@ -170,6 +170,10 @@ export function projectSky(ra: number, dec: number): { x: number; y: number } {
 /** The projected chart position of a world (falls back to the chart centre if the theme has no sky
  *  anchor — never happens for a real Star Tour course, but keeps the projection total). */
 export function worldPos(w: StarTourWorld): { x: number; y: number } {
+  // HOME (GS-earth): the Old Course lives ON Earth, the home landmark beside the port — not out on a
+  // constellation. It has no sky anchor (Earth is the observer), so it's pinned to the blue-marble
+  // glyph's fixed position instead of the RA/Dec projection.
+  if (w.themeId === 'earth') return EARTH_POS;
   const sky = THEME_SKY[w.themeId];
   return sky ? projectSky(sky.ra, sky.dec) : { x: CHART_W / 2, y: CHART_H / 2 };
 }
@@ -1156,9 +1160,14 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
 
 /** Home EARTH — a recognisable blue marble beside the port (GS-star-map-icon-consistency): ocean-blue
  *  disc, green continents, white cloud swirls, a cyan atmosphere rim + day/night terminator, and a
- *  small grey Moon. A landmark ("Home"), not a course, so it's not tappable. Seeded for the continents
- *  but always reads as Earth. */
-function earthGlyph(): string {
+ *  small grey Moon. Seeded for the continents but always reads as Earth.
+ *
+ *  GS-earth: Earth is now ALSO the destination for the Old Course at St Andrews — the home planet's
+ *  course. When a `world` is passed (the `earth`-themed catalogue row) the blue marble becomes a
+ *  TAPPABLE course target (`data-startour-course`), with the selection ring + record star + best-to-par
+ *  the constellation worlds carry; flying home to it opens the Old Course dossier. With no world it stays
+ *  the decorative "HOME" landmark (backward-safe). */
+function earthGlyph(world?: StarTourWorld, selected = false): string {
   const { x, y } = EARTH_POS;
   const rnd = mulberry32(hashSeed('startour:earth'));
   const rr = (v: number) => v.toFixed(1);
@@ -1185,8 +1194,26 @@ function earthGlyph(): string {
     const cy = Math.sin(a) * d;
     clouds += `<ellipse cx="${rr(cx)}" cy="${rr(cy)}" rx="${rr(r * (0.2 + rnd() * 0.24))}" ry="${rr(r * 0.1)}" fill="#ffffff" opacity="0.5" transform="rotate(${(rnd() * 60 - 30) | 0} ${rr(cx)} ${rr(cy)})"/>`;
   }
+  // As a course target: the selection ring, the ★ record badge, and the best-to-par label (mirrors
+  // `worldGlyph`), plus the tappable wrapper attributes. As the bare landmark: aria-hidden, no controls.
+  const ring = selected
+    ? `<circle r="${rr(r + 10)}" fill="none" stroke="#7fe0ff" stroke-width="2.5" opacity="0.9"><animate attributeName="r" values="${rr(r + 8)};${rr(r + 13)};${rr(r + 8)}" dur="2.4s" repeatCount="indefinite"/></circle>`
+    : '';
+  const record =
+    world?.hasRecord
+      ? `<g transform="translate(${rr(r * 0.92)},${rr(-r * 0.92)})"><circle r="8" fill="#0a0d1c"/><text x="0" y="3.4" font-size="11" text-anchor="middle" fill="#ffce54">★</text></g>`
+      : '';
+  const best =
+    world?.hasRecord && world.bestToPar !== undefined
+      ? `<text x="0" y="${rr(r + 30)}" font-size="12" text-anchor="middle" fill="${world.bestToPar < 0 ? '#5fd45a' : world.bestToPar === 0 ? '#cdd3df' : '#ffce54'}" font-weight="700">${toParLabel(world.bestToPar)}</text>`
+      : '';
+  const wrapOpen = world
+    ? `<g class="gs-st-world gs-st-earth" data-startour-course="${world.id}" role="button" tabindex="0" aria-label="Earth — The Old Course, St Andrews" transform="translate(${x},${y})" style="cursor:pointer;">`
+    : `<g transform="translate(${x},${y})" aria-hidden="true">`;
+  const sublabel = world ? 'THE OLD COURSE' : 'HOME';
   return `
-    <g transform="translate(${x},${y})" aria-hidden="true">
+    ${wrapOpen}
+      ${ring}
       <circle r="${rr(r * 1.5)}" fill="#6fd6ff" opacity="0.1"/>
       <circle r="${rr(r * 1.18)}" fill="#6fd6ff" opacity="0.12"/>
       <clipPath id="${clip}"><circle r="${rr(r)}"/></clipPath>
@@ -1200,8 +1227,10 @@ function earthGlyph(): string {
       <circle r="${rr(r)}" fill="none" stroke="#bfe6ff" stroke-width="0.9" opacity="0.55"/>
       <circle cx="${rr(r * 2.0)}" cy="${rr(-r * 1.1)}" r="${rr(r * 0.3)}" fill="#c6ccd4"/>
       <circle cx="${rr(r * 2.0)}" cy="${rr(-r * 1.1)}" r="${rr(r * 0.3)}" fill="url(#stWorldShade)"/>
+      ${record}
       <text x="0" y="${-r - 9}" font-size="13" text-anchor="middle" fill="#bfe6ff" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">Earth</text>
-      <text x="0" y="${r + 16}" font-size="10" text-anchor="middle" fill="#9fb8d6" font-weight="600" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:2.5px;letter-spacing:.12em;">HOME</text>
+      <text x="0" y="${r + 16}" font-size="10" text-anchor="middle" fill="#9fb8d6" font-weight="600" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:2.5px;letter-spacing:.12em;">${sublabel}</text>
+      ${best}
     </g>`;
 }
 
@@ -1423,7 +1452,13 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     const y = ((gy / ghN) * CHART_H).toFixed(1);
     grid += `<line x1="0" y1="${y}" x2="${CHART_W}" y2="${y}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
-  const worlds = opts.worlds.map((w) => worldGlyph(w, w.id === opts.selectedId)).join('');
+  // The home Old Course rides the bespoke Earth blue-marble glyph (drawn with the port), not a generic
+  // constellation planet — so it's split out of the world loop and handed to `earthGlyph` below.
+  const earthWorld = opts.worlds.find((w) => w.themeId === 'earth');
+  const worlds = opts.worlds
+    .filter((w) => w.themeId !== 'earth')
+    .map((w) => worldGlyph(w, w.id === opts.selectedId))
+    .join('');
   return `<svg class="gs-startour__chart" viewBox="0 0 ${CHART_W} ${CHART_H}" width="${(CHART_W * zoom).toFixed(0)}" height="${(CHART_H * zoom).toFixed(0)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Star Tour chart">
     <defs>
       <radialGradient id="stSky" cx="50%" cy="42%" r="80%">
@@ -1451,7 +1486,7 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     ${stars}
     ${heroes}
     ${spaceportGlyph()}
-    ${earthGlyph()}
+    ${earthGlyph(earthWorld, earthWorld?.id === opts.selectedId)}
     ${worlds}
     ${shipGroup(opts)}
     ${fuelTruckGroup()}

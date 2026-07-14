@@ -144,6 +144,15 @@ export const MUSIC_TRACKS: Record<MusicSceneId, MusicTrack> = {
     chords: [[0, 2, 4], [5, 7, 9], [3, 5, 7], [0, 2, 4]],
     padType: 'sine', arpType: 'triangle', arpDensity: 0.07, bassDensity: 0.26, shimmer: 0.2, gain: 0.25,
   },
+  earth: {
+    // HOME (GS-earth) — a wistful, breezy Celtic-folk air for the old grey links: a warm triangle pad on
+    // a folky Dorian mode over a gentle mid-tempo lilt, with an airy pentatonic-flavoured arp like a tin
+    // whistle on the sea wind. Nostalgic and human — the birthplace of the game, not another alien world.
+    // Unique root+scale+bpm fingerprint (146.83|DORIAN|68).
+    name: 'The Auld Grey Toun', bpm: 68, root: 146.83, scale: DORIAN,
+    chords: [[0, 2, 4], [5, 7, 9], [3, 5, 7], [4, 6, 8]],
+    padType: 'triangle', arpType: 'triangle', arpDensity: 0.24, bassDensity: 0.42, shimmer: 0.32, gain: 0.3,
+  },
 };
 
 // --- Engine state ------------------------------------------------------------------------------

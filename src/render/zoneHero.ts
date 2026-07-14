@@ -364,6 +364,34 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
     return frame(W, H, inner, ['#04060b', '#0e141c'], gid);
   }
 
+  if (archetype === 'earth') {
+    // HOME (GS-earth) — the Old Course at dusk: a low sun over the North Sea, rolling golden dune
+    // ridges, a Swilcan-style stone bridge, and a flag on a huge green under a real seaside sky.
+    let inner = body(W * 0.74, H * 0.34, 15, '#ffe6a8', { glow: 'rgba(255,214,140,0.28)', shade: false });
+    inner += `<rect x="0" y="${n1(H * 0.5)}" width="${W}" height="${n1(H * 0.14)}" fill="rgba(90,140,180,0.4)"/>`;
+    for (let i = 0; i < 4; i++) {
+      const sx = W * (0.1 + rng() * 0.8);
+      inner += `<line x1="${n1(sx)}" y1="${n1(H * (0.53 + rng() * 0.08))}" x2="${n1(sx + 10)}" y2="${n1(H * 0.55)}" stroke="rgba(255,240,200,0.3)" stroke-width="1.5"/>`;
+    }
+    inner += ridge(rng, W, H, H * 0.6, 7, '#8a7c44'); // far dune (fescue gold)
+    inner += ridge(rng, W, H, H * 0.72, 9, '#6a9a44'); // links fairway green
+    inner += ridge(rng, W, H, H * 0.86, 6, '#527a34');
+    const bx = W * 0.22;
+    const by = H * 0.8;
+    inner += `<path d="M${n1(bx - 20)},${n1(by)} Q${n1(bx)},${n1(by - 12)} ${n1(bx + 20)},${n1(by)}" fill="none" stroke="#b8ac8c" stroke-width="5" stroke-linecap="round"/>`;
+    inner += `<path d="M${n1(bx - 14)},${n1(by + 2)} Q${n1(bx)},${n1(by - 6)} ${n1(bx + 14)},${n1(by + 2)}" fill="none" stroke="#3a4a2a" stroke-width="3"/>`;
+    const px = W * 0.66;
+    const py = H * 0.82;
+    inner += `<ellipse cx="${n1(px)}" cy="${n1(py + 4)}" rx="34" ry="8" fill="#6fb04a" opacity="0.7"/>`;
+    inner += `<line x1="${n1(px)}" y1="${n1(py)}" x2="${n1(px)}" y2="${n1(py - 22)}" stroke="#e8e8e8" stroke-width="1.6"/>`;
+    inner += `<polygon points="${n1(px)},${n1(py - 22)} ${n1(px + 12)},${n1(py - 18)} ${n1(px)},${n1(py - 14)}" fill="#d64545"/>`;
+    for (let i = 0; i < 3; i++) {
+      const cx = W * (0.36 + i * 0.16 + rng() * 0.04);
+      inner += `<ellipse cx="${n1(cx)}" cy="${n1(H * 0.9)}" rx="7" ry="3" fill="#d8c48f"/><ellipse cx="${n1(cx)}" cy="${n1(H * 0.9 - 1)}" rx="7" ry="2" fill="#8a7c44"/>`;
+    }
+    return frame(W, H, inner, ['#2a4a6a', '#d9c48a'], gid);
+  }
+
   // void
   let inner = stars(rng, W, H, 34, 1);
   // A nebula smear.

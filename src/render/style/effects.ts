@@ -362,6 +362,7 @@ const WIND_COL: Record<BiomeArchetype, string> = {
   metal: 'rgba(190,160,120,', // blown metal filings / scrap dust
   derelict: 'rgba(150,175,205,', // cold venting vapour / drifting hull dust
   asgard: 'rgba(255,240,190,', // pale divine gold-white — drifting light off the Golden Realm
+  earth: 'rgba(224,222,196,', // pale sea-haze — drifting sand + spindrift off the links in the coastal wind
 };
 
 /** Unit SCREEN direction the wind blows, from a hole's `Wind.dir` (course bearing) through the

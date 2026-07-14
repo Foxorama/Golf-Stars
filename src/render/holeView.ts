@@ -79,6 +79,7 @@ const TREE_GLYPH: Record<BiomeArchetype, string> = {
   metal: '📡', // rusted scrap mast / antenna
   derelict: '🛰️', // a broken antenna spar / dead dish jutting from the hull
   asgard: '🍁', // Yggdrasil golden-leaf ash
+  earth: '🌾', // links gorse / dune grass — the treeless course's only "treeline"
 };
 const blockGlyph = (src: 'trees' | 'tents' | 'walls', arch: BiomeArchetype): string =>
   src === 'tents' ? TENT_GLYPH : src === 'walls' ? WALL_GLYPH : TREE_GLYPH[arch];

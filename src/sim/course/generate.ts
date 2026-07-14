@@ -151,6 +151,14 @@ export interface GenerateOptions {
    * mode; absent ⇒ the arc, byte-for-byte the old composition (contract 1). Ignored without `compose`.
    */
   wildnessMix?: readonly number[];
+  /**
+   * PINNED PAR SEQUENCE (GS-hole-plan): with `compose` on, an explicit hole-by-hole par list that
+   * REPLACES the random par plan — so a static course can pin its exact routing rhythm (e.g. a
+   * real-course replica's par-72 sequence) rather than sampling the world's par mix. Passed straight
+   * to `planCourse`; hole `i` takes `parSequence[i % length]`. Absent ⇒ the world's random par plan,
+   * byte-for-byte. Ignored without `compose` (a single-hole slice / IID path never composes).
+   */
+  parSequence?: readonly (3 | 4 | 5)[];
 }
 
 const NAME_PREFIX = ['Kepler', 'Vega', 'Lyra', 'Orion', 'Cygnus', 'Helix', 'Pulsar', 'Nyx'];
@@ -2232,6 +2240,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
       signatures: !biome.lostRough && !biome.walls,
       parMix: biome.parMix, // per-biome par rhythm (GS-biome-profile); absent ⇒ the default mix
       wildnessMix: opts.wildnessMix, // Star Tour per-hole medium/hard mix (GS-star-tour-difficulty); absent ⇒ the arc
+      parSequence: opts.parSequence, // pinned real-course par rhythm (GS-hole-plan); absent ⇒ the random par plan
     });
     let prevFamily: string | undefined;
     for (let i = 0; i < holeCount; i++) {
