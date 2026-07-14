@@ -228,6 +228,17 @@ these systems** — each bullet is the tip of a documented iceberg.
     mean per-stop Stableford (contract 4), never fires on wide calm corridors. Pure, zero rng.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
+  - The green-END varies per hole (GS-green-end): the fairway APRON used to be ONE fixed tapering wrap on
+    EVERY hole (the "tapered snake head" — every hole-end read identical). Now a per-hole green-COMPLEX
+    archetype varies the apron shape BEHIND + AROUND the green (the part the corridor, which ends AT the
+    green, doesn't reach — so it genuinely reads): a perched SHELF (no tail, rough behind — going long is
+    punished), a gathering PUNCHBOWL (wide wrap + stub tail), a long RUNOFF collection ramp, a narrow
+    TONGUE promontory, or the classic OPEN wedge. Drawn from a DEDICATED side stream
+    (`${seed}:greencomplex:`, the pin/slope pattern), so it perturbs ZERO main-`rng` draws — terrain,
+    hazards, pin, slope, greenside guards all byte-identical; only the apron polygon shifts (the SHELF's
+    rough-behind is a mild scoring change, not a stream one). Skipped on lost-rough worlds (floating
+    island greens have no apron). `GENERATOR_VERSION` 39. Sibling of GS-approach-hazards in the
+    hazard/hole-END distribution follow-up to GS-biome-variety.
   - `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves
     carry), sampled from an asymmetric 5-zone `SprayShape`.
   - Forced-carry crossings are generic penalty bands; the carry-aware AI flies them off `penalty`,
