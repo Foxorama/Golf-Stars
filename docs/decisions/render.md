@@ -658,6 +658,25 @@
   `_gsFeel.cetusFlowSpeed` sub-field (1 default, 0 freezes) — a feel tunable, no test-hub hook. Eyeball
   with `scripts/cetus-flow-preview.mjs`.
 
+- **The waterfall TIPS to line up with the edge (GS-cetus-waterfall-angle, 2026-07-14).** The curtain
+  (both the animated `cetusFlow` and the static `cetusRiver`) always dropped straight screen-DOWN — the
+  cliff-extrusion convention. When the river arrives at the lip vertically that's perfect (and it's the
+  case players loved). But the follow-cam ROTATES: on a hole where the river reaches the plateau edge on
+  a slant, the fixed straight-down fall painted a flat HORIZONTAL lip pasted across a diagonal river,
+  reading as "not lining up with the edge" — the exact complaint. FIX: a shared `waterfallBasis(screen)`
+  (in `style/platforms.ts`) reads the river's PROJECTED downstream tangent at the spill (a few points
+  upstream → the spill) and returns a fall unit vector + a perpendicular lip vector. The bands, lip,
+  falling streaks and splash are all rebuilt off that basis (`fpt(u, lat, half)`), so the lip lies ALONG
+  the edge and the curtain continues the river's flow off it. The tilt is CLAMPED to ≤~34° off
+  straight-down (via `atan2(dx,dy)` deviation) so it never falls sideways or up — always a gravity drop;
+  and when the tangent already points straight down the basis returns `(fx,fy)=(0,1),(px,py)=(1,0)`,
+  which reduces every offset to the OLD straight-down math BYTE-FOR-BYTE (the aligned case is untouched).
+  The `paint` gate (don't draw a fall that lands on turf) probes along the tilted fall direction too, so
+  it stays correct under rotation. Pure screen-space geometry off the projected spine — ZERO rng, no
+  seeded stream touched, `cetus.test`'s byte-stability + gating assertions unchanged. ONE basis feeds
+  both the map and the play view so they can't diverge. Eyeball with `scripts/cetus-angle-preview.mjs`
+  (auto-finds real waterfall holes at several arrival angles; the near-0° tile must match the old look).
+
 ## GS-overlay-decor: the animated world-decor also moves on the aim/putt screen (2026-07-10)
 
 - **The moving decor twins were watch-only (the bug).** `render/cetusFlow.ts` (the flowing Cetus

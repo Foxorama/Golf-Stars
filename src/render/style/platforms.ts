@@ -44,6 +44,37 @@ function ribbonVar(path: Vec[], hw: number[]): Vec[] {
   return [...left, ...right.reverse()];
 }
 
+/**
+ * The screen-space fall BASIS for the star-waterfall (GS-cetus-waterfall-angle). The curtain used to
+ * always drop straight screen-DOWN, so on a rotated follow-cam the lip sat as a flat horizontal bar
+ * pasted across a river arriving at an angle — the "off-centre waterfall" the eye reads as not lining
+ * up with the plateau edge. Instead we tip the curtain along the river's OWN downstream flow at the
+ * spill: the lip turns to lie along the EDGE the water crosses and the fall continues the river's line.
+ * Clamped to a tasteful lean off straight-down (never sideways or up, so it always reads as a gravity
+ * drop), and byte-for-byte straight-down when the river already arrives vertically (the perfectly-
+ * aligned case that already looked stunning). Pure geometry off the PROJECTED spine — no rng.
+ * Returns the fall unit vector (fx,fy) and the perpendicular lip unit vector (px,py).
+ */
+export function waterfallBasis(screen: Vec[]): { fx: number; fy: number; px: number; py: number } {
+  const n = screen.length;
+  const spill = screen[n - 1]!;
+  const tail = screen[Math.max(0, n - 4)]!; // a few steps upstream → the local downstream flow
+  let dx = spill[0] - tail[0];
+  let dy = spill[1] - tail[1];
+  if (Math.hypot(dx, dy) < 1e-3) {
+    dx = 0;
+    dy = 1;
+  }
+  // Deviation from straight-down (screen +y), clamped to a lean — a tilt that lines the lip up with
+  // the edge, never a sideways/upward fling that stops reading as a fall.
+  const MAX_TILT = 0.6; // ~34°
+  let ang = Math.atan2(dx, dy); // 0 = straight down; sign = lean left/right
+  ang = Math.max(-MAX_TILT, Math.min(MAX_TILT, ang));
+  const fx = Math.sin(ang);
+  const fy = Math.cos(ang);
+  return { fx, fy, px: fy, py: -fx };
+}
+
 /** Sample a polyline at parameter `u` in [0,1] by arc length (so a curve is walked evenly). */
 function sampleAlong(line: Vec[], u: number): Vec {
   const n = line.length;
@@ -740,10 +771,18 @@ export function cetusRiver(
       break;
     }
   }
+  // Tip the curtain along the river's downstream flow so the lip lines up with the plateau edge
+  // (GS-cetus-waterfall-angle) — straight-down when the river arrives vertically, a lean when the
+  // follow-cam rotates the crossing. All screen offsets below are built off this basis.
+  const { fx: dfx, fy: dfy, px: lpx, py: lpy } = waterfallBasis(screen);
+  const fpt = (u: number, lat: number, half: number): Vec => [
+    spill[0] + dfx * fallLen * u + lpx * lat * half,
+    spill[1] + dfy * fallLen * u + lpy * lat * half,
+  ];
   const onLand = (p: Vec) => landCourse.some((lp) => pointInPoly(p, lp));
   const paint =
-    !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.35)) &&
-    !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.8));
+    !onLand(proj.unproject(spill[0] + dfx * fallLen * 0.35, spill[1] + dfy * fallLen * 0.35)) &&
+    !onLand(proj.unproject(spill[0] + dfx * fallLen * 0.8, spill[1] + dfy * fallLen * 0.8));
   const spillW = Math.max(12, hw[hw.length - 1]! * proj.scale * 2.2);
   const fall: Prim[] = [];
   if (paint) {
@@ -751,7 +790,7 @@ export function cetusRiver(
     // A LUMINOUS curtain that fades with the drop (stacked translucent bands): the old dark-blue
     // veil vanished against the dark cliff face, leaving only the sparse streaks — which read as
     // dangling drips ("an electric eel vomiting"), not a waterfall. Star-water GLOWS as it falls.
-    const xAt = (u: number, f: number) => spill[0] + f * spillW * (0.5 + 0.14 * u);
+    const halfAt = (u: number) => spillW * (0.5 + 0.14 * u);
     const bands: [number, number, string][] = [
       [0, 0.4, 'rgba(150,222,248,0.4)'],
       [0.4, 0.72, 'rgba(118,190,235,0.24)'],
@@ -760,50 +799,46 @@ export function cetusRiver(
     for (const [u0, u1, colBand] of bands) {
       fall.push({
         t: 'poly',
-        pts: [
-          [xAt(u0, -1), spill[1] + fallLen * u0],
-          [xAt(u0, 1), spill[1] + fallLen * u0],
-          [xAt(u1, 1), spill[1] + fallLen * u1],
-          [xAt(u1, -1), spill[1] + fallLen * u1],
-        ],
+        pts: [fpt(u0, -1, halfAt(u0)), fpt(u0, 1, halfAt(u0)), fpt(u1, 1, halfAt(u1)), fpt(u1, -1, halfAt(u1))],
         fill: colBand,
       });
     }
     // The LIP: a bright brink line right where the river tips over the edge — the highlight that
-    // sells "water leaves the ground here" at both zooms.
-    fall.push({ t: 'line', a: [spill[0] - spillW * 0.5, spill[1]], b: [spill[0] + spillW * 0.5, spill[1]], stroke: 'rgba(235,252,255,0.9)', sw: 1.8, round: true });
-    fall.push({ t: 'line', a: [spill[0] - spillW * 0.42, spill[1] + 2.2], b: [spill[0] + spillW * 0.42, spill[1] + 2.2], stroke: 'rgba(170,232,250,0.5)', sw: 1, round: true });
+    // sells "water leaves the ground here" at both zooms. Drawn along the lip axis so it lies on the
+    // edge, not flat across it.
+    fall.push({ t: 'line', a: fpt(0, -1, spillW * 0.5), b: fpt(0, 1, spillW * 0.5), stroke: 'rgba(235,252,255,0.9)', sw: 1.8, round: true });
+    fall.push({ t: 'line', a: fpt(0.03, -1, spillW * 0.42), b: fpt(0.03, 1, spillW * 0.42), stroke: 'rgba(170,232,250,0.5)', sw: 1, round: true });
   }
   // Falling star-streaks INSIDE the curtain: short, staggered, fading with the drop — rng consumed
   // UNCONDITIONALLY (the `paint` gate reads the camera, so it may only choose what is pushed,
   // never what is drawn).
   const fallN = accents > 0 ? 16 : 5;
   for (let i = 0; i < fallN; i++) {
-    const fx = (i / Math.max(1, fallN - 1) - 0.5) + (rng() - 0.5) * 0.1; // even lanes → a curtain
+    const lane = (i / Math.max(1, fallN - 1) - 0.5) + (rng() - 0.5) * 0.1; // even lanes → a curtain
     const u0 = rng() * 0.45;
     const u1 = Math.min(1, u0 + 0.2 + rng() * 0.3);
     const alpha = (0.4 + rng() * 0.25) * (1 - u0 * 0.55); // dimmer the further down it starts
     const dropR = 0.5 + rng() * 0.9;
     const uc2 = u0 + (u1 - u0) * rng();
     if (!paint) continue;
-    const xf = (u: number) => spill[0] + fx * spillW * (0.9 + 0.28 * u); // splays gently with the drop, stays inside the curtain
+    const laneHalf = (u: number) => spillW * (0.9 + 0.28 * u); // splays gently with the drop, stays inside the curtain
     fall.push({
       t: 'line',
-      a: [xf(u0), spill[1] + fallLen * u0],
-      b: [xf(u1), spill[1] + fallLen * u1],
+      a: fpt(u0, lane, laneHalf(u0)),
+      b: fpt(u1, lane, laneHalf(u1)),
       stroke: `rgba(205,249,255,${alpha.toFixed(2)})`,
       sw: 1.1,
       round: true,
     });
-    if (accents > 0) fall.push({ t: 'circle', c: [xf(uc2), spill[1] + fallLen * uc2], r: dropR, fill: 'rgba(232,252,255,0.8)' });
+    if (accents > 0) fall.push({ t: 'circle', c: fpt(uc2, lane, laneHalf(uc2)), r: dropR, fill: 'rgba(232,252,255,0.8)' });
   }
   // Splash foot: a soft mist bloom + ripple rings where the curtain meets the star-ocean.
-  const pool: Vec = [spill[0], spill[1] + fallLen];
+  const pool: Vec = [spill[0] + dfx * fallLen, spill[1] + dfy * fallLen];
   const mist: [number, number, number][] = [];
   for (let i = 0; i < 3; i++) mist.push([(rng() - 0.5) * spillW * 0.9, rng() * 4, 2.5 + rng() * 3.5]);
   if (paint) {
     fall.push({ t: 'glow', c: pool, r: spillW * 1.3, col: 'rgba(150,238,255,0.35)' });
-    for (const [mx, my, mr] of mist) fall.push({ t: 'circle', c: [pool[0] + mx, pool[1] - my], r: mr, fill: 'rgba(210,246,255,0.3)' });
+    for (const [mx, my, mr] of mist) fall.push({ t: 'circle', c: [pool[0] + lpx * mx - dfx * my, pool[1] + lpy * mx - dfy * my], r: mr, fill: 'rgba(210,246,255,0.3)' });
     for (let i = 1; i <= 3; i++) {
       fall.push({ t: 'circle', c: pool, r: i * 5 + spillW * 0.22, fill: 'none', stroke: `rgba(150,238,255,${(0.45 - i * 0.12).toFixed(2)})`, sw: 1 });
     }

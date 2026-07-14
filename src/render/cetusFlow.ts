@@ -19,7 +19,7 @@ import type { Hole, Vec } from '../sim/course/contract';
 import { dist, pointInPoly } from '../sim/course/contract';
 import type { Projector } from './project';
 import { mulberry32, hashHole, projPoly } from './style/shared';
-import { cetusRiverPath } from './style/platforms';
+import { cetusRiverPath, waterfallBasis } from './style/platforms';
 import { landPolysCourseFor } from './style/land';
 
 // The dedicated river seed buildScene uses (`0x00cef10e`) — reproduced here so the animated channel
@@ -289,10 +289,18 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
     }
     const spill = screen[screen.length - 1]!;
     const fallLen = fallLenFor(line, land, proj, avgHwPx);
+    // Tip the curtain along the river's downstream flow so the lip lines up with the plateau edge
+    // (GS-cetus-waterfall-angle) — straight-down when the river arrives vertically, a lean when the
+    // follow-cam rotates the crossing. Every screen offset below is built off this basis.
+    const { fx: dfx, fy: dfy, px: lpx, py: lpy } = waterfallBasis(screen);
+    const fpt = (u: number, lat: number, half: number): Vec => [
+      spill[0] + dfx * fallLen * u + lpx * lat * half,
+      spill[1] + dfy * fallLen * u + lpy * lat * half,
+    ];
     const onLand = (p: Vec) => land.some((lp) => pointInPoly(p, lp));
     const paint =
-      !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.35)) &&
-      !onLand(proj.unproject(spill[0], spill[1] + fallLen * 0.8));
+      !onLand(proj.unproject(spill[0] + dfx * fallLen * 0.35, spill[1] + dfy * fallLen * 0.35)) &&
+      !onLand(proj.unproject(spill[0] + dfx * fallLen * 0.8, spill[1] + dfy * fallLen * 0.8));
     if (!paint) {
       ctx.restore();
       return;
@@ -308,27 +316,33 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
     ctx.arc(spill[0], spill[1], spillW * 1.3, 0, Math.PI * 2);
     ctx.fill();
     // Translucent curtain bands fading with the drop (the container the streaks fall through).
-    const xAt = (u: number, f: number) => spill[0] + f * spillW * (0.5 + 0.14 * u);
+    const halfAt = (u: number) => spillW * (0.5 + 0.14 * u);
     const bands: [number, number, string][] = [
       [0, 0.4, 'rgba(150,222,248,0.4)'],
       [0.4, 0.72, 'rgba(118,190,235,0.24)'],
       [0.72, 1, 'rgba(92,150,210,0.1)'],
     ];
     for (const [u0, u1, col] of bands) {
+      const a0 = fpt(u0, -1, halfAt(u0));
+      const b0 = fpt(u0, 1, halfAt(u0));
+      const b1 = fpt(u1, 1, halfAt(u1));
+      const a1 = fpt(u1, -1, halfAt(u1));
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.moveTo(xAt(u0, -1), spill[1] + fallLen * u0);
-      ctx.lineTo(xAt(u0, 1), spill[1] + fallLen * u0);
-      ctx.lineTo(xAt(u1, 1), spill[1] + fallLen * u1);
-      ctx.lineTo(xAt(u1, -1), spill[1] + fallLen * u1);
+      ctx.moveTo(a0[0], a0[1]);
+      ctx.lineTo(b0[0], b0[1]);
+      ctx.lineTo(b1[0], b1[1]);
+      ctx.lineTo(a1[0], a1[1]);
       ctx.closePath();
       ctx.fill();
     }
+    const lip0 = fpt(0, -1, spillW * 0.5);
+    const lip1 = fpt(0, 1, spillW * 0.5);
     ctx.strokeStyle = 'rgba(235,252,255,0.9)';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.moveTo(spill[0] - spillW * 0.5, spill[1]);
-    ctx.lineTo(spill[0] + spillW * 0.5, spill[1]);
+    ctx.moveTo(lip0[0], lip0[1]);
+    ctx.lineTo(lip1[0], lip1[1]);
     ctx.stroke();
 
     // FALLING star-streaks — the curtain in motion. Each seeded streak cycles top→bottom off `now`,
@@ -340,25 +354,27 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
       const segLen = 0.12 + st.len * 0.22;
       const v1 = Math.min(1, v + segLen);
       const alpha = (0.42 + st.sz * 0.28) * (1 - v * 0.7);
-      const xf = (u: number) => spill[0] + st.lane * spillW * (0.9 + 0.28 * u);
+      const laneHalf = (u: number) => spillW * (0.9 + 0.28 * u);
+      const h0 = fpt(v, st.lane, laneHalf(v));
+      const h1 = fpt(v1, st.lane, laneHalf(v1));
       ctx.globalAlpha = clamp01(alpha);
       ctx.strokeStyle = 'rgba(205,249,255,1)';
       ctx.lineWidth = 1.1;
       ctx.beginPath();
-      ctx.moveTo(xf(v), spill[1] + fallLen * v);
-      ctx.lineTo(xf(v1), spill[1] + fallLen * v1);
+      ctx.moveTo(h0[0], h0[1]);
+      ctx.lineTo(h1[0], h1[1]);
       ctx.stroke();
       if (accents > 0) {
         ctx.fillStyle = 'rgba(232,252,255,0.85)';
         ctx.beginPath();
-        ctx.arc(xf(v1), spill[1] + fallLen * v1, 0.6 + st.sz * 0.9, 0, Math.PI * 2);
+        ctx.arc(h1[0], h1[1], 0.6 + st.sz * 0.9, 0, Math.PI * 2);
         ctx.fill();
       }
     }
     ctx.globalAlpha = 1;
 
     // Splash foot: a pulsing mist bloom + outward ripple rings where the curtain meets the ocean.
-    const pool: Vec = [spill[0], spill[1] + fallLen];
+    const pool: Vec = [spill[0] + dfx * fallLen, spill[1] + dfy * fallLen];
     const mg = ctx.createRadialGradient(pool[0], pool[1], 0, pool[0], pool[1], spillW * 1.3);
     mg.addColorStop(0, 'rgba(150,238,255,0.35)');
     mg.addColorStop(1, 'rgba(150,238,255,0)');
@@ -368,9 +384,11 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
     ctx.fill();
     for (const [mx, my, mr] of splash) {
       const wob = 1 + 0.25 * Math.sin(now * 0.007 + mx * 6);
+      const sx = pool[0] + lpx * mx * spillW * 0.45 - dfx * my * 4;
+      const sy = pool[1] + lpy * mx * spillW * 0.45 - dfy * my * 4;
       ctx.fillStyle = 'rgba(210,246,255,0.3)';
       ctx.beginPath();
-      ctx.arc(pool[0] + mx * spillW * 0.45, pool[1] - my * 4, mr * wob, 0, Math.PI * 2);
+      ctx.arc(sx, sy, mr * wob, 0, Math.PI * 2);
       ctx.fill();
     }
     // Rings expand + fade on a loop, so the pool visibly churns.

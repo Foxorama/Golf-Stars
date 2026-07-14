@@ -851,7 +851,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     (GS-decor-view-states), ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical;
     PERF-neutral (geometry cached at mount, per-frame = re-project a short polyline + ~90 capped particles,
     NO `buildScene` rebuild — it replaces the equal static river the follow-cam rebuilt). Speed rides
-    `_gsFeel.cetusFlowSpeed`.
+    `_gsFeel.cetusFlowSpeed`. The WATERFALL tips to the EDGE (GS-cetus-waterfall-angle,
+    `waterfallBasis` in `style/platforms.ts`, shared by BOTH the animated flow AND the static
+    `cetusRiver`): the curtain used to always drop straight screen-DOWN, so a rotated follow-cam sat a
+    flat horizontal lip across a river arriving on a slant. Now the lip + curtain lean along the river's
+    own PROJECTED downstream tangent at the spill, so they line up with the plateau edge — clamped to
+    ≤~34° off straight-down (never sideways/up, always reads as a gravity drop) and byte-for-byte
+    straight-down when the river arrives vertically (the perfectly-aligned case). Pure geometry, zero rng.
   - DECOR IS VIEW-STATE-INVARIANT (GS-decor-view-states): the four gameplay views (aim / watch / chip /
     putt) draw the animated decor through DIFFERENT projectors on DIFFERENT canvases, so any element that
     is a pure function of `(worldPosition, wallClock)` reads IDENTICALLY in all four and never jumps on a
