@@ -9,9 +9,13 @@
  * right pill toggles the course-record boards.
  *
  * Character select comes BEFORE this screen (GS-star-tour-2), so `run.loadout.characterId` is set and
- * the ship is the golfer's own. Cockpit chrome uses its OWN class prefix `.gs-sthud` (never the play
- * screen's `.gs-hud` nor the journey map's `.gs-bhud` — the class-collision rule). The ship's motion is
- * an app-layer rAF animation (starTourView holds its position); the reducer stays pure.
+ * the ship is the golfer's own. The cockpit HUD REUSES the journey bridge HUD (GS-star-tour-hud): the map
+ * renders a `.gs-bhud gs-bhud--st gs-bhud--<variant>` frame themed by `hudThemeForShip`/`hudChromeFor`, so
+ * it recolours to the flown ship AND inherits the same fleet ornaments — with a `.gs-bhud--st` context
+ * modifier swapping the travel controls (fuel/scan/credits/hole) for Star Tour's own (records stat pod,
+ * golfer-swap centre command, records readout, EXIT in the bottom-left slot). Star-Tour content keeps the
+ * `.gs-sthud__` prefix; the class-collision guard is unchanged (never the play screen's `.gs-hud`). The
+ * ship's motion is an app-layer rAF animation (starTourView holds its position); the reducer stays pure.
  */
 
 import { state } from './ctx';
@@ -24,6 +28,8 @@ import { shipForCharacter } from '../ui/gameCosmetics';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
 import type { CosmeticRarity } from '../sim/rpg/cosmetics';
+import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
+import { hudChromeFor } from '../render/hudChrome';
 
 /** View state for the star map (mutated by app.ts; reset on entry). */
 export const starTourView = {
@@ -115,33 +121,71 @@ export function starTourWorlds(): StarTourWorld[] {
   });
 }
 
-/** The cockpit HUD frame: corner brackets, title plate, an EXIT switch, the top-right stat pod, plus
- *  the bottom dock (golfer swap + records toggle). Its own `.gs-sthud` prefix; `pointer-events:none`
- *  so map scroll/taps pass through — only the buttons catch pointers. */
+/** The cockpit HUD (GS-star-tour-hud): the star map reuses the journey bridge HUD (`.gs-bhud`) so it
+ *  recolours to the flown ship IDENTICALLY (id → set → standard cyan — see `render/hudTheme.ts`) and
+ *  inherits the same fleet ornaments (title plate = ship name, side rails, corner nodes, wings, deck).
+ *  A `.gs-bhud--st` context modifier swaps the travel-only controls (fuel / scan / credits / hole
+ *  progress) for Star Tour's own: a records stat pod, the golfer-swap CENTRE command (parallel to the
+ *  scan dial's focal slot), a records readout (parallel to the fuel readout), and the EXIT switch moved
+ *  to the bottom-left console slot (the user's ask). Star-Tour CONTENT keeps the `.gs-sthud__` prefix;
+ *  the shared FRAME / theme / ornaments are the bridge HUD's `.gs-bhud`. `pointer-events:none` on the
+ *  frame so map scroll/taps pass through — only the console controls catch pointers. */
 function stHud(): string {
   const charId = state.run.loadout.characterId;
   const ch = charId ? getCharacter(charId) : undefined;
   const shipId = shipForCharacter(state, charId);
   const ship = shipById(shipId);
   const accent = ch?.style.cap ?? '#7fe0ff';
+
+  // The livery follows the flown ship, exactly like the travel screen — piped in as `--hud-*` custom
+  // properties + a `gs-bhud--<variant>` frame class, plus optional bespoke CHROME (themed exit icon/label
+  // + frame ornaments). `chrome` is null for the standard cyan console (an unknown/basic ship).
+  const hud = hudThemeForShip(shipId);
+  const chrome = hudChromeFor(hud.variant, ship);
+  const exitIco = chrome?.exitIcon ?? '🚪';
+  const exitLbl = chrome?.exitLabel ?? 'EXIT';
+
+  const total = starTourWorlds().length;
+  const played = Object.keys(state.strokePlayBest).length;
+  const recordsToggle = starTourView.recordsOpen ? '0' : '1';
+
   return `
-    <div class="gs-sthud" aria-hidden="false">
-      <div class="gs-sthud__frame"></div>
-      <button class="gs-sthud__back" data-action='{"type":"exitStarTour"}'>‹ Exit</button>
-      <div class="gs-sthud__plate">✦ STAR TOUR</div>
-      <div class="gs-sthud__statpod">
-        <span class="gs-sthud__shards">✦ <b>${state.shards}</b></span>
-        <button class="gs-sthud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
+    <div class="gs-bhud gs-bhud--st gs-bhud--${hud.variant}" style="${hudThemeVars(hud)}">
+      <div class="gs-bhud__frame" aria-hidden="true">
+        <span class="gs-bhud__corner gs-bhud__corner--tl"></span>
+        <span class="gs-bhud__corner gs-bhud__corner--tr"></span>
+        <span class="gs-bhud__corner gs-bhud__corner--bl"></span>
+        <span class="gs-bhud__corner gs-bhud__corner--br"></span>
       </div>
-      <div class="gs-sthud__dock">
-        <button class="gs-sthud__golfer" data-action='{"type":"openStarTour"}' title="Change golfer">
-          <span class="gs-sthud__golfer-dot" style="background:${accent};"></span>
-          <span class="gs-sthud__golfer-txt">
-            <b>${ch?.name ?? 'Pick golfer'}</b>
-            <span>🚀 ${ship?.name ?? 'ship'} · change ▸</span>
-          </span>
-        </button>
-        <button class="gs-sthud__records" data-startour-records="1">🏆 Records</button>
+      ${chrome?.frame ?? ''}
+      <div class="gs-bhud__idpod">
+        <span class="gs-bhud__who">✦ <b class="gs-bhud__name">STAR TOUR</b></span>
+        <span class="gs-bhud__prog">🏆 <b>${played}</b>/${total}</span>
+      </div>
+      <div class="gs-bhud__statpod">
+        <span class="gs-bhud__shards">✦ <b>${state.shards}</b></span>
+        <button class="gs-bhud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+      <div class="gs-bhud__console">
+        ${chrome?.deck ?? ''}
+        <div class="gs-bhud__slot gs-bhud__slot--exit">
+          <button class="gs-travel__exit" data-action='{"type":"exitStarTour"}' title="Leave the Star Tour" aria-label="Leave the Star Tour, back to the title">
+            <span class="gs-travel__exit-ico">${exitIco}</span>
+            <span class="gs-travel__exit-lbl">${exitLbl}</span>
+          </button>
+        </div>
+        <div class="gs-bhud__slot gs-bhud__slot--scan">
+          <button class="gs-sthud__golfer" data-action='{"type":"openStarTour"}' title="Change golfer">
+            <span class="gs-sthud__golfer-dot" style="background:${accent};"></span>
+            <span class="gs-sthud__golfer-txt">
+              <b>${ch?.name ?? 'Pick golfer'}</b>
+              <span>🚀 ${ship?.name ?? 'ship'} · change ▸</span>
+            </span>
+          </button>
+        </div>
+        <div class="gs-bhud__slot gs-bhud__slot--fuel">
+          <button class="gs-sthud__records" data-startour-records="${recordsToggle}" aria-pressed="${starTourView.recordsOpen}">🏆 Records</button>
+        </div>
       </div>
     </div>`;
 }
