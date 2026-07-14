@@ -1420,6 +1420,14 @@
          worlds UP under the pods, and Earth at the bottom poked past the console outside the frame. */
       .gs-travel .gs-journey--v {
         flex: 1 1 auto; min-height: 0; max-height: none; margin: 0; padding: 66px 6px 88px;
+        /* Anchor the chart to the TOP, never `safe center` (the base rule): the SVG scales to the panel
+           WIDTH, so its px-per-unit is fixed and the worlds always sit at the same CHOICE_Y — but the base
+           centring only holds while the chart is SHORTER than the panel (a fresh stop). Once the trail grows
+           past the panel the chart overflows and flips to top-aligned, jerking the worlds UP ~90px and the
+           whole map's framing with them (the "it zooms out and shifts up when it gets long enough to scroll"
+           bug). Pinning to flex-start keeps the worlds fixed and the framing identical at every trail length;
+           a short first stop simply shows sky below Earth instead of centring. */
+        justify-content: flex-start;
         /* Feather the map (+ its starfield, both live on this element) into the sticky chrome at top and
            bottom, so a world scrolling up toward the pods or a trail node sliding down past the console
            DISSOLVES rather than hard-cutting under the bar or poking out below the frame (the bottom-left
