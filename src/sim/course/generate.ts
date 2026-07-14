@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 29; // GS-biome-variety: Ember World tight-inferno identity (lava carries + squeezed corridors force layups) + denser charred-snag rough
+export const GENERATOR_VERSION = 30; // GS-biome-variety: Crystal Spires angular-precision identity + spire-forest rough (treeDensity up)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
