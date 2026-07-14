@@ -29,14 +29,16 @@ function sample(biome: string, wildness = 0.6, stops = 120) {
 
 describe('per-biome design profiles (GS-biome-profile)', () => {
   it('a world WITHOUT a profile is byte-for-byte the old generation', () => {
-    // ember-world sets no profile fields; composing it must be identical run to run and unchanged by
-    // the new machinery (the default weights reproduce the old thresholds/proportions exactly).
-    const a = generateCourse(123, { biome: 'ember-world', holes: 9, wildness: 0.7, compose: true });
-    const b = generateCourse(123, { biome: 'ember-world', holes: 9, wildness: 0.7, compose: true });
+    // asgard-realm is the deliberately-UNPROFILED reference (the grand fair reward world we never
+    // re-shape under GS-biome-variety); composing it must be identical run to run and unchanged by the
+    // new machinery (the default weights reproduce the old thresholds/proportions exactly). (Ember was
+    // the reference until GS-biome-variety gave it a tight-inferno identity.)
+    const a = generateCourse(123, { biome: 'asgard-realm', holes: 9, wildness: 0.7, compose: true });
+    const b = generateCourse(123, { biome: 'asgard-realm', holes: 9, wildness: 0.7, compose: true });
     expect(a).toEqual(b);
-    expect(biomeById('ember-world')?.parMix).toBeUndefined();
-    expect(biomeById('ember-world')?.shapeWeights).toBeUndefined();
-    expect(biomeById('ember-world')?.widthWeights).toBeUndefined();
+    expect(biomeById('asgard-realm')?.parMix).toBeUndefined();
+    expect(biomeById('asgard-realm')?.shapeWeights).toBeUndefined();
+    expect(biomeById('asgard-realm')?.widthWeights).toBeUndefined();
   });
 
   it('Dust Belt plays LONG and OPEN — more par-5s, wide fairways, few tight corridors', () => {

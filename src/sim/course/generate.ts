@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 28; // GS-biome-variety: Dust Belt roughFill (dune-scrub waste fills the open desert rough) + width/hazard tweaks
+export const GENERATOR_VERSION = 29; // GS-biome-variety: Ember World tight-inferno identity (lava carries + squeezed corridors force layups) + denser charred-snag rough
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)

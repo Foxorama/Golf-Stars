@@ -319,19 +319,28 @@ export const BIOMES: readonly Biome[] = [
     scatter: [{ kind: 'crystal', freqPerHole: 0.8, rMin: 6, rMax: 11 }],
     fairwayWidthMult: 0.9,
     doglegBias: 0.4,
-    treeDensity: 0.55, // charred snags, a little denser
+    treeDensity: 1.1, // GS-biome-variety: a burnt forest of charred snags walls the lava fields (was sparse)
     fairwayBunkers: 1.2,
     lavaRiver: true, // signature: molten rivers cross the fairway (forced carry)
     deepRough: 'deeprough', // deep cinder-ash brush chokes a cut corner
-    fairwayBreaks: 0.4, // scorched waste cuts across the odd fairway
-    potBunkers: 0.3, // the odd cinder pot near the green
+    fairwayBreaks: 0.6, // scorched waste cuts across the fairway
+    potBunkers: 0.6, // cinder pots pinch the landing zones + ring the greens
     greenSize: 0.95, // jagged, broken basalt greens
     greenAspect: 2.0,
     greenIrregular: 1.45,
     greenSlopeMax: 0.6, // GS-greens-3 green tilt character
     roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-variety): a TIGHT, DANGEROUS inferno — the molten rivers are the signature, so
+    // holes bend around the lava (doglegs + heroic CAPE carries + severe HAIRPINS over the flow), and the
+    // corridors SQUEEZE (thin/neck/chute) so you thread the drive and lay up short of a lava carry to
+    // leave an iron in. Difficulty is the carry + the pinch + the charred-snag rough, not length (the
+    // dense hot air already keeps holes short). Par-4 dominant with short par-3 carries; few par-5s.
+    parMix: { p3: 0.28, p4: 0.56, p5: 0.16 },
+    shapeWeights: { straight: 0.16, dogleg: 0.3, cape: 0.24, double: 0.16, hairpin: 0.14 },
+    widthWeights: { classic: 0.16, chute: 0.2, neck: 0.2, hourglass: 0.14, wander: 0.06, thin: 0.16, broad: 0.08 },
     // GS-biome-difficulty: jagged broken basalt greens get wilder with depth (double-breaking contours,
-    // pins tucked in the lava-rock folds) — the approach + putt is the danger, not raw length.
+    // pins tucked in the lava-rock folds) — the approach + putt is a SECONDARY danger, on top of the
+    // hazard layouts above (not the primary difficulty lever).
     difficulty: { greenComplexity: 1.35, greenTilt: 1.2, pinTuck: 0.5 },
   },
   {

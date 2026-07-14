@@ -138,8 +138,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     death-spiral/tents balance fences are RELAXED with `TODO(GS-biome-variety)` (the GS-rough-gradient
     pattern), NEVER the structural fairness contracts (`validateFairness`/`Crossings`/`Course` stay green
     by construction). The `tests/fairway-width.test.ts` GRAMMAR sample moved off verdant → `asgard-realm`
-    (the neutral default-weights reference we never re-profile). Done: verdant-station (strategic parkland),
-    dust-belt (open dune-field desert — `roughFill` waste mounds + hourglass dune pinches). Cetus
+    (the neutral default-weights reference we never re-profile — the `biome-profile.test.ts` byte-identity
+    case moved off ember → asgard for the same reason). Done: verdant-station (strategic parkland),
+    dust-belt (open dune-field desert — `roughFill` waste mounds + hourglass dune pinches), ember-world
+    (tight inferno — lava-carry capes/hairpins + squeezed thin/neck corridors + charred-snag rough). Cetus
     (waterfalls) + Derelict (walls) are handled LAST + minimally.
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
