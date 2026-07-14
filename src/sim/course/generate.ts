@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 27; // GS-biome-variety: per-world shape/width/par identities + denser rough so worlds stop reading as one snake corridor
+export const GENERATOR_VERSION = 28; // GS-biome-variety: Dust Belt roughFill (dune-scrub waste fills the open desert rough) + width/hazard tweaks
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -1364,6 +1364,22 @@ function generateHole(
           const lat = Math.min(maxLat, edge + Math.max(buffer, standoff(r)) + depthFrac * forestReach + roughRng.range(0, 10));
           const c: Vec = [along[0] + perp[0] * side * lat, along[1] + perp[1] * side * lat];
           hazards.push({ kind: 'trees', poly: blobPoly(c, r, 8, 0.3, roughRng) });
+        }
+        // NON-TREE ROUGH FILL (GS-biome-variety) — a scrubby/treeless world (`biome.roughFill` set)
+        // fills its off-corridor rough with world-appropriate NON-penalty obstacles (dune mounds, rock
+        // piles, crystal shards, scrap plates) at a density that does NOT scale with `treeDensity`, so
+        // an open desert/metal/crystal world still reads as a real hazard-scape you must play AROUND —
+        // "fill the rough so a direct line at the green runs into trouble". Off-corridor (standoff),
+        // non-penalty (fairness ignores them). Only worlds that opt in draw this — the rest are
+        // byte-identical (and it never runs on lost-rough worlds, guarded by the enclosing `!lostRough`).
+        if (biome.roughFill) {
+          const fillCount = 1 + (roughRng.float() < 0.4 ? 1 : 0);
+          for (let k = 0; k < fillCount; k++) {
+            const r = roughRng.range(5, 11);
+            const lat = Math.min(maxLat, edge + Math.max(buffer, standoff(r)) + roughRng.range(0, forestReach));
+            const c: Vec = [along[0] + perp[0] * side * lat, along[1] + perp[1] * side * lat];
+            hazards.push({ kind: biome.roughFill, poly: blobPoly(c, r, 9, 0.34, roughRng) });
+          }
         }
       }
     }
