@@ -438,17 +438,17 @@
       .gs-startour__viewport {
         position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch; background: #05060f;
-        /* Flex + `margin:auto` on the chart CENTRES it (letterboxed) whenever it's smaller than the
-           viewport in an axis — the case when the player zooms out past cover to see the whole wide map
-           on a tall portrait phone (GS-star-map-zoom-out). When the chart OVERFLOWS, the auto margins
-           resolve to 0 and it aligns top-left, so the existing scroll-pan math is unchanged. */
-        display: flex;
         /* We drive pan + pinch-zoom ourselves via pointer events (GS-star-tour), so disable native
            touch panning/zoom — it used to jitter into the drag handler on a second finger (the pinch
            "flicker jump"). Wheel + scrollbar still scroll (touch-action only gates touch). */
         touch-action: none;
       }
-      .gs-startour__chart { display: block; margin: auto; }
+      /* Plain block scroll-child. When the player zooms OUT past cover so the chart is smaller than the
+         viewport in an axis, it's CENTRED (letterboxed) via JS-computed explicit margins (GS-star-map-
+         zoom-out) — NOT flexbox, whose `align-items:stretch` distorted the SVG's aspect (the "map broke,
+         ship jumps, pinch dead" regression). When the chart overflows, the margins are 0 and it scrolls
+         from the top-left exactly as before. */
+      .gs-startour__chart { display: block; }
       /* The SPACEPORT is a tappable "leave to Clubhouse" station (GS-star-tour-port) — a soft hover glow so
          it reads as an interactive dock, not just a landmark. */
       .gs-st-port { transition: filter .16s ease; }
