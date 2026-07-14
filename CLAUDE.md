@@ -962,26 +962,31 @@ these systems** — each bullet is the tip of a documented iceberg.
     (the between-hole recap) is `STROKEPLAY_FORMAT`-branched to show the course + running to-par instead of
     the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard), never the
     ghost competitor leaderboard. The Daily button is parked off the title for now. DESTINATION ICONS
-    (GS-star-tour-destinations, `render/starTourMap.ts`) — the star map is a DIFFERENT interface from the
-    journey map: a course is the PLACE it's named for, not a biome skin, so EVERY destination is its own
-    luminous celestial object that EMITS into the star field (no hard tier ring, no dark halo bubble, no
-    emoji sticker — those made each icon read as a token pasted on black; `softGlow` concentric-ring bloom
-    replaces them so bodies blend in). Two levers: (1) a per-destination PALETTE (`worldLook`, a bounded
-    HSL hue/sat/light shift seeded off `themeId`) so two same-biome courses never share a colour; (2) a
-    celestial KIND — a hand-authored `DESTINATION_KIND[themeId]` map (fallback = `celestialKind` inference
-    off name+archetype, so a new evocative row still picks up a fitting shape) drives the SHAPE, one bespoke
-    renderer each: `galaxy` (spiral arms + black-hole heart — a "Core"), `rift` (an elongated dark SLIT torn
-    by a jagged luminous crack + sparks — a void/"Rift"), `wreck` (broken starship hull: nose + drifted tail,
-    engine bell, dead/flickering windows, antenna, debris, ghost-nebula haze — a derelict/"Wreck"/"Ship"),
-    `nebula` (soft gas blobs + an embedded twinkling star cluster — a "Meadows"/"Hollows"), `star` (corona +
-    diffraction cross + prominences + hot core — a "Forge"/"Sting"; palette makes a blue-white forge-star vs
-    a red giant diverge), `crystal` (faceted glowing shards radiating from a gem — a "Prism"/"Wedge"), `storm`
-    (a cyclone spiral into a dark eye — a "Gale"/tempest), `binary` (twin worlds on an orbital tether — the
-    "Twins"), `ringworld` (a lit planet with a `ringStyleFor` ring — ice/ocean band or a metal DEBRIS belt),
-    or `planet` (a lit world: seeded surface by `SURFACE_FAMILY`, atmosphere glow, terminator+rim). Tier is a
-    small luminous BEACON dot (top-left), not a ring. Everything past the palette is `mulberry32`-seeded off
-    the world id (per-world clip ids via `idSafe`). Pure + byte-stable (the map has its OWN seeded stream, not
-    the sim rng). Eyeball via `scripts/startour-preview.mjs`.
+    (GS-star-tour-destinations → GS-star-map-icon-consistency, `render/starTourMap.ts`) — the star map is a
+    DIFFERENT interface from the journey map: a course is the PLACE it's named for, not a biome skin, so
+    EVERY destination is its own luminous celestial object that EMITS into the star field via `softGlow`
+    (no hard tier ring, no dark halo bubble, no emoji sticker — those read as tokens on black). Each place
+    is BESPOKE, in-sync, and UNIQUE from same-biome siblings via a `SIGNATURE[themeId]` row (`{kind, size,
+    motif?, ring?, star?}`; fallback `signatureFor` infers off name+archetype). Three levers: (1) a
+    per-destination PALETTE — a deliberate `TINT_OVERRIDE` (Orion's blue forge vs Scorpius' red, Hydra's
+    toxic acid, Leo/Vela golds, Antlia/Pyxis greys) else a seeded HSL shift on the archetype base, so two
+    same-biome courses never share a colour; (2) a celestial KIND, one bespoke renderer each — `galaxy`
+    (grand spiral + black-hole heart, drawn LARGE so the Sagittarius Core never reads smaller than a
+    planet), `rift` (torn luminous crack), `wreck` (broken starship), `ringNebula` (Lyra = the green Ring
+    Nebula M57 smoke-ring), `dumbbell` (Vulpecula = the bi-lobed M27, so it's NOT a Lyra clone), `star`
+    (a TAMED sun — glow restrained so no icon overpowers — flavoured `forge` [blue + Orion's Belt] or
+    `sting` [red Antares + a curved stinger tail of stars]), `crown` (Corona Borealis = a jewelled arc-
+    tiara), `crystal` (a three-point wedge, for Triangulum), `maelstrom` (Draco = a dense multi-arm vortex
+    with a dark eye, the finished storm), `binary` (Gemini = twin icy worlds), `serpent` (Hydra = a toxic
+    many-headed water-serpent coiled in acid haze), or `planet`; and (3) a per-world planet MOTIF that
+    individuates the shared planet body — `mane` (Leo's golden lion mane), `companion` (Centaurus + bright
+    Alpha Centauri), `whale` (Cetus breaching the star-sea), `river` (Eridanus' star-stream), `dune`
+    (Vela's sail-wisp + dune bands), `scrap` (Antlia's junk belt + antenna, corroded), `foundry` (Pyxis'
+    molten seams + compass needle), plus `ring` styles (ice/ocean/metal). The chart is ENLARGED (`CHART_W`
+    2240 × `CHART_H` 1456) so worlds breathe. `EARTH_POS` plots a recognisable blue-marble HOME beside the
+    `SPACEPORT`. Tier is a small luminous BEACON dot (top-left), not a ring. Everything is `mulberry32`-
+    seeded off the world id (per-world clip ids via `idSafe`) — pure + byte-stable (the map has its OWN
+    seeded stream, not the sim rng). Eyeball via `scripts/startour-preview.mjs`.
   - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
     `src/app/` module over growing it, and re-read the relevant span before editing.**
 - **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;
