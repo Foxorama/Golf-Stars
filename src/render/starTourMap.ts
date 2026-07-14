@@ -64,20 +64,34 @@ export interface StarTourMapOpts {
  *  the constellation field above the home spaceport. */
 export const SHIP_DOCK_HEADING = -90;
 
-/** The chart's intrinsic size (bigger than any viewport → it pans). Enlarged (GS-star-map-icon-
- *  consistency) so the destinations breathe — space is big, and a longer cruise between worlds is the
- *  point. The RA→x / Dec→y projection keeps the same proportions, so a bigger chart just spreads the
- *  clustered constellations apart. */
-export const CHART_W = 2240;
-export const CHART_H = 1456;
+/** The CONTENT box — the region the RA→x / Dec→y world projection maps into. This is the original chart
+ *  size; every constellation keeps its exact J2000 layout INSIDE this box. The visible chart is bigger
+ *  than this (see the PAD below), so the worlds cluster in the middle and open starry space surrounds
+ *  them on every side. */
+const CONTENT_W = 2240;
+const CONTENT_H = 1456;
+
+/** Starry-space PADDING around the content box (GS-star-map-bigger-canvas). The world cluster is a
+ *  DESTINATION field; space is mostly empty, so we wrap the constellations in a generous margin of pure
+ *  starfield you can fly out into. The pad is asymmetric-friendly but here symmetric: the content sits
+ *  dead-centre. A portrait-leaning aspect (taller than the old 1.54:1 landscape) means a phone screen
+ *  zoomed all the way out shows far more starry sky and far less black letterbox. */
+const PAD_X = 620;
+const PAD_Y = 1120;
+
+/** The chart's intrinsic size (bigger than any viewport → it pans). = content + padding on every side.
+ *  The RA→x / Dec→y projection keeps the same proportions inside the content box, so the constellations
+ *  are byte-for-byte where they were, just translated into the centre of a much larger sky. */
+export const CHART_W = CONTENT_W + PAD_X * 2;
+export const CHART_H = CONTENT_H + PAD_Y * 2;
 
 /** The clubhouse SPACEPORT (GS-star-tour-2): the player's home base, where the ship starts docked and
- *  the view opens centred. A fixed chart position below the constellation field. */
-export const SPACEPORT_POS = { x: CHART_W * 0.5, y: CHART_H * 0.8 };
+ *  the view opens centred. Anchored to the content box (so it keeps its place among the worlds). */
+export const SPACEPORT_POS = { x: PAD_X + CONTENT_W * 0.5, y: PAD_Y + CONTENT_H * 0.8 };
 
 /** Home EARTH (GS-star-map-icon-consistency) — a recognisable blue marble beside the home port, so the
  *  chart has a "you are here" anchor. A landmark, not a course (not tappable). */
-export const EARTH_POS = { x: CHART_W * 0.5 + 232, y: CHART_H * 0.8 + 10 };
+export const EARTH_POS = { x: PAD_X + CONTENT_W * 0.5 + 232, y: PAD_Y + CONTENT_H * 0.8 + 10 };
 
 /** How big the ship draws on the chart (shipSVG scale ≈ width/40). */
 const SHIP_SCALE = 1.25;
@@ -143,11 +157,13 @@ function mulberry32(a: number): () => number {
   };
 }
 
-/** Project an RA/Dec (J2000) onto the chart: RA 0–360 → x, Dec +90..−90 → y (north up). */
+/** Project an RA/Dec (J2000) onto the chart: RA 0–360 → x, Dec +90..−90 → y (north up). Maps into the
+ *  centred CONTENT box (offset by the starry PAD), so the constellations keep their exact relative
+ *  layout while open space surrounds them. */
 export function projectSky(ra: number, dec: number): { x: number; y: number } {
   return {
-    x: (ra / 360) * CHART_W,
-    y: ((90 - dec) / 180) * CHART_H,
+    x: PAD_X + (ra / 360) * CONTENT_W,
+    y: PAD_Y + ((90 - dec) / 180) * CONTENT_H,
   };
 }
 
@@ -1316,11 +1332,13 @@ function nebulaClouds(rnd: () => number): { defs: string; body: string } {
   ];
   let defs = '';
   let body = '';
-  for (let i = 0; i < 5; i++) {
-    const cx = (0.12 + rnd() * 0.76) * CHART_W;
-    const cy = (0.08 + rnd() * 0.82) * CHART_H;
-    const rx = (150 + rnd() * 220).toFixed(0);
-    const ry = (110 + rnd() * 170).toFixed(0);
+  // More, larger clouds to dress the enlarged canvas (GS-star-map-bigger-canvas) so the open margins
+  // read as deep space with drifting colour, not flat emptiness.
+  for (let i = 0; i < 9; i++) {
+    const cx = (0.08 + rnd() * 0.84) * CHART_W;
+    const cy = (0.06 + rnd() * 0.88) * CHART_H;
+    const rx = (200 + rnd() * 300).toFixed(0);
+    const ry = (150 + rnd() * 230).toFixed(0);
     const rot = (rnd() * 180).toFixed(0);
     const [a, b] = HUES[i % HUES.length]!;
     const id = `stNeb${i}`;
@@ -1357,7 +1375,9 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
   const zoom = opts.zoom ?? 1;
   const neb = nebulaClouds(rnd);
   let stars = '';
-  const counts = [360, 240, 130, 48];
+  // Scaled to the enlarged canvas (GS-star-map-bigger-canvas) so the starfield density holds across the
+  // full sky — the padded margins are open space to fly through, but never an empty black void.
+  const counts = [1420, 950, 510, 190];
   const rBases = [0.55, 0.9, 1.4, 2.1];
   const opBases = [0.32, 0.5, 0.72, 0.92];
   for (let plane = 0; plane < counts.length; plane++) {
@@ -1378,7 +1398,7 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     }
   }
   let heroes = '';
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 55; i++) {
     const hx = (rnd() * CHART_W).toFixed(1);
     const hy = (rnd() * CHART_H).toFixed(1);
     const tint = STAR_TINTS[(rnd() * STAR_TINTS.length) | 0]!;
@@ -1391,12 +1411,16 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     </g>`;
   }
   let grid = '';
-  for (let gx = 1; gx < 11; gx++) {
-    const x = (gx / 11) * CHART_W;
+  // Keep a roughly constant cell size (~205 chart-units) as the canvas grows, so the coordinate grid
+  // reads the same density it always did rather than stretching into a few huge cells.
+  const gvN = Math.round(CHART_W / 205);
+  const ghN = Math.round(CHART_H / 205);
+  for (let gx = 1; gx < gvN; gx++) {
+    const x = ((gx / gvN) * CHART_W).toFixed(1);
     grid += `<line x1="${x}" y1="0" x2="${x}" y2="${CHART_H}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
-  for (let gy = 1; gy < 7; gy++) {
-    const y = (gy / 7) * CHART_H;
+  for (let gy = 1; gy < ghN; gy++) {
+    const y = ((gy / ghN) * CHART_H).toFixed(1);
     grid += `<line x1="0" y1="${y}" x2="${CHART_W}" y2="${y}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
   const worlds = opts.worlds.map((w) => worldGlyph(w, w.id === opts.selectedId)).join('');

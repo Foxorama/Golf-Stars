@@ -1009,8 +1009,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     individuates the shared planet body — `mane` (Leo's golden lion mane), `companion` (Centaurus + bright
     Alpha Centauri), `whale` (Cetus breaching the star-sea), `river` (Eridanus' star-stream), `dune`
     (Vela's sail-wisp + dune bands), `scrap` (Antlia's junk belt + antenna, corroded), `foundry` (Pyxis'
-    molten seams + compass needle), plus `ring` styles (ice/ocean/metal). The chart is ENLARGED (`CHART_W`
-    2240 × `CHART_H` 1456) so worlds breathe. `EARTH_POS` plots a recognisable blue-marble HOME beside the
+    molten seams + compass needle), plus `ring` styles (ice/ocean/metal). BIGGER CANVAS (GS-star-map-
+    bigger-canvas): the constellations project into a centred CONTENT box (`CONTENT_W` 2240 × `CONTENT_H`
+    1456 — the old chart size, so every J2000 position is byte-for-byte where it was) wrapped in a starry
+    `PAD` (`CHART_W`/`CHART_H` = content + pad; `projectSky`/`SPACEPORT_POS`/`EARTH_POS` all offset by the
+    pad so the whole cluster just TRANSLATES — flight/tap/dock/fuel math unchanged), so open starry space
+    surrounds the worlds to fly out into. Starfield/nebula/grid density scale with the larger area. Because
+    a portrait phone zoomed all the way out still letterboxes a landscape/square chart (contain-fit), the
+    `.gs-st-space` deep-space CSS backdrop (matching gradient + faint tiled stars, on BOTH `.gs-startour`
+    and its viewport) fills those margins so the WHOLE screen reads as continuous starry space, never black
+    bands. `EARTH_POS` plots a recognisable blue-marble HOME beside the
     `SPACEPORT`. Tier is a small luminous BEACON dot (top-left), not a ring. Everything is `mulberry32`-
     seeded off the world id (per-world clip ids via `idSafe`) — pure + byte-stable (the map has its OWN
     seeded stream, not the sim rng). Eyeball via `scripts/startour-preview.mjs`.

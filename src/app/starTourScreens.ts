@@ -319,8 +319,8 @@ export function starTourScreen(): string {
   });
   const sheet = sel ? dossier(sel) : starTourView.recordsOpen ? recordsSheet() : '';
   return `
-    <div class="gs-startour">
-      <div class="gs-startour__viewport" id="gs-st-viewport">${chart}</div>
+    <div class="gs-startour gs-st-space">
+      <div class="gs-startour__viewport gs-st-space" id="gs-st-viewport">${chart}</div>
       ${stHud()}
       ${sheet}
     </div>`;
