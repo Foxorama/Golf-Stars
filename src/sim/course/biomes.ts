@@ -203,18 +203,26 @@ export const BIOMES: readonly Biome[] = [
     fairwayWidthMult: 1.0,
     doglegBias: 0.35,
     treeDensity: 2.6, // lush, densely tree-lined parkland — real forest down both sides
-    fairwayBunkers: 1.5,
+    fairwayBunkers: 1.9, // sand pinches the landing zones (GS-biome-variety)
     waterCreek: true, // signature: a creek crosses the fairway (forced carry)
     deepRough: 'deeprough', // hay-thick tangle guards the inside of the doglegs
-    ponds: 1.2, // big parkland lakes flank the landing zones
-    fairwayBreaks: 0.7, // the odd sandy waste break across the fairway
-    potBunkers: 0.8, // links-style pot bunkers pinch the landing zones
+    ponds: 1.5, // big parkland lakes flank the landing zones — an offline miss is wet
+    fairwayBreaks: 0.9, // the odd sandy waste break across the fairway
+    potBunkers: 1.2, // links-style pot bunkers pinch the landing zones + ring the greens
     fescue: 1.0, // wispy native fescue lines the deep rough
     greenSize: 1.05, // classic parkland greens — gently rolling, moderate variety
     greenAspect: 1.9,
     greenIrregular: 1.1,
     greenSlopeMax: 0.45, // GS-greens-3 green tilt character
     roughBreaks: 0.9, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-variety): STRATEGIC PARKLAND — the position-golf home world. Real DOGLEGS
+    // bending around tree corners + water (not one wandering snake), and tree-lined CHUTES that neck
+    // down for the approach so you thread the drive and lay up short of the pinch to leave an iron in.
+    // Difficulty is the tree-corner + the pinch + the pond, not raw length. Par-4 dominant with a
+    // proper par-3/par-5 rhythm.
+    parMix: { p3: 0.24, p4: 0.53, p5: 0.23 },
+    shapeWeights: { straight: 0.22, dogleg: 0.36, cape: 0.16, double: 0.18, hairpin: 0.08 },
+    widthWeights: { classic: 0.22, chute: 0.22, neck: 0.16, hourglass: 0.14, wander: 0.08, thin: 0.06, broad: 0.12 },
   },
   {
     id: 'dust-belt',

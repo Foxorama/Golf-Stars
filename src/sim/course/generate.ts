@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 26; // GS-ship-calm-space: the derelict is walled space at EVERY wildness (calm off-deck is lost too), so its bulkheads always contain
+export const GENERATOR_VERSION = 27; // GS-biome-variety: per-world shape/width/par identities + denser rough so worlds stop reading as one snake corridor
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
