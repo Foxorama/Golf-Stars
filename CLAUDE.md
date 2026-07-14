@@ -141,8 +141,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     (the neutral default-weights reference we never re-profile — the `biome-profile.test.ts` byte-identity
     case moved off ember → asgard for the same reason). Done: verdant-station (strategic parkland),
     dust-belt (open dune-field desert — `roughFill` waste mounds + hourglass dune pinches), ember-world
-    (tight inferno — lava-carry capes/hairpins + squeezed thin/neck corridors + charred-snag rough). Cetus
-    (waterfalls) + Derelict (walls) are handled LAST + minimally.
+    (tight inferno — lava-carry capes/hairpins + squeezed thin/neck corridors + charred-snag rough),
+    crystal-spires (angular precision — cape/hairpin lines threaded through NECK/CHUTE corridors between
+    spire forests, `treeDensity` 0.3→1.3 so the namesake spires wall the rough). Cetus (waterfalls) +
+    Derelict (walls) are handled LAST + minimally.
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays

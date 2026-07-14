@@ -382,16 +382,24 @@ export const BIOMES: readonly Biome[] = [
     fairwayWidthMult: 1.0,
     doglegBias: 0.4,
     deepRough: 'deeprough', // a dense shard-thicket walls off a cut corner
-    treeDensity: 0.3, // a few crystalline spires line the rough
+    treeDensity: 1.3, // GS-biome-variety: forests of crystalline SPIRES wall the fairways (the world's namesake — was a bare 0.3)
     fairwayBunkers: 1.0,
-    potBunkers: 0.5,
+    potBunkers: 0.7, // pot bunkers pinch the precision landing zones
     greenSize: 0.95, // sharp, faceted greens
     greenAspect: 1.9,
     greenIrregular: 1.4,
     greenSlopeMax: 0.55, // GS-greens-3 green tilt character
     roughBreaks: 0.5, // GS-variety-2 broken-fairway frequency
-    // GS-biome-difficulty: a PRECISION world — the challenge deep in is a tucked pin on a fast faceted
-    // green you must flag, not brute length. Heavy pin-tuck, moderate contour, tilt left to the ceiling.
+    // IDENTITY (GS-biome-variety): a PRECISION world of ANGULAR spires — sharp diagonal CAPE lines +
+    // doglegs + severe HAIRPINS cutting between the crystal stacks (not a wandering snake), threaded down
+    // NECK/CHUTE/HOURGLASS corridors that squeeze between the spire forests so you place the drive and
+    // hit an iron in. Difficulty is the tight line through the spires, not length; the fast crystal
+    // fairway scatter rewards a clean strike. Par-4 dominant with precision par-3 irons.
+    parMix: { p3: 0.28, p4: 0.54, p5: 0.18 },
+    shapeWeights: { straight: 0.18, dogleg: 0.3, cape: 0.24, double: 0.14, hairpin: 0.14 },
+    widthWeights: { classic: 0.18, chute: 0.2, neck: 0.18, hourglass: 0.16, wander: 0.06, thin: 0.14, broad: 0.08 },
+    // GS-biome-difficulty: a tucked pin on a fast faceted green you must flag — a SECONDARY danger on top
+    // of the angular hazard lines above, not the primary lever.
     difficulty: { pinTuck: 0.8, greenComplexity: 1.2 },
   },
   {
