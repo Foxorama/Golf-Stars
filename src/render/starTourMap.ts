@@ -10,6 +10,18 @@
  * byte-stable. The chart is intrinsic-sized and PANS inside its viewport (the app translates it on
  * drag); worlds are tappable `<g data-startour-course>` targets, the ship is a fixed centre reticle
  * drawn by the HUD layer, not here.
+ *
+ * DESTINATION ICONS (GS-star-tour-destinations / GS-star-map-icon-consistency): the star map is a
+ * DIFFERENT interface from the journey map — a course is the PLACE it is named for, not a biome skin.
+ * So every destination is its OWN bespoke celestial object, keyed by themeId through `SIGNATURE`, that
+ * marries the constellation's identity to the biome: Lyra IS the green Ring Nebula, Vulpecula the
+ * Dumbbell, Hydra a toxic multi-headed serpent, Corona Borealis a jewelled crown-arc, Sagittarius the
+ * grand galactic core. Two courses of the same archetype (both void, both desert, …) never share a
+ * shape OR a palette — a per-destination hue/sat/light shift + a per-world MOTIF (a lion's mane, a
+ * river of stars, a breaching whale, a scrap belt, molten foundry seams) individuates the shared
+ * planet body. Every body EMITS its own soft glow so it blends INTO the star field instead of sitting
+ * on it as a token. Diffuse objects (galaxy/nebula/storm/crown/serpent) draw larger; the blazing stars
+ * are TAMED so no single icon overpowers the chart. All seeded → byte-stable.
  */
 
 import { THEME_SKY } from './sky-coords';
@@ -52,33 +64,58 @@ export interface StarTourMapOpts {
  *  the constellation field above the home spaceport. */
 export const SHIP_DOCK_HEADING = -90;
 
-/** The chart's intrinsic size (bigger than any viewport → it pans). */
-export const CHART_W = 1600;
-export const CHART_H = 1040;
+/** The chart's intrinsic size (bigger than any viewport → it pans). Enlarged (GS-star-map-icon-
+ *  consistency) so the destinations breathe — space is big, and a longer cruise between worlds is the
+ *  point. The RA→x / Dec→y projection keeps the same proportions, so a bigger chart just spreads the
+ *  clustered constellations apart. */
+export const CHART_W = 2240;
+export const CHART_H = 1456;
 
 /** The clubhouse SPACEPORT (GS-star-tour-2): the player's home base, where the ship starts docked and
  *  the view opens centred. A fixed chart position below the constellation field. */
 export const SPACEPORT_POS = { x: CHART_W * 0.5, y: CHART_H * 0.8 };
 
+/** Home EARTH (GS-star-map-icon-consistency) — a recognisable blue marble beside the home port, so the
+ *  chart has a "you are here" anchor. A landmark, not a course (not tappable). */
+export const EARTH_POS = { x: CHART_W * 0.5 + 232, y: CHART_H * 0.8 + 10 };
+
 /** How big the ship draws on the chart (shipSVG scale ≈ width/40). */
 const SHIP_SCALE = 1.25;
 
-/** Per-archetype look on the star map: planet body colour, rarity-ish accent, and a glyph. Self-
- *  contained (mirrors the journey map's BIOME_LOOK spirit, no coupling to the render palette). */
-const WORLD_LOOK: Record<string, { col: string; hi: string; glyph: string }> = {
-  verdant: { col: '#4a9e58', hi: '#7fe08a', glyph: '🌿' },
-  desert: { col: '#c2872e', hi: '#e8c05e', glyph: '🏜' },
-  frost: { col: '#7fb2d8', hi: '#d6f0ff', glyph: '❄' },
-  inferno: { col: '#c24a2e', hi: '#ff9a5e', glyph: '🌋' },
-  crystal: { col: '#8f6fd8', hi: '#d9c6ff', glyph: '💎' },
-  tempest: { col: '#4a7ab8', hi: '#8fc0f0', glyph: '🌀' },
-  fungal: { col: '#5aa84a', hi: '#b6f07a', glyph: '🍄' },
-  ocean: { col: '#2f8f9a', hi: '#7fe0e6', glyph: '🌊' },
-  swamp: { col: '#6a8a3a', hi: '#c6f07a', glyph: '☣' },
-  metal: { col: '#8a8f96', hi: '#d6dde6', glyph: '⚙' },
-  void: { col: '#4a3b78', hi: '#8f6fd8', glyph: '🕳' },
-  cetus: { col: '#3a5a8a', hi: '#8fc0f0', glyph: '🐋' },
-  derelict: { col: '#7a8288', hi: '#c6cdd6', glyph: '🛸' },
+/** Per-archetype base look on the star map: planet body colour + a lit accent. The archetype supplies
+ *  the colour FAMILY so a world still reads its biome at a glance; a per-destination shift + a specific
+ *  TINT_OVERRIDE individuate each place. */
+const WORLD_LOOK: Record<string, { col: string; hi: string }> = {
+  verdant: { col: '#4a9e58', hi: '#7fe08a' },
+  desert: { col: '#c2872e', hi: '#e8c05e' },
+  frost: { col: '#7fb2d8', hi: '#d6f0ff' },
+  inferno: { col: '#c24a2e', hi: '#ff9a5e' },
+  crystal: { col: '#8f6fd8', hi: '#d9c6ff' },
+  tempest: { col: '#4a7ab8', hi: '#8fc0f0' },
+  fungal: { col: '#5aa84a', hi: '#b6f07a' },
+  ocean: { col: '#2f8f9a', hi: '#7fe0e6' },
+  swamp: { col: '#6a8a3a', hi: '#c6f07a' },
+  metal: { col: '#8a8f96', hi: '#d6dde6' },
+  void: { col: '#4a3b78', hi: '#8f6fd8' },
+  cetus: { col: '#3a5a8a', hi: '#8fc0f0' },
+  derelict: { col: '#7a8288', hi: '#c6cdd6' },
+};
+
+/** DELIBERATE per-destination palettes (GS-star-map-icon-consistency) — where the archetype base
+ *  would collide (both inferno stars, both desert planets) or a place has a signature colour (Hydra's
+ *  toxic acid, Orion's blue forge). Applied INSTEAD of the seeded hue shift so the intended colour
+ *  holds; a whisper of seeded light jitter still keeps them from being flat. */
+const TINT_OVERRIDE: Record<string, { col: string; hi: string }> = {
+  orion: { col: '#4a72c8', hi: '#cfe2ff' }, // a blue-white forge sun (vs Scorpius' red)
+  scorpius: { col: '#c93a2e', hi: '#ff9a6e' }, // red Antares, the scorpion's heart
+  leo: { col: '#c39a34', hi: '#f2da72' }, // bright golden savannah
+  vela: { col: '#b07a2e', hi: '#e0b45e' }, // muted dusty amber (vs Leo's yellow-gold)
+  hydra: { col: '#7fa62e', hi: '#ccf24e' }, // toxic acid green
+  centaurus: { col: '#3f9e6a', hi: '#8fe0a2' }, // verdant, distinct from Lyra's meadow
+  cetus: { col: '#2f6f8a', hi: '#7fdce6' }, // deep star-sea
+  eridanus: { col: '#2f7fa8', hi: '#8fd0f0' }, // river blue
+  antlia: { col: '#8f8a80', hi: '#d0c9bd' }, // warm corroded scrap (vs Pyxis' cool steel)
+  pyxis: { col: '#868f98', hi: '#ccd6df' }, // cool foundry steel
 };
 
 const TIER_COL: Record<StarTourWorld['tier'], string> = {
@@ -125,9 +162,9 @@ function toParLabel(toPar: number): string {
   return toPar === 0 ? 'E' : toPar > 0 ? `+${toPar}` : `−${-toPar}`;
 }
 
-/** The surface CHARACTER a world's planet is painted with (GS-star-tour-map-improvements). Keyed by
- *  archetype so a world still reads its biome at a glance, but the individual craters/bands/continents
- *  are seeded per world so two courses of the SAME archetype never look alike. */
+/** The surface CHARACTER a world's planet is painted with. Keyed by archetype so a world still reads
+ *  its biome at a glance, but the individual craters/bands/continents are seeded per world so two
+ *  courses of the SAME archetype never look alike. */
 type SurfaceFamily = 'lush' | 'rocky' | 'gas' | 'fiery' | 'crystal';
 const SURFACE_FAMILY: Record<string, SurfaceFamily> = {
   verdant: 'lush',
@@ -213,24 +250,21 @@ function shiftHsl(hex: string, dHue: number, dSat: number, dLight: number): stri
   return hslToHex(h + dHue, s + dSat, l + dLight);
 }
 
-/** The star map is a DIFFERENT interface from the journey map: a course is a DESTINATION, not a biome
- *  skin. So the palette is derived per DESTINATION (seeded off its themeId/id), not shared across every
- *  course of the same archetype — Pegasus Rift and Sagittarius Core are both void yet must read as
- *  distinct places. The archetype supplies the base colour + emblem glyph (so it still reads its biome
- *  at a glance); a bounded hue/sat/light shift makes each destination its own. Pure + mulberry32-seeded
- *  → byte-stable. */
-function worldLook(w: StarTourWorld): { col: string; hi: string; glyph: string } {
-  const base = WORLD_LOOK[w.archetype] ?? WORLD_LOOK.verdant!;
+/** The per-destination palette. A deliberate TINT_OVERRIDE wins (only a whisper of seeded light jitter
+ *  on top); otherwise the archetype base is shifted by a bounded per-id hue/sat/light so two same-biome
+ *  worlds diverge. Pure + mulberry32-seeded → byte-stable. */
+function worldLook(w: StarTourWorld): { col: string; hi: string } {
   const rnd = mulberry32(hashSeed('stlook:' + (w.themeId || w.id)));
-  const dHue = (rnd() - 0.5) * 76; // ±38° — enough to separate two same-biome worlds, not so far it
-  //                                  leaves the archetype's colour family.
+  const ov = TINT_OVERRIDE[w.themeId];
+  if (ov) {
+    const dl = (rnd() - 0.5) * 0.06;
+    return { col: shiftHsl(ov.col, 0, 0, dl), hi: shiftHsl(ov.hi, 0, 0, dl) };
+  }
+  const base = WORLD_LOOK[w.archetype] ?? WORLD_LOOK.verdant!;
+  const dHue = (rnd() - 0.5) * 76; // ±38° — separates two same-biome worlds, stays in the family.
   const dSat = (rnd() - 0.5) * 0.22;
   const dLight = (rnd() - 0.5) * 0.14;
-  return {
-    col: shiftHsl(base.col, dHue, dSat, dLight),
-    hi: shiftHsl(base.hi, dHue, dSat, dLight),
-    glyph: base.glyph,
-  };
+  return { col: shiftHsl(base.col, dHue, dSat, dLight), hi: shiftHsl(base.hi, dHue, dSat, dLight) };
 }
 
 /** The seeded surface features drawn INSIDE a planet's disc, per family. Returns clip-bounded markup
@@ -239,7 +273,6 @@ function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, r
   let s = '';
   const rr = (v: number) => v.toFixed(1);
   if (fam === 'lush') {
-    // Organic continents (hi) over darker seas — a couple of blobby land masses.
     const seas = shadeHex(col, -0.22);
     s += `<circle r="${rr(r)}" fill="${seas}" opacity="0.35"/>`;
     const n = 2 + ((rnd() * 2) | 0);
@@ -254,7 +287,6 @@ function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, r
       s += `<ellipse cx="${rr(cx)}" cy="${rr(cy)}" rx="${rr(rx)}" ry="${rr(ry)}" fill="${hi}" opacity="0.62" transform="rotate(${rot} ${rr(cx)} ${rr(cy)})"/>`;
     }
   } else if (fam === 'rocky') {
-    // Impact craters — dark pits with a lit rim, scattered across the face.
     const pit = shadeHex(col, -0.3);
     const rim = shadeHex(col, 0.28);
     const n = 3 + ((rnd() * 3) | 0);
@@ -268,7 +300,6 @@ function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, r
       s += `<circle cx="${rr(cx - cr * 0.24)}" cy="${rr(cy - cr * 0.24)}" r="${rr(cr * 0.72)}" fill="${rim}" opacity="0.32"/>`;
     }
   } else if (fam === 'gas') {
-    // Latitudinal cloud bands + a great storm spot.
     const n = 3 + ((rnd() * 2) | 0);
     for (let i = 0; i < n; i++) {
       const cy = -r * 0.6 + (i / (n - 1)) * r * 1.2;
@@ -284,7 +315,6 @@ function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, r
     s += `<ellipse cx="${rr(scx)}" cy="${rr(scy)}" rx="${rr(sr * 1.3)}" ry="${rr(sr)}" fill="${shadeHex(hi, 0.15)}" opacity="0.7"/>`;
     s += `<ellipse cx="${rr(scx)}" cy="${rr(scy)}" rx="${rr(sr * 0.6)}" ry="${rr(sr * 0.45)}" fill="#ffffff" opacity="0.5"/>`;
   } else if (fam === 'fiery') {
-    // A molten face — glowing cracks branching from a hot core.
     const hot = shadeHex(hi, 0.2);
     s += `<circle r="${rr(r)}" fill="${shadeHex(col, -0.3)}" opacity="0.4"/>`;
     const n = 3 + ((rnd() * 3) | 0);
@@ -300,7 +330,6 @@ function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, r
     }
     s += `<circle r="${rr(r * 0.22)}" fill="#fff2c0" opacity="0.85"/>`;
   } else {
-    // crystal — faceted gem shards radiating from the centre.
     const n = 4 + ((rnd() * 3) | 0);
     const start = rnd() * Math.PI * 2;
     for (let i = 0; i < n; i++) {
@@ -319,8 +348,7 @@ function planetSurface(fam: SurfaceFamily, r: number, col: string, hi: string, r
 }
 
 /** A soft luminous HALO — concentric fading rings so a body EMITS light into the star field and blends
- *  IN, instead of sitting on it as a hard opaque disc (the whole reason the old ringed+haloed tokens
- *  read as stickers on black). Inner ring brightest, fading out. Pure geometry. */
+ *  IN, instead of sitting on it as a hard opaque disc. Inner ring brightest, fading out. Pure geometry. */
 function softGlow(col: string, r: number, opa = 0.15, layers = 3): string {
   let s = '';
   for (let i = layers; i >= 1; i--) {
@@ -334,13 +362,6 @@ function softGlow(col: string, r: number, opa = 0.15, layers = 3): string {
 /** The ring STYLE a ringed world wears — keyed to what the world IS (icy halo / watery band / metal
  *  debris belt / dusty ring), so a ringed frost world and a ringed metal world read differently. */
 type RingStyle = 'ice' | 'ocean' | 'metal' | 'dust' | 'default';
-function ringStyleFor(arch: string): RingStyle {
-  if (arch === 'frost') return 'ice';
-  if (arch === 'ocean' || arch === 'cetus') return 'ocean';
-  if (arch === 'metal') return 'metal';
-  if (arch === 'desert') return 'dust';
-  return 'default';
-}
 
 /** Build a tilted planetary RING system (back arc drawn behind the body, front arc over it). Metal rings
  *  are scattered DEBRIS chunks (an asteroid/scrap belt); the rest are smooth ice/water/dust bands. */
@@ -357,15 +378,25 @@ function ringSystem(
   let band: string;
   let line: string;
   let bw = r * 0.24;
-  if (style === 'ice') { band = '#bcd9f0'; line = '#ffffff'; }
-  else if (style === 'ocean') { band = shadeHex(look.hi, 0.05); line = shadeHex(look.hi, 0.4); }
-  else if (style === 'metal') { band = '#8a8f96'; line = '#c6cdd6'; }
-  else if (style === 'dust') { band = '#c9a86a'; line = '#ecd39a'; bw = r * 0.34; }
-  else { band = shadeHex(look.hi, 0.1); line = shadeHex(look.hi, 0.45); }
+  if (style === 'ice') {
+    band = '#bcd9f0';
+    line = '#ffffff';
+  } else if (style === 'ocean') {
+    band = shadeHex(look.hi, 0.05);
+    line = shadeHex(look.hi, 0.4);
+  } else if (style === 'metal') {
+    band = '#8a8f96';
+    line = '#c6cdd6';
+  } else if (style === 'dust') {
+    band = '#c9a86a';
+    line = '#ecd39a';
+    bw = r * 0.34;
+  } else {
+    band = shadeHex(look.hi, 0.1);
+    line = shadeHex(look.hi, 0.45);
+  }
 
   if (style === 'metal') {
-    // A ring of tumbling scrap: chunks scattered along the tilted ellipse, split near/far by the
-    // pre-rotation y so the near half draws OVER the body and the far half behind.
     let back = '';
     let front = '';
     const n = 26;
@@ -388,15 +419,232 @@ function ringSystem(
   return { back, front };
 }
 
-/** A lit planetary WORLD — a luminous atmosphere glow, a seeded surface (craters / bands / continents /
- *  lava / facets by archetype family), a soft terminator + lit rim, and an OPTIONAL ring. No hard tier
- *  ring, no dark halo bubble, no emoji sticker — it emits into the field so it reads as a real world on
- *  a star chart. Everything is seeded off the world id → each same-biome world looks distinct. */
+/** A small four-point diffraction cross for a bright star at (cx,cy), radius `s`. */
+function starTwinkle(cx: number, cy: number, s: number, tint: string): string {
+  const rr = (v: number) => v.toFixed(1);
+  const sp = s * 3.2;
+  return `<g transform="translate(${rr(cx)},${rr(cy)})">
+    <circle r="${rr(s * 2.4)}" fill="${tint}" opacity="0.16"/>
+    <path d="M0,${rr(-sp)} L0,${rr(sp)} M${rr(-sp)},0 L${rr(sp)},0" stroke="${tint}" stroke-width="0.7" opacity="0.5"/>
+    <circle r="${rr(s)}" fill="#ffffff"/>
+    <circle r="${rr(s * 1.7)}" fill="${tint}" opacity="0.5"/>
+  </g>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Per-destination celestial identity: a SIGNATURE table (kind + size + motif + ring/star flavour), a
+// bespoke renderer per kind, and a MOTIF system that individuates the shared planet body.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The celestial KIND a destination is drawn as. */
+type CelestialKind =
+  | 'galaxy'
+  | 'rift'
+  | 'wreck'
+  | 'ringNebula'
+  | 'dumbbell'
+  | 'star'
+  | 'crown'
+  | 'crystal'
+  | 'maelstrom'
+  | 'binary'
+  | 'serpent'
+  | 'planet';
+
+/** A per-world planet MOTIF — the decoration that individuates one shared planet body from another of
+ *  the same archetype. */
+type PlanetMotif = 'mane' | 'companion' | 'whale' | 'river' | 'dune' | 'scrap' | 'foundry';
+
+interface Signature {
+  kind: CelestialKind;
+  /** Body size multiplier (diffuse objects draw bigger; compact ones stay tight). */
+  size?: number;
+  /** Planet motif (only meaningful when kind === 'planet'). */
+  motif?: PlanetMotif;
+  /** Planet ring style (only meaningful when kind === 'planet'). */
+  ring?: RingStyle;
+  /** Star flavour (only meaningful when kind === 'star'): a cool forge sun vs a red stinger. */
+  star?: 'forge' | 'sting';
+}
+
+/** Per-DESTINATION signature, keyed by themeId — hand-authored so every course reads as its OWN place
+ *  and no two same-biome worlds collide. Any unlisted/future destination falls back to inference. */
+const SIGNATURE: Record<string, Signature> = {
+  lyra: { kind: 'ringNebula', size: 1.15 }, // the Ring Nebula (M57), a green smoke ring
+  vulpecula: { kind: 'dumbbell', size: 1.15 }, // the Dumbbell Nebula (M27), bi-lobed
+  cygnus: { kind: 'planet', ring: 'ice' }, // the Swan glides icy links → a ringed frost world
+  delphinus: { kind: 'planet', ring: 'ocean' }, // the Dolphin's tidal sea → a ringed ocean world
+  pyxis: { kind: 'planet', ring: 'metal', motif: 'foundry' }, // the Compass's scrap foundry
+  antlia: { kind: 'planet', motif: 'scrap', size: 1.05 }, // the Air-Pump scrapworks
+  orion: { kind: 'star', star: 'forge', size: 1.0 }, // the Hunter's blue forge-sun + belt
+  scorpius: { kind: 'star', star: 'sting', size: 1.0 }, // red Antares + the scorpion's tail
+  'corona-borealis': { kind: 'crown', size: 1.2 }, // the Northern Crown, a jewelled arc
+  triangulum: { kind: 'crystal', size: 1.05 }, // a sharp three-point crystal wedge
+  draco: { kind: 'maelstrom', size: 1.35 }, // the Dragon coiled in a raging storm
+  gemini: { kind: 'binary', size: 1.0 }, // the Twins, side by side on the ice
+  pegasus: { kind: 'rift', size: 1.1 }, // the void rift the Winged Horse soars
+  sagittarius: { kind: 'galaxy', size: 1.6 }, // the grand galactic CORE at the sky's heart
+  vela: { kind: 'planet', motif: 'dune', size: 1.0 }, // the Sails billowing over dust
+  leo: { kind: 'planet', motif: 'mane', size: 1.05 }, // the Lion's golden mane
+  hydra: { kind: 'serpent', size: 1.28 }, // the Water-Serpent, toxic and many-headed
+  eridanus: { kind: 'planet', motif: 'river', size: 1.0 }, // the celestial River
+  cetus: { kind: 'planet', motif: 'whale', size: 1.05 }, // the Whale sounding the star-sea
+  centaurus: { kind: 'planet', motif: 'companion', size: 1.0 }, // + bright Alpha Centauri
+  'ghost-nebula': { kind: 'wreck', size: 1.1 }, // the derelict adrift in the Ghost Nebula
+};
+
+/** The signature for a world — the hand-authored row, else inferred from name/archetype so a new
+ *  evocative destination still picks up a fitting shape with no plumbing. */
+function signatureFor(w: StarTourWorld): Signature {
+  const s = SIGNATURE[w.themeId];
+  if (s) return s;
+  const name = w.name.toLowerCase();
+  if (w.archetype === 'derelict' || name.includes('wreck') || name.includes('ship')) return { kind: 'wreck', size: 1.1 };
+  if (name.includes('core') || name.includes('galaxy') || name.includes('nucleus')) return { kind: 'galaxy', size: 1.5 };
+  if (w.archetype === 'void' || name.includes('rift') || name.includes('abyss')) return { kind: 'rift', size: 1.1 };
+  if (w.archetype === 'swamp') return { kind: 'serpent', size: 1.25 };
+  if (w.archetype === 'crystal') return { kind: 'crystal', size: 1.05 };
+  if (w.archetype === 'tempest') return { kind: 'maelstrom', size: 1.3 };
+  if (w.archetype === 'inferno') return { kind: 'star', star: 'sting', size: 1.0 };
+  if (w.archetype === 'frost') return { kind: 'planet', ring: 'ice' };
+  return { kind: 'planet' };
+}
+
+/** A per-world MOTIF drawn around/over the shared planet body — a lion's mane, a companion star, a
+ *  breaching whale, a river of stars, dune sails, a scrap belt, molten foundry seams. Returns markup
+ *  layered `behind` the body, added to its clipped `surface`, and drawn in `front`. Seeded per world. */
+function planetMotif(
+  motif: PlanetMotif,
+  r: number,
+  look: { col: string; hi: string },
+  rnd: () => number,
+): { behind: string; surface: string; front: string } {
+  const rr = (v: number) => v.toFixed(1);
+  const { col, hi } = look;
+  if (motif === 'mane') {
+    // A radiating golden MANE of tapered light-spikes (the Lion) — behind the disc.
+    let rays = '';
+    const n = 18;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rnd() * 0.1;
+      const inner = r * 1.02;
+      const outer = r * (1.5 + (i % 2 ? 0.4 : 0.12) + rnd() * 0.15);
+      const hw = r * 0.09;
+      const bx = Math.cos(a) * inner;
+      const by = Math.sin(a) * inner;
+      const tx = Math.cos(a) * outer;
+      const ty = Math.sin(a) * outer;
+      const px = -Math.sin(a) * hw;
+      const py = Math.cos(a) * hw;
+      rays += `<path d="M${rr(bx + px)},${rr(by + py)} L${rr(tx)},${rr(ty)} L${rr(bx - px)},${rr(by - py)} Z" fill="${hi}" opacity="0.42"/>`;
+    }
+    return { behind: `${softGlow(hi, r, 0.14)}${rays}`, surface: '', front: '' };
+  }
+  if (motif === 'companion') {
+    // A bright binary COMPANION beside the world (Alpha Centauri, our nearest star), tethered.
+    const cx = r * 1.75;
+    const cy = -r * 0.62;
+    return {
+      behind: softGlow(hi, r, 0.13),
+      surface: '',
+      front: `<line x1="0" y1="0" x2="${rr(cx)}" y2="${rr(cy)}" stroke="${shadeHex(hi, 0.4)}" stroke-width="0.7" opacity="0.32" stroke-dasharray="2 3"/>
+        ${starTwinkle(cx, cy, r * 0.2, '#ffe9b0')}
+        ${starTwinkle(cx + r * 0.34, cy + r * 0.26, r * 0.12, '#ffd18a')}`,
+    };
+  }
+  if (motif === 'whale') {
+    // A WHALE breaching beside the deep star-sea world — a stylised fluke + spout of stars.
+    const wx = r * 1.5;
+    const wy = r * 0.5;
+    const body = shadeHex(col, -0.15);
+    return {
+      behind: softGlow(hi, r, 0.13),
+      surface: '',
+      front: `<g transform="translate(${rr(wx)},${rr(wy)}) rotate(24)">
+        <path d="M${rr(-r * 0.7)},0 Q${rr(-r * 0.1)},${rr(-r * 0.42)} ${rr(r * 0.55)},${rr(-r * 0.26)} Q${rr(r * 0.2)},0 ${rr(r * 0.55)},${rr(r * 0.26)} Q${rr(-r * 0.1)},${rr(r * 0.42)} ${rr(-r * 0.7)},0 Z" fill="${body}" opacity="0.9"/>
+        <path d="M${rr(-r * 0.7)},0 L${rr(-r * 1.05)},${rr(-r * 0.34)} L${rr(-r * 0.86)},0 L${rr(-r * 1.05)},${rr(r * 0.34)} Z" fill="${body}" opacity="0.9"/>
+        <circle cx="${rr(r * 0.34)}" cy="${rr(-r * 0.06)}" r="${rr(r * 0.07)}" fill="#eaffff"/>
+      </g>
+      <circle cx="${rr(wx - r * 0.2)}" cy="${rr(wy - r * 0.7)}" r="0.9" fill="#dff4ff" opacity="0.8"/>
+      <circle cx="${rr(wx)}" cy="${rr(wy - r * 0.95)}" r="0.7" fill="#dff4ff" opacity="0.7"/>`,
+    };
+  }
+  if (motif === 'river') {
+    // A winding luminous RIVER of stars pouring off the world (Eridanus, the celestial River).
+    let d = `M${rr(r * 0.7)},${rr(r * 0.2)}`;
+    let dots = '';
+    let px = r * 0.7;
+    let py = r * 0.2;
+    const steps = 6;
+    for (let i = 1; i <= steps; i++) {
+      const nx = r * (0.7 + i * 0.42);
+      const ny = r * (0.2 + Math.sin(i * 1.3 + rnd()) * 0.55);
+      const mx = (px + nx) / 2;
+      const my = (py + ny) / 2 + (rnd() - 0.5) * r * 0.3;
+      d += ` Q${rr(mx)},${rr(my)} ${rr(nx)},${rr(ny)}`;
+      dots += `<circle cx="${rr(nx)}" cy="${rr(ny)}" r="${rr(1.2 - i * 0.1)}" fill="#dff2ff" opacity="${(0.9 - i * 0.12).toFixed(2)}"/>`;
+      px = nx;
+      py = ny;
+    }
+    return {
+      behind: softGlow(hi, r, 0.13),
+      surface: '',
+      front: `<path d="${d}" fill="none" stroke="${shadeHex(hi, 0.2)}" stroke-width="${rr(r * 0.12)}" stroke-linecap="round" opacity="0.4"/>
+        <path d="${d}" fill="none" stroke="#dff2ff" stroke-width="1" stroke-linecap="round" opacity="0.6"/>${dots}`,
+    };
+  }
+  if (motif === 'dune') {
+    // A triangular SAIL nebula-wisp behind (the Sails of Vela) + strong dune bands on the surface.
+    let bands = '';
+    for (let i = 0; i < 4; i++) {
+      const cy = -r * 0.55 + i * r * 0.42;
+      bands += `<ellipse cx="0" cy="${rr(cy)}" rx="${rr(r * 1.02)}" ry="${rr(r * 0.11)}" fill="${i % 2 ? shadeHex(hi, 0.05) : shadeHex(col, -0.18)}" opacity="0.5" transform="rotate(-12)"/>`;
+    }
+    const sail = `<path d="M${rr(-r * 1.7)},${rr(r * 0.7)} Q${rr(-r * 0.5)},${rr(-r * 1.6)} ${rr(r * 0.4)},${rr(-r * 0.4)} Q${rr(-r * 0.6)},${rr(-r * 0.1)} ${rr(-r * 1.7)},${rr(r * 0.7)} Z" fill="${shadeHex(hi, 0.1)}" opacity="0.1"/>`;
+    return { behind: `${softGlow(hi, r, 0.13)}${sail}`, surface: bands, front: '' };
+  }
+  if (motif === 'scrap') {
+    // A broken machine world — a partial belt of tumbling JUNK + jutting antenna/panels, corroded.
+    let junk = '';
+    const n = 12;
+    const t0 = rnd() * Math.PI;
+    for (let i = 0; i < n; i++) {
+      const a = t0 + (i / n) * Math.PI * 1.25;
+      const rad = r * (1.35 + (i % 3) * 0.14);
+      const jx = Math.cos(a) * rad * 1.7;
+      const jy = Math.sin(a) * rad * 0.5;
+      const sz = r * (0.06 + rnd() * 0.07);
+      junk += `<rect x="${rr(jx - sz / 2)}" y="${rr(jy - sz / 2)}" width="${rr(sz)}" height="${rr(sz * 0.7)}" fill="${i % 2 ? '#7a746a' : '#b45a3a'}" opacity="0.85" transform="rotate(${rr(rnd() * 90)} ${rr(jx)} ${rr(jy)})"/>`;
+    }
+    const antenna = `<path d="M${rr(-r * 0.2)},${rr(-r * 0.9)} L${rr(-r * 0.24)},${rr(-r * 1.4)}" stroke="#c6c0b4" stroke-width="1" opacity="0.8"/><circle cx="${rr(-r * 0.24)}" cy="${rr(-r * 1.4)}" r="1.3" fill="#ff8f5e"/>
+      <path d="M${rr(r * 0.5)},${rr(-r * 0.7)} l${rr(r * 0.3)},${rr(-r * 0.18)}" stroke="#8a857a" stroke-width="2" opacity="0.7"/>`;
+    const rust = `<ellipse cx="${rr(r * 0.2)}" cy="${rr(r * 0.1)}" rx="${rr(r * 0.4)}" ry="${rr(r * 0.3)}" fill="#8a4a2e" opacity="0.35"/>`;
+    return { behind: `${softGlow(hi, r, 0.12)}${junk}`, surface: rust, front: antenna };
+  }
+  // foundry — molten glowing SEAMS across the metal world + a compass needle (the Mariner's Compass).
+  let seams = '';
+  const n = 3;
+  for (let i = 0; i < n; i++) {
+    const y = -r * 0.5 + i * r * 0.5;
+    seams += `<path d="M${rr(-r * 0.92)},${rr(y + (rnd() - 0.5) * r * 0.2)} Q0,${rr(y + (rnd() - 0.5) * r * 0.4)} ${rr(r * 0.92)},${rr(y + (rnd() - 0.5) * r * 0.2)}" fill="none" stroke="#ff8a3a" stroke-width="${rr(r * 0.07)}" stroke-linecap="round" opacity="0.85"/>`;
+  }
+  seams += `<circle r="${rr(r * 0.16)}" fill="#ffd27a" opacity="0.7"/>`;
+  const na = -30 + rnd() * 60;
+  const compass = `<g transform="rotate(${rr(na)})">
+    <path d="M0,${rr(-r * 0.72)} L${rr(r * 0.14)},0 L0,${rr(r * 0.16)} L${rr(-r * 0.14)},0 Z" fill="#ff5a4a" opacity="0.9"/>
+    <path d="M0,${rr(r * 0.72)} L${rr(r * 0.14)},0 L0,${rr(-r * 0.16)} L${rr(-r * 0.14)},0 Z" fill="#e6ecf5" opacity="0.85"/>
+    <circle r="${rr(r * 0.1)}" fill="#20262e"/></g>`;
+  return { behind: softGlow(hi, r, 0.12), surface: seams, front: compass };
+}
+
+/** A lit planetary WORLD — a luminous atmosphere glow, a seeded surface, a soft terminator + lit rim,
+ *  an OPTIONAL ring, and an OPTIONAL per-world MOTIF. Everything is seeded off the world id → each
+ *  same-biome world looks distinct. */
 function planetBody(
   w: StarTourWorld,
   r: number,
   look: { col: string; hi: string },
-  opts: { ring?: RingStyle } = {},
+  opts: { ring?: RingStyle; motif?: PlanetMotif } = {},
 ): string {
   const rnd = mulberry32(hashSeed('stworld:' + w.id));
   const fam = SURFACE_FAMILY[w.archetype] ?? 'rocky';
@@ -404,115 +652,59 @@ function planetBody(
   const rr = (v: number) => v.toFixed(1);
   const clipId = `stwClip-${idSafe(w.id)}`;
   const ring = opts.ring ? ringSystem(r, look, opts.ring, rnd) : null;
+  const motif = opts.motif ? planetMotif(opts.motif, r, look, rnd) : null;
   return `
-    ${softGlow(hi, r, 0.15)}
+    ${motif ? motif.behind : softGlow(hi, r, 0.15)}
     ${ring ? ring.back : ''}
     <clipPath id="${clipId}"><circle r="${rr(r)}"/></clipPath>
     <circle r="${rr(r)}" fill="${col}"/>
-    <g clip-path="url(#${clipId})">${planetSurface(fam, r, col, hi, rnd)}</g>
+    <g clip-path="url(#${clipId})">${planetSurface(fam, r, col, hi, rnd)}${motif ? motif.surface : ''}</g>
     <circle r="${rr(r)}" fill="url(#stWorldShade)"/>
     <circle r="${rr(r)}" fill="none" stroke="${shadeHex(hi, 0.5)}" stroke-width="0.8" opacity="0.4"/>
-    ${ring ? ring.front : ''}`;
+    ${ring ? ring.front : ''}
+    ${motif ? motif.front : ''}`;
 }
 
-/** The celestial KIND a destination is drawn as. The star map is exploration — a course is the PLACE it
- *  is named for, not a generic "world" — so a galactic CORE is a spiral galaxy, a RIFT is a tear in
- *  space, a derelict is a broken SHIP, a "Meadows"/"Hollows" is a glowing NEBULA, a "Forge"/"Sting" is a
- *  blazing STAR, a "Prism"/"Wedge" is a CRYSTAL cluster, a "Gale" is a STORM, the "Twins" are a BINARY,
- *  a "Links"/"Tides"/"Foundry" wears a RING, and the rest are lit planets. */
-type CelestialKind =
-  | 'galaxy'
-  | 'rift'
-  | 'wreck'
-  | 'nebula'
-  | 'star'
-  | 'crystal'
-  | 'storm'
-  | 'binary'
-  | 'ringworld'
-  | 'planet';
-
-/** Per-DESTINATION kind, keyed by themeId — hand-authored so every course reads as its own place. Any
- *  unlisted/future destination falls back to inference (below), so a new evocative row still picks up a
- *  fitting shape with no plumbing. */
-const DESTINATION_KIND: Record<string, CelestialKind> = {
-  lyra: 'nebula',
-  vulpecula: 'nebula',
-  cygnus: 'ringworld',
-  delphinus: 'ringworld',
-  pyxis: 'ringworld',
-  antlia: 'ringworld',
-  orion: 'star',
-  scorpius: 'star',
-  'corona-borealis': 'crystal',
-  triangulum: 'crystal',
-  draco: 'storm',
-  gemini: 'binary',
-  pegasus: 'rift',
-  sagittarius: 'galaxy',
-  'ghost-nebula': 'wreck',
-  vela: 'planet',
-  eridanus: 'planet',
-  hydra: 'planet',
-  cetus: 'planet',
-  centaurus: 'planet',
-  leo: 'planet',
-};
-function celestialKind(w: StarTourWorld): CelestialKind {
-  const byTheme = DESTINATION_KIND[w.themeId];
-  if (byTheme) return byTheme;
-  const name = w.name.toLowerCase();
-  if (w.archetype === 'derelict' || name.includes('wreck') || name.includes('ship')) return 'wreck';
-  if (name.includes('core') || name.includes('galaxy') || name.includes('nucleus')) return 'galaxy';
-  if (w.archetype === 'void' || name.includes('rift') || name.includes('abyss')) return 'rift';
-  if (w.archetype === 'crystal') return 'crystal';
-  if (w.archetype === 'tempest') return 'storm';
-  if (w.archetype === 'inferno') return 'star';
-  return 'planet';
-}
-
-/** A spiral GALAXY seen from a shallow angle — a luminous tilted disc, two or three sweeping arms of
- *  scattered stars, and a blazing core with a dark black-hole heart ringed in light (for a galactic-core
- *  destination). Coloured off the per-destination palette so two galaxies never match. Pure + seeded. */
+/** A spiral GALAXY seen from a shallow angle — a luminous tilted disc, sweeping arms of scattered
+ *  stars, and a blazing core with a black-hole heart ringed in light. The GRAND destination (Sagittarius
+ *  Core), drawn large so it never reads smaller than a planet. Seeded → byte-stable. */
 function galaxyBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
   const rnd = mulberry32(hashSeed('stgalaxy:' + w.id));
   const rr = (v: number) => v.toFixed(1);
   const { col, hi } = look;
   const tilt = -30 + rnd() * 24;
-  const armN = 2 + (rnd() < 0.5 ? 1 : 0);
+  const armN = 3 + (rnd() < 0.5 ? 1 : 0);
   const start = rnd() * Math.PI * 2;
   let arms = '';
   for (let a = 0; a < armN; a++) {
     const phase = start + (a / armN) * Math.PI * 2;
-    const turns = 1.05 + rnd() * 0.5;
-    const stars = 12 + ((rnd() * 6) | 0);
+    const turns = 1.1 + rnd() * 0.5;
+    const stars = 16 + ((rnd() * 8) | 0);
     for (let i = 0; i < stars; i++) {
       const t = i / stars;
       const ang = phase + t * turns * Math.PI * 2;
-      const rad = r * (0.16 + t * 1.15);
+      const rad = r * (0.16 + t * 1.35);
       const x = Math.cos(ang) * rad;
-      const y = Math.sin(ang) * rad * 0.42; // squashed disc → a shallow viewing angle
-      const sr = (0.4 + rnd() * 1.1) * (1 - t * 0.5);
+      const y = Math.sin(ang) * rad * 0.42;
+      const sr = (0.4 + rnd() * 1.2) * (1 - t * 0.45);
       const tint = i % 4 === 0 ? '#ffffff' : hi;
-      arms += `<circle cx="${rr(x)}" cy="${rr(y)}" r="${rr(sr)}" fill="${tint}" opacity="${(0.85 - t * 0.55).toFixed(2)}"/>`;
+      arms += `<circle cx="${rr(x)}" cy="${rr(y)}" r="${rr(sr)}" fill="${tint}" opacity="${(0.88 - t * 0.5).toFixed(2)}"/>`;
     }
   }
   return `<g transform="rotate(${rr(tilt)})">
-    <ellipse rx="${rr(r * 1.5)}" ry="${rr(r * 0.64)}" fill="${col}" opacity="0.14"/>
-    <ellipse rx="${rr(r * 1.15)}" ry="${rr(r * 0.48)}" fill="${col}" opacity="0.16"/>
-    <ellipse rx="${rr(r * 0.85)}" ry="${rr(r * 0.36)}" fill="${hi}" opacity="0.16"/>
+    <ellipse rx="${rr(r * 1.75)}" ry="${rr(r * 0.74)}" fill="${col}" opacity="0.14"/>
+    <ellipse rx="${rr(r * 1.3)}" ry="${rr(r * 0.55)}" fill="${col}" opacity="0.16"/>
+    <ellipse rx="${rr(r * 0.9)}" ry="${rr(r * 0.4)}" fill="${hi}" opacity="0.18"/>
     ${arms}
-    <ellipse rx="${rr(r * 0.4)}" ry="${rr(r * 0.26)}" fill="${shadeHex(hi, 0.35)}" opacity="0.85"/>
-    <ellipse rx="${rr(r * 0.22)}" ry="${rr(r * 0.14)}" fill="#fff4d6" opacity="0.95"/>
-    <circle r="${rr(r * 0.1)}" fill="#07040e"/>
-    <circle r="${rr(r * 0.13)}" fill="none" stroke="#ffe8b0" stroke-width="${rr(r * 0.05)}" opacity="0.9"/>
+    <ellipse rx="${rr(r * 0.46)}" ry="${rr(r * 0.3)}" fill="${shadeHex(hi, 0.35)}" opacity="0.9"/>
+    <ellipse rx="${rr(r * 0.26)}" ry="${rr(r * 0.16)}" fill="#fff4d6" opacity="0.98"/>
+    <circle r="${rr(r * 0.12)}" fill="#07040e"/>
+    <circle r="${rr(r * 0.15)}" fill="none" stroke="#ffe8b0" stroke-width="${rr(r * 0.05)}" opacity="0.95"/>
   </g>`;
 }
 
 /** A RIFT in spacetime — an elongated dark SLIT torn open by a jagged luminous crack, wrapped in a soft
- *  energy glow and flinging sparks of debris (for a void/rift destination). No round dark disc — the
- *  darkness hugs the crack so it reads as a tear, not a token. The crack + glow take the per-destination
- *  colour. Seeded → byte-stable. */
+ *  energy glow and flinging sparks. The darkness hugs the crack so it reads as a tear, not a token. */
 function riftBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
   const rnd = mulberry32(hashSeed('strift:' + w.id));
   const rr = (v: number) => v.toFixed(1);
@@ -547,78 +739,123 @@ function riftBody(w: StarTourWorld, r: number, look: { col: string; hi: string }
   </g>`;
 }
 
-/** A glowing emission NEBULA — soft transparent gas blobs with an embedded star CLUSTER twinkling
- *  through it (for a "Meadows"/"Hollows"-type place: a luminous cloud, not a planet). Blends straight
- *  into the star field because it IS gas + stars. Coloured off the per-destination palette. Seeded. */
-function nebulaBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
-  const rnd = mulberry32(hashSeed('stneb:' + w.id));
+/** The RING NEBULA (Lyra / M57) — a bright glowing SMOKE RING (annulus) with a darker heart, a tiny
+ *  central white-dwarf, and a soft haze, coloured off the meadow-green palette. A luminous cloud, not a
+ *  planet, so it blends straight into the field. Seeded → byte-stable. */
+function ringNebulaBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stringneb:' + w.id));
   const rr = (v: number) => v.toFixed(1);
   const { col, hi } = look;
-  let cloud = '';
-  const blobs = 6 + ((rnd() * 4) | 0);
-  for (let i = 0; i < blobs; i++) {
-    const a = rnd() * Math.PI * 2;
-    const d = rnd() * r * 1.0;
-    const bx = Math.cos(a) * d;
-    const by = Math.sin(a) * d * 0.85;
-    const br = r * (0.55 + rnd() * 0.8);
-    const c = i % 3 === 0 ? shadeHex(hi, 0.25) : i % 2 ? hi : col;
-    cloud += `<circle cx="${rr(bx)}" cy="${rr(by)}" r="${rr(br)}" fill="${c}" opacity="0.1"/>`;
-  }
-  cloud += `<circle r="${rr(r * 0.45)}" fill="${shadeHex(hi, 0.3)}" opacity="0.13"/>`;
-  let stars = '';
-  const n = 14 + ((rnd() * 10) | 0);
+  const tilt = -28 + rnd() * 30;
+  const inner = shadeHex(col, -0.24);
+  let speckle = '';
+  const n = 10 + ((rnd() * 6) | 0);
   for (let i = 0; i < n; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * r * 1.15;
-    const sx = Math.cos(a) * d;
-    const sy = Math.sin(a) * d * 0.9;
-    const sr = 0.4 + rnd() * 1.3;
-    const op = (0.5 + rnd() * 0.5).toFixed(2);
-    const twinkle =
-      rnd() < 0.28
-        ? `<animate attributeName="opacity" values="${op};0.2;${op}" dur="${(2.5 + rnd() * 3).toFixed(1)}s" repeatCount="indefinite"/>`
-        : '';
-    stars += `<circle cx="${rr(sx)}" cy="${rr(sy)}" r="${rr(sr)}" fill="${rnd() < 0.25 ? hi : '#ffffff'}" opacity="${op}">${twinkle}</circle>`;
+    const rad = r * (0.62 + rnd() * 0.5);
+    const sx = Math.cos(a) * rad;
+    const sy = Math.sin(a) * rad * 0.7;
+    speckle += `<circle cx="${rr(sx)}" cy="${rr(sy)}" r="${rr(0.5 + rnd() * 0.8)}" fill="${i % 2 ? '#ffffff' : hi}" opacity="0.6"/>`;
   }
-  return cloud + stars;
+  return `${softGlow(hi, r, 0.15)}
+    <g transform="rotate(${rr(tilt)})">
+      <ellipse rx="${rr(r * 1.15)}" ry="${rr(r * 0.82)}" fill="${col}" opacity="0.2"/>
+      <ellipse rx="${rr(r * 1.0)}" ry="${rr(r * 0.7)}" fill="none" stroke="${hi}" stroke-width="${rr(r * 0.42)}" opacity="0.42"/>
+      <ellipse rx="${rr(r * 1.0)}" ry="${rr(r * 0.7)}" fill="none" stroke="${shadeHex(hi, 0.35)}" stroke-width="${rr(r * 0.16)}" opacity="0.7"/>
+      <ellipse rx="${rr(r * 0.66)}" ry="${rr(r * 0.42)}" fill="${inner}" opacity="0.5"/>
+      ${speckle}
+      <circle r="${rr(r * 0.12)}" fill="#ffffff" opacity="0.95"/>
+      <circle r="${rr(r * 0.22)}" fill="#ffffff" opacity="0.25"/>
+    </g>`;
 }
 
-/** A blazing STAR — a soft corona, a bright diffraction cross, seeded prominences/flares, and a hot
- *  white core (for a "Forge"/"Sting"-type place: a sun, not a planet). Coloured off the per-destination
- *  palette so a blue-white forge-star and a deep-red giant diverge. Seeded → byte-stable. */
-function starBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+/** The DUMBBELL NEBULA (Vulpecula / M27) — a bi-lobed "apple-core" planetary nebula: two bright glowing
+ *  lobes with a fainter perpendicular waist and a hot central star, in luminous fungal green. Seeded. */
+function dumbbellBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stdumb:' + w.id));
+  const rr = (v: number) => v.toFixed(1);
+  const { col, hi } = look;
+  const tilt = -20 + rnd() * 40;
+  let stars = '';
+  const n = 10 + ((rnd() * 6) | 0);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * Math.PI * 2;
+    const rad = r * (0.3 + rnd() * 0.9);
+    stars += `<circle cx="${rr(Math.cos(a) * rad)}" cy="${rr(Math.sin(a) * rad * 0.9)}" r="${rr(0.4 + rnd() * 0.8)}" fill="${i % 3 ? '#ffffff' : hi}" opacity="0.6"/>`;
+  }
+  const lobe = (cy: number): string =>
+    `<circle cx="0" cy="${rr(cy)}" r="${rr(r * 0.66)}" fill="${col}" opacity="0.28"/>
+     <circle cx="0" cy="${rr(cy)}" r="${rr(r * 0.5)}" fill="${hi}" opacity="0.3"/>
+     <circle cx="0" cy="${rr(cy)}" r="${rr(r * 0.3)}" fill="${shadeHex(hi, 0.25)}" opacity="0.35"/>`;
+  return `${softGlow(hi, r, 0.15)}
+    <g transform="rotate(${rr(tilt)})">
+      <ellipse rx="${rr(r * 0.5)}" ry="${rr(r * 1.05)}" fill="${col}" opacity="0.14"/>
+      ${lobe(-r * 0.55)}
+      ${lobe(r * 0.55)}
+      <ellipse rx="${rr(r * 0.9)}" ry="${rr(r * 0.28)}" fill="${hi}" opacity="0.12"/>
+      ${stars}
+      <circle r="${rr(r * 0.1)}" fill="#ffffff" opacity="0.95"/>
+    </g>`;
+}
+
+/** A blazing STAR — a tamed corona, a soft diffraction cross, seeded flares and a hot core. TWO
+ *  flavours: a 'forge' sun (blue-white, flanked by Orion's Belt) and a 'sting' (red Antares, trailing
+ *  the scorpion's curved stinger tail). The glow is deliberately restrained so a star never overpowers
+ *  the rest of the chart (the old Scorpius bloom did). Seeded → byte-stable. */
+function starBody(w: StarTourWorld, r: number, look: { col: string; hi: string }, star: 'forge' | 'sting'): string {
   const rnd = mulberry32(hashSeed('ststar:' + w.id));
   const rr = (v: number) => v.toFixed(1);
   const { col, hi } = look;
   const coreCol = shadeHex(hi, 0.55);
-  const spike = r * 2.8;
+  const spike = r * 2.2;
   let flares = '';
-  const n = 5 + ((rnd() * 4) | 0);
+  const n = 5 + ((rnd() * 3) | 0);
   for (let i = 0; i < n; i++) {
     const a = rnd() * Math.PI * 2;
-    const len = r * (1.0 + rnd() * 0.8);
+    const len = r * (0.9 + rnd() * 0.6);
     const x2 = Math.cos(a) * len;
     const y2 = Math.sin(a) * len;
-    const wdt = r * (0.12 + rnd() * 0.14);
+    const wdt = r * (0.1 + rnd() * 0.12);
     const px = -Math.sin(a) * wdt;
     const py = Math.cos(a) * wdt;
-    flares += `<path d="M${rr(px)},${rr(py)} L${rr(x2)},${rr(y2)} L${rr(-px)},${rr(-py)} Z" fill="${hi}" opacity="0.25"/>`;
+    flares += `<path d="M${rr(px)},${rr(py)} L${rr(x2)},${rr(y2)} L${rr(-px)},${rr(-py)} Z" fill="${hi}" opacity="0.22"/>`;
+  }
+  // Signature satellites: Orion's Belt (three stars in a diagonal row) or the scorpion's stinger tail.
+  let sig = '';
+  if (star === 'forge') {
+    for (let i = 0; i < 3; i++) {
+      const bx = r * (1.5 + i * 0.55);
+      const by = r * (0.7 - i * 0.55);
+      sig += starTwinkle(bx, by, r * 0.13, '#dfeaff');
+    }
+  } else {
+    let d = `M${rr(r * 0.8)},${rr(r * 0.3)}`;
+    let dots = '';
+    const pts = 5;
+    for (let i = 1; i <= pts; i++) {
+      const t = i / pts;
+      const ang = -0.3 + t * 2.4;
+      const rad = r * (1.0 + t * 1.1);
+      const x = r * 0.8 + Math.cos(ang) * rad * 0.6;
+      const y = r * 0.3 + Math.sin(ang) * rad;
+      d += ` L${rr(x)},${rr(y)}`;
+      dots += starTwinkle(x, y, r * (0.14 - t * 0.05), '#ffb488');
+    }
+    sig = `<path d="${d}" fill="none" stroke="${hi}" stroke-width="1" opacity="0.35" stroke-dasharray="1.5 3"/>${dots}`;
   }
   return `
-    ${softGlow(col, r, 0.2, 4)}
-    ${softGlow(hi, r * 0.8, 0.18, 3)}
-    <path d="M0,${rr(-spike)} L0,${rr(spike)} M${rr(-spike)},0 L${rr(spike)},0" stroke="${hi}" stroke-width="1" opacity="0.35"/>
-    <path d="M${rr(-spike * 0.66)},${rr(-spike * 0.66)} L${rr(spike * 0.66)},${rr(spike * 0.66)} M${rr(-spike * 0.66)},${rr(spike * 0.66)} L${rr(spike * 0.66)},${rr(-spike * 0.66)}" stroke="${hi}" stroke-width="0.6" opacity="0.2"/>
+    ${softGlow(col, r, 0.16, 3)}
+    ${softGlow(hi, r * 0.75, 0.14, 2)}
+    <path d="M0,${rr(-spike)} L0,${rr(spike)} M${rr(-spike)},0 L${rr(spike)},0" stroke="${hi}" stroke-width="0.9" opacity="0.28"/>
     ${flares}
+    ${sig}
     <circle r="${rr(r * 0.92)}" fill="${col}" opacity="0.6"/>
-    <circle r="${rr(r * 0.7)}" fill="${hi}"/>
-    <circle r="${rr(r * 0.42)}" fill="${coreCol}"/>`;
+    <circle r="${rr(r * 0.68)}" fill="${hi}"/>
+    <circle r="${rr(r * 0.4)}" fill="${coreCol}"/>`;
 }
 
-/** A CRYSTAL cluster — glowing faceted shards radiating from a bright central gem (for a "Prism"/"Wedge"
- *  crystal place, e.g. the Northern Crown). Two-tone facets catch the light; coloured off the palette.
- *  Seeded → byte-stable. */
+/** A CRYSTAL cluster — glowing faceted shards radiating from a bright central gem (for Triangulum's
+ *  three-point wedge). Two-tone facets catch the light; coloured off the palette. Seeded. */
 function crystalBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
   const rnd = mulberry32(hashSeed('stcrys:' + w.id));
   const rr = (v: number) => v.toFixed(1);
@@ -645,34 +882,86 @@ function crystalBody(w: StarTourWorld, r: number, look: { col: string; hi: strin
   return `${softGlow(hi, r, 0.16)}${shards}<circle r="${rr(r * 0.32)}" fill="${shadeHex(hi, 0.3)}"/><circle r="${rr(r * 0.18)}" fill="#ffffff" opacity="0.85"/>`;
 }
 
-/** A cyclonic STORM world — spiral cloud arms winding into a dark eye (for a "Gale"/tempest place: a
- *  raging vortex). Coloured off the per-destination palette. Seeded → byte-stable. */
-function stormBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
-  const rnd = mulberry32(hashSeed('ststorm:' + w.id));
+/** The CROWN (Corona Borealis, the Northern Crown) — a semicircular ARC of jewelled gems on a luminous
+ *  band, brightest at the centre stone, mirroring the real constellation's diadem. Crystal palette.
+ *  Seeded → byte-stable. */
+function crownBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stcrown:' + w.id));
   const rr = (v: number) => v.toFixed(1);
   const { col, hi } = look;
-  let arms = '';
-  const armN = 2 + (rnd() < 0.5 ? 1 : 0);
+  const gemN = 7;
+  const arcR = r * 1.15;
+  const a0 = Math.PI * 0.86; // sweep the upper arc (a crown opening upward)
+  const a1 = Math.PI * 0.14;
+  // The luminous band the gems sit on.
+  const band = `<path d="M${rr(Math.cos(a0) * arcR)},${rr(-Math.sin(a0) * arcR)} A ${rr(arcR)} ${rr(arcR)} 0 0 1 ${rr(Math.cos(a1) * arcR)},${rr(-Math.sin(a1) * arcR)}" fill="none" stroke="${hi}" stroke-width="${rr(r * 0.14)}" opacity="0.4" stroke-linecap="round"/>`;
+  let gems = '';
+  for (let i = 0; i < gemN; i++) {
+    const t = i / (gemN - 1);
+    const a = a0 + (a1 - a0) * t;
+    const gx = Math.cos(a) * arcR;
+    const gy = -Math.sin(a) * arcR;
+    // Centre gem is the crown jewel — biggest + brightest.
+    const centreW = 1 - Math.abs(t - 0.5) * 1.3;
+    const gr = r * (0.16 + centreW * 0.18 + (rnd() - 0.5) * 0.03);
+    const gemCol = i % 2 ? hi : shadeHex(col, 0.1);
+    gems += `<g transform="translate(${rr(gx)},${rr(gy)})">
+      <circle r="${rr(gr * 1.8)}" fill="${gemCol}" opacity="0.18"/>
+      <path d="M0,${rr(-gr)} L${rr(gr * 0.7)},0 L0,${rr(gr)} L${rr(-gr * 0.7)},0 Z" fill="${gemCol}" opacity="0.9" stroke="${shadeHex(hi, 0.45)}" stroke-width="0.6"/>
+      <circle r="${rr(gr * 0.34)}" fill="#ffffff" opacity="0.85"/>
+    </g>`;
+  }
+  return `${softGlow(hi, r, 0.14)}${band}${gems}`;
+}
+
+/** A cyclonic MAELSTROM (Draco Gale) — a dense raging vortex: many tight spiral arms winding into a
+ *  dark eye with a glowing heart, whipping outer wisps and a bright rim, so it reads as a proper storm
+ *  and not a thin doodle. Coloured off the tempest palette. Seeded → byte-stable. */
+function maelstromBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stmael:' + w.id));
+  const rr = (v: number) => v.toFixed(1);
+  const { col, hi } = look;
+  const armN = 5;
   const start = rnd() * Math.PI * 2;
+  let arms = '';
   for (let a = 0; a < armN; a++) {
     const phase = start + (a / armN) * Math.PI * 2;
     let d = '';
-    const steps = 14;
+    const steps = 20;
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
-      const ang = phase + t * 2.4 * Math.PI;
-      const rad = r * (0.14 + t * 0.95);
+      const ang = phase + t * 2.9 * Math.PI;
+      const rad = r * (0.12 + t * 1.08);
       const x = Math.cos(ang) * rad;
       const y = Math.sin(ang) * rad;
       d += (i ? ' L' : 'M') + rr(x) + ',' + rr(y);
     }
-    arms += `<path d="${d}" fill="none" stroke="${a % 2 ? hi : shadeHex(col, 0.15)}" stroke-width="${rr(r * 0.16)}" stroke-linecap="round" opacity="0.55"/>`;
+    const w2 = a % 2 ? r * 0.18 : r * 0.11;
+    arms += `<path d="${d}" fill="none" stroke="${a % 2 ? hi : shadeHex(col, 0.18)}" stroke-width="${rr(w2)}" stroke-linecap="round" opacity="0.6"/>`;
   }
-  return `${softGlow(hi, r, 0.15)}<circle r="${rr(r * 0.95)}" fill="${col}" opacity="0.25"/>${arms}<circle r="${rr(r * 0.2)}" fill="${shadeHex(col, -0.2)}"/><circle r="${rr(r * 0.1)}" fill="${shadeHex(hi, 0.3)}" opacity="0.9"/>`;
+  // A few detached whipping wisps at the edge.
+  let wisps = '';
+  for (let i = 0; i < 4; i++) {
+    const a = rnd() * Math.PI * 2;
+    const r0 = r * (0.95 + rnd() * 0.35);
+    const x0 = Math.cos(a) * r0;
+    const y0 = Math.sin(a) * r0;
+    const x1 = x0 - Math.sin(a) * r * 0.4;
+    const y1 = y0 + Math.cos(a) * r * 0.4;
+    wisps += `<path d="M${rr(x0)},${rr(y0)} Q${rr((x0 + x1) / 2 + (rnd() - 0.5) * r * 0.3)},${rr((y0 + y1) / 2)} ${rr(x1)},${rr(y1)}" fill="none" stroke="${hi}" stroke-width="${rr(r * 0.06)}" stroke-linecap="round" opacity="0.5"/>`;
+  }
+  return `${softGlow(hi, r, 0.16)}
+    <circle r="${rr(r * 1.05)}" fill="${col}" opacity="0.22"/>
+    <circle r="${rr(r * 0.8)}" fill="${col}" opacity="0.16"/>
+    ${arms}
+    ${wisps}
+    <circle r="${rr(r * 0.9)}" fill="none" stroke="${shadeHex(hi, 0.3)}" stroke-width="1" opacity="0.35"/>
+    <circle r="${rr(r * 0.24)}" fill="${shadeHex(col, -0.28)}"/>
+    <circle r="${rr(r * 0.12)}" fill="${shadeHex(hi, 0.35)}" opacity="0.95"/>`;
 }
 
-/** A BINARY — twin worlds bound by a faint orbital tether (for the "Twins": two bodies, not one). The
- *  larger takes the base palette, the smaller a shade off it. Seeded → byte-stable. */
+/** A BINARY — twin worlds bound by a faint orbital tether (Gemini, the Twins). The larger takes the
+ *  base palette, the smaller a shade off it; both wear an icy sheen. Seeded → byte-stable. */
 function binaryBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
   const rr = (v: number) => v.toFixed(1);
   const { col, hi } = look;
@@ -683,7 +972,7 @@ function binaryBody(w: StarTourWorld, r: number, look: { col: string; hi: string
   const sphere = (cx: number, cy: number, rad: number, clip: string, tint: string): string => `
     <clipPath id="${clip}"><circle cx="${rr(cx)}" cy="${rr(cy)}" r="${rr(rad)}"/></clipPath>
     <circle cx="${rr(cx)}" cy="${rr(cy)}" r="${rr(rad)}" fill="${tint}"/>
-    <g clip-path="url(#${clip})"><circle cx="${rr(cx)}" cy="${rr(cy)}" r="${rr(rad)}" fill="url(#stWorldShade)"/></g>
+    <g clip-path="url(#${clip})"><circle cx="${rr(cx)}" cy="${rr(cy)}" r="${rr(rad)}" fill="url(#stWorldShade)"/><ellipse cx="${rr(cx - rad * 0.2)}" cy="${rr(cy - rad * 0.3)}" rx="${rr(rad * 0.6)}" ry="${rr(rad * 0.3)}" fill="#ffffff" opacity="0.25"/></g>
     <circle cx="${rr(cx)}" cy="${rr(cy)}" r="${rr(rad)}" fill="none" stroke="${shadeHex(hi, 0.5)}" stroke-width="0.7" opacity="0.4"/>`;
   return `
     ${softGlow(hi, r, 0.14)}
@@ -692,10 +981,49 @@ function binaryBody(w: StarTourWorld, r: number, look: { col: string; hi: string
     ${sphere(sep, -sep * 0.4, rp * 0.82, clipB, shadeHex(col, 0.12))}`;
 }
 
-/** A derelict STARSHIP wreck adrift in a ghostly nebula — a torn hull broken into a nose section and a
- *  drifted tail with a dead engine bell, dark windows (one still flickering), a bent antenna, and a
- *  couple of tumbling debris chunks (for The Ghost Wreck and any derelict). The hull is cold metal; the
- *  haze is an eerie soft nebula that blends into the field. Seeded → byte-stable. */
+/** The HYDRA — a toxic, many-headed WATER-SERPENT coiled in an acid haze (Hydra, the sky's largest
+ *  constellation, over the toxic mire). A glowing acid-green sinuous body with THREE rising heads (a
+ *  glowing eye + fang each) and dripping venom motes. The signature bespoke destination. Seeded. */
+function serpentBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
+  const rnd = mulberry32(hashSeed('stserpent:' + w.id));
+  const rr = (v: number) => v.toFixed(1);
+  const { col, hi } = look;
+  const bodyDk = shadeHex(col, -0.2);
+  // The coiled body — a fat sinuous S/coil path stroked twice (dark body + bright spine highlight).
+  const coil = `M${rr(-r * 1.1)},${rr(r * 0.6)}
+    C${rr(-r * 0.6)},${rr(r * 1.0)} ${rr(-r * 0.2)},${rr(r * 0.2)} ${rr(r * 0.1)},${rr(r * 0.3)}
+    C${rr(r * 0.5)},${rr(r * 0.42)} ${rr(r * 0.7)},${rr(-r * 0.2)} ${rr(r * 0.35)},${rr(-r * 0.35)}
+    C${rr(r * 0.05)},${rr(-r * 0.48)} ${rr(-r * 0.2)},${rr(-r * 0.1)} ${rr(-r * 0.05)},${rr(r * 0.05)}`;
+  const body = `<path d="${coil}" fill="none" stroke="${bodyDk}" stroke-width="${rr(r * 0.42)}" stroke-linecap="round" opacity="0.92"/>
+    <path d="${coil}" fill="none" stroke="${hi}" stroke-width="${rr(r * 0.14)}" stroke-linecap="round" opacity="0.6"/>`;
+  // Three heads on necks rising off the coil (the many-headed Hydra).
+  const head = (hx: number, hy: number, ang: number, sc: number): string =>
+    `<g transform="translate(${rr(hx)},${rr(hy)}) rotate(${rr(ang)}) scale(${sc.toFixed(2)})">
+      <path d="M${rr(-r * 0.5)},${rr(r * 0.16)} Q${rr(-r * 0.2)},0 ${rr(-r * 0.42)},${rr(-r * 0.16)}" fill="none" stroke="${col}" stroke-width="${rr(r * 0.22)}" stroke-linecap="round"/>
+      <path d="M${rr(-r * 0.1)},${rr(-r * 0.28)} Q${rr(r * 0.42)},${rr(-r * 0.36)} ${rr(r * 0.5)},0 Q${rr(r * 0.42)},${rr(r * 0.34)} ${rr(-r * 0.1)},${rr(r * 0.26)} Q${rr(-r * 0.28)},0 ${rr(-r * 0.1)},${rr(-r * 0.28)} Z" fill="${col}" stroke="${shadeHex(hi, 0.2)}" stroke-width="0.6"/>
+      <path d="M${rr(r * 0.5)},${rr(-r * 0.04)} l${rr(r * 0.16)},${rr(-r * 0.05)} m${rr(-r * 0.16)},${rr(r * 0.12)} l${rr(r * 0.16)},${rr(r * 0.05)}" stroke="#eaf7c0" stroke-width="1" opacity="0.8"/>
+      <circle cx="${rr(r * 0.16)}" cy="${rr(-r * 0.05)}" r="${rr(r * 0.09)}" fill="#eaffb0"/>
+      <circle cx="${rr(r * 0.16)}" cy="${rr(-r * 0.05)}" r="${rr(r * 0.045)}" fill="#1a2a06"/>
+    </g>`;
+  let drips = '';
+  const dn = 4 + ((rnd() * 3) | 0);
+  for (let i = 0; i < dn; i++) {
+    const dx = (rnd() - 0.5) * r * 2.0;
+    const dy = r * (0.4 + rnd() * 0.9);
+    drips += `<circle cx="${rr(dx)}" cy="${rr(dy)}" r="${rr(0.8 + rnd() * 1.0)}" fill="${hi}" opacity="0.6"/>`;
+  }
+  return `${softGlow(hi, r, 0.16)}
+    <circle r="${rr(r * 1.05)}" fill="${col}" opacity="0.12"/>
+    ${body}
+    ${head(-r * 0.05, -r * 0.05, -50, 0.92)}
+    ${head(-r * 0.55, r * 0.1, -20, 0.72)}
+    ${head(r * 0.45, -r * 0.3, -80, 0.66)}
+    ${drips}`;
+}
+
+/** A derelict STARSHIP wreck adrift in a ghostly nebula (The Ghost Wreck) — a torn hull broken into a
+ *  nose section and a drifted tail with a dead engine bell, dark windows (one flickering), a bent
+ *  antenna and tumbling debris. The hull is cold metal; the haze is an eerie nebula. Seeded. */
 function wreckBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
   const rnd = mulberry32(hashSeed('stwreck:' + w.id));
   const rr = (v: number) => v.toFixed(1);
@@ -703,7 +1031,6 @@ function wreckBody(w: StarTourWorld, r: number, look: { col: string; hi: string 
   const hull = '#8f97a1';
   const hullDk = '#4c545e';
   const hullLt = '#c8d0da';
-  // Ghostly nebula haze — a scatter of soft blobs so the wreck sits IN a cloud, not on a dark disc.
   let haze = '';
   const hb = 5;
   for (let i = 0; i < hb; i++) {
@@ -749,39 +1076,44 @@ function wreckBody(w: StarTourWorld, r: number, look: { col: string; hi: string 
     </g>`;
 }
 
-/** Draw the destination's celestial body by its KIND. */
-function celestialBody(w: StarTourWorld, r: number, look: { col: string; hi: string }): string {
-  switch (celestialKind(w)) {
+/** Draw the destination's celestial body by its signature. */
+function celestialBody(w: StarTourWorld, r: number, look: { col: string; hi: string }, sig: Signature): string {
+  switch (sig.kind) {
     case 'galaxy':
       return galaxyBody(w, r, look);
     case 'rift':
       return riftBody(w, r, look);
     case 'wreck':
       return wreckBody(w, r, look);
-    case 'nebula':
-      return nebulaBody(w, r, look);
+    case 'ringNebula':
+      return ringNebulaBody(w, r, look);
+    case 'dumbbell':
+      return dumbbellBody(w, r, look);
     case 'star':
-      return starBody(w, r, look);
+      return starBody(w, r, look, sig.star ?? 'sting');
+    case 'crown':
+      return crownBody(w, r, look);
     case 'crystal':
       return crystalBody(w, r, look);
-    case 'storm':
-      return stormBody(w, r, look);
+    case 'maelstrom':
+      return maelstromBody(w, r, look);
     case 'binary':
       return binaryBody(w, r, look);
-    case 'ringworld':
-      return planetBody(w, r, look, { ring: ringStyleFor(w.archetype) });
+    case 'serpent':
+      return serpentBody(w, r, look);
     default:
-      return planetBody(w, r, look);
+      return planetBody(w, r, look, { ring: sig.ring, motif: sig.motif });
   }
 }
 
 /** One tappable destination + label. The body EMITS its own glow so it blends into the star field — no
- *  hard tier ring or dark halo bubble (those made every icon read as a token). Tier is a small luminous
- *  BEACON dot top-left; a record ★ sits top-right; the name floats above. */
+ *  hard tier ring or dark halo bubble. Tier is a small luminous BEACON dot top-left; a record ★ sits
+ *  top-right; the name floats above. Diffuse bodies (galaxy/nebula/…) draw larger via the signature. */
 function worldGlyph(w: StarTourWorld, selected: boolean): string {
   const { x, y } = worldPos(w);
   const look = worldLook(w);
-  const r = selected ? 24 : 19;
+  const sig = signatureFor(w);
+  const r = (selected ? 24 : 19) * (sig.size ?? 1);
   const rr = (v: number) => v.toFixed(1);
   const tierCol = TIER_COL[w.tier];
   const record = w.hasRecord
@@ -798,7 +1130,7 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
   return `
     <g class="gs-st-world" data-startour-course="${w.id}" role="button" tabindex="0" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" style="cursor:pointer;">
       ${ring}
-      ${celestialBody(w, r, look)}
+      ${celestialBody(w, r, look, sig)}
       ${tierDot}
       ${record}
       <text x="0" y="${-r - 8}" font-size="13" text-anchor="middle" fill="#e6ecf5" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">${w.name}</text>
@@ -806,8 +1138,59 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
     </g>`;
 }
 
+/** Home EARTH — a recognisable blue marble beside the port (GS-star-map-icon-consistency): ocean-blue
+ *  disc, green continents, white cloud swirls, a cyan atmosphere rim + day/night terminator, and a
+ *  small grey Moon. A landmark ("Home"), not a course, so it's not tappable. Seeded for the continents
+ *  but always reads as Earth. */
+function earthGlyph(): string {
+  const { x, y } = EARTH_POS;
+  const rnd = mulberry32(hashSeed('startour:earth'));
+  const rr = (v: number) => v.toFixed(1);
+  const r = 21;
+  const clip = 'stEarthClip';
+  let land = '';
+  const conts = 4;
+  for (let i = 0; i < conts; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * r * 0.55;
+    const cx = Math.cos(a) * d;
+    const cy = Math.sin(a) * d;
+    const rx = r * (0.24 + rnd() * 0.26);
+    const ry = r * (0.18 + rnd() * 0.22);
+    const rot = (rnd() * 180) | 0;
+    land += `<ellipse cx="${rr(cx)}" cy="${rr(cy)}" rx="${rr(rx)}" ry="${rr(ry)}" fill="#4faa5a" opacity="0.9" transform="rotate(${rot} ${rr(cx)} ${rr(cy)})"/>`;
+    land += `<ellipse cx="${rr(cx + rx * 0.2)}" cy="${rr(cy + ry * 0.2)}" rx="${rr(rx * 0.5)}" ry="${rr(ry * 0.5)}" fill="#6fc46a" opacity="0.7"/>`;
+  }
+  let clouds = '';
+  for (let i = 0; i < 4; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * r * 0.7;
+    const cx = Math.cos(a) * d;
+    const cy = Math.sin(a) * d;
+    clouds += `<ellipse cx="${rr(cx)}" cy="${rr(cy)}" rx="${rr(r * (0.2 + rnd() * 0.24))}" ry="${rr(r * 0.1)}" fill="#ffffff" opacity="0.5" transform="rotate(${(rnd() * 60 - 30) | 0} ${rr(cx)} ${rr(cy)})"/>`;
+  }
+  return `
+    <g transform="translate(${x},${y})" aria-hidden="true">
+      <circle r="${rr(r * 1.5)}" fill="#6fd6ff" opacity="0.1"/>
+      <circle r="${rr(r * 1.18)}" fill="#6fd6ff" opacity="0.12"/>
+      <clipPath id="${clip}"><circle r="${rr(r)}"/></clipPath>
+      <circle r="${rr(r)}" fill="#2f6fc2"/>
+      <g clip-path="url(#${clip})">
+        <circle r="${rr(r)}" fill="#245aa8" opacity="0.5"/>
+        ${land}
+        ${clouds}
+        <circle r="${rr(r)}" fill="url(#stWorldShade)"/>
+      </g>
+      <circle r="${rr(r)}" fill="none" stroke="#bfe6ff" stroke-width="0.9" opacity="0.55"/>
+      <circle cx="${rr(r * 2.0)}" cy="${rr(-r * 1.1)}" r="${rr(r * 0.3)}" fill="#c6ccd4"/>
+      <circle cx="${rr(r * 2.0)}" cy="${rr(-r * 1.1)}" r="${rr(r * 0.3)}" fill="url(#stWorldShade)"/>
+      <text x="0" y="${-r - 9}" font-size="13" text-anchor="middle" fill="#bfe6ff" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">Earth</text>
+      <text x="0" y="${r + 16}" font-size="10" text-anchor="middle" fill="#9fb8d6" font-weight="600" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:2.5px;letter-spacing:.12em;">HOME</text>
+    </g>`;
+}
+
 /** The clubhouse spaceport station — the ship's home dock, drawn as a ringed orbital platform with a
- *  lit landing pad and a "HOME" beacon. Not tappable (it's a landmark, not a course). */
+ *  lit landing pad and a beacon. Not tappable (it's a landmark, not a course). */
 function spaceportGlyph(): string {
   const { x, y } = SPACEPORT_POS;
   return `
@@ -855,8 +1238,7 @@ function thrustTrail(look: ShipLook): string {
 /** The player's ship group (GS-star-tour-2) — positioned, rotated + flipped by the app each frame via
  *  its transform. Drawn at the origin (shipSVG at 0,0) so the wrapping transform is a pure
  *  translate+rotate+scale. The ship art faces +x (right), so heading 0 = flying right; the app feeds
- *  `atan2(dy,dx)` so the nose always points along the flight (the old code fed a 0=up heading into a
- *  right-facing hull, which is why a downward flight rendered upside-down). */
+ *  `atan2(dy,dx)` so the nose always points along the flight. */
 function shipGroup(opts: StarTourMapOpts): string {
   const x = opts.shipX ?? SPACEPORT_POS.x;
   const y = opts.shipY ?? SPACEPORT_POS.y;
@@ -927,10 +1309,8 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
   const rnd = mulberry32(hashSeed(opts.seed));
   const zoom = opts.zoom ?? 1;
   const neb = nebulaClouds(rnd);
-  // Seeded starfield — four depth planes of tinted twinkles (denser + more colourful than a flat white
-  // field), some slowly pulsing so the sky feels alive.
   let stars = '';
-  const counts = [260, 170, 90, 34];
+  const counts = [360, 240, 130, 48];
   const rBases = [0.55, 0.9, 1.4, 2.1];
   const opBases = [0.32, 0.5, 0.72, 0.92];
   for (let plane = 0; plane < counts.length; plane++) {
@@ -943,7 +1323,6 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
       const sr = (rBase + rnd() * rBase).toFixed(2);
       const tint = STAR_TINTS[(rnd() * STAR_TINTS.length) | 0]!;
       const op = (opBase * (0.6 + rnd() * 0.4)).toFixed(2);
-      // The nearest plane's brightest stars twinkle; the rest stay steady (perf + calm).
       const twinkle =
         plane >= 2 && rnd() < 0.35
           ? `<animate attributeName="opacity" values="${op};${(Number(op) * 0.4).toFixed(2)};${op}" dur="${(2.4 + rnd() * 3).toFixed(1)}s" repeatCount="indefinite"/>`
@@ -951,10 +1330,8 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
       stars += `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="${tint}" opacity="${op}">${twinkle}</circle>`;
     }
   }
-  // A handful of bright hero stars with a soft halo + a diffraction cross — the anchors the eye reads
-  // as nearby suns.
   let heroes = '';
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 14; i++) {
     const hx = (rnd() * CHART_W).toFixed(1);
     const hy = (rnd() * CHART_H).toFixed(1);
     const tint = STAR_TINTS[(rnd() * STAR_TINTS.length) | 0]!;
@@ -966,14 +1343,13 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
       <circle r="${(Number(s) * 1.8).toFixed(1)}" fill="${tint}" opacity="0.4"/>
     </g>`;
   }
-  // A faint RA/Dec grid so it reads as a real star chart (kept subtle under the richer sky).
   let grid = '';
-  for (let gx = 1; gx < 8; gx++) {
-    const x = (gx / 8) * CHART_W;
+  for (let gx = 1; gx < 11; gx++) {
+    const x = (gx / 11) * CHART_W;
     grid += `<line x1="${x}" y1="0" x2="${x}" y2="${CHART_H}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
-  for (let gy = 1; gy < 5; gy++) {
-    const y = (gy / 5) * CHART_H;
+  for (let gy = 1; gy < 7; gy++) {
+    const y = (gy / 7) * CHART_H;
     grid += `<line x1="0" y1="${y}" x2="${CHART_W}" y2="${y}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
   const worlds = opts.worlds.map((w) => worldGlyph(w, w.id === opts.selectedId)).join('');
@@ -1004,6 +1380,7 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     ${stars}
     ${heroes}
     ${spaceportGlyph()}
+    ${earthGlyph()}
     ${worlds}
     ${shipGroup(opts)}
   </svg>`;
