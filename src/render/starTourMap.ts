@@ -1252,6 +1252,35 @@ function shipGroup(opts: StarTourMapOpts): string {
   </g>`;
 }
 
+/** The out-of-fuel SPACE TANKER (GS-star-tour-fuel): when the ship drains its tank in deep space a little
+ *  fuel truck flies in from the viewport edge, hoses up, and leaves. Drawn nose facing +x (like the ship),
+ *  ~44 units across; the app positions/flips it each frame by rewriting `#gs-st-fueltruck`'s transform and
+ *  reveals it (display) only during a refuel. Pure geometry — a rounded tank, a cab window, a hazard band,
+ *  a fuel-drop emblem, a nozzle at the belly the hose connects to. */
+function fuelTruckArt(): string {
+  return `
+    <g transform="scale(1.15)">
+      <ellipse cx="-25" cy="0" rx="9" ry="4.5" fill="#ffd27a" opacity="0.55"/>
+      <ellipse cx="-25" cy="0" rx="5" ry="2.4" fill="#fff2c0" opacity="0.8"/>
+      <rect x="-20" y="-11" width="30" height="22" rx="10" fill="#e08a2e" stroke="#4a2c0c" stroke-width="1.6"/>
+      <ellipse cx="-4" cy="-4" rx="12" ry="4.5" fill="#ffffff" opacity="0.16"/>
+      <rect x="-7" y="-11" width="7" height="22" fill="#2a1a08" opacity="0.5"/>
+      <path d="M-3.5,-3 Q-3.5,-8 -0.2,-9.5 Q3,-8 3,-3 a3.3 3.3 0 1 1 -6.5 0 Z" fill="#ffe08a" opacity="0.92"/>
+      <path d="M10,-9 L19,-4.5 L19,4.5 L10,9 Z" fill="#c96f22" stroke="#4a2c0c" stroke-width="1.3"/>
+      <circle cx="14.5" cy="0" r="2.6" fill="#bfe8ff" stroke="#2a3340" stroke-width="0.6"/>
+      <rect x="-2.4" y="10" width="4.8" height="6" rx="1.6" fill="#9aa0a8" stroke="#3a3f46" stroke-width="0.6"/>
+    </g>`;
+}
+
+/** The refuel HOSE + tanker group, mounted hidden in the chart SVG (the app shows/positions them during a
+ *  refuel). The hose `d` is rewritten each frame to link the tanker's belly nozzle to the ship. */
+function fuelTruckGroup(): string {
+  return `
+    <path id="gs-st-fuelhose" d="" fill="none" stroke="#c98a3a" stroke-width="3" stroke-linecap="round" opacity="0.9" style="display:none;pointer-events:none;"/>
+    <path id="gs-st-fuelhose-hi" d="" fill="none" stroke="#ffe08a" stroke-width="1" stroke-linecap="round" opacity="0.85" style="display:none;pointer-events:none;"/>
+    <g id="gs-st-fueltruck" transform="translate(${SPACEPORT_POS.x} ${SPACEPORT_POS.y})" style="display:none;pointer-events:none;">${fuelTruckArt()}</g>`;
+}
+
 /** Star tints — most stars are white, but a galaxy reads richer with a scatter of blue-white giants,
  *  warm gold suns and the odd red one. Weighted so white dominates. */
 const STAR_TINTS = ['#ffffff', '#ffffff', '#ffffff', '#dbe6ff', '#bcd4ff', '#fff0cf', '#ffd8a8', '#ffc0b0'];
@@ -1383,5 +1412,6 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     ${earthGlyph()}
     ${worlds}
     ${shipGroup(opts)}
+    ${fuelTruckGroup()}
   </svg>`;
 }

@@ -447,48 +447,81 @@
       /* Engine plume — hidden on a docked/idle ship, faded in by the rAF loop while cruising. */
       .gs-st-thrust { opacity: 0; transition: opacity .18s ease-out; }
       #gs-st-ship.gs-st-thrusting .gs-st-thrust { opacity: 1; }
-      /* Cockpit chrome (GS-star-tour-hud): the star map REUSES the journey bridge HUD (`.gs-bhud`) so it
-         recolours to the flown ship identically and inherits the same fleet ornaments — see the `.gs-bhud`
-         block below + `render/hudTheme.ts`. A `.gs-bhud--st` context modifier swaps the travel controls
-         (fuel/scan/credits/hole) for Star Tour's own: a records stat pod, the golfer-swap CENTRE command,
-         a records readout, and the EXIT switch in the bottom-left console slot. Star-Tour CONTENT keeps the
-         `.gs-sthud__` prefix; the FRAME/theme/ornaments are the shared `.gs-bhud`. (This SUPERSEDED the old
-         standalone `.gs-sthud` frame — same class-collision guard: never `.gs-hud`, the play screen's.) */
+      /* Cockpit chrome (GS-star-tour-hud → GS-star-tour-fuel): the star map REUSES the journey bridge HUD
+         (`.gs-bhud`) so it recolours to the flown ship identically and inherits the same fleet ornaments —
+         see the `.gs-bhud` block below + `render/hudTheme.ts`. A `.gs-bhud--st` context modifier swaps the
+         travel controls for Star Tour's own. Star Tour has NO bank/run, so there's no exit switch and no big
+         golfer name plate crowding the console: the RECORDS board is baked into the top-left "STAR TOUR n/N"
+         link, and the bottom console is the ship's DASHBOARD — a compact pilot-swap dot (left), the themed
+         instrument deck, a NORMAL/FAST speed control (focal centre), and the live FUEL gauge (right). Star-
+         Tour CONTENT keeps the `.gs-sthud__` prefix; the FRAME/theme/ornaments are the shared `.gs-bhud`
+         (class-collision guard: never `.gs-hud`, the play screen's). */
       .gs-bhud--st .gs-bhud__shards { flex: 0 0 auto; font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--gs-gold); }
       .gs-bhud--st .gs-bhud__shards b { color: var(--gs-gold); }
-      /* Push the console DECK further left so it clears the wider golfer pill in the centre slot (the
-         travel deck stops at 50%+40px for the 62px scan dial; the golfer pill is up to ~180px). */
-      .gs-bhud--st .gs-bhud__deck { right: calc(50% + 100px); }
-      /* CENTRE command — the golfer swap, styled like the journey scan dial (glowing round-rect reading
-         the livery `--hud-*`) but a wider pill so the golfer name + ship fit. */
-      .gs-sthud__golfer {
-        pointer-events: auto; display: flex; align-items: center; gap: 9px; cursor: pointer; text-align: left;
-        max-width: 190px; height: 48px; padding: 0 14px; border-radius: 13px; color: var(--gs-ink); line-height: 1;
+      /* The dashboard is now the focus: the centre control is a compact speed dial (like the travel scan
+         dial), so the instrument DECK gets the wide, prominent left area (clearing the small pilot dot). */
+      .gs-bhud--st .gs-bhud__deck { left: 56px; right: calc(50% + 44px); }
+      /* Top-left RECORDS link — the "✦ STAR TOUR 🏆 n/N" pod is itself the records-board toggle (the
+         records readout is baked in here, off the console). Reuses the `.gs-bhud__idpod` glass look; this
+         just makes it a tappable button. */
+      .gs-sthud__recordslink {
+        cursor: pointer; font: inherit; text-align: left; appearance: none; -webkit-appearance: none;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .08s ease, border-color .16s ease, filter .16s ease, box-shadow .16s ease;
+      }
+      .gs-sthud__recordslink:active { transform: scale(0.97); }
+      .gs-sthud__recordslink:hover { filter: brightness(1.1); border-color: color-mix(in srgb, var(--hud-accent) 55%, transparent); }
+      .gs-sthud__recordslink[aria-pressed="true"] { border-color: color-mix(in srgb, var(--gs-gold) 60%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gs-gold) 26%, transparent), 0 0 16px -5px var(--gs-gold); }
+      /* LEFT slot — the pilot-swap dot (changes golfer). Small + thematic, NOT a name plate. */
+      .gs-sthud__pilot {
+        pointer-events: auto; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center;
+        width: 44px; height: 44px; border-radius: 12px; color: var(--gs-ink);
+        border: 1px solid color-mix(in srgb, var(--hud-accent) 34%, transparent);
+        background: radial-gradient(120% 120% at 50% 30%, color-mix(in srgb, var(--hud-accent) 16%, #0b111c), #06090f);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 30%, transparent), inset 0 0 10px color-mix(in srgb, var(--hud-glow) 34%, transparent);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .08s ease, border-color .16s ease, filter .16s ease;
+      }
+      .gs-sthud__pilot:active { transform: scale(0.94); }
+      .gs-sthud__pilot:hover { border-color: color-mix(in srgb, var(--hud-accent) 62%, transparent); filter: brightness(1.12); }
+      .gs-sthud__pilot-dot { width: 15px; height: 15px; border-radius: 999px; box-shadow: 0 0 9px currentColor; }
+      .gs-sthud__pilot-swap { position: absolute; right: 3px; bottom: 1px; font-size: 9px; color: var(--hud-ink); opacity: .85; }
+      /* CENTRE focal control — the cruise SPEED dial, styled like the journey scan dial (glowing round-rect
+         reading the livery `--hud-*`, so each ship's speed control is its own cockpit colour). FAST glows
+         hotter and rides the throttle knob UP. */
+      .gs-sthud__speed {
+        pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0px;
+        width: 64px; height: 48px; border-radius: 13px; line-height: 1; color: var(--gs-ink);
         border: 1.5px solid color-mix(in srgb, var(--hud-accent) 62%, transparent);
-        background: radial-gradient(120% 120% at 50% 26%, color-mix(in srgb, var(--hud-accent) 22%, #0b111c), #06090f);
+        background: radial-gradient(120% 120% at 50% 26%, color-mix(in srgb, var(--hud-accent) 24%, #0b111c), #06090f);
         box-shadow: 0 0 18px -5px var(--hud-accent), inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 44%, transparent), inset 0 0 12px color-mix(in srgb, var(--hud-glow) 52%, transparent);
         -webkit-tap-highlight-color: transparent; touch-action: manipulation;
         transition: transform .08s ease, border-color .16s ease, filter .16s ease, box-shadow .16s ease;
       }
-      .gs-sthud__golfer:active { transform: scale(0.95); }
-      .gs-sthud__golfer:hover { filter: brightness(1.12); box-shadow: 0 0 24px -4px var(--hud-accent), inset 0 1px 0 color-mix(in srgb, var(--hud-accent) 56%, transparent), inset 0 0 15px color-mix(in srgb, var(--hud-glow) 64%, transparent); }
-      .gs-sthud__golfer-dot { width: 12px; height: 12px; border-radius: 999px; flex: 0 0 auto; box-shadow: 0 0 8px currentColor; }
-      .gs-sthud__golfer-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.18; }
-      .gs-sthud__golfer-txt b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .gs-sthud__golfer-txt span { font-size: 10px; color: var(--hud-ink); opacity: .82; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      /* RIGHT readout — the records toggle, recessed like the journey fuel readout. */
-      .gs-sthud__records {
-        pointer-events: auto; cursor: pointer; flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
-        height: 44px; padding: 0 13px; border-radius: 11px; font: 700 12.5px/1 system-ui; color: var(--gs-gold);
+      .gs-sthud__speed:active { transform: scale(0.95); }
+      .gs-sthud__speed:hover { filter: brightness(1.12); }
+      .gs-sthud__speed--fast { border-color: color-mix(in srgb, var(--gs-warn) 72%, transparent); box-shadow: 0 0 22px -4px var(--gs-warn), inset 0 1px 0 color-mix(in srgb, var(--gs-warn) 50%, transparent), inset 0 0 13px color-mix(in srgb, var(--hud-glow) 60%, transparent); }
+      .gs-sthud__speed-ico { display: flex; align-items: center; justify-content: center; }
+      .gs-sthud__speed-svg { width: 16px; height: 21px; display: block; }
+      .gs-sthud__speed-knob { transform-box: view-box; transition: transform .2s cubic-bezier(.3,1.4,.5,1); }
+      .gs-sthud__speed--fast .gs-sthud__speed-knob { transform: translateY(-10px); fill: var(--gs-warn); }
+      .gs-sthud__speed-lbl { font-size: 8px; font-weight: 800; letter-spacing: 1px; color: var(--hud-ink); margin-top: 1.5px; }
+      .gs-sthud__speed--fast .gs-sthud__speed-lbl { color: var(--gs-warn); }
+      .gs-sthud__speed-cost { font-size: 8px; font-weight: 700; color: var(--hud-accent); margin-top: 0.5px; }
+      .gs-sthud__speed--fast .gs-sthud__speed-cost { color: var(--gs-warn); }
+      /* RIGHT readout — the live FUEL gauge, recessed like the journey fuel screen (⛽ · cells · count). */
+      .gs-sthud__fuel {
+        pointer-events: auto; display: flex; align-items: center; max-width: 100%; overflow: hidden;
+        padding: 5px 9px; border-radius: 11px;
         border: 1px solid color-mix(in srgb, var(--hud-accent) 28%, transparent);
         background: linear-gradient(180deg, rgba(4,7,12,0.66), rgba(8,11,17,0.5));
         box-shadow: inset 0 1px 4px rgba(0,0,0,0.6), inset 0 0 9px color-mix(in srgb, var(--hud-glow) 26%, transparent);
-        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-        transition: transform .08s ease, border-color .16s ease, filter .16s ease;
       }
-      .gs-sthud__records:active { transform: scale(0.94); }
-      .gs-sthud__records:hover { border-color: color-mix(in srgb, var(--hud-accent) 52%, transparent); filter: brightness(1.08); }
-      .gs-sthud__records[aria-pressed="true"] { border-color: color-mix(in srgb, var(--gs-gold) 60%, transparent); box-shadow: inset 0 1px 4px rgba(0,0,0,0.6), 0 0 14px -4px var(--gs-gold); }
+      .gs-sthud__fuel .gs-fuelbar { gap: 5px; }
+      .gs-sthud__fuel .gs-fuelbar__cells { gap: 1.5px; padding: 2px 3px; }
+      .gs-sthud__fuel .gs-fuelbar__cell { width: 4px; height: 12px; border-radius: 1.5px; }
+      .gs-sthud__fuel .gs-fuelbar__n { font-size: 15px; }
+      .gs-sthud__fuel .gs-fuelbar__ico { font-size: 13px; }
       .gs-st-hint { font-size: 12px; color: #7fa6c4; margin: 2px 0 12px; }
       /* The bottom dossier / records sheet */
       .gs-st-sheet {
