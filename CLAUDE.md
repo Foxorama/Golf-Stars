@@ -149,7 +149,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     sea + lagoon-threaded hourglass/neck, `deepRough` water cut carries, palm + `roughFill` beach shore),
     toxic-mire (the Water-Serpent's swamp — the TWISTIEST world, S-curve `double`/`hairpin` coils down
     claustrophobic chute/neck/thin corridors between dead mangroves, acid pools everywhere; distinct from
-    the jungle's doglegs). Cetus (waterfalls) + Derelict (walls) are handled LAST + minimally.
+    the jungle's doglegs), scrap-belt (low-grav bomber's junkyard — WIDE broad/wander bombs pocked by dense
+    CRATER fields + `roughFill` scrap-plate flats + hourglass crater-pinches + barranca CAPE carries). Cetus
+    (waterfalls) + Derelict (walls) are handled LAST + minimally. (This PR also UNFROZE the flagship
+    `metal-18` static course — see the static-courses bullet — so no 18-hole course is a frozen exception.)
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays
@@ -405,22 +408,24 @@ these systems** — each bullet is the tip of a documented iceberg.
     shrink it casually).
   - All new generator draws gate on their feature being armed (contract 1); current
     `GENERATOR_VERSION` 19.
-  - A STATIC course has TWO representations of one identity (GS-static-courses, `course/staticCourses.ts`
-    + `staticCourseSpecs.ts` — `docs/decisions/static-courses.md`): (1) a FROZEN JSON data file
-    (`course/static/<id>.json`) served by DEFAULT (`buildStaticCourse(id)`/`metalEighteen`), byte-identical
-    FOREVER even across `GENERATOR_VERSION` bumps — deep-cloned per call so the run path's in-place hole
-    stamping can't corrupt the shared singleton; (2) a pinned `StaticCourseSpec` (`seed`/`opts`) that
-    REBUILDS through the SAME `generateCourse` pipeline (`buildStaticCourse(id,{regenerate:true})` /
-    `regenerateStaticCourse` / `npm run gen:courses`) — the seasonal-redesign / rebalance path, which
-    re-validates the rounded course so a redesign can't freeze an unfair hole. Flagship `metal-18` "Antlia
-    Scrapworks" = the `scrap-belt` (metal) archetype, `{holes:18,compose:true,wildness:0.5}` → composed
-    par 71 (F35/B36). Freezer rounds coords to 3 decimals + minifies (~262 KB). The catalogue is a ROW,
-    never hand-authored geometry. `metal-18` is the ONLY frozen course; the STAR TOUR courses (GS-star-tour,
-    below) are UNFROZEN spec rows — `buildStaticCourse(id)` regenerates them on demand (line 58, "no frozen
-    file yet ⇒ build from source"), keeping the bundle lean (freezing ~10 more would add ~2.5 MB) at the
-    cost of re-rolling on a `GENERATOR_VERSION` bump (acceptable for a casual records chase). A tour course
+  - A STATIC course is a pinned `StaticCourseSpec` (`seed`/`opts`) REBUILT on demand through the live
+    `generateCourse` pipeline (GS-static-courses, `course/staticCourses.ts` + `staticCourseSpecs.ts` —
+    `docs/decisions/static-courses.md`): `buildStaticCourse(id)` / `metalEighteen()` regenerate it (the
+    default), DETERMINISTIC within a `GENERATOR_VERSION` (same layout every play; a version bump re-rolls
+    it, the accepted cost of a lean unfrozen bundle for a casual records chase). `{regenerate:true}` /
+    `regenerateStaticCourse` / `npm run gen:courses` are the same path (a seasonal-redesign / rebalance /
+    re-freeze hook), re-validating the course so a redesign can't ship an unfair hole. NO COURSE IS FROZEN
+    (GS-biome-variety): a course COULD be frozen to a byte-identical `course/static/<id>.json` via a
+    `FROZEN_COURSES` row (the mechanism is kept, `buildStaticCourse` deep-clones a frozen singleton so the
+    run path's in-place stamping can't corrupt it), but freezing all ~15 tour courses would add ~2.5 MB, so
+    even the flagship `metal-18` "Antlia Scrapworks" — the `scrap-belt` (metal) archetype,
+    `{holes:18,compose:true,wildness:0.5}`, formerly the ONE frozen exception — now regenerates, keeping the
+    18-hole formats uniform (no exception) and letting each course reflect the latest per-world design (e.g.
+    the GS-biome-variety Scrap Belt crater fields). A course's exact par thus shifts with the design; its
+    identity is a VALID varied routing in the ~69–73 band (guarded by `tests/static-courses.test.ts`), not a
+    pinned number. The catalogue is a ROW, never hand-authored geometry. A tour course
     row carries star-map metadata (`themeId`/`archetype`/`tier`/`blurb`) that does NOT feed generation. Every
-    tour row (NOT frozen `metal-18`) sets `opts.wildnessMix` = `STAR_TOUR_MIX` `{medium 0.6, hard 0.85}`
+    Star Tour row (NOT flagship `metal-18`, which keeps a fixed `wildness: 0.5`) sets `opts.wildnessMix` = `STAR_TOUR_MIX` `{medium 0.6, hard 0.85}`
     (GS-star-tour-difficulty): each hole rolls its wildness INDEPENDENTLY from that discrete set via the
     composer's `planWildnessMix` (gated on `GenerateOptions.wildnessMix`), so a Star Tour round mixes
     medium/hard holes and may come out all-one-level — fine for a solo stroke-play records chase with no

@@ -31,7 +31,7 @@ export interface StaticCourseSpec {
   opts: GenerateOptions;
   /** The constellation/theme this course sits on (a THEMES id) — keys its J2000 sky position on the
    *  Star Tour star map, its constellation backdrop, and its display flavour. Absent = no star-map
-   *  placement (the flagship metal-18 predates this and keeps its frozen opts untouched). */
+   *  placement (the flagship metal-18 predates this and keeps its designed opts untouched). */
   themeId?: string;
   /** The world archetype the star map paints this course's planet + glyph from. */
   archetype?: BiomeArchetype;
@@ -52,8 +52,8 @@ export const METAL_18_ID = 'metal-18';
  * come out all-medium or all-hard — fine for this solo records mode, which has no death-spiral survival
  * cut to protect (unlike the Voyage, whose arc + balance are left untouched). `STAR_TOUR_WILDNESS` is
  * the representative course-level value used for `meta.wildness` (the intro/scorecard number); the mix
- * is what actually drives each hole's geometry. `metal-18` is EXCLUDED — it is served from frozen JSON
- * and its opts are frozen, so it keeps its designed mid-wildness routing.
+ * is what actually drives each hole's geometry. `metal-18` is EXCLUDED — the flagship keeps a designed
+ * fixed `wildness: 0.5` (its own mid-wildness routing), not the medium/hard mix.
  */
 const STAR_TOUR_MEDIUM = 0.6;
 const STAR_TOUR_HARD = 0.85;
@@ -89,9 +89,10 @@ export const STATIC_COURSES: readonly StaticCourseSpec[] = [
     id: METAL_18_ID,
     name: 'Antlia Scrapworks',
     seed: 'gs-static:metal-18',
-    // NOTE: opts is FROZEN — metal-18 has a frozen JSON generated from exactly these opts, so it must
-    // never change (no themeId injected here or the frozen file drifts). The star-map metadata lives on
-    // the spec fields below, which don't feed generation.
+    // The flagship's designed opts: a fixed mid-wildness (0.5) composed 18 over the Scrap Belt (no
+    // STAR_TOUR_MIX). metal-18 is no longer frozen (GS-biome-variety) — it regenerates from these opts
+    // like every other course, so changing them re-rolls the layout (fine; it's not pinned to a file).
+    // Keep `themeId` a SPEC field below (it does not feed generation), never inside `opts`.
     opts: { biome: 'scrap-belt', holes: 18, compose: true, wildness: 0.5 },
     themeId: 'antlia',
     archetype: 'metal',

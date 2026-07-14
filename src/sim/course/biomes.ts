@@ -676,19 +676,29 @@ export const BIOMES: readonly Biome[] = [
     scatter: [{ kind: 'waste', freqPerHole: 1.4, rMin: 7, rMax: 14 }], // riveted scrap-plate flats (true, firm)
     fairwayWidthMult: 1.05,
     doglegBias: 0.32,
-    treeDensity: 0.3, // sparse rusted antenna masts / girders stand in for trees
+    treeDensity: 0.6, // GS-biome-variety: more rusted antenna masts / girders stand up out of the belt (was sparse)
     fairwayBunkers: 1.8, // crater + scrap bunkers dot the belt
-    craters: 2.0, // signature: impact-blast craters pock the landing zones (a navigable crater field)
+    craters: 2.6, // signature: impact-blast craters pock the landing zones — a dense navigable crater field
     barranca: true, // signature: a chasm between drifting hull-plates crosses the fairway (forced carry)
     deepRough: 'deeprough', // a rebar/scrap thicket chokes a cut corner
     fairwayBreaks: 1.0, // scrap-waste bands slash clean across the fairway
     fescue: 0.4, // wiry scrap-weed in the deep rough
     potBunkers: 0.5,
+    roughFill: 'waste', // GS-biome-variety: riveted scrap-PLATE flats fill the junkyard rough so an offline bomb lands in the debris field, not bare metal
     greenSize: 0.95, // small, angular plate-metal greens
     greenAspect: 1.9,
     greenIrregular: 1.35,
     greenSlopeMax: 0.5,
     roughBreaks: 0.4,
+    // IDENTITY (GS-biome-variety): a LOW-GRAV BOMBER's junkyard — the lowest playable gravity, so every
+    // hole BOMBS long (more par-5s). WIDE broad/wander fairways you launch down, but pocked by dense
+    // CRATER fields + scrap-plate flats, with HOURGLASS driving-zone crater-pinches (thread the debris or
+    // lay up) and heroic CAPE carries over the hull-plate BARRANCA chasms. Difficulty is navigating the
+    // metal debris field + the chasm carry, not tight corridors. (Distinct from the desert bomber: this
+    // is a cratered METAL graveyard with chasm carries, not open dunes.)
+    parMix: { p3: 0.2, p4: 0.5, p5: 0.3 },
+    shapeWeights: { straight: 0.28, dogleg: 0.26, cape: 0.24, double: 0.12, hairpin: 0.1 },
+    widthWeights: { classic: 0.18, chute: 0.06, neck: 0.08, hourglass: 0.18, wander: 0.2, thin: 0.06, broad: 0.24 },
   },
   {
     // Derelict (GS-derelict) — a DEAD STARSHIP adrift in the deep. Unlike the Scrap Belt (solid metal
