@@ -478,19 +478,29 @@ export const BIOMES: readonly Biome[] = [
     scatter: [],
     fairwayWidthMult: 1.0,
     doglegBias: 0.35,
-    treeDensity: 0.6, // the odd palm
+    treeDensity: 1.0, // GS-biome-variety: denser PALM stands line the shore (was a sparse "odd palm")
     fairwayBunkers: 2.0, // beaches everywhere
-    potBunkers: 0.4,
+    potBunkers: 0.8, // coral pot bunkers ring the greens + pinch the landing zones
     waterCreek: true, // signature: a sea channel crosses the fairway (forced carry)
     // Signature deep rough: the OCEAN itself — the sea laps the sandy shore of the rough, so cutting
     // the corner of a dogleg means carrying open water (a real penalty, not a hack-out).
     deepRough: 'water',
-    ponds: 1.8, // lagoons flank the corridors — an offline shot is wet
+    ponds: 2.0, // lagoons thread the corridors — an offline shot is wet
+    roughFill: 'waste', // GS-biome-variety: sandy BEACH / coral flats fill the tropical shore rough (a firm, playable lie — the water is the teeth)
     greenSize: 1.0,
     greenAspect: 1.7,
     greenIrregular: 1.0,
     greenSlopeMax: 0.4, // GS-greens-3 green tilt character
     roughBreaks: 0.8, // GS-variety-2 broken-fairway frequency
+    // IDENTITY (GS-biome-variety): a HEROIC WATER-CARRY archipelago — the CAPE is the star (a diagonal
+    // "bite off as much as you dare" carry over open sea, green tucked inside), plus doglegs bending
+    // around the lagoons. You THREAD hourglass/neck landing zones pinched between the water: carry the
+    // corner or lay up to the dry side and take an iron in. Difficulty is the water decision, not length;
+    // the sandy shore is a soft recovery so only the SEA punishes. Coastal par-3s over water; par-5s
+    // reachable across a lagoon.
+    parMix: { p3: 0.26, p4: 0.5, p5: 0.24 },
+    shapeWeights: { straight: 0.2, dogleg: 0.28, cape: 0.3, double: 0.14, hairpin: 0.08 },
+    widthWeights: { classic: 0.2, chute: 0.08, neck: 0.16, hourglass: 0.2, wander: 0.1, thin: 0.08, broad: 0.18 },
   },
   {
     // GS-asgard: the Golden Realm atop Yggdrasil — a GRAND, FAIR reward world, the opposite of the
