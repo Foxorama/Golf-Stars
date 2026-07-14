@@ -367,10 +367,13 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0, // nothing grows in the void — crystals are the spice
     fairwayBunkers: 0.5,
     lostRough: 'voidrough', // signature: there is no rough — off the fairway is lost to the void
-    greenSize: 0.85, // small, angular asteroid greens adrift in the abyss
+    greenSize: 1.05, // GS-green-diversity: bigger ANGULAR asteroid greens adrift in the abyss (was tiny 0.85)
     greenAspect: 1.7,
     greenIrregular: 1.25,
-    greenSlopeMax: 0.4, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.55, // low-grav greens roll far + tilt hard (GS-green-diversity: 0.4 → 0.55)
+    // GS-green-diversity: bigger, steeper asteroid greens — in the near-vacuum low gravity a putt runs
+    // and breaks a long way, so even a held island green leaves a slippery two-putt.
+    difficulty: { greenTilt: 1.25, greenComplexity: 1.3 },
     roughBreaks: 0.0, // GS-variety-2 broken-fairway frequency
   },
   // --- GS-worlds: four new exotic worlds, each a distinct PLAYSTYLE -----------
@@ -625,10 +628,13 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0.3, // sparse wind-bent coastal stacks
     fairwayBunkers: 1.4, // sandy clifftop coves
     lostRough: 'cetusdeep', // signature: off the clifftop is lost to the star-ocean (deep/wild stops)
-    greenSize: 0.95, // organic tide-pool greens
-    greenAspect: 1.8,
+    greenSize: 1.1, // GS-green-diversity: bigger organic TIDE-POOL greens on the clifftop (was 0.95)
+    greenAspect: 1.85,
     greenIrregular: 1.2,
-    greenSlopeMax: 0.5, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.6, // clifftop tide-pool roll (GS-green-diversity: 0.5 → 0.6)
+    // GS-green-diversity: bigger, rolling tide-pool greens perched over the star-ocean — a long breaking
+    // putt with the abyss right off the edge. (Green levers only; the waterfall/island machinery untouched.)
+    difficulty: { greenComplexity: 1.25, greenTilt: 1.15 },
     roughBreaks: 0.0, // GS-variety-2 broken-fairway frequency
   },
   // --- GS-more-worlds: two exotic worlds bracketing the gravity spectrum ------
@@ -753,10 +759,14 @@ export const BIOMES: readonly Biome[] = [
     lostRough: 'shiprough', // signature: off the deck is lost to open space
     walls: true, // signature: metal corridor walls bounce a low ball back onto the deck (GS-ship-walls)
     sharpCorners: true, // signature: the corridor bends at angular ship-hallway corners, not smooth curves (GS-ship-feel)
-    greenSize: 0.9, // small angular plate-metal landing pads
+    greenSize: 1.05, // GS-green-diversity: bigger ANGULAR plate-metal landing pads (was small 0.9 — a more forgiving pad, a harder putt)
     greenAspect: 1.85,
     greenIrregular: 1.3,
-    greenSlopeMax: 0.5,
+    greenSlopeMax: 0.58, // canted, buckled deck plate (GS-green-diversity: 0.5 → 0.58)
+    // GS-green-diversity: bigger, canted plate-metal landing pads — the ball rolls off a buckled steel
+    // deck, a slippery two-putt at the end of the walled corridor. (Green levers only; the walls / ship
+    // corridor / containment machinery is completely untouched.)
+    difficulty: { greenTilt: 1.2 },
     roughBreaks: 0.0, // lost worlds keep an unbroken pad/corridor
   },
 ];

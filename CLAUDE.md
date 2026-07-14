@@ -152,10 +152,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     the jungle's doglegs), scrap-belt (low-grav bomber's junkyard — WIDE broad/wander bombs pocked by dense
     CRATER fields + `roughFill` scrap-plate flats + hourglass crater-pinches + barranca CAPE carries),
     ice-ring (exposed frosted links — enhanced with `roughFill` fescue on the wind-scoured shelves + more
-    frozen `ponds`/pot bunkers; its heavy green vector MODERATED 1.35/1.4/0.6 → 1.15/1.2/0.4 so difficulty
-    leans on wind+hazards not putting). Cetus (waterfalls) + Derelict (walls) are handled LAST + minimally.
+    frozen `ponds`/pot bunkers; its green vector later RESTORED to steep in GS-green-diversity). The lost
+    island/wall worlds (void/cetus/derelict) got a CAREFUL, GREENS-ONLY pass (bigger island/deck greens
+    via GS-green-diversity) — no shape/width changes, because they're already the most visually distinct
+    worlds (island chains / star-waterfalls / ship corridors, never a "snake") and their waterfall/wall
+    machinery must not be touched (guarded green by the full walls.test/cetus.test/island-gaps suites).
     (The scrap-belt PR also UNFROZE the flagship `metal-18` static course — see the static-courses bullet —
-    so no 18-hole course is a frozen exception.)
+    so no 18-hole course is a frozen exception.) ALL 15 worlds done.
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays
@@ -180,7 +183,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     stream, so it was LEFT per-world. Bigger greens are EASIER to hit (so the auto death-spiral bars don't
     trip — the auto sim's putting is simplified) but HARDER to putt for a human (longer lag, more break) —
     the intended asymmetry. Only the ace-ship fixture seed re-pinned (79 → 25). `GENERATOR_VERSION` 36.
-    Void/Cetus/Derelict greens ride the careful island/wall PR.
+    The careful trio followed (`GENERATOR_VERSION` 37): void (bigger, steeper asteroid greens), cetus
+    (bigger rolling tide-pool greens — waterfall/island machinery UNTOUCHED), derelict (bigger canted
+    deck pads — walls/ship-corridor/containment UNTOUCHED); green levers ONLY, so the full walls.test /
+    cetus.test / island-gaps suites stay green. Every rotation world now has a distinct green identity.
   - A multi-hole stop is COMPOSED, not IID-sampled (GS-compose, `course/compose.ts planCourse`): the
     run path (`runCourse`, `opts.compose`) plans a par SEQUENCE (proportions track the generator's own
     ~25/55/20 mix, a par-3+par-5 guaranteed, never 3 identical pars in a row), 1–2 SIGNATURE holes (a
