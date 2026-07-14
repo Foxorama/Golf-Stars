@@ -76,9 +76,9 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult } from './app/starTourScreens';
+import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP } from './app/starTourScreens';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
-import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
+import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
@@ -296,7 +296,13 @@ function dispatch(action: Action): void {
       starTourView.targetX = null;
       starTourView.targetY = null;
       starTourView.flyingTo = null;
-      starTourView.zoom = 1;
+      // Open slightly more zoomed OUT than the intrinsic 1× (GS-star-tour-map-improvements) so more of the
+      // sky is in frame on arrival; the cover-zoom clamp still raises it if a tall viewport would letterbox.
+      starTourView.zoom = ST_OPEN_ZOOM;
+      // Fresh tank, normal throttle, no tanker in progress (GS-star-tour-fuel).
+      starTourView.fuel = STAR_TOUR_FUEL_CAP;
+      starTourView.speed = 'normal';
+      starTourView.refuel = null;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -1385,6 +1391,27 @@ const STAR_TOUR_BASE_STEP = 5.25;
  *  flat cruise; shorter/medium hops stay at the constant base speed. */
 const STAR_TOUR_LONG_HAUL = 750;
 
+/** The star map opens slightly more zoomed OUT than intrinsic (GS-star-tour-map-improvements) — the
+ *  cover-zoom clamp still overrides this upward on a tall/narrow viewport that would otherwise letterbox. */
+const ST_OPEN_ZOOM = 0.82;
+
+/** ── FUEL model (GS-star-tour-fuel) ──────────────────────────────────────────────────────────────────
+ *  Flying burns fuel by DISTANCE travelled (not time), so the "empty after 3/4 of the map at fast" target
+ *  holds exactly regardless of the speed multiplier. FAST empties the tank over 3/4 of the chart width and
+ *  burns 1.5× the fuel-per-distance of NORMAL (so NORMAL lasts 1.5× further = well past a full traverse).
+ *  FAST also cruises +25% faster. Fuel is app-layer feel state (never the sim / a save). */
+const ST_SPEED_FAST_MULT = 1.25;
+/** Fuel drained per chart-unit travelled at FAST — sized so a fast cruise empties over 0.75 × CHART_W. */
+const ST_FUEL_BURN_FAST = STAR_TOUR_FUEL_CAP / (0.75 * CHART_W);
+/** NORMAL burns 1.5× LESS per distance than fast (the console fast-mode 1.5× thirst). */
+const ST_FUEL_BURN_NORMAL = ST_FUEL_BURN_FAST / 1.5;
+/** Coming to rest within this of a world / Earth / the spaceport tops the tank to full (a fuel stop). */
+const ST_REFUEL_STATION_R = 96;
+/** Tanker lerp speeds (fraction/frame) for the fly-in / fly-out, and the hose fill rate (fuel/frame). */
+const ST_TRUCK_IN_EASE = 0.11;
+const ST_TRUCK_OUT_EASE = 0.09;
+const ST_TRUCK_FILL_RATE = STAR_TOUR_FUEL_CAP / 90; // ~1.5 s to brim the tank at 60fps
+
 /** Set the hull flip for a flight: mirror vertically (−1) when heading LEFT so a wheeled/keeled ship
  *  keeps its top up rather than reading belly-up (a spaceship has no "up", but these are drawn as
  *  vehicles). Held constant for the whole flight (decided at launch off the target's side) so it never
@@ -1435,6 +1462,119 @@ function startStarTourAnim(): void {
   stAnim.raf = requestAnimationFrame(stepStarTour);
 }
 
+/** A rest point is at a fuel STATION (GS-star-tour-fuel) if it's within `ST_REFUEL_STATION_R` of any
+ *  world, Earth, or the spaceport — coming to rest there tops the tank to full (a fuel stop). A free-roam
+ *  tap into empty space does NOT refuel; running dry out there is what summons the tanker. */
+function starTourStationNear(x: number, y: number): boolean {
+  const stations = [SPACEPORT_POS, EARTH_POS, ...starTourWorlds().map(worldPos)];
+  return stations.some((p) => Math.hypot(p.x - x, p.y - y) <= ST_REFUEL_STATION_R);
+}
+
+/** The tank ran dry in deep space: stall the ship and fly the space tanker in. The interrupted flight is
+ *  stashed on `resume` so the ship carries on to its target once the tank is brimmed again. */
+function beginStarTourRefuel(vp: HTMLElement | null): void {
+  const v = starTourView;
+  const shipX = v.shipX ?? SPACEPORT_POS.x;
+  const shipY = v.shipY ?? SPACEPORT_POS.y;
+  const resume = v.targetX != null && v.targetY != null ? { targetX: v.targetX, targetY: v.targetY, flyingTo: v.flyingTo } : null;
+  v.targetX = null;
+  v.targetY = null;
+  v.flyingTo = null;
+  // Enter from whichever side of the VISIBLE region the ship has more runway toward, so the truck has room
+  // to fly in on-screen. Fall back to a fixed offset if the viewport isn't measurable yet.
+  const z = v.zoom || 1;
+  const leftEdge = vp ? vp.scrollLeft / z : shipX - 320;
+  const rightEdge = vp ? (vp.scrollLeft + vp.clientWidth) / z : shipX + 320;
+  const enterRight = shipX - leftEdge < rightEdge - shipX;
+  const sideDir = enterRight ? 1 : -1;
+  const edgeX = enterRight ? rightEdge + 70 : leftEdge - 70;
+  const dockX = shipX + sideDir * 46;
+  const dockY = shipY - 42;
+  v.refuel = {
+    phase: 'in',
+    truckX: edgeX,
+    truckY: dockY,
+    dockX,
+    dockY,
+    exitX: edgeX,
+    exitY: dockY,
+    flip: -sideDir, // the +x-facing tanker mirrors so its cab points back at the ship
+    resume,
+  };
+  sfx.click();
+}
+
+/** Advance the refuel tanker (fly in → hose the tank up → fly out → resume the stashed flight). */
+function stepStarTourRefuel(): void {
+  const v = starTourView;
+  const rf = v.refuel!;
+  if (rf.phase === 'in') {
+    rf.truckX += (rf.dockX - rf.truckX) * ST_TRUCK_IN_EASE;
+    rf.truckY += (rf.dockY - rf.truckY) * ST_TRUCK_IN_EASE;
+    if (Math.hypot(rf.dockX - rf.truckX, rf.dockY - rf.truckY) < 4) rf.phase = 'hose';
+  } else if (rf.phase === 'hose') {
+    rf.truckX = rf.dockX;
+    rf.truckY = rf.dockY;
+    v.fuel = Math.min(STAR_TOUR_FUEL_CAP, v.fuel + ST_TRUCK_FILL_RATE);
+    if (v.fuel >= STAR_TOUR_FUEL_CAP) {
+      v.fuel = STAR_TOUR_FUEL_CAP;
+      rf.phase = 'out';
+      sfx.click();
+    }
+  } else {
+    rf.truckX += (rf.exitX - rf.truckX) * ST_TRUCK_OUT_EASE;
+    rf.truckY += (rf.exitY - rf.truckY) * ST_TRUCK_OUT_EASE;
+    if (Math.hypot(rf.exitX - rf.truckX, rf.exitY - rf.truckY) < 8) {
+      const resume = rf.resume;
+      v.refuel = null;
+      if (resume) {
+        v.targetX = resume.targetX;
+        v.targetY = resume.targetY;
+        v.flyingTo = resume.flyingTo;
+        setStarTourFlip(resume.targetX);
+      }
+    }
+  }
+}
+
+/** Draw the tanker + hose (during a refuel) and keep the fuel gauge in sync. Pure DOM writes on the
+ *  existing SVG nodes — no whole-map re-render, like the ship transform. */
+function paintStarTourRefuel(): void {
+  const v = starTourView;
+  const truckEl = document.getElementById('gs-st-fueltruck');
+  const hoseEl = document.getElementById('gs-st-fuelhose');
+  const hoseHiEl = document.getElementById('gs-st-fuelhose-hi');
+  const rf = v.refuel;
+  if (rf && truckEl) {
+    truckEl.style.display = '';
+    truckEl.setAttribute('transform', `translate(${rf.truckX.toFixed(1)} ${rf.truckY.toFixed(1)}) scale(${rf.flip} 1)`);
+    if (rf.phase === 'hose' && hoseEl && hoseHiEl) {
+      const nx = rf.truckX;
+      const ny = rf.truckY + 18; // the tanker's belly nozzle
+      const sx = v.shipX ?? nx;
+      const sy = v.shipY ?? ny;
+      const mx = (nx + sx) / 2;
+      const my = Math.max(ny, sy) + 16; // a slack sag between the two
+      const d = `M${nx.toFixed(1)},${ny.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${sx.toFixed(1)},${sy.toFixed(1)}`;
+      hoseEl.setAttribute('d', d);
+      hoseHiEl.setAttribute('d', d);
+      hoseEl.style.display = '';
+      hoseHiEl.style.display = '';
+    } else {
+      if (hoseEl) hoseEl.style.display = 'none';
+      if (hoseHiEl) hoseHiEl.style.display = 'none';
+    }
+  } else if (truckEl) {
+    truckEl.style.display = 'none';
+    if (hoseEl) hoseEl.style.display = 'none';
+    if (hoseHiEl) hoseHiEl.style.display = 'none';
+  }
+}
+
+/** The floored fuel value currently painted into `#gs-st-fuel`, so the gauge only rebuilds on a real
+ *  step-change (cheap) instead of every frame. −1 forces the first paint. */
+let stFuelShown = -1;
+
 function stepStarTour(): void {
   if (state.screen !== 'starTour') {
     stAnim.raf = 0;
@@ -1445,19 +1585,25 @@ function stepStarTour(): void {
     v.shipX = SPACEPORT_POS.x;
     v.shipY = SPACEPORT_POS.y;
   }
-  const wasFlying = v.targetX != null && v.targetY != null;
-  if (wasFlying) {
-    const dx = v.targetX! - v.shipX;
-    const dy = v.targetY! - v.shipY;
+  const vp = document.getElementById('gs-st-viewport');
+  let cruising = false;
+  if (v.refuel) {
+    // Stalled: run the tanker sequence instead of a flight (the ship holds position).
+    stepStarTourRefuel();
+  } else if (v.targetX != null && v.targetY != null) {
+    const dx = v.targetX - v.shipX;
+    const dy = v.targetY - v.shipY;
     const d = Math.hypot(dx, dy);
     // Orient the nose ALONG the flight. The ship art faces +x (right), so heading = atan2(dy,dx); the
     // old atan2(dx,−dy) assumed a 0=up hull and rendered a downward flight upside-down (GS-star-tour).
     v.heading = lerpAngle(v.heading, (Math.atan2(dy, dx) * 180) / Math.PI, 0.28);
     if (d < 3.5) {
-      v.shipX = v.targetX!;
-      v.shipY = v.targetY!;
+      v.shipX = v.targetX;
+      v.shipY = v.targetY;
       v.targetX = null;
       v.targetY = null;
+      // Visiting any station (a world, Earth, the spaceport) tops the tank to full (GS-star-tour-fuel).
+      if (starTourStationNear(v.shipX, v.shipY)) v.fuel = STAR_TOUR_FUEL_CAP;
       if (v.flyingTo) {
         // Arrived at a world → open its course dossier (the "course info screen loads on arrival").
         v.selectedId = v.flyingTo;
@@ -1472,18 +1618,24 @@ function stepStarTour(): void {
       // speed, not the old `d * 0.14` that made distant hops rocket off way too fast. The base step is
       // scaled by the flown ship's RARITY (commons slower, mythic faster) and only a genuinely long
       // haul earns a gentle acceleration so a cross-galaxy jump isn't a slog — anything under
-      // STAR_TOUR_LONG_HAUL cruises flat.
+      // STAR_TOUR_LONG_HAUL cruises flat. FAST throttle adds +25% on top (GS-star-tour-fuel).
       const accel = d > STAR_TOUR_LONG_HAUL ? (d - STAR_TOUR_LONG_HAUL) * 0.0375 : 0;
-      const step = (STAR_TOUR_BASE_STEP + accel) * starTourShipSpeedMult();
-      const f = Math.min(1, step / d);
+      const speedMult = v.speed === 'fast' ? ST_SPEED_FAST_MULT : 1;
+      const step = (STAR_TOUR_BASE_STEP + accel) * starTourShipSpeedMult() * speedMult;
+      const moved = Math.min(step, d);
+      const f = moved / d;
       v.shipX += dx * f;
       v.shipY += dy * f;
+      cruising = true;
+      // Burn fuel by DISTANCE moved so the "empty after 3/4 map at fast" target holds regardless of speed.
+      const burn = v.speed === 'fast' ? ST_FUEL_BURN_FAST : ST_FUEL_BURN_NORMAL;
+      v.fuel = Math.max(0, v.fuel - moved * burn);
+      if (v.fuel <= 0) beginStarTourRefuel(vp); // ran dry in deep space → the tanker comes to you
     }
   }
-  const vp = document.getElementById('gs-st-viewport');
-  // Chase-cam: while flying, ease the viewport toward keeping the ship centred so you watch it cruise.
-  // Scroll is in rendered px = chart-coord × zoom.
-  if (wasFlying && vp) {
+  // Chase-cam: while flying (or watching the tanker), ease the viewport to keep the ship centred. Scroll
+  // is in rendered px = chart-coord × zoom.
+  if ((cruising || v.refuel) && vp) {
     const z = v.zoom || 1;
     const tx = v.shipX * z - vp.clientWidth / 2;
     const ty = v.shipY * z - vp.clientHeight / 2;
@@ -1495,8 +1647,16 @@ function stepStarTour(): void {
   const el = document.getElementById('gs-st-ship');
   if (el) {
     el.setAttribute('transform', `translate(${v.shipX.toFixed(1)} ${v.shipY.toFixed(1)}) rotate(${v.heading.toFixed(1)}) scale(1 ${v.flip})`);
-    // Fire the engine plume (a `.gs-st-thrust` in the group) only while actually cruising.
-    el.classList.toggle('gs-st-thrusting', wasFlying);
+    // Fire the engine plume (a `.gs-st-thrust` in the group) only while actually cruising (not stalled).
+    el.classList.toggle('gs-st-thrusting', cruising);
+  }
+  paintStarTourRefuel();
+  // Keep the fuel gauge honest, rebuilding only when the shown integer changes (cheap).
+  const shown = Math.floor(v.fuel);
+  if (shown !== stFuelShown) {
+    stFuelShown = shown;
+    const fuelEl = document.getElementById('gs-st-fuel');
+    if (fuelEl) fuelEl.innerHTML = starTourFuelHTML();
   }
   stAnim.raf = requestAnimationFrame(stepStarTour);
 }
@@ -1850,6 +2010,16 @@ function render(): void {
     el.addEventListener('click', () => {
       starTourView.recordsOpen = el.getAttribute('data-startour-records') === '1';
       sfx.click();
+      render();
+    });
+  });
+  // Star Tour speed control (GS-star-tour-fuel): toggle the cruise throttle between NORMAL and FAST. FAST
+  // is +25% speed and burns 1.5× fuel per distance; the fuel gauge + flight loop read `starTourView.speed`.
+  app.querySelectorAll<HTMLElement>('[data-startour-speed]').forEach((el) => {
+    el.addEventListener('click', () => {
+      starTourView.speed = starTourView.speed === 'fast' ? 'normal' : 'fast';
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });

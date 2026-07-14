@@ -30,6 +30,31 @@ import { shipById } from '../sim/rpg/ships';
 import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
 import { hudChromeFor } from '../render/hudChrome';
+import { fuelGaugeHTML } from '../render/fuel';
+
+/** The star-map fuel tank (GS-star-tour-fuel): flying burns fuel by DISTANCE travelled; visiting any
+ *  station (a world / Earth / the spaceport) tops it back to full; draining it in deep space calls the
+ *  space tanker. A round display value (one gauge cell per unit) — app-layer feel only, never persisted. */
+export const STAR_TOUR_FUEL_CAP = 10;
+
+/** The refuel-tanker animation state (GS-star-tour-fuel): when the tank hits empty mid-flight the ship
+ *  stalls, a fuel truck flies in from the viewport edge (`in`), hoses the tank up (`hose`), then flies out
+ *  (`out`); the interrupted flight resumes afterwards. Chart-space coords; driven by app.ts's rAF loop. */
+export interface StarTourRefuel {
+  phase: 'in' | 'hose' | 'out';
+  /** Tanker position (chart coords), lerped toward the dock/exit each frame. */
+  truckX: number;
+  truckY: number;
+  /** Where the tanker docks beside the stalled ship, and the edge it exits toward. */
+  dockX: number;
+  dockY: number;
+  exitX: number;
+  exitY: number;
+  /** Horizontal facing (+1 nose-right / −1 nose-left) so the cab points at the ship. */
+  flip: number;
+  /** The flight to resume once the tank is full again (null = the ship was idle when it ran dry). */
+  resume: { targetX: number; targetY: number; flyingTo: string | null } | null;
+}
 
 /** View state for the star map (mutated by app.ts; reset on entry). */
 export const starTourView = {
@@ -59,6 +84,12 @@ export const starTourView = {
   flyingTo: null as string | null,
   /** Chart zoom (pinch/scroll), 1 = intrinsic. Preserved across re-renders like the scroll offset. */
   zoom: 1,
+  /** Ship fuel (GS-star-tour-fuel), 0..STAR_TOUR_FUEL_CAP. Drains while cruising, tops up at stations. */
+  fuel: STAR_TOUR_FUEL_CAP,
+  /** Throttle: 'fast' cruises +25% and burns 1.5× the fuel per distance (the console speed control). */
+  speed: 'normal' as 'normal' | 'fast',
+  /** Active refuel-tanker sequence, or null. */
+  refuel: null as StarTourRefuel | null,
 };
 
 /** Ship cruise speed by RARITY (GS-star-tour-map-improvements): the flown ship's rarity scales its
@@ -121,14 +152,40 @@ export function starTourWorlds(): StarTourWorld[] {
   });
 }
 
-/** The cockpit HUD (GS-star-tour-hud): the star map reuses the journey bridge HUD (`.gs-bhud`) so it
- *  recolours to the flown ship IDENTICALLY (id → set → standard cyan — see `render/hudTheme.ts`) and
- *  inherits the same fleet ornaments (title plate = ship name, side rails, corner nodes, wings, deck).
- *  A `.gs-bhud--st` context modifier swaps the travel-only controls (fuel / scan / credits / hole
- *  progress) for Star Tour's own: a records stat pod, the golfer-swap CENTRE command (parallel to the
- *  scan dial's focal slot), a records readout (parallel to the fuel readout), and the EXIT switch moved
- *  to the bottom-left console slot (the user's ask). Star-Tour CONTENT keeps the `.gs-sthud__` prefix;
- *  the shared FRAME / theme / ornaments are the bridge HUD's `.gs-bhud`. `pointer-events:none` on the
+/** The themed fuel glyph for the flown ship (the ship's bridge livery swaps the default ⛽ for its own
+ *  cell/plasma/drum glyph). Shared by the HUD's initial paint and app.ts's per-frame gauge refresh. */
+function starTourFuelIcon(): string {
+  const shipId = shipForCharacter(state, state.run.loadout.characterId);
+  const hud = hudThemeForShip(shipId);
+  const chrome = hudChromeFor(hud.variant, shipById(shipId));
+  return chrome?.fuelIcon ?? '⛽';
+}
+
+/** The fuel gauge markup for the console's bottom-right readout. Rebuilt in place each rAF frame by
+ *  app.ts (`#gs-st-fuel`) so the tank visibly ticks down as fuel burns, without a whole-SVG re-render. */
+export function starTourFuelHTML(): string {
+  return fuelGaugeHTML(starTourView.fuel, STAR_TOUR_FUEL_CAP, { icon: starTourFuelIcon() });
+}
+
+/** A two-notch THROTTLE lever (GS-star-tour-fuel) for the console speed control — reads the livery
+ *  `--hud-*` props so each ship's speed control is its own cockpit colour. The knob rides UP on `fast`
+ *  (a `.gs-sthud__speed--fast` class), so the graphic reads the throttle position. */
+function throttleSVG(): string {
+  return `<svg class="gs-sthud__speed-svg" viewBox="0 0 20 26" aria-hidden="true">
+    <rect x="8.4" y="3" width="3.2" height="20" rx="1.6" fill="none" stroke="var(--hud-accent2)" stroke-width="1.2" opacity=".6"/>
+    <line x1="10" y1="4.5" x2="10" y2="21.5" stroke="var(--hud-accent)" stroke-width="1" opacity=".35"/>
+    <rect class="gs-sthud__speed-knob" x="3.5" y="15" width="13" height="5.5" rx="2.2" fill="var(--hud-accent)"/>
+  </svg>`;
+}
+
+/** The cockpit HUD (GS-star-tour-hud → GS-star-tour-fuel): the star map reuses the journey bridge HUD
+ *  (`.gs-bhud`) so it recolours to the flown ship IDENTICALLY (id → set → standard cyan) and inherits the
+ *  same fleet ornaments (title plate = ship name, side rails, corner nodes, wings, deck). A `.gs-bhud--st`
+ *  context modifier swaps the travel-only controls for Star Tour's own. Star Tour has no bank/run, so
+ *  there is NO exit switch and NO big golfer name plate crowding the console (they used to obscure the
+ *  dashboard); the RECORDS board is baked into the top-left "STAR TOUR n/N" link, and the bottom console
+ *  is the ship's DASHBOARD: a compact pilot-swap dot, the themed instrument deck, a NORMAL/FAST speed
+ *  control in the focal centre slot, and the live FUEL gauge on the right. `pointer-events:none` on the
  *  frame so map scroll/taps pass through — only the console controls catch pointers. */
 function stHud(): string {
   const charId = state.run.loadout.characterId;
@@ -138,16 +195,14 @@ function stHud(): string {
   const accent = ch?.style.cap ?? '#7fe0ff';
 
   // The livery follows the flown ship, exactly like the travel screen — piped in as `--hud-*` custom
-  // properties + a `gs-bhud--<variant>` frame class, plus optional bespoke CHROME (themed exit icon/label
-  // + frame ornaments). `chrome` is null for the standard cyan console (an unknown/basic ship).
+  // properties + a `gs-bhud--<variant>` frame class, plus optional bespoke CHROME (themed deck/ornaments).
   const hud = hudThemeForShip(shipId);
   const chrome = hudChromeFor(hud.variant, ship);
-  const exitIco = chrome?.exitIcon ?? '🚪';
-  const exitLbl = chrome?.exitLabel ?? 'EXIT';
 
   const total = starTourWorlds().length;
   const played = Object.keys(state.strokePlayBest).length;
   const recordsToggle = starTourView.recordsOpen ? '0' : '1';
+  const fast = starTourView.speed === 'fast';
 
   return `
     <div class="gs-bhud gs-bhud--st gs-bhud--${hud.variant}" style="${hudThemeVars(hud)}">
@@ -158,33 +213,31 @@ function stHud(): string {
         <span class="gs-bhud__corner gs-bhud__corner--br"></span>
       </div>
       ${chrome?.frame ?? ''}
-      <div class="gs-bhud__idpod">
+      <button class="gs-bhud__idpod gs-sthud__recordslink" data-startour-records="${recordsToggle}" aria-pressed="${starTourView.recordsOpen}" title="Course records">
         <span class="gs-bhud__who">✦ <b class="gs-bhud__name">STAR TOUR</b></span>
         <span class="gs-bhud__prog">🏆 <b>${played}</b>/${total}</span>
-      </div>
+      </button>
       <div class="gs-bhud__statpod">
         <span class="gs-bhud__shards">✦ <b>${state.shards}</b></span>
         <button class="gs-bhud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
       </div>
-      <div class="gs-bhud__console">
+      <div class="gs-bhud__console gs-bhud__console--st">
         ${chrome?.deck ?? ''}
         <div class="gs-bhud__slot gs-bhud__slot--exit">
-          <button class="gs-travel__exit" data-action='{"type":"exitStarTour"}' title="Leave the Star Tour" aria-label="Leave the Star Tour, back to the title">
-            <span class="gs-travel__exit-ico">${exitIco}</span>
-            <span class="gs-travel__exit-lbl">${exitLbl}</span>
+          <button class="gs-sthud__pilot" data-action='{"type":"openStarTour"}' title="Change golfer — ${ch?.name ?? 'pick a pilot'}" aria-label="Change golfer">
+            <span class="gs-sthud__pilot-dot" style="background:${accent};"></span>
+            <span class="gs-sthud__pilot-swap">⇄</span>
           </button>
         </div>
         <div class="gs-bhud__slot gs-bhud__slot--scan">
-          <button class="gs-sthud__golfer" data-action='{"type":"openStarTour"}' title="Change golfer">
-            <span class="gs-sthud__golfer-dot" style="background:${accent};"></span>
-            <span class="gs-sthud__golfer-txt">
-              <b>${ch?.name ?? 'Pick golfer'}</b>
-              <span>🚀 ${ship?.name ?? 'ship'} · change ▸</span>
-            </span>
+          <button class="gs-sthud__speed${fast ? ' gs-sthud__speed--fast' : ''}" data-startour-speed="1" title="Cruise speed — fast is +25% speed and burns 1.5× fuel" aria-pressed="${fast}">
+            <span class="gs-sthud__speed-ico">${throttleSVG()}</span>
+            <span class="gs-sthud__speed-lbl">${fast ? 'FAST' : 'NORMAL'}</span>
+            <span class="gs-sthud__speed-cost">${fast ? '1.5× ⛽' : 'cruise'}</span>
           </button>
         </div>
         <div class="gs-bhud__slot gs-bhud__slot--fuel">
-          <button class="gs-sthud__records" data-startour-records="${recordsToggle}" aria-pressed="${starTourView.recordsOpen}">🏆 Records</button>
+          <div class="gs-sthud__fuel" id="gs-st-fuel">${starTourFuelHTML()}</div>
         </div>
       </div>
     </div>`;

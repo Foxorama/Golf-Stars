@@ -948,18 +948,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     applied on top). Tapping a WORLD flies to it
     and OPENS its DOSSIER on arrival (flavour, tier,
     record, WEATHER picker, Fly-here-&-play → `pickStarTourCourse` pins the course on the golfer's run →
-    `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there). Change golfer
-    (`openStarTour` again → back to the roster; a recap "Star map" KEEPS the golfer) is the console CENTRE
-    command; a RECORDS toggle is the right readout. The cockpit HUD REUSES the journey bridge HUD
+    `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there, slightly more
+    zoomed OUT than intrinsic — `ST_OPEN_ZOOM`). The cockpit HUD REUSES the journey bridge HUD
     (GS-star-tour-hud, `stHud`): the star map renders a `.gs-bhud gs-bhud--st gs-bhud--<variant>` frame
     piped `hudThemeForShip`/`hudThemeVars` + `hudChromeFor`, so it recolours to the flown ship AND inherits
     the identical fleet ornaments (title plate = ship name, rails, nodes, wings, deck) — a themed bridge is
     a table row (`render/hudTheme.ts`), never a Star-Tour edit. The `.gs-bhud--st` context modifier swaps
-    the travel controls (fuel/scan/credits/hole progress) for Star Tour's own — a ✦ shards + cog stat pod,
-    a "✦ STAR TOUR · 🏆 n/N" id pod, and a bottom console with the EXIT switch moved to the LEFT slot (the
-    themed exit icon/label), the golfer-swap CENTRE command, and the records readout RIGHT. Star-Tour
-    CONTENT keeps the `.gs-sthud__` prefix (golfer/records); the FRAME/theme/ornaments are the shared
-    `.gs-bhud` (this SUPERSEDED the old standalone cyan `.gs-sthud` chrome). The class-collision guard is
+    the travel controls for Star Tour's own. Star Tour has NO bank/run, so the CONSOLE (GS-star-tour-fuel)
+    carries NO exit switch and NO big golfer name plate (they crowded/obscured the dashboard): the RECORDS
+    board is baked into the top-left "✦ STAR TOUR · 🏆 n/N" id-pod LINK (`data-startour-records`, toggles
+    the board), and the bottom console is the ship's DASHBOARD — a compact pilot-swap DOT (left slot,
+    `openStarTour` → change golfer; a recap "Star map" KEEPS the golfer), the themed instrument DECK
+    (widened to the focus now the centre is compact), a NORMAL/FAST SPEED control in the focal CENTRE slot
+    (`data-startour-speed`, a throttle reading `--hud-*` so each ship's control is its livery colour), and
+    the live FUEL gauge RIGHT. Leaving the map is the settings-cog "Return to title". Star-Tour CONTENT
+    keeps the `.gs-sthud__` prefix; the FRAME/theme/ornaments are the shared `.gs-bhud` (this SUPERSEDED the
+    old standalone cyan `.gs-sthud` chrome). The class-collision guard is
     unchanged: never `.gs-hud` (the play screen's), which the `tests/build.test.ts` play-HUD test proves.
     `intro` is Star-Tour-branched (objective/field, Watch
     hidden so a record is EARNED); the round resolves to `strokeResult` (`app/strokeResultScreens.ts`).
@@ -968,10 +972,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     like Asgard resolves its tournament). Deep-linkable via `?screen=startour`/`?screen=strokeresult`
     (GS-screen-deeplink, real reducer transitions); guarded by `tests/startour-flow.test.ts` +
     `tests/build.test.ts` browser smoke. Star Tour never consumes the parked Voyage/Unending resume.
-    NO run economy: Star Tour is a records chase with no credits/fuel/handicap/stop/distance — so `header()`
-    (the between-hole recap) is `STROKEPLAY_FORMAT`-branched to show the course + running to-par instead of
-    the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard), never the
-    ghost competitor leaderboard. The Daily button is parked off the title for now. DESTINATION ICONS
+    NO run economy: Star Tour is a records chase with no credits/handicap/stop/distance/scoring-fuel — so
+    `header()` (the between-hole recap) is `STROKEPLAY_FORMAT`-branched to show the course + running to-par
+    instead of the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard),
+    never the ghost competitor leaderboard. The star map's own FUEL (GS-star-tour-fuel) is a pure MAP-
+    EXPLORATION feel mechanic, NOT run economy: it lives ONLY in `starTourView` (app layer — never the sim,
+    a save, or the round), so records stay comparable. Flying burns fuel by DISTANCE (so the target holds
+    regardless of speed): FAST cruises +25% and burns 1.5× the fuel/distance of NORMAL, sized so a FAST
+    cruise empties over 3/4 of the chart width (NORMAL lasts 1.5× further). Coming to REST at any station (a
+    world / Earth / the spaceport, within `ST_REFUEL_STATION_R`) tops the tank to full; draining it in deep
+    space stalls the ship and flies in a space TANKER (`#gs-st-fueltruck` + hose, an rAF state machine in
+    `stepStarTour`) that hoses it up and departs, then the interrupted flight resumes. All app-layer/render
+    (no reducer/save/rng, no `_gs*`/URL hook → no test-hub wiring). Re-shoot `scripts/startour-preview.mjs`. The Daily button is parked off the title for now. DESTINATION ICONS
     (GS-star-tour-destinations → GS-star-map-icon-consistency, `render/starTourMap.ts`) — the star map is a
     DIFFERENT interface from the journey map: a course is the PLACE it's named for, not a biome skin, so
     EVERY destination is its own luminous celestial object that EMITS into the star field via `softGlow`
