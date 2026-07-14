@@ -77,6 +77,7 @@ export const WIND_RGBA: Record<string, string> = {
   metal: '190,160,120', // blown metal filings / scrap dust
   derelict: '150,175,205', // cold venting vapour / drifting hull dust
   asgard: '255,240,190', // pale divine gold-white
+  earth: '224,222,196', // pale sea-haze — drifting sand + spindrift off the links
 };
 
 /**
@@ -120,6 +121,7 @@ export const AMBIENT: Record<string, AmbientCfg> = {
   swamp: { mode: 'rise', cols: ['150,200,80', '190,225,120'], density: 0.42, spd: 6, r: [0.8, 2.0], a: 0.5, glow: true }, // rising acid-bog gas bubbles / spores
   metal: { mode: 'drift', cols: ['200,170,130', '255,180,90'], density: 0.4, spd: 20, r: [0.5, 1.3], a: 0.32, glow: true }, // drifting metal filings + the odd spark
   derelict: { mode: 'drift', cols: ['150,175,205', '255,90,74'], density: 0.28, spd: 5, r: [0.6, 1.6], a: 0.34, glow: true }, // slow cold dust motes + the odd dying red warning-light spark
+  earth: { mode: 'drift', cols: ['235,232,205', '210,220,195'], density: 0.42, spd: 24, r: [0.5, 1.3], a: 0.3 }, // pale seaside spindrift + blown dune sand on the links wind
 };
 
 export interface WeatherOpts {

@@ -637,6 +637,9 @@ const DEEP_ROUGH: Partial<Record<BiomeArchetype, DeepRoughLook>> = {
   // A dark gunmetal thicket of twisted torn hull-plate + severed cabling with a faint cold-cyan glow —
   // a jagged tangle of wreckage on the derelict's steel ground.
   derelict: { base: '#2a3138', shade: '#191d22', ink: 'rgba(6,9,12,0.55)', mark: 'shard', markCols: ['#5c6773', '#8fb0c0'], glow: 'rgba(95,212,208,0.10)' },
+  // A thick tawny GORSE/WHIN + fescue tangle (GS-earth) — golden-brown seaside scrub that swallows a cut
+  // corner, its wiry blades tipped in the gorse's dusty yellow-green (no glow — real daylight links rough).
+  earth: { base: '#6a5a2a', shade: '#4a3e1c', ink: 'rgba(30,24,8,0.5)', mark: 'blade', markCols: ['#8a7c3a', '#b6a85a'] },
 };
 const DEEP_ROUGH_DEFAULT: DeepRoughLook = { base: '#2c4014', shade: '#1a2a0c', ink: 'rgba(10,20,4,0.5)', mark: 'blade', markCols: ['#3e5a1e', '#597e2c'] };
 

@@ -59,6 +59,7 @@ export const BIOME_RELIEF: Record<BiomeArchetype, ReliefLook> = {
   metal: { hi: 'rgba(255,190,120,0.13)', lo: 'rgba(10,6,3,0.30)', strength: 1.15 }, // buckled scrap-plate swells
   derelict: { hi: 'rgba(150,185,215,0.13)', lo: 'rgba(6,9,16,0.34)', strength: 1.1 }, // buckled cold hull-plating swells
   asgard: { hi: 'rgba(255,232,150,0.14)', lo: 'rgba(12,38,20,0.22)', strength: 1.1 }, // gilded meadow rolls
+  earth: { hi: 'rgba(224,206,140,0.14)', lo: 'rgba(58,46,20,0.20)', strength: 1.2 }, // tumbling links dunes + humps and hollows
 };
 
 /**

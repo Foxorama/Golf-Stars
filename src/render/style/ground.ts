@@ -128,6 +128,17 @@ export const GROUND_COVER: Partial<Record<BiomeArchetype, GroundCoverLook>> = {
     sparkle: 'rgba(255,232,150,0.85)',
     tuft: { cols: ['#2f7a48', '#c9a84e'], style: 'blade' }, // emerald grass, gold-tipped
   },
+  // Earth — a windswept LINKS turf floor (GS-earth): warm golden fescue mottle, dune-ridge combing, a
+  // rare pale sea-light glint, and leaning marram/fescue BLADE tufts, so the rough reads as tawny
+  // seaside dune-grass rippling in the wind rather than a flat golden slab.
+  earth: {
+    mottleLight: 'rgba(214,196,130,0.11)',
+    mottleDark: 'rgba(58,48,20,0.15)',
+    grain: ['rgba(220,206,150,0.5)', 'rgba(96,80,40,0.5)'],
+    ridge: 'rgba(214,200,150,0.20)', // wind-heaped dune ridges
+    tuft: { cols: ['#8a7c44', '#c2b877'], style: 'blade' }, // wispy fescue / marram dune-grass
+    density: 1.2,
+  },
   // Swamp — a murky muck floor: dark tonal mottle, rotting-matter grain, and reed BLADE tufts, with a
   // rare sickly acid glint. Denser so the mire reads as a wet, tangled bog rather than a flat slab.
   swamp: {

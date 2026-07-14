@@ -144,6 +144,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     opt in. Balance guarded by a composed death-spiral bar (`tests/compose.test.ts`, same fences as the
     IID bar); it's an internal generator opt, NOT a `_gs*`/URL hook, so no test-hub wiring.
     `GENERATOR_VERSION` 23.
+  - A composed course can PIN its exact par routing (GS-hole-plan, `GenerateOptions.parSequence` →
+    `planCourse`): an authored hole-by-hole par list REPLACES the random par multiset + contrast
+    ordering entirely (hole `i` = `parSequence[i % len]`; shorter tiles, longer truncates), so a
+    real-course replica carries its actual rhythm instead of a distribution sample. Wins over
+    `parCap`/`parMix`; when set the par-planning rng draws are skipped (authored, not rolled). OPT-IN +
+    only ever passed by a pinned static course ⇒ absent is byte-for-byte the old random par plan, no
+    stream perturbed (contract 1), no test-hub wiring. Built for the Old St Andrews course (below).
   - A world's APPEARANCE RATE is its themes' summed rarity weight per arc; a world with themes in
     only one arc (or only epic-weight ones) is near-unreachable in the deep game where a run spends
     most of its stops. Every archetype must carry ≥1 arc-3 theme at ~toxic-mire (swamp) weight or a
@@ -406,6 +413,25 @@ these systems** — each bullet is the tip of a documented iceberg.
     + best-rounds-overall. Persisted in save v27 (`strokePlayBest`). Threaded through both the auto
     (`playCourse`+`playTotals`) and interactive drivers (contract 2). The mode does NOT touch Voyage/Unending
     behaviour.
+  - EARTH — the HOME course (GS-earth): the one real-world course, the Old Course at St Andrews, is the
+    Star Tour destination you reach by flying to the Earth landmark. It is a NEW `earth` BiomeArchetype +
+    `earth-links` Biome (a true Scottish LINKS: `carryMult` 1.0 — the only real-Earth gravity — seaside
+    wind, treeless firm turf, deep revetted POT bunkers, fescue/gorse rough, the Swilcan BURN carry, huge
+    undulating SHARED double greens). WEIGHT 0 + no pickable theme ⇒ out of the normal galaxy rotation,
+    reached only by the static course forcing the biome by id (the Asgard pattern; kept mid-`BIOMES` so
+    the last row stays positive-weight for the `pickBiome(0.999)` span test). NOT balance-exempt — a fair
+    world, so it clears the fairness/death-spiral bars (auto-AI plays it ≈ even par). The `standrews-18`
+    spec (`The Old Course, St Andrews`) is an UNFROZEN tour row like the others EXCEPT it PINS the real
+    par-72 routing (`opts.parSequence`, GS-hole-plan) and uses the designed difficulty ARC — NOT
+    `STAR_TOUR_MIX` — so a real course opens gentle and builds through the closing stretch. A new
+    archetype = a row in every archetype-keyed table (compile-forced: `ARCHETYPE_BIOME`/`ARCHETYPE_AFFINITY`/
+    `ARCHETYPE_TURF`/`ARCHETYPE_SPACE`/`OB_LOOK`/`BIOME_RELIEF`/`WIND_COL`/`TREE_VOICES`/`TREE_GLYPH`/`PRO_LOOK`/
+    `MUSIC_TRACKS`/`ZONES`/`PROS`; test-forced: `GROUND_COVER`/`WIND_RGBA`/`AMBIENT`; plus `BIOME_ROUGH`/
+    `ACCENTS` by biome id, `DEEP_ROUGH`, a `zoneHeroSVG` branch), never an engine fork. Star map: Earth is
+    the tappable Old-Course target — `worldPos` special-cases `themeId:'earth'` → the blue-marble
+    `EARTH_POS`, and `earthGlyph` (not a generic constellation planet) carries the selection ring + record
+    + play flow. Guarded by `tests/startour-flow.test.ts`. Pure render/data + a static row — no `_gs*`/URL
+    hook, no test-hub wiring.
 - **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
   - The spine: `startRun → [playStop → buy* → travel]*` until the survival rule fails; pure and
     deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);
