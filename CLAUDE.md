@@ -130,11 +130,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     `shapeWeights` (kill the wandering-snake read — real doglegs/capes/pinches), `widthWeights` leaning on
     the SQUEEZE archetypes (`hourglass`/`neck`/`chute`) so a pinch forces a LAYUP + iron approach
     (difficulty from strategy, not length or trick greens), and bumped `treeDensity`/`ponds`/`potBunkers`/
-    scatter so the rough bites. Difficulty is deliberately raised — the death-spiral/tents balance fences
-    are RELAXED with `TODO(GS-biome-variety)` (the GS-rough-gradient pattern), NEVER the structural
-    fairness contracts (`validateFairness`/`Crossings`/`Course` stay green by construction). The
-    `tests/fairway-width.test.ts` GRAMMAR sample moved off verdant → `asgard-realm` (the neutral
-    default-weights reference we never re-profile). Done: verdant-station (strategic parkland). Cetus
+    scatter so the rough bites. For the SCRUBBY / TREELESS worlds a gated `Biome.roughFill` (a NON-penalty
+    lie kind) scatters world-appropriate obstacles (dune-scrub `waste`, rock/shard/scrap) through the
+    off-corridor rough at a density INDEPENDENT of `treeDensity`, on the `${seed}:rough:` SIDE stream so it
+    perturbs ZERO main-`rng` draws (penalty crossings/greens byte-identical; only non-penalty rough ADDED)
+    — the "fill the empty desert/metal/crystal rough" answer. Difficulty is deliberately raised — the
+    death-spiral/tents balance fences are RELAXED with `TODO(GS-biome-variety)` (the GS-rough-gradient
+    pattern), NEVER the structural fairness contracts (`validateFairness`/`Crossings`/`Course` stay green
+    by construction). The `tests/fairway-width.test.ts` GRAMMAR sample moved off verdant → `asgard-realm`
+    (the neutral default-weights reference we never re-profile). Done: verdant-station (strategic parkland),
+    dust-belt (open dune-field desert — `roughFill` waste mounds + hourglass dune pinches). Cetus
     (waterfalls) + Derelict (walls) are handled LAST + minimally.
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp

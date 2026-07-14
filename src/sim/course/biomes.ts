@@ -169,6 +169,18 @@ export interface Biome {
   shapeWeights?: Partial<Record<string, number>>;
   widthWeights?: Partial<Record<string, number>>;
   /**
+   * NON-TREE ROUGH FILLER (GS-biome-variety) — names a NON-penalty lie kind (must have a LIE_INFO row
+   * + a render painter) that the rough-gradient pass scatters through the OFF-corridor rough at a
+   * density INDEPENDENT of `treeDensity`. This is the "fill the rough so you can't just direct-line the
+   * green" answer for the SCRUBBY / TREELESS worlds (desert dunes, crystal spires, scrap/metal plates)
+   * whose forest band is near-empty — an off-line drive now lands in a dune/rock/shard field instead of
+   * bare ground, so navigating the fairway matters. Drawn from the dedicated `${seed}:rough:` SIDE
+   * stream (like the rest of the gradient), so it perturbs ZERO main-`rng` draws — penalty crossings/
+   * ponds/greens stay byte-for-byte and only non-penalty rough obstacles are ADDED. Absent ⇒ untouched.
+   * Skipped on lost-rough worlds (off the fairway is already the abyss).
+   */
+  roughFill?: string;
+  /**
    * PER-BIOME DIFFICULTY VECTOR (GS-biome-difficulty) — the GREEN/PUTTING axis. The single `wildness`
    * scalar ramps every lever together (width, bend, hazards, length via gravity), so depth reads as
    * "the hole gets longer". This lets a world get harder via its GREENS instead: two worlds at the SAME
@@ -239,23 +251,25 @@ export const BIOMES: readonly Biome[] = [
     doglegBias: 0.25,
     treeDensity: 0.2, // sparse desert scrub
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
-    craters: 2.2, // signature: impact-crater bunkers pock the landing zones
+    craters: 2.6, // signature: impact-crater bunkers pock the landing zones (denser — a crater field to navigate)
     deepRough: 'deeprough', // deep waste dune-scrub swallows a cut corner
     fairwayBreaks: 1.0, // sandbelt waste areas slash across the fairway
     potBunkers: 0.6, // deep desert pots dot the landing zones
     fescue: 0.8, // dune-grass fescue chokes the deep waste
     barranca: true, // signature: a dry barranca/ravine crosses the fairway (forced carry)
+    roughFill: 'waste', // GS-biome-variety: dune-scrub WASTE mounds fill the treeless rough so an offline drive lands in a broken dune field, not bare sand
     greenSize: 1.3, // big, smooth oasis greens against the dunes
     greenAspect: 1.7,
     greenIrregular: 0.85,
     greenSlopeMax: 0.32, // GS-greens-3 green tilt character
     roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-profile): a LONG, OPEN, HEROIC desert — more par-5s, straight/cape lines you
-    // bomb across the dunes, and generous broad/wandering fairways. Difficulty is length + wind + sand,
-    // not tight twisty corridors.
+    // bomb across the dunes, and generous broad/wandering fairways. Difficulty is length + wind + a
+    // DUNE FIELD you navigate (GS-biome-variety: waste mounds + craters fill the once-empty rough +
+    // hourglass driving-zone pinches ask for a layup), not tight twisty corridors.
     parMix: { p3: 0.18, p4: 0.5, p5: 0.32 },
     shapeWeights: { straight: 0.32, dogleg: 0.22, cape: 0.28, double: 0.1, hairpin: 0.08 },
-    widthWeights: { classic: 0.18, chute: 0.05, neck: 0.07, hourglass: 0.1, wander: 0.22, thin: 0.06, broad: 0.32 },
+    widthWeights: { classic: 0.18, chute: 0.05, neck: 0.07, hourglass: 0.16, wander: 0.16, thin: 0.06, broad: 0.32 },
   },
   {
     id: 'ice-ring',
