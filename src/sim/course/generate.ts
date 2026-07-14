@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 39; // GS-green-end: per-hole green-complex apron archetype (shelf/punchbowl/runoff/tongue/open) — vary the hole-end shape (side stream)
+export const GENERATOR_VERSION = 40; // GS-fairway-water: in-fairway cape lakes + split fairways (sanctioned, centre-dry, validateInFairwayWater)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -56,6 +56,10 @@ const DEEP_ROUGH_MIN_WILDNESS = 0.3; // below (incl. the stop-0 ceiling): dogleg
 // buffer, trees pushed far out); at/above it each hole rolls a CHARACTER (tight tree chute / heavy-rough
 // gauntlet / mixed) so the wilder stops read "a lot more random".
 const ROUGH_CHAR_MIN_WILDNESS = 0.45;
+
+/** GS-fairway-water: below this wildness a hole gets no in-fairway cape lake / split (the calm openers
+ *  stay clean); at/above it a wide landing zone may bite in a cape or split into lanes. */
+const FW_WATER_MIN_WILDNESS = 0.32;
 
 /** Penalty kinds that are SANCTIONED forced carries on the play corridor (GS-19/GS-mechanics): they
  *  may cross the centreline (exempt from `validateFairness`) BUT `validateCrossings` proves each one
@@ -1226,6 +1230,62 @@ function generateHole(
     }
   }
 
+  // IN-FAIRWAY WATER + SPLIT FAIRWAYS (GS-fairway-water): the fairway itself was never interrupted —
+  // penalty water only ever FLANKED it (`clearsPlayCorridor`), so there were "no lakes on/interrupting
+  // fairways and no split fairways". This pass bites INTO the corridor at a WIDE landing zone while
+  // keeping the CENTRELINE (the safe line AND the auto-AI's aim) DRY, so it's fair by construction (a
+  // shot down the middle is always clean) and the auto-AI is unchanged:
+  //   • CAPE  — a lake eats ONE side of the fairway; carry the corner (aggressive, shorter) or bail to
+  //     the dry inner/other lane (safe, longer).
+  //   • SPLIT — an off-centre hazard STRIP + a parallel ALTERNATE fairway lane beyond it: the main route
+  //     runs down the dry centre, a bolder player takes the shortcut lane past the hazard.
+  // Water on WATER worlds (marked `sanctioned` → exempt from validateFairness's flank rule, like the
+  // greenside ring, and proven fair by `validateInFairwayWater` — the centre route stays penalty-free);
+  // a NON-penalty rough/bunker bite on dry worlds (needs no sanction). Par 4/5, non-lost, wildness-gated,
+  // ONE per hole, skipped if a crossing already interrupts the hole. Drawn on a DEDICATED side stream so
+  // it perturbs ZERO main draws — terrain/hazards/greens byte-identical, only this feature ADDED.
+  const hasXingFw = hazards.some((h) => CROSSING_KINDS.has(h.kind));
+  if (par >= 4 && !islandPar3 && !lostRough && wildness >= FW_WATER_MIN_WILDNESS && !hasXingFw) {
+    const fwRng = new Rng(`${rng.seed}:fwwater:${holeIndex}`);
+    if (fwRng.bool(0.28 + wildness * 0.4)) {
+      const t = fwRng.range(0.4, 0.62);
+      const idx = Math.max(0, Math.min(segs - 1, Math.round(t * (segs - 1))));
+      const localHalf = Math.max(leftHW[idx] ?? fairwayHalfWidth, rightHW[idx] ?? fairwayHalfWidth, 6);
+      const along = centrePoint(centreline, t);
+      const perp = perpAt(centreline, t);
+      const waterWorld = biome.hazardKinds.includes('water');
+      const dryKind = (biome.fairwayBunkers ?? 0) > 0 || (biome.potBunkers ?? 0) > 0 ? 'bunker' : 'deeprough';
+      const side = fwRng.bool() ? 1 : -1;
+      if (fwRng.float() < 0.6) {
+        // CAPE — bite one side of the fairway from ~60% of the local half-width out into the rough.
+        const r = localHalf * fwRng.range(0.5, 0.72) + fwRng.range(2, 7);
+        const L = localHalf * fwRng.range(0.6, 0.72) + r; // inner edge in the OUTER half, off the centre
+        const c: Vec = [along[0] + perp[0] * side * L, along[1] + perp[1] * side * L];
+        if (waterWorld) hazards.push({ kind: 'water', poly: blobPoly(c, r, 14, 0.28, fwRng), sanctioned: true });
+        else hazards.push({ kind: dryKind, poly: blobPoly(c, r, 14, 0.28, fwRng) });
+      } else {
+        // SPLIT — an off-centre hazard strip + a parallel ALTERNATE fairway lane beyond it.
+        const stripR = localHalf * fwRng.range(0.34, 0.5) + fwRng.range(2, 5);
+        const stripL = localHalf * fwRng.range(0.62, 0.74) + stripR; // just past the corridor edge, off centre
+        const sc: Vec = [along[0] + perp[0] * side * stripL, along[1] + perp[1] * side * stripL];
+        // Alternate lane a short parallel ribbon BEYOND the strip.
+        const laneL = stripL + stripR + localHalf * fwRng.range(0.45, 0.75);
+        const t0 = Math.max(0.18, t - 0.13);
+        const t1 = Math.min(0.84, t + 0.13);
+        const laneLine: Vec[] = [0, 0.5, 1].map((f) => {
+          const tt = t0 + (t1 - t0) * f;
+          const a = centrePoint(centreline, tt);
+          const p = perpAt(centreline, tt);
+          return [a[0] + p[0] * side * laneL, a[1] + p[1] * side * laneL] as Vec;
+        });
+        const laneHW = localHalf * fwRng.range(0.5, 0.72);
+        features.push({ kind: 'fairway', poly: ribbon(laneLine, [laneHW * 0.5, laneHW, laneHW * 0.5], [laneHW * 0.5, laneHW, laneHW * 0.5], true, true) });
+        if (waterWorld) hazards.push({ kind: 'water', poly: blobPoly(sc, stripR, 12, 0.26, fwRng), sanctioned: true });
+        else hazards.push({ kind: dryKind, poly: blobPoly(sc, stripR, 12, 0.26, fwRng) });
+      }
+    }
+  }
+
   // Non-penalty fairway BREAK (GS-terrain): a sandy waste band cutting clean across the corridor — a
   // visible interruption in the fairway you carry or thread (sandbelt-style). Waste is NON-PENALTY
   // (precedence 3 → reads as 'waste', never costs a card) so it may sit on the line; `validateFairness`
@@ -2378,6 +2438,7 @@ export function generateCourse(seed: number | string, opts: GenerateOptions = {}
     ...validateFairness(course),
     ...validateCrossings(course),
     ...validateGreenApproach(course),
+    ...validateInFairwayWater(course),
     ...validateIslandHops(course),
   ];
   if (errs.length) {
@@ -2444,6 +2505,33 @@ export function validateCrossings(course: Course): string[] {
       const total = pathLength(h.centreline) || 1;
       const after = centrePoint(h.centreline, Math.min(0.99, tOut + 20 / total));
       if (lieInfo(lieAt(h, after)).penalty) errs.push(`hole[${i}]: no safe landing past the ${what}`);
+    }
+  });
+  return errs;
+}
+
+/**
+ * IN-FAIRWAY WATER fairness (GS-fairway-water): a cape lake / split strip is a SANCTIONED penalty that
+ * bites INTO the corridor (exempt from `validateFairness`'s flank rule, like the greenside ring), so it
+ * must instead be proven to leave a fair SAFE LINE — the CENTRELINE (the auto-AI's aim + the sensible
+ * middle route) stays penalty-free through the fairway BODY. By construction the bite is placed strictly
+ * OFF the centreline, so a shot down the middle is always clean; proven on every generated course.
+ * (The near-green greenside RING is also a sanctioned penalty but sits past t 0.82, so it is never
+ * sampled here — it is proved instead by `validateGreenApproach`.)
+ */
+export function validateInFairwayWater(course: Course): string[] {
+  const errs: string[] = [];
+  const SAMPLES = 140;
+  course.holes.forEach((h, i) => {
+    const hasBite = h.hazards.some((hz) => hz.sanctioned && lieInfo(hz.kind).penalty && !CROSSING_KINDS.has(hz.kind));
+    if (!hasBite) return;
+    for (let s = 0; s <= SAMPLES; s++) {
+      const t = 0.1 + (s / SAMPLES) * 0.72; // the fairway BODY only (skip the greenside zone)
+      const lie = lieAt(h, centrePoint(h.centreline, t));
+      if (lieInfo(lie).penalty && !CROSSING_KINDS.has(lie)) {
+        errs.push(`hole[${i}]: in-fairway water blocks the safe centre line`);
+        break;
+      }
     }
   });
   return errs;
