@@ -146,8 +146,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     spire forests, `treeDensity` 0.3→1.3 so the namesake spires wall the rough), tempest-reach (exposed
     wind-links — WIDE broad/wander fairways guarded by flanking storm `ponds` + pot-bunker fields, wind is
     the defence, `roughFill` fescue moor), tidal-archipelago (heroic water-carry — CAPE carries over the
-    sea + lagoon-threaded hourglass/neck, `deepRough` water cut carries, palm + `roughFill` beach shore).
-    Cetus (waterfalls) + Derelict (walls) are handled LAST + minimally.
+    sea + lagoon-threaded hourglass/neck, `deepRough` water cut carries, palm + `roughFill` beach shore),
+    toxic-mire (the Water-Serpent's swamp — the TWISTIEST world, S-curve `double`/`hairpin` coils down
+    claustrophobic chute/neck/thin corridors between dead mangroves, acid pools everywhere; distinct from
+    the jungle's doglegs). Cetus (waterfalls) + Derelict (walls) are handled LAST + minimally.
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays

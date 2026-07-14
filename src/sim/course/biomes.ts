@@ -636,7 +636,7 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 0.4, // the odd silt bank (a bog has little sand)
     waterCreek: true, // signature: an acid channel crosses the fairway (forced carry)
     deepRough: 'deeprough', // a boggy reed/bramble tangle chokes a cut corner (non-penalty hack-out)
-    ponds: 1.7, // bog pools flank the landing zones — an offline miss is in the acid
+    ponds: 2.0, // acid bog pools thread + pinch the landing zones — an offline miss is in the acid
     fescue: 1.3, // dense reeds line the deep rough
     fairwayBreaks: 0.5, // the odd muddy silt flat cuts the fairway
     potBunkers: 0.2,
@@ -645,6 +645,16 @@ export const BIOMES: readonly Biome[] = [
     greenIrregular: 1.35,
     greenSlopeMax: 0.35, // waterlogged and flat — low tilt
     roughBreaks: 0.7,
+    // IDENTITY (GS-biome-variety): the WATER-SERPENT's swamp — the TWISTIEST world, all winding COILS.
+    // Leans hardest on the S-curve DOUBLE + severe HAIRPIN (the serpent's writhing body) plus doglegs,
+    // almost no straights, threaded down CLAUSTROPHOBIC chute/neck/thin corridors between the dead
+    // mangroves with acid pools pinching every landing zone. The heavy, humid air keeps holes SHORT so
+    // difficulty is the tight winding line over the acid, never length. (Distinct from the jungle: the
+    // jungle bends in doglegs; the mire COILS in S-curves + hairpins, and the acid water is everywhere.)
+    // Par-4 dominant with short bog par-3s; few par-5s (heavy air can't stretch a long hole).
+    parMix: { p3: 0.28, p4: 0.58, p5: 0.14 },
+    shapeWeights: { straight: 0.14, dogleg: 0.32, cape: 0.12, double: 0.28, hairpin: 0.14 },
+    widthWeights: { classic: 0.16, chute: 0.22, neck: 0.2, hourglass: 0.1, wander: 0.08, thin: 0.16, broad: 0.08 },
   },
   {
     // Scrap Belt (Antlia) — the lowest NON-abyss gravity: big bombs + tumbling-debris carry jitter, in
