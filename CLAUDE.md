@@ -150,9 +150,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     toxic-mire (the Water-Serpent's swamp — the TWISTIEST world, S-curve `double`/`hairpin` coils down
     claustrophobic chute/neck/thin corridors between dead mangroves, acid pools everywhere; distinct from
     the jungle's doglegs), scrap-belt (low-grav bomber's junkyard — WIDE broad/wander bombs pocked by dense
-    CRATER fields + `roughFill` scrap-plate flats + hourglass crater-pinches + barranca CAPE carries). Cetus
-    (waterfalls) + Derelict (walls) are handled LAST + minimally. (This PR also UNFROZE the flagship
-    `metal-18` static course — see the static-courses bullet — so no 18-hole course is a frozen exception.)
+    CRATER fields + `roughFill` scrap-plate flats + hourglass crater-pinches + barranca CAPE carries),
+    ice-ring (exposed frosted links — enhanced with `roughFill` fescue on the wind-scoured shelves + more
+    frozen `ponds`/pot bunkers; its heavy green vector MODERATED 1.35/1.4/0.6 → 1.15/1.2/0.4 so difficulty
+    leans on wind+hazards not putting). Cetus (waterfalls) + Derelict (walls) are handled LAST + minimally.
+    (The scrap-belt PR also UNFROZE the flagship `metal-18` static course — see the static-courses bullet —
+    so no 18-hole course is a frozen exception.)
   - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
     `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
     with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays

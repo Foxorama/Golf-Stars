@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 34; // GS-biome-variety: Scrap Belt low-grav-bomber identity (crater-field hourglass pinches + barranca cape carries + scrap-plate roughFill)
+export const GENERATOR_VERSION = 35; // GS-biome-variety: Ice Ring exposed-links rough/hazard enhancement (fescue shelf roughFill + more pots/ponds; moderated green vector)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
