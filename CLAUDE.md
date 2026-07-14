@@ -452,6 +452,21 @@ these systems** — each bullet is the tip of a documented iceberg.
     hole byte-identical; only non-penalty approach bunkers ADDED). `GENERATOR_VERSION` 38. Part of the
     hazard-DISTRIBUTION follow-up to GS-biome-variety (the sibling green-END-variety + in-fairway-water/
     split-fairway passes are next).
+  - IN-FAIRWAY WATER + SPLIT FAIRWAYS (GS-fairway-water): penalty water only ever FLANKED the corridor
+    (`clearsPlayCorridor`), so "no lakes on/interrupting fairways and no split fairways". This pass bites
+    INTO the corridor at a WIDE landing zone while keeping the CENTRELINE (the safe line AND the auto-AI's
+    aim) DRY — so it's fair by construction (a middle shot is always clean) and the auto-AI is UNCHANGED:
+    a CAPE (a lake eats ONE side; carry the corner or bail to the dry lane) or a SPLIT (an off-centre
+    hazard STRIP + a parallel ALTERNATE fairway lane — main route down the dry centre, shortcut lane past
+    the hazard). WATER on water worlds is marked `sanctioned` (exempt from `validateFairness`'s flank rule,
+    the greenside-ring pattern) and proven fair by the new `validateInFairwayWater` (the centre route stays
+    penalty-free through the fairway BODY, `t 0.1–0.82`, so it never coincides with the near-green ring);
+    dry worlds get a NON-penalty rough/bunker bite (needs no sanction). Par 4/5, non-lost, wildness-gated
+    (`FW_WATER_MIN_WILDNESS` 0.32), ONE per hole, skipped when a crossing already interrupts the hole.
+    Drawn on a DEDICATED side stream (`${seed}:fwwater:`) → perturbs ZERO main draws (terrain/hazards/
+    greens byte-identical; only this feature ADDED). The STRUCTURAL fairness contract is NOT relaxed —
+    `generateCourse` throws (via `validateInFairwayWater`) on any bite that reaches the centre.
+    `GENERATOR_VERSION` 40. Last of the hazard-distribution follow-ups to GS-biome-variety.
   - OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
     shrink it casually).
   - All new generator draws gate on their feature being armed (contract 1); current
