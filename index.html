@@ -444,6 +444,12 @@
         touch-action: none;
       }
       .gs-startour__chart { display: block; }
+      /* The SPACEPORT is a tappable "leave to Clubhouse" station (GS-star-tour-port) — a soft hover glow so
+         it reads as an interactive dock, not just a landmark. */
+      .gs-st-port { transition: filter .16s ease; }
+      .gs-st-port:hover { filter: brightness(1.18) drop-shadow(0 0 10px rgba(57,217,196,0.65)); }
+      .gs-st-port__halo { transition: opacity .3s ease; }
+      .gs-st-port:hover .gs-st-port__halo { opacity: 0.6; }
       /* Engine plume — hidden on a docked/idle ship, faded in by the rAF loop while cruising. */
       .gs-st-thrust { opacity: 0; transition: opacity .18s ease-out; }
       #gs-st-ship.gs-st-thrusting .gs-st-thrust { opacity: 1; }

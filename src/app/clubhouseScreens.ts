@@ -54,7 +54,10 @@ export function clubhouseHallScreen(): string {
       <p style="opacity:.75;font-size:13px;margin:.3em 0;">Your golfers are unwinding by the fire, their rides parked at the spaceport below. Tap a golfer or their ship to outfit them — their own ride, their own look head to toe. Buy gear at the <b>Trade Market</b>.</p>
     </header>
     <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender, state.marmotTips, state.ownedApparel.includes('thors-hammer'))}</div>
-    <div style="text-align:center;">${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}</div>`;
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      ${btn('🚀 Depart to Star Tour', { type: 'openStarTour' }, { variant: 'primary' })}
+      ${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}
+    </div>`;
 }
 
 /** A hangar-bay backdrop for the Clubhouse garage tile (GS-clubhouse-stage): a launch pad under an open
