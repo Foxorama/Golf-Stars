@@ -298,7 +298,8 @@ function dispatch(action: Action): void {
       starTourView.flyingTo = null;
       starTourView.dockingAtPort = false;
       // Open slightly more zoomed OUT than the intrinsic 1× (GS-star-tour-map-improvements) so more of the
-      // sky is in frame on arrival; the cover-zoom clamp still raises it if a tall viewport would letterbox.
+      // sky is in frame on arrival; the fit clamp only pulls it in if a viewport is so small the whole
+      // chart wouldn't fit even here (GS-star-map-zoom-out).
       starTourView.zoom = ST_OPEN_ZOOM;
       // Fresh tank, normal throttle, no tanker in progress (GS-star-tour-fuel).
       starTourView.fuel = STAR_TOUR_FUEL_CAP;
@@ -1253,32 +1254,37 @@ let selClubSetTouched = false;
 // click that ends the drag doesn't accidentally select the world it lands on. Reset on each pointerdown.
 let starTourDragged = false;
 
-/** Star Tour chart zoom bounds (pinch / scroll). The MIN is dynamic (`starTourCoverZoom`) — a static
- *  floor let a pinch-out shrink the chart smaller than the viewport, so the SVG sat at the top-left and
- *  the viewport's black background showed around it (the "zoomed but left a heap of black space" bug). */
+/** Star Tour chart zoom bounds (pinch / scroll). The MIN is dynamic (`starTourFitZoom`) so the player can
+ *  pull ALL the way back to see the whole wide map — essential on a tall portrait phone where the old
+ *  COVER floor (`max(w/CHART_W, h/CHART_H)`) forced a heavy zoom-in just to cover the viewport height and
+ *  made zoom-out nearly impossible (GS-star-map-zoom-out). Below the fit floor the chart is centred
+ *  (letterboxed) by CSS `margin:auto`, so there's no more top-left black-corner bug to guard against. */
 const ST_ZOOM_MAX = 2.6;
 
-/** The smallest zoom at which the chart still COVERS the viewport in BOTH axes: below this the rendered
- *  SVG (`CHART_W×CHART_H × zoom` px) is smaller than the viewport and bare space shows around it. A
- *  covering zoom must clear the width ratio AND the height ratio, so the floor is the LARGER of the two.
- *  Guards against a zero-sized viewport (pre-layout) by falling back to 0 so the caller's own max wins. */
-function starTourCoverZoom(vp: HTMLElement): number {
+/** The smallest zoom at which the WHOLE chart still FITS inside the viewport (SVG = `CHART_W×CHART_H ×
+ *  zoom` px): the entire map is visible, letterboxed on the axis it doesn't fill. Fitting both axes means
+ *  clearing the SMALLER ratio, so the floor is the lesser of width/height fit. Guards a zero-sized
+ *  viewport (pre-layout) by falling back to 0 so the caller's own bounds win. */
+function starTourFitZoom(vp: HTMLElement): number {
   const w = vp.clientWidth;
   const h = vp.clientHeight;
   if (w <= 0 || h <= 0) return 0;
-  return Math.max(w / CHART_W, h / CHART_H);
+  return Math.min(w / CHART_W, h / CHART_H);
 }
 
-/** Force the chart's rendered size to at least cover the viewport (used on mount + resize): if the
- *  current zoom letterboxes, bump it to the cover floor and resize the SVG in place. */
-function clampStarTourZoomToCover(vp: HTMLElement): void {
+/** Keep the chart's rendered size within the fit floor / max ceiling (used on mount + resize): if the
+ *  current zoom is below the fit floor (whole chart no longer fits) or above the max, clamp it and resize
+ *  the SVG in place. Never forces a zoom-IN — the default open zoom (`ST_OPEN_ZOOM`) sits above fit. */
+function clampStarTourZoom(vp: HTMLElement): void {
   const chart = vp.querySelector<SVGElement>('.gs-startour__chart');
-  const zMin = starTourCoverZoom(vp);
-  if (!chart || zMin <= 0) return;
-  if ((starTourView.zoom || 1) < zMin) {
-    starTourView.zoom = zMin;
-    chart.setAttribute('width', (CHART_W * zMin).toFixed(0));
-    chart.setAttribute('height', (CHART_H * zMin).toFixed(0));
+  const zFit = starTourFitZoom(vp);
+  if (!chart || zFit <= 0) return;
+  const zMax = Math.max(ST_ZOOM_MAX, zFit);
+  const z = Math.max(zFit, Math.min(zMax, starTourView.zoom || 1));
+  if (z !== (starTourView.zoom || 1)) {
+    starTourView.zoom = z;
+    chart.setAttribute('width', (CHART_W * z).toFixed(0));
+    chart.setAttribute('height', (CHART_H * z).toFixed(0));
   }
 }
 
@@ -1297,10 +1303,10 @@ function wireStarTourGestures(vp: HTMLElement): void {
   vp.style.cursor = 'grab';
 
   const setZoom = (z: number, focalClientX: number, focalClientY: number): void => {
-    // Floor at the cover zoom so a pinch-out never shrinks the chart smaller than the viewport (which
-    // would letterbox it in black). Keep the ceiling above the floor for tall/narrow viewports where
-    // the cover fit itself exceeds ST_ZOOM_MAX.
-    const zMin = starTourCoverZoom(vp);
+    // Floor at the FIT zoom so a pinch-out can pull all the way back to the whole map (letterboxed +
+    // centred by CSS below fit) but never smaller than that — no point zooming past "everything visible".
+    // Keep the ceiling above the floor for the degenerate case where the fit itself exceeds ST_ZOOM_MAX.
+    const zMin = starTourFitZoom(vp);
     const zMax = Math.max(ST_ZOOM_MAX, zMin);
     z = Math.max(zMin, Math.min(zMax, z));
     const oldZoom = starTourView.zoom || 1;
@@ -1881,9 +1887,9 @@ function render(): void {
     if (vp) {
       if (!starTourView.centred) {
         requestAnimationFrame(() => {
-          // Never open (or re-open) below the cover zoom — a tall/narrow viewport at the intrinsic 1×
-          // would already letterbox the chart.
-          clampStarTourZoomToCover(vp);
+          // Keep the open zoom within the fit floor / max ceiling (only matters on a viewport too small
+          // to fit the whole chart even at ST_OPEN_ZOOM).
+          clampStarTourZoom(vp);
           // Open the view on the clubhouse SPACEPORT — the ship's home dock (GS-star-tour-2). Scroll is
           // rendered px = chart-coord × zoom.
           const z = starTourView.zoom || 1;
@@ -1894,9 +1900,9 @@ function render(): void {
           starTourView.centred = true;
         });
       } else if (starTourView.scrollX != null && starTourView.scrollY != null) {
-        // Re-clamp on every re-render: an orientation change / resize can lift the cover floor above the
-        // held zoom, which would reintroduce the black margin until the next pinch.
-        clampStarTourZoomToCover(vp);
+        // Re-clamp on every re-render: an orientation change / resize can lift the fit floor above the
+        // held zoom, so a whole-map view stays valid rather than shrinking below "everything visible".
+        clampStarTourZoom(vp);
         // Restore the preserved scroll — the viewport is a fresh node each render, so the browser
         // scroll is otherwise lost and the chart snaps to its top-left corner.
         vp.scrollLeft = starTourView.scrollX;
