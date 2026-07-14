@@ -222,10 +222,13 @@ export const BIOMES: readonly Biome[] = [
     fairwayBreaks: 0.9, // the odd sandy waste break across the fairway
     potBunkers: 1.2, // links-style pot bunkers pinch the landing zones + ring the greens
     fescue: 1.0, // wispy native fescue lines the deep rough
-    greenSize: 1.05, // classic parkland greens — gently rolling, moderate variety
+    greenSize: 1.25, // GS-green-diversity: LARGE rolling parkland greens (bigger = longer putts = harder)
     greenAspect: 1.9,
     greenIrregular: 1.1,
-    greenSlopeMax: 0.45, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.55, // rolling parkland break (GS-green-diversity: 0.45 → 0.55)
+    // GS-green-diversity: big rolling greens with real break — you'll often be ON the green but a long
+    // two-putt away across a roll. The parkland's putting test is SIZE + gentle contour, not a trick tilt.
+    difficulty: { greenTilt: 1.15, greenComplexity: 1.25, pinTuck: 0.35 },
     roughBreaks: 0.9, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-variety): STRATEGIC PARKLAND — the position-golf home world. Real DOGLEGS
     // bending around tree corners + water (not one wandering snake), and tree-lined CHUTES that neck
@@ -258,10 +261,12 @@ export const BIOMES: readonly Biome[] = [
     fescue: 0.8, // dune-grass fescue chokes the deep waste
     barranca: true, // signature: a dry barranca/ravine crosses the fairway (forced carry)
     roughFill: 'waste', // GS-biome-variety: dune-scrub WASTE mounds fill the treeless rough so an offline drive lands in a broken dune field, not bare sand
-    greenSize: 1.3, // big, smooth oasis greens against the dunes
+    greenSize: 1.5, // GS-green-diversity: HUGE smooth oasis greens — the poster child for "big = hard putt"
     greenAspect: 1.7,
-    greenIrregular: 0.85,
-    greenSlopeMax: 0.32, // GS-greens-3 green tilt character
+    greenIrregular: 0.85, // smooth (kept low → the desert green is big + gentle, never a trick surface)
+    greenSlopeMax: 0.42, // gentle desert tilt (GS-green-diversity: 0.32 → 0.42). NO `difficulty` vector — the
+    // desert stays the SMOOTH big-green world: its putting difficulty is pure SIZE (you can be 60 ft away
+    // on a giant flat green), never a treacherous ramp. (It is also the biome-difficulty test's smooth ref.)
     roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-profile): a LONG, OPEN, HEROIC desert — more par-5s, straight/cape lines you
     // bomb across the dunes, and generous broad/wandering fairways. Difficulty is length + wind + a
@@ -292,10 +297,10 @@ export const BIOMES: readonly Biome[] = [
     potBunkers: 1.0, // frozen-faced pot bunkers pinch the shelf landing zones + ring the ice greens
     fescue: 0.5, // frosted tussock grass in the deep rough
     roughFill: 'fescue', // GS-biome-variety: wind-scoured FESCUE / frozen marram fills the exposed shelf rough (recoverable — the wind + ice are the teeth)
-    greenSize: 1.0, // long, narrow ice-shelf greens — a tester to hold
+    greenSize: 1.2, // GS-green-diversity: bigger LONG ice-shelf greens — a long, steep, breaking two-putt
     greenAspect: 2.6,
     greenIrregular: 1.0,
-    greenSlopeMax: 0.7, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.7, // GS-greens-3 green tilt character (the steepest world)
     roughBreaks: 0.6, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-profile / GS-biome-variety): an EXPOSED LINKS on the ice — more short par-3s
     // (wind-shot holes), sweeping S-curves the gale pushes, and wandering wind-scoured shelf fairways
@@ -304,11 +309,11 @@ export const BIOMES: readonly Biome[] = [
     parMix: { p3: 0.32, p4: 0.5, p5: 0.18 },
     shapeWeights: { straight: 0.24, dogleg: 0.22, cape: 0.12, double: 0.3, hairpin: 0.12 },
     widthWeights: { classic: 0.16, chute: 0.08, neck: 0.1, hourglass: 0.16, wander: 0.24, thin: 0.18, broad: 0.08 },
-    // GS-biome-difficulty: the ice SHELVES stay a distinct test — deep stops turn treacherous underfoot
-    // (steeper tilt, double-breaking contours, pins tucked on the shelves). MODERATED (GS-biome-variety:
-    // 1.35/1.4/0.6 → 1.15/1.2/0.4) so difficulty leans on the wind + hazards above, not putting-punishment
-    // — still clearly the treacherous-green world (well above the smooth desert), just less extreme.
-    difficulty: { greenTilt: 1.15, greenComplexity: 1.2, pinTuck: 0.4 },
+    // GS-biome-difficulty / GS-green-diversity: the ice SHELVES are the game's treacherous-green test —
+    // long, steep, double-breaking, pins tucked on the shelf. RESTORED to strong after a brief moderation
+    // (bigger greens are the wanted putting-difficulty lever, not a bug): 1.35/1.35/0.55, the steepest
+    // reads in the game.
+    difficulty: { greenTilt: 1.35, greenComplexity: 1.35, pinTuck: 0.55 },
   },
   {
     id: 'ember-world',
@@ -329,10 +334,10 @@ export const BIOMES: readonly Biome[] = [
     deepRough: 'deeprough', // deep cinder-ash brush chokes a cut corner
     fairwayBreaks: 0.6, // scorched waste cuts across the fairway
     potBunkers: 0.6, // cinder pots pinch the landing zones + ring the greens
-    greenSize: 0.95, // jagged, broken basalt greens
+    greenSize: 1.15, // GS-green-diversity: bigger JAGGED broken-basalt greens (was small 0.95)
     greenAspect: 2.0,
-    greenIrregular: 1.45,
-    greenSlopeMax: 0.6, // GS-greens-3 green tilt character
+    greenIrregular: 1.45, // jagged, kidney-bitten — the wildest silhouettes in the game
+    greenSlopeMax: 0.68, // steep broken basalt (GS-green-diversity: 0.6 → 0.68)
     roughBreaks: 0.3, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-variety): a TIGHT, DANGEROUS inferno — the molten rivers are the signature, so
     // holes bend around the lava (doglegs + heroic CAPE carries + severe HAIRPINS over the flow), and the
@@ -342,10 +347,9 @@ export const BIOMES: readonly Biome[] = [
     parMix: { p3: 0.28, p4: 0.56, p5: 0.16 },
     shapeWeights: { straight: 0.16, dogleg: 0.3, cape: 0.24, double: 0.16, hairpin: 0.14 },
     widthWeights: { classic: 0.16, chute: 0.2, neck: 0.2, hourglass: 0.14, wander: 0.06, thin: 0.16, broad: 0.08 },
-    // GS-biome-difficulty: jagged broken basalt greens get wilder with depth (double-breaking contours,
-    // pins tucked in the lava-rock folds) — the approach + putt is a SECONDARY danger, on top of the
-    // hazard layouts above (not the primary difficulty lever).
-    difficulty: { greenComplexity: 1.35, greenTilt: 1.2, pinTuck: 0.5 },
+    // GS-biome-difficulty / GS-green-diversity: big jagged broken-basalt greens that double-break hard
+    // with depth, pins tucked in the lava-rock folds — a treacherous putt to pair with the lava carries.
+    difficulty: { greenComplexity: 1.4, greenTilt: 1.25, pinTuck: 0.5 },
   },
   {
     id: 'void-garden',
@@ -389,10 +393,10 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 1.3, // GS-biome-variety: forests of crystalline SPIRES wall the fairways (the world's namesake — was a bare 0.3)
     fairwayBunkers: 1.0,
     potBunkers: 0.7, // pot bunkers pinch the precision landing zones
-    greenSize: 0.95, // sharp, faceted greens
+    greenSize: 1.15, // GS-green-diversity: bigger SHARP faceted greens (was small 0.95)
     greenAspect: 1.9,
     greenIrregular: 1.4,
-    greenSlopeMax: 0.55, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.62, // faceted, fast (GS-green-diversity: 0.55 → 0.62)
     roughBreaks: 0.5, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-variety): a PRECISION world of ANGULAR spires — sharp diagonal CAPE lines +
     // doglegs + severe HAIRPINS cutting between the crystal stacks (not a wandering snake), threaded down
@@ -402,9 +406,9 @@ export const BIOMES: readonly Biome[] = [
     parMix: { p3: 0.28, p4: 0.54, p5: 0.18 },
     shapeWeights: { straight: 0.18, dogleg: 0.3, cape: 0.24, double: 0.14, hairpin: 0.14 },
     widthWeights: { classic: 0.18, chute: 0.2, neck: 0.18, hourglass: 0.16, wander: 0.06, thin: 0.14, broad: 0.08 },
-    // GS-biome-difficulty: a tucked pin on a fast faceted green you must flag — a SECONDARY danger on top
-    // of the angular hazard lines above, not the primary lever.
-    difficulty: { pinTuck: 0.8, greenComplexity: 1.2 },
+    // GS-biome-difficulty / GS-green-diversity: a HEAVILY tucked pin on a fast, faceted, tiered green you
+    // must flag precisely — the heaviest pin-tuck in the game, paired now with a bigger surface + break.
+    difficulty: { pinTuck: 0.8, greenComplexity: 1.3, greenTilt: 1.2 },
   },
   {
     id: 'tempest-reach',
@@ -425,10 +429,13 @@ export const BIOMES: readonly Biome[] = [
     potBunkers: 1.2, // signature: FIELDS of deep links pot bunkers guard the wide targets (the classic links defence)
     ponds: 1.6, // signature: big storm lakes flank the corridors — the gale pushes an offline shot into the water
     roughFill: 'fescue', // GS-biome-variety: wispy storm-moor FESCUE fills the exposed rough (recoverable, not brutal — the wind is the teeth)
-    greenSize: 1.05,
-    greenAspect: 2.2, // long, storm-scoured shelves
+    greenSize: 1.25, // GS-green-diversity: big, long storm-scoured shelf greens
+    greenAspect: 2.3, // long, storm-scoured shelves
     greenIrregular: 1.1,
-    greenSlopeMax: 0.5, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.6, // wind-scoured tilt (GS-green-diversity: 0.5 → 0.6)
+    // GS-green-diversity: long wind-scoured shelf greens that break hard — a big surface, a long two-putt,
+    // and the gale keeps blowing on the green. Pairs with the flanking-water hazards, not a trick tilt.
+    difficulty: { greenTilt: 1.25, greenComplexity: 1.25 },
     roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-variety): an EXPOSED WIND-LINKS on the gas giant — WIDE, sweeping fairways
     // (broad/wander) with the odd hourglass driving-zone pinch, but the WIND is the defence: it pushes an
@@ -457,10 +464,13 @@ export const BIOMES: readonly Biome[] = [
     fairwayBunkers: 0.9,
     fescue: 1.2, // glowing undergrowth chokes the deep rough
     waterCreek: true, // jungle streams cross the fairway
-    greenSize: 1.0,
+    greenSize: 1.2, // GS-green-diversity: bigger SOFT undulating jungle greens
     greenAspect: 1.8,
     greenIrregular: 1.2,
-    greenSlopeMax: 0.45, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.55, // soft rolling undulation (GS-green-diversity: 0.45 → 0.55)
+    // GS-green-diversity: big soft undulating greens that double-break — after threading the tight jungle,
+    // the putt is a long roll across the humps.
+    difficulty: { greenComplexity: 1.3 },
     roughBreaks: 1.0, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-profile): a TIGHT, TWISTY, TECHNICAL jungle — mostly par-4s (no room for long
     // bombers), winding doglegs + S-curves through the mushroom stands, and narrow chute/neck/thin
@@ -491,10 +501,13 @@ export const BIOMES: readonly Biome[] = [
     deepRough: 'water',
     ponds: 2.0, // lagoons thread the corridors — an offline shot is wet
     roughFill: 'waste', // GS-biome-variety: sandy BEACH / coral flats fill the tropical shore rough (a firm, playable lie — the water is the teeth)
-    greenSize: 1.0,
-    greenAspect: 1.7,
+    greenSize: 1.25, // GS-green-diversity: BIG organic tide-pool greens ringed by water — a long putt with the sea right there
+    greenAspect: 1.75,
     greenIrregular: 1.0,
-    greenSlopeMax: 0.4, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.5, // tide-pool roll (GS-green-diversity: 0.4 → 0.5)
+    // GS-green-diversity: big organic greens ringed by lagoon — the size makes the two-putt long, and a
+    // bold putt that runs off the back is wet. Difficulty is the size + the water, not a trick tilt.
+    difficulty: { greenComplexity: 1.2 },
     roughBreaks: 0.8, // GS-variety-2 broken-fairway frequency
     // IDENTITY (GS-biome-variety): a HEROIC WATER-CARRY archipelago — the CAPE is the star (a diagonal
     // "bite off as much as you dare" carry over open sea, green tucked inside), plus doglegs bending
@@ -532,10 +545,13 @@ export const BIOMES: readonly Biome[] = [
     ponds: 0.8, // the odd celestial pool flanks the corridor (low density, clear of the route)
     potBunkers: 0.3,
     fescue: 0.6, // golden native grass lines the deep rough
-    greenSize: 1.1, // grand, true greens
-    greenAspect: 1.8,
+    greenSize: 1.3, // GS-green-diversity: GRAND, true greens (bigger — a long, fair two-putt on a reward world)
+    greenAspect: 1.85,
     greenIrregular: 1.0,
-    greenSlopeMax: 0.4, // GS-greens-3 green tilt character
+    greenSlopeMax: 0.5, // grand, gentle rolls (GS-green-diversity: 0.4 → 0.5)
+    // GS-green-diversity: big, grand, TRUE greens — the reward world's putting test is the vast fair
+    // surface (a long lag), never a treacherous ramp.
+    difficulty: { greenComplexity: 1.15 },
     roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
   },
   {
@@ -570,10 +586,10 @@ export const BIOMES: readonly Biome[] = [
     waterCreek: true, // signature: the Swilcan Burn crosses the fairway (a forced carry)
     deepRough: 'deeprough', // thick whin/gorse chokes the inside of a cut corner (a hack-out, non-penalty)
     fairwayBreaks: 0.6, // whin-covered humps + sandy waste breaks split the odd fairway
-    greenSize: 1.35, // signature: ENORMOUS shared double greens — vast putting surfaces
+    greenSize: 1.5, // signature: ENORMOUS shared double greens — vast putting surfaces (GS-green-diversity: 1.35 → 1.5, the biggest in the game)
     greenAspect: 2.0, // long, sweeping double-green shelves
     greenIrregular: 1.15, // humps, hollows, the Valley of Sin — characterful, never circular
-    greenSlopeMax: 0.5, // undulating links greens — a real test of the read
+    greenSlopeMax: 0.55, // undulating links greens — a real test of the read (GS-green-diversity: 0.5 → 0.55)
     roughBreaks: 0.5,
     // IDENTITY (GS-biome-profile): classic LINKS — a par-4-dominated out-and-back rhythm, mostly STRAIGHT
     // holes with the odd cape/dogleg, and generous BROAD/wandering fairways. The wind + pots + greens are
@@ -584,9 +600,10 @@ export const BIOMES: readonly Biome[] = [
     parMix: { p3: 0.18, p4: 0.64, p5: 0.18 },
     shapeWeights: { straight: 0.5, dogleg: 0.2, cape: 0.14, double: 0.1, hairpin: 0.06 },
     widthWeights: { classic: 0.2, chute: 0.05, neck: 0.06, hourglass: 0.09, wander: 0.2, thin: 0.05, broad: 0.35 },
-    // GS-biome-difficulty: the huge undulating greens are the world's late test — deep pins tuck into the
-    // hollows/shelves and the contours double-break, rather than the hole just getting longer.
-    difficulty: { greenComplexity: 1.2, greenTilt: 1.1, pinTuck: 0.4 },
+    // GS-biome-difficulty / GS-green-diversity: the ENORMOUS undulating double greens are the Old Course's
+    // signature test — a 100-ft putt across the Valley of Sin, deep pins tucked in the hollows/shelves,
+    // contours double-breaking. The largest greens in the game; putting IS the defence here.
+    difficulty: { greenComplexity: 1.25, greenTilt: 1.15, pinTuck: 0.45 },
   },
   {
     // GS-cetus: the Whale constellation's clifftop star-ocean. Plays the void's proven-fair island/
@@ -644,10 +661,13 @@ export const BIOMES: readonly Biome[] = [
     fescue: 1.3, // dense reeds line the deep rough
     fairwayBreaks: 0.5, // the odd muddy silt flat cuts the fairway
     potBunkers: 0.2,
-    greenSize: 1.0, // soft, blobby waterlogged greens
+    greenSize: 1.25, // GS-green-diversity: BIG soft, blobby waterlogged greens (kidney-bitten silhouettes)
     greenAspect: 1.7,
     greenIrregular: 1.35,
-    greenSlopeMax: 0.35, // waterlogged and flat — low tilt
+    greenSlopeMax: 0.48, // soft waterlogged roll (GS-green-diversity: 0.35 → 0.48 — gentle but no longer flat)
+    // GS-green-diversity: big soft waterlogged greens with slow, sweeping breaks — a long lag across the
+    // bog after coiling through the mangroves; acid pools right off the edge.
+    difficulty: { greenComplexity: 1.25 },
     roughBreaks: 0.7,
     // IDENTITY (GS-biome-variety): the WATER-SERPENT's swamp — the TWISTIEST world, all winding COILS.
     // Leans hardest on the S-curve DOUBLE + severe HAIRPIN (the serpent's writhing body) plus doglegs,
@@ -689,10 +709,13 @@ export const BIOMES: readonly Biome[] = [
     fescue: 0.4, // wiry scrap-weed in the deep rough
     potBunkers: 0.5,
     roughFill: 'waste', // GS-biome-variety: riveted scrap-PLATE flats fill the junkyard rough so an offline bomb lands in the debris field, not bare metal
-    greenSize: 0.95, // small, angular plate-metal greens
+    greenSize: 1.15, // GS-green-diversity: bigger ANGULAR plate-metal greens (was small 0.95)
     greenAspect: 1.9,
     greenIrregular: 1.35,
-    greenSlopeMax: 0.5,
+    greenSlopeMax: 0.6, // tilted, buckled plate (GS-green-diversity: 0.5 → 0.6)
+    // GS-green-diversity: big angular plate-metal greens that tilt + buckle — the ball rolls hard off a
+    // canted steel deck, a long breaking putt after bombing the crater field.
+    difficulty: { greenTilt: 1.25, greenComplexity: 1.2 },
     roughBreaks: 0.4,
     // IDENTITY (GS-biome-variety): a LOW-GRAV BOMBER's junkyard — the lowest playable gravity, so every
     // hole BOMBS long (more par-5s). WIDE broad/wander fairways you launch down, but pocked by dense
