@@ -963,20 +963,25 @@ these systems** — each bullet is the tip of a documented iceberg.
     the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard), never the
     ghost competitor leaderboard. The Daily button is parked off the title for now. DESTINATION ICONS
     (GS-star-tour-destinations, `render/starTourMap.ts`) — the star map is a DIFFERENT interface from the
-    journey map: a course is the PLACE it's named for, not a biome skin, so the icon is drawn per
-    DESTINATION, not shared across every course of an archetype. Two levers: (1) a per-destination PALETTE
-    (`worldLook`, a bounded HSL hue/sat/light shift seeded off `themeId`) so two same-biome courses (both
-    void, both verdant, …) never share a colour — Pegasus Rift and Sagittarius Core diverge; (2) a
-    celestial KIND (`celestialKind`, inferred from name + archetype) drives the SHAPE: a `galaxy` (spiral
-    disc + arms + black-hole heart, for a "Core"/nucleus), a `rift` (dark lens torn by a jagged luminous
-    crack + debris sparks, for void/"Rift"/"Abyss"), a `wreck` (broken starship hull — nose + drifted tail,
-    engine bell, dead/flickering windows, antenna, debris, nebula haze — for a derelict/"Wreck"/"Ship"), or
-    a `planet` (the richly-drawn disc: atmosphere halo, seeded surface by `SURFACE_FAMILY`, optional Saturn
-    RING + 0–2 MOONS, lit rim, archetype emoji emblem — for everything else). Tier shows as a soft coloured
-    aura for every kind + a crisp ring for planets only (the freer shapes skip it to stay legible).
-    Everything past the palette is `mulberry32`-seeded off the world id (per-world circular clip ids via
-    `idSafe`). A new evocative course name picks up the right shape with no data plumbing. Pure + byte-stable
-    (the map has its OWN seeded stream, not the sim rng). Eyeball via `scripts/startour-preview.mjs`.
+    journey map: a course is the PLACE it's named for, not a biome skin, so EVERY destination is its own
+    luminous celestial object that EMITS into the star field (no hard tier ring, no dark halo bubble, no
+    emoji sticker — those made each icon read as a token pasted on black; `softGlow` concentric-ring bloom
+    replaces them so bodies blend in). Two levers: (1) a per-destination PALETTE (`worldLook`, a bounded
+    HSL hue/sat/light shift seeded off `themeId`) so two same-biome courses never share a colour; (2) a
+    celestial KIND — a hand-authored `DESTINATION_KIND[themeId]` map (fallback = `celestialKind` inference
+    off name+archetype, so a new evocative row still picks up a fitting shape) drives the SHAPE, one bespoke
+    renderer each: `galaxy` (spiral arms + black-hole heart — a "Core"), `rift` (an elongated dark SLIT torn
+    by a jagged luminous crack + sparks — a void/"Rift"), `wreck` (broken starship hull: nose + drifted tail,
+    engine bell, dead/flickering windows, antenna, debris, ghost-nebula haze — a derelict/"Wreck"/"Ship"),
+    `nebula` (soft gas blobs + an embedded twinkling star cluster — a "Meadows"/"Hollows"), `star` (corona +
+    diffraction cross + prominences + hot core — a "Forge"/"Sting"; palette makes a blue-white forge-star vs
+    a red giant diverge), `crystal` (faceted glowing shards radiating from a gem — a "Prism"/"Wedge"), `storm`
+    (a cyclone spiral into a dark eye — a "Gale"/tempest), `binary` (twin worlds on an orbital tether — the
+    "Twins"), `ringworld` (a lit planet with a `ringStyleFor` ring — ice/ocean band or a metal DEBRIS belt),
+    or `planet` (a lit world: seeded surface by `SURFACE_FAMILY`, atmosphere glow, terminator+rim). Tier is a
+    small luminous BEACON dot (top-left), not a ring. Everything past the palette is `mulberry32`-seeded off
+    the world id (per-world clip ids via `idSafe`). Pure + byte-stable (the map has its OWN seeded stream, not
+    the sim rng). Eyeball via `scripts/startour-preview.mjs`.
   - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
     `src/app/` module over growing it, and re-read the relevant span before editing.**
 - **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;
