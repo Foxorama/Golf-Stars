@@ -63,6 +63,9 @@ const SHIP_HUD: Record<string, Partial<HudTheme>> = {
   'comet-rider': { variant: 'comet', accent: '#bfe3ff', accent2: '#3f6a8a', glow: 'rgba(150,210,255,0.28)', ink: '#eaf6ff' },
   // The Thunderbolt (mythic chopper) — a hot-rod bridge wreathed in flame + forked lightning.
   'chopper-thunderbolt': { variant: 'chopper', accent: '#ff7a1a', accent2: '#7a3410', glow: 'rgba(255,120,30,0.30)', ink: '#ffd9b0' },
+  // The Firebird (GS-lore-parrot-firebird) — a black-and-gold muscle-car cockpit: it reuses the racer's
+  // redline carbon dash, recoloured to the Trans Am's phoenix gold on jet black (no new CSS/chrome).
+  firebird: { variant: 'racer', accent: '#f2b53a', accent2: '#3a2f10', glow: 'rgba(240,180,60,0.30)', ink: '#ffe9b0' },
 
   // The INFINITY ACE (GS-infinity-hud) — the hole-150 Unending grail, the reference bespoke reskin: a
   // living-aurora ring (gold→emerald→aquamarine→violet, the ship's own palette), a phoenix-wing canopy,

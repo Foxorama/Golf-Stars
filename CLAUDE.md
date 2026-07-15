@@ -808,6 +808,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     direction, dim italic). `LoreContext` (biome/archetype/caddyId/characterId/format/stopIndex/
     reputation) is deliberately broad — extend it for a beat that gates on more, and populate it in the
     gate. First row: `driver-dan-derelict` (`archetype === 'derelict' && caddyId === 'driver-dan'`).
+  - A beat can PAY OUT, not just speak (GS-lore-rewards): the optional `LoreEvent.effects` is applied
+    ONCE by `dismissLore` (still UI-only, zero sim rng) — `unlockShip` adds a secret ship to `ownedShips`
+    (the ace-ship pattern), `parrotForesight` arms the Prognostic Parrot's foresight at 100% for the
+    ARRIVED stop only. A new reward kind = a new `LoreEffects` field + one `dismissLore` branch. Second
+    row: `prognostic-parrot-derelict` (GS-lore-parrot-firebird — `derelict && caddyId ===
+    'prognostic-parrot'`): the parrot mourns his dead spirit-brother's wreck; dismiss grants the secret
+    MYTHIC **Firebird** ship (`ships.ts` `FIREBIRD_SHIP_ID`, a black Trans-Am cruiser with a golden
+    phoenix, `look.kind:'firebird'`) and 100% foresight here. The boon rides `run.parrotForesightStop`
+    (snapshotted; `foresightChance(run)` = 1 when it equals the live `stopIndex`, else the loadout chance
+    — so feature-off is byte-for-byte and it self-expires on travel), read by BOTH the headless
+    `playerHoleOpts` and the interactive proc (auto ≡ interactive). A caddy is one-at-a-time, so the two
+    derelict beats never collide.
   - One-off tracking is PERSISTED (`SeenLore = Record<string,true>`, save **v28** `seenLore`, mapped in
     BOTH `persist.ts` mappers): a beat fires exactly ONCE ever, across every run + mode, recorded on
     DISMISS. Save bump is purely additive (existing seeded runs byte-identical).

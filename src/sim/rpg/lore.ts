@@ -75,6 +75,24 @@ export interface LoreEvent {
   cta?: string;
   /** Accent colour hint (hex) — the banner glow / rule. Falls back to a neutral gold. */
   accent?: string;
+  /**
+   * One-off REWARDS a beat grants when it's DISMISSED (GS-lore-rewards) — a beat can pay out, not just
+   * speak. Applied ONCE (the beat is `once`, recorded in `seenLore`), by the reducer's `dismissLore`, so
+   * it stays UI/render-only (zero sim rng — determinism/auto≡interactive untouched). Absent ⇒ a pure
+   * dialogue beat, byte-for-byte the original. A new kind of reward is a new field here + one branch in
+   * `dismissLore`, never an engine edit.
+   */
+  effects?: LoreEffects;
+}
+
+/** The one-off payouts a lore beat grants on dismiss (GS-lore-rewards). All optional; each maps to a
+ *  single branch in the reducer's `dismissLore`. */
+export interface LoreEffects {
+  /** A cosmetic SHIP id added to the owned fleet (a secret grail, never sold — like the ace ship). */
+  unlockShip?: string;
+  /** Arm the Prognostic Parrot's FORESIGHT at 100% for the stop just arrived at (this stop only): the
+   *  pirate captain, true to his word ("I always see the trouble coming"), foresees EVERY swing here. */
+  parrotForesight?: boolean;
 }
 
 /**
@@ -110,6 +128,47 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       },
       { kind: 'action', text: 'Dan gives you a steady look.' },
       { kind: 'say', text: 'Do her proud, will you? Play your best out here.' },
+    ],
+  },
+  // GS-lore-parrot-firebird: the Prognostic Parrot recognises the wreck too — it was his spirit-brother's
+  // long-haul ship, and his own great guilt. Fires the first time a player arrives at the derelict with
+  // the Prognostic Parrot on the bag (any mode). A caddy is one-at-a-time, so this never collides with the
+  // Driver-Dan beat above. Dismissing it PAYS OUT (`effects`): the secret mythic Firebird ship, and the
+  // parrot's foresight at 100% for this haunted stop — "I always see the trouble coming."
+  {
+    id: 'prognostic-parrot-derelict',
+    trigger: (c) => c.archetype === 'derelict' && c.caddyId === 'prognostic-parrot',
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'The blocker returns',
+    title: 'One Last Job',
+    accent: '#f2b53a',
+    cta: 'I always see the trouble coming →',
+    effects: { unlockShip: 'firebird', parrotForesight: true },
+    lines: [
+      {
+        kind: 'say',
+        text: 'I should have been here! I was his blocker. I was the one trusted to run interference. I could always see the trouble coming, and that made me the best…',
+      },
+      { kind: 'action', text: 'The parrot pauses, staring off into the dark between the stars.' },
+      {
+        kind: 'say',
+        text: 'Karrina was right, though. My partner and our younglings came first — they were my priority, more important than one last job with my spirit-brother.',
+      },
+      { kind: 'action', text: "The parrot's shoulders, such as they are, slump." },
+      {
+        kind: 'say',
+        text: "And what happened? I blamed them for his death. It wasn't their fault at all — but because I couldn't handle the guilt of not being here, I tore our family apart…",
+      },
+      {
+        kind: 'say',
+        text: 'And now the best long-haul truck in the galaxy is a junky golf course, and the best long-haul trucker to ever live died for nothing…',
+      },
+      { kind: 'action', text: "The parrot's eyes turn to steel." },
+      {
+        kind: 'say',
+        text: "I won't let it happen again, though. Play your best — I always see the trouble coming.",
+      },
     ],
   },
 ];

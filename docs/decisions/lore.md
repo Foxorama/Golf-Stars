@@ -93,3 +93,63 @@ engine edit.**
 3. That's it — the gate, the once-only tracking, the screen, and persistence are all generic. If a
    beat should fire somewhere OTHER than a stop arrival, wrap that return with `withLoreGate` too (or a
    sibling gate) rather than special-casing it.
+
+## GS-lore-rewards / GS-lore-parrot-firebird — a beat that pays out
+
+### The player ask
+"A second beat: visiting the Derelict Ship with the **Prognostic Parrot** as your caddy pops a screen
+of the parrot talking (his backstory — the wreck was his dead spirit-brother's long-haul ship, and his
+own great guilt). Triggers once. It ALSO fires two special effects: for this hole the parrot's foresight
+runs at 100%, and it unlocks a mythic ship, **The Firebird** (the black Trans-Am with the golden phoenix
+from *Smokey and the Bandit*)."
+
+### The shape — rewards are DATA on the row, not a fork
+A lore beat can now grant a one-off payout, kept in the same content-as-data spirit:
+
+- **`LoreEvent.effects?: LoreEffects`** (`sim/rpg/lore.ts`) — `{ unlockShip?, parrotForesight? }`. Applied
+  ONCE by the reducer's `dismissLore` (the beat is `once`, recorded in `seenLore`), so it stays
+  **UI/render-only — zero sim rng**, determinism + `auto ≡ interactive` untouched. Absent ⇒ a pure
+  dialogue beat, byte-for-byte the original. A new kind of reward is a new field here + one branch in
+  `dismissLore`, never an engine edit.
+  - `unlockShip` — a cosmetic ship id added to `ownedShips` if not already owned (the ace-ship pattern).
+  - `parrotForesight` — arms the Prognostic Parrot's foresight at 100% for the ARRIVED stop.
+
+### The beat
+`prognostic-parrot-derelict` — `trigger: c => c.archetype === 'derelict' && c.caddyId ===
+'prognostic-parrot'`, `effects: { unlockShip: 'firebird', parrotForesight: true }`. A caddy is
+one-at-a-time, so it can never collide with `driver-dan-derelict`. Portrait: `prognostic-parrot` →
+`prognosticParrotPortraitSVG()` (the green pirate captain from `caddyArt.ts`, weathered, one steel eye).
+
+### The Firebird (the ship reward)
+`ships.ts` `FIREBIRD_SHIP_ID = 'firebird'` — a `secret`, `cost:0` MYTHIC grail (hidden from the Trade
+Market until owned, never buyable), a `look.kind:'firebird'` drawn in `render/shipArt.ts` as a jet-black
+muscle-car cruiser with a golden phoenix ablaze across the hood + gold-rimmed tyres + twin flame exhaust.
+It rides the standard secret-ship plumbing (`shipRevealedInMarket`, per-character equip). Placed AFTER
+the Mothership in `SHIPS` so the ships tests' "first mythic = Mothership" assertion is undisturbed. It
+also gets a HUD bridge (`hudTheme.ts`): a hero-ship override reusing the `racer` variant recoloured
+black/gold (no new CSS/chrome).
+
+### The 100% foresight boon (the only sim-facing part)
+The parrot's normal proc is `run.loadout.previewScramble` (0.33). The boon bumps it to a certain 1.0 for
+the haunted stop, via **one pure source** so both drivers agree (contract 2):
+- `run.parrotForesightStop?: number` (snapshotted in `runSerialise.ts` for a mid-stop resume) — set to
+  `run.stopIndex` by `dismissLore` when `effects.parrotForesight` fires.
+- `foresightChance(run)` (`run.ts`) = `1` when `previewScramble` is set AND `parrotForesightStop ===
+  stopIndex`, else `previewScramble` verbatim. The `&& base` guard means a bag WITHOUT the parrot is
+  never boosted — so **feature-off is byte-for-byte** (contract 1) — and it **self-expires** the moment
+  you travel (the stopIndex advances and no longer matches). Read by the headless `playerHoleOpts` and
+  the interactive shot / auto-finish procs, so a foreseen swing is identical either way. The proc is one
+  `rng.bool(chance)` drawn before the shot in both paths; a 100% chance changes the boolean, not the draw
+  position, and best-of-two only ever RAISES Stableford (contract 4).
+
+### Guards
+- `tests/lore.test.ts` — the parrot beat's trigger (fires only for derelict + parrot, once), its
+  `effects`, the portrait, and the reducer flow (dismiss grants the Firebird + arms foresight; the boon
+  expires next stop; a parrot-less bag is never boosted).
+- `tests/ships.test.ts` — the secret Firebird (mythic, free, hidden-until-owned, NOT the first mythic)
+  + it renders a self-contained glyph.
+
+### Adding the NEXT paying beat (the recipe)
+Same as a plain beat, plus: set `effects` on the row. If it needs a NEW reward kind, add a field to
+`LoreEffects` and one branch in `dismissLore` (keep it side-effect-only — no rng). A ship reward is just
+a `SHIPS` row (secret, `cost:0`) named in `effects.unlockShip`.

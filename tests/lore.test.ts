@@ -10,6 +10,9 @@ import {
 import { lorePortraitSVG } from '../src/render/loreArt';
 import { generateCourse } from '../src/sim/course/generate';
 import { CHARACTERS } from '../src/sim/rpg/characters';
+import { foresightChance } from '../src/sim/rpg/run';
+import { FIREBIRD_SHIP_ID } from '../src/sim/rpg/ships';
+import { PARROT_PREVIEW_CHANCE } from '../src/sim/rpg/shopItems';
 
 /** A base arrival context — a plain world with no caddy. Override per case. */
 const BASE: LoreContext = {
@@ -27,6 +30,14 @@ const DERELICT_DAN: LoreContext = {
   biome: 'derelict-ship',
   archetype: 'derelict',
   caddyId: 'driver-dan',
+};
+
+/** An arrival at the derelict wreck with the Prognostic Parrot on the bag — the GS-lore-parrot-firebird beat. */
+const DERELICT_PARROT: LoreContext = {
+  ...BASE,
+  biome: 'derelict-ship',
+  archetype: 'derelict',
+  caddyId: 'prognostic-parrot',
 };
 
 describe('lore table (GS-lore) — pure pickLoreEvent', () => {
@@ -75,6 +86,29 @@ describe('lore table (GS-lore) — pure pickLoreEvent', () => {
     expect(svg).toContain('<svg');
     expect(svg).toContain('Driver Dan'); // aria-label
     expect(lorePortraitSVG('who?')).toBe('');
+  });
+
+  // --- GS-lore-parrot-firebird: the Prognostic Parrot's beat at the wreck ---
+  it('the Parrot-at-the-derelict beat fires only for derelict + Prognostic Parrot, when unseen', () => {
+    expect(pickLoreEvent(DERELICT_PARROT, {})?.id).toBe('prognostic-parrot-derelict');
+    expect(pickLoreEvent(DERELICT_PARROT, { 'prognostic-parrot-derelict': true })).toBeUndefined();
+    // Not on another world, and not at the wreck with the wrong (or no) caddy.
+    expect(pickLoreEvent({ ...DERELICT_PARROT, archetype: 'inferno', biome: 'ember-world' }, {})).toBeUndefined();
+    expect(pickLoreEvent({ ...DERELICT_PARROT, caddyId: 'driver-dan' }, {})?.id).toBe('driver-dan-derelict');
+    expect(pickLoreEvent({ ...DERELICT_PARROT, caddyId: undefined }, {})).toBeUndefined();
+  });
+
+  it('the Parrot beat carries its one-off rewards (the Firebird ship + 100% foresight)', () => {
+    const beat = loreEventById('prognostic-parrot-derelict')!;
+    expect(beat.effects?.unlockShip).toBe('firebird');
+    expect(beat.effects?.parrotForesight).toBe(true);
+    expect(beat.portrait).toBe('prognostic-parrot');
+  });
+
+  it('lorePortraitSVG paints the Prognostic Parrot', () => {
+    const svg = lorePortraitSVG('prognostic-parrot');
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('Prognostic Parrot'); // aria-label
   });
 });
 
@@ -139,5 +173,56 @@ describe('lore arrival gate (GS-lore) — reducer flow, mode-agnostic', () => {
     expect(gated.pendingLoreId).toBeUndefined();
     // ...but add Driver Dan and the SAME arrival now diverts.
     expect(withLoreGate(withCaddy(s, 'driver-dan')).screen).toBe('lore');
+  });
+});
+
+/** Hand-build an honest "arrived at the derelict with the Prognostic Parrot" lore state. */
+function derelictWithParrot(seed = 'lore-parrot'): UiState {
+  let s = initState(seed);
+  const course = generateCourse('gs-lore-parrot-test', { biome: 'derelict-ship', holes: 4, wildness: 0.6 });
+  // Hire the parrot: the perk id drives the gate (`namedCaddyOwned`) AND the loadout carries its proc
+  // chance (what the shop's `apply` would set), so `foresightChance` sees a real base to boost.
+  s = {
+    ...s,
+    screen: 'intro',
+    course,
+    run: {
+      ...s.run,
+      stopIndex: 2,
+      loadout: { ...s.run.loadout, perks: [...s.run.loadout.perks, 'prognostic-parrot'], previewScramble: PARROT_PREVIEW_CHANCE },
+    },
+  };
+  return withLoreGate(s);
+}
+
+describe('GS-lore-parrot-firebird — the beat pays out on dismiss', () => {
+  it('arriving at the wreck with the parrot diverts to the beat, and dismiss grants the Firebird + arms foresight', () => {
+    const lore = derelictWithParrot();
+    expect(lore.screen).toBe('lore');
+    expect(lore.pendingLoreId).toBe('prognostic-parrot-derelict');
+    expect(lore.ownedShips).not.toContain(FIREBIRD_SHIP_ID); // not yet — earned on dismiss
+
+    const after = reduce(lore, { type: 'dismissLore' });
+    expect(after.screen).toBe('intro');
+    expect(after.seenLore['prognostic-parrot-derelict']).toBe(true);
+    // The secret mythic Firebird is now owned...
+    expect(after.ownedShips).toContain(FIREBIRD_SHIP_ID);
+    // ...and the parrot's foresight is armed at 100% for THIS stop (and only this stop).
+    expect(after.run.parrotForesightStop).toBe(after.run.stopIndex);
+    expect(foresightChance(after.run)).toBe(1);
+  });
+
+  it('the armed foresight expires once you move on (it keys off the live stopIndex)', () => {
+    const after = reduce(derelictWithParrot(), { type: 'dismissLore' });
+    // Same run, next stop: the boost no longer matches, so it falls back to the loadout chance.
+    const moved = { ...after.run, stopIndex: after.run.stopIndex + 1 };
+    expect(foresightChance(moved)).toBe(after.run.loadout.previewScramble);
+  });
+
+  it('foresightChance never boosts a bag WITHOUT the parrot (feature-off is byte-for-byte)', () => {
+    const s = initState('no-parrot');
+    // No parrot on the bag → previewScramble undefined → armed or not, chance stays undefined.
+    expect(foresightChance(s.run)).toBeUndefined();
+    expect(foresightChance({ ...s.run, parrotForesightStop: s.run.stopIndex })).toBeUndefined();
   });
 });

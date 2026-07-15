@@ -12,6 +12,8 @@ export function lorePortraitSVG(id: string): string {
   switch (id) {
     case 'driver-dan':
       return driverDanPortraitSVG();
+    case 'prognostic-parrot':
+      return prognosticParrotPortraitSVG();
     default:
       return '';
   }
@@ -125,5 +127,110 @@ export function driverDanPortraitSVG(): string {
   <!-- little golf-ball emblem on the crown -->
   <circle cx="160" cy="82" r="9" fill="#f4efe6" stroke="#c9c2b4" stroke-width="1.5"/>
   <g fill="#c9c2b4"><circle cx="156" cy="79" r="1"/><circle cx="163" cy="79" r="1"/><circle cx="160" cy="83" r="1"/><circle cx="156" cy="86" r="1"/><circle cx="163" cy="86" r="1"/></g>
+</svg>`;
+}
+
+/**
+ * The Prognostic Parrot, up close — the bipedal green pirate captain from his on-course figure
+ * (`caddyArt.ts`: green torso #37a05a, belly #7ed957, gold beak #f0b429, tricorne #2b2f3a with gold
+ * #d9a441 trim, eyepatch) reborn as a story portrait: a navy pirate coat with gold braid, weathered
+ * feathers, one eye behind the patch — and the good eye turned to STEEL, cold and resolved, as he swears
+ * he won't fail again. A brass spyglass (his foresight) rests at the shoulder. Same palette as the caddy
+ * so he's unmistakably the same bird, drawn as a face you can read.
+ */
+export function prognosticParrotPortraitSVG(): string {
+  return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Prognostic Parrot" style="display:block;aspect-ratio:320/340;overflow:visible;">
+  <defs>
+    <radialGradient id="gs-lore-parrot-spot" cx="50%" cy="40%" r="64%">
+      <stop offset="0%" stop-color="#2a5a4a" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#152a28" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#0a1210" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gs-lore-parrot-coat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b2f66"/>
+      <stop offset="100%" stop-color="#0e1a3e"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-parrot-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#41b466"/>
+      <stop offset="100%" stop-color="#2f8f47"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-parrot-hat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#333947"/>
+      <stop offset="100%" stop-color="#20242e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- soft spotlight halo -->
+  <ellipse cx="160" cy="148" rx="150" ry="162" fill="url(#gs-lore-parrot-spot)"/>
+
+  <!-- the brass spyglass (his foresight) resting at the far shoulder -->
+  <g transform="translate(236 224) rotate(-28)">
+    <rect x="-4" y="-6" width="34" height="12" rx="3" fill="#c8912f" stroke="#8a5f1c" stroke-width="1.5"/>
+    <rect x="26" y="-7.5" width="9" height="15" rx="2" fill="#e8b64a" stroke="#8a5f1c" stroke-width="1.5"/>
+    <rect x="2" y="-6" width="4" height="12" fill="#8a5f1c" opacity="0.5"/>
+  </g>
+
+  <!-- shoulders / navy pirate coat with gold braid -->
+  <path d="M34 340 Q40 250 96 236 Q160 224 224 236 Q280 250 286 340 Z" fill="url(#gs-lore-parrot-coat)"/>
+  <path d="M34 340 Q40 250 96 236 Q120 232 132 236 Q92 262 84 340 Z" fill="#000" opacity="0.16"/>
+  <!-- lapels + gold trim -->
+  <path d="M120 240 Q160 300 200 240 L214 252 Q160 322 106 252 Z" fill="#0b1533"/>
+  <path d="M120 240 Q160 300 200 240" fill="none" stroke="#d9a441" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M108 252 Q160 320 212 252" fill="none" stroke="#d9a441" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+  <!-- gold buttons -->
+  <g fill="#e8c25a"><circle cx="150" cy="292" r="3.4"/><circle cx="170" cy="292" r="3.4"/><circle cx="156" cy="312" r="3.2"/><circle cx="164" cy="312" r="3.2"/></g>
+  <!-- shoulder epaulette fringe -->
+  <g stroke="#e8c25a" stroke-width="2.4" stroke-linecap="round"><line x1="70" y1="252" x2="66" y2="270"/><line x1="80" y1="250" x2="78" y2="268"/><line x1="90" y1="250" x2="90" y2="268"/></g>
+
+  <!-- green feathered neck + chest, brighter belly -->
+  <path d="M120 236 Q120 206 160 200 Q200 206 200 236 Q200 262 160 268 Q120 262 120 236 Z" fill="url(#gs-lore-parrot-body)"/>
+  <path d="M138 232 Q160 214 182 232 Q182 254 160 260 Q138 254 138 232 Z" fill="#7ed957" opacity="0.9"/>
+  <!-- chest feather flecks -->
+  <g fill="#2f8f47" opacity="0.7"><path d="M150 236 q-3 5 0 9"/><path d="M160 238 q-3 5 0 9"/><path d="M170 236 q-3 5 0 9"/></g>
+
+  <!-- head: round green skull -->
+  <path d="M108 150 Q108 92 160 88 Q212 92 212 150 Q212 204 160 214 Q108 204 108 150 Z" fill="url(#gs-lore-parrot-body)"/>
+  <!-- cheek feather shading -->
+  <path d="M160 214 Q122 204 112 160 Q124 198 160 206 Z" fill="#000" opacity="0.10"/>
+  <path d="M160 214 Q198 204 208 160 Q196 198 160 206 Z" fill="#000" opacity="0.06"/>
+  <!-- a spray of nape feathers -->
+  <g fill="#2f8f47"><path d="M108 138 q-12 -4 -18 4 q10 0 16 6 Z"/><path d="M110 156 q-13 0 -18 9 q10 -3 17 2 Z"/></g>
+  <!-- blue flight-feather flecks over the crown edge -->
+  <g stroke="#4b7bd6" stroke-width="3" stroke-linecap="round"><line x1="120" y1="112" x2="126" y2="106"/><line x1="134" y1="104" x2="139" y2="98"/></g>
+
+  <!-- curved golden beak, hooked -->
+  <path d="M198 150 Q236 150 232 172 Q228 188 208 186 Q216 176 210 166 Q206 158 198 158 Z" fill="#f0b429" stroke="#c8912f" stroke-width="2"/>
+  <path d="M206 172 Q216 174 224 170" fill="none" stroke="#b5801f" stroke-width="2" stroke-linecap="round"/>
+  <path d="M232 172 Q228 182 214 184" fill="#c8912f" opacity="0.5"/>
+  <!-- lower mandible seam -->
+  <path d="M200 172 Q212 178 210 186" fill="none" stroke="#b5801f" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- brow ridge — furrowed, resolute -->
+  <path d="M126 128 Q150 118 172 126" fill="none" stroke="#22643a" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- good eye (viewer's left): turned to STEEL — cold, pale, resolved -->
+  <circle cx="150" cy="146" r="17" fill="#f0f4f6"/>
+  <circle cx="150" cy="146" r="17" fill="none" stroke="#1a4a34" stroke-width="2"/>
+  <circle cx="152" cy="147" r="8.5" fill="#8fb0c0"/>
+  <circle cx="152" cy="147" r="4.6" fill="#20323c"/>
+  <circle cx="149" cy="144" r="1.8" fill="#fff"/>
+  <!-- a hard, low lid over the steel eye -->
+  <path d="M133 140 Q150 132 167 140" fill="none" stroke="#1a4a34" stroke-width="3.2" stroke-linecap="round"/>
+
+  <!-- eyepatch over the far eye, black strap crossing the crown -->
+  <path d="M182 138 Q196 132 205 140 Q206 152 196 156 Q184 154 182 144 Z" fill="#12161c" stroke="#000" stroke-width="1.5"/>
+  <path d="M118 116 Q160 122 205 140" fill="none" stroke="#12161c" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- pirate tricorne hat: three cocked corners over the crown -->
+  <path d="M92 118 Q100 74 160 70 Q220 74 228 118 Q188 96 160 96 Q132 96 92 118 Z" fill="url(#gs-lore-parrot-hat)"/>
+  <path d="M78 120 Q160 90 242 120 Q244 128 236 132 Q160 104 84 132 Q76 128 78 120 Z" fill="#20242e"/>
+  <!-- cocked side points -->
+  <path d="M78 120 Q86 104 100 108 Q90 116 84 128 Z" fill="#2b2f3a"/>
+  <path d="M242 120 Q234 104 220 108 Q230 116 236 128 Z" fill="#2b2f3a"/>
+  <!-- gold trim braid along the brim -->
+  <path d="M92 118 Q160 92 228 118" fill="none" stroke="#d9a441" stroke-width="3" stroke-linecap="round"/>
+  <!-- gold badge on the front -->
+  <circle cx="160" cy="106" r="7" fill="#e8c25a" stroke="#a8791c" stroke-width="2"/>
+  <path d="M160 100 l1.8 3.6 4 0.6 -2.9 2.8 0.7 4 -3.6 -1.9 -3.6 1.9 0.7 -4 -2.9 -2.8 4 -0.6 Z" fill="#a8791c"/>
 </svg>`;
 }

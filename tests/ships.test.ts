@@ -8,8 +8,10 @@ import {
   canBuyShip,
   shipRevealedInMarket,
   aceShipUnlock,
+  FIREBIRD_SHIP_ID,
 } from '../src/sim/rpg/ships';
 import { COSMETIC_RARITY } from '../src/sim/rpg/cosmetics';
+import { shipSVG } from '../src/render/shipArt';
 
 describe('ships catalogue (GS-garage / GS-clubhouse)', () => {
   it('has a free default wagon and several priced ships across sets/rarities', () => {
@@ -91,5 +93,27 @@ describe('the secret ace ship — Comet Rider (GS-ace-ship)', () => {
     // Already owns it → idempotent no-op (same reference, no duplicate).
     const owned = [DEFAULT_SHIP_ID, ACE_SHIP_ID];
     expect(aceShipUnlock(owned, 1)).toBe(owned);
+  });
+});
+
+describe('the secret Firebird (GS-lore-parrot-firebird)', () => {
+  it('is a secret, free MYTHIC grail hidden until owned — but NOT the first mythic (that stays the Mothership)', () => {
+    const fire = shipById(FIREBIRD_SHIP_ID);
+    expect(fire).toBeTruthy();
+    expect(fire!.rarity).toBe('mythic');
+    expect(fire!.cost).toBe(0); // earned at the wreck, never priced
+    expect(fire!.secret).toBe(true); // reveal-on-own
+    expect(fire!.unlockHoles).toBeUndefined(); // a lore unlock, not an endless-holes one
+    expect(canBuyShip(fire, 99999, [DEFAULT_SHIP_ID])).toBe(false); // secret + free ⇒ never buyable
+    expect(shipRevealedInMarket(fire!, [DEFAULT_SHIP_ID])).toBe(false);
+    expect(shipRevealedInMarket(fire!, [DEFAULT_SHIP_ID, FIREBIRD_SHIP_ID])).toBe(true);
+    // The "first mythic" the catalogue test pins must remain the Mothership (Firebird placed after it).
+    expect(SHIPS.find((s) => s.rarity === 'mythic')!.look.kind).toBe('ufo');
+  });
+
+  it('renders as a self-contained firebird glyph', () => {
+    const svg = shipSVG(FIREBIRD_SHIP_ID, 0, 0, 1);
+    expect(svg).toContain('<g'); // draws something
+    expect(svg).not.toContain('undefined');
   });
 });
