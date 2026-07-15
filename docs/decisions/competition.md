@@ -84,7 +84,7 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   read a Stableford number as a nonsense "top 22 advance". Now a WINNABLE voyage builds ONE 20-golfer
   field for the whole journey (`buildVoyageField(seed, player)`, champions spanning all three arcs) and the
   positional cut is CUMULATIVE across the voyage, ramping the survivor target down
-  `VOYAGE_SURVIVOR_TARGETS = [16, 12, 9, 6, 4, 2]` over the six ordinary stops (`arcSurvivorTarget` now
+  `VOYAGE_SURVIVOR_TARGETS = [16, 13, 10, 8, 5, 2]` over the six ordinary stops (`arcSurvivorTarget` now
   indexes by `ordinaryStopOrdinal`, undefined on a boss slot) — so exactly
   TWO remain (you + one rival) going into the final, a true 1st-vs-2nd matchplay. Both league (`runField`)
   and run (`survivalField`) route winnable formats through `buildVoyageField`, and `arcSlices` now spans
@@ -93,20 +93,24 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   the ramp-to-two, and score continuity). Endless flat/ladder keep the per-arc field + Stableford cut,
   byte-for-byte. The leaderboard divider reads "⚔ boss round" on a positional boss stop (never a stray
   "top N advance"). Tune the ramp via `VOYAGE_SURVIVOR_TARGETS`.
-- **Only the FINAL ordinary stop cuts to 2 — pre-final targets floor at 4 (GS-cut-balance).** The
-  original `arcSurvivorTarget` subtracted `ascensionCutBonus` from EVERY target and floored the result
-  at 2 ("so the final is always a duel") — but the level IS the subtraction, so an ascended voyage
-  collapsed the field to a two-player duel stops before the Galactic Major (A2 → `[14,10,7,4,2,2]`, the
-  Far Reach played 1-v-1 twice; A7 → `[9,5,2,2,2,2]`, a duel from Deep Run I on). That both spoiled the
-  final's headline moment (the title match was just "another stop") and made mid-voyage survival
-  needlessly binary. THE RULE: the two-player state exists ONLY at the final boss. The last ordinal
-  (stop 7, feeding the final) keeps its floor of 2; every earlier ordinal floors at
-  `PRE_FINAL_SURVIVOR_FLOOR = 4`, so the section right before the last boss always fields at least four
-  and the cut-to-two lands exactly once, going into the 1st-v-2nd matchplay. Base (A0) targets
-  `[16,12,9,6,4,2]` already respect both floors, so the default path is byte-identical (the whole suite
-  is the guard); Ascension still tightens every step above the floor. No rng involvement — targets
-  change who is cut, never a draw. Tests: `tests/competition.test.ts` (pre-final floor across
-  A1/A2/A5/A7/A15, final stays 2).
+- **The field thins gently and keeps VARIETY until the end — 2 only at the final, at ALL Ascensions
+  (GS-cut-variety).** History: the original `arcSurvivorTarget` subtracted `ascensionCutBonus` from EVERY
+  target and floored the result at 2, so an ascended voyage collapsed to a two-player duel stops before
+  the Galactic Major (GS-cut-balance raised that to a single flat floor of 4). But a flat floor of 4 was
+  STILL too aggressive: because the Ascension level IS the subtraction, every pre-final target hit the
+  floor early, so a hard voyage played as a FOUR-golfer board for two whole arcs (the reported bug: at A8
+  the middle of arc 2 had only four golfers left — no leaderboard variety). THE FIX: a gentler base curve
+  `[16,13,10,8,5,2]` plus a PER-ORDINAL floor `VOYAGE_SURVIVOR_FLOORS = [10,8,7,5,4,2]`, so the field thins
+  smoothly and keeps a genuine, DESCENDING field the whole way (even at `ASCENSION_MAX`: ≥7 mid-arc-2, ≥5
+  into the arc-2 boss, ≥4 opening arc 3) and CONVERGES to 2 only at the last ordinal (stop 7 → the
+  1st-v-2nd matchplay), independent of Ascension. Ascension still tightens the EARLY cuts a little (A0
+  `[16,13,10,8,5,2]` → A4 `[12,9,7,6,4,2]` → A8+ settles at the floors `[10,8,7,5,4,2]`), but can never
+  flatten the curve or kill the variety. A hard Ascension's difficulty is carried by the field's STRENGTH
+  (the ghost-field ease fades to 0 by A8) and the scaling bosses — NOT by scything the board to its floor;
+  the binding survival constraint is still the final top-2, so even-par survival at A8 stays brutal (the
+  `a8 < 0.15` balance test holds unchanged). No rng involvement — targets change who is cut, never a draw.
+  Tests: `tests/competition.test.ts` (the ramp values + the GS-cut-variety descending/variety check across
+  A0–A15, final stays 2).
 - **The low-Ascension ghost-field EASE — a green-bag player shooting par is competitive at A0–A4
   (GS-green-ease).** The competition is calibrated around the field median (~2.1–2.2 SF/hole), which
   is the whole point of it being a hard tournament — but it also meant an even-par (2.0 SF/hole) player

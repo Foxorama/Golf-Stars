@@ -64,21 +64,33 @@ export function stopPressure(stopIndex: number): number {
 }
 
 /**
- * Positional cut targets (GS-positional-cut / GS-voyage-field): the field is now ONE persistent
- * 20-golfer field across the WHOLE voyage (not rebuilt per arc), and the cut RAMPS DOWN over the six
- * ordinary stops so that exactly TWO remain (you + one rival) going into the final — a 1-on-1
- * matchplay for the title. Indexed by the ordinal of the ordinary stop (0..5: arc1 stops 0,1 → arc2
- * stops 3,4 → arc3 stops 6,7); the boss slot of each arc (pos 2) has no entry (it's a knockout, not a
- * positional cut, and adds nothing to the standings). Ascension tightens the targets, but ONLY the
- * FINAL ordinary stop may cut to 2 (the 1st-v-2nd title match) — every earlier target is floored at 4
- * (GS-cut-balance), so the last pre-boss section always has a real field of at least four and the
- * two-player state exists only at the final boss. A bigger field is fine — eliminated golfers sink
- * below the cut line.
+ * Positional cut targets (GS-positional-cut / GS-voyage-field / GS-cut-variety): ONE persistent
+ * 20-golfer field across the WHOLE voyage (not rebuilt per arc), thinned DOWN over the six ordinary
+ * stops so exactly TWO remain (you + one rival) going into the final — a 1-on-1 matchplay for the title.
+ * Indexed by the ordinal of the ordinary stop (0..5: arc1 stops 0,1 → arc2 stops 3,4 → arc3 stops 6,7);
+ * the boss slot of each arc (pos 2) has no entry (a knockout, not a positional cut, and adds nothing to
+ * the standings).
+ *
+ * The curve thins GENTLY so the leaderboard keeps real VARIETY the whole way and only CONVERGES at the
+ * end (GS-cut-variety): arcs 1–2 stay a genuine field, arc 3 does the pinch, the final ordinary stop is
+ * the 1-v-2 title match. Ascension tightens the EARLY cuts a little, but can never flatten the curve —
+ * each ordinal has its OWN floor (`VOYAGE_SURVIVOR_FLOORS`), so even at `ASCENSION_MAX` the field stays
+ * varied (≥7 mid-arc-2, ≥5 into the arc-2 boss, ≥4 opening arc 3) and only the FINAL stop reaches 2. This
+ * replaced a single flat floor of 4 that let a high-Ascension voyage collapse to a FOUR-golfer board from
+ * the end of arc 1 — no variety for two whole arcs (the reported bug: at A8 the middle of arc 2 had only
+ * four golfers left). A hard Ascension's per-stop difficulty is carried instead by the field's STRENGTH
+ * (`voyageFieldEase` fades to 0 by A8) and the scaling bosses, NOT by scything the board down to its floor.
+ * A bigger field is always fine — eliminated golfers sink below the cut line.
  */
-export const VOYAGE_SURVIVOR_TARGETS = [16, 12, 9, 6, 4, 2] as const;
+export const VOYAGE_SURVIVOR_TARGETS = [16, 13, 10, 8, 5, 2] as const;
 
-/** Pre-final targets never drop below this, however hard Ascension squeezes (GS-cut-balance). */
-export const PRE_FINAL_SURVIVOR_FLOOR = 4;
+/**
+ * Per-ordinal floor the Ascension squeeze can never push a target below (GS-cut-variety) — chosen so the
+ * field stays VARIED through arcs 1–2 and pinches only in arc 3, while the curve still strictly descends
+ * (every ordinary stop eliminates someone). The final ordinal is always 2 (the title duel), independent
+ * of Ascension.
+ */
+export const VOYAGE_SURVIVOR_FLOORS = [10, 8, 7, 5, 4, 2] as const;
 
 /** The 0-based ordinal of an ORDINARY stop among the voyage's ordinary stops (skips boss slots). */
 export function ordinaryStopOrdinal(stopIndex: number): number {
@@ -89,8 +101,10 @@ export function arcSurvivorTarget(stopIndex: number, ascensionCut = 0): number |
   if (isArcBossSlot(stopIndex)) return undefined; // boss slot — decided by the match, no positional cut
   const ord = ordinaryStopOrdinal(stopIndex);
   const last = VOYAGE_SURVIVOR_TARGETS.length - 1;
-  const base = VOYAGE_SURVIVOR_TARGETS[Math.min(ord, last)]!;
-  const floor = ord >= last ? 2 : PRE_FINAL_SURVIVOR_FLOOR;
+  // The FINAL ordinary stop is ALWAYS the 1-v-2 title match, at every Ascension.
+  if (ord >= last) return 2;
+  const base = VOYAGE_SURVIVOR_TARGETS[ord]!;
+  const floor = VOYAGE_SURVIVOR_FLOORS[ord]!;
   return Math.max(floor, base - Math.max(0, Math.round(ascensionCut)));
 }
 

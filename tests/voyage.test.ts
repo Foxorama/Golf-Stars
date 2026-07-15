@@ -13,7 +13,7 @@ import { cutLine } from '../src/sim/rpg/economy';
 import { generateCourse } from '../src/sim/course/generate';
 import { playCourse } from '../src/sim/round';
 import { Rng } from '../src/sim/rng';
-import { scramblePartnerId } from '../src/sim/rpg/characters';
+import { scramblePartnerId, bossPartnerId } from '../src/sim/rpg/characters';
 
 const voyage = getFormat('voyage');
 
@@ -107,5 +107,30 @@ describe('voyage format (GS-voyage)', () => {
     const b = scramblePartnerId(123, 5, 'feather-fade');
     expect(a).toBe(b);
     expect(a).not.toBe('feather-fade');
+  });
+
+  it('partner picks actually VARY with the run seed (guards the imul hash — not stuck on one golfer)', () => {
+    // Regression for the stuck-partner bugs: `bossPartnerId`'s `40503 % 3 === 0` made the seed vanish
+    // mod the pool, and `scramblePartnerId`'s `seed * 2654435761` overflowed 2^53 on a pool of 4.
+    // Both pinned the partner to a single golfer. Assert real variety across REALISTIC seeds (up to ~1e9,
+    // freshRunSeed's range), at a fixed boss stop, for both teams — with and without a chosen player.
+    for (const stop of [2, 5]) {
+      for (const player of ['feather-fade', undefined] as const) {
+        const scr = new Set<string>();
+        const boss = new Set<string>();
+        for (let i = 0; i < 400; i++) {
+          const seed = Math.floor(((i * 2654435761) % 1e9 + 1e9) % 1e9); // spread of large seeds, no Math.random
+          scr.add(scramblePartnerId(seed, stop, player));
+          boss.add(bossPartnerId(seed, stop, player));
+          if (player) {
+            expect(scramblePartnerId(seed, stop, player)).not.toBe(player);
+            expect(bossPartnerId(seed, stop, player)).not.toBe(player);
+          }
+        }
+        // A stuck hash yields a set of size 1; a working one covers the whole eligible pool (3 or 4).
+        expect(scr.size).toBeGreaterThan(1);
+        expect(boss.size).toBeGreaterThan(1);
+      }
+    }
   });
 });
