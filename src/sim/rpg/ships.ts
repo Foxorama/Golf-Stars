@@ -21,7 +21,7 @@ import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
 export interface ShipLook {
   /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated); `infinity` is
    *  the hole-150 Unending-Universe grail (GS-unending) — the most animated craft in the fleet. */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity' | 'pegasus';
+  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity' | 'pegasus' | 'firebird';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -62,6 +62,11 @@ export const DEFAULT_SHIP_ID = 'wagon-classic';
 /** The secret ship earned by making a hole-in-one (GS-ace-ship). A `secret`, `cost: 0` ride —
  *  never sold, hidden from the Trade Market until owned; granted by the reducer on any ace. */
 export const ACE_SHIP_ID = 'comet-rider';
+
+/** The secret MYTHIC ship earned by meeting the Prognostic Parrot's ghost at the derelict wreck
+ *  (GS-lore-parrot-firebird). A `secret`, `cost: 0` grail — never sold, hidden until owned; granted
+ *  by the reducer when the parrot-derelict lore beat is dismissed (its `effects.unlockShip`). */
+export const FIREBIRD_SHIP_ID = 'firebird';
 
 /** Shard prices per rarity tier (the Trade Market economy). Mythic is the 600-shard grail.
  *  Prices were cut 40% in the GS-trade-rebalance (with a one-off refund migration) — see
@@ -201,6 +206,22 @@ export const SHIPS: readonly Ship[] = [
     blurb: 'A hot-rod space chopper — fat wheels, a bag stood between the bars, wreathed in flame and forked lightning.',
     cost: 750, // the top of the fleet — a hand-built showpiece above the Mothership grail
     look: { kind: 'chopper', body: '#16181f', glass: '#cfe9ff', flame: '#ff7a1a', accent: '#7fe049', bling: 3 },
+  },
+  {
+    // The SECRET Firebird (GS-lore-parrot-firebird): earned — never bought — by meeting the Prognostic
+    // Parrot's ghost aboard the derelict wreck. A black muscle-car star-cruiser with a golden phoenix
+    // ablaze across the hood (a Smokey-and-the-Bandit Trans Am reborn as the parrot's spirit-brother's
+    // ride). A `secret`, free grail, hidden from the market until owned; granted by the lore beat's
+    // `effects.unlockShip` on dismiss. Placed AFTER the Mothership so the ships tests' first-mythic
+    // assertion (the Mothership) is undisturbed.
+    id: FIREBIRD_SHIP_ID,
+    name: 'The Firebird',
+    set: 'Mythic',
+    rarity: 'mythic',
+    blurb: 'A jet-black muscle-car cruiser, a golden phoenix blazing across the hood. Bandit runs one last haul — earned at the derelict wreck.',
+    cost: 0,
+    secret: true,
+    look: { kind: 'firebird', body: '#0d0f14', glass: '#ffca4a', flame: '#ff7a1a', accent: '#f2b53a', bling: 3 },
   },
   // --- The SECRET grail (GS-unending): earned at hole 150 of the Unending Universe, never sold.
   // Kept LAST so the ships tests' first-mythic assertions (the Mothership) are undisturbed.

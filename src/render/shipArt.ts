@@ -339,6 +339,61 @@ function shipBody(look: ShipLook): string {
         </g>
         ${wing(2, '0.35s', glass)}`;
     }
+    case 'firebird': {
+      // The Firebird (GS-lore-parrot-firebird) — the parrot's spirit-brother's ride reborn: a jet-black
+      // muscle-car star-cruiser with a golden PHOENIX blazing across the hood (a Smokey-and-the-Bandit
+      // Trans Am). Authored right-facing in the ±20u frame: fat gold-rimmed tyres UNDER the body (fenders
+      // over them), a low coupe greenhouse in Trans Am gold glass with a T-top bar, a shaker hood scoop,
+      // twin flame exhaust trailing off the tail, and the spread-winged firebird emblem over the flank.
+      const wheel = (x: number) => `
+        <circle cx="${x}" cy="6" r="3.5" fill="#0a0c10" stroke="#050608" stroke-width="1"/>
+        <circle cx="${x}" cy="6" r="2.1" fill="#14171f" stroke="${accent}" stroke-width="1.1"/>
+        <g transform="translate(${x} 6)"><g stroke="${accent}" stroke-width="0.7">
+          <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="0.6s" repeatCount="indefinite"/>
+          <line x1="-2" y1="0" x2="2" y2="0"/><line x1="0" y1="-2" x2="0" y2="2"/>
+          <line x1="-1.4" y1="-1.4" x2="1.4" y2="1.4"/><line x1="-1.4" y1="1.4" x2="1.4" y2="-1.4"/>
+        </g></g>
+        <circle cx="${x}" cy="6" r="0.7" fill="${accent}"/>`;
+      return `
+        <!-- twin flame exhaust roaring off the tail -->
+        <g stroke="none">
+          <path d="M-17,3.2 L-28,1.6 L-24,3.4 L-30,4 L-24,4.6 L-27,6.2 Z" fill="${flame}" opacity="0.9"><animate attributeName="opacity" values="0.6;1;0.7;1;0.6" dur="0.4s" repeatCount="indefinite"/></path>
+          <path d="M-17,3.6 L-24,2.8 L-22,3.8 L-25,4.2 L-22,4.9 Z" fill="#ffd23a"/>
+          <path d="M-17,3.9 L-22,3.2 L-21,4 L-23,4.4 Z" fill="#fff2b0"/>
+        </g>
+        ${wheel(-10)}${wheel(12)}
+        <g stroke="#050608" stroke-width="1" stroke-linejoin="round">
+          <!-- low wide muscle-car body: rear ducktail → cabin → long hood down to a pointed nose -->
+          <path d="M-17,5 L-17,2.4 L-12.5,1.6 L-8,-2 L-2,-4.6 L6,-4.8 L11,-2.2 L19,-1 L19,2.6 L16.5,5 Z" fill="${body}"/>
+          <!-- gloss highlight along the flank -->
+          <path d="M-12,1.4 L-7.4,-1.6 L-2,-3.9 L6,-4 L10.4,-1.8 L17.5,-0.7" fill="none" stroke="#2a2f3a" stroke-width="0.8" opacity="0.8"/>
+          <!-- greenhouse: raked windscreen + side glass, Trans Am gold -->
+          <path d="M-1.4,-4 L5.4,-4.2 L9.4,-2.2 L-1.4,-2 Z" fill="${glass}" opacity="0.9"/>
+          <path d="M-7,-2 L-2,-4 L-2,-2 Z" fill="${glass}" opacity="0.85"/>
+          <!-- T-top bar splitting the glass -->
+          <rect x="1.4" y="-4.3" width="1.5" height="2.5" fill="${body}" stroke="none"/>
+          <!-- gold beltline pinstripe -->
+          <path d="M-15,1.8 Q0,0.2 16,-0.5" fill="none" stroke="${accent}" stroke-width="0.8" opacity="0.9"/>
+          <!-- shaker hood scoop up front -->
+          <path d="M9.5,-2.2 L14.5,-1.7 L14.5,-0.7 L9.5,-1.1 Z" fill="#151a22"/>
+          <!-- pop-up headlamp + rear taillight -->
+          <rect x="16.6" y="-0.6" width="2.3" height="1.5" rx="0.4" fill="#fff6c0"/>
+          <rect x="-17" y="1.2" width="1.3" height="2.4" rx="0.3" fill="#ff5a4d"/>
+        </g>
+        <!-- the golden PHOENIX ablaze across the hood/flank — the signature, facing the nose -->
+        <g fill="${accent}" stroke="none">
+          <!-- central body + crested head toward the nose -->
+          <path d="M4,-0.4 Q9,-1.8 14,-0.8 Q11.5,0.2 14,1.2 Q9,0.4 4,-0.4 Z"/>
+          <!-- far wing swept up over the hood -->
+          <path d="M5,-0.8 Q1,-5.4 -4,-6 Q-0.6,-3.6 -1.4,-2.2 Q2.4,-3 5,-0.8 Z"/>
+          <!-- near wing (lighter, over the cabin) -->
+          <path d="M6,-0.6 Q3,-4.6 -1,-5 Q1.6,-2.8 0.8,-1.6 Q3.4,-2.4 6,-0.6 Z" fill="${glass}" opacity="0.92"/>
+          <!-- flame tail feathers dropping toward the door -->
+          <path d="M4,0.2 Q1.4,3.4 -3.6,4 Q-0.6,2 -1.4,0.9 Q1.6,1.6 4,0.2 Z"/>
+          <!-- eye + beak glint -->
+          <circle cx="12.4" cy="-0.5" r="0.5" fill="#050608"/>
+        </g>`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `

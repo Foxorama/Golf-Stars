@@ -216,6 +216,12 @@ export interface Run {
    *  this run. Absent/false on every ordinary run → byte-for-byte unchanged. Snapshotted so a resume
    *  keeps the block. */
   rainbowConsumed?: boolean;
+  /** The stopIndex at which the Prognostic Parrot's FORESIGHT is armed at 100% (GS-lore-parrot-firebird):
+   *  set by the reducer when the parrot-derelict lore beat is dismissed, so THAT stop (and only that stop)
+   *  foresees every swing. Self-expiring — `foresightChance` compares it to the live `stopIndex`, so once
+   *  you travel on it no longer matches. Absent on every ordinary run → the parrot's normal proc chance,
+   *  byte-for-byte unchanged. Snapshotted so a mid-stop resume keeps the boon. */
+  parrotForesightStop?: number;
   status: RunStatus;
   endedReason?: EndReason;
   history: StopResult[];
@@ -632,6 +638,19 @@ export function scrambleOptsFor(run: Run): ScrambleOpts | undefined {
   return { partnerMods: setup.playerPartnerMods };
 }
 
+/**
+ * The Prognostic Parrot's EFFECTIVE foresight chance for the CURRENT stop (GS-lore-parrot-firebird): the
+ * loadout's proc chance, boosted to a certain 1.0 on the stop where the parrot-derelict lore beat armed
+ * it (`run.parrotForesightStop === run.stopIndex`). The `&& base` guard means an un-armed loadout (no
+ * parrot) never gets a boost — so with the boon off this returns `run.loadout.previewScramble` verbatim
+ * and every seeded run is byte-for-byte unchanged. ONE source, read by BOTH the headless auto path (via
+ * `playerHoleOpts`) and the interactive reducer, so `auto ≡ interactive` holds. Pure, zero rng.
+ */
+export function foresightChance(run: Run): number | undefined {
+  const base = run.loadout.previewScramble;
+  return base && run.parrotForesightStop === run.stopIndex ? 1 : base;
+}
+
 /** The player's `playHole`/`playCourse` options from their loadout — shared by the auto sim and the
  *  matchplay duel so the player's own ball plays identically with or without a boss alongside. */
 export function playerHoleOpts(run: Run): PlayHoleOptions {
@@ -669,7 +688,8 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     scramble: scrambleOptsFor(run),
     // Prognostic Parrot foresight (GS-caddy-parrot): the parrot's per-shot second-swing proc, applied
     // by playHole with the player's OWN golfer as the partner. Undefined without the parrot ⇒ no draw.
-    previewScramble: run.loadout.previewScramble,
+    // `foresightChance` bumps it to 100% on the parrot-derelict lore stop (GS-lore-parrot-firebird).
+    previewScramble: foresightChance(run),
   };
 }
 

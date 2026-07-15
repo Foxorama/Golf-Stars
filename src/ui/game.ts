@@ -19,6 +19,7 @@ import {
   currentCourse,
   endlessAttackArmed,
   finishStop,
+  foresightChance,
   playStop,
   playStopWarp,
   playerHoleOpts,
@@ -59,7 +60,7 @@ import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
-import type { SeenLore } from '../sim/rpg/lore';
+import { loreEventById, type SeenLore } from '../sim/rpg/lore';
 import {
   autoDecision,
   awaitingPutt,
@@ -303,7 +304,16 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'lore') return state;
       const id = state.pendingLoreId;
       const seenLore: SeenLore = id ? { ...state.seenLore, [id]: true } : state.seenLore;
-      return { ...state, screen: 'intro', pendingLoreId: undefined, seenLore };
+      // GS-lore-rewards: a beat can PAY OUT on dismiss (unlock a ship, arm a boon). Applied ONCE here (the
+      // beat is `once`), so it stays UI/render-only — zero sim rng, determinism/auto≡interactive untouched.
+      const fx = loreEventById(id)?.effects;
+      const ownedShips =
+        fx?.unlockShip && !state.ownedShips.includes(fx.unlockShip)
+          ? [...state.ownedShips, fx.unlockShip]
+          : state.ownedShips;
+      // Arm the Prognostic Parrot's 100% foresight for THIS stop (self-expiring off `stopIndex`).
+      const run = fx?.parrotForesight ? { ...state.run, parrotForesightStop: state.run.stopIndex } : state.run;
+      return { ...state, screen: 'intro', pendingLoreId: undefined, seenLore, ownedShips, run };
     }
 
     case 'play': {
@@ -493,7 +503,8 @@ export function reduce(state: UiState, action: Action): UiState {
       // SEES the shot — resolve TWO of the player's OWN swings and let them keep the better, reusing the
       // scramble choice card. The proc draw fires ONLY when the parrot is hired, so a normal hole's rng
       // stream is unchanged; the headless playHole draws the identical proc + partner (auto ≡ interactive).
-      if (state.run.loadout.previewScramble && state.holeRng.bool(state.run.loadout.previewScramble)) {
+      const foresight = foresightChance(state.run);
+      if (foresight && state.holeRng.bool(foresight)) {
         const foreseen = resolveScrambleShot(
           state.play,
           { clubId: action.clubId, aim: action.aim, target: action.target, power: action.power },
@@ -551,7 +562,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-ai-attack: past the bogey bar the endless auto driver hunts pins — the identical per-hole
       // rule headless playStop applies, so an auto-finished hole stays byte-for-byte the sim's.
       const attack = endlessAttackArmed(state.run);
-      const preview = state.run.loadout.previewScramble;
+      const preview = foresightChance(state.run);
       while (!p.done && guard++ < 40) {
         if (awaitingPutt(p)) {
           p = takePutt(p, state.run.loadout, state.holeRng);

@@ -75,6 +75,9 @@ export interface RunSnapshot {
   /** The Rainbow Ball was spent on an Asgard tournament (GS-asgard), so a resume keeps it stripped and
    *  the shop keeps it off the rack. Absent on every ordinary run → byte-for-byte unchanged. */
   rainbowConsumed?: boolean;
+  /** The stopIndex at which the Prognostic Parrot's foresight is armed at 100% (GS-lore-parrot-firebird),
+   *  so a mid-stop resume keeps the boon. Absent on every ordinary run → no boost (byte-for-byte). */
+  parrotForesightStop?: number;
   /** Every stop finished so far this run (GS-voyage-field): the completed `StopResult`s the positional
    *  cut + team-duel setup are computed from. WITHOUT it a resumed run rebuilt an EMPTY history, which
    *  zeroed the whole arc leaderboard (player + field) and — since the underdog side is decided by
@@ -111,6 +114,7 @@ export function snapshotRun(run: Run): RunSnapshot {
     routeScans: run.routeScans || undefined,
     firedCaddies: run.firedCaddies.length ? [...run.firedCaddies] : undefined,
     rainbowConsumed: run.rainbowConsumed || undefined,
+    parrotForesightStop: run.parrotForesightStop,
     // Persist the completed-stop history (GS-voyage-field) so a resume rebuilds the SAME arc
     // leaderboard + team-duel underdog side. Absent when nothing's been finished yet (byte-stable).
     history: run.history.length ? run.history.map((h) => ({ ...h })) : undefined,
@@ -154,6 +158,7 @@ export function resumeRun(snap: RunSnapshot): Run {
     routeScans: snap.routeScans ?? 0,
     firedCaddies: snap.firedCaddies ? [...snap.firedCaddies] : [],
     rainbowConsumed: snap.rainbowConsumed || undefined,
+    parrotForesightStop: snap.parrotForesightStop,
     status: 'active',
     // Restore the finished-stop history (GS-voyage-field) so the positional cut, the arc leaderboard
     // scores and the boss team-duel underdog side reconstruct exactly as they were. Old snapshots
