@@ -3,7 +3,8 @@ import { initState, reduce, type UiState } from '../src/ui/game';
 import { CHARACTERS } from '../src/sim/rpg/characters';
 import { STROKEPLAY_FORMAT } from '../src/sim/rpg/formats';
 import { STATIC_COURSES, buildStaticCourse } from '../src/sim/course/staticCourses';
-import { starTourMapSVG, worldPos, EARTH_POS, type StarTourWorld } from '../src/render/starTourMap';
+import { ASGARD_FORMAT } from '../src/sim/rpg/formats';
+import { starTourMapSVG, worldPos, EARTH_POS, YGGDRASIL_REALMS, type StarTourWorld } from '../src/render/starTourMap';
 
 /** Drive a Star Tour round to the strokeResult recap (openStarTour → CHARACTER → star map → pick a
  *  course → intro → play 18 → holeComplete×18). Character select comes FIRST (GS-star-tour-2). */
@@ -107,6 +108,71 @@ describe('Star Tour reducer flow (GS-star-tour-2)', () => {
     expect(s.screen).toBe('starTour');
     s = reduce(s, { type: 'exitStarTour' });
     expect(s.screen).toBe('title');
+  });
+});
+
+describe('Yggdrasil — the hidden World Tree (GS-star-tour-yggdrasil)', () => {
+  /** Reach the star map with a golfer picked. */
+  function onMap(seed = 'ygg-seed', charId = CHARACTERS[0]!.id): UiState {
+    let s = initState(seed);
+    s = reduce(s, { type: 'openStarTour' });
+    s = reduce(s, { type: 'selectCharacter', characterId: charId });
+    expect(s.screen).toBe('starTour');
+    return s;
+  }
+
+  it('the tree glyph renders on the chart only when armed (showYggdrasil)', () => {
+    const world: StarTourWorld = { id: 'verdant-18', name: 'X', archetype: 'verdant', tier: 'gentle', themeId: 'lyra', hasRecord: false };
+    const off = starTourMapSVG({ seed: 'y', worlds: [world] });
+    expect(off).not.toContain('data-startour-yggdrasil');
+    const on = starTourMapSVG({ seed: 'y', worlds: [world], showYggdrasil: true });
+    expect(on).toContain('data-startour-yggdrasil');
+    expect(on).toContain('YGGDRASIL');
+  });
+
+  it('carries all nine realms with only Asgard playable', () => {
+    expect(YGGDRASIL_REALMS).toHaveLength(9);
+    expect(YGGDRASIL_REALMS[0]!.id).toBe('asgard');
+    expect(YGGDRASIL_REALMS.filter((r) => r.playable).map((r) => r.id)).toEqual(['asgard']);
+  });
+
+  it('is a no-op without Thor\'s Hammer (the tree is hidden until then)', () => {
+    const s = onMap();
+    expect(s.ownedApparel).not.toContain('thors-hammer');
+    const after = reduce(s, { type: 'playYggdrasilRealm', realmId: 'asgard' });
+    expect(after.screen).toBe('starTour'); // nothing happened
+    expect(after.run.formatId).toBe(STROKEPLAY_FORMAT);
+  });
+
+  it('a non-Asgard (unbloomed) realm is a no-op even when armed', () => {
+    const s = { ...onMap(), ownedApparel: ['thors-hammer'] } as UiState;
+    const after = reduce(s, { type: 'playYggdrasilRealm', realmId: 'vanaheim' });
+    expect(after.screen).toBe('starTour');
+  });
+
+  it('armed: launches the standalone Asgard tournament and returns to the star map', () => {
+    let s = { ...onMap(), ownedApparel: ['thors-hammer'] } as UiState;
+    s = reduce(s, { type: 'playYggdrasilRealm', realmId: 'asgard' });
+    expect(s.screen).toBe('playing');
+    expect(s.run.formatId).toBe(ASGARD_FORMAT);
+    expect(s.asgardFromStarTour).toBe(true);
+    expect(s.asgardReturn).toBeUndefined(); // standalone — no suspended journey
+    expect(s.course.holes).toHaveLength(9);
+    // Play the nine holes out to the tournament result.
+    let guard = 0;
+    while (s.screen === 'playing' && guard++ < 100) {
+      while (s.play && !s.play.done && guard++ < 400) s = reduce(s, { type: 'autoShotHole' });
+      s = reduce(s, { type: 'holeComplete' });
+    }
+    expect(s.screen).toBe('asgardResult');
+    expect(s.asgardOutcome).toBeTruthy();
+    // Leave → back to the star map (not a journey/travel screen), with a fresh strokeplay run.
+    s = reduce(s, { type: 'leaveAsgard' });
+    expect(s.screen).toBe('starTour');
+    expect(s.run.formatId).toBe(STROKEPLAY_FORMAT);
+    expect(s.run.status).toBe('active');
+    expect(s.run.staticCourseId).toBeUndefined();
+    expect(s.asgardFromStarTour).toBeUndefined();
   });
 });
 

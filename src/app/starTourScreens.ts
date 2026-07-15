@@ -21,7 +21,7 @@
 import { state } from './ctx';
 import { STATIC_COURSES, staticCourseSpec } from '../sim/course/staticCourses';
 import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
-import { starTourMapSVG, SHIP_DOCK_HEADING, type StarTourWorld } from '../render/starTourMap';
+import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
@@ -70,6 +70,9 @@ export const starTourView = {
   effect: 'none' as CourseEffectId,
   /** The course-record boards panel is open. */
   recordsOpen: false,
+  /** The Yggdrasil realm-tree overlay is open (GS-star-tour-yggdrasil): opened by flying to the World
+   *  Tree (visible only once Thor's Hammer is won), it lists the Nine Realms with Asgard playable. */
+  yggdrasilOpen: false,
   /** Set once the viewport has been auto-centred on the spaceport (app.ts). */
   centred: false,
   /** The chart scroll offset, preserved across re-renders (each render rebuilds the viewport node, so
@@ -97,6 +100,9 @@ export const starTourView = {
   /** Flying home to the SPACEPORT (GS-star-tour-port): on arrival the ship docks and the Clubhouse opens
    *  (the map's way OUT). Set by tapping the spaceport, cleared by any other fly. */
   dockingAtPort: false,
+  /** Flying to the hidden YGGDRASIL (GS-star-tour-yggdrasil): on arrival the realm-tree overlay opens.
+   *  Set by tapping the World Tree, cleared by any other fly. */
+  flyingToYggdrasil: false,
   /** Chart zoom (pinch/scroll), 1 = intrinsic. Preserved across re-renders like the scroll offset. */
   zoom: 1,
   /** Ship fuel (GS-star-tour-fuel), 0..STAR_TOUR_FUEL_CAP. Drains while cruising, tops up at stations. */
@@ -152,6 +158,16 @@ const TIER_COL: Record<StarTourWorld['tier'], string> = {
   testing: '#ffce54',
   brutal: '#ff6b6b',
 };
+
+/** The Thor's Hammer cosmetic id (GS-asgard) — winning it on Asgard is what REVEALS the hidden Yggdrasil
+ *  on the star map (GS-star-tour-yggdrasil). */
+const THOR_HAMMER_ID = 'thors-hammer';
+
+/** Whether the hidden Yggdrasil (the World Tree) is revealed on the chart — only once Thor's Hammer is
+ *  owned. Drives both the map glyph and whether the realm overlay can open. */
+export function yggdrasilArmed(): boolean {
+  return state.ownedApparel.includes(THOR_HAMMER_ID);
+}
 
 /** The Star Tour catalogue as plottable worlds, stamped with the player's records. */
 export function starTourWorlds(): StarTourWorld[] {
@@ -337,10 +353,47 @@ function recordsSheet(): string {
     </div>`;
 }
 
+/** The Yggdrasil realm-tree overlay (GS-star-tour-yggdrasil): the Nine Realms hanging on the World Tree.
+ *  ASGARD is playable (a "Cross the Bifröst" button dispatching `playYggdrasilRealm`); the other eight are
+ *  BARE branches — placeholder rows awaiting the realms they'll host, so a new realm is a data flip. */
+function yggdrasilSheet(): string {
+  const realms = YGGDRASIL_REALMS.map((r) => {
+    if (r.playable) {
+      return `<div class="gs-st-realm gs-st-realm--open">
+        <div class="gs-st-realm__head">
+          <span class="gs-st-realm__icon">⚔</span>
+          <b class="gs-st-realm__name">${r.name}</b>
+          <span class="gs-st-realm__badge">Open</span>
+        </div>
+        <p class="gs-st-realm__blurb">${r.blurb}</p>
+        <button class="gs-st-play" data-action='${JSON.stringify({ type: 'playYggdrasilRealm', realmId: r.id })}'>⚡ Cross the Bifröst &amp; challenge the Warriors Three</button>
+      </div>`;
+    }
+    return `<div class="gs-st-realm gs-st-realm--locked">
+      <div class="gs-st-realm__head">
+        <span class="gs-st-realm__icon">🌱</span>
+        <b class="gs-st-realm__name">${r.name}</b>
+        <span class="gs-st-realm__badge gs-st-realm__badge--soon">Yet to bloom</span>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="gs-st-sheet gs-st-sheet--ygg" role="dialog" aria-label="Yggdrasil — the World Tree">
+      <button class="gs-st-sheet__close" data-startour-ygg="0" aria-label="Close">✕</button>
+      <div class="gs-st-sheet__head">
+        <h2 class="gs-st-sheet__title">🌳 Yggdrasil</h2>
+        <span class="gs-st-tier" style="--tc:#7fe0a2;">The World Tree</span>
+      </div>
+      <p class="gs-st-sheet__blurb">The nine realms hang from the branches of the World Tree. Only Asgard has bloomed — the others await their worlds.</p>
+      <div class="gs-st-realms">${realms}</div>
+    </div>`;
+}
+
 /** The whole Star Tour screen. */
 export function starTourScreen(): string {
   const worlds = starTourWorlds();
   const sel = starTourView.selectedId ? worlds.find((w) => w.id === starTourView.selectedId) : undefined;
+  const armed = yggdrasilArmed();
   const chart = starTourMapSVG({
     seed: `startour:${state.run.seed}`,
     worlds,
@@ -351,8 +404,16 @@ export function starTourScreen(): string {
     shipHeading: starTourView.heading,
     shipFlip: starTourView.flip,
     zoom: starTourView.zoom,
+    showYggdrasil: armed,
+    yggdrasilSelected: starTourView.yggdrasilOpen,
   });
-  const sheet = sel ? dossier(sel) : starTourView.recordsOpen ? recordsSheet() : '';
+  const sheet = sel
+    ? dossier(sel)
+    : starTourView.yggdrasilOpen && armed
+    ? yggdrasilSheet()
+    : starTourView.recordsOpen
+    ? recordsSheet()
+    : '';
   return `
     <div class="gs-startour gs-st-space">
       <div class="gs-startour__viewport gs-st-space" id="gs-st-viewport">${chart}</div>

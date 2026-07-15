@@ -201,6 +201,10 @@ export interface UiState {
    *  with `strokeIsRecord` (did it set a NEW course best?). Transient. */
   lastStrokeRecord?: StrokePlayRecord;
   strokeIsRecord?: boolean;
+  /** The Asgard tournament was launched from the Star Tour's hidden Yggdrasil (GS-star-tour-yggdrasil),
+   *  not from a Rainbow-Road eagle mid-voyage — so there is no suspended journey to resume. `leaveAsgard`
+   *  reads this to return to the star map instead of a travel screen. Transient (never persisted). */
+  asgardFromStarTour?: boolean;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -242,6 +246,7 @@ export type Action =
   | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
   | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
+  | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
   | { type: 'buy'; id: string; confirmFire?: boolean } // confirmFire: the caddy-swap warning was accepted (GS-caddy-factions)
