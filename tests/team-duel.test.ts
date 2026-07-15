@@ -65,6 +65,18 @@ describe('team-duel format resolution (GS-team-duel)', () => {
     const seen = new Set([...Array(40).keys()].map((s) => resolveTeamFormat(boss, s)));
     expect(seen.has('scramble')).toBe(true);
     expect(seen.has('bestball')).toBe(true);
+    // ...AND across REALISTIC run seeds (freshRunSeed = up to ~1e9), where the old
+    // `seed * 2654435761` overflowed 2^53 and collapsed the parity to ~always scramble.
+    // Sample a wide spread and assert a genuine mix (neither format under a fifth of picks).
+    let scr = 0,
+      bb = 0;
+    for (let s = 0; s < 5000; s++) {
+      const seed = Math.floor(((s * 2654435761) % 1e9 + 1e9) % 1e9); // spread of large seeds, no Math.random
+      if (resolveTeamFormat(boss, seed) === 'scramble') scr++;
+      else bb++;
+    }
+    expect(scr).toBeGreaterThan(1000);
+    expect(bb).toBeGreaterThan(1000);
   });
 });
 
