@@ -359,20 +359,35 @@ export function ghostHoleStrokes(golferId: string, holeKey: string, par: number,
 
 /**
  * How much the Warriors Three SHARPEN for a tournament reached deep in a run / at a high Ascension
- * (GS-asgard-scaling) — a per-hole stroke `edge` fed to `ghostHoleStrokes` so encountering the Bifröst
- * LATE, with an upgraded bag and banked talents, stays a real fight instead of a roflstomp. DEPTH (stops
- * cleared — the "upgraded clubs" proxy the player actually feels) is the primary lever; Ascension adds on
- * top. Pure; returns 0 at a fresh, base-difficulty encounter, so that field is byte-identical to the
- * pre-scaling one. Capped so the field never trends into unbeatable territory (ties go to the player).
+ * (GS-asgard-scaling / GS-warriors-tune) — a per-hole stroke `edge` fed to `ghostHoleStrokes` so the
+ * Bifröst stays a real fight instead of a roflstomp. Two contexts (the Warriors are effectively a boss
+ * match, but LOSING costs nothing — no run ends — so they can sit ABOVE an ordinary boss):
+ *  • VOYAGE (`voyage = true`, reached via the Rainbow-Road eagle from a parked run): the player arrives
+ *    with pro-shop upgrades and can birdie most holes, so at edge 0 the Warriors (lowest-of-three ≈ 5
+ *    under over nine) were a roflstomp. A flat `WARRIORS_VOYAGE_BASE` floor makes even an EARLY trigger
+ *    tough — "slightly harder than an Arc-III boss" — then DEPTH + Ascension sharpen further, clamped to
+ *    `WARRIORS_VOYAGE_CAP` so a strong upgraded round (≈ 6 under) still wins ~11–24% of the time (hard,
+ *    but beatable when you play well; ties go to the player).
+ *  • STAR TOUR / Yggdrasil (`voyage = false`, no parked run): tuned for a DEFAULT-bag records chase — no
+ *    base, no depth, so it stays the gentle baseline (lowest-of-three ≈ 5 under), the easier venue. This
+ *    is the byte-identical pre-scaling field (edge 0 at depth 0), so existing Asgard tests are unchanged.
+ * Pure & deterministic.
  */
 export const WARRIORS_DEPTH_STEP = 0.03; // per stop cleared before the tournament
 export const WARRIORS_DEPTH_CAP = 10; // stops past which depth stops sharpening them further
 export const WARRIORS_ASC_STEP = 0.015; // per Ascension level
 export const WARRIORS_EDGE_CAP = 0.42; // absolute per-hole ceiling (~4 strokes over the nine)
-export function warriorsEdge(depth: number, ascension = 0): number {
+/** Voyage-only flat floor (GS-warriors-tune): the Warriors are tough even on an EARLY Rainbow-Road eagle,
+ *  so an upgraded player never roflstomps them — "slightly harder than an Arc-III boss". */
+export const WARRIORS_VOYAGE_BASE = 0.2;
+/** Voyage ceiling — held below WARRIORS_EDGE_CAP so even the deepest/high-Ascension Bifröst stays winnable
+ *  by a strong upgraded round (they cost nothing to lose, so they're hard, never a brick wall). */
+export const WARRIORS_VOYAGE_CAP = 0.34;
+export function warriorsEdge(depth: number, ascension = 0, voyage = false): number {
   const d = clamp(depth, 0, WARRIORS_DEPTH_CAP);
-  const raw = WARRIORS_DEPTH_STEP * d + WARRIORS_ASC_STEP * Math.max(0, ascension);
-  return clamp(raw, 0, WARRIORS_EDGE_CAP);
+  const base = voyage ? WARRIORS_VOYAGE_BASE : 0;
+  const raw = base + WARRIORS_DEPTH_STEP * d + WARRIORS_ASC_STEP * Math.max(0, ascension);
+  return clamp(raw, base, voyage ? WARRIORS_VOYAGE_CAP : WARRIORS_EDGE_CAP);
 }
 
 /**

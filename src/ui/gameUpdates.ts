@@ -273,7 +273,11 @@ export function withLoreGate(next: UiState): UiState {
  * snapshot (its ascension is the same value the Asgard run carries). Zero at a shallow, base encounter. */
 export function asgardFieldEdge(state: UiState): number {
   const src = state.asgardReturn;
-  return warriorsEdge(src?.stopIndex ?? 0, src?.ascension ?? state.run.ascension);
+  // A parked run (`asgardReturn`) ⇒ the VOYAGE Bifröst — the player arrives upgraded, so the Warriors
+  // sharpen off the flat voyage floor + depth/Ascension (GS-warriors-tune). No parked run ⇒ the Star
+  // Tour / Yggdrasil realm — the gentle default-bag baseline (voyage = false, byte-identical edge 0).
+  const voyage = !!src;
+  return warriorsEdge(src?.stopIndex ?? 0, src?.ascension ?? state.run.ascension, voyage);
 }
 
 /**
