@@ -50,11 +50,14 @@ describe('hole archetypes (GS-shapes-2)', () => {
       return n;
     };
     // A calm voyage already carries a healthy share of capes/hairpins (variety early), and a wild one
-    // still carries somewhat more (the dial turns up) — but calm is no longer near-zero.
+    // STILL carries a healthy share — the heroic shapes never vanish deep in. Note GS-variety-4 no
+    // longer requires wild ≥ calm: past the deep-game threshold the profiled worlds trade SOME of their
+    // bends for straight change-of-pace breathers (so a wild desert stops reading as an all-bends
+    // snake), so the cape/hairpin count is roughly flat-to-slightly-lower deep in, not monotonically up.
     const calm = countWild(0.1);
     const wild = countWild(0.9);
     expect(calm).toBeGreaterThan(30); // real variety on the calm opening stops
-    expect(wild).toBeGreaterThanOrEqual(calm); // wildness still adds a touch more
+    expect(wild).toBeGreaterThan(30); // and the heroic shapes are still plentiful on the wild deep stops
   });
 
   it('par-4 length VARIES: drivable holes are genuinely short, long holes genuinely long', () => {

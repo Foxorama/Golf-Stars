@@ -250,7 +250,7 @@ export const BIOMES: readonly Biome[] = [
     hazardKinds: ['waste', 'bunker'],
     greensideKind: 'bunker',
     scatter: [{ kind: 'waste', freqPerHole: 1.2, rMin: 7, rMax: 14 }],
-    fairwayWidthMult: 1.1,
+    fairwayWidthMult: 1.25, // GS-variety-4: a touch WIDER — the open desert should feel generous off the tee (fun-at-difficulty); the dune field + hourglass pinches, not a narrow corridor, are the defence
     doglegBias: 0.25,
     treeDensity: 0.2, // sparse desert scrub
     fairwayBunkers: 2.2, // sandy world — bunkers everywhere
@@ -274,7 +274,10 @@ export const BIOMES: readonly Biome[] = [
     // hourglass driving-zone pinches ask for a layup), not tight twisty corridors.
     parMix: { p3: 0.18, p4: 0.5, p5: 0.32 },
     shapeWeights: { straight: 0.32, dogleg: 0.22, cape: 0.28, double: 0.1, hairpin: 0.08 },
-    widthWeights: { classic: 0.18, chute: 0.05, neck: 0.07, hourglass: 0.16, wander: 0.16, thin: 0.06, broad: 0.32 },
+    // GS-variety-4: lean a touch further onto the BROAD/classic archetypes (a wider, more generous desert)
+    // while KEEPING the hourglass pinch (0.16) — that pinch + the corner-cut deep rough are what make the
+    // remaining bends strategic, so widening the norm doesn't flatten every hole into a free-swing snake.
+    widthWeights: { classic: 0.2, chute: 0.04, neck: 0.06, hourglass: 0.16, wander: 0.14, thin: 0.04, broad: 0.36 },
   },
   {
     id: 'ice-ring',

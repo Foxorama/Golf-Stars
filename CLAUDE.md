@@ -423,6 +423,21 @@ these systems** — each bullet is the tip of a documented iceberg.
     in count + position, not one even chain; every gap is floored to `ISLAND_GAP_MIN_YD` (past the
     render's dilation bridge) so a void carry always READS as a real gap (graphic ≡ physics), still
     clamped completable (`separateIslandGaps`/`validateIslandHops`). `GENERATOR_VERSION` 20.
+  - GS-variety-4 EXTENDS variety-3 to the PROFILED worlds (the player ask: a high-Ascension DESERT stop
+    read as an unbroken run of long, boring, bending "snakes"). Variety-3's `straightP`-rises-with-wildness
+    only fired on the FALLBACK (no-`shapeWeights`) picker, so every `shapeWeights` world (desert/scrap/ice/
+    jungle/…) stayed maximally bendy deep in. Now `pickWeightedShape(roll, weights, wildness)` lifts the
+    STRAIGHT share past `SHAPE_STRAIGHT_RAMP_MIN` (0.55) by `SHAPE_STRAIGHT_RAMP_K·(wildness−min)` and
+    renormalises — so a wild stop mixes in change-of-pace straight breathers (bend share ~84%→~75% on the
+    desert at w=1) instead of all-bends. Byte-identical BELOW the threshold (boost 0 ⇒ every calm/mid seeded
+    test unchanged) and consumes ZERO extra rng (remaps the already-drawn `shapeRoll`, contract 1); deep-stop
+    output re-flows so `GENERATOR_VERSION` is bumped. The DESERT also got a touch WIDER + more generous
+    (`fairwayWidthMult` 1.1→1.25, `widthWeights` leaned onto broad/classic) to make higher difficulty FUN not
+    tight — but KEEPS its hourglass pinch (0.16) and the corner-cut deep-rough reject margin was tightened
+    (+22→+18) so the wider fairways don't flatten the surviving bends into free curves (cutting a corner
+    still lands in hay). Difficulty from strategy + length + wind + big greens, never a monotonous snake.
+    Guarded by the composed + IID death-spiral bars (huge headroom: all-worlds toPar ~0.62 at w=1) and the
+    biome-profile contrasts. `GENERATOR_VERSION` 41.
   - DEEP ROUGH chokes a dogleg's cut-the-corner chord (biome opt-in `deepRough`; ocean uses water);
     fair by construction (far from the bent corridor), wildness-gated, zero-rng on straight holes.
   - ROUGH GRADIENT (GS-rough-gradient): a distance-graded fill LINES every non-lost hole so a spray
