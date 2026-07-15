@@ -1292,23 +1292,25 @@ let selClubSetTouched = false;
 // click that ends the drag doesn't accidentally select the world it lands on. Reset on each pointerdown.
 let starTourDragged = false;
 
-/** Star Tour chart zoom bounds (pinch / scroll). The MIN is dynamic (`starTourFitZoom`) so the player can
- *  pull ALL the way back to see the whole wide map — essential on a tall portrait phone where the old
- *  COVER floor (`max(w/CHART_W, h/CHART_H)`) forced a heavy zoom-in just to cover the viewport height and
- *  made zoom-out nearly impossible (GS-star-map-zoom-out). Below the fit floor the chart is centred
- *  (letterboxed) via JS-computed margins (`applyStarTourChartSize`) — not flexbox (its stretch distorted
- *  the SVG's aspect and broke pan/pinch/ship-motion), so the scroll-pan model is preserved. */
+/** Star Tour chart zoom bounds (pinch / scroll). The MIN is dynamic (`starTourFitZoom`) and set to the
+ *  COVER floor so a pinch-out never pulls back past the point where the chart still fills the whole
+ *  viewport — no empty black letterbox bands ever show (the player ask: "zoom goes too far out, leaving
+ *  black empty map sections"). The earlier FIT floor (`min(w/CHART_W, h/CHART_H)`) let the whole wide map
+ *  shrink inside the viewport with dark bands on the axis it didn't fill (GS-star-map-zoom-out); the
+ *  starry `.gs-st-space` backdrop softened those bands but they still read as empty (GS-star-map-zoom-cap).
+ *  The chart is a big, near-square canvas (lots of starry PAD around the world cluster), so the cover
+ *  floor still shows plenty of open space to fly into while keeping the frame full. */
 const ST_ZOOM_MAX = 2.6;
 
-/** The smallest zoom at which the WHOLE chart still FITS inside the viewport (SVG = `CHART_W×CHART_H ×
- *  zoom` px): the entire map is visible, letterboxed on the axis it doesn't fill. Fitting both axes means
- *  clearing the SMALLER ratio, so the floor is the lesser of width/height fit. Guards a zero-sized
- *  viewport (pre-layout) by falling back to 0 so the caller's own bounds win. */
+/** The smallest zoom at which the chart still COVERS the whole viewport (SVG = `CHART_W×CHART_H × zoom`
+ *  px): every viewport edge is filled, the chart overflowing (pannable) on the axis it doesn't exactly
+ *  match. Covering both axes means clearing the LARGER ratio, so the floor is the greater of width/height
+ *  fit. Guards a zero-sized viewport (pre-layout) by falling back to 0 so the caller's own bounds win. */
 function starTourFitZoom(vp: HTMLElement): number {
   const w = vp.clientWidth;
   const h = vp.clientHeight;
   if (w <= 0 || h <= 0) return 0;
-  return Math.min(w / CHART_W, h / CHART_H);
+  return Math.max(w / CHART_W, h / CHART_H);
 }
 
 /** The letterbox margin (px) that CENTRES the chart on each axis when the scaled chart is SMALLER than the
@@ -1339,10 +1341,10 @@ function applyStarTourChartSize(vp: HTMLElement): { mx: number; my: number } {
   return m;
 }
 
-/** Keep the chart's rendered size within the fit floor / max ceiling (used on mount + resize): if the
- *  current zoom is below the fit floor (whole chart no longer fits) or above the max, clamp it; then
- *  (re)size the SVG + re-centre. Never forces a zoom-IN — the default open zoom (`ST_OPEN_ZOOM`) sits
- *  above fit. */
+/** Keep the chart's rendered size within the cover floor / max ceiling (used on mount + resize): if the
+ *  current zoom is below the cover floor (chart no longer fills the viewport) or above the max, clamp it;
+ *  then (re)size the SVG + re-centre. May force a zoom-IN when the default open zoom (`ST_OPEN_ZOOM`) sits
+ *  below the cover floor on a viewport whose aspect needs more scale to stay full-frame. */
 function clampStarTourZoom(vp: HTMLElement): void {
   const zFit = starTourFitZoom(vp);
   if (zFit <= 0) return;
@@ -1366,9 +1368,9 @@ function wireStarTourGestures(vp: HTMLElement): void {
   vp.style.cursor = 'grab';
 
   const setZoom = (z: number, focalClientX: number, focalClientY: number): void => {
-    // Floor at the FIT zoom so a pinch-out can pull all the way back to the whole map (letterboxed +
-    // centred below fit) but never smaller than that — no point zooming past "everything visible".
-    // Keep the ceiling above the floor for the degenerate case where the fit itself exceeds ST_ZOOM_MAX.
+    // Floor at the COVER zoom so a pinch-out can pull back until the chart just fills the viewport but
+    // never smaller than that — past it the map would letterbox into empty black bands (GS-star-map-zoom-cap).
+    // Keep the ceiling above the floor for the degenerate case where the cover itself exceeds ST_ZOOM_MAX.
     const zMin = starTourFitZoom(vp);
     const zMax = Math.max(ST_ZOOM_MAX, zMin);
     z = Math.max(zMin, Math.min(zMax, z));
