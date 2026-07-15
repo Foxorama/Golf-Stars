@@ -2185,16 +2185,19 @@
       .gs-lore__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--acc);
         box-shadow: 0 0 10px 1px color-mix(in srgb, var(--acc) 80%, transparent); }
 
-      .gs-lore__stage { display: flex; flex-wrap: wrap; gap: clamp(12px, 3vw, 20px); align-items: center;
-        justify-content: center; margin: 14px 0 4px; }
+      /* Always STACK the portrait ON TOP of the dialogue (never a side-by-side that, on wide phones,
+         floats Dan in a short column beside the text and shrinks the whole card into a centred sliver
+         with big empty bands). Dan is a hero that fills the width; the dialogue reads full-width below. */
+      .gs-lore__stage { display: flex; flex-direction: column; align-items: center;
+        gap: clamp(10px, 2.4vw, 14px); margin: clamp(10px, 2.6vw, 16px) 0 4px; }
       .gs-lore__portrait {
-        flex: 0 0 auto; width: clamp(128px, 30vw, 176px);
-        border-radius: 16px; padding: 8px 8px 0;
-        background: radial-gradient(80% 70% at 50% 24%, color-mix(in srgb, var(--acc) 22%, transparent), transparent 70%);
-        filter: drop-shadow(0 8px 22px rgba(0,0,0,.5));
+        flex: 0 0 auto; width: clamp(150px, 44vw, 216px);
+        border-radius: 16px; padding: 4px 8px 0;
+        background: radial-gradient(78% 68% at 50% 26%, color-mix(in srgb, var(--acc) 24%, transparent), transparent 70%);
+        filter: drop-shadow(0 10px 26px rgba(0,0,0,.55));
       }
       .gs-lore__portrait svg { display: block; }
-      .gs-lore__lines { flex: 1 1 240px; min-width: 220px; display: flex; flex-direction: column; gap: 9px; }
+      .gs-lore__lines { width: 100%; display: flex; flex-direction: column; gap: 9px; }
       .gs-lore__say {
         background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.08);
         border-left: 3px solid color-mix(in srgb, var(--acc) 65%, transparent);
@@ -2208,10 +2211,6 @@
       .gs-lore__cta { margin-top: 16px; }
       .gs-lore__cta .gs-btn { width: 100%; text-align: center; font-size: 16px; padding: 13px; }
 
-      @media (max-width: 460px) {
-        .gs-lore__stage { flex-direction: column; }
-        .gs-lore__lines { flex-basis: auto; width: 100%; }
-      }
       @media (prefers-reduced-motion: reduce) {
         .gs-lore__card { animation: none; }
       }
