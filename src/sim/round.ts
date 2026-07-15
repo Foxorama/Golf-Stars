@@ -1923,6 +1923,45 @@ function maxReachOf(bag: readonly Club[], carryMult: number, lie: FeatureKind): 
   return max * carryMult * lieInfo(lie).carryMult;
 }
 
+/**
+ * The SMART interactive default aim (GS-default-aim). Where a helpful auto-aim assist points so the
+ * default framing looks DOWN the hole, never out into the rough:
+ *   - a par 3 (or any one-shot hole) → the FLAG (attack it — that's the whole shot);
+ *   - a par 4/5 TEE shot → down the fairway CENTRELINE (dogleg-aware: the corridor station a good
+ *     drive reaches, not a straight line that cuts the corner into the trees);
+ *   - a par 4/5 NON-tee shot → the FLAG when the green is reachable (the best shot at the hole),
+ *     else position down the corridor like the tee shot.
+ * Routes the positioning aim through the shared `safeTarget` so a forced carry / side hazard on the
+ * way is still respected (fair by construction). Pure, zero rng. Interactive-only — the headless auto
+ * sim keeps its own `layupTarget` line, so determinism (contract 1) and every seeded test are
+ * untouched; only the interactive shot screen's DEFAULT target changes.
+ */
+export function autoAimTarget(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind = 'tee',
+  bag: readonly Club[] = CLUBS,
+  carryMult: number = biomeCarryMult(hole),
+): Vec {
+  const pin = pinOf(hole);
+  if (hole.par <= 3) return pin;
+  const maxReach = maxReachOf(bag, carryMult, lie);
+  // A shot from off the tee that can carry to the green goes for the flag.
+  if (lie !== 'tee' && maxReach > 0 && dist(ball, pin) <= maxReach) return pin;
+  // Tee shot, or an out-of-reach approach: position DOWN the corridor. Aim at the centreline station a
+  // good drive reaches (following any dogleg) — this keeps the camera framed on the hole, not the rough.
+  const t0 = nearestCentrelineT(hole, ball);
+  const tAim = stationAtDistance(hole, ball, t0, maxReach * WIDTH_LAYUP.meanLandFrac);
+  const aimPt = pointAlong(hole.centreline, tAim);
+  // If the straight line to that station is penalty-free, aim there. Otherwise a forced carry blocks it:
+  // defer to the shared safe logic toward the green (carry it, or lay up short — fair by construction),
+  // but never aim a positioning shot PAST a drive (the fractional side-hazard advance can overshoot on a
+  // wandering corridor), so fall back to the reachable station if the safe line runs long.
+  if (clearLine(hole, ball, aimPt)) return aimPt;
+  const safe = safeTarget(hole, ball, pin, maxReach);
+  return dist(ball, safe) <= maxReach + 1e-6 ? safe : aimPt;
+}
+
 /** Auto putt-out from a position (exported for the interactive driver). */
 export function puttOutFrom(
   rng: Rng,

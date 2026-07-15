@@ -52,6 +52,16 @@ export function settingsOverlay(): string {
         ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
         ${row('leftHanded', 'Left-handed', 'Enables left handed mode')}
         ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
+        <div style="margin:8px 4px 3px;font-size:12px;opacity:.72;">🎯 Aim assist — how every shot is pre-aimed (change it in play with the ◎ button too)</div>
+        <label class="gs-selpill" style="--cc:var(--gs-info);width:100%;box-sizing:border-box;margin-bottom:2px;">
+          <span class="gs-selpill-l">🎯 Aim</span>
+          <select class="gs-selpill-sel" data-selaim aria-label="Default aim mode">
+            <option value="auto"${s.aimMode === 'auto' ? ' selected' : ''}>Auto — smart</option>
+            <option value="attack"${s.aimMode === 'attack' ? ' selected' : ''}>Attack the flag</option>
+            <option value="safe"${s.aimMode === 'safe' ? ' selected' : ''}>Play safe</option>
+          </select>
+          <span class="gs-selpill-caret" aria-hidden="true">▾</span>
+        </label>
         ${homeRow}
         <div style="text-align:center;margin-top:10px;">
           <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 26px;">Done</button>

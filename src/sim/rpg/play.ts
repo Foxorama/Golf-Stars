@@ -14,6 +14,7 @@ import { type Club } from '../clubs';
 import {
   aiClub,
   attackTarget,
+  autoAimTarget,
   backspinRoll,
   biomeCarryMult,
   executeShot,
@@ -43,7 +44,7 @@ import type { Rng } from '../rng';
 import { netDispersion, puttSkillOf, spinReadOf, usableBag, type PlayerLoadout } from './economy';
 import { characterShotMods } from './characters';
 
-export type AimMode = 'attack' | 'safe';
+export type AimMode = 'attack' | 'safe' | 'auto';
 
 export interface ShotDecision {
   clubId: string;
@@ -101,6 +102,9 @@ export interface ShotView {
   attackClubId: string;
   /** Suggested club id for a safe lay-up to the corridor. */
   safeClubId: string;
+  /** Suggested club id for the smart 'auto' default aim (GS-default-aim) — matches its target so the
+   *  default club fits the auto line (centreline off the tee, flag on a reachable approach). */
+  autoClubId: string;
   /** True when the safe target differs from the pin (the line is blocked). */
   blocked: boolean;
   strokesSoFar: number;
@@ -118,6 +122,7 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
   // Same forced-carry-aware layup the auto sim uses (same bag/lie/carryMult → byte-for-byte).
   const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
+  const auto = autoAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
   return {
     distToPin: Math.round(dist(state.ball, pin)),
     lie: state.lie,
@@ -127,9 +132,27 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
       dispersionMult,
     }).id,
     safeClubId: aiClub(state.hole, state.ball, safe, carryMult, bag).id,
+    autoClubId: aiClub(state.hole, state.ball, auto, carryMult, bag).id,
     blocked: dist(safe, pin) > 1,
     strokesSoFar: state.strokes,
   };
+}
+
+/** Resolve a shot decision's aim to a concrete course-space target. SHARED by `previewShot`,
+ *  `takeShot` (and the auto-finish) so the contemplated cone, the fired shot, and the headless
+ *  auto-finish are byte-for-byte identical (contract 2). A free-drag `target` always wins; otherwise
+ *  the aim mode maps to a target — 'attack' the flag, 'safe' the corridor lay-up, 'auto' the smart
+ *  default aim (centreline off the tee, flag on a reachable approach). */
+function aimTargetOf(
+  state: HolePlay,
+  decision: ShotDecision,
+  bag: readonly Club[],
+  carryMult: number,
+): Vec {
+  if (decision.target) return decision.target;
+  if (decision.aim === 'attack') return pinOf(state.hole);
+  if (decision.aim === 'auto') return autoAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
+  return layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
 }
 
 /** The spread the player's contemplated shot would have — for the aiming spray cone.
@@ -141,9 +164,7 @@ export function previewShot(
 ): ShotSpread {
   const carryMult = biomeCarryMult(state.hole);
   const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
-  const target =
-    decision.target ??
-    (decision.aim === 'attack' ? pinOf(state.hole) : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
+  const target = aimTargetOf(state, decision, bag, carryMult);
   const club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
   const dispersionMult = netDispersion(loadout);
@@ -226,9 +247,7 @@ export function takeShot(
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
   const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
-  const target =
-    decision.target ??
-    (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
+  const target = aimTargetOf(state, decision, bag, carryMult);
   const club: Club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
 
@@ -388,9 +407,7 @@ export function resolveScrambleShot(
   const pin = pinOf(state.hole);
   const carryMult = biomeCarryMult(state.hole);
   const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
-  const target =
-    decision.target ??
-    (decision.aim === 'attack' ? pin : layupTarget(state.hole, state.ball, state.lie, bag, carryMult));
+  const target = aimTargetOf(state, decision, bag, carryMult);
   const club: Club =
     bag.find((c) => c.id === decision.clubId) ?? aiClub(state.hole, state.ball, target, carryMult, bag);
   const dispersionMult = netDispersion(loadout);
