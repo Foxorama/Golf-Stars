@@ -11,7 +11,7 @@ import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { installDecorProbe } from './render/decorProbe';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { type ProjectOptions } from './render/project';
-import { shotView, previewShot, previewBackspin, awaitingPutt, canPuttFringe } from './sim/rpg/play';
+import { shotView, previewShot, previewBackspin, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
@@ -415,7 +415,18 @@ let animatedShots = 0; // shots of the current hole already animated
 let animHoleIndex = -1;
 let animatedPutts = 0; // putts of the current hole already animated
 let selClubId: string | null = null;
-let selAim: 'attack' | 'safe' = 'attack';
+// The per-shot aim mode (GS-default-aim). Seeded from the player's persisted `aimMode` preference
+// each new shot (default 'auto' — the smart down-the-hole assist); the in-play ◎ button and the
+// settings pill change it. A free-drag aim (`selFreeTarget`) overrides it for that shot.
+let selAim: AimMode = 'auto';
+// Cycle order for the in-play aim-mode button + labels/icons shared by the button, its title, the
+// power HUD note, and the settings pill (GS-default-aim).
+const AIM_MODES: readonly AimMode[] = ['auto', 'attack', 'safe'] as const;
+function aimModeMeta(m: AimMode): { icon: string; label: string; note: string } {
+  if (m === 'attack') return { icon: '🚩', label: 'Attack the flag', note: 'aim: flag' };
+  if (m === 'safe') return { icon: '🛟', label: 'Play safe', note: 'aim: safe' };
+  return { icon: '◎', label: 'Auto aim', note: 'aim: auto' };
+}
 // Fringe/apron putt (GS-fringe-putt): when the ball is just off the green, putting with the pace
 // meter is offered (and is the default) instead of an awkward full-swing chip — `selPutt` toggles
 // between the putt meter and the normal shot gesture. Reset each new shot to the lie's natural choice.
@@ -886,7 +897,7 @@ function playingBody(animating: boolean): string {
   if (newShot) {
     decisionShotCount = play.shots.length;
     selClubId = null;
-    selAim = 'attack';
+    selAim = getSettings().aimMode; // the player's default aim assist (GS-default-aim), 'auto' by default
     selFreeTarget = null;
     selPower = 1; // seeded sensibly below once the club is known; full swing is the fallback
     selAimBearing = null; // re-seed the aim to the pin for the new shot
@@ -1044,11 +1055,19 @@ function playingBody(animating: boolean): string {
   const hasSuggest = !!state.run.loadout.clubSuggest;
   const onGreenPutter = v.lie === 'green' && usable.some((c) => c.id === 'putter');
   // The green-coverage suggestion. Putter is the obvious green default for everyone — that's not a
-  // "suggestion", just the only sensible flat-stick choice.
+  // "suggestion", just the only sensible flat-stick choice. This is Sam's 🏌 snap-to club (the pin
+  // attack), independent of the aim mode.
   const suggested = onGreenPutter ? 'putter' : v.attackClubId;
-  // Default selection: putter on the green, else the green-coverage club (longest that still stops on
-  // the green). You can still cycle/override; Sam just makes the suggestion explicit and snap-back-able.
-  const defaultClubId = suggested;
+  // Default selection: putter on the green, else the club that fits the DEFAULT AIM (GS-default-aim) —
+  // the auto/safe positioning club off the tee, the green-coverage club when attacking the flag — so
+  // the pre-armed club matches where we're pre-aimed. You can still cycle/override.
+  const defaultClubId = onGreenPutter
+    ? 'putter'
+    : selAim === 'safe'
+      ? v.safeClubId
+      : selAim === 'auto'
+        ? v.autoClubId
+        : v.attackClubId;
   if (selClubId === null || !usable.some((c) => c.id === selClubId)) selClubId = defaultClubId;
   const maxPower = maxPowerOf(state.run.loadout);
   // Seed the at-rest preview POWER on a NEW shot so the default cone lands AT the target rather than
@@ -1132,11 +1151,20 @@ function playingBody(animating: boolean): string {
     </div>`;
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
-  // Club row: ◄ name ► + (re-aim-at-pin when nudged) + (Sam's snap-to-suggested when hired).
+  // Aim-mode toggle (GS-default-aim): cycle the default aim between the smart auto assist, always-attack
+  // the flag, and always-play-safe. It sets the persisted preference AND this shot; a free-drag aim
+  // (🎯 clears it) still overrides for the current shot. Hidden while a manual aim is dragged (the 🎯
+  // reset owns that state) so the two controls never contradict.
+  const aimMeta = aimModeMeta(selAim);
+  const aimBtn = selFreeTarget
+    ? ''
+    : `<button class="gs-btn gs-mini${selAim === 'auto' ? '' : ' gs-btn--on'}" data-aimmode="1" title="Aim: ${aimMeta.label} — tap to change">${aimMeta.icon}</button>`;
+  // Club row: ◄ name ► + aim-mode + (re-aim-at-pin when nudged) + (Sam's snap-to-suggested when hired).
   const clubRow = `<div class="gs-clubrow">
       ${cbtn('◄', -1)}
       <span class="gs-clubname">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</span>
       ${cbtn('►', 1)}
+      ${aimBtn}
       ${selFreeTarget ? `<button class="gs-btn gs-mini" data-aimreset="1" title="Re-aim at the pin">🎯</button>` : ''}
       ${hasSuggest ? `<button class="gs-btn gs-mini${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🏌</button>` : ''}
       ${canPuttFringe(play) ? `<button class="gs-btn gs-mini" data-putt-toggle="1" title="Putt from the fringe">⛳</button>` : ''}
@@ -1148,7 +1176,12 @@ function playingBody(animating: boolean): string {
     const powerPct = Math.round(selPower * 100);
     const over = selPower > 1.001;
     const powerCol = over ? '#ff8a3d' : selPower >= 0.66 ? '#5fd45a' : selPower >= 0.33 ? '#ffc454' : '#9fd8e6';
-    const aimNote = selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2 ? 'aim adjusted' : 'aim: pin';
+    const aimNote =
+      selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2
+        ? 'aim adjusted'
+        : selFreeTarget
+          ? 'aim: pin'
+          : aimModeMeta(selAim).note;
     return `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
       <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · pull back to cancel' : 'pull DOWN on the map'}</span></div>`;
   };
@@ -2133,6 +2166,22 @@ function render(): void {
       render();
     });
   });
+  // Aim-mode toggle (GS-default-aim): cycle auto → attack → safe, persist it as the default, and apply
+  // it to THIS shot. Re-seed the club to the new mode's fit and clear any drag aim so the mode takes.
+  app.querySelectorAll<HTMLElement>('[data-aimmode]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const next = AIM_MODES[(AIM_MODES.indexOf(selAim) + 1) % AIM_MODES.length]!;
+      selAim = next;
+      setSetting('aimMode', next);
+      selClubId = null; // re-seed the default club to fit the new aim on the next render
+      selFreeTarget = null;
+      selAimBearing = null;
+      resumeAudio();
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
   // Map-nav: overview/follow toggle + recenter.
   app.querySelectorAll<HTMLElement>('[data-mapview]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -2239,6 +2288,20 @@ function render(): void {
       selAscension = Number(el.value);
       // Remember the pick so the picker defaults here next run instead of snapping back to A0.
       setSetting('lastAscension', selAscension);
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // Default aim-mode DROPDOWN in the settings sheet (GS-default-aim): persist the preference and, if a
+  // shot is being aimed, apply it now (re-seeding the club to fit + clearing any drag aim).
+  app.querySelectorAll<HTMLSelectElement>('[data-selaim]').forEach((el) => {
+    el.addEventListener('change', () => {
+      selAim = el.value as AimMode;
+      setSetting('aimMode', selAim);
+      selClubId = null;
+      selFreeTarget = null;
+      selAimBearing = null;
       sfx.click();
       haptic(HAPTICS.tap);
       render();

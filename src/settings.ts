@@ -10,6 +10,8 @@
  * disabled-storage browser degrades to the defaults rather than throwing.
  */
 
+import type { AimMode } from './sim/rpg/play';
+
 export interface Settings {
   /** Master sound on/off (assetless WebAudio SFX). */
   sound: boolean;
@@ -27,6 +29,11 @@ export interface Settings {
   /** Last Ascension difficulty picked on character select (GS-title-2) — so the picker defaults to
    *  the tier you chose last, not always A0. Clamped to the unlocked max when read. */
   lastAscension: number;
+  /** Default aim assist (GS-default-aim): how the shot screen pre-aims each shot across ALL modes.
+   *  'auto' (smart — flag on a par 3, down the fairway centreline off a par 4/5 tee, flag on a
+   *  reachable approach else corridor); 'attack' (always the flag — the old default); 'safe' (always
+   *  lay up to the corridor). Set by the in-play ◎ button and the settings pill. */
+  aimMode: AimMode;
 }
 
 const KEY = 'gs_settings';
@@ -49,6 +56,7 @@ function defaults(): Settings {
     leftHanded: false,
     fastShots: false,
     lastAscension: 0,
+    aimMode: 'auto',
   };
 }
 

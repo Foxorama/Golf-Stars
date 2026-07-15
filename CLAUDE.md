@@ -1013,6 +1013,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     wiring mutates. A new screen = a new `src/app/` module, not more app.ts.
   - Visual theme is the design-token CSS in `index.html`, not the SVG layer. The play screen is
     full-bleed and never scrolls; pull-to-power is the only shot input.
+  - DEFAULT AIM is a smart assist (GS-default-aim): `selAim` seeds from the persisted `Settings.aimMode`
+    each new shot (default `'auto'`), resolved by the SHARED `aimTargetOf` in `play.ts` (so `previewShot`/
+    `takeShot`/auto-finish stay byte-identical, contract 2). `'auto'` = the pure `round.ts autoAimTarget`:
+    par 3 → the flag; par 4/5 TEE → down the fairway CENTRELINE (dogleg-aware station at ~drive reach, not
+    a straight line that cuts the corner into rough); par 4/5 NON-tee → the flag when the green's reachable,
+    else position down the corridor. Forced carries defer to `safeTarget` (clamped ≤ reach). `'attack'`
+    (flag) + `'safe'` (`layupTarget` corridor lay-up) are the old modes. INTERACTIVE-only — the headless
+    `playHole` keeps its own `layupTarget` line, so determinism (contract 1) + every seeded test are
+    untouched. Change it in play via the ◎ club-row button (cycles auto→attack→safe, persists) or the
+    settings-sheet 🎯 pill; the default club seeds to the mode's fit (`ShotView.autoClubId`). A free-drag
+    aim still overrides for that shot. `aimMode` is a `Settings` field (no save bump, no `_gs*`/URL hook →
+    no test-hub wiring). Guarded by `tests/default-aim.test.ts`.
   - The settings cog rides EVERY screen (appended once in `render()`); "Return to title" is
     NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
