@@ -755,8 +755,15 @@ these systems** — each bullet is the tip of a documented iceberg.
 - **Competition & leaderboards** — `docs/decisions/competition.md`
   - The field is a deterministic STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims.
   - Voyage survival is your POSITION in one persistent field thinning to the final two;
-    `competition.ts` is the single source for the drawn board AND real survival. Only the FINAL
-    ordinary stop cuts to 2; every earlier target floors at 4.
+    `competition.ts` is the single source for the drawn board AND real survival. The cut thins GENTLY
+    so the leaderboard keeps VARIETY the whole way and CONVERGES to 2 only at the FINAL ordinary stop
+    (GS-cut-variety): base curve `VOYAGE_SURVIVOR_TARGETS = [16,13,10,8,5,2]` with a PER-ORDINAL floor
+    `VOYAGE_SURVIVOR_FLOORS = [10,8,7,5,4,2]`, so even at `ASCENSION_MAX` the field stays a real,
+    descending set through arcs 1–2 (≥7 mid-arc-2) and only the last ordinal reaches 2. Ascension
+    tightens the EARLY cuts but can NEVER flatten the curve to its floor (the old flat floor of 4
+    collapsed a hard voyage to a four-golfer board for two arcs); high-Ascension difficulty rides the
+    field's strength (`voyageFieldEase`→0 by A8) + scaling bosses, and the binding survival gate is the
+    final top-2 (even-par A8 survival stays ~brutal, `a8<0.15`).
   - LOW-Ascension ghost-field EASE (GS-green-ease): `voyageFieldEase(ascension)` hands the whole AI
     field back `VOYAGE_EASE_A0` (0.66) SF/hole at A0 — held across A0–A4, faded to 0 by A8 — so a
     green-bag player shooting ~even par is competitive at the gentle tiers (cut-survival ≈84→61% A0→A4)

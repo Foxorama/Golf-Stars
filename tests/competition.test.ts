@@ -381,29 +381,37 @@ describe('arcCut (positional cut, GS-positional-cut)', () => {
   });
 
   it('survivor targets ramp the persistent voyage field down to the final two (GS-voyage-field)', () => {
-    // One field across the whole voyage; the cut thins it 16→12→9→6→4→2 over the six ordinary stops,
+    // One field across the whole voyage; the cut thins it 16→13→10→8→5→2 over the six ordinary stops,
     // so exactly two remain (you + one rival) going into the final matchplay.
     expect(arcSurvivorTarget(0)).toBe(16); // arc 1, ordinary stop 0
-    expect(arcSurvivorTarget(1)).toBe(12); // arc 1, ordinary stop 1
+    expect(arcSurvivorTarget(1)).toBe(13); // arc 1, ordinary stop 1
     expect(arcSurvivorTarget(2)).toBeUndefined(); // boss slot — a knockout, no positional cut
-    expect(arcSurvivorTarget(3)).toBe(9); // arc 2, ordinary stop 0
-    expect(arcSurvivorTarget(4)).toBe(6); // arc 2, ordinary stop 1
-    expect(arcSurvivorTarget(6)).toBe(4); // arc 3, ordinary stop 0
+    expect(arcSurvivorTarget(3)).toBe(10); // arc 2, ordinary stop 0
+    expect(arcSurvivorTarget(4)).toBe(8); // arc 2, ordinary stop 1
+    expect(arcSurvivorTarget(6)).toBe(5); // arc 3, ordinary stop 0
     expect(arcSurvivorTarget(7)).toBe(2); // arc 3, ordinary stop 1 → the final two
-    expect(arcSurvivorTarget(0, 3)).toBe(13); // ascension tightens it
+    expect(arcSurvivorTarget(0, 3)).toBe(13); // ascension tightens the early cuts
   });
 
-  it('only the FINAL ordinary stop cuts to 2 — pre-final targets floor at 4 under Ascension (GS-cut-balance)', () => {
-    // The reported bug: Ascension floored every target at 2, so a hard voyage collapsed to a
-    // two-player duel stops before the Galactic Major. The 1-v-2 must exist ONLY at the final boss;
-    // the section right before it (stops 6–7) keeps a field of at least four.
-    for (const asc of [1, 2, 5, 7, 15]) {
-      for (const stop of [0, 1, 3, 4, 6]) {
-        expect(arcSurvivorTarget(stop, asc)!).toBeGreaterThanOrEqual(4); // every pre-final stop
-      }
-      expect(arcSurvivorTarget(7, asc)).toBe(2); // the final ordinary stop → the title duel
+  it('the field stays VARIED before the final and converges to 2 only at the end, at ALL Ascensions (GS-cut-variety)', () => {
+    // The reported bug: a flat floor of 4 let a high-Ascension voyage collapse to a four-golfer board
+    // from the end of arc 1 — at A8 the middle of arc 2 had only four golfers left, no variety for two
+    // whole arcs. Now each pre-final stop keeps a real, DESCENDING field at every difficulty, and only
+    // the final ordinary stop is the 1-v-2 title duel.
+    const ordinaries = [0, 1, 3, 4, 6, 7]; // arc1 ·2, arc2 ·2, arc3 ·2 (skips the boss slots 2, 5, 8)
+    for (const asc of [0, 1, 2, 5, 8, 12, 15]) {
+      const t = ordinaries.map((s) => arcSurvivorTarget(s, asc)!);
+      // Strictly descending — every ordinary stop eliminates at least one golfer.
+      for (let i = 1; i < t.length; i++) expect(t[i]!).toBeLessThan(t[i - 1]!);
+      // The final is the title duel; the stop before it still fields four+ (variety, not a 1-v-2).
+      expect(t[5]).toBe(2);
+      expect(t[4]!).toBeGreaterThanOrEqual(4);
+      // Arc 2 keeps a genuine field even at the deepest squeeze (the A8 complaint: was 4, now ≥5).
+      expect(arcSurvivorTarget(3, asc)!).toBeGreaterThanOrEqual(7); // mid arc 2
+      expect(arcSurvivorTarget(4, asc)!).toBeGreaterThanOrEqual(5); // into the arc-2 boss
     }
-    expect(arcSurvivorTarget(6, 15)).toBe(4); // deepest squeeze still fields four into the Far Reach
+    // The specific reported case: A8, middle of arc 2 — a varied field, not four.
+    expect(arcSurvivorTarget(3, 8)!).toBe(7);
   });
 
   it('keeps the top-N and cuts the rest; a strong player survives, a blanking one is out', () => {
