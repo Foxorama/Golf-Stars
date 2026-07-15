@@ -48,12 +48,23 @@ export const HOME_EDGE_HANDICAP = 2;
 // hunt pins (the shared GS-ai-attack target rule). A0 with a common bag is an exact no-op, so the
 // classic boss — and every existing seeded test — is byte-for-byte unchanged.
 
-/** The run-derived sharpening a boss duel is played at. Empty/A0+common = the classic boss. */
+/** The run-derived sharpening a boss duel is played at. Empty/A0+common+arc0 = the classic boss. */
 export interface BossEdge {
   /** Ascension tier of the run (0 = classic, byte-identical). */
   ascension?: number;
   /** The run's bag tier — the boss brings the same rarity clubs (gear parity). */
   bagTier?: BagTier;
+  /**
+   * The boss's ARC RANK (GS-boss-escalation): 0 for the Arc-I boss, 1 for Arc-II, 2 for the Arc-III
+   * final — so a voyage's three bosses ESCALATE, not just scale flat with Ascension. Derived from the
+   * boss's `cutBonus` (1/2/3 → rank 0/1/2), reviving that field's documented "boss is harder" purpose:
+   * it was inert because a matchplay boss passes on the DUEL (`matchWon`), never the Stableford cut, so
+   * the +1/+2/+3 cut never bit. It now sharpens the boss LOADOUT instead — handicap, distance, dispersion
+   * — stacking ON TOP of the Ascension edge. Rank 0 (Arc-I, and the default) is byte-identical to the
+   * classic boss. A grown player (deep bag + perks) is meant to out-club the escalation and still win;
+   * the escalation just restores a real difficulty CLIMB across the campaign.
+   */
+  arcRank?: number;
 }
 
 /** Handicap strokes shaved off the boss per Ascension tier (they bottom out at scratch). */
@@ -66,6 +77,23 @@ export const BOSS_ASC_DISPERSION = 0.015;
 export const BOSS_ASC_DISPERSION_FLOOR = 0.78;
 /** From this Ascension tier up, the boss hunts pins (GS-ai-attack) instead of the percentage play. */
 export const BOSS_ATTACK_ASCENSION = 4;
+
+/**
+ * Per-ARC-RANK boss sharpening (GS-boss-escalation) — the Arc-II boss is harder than Arc-I, the Arc-III
+ * final meaningfully harder again, INDEPENDENT of Ascension (so the campaign escalates even at A0). Rank
+ * 0 (Arc-I / default) contributes nothing, so the classic boss + every A0-arc-1 seeded test is unchanged.
+ * Tuned bigger than the per-Ascension steps so the arc climb is felt: the Arc-III final (rank 2) plays
+ * ~2.6 strokes lower handicap, ~8 yds longer, ~8% tighter than the Arc-I boss at the same tier — a clear
+ * step up that a grown bag can still out-club. From rank ≥1 the boss also hunts pins (GS-ai-attack), so a
+ * late-arc boss attacks flags even at low Ascension.
+ */
+export const BOSS_ARC_HANDICAP = 1.3;
+export const BOSS_ARC_DISTANCE = 4;
+export const BOSS_ARC_DISPERSION = 0.04;
+/** From this arc rank up the boss pin-hunts even below BOSS_ATTACK_ASCENSION — reserved for the Arc-III
+ *  FINAL (rank 2), so the climax boss plays aggressive championship golf even at A0, while Arc-II stays
+ *  the percentage player (just tighter/longer). Above BOSS_ATTACK_ASCENSION every boss pin-hunts anyway. */
+export const BOSS_ARC_ATTACK_RANK = 2;
 
 /** Does this boss golfer get the "their turf" home-zone edge on a course of the given theme? */
 export function bossHasHomeEdge(golferId: string, themeId: string | undefined): boolean {
@@ -81,16 +109,18 @@ export function bossHasHomeEdge(golferId: string, themeId: string | undefined): 
 export function bossLoadout(golferId: string, homeEdge = false, edge: BossEdge = {}): PlayerLoadout {
   const p = golferProfile(golferId);
   const asc = clamp(Math.round(edge.ascension ?? 0), 0, 15);
+  const arcRank = Math.max(0, Math.round(edge.arcRank ?? 0)); // GS-boss-escalation: 0=Arc-I … 2=final
   // Gear parity (GS-boss-scale): re-stamp the boss's bag to the run's tier FIRST (applyBagTier
   // rebuilds carries from the set rows), then lay the golfer/home/ascension distance bonus on top.
   const base = applyBagTier(startingLoadout(), edge.bagTier ?? 'common');
   // Skill+accuracy → handicap ~2 (elite) to ~16 (journeyman); the home edge shaves a couple of
-  // strokes, and each Ascension tier shaves BOSS_ASC_HANDICAP more (floored at scratch above A0 —
-  // the A0 floor stays 1 so the classic boss is byte-identical).
+  // strokes, each Ascension tier shaves BOSS_ASC_HANDICAP more, and each ARC RANK shaves
+  // BOSS_ARC_HANDICAP (the campaign climb). Floored at scratch once ANY edge is armed (asc>0 OR
+  // arcRank>0); the A0 Arc-I floor stays 1 so the classic boss is byte-identical.
   const handicap = Math.round(
     clamp(
-      20 - p.skill * 12 - p.accuracy * 6 - (homeEdge ? HOME_EDGE_HANDICAP : 0) - asc * BOSS_ASC_HANDICAP,
-      asc > 0 ? 0 : 1,
+      20 - p.skill * 12 - p.accuracy * 6 - (homeEdge ? HOME_EDGE_HANDICAP : 0) - asc * BOSS_ASC_HANDICAP - arcRank * BOSS_ARC_HANDICAP,
+      asc > 0 || arcRank > 0 ? 0 : 1,
       18,
     ),
   );
@@ -98,12 +128,15 @@ export function bossLoadout(golferId: string, homeEdge = false, edge: BossEdge =
     ...base,
     bag: boostDistanceClubs(
       base.bag,
-      golferDistanceBonus(golferId) + (homeEdge ? HOME_EDGE_DISTANCE : 0) + Math.round(asc * BOSS_ASC_DISTANCE),
+      golferDistanceBonus(golferId) +
+        (homeEdge ? HOME_EDGE_DISTANCE : 0) +
+        Math.round(asc * BOSS_ASC_DISTANCE) +
+        arcRank * BOSS_ARC_DISTANCE,
     ),
     handicap,
     // The tier ALSO tightens raw dispersion (multiplicative, floored) — handicap alone saturates
-    // at scratch, and the deep tiers need a knob that keeps working. ×1 at A0, byte-identical.
-    dispersionMult: Math.max(BOSS_ASC_DISPERSION_FLOOR, 1 - asc * BOSS_ASC_DISPERSION),
+    // at scratch, and the deep tiers need a knob that keeps working. ×1 at A0-arc-1, byte-identical.
+    dispersionMult: Math.max(BOSS_ASC_DISPERSION_FLOOR, 1 - asc * BOSS_ASC_DISPERSION - arcRank * BOSS_ARC_DISPERSION),
     characterId: undefined,
   };
 }
@@ -116,7 +149,9 @@ export function bossPlayOpts(golferId: string, homeEdge = false, edge: BossEdge 
     bag: lo.bag,
     dispersionMult: netDispersion(lo),
     shotMods: bossShotMods(golferId),
-    attackPin: (edge.ascension ?? 0) >= BOSS_ATTACK_ASCENSION,
+    // Pin-hunt from high Ascension OR a late arc (GS-boss-escalation) — an Arc-II/III boss attacks
+    // flags even at low Ascension. Arc-I (rank 0) at A<4 stays the percentage player, byte-identical.
+    attackPin: (edge.ascension ?? 0) >= BOSS_ATTACK_ASCENSION || Math.max(0, Math.round(edge.arcRank ?? 0)) >= BOSS_ARC_ATTACK_RANK,
     // A tier-parity bag carries its putter's boost — the boss putts like its flat-stick deserves
     // ({} on the classic common bag, byte-identical).
     puttSkill: puttSkillOf(lo),

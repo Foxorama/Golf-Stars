@@ -693,11 +693,16 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
   };
 }
 
-/** The run-derived boss sharpening (GS-boss-scale): Ascension tier + the run's bag tier (gear
- *  parity). One source for the headless `playStop` and the interactive reducer, so a duel plays
- *  the identical boss either way. A0 + common bag ⇒ the classic boss, byte-for-byte. */
+/** The run-derived boss sharpening (GS-boss-scale / GS-boss-escalation): Ascension tier + the run's
+ *  bag tier (gear parity) + the boss's ARC RANK, so the voyage's three bosses ESCALATE (Arc-II harder,
+ *  the Arc-III final meaningfully harder) instead of scaling flat with Ascension. The rank comes from
+ *  the boss's `cutBonus` (1/2/3 → rank 0/1/2), reviving that field's dead "boss is harder" purpose (a
+ *  matchplay boss passes on the DUEL, never the cut, so the +1/+2/+3 cut never bit). One source for the
+ *  headless `playStop` and the interactive reducer, so a duel plays the identical boss either way. A0 +
+ *  common bag + Arc-I (rank 0) ⇒ the classic boss, byte-for-byte. */
 export function bossEdgeForRun(run: Run): BossEdge {
-  return { ascension: run.ascension, bagTier: run.bagTier };
+  const cutBonus = currentBoss(run)?.cutBonus ?? 1;
+  return { ascension: run.ascension, bagTier: run.bagTier, arcRank: Math.max(0, cutBonus - 1) };
 }
 
 // --- Warp (GS-warp): fast-forward the proven holes under the auto-birdie rule -----------------
