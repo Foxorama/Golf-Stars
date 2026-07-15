@@ -608,13 +608,23 @@
 
 - **`render/merge.ts`** is the grid geometry engine: scanline-rasterise polys onto a small course-space
   node grid → optional chamfer-DT dilation → marching-squares contour trace → decimate + Chaikin smooth.
-  Pure, zero rng. Two exports:
+  Pure, zero rng. Three exports:
   - `unionPolys(polys)` — true union; bbox-cluster union-find first, so ISOLATED bodies return their
     exact original vertices (identity fast path) and only genuinely touching clusters rasterise.
+  - `unionClose(polys, gap)` — NEAR-body blend (GS-hazard-merge): fuses bodies within ~`gap` yards of
+    one another (not just touching ones, the way `unionPolys` does) by dropping a slim NECK quad between
+    each near pair, then taking the true grid union of bodies + necks. So a cluster of bunkers or a
+    lake-and-pond pair reads as ONE organic complex with a natural pinched waist, instead of a scatter
+    of individual stickers each wearing its own rim. Bodies keep their EXACT size — only a connecting
+    waist is added — so the drawn hazard still tracks its sim penalty polys (graphic ≈ physics). A body
+    with no neighbour within `gap` takes the identity fast path (a lone bunker is untouched). Neck width
+    scales to the smaller body (pots → an isthmus, lakes → a fat waist).
   - `dilateUnion(polys, pad)` — union of the polys grown by `pad`, rounded corners, can never fold.
 - **Sand + liquid families draw MERGED bodies.** `mergedHazardsFor(hole)` (WeakMap-cached per hole)
-  unions each family's polys in COURSE space; `styleSandFamily`/`styleLiquidFamily` receive the merged
-  loops, so touching bunkers/pots/waste read as ONE excavated complex with a single lip-shadow +
+  CLOSES each family's polys in COURSE space via `unionClose` (`HAZARD_MERGE_GAP` = sand 14 / water 11 /
+  lava 11 yd — sand bridges a hair wider since bunkers cluster into fields; water/lava are larger bodies
+  a player still reads as distinct at a wider gap); `styleSandFamily`/`styleLiquidFamily` receive the
+  merged loops, so nearby bunkers/pots/waste read as ONE excavated complex with a single lip-shadow +
   depression crescent, and a creek + its mouth lake as one water body with one shoreline. Course-space
   merging keeps the merged-body COUNT camera-proof (the liquid pass draws rng per body — a screen-space
   union could flip counts under zoom and shift the shared stream). Known, accepted edge: a fully

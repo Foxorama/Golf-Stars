@@ -924,7 +924,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     (no new `_gs*` hook). Re-shoot the gallery after touching it.
   - Platforms + hazard families merge through `render/merge.ts`: platforms are
     `dilateUnion(…, 14)` (never a mitred `offsetPoly` outset — it folds at concave bends);
-    sand/liquid families draw union-merged bodies (course-space, WeakMap-cached).
+    sand/liquid families draw NEAR-body-CLOSED bodies (`unionClose`, course-space, WeakMap-cached,
+    GS-hazard-merge). Where `unionPolys` fuses only bodies that already TOUCH, `unionClose` also bridges
+    hazards within a `gap` (`HAZARD_MERGE_GAP` = sand 14 / water 11 / lava 11 yd) by dropping a slim neck
+    quad between each near pair — so a cluster of bunkers or a lake+pond reads as ONE organic complex with
+    a pinched waist, not a manky pile of individual stickers. Bodies keep their exact size (only a neck is
+    added → graphic ≈ physics); a lone hazard is untouched. Render-only, zero rng — sim penalty polys
+    (fairness/carry/aim) are unchanged, so no balance impact.
   - A crossing river/lava flow/crevice's DRAWN bank is roughened so it reads as a natural hazard,
     not a uniform band-aid (GS-hazard-edges, `roughenHazardEdge`): course-space, `posHash`-derived,
     MEAN-ZERO about the true edge + amplitude-capped (≤40% of the body's narrow span) → RENDER-ONLY,

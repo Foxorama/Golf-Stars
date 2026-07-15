@@ -80,13 +80,12 @@ function rasterize(polys: Vec[][], cell: number, pad: number): Grid {
   return { on, nx, ny, x0, y0, cell };
 }
 
-/** Grow the occupied region outward by `pad` (course units) — two-pass chamfer distance transform,
- *  then threshold. The dilated silhouette is round-cornered and can never self-intersect. */
-function dilate(g: Grid, pad: number): void {
-  const { nx, ny, cell } = g;
+/** Two-pass chamfer distance transform (in CELL units): distance from every node to the nearest
+ *  node where `seed` is set. Shared by `dilate` (seed = occupied) and `erode` (seed = empty). */
+function chamferDT(seed: Uint8Array, nx: number, ny: number): Float32Array {
   const INF = 1e9;
   const d = new Float32Array(nx * ny);
-  for (let k = 0; k < d.length; k++) d[k] = g.on[k] ? 0 : INF;
+  for (let k = 0; k < d.length; k++) d[k] = seed[k] ? 0 : INF;
   const D = Math.SQRT2;
   // forward pass
   for (let j = 0; j < ny; j++) {
@@ -116,7 +115,14 @@ function dilate(g: Grid, pad: number): void {
       d[k] = v;
     }
   }
-  const t = pad / cell;
+  return d;
+}
+
+/** Grow the occupied region outward by `pad` (course units) — chamfer distance transform, then
+ *  threshold. The dilated silhouette is round-cornered and can never self-intersect. */
+function dilate(g: Grid, pad: number): void {
+  const d = chamferDT(g.on, g.nx, g.ny);
+  const t = pad / g.cell;
   for (let k = 0; k < d.length; k++) g.on[k] = d[k]! <= t ? 1 : 0;
 }
 
@@ -313,6 +319,110 @@ export function unionPolys(polys: Vec[][], cell = 1.6): Vec[][] {
     const merged = contoursToCourse(g, cell * cell * 3);
     // Paranoid fallback: if tracing degenerates (shouldn't), keep the originals rather than vanish.
     out.push(...(merged.length ? merged : group));
+  }
+  return out;
+}
+
+/** Nearest approach between two polygons — min vertex-to-vertex distance and the two closest points
+ *  (both bodies carry ~16 vertices, so vertex sampling is a fine proxy for the true edge gap). */
+function nearestBetween(a: Vec[], b: Vec[]): { d: number; pa: Vec; pb: Vec } {
+  let best = Infinity;
+  let pa = a[0]!;
+  let pb = b[0]!;
+  for (const p of a) {
+    for (const q of b) {
+      const dd = Math.hypot(p[0] - q[0], p[1] - q[1]);
+      if (dd < best) {
+        best = dd;
+        pa = p;
+        pb = q;
+      }
+    }
+  }
+  return { d: best, pa, pb };
+}
+
+/** A capsule-ish quad connecting `pa`→`pb` with half-width `w`, extended `over` yards into each body
+ *  so the bridge overlaps both and the union has no seam. */
+function bridgeQuad(pa: Vec, pb: Vec, w: number, over: number): Vec[] {
+  const dx = pb[0] - pa[0];
+  const dy = pb[1] - pa[1];
+  const l = Math.hypot(dx, dy) || 1;
+  const px = (-dy / l) * w;
+  const py = (dx / l) * w;
+  const ex = (dx / l) * over;
+  const ey = (dy / l) * over;
+  const a: Vec = [pa[0] - ex, pa[1] - ey];
+  const b: Vec = [pb[0] + ex, pb[1] + ey];
+  return [
+    [a[0] + px, a[1] + py],
+    [b[0] + px, b[1] + py],
+    [b[0] - px, b[1] - py],
+    [a[0] - px, a[1] - py],
+  ];
+}
+
+/** Smaller of a polygon's two bbox spans (its narrow dimension) — used to size a bridge neck to the
+ *  bodies it joins, so two pot bunkers get a slim isthmus and two lakes a fat one. */
+function narrowSpan(poly: Vec[]): number {
+  const b = bboxAll([poly]);
+  return Math.min(b.maxX - b.minX, b.maxY - b.minY);
+}
+
+/**
+ * NEAR-body BLEND (course space, GS-hazard-merge): fuse a family of hazard bodies that sit WITHIN
+ * ~`gap` yards of one another into ONE organic silhouette, instead of a scatter of individual stickers
+ * each wearing its own rim (the "manky pile of separate blobs" tell). Where `unionPolys` only fuses
+ * bodies that already TOUCH, this bridges a real air gap — the difference between separate blobs and
+ * one hazard that reads as one.
+ *
+ * How: cluster bodies by proximity (union-find on nearest-approach ≤ `gap`), so a body with no
+ * neighbour within `gap` takes the IDENTITY fast path (returns its exact hand-drawn vertices — a lone
+ * bunker is untouched and costs nothing). For a multi-body cluster, drop a slim NECK quad between each
+ * near pair (width scaled to the smaller body, so pots get an isthmus and lakes a fat waist), then take
+ * the true grid union of bodies + necks. The bodies keep their exact size — only a natural connecting
+ * waist is ADDED — so the drawn hazard still tracks its sim penalty polys (graphic ≈ physics), it just
+ * reads as one melted-together complex. PURE geometry, zero rng, course space → per-hole byte-stable +
+ * camera-proof, exactly like `unionPolys`.
+ */
+export function unionClose(polys: Vec[][], gap = 8, cell = 1.6): Vec[][] {
+  const n = polys.length;
+  if (n <= 1) return polys.slice();
+  // Pairwise nearest approach → cluster (union-find) and remember which pairs get a neck.
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
+  const necks: { poly: Vec[]; owner: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      // Cheap bbox reject before the O(v²) nearest-approach probe.
+      if (!bboxesTouch(polys[i]!, polys[j]!, gap)) continue;
+      const near = nearestBetween(polys[i]!, polys[j]!);
+      if (near.d > gap) continue;
+      // Neck width tracks the smaller body (so it reads in proportion); clamped to a sane band.
+      const w = Math.max(2, Math.min(9, Math.min(narrowSpan(polys[i]!), narrowSpan(polys[j]!)) * 0.28));
+      necks.push({ poly: bridgeQuad(near.pa, near.pb, w, 3), owner: i });
+      parent[find(i)] = find(j);
+    }
+  }
+  const clusters = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const c = clusters.get(r);
+    if (c) c.push(i);
+    else clusters.set(r, [i]);
+  }
+  const out: Vec[][] = [];
+  for (const [root, idxs] of clusters) {
+    if (idxs.length === 1) {
+      out.push(polys[idxs[0]!]!); // isolated body — keep its exact edge (identity fast path)
+      continue;
+    }
+    const bodies = idxs.map((i) => polys[i]!);
+    const group = [...bodies, ...necks.filter((neck) => find(neck.owner) === root).map((neck) => neck.poly)];
+    const g = rasterize(group, cell, 0);
+    const merged = contoursToCourse(g, cell * cell * 3);
+    // Paranoid fallback: if tracing degenerates, keep the originals rather than vanish.
+    out.push(...(merged.length ? merged : bodies));
   }
   return out;
 }

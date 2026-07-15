@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { unionPolys, dilateUnion } from '../src/render/merge';
+import { unionPolys, unionClose, dilateUnion } from '../src/render/merge';
 import { pointInPoly, type Vec } from '../src/sim/course/contract';
 
 /** A regular n-gon approximating a circle. */
@@ -51,6 +51,41 @@ describe('unionPolys (same-family hazard merge, GS-hazard-blend)', () => {
     for (const c of [[0, 0], [6, 2], [12, 0], [18, 2]] as Vec[]) {
       expect(pointInPoly(c, merged[0]!)).toBe(true);
     }
+  });
+});
+
+describe('unionClose (near-body blend, GS-hazard-merge)', () => {
+  it('two NEAR bunkers (a real air gap between them) fuse into ONE body with a connecting waist', () => {
+    // Circles r=3, centres 11 apart → 5 yd of clear grass between the rims.
+    const merged = unionClose([circle(0, 0, 3), circle(11, 0, 3)], 9);
+    expect(merged.length).toBe(1);
+    const m = merged[0]!;
+    expect(pointInPoly([0, 0], m)).toBe(true);
+    expect(pointInPoly([11, 0], m)).toBe(true);
+    expect(pointInPoly([5.5, 0], m)).toBe(true); // the bridged waist between them — solid now
+  });
+
+  it('bodies FARTHER apart than the gap stay separate — no over-merging across open ground', () => {
+    // 12 yd of clear grass between the rims, gap 9 → they must not bridge.
+    const merged = unionClose([circle(0, 0, 3), circle(18, 0, 3)], 9);
+    expect(merged.length).toBe(2);
+  });
+
+  it('a lone body with no neighbour keeps its EXACT original vertices (identity fast path)', () => {
+    const lone = circle(0, 0, 5);
+    const far = circle(200, 0, 5);
+    const merged = unionClose([lone, far], 9);
+    expect(merged.length).toBe(2);
+    expect(merged).toContain(lone);
+    expect(merged).toContain(far);
+  });
+
+  it('a scattered field merges into a complex while a distant pond stays its own body', () => {
+    const merged = unionClose(
+      [circle(0, 0, 5), circle(13, 4, 5), circle(24, -3, 6), circle(90, 0, 7)],
+      9,
+    );
+    expect(merged.length).toBe(2); // the three-bunker field → 1, the far pond → 1
   });
 });
 
