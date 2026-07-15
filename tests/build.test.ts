@@ -300,6 +300,51 @@ describe('build output (real browser)', () => {
     );
   }
 
+  // STAR-MAP WEAPONS (GS-star-tour-weapons). The dashboard fire button spawns a themed projectile into the
+  // `#gs-st-shots` SVG layer + ticks an ammo pip down — pure app-layer DOM the sim suite can't see. This
+  // guards that the button mounts, firing appends a shot group, and the magazine decrements (and empties).
+  it.runIf(chromePath)(
+    'Star Tour dashboard fire button spawns projectiles + spends ammo',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=startour&intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        // The fire control + the projectile layer both mounted.
+        expect(await page.$('[data-startour-fire]'), 'fire button present').not.toBeNull();
+        expect(await page.$('#gs-st-shots'), 'shots layer present').not.toBeNull();
+        const pipsFull = await page.$$eval('#gs-st-ammo .gs-sthud__pip--on', (e) => e.length);
+        expect(pipsFull, 'magazine starts loaded').toBeGreaterThan(0);
+        // Fire once → a shot group appears in the layer and an ammo pip goes dark.
+        await page.click('[data-startour-fire]');
+        await page.waitForTimeout(60);
+        const afterOne = await page.evaluate(() => ({
+          shots: document.getElementById('gs-st-shots')?.childElementCount ?? 0,
+          pips: document.querySelectorAll('#gs-st-ammo .gs-sthud__pip--on').length,
+        }));
+        expect(afterOne.shots, 'firing spawned projectile(s)').toBeGreaterThan(0);
+        expect(afterOne.pips, 'firing spent a charge').toBe(pipsFull - 1);
+        // Empty the magazine, then a further shot is refused (button goes --empty, no charge left).
+        for (let i = 0; i < pipsFull + 1; i++) await page.click('[data-startour-fire]');
+        await page.waitForTimeout(30);
+        const drained = await page.evaluate(() => ({
+          pips: document.querySelectorAll('#gs-st-ammo .gs-sthud__pip--on').length,
+          empty: document.getElementById('gs-st-fire')?.classList.contains('gs-sthud__fire--empty') ?? false,
+        }));
+        expect(drained.pips, 'magazine emptied').toBe(0);
+        expect(drained.empty, 'fire button reads empty').toBe(true);
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
   // ANIMATED DECOR VIEW-INVARIANCE (GS-decor-view-states). The derelict's drifting hull junk/sections (and
   // weather, the Cetus river) are drawn independently on the aim/putt overlay AND the watch play view. When
   // any element is anchored to the SCREEN instead of the WORLD — as the big ship SECTIONS once were

@@ -76,7 +76,9 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP } from './app/starTourScreens';
+import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP } from './app/starTourScreens';
+import { shipForCharacter } from './ui/gameCosmetics';
+import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
@@ -310,6 +312,9 @@ function dispatch(action: Action): void {
       starTourView.fuel = STAR_TOUR_FUEL_CAP;
       starTourView.speed = 'normal';
       starTourView.refuel = null;
+      // Fresh weapon magazine + no live projectiles (GS-star-tour-weapons).
+      starTourView.ammo = WEAPON_AMMO_CAP;
+      stShots.length = 0;
     }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
@@ -1537,6 +1542,104 @@ function flyStarTourToPort(): void {
   render();
 }
 
+/** ── STAR-MAP WEAPONS (GS-star-tour-weapons) ─────────────────────────────────────────────────────────
+ *  A live projectile: an SVG `<g>` appended to `#gs-st-shots`, moved by a per-frame transform (the ship /
+ *  tanker pattern), removed when `life` runs out. Pure app-layer feel — no sim, no save, no rng. */
+interface StShot {
+  g: SVGGElement;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rot: number;
+  life: number;
+  /** Frames over which to fade the shot out at the end of its life. */
+  fade: number;
+}
+const SVGNS = 'http://www.w3.org/2000/svg';
+let stShots: StShot[] = [];
+
+/** Spawn one projectile `<g>` into the shots layer, authored facing +x and oriented by `rot`. */
+function addStShot(group: Element, style: WeaponStyle | 'flash' | 'pellet', c1: string, c2: string, x: number, y: number, rot: number, vx: number, vy: number, life: number): void {
+  const g = document.createElementNS(SVGNS, 'g') as SVGGElement;
+  g.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(1)})`);
+  // innerHTML on an SVG element parses its children in the SVG namespace (modern browsers) — the same
+  // authored-facing-+x markup the ship/thrust use, so a projectile just needs a translate+rotate.
+  g.innerHTML = shotInnerSVG(style, c1, c2);
+  group.appendChild(g);
+  stShots.push({ g, x, y, vx, vy, rot, life, fade: Math.min(9, life) });
+}
+
+/** Fire the flown ship's weapon (GS-star-tour-weapons): spend one charge, spray the volley + a muzzle flash
+ *  from the nose along the current heading. Blocked while the tank is being refuelled; a soft click when out
+ *  of charges (they reload at the next fuel stop). Pure DOM + the shot list — never a `render()` (that would
+ *  rebuild the whole chart and wipe live projectiles), so the ammo pips update in place like the fuel gauge. */
+function fireStarTourWeapon(): void {
+  if (state.screen !== 'starTour') return;
+  const v = starTourView;
+  if (v.refuel) return; // stalled at the pump — no firing
+  const group = document.getElementById('gs-st-shots');
+  if (!group) return;
+  if (v.ammo <= 0) {
+    sfx.click();
+    haptic(HAPTICS.bad);
+    return;
+  }
+  const w = shipWeaponFor(shipForCharacter(state, state.run.loadout.characterId));
+  const sx = v.shipX ?? SPACEPORT_POS.x;
+  const sy = v.shipY ?? SPACEPORT_POS.y;
+  const hRad = (v.heading * Math.PI) / 180;
+  // Spawn at the ship's NOSE so the shot reads as leaving the muzzle.
+  const nx = sx + Math.cos(hRad) * 14;
+  const ny = sy + Math.sin(hRad) * 14;
+  addStShot(group, 'flash', w.color, w.color2, nx, ny, v.heading, 0, 0, 12);
+  const n = Math.max(1, w.count);
+  for (let i = 0; i < n; i++) {
+    const spreadDeg = n > 1 ? (i / (n - 1) - 0.5) * w.spread : 0;
+    const a = hRad + (spreadDeg * Math.PI) / 180;
+    // A scatter volley draws individual pellets; every other weapon draws its own style once.
+    const style = w.style === 'scatter' ? 'pellet' : w.style;
+    addStShot(group, style, w.color, w.color2, nx, ny, v.heading + spreadDeg, Math.cos(a) * w.speed, Math.sin(a) * w.speed, w.life);
+  }
+  v.ammo = Math.max(0, v.ammo - 1);
+  updateStAmmo();
+  sfx.redirectFire(w.sound === 'kinetic' ? 'boomerang' : 'laser', 550);
+  haptic(HAPTICS.tap);
+  startStarTourAnim(); // ensure the loop is running to animate the shots (idempotent)
+}
+
+/** Advance/fade/reap the live projectiles — one frame. Called from the star-map rAF loop. */
+function stepStarTourShots(): void {
+  if (!stShots.length) return;
+  const group = document.getElementById('gs-st-shots');
+  for (let i = stShots.length - 1; i >= 0; i--) {
+    const s = stShots[i]!;
+    // A stale ref (the chart was re-rendered out from under us) — drop it.
+    if (group && !group.contains(s.g)) {
+      stShots.splice(i, 1);
+      continue;
+    }
+    s.x += s.vx;
+    s.y += s.vy;
+    s.life--;
+    s.g.setAttribute('transform', `translate(${s.x.toFixed(1)} ${s.y.toFixed(1)}) rotate(${s.rot.toFixed(1)})`);
+    if (s.life < s.fade) s.g.setAttribute('opacity', Math.max(0, s.life / s.fade).toFixed(2));
+    if (s.life <= 0) {
+      s.g.remove();
+      stShots.splice(i, 1);
+    }
+  }
+}
+
+/** Rebuild the ammo pips in place (`#gs-st-ammo`) + reflect the empty state on the fire button, without a
+ *  whole-chart re-render (the fuel-gauge pattern). */
+function updateStAmmo(): void {
+  const ammoEl = document.getElementById('gs-st-ammo');
+  if (ammoEl) ammoEl.innerHTML = starTourAmmoHTML();
+  const btn = document.getElementById('gs-st-fire');
+  if (btn) btn.classList.toggle('gs-sthud__fire--empty', starTourView.ammo <= 0);
+}
+
 /** Lerp an angle (degrees) toward a target by fraction f, taking the short way round. */
 function lerpAngle(a: number, b: number, f: number): number {
   let d = ((b - a + 540) % 360) - 180;
@@ -1607,6 +1710,11 @@ function stepStarTourRefuel(): void {
     v.fuel = Math.min(STAR_TOUR_FUEL_CAP, v.fuel + ST_TRUCK_FILL_RATE);
     if (v.fuel >= STAR_TOUR_FUEL_CAP) {
       v.fuel = STAR_TOUR_FUEL_CAP;
+      // A tanker top-up also reloads the weapon (GS-star-tour-weapons).
+      if (v.ammo < WEAPON_AMMO_CAP) {
+        v.ammo = WEAPON_AMMO_CAP;
+        updateStAmmo();
+      }
       rf.phase = 'out';
       sfx.click();
     }
@@ -1691,8 +1799,15 @@ function stepStarTour(): void {
       v.shipY = v.targetY;
       v.targetX = null;
       v.targetY = null;
-      // Visiting any station (a world, Earth, the spaceport) tops the tank to full (GS-star-tour-fuel).
-      if (starTourStationNear(v.shipX, v.shipY)) v.fuel = STAR_TOUR_FUEL_CAP;
+      // Visiting any station (a world, Earth, the spaceport) tops the tank to full (GS-star-tour-fuel) and
+      // reloads the weapon magazine (GS-star-tour-weapons).
+      if (starTourStationNear(v.shipX, v.shipY)) {
+        v.fuel = STAR_TOUR_FUEL_CAP;
+        if (v.ammo < WEAPON_AMMO_CAP) {
+          v.ammo = WEAPON_AMMO_CAP;
+          updateStAmmo();
+        }
+      }
       if (v.dockingAtPort) {
         // Docked home at the spaceport (GS-star-tour-port) → into the Clubhouse (the map's way out).
         v.dockingAtPort = false;
@@ -1750,6 +1865,7 @@ function stepStarTour(): void {
     el.classList.toggle('gs-st-thrusting', cruising);
   }
   paintStarTourRefuel();
+  stepStarTourShots();
   // Keep the fuel gauge honest, rebuilding only when the shown integer changes (cheap).
   const shown = Math.floor(v.fuel);
   if (shown !== stFuelShown) {
@@ -1956,6 +2072,9 @@ function render(): void {
   // centroid; then wire pointer-drag-to-fly (native scroll already handles touch + wheel). Re-wired
   // each render (innerHTML replaced the node), so a fresh element always gets its listeners.
   if (state.screen === 'starTour') {
+    // A render rebuilt the chart SVG — the old shots layer + its `<g>`s are detached, so drop the stale
+    // element refs (a fresh empty `#gs-st-shots` is in the new DOM).
+    stShots.length = 0;
     const vp = document.getElementById('gs-st-viewport');
     if (vp) {
       if (!starTourView.centred) {
@@ -2133,6 +2252,15 @@ function render(): void {
       sfx.click();
       haptic(HAPTICS.tap);
       render();
+    });
+  });
+  // Star Tour weapon (GS-star-tour-weapons): the dashboard fire button spits the ship's themed projectile
+  // from the nose. Fires directly (no render() — that would wipe live shots); ammo pips update in place.
+  app.querySelectorAll<HTMLElement>('[data-startour-fire]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resumeAudio();
+      fireStarTourWeapon();
     });
   });
   // Travel map chrome: the fuel gauge / depot ✕ toggle the fuel-depot sheet (a view flag). Opening it
