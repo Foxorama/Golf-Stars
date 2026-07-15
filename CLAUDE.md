@@ -580,10 +580,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     (`asgardPortalOpens`, reducer-only + gated on the ball → zero rng, feature-off byte-identical) opens
     the Bifröst — instead of the result/shop it diverts to the Himinbjörg map, then a nine-hole STROKE-
     play tournament vs the Warriors Three (three bespoke `contender` golfers; `warriorsThreeTotals` ghost
-    gross, lowest wins, ties→player). The field SCALES with the run (GS-asgard-scaling): `warriorsEdge`
-    sharpens every warrior by a per-hole stroke `edge` scaled off DEPTH (the parked run's `stopIndex`) +
-    Ascension (`asgardFieldEdge` feeds BOTH the verdict and the live board), so a late-run encounter isn't
-    a roflstomp — bounded, ties still to the player, and `edge=0` (shallow/base) is byte-identical. The
+    gross, lowest wins, ties→player). The field SCALES with the run (GS-asgard-scaling / GS-warriors-tune):
+    `warriorsEdge(depth, ascension, voyage)` sharpens every warrior by a per-hole stroke `edge`. The
+    Warriors are effectively a boss match but LOSING costs nothing (no run ends), so they sit ABOVE an
+    ordinary boss, tuned per CONTEXT: the VOYAGE Bifröst (`voyage=true`, `asgardReturn` present ⇒ the
+    player arrives upgraded) rides a flat `WARRIORS_VOYAGE_BASE` (0.2) floor so even an EARLY Rainbow-Road
+    eagle is "slightly harder than an Arc-III boss", then DEPTH+Ascension sharpen to `WARRIORS_VOYAGE_CAP`
+    (0.34) — a strong upgraded round (≈6 under) still wins ~12–25% (beatable, never a brick wall); the
+    STAR TOUR / Yggdrasil realm (`voyage=false`, no parked run) stays the gentle default-bag baseline
+    (edge 0, ≈5-under Warriors, the easier venue). `asgardFieldEdge` picks the context off `asgardReturn`
+    and feeds BOTH the verdict and the live board; `edge=0` (Star Tour / base) is byte-identical. The
     real run is SUSPENDED (`asgardReturn` snapshot); the Asgard run
     (`startAsgardRun`, format `asgard`, `pendingTheme` = the `ASGARD_THEME` object so it never needs a
     THEMES entry) plays the player's bag MINUS the Rainbow Ball. It is NEVER persisted (`persist` parks

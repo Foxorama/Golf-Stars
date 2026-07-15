@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { initState, reduce, asgardPortalOpens, type UiState } from '../src/ui/game';
 import { startRun, startAsgardRun, snapshotRun, baseLoadoutForRun, currentCourse, shopOffer } from '../src/sim/rpg/run';
 import { loadoutFromPerks } from '../src/sim/rpg/economy';
-import { warriorsThreeTotals, warriorsThreeThru, warriorsEdge, WARRIORS_EDGE_CAP, WARRIORS_DEPTH_CAP } from '../src/sim/rpg/competition';
+import { warriorsThreeTotals, warriorsThreeThru, warriorsEdge, WARRIORS_EDGE_CAP, WARRIORS_DEPTH_CAP, WARRIORS_VOYAGE_BASE, WARRIORS_VOYAGE_CAP } from '../src/sim/rpg/competition';
 import { WARRIORS_THREE } from '../src/sim/rpg/golfers';
 import { ASGARD_THEME } from '../src/sim/course/themes';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
@@ -99,6 +99,36 @@ describe('GS-asgard: the Bifröst tournament', () => {
     expect(warriorsEdge(999, 15)).toBeLessThanOrEqual(WARRIORS_EDGE_CAP);
     // Negative inputs never make the field WORSE than the base.
     expect(warriorsEdge(-5, -5)).toBe(0);
+  });
+
+  it('the VOYAGE Bifröst is harder than the Star Tour one, at every depth (GS-warriors-tune)', () => {
+    // Star Tour (voyage=false, default-bag records chase) stays the gentle baseline; the Voyage Bifröst
+    // (voyage=true, player arrives upgraded) sits above it — a flat floor so even an EARLY Rainbow-Road
+    // eagle is tough, then depth/Ascension sharpen, clamped to a still-beatable ceiling.
+    // Star Tour is always a depth-0, base-difficulty encounter (no parked run) ⇒ edge 0, the easy venue.
+    const starTourEdge = warriorsEdge(0, 0, false);
+    expect(starTourEdge).toBe(0);
+    expect(warriorsEdge(0, 0, true)).toBe(WARRIORS_VOYAGE_BASE); // an early voyage trigger is already tough
+    // Every voyage encounter (any depth/Ascension) is harder than the Star Tour baseline.
+    for (const [d, a] of [[0, 0], [2, 0], [5, 4], [8, 8]] as [number, number][]) {
+      expect(warriorsEdge(d, a, true)).toBeGreaterThan(starTourEdge);
+    }
+    // Voyage sharpens with depth then holds at its own (beatable) ceiling — never the harsh absolute cap.
+    expect(warriorsEdge(2, 0, true)).toBeGreaterThan(warriorsEdge(0, 0, true));
+    expect(warriorsEdge(999, 15, true)).toBe(WARRIORS_VOYAGE_CAP);
+    expect(WARRIORS_VOYAGE_CAP).toBeLessThan(WARRIORS_EDGE_CAP);
+    // The voyage Warriors genuinely trend further under par than the Star Tour ones (they're harder).
+    const pars = [4, 4, 3, 5, 4, 4, 3, 5, 4];
+    const low = (edge: number) => Math.min(...warriorsThreeTotals('vst', pars, edge).map((w) => w.total));
+    let voyLower = 0;
+    for (let s = 0; s < 40; s++) {
+      const p = [4, 4, 3, 5, 4, 4, 3, 5, 4];
+      const st = Math.min(...warriorsThreeTotals(`st${s}`, p, warriorsEdge(3, 0, false)).map((w) => w.total));
+      const vy = Math.min(...warriorsThreeTotals(`st${s}`, p, warriorsEdge(3, 0, true)).map((w) => w.total));
+      if (vy < st) voyLower++;
+    }
+    expect(voyLower).toBeGreaterThan(30); // the voyage field is lower (harder) on the vast majority of rounds
+    expect(low(warriorsEdge(3, 0, true))).toBeLessThanOrEqual(low(warriorsEdge(3, 0, false)));
   });
 
   it('a scaled tournament trends the Warriors further under par than an unscaled one', () => {

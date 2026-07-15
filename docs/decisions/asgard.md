@@ -85,6 +85,23 @@ player. The reducer derives the edge once (`asgardFieldEdge`, off `asgardReturn`
 feeds it to BOTH the final `warriorsThreeTotals` and the between-hole `warriorsThreeThru` board, so the
 running standings and the verdict agree score-for-score.
 
+**Per-CONTEXT tuning (GS-warriors-tune).** The Warriors are effectively a boss match, but losing costs
+NOTHING (no run ends, it's an optional side-event with a cosmetic reward), so they're pitched a notch
+ABOVE an ordinary boss — and differently in the two places they're reached. `warriorsEdge` takes a third
+`voyage` flag; `asgardFieldEdge` sets it from whether a run is parked (`!!asgardReturn`):
+- **Voyage Bifröst** (`voyage=true`): the player arrives with pro-shop upgrades and can birdie most holes,
+  so at edge 0 the Warriors (≈5 under over nine) were a roflstomp — the reported "too easy". A flat
+  `WARRIORS_VOYAGE_BASE` (0.2) floor makes even an EARLY Rainbow-Road eagle "slightly harder than an
+  Arc-III boss", then depth/Ascension sharpen to `WARRIORS_VOYAGE_CAP` (0.34, held below the harsh
+  `WARRIORS_EDGE_CAP` so it never bricks). Measured player-side: an upgraded ≈6-under round wins ~12–25%
+  (hard, beatable when you play well; ties to the player).
+- **Star Tour / Yggdrasil** (`voyage=false`, no parked run): a default-bag records chase, so it stays the
+  gentle baseline — no floor, no depth (Star Tour is always a depth-0 encounter), edge 0, the easier venue
+  (≈5-under Warriors an upgraded round beats ~84% of the time). This is byte-identical to the pre-tune
+  field, so every seeded Asgard test that passes `edge=0` is unchanged.
+Guarded by `tests/asgard.test.ts` (voyage > Star Tour at every depth; voyage floored/capped; the voyage
+field trends lower/harder).
+
 ### Suspend / resume — the load-bearing decision
 There is no run-stack in the engine, only a single `resumable` slot. The interlude needed to pause the
 real run, play a self-contained side-run, and come back. The chosen shape:
@@ -144,9 +161,11 @@ by the hub with `intro:'0'` so they land past the boot cinematic in one click.
 
 ## Follow-ups / known scope edges
 - The portal is ordinary-stop only (boss stops don't open it).
-- The Warriors Three difficulty is tuned by feel: the flat floor lives in `ghostHoleStrokes`' `toPar`
-  coefficients; the depth/Ascension ramp lives in `warriorsEdge`' constants (`WARRIORS_DEPTH_STEP`/`_CAP`,
-  `WARRIORS_ASC_STEP`, `WARRIORS_EDGE_CAP`). Retune those, not the Asgard course. If it proves too hard
-  deep in a run, lower the steps or the cap; too easy, raise them.
+- The Warriors Three difficulty is tuned by feel via `warriorsEdge`'s constants: the base archetype
+  scores (`ghostHoleStrokes`' `toPar` coefficients); the depth/Ascension ramp (`WARRIORS_DEPTH_STEP`/`_CAP`,
+  `WARRIORS_ASC_STEP`, `WARRIORS_EDGE_CAP`); and the per-context split (GS-warriors-tune,
+  `WARRIORS_VOYAGE_BASE`/`_CAP` — the voyage floor+ceiling). Retune those, not the Asgard course. Voyage
+  too hard deep in a run → lower `WARRIORS_VOYAGE_CAP`; too easy for an upgraded player → raise
+  `WARRIORS_VOYAGE_BASE`. Star Tour is the `voyage=false` baseline (edge 0) — leave it gentle.
 - The Himinbjörg map is a dedicated `asgardBridgeHTML`, not a parameterised `journeyMapHTML`, to keep the
   heavily-loaded journey map untouched.
