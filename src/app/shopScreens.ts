@@ -2,13 +2,17 @@
  * The credit-economy shop screens: the Pro Shop and the mid-hole StarMart (GS-tent-interactions),
  * plus the Fuel Depot block (GS-fuel-2) the travel screen also mounts.
  *
- * GS-pro-shop-redesign: the Pro Shop is a stack of self-contained panels rather than one long
- * scroll. A fun SPLASH hero (pro greeting + the Travel-onward CTA + credits) sits right at the top
- * so the next action is never buried; the interactive Fuel Depot rides below it with its top-up
- * buttons ALWAYS shown (greyed when unaffordable) so the layout never jumps as fuel drains. The
- * stock rack, the golf bag, and an active-upgrades digest are each a tap-to-expand accordion
- * (`shopView.open`, independent so the shop and bag can both be open to compare). Pure renders off
- * the live state; buys dispatch through `data-action`.
+ * GS-pro-shop-redesign / GS-shop-stop-layout: the shop stop reads as one deck instead of a stack of
+ * disjointed boxes. The TOP ROW is two-up — the Travel-Onward hero button (its own ship-art CTA,
+ * `travelOnwardCardHTML`) beside a COMPACT Fuel Depot (`fuelDepotHTML({compact:true})`, quick-buys
+ * stacked to fit the half-column). Below it the Pro & Pro Shop are COMBINED into one panel: the pro
+ * greeting + credits purse + stock-reroll (`proShopIntroHTML`) open the same accordion as the stock
+ * rack. Then Upgrades & Effects sits ABOVE the Golf Bag. The fuel top-up buttons are ALWAYS shown
+ * (greyed when unaffordable) so the panel never jumps as fuel drains. Each lower panel is a
+ * tap-to-expand accordion (`shopView.open`, independent so the shop and bag can both be open to
+ * compare). Pure renders off the live state; buys dispatch through `data-action`. Applies to both
+ * the Voyage and the Unending Universe (both use `shopScreen`). The full (non-compact) Fuel Depot
+ * still backs the journey screen's depot sheet.
  */
 
 import { btn, header, state } from './ctx';
@@ -33,7 +37,8 @@ import { itemCardHTML } from '../render/cards';
 import { bagSet } from '../sim/rpg/bag';
 import { apparelById } from '../sim/rpg/apparel';
 import { apparelCardSVG } from '../render/apparelArt';
-import { golfBagForCharacter } from '../ui/game';
+import { golfBagForCharacter, shipForCharacter } from '../ui/game';
+import { shipSVG } from '../render/shipArt';
 import { fuelUnitCost, STARMART_COST, starmartRerollCost, tankCapacity } from '../sim/rpg/run';
 import { fuelColour, fuelGaugeHTML } from '../render/fuel';
 import { rerollCost } from '../ui/game';
@@ -86,26 +91,57 @@ function proGreeting(): { avatar: string; name: string; title: string; line: str
   return { avatar: proAvatarSVG(archetype), name: pro.name, title: pro.title, line };
 }
 
-/** The splash HERO (GS-pro-shop-redesign): a fun rarity-tinted panel at the very top of the Pro Shop —
- *  the head pro's greeting on the left, and on the right the credits purse + the primary "Travel onward"
- *  CTA (with a reroll) so the next action lives at the TOP of the screen, never buried under the stock. */
-function shopHeroHTML(): string {
+/** The TRAVEL-ONWARD hero button (GS-shop-stop-layout) — its own primary CTA with a ship graphic,
+ *  sharing the top row with the Fuel Depot. The whole card is the button; a starfield backs the
+ *  golfer's own ship streaking to the next world with an ion wake, so the next action reads as the
+ *  hero it is. Dispatches `{type:'leaveShop'}` (same as the old hero CTA). */
+function travelOnwardCardHTML(): string {
+  const shipId = shipForCharacter(state, state.run.loadout.characterId);
+  const action = JSON.stringify({ type: 'leaveShop' });
+  // A compact starfield + the flying ship (ion wake armed) — pure SVG, no rng (fixed star positions).
+  const stars = [
+    [14, 20], [42, 12], [70, 30], [96, 16], [120, 26], [150, 14], [30, 44], [86, 50], [134, 46],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 === 0 ? 1.3 : 0.8}" fill="#cfe8ff" opacity="${0.35 + (i % 4) * 0.14}"/>`)
+    .join('');
+  const art = `
+    <svg viewBox="0 0 168 68" role="img" aria-label="Travel onward" style="display:block;width:100%;height:100%;">
+      <defs><radialGradient id="gs-travelsky" cx="30%" cy="30%" r="90%">
+        <stop offset="0%" stop-color="#16351f"/><stop offset="100%" stop-color="#0a1a12"/>
+      </radialGradient></defs>
+      <rect x="0" y="0" width="168" height="68" fill="url(#gs-travelsky)"/>
+      ${stars}
+      <g transform="rotate(-7 112 38)">${shipSVG(shipId, 112, 38, 1.55, { ion: true })}</g>
+    </svg>`;
+  return `
+    <button class="gs-travelcard" data-action='${action}' aria-label="Travel onward to the next world">
+      <span class="gs-travelcard__art">${art}</span>
+      <span class="gs-travelcard__body">
+        <span class="gs-travelcard__k">🚀 Travel onward</span>
+        <span class="gs-travelcard__sub">Jump to the next world →</span>
+      </span>
+    </button>`;
+}
+
+/** The pro greeting + credits purse + reroll bar that opens the combined Pro Shop panel
+ *  (GS-shop-stop-layout): the head pro, the run purse, and the stock-reroll all live together at the
+ *  top of the one Pro Shop panel now, instead of a separate splash hero. */
+function proShopIntroHTML(): string {
   const credits = state.run.credits;
-  const accent = rarCol(state.course.rarity);
   const pro = proGreeting();
   const proBlock = pro
-    ? `<div class="gs-shophero__pro">
-         <div class="gs-shophero__ava">${pro.avatar}</div>
-         <div class="gs-shophero__say">
-           <div class="gs-shophero__name">${pro.name}</div>
-           <div class="gs-shophero__role">${pro.title}</div>
-           <div class="gs-shophero__line">&ldquo;${pro.line}&rdquo;</div>
+    ? `<div class="gs-proshop__pro">
+         <div class="gs-proshop__ava">${pro.avatar}</div>
+         <div class="gs-proshop__say">
+           <div class="gs-proshop__name">${pro.name}</div>
+           <div class="gs-proshop__role">${pro.title}</div>
+           <div class="gs-proshop__line">&ldquo;${pro.line}&rdquo;</div>
          </div>
        </div>`
-    : `<div class="gs-shophero__pro">
-         <div class="gs-shophero__say">
-           <div class="gs-shophero__name">🏌 Pro Shop</div>
-           <div class="gs-shophero__line">Kit out your bag before the next jump — stock rotates every stop.</div>
+    : `<div class="gs-proshop__pro">
+         <div class="gs-proshop__say">
+           <div class="gs-proshop__name">🏌 Head pro</div>
+           <div class="gs-proshop__line">Kit out your bag before the next jump — stock rotates every stop.</div>
          </div>
        </div>`;
   const rr = rerollCost(state.shopRerolls ?? 0);
@@ -113,15 +149,10 @@ function shopHeroHTML(): string {
     ? btn(`🎲 Reroll · ${rr} cr`, { type: 'rerollShop' }, { variant: 'ghost' })
     : `<span class="gs-btn gs-btn--ghost" style="opacity:.45;cursor:not-allowed;font-size:12px;">🎲 Reroll needs ${rr} cr</span>`;
   return `
-    <div class="gs-shophero" style="--acc:${accent};">
-      ${proBlock}
-      <div class="gs-shophero__bar">
-        <span class="gs-shophero__purse">💰 <b>${credits}</b> credits</span>
-        <div class="gs-shophero__cta">
-          ${rerollBtn}
-          ${btn('Travel onward →', { type: 'leaveShop' }, { variant: 'primary' })}
-        </div>
-      </div>
+    ${proBlock}
+    <div class="gs-proshop__bar">
+      <span class="gs-proshop__purse">💰 <b>${credits}</b> credits</span>
+      <div class="gs-proshop__cta">${rerollBtn}</div>
     </div>`;
 }
 
@@ -359,8 +390,9 @@ function upgradesPanelBodyHTML(): string {
  *  purchasable). The LOCAL price is the headline (it rises with galaxy depth). GS-pro-shop-redesign: the
  *  +1 / +3 / Fill quick-buy buttons ALWAYS render (greyed when the purse or tank says no) so the panel
  *  never changes height as fuel drains — no more layout jump when the options appear/disappear. */
-export function fuelDepotHTML(): string {
+export function fuelDepotHTML(opts: { compact?: boolean } = {}): string {
   const r = state.run;
+  const compact = !!opts.compact;
   const cap = tankCapacity(r);
   const price = fuelUnitCost(r);
   const space = Math.max(0, cap - r.fuel);
@@ -380,6 +412,34 @@ export function fuelDepotHTML(): string {
     : r.fuel <= 2
       ? `<span class="gs-fueldepot__state" style="color:var(--gs-danger);">running dry!</span>`
       : '';
+  // The compact variant (GS-shop-stop-layout) rides the shop's top row beside Travel Onward: a tighter
+  // header, the quick-buy buttons STACKED to fit the narrow half-column, and the long explainer dropped
+  // (it stays on the journey-screen depot sheet). The fitted-upgrade one-liners are kept — they're live
+  // status, not filler. The full variant (no opts) is unchanged for the travel screen's depot sheet.
+  const fittedNotes = `${
+    (r.loadout.fuelEfficiency ?? 0) > 0
+      ? `<p class="gs-fueldepot__note" style="color:#7ff3ff;opacity:.85;">🌀 Ion thrusters — −${r.loadout.fuelEfficiency} ⛽ / jump.</p>`
+      : ''
+  }${
+    (r.loadout.tankBonus ?? 0) > 0
+      ? `<p class="gs-fueldepot__note" style="color:#4fd0e0;opacity:.85;">🛢 Reserve tank — +${r.loadout.tankBonus} cap.</p>`
+      : ''
+  }`;
+  if (compact) {
+    return `
+      <div class="gs-fueldepot gs-fueldepot--compact">
+        <div class="gs-fueldepot__head">
+          <span class="gs-fueldepot__title">⛽ FUEL</span>
+          <b style="font-size:13px;color:${fuelColour(r.fuel, cap)};margin-left:auto;">${r.fuel}/${cap}</b>
+        </div>
+        <div class="gs-fueldepot__gauge">${fuelGaugeHTML(r.fuel, cap, { bare: true })}</div>
+        <div class="gs-fueldepot__meta">
+          ${tankNote || `<span class="gs-fueldepot__price">${price} cr / unit</span>`}
+        </div>
+        <div class="gs-fueldepot__row gs-fueldepot__row--stack">${quick(1, '+1 ⛽')}${quick(3, '+3 ⛽')}${quick(space || 1, 'Fill ⛽')}</div>
+        ${fittedNotes}
+      </div>`;
+  }
   return `
     <div class="gs-fueldepot">
       <div class="gs-fueldepot__head">
@@ -391,15 +451,7 @@ export function fuelDepotHTML(): string {
       </div>
       <div class="gs-fueldepot__row">${quick(1, '+1 ⛽')}${quick(3, '+3 ⛽')}${quick(space || 1, 'Fill ⛽')}</div>
       <p class="gs-fueldepot__note">A jump burns its distance in fuel (a deep jump = 2–3 units). Fuel gets dearer the deeper you fly — launching short-tanked auto-charges the local price.</p>
-      ${
-        (r.loadout.fuelEfficiency ?? 0) > 0
-          ? `<p class="gs-fueldepot__note" style="color:#7ff3ff;opacity:.85;">🌀 Ion thrusters fitted — every jump burns ${r.loadout.fuelEfficiency} less ⛽ (min 1).</p>`
-          : ''
-      }${
-        (r.loadout.tankBonus ?? 0) > 0
-          ? `<p class="gs-fueldepot__note" style="color:#4fd0e0;opacity:.85;">🛢 Reserve tank strapped on — capacity +${r.loadout.tankBonus}.</p>`
-          : ''
-      }
+      ${fittedNotes}
     </div>`;
 }
 
@@ -471,18 +523,25 @@ export function shopScreen(): string {
     // buy) and any caddy you FIRED this run (they've stormed off and won't return until a future run).
     .filter((it) => it.caddy !== 'named' || (ownedCount(perks, it.id) === 0 && !state.run.firedCaddies.includes(it.id)));
   const stock = stockItems.map(renderCard).join('');
+  // The combined Pro Shop panel (GS-shop-stop-layout): the pro greeting + credits purse + reroll
+  // (the old separate splash hero) now open the SAME panel as the stock rack — Pro & Pro Shop as one.
   const shopBody = `
+    ${proShopIntroHTML()}
     <p class="gs-acc__blurb" style="text-align:left;">Tap a card to buy. Stock rotates each stop — deeper stops carry rare/epic power. Stackables cost more the more you own; you can only keep one caddy (hiring fires your current one).</p>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;">${stock || '<p style="font-size:13px;opacity:.6;">Sold out — reroll or travel on.</p>'}</div>`;
   const clubCount = state.run.loadout.bag.length;
+  // Layout (GS-shop-stop-layout): a two-up top row — the Travel-Onward hero button beside a compact
+  // Fuel Depot — then the combined Pro Shop, then Upgrades & Effects ABOVE the Golf Bag.
   return `
     ${header()}
-    ${shopHeroHTML()}
     ${fireWarning}
-    ${fuelDepotHTML()}
+    <div class="gs-shoptop">
+      ${travelOnwardCardHTML()}
+      ${fuelDepotHTML({ compact: true })}
+    </div>
     ${shopPanel('shop', '🛒', 'Pro Shop', `${stockItems.length} in stock`, shopBody, rarCol(state.course.rarity))}
-    ${shopPanel('bag', '🎒', 'Golf Bag', `${clubCount} clubs`, bagInventoryHTML())}
-    ${shopPanel('upgrades', '⭐', 'Upgrades & Effects', `${upgradeLines().length} active`, upgradesPanelBodyHTML())}`;
+    ${shopPanel('upgrades', '⭐', 'Upgrades & Effects', `${upgradeLines().length} active`, upgradesPanelBodyHTML())}
+    ${shopPanel('bag', '🎒', 'Golf Bag', `${clubCount} clubs`, bagInventoryHTML())}`;
 }
 
 /**
