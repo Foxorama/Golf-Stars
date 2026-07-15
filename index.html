@@ -516,9 +516,23 @@
          (class-collision guard: never `.gs-hud`, the play screen's). */
       .gs-bhud--st .gs-bhud__shards { flex: 0 0 auto; font-size: 14px; font-weight: 700; white-space: nowrap; color: var(--gs-gold); }
       .gs-bhud--st .gs-bhud__shards b { color: var(--gs-gold); }
-      /* The dashboard is now the focus: the centre control is a compact speed dial (like the travel scan
-         dial), so the instrument DECK gets the wide, prominent left area (clearing the small pilot dot). */
-      .gs-bhud--st .gs-bhud__deck { left: 56px; right: calc(50% + 44px); }
+      /* The star-map console carries FIVE things — pilot · deck (the ship's fun instrument cluster) · speed ·
+         WEAPON fire · fuel (GS-star-tour-weapons). The travel console floats the deck ABSOLUTELY in the left
+         gap (behind the controls), which the added fire button then covered + crowded. So Star Tour instead
+         lays everything out IN-FLOW in an EVEN flex row: the deck gets its OWN space between the pilot and
+         speed dial (no more overlap/clipping), and the fuel gauge is slimmed to keep real breathing room. */
+      .gs-bhud--st .gs-bhud__console { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 0 10px; }
+      .gs-bhud--st .gs-bhud__deck {
+        position: static; inset: auto; flex: 0 0 auto; overflow: visible; opacity: 1; gap: 6px;
+        -webkit-mask: none; mask: none;
+      }
+      /* Slimmer fuel readout on Star Tour so the five-across bar isn't cramped (the count stays the hero). */
+      .gs-bhud--st .gs-sthud__fuel { padding: 4px 7px; }
+      .gs-bhud--st .gs-sthud__fuel .gs-fuelbar { gap: 4px; }
+      .gs-bhud--st .gs-sthud__fuel .gs-fuelbar__cells { gap: 1px; padding: 2px 2px; }
+      .gs-bhud--st .gs-sthud__fuel .gs-fuelbar__cell { width: 3px; height: 11px; }
+      .gs-bhud--st .gs-sthud__fuel .gs-fuelbar__n { font-size: 13px; }
+      .gs-bhud--st .gs-sthud__fuel .gs-fuelbar__ico { font-size: 12px; }
       /* Top-left RECORDS link — the "✦ STAR TOUR 🏆 n/N" pod is itself the records-board toggle (the
          records readout is baked in here, off the console). Reuses the `.gs-bhud__idpod` glass look; this
          just makes it a tappable button. */
@@ -567,6 +581,34 @@
       .gs-sthud__speed--fast .gs-sthud__speed-lbl { color: var(--gs-warn); }
       .gs-sthud__speed-cost { font-size: 8px; font-weight: 700; color: var(--hud-accent); margin-top: 0.5px; }
       .gs-sthud__speed--fast .gs-sthud__speed-cost { color: var(--gs-warn); }
+      /* WEAPON fire button (GS-star-tour-weapons) — a hot trigger beside the speed dial, glowing in the flown
+         ship's own weapon colours (`--wpn`/`--wpn2` set inline per gun) so each craft's trigger reads as its
+         own. Pressing it spits a themed projectile from the ship's nose; the ammo pips below tick down. It
+         dims to `--empty` when out of charges (reload at any fuel stop). */
+      .gs-sthud__fire {
+        pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0px;
+        width: 60px; height: 48px; border-radius: 13px; line-height: 1; color: var(--gs-ink);
+        border: 1.5px solid color-mix(in srgb, var(--wpn, var(--hud-accent)) 66%, transparent);
+        background: radial-gradient(120% 120% at 50% 26%, color-mix(in srgb, var(--wpn, var(--hud-accent)) 26%, #0b111c), #06090f);
+        box-shadow: 0 0 18px -5px var(--wpn, var(--hud-accent)), inset 0 1px 0 color-mix(in srgb, var(--wpn, var(--hud-accent)) 44%, transparent), inset 0 0 12px color-mix(in srgb, var(--wpn2, var(--hud-glow)) 30%, transparent);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: transform .08s ease, border-color .16s ease, filter .16s ease, box-shadow .16s ease, opacity .16s ease;
+      }
+      .gs-sthud__fire:active { transform: scale(0.92); }
+      .gs-sthud__fire:hover { filter: brightness(1.14); }
+      .gs-sthud__fire-ico { display: flex; align-items: center; justify-content: center; }
+      .gs-sthud__fire-svg { width: 19px; height: 19px; display: block; }
+      .gs-sthud__fire-lbl { font-size: 8px; font-weight: 800; letter-spacing: 0.6px; color: var(--gs-ink); margin-top: 1px; white-space: nowrap; }
+      .gs-sthud__fire-ammo { display: flex; gap: 2.5px; margin-top: 2.5px; }
+      .gs-sthud__pip {
+        width: 6px; height: 6px; border-radius: 999px;
+        background: color-mix(in srgb, var(--wpn, var(--hud-accent)) 16%, #0b111c);
+        border: 1px solid color-mix(in srgb, var(--wpn, var(--hud-accent)) 34%, transparent);
+      }
+      .gs-sthud__pip--on { background: var(--wpn2, var(--hud-accent)); border-color: var(--wpn, var(--hud-accent)); box-shadow: 0 0 6px var(--wpn, var(--hud-accent)); }
+      /* Out of charges — the trigger dims + desaturates, but stays tappable (a soft click). */
+      .gs-sthud__fire--empty { opacity: 0.5; filter: grayscale(0.5); box-shadow: none; }
+      .gs-sthud__fire--empty .gs-sthud__pip { box-shadow: none; }
       /* RIGHT readout — the live FUEL gauge, recessed like the journey fuel screen (⛽ · cells · count). */
       .gs-sthud__fuel {
         pointer-events: auto; display: flex; align-items: center; max-width: 100%; overflow: hidden;

@@ -31,11 +31,17 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
 import { hudChromeFor } from '../render/hudChrome';
 import { fuelGaugeHTML } from '../render/fuel';
+import { shipWeaponFor, weaponReticleSVG } from '../render/shipWeapons';
 
 /** The star-map fuel tank (GS-star-tour-fuel): flying burns fuel by DISTANCE travelled; visiting any
  *  station (a world / Earth / the spaceport) tops it back to full; draining it in deep space calls the
  *  space tanker. A round display value (one gauge cell per unit) — app-layer feel only, never persisted. */
 export const STAR_TOUR_FUEL_CAP = 10;
+
+/** The weapon charge magazine (GS-star-tour-weapons): a couple of shots on the dashboard fire button,
+ *  refilled whenever the fuel tank tops up (at any station, or after the space tanker's visit). App-layer
+ *  feel only — never the sim, a save, or the rng stream. */
+export const WEAPON_AMMO_CAP = 2;
 
 /** The refuel-tanker animation state (GS-star-tour-fuel): when the tank hits empty mid-flight the ship
  *  stalls, a fuel truck flies in from the viewport edge (`in`), hoses the tank up (`hose`), then flies out
@@ -91,6 +97,8 @@ export const starTourView = {
   fuel: STAR_TOUR_FUEL_CAP,
   /** Throttle: 'fast' cruises +25% and burns 1.5× the fuel per distance (the console speed control). */
   speed: 'normal' as 'normal' | 'fast',
+  /** Weapon charges left (GS-star-tour-weapons), 0..WEAPON_AMMO_CAP. Firing spends one; refuelling refills. */
+  ammo: WEAPON_AMMO_CAP,
   /** Active refuel-tanker sequence, or null. */
   refuel: null as StarTourRefuel | null,
 };
@@ -170,6 +178,16 @@ export function starTourFuelHTML(): string {
   return fuelGaugeHTML(starTourView.fuel, STAR_TOUR_FUEL_CAP, { icon: starTourFuelIcon() });
 }
 
+/** The weapon ammo pips for the fire button — one cell per `WEAPON_AMMO_CAP`, lit up to the charges left.
+ *  Rebuilt in place each fire by app.ts (`#gs-st-ammo`) so it ticks down without a whole-SVG re-render. */
+export function starTourAmmoHTML(): string {
+  let cells = '';
+  for (let i = 0; i < WEAPON_AMMO_CAP; i++) {
+    cells += `<span class="gs-sthud__pip${i < starTourView.ammo ? ' gs-sthud__pip--on' : ''}"></span>`;
+  }
+  return cells;
+}
+
 /** A two-notch THROTTLE lever (GS-star-tour-fuel) for the console speed control — reads the livery
  *  `--hud-*` props so each ship's speed control is its own cockpit colour. The knob rides UP on `fast`
  *  (a `.gs-sthud__speed--fast` class), so the graphic reads the throttle position. */
@@ -206,6 +224,10 @@ function stHud(): string {
   const played = Object.keys(state.strokePlayBest).length;
   const recordsToggle = starTourView.recordsOpen ? '0' : '1';
   const fast = starTourView.speed === 'fast';
+  // The dashboard weapon (GS-star-tour-weapons): a thematically-matched gun for the flown ship, fired from
+  // the console. A couple of charges, refilled at any fuel stop. Icon + label tint to the weapon's colours.
+  const weapon = shipWeaponFor(shipId);
+  const empty = starTourView.ammo <= 0;
 
   return `
     <div class="gs-bhud gs-bhud--st gs-bhud--${hud.variant}" style="${hudThemeVars(hud)}">
@@ -225,18 +247,25 @@ function stHud(): string {
         <button class="gs-bhud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
       </div>
       <div class="gs-bhud__console gs-bhud__console--st">
-        ${chrome?.deck ?? ''}
         <div class="gs-bhud__slot gs-bhud__slot--exit">
           <button class="gs-sthud__pilot" data-action='{"type":"openStarTour"}' title="Change golfer — ${ch?.name ?? 'pick a pilot'}" aria-label="Change golfer">
             <span class="gs-sthud__pilot-dot" style="background:${accent};"></span>
             <span class="gs-sthud__pilot-swap">⇄</span>
           </button>
         </div>
+        ${chrome?.deck ?? ''}
         <div class="gs-bhud__slot gs-bhud__slot--scan">
           <button class="gs-sthud__speed${fast ? ' gs-sthud__speed--fast' : ''}" data-startour-speed="1" title="Cruise speed — fast is +25% speed and burns 1.5× fuel" aria-pressed="${fast}">
             <span class="gs-sthud__speed-ico">${throttleSVG()}</span>
             <span class="gs-sthud__speed-lbl">${fast ? 'FAST' : 'NORMAL'}</span>
             <span class="gs-sthud__speed-cost">${fast ? '1.5× ⛽' : 'cruise'}</span>
+          </button>
+        </div>
+        <div class="gs-bhud__slot gs-bhud__slot--fire">
+          <button class="gs-sthud__fire${empty ? ' gs-sthud__fire--empty' : ''}" id="gs-st-fire" data-startour-fire="1" style="--wpn:${weapon.color};--wpn2:${weapon.color2};" title="Fire ${weapon.name} — ${starTourView.ammo}/${WEAPON_AMMO_CAP} charges (refuel to reload)" aria-label="Fire ${weapon.name}">
+            <span class="gs-sthud__fire-ico">${weaponReticleSVG(weapon)}</span>
+            <span class="gs-sthud__fire-lbl">${weapon.name}</span>
+            <span class="gs-sthud__fire-ammo" id="gs-st-ammo">${starTourAmmoHTML()}</span>
           </button>
         </div>
         <div class="gs-bhud__slot gs-bhud__slot--fuel">

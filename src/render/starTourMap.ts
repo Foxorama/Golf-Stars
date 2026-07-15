@@ -1489,6 +1489,10 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     ${earthGlyph(earthWorld, earthWorld?.id === opts.selectedId)}
     ${worlds}
     ${shipGroup(opts)}
+    <!-- Weapon projectiles (GS-star-tour-weapons): an empty layer the app fills with fired shots (the
+         fuel-tanker pattern) — a shot group is appended here + driven by a per-frame transform, then
+         removed when it dies. Over the ship so a muzzle shot reads leaving the nose. -->
+    <g id="gs-st-shots" style="pointer-events:none;"></g>
     ${fuelTruckGroup()}
   </svg>`;
 }

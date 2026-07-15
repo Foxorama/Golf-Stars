@@ -1162,7 +1162,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     world / Earth / the spaceport, within `ST_REFUEL_STATION_R`) tops the tank to full; draining it in deep
     space stalls the ship and flies in a space TANKER (`#gs-st-fueltruck` + hose, an rAF state machine in
     `stepStarTour`) that hoses it up and departs, then the interrupted flight resumes. All app-layer/render
-    (no reducer/save/rng, no `_gs*`/URL hook → no test-hub wiring). Re-shoot `scripts/startour-preview.mjs`. The Daily button is parked off the title for now. DESTINATION ICONS
+    (no reducer/save/rng, no `_gs*`/URL hook → no test-hub wiring). Re-shoot `scripts/startour-preview.mjs`. The Daily button is parked off the title for now. SHIP WEAPONS
+    (GS-star-tour-weapons, `render/shipWeapons.ts`) — the console FIRE button (`data-startour-fire`) spits a
+    THEMATICALLY-MATCHED projectile from the ship's nose along its heading: a scatter-gun of golf-ball buckshot
+    (wagon), a railgun slug (racer), an abduction RAY (saucer), ice shards (comet), rockets (hauler), a plasma
+    death-orb (mothership), twin neon lasers (bike), a forked LIGHTNING/Bifröst cannon (chopper/Pegasus), an
+    aurora BLACK-HOLE nova (Infinity Ace), a phoenix fireball (Firebird). The gun is a `WEAPON_BY_KIND` row
+    keyed by `look.kind` (a new ship inherits a fitting gun, no engine edit); projectiles are authored facing
+    +x and driven by `stepStarTour`'s rAF loop into a `#gs-st-shots` SVG layer (the fuel-tanker/thrust
+    pattern) — pure geometry + SMIL, ZERO rng. Magazine = `WEAPON_AMMO_CAP` (2) charges on `starTourView.ammo`,
+    spent per fire, RELOADED wherever the tank refuels (any station arrival + the tanker top-up). Firing NEVER
+    calls `render()` (that rebuilds the chart + wipes live shots) — it appends shot `<g>`s + ticks the ammo
+    pips in place, exactly like the fuel gauge. All app-layer/render feel (no reducer/save/rng, no `_gs*`/URL
+    hook → no test-hub wiring); guarded by `tests/ship-weapons.test.ts` (weapon/style coverage) +
+    `tests/build.test.ts` (browser: fire spawns a shot + spends a charge). The star-map CONSOLE lays its five
+    controls (pilot · deck · speed · fire · fuel) out IN-FLOW (flex, own space each) — NOT the travel console's
+    absolute-floated deck, which the fire button crowded. DESTINATION ICONS
     (GS-star-tour-destinations → GS-star-map-icon-consistency, `render/starTourMap.ts`) — the star map is a
     DIFFERENT interface from the journey map: a course is the PLACE it's named for, not a biome skin, so
     EVERY destination is its own luminous celestial object that EMITS into the star field via `softGlow`
