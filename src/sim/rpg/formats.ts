@@ -17,8 +17,16 @@ export interface BossSpec {
   name: string;
   /** One-line flavour shown on the boss intro splash. */
   blurb: string;
-  /** Extra Stableford demanded on top of the distance-ramped cut (the "boss is harder" knob — fair,
-   *  since the cut is a scoring threshold, never an unfair hole). */
+  /**
+   * The "boss is harder" knob, and the voyage's ARC index (1/2/3 for the Arc-I/II/III bosses).
+   *  • For a NON-matchplay boss it's extra Stableford demanded on top of the distance-ramped cut (fair —
+   *    the cut is a scoring threshold, never an unfair hole).
+   *  • For a MATCHPLAY boss (every voyage boss today) the Stableford cut is bypassed — the duel decides
+   *    (`matchWon`) — so cutBonus drives the boss's ARC RANK instead (GS-boss-escalation): `bossEdgeForRun`
+   *    maps it 1/2/3 → arcRank 0/1/2, sharpening the boss LOADOUT (handicap/distance/dispersion, and the
+   *    final pin-hunts), so the three bosses genuinely ESCALATE across the campaign. Keep it 1/2/3 in arc
+   *    order; a change reshapes the difficulty climb.
+   */
   cutBonus: number;
   /** The final boss of the voyage — clearing it WINS the run. Exactly one per format. */
   final?: boolean;

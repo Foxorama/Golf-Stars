@@ -53,6 +53,21 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   (verdict + W/L/½ pips). The boss's pre-played shot trail for the current hole is overlaid MUTED on the
   play map (`renderHoleSVG.ghostShots`) and the HUD shows "Boss made N here" so you have feedback on their
   ball/score. Tests: `tests/golfers|competition|league|match.test.ts`.
+- **The three voyage bosses ESCALATE (GS-boss-escalation).** They used to scale ONLY with Ascension +
+  bag tier (`bossEdgeForRun` = `{ascension, bagTier}`), both fixed for a run — so within one voyage the
+  Arc-III FINAL was mechanically no harder than the Arc-I boss, and since the player grows across arcs the
+  climax often felt EASIER than the opener. The `BossSpec.cutBonus` (1/2/3) that was meant to supply the
+  climb was INERT: a matchplay boss passes on the DUEL (`matchWon`), never the Stableford cut, so the
+  +1/+2/+3 never bit. Fix: `bossEdgeForRun` now maps `cutBonus` → `BossEdge.arcRank` (0/1/2), and
+  `bossLoadout` sharpens per rank — handicap −`BOSS_ARC_HANDICAP` (1.3), distance +`BOSS_ARC_DISTANCE` (4),
+  dispersion −`BOSS_ARC_DISPERSION` (0.04) each rank, stacked ON TOP of the Ascension edge — and the FINAL
+  (rank 2) pin-hunts even at A0 (`BOSS_ARC_ATTACK_RANK` 2), while Arc-II stays the percentage player, just
+  tighter/longer. So at A0 the boss plays off handicap 4 → 3 → 1 and dispersion 1.0 → 0.96 → 0.92 across the
+  three arcs — a clear, felt climb. Rank 0 (Arc-I, and the default `BossEdge`) is byte-identical to the
+  classic boss, so every A0-Arc-I seeded test is unchanged; a grown bag (gear parity means the boss shares
+  the run's tier) still out-clubs the climb and wins (the strong-build voyage-win test holds). Guarded by
+  `tests/boss-scale.test.ts` (the escalation knobs + rank-from-cutBonus + the final-scores-better check).
+  NOTE the Asgard Warriors Three are a SEPARATE stroke-play ghost (`warriorsEdge`), tuned on their own.
 - **Survival is your PLACE in the field — the leaderboard IS the cut (GS-positional-cut).** A WINNABLE
   campaign (the voyage) is a FIELD competition, so you no longer survive an ordinary stop by clearing an
   abstract Stableford line — you survive by finishing in the TOP-N of the arc leaderboard (`ARC_CUT_TARGETS

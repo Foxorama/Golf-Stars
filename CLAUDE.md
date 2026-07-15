@@ -748,10 +748,19 @@ these systems** — each bullet is the tip of a documented iceberg.
     draw off a filtered pool). Characters/talents/ace rewards ride `loadout.perks` ids, rebuilt on
     resume (no save bump).
   - Bosses play on a separate `:boss` rng and SCALE with Ascension via `bossEdgeForRun` (the ONE
-    source for headless AND reducer); A0 + a common bag is the classic boss, byte-for-byte. The
+    source for headless AND reducer); A0 + a common bag + Arc-I is the classic boss, byte-for-byte. The
     auto-AI pin-hunts via `PlayHoleOptions.attackPin` (default off = byte-identical), armed for
     endless bogey-or-tighter bars and high-Ascension bosses; `playHole` takes `puttSkill` so putter
     perks reach the headless putt-out.
+  - The voyage's three bosses ESCALATE, not just scale flat with Ascension (GS-boss-escalation): the
+    boss's `cutBonus` (1/2/3, arc order) maps to an `arcRank` (0/1/2) on `BossEdge`, which sharpens the
+    boss LOADOUT — handicap −`BOSS_ARC_HANDICAP`/rank, distance +`BOSS_ARC_DISTANCE`/rank, dispersion
+    −`BOSS_ARC_DISPERSION`/rank — so the Arc-II boss is harder and the Arc-III FINAL harder again, INDEPENDENT
+    of Ascension. The final (rank 2) also pin-hunts even at A0 (`BOSS_ARC_ATTACK_RANK`). This revived
+    `cutBonus`, which was INERT for matchplay bosses (they pass on the DUEL `matchWon`, never the Stableford
+    cut, so the +1/+2/+3 never bit). Rank 0 (Arc-I, and the default `BossEdge`) is byte-identical to the
+    classic boss; a grown bag can still out-club the climb (`tests/boss-scale.test.ts` guards the escalation +
+    the strong-build voyage win). The Asgard Warriors Three are a separate stroke-play ghost (see below).
 - **Competition & leaderboards** — `docs/decisions/competition.md`
   - The field is a deterministic STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims.
   - Voyage survival is your POSITION in one persistent field thinning to the final two;

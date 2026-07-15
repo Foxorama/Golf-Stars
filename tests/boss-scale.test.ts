@@ -62,6 +62,54 @@ describe('ascension-scaled bosses (GS-boss-scale)', () => {
     expect(bossPlayOpts(boss.id, false, { ascension: BOSS_ATTACK_ASCENSION }).attackPin).toBe(true);
   });
 
+  it('the three arc bosses ESCALATE — Arc-II harder than Arc-I, the final harder again (GS-boss-escalation)', () => {
+    // Arc rank 0/1/2 = the Arc-I / Arc-II / Arc-III (final) boss. Higher rank = tighter, longer, and the
+    // final (rank 2) pin-hunts even at A0. Rank 0 is byte-identical to the classic boss.
+    expect(bossLoadout(boss.id, false, { arcRank: 0 })).toEqual(bossLoadout(boss.id));
+    let prevHcp = Infinity;
+    let prevDisp = Infinity;
+    let prevDrive = 0;
+    for (const arcRank of [0, 1, 2]) {
+      const lo = bossLoadout(boss.id, false, { arcRank });
+      expect(lo.handicap).toBeLessThanOrEqual(prevHcp);
+      expect(lo.dispersionMult).toBeLessThanOrEqual(prevDisp);
+      const drive = Math.max(...lo.bag.map((c) => c.carry));
+      expect(drive).toBeGreaterThanOrEqual(prevDrive);
+      prevHcp = lo.handicap;
+      prevDisp = lo.dispersionMult;
+      prevDrive = drive;
+    }
+    // The final is STRICTLY sharper than the Arc-I boss on every knob (a real climb, even at A0).
+    const arc1 = bossLoadout(boss.id, false, { arcRank: 0 });
+    const final = bossLoadout(boss.id, false, { arcRank: 2 });
+    expect(final.handicap).toBeLessThan(arc1.handicap);
+    expect(final.dispersionMult).toBeLessThan(arc1.dispersionMult);
+    expect(Math.max(...final.bag.map((c) => c.carry))).toBeGreaterThan(Math.max(...arc1.bag.map((c) => c.carry)));
+    // The final boss pin-hunts even at A0; Arc-I/II at A0 stay the percentage player.
+    expect(bossPlayOpts(boss.id, false, { arcRank: 0 }).attackPin).toBe(false);
+    expect(bossPlayOpts(boss.id, false, { arcRank: 1 }).attackPin).toBe(false);
+    expect(bossPlayOpts(boss.id, false, { arcRank: 2 }).attackPin).toBe(true);
+    // The final boss actually scores better than the Arc-I boss across seeds (the escalation bites).
+    let arc1Strokes = 0;
+    let finalStrokes = 0;
+    for (let s = 0; s < 30; s++) {
+      const c = currentCourse({ ...startRun(s, 'voyage'), stopIndex: 2 });
+      for (const h of c.holes) {
+        arc1Strokes += playHole(h, new Rng(`e${s}`), bossPlayOpts(boss.id, false, { arcRank: 0 })).record.strokes;
+        finalStrokes += playHole(h, new Rng(`e${s}`), bossPlayOpts(boss.id, false, { arcRank: 2 })).record.strokes;
+      }
+    }
+    expect(finalStrokes).toBeLessThan(arc1Strokes);
+  });
+
+  it('bossEdgeForRun derives the arc rank from the boss cutBonus (Arc-I 0 → final 2)', () => {
+    const run = startRun(3, 'voyage', {}, 'feather-fade', 0);
+    // Voyage boss stops: 2 (Arc-I, cutBonus 1), 5 (Arc-II, 2), 8 (final, 3) → ranks 0, 1, 2.
+    expect(bossEdgeForRun({ ...run, stopIndex: 2 }).arcRank).toBe(0);
+    expect(bossEdgeForRun({ ...run, stopIndex: 5 }).arcRank).toBe(1);
+    expect(bossEdgeForRun({ ...run, stopIndex: 8 }).arcRank).toBe(2);
+  });
+
   it('gear parity: the boss bag re-stamps to the run bag tier', () => {
     const common = bossLoadout(boss.id, false, { bagTier: 'common' });
     const epic = bossLoadout(boss.id, false, { bagTier: 'epic' });
@@ -74,7 +122,7 @@ describe('ascension-scaled bosses (GS-boss-scale)', () => {
 
   it('bossEdgeForRun plumbs the run tier + bag; the scaled duel is deterministic and plays better', () => {
     const run = startRun(11, 'voyage', {}, 'feather-fade', 8);
-    expect(bossEdgeForRun(run)).toEqual({ ascension: 8, bagTier: run.bagTier });
+    expect(bossEdgeForRun(run)).toEqual({ ascension: 8, bagTier: run.bagTier, arcRank: 0 });
 
     const holes = currentCourse(run).holes;
     const playerOpts = playerHoleOpts(run);
