@@ -92,7 +92,7 @@ export {
 } from './runShop';
 export type { ShopOffer, ShardShopOffer } from './runShop';
 export { snapshotRun, resumeRun } from './runSerialise';
-export type { RunSnapshot } from './runSerialise';
+export type { RunSnapshot, RoundProgress } from './runSerialise';
 
 export type RunStatus = 'active' | 'ended';
 export type EndReason = 'cut' | 'banked' | 'won' | 'stranded';

@@ -461,6 +461,38 @@
         .gs-navtiles--games .gs-navtile__cap { padding: 16px 8px 9px; }
       }
 
+      /* ── Continue Run button (GS-continue-button): the thematic, mode-aware resume card ──
+         The character's cosmetic ship on the left, a mode-aware message (Voyage arc / Unending hole /
+         Star Tour course + hole) on the right; the whole card is the resume button. Its OWN class
+         prefix (never the play HUD's `.gs-hud`) — new title chrome gets a fresh prefix. */
+      .gs-resume {
+        display: flex; align-items: center; gap: 14px; width: 100%;
+        margin: 4px 0 2px; padding: 10px 14px 10px 8px;
+        border-radius: var(--gs-r-lg); border: 1px solid #2bb673; cursor: pointer; text-align: left;
+        color: var(--gs-ink); -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        background: linear-gradient(180deg, #10241a, #0e1a14);
+        box-shadow: var(--gs-shadow);
+        transition: transform .14s ease, box-shadow .18s ease, border-color .16s ease, filter .16s ease;
+      }
+      .gs-resume:hover { transform: translateY(-2px); border-color: #46e0a0; filter: brightness(1.06); box-shadow: 0 8px 22px rgba(0,0,0,.5); }
+      .gs-resume:active { transform: translateY(0); }
+      .gs-resume:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+      .gs-resume__ship {
+        flex: 0 0 auto; width: 96px; height: 60px; display: block; border-radius: 10px;
+        background: radial-gradient(120% 120% at 60% 30%, rgba(43,182,115,0.16), rgba(6,12,9,0.55));
+      }
+      .gs-resume__ship svg { display: block; width: 100%; height: 100%; }
+      .gs-resume__body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+      .gs-resume__kicker { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #7fe0b0; opacity: .9; }
+      .gs-resume__head { font: 800 20px/1.15 system-ui, sans-serif; color: var(--gs-ink); }
+      .gs-resume__sub { font-size: 12px; color: var(--gs-dim); }
+      .gs-resume__go { flex: 0 0 auto; font-size: 20px; color: #46e0a0; padding-right: 4px; }
+      @media (max-width: 460px) {
+        .gs-resume { gap: 11px; padding: 8px 12px 8px 6px; }
+        .gs-resume__ship { width: 78px; height: 50px; }
+        .gs-resume__head { font-size: 18px; }
+      }
+
       /* ── Star Tour: the free-roam star map course picker (GS-star-tour) ───────── */
       /* Deep-space starfield backdrop (GS-star-map-bigger-canvas): the chart is bigger than any phone
          screen and pans, but when zoomed all the way out it fits with letterbox margins. Rather than

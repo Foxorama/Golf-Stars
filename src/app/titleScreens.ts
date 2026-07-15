@@ -4,8 +4,16 @@
  * art is hand-placed (zero rng) so it stays byte-stable.
  */
 
-import { btn, state } from './ctx';
-import { FORMATS, ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { state } from './ctx';
+import { FORMATS, ASGARD_FORMAT, STROKEPLAY_FORMAT, getFormat } from '../sim/rpg/formats';
+import type { RunSnapshot } from '../sim/rpg/run';
+import { shipForCharacter } from '../ui/gameCosmetics';
+import { shipCardSVG } from '../render/shipArt';
+import { getCharacter } from '../sim/rpg/characters';
+import { arcIndexOf } from '../sim/rpg/competition';
+import { staticCourseSpec } from '../sim/course/staticCourses';
+import { ARCHETYPE_SPACE, ARCHETYPE_TURF } from '../render/palette';
+import type { BiomeArchetype } from '../sim/course/themes';
 
 /** The captured PWA install prompt (beforeinstallprompt), if the browser offered one and the
  *  player hasn't installed/dismissed it. Surfaced as an "Install" button on the title. Set by
@@ -59,6 +67,10 @@ export function titleScreen(): string {
     state.endlessBestHoles > 0
       ? `<span class="gs-chip" title="Unending Universe best" style="font-size:12px;">∞ Best <b style="color:#4fe08a;">${state.endlessBestHoles}</b> holes</span>`
       : '';
+  // The thematic, mode-aware Continue Run button (GS-continue-button): the character's ship + a message
+  // that reads the run being continued (Voyage arc / Unending hole / Star Tour course + hole). Empty for a
+  // Star Tour session where no course has been started (nothing meaningful to continue).
+  const resumeHTML = continueRunHTML();
   return `
     <header class="gs-hero">
       <h1 class="gs-hero-title">⛳ Golf Stars</h1>
@@ -71,18 +83,81 @@ export function titleScreen(): string {
         ${installButtonHTML()}
       </div>
     </header>
-    ${
-      state.resumable
-        ? `<div class="gs-panel" style="border-color:#2bb673;background:linear-gradient(180deg,#10241a,#0e1a14);">
-             <b style="font-size:14px;">Run in progress</b> — stop ${state.resumable.stopIndex + 1}, distance ${state.resumable.distanceFromStart}, ${state.resumable.credits} credits.
-             <div style="margin-top:6px;">${btn('▶ Continue run', { type: 'resume' }, { variant: 'primary' })}</div>
-           </div>`
-        : ''
-    }
-    <h2 class="gs-seclabel">${state.resumable ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
+    ${resumeHTML}
+    <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
     <div class="gs-navtiles gs-navtiles--games">${modes}${starTourTileHTML()}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
+}
+
+/** The mode-aware message shown on the Continue Run button (GS-continue-button). Returns `null` when the
+ *  run isn't worth (or possible) to continue — today only a Star Tour session with no course teed off. */
+function resumeInfo(r: RunSnapshot): { kicker: string; head: string; sub: string } | null {
+  const ch = getCharacter(r.characterId);
+  const who = ch ? ch.name : 'Your golfer';
+  // Star Tour (GS-star-tour): a records chase on a chosen course — only offer a continue once a course has
+  // actually been started, and lead with the COURSE (its icon + name) and the hole reached.
+  if (r.formatId === STROKEPLAY_FORMAT) {
+    if (!r.staticCourseId) return null;
+    const spec = staticCourseSpec(r.staticCourseId);
+    const hole = (r.stopHoleIndex ?? 0) + 1;
+    return {
+      kicker: `🗺 Star Tour · ${who}`,
+      head: `${courseIconHTML(spec?.archetype)} ${spec?.name ?? 'Course'}`,
+      sub: `Round in progress · <b style="color:var(--gs-ink);">Hole ${hole}</b> of 18`,
+    };
+  }
+  // The Voyage (GS-voyage): the winnable campaign runs three arcs — say which arc you're in.
+  if (getFormat(r.formatId).winnable) {
+    const arc = arcIndexOf(r.stopIndex) + 1;
+    return {
+      kicker: `🚀 The Voyage · ${who}`,
+      head: `Arc ${arc}<span style="color:var(--gs-dim);font-weight:600;"> of 3</span>`,
+      sub: `Stop ${r.stopIndex + 1} · ${r.credits} credits`,
+    };
+  }
+  // The Unending Universe (GS-unending): endless survival — say the hole you're up to.
+  const hole = (r.holesSurvived ?? 0) + 1;
+  return {
+    kicker: `🌌 Unending Universe · ${who}`,
+    head: `Hole ${hole}`,
+    sub: `${r.credits} credits${r.bonusShards ? ` · ✦ ${r.bonusShards}` : ''}`,
+  };
+}
+
+/** A small themed "course on a world" medallion for the Star Tour continue message — a planet tinted by
+ *  the course's world archetype with a pin flag, so the button carries the course's identity. */
+function courseIconHTML(archetype: BiomeArchetype | undefined): string {
+  const ring = (archetype && ARCHETYPE_SPACE[archetype]?.edge) || 'rgba(120,205,140,0.55)';
+  const body = (archetype && ARCHETYPE_TURF[archetype]?.green.base) || '#5fd45a';
+  const dark = (archetype && ARCHETYPE_TURF[archetype]?.green.ink) || '#1d4d22';
+  return `<svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:-3px;display:inline-block;" aria-hidden="true">
+    <circle cx="9" cy="10" r="5.4" fill="${body}"/>
+    <circle cx="7.2" cy="8.2" r="5.4" fill="${dark}" opacity="0.35"/>
+    <ellipse cx="9" cy="10" rx="8" ry="2.6" fill="none" stroke="${ring}" stroke-width="1.2"/>
+    <line x1="11.4" y1="10.4" x2="11.4" y2="4.6" stroke="#e8e8ea" stroke-width="1"/>
+    <path d="M11.4,4.8 L15,6.1 L11.4,7.4 Z" fill="#ff6b6b"/>
+  </svg>`;
+}
+
+/** The thematic Continue Run button (GS-continue-button): the character's cosmetic ship + a mode-aware
+ *  message. The WHOLE card is the resume button. Empty when there's nothing to continue. */
+function continueRunHTML(): string {
+  const r = state.resumable;
+  if (!r) return '';
+  const info = resumeInfo(r);
+  if (!info) return '';
+  const shipId = shipForCharacter(state, r.characterId);
+  return `
+    <button class="gs-resume" data-action='${JSON.stringify({ type: 'resume' })}'>
+      <span class="gs-resume__ship" aria-hidden="true">${shipCardSVG(shipId, 96, 60)}</span>
+      <span class="gs-resume__body">
+        <span class="gs-resume__kicker">${info.kicker}</span>
+        <span class="gs-resume__head">${info.head}</span>
+        <span class="gs-resume__sub">${info.sub}</span>
+      </span>
+      <span class="gs-resume__go" aria-hidden="true">▶</span>
+    </button>`;
 }
 
 /** The third game tile (GS-star-tour): the free-roam Star Tour, launched from its own star-map course

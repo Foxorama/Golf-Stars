@@ -237,11 +237,42 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'resume': {
       if (state.screen !== 'title' || !state.resumable) return state;
-      const run = resumeRun(state.resumable);
+      const snap = state.resumable;
+      const run = resumeRun(snap);
+      const course = currentCourse(run);
+      // STAR TOUR mid-round resume (GS-star-tour-resume): a parked stroke-play round carries its
+      // completed scorecard (`stopPlayed`) + the hole reached (`stopHoleIndex`), so continue drops you
+      // back on that hole's tee with your card intact — the 18 holes are ONE stop, so the ordinary
+      // restart-the-stop resume would otherwise bin the whole round. `holeRng` is reseeded fresh: the
+      // round is a user-driven records chase (no determinism-guarded auto sim), so the resumed holes just
+      // draw a new dispersion stream — no already-played score is re-rolled. No lore gate here (you're
+      // already teed off, mid-round). Every other format keeps the intro/restart-the-stop resume below.
+      if (
+        run.formatId === STROKEPLAY_FORMAT &&
+        snap.stopPlayed &&
+        snap.stopHoleIndex !== undefined &&
+        snap.stopHoleIndex < course.holes.length
+      ) {
+        return {
+          ...state,
+          run,
+          course,
+          screen: 'playing',
+          holeRng: new Rng(`${course.seed}:play`),
+          stopPlayed: [...snap.stopPlayed],
+          play: beginHole(course.holes[snap.stopHoleIndex]!, snap.stopHoleIndex),
+          match: undefined,
+          played: undefined,
+          lastResult: undefined,
+          routes: undefined,
+          resumable: undefined,
+          viewHole: 0,
+        };
+      }
       return withLoreGate({
         ...state,
         run,
-        course: currentCourse(run),
+        course,
         screen: 'intro',
         played: undefined,
         lastResult: undefined,
@@ -1197,7 +1228,14 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen === 'title') return state;
       const resumable =
         state.run.status === 'active' && state.run.loadout.characterId
-          ? snapshotRun(state.run)
+          ? snapshotRun(
+              state.run,
+              // Carry a live stroke-play round's progress (GS-star-tour-resume) so a Star Tour round
+              // parked via "back to title" resumes from the hole it left off, not the 1st tee.
+              state.run.formatId === STROKEPLAY_FORMAT && state.play
+                ? { stopHoleIndex: state.play.holeIndex, stopPlayed: state.stopPlayed ?? [] }
+                : undefined,
+            )
           : state.resumable;
       // Rebuild the placeholder run backing the title (same seed) so format previews start clean.
       const run = startRun(state.run.seed, undefined, state.metaUpgrades, undefined, 0, state.bagTier);

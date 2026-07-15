@@ -68,7 +68,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v28**; bump + add a migration when you
+  (localStorage is the only copy). Current schema is **v29**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -1085,6 +1085,20 @@ these systems** — each bullet is the tip of a documented iceberg.
     NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
     character-less placeholder run (it wipes saves).
+  - The title's CONTINUE RUN button (GS-continue-button, `titleScreens.ts continueRunHTML`/`resumeInfo`)
+    is THEMATIC + mode-aware: the character's cosmetic ship (`shipForCharacter`→`shipCardSVG`) + a message
+    read off the parked `RunSnapshot` — Voyage → `Arc N of 3` (`arcIndexOf(stopIndex)+1`), Unending →
+    `Hole N` (`holesSurvived+1`), Star Tour → a course medallion (`courseIconHTML`, archetype-tinted
+    planet+flag) + course name + `Hole N of 18`. Star Tour ONLY offers a continue once a course is teed
+    off (`staticCourseId` set) — a golfer-picked-but-no-course session shows no card. OWN class prefix
+    `.gs-resume*` (never the play HUD's `.gs-hud`). Pure render off `state.resumable`; no `_gs*`/URL hook.
+  - STAR TOUR mid-round resume (GS-star-tour-resume): the 18 holes are ONE stop, so the ordinary
+    restart-the-stop resume would bin a parked round. The snapshot now carries the live round progress
+    (`RunSnapshot.stopHoleIndex` + `stopPlayed`, captured in `persist`/`toTitle` from `state.play`/
+    `stopPlayed`, save **v29**); the reducer's `resume` restores the scorecard + tees up that hole (screen
+    `playing`, no lore gate) so you continue where you left off. `holeRng` reseeds fresh — a records chase
+    isn't determinism-guarded, so resumed holes just draw a new dispersion stream, no played score re-rolls.
+    STROKEPLAY-only (the fields are absent on every other format → byte-for-byte the old restart resume).
   - Character select fits ONE screen in every mode (equal-height cards via `grid-auto-rows:1fr`);
     Ascension is picked WITH the golfer, never on the title, defaulting to your LAST pick
     (`Settings.lastAscension`). Difficulty is TWO native-select DROPDOWN pills on one compact row

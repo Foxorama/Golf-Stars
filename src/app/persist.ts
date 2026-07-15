@@ -10,8 +10,17 @@
 import { state } from './ctx';
 import { writeSave } from '../save/storage';
 import { SAVE_VERSION, type Save } from '../save/schema';
-import { snapshotRun } from '../sim/rpg/run';
-import { ASGARD_FORMAT } from '../sim/rpg/formats';
+import { snapshotRun, type RoundProgress } from '../sim/rpg/run';
+import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+
+/** The live in-progress round state to carry on the snapshot (GS-star-tour-resume) — only for an
+ *  underway stroke-play round (a Star Tour course teed off), so its resume continues from the hole it
+ *  left off. Every other format restarts the current stop on resume, exactly as before. */
+function roundProgress(): RoundProgress | undefined {
+  return state.run.formatId === STROKEPLAY_FORMAT && state.play
+    ? { stopHoleIndex: state.play.holeIndex, stopPlayed: state.stopPlayed ?? [] }
+    : undefined;
+}
 
 /** The cross-run meta carried into `initState` from a loaded save (everything but the active run,
  *  which boot passes separately). */
@@ -91,7 +100,7 @@ export function persist(): void {
       state.run.status === 'active' && state.run.formatId === ASGARD_FORMAT
         ? state.asgardReturn
         : state.run.status === 'active' && state.run.loadout.characterId
-        ? snapshotRun(state.run)
+        ? snapshotRun(state.run, roundProgress())
         : state.resumable,
   });
 }
