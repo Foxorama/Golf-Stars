@@ -304,6 +304,7 @@ function dispatch(action: Action): void {
       starTourView.targetY = null;
       starTourView.flyingTo = null;
       starTourView.dockingAtPort = false;
+      starTourView.following = false;
       // Open slightly more zoomed OUT than the intrinsic 1× (GS-star-tour-map-improvements) so more of the
       // sky is in frame on arrival; the fit clamp only pulls it in if a viewport is so small the whole
       // chart wouldn't fit even here (GS-star-map-zoom-out).
@@ -1400,6 +1401,9 @@ function wireStarTourGestures(vp: HTMLElement): void {
 
   vp.addEventListener('pointerdown', (e) => {
     if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+    // The player is taking manual control (pan/pinch) — release the chase-cam so it can't yank the map
+    // back to the ship (GS-star-map-jerky-movement). A trailing tap re-arms it via fly* on `click`.
+    starTourView.following = false;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     // NB: deliberately NO setPointerCapture — capturing the pointer retargets the trailing `click` to
     // the viewport, so `target.closest('[data-startour-course]')` misses the tapped world and every
@@ -1449,6 +1453,9 @@ function wireStarTourGestures(vp: HTMLElement): void {
   vp.addEventListener(
     'wheel',
     (e) => {
+      // Any wheel input is manual navigation (native scroll or ⌘/Ctrl zoom) — release the chase-cam so it
+      // doesn't fight the wheel (GS-star-map-jerky-movement).
+      starTourView.following = false;
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       setZoom((starTourView.zoom || 1) * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
@@ -1508,6 +1515,7 @@ function flyStarTourToPoint(x: number, y: number): void {
   starTourView.targetY = Math.max(20, Math.min(CHART_H - 20, y));
   starTourView.flyingTo = null;
   starTourView.dockingAtPort = false;
+  starTourView.following = true; // arm the chase-cam so rapid re-taps glide (GS-star-map-jerky-movement)
   setStarTourFlip(starTourView.targetX);
   sfx.click();
   startStarTourAnim();
@@ -1523,6 +1531,7 @@ function flyStarTourToWorld(id: string | null): void {
   starTourView.targetY = p.y;
   starTourView.flyingTo = id;
   starTourView.dockingAtPort = false;
+  starTourView.following = true; // arm the chase-cam (GS-star-map-jerky-movement)
   starTourView.selectedId = null; // close any open dossier while we fly
   setStarTourFlip(p.x);
   sfx.click();
@@ -1537,6 +1546,7 @@ function flyStarTourToPort(): void {
   starTourView.targetY = SPACEPORT_POS.y;
   starTourView.flyingTo = null;
   starTourView.dockingAtPort = true;
+  starTourView.following = true; // arm the chase-cam (GS-star-map-jerky-movement)
   starTourView.selectedId = null;
   setStarTourFlip(SPACEPORT_POS.x);
   sfx.click();
@@ -1847,10 +1857,15 @@ function stepStarTour(): void {
       if (v.fuel <= 0) beginStarTourRefuel(vp); // ran dry in deep space → the tanker comes to you
     }
   }
-  // Chase-cam: while flying (or watching the tanker), ease the viewport to keep the ship centred. The
-  // chart point's on-screen x is `margin − scroll + coord×zoom`, so centring the ship needs
-  // scroll = margin + shipX×zoom − half-viewport (margin is 0 unless the map is zoomed out to letterbox).
-  if ((cruising || v.refuel) && vp) {
+  // Chase-cam: while the player is flying the ship around (or watching the tanker), ease the viewport to
+  // keep the ship centred. The chart point's on-screen x is `margin − scroll + coord×zoom`, so centring the
+  // ship needs scroll = margin + shipX×zoom − half-viewport (margin is 0 unless the map is zoomed out to
+  // letterbox). Gated on `v.following` (set by any fly*, cleared on manual pan/pinch/wheel) rather than the
+  // per-frame `cruising` flag (GS-star-map-jerky-movement): a completed hop used to drop `cruising` and hard-
+  // freeze the map off-centre until the next tap, so rapid "tap to keep moving" taps stuttered freeze→lurch.
+  // Following instead keeps the cam easing across the gaps, so it glides — and once the ship is idle+centred
+  // the ease converges to a no-op, so it never fights a resting view.
+  if ((cruising || v.refuel || v.following) && vp) {
     const z = v.zoom || 1;
     const m = starTourChartMargins(vp, z);
     const tx = m.mx + v.shipX * z - vp.clientWidth / 2;

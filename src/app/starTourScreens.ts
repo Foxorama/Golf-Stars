@@ -86,6 +86,12 @@ export const starTourView = {
   /** Current flight target (chart coords), or null when idle. */
   targetX: null as number | null,
   targetY: null as number | null,
+  /** Camera-follow intent (GS-star-map-jerky-movement): true while the player is flying the ship around
+   *  (set by any fly*), cleared the instant they take manual control (pan/pinch/wheel). The chase-cam eases
+   *  toward the ship whenever this is set — NOT only while a hop is actively cruising — so a completed hop
+   *  finishes centring smoothly instead of hard-freezing the map, and rapid "tap to keep moving" taps read
+   *  as one continuous glide rather than a freeze→lurch stutter between hops. */
+  following: false,
   /** The course id to open on arrival (a flight triggered by tapping a world), or null (free flight). */
   flyingTo: null as string | null,
   /** Flying home to the SPACEPORT (GS-star-tour-port): on arrival the ship docks and the Clubhouse opens
