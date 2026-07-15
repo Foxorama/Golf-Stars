@@ -260,6 +260,23 @@ export function characterShotMods(id: string | undefined): ShotMods | undefined 
 }
 
 /**
+ * Stable index hash off (seed, stopIndex) into a pool of `poolLen` (GS-team-duel / GS-scramble).
+ * Mixes with `Math.imul` so every step stays int32-exact — a bare `seed * BIG` overflows 2^53 for a
+ * real run seed (~1e9) and the product's low bits round away, and a plain constant that shares a factor
+ * with `poolLen` (e.g. `40503 % 3 === 0`) makes the seed vanish under the modulo. Both failure modes
+ * pinned a partner to one golfer regardless of the seed; the two-round imul mixer diffuses every bit
+ * before the modulo, so the pick is uniform for ANY pool size (see formats.ts resolveTeamFormat, same
+ * fix). `salt` separates the two teams' draws so they rarely field the same golfer.
+ */
+function partnerIndex(seed: number, stopIndex: number, salt: number, poolLen: number): number {
+  let h = ((Math.round(seed) | 0) ^ Math.imul(stopIndex + 1, 0x9e3779b1) ^ salt) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h % poolLen;
+}
+
+/**
  * The co-op scramble PARTNER for a boss showdown (GS-scramble): an UNCHOSEN golfer from the roster,
  * picked deterministically from the run seed + stop so it's stable across reloads/resume. Excludes the
  * player's own golfer (you don't partner yourself). Pure — no rng object, just an index hash.
@@ -267,9 +284,7 @@ export function characterShotMods(id: string | undefined): ShotMods | undefined 
 export function scramblePartnerId(seed: number, stopIndex: number, playerId: string | undefined): string {
   const pool = CHARACTERS.filter((c) => c.id !== playerId);
   if (pool.length === 0) return CHARACTERS[0]!.id;
-  // A small stable hash off the seed+stop → an index into the eligible roster.
-  const h = Math.abs(Math.round(seed) * 2654435761 + stopIndex * 40503) % pool.length;
-  return pool[h]!.id;
+  return pool[partnerIndex(seed, stopIndex, 0x53435242 /* 'SCRB' */, pool.length)]!.id;
 }
 
 export function scramblePartner(seed: number, stopIndex: number, playerId: string | undefined): Character {
@@ -284,8 +299,7 @@ export function scramblePartner(seed: number, stopIndex: number, playerId: strin
 export function bossPartnerId(seed: number, stopIndex: number, playerId: string | undefined): string {
   const pool = CHARACTERS.filter((c) => c.id !== playerId);
   if (pool.length === 0) return CHARACTERS[0]!.id;
-  const h = Math.abs(Math.round(seed) * 40503 + stopIndex * 2654435761 + 0x85ebca6b) % pool.length;
-  return pool[h]!.id;
+  return pool[partnerIndex(seed, stopIndex, 0x424f5353 /* 'BOSS' */, pool.length)]!.id;
 }
 
 export function bossPartner(seed: number, stopIndex: number, playerId: string | undefined): Character {

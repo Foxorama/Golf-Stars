@@ -78,6 +78,15 @@
   home edge. Tests: `tests/team-duel.test.ts` (format resolution, the scoring engine, the rank rule, the
   headless stop, and the interactive scramble-choice + best-ball reducer flows); `tests/scramble.test.ts`
   guards the base fold + `scrambleOptsFor` gating. NO new `_gs*`/URL hook (the choice is reducer state).
+  GOTCHA — the seed→choice hashes (`resolveTeamFormat`, `scramblePartnerId`/`bossPartnerId`) MUST mix with
+  `Math.imul`, never a bare `seed * BIG % N`. Two ways a bare product collapses to a CONSTANT pick: (a) a
+  real run seed reaches ~1e9 and `seed * 2654435761` overflows 2^53, so the product's low bits round away
+  (killed `resolveTeamFormat`'s `% 2` — always scramble; and `scramblePartnerId` on a power-of-2 pool); (b) a
+  constant that shares a factor with the pool makes the seed vanish under the modulo (`40503 % 3 === 0` pinned
+  `bossPartnerId` to one golfer per stop on the 3-deep pool — no overflow needed). The shared `partnerIndex`
+  helper (two-round imul mixer, same as `formats.ts`) fixes both and is uniform for ANY pool size; guarded by
+  the partner-variety test in `tests/voyage.test.ts` (asserts the pick VARIES across realistic 1e9 seeds, not
+  just that it's deterministic — the old single-seed test couldn't see a stuck value).
 - **Boss EXTRAS (GS-team-duel): a home-zone edge + a pre-match scouting line.** (1) **Home edge** — a boss
   golfer on THEIR home constellation (`bossHasHomeEdge(id, themeId)`) plays sharper: `bossLoadout(id,
   homeEdge)` shaves `HOME_EDGE_HANDICAP` strokes and adds `HOME_EDGE_DISTANCE` yds (a "this is my turf"
