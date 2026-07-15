@@ -262,6 +262,7 @@ describe('build output (real browser)', () => {
     { screen: 'clubhouse', text: 'The Clubhouse', label: 'the Clubhouse hall' },
     { screen: 'startour', sel: '.gs-startour', text: 'STAR TOUR', label: 'the Star Tour star map' },
     { screen: 'strokeresult', sel: '.gs-strres', text: 'Best rounds overall', label: 'the Star Tour round recap' },
+    { screen: 'lore', sel: '.gs-lore', text: 'The Old Girl', label: 'the lore story-beat popup' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

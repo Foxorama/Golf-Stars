@@ -27,6 +27,8 @@ import { addEndlessRecord, endlessUnlocksCrossed } from '../sim/rpg/endless';
 import { addStrokeRecord, isNewCourseRecord, type StrokePlayRecord } from '../sim/rpg/strokePlay';
 import { playTotals } from '../sim/score';
 import { archetypeFor } from '../sim/course/themes';
+import { namedCaddyOwned } from '../sim/rpg/economy';
+import { pickLoreEvent, type LoreContext } from '../sim/rpg/lore';
 import { ASGARD_FORMAT } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
 import { warriorsThreeTotals, warriorsEdge } from '../sim/rpg/competition';
@@ -237,6 +239,30 @@ export function withAsgardPortal(next: UiState, run: Run, played: PlayedHole[]):
     return { ...next, screen: 'asgardMap', asgardReturn: snapshotRun(run) };
   }
   return next;
+}
+
+/**
+ * The arrival LORE gate (GS-lore) — the generic hook that fires a one-off story beat when the player
+ * reaches a stop. Wraps any "→ intro" reducer return: it reads a pure snapshot of the arrival (world,
+ * caddy, golfer, format, depth) and, if an unseen event's trigger fires, diverts to the `'lore'` screen
+ * (stashing the beat's id in `pendingLoreId`); `dismissLore` marks it seen and continues to the intro.
+ * A no-op on any non-`'intro'` return and whenever no beat qualifies (the common path). UI/render-only —
+ * it touches no sim rng, so every seeded run stays byte-identical.
+ */
+export function withLoreGate(next: UiState): UiState {
+  if (next.screen !== 'intro') return next;
+  const { run, course } = next;
+  const ctx: LoreContext = {
+    biome: course.biome,
+    archetype: archetypeFor(course.meta?.themeId, course.biome),
+    caddyId: namedCaddyOwned(run.loadout.perks),
+    characterId: run.loadout.characterId,
+    format: run.formatId,
+    stopIndex: run.stopIndex,
+    reputation: next.reputation,
+  };
+  const event = pickLoreEvent(ctx, next.seenLore);
+  return event ? { ...next, screen: 'lore', pendingLoreId: event.id } : next;
 }
 
 /**

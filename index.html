@@ -2132,6 +2132,89 @@
       .gs-sheet__note { font-size: 13px; line-height: 1.5; color: var(--gs-dim); margin: 0 0 12px; }
       .gs-sheet__actions { display: flex; flex-direction: column; gap: 8px; }
       .gs-sheet__actions .gs-btn { width: 100%; text-align: center; }
+
+      /* ---- Lore story-beat popup (GS-lore) --------------------------------------------------------
+         A full-bleed cinematic moment: a banner, a portrait, and a short conversation, over a dark
+         starfield tinted by the beat's accent (--gs-lore-acc). Its OWN class prefix (.gs-lore*), never
+         the play HUD's .gs-hud — see the CLAUDE.md global-CSS warning. */
+      .gs-lore {
+        --acc: var(--gs-lore-acc, #ffd97a);
+        min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+        overflow-y: auto;
+        padding:
+          calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+          calc(24px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+        background:
+          radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--acc) 16%, transparent) 0%, transparent 55%),
+          radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.5), transparent),
+          radial-gradient(1px 1px at 70% 20%, rgba(255,255,255,.35), transparent),
+          radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,.4), transparent),
+          radial-gradient(1.5px 1.5px at 85% 60%, rgba(255,255,255,.3), transparent),
+          radial-gradient(1px 1px at 12% 82%, rgba(255,255,255,.3), transparent),
+          linear-gradient(180deg, #090b11 0%, #0b0d12 100%);
+      }
+      .gs-lore__card {
+        width: 100%; max-width: 560px; margin: auto;
+        background: rgba(12, 15, 22, .78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        border: 1px solid color-mix(in srgb, var(--acc) 34%, transparent);
+        border-radius: 18px;
+        box-shadow: 0 18px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.03) inset,
+                    0 0 46px -12px color-mix(in srgb, var(--acc) 40%, transparent);
+        padding: clamp(16px, 4vw, 26px);
+        animation: gsLoreIn .5s cubic-bezier(.2,.8,.2,1) both;
+      }
+      @keyframes gsLoreIn { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+
+      .gs-lore__banner { text-align: center; position: relative; padding-bottom: 12px; margin-bottom: 4px; }
+      .gs-lore__banner::after {
+        content: ""; position: absolute; left: 12%; right: 12%; bottom: 0; height: 1px;
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--acc) 70%, transparent), transparent);
+      }
+      .gs-lore__kicker {
+        font-size: 11px; letter-spacing: .28em; text-transform: uppercase; font-weight: 800;
+        color: var(--acc); opacity: .92; margin-bottom: 4px;
+      }
+      .gs-lore__title {
+        margin: 0; font-size: clamp(24px, 6.5vw, 34px); line-height: 1.05; font-weight: 800;
+        color: #fff; text-shadow: 0 2px 18px color-mix(in srgb, var(--acc) 55%, transparent);
+      }
+      .gs-lore__speaker {
+        display: inline-flex; align-items: center; gap: 7px; margin-top: 7px;
+        font-size: 13px; font-weight: 700; letter-spacing: .04em; color: var(--acc);
+      }
+      .gs-lore__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--acc);
+        box-shadow: 0 0 10px 1px color-mix(in srgb, var(--acc) 80%, transparent); }
+
+      .gs-lore__stage { display: flex; flex-wrap: wrap; gap: clamp(12px, 3vw, 20px); align-items: center;
+        justify-content: center; margin: 14px 0 4px; }
+      .gs-lore__portrait {
+        flex: 0 0 auto; width: clamp(128px, 30vw, 176px);
+        border-radius: 16px; padding: 8px 8px 0;
+        background: radial-gradient(80% 70% at 50% 24%, color-mix(in srgb, var(--acc) 22%, transparent), transparent 70%);
+        filter: drop-shadow(0 8px 22px rgba(0,0,0,.5));
+      }
+      .gs-lore__portrait svg { display: block; }
+      .gs-lore__lines { flex: 1 1 240px; min-width: 220px; display: flex; flex-direction: column; gap: 9px; }
+      .gs-lore__say {
+        background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.08);
+        border-left: 3px solid color-mix(in srgb, var(--acc) 65%, transparent);
+        border-radius: 4px 12px 12px 12px; padding: 9px 12px;
+        font-size: clamp(14px, 3.6vw, 15.5px); line-height: 1.48; color: var(--gs-ink);
+      }
+      .gs-lore__action {
+        text-align: center; font-style: italic; font-size: 12.5px; color: var(--gs-dim);
+        letter-spacing: .01em; padding: 1px 6px;
+      }
+      .gs-lore__cta { margin-top: 16px; }
+      .gs-lore__cta .gs-btn { width: 100%; text-align: center; font-size: 16px; padding: 13px; }
+
+      @media (max-width: 460px) {
+        .gs-lore__stage { flex-direction: column; }
+        .gs-lore__lines { flex-basis: auto; width: 100%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .gs-lore__card { animation: none; }
+      }
     </style>
   </head>
   <body>
