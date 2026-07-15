@@ -7,7 +7,7 @@
 
 import type { Hole, Vec } from '../../sim/course/contract';
 import { playBounds } from '../../sim/round';
-import { unionPolys, dilateUnion } from '../merge';
+import { unionPolys, unionClose, dilateUnion } from '../merge';
 import { mulberry32, hashHole, type Box } from './shared';
 import { WATER_KINDS, LAVA_KINDS } from './hazards';
 
@@ -73,8 +73,17 @@ export function lostPlatformsCourse(hole: Hole): Vec[][] {
   return out;
 }
 
-/** Per-hole cache of the hazard families' UNION-merged course-space bodies (GS-hazard-blend) —
- *  pure geometry per hole, rebuilt scenes (the follow-cam re-renders every frame) reuse it. */
+/** Per-hole cache of the hazard families' MERGED course-space bodies (GS-hazard-blend / GS-hazard-merge)
+ *  — pure geometry per hole, rebuilt scenes (the follow-cam re-renders every frame) reuse it.
+ *
+ *  Each family is CLOSED (`unionClose`), not just unioned: bodies within ~`HAZARD_MERGE_GAP` yards of
+ *  one another fuse into ONE organic silhouette with a natural pinched waist — so a cluster of bunkers
+ *  or a lake-and-pond pair reads as a single big hazard, the way a real complex does, instead of a
+ *  scatter of individual stickers each with its own rim (the "manky pile of separate blobs" tell). A
+ *  body with no neighbour within the gap is untouched (identity — a lone bunker keeps its hand-drawn
+ *  edge). Water/lava bridge a hair tighter than sand: their bodies are larger and a wide gap would fuse
+ *  hazards a player still reads as distinct, whereas bunkers cluster into tight fields. */
+const HAZARD_MERGE_GAP = { sand: 14, water: 11, lava: 11 } as const;
 const mergedHazardsCache = new WeakMap<Hole, { sand: Vec[][]; water: Vec[][]; lava: Vec[][] }>();
 export function mergedHazardsFor(hole: Hole): { sand: Vec[][]; water: Vec[][]; lava: Vec[][] } {
   const hit = mergedHazardsCache.get(hole);
@@ -87,7 +96,11 @@ export function mergedHazardsFor(hole: Hole): { sand: Vec[][]; water: Vec[][]; l
     else if (LAVA_KINDS.has(f.kind)) lava.push(f.poly);
     else if (f.kind === 'bunker' || f.kind === 'waste' || f.kind === 'sand' || f.kind === 'pot') sand.push(f.poly);
   }
-  const out = { sand: unionPolys(sand), water: unionPolys(water), lava: unionPolys(lava) };
+  const out = {
+    sand: unionClose(sand, HAZARD_MERGE_GAP.sand),
+    water: unionClose(water, HAZARD_MERGE_GAP.water),
+    lava: unionClose(lava, HAZARD_MERGE_GAP.lava),
+  };
   mergedHazardsCache.set(hole, out);
   return out;
 }
