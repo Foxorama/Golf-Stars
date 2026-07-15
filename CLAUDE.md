@@ -1106,7 +1106,12 @@ these systems** — each bullet is the tip of a documented iceberg.
     the map, so the run carries the golfer and the map flies THEIR cosmetic ship (`shipForCharacter` →
     `shipSVG`). You FLY the ship: a TAP orients + cruises it there (an app-layer rAF loop in `stepStarTour`
     moving `starTourView.shipX/Y/heading`, chase-cam following, scroll preserved across renders via
-    `starTourView.scrollX/Y`). The ship art faces +x, so heading = `atan2(dy,dx)` (0 = flying right) —
+    `starTourView.scrollX/Y`). The chase-cam eases the scroll to keep the ship centred while
+    `starTourView.following` is set — armed by any fly*, cleared the instant the player takes manual control
+    (pan/pinch/wheel) — NOT the per-frame `cruising` flag (GS-star-map-jerky-movement): gating on `cruising`
+    hard-FROZE the map off-centre the moment a hop reached its target, so rapid "tap to keep moving" taps
+    stuttered freeze→lurch between hops. Following keeps the ease running across those gaps (converging to a
+    no-op once the ship is idle+centred, so it never fights a resting/panned view). The ship art faces +x, so heading = `atan2(dy,dx)` (0 = flying right) —
     NOT the old `atan2(dx,−dy)` 0=up heading fed into a right-facing hull, which rendered a downward flight
     upside-down. A LEFTWARD flight mirrors the hull vertically (`starTourView.flip` = −1, decided at launch
     off the target side, held for the whole flight so it never snaps mid-cruise) so a wheeled/keeled craft
