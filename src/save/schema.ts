@@ -18,7 +18,7 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 28;
+export const SAVE_VERSION = 29;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -445,8 +445,18 @@ export type SaveV28 = Omit<SaveV27, 'version'> & {
   seenLore: SeenLore;
 };
 
+/** v29 stamps STAR TOUR mid-round resume (GS-star-tour-resume) onto the persisted shape: the in-progress
+ *  stroke-play round now carries its completed scorecard + the hole reached (`RunSnapshot.stopHoleIndex` +
+ *  `stopPlayed`), so a parked Star Tour round continues from where it left off instead of restarting from
+ *  the 1st tee. Both fields are optional and absent on every pre-v29 / non-strokeplay save, so the
+ *  migration is a pure version stamp — an old parked round simply resumes the pre-fix way (restart the
+ *  stop). Shape is unchanged (they live on the opaque `activeRun` snapshot, passed through untouched). */
+export type SaveV29 = Omit<SaveV28, 'version'> & {
+  version: 29;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV28;
+export type Save = SaveV29;
 
 export function defaultSave(): Save {
   return {
@@ -876,6 +886,13 @@ function v27ToV28(s: SaveV27): SaveV28 {
   return { ...s, version: 28, seenLore: {} };
 }
 
+/** v28 → v29: pure version stamp — the Star Tour mid-round-resume fields (`RunSnapshot.stopHoleIndex` +
+ *  `stopPlayed`) are optional and absent on every pre-v29 save; such a parked round resumes by restarting
+ *  the stop, exactly as it did before the feature. */
+function v28ToV29(s: SaveV28): SaveV29 {
+  return { ...s, version: 29 };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -911,6 +928,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 25) s = v25ToV26(s as unknown as SaveV25) as unknown as typeof s;
   if (s.version === 26) s = v26ToV27(s as unknown as SaveV26) as unknown as typeof s;
   if (s.version === 27) s = v27ToV28(s as unknown as SaveV27) as unknown as typeof s;
+  if (s.version === 28) s = v28ToV29(s as unknown as SaveV28) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -918,7 +936,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV28>;
+  const v14 = s as unknown as Partial<SaveV29>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';

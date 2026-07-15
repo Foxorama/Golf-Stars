@@ -18,6 +18,7 @@ import { routeEvent } from './events';
 import { themeById } from '../course/themes';
 import { startingLoadoutFor } from './runLoadout';
 import type { Run, StopResult } from './run';
+import type { PlayedHole } from '../round';
 
 export interface RunSnapshot {
   seed: number;
@@ -85,9 +86,25 @@ export interface RunSnapshot {
    *  snapshots → the pre-fix empty history (a resume there still resets the board, but no new save
    *  carries the bug). */
   history?: StopResult[];
+  /** STAR TOUR mid-round resume (GS-star-tour-resume): the 0-based hole the player had reached, and the
+   *  completed-hole scorecard so far, when a stroke-play round was parked. A Star Tour round is the WHOLE
+   *  18 holes in ONE stop, so without these a resume would restart from the 1st tee and bin the round.
+   *  Set ONLY for an in-progress strokeplay round (captured by the reducer/persist from the live play
+   *  state); the reducer restores `stopPlayed` + tees up `stopHoleIndex` on resume. Absent on every other
+   *  format / a round not yet teed off → byte-for-byte the old restart-the-stop resume. `resumeRun` does
+   *  NOT read them (they're UI-level round progress, not `Run` fields). */
+  stopHoleIndex?: number;
+  stopPlayed?: PlayedHole[];
 }
 
-export function snapshotRun(run: Run): RunSnapshot {
+/** Optional in-progress round state captured alongside the run (GS-star-tour-resume) — the current hole +
+ *  the completed-hole scorecard, so a parked stroke-play round resumes where it left off. */
+export interface RoundProgress {
+  stopHoleIndex: number;
+  stopPlayed: readonly PlayedHole[];
+}
+
+export function snapshotRun(run: Run, progress?: RoundProgress): RunSnapshot {
   return {
     seed: run.seed,
     formatId: run.formatId,
@@ -118,6 +135,11 @@ export function snapshotRun(run: Run): RunSnapshot {
     // Persist the completed-stop history (GS-voyage-field) so a resume rebuilds the SAME arc
     // leaderboard + team-duel underdog side. Absent when nothing's been finished yet (byte-stable).
     history: run.history.length ? run.history.map((h) => ({ ...h })) : undefined,
+    // STAR TOUR mid-round resume (GS-star-tour-resume): carry the live round progress so a parked
+    // stroke-play round continues from the hole it left off, with the card intact.
+    ...(progress
+      ? { stopHoleIndex: progress.stopHoleIndex, stopPlayed: progress.stopPlayed.map((h) => ({ ...h })) }
+      : {}),
   };
 }
 

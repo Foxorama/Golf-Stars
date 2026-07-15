@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(28);
+    expect(SAVE_VERSION).toBe(29);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});
@@ -55,6 +55,31 @@ describe('save schema', () => {
     expect(s.seenLore).toEqual({}); // no beats seen yet
     expect(s.shards).toBe(41);
     expect(s.clubhouseVisit).toBe(9);
+  });
+
+  it('migrates a v28 blob forward to v29 (pure version stamp — Star Tour resume fields are optional)', () => {
+    const v28 = {
+      ...defaultSave(),
+      version: 28 as const,
+      shards: 17,
+      clubhouseVisit: 3,
+    } as unknown as Parameters<typeof migrate>[0];
+    const s = migrate(v28);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.shards).toBe(17);
+    expect(s.clubhouseVisit).toBe(3);
+  });
+
+  it('carries a stroke-play round\'s mid-round progress through the activeRun snapshot round-trip', () => {
+    // A parked Star Tour round's hole + scorecard ride on the opaque activeRun snapshot, untouched by
+    // migrate (GS-star-tour-resume), so a resume can continue from where it left off.
+    const withProgress = {
+      ...defaultSave(),
+      activeRun: { seed: 7, formatId: 'strokeplay', stopIndex: 0, distanceFromStart: 0, credits: 20, perks: [], stopHoleIndex: 6, stopPlayed: [] },
+    } as unknown as Parameters<typeof migrate>[0];
+    const s = migrate(withProgress);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect((s.activeRun as { stopHoleIndex?: number }).stopHoleIndex).toBe(6);
   });
 
   it('migrates a v20 blob forward to v21 (seeds empty caddy-faction reputation, preserves everything else)', () => {

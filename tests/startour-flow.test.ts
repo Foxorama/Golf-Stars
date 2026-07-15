@@ -44,6 +44,43 @@ describe('Star Tour reducer flow (GS-star-tour-2)', () => {
     expect(s.strokePlayBest['verdant-18']).toEqual(rec);
   });
 
+  it('a round parked mid-way resumes from the hole it left off, card intact (GS-star-tour-resume)', () => {
+    let s = initState('resume-seed');
+    s = reduce(s, { type: 'openStarTour' });
+    s = reduce(s, { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+    s = reduce(s, { type: 'pickStarTourCourse', courseId: 'verdant-18', effect: 'none' });
+    s = reduce(s, { type: 'playInteractive' });
+    // Play the first five holes, then park.
+    let guard = 0;
+    for (let h = 0; h < 5; h++) {
+      while (s.play && !s.play.done && guard++ < 400) s = reduce(s, { type: 'autoShotHole' });
+      s = reduce(s, { type: 'holeComplete' });
+    }
+    expect(s.screen).toBe('playing');
+    expect(s.play!.holeIndex).toBe(5);
+    expect(s.stopPlayed).toHaveLength(5);
+    // Back to the title — the run parks as a resumable snapshot carrying the hole + scorecard.
+    s = reduce(s, { type: 'toTitle' });
+    expect(s.screen).toBe('title');
+    expect(s.resumable!.stopHoleIndex).toBe(5);
+    expect(s.resumable!.stopPlayed).toHaveLength(5);
+    // Continue — lands straight back on the 6th hole (index 5), still playing, card restored (NOT the
+    // 1st tee, which the old restart-the-stop resume would have done).
+    s = reduce(s, { type: 'resume' });
+    expect(s.screen).toBe('playing');
+    expect(s.play!.holeIndex).toBe(5);
+    expect(s.stopPlayed).toHaveLength(5);
+    expect(s.resumable).toBeUndefined();
+    // Finishing out still banks a full 18-hole record.
+    guard = 0;
+    while (s.screen === 'playing' && guard++ < 300) {
+      while (s.play && !s.play.done && guard++ < 800) s = reduce(s, { type: 'autoShotHole' });
+      s = reduce(s, { type: 'holeComplete' });
+    }
+    expect(s.screen).toBe('strokeResult');
+    expect(s.played).toHaveLength(18);
+  });
+
   it('the golfer is baked onto the run BEFORE the course is chosen (so the ship is theirs)', () => {
     let s = initState('ship-seed');
     s = reduce(s, { type: 'openStarTour' });
