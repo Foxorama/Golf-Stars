@@ -68,7 +68,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v27**; bump + add a migration when you
+  (localStorage is the only copy). Current schema is **v28**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
@@ -800,6 +800,29 @@ these systems** — each bullet is the tip of a documented iceberg.
     `rng.bool(chance)` drawn BEFORE the shot in BOTH, so undefined/0 is byte-for-byte and best-of-two only
     ever RAISES Stableford (contract 4 by construction). It's NOT a guard/projectile caddy, so no
     `_gsFeel.forceRedirect` case — just the `caddyEffects` row + faction the RULE demands.
+- **Lore / story beats** — `docs/decisions/lore.md`
+  - Lore is CONTENT-AS-DATA (GS-lore, `sim/rpg/lore.ts`): a beat is a `LoreEvent` ROW — a pure
+    `trigger(ctx: LoreContext)` predicate + the presentation (`title`/`kicker`/`lines`/`portrait`).
+    `pickLoreEvent(ctx, seen)` returns the first UNSEEN (`once`) beat whose trigger fires; a new beat is
+    a NEW ROW, never an engine edit. `LoreLine.kind` = `say` (a dialogue bubble) vs `action` (a stage
+    direction, dim italic). `LoreContext` (biome/archetype/caddyId/characterId/format/stopIndex/
+    reputation) is deliberately broad — extend it for a beat that gates on more, and populate it in the
+    gate. First row: `driver-dan-derelict` (`archetype === 'derelict' && caddyId === 'driver-dan'`).
+  - One-off tracking is PERSISTED (`SeenLore = Record<string,true>`, save **v28** `seenLore`, mapped in
+    BOTH `persist.ts` mappers): a beat fires exactly ONCE ever, across every run + mode, recorded on
+    DISMISS. Save bump is purely additive (existing seeded runs byte-identical).
+  - The gate `withLoreGate(next)` (`ui/gameUpdates.ts`, the `withAsgardPortal` sibling) wraps every
+    "→ intro" arrival return (`route`/`pickStarTourCourse`/`selectCharacter`/`resume`); an unseen
+    triggering beat diverts to the `'lore'` SCREEN (`pendingLoreId`), `dismissLore` marks it seen + lands
+    on the intro. MODE-AGNOSTIC: derelict via `course.biome === 'derelict-ship'`, caddy via
+    `namedCaddyOwned(perks)` — one gate covers Voyage/Unending/Star Tour, no run snapshot needed.
+  - The screen (`app/loreScreens.ts`, full-bleed cinematic) paints a banner + a bespoke close-up
+    portrait (`render/loreArt.ts lorePortraitSVG`, Dan's on-course palette) + the dialogue. CSS is
+    `.gs-lore*` (its OWN prefix, NEVER the play HUD's `.gs-hud`). UI/RENDER ONLY — zero sim rng
+    (determinism/auto≡interactive untouched); no `_gs*`/`?param` hook (only a new `?screen=lore`
+    deep-link VALUE for the layout smoke test), so no test-hub wiring. Guards: `tests/lore.test.ts`
+    (pure table + reducer flow) + `tests/build.test.ts` (`?screen=lore` smoke) + `tests/save.test.ts`
+    (v27→v28). A new speaker = a `lorePortraitSVG` case; a new beat = a `LORE_EVENTS` row.
 - **Putting** — `docs/decisions/putting.md`
   - Manual pace-meter by default; AUTO only via the Penelope Putter caddy. `takePutt(…, control?)`:
     control → manual, none → `onePutt` (auto/tests, byte-for-byte). Fringe-putt is interactive-only.

@@ -78,6 +78,7 @@ import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP } from './app/starTourScreens';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
+import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
@@ -131,9 +132,9 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
- *     shop / market / clubhouse surfaces WITHOUT playing a full stop (shot animations + watch screens
+ *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
  *     redesigned three times in one day with no layout guard. Reuses the real reducer transitions
  *     where they exist (leaveShop → travel, openMarket, openClubhouseHall) so nothing forks the logic.
@@ -193,6 +194,10 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const intro = reduce(map, { type: 'pickStarTourCourse', courseId: 'verdant-18' });
       return reduce(intro, { type: 'play' });
     }
+    case 'lore':
+      // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
+      // lore gate builds), so a headless smoke test can render the new screen chrome.
+      return { ...s, screen: 'lore', pendingLoreId: 'driver-dan-derelict' };
     default:
       return s; // unknown value → land on the normal title (no crash)
   }
@@ -1906,12 +1911,17 @@ function render(): void {
       ? starTourScreen()
       : state.screen === 'strokeResult'
       ? strokeResultScreen()
+      : state.screen === 'lore'
+      ? loreScreen()
       : gameoverScreen();
 
   // The interactive play screen (decision / watching / putting — but not the hole-complete card) is
   // full-bleed: the map fills the page, so drop the page frame's padding/max-width for it.
   // The Star Tour star map (GS-star-tour) is full-bleed too — the chart fills the page and pans.
-  const fullBleed = (state.screen === 'playing' && !!state.play && !state.play.done) || state.screen === 'starTour';
+  const fullBleed =
+    (state.screen === 'playing' && !!state.play && !state.play.done) ||
+    state.screen === 'starTour' ||
+    state.screen === 'lore'; // GS-lore: the story beat owns the full viewport (its own cinematic backdrop)
   // The character-select roster wants a wider frame so all four golfers line up across one screen.
   const wide = state.screen === 'character';
   // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's

@@ -18,6 +18,7 @@ import type { MetaUpgrades } from '../sim/rpg/meta';
 import type { BagTier } from '../sim/rpg/bag';
 import type { ClubUnlockReward } from '../sim/rpg/club-unlock';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
+import type { SeenLore } from '../sim/rpg/lore';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
@@ -42,7 +43,9 @@ export type Screen =
   | 'asgardResult'
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
   | 'starTour'
-  | 'strokeResult';
+  | 'strokeResult'
+  // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
+  | 'lore';
 
 export interface UiState {
   run: Run;
@@ -165,6 +168,14 @@ export interface UiState {
    *  Persisted; moved by the shop when a caddy is hired (+1) or fired (−3). Deliberately HIDDEN — no
    *  screen reads it yet; it's groundwork for future faction perks/events. */
   reputation: ReputationByCharacter;
+  /** One-off LORE beats already seen (GS-lore): id → true. Persisted, so each story beat fires exactly
+   *  once ever, across every run + mode. `pickLoreEvent` reads this to decide eligibility; `dismissLore`
+   *  adds the just-shown beat's id. */
+  seenLore: SeenLore;
+  /** The lore beat currently being shown on the `'lore'` screen (GS-lore) — its id, resolved to its
+   *  presentation via `loreEventById`. Transient (never persisted); set by the arrival lore gate,
+   *  cleared on dismiss. */
+  pendingLoreId?: string;
   /** A pending caddy SWAP awaiting confirmation (GS-caddy-factions): the player clicked a new caddy
    *  while one is already on the bag, so the shop shows a "they won't be happy to be fired" warning
    *  before the hire goes through. Transient (never persisted); cleared on confirm/cancel. */
@@ -231,6 +242,7 @@ export type Action =
   | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
   | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
+  | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
   | { type: 'buy'; id: string; confirmFire?: boolean } // confirmFire: the caddy-swap warning was accepted (GS-caddy-factions)
   | { type: 'cancelFireCaddy' } // dismiss the caddy-swap "they won't be happy" warning without hiring (GS-caddy-factions)
@@ -289,6 +301,7 @@ export interface MetaProgress {
   endlessRuns?: EndlessRunRecord[];
   reputationByCharacter?: ReputationByCharacter;
   strokePlayBest?: StrokePlayBest;
+  seenLore?: SeenLore;
   /** Star Shards refunded by the GS-trade-rebalance 40% Trade Market price cut — set by the save
    *  migration, drives the one-off "prices dropped, here's your refund" notice. */
   priceRefund?: number;

@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(27);
+    expect(SAVE_VERSION).toBe(28);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});
@@ -38,6 +38,23 @@ describe('save schema', () => {
     expect(d.marmotTips).toBe(0);
     expect(d.endlessRuns).toEqual([]);
     expect(d.reputationByCharacter).toEqual({});
+    expect(d.seenLore).toEqual({}); // GS-lore: no story beats seen on a fresh save
+  });
+
+  it('migrates a v27 blob forward to v28 (seeds an empty lore-progress set, preserves everything else)', () => {
+    const v27 = {
+      ...defaultSave(),
+      version: 27 as const,
+      shards: 41,
+      clubhouseVisit: 9,
+    } as unknown as Parameters<typeof migrate>[0];
+    // Strip the v28-only field so the input is a genuine v27 shape.
+    delete (v27 as Record<string, unknown>).seenLore;
+    const s = migrate(v27);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.seenLore).toEqual({}); // no beats seen yet
+    expect(s.shards).toBe(41);
+    expect(s.clubhouseVisit).toBe(9);
   });
 
   it('migrates a v20 blob forward to v21 (seeds empty caddy-faction reputation, preserves everything else)', () => {

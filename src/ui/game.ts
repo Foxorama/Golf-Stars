@@ -59,6 +59,7 @@ import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
+import type { SeenLore } from '../sim/rpg/lore';
 import {
   autoDecision,
   awaitingPutt,
@@ -83,6 +84,7 @@ import {
   runEndUpdates,
   withAsgardPortal,
   withBestBallPartner,
+  withLoreGate,
 } from './gameUpdates';
 
 // game.ts stays the public entry point (`import … from '../ui/game'`): re-export the state/action
@@ -145,6 +147,7 @@ export function initState(
     endlessRuns: meta.endlessRuns ?? [],
     reputation: meta.reputationByCharacter ?? {},
     strokePlayBest: meta.strokePlayBest ?? {},
+    seenLore: meta.seenLore ?? {},
     priceRefund: meta.priceRefund,
   };
 }
@@ -220,7 +223,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
       // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
       // cycle off this running total (`marmotTips % (CAP + 1)`), so the reducer just keeps counting.
-      return { ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter };
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter });
     }
 
     case 'backToCharacter': {
@@ -234,7 +237,7 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'resume': {
       if (state.screen !== 'title' || !state.resumable) return state;
       const run = resumeRun(state.resumable);
-      return {
+      return withLoreGate({
         ...state,
         run,
         course: currentCourse(run),
@@ -244,7 +247,7 @@ export function reduce(state: UiState, action: Action): UiState {
         routes: undefined,
         resumable: undefined,
         viewHole: 0,
-      };
+      });
     }
 
     case 'openStarTour': {
@@ -284,12 +287,23 @@ export function reduce(state: UiState, action: Action): UiState {
       // round intro. Guarded to the star map.
       if (state.screen !== 'starTour' || !state.run.loadout.characterId) return state;
       const run = { ...state.run, staticCourseId: action.courseId, staticEffect: action.effect ?? 'none' };
-      return { ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0 };
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0 });
     }
 
     case 'exitStarTour': {
       if (state.screen !== 'starTour') return state;
       return { ...state, screen: 'title', starTourPick: undefined };
+    }
+
+    case 'dismissLore': {
+      // GS-lore: close the story beat, RECORD it as seen (so it never fires again, across every run +
+      // mode — persist writes `seenLore`), and continue to the stop intro the gate diverted from. The
+      // run/course were already pinned on the diverted-from state, so the intro renders exactly as it
+      // would have; the intro-entry side-effect (introView reset) fires on the lore→intro transition.
+      if (state.screen !== 'lore') return state;
+      const id = state.pendingLoreId;
+      const seenLore: SeenLore = id ? { ...state.seenLore, [id]: true } : state.seenLore;
+      return { ...state, screen: 'intro', pendingLoreId: undefined, seenLore };
     }
 
     case 'play': {
@@ -875,7 +889,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // `travel` grants from, so the reveal on the intro is exactly what got equipped.
       const salvageReveal = salvageFindFor(state.run, route);
       const run = travel(state.run, route);
-      return {
+      return withLoreGate({
         ...state,
         run,
         course: currentCourse(run),
@@ -888,7 +902,7 @@ export function reduce(state: UiState, action: Action): UiState {
         bossReward: undefined,
         asgardBanner: undefined, // the Asgard return note is a one-shot on the journey map (GS-asgard)
         viewHole: 0,
-      };
+      });
     }
 
     case 'scanRoutes': {
@@ -1168,6 +1182,7 @@ export function reduce(state: UiState, action: Action): UiState {
           endlessRuns: state.endlessRuns,
           reputationByCharacter: state.reputation,
           strokePlayBest: state.strokePlayBest,
+          seenLore: state.seenLore,
         },
         state.resumable,
       );
