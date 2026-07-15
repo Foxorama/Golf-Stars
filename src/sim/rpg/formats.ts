@@ -65,8 +65,16 @@ export function isTeamDuelBoss(boss: BossSpec | undefined): boolean {
 export function resolveTeamFormat(boss: BossSpec | undefined, seed: number): 'bestball' | 'scramble' | undefined {
   if (!boss?.team) return undefined;
   if (boss.team !== 'random') return boss.team;
-  // A small stable hash off the seed → one of the two formats.
-  return Math.abs(Math.round(seed) * 2654435761 + 0x9e3779b1) % 2 === 0 ? 'scramble' : 'bestball';
+  // A small stable hash off the seed → one of the two formats. Mix with Math.imul so every
+  // step stays in int32 range: a real run seed reaches ~1e9, and the old `seed * 2654435761`
+  // blew past 2^53 into float, where the product's low bit was always rounded away — so `% 2`
+  // was ~always 0 and the Arc-II boss came up scramble ~99.8% of the time (the "always
+  // scramble" bug). imul keeps the multiply 32-bit exact, so parity is a true ~50/50 coin.
+  let h = Math.round(seed) | 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h % 2 === 0 ? 'scramble' : 'bestball';
 }
 
 export interface StopSpec {
