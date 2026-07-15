@@ -76,12 +76,12 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP } from './app/starTourScreens';
+import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed } from './app/starTourScreens';
 import { shipForCharacter } from './ui/gameCosmetics';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { loreScreen } from './app/loreScreens';
-import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
+import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
@@ -291,10 +291,11 @@ function dispatch(action: Action): void {
     // Entering Star Tour (GS-star-tour-2): character select comes first, so `openStarTour` opens the
     // roster; reset the star map's whole view (selection, weather, ship at the spaceport) so a fresh
     // tour docks at home and re-centres on the port.
-    if (action.type === 'openStarTour') {
+    if (action.type === 'openStarTour' || (action.type === 'leaveAsgard' && state.screen === 'starTour')) {
       starTourView.selectedId = null;
       starTourView.effect = 'none';
       starTourView.recordsOpen = false;
+      starTourView.yggdrasilOpen = false;
       starTourView.centred = false;
       starTourView.shipX = null;
       starTourView.shipY = null;
@@ -304,6 +305,7 @@ function dispatch(action: Action): void {
       starTourView.targetY = null;
       starTourView.flyingTo = null;
       starTourView.dockingAtPort = false;
+      starTourView.flyingToYggdrasil = false;
       starTourView.following = false;
       // Open slightly more zoomed OUT than the intrinsic 1× (GS-star-tour-map-improvements) so more of the
       // sky is in frame on arrival; the fit clamp only pulls it in if a viewport is so small the whole
@@ -1515,6 +1517,8 @@ function flyStarTourToPoint(x: number, y: number): void {
   starTourView.targetY = Math.max(20, Math.min(CHART_H - 20, y));
   starTourView.flyingTo = null;
   starTourView.dockingAtPort = false;
+  starTourView.flyingToYggdrasil = false;
+  starTourView.yggdrasilOpen = false;
   starTourView.following = true; // arm the chase-cam so rapid re-taps glide (GS-star-map-jerky-movement)
   setStarTourFlip(starTourView.targetX);
   sfx.click();
@@ -1531,6 +1535,8 @@ function flyStarTourToWorld(id: string | null): void {
   starTourView.targetY = p.y;
   starTourView.flyingTo = id;
   starTourView.dockingAtPort = false;
+  starTourView.flyingToYggdrasil = false;
+  starTourView.yggdrasilOpen = false;
   starTourView.following = true; // arm the chase-cam (GS-star-map-jerky-movement)
   starTourView.selectedId = null; // close any open dossier while we fly
   setStarTourFlip(p.x);
@@ -1546,9 +1552,27 @@ function flyStarTourToPort(): void {
   starTourView.targetY = SPACEPORT_POS.y;
   starTourView.flyingTo = null;
   starTourView.dockingAtPort = true;
+  starTourView.flyingToYggdrasil = false;
+  starTourView.yggdrasilOpen = false;
   starTourView.following = true; // arm the chase-cam (GS-star-map-jerky-movement)
   starTourView.selectedId = null;
   setStarTourFlip(SPACEPORT_POS.x);
+  sfx.click();
+  haptic(HAPTICS.tap);
+  render();
+}
+
+/** Fly to the hidden YGGDRASIL (GS-star-tour-yggdrasil): on arrival the realm-tree overlay opens. */
+function flyStarTourToYggdrasil(): void {
+  starTourView.targetX = YGGDRASIL_POS.x;
+  starTourView.targetY = YGGDRASIL_POS.y;
+  starTourView.flyingTo = null;
+  starTourView.dockingAtPort = false;
+  starTourView.flyingToYggdrasil = true;
+  starTourView.following = true; // arm the chase-cam (GS-star-map-jerky-movement)
+  starTourView.selectedId = null;
+  starTourView.recordsOpen = false;
+  setStarTourFlip(YGGDRASIL_POS.x);
   sfx.click();
   haptic(HAPTICS.tap);
   render();
@@ -1670,6 +1694,8 @@ function startStarTourAnim(): void {
  *  tap into empty space does NOT refuel; running dry out there is what summons the tanker. */
 function starTourStationNear(x: number, y: number): boolean {
   const stations = [SPACEPORT_POS, EARTH_POS, ...starTourWorlds().map(worldPos)];
+  // The World Tree is a station too, once it's revealed (GS-star-tour-yggdrasil).
+  if (yggdrasilArmed()) stations.push(YGGDRASIL_POS);
   return stations.some((p) => Math.hypot(p.x - x, p.y - y) <= ST_REFUEL_STATION_R);
 }
 
@@ -1826,6 +1852,15 @@ function stepStarTour(): void {
         stAnim.raf = 0;
         sfx.click();
         dispatch({ type: 'openClubhouseHall' });
+        return;
+      }
+      if (v.flyingToYggdrasil) {
+        // Arrived at the World Tree (GS-star-tour-yggdrasil) → open the Nine Realms overlay.
+        v.flyingToYggdrasil = false;
+        v.yggdrasilOpen = true;
+        stAnim.raf = 0;
+        sfx.click();
+        render();
         return;
       }
       if (v.flyingTo) {
@@ -2229,6 +2264,11 @@ function render(): void {
           flyStarTourToPort();
           return;
         }
+        // Tapping the hidden YGGDRASIL (GS-star-tour-yggdrasil) flies to it and opens the realm overlay.
+        if (target.closest('[data-startour-yggdrasil]')) {
+          flyStarTourToYggdrasil();
+          return;
+        }
         // Free flight to the tapped chart point. The SVG renders at zoom×intrinsic and is offset by the
         // letterbox margin when zoomed out, so recover chart coords as `(client − rect − margin + scroll) / zoom`.
         const rect = vp.getBoundingClientRect();
@@ -2257,6 +2297,14 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-startour-records]').forEach((el) => {
     el.addEventListener('click', () => {
       starTourView.recordsOpen = el.getAttribute('data-startour-records') === '1';
+      sfx.click();
+      render();
+    });
+  });
+  // Star Tour Yggdrasil overlay close (GS-star-tour-yggdrasil): dismiss the realm-tree sheet.
+  app.querySelectorAll<HTMLElement>('[data-startour-ygg]').forEach((el) => {
+    el.addEventListener('click', () => {
+      starTourView.yggdrasilOpen = el.getAttribute('data-startour-ygg') === '1';
       sfx.click();
       render();
     });

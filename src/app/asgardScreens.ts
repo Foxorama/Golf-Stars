@@ -142,13 +142,21 @@ export function asgardResultScreen(): string {
     : `<div style="font-size:12px;letter-spacing:3px;color:var(--gs-dim);font-weight:700;">THE GOLDEN REALM FADES</div>
        <h1 style="margin:6px 0 2px;font-size:26px;color:var(--gs-ink);">Better luck next time…</h1>`;
 
+  // GS-star-tour-yggdrasil: a standalone Asgard played off the World Tree returns to the star map, not a
+  // suspended voyage — so drop the Rainbow-Ball / journey note and re-label the CTA.
+  const fromTree = !!state.asgardFromStarTour;
+  const returnNote = fromTree
+    ? ''
+    : `<p style="font-size:12px;color:var(--gs-dim);margin:8px 0 12px;">The Rainbow Ball is spent — your voyage returns to its true worlds.</p>`;
+  const returnLabel = fromTree ? 'Return to the star map' : 'Return to your journey';
+
   return `
     <div style="max-width:460px;margin:0 auto;text-align:center;">
       ${header}
       <p style="margin:2px 0 12px;font-size:13px;color:var(--gs-dim);">Nine holes · stroke play · lowest total wins</p>
       <div class="gs-glass" style="padding:8px;border-radius:12px;border:1px solid rgba(255,210,110,0.3);">${board}</div>
       ${prizes}
-      <p style="font-size:12px;color:var(--gs-dim);margin:8px 0 12px;">The Rainbow Ball is spent — your voyage returns to its true worlds.</p>
-      ${btn('Return to your journey', { type: 'leaveAsgard' }, { variant: 'primary', block: true })}
+      ${returnNote}
+      ${btn(returnLabel, { type: 'leaveAsgard' }, { variant: 'primary', block: true })}
     </div>`;
 }

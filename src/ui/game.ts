@@ -296,6 +296,37 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, screen: 'title', starTourPick: undefined };
     }
 
+    case 'playYggdrasilRealm': {
+      // GS-star-tour-yggdrasil: play a Norse realm off the hidden World Tree on the star map. The tree is
+      // revealed only once Thor's Hammer is won, and today ONLY Asgard has bloomed (the other branches are
+      // placeholders for future realms) — so gate hard on both. This spins up a STANDALONE Asgard run (the
+      // Warriors Three tournament) from the star-map golfer's bag, exactly like `crossBifrost`, but WITHOUT
+      // a suspended journey: `asgardFromStarTour` marks it so `leaveAsgard` returns to the map, not travel.
+      if (state.screen !== 'starTour' || !state.run.loadout.characterId) return state;
+      if (!state.ownedApparel.includes('thors-hammer')) return state;
+      if (action.realmId !== 'asgard') return state;
+      const run = startAsgardRun(state.run);
+      const course = currentCourse(run);
+      return {
+        ...state,
+        run,
+        course,
+        screen: 'playing',
+        holeRng: new Rng(`${course.seed}:play`),
+        stopPlayed: [],
+        play: beginHole(course.holes[0]!, 0),
+        match: undefined,
+        played: undefined,
+        lastResult: undefined,
+        mulliganPending: undefined,
+        starmartOffer: undefined,
+        starmartRerolls: undefined,
+        viewHole: 0,
+        asgardFromStarTour: true,
+        asgardReturn: undefined,
+      };
+    }
+
     case 'dismissLore': {
       // GS-lore: close the story beat, RECORD it as seen (so it never fires again, across every run +
       // mode — persist writes `seenLore`), and continue to the stop intro the gate diverted from. The
@@ -731,7 +762,37 @@ export function reduce(state: UiState, action: Action): UiState {
       // Win OR lose the run loses the Rainbow Ball for good (stripped from perks + `rainbowConsumed` so
       // the shop never re-offers it); a WIN also grants the Odin's Favour perk. The Thor's Hammer cosmetic
       // was already banked at `resolveAsgard`.
-      if (state.screen !== 'asgardResult' || !state.asgardReturn) return state;
+      if (state.screen !== 'asgardResult') return state;
+      // GS-star-tour-yggdrasil: a STANDALONE Asgard played off the World Tree has no suspended journey to
+      // resume — hand the player back to the star map instead. Thor's Hammer (the only prize) was already
+      // banked at `resolveAsgard`; there's no journey run to graft Odin's Favour onto. Rebuild a fresh
+      // strokeplay run for the golfer so the map's flight/pick machinery has a clean run to work on.
+      if (state.asgardFromStarTour) {
+        const golfer = state.run.loadout.characterId;
+        const run = golfer
+          ? startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, golfer, state.run.ascension, state.run.bagTier, state.run.unlockedClubs)
+          : startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades);
+        return {
+          ...state,
+          run,
+          course: currentCourse(run),
+          screen: 'starTour',
+          asgardFromStarTour: undefined,
+          asgardOutcome: undefined,
+          asgardBanner: undefined,
+          starTourPick: undefined,
+          played: undefined,
+          lastResult: undefined,
+          match: undefined,
+          bossReward: undefined,
+          stopPlayed: undefined,
+          play: undefined,
+          holeRng: undefined,
+          shopOffer: undefined,
+          viewHole: 0,
+        };
+      }
+      if (!state.asgardReturn) return state;
       const won = !!state.asgardOutcome?.won;
       const perks = state.asgardReturn.perks.filter((p) => p !== 'rainbow-ball');
       const editedPerks = won ? [...perks, 'talent-odins-favour'] : perks;

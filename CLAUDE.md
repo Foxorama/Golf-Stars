@@ -1216,6 +1216,20 @@ these systems** — each bullet is the tip of a documented iceberg.
     `SPACEPORT`. Tier is a small luminous BEACON dot (top-left), not a ring. Everything is `mulberry32`-
     seeded off the world id (per-world clip ids via `idSafe`) — pure + byte-stable (the map has its OWN
     seeded stream, not the sim rng). Eyeball via `scripts/startour-preview.mjs`.
+  - HIDDEN YGGDRASIL (GS-star-tour-yggdrasil, `render/starTourMap.ts` `yggdrasilGlyph`/`YGGDRASIL_REALMS`
+    + `starTourScreens.ts` `yggdrasilSheet`): the World Tree, drawn on the chart (`YGGDRASIL_POS`, high in the
+    open PAD above the constellations) ONLY once Thor's Hammer is owned (`showYggdrasil` gate → `ownedApparel`
+    includes `thors-hammer`; a Hammerless chart is byte-for-byte unchanged). A tappable object
+    (`data-startour-yggdrasil`) — flying to it (a fuel STATION when armed) opens the NINE REALMS overlay
+    (`starTourView.yggdrasilOpen`). The realms are a `YGGDRASIL_REALMS` TABLE hung as glowing fruit on the
+    tree; ASGARD (the crown, lit gold) is the ONLY `playable` one today, the other eight are BARE dashed
+    sockets — placeholder rows so **a new realm is a data flip** (`playable:true` + a launcher), never a
+    glyph edit. Tapping Asgard dispatches `playYggdrasilRealm` → a STANDALONE Asgard tournament
+    (`startAsgardRun`, the `crossBifrost` machinery) with NO suspended journey: `asgardFromStarTour` marks it
+    so `leaveAsgard` rebuilds a fresh strokeplay run and returns to the star MAP (not travel). Reducer-gated
+    HARD on the Hammer + `realmId==='asgard'` (both mismatches are no-ops), so it can't fire early or on an
+    unbloomed branch. App-layer/render + a reducer flow — no `_gs*`/URL hook (no test-hub wiring), no save
+    bump (`asgardFromStarTour` is transient). Guarded by `tests/startour-flow.test.ts`.
   - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
     `src/app/` module over growing it, and re-read the relevant span before editing.**
 - **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;

@@ -58,6 +58,13 @@ export interface StarTourMapOpts {
   /** Chart zoom (pinch/scroll). 1 = intrinsic size; the SVG's px width/height scale by this while the
    *  viewBox stays fixed, so ship/world chart-coords are unchanged and only the render size grows. */
   zoom?: number;
+  /** The HIDDEN Yggdrasil, the World Tree (GS-star-tour-yggdrasil): drawn only once the player has
+   *  unlocked Thor's Hammer, in the open sky above the constellation cluster. A tappable object
+   *  (`data-startour-yggdrasil`) that opens the Nine Realms overlay — Asgard is playable, the rest are
+   *  bare branches awaiting future realms. Absent/false ⇒ no tree (byte-for-byte the old chart). */
+  showYggdrasil?: boolean;
+  /** The tree is the flight target / its realm overlay is open (draws the selection ring). */
+  yggdrasilSelected?: boolean;
 }
 
 /** The ship's docked heading (GS-star-tour): nose UP (−90° in the +x-facing art frame), poised toward
@@ -92,6 +99,36 @@ export const SPACEPORT_POS = { x: PAD_X + CONTENT_W * 0.5, y: PAD_Y + CONTENT_H 
 /** Home EARTH (GS-star-map-icon-consistency) — a recognisable blue marble beside the home port, so the
  *  chart has a "you are here" anchor. A landmark, not a course (not tappable). */
 export const EARTH_POS = { x: PAD_X + CONTENT_W * 0.5 + 232, y: PAD_Y + CONTENT_H * 0.8 + 10 };
+
+/** The hidden YGGDRASIL, the World Tree (GS-star-tour-yggdrasil): sits high in the open starry PAD above
+ *  the constellation cluster (the World Tree crowns all realms), reachable by flying up from the port.
+ *  Anchored off the content box so it keeps its place as the canvas grows. */
+export const YGGDRASIL_POS = { x: PAD_X + CONTENT_W * 0.5, y: PAD_Y * 0.46 };
+
+/** One realm hanging on the World Tree (GS-star-tour-yggdrasil). CONTENT-AS-DATA: the Nine Realms are a
+ *  table both the tree glyph (which node lights) and the overlay (which branch is pickable) read — a new
+ *  realm is a NEW ROW (flip `playable` + wire its launcher), never an engine edit. Only ASGARD is
+ *  playable today (the Warriors Three tournament); the other eight are bare branches awaiting the realms
+ *  they'll host. `node` is the glyph offset from the canopy centre where the realm's fruit hangs. */
+export interface YggdrasilRealm {
+  id: string;
+  name: string;
+  blurb: string;
+  playable: boolean;
+  node: { dx: number; dy: number };
+}
+
+export const YGGDRASIL_REALMS: readonly YggdrasilRealm[] = [
+  { id: 'asgard', name: 'Asgard', blurb: 'The Golden Realm at the crown of the tree. Cross the Bifröst and challenge the Warriors Three to nine holes of stroke play.', playable: true, node: { dx: 0, dy: -78 } },
+  { id: 'vanaheim', name: 'Vanaheim', blurb: 'Home of the Vanir. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: -46, dy: -50 } },
+  { id: 'alfheim', name: 'Alfheim', blurb: 'Realm of the light elves. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: 46, dy: -50 } },
+  { id: 'midgard', name: 'Midgard', blurb: 'The world of mortals. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: -72, dy: -14 } },
+  { id: 'jotunheim', name: 'Jötunheim', blurb: 'Land of the giants. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: 72, dy: -14 } },
+  { id: 'svartalfheim', name: 'Svartálfheim', blurb: 'The dwarven forges of Niðavellir. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: -44, dy: 18 } },
+  { id: 'muspelheim', name: 'Múspelheim', blurb: 'The primordial fire. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: 44, dy: 18 } },
+  { id: 'niflheim', name: 'Niflheim', blurb: 'The primordial ice and mist. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: -22, dy: 44 } },
+  { id: 'helheim', name: 'Helheim', blurb: 'The realm of the dead. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: 22, dy: 44 } },
+];
 
 /** How big the ship draws on the chart (shipSVG scale ≈ width/40). */
 const SHIP_SCALE = 1.25;
@@ -1274,6 +1311,80 @@ function spaceportGlyph(): string {
     </g>`;
 }
 
+/** The hidden YGGDRASIL — the World Tree (GS-star-tour-yggdrasil). Revealed on the chart only once the
+ *  player has won Thor's Hammer. A luminous cosmic tree — glowing roots, a broad trunk, a canopy of
+ *  branches — hung with the NINE REALMS as glowing fruit. ASGARD crowns the tree, lit gold with a ⚔
+ *  and a soft pulse (the one playable branch); the other eight are BARE sockets (a dim dashed ring)
+ *  awaiting the realms they'll host. The whole tree is ONE tappable target that opens the realm overlay.
+ *  Pure geometry, zero rng → byte-stable; only rendered when armed, so a Hammerless chart is unchanged. */
+function yggdrasilGlyph(selected: boolean): string {
+  const { x, y } = YGGDRASIL_POS;
+  const rr = (v: number) => v.toFixed(1);
+  const GOLD = '#ffd97a';
+  const BARK = '#6a5a3a';
+  const BARK_LT = '#a2895a';
+  const LEAF = '#4a9e6a';
+  const LEAF_LT = '#7fe0a2';
+  // Canopy foliage — a cluster of soft luminous blobs behind the branch nodes.
+  const canopy = [
+    [0, -60, 58],
+    [-52, -30, 40],
+    [52, -30, 40],
+    [-30, 24, 38],
+    [30, 24, 38],
+    [0, 8, 46],
+  ]
+    .map(([cx, cy, r]) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${LEAF}" opacity="0.14"/>`)
+    .join('');
+  // Branches fanning from the trunk to each realm node, plus roots spreading below.
+  let branches = '';
+  for (const realm of YGGDRASIL_REALMS) {
+    const { dx, dy } = realm.node;
+    const midx = dx * 0.5;
+    const midy = 40 + dy * 0.4;
+    branches += `<path d="M0,52 Q${rr(midx)},${rr(midy)} ${rr(dx)},${rr(dy)}" fill="none" stroke="${BARK}" stroke-width="4.5" stroke-linecap="round" opacity="0.85"/>`;
+    branches += `<path d="M0,52 Q${rr(midx)},${rr(midy)} ${rr(dx)},${rr(dy)}" fill="none" stroke="${BARK_LT}" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/>`;
+  }
+  const roots = [-1, 0, 1]
+    .map((s) => `<path d="M0,78 Q${rr(s * 26)},96 ${rr(s * 54)},108" fill="none" stroke="${BARK}" stroke-width="${s === 0 ? 5 : 4}" stroke-linecap="round" opacity="0.8"/>`)
+    .join('');
+  // The realm nodes — Asgard lit gold, the rest bare dashed sockets.
+  const nodes = YGGDRASIL_REALMS.map((realm) => {
+    const { dx, dy } = realm.node;
+    if (realm.playable) {
+      return `<g transform="translate(${rr(dx)},${rr(dy)})">
+        <circle r="17" fill="${GOLD}" opacity="0.16"><animate attributeName="r" values="15;20;15" dur="2.6s" repeatCount="indefinite"/></circle>
+        <circle r="10.5" fill="#fff4d6"/>
+        <circle r="10.5" fill="url(#stWorldShade)"/>
+        <circle r="10.5" fill="none" stroke="${GOLD}" stroke-width="1.6" opacity="0.95"/>
+        <text x="0" y="4.2" font-size="12" text-anchor="middle" fill="#7a5a10">⚔</text>
+        <text x="0" y="-16" font-size="10.5" text-anchor="middle" fill="${GOLD}" font-weight="800" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">${realm.name}</text>
+      </g>`;
+    }
+    return `<g transform="translate(${rr(dx)},${rr(dy)})">
+      <circle r="7.5" fill="#141c2a" opacity="0.7"/>
+      <circle r="7.5" fill="none" stroke="#5f7048" stroke-width="1.2" stroke-dasharray="2.5 3" opacity="0.7"/>
+      <circle r="1.6" fill="${LEAF_LT}" opacity="0.5"/>
+    </g>`;
+  }).join('');
+  const ring = selected
+    ? `<circle r="118" fill="none" stroke="#7fe0ff" stroke-width="2.5" opacity="0.9"><animate attributeName="r" values="112;124;112" dur="2.4s" repeatCount="indefinite"/></circle>`
+    : '';
+  return `
+    <g class="gs-st-ygg" data-startour-yggdrasil="1" role="button" tabindex="0" aria-label="Yggdrasil — the World Tree" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" style="cursor:pointer;">
+      ${ring}
+      ${softGlow(LEAF_LT, 80, 0.05, 3)}
+      ${canopy}
+      <rect x="-9" y="40" width="18" height="46" rx="5" fill="${BARK}"/>
+      <rect x="-9" y="40" width="6" height="46" rx="3" fill="${BARK_LT}" opacity="0.5"/>
+      ${roots}
+      ${branches}
+      ${nodes}
+      <text x="0" y="132" font-size="15" text-anchor="middle" fill="${LEAF_LT}" font-weight="800" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3.5px;letter-spacing:.08em;">YGGDRASIL</text>
+      <text x="0" y="148" font-size="10" text-anchor="middle" fill="#9fbf9a" font-weight="600" opacity="0.9" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;letter-spacing:.12em;">THE WORLD TREE</text>
+    </g>`;
+}
+
 /** The engine THRUST wake (GS-star-tour) — a layered ion plume trailing behind the hull so the ship
  *  reads as FLYING, not sliding. Authored in the ±20u right-facing ship frame trailing off the tail
  *  (−x), coloured off the ship's own flame/accent for cohesion; SMIL flicker + charge particles racing
@@ -1488,6 +1599,7 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     ${spaceportGlyph()}
     ${earthGlyph(earthWorld, earthWorld?.id === opts.selectedId)}
     ${worlds}
+    ${opts.showYggdrasil ? yggdrasilGlyph(!!opts.yggdrasilSelected) : ''}
     ${shipGroup(opts)}
     <!-- Weapon projectiles (GS-star-tour-weapons): an empty layer the app fills with fired shots (the
          fuel-tanker pattern) — a shot group is appended here + driven by a per-frame transform, then
