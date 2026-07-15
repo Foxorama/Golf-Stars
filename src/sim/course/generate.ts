@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 40; // GS-fairway-water: in-fairway cape lakes + split fairways (sanctioned, centre-dry, validateInFairwayWater)
+export const GENERATOR_VERSION = 41; // GS-variety-4: deep-stop straight change-of-pace on shapeWeights worlds + wider, still-strategic desert
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -1777,9 +1777,12 @@ function generateHole(
     for (let s = 2; s < STEPS - 1 && stands < maxStands; s++) {
       const f = s / STEPS;
       const cp: Vec = [tee[0] + cdx * chordLen * f, tee[1] + cdy * chordLen * f];
-      // Only where the straight line is genuinely OFF the corridor (the corner being cut). The +22
+      // Only where the straight line is genuinely OFF the corridor (the corner being cut). The +18
       // reject leaves clearance for the blob radius below so its inner edge never reaches the corridor.
-      if (polylineDist(cp, centreline) < fairwayHalfWidth + 22) continue;
+      // GS-variety-4: tightened from +22 so the corner-cut bite survives the wider fairways (the choke
+      // keys off `fairwayHalfWidth`, which grew with the width bump) — a cut corner still lands in hay,
+      // so the bends that remain after the deep-stop straight-ramp stay strategic, not free curves.
+      if (polylineDist(cp, centreline) < fairwayHalfWidth + 18) continue;
       if (rng.float() > standChance) continue;
       stands++;
       const r = rng.range(7, 11);
@@ -1890,9 +1893,24 @@ function cumWeights(order: readonly string[], weights: Partial<Record<string, nu
   return vals.map((v) => (acc += v / total));
 }
 
-/** Pick a hole SHAPE from per-biome weights using an already-drawn roll (GS-biome-profile). */
-function pickWeightedShape(roll: number, weights: Partial<Record<string, number>>): ShapeKind {
-  const cum = cumWeights(SHAPE_ORDER, weights);
+// Deep, wild stops gain change-of-pace STRAIGHT holes even on the per-biome shape vocabularies
+// (GS-variety-4): the long, low-gravity worlds (desert / scrap-belt / the lost worlds) otherwise read
+// as an unbroken run of bending "snakes" deep in — a real player complaint on a high-Ascension desert
+// stop. The fallback (no-`shapeWeights`) picker already lifts its `straightP` with wildness (GS-variety-3,
+// "a hard hole need NOT bend"), but the `shapeWeights` worlds took the FIXED-mix branch and never got it,
+// so every profiled world stayed maximally bendy at max wildness. We boost the `straight` weight as
+// wildness climbs past a DEEP-GAME threshold and renormalise the rest down, so a wild stop mixes in the
+// odd straight breather (defended by length/width/rough/green-tilt, not shape) instead of all-bends.
+const SHAPE_STRAIGHT_RAMP_MIN = 0.55; // below this the mix is the world's own weights, BYTE-IDENTICAL (boost 0)
+const SHAPE_STRAIGHT_RAMP_K = 0.6; //   straight-weight gain per unit wildness past the threshold (≈+0.27 at w=1)
+
+/** Pick a hole SHAPE from per-biome weights using an already-drawn roll (GS-biome-profile). `wildness`
+ *  lifts the `straight` share on the deep stops (GS-variety-4); default 0 ⇒ the world's raw weights,
+ *  byte-for-byte. Consumes NO extra rng — it only remaps the roll already drawn by `chooseTemplate`. */
+function pickWeightedShape(roll: number, weights: Partial<Record<string, number>>, wildness = 0): ShapeKind {
+  const boost = Math.max(0, wildness - SHAPE_STRAIGHT_RAMP_MIN) * SHAPE_STRAIGHT_RAMP_K;
+  const w = boost > 0 ? { ...weights, straight: (weights.straight ?? 0) + boost } : weights;
+  const cum = cumWeights(SHAPE_ORDER, w);
   for (let i = 0; i < SHAPE_ORDER.length; i++) if (roll < cum[i]!) return SHAPE_ORDER[i]!;
   return SHAPE_ORDER[SHAPE_ORDER.length - 1]!;
 }
@@ -2025,7 +2043,10 @@ function chooseTemplate(
     // kinds, so a world bends in a characteristic way (desert = straight+cape, jungle = doglegs+
     // doubles) rather than the one global `doglegBias` mix. Uses the already-drawn `shapeRoll` (no
     // extra draw). Only worlds that set `shapeWeights` take this path; the rest are byte-identical.
-    shape = pickWeightedShape(shapeRoll, biome.shapeWeights);
+    // `wildness` lifts the STRAIGHT share on the deep stops (GS-variety-4) so a profiled world stops
+    // reading as an all-bends "snake" run at max wildness — the same change-of-pace lever the fallback
+    // path below already has. Byte-identical below SHAPE_STRAIGHT_RAMP_MIN (the calm/mid stops).
+    shape = pickWeightedShape(shapeRoll, biome.shapeWeights, wildness);
   } else {
     const bend = biome.doglegBias;
     const hairP = 0.05 + bend * 0.1 + wildness * 0.03; // severe corner — still rare, a touch more deep in
