@@ -163,6 +163,11 @@ export interface Run {
   /** STAR TOUR (GS-star-tour): the weather sky chosen for the round (a `CourseEffectId`) — applied to the
    *  static course as pure physics (wind/carry) by `currentCourse`. Absent/'none' = calm. Snapshotted. */
   staticEffect?: string;
+  /** GS-story-prologue: this strokeplay run is a STORY MODE world round (launched from the campaign hub),
+   *  so it resolves back INTO the `StoryState` (record the clear, pay credits, advance the chapter) instead
+   *  of the Star-Tour record recap, and is never written to the MAIN-save `resumable` (the campaign has its
+   *  own `gs_story` save). A run-lifetime flag (not snapshotted — a mid-round quit replays the world). */
+  storyRound?: boolean;
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.

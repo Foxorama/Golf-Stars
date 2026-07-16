@@ -66,6 +66,42 @@ describe('Story Mode entry flow (GS-story-save wiring)', () => {
   });
 });
 
+describe('Story prologue round (GS-story-prologue)', () => {
+  it('teeing off the Earth round from the hub → auto-play → resolves into the campaign (chapter 0 → 1)', () => {
+    // Enter Story Mode, pick a golfer, land on the hub.
+    const hub = reduce(reduce(initState('seed'), { type: 'openStory' }), {
+      type: 'selectCharacter',
+      characterId: 'longshot-larry',
+    });
+    expect(hub.screen).toBe('story');
+    expect(hub.story?.chapter).toBe(0);
+
+    // Tee off the prologue: build a marked Story round on the Earth course.
+    const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.storyRound).toBe(true);
+    expect(intro.run.staticCourseId).toBe('standrews-18');
+    expect(intro.run.loadout.characterId).toBe('longshot-larry');
+
+    // Auto-play the whole round (watch) → it resolves back INTO the campaign, not the Star Tour boards.
+    const done = reduce(intro, { type: 'play' });
+    expect(done.screen).toBe('storyResult');
+    expect(done.lastStoryRound?.wasPrologue).toBe(true);
+    expect(done.lastStoryRound?.advancedChapter).toBe(true);
+    expect(done.story?.chapter).toBe(1);
+    expect(done.story?.clearedWorldIds).toContain('standrews-18');
+    expect((done.story?.credits ?? 0)).toBeGreaterThanOrEqual(100);
+    // A Story round never touches the main-save Star Tour record boards.
+    expect(done.strokePlayBest).toEqual(hub.strokePlayBest);
+
+    // Continue → back to the hub, recap cleared.
+    const back = reduce(done, { type: 'storyRoundContinue' });
+    expect(back.screen).toBe('story');
+    expect(back.lastStoryRound).toBeUndefined();
+    expect(back.story?.chapter).toBe(1);
+  });
+});
+
 describe('storyStore persistence (GS-story-save wiring)', () => {
   it('degrades safely with no localStorage (Node): no-ops, never throws', () => {
     // In the node test env localStorage is undefined, so the store degrades to no-ops.

@@ -83,6 +83,7 @@ import {
   resolveAsgard,
   resolveBossId,
   resolveStrokePlay,
+  resolveStoryRound,
   runEndUpdates,
   withAsgardPortal,
   withBestBallPartner,
@@ -363,6 +364,25 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, screen: 'title' };
     }
 
+    case 'storyPlayWorld': {
+      // GS-story-prologue: tee off a Story Mode world round from the campaign hub. Build a strokeplay run
+      // pinned to the course from the campaign's golfer — a CLEAN loadout (common bag, no main-save meta/
+      // ascension-unlocks: the campaign is a separate progression; the green-bag start + gear ride the
+      // StoryState in a later chunk), mark it a Story round so it resolves back into the campaign, and tee
+      // up the round intro (through the lore gate, so a world's arrival beat still fires).
+      if (state.screen !== 'story' || !state.story) return state;
+      const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
+      const run = { ...run0, staticCourseId: action.courseId, staticEffect: 'none', storyRound: true };
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined });
+    }
+
+    case 'storyRoundContinue': {
+      // GS-story-prologue: dismiss the world-round recap back to the campaign hub (the run already banked
+      // into the StoryState at `resolveStoryRound`).
+      if (state.screen !== 'storyResult') return state;
+      return { ...state, screen: 'story', lastStoryRound: undefined };
+    }
+
     case 'playYggdrasilRealm': {
       // GS-star-tour-yggdrasil: play a Norse realm off the hidden World Tree on the star map. The tree is
       // revealed only once Thor's Hammer is won, and today ONLY Asgard has bloomed (the other branches are
@@ -465,6 +485,9 @@ export function reduce(state: UiState, action: Action): UiState {
         };
       }
       const { run, result, played } = playStop(state.run, { prevBestHoles: state.endlessBestHoles });
+      // GS-story-prologue: a Story Mode world round resolves back INTO the campaign (record the clear, pay
+      // credits, advance the chapter), not the Star-Tour record boards. Checked before the strokeplay branch.
+      if (state.run.storyRound) return resolveStoryRound(state, played);
       // Star Tour (GS-star-tour): a watched round is scored to the personal course-record boards, not the
       // Stableford cut/travel flow — resolve it like Asgard and land on the record recap.
       if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, played);
@@ -752,6 +775,8 @@ export function reduce(state: UiState, action: Action): UiState {
       if (nextIdx < total) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
+      // GS-story-prologue: a Story world round resolves into the campaign, not the course-record boards.
+      if (state.run.storyRound) return resolveStoryRound(state, stopPlayed);
       // Star Tour (GS-star-tour): the 18-hole round is complete — bank it to the course-record boards.
       if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, stopPlayed);
       // The Asgard tournament (GS-asgard) is decided on total gross on The Warrior's Tee — resolve it

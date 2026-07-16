@@ -103,9 +103,14 @@ export function persist(): void {
     // The Asgard tournament run (GS-asgard) is NEVER persisted — a mid-tournament quit resumes the
     // SUSPENDED real run (the Asgard attempt is forfeited, the Rainbow Ball intact), so persist the
     // parked snapshot instead of the ephemeral tournament run.
+    // A Story Mode world round (GS-story-prologue) is NEVER the main-save resumable — the campaign has its
+    // own `gs_story` save, and a mid-round quit replays the world — so pass the parked snapshot through,
+    // exactly like the Asgard tournament run.
     activeRun:
       state.run.status === 'active' && state.run.formatId === ASGARD_FORMAT
         ? state.asgardReturn
+        : state.run.status === 'active' && state.run.storyRound
+        ? state.resumable
         : state.run.status === 'active' && state.run.loadout.characterId
         ? snapshotRun(state.run, roundProgress())
         : state.resumable,

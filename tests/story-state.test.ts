@@ -14,6 +14,9 @@ import {
   addCredits,
   recordWorldClear,
   defaultBagIsValid,
+  completeStoryRound,
+  storyRoundCredits,
+  PROLOGUE_COURSE_ID,
   type StoryState,
 } from '../src/sim/rpg/story';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
@@ -113,6 +116,43 @@ describe('story-state model (GS-story-save)', () => {
       s = recordWorldClear(s, 'w1', { toPar: 5, strokes: 77, par: 72, seed: 'z' }, 10);
       expect(s.worldBest['w1']?.toPar).toBe(-1);
       expect(s.clearedWorldIds).toEqual(['w1']); // still just once
+    });
+
+    it('storyRoundCredits pays more under par and floors at 100', () => {
+      expect(storyRoundCredits(0)).toBe(200);
+      expect(storyRoundCredits(-4)).toBe(260);
+      expect(storyRoundCredits(10)).toBe(100); // floored
+    });
+
+    it('completeStoryRound clears the world, pays, keeps best, and advances the prologue chapter', () => {
+      const s0 = defaultStoryState('feather-fade');
+      expect(s0.chapter).toBe(0);
+      const { story, advancedChapter, wasPrologue } = completeStoryRound(
+        s0,
+        PROLOGUE_COURSE_ID,
+        { toPar: -2, strokes: 70, par: 72, seed: 's' },
+        storyRoundCredits(-2),
+      );
+      expect(wasPrologue).toBe(true);
+      expect(advancedChapter).toBe(true);
+      expect(story.chapter).toBe(1);
+      expect(story.clearedWorldIds).toContain(PROLOGUE_COURSE_ID);
+      expect(story.credits).toBe(230);
+      expect(story.worldBest[PROLOGUE_COURSE_ID]?.toPar).toBe(-2);
+    });
+
+    it('completeStoryRound on a non-prologue world clears + pays but does NOT advance the chapter', () => {
+      const s0 = { ...defaultStoryState(), chapter: 2 };
+      const { story, advancedChapter, wasPrologue } = completeStoryRound(
+        s0,
+        'orion-forge',
+        { toPar: 1, strokes: 73, par: 72, seed: 's' },
+        200,
+      );
+      expect(wasPrologue).toBe(false);
+      expect(advancedChapter).toBe(false);
+      expect(story.chapter).toBe(2);
+      expect(story.clearedWorldIds).toContain('orion-forge');
     });
 
     it('the key to the other realm needs all five trophies', () => {
