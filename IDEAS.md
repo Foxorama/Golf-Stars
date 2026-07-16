@@ -19,7 +19,9 @@ meta layer into its own persistent progression (`StoryState`, `gs_story` save). 
 Trade Market stay frozen. Story: the Fairway Wardens (Parrot/Mothership) vs **the Coil** (Sinister Snake
 Cult) racing to wake Jörmungandr; 5 Galaxy Tournaments (Lyra→Orion→Draco→split→Hydra Mire) → the Green Key
 → a Cthulhu-serpent SPACE BATTLE at Yggdrasil's root. A mid-story **CHOICE** (stay Warden / join the Coil)
-forks the back half — different NPCs, cursed-relic vs Warden gear, ships, and ending — for replay value.
+forks into two DISTINCT world-routes (Warden void/crystal/frost vs Herald ocean/derelict/cetus) — different
+NPCs, tournaments, cursed-relic vs Warden gear, ships, and ending; the Herald even crushes former allies
+Dan & Penelope. Real divergence, still interconnected (shared shrine, cast reversed) — for replay value.
 Ships as **chunks**, one focused tested auto-merged PR each:
 - **GS-story-save** — ✅ *model shipped (#445)*; next: `gs_story` persistence + New Game/Continue (Star Tour tile → Story Mode) + a minimal hub. The spine.
 - **GS-story-prologue** — Earth final round (`standrews-18`) → win/victory → Mothership → Parrot recruit → story intro → Clubhouse.
@@ -30,7 +32,9 @@ Ships as **chunks**, one focused tested auto-merged PR each:
 - **GS-story-locker** — Story locker/wardrobe variant + per-character equipment screen + caddy roster (hire→keep→choose, no fire).
 - **GS-story-map** — worlds gain locked/unlocked/cleared states; chapter-gated unlocks; difficulty-scaled world choice.
 - **GS-story-tournament** — Galaxy Tournament framework: qualifier → final → Sigil + reward + host/rival (Venoma); Asgard-style ghost stroke-play; new Coil faction.
-- **GS-story-chapters** — the 5 tournaments as data + beats; the Coil's escalation; **The Choice** (end Ch.3) sets `alignment` and forks Ch.4–5; 5 Sigils → the Green Key.
+- **GS-story-chapters (trunk)** — shared Ch.1–3 (Lyra→Orion→Draco) + beats; Coil escalation; **The Choice** (end Ch.3) sets `alignment`.
+- **GS-story-warden-track** — Ch.4W–6W (Gemini→Sagittarius→Coronae→Hydra): reseal route (void/crystal/frost); win a fallen friend back; Warden gear/ship.
+- **GS-story-herald-track** — Ch.4H–6H (Eridanus→Ghost Wreck+Cetus→Hydra): desecration route (ocean/derelict/cetus); **crush Dan & Penelope**; cursed sheddings; wyrm-ship.
 - **GS-story-yggdrasil** — Dark-Root socket + Jörmungandr Cthulhu-serpent SPACE BATTLE (real HP/collision/outcome + golf finisher) + **two endings by alignment** + shared loss/retry.
 - **GS-story-beats** — Parrot bar interaction (tap → story/direction), inter-chapter NPC scenes, cross-chapter balance pass.
 

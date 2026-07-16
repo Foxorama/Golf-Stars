@@ -157,10 +157,15 @@ Ordered so each ships something playable and nothing lands before its foundation
 - **GS-story-tournament** — the Galaxy Tournament **framework**: qualifying round → final → **Sigil** +
   signature reward, with a **host + a recurring rival** (Venoma). Row-driven, reusing Asgard-style ghost
   stroke-play. Difficulty ramps per chapter. New **Coil faction** row (`factions.ts`).
-- **GS-story-chapters** — the **5 tournaments** as data (worlds/hosts/rivals/beats/rewards per the bible:
-  Lyra → Orion → Draco → path-split → Hydra Mire); the Coil's escalation; **The Choice** at the end of
-  Ch.3 sets `alignment` and forks Ch.4–5 (which NPCs, beats, gear/ship pools). Five Sigils forge the
-  **Green Key**. Batches as framework + data rows.
+- **GS-story-chapters (trunk)** — the shared **Ch.1–3** (Lyra → Orion → Draco) as data + beats; the Coil's
+  escalation; **The Choice** at the end of Ch.3 sets `alignment`. Both routes reach five Sigils via a
+  symmetric shape (2 Sigil-majors + 1 Sigil-less emotional chapter + the shrine).
+- **GS-story-warden-track** — Ch.4W–6W (Gemini Ice → **Sagittarius Core** → **Coronae Prism** → **Hydra
+  Mire**): the re-consecration route (cold/void/crystal worlds), the *win a fallen friend back* chapter,
+  Warden gear/ship, and the alignment-gated world-unlock route.
+- **GS-story-herald-track** — Ch.4H–6H (**Eridanus Atolls** → **Ghost Wreck + Cetus** → **Hydra Mire**):
+  the desecration route (ocean/derelict/cetus), the **Ghost Harvest where you crush Driver Dan & Penelope**,
+  cursed sheddings, the wyrm-ship, and its own world-unlock route. Both tracks converge on the Green Key.
 
 **Phase F — Finale**
 - **GS-story-yggdrasil** — the **Dark Root** socket on the Yggdrasil tree + the **Jörmungandr space

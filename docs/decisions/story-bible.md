@@ -98,25 +98,58 @@ neutral tour bodies the Coil bribes or leans on as the stakes rise. **The Coil i
 
 ## 3. Campaign spine
 
-```
-PROLOGUE  Earth · the World Tour final (St Andrews) → win → victory → the Mothership lands →
-          the Parrot's recruitment → story intro cinematic → the Clubhouse (wagon in port, Parrot in bar)
+The campaign is a **shared trunk (Ch.1–3)** that forks at **The Choice** into **two genuinely distinct
+routes** — different worlds/biomes, different tournaments, different allies and enemies, different loot,
+different endings. The routes stay **interconnected**: they share the trunk's history, they cross the same
+shrine (Hydra Mire) toward opposite rites, and — crucially — **the people don't vanish, they change sides.**
+The friends who fought beside you become the champions you must *break* if you turn; the Apostate who hunted
+you becomes your mentor. That reversal is the whole point of the choice.
 
-CH.1  The Emerald Invitational   (Lyra Meadows, verdant)   — the rookie major; learn the Game is real
-CH.2  The Forge Masters          (Orion Forge, ember)      — the Coil surfaces; Venoma's first denial
-CH.3  The Storm Championship     (Draco Gale, tempest)     — open cult sabotage; the Apostate appears
-      ── THE CHOICE ── Brother Ouros makes The Offer. Keep faith (WARDEN) or turn (HERALD).
-CH.4  diverges by alignment      (Sagittarius Core, void / Eridanus Atolls, ocean)
-CH.5  The Serpent's Cup          (Hydra Mire, toxic-mire)  — the Water-Serpent's shrine; the fifth Sigil
-      ── all five Sigils forge the GREEN KEY to Yggdrasil's root ──
-FINALE  Yggdrasil's Dark Root · the JÖRMUNGANDR SPACE BATTLE → ending (by alignment) or loss
+```
+PROLOGUE  Earth · World Tour final (St Andrews) → win → Mothership lands → Parrot recruits → intro → Clubhouse
+
+── SHARED TRUNK ──────────────────────────────────────────────────────────────────────────────
+CH.1  The Emerald Invitational   (Lyra Meadows, verdant)   — rookie major; the Game is real     [Sigil 1]
+CH.2  The Forge Masters          (Orion Forge, ember)      — the Coil surfaces; Venoma's denial  [Sigil 2]
+CH.3  The Storm Championship     (Draco Gale, tempest)     — open sabotage; the Apostate appears [Sigil 3]
+      ══ THE CHOICE ══ Brother Ouros makes The Offer. Keep faith → WARDEN. Turn → HERALD.
+
+── WARDEN ROUTE (light) — re-consecrate, protect, race the Coil ────────────────────────────────
+      side world: Gemini Ice (frost) — regroup; the Wardens rally to you
+CH.4W The Abyssal Vigil          (Sagittarius Core, void)  — reseal a lesser dreamer            [Sigil 4]
+CH.5W The Prism Accord           (Coronae Prism, crystal)  — a friend fell to the Coil; win them back
+CH.6W The Serpent's Vigil        (Hydra Mire, toxic-mire)  — storm the rite; redeem/break Venoma [Sigil 5]
+
+── HERALD ROUTE (dark) — desecrate, corrupt, crush the Wardens ──────────────────────────────────
+CH.4H The Drowning Rite          (Eridanus Atolls, ocean)  — desecrate a world; drown a friend  [Sigil 4]
+CH.5H The Ghost Harvest          (Ghost Wreck derelict + Cetus Shelf) — raid the dead;
+                                                             ═ CRUSH Driver Dan & Penelope ═
+CH.6H The Serpent's Ascension    (Hydra Mire, toxic-mire)  — complete the rite; anointed Herald  [Sigil 5]
+
+── CONVERGENCE ──────────────────────────────────────────────────────────────────────────────
+      all five Sigils forge the GREEN KEY → Yggdrasil's Dark Root
+FINALE  the JÖRMUNGANDR SPACE BATTLE → Warden "The Reseal" / Herald "The Long Rest" / shared loss-retry
 ```
 
-Between chapters you **travel the star map**: each cleared chapter unlocks a few new worlds (a qualifier +
-side worlds + the next major), always offering a **choice** scaled by difficulty (`chapter` raises each
-world's wildness). Clearing any world pays **credits**; each has a **Pro Shop**; a revisit lets you *play
-again* (best-score chase) or go *straight to the shop.* A tournament is entered via a **qualifying round**
-(a nearby world you must clear under a target) that unlocks its **final** (the major itself).
+**Interconnection, concretely** — the routes are mirrors of one shared cast, not two separate stories:
+- **Hydra Mire** is the fifth Sigil on *both* routes — the same acid shrine, played toward opposite rites
+  (lock the last seal vs consummate the awakening). Your Warden-run memory of consecrating it makes the
+  Herald-run desecration land harder (and vice-versa on NG+).
+- **Every ally is a potential enemy.** Warden: **Venoma** hunts you but can be *turned*; a friend who fell
+  to the Coil must be *won back* (Ch.5W). Herald: your former friends become the Warden champions you must
+  *defeat* — **Driver Dan & Penelope** headline the Ghost Harvest (Ch.5H), and the **Parrot** himself, your
+  grieving betrayed prophet, tries to bar the root.
+- **The Apostate** inverts: your Ch.3 tormentor becomes (Herald) the mentor who anoints you, or (Warden)
+  the final heretic you must out-play at the shrine.
+
+Between chapters you **travel the star map**; each cleared chapter unlocks a few new worlds **on your
+route** (a qualifier + side worlds + the next major), always offering a **choice** scaled by difficulty
+(`chapter` raises each world's wildness). Clearing any world pays **credits**; each has a **Pro Shop**; a
+revisit lets you *play again* (best-score chase) or go *straight to the shop.* A tournament is entered via a
+**qualifying round** (a nearby world cleared under a target) that unlocks its **final** (the major itself).
+The two routes touch different biome sets — Warden leans **void/crystal/frost** (cold, clean, cosmic),
+Herald leans **ocean/derelict/cetus** (drowned, dead, deep) — so the back half *looks and feels* different,
+not just reads differently.
 
 ---
 
@@ -160,46 +193,107 @@ tier. Each grants a **Sigil of the Game** (the trophy) + a **signature prize** (
 - **Sigil: The Storm Sigil.** **Prize:** branches (Warden **Galewarden Irons**, control; Herald **first
   true shedding** from Sister Ecdysis).
 
-### Chapter 4 — diverges by alignment
-- **WARDEN → The Abyssal Vigil · Sagittarius Core** (`void2-18`, void, brutal). The Coil tries to wake a
-  *lesser* dreaming thing at the galaxy's black-heart; you re-seal it by playing the abyss true (island-hop
-  carries over the void). Host: the Wardens themselves. Rival: **Venoma**, now openly hunting you — but her
-  doubt shows. **Sigil: The Abyssal Sigil.** Prize: **Warden ship** (a radiant cruiser) + celestial gear.
-- **HERALD → The Drowning Rite · Eridanus Atolls** (`ocean-18`, ocean, testing→scaled). You help the Coil
-  *desecrate* a world — win its tournament to claim its order for the serpent instead of renewing it (the
-  sea rises, beautiful and wrong). Host: **Sister Ecdysis.** Rival: a **Warden champion** (one of your
-  former friends, heartbroken) tries to stop you. **Sigil: The Drowned Sigil.** Prize: **Coil ship** (a
-  scaled black wyrm-cruiser) + a potent shedding.
+Past Chapter 3 the campaign forks into **two distinct routes** — different worlds, tournaments, hosts,
+rivals, loot and beats. Each route is its own three-chapter arc to the fifth Sigil.
 
-### Chapter 5 — The Serpent's Cup · **Hydra Mire** (`swamp-18`, toxic-mire, the Water-Serpent's home)
-The acid mire where the serpent's dream is thickest and the ball flies short in the heavy, hissing air.
-The Coil's holy ground; the fifth Sigil sits on the serpent's very shrine.
-- **Qualifier:** *The Ghost Wreck* (`derelict-18`, derelict) — a Coil-raided dead starship; you shoot its
-  metal corridors to reach the mire (ties the existing derelict lore + Firebird beat in).
-- **WARDEN:** storm the Coil's rite and play the shrine true to **lock the last seal.** Final rival:
-  **Venoma** — beat her and she can be *turned* (a redeemed lieutenant for the finale), or broken.
-- **HERALD:** complete the rite yourself; **Sable Voss** anoints you the serpent's chosen Herald.
-- **Sigil: The Serpent's Sigil** (Warden: a seal; Herald: a key-fang). **Prize:** the path-defining relic:
-  Warden **Star-Blessed Ball** (clean, true) / Herald **Ouroboros Ball** (monstrous, cursed). With five
-  Sigils, the **Green Key** forms — and the way to Yggdrasil's dark root opens on the star map.
+## 4a. The WARDEN route (light) — *re-consecrate, protect, race the Coil*
+
+*Cold, clean, cosmic worlds (frost/void/crystal). You are the feared-but-respected champion holding the
+line; the Coil is always one world ahead, and you arrive to undo what they've done.*
+
+**Side world · Gemini Ice** (`frost2-18`, frost) — no Sigil. The Wardens rally to you after The Choice;
+Pim briefs the true stakes, Driver Dan and Penelope pledge to your bag, the friends reaffirm. A breath
+before the climb — and the last time it feels safe.
+
+### Chapter 4W — The Abyssal Vigil · **Sagittarius Core** (`void2-18`, void, brutal)
+- **Qualifier:** *Pegasus Rift* (`void-18`) — island-pad carries over the abyss; miss and you're gone.
+- **Host:** the Wardens themselves — a vigil, not a show. The Coil is trying to wake a *lesser* dreamer at
+  the galaxy's black heart; you re-seal it by playing the abyss **true.**
+- **Rival:** **Venoma**, openly hunting you now — but her taunts have cracks; she's afraid of what she serves.
+- **Beats:** the void whispers with the serpent's voice; a Warden is lost to it; you hold the line anyway.
+- **Sigil: The Abyssal Sigil.** **Prize:** a **radiant Warden cruiser** (ship) + celestial gear.
+
+### Chapter 5W — The Prism Accord · **Coronae Prism** (`crystal-18`, crystal)
+- **Qualifier:** *Triangulum Wedge* (`crystal2-18`) — fast, true crystal that punishes a loose swing.
+- **The gut-punch (mirror of the Herald's):** one of **your three friends has fallen to the Coil** — seduced
+  while you were away. The tournament *is* the intervention: you must **out-play them to break the whisper's
+  hold and win them back.** Beat them clean and they're saved (and rejoin for the finale); fail the target
+  and they're lost to the Coil for the rest of the run. A real stake with a real cost.
+- **Host:** Sir Aldous Greensward returns, out of his depth and quietly brave.
+- **No Sigil** (this is the intervention chapter — the mirror of the Herald's Ghost Harvest) but winning
+  the friend back yields the **Warden Grace glove** (clean, honest bonus) and restores them for the finale.
+
+### Chapter 6W — The Serpent's Vigil · **Hydra Mire** (`swamp-18`, toxic-mire — the shrine)
+- **Qualifier:** *Delphinus Tides* (`ocean2-18`) — you cross the drowned lagoons to reach the mire.
+- You **storm the Coil's rite** and play the shrine true to **lock the last seal.** Final rival: **Venoma**
+  — beat her and (if you spared her doubt) she can be *turned*, a redeemed lieutenant for the finale; break
+  her and she falls to the serpent. The **Apostate** watches, and for the first time seems *uncertain.*
+- **Sigil: The Serpent's Seal.** **Prize:** the **Star-Blessed Ball** (clean, true). Five Sigils → the
+  **Green Key**, and the way to Yggdrasil's Dark Root opens — to *seal* it deeper.
+
+## 4b. The HERALD route (dark) — *desecrate, corrupt, crush the Wardens*
+
+*Drowned, dead, deep worlds (ocean/derelict/cetus). You are the heretic the tour whispers about; the
+Wardens — your former friends — keep arriving to stop you, and you keep having to put them down.*
+
+### Chapter 4H — The Drowning Rite · **Eridanus Atolls** (`ocean-18`, ocean)
+- **Qualifier:** *Delphinus Tides* (`ocean2-18`) — the same tides, read as omen now.
+- **Host:** **Sister Ecdysis.** You **desecrate** a world — win to claim its order for the serpent instead
+  of renewing it; the sea rises, beautiful and wrong, and it *feels* like a sin.
+- **The gut-punch:** the **Warden champion** sent to stop you is one of **your three friends**, heartbroken
+  and disbelieving. You drown their round to take the Sigil. They don't hate you. That's worse.
+- **Sigil: The Drowned Sigil.** **Prize:** a **wyrm-cruiser** (Coil ship) + a potent shedding.
+
+### Chapter 5H — The Ghost Harvest · **The Ghost Wreck** (`derelict-18`) → **Cetus Shelf** (`cetus-18`)
+- **Two dead worlds, no host** — a raid, not a tournament, for the relics the rite needs. You shoot the
+  derelict's metal corridors (ties in the existing derelict/Firebird lore — the Parrot's dead spirit-brother)
+  and the whale-haunted star-cliffs of Cetus.
+- **THE BEAT YOU ASKED FOR:** the Wardens make their **last stand** here — **Driver Dan and Penelope Putter**,
+  who once carried your bag, stand between you and the harvest, and you must **crush them.** Dan won't believe
+  it's you until the final hole ("*Come on, kid. Tell me the Parrot's wrong.*"); Penelope forgives you as she
+  loses, which breaks something. Beat them and they're *done* — they don't come back. It should hurt to win.
+- **No Sigil** (this is the corruption chapter) but **the harvest yields the rarest shedding of the run**
+  and the **Ouroboros relic-set** groundwork.
+
+### Chapter 6H — The Serpent's Ascension · **Hydra Mire** (`swamp-18`, toxic-mire — the shrine)
+- **Qualifier:** *The Ghost Wreck* (`derelict-18`) again, now yours.
+- You **complete the rite** yourself on the serpent's shrine; **Sable Voss anoints you** the World-Eater's
+  chosen Herald as the mire glows. The Parrot arrives too late, and grieves.
+- **Sigil: The Serpent's Fang.** **Prize:** the **Ouroboros Ball** (monstrous, cursed). Five Sigils → the
+  **Green Key**, and the Dark Root opens — to *unseal* it.
+
+> Note: both routes are symmetric in shape — **two Sigil-majors (Ch.4 + the shrine Ch.6) + one Sigil-less
+> emotional chapter (Ch.5)** — so each reaches exactly **five Sigils** (3 trunk + 4 + 5). The Sigil-less
+> Ch.5 is where the *cost* lives: Warden wins a fallen friend back; Herald crushes Dan & Penelope for good.
+> Same structure, opposite heart. Round/credit balance across both routes is a Phase G pass.
 
 ---
 
 ## 5. The Choice & the alignment branch
 
 **Alignment** is a `StoryState` field — `'undecided'` until the end of Chapter 3, then `'warden'` or
-`'herald'`. It re-colours the back half without doubling the *engine* (same worlds, tournament framework,
-star map, finale battle) — the divergence is **data**: which NPCs host/oppose you, which beats fire, which
-gear/ship pools the Pro Shops offer, and which finale scene plays. That's the replay engine: a second run
-down the other alignment is a genuinely different story with different loot and a different ending.
+`'herald'`. Past The Choice the routes **genuinely diverge**: different worlds/biomes (Warden void·crystal·
+frost vs Herald ocean·derelict·cetus), different tournaments, hosts, rivals, gear/ship pools, beats, and
+ending. The *engine* isn't doubled — one reducer, one tournament framework, one star map, one finale battle
+system — but the **content is a real fork**: the star map unlocks a **different route** of worlds per
+alignment, and the beat/tournament/loot rows are alignment-gated. That's the replay engine: the second run
+down the other alignment visits different places, fights different people, and earns different loot toward a
+different ending.
 
-- **Warden (Redeemer):** you're the feared-but-respected champion re-consecrating worlds; allies are the
-  Parrot/Pim/friends; loot is **clean and radiant** (fair bonuses, higher cost/rarity); finale = **reseal.**
-- **Herald (Betrayer):** you're the heretic the tour whispers about; allies are Ouros/Ecdysis/Voss; loot is
-  **cursed sheddings** (huge power, real drawbacks); finale = **the Long Rest.**
+- **Warden (Redeemer):** the feared-but-respected champion re-consecrating **cold, clean, cosmic** worlds;
+  allies are the Parrot/Pim/Dan/Penelope/friends; loot is **clean and radiant** (fair bonuses, dearer);
+  the emotional cost is **winning a fallen friend back** (or losing them); finale = **The Reseal.**
+- **Herald (Betrayer):** the heretic the tour whispers about, desecrating **drowned, dead, deep** worlds;
+  allies are Ouros/Ecdysis/Voss; loot is **cursed sheddings** (huge power, real drawbacks); the cost is
+  **crushing the friends who trusted you** — Dan and Penelope by name; finale = **The Long Rest.**
 
-Neutral-until-Choice keeps Chapters 1–3 shared (one build), so the branch is a *back-half data fork*, not a
-second campaign to author from scratch. New Game+ carries cosmetics/records and offers the opposite path.
+The divergence is real enough that the choice *matters*: it changes where you go, who you fight, what you
+wield, and how it ends. Chapters 1–3 stay shared (one trunk build); the fork is authored as **two back-half
+tracks** of alignment-gated content, not a full second engine. New Game+ carries cosmetics/records and steers
+you to the road not taken — and the memory of consecrating a world you now desecrate (or vice-versa) is the
+point. **Guardrail:** the shared golf engine, star map, tournament framework and battle stay single-source;
+only *content rows + world-unlock routes + gated beats* branch — so the fork adds data, never a parallel
+engine to keep in sync.
 
 ---
 
@@ -277,8 +371,10 @@ are data over the GS-story-tournament framework; the branch is `StoryState.align
 | GS-story-econ/clubs/gear/ships/locker | the green-bag start, Pro Shops, **cursed sheddings** + Warden gear, path ships, caddy roster (Warden allies) |
 | GS-story-map | chapter-gated world unlocks, difficulty-scaled choice, qualifier→final gating |
 | GS-story-tournament | the major framework (host/rival/Sigil/prize), Venoma the recurring rival |
-| GS-story-chapters | Ch.1–5 data + beats; the Coil's escalation; **The Choice** at end of Ch.3 + the alignment fork |
-| GS-story-yggdrasil | the Dark Root socket + the Jörmungandr space battle + the two endings + the loss scene |
+| GS-story-chapters (trunk) | Ch.1–3 shared data + beats; the Coil's escalation; **The Choice** at end of Ch.3 sets `alignment` |
+| GS-story-warden-track | Ch.4W–6W (Gemini Ice → Sagittarius Core → Coronae Prism → Hydra Mire): reseal beats, win-back-a-friend, Warden gear/ship, world-unlock route |
+| GS-story-herald-track | Ch.4H–6H (Eridanus → Ghost Wreck+Cetus → Hydra Mire): desecration beats, **crush Dan & Penelope**, cursed sheddings, wyrm-ship, world-unlock route |
+| GS-story-yggdrasil | the Dark Root socket + the Jörmungandr space battle + the two endings (Reseal/Long Rest) + the loss scene |
 | GS-story-beats | the Parrot bar interactions, inter-chapter NPC scenes, the cross-chapter balance pass |
 
 **`StoryState` fields the story adds** (each a versioned migration when its chunk lands): `alignment`,
