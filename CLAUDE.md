@@ -1132,6 +1132,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
     character-less placeholder run (it wipes saves).
+  - The settings SHEET's inner content is `settingsSheetInner()` (split from the `settingsOverlay`
+    backdrop/frame wrapper); an in-sheet toggle/aim tap updates it SURGICALLY via `refreshSettings()`
+    (swap `.gs-settings` innerHTML + re-`wireSettingsSheet(sheet)`) — NOT a full `render()`, which
+    re-mounts the `.gs-sheet` frame and replays its slide-up animation as a flicker (GS-settings-flicker,
+    the `puttAimRefresh` sibling). A Music toggle still calls `syncMusic()` in the handler (render() no
+    longer runs to do it). `wireSettingsSheet(root)` wires the sheet's descendants only, so the
+    persistent backdrop + frame are never double-listened. The Audio + Feel on/off prefs are compact icon
+    CHIPS (GS-settings-chips, `.gs-setchip` in a 2-col `.gs-chipgrid`, `TOGGLE_CHIPS` table) — icon +
+    label + a mini switch, descriptions on `title`/`aria-label` — replacing the tall full-width rows so
+    the sheet is far shorter; aim stays the segmented `.gs-seg` control.
   - The title's CONTINUE RUN button (GS-continue-button, `titleScreens.ts continueRunHTML`/`resumeInfo`)
     is THEMATIC + mode-aware: the character's cosmetic ship (`shipForCharacter`→`shipCardSVG`) + a message
     read off the parked `RunSnapshot` — Voyage → `Arc N of 3` (`arcIndexOf(stopIndex)+1`), Unending →
