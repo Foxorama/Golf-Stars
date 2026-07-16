@@ -263,6 +263,10 @@
       .gs-selpill-sel option { color: #111; background: #fff; }
       .gs-selpill-caret { position: absolute; right: 10px; pointer-events: none; opacity: .65; font-size: 10px; color: var(--cc, var(--gs-ink)); }
       .gs-diffrow-hint { flex-basis: 100%; font-size: 10.5px; opacity: .55; }
+      /* Keep the difficulty hint to a single line on phones so it doesn't steal a card row of height. */
+      @media (max-width: 640px) {
+        .gs-select .gs-diffrow-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      }
       /* The per-golfer club-unlock badge on the select card (GS-ascension-clubs display): does a win at the
          selected Ascension grow THIS golfer's bag? green = yes, dim = already cleared, gold = bag full. */
       .gs-unlock-badge { font-size: 10px; font-weight: 800; letter-spacing: .02em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
@@ -1016,6 +1020,12 @@
          (.gs-main) drops its padding for this screen via .gs-main--bleed. */
       .gs-main--bleed { padding: 0; max-width: none; }
       .gs-main--wide { max-width: 1180px; }
+      /* Character-select locks to the viewport on phones (GS-select-onescreen): the page frame becomes a
+         flex column of exactly one screen height, so the roster grid inside fills the space under the
+         header and the whole roster fits with no scroll. Desktop keeps the natural scrolling frame. */
+      @media (max-width: 999px) {
+        .gs-main--fit { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+      }
       .gs-shot--full {
         position: relative; width: 100%;
         height: 100vh; height: 100dvh; overflow: hidden;
@@ -1428,20 +1438,48 @@
         .gs-win-emoji, .gs-win-tier { animation: none; }
       }
 
-      /* ── Character select (GS-18, flashy redesign; compacted GS-settings-nav so the whole
-             roster fits ONE screen in every game mode — 2×2 on phones, 4-across on desktop) ── */
-      .gs-charhead h1 { margin: 0; font-size: 20px; }
-      .gs-charhead p { opacity: .75; font-size: 12px; margin: .25em 0 0; }
+      /* ── Character select (GS-18 → GS-select-onescreen): a viewport-locked flex column on phones.
+             The header + difficulty pills sit at natural height; the roster grid FILLS the rest, so
+             every golfer lands on one mobile screen with no scroll. The grid auto-flows (2 cols on
+             phones), so future characters reflow into more rows that SHARE the height — no per-count
+             redesign. Cards clip their softest region (the unlocked-clubs strip) first; portrait,
+             stats, hint and the Tap-to-play CTA never clip. Desktop keeps the roomy 4-across row. ── */
+      .gs-select { display: block; }
+      @media (max-width: 999px) {
+        .gs-select { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+      }
+      /* Header reads like the app's other section heads (accent bar + hairline); the right pad clears
+         the fixed settings cog so the title never sits under it. */
+      .gs-charhead {
+        flex: 0 0 auto;
+        border-left: 3px solid var(--gs-gold);
+        border-bottom: 1px solid var(--gs-line-2);
+        padding: 0 48px 9px 11px;
+      }
+      .gs-charhead h1 { margin: 0; font-size: 19px; line-height: 1.12; }
+      .gs-charhead p { opacity: .78; font-size: 11.5px; margin: .3em 0 0; line-height: 1.4; }
+      .gs-select > .gs-diffrow { flex: 0 0 auto; margin: 9px 0 0; }
+      /* Keep the two difficulty pills on ONE row on phones (they otherwise stack and steal a whole
+         card-row of height); the hint drops to its own line beneath. Pills share the width and their
+         value truncates rather than wrapping. */
+      @media (max-width: 640px) {
+        .gs-select > .gs-diffrow .gs-selpill { flex: 1 1 0; min-width: 0; }
+        .gs-select > .gs-diffrow .gs-selpill-sel { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      }
       .gs-charwrap {
         display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-auto-rows: 1fr; gap: 10px; margin-top: 12px;
+        grid-auto-rows: 1fr; gap: 8px; margin-top: 9px;
+      }
+      @media (max-width: 999px) {
+        .gs-charwrap { flex: 1 1 auto; min-height: 0; overflow: hidden; }
       }
       /* A full 4-across roster lineup on desktop — never an orphan 3+1 row. */
       @media (min-width: 1000px) { .gs-charwrap { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
       .gs-charcard {
         position: relative; overflow: hidden; text-align: left; cursor: pointer;
-        display: flex; flex-direction: column; gap: 8px;
-        padding: 11px 11px 12px; border-radius: var(--gs-r-lg); color: var(--gs-ink);
+        min-height: 0;
+        display: flex; flex-direction: column; gap: 7px;
+        padding: 10px 10px 11px; border-radius: var(--gs-r-lg); color: var(--gs-ink);
         border: 1px solid color-mix(in srgb, var(--cc) 45%, var(--gs-line));
         background:
           radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--cc) 22%, transparent), transparent 60%),
@@ -1474,22 +1512,27 @@
       @media (hover: hover) { .gs-charcard:hover .gs-charcard-sheen { animation: gs-char-sheen .7s ease; } }
       @keyframes gs-char-sheen { 0% { opacity: 0; transform: translateX(-120%); } 35% { opacity: .8; } 100% { opacity: 0; transform: translateX(120%); } }
       .gs-charcard > * { position: relative; z-index: 2; }
-      .gs-charcard-top { display: flex; gap: 9px; align-items: center; }
+      .gs-charcard-top { flex: 0 0 auto; display: flex; gap: 9px; align-items: center; }
       .gs-charcard-port {
-        flex: 0 0 auto; display: grid; place-items: center; width: 64px; height: 76px;
+        flex: 0 0 auto; display: grid; place-items: center; width: 56px; height: 66px;
         border-radius: 10px; background: radial-gradient(60% 60% at 50% 40%, #1b2230, #0d1018);
         border: 1px solid color-mix(in srgb, var(--cc) 30%, var(--gs-line));
       }
       .gs-charcard-id { flex: 1 1 auto; min-width: 0; }
       .gs-charcard-name { display: block; font-size: 15px; line-height: 1.15; text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent); }
       .gs-charcard-org { font-size: 10.5px; opacity: .65; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .gs-charcard-blurb { font-size: 12.5px; opacity: .9; margin: 0; line-height: 1.45; }
+      .gs-charcard-blurb { flex: 0 0 auto; font-size: 12.5px; opacity: .9; margin: 0; line-height: 1.45; }
       /* Phone-sized cards: the one-line ✓ strength · ▲ quirk hint stands in for the blurb + full
          pros/cons list, which come back at desktop width (same markup, media-query visibility). */
-      .gs-charcard-hint { font-size: 10.5px; line-height: 1.45; opacity: .85; margin: 0; }
+      .gs-charcard-hint {
+        flex: 0 0 auto; font-size: 10.5px; line-height: 1.4; opacity: .85; margin: 0;
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+      }
+      /* On the tightest phones trim the hint to two lines so the unlocked-clubs chips keep room. */
+      @media (max-width: 400px) { .gs-charcard-hint { -webkit-line-clamp: 2; } }
       @media (max-width: 999px) { .gs-charcard-blurb, .gs-charcard-pc { display: none; } }
       @media (min-width: 1000px) { .gs-charcard-hint { display: none; } }
-      .gs-charcard-stats { display: grid; gap: 4px; padding: 2px 0; }
+      .gs-charcard-stats { flex: 0 0 auto; display: grid; gap: 4px; padding: 2px 0; }
       .gs-stat { display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 7px; }
       .gs-stat-l { font-size: 10px; font-weight: 700; letter-spacing: .6px; opacity: .6; }
       .gs-stat-rail { height: 6px; border-radius: 999px; background: #ffffff12; overflow: hidden; }
@@ -1499,13 +1542,28 @@
         animation: gs-stat-grow .6s .15s cubic-bezier(.2,.7,.3,1) both;
       }
       @keyframes gs-stat-grow { from { width: 0; } to { width: var(--w); } }
-      .gs-charcard-pc { list-style: none; padding: 0; margin: 0; font-size: 12px; line-height: 1.55; }
+      .gs-charcard-pc { flex: 0 0 auto; list-style: none; padding: 0; margin: 0; font-size: 12px; line-height: 1.55; }
       .gs-charcard-pc .gs-pc-i { display: inline-block; width: 14px; }
+      /* The unlocked-clubs strip is the card's ONE soft region (GS-select-onescreen). It flex-GROWS to
+         fill spare card height, so its content top-aligns and the CTA pins to the bottom; on a roomy
+         card the spare space is empty (below the chips), and on a short card the chips/badge overflow
+         and the mobile mask (below) dissolves the overflow instead of hard-cutting a row in half. */
+      .gs-charcard-unlocks {
+        flex: 1 1 auto; min-height: 0; overflow: hidden;
+        margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gs-line-2);
+      }
+      .gs-charcard-unlocks--empty { margin: 0; padding: 0; border-top: 0; }
+      @media (max-width: 999px) {
+        .gs-charcard-unlocks {
+          -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+          mask-image: linear-gradient(to bottom, #000 78%, transparent);
+        }
+      }
       /* Not a nested button — the whole card IS the button. This is a footer affordance line
          (top-divider + accent text + arrow) telling you what tapping the card does, so the card
          no longer reads as "tap area PLUS a separate advance button" (GS-select-layout). */
       .gs-charcard-cta {
-        margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 6px;
+        flex: 0 0 auto; margin-top: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
         font-size: 11.5px; font-weight: 800; letter-spacing: .01em; padding: 9px 4px 1px;
         color: var(--cc); border-top: 1px solid color-mix(in srgb, var(--cc) 26%, var(--gs-line-2));
         transition: color .16s ease, opacity .16s ease;

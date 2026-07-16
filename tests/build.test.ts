@@ -255,6 +255,7 @@ describe('build output (real browser)', () => {
   // Distinctive markers — a CSS selector unique to the screen, or a text string it renders. Deliberately
   // NOT `.gs-cog` (the settings cog rides every screen, including the title, so it proves nothing).
   const SCREENS: { screen: string; sel?: string; text?: string; label: string }[] = [
+    { screen: 'character', sel: '.gs-select', text: 'Choose your golfer', label: 'the golfer roster' },
     { screen: 'travel', sel: '.gs-journey', label: 'the journey star-map' },
     { screen: 'shop', text: 'Pro Shop', label: 'the Pro Shop' },
     { screen: 'starmart', text: 'StarMart', label: 'the StarMart pop-up' },
@@ -299,6 +300,37 @@ describe('build output (real browser)', () => {
       60_000,
     );
   }
+
+  // CHARACTER SELECT fits one mobile screen with no scroll (GS-select-onescreen). The roster locks to the
+  // viewport (`.gs-main--fit`) so the whole golfer grid fits a phone with no vertical page scroll and no
+  // horizontal overflow — the exact regression the bug report flagged (cards running off the bottom/edge).
+  // A pure-DOM guard the sim suite is blind to; only a real browser lays out the grid + viewport lock.
+  it.runIf(chromePath)(
+    'character select fits one phone screen with no page scroll (GS-select-onescreen)',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 390, height: 780 } });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=character&intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        await page.waitForSelector('.gs-select', { timeout: 8000 });
+        const m = await page.evaluate(() => {
+          const de = document.documentElement;
+          return { vScroll: de.scrollHeight - de.clientHeight, hScroll: de.scrollWidth - de.clientWidth };
+        });
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+        // A couple of px of sub-pixel rounding is fine; a scrolling roster (the bug) is tens of px.
+        expect(m.vScroll, 'roster must not scroll vertically').toBeLessThanOrEqual(2);
+        expect(m.hScroll, 'roster must not overflow horizontally').toBeLessThanOrEqual(2);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
 
   // STAR-MAP WEAPONS (GS-star-tour-weapons). The dashboard fire button spawns a themed projectile into the
   // `#gs-st-shots` SVG layer + ticks an ammo pip down — pure app-layer DOM the sim suite can't see. This
