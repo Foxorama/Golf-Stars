@@ -9,6 +9,7 @@ import { state } from './ctx';
 import { currentEffect, holeBiome, holeThemeId, rainbowActive } from './helpers';
 import { archetypeFor } from '../sim/course/themes';
 import { setMusicScene, type MusicSceneId } from '../render/music';
+import { setWeatherAmbience } from '../render/weatherAudio';
 import { holeProjector, type Projector, type ProjectOptions } from '../render/project';
 import { createWeather } from '../render/weather';
 import { createCetusFlow } from '../render/cetusFlow';
@@ -24,8 +25,10 @@ import { type Hole, type Vec } from '../sim/course/contract';
 
 /** Drive the ambient music layer (GS-audio-2) off the current screen: the stop's world theme
  *  while golf is on screen (playing/result — the hole under view picks the track, so a
- *  split-biome stop's back holes switch), the clubhouse lull everywhere else. A cheap no-op when
- *  the scene hasn't changed, so it's safe on render()'s hot path (power-pull re-renders). */
+ *  split-biome stop's back holes switch), the clubhouse lull everywhere else. Also drives the
+ *  WEATHER AMBIENCE layer (GS-weather-audio) off the route's course effect while golf is on screen
+ *  (a subtle bed under the music — a blizzard howls, a storm crackles), silent everywhere else. Both
+ *  are cheap no-ops when unchanged, so it's safe on render()'s hot path (power-pull re-renders). */
 export function syncMusic(): void {
   let sceneId: MusicSceneId = 'menu';
   const hole =
@@ -36,6 +39,9 @@ export function syncMusic(): void {
         : undefined;
   if (hole) sceneId = archetypeFor(holeThemeId(hole), holeBiome(hole));
   setMusicScene(sceneId);
+  // The weather bed only sounds where the weather is on screen (a golf hole under view); the menu /
+  // travel / shop screens stay dry. `currentEffect()` is the run's chosen sky (undefined ⇒ clear).
+  setWeatherAmbience(hole ? currentEffect() ?? 'none' : null);
 }
 
 /** The per-hole weather seed — shared by the play view + the aim/putt overlay so the sky reads

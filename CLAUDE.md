@@ -1088,7 +1088,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     penalties). A safe-landing-then-abyss-roll fires its lost FX at REST, not on the landing.
   - Music is table+dispatch per archetype (`MUSIC_TRACKS` + `'menu'`; coverage + gain ≤0.35
     machine-checked) on a PRIVATE seeded stream. The sim never calls audio; audio modules must
-    import clean in node.
+    import clean in node. Worlds are made AUDIBLY DISTINCT (GS-music-distinct) — not just re-tuned —
+    by per-row TIMBRE levers the engine renders (all optional, absent = the old plain voice): `lead`
+    (the melodic voice's CHARACTER: pluck/bell/marimba/bowed/blip — the biggest cue), `padDetune`
+    (chorus width), `padCut` (a low-pass that DARKENS the pad — the strongest bright-vs-murky cue),
+    `sub` (a deep drone for weight), `pulse`/`pulseVoice` (a subtle percussion groove: kick/clank/
+    heart/shaker/tick on the driving worlds). Guarded that the table stays genuinely varied (≥4 leads,
+    ≥6 grooved, ≥4 darkened) so it can't collapse back to one voice.
+  - WEATHER AMBIENCE (GS-weather-audio, `render/weatherAudio.ts`) — a subtle environmental sound bed
+    that COMPLEMENTS the music, keyed to the route's `CourseEffect` (content-as-data, coverage
+    machine-checked): a blizzard howls, a storm crackles, an aurora shimmers, a gravity well rumbles.
+    One `WEATHER_AMBIENCE` row per effect = a continuous bed (wind/drone/shimmer, gusting on an LFO) +
+    a sparse event pump (crackle/sparkle/twinkle/whoosh/clank). Its OWN low-gain bus off the shared
+    context; gated on `sound` (environmental SFX, independent of `music`); DELIBERATELY subtle —
+    capped at `WEATHER_GAIN_CAP` (0.16), well under the music bed, so it never overpowers the melody.
+    Driven from `syncMusic()` (only while a golf hole is on screen; silent on menu/travel/shop). A new
+    sky's sound = a row. `_gsFeel.weatherVolume` scales it (a sub-field, no test-hub wiring).
 - **UI layer** — `docs/decisions/ui-intro.md`
   - The screen flow is a PURE reducer (`ui/game.ts`): `(UiState, Action) → UiState`, no DOM/time,
     fully unit-tested. `app.ts`/`main.ts` render state + dispatch; save persistence + canvas mounts
