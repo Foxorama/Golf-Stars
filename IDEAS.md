@@ -64,14 +64,21 @@ Foundations are shipped; these are the live follow-ons.
   GS-rough-gradient-rebalance (richer starter bags / a general play-back-to-the-fairway reach-AI); do
   them together.
 - **GS-rough-gradient-rebalance** — the balance half of GS-rough-gradient (shipped: heavy rough hugs the
-  fairway + a distance-graded forest at all difficulties, real-golf feel first by design; the death-spiral
-  fences were relaxed to the interim reality with `TODO(GS-rough-gradient)` in
-  `tests/{biomes,themes,patches,characters}.test.ts`). The course is now meaningfully harder
-  (max-wildness `toPar/hole` ~1.0–1.4, floor-hit ~10% / ~20% for sparse bags). Rebalance and re-tighten
-  those fences: teach the auto reach-AI to play BACK to the fairway (punch out of trees / accept a
-  layup rather than bomb into forest) and/or enrich the starter bags — NEVER by softening the rough.
-  The gradient knobs (per-hole `buffer` character, `forestReach`, ring `plantP`, `ROUGH_CHAR_MIN_WILDNESS`)
-  are the tuning surface once the AI reads the rough.
+  fairway + a distance-graded forest at all difficulties, real-golf feel first by design). REACH-AI HALF
+  DONE (2026-07-15, PR pending): the auto sim now plays POSITIONAL golf out of trouble — `recoveryTarget`
+  punches OUT of trees/deep-rough to the nearest reachable fairway (the #1 death-spiral driver: a trees
+  lie fed ~60% of pick-ups, and the sim used to aim through the forest since `clearLine` ignores trees),
+  and `autoShotPower` dials a genuine chip/punch down instead of always swinging full (the short-game
+  stall). Pure, zero-rng, in the SHARED `layupTarget`/exec path so auto ≡ interactive (byte-checked).
+  Pulled the worst sparse-bag max-wildness bar ~1.27→~1.07 toPar and ~20%→~12% floor-hits WITHOUT
+  softening the rough; the `tests/characters.test.ts` fences re-tightened 1.45/0.25 → 1.15/0.15.
+  STILL OPEN: (a) the full-bag `TODO(GS-biome-variety)` hazard-density fences in `tests/{themes,tents}.test.ts`
+  (a per-world hazard-layout debt, not this one) and the `TODO(GS-rough-gradient)` `patches.test.ts` fence
+  stayed at their relaxed thresholds (the full bag was already fine, ~0.9, so the reach-AI barely moved it);
+  (b) the residual sparse-bag gap to the <1.0/<5% ideal is a SHORT-GAME / scoring pass (a sparse bag's
+  ~15-yd club gap still misses more greens), never softer rough; (c) the POSITIONAL-golf tax below (making
+  the fairway MATTER) is a separate PR. The gradient knobs (per-hole `buffer` character, `forestReach`,
+  ring `plantP`, `ROUGH_CHAR_MIN_WILDNESS`) remain the tuning surface.
   PLAYTEST FINDING (2026-07-07) — the core of this rebalance: "clean open rough lets you skip the fairway;
   different-sized clubs are meaningless if you don't have to play the fairway." Today the DEFAULT off-fairway
   lie is plain `rough` at only −10% carry (`shot.ts LIE_INFO.rough`), the punishing lies (fescue −28%,

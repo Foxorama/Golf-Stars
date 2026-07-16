@@ -226,6 +226,20 @@ these systems** — each bullet is the tip of a documented iceberg.
     just short (position over power, auto ≡ interactive — it lives in the shared `safeTarget`).
     Gated LOW (`pinchHalfWidth` 10) so it fires only on the brutal deep-stop corridors — RAISES
     mean per-stop Stableford (contract 4), never fires on wide calm corridors. Pure, zero rng.
+  - The reach-AI plays POSITIONAL golf out of trouble (GS-rough-gradient-rebalance, `round.ts`): the
+    twin sparse-bag death-spiral drivers were (a) a TREES lie — the AI aimed at the green through the
+    forest (`clearLine` only sees penalty hazards, not trees), re-hit trees, and blew up (~60% of
+    pick-ups carried a trees lie), and (b) a SHORT-game stall — the sim only ever swung FULL, so a chip
+    onto a green / a punch-out flew the target into trouble. Two pure, zero-rng fixes in the SHARED
+    `layupTarget`/exec path (so auto ≡ interactive, contract 2, byte-checked): `recoveryTarget` punches
+    OUT of trees/deep-rough to the nearest REACHABLE fairway (penalty-free line, never over a hazard)
+    when the green's out of reach; `autoShotPower` dials the power DOWN for a genuine short shot (shortest
+    club + target inside `AUTO_THROTTLE_MAX` of its carry, never a forced carry) so a chip/punch lands
+    near the target instead of past it. Both fire only in the chip/punch regime, so ordinary reach shots
+    are BYTE-IDENTICAL (the whole suite is the guard). Pulled the worst sparse-bag max-wildness bar
+    ~1.27→~1.07 toPar and ~20%→~12% floor-hits WITHOUT softening the rough (density unchanged); the
+    `tests/characters.test.ts` fences tightened 1.45/0.25 → 1.15/0.15 to match. The residual gap (a
+    sparse bag still misses more greens) is a short-game/scoring pass, never softer rough.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
   - The green-END varies per hole (GS-green-end): the fairway APRON used to be ONE fixed tapering wrap on

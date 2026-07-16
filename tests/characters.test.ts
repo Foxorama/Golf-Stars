@@ -36,11 +36,13 @@ function meanStableford(characterId: string | undefined, n = 400): number {
 }
 
 /**
- * Mean strokes-over-par per hole AND blow-up rate over many wild (max-wildness) stops. With the
- * sparse signature starting bags (GS-clubs), the max-wildness MEAN sits near bogey (~0.85–1.0/hole) —
- * higher than the full-bag baseline (~0.34) because a ~15-yd club gap misses more greens — but the
- * true death-spiral signal, the blow-up (≥+5) rate, stays ~0%. So the no-death-spiral guard here is
- * a relaxed toPar bar PLUS a strict blow-up bar. Collecting reward clubs over a run closes the gap.
+ * Mean strokes-over-par per hole AND floor-hit (par+MAX_OVER_PAR pick-up) rate over many wild
+ * (max-wildness) stops. The starting bags all carry the balanced 10-club set now; a golfer's
+ * max-wildness mean sits near bogey (~0.93–1.07/hole) — higher than the full-bag baseline (~0.34)
+ * because a golfer's wider dispersion / ~15-yd club gap misses more greens and finds more trees. The
+ * death-spiral signal is the floor-hit rate; after GS-rough-gradient-rebalance (the punch-out reach-AI +
+ * short-shot power throttle) it dropped to ~10–12% (from ~20%). The guard is a relaxed toPar bar PLUS a
+ * floor-hit bar; collecting reward clubs / tightening the short game over a run closes the residual gap.
  */
 function wildStats(characterId: string | undefined, n = 300): { toPar: number; blow: number } {
   const lo = applyCharacter(characterId, startingLoadout());
@@ -112,24 +114,17 @@ describe('character balance — each viable, none dominant (CLAUDE.md balance ru
   it('no golfer death-spirals: relaxed toPar bar + ~0 blow-ups on max-wildness courses', () => {
     for (const ch of CHARACTERS) {
       const { toPar, blow } = wildStats(ch.id);
-      // Sparse starting bags raise the max-wildness mean toward bogey; GS-variety-2's richer hazards
-      // (proper doglegs with filled corners, greenside rings, approach lakes, broken fairways) nudge
-      // the auto reach-AI's mean up a touch further — variety was deliberately prioritised over the
-      // difficulty bar (tuned per-hole later).
-      // TODO(GS-rough-gradient): the deliberate rough/tree increase (drive play back to the fairway,
-      // balance to follow) lifted the sparsest-bag mean a touch further (~1.27). GS-fairway-width-2's
-      // width-aware reach-AI reads the corridor but fires only on the tightest driving-zone pinches, so
-      // it barely moves the SPARSE bags (they lack a club to lay up WITH) — worst ~1.27. This fence stays
-      // relaxed; closing the sparse-bag gap is GS-rough-gradient-rebalance, not by softening the rough.
-      expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.45);
-      // REGRESSION FENCE, not the design target. The real floor-hit (par+MAX_OVER_PAR pick-up) rate for
-      // the sparse starter bags at MAX wildness is ~20% with the auto reach-AI — well above contract #4's
-      // aspirational "<5% blow-ups", which the sparse bags miss pending the AI/scoring rebalance.
-      // TODO(GS-rough-gradient): the deliberate rough/tree increase lifted the sparsest bag's floor-hit
-      // rate from ~13–14% to ~20% at MAX wildness. This bar only catches the rate getting WORSE than
-      // today's ceiling; closing the gap to 5% is deferred balance work (a richer starter bag / a smarter
-      // reach-AI that plays back to the fairway), NOT by softening the rough.
-      expect(blow, `${ch.id} floor-hit rate ${(blow * 100).toFixed(1)}%`).toBeLessThan(0.25);
+      // GS-rough-gradient-rebalance: the punch-out reach-AI + short-shot power throttle (round.ts
+      // `recoveryTarget` / `autoShotPower`) taught the auto sim to play BACK to the fairway out of trees
+      // and to chip onto greens instead of over-swinging past them — the twin sparse-bag death-spiral
+      // drivers (a trees lie fed ~60% of blow-ups; a full-power chip flew the apron). That pulled the
+      // worst sparse-bag max-wildness mean from ~1.27 → ~1.07 and the floor-hit rate from ~20% → ~12%,
+      // WITHOUT softening the rough (the rough/tree density is unchanged). The fences tighten to the new
+      // reality (from the interim 1.45 / 0.25) — still a RELAXED bar (contract #4's ideal is <1.0 / <5%),
+      // because a sparse bag's ~15-yd club gap genuinely misses more greens; the residual gap is a scoring
+      // pass (short game), never softer rough.
+      expect(toPar, `${ch.id} toPar/hole ${toPar.toFixed(3)}`).toBeLessThan(1.15);
+      expect(blow, `${ch.id} floor-hit rate ${(blow * 100).toFixed(1)}%`).toBeLessThan(0.15);
     }
   });
 

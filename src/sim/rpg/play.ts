@@ -15,6 +15,7 @@ import {
   aiClub,
   attackTarget,
   autoAimTarget,
+  autoShotPower,
   backspinRoll,
   biomeCarryMult,
   executeShot,
@@ -220,13 +221,21 @@ export function previewBackspin(
  *  `attackPin` armed (GS-ai-attack), hunt the flag on a green-reach shot exactly as the headless
  *  `playHole` does (shared `attackTarget` rule + the same `aiClub` pick, so auto ≡ interactive). */
 export function autoDecision(state: HolePlay, loadout: PlayerLoadout, attackPin = false): ShotDecision {
+  const carryMult = biomeCarryMult(state.hole);
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
   if (attackPin) {
-    const carryMult = biomeCarryMult(state.hole);
-    const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
     const flag = attackTarget(state.hole, state.ball, bag, carryMult);
-    if (flag) return { aim: 'attack', clubId: aiClub(state.hole, state.ball, flag, carryMult, bag).id };
+    if (flag) {
+      const club = aiClub(state.hole, state.ball, flag, carryMult, bag);
+      // GS-rough-gradient-rebalance: mirror the headless auto power so auto ≡ interactive (contract 2).
+      return { aim: 'attack', clubId: club.id, power: autoShotPower(state.hole, state.ball, flag, club, carryMult, bag) };
+    }
   }
-  return { aim: 'safe', clubId: shotView(state, loadout).safeClubId };
+  // The SAFE line — shares `layupTarget` (incl. the trees/deep-rough punch-out) + `autoShotPower` with the
+  // headless `playHole`, so the interactive auto-finish resolves the identical shot.
+  const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
+  const club = aiClub(state.hole, state.ball, safe, carryMult, bag);
+  return { aim: 'safe', clubId: club.id, power: autoShotPower(state.hole, state.ball, safe, club, carryMult, bag) };
 }
 
 /** Resolve one player shot. When the ball comes to rest on the green: if `autoPutt` is on
