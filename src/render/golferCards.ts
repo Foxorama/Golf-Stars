@@ -143,12 +143,17 @@ function unlockedStrip(
         ? `<span class="gs-unlock-badge gs-unlock-badge--go">🔓 Win A${unlock.sel} → new club</span>`
         : `<span class="gs-unlock-badge gs-unlock-badge--wait">🔒 Next club: win A${unlock.cleared}</span>`;
   }
-  if (names.length === 0 && !badge) return '';
+  // Always emit the strip container (GS-select-onescreen): it's the card's flex-GROW spacer, so it
+  // fills any spare height and pins the CTA to the bottom even when there's nothing to unlock yet.
+  if (names.length === 0 && !badge) return '<div class="gs-charcard-unlocks gs-charcard-unlocks--empty" aria-hidden="true"></div>';
   const chips = names
     .map((n) => `<span style="display:inline-block;font-size:10.5px;line-height:1.5;padding:1px 8px;border-radius:999px;background:${col}1e;border:1px solid ${col}59;color:var(--gs-ink);">${n}</span>`)
     .join('');
+  // Class-driven (GS-select-onescreen) so the card layout can treat this as its one soft/clipping
+  // region — it grows into spare room and is the first thing trimmed on a short card, keeping the
+  // portrait/stats/CTA always visible.
   return `
-    <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--gs-line-2);">
+    <div class="gs-charcard-unlocks">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         <span style="font-size:10px;letter-spacing:.06em;font-weight:800;color:${col};opacity:.92;">⛳ UNLOCKED · ${names.length}</span>
         ${badge}
@@ -215,7 +220,7 @@ export function characterScreen(
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
-          <div class="gs-charcard-port">${golferSVG(ch.style, 64, 76)}</div>
+          <div class="gs-charcard-port">${golferSVG(ch.style, 56, 66)}</div>
           <div class="gs-charcard-id">
             <b class="gs-charcard-name" style="color:${cap};">${ch.name}</b>
             <div class="gs-charcard-org">${ch.origin} · ${ch.identity}</div>
@@ -263,13 +268,19 @@ export function characterScreen(
           }</span>
         </div>`
       : '';
+  // GS-select-onescreen: one self-contained section that locks to the viewport on phones — the header
+  // and difficulty pills sit at their natural height and the roster grid fills the rest, so the whole
+  // roster lands on ONE mobile screen with no scroll (and reflows to more rows, not off-screen, as
+  // future golfers are added).
   return `
-    <header class="gs-charhead" style="border-left:4px solid #5fd45a;padding-left:10px;">
-      <h1>Choose your golfer</h1>
-      <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
-    </header>
-    ${diffRow}
-    <div class="gs-charwrap">${cards}</div>`;
+    <section class="gs-select">
+      <header class="gs-charhead">
+        <h1>Choose your golfer</h1>
+        <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
+      </header>
+      ${diffRow}
+      <div class="gs-charwrap">${cards}</div>
+    </section>`;
 }
 
 /** 1 → "1st", 2 → "2nd", … */

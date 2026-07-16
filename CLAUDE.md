@@ -1156,8 +1156,19 @@ these systems** — each bullet is the tip of a documented iceberg.
     `playing`, no lore gate) so you continue where you left off. `holeRng` reseeds fresh — a records chase
     isn't determinism-guarded, so resumed holes just draw a new dispersion stream, no played score re-rolls.
     STROKEPLAY-only (the fields are absent on every other format → byte-for-byte the old restart resume).
-  - Character select fits ONE screen in every mode (equal-height cards via `grid-auto-rows:1fr`);
-    Ascension is picked WITH the golfer, never on the title, defaulting to your LAST pick
+  - Character select fits ONE mobile screen with NO scroll (GS-select-onescreen): the roster is a
+    self-contained `.gs-select` flex column inside a viewport-LOCKED page frame (`.gs-main--fit` →
+    `height:100dvh;overflow:hidden` on phones, app.ts `fit` flag). The header + difficulty pills sit at
+    natural height and the `.gs-charwrap` grid (`repeat(2,1fr)` phones / `repeat(4,1fr)` desktop,
+    `grid-auto-rows:1fr`) FILLS the rest — so adding future golfers REFLOWS into more rows that share
+    the height, never off-screen (no per-count redesign). Each card is a flex column whose ONE soft
+    region is the unlocked-clubs strip (`.gs-charcard-unlocks`): it flex-GROWS to pin the CTA to the
+    bottom (an empty `--empty` strip is the grow spacer on a fresh account) and is the ONLY thing that
+    clips on a short card — portrait/stats/hint/CTA never clip — with a mobile-only bottom mask-fade so
+    the overflow dissolves instead of hard-cutting a row. The two difficulty pills share one row on
+    phones (`flex:1` in `.gs-diffrow`, value truncates). Guarded by a browser no-scroll assertion +
+    `?screen=character` deep-link in `tests/build.test.ts`. Ascension is picked WITH the golfer, never
+    on the title, defaulting to your LAST pick
     (`Settings.lastAscension`). Difficulty is TWO native-select DROPDOWN pills on one compact row
     (GS-diffpills, `.gs-selpill` / `[data-selasc]` + `[data-selclubset]`): ⚔ Ascension (voyage, when
     tiers are unlocked) + 🎒 Club set / bag — the club-set pill shows on EVERY mode now (only when a

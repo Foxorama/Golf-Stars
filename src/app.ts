@@ -173,6 +173,10 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
   const run = s.run;
   const withShop = (): UiState => ({ ...s, screen: 'shop', shopOffer: shopOffer(run).map((o) => o.item.id), shopRerolls: 0 });
   switch (screen) {
+    case 'character':
+      // GS-select-onescreen: the golfer roster — mount it the honest way (the Star Tour tile opens
+      // character select first), so the layout smoke test can guard the viewport-fit roster.
+      return reduce(title, { type: 'openStarTour' });
     case 'shop':
       return withShop();
     case 'travel':
@@ -2175,8 +2179,11 @@ function render(): void {
     (state.screen === 'playing' && !!state.play && !state.play.done) ||
     state.screen === 'starTour' ||
     state.screen === 'lore'; // GS-lore: the story beat owns the full viewport (its own cinematic backdrop)
-  // The character-select roster wants a wider frame so all four golfers line up across one screen.
+  // The character-select roster wants a wider frame so all four golfers line up across one screen,
+  // and on phones it locks to the viewport (GS-select-onescreen) — the grid fills the space under the
+  // header so the whole roster fits one mobile screen with no scroll.
   const wide = state.screen === 'character';
+  const fit = state.screen === 'character';
   // The settings cog rides EVERY screen (GS-settings-nav) — fixed top-right, outside each screen's
   // own markup so no screen can forget it. Two exceptions carry their OWN cog and would collide with a
   // second fixed one: the full-bleed play view (its map-nav stack has a cog) and the travel bridge HUD
@@ -2192,7 +2199,7 @@ function render(): void {
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
   // until the player closes it — it's stamped by the save migration and shown on the boot title.
   const priceNotice = state.priceRefund != null ? priceNoticeOverlay() : '';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'
