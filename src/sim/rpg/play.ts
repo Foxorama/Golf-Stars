@@ -14,6 +14,7 @@ import { type Club } from '../clubs';
 import {
   aiClub,
   attackTarget,
+  autoAimClub,
   autoAimTarget,
   autoShotPower,
   backspinRoll,
@@ -123,7 +124,6 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
   // Same forced-carry-aware layup the auto sim uses (same bag/lie/carryMult → byte-for-byte).
   const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
-  const auto = autoAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
   return {
     distToPin: Math.round(dist(state.ball, pin)),
     lie: state.lie,
@@ -133,7 +133,9 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
       dispersionMult,
     }).id,
     safeClubId: aiClub(state.hole, state.ball, safe, carryMult, bag).id,
-    autoClubId: aiClub(state.hole, state.ball, auto, carryMult, bag).id,
+    // The default-aim (GS-default-aim) club is chosen for green COVERAGE / a full send, NOT the auto
+    // sim's club-DOWN `aiClub` — so the tee pre-arms the driver and an approach never comes up short.
+    autoClubId: autoAimClub(state.hole, state.ball, state.lie, bag, carryMult, dispersionMult).id,
     blocked: dist(safe, pin) > 1,
     strokesSoFar: state.strokes,
   };
@@ -154,6 +156,15 @@ function aimTargetOf(
   if (decision.aim === 'attack') return pinOf(state.hole);
   if (decision.aim === 'auto') return autoAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
   return layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
+}
+
+/** The concrete course-space target a decision resolves to — the SAME `aimTargetOf` the preview and the
+ *  fired shot use, exposed for the shot-screen ORIENTATION (GS-default-aim) so the map points DOWN the
+ *  aim line and reorients with the chosen aim mode / free-drag aim. Pure, zero rng. */
+export function resolveAimTarget(state: HolePlay, decision: ShotDecision, loadout: PlayerLoadout): Vec {
+  const carryMult = biomeCarryMult(state.hole);
+  const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
+  return aimTargetOf(state, decision, bag, carryMult);
 }
 
 /** The spread the player's contemplated shot would have — for the aiming spray cone.

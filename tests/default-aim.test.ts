@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse } from '../src/sim/course/generate';
 import { dist, type Hole, type Vec } from '../src/sim/course/contract';
-import { autoAimTarget, layupTarget, pinOf, biomeCarryMult } from '../src/sim/round';
+import { autoAimTarget, autoAimClub, aiClub, suggestPlayerClub, layupTarget, pinOf, biomeCarryMult } from '../src/sim/round';
 import { beginHole, previewShot, type ShotDecision } from '../src/sim/rpg/play';
 import { startingLoadout } from '../src/sim/rpg/economy';
-import { CLUBS } from '../src/sim/clubs';
+import { CLUBS, clubDist } from '../src/sim/clubs';
+
+/** The longest-carry usable (non-putter) club in a bag — the driver in the default bag. */
+function longestClub(bag = CLUBS) {
+  return bag.filter((c) => c.id !== 'putter').reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
+}
 
 /** Point a fraction t (arc length) along the centreline — mirrors the generator's centrePoint. */
 function alongAt(line: Vec[], t: number): Vec {
@@ -140,6 +145,70 @@ describe('smart default aim (GS-default-aim)', () => {
       const dExplicit: ShotDecision = { clubId: 'D', aim: 'attack', target: tgt, power: 1 };
       // The 'auto' aim and an explicit free-target at the same point yield an identical contemplated cone.
       expect(previewShot(play, dAuto, lo)).toEqual(previewShot(play, dExplicit, lo));
+    }
+  });
+
+  it('the default club (autoAimClub) never clubs DOWN off the tee — driver on an open corridor', () => {
+    let checked = 0;
+    let driverPicks = 0;
+    const driver = longestClub();
+    for (let s = 0; s < 120; s++) {
+      let c;
+      try {
+        c = generateCourse(s + 14000, { holes: 4, wildness: 0.6 });
+      } catch {
+        continue;
+      }
+      for (const h of c.holes) {
+        if (h.par < 4 || h.widthId?.startsWith('island')) continue;
+        const cm = biomeCarryMult(h);
+        const pick = autoAimClub(h, h.tee, 'tee', CLUBS, cm);
+        // The whole bug: defaulting to a 5-wood. The fix NEVER pre-arms a club shorter than the auto
+        // sim's club-down `aiClub` default — on an OPEN corridor it bombs the driver, on a forced-carry
+        // drive it lays up with `aiClub` (never over-clubbing into the hazard), but never SHORTER.
+        const oldDefault = aiClub(h, h.tee, autoAimTarget(h, h.tee, 'tee', CLUBS, cm), cm, CLUBS);
+        expect(clubDist(pick)).toBeGreaterThanOrEqual(clubDist(oldDefault) - 1e-6);
+        checked++;
+        if (pick.id === driver.id) driverPicks++;
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+    // Most open par-4/5 tee shots now pre-arm the driver (the fix); the rest are forced-carry lay-ups.
+    expect(driverPicks / checked).toBeGreaterThan(0.5);
+  });
+
+  it('a reachable approach pre-arms the green-COVERAGE club (never a club short of the green)', () => {
+    let checked = 0;
+    for (let s = 0; s < 120; s++) {
+      let c;
+      try {
+        c = generateCourse(s + 15000, { holes: 4, wildness: 0.5 });
+      } catch {
+        continue;
+      }
+      for (const h of c.holes) {
+        if (h.par < 4 || h.widthId?.startsWith('island')) continue;
+        const cm = biomeCarryMult(h);
+        const back: Vec = alongAt(h.centreline, 0.72);
+        const near: Vec = alongAt(h.centreline, 0.98);
+        const ball: Vec = dist(back, pinOf(h)) < maxNominalReach(cm) ? back : near;
+        if (dist(ball, pinOf(h)) > maxNominalReach(cm)) continue;
+        checked++;
+        // Auto aims at the flag here → the club is the green-coverage suggestion (the MOST club that
+        // still holds the green), matching the attack suggestion — NOT the auto sim's club-down pick.
+        const pick = autoAimClub(h, ball, 'fairway', CLUBS, cm);
+        const cover = suggestPlayerClub(h, ball, 'fairway', CLUBS, { carryMult: cm });
+        expect(pick.id).toBe(cover.id);
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
+
+  it('autoAimClub is deterministic (pure of hole/ball/lie/bag)', () => {
+    const c = generateCourse(4242, { biome: 'verdant-station', holes: 6, wildness: 0.5 });
+    for (const h of c.holes) {
+      const cm = biomeCarryMult(h);
+      expect(autoAimClub(h, h.tee, 'tee', CLUBS, cm)).toEqual(autoAimClub(h, h.tee, 'tee', CLUBS, cm));
     }
   });
 

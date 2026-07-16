@@ -2054,6 +2054,45 @@ export function autoAimTarget(
   return dist(ball, safe) <= maxReach + 1e-6 ? safe : aimPt;
 }
 
+/**
+ * The club the SMART default aim (`autoAimTarget`) pre-selects (GS-default-aim), kept in LOCKSTEP with
+ * it so the pre-armed club matches the pre-aimed line. The headless `aiClub` clubs DOWN (the shortest
+ * club that just reaches the target minus roll) — right for the auto-sim balance, wrong for a human
+ * DEFAULT: off the tee it handed back a fairway wood instead of the driver, and an approach came up a
+ * club or two SHORT of the green. This picks the club a player wants pre-armed instead:
+ *   - a green attack (par 3, or a reachable approach — auto aims at the flag) → the green-COVERAGE club
+ *     (`suggestPlayerClub`: the MOST club that still holds the green), so an approach never clubs short;
+ *   - an OPEN positioning shot down the corridor (a tee bomb, a lay-forward) → the LONGEST usable club
+ *     (the driver off the tee), so a drive isn't clubbed down to a wood — the club sets the CARRY and the
+ *     aim target only the DIRECTION (`shotSpread`), so the longest club bombs down the aim line;
+ *   - a forced-carry lay-up (the aim line defers SHORT of a hazard) → the shortest club that REACHES the
+ *     lay-up (`aiClub`), a controlled shot that won't fly the hazard.
+ * Pure, zero rng. Interactive-only (the UI's default club) — the headless sim keeps `aiClub`, so
+ * determinism (contract 1) and every seeded test are untouched.
+ */
+export function autoAimClub(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind,
+  bag: readonly Club[],
+  carryMult: number,
+  dispersionMult = 1,
+): Club {
+  const target = autoAimTarget(hole, ball, lie, bag, carryMult);
+  // Green attack — cover the green (never club short of it).
+  if (dist(target, pin(hole)) <= 1) {
+    return suggestPlayerClub(hole, ball, lie, bag, { carryMult, dispersionMult });
+  }
+  const cand = bag.filter((c) => c.id !== 'putter');
+  if (cand.length === 0) return bag[0]!;
+  // Open positioning down the corridor → send the LONGEST club (driver off the tee). A blocked (forced-
+  // carry) aim line laid up short → club to REACH that lay-up instead of bombing over the hazard.
+  if (clearLine(hole, ball, target)) {
+    return cand.reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
+  }
+  return aiClub(hole, ball, target, carryMult, bag);
+}
+
 /** Auto putt-out from a position (exported for the interactive driver). */
 export function puttOutFrom(
   rng: Rng,

@@ -1116,7 +1116,18 @@ these systems** — each bullet is the tip of a documented iceberg.
     untouched. Change it in play via the ◎ club-row button (cycles auto→attack→safe, persists) or the
     settings-sheet 🎯 pill; the default club seeds to the mode's fit (`ShotView.autoClubId`). A free-drag
     aim still overrides for that shot. `aimMode` is a `Settings` field (no save bump, no `_gs*`/URL hook →
-    no test-hub wiring). Guarded by `tests/default-aim.test.ts`.
+    no test-hub wiring). Guarded by `tests/default-aim.test.ts`. THREE follow-up fixes: (1) the shot map
+    now ORIENTS down the resolved aim line — `decisionView`'s `up` = `resolveAimTarget(…)` − ball, not the
+    hardcoded tee→PIN — so the framing AGREES with the default aim and reorients when the mode / free-drag
+    aim changes (the old pin-up pointed across a dogleg corner into the trees while the auto aim went down
+    the fairway). (2) the default CLUB is `round.ts autoAimClub` (NOT the auto sim's club-DOWN `aiClub`),
+    kept in lockstep with `autoAimTarget`: a green attack → the green-COVERAGE club (`suggestPlayerClub`,
+    so an approach never comes up a club short); an OPEN corridor positioning shot → the LONGEST usable
+    club (the driver off the tee, since the club sets the CARRY and the aim only the DIRECTION — it was
+    pre-arming a 5-wood); a forced-carry lay-up → `aiClub` (never over-club into the hazard). (3) the
+    settings 🎯 dropdown was UNPICKABLE — a click on the `<select>` bubbled through the `[data-settings=
+    "keep"]` branch (which `return`ed WITHOUT `stopPropagation`) to the backdrop's close handler, tearing
+    the sheet down before you could choose; the keep branch now stops the event.
   - The settings cog rides EVERY screen (appended once in `render()`); "Return to title" is
     NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
