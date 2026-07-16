@@ -1553,21 +1553,18 @@
         margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--gs-line-2);
       }
       .gs-charcard-unlocks--empty { margin: 0; padding: 0; border-top: 0; }
-      @media (max-width: 999px) {
-        .gs-charcard-unlocks {
-          -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
-          mask-image: linear-gradient(to bottom, #000 78%, transparent);
-        }
-      }
-      /* Not a nested button — the whole card IS the button. This is a footer affordance line
-         (top-divider + accent text + arrow) telling you what tapping the card does, so the card
-         no longer reads as "tap area PLUS a separate advance button" (GS-select-layout). */
+      /* Not a nested button — the whole card IS the button (with an aria-label carrying the action).
+         This footer affordance line reads "what tapping does" on DESKTOP; on PHONES it's HIDDEN
+         (GS-select-onescreen): it sat over the unlocked-clubs chips and, with the tap target being the
+         whole card, read as a scrollable footer that instead selected the golfer. The card is an
+         obvious big button, so the phone roster drops it and gives the chips the room. */
       .gs-charcard-cta {
         flex: 0 0 auto; margin-top: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
         font-size: 11.5px; font-weight: 800; letter-spacing: .01em; padding: 9px 4px 1px;
         color: var(--cc); border-top: 1px solid color-mix(in srgb, var(--cc) 26%, var(--gs-line-2));
         transition: color .16s ease, opacity .16s ease;
       }
+      @media (max-width: 999px) { .gs-charcard-cta { display: none; } }
       @media (hover: hover) {
         .gs-charcard:hover .gs-charcard-cta { color: color-mix(in srgb, var(--cc) 80%, #fff); }
       }

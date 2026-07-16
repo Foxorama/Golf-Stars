@@ -34,7 +34,7 @@ ${styleBlock}
     'backspin-bo': ['5I','9I','3W'],
   }`};
   const opts = ${mode === 'voyage'
-    ? `{ modeName: 'Voyage', winnable: true, ascension: { max: 5, sel: 2 }, clubSet: { owned: 'epic', sel: 'epic' }, unlockLadder: { 'feather-fade': 1, 'huang-woo-hook': 0, 'longshot-larry': 2, 'backspin-bo': 1 } }`
+    ? `{ modeName: 'The Voyage', winnable: true, ascension: { max: 15, sel: 8 }, clubSet: { owned: 'epic', sel: 'epic' }, unlockLadder: { 'feather-fade': 4, 'huang-woo-hook': 1, 'longshot-larry': 9, 'backspin-bo': 3 } }`
     : `{ modeName: 'Star Tour', winnable: false, clubSet: { owned: 'epic', sel: 'epic' } }`};
   document.getElementById('app').innerHTML =
     '<main class="gs-main gs-main--wide gs-main--fit">' + characterScreen(unlocked, opts) + '</main>' +

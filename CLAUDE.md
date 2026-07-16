@@ -1162,23 +1162,29 @@ these systems** — each bullet is the tip of a documented iceberg.
     natural height and the `.gs-charwrap` grid (`repeat(2,1fr)` phones / `repeat(4,1fr)` desktop,
     `grid-auto-rows:1fr`) FILLS the rest — so adding future golfers REFLOWS into more rows that share
     the height, never off-screen (no per-count redesign). Each card is a flex column whose ONE soft
-    region is the unlocked-clubs strip (`.gs-charcard-unlocks`): it flex-GROWS to pin the CTA to the
-    bottom (an empty `--empty` strip is the grow spacer on a fresh account) and is the ONLY thing that
-    clips on a short card — portrait/stats/hint/CTA never clip — with a mobile-only bottom mask-fade so
-    the overflow dissolves instead of hard-cutting a row. The two difficulty pills share one row on
-    phones (`flex:1` in `.gs-diffrow`, value truncates). Guarded by a browser no-scroll assertion +
-    `?screen=character` deep-link in `tests/build.test.ts`. Ascension is picked WITH the golfer, never
-    on the title, defaulting to your LAST pick
+    region is the unlocked-clubs strip (`.gs-charcard-unlocks`): it flex-GROWS to fill spare height and
+    is the ONLY thing that clips on a short card — portrait/stats/hint never clip. On PHONES the footer
+    CTA (`.gs-charcard-cta`) is HIDDEN (`display:none`) — the whole card is the button (an `aria-label`
+    carries the action) — because it sat over the club chips and read as a scrollable footer that
+    instead selected the golfer; desktop keeps the CTA. No mask-fade (a bottom fade reads as
+    "scrollable"). The two difficulty pills share one row on phones (`flex:1` in `.gs-diffrow`, value
+    truncates). Guarded by a browser no-scroll assertion + `?screen=character` deep-link in
+    `tests/build.test.ts`. Ascension is picked WITH the golfer, never on the title, defaulting to your
+    LAST pick
     (`Settings.lastAscension`). Difficulty is TWO native-select DROPDOWN pills on one compact row
     (GS-diffpills, `.gs-selpill` / `[data-selasc]` + `[data-selclubset]`): ⚔ Ascension (voyage, when
     tiers are unlocked) + 🎒 Club set / bag — the club-set pill shows on EVERY mode now (only when a
     better-than-common bag is owned) so a per-run bag downgrade is one tap from any format. The pills
     are view state (reducer-clamped); the club-set pick overrides + write-throughs only when CHANGED.
-    Each VOYAGE card carries a club-UNLOCK badge tied to the selected Ascension (GS-ascension-clubs
-    display, off `maxAscensionByCharacter`): 🔓 "win A_n → new club" when a win at the picked tier
-    grows THAT golfer's bag, 🔒 "next club: win A_k" when the tier's already cleared (k = their next
-    uncleared tier), ★ "bag complete" when full — so it's obvious which difficulty to play which golfer
-    at to unlock clubs. The whole card is the button (its CTA is a footer label). GS-select-layout.
+    Each VOYAGE card's club-UNLOCK badge names that golfer's OWN easiest unlock tier (GS-ascension-clubs
+    display, off `maxAscensionByCharacter`): the mechanic (`runEndUpdates`) grants a club on a win at
+    Ascension `>= maxAscensionByCharacter[id]`, so the LOWEST uncleared tier `A{cleared}` is the easiest
+    unlock — and the badge ALWAYS names `A{cleared}` (INDEPENDENT per golfer; they read "all over the
+    place" by design). NOT the globally-selected difficulty (the fixed bug: it printed `A{sel}`, telling
+    you to grind A8 when this golfer unlocks at A1). The selected difficulty only tints it: 🔓 green "Win
+    A{cleared} → new club" when `sel ≥ cleared` (a win at your current pick unlocks), 🔒 "Next club: win
+    A{cleared}" when `sel < cleared` (raise the difficulty), ★ "Bag complete" when full. The whole card
+    is the button. GS-select-layout.
   - The stop intro is TWO mobile steps on one reducer screen (`'intro'` + view state `introStage`);
     `introShared()` derives world/notes/objective ONCE so the steps never drift. Past stop 0 EVERY
     format opens on the `'hole'` step (map + Tee Off), so a route jump lands one tap from teeing off
