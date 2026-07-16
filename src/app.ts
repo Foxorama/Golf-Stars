@@ -69,7 +69,7 @@ import {
   holeMatchProgressHTML,
 } from './app/duelHud';
 import { installView, titleScreen } from './app/titleScreens';
-import { endlessRoundSoFar, introScreen, introTraitsOverlay, introView } from './app/introScreens';
+import { endlessRoundSoFar, introFieldOverlay, introScreen, introTraitsOverlay, introView } from './app/introScreens';
 import { bossRewardScreen, gameoverScreen, resultScreen, victoryInfo } from './app/resultScreens';
 import { shopScreen, shopView, starmartScreen } from './app/shopScreens';
 import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketScreens';
@@ -345,6 +345,7 @@ function dispatch(action: Action): void {
     if (state.screen === 'intro' && prevScreen !== 'intro') {
       introView.stage = state.run.stopIndex > 0 ? 'hole' : 'arc';
       introView.traitsOpen = false;
+      introView.fieldOpen = false;
     }
     // Purchase chime (a real buy only — unaffordable cards aren't clickable).
     if (action.type === 'buy' || action.type === 'buyShip' || action.type === 'buyApparel') {
@@ -2186,23 +2187,13 @@ function render(): void {
       : `<button class="gs-cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>`;
   // The hole-step hazards/benefits popup (GS-intro-split) rides over the page like the settings sheet.
   const introTraits = state.screen === 'intro' && introView.stage === 'hole' && introView.traitsOpen ? introTraitsOverlay() : '';
+  // The arc-step field/scout overlay (GS-intro-onescreen): the full competitor field / records behind a tap.
+  const introField = state.screen === 'intro' && introView.stage === 'arc' && introView.fieldOpen ? introFieldOverlay() : '';
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
   // until the player closes it — it's stamped by the save migration and shown on the boot title.
   const priceNotice = state.priceRefund != null ? priceNoticeOverlay() : '';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${priceNotice}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
-
-  // Arc-intro "First Tee" at the BOTTOM only when the field overflows one screen (GS-intro-split):
-  // measure after layout settles and reveal the second CTA so it's reachable without scrolling back
-  // up — but never a redundant duplicate on a short screen. rAF so scrollHeight is post-layout.
-  if (state.screen === 'intro' && introView.stage === 'arc') {
-    requestAnimationFrame(() => {
-      const wrap = document.getElementById('gs-firsttee-bottomwrap');
-      if (!wrap) return;
-      const overflows = document.documentElement.scrollHeight - window.innerHeight > 8;
-      wrap.style.display = overflows ? 'flex' : 'none';
-    });
-  }
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'
   // centroid; then wire pointer-drag-to-fly (native scroll already handles touch + wheel). Re-wired
@@ -2525,6 +2516,7 @@ function render(): void {
       e.stopPropagation();
       introView.stage = el.dataset.introStage === 'hole' ? 'hole' : 'arc';
       introView.traitsOpen = false;
+      introView.fieldOpen = false;
       sfx.click();
       haptic(HAPTICS.tap);
       render();
@@ -2537,6 +2529,17 @@ function render(): void {
       if (a === 'keep') return; // clicks inside the sheet body don't close it
       e.stopPropagation();
       introView.traitsOpen = a === 'open';
+      sfx.click();
+      render();
+    });
+  });
+  // Arc-step field/scout overlay open/close (GS-intro-onescreen) — the sibling of the hazards popup.
+  app.querySelectorAll<HTMLElement>('[data-introfield]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const a = el.dataset.introfield;
+      if (a === 'keep') return; // clicks inside the sheet body don't close it
+      e.stopPropagation();
+      introView.fieldOpen = a === 'open';
       sfx.click();
       render();
     });
