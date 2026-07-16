@@ -2513,11 +2513,14 @@ function render(): void {
       render();
     });
   });
-  // Default aim-mode DROPDOWN in the settings sheet (GS-default-aim): persist the preference and, if a
-  // shot is being aimed, apply it now (re-seeding the club to fit + clearing any drag aim).
-  app.querySelectorAll<HTMLSelectElement>('[data-selaim]').forEach((el) => {
-    el.addEventListener('change', () => {
-      selAim = el.value as AimMode;
+  // Default aim-mode SEGMENTED control in the settings sheet (GS-default-aim): three real buttons (no
+  // fiddly native <select> to mis-tap). Each STOPS PROPAGATION so a tap can't bubble to the backdrop's
+  // close handler. Persist the preference and, if a shot is being aimed, apply it now (re-seeding the
+  // club to fit + clearing any drag aim).
+  app.querySelectorAll<HTMLElement>('[data-selaim]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selAim = el.dataset.selaim as AimMode;
       setSetting('aimMode', selAim);
       selClubId = null;
       selFreeTarget = null;
