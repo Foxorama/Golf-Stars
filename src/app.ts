@@ -11,13 +11,13 @@ import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { installDecorProbe } from './render/decorProbe';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { type ProjectOptions } from './render/project';
-import { shotView, previewShot, previewBackspin, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
+import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawCaddy, hasCaddyArt } from './render/caddyArt';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
-import { bearing, dist } from './sim/course/contract';
+import { bearing, dist, type Vec } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
@@ -771,16 +771,18 @@ function mapViewMoved(): boolean {
  * drawn (the projector-sync gotcha). `whole` mode fits the entire hole; `follow` zooms the camera
  * onto the contemplated shot, offset by `mapPan` and scaled by `mapZoom`.
  */
-function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread): ProjectOptions {
+function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread, aimTarget: Vec): ProjectOptions {
   const base: ProjectOptions = { width: DMAP_W, height: DMAP_H };
   if (mapView === 'whole') return base; // whole-hole fit — see the green + full layout (tee→green up)
   const reach = decisionReach(spray.carryHigh) / mapZoom;
   const focus: [number, number] = [play.ball[0] + mapPan[0], play.ball[1] + mapPan[1]];
-  // Reorient so the PIN is up-screen — keeps the contemplated shot pointing UP even when the ball
-  // is long of the green (so the pull-to-aim gesture never feels backwards). Degenerate near the
-  // hole falls back to tee→green inside the projector.
-  const pin = pinOf(play.hole);
-  const up: [number, number] = [pin[0] - play.ball[0], pin[1] - play.ball[1]];
+  // Reorient so the AIM LINE is up-screen (GS-default-aim): the map points DOWN where THIS shot is
+  // aimed — down the fairway corridor off the tee, at the flag on an approach — so the default framing
+  // and the default aim always AGREE, and it reorients when the aim mode (◎/settings) or a free-drag
+  // aim changes. (It used to hardcode tee→PIN, which pointed across a dogleg corner into the trees even
+  // when the auto aim went down the fairway.) Degenerate (aim ≈ the ball) falls back to tee→green
+  // inside the projector.
+  const up: [number, number] = [aimTarget[0] - play.ball[0], aimTarget[1] - play.ball[1]];
   return { ...base, focus, viewRadius: reach, focusBias: DMAP_BIAS, up };
 }
 
@@ -1118,7 +1120,15 @@ function playingBody(animating: boolean): string {
   // must hold perfectly still for the entire decision. Both the render and the gesture build the
   // projector from this same stable spread (projector-sync).
   const frameSpray = previewShot(play, { clubId: selClubId, aim: selAim, power: 1 }, state.run.loadout);
-  const mapOpts = decisionView(play, frameSpray);
+  // Orient the map DOWN the aim line (GS-default-aim): resolve the SAME target the shot will fly (aim
+  // mode, or a free-drag aim when set) and point the camera at it, so the framing matches the default
+  // aim and reorients when either changes. Power-independent, so it holds steady while the cone charges.
+  const orientTarget = resolveAimTarget(
+    play,
+    { clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined, power: 1 },
+    state.run.loadout,
+  );
+  const mapOpts = decisionView(play, frameSpray, orientTarget);
   // Remember the follow-cam radius the player is LOOKING AT — the shot animation starts at this
   // exact zoom so releasing the gesture never skip-jumps to a different framing (GS-power).
   decisionRadius = mapOpts.viewRadius ?? null;
@@ -2468,7 +2478,14 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-settings]').forEach((el) => {
     el.addEventListener('click', (e) => {
       const a = el.dataset.settings;
-      if (a === 'keep') return; // clicks inside the sheet body don't close it
+      // Clicks inside the sheet body don't close it — and MUST stop here, else the click bubbles up to
+      // the backdrop's own [data-settings="close"] handler and closes the sheet anyway. That swallowed
+      // the aim-mode <select>: tapping it bubbled through, render() tore the sheet down, and you could
+      // never pick Attack/Safe/Auto (GS-default-aim). stopPropagation keeps native selects usable.
+      if (a === 'keep') {
+        e.stopPropagation();
+        return;
+      }
       e.stopPropagation();
       settingsOpen = false;
       render();
