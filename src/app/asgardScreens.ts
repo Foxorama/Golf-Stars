@@ -1,7 +1,7 @@
 /**
  * The Asgard interlude screens (GS-asgard): the Himinbjörg reveal map (crossed into by earning an
  * eagle-or-better on Rainbow Road) and the win/lose result of the nine-hole stroke-play tournament
- * against the Warriors Three. Pure HTML-string builders — they read the live `state` from ctx and
+ * on The Warrior's Tee. Pure HTML-string builders — they read the live `state` from ctx and
  * dispatch through `data-action` wiring in app.ts, like every other screen module (GS-app-split).
  */
 
@@ -48,7 +48,7 @@ function asgardBoardHTML(rows: AsgardRow[], par: number): string {
 }
 
 /**
- * The running Warriors-Three stroke-play standings shown BETWEEN holes of the Asgard tournament
+ * The running Warrior's-Tee stroke-play standings shown BETWEEN holes of the Asgard tournament
  * (GS-asgard): the player's real cumulative gross vs each warrior's ghost gross THRU the holes played so
  * far, lowest total leading. This is the stroke-play twin of the ordinary 20-golfer Stableford field —
  * on the Golden Realm the between-hole screen must read as ITS OWN event, never the normal arc board.
@@ -69,7 +69,7 @@ export function asgardLiveBoardHTML(playedSoFar: PlayedHole[], pars: readonly nu
     <p style="font-size:13px;margin:.4em 0 .5em;">You're <b style="color:${placeCol};">${ord}</b> of ${rows.length} · ${thru} hole${thru === 1 ? '' : 's'} in · stroke play.</p>
     <div class="gs-glass" style="padding:8px;border-radius:12px;border:1px solid rgba(255,210,110,0.3);">
       <div style="display:flex;align-items:center;padding:2px 10px 6px;font-size:10.5px;letter-spacing:.08em;color:var(--gs-dim);text-transform:uppercase;">
-        <span style="flex:1;">⚔ Warriors Three · thru ${thru}</span><span>Gross</span>
+        <span style="flex:1;">⚔ The Warrior's Tee · thru ${thru}</span><span>Gross</span>
       </div>
       ${asgardBoardHTML(rows, parThru)}
     </div>`;
@@ -77,7 +77,7 @@ export function asgardLiveBoardHTML(playedSoFar: PlayedHole[], pars: readonly nu
 
 /**
  * The Himinbjörg reveal (GS-asgard): shown the instant an eagle-or-better lands on Rainbow Road. The
- * Bifröst opens; a card names the Warriors Three and the format; the CTA crosses into the tournament.
+ * Bifröst opens; a card names The Warrior's Tee and the format; the CTA crosses into the tournament.
  */
 export function asgardMapScreen(): string {
   const seed = `${state.run.seed}:asgard:${state.run.stopIndex}`;
@@ -92,10 +92,11 @@ export function asgardMapScreen(): string {
       </p>
       ${asgardBridgeHTML({ seed })}
       <div class="gs-glass" style="margin:12px 0;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,210,110,0.35);text-align:left;">
-        <div style="font-size:13px;font-weight:800;color:${GOLD};margin-bottom:4px;">⚔ The Warriors Three</div>
+        <div style="font-size:13px;font-weight:800;color:${GOLD};margin-bottom:4px;">⚔ The Warrior's Tee</div>
         <div style="font-size:13px;color:var(--gs-ink);line-height:1.5;">
-          ${warriors} await on the Golden Realm. It is <b>nine holes of stroke play</b> — the lowest total
-          score wins. Play the Bifröst well and glory (and a mythic prize) is yours.
+          You have proven worthy to play on <b style="color:${GOLD};">The Warrior's Tee</b>. ${warriors}
+          await on the Golden Realm. It is <b>nine holes of stroke play</b> — the lowest total score wins.
+          Play the Bifröst well and glory (and a mythic prize) is yours.
         </div>
       </div>
       ${btn('⚡ Cross the Bifröst to Asgard', { type: 'crossBifrost' }, { variant: 'primary', block: true })}
@@ -103,7 +104,7 @@ export function asgardMapScreen(): string {
 }
 
 /**
- * The tournament result (GS-asgard): the final leaderboard (you + the three warriors, lowest first),
+ * The tournament result (GS-asgard): the final leaderboard (you + the Warrior's Tee three, lowest first),
  * the prizes on a win (Thor's Hammer cosmetic + Odin's Favour perk) or the consolation on a loss, and
  * the note that — win or lose — the Rainbow Ball is spent. The CTA returns to the suspended journey.
  */
@@ -131,7 +132,7 @@ export function asgardResultScreen(): string {
        </div>`
     : `<div class="gs-glass" style="margin:12px 0;padding:14px 16px;border-radius:12px;border:1px solid var(--gs-line-2);text-align:left;">
          <div style="font-size:13px;color:var(--gs-dim);line-height:1.6;">
-           The Warriors Three out-scored you this time. The gods send you home with their respect —
+           You were out-scored on The Warrior's Tee this time. The gods send you home with their respect —
            <b>better luck next time…</b>
          </div>
        </div>`;

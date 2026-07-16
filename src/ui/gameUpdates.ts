@@ -266,7 +266,7 @@ export function withLoreGate(next: UiState): UiState {
 }
 
 /**
- * The Warriors Three's per-hole SHARPENING for THIS tournament (GS-asgard-scaling): scaled off how deep
+ * The Warrior's Tee's per-hole SHARPENING for THIS tournament (GS-asgard-scaling): scaled off how deep
  * into the journey (the parked real run's `stopIndex` — the "upgraded clubs" proxy) and at what Ascension
  * the Bifröst was reached, so a late-run encounter with an upgraded bag stays a contest. The suspended
  * run lives in `asgardReturn`; the fresh Asgard run resets `stopIndex` to 0, so read the depth from the
@@ -329,7 +329,7 @@ export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState
 
 /**
  * Resolve the Asgard STROKE-PLAY tournament (GS-asgard): the player's real nine-hole gross against the
- * Warriors Three's deterministic ghost totals. Lowest total wins, ties to the player (a hard-won reward
+ * Warrior's Tee's deterministic ghost totals. Lowest total wins, ties to the player (a hard-won reward
  * event). A win banks the Thor's Hammer cosmetic here; the Odin's Favour perk + the Rainbow-Ball removal
  * land on the resumed run at `leaveAsgard`. Win OR lose, the player is handed back to their journey.
  */

@@ -120,7 +120,7 @@ export const YGGDRASIL_POS = { x: PAD_X + CONTENT_W * 0.5, y: PAD_Y * 0.46 };
 /** One realm hanging on the World Tree (GS-star-tour-yggdrasil). CONTENT-AS-DATA: the Nine Realms are a
  *  table both the tree glyph (which node lights) and the overlay (which branch is pickable) read — a new
  *  realm is a NEW ROW (flip `playable` + wire its launcher), never an engine edit. Only ASGARD is
- *  playable today (the Warriors Three tournament); the other eight are bare branches awaiting the realms
+ *  playable today (The Warrior's Tee tournament); the other eight are bare branches awaiting the realms
  *  they'll host. `node` is the glyph offset from the canopy centre where the realm's fruit hangs. */
 export interface YggdrasilRealm {
   id: string;
@@ -131,7 +131,7 @@ export interface YggdrasilRealm {
 }
 
 export const YGGDRASIL_REALMS: readonly YggdrasilRealm[] = [
-  { id: 'asgard', name: 'Asgard', blurb: 'The Golden Realm at the crown of the tree. Cross the Bifröst and challenge the Warriors Three to nine holes of stroke play.', playable: true, node: { dx: 0, dy: -78 } },
+  { id: 'asgard', name: 'Asgard', blurb: "The Golden Realm at the crown of the tree. Cross the Bifröst and play The Warrior's Tee — nine holes of stroke play.", playable: true, node: { dx: 0, dy: -78 } },
   { id: 'vanaheim', name: 'Vanaheim', blurb: 'Home of the Vanir. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: -46, dy: -50 } },
   { id: 'alfheim', name: 'Alfheim', blurb: 'Realm of the light elves. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: 46, dy: -50 } },
   { id: 'midgard', name: 'Midgard', blurb: 'The world of mortals. A bare branch — a realm yet to bloom on the World Tree.', playable: false, node: { dx: -72, dy: -14 } },

@@ -593,7 +593,7 @@ these systems** — each bullet is the tip of a documented iceberg.
   - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard): an eagle-or-better on RAINBOW ROAD
     (`asgardPortalOpens`, reducer-only + gated on the ball → zero rng, feature-off byte-identical) opens
     the Bifröst — instead of the result/shop it diverts to the Himinbjörg map, then a nine-hole STROKE-
-    play tournament vs the Warriors Three (three bespoke `contender` golfers; `warriorsThreeTotals` ghost
+    play tournament on The Warrior's Tee (three bespoke `contender` golfers — Hogan/Frankie/Vince; `warriorsThreeTotals` ghost
     gross, lowest wins, ties→player). The field SCALES with the run (GS-asgard-scaling / GS-warriors-tune):
     `warriorsEdge(depth, ascension, voyage)` sharpens every warrior by a per-hole stroke `edge`. The
     Warriors are effectively a boss match but LOSING costs nothing (no run ends), so they sit ABOVE an
@@ -780,7 +780,7 @@ these systems** — each bullet is the tip of a documented iceberg.
     `cutBonus`, which was INERT for matchplay bosses (they pass on the DUEL `matchWon`, never the Stableford
     cut, so the +1/+2/+3 never bit). Rank 0 (Arc-I, and the default `BossEdge`) is byte-identical to the
     classic boss; a grown bag can still out-club the climb (`tests/boss-scale.test.ts` guards the escalation +
-    the strong-build voyage win). The Asgard Warriors Three are a separate stroke-play ghost (see below).
+    the strong-build voyage win). The Asgard Warrior's Tee is a separate stroke-play ghost (see below).
 - **Competition & leaderboards** — `docs/decisions/competition.md`
   - The field is a deterministic STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims.
   - Voyage survival is your POSITION in one persistent field thinning to the final two;
