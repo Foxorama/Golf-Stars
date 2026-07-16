@@ -22,6 +22,13 @@ export interface ShipLook {
   /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated); `infinity` is
    *  the hole-150 Unending-Universe grail (GS-unending) — the most animated craft in the fleet. */
   kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity' | 'pegasus' | 'firebird';
+  /** Flight ORIENTATION on the star map (GS-ship-fly-orient). `'nose'` (default) — a craft with a clear
+   *  front + tail exhaust (all the cars/cruisers): the hull rotates so its nose points ALONG the flight.
+   *  `'hover'` — a nose-LESS hovering craft (flying saucer / disc / orb): the hull stays UPRIGHT (never
+   *  tumbles), banks gently toward travel, and shows motion via a streaming thrust plume behind it — so a
+   *  saucer glides level instead of spinning its underside beam out the side. Any future disc/orb ship
+   *  that isn't a typical vehicle shape sets `'hover'`; a normal-shaped ship omits it. */
+  fly?: 'nose' | 'hover';
   /** Body fill. */
   body: string;
   /** Canopy / glass. */
@@ -154,7 +161,7 @@ export const SHIPS: readonly Ship[] = [
     rarity: 'epic',
     blurb: 'A flying saucer with a 7-iron. They come in peace.',
     cost: TIER_COST.epic,
-    look: { kind: 'saucer', body: '#54dba0', glass: '#d8fff0', flame: '#9affd6', accent: '#1c5a3c', bling: 1 },
+    look: { kind: 'saucer', fly: 'hover', body: '#54dba0', glass: '#d8fff0', flame: '#9affd6', accent: '#1c5a3c', bling: 1 },
   },
   {
     // The SECRET ace ship (GS-ace-ship): earned — never bought — by making a hole-in-one. A `secret`
@@ -196,7 +203,7 @@ export const SHIPS: readonly Ship[] = [
     rarity: 'mythic',
     blurb: 'A genuine flying saucer — spinning gear, flashing lights, and a "Hole 19" flag flying proud.',
     cost: TIER_COST.mythic,
-    look: { kind: 'ufo', body: '#9fb4c8', glass: '#9affe0', flame: '#7fffd0', accent: '#ffd36b', bling: 3, flag: 'Hole 19' },
+    look: { kind: 'ufo', fly: 'hover', body: '#9fb4c8', glass: '#9affe0', flame: '#7fffd0', accent: '#ffd36b', bling: 3, flag: 'Hole 19' },
   },
   {
     id: 'chopper-thunderbolt',

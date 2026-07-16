@@ -133,6 +133,14 @@ export function starTourShipSpeedMult(): number {
   return ship ? RARITY_SPEED_MULT[ship.rarity] : 1.0;
 }
 
+/** Whether the flown ship is a nose-LESS HOVER craft (GS-ship-fly-orient) — a flying saucer / disc that
+ *  glides level and banks rather than pointing a nose along the flight. Drives the app's per-frame body
+ *  transform so the disc never tumbles its under-beam out the side. */
+export function starTourShipHovers(): boolean {
+  const ship = shipById(shipForCharacter(state, state.run.loadout.characterId));
+  return ship?.look.fly === 'hover';
+}
+
 /** The weather skies offered on the star map — atmospheric choices (the trade-camp / mechanic effects
  *  are excluded so a record round is never decided by a tent bounce). Ordered calm → wild. */
 export const STAR_TOUR_WEATHERS: readonly CourseEffectId[] = [

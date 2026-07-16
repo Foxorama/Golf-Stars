@@ -4,7 +4,8 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 import { STROKEPLAY_FORMAT } from '../src/sim/rpg/formats';
 import { STATIC_COURSES, buildStaticCourse } from '../src/sim/course/staticCourses';
 import { ASGARD_FORMAT } from '../src/sim/rpg/formats';
-import { starTourMapSVG, worldPos, EARTH_POS, YGGDRASIL_REALMS, type StarTourWorld } from '../src/render/starTourMap';
+import { starTourMapSVG, worldPos, EARTH_POS, YGGDRASIL_REALMS, hoverBank, HOVER_BANK_MAX, SHIP_DOCK_HEADING, type StarTourWorld } from '../src/render/starTourMap';
+import { SHIPS, shipById } from '../src/sim/rpg/ships';
 
 /** Drive a Star Tour round to the strokeResult recap (openStarTour → CHARACTER → star map → pick a
  *  course → intro → play 18 → holeComplete×18). Character select comes FIRST (GS-star-tour-2). */
@@ -249,5 +250,43 @@ describe('Earth — the Old Course at St Andrews (GS-earth)', () => {
     expect(svg).toContain('THE OLD COURSE');
     // It is NOT drawn as a generic constellation planet (that class is only the constellation worlds).
     expect((svg.match(/class="gs-st-world"/g) ?? []).length).toBe(0);
+  });
+});
+
+describe('ship flight orientation (GS-ship-fly-orient)', () => {
+  const world: StarTourWorld = { id: 'w', name: 'W', archetype: 'links', tier: 'testing', themeId: 'lyra', hasRecord: false };
+
+  it('the flying-saucer craft are tagged as nose-less HOVER ships', () => {
+    // The Little Green Caddie (saucer) + the Mothership (ufo) are the disc craft that must not tumble.
+    expect(shipById('ufo-saucer')!.look.fly).toBe('hover');
+    expect(shipById('ufo-mothership')!.look.fly).toBe('hover');
+    // Every ordinary vehicle-shaped ride stays a nose craft (undefined = default 'nose').
+    for (const s of SHIPS) {
+      if (s.id === 'ufo-saucer' || s.id === 'ufo-mothership') continue;
+      expect(s.look.fly).toBeUndefined();
+    }
+  });
+
+  it('hoverBank leans into the HORIZONTAL travel and sits level flying vertically / docked', () => {
+    expect(hoverBank(0)).toBeCloseTo(HOVER_BANK_MAX, 5); // flying right → lean right
+    expect(hoverBank(180)).toBeCloseTo(-HOVER_BANK_MAX, 5); // flying left → lean left
+    expect(Math.abs(hoverBank(90))).toBeLessThan(1e-6); // straight down → flat
+    expect(Math.abs(hoverBank(SHIP_DOCK_HEADING))).toBeLessThan(1e-6); // docked (−90) → flat
+  });
+
+  it('splits body + plume so a HOVER hull stays upright (banks only) while a NOSE hull rotates to heading', () => {
+    const hover = starTourMapSVG({ seed: 's', worlds: [world], shipId: 'ufo-mothership', shipHeading: 0 });
+    const nose = starTourMapSVG({ seed: 's', worlds: [world], shipId: 'wagon-classic', shipHeading: 0 });
+    // Both carry the split structure: a position-only group + oriented body + oriented plume.
+    for (const svg of [hover, nose]) {
+      expect(svg).toContain('id="gs-st-body"');
+      expect(svg).toContain('id="gs-st-thrust-orient"');
+    }
+    // The hover body banks (a plain rotate, no nose-flip scale); the nose body rotates + flips.
+    const hoverBody = hover.match(/id="gs-st-body" transform="([^"]*)"/)![1];
+    const noseBody = nose.match(/id="gs-st-body" transform="([^"]*)"/)![1];
+    expect(hoverBody).toBe(`rotate(${HOVER_BANK_MAX.toFixed(1)})`); // heading 0 → full bank, no scale()
+    expect(hoverBody).not.toContain('scale');
+    expect(noseBody).toContain('scale(1'); // nose hull carries the left/right flip
   });
 });

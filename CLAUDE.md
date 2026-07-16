@@ -1233,9 +1233,20 @@ these systems** — each bullet is the tip of a documented iceberg.
     NOT the old `atan2(dx,−dy)` 0=up heading fed into a right-facing hull, which rendered a downward flight
     upside-down. A LEFTWARD flight mirrors the hull vertically (`starTourView.flip` = −1, decided at launch
     off the target side, held for the whole flight so it never snaps mid-cruise) so a wheeled/keeled craft
-    keeps its top up; docked heading is nose-UP (`SHIP_DOCK_HEADING` = −90). An engine PLUME (`thrustTrail`,
-    trailing off the tail, coloured off the ship's flame/accent) fades in via a `.gs-st-thrusting` class the
-    rAF loop toggles while cruising, so the ship reads as flying, not sliding. FLIGHT SPEED
+    keeps its top up; docked heading is nose-UP (`SHIP_DOCK_HEADING` = −90). FLIGHT ORIENTATION IS PER-SHIP
+    (GS-ship-fly-orient, `ShipLook.fly`): the nose-along-heading rule above is `'nose'` (the default — every
+    car/cruiser has a front + tail exhaust). A nose-LESS HOVER craft (`'hover'` — the flying-saucer Little
+    Green Caddie + the Mothership, and any future disc/orb ship that isn't a vehicle shape) must NOT rotate to
+    the heading — that tumbled the disc and swung its downward under-beam out the side ("flames out the side,
+    moving sideways"). Instead the `#gs-st-ship` group carries POSITION only and splits into two oriented
+    children: `#gs-st-body` (the hull — NOSE → `rotate(heading) scale(1 flip)`; HOVER → stays UPRIGHT and only
+    `hoverBank(heading)` = `HOVER_BANK_MAX·cos(heading)`, a gentle lean into travel that never tumbles) and
+    `#gs-st-thrust-orient` (the plume — ALWAYS `rotate(heading)` so it streams BEHIND the hull whatever the
+    body does). Both `shipGroup` (initial paint) AND the app's per-frame `stepStarTour` write the same split
+    (branch on `starTourShipHovers()`); a new hover ship is just `fly: 'hover'` on its row. An engine PLUME
+    (`thrustTrail`, trailing off the tail, coloured off the ship's flame/accent) fades in via a
+    `.gs-st-thrusting` class the rAF loop toggles while cruising, so the ship reads as flying, not sliding.
+    FLIGHT SPEED
     (GS-star-tour-map-improvements) is a near-CONSTANT flat cruise (`STAR_TOUR_BASE_STEP` 5.25 × the flown
     ship's RARITY via `starTourShipSpeedMult` — common .9 / rare 1 / epic 1.1 / legendary 1.2 / mythic 1.3),
     NOT the old `d*0.14` that rocketed distant hops off way too fast; only a haul with more than
