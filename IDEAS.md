@@ -12,22 +12,27 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 ## Now / next
 Foundations are shipped; these are the live follow-ons.
 
-**GS-story — Story Mode (the big one; full design + roadmap in `docs/decisions/story-mode.md`)**
+**GS-story — Story Mode (the big one; systems roadmap in `docs/decisions/story-mode.md`, narrative canon in
+`docs/decisions/story-bible.md`)**
 Turn Star Tour into a standalone story-mode campaign, reusing the golf engine + content but forking the
 meta layer into its own persistent progression (`StoryState`, `gs_story` save). Voyage/Unending/Clubhouse/
-Trade Market stay frozen. Ships as **chunks**, one focused tested auto-merged PR each:
-- **GS-story-save** — `StoryState` + `gs_story` save + New Game/Continue (Star Tour tile → Story Mode). The spine. ← *start here*
+Trade Market stay frozen. Story: the Fairway Wardens (Parrot/Mothership) vs **the Coil** (Sinister Snake
+Cult) racing to wake Jörmungandr; 5 Galaxy Tournaments (Lyra→Orion→Draco→split→Hydra Mire) → the Green Key
+→ a Cthulhu-serpent SPACE BATTLE at Yggdrasil's root. A mid-story **CHOICE** (stay Warden / join the Coil)
+forks the back half — different NPCs, cursed-relic vs Warden gear, ships, and ending — for replay value.
+Ships as **chunks**, one focused tested auto-merged PR each:
+- **GS-story-save** — ✅ *model shipped (#445)*; next: `gs_story` persistence + New Game/Continue (Star Tour tile → Story Mode) + a minimal hub. The spine.
 - **GS-story-prologue** — Earth final round (`standrews-18`) → win/victory → Mothership → Parrot recruit → story intro → Clubhouse.
 - **GS-story-econ** — persistent credits, per-world Pro Shop, credits on clear, revisit (play again / pro shop).
 - **GS-story-clubs** — individually owned & equippable clubs; start green bag; buy + equip.
-- **GS-story-gear** — equippable gear WITH effects (gloves/hat/shoes/bag) via `PlayerLoadout` no-op-default fields; Inventory screen.
-- **GS-story-ships** — start wagon; buy ships; ship weapons/engines/upgrades as owned effect-bearing upgrades (feeds the finale).
+- **GS-story-gear** — equippable gear WITH effects (gloves/hat/shoes/bag) via `PlayerLoadout` no-op-default fields; the **cursed sheddings** (power + a curse) vs Warden grace; Inventory screen.
+- **GS-story-ships** — start wagon; buy ships; ship weapons/engines/upgrades as owned effect-bearing upgrades; path pools (radiant Warden vs wyrm-ships). Feeds the finale.
 - **GS-story-locker** — Story locker/wardrobe variant + per-character equipment screen + caddy roster (hire→keep→choose, no fire).
 - **GS-story-map** — worlds gain locked/unlocked/cleared states; chapter-gated unlocks; difficulty-scaled world choice.
-- **GS-story-tournament** — Galaxy Tournament framework: qualifying → final → trophy + reward (Asgard-style ghost stroke-play).
-- **GS-story-chapters** — the 5 tournaments as data; all 5 trophies → key to the other realm.
-- **GS-story-yggdrasil** — dark root-realm unlock + Jörmungandr Cthulhu-serpent SPACE BATTLE (real HP/collision/outcome) + win/lose scenes.
-- **GS-story-beats** — Parrot bar interaction (tap → story/direction), inter-chapter beats, cross-chapter balance pass.
+- **GS-story-tournament** — Galaxy Tournament framework: qualifier → final → Sigil + reward + host/rival (Venoma); Asgard-style ghost stroke-play; new Coil faction.
+- **GS-story-chapters** — the 5 tournaments as data + beats; the Coil's escalation; **The Choice** (end Ch.3) sets `alignment` and forks Ch.4–5; 5 Sigils → the Green Key.
+- **GS-story-yggdrasil** — Dark-Root socket + Jörmungandr Cthulhu-serpent SPACE BATTLE (real HP/collision/outcome + golf finisher) + **two endings by alignment** + shared loss/retry.
+- **GS-story-beats** — Parrot bar interaction (tap → story/direction), inter-chapter NPC scenes, cross-chapter balance pass.
 
 **Run structure & meta**
 - **GS-encounters** — branching StS-style node map (elite / driving-range buff / treasure / shop / boss)

@@ -4,6 +4,12 @@
 > standalone **Story Mode** campaign. It starts as a fleshed-out design + chunk roadmap and accretes
 > per-chunk rationale as PRs ship (the `docs/decisions/*` pattern: the *rule* lands in `CLAUDE.md`,
 > the *story* here). Every chunk below carries a stable `GS-story-*` id tracked in `IDEAS.md`.
+>
+> **The narrative canon lives in `docs/decisions/story-bible.md`** — the mythos (the Great Game vs the
+> World-Eater), the two Orders (Fairway Wardens vs the Coil doomsday cult), the NPC roster, the five
+> Galaxy Tournaments world-by-world, the **good/evil alignment branch** (stay the Chosen One or join the
+> cult → different allies, relics, ships, and ending), the cursed relics, and the two finales. This doc
+> is the *systems + roadmap*; the bible is the *world*. Write beats/tournaments/finale against the bible.
 
 ## The pitch (what the player experiences)
 
@@ -74,11 +80,16 @@ seam rather than forking the reducer:
     ownedShipUpgradeIds, equippedWeaponId/engineId/...,   // ship weapons/engines/upgrades
     ownedGearIds, equippedGear: Record<GearSlot,id>,      // gloves/hat/shoes/bag/glove w/ EFFECTS
     hiredCaddyIds, activeCaddyId,  // hire-and-keep roster; choose active
-    trophyIds: string[],           // 5 → forge the key to the other realm
+    trophyIds: string[],           // 5 Sigils → forge the Green Key to Yggdrasil's root
+    alignment: 'undecided'|'warden'|'herald',  // set at The Choice (end Ch.3); forks the back half + finale
+    relicIds, defeatedRivalIds,    // cursed sheddings / Warden grace owned; rivals beaten (Venoma…)
+    tournamentStage,               // qualifier vs final progress per chapter
     seenStoryBeats,                // one-off story-beat tracking (SeenLore twin)
     activeRound?,                  // resume a mid-round world
   }
   ```
+  Fields land incrementally (each a `STORY_VERSION` bump + migration when its chunk ships); all default to
+  no-ops (`alignment: 'undecided'`, empty lists) so an early campaign upgrades cleanly.
 
 - **Reuse the shared reducer, add story screens/actions.** New `Screen` members (story hub / locker /
   inventory / pro shop / tournament bracket / space battle) and new `Action`s, all gated so Voyage/
@@ -129,9 +140,12 @@ Ordered so each ships something playable and nothing lands before its foundation
   flow (play again keeps `worldBest` / straight to pro shop).
 - **GS-story-clubs** — individually owned & equippable clubs; start green bag; buy clubs; equip the bag.
 - **GS-story-gear** — equippable gear **with effects** (gloves/hat/shoes/bag/glove): extend
-  `PlayerLoadout`, fold equipped gear at round start; the **Inventory** screen.
+  `PlayerLoadout`, fold equipped gear at round start; the **Inventory** screen. Home of the **cursed
+  sheddings** (big power + a balancing curse — a new *negative* effect field per relic) and their Warden
+  grace mirrors (clean bonuses, dearer). A shedding must be a *choice*, never a strict upgrade.
 - **GS-story-ships** — start wagon; buy ships; ship **weapons / engines / upgrades** as owned upgrades
-  with real effects (feeds the finale + travel flavour).
+  with real effects (feeds the finale + travel flavour). Path-flavoured hull pools: radiant Warden ships
+  vs corrupted **wyrm-ships** (hit harder in the battle, frailer).
 - **GS-story-locker** — the Story **locker room / wardrobe** variant + per-character equipment screen +
   the **caddy roster** (hire → keep → choose active, no fire).
 
@@ -140,15 +154,20 @@ Ordered so each ships something playable and nothing lands before its foundation
   world choice scaled by difficulty; the star map becomes the story navigator.
 
 **Phase E — Tournaments (the five chapters)**
-- **GS-story-tournament** — the Galaxy Tournament **framework**: qualifying round → tournament → trophy
-  + signature reward. Row-driven, reusing Asgard-style ghost stroke-play. Difficulty ramps per chapter.
-- **GS-story-chapters** — the **5 tournaments** as data (worlds, fields, beats, rewards); collecting all
-  5 trophies forges the **key to the other realm**. May batch as framework + data rows.
+- **GS-story-tournament** — the Galaxy Tournament **framework**: qualifying round → final → **Sigil** +
+  signature reward, with a **host + a recurring rival** (Venoma). Row-driven, reusing Asgard-style ghost
+  stroke-play. Difficulty ramps per chapter. New **Coil faction** row (`factions.ts`).
+- **GS-story-chapters** — the **5 tournaments** as data (worlds/hosts/rivals/beats/rewards per the bible:
+  Lyra → Orion → Draco → path-split → Hydra Mire); the Coil's escalation; **The Choice** at the end of
+  Ch.3 sets `alignment` and forks Ch.4–5 (which NPCs, beats, gear/ship pools). Five Sigils forge the
+  **Green Key**. Batches as framework + data rows.
 
 **Phase F — Finale**
-- **GS-story-yggdrasil** — the dark **root realm** unlock (Yggdrasil socket) + the **Jörmungandr
-  space-battle** boss: a real health/collision/outcome mini-game on the star-map + ship-weapons layer,
-  Cthulhu-corrupted serpent art, win/lose scenes (universe saved / planets devoured).
+- **GS-story-yggdrasil** — the **Dark Root** socket on the Yggdrasil tree + the **Jörmungandr space
+  battle**: a real health/collision/outcome mini-game on the star-map + ship-weapons layer (with a golf
+  *finisher* shot), Cthulhu-corrupted serpent art, and **two endings by alignment** — Warden "The Reseal"
+  (universe saved) vs Herald "The Long Rest" (universe unmade — a win that grieves) — plus the shared
+  loss/retry scene (the serpent wakes hungry).
 
 **Phase G — Polish**
 - **GS-story-beats** — the Parrot bar interaction (tap → story/direction), inter-chapter beats, and a
@@ -156,8 +175,13 @@ Ordered so each ships something playable and nothing lands before its foundation
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
-- **"Gather your friends"** is flavour for now (single protagonist, per the design call). Party
-  recruitment stays a possible later beat, not a Phase A–F dependency.
+- **"Gather your friends"** — single protagonist (per the design call); the other three golfers are
+  recurring Warden allies/friendly rivals in the majors, not a party you swap. Full recruitment stays a
+  possible later beat, not a Phase A–F dependency.
+- **Alignment scope** — the branch is a back-half *data* fork (same worlds/framework/star-map/battle;
+  divergent NPCs, beats, gear/ship pools, ending), NOT a second campaign to author from scratch — so
+  Chapters 1–3 are one shared build. New Game+ offers the opposite path. Tune how much Ch.4 diverges
+  (world choice) vs shares in GS-story-chapters.
 - **Ship weapon/engine effects** on the *golf* side vs *space-battle* side — decide the split in
   GS-story-ships (likely: engines/upgrades = travel/fuel + battle stats; weapons = battle only).
 - **Balance** of a single persistent purse across a 5-chapter campaign — its own pass in Phase G.
