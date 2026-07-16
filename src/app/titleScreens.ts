@@ -85,7 +85,7 @@ export function titleScreen(): string {
     </header>
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-navtiles gs-navtiles--games">${modes}${starTourTileHTML()}</div>
+    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
 }
@@ -160,15 +160,21 @@ function continueRunHTML(): string {
     </button>`;
 }
 
-/** The third game tile (GS-star-tour): the free-roam Star Tour, launched from its own star-map course
- *  picker (not the generic `start` path), so it's a bespoke tile rather than an auto-listed format. */
-function starTourTileHTML(): string {
+/** The third game tile (GS-story): STORY MODE — the standalone campaign that grew out of Star Tour. The
+ *  whole tile is the button; its caption is mode-aware (Continue an in-progress campaign vs Begin a new
+ *  one), reading the loaded `state.story`. Launches its own new-game/continue flow (`openStory`), not the
+ *  generic `start` path. (The old free-roam Star Tour records-chase folds into Story Mode's world revisits.) */
+function storyTileHTML(): string {
+  const inProgress = !!state.story;
+  const sub = inProgress
+    ? `Continue your campaign · ${state.story!.chapter <= 0 ? 'the voyage begins' : `Chapter ${state.story!.chapter}`}`
+    : 'Save the Universe — a galaxy-spanning golf campaign';
   return `
-    <button class="gs-navtile gs-navtile--game gs-navtile--startour" style="--mc:#54c8ff;" data-action='${JSON.stringify({ type: 'openStarTour' })}'>
+    <button class="gs-navtile gs-navtile--game gs-navtile--startour" style="--mc:#54c8ff;" data-action='${JSON.stringify({ type: 'openStory' })}'>
       <span class="gs-navtile__art" aria-hidden="true">${starTourTileArt()}</span>
       <span class="gs-navtile__cap">
-        <span class="gs-navtile__title">🗺 Star Tour</span>
-        <span class="gs-navtile__sub">Pick a world, play its 18 — chase course records</span>
+        <span class="gs-navtile__title">🌠 Story Mode</span>
+        <span class="gs-navtile__sub">${sub}</span>
       </span>
     </button>`;
 }

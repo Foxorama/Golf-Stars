@@ -198,9 +198,11 @@ export function characterScreen(
      *  (`maxAscensionByCharacter`). Drives the per-card "does a win here unlock a new club?" badge on the
      *  Voyage. Absent for non-winnable formats (the Unending Universe grants no club unlocks). */
     unlockLadder?: Record<string, number>;
+    /** GS-story: override the card verb ("Play as" for Story Mode); defaults to Survive/Voyage by mode. */
+    verb?: string;
   } = {},
 ): string {
-  const verb = opts.winnable === false ? 'Survive as' : 'Voyage as';
+  const verb = opts.verb ?? (opts.winnable === false ? 'Survive as' : 'Voyage as');
   const statRows = (st: GolferStats, col: string): string =>
     statBar('PWR', st.power, col) + statBar('ACC', st.accuracy, col) + statBar('TCH', st.touch, col) + statBar('CON', st.consistency, col);
 
