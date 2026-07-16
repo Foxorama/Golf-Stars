@@ -119,13 +119,17 @@ export function statBar(label: string, n: number, col: string): string {
  *  an Ascension with a golfer permanently grows THEIR starting bag, so each card surfaces what that golfer
  *  has earned — the character-specific progression made visible before you pick.
  *
- *  `unlock` (GS-ascension-clubs display) ties it to the SELECTED difficulty on the Voyage: a golfer earns a
- *  club by WINNING at an Ascension tier they haven't cleared (`cleared` = `maxAscensionByCharacter`, the
- *  count of tiers cleared, so their next uncleared tier is A`cleared`). It answers the user's question —
- *  "which difficulty do I play THIS golfer at to unlock a club?" — right on the card:
- *    · bag already full            → ★ Bag complete (nothing left to unlock)
- *    · selected tier ≥ next uncleared → 🔓 a win here unlocks a new club
- *    · selected tier < next uncleared → 🔒 already cleared; next club is at A`cleared`
+ *  `unlock` (GS-ascension-clubs display) surfaces the EASIEST Ascension that unlocks THIS golfer's next
+ *  club, INDEPENDENT per golfer. The mechanic (see `runEndUpdates`): a golfer earns a club by winning at an
+ *  Ascension `>= maxAscensionByCharacter[id]` — so their LOWEST uncleared tier, `A{cleared}`, is the easiest
+ *  tier that unlocks. Each golfer's `cleared` differs, so the tiers read "all over the place" by design (a
+ *  golfer you've pushed deep needs a high tier; a fresh one unlocks at A0). The badge ALWAYS names that
+ *  golfer's own `A{cleared}` (never the globally-selected difficulty — that was the bug: it printed the
+ *  SELECTED tier, telling you to grind A8 when this golfer unlocks at A1). The selected difficulty only
+ *  tints it:
+ *    · bag already full                 → ★ Bag complete (nothing left to unlock)
+ *    · selected difficulty ≥ A{cleared} → 🔓 Win A{cleared} → new club (a win at your current pick unlocks)
+ *    · selected difficulty < A{cleared} → 🔒 Next club: win A{cleared} (raise the difficulty to reach it)
  *  Rendered whenever there's a badge OR earned clubs; absent on non-winnable formats (no `unlock`). */
 function unlockedStrip(
   unlockedTypes: readonly string[],
@@ -137,11 +141,14 @@ function unlockedStrip(
   let badge = '';
   if (unlock) {
     const bagFull = unlockableClubTypes(characterId, unlockedTypes).length === 0;
+    // The easiest unlock tier is this golfer's own lowest uncleared Ascension — ALWAYS `A{cleared}`,
+    // regardless of the currently-selected difficulty (which only decides the go/wait tint below).
+    const tier = `A${unlock.cleared}`;
     badge = bagFull
       ? `<span class="gs-unlock-badge gs-unlock-badge--full">★ Bag complete</span>`
       : unlock.sel >= unlock.cleared
-        ? `<span class="gs-unlock-badge gs-unlock-badge--go">🔓 Win A${unlock.sel} → new club</span>`
-        : `<span class="gs-unlock-badge gs-unlock-badge--wait">🔒 Next club: win A${unlock.cleared}</span>`;
+        ? `<span class="gs-unlock-badge gs-unlock-badge--go">🔓 Win ${tier} → new club</span>`
+        : `<span class="gs-unlock-badge gs-unlock-badge--wait">🔒 Next club: win ${tier}</span>`;
   }
   // Always emit the strip container (GS-select-onescreen): it's the card's flex-GROW spacer, so it
   // fills any spare height and pins the CTA to the bottom even when there's nothing to unlock yet.
@@ -217,6 +224,7 @@ export function characterScreen(
     };
     return `
       <button class="gs-charcard" data-action='${JSON.stringify(action)}'
+        aria-label="${verb} ${ch.name}"
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
@@ -263,7 +271,7 @@ export function characterScreen(
       ? `<div class="gs-diffrow">${ascPill}${clubPill}
           <span class="gs-diffrow-hint">${
             opts.ascension
-              ? 'harder Ascension = leaner purse; a win at your top tier unlocks a golfer’s next club'
+              ? 'harder Ascension = leaner purse; each golfer unlocks its next club at its own lowest uncleared tier'
               : 'a weaker bag is the sterner test'
           }</span>
         </div>`
