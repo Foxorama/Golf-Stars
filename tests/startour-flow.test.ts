@@ -289,4 +289,21 @@ describe('ship flight orientation (GS-ship-fly-orient)', () => {
     expect(hoverBody).not.toContain('scale');
     expect(noseBody).toContain('scale(1'); // nose hull carries the left/right flip
   });
+
+  it('gives a HOVER craft a downward repulsor (not the sideways jet) and leaves the jet group empty', () => {
+    const hover = starTourMapSVG({ seed: 's', worlds: [world], shipId: 'ufo-mothership', shipHeading: 0 });
+    const nose = starTourMapSVG({ seed: 's', worlds: [world], shipId: 'wagon-classic', shipHeading: 0 });
+    // A saucer carries the bespoke anti-grav repulsor, NOT a car's tail-jet plume.
+    expect(hover).toContain('gs-st-hoverprop');
+    expect(nose).not.toContain('gs-st-hoverprop');
+    // A car keeps its jet trail (its far-tail control point) and no repulsor.
+    expect(nose).toContain('-63,1'); // the thrustTrail plume's far tail
+    expect(hover).not.toContain('-63,1');
+    // The hover jet-orient group is EMPTY (a saucer trails no sideways jet), while the nose one holds one.
+    const jetSeg = (svg: string) => svg.slice(svg.indexOf('gs-st-thrust-orient'), svg.indexOf('gs-st-body'));
+    expect(jetSeg(hover)).not.toContain('gs-st-thrust"'); // no jet <g class="gs-st-thrust"> before the body
+    expect(jetSeg(nose)).toContain('gs-st-thrust"'); // the car's jet lives here
+    // The repulsor sits INSIDE the upright body group (banks with the disc, stays under it).
+    expect(hover.indexOf('gs-st-hoverprop')).toBeGreaterThan(hover.indexOf('id="gs-st-body"'));
+  });
 });
