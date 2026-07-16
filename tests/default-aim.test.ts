@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { generateCourse } from '../src/sim/course/generate';
 import { dist, type Hole, type Vec } from '../src/sim/course/contract';
-import { autoAimTarget, autoAimClub, aiClub, suggestPlayerClub, layupTarget, pinOf, biomeCarryMult } from '../src/sim/round';
+import { autoAimTarget, autoAimClub, aiClub, suggestPlayerClub, layupTarget, pinOf, biomeCarryMult, forcedCarry } from '../src/sim/round';
 import { beginHole, previewShot, type ShotDecision } from '../src/sim/rpg/play';
 import { startingLoadout } from '../src/sim/rpg/economy';
+import { applyBagTier } from '../src/sim/rpg/bag';
 import { CLUBS, clubDist } from '../src/sim/clubs';
 
 /** The longest-carry usable (non-putter) club in a bag — the driver in the default bag. */
@@ -175,6 +176,42 @@ describe('smart default aim (GS-default-aim)', () => {
     expect(checked).toBeGreaterThan(50);
     // Most open par-4/5 tee shots now pre-arm the driver (the fix); the rest are forced-carry lay-ups.
     expect(driverPicks / checked).toBeGreaterThan(0.5);
+  });
+
+  it('a forced-CARRY tee drive takes the DRIVER (not a clubbed-down wood) when it clears the hazard', () => {
+    // The reported bug: a long par-4 tee shot whose aim line flies over a river/creek defaulted to a
+    // 5-wood — `autoAimClub` clubbed DOWN to the shortest club that reached the carry landing, even
+    // though the driver flew the hazard easily (and further). A player takes MORE club to carry, not
+    // less. Uses the epic bag (the 'Phoenix' set the bug was seen on) so a real driver is in the bag.
+    const bag = applyBagTier(startingLoadout(), 'epic').bag;
+    const driver = bag.filter((c) => c.id !== 'putter').reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
+    let carries = 0;
+    let driverPicks = 0;
+    for (let s = 0; s < 300; s++) {
+      let c;
+      try {
+        c = generateCourse(s + 50000, { holes: 6, wildness: 0.6, compose: true });
+      } catch {
+        continue;
+      }
+      for (const h of c.holes) {
+        if (h.par < 4 || h.widthId?.startsWith('island')) continue;
+        const cm = biomeCarryMult(h);
+        const tgt = autoAimTarget(h, h.tee, 'tee', bag, cm);
+        if (dist(tgt, pinOf(h)) <= 1) continue; // a green attack, not a positioning drive
+        const fc = forcedCarry(h, h.tee, tgt);
+        if (!fc) continue; // only the forced-carry drives — the ones the bug hit
+        carries++;
+        const pick = autoAimClub(h, h.tee, 'tee', bag, cm);
+        // The picked club must ALWAYS carry past the hazard's far bank (never drop a soft club into it).
+        expect(clubDist(pick) * cm).toBeGreaterThanOrEqual(fc.carry - 1e-6);
+        if (pick.id === driver.id) driverPicks++;
+      }
+    }
+    expect(carries).toBeGreaterThan(50);
+    // The overwhelming majority of forced-carry drives the driver clears now pre-arm the DRIVER (a few
+    // legitimately step down: the driver can't clear, or would overshoot into a second hazard).
+    expect(driverPicks / carries).toBeGreaterThan(0.9);
   });
 
   it('a reachable approach pre-arms the green-COVERAGE club (never a club short of the green)', () => {

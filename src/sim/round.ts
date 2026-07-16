@@ -2065,8 +2065,11 @@ export function autoAimTarget(
  *   - an OPEN positioning shot down the corridor (a tee bomb, a lay-forward) → the LONGEST usable club
  *     (the driver off the tee), so a drive isn't clubbed down to a wood — the club sets the CARRY and the
  *     aim target only the DIRECTION (`shotSpread`), so the longest club bombs down the aim line;
- *   - a forced-carry lay-up (the aim line defers SHORT of a hazard) → the shortest club that REACHES the
- *     lay-up (`aiClub`), a controlled shot that won't fly the hazard.
+ *   - a forced-CARRY drive (the aim line flies OVER a hazard to a landing beyond it) → the LONGEST club
+ *     that still safely clears the far bank and lands penalty-free (a tee carry the driver flies is a
+ *     driver, not a clubbed-down wood — taking MORE club is the safer carry, never less). Only when NO
+ *     club can both clear the hazard and land clear (a genuine lay-up short) does it fall back to the
+ *     shortest club that REACHES (`aiClub`), a controlled shot that won't drop into the hazard.
  * Pure, zero rng. Interactive-only (the UI's default club) — the headless sim keeps `aiClub`, so
  * determinism (contract 1) and every seeded test are untouched.
  */
@@ -2085,12 +2088,48 @@ export function autoAimClub(
   }
   const cand = bag.filter((c) => c.id !== 'putter');
   if (cand.length === 0) return bag[0]!;
-  // Open positioning down the corridor → send the LONGEST club (driver off the tee). A blocked (forced-
-  // carry) aim line laid up short → club to REACH that lay-up instead of bombing over the hazard.
-  if (clearLine(hole, ball, target)) {
-    return cand.reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
+  // Open positioning down the corridor → send the LONGEST club (driver off the tee).
+  const longest = cand.reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
+  if (clearLine(hole, ball, target)) return longest;
+  // Blocked line: the aim flies OVER a hazard (a forced carry — a lay-up SHORT would leave the line
+  // clear). A player takes the driver to carry it, not a clubbed-down wood, so send the LONGEST club
+  // that still clears the far bank AND lands on a penalty-free spot. Only if none can (the hazard is
+  // out of every club's carry — a genuine lay-up short) fall back to the controlled `aiClub` reach.
+  return longestCarryClub(hole, ball, target, lie, carryMult, cand) ?? aiClub(hole, ball, target, carryMult, bag);
+}
+
+/**
+ * The LONGEST club that safely CARRIES the hazard on the ball→target line and comes down on a
+ * penalty-free spot — the club a player reaches for on a forced-carry drive (more club = the safer
+ * carry). Walks longest→shortest and returns the first whose nominal carry clears the hazard's far
+ * bank and whose landing isn't itself a penalty (so a bomb that would overshoot into a SECOND hazard
+ * steps down to the longest club that stays dry). Null when no club can clear it (lay up short).
+ * Pure, zero rng — used only by the interactive default-club pick.
+ */
+function longestCarryClub(
+  hole: Hole,
+  ball: Vec,
+  target: Vec,
+  lie: FeatureKind,
+  carryMult: number,
+  cand: readonly Club[],
+): Club | null {
+  const fc = forcedCarry(hole, ball, target);
+  if (!fc) return null; // not actually a carry — nothing to clear
+  const total = dist(ball, target);
+  if (total < 1) return null;
+  const ux = (target[0] - ball[0]) / total;
+  const uy = (target[1] - ball[1]) / total;
+  const lieM = lieInfo(lie).carryMult;
+  const byLong = [...cand].sort((a, b) => clubDist(b) - clubDist(a));
+  for (const c of byLong) {
+    const carry = clubDist(c) * carryMult * lieM;
+    if (carry < fc.carry) continue; // doesn't reach past the far bank → would drop into the hazard
+    const land: Vec = [ball[0] + ux * carry, ball[1] + uy * carry];
+    if (lieInfo(lieAt(hole, land)).penalty) continue; // overshoots into another penalty → try shorter
+    return c;
   }
-  return aiClub(hole, ball, target, carryMult, bag);
+  return null;
 }
 
 /** Auto putt-out from a position (exported for the interactive driver). */
