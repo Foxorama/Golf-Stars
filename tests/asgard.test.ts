@@ -40,7 +40,7 @@ describe('GS-asgard: the Bifröst tournament', () => {
     setState(initState('title', {}, undefined));
     const html = titleScreen();
     expect(html).not.toContain('"format":"asgard"'); // no start action for the interlude
-    expect(html).not.toContain('Warriors Three');
+    expect(html).not.toContain("Warrior's Tee");
     // the real modes are still there
     expect(html).toContain('"format":"voyage"');
     expect(html).toContain('"format":"unending"');

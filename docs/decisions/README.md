@@ -21,7 +21,7 @@ domain. The root `CLAUDE.md` carries the load-bearing invariants and points here
 | `rpg-meta-loop.md` | The run spine, voyage/ascension, banking, characters, talents, ace/eagle rewards, route events, bosses, team duels, ships/market, club rewards, rainbow ball |
 | `club-list.md` | Recipe & guardrails for changing the club taxonomy: what an id/carry touches, the carry-spread rule, the death-spiral harness check, the ordered how-to |
 | `competition.md` | The golfer roster, ghost leaderboard, league glue, matchplay bosses, positional cut, voyage field |
-| `asgard.md` | The Golden Realm interlude (GS-asgard): the Asgard biome, the `driver` cosmetic slot + Thor's Hammer, and the Rainbow-Road eagle trigger → Bifröst → nine-hole stroke-play tournament vs the Warriors Three, with suspend/resume + rewards |
+| `asgard.md` | The Golden Realm interlude (GS-asgard): the Asgard biome, the `driver` cosmetic slot + Thor's Hammer, and the Rainbow-Road eagle trigger → Bifröst → nine-hole stroke-play tournament on The Warrior's Tee, with suspend/resume + rewards |
 | `caddies.md` | Named caddies, signature powers, guard redirects, slo-mo voice/impact, harness testing |
 | `feedback-mobile-ux.md` | Audio/haptics/settings layer, lefty mirror, lie awareness, gestures, mobile hygiene |
 | `putting.md` | Manual pace-meter + auto (Penelope), fringe-putt, `puttBoost` upgrades |

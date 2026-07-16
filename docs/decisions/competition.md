@@ -67,7 +67,7 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
   classic boss, so every A0-Arc-I seeded test is unchanged; a grown bag (gear parity means the boss shares
   the run's tier) still out-clubs the climb and wins (the strong-build voyage-win test holds). Guarded by
   `tests/boss-scale.test.ts` (the escalation knobs + rank-from-cutBonus + the final-scores-better check).
-  NOTE the Asgard Warriors Three are a SEPARATE stroke-play ghost (`warriorsEdge`), tuned on their own.
+  NOTE the Asgard Warrior's Tee is a SEPARATE stroke-play ghost (`warriorsEdge`), tuned on its own.
 - **Survival is your PLACE in the field — the leaderboard IS the cut (GS-positional-cut).** A WINNABLE
   campaign (the voyage) is a FIELD competition, so you no longer survive an ordinary stop by clearing an
   abstract Stableford line — you survive by finishing in the TOP-N of the arc leaderboard (`ARC_CUT_TARGETS

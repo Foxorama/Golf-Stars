@@ -331,7 +331,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-star-tour-yggdrasil: play a Norse realm off the hidden World Tree on the star map. The tree is
       // revealed only once Thor's Hammer is won, and today ONLY Asgard has bloomed (the other branches are
       // placeholders for future realms) — so gate hard on both. This spins up a STANDALONE Asgard run (the
-      // Warriors Three tournament) from the star-map golfer's bag, exactly like `crossBifrost`, but WITHOUT
+      // The Warrior's Tee tournament) from the star-map golfer's bag, exactly like `crossBifrost`, but WITHOUT
       // a suspended journey: `asgardFromStarTour` marks it so `leaveAsgard` returns to the map, not travel.
       if (state.screen !== 'starTour' || !state.run.loadout.characterId) return state;
       if (!state.ownedApparel.includes('thors-hammer')) return state;
@@ -432,7 +432,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // Star Tour (GS-star-tour): a watched round is scored to the personal course-record boards, not the
       // Stableford cut/travel flow — resolve it like Asgard and land on the record recap.
       if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, played);
-      // The Asgard tournament (GS-asgard) is scored on total gross vs the Warriors Three, not the cut —
+      // The Asgard tournament (GS-asgard) is scored on total gross on The Warrior's Tee, not the cut —
       // resolve it here instead of the ordinary result flow (a watched Asgard stop still resolves).
       if (state.run.formatId === ASGARD_FORMAT) return resolveAsgard(state, played);
       // A run ends on a missed cut OR a won voyage (final boss cleared) — both bank shards and go to
@@ -718,7 +718,7 @@ export function reduce(state: UiState, action: Action): UiState {
       }
       // Star Tour (GS-star-tour): the 18-hole round is complete — bank it to the course-record boards.
       if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, stopPlayed);
-      // The Asgard tournament (GS-asgard) is decided on total gross vs the Warriors Three — resolve it
+      // The Asgard tournament (GS-asgard) is decided on total gross on The Warrior's Tee — resolve it
       // here rather than through the ordinary Stableford-cut flow.
       if (state.run.formatId === ASGARD_FORMAT) return resolveAsgard(state, stopPlayed);
       // Set complete — score it exactly as the auto path does.

@@ -63,7 +63,7 @@ instead of the result splash → shop, `withAsgardPortal` diverts to the Himinbj
 out of scope — a rare rainbow+eagle-on-a-boss combo — to avoid entangling the matchplay early-finish.)
 
 ### The tournament — statistical ghosts, not real balls
-Nine holes of **stroke play** vs the Warriors Three (Volstagg the bomber, Fandral the maverick, Hogun the
+Nine holes of **stroke play** on The Warrior's Tee (Hogan the bomber, Frankie the maverick, Vince the
 ice-man — three bespoke `contender` golfers in `GOLFERS`, never in the normal field). Following the
 competition doctrine (a field is a statistical ghost, not N ball-sims), `warriorsThreeTotals` gives each
 opponent a deterministic nine-hole gross from `ghostHoleStrokes` (the stroke-play twin of
@@ -161,7 +161,7 @@ by the hub with `intro:'0'` so they land past the boot cinematic in one click.
 
 ## Follow-ups / known scope edges
 - The portal is ordinary-stop only (boss stops don't open it).
-- The Warriors Three difficulty is tuned by feel via `warriorsEdge`'s constants: the base archetype
+- The Warrior's Tee difficulty is tuned by feel via `warriorsEdge`'s constants: the base archetype
   scores (`ghostHoleStrokes`' `toPar` coefficients); the depth/Ascension ramp (`WARRIORS_DEPTH_STEP`/`_CAP`,
   `WARRIORS_ASC_STEP`, `WARRIORS_EDGE_CAP`); and the per-context split (GS-warriors-tune,
   `WARRIORS_VOYAGE_BASE`/`_CAP` — the voyage floor+ceiling). Retune those, not the Asgard course. Voyage

@@ -848,7 +848,7 @@ function playingBody(animating: boolean): string {
     const d = kept.pickedUp ? 99 : kept.record.strokes - par;
     const scoreCol = d < 0 ? '#5fd45a' : d === 0 ? 'var(--gs-ink)' : d === 1 ? '#ffce54' : '#ff6b6b';
     // The Asgard tournament (GS-asgard) is STROKE PLAY, so the banner counts GROSS and to-par, not
-    // Stableford points — the running gross total is what decides it against the Warriors Three.
+    // Stableford points — the running gross total is what decides it on The Warrior's Tee.
     const isAsgard = state.run.formatId === ASGARD_FORMAT;
     const grossSoFar = playedSoFar.reduce((s, p) => s + p.record.strokes, 0);
     const toParSoFar = grossSoFar - playedSoFar.reduce((s, p) => s + p.record.par, 0);
@@ -882,7 +882,7 @@ function playingBody(animating: boolean): string {
         // voyage's ghost competitor board (there is no field to place against).
         strokePlayProgressHTML(playedSoFar)
       : state.run.formatId === ASGARD_FORMAT
-      ? // The Asgard tournament (GS-asgard) is STROKE PLAY vs the Warriors Three, not the 20-golfer
+      ? // The Asgard tournament (GS-asgard) is STROKE PLAY on The Warrior's Tee, not the 20-golfer
         // Stableford field — show the running lowest-gross standings, its own event.
         asgardLiveBoardHTML(playedSoFar, state.course.holes.map((h) => h.par), `${state.run.seed}`, asgardFieldEdge(state))
       : state.match

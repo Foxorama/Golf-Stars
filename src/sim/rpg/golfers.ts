@@ -369,18 +369,19 @@ const CHAMPIONS: readonly ChampRow[] = [
   { theme: 'pyxis', name: 'Petra Pyxidis', shortName: 'Pyxidis', archetypeId: 'bomber', origin: 'Pyxis' }, // a low-grav belt bomber
 ];
 
-// --- The Warriors Three (GS-asgard) -------------------------------------------
+// --- The Warrior's Tee (GS-asgard) --------------------------------------------
 
 /**
- * Asgard's guardians (GS-asgard): the three named opponents of the Bifröst stroke-play tournament. They
- * are NOT constellation champions (so they never enter the normal field/leaderboard) — bespoke elite
- * challengers the reducer names directly. Strong but beatable: a booming bomber, a dashing all-rounder,
- * and a grim, cold-blooded ice-man. `golferProfile`/`bossShotMods` give them real ghost scores for free.
+ * The Warrior's Tee (GS-asgard): the three named opponents you face when you've proven worthy to play the
+ * Bifröst stroke-play tournament. They are NOT constellation champions (so they never enter the normal
+ * field/leaderboard) — bespoke elite challengers the reducer names directly. Strong but beatable: a
+ * booming bomber, a dashing all-rounder, and a grim, cold-blooded ice-man. `golferProfile`/`bossShotMods`
+ * give them real ghost scores for free.
  */
 export const WARRIORS_THREE: readonly { id: string; name: string; shortName: string; archetypeId: string }[] = [
-  { id: 'warrior:volstagg', name: 'Volstagg the Lion', shortName: 'Volstagg', archetypeId: 'bomber' },
-  { id: 'warrior:fandral', name: 'Fandral the Dashing', shortName: 'Fandral', archetypeId: 'maverick' },
-  { id: 'warrior:hogun', name: 'Hogun the Grim', shortName: 'Hogun', archetypeId: 'iceman' },
+  { id: 'warrior:hogan', name: 'Hogan the Hammer', shortName: 'Hogan', archetypeId: 'bomber' },
+  { id: 'warrior:frankie', name: 'Frankie the Flash', shortName: 'Frankie', archetypeId: 'maverick' },
+  { id: 'warrior:vince', name: 'Vince the Viper', shortName: 'Vince', archetypeId: 'iceman' },
 ];
 
 function buildWarriorsThree(): Golfer[] {

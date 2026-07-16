@@ -239,7 +239,7 @@ export const ASGARD_THEME: Theme = {
   arc: 3,
   archetype: 'asgard',
   anchor: 'Ásgarðr',
-  blurb: 'The Golden Realm atop Yggdrasil — cross the Bifröst and face the Warriors Three.',
+  blurb: "The Golden Realm atop Yggdrasil — cross the Bifröst and play The Warrior's Tee.",
   unique: true,
 };
 

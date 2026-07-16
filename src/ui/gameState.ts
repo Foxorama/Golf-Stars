@@ -38,7 +38,7 @@ export type Screen =
   | 'clubhouse'
   | 'starmart'
   // GS-asgard: the Bifröst interlude — the Himinbjörg reveal map, then the win/lose result of the
-  // nine-hole stroke-play tournament against the Warriors Three.
+  // nine-hole stroke-play tournament on The Warrior's Tee.
   | 'asgardMap'
   | 'asgardResult'
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.

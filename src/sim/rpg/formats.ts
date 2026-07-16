@@ -145,16 +145,16 @@ export function startingFuelFor(format: RunFormat): number {
 }
 
 export const FORMATS: Record<string, RunFormat> = {
-  // The Asgard interlude (GS-asgard): a single nine-hole stroke-play tournament on the Golden Realm
-  // against the Warriors Three. Reached only via the Rainbow-Road eagle trigger and played with the
+  // The Asgard interlude (GS-asgard): a single nine-hole stroke-play tournament on the Golden Realm,
+  // The Warrior's Tee. Reached only via the Rainbow-Road eagle trigger and played with the
   // player's current bag (minus the Rainbow Ball, so it plays Asgard's real geometry). No travel/shop,
   // so `startingFuel`/`cutMult` are irrelevant; the reducer decides win/lose on total gross and hands
   // the player back to their suspended run.
   asgard: {
     id: 'asgard',
-    name: 'Asgard · The Warriors Three',
-    blurb: 'A nine-hole stroke-play duel with the Warriors Three on the Golden Realm',
-    stops: [{ holes: 9, label: 'Asgard · The Warriors Three' }],
+    name: "Asgard · The Warrior's Tee",
+    blurb: "A nine-hole stroke-play duel on The Warrior's Tee, the Golden Realm",
+    stops: [{ holes: 9, label: "Asgard · The Warrior's Tee" }],
   },
   // The endless survival mode (GS-unending): 4 random holes → Pro Shop → journey lane → 4 more,
   // forever. Survival is the PER-HOLE bar (endless.ts) — quad bogey for the first 8 holes, one
@@ -230,8 +230,8 @@ export const FORMATS: Record<string, RunFormat> = {
 };
 
 /**
- * The Asgard tournament format (GS-asgard): a one-off, nine-hole STROKE-PLAY side event against the
- * Warriors Three, reached only by earning an eagle-or-better on Rainbow Road (never selectable on the
+ * The Asgard tournament format (GS-asgard): a one-off, nine-hole STROKE-PLAY side event on The Warrior's
+ * Tee, reached only by earning an eagle-or-better on Rainbow Road (never selectable on the
  * title). Not winnable/holeGate — the reducer scores it as lowest-gross-of-four and returns the player
  * to their suspended run afterward, so `finishStop`'s ordinary Stableford path is a harmless no-op here.
  */

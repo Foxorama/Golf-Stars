@@ -358,7 +358,7 @@ export function ghostHoleStrokes(golferId: string, holeKey: string, par: number,
 }
 
 /**
- * How much the Warriors Three SHARPEN for a tournament reached deep in a run / at a high Ascension
+ * How much The Warrior's Tee field SHARPENS for a tournament reached deep in a run / at a high Ascension
  * (GS-asgard-scaling / GS-warriors-tune) — a per-hole stroke `edge` fed to `ghostHoleStrokes` so the
  * Bifröst stays a real fight instead of a roflstomp. Two contexts (the Warriors are effectively a boss
  * match, but LOSING costs nothing — no run ends — so they can sit ABOVE an ordinary boss):
@@ -391,7 +391,7 @@ export function warriorsEdge(depth: number, ascension = 0, voyage = false): numb
 }
 
 /**
- * The Warriors Three's total gross over a set of holes (GS-asgard) — a deterministic nine-hole score per
+ * The Warrior's Tee field's total gross over a set of holes (GS-asgard) — a deterministic nine-hole score per
  * opponent for the Asgard stroke-play tournament, each carrying a per-tournament FORM streak. The reducer
  * compares these to the player's real gross; the player WINS by matching or beating the lowest of the
  * three. `edge` (GS-asgard-scaling, default 0) sharpens the field for a deep/high-Ascension encounter —

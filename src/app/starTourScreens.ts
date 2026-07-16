@@ -374,7 +374,7 @@ function yggdrasilSheet(): string {
           <span class="gs-st-realm__badge">Open</span>
         </div>
         <p class="gs-st-realm__blurb">${r.blurb}</p>
-        <button class="gs-st-play" data-action='${JSON.stringify({ type: 'playYggdrasilRealm', realmId: r.id })}'>⚡ Cross the Bifröst &amp; challenge the Warriors Three</button>
+        <button class="gs-st-play" data-action='${JSON.stringify({ type: 'playYggdrasilRealm', realmId: r.id })}'>⚡ Cross the Bifröst &amp; play The Warrior&apos;s Tee</button>
       </div>`;
     }
     return `<div class="gs-st-realm gs-st-realm--locked">
