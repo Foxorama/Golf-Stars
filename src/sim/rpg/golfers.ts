@@ -379,9 +379,9 @@ const CHAMPIONS: readonly ChampRow[] = [
  * give them real ghost scores for free.
  */
 export const WARRIORS_THREE: readonly { id: string; name: string; shortName: string; archetypeId: string }[] = [
-  { id: 'warrior:hogan', name: 'Hogan', shortName: 'Hogan', archetypeId: 'bomber' },
-  { id: 'warrior:frankie', name: 'Frankie', shortName: 'Frankie', archetypeId: 'maverick' },
-  { id: 'warrior:vince', name: 'Vince', shortName: 'Vince', archetypeId: 'iceman' },
+  { id: 'warrior:hogan', name: 'Hogan the Hammer', shortName: 'Hogan', archetypeId: 'bomber' },
+  { id: 'warrior:frankie', name: 'Frankie the Flash', shortName: 'Frankie', archetypeId: 'maverick' },
+  { id: 'warrior:vince', name: 'Vince the Viper', shortName: 'Vince', archetypeId: 'iceman' },
 ];
 
 function buildWarriorsThree(): Golfer[] {
