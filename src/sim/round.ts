@@ -776,6 +776,9 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
 
     const execOpts: ExecOpts = {
       carryMult,
+      // GS-rough-gradient-rebalance: dial the power down for a short shot (chip/punch-out) instead of
+      // over-swinging past the target. Full power (byte-identical) on any ordinary reach shot.
+      power: autoShotPower(hole, ball, tgt, club, carryMult, usable, opts.stats),
       dispersionMult: opts.dispersionMult,
       stats: opts.stats,
       shotMods: opts.shotMods,
@@ -1788,6 +1791,53 @@ export function aiClub(
   return suggestClub(Math.max(1, playLike - rollAllowance) / carryMult, 'reach', bag, stats);
 }
 
+/** Floor on the auto sim's dialed-down power — a controlled chip/punch, never a putt-tap full swing. */
+export const AUTO_MIN_POWER = 0.4;
+/** Only throttle when the target is inside this fraction of the club's carry — a genuine chip/punch,
+ *  not a near-full approach (kept moderate so ordinary short-iron approaches stay full power). */
+export const AUTO_THROTTLE_MAX = 0.8;
+
+/**
+ * The POWER the auto sim plays a shot at (GS-rough-gradient-rebalance). The sim used to swing every
+ * club at FULL power, so when the target sat inside the chosen club's carry — a chip onto a green, a
+ * punch-out to the nearest fairway — it OVERSHOT (blasting a 60-yd wedge at a 25-yd escape), the ball
+ * flew back into trouble, and strokes piled up. That was the twin sparse-bag death-spiral driver: the
+ * ball couldn't escape trees (a full swing sprayed back in) and couldn't hold a green from close (it
+ * flew the apron). A real player dials the power gesture down for a short shot; now the auto sim does
+ * too — it throttles to land the ball near the target (leaving the same 10%-ish roll allowance
+ * `aiClub` clubs for), floored at `AUTO_MIN_POWER`. Returns 1 (byte-identical) whenever the target is
+ * at/beyond the club's controllable carry, so ordinary reach shots are UNCHANGED. Pure, zero rng —
+ * mirrored by the interactive auto path (`autoDecision`) so auto ≡ interactive holds.
+ */
+export function autoShotPower(
+  hole: Hole,
+  from: Vec,
+  target: Vec,
+  club: Club,
+  carryMult: number,
+  bag: readonly Club[],
+  stats?: ClubStats,
+): number {
+  const full = clubDist(club, stats) * carryMult;
+  if (full <= 0) return 1;
+  // NEVER dial down a shot whose line must CARRY a penalty hazard (water/lava/void/crossing) — a soft
+  // shot would drop short INTO it. Those play full power to clear (byte-identical on a clear line).
+  if (forcedCarry(hole, from, target)) return 1;
+  // ONLY a genuine short shot gets dialed — a chip onto a green, a punch-out from trees. That means
+  // the SHORTEST club in the bag was chosen (no shorter option exists) AND the target sits well inside
+  // its carry, so a full swing would blow past it into trouble. Every ordinary reach shot (a longer
+  // club, or a target near/beyond the club's carry) plays FULL power → byte-identical.
+  let shortest = Infinity;
+  for (const c of bag) if (c.id !== 'putter') shortest = Math.min(shortest, clubDist(c, stats) * carryMult);
+  if (full > shortest + 1e-6) return 1; // a longer club than the shortest ⇒ a reach shot, full power
+  const playLike = playsLike(dist(from, target), hole.wind, bearingDeg(from, target));
+  if (playLike >= full * AUTO_THROTTLE_MAX) return 1; // target near the club's carry ⇒ full power
+  // A soft chip/punch still rolls a touch, so carry SHORT of the target and let it roll on. Floored so
+  // it stays a controlled shot, never a stunted tap.
+  const wantCarry = playLike - Math.min(MAX_ROLL, playLike * 0.1);
+  return Math.max(AUTO_MIN_POWER, wantCarry / full);
+}
+
 /** Pin location (exported for the interactive driver). */
 export function pinOf(hole: Hole): Vec {
   return pin(hole);
@@ -1900,6 +1950,44 @@ export function suggestPlayerClub(
   return pick ?? byCarryAsc[0]!;
 }
 
+/**
+ * PUNCH-OUT recovery (GS-rough-gradient-rebalance): from a TRAPPING lie — trees or deep rough — where
+ * the green is out of reach anyway, the smart play is OUT to the nearest fairway, NOT a low-percentage
+ * bomb toward the green through the forest. That bomb was the #1 sparse-bag death-spiral driver: a trees
+ * lie fed ~60% of the blow-ups (the ball kept re-hitting trees because the AI always aimed forward and
+ * `clearLine` only sees penalty hazards, not trees). Returns the nearest REACHABLE fairway/green point
+ * that best trades escape cost for forward progress (never retreating more than a little), or null when
+ * there's no worthwhile escape (fall back to the normal forward line). Pure geometry, zero rng — shared
+ * by the auto sim (`playHole`) and the interactive "safe"/auto-finish aim, so auto ≡ interactive holds.
+ */
+function recoveryTarget(hole: Hole, ball: Vec, lie: FeatureKind, maxReach: number): Vec | null {
+  if ((lie !== 'trees' && lie !== 'deeprough') || maxReach <= 0) return null;
+  const flag = pin(hole);
+  // If the green is reachable this is an approach/greenside recovery — let `safeTarget` play toward
+  // the green (a sideways punch-out would waste a scoring shot). Only punch out on the long game.
+  if (dist(ball, flag) <= maxReach) return null;
+  const here = dist(ball, flag);
+  let best: Vec | null = null;
+  let bestScore = -Infinity;
+  for (let i = 0; i <= 200; i++) {
+    const q = pointAlong(hole.centreline, i / 200);
+    const k = lieAt(hole, q);
+    if (k !== 'fairway' && k !== 'green') continue;
+    const d = dist(q, ball);
+    if (d > maxReach || d < 1) continue; // must be reachable, and a real move
+    if (!clearLine(hole, ball, q)) continue; // never punch OVER a penalty hazard (lava/water/void)
+    const progress = here - dist(q, flag); // >0 ⇒ q is closer to the green than the ball
+    if (progress < -maxReach * 0.25) continue; // never retreat more than a quarter of the reach
+    // Prefer forward progress; discount by escape distance so we take the CLOSE, safe way out.
+    const score = progress - d * 0.5;
+    if (score > bestScore) {
+      bestScore = score;
+      best = q;
+    }
+  }
+  return best;
+}
+
 /** Lay-up target: the penalty-free corridor point ahead of the ball (exported). */
 export function layupTarget(
   hole: Hole,
@@ -1913,7 +2001,11 @@ export function layupTarget(
   // The "attack" choice is what aims at the flag — the player's risk to take. `maxReach` is
   // derived deterministically from (bag, lie, carryMult) so a forced-carry decision (lava
   // rivers) is identical on both the auto and interactive paths.
-  return safeTarget(hole, ball, hole.green, maxReachOf(bag, carryMult, lie));
+  const maxReach = maxReachOf(bag, carryMult, lie);
+  // From trees / deep rough, punch OUT to the fairway first (positional golf, not a forest bomb).
+  const escape = recoveryTarget(hole, ball, lie, maxReach);
+  if (escape) return escape;
+  return safeTarget(hole, ball, hole.green, maxReach);
 }
 
 /** Effective max carry (yards) the bag can fly from this lie — the reach a forced carry needs. */
