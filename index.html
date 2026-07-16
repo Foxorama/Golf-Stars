@@ -1243,6 +1243,31 @@
       }
       .gs-toggle--on { background: #1f5e2d; border-color: var(--gs-accent); }
       .gs-toggle--on .gs-knob { transform: translateX(19px); background: #ecffe9; }
+      /* Compact icon on/off toggle CHIPS (GS-settings-chips) — Audio + Feel prefs bundled two-per-row
+         so they take a fraction of the height the old full-width rows did. Each is a real switch. */
+      .gs-chipgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+      .gs-setchip {
+        display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+        padding: 10px 11px; border-radius: var(--gs-r); cursor: pointer; color: var(--gs-dim);
+        background: #1b2130; border: 1px solid var(--gs-line);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: background .14s ease, border-color .14s ease, color .14s ease;
+      }
+      .gs-setchip:active { background: #ffffff0d; }
+      .gs-setchip-i { font-size: 18px; line-height: 1; flex: 0 0 auto; }
+      .gs-setchip-t { font-size: 13px; font-weight: 700; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .gs-setchip-sw {
+        flex: 0 0 auto; width: 30px; height: 18px; border-radius: 999px;
+        background: #2a3142; border: 1px solid #3a4356; position: relative;
+        transition: background .16s ease, border-color .16s ease;
+      }
+      .gs-setchip-sw::after {
+        content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%;
+        background: #c8cdd8; transition: transform .16s ease, background .16s ease;
+      }
+      .gs-setchip--on { background: #17331f; border-color: var(--gs-accent); color: var(--gs-ink); }
+      .gs-setchip--on .gs-setchip-sw { background: #1f5e2d; border-color: var(--gs-accent); }
+      .gs-setchip--on .gs-setchip-sw::after { transform: translateX(12px); background: #ecffe9; }
       /* Settings sheet sections + segmented aim control (GS-default-aim) */
       .gs-setsec {
         font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;

@@ -83,7 +83,7 @@ import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultSc
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
-import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, shotPopupOverlay } from './app/overlays';
+import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 import { metaFromSave, persist } from './app/persist';
@@ -1940,6 +1940,80 @@ function stepStarTour(): void {
 
 
 
+/**
+ * Wire the settings sheet's interactive elements found under `root`. Called with the whole `app` on a
+ * full render, and with the sheet element alone from `refreshSettings` after an in-sheet surgical update
+ * (so only the freshly-swapped descendants get fresh listeners — the persistent backdrop + sheet frame
+ * keep their original ones and are never double-wired). GS-settings-flicker.
+ */
+function wireSettingsSheet(root: ParentNode): void {
+  // Close (backdrop tap, the ✕, Done); a `keep` on the sheet frame swallows body taps so they can't
+  // bubble to the backdrop's close (the old <select> mis-tap → accidental exit, GS-default-aim).
+  root.querySelectorAll<HTMLElement>('[data-settings]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (el.dataset.settings === 'keep') {
+        e.stopPropagation();
+        return;
+      }
+      e.stopPropagation();
+      settingsOpen = false;
+      render();
+    });
+  });
+  // On/off preference CHIP toggles (GS-settings-chips). Update the sheet SURGICALLY (refreshSettings) so
+  // the frame's slide-up animation isn't replayed; keep the ambient music matched when Music is flipped.
+  root.querySelectorAll<HTMLElement>('[data-setting]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSetting(el.dataset.setting as keyof Settings);
+      resumeAudio();
+      sfx.click();
+      syncMusic();
+      refreshSettings();
+    });
+  });
+  // Default aim-mode SEGMENTED control (GS-default-aim): three real buttons (no fiddly native <select> to
+  // mis-tap). Each STOPS PROPAGATION so a tap can't bubble to the backdrop's close. Persist the choice
+  // and clear any drag aim / club pick so the next shot re-seeds from it; refresh the sheet surgically.
+  root.querySelectorAll<HTMLElement>('[data-selaim]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selAim = el.dataset.selaim as AimMode;
+      setSetting('aimMode', selAim);
+      selClubId = null;
+      selFreeTarget = null;
+      selAimBearing = null;
+      sfx.click();
+      haptic(HAPTICS.tap);
+      refreshSettings();
+    });
+  });
+  // "Return to title" (GS-settings-nav): close the sheet, then the reducer parks an underway run as a
+  // resumable snapshot and lands on the title — the same offer a page reload makes.
+  root.querySelectorAll<HTMLElement>('[data-settings-home]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsOpen = false;
+      dispatch({ type: 'toTitle' });
+    });
+  });
+}
+
+/**
+ * Re-render JUST the open settings sheet's inner content in place, then re-wire it — no full render(), so
+ * the `.gs-sheet` frame stays mounted and its slide-up animation doesn't replay on every toggle/aim tap
+ * (the flicker, GS-settings-flicker). Falls back to a full render if the sheet isn't mounted.
+ */
+function refreshSettings(): void {
+  const sheet = document.querySelector<HTMLElement>('.gs-settings');
+  if (!settingsOpen || !sheet) {
+    render();
+    return;
+  }
+  sheet.innerHTML = settingsSheetInner();
+  wireSettingsSheet(sheet);
+}
+
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -2475,31 +2549,10 @@ function render(): void {
       render();
     });
   });
-  app.querySelectorAll<HTMLElement>('[data-settings]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      const a = el.dataset.settings;
-      // Clicks inside the sheet body don't close it — and MUST stop here, else the click bubbles up to
-      // the backdrop's own [data-settings="close"] handler and closes the sheet anyway. That swallowed
-      // the aim-mode <select>: tapping it bubbled through, render() tore the sheet down, and you could
-      // never pick Attack/Safe/Auto (GS-default-aim). stopPropagation keeps native selects usable.
-      if (a === 'keep') {
-        e.stopPropagation();
-        return;
-      }
-      e.stopPropagation();
-      settingsOpen = false;
-      render();
-    });
-  });
-  app.querySelectorAll<HTMLElement>('[data-setting]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleSetting(el.dataset.setting as keyof Settings);
-      resumeAudio();
-      sfx.click();
-      render();
-    });
-  });
+  // Settings-sheet handlers (toggles, aim segments, close, "Return to title"). Shared with the surgical
+  // `refreshSettings` in-sheet update, so an in-sheet tap updates the sheet WITHOUT a full render (which
+  // re-mounts the sheet and replays its slide-up animation — the flicker, GS-settings-flicker).
+  wireSettingsSheet(app);
   // Ascension difficulty DROPDOWN on character select (GS-diffpills): a native-select pill — the picked
   // tier re-renders the roster (updating each card's club-unlock badge) and rides every golfer card's
   // select action. `change` fires on the OS picker's commit; re-render surgically keeps the pill's value.
@@ -2508,23 +2561,6 @@ function render(): void {
       selAscension = Number(el.value);
       // Remember the pick so the picker defaults here next run instead of snapping back to A0.
       setSetting('lastAscension', selAscension);
-      sfx.click();
-      haptic(HAPTICS.tap);
-      render();
-    });
-  });
-  // Default aim-mode SEGMENTED control in the settings sheet (GS-default-aim): three real buttons (no
-  // fiddly native <select> to mis-tap). Each STOPS PROPAGATION so a tap can't bubble to the backdrop's
-  // close handler. Persist the preference and, if a shot is being aimed, apply it now (re-seeding the
-  // club to fit + clearing any drag aim).
-  app.querySelectorAll<HTMLElement>('[data-selaim]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selAim = el.dataset.selaim as AimMode;
-      setSetting('aimMode', selAim);
-      selClubId = null;
-      selFreeTarget = null;
-      selAimBearing = null;
       sfx.click();
       haptic(HAPTICS.tap);
       render();
@@ -2540,15 +2576,6 @@ function render(): void {
       sfx.click();
       haptic(HAPTICS.tap);
       render();
-    });
-  });
-  // "Return to title" (GS-settings-nav): close the sheet, then the reducer parks an underway run
-  // as a resumable snapshot and lands on the title — the same offer a page reload makes.
-  app.querySelectorAll<HTMLElement>('[data-settings-home]').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      settingsOpen = false;
-      dispatch({ type: 'toTitle' });
     });
   });
   // Dismiss the shot-result popup → reveal the next decision (a local view control).
