@@ -9,6 +9,7 @@
 
 import { state } from './ctx';
 import { writeSave } from '../save/storage';
+import { writeStory } from '../save/storyStore';
 import { SAVE_VERSION, type Save } from '../save/schema';
 import { snapshotRun, type RoundProgress } from '../sim/rpg/run';
 import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
@@ -54,6 +55,12 @@ export function metaFromSave(save: Save) {
     seenLore: save.seenLore,
     priceRefund: save.priceRefund,
   };
+}
+
+/** GS-story: write the active Story Mode campaign to its OWN `gs_story` blob (separate from the main save),
+ *  when one is present. A no-op with no campaign, so Voyage/Unending sessions never touch `gs_story`. */
+export function persistStory(): void {
+  if (state.story) writeStory(state.story);
 }
 
 /** Write the live state to localStorage (the only copy). Called after every reducer action. */

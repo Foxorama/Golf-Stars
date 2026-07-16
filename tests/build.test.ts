@@ -264,6 +264,7 @@ describe('build output (real browser)', () => {
     { screen: 'startour', sel: '.gs-startour', text: 'STAR TOUR', label: 'the Star Tour star map' },
     { screen: 'strokeresult', sel: '.gs-strres', text: 'Best rounds overall', label: 'the Star Tour round recap' },
     { screen: 'lore', sel: '.gs-lore', text: 'The Old Girl', label: 'the lore story-beat popup' },
+    { screen: 'story', sel: '.gs-storyhub', text: 'Story Mode', label: 'the Story Mode campaign hub' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

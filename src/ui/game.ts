@@ -61,6 +61,7 @@ import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
 import { loreEventById, type SeenLore } from '../sim/rpg/lore';
+import { defaultStoryState, type StoryState } from '../sim/rpg/story';
 import {
   autoDecision,
   awaitingPutt,
@@ -113,6 +114,7 @@ export function initState(
   seed: number | string,
   meta: MetaProgress = {},
   resumable?: RunSnapshot,
+  story?: StoryState,
 ): UiState {
   const metaUpgrades = meta.metaUpgrades ?? {};
   const bagTier = meta.bagTier ?? DEFAULT_BAG_TIER;
@@ -123,6 +125,7 @@ export function initState(
     course: currentCourse(run),
     viewHole: 0,
     resumable,
+    ...(story ? { story } : {}),
     bestStableford: meta.bestStableford ?? 0,
     bestDistance: meta.bestDistance ?? 0,
     shards: meta.shards ?? 0,
@@ -185,6 +188,18 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'selectCharacter': {
       if (state.screen !== 'character') return state;
+      // GS-story: picking a golfer to BEGIN a campaign creates the persistent `StoryState` (green bag +
+      // station wagon, empty purse, chapter 0) and lands in the Story Mode hub — it does NOT build a run
+      // (a Story round is teed off later from the campaign). Branch first so the shared run-building path
+      // below is byte-identical for every other mode.
+      if (state.pendingStoryNew) {
+        return {
+          ...state,
+          story: defaultStoryState(action.characterId),
+          pendingStoryNew: false,
+          screen: 'story',
+        };
+      }
       // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + bag tier
       // chosen at 'start'. Ascension (GS-ascension) is a per-run difficulty picked HERE, alongside
       // the golfer (GS-title-2) — it's a choice about who you're playing, so it lives on the same
@@ -325,6 +340,27 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'exitStarTour': {
       if (state.screen !== 'starTour') return state;
       return { ...state, screen: 'title', starTourPick: undefined };
+    }
+
+    case 'openStory': {
+      // GS-story: enter Story Mode. If a campaign is loaded (boot read `gs_story` into `state.story`),
+      // CONTINUE it — straight to the hub. Otherwise begin a NEW campaign by picking a golfer (the
+      // `pendingStoryNew` flag routes `selectCharacter` to create the `StoryState`).
+      if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'story') return state;
+      if (state.story) return { ...state, screen: 'story' };
+      return { ...state, screen: 'character', pendingStoryNew: true, resumable: state.resumable };
+    }
+
+    case 'storyNewCampaign': {
+      // GS-story: begin a fresh campaign from the title or the hub (a "start over" that overwrites the
+      // saved one only once a golfer is picked). Go pick the protagonist.
+      if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'story') return state;
+      return { ...state, screen: 'character', pendingStoryNew: true };
+    }
+
+    case 'exitStory': {
+      if (state.screen !== 'story') return state;
+      return { ...state, screen: 'title' };
     }
 
     case 'playYggdrasilRealm': {

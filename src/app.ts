@@ -41,6 +41,7 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
+import { loadStory } from './save/storyStore';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
@@ -80,13 +81,14 @@ import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, st
 import { shipForCharacter } from './ui/gameCosmetics';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
+import { storyHubScreen } from './app/storyScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
-import { metaFromSave, persist } from './app/persist';
+import { metaFromSave, persist, persistStory } from './app/persist';
 
 // Breadcrumb: app.ts's module body reached top level (i.e. all imports above evaluated
 // without throwing). If the watchdog ever reports a stage *before* this, the fault is in
@@ -113,9 +115,12 @@ function boot(): void {
     stage('loaded');
     const meta = metaFromSave(save);
     const seed = seedFromUrl() ?? freshRunSeed();
+    // GS-story: load the Story Mode campaign from its own `gs_story` blob (null ⇒ no campaign yet), so the
+    // title's Story tile can offer Continue and `openStory` can resume straight to the hub.
+    const story = loadStory() ?? undefined;
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
-    setState(initState(seed, meta, save.activeRun));
+    setState(initState(seed, meta, save.activeRun, story));
     applyDebugParams(); // GS-asgard: test-hub-only `?rainbow=` / `?asgard=` jumps (dormant in the live game)
     stage('init');
     render();
@@ -200,6 +205,10 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const intro = reduce(map, { type: 'pickStarTourCourse', courseId: 'verdant-18' });
       return reduce(intro, { type: 'play' });
     }
+    case 'story':
+      // GS-story: mount the Story Mode hub the honest way — enter Story Mode (no save ⇒ new-game golfer
+      // pick), then pick the first golfer, which creates the StoryState and lands on the hub.
+      return reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
       // lore gate builds), so a headless smoke test can render the new screen chrome.
@@ -368,6 +377,7 @@ function dispatch(action: Action): void {
       haptic(HAPTICS.bad);
     }
     persist();
+    persistStory(); // GS-story: write the campaign to its own gs_story blob when one is active
     render();
     // The sector-scan sweep (GS-fuel-4): a radar beam climbs the fresh journey map and the redrawn
     // lanes pop in behind it. Called synchronously after render() (same task, before paint) so the
@@ -2128,6 +2138,10 @@ function render(): void {
   const body =
     state.screen === 'title'
       ? titleScreen()
+      : state.screen === 'character' && state.pendingStoryNew
+      ? // GS-story: picking your protagonist for a NEW campaign — single golfer, no Ascension/club-set
+        // difficulty pills (Story Mode's difficulty is the chapter arc), and a Story-flavoured header.
+        characterScreen(state.unlockedClubsByCharacter, { modeName: 'Story Mode', winnable: false, verb: 'Play as' })
       : state.screen === 'character'
       ? characterScreen(state.unlockedClubsByCharacter, {
           modeName: getFormat(state.run.formatId).name,
@@ -2181,6 +2195,8 @@ function render(): void {
       ? starTourScreen()
       : state.screen === 'strokeResult'
       ? strokeResultScreen()
+      : state.screen === 'story'
+      ? storyHubScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();

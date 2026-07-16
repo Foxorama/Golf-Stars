@@ -19,6 +19,7 @@ import type { BagTier } from '../sim/rpg/bag';
 import type { ClubUnlockReward } from '../sim/rpg/club-unlock';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
+import type { StoryState } from '../sim/rpg/story';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
@@ -44,6 +45,8 @@ export type Screen =
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
   | 'starTour'
   | 'strokeResult'
+  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save).
+  | 'story'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -205,6 +208,14 @@ export interface UiState {
    *  not from a Rainbow-Road eagle mid-voyage — so there is no suspended journey to resume. `leaveAsgard`
    *  reads this to return to the star map instead of a travel screen. Transient (never persisted). */
   asgardFromStarTour?: boolean;
+  /** GS-story: the active Story Mode campaign, when the player is in Story Mode. Persisted to its OWN
+   *  `gs_story` save blob (NOT the main `gs_save`), loaded into state at boot if a campaign exists, and
+   *  written back by the app after each action. Absent ⇒ no campaign started on this device. */
+  story?: StoryState;
+  /** GS-story: the golfer picker is open to begin a NEW campaign (vs picking a golfer for Voyage/Unending/
+   *  Star Tour). `selectCharacter` reads this to create a fresh `StoryState` instead of building a run.
+   *  Transient (never persisted). */
+  pendingStoryNew?: boolean;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -246,6 +257,9 @@ export type Action =
   | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
   | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
+  | { type: 'openStory' } // GS-story: enter Story Mode — continue the saved campaign, or pick a golfer for a new one
+  | { type: 'storyNewCampaign' } // GS-story: begin a fresh campaign (pick a golfer) — overwrites the saved one on completion
+  | { type: 'exitStory' } // GS-story: leave the Story Mode hub back to the title
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
