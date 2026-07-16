@@ -120,6 +120,54 @@ view picks the archetype while golf is on screen (playing/result — so a split-
 holes switch tracks), `'menu'` everywhere else. `setMusicScene()` is a cheap no-op when the scene
 is unchanged, which matters because `render()` runs hot during the power-pull.
 
+### Per-world DISTINCTNESS (GS-music-distinct)
+
+The first cut of the music was *in tune and in sync but nearly indistinguishable* — every track
+plucked one generic note over one generic pad, so only the tuning (root/scale/bpm/waveform) changed
+between worlds and the ear couldn't tell it had moved. The fix keeps the table+dispatch shape but adds
+five **timbre levers** to the row (all optional; absent = the old plain voice), rendered by the engine
+so each world reads as a *different instrument*, not the same one re-tuned:
+
+- **`lead`** — the melodic voice's CHARACTER (the biggest cue): `pluck` (the classic arp), `bell` (a
+  long glassy chime with an *inharmonic* partial — frost/crystal/asgard), `marimba` (a quick woody
+  mallet + sub-octave thump — verdant/earth/fungal/menu), `bowed` (a slow legato swell that melts into
+  the pad — the deep/becalmed worlds: void/cetus/derelict/desert/ocean/swamp), `blip` (a bright square
+  stab — tempest/metal).
+- **`padDetune`** (cents) — chorus width; a fat lush pad (ocean 18, swamp 20) vs a pure cold one (void 3).
+- **`padCut`** (Hz low-pass on the pad only) — darkens/muffles the held chord; the strongest "another
+  instrument" cue between a bright world and a murky one (swamp 700, cetus 800, void 900 vs open/bright).
+- **`sub`** — a deep octave-below-the-bass drone for weight (the deep-space + heavy worlds).
+- **`pulse`** / **`pulseVoice`** — a subtle percussion groove (`kick`/`clank`/`heart`/`shaker`/`tick`) on
+  the downbeats with light off-beat ticks; the driving worlds (metal clank, tempest/inferno kick, swamp
+  heartbeat, desert/ocean shaker) get a pulse the calm ones lack. Levels are gentle — still a bed.
+
+Guarded in `tests/audio.test.ts`: the levers stay in range AND the table is *actually* distinct (≥4
+lead voices in use, ≥6 grooved worlds, ≥4 darkened pads) so it can't silently collapse back to one voice.
+
+### Weather AMBIENCE (GS-weather-audio) — `render/weatherAudio.ts`
+
+A subtle environmental sound layer that COMPLEMENTS the music, keyed to the route's `CourseEffect`
+(the same content-as-data as the visible weather): a blizzard *howls*, a solar/ion storm *crackles*, an
+aurora/nebula *shimmers* with soft chimes, a gravity well / dark-matter drift *rumbles*, a meteor shower
+*whooshes*, a debris field *clanks*. One `WEATHER_AMBIENCE` row per `CourseEffectId` (coverage
+machine-checked, like the music tracks): a **continuous bed** (`wind` = looping filtered noise gusting on
+an LFO; `drone` = low detuned oscillators; `shimmer` = a soft high airy hiss) plus a sparse **event
+pump** (`setInterval`) firing the odd crackle/sparkle/twinkle/whoosh/clank so the sky never sits dead
+still. `none`/calm rows are zero-gain no-ops.
+
+It rides the house rules: assetless synth, its OWN low-gain bus off the shared `AudioContext`, imports
+clean in node, tab-hidden mutes. Two deliberate choices:
+- **Gated on `sound`, not `music`** — it's environmental SFX, so it plays with cues-on/music-off and
+  vice-versa (independent toggles, same as the two existing buses).
+- **DELIBERATELY subtle** — the bus caps at `WEATHER_GAIN_CAP` (0.16), *well* under the music bed
+  (music ≤0.32), so it adds life without fighting the melody. `_gsFeel.weatherVolume` scales it for
+  tuning (a *sub-field* of the existing `_gsFeel` hatch — no new hook, so no test-hub wiring).
+
+Driven from `syncMusic()` (playFx.ts) alongside the music scene: while a golf hole is on screen it plays
+`currentEffect()`'s sky, silent on the menu/travel/shop screens. A cheap no-op when unchanged (render's
+hot path), and it stops the moment `sound` is toggled off (the pump re-reads the setting each tick).
+Guarded in `tests/audio.test.ts`: full coverage, the gain ceiling, and the driver as a headless no-op.
+
 Engine gotchas encoded in the module:
 - **Suspended context**: pre-gesture, `currentTime` is frozen — the pump fills one lookahead
   window and idles; on resume the queued notes play and the pump takes over. Never busy-schedule

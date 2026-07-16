@@ -12,7 +12,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import { sfx, strikeClassOf, landVoiceOf, treeVoiceOf, TREE_VOICES, type StrikeClass } from '../src/render/audio';
-import { MUSIC_TRACKS, type MusicSceneId } from '../src/render/music';
+import { MUSIC_TRACKS, type MusicSceneId, type LeadVoice, type PulseVoice } from '../src/render/music';
+import {
+  WEATHER_AMBIENCE,
+  WEATHER_GAIN_CAP,
+  setWeatherAmbience,
+  stopWeatherAmbience,
+} from '../src/render/weatherAudio';
+import { COURSE_EFFECTS, type CourseEffectId } from '../src/sim/rpg/effects';
 import { CLUBS } from '../src/sim/clubs';
 import { ARCHETYPE_TURF } from '../src/render/palette';
 import type { BiomeArchetype } from '../src/sim/course/themes';
@@ -75,6 +82,72 @@ describe('world music (GS-audio-2)', () => {
   it('no two worlds share the identical mood (root+scale+bpm fingerprint is unique)', () => {
     const prints = Object.values(MUSIC_TRACKS).map((t) => `${t.root}|${t.scale.join(',')}|${t.bpm}`);
     expect(new Set(prints).size).toBe(prints.length);
+  });
+
+  it('the timbre levers (GS-music-distinct) stay in valid ranges', () => {
+    const LEADS: readonly LeadVoice[] = ['pluck', 'bell', 'marimba', 'bowed', 'blip'];
+    const PULSES: readonly PulseVoice[] = ['tick', 'kick', 'clank', 'heart', 'shaker'];
+    for (const [id, t] of Object.entries(MUSIC_TRACKS)) {
+      if (t.lead !== undefined) expect(LEADS, `${id} lead`).toContain(t.lead);
+      if (t.pulseVoice !== undefined) expect(PULSES, `${id} pulseVoice`).toContain(t.pulseVoice);
+      for (const k of ['padDetune', 'padCut', 'sub', 'pulse'] as const) {
+        if (t[k] !== undefined) expect(t[k], `${id} ${k}`).toBeGreaterThanOrEqual(0);
+      }
+      // Sub drone + percussion levels are gentle so they never dominate the bed.
+      if (t.sub !== undefined) expect(t.sub, `${id} sub`).toBeLessThanOrEqual(0.2);
+      if (t.pulse !== undefined) expect(t.pulse, `${id} pulse`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('the worlds are ACTUALLY distinct in timbre — a spread of lead voices AND grooved worlds', () => {
+    // The player ask: worlds must sound obviously different, not just subtly re-tuned. Guard that the
+    // table actually exercises the distinctness levers rather than collapsing back to one voice.
+    const leads = new Set(Object.values(MUSIC_TRACKS).map((t) => t.lead ?? 'pluck'));
+    expect(leads.size, 'distinct lead voices in use').toBeGreaterThanOrEqual(4);
+    const grooved = Object.values(MUSIC_TRACKS).filter((t) => (t.pulse ?? 0) > 0).length;
+    expect(grooved, 'worlds with a percussion pulse').toBeGreaterThanOrEqual(6);
+    const darkened = Object.values(MUSIC_TRACKS).filter((t) => (t.padCut ?? 0) > 0).length;
+    expect(darkened, 'worlds with a darkened/muffled pad').toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('weather ambience (GS-weather-audio)', () => {
+  const EFFECTS = Object.keys(COURSE_EFFECTS) as CourseEffectId[];
+
+  it('every course effect has an ambience row (no silent fallback), and clear skies are silent', () => {
+    for (const e of EFFECTS) expect(WEATHER_AMBIENCE[e], `ambience for ${e}`).toBeDefined();
+    expect(WEATHER_AMBIENCE.none.gain, 'clear skies play nothing').toBe(0);
+  });
+
+  it('every ambience is SUBTLE — capped well under the music bed so it never overpowers the melody', () => {
+    for (const [id, a] of Object.entries(WEATHER_AMBIENCE)) {
+      expect(a.gain, `${id} gain`).toBeGreaterThanOrEqual(0);
+      expect(a.gain, `${id} gain (weather is a bed under the music, ≤ ${WEATHER_GAIN_CAP})`).toBeLessThanOrEqual(
+        WEATHER_GAIN_CAP,
+      );
+      expect(a.gust, `${id} gust`).toBeGreaterThanOrEqual(0);
+      expect(a.gust, `${id} gust`).toBeLessThanOrEqual(1);
+      expect(a.eventChance, `${id} eventChance`).toBeGreaterThanOrEqual(0);
+      expect(a.eventChance, `${id} eventChance`).toBeLessThanOrEqual(1);
+    }
+    // The subtlety bar is real: the weather ceiling sits well below the music bed (≤0.32).
+    expect(WEATHER_GAIN_CAP).toBeLessThan(0.32);
+  });
+
+  it('the marquee skies read true — the blizzard howls hardest, calm skies stay quiet', () => {
+    expect(WEATHER_AMBIENCE.blizzard.bed).toBe('wind');
+    expect(WEATHER_AMBIENCE.blizzard.gain).toBeGreaterThan(WEATHER_AMBIENCE.moonlight.gain);
+    expect(WEATHER_AMBIENCE.ionStorm.event).toBe('crackle');
+    expect(WEATHER_AMBIENCE.gravityWell.bed).toBe('drone');
+    expect(WEATHER_AMBIENCE.aurora.event).toBe('sparkle');
+  });
+
+  it('the driver is a guarded headless no-op (never a throw in node, no AudioContext)', () => {
+    for (const e of EFFECTS) expect(() => setWeatherAmbience(e), `set ${e}`).not.toThrow();
+    expect(() => setWeatherAmbience('none')).not.toThrow();
+    expect(() => setWeatherAmbience(null)).not.toThrow();
+    expect(() => setWeatherAmbience('bogus-effect')).not.toThrow(); // unknown id → silent, never a throw
+    expect(() => stopWeatherAmbience()).not.toThrow();
   });
 });
 
