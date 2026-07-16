@@ -1421,16 +1421,60 @@ function thrustTrail(look: ShipLook): string {
   </g>`;
 }
 
+/** The HOVER-craft propulsion (GS-ship-hover-prop) — a bespoke ANTI-GRAV REPULSOR for a nose-less disc
+ *  (flying saucer / UFO / any `fly:'hover'` ship), NOT the sideways jet plume a car trails. A saucer
+ *  doesn't burn a tail flame — it PUSHES DOWN on space to hover, so the propulsion lives UNDER the hull
+ *  (drawn in the body-local frame, so it banks with the disc and always points down, never out the side):
+ *    • expanding PULSE RINGS ripple down-and-out (the repulsor beating against space),
+ *    • a bright plasma PAD hugs the disc base,
+ *    • a soft downward ION COLUMN flickers below it,
+ *    • charge MOTES stream down the column.
+ *  Coloured off the ship's own flame/accent so the caddie glows green and the mothership teal-gold. Wears
+ *  `.gs-st-thrust` so the app's `.gs-st-thrusting` fade powers it up only while cruising (a docked disc
+ *  rests on its pad), plus `.gs-st-hoverprop` as the marker that this is the repulsor, not the jet. */
+function hoverThrust(look: ShipLook): string {
+  const { flame, accent } = look;
+  // A repulsor pulse: an ellipse that grows down-and-out from the disc base and fades — a shove of thrust.
+  const pulse = (begin: string): string => `
+    <ellipse cx="0" cy="8" rx="5" ry="1.6" fill="none" stroke="${accent}" stroke-width="1.3" opacity="0">
+      <animate attributeName="rx" values="4;17" dur="1.2s" begin="${begin}" repeatCount="indefinite"/>
+      <animate attributeName="ry" values="1.3;5.4" dur="1.2s" begin="${begin}" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="8;16" dur="1.2s" begin="${begin}" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.85;0" dur="1.2s" begin="${begin}" repeatCount="indefinite"/>
+    </ellipse>`;
+  // A charge mote falling down the ion column.
+  const mote = (x: number, begin: string, dur: string): string => `
+    <circle cx="${x}" cy="8" r="1.1" fill="#eaffff" opacity="0">
+      <animate attributeName="opacity" values="0;0.9;0" dur="${dur}" begin="${begin}" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="7;19" dur="${dur}" begin="${begin}" repeatCount="indefinite"/>
+    </circle>`;
+  return `<g class="gs-st-thrust gs-st-hoverprop" stroke="none">
+    ${pulse('0s')}${pulse('0.6s')}
+    <path d="M-6.5,7 L6.5,7 L3.4,21 L-3.4,21 Z" fill="${flame}" opacity="0.3">
+      <animate attributeName="opacity" values="0.36;0.16;0.36" dur="0.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M-3.4,7 L3.4,7 L1.6,18 L-1.6,18 Z" fill="#ffffff" opacity="0.45">
+      <animate attributeName="opacity" values="0.55;0.3;0.55" dur="0.4s" repeatCount="indefinite"/>
+    </path>
+    <ellipse cx="0" cy="7.5" rx="8" ry="3.2" fill="${flame}" opacity="0.45">
+      <animate attributeName="rx" values="7;9;7" dur="0.9s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse cx="0" cy="7.5" rx="4" ry="1.8" fill="#ffffff" opacity="0.85"/>
+    ${mote(-2.4, '0s', '0.9s')}${mote(2.4, '0.35s', '1.1s')}${mote(0, '0.6s', '0.8s')}
+  </g>`;
+}
+
 /** The player's ship group (GS-star-tour-2, GS-ship-fly-orient) — positioned each frame by the app
  *  rewriting the transforms. The group splits into TWO oriented children so a nose-less hover craft can
  *  glide level while its plume still streams behind:
  *    • `#gs-st-ship`   — position only (`translate`).
- *    • `#gs-st-thrust-orient` — the engine plume, always rotated to the flight heading so it trails BEHIND
- *                        the hull (the art plume points −x, so `rotate(heading)` sends it opposite travel).
+ *    • `#gs-st-thrust-orient` — the NOSE-craft jet plume, always rotated to the flight heading so it trails
+ *                        BEHIND the hull (the art plume points −x, so `rotate(heading)` sends it opposite
+ *                        travel). EMPTY for a hover craft — a saucer trails no tail jet.
  *    • `#gs-st-body`   — the hull. NOSE craft rotate to the heading (+ vertical `flip` when flying left
  *                        so a wheeled hull never reads belly-up). HOVER craft (saucer/UFO) stay UPRIGHT
- *                        and only `hoverBank()` — the disc never tumbles, so its under-beam stops swinging
- *                        out the side.
+ *                        and only `hoverBank()` — the disc never tumbles — and carry their own downward
+ *                        `hoverThrust()` REPULSOR under the hull (GS-ship-hover-prop) instead of a jet.
  *  The ship art faces +x (right), so heading 0 = flying right; the app feeds `atan2(dy,dx)`. */
 function shipGroup(opts: StarTourMapOpts): string {
   const x = opts.shipX ?? SPACEPORT_POS.x;
@@ -1438,14 +1482,16 @@ function shipGroup(opts: StarTourMapOpts): string {
   const h = opts.shipHeading ?? SHIP_DOCK_HEADING;
   const flip = opts.shipFlip ?? 1;
   const look = (shipById(opts.shipId) ?? shipById(DEFAULT_SHIP_ID)!).look;
-  const bodyTransform =
-    look.fly === 'hover'
-      ? `rotate(${hoverBank(h).toFixed(1)})`
-      : `rotate(${h.toFixed(1)}) scale(1 ${flip})`;
+  const hover = look.fly === 'hover';
+  const bodyTransform = hover ? `rotate(${hoverBank(h).toFixed(1)})` : `rotate(${h.toFixed(1)}) scale(1 ${flip})`;
+  // NOSE craft trail the jet from the heading-oriented group; HOVER craft leave it empty and instead carry
+  // a downward repulsor UNDER the hull (drawn first, so the disc sits on it), banking with the body.
+  const jet = hover ? '' : thrustTrail(look);
+  const repulsor = hover ? `<g transform="scale(${SHIP_SCALE})">${hoverThrust(look)}</g>` : '';
   return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" style="pointer-events:none;">
     <circle r="30" fill="#7fe0ff" opacity="0.08"/>
-    <g id="gs-st-thrust-orient" transform="rotate(${h.toFixed(1)})"><g transform="scale(${SHIP_SCALE})">${thrustTrail(look)}</g></g>
-    <g id="gs-st-body" transform="${bodyTransform}">${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}</g>
+    <g id="gs-st-thrust-orient" transform="rotate(${h.toFixed(1)})"><g transform="scale(${SHIP_SCALE})">${jet}</g></g>
+    <g id="gs-st-body" transform="${bodyTransform}">${repulsor}${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}</g>
   </g>`;
 }
 

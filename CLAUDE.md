@@ -1243,7 +1243,13 @@ these systems** — each bullet is the tip of a documented iceberg.
     `hoverBank(heading)` = `HOVER_BANK_MAX·cos(heading)`, a gentle lean into travel that never tumbles) and
     `#gs-st-thrust-orient` (the plume — ALWAYS `rotate(heading)` so it streams BEHIND the hull whatever the
     body does). Both `shipGroup` (initial paint) AND the app's per-frame `stepStarTour` write the same split
-    (branch on `starTourShipHovers()`); a new hover ship is just `fly: 'hover'` on its row. An engine PLUME
+    (branch on `starTourShipHovers()`); a new hover ship is just `fly: 'hover'` on its row. A hover craft
+    also gets a BESPOKE PROPULSION (GS-ship-hover-prop, `hoverThrust`) instead of the car jet: a downward
+    ANTI-GRAV REPULSOR (pulse rings rippling down-and-out + a plasma pad hugging the disc base + a flickering
+    ion column + falling charge motes, coloured off the ship's flame/accent) drawn UNDER the hull in the
+    body-local frame (so it banks with the disc + always points down, never a sideways tail flame); its
+    `#gs-st-thrust-orient` jet group is left EMPTY. Wears `.gs-st-thrust` so the `.gs-st-thrusting` cruise
+    fade powers it up (docked = the disc rests on its pad) + `.gs-st-hoverprop` as the marker. An engine PLUME
     (`thrustTrail`, trailing off the tail, coloured off the ship's flame/accent) fades in via a
     `.gs-st-thrusting` class the rAF loop toggles while cruising, so the ship reads as flying, not sliding.
     FLIGHT SPEED
