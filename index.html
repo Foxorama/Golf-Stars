@@ -182,11 +182,11 @@
       .gs-fueldepot__row--stack > span { flex: 1 1 auto; width: 100%; }
       /* ── Stop intro (GS-intro-split): two mobile-first steps — the ARC (mode + field of
              competitors) then the HOLE (map + hazards popup). Each step is built to hold one
-             phone screen; the arc's bottom First-Tee is revealed by JS only when the field
-             overflows, and the hole map is viewport-capped so its action row stays on-screen. ── */
+             phone screen; the arc's field of 20 sits behind a tap-to-open SCOUT bar (one CTA, no
+             duplicate), and the hole map is viewport-capped so its action row stays on-screen. ── */
       .gs-intro-ctarow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-      .gs-intro-ctarow--bottom { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gs-line-2); }
       .gs-intro-first { flex: 1 1 auto; min-width: 160px; text-align: center; font-size: 16px; padding: 14px 18px; }
+      .gs-intro-scout { margin-top: 14px; }
       .gs-holeintro { display: flex; flex-direction: column; gap: 10px; }
       .gs-holeintro-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
       .gs-holeintro-boss {

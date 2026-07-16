@@ -3,8 +3,10 @@
  * condition, the field of 20 AND the hole art + hazard list into one long mobile scroll. It's now
  * split so each step fits a phone and has its own primary action:
  *   'arc'  — the GAME (mode + objective) and the COMPETITION (boss note + the field of competitors),
- *            a big "First Tee ▸" at the top (and again at the bottom when the field overflows a
- *            screen), plus a "Change golfer" back-out.
+ *            ONE big "First Tee ▸" up top plus a "Change golfer" back-out. The field of 20 (or the
+ *            endless/Star-Tour records) sits behind a tap-to-open SCOUT bar (the hole step's
+ *            hazards-popup pattern) so the arc step always holds one phone screen — no long roster
+ *            scroll, and no duplicate bottom "First Tee" to reach it (both removed GS-intro-onescreen).
  *   'hole' — the HOLE you're about to play: a big map, a tap-to-open hazards/benefits popup, and a
  *            "Tee Off" / "Watch AI" / "Back" action row, sized to hold one screen.
  */
@@ -34,7 +36,7 @@ import type { PlayedHole } from '../sim/round';
 // View-only module state (like settingsOpen / travelView.selectedRouteId) — reset to the arc step +
 // closed popup whenever we (re-)enter the intro, so a fresh stop always opens on the arc. No
 // save/rng touch. app.ts's dispatch/render own the resets + `[data-intro-stage]` wiring.
-export const introView = { stage: 'arc' as 'arc' | 'hole', traitsOpen: false };
+export const introView = { stage: 'arc' as 'arc' | 'hole', traitsOpen: false, fieldOpen: false };
 
 /**
  * Shared derivation for BOTH intro steps: the world identity, the compact competition/route NOTES,
@@ -233,26 +235,7 @@ export function endlessRoundSoFar(playedSoFar: PlayedHole[]): EndlessCardData {
  */
 function arcIntroScreen(): string {
   const { c, zone, theme, col, par, rar, diffPips, notes, salvageNote, objective } = introShared();
-  // The Unending Universe tracks DEPTH (GS-set-survival): the "field" slot shows your progress card
-  // (sets cleared + this set's target) + the personal last-runs leaderboard grouped by starting club
-  // set, instead of the voyage's ghost competitor board. Gated to the gate format (voyage untouched).
-  const gate = holeGateArmed(state.run);
-  let field: string;
-  if (state.run.formatId === STROKEPLAY_FORMAT) {
-    // Star Tour (GS-star-tour): the "field" slot shows the personal course records instead of a ghost
-    // field — this course's best and your best rounds overall.
-    field = strokeRecordsCard();
-  } else if (gate) {
-    const r = state.run;
-    field =
-      endlessScoreCard(
-        { holesCleared: r.holesSurvived, stopIndex: r.stopIndex, tier: r.bagTier ?? 'common' },
-        { title: r.holesSurvived > 0 ? 'Your run' : 'New run', next: true },
-      ) + endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common' });
-  } else {
-    const board = leaderboard(state.run);
-    field = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
-  }
+  const fieldSlot = introFieldSlot();
   // Stop 0 is the first tee after character select — the ONLY intro where "Change golfer" makes
   // sense (you've committed to this golfer for the run). Every later world intro (post pro-shop) is
   // "Next Tee" with no back-out to character select (GS-intro-nav).
@@ -284,11 +267,57 @@ function arcIntroScreen(): string {
       </div>
       ${notes.join('')}
       ${salvageNote}
-      ${field}
-      <div class="gs-intro-ctarow gs-intro-ctarow--bottom" id="gs-firsttee-bottomwrap" style="display:none;">
-        ${firstTee('gs-firsttee-bottom')}
-      </div>
+      <button class="gs-traits-bar gs-intro-scout" data-introfield="open" aria-label="${fieldSlot.aria}">
+        <span class="gs-trait-chip"><span class="gs-trait-chip-i">${fieldSlot.icon}</span><span class="gs-trait-chip-l" style="--tc:var(--gs-ink);">${fieldSlot.title}</span></span>
+        <span class="gs-traits-bar-more">${fieldSlot.hint} ›</span>
+      </button>
     </article>`;
+}
+
+/**
+ * The arc step's "field" slot (GS-intro-onescreen), shared by the SCOUT bar and its overlay so they
+ * never drift. `body` is the full content (kept behind a tap so the arc step holds one screen); the
+ * bar shows `title`/`hint`. Per format: the Voyage ghost competitor field, the Unending run+records,
+ * or the Star Tour course records.
+ */
+function introFieldSlot(): { body: string; title: string; hint: string; icon: string; aria: string } {
+  // The Unending Universe tracks DEPTH (GS-set-survival): the slot shows your progress card (sets
+  // cleared + this set's target) + the personal last-runs leaderboard grouped by starting club set,
+  // instead of the voyage's ghost competitor board. Gated to the gate format (voyage untouched).
+  if (state.run.formatId === STROKEPLAY_FORMAT) {
+    // Star Tour (GS-star-tour): the personal course records instead of a ghost field.
+    return { body: strokeRecordsCard(), title: 'Course records', hint: 'View', icon: '🏆', aria: 'View course records' };
+  }
+  if (holeGateArmed(state.run)) {
+    const r = state.run;
+    const body =
+      endlessScoreCard(
+        { holesCleared: r.holesSurvived, stopIndex: r.stopIndex, tier: r.bagTier ?? 'common' },
+        { title: r.holesSurvived > 0 ? 'Your run' : 'New run', next: true },
+      ) + endlessRecordsBoard(state.endlessRuns, { currentTier: r.bagTier ?? 'common' });
+    return { body, title: 'Your run & records', hint: 'View', icon: '🏆', aria: 'View your run and records' };
+  }
+  const board = leaderboard(state.run);
+  const body = board.hasScores ? leaderboardHTML(board) : competitorsCard(runField(state.run));
+  const n = runField(state.run).golfers.length;
+  return { body, title: `The field — ${n} golfers`, hint: 'Scout', icon: '🏆', aria: `Scout the field of ${n} golfers` };
+}
+
+/** The arc-step field/scout overlay (GS-intro-onescreen): the full competitor field / records, kept
+ *  behind a tap so the arc step holds one phone screen — the sibling of the hole step's hazards popup. */
+export function introFieldOverlay(): string {
+  const { body, title } = introFieldSlot();
+  return `
+    <div class="gs-sheet-backdrop" data-introfield="close">
+      <div class="gs-sheet" data-introfield="keep">
+        <div class="gs-sheet-head"><b style="font-size:17px;">${title}</b>
+          <button class="gs-mapbtn" data-introfield="close" title="Close">✕</button></div>
+        ${body}
+        <div style="text-align:center;margin-top:12px;">
+          <button class="gs-btn gs-btn--primary" data-introfield="close" style="padding:11px 26px;">Done</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 /**
