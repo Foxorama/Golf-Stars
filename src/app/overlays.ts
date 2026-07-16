@@ -21,50 +21,71 @@ import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
 import { getSettings, type Settings } from '../settings';
 
-/** The settings sheet: player-owned feel/control prefs (sound, haptics, fast shots, swing gesture,
- *  left-handed, reduced motion), plus — anywhere but the title itself — a "Return to title" escape
- *  hatch (GS-settings-nav). An underway run is parked as a resumable snapshot, never destroyed. */
+/** The three default-aim modes, as a SEGMENTED radio control (GS-default-aim): big real-button tap
+ *  targets, so there's no fiddly native `<select>` to mis-tap (the old dropdown only opened on its
+ *  text and near-misses landed on the adjacent "Return to title" row — a jarring accidental exit). */
+const AIM_OPTS: readonly { id: Settings['aimMode']; icon: string; label: string; desc: string }[] = [
+  { id: 'auto', icon: '◎', label: 'Auto', desc: 'Smart — down the fairway off the tee, at the flag on an approach.' },
+  { id: 'attack', icon: '🚩', label: 'Attack', desc: 'Always aim straight at the flag.' },
+  { id: 'safe', icon: '🛟', label: 'Safe', desc: 'Lay up to the fat of the fairway and green.' },
+];
+
+/**
+ * The settings sheet: player-owned feel/control prefs grouped into sections (Audio / Feel / Aim assist),
+ * plus — anywhere but the title itself — a clearly-separated "Return to title" footer (GS-settings-nav).
+ * An underway run is parked as a resumable snapshot, never destroyed. Every interactive element carries
+ * a `data-*` hook whose app.ts handler stops propagation, so a tap (or a near-miss) can never bubble to
+ * the backdrop and tear the sheet down (the old native `<select>` mis-tap → accidental exit).
+ */
 export function settingsOverlay(): string {
   const s = getSettings();
   const row = (key: keyof Settings, label: string, desc: string): string => {
     const on = s[key];
-    return `<button class="gs-setrow" data-setting="${key}">
+    return `<button class="gs-setrow" data-setting="${key}" role="switch" aria-checked="${on}">
       <span class="gs-setlabel"><b>${label}</b><span>${desc}</span></span>
       <span class="gs-toggle${on ? ' gs-toggle--on' : ''}" aria-hidden="true"><span class="gs-knob"></span></span>
     </button>`;
   };
+  const aimBtns = AIM_OPTS.map(
+    (o) => `<button class="gs-seg${s.aimMode === o.id ? ' gs-seg--on' : ''}" data-selaim="${o.id}" role="radio" aria-checked="${s.aimMode === o.id}">
+        <span class="gs-seg-i" aria-hidden="true">${o.icon}</span><span class="gs-seg-t">${o.label}</span>
+      </button>`,
+  ).join('');
+  const activeAim = AIM_OPTS.find((o) => o.id === s.aimMode) ?? AIM_OPTS[0]!;
   const midRun = state.run.status === 'active' && !!state.run.loadout.characterId;
-  const homeRow =
+  const homeFoot =
     state.screen === 'title'
       ? ''
-      : `<button class="gs-setrow" data-settings-home="1">
-          <span class="gs-setlabel"><b>🏠 Return to title</b><span>${midRun ? 'Your run is saved — continue it any time' : 'Back to the main menu'}</span></span>
-          <span style="font-size:16px;opacity:.6;" aria-hidden="true">→</span>
-        </button>`;
+      : `<div class="gs-setfoot">
+          <button class="gs-setrow gs-setrow--nav" data-settings-home="1">
+            <span class="gs-setlabel"><b>🏠 Return to title</b><span>${midRun ? 'Your run is saved — continue it any time' : 'Back to the main menu'}</span></span>
+            <span style="font-size:16px;opacity:.6;" aria-hidden="true">→</span>
+          </button>
+        </div>`;
   return `
     <div class="gs-sheet-backdrop" data-settings="close">
-      <div class="gs-sheet" data-settings="keep">
+      <div class="gs-sheet gs-settings" data-settings="keep">
         <div class="gs-sheet-head"><b style="font-size:17px;">⚙ Settings</b>
           <button class="gs-mapbtn" data-settings="close" title="Close">✕</button></div>
+
+        <div class="gs-setsec">Audio</div>
         ${row('sound', 'Sound', 'Chimes & contact cues (no downloads)')}
         ${row('music', 'Music', 'Ambient world themes — a different mood per world')}
+
+        <div class="gs-setsec">Feel</div>
         ${row('haptics', 'Haptics', 'Vibration feedback on supported phones')}
         ${row('fastShots', 'Fast shots', 'Skip the tap after each shot — roll straight on')}
-        ${row('leftHanded', 'Left-handed', 'Enables left handed mode')}
+        ${row('leftHanded', 'Left-handed', 'Swing and aim mirrored for lefties')}
         ${row('reducedMotion', 'Reduced motion', 'Calmer effects & celebrations')}
-        <div style="margin:8px 4px 3px;font-size:12px;opacity:.72;">🎯 Aim assist — how every shot is pre-aimed (change it in play with the ◎ button too)</div>
-        <label class="gs-selpill" style="--cc:var(--gs-info);width:100%;box-sizing:border-box;margin-bottom:2px;">
-          <span class="gs-selpill-l">🎯 Aim</span>
-          <select class="gs-selpill-sel" data-selaim aria-label="Default aim mode">
-            <option value="auto"${s.aimMode === 'auto' ? ' selected' : ''}>Auto — smart</option>
-            <option value="attack"${s.aimMode === 'attack' ? ' selected' : ''}>Attack the flag</option>
-            <option value="safe"${s.aimMode === 'safe' ? ' selected' : ''}>Play safe</option>
-          </select>
-          <span class="gs-selpill-caret" aria-hidden="true">▾</span>
-        </label>
-        ${homeRow}
-        <div style="text-align:center;margin-top:10px;">
-          <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 26px;">Done</button>
+
+        <div class="gs-setsec">🎯 Aim assist</div>
+        <div class="gs-setnote">How every shot is pre-aimed. Change it mid-round with the ◎ button too.</div>
+        <div class="gs-segctl" role="radiogroup" aria-label="Default aim mode">${aimBtns}</div>
+        <div class="gs-seghint">${activeAim.desc}</div>
+
+        ${homeFoot}
+        <div class="gs-setdone">
+          <button class="gs-btn gs-btn--primary" data-settings="close" style="padding:11px 30px;">Done</button>
         </div>
       </div>
     </div>`;

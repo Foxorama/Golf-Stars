@@ -1243,6 +1243,32 @@
       }
       .gs-toggle--on { background: #1f5e2d; border-color: var(--gs-accent); }
       .gs-toggle--on .gs-knob { transform: translateX(19px); background: #ecffe9; }
+      /* Settings sheet sections + segmented aim control (GS-default-aim) */
+      .gs-setsec {
+        font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+        color: var(--gs-dim); margin: 15px 2px 1px;
+      }
+      .gs-setsec:first-of-type { margin-top: 4px; }
+      .gs-setnote { font-size: 12px; opacity: .62; margin: 4px 2px 0; line-height: 1.4; }
+      .gs-segctl { display: flex; gap: 7px; margin-top: 9px; }
+      .gs-seg {
+        flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
+        padding: 11px 4px; border-radius: var(--gs-r); cursor: pointer; color: var(--gs-dim);
+        background: #1b2130; border: 1px solid var(--gs-line);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: background .14s ease, border-color .14s ease, color .14s ease;
+      }
+      .gs-seg:active { background: #ffffff0d; }
+      .gs-seg-i { font-size: 20px; line-height: 1; }
+      .gs-seg-t { font-size: 12.5px; font-weight: 700; }
+      .gs-seg--on {
+        background: #17331f; border-color: var(--gs-accent); color: var(--gs-ink);
+        box-shadow: inset 0 0 0 1px var(--gs-accent);
+      }
+      .gs-seghint { font-size: 12px; opacity: .7; margin: 8px 2px 0; min-height: 15px; line-height: 1.4; }
+      .gs-setfoot { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--gs-line); }
+      .gs-setrow--nav { border-top: none; }
+      .gs-setdone { text-align: center; margin-top: 14px; }
 
       /* ── Celebration sparkle burst (assetless, one-shot) ───────────────────────────── */
       .gs-burst { position: absolute; left: 50%; top: 28%; width: 0; height: 0; pointer-events: none; z-index: 4; }
