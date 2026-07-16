@@ -1124,7 +1124,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     kept in lockstep with `autoAimTarget`: a green attack → the green-COVERAGE club (`suggestPlayerClub`,
     so an approach never comes up a club short); an OPEN corridor positioning shot → the LONGEST usable
     club (the driver off the tee, since the club sets the CARRY and the aim only the DIRECTION — it was
-    pre-arming a 5-wood); a forced-carry lay-up → `aiClub` (never over-club into the hazard). (3) the
+    pre-arming a 5-wood); a forced-CARRY drive (the aim flies OVER a hazard to a landing beyond it) →
+    `longestCarryClub`, the LONGEST club that still clears the far bank AND lands penalty-free (more club
+    is the safer carry, not less — a long par-4 tee shot over a river is a DRIVER, not a clubbed-down
+    wood), stepping down only if the driver can't clear / would overshoot into a second hazard, and
+    falling back to `aiClub` only when NO club clears (a genuine lay-up short). This fixed the residual
+    "off-tee still defaults to a 5-wood on a carry hole" report: the old blocked-line branch handed the
+    forced carry straight to `aiClub` (shortest club that reaches), clubbing a driver down to a wood on
+    the ~58% of long par-4 tee shots that carry a creek/river; it also cured the sticky sibling symptom
+    (auto pre-armed the wood, then toggling aim to pin KEEPS the selection since it's still usable — so
+    an attack shot showed the wood too). (3) the
     settings 🎯 dropdown was UNPICKABLE — a click on the `<select>` bubbled through the `[data-settings=
     "keep"]` branch (which `return`ed WITHOUT `stopPropagation`) to the backdrop's close handler, tearing
     the sheet down before you could choose; the keep branch now stops the event.
