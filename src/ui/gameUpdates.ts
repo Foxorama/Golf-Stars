@@ -34,6 +34,7 @@ import { matchOpponentFor, runField } from '../sim/rpg/league';
 import { warriorsThreeTotals, warriorsEdge } from '../sim/rpg/competition';
 import { ascensionClubReward } from '../sim/rpg/club-unlock';
 import { aceShipUnlock } from '../sim/rpg/ships';
+import { completeStoryRound, PROLOGUE_COURSE_ID, storyRoundCredits, defaultStoryState } from '../sim/rpg/story';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
 
@@ -324,6 +325,42 @@ export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState
     ...(ownedShips !== state.ownedShips ? { ownedShips } : {}),
     // A finished round bumps the lounge counter so the golfers have shuffled by the time you're home.
     clubhouseVisit: state.clubhouseVisit + 1,
+  };
+}
+
+/**
+ * GS-story-prologue: resolve a completed Story Mode WORLD ROUND back into the campaign. Unlike Star Tour
+ * (which banks a course record and lands on the record recap), a Story round records the world clear on the
+ * `StoryState` — pay credits, keep the best score for the revisit chase, and advance the chapter if this was
+ * the prologue (Earth) — then lands on the Story recap (`storyResult`). Deliberately touches NO main-save
+ * meta (shards/aces/ownedShips) — the campaign is a separate progression (`gs_story`). The pure transition
+ * lives in `story.ts completeStoryRound`; this wraps it with the round scoring + screen/state plumbing.
+ */
+export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState {
+  const run = state.run;
+  const totals = playTotals(played.map((p) => p.record));
+  const courseId = run.staticCourseId ?? PROLOGUE_COURSE_ID;
+  const credits = storyRoundCredits(totals.toPar);
+  // Defensive: the hub should always have a campaign, but never crash if it's missing mid-round.
+  const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
+  const { story, advancedChapter, wasPrologue } = completeStoryRound(
+    base,
+    courseId,
+    { toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, seed: String(run.seed) },
+    credits,
+  );
+  return {
+    ...state,
+    run: { ...run, status: 'ended', endedReason: 'banked' },
+    story,
+    played,
+    stopPlayed: undefined,
+    play: undefined,
+    holeRng: undefined,
+    match: undefined,
+    viewHole: 0,
+    screen: 'storyResult',
+    lastStoryRound: { courseId, toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, credits, advancedChapter, wasPrologue },
   };
 }
 

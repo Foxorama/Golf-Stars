@@ -81,7 +81,7 @@ import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, st
 import { shipForCharacter } from './ui/gameCosmetics';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
-import { storyHubScreen } from './app/storyScreens';
+import { storyHubScreen, storyResultScreen } from './app/storyScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -209,6 +209,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       // GS-story: mount the Story Mode hub the honest way — enter Story Mode (no save ⇒ new-game golfer
       // pick), then pick the first golfer, which creates the StoryState and lands on the hub.
       return reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+    case 'storyresult': {
+      // GS-story-prologue: mount the world-round recap the honest way — enter Story Mode, pick a golfer,
+      // tee off the Earth prologue round, then auto-play + resolve it exactly as the reducer's `play` path
+      // does. Exercises the whole Story round → resolveStoryRound spine, so the deep-link can't hide a bug.
+      const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
+      return reduce(intro, { type: 'play' });
+    }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
       // lore gate builds), so a headless smoke test can render the new screen chrome.
@@ -2197,6 +2205,8 @@ function render(): void {
       ? strokeResultScreen()
       : state.screen === 'story'
       ? storyHubScreen()
+      : state.screen === 'storyResult'
+      ? storyResultScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();

@@ -27,6 +27,35 @@ export const STORY_VERSION = 1;
 /** The five Galaxy Tournaments — collecting all five trophies forges the key to the other realm. */
 export const STORY_CHAPTER_COUNT = 5;
 
+/** The Earth opening: the final round of the World Tour (the Old Course at St Andrews). Clearing it is the
+ *  prologue — it recruits you into the campaign and advances chapter 0 → 1. See the story bible. */
+export const PROLOGUE_COURSE_ID = 'standrews-18';
+
+/** Credits paid for clearing a world round: a solid base, sweetened for going under par, floored so even a
+ *  scrappy win pays. Deliberately simple for now (a single persistent purse) — the cross-chapter economy
+ *  balance is a Phase G pass. `toPar` negative = under par. */
+export function storyRoundCredits(toPar: number): number {
+  const BASE = 200;
+  const PER_STROKE_UNDER = 15;
+  return Math.max(100, Math.round(BASE - toPar * PER_STROKE_UNDER));
+}
+
+/**
+ * Resolve a completed world round into the campaign (pure): record the clear (+credits, +best-score for the
+ * revisit chase), and — if this was the PROLOGUE (Earth, chapter 0) — advance to chapter 1. Immutable.
+ */
+export function completeStoryRound(
+  story: StoryState,
+  courseId: string,
+  result: StoryWorldBest,
+  creditsEarned: number,
+): { story: StoryState; advancedChapter: boolean; wasPrologue: boolean } {
+  let next = recordWorldClear(story, courseId, result, creditsEarned);
+  const wasPrologue = story.chapter === 0 && courseId === PROLOGUE_COURSE_ID;
+  if (wasPrologue) next = { ...next, chapter: 1 };
+  return { story: next, advancedChapter: wasPrologue, wasPrologue };
+}
+
 /**
  * The default GREEN bag every new campaign starts with (GS-story-save): a lean 10-club starter you must
  * grow by BUYING clubs in world Pro Shops (unlike the other modes, which hand you the full bag). A

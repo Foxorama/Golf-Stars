@@ -45,8 +45,10 @@ export type Screen =
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
   | 'starTour'
   | 'strokeResult'
-  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save).
+  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save),
+  // and the recap shown after clearing a world round (the prologue's victory grows into this).
   | 'story'
+  | 'storyResult'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -216,6 +218,19 @@ export interface UiState {
    *  Star Tour). `selectCharacter` reads this to create a fresh `StoryState` instead of building a run.
    *  Transient (never persisted). */
   pendingStoryNew?: boolean;
+  /** GS-story-prologue: the just-finished Story world round's recap payload (the `storyResult` screen). The
+   *  prologue's victory grows into the Mothership/Parrot scene here. Transient. */
+  lastStoryRound?: {
+    courseId: string;
+    toPar: number;
+    strokes: number;
+    par: number;
+    credits: number;
+    /** This clear advanced the story chapter (the prologue → Chapter 1). */
+    advancedChapter: boolean;
+    /** This was the prologue (the Earth World Tour final). */
+    wasPrologue: boolean;
+  };
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -260,6 +275,8 @@ export type Action =
   | { type: 'openStory' } // GS-story: enter Story Mode — continue the saved campaign, or pick a golfer for a new one
   | { type: 'storyNewCampaign' } // GS-story: begin a fresh campaign (pick a golfer) — overwrites the saved one on completion
   | { type: 'exitStory' } // GS-story: leave the Story Mode hub back to the title
+  | { type: 'storyPlayWorld'; courseId: string } // GS-story-prologue: tee off a Story world round from the hub
+  | { type: 'storyRoundContinue' } // GS-story-prologue: dismiss the world-round recap back to the campaign hub
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
