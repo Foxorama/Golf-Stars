@@ -71,6 +71,18 @@ export interface StarTourMapOpts {
  *  the constellation field above the home spaceport. */
 export const SHIP_DOCK_HEADING = -90;
 
+/** Max lean (deg) a HOVER craft (GS-ship-fly-orient) banks into its travel — enough to read as "gliding
+ *  that way" without ever tumbling the disc. */
+export const HOVER_BANK_MAX = 15;
+
+/** A nose-LESS hover craft's body BANK for a given flight heading (GS-ship-fly-orient): it stays UPRIGHT
+ *  and leans by the HORIZONTAL component of travel (cos heading = dx/|v|) — flying right tips the disc
+ *  right, flying left tips it left, flying straight up/down keeps it flat (0), and docked (heading −90)
+ *  sits it level. The trailing thrust plume shows the actual direction; the bank only sells the glide. */
+export function hoverBank(headingDeg: number): number {
+  return HOVER_BANK_MAX * Math.cos((headingDeg * Math.PI) / 180);
+}
+
 /** The CONTENT box — the region the RA→x / Dec→y world projection maps into. This is the original chart
  *  size; every constellation keeps its exact J2000 layout INSIDE this box. The visible chart is bigger
  *  than this (see the PAD below), so the worlds cluster in the middle and open starry space surrounds
@@ -1409,20 +1421,31 @@ function thrustTrail(look: ShipLook): string {
   </g>`;
 }
 
-/** The player's ship group (GS-star-tour-2) — positioned, rotated + flipped by the app each frame via
- *  its transform. Drawn at the origin (shipSVG at 0,0) so the wrapping transform is a pure
- *  translate+rotate+scale. The ship art faces +x (right), so heading 0 = flying right; the app feeds
- *  `atan2(dy,dx)` so the nose always points along the flight. */
+/** The player's ship group (GS-star-tour-2, GS-ship-fly-orient) — positioned each frame by the app
+ *  rewriting the transforms. The group splits into TWO oriented children so a nose-less hover craft can
+ *  glide level while its plume still streams behind:
+ *    • `#gs-st-ship`   — position only (`translate`).
+ *    • `#gs-st-thrust-orient` — the engine plume, always rotated to the flight heading so it trails BEHIND
+ *                        the hull (the art plume points −x, so `rotate(heading)` sends it opposite travel).
+ *    • `#gs-st-body`   — the hull. NOSE craft rotate to the heading (+ vertical `flip` when flying left
+ *                        so a wheeled hull never reads belly-up). HOVER craft (saucer/UFO) stay UPRIGHT
+ *                        and only `hoverBank()` — the disc never tumbles, so its under-beam stops swinging
+ *                        out the side.
+ *  The ship art faces +x (right), so heading 0 = flying right; the app feeds `atan2(dy,dx)`. */
 function shipGroup(opts: StarTourMapOpts): string {
   const x = opts.shipX ?? SPACEPORT_POS.x;
   const y = opts.shipY ?? SPACEPORT_POS.y;
   const h = opts.shipHeading ?? SHIP_DOCK_HEADING;
   const flip = opts.shipFlip ?? 1;
   const look = (shipById(opts.shipId) ?? shipById(DEFAULT_SHIP_ID)!).look;
-  return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${h.toFixed(1)}) scale(1 ${flip})" style="pointer-events:none;">
+  const bodyTransform =
+    look.fly === 'hover'
+      ? `rotate(${hoverBank(h).toFixed(1)})`
+      : `rotate(${h.toFixed(1)}) scale(1 ${flip})`;
+  return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" style="pointer-events:none;">
     <circle r="30" fill="#7fe0ff" opacity="0.08"/>
-    <g transform="scale(${SHIP_SCALE})">${thrustTrail(look)}</g>
-    ${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}
+    <g id="gs-st-thrust-orient" transform="rotate(${h.toFixed(1)})"><g transform="scale(${SHIP_SCALE})">${thrustTrail(look)}</g></g>
+    <g id="gs-st-body" transform="${bodyTransform}">${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}</g>
   </g>`;
 }
 

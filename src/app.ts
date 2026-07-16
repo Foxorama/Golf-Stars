@@ -76,12 +76,12 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed } from './app/starTourScreens';
+import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed } from './app/starTourScreens';
 import { shipForCharacter } from './ui/gameCosmetics';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { loreScreen } from './app/loreScreens';
-import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING } from './render/starTourMap';
+import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
@@ -1927,7 +1927,20 @@ function stepStarTour(): void {
   }
   const el = document.getElementById('gs-st-ship');
   if (el) {
-    el.setAttribute('transform', `translate(${v.shipX.toFixed(1)} ${v.shipY.toFixed(1)}) rotate(${v.heading.toFixed(1)}) scale(1 ${v.flip})`);
+    // GS-ship-fly-orient: the group carries POSITION only; two children carry orientation so a nose-less
+    // hover craft (saucer/UFO) glides LEVEL while its plume still trails behind. NOSE craft rotate the hull
+    // to the heading (+ vertical flip flying left); HOVER craft keep the disc upright and only bank.
+    el.setAttribute('transform', `translate(${v.shipX.toFixed(1)} ${v.shipY.toFixed(1)})`);
+    const hover = starTourShipHovers();
+    const bodyEl = document.getElementById('gs-st-body');
+    if (bodyEl)
+      bodyEl.setAttribute(
+        'transform',
+        hover ? `rotate(${hoverBank(v.heading).toFixed(1)})` : `rotate(${v.heading.toFixed(1)}) scale(1 ${v.flip})`,
+      );
+    // The thrust plume always rotates to the heading so it streams BEHIND the hull, whatever the body does.
+    const thrustEl = document.getElementById('gs-st-thrust-orient');
+    if (thrustEl) thrustEl.setAttribute('transform', `rotate(${v.heading.toFixed(1)})`);
     // Fire the engine plume (a `.gs-st-thrust` in the group) only while actually cruising (not stalled).
     el.classList.toggle('gs-st-thrusting', cruising);
   }
