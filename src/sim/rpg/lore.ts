@@ -47,6 +47,13 @@ export interface LoreContext {
   stopIndex: number;
   /** Per-character caddy-faction reputation (GS-caddy-factions) — for future faction-gated lore. */
   reputation?: ReputationByCharacter;
+  /** GS-story-beats: this arrival is a STORY-TOUR round (a world clear or a Galaxy Tournament) — story
+   *  dialogue beats gate on this so they NEVER fire in Voyage/Unending. Absent/false = not a story round. */
+  storyRound?: boolean;
+  /** GS-story-beats: the campaign chapter on arrival (1..5), for chapter-escalation beats. */
+  storyChapter?: number;
+  /** GS-story-beats: the chosen path after The Choice (`'warden'`/`'herald'`), for alignment-branched beats. */
+  storyAlignment?: 'warden' | 'herald';
 }
 
 /**
@@ -169,6 +176,74 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
         kind: 'say',
         text: "I won't let it happen again, though. Play your best — I always see the trouble coming.",
       },
+    ],
+  },
+
+  // ── GS-story-beats: Story-Tour NPC dialogue, gated on the campaign (never fires in Voyage/Unending).
+  // Escalation: the Parrot names the Coil (Ch.2) → Coilkeepers creep in (Ch.3) → Venoma confronts you after
+  // The Choice (Ch.4), her line branching on your path. Each fires ONCE, on a story-round arrival.
+  {
+    id: 'story-coil-named',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 2,
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'A shadow over the tour',
+    title: 'The Coil',
+    accent: '#7fe0a0',
+    cta: 'Tee off →',
+    lines: [
+      { kind: 'action', text: 'The Parrot drops onto your bag, lower than usual, voice quiet.' },
+      { kind: 'say', text: "You've felt it too, haven't you? The galleries watching a beat too long. A ball that hisses." },
+      { kind: 'say', text: "It's called the Coil — a cult that wants the world-serpent at Yggdrasil's root AWAKE. They think the end of everything is a kind of peace." },
+      { kind: 'say', text: 'The Sigils you\'re winning are the only thing that can lock the root. So they will come for you. Win anyway.' },
+    ],
+  },
+  {
+    id: 'story-coilkeepers',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 3,
+    speaker: 'A Coilkeeper',
+    portrait: 'coilkeeper',
+    kicker: 'They came to watch',
+    title: 'Coilkeepers in the Gallery',
+    accent: '#9b6cc0',
+    cta: 'Ignore them →',
+    lines: [
+      { kind: 'action', text: 'Hooded figures ring the tee, unmoving, a serpent sigil on every chest.' },
+      { kind: 'say', text: 'The seal weakens with every world you take, champion. You feel it. The stirring under the roots.' },
+      { kind: 'say', text: 'It would be so much easier to stop swinging. To let it come. The Coil would welcome you — you, of all golfers.' },
+      { kind: 'action', text: 'They do not blink. The wind moves everything on the course except them.' },
+    ],
+  },
+  {
+    id: 'story-venoma-warden',
+    trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 4 && c.storyAlignment === 'warden',
+    speaker: 'Venoma "the Viper" Krait',
+    portrait: 'venoma',
+    kicker: 'The rival, up close',
+    title: 'You Chose Wrong',
+    accent: '#c98adf',
+    cta: 'We\'ll see →',
+    lines: [
+      { kind: 'action', text: 'Venoma leans on her driver, smile all teeth, eyes not quite matching it.' },
+      { kind: 'say', text: 'A Warden. To the end. How brave. How boring. You could have had the whole galaxy quiet and kind.' },
+      { kind: 'action', text: 'For just a second, the smile slips — something underneath it that might be fear.' },
+      { kind: 'say', text: "Don't look at me like that. I'm not the one who needs saving. …Am I. Just play, champion. Just play." },
+    ],
+  },
+  {
+    id: 'story-venoma-herald',
+    trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 4 && c.storyAlignment === 'herald',
+    speaker: 'Venoma "the Viper" Krait',
+    portrait: 'venoma',
+    kicker: 'One of us now',
+    title: 'Welcome, Sister',
+    accent: '#b060c0',
+    cta: 'Coil and strike →',
+    lines: [
+      { kind: 'action', text: 'Venoma falls into step beside you, easy, like you\'ve always been on the same side.' },
+      { kind: 'say', text: 'I knew it. The first time you out-drove me, I knew you had the Coil in you. Everyone does. Most just never admit it.' },
+      { kind: 'say', text: 'The Wardens will send your old friends to stop us. Dan. Penelope. Look them in the eye and swing anyway — that\'s the whole of it.' },
+      { kind: 'action', text: 'She flicks a hissing ball into the air and catches it without looking.' },
     ],
   },
 ];

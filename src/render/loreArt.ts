@@ -14,6 +14,10 @@ export function lorePortraitSVG(id: string): string {
       return driverDanPortraitSVG();
     case 'prognostic-parrot':
       return prognosticParrotPortraitSVG();
+    case 'venoma':
+      return venomaPortraitSVG();
+    case 'coilkeeper':
+      return coilkeeperPortraitSVG();
     default:
       return '';
   }
@@ -232,5 +236,184 @@ export function prognosticParrotPortraitSVG(): string {
   <!-- gold badge on the front -->
   <circle cx="160" cy="106" r="7" fill="#e8c25a" stroke="#a8791c" stroke-width="2"/>
   <path d="M160 100 l1.8 3.6 4 0.6 -2.9 2.8 0.7 4 -3.6 -1.9 -3.6 1.9 0.7 -4 -2.9 -2.8 4 -0.6 Z" fill="#a8791c"/>
+</svg>`;
+}
+
+/**
+ * Venoma "the Viper" Krait, up close (GS-story-beats) — the Story-Tour rival, a viper-woman pro. A cold
+ * beauty with a serpent's poise: acid-violet skin under a scaled hood, slit-pupil amber eyes, and a
+ * smile that's all teeth. Her palette is the Coil's — venom-violet #b060c0 / acid-green #7fe0a0 / deep
+ * plum — a mirror of the cultists she leads. Drawn as a face you can read: charming on the surface, with
+ * something scared and coiled underneath (the beat's whole point). A hissing snake coils at her collar.
+ */
+export function venomaPortraitSVG(): string {
+  return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Venoma the Viper Krait" style="display:block;aspect-ratio:320/340;overflow:visible;">
+  <defs>
+    <radialGradient id="gs-lore-ven-spot" cx="50%" cy="40%" r="64%">
+      <stop offset="0%" stop-color="#4a2a5c" stop-opacity="0.92"/>
+      <stop offset="55%" stop-color="#241230" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#100818" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gs-lore-ven-cloak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a1a4a"/>
+      <stop offset="100%" stop-color="#1c0d28"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-ven-skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c79fd6"/>
+      <stop offset="100%" stop-color="#a072b8"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-ven-hood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7a3a94"/>
+      <stop offset="100%" stop-color="#4a1e60"/>
+    </linearGradient>
+  </defs>
+
+  <!-- soft spotlight halo -->
+  <ellipse cx="160" cy="150" rx="150" ry="162" fill="url(#gs-lore-ven-spot)"/>
+
+  <!-- shoulders / scaled plum cloak -->
+  <path d="M34 340 Q40 250 96 236 Q160 222 224 236 Q280 250 286 340 Z" fill="url(#gs-lore-ven-cloak)"/>
+  <path d="M34 340 Q40 250 96 236 Q120 232 132 236 Q92 262 84 340 Z" fill="#000" opacity="0.18"/>
+  <!-- scale texture on the cloak -->
+  <g fill="#5a2a72" opacity="0.6"><path d="M70 300 q8 -8 16 0 q-8 8 -16 0 Z"/><path d="M100 312 q8 -8 16 0 q-8 8 -16 0 Z"/><path d="M204 312 q8 -8 16 0 q-8 8 -16 0 Z"/><path d="M234 300 q8 -8 16 0 q-8 8 -16 0 Z"/></g>
+  <!-- collar with acid-green trim -->
+  <path d="M118 240 Q160 292 202 240 L214 252 Q160 314 106 252 Z" fill="#160a20"/>
+  <path d="M118 240 Q160 292 202 240" fill="none" stroke="#7fe0a0" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- a small hissing snake coiled at her collar (identity motif) -->
+  <g transform="translate(196 262)">
+    <path d="M0 12 q10 -2 8 -12 q-2 -8 8 -8 q10 0 8 8" fill="none" stroke="#7fe0a0" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="24" cy="-2" r="4" fill="#7fe0a0"/>
+    <circle cx="25.5" cy="-3" r="1.2" fill="#160a20"/>
+    <path d="M28 -2 l6 -2 M28 -1 l6 2" stroke="#c9433a" stroke-width="1.4" stroke-linecap="round"/>
+  </g>
+
+  <!-- neck -->
+  <path d="M136 220 Q136 250 160 256 Q184 250 184 220 L184 198 L136 198 Z" fill="url(#gs-lore-ven-skin)"/>
+  <path d="M136 220 Q136 246 160 252 L160 202 L136 202 Z" fill="#000" opacity="0.10"/>
+
+  <!-- head: a slim serpentine face -->
+  <path d="M110 152 Q110 96 160 92 Q210 96 210 152 Q210 206 160 220 Q110 206 110 152 Z" fill="url(#gs-lore-ven-skin)"/>
+  <!-- jaw + cheek shading -->
+  <path d="M160 220 Q124 208 114 162 Q126 202 160 212 Z" fill="#000" opacity="0.10"/>
+  <path d="M160 220 Q196 208 206 162 Q194 202 160 212 Z" fill="#000" opacity="0.06"/>
+
+  <!-- diamond scale pattern down the temples/cheeks -->
+  <g fill="#8f5aa8" opacity="0.55">
+    <path d="M124 150 l6 -6 6 6 -6 6 Z"/><path d="M124 170 l6 -6 6 6 -6 6 Z"/>
+    <path d="M196 150 l-6 -6 -6 6 6 6 Z"/><path d="M196 170 l-6 -6 -6 6 6 6 Z"/>
+  </g>
+  <!-- a darker venom mark down the nose bridge -->
+  <path d="M160 122 Q156 150 160 176 Q164 150 160 122 Z" fill="#8f5aa8" opacity="0.4"/>
+
+  <!-- sculpted brows, arched high (amused, cruel) -->
+  <path d="M126 134 Q142 122 158 132 Q142 128 126 138 Z" fill="#3a1a4a"/>
+  <path d="M162 132 Q178 122 194 134 Q178 128 162 138 Z" fill="#3a1a4a"/>
+
+  <!-- eyes: amber with a vertical SLIT pupil (viper) -->
+  <path d="M128 150 Q140 140 154 150 Q140 160 128 150 Z" fill="#fdf0d6"/>
+  <path d="M166 150 Q180 140 192 150 Q180 160 166 150 Z" fill="#fdf0d6"/>
+  <ellipse cx="141" cy="150" rx="8" ry="9" fill="#f0a828"/>
+  <ellipse cx="179" cy="150" rx="8" ry="9" fill="#f0a828"/>
+  <ellipse cx="141" cy="150" rx="2.2" ry="9" fill="#1a0e10"/>
+  <ellipse cx="179" cy="150" rx="2.2" ry="9" fill="#1a0e10"/>
+  <circle cx="138.5" cy="146" r="1.6" fill="#fff" opacity="0.9"/>
+  <circle cx="176.5" cy="146" r="1.6" fill="#fff" opacity="0.9"/>
+  <!-- upper liner -->
+  <path d="M127 148 Q140 138 155 148" fill="none" stroke="#2a1030" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M165 148 Q180 138 193 148" fill="none" stroke="#2a1030" stroke-width="2.4" stroke-linecap="round"/>
+
+  <!-- slim nose -->
+  <path d="M160 154 Q157 170 153 178 Q160 182 167 178 Q163 170 160 154 Z" fill="#9868b0"/>
+
+  <!-- smile — all teeth, with two little fangs -->
+  <path d="M134 192 Q160 208 186 192 Q160 200 134 192 Z" fill="#160a20"/>
+  <path d="M138 194 Q160 204 182 194 Q160 198 138 194 Z" fill="#f4eef6"/>
+  <path d="M148 196 l3 8 3 -8 Z" fill="#f4eef6"/>
+  <path d="M172 196 l-3 8 -3 -8 Z" fill="#f4eef6"/>
+  <path d="M134 192 Q160 208 186 192" fill="none" stroke="#c98adf" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- scaled hood framing the face, drawn back -->
+  <path d="M96 150 Q92 84 160 76 Q228 84 224 150 Q224 118 206 104 Q160 84 114 104 Q96 118 96 150 Z" fill="url(#gs-lore-ven-hood)"/>
+  <!-- hood scale ridges -->
+  <g fill="#5a2a72" opacity="0.7"><path d="M108 120 q6 -6 12 0 q-6 6 -12 0 Z"/><path d="M200 120 q6 -6 12 0 q-6 6 -12 0 Z"/><path d="M124 100 q6 -6 12 0 q-6 6 -12 0 Z"/><path d="M184 100 q6 -6 12 0 q-6 6 -12 0 Z"/></g>
+  <!-- acid-green Coil sigil at the hood crown -->
+  <g transform="translate(160 96)">
+    <circle r="9" fill="none" stroke="#7fe0a0" stroke-width="2.2"/>
+    <path d="M-4 5 Q6 3 4 -4 Q3 -8 -2 -7" fill="none" stroke="#7fe0a0" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="5" cy="-5" r="1.8" fill="#7fe0a0"/>
+  </g>
+</svg>`;
+}
+
+/**
+ * A Coilkeeper, up close (GS-story-beats) — one of the hooded cultists who ring the tee in Chapter 3. A
+ * FACELESS figure: a deep cowl with only a cold acid-green glow where a face should be, the serpent sigil
+ * burning on the chest. No skin, no eyes you can meet — the point is that they are unmoving and unreadable.
+ * The Coil palette (venom-violet + acid-green) marks them as Venoma's order. Deliberately austere versus
+ * the two character portraits — a robe and a void, not a face.
+ */
+export function coilkeeperPortraitSVG(): string {
+  return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="A Coilkeeper" style="display:block;aspect-ratio:320/340;overflow:visible;">
+  <defs>
+    <radialGradient id="gs-lore-ck-spot" cx="50%" cy="42%" r="64%">
+      <stop offset="0%" stop-color="#2a3a30" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#141c18" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#080c0a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gs-lore-ck-robe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2e1c3c"/>
+      <stop offset="100%" stop-color="#160c1e"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-ck-hood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2450"/>
+      <stop offset="100%" stop-color="#1c1028"/>
+    </linearGradient>
+    <radialGradient id="gs-lore-ck-void" cx="50%" cy="46%" r="60%">
+      <stop offset="0%" stop-color="#7fe0a0" stop-opacity="0.55"/>
+      <stop offset="45%" stop-color="#2f7a54" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#040806" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft spotlight halo -->
+  <ellipse cx="160" cy="152" rx="150" ry="162" fill="url(#gs-lore-ck-spot)"/>
+
+  <!-- shoulders / heavy hooded robe -->
+  <path d="M28 340 Q34 246 96 230 Q160 216 224 230 Q286 246 292 340 Z" fill="url(#gs-lore-ck-robe)"/>
+  <!-- robe fold shadows -->
+  <path d="M96 230 Q108 300 96 340 L74 340 Q72 268 96 230 Z" fill="#000" opacity="0.22"/>
+  <path d="M224 230 Q212 300 224 340 L246 340 Q248 268 224 230 Z" fill="#000" opacity="0.22"/>
+  <path d="M160 250 L160 340" stroke="#000" stroke-width="10" opacity="0.18"/>
+  <!-- acid-green cord at the collar -->
+  <path d="M118 236 Q160 268 202 236" fill="none" stroke="#5aa878" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- burning serpent sigil on the chest -->
+  <g transform="translate(160 288)">
+    <circle r="26" fill="#0c1410" stroke="#2f7a54" stroke-width="2" opacity="0.9"/>
+    <path d="M-12 12 Q14 8 10 -8 Q7 -18 -6 -16 Q-16 -14 -13 -4" fill="none" stroke="#7fe0a0" stroke-width="3.4" stroke-linecap="round"/>
+    <circle cx="12" cy="-10" r="4" fill="#7fe0a0"/>
+    <circle cx="13.5" cy="-11" r="1.4" fill="#0c1410"/>
+    <path d="M16 -10 l7 -3 M16 -9 l7 3" stroke="#7fe0a0" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+
+  <!-- the deep cowl -->
+  <path d="M84 156 Q78 74 160 66 Q242 74 236 156 Q236 210 200 234 Q160 250 120 234 Q84 210 84 156 Z" fill="url(#gs-lore-ck-hood)"/>
+  <!-- hood inner shadow ring -->
+  <path d="M104 158 Q100 96 160 90 Q220 96 216 158 Q216 200 186 220 Q160 232 134 220 Q104 200 104 158 Z" fill="#0c0810"/>
+  <!-- the faceless void within, cold green glow -->
+  <ellipse cx="160" cy="156" rx="46" ry="60" fill="url(#gs-lore-ck-void)"/>
+  <!-- two dim points where eyes might be — no face, just a suggestion -->
+  <ellipse cx="146" cy="150" rx="4.5" ry="7" fill="#aef0c4" opacity="0.85"/>
+  <ellipse cx="174" cy="150" rx="4.5" ry="7" fill="#aef0c4" opacity="0.85"/>
+  <ellipse cx="146" cy="150" rx="4.5" ry="7" fill="none" stroke="#7fe0a0" stroke-width="1" opacity="0.6"/>
+  <ellipse cx="174" cy="150" rx="4.5" ry="7" fill="none" stroke="#7fe0a0" stroke-width="1" opacity="0.6"/>
+
+  <!-- hood outer highlight + scale ridges down the crown -->
+  <path d="M84 156 Q78 74 160 66 Q242 74 236 156" fill="none" stroke="#5a3a78" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <g fill="#4a2e64" opacity="0.7"><path d="M160 84 q7 -6 14 0 q-7 6 -14 0 Z"/><path d="M138 96 q6 -6 12 0 q-6 6 -12 0 Z"/><path d="M182 96 q6 -6 12 0 q-6 6 -12 0 Z"/></g>
+  <!-- a small acid sigil pin at the brow of the hood -->
+  <circle cx="160" cy="100" r="6" fill="none" stroke="#7fe0a0" stroke-width="2" opacity="0.8"/>
+  <circle cx="160" cy="100" r="1.8" fill="#7fe0a0" opacity="0.9"/>
 </svg>`;
 }

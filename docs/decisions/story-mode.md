@@ -302,8 +302,24 @@ Ordered so each ships something playable and nothing lands before its foundation
   fork; an **interactive** finisher shot is a later polish.
 
 **Phase G — Polish**
-- **GS-story-beats** — the Parrot bar interaction (tap → story/direction), inter-chapter beats, and a
-  cross-chapter difficulty/economy balance pass.
+- **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
+  the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/
+  once-only tracking are all reused — zero new engine. `LoreContext` gained three story fields
+  (`storyRound?`, `storyChapter?`, `storyAlignment?`), populated by `withLoreGate` from `run.storyRound`
+  + the live `StoryState` (`chapter`/`alignment`); every story beat gates on `storyRound === true`, so
+  they can NEVER fire in Voyage/Unending. Four beats ESCALATE the campaign: `story-coil-named` (Ch.2 — the
+  Parrot names the Coil cult), `story-coilkeepers` (Ch.3 — hooded cultists ring the tee), and Venoma's
+  confrontation from Ch.4, branching on the chosen path (`story-venoma-warden` "You Chose Wrong" vs
+  `story-venoma-herald` "Welcome, Sister"). Two bespoke portraits added to `render/loreArt.ts`
+  (`venoma` — a viper-woman with amber slit-pupil eyes + fangs + a Coil-sigil hood; `coilkeeper` — a
+  faceless hooded cultist, an acid-green void where a face should be), in the house SVG language + the
+  Coil palette (venom-violet #b060c0 / acid-green #7fe0a0). The one-off is recorded in the main-save
+  `seenLore` (across all runs/modes), like every other lore beat — no new save field. Because story
+  rounds arrive through `withLoreGate`, a Ch.2+ arrival diverts to the `'lore'` screen first, then
+  `dismissLore` continues to the intro. UI/render + a pure DATA table — zero sim rng (determinism/
+  auto≡interactive untouched), no `_gs*`/URL hook. Guarded by `tests/lore.test.ts` (pure triggers +
+  portrait coverage) + the story-beat flow in `tests/story-flow.test.ts`. **Remaining Phase-G polish:**
+  the Parrot BAR interaction (tap → chatter) and the cross-chapter difficulty/economy balance pass.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

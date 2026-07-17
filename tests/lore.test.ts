@@ -112,6 +112,58 @@ describe('lore table (GS-lore) — pure pickLoreEvent', () => {
   });
 });
 
+/** A STORY-TOUR arrival context (a campaign round). Override chapter/alignment per case. */
+const STORY: LoreContext = { ...BASE, format: 'strokeplay', storyRound: true };
+
+describe('GS-story-beats — story-round dialogue beats gate on the campaign', () => {
+  it('the Parrot names the Coil in Chapter 2 (and never off a story round)', () => {
+    expect(pickLoreEvent({ ...STORY, storyChapter: 2 }, {})?.id).toBe('story-coil-named');
+    // Same chapter, but NOT a story round (a Voyage/Unending arrival) → never fires.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 2, storyRound: false }, {})).toBeUndefined();
+    // Wrong chapter → no misfire.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 1 }, {})).toBeUndefined();
+    // Once seen → gone.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 2 }, { 'story-coil-named': true })).toBeUndefined();
+  });
+
+  it('the Coilkeepers appear in Chapter 3', () => {
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3 }, {})?.id).toBe('story-coilkeepers');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyRound: false }, {})).toBeUndefined();
+  });
+
+  it('Venoma confronts you from Chapter 4, her beat branching on the chosen path', () => {
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'herald' }, {})?.id).toBe('story-venoma-herald');
+    // Chapter 4+ but no alignment chosen yet → neither variant fires.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4 }, {})).toBeUndefined();
+    // Before The Choice (Ch <4) → no Venoma.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyAlignment: 'warden' }, {})?.id).toBe('story-coilkeepers');
+  });
+
+  it('none of the story beats fire on an ordinary Voyage/Unending arrival (no storyRound)', () => {
+    for (const ch of [2, 3, 4, 5]) {
+      expect(pickLoreEvent({ ...BASE, storyChapter: ch, storyAlignment: 'warden' }, {})).toBeUndefined();
+    }
+  });
+
+  it('paints the two new story portraits (Venoma + the Coilkeeper)', () => {
+    const v = lorePortraitSVG('venoma');
+    expect(v).toContain('<svg');
+    expect(v).toContain('Venoma'); // aria-label
+    const c = lorePortraitSVG('coilkeeper');
+    expect(c).toContain('<svg');
+    expect(c).toContain('Coilkeeper');
+  });
+
+  it('every story beat names a portrait that lorePortraitSVG can paint', () => {
+    for (const id of ['story-coil-named', 'story-coilkeepers', 'story-venoma-warden', 'story-venoma-herald']) {
+      const beat = loreEventById(id)!;
+      expect(lorePortraitSVG(beat.portrait)).toContain('<svg');
+    }
+  });
+});
+
 /** Inject a hired caddy into a run's loadout (what owning that caddy means to the gate). */
 function withCaddy(s: UiState, caddyId: string): UiState {
   return { ...s, run: { ...s.run, loadout: { ...s.run.loadout, perks: [...s.run.loadout.perks, caddyId] } } };

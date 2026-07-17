@@ -142,10 +142,32 @@ the haunted stop, via **one pure source** so both drivers agree (contract 2):
   `rng.bool(chance)` drawn before the shot in both paths; a 100% chance changes the boolean, not the draw
   position, and best-of-two only ever RAISES Stableford (contract 4).
 
+## GS-story-beats — Story-Tour campaign dialogue (reusing the lore machinery)
+The Story-Tour campaign's NPC scenes are ordinary lore beats — the whole point of GS-lore being
+DATA-driven is that a new story arc costs zero engine. Three additions:
+- **`LoreContext` story fields** — `storyRound?` (this arrival is a Story-Tour round), `storyChapter?`
+  (1..5), `storyAlignment?` (`'warden'`/`'herald'`). Populated by `withLoreGate` (`gameUpdates.ts`) from
+  `run.storyRound` + the live `StoryState` (`next.story.chapter`/`.alignment`). Every story beat gates on
+  `storyRound === true`, so they NEVER fire in Voyage/Unending (an ordinary arrival leaves the fields
+  unset).
+- **Four escalation beats** (in `LORE_EVENTS`): `story-coil-named` (Ch.2, the Parrot names the Coil),
+  `story-coilkeepers` (Ch.3, cultists ring the tee), and Venoma's Ch.4+ confrontation branching on the
+  path — `story-venoma-warden` vs `story-venoma-herald`. Because story rounds arrive through the gate, a
+  qualifying arrival diverts to the `'lore'` screen first, then `dismissLore` continues to the intro.
+- **Two portraits** in `render/loreArt.ts`: `venoma` (viper-woman — amber slit-pupil eyes, fangs, a
+  Coil-sigil hood, a hissing snake at the collar) and `coilkeeper` (a faceless hooded cultist, an
+  acid-green void where a face should be, the serpent sigil burning on the chest). House SVG language,
+  Coil palette (venom-violet `#b060c0` / acid-green `#7fe0a0`).
+The one-off is recorded in the main-save `seenLore` like every other beat (no new save field). Pure DATA
++ render — zero sim rng, no `_gs*`/URL hook. Full campaign story: `docs/decisions/story-mode.md`.
+
 ### Guards
 - `tests/lore.test.ts` — the parrot beat's trigger (fires only for derelict + parrot, once), its
   `effects`, the portrait, and the reducer flow (dismiss grants the Firebird + arms foresight; the boon
-  expires next stop; a parrot-less bag is never boosted).
+  expires next stop; a parrot-less bag is never boosted). Also the four story beats' triggers (chapter/
+  alignment gating, never off a story round, once) + the `venoma`/`coilkeeper` portrait coverage.
+- `tests/story-flow.test.ts` — the story-round dialogue gate (a Ch.2 round diverts to the Coil beat then
+  dismisses to the intro; Venoma branches on the path from Ch.4; a Ch.1 round tees off with no beat).
 - `tests/ships.test.ts` — the secret Firebird (mythic, free, hidden-until-owned, NOT the first mythic)
   + it renders a self-contained glyph.
 
