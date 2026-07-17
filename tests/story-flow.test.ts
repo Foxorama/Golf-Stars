@@ -154,6 +154,66 @@ describe('Story prologue round (GS-story-prologue)', () => {
   });
 });
 
+describe('Story Pro Shop flow (GS-story-econ)', () => {
+  // A campaign at Chapter 1 that has cleared verdant-18 (so its rack is shoppable), on the star map.
+  function shoppableMap() {
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 1,
+      credits: 1000,
+      clearedWorldIds: ['standrews-18', 'verdant-18'],
+    };
+    return { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
+  }
+
+  it('opens a cleared world’s Pro Shop from the map, and closes back to the map', () => {
+    const map = shoppableMap();
+    const shop = reduce(map, { type: 'openStoryShop', worldId: 'verdant-18' });
+    expect(shop.screen).toBe('storyShop');
+    expect(shop.storyShopWorldId).toBe('verdant-18');
+    const back = reduce(shop, { type: 'exitStoryShop' });
+    expect(back.screen).toBe('starTour');
+  });
+
+  it('refuses the shop for a world that is not cleared', () => {
+    const map = shoppableMap();
+    const nope = reduce(map, { type: 'openStoryShop', worldId: 'desert-18' }); // not cleared
+    expect(nope.screen).toBe('starTour'); // unchanged
+    expect(nope.storyShopWorldId).toBeUndefined();
+  });
+
+  it('inspect → buy: spends credits, grows the bag, and closes the card', () => {
+    const shop = reduce(shoppableMap(), { type: 'openStoryShop', worldId: 'verdant-18' });
+    const inspect = reduce(shop, { type: 'storyInspectItem', itemId: 'club:tour:3W' });
+    expect(inspect.storyItemInspectId).toBe('club:tour:3W');
+
+    const bagBefore = shop.story!.equippedBagIds.length;
+    const bought = reduce(inspect, { type: 'storyBuyItem', itemId: 'club:tour:3W' });
+    expect(bought.story!.credits).toBe(1000 - 180);
+    expect(bought.story!.ownedClubIds).toContain('club:tour:3W');
+    expect(bought.story!.equippedBagIds.length).toBe(bagBefore + 1); // 3W is a new type
+    expect(bought.storyItemInspectId).toBeUndefined(); // card closes on buy
+
+    const closed = reduce(inspect, { type: 'storyCloseItem' });
+    expect(closed.storyItemInspectId).toBeUndefined();
+  });
+
+  it('the campaign green bag actually tees off into a Story round', () => {
+    const shop = reduce(shoppableMap(), { type: 'openStoryShop', worldId: 'verdant-18' });
+    const bought = reduce(reduce(shop, { type: 'storyInspectItem', itemId: 'club:tour:3W' }), {
+      type: 'storyBuyItem',
+      itemId: 'club:tour:3W',
+    });
+    // Replay verdant-18 from the shop → the round's bag is the campaign's grown green bag (not the
+    // golfer's normal common bag), so the bought Planet 3-Wood is in play.
+    const intro = reduce(bought, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.loadout.bag.some((c) => c.name === 'Planet 3-Wood')).toBe(true);
+    // the lean green start: far fewer than a full 14-club common bag
+    expect(intro.run.loadout.bag.length).toBeLessThanOrEqual(11);
+  });
+});
+
 describe('storyStore persistence (GS-story-save wiring)', () => {
   it('degrades safely with no localStorage (Node): no-ops, never throws', () => {
     // In the node test env localStorage is undefined, so the store degrades to no-ops.

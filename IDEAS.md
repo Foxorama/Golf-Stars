@@ -28,10 +28,10 @@ Ships user-facing as **"Story Tour"**; **Star Tour is the reward** — unlocked 
 focused tested auto-merged PR each:
 - **GS-story-save** — ✅ *model + `gs_story` persistence + New Game/Continue + hub shipped*. The spine.
 - **GS-story-startour-unlock** — ✅ *rename Story Mode → "Story Tour"; Star Tour tile hidden→locked→open, gated on `storyComplete`.*
-- **GS-story-lore-cards** — tap-to-inspect lore/description card for every item/world/relic/ship/gear (there's no room for image+name+detail+lore inline; lore fills out the galaxy). Detailed flavour on all new content.
+- **GS-story-lore-cards** — ✅ *foundation shipped* (`render/loreCard.ts`): reusable tap-to-inspect card (art + name + detail + composed lore + action). First consumer: the Pro Shop. Gear/ship/relic reuse it.
 - **GS-story-prologue** — Earth final round (`standrews-18`) → win/victory → Mothership → Parrot recruit → story intro → Clubhouse.
-- **GS-story-econ** — persistent credits, per-world Pro Shop, credits on clear, revisit (play again / pro shop).
-- **GS-story-clubs** — individually owned & equippable clubs; start green bag; buy + equip.
+- **GS-story-econ** — ✅ *shipped*: per-world Pro Shop (themed Planet/Phoenix/Solar clubs, lore cards), spend credits, buy→equip into the green bag, revisit (play again / pro shop). The green bag now tees off.
+- **GS-story-clubs** — buy+equip DONE (via econ); remaining: the locker bag-SWAP UI once you own >14 clubs.
 - **GS-story-gear** — equippable gear WITH effects (gloves/hat/shoes/bag) via `PlayerLoadout` no-op-default fields; the **cursed sheddings** (power + a curse) vs Warden grace; Inventory screen.
 - **GS-story-ships** — start wagon; buy ships; ship weapons/engines/upgrades as owned effect-bearing upgrades; path pools (radiant Warden vs wyrm-ships). Feeds the finale.
 - **GS-story-locker** — Story locker/wardrobe variant + per-character equipment screen + caddy roster (hire→keep→choose, no fire).

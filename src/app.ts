@@ -82,6 +82,7 @@ import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, st
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
+import { storyShopScreen } from './app/storyShopScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -139,7 +140,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -231,6 +232,19 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const club = reduce(result, { type: 'storyRoundContinue' });
       starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       return reduce(club, { type: 'openStoryMap' });
+    }
+    case 'storyshop': {
+      // GS-story-econ: mount a world's Pro Shop the honest way — play the prologue to Chapter 1, then
+      // clear a shoppable world (verdant-18) so its rack is reachable, open the star map, and open the
+      // shop. Exercises the buy/lore-card chrome through real reducer transitions.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
+      const world = reduce(reduce(hub1, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+      const hub2 = reduce(world, { type: 'storyRoundContinue' });
+      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
+      const map = reduce(hub2, { type: 'openStoryMap' });
+      return reduce(map, { type: 'openStoryShop', worldId: 'verdant-18' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2231,6 +2245,8 @@ function render(): void {
       ? storyHubScreen()
       : state.screen === 'storyResult'
       ? storyResultScreen()
+      : state.screen === 'storyShop'
+      ? storyShopScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();
@@ -2326,6 +2342,10 @@ function render(): void {
       }
       mountStoryIntro({ onDone: go });
     });
+  });
+  // GS-story-econ / GS-story-lore-cards: dismiss the Pro-Shop item lore card (backdrop or ✕ carry this).
+  app.querySelectorAll<HTMLElement>('[data-story-item-close]').forEach((el) => {
+    el.addEventListener('click', () => dispatch({ type: 'storyCloseItem' }));
   });
   // Shop bag-inventory: tap an owned gear chip to pop its card (toggle), for comparison with the stock.
   app.querySelectorAll<HTMLElement>('[data-inspect]').forEach((el) => {
