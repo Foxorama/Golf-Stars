@@ -61,7 +61,7 @@ import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
 import { loreEventById, type SeenLore } from '../sim/rpg/lore';
-import { defaultStoryState, type StoryState } from '../sim/rpg/story';
+import { defaultStoryState, storyWorldById, storyWorldUnlocked, type StoryState } from '../sim/rpg/story';
 import {
   autoDecision,
   awaitingPutt,
@@ -370,8 +370,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // pinned to the course from the campaign's golfer — a CLEAN loadout (common bag, no main-save meta/
       // ascension-unlocks: the campaign is a separate progression; the green-bag start + gear ride the
       // StoryState in a later chunk), mark it a Story round so it resolves back into the campaign, and tee
-      // up the round intro (through the lore gate, so a world's arrival beat still fires).
-      if (state.screen !== 'story' || !state.story) return state;
+      // up the round intro (through the lore gate, so a world's arrival beat still fires). Reachable from
+      // the prologue hub (Earth) and the star-map destination dossier (any charted world).
+      if ((state.screen !== 'story' && state.screen !== 'storyMap') || !state.story) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const run = { ...run0, staticCourseId: action.courseId, staticEffect: 'none', storyRound: true };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined });
@@ -401,6 +402,29 @@ export function reduce(state: UiState, action: Action): UiState {
       // begun (chapter 0, Earth not yet cleared), so it never rewrites a golfer mid-campaign.
       if (state.screen !== 'story' || !state.story || state.story.chapter > 0) return state;
       return { ...state, story: { ...state.story, characterId: action.characterId }, storyInspectId: undefined };
+    }
+
+    case 'openStoryMap': {
+      // GS-story-map: open the star-map navigator from the spaceport clubhouse (post-recruitment only).
+      if (state.screen !== 'story' || !state.story) return state;
+      return { ...state, screen: 'storyMap', storyWorldInspectId: undefined };
+    }
+
+    case 'exitStoryMap': {
+      if (state.screen !== 'storyMap') return state;
+      return { ...state, screen: 'story', storyWorldInspectId: undefined };
+    }
+
+    case 'storyInspectWorld': {
+      // GS-story-map: open a destination's dossier (only if it's charted at the current chapter).
+      if (state.screen !== 'storyMap' || !state.story) return state;
+      const w = storyWorldById(action.courseId);
+      if (!w || !storyWorldUnlocked(w, state.story.chapter)) return state;
+      return { ...state, storyWorldInspectId: action.courseId };
+    }
+
+    case 'storyCloseWorldInspect': {
+      return state.storyWorldInspectId ? { ...state, storyWorldInspectId: undefined } : state;
     }
 
     case 'playYggdrasilRealm': {

@@ -96,6 +96,36 @@ describe('Story clubhouse golfer inspect/switch (GS-story-clubhouse)', () => {
   });
 });
 
+describe('Story star map (GS-story-map)', () => {
+  it('opens the chart from the clubhouse; inspects a charted world; ignores a locked one', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+    const map = reduce(hub, { type: 'openStoryMap' });
+    expect(map.screen).toBe('storyMap');
+
+    // A chapter-1 world opens its dossier.
+    const inspecting = reduce(map, { type: 'storyInspectWorld', courseId: 'verdant-18' });
+    expect(inspecting.storyWorldInspectId).toBe('verdant-18');
+    // A chapter-5 world is not charted yet → no dossier.
+    const locked = reduce(map, { type: 'storyInspectWorld', courseId: 'swamp-18' });
+    expect(locked.storyWorldInspectId).toBeUndefined();
+
+    const closed = reduce(inspecting, { type: 'storyCloseWorldInspect' });
+    expect(closed.storyWorldInspectId).toBeUndefined();
+    const back = reduce(map, { type: 'exitStoryMap' });
+    expect(back.screen).toBe('story');
+  });
+
+  it('teeing off a charted world from the map builds a Story round on that course', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const map = { ...initState('seed', {}, undefined, story), screen: 'storyMap' as const };
+    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.storyRound).toBe(true);
+    expect(intro.run.staticCourseId).toBe('verdant-18');
+  });
+});
+
 describe('Story prologue round (GS-story-prologue)', () => {
   it('teeing off the Earth round from the hub → auto-play → resolves into the campaign (chapter 0 → 1)', () => {
     // Enter Story Mode, pick a golfer, land on the hub.

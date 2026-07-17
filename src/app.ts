@@ -83,6 +83,7 @@ import { shipForCharacter } from './ui/gameCosmetics';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
+import { storyMapScreen } from './app/storyMapScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -221,6 +222,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
       return reduce(intro, { type: 'play' });
+    }
+    case 'storymap': {
+      // GS-story-map: reach the star map the honest way — play the prologue to Chapter 1, continue to the
+      // spaceport clubhouse, then open the chart. Exercises world unlock-by-chapter + the map render.
+      const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const result = reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const club = reduce(result, { type: 'storyRoundContinue' });
+      return reduce(club, { type: 'openStoryMap' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2210,6 +2219,8 @@ function render(): void {
       ? strokeResultScreen()
       : state.screen === 'story'
       ? storyHubScreen()
+      : state.screen === 'storyMap'
+      ? storyMapScreen()
       : state.screen === 'storyResult'
       ? storyResultScreen()
       : state.screen === 'lore'

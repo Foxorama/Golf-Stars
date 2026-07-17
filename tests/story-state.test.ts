@@ -17,6 +17,9 @@ import {
   completeStoryRound,
   storyRoundCredits,
   PROLOGUE_COURSE_ID,
+  STORY_WORLDS,
+  storyWorldUnlocked,
+  storyWorldById,
   type StoryState,
 } from '../src/sim/rpg/story';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
@@ -153,6 +156,21 @@ describe('story-state model (GS-story-save)', () => {
       expect(advancedChapter).toBe(false);
       expect(story.chapter).toBe(2);
       expect(story.clearedWorldIds).toContain('orion-forge');
+    });
+
+    it('story worlds chart progressively by chapter (gentle → later)', () => {
+      // Chapter 1 opens a starter cluster; chapter 5 opens the serpent's reaches.
+      const atCh1 = STORY_WORLDS.filter((w) => storyWorldUnlocked(w, 1));
+      const atCh5 = STORY_WORLDS.filter((w) => storyWorldUnlocked(w, 5));
+      expect(atCh1.length).toBeGreaterThanOrEqual(2);
+      expect(atCh1.length).toBeLessThan(atCh5.length);
+      expect(atCh5.length).toBe(STORY_WORLDS.length);
+      // Nothing is charted before the prologue (chapter 0).
+      expect(STORY_WORLDS.filter((w) => storyWorldUnlocked(w, 0))).toHaveLength(0);
+      // Chapter 1 includes the gentle opener, Hydra Mire waits until chapter 5.
+      expect(atCh1.some((w) => w.courseId === 'verdant-18')).toBe(true);
+      expect(storyWorldUnlocked(storyWorldById('swamp-18')!, 1)).toBe(false);
+      expect(storyWorldUnlocked(storyWorldById('swamp-18')!, 5)).toBe(true);
     });
 
     it('the key to the other realm needs all five trophies', () => {
