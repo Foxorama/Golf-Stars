@@ -196,9 +196,18 @@ Ordered so each ships something playable and nothing lands before its foundation
   roster** (hire→keep→choose) waits on a caddy purchase mechanic (a later chunk). Guarded by the locker
   model in `tests/story-shop.test.ts`, the locker flow in `tests/story-flow.test.ts`, and the
   `?screen=storylocker` browser smoke.
-- **GS-story-ships** — start wagon; buy ships; ship **weapons / engines / upgrades** as owned upgrades
-  with real effects (feeds the finale + travel flavour). Path-flavoured hull pools: radiant Warden ships
-  vs corrupted **wyrm-ships** (hit harder in the battle, frailer).
+- **GS-story-ships** — ✅ *shipped* (`sim/rpg/storyShips.ts` + `app/storyShipyardScreens.ts`). The
+  spaceport **Shipyard** (reached from the clubhouse): buy + fly the campaign fleet. A story ship is a THIN
+  row over an existing `ships.ts` hull (no new ship art) carrying a light, honest STORY effect — a
+  **credit-earning bonus** per world clear (`shipCreditMult`, applied in `resolveStoryRound`; a bigger hold
+  banks more). A deliberate **scattering of acquisition approaches**: `buy` (for sale), `milestone`
+  (revealed after clearing N worlds, then for sale), `ace` (the Comet Rider, granted free by a hole-in-one
+  on any Story round — `grantStoryAceShip`), and `secret` (a late grail, revealed deep in the campaign).
+  Every ship is tappable → the reusable lore card (hull art + credit-bonus detail + bespoke lore +
+  Buy/Fly). Own `.gs-yard*` prefix; no save bump (`ownedShipIds`/`equippedShipId` already exist). Ship
+  **weapons / engines / battle upgrades** (for the finale) are a LATER reward/Pro-Shop layer on this seam —
+  possibly path-flavoured (Warden vs corrupted wyrm-ship pools). Guarded by `tests/story-ships.test.ts`,
+  the shipyard + credit-mult flow in `tests/story-flow.test.ts`, and the `?screen=storyshipyard` smoke.
 - **GS-story-locker** — the Story **locker room / wardrobe** variant + per-character equipment screen +
   the **caddy roster** (hire → keep → choose active, no fire).
 

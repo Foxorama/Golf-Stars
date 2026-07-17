@@ -84,6 +84,7 @@ import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultSc
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
 import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen } from './app/storyLockerScreens';
+import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -141,7 +142,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -254,6 +255,13 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
       return reduce(hub1, { type: 'openStoryLocker' });
+    }
+    case 'storyshipyard': {
+      // GS-story-ships: reach the shipyard the honest way — prologue → Chapter 1 spaceport → open shipyard.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
+      return reduce(hub1, { type: 'openStoryShipyard' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2258,6 +2266,8 @@ function render(): void {
       ? storyShopScreen()
       : state.screen === 'storyLocker'
       ? storyLockerScreen()
+      : state.screen === 'storyShipyard'
+      ? storyShipyardScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();

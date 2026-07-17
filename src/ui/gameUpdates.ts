@@ -35,6 +35,7 @@ import { warriorsThreeTotals, warriorsEdge } from '../sim/rpg/competition';
 import { ascensionClubReward } from '../sim/rpg/club-unlock';
 import { aceShipUnlock } from '../sim/rpg/ships';
 import { completeStoryRound, PROLOGUE_COURSE_ID, storyRoundCredits, defaultStoryState } from '../sim/rpg/story';
+import { shipCreditMult, grantStoryAceShip } from '../sim/rpg/storyShips';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
 
@@ -340,15 +341,19 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   const run = state.run;
   const totals = playTotals(played.map((p) => p.record));
   const courseId = run.staticCourseId ?? PROLOGUE_COURSE_ID;
-  const credits = storyRoundCredits(totals.toPar);
   // Defensive: the hub should always have a campaign, but never crash if it's missing mid-round.
   const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
-  const { story, advancedChapter, wasPrologue } = completeStoryRound(
+  // GS-story-ships: the equipped ship's credit multiplier (a bigger hold banks more per world clear).
+  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base));
+  const { story: cleared, advancedChapter, wasPrologue } = completeStoryRound(
     base,
     courseId,
     { toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, seed: String(run.seed) },
     credits,
   );
+  // GS-story-ships: a hole-in-one on any Story round earns the secret Comet Rider (the ace ship).
+  const aced = played.some((p) => p.record.strokes === 1);
+  const story = aced ? grantStoryAceShip(cleared) : cleared;
   return {
     ...state,
     run: { ...run, status: 'ended', endedReason: 'banked' },

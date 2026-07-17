@@ -71,6 +71,7 @@ import {
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
+import { isStoryShipId, buyStoryShip, equipStoryShip } from '../sim/rpg/storyShips';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -456,15 +457,15 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyInspectItem': {
-      // GS-story-econ / GS-story-lore-cards: tap an item (club OR gear) → raise its lore card. Works on
-      // the Pro Shop (buy footer) AND the locker (equip footer).
-      if ((state.screen !== 'storyShop' && state.screen !== 'storyLocker') || !state.story) return state;
-      if (!storyItemKind(action.itemId)) return state;
+      // GS-story-econ / GS-story-lore-cards: tap an item → raise its lore card. Works on the Pro Shop
+      // (buy footer), the locker (equip footer), and the shipyard (ship ids → buy/fly footer).
+      if ((state.screen !== 'storyShop' && state.screen !== 'storyLocker' && state.screen !== 'storyShipyard') || !state.story) return state;
+      if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId)) return state;
       return { ...state, storyItemInspectId: action.itemId };
     }
 
     case 'storyCloseItem': {
-      if (state.screen !== 'storyShop' && state.screen !== 'storyLocker') return state;
+      if (state.screen !== 'storyShop' && state.screen !== 'storyLocker' && state.screen !== 'storyShipyard') return state;
       return { ...state, storyItemInspectId: undefined };
     }
 
@@ -514,6 +515,32 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'storyUnequipGear': {
       if (state.screen !== 'storyLocker' || !state.story) return state;
       const story = unequipStoryGear(state.story, action.slot as GearSlot);
+      return story === state.story ? state : { ...state, story };
+    }
+
+    case 'openStoryShipyard': {
+      // GS-story-ships: open the spaceport shipyard from the clubhouse (post-recruitment).
+      if (state.screen !== 'story' || !state.story) return state;
+      return { ...state, screen: 'storyShipyard', storyItemInspectId: undefined };
+    }
+
+    case 'exitStoryShipyard': {
+      if (state.screen !== 'storyShipyard') return state;
+      return { ...state, screen: 'story', storyItemInspectId: undefined };
+    }
+
+    case 'storyBuyShip': {
+      // GS-story-ships: buy a ship (spend credits, own + fly it). No-op if unaffordable/owned/locked.
+      if (state.screen !== 'storyShipyard' || !state.story) return state;
+      const story = buyStoryShip(state.story, action.shipId);
+      if (story === state.story) return state;
+      return { ...state, story, storyItemInspectId: undefined };
+    }
+
+    case 'storyEquipShip': {
+      // GS-story-ships: fly an owned ship.
+      if (state.screen !== 'storyShipyard' || !state.story) return state;
+      const story = equipStoryShip(state.story, action.shipId);
       return story === state.story ? state : { ...state, story };
     }
 

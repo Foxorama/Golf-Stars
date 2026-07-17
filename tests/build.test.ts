@@ -270,6 +270,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyresult', sel: '.gs-storyres', text: 'Champion', label: 'the Story prologue world-round recap' },
     { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
     { screen: 'storylocker', sel: '.gs-lock-grid', text: 'Your bag', label: 'the Story locker (bag builder + gear)' },
+    { screen: 'storyshipyard', sel: '.gs-yard-grid', text: 'Shipyard', label: 'the Story shipyard (buy + fly ships)' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

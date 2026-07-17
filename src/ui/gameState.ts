@@ -54,6 +54,8 @@ export type Screen =
   | 'storyShop'
   // GS-story-locker: the campaign locker — build the bag from owned clubs + swap equipped gear.
   | 'storyLocker'
+  // GS-story-ships: the spaceport shipyard — buy + fly ships.
+  | 'storyShipyard'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -305,6 +307,10 @@ export type Action =
   | { type: 'storyUnequipClub'; clubId: string } // GS-story-locker: take a club out of the bag (to the bench)
   | { type: 'storyEquipGear'; gearId: string } // GS-story-locker: equip an owned gear item in its slot
   | { type: 'storyUnequipGear'; slot: string } // GS-story-locker: empty a gear slot
+  | { type: 'openStoryShipyard' } // GS-story-ships: open the spaceport shipyard from the clubhouse
+  | { type: 'exitStoryShipyard' } // GS-story-ships: back to the clubhouse from the shipyard
+  | { type: 'storyBuyShip'; shipId: string } // GS-story-ships: buy a ship (spend credits, fly it)
+  | { type: 'storyEquipShip'; shipId: string } // GS-story-ships: fly an owned ship
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
