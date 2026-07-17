@@ -31,7 +31,9 @@ focused tested auto-merged PR each:
 - **GS-story-lore-cards** — ✅ *foundation shipped* (`render/loreCard.ts`): reusable tap-to-inspect card (art + name + detail + composed lore + action). First consumer: the Pro Shop. Gear/ship/relic reuse it.
 - **GS-story-prologue** — Earth final round (`standrews-18`) → win/victory → Mothership → Parrot recruit → story intro → Clubhouse.
 - **GS-story-econ** — ✅ *shipped*: per-world Pro Shop (themed Planet/Phoenix/Solar clubs, lore cards), spend credits, buy→equip into the green bag, revisit (play again / pro shop). The green bag now tees off.
-- **GS-story-clubs** — buy+equip DONE (via econ); remaining: the locker bag-SWAP UI once you own >14 clubs.
+- **GS-story-clubs** — ✅ *shipped* (buy via econ; equip/bag-swap via the locker below).
+- **GS-story-gear** — ✅ *shipped*: effect-bearing glove/cap/shoes/ball in the Pro Shop, folded at tee-off (Story-only). Cursed-relic pass is later.
+- **GS-story-locker** — ✅ *shipped*: campaign locker — bag builder (equip/unequip owned clubs, ≤14) + gear slot-switch, every item tappable → lore card. Caddy roster waits on a caddy shop.
 - **GS-story-gear** — equippable gear WITH effects (gloves/hat/shoes/bag) via `PlayerLoadout` no-op-default fields; the **cursed sheddings** (power + a curse) vs Warden grace; Inventory screen.
 - **GS-story-ships** — start wagon; buy ships; ship weapons/engines/upgrades as owned effect-bearing upgrades; path pools (radiant Warden vs wyrm-ships). Feeds the finale.
 - **GS-story-locker** — Story locker/wardrobe variant + per-character equipment screen + caddy roster (hire→keep→choose, no fire).

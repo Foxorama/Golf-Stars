@@ -231,6 +231,56 @@ describe('Story Pro Shop flow (GS-story-econ)', () => {
   });
 });
 
+describe('Story locker flow (GS-story-locker)', () => {
+  // A Chapter-1 campaign at the spaceport clubhouse, holding a bought Planet 5-Wood + a gear glove.
+  function lockerReady() {
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 1,
+      credits: 1000,
+      ownedClubIds: [...defaultStoryState().ownedClubIds, 'club:tour:5W'],
+      equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === '5W' ? 'club:tour:5W' : id)),
+      ownedGearIds: ['gear:glove:tacky', 'gear:glove:vice'],
+      equippedGear: { glove: 'gear:glove:vice' as string },
+    };
+    return { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+  }
+
+  it('opens the locker from the clubhouse and back', () => {
+    const hub = lockerReady();
+    const locker = reduce(hub, { type: 'openStoryLocker' });
+    expect(locker.screen).toBe('storyLocker');
+    const back = reduce(locker, { type: 'exitStoryLocker' });
+    expect(back.screen).toBe('story');
+  });
+
+  it('benches and re-equips a club', () => {
+    const locker = reduce(lockerReady(), { type: 'openStoryLocker' });
+    const benched = reduce(locker, { type: 'storyUnequipClub', clubId: 'club:tour:5W' });
+    expect(benched.story!.equippedBagIds).not.toContain('club:tour:5W');
+    expect(benched.story!.ownedClubIds).toContain('club:tour:5W'); // still owned
+    const reeq = reduce(benched, { type: 'storyEquipClub', clubId: 'club:tour:5W' });
+    expect(reeq.story!.equippedBagIds).toContain('club:tour:5W');
+  });
+
+  it('swaps and removes gear in a slot', () => {
+    const locker = reduce(lockerReady(), { type: 'openStoryLocker' });
+    expect(locker.story!.equippedGear.glove).toBe('gear:glove:vice');
+    const swapped = reduce(locker, { type: 'storyEquipGear', gearId: 'gear:glove:tacky' });
+    expect(swapped.story!.equippedGear.glove).toBe('gear:glove:tacky');
+    const bare = reduce(swapped, { type: 'storyUnequipGear', slot: 'glove' });
+    expect(bare.story!.equippedGear.glove).toBeUndefined();
+  });
+
+  it('inspect works on the locker screen (read-only lore card)', () => {
+    const locker = reduce(lockerReady(), { type: 'openStoryLocker' });
+    const inspect = reduce(locker, { type: 'storyInspectItem', itemId: 'gear:glove:vice' });
+    expect(inspect.storyItemInspectId).toBe('gear:glove:vice');
+    const closed = reduce(inspect, { type: 'storyCloseItem' });
+    expect(closed.storyItemInspectId).toBeUndefined();
+  });
+});
+
 describe('storyStore persistence (GS-story-save wiring)', () => {
   it('degrades safely with no localStorage (Node): no-ops, never throws', () => {
     // In the node test env localStorage is undefined, so the store degrades to no-ops.

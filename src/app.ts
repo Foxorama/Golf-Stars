@@ -83,6 +83,7 @@ import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeap
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
 import { storyShopScreen } from './app/storyShopScreens';
+import { storyLockerScreen } from './app/storyLockerScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -140,7 +141,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -245,6 +246,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       const map = reduce(hub2, { type: 'openStoryMap' });
       return reduce(map, { type: 'openStoryShop', worldId: 'verdant-18' });
+    }
+    case 'storylocker': {
+      // GS-story-locker: reach the campaign locker the honest way — play the prologue to Chapter 1 (the
+      // spaceport clubhouse), then open the locker. Exercises the bag-builder + gear chrome.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
+      return reduce(hub1, { type: 'openStoryLocker' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2247,6 +2256,8 @@ function render(): void {
       ? storyResultScreen()
       : state.screen === 'storyShop'
       ? storyShopScreen()
+      : state.screen === 'storyLocker'
+      ? storyLockerScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();

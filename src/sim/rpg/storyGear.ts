@@ -259,6 +259,29 @@ export function buyStoryGear(story: StoryState, item: StoryGearItem): StoryState
   return { ...next, equippedGear: { ...next.equippedGear, [item.slot]: item.id } };
 }
 
+/** Equip an OWNED gear item in its slot (pure, GS-story-locker) — for switching among owned gear in the
+ *  locker. No-op if the id isn't owned/known. Replaces whatever occupied the slot. */
+export function equipStoryGear(story: StoryState, id: string): StoryState {
+  const item = storyGearById(id);
+  if (!item || !story.ownedGearIds.includes(id)) return story;
+  return { ...story, equippedGear: { ...story.equippedGear, [item.slot]: id } };
+}
+
+/** Empty a gear SLOT (pure, GS-story-locker) — remove whatever is equipped there (it stays owned). */
+export function unequipStoryGear(story: StoryState, slot: GearSlot): StoryState {
+  if (story.equippedGear[slot] === undefined) return story;
+  const next = { ...story.equippedGear };
+  delete next[slot];
+  return { ...story, equippedGear: next };
+}
+
+/** All OWNED gear for a slot (for the locker's per-slot picker). */
+export function ownedGearForSlot(story: StoryState, slot: GearSlot): StoryGearItem[] {
+  return story.ownedGearIds
+    .map((id) => storyGearById(id))
+    .filter((g): g is StoryGearItem => !!g && g.slot === slot);
+}
+
 /**
  * Fold every equipped gear item's effect onto a round loadout (pure). Story rounds ONLY — called at
  * tee-off after the bag is set. Unknown/absent gear is skipped, so an un-geared campaign is a no-op
