@@ -34,9 +34,17 @@ import { matchOpponentFor, runField } from '../sim/rpg/league';
 import { warriorsThreeTotals, warriorsEdge } from '../sim/rpg/competition';
 import { ascensionClubReward } from '../sim/rpg/club-unlock';
 import { aceShipUnlock } from '../sim/rpg/ships';
-import { completeStoryRound, PROLOGUE_COURSE_ID, storyRoundCredits, defaultStoryState } from '../sim/rpg/story';
+import {
+  completeStoryRound,
+  PROLOGUE_COURSE_ID,
+  storyRoundCredits,
+  defaultStoryState,
+  recordWorldClear,
+  STORY_CHAPTER_COUNT,
+} from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
+import { tournamentForChapter, rivalTotal, winTournament } from '../sim/rpg/storyTournaments';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
 
@@ -368,6 +376,62 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     viewHole: 0,
     screen: 'storyResult',
     lastStoryRound: { courseId, toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, credits, advancedChapter, wasPrologue },
+  };
+}
+
+/**
+ * Resolve a GALAXY TOURNAMENT round (GS-story-tournament): the player's venue gross against the rival's
+ * deterministic ghost total. Beat the rival (ties to the player) and you win the chapter's Sigil, which
+ * advances the chapter (unlocking the next worlds). Win OR lose you still played the round, so credits +
+ * the venue best bank as usual (with the ship/upgrade credit multipliers). Lands on the tournament recap.
+ */
+export function resolveStoryTournament(state: UiState, played: PlayedHole[]): UiState {
+  const run = state.run;
+  const chapter = run.storyTournament ?? 1;
+  const totals = playTotals(played.map((p) => p.record));
+  const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
+  const t = tournamentForChapter(chapter);
+  // Defensive: an unknown chapter falls back to a plain clear so a round can never hang.
+  if (!t) return resolveStoryRound({ ...state, run: { ...run, storyTournament: undefined } }, played);
+
+  const pars = state.course.holes.map((h) => h.par);
+  const rivalGross = rivalTotal(t, String(run.seed), pars);
+  const won = totals.gross <= rivalGross;
+
+  // Bank the round (credits + best) exactly like a world clear.
+  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base) * upgradeCreditMult(base));
+  let story = recordWorldClear(
+    base,
+    t.venueId,
+    { toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, seed: String(run.seed) },
+    credits,
+  );
+  const alreadyWon = story.trophyIds.includes(t.sigilId);
+  if (won) story = winTournament(story, t);
+  const finalSigil = won && !alreadyWon && story.trophyIds.length >= STORY_CHAPTER_COUNT;
+
+  return {
+    ...state,
+    run: { ...run, status: 'ended', endedReason: 'banked' },
+    story,
+    played,
+    stopPlayed: undefined,
+    play: undefined,
+    holeRng: undefined,
+    match: undefined,
+    viewHole: 0,
+    screen: 'storyTournamentResult',
+    lastStoryTournament: {
+      chapter,
+      name: t.name,
+      sigilName: t.sigilName,
+      prize: t.prize,
+      rivalName: t.rivalName,
+      playerGross: totals.gross,
+      rivalGross,
+      won,
+      finalSigil,
+    },
   };
 }
 

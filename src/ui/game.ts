@@ -73,6 +73,7 @@ import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop'
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
 import { isStoryShipId, buyStoryShip, equipStoryShip } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
+import { currentTournament } from '../sim/rpg/storyTournaments';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -96,6 +97,7 @@ import {
   resolveBossId,
   resolveStrokePlay,
   resolveStoryRound,
+  resolveStoryTournament,
   runEndUpdates,
   withAsgardPortal,
   withBestBallPartner,
@@ -554,6 +556,45 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, story, storyItemInspectId: undefined };
     }
 
+    case 'openStoryTournament': {
+      // GS-story-tournament: open the current chapter's Galaxy Tournament lobby (from the clubhouse), only
+      // when one is actually unlocked (enough chapter worlds cleared, Sigil unwon).
+      if (state.screen !== 'story' || !state.story) return state;
+      if (!currentTournament(state.story)) return state;
+      return { ...state, screen: 'storyTournament' };
+    }
+
+    case 'exitStoryTournament': {
+      if (state.screen !== 'storyTournament') return state;
+      return { ...state, screen: 'story' };
+    }
+
+    case 'storyPlayTournament': {
+      // GS-story-tournament: tee off the tournament round at the venue vs the rival. Builds a story round
+      // (campaign bag + gear) MARKED as the chapter's tournament so it resolves vs the rival for the Sigil.
+      if (state.screen !== 'storyTournament' || !state.story) return state;
+      const t = currentTournament(state.story);
+      if (!t) return state;
+      const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
+      const bag = storyBagClubs(state.story);
+      const loadout = applyStoryGear({ ...run0.loadout, bag }, state.story);
+      const run = {
+        ...run0,
+        loadout,
+        staticCourseId: t.venueId,
+        staticEffect: 'none',
+        storyRound: true,
+        storyTournament: t.chapter,
+      };
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
+    }
+
+    case 'storyTournamentContinue': {
+      // GS-story-tournament: dismiss the tournament recap back to the clubhouse (already banked).
+      if (state.screen !== 'storyTournamentResult') return state;
+      return { ...state, screen: 'story', lastStoryTournament: undefined };
+    }
+
     case 'playYggdrasilRealm': {
       // GS-star-tour-yggdrasil: play a Norse realm off the hidden World Tree on the star map. The tree is
       // revealed only once Thor's Hammer is won, and today ONLY Asgard has bloomed (the other branches are
@@ -658,6 +699,8 @@ export function reduce(state: UiState, action: Action): UiState {
       const { run, result, played } = playStop(state.run, { prevBestHoles: state.endlessBestHoles });
       // GS-story-prologue: a Story Mode world round resolves back INTO the campaign (record the clear, pay
       // credits, advance the chapter), not the Star-Tour record boards. Checked before the strokeplay branch.
+      // GS-story-tournament: a Galaxy Tournament round resolves vs the rival (Sigil + chapter advance).
+      if (state.run.storyTournament) return resolveStoryTournament(state, played);
       if (state.run.storyRound) return resolveStoryRound(state, played);
       // Star Tour (GS-star-tour): a watched round is scored to the personal course-record boards, not the
       // Stableford cut/travel flow — resolve it like Asgard and land on the record recap.
@@ -947,6 +990,7 @@ export function reduce(state: UiState, action: Action): UiState {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
       // GS-story-prologue: a Story world round resolves into the campaign, not the course-record boards.
+      if (state.run.storyTournament) return resolveStoryTournament(state, stopPlayed);
       if (state.run.storyRound) return resolveStoryRound(state, stopPlayed);
       // Star Tour (GS-star-tour): the 18-hole round is complete — bank it to the course-record boards.
       if (state.run.formatId === STROKEPLAY_FORMAT) return resolveStrokePlay(state, stopPlayed);

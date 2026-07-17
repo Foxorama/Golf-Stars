@@ -226,9 +226,22 @@ Ordered so each ships something playable and nothing lands before its foundation
   world choice scaled by difficulty; the star map becomes the story navigator.
 
 **Phase E — Tournaments (the five chapters)**
-- **GS-story-tournament** — the Galaxy Tournament **framework**: qualifying round → final → **Sigil** +
-  signature reward, with a **host + a recurring rival** (Venoma). Row-driven, reusing Asgard-style ghost
-  stroke-play. Difficulty ramps per chapter. New **Coil faction** row (`factions.ts`).
+- **GS-story-tournament** — ✅ *framework + winnable trunk shipped* (`sim/rpg/storyTournaments.ts` +
+  `app/storyTournamentScreens.ts`). The campaign SPINE: one Galaxy Tournament per chapter (data rows), at a
+  venue world, unlocked once you've cleared ≥2 of the chapter's worlds. It's a stroke-play round vs a
+  recurring **rival** (Venoma "the Viper" from Ch.2; Birdie Bianchi is the Ch.1 club champion) — a scaled
+  ghost reusing the Asgard `ghostHoleStrokes`/`golferForm` model with a per-tournament `rivalEdge` (gentle
+  0.12 → brutal 0.50). Beat the rival's gross (ties to you) → win a **Sigil** (a `trophyIds` entry), which
+  **advances the chapter** (auto-unlocking the next world cluster) + banks credits/best; five Sigils →
+  `keyToOtherRealm` → `storyComplete` (the campaign is now winnable end-to-end, Star Tour unlocks). Marked
+  by `run.storyTournament` (a story round that resolves via `resolveStoryTournament` instead of the plain
+  clear); a gold clubhouse BANNER opens the lobby (host/rival/Sigil/prize + tee-off) → the win/lose recap.
+  Own `.gs-tourn*` prefix; no save bump (`trophyIds`/`chapter` already exist). This is the ROUTE-AGNOSTIC
+  trunk over the current chapter-gated worlds — the bible's Warden/Herald fork (Ch.4–6, two routes) swaps
+  the rows in a later pass without touching the flow. Guarded by `tests/story-tournament.test.ts`, the
+  tournament flow in `tests/story-flow.test.ts`, and the `?screen=storytournament[result]` smokes. Deferred
+  from the full vision (later chunks): a distinct **qualifier→final** two-round shape, the **Coil faction**
+  row (`factions.ts`), and richer **host/rival dialogue beats**.
 - **GS-story-chapters (trunk)** — the shared **Ch.1–3** (Lyra → Orion → Draco) as data + beats; the Coil's
   escalation; **The Choice** at the end of Ch.3 sets `alignment`. Both routes reach five Sigils via a
   symmetric shape (2 Sigil-majors + 1 Sigil-less emotional chapter + the shrine).
