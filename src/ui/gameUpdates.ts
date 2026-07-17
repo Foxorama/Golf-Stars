@@ -36,6 +36,7 @@ import { ascensionClubReward } from '../sim/rpg/club-unlock';
 import { aceShipUnlock } from '../sim/rpg/ships';
 import { completeStoryRound, PROLOGUE_COURSE_ID, storyRoundCredits, defaultStoryState } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip } from '../sim/rpg/storyShips';
+import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
 
@@ -343,8 +344,9 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   const courseId = run.staticCourseId ?? PROLOGUE_COURSE_ID;
   // Defensive: the hub should always have a campaign, but never crash if it's missing mid-round.
   const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
-  // GS-story-ships: the equipped ship's credit multiplier (a bigger hold banks more per world clear).
-  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base));
+  // GS-story-ships: the equipped ship's credit multiplier (a bigger hold banks more per world clear),
+  // stacked with any ENGINE upgrades' credit bonus (GS-story-ship-upgrades).
+  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base) * upgradeCreditMult(base));
   const { story: cleared, advancedChapter, wasPrologue } = completeStoryRound(
     base,
     courseId,

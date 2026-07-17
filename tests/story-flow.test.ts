@@ -313,6 +313,24 @@ describe('Story shipyard flow (GS-story-ships)', () => {
     expect(done.lastStoryRound!.credits).toBe(earned);
     expect(earned).toBeGreaterThanOrEqual(Math.round(100 * 1.25));
   });
+
+  it('buys a ship upgrade → combat rating rises + an engine bonus stacks onto the ship\'s (GS-story-ship-upgrades)', () => {
+    const yard = reduce(shipyardReady(), { type: 'openStoryShipyard' });
+    // inspect + buy a weapon (combat rating) and an engine (credit bonus)
+    const w = reduce(reduce(yard, { type: 'storyInspectItem', itemId: 'upg:weapon:scatter' }), { type: 'storyBuyUpgrade', upgradeId: 'upg:weapon:scatter' });
+    expect(w.story!.ownedShipUpgradeIds).toContain('upg:weapon:scatter');
+    expect(w.storyItemInspectId).toBeUndefined();
+    const e = reduce(w, { type: 'storyBuyUpgrade', upgradeId: 'upg:engine:ion' });
+    expect(e.story!.ownedShipUpgradeIds).toContain('upg:engine:ion');
+
+    // now buy the +25% hauler too and clear a world: payout = base × 1.25 (ship) × 1.05 (ion engine)
+    const withShip = reduce(e, { type: 'storyBuyShip', shipId: 'hauler-barge' });
+    const hub = reduce(withShip, { type: 'exitStoryShipyard' });
+    const before = hub.story!.credits;
+    const done = reduce(reduce({ ...hub, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    const earned = done.story!.credits - before;
+    expect(earned).toBeGreaterThanOrEqual(Math.round(100 * 1.25 * 1.05));
+  });
 });
 
 describe('storyStore persistence (GS-story-save wiring)', () => {
