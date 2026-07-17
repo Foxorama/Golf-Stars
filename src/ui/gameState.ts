@@ -56,6 +56,9 @@ export type Screen =
   | 'storyLocker'
   // GS-story-ships: the spaceport shipyard — buy + fly ships.
   | 'storyShipyard'
+  // GS-story-tournament: a chapter's Galaxy Tournament — the lobby (host/rival/Sigil) and the win/lose recap.
+  | 'storyTournament'
+  | 'storyTournamentResult'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -241,6 +244,19 @@ export interface UiState {
     /** This was the prologue (the Earth World Tour final). */
     wasPrologue: boolean;
   };
+  /** GS-story-tournament: the just-finished Galaxy Tournament recap (the `storyTournamentResult` screen). */
+  lastStoryTournament?: {
+    chapter: number;
+    name: string;
+    sigilName: string;
+    prize: string;
+    rivalName: string;
+    playerGross: number;
+    rivalGross: number;
+    won: boolean;
+    /** True when this win took the fifth Sigil (the campaign is complete). */
+    finalSigil: boolean;
+  };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
   storyShopWorldId?: string;
   /** GS-story-econ: the shop item whose lore card is open (over the rack). Absent ⇒ no card. Transient. */
@@ -312,6 +328,10 @@ export type Action =
   | { type: 'storyBuyShip'; shipId: string } // GS-story-ships: buy a ship (spend credits, fly it)
   | { type: 'storyEquipShip'; shipId: string } // GS-story-ships: fly an owned ship
   | { type: 'storyBuyUpgrade'; upgradeId: string } // GS-story-ship-upgrades: buy a ship weapon/engine/shield
+  | { type: 'openStoryTournament' } // GS-story-tournament: open the chapter's Galaxy Tournament lobby
+  | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
+  | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
+  | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

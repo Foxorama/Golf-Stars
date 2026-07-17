@@ -85,6 +85,7 @@ import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/
 import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
+import { storyTournamentScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -142,7 +143,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -262,6 +263,21 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
       return reduce(hub1, { type: 'openStoryShipyard' });
+    }
+    case 'storytournament':
+    case 'storytournamentresult': {
+      // GS-story-tournament: reach the Galaxy Tournament the honest way — prologue → Chapter 1, clear two of
+      // Chapter 1's worlds so the tournament unlocks, then open its lobby. `storytournamentresult` plays it
+      // out (vs the rival) to land on the recap.
+      const st0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const playWorld = (s: UiState, courseId: string): UiState =>
+        reduce(reduce(reduce(s, { type: 'storyPlayWorld', courseId }), { type: 'play' }), { type: 'storyRoundContinue' });
+      const st1 = playWorld(st0, 'standrews-18'); // prologue → Chapter 1
+      const st2 = playWorld(st1, 'verdant-18'); // clear 1
+      const st3 = playWorld(st2, 'verdant2-18'); // clear 2 → tournament unlocks
+      const lobby = reduce(st3, { type: 'openStoryTournament' });
+      if (screen === 'storytournament') return lobby;
+      return reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'play' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2268,6 +2284,10 @@ function render(): void {
       ? storyLockerScreen()
       : state.screen === 'storyShipyard'
       ? storyShipyardScreen()
+      : state.screen === 'storyTournament'
+      ? storyTournamentScreen()
+      : state.screen === 'storyTournamentResult'
+      ? storyTournamentResultScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();

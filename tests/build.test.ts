@@ -271,6 +271,8 @@ describe('build output (real browser)', () => {
     { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
     { screen: 'storylocker', sel: '.gs-lock-grid', text: 'Your bag', label: 'the Story locker (bag builder + gear)' },
     { screen: 'storyshipyard', sel: '.gs-yard-usec', text: 'Weapons & upgrades', label: 'the Story shipyard (ships + weapons/upgrades)' },
+    { screen: 'storytournament', sel: '.gs-tourn-rival', text: 'Emerald Invitational', label: 'the Story Galaxy Tournament lobby' },
+    { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

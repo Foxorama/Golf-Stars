@@ -333,6 +333,61 @@ describe('Story shipyard flow (GS-story-ships)', () => {
   });
 });
 
+describe('Story tournament flow (GS-story-tournament)', () => {
+  // A Chapter-1 campaign that has cleared two Chapter-1 worlds → the tournament is unlocked.
+  function tournamentReady() {
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 1,
+      clearedWorldIds: ['standrews-18', 'verdant-18', 'verdant2-18'],
+    };
+    return { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+  }
+
+  it('opens the tournament lobby only when unlocked, and tees off a marked tournament round', () => {
+    // Not unlocked (no chapter worlds cleared) → no-op.
+    const locked = { ...initState('seed', {}, undefined, { ...defaultStoryState(), chapter: 1 }), screen: 'story' as const };
+    expect(reduce(locked, { type: 'openStoryTournament' }).screen).toBe('story');
+
+    const hub = tournamentReady();
+    const lobby = reduce(hub, { type: 'openStoryTournament' });
+    expect(lobby.screen).toBe('storyTournament');
+    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.storyTournament).toBe(1);
+    expect(intro.run.storyRound).toBe(true);
+    expect(intro.run.staticCourseId).toBe('verdant-18'); // the Chapter 1 venue
+  });
+
+  it('playing the tournament resolves vs the rival and, on a win, banks the Sigil + advances the chapter', () => {
+    const lobby = reduce(tournamentReady(), { type: 'openStoryTournament' });
+    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    const done = reduce(intro, { type: 'play' });
+    expect(done.screen).toBe('storyTournamentResult');
+    const r = done.lastStoryTournament!;
+    expect(r.chapter).toBe(1);
+    // the recap is internally consistent: won iff the player's gross beat the rival's
+    expect(r.won).toBe(r.playerGross <= r.rivalGross);
+    if (r.won) {
+      expect(done.story!.trophyIds).toContain('sigil-emerald');
+      expect(done.story!.chapter).toBe(2); // advanced
+    } else {
+      expect(done.story!.trophyIds).not.toContain('sigil-emerald');
+      expect(done.story!.chapter).toBe(1); // unchanged — retry
+    }
+    // continue → back to the clubhouse, recap cleared
+    const back = reduce(done, { type: 'storyTournamentContinue' });
+    expect(back.screen).toBe('story');
+    expect(back.lastStoryTournament).toBeUndefined();
+  });
+
+  it('a Story tournament never touches the main-save Star Tour boards', () => {
+    const hub = tournamentReady();
+    const done = reduce(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }), { type: 'play' });
+    expect(done.strokePlayBest).toEqual(hub.strokePlayBest);
+  });
+});
+
 describe('storyStore persistence (GS-story-save wiring)', () => {
   it('degrades safely with no localStorage (Node): no-ops, never throws', () => {
     // In the node test env localStorage is undefined, so the store degrades to no-ops.

@@ -16,6 +16,7 @@ import { shipById } from '../sim/rpg/ships';
 import { shipCardSVG } from '../render/shipArt';
 import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
+import { currentTournament } from '../sim/rpg/storyTournaments';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 
 export function storyHubScreen(): string {
@@ -113,6 +114,24 @@ function earthClubhouseHTML(story: StoryState): string {
 }
 
 /**
+ * The chapter's Galaxy Tournament banner (GS-story-tournament) — shown on the clubhouse only when the
+ * current chapter's tournament is UNLOCKED (enough of its worlds cleared, Sigil unwon). The chapter climax,
+ * so it's a prominent gold call-to-action above the spaceport actions. Empty when no tournament is ready.
+ */
+function tournamentBannerHTML(story: StoryState): string {
+  const t = currentTournament(story);
+  if (!t) return '';
+  return `
+    <section style="max-width:520px;margin:12px auto 0;">
+      <button class="gs-btn" style="background:linear-gradient(180deg,#2a2410,#1c1808);border-color:#6a5320;color:#ffe6a6;text-align:left;padding:12px 16px;"
+        data-action='${JSON.stringify({ type: 'openStoryTournament' })}'>
+        <div style="font-size:15px;font-weight:800;">🏆 ${t.name} — now open</div>
+        <div style="font-size:12px;color:#d8c089;font-weight:600;margin-top:2px;">Play for ${t.sigilName} · your rival ${t.rivalName.split(' ')[0]} awaits</div>
+      </button>
+    </section>`;
+}
+
+/**
  * The SPACEPORT clubhouse (post-recruitment, Chapter 1+): your ship parked, the Parrot in the bar, the star
  * chart ahead. The campaign has "opened up" to space. The forward "set course" star-map action lands with
  * the GS-story-map chunk; for now, the chart teaser.
@@ -149,6 +168,8 @@ function spaceClubhouseHTML(story: StoryState): string {
         </p>
       </div>
     </section>
+
+    ${tournamentBannerHTML(story)}
 
     <h2 class="gs-seclabel">The spaceport</h2>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
