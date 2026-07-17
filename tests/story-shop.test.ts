@@ -16,7 +16,17 @@ import {
   storyItemOwned,
   storyItemEquipped,
   storyWorldShoppable,
+  storyCardFor,
+  storyItemKind,
+  buyStoryCard,
 } from '../src/sim/rpg/storyShop';
+import {
+  STORY_GEAR,
+  STORY_GEAR_STOCK,
+  storyGearById,
+  buyStoryGear,
+  applyStoryGear,
+} from '../src/sim/rpg/storyGear';
 import {
   defaultStoryState,
   resolveStoryClub,
@@ -26,8 +36,10 @@ import {
   MAX_STORY_BAG,
   addCredits,
   recordWorldClear,
+  GEAR_SLOTS,
+  STORY_WORLDS,
 } from '../src/sim/rpg/story';
-import { STORY_WORLDS } from '../src/sim/rpg/story';
+import type { PlayerLoadout } from '../src/sim/rpg/economy';
 
 describe('story club resolution (GS-story-econ)', () => {
   it('resolves a plain taxonomy id and a themed reward id', () => {
@@ -185,5 +197,86 @@ describe('buying (GS-story-econ)', () => {
     // Earth has no rack even once cleared
     const earth = recordWorldClear(s0, 'standrews-18', { toPar: 0, strokes: 72, par: 72, seed: 'x' }, 200);
     expect(storyWorldShoppable(earth, 'standrews-18')).toBe(false);
+  });
+});
+
+describe('Story gear (GS-story-gear)', () => {
+  it('every gear row has art-routable id, price, detail + lore; every stock id resolves', () => {
+    for (const g of STORY_GEAR) {
+      expect(g.id.startsWith('gear:')).toBe(true);
+      expect(GEAR_SLOTS).toContain(g.slot);
+      expect(g.price).toBeGreaterThan(0);
+      expect(g.detail.length).toBeGreaterThan(0);
+      expect(g.lore.length).toBeGreaterThan(0);
+      expect(g.blurb.length).toBeGreaterThan(0);
+    }
+    for (const [worldId, ids] of Object.entries(STORY_GEAR_STOCK)) {
+      expect(STORY_WORLDS.some((w) => w.courseId === worldId)).toBe(true);
+      for (const id of ids) expect(storyGearById(id), `${id} resolves`).toBeTruthy();
+    }
+  });
+
+  it('buying gear spends credits, owns it, and equips it in its slot (swapping the old one)', () => {
+    const rich = addCredits(defaultStoryState(), 2000);
+    const glove = storyGearById('gear:glove:tacky')!;
+    const after = buyStoryGear(rich, glove);
+    expect(after.credits).toBe(2000 - glove.price);
+    expect(after.ownedGearIds).toContain(glove.id);
+    expect(after.equippedGear.glove).toBe(glove.id);
+    // a second glove REPLACES the first in the slot (one per slot)
+    const vice = storyGearById('gear:glove:vice')!;
+    const swapped = buyStoryGear(after, vice);
+    expect(swapped.equippedGear.glove).toBe(vice.id);
+    expect(swapped.ownedGearIds).toContain(glove.id); // still owned, just not equipped
+  });
+
+  it('applyStoryGear folds equipped effects onto a loadout (and is a no-op when un-geared)', () => {
+    const base: PlayerLoadout = {
+      bag: [],
+      handicap: 10,
+      dispersionMult: 1,
+      creditMult: 1,
+      perks: [],
+      shapeMod: {},
+      minCarryBoost: 0,
+      wedgeWindow: 0,
+      distanceClubBonus: 0,
+      puttBoost: 0,
+      birdieCredit: 0,
+      eagleCredit: 0,
+      comebackCredit: 0,
+    };
+    const un = defaultStoryState();
+    expect(applyStoryGear(base, un)).toEqual(base); // no gear → unchanged
+
+    let s = addCredits(defaultStoryState(), 3000);
+    s = buyStoryGear(s, storyGearById('gear:glove:tacky')!); // dispersion ×0.93
+    s = buyStoryGear(s, storyGearById('gear:hat:visor')!); // puttBoost +0.08
+    s = buyStoryGear(s, storyGearById('gear:shoes:spikes')!); // lieRelief 0.30
+    s = buyStoryGear(s, storyGearById('gear:ball:soft')!); // backspin +0.08
+    const out = applyStoryGear(base, s);
+    expect(out.dispersionMult).toBeCloseTo(0.93, 5);
+    expect(out.puttBoost).toBeCloseTo(0.08, 5);
+    expect(out.lieRelief).toBeCloseTo(0.3, 5);
+    expect(out.backspinBoost).toBeCloseTo(0.08, 5);
+  });
+
+  it('the unified card layer resolves both clubs and gear', () => {
+    const club = storyCardFor('club:tour:3W');
+    expect(club?.kind).toBe('club');
+    expect(club?.tag).toContain('Fairway wood');
+    const gear = storyCardFor('gear:glove:tacky');
+    expect(gear?.kind).toBe('gear');
+    expect(gear?.tag).toContain('Glove');
+    expect(storyItemKind('gear:hat:focus')).toBe('gear');
+    expect(storyItemKind('club:solar:D')).toBe('club');
+    expect(storyItemKind('nonsense')).toBeUndefined();
+
+    // buyStoryCard dispatches to the right catalogue
+    const rich = addCredits(defaultStoryState(), 2000);
+    const boughtGear = buyStoryCard(rich, 'gear:glove:tacky');
+    expect(boughtGear.equippedGear.glove).toBe('gear:glove:tacky');
+    const boughtClub = buyStoryCard(rich, 'club:tour:3W');
+    expect(boughtClub.ownedClubIds).toContain('club:tour:3W');
   });
 });

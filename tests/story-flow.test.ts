@@ -212,6 +212,23 @@ describe('Story Pro Shop flow (GS-story-econ)', () => {
     // the lean green start: far fewer than a full 14-club common bag
     expect(intro.run.loadout.bag.length).toBeLessThanOrEqual(11);
   });
+
+  it('buying GEAR equips it and folds its effect into the next Story round (GS-story-gear)', () => {
+    const shop = reduce(shoppableMap(), { type: 'openStoryShop', worldId: 'verdant-18' });
+    // verdant-18's rack carries the Tacky Tour Glove (dispersion ×0.93).
+    const inspect = reduce(shop, { type: 'storyInspectItem', itemId: 'gear:glove:tacky' });
+    expect(inspect.storyItemInspectId).toBe('gear:glove:tacky');
+    const bought = reduce(inspect, { type: 'storyBuyItem', itemId: 'gear:glove:tacky' });
+    expect(bought.story!.ownedGearIds).toContain('gear:glove:tacky');
+    expect(bought.story!.equippedGear.glove).toBe('gear:glove:tacky');
+    expect(bought.storyItemInspectId).toBeUndefined();
+
+    // Tee off → the glove's tighter-dispersion effect is folded onto the round loadout: the geared
+    // round's dispersion is exactly 0.93× the un-geared round's.
+    const geared = reduce(bought, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    const ungeared = reduce(shop, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(geared.run.loadout.dispersionMult).toBeCloseTo(ungeared.run.loadout.dispersionMult * 0.93, 5);
+  });
 });
 
 describe('storyStore persistence (GS-story-save wiring)', () => {
