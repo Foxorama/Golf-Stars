@@ -198,6 +198,7 @@ export function reduce(state: UiState, action: Action): UiState {
           ...state,
           story: defaultStoryState(action.characterId),
           pendingStoryNew: false,
+          storyInspectId: undefined,
           screen: 'story',
         };
       }
@@ -348,20 +349,20 @@ export function reduce(state: UiState, action: Action): UiState {
       // CONTINUE it — straight to the hub. Otherwise begin a NEW campaign by picking a golfer (the
       // `pendingStoryNew` flag routes `selectCharacter` to create the `StoryState`).
       if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'story') return state;
-      if (state.story) return { ...state, screen: 'story' };
-      return { ...state, screen: 'character', pendingStoryNew: true, resumable: state.resumable };
+      if (state.story) return { ...state, screen: 'story', storyInspectId: undefined };
+      return { ...state, screen: 'character', pendingStoryNew: true, storyInspectId: undefined, resumable: state.resumable };
     }
 
     case 'storyNewCampaign': {
       // GS-story: begin a fresh campaign from the title or the hub (a "start over" that overwrites the
       // saved one only once a golfer is picked). Go pick the protagonist.
       if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'story') return state;
-      return { ...state, screen: 'character', pendingStoryNew: true };
+      return { ...state, screen: 'character', pendingStoryNew: true, storyInspectId: undefined };
     }
 
     case 'exitStory': {
       if (state.screen !== 'story') return state;
-      return { ...state, screen: 'title' };
+      return { ...state, screen: 'title', storyInspectId: undefined };
     }
 
     case 'storyPlayWorld': {
@@ -381,6 +382,25 @@ export function reduce(state: UiState, action: Action): UiState {
       // into the StoryState at `resolveStoryRound`).
       if (state.screen !== 'storyResult') return state;
       return { ...state, screen: 'story', lastStoryRound: undefined };
+    }
+
+    case 'storyInspectGolfer': {
+      // GS-story-clubhouse: open a golfer's stats/abilities overlay in the Earth clubhouse (the new-game
+      // picker, or the prologue hub). Guarded to those surfaces.
+      const onClubhouse = (state.screen === 'character' && state.pendingStoryNew) || state.screen === 'story';
+      if (!onClubhouse) return state;
+      return { ...state, storyInspectId: action.characterId };
+    }
+
+    case 'storyCloseInspect': {
+      return state.storyInspectId ? { ...state, storyInspectId: undefined } : state;
+    }
+
+    case 'storySwitchGolfer': {
+      // GS-story-clubhouse: change your protagonist from the prologue hub — only BEFORE the campaign has
+      // begun (chapter 0, Earth not yet cleared), so it never rewrites a golfer mid-campaign.
+      if (state.screen !== 'story' || !state.story || state.story.chapter > 0) return state;
+      return { ...state, story: { ...state.story, characterId: action.characterId }, storyInspectId: undefined };
     }
 
     case 'playYggdrasilRealm': {
