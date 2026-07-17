@@ -19,6 +19,16 @@ import type { Rarity } from '../course/contract';
 import { clubById } from '../clubs';
 import { clubSetById, buildRewardClub, isDistanceType, type ClubSet } from './economy';
 import { addCredits, equipStoryClub, worldCleared, type StoryState } from './story';
+import {
+  STORY_GEAR_STOCK,
+  storyGearById,
+  storyGearStock,
+  storyGearOwned,
+  storyGearEquipped,
+  canBuyStoryGear,
+  buyStoryGear,
+  type StoryGearItem,
+} from './storyGear';
 
 /** A single purchasable Pro-Shop item. Today only themed CLUBS (gear/ships/upgrades land in later
  *  chunks reusing this shape); a club item's `id` IS the granted `club:<set>:<type>` club id. */
@@ -111,9 +121,9 @@ export function storyShopStock(story: StoryState, worldId: string): StoryShopIte
     .filter((it): it is StoryShopItem => !!it && !story.ownedClubIds.includes(it.id));
 }
 
-/** Can this world be shopped at all (has a rack and the campaign has opened up to space)? */
+/** Can this world be shopped at all (has a club or gear rack)? The Earth prologue has neither. */
 export function worldHasShop(worldId: string): boolean {
-  return (STORY_SHOP[worldId]?.length ?? 0) > 0;
+  return (STORY_SHOP[worldId]?.length ?? 0) > 0 || (STORY_GEAR_STOCK[worldId]?.length ?? 0) > 0;
 }
 
 /** Can the player buy this item right now — not owned and affordable? */
@@ -232,3 +242,118 @@ export function storyWorldShoppable(story: StoryState, worldId: string): boolean
 export function storyItemEquipped(story: StoryState, item: StoryShopItem): boolean {
   return story.equippedBagIds.includes(item.id);
 }
+
+// ── Unified item layer (GS-story-gear) — one path for clubs AND gear ──────────────────────────────
+// The Pro Shop screen + the buy/inspect reducer treat a rack item generically via its id: a `club:` id
+// resolves to a themed club, a `gear:` id to a gear piece. This keeps the reducer to ONE buy/inspect
+// path and the lore card to ONE renderer, while each kind keeps its own catalogue.
+
+/** A rack item's kind, or undefined if the id is neither a valid club nor gear. */
+export function storyItemKind(id: string): 'club' | 'gear' | undefined {
+  if (id.startsWith('club:')) return storyItemById(id) ? 'club' : undefined;
+  if (id.startsWith('gear:')) return storyGearById(id) ? 'gear' : undefined;
+  return undefined;
+}
+
+/** A human "Rare · Fairway wood" / "Epic · Glove" tag for a rack item. */
+function clubKindWord(clubType: string): string {
+  if (clubType === 'D') return 'Driver';
+  if (/W$/.test(clubType)) return 'Fairway wood';
+  if (/H$/.test(clubType)) return 'Hybrid';
+  if (/i$/.test(clubType)) return 'Iron';
+  if (clubType === 'putter') return 'Putter';
+  return 'Club';
+}
+const GEAR_SLOT_WORD: Record<string, string> = {
+  glove: 'Glove', hat: 'Cap', shoes: 'Shoes', ball: 'Ball', bag: 'Bag',
+};
+
+/** The everything-the-card-needs view of a rack item (club or gear), or undefined for a bad id. */
+export interface StoryCard {
+  id: string;
+  kind: 'club' | 'gear';
+  name: string;
+  rarity: Rarity;
+  price: number;
+  tag: string;
+  blurb: string;
+  detail: string[];
+  lore: string[];
+  /** Club-art set theme (for `itemArtSVG`); undefined for gear (art routes off the id). */
+  theme?: string;
+}
+
+function titleCase(r: Rarity): string {
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+
+/** Resolve any rack id to the unified `StoryCard`. */
+export function storyCardFor(id: string): StoryCard | undefined {
+  if (id.startsWith('club:')) {
+    const it = storyItemById(id);
+    if (!it) return undefined;
+    const rarity = storyItemRarity(it);
+    return {
+      id,
+      kind: 'club',
+      name: storyItemName(it),
+      rarity,
+      price: storyItemPrice(it),
+      tag: `${titleCase(rarity)} · ${clubKindWord(it.clubType)}`,
+      blurb: storyItemBlurb(it),
+      detail: storyItemDetail(it),
+      lore: storyItemLore(it),
+      theme: clubSetById(it.setId)?.theme,
+    };
+  }
+  const g = storyGearById(id);
+  if (!g) return undefined;
+  return {
+    id,
+    kind: 'gear',
+    name: g.name,
+    rarity: g.rarity,
+    price: g.price,
+    tag: `${titleCase(g.rarity)} · ${GEAR_SLOT_WORD[g.slot] ?? 'Gear'}`,
+    blurb: g.blurb,
+    detail: g.detail,
+    lore: g.lore,
+  };
+}
+
+/** Does the player own this rack item (club or gear)? */
+export function storyCardOwned(story: StoryState, id: string): boolean {
+  if (id.startsWith('club:')) return story.ownedClubIds.includes(id);
+  const g = storyGearById(id);
+  return g ? storyGearOwned(story, g.id) : false;
+}
+
+/** Is this owned rack item currently equipped (in the bag / in its gear slot)? */
+export function storyCardEquipped(story: StoryState, id: string): boolean {
+  if (id.startsWith('club:')) return story.equippedBagIds.includes(id);
+  const g = storyGearById(id);
+  return g ? storyGearEquipped(story, g) : false;
+}
+
+/** Can the player buy this rack item right now? */
+export function canBuyStoryCard(story: StoryState, id: string): boolean {
+  if (id.startsWith('club:')) {
+    const it = storyItemById(id);
+    return !!it && canBuyStoryItem(story, it);
+  }
+  const g = storyGearById(id);
+  return !!g && canBuyStoryGear(story, g);
+}
+
+/** Buy any rack item (club or gear), dispatching to the right catalogue. No-op on a bad/unaffordable id. */
+export function buyStoryCard(story: StoryState, id: string): StoryState {
+  if (id.startsWith('club:')) {
+    const it = storyItemById(id);
+    return it ? buyStoryItem(story, it) : story;
+  }
+  const g = storyGearById(id);
+  return g ? buyStoryGear(story, g) : story;
+}
+
+/** The gear rack for a world (re-exported so the screen imports one module). */
+export { storyGearStock, type StoryGearItem };

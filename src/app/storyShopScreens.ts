@@ -1,10 +1,10 @@
 /**
- * The Story-Tour Pro Shop screen (GS-story-econ). Reached from a CLEARED world's dossier on the galaxy
- * map ("🛒 Pro Shop"): a per-world rack of themed clubs you spend campaign credits on to grow the green
- * bag. Tapping an item raises the reusable LORE CARD (GS-story-lore-cards) — art + name + mechanical
- * detail + flavour + a Buy action. Built from existing design tokens + a self-contained `.gs-sshop*`
- * style block (own prefix — no global CSS collision). Reads the live `state`; actions dispatch via
- * `data-action` wiring in app.ts.
+ * The Story-Tour Pro Shop screen (GS-story-econ / GS-story-gear). Reached from a CLEARED world's dossier
+ * on the galaxy map ("🛒 Pro Shop"): a per-world rack of themed CLUBS + effect-bearing GEAR you spend
+ * campaign credits on. Tapping an item raises the reusable LORE CARD (GS-story-lore-cards) — art + name +
+ * mechanical detail + flavour + a Buy action. Built from existing design tokens + a self-contained
+ * `.gs-sshop*` style block (own prefix — no global CSS collision). Reads the live `state`; actions
+ * dispatch via `data-action` wiring in app.ts.
  */
 
 import { state } from './ctx';
@@ -12,42 +12,21 @@ import { rarCol } from '../sim/rpg/loot';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
-import { clubSetById } from '../sim/rpg/economy';
 import {
   storyShopStock,
-  storyItemById,
-  storyItemName,
-  storyItemPrice,
-  storyItemRarity,
-  storyItemBlurb,
-  storyItemDetail,
-  storyItemLore,
-  storyItemOwned,
-  storyItemEquipped,
-  canBuyStoryItem,
+  storyGearStock,
+  storyCardFor,
+  storyCardOwned,
+  storyCardEquipped,
+  canBuyStoryCard,
   WORLD_SHOP_INTRO,
-  type StoryShopItem,
 } from '../sim/rpg/storyShop';
 
-/** A human tag for an item's kind + rarity, e.g. "Rare · Fairway wood". */
-function itemTag(item: StoryShopItem): string {
-  const rar = storyItemRarity(item);
-  const rarWord = rar.charAt(0).toUpperCase() + rar.slice(1);
-  const t = item.clubType;
-  const kind =
-    t === 'D' ? 'Driver'
-    : /W$/.test(t) ? 'Fairway wood'
-    : /H$/.test(t) ? 'Hybrid'
-    : /i$/.test(t) ? 'Iron'
-    : t === 'putter' ? 'Putter'
-    : 'Club';
-  return `${rarWord} · ${kind}`;
-}
-
-/** The procedural art for an item (its themed reward-club head). */
-function itemArt(item: StoryShopItem): string {
-  const theme = clubSetById(item.setId)?.theme;
-  return itemArtSVG(item.id, storyItemRarity(item), theme);
+/** The procedural art for any rack id — a themed club head, or the gear's kit (glove/cap/shoes/ball). */
+function cardArt(id: string): string {
+  const card = storyCardFor(id);
+  if (!card) return '';
+  return itemArtSVG(id, card.rarity, card.theme);
 }
 
 export function storyShopScreen(): string {
@@ -64,10 +43,15 @@ export function storyShopScreen(): string {
   const spec = staticCourseSpec(worldId);
   const courseName = spec?.name ?? 'this world';
   const intro = WORLD_SHOP_INTRO[worldId] ?? 'The pro shop is open for business.';
-  const stock = storyShopStock(story, worldId);
+  const clubIds = storyShopStock(story, worldId).map((it) => it.id);
+  const gearIds = storyGearStock(story, worldId).map((it) => it.id);
 
-  const cards = stock.length
-    ? stock.map((it) => shopCard(it)).join('')
+  const section = (label: string, ids: string[]): string =>
+    ids.length ? `<h2 class="gs-sshop-sec">${label}</h2><div class="gs-sshop-grid">${ids.map(rackCard).join('')}</div>` : '';
+
+  const anyStock = clubIds.length || gearIds.length;
+  const body = anyStock
+    ? `${section('Clubs', clubIds)}${section('Gear', gearIds)}`
     : `<div class="gs-sshop-empty">You've bought everything on this rack. Come back after you've charted new worlds.</div>`;
 
   const overlay = state.storyItemInspectId ? inspectOverlay(state.storyItemInspectId) : '';
@@ -82,10 +66,10 @@ export function storyShopScreen(): string {
       </div>
     </header>
     <section style="max-width:560px;margin:2px auto 0;">
-      <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:2px 0 12px;">
+      <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:2px 0 10px;">
         <em>${intro}</em>
       </p>
-      <div class="gs-sshop-grid">${cards}</div>
+      ${body}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: worldId })}'>↺ Play this world again</button>
@@ -93,6 +77,8 @@ export function storyShopScreen(): string {
     </div>
     ${overlay}
     <style>
+      .gs-sshop-sec{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gs-dim,#9fb0c8);
+        margin:12px 0 8px;padding-bottom:4px;border-bottom:1px solid #232b3b;}
       .gs-sshop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
       .gs-sshop-card{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;cursor:pointer;
         background:linear-gradient(180deg,#141926,#0f131c);border:1px solid #262f42;border-top:3px solid var(--ac,#5b8bd0);
@@ -104,49 +90,50 @@ export function storyShopScreen(): string {
       .gs-sshop-blurb{font-size:11px;color:var(--gs-dim,#9fb0c8);line-height:1.3;min-height:2.2em;}
       .gs-sshop-price{font-size:13px;font-weight:800;color:var(--gs-gold,#e9c46a);}
       .gs-sshop-price--no{color:#c86a6a;}
-      .gs-sshop-empty{grid-column:1/-1;text-align:center;color:var(--gs-dim,#9fb0c8);font-size:13px;
+      .gs-sshop-empty{text-align:center;color:var(--gs-dim,#9fb0c8);font-size:13px;
         line-height:1.5;padding:22px 12px;border:1px dashed #2a3346;border-radius:12px;}
     </style>`;
 }
 
-/** One rack card (art + name + blurb + price). Tapping opens the lore card. */
-function shopCard(item: StoryShopItem): string {
-  const price = storyItemPrice(item);
-  const afford = state.story ? state.story.credits >= price : false;
-  const ac = rarCol(storyItemRarity(item));
+/** One rack card (art + name + blurb + price). Tapping opens the lore card. Works for any rack id. */
+function rackCard(id: string): string {
+  const card = storyCardFor(id);
+  if (!card) return '';
+  const afford = state.story ? state.story.credits >= card.price : false;
+  const ac = rarCol(card.rarity);
   return `
-    <div class="gs-sshop-card" style="--ac:${ac};" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: item.id })}'>
-      <span class="gs-sshop-art" aria-hidden="true">${itemArt(item)}</span>
-      <span class="gs-sshop-name">${storyItemName(item)}</span>
-      <span class="gs-sshop-blurb">${storyItemBlurb(item)}</span>
-      <span class="gs-sshop-price${afford ? '' : ' gs-sshop-price--no'}">✦ ${price}</span>
+    <div class="gs-sshop-card" style="--ac:${ac};" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}'>
+      <span class="gs-sshop-art" aria-hidden="true">${cardArt(id)}</span>
+      <span class="gs-sshop-name">${card.name}</span>
+      <span class="gs-sshop-blurb">${card.blurb}</span>
+      <span class="gs-sshop-price${afford ? '' : ' gs-sshop-price--no'}">✦ ${card.price}</span>
     </div>`;
 }
 
 /** The tap-to-inspect lore card for one item, with a context-aware footer (Buy / Owned / Can't afford). */
 function inspectOverlay(itemId: string): string {
   const story = state.story;
-  const item = storyItemById(itemId);
-  if (!story || !item) return '';
-  const price = storyItemPrice(item);
-  const owned = storyItemOwned(story, item);
-  const equipped = storyItemEquipped(story, item);
+  const card = storyCardFor(itemId);
+  if (!story || !card) return '';
+  const owned = storyCardOwned(story, itemId);
+  const equipped = storyCardEquipped(story, itemId);
+  const equippedWord = card.kind === 'club' ? 'in your bag' : 'equipped';
   let footer: string;
   if (owned) {
-    footer = `<div class="gs-sshop-owned">✓ Owned${equipped ? ' · in your bag' : ' · in the locker'}</div>`;
-  } else if (canBuyStoryItem(story, item)) {
-    footer = `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyBuyItem', itemId: item.id })}'>Buy · ✦ ${price}</button>`;
+    footer = `<div class="gs-sshop-owned">✓ Owned${equipped ? ` · ${equippedWord}` : ' · in the locker'}</div>`;
+  } else if (canBuyStoryCard(story, itemId)) {
+    footer = `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyBuyItem', itemId })}'>Buy · ✦ ${card.price}</button>`;
   } else {
-    footer = `<div class="gs-sshop-cant">Not enough credits — ✦ ${price} (you have ✦ ${story.credits})</div>`;
+    footer = `<div class="gs-sshop-cant">Not enough credits — ✦ ${card.price} (you have ✦ ${story.credits})</div>`;
   }
   return (
     loreCardHTML({
-      icon: itemArt(item),
-      name: storyItemName(item),
-      tag: itemTag(item),
-      accent: rarCol(storyItemRarity(item)),
-      detail: storyItemDetail(item),
-      lore: storyItemLore(item),
+      icon: cardArt(itemId),
+      name: card.name,
+      tag: card.tag,
+      accent: rarCol(card.rarity),
+      detail: card.detail,
+      lore: card.lore,
       footerHTML: footer,
       closeAttr: 'data-story-item-close="1"',
     }) +

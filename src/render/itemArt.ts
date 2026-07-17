@@ -46,6 +46,7 @@ export type ItemArtKind =
   | 'coin'
   | 'putter'
   | 'shoes'
+  | 'hat'
   | 'rangefinder'
   | 'wedge'
   | 'coach'
@@ -115,6 +116,15 @@ const KIND_BY_ID: Record<string, ItemArtKind> = {
 /** Resolve the art kind for an item id. Named caddies → 'caddy'; reward clubs → 'club'. */
 export function itemArtKind(id: string): ItemArtKind {
   if (id.startsWith('club:')) return 'club';
+  // Story-Tour gear ids (`gear:<slot>:<variant>`, GS-story-gear) draw their slot's kit: a glove, shoes,
+  // a ball, a cap. The variant + rarity tint tell them apart; a new slot maps to a new/existing drawing.
+  if (id.startsWith('gear:')) {
+    const slot = id.split(':')[1];
+    if (slot === 'glove') return 'glove';
+    if (slot === 'shoes') return 'shoes';
+    if (slot === 'ball') return 'ball';
+    if (slot === 'hat') return 'hat';
+  }
   return KIND_BY_ID[id] ?? 'caddy'; // caddies + anything unmapped get the caddy bag glyph
 }
 
@@ -676,6 +686,27 @@ function drawShoes(col: string, seed: string): string {
   return frame(`${sparkles(seed, col, 4)}${shoe(18)}${shoe(58)}`, col);
 }
 
+/** A golf cap (GS-story-gear, the `hat` slot): a curved crown + a long visor, a themed band, a small
+ *  front badge. Deterministic; the rarity tint colours crown + band. */
+function drawHat(col: string, seed: string): string {
+  const crown = mix(col, '#2b3140', 0.35);
+  const band = mix(col, '#f0f3f8', 0.35);
+  const visor = mix(col, '#11141b', 0.25);
+  return frame(
+    `${sparkles(seed, col, 4)}
+     <g transform="translate(30 26)">
+       <path d="M 6 30 q -4 -34 42 -34 q 40 0 40 26 q 0 4 -4 6 l -74 4 q -4 0 -4 -2 z" fill="${crown}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M 2 30 q -2 -6 6 -6 l 74 0 q 6 0 6 4 q 0 4 -6 6 l -74 2 q -6 0 -6 -6 z" fill="${band}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M 2 34 q -14 2 -22 12 q -3 4 2 6 q 24 -6 26 -12 z" fill="${visor}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <circle cx="44" cy="-2" r="1.8" fill="${band}"/>
+       <circle cx="40" cy="14" r="6" fill="#0c0f15" stroke="${col}" stroke-width="1.6"/>
+       <path d="M 40 10 l 0 8 M 36 14 l 8 0" stroke="${mix(col, '#ffffff', 0.4)}" stroke-width="1.4"/>
+     </g>
+     ${ballGlyph(122, 74, 8)}`,
+    col,
+  );
+}
+
 function drawRangefinder(col: string, seed: string): string {
   const body = mix(col, '#2a2f3a', 0.25);
   return frame(
@@ -1032,6 +1063,9 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
       break;
     case 'shoes':
       base = drawShoes(col, seed);
+      break;
+    case 'hat':
+      base = drawHat(col, seed);
       break;
     case 'rangefinder':
       base = drawRangefinder(col, seed);

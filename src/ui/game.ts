@@ -62,7 +62,8 @@ import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/r
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
 import { loreEventById, type SeenLore } from '../sim/rpg/lore';
 import { defaultStoryState, storyBagClubs, worldCleared, type StoryState } from '../sim/rpg/story';
-import { storyItemById, buyStoryItem, worldHasShop } from '../sim/rpg/storyShop';
+import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
+import { applyStoryGear } from '../sim/rpg/storyGear';
 import {
   autoDecision,
   awaitingPutt,
@@ -379,9 +380,11 @@ export function reduce(state: UiState, action: Action): UiState {
       if ((state.screen !== 'story' && state.screen !== 'starTour' && state.screen !== 'storyShop') || !state.story) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const bag = storyBagClubs(state.story);
+      // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
+      const loadout = applyStoryGear({ ...run0.loadout, bag }, state.story);
       const run = {
         ...run0,
-        loadout: { ...run0.loadout, bag },
+        loadout,
         staticCourseId: action.courseId,
         staticEffect: 'none',
         storyRound: true,
@@ -445,9 +448,9 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyInspectItem': {
-      // GS-story-econ / GS-story-lore-cards: tap a rack item → raise its lore card over the shop.
+      // GS-story-econ / GS-story-lore-cards: tap a rack item (club OR gear) → raise its lore card.
       if (state.screen !== 'storyShop' || !state.story) return state;
-      if (!storyItemById(action.itemId)) return state;
+      if (!storyItemKind(action.itemId)) return state;
       return { ...state, storyItemInspectId: action.itemId };
     }
 
@@ -457,12 +460,12 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyBuyItem': {
-      // GS-story-econ: buy the item (spend credits, add to owned, equip into the bag ≤14). No-op if
-      // unaffordable/owned (buyStoryItem gates), so a double-tap can't overspend. Persists via `state.story`.
+      // GS-story-econ / GS-story-gear: buy the item (club → spend + equip into the bag ≤14; gear → spend +
+      // equip in its slot). No-op if unaffordable/owned (buyStoryCard gates), so a double-tap can't
+      // overspend. Persists via `state.story`.
       if (state.screen !== 'storyShop' || !state.story) return state;
-      const item = storyItemById(action.itemId);
-      if (!item) return state;
-      const story = buyStoryItem(state.story, item);
+      if (!storyItemKind(action.itemId)) return state;
+      const story = buyStoryCard(state.story, action.itemId);
       if (story === state.story) return state; // couldn't buy — leave the card open
       return { ...state, story, storyItemInspectId: undefined };
     }

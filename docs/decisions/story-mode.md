@@ -66,6 +66,19 @@ you choose from in the bar/locker (no hire-and-fire).
 - **Content as data.** A new world / club / gear / ship / tournament / story beat is a **row**, not an
   engine edit. Chapters are data over a small reusable framework.
 
+### The item-authoring rule (EVERY individual item — GS-story-lore-cards)
+No item ships as a bare stat line. Each one — club, gear, ship, relic, weapon, caddy — is authored through
+**three lenses** (the constitution's three lenses, applied to content):
+1. **Visual.** Its OWN art in the house procedural-SVG language (no downloaded assets), rarity-tinted and
+   theme-aware. No two items share a silhouette; a new *kind* of item gets a new `render/itemArt.ts`
+   drawing (or a themed aura over a shared base). **Eyeball a real-browser screenshot before shipping.**
+2. **Lore.** *Detailed* flavour, never a raw number. Compose it from reusable canon (the set/faction/world
+   lore) **plus** an item-specific line, so each reads distinct without hand-writing a novel each time;
+   add new canon to `story-bible.md` when an item needs it. The lore is what fills out the galaxy.
+3. **Interaction.** Tappable → the reusable **lore card** (`render/loreCard.ts`): art + name + rarity/kind
+   tag + mechanical detail + lore + a footer action. Never image+name inline only.
+When you add an item catalogue, wire all three; a stat-only item is an incomplete item.
+
 ## Architecture — the separation seam
 
 Star Tour today is the `strokeplay` run format: ~9 branch points on `formatId === STROKEPLAY_FORMAT` /
