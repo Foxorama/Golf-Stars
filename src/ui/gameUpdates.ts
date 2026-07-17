@@ -42,7 +42,7 @@ import {
   recordWorldClear,
   STORY_CHAPTER_COUNT,
 } from '../sim/rpg/story';
-import { shipCreditMult, grantStoryAceShip } from '../sim/rpg/storyShips';
+import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
 import { tournamentForChapter, rivalTotal, winTournament } from '../sim/rpg/storyTournaments';
 import type { HolePlay } from '../sim/rpg/play';
@@ -407,7 +407,11 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     credits,
   );
   const alreadyWon = story.trophyIds.includes(t.sigilId);
-  if (won) story = winTournament(story, t);
+  if (won) {
+    story = winTournament(story, t);
+    // GS-story-route-rewards: a route major grants its signature ship (own + fly it).
+    if (t.rewardShipId) story = grantStoryShip(story, t.rewardShipId);
+  }
   const finalSigil = won && !alreadyWon && story.trophyIds.length >= STORY_CHAPTER_COUNT;
 
   return {

@@ -195,6 +195,29 @@ export const SHIPS: readonly Ship[] = [
     cost: TIER_COST.legendary,
     look: { kind: 'pegasus', body: '#b8823a', glass: '#f2e6c4', flame: '#ffd873', accent: '#e6b93f', bling: 2 },
   },
+  // --- Story-Tour ROUTE ships (GS-story-route-rewards): earned by winning your path's Chapter-4 major.
+  // `secret` (hidden from the Trade Market until owned) + free — the campaign grants them to `gs_story`
+  // ownership, so they never surface in the main-save market. Reuse existing hulls with a route palette.
+  {
+    id: 'warden-cruiser',
+    name: 'Radiant Warden Cruiser',
+    set: 'Exotic',
+    rarity: 'legendary',
+    blurb: 'A Warden star-cruiser haloed in celestial light — earned on the Warden path.',
+    cost: 0,
+    secret: true,
+    look: { kind: 'shuttle', body: '#eaf2ff', glass: '#bfe9ff', flame: '#8fe6ff', accent: '#ffe08a', bling: 3 },
+  },
+  {
+    id: 'wyrm-ship',
+    name: 'Coil Wyrm-Ship',
+    set: 'Exotic',
+    rarity: 'legendary',
+    blurb: 'A corrupted serpent-hull that hits harder and flies frailer — earned on the Coil path.',
+    cost: 0,
+    secret: true,
+    look: { kind: 'racer', body: '#1c3a2a', glass: '#9dffce', flame: '#b060c0', accent: '#54dba0', bling: 2 },
+  },
   // --- The MYTHIC grail: the rarest, flashiest ride in the galaxy ---
   {
     id: 'ufo-mothership',

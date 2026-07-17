@@ -46,8 +46,10 @@ export interface StoryTournament {
   /** The trophy id awarded on a win (a "Sigil of the Game"). */
   sigilId: string;
   sigilName: string;
-  /** The signature prize blurb (the actual prize item is a later hook). */
+  /** The signature prize blurb. */
   prize: string;
+  /** GS-story-route-rewards: a ship GRANTED on winning this major (the route's signature ride). Absent = none. */
+  rewardShipId?: string;
   /** Host/rival flavour for the tournament lobby (lore-card style). */
   intro: string[];
 }
@@ -122,7 +124,8 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     unlockAfterClears: 2,
     sigilId: 'sigil-abyssal',
     sigilName: 'The Abyssal Sigil',
-    prize: 'A radiant Warden cruiser and celestial gear await the victor.',
+    prize: 'The Radiant Warden Cruiser — a celestial ship, awarded to the victor.',
+    rewardShipId: 'warden-cruiser',
     intro: [
       'Not a show — a vigil. At the edge of a black hole the Coil is trying to wake a lesser dreamer, and ' +
         'the Wardens play the Sagittarius Core to hold it down. Venoma hunts you openly now — but her ' +
@@ -142,7 +145,8 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     unlockAfterClears: 2,
     sigilId: 'sigil-drowned',
     sigilName: 'The Drowned Sigil',
-    prize: 'A corrupted wyrm-ship hull and a cursed shedding — power with a price.',
+    prize: 'The Coil Wyrm-Ship — a corrupted serpent-hull, power with a price.',
+    rewardShipId: 'wyrm-ship',
     intro: [
       'You wear the Coil’s mark now. At the Eridanus Atolls you desecrate a Warden shrine to drown its ' +
         'wards — and the Warden sent to stop you is Penelope, who once read your putts. She does not ' +

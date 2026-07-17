@@ -254,9 +254,22 @@ Ordered so each ships something playable and nothing lands before its foundation
   valid value, drops junk). Own `.gs-choice*` prefix. Guarded by the fork/Sigil coverage in
   `tests/story-tournament.test.ts`, the migrate in `tests/story-state.test.ts`, the Choice→path→forked-venue
   flow in `tests/story-flow.test.ts`, and the `?screen=storychoice` smoke. **Deferred** (bible): the
-  Sigil-less emotional MID-chapter per route (the friend won back / drowned), route-specific **gear/ship
-  pools** + cursed **sheddings** + the **wyrm-ship**, and the Gemini-Ice rally side world — a later content
-  pass on this same alignment seam (the former GS-story-warden-track / GS-story-herald-track).
+  Sigil-less emotional MID-chapter per route (the friend won back / drowned) and the Gemini-Ice rally side
+  world — a later content pass on this same alignment seam.
+- **GS-story-route-rewards** — ✅ *shipped*. The paths now diverge in LOOT, not just beats. **Cursed
+  sheddings vs Warden grace** (`storyGear.ts`, `alignment` + `curse` on `StoryGearItem`): Herald sheddings
+  are stronger AND cheaper but each carries a real CURSE folded into its `apply` (Shed-Skin Grip: dispersion
+  ×0.78 but a −10% credit tithe; Venom-Core Ball: +26% backspin but +8% dispersion; Coilstride Boots: huge
+  lie-relief but −6% putt window). Warden grace is clean but dearer (Grace Gauntlet, Star-Blessed Ball,
+  Hallowed Spikes). `storyGearStock` route-GATES them — you only ever see your path's relics (none before
+  The Choice); the lore card wears the curse as a ⚠ detail line + a "cursed" tag (never a hidden trap).
+  **Route ships** (`ships.ts` + `storyShips.ts`, `acquire: 'reward'` + `alignment`): the **Radiant Warden
+  Cruiser** and the **Coil Wyrm-Ship**, each GRANTED (not sold — `grantStoryShip`) by winning that route's
+  Chapter-4 major (`StoryTournament.rewardShipId`, granted in `resolveStoryTournament`), hidden from the
+  shipyard until owned. No save bump (owned-lists + the existing `alignment`). Guarded by the relic
+  route-gate/curse in `tests/story-shop.test.ts`, the route ships in `tests/story-ships.test.ts`, the
+  reward `rewardShipId` + grant in `tests/story-tournament.test.ts` / `tests/story-flow.test.ts`. Deferred:
+  a wyrm-ship "frailer in battle" finale nuance (the finale is gate-based, so it's flavour for now).
 
 **Phase F — Finale**
 - **GS-story-yggdrasil** — ✅ *shipped* (`sim/rpg/storyFinale.ts` + `render/storyFinale.ts` +

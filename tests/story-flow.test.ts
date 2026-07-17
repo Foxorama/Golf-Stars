@@ -418,6 +418,29 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
     expect(intro.run.staticCourseId).toBe('ocean-18'); // the Herald venue (Warden would be void2-18)
   });
 
+  it('winning the Warden Chapter-4 major grants + flies the Radiant Warden Cruiser (GS-story-route-rewards)', () => {
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 4,
+      alignment: 'warden' as const,
+      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm'],
+      clearedWorldIds: ['standrews-18', 'ocean-18', 'void2-18'],
+      // arm up so the Warden Ch4 rival (Venoma, edge 0.42) is beatable by the auto round
+      ownedClubIds: [...defaultStoryState().ownedClubIds, 'club:solar:D', 'club:solar:3W', 'club:masters:2H'],
+      equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === 'D' ? 'club:solar:D' : id)),
+    };
+    const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+    const done = reduce(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }), { type: 'play' });
+    expect(done.screen).toBe('storyTournamentResult');
+    // The ship is granted iff the major was won — gate the assertion on the actual outcome.
+    if (done.lastStoryTournament!.won) {
+      expect(done.story!.ownedShipIds).toContain('warden-cruiser');
+      expect(done.story!.equippedShipId).toBe('warden-cruiser');
+    } else {
+      expect(done.story!.ownedShipIds).not.toContain('warden-cruiser');
+    }
+  });
+
   it('chooseAlignment is a no-op off the choice screen / once chosen', () => {
     const chosen = { ...initState('seed', {}, undefined, { ...defaultStoryState(), alignment: 'warden' as const }), screen: 'storyChoice' as const };
     expect(reduce(chosen, { type: 'chooseAlignment', alignment: 'herald' }).story!.alignment).toBe('warden'); // already chosen

@@ -8,6 +8,7 @@ import {
   buyStoryShip,
   equipStoryShip,
   grantStoryAceShip,
+  grantStoryShip,
   shipCreditMult,
   storyShipDetail,
   isStoryShipId,
@@ -97,5 +98,24 @@ describe('story ships catalogue (GS-story-ships)', () => {
     expect(s.ownedShipIds).toContain(ACE_SHIP_ID);
     expect(s.equippedShipId).toBe(ACE_SHIP_ID);
     expect(grantStoryAceShip(s)).toBe(s); // idempotent (already owned → same ref)
+  });
+
+  it('route reward ships (GS-story-route-rewards) are earned, never sold, and path-tagged', () => {
+    const warden = storyShipRow('warden-cruiser')!;
+    const wyrm = storyShipRow('wyrm-ship')!;
+    expect(warden.acquire).toBe('reward');
+    expect(warden.alignment).toBe('warden');
+    expect(wyrm.alignment).toBe('herald');
+    // not for sale, and hidden from the shipyard until owned
+    const rich = addCredits(defaultStoryState(), 9000);
+    expect(canBuyStoryShip(rich, warden)).toBe(false);
+    expect(storyShipRevealed(rich, warden)).toBe(false);
+    // granted → owned, flown, and now revealed
+    const granted = grantStoryShip(rich, 'warden-cruiser');
+    expect(granted.ownedShipIds).toContain('warden-cruiser');
+    expect(granted.equippedShipId).toBe('warden-cruiser');
+    expect(storyShipRevealed(granted, warden)).toBe(true);
+    expect(shipCreditMult(granted)).toBeCloseTo(1.2, 5);
+    expect(grantStoryShip(granted, 'warden-cruiser')).toBe(granted); // idempotent
   });
 });

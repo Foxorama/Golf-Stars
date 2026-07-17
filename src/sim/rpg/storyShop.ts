@@ -314,9 +314,10 @@ export function storyCardFor(id: string): StoryCard | undefined {
     name: g.name,
     rarity: g.rarity,
     price: g.price,
-    tag: `${titleCase(g.rarity)} · ${GEAR_SLOT_WORD[g.slot] ?? 'Gear'}`,
+    // A cursed shedding wears its downside right on the card (GS-story-route-rewards) — never a hidden trap.
+    tag: `${titleCase(g.rarity)} · ${GEAR_SLOT_WORD[g.slot] ?? 'Gear'}${g.curse ? ' · cursed' : ''}`,
     blurb: g.blurb,
-    detail: g.detail,
+    detail: g.curse ? [...g.detail, `⚠ ${g.curse}`] : g.detail,
     lore: g.lore,
   };
 }
