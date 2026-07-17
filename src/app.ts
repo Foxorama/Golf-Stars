@@ -78,8 +78,7 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed } from './app/starTourScreens';
-import { shipForCharacter } from './ui/gameCosmetics';
+import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed, tourShipId } from './app/starTourScreens';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
@@ -222,6 +221,17 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
       return reduce(intro, { type: 'play' });
     }
+    case 'storymap': {
+      // GS-story-map: reach the galaxy star map in STORY mode the honest way — play the prologue to Chapter
+      // 1, continue to the spaceport clubhouse, then open the chart (which reuses the Star Tour screen with
+      // the story context). Exercises world unlock-by-chapter + the map render. The app-layer `storyMode`
+      // flag is set by the dispatch handler on `openStoryMap`, so drive it through a real dispatch below.
+      const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const result = reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const club = reduce(result, { type: 'storyRoundContinue' });
+      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
+      return reduce(club, { type: 'openStoryMap' });
+    }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
       // lore gate builds), so a headless smoke test can render the new screen chrome.
@@ -317,7 +327,16 @@ function dispatch(action: Action): void {
     // Entering Star Tour (GS-star-tour-2): character select comes first, so `openStarTour` opens the
     // roster; reset the star map's whole view (selection, weather, ship at the spaceport) so a fresh
     // tour docks at home and re-centres on the port.
-    if (action.type === 'openStarTour' || (action.type === 'leaveAsgard' && state.screen === 'starTour')) {
+    // GS-story-map: Story Mode's "Set course" (openStoryMap) flies the SAME galaxy star map as the campaign
+    // navigator — reset the view identically, and flag `storyMode` so the chart plots the story's charted
+    // worlds, flies the campaign ship, and exits to the clubhouse (openStarTour clears the flag → the
+    // records chase). `leaveAsgard→starTour` is the records chase (no Story map returns via Asgard).
+    if (
+      action.type === 'openStarTour' ||
+      action.type === 'openStoryMap' ||
+      (action.type === 'leaveAsgard' && state.screen === 'starTour')
+    ) {
+      starTourView.storyMode = action.type === 'openStoryMap';
       starTourView.selectedId = null;
       starTourView.effect = 'none';
       starTourView.recordsOpen = false;
@@ -1659,7 +1678,7 @@ function fireStarTourWeapon(): void {
     haptic(HAPTICS.bad);
     return;
   }
-  const w = shipWeaponFor(shipForCharacter(state, state.run.loadout.characterId));
+  const w = shipWeaponFor(tourShipId());
   const sx = v.shipX ?? SPACEPORT_POS.x;
   const sy = v.shipY ?? SPACEPORT_POS.y;
   const hRad = (v.heading * Math.PI) / 180;

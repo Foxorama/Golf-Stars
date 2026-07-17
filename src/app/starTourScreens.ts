@@ -23,6 +23,7 @@ import { STATIC_COURSES, staticCourseSpec } from '../sim/course/staticCourses';
 import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
 import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
+import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT } from '../sim/rpg/story';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
 import { getCharacter } from '../sim/rpg/characters';
@@ -64,6 +65,10 @@ export interface StarTourRefuel {
 
 /** View state for the star map (mutated by app.ts; reset on entry). */
 export const starTourView = {
+  /** GS-story-map: the star map is being flown as the STORY campaign navigator (worlds gated by chapter,
+   *  story ship + credits, a clubhouse exit) rather than the free-roam records chase. Set by app.ts on
+   *  `openStoryMap`, cleared on `openStarTour`. */
+  storyMode: false,
   /** The world whose dossier is open, or null. */
   selectedId: null as string | null,
   /** The weather sky chosen for the round (a CourseEffectId). */
@@ -127,9 +132,23 @@ const RARITY_SPEED_MULT: Record<CosmeticRarity, number> = {
   mythic: 1.3,
 };
 
+/** GS-story-map: is the star map the STORY campaign navigator (vs the records chase)? */
+export function inStoryTour(): boolean {
+  return !!starTourView.storyMode && !!state.story;
+}
+/** The active golfer id on the chart — the story protagonist in story mode, else the run's golfer. */
+function tourCharacterId(): string | undefined {
+  return inStoryTour() ? state.story!.characterId : state.run.loadout.characterId;
+}
+/** The ship flown on the chart — the campaign's equipped ship in story mode (its own progression), else
+ *  the character's cosmetic ride. Exported so app.ts's flight loop (weapon/hover) reads the same ship. */
+export function tourShipId(): string {
+  return inStoryTour() ? state.story!.equippedShipId : shipForCharacter(state, state.run.loadout.characterId);
+}
+
 /** The current golfer's ship-rarity cruise multiplier for the star-map flight (1.0 if no ship). */
 export function starTourShipSpeedMult(): number {
-  const ship = shipById(shipForCharacter(state, state.run.loadout.characterId));
+  const ship = shipById(tourShipId());
   return ship ? RARITY_SPEED_MULT[ship.rarity] : 1.0;
 }
 
@@ -137,7 +156,7 @@ export function starTourShipSpeedMult(): number {
  *  glides level and banks rather than pointing a nose along the flight. Drives the app's per-frame body
  *  transform so the disc never tumbles its under-beam out the side. */
 export function starTourShipHovers(): boolean {
-  const ship = shipById(shipForCharacter(state, state.run.loadout.characterId));
+  const ship = shipById(tourShipId());
   return ship?.look.fly === 'hover';
 }
 
@@ -179,6 +198,25 @@ export function yggdrasilArmed(): boolean {
 
 /** The Star Tour catalogue as plottable worlds, stamped with the player's records. */
 export function starTourWorlds(): StarTourWorld[] {
+  // GS-story-map: the campaign navigator plots only the CHARTED story worlds (unlocked by chapter), read
+  // through the story's own best scores — so the chart fills in as the story advances.
+  if (inStoryTour()) {
+    const story = state.story!;
+    return STORY_WORLDS.filter((w) => storyWorldUnlocked(w, story.chapter)).flatMap((w) => {
+      const c = staticCourseSpec(w.courseId);
+      if (!c || !c.themeId || !c.archetype) return [];
+      const best = story.worldBest[w.courseId];
+      return [{
+        id: c.id,
+        name: c.name,
+        archetype: c.archetype,
+        tier: c.tier ?? 'testing',
+        themeId: c.themeId,
+        hasRecord: !!best,
+        bestToPar: best?.toPar,
+      }];
+    });
+  }
   return STATIC_COURSES.filter((c) => c.themeId && c.archetype).map((c) => {
     const best = bestStrokeFor(state.strokePlayBest, c.id);
     return {
@@ -196,7 +234,7 @@ export function starTourWorlds(): StarTourWorld[] {
 /** The themed fuel glyph for the flown ship (the ship's bridge livery swaps the default ⛽ for its own
  *  cell/plasma/drum glyph). Shared by the HUD's initial paint and app.ts's per-frame gauge refresh. */
 function starTourFuelIcon(): string {
-  const shipId = shipForCharacter(state, state.run.loadout.characterId);
+  const shipId = tourShipId();
   const hud = hudThemeForShip(shipId);
   const chrome = hudChromeFor(hud.variant, shipById(shipId));
   return chrome?.fuelIcon ?? '⛽';
@@ -239,9 +277,10 @@ function throttleSVG(): string {
  *  control in the focal centre slot, and the live FUEL gauge on the right. `pointer-events:none` on the
  *  frame so map scroll/taps pass through — only the console controls catch pointers. */
 function stHud(): string {
-  const charId = state.run.loadout.characterId;
+  const story = inStoryTour();
+  const charId = tourCharacterId();
   const ch = charId ? getCharacter(charId) : undefined;
-  const shipId = shipForCharacter(state, charId);
+  const shipId = tourShipId();
   const ship = shipById(shipId);
   const accent = ch?.style.cap ?? '#7fe0ff';
 
@@ -268,20 +307,35 @@ function stHud(): string {
         <span class="gs-bhud__corner gs-bhud__corner--br"></span>
       </div>
       ${chrome?.frame ?? ''}
-      <button class="gs-bhud__idpod gs-sthud__recordslink" data-startour-records="${recordsToggle}" aria-pressed="${starTourView.recordsOpen}" title="Course records">
+      ${
+        story
+          ? `<button class="gs-bhud__idpod gs-sthud__recordslink" data-action='${JSON.stringify({ type: 'exitStoryMap' })}' title="Back to the clubhouse">
+        <span class="gs-bhud__who">‹ <b class="gs-bhud__name">CLUBHOUSE</b></span>
+        <span class="gs-bhud__prog">Chapter <b>${state.story!.chapter}</b>/${STORY_CHAPTER_COUNT}</span>
+      </button>`
+          : `<button class="gs-bhud__idpod gs-sthud__recordslink" data-startour-records="${recordsToggle}" aria-pressed="${starTourView.recordsOpen}" title="Course records">
         <span class="gs-bhud__who">✦ <b class="gs-bhud__name">STAR TOUR</b></span>
         <span class="gs-bhud__prog">🏆 <b>${played}</b>/${total}</span>
-      </button>
+      </button>`
+      }
       <div class="gs-bhud__statpod">
-        <span class="gs-bhud__shards">✦ <b>${state.shards}</b></span>
+        <span class="gs-bhud__shards">✦ <b>${story ? state.story!.credits : state.shards}</b></span>
         <button class="gs-bhud__cog" data-open-settings="1" title="Settings" aria-label="Settings">⚙</button>
       </div>
       <div class="gs-bhud__console gs-bhud__console--st">
         <div class="gs-bhud__slot gs-bhud__slot--exit">
-          <button class="gs-sthud__pilot" data-action='{"type":"openStarTour"}' title="Change golfer — ${ch?.name ?? 'pick a pilot'}" aria-label="Change golfer">
+          ${
+            story
+              ? // Story Mode: the protagonist is fixed for the campaign — the pod is a plain identity dot
+                // (tapping the top-left CLUBHOUSE pill is the way out), never the records-chase golfer swap.
+                `<div class="gs-sthud__pilot" title="${ch?.name ?? 'your golfer'}" aria-hidden="true">
+            <span class="gs-sthud__pilot-dot" style="background:${accent};"></span>
+          </div>`
+              : `<button class="gs-sthud__pilot" data-action='{"type":"openStarTour"}' title="Change golfer — ${ch?.name ?? 'pick a pilot'}" aria-label="Change golfer">
             <span class="gs-sthud__pilot-dot" style="background:${accent};"></span>
             <span class="gs-sthud__pilot-swap">⇄</span>
-          </button>
+          </button>`
+          }
         </div>
         ${chrome?.deck ?? ''}
         <div class="gs-bhud__slot gs-bhud__slot--scan">
@@ -315,13 +369,26 @@ function weatherPicker(): string {
   return `<div class="gs-st-wxrow">${chips}</div>`;
 }
 
-/** The bottom dossier for a selected world — flavour, difficulty, your record, weather + play. */
+/** The bottom dossier for a selected world — flavour, difficulty, your record, weather + play. In STORY
+ *  mode (GS-story-map) it reads the campaign's own best, drops the weather picker (story worlds play their
+ *  designed sky), and tees off into the campaign (`storyPlayWorld`) instead of a records round. */
 function dossier(w: StarTourWorld): string {
   const spec = staticCourseSpec(w.id);
-  const best = bestStrokeFor(state.strokePlayBest, w.id);
-  const recordLine = best
-    ? `<span class="gs-st-rec">🏆 Your best: <b style="color:${toParColour(best.toPar)};">${formatToPar(best.toPar)}</b> <span style="opacity:.7;">(${best.strokes} strokes, par ${best.par})</span></span>`
-    : `<span class="gs-st-rec" style="opacity:.7;">No record yet — set the first!</span>`;
+  const story = inStoryTour();
+  const sBest = story ? state.story!.worldBest[w.id] : undefined;
+  const recordLine = story
+    ? sBest
+      ? `<span class="gs-st-rec">🏆 Your best: <b style="color:${toParColour(sBest.toPar)};">${formatToPar(sBest.toPar)}</b> <span style="opacity:.7;">(${sBest.strokes} strokes, par ${sBest.par})</span></span>`
+      : `<span class="gs-st-rec" style="opacity:.7;">Not yet played — chart a course!</span>`
+    : (() => {
+        const best = bestStrokeFor(state.strokePlayBest, w.id);
+        return best
+          ? `<span class="gs-st-rec">🏆 Your best: <b style="color:${toParColour(best.toPar)};">${formatToPar(best.toPar)}</b> <span style="opacity:.7;">(${best.strokes} strokes, par ${best.par})</span></span>`
+          : `<span class="gs-st-rec" style="opacity:.7;">No record yet — set the first!</span>`;
+      })();
+  const playAction = story
+    ? { type: 'storyPlayWorld', courseId: w.id }
+    : { type: 'pickStarTourCourse', courseId: w.id, effect: starTourView.effect };
   return `
     <div class="gs-st-sheet" role="dialog" aria-label="${w.name}">
       <button class="gs-st-sheet__close" data-startour-close="1" aria-label="Close">✕</button>
@@ -331,9 +398,8 @@ function dossier(w: StarTourWorld): string {
       </div>
       <p class="gs-st-sheet__blurb">${spec?.blurb ?? ''}</p>
       ${recordLine}
-      <div class="gs-st-sheet__wxlabel">Weather sky</div>
-      ${weatherPicker()}
-      <button class="gs-st-play" data-action='${JSON.stringify({ type: 'pickStarTourCourse', courseId: w.id, effect: starTourView.effect })}'>▸ Fly here &amp; play 18</button>
+      ${story ? '' : `<div class="gs-st-sheet__wxlabel">Weather sky</div>${weatherPicker()}`}
+      <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${story ? 'Fly here &amp; tee off' : 'Fly here &amp; play 18'}</button>
     </div>`;
 }
 
@@ -401,12 +467,14 @@ function yggdrasilSheet(): string {
 export function starTourScreen(): string {
   const worlds = starTourWorlds();
   const sel = starTourView.selectedId ? worlds.find((w) => w.id === starTourView.selectedId) : undefined;
-  const armed = yggdrasilArmed();
+  // Yggdrasil (the Warrior's Tee off the World Tree) is a Star-Tour/Asgard feature — hidden in the story
+  // campaign navigator (the story has its own finale at Yggdrasil's root).
+  const armed = !inStoryTour() && yggdrasilArmed();
   const chart = starTourMapSVG({
     seed: `startour:${state.run.seed}`,
     worlds,
     selectedId: sel?.id,
-    shipId: shipForCharacter(state, state.run.loadout.characterId),
+    shipId: tourShipId(),
     shipX: starTourView.shipX ?? undefined,
     shipY: starTourView.shipY ?? undefined,
     shipHeading: starTourView.heading,

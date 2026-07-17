@@ -96,6 +96,28 @@ describe('Story clubhouse golfer inspect/switch (GS-story-clubhouse)', () => {
   });
 });
 
+describe('Story star map (GS-story-map)', () => {
+  it('opens the galaxy chart (the Star Tour screen) from the clubhouse and back', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+    // The star-map navigator REUSES the Star Tour screen (app.ts flags it story-mode).
+    const map = reduce(hub, { type: 'openStoryMap' });
+    expect(map.screen).toBe('starTour');
+    const back = reduce(map, { type: 'exitStoryMap' });
+    expect(back.screen).toBe('story');
+    expect(back.story).toBe(story);
+  });
+
+  it('teeing off a charted world from the map builds a Story round on that course', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const map = { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
+    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.storyRound).toBe(true);
+    expect(intro.run.staticCourseId).toBe('verdant-18');
+  });
+});
+
 describe('Story prologue round (GS-story-prologue)', () => {
   it('teeing off the Earth round from the hub → auto-play → resolves into the campaign (chapter 0 → 1)', () => {
     // Enter Story Mode, pick a golfer, land on the hub.

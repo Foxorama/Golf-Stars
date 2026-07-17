@@ -370,8 +370,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // pinned to the course from the campaign's golfer — a CLEAN loadout (common bag, no main-save meta/
       // ascension-unlocks: the campaign is a separate progression; the green-bag start + gear ride the
       // StoryState in a later chunk), mark it a Story round so it resolves back into the campaign, and tee
-      // up the round intro (through the lore gate, so a world's arrival beat still fires).
-      if (state.screen !== 'story' || !state.story) return state;
+      // up the round intro (through the lore gate, so a world's arrival beat still fires). Reachable from
+      // the prologue hub (Earth) and the star-map destination dossier (any charted world).
+      if ((state.screen !== 'story' && state.screen !== 'starTour') || !state.story) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const run = { ...run0, staticCourseId: action.courseId, staticEffect: 'none', storyRound: true };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined });
@@ -401,6 +402,21 @@ export function reduce(state: UiState, action: Action): UiState {
       // begun (chapter 0, Earth not yet cleared), so it never rewrites a golfer mid-campaign.
       if (state.screen !== 'story' || !state.story || state.story.chapter > 0) return state;
       return { ...state, story: { ...state.story, characterId: action.characterId }, storyInspectId: undefined };
+    }
+
+    case 'openStoryMap': {
+      // GS-story-map: open the galaxy star-map navigator from the spaceport clubhouse (post-recruitment). It
+      // REUSES the Star Tour `starTour` screen in a story context — app.ts's dispatch handler flags
+      // `starTourView.storyMode` so the chart plots the campaign's charted worlds + flies the story ship.
+      if (state.screen !== 'story' || !state.story) return state;
+      return { ...state, screen: 'starTour' };
+    }
+
+    case 'exitStoryMap': {
+      // Back to the clubhouse from the story star map (guarded to a campaign, so the records chase — which
+      // never dispatches this — is unaffected).
+      if (state.screen !== 'starTour' || !state.story) return state;
+      return { ...state, screen: 'story' };
     }
 
     case 'playYggdrasilRealm': {

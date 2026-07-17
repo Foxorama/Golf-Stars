@@ -45,8 +45,9 @@ export type Screen =
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
   | 'starTour'
   | 'strokeResult'
-  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save),
-  // and the recap shown after clearing a world round (the prologue's victory grows into this).
+  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save) and
+  // the recap shown after clearing a world round (the prologue's victory grows into it). The star-map
+  // navigator REUSES the Star Tour `starTour` screen in a story context (GS-story-map).
   | 'story'
   | 'storyResult'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
@@ -283,6 +284,8 @@ export type Action =
   | { type: 'storyInspectGolfer'; characterId: string } // GS-story-clubhouse: open a golfer's stats/abilities overlay
   | { type: 'storyCloseInspect' } // GS-story-clubhouse: close the golfer stats overlay
   | { type: 'storySwitchGolfer'; characterId: string } // GS-story-clubhouse: change your protagonist (pre-tee-off, prologue only)
+  | { type: 'openStoryMap' } // GS-story-map: open the galaxy star-map navigator (the Star Tour screen, story context)
+  | { type: 'exitStoryMap' } // GS-story-map: back to the clubhouse from the star map
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

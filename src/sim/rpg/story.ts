@@ -31,6 +31,47 @@ export const STORY_CHAPTER_COUNT = 5;
  *  prologue — it recruits you into the campaign and advances chapter 0 → 1. See the story bible. */
 export const PROLOGUE_COURSE_ID = 'standrews-18';
 
+/** A Story Mode destination on the star chart (GS-story-map): a static course + the chapter that unlocks it.
+ *  Difficulty rises across the chapters (gentle → brutal, per each course's own tier). Content-as-data — a
+ *  new destination is a row, never an engine edit; the render layer reads the course's name/tier/archetype
+ *  from `staticCourseSpec(courseId)`. Tournament worlds + the alignment-split back-half route land later. */
+export interface StoryWorld {
+  courseId: string;
+  /** The chapter at which this world appears on the chart (1 = available right after the prologue). */
+  unlockChapter: number;
+}
+export const STORY_WORLDS: readonly StoryWorld[] = [
+  // Chapter 1 — the gentle opening cluster (the Emerald Invitational + warm-ups).
+  { courseId: 'verdant-18', unlockChapter: 1 }, // Lyra Meadows
+  { courseId: 'verdant2-18', unlockChapter: 1 }, // Centaurus Fairways
+  { courseId: 'desert-18', unlockChapter: 1 }, // Vela Dunes
+  // Chapter 2 — the Forge (fire) opens up.
+  { courseId: 'inferno-18', unlockChapter: 2 }, // Orion Forge
+  { courseId: 'inferno2-18', unlockChapter: 2 }, // Scorpius Sting
+  { courseId: 'frost-18', unlockChapter: 2 }, // Cygnus Links
+  // Chapter 3 — the Storm.
+  { courseId: 'tempest-18', unlockChapter: 3 }, // Draco Gale
+  { courseId: 'crystal-18', unlockChapter: 3 }, // Coronae Prism
+  { courseId: 'fungal-18', unlockChapter: 3 }, // Vulpecula Hollows
+  // Chapter 4 — the deep sky.
+  { courseId: 'ocean-18', unlockChapter: 4 }, // Eridanus Atolls
+  { courseId: 'void2-18', unlockChapter: 4 }, // Sagittarius Core
+  { courseId: 'crystal2-18', unlockChapter: 4 }, // Triangulum Wedge
+  // Chapter 5 — the serpent's reaches.
+  { courseId: 'swamp-18', unlockChapter: 5 }, // Hydra Mire
+  { courseId: 'derelict-18', unlockChapter: 5 }, // The Ghost Wreck
+  { courseId: 'cetus-18', unlockChapter: 5 }, // Cetus Shelf
+];
+
+/** Is this world charted (available to travel to) at the given chapter? */
+export function storyWorldUnlocked(w: StoryWorld, chapter: number): boolean {
+  return w.unlockChapter <= chapter;
+}
+/** Look up a story destination by its course id. */
+export function storyWorldById(courseId: string): StoryWorld | undefined {
+  return STORY_WORLDS.find((w) => w.courseId === courseId);
+}
+
 /** Credits paid for clearing a world round: a solid base, sweetened for going under par, floored so even a
  *  scrappy win pays. Deliberately simple for now (a single persistent purse) — the cross-chapter economy
  *  balance is a Phase G pass. `toPar` negative = under par. */

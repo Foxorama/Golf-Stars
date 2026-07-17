@@ -152,9 +152,8 @@ function spaceClubhouseHTML(story: StoryState): string {
 
     <h2 class="gs-seclabel">The spaceport</h2>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
-      <div style="text-align:center;color:var(--gs-dim);font-size:13px;padding:6px 0;">
-        🗺 The star chart opens as the story unfolds — your next destination is being plotted.
-      </div>
+      <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Set course — the star chart</button>
+      <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
       ${hubFooterHTML()}
     </div>`;
 }
