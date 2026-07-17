@@ -35,7 +35,7 @@ focused tested auto-merged PR each:
 - **GS-story-gear** — ✅ *shipped*: effect-bearing glove/cap/shoes/ball in the Pro Shop, folded at tee-off (Story-only). Cursed-relic pass is later.
 - **GS-story-locker** — ✅ *shipped*: campaign locker — bag builder (equip/unequip owned clubs, ≤14) + gear slot-switch, every item tappable → lore card. Caddy roster waits on a caddy shop.
 - **GS-story-gear** — equippable gear WITH effects (gloves/hat/shoes/bag) via `PlayerLoadout` no-op-default fields; the **cursed sheddings** (power + a curse) vs Warden grace; Inventory screen.
-- **GS-story-ships** — start wagon; buy ships; ship weapons/engines/upgrades as owned effect-bearing upgrades; path pools (radiant Warden vs wyrm-ships). Feeds the finale.
+- **GS-story-ships** — ✅ *shipped*: spaceport Shipyard — buy/fly the fleet; a scattering of acquisition (buy/milestone/ace/secret) + a credit-earning bonus per ship; every ship → lore card. Weapons/engines/battle upgrades (finale) are a later reward/pro-shop layer.
 - **GS-story-locker** — Story locker/wardrobe variant + per-character equipment screen + caddy roster (hire→keep→choose, no fire).
 - **GS-story-map** — worlds gain locked/unlocked/cleared states; chapter-gated unlocks; difficulty-scaled world choice.
 - **GS-story-tournament** — Galaxy Tournament framework: qualifier → final → Sigil + reward + host/rival (Venoma); Asgard-style ghost stroke-play; new Coil faction.

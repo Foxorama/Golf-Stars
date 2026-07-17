@@ -154,6 +154,7 @@ function spaceClubhouseHTML(story: StoryState): string {
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
       <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Set course — the star chart</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryLocker' })}'>🎒 Locker — build your bag &amp; gear</button>
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryShipyard' })}'>🚀 Shipyard — buy &amp; fly ships</button>
       <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
       ${hubFooterHTML()}
     </div>`;

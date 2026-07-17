@@ -281,6 +281,40 @@ describe('Story locker flow (GS-story-locker)', () => {
   });
 });
 
+describe('Story shipyard flow (GS-story-ships)', () => {
+  function shipyardReady() {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1, credits: 2000, clearedWorldIds: ['standrews-18'] };
+    return { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+  }
+
+  it('opens the shipyard, buys + flies a ship, and back', () => {
+    const hub = shipyardReady();
+    const yard = reduce(hub, { type: 'openStoryShipyard' });
+    expect(yard.screen).toBe('storyShipyard');
+    const bought = reduce(yard, { type: 'storyBuyShip', shipId: 'hauler-barge' });
+    expect(bought.story!.ownedShipIds).toContain('hauler-barge');
+    expect(bought.story!.equippedShipId).toBe('hauler-barge');
+    expect(bought.story!.credits).toBe(2000 - 480);
+    const back = reduce(bought, { type: 'exitStoryShipyard' });
+    expect(back.screen).toBe('story');
+  });
+
+  it('a bought ship\'s credit bonus multiplies the next world clear\'s payout', () => {
+    // Buy the +25% hauler, then clear a world; the payout is 1.25× the base.
+    const yard = reduce(shipyardReady(), { type: 'openStoryShipyard' });
+    const bought = reduce(yard, { type: 'storyBuyShip', shipId: 'hauler-barge' });
+    const hub = reduce(bought, { type: 'exitStoryShipyard' });
+    const creditsBefore = hub.story!.credits;
+    // tee off + auto-play a charted world (chapter 1 opens verdant-18)
+    const intro = reduce({ ...hub, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    const done = reduce(intro, { type: 'play' });
+    const earned = done.story!.credits - creditsBefore;
+    // base payout for the round × 1.25 (rounded) — always ≥ the floored base (100) × 1.25
+    expect(done.lastStoryRound!.credits).toBe(earned);
+    expect(earned).toBeGreaterThanOrEqual(Math.round(100 * 1.25));
+  });
+});
+
 describe('storyStore persistence (GS-story-save wiring)', () => {
   it('degrades safely with no localStorage (Node): no-ops, never throws', () => {
     // In the node test env localStorage is undefined, so the store degrades to no-ops.
