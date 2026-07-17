@@ -72,6 +72,7 @@ import {
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
 import { isStoryShipId, buyStoryShip, equipStoryShip } from '../sim/rpg/storyShips';
+import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -460,7 +461,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-econ / GS-story-lore-cards: tap an item → raise its lore card. Works on the Pro Shop
       // (buy footer), the locker (equip footer), and the shipyard (ship ids → buy/fly footer).
       if ((state.screen !== 'storyShop' && state.screen !== 'storyLocker' && state.screen !== 'storyShipyard') || !state.story) return state;
-      if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId)) return state;
+      if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId) && !isShipUpgradeId(action.itemId)) return state;
       return { ...state, storyItemInspectId: action.itemId };
     }
 
@@ -542,6 +543,15 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'storyShipyard' || !state.story) return state;
       const story = equipStoryShip(state.story, action.shipId);
       return story === state.story ? state : { ...state, story };
+    }
+
+    case 'storyBuyUpgrade': {
+      // GS-story-ship-upgrades: buy a ship weapon/engine/shield (spend credits, arm up). No-op if
+      // unaffordable/owned/locked (buyShipUpgrade gates).
+      if (state.screen !== 'storyShipyard' || !state.story) return state;
+      const story = buyShipUpgrade(state.story, action.upgradeId);
+      if (story === state.story) return state;
+      return { ...state, story, storyItemInspectId: undefined };
     }
 
     case 'playYggdrasilRealm': {

@@ -204,10 +204,20 @@ Ordered so each ships something playable and nothing lands before its foundation
   (revealed after clearing N worlds, then for sale), `ace` (the Comet Rider, granted free by a hole-in-one
   on any Story round — `grantStoryAceShip`), and `secret` (a late grail, revealed deep in the campaign).
   Every ship is tappable → the reusable lore card (hull art + credit-bonus detail + bespoke lore +
-  Buy/Fly). Own `.gs-yard*` prefix; no save bump (`ownedShipIds`/`equippedShipId` already exist). Ship
-  **weapons / engines / battle upgrades** (for the finale) are a LATER reward/Pro-Shop layer on this seam —
-  possibly path-flavoured (Warden vs corrupted wyrm-ship pools). Guarded by `tests/story-ships.test.ts`,
-  the shipyard + credit-mult flow in `tests/story-flow.test.ts`, and the `?screen=storyshipyard` smoke.
+  Buy/Fly). Own `.gs-yard*` prefix; no save bump (`ownedShipIds`/`equippedShipId` already exist). Guarded
+  by `tests/story-ships.test.ts`, the shipyard + credit-mult flow in `tests/story-flow.test.ts`, and the
+  `?screen=storyshipyard` smoke.
+- **GS-story-ship-upgrades** — ✅ *shipped* (`sim/rpg/storyShipUpgrades.ts`; the shipyard's outfitting bay).
+  Ship **weapons / engines / shields**, bought with credits (some `milestone`-gated). Each raises the
+  fleet's **Combat Rating** (`combatRating` = Σ owned `battle`) — a visible readiness meter the Parrot
+  nags about, which the **finale space battle** (a later chunk) will CONSUME; until then it's a real
+  accumulating goal, and **engines also carry a LIVE credit bonus** (`upgradeCreditMult`, stacked onto the
+  ship's in `resolveStoryRound`), so the choice (economy now vs battle prep) has teeth today. Upgrades are
+  simply OWNED (`ownedShipUpgradeIds`, all-active — no per-slot equip, no save bump). Ids `upg:<cat>:<var>`;
+  new card art (`drawWeapon`/`drawShield`, engine reuses `drawThruster`) routed off the category. Every
+  upgrade → the reusable lore card. Guarded by `tests/story-ship-upgrades.test.ts` + the buy/combat/engine
+  flow in `tests/story-flow.test.ts` + the `?screen=storyshipyard` smoke (now checks the upgrades section).
+  The finale will read `combatRating`; a possible Warden-vs-wyrm path-flavoured pool is a later option.
 - **GS-story-locker** — the Story **locker room / wardrobe** variant + per-character equipment screen +
   the **caddy roster** (hire → keep → choose active, no fire).
 

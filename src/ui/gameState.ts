@@ -311,6 +311,7 @@ export type Action =
   | { type: 'exitStoryShipyard' } // GS-story-ships: back to the clubhouse from the shipyard
   | { type: 'storyBuyShip'; shipId: string } // GS-story-ships: buy a ship (spend credits, fly it)
   | { type: 'storyEquipShip'; shipId: string } // GS-story-ships: fly an owned ship
+  | { type: 'storyBuyUpgrade'; upgradeId: string } // GS-story-ship-upgrades: buy a ship weapon/engine/shield
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

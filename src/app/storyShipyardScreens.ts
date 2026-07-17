@@ -8,8 +8,11 @@
 
 import { state } from './ctx';
 import { rarCol } from '../sim/rpg/loot';
+import { getCharacter } from '../sim/rpg/characters';
 import { shipCardSVG } from '../render/shipArt';
+import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
+import type { StoryState } from '../sim/rpg/story';
 import { COSMETIC_RARITY } from '../sim/rpg/cosmetics';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import {
@@ -23,6 +26,23 @@ import {
   storyShipDetail,
   type StoryShip,
 } from '../sim/rpg/storyShips';
+import {
+  STORY_SHIP_UPGRADES,
+  shipUpgradeById,
+  isShipUpgradeId,
+  upgradeRevealed,
+  ownsUpgrade,
+  canBuyUpgrade,
+  upgradeDetail,
+  combatRating,
+  type UpgradeCategory,
+  type StoryShipUpgrade,
+} from '../sim/rpg/storyShipUpgrades';
+
+/** The campaign golfer's short name for the Parrot's line. */
+function who(story: StoryState): string {
+  return getCharacter(story.characterId)?.name ?? 'Champion';
+}
 
 /** loreCard accent wants a base `Rarity`; a mythic hull maps to the legendary gold. */
 function shipAccent(shipId: string): string {
@@ -53,12 +73,28 @@ export function storyShipyardScreen(): string {
   const cards = rows.map(({ shipId }) => yardCard(shipId)).join('');
   const overlay = state.storyItemInspectId ? inspectOverlay(state.storyItemInspectId) : '';
 
+  // GS-story-ship-upgrades: the outfitting bay — weapons/engines/shields, grouped, gated by reveal.
+  const CATS: { cat: UpgradeCategory; label: string }[] = [
+    { cat: 'weapon', label: '🔫 Weapons' },
+    { cat: 'engine', label: '🚀 Engines' },
+    { cat: 'shield', label: '🛡 Shields' },
+  ];
+  const upgradeSections = CATS.map(({ cat, label }) => {
+    const items = STORY_SHIP_UPGRADES.filter(
+      (u) => u.category === cat && (upgradeRevealed(story, u) || ownsUpgrade(story, u.id)),
+    );
+    if (!items.length) return '';
+    return `<div class="gs-yard-usec">${label}</div><div class="gs-yard-grid">${items.map((u) => upgradeCard(u)).join('')}</div>`;
+  }).join('');
+  const rating = combatRating(story);
+
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title">🚀 Shipyard</h1>
-      <p class="gs-hero-tag">Buy your ride · fly your fleet</p>
+      <p class="gs-hero-tag">Buy your ride · arm your ship</p>
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="credits">✦ <b>${story.credits}</b></span>
+        <span class="gs-chip" style="border-color:#3a2030;color:#ff8a8a;font-size:14px;" title="fleet combat readiness for the finale">⚔ <b>${rating}</b> combat</span>
       </div>
     </header>
     <section style="max-width:600px;margin:2px auto 0;">
@@ -66,12 +102,20 @@ export function storyShipyardScreen(): string {
         <em>The berths hum with ships from every corner of the galaxy. Some you can buy today; some the galaxy hands you once you&rsquo;ve earned them.</em>
       </p>
       <div class="gs-yard-grid">${cards}</div>
+
+      <h2 class="gs-yard-sec">Weapons &amp; upgrades</h2>
+      <p style="text-align:center;color:var(--gs-dim);font-size:12px;line-height:1.5;margin:0 0 10px;">
+        <span style="color:#7fe0a0;">🦜 "Arm up, ${who(story)}."</span> Every piece raises your <b style="color:#ff8a8a;">combat rating</b> — you'll need it when the serpent wakes.
+      </p>
+      ${upgradeSections || '<div class="gs-yard-cant" style="text-align:center;">The outfitting bay stocks more as you clear worlds.</div>'}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShipyard' })}'>‹ Back to the clubhouse</button>
     </div>
     ${overlay}
     <style>
+      .gs-yard-sec{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--gs-ink,#eaf1fb);margin:18px 0 6px;padding-top:12px;border-top:1px solid #232b3b;}
+      .gs-yard-usec{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--gs-dim,#9fb0c8);margin:12px 0 7px;}
       .gs-yard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
       .gs-yard-card{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;cursor:pointer;
         background:linear-gradient(180deg,#141926,#0f131c);border:1px solid #262f42;border-top:3px solid var(--ac,#5b8bd0);
@@ -117,6 +161,24 @@ function yardCard(shipId: string): string {
     </div>`;
 }
 
+/** An outfitting card (weapon/engine/shield). Tap → its lore card. */
+function upgradeCard(u: StoryShipUpgrade): string {
+  const story = state.story!;
+  const owned = ownsUpgrade(story, u.id);
+  const ac = rarCol(u.rarity);
+  let stateLine: string;
+  if (owned) stateLine = `<span class="gs-yard-state gs-yard-state--owned">✓ Installed</span>`;
+  else if (canBuyUpgrade(story, u)) stateLine = `<span class="gs-yard-state gs-yard-state--price">✦ ${u.price}</span>`;
+  else stateLine = `<span class="gs-yard-state gs-yard-state--no">✦ ${u.price}</span>`;
+  return `
+    <div class="gs-yard-card" style="--ac:${ac};" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: u.id })}'>
+      <span class="gs-yard-badge">⚔ ${u.battle}</span>
+      <span class="gs-yard-art" aria-hidden="true">${itemArtSVG(u.id, u.rarity)}</span>
+      <span class="gs-yard-name">${u.name}</span>
+      ${stateLine}
+    </div>`;
+}
+
 /** A little corner badge naming the acquisition approach. */
 function acquireBadge(row: StoryShip): string {
   const label =
@@ -127,12 +189,33 @@ function acquireBadge(row: StoryShip): string {
   return label ? `<span class="gs-yard-badge">${label}</span>` : '';
 }
 
-/** The tap-to-inspect lore card for a ship, footer = Buy / Fly / Flying / can't-buy. */
-function inspectOverlay(shipId: string): string {
+/** The tap-to-inspect lore card for a ship OR an upgrade, footer = the right buy/equip action. */
+function inspectOverlay(id: string): string {
   const story = state.story;
+  if (!story) return '';
+  // GS-story-ship-upgrades: an outfitting item's lore card (Combat Rating + credit-bonus detail).
+  if (isShipUpgradeId(id)) {
+    const u = shipUpgradeById(id)!;
+    const owned = ownsUpgrade(story, id);
+    let footer: string;
+    if (owned) footer = `<div class="gs-yard-owned">✓ Installed on your ship</div>`;
+    else if (canBuyUpgrade(story, u)) footer = `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyBuyUpgrade', upgradeId: id })}'>Install · ✦ ${u.price}</button>`;
+    else footer = `<div class="gs-yard-cant">Not enough credits — ✦ ${u.price} (you have ✦ ${story.credits})</div>`;
+    return loreCardHTML({
+      icon: itemArtSVG(id, u.rarity),
+      name: u.name,
+      tag: `${u.rarity.charAt(0).toUpperCase() + u.rarity.slice(1)} · ${u.category === 'weapon' ? 'Weapon' : u.category === 'engine' ? 'Engine' : 'Shield'}`,
+      accent: rarCol(u.rarity),
+      detail: upgradeDetail(u),
+      lore: u.lore,
+      footerHTML: footer,
+      closeAttr: 'data-story-item-close="1"',
+    });
+  }
+  const shipId = id;
   const hull = storyShipHull(shipId);
   const row = storyShipRow(shipId);
-  if (!story || !hull) return '';
+  if (!hull) return '';
   const owned = shipId === DEFAULT_SHIP_ID || storyShipOwned(story, shipId);
   const flying = storyShipEquipped(story, shipId);
   let footer: string;

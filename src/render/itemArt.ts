@@ -53,6 +53,8 @@ export type ItemArtKind =
   | 'trophy'
   | 'thruster'
   | 'fueltank'
+  | 'weapon'
+  | 'shield'
   | 'caddy'
   | 'club';
 
@@ -124,6 +126,14 @@ export function itemArtKind(id: string): ItemArtKind {
     if (slot === 'shoes') return 'shoes';
     if (slot === 'ball') return 'ball';
     if (slot === 'hat') return 'hat';
+  }
+  // Story-Tour ship upgrades (`upg:<category>:<variant>`, GS-story-ship-upgrades): a weapon turret, an
+  // engine (reuses the thruster art), a deflector shield.
+  if (id.startsWith('upg:')) {
+    const cat = id.split(':')[1];
+    if (cat === 'weapon') return 'weapon';
+    if (cat === 'engine') return 'thruster';
+    if (cat === 'shield') return 'shield';
   }
   return KIND_BY_ID[id] ?? 'caddy'; // caddies + anything unmapped get the caddy bag glyph
 }
@@ -642,6 +652,47 @@ function drawThruster(col: string, seed: string): string {
   );
 }
 
+/** Ship WEAPON (GS-story-ship-upgrades): a mounted cannon/laser turret firing a bright bolt. */
+function drawWeapon(col: string, seed: string): string {
+  const metal = mix(col, '#dbe4f0', 0.5);
+  const dark = mix(col, '#0b0d12', 0.55);
+  return frame(
+    `${sparkles(seed, col, 4)}
+     <ellipse cx="70" cy="82" rx="34" ry="6" fill="rgba(0,0,0,0.3)"/>
+     <path d="M24 52 h30 a10 10 0 0 1 10 10 v6 a4 4 0 0 1 -4 4 h-42 a4 4 0 0 1 -4 -4 v-12 a4 4 0 0 1 4 -4 z" fill="${dark}" stroke="#11141b" stroke-width="2.4"/>
+     <circle cx="44" cy="52" r="16" fill="${metal}" stroke="#11141b" stroke-width="2.4"/>
+     <circle cx="44" cy="52" r="7" fill="${dark}" stroke="#11141b" stroke-width="1.6"/>
+     <rect x="52" y="46" width="58" height="12" rx="5" fill="${metal}" stroke="#11141b" stroke-width="2.4"/>
+     <rect x="52" y="46" width="58" height="4" rx="2" fill="#ffffff" opacity="0.25"/>
+     <circle cx="112" cy="52" r="7.5" fill="${dark}" stroke="#11141b" stroke-width="1.6"/>
+     <circle cx="122" cy="52" r="5" fill="${mix(col, '#ffffff', 0.5)}"/>
+     <circle cx="122" cy="52" r="10" fill="${col}" opacity="0.35"/>
+     <path d="M128 52 h12 M126 45 l9 -4 M126 59 l9 4" stroke="${mix(col, '#ffffff', 0.5)}" stroke-width="2" stroke-linecap="round" opacity="0.8"/>`,
+    col,
+  );
+}
+
+/** Ship SHIELD (GS-story-ship-upgrades): a deflector emitter throwing a glowing energy dome. */
+function drawShield(col: string, seed: string): string {
+  const metal = mix(col, '#dbe4f0', 0.5);
+  const dark = mix(col, '#0b0d12', 0.55);
+  const glow = mix(col, '#bfe9ff', 0.55);
+  return frame(
+    `${sparkles(seed, col, 4)}
+     <ellipse cx="75" cy="84" rx="34" ry="5" fill="rgba(0,0,0,0.3)"/>
+     <path d="M32 74 a48 48 0 0 1 86 0 z" fill="${col}" opacity="0.14"/>
+     <path d="M40 74 a35 35 0 0 1 70 0" fill="none" stroke="${glow}" stroke-width="2.4" opacity="0.85"/>
+     <path d="M48 74 a27 27 0 0 1 54 0" fill="none" stroke="${glow}" stroke-width="1.6" opacity="0.5"/>
+     <g transform="translate(75 74)">
+       <path d="M-16 0 h32 v-6 a16 10 0 0 0 -32 0 z" fill="${metal}" stroke="#11141b" stroke-width="2.2"/>
+       <rect x="-20" y="0" width="40" height="10" rx="3" fill="${dark}" stroke="#11141b" stroke-width="2.2"/>
+       <circle cx="0" cy="-6" r="4" fill="${glow}"/>
+     </g>
+     <circle cx="52" cy="44" r="2" fill="${glow}"/><circle cx="98" cy="40" r="1.6" fill="${glow}"/><circle cx="75" cy="30" r="2" fill="${glow}"/>`,
+    col,
+  );
+}
+
 /** Reserve Fuel Tank (GS-fuel-3): a strapped-on auxiliary canister, delivered full. */
 function drawFuelTank(col: string, seed: string): string {
   const body = mix(col, '#e8edf5', 0.35);
@@ -1084,6 +1135,12 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
       break;
     case 'fueltank':
       base = drawFuelTank(col, seed);
+      break;
+    case 'weapon':
+      base = drawWeapon(col, seed);
+      break;
+    case 'shield':
+      base = drawShield(col, seed);
       break;
     case 'club':
       // Reward club id is `club:<set>:<type>` — the type selects the head (putter vs iron/wood).
