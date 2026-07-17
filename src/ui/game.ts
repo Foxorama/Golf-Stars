@@ -61,7 +61,7 @@ import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
 import { loreEventById, type SeenLore } from '../sim/rpg/lore';
-import { defaultStoryState, storyWorldById, storyWorldUnlocked, type StoryState } from '../sim/rpg/story';
+import { defaultStoryState, type StoryState } from '../sim/rpg/story';
 import {
   autoDecision,
   awaitingPutt,
@@ -372,7 +372,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // StoryState in a later chunk), mark it a Story round so it resolves back into the campaign, and tee
       // up the round intro (through the lore gate, so a world's arrival beat still fires). Reachable from
       // the prologue hub (Earth) and the star-map destination dossier (any charted world).
-      if ((state.screen !== 'story' && state.screen !== 'storyMap') || !state.story) return state;
+      if ((state.screen !== 'story' && state.screen !== 'starTour') || !state.story) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const run = { ...run0, staticCourseId: action.courseId, staticEffect: 'none', storyRound: true };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined });
@@ -405,26 +405,18 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStoryMap': {
-      // GS-story-map: open the star-map navigator from the spaceport clubhouse (post-recruitment only).
+      // GS-story-map: open the galaxy star-map navigator from the spaceport clubhouse (post-recruitment). It
+      // REUSES the Star Tour `starTour` screen in a story context — app.ts's dispatch handler flags
+      // `starTourView.storyMode` so the chart plots the campaign's charted worlds + flies the story ship.
       if (state.screen !== 'story' || !state.story) return state;
-      return { ...state, screen: 'storyMap', storyWorldInspectId: undefined };
+      return { ...state, screen: 'starTour' };
     }
 
     case 'exitStoryMap': {
-      if (state.screen !== 'storyMap') return state;
-      return { ...state, screen: 'story', storyWorldInspectId: undefined };
-    }
-
-    case 'storyInspectWorld': {
-      // GS-story-map: open a destination's dossier (only if it's charted at the current chapter).
-      if (state.screen !== 'storyMap' || !state.story) return state;
-      const w = storyWorldById(action.courseId);
-      if (!w || !storyWorldUnlocked(w, state.story.chapter)) return state;
-      return { ...state, storyWorldInspectId: action.courseId };
-    }
-
-    case 'storyCloseWorldInspect': {
-      return state.storyWorldInspectId ? { ...state, storyWorldInspectId: undefined } : state;
+      // Back to the clubhouse from the story star map (guarded to a campaign, so the records chase — which
+      // never dispatches this — is unaffected).
+      if (state.screen !== 'starTour' || !state.story) return state;
+      return { ...state, screen: 'story' };
     }
 
     case 'playYggdrasilRealm': {

@@ -97,28 +97,20 @@ describe('Story clubhouse golfer inspect/switch (GS-story-clubhouse)', () => {
 });
 
 describe('Story star map (GS-story-map)', () => {
-  it('opens the chart from the clubhouse; inspects a charted world; ignores a locked one', () => {
+  it('opens the galaxy chart (the Star Tour screen) from the clubhouse and back', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
     const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+    // The star-map navigator REUSES the Star Tour screen (app.ts flags it story-mode).
     const map = reduce(hub, { type: 'openStoryMap' });
-    expect(map.screen).toBe('storyMap');
-
-    // A chapter-1 world opens its dossier.
-    const inspecting = reduce(map, { type: 'storyInspectWorld', courseId: 'verdant-18' });
-    expect(inspecting.storyWorldInspectId).toBe('verdant-18');
-    // A chapter-5 world is not charted yet → no dossier.
-    const locked = reduce(map, { type: 'storyInspectWorld', courseId: 'swamp-18' });
-    expect(locked.storyWorldInspectId).toBeUndefined();
-
-    const closed = reduce(inspecting, { type: 'storyCloseWorldInspect' });
-    expect(closed.storyWorldInspectId).toBeUndefined();
+    expect(map.screen).toBe('starTour');
     const back = reduce(map, { type: 'exitStoryMap' });
     expect(back.screen).toBe('story');
+    expect(back.story).toBe(story);
   });
 
   it('teeing off a charted world from the map builds a Story round on that course', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
-    const map = { ...initState('seed', {}, undefined, story), screen: 'storyMap' as const };
+    const map = { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
     const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
     expect(intro.screen).toBe('intro');
     expect(intro.run.storyRound).toBe(true);

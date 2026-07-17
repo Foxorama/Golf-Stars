@@ -45,11 +45,10 @@ export type Screen =
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
   | 'starTour'
   | 'strokeResult'
-  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save),
-  // the star-map navigator (chapter-gated worlds to travel to), and the recap shown after clearing a
-  // world round (the prologue's victory grows into it).
+  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save) and
+  // the recap shown after clearing a world round (the prologue's victory grows into it). The star-map
+  // navigator REUSES the Star Tour `starTour` screen in a story context (GS-story-map).
   | 'story'
-  | 'storyMap'
   | 'storyResult'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
@@ -223,9 +222,6 @@ export interface UiState {
   /** GS-story-clubhouse: the golfer whose stats/abilities overlay is open in the Earth clubhouse (picker or
    *  prologue hub). Absent ⇒ no overlay. Transient (never persisted). */
   storyInspectId?: string;
-  /** GS-story-map: the destination whose dossier is open on the star-map navigator (a course id). Absent ⇒
-   *  no dossier. Transient (never persisted). */
-  storyWorldInspectId?: string;
   /** GS-story-prologue: the just-finished Story world round's recap payload (the `storyResult` screen). The
    *  prologue's victory grows into the Mothership/Parrot scene here. Transient. */
   lastStoryRound?: {
@@ -288,10 +284,8 @@ export type Action =
   | { type: 'storyInspectGolfer'; characterId: string } // GS-story-clubhouse: open a golfer's stats/abilities overlay
   | { type: 'storyCloseInspect' } // GS-story-clubhouse: close the golfer stats overlay
   | { type: 'storySwitchGolfer'; characterId: string } // GS-story-clubhouse: change your protagonist (pre-tee-off, prologue only)
-  | { type: 'openStoryMap' } // GS-story-map: open the star-map navigator from the clubhouse
+  | { type: 'openStoryMap' } // GS-story-map: open the galaxy star-map navigator (the Star Tour screen, story context)
   | { type: 'exitStoryMap' } // GS-story-map: back to the clubhouse from the star map
-  | { type: 'storyInspectWorld'; courseId: string } // GS-story-map: open a destination's dossier
-  | { type: 'storyCloseWorldInspect' } // GS-story-map: close the destination dossier
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
