@@ -265,6 +265,7 @@ describe('build output (real browser)', () => {
     { screen: 'strokeresult', sel: '.gs-strres', text: 'Best rounds overall', label: 'the Star Tour round recap' },
     { screen: 'lore', sel: '.gs-lore', text: 'The Old Girl', label: 'the lore story-beat popup' },
     { screen: 'story', sel: '.gs-storyhub', text: 'World Tour', label: 'the Story Mode prologue (Earth) clubhouse' },
+    { screen: 'storypick', sel: '.gs-eclub-ov', text: 'STRENGTHS', label: 'the Story golfer stats/abilities overlay' },
     { screen: 'storyresult', sel: '.gs-storyres', text: 'Champion', label: 'the Story prologue world-round recap' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {

@@ -11,10 +11,10 @@
  */
 
 import { state } from './ctx';
-import { getCharacter, CHARACTERS } from '../sim/rpg/characters';
+import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
 import { shipCardSVG } from '../render/shipArt';
-import { golferPreviewSVG } from '../render/apparelArt';
+import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 
@@ -44,56 +44,72 @@ function hubFooterHTML(): string {
 }
 
 /**
- * The PROLOGUE clubhouse (GS-story-prologue): the Earth clubhouse on the eve of the World Tour final. All
- * four golfers are here getting ready; your chosen one is highlighted. No spaceship, no Parrot yet — you're
- * still just the best golfer on one small planet. The forward button heads to the first tee at St Andrews.
+ * The GOLFER PICKER (GS-story-clubhouse) — the graphic Earth clubhouse used to CHOOSE your protagonist for a
+ * new campaign (screen `character` + `pendingStoryNew`). Walk into the clubhouse, tap a golfer, read their
+ * stats + abilities, and "Play as" them. Exported for app.ts's render branch.
+ */
+export function storyGolferPickerHTML(): string {
+  const overlay = state.storyInspectId
+    ? golferInspectOverlayHTML(state.storyInspectId, {
+        label: `▶ Play as ${getCharacter(state.storyInspectId)?.name ?? 'this golfer'}`,
+        action: { type: 'selectCharacter', characterId: state.storyInspectId },
+      })
+    : '';
+  return `
+    <header class="gs-hero gs-storyhub">
+      <h1 class="gs-hero-title">🌍 World Tour</h1>
+      <p class="gs-hero-tag">The Final Round · The Old Course, St Andrews · Earth</p>
+    </header>
+    <section style="max-width:620px;margin:2px auto 0;">
+      <div style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin-bottom:8px;">
+        The clubhouse hums before the final round. <span style="color:var(--gs-ink);">Tap a golfer</span> to
+        weigh their game — then choose who tees it up for the Tour.
+      </div>
+      ${earthClubhouseSceneHTML(null)}
+    </section>
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>
+    </div>
+    ${overlay}`;
+}
+
+/**
+ * The PROLOGUE clubhouse (GS-story-prologue / GS-story-clubhouse): the graphic Earth clubhouse on the eve of
+ * the World Tour final, your chosen golfer highlighted. Tap any golfer to view their stats (yours, or switch
+ * to another before you tee off). No spaceship, no Parrot yet — you're still just the best golfer on one small
+ * planet. The forward button heads to the first tee at St Andrews.
  */
 function earthClubhouseHTML(story: StoryState): string {
   const spec = staticCourseSpec(PROLOGUE_COURSE_ID);
   const courseName = spec?.name ?? 'The Old Course, St Andrews';
-  const golfers = CHARACTERS.map((ch) => {
-    const you = ch.id === story.characterId;
-    const portrait = golferPreviewSVG(undefined, undefined, undefined, {
-      skin: ch.style.skin,
-      shirtBase: ch.style.shirt,
-      capColor: ch.style.cap,
-      hair: ch.style.hair,
-      w: 60,
-      h: 104,
-      uid: `earthclub-${ch.id}`,
-    });
-    return `
-      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px;border-radius:12px;${
-        you ? 'background:rgba(90,200,255,0.12);border:1px solid #3a6c88;' : 'border:1px solid transparent;opacity:0.72;'
-      }">
-        <span aria-hidden="true">${portrait}</span>
-        <span style="font-size:12px;color:${you ? 'var(--gs-ink)' : 'var(--gs-dim)'};font-weight:${you ? 700 : 500};">${ch.shortName}</span>
-        <span style="font-size:10px;letter-spacing:0.06em;color:${you ? '#7fd8ff' : 'var(--gs-dim)'};">${you ? '★ YOU' : 'in the field'}</span>
-      </div>`;
-  }).join('');
-
+  const inspectId = state.storyInspectId;
+  const overlay = inspectId
+    ? golferInspectOverlayHTML(
+        inspectId,
+        inspectId === story.characterId
+          ? { label: '★ Your golfer', action: {}, disabled: true }
+          : { label: `Switch to ${getCharacter(inspectId)?.name ?? 'this golfer'}`, action: { type: 'storySwitchGolfer', characterId: inspectId } },
+      )
+    : '';
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title">🌍 World Tour</h1>
       <p class="gs-hero-tag">The Final Round · ${courseName} · Earth</p>
     </header>
-
-    <section style="max-width:560px;margin:6px auto 0;">
+    <section style="max-width:620px;margin:2px auto 0;">
       <div style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin-bottom:8px;">
-        The clubhouse hums before the final round. The four of you have chased the Tour all season —
-        today, one lifts the trophy. <span style="color:var(--gs-ink);">Make it you.</span>
+        Your rivals are here too — but today, the trophy is yours to take.
+        <span style="color:var(--gs-ink);">Tap a golfer</span> to check their game.
       </div>
-      <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;background:var(--gs-panel,#161a24);border:1px solid #2a2f3c;border-radius:14px;padding:12px 10px;">
-        ${golfers}
-      </div>
+      ${earthClubhouseSceneHTML(story.characterId)}
     </section>
-
-    <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
       <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: PROLOGUE_COURSE_ID })}'>
         ⛳ Head to the first tee — St Andrews
       </button>
       ${hubFooterHTML()}
-    </div>`;
+    </div>
+    ${overlay}`;
 }
 
 /**

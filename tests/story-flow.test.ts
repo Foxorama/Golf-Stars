@@ -66,6 +66,36 @@ describe('Story Mode entry flow (GS-story-save wiring)', () => {
   });
 });
 
+describe('Story clubhouse golfer inspect/switch (GS-story-clubhouse)', () => {
+  it('the picker opens a golfer overlay; Play as selects them and clears the overlay', () => {
+    const picker = reduce(initState('seed'), { type: 'openStory' });
+    expect(picker.screen).toBe('character');
+    const inspecting = reduce(picker, { type: 'storyInspectGolfer', characterId: 'longshot-larry' });
+    expect(inspecting.storyInspectId).toBe('longshot-larry');
+    const closed = reduce(inspecting, { type: 'storyCloseInspect' });
+    expect(closed.storyInspectId).toBeUndefined();
+    // Play as → create the campaign, clear the overlay, land on the hub.
+    const hub = reduce(inspecting, { type: 'selectCharacter', characterId: 'longshot-larry' });
+    expect(hub.screen).toBe('story');
+    expect(hub.storyInspectId).toBeUndefined();
+    expect(hub.story?.characterId).toBe('longshot-larry');
+  });
+
+  it('from the prologue hub you can switch golfer (chapter 0 only)', () => {
+    const story = defaultStoryState('feather-fade');
+    const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+    const inspecting = reduce(hub, { type: 'storyInspectGolfer', characterId: 'backspin-bo' });
+    expect(inspecting.storyInspectId).toBe('backspin-bo');
+    const switched = reduce(inspecting, { type: 'storySwitchGolfer', characterId: 'backspin-bo' });
+    expect(switched.story?.characterId).toBe('backspin-bo');
+    expect(switched.storyInspectId).toBeUndefined();
+    // Switching is blocked once the campaign is underway (chapter > 0).
+    const midCampaign = { ...hub, story: { ...story, chapter: 2 } };
+    const blocked = reduce(midCampaign, { type: 'storySwitchGolfer', characterId: 'backspin-bo' });
+    expect(blocked.story?.characterId).toBe('feather-fade');
+  });
+});
+
 describe('Story prologue round (GS-story-prologue)', () => {
   it('teeing off the Earth round from the hub → auto-play → resolves into the campaign (chapter 0 → 1)', () => {
     // Enter Story Mode, pick a golfer, land on the hub.

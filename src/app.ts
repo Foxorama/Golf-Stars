@@ -81,7 +81,7 @@ import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, st
 import { shipForCharacter } from './ui/gameCosmetics';
 import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
-import { storyHubScreen, storyResultScreen } from './app/storyScreens';
+import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -209,6 +209,10 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       // GS-story: mount the Story Mode hub the honest way — enter Story Mode (no save ⇒ new-game golfer
       // pick), then pick the first golfer, which creates the StoryState and lands on the hub.
       return reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+    case 'storypick':
+      // GS-story-clubhouse: mount the golfer PICKER with a stats/abilities overlay open — enter Story Mode
+      // (fresh ⇒ the clubhouse picker), then inspect the first golfer, so the overlay chrome is smoke-tested.
+      return reduce(reduce(title, { type: 'openStory' }), { type: 'storyInspectGolfer', characterId: CHARACTERS[0]!.id });
     case 'storyresult': {
       // GS-story-prologue: mount the world-round recap the honest way — enter Story Mode, pick a golfer,
       // tee off the Earth prologue round, then auto-play + resolve it exactly as the reducer's `play` path
@@ -2147,10 +2151,9 @@ function render(): void {
     state.screen === 'title'
       ? titleScreen()
       : state.screen === 'character' && state.pendingStoryNew
-      ? // GS-story: picking your protagonist for a NEW campaign — single golfer, no Ascension/club-set
-        // difficulty pills (Story Mode's difficulty is the chapter arc). Framed as the World Tour final on
-        // Earth (GS-story-prologue), the on-ramp before the campaign opens up to space.
-        characterScreen(state.unlockedClubsByCharacter, { modeName: 'The World Tour · Earth', winnable: false, verb: 'Play as' })
+      ? // GS-story-clubhouse: picking your protagonist for a NEW campaign happens IN the graphic Earth
+        // clubhouse — tap a golfer to open their stats/abilities overlay, then "Play as" them.
+        storyGolferPickerHTML()
       : state.screen === 'character'
       ? characterScreen(state.unlockedClubsByCharacter, {
           modeName: getFormat(state.run.formatId).name,

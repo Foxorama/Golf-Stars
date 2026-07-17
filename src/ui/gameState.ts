@@ -218,6 +218,9 @@ export interface UiState {
    *  Star Tour). `selectCharacter` reads this to create a fresh `StoryState` instead of building a run.
    *  Transient (never persisted). */
   pendingStoryNew?: boolean;
+  /** GS-story-clubhouse: the golfer whose stats/abilities overlay is open in the Earth clubhouse (picker or
+   *  prologue hub). Absent ⇒ no overlay. Transient (never persisted). */
+  storyInspectId?: string;
   /** GS-story-prologue: the just-finished Story world round's recap payload (the `storyResult` screen). The
    *  prologue's victory grows into the Mothership/Parrot scene here. Transient. */
   lastStoryRound?: {
@@ -277,6 +280,9 @@ export type Action =
   | { type: 'exitStory' } // GS-story: leave the Story Mode hub back to the title
   | { type: 'storyPlayWorld'; courseId: string } // GS-story-prologue: tee off a Story world round from the hub
   | { type: 'storyRoundContinue' } // GS-story-prologue: dismiss the world-round recap back to the campaign hub
+  | { type: 'storyInspectGolfer'; characterId: string } // GS-story-clubhouse: open a golfer's stats/abilities overlay
+  | { type: 'storyCloseInspect' } // GS-story-clubhouse: close the golfer stats overlay
+  | { type: 'storySwitchGolfer'; characterId: string } // GS-story-clubhouse: change your protagonist (pre-tee-off, prologue only)
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
