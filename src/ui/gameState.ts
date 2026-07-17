@@ -64,6 +64,8 @@ export type Screen =
   | 'storyFinaleResult'
   // GS-story-chapters: The Choice after Chapter 3 — stay a Warden or join the Coil (become a Herald).
   | 'storyChoice'
+  // GS-story-midchapter: the emotional interlude between the route majors (win a friend back / sever one).
+  | 'storyInterlude'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -344,6 +346,7 @@ export type Action =
   | { type: 'engageStoryFinale' } // GS-story-yggdrasil: resolve the Jörmungandr battle → victory/defeat recap
   | { type: 'storyFinaleContinue' } // GS-story-yggdrasil: dismiss the recap (to clubhouse; victory → title)
   | { type: 'chooseAlignment'; alignment: 'warden' | 'herald' } // GS-story-chapters: The Choice after Ch.3
+  | { type: 'storyInterludeContinue' } // GS-story-midchapter: dismiss the emotional interlude (apply its outcome)
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

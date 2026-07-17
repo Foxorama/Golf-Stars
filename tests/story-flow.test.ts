@@ -441,6 +441,32 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
     }
   });
 
+  it('winning the Chapter-4 major reaches the emotional interlude, which pays out once (GS-story-midchapter)', () => {
+    // A Herald who just won the Drowning Rite (Ch.4) recap, interlude unseen.
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 5,
+      alignment: 'herald' as const,
+      credits: 500,
+      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'],
+    };
+    const recap = {
+      ...initState('seed', {}, undefined, story),
+      screen: 'storyTournamentResult' as const,
+      lastStoryTournament: { chapter: 4, name: 'The Drowning Rite', sigilName: 'The Drowned Sigil', prize: '', rivalName: 'Penelope', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
+    };
+    const interlude = reduce(recap, { type: 'storyTournamentContinue' });
+    expect(interlude.screen).toBe('storyInterlude');
+    const done = reduce(interlude, { type: 'storyInterludeContinue' });
+    expect(done.screen).toBe('story');
+    expect(done.story!.credits).toBe(500 + 600); // the Coil's blood-money
+    expect(done.story!.seenStoryBeats['interlude-herald']).toBe(true);
+
+    // it fires exactly once: a later Ch.4-recap continue (seen) goes straight to the clubhouse
+    const recap2 = { ...done, screen: 'storyTournamentResult' as const, lastStoryTournament: { ...recap.lastStoryTournament } };
+    expect(reduce(recap2, { type: 'storyTournamentContinue' }).screen).toBe('story');
+  });
+
   it('chooseAlignment is a no-op off the choice screen / once chosen', () => {
     const chosen = { ...initState('seed', {}, undefined, { ...defaultStoryState(), alignment: 'warden' as const }), screen: 'storyChoice' as const };
     expect(reduce(chosen, { type: 'chooseAlignment', alignment: 'herald' }).story!.alignment).toBe('warden'); // already chosen

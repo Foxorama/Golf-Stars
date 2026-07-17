@@ -276,6 +276,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyfinale', sel: '.gs-fin-gate', text: 'Jörmungandr', label: 'the Story finale battle briefing' },
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
     { screen: 'storychoice', sel: '.gs-choice-grid', text: 'The Choice', label: 'the Story alignment fork (The Choice)' },
+    { screen: 'storyinterlude', sel: '.gs-inter-dialogue', text: 'The Severing', label: 'the Story emotional interlude' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(
