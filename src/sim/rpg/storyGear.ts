@@ -16,7 +16,7 @@
 
 import type { Rarity } from '../course/contract';
 import type { PlayerLoadout } from './economy';
-import { addCredits, type GearSlot, type StoryState } from './story';
+import { addCredits, type GearSlot, type StoryState, type StoryAlignment } from './story';
 
 /** A purchasable, equippable piece of Story gear. `apply` folds its effect onto a round loadout. */
 export interface StoryGearItem {
@@ -33,6 +33,11 @@ export interface StoryGearItem {
   lore: string[];
   /** Fold this item's effect onto the round loadout (pure). */
   apply: (loadout: PlayerLoadout) => PlayerLoadout;
+  /** GS-story-route-rewards: route-GATED relic — only revealed/buyable on this path (a Herald cursed
+   *  shedding or a Warden grace piece). Absent = an ordinary item, available to any path. */
+  alignment?: StoryAlignment;
+  /** The downside line shown on the lore card for a CURSED shedding (power with a price). Absent = clean. */
+  curse?: string;
 }
 
 // The gear catalogue. Effects mirror the Voyage gear economy's proven levers so they're balanced +
@@ -193,6 +198,107 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
       minCarryBoost: m.minCarryBoost + 0.04,
     }),
   },
+
+  // ── HERALD cursed sheddings (GS-story-route-rewards) — big power, a real curse; only on the Coil path.
+  // Forged by Sister Ecdysis from what a broken thing sheds. Stronger AND cheaper than Warden grace, but
+  // each takes something back. A shedding must be a CHOICE, never a strict upgrade.
+  {
+    id: 'gear:glove:shed',
+    slot: 'glove',
+    name: 'Shed-Skin Grip',
+    rarity: 'epic',
+    price: 300,
+    alignment: 'herald',
+    blurb: 'Viciously tight — at a tithe.',
+    detail: ['Dispersion ×0.78 — the tightest grip in the galaxy.'],
+    curse: 'The Coil takes its tithe — credits earned −10%.',
+    lore: [
+      'A glove sloughed from something that outgrew its old skin, tanned by Sister Ecdysis in the Coil’s ' +
+        'reliquary. It grips like nothing else — and the Coil’s mark on the cuff quietly skims a tithe off ' +
+        'every purse you take. Power is never free on the dark path.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.78, creditMult: m.creditMult * 0.9 }),
+  },
+  {
+    id: 'gear:ball:venom',
+    slot: 'ball',
+    name: 'Venom-Core Ball',
+    rarity: 'epic',
+    price: 340,
+    alignment: 'herald',
+    blurb: 'Savage bite — it fights you.',
+    detail: ['Backspin +26% — it rips back off any green.'],
+    curse: 'The venom fights the swing — dispersion +8%.',
+    lore: [
+      'A ball wound around a drop of the serpent’s venom. It hisses in flight and bites the green like a ' +
+        'struck snake — but it never quite wants to go where you aimed. The Coil calls that honesty.',
+    ],
+    apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.26, dispersionMult: m.dispersionMult * 1.08 }),
+  },
+  {
+    id: 'gear:shoes:coil',
+    slot: 'shoes',
+    name: 'Coilstride Boots',
+    rarity: 'epic',
+    price: 300,
+    alignment: 'herald',
+    blurb: 'Rooted anywhere — but restless.',
+    detail: ['Huge lie relief — stand and swing from anywhere.'],
+    curse: 'The serpent never rests — putt make-window −6%.',
+    lore: [
+      'Boots scaled like a shed serpent’s belly; they grip acid, void, and bare rock alike, so no lie can ' +
+        'stop you. But the restlessness in them creeps up the leg to the hands, and the greens never quite ' +
+        'go still under you again.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.6), puttBoost: (m.puttBoost ?? 0) - 0.06 }),
+  },
+
+  // ── WARDEN grace (GS-story-route-rewards) — clean bonuses, dearer; only on the light path. No curse.
+  {
+    id: 'gear:glove:grace',
+    slot: 'glove',
+    name: 'Grace Gauntlet',
+    rarity: 'epic',
+    price: 460,
+    alignment: 'warden',
+    blurb: 'Tight and true — clean.',
+    detail: ['Dispersion ×0.80 — a Warden’s steady hand, no strings.'],
+    lore: [
+      'Consecrated by the Fairway Wardens and given, never sold cheap — grace is dearer than a shedding ' +
+        'because it asks nothing back. The hand it steadies stays your own.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.8 }),
+  },
+  {
+    id: 'gear:ball:blessed',
+    slot: 'ball',
+    name: 'Star-Blessed Ball',
+    rarity: 'epic',
+    price: 500,
+    alignment: 'warden',
+    blurb: 'Bites AND rolls true.',
+    detail: ['Backspin +20% AND a steadier putt make-window (+5%).'],
+    lore: [
+      'A ball blessed under an open sky by the Wardens: it checks like a tour ball and holds its line on ' +
+        'the greens, and it never once turns on the golfer who trusts it. Clean, true, and worth the cost.',
+    ],
+    apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.2, puttBoost: (m.puttBoost ?? 0) + 0.05 }),
+  },
+  {
+    id: 'gear:shoes:hallowed',
+    slot: 'shoes',
+    name: 'Hallowed Spikes',
+    rarity: 'epic',
+    price: 460,
+    alignment: 'warden',
+    blurb: 'Sure footing — clean.',
+    detail: ['Strong lie relief — a Warden stands firm anywhere, no cost.'],
+    lore: [
+      'Spikes blessed to grip any ground the Wardens are called to defend — cold void, drowned atoll, dead ' +
+        'deck. They ask nothing of the wearer but that they keep standing for the right side.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
+  },
 ];
 
 /** Per-world gear stock (content-as-data) — a curated 1–2 items per world, tiered by chapter, so travel
@@ -210,12 +316,12 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   'tempest-18': ['gear:glove:vice', 'gear:hat:focus'],
   'crystal-18': ['gear:hat:focus'],
   'fungal-18': ['gear:ball:zip'],
-  // Chapter 4 — epics everywhere.
-  'ocean-18': ['gear:shoes:gravlock', 'gear:ball:zip'],
+  // Chapter 4 — epics everywhere + the first ROUTE RELICS (alignment-gated: only your path sees its own).
+  'ocean-18': ['gear:shoes:gravlock', 'gear:ball:zip', 'gear:glove:shed', 'gear:glove:grace'],
   'void2-18': ['gear:shoes:gravlock'],
-  'crystal2-18': ['gear:glove:vice', 'gear:hat:focus'],
-  // Chapter 5 — the legendary ball in the serpent's reaches.
-  'swamp-18': ['gear:ball:comet'],
+  'crystal2-18': ['gear:glove:vice', 'gear:hat:focus', 'gear:ball:venom', 'gear:ball:blessed'],
+  // Chapter 5 — the legendary ball + the last route relics in the serpent's reaches.
+  'swamp-18': ['gear:ball:comet', 'gear:shoes:coil', 'gear:shoes:hallowed'],
   'derelict-18': ['gear:shoes:gravlock', 'gear:ball:comet'],
   'cetus-18': ['gear:ball:comet'],
 };
@@ -235,12 +341,15 @@ export function storyGearEquipped(story: StoryState, item: StoryGearItem): boole
   return story.equippedGear[item.slot] === item.id;
 }
 
-/** A world's gear rack: the curated stock minus anything already owned. */
+/** A world's gear rack: the curated stock minus anything already owned, and minus route-gated relics that
+ *  don't match the chosen path (GS-story-route-rewards — a Herald never sees Warden grace, and vice versa;
+ *  before The Choice, no route relic shows). */
 export function storyGearStock(story: StoryState, worldId: string): StoryGearItem[] {
   const ids = STORY_GEAR_STOCK[worldId] ?? [];
   return ids
     .map((id) => storyGearById(id))
-    .filter((it): it is StoryGearItem => !!it && !story.ownedGearIds.includes(it.id));
+    .filter((it): it is StoryGearItem => !!it && !story.ownedGearIds.includes(it.id))
+    .filter((it) => !it.alignment || it.alignment === story.alignment);
 }
 
 /** Can the player buy this gear right now — not owned and affordable? */

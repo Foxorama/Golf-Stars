@@ -24,6 +24,7 @@ import {
   STORY_GEAR,
   STORY_GEAR_STOCK,
   storyGearById,
+  storyGearStock,
   buyStoryGear,
   applyStoryGear,
   equipStoryGear,
@@ -331,5 +332,41 @@ describe('the locker model (GS-story-locker)', () => {
     expect(bare.ownedGearIds).toContain('gear:glove:tacky'); // still owned
     // equipping an UNOWNED gear is a no-op
     expect(equipStoryGear(defaultStoryState(), 'gear:glove:vice')).toEqual(defaultStoryState());
+  });
+});
+
+describe('route relics (GS-story-route-rewards)', () => {
+  it('sheddings are cursed (boon + a real downside); grace is clean', () => {
+    const shed = storyGearById('gear:glove:shed')!;
+    expect(shed.alignment).toBe('herald');
+    expect(shed.curse).toBeTruthy();
+    const grace = storyGearById('gear:glove:grace')!;
+    expect(grace.alignment).toBe('warden');
+    expect(grace.curse).toBeUndefined();
+    // the shedding's apply folds BOTH the boon (tighter) and the curse (a credit tithe)
+    const base = { dispersionMult: 1, creditMult: 1, minCarryBoost: 0, wedgeWindow: 0, handicap: 10, bag: [], perks: [], shapeMod: {}, distanceClubBonus: 0, puttBoost: 0, birdieCredit: 0, eagleCredit: 0, comebackCredit: 0 } as PlayerLoadout;
+    const out = shed.apply(base);
+    expect(out.dispersionMult).toBeCloseTo(0.78, 5); // boon
+    expect(out.creditMult).toBeCloseTo(0.9, 5); // curse
+    // the lore card surfaces the curse as a detail line + a "cursed" tag
+    const card = storyCardFor('gear:glove:shed')!;
+    expect(card.tag).toContain('cursed');
+    expect(card.detail.some((d) => d.includes('⚠'))).toBe(true);
+  });
+
+  it('a world rack shows only YOUR path’s relics (and none before The Choice)', () => {
+    const rich = addCredits(defaultStoryState('feather-fade'), 5000);
+    // crystal2-18 stocks a Herald ball (venom) + a Warden ball (blessed) + ordinary gear.
+    const unchosen = storyGearStock(rich, 'crystal2-18').map((g) => g.id);
+    expect(unchosen).not.toContain('gear:ball:venom');
+    expect(unchosen).not.toContain('gear:ball:blessed'); // route relics hidden before The Choice
+    const herald = storyGearStock({ ...rich, alignment: 'herald' }, 'crystal2-18').map((g) => g.id);
+    expect(herald).toContain('gear:ball:venom');
+    expect(herald).not.toContain('gear:ball:blessed'); // never the other path's
+    const warden = storyGearStock({ ...rich, alignment: 'warden' }, 'crystal2-18').map((g) => g.id);
+    expect(warden).toContain('gear:ball:blessed');
+    expect(warden).not.toContain('gear:ball:venom');
+    // ordinary (unaligned) gear still shows on either path
+    expect(warden).toContain('gear:glove:vice');
   });
 });

@@ -95,6 +95,9 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     const h5 = tournamentForChapter(5, 'herald')!;
     expect(h5.rivalName).toBe('Driver Dan'); // the Ghost Harvest — crush your first caddy
     expect(w5.sigilId).not.toBe(h5.sigilId);
+    // GS-story-route-rewards: the Chapter-4 major grants the route's signature ship
+    expect(w4.rewardShipId).toBe('warden-cruiser');
+    expect(h4.rewardShipId).toBe('wyrm-ship');
     // an unset path defaults to the Warden variant (defensive; by Ch.4 The Choice is made)
     expect(tournamentForChapter(4)).toBe(w4);
     // either full path collects exactly five distinct Sigils → the key

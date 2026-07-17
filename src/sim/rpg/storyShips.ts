@@ -19,22 +19,24 @@
  */
 
 import { shipById, ACE_SHIP_ID, type Ship } from './ships';
-import { addCredits, type StoryState } from './story';
+import { addCredits, type StoryState, type StoryAlignment } from './story';
 
-/** How a story ship is obtained. */
-export type ShipAcquire = 'buy' | 'milestone' | 'ace' | 'secret';
+/** How a story ship is obtained. `reward` = granted by winning your path's route major (GS-story-route-rewards). */
+export type ShipAcquire = 'buy' | 'milestone' | 'ace' | 'secret' | 'reward';
 
 /** A story-fleet row over a shared `ships.ts` hull. */
 export interface StoryShip {
   /** The `ships.ts` id this row flies. */
   shipId: string;
   acquire: ShipAcquire;
-  /** Credit price at the shipyard (buy / milestone / secret). An `ace` ship is free (0). */
+  /** Credit price at the shipyard (buy / milestone / secret). An `ace`/`reward` ship is free (0). */
   price: number;
   /** For `milestone`/`secret`: revealed once this many worlds are cleared (excludes the Earth prologue). */
   unlockAfterClears?: number;
   /** The STORY effect: credits earned per world clear are multiplied by this (default 1 = no bonus). */
   creditMult: number;
+  /** GS-story-route-rewards: a `reward` ship belongs to this path (granted on that route's major). */
+  alignment?: StoryAlignment;
   /** Bespoke lore paragraph(s) for the ship's lore card. */
   lore: string[];
 }
@@ -126,6 +128,31 @@ export const STORY_SHIPS: readonly StoryShip[] = [
     ],
   },
   {
+    shipId: 'warden-cruiser',
+    acquire: 'reward',
+    price: 0,
+    creditMult: 1.2,
+    alignment: 'warden',
+    lore: [
+      'A Warden star-cruiser, hull haloed in celestial light — awarded for holding the Abyssal Vigil on the ' +
+        'light path. It flies clean and true, and the galaxy’s defenders wave it through every gate.',
+      'Earned, never sold. Only the Warden path ever flies one.',
+    ],
+  },
+  {
+    shipId: 'wyrm-ship',
+    acquire: 'reward',
+    price: 0,
+    creditMult: 1.25,
+    alignment: 'herald',
+    lore: [
+      'A serpent-hull grown, not built — the Coil’s reward for the Drowning Rite on the dark path. It hits ' +
+        'harder and banks richer than any honest ship, and it flies a little frailer for it, the way ' +
+        'everything on the Coil’s road does.',
+      'Earned, never sold. Only the Herald path ever flies one.',
+    ],
+  },
+  {
     shipId: 'ufo-mothership',
     acquire: 'secret',
     price: 1500,
@@ -163,9 +190,9 @@ function nonPrologueClears(story: StoryState): number {
 }
 
 /** Is this ship REVEALED at the shipyard? `buy` always; `milestone`/`secret` once enough worlds are
- *  cleared; an `ace` ship is never shown for sale (it's earned, granted on a hole-in-one). */
+ *  cleared; an `ace`/`reward` ship is shown only once OWNED (earned by an ace / a route major, never sold). */
 export function storyShipRevealed(story: StoryState, row: StoryShip): boolean {
-  if (row.acquire === 'ace') return story.ownedShipIds.includes(row.shipId);
+  if (row.acquire === 'ace' || row.acquire === 'reward') return story.ownedShipIds.includes(row.shipId);
   if (row.acquire === 'milestone' || row.acquire === 'secret') {
     return story.ownedShipIds.includes(row.shipId) || nonPrologueClears(story) >= (row.unlockAfterClears ?? 0);
   }
@@ -179,15 +206,23 @@ export function storyShipEquipped(story: StoryState, shipId: string): boolean {
   return story.equippedShipId === shipId;
 }
 
-/** Can the player buy this ship now — revealed, for sale (not an ace ship), not owned, affordable? */
+/** Can the player buy this ship now — revealed, for sale (not an ace/reward ship), not owned, affordable? */
 export function canBuyStoryShip(story: StoryState, row: StoryShip): boolean {
   return (
     row.acquire !== 'ace' &&
+    row.acquire !== 'reward' &&
     !storyShipOwned(story, row.shipId) &&
     storyShipRevealed(story, row) &&
     row.price > 0 &&
     story.credits >= row.price
   );
+}
+
+/** Grant a route-reward ship (pure, GS-story-route-rewards) — own + fly it if not already owned; else
+ *  unchanged. Called when the route's major is won. */
+export function grantStoryShip(story: StoryState, shipId: string): StoryState {
+  if (story.ownedShipIds.includes(shipId)) return story;
+  return { ...story, ownedShipIds: [...story.ownedShipIds, shipId], equippedShipId: shipId };
 }
 
 /** Buy a ship (pure): deduct credits, own it, and fly it. No-op if it can't be bought. */
@@ -227,6 +262,7 @@ export function storyShipDetail(row: StoryShip): string[] {
   const pct = Math.round((row.creditMult - 1) * 100);
   lines.push(pct > 0 ? `Credits per world clear +${pct}% (bigger hold).` : 'A pure-flair ride — no credit bonus.');
   if (row.acquire === 'ace') lines.push('Earned only by a hole-in-one — never for sale.');
+  else if (row.acquire === 'reward') lines.push(`Earned on the ${row.alignment === 'herald' ? 'Coil' : 'Warden'} path — never for sale.`);
   else if (row.acquire === 'milestone') lines.push(`Revealed after clearing ${row.unlockAfterClears} worlds.`);
   else if (row.acquire === 'secret') lines.push(`A grail — revealed after clearing ${row.unlockAfterClears} worlds.`);
   return lines;
