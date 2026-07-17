@@ -270,6 +270,16 @@ Ordered so each ships something playable and nothing lands before its foundation
   route-gate/curse in `tests/story-shop.test.ts`, the route ships in `tests/story-ships.test.ts`, the
   reward `rewardShipId` + grant in `tests/story-tournament.test.ts` / `tests/story-flow.test.ts`. Deferred:
   a wyrm-ship "frailer in battle" finale nuance (the finale is gate-based, so it's flavour for now).
+- **GS-story-midchapter** — ✅ *shipped* (`sim/rpg/storyInterlude.ts` + `app/storyInterludeScreens.ts`).
+  The Sigil-LESS emotional interlude between the route majors: winning the Chapter-4 major diverts
+  (`storyTournamentContinue`) once — before the clubhouse — to a story BEAT. **Warden "The Prism Accord"**
+  (win a fallen friend back → a reunion + their parting gift) vs **Herald "The Severing"** (sever/betray a
+  friend to complete the rite → the Coil's larger blood-money). Pure model: `interludeBeat(alignment)` +
+  colour-coded dialogue, the "friend" a real roster golfer (`interludeFriend` = first non-protagonist, so
+  the portrait is a face you've seen via `golferPreviewSVG`); fires exactly once (`seenStoryBeats`), the
+  only mechanical consequence a credit outcome (`applyInterlude` — Herald pays more, the dark-path irony).
+  Own `.gs-inter*` prefix; no save bump. Guarded by `tests/story-interlude.test.ts`, the
+  Ch4-win→interlude→pay-once flow in `tests/story-flow.test.ts`, and the `?screen=storyinterlude` smoke.
 
 **Phase F — Finale**
 - **GS-story-yggdrasil** — ✅ *shipped* (`sim/rpg/storyFinale.ts` + `render/storyFinale.ts` +

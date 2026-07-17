@@ -76,6 +76,7 @@ import { isStoryShipId, buyStoryShip, equipStoryShip } from '../sim/rpg/storyShi
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
+import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -600,7 +601,19 @@ export function reduce(state: UiState, action: Action): UiState {
       if (r?.won && r.chapter === 3 && state.story && !state.story.alignment) {
         return { ...state, screen: 'storyChoice', lastStoryTournament: undefined };
       }
+      // GS-story-midchapter: winning the Chapter-4 route major reaches the emotional INTERLUDE (win a
+      // friend back / sever one) — divert to it once, before the clubhouse.
+      if (r?.won && r.chapter === 4 && state.story?.alignment && !interludeSeen(state.story, state.story.alignment)) {
+        return { ...state, screen: 'storyInterlude', lastStoryTournament: undefined };
+      }
       return { ...state, screen: 'story', lastStoryTournament: undefined };
+    }
+
+    case 'storyInterludeContinue': {
+      // GS-story-midchapter: dismiss the interlude → apply its outcome (mark seen once + the credit
+      // consequence) and land on the clubhouse.
+      if (state.screen !== 'storyInterlude' || !state.story?.alignment) return state;
+      return { ...state, story: applyInterlude(state.story, state.story.alignment), screen: 'story' };
     }
 
     case 'chooseAlignment': {

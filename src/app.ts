@@ -88,6 +88,7 @@ import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { storyTournamentScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
+import { storyInterludeScreen } from './app/storyInterludeScreens';
 import { mountStoryFinale } from './render/storyFinale';
 import { finaleResult } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
@@ -147,7 +148,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament|storyfinale|storychoice` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament|storyfinale|storychoice|storyinterlude` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -311,6 +312,13 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       if (!base.story) return base;
       return { ...base, story: { ...base.story, chapter: 4, trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm'] }, screen: 'storyChoice' };
+    }
+    case 'storyinterlude': {
+      // GS-story-midchapter: mount the emotional interlude by seeding a Herald campaign that just won its
+      // Chapter-4 major (path chosen, interlude unseen) directly onto the interlude screen.
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      if (!base.story) return base;
+      return { ...base, story: { ...base.story, chapter: 5, alignment: 'herald', trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'] }, screen: 'storyInterlude' };
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2327,6 +2335,8 @@ function render(): void {
       ? storyFinaleResultScreen()
       : state.screen === 'storyChoice'
       ? storyChoiceScreen()
+      : state.screen === 'storyInterlude'
+      ? storyInterludeScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();
