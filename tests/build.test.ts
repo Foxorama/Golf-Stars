@@ -335,6 +335,40 @@ describe('build output (real browser)', () => {
     60_000,
   );
 
+  // STORY-MODE RECRUITMENT CINEMATIC (GS-story-intro). "Answer the call" on the prologue victory plays the
+  // Canvas2D recruitment cinematic (Mothership + Parrot), then continues to the spaceport clubhouse. The
+  // canvas feel is verified eyes-on; this guards the WIRING: the overlay mounts, and skipping it lands on the
+  // spaceport clubhouse (Chapter 1) with no page error.
+  it.runIf(chromePath)(
+    'prologue "Answer the call" plays the cinematic, then lands at the spaceport clubhouse',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 }, reducedMotion: 'no-preference' });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=storyresult&intro=0&seed=7', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        await page.getByText('Answer the call', { exact: false }).first().click();
+        // The cinematic overlay mounts.
+        await page.waitForSelector('[data-gs-storyintro]', { timeout: 4000 });
+        // Skip it (a click on the overlay finishes it → continue to the clubhouse).
+        await page.click('[data-gs-storyintro]');
+        await page.waitForSelector('[data-gs-storyintro]', { state: 'detached', timeout: 4000 });
+        // We land on the spaceport clubhouse (Chapter 1) — the campaign advanced past the prologue.
+        await page.waitForSelector('.gs-storyhub', { timeout: 4000 });
+        const txt = await page.evaluate(() => document.getElementById('app')?.textContent ?? '');
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+        expect(txt).toContain('Clubhouse');
+        expect(txt).toContain('Chapter 1');
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
   // STAR-MAP WEAPONS (GS-star-tour-weapons). The dashboard fire button spawns a themed projectile into the
   // `#gs-st-shots` SVG layer + ticks an ammo pip down — pure app-layer DOM the sim suite can't see. This
   // guards that the button mounts, firing appends a shot group, and the magazine decrements (and empties).
