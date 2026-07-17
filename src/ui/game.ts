@@ -61,7 +61,8 @@ import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
 import { loreEventById, type SeenLore } from '../sim/rpg/lore';
-import { defaultStoryState, type StoryState } from '../sim/rpg/story';
+import { defaultStoryState, storyBagClubs, worldCleared, type StoryState } from '../sim/rpg/story';
+import { storyItemById, buyStoryItem, worldHasShop } from '../sim/rpg/storyShop';
 import {
   autoDecision,
   awaitingPutt,
@@ -372,10 +373,20 @@ export function reduce(state: UiState, action: Action): UiState {
       // StoryState in a later chunk), mark it a Story round so it resolves back into the campaign, and tee
       // up the round intro (through the lore gate, so a world's arrival beat still fires). Reachable from
       // the prologue hub (Earth) and the star-map destination dossier (any charted world).
-      if ((state.screen !== 'story' && state.screen !== 'starTour') || !state.story) return state;
+      // Reachable from the prologue hub (Earth), the star-map dossier (any charted world), and the Pro
+      // Shop's "play again" (a cleared world). The bag is the campaign's OWN equipped bag (GS-story-econ):
+      // the lean green starter grown by Pro-Shop purchases — not the golfer's normal common bag.
+      if ((state.screen !== 'story' && state.screen !== 'starTour' && state.screen !== 'storyShop') || !state.story) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
-      const run = { ...run0, staticCourseId: action.courseId, staticEffect: 'none', storyRound: true };
-      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined });
+      const bag = storyBagClubs(state.story);
+      const run = {
+        ...run0,
+        loadout: { ...run0.loadout, bag },
+        staticCourseId: action.courseId,
+        staticEffect: 'none',
+        storyRound: true,
+      };
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }
 
     case 'storyRoundContinue': {
@@ -417,6 +428,43 @@ export function reduce(state: UiState, action: Action): UiState {
       // never dispatches this — is unaffected).
       if (state.screen !== 'starTour' || !state.story) return state;
       return { ...state, screen: 'story' };
+    }
+
+    case 'openStoryShop': {
+      // GS-story-econ: open a CLEARED world's Pro Shop from its star-map dossier. Guarded to a campaign +
+      // a cleared, shoppable world (so a not-yet-played world offers no rack). Opens from the story map.
+      if (state.screen !== 'starTour' || !state.story) return state;
+      if (!worldCleared(state.story, action.worldId) || !worldHasShop(action.worldId)) return state;
+      return { ...state, screen: 'storyShop', storyShopWorldId: action.worldId, storyItemInspectId: undefined };
+    }
+
+    case 'exitStoryShop': {
+      // Close the Pro Shop back to the star map (where it was opened from).
+      if (state.screen !== 'storyShop') return state;
+      return { ...state, screen: 'starTour', storyItemInspectId: undefined };
+    }
+
+    case 'storyInspectItem': {
+      // GS-story-econ / GS-story-lore-cards: tap a rack item → raise its lore card over the shop.
+      if (state.screen !== 'storyShop' || !state.story) return state;
+      if (!storyItemById(action.itemId)) return state;
+      return { ...state, storyItemInspectId: action.itemId };
+    }
+
+    case 'storyCloseItem': {
+      if (state.screen !== 'storyShop') return state;
+      return { ...state, storyItemInspectId: undefined };
+    }
+
+    case 'storyBuyItem': {
+      // GS-story-econ: buy the item (spend credits, add to owned, equip into the bag ≤14). No-op if
+      // unaffordable/owned (buyStoryItem gates), so a double-tap can't overspend. Persists via `state.story`.
+      if (state.screen !== 'storyShop' || !state.story) return state;
+      const item = storyItemById(action.itemId);
+      if (!item) return state;
+      const story = buyStoryItem(state.story, item);
+      if (story === state.story) return state; // couldn't buy — leave the card open
+      return { ...state, story, storyItemInspectId: undefined };
     }
 
     case 'playYggdrasilRealm': {

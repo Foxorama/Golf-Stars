@@ -148,9 +148,27 @@ Ordered so each ships something playable and nothing lands before its foundation
   Parrot in bar). Reuses lore machinery + a new story intro.
 
 **Phase C — Progression systems**
-- **GS-story-econ** — persistent story credits, per-world Pro Shop, credits on world clear, revisit
-  flow (play again keeps `worldBest` / straight to pro shop).
-- **GS-story-clubs** — individually owned & equippable clubs; start green bag; buy clubs; equip the bag.
+- **GS-story-econ** — ✅ *shipped.* The per-world **Pro Shop** (`sim/rpg/storyShop.ts` +
+  `app/storyShopScreens.ts`), reached from a **cleared** world's star-map dossier ("🛒 Pro Shop") or its
+  "Play again" (revisit keeps `worldBest`). It sells **themed clubs** — the existing Voyage reward sets
+  **Planet / Phoenix Flames / Solar Storm** (`club:<set>:<type>` ids resolved through the shared
+  `buildRewardClub`, so a bought club plays exactly as the same Voyage reward: carry bonus on distance
+  clubs, a wider putt make-window, themed art the golfer swings) — a curated 3-item rack per world, tiered
+  by chapter (Planet early → Solar late), priced in credits, filtered to hide what you own. Buying spends
+  credits, adds to `ownedClubIds`, and **equips into the bag** (`equipStoryClub`: upgrade a carried TYPE in
+  place, or append a new type up to `MAX_STORY_BAG` = 14). The campaign's OWN equipped bag now tees off
+  into a Story round (`storyPlayWorld` sets `loadout.bag = storyBagClubs`), so the lean green start actually
+  grows as you shop. NO save bump — owned/equipped stay id-lists; `resolveStoryClub`/`storyBagClubs` are
+  themed-aware. Guarded by `tests/story-shop.test.ts` + the Pro-Shop flow in `tests/story-flow.test.ts` +
+  the `?screen=storyshop` browser smoke.
+- **GS-story-lore-cards** — ✅ *foundation shipped* (`render/loreCard.ts`). The reusable tap-to-inspect
+  overlay (own `.gs-lorecard*` prefix, self-contained `<style>`): art medallion + name + rarity/kind tag +
+  mechanical DETAIL + composed LORE + a footer action (Buy / Owned / can't-afford). First consumer is the
+  Pro Shop; club lore is COMPOSED from a per-SET line (the Planet/Phoenix/Solar canon) + a per-TYPE
+  flavour, so every club reads distinct without hand-writing each. Gear/ship/relic chunks pass their own
+  art + copy into the same card.
+- **GS-story-clubs** — individually owned & equippable clubs (buy is DONE via GS-story-econ; the remaining
+  work is the LOCKER bag-swap UI once you own more than 14, and a plain green-club start already in place).
 - **GS-story-gear** — equippable gear **with effects** (gloves/hat/shoes/bag/glove): extend
   `PlayerLoadout`, fold equipped gear at round start; the **Inventory** screen. Home of the **cursed
   sheddings** (big power + a balancing curse — a new *negative* effect field per relic) and their Warden

@@ -50,6 +50,8 @@ export type Screen =
   // navigator REUSES the Star Tour `starTour` screen in a story context (GS-story-map).
   | 'story'
   | 'storyResult'
+  // GS-story-econ: a cleared world's Pro Shop (spend credits on themed clubs, grow the green bag).
+  | 'storyShop'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -235,6 +237,10 @@ export interface UiState {
     /** This was the prologue (the Earth World Tour final). */
     wasPrologue: boolean;
   };
+  /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
+  storyShopWorldId?: string;
+  /** GS-story-econ: the shop item whose lore card is open (over the rack). Absent ⇒ no card. Transient. */
+  storyItemInspectId?: string;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -286,6 +292,11 @@ export type Action =
   | { type: 'storySwitchGolfer'; characterId: string } // GS-story-clubhouse: change your protagonist (pre-tee-off, prologue only)
   | { type: 'openStoryMap' } // GS-story-map: open the galaxy star-map navigator (the Star Tour screen, story context)
   | { type: 'exitStoryMap' } // GS-story-map: back to the clubhouse from the star map
+  | { type: 'openStoryShop'; worldId: string } // GS-story-econ: open a cleared world's Pro Shop from its dossier
+  | { type: 'exitStoryShop' } // GS-story-econ: close the Pro Shop back to the star map
+  | { type: 'storyInspectItem'; itemId: string } // GS-story-econ: tap a shop item → its lore card
+  | { type: 'storyCloseItem' } // GS-story-econ: dismiss the item lore card
+  | { type: 'storyBuyItem'; itemId: string } // GS-story-econ: buy the inspected item (spend credits, grow the bag)
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

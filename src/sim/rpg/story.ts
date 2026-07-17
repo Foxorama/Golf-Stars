@@ -18,6 +18,7 @@
  */
 
 import { CLUBS, clubById, type Club } from '../clubs';
+import { clubSetById, buildRewardClub } from './economy';
 import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
@@ -106,6 +107,11 @@ export function completeStoryRound(
 export const DEFAULT_STORY_BAG: readonly string[] = [
   'D', '5W', '3H', '5i', '7i', '9i', 'PW', 'SW', 'chip', 'putter',
 ];
+
+/** A real bag holds 14 clubs. Pro-Shop purchases grow the green bag up to this many EQUIPPED clubs
+ *  (extra owned clubs wait in the locker for a swap — GS-story-clubs). Buying a club for a TYPE you
+ *  already carry UPGRADES it in place (no size cost); a NEW type appends until the bag is full. */
+export const MAX_STORY_BAG = 14;
 
 /** Effect-bearing equipment slots (GS-story-gear): one item per slot, each folds a `PlayerLoadout` field. */
 export type GearSlot = 'glove' | 'hat' | 'shoes' | 'ball' | 'bag';
@@ -235,12 +241,55 @@ export function storyComplete(story: StoryState): boolean {
 
 // ── Pure progression helpers (immutable: never mutate `story`, always return a new object) ──────────
 
-/** Resolve the equipped bag ids to real `Club` rows (skips ids that aren't in the taxonomy). */
+/**
+ * Resolve a Story-owned club id to a real `Club`. A PLAIN id (`'3W'`, `'putter'`) resolves off the
+ * taxonomy; a THEMED reward id (`club:<set>:<type>`, e.g. `club:tour:3W`) rebuilds the themed reward
+ * club (its carry bonus + set/rarity + "Planet 3-Wood" name) through the shared reward machinery, so a
+ * bought Pro-Shop club plays exactly as the same Voyage reward would. Unknown ids → undefined. Pure.
+ */
+export function resolveStoryClub(id: string): Club | undefined {
+  if (id.startsWith('club:')) {
+    const [, setId, type] = id.split(':');
+    const set = clubSetById(setId);
+    if (set && type && clubById(type)) return buildRewardClub(set, type);
+    return undefined;
+  }
+  const base = clubById(id);
+  return base ? { ...base } : undefined;
+}
+
+/** The bag TYPE an owned-club id occupies (for one-per-type dedupe): a themed id's base type, else the
+ *  id itself. `club:tour:3W` → `'3W'`, `'putter'` → `'putter'`. */
+export function storyClubType(id: string): string {
+  return id.startsWith('club:') ? id.split(':')[2] ?? id : id;
+}
+
+/** Resolve the equipped bag ids to real `Club` rows (themed-aware; skips ids that resolve to nothing). */
 export function storyBagClubs(story: StoryState): Club[] {
   return story.equippedBagIds
-    .map((id) => clubById(id))
-    .filter((c): c is Club => !!c)
-    .map((c) => ({ ...c }));
+    .map((id) => resolveStoryClub(id))
+    .filter((c): c is Club => !!c);
+}
+
+/**
+ * Equip an owned club id into the bag (pure). One club per TYPE: a themed upgrade for a type already
+ * carried REPLACES it in place (no size change); a NEW type is appended only if the bag has room
+ * (< `MAX_STORY_BAG`). The equipped list is kept ordered longest→shortest by resolved carry so the bag
+ * reads cleanly. Returns the story unchanged if the club can't resolve or the bag is full for a new type.
+ */
+export function equipStoryClub(story: StoryState, clubId: string): StoryState {
+  const club = resolveStoryClub(clubId);
+  if (!club) return story;
+  const type = storyClubType(clubId);
+  const without = story.equippedBagIds.filter((id) => storyClubType(id) !== type);
+  const wasCarried = without.length !== story.equippedBagIds.length;
+  if (!wasCarried && without.length >= MAX_STORY_BAG) return story; // full, and this is a new type
+  const nextIds = [...without, clubId].sort((a, b) => {
+    const ca = resolveStoryClub(a)?.carry ?? 0;
+    const cb = resolveStoryClub(b)?.carry ?? 0;
+    return cb - ca;
+  });
+  return { ...story, equippedBagIds: nextIds };
 }
 
 export function worldUnlocked(story: StoryState, worldId: string): boolean {

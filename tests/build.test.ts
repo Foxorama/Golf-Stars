@@ -268,6 +268,7 @@ describe('build output (real browser)', () => {
     { screen: 'storypick', sel: '.gs-eclub-ov', text: 'STRENGTHS', label: 'the Story golfer stats/abilities overlay' },
     { screen: 'storymap', sel: '.gs-startour', text: 'CLUBHOUSE', label: 'the Story galaxy star-map navigator' },
     { screen: 'storyresult', sel: '.gs-storyres', text: 'Champion', label: 'the Story prologue world-round recap' },
+    { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

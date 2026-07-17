@@ -23,7 +23,8 @@ import { STATIC_COURSES, staticCourseSpec } from '../sim/course/staticCourses';
 import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
 import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
-import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT } from '../sim/rpg/story';
+import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
+import { storyWorldShoppable } from '../sim/rpg/storyShop';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
 import { getCharacter } from '../sim/rpg/characters';
@@ -386,9 +387,16 @@ function dossier(w: StarTourWorld): string {
           ? `<span class="gs-st-rec">🏆 Your best: <b style="color:${toParColour(best.toPar)};">${formatToPar(best.toPar)}</b> <span style="opacity:.7;">(${best.strokes} strokes, par ${best.par})</span></span>`
           : `<span class="gs-st-rec" style="opacity:.7;">No record yet — set the first!</span>`;
       })();
+  const cleared = story && worldCleared(state.story!, w.id);
+  const shoppable = story && storyWorldShoppable(state.story!, w.id);
   const playAction = story
     ? { type: 'storyPlayWorld', courseId: w.id }
     : { type: 'pickStarTourCourse', courseId: w.id, effect: starTourView.effect };
+  const playLabel = story ? (cleared ? 'Play again' : 'Fly here &amp; tee off') : 'Fly here &amp; play 18';
+  // GS-story-econ: a cleared, shoppable world offers its Pro Shop right from the dossier.
+  const shopBtn = shoppable
+    ? `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#2a2416,#1c1810);border-color:#5a4a22;color:#e9c46a;" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: w.id })}'>🛒 Pro Shop</button>`
+    : '';
   return `
     <div class="gs-st-sheet" role="dialog" aria-label="${w.name}">
       <button class="gs-st-sheet__close" data-startour-close="1" aria-label="Close">✕</button>
@@ -399,7 +407,8 @@ function dossier(w: StarTourWorld): string {
       <p class="gs-st-sheet__blurb">${spec?.blurb ?? ''}</p>
       ${recordLine}
       ${story ? '' : `<div class="gs-st-sheet__wxlabel">Weather sky</div>${weatherPicker()}`}
-      <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${story ? 'Fly here &amp; tee off' : 'Fly here &amp; play 18'}</button>
+      <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${playLabel}</button>
+      ${shopBtn}
     </div>`;
 }
 
