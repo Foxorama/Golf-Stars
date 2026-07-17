@@ -59,6 +59,9 @@ export type Screen =
   // GS-story-tournament: a chapter's Galaxy Tournament — the lobby (host/rival/Sigil) and the win/lose recap.
   | 'storyTournament'
   | 'storyTournamentResult'
+  // GS-story-yggdrasil: the finale — the Jörmungandr battle briefing and its victory/defeat recap.
+  | 'storyFinale'
+  | 'storyFinaleResult'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -257,6 +260,8 @@ export interface UiState {
     /** True when this win took the fifth Sigil (the campaign is complete). */
     finalSigil: boolean;
   };
+  /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
+  lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence' };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
   storyShopWorldId?: string;
   /** GS-story-econ: the shop item whose lore card is open (over the rack). Absent ⇒ no card. Transient. */
@@ -332,6 +337,10 @@ export type Action =
   | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
+  | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)
+  | { type: 'exitStoryFinale' } // GS-story-yggdrasil: back to the clubhouse from the briefing
+  | { type: 'engageStoryFinale' } // GS-story-yggdrasil: resolve the Jörmungandr battle → victory/defeat recap
+  | { type: 'storyFinaleContinue' } // GS-story-yggdrasil: dismiss the recap (to clubhouse; victory → title)
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

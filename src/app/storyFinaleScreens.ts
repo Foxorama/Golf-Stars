@@ -1,0 +1,132 @@
+/**
+ * The Story-Tour FINALE screens (GS-story-yggdrasil) — the Jörmungandr battle. The BRIEFING (reached from
+ * the clubhouse once the five Sigils forge the key) reveals the serpent and your ship's readiness across
+ * the two battle gates (firepower to breach, engines+shields to survive), and lets you engage. Engaging
+ * plays the battle CINEMATIC (app.ts) and lands on the RESULT: victory (universe saved, campaign complete,
+ * Star Tour unlocked) or defeat (which gate fell short + how to arm for the rematch). Built from design
+ * tokens + a self-contained `.gs-fin*` style block (own prefix). Reads the live `state`.
+ */
+
+import { state } from './ctx';
+import { getCharacter } from '../sim/rpg/characters';
+import {
+  finaleResult,
+  FINALE_BREACH_NEED,
+  FINALE_SURVIVE_NEED,
+} from '../sim/rpg/storyFinale';
+
+/** A readiness gate row — its rating vs the threshold, met or short. */
+function gateRow(label: string, have: number, need: number, hint: string): string {
+  const ok = have >= need;
+  const pct = Math.max(0, Math.min(100, Math.round((have / need) * 100)));
+  return `
+    <div class="gs-fin-gate">
+      <div class="gs-fin-gatehd">
+        <span>${ok ? '✅' : '⚠️'} ${label}</span>
+        <span class="gs-fin-gateval" style="color:${ok ? '#7fe0a0' : '#ff9a6a'};">${have} / ${need}</span>
+      </div>
+      <div class="gs-fin-bar"><div class="gs-fin-barfill" style="width:${pct}%;background:${ok ? '#4fe08a' : '#e0794f'};"></div></div>
+      ${ok ? '' : `<div class="gs-fin-hint">${hint}</div>`}
+    </div>`;
+}
+
+export function storyFinaleScreen(): string {
+  const story = state.story;
+  const r = story ? finaleResult(story) : undefined;
+  if (!story || !r) {
+    return `
+      <header class="gs-hero"><h1 class="gs-hero-title">🐍 The Dark Root</h1></header>
+      <div style="max-width:420px;margin:24px auto 0;">
+        <button class="gs-btn" data-action='${JSON.stringify({ type: 'exitStoryFinale' })}'>‹ Back</button>
+      </div>`;
+  }
+  const who = getCharacter(story.characterId)?.name ?? 'Champion';
+  const ready = r.won;
+  return `
+    <header class="gs-hero gs-storyhub">
+      <h1 class="gs-hero-title">🐍 Jörmungandr</h1>
+      <p class="gs-hero-tag">The Dark Root of Yggdrasil · the final battle</p>
+    </header>
+    <section style="max-width:520px;margin:6px auto 0;">
+      <p class="gs-fin-lore">The five Sigils burn together into a single key, and the root of the World-Tree
+        splits open. Coiled in the dark below sleeps the world-serpent — and something worse wears it now,
+        a corruption from beyond the stars. It is waking. Only your ship stands between it and every world
+        you crossed to get here.</p>
+      <p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Everything we armed for. Take the
+        shot when she opens her eye — and don’t miss."</p>
+
+      <h2 class="gs-fin-sec">Battle readiness</h2>
+      ${gateRow('Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, 'Buy heavier WEAPONS at the shipyard — your guns can’t crack her scales yet.')}
+      ${gateRow('Defence — survive the coils', r.defenceRating, FINALE_SURVIVE_NEED, 'Buy ENGINES + SHIELDS at the shipyard — you can’t weather her strike yet.')}
+      <div class="gs-fin-verdict" style="color:${ready ? '#7fe0a0' : '#ff9a6a'};">
+        ${ready ? '🚀 Your ship is ready. Engage when you are.' : '🛠 Your ship isn’t ready — arm up at the shipyard, then return.'}
+      </div>
+    </section>
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">
+      <button class="gs-btn" data-story-finale-engage="1" style="${ready ? '' : 'opacity:0.9;'}">⚔ Engage Jörmungandr</button>
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryFinale' })}'>‹ Not yet — back to the clubhouse</button>
+    </div>
+    ${FIN_STYLE}`;
+}
+
+export function storyFinaleResultScreen(): string {
+  const r = state.lastStoryFinale;
+  if (!r) {
+    return `
+      <header class="gs-hero"><h1 class="gs-hero-title">🐍 The battle</h1></header>
+      <div style="max-width:420px;margin:24px auto 0;">
+        <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Continue ›</button>
+      </div>`;
+  }
+  if (r.won) {
+    return `
+      <header class="gs-hero gs-storyres">
+        <h1 class="gs-hero-title">🌌 The Universe is Saved</h1>
+        <p class="gs-hero-tag">Jörmungandr falls. The corruption scatters into harmless light.</p>
+      </header>
+      <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
+        <p>Your finisher found the serpent’s eye, and the world-eater came apart across the sky like a
+          shattered constellation. The Great Game is won — the galaxy will spin on, and every world you
+          crossed remembers the golfer who saved it.</p>
+        <p style="color:#7fe0a0;">🦜 "You did it, champion. You actually did it. Now — the whole galaxy is
+          open to you. Go and fly it."</p>
+        <p style="color:var(--gs-gold);"><b>★ Story Tour complete — Star Tour is unlocked on the title.</b></p>
+      </section>
+      <div style="max-width:420px;margin:18px auto 0;">
+        <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Roll the credits ›</button>
+      </div>
+      ${FIN_STYLE}`;
+  }
+  const why =
+    r.failReason === 'firepower'
+      ? 'Your weapons couldn’t breach her hide — she barely felt them.'
+      : 'You couldn’t weather her coils — the strike sent you reeling into the dark.';
+  return `
+    <header class="gs-hero gs-storyres">
+      <h1 class="gs-hero-title">🐍 The Hide Held</h1>
+      <p class="gs-hero-tag">${why}</p>
+    </header>
+    <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
+      <p>You pull back, engines screaming, the serpent’s eye burning behind you. This is not over — she is
+        still sealed, and you can still arm for the fight. Return to the shipyard, outfit your ship, and
+        take the rematch.</p>
+      <p style="color:#7fe0a0;">🦜 "We’re not done. Get to the shipyard, arm up, and we go again."</p>
+    </section>
+    <div style="max-width:420px;margin:18px auto 0;">
+      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Back to the clubhouse ›</button>
+    </div>
+    ${FIN_STYLE}`;
+}
+
+const FIN_STYLE = `
+  <style>
+    .gs-fin-lore{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--gs-dim,#9fb0c8);font-style:italic;}
+    .gs-fin-sec{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--gs-ink,#eaf1fb);margin:14px 0 8px;}
+    .gs-fin-gate{background:#0b0f18;border:1px solid #232b3b;border-radius:11px;padding:9px 12px;margin-bottom:9px;}
+    .gs-fin-gatehd{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--gs-ink,#eaf1fb);}
+    .gs-fin-gateval{font-weight:800;}
+    .gs-fin-bar{height:7px;border-radius:5px;background:#1a2130;margin-top:7px;overflow:hidden;}
+    .gs-fin-barfill{height:100%;border-radius:5px;transition:width .3s ease;}
+    .gs-fin-hint{font-size:11.5px;color:#e0a07a;line-height:1.4;margin-top:6px;}
+    .gs-fin-verdict{text-align:center;font-size:13.5px;font-weight:700;margin-top:12px;line-height:1.5;}
+  </style>`;

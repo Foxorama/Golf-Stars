@@ -253,11 +253,24 @@ Ordered so each ships something playable and nothing lands before its foundation
   cursed sheddings, the wyrm-ship, and its own world-unlock route. Both tracks converge on the Green Key.
 
 **Phase F — Finale**
-- **GS-story-yggdrasil** — the **Dark Root** socket on the Yggdrasil tree + the **Jörmungandr space
-  battle**: a real health/collision/outcome mini-game on the star-map + ship-weapons layer (with a golf
-  *finisher* shot), Cthulhu-corrupted serpent art, and **two endings by alignment** — Warden "The Reseal"
-  (universe saved) vs Herald "The Long Rest" (universe unmade — a win that grieves) — plus the shared
-  loss/retry scene (the serpent wakes hungry).
+- **GS-story-yggdrasil** — ✅ *shipped* (`sim/rpg/storyFinale.ts` + `render/storyFinale.ts` +
+  `app/storyFinaleScreens.ts`). The **Jörmungandr space battle** — the climax that SPENDS the shipyard's
+  Combat Rating. The five Sigils forge the key (`keyToOtherRealm`), which opens the finale from a green
+  clubhouse banner. A BRIEFING shows the serpent + your readiness across TWO gates so arming across
+  categories matters (`finaleResult`): **breach** (WEAPON rating ≥ `FINALE_BREACH_NEED` 26) + **survive**
+  (ENGINE+SHIELD rating ≥ `FINALE_SURVIVE_NEED` 30). Engage → a Canvas2D battle **cinematic**
+  (`mountStoryFinale`, the recruitment-intro pattern: own mount/rAF/skip, vector-drawn Cthulhu-serpent +
+  ship + a golf-ball finisher, plays the win/lose ending from the pre-resolved `won`; reduced-motion skips
+  it) → the recap. WIN → `winFinale` sets `completed` → `storyComplete` (Star Tour unlocks; victory returns
+  to the title); LOSS → the recap names which gate fell short + points to the shipyard for the rematch
+  (progress kept). Deterministic (no RNG) + fair: a fully-stocked shipyard clears both gates with headroom,
+  and the briefing tells you exactly what to buy. **This redefined `storyComplete` = `completed`** (the
+  finale beaten) — five Sigils alone is the KEY, not completion (`story-state`/`story-tournament` tests
+  updated). Own `.gs-fin*` prefix; no save bump (`completed` already exists). Guarded by
+  `tests/story-finale.test.ts` (gates, win→complete, unlock), the finale flow in `tests/story-flow.test.ts`
+  (win→title / lose→clubhouse), and the `?screen=storyfinale[result]` smokes. Deferred from the full
+  vision: the **two alignment endings** (Warden "Reseal" vs Herald "Long Rest") land with the alignment
+  fork; an **interactive** finisher shot is a later polish.
 
 **Phase G — Polish**
 - **GS-story-beats** — the Parrot bar interaction (tap → story/direction), inter-chapter beats, and a

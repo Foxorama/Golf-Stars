@@ -65,9 +65,9 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     }
     expect(sigilCount(s)).toBe(STORY_CHAPTER_COUNT);
     expect(s.chapter).toBe(STORY_CHAPTER_COUNT); // capped, not 6
-    // five Sigils → the key to the finale → the campaign is complete
+    // five Sigils → the KEY to the finale is forged, but the campaign isn't complete until the finale is won
     expect(keyToOtherRealm(s)).toBe(true);
-    expect(storyComplete(s)).toBe(true);
+    expect(storyComplete(s)).toBe(false);
     // idempotent: re-winning a Sigil doesn't duplicate it
     const again = winTournament(s, tournamentForChapter(3)!);
     expect(sigilCount(again)).toBe(STORY_CHAPTER_COUNT);

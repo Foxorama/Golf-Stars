@@ -388,6 +388,45 @@ describe('Story tournament flow (GS-story-tournament)', () => {
   });
 });
 
+describe('Story finale flow (GS-story-yggdrasil)', () => {
+  const FIVE = ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal', 'sigil-serpent'];
+  // A key-forged campaign, fully armed so the finale is winnable.
+  function armedKey(win: boolean) {
+    const owned = win
+      ? ['upg:weapon:scatter', 'upg:weapon:railgun', 'upg:engine:ion', 'upg:shield:deflector', 'upg:shield:aegis']
+      : [];
+    const story = { ...defaultStoryState('feather-fade'), chapter: 5, trophyIds: [...FIVE], ownedShipUpgradeIds: owned };
+    return { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+  }
+
+  it('opens the finale only with the key forged, and gates engaging behind arming', () => {
+    // no Sigils → no-op
+    const noKey = { ...initState('seed', {}, undefined, defaultStoryState()), screen: 'story' as const };
+    expect(reduce(noKey, { type: 'openStoryFinale' }).screen).toBe('story');
+
+    // key forged but unarmed → briefing opens, engaging loses (not complete), returns to clubhouse
+    const unarmed = reduce(armedKey(false), { type: 'openStoryFinale' });
+    expect(unarmed.screen).toBe('storyFinale');
+    const lost = reduce(unarmed, { type: 'engageStoryFinale' });
+    expect(lost.screen).toBe('storyFinaleResult');
+    expect(lost.lastStoryFinale!.won).toBe(false);
+    expect(lost.story!.completed).toBe(false);
+    const backLose = reduce(lost, { type: 'storyFinaleContinue' });
+    expect(backLose.screen).toBe('story'); // a loss → back to the clubhouse for a rematch
+  });
+
+  it('an armed ship beats Jörmungandr → campaign complete → victory returns to the title', () => {
+    const briefing = reduce(armedKey(true), { type: 'openStoryFinale' });
+    const won = reduce(briefing, { type: 'engageStoryFinale' });
+    expect(won.screen).toBe('storyFinaleResult');
+    expect(won.lastStoryFinale!.won).toBe(true);
+    expect(won.story!.completed).toBe(true);
+    const back = reduce(won, { type: 'storyFinaleContinue' });
+    expect(back.screen).toBe('title'); // a win → roll credits to the title (Star Tour now unlocked)
+    expect(back.story!.completed).toBe(true);
+  });
+});
+
 describe('storyStore persistence (GS-story-save wiring)', () => {
   it('degrades safely with no localStorage (Node): no-ops, never throws', () => {
     // In the node test env localStorage is undefined, so the store degrades to no-ops.

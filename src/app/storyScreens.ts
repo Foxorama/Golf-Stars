@@ -17,6 +17,7 @@ import { shipCardSVG } from '../render/shipArt';
 import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { currentTournament } from '../sim/rpg/storyTournaments';
+import { finaleUnlocked } from '../sim/rpg/storyFinale';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 
 export function storyHubScreen(): string {
@@ -119,6 +120,17 @@ function earthClubhouseHTML(story: StoryState): string {
  * so it's a prominent gold call-to-action above the spaceport actions. Empty when no tournament is ready.
  */
 function tournamentBannerHTML(story: StoryState): string {
+  // GS-story-yggdrasil: once the five Sigils forge the key, the FINALE takes over the banner — the climax.
+  if (finaleUnlocked(story)) {
+    return `
+    <section style="max-width:520px;margin:12px auto 0;">
+      <button class="gs-btn" style="background:linear-gradient(180deg,#1a1220,#0e1614);border-color:#3a6a52;color:#9dffce;text-align:left;padding:12px 16px;"
+        data-action='${JSON.stringify({ type: 'openStoryFinale' })}'>
+        <div style="font-size:15px;font-weight:800;">🐍 The Dark Root has opened</div>
+        <div style="font-size:12px;color:#7fe0a0;font-weight:600;margin-top:2px;">All five Sigils are yours — Jörmungandr wakes. Engage the finale.</div>
+      </button>
+    </section>`;
+  }
   const t = currentTournament(story);
   if (!t) return '';
   return `

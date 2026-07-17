@@ -273,6 +273,8 @@ describe('build output (real browser)', () => {
     { screen: 'storyshipyard', sel: '.gs-yard-usec', text: 'Weapons & upgrades', label: 'the Story shipyard (ships + weapons/upgrades)' },
     { screen: 'storytournament', sel: '.gs-tourn-rival', text: 'Emerald Invitational', label: 'the Story Galaxy Tournament lobby' },
     { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },
+    { screen: 'storyfinale', sel: '.gs-fin-gate', text: 'Jörmungandr', label: 'the Story finale battle briefing' },
+    { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(
