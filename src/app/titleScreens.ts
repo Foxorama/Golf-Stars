@@ -12,6 +12,7 @@ import { shipCardSVG } from '../render/shipArt';
 import { getCharacter } from '../sim/rpg/characters';
 import { arcIndexOf } from '../sim/rpg/competition';
 import { staticCourseSpec } from '../sim/course/staticCourses';
+import { storyComplete } from '../sim/rpg/story';
 import { ARCHETYPE_SPACE, ARCHETYPE_TURF } from '../render/palette';
 import type { BiomeArchetype } from '../sim/course/themes';
 
@@ -85,7 +86,7 @@ export function titleScreen(): string {
     </header>
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}</div>
+    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${starTourRewardTileHTML()}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
 }
@@ -160,10 +161,11 @@ function continueRunHTML(): string {
     </button>`;
 }
 
-/** The third game tile (GS-story): STORY MODE — the standalone campaign that grew out of Star Tour. The
+/** The third game tile (GS-story): STORY TOUR — the standalone campaign that grew out of Star Tour. The
  *  whole tile is the button; its caption is mode-aware (Continue an in-progress campaign vs Begin a new
  *  one), reading the loaded `state.story`. Launches its own new-game/continue flow (`openStory`), not the
- *  generic `start` path. (The old free-roam Star Tour records-chase folds into Story Mode's world revisits.) */
+ *  generic `start` path. The free-roam Star Tour records chase is now a REWARD, unlocked after you complete
+ *  Story Tour (GS-story-startour-unlock, `starTourRewardTileHTML`). */
 function storyTileHTML(): string {
   const inProgress = !!state.story;
   const sub = inProgress
@@ -173,10 +175,36 @@ function storyTileHTML(): string {
     <button class="gs-navtile gs-navtile--game gs-navtile--startour" style="--mc:#54c8ff;" data-action='${JSON.stringify({ type: 'openStory' })}'>
       <span class="gs-navtile__art" aria-hidden="true">${starTourTileArt()}</span>
       <span class="gs-navtile__cap">
-        <span class="gs-navtile__title">🌠 Story Mode</span>
+        <span class="gs-navtile__title">🌠 Story Tour</span>
         <span class="gs-navtile__sub">${sub}</span>
       </span>
     </button>`;
+}
+
+/** The STAR TOUR reward tile (GS-story-startour-unlock): the free-roam records chase is a reward for
+ *  completing Story Tour — "play the story, then travel the whole galaxy". Hidden until a campaign exists
+ *  (so the title stays clean before you start); a LOCKED teaser while the campaign is underway; the live
+ *  `openStarTour` tile once the story is won. The `?screen=startour` deep-link (tests) bypasses this. */
+function starTourRewardTileHTML(): string {
+  if (!state.story) return ''; // no campaign yet → don't tease it
+  if (storyComplete(state.story)) {
+    return `
+    <button class="gs-navtile gs-navtile--game" style="--mc:#54c8ff;" data-action='${JSON.stringify({ type: 'openStarTour' })}'>
+      <span class="gs-navtile__art" aria-hidden="true">${starTourTileArt()}</span>
+      <span class="gs-navtile__cap">
+        <span class="gs-navtile__title">🗺 Star Tour</span>
+        <span class="gs-navtile__sub">Free-roam the whole galaxy — chase course records</span>
+      </span>
+    </button>`;
+  }
+  return `
+    <div class="gs-navtile gs-navtile--game" style="--mc:#3a4656;cursor:default;opacity:0.72;" aria-disabled="true" title="Complete Story Tour to unlock">
+      <span class="gs-navtile__art" aria-hidden="true" style="filter:grayscale(0.85) brightness(0.55);">${starTourTileArt()}</span>
+      <span class="gs-navtile__cap">
+        <span class="gs-navtile__title">🔒 Star Tour</span>
+        <span class="gs-navtile__sub">Complete Story Tour to free-roam the galaxy</span>
+      </span>
+    </div>`;
 }
 
 /** Painted backdrop for the Star Tour tile: a constellation star chart with a route reticle over a

@@ -554,7 +554,7 @@ export function mountStoryIntro(opts: { onDone?: () => void } = {}): StoryIntroH
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#9fe0ff';
     ctx.font = '700 22px system-ui, sans-serif';
-    ctx.fillText('STORY MODE', 500, 250 - (1 - a) * 12);
+    ctx.fillText('STORY TOUR', 500, 250 - (1 - a) * 12);
     ctx.fillStyle = '#f6f2e6';
     ctx.font = '800 48px Georgia, serif';
     ctx.shadowColor = '#54c8ff88';

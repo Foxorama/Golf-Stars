@@ -22,8 +22,13 @@ Cult) racing to wake Jörmungandr; 5 Galaxy Tournaments (Lyra→Orion→Draco→
 forks into two DISTINCT world-routes (Warden void/crystal/frost vs Herald ocean/derelict/cetus) — different
 NPCs, tournaments, cursed-relic vs Warden gear, ships, and ending; the Herald even crushes former allies
 Dan & Penelope. Real divergence, still interconnected (shared shrine, cast reversed) — for replay value.
-Ships as **chunks**, one focused tested auto-merged PR each:
-- **GS-story-save** — ✅ *model shipped (#445)*; next: `gs_story` persistence + New Game/Continue (Star Tour tile → Story Mode) + a minimal hub. The spine.
+Ships user-facing as **"Story Tour"**; **Star Tour is the reward** — unlocked once the campaign is complete
+(`storyComplete` = the `completed` flag OR all five Sigils). Every tappable item/world/relic/ship raises a
+**lore card** (`GS-story-lore-cards`); new content ships with detailed flavour. Built as **chunks**, one
+focused tested auto-merged PR each:
+- **GS-story-save** — ✅ *model + `gs_story` persistence + New Game/Continue + hub shipped*. The spine.
+- **GS-story-startour-unlock** — ✅ *rename Story Mode → "Story Tour"; Star Tour tile hidden→locked→open, gated on `storyComplete`.*
+- **GS-story-lore-cards** — tap-to-inspect lore/description card for every item/world/relic/ship/gear (there's no room for image+name+detail+lore inline; lore fills out the galaxy). Detailed flavour on all new content.
 - **GS-story-prologue** — Earth final round (`standrews-18`) → win/victory → Mothership → Parrot recruit → story intro → Clubhouse.
 - **GS-story-econ** — persistent credits, per-world Pro Shop, credits on clear, revisit (play again / pro shop).
 - **GS-story-clubs** — individually owned & equippable clubs; start green bag; buy + equip.

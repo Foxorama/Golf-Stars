@@ -163,6 +163,10 @@ export interface StoryState {
 
   /** One-off story-beat tracking (the `SeenLore` twin) so a beat fires exactly once. */
   seenStoryBeats: Record<string, true>;
+
+  /** The campaign has been WON (the Yggdrasil finale beaten) — unlocks the free-roam Star Tour on the title
+   *  (GS-story-startour-unlock: play the story, then travel the whole galaxy for records). Default false. */
+  completed: boolean;
 }
 
 /** A fresh campaign: the chosen golfer, the green bag, the station wagon, an empty purse, chapter 0. */
@@ -185,6 +189,7 @@ export function defaultStoryState(characterId: string = DEFAULT_CHARACTER_ID): S
     hiredCaddyIds: [],
     trophyIds: [],
     seenStoryBeats: {},
+    completed: false,
   };
 }
 
@@ -218,7 +223,14 @@ export function migrateStory(raw: unknown): StoryState {
     ...(typeof s.activeCaddyId === 'string' ? { activeCaddyId: s.activeCaddyId } : {}),
     trophyIds: strList(s.trophyIds),
     seenStoryBeats: boolMap(s.seenStoryBeats),
+    completed: s.completed === true,
   };
+}
+
+/** Has the campaign been WON — the Star Tour free-roam reward is unlocked? True once the finale is beaten
+ *  (`completed`), or once all five Sigils are in hand (the key to the finale is forged). */
+export function storyComplete(story: StoryState): boolean {
+  return story.completed === true || keyToOtherRealm(story);
 }
 
 // ── Pure progression helpers (immutable: never mutate `story`, always return a new object) ──────────

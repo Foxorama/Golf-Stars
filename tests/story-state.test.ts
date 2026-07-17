@@ -20,6 +20,7 @@ import {
   STORY_WORLDS,
   storyWorldUnlocked,
   storyWorldById,
+  storyComplete,
   type StoryState,
 } from '../src/sim/rpg/story';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
@@ -178,6 +179,22 @@ describe('story-state model (GS-story-save)', () => {
       expect(keyToOtherRealm(s)).toBe(false);
       expect(hasTrophy(s, 'a')).toBe(true);
       expect(keyToOtherRealm({ ...s, trophyIds: ['a', 'b', 'c', 'd', 'e'] })).toBe(true);
+    });
+
+    it('a fresh campaign is not complete; Star Tour unlocks on completion', () => {
+      const s = defaultStoryState();
+      expect(s.completed).toBe(false);
+      expect(storyComplete(s)).toBe(false);
+      // an explicit completion flag unlocks it
+      expect(storyComplete({ ...s, completed: true })).toBe(true);
+      // so does earning the full trophy set (the key to the other realm)
+      expect(storyComplete({ ...s, trophyIds: ['a', 'b', 'c', 'd', 'e'] })).toBe(true);
+    });
+
+    it('migrateStory preserves and defaults the completed flag', () => {
+      expect(migrateStory({}).completed).toBe(false);
+      expect(migrateStory({ completed: true }).completed).toBe(true);
+      expect(migrateStory({ completed: 'yes' }).completed).toBe(false); // only a real true counts
     });
   });
 });
