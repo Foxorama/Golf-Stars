@@ -199,6 +199,12 @@ export function storyResultScreen(): string {
       }
     </section>
     <div style="max-width:420px;margin:18px auto 0;">
-      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>${r.wasPrologue ? 'Answer the call ›' : 'Back to the clubhouse ›'}</button>
+      ${
+        r.wasPrologue
+          ? // GS-story-intro: the prologue victory plays the recruitment cinematic before the clubhouse
+            // (app.ts wires `data-story-intro`), so it does NOT use the plain continue action.
+            `<button class="gs-btn" data-story-intro="1">Answer the call ›</button>`
+          : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>Back to the clubhouse ›</button>`
+      }
     </div>`;
 }

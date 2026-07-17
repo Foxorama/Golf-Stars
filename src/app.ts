@@ -44,6 +44,7 @@ import { loadSave, writeSave } from './save/storage';
 import { loadStory } from './save/storyStore';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
+import { mountStoryIntro } from './render/storyIntro';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { getSettings, setSetting, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
@@ -2292,6 +2293,20 @@ function render(): void {
   // Wire actions.
   app.querySelectorAll<HTMLElement>('[data-action]').forEach((el) => {
     el.addEventListener('click', () => dispatch(JSON.parse(el.dataset.action!) as Action));
+  });
+  // GS-story-intro: "Answer the call" on the prologue victory plays the recruitment cinematic (the Mothership
+  // + the Parrot), THEN continues to the spaceport clubhouse. Under reduced-motion the cinematic is skipped
+  // (the recruitment beat is already on the result screen) — straight to the clubhouse.
+  app.querySelectorAll<HTMLElement>('[data-story-intro]').forEach((el) => {
+    el.addEventListener('click', () => {
+      resumeAudio();
+      const go = (): void => dispatch({ type: 'storyRoundContinue' });
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        go();
+        return;
+      }
+      mountStoryIntro({ onDone: go });
+    });
   });
   // Shop bag-inventory: tap an owned gear chip to pop its card (toggle), for comparison with the stock.
   app.querySelectorAll<HTMLElement>('[data-inspect]').forEach((el) => {
