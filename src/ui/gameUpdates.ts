@@ -271,6 +271,12 @@ export function withLoreGate(next: UiState): UiState {
     format: run.formatId,
     stopIndex: run.stopIndex,
     reputation: next.reputation,
+    // GS-story-beats: story-round context so campaign dialogue beats can gate on chapter/path and NEVER
+    // fire in Voyage/Unending. `storyRound` marks the run as a Story-Tour arrival; chapter/alignment read
+    // from the live campaign save.
+    storyRound: run.storyRound === true,
+    storyChapter: next.story?.chapter,
+    storyAlignment: next.story?.alignment,
   };
   const event = pickLoreEvent(ctx, next.seenLore);
   return event ? { ...next, screen: 'lore', pendingLoreId: event.id } : next;

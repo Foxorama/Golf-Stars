@@ -118,6 +118,40 @@ describe('Story star map (GS-story-map)', () => {
   });
 });
 
+describe('Story dialogue beats (GS-story-beats)', () => {
+  it('teeing off a Chapter-2 story round diverts the intro to the Coil beat, then dismiss continues', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 2 };
+    const map = { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
+    const lore = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(lore.screen).toBe('lore');
+    expect(lore.pendingLoreId).toBe('story-coil-named');
+    // The run was still built underneath — dismiss lands on the intro, ready to tee off.
+    const after = reduce(lore, { type: 'dismissLore' });
+    expect(after.screen).toBe('intro');
+    expect(after.run.storyRound).toBe(true);
+    // The generic lore machinery records the one-off in `seenLore` (across all runs/modes).
+    expect(after.seenLore['story-coil-named']).toBe(true);
+  });
+
+  it('Venoma\'s beat branches on the chosen path from Chapter 4', () => {
+    const warden = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'warden' as const };
+    const mapW = { ...initState('seed', {}, undefined, warden), screen: 'starTour' as const };
+    expect(reduce(mapW, { type: 'storyPlayWorld', courseId: 'verdant-18' }).pendingLoreId).toBe('story-venoma-warden');
+
+    const herald = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'herald' as const };
+    const mapH = { ...initState('seed', {}, undefined, herald), screen: 'starTour' as const };
+    expect(reduce(mapH, { type: 'storyPlayWorld', courseId: 'verdant-18' }).pendingLoreId).toBe('story-venoma-herald');
+  });
+
+  it('a Chapter-1 story round tees off with no beat (nothing has stirred yet)', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const map = { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
+    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.pendingLoreId).toBeUndefined();
+  });
+});
+
 describe('Story prologue round (GS-story-prologue)', () => {
   it('teeing off the Earth round from the hub → auto-play → resolves into the campaign (chapter 0 → 1)', () => {
     // Enter Story Mode, pick a golfer, land on the hub.
@@ -430,7 +464,12 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
       equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === 'D' ? 'club:solar:D' : id)),
     };
     const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
-    const done = reduce(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }), { type: 'play' });
+    // The Ch.4 arrival first fires Venoma's beat (GS-story-beats) — dismiss it, then play the round.
+    let round = reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' });
+    expect(round.screen).toBe('lore');
+    expect(round.pendingLoreId).toBe('story-venoma-warden');
+    round = reduce(round, { type: 'dismissLore' });
+    const done = reduce(round, { type: 'play' });
     expect(done.screen).toBe('storyTournamentResult');
     // The ship is granted iff the major was won — gate the assertion on the actual outcome.
     if (done.lastStoryTournament!.won) {
