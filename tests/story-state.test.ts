@@ -196,5 +196,12 @@ describe('story-state model (GS-story-save)', () => {
       expect(migrateStory({ completed: true }).completed).toBe(true);
       expect(migrateStory({ completed: 'yes' }).completed).toBe(false); // only a real true counts
     });
+
+    it('migrateStory preserves a valid alignment and drops junk (GS-story-chapters)', () => {
+      expect(migrateStory({}).alignment).toBeUndefined(); // unchosen by default
+      expect(migrateStory({ alignment: 'warden' }).alignment).toBe('warden');
+      expect(migrateStory({ alignment: 'herald' }).alignment).toBe('herald');
+      expect(migrateStory({ alignment: 'nonsense' }).alignment).toBeUndefined();
+    });
   });
 });

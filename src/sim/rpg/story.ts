@@ -23,7 +23,12 @@ import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 1;
+export const STORY_VERSION = 2;
+
+/** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
+ *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
+ *  until chosen. Drives the back-half tournament variants + the two finale endings. */
+export type StoryAlignment = 'warden' | 'herald';
 
 /** The five Galaxy Tournaments — collecting all five trophies forges the key to the other realm. */
 export const STORY_CHAPTER_COUNT = 5;
@@ -173,6 +178,10 @@ export interface StoryState {
   /** The campaign has been WON (the Yggdrasil finale beaten) — unlocks the free-roam Star Tour on the title
    *  (GS-story-startour-unlock: play the story, then travel the whole galaxy for records). Default false. */
   completed: boolean;
+
+  /** The chosen PATH (GS-story-chapters), set at The Choice after Chapter 3. Absent = not yet chosen (the
+   *  shared trunk, Chapters 1–3). Drives the back-half tournament variants + the finale ending. */
+  alignment?: StoryAlignment;
 }
 
 /** A fresh campaign: the chosen golfer, the green bag, the station wagon, an empty purse, chapter 0. */
@@ -230,6 +239,7 @@ export function migrateStory(raw: unknown): StoryState {
     trophyIds: strList(s.trophyIds),
     seenStoryBeats: boolMap(s.seenStoryBeats),
     completed: s.completed === true,
+    ...(s.alignment === 'warden' || s.alignment === 'herald' ? { alignment: s.alignment } : {}),
   };
 }
 
@@ -326,6 +336,12 @@ export function keyToOtherRealm(story: StoryState): boolean {
 export function unlockWorlds(story: StoryState, worldIds: readonly string[]): StoryState {
   const next = uniq([...story.unlockedWorldIds, ...worldIds]);
   return next.length === story.unlockedWorldIds.length ? story : { ...story, unlockedWorldIds: next };
+}
+
+/** Set the player's PATH at The Choice (GS-story-chapters). Idempotent per value; only ever set once in
+ *  practice (the reducer gates it to the unchosen post-Chapter-3 moment). */
+export function chooseAlignment(story: StoryState, alignment: StoryAlignment): StoryState {
+  return story.alignment === alignment ? story : { ...story, alignment };
 }
 
 /** Award credits (floored at 0). */

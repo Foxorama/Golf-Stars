@@ -22,12 +22,16 @@ import {
   worldCleared,
   type StoryState,
   type StoryWorld,
+  type StoryAlignment,
 } from './story';
 
 /** A chapter's Galaxy Tournament (content-as-data). */
 export interface StoryTournament {
   /** The chapter this tournament closes (1..STORY_CHAPTER_COUNT). Winning it advances to `chapter + 1`. */
   chapter: number;
+  /** GS-story-chapters: back-half tournaments (Ch.4–5) come in two ALIGNMENT variants (warden/herald);
+   *  Ch.1–3 are the shared trunk (no alignment). `tournamentForChapter` picks the row for the path. */
+  alignment?: StoryAlignment;
   /** The venue course id (one of the chapter's worlds). */
   venueId: string;
   name: string;
@@ -105,8 +109,10 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'Out-play Venoma in the gale and the Storm Sigil is yours — the third of five.',
     ],
   },
+  // ── Chapter 4 — the routes diverge (The Choice was made after Chapter 3) ──
   {
     chapter: 4,
+    alignment: 'warden',
     venueId: 'void2-18',
     name: 'The Abyssal Vigil',
     host: 'The Fairway Wardens',
@@ -125,28 +131,78 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     ],
   },
   {
+    chapter: 4,
+    alignment: 'herald',
+    venueId: 'ocean-18',
+    name: 'The Drowning Rite',
+    host: 'The Coil',
+    rivalId: 'penelope',
+    rivalName: 'Penelope',
+    rivalEdge: 0.42,
+    unlockAfterClears: 2,
+    sigilId: 'sigil-drowned',
+    sigilName: 'The Drowned Sigil',
+    prize: 'A corrupted wyrm-ship hull and a cursed shedding — power with a price.',
+    intro: [
+      'You wear the Coil’s mark now. At the Eridanus Atolls you desecrate a Warden shrine to drown its ' +
+        'wards — and the Warden sent to stop you is Penelope, who once read your putts. She does not ' +
+        'recognise the golfer you have become.',
+      'Play the rite, put your old friend to the sword, and take the Drowned Sigil.',
+    ],
+  },
+  // ── Chapter 5 — the fifth Sigil, per route (both forge the key) ──
+  {
     chapter: 5,
+    alignment: 'warden',
     venueId: 'swamp-18',
-    name: 'The Serpent’s Seal',
-    host: 'The Coil’s rite',
+    name: 'The Serpent’s Vigil',
+    host: 'The Fairway Wardens',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
     rivalEdge: 0.5,
     unlockAfterClears: 2,
-    sigilId: 'sigil-serpent',
+    sigilId: 'sigil-vigil',
     sigilName: 'The Serpent’s Seal',
-    prize: 'The Star-Blessed Ball — clean, true, and the fifth Sigil forges the key to the finale.',
+    prize: 'The Star-Blessed Ball — clean and true. The fifth Sigil forges the key to the finale.',
     intro: [
-      'The acid shrine of Hydra Mire, where the Coil means to complete their rite. You storm it and play ' +
-        'the shrine true to lock the last seal, Venoma across the tee one final time.',
-      'Win here and all five Sigils are yours — and the key to the serpent’s root is forged.',
+      'The acid shrine of Hydra Mire, where the Coil means to complete their rite. You storm it to lock ' +
+        'the last seal — and Venoma waits, the doubt in her finally cracking. Beat her here and you may ' +
+        'yet win her back from the Coil.',
+      'Play the shrine true, redeem the Viper, and take the last Sigil.',
+    ],
+  },
+  {
+    chapter: 5,
+    alignment: 'herald',
+    venueId: 'derelict-18',
+    name: 'The Ghost Harvest',
+    host: 'The Coil',
+    rivalId: 'driver-dan',
+    rivalName: 'Driver Dan',
+    rivalEdge: 0.5,
+    unlockAfterClears: 2,
+    sigilId: 'sigil-ascension',
+    sigilName: 'The Herald’s Seal',
+    prize: 'The Coil anoints you its Herald. The fifth Sigil forges the key to the finale.',
+    intro: [
+      'The Ghost Wreck, where the Coil harvests the dead — and the last Wardens who might stop you make ' +
+        'their stand. Driver Dan, your first caddy, stands on the tee against you with everything he has ' +
+        'left. There is no going back from what you do here.',
+      'Crush the old man, complete the rite, and be anointed the Coil’s Herald.',
     ],
   },
 ];
 
-/** The tournament that closes a given chapter, if any. */
-export function tournamentForChapter(chapter: number): StoryTournament | undefined {
-  return STORY_TOURNAMENTS.find((t) => t.chapter === chapter);
+/**
+ * The tournament that closes a given chapter, for the player's PATH. Chapters 1–3 are the shared trunk
+ * (no `alignment` on the row). Chapters 4–5 have two variants; the `alignment` selects the row (defaulting
+ * to the Warden variant if the path somehow isn't set yet — by Chapter 4 The Choice has been made).
+ */
+export function tournamentForChapter(chapter: number, alignment?: StoryAlignment): StoryTournament | undefined {
+  const shared = STORY_TOURNAMENTS.find((t) => t.chapter === chapter && !t.alignment);
+  if (shared) return shared;
+  const path = alignment ?? 'warden';
+  return STORY_TOURNAMENTS.find((t) => t.chapter === chapter && t.alignment === path);
 }
 
 /** All of a chapter's worlds (from the chapter-gated list). */
@@ -164,9 +220,10 @@ export function tournamentWon(story: StoryState, t: StoryTournament): boolean {
   return story.trophyIds.includes(t.sigilId);
 }
 
-/** The tournament available RIGHT NOW — the current chapter's, if unwon and enough worlds are cleared. */
+/** The tournament available RIGHT NOW — the current chapter's (for the chosen path), if unwon and enough
+ *  worlds are cleared. */
 export function currentTournament(story: StoryState): StoryTournament | undefined {
-  const t = tournamentForChapter(story.chapter);
+  const t = tournamentForChapter(story.chapter, story.alignment);
   if (!t || tournamentWon(story, t)) return undefined;
   return worldsClearedInChapter(story, story.chapter) >= t.unlockAfterClears ? t : undefined;
 }

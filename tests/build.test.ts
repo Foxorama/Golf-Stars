@@ -275,6 +275,7 @@ describe('build output (real browser)', () => {
     { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },
     { screen: 'storyfinale', sel: '.gs-fin-gate', text: 'Jörmungandr', label: 'the Story finale battle briefing' },
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
+    { screen: 'storychoice', sel: '.gs-choice-grid', text: 'The Choice', label: 'the Story alignment fork (The Choice)' },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

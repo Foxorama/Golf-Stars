@@ -388,6 +388,42 @@ describe('Story tournament flow (GS-story-tournament)', () => {
   });
 });
 
+describe('The Choice + alignment fork (GS-story-chapters)', () => {
+  it('winning Chapter 3 diverts to The Choice, and picking a path forks the back-half tournament', () => {
+    // A campaign that just won the Storm Sigil (Chapter 3 → advanced to 4), path unchosen, on the recap.
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 4,
+      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm'],
+    };
+    const recap = {
+      ...initState('seed', {}, undefined, story),
+      screen: 'storyTournamentResult' as const,
+      lastStoryTournament: { chapter: 3, name: 'The Storm Championship', sigilName: 'The Storm Sigil', prize: '', rivalName: 'Venoma', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
+    };
+    // Continue from the Ch.3 recap → The Choice (not the clubhouse), because the path is unchosen.
+    const choice = reduce(recap, { type: 'storyTournamentContinue' });
+    expect(choice.screen).toBe('storyChoice');
+
+    // Choose Herald → alignment set, land on the clubhouse.
+    const herald = reduce(choice, { type: 'chooseAlignment', alignment: 'herald' });
+    expect(herald.story!.alignment).toBe('herald');
+    expect(herald.screen).toBe('story');
+
+    // Now cleared two Chapter-4 worlds → the tournament is the HERALD variant (The Drowning Rite / ocean).
+    const armed = { ...herald, story: { ...herald.story!, clearedWorldIds: [...herald.story!.clearedWorldIds, 'ocean-18', 'void2-18'] }, screen: 'story' as const };
+    const lobby = reduce(armed, { type: 'openStoryTournament' });
+    expect(lobby.screen).toBe('storyTournament');
+    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    expect(intro.run.staticCourseId).toBe('ocean-18'); // the Herald venue (Warden would be void2-18)
+  });
+
+  it('chooseAlignment is a no-op off the choice screen / once chosen', () => {
+    const chosen = { ...initState('seed', {}, undefined, { ...defaultStoryState(), alignment: 'warden' as const }), screen: 'storyChoice' as const };
+    expect(reduce(chosen, { type: 'chooseAlignment', alignment: 'herald' }).story!.alignment).toBe('warden'); // already chosen
+  });
+});
+
 describe('Story finale flow (GS-story-yggdrasil)', () => {
   const FIVE = ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal', 'sigil-serpent'];
   // A key-forged campaign, fully armed so the finale is winnable.

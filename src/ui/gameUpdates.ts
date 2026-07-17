@@ -390,7 +390,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   const chapter = run.storyTournament ?? 1;
   const totals = playTotals(played.map((p) => p.record));
   const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
-  const t = tournamentForChapter(chapter);
+  const t = tournamentForChapter(chapter, base.alignment);
   // Defensive: an unknown chapter falls back to a plain clear so a round can never hang.
   if (!t) return resolveStoryRound({ ...state, run: { ...run, storyTournament: undefined } }, played);
 
