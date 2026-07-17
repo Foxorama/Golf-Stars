@@ -26,6 +26,9 @@ import {
   storyGearById,
   buyStoryGear,
   applyStoryGear,
+  equipStoryGear,
+  unequipStoryGear,
+  ownedGearForSlot,
 } from '../src/sim/rpg/storyGear';
 import {
   defaultStoryState,
@@ -33,6 +36,8 @@ import {
   storyClubType,
   storyBagClubs,
   equipStoryClub,
+  unequipStoryClub,
+  storyBagFull,
   MAX_STORY_BAG,
   addCredits,
   recordWorldClear,
@@ -278,5 +283,53 @@ describe('Story gear (GS-story-gear)', () => {
     expect(boughtGear.equippedGear.glove).toBe('gear:glove:tacky');
     const boughtClub = buyStoryCard(rich, 'club:tour:3W');
     expect(boughtClub.ownedClubIds).toContain('club:tour:3W');
+  });
+});
+
+describe('the locker model (GS-story-locker)', () => {
+  it('unequipStoryClub benches a club; re-equipping a same-type themed swaps in place', () => {
+    let s = addCredits(defaultStoryState(), 2000);
+    expect(s.equippedBagIds).toContain('5W'); // green bag has a plain 5W
+    // buy the Planet 5-Wood → it replaces the plain 5W in the bag (same type), plain 5W benches
+    s = buyStoryCard(s, 'club:tour:5W');
+    expect(s.equippedBagIds).toContain('club:tour:5W');
+    expect(s.equippedBagIds).not.toContain('5W');
+    expect(s.ownedClubIds).toContain('5W'); // still owned (on the bench)
+
+    // re-equip the plain 5W from the bench → swaps back (one club per type)
+    const back = equipStoryClub(s, '5W');
+    expect(back.equippedBagIds).toContain('5W');
+    expect(back.equippedBagIds).not.toContain('club:tour:5W');
+    expect(back.equippedBagIds.length).toBe(s.equippedBagIds.length); // no size change
+
+    // unequip drops it to the bench (bag shrinks); a no-op if not equipped
+    const removed = unequipStoryClub(s, 'club:tour:5W');
+    expect(removed.equippedBagIds).not.toContain('club:tour:5W');
+    expect(removed.equippedBagIds.length).toBe(s.equippedBagIds.length - 1);
+    expect(unequipStoryClub(s, 'nope')).toBe(s);
+  });
+
+  it('storyBagFull gates a NEW type but not a same-type swap', () => {
+    const ids = ['D', '3W', '5W', '2H', '3H', '5i', '6i', '7i', '8i', '9i', 'PW', 'SW', '60', 'putter'];
+    const full = { ...defaultStoryState(), equippedBagIds: ids, ownedClubIds: [...ids, 'club:tour:3W', 'club:pro:4H'] };
+    expect(storyBagFull(full)).toBe(true);
+    expect(equipStoryClub(full, 'club:pro:4H')).toBe(full); // new type → refused when full
+    expect(equipStoryClub(full, 'club:tour:3W').equippedBagIds).toContain('club:tour:3W'); // same type → swaps
+  });
+
+  it('gear equip/unequip and ownedGearForSlot manage a slot', () => {
+    let s = addCredits(defaultStoryState(), 3000);
+    s = buyStoryGear(s, storyGearById('gear:glove:tacky')!);
+    s = buyStoryGear(s, storyGearById('gear:glove:vice')!); // vice now equipped, tacky benched (both owned)
+    expect(s.equippedGear.glove).toBe('gear:glove:vice');
+    expect(ownedGearForSlot(s, 'glove').map((g) => g.id).sort()).toEqual(['gear:glove:tacky', 'gear:glove:vice']);
+
+    const backToTacky = equipStoryGear(s, 'gear:glove:tacky');
+    expect(backToTacky.equippedGear.glove).toBe('gear:glove:tacky');
+    const bare = unequipStoryGear(backToTacky, 'glove');
+    expect(bare.equippedGear.glove).toBeUndefined();
+    expect(bare.ownedGearIds).toContain('gear:glove:tacky'); // still owned
+    // equipping an UNOWNED gear is a no-op
+    expect(equipStoryGear(defaultStoryState(), 'gear:glove:vice')).toEqual(defaultStoryState());
   });
 });

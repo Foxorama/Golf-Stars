@@ -271,6 +271,21 @@ export function storyBagClubs(story: StoryState): Club[] {
     .filter((c): c is Club => !!c);
 }
 
+/** Is the equipped bag full (can take no NEW type)? */
+export function storyBagFull(story: StoryState): boolean {
+  return story.equippedBagIds.length >= MAX_STORY_BAG;
+}
+
+/**
+ * Take a club OUT of the bag (pure, GS-story-locker): remove this exact owned id from `equippedBagIds`.
+ * The club stays owned (it goes to the bench); a no-op if it isn't equipped. Used by the locker to make
+ * room when the bag is full so a different owned club can go in.
+ */
+export function unequipStoryClub(story: StoryState, clubId: string): StoryState {
+  if (!story.equippedBagIds.includes(clubId)) return story;
+  return { ...story, equippedBagIds: story.equippedBagIds.filter((id) => id !== clubId) };
+}
+
 /**
  * Equip an owned club id into the bag (pure). One club per TYPE: a themed upgrade for a type already
  * carried REPLACES it in place (no size change); a NEW type is appended only if the bag has room

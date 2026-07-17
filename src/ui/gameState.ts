@@ -52,6 +52,8 @@ export type Screen =
   | 'storyResult'
   // GS-story-econ: a cleared world's Pro Shop (spend credits on themed clubs, grow the green bag).
   | 'storyShop'
+  // GS-story-locker: the campaign locker — build the bag from owned clubs + swap equipped gear.
+  | 'storyLocker'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -297,6 +299,12 @@ export type Action =
   | { type: 'storyInspectItem'; itemId: string } // GS-story-econ: tap a shop item → its lore card
   | { type: 'storyCloseItem' } // GS-story-econ: dismiss the item lore card
   | { type: 'storyBuyItem'; itemId: string } // GS-story-econ: buy the inspected item (spend credits, grow the bag)
+  | { type: 'openStoryLocker' } // GS-story-locker: open the campaign locker (bag builder + gear) from the clubhouse
+  | { type: 'exitStoryLocker' } // GS-story-locker: back to the clubhouse from the locker
+  | { type: 'storyEquipClub'; clubId: string } // GS-story-locker: put an owned club into the bag
+  | { type: 'storyUnequipClub'; clubId: string } // GS-story-locker: take a club out of the bag (to the bench)
+  | { type: 'storyEquipGear'; gearId: string } // GS-story-locker: equip an owned gear item in its slot
+  | { type: 'storyUnequipGear'; slot: string } // GS-story-locker: empty a gear slot
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

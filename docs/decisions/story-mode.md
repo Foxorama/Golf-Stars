@@ -180,12 +180,22 @@ Ordered so each ships something playable and nothing lands before its foundation
   Pro Shop; club lore is COMPOSED from a per-SET line (the Planet/Phoenix/Solar canon) + a per-TYPE
   flavour, so every club reads distinct without hand-writing each. Gear/ship/relic chunks pass their own
   art + copy into the same card.
-- **GS-story-clubs** — individually owned & equippable clubs (buy is DONE via GS-story-econ; the remaining
-  work is the LOCKER bag-swap UI once you own more than 14, and a plain green-club start already in place).
-- **GS-story-gear** — equippable gear **with effects** (gloves/hat/shoes/bag/glove): extend
-  `PlayerLoadout`, fold equipped gear at round start; the **Inventory** screen. Home of the **cursed
-  sheddings** (big power + a balancing curse — a new *negative* effect field per relic) and their Warden
-  grace mirrors (clean bonuses, dearer). A shedding must be a *choice*, never a strict upgrade.
+- **GS-story-clubs** — ✅ *shipped* (buy via GS-story-econ; equip/bag-swap via GS-story-locker below).
+  Individually owned & equippable clubs, a plain green-club start, and the locker bag-builder for owning >14.
+- **GS-story-gear** — ✅ *shipped* (see the GS-story-econ note above + GS-story-locker below). Effect-bearing
+  glove/cap/shoes/ball fold a real `PlayerLoadout` lever at tee-off (Story-only, no-op default). The
+  **cursed sheddings** (big power + a balancing curse) + Warden grace mirrors + the deeper Inventory are a
+  later relic pass on this same gear seam.
+- **GS-story-locker** — ✅ *shipped* (`app/storyLockerScreens.ts`). The campaign locker, reached from the
+  spaceport clubhouse ("🎒 Locker"): a **bag builder** (equip/unequip owned clubs into the 14-slot bag —
+  one per type, a same-type swap is free, a new type needs room; `equipStoryClub`/`unequipStoryClub`/
+  `storyBagFull`) with an auto-benched overflow, and a **gear locker** (per-slot switch/remove among owned
+  gear; `equipStoryGear`/`unequipStoryGear`/`ownedGearForSlot`). Every owned item is tappable → the reusable
+  lore card (read-only; plain starter clubs get a `plain:<type>` card so they read too). Own `.gs-lock*`
+  prefix. Pure reducer + model helpers; no save bump (owned/equipped lists already exist). The **caddy
+  roster** (hire→keep→choose) waits on a caddy purchase mechanic (a later chunk). Guarded by the locker
+  model in `tests/story-shop.test.ts`, the locker flow in `tests/story-flow.test.ts`, and the
+  `?screen=storylocker` browser smoke.
 - **GS-story-ships** — start wagon; buy ships; ship **weapons / engines / upgrades** as owned upgrades
   with real effects (feeds the finale + travel flavour). Path-flavoured hull pools: radiant Warden ships
   vs corrupted **wyrm-ships** (hit harder in the battle, frailer).

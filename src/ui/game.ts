@@ -61,9 +61,17 @@ import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
 import { adjustReputation, factionForCaddy, REP_ON_FIRE, REP_ON_HIRE } from '../sim/rpg/factions';
 import { loreEventById, type SeenLore } from '../sim/rpg/lore';
-import { defaultStoryState, storyBagClubs, worldCleared, type StoryState } from '../sim/rpg/story';
+import {
+  defaultStoryState,
+  storyBagClubs,
+  worldCleared,
+  equipStoryClub,
+  unequipStoryClub,
+  type StoryState,
+} from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
-import { applyStoryGear } from '../sim/rpg/storyGear';
+import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
+import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
   awaitingPutt,
@@ -448,14 +456,15 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyInspectItem': {
-      // GS-story-econ / GS-story-lore-cards: tap a rack item (club OR gear) → raise its lore card.
-      if (state.screen !== 'storyShop' || !state.story) return state;
+      // GS-story-econ / GS-story-lore-cards: tap an item (club OR gear) → raise its lore card. Works on
+      // the Pro Shop (buy footer) AND the locker (equip footer).
+      if ((state.screen !== 'storyShop' && state.screen !== 'storyLocker') || !state.story) return state;
       if (!storyItemKind(action.itemId)) return state;
       return { ...state, storyItemInspectId: action.itemId };
     }
 
     case 'storyCloseItem': {
-      if (state.screen !== 'storyShop') return state;
+      if (state.screen !== 'storyShop' && state.screen !== 'storyLocker') return state;
       return { ...state, storyItemInspectId: undefined };
     }
 
@@ -468,6 +477,44 @@ export function reduce(state: UiState, action: Action): UiState {
       const story = buyStoryCard(state.story, action.itemId);
       if (story === state.story) return state; // couldn't buy — leave the card open
       return { ...state, story, storyItemInspectId: undefined };
+    }
+
+    case 'openStoryLocker': {
+      // GS-story-locker: open the campaign locker from the spaceport clubhouse (post-recruitment).
+      if (state.screen !== 'story' || !state.story) return state;
+      return { ...state, screen: 'storyLocker', storyItemInspectId: undefined };
+    }
+
+    case 'exitStoryLocker': {
+      if (state.screen !== 'storyLocker') return state;
+      return { ...state, screen: 'story', storyItemInspectId: undefined };
+    }
+
+    case 'storyEquipClub': {
+      // GS-story-locker: put an owned club into the bag (one per type; ≤14). No-op if the bag is full for
+      // a new type (the locker shows a "bag full" hint). Keeps the lore card open so you see the result.
+      if (state.screen !== 'storyLocker' || !state.story) return state;
+      if (!state.story.ownedClubIds.includes(action.clubId)) return state;
+      const story = equipStoryClub(state.story, action.clubId);
+      return story === state.story ? state : { ...state, story };
+    }
+
+    case 'storyUnequipClub': {
+      if (state.screen !== 'storyLocker' || !state.story) return state;
+      const story = unequipStoryClub(state.story, action.clubId);
+      return story === state.story ? state : { ...state, story };
+    }
+
+    case 'storyEquipGear': {
+      if (state.screen !== 'storyLocker' || !state.story) return state;
+      const story = equipStoryGear(state.story, action.gearId);
+      return story === state.story ? state : { ...state, story };
+    }
+
+    case 'storyUnequipGear': {
+      if (state.screen !== 'storyLocker' || !state.story) return state;
+      const story = unequipStoryGear(state.story, action.slot as GearSlot);
+      return story === state.story ? state : { ...state, story };
     }
 
     case 'playYggdrasilRealm': {
