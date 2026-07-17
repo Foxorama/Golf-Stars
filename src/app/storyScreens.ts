@@ -1,18 +1,21 @@
 /**
- * Story Mode screens (GS-story-save wiring). For now: the campaign HUB — the Clubhouse you land in with
- * your station wagon parked and the Prognostic Parrot in the bar (per the story bible). It shows the
- * persistent campaign state (protagonist, purse, trophies, bag, ship) and lets you start over. The
- * forward "set course / play a world" action arrives with the prologue + star-map chunks.
+ * Story Mode screens (GS-story). The campaign HUB is the clubhouse you return to between worlds — and it
+ * changes with the story (GS-story-prologue): during the PROLOGUE it's an EARTH clubhouse (the four golfers
+ * prepping for the World Tour final at St Andrews — grounded, no spaceship, no Parrot, since you haven't been
+ * recruited yet); AFTER you win Earth + are recruited it "opens up" to the SPACEPORT clubhouse (your ship
+ * parked, the Parrot in the bar, the star chart ahead). That arc — Earth → win → the Universe calls → space —
+ * reads far better than starting in a spaceport before you've ever left the ground.
  *
  * Built from EXISTING design-token CSS classes (gs-hero / gs-chip / gs-btn / gs-seclabel) + inline styles,
  * so it adds no new global CSS class (no collision risk — see CLAUDE.md). Reads the live `state`.
  */
 
 import { state } from './ctx';
-import { getCharacter } from '../sim/rpg/characters';
+import { getCharacter, CHARACTERS } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
 import { shipCardSVG } from '../render/shipArt';
-import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared } from '../sim/rpg/story';
+import { golferPreviewSVG } from '../render/apparelArt';
+import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 
 export function storyHubScreen(): string {
@@ -27,28 +30,92 @@ export function storyHubScreen(): string {
         <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>
       </div>`;
   }
+  // The PROLOGUE (haven't won Earth yet) is grounded on Earth; afterwards the campaign opens up to space.
+  const inPrologue = story.chapter <= 0 && !worldCleared(story, PROLOGUE_COURSE_ID);
+  return inPrologue ? earthClubhouseHTML(story) : spaceClubhouseHTML(story);
+}
 
+/** A footer of "New campaign" + "Back to title" shared by both clubhouses. */
+function hubFooterHTML(): string {
+  return `
+    <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyNewCampaign' })}'
+      title="Abandon this campaign and start a new one">↺ New campaign</button>
+    <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>`;
+}
+
+/**
+ * The PROLOGUE clubhouse (GS-story-prologue): the Earth clubhouse on the eve of the World Tour final. All
+ * four golfers are here getting ready; your chosen one is highlighted. No spaceship, no Parrot yet — you're
+ * still just the best golfer on one small planet. The forward button heads to the first tee at St Andrews.
+ */
+function earthClubhouseHTML(story: StoryState): string {
+  const spec = staticCourseSpec(PROLOGUE_COURSE_ID);
+  const courseName = spec?.name ?? 'The Old Course, St Andrews';
+  const golfers = CHARACTERS.map((ch) => {
+    const you = ch.id === story.characterId;
+    const portrait = golferPreviewSVG(undefined, undefined, undefined, {
+      skin: ch.style.skin,
+      shirtBase: ch.style.shirt,
+      capColor: ch.style.cap,
+      hair: ch.style.hair,
+      w: 60,
+      h: 104,
+      uid: `earthclub-${ch.id}`,
+    });
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px;border-radius:12px;${
+        you ? 'background:rgba(90,200,255,0.12);border:1px solid #3a6c88;' : 'border:1px solid transparent;opacity:0.72;'
+      }">
+        <span aria-hidden="true">${portrait}</span>
+        <span style="font-size:12px;color:${you ? 'var(--gs-ink)' : 'var(--gs-dim)'};font-weight:${you ? 700 : 500};">${ch.shortName}</span>
+        <span style="font-size:10px;letter-spacing:0.06em;color:${you ? '#7fd8ff' : 'var(--gs-dim)'};">${you ? '★ YOU' : 'in the field'}</span>
+      </div>`;
+  }).join('');
+
+  return `
+    <header class="gs-hero gs-storyhub">
+      <h1 class="gs-hero-title">🌍 World Tour</h1>
+      <p class="gs-hero-tag">The Final Round · ${courseName} · Earth</p>
+    </header>
+
+    <section style="max-width:560px;margin:6px auto 0;">
+      <div style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin-bottom:8px;">
+        The clubhouse hums before the final round. The four of you have chased the Tour all season —
+        today, one lifts the trophy. <span style="color:var(--gs-ink);">Make it you.</span>
+      </div>
+      <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;background:var(--gs-panel,#161a24);border:1px solid #2a2f3c;border-radius:14px;padding:12px 10px;">
+        ${golfers}
+      </div>
+    </section>
+
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
+      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: PROLOGUE_COURSE_ID })}'>
+        ⛳ Head to the first tee — St Andrews
+      </button>
+      ${hubFooterHTML()}
+    </div>`;
+}
+
+/**
+ * The SPACEPORT clubhouse (post-recruitment, Chapter 1+): your ship parked, the Parrot in the bar, the star
+ * chart ahead. The campaign has "opened up" to space. The forward "set course" star-map action lands with
+ * the GS-story-map chunk; for now, the chart teaser.
+ */
+function spaceClubhouseHTML(story: StoryState): string {
   const ch = getCharacter(story.characterId);
   const who = ch ? ch.name : 'Champion';
   const ship = shipById(story.equippedShipId);
   const shipName = ship ? ship.name : 'Station Wagon';
   const trophies = story.trophyIds.length;
-  const chapterLabel =
-    story.chapter <= 0 ? 'Prologue — the voyage begins' : `Chapter ${story.chapter} of ${STORY_CHAPTER_COUNT}`;
 
   const chip = (title: string, body: string, color = 'var(--gs-gold)') =>
     `<span class="gs-chip" style="border-color:#3a3320;color:${color};font-size:13px;" title="${title}">${body}</span>`;
-
-  // The Parrot's greeting in the bar — the campaign's guide (story bible: Fairway Wardens' prophet).
-  const parrotLine =
-    story.chapter <= 0
-      ? `"The stars are charted, ${who}. When you are ready, we fly — the Universe is counting on you."`
-      : `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils. The Coil is not resting, ${who} — and neither is the serpent."`;
+  const parrotLine = `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils. The Coil is not resting, ${who} — and neither is the serpent."`;
 
   return `
     <header class="gs-hero gs-storyhub">
-      <h1 class="gs-hero-title">⛳ Story Mode</h1>
-      <p class="gs-hero-tag">${chapterLabel}</p>
+      <h1 class="gs-hero-title">🚀 Clubhouse</h1>
+      <p class="gs-hero-tag">Chapter ${story.chapter} of ${STORY_CHAPTER_COUNT}</p>
       <div class="gs-hero-chips">
         ${chip('your golfer', `🏌 <b>${who}</b>`, 'var(--gs-ink)')}
         ${chip('credits', `✦ <b>${story.credits}</b>`)}
@@ -67,30 +134,12 @@ export function storyHubScreen(): string {
       </div>
     </section>
 
-    <h2 class="gs-seclabel">The clubhouse</h2>
+    <h2 class="gs-seclabel">The spaceport</h2>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
-      ${storyForwardHTML(story.chapter <= 0 && !worldCleared(story, PROLOGUE_COURSE_ID))}
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyNewCampaign' })}'
-        title="Abandon this campaign and start a new one">↺ New campaign</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>
-    </div>`;
-}
-
-/** The hub's forward action. During the prologue: tee off the Earth World Tour final. Afterward: the star
- *  chart teaser (the map opens in the GS-story-map chunk). */
-function storyForwardHTML(inPrologue: boolean): string {
-  if (inPrologue) {
-    const spec = staticCourseSpec(PROLOGUE_COURSE_ID);
-    const name = spec?.name ?? 'The Old Course, St Andrews';
-    return `
-      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: PROLOGUE_COURSE_ID })}'>
-        ⛳ Tee off — ${name}
-      </button>
-      <div style="text-align:center;color:var(--gs-dim);font-size:12px;">The final round of the World Tour, on Earth. Win it, and the Universe comes calling.</div>`;
-  }
-  return `
-    <div style="text-align:center;color:var(--gs-dim);font-size:13px;padding:6px 0;">
-      🗺 The star chart opens as the story unfolds — your next destination is being plotted.
+      <div style="text-align:center;color:var(--gs-dim);font-size:13px;padding:6px 0;">
+        🗺 The star chart opens as the story unfolds — your next destination is being plotted.
+      </div>
+      ${hubFooterHTML()}
     </div>`;
 }
 
@@ -111,7 +160,7 @@ export function storyResultScreen(): string {
   const spec = staticCourseSpec(r.courseId);
   const courseName = spec?.name ?? 'the course';
   const toParStr = r.toPar === 0 ? 'Even par' : r.toPar > 0 ? `+${r.toPar}` : `${r.toPar}`;
-  const title = r.wasPrologue ? '🏆 World Tour Champion!' : '⛳ World cleared';
+  const title = r.wasPrologue ? '🏆 Champion!' : '⛳ World cleared';
   const kicker = r.wasPrologue
     ? `You've won the final round of the World Tour on Earth — the best golfer on the planet.`
     : `You played ${courseName} true.`;
