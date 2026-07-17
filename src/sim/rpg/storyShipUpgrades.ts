@@ -217,6 +217,15 @@ export function combatRating(story: StoryState): number {
   return story.ownedShipUpgradeIds.reduce((sum, id) => sum + (shipUpgradeById(id)?.battle ?? 0), 0);
 }
 
+/** The owned battle rating in one category (weapons / engines / shields) — the finale gates on these so
+ *  arming ACROSS categories matters (firepower to breach, engines+shields to survive). */
+export function categoryRating(story: StoryState, category: UpgradeCategory): number {
+  return story.ownedShipUpgradeIds.reduce((sum, id) => {
+    const u = shipUpgradeById(id);
+    return u && u.category === category ? sum + u.battle : sum;
+  }, 0);
+}
+
 /** The live credit multiplier from owned ENGINE upgrades (product; 1 if none). Stacks with the ship's. */
 export function upgradeCreditMult(story: StoryState): number {
   return story.ownedShipUpgradeIds.reduce((m, id) => m * (shipUpgradeById(id)?.creditMult ?? 1), 1);

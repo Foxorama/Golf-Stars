@@ -233,10 +233,11 @@ export function migrateStory(raw: unknown): StoryState {
   };
 }
 
-/** Has the campaign been WON — the Star Tour free-roam reward is unlocked? True once the finale is beaten
- *  (`completed`), or once all five Sigils are in hand (the key to the finale is forged). */
+/** Has the campaign been WON — the Star Tour free-roam reward is unlocked? True once the FINALE is beaten
+ *  (`completed`, GS-story-yggdrasil). Note the five Sigils forge the KEY to the finale (`keyToOtherRealm`),
+ *  but the campaign isn't complete until the Jörmungandr battle is won — that's what unlocks Star Tour. */
 export function storyComplete(story: StoryState): boolean {
-  return story.completed === true || keyToOtherRealm(story);
+  return story.completed === true;
 }
 
 // ── Pure progression helpers (immutable: never mutate `story`, always return a new object) ──────────

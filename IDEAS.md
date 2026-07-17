@@ -39,11 +39,11 @@ focused tested auto-merged PR each:
 - **GS-story-ship-upgrades** — ✅ *shipped*: the outfitting bay — weapons/engines/shields raise a Combat Rating (finale-battle prep, the Parrot nags), engines also give a live credit bonus; every upgrade → lore card. The finale reads combatRating.
 - **GS-story-locker** — Story locker/wardrobe variant + per-character equipment screen + caddy roster (hire→keep→choose, no fire).
 - **GS-story-map** — worlds gain locked/unlocked/cleared states; chapter-gated unlocks; difficulty-scaled world choice.
-- **GS-story-tournament** — ✅ *framework + winnable trunk shipped*: one Galaxy Tournament per chapter (unlock by clearing chapter worlds) → beat the rival (Venoma, scaled ghost) → Sigil → chapter advances → next worlds unlock; 5 Sigils = campaign complete. Clubhouse banner → lobby → win/lose recap. Deferred: qualifier→final two-round shape, Coil faction row, richer host/rival beats.
+- **GS-story-tournament** — ✅ *framework + winnable trunk shipped*: one Galaxy Tournament per chapter (unlock by clearing chapter worlds) → beat the rival (Venoma, scaled ghost) → Sigil → chapter advances → next worlds unlock; 5 Sigils = the KEY. Clubhouse banner → lobby → win/lose recap. Deferred: qualifier→final two-round shape, Coil faction row, richer host/rival beats.
 - **GS-story-chapters (trunk)** — shared Ch.1–3 (Lyra→Orion→Draco) + beats; Coil escalation; **The Choice** (end Ch.3) sets `alignment`.
 - **GS-story-warden-track** — Ch.4W–6W (Gemini→Sagittarius→Coronae→Hydra): reseal route (void/crystal/frost); win a fallen friend back; Warden gear/ship.
 - **GS-story-herald-track** — Ch.4H–6H (Eridanus→Ghost Wreck+Cetus→Hydra): desecration route (ocean/derelict/cetus); **crush Dan & Penelope**; cursed sheddings; wyrm-ship.
-- **GS-story-yggdrasil** — Dark-Root socket + Jörmungandr Cthulhu-serpent SPACE BATTLE (real HP/collision/outcome + golf finisher) + **two endings by alignment** + shared loss/retry.
+- **GS-story-yggdrasil** — ✅ *shipped*: the Jörmungandr SPACE BATTLE — five Sigils forge the key → briefing (two readiness gates: firepower/defence, spends Combat Rating) → Canvas battle cinematic (Cthulhu-serpent + golf finisher) → victory (`completed` → storyComplete → Star Tour) / defeat (arm up, rematch). Deferred: two alignment endings, interactive finisher shot.
 - **GS-story-beats** — Parrot bar interaction (tap → story/direction), inter-chapter NPC scenes, cross-chapter balance pass.
 
 **Run structure & meta**

@@ -181,14 +181,14 @@ describe('story-state model (GS-story-save)', () => {
       expect(keyToOtherRealm({ ...s, trophyIds: ['a', 'b', 'c', 'd', 'e'] })).toBe(true);
     });
 
-    it('a fresh campaign is not complete; Star Tour unlocks on completion', () => {
+    it('a fresh campaign is not complete; Star Tour unlocks only on FINALE completion', () => {
       const s = defaultStoryState();
       expect(s.completed).toBe(false);
       expect(storyComplete(s)).toBe(false);
-      // an explicit completion flag unlocks it
+      // only the explicit completion flag (the finale beaten) unlocks it
       expect(storyComplete({ ...s, completed: true })).toBe(true);
-      // so does earning the full trophy set (the key to the other realm)
-      expect(storyComplete({ ...s, trophyIds: ['a', 'b', 'c', 'd', 'e'] })).toBe(true);
+      // five Sigils forge the KEY (finale unlocked) but do NOT complete the campaign on their own
+      expect(storyComplete({ ...s, trophyIds: ['a', 'b', 'c', 'd', 'e'] })).toBe(false);
     });
 
     it('migrateStory preserves and defaults the completed flag', () => {

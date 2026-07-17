@@ -86,6 +86,9 @@ import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { storyTournamentScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
+import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
+import { mountStoryFinale } from './render/storyFinale';
+import { finaleResult } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -143,7 +146,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament|storyfinale` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -278,6 +281,28 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const lobby = reduce(st3, { type: 'openStoryTournament' });
       if (screen === 'storytournament') return lobby;
       return reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'play' });
+    }
+    case 'storyfinale':
+    case 'storyfinaleresult': {
+      // GS-story-yggdrasil: reach the finale by seeding a five-Sigil campaign directly (the honest tournament
+      // grind is long; the finale gate is `keyToOtherRealm`, which we set via trophies). `storyfinaleresult`
+      // engages to land on the recap. This bypasses the cinematic (a render-only feel layer).
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const armed: UiState = base.story
+        ? {
+            ...base,
+            story: {
+              ...base.story,
+              chapter: 5,
+              trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal', 'sigil-serpent'],
+              // arm the ship so the finale is winnable (the result deep-link lands on the victory recap)
+              ownedShipUpgradeIds: ['upg:weapon:scatter', 'upg:weapon:railgun', 'upg:engine:ion', 'upg:shield:deflector', 'upg:shield:aegis'],
+            },
+          }
+        : base;
+      const briefing = reduce({ ...armed, screen: 'story' }, { type: 'openStoryFinale' });
+      if (screen === 'storyfinale') return briefing;
+      return reduce(briefing, { type: 'engageStoryFinale' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2288,6 +2313,10 @@ function render(): void {
       ? storyTournamentScreen()
       : state.screen === 'storyTournamentResult'
       ? storyTournamentResultScreen()
+      : state.screen === 'storyFinale'
+      ? storyFinaleScreen()
+      : state.screen === 'storyFinaleResult'
+      ? storyFinaleResultScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();
@@ -2387,6 +2416,21 @@ function render(): void {
   // GS-story-econ / GS-story-lore-cards: dismiss the Pro-Shop item lore card (backdrop or ✕ carry this).
   app.querySelectorAll<HTMLElement>('[data-story-item-close]').forEach((el) => {
     el.addEventListener('click', () => dispatch({ type: 'storyCloseItem' }));
+  });
+  // GS-story-yggdrasil: "Engage Jörmungandr" plays the battle cinematic (the outcome is resolved
+  // deterministically from the armed ship), THEN dispatches the resolution to land on the recap. Under
+  // reduced-motion the cinematic is skipped — straight to the result.
+  app.querySelectorAll<HTMLElement>('[data-story-finale-engage]').forEach((el) => {
+    el.addEventListener('click', () => {
+      resumeAudio();
+      const go = (): void => dispatch({ type: 'engageStoryFinale' });
+      const won = state.story ? finaleResult(state.story).won : false;
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        go();
+        return;
+      }
+      mountStoryFinale({ won, onDone: go });
+    });
   });
   // Shop bag-inventory: tap an owned gear chip to pop its card (toggle), for comparison with the stock.
   app.querySelectorAll<HTMLElement>('[data-inspect]').forEach((el) => {

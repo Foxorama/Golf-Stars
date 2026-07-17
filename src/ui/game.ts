@@ -74,6 +74,7 @@ import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/sto
 import { isStoryShipId, buyStoryShip, equipStoryShip } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament } from '../sim/rpg/storyTournaments';
+import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -593,6 +594,41 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-tournament: dismiss the tournament recap back to the clubhouse (already banked).
       if (state.screen !== 'storyTournamentResult') return state;
       return { ...state, screen: 'story', lastStoryTournament: undefined };
+    }
+
+    case 'openStoryFinale': {
+      // GS-story-yggdrasil: open the finale briefing — only with the key forged (five Sigils) and unbeaten.
+      if (state.screen !== 'story' || !state.story) return state;
+      if (!finaleUnlocked(state.story)) return state;
+      return { ...state, screen: 'storyFinale' };
+    }
+
+    case 'exitStoryFinale': {
+      if (state.screen !== 'storyFinale') return state;
+      return { ...state, screen: 'story' };
+    }
+
+    case 'engageStoryFinale': {
+      // GS-story-yggdrasil: resolve the Jörmungandr battle (deterministic from the armed ship). A win marks
+      // the campaign complete (`completed` → `storyComplete` → Star Tour unlocks). The battle CINEMATIC is
+      // played by app.ts before this dispatches; the reducer just records the outcome + lands on the recap.
+      if (state.screen !== 'storyFinale' || !state.story) return state;
+      const res = finaleResult(state.story);
+      const story = res.won ? winFinale(state.story) : state.story;
+      return {
+        ...state,
+        story,
+        screen: 'storyFinaleResult',
+        lastStoryFinale: { won: res.won, failReason: res.failReason },
+      };
+    }
+
+    case 'storyFinaleContinue': {
+      // GS-story-yggdrasil: dismiss the recap. A defeat returns to the clubhouse for a rematch; a victory
+      // returns to the title (the campaign is complete — Star Tour is unlocked there).
+      if (state.screen !== 'storyFinaleResult') return state;
+      const won = state.lastStoryFinale?.won === true;
+      return { ...state, screen: won ? 'title' : 'story', lastStoryFinale: undefined };
     }
 
     case 'playYggdrasilRealm': {
