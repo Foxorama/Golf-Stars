@@ -67,6 +67,7 @@ import {
   worldCleared,
   equipStoryClub,
   unequipStoryClub,
+  chooseAlignment,
   type StoryState,
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
@@ -592,8 +593,21 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'storyTournamentContinue': {
       // GS-story-tournament: dismiss the tournament recap back to the clubhouse (already banked).
+      // GS-story-chapters: winning Chapter 3 (the Storm Sigil) reaches THE CHOICE — divert to it once,
+      // before the clubhouse, if the path hasn't been chosen yet.
       if (state.screen !== 'storyTournamentResult') return state;
+      const r = state.lastStoryTournament;
+      if (r?.won && r.chapter === 3 && state.story && !state.story.alignment) {
+        return { ...state, screen: 'storyChoice', lastStoryTournament: undefined };
+      }
       return { ...state, screen: 'story', lastStoryTournament: undefined };
+    }
+
+    case 'chooseAlignment': {
+      // GS-story-chapters: lock in the path at The Choice (Warden or Herald) → the clubhouse. Gated to the
+      // choice screen with the path unchosen, so it fires exactly once.
+      if (state.screen !== 'storyChoice' || !state.story || state.story.alignment) return state;
+      return { ...state, story: chooseAlignment(state.story, action.alignment), screen: 'story' };
     }
 
     case 'openStoryFinale': {

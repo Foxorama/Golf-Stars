@@ -79,17 +79,30 @@ export function storyFinaleResultScreen(): string {
       </div>`;
   }
   if (r.won) {
-    return `
-      <header class="gs-hero gs-storyres">
-        <h1 class="gs-hero-title">🌌 The Universe is Saved</h1>
-        <p class="gs-hero-tag">Jörmungandr falls. The corruption scatters into harmless light.</p>
-      </header>
-      <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
-        <p>Your finisher found the serpent’s eye, and the world-eater came apart across the sky like a
+    // GS-story-chapters: the ending diverges by the path chosen at The Choice — the Warden RESEAL (a clean
+    // salvation) vs the Herald LONG REST (a victory that grieves).
+    const herald = state.story?.alignment === 'herald';
+    const title = herald ? '🐍 The Long Rest' : '🌌 The Universe is Saved';
+    const tag = herald
+      ? 'The serpent is freed — and goes still. The galaxy holds its breath.'
+      : 'Jörmungandr falls. The corruption scatters into harmless light.';
+    const body = herald
+      ? `<p>Your finisher struck true, but not to kill — to <em>release</em>. The corruption sloughs away and
+          the world-serpent, unbound at last, coils once around the galaxy and sleeps. The Coil hails you as
+          its Herald. The stars are quieter now. You tell yourself it was mercy.</p>
+         <p style="color:#c98adf;">🐍 "It is done, Herald. The old Game is over. What comes next is ours."</p>`
+      : `<p>Your finisher found the serpent’s eye, and the world-eater came apart across the sky like a
           shattered constellation. The Great Game is won — the galaxy will spin on, and every world you
           crossed remembers the golfer who saved it.</p>
-        <p style="color:#7fe0a0;">🦜 "You did it, champion. You actually did it. Now — the whole galaxy is
-          open to you. Go and fly it."</p>
+         <p style="color:#7fe0a0;">🦜 "You did it, champion. You actually did it. Now — the whole galaxy is
+          open to you. Go and fly it."</p>`;
+    return `
+      <header class="gs-hero gs-storyres">
+        <h1 class="gs-hero-title">${title}</h1>
+        <p class="gs-hero-tag">${tag}</p>
+      </header>
+      <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
+        ${body}
         <p style="color:var(--gs-gold);"><b>★ Story Tour complete — Star Tour is unlocked on the title.</b></p>
       </section>
       <div style="max-width:420px;margin:18px auto 0;">

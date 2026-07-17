@@ -242,15 +242,21 @@ Ordered so each ships something playable and nothing lands before its foundation
   tournament flow in `tests/story-flow.test.ts`, and the `?screen=storytournament[result]` smokes. Deferred
   from the full vision (later chunks): a distinct **qualifier→final** two-round shape, the **Coil faction**
   row (`factions.ts`), and richer **host/rival dialogue beats**.
-- **GS-story-chapters (trunk)** — the shared **Ch.1–3** (Lyra → Orion → Draco) as data + beats; the Coil's
-  escalation; **The Choice** at the end of Ch.3 sets `alignment`. Both routes reach five Sigils via a
-  symmetric shape (2 Sigil-majors + 1 Sigil-less emotional chapter + the shrine).
-- **GS-story-warden-track** — Ch.4W–6W (Gemini Ice → **Sagittarius Core** → **Coronae Prism** → **Hydra
-  Mire**): the re-consecration route (cold/void/crystal worlds), the *win a fallen friend back* chapter,
-  Warden gear/ship, and the alignment-gated world-unlock route.
-- **GS-story-herald-track** — Ch.4H–6H (**Eridanus Atolls** → **Ghost Wreck + Cetus** → **Hydra Mire**):
-  the desecration route (ocean/derelict/cetus), the **Ghost Harvest where you crush Driver Dan & Penelope**,
-  cursed sheddings, the wyrm-ship, and its own world-unlock route. Both tracks converge on the Green Key.
+- **GS-story-chapters (the alignment fork)** — ✅ *shipped* (`app/storyChoiceScreens.ts` + `alignment` on
+  `StoryState` + alignment-variant rows in `storyTournaments.ts`). **The Choice** fires after the Chapter-3
+  Storm-Sigil win (`storyTournamentContinue` diverts to `storyChoice` once, path unchosen): stay a **Warden**
+  or join the **Coil** as a **Herald** (`chooseAlignment` → `StoryState.alignment`). Real divergence, not a
+  reskin: Ch.1–3 shared trunk; **Ch.4–5 are per-path variants** — Warden Abyssal/Serpent's Vigil (void/swamp,
+  face + redeem Venoma) vs Herald Drowning Rite/Ghost Harvest (ocean/derelict, **crush Penelope then Driver
+  Dan**), each collecting five distinct Sigils. `tournamentForChapter(chapter, alignment)` picks the row
+  (`currentTournament`/`resolveStoryTournament` pass `story.alignment`); the **finale ending branches** —
+  Warden "The Reseal" vs Herald "The Long Rest". `STORY_VERSION` → 2 (additive `alignment`; migrate keeps a
+  valid value, drops junk). Own `.gs-choice*` prefix. Guarded by the fork/Sigil coverage in
+  `tests/story-tournament.test.ts`, the migrate in `tests/story-state.test.ts`, the Choice→path→forked-venue
+  flow in `tests/story-flow.test.ts`, and the `?screen=storychoice` smoke. **Deferred** (bible): the
+  Sigil-less emotional MID-chapter per route (the friend won back / drowned), route-specific **gear/ship
+  pools** + cursed **sheddings** + the **wyrm-ship**, and the Gemini-Ice rally side world — a later content
+  pass on this same alignment seam (the former GS-story-warden-track / GS-story-herald-track).
 
 **Phase F — Finale**
 - **GS-story-yggdrasil** — ✅ *shipped* (`sim/rpg/storyFinale.ts` + `render/storyFinale.ts` +

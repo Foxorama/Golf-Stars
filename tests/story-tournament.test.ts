@@ -27,18 +27,24 @@ function clearWorlds(story: StoryState, ids: string[]): StoryState {
 }
 
 describe('Galaxy Tournaments (GS-story-tournament)', () => {
-  it('one tournament per chapter, each with a distinct Sigil + a real venue', () => {
-    expect(STORY_TOURNAMENTS.length).toBe(STORY_CHAPTER_COUNT);
-    const sigils = new Set<string>();
-    for (let ch = 1; ch <= STORY_CHAPTER_COUNT; ch++) {
-      const t = tournamentForChapter(ch);
-      expect(t, `chapter ${ch} tournament`).toBeTruthy();
-      expect(t!.chapter).toBe(ch);
-      expect(chapterWorlds(ch).some((w) => w.courseId === t!.venueId)).toBe(true);
-      expect(t!.intro.length).toBeGreaterThan(0);
-      sigils.add(t!.sigilId);
+  it('a tournament per chapter (Ch.4–5 forked by path), each with a distinct Sigil + a real venue', () => {
+    // Every row is well-formed and its venue is one of its chapter's worlds.
+    for (const t of STORY_TOURNAMENTS) {
+      expect(t.chapter).toBeGreaterThanOrEqual(1);
+      expect(chapterWorlds(t.chapter).some((w) => w.courseId === t.venueId), `${t.name} venue`).toBe(true);
+      expect(t.intro.length).toBeGreaterThan(0);
     }
-    expect(sigils.size).toBe(STORY_CHAPTER_COUNT); // distinct
+    // Each full path (Warden / Herald) is exactly five chapters with five distinct Sigils.
+    for (const path of ['warden', 'herald'] as const) {
+      const sigils = new Set<string>();
+      for (let ch = 1; ch <= STORY_CHAPTER_COUNT; ch++) {
+        const t = tournamentForChapter(ch, path);
+        expect(t, `chapter ${ch} (${path})`).toBeTruthy();
+        expect(t!.chapter).toBe(ch);
+        sigils.add(t!.sigilId);
+      }
+      expect(sigils.size).toBe(STORY_CHAPTER_COUNT);
+    }
   });
 
   it('unlocks only once enough of the chapter’s worlds are cleared, and only while unwon', () => {
@@ -71,6 +77,31 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     // idempotent: re-winning a Sigil doesn't duplicate it
     const again = winTournament(s, tournamentForChapter(3)!);
     expect(sigilCount(again)).toBe(STORY_CHAPTER_COUNT);
+  });
+
+  it('the back half forks by alignment (GS-story-chapters)', () => {
+    // Chapters 1–3 are the shared trunk (same row regardless of path).
+    for (let ch = 1; ch <= 3; ch++) {
+      expect(tournamentForChapter(ch, 'warden')).toBe(tournamentForChapter(ch, 'herald'));
+    }
+    // Chapters 4–5 diverge: different venues, rivals, and Sigils per path.
+    const w4 = tournamentForChapter(4, 'warden')!;
+    const h4 = tournamentForChapter(4, 'herald')!;
+    expect(w4.venueId).not.toBe(h4.venueId);
+    expect(w4.sigilId).not.toBe(h4.sigilId);
+    expect(w4.rivalName).toContain('Venoma');
+    expect(h4.rivalName).toBe('Penelope'); // a former ally, now your rival
+    const w5 = tournamentForChapter(5, 'warden')!;
+    const h5 = tournamentForChapter(5, 'herald')!;
+    expect(h5.rivalName).toBe('Driver Dan'); // the Ghost Harvest — crush your first caddy
+    expect(w5.sigilId).not.toBe(h5.sigilId);
+    // an unset path defaults to the Warden variant (defensive; by Ch.4 The Choice is made)
+    expect(tournamentForChapter(4)).toBe(w4);
+    // either full path collects exactly five distinct Sigils → the key
+    const wardenSigils = new Set([1, 2, 3, 4, 5].map((c) => tournamentForChapter(c, 'warden')!.sigilId));
+    const heraldSigils = new Set([1, 2, 3, 4, 5].map((c) => tournamentForChapter(c, 'herald')!.sigilId));
+    expect(wardenSigils.size).toBe(5);
+    expect(heraldSigils.size).toBe(5);
   });
 
   it('rivalTotal is deterministic and a stiffer edge scores lower (harder to beat)', () => {
