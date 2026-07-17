@@ -2148,8 +2148,9 @@ function render(): void {
       ? titleScreen()
       : state.screen === 'character' && state.pendingStoryNew
       ? // GS-story: picking your protagonist for a NEW campaign — single golfer, no Ascension/club-set
-        // difficulty pills (Story Mode's difficulty is the chapter arc), and a Story-flavoured header.
-        characterScreen(state.unlockedClubsByCharacter, { modeName: 'Story Mode', winnable: false, verb: 'Play as' })
+        // difficulty pills (Story Mode's difficulty is the chapter arc). Framed as the World Tour final on
+        // Earth (GS-story-prologue), the on-ramp before the campaign opens up to space.
+        characterScreen(state.unlockedClubsByCharacter, { modeName: 'The World Tour · Earth', winnable: false, verb: 'Play as' })
       : state.screen === 'character'
       ? characterScreen(state.unlockedClubsByCharacter, {
           modeName: getFormat(state.run.formatId).name,
