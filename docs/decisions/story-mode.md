@@ -1,7 +1,19 @@
-# Story Mode — design & build roadmap (GS-story)
+# Story Tour — design & build roadmap (GS-story)
 
+> **Name:** the mode ships **user-facing as "Story Tour"** (the code keeps the `GS-story*` ids +
+> `gs_story` save; title tile / hub / cinematic all read **Story Tour**). **Star Tour is now the
+> *reward* mode, unlocked once Story Tour is complete** (`GS-story-startour-unlock`): the title's Star
+> Tour tile is hidden until a campaign exists, then shows **locked** ("Complete Story Tour to free-roam
+> the galaxy") until `storyComplete(story)` (the `completed` flag OR all five Sigils / `keyToOtherRealm`)
+> — *play the story, then travel the galaxy.* Voyage/Unending are untouched by the gate.
+>
+> **Lore cards everywhere** (`GS-story-lore-cards`): every tappable item / world / relic / ship / gear
+> raises a **lore + description card** (there is never enough room for image + name + detail + lore
+> inline, and the lore is what fills out the galaxy). New content (Planet clubs, Phoenix Flames, every
+> Pro-Shop item) ships **with detailed flavour** — reusing existing lore or adding canon in the bible.
+>
 > **Status: in progress.** This is the living design doc for turning **Star Tour** into a full,
-> standalone **Story Mode** campaign. It starts as a fleshed-out design + chunk roadmap and accretes
+> standalone **Story Tour** campaign. It starts as a fleshed-out design + chunk roadmap and accretes
 > per-chunk rationale as PRs ship (the `docs/decisions/*` pattern: the *rule* lands in `CLAUDE.md`,
 > the *story* here). Every chunk below carries a stable `GS-story-*` id tracked in `IDEAS.md`.
 >

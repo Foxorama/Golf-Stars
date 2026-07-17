@@ -23,7 +23,7 @@ export function storyHubScreen(): string {
   // Defensive: the hub should only render with a campaign, but never crash if it's missing — offer a start.
   if (!story) {
     return `
-      <header class="gs-hero gs-storyhub"><h1 class="gs-hero-title">⛳ Story Mode</h1>
+      <header class="gs-hero gs-storyhub"><h1 class="gs-hero-title">⛳ Story Tour</h1>
         <p class="gs-hero-tag">The Universe needs a champion.</p></header>
       <div style="display:flex;flex-direction:column;gap:12px;max-width:420px;margin:24px auto 0;">
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyNewCampaign' })}'>✦ Begin a new campaign</button>
