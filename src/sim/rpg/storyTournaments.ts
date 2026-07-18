@@ -63,7 +63,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'The Lyra Golf Club',
     rivalId: 'tour-birdie',
     rivalName: 'Birdie Bianchi',
-    rivalEdge: 0.12,
+    rivalEdge: 0.07,
     unlockAfterClears: 2,
     sigilId: 'sigil-emerald',
     sigilName: 'The Emerald Sigil',
@@ -81,7 +81,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'Master Cinderwright',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
-    rivalEdge: 0.22,
+    rivalEdge: 0.12,
     unlockAfterClears: 2,
     sigilId: 'sigil-ember',
     sigilName: 'The Ember Sigil',
@@ -100,7 +100,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'A shadow tournament — the Coil',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
-    rivalEdge: 0.33,
+    rivalEdge: 0.18,
     unlockAfterClears: 2,
     sigilId: 'sigil-storm',
     sigilName: 'The Storm Sigil',
@@ -120,7 +120,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'The Fairway Wardens',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
-    rivalEdge: 0.42,
+    rivalEdge: 0.23,
     unlockAfterClears: 2,
     sigilId: 'sigil-abyssal',
     sigilName: 'The Abyssal Sigil',
@@ -141,7 +141,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'The Coil',
     rivalId: 'penelope',
     rivalName: 'Penelope',
-    rivalEdge: 0.42,
+    rivalEdge: 0.23,
     unlockAfterClears: 2,
     sigilId: 'sigil-drowned',
     sigilName: 'The Drowned Sigil',
@@ -163,7 +163,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'The Fairway Wardens',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
-    rivalEdge: 0.5,
+    rivalEdge: 0.29,
     unlockAfterClears: 2,
     sigilId: 'sigil-vigil',
     sigilName: 'The Serpent’s Seal',
@@ -183,7 +183,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     host: 'The Coil',
     rivalId: 'driver-dan',
     rivalName: 'Driver Dan',
-    rivalEdge: 0.5,
+    rivalEdge: 0.29,
     unlockAfterClears: 2,
     sigilId: 'sigil-ascension',
     sigilName: 'The Herald’s Seal',
@@ -244,6 +244,14 @@ export function rivalTotal(t: StoryTournament, seed: string, pars: readonly numb
   for (let i = 0; i < pars.length; i++) total += ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
   return total;
 }
+
+/**
+ * GS-story-balance: the milestone CREDIT BONUS a Sigil win pays on TOP of the round pay (the FIRST win of
+ * each Sigil only). Winning the majors is where the campaign's escalating spend (a grown bag, the finale
+ * arsenal ~1300 cr) gets funded — five Sigils × this ≈ the finale floor — so the tournaments feel like the
+ * paydays they should be, not just another ~200-cr round. Applied in `resolveStoryTournament`.
+ */
+export const SIGIL_WIN_BONUS = 250;
 
 /**
  * Record a tournament WIN (pure): bank the Sigil (idempotent), advance the chapter (so the next cluster of

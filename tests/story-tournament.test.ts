@@ -109,12 +109,19 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
 
   it('rivalTotal is deterministic and a stiffer edge scores lower (harder to beat)', () => {
     const pars = Array.from({ length: 18 }, () => 4);
-    const t1 = tournamentForChapter(1)!; // edge 0.12
-    const t5 = tournamentForChapter(5)!; // edge 0.50
+    const t1 = tournamentForChapter(1)!; // gentle opener edge
+    const t5 = tournamentForChapter(5)!; // the climax edge (stiffer)
     const a = rivalTotal(t1, 'seed-A', pars);
     const b = rivalTotal(t1, 'seed-A', pars);
     expect(a).toBe(b); // deterministic
-    // the chapter-5 rival plays a lower (better) total than the chapter-1 rival on the same card
-    expect(rivalTotal(t5, 'seed-A', pars)).toBeLessThan(rivalTotal(t1, 'seed-A', pars));
+    // The chapter-5 rival plays a lower (better) MEAN total than the chapter-1 rival. Averaged over seeds
+    // because the once-per-round form draw (±~11 strokes) swamps the edge gap on any single card
+    // (GS-story-balance narrowed the edges to a smooth curve, so a single-seed compare is pure noise).
+    const mean = (t: typeof t1) => {
+      let s = 0;
+      for (let i = 0; i < 80; i++) s += rivalTotal(t, `edge-seed:${i}`, pars);
+      return s / 80;
+    };
+    expect(mean(t5)).toBeLessThan(mean(t1));
   });
 });

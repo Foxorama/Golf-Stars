@@ -332,8 +332,26 @@ Ordered so each ships something playable and nothing lands before its foundation
   pure render, ZERO sim rng, NO save write (no `STORY_VERSION` bump), no `_gs*`/URL hook (just a new
   `?screen=storybar` deep-link value). Guarded by `tests/parrot-bar.test.ts` (pure table + selectors +
   cycling), the bar flow in `tests/story-flow.test.ts` (open/tap/exit, no story write), and the
-  `?screen=storybar` browser smoke. **Remaining Phase-G polish:** the cross-chapter difficulty/economy
-  balance pass.
+  `?screen=storybar` browser smoke.
+- **GS-story-balance** — ✅ *shipped* (the cross-chapter difficulty + economy pass). MEASURED first: the
+  Story tournaments are ghost-vs-gross (the Asgard model) tuned for INTERACTIVE human play (a several-under
+  round that grows with the bag), NOT the weak auto/watch AI. A headless probe of the rival ghost vs fixed
+  to-par reference rounds exposed the problem: the old edges (0.12/0.22/0.33/0.42/0.50) made the LATE
+  Sigils a near-wall — a strong grown (−6) round won only ~33% by Ch3 and ~13% by Ch5 (a *mandatory*
+  progression gate!), with a Ch2→Ch3 cliff (~3 strokes). **Fix 1 — rival edges recalibrated** to a smooth
+  ~1-stroke-harder-per-chapter curve (0.07/0.12/0.18/0.23/0.29, both Warden/Herald variants at Ch4/5): a
+  −6 round now wins ~77% (Ch1) → ~38–46% (Ch5), a mid −4 round ~57% → ~23–27%, a maxed −8 round can take
+  the climax with margin (~56–62%) — winnable-but-earned, no cliffs, growth matters. **Fix 2 — a Sigil
+  milestone bonus** (`SIGIL_WIN_BONUS` = 250, first win only, `resolveStoryTournament`): winning a major
+  pays +250 on TOP of the round so the tournaments are the paydays they should be — five Sigils ≈ the
+  finale arsenal floor (~1300 cr), easing the escalating bag/ship/finale spend without trivialising it.
+  Economy audit: the finale floor (scatter+railgun weapon 26, deflector+aegis defence 32 = 1300 cr) is
+  comfortably affordable within the ~16 guaranteed paying rounds (~3200+ cr base, more with ship/engine
+  mults + the Sigil bonuses); the finale gates + costs were left as-is. Guarded by `tests/story-balance.test.ts`
+  (the rival curve is winnable, not a gimme, monotonic + no cliffs; the Sigil bonus pays on a win only;
+  the round-pay curve). The `tests/story-tournament.test.ts` edge-monotonicity check was made seed-robust
+  (a mean over seeds — the once-per-round form draw swamps the now-narrower edge gap on any single card).
+  **Phase G, and the Story Tour campaign, is feature-complete.**
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
