@@ -346,6 +346,58 @@ export function rainbowSky(W: number, H: number, accents: number, rng: () => num
   return prims;
 }
 
+/**
+ * Earth's atmospheric DAYLIGHT sky (GS-story-earth-sky): the one real-world course — the Old Course at
+ * St Andrews — sits on planet Earth, not out in space, so its out-of-bounds backdrop is a bright coastal
+ * SKY, not the deep-space base + starfield every space world draws. A vertical blue gradient (deep zenith
+ * easing to a pale sea-haze), a warm low sun with a soft halo, and a scatter of drifting clouds. Replaces
+ * buildScene §1+§2 for the `earth` archetype ONLY, so every other world is byte-for-byte unchanged.
+ *
+ * Screen-space + off the shared celestial `crng`, camera-proof (fixed loop counts, no projection read) —
+ * the same contract as `rainbowSky`. `accents` scales the cloud density like every other art layer. The
+ * gradient is a stack of full-width opaque bands (there is no linear-gradient prim); the sun/clouds are
+ * soft `glow` prims. The animated play view drops the twinkle starfield for earth (see `weather.ts`), and
+ * the pale seaside spindrift ambient (`AMBIENT.earth`) still blows across on the coastal wind.
+ */
+export function earthSky(W: number, H: number, accents: number, rng: () => number): Prim[] {
+  const prims: Prim[] = [];
+  // 1. The sky gradient — full-width bands from a deep zenith blue at the top to a pale sea-haze low down.
+  const ZENITH: [number, number, number] = [74, 134, 196]; // #4a86c4
+  const HAZE: [number, number, number] = [193, 221, 240]; // #c1ddf0
+  const bands = 12;
+  for (let i = 0; i < bands; i++) {
+    const t = i / (bands - 1);
+    const r = Math.round(ZENITH[0] + (HAZE[0] - ZENITH[0]) * t);
+    const g = Math.round(ZENITH[1] + (HAZE[1] - ZENITH[1]) * t);
+    const b = Math.round(ZENITH[2] + (HAZE[2] - ZENITH[2]) * t);
+    const y0 = (H * i) / bands;
+    const y1 = (H * (i + 1)) / bands + 1; // +1 overlap so the bands never seam
+    prims.push({ t: 'poly', pts: [[0, y0], [W, y0], [W, y1], [0, y1]], fill: `rgb(${r},${g},${b})` });
+  }
+  // 2. A warm low SUN — a wide soft halo, a tighter inner glow, and a bright disc, up in the sky.
+  const sx = W * (0.14 + rng() * 0.26);
+  const sy = H * (0.09 + rng() * 0.13);
+  const big = Math.max(W, H);
+  prims.push({ t: 'glow', c: [sx, sy], r: big * 0.28, col: 'rgba(255,246,214,0.5)' });
+  prims.push({ t: 'glow', c: [sx, sy], r: big * 0.1, col: 'rgba(255,250,232,0.72)' });
+  prims.push({ t: 'circle', c: [sx, sy], r: 9 + rng() * 4, fill: 'rgba(255,252,238,0.95)' });
+  // 3. Drifting CLOUDS — each a cluster of soft white glow puffs, scattered across the upper sky.
+  const clouds = Math.max(3, Math.round(5 * accents));
+  for (let i = 0; i < clouds; i++) {
+    const cx = rng() * W;
+    const cy = H * (0.05 + rng() * 0.62);
+    const cr = 26 + rng() * 40;
+    const puffs = 3 + ((rng() * 3) | 0);
+    for (let p = 0; p < puffs; p++) {
+      const px = cx + (p - puffs / 2) * cr * 0.6 + (rng() - 0.5) * cr * 0.3;
+      const py = cy + (rng() - 0.5) * cr * 0.3;
+      const pr = cr * (0.6 + rng() * 0.5);
+      prims.push({ t: 'glow', c: [px, py], r: pr, col: 'rgba(255,255,255,0.4)' });
+    }
+  }
+  return prims;
+}
+
 /** Per-world WIND look (GS-wind): the colour of the weather streaking across the hole. */
 const WIND_COL: Record<BiomeArchetype, string> = {
   inferno: 'rgba(255,150,70,', // solar wind / embers
