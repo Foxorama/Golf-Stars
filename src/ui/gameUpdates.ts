@@ -38,6 +38,8 @@ import {
   completeStoryRound,
   PROLOGUE_COURSE_ID,
   storyRoundCredits,
+  storyWorldChapter,
+  worldCleared,
   defaultStoryState,
   recordWorldClear,
   STORY_CHAPTER_COUNT,
@@ -358,9 +360,17 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   const courseId = run.staticCourseId ?? PROLOGUE_COURSE_ID;
   // Defensive: the hub should always have a campaign, but never crash if it's missing mid-round.
   const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
-  // GS-story-ships: the equipped ship's credit multiplier (a bigger hold banks more per world clear),
-  // stacked with any ENGINE upgrades' credit bonus (GS-story-ship-upgrades).
-  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base) * upgradeCreditMult(base));
+  // GS-story-econ2: pay scales by the WORLD's difficulty tier (its unlock chapter) and drops to a top-up
+  // on a revisit (an already-cleared world) — reward hard worlds, kill the grind-the-easiest-world loop.
+  // GS-story-ships: then the equipped ship's credit multiplier (a bigger hold banks more per world clear),
+  // stacked with any ENGINE upgrades' credit bonus (GS-story-ship-upgrades). `worldCleared(base, …)` reads
+  // the PRE-clear state, so the first clear pays full and every re-fly pays the top-up.
+  const revisit = worldCleared(base, courseId);
+  const credits = Math.round(
+    storyRoundCredits(totals.toPar, { chapter: storyWorldChapter(courseId), revisit }) *
+      shipCreditMult(base) *
+      upgradeCreditMult(base),
+  );
   const { story: cleared, advancedChapter, wasPrologue } = completeStoryRound(
     base,
     courseId,
@@ -408,7 +418,14 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   // win (GS-story-balance): the majors fund the escalating bag/ship/finale spend.
   const alreadyWon = base.trophyIds.includes(t.sigilId);
   const winBonus = won && !alreadyWon ? SIGIL_WIN_BONUS : 0;
-  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base) * upgradeCreditMult(base)) + winBonus;
+  // GS-story-econ2: a major pays at its VENUE's difficulty tier (later majors pay more), always full-rate
+  // (never a revisit top-up) — the tournaments are the campaign's paydays (the Sigil bonus rides on top).
+  const credits =
+    Math.round(
+      storyRoundCredits(totals.toPar, { chapter: storyWorldChapter(t.venueId) }) *
+        shipCreditMult(base) *
+        upgradeCreditMult(base),
+    ) + winBonus;
   let story = recordWorldClear(
     base,
     t.venueId,

@@ -174,6 +174,20 @@ Ordered so each ships something playable and nothing lands before its foundation
   grows as you shop. NO save bump — owned/equipped stay id-lists; `resolveStoryClub`/`storyBagClubs` are
   themed-aware. Guarded by `tests/story-shop.test.ts` + the Pro-Shop flow in `tests/story-flow.test.ts` +
   the `?screen=storyshop` browser smoke.
+- **GS-story-econ2** — ✅ *shipped* (the review economy pass, `reports/story-mode-review-2026-07-18.md`).
+  The flat `storyRoundCredits(toPar)` (a constant `max(100, 200 − 15·under)`) gave every world the SAME pay
+  and let a revisit farm the full purse forever — so grinding the easiest world you owned was the optimal
+  road to the ~1300-cr finale arsenal, gutting the shipyard/locker/pro-shop spend choices. Now the pay
+  rides a `RoundPayContext`: `chapter` (the WORLD's difficulty tier = its `unlockChapter`, `×(1 + 0.15·(ch−1))`
+  → Ch.1 ×1.0 … Ch.5 ×1.6, so hard worlds are worth playing) and `revisit` (an already-cleared world pays
+  `×0.4`, a top-up not a farm). `storyWorldChapter(courseId)` reads the tier (1 off-chart, e.g. the Earth
+  prologue). `resolveStoryRound` passes `{chapter, revisit: worldCleared(base, …)}` (pre-clear read → first
+  clear full, re-flies top-up); `resolveStoryTournament` passes the venue's tier at FULL rate (majors are
+  the paydays, never revisit-decayed; the Sigil bonus rides on top). Both levers DEFAULT to no-ops (an empty
+  context is byte-for-byte the classic flat pay), so `storyRoundCredits(x)` callers/tests are unchanged and
+  the Ch.1 balance assertions hold. Pure model + reducer wiring — no save bump. Guarded by
+  `tests/story-state.test.ts` (scaling + revisit + `storyWorldChapter`) and the revisit wiring in
+  `tests/story-flow.test.ts`.
 - **GS-story-lore-cards** — ✅ *foundation shipped* (`render/loreCard.ts`). The reusable tap-to-inspect
   overlay (own `.gs-lorecard*` prefix, self-contained `<style>`): art medallion + name + rarity/kind tag +
   mechanical DETAIL + composed LORE + a footer action (Buy / Owned / can't-afford). First consumer is the

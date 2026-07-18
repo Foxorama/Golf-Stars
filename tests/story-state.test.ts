@@ -16,6 +16,9 @@ import {
   defaultBagIsValid,
   completeStoryRound,
   storyRoundCredits,
+  storyWorldChapter,
+  CHAPTER_CREDIT_STEP,
+  REVISIT_CREDIT_MULT,
   PROLOGUE_COURSE_ID,
   STORY_WORLDS,
   storyWorldUnlocked,
@@ -126,6 +129,27 @@ describe('story-state model (GS-story-save)', () => {
       expect(storyRoundCredits(0)).toBe(200);
       expect(storyRoundCredits(-4)).toBe(260);
       expect(storyRoundCredits(10)).toBe(100); // floored
+    });
+
+    it('storyRoundCredits scales by the WORLD difficulty tier and drops to a top-up on a revisit (GS-story-econ2)', () => {
+      // An empty context is byte-for-byte the classic flat pay (no regression).
+      expect(storyRoundCredits(0, {})).toBe(storyRoundCredits(0));
+      expect(storyRoundCredits(-4, { chapter: 1 })).toBe(260);
+      // A harder (later) world pays more: Ch.5 = ×(1 + 4·step).
+      expect(storyRoundCredits(0, { chapter: 5 })).toBe(Math.round(200 * (1 + CHAPTER_CREDIT_STEP * 4)));
+      expect(storyRoundCredits(0, { chapter: 3 })).toBeGreaterThan(storyRoundCredits(0, { chapter: 1 }));
+      // A revisit pays only the top-up fraction (kills the grind-the-easiest-world loop).
+      expect(storyRoundCredits(0, { chapter: 1, revisit: true })).toBe(Math.round(200 * REVISIT_CREDIT_MULT));
+      expect(storyRoundCredits(0, { chapter: 5, revisit: true })).toBeLessThan(storyRoundCredits(0, { chapter: 5 }));
+      // A hard first-clear beats an easy grind: Ch.5 first clear >> Ch.1 revisit — hard worlds are worth it.
+      expect(storyRoundCredits(0, { chapter: 5 })).toBeGreaterThan(storyRoundCredits(-4, { chapter: 1, revisit: true }));
+    });
+
+    it('storyWorldChapter reads a world tier and falls back to 1 off the chart (GS-story-econ2)', () => {
+      expect(storyWorldChapter('verdant-18')).toBe(1); // Ch.1 world
+      expect(storyWorldChapter('swamp-18')).toBe(5); // Ch.5 shrine
+      expect(storyWorldChapter(PROLOGUE_COURSE_ID)).toBe(1); // Earth prologue — off the chart
+      expect(storyWorldChapter('not-a-world')).toBe(1);
     });
 
     it('completeStoryRound clears the world, pays, keeps best, and advances the prologue chapter', () => {
