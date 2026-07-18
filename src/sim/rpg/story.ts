@@ -23,7 +23,7 @@ import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 2;
+export const STORY_VERSION = 3;
 
 /** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
  *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
@@ -225,6 +225,11 @@ export interface StoryState {
   /** The chosen PATH (GS-story-chapters), set at The Choice after Chapter 3. Absent = not yet chosen (the
    *  shared trunk, Chapters 1–3). Drives the back-half tournament variants + the finale ending. */
   alignment?: StoryAlignment;
+
+  /** GS-story-quests: the ally SIDE QUEST currently accepted (one at a time), or absent. */
+  activeQuestId?: string;
+  /** GS-story-quests: ally side quests already completed (their rewards granted). */
+  completedQuestIds: string[];
 }
 
 /** A fresh campaign: the chosen golfer, the green bag, the station wagon, an empty purse, chapter 0. */
@@ -248,6 +253,7 @@ export function defaultStoryState(characterId: string = DEFAULT_CHARACTER_ID): S
     trophyIds: [],
     seenStoryBeats: {},
     completed: false,
+    completedQuestIds: [],
   };
 }
 
@@ -283,6 +289,8 @@ export function migrateStory(raw: unknown): StoryState {
     seenStoryBeats: boolMap(s.seenStoryBeats),
     completed: s.completed === true,
     ...(s.alignment === 'warden' || s.alignment === 'herald' ? { alignment: s.alignment } : {}),
+    ...(typeof s.activeQuestId === 'string' ? { activeQuestId: s.activeQuestId } : {}),
+    completedQuestIds: strList(s.completedQuestIds),
   };
 }
 

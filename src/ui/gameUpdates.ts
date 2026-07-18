@@ -392,7 +392,17 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     match: undefined,
     viewHole: 0,
     screen: 'storyResult',
-    lastStoryRound: { courseId, toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, credits, advancedChapter, wasPrologue },
+    lastStoryRound: {
+      courseId,
+      toPar: totals.toPar,
+      strokes: totals.gross,
+      par: totals.totalPar,
+      credits,
+      advancedChapter,
+      wasPrologue,
+      // GS-story-quests: carry the ally quest id so the recap can offer the reward.
+      ...(run.storyQuest ? { questId: run.storyQuest } : {}),
+    },
   };
 }
 

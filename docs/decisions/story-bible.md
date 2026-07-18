@@ -368,6 +368,12 @@ gear hits harder but you're frailer.
 - **The Choice → two campaigns from one build:** different allies, hosts, rivals, gear pools, ships, ending.
 - **New Game+:** carry cosmetics + records; the opposite alignment is offered; the Parrot remembers.
 - **World revisits:** the *true-line* best-score chase per world (records folded into revisit).
+- **Ally side quests (GS-story-quests):** every recruited friend carries a deep, faction-relevant personal
+  quest — offered on their Clubhouse talk card once you reach their chapter. It takes you to the world that
+  MEANS something to them (Driver Dan's old long-haul rig — the derelict — around Ch.3; Sandy's home dunes;
+  the Mole's deepest green), and rewards a UNIQUE club (its own name, art, and carry/putt bonus): the Long
+  Haul (Dan's solar driver), Sand-Saver's Second, the Phoenix Scalpel, the Star-Reader, Conviction, the
+  Dowser. Content-as-data (`sim/rpg/storyQuests.ts`) — one row per ally; one quest active at a time.
 - **Relic hunting:** cursed sheddings vs Warden grace — a build-crafting axis with real trade-offs.
 - **Secret content:** the Firebird/derelict beats, a redeemable Venoma, the Warriors' Tee (Asgard) tie-in
   as an optional Yggdrasil branch once Thor's Hammer is owned.

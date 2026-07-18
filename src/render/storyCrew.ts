@@ -18,6 +18,7 @@ import {
   allyFactionBlurb,
 } from '../sim/rpg/storyAllies';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
+import { questForCaddy, questOfferable, questDone } from '../sim/rpg/storyQuests';
 import type { StoryState } from '../sim/rpg/story';
 
 /** The crew wall for the spaceport clubhouse: a labelled row of recruited allies, each a tappable avatar.
@@ -48,10 +49,11 @@ function crewChipHTML(caddyId: string, active: boolean): string {
  * (make active, unless already), and Close. `talkCount` drives which banter line shows. The whole backdrop
  * closes it. (`questSlot` lets the later quest chunk inject a quest offer/progress row — empty for now.)
  */
-export function allyInspectOverlayHTML(caddyId: string, story: StoryState, talkCount: number, questSlot = ''): string {
+export function allyInspectOverlayHTML(caddyId: string, story: StoryState, talkCount: number): string {
   const talk = allyTalk(caddyId);
   if (!talk) return '';
   const active = activeStoryCaddy(story) === caddyId;
+  const questSlot = questSlotHTML(caddyId, story);
   const faction = allyFactionName(caddyId);
   const factionBlurb = allyFactionBlurb(caddyId);
   const line = allyLineAt(caddyId, talkCount);
@@ -81,6 +83,29 @@ export function allyInspectOverlayHTML(caddyId: string, story: StoryState, talkC
         </div>
       </div>
     </div>`;
+}
+
+/** GS-story-quests: the ally card's quest row — an OFFER (accept), an ACTIVE note, or a COMPLETE badge with
+ *  the reward. Empty when the ally has no quest (they all do) or it isn't yet available at this chapter. */
+function questSlotHTML(caddyId: string, story: StoryState): string {
+  const q = questForCaddy(caddyId);
+  if (!q) return '';
+  if (questDone(story, q.id)) {
+    return `<div class="gs-crew-quest gs-crew-quest--done">✓ <b>${q.title}</b> — done. <span>${q.rewardName} is in your bag.</span></div>`;
+  }
+  if (story.activeQuestId === q.id) {
+    return `<div class="gs-crew-quest gs-crew-quest--active">🗺 <b>${q.title}</b> — accepted. <span>Fly to the star chart and play it together.</span></div>`;
+  }
+  if (questOfferable(story, caddyId)) {
+    return `<div class="gs-crew-quest">
+      <div class="gs-crew-questtitle">🗺 A quest: <b>${q.title}</b></div>
+      <div class="gs-crew-questhook">${q.hook}</div>
+      <button class="gs-btn" style="margin-top:8px;" data-action='${JSON.stringify({ type: 'acceptStoryQuest', questId: q.id })}'>Take it on ›</button>
+    </div>`;
+  }
+  // has a quest, but not yet available (chapter too early, or another quest is active)
+  if (story.activeQuestId) return '';
+  return `<div class="gs-crew-quest gs-crew-quest--soon">🗺 <b>${q.title}</b> — they’ll have something for you deeper into the journey.</div>`;
 }
 
 const CREW_STYLE = `<style>
@@ -122,4 +147,12 @@ const CREW_STYLE = `<style>
   .gs-crew-actions .gs-btn{flex:1 1 auto;}
   .gs-crew-activebadge{flex:1 1 auto;text-align:center;padding:10px;border-radius:10px;background:#20180a;
     border:1px solid #6a5320;color:#f0c874;font-size:13px;font-weight:700;}
+  .gs-crew-quest{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:#181322;border:1px solid #3a2f4a;
+    border-left:3px solid #a97b25;font-size:12.5px;line-height:1.5;color:#e6ddf0;}
+  .gs-crew-questtitle{font-weight:800;color:#f0c874;}
+  .gs-crew-questhook{margin-top:3px;color:#c6bcd6;font-style:italic;}
+  .gs-crew-quest--active{border-left-color:#54c8ff;color:#bfe4ff;}
+  .gs-crew-quest--active span,.gs-crew-quest--done span{color:#9aa8bc;font-style:italic;}
+  .gs-crew-quest--done{border-left-color:#4fe08a;color:#9dffce;}
+  .gs-crew-quest--soon{border-left-color:#4a4656;color:#9aa2b4;}
 </style>`;
