@@ -247,7 +247,7 @@ export function storyResultScreen(): string {
       ${
         r.wasPrologue
           ? `<p><em>As the gallery roars, a shadow falls across the 18th green. Something vast is descending from the sky…</em></p>
-             <p style="color:#7fe0a0;">🦜 "Golfer — the Universe needs you. Gather your friends and follow me!"</p>`
+             <p style="color:#7fe0a0;">🦜 "Golfer — the Universe needs you. Gather friends and allies, and follow me!"</p>`
           : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`
       }
     </section>

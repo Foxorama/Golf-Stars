@@ -664,7 +664,7 @@ export function mountStoryIntro(opts: { onDone?: () => void } = {}): StoryIntroH
       sub = typed(line, (e - B.land) / (P.call * 0.7));
       subA = clamp01((e - B.land) / 300);
     } else if (e < B.ascend) {
-      const line = '"Gather your friends… and follow me!"';
+      const line = '"Gather friends and allies… and follow me!"';
       sub = typed(line, (e - B.call) / (P.ascend * 0.55));
       subA = clamp01((e - B.call) / 200) * clamp01((B.ascend - e) / 500);
     }
