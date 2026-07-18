@@ -52,8 +52,13 @@ export function storyFinaleScreen(): string {
         splits open. Coiled in the dark below sleeps the world-serpent — and something worse wears it now,
         a corruption from beyond the stars. It is waking. Only your ship stands between it and every world
         you crossed to get here.</p>
-      <p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Everything we armed for. Take the
-        shot when she opens her eye — and don’t miss."</p>
+      <p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Two stages: first we FIGHT her ship
+        to ship — fire your guns, hold your shields — then, when she's reeling and bares her eye, you take the
+        shot. Don’t miss."</p>
+
+      <p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> Fire your weapon (it holds a few charges and
+        recharges) to break the serpent's hide while your shields weather her lunges.<br>
+        🎯 <b>Stage 2 — the Final Strike.</b> When she's broken and her eye opens, strike the ball home.</p>
 
       <h2 class="gs-fin-sec">Battle readiness</h2>
       ${gateRow('Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, 'Buy heavier WEAPONS at the shipyard — your guns can’t crack her scales yet.')}
@@ -61,10 +66,12 @@ export function storyFinaleScreen(): string {
       <div class="gs-fin-verdict" style="color:${ready ? '#7fe0a0' : '#ff9a6a'};">
         ${ready ? '🚀 Your ship is ready. Engage when you are.' : '🛠 Your ship isn’t ready — arm up at the shipyard, then return.'}
       </div>
+      <p class="gs-fin-save">💾 Your campaign is <b>saved</b> right here at the root. Engaging risks nothing —
+        lose, and you return to the clubhouse with everything intact to arm up and try again. The root will wait.</p>
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">
       <button class="gs-btn" data-story-finale-engage="1" style="${ready ? '' : 'opacity:0.9;'}">⚔ Engage Jörmungandr</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryFinale' })}'>‹ Not yet — back to the clubhouse</button>
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryFinale' })}'>‹ Not yet — arm up first (progress saved)</button>
     </div>
     ${FIN_STYLE}`;
 }
@@ -161,4 +168,8 @@ const FIN_STYLE = `
     .gs-fin-barfill{height:100%;border-radius:5px;transition:width .3s ease;}
     .gs-fin-hint{font-size:11.5px;color:#e0a07a;line-height:1.4;margin-top:6px;}
     .gs-fin-verdict{text-align:center;font-size:13.5px;font-weight:700;margin-top:12px;line-height:1.5;}
+    .gs-fin-battleplan{background:#0b0f18;border:1px solid #232b3b;border-left:3px solid #6a5320;border-radius:10px;
+      padding:9px 12px;margin:2px 0 4px;font-size:12.5px;line-height:1.6;color:#cbd6e4;}
+    .gs-fin-save{margin:12px 0 0;font-size:12px;line-height:1.5;color:#8fb8ff;text-align:center;
+      background:#0a1220;border:1px solid #1f2f44;border-radius:10px;padding:8px 12px;}
   </style>`;

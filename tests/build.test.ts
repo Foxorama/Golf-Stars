@@ -386,7 +386,7 @@ describe('build output (real browser)', () => {
   // eyes-on; this guards the WIRING: the overlay mounts, reaches the aim phase without a page error, and a
   // strike (or skip) resolves to the victory recap (campaign complete → Star Tour unlocked).
   it.runIf(chromePath)(
-    'engaging the finale mounts the interactive strike overlay and resolves to a win',
+    'engaging the finale mounts the interactive two-stage battle overlay and resolves to a win',
     async () => {
       const { chromium } = await import('playwright-core');
       const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
@@ -397,10 +397,11 @@ describe('build output (real browser)', () => {
         await page.goto('file://' + dist + '?screen=storyfinale&intro=0&seed=7', { waitUntil: 'load' });
         await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
         await page.getByText('Engage Jörmungandr', { exact: false }).first().click();
-        // The interactive battle overlay mounts.
+        // The interactive two-stage battle overlay mounts (GS-story-battle).
         await page.waitForSelector('[data-gs-storyfinale]', { timeout: 4000 });
-        // It HOLDS at the aim phase past the timed cinematic length (waiting for the player's strike) — a
-        // non-interactive cinematic would have finished by now. This guards the aim-hold render path.
+        // It HOLDS in the interactive Stage-1 assault well past any timed-cinematic length (waiting for the
+        // player to fire / strike) — a purely timed cinematic would have finished by now. Guards the
+        // interactive-hold render path.
         await page.waitForTimeout(7000);
         expect(await page.$('[data-gs-storyfinale]')).not.toBeNull();
         // Skip resolves a clean win (the Skip button is never a punishment) → the victory recap.
