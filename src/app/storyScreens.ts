@@ -13,8 +13,8 @@
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
-import { shipCardSVG } from '../render/shipArt';
 import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
+import { spaceportSceneHTML } from '../render/storySpaceport';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { currentTournament } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked } from '../sim/rpg/storyFinale';
@@ -201,15 +201,13 @@ function spaceClubhouseHTML(story: StoryState): string {
       </div>
     </header>
 
-    <section style="max-width:520px;margin:8px auto 0;">
-      <button data-action='${JSON.stringify({ type: 'openStoryBar' })}' title="Visit the Crow's Nest"
-        style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;cursor:pointer;background:var(--gs-panel,#161a24);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;color:inherit;font:inherit;">
-        <span aria-hidden="true" style="flex:0 0 auto;">${shipCardSVG(story.equippedShipId, 108, 66)}</span>
-        <span style="margin:0;color:var(--gs-dim);font-size:14px;line-height:1.45;">
-          <span style="color:#7fe0a0;">🦜 The Prognostic Parrot:</span> <em>${parrotLine}</em>
-          <span style="display:block;margin-top:4px;color:#7fe0a0;font-size:12px;font-style:normal;">🍺 Tap to join him at the Crow's Nest ›</span>
-        </span>
-      </button>
+    <!-- GS-story-clubhouse-scene: the interactive Mothership clubhouse — tap the star chart, hangar, locker,
+         or the bar to go there; your golfer + active caddy stand on the deck, the Parrot tends the bar. -->
+    <section style="max-width:620px;margin:8px auto 0;">
+      ${spaceportSceneHTML(story)}
+      <p style="text-align:center;color:var(--gs-dim);font-size:12px;line-height:1.45;margin:8px 0 0;">
+        <span style="color:#7fe0a0;">🦜</span> <em>${parrotLine}</em>
+      </p>
     </section>
 
     ${tournamentBannerHTML(story)}
@@ -218,13 +216,7 @@ function spaceClubhouseHTML(story: StoryState): string {
 
     ${crewWallHTML(story)}
 
-    <h2 class="gs-seclabel">The spaceport</h2>
-    <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
-      <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Set course — the star chart</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryLocker' })}'>🎒 Locker — build your bag &amp; gear</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryShipyard' })}'>🚀 Hangar — fly your fleet</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryBar' })}'>🍺 The Crow's Nest — talk to the captain</button>
-      <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
       ${hubFooterHTML()}
     </div>
     ${allyOverlay}`;

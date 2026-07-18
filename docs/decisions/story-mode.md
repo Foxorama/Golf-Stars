@@ -455,6 +455,24 @@ Ordered so each ships something playable and nothing lands before its foundation
   (a mean over seeds — the once-per-round form draw swamps the now-narrower edge gap on any single card).
   **Phase G, and the Story Tour campaign, is feature-complete.**
 
+**Phase H — Presentation polish (the "it's flat" pass)**
+The campaign is mechanically complete but its between-round screens read as flat button lists next to the
+rich Earth-clubhouse / Crow's-Nest scenes. This phase makes every Story hub an interactive SCENE — you see
+your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
+- **GS-story-clubhouse-scene** — ✅ *shipped* (`render/storySpaceport.ts`). The post-recruitment SPACEPORT
+  clubhouse (Chapter 1+) was a chip header + a parrot text card + a stack of labelled buttons. It's now ONE
+  interactive Mothership-interior scene (its OWN identity, distinct from the cosmetic title Clubhouse): your
+  golfer stands on the deck (their look, feet-anchored), the Prognostic Parrot tends the bar (his lore bust,
+  the Crow's-Nest idiom), your equipped SHIP is parked in the hangar bay (`shipSVG`), and your active caddy
+  stands at your side (a portrait standee, tap → their ally card). Four tap HOTSPOTS replace the button
+  list — the star-chart viewport (`openStoryMap`), the hangar bay (`openStoryShipyard`), the locker bank
+  (`openStoryLocker`), and the bar (`openStoryBar`) — each an always-labelled, aria-labelled button over the
+  SVG (reuses the Earth-clubhouse feet-anchored-figure + hotspot idiom; container-query sized). Tournament/
+  quest/finale banners + the crew wall + the New-campaign/Back footer still ride below. Pure render, ZERO
+  rng (hand-placed, byte-stable), own `.gs-sclub*` CSS prefix (never the play HUD's `.gs-hud`). No sim/save
+  touch. Reached honestly via `?screen=storyclub` (prologue → Chapter 1 spaceport); guarded by the
+  `.gs-sclub-scene` browser smoke in `tests/build.test.ts`.
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are

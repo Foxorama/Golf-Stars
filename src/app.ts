@@ -282,6 +282,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
       return reduce(hub1, { type: 'openStoryBar' });
     }
+    case 'storyclub': {
+      // GS-story-clubhouse-scene: reach the SPACEPORT (post-recruitment, Chapter 1) clubhouse the honest way
+      // — play the Earth prologue, then continue past the recruitment cinematic to the Mothership clubhouse
+      // scene. Exercises the interactive scene (star chart / hangar / locker / bar hotspots + your golfer).
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      return reduce(afterProl, { type: 'storyRoundContinue' });
+    }
     case 'storytournament':
     case 'storytournamentresult': {
       // GS-story-tournament: reach the Galaxy Tournament the honest way — prologue → Chapter 1, clear two of
