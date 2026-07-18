@@ -46,7 +46,32 @@ focused tested auto-merged PR each:
 - **GS-story-yggdrasil** — ✅ *shipped*: the Jörmungandr SPACE BATTLE — five Sigils forge the key → briefing (two readiness gates: firepower/defence, spends Combat Rating) → Canvas battle cinematic (Cthulhu-serpent + golf finisher) → victory (`completed` → storyComplete → Star Tour) / defeat (arm up, rematch). Deferred: two alignment endings, interactive finisher shot.
 - **GS-story-beats** — ✅ *shipped* (the inter-chapter dialogue): four escalation beats through the DATA-driven lore machinery (`LoreContext` gained `storyRound`/`storyChapter`/`storyAlignment`) — the Parrot names the Coil (Ch.2), Coilkeepers ring the tee (Ch.3), Venoma confronts you from Ch.4 branching Warden/Herald. Two bespoke SVG portraits (viper-woman Venoma, faceless Coilkeeper). Story-round-gated (never fires in Voyage/Unending), once-only via `seenLore`.
 - **GS-story-parrot-bar** — ✅ *shipped* (the Parrot BAR interaction): "The Crow's Nest", a cosmetic Mothership hangout off the clubhouse — tap the Prognostic Parrot to cycle campaign-adaptive chatter (a state-appropriate greeting + rotating lore/Coil/path/hint lines gated on chapter/alignment/Sigils/completion). Content-as-data (`parrotBar.ts`) + a bespoke SVG cantina scene (porthole to space, neon sign, bottle shelf, the Parrot behind the bar reusing his lore bust). Transient tap counter, zero sim rng, no save bump.
-- **GS-story-balance** — ✅ *shipped* (the cross-chapter difficulty + economy pass): measured the rival ghost vs fixed to-par reference rounds → the late Sigils were a near-wall (a −6 round won ~13% by Ch5, a mandatory gate) with a Ch2→Ch3 cliff. Recalibrated the rival edges to a smooth ~1-stroke/chapter curve (0.07/0.12/0.18/0.23/0.29) so a grown −6 round wins ~77%→~38% Ch1→Ch5 (winnable-but-earned, growth matters, no cliffs), and added a Sigil-win milestone bonus (`SIGIL_WIN_BONUS` 250, first win only) so the majors fund the escalating spend (5 Sigils ≈ the ~1300cr finale floor). Guarded by `tests/story-balance.test.ts`. **Story Tour is feature-complete.**
+- **GS-story-balance** — ✅ *shipped* (the cross-chapter difficulty + economy pass): measured the rival ghost vs fixed to-par reference rounds → the late Sigils were a near-wall (a −6 round won ~13% by Ch5, a mandatory gate) with a Ch2→Ch3 cliff. Recalibrated the rival edges to a smooth ~1-stroke/chapter curve (0.07/0.12/0.18/0.23/0.29) so a grown −6 round wins ~77%→~38% Ch1→Ch5 (winnable-but-earned, growth matters, no cliffs), and added a Sigil-win milestone bonus (`SIGIL_WIN_BONUS` 250, first win only) so the majors fund the escalating spend (5 Sigils ≈ the ~1300cr finale floor). Guarded by `tests/story-balance.test.ts`. **Story Tour is feature-complete** (all chunks shipped).
+
+**GS-story-review — Story Tour polish backlog** (from `reports/story-mode-review-2026-07-18.md`, the
+designer/QA/story-editor pass). The systems all shipped; these close the gaps between the campaign and the
+bible. Story-only surfaces (separate save + gated rows) so none risk Voyage/Unending determinism.
+- **GS-story-apostate** — ✅ *shipping*: Malachai "Sable" Voss, the Apostate — the bible's dark-mirror
+  antagonist, previously absent (0 refs). Adds a `voss` lore portrait, a Ch3 "the Apostate appears" beat,
+  his presence delivering The Offer on The Choice screen, and a parrot-bar line. The device that gives The
+  Choice its weight.
+- **GS-story-econ2** — ✅ *shipping*: chapter-scaled world payouts (reward playing hard worlds) + diminishing
+  repeat-revisit returns (kill the grind-the-easiest-world loop), so the shipyard/locker/pro-shop spend
+  choices have teeth. Pure model + reachability test.
+- **GS-story-hosts** — ✅ *shipping*: restore the bible's named hosts (Sir Aldous Greensward, Magnus Cinder,
+  …) into the `host` rows + rival-variety flavour. Data-only.
+- **GS-story-finisher** — ⭐ *top follow-up*: make the Jörmungandr finale an actual INTERACTIVE strike
+  (the bible's "golf finisher into the serpent's eye") instead of a pure `combatRating ≥ N` threshold. Keep
+  the two arm-up gates as the FLOOR (you must be armed to reach the finisher); the strike's quality colours
+  the ending (clean kill vs graze) and the two endings diverge in event, not just copy. Highest value.
+- **GS-story-worlddiff** — chapter-scaled world DIFFICULTY: a story world round pins the static course with
+  `staticEffect:'none'`, so moment-to-moment golf is flat Ch1→Ch5 (only the ghost edge scales). Ride wildness
+  off the chapter; guard that the non-story (Star-Tour/records) render of the same course stays byte-identical.
+- **GS-story-friends** — cash the "gather your friends" promise: the caddy roster (`hiredCaddyIds`/
+  `activeCaddyId` fields exist, no mechanic) — hire-once Warden allies (Dan/Penelope/Pim) that fold into the
+  story bag; the three friends as the Ch1 friendly-rival board + named in the interlude.
+- **GS-story-choice-cost** — surface the alignment trade-off at The Choice (the Herald interlude pays MORE
+  credits with no visible downside today — cursed = a visible cost, not the greedy pick).
 
 **Run structure & meta**
 - **GS-encounters** — branching StS-style node map (elite / driving-range buff / treasure / shop / boss)
