@@ -17,6 +17,7 @@ import {
   completeStoryRound,
   storyRoundCredits,
   storyWorldChapter,
+  storyWorldEffect,
   CHAPTER_CREDIT_STEP,
   REVISIT_CREDIT_MULT,
   PROLOGUE_COURSE_ID,
@@ -150,6 +151,27 @@ describe('story-state model (GS-story-save)', () => {
       expect(storyWorldChapter('swamp-18')).toBe(5); // Ch.5 shrine
       expect(storyWorldChapter(PROLOGUE_COURSE_ID)).toBe(1); // Earth prologue — off the chart
       expect(storyWorldChapter('not-a-world')).toBe(1);
+    });
+
+    it('storyWorldEffect stiffens the wind by world tier — deep worlds harder, not just longer (GS-story-worlddiff)', () => {
+      // Ch.1 worlds + the Earth prologue play calm; the sky rises to the wildest storm by Ch.5.
+      expect(storyWorldEffect('verdant-18')).toBe('none');
+      expect(storyWorldEffect(PROLOGUE_COURSE_ID)).toBe('none');
+      expect(storyWorldEffect('swamp-18')).toBe('ionStorm'); // Ch.5
+      // Rising, and only ever from the PURE wind/carry set (no craters / lies / tents that would alter the
+      // layout or fairness) — a fair, readable difficulty, records-safe.
+      const PURE_WIND = new Set(['none', 'solarWind', 'solarStorm', 'dustStorm', 'ionStorm']);
+      const tiers = STORY_WORLDS.map((w) => w.unlockChapter);
+      const windOf = (e: string) => ({ none: 1, solarWind: 1.15, solarStorm: 1.2, dustStorm: 1.25, ionStorm: 1.35 }[e] ?? 1);
+      let prevWind = 0;
+      for (let ch = 1; ch <= 5; ch++) {
+        const w = STORY_WORLDS.find((x) => x.unlockChapter === ch)!;
+        const e = storyWorldEffect(w.courseId);
+        expect(PURE_WIND.has(e), `${e} is a pure-wind effect`).toBe(true);
+        expect(windOf(e)).toBeGreaterThanOrEqual(prevWind); // monotonically stiffer by tier
+        prevWind = windOf(e);
+      }
+      expect(tiers.length).toBeGreaterThan(0);
     });
 
     it('completeStoryRound clears the world, pays, keeps best, and advances the prologue chapter', () => {

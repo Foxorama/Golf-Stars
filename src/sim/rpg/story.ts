@@ -114,6 +114,23 @@ export function storyWorldChapter(courseId: string): number {
 }
 
 /**
+ * GS-story-worlddiff — the WEATHER a Story world plays under, scaled by its difficulty TIER (unlock chapter)
+ * so deep worlds are genuinely harder, not just longer. A rising, fair WIND: pure physics (wind/carry only,
+ * no geometry, `applyEffectPhysics`), so it never touches the layout — records/Star-Tour stay comparable —
+ * and wind reads true off the shot bearing (club up, aim off), the strategic axis the review asked for
+ * ("difficulty is just length" was the complaint). Deliberately PURE wind/carry effects (no craters / lies /
+ * tents). Ch.1 worlds play calm; the sky stiffens to the wildest storm by Ch.5 — which also reads as the
+ * galaxy fraying as the serpent stirs. Scaled by the WORLD (tier), not the run chapter, so a given world's
+ * difficulty is stable (a revisit is the same test, `worldBest` stays comparable). The Earth prologue (tier
+ * 1, off-chart) stays calm. Returns a `CourseEffectId` string (the sim reads it through `run.staticEffect`).
+ */
+const STORY_TIER_EFFECT: readonly string[] = ['none', 'solarWind', 'solarStorm', 'dustStorm', 'ionStorm'];
+export function storyWorldEffect(courseId: string): string {
+  const tier = Math.max(1, Math.min(STORY_TIER_EFFECT.length, storyWorldChapter(courseId)));
+  return STORY_TIER_EFFECT[tier - 1] ?? 'none';
+}
+
+/**
  * Resolve a completed world round into the campaign (pure): record the clear (+credits, +best-score for the
  * revisit chase), and — if this was the PROLOGUE (Earth, chapter 0) — advance to chapter 1. Immutable.
  */

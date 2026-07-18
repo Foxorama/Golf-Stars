@@ -374,6 +374,20 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     const intro = reduce({ ...reactivated, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'desert-18' });
     expect(intro.run.loadout.perks).toContain('sandy-sandsaver');
   });
+
+  it('a deep world plays under a stiffer wind (fair physics) and still resolves (GS-story-worlddiff)', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 5, credits: 500, clearedWorldIds: ['standrews-18'] };
+    const hub = { ...initState('wind-seed', {}, undefined, story), screen: 'story' as const };
+    // A Ch.1 world stays calm; a Ch.5 world blows the wildest sky — pure physics, records-safe.
+    expect(reduce(hub, { type: 'storyPlayWorld', courseId: 'verdant-18' }).run.staticEffect).toBe('none');
+    const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'swamp-18' });
+    expect(intro.run.staticEffect).toBe('ionStorm');
+    expect(intro.course.meta.effect).toBe('ionStorm'); // stamped so the render/HUD show the storm
+    // The wind is real course data (auto ≡ interactive), and the auto round still finishes cleanly.
+    const done = reduce(intro, { type: 'play' });
+    expect(done.screen).toBe('storyResult');
+    expect(Number.isFinite(done.lastStoryRound!.strokes)).toBe(true);
+  });
 });
 
 describe('Story locker flow (GS-story-locker)', () => {
