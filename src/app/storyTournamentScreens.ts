@@ -34,7 +34,7 @@ export function storyTournamentScreen(): string {
     </header>
     <section style="max-width:520px;margin:8px auto 0;">
       <div class="gs-tourn-rival">
-        <span class="gs-tourn-rivalglyph" aria-hidden="true">${t.rivalId === 'venoma' ? '🐍' : '🏌'}</span>
+        <span class="gs-tourn-rivalglyph" aria-hidden="true">${t.rivalId === 'venoma' ? '🐍' : t.rivalId === 'voss' ? '🖤' : '🏌'}</span>
         <div>
           <div class="gs-tourn-rivallabel">Your rival</div>
           <div class="gs-tourn-rivalname">${t.rivalName}</div>

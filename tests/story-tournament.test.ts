@@ -45,6 +45,11 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
       }
       expect(sigils.size).toBe(STORY_CHAPTER_COUNT);
     }
+    // Every tournament names a host (no bare placeholders); the bible's named cast is in place (GS-story-hosts).
+    for (const t of STORY_TOURNAMENTS) expect(t.host.length).toBeGreaterThan(0);
+    expect(tournamentForChapter(1)!.host).toBe('Sir Aldous Greensward');
+    expect(tournamentForChapter(2)!.host).toBe('Magnus Cinder');
+    expect(tournamentForChapter(4, 'herald')!.host).toBe('Sister Ecdysis');
   });
 
   it('unlocks only once enough of the chapter’s worlds are cleared, and only while unwon', () => {
