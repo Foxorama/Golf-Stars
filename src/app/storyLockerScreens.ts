@@ -121,7 +121,7 @@ function clubChip(id: string, where: 'bag' | 'bench', bagFull = false): string {
  *  a friend active, ✕ to bench all). Empty until you recruit one out at the worlds where they wait. */
 function crewSectionHTML(story: StoryState): string {
   if (!story.hiredCaddyIds.length) {
-    return `<h2 class="gs-lock-sec">Your crew <span class="gs-lock-hint">gather your friends</span></h2>
+    return `<h2 class="gs-lock-sec">Your crew <span class="gs-lock-hint">friends and allies</span></h2>
       <div class="gs-lock-empty">No friends aboard yet — recruit them out in the galaxy, at the worlds where each one waits.</div>`;
   }
   const active = activeStoryCaddy(story);
