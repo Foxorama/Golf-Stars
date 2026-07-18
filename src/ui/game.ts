@@ -695,9 +695,10 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'engageStoryFinale': {
-      // GS-story-yggdrasil: resolve the Jörmungandr battle (deterministic from the armed ship). A win marks
-      // the campaign complete (`completed` → `storyComplete` → Star Tour unlocks). The battle CINEMATIC is
-      // played by app.ts before this dispatches; the reducer just records the outcome + lands on the recap.
+      // GS-story-yggdrasil: whether you CAN win is the deterministic arm-up floor (`finaleResult`, the two
+      // gates). GS-story-finisher: the KILL is an interactive golf strike played by app.ts before this
+      // dispatches; its quality (`strike`) colours the ending but NEVER decides win/lose (an armed player
+      // always wins). A win marks the campaign complete (`completed` → Star Tour unlocks).
       if (state.screen !== 'storyFinale' || !state.story) return state;
       const res = finaleResult(state.story);
       const story = res.won ? winFinale(state.story) : state.story;
@@ -705,7 +706,7 @@ export function reduce(state: UiState, action: Action): UiState {
         ...state,
         story,
         screen: 'storyFinaleResult',
-        lastStoryFinale: { won: res.won, failReason: res.failReason },
+        lastStoryFinale: { won: res.won, failReason: res.failReason, strike: res.won ? action.strike ?? 'clean' : undefined },
       };
     }
 

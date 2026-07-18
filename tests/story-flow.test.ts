@@ -691,6 +691,25 @@ describe('Story finale flow (GS-story-yggdrasil)', () => {
     expect(back.screen).toBe('title'); // a win → roll credits to the title (Star Tour now unlocked)
     expect(back.story!.completed).toBe(true);
   });
+
+  it('the interactive finisher STRIKE colours a win but never decides it (GS-story-finisher)', () => {
+    const briefing = reduce(armedKey(true), { type: 'openStoryFinale' });
+    // A clean strike vs a graze — both WIN (the arm-up gates already decided that); the quality is recorded.
+    const clean = reduce(briefing, { type: 'engageStoryFinale', strike: 'clean' });
+    expect(clean.lastStoryFinale!.won).toBe(true);
+    expect(clean.lastStoryFinale!.strike).toBe('clean');
+    expect(clean.story!.completed).toBe(true);
+    const graze = reduce(briefing, { type: 'engageStoryFinale', strike: 'graze' });
+    expect(graze.lastStoryFinale!.won).toBe(true); // a graze still wins an armed ship
+    expect(graze.lastStoryFinale!.strike).toBe('graze');
+    expect(graze.story!.completed).toBe(true);
+    // A default (no strike passed, e.g. reduced-motion skip) is a clean win.
+    expect(reduce(briefing, { type: 'engageStoryFinale' }).lastStoryFinale!.strike).toBe('clean');
+    // An UNARMED engage can't be rescued by a "clean" strike — the gates still lose it, no strike recorded.
+    const lost = reduce(reduce(armedKey(false), { type: 'openStoryFinale' }), { type: 'engageStoryFinale', strike: 'clean' });
+    expect(lost.lastStoryFinale!.won).toBe(false);
+    expect(lost.lastStoryFinale!.strike).toBeUndefined();
+  });
 });
 
 describe('storyStore persistence (GS-story-save wiring)', () => {

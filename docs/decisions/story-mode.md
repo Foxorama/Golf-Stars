@@ -188,6 +188,24 @@ Ordered so each ships something playable and nothing lands before its foundation
   the Ch.1 balance assertions hold. Pure model + reducer wiring — no save bump. Guarded by
   `tests/story-state.test.ts` (scaling + revisit + `storyWorldChapter`) and the revisit wiring in
   `tests/story-flow.test.ts`.
+- **GS-story-finisher** — ✅ *shipped* (the review's TOP finding, D1: "the finale isn't a game"). The
+  Jörmungandr finale resolved as a pure `combatRating ≥ N` threshold — no input, no skill, no tension. The
+  KILL is now an INTERACTIVE golf strike. Whether you CAN win is still the deterministic arm-up FLOOR
+  (`finaleResult`, the two gates — an unarmed ship still can't engage, no soft-lock), but once armed the
+  cinematic HOLDS at the serpent's exposed eye and a reticle sweeps its head: TAP to fire the ball into the
+  eye. A near-miss makes the serpent LASH and you re-sweep (an armed player always lands it eventually), and
+  the strike's ACCURACY sets the ending quality — a dead-centre CLEAN kill vs a GRAZE that clipped the eye
+  (both WIN; the strike never decides win/lose, so arming correctly is never punished by a mistime). The
+  quality colours the result screen's ending copy (on top of the Warden/Herald branch). Implemented by
+  holding the timeline at the breach frame until the strike lands, then replaying the proven win-climax from
+  `climaxStart` — minimal risk to the existing animation. `render/storyFinale.ts` gains the interactive aim
+  state (`FinaleStrike`, the reticle, `onTap`); `app.ts` plays it (`interactive: won`) and passes the strike
+  to `engageStoryFinale` (reduced-motion / Skip = a clean win, never a punishment); `lastStoryFinale.strike`
+  carries the quality. Tuned for feel (a forgiving 88-unit hit zone, a 26-unit clean reward, a readable
+  1.9-speed sweep, a short 430 ms lash lockout). Render/app only — NO sim rng, no save bump. Guarded by the
+  strike-quality flow in `tests/story-flow.test.ts` + a real-browser engage→aim-hold→resolve smoke in
+  `tests/build.test.ts`; the Canvas2D feel verified eyes-on (drive: engage an armed campaign, land the
+  strike, watch the quality-tiered ending). Closes the review's #1 backlog item.
 - **GS-story-worlddiff** — ✅ *shipped* (the flat-difficulty fix, review finding D2). A Story world round
   pinned the static course with `staticEffect:'none'`, so the moment-to-moment golf was flat Ch.1→Ch.5 —
   only the tournament ghost edge scaled ("difficulty is just length"). Now each world plays under a WIND

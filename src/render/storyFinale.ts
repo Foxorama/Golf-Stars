@@ -1,20 +1,23 @@
 /**
- * The FINALE space-battle cinematic (GS-story-yggdrasil) — Canvas2D, render-only (NOT the sim), a
- * full-screen overlay played when you engage the Cthulhu-corrupted Jörmungandr at Yggdrasil's Dark Root.
- * The OUTCOME is resolved deterministically before this runs (`storyFinale.finaleResult`) and passed in as
- * `won`, so the cinematic just plays the matching climax:
+ * The FINALE space-battle cinematic (GS-story-yggdrasil / GS-story-finisher) — Canvas2D, render-only (NOT
+ * the sim), a full-screen overlay played when you engage the Cthulhu-corrupted Jörmungandr at Yggdrasil's
+ * Dark Root. Whether you CAN win is still the deterministic arm-up floor (`finaleResult.won`, the two
+ * gates); once armed, the KILL is an INTERACTIVE golf strike (GS-story-finisher — the review's D1: the
+ * finale must be a game, not a threshold). Phases:
  *   APPROACH — your armed ship flies in toward the coiled, eldritch world-serpent.
- *   BREACH   — the ship strafes it with weapon bolts; the corruption flares.
- *   CLIMAX (won)  — the hide cracks, the serpent rears, and a glowing GOLF BALL finisher arcs into its
- *                    great eye; a white nova shatters the serpent into drifting light. "THE SERPENT FALLS."
- *   CLIMAX (lost) — the bolts fizzle on the unbroken hide / a coil sweeps the ship back into the dark.
- *                    "THE HIDE HELD — arm your ship and return."
+ *   BREACH   — the ship strafes it with weapon bolts; the corruption flares and the great eye opens.
+ *   AIM (interactive win) — the serpent bares its eye; a reticle sweeps its head; TAP to strike the golf
+ *                    ball into the eye. A near-miss makes it LASH and you re-sweep (an armed player always
+ *                    lands it — no soft-lock); the strike's ACCURACY sets the ending quality (clean / graze).
+ *   CLIMAX (won)  — the finisher lands, a white nova shatters the serpent into drifting light.
+ *   CLIMAX (lost) — the bolts fizzle on the unbroken hide; a coil sweeps the ship back into the dark.
  *
  * Self-contained (own mount/resize/rAF/skip scaffolding, mirroring `storyIntro.ts`), everything vector-
- * drawn (no asset to 404), skippable (tap / Skip / Esc). Thin imperative "feel" layer — verify eyes-on.
- * Respect reduced-motion at the call site (skip straight to the result).
+ * drawn (no asset to 404). The Skip button lands a default CLEAN strike (never a punishment). Thin
+ * imperative "feel" layer — verify eyes-on. Respect reduced-motion at the call site (skip → clean win).
  */
 
+export type FinaleStrike = 'clean' | 'graze';
 export interface StoryFinaleHandle {
   destroy(): void;
 }
@@ -46,8 +49,13 @@ const B = {
 };
 const TOTAL = B.title;
 
-export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = { won: false }): StoryFinaleHandle {
+export function mountStoryFinale(
+  opts: { won: boolean; interactive?: boolean; onDone?: (strike: FinaleStrike) => void } = { won: false },
+): StoryFinaleHandle {
   const won = opts.won;
+  // The interactive golf-finisher runs only on a WIN engage (armed). A loss / non-interactive call plays
+  // the old timed cinematic straight through.
+  const interactive = !!opts.interactive && won;
   const overlay = document.createElement('div');
   overlay.setAttribute('data-gs-storyfinale', '1');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#03040a;overflow:hidden;cursor:pointer;';
@@ -68,6 +76,13 @@ export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = {
   let raf = 0;
   let start = 0;
   let finished = false;
+  // GS-story-finisher: the interactive-aim state. `struck` flips when a landed strike locks the kill;
+  // `climaxStart` re-anchors the timeline so the proven win-climax replays from the breach frame; a recent
+  // miss (`lashUntil`) plays a short serpent lash before the sweep resumes. `strike` is the ending quality.
+  let struck = false;
+  let strike: FinaleStrike = 'clean';
+  let climaxStart = 0;
+  let lashUntil = 0;
   let dpr = 1;
   let cssW = 0;
   let cssH = 0;
@@ -114,7 +129,8 @@ export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = {
   }
 
   const onKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') finish();
+    if (e.key === 'Escape') finish();
+    else if (e.key === 'Enter' || e.key === ' ') onTap();
   };
   function finish(): void {
     if (finished) return;
@@ -123,13 +139,48 @@ export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = {
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onKey);
     overlay.remove();
-    opts.onDone?.();
+    opts.onDone?.(struck ? strike : 'clean');
+  }
+
+  // The horizontal centre of the aim reticle at time `t` (design space). It sweeps across the serpent's
+  // head; the eye sits at x=890, so a tap near 890 lands, a tap near dead-centre lands CLEAN.
+  const EYE_X = 890;
+  const HIT_ZONE = 88; // within this of the eye → a landed strike (forgiving — an armed kill is earned, not brutal)
+  const CLEAN_ZONE = 26; // within this → a clean kill (the precise reward); else a graze
+  const SWEEP_AMP = 250;
+  const SWEEP_SPEED = 1.9; // a readable sweep — fast enough to be a timing test, slow enough to feel fair
+  function reticleX(t: number): number {
+    return EYE_X + Math.sin(t * SWEEP_SPEED) * SWEEP_AMP;
+  }
+  /** A tap during the AIM phase fires the ball at the reticle: a hit locks the kill (quality by accuracy),
+   *  a miss makes the serpent lash and the sweep resumes. Outside the aim phase a tap is a no-op (the
+   *  cinematic plays out on its own); the Skip button always finishes with a clean win. */
+  function onTap(): void {
+    if (finished) return;
+    if (!interactive || struck) return; // only meaningful while aiming
+    const now = performance.now ? performance.now() : Date.now();
+    if (now < lashUntil) return; // the serpent is mid-lash — can't fire yet
+    const realEl = now - start;
+    if (realEl < B.breach) return; // not aiming yet (still approaching / breaching)
+    const t = realEl / 1000;
+    const dx = Math.abs(reticleX(t) - EYE_X);
+    if (dx <= HIT_ZONE) {
+      struck = true;
+      strike = dx <= CLEAN_ZONE ? 'clean' : 'graze';
+      climaxStart = now;
+    } else {
+      lashUntil = now + 430; // a miss: the serpent lashes briefly, then you re-sweep
+    }
   }
   skip.addEventListener('click', (e) => {
     e.stopPropagation();
     finish();
   });
-  overlay.addEventListener('click', finish);
+  // In interactive AIM a click is the STRIKE; otherwise (loss / non-interactive) a click skips to the end.
+  overlay.addEventListener('click', () => {
+    if (interactive && !struck) onTap();
+    else finish();
+  });
   window.addEventListener('keydown', onKey);
 
   // ── drawing (design space) ───────────────────────────────────────────────────
@@ -268,6 +319,59 @@ export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = {
     ctx.restore();
   }
 
+  /** The aim reticle + prompt (GS-story-finisher). A crosshair sweeps the head; the eye (890, eyeY) wears a
+   *  pulsing target ring. Green when the reticle is in the hit zone. On a recent miss it flashes a lash. */
+  function drawAim(t: number, eyeY: number, lash: boolean): void {
+    if (!ctx) return;
+    const rx = reticleX(t);
+    const near = Math.abs(rx - EYE_X) <= HIT_ZONE;
+    // pulsing target ring on the eye
+    const pr = 30 + 8 * Math.sin(t * 5);
+    ctx.strokeStyle = lash ? 'rgba(255,90,60,0.95)' : `rgba(157,255,206,${0.55 + 0.25 * Math.sin(t * 5)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(EYE_X, eyeY, pr, 0, 6.283);
+    ctx.stroke();
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath();
+    ctx.arc(EYE_X, eyeY, pr + 12, 0, 6.283);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // the sweeping crosshair
+    const col = near ? '#9dffce' : '#e8f2ff';
+    ctx.strokeStyle = col;
+    ctx.lineWidth = near ? 3 : 2;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.moveTo(rx, eyeY - 60);
+    ctx.lineTo(rx, eyeY + 60);
+    ctx.moveTo(rx - 22, eyeY);
+    ctx.lineTo(rx + 22, eyeY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(rx, eyeY, 10, 0, 6.283);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // prompt
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 26px system-ui, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 12;
+    if (lash) {
+      ctx.fillStyle = '#ff8a6a';
+      ctx.fillText('IT LASHES — line up again!', 500, 96);
+    } else {
+      ctx.fillStyle = near ? '#9dffce' : '#e8f2ff';
+      ctx.fillText('TAP to strike the eye', 500, 88);
+      ctx.font = '600 15px system-ui, sans-serif';
+      ctx.fillStyle = '#aebfd6';
+      ctx.fillText('dead-centre for the killing blow', 500, 118);
+    }
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'start';
+  }
+
   function centeredText(lines: { s: string; size: number; col: string; dy: number }[], alpha: number): void {
     if (!ctx) return;
     ctx.globalAlpha = alpha;
@@ -291,8 +395,22 @@ export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = {
       return;
     }
     if (!start) start = now;
-    const el = now - start;
-    const t = el / 1000;
+    const realEl = now - start;
+    // GS-story-finisher: on an interactive win the timeline HOLDS at the breach frame (eye exposed) until
+    // the player lands the strike, then resumes the proven win-climax from `climaxStart`. The serpent +
+    // reticle keep animating off the continuous wall clock (`realEl`), so the held frame stays alive.
+    let el = realEl;
+    let aiming = false;
+    if (interactive) {
+      if (!struck) {
+        el = Math.min(realEl, B.breach);
+        aiming = realEl >= B.breach;
+      } else {
+        el = B.breach + (now - climaxStart);
+      }
+    }
+    const t = realEl / 1000;
+    const lashing = interactive && !struck && now < lashUntil;
     try {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
@@ -391,6 +509,10 @@ export function mountStoryFinale(opts: { won: boolean; onDone?: () => void } = {
         ctx.stroke();
       }
       if (!(won && el >= B.climax)) drawShip(shipX, shipY, won ? -0.15 : 0.25, thrust);
+
+      // GS-story-finisher: the interactive AIM overlay — a reticle sweeping the serpent's head that the
+      // player taps to fire the golf ball into the eye. Only while holding at the exposed-eye frame.
+      if (aiming) drawAim(t, headPos(t, 0).y, lashing);
 
       // title text
       if (el >= B.climax) {
