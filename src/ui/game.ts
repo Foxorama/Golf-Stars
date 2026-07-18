@@ -74,6 +74,7 @@ import {
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
 import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
+import { allyTalk } from '../sim/rpg/storyAllies';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament } from '../sim/rpg/storyTournaments';
@@ -484,10 +485,29 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'setStoryCaddy': {
-      // GS-story-caddies: choose which owned caddy carries your bag (an EQUIP, from the clubhouse Locker).
-      if (state.screen !== 'storyLocker' || !state.story) return state;
+      // GS-story-caddies: choose which owned caddy carries your bag (an EQUIP). Reachable from the Locker
+      // AND from an ally's talk card on the clubhouse hub (GS-story-allies — "carry my bag").
+      if ((state.screen !== 'storyLocker' && state.screen !== 'story') || !state.story) return state;
       const story = setActiveStoryCaddy(state.story, action.caddyId);
       return story === state.story ? state : { ...state, story };
+    }
+
+    case 'storyInspectAlly': {
+      // GS-story-allies: tap a recruited crew ally on the clubhouse → open their talk card (banter starts on
+      // the first line). Guarded to the hub + a real hired ally, so a stray tap can't open a mute card.
+      if (state.screen !== 'story' || !state.story) return state;
+      if (!state.story.hiredCaddyIds.includes(action.caddyId) || !allyTalk(action.caddyId)) return state;
+      return { ...state, storyAllyInspectId: action.caddyId, storyAllyTalk: 0 };
+    }
+
+    case 'storyAllyTalk': {
+      // GS-story-allies: cycle the open ally's banter line (the Parrot-bar tap pattern). Purely cosmetic.
+      if (state.screen !== 'story' || state.storyAllyInspectId !== action.caddyId) return state;
+      return { ...state, storyAllyTalk: (state.storyAllyTalk ?? 0) + 1 };
+    }
+
+    case 'storyCloseAlly': {
+      return state.storyAllyInspectId ? { ...state, storyAllyInspectId: undefined, storyAllyTalk: undefined } : state;
     }
 
     case 'storyInspectItem': {
