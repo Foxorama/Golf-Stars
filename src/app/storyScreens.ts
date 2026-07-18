@@ -173,12 +173,14 @@ function spaceClubhouseHTML(story: StoryState): string {
     </header>
 
     <section style="max-width:520px;margin:8px auto 0;">
-      <div style="display:flex;align-items:center;gap:14px;background:var(--gs-panel,#161a24);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;">
+      <button data-action='${JSON.stringify({ type: 'openStoryBar' })}' title="Visit the Crow's Nest"
+        style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;cursor:pointer;background:var(--gs-panel,#161a24);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;color:inherit;font:inherit;">
         <span aria-hidden="true" style="flex:0 0 auto;">${shipCardSVG(story.equippedShipId, 108, 66)}</span>
-        <p style="margin:0;color:var(--gs-dim);font-size:14px;line-height:1.45;">
+        <span style="margin:0;color:var(--gs-dim);font-size:14px;line-height:1.45;">
           <span style="color:#7fe0a0;">🦜 The Prognostic Parrot:</span> <em>${parrotLine}</em>
-        </p>
-      </div>
+          <span style="display:block;margin-top:4px;color:#7fe0a0;font-size:12px;font-style:normal;">🍺 Tap to join him at the Crow's Nest ›</span>
+        </span>
+      </button>
     </section>
 
     ${tournamentBannerHTML(story)}
@@ -188,6 +190,7 @@ function spaceClubhouseHTML(story: StoryState): string {
       <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Set course — the star chart</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryLocker' })}'>🎒 Locker — build your bag &amp; gear</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryShipyard' })}'>🚀 Shipyard — buy &amp; fly ships</button>
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryBar' })}'>🍺 The Crow's Nest — talk to the captain</button>
       <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
       ${hubFooterHTML()}
     </div>`;

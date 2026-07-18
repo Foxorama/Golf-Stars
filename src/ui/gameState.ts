@@ -66,6 +66,8 @@ export type Screen =
   | 'storyChoice'
   // GS-story-midchapter: the emotional interlude between the route majors (win a friend back / sever one).
   | 'storyInterlude'
+  // GS-story-parrot-bar: "The Crow's Nest" — the Parrot's cantina; tap for campaign-adaptive chatter.
+  | 'storyBar'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
   | 'lore';
 
@@ -270,6 +272,9 @@ export interface UiState {
   storyShopWorldId?: string;
   /** GS-story-econ: the shop item whose lore card is open (over the rack). Absent ⇒ no card. Transient. */
   storyItemInspectId?: string;
+  /** GS-story-parrot-bar: the Parrot's chatter tap-count at the bar (0 = greeting; each tap advances,
+   *  wrapping through the eligible lines). Transient — reset to 0 each time the bar is opened, never saved. */
+  storyBarTalk?: number;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -347,6 +352,9 @@ export type Action =
   | { type: 'storyFinaleContinue' } // GS-story-yggdrasil: dismiss the recap (to clubhouse; victory → title)
   | { type: 'chooseAlignment'; alignment: 'warden' | 'herald' } // GS-story-chapters: The Choice after Ch.3
   | { type: 'storyInterludeContinue' } // GS-story-midchapter: dismiss the emotional interlude (apply its outcome)
+  | { type: 'openStoryBar' } // GS-story-parrot-bar: enter the Parrot's cantina from the clubhouse
+  | { type: 'exitStoryBar' } // GS-story-parrot-bar: back to the clubhouse from the bar
+  | { type: 'parrotBarNext' } // GS-story-parrot-bar: tap the Parrot for the next line (advance the chatter)
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

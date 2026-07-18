@@ -118,6 +118,40 @@ describe('Story star map (GS-story-map)', () => {
   });
 });
 
+describe('Parrot Bar (GS-story-parrot-bar)', () => {
+  function spaceHub(chapter = 2) {
+    const story = { ...defaultStoryState('feather-fade'), chapter };
+    return { ...initState('seed', {}, undefined, story), screen: 'story' as const };
+  }
+
+  it('opens the Crow\'s Nest from the clubhouse (chatter starts on the greeting) and back', () => {
+    const hub = spaceHub();
+    const bar = reduce(hub, { type: 'openStoryBar' });
+    expect(bar.screen).toBe('storyBar');
+    expect(bar.storyBarTalk).toBe(0);
+    const back = reduce(bar, { type: 'exitStoryBar' });
+    expect(back.screen).toBe('story');
+    expect(back.storyBarTalk).toBeUndefined();
+    expect(back.story).toBe(hub.story); // purely cosmetic — the campaign is untouched
+  });
+
+  it('tapping the Parrot advances the chatter counter (no story write)', () => {
+    const bar = reduce(spaceHub(), { type: 'openStoryBar' });
+    const t1 = reduce(bar, { type: 'parrotBarNext' });
+    expect(t1.storyBarTalk).toBe(1);
+    const t2 = reduce(t1, { type: 'parrotBarNext' });
+    expect(t2.storyBarTalk).toBe(2);
+    expect(t2.story).toBe(bar.story);
+  });
+
+  it('the bar actions are no-ops off their screens', () => {
+    const hub = spaceHub();
+    expect(reduce(hub, { type: 'parrotBarNext' })).toBe(hub); // not at the bar
+    const bar = reduce(hub, { type: 'openStoryBar' });
+    expect(reduce(bar, { type: 'openStoryBar' })).toBe(bar); // already at the bar (screen guard)
+  });
+});
+
 describe('Story dialogue beats (GS-story-beats)', () => {
   it('teeing off a Chapter-2 story round diverts the intro to the Coil beat, then dismiss continues', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 2 };
