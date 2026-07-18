@@ -10,7 +10,10 @@ import {
   rivalTotal,
   winTournament,
   sigilCount,
+  tournamentField,
+  tournamentLeaderboard,
 } from '../src/sim/rpg/storyTournaments';
+import { CHARACTERS } from '../src/sim/rpg/characters';
 import {
   defaultStoryState,
   recordWorldClear,
@@ -128,5 +131,40 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
       return s / 80;
     };
     expect(mean(t5)).toBeLessThan(mean(t1));
+  });
+});
+
+describe('Tournament FIELD — all competitors (GS-story-tournament-field)', () => {
+  const t = STORY_TOURNAMENTS[0]!; // Ch.1 Emerald Invitational (rival = Birdie Bianchi, not a playable golfer)
+  const pars = Array.from({ length: 18 }, (_, i) => (i % 3 === 0 ? 5 : i % 3 === 1 ? 3 : 4));
+
+  it('the field is the rival + your three friends (never the protagonist), deterministic from the seed', () => {
+    const prot = CHARACTERS[0]!.id;
+    const field = tournamentField(t, 'field-seed', pars, prot);
+    // rival + the three non-protagonist playable golfers.
+    expect(field.filter((g) => g.kind === 'rival')).toHaveLength(1);
+    expect(field.filter((g) => g.kind === 'friend')).toHaveLength(CHARACTERS.length - 1);
+    expect(field.some((g) => g.id === prot)).toBe(false); // never yourself
+    // Deterministic: same seed → identical grosses.
+    const again = tournamentField(t, 'field-seed', pars, prot);
+    expect(again.map((g) => g.gross)).toEqual(field.map((g) => g.gross));
+    // Different seed → the field re-rolls (grosses can differ).
+    const other = tournamentField(t, 'other-seed', pars, prot);
+    expect(other.map((g) => g.gross)).not.toEqual(field.map((g) => g.gross));
+  });
+
+  it('the finished leaderboard folds YOU in and sorts low-gross-first (ties keep you ahead)', () => {
+    const field = tournamentField(t, 'lb-seed', pars, CHARACTERS[0]!.id);
+    const board = tournamentLeaderboard(field, 'You', 70);
+    expect(board).toHaveLength(field.length + 1);
+    // sorted ascending by gross
+    for (let i = 1; i < board.length; i++) expect(board[i]!.gross).toBeGreaterThanOrEqual(board[i - 1]!.gross);
+    expect(board.filter((g) => g.kind === 'player')).toHaveLength(1);
+    // A tie puts the player ahead of the tied rival/friend.
+    const tieGross = field[0]!.gross;
+    const tied = tournamentLeaderboard(field, 'You', tieGross);
+    const youIdx = tied.findIndex((g) => g.kind === 'player');
+    const rivalIdx = tied.findIndex((g) => g.id === field[0]!.id);
+    if (field[0]!.gross === tieGross) expect(youIdx).toBeLessThan(rivalIdx);
   });
 });

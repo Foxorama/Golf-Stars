@@ -46,7 +46,8 @@ import {
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
-import { tournamentForChapter, rivalTotal, winTournament, SIGIL_WIN_BONUS } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS } from '../sim/rpg/storyTournaments';
+import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
 
@@ -413,6 +414,16 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   const pars = state.course.holes.map((h) => h.par);
   const rivalGross = rivalTotal(t, String(run.seed), pars);
   const won = totals.gross <= rivalGross;
+  // GS-story-tournament-field: the full "all competitors" leaderboard for the victory recap — the rival +
+  // your three friendly-rival golfers + you, sorted low-gross-first. Display only (the WIN is still you vs
+  // the rival for the Sigil, above); deterministic from the round seed.
+  const field = tournamentField(t, String(run.seed), pars, base.characterId);
+  const playerName = getCharacter(base.characterId)?.shortName ?? 'You';
+  const leaderboard = tournamentLeaderboard(field, playerName, totals.gross).map((g) => ({
+    name: g.kind === 'player' ? 'You' : g.name,
+    gross: g.gross,
+    kind: g.kind,
+  }));
 
   // Bank the round (credits + best) exactly like a world clear, PLUS the Sigil milestone bonus on a first
   // win (GS-story-balance): the majors fund the escalating bag/ship/finale spend.
@@ -460,6 +471,8 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       rivalGross,
       won,
       finalSigil,
+      par: totals.totalPar,
+      leaderboard,
     },
   };
 }
