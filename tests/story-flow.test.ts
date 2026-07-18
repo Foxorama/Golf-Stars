@@ -299,6 +299,60 @@ describe('Story Pro Shop flow (GS-story-econ)', () => {
   });
 });
 
+describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything (GS-story-shop-access)', () => {
+  // A campaign that just cleared a world, sitting on the world-clear recap.
+  function afterClear(courseId: string, extraCleared: string[] = []) {
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 2,
+      credits: 3000,
+      clearedWorldIds: ['standrews-18', courseId, ...extraCleared],
+    };
+    return {
+      ...initState('seed', {}, undefined, story),
+      screen: 'storyResult' as const,
+      lastStoryRound: { courseId, toPar: -2, strokes: 70, par: 72, credits: 200, advancedChapter: false, wasPrologue: false },
+    };
+  }
+
+  it('the Pro Shop opens from the world-clear RECAP and returns to the clubhouse', () => {
+    const recap = afterClear('verdant-18');
+    const shop = reduce(recap, { type: 'openStoryShop', worldId: 'verdant-18' });
+    expect(shop.screen).toBe('storyShop');
+    expect(shop.storyShopWorldId).toBe('verdant-18');
+    expect(shop.storyShopReturn).toBe('story');
+    expect(reduce(shop, { type: 'exitStoryShop' }).screen).toBe('story');
+  });
+
+  it('the Pro Shop is NOT reachable from the clubhouse (a per-world shop keeps the galaxy big)', () => {
+    const hub = { ...afterClear('verdant-18'), screen: 'story' as const };
+    expect(reduce(hub, { type: 'openStoryShop', worldId: 'verdant-18' }).screen).toBe('story'); // no-op
+  });
+
+  it('a ship-vendor world opens its shipyard from the recap (buy mode) and returns to the clubhouse', () => {
+    const recap = afterClear('desert-18'); // desert-18 is the Ch.1 ship vendor
+    const yard = reduce(recap, { type: 'openStoryShipyard', worldId: 'desert-18' });
+    expect(yard.screen).toBe('storyShipyard');
+    expect(yard.storyShipyardWorldId).toBe('desert-18');
+    expect(reduce(yard, { type: 'exitStoryShipyard' }).screen).toBe('story');
+  });
+
+  it('opening a vendor shipyard refuses a non-vendor world and an uncleared world', () => {
+    const recap = afterClear('verdant-18'); // verdant is a Pro-Shop world, NOT a ship vendor
+    expect(reduce(recap, { type: 'openStoryShipyard', worldId: 'verdant-18' }).screen).toBe('storyResult'); // no-op
+    // desert-18 IS a vendor, but this campaign hasn't cleared it → still refused.
+    expect(reduce(recap, { type: 'openStoryShipyard', worldId: 'desert-18' }).screen).toBe('storyResult'); // no-op
+  });
+
+  it('the clubhouse opens the HANGAR (equip-only, no vendor world) and returns to the clubhouse', () => {
+    const hub = { ...afterClear('desert-18'), screen: 'story' as const };
+    const hangar = reduce(hub, { type: 'openStoryShipyard' }); // no worldId → hangar
+    expect(hangar.screen).toBe('storyShipyard');
+    expect(hangar.storyShipyardWorldId).toBeUndefined();
+    expect(reduce(hangar, { type: 'exitStoryShipyard' }).screen).toBe('story');
+  });
+});
+
 describe('Story locker flow (GS-story-locker)', () => {
   // A Chapter-1 campaign at the spaceport clubhouse, holding a bought Planet 5-Wood + a gear glove.
   function lockerReady() {

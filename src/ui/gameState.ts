@@ -270,6 +270,14 @@ export interface UiState {
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence' };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
   storyShopWorldId?: string;
+  /** GS-story-shop-access: the screen the Pro Shop was opened FROM, so exiting returns there — the star map
+   *  (a dossier tap) or the world-clear recap. Transient. */
+  storyShopReturn?: Screen;
+  /** GS-story-ship-vendors: the ship-vendor world whose shipyard is open (buy mode). Absent ⇒ the clubhouse
+   *  HANGAR (equip an owned ship only, no buying). Transient. */
+  storyShipyardWorldId?: string;
+  /** GS-story-ship-vendors: the screen the shipyard was opened FROM, so exiting returns there. Transient. */
+  storyShipyardReturn?: Screen;
   /** GS-story-econ: the shop item whose lore card is open (over the rack). Absent ⇒ no card. Transient. */
   storyItemInspectId?: string;
   /** GS-story-parrot-bar: the Parrot's chatter tap-count at the bar (0 = greeting; each tap advances,
@@ -337,7 +345,7 @@ export type Action =
   | { type: 'storyUnequipClub'; clubId: string } // GS-story-locker: take a club out of the bag (to the bench)
   | { type: 'storyEquipGear'; gearId: string } // GS-story-locker: equip an owned gear item in its slot
   | { type: 'storyUnequipGear'; slot: string } // GS-story-locker: empty a gear slot
-  | { type: 'openStoryShipyard' } // GS-story-ships: open the spaceport shipyard from the clubhouse
+  | { type: 'openStoryShipyard'; worldId?: string } // GS-story-ship-vendors: worldId ⇒ that vendor world's shipyard (buy); absent ⇒ the clubhouse Hangar (equip only)
   | { type: 'exitStoryShipyard' } // GS-story-ships: back to the clubhouse from the shipyard
   | { type: 'storyBuyShip'; shipId: string } // GS-story-ships: buy a ship (spend credits, fly it)
   | { type: 'storyEquipShip'; shipId: string } // GS-story-ships: fly an owned ship

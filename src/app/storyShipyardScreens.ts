@@ -15,8 +15,8 @@ import { loreCardHTML } from '../render/loreCard';
 import type { StoryState } from '../sim/rpg/story';
 import { COSMETIC_RARITY } from '../sim/rpg/cosmetics';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { staticCourseSpec } from '../sim/course/staticCourses';
 import {
-  STORY_SHIPS,
   storyShipRow,
   storyShipHull,
   storyShipRevealed,
@@ -24,10 +24,10 @@ import {
   storyShipEquipped,
   canBuyStoryShip,
   storyShipDetail,
+  worldShipStock,
   type StoryShip,
 } from '../sim/rpg/storyShips';
 import {
-  STORY_SHIP_UPGRADES,
   shipUpgradeById,
   isShipUpgradeId,
   upgradeRevealed,
@@ -60,37 +60,67 @@ export function storyShipyardScreen(): string {
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'exitStoryShipyard' })}'>‹ Back</button>
       </div>`;
   }
-  // The starter wagon (owned free) first, then the fleet by rarity; hide unrevealed milestone/secret/ace ships.
-  const rows: { shipId: string; row?: StoryShip }[] = [{ shipId: DEFAULT_SHIP_ID }];
-  const revealed = STORY_SHIPS.filter((r) => storyShipRevealed(story, r) || storyShipOwned(story, r.shipId));
-  revealed.sort((a, b) => {
-    const ra = storyShipHull(a.shipId)?.rarity ?? 'common';
-    const rb = storyShipHull(b.shipId)?.rarity ?? 'common';
-    return COSMETIC_RARITY[ra].order - COSMETIC_RARITY[rb].order;
-  });
-  for (const r of revealed) rows.push({ shipId: r.shipId, row: r });
-
-  const cards = rows.map(({ shipId }) => yardCard(shipId)).join('');
   const overlay = state.storyItemInspectId ? inspectOverlay(state.storyItemInspectId) : '';
+  const rating = combatRating(story);
+  const vendorWorldId = state.storyShipyardWorldId;
 
-  // GS-story-ship-upgrades: the outfitting bay — weapons/engines/shields, grouped, gated by reveal.
+  // ── HANGAR (clubhouse, no vendor world): fly an owned ship, see your combat rating. NO buying — ships
+  //    and upgrades are bought at the ship-vendor WORLDS (GS-story-ship-vendors). ────────────────────────
+  if (!vendorWorldId) {
+    const owned = [DEFAULT_SHIP_ID, ...story.ownedShipIds.filter((id) => id !== DEFAULT_SHIP_ID)];
+    const seen = new Set<string>();
+    const cards = owned.filter((id) => (seen.has(id) ? false : (seen.add(id), true))).map((id) => yardCard(id)).join('');
+    return `
+      <header class="gs-hero gs-storyhub">
+        <h1 class="gs-hero-title">🚀 Hangar</h1>
+        <p class="gs-hero-tag">Fly your fleet</p>
+        <div class="gs-hero-chips">
+          <span class="gs-chip" style="border-color:#3a2030;color:#ff8a8a;font-size:14px;" title="fleet combat readiness for the finale">⚔ <b>${rating}</b> combat</span>
+        </div>
+      </header>
+      <section style="max-width:600px;margin:2px auto 0;">
+        <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:2px 0 12px;">
+          <em>Your berth. Tap a ship you own to fly it.</em>
+          <span style="display:block;margin-top:4px;color:#7fd8ff;font-size:12px;">New ships &amp; upgrades are bought at each world's <b>Shipyard</b> — fly out to the vendor worlds to arm up.</span>
+        </p>
+        <div class="gs-yard-grid">${cards}</div>
+      </section>
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
+        <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShipyard' })}'>‹ Back to the clubhouse</button>
+      </div>
+      ${overlay}
+      ${YARD_STYLE}`;
+  }
+
+  // ── VENDOR (a cleared ship-vendor world): buy the ships + upgrades THIS world stocks. Travel back to
+  //    a vendor world to buy what you skipped — the per-world economy (GS-story-ship-vendors). ───────────
+  const worldName = staticCourseSpec(vendorWorldId)?.name ?? 'Shipyard';
+  const stock = worldShipStock(vendorWorldId);
+  const shipRows = stock.ships
+    .map((id) => ({ id, row: storyShipRow(id) }))
+    .filter(({ id, row }) => !row || storyShipRevealed(story, row) || storyShipOwned(story, id))
+    .sort((a, b) => {
+      const ra = storyShipHull(a.id)?.rarity ?? 'common';
+      const rb = storyShipHull(b.id)?.rarity ?? 'common';
+      return COSMETIC_RARITY[ra].order - COSMETIC_RARITY[rb].order;
+    });
+  const shipCards = shipRows.map(({ id }) => yardCard(id)).join('');
+
   const CATS: { cat: UpgradeCategory; label: string }[] = [
     { cat: 'weapon', label: '🔫 Weapons' },
     { cat: 'engine', label: '🚀 Engines' },
     { cat: 'shield', label: '🛡 Shields' },
   ];
+  const stockUpgrades = stock.upgrades.map((id) => shipUpgradeById(id)).filter((u): u is StoryShipUpgrade => !!u);
   const upgradeSections = CATS.map(({ cat, label }) => {
-    const items = STORY_SHIP_UPGRADES.filter(
-      (u) => u.category === cat && (upgradeRevealed(story, u) || ownsUpgrade(story, u.id)),
-    );
+    const items = stockUpgrades.filter((u) => u.category === cat && (upgradeRevealed(story, u) || ownsUpgrade(story, u.id)));
     if (!items.length) return '';
     return `<div class="gs-yard-usec">${label}</div><div class="gs-yard-grid">${items.map((u) => upgradeCard(u)).join('')}</div>`;
   }).join('');
-  const rating = combatRating(story);
 
   return `
     <header class="gs-hero gs-storyhub">
-      <h1 class="gs-hero-title">🚀 Shipyard</h1>
+      <h1 class="gs-hero-title">🚀 ${worldName} Shipyard</h1>
       <p class="gs-hero-tag">Buy your ride · arm your ship</p>
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="credits">✦ <b>${story.credits}</b></span>
@@ -99,20 +129,23 @@ export function storyShipyardScreen(): string {
     </header>
     <section style="max-width:600px;margin:2px auto 0;">
       <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:2px 0 12px;">
-        <em>The berths hum with ships from every corner of the galaxy. Some you can buy today; some the galaxy hands you once you&rsquo;ve earned them.</em>
+        <em>This berth stocks its own hulls and arms — buy them here, or fly back for what you skip. The next world's yard carries different wares.</em>
       </p>
-      <div class="gs-yard-grid">${cards}</div>
+      ${shipCards ? `<div class="gs-yard-grid">${shipCards}</div>` : ''}
 
-      <h2 class="gs-yard-sec">Weapons &amp; upgrades</h2>
+      ${upgradeSections ? `<h2 class="gs-yard-sec">Weapons &amp; upgrades</h2>
       <p style="text-align:center;color:var(--gs-dim);font-size:12px;line-height:1.5;margin:0 0 10px;">
         <span style="color:#7fe0a0;">🦜 "Arm up, ${who(story)}."</span> Every piece raises your <b style="color:#ff8a8a;">combat rating</b> — you'll need it when the serpent wakes.
-      </p>
-      ${upgradeSections || '<div class="gs-yard-cant" style="text-align:center;">The outfitting bay stocks more as you clear worlds.</div>'}
+      </p>${upgradeSections}` : ''}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShipyard' })}'>‹ Back to the clubhouse</button>
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShipyard' })}'>‹ Leave the shipyard</button>
     </div>
     ${overlay}
+    ${YARD_STYLE}`;
+}
+
+const YARD_STYLE = `
     <style>
       .gs-yard-sec{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--gs-ink,#eaf1fb);margin:18px 0 6px;padding-top:12px;border-top:1px solid #232b3b;}
       .gs-yard-usec{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--gs-dim,#9fb0c8);margin:12px 0 7px;}
@@ -134,7 +167,6 @@ export function storyShipyardScreen(): string {
       .gs-yard-owned{text-align:center;color:#7fe0a0;font-weight:700;font-size:14px;padding:8px;}
       .gs-yard-cant{text-align:center;color:#c86a6a;font-size:13px;line-height:1.4;padding:6px;}
     </style>`;
-}
 
 /** A card per ship — art + name + its state (Flying / Fly / price / can't-afford). Tap → lore card. */
 function yardCard(shipId: string): string {

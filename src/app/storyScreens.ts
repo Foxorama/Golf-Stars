@@ -18,6 +18,8 @@ import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/sto
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { currentTournament } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked } from '../sim/rpg/storyFinale';
+import { worldHasShop } from '../sim/rpg/storyShop';
+import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 
 export function storyHubScreen(): string {
@@ -189,7 +191,7 @@ function spaceClubhouseHTML(story: StoryState): string {
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
       <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Set course — the star chart</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryLocker' })}'>🎒 Locker — build your bag &amp; gear</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryShipyard' })}'>🚀 Shipyard — buy &amp; fly ships</button>
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryShipyard' })}'>🚀 Hangar — fly your fleet</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryBar' })}'>🍺 The Crow's Nest — talk to the captain</button>
       <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
       ${hubFooterHTML()}
@@ -235,13 +237,18 @@ export function storyResultScreen(): string {
           : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`
       }
     </section>
-    <div style="max-width:420px;margin:18px auto 0;">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:18px auto 0;">
       ${
         r.wasPrologue
           ? // GS-story-intro: the prologue victory plays the recruitment cinematic before the clubhouse
             // (app.ts wires `data-story-intro`), so it does NOT use the plain continue action.
             `<button class="gs-btn" data-story-intro="1">Answer the call ›</button>`
-          : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>Back to the clubhouse ›</button>`
+          : // GS-story-shop-access: shop the world you just cleared right here (Pro Shop always; the ship
+            // vendor worlds also open their shipyard) — no need to fly back for the first visit. Both are
+            // guarded to a cleared, stocking world, so they only show where there's something to buy.
+            `${worldHasShop(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: r.courseId })}'>🛒 Visit the Pro Shop</button>` : ''}
+             ${worldIsShipVendor(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: r.courseId })}'>🚀 Visit the Shipyard</button>` : ''}
+             <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>Back to the clubhouse ›</button>`
       }
     </div>`;
 }

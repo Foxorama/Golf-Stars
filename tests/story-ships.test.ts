@@ -12,8 +12,13 @@ import {
   shipCreditMult,
   storyShipDetail,
   isStoryShipId,
+  SHIP_VENDOR_STOCK,
+  worldIsShipVendor,
+  worldShipStock,
 } from '../src/sim/rpg/storyShips';
-import { defaultStoryState, addCredits, recordWorldClear, type StoryState } from '../src/sim/rpg/story';
+import { STORY_SHIP_UPGRADES, shipUpgradeById } from '../src/sim/rpg/storyShipUpgrades';
+import { FINALE_BREACH_NEED, FINALE_SURVIVE_NEED } from '../src/sim/rpg/storyFinale';
+import { defaultStoryState, addCredits, recordWorldClear, STORY_WORLDS, type StoryState } from '../src/sim/rpg/story';
 import { ACE_SHIP_ID, DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 
 function clearN(story: StoryState, n: number): StoryState {
@@ -38,6 +43,45 @@ describe('story ships catalogue (GS-story-ships)', () => {
     expect(kinds.has('ace')).toBe(true);
     expect(kinds.has('secret')).toBe(true);
     expect(isStoryShipId('not-a-ship')).toBe(false);
+  });
+
+  it('ships + upgrades are sold at ship-vendor WORLDS, not a clubhouse bay (GS-story-ship-vendors)', () => {
+    const vendorWorlds = Object.keys(SHIP_VENDOR_STOCK);
+    const realWorldIds = new Set(STORY_WORLDS.map((w) => w.courseId));
+    // Every vendor world is a real, travel-to-able world, and it actually stocks something.
+    for (const wid of vendorWorlds) {
+      expect(realWorldIds.has(wid), `${wid} is a real world`).toBe(true);
+      expect(worldIsShipVendor(wid)).toBe(true);
+      const stock = worldShipStock(wid);
+      expect(stock.ships.length + stock.upgrades.length).toBeGreaterThan(0);
+      for (const id of stock.ships) expect(storyShipHull(id), `${id} hull`).toBeTruthy();
+      for (const id of stock.upgrades) expect(shipUpgradeById(id), `${id} upgrade`).toBeTruthy();
+    }
+    // A non-vendor world (a Pro-Shop-only world) is not a ship vendor.
+    expect(worldIsShipVendor('verdant-18')).toBe(false);
+    expect(worldShipStock('verdant-18').ships.length).toBe(0);
+
+    // Every SELLABLE ship (buy / milestone / secret — NOT the granted ace/reward ships) is stocked at
+    // exactly one vendor, so a player can always reach it by travelling.
+    const sellable = STORY_SHIPS.filter((r) => r.acquire === 'buy' || r.acquire === 'milestone' || r.acquire === 'secret');
+    const allVendorShips = vendorWorlds.flatMap((w) => [...SHIP_VENDOR_STOCK[w]!.ships]);
+    for (const r of sellable) {
+      expect(allVendorShips.filter((id) => id === r.shipId).length, `${r.shipId} sold once`).toBe(1);
+    }
+    // Granted ships are NEVER on a vendor rack.
+    for (const r of STORY_SHIPS.filter((r) => r.acquire === 'ace' || r.acquire === 'reward')) {
+      expect(allVendorShips.includes(r.shipId), `${r.shipId} not sold`).toBe(false);
+    }
+    // Every upgrade is stocked at exactly one vendor (the finale arsenal is fully reachable by travel).
+    const allVendorUpgrades = vendorWorlds.flatMap((w) => [...SHIP_VENDOR_STOCK[w]!.upgrades]);
+    for (const u of STORY_SHIP_UPGRADES) {
+      expect(allVendorUpgrades.filter((id) => id === u.id).length, `${u.id} sold once`).toBe(1);
+    }
+    // The finale-critical arsenal clears BOTH gates when fully assembled from the vendors.
+    const weaponTotal = STORY_SHIP_UPGRADES.filter((u) => u.category === 'weapon').reduce((s, u) => s + u.battle, 0);
+    const defenceTotal = STORY_SHIP_UPGRADES.filter((u) => u.category !== 'weapon').reduce((s, u) => s + u.battle, 0);
+    expect(weaponTotal).toBeGreaterThanOrEqual(FINALE_BREACH_NEED);
+    expect(defenceTotal).toBeGreaterThanOrEqual(FINALE_SURVIVE_NEED);
   });
 
   it('milestone + secret ships stay hidden until enough worlds are cleared; ace ships never show for sale', () => {

@@ -25,6 +25,7 @@ import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
 import { storyWorldShoppable } from '../sim/rpg/storyShop';
+import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
 import { getCharacter } from '../sim/rpg/characters';
@@ -397,6 +398,11 @@ function dossier(w: StarTourWorld): string {
   const shopBtn = shoppable
     ? `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#2a2416,#1c1810);border-color:#5a4a22;color:#e9c46a;" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: w.id })}'>🛒 Pro Shop</button>`
     : '';
+  // GS-story-ship-vendors: a cleared SHIP-VENDOR world also opens its shipyard here (buy ships/upgrades;
+  // fly back to re-buy). Only the handful of vendor worlds show it — the galaxy stays a place you travel.
+  const yardBtn = cleared && worldIsShipVendor(w.id)
+    ? `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#161f2e,#0f1622);border-color:#2f5a7a;color:#7fd8ff;" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: w.id })}'>🚀 Shipyard</button>`
+    : '';
   return `
     <div class="gs-st-sheet" role="dialog" aria-label="${w.name}">
       <button class="gs-st-sheet__close" data-startour-close="1" aria-label="Close">✕</button>
@@ -409,6 +415,7 @@ function dossier(w: StarTourWorld): string {
       ${story ? '' : `<div class="gs-st-sheet__wxlabel">Weather sky</div>${weatherPicker()}`}
       <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${playLabel}</button>
       ${shopBtn}
+      ${yardBtn}
     </div>`;
 }
 

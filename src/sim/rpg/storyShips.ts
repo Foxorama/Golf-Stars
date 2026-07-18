@@ -168,6 +168,41 @@ export const STORY_SHIPS: readonly StoryShip[] = [
   },
 ];
 
+/**
+ * GS-story-ship-vendors — ships + ship upgrades are NOT sold from a clubhouse "buy anything" bay (that
+ * shrinks the galaxy). Each is sold at a DEDICATED SHIP-VENDOR WORLD, one per chapter: you reach its
+ * shipyard from that cleared world (its star-map dossier or the world-clear recap), and to buy something
+ * you skipped you fly BACK to that world — the same per-world model as the Pro Shop. Different worlds
+ * stock different ships/upgrades, so the galaxy stays a place you travel. The clubhouse keeps only the
+ * HANGAR (fly an owned ship), never a purchase. Stock is keyed by world id → the ship + upgrade ids it
+ * sells; every buyable ship + every upgrade appears at exactly one vendor (proven by `tests/story-ships`),
+ * and the finale-critical arsenal is all reachable by Chapter 3. Upgrade ids are the `upg:<cat>:<var>`
+ * strings from `storyShipUpgrades.ts` (validated there, not imported here to avoid a cycle).
+ */
+export const SHIP_VENDOR_STOCK: Record<string, { ships: readonly string[]; upgrades: readonly string[] }> = {
+  // Chapter 1 — Vela Dunes: the entry berth. The first ride upgrades + the starter arsenal.
+  'desert-18': { ships: ['wagon-chrome', 'racer-redline'], upgrades: ['upg:weapon:scatter', 'upg:engine:ion', 'upg:shield:deflector'] },
+  // Chapter 2 — Cygnus Links: heavier hulls + the serious guns.
+  'frost-18': { ships: ['hauler-barge', 'ufo-saucer'], upgrades: ['upg:weapon:railgun', 'upg:engine:warp'] },
+  // Chapter 3 — Vulpecula Hollows: the fast hull + the capital shield (a finale-ready arsenal is now
+  // assembled from the first three vendors).
+  'fungal-18': { ships: ['moto-nitro'], upgrades: ['upg:shield:aegis'] },
+  // Chapter 4 — Sagittarius Core: the celestial milestone hull + the apex weapon/engine.
+  'void2-18': { ships: ['pegasus-valkyrie'], upgrades: ['upg:weapon:nova', 'upg:engine:singularity'] },
+  // Chapter 5 — Cetus Shelf: the grail + the capital bulwark.
+  'cetus-18': { ships: ['ufo-mothership'], upgrades: ['upg:shield:bulwark'] },
+};
+
+/** Is this world a ship-vendor (sells ships/upgrades from its shipyard)? */
+export function worldIsShipVendor(worldId: string): boolean {
+  const s = SHIP_VENDOR_STOCK[worldId];
+  return !!s && (s.ships.length > 0 || s.upgrades.length > 0);
+}
+/** The ship + upgrade ids a vendor world stocks (empty for a non-vendor world). */
+export function worldShipStock(worldId: string): { ships: readonly string[]; upgrades: readonly string[] } {
+  return SHIP_VENDOR_STOCK[worldId] ?? { ships: [], upgrades: [] };
+}
+
 const STORY_SHIP_BY_ID: Record<string, StoryShip> = Object.fromEntries(STORY_SHIPS.map((s) => [s.shipId, s]));
 
 /** The story-fleet row + its shared hull for a ship id (undefined if it isn't a story ship). */
