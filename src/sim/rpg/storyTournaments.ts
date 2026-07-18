@@ -60,7 +60,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     chapter: 1,
     venueId: 'verdant-18',
     name: 'The Emerald Invitational',
-    host: 'The Lyra Golf Club',
+    host: 'Sir Aldous Greensward',
     rivalId: 'tour-birdie',
     rivalName: 'Birdie Bianchi',
     rivalEdge: 0.07,
@@ -69,16 +69,17 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilName: 'The Emerald Sigil',
     prize: 'The Verdant Wood — a reliable fairway wood, your first real reward.',
     intro: [
-      'The rookie major. Green fairways, a warm twin-sun, and a gallery that still thinks this is just ' +
-        'golf. It isn’t — but today you can pretend, and win your first Sigil of the Game.',
-      'Beat the club’s champion, Birdie Bianchi, over eighteen and the Emerald Sigil is yours.',
+      'The rookie major, hosted by Sir Aldous Greensward — genteel old-guard chair of the Galactic Tour, ' +
+        'pompous and kind and utterly ignorant of the Game beneath his tournament. A warm twin-sun, and a ' +
+        'gallery that still thinks this is just golf. It isn’t — but today you can pretend.',
+      'Beat the club’s champion, Birdie Bianchi, over eighteen and your first Sigil of the Game is yours.',
     ],
   },
   {
     chapter: 2,
     venueId: 'inferno-18',
     name: 'The Forge Masters',
-    host: 'Master Cinderwright',
+    host: 'Magnus Cinder',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
     rivalEdge: 0.12,
@@ -87,8 +88,10 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilName: 'The Ember Sigil',
     prize: 'The Forgefire Driver — reborn in the fire, longer than anything you own.',
     intro: [
-      'The anvil-world of Orion. Halfway through, an uninvited golfer strides onto the tee: Venoma "the ' +
-        'Viper" Krait, the Coil’s prodigy, playing a ball that hisses as it flies.',
+      'The anvil-world of Orion, staged by Magnus Cinder — a bombastic pyromaniac promoter who’ll do ' +
+        'anything for spectacle, and who took Coil money without ever knowing what he sold. Halfway ' +
+        'through, an uninvited golfer strides onto the tee: Venoma "the Viper" Krait, the Coil’s prodigy, ' +
+        'playing a ball that hisses as it flies.',
       '🦜 "That’s the Coil, champion — a cult that wants the serpent awake. Beat her. This is where it ' +
         'stops being a game."',
     ],
@@ -141,7 +144,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     alignment: 'herald',
     venueId: 'ocean-18',
     name: 'The Drowning Rite',
-    host: 'The Coil',
+    host: 'Sister Ecdysis',
     rivalId: 'penelope',
     rivalName: 'Penelope',
     rivalEdge: 0.23,
@@ -151,9 +154,10 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     prize: 'The Coil Wyrm-Ship — a corrupted serpent-hull, power with a price.',
     rewardShipId: 'wyrm-ship',
     intro: [
-      'You wear the Coil’s mark now. At the Eridanus Atolls you desecrate a Warden shrine to drown its ' +
-        'wards — and the Warden sent to stop you is Penelope, who once read your putts. She does not ' +
-        'recognise the golfer you have become.',
+      'You wear the Coil’s mark now, and Sister Ecdysis — the Shedmaker, who forges the cult’s cursed ' +
+        'relics from serpent-scale — presides over your rite. At the Eridanus Atolls you desecrate a ' +
+        'Warden shrine to drown its wards — and the Warden sent to stop you is Penelope, who once read ' +
+        'your putts. She does not recognise the golfer you have become.',
       'Play the rite, put your old friend to the sword, and take the Drowned Sigil.',
     ],
   },

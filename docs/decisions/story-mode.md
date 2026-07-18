@@ -256,6 +256,13 @@ Ordered so each ships something playable and nothing lands before its foundation
   tournament flow in `tests/story-flow.test.ts`, and the `?screen=storytournament[result]` smokes. Deferred
   from the full vision (later chunks): a distinct **qualifier→final** two-round shape, the **Coil faction**
   row (`factions.ts`), and richer **host/rival dialogue beats**.
+  - **GS-story-hosts** — ✅ *shipped* (the review flavour pass, `reports/story-mode-review-2026-07-18.md`).
+    The tournament `host` fields were generic placeholders ("The Lyra Golf Club", "Master Cinderwright",
+    "The Coil"); restored to the bible's named cast — **Sir Aldous Greensward** (Ch.1, the genteel pompous
+    Tour chair), **Magnus Cinder** (Ch.2, the bombastic promoter who took Coil money), **Sister Ecdysis**
+    (Ch.4 Herald, the Coil's Shedmaker) — with their characterisation woven into each `intro`, and the
+    lobby's rival glyph now distinguishes the Apostate (🖤). Data/render only, no save bump. Guarded by the
+    host coverage in `tests/story-tournament.test.ts`.
 - **GS-story-chapters (the alignment fork)** — ✅ *shipped* (`app/storyChoiceScreens.ts` + `alignment` on
   `StoryState` + alignment-variant rows in `storyTournaments.ts`). **The Choice** fires after the Chapter-3
   Storm-Sigil win (`storyTournamentContinue` diverts to `storyChoice` once, path unchosen): stay a **Warden**
