@@ -188,6 +188,21 @@ Ordered so each ships something playable and nothing lands before its foundation
   the Ch.1 balance assertions hold. Pure model + reducer wiring — no save bump. Guarded by
   `tests/story-state.test.ts` (scaling + revisit + `storyWorldChapter`) and the revisit wiring in
   `tests/story-flow.test.ts`.
+- **GS-story-worlddiff** — ✅ *shipped* (the flat-difficulty fix, review finding D2). A Story world round
+  pinned the static course with `staticEffect:'none'`, so the moment-to-moment golf was flat Ch.1→Ch.5 —
+  only the tournament ghost edge scaled ("difficulty is just length"). Now each world plays under a WIND
+  scaled by its difficulty TIER (`storyWorldEffect` off `storyWorldChapter`): calm at Ch.1, stiffening
+  `solarWind → solarStorm → dustStorm → ionStorm` by Ch.5. It's the existing weather-PHYSICS lever
+  (`applyEffectPhysics` — pure wind/carry, NO geometry), so it never touches the layout (records / Star-Tour
+  stay comparable, `validateFairness`/`Crossings` untouched, auto ≡ interactive by construction) and wind
+  reads TRUE off the shot bearing — the strategic axis (club up, aim off), not more length. Deliberately the
+  PURE wind/carry effects only (no craters/lies/tents). Scaled by the WORLD (tier), not the run chapter, so
+  a world's test is stable across revisits (`worldBest` comparable); the Earth prologue (tier 1) stays calm.
+  Set in `storyPlayWorld`/`storyPlayTournament`'s `staticEffect`; a Ch.1 world is byte-for-byte the old
+  `'none'` round, so every existing story-flow test (which plays Ch.1 worlds) is unchanged. No save bump.
+  Guarded by the tier-effect coverage in `tests/story-state.test.ts` + a "deep world blows the wildest sky
+  and still resolves" round in `tests/story-flow.test.ts`. (Geometry-based scaling — tighter/longer late
+  worlds — is a deferred, riskier follow-up; wind is the fair, records-safe first pass.)
 - **GS-story-caddies** — ✅ *shipped* ("gather your friends" — the caddy roster the review flagged as a
   hole). The campaign's Warden allies are the existing NAMED caddies (Driver Dan, Penelope, Sandy, Dr
   Chipinski, Mystic Mole, Suggestible Sam); you **recruit** them one at a time out in the galaxy — each

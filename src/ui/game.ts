@@ -68,6 +68,7 @@ import {
   equipStoryClub,
   unequipStoryClub,
   chooseAlignment,
+  storyWorldEffect,
   type StoryState,
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
@@ -403,7 +404,9 @@ export function reduce(state: UiState, action: Action): UiState {
         ...run0,
         loadout,
         staticCourseId: action.courseId,
-        staticEffect: 'none',
+        // GS-story-worlddiff: deep worlds play under a stiffer WIND (pure physics, records-safe) so they're
+        // harder, not just longer — scaled by the world's tier, calm at Ch.1 → the wildest sky by Ch.5.
+        staticEffect: storyWorldEffect(action.courseId),
         storyRound: true,
       };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
@@ -640,7 +643,8 @@ export function reduce(state: UiState, action: Action): UiState {
         ...run0,
         loadout,
         staticCourseId: t.venueId,
-        staticEffect: 'none',
+        // GS-story-worlddiff: the major plays under its venue's tier wind too (the ghost rival also scales).
+        staticEffect: storyWorldEffect(t.venueId),
         storyRound: true,
         storyTournament: t.chapter,
       };
