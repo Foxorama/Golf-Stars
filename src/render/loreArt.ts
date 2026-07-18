@@ -18,6 +18,8 @@ export function lorePortraitSVG(id: string): string {
       return venomaPortraitSVG();
     case 'coilkeeper':
       return coilkeeperPortraitSVG();
+    case 'voss':
+      return vossPortraitSVG();
     default:
       return '';
   }
@@ -415,5 +417,124 @@ export function coilkeeperPortraitSVG(): string {
   <!-- a small acid sigil pin at the brow of the hood -->
   <circle cx="160" cy="100" r="6" fill="none" stroke="#7fe0a0" stroke-width="2" opacity="0.8"/>
   <circle cx="160" cy="100" r="1.8" fill="#7fe0a0" opacity="0.9"/>
+</svg>`;
+}
+
+/**
+ * Malachai "Sable" Voss, the Apostate, up close (GS-story-apostate) — the World Tour champion BEFORE you,
+ * the last mortal to play a course perfectly true, who heard the serpent whisper and fell. Your dark
+ * mirror. Drawn as a HUMAN face (unlike the viper Venoma or the faceless Coilkeeper) so the tragedy reads:
+ * a gaunt, once-handsome champion, hollow-cheeked, hair gone half to grey, a thin CERTAIN smile — a man
+ * utterly at peace with the end of everything, which is worse than any snarl. The corruption is subtle:
+ * an acid-green serpent-shine behind the eyes, and a coat grown from SHED serpent-scale (plum + acid-green
+ * edge, the Coil palette) drawn over a champion's collar. His identity motif is the BLACK DRIVER THAT
+ * DRIPS resting at the far shoulder (the mirror of Driver Dan's honest slung driver), a bead of dark
+ * ichor falling from its head. Desaturated and human next to Venoma's saturated menace — grief, not venom.
+ */
+export function vossPortraitSVG(): string {
+  return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Malachai Sable Voss the Apostate" style="display:block;aspect-ratio:320/340;overflow:visible;">
+  <defs>
+    <radialGradient id="gs-lore-voss-spot" cx="50%" cy="40%" r="64%">
+      <stop offset="0%" stop-color="#33304a" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#181628" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#090812" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gs-lore-voss-coat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#33244a"/>
+      <stop offset="100%" stop-color="#171026"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-voss-skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b9b0bd"/>
+      <stop offset="100%" stop-color="#8f8598"/>
+    </linearGradient>
+    <radialGradient id="gs-lore-voss-eye" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#9ff0bf"/>
+      <stop offset="100%" stop-color="#2f6a4c"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft spotlight halo -->
+  <ellipse cx="160" cy="150" rx="150" ry="162" fill="url(#gs-lore-voss-spot)"/>
+
+  <!-- the BLACK DRIVER THAT DRIPS, resting at the far shoulder (his identity motif — a dark mirror of
+       Driver Dan's honest slung driver) -->
+  <g transform="translate(238 214) rotate(-26)" stroke="#1a1622" stroke-width="6" stroke-linecap="round">
+    <line x1="-8" y1="48" x2="30" y2="-32"/>
+  </g>
+  <path d="M262 172 Q286 172 284 192 Q282 206 262 204 Q248 202 248 186 Q248 174 262 172 Z" transform="rotate(-26 266 188)" fill="#100c18" stroke="#3a2e4a" stroke-width="2"/>
+  <ellipse cx="256" cy="182" rx="6" ry="3.4" transform="rotate(-26 266 188)" fill="#2a2238"/>
+  <!-- a bead of dark ichor falling from the driver head -->
+  <path d="M270 210 q-3 8 0 14 q3 -6 0 -14 Z" fill="#1a1226" opacity="0.9"/>
+  <circle cx="270" cy="228" r="3.2" fill="#140e20"/>
+
+  <!-- shoulders / coat of shed serpent-scale -->
+  <path d="M34 340 Q40 250 96 236 Q160 224 224 236 Q280 250 286 340 Z" fill="url(#gs-lore-voss-coat)"/>
+  <path d="M34 340 Q40 250 96 236 Q120 232 132 236 Q92 262 84 340 Z" fill="#000" opacity="0.18"/>
+  <!-- shed-scale texture, acid-green edged -->
+  <g fill="#2f2246" opacity="0.7"><path d="M72 298 q9 -9 18 0 q-9 9 -18 0 Z"/><path d="M104 312 q9 -9 18 0 q-9 9 -18 0 Z"/><path d="M200 312 q9 -9 18 0 q-9 9 -18 0 Z"/><path d="M232 298 q9 -9 18 0 q-9 9 -18 0 Z"/></g>
+  <g fill="none" stroke="#4f8f6a" stroke-width="1.4" opacity="0.5"><path d="M72 298 q9 -9 18 0"/><path d="M232 298 q9 -9 18 0"/></g>
+  <!-- a champion's collar under the coat, one green-lit lapel edge -->
+  <path d="M122 240 Q160 292 198 240 L210 250 Q160 312 110 250 Z" fill="#120c1e"/>
+  <path d="M122 240 Q160 292 198 240" fill="none" stroke="#6fd0a0" stroke-width="2.4" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- neck, gaunt -->
+  <path d="M138 220 Q138 248 160 254 Q182 248 182 220 L182 198 L138 198 Z" fill="url(#gs-lore-voss-skin)"/>
+  <path d="M138 220 Q138 244 160 250 L160 202 L138 202 Z" fill="#000" opacity="0.12"/>
+  <!-- hollow at the throat -->
+  <path d="M150 210 Q160 220 170 210" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+
+  <!-- head: a lean, hollow-cheeked champion's face -->
+  <path d="M112 150 Q112 94 160 90 Q208 94 208 150 Q208 204 160 216 Q112 204 112 150 Z" fill="url(#gs-lore-voss-skin)"/>
+  <!-- deep hollow cheeks + jaw shadow -->
+  <path d="M160 216 Q124 206 116 158 Q126 194 148 188 Q140 200 160 208 Z" fill="#000" opacity="0.13"/>
+  <path d="M160 216 Q196 206 204 158 Q194 194 172 188 Q180 200 160 208 Z" fill="#000" opacity="0.10"/>
+  <path d="M134 172 Q140 186 150 190" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" opacity="0.10"/>
+  <path d="M186 172 Q180 186 170 190" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" opacity="0.10"/>
+
+  <!-- a creeping scale mark at the temple (the corruption spreading) -->
+  <g fill="#5a4a70" opacity="0.5"><path d="M118 140 l5 -5 5 5 -5 5 Z"/><path d="M120 158 l5 -5 5 5 -5 5 Z"/></g>
+
+  <!-- ears -->
+  <ellipse cx="112" cy="162" rx="8" ry="13" fill="#a89ab0"/>
+  <ellipse cx="208" cy="162" rx="8" ry="13" fill="#a89ab0"/>
+
+  <!-- flat, tired brows -->
+  <path d="M124 138 Q140 132 156 138 Q140 135 124 142 Z" fill="#2a2436"/>
+  <path d="M164 138 Q180 132 196 138 Q180 135 164 142 Z" fill="#2a2436"/>
+
+  <!-- eyes — hollow, ringed, with a cold acid-green shine behind them (he sees the Long Rest and welcomes it) -->
+  <ellipse cx="141" cy="151" rx="12" ry="7.5" fill="#0d1512"/>
+  <ellipse cx="179" cy="151" rx="12" ry="7.5" fill="#0d1512"/>
+  <circle cx="141" cy="151" r="5.4" fill="url(#gs-lore-voss-eye)"/>
+  <circle cx="179" cy="151" r="5.4" fill="url(#gs-lore-voss-eye)"/>
+  <circle cx="141" cy="151" r="2.4" fill="#0b1a12"/>
+  <circle cx="179" cy="151" r="2.4" fill="#0b1a12"/>
+  <circle cx="139" cy="149" r="1.3" fill="#d8ffe8" opacity="0.9"/>
+  <circle cx="177" cy="149" r="1.3" fill="#d8ffe8" opacity="0.9"/>
+  <!-- hooded upper lids + dark hollows below -->
+  <path d="M128 148 Q141 141 154 148" fill="none" stroke="#1a1424" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M166 148 Q179 141 192 148" fill="none" stroke="#1a1424" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M130 160 Q141 164 152 160" fill="none" stroke="#6a5c78" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+  <path d="M168 160 Q179 164 190 160" fill="none" stroke="#6a5c78" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- straight nose -->
+  <path d="M160 152 Q157 170 152 179 Q160 184 168 179 Q163 170 160 152 Z" fill="#9a8fa4"/>
+  <path d="M152 179 Q160 183 168 179" fill="none" stroke="#7a6f86" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- the thin, CERTAIN smile — no cruelty, just a man completely at peace with the end -->
+  <path d="M138 196 Q160 204 182 196" fill="none" stroke="#3a2e46" stroke-width="3" stroke-linecap="round"/>
+  <path d="M144 199 Q160 205 176 199" fill="none" stroke="#6fd0a0" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+  <!-- gaunt nasolabial lines -->
+  <path d="M147 179 Q141 190 145 199" fill="none" stroke="#6a5c78" stroke-width="1.6" stroke-linecap="round" opacity="0.45"/>
+  <path d="M173 179 Q179 190 175 199" fill="none" stroke="#6a5c78" stroke-width="1.6" stroke-linecap="round" opacity="0.45"/>
+
+  <!-- dark hair, swept back, gone half to grey -->
+  <path d="M108 132 Q100 78 160 72 Q220 78 212 132 Q212 108 196 100 Q160 84 124 100 Q108 108 108 132 Z" fill="#20202e"/>
+  <!-- grey streak + swept strands -->
+  <path d="M150 78 Q146 100 150 128" fill="none" stroke="#8a8898" stroke-width="4" stroke-linecap="round" opacity="0.75"/>
+  <path d="M120 106 Q140 90 166 90" fill="none" stroke="#3a3a4c" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <path d="M196 108 Q182 92 160 90" fill="none" stroke="#3a3a4c" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <!-- a faint acid-green halo bleeding from the hair (the whisper he carries) -->
+  <path d="M108 128 Q100 80 160 74 Q220 80 212 128" fill="none" stroke="#4f8f6a" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
 </svg>`;
 }

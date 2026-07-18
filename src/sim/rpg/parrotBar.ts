@@ -119,6 +119,12 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
     text: "Venoma. The Viper. She'll smile and out-drive you and tell you the end of everything is a kind of peace. Don't argue with her — just beat her. The scoreboard's the only sermon she respects.",
   },
   {
+    id: 'coil-apostate',
+    kind: 'coil',
+    when: (c) => !c.completed && c.chapter >= 3,
+    text: "You met Voss out in the storm, then. The Apostate. He held this bag before you did — best there ever was, until the serpent got a claw into him. Don't hate him, champion. Fear what got him. It's the same voice that's whispering to you.",
+  },
+  {
     id: 'coil-final',
     kind: 'coil',
     when: (c) => !c.completed && c.sigils >= 5,

@@ -98,8 +98,10 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     venueId: 'tempest-18',
     name: 'The Storm Championship',
     host: 'A shadow tournament — the Coil',
-    rivalId: 'venoma',
-    rivalName: 'Venoma "the Viper" Krait',
+    // GS-story-apostate: the Storm is where the Apostate plays himself — not to win, but to SHOW you.
+    // (All story rivals share the default ghost profile, so this is a name/edge change only — balance-neutral.)
+    rivalId: 'voss',
+    rivalName: 'Malachai "Sable" Voss',
     rivalEdge: 0.18,
     unlockAfterClears: 2,
     sigilId: 'sigil-storm',
@@ -108,7 +110,8 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     intro: [
       'The tour "postponed" it; the Coil runs a shadow tournament in the eye of the Dragon’s storm, and ' +
         'you crash it to take the Sigil before they can corrupt it. The rough itself seems to move.',
-      'Out-play Venoma in the gale and the Storm Sigil is yours — the third of five.',
+      'And he is here — the Apostate, Malachai Voss, the champion who fell. He will not try to beat you. ' +
+        'He will try to make you understand. Out-play him in the gale and the Storm Sigil is yours.',
     ],
   },
   // ── Chapter 4 — the routes diverge (The Choice was made after Chapter 3) ──

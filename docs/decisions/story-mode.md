@@ -319,6 +319,16 @@ Ordered so each ships something playable and nothing lands before its foundation
   `dismissLore` continues to the intro. UI/render + a pure DATA table — zero sim rng (determinism/
   auto≡interactive untouched), no `_gs*`/URL hook. Guarded by `tests/lore.test.ts` (pure triggers +
   portrait coverage) + the story-beat flow in `tests/story-flow.test.ts`.
+- **GS-story-apostate** — ✅ *shipped* (the review pass, `reports/story-mode-review-2026-07-18.md`). The
+  bible's central antagonist, **Malachai "Sable" Voss, the Apostate** — previously absent from the build —
+  now lands as a `voss` lore PORTRAIT (a human, tragic dark-mirror in the house SVG language + Coil palette,
+  motif = the black driver that drips), a Ch.3 `story-apostate` beat (he holes an impossible shot and hands
+  you the Coil's argument, placed after the Coilkeepers beat), the Ch.3 Storm Championship **rival** (a
+  name-only swap off Venoma — all story rivals share the default ghost profile, so it's balance-neutral),
+  the speaker who makes **The Offer** on the `storyChoice` screen (his portrait + quote replacing the
+  anonymous Coilkeeper framing), and a `coil-apostate` parrot-bar line. Content/data + render only — zero
+  sim rng, no save bump. Guarded by `tests/lore.test.ts`. Closes the review's top story gap (the tempter
+  who gives The Choice its weight).
 - **GS-story-parrot-bar** — ✅ *shipped* (the Parrot BAR interaction). "The Crow's Nest" — a cosmetic
   Story-Tour hangout aboard the Mothership, reached from the spaceport clubhouse (a "🍺 The Crow's Nest"
   doorway + the existing hub Parrot strip is now tappable). You TAP the Prognostic Parrot (or "Another,
