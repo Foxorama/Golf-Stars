@@ -497,6 +497,25 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, screen: 'story', storyItemInspectId: undefined };
     }
 
+    case 'openStoryBar': {
+      // GS-story-parrot-bar: enter the Parrot's cantina from the spaceport clubhouse; the chatter starts
+      // on the greeting (talk 0). Purely cosmetic — no story write, no rng.
+      if (state.screen !== 'story' || !state.story) return state;
+      return { ...state, screen: 'storyBar', storyBarTalk: 0 };
+    }
+
+    case 'exitStoryBar': {
+      if (state.screen !== 'storyBar') return state;
+      return { ...state, screen: 'story', storyBarTalk: undefined };
+    }
+
+    case 'parrotBarNext': {
+      // Tap the Parrot for the next line — advance the transient chatter counter (the screen cycles it
+      // through the eligible lines). A no-op off the bar screen.
+      if (state.screen !== 'storyBar') return state;
+      return { ...state, storyBarTalk: (state.storyBarTalk ?? 0) + 1 };
+    }
+
     case 'storyEquipClub': {
       // GS-story-locker: put an owned club into the bag (one per type; ≤14). No-op if the bag is full for
       // a new type (the locker shows a "bag full" hint). Keeps the lore card open so you see the result.

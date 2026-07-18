@@ -89,6 +89,7 @@ import { storyTournamentScreen, storyTournamentResultScreen } from './app/storyT
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
 import { storyInterludeScreen } from './app/storyInterludeScreens';
+import { storyBarScreen } from './app/storyBarScreens';
 import { mountStoryFinale } from './render/storyFinale';
 import { finaleResult } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
@@ -148,7 +149,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament|storyfinale|storychoice|storyinterlude` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -268,6 +269,13 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
       return reduce(hub1, { type: 'openStoryShipyard' });
+    }
+    case 'storybar': {
+      // GS-story-parrot-bar: reach the Crow's Nest the honest way — prologue → Chapter 1 spaceport → open bar.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
+      return reduce(hub1, { type: 'openStoryBar' });
     }
     case 'storytournament':
     case 'storytournamentresult': {
@@ -2337,6 +2345,8 @@ function render(): void {
       ? storyChoiceScreen()
       : state.screen === 'storyInterlude'
       ? storyInterludeScreen()
+      : state.screen === 'storyBar'
+      ? storyBarScreen()
       : state.screen === 'lore'
       ? loreScreen()
       : gameoverScreen();

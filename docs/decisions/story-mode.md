@@ -318,8 +318,22 @@ Ordered so each ships something playable and nothing lands before its foundation
   rounds arrive through `withLoreGate`, a Ch.2+ arrival diverts to the `'lore'` screen first, then
   `dismissLore` continues to the intro. UI/render + a pure DATA table — zero sim rng (determinism/
   auto≡interactive untouched), no `_gs*`/URL hook. Guarded by `tests/lore.test.ts` (pure triggers +
-  portrait coverage) + the story-beat flow in `tests/story-flow.test.ts`. **Remaining Phase-G polish:**
-  the Parrot BAR interaction (tap → chatter) and the cross-chapter difficulty/economy balance pass.
+  portrait coverage) + the story-beat flow in `tests/story-flow.test.ts`.
+- **GS-story-parrot-bar** — ✅ *shipped* (the Parrot BAR interaction). "The Crow's Nest" — a cosmetic
+  Story-Tour hangout aboard the Mothership, reached from the spaceport clubhouse (a "🍺 The Crow's Nest"
+  doorway + the existing hub Parrot strip is now tappable). You TAP the Prognostic Parrot (or "Another,
+  captain ›") to cycle his chatter, which ADAPTS to the campaign: a state-appropriate GREETING leads
+  (chapter / chosen path / whether the finale's beaten), then rotating lore / Coil-threat / path / gameplay-
+  hint lines gated on `chapter`/`alignment`/`sigils`/`completed`. Content-as-data: `sim/rpg/parrotBar.ts`
+  (`PARROT_BAR_LINES` rows + pure `parrotBarLines`/`parrotBarLineAt`), a bespoke SVG cantina scene
+  (`render/parrotBarArt.ts` — a porthole onto space, a neon sign, a glowing bottle shelf, the Parrot behind
+  the counter reusing his lore bust `prognosticParrotPortraitSVG`), and the screen (`app/storyBarScreens.ts`,
+  own `.gs-pbar*` prefix). The tap counter is a TRANSIENT UiState field (`storyBarTalk`, reset on open) —
+  pure render, ZERO sim rng, NO save write (no `STORY_VERSION` bump), no `_gs*`/URL hook (just a new
+  `?screen=storybar` deep-link value). Guarded by `tests/parrot-bar.test.ts` (pure table + selectors +
+  cycling), the bar flow in `tests/story-flow.test.ts` (open/tap/exit, no story write), and the
+  `?screen=storybar` browser smoke. **Remaining Phase-G polish:** the cross-chapter difficulty/economy
+  balance pass.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
