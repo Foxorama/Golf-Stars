@@ -265,7 +265,7 @@ describe('build output (real browser)', () => {
     { screen: 'strokeresult', sel: '.gs-strres', text: 'Best rounds overall', label: 'the Star Tour round recap' },
     { screen: 'lore', sel: '.gs-lore', text: 'The Old Girl', label: 'the lore story-beat popup' },
     { screen: 'story', sel: '.gs-storyhub', text: 'World Tour', label: 'the Story Mode prologue (Earth) clubhouse' },
-    { screen: 'storyclub', sel: '.gs-sclub-scene', text: 'Clubhouse', label: 'the Story spaceport Mothership clubhouse scene' },
+    { screen: 'storyclub', sel: '.gs-sclub-scene', text: 'Your mission', label: 'the Story spaceport Mothership clubhouse scene + mission log' },
     { screen: 'storypick', sel: '.gs-eclub-ov', text: 'STRENGTHS', label: 'the Story golfer stats/abilities overlay' },
     { screen: 'storymap', sel: '.gs-startour', text: 'CLUBHOUSE', label: 'the Story galaxy star-map navigator' },
     { screen: 'storyresult', sel: '.gs-storyres', text: 'Champion', label: 'the Story prologue world-round recap' },

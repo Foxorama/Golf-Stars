@@ -483,6 +483,21 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `app.ts` toggles it. A compact illustrated locker-room banner (locker bank + bench + bag, pure byte-stable
   SVG) tops the screen. Pure render/view + one app handler — no sim/save/rng touch. Guarded by the existing
   `?screen=storylocker` browser smoke (bag panel open ⇒ `.gs-lock-grid` + "Your bag").
+- **GS-story-objective** — ✅ *shipped* (`sim/rpg/storyGuide.ts` + the clubhouse mission log + a new-game
+  premise card). Player feedback: "the new game start gives you no indication of what's happening or why
+  you are playing" and "after becoming world champion the game gives you nothing to go on — what do you
+  need to do, what's involved?". Two fixes: (1) a NEW-GAME PREMISE card on the golfer picker — a short
+  evocative brief (you're Earth's champion; win, and the Universe calls) + a 4-step road-map chip row
+  (🌍 Win Earth › 🚀 Voyage › 🏆 5 Sigils › 🐍 Slay Jörmungandr), so the campaign's shape is clear before
+  you tee off; the Earth clubhouse also gains a one-line "win to become Champion — then answer the call"
+  hook. (2) a MISSION LOG panel atop the spaceport clubhouse driven by the pure `storyObjective(story)`:
+  the overarching GOAL, a live Sigil progress row (5 pips + n/5), and the single most useful NEXT step —
+  prologue → clear N more worlds (with a ↳ Set course button) → the tournament is open → engage the finale
+  → complete (Star Tour unlocked). `storyObjective` is pure/deterministic, composed from the existing
+  progression predicates (`currentTournament`/`tournamentForChapter`/`worldsClearedInChapter`/
+  `finaleUnlocked`/`storyComplete`), so it's unit-tested (`tests/story-guide.test.ts`, every stage). Own
+  `.gs-mission*`/`.gs-premise*` CSS prefixes. No sim/save/rng touch. Guarded by the guide unit test + the
+  `?screen=storyclub` smoke (now asserts "Your mission").
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
