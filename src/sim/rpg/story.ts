@@ -78,13 +78,39 @@ export function storyWorldById(courseId: string): StoryWorld | undefined {
   return STORY_WORLDS.find((w) => w.courseId === courseId);
 }
 
+/** Payout scaling levers (GS-story-econ2 — the review economy pass, `reports/story-mode-review-2026-07-18.md`).
+ *  A world's pay now rides its DIFFICULTY (its unlock chapter — a brutal late world pays more than a gentle
+ *  early one, so tackling hard worlds is worth it) and a REVISIT pays a reduced TOP-UP (so re-flying the
+ *  easiest world you own on repeat isn't the optimal road to the finale arsenal — the grind loop the flat
+ *  economy invited). Both default to no-ops (`chapter` 1, not a revisit) so the classic flat pay is intact. */
+export const CHAPTER_CREDIT_STEP = 0.15; // per chapter past the first: Ch.1 ×1.0 → Ch.5 ×1.6
+export const REVISIT_CREDIT_MULT = 0.4; // a re-flown, already-cleared world pays a top-up, not the full purse
+
+/** Context for `storyRoundCredits` (all optional → the classic flat pay). `chapter` is the WORLD's difficulty
+ *  tier (its unlock chapter, 1..5), NOT the player's current chapter — so an easy Ch.1 world stays cheap even
+ *  late in the run. `revisit` = this world was already cleared before this round. */
+export interface RoundPayContext {
+  chapter?: number;
+  revisit?: boolean;
+}
+
 /** Credits paid for clearing a world round: a solid base, sweetened for going under par, floored so even a
- *  scrappy win pays. Deliberately simple for now (a single persistent purse) — the cross-chapter economy
- *  balance is a Phase G pass. `toPar` negative = under par. */
-export function storyRoundCredits(toPar: number): number {
+ *  scrappy win pays — then scaled by the world's difficulty tier and dropped to a top-up on a revisit
+ *  (GS-story-econ2). `toPar` negative = under par. An empty context is byte-for-byte the classic flat pay. */
+export function storyRoundCredits(toPar: number, ctx: RoundPayContext = {}): number {
   const BASE = 200;
   const PER_STROKE_UNDER = 15;
-  return Math.max(100, Math.round(BASE - toPar * PER_STROKE_UNDER));
+  const raw = Math.max(100, Math.round(BASE - toPar * PER_STROKE_UNDER));
+  const chapter = Math.max(1, Math.round(ctx.chapter ?? 1));
+  const chapterMult = 1 + CHAPTER_CREDIT_STEP * (chapter - 1);
+  const revisitMult = ctx.revisit ? REVISIT_CREDIT_MULT : 1;
+  return Math.max(1, Math.round(raw * chapterMult * revisitMult));
+}
+
+/** The difficulty tier (unlock chapter, 1..5) of a world for payout scaling — its `STORY_WORLDS` row, or 1
+ *  for anything off the chart (the Earth prologue). */
+export function storyWorldChapter(courseId: string): number {
+  return storyWorldById(courseId)?.unlockChapter ?? 1;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initState, reduce } from '../src/ui/game';
 import { DEFAULT_CHARACTER_ID } from '../src/sim/rpg/characters';
-import { defaultStoryState } from '../src/sim/rpg/story';
+import { defaultStoryState, REVISIT_CREDIT_MULT } from '../src/sim/rpg/story';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
 
 describe('Story Mode entry flow (GS-story-save wiring)', () => {
@@ -380,6 +380,23 @@ describe('Story shipyard flow (GS-story-ships)', () => {
     // base payout for the round × 1.25 (rounded) — always ≥ the floored base (100) × 1.25
     expect(done.lastStoryRound!.credits).toBe(earned);
     expect(earned).toBeGreaterThanOrEqual(Math.round(100 * 1.25));
+  });
+
+  it('a revisit of a cleared world pays only the reduced top-up (GS-story-econ2)', () => {
+    // Same seed + same bag → the same auto-played round; the only difference is whether the world was
+    // already cleared, so the credit ratio isolates the revisit top-up wiring in resolveStoryRound.
+    const base = { ...defaultStoryState('feather-fade'), chapter: 1, credits: 0, clearedWorldIds: ['standrews-18'] };
+    const firstState = { ...initState('econ-seed', {}, undefined, base), screen: 'story' as const };
+    const first = reduce(reduce(firstState, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    const firstEarned = first.lastStoryRound!.credits;
+
+    const revState = {
+      ...initState('econ-seed', {}, undefined, { ...base, clearedWorldIds: ['standrews-18', 'verdant-18'] }),
+      screen: 'story' as const,
+    };
+    const revisit = reduce(reduce(revState, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    expect(revisit.lastStoryRound!.credits).toBeLessThan(firstEarned);
+    expect(revisit.lastStoryRound!.credits / firstEarned).toBeCloseTo(REVISIT_CREDIT_MULT, 1);
   });
 
   it('buys a ship upgrade → combat rating rises + an engine bonus stacks onto the ship\'s (GS-story-ship-upgrades)', () => {
