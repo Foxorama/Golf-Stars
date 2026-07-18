@@ -96,6 +96,7 @@ import {
   stylePatches,
   constellationBackdrop,
   rainbowSky,
+  earthSky,
   windStreaks,
 } from './style/effects';
 
@@ -259,23 +260,32 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // spills down a real edge. Empty on every non-cetus world (the pass is gated to `arch === 'cetus'`).
   let cetusFaces: { top: Vec[]; height: number }[] = [];
 
-  // --- 1. Deep space: an opaque world-tinted base + soft nebula smears ---------
-  // The nebulae are SOFT radial GLOWS (luminous wash, the intro's sky) — NOT hard-edged flat discs,
-  // which read as a "weird static blob" floating over the hole. A touch brighter at the core than the
-  // old flat alpha (a glow falls off, so a flat-alpha peak looked anaemic) and feathered to nothing.
-  prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: space.base });
-  const nebPeak = scaleAlpha(space.nebula, 1.9);
-  for (let i = 0; i < 3; i++) {
-    prims.push({
-      t: 'glow',
-      c: [W * (0.08 + crng() * 0.84), H * (0.04 + crng() * 0.5)],
-      r: (0.3 + crng() * 0.3) * Math.max(W, H),
-      col: nebPeak,
-    });
-  }
+  // --- 1+2. The backdrop: EARTH gets a daylight sky, every space world gets the void ---------
+  // The one real-world course (the Old Course at St Andrews, `earth` archetype) is on planet Earth, so
+  // its out-of-bounds backdrop is a bright coastal SKY — a blue gradient, a warm sun, drifting clouds —
+  // NOT the deep-space base + starfield (GS-story-earth-sky). Gated to `earth` (and never rainbow), so
+  // every other world's §1/§2 is byte-for-byte unchanged; the animated play view likewise drops the
+  // twinkle starfield for earth (see `weather.ts`).
+  if (arch === 'earth' && !rainbow) {
+    prims.push(...earthSky(W, H, art.accents, crng));
+  } else {
+    // --- 1. Deep space: an opaque world-tinted base + soft nebula smears ---------
+    // The nebulae are SOFT radial GLOWS (luminous wash, the intro's sky) — NOT hard-edged flat discs,
+    // which read as a "weird static blob" floating over the hole. A touch brighter at the core than the
+    // old flat alpha (a glow falls off, so a flat-alpha peak looked anaemic) and feathered to nothing.
+    prims.push({ t: 'poly', pts: [[0, 0], [W, 0], [W, H], [0, H]], fill: space.base });
+    const nebPeak = scaleAlpha(space.nebula, 1.9);
+    for (let i = 0; i < 3; i++) {
+      prims.push({
+        t: 'glow',
+        c: [W * (0.08 + crng() * 0.84), H * (0.04 + crng() * 0.5)],
+        r: (0.3 + crng() * 0.3) * Math.max(W, H),
+        col: nebPeak,
+      });
+    }
 
-  // --- 2. Starfield in the void — the intro's sky, carried in-game -------------
-  if (art.accents > 0) {
+    // --- 2. Starfield in the void — the intro's sky, carried in-game -------------
+    if (art.accents > 0) {
     const starTarget = Math.round(90 * art.accents);
     for (let i = 0; i < starTarget; i++) {
       const sx = crng() * W;
@@ -316,7 +326,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'line', a: [hx, hy], b: [hx + Math.cos(ang) * len, hy + Math.sin(ang) * len], stroke: 'rgba(214,230,255,0.4)', sw: 1.4, round: true });
       prims.push({ t: 'circle', c: [hx, hy], r: 1.8, fill: 'rgba(255,255,255,0.95)' });
     }
-  }
+    }
+  } // end space-vs-earth backdrop branch
 
   // --- 2a. Rainbow Road's bespoke aurora sky (GS-rainbow-polish) --------------
   // Prismatic aurora curtains + coloured hero stars OVER the shared starfield, so the legendary ball

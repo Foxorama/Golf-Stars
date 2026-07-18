@@ -242,6 +242,11 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   const effect = o.effect || 'none';
   const windCol = WIND_RGBA[o.archetype] ?? WIND_RGBA.verdant;
   const spaceOn = o.spaceFX !== false;
+  // GS-story-earth-sky: the one real-world course (Old Course, St Andrews — `earth`) plays under a daylight
+  // SKY, not the star void (the static backdrop draws blue sky + sun + clouds), so the animated twinkle
+  // starfield + shooting stars are suppressed for earth. Everything else that rides `spaceOn` (the pale
+  // seaside spindrift `AMBIENT.earth`, the weather tint) stays on — only the stars go.
+  const starsOn = spaceOn && o.archetype !== 'earth';
   const windOn = o.wind !== false;
 
   let stars: Star[] = [];
@@ -515,7 +520,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   }
 
   function drawStars(ctx: CanvasRenderingContext2D, now: number): void {
-    if (!spaceOn) return;
+    if (!starsOn) return;
     const sprite = glowSprite();
     const mask = o.starMask?.() ?? null; // the drawn land — stars only twinkle over true space
     ctx.save();
@@ -541,7 +546,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   }
 
   function drawShootingStar(ctx: CanvasRenderingContext2D, now: number): void {
-    if (!spaceOn) return;
+    if (!starsOn) return;
     const period = 5200;
     const dur = 760;
     const sp = ((now + shootOff) % period) / dur;
