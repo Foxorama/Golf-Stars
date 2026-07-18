@@ -59,6 +59,8 @@ export type Screen =
   // GS-story-tournament: a chapter's Galaxy Tournament — the lobby (host/rival/Sigil) and the win/lose recap.
   | 'storyTournament'
   | 'storyTournamentResult'
+  // GS-story-tournament-midpop: the halftime (after hole 9) rival brag/curse pop in an 18-hole major.
+  | 'storyTournamentPop'
   // GS-story-yggdrasil: the finale — the Jörmungandr battle briefing and its victory/defeat recap.
   | 'storyFinale'
   | 'storyFinaleResult'
@@ -263,6 +265,8 @@ export interface UiState {
     playerGross: number;
     rivalGross: number;
     won: boolean;
+    /** The trophy id won (for the Sigil ceremony cinematic — GS-story-sigil-ceremony). */
+    sigilId?: string;
     /** True when this win took the fifth Sigil (the campaign is complete). */
     finalSigil: boolean;
     /** The venue's total par (for the scoreboard's to-par column). */
@@ -270,6 +274,17 @@ export interface UiState {
     /** GS-story-tournament-field: the FULL finished leaderboard (rival + your three friends + you), sorted
      *  low-gross-first — the "all competitors" scoreboard for the victory recap. */
     leaderboard?: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[];
+  };
+  /** GS-story-tournament-midpop: the halftime (after hole 9) rival pop payload — the rival BRAGS when
+   *  ahead / CURSES you when behind, over the standings through nine. Transient (the `storyTournamentPop`
+   *  screen reads it; cleared on "play on"). */
+  storyTournamentMidPop?: {
+    rivalId: string;
+    rivalName: string;
+    /** The rival is ahead (fewer strokes) → they brag; else they curse you (you're beating them). */
+    brag: boolean;
+    playerThru: number;
+    rivalThru: number;
   };
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence'; strike?: 'clean' | 'graze' };
@@ -366,6 +381,7 @@ export type Action =
   | { type: 'openStoryTournament' } // GS-story-tournament: open the chapter's Galaxy Tournament lobby
   | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
+  | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
   | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)
   | { type: 'exitStoryFinale' } // GS-story-yggdrasil: back to the clubhouse from the briefing

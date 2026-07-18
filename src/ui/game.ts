@@ -77,7 +77,7 @@ import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from
 import { allyTalk } from '../sim/rpg/storyAllies';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
-import { currentTournament } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter, rivalTotalThrough } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import type { GearSlot } from '../sim/rpg/story';
@@ -687,6 +687,18 @@ export function reduce(state: UiState, action: Action): UiState {
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }
 
+    case 'tournamentPopContinue': {
+      // GS-story-tournament-midpop: dismiss the halftime rival pop and play on — begin the back nine (hole
+      // index 9). Guarded to the pop screen with a live round.
+      if (state.screen !== 'storyTournamentPop' || !state.play) return state;
+      return {
+        ...state,
+        screen: 'playing',
+        storyTournamentMidPop: undefined,
+        play: beginHole(state.course.holes[9]!, 9),
+      };
+    }
+
     case 'storyTournamentContinue': {
       // GS-story-tournament: dismiss the tournament recap back to the clubhouse (already banked).
       // GS-story-chapters: winning Chapter 3 (the Storm Sigil) reaches THE CHOICE — divert to it once,
@@ -1144,6 +1156,30 @@ export function reduce(state: UiState, action: Action): UiState {
 
       // The Unending Universe's survival bar (GS-set-survival) is judged on the whole SET of four, so a
       // blow-up hole never ends the stop mid-way — play every hole, then `finishStop` scores the set's
+      // GS-story-tournament-midpop: the HALFTIME pop of an 18-hole major — after hole 9, the rival BRAGS if
+      // they're ahead / CURSES you if you're beating them. Interactive-only (this per-hole `holeComplete`
+      // path; the headless `play` resolves the whole round without it, so auto ≡ interactive + every
+      // `{type:'play'}` test is unaffected). Fires exactly once at the nine-hole boundary.
+      if (state.run.storyTournament && total === 18 && nextIdx === 9) {
+        const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
+        if (t) {
+          const pars = state.course.holes.map((h) => h.par);
+          const rivalThru = rivalTotalThrough(t, String(state.run.seed), pars, 9);
+          const playerThru = stopPlayed.reduce((s, p) => s + p.record.strokes, 0);
+          return {
+            ...state,
+            stopPlayed,
+            screen: 'storyTournamentPop',
+            storyTournamentMidPop: {
+              rivalId: t.rivalId,
+              rivalName: t.rivalName,
+              brag: rivalThru < playerThru, // rival ahead (fewer strokes) → they brag; else they curse you
+              playerThru,
+              rivalThru,
+            },
+          };
+        }
+      }
       // cumulative total (exactly as the headless `playStop` does), so auto ≡ interactive holds.
       if (nextIdx < total) {
         return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };

@@ -569,6 +569,39 @@ describe('Story tournament flow (GS-story-tournament)', () => {
     const done = reduce(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }), { type: 'play' });
     expect(done.strokePlayBest).toEqual(hub.strokePlayBest);
   });
+
+  it('the interactive tournament pops the halftime rival beat after hole 9, then plays on (GS-story-tournament-midpop)', () => {
+    const lobby = reduce(tournamentReady(), { type: 'openStoryTournament' });
+    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    let s = reduce(intro, { type: 'playInteractive' });
+    expect(s.screen).toBe('playing');
+    // play the front nine, hole by hole (the interactive path — where the pop lives).
+    let guard = 0;
+    let popped = false;
+    while (s.screen === 'playing' && guard++ < 40) {
+      while (s.play && !s.play.done && guard++ < 400) s = reduce(s, { type: 'autoShotHole' });
+      s = reduce(s, { type: 'holeComplete' });
+      if (s.screen === 'storyTournamentPop') { popped = true; break; }
+    }
+    expect(popped).toBe(true);
+    // the pop carries the standings through nine + a brag/curse flag consistent with them.
+    const p = s.storyTournamentMidPop!;
+    expect(p.rivalName).toBeTruthy();
+    expect(p.brag).toBe(p.rivalThru < p.playerThru);
+    // "play on" resumes at the back nine (hole index 9) and the pop clears.
+    const on = reduce(s, { type: 'tournamentPopContinue' });
+    expect(on.screen).toBe('playing');
+    expect(on.storyTournamentMidPop).toBeUndefined();
+    expect(on.play!.holeIndex).toBe(9);
+    // and the round still finishes to a tournament result (pop fires exactly once — no second pop).
+    guard = 0;
+    let s2 = on;
+    while (s2.screen === 'playing' && guard++ < 40) {
+      while (s2.play && !s2.play.done && guard++ < 400) s2 = reduce(s2, { type: 'autoShotHole' });
+      s2 = reduce(s2, { type: 'holeComplete' });
+    }
+    expect(s2.screen).toBe('storyTournamentResult');
+  });
 });
 
 describe('The Choice + alignment fork (GS-story-chapters)', () => {
