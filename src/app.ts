@@ -90,7 +90,7 @@ import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScr
 import { storyChoiceScreen } from './app/storyChoiceScreens';
 import { storyInterludeScreen } from './app/storyInterludeScreens';
 import { storyBarScreen } from './app/storyBarScreens';
-import { mountStoryFinale } from './render/storyFinale';
+import { mountStoryBattle } from './render/storyBattle';
 import { mountSigilCeremony } from './render/sigilCeremony';
 import { mountStoryEnding, endingVariant } from './render/storyEnding';
 import { finaleResult } from './sim/rpg/storyFinale';
@@ -2470,10 +2470,13 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-story-finale-engage]').forEach((el) => {
     el.addEventListener('click', () => {
       resumeAudio();
-      // GS-story-finisher: on a WIN the KILL is an interactive golf strike whose quality (clean/graze)
-      // colours the ending; a loss plays the old timed cinematic. The strike NEVER decides win/lose (the
-      // arm-up gates already did) — so an armed player always wins, with a clean or scrappy finish.
-      const won = state.story ? finaleResult(state.story).won : false;
+      // GS-story-battle: "Engage" plays the INTERACTIVE two-stage battle — Stage 1 you fire your weapon
+      // (charges + recharge) to drop the serpent while your shields weather its lunges; Stage 2 is the golf
+      // FINAL STRIKE into the eye. Whether you CAN win is still the deterministic arm-up verdict (`won`, the
+      // two gates), so an armed player always wins and an under-armed one always loses — skill sets the FEEL,
+      // the strike quality (clean/graze) colours the ending, but neither decides win/lose (no soft-lock).
+      const fr = state.story ? finaleResult(state.story) : undefined;
+      const won = fr?.won ?? false;
       // GS-story-endings: after the battle resolves, play the path+outcome ENDING cinematic (good/cult ×
       // win/lose) over the recap. The alignment is read off the live story (unchanged by the resolution).
       const alignment = state.story?.alignment;
@@ -2482,11 +2485,17 @@ function render(): void {
         mountStoryEnding({ variant: endingVariant(alignment, won) });
       };
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        // Reduced motion: skip both the battle cinematic AND the ending — straight to the recap.
+        // Reduced motion: skip both the battle AND the ending — straight to the recap.
         dispatch({ type: 'engageStoryFinale', strike: 'clean' });
         return;
       }
-      mountStoryFinale({ won, interactive: won, onDone: go });
+      mountStoryBattle({
+        won,
+        weaponRating: fr?.weaponRating ?? 0,
+        defenceRating: fr?.defenceRating ?? 0,
+        interactive: true,
+        onDone: go,
+      });
     });
   });
   // GS-story-sigil-ceremony: winning a Galaxy Tournament plays the Sigil→Keystone→serpent cinematic (the
