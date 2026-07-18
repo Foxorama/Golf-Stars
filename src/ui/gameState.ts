@@ -267,7 +267,7 @@ export interface UiState {
     finalSigil: boolean;
   };
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
-  lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence' };
+  lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence'; strike?: 'clean' | 'graze' };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
   storyShopWorldId?: string;
   /** GS-story-shop-access: the screen the Pro Shop was opened FROM, so exiting returns there — the star map
@@ -358,7 +358,7 @@ export type Action =
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
   | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)
   | { type: 'exitStoryFinale' } // GS-story-yggdrasil: back to the clubhouse from the briefing
-  | { type: 'engageStoryFinale' } // GS-story-yggdrasil: resolve the Jörmungandr battle → victory/defeat recap
+  | { type: 'engageStoryFinale'; strike?: 'clean' | 'graze' } // GS-story-yggdrasil/-finisher: resolve the battle → recap (strike = the interactive finisher quality)
   | { type: 'storyFinaleContinue' } // GS-story-yggdrasil: dismiss the recap (to clubhouse; victory → title)
   | { type: 'chooseAlignment'; alignment: 'warden' | 'herald' } // GS-story-chapters: The Choice after Ch.3
   | { type: 'storyInterludeContinue' } // GS-story-midchapter: dismiss the emotional interlude (apply its outcome)

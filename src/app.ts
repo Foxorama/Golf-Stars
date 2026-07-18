@@ -2456,13 +2456,16 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-story-finale-engage]').forEach((el) => {
     el.addEventListener('click', () => {
       resumeAudio();
-      const go = (): void => dispatch({ type: 'engageStoryFinale' });
+      // GS-story-finisher: on a WIN the KILL is an interactive golf strike whose quality (clean/graze)
+      // colours the ending; a loss plays the old timed cinematic. The strike NEVER decides win/lose (the
+      // arm-up gates already did) — so an armed player always wins, with a clean or scrappy finish.
       const won = state.story ? finaleResult(state.story).won : false;
+      const go = (strike: 'clean' | 'graze'): void => dispatch({ type: 'engageStoryFinale', strike });
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        go();
+        go('clean');
         return;
       }
-      mountStoryFinale({ won, onDone: go });
+      mountStoryFinale({ won, interactive: won, onDone: go });
     });
   });
   // Shop bag-inventory: tap an owned gear chip to pop its card (toggle), for comparison with the stock.

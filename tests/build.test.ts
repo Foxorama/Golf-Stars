@@ -380,6 +380,44 @@ describe('build output (real browser)', () => {
     60_000,
   );
 
+  // INTERACTIVE FINALE (GS-story-finisher). Engaging the armed finale mounts the Canvas2D battle overlay; on
+  // an armed win it holds at the exposed-eye AIM phase for the player's golf STRIKE. The canvas feel is
+  // eyes-on; this guards the WIRING: the overlay mounts, reaches the aim phase without a page error, and a
+  // strike (or skip) resolves to the victory recap (campaign complete → Star Tour unlocked).
+  it.runIf(chromePath)(
+    'engaging the finale mounts the interactive strike overlay and resolves to a win',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 }, reducedMotion: 'no-preference' });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=storyfinale&intro=0&seed=7', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        await page.getByText('Engage Jörmungandr', { exact: false }).first().click();
+        // The interactive battle overlay mounts.
+        await page.waitForSelector('[data-gs-storyfinale]', { timeout: 4000 });
+        // It HOLDS at the aim phase past the timed cinematic length (waiting for the player's strike) — a
+        // non-interactive cinematic would have finished by now. This guards the aim-hold render path.
+        await page.waitForTimeout(7000);
+        expect(await page.$('[data-gs-storyfinale]')).not.toBeNull();
+        // Skip resolves a clean win (the Skip button is never a punishment) → the victory recap.
+        await page.click('button:has-text("Skip")');
+        await page.waitForSelector('[data-gs-storyfinale]', { state: 'detached', timeout: 6000 });
+        await page.waitForSelector('.gs-storyres', { timeout: 4000 });
+        const txt = await page.evaluate(() => document.getElementById('app')?.textContent ?? '');
+        const done = await page.evaluate(() => JSON.parse(localStorage.getItem('gs_story') || '{}').completed);
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+        expect(txt).toContain('Star Tour is unlocked');
+        expect(done).toBe(true);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
   // STAR-MAP WEAPONS (GS-star-tour-weapons). The dashboard fire button spawns a themed projectile into the
   // `#gs-st-shots` SVG layer + ticks an ammo pip down — pure app-layer DOM the sim suite can't see. This
   // guards that the button mounts, firing appends a shot group, and the magazine decrements (and empties).

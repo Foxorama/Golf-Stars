@@ -82,6 +82,12 @@ export function storyFinaleResultScreen(): string {
     // GS-story-chapters: the ending diverges by the path chosen at The Choice — the Warden RESEAL (a clean
     // salvation) vs the Herald LONG REST (a victory that grieves).
     const herald = state.story?.alignment === 'herald';
+    // GS-story-finisher: the interactive strike's quality colours the win — a dead-centre CLEAN kill vs a
+    // GRAZE that clipped the eye (the serpent still falls; an armed champion always wins).
+    const graze = r.strike === 'graze';
+    const strikeLine = graze
+      ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the killing blow you wanted, but enough. The serpent falls all the same, and you'll always know how close it was.</p>`
+      : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to. A perfect kill.</p>`;
     const title = herald ? '🐍 The Long Rest' : '🌌 The Universe is Saved';
     const tag = herald
       ? 'The serpent is freed — and goes still. The galaxy holds its breath.'
@@ -102,6 +108,7 @@ export function storyFinaleResultScreen(): string {
         <p class="gs-hero-tag">${tag}</p>
       </header>
       <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
+        ${strikeLine}
         ${body}
         <p style="color:var(--gs-gold);"><b>★ Story Tour complete — Star Tour is unlocked on the title.</b></p>
       </section>
