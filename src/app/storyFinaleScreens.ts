@@ -88,15 +88,15 @@ export function storyFinaleResultScreen(): string {
     const strikeLine = graze
       ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the killing blow you wanted, but enough. The serpent falls all the same, and you'll always know how close it was.</p>`
       : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to. A perfect kill.</p>`;
-    const title = herald ? '🐍 The Long Rest' : '🌌 The Universe is Saved';
+    const title = herald ? '🐍 Ragnarök — The Long Rest' : '🌌 The Universe is Saved';
     const tag = herald
-      ? 'The serpent is freed — and goes still. The galaxy holds its breath.'
+      ? 'The serpent uncoils around the galaxy. The lights go out, one by one, into a final green silence.'
       : 'Jörmungandr falls. The corruption scatters into harmless light.';
     const body = herald
-      ? `<p>Your finisher struck true, but not to kill — to <em>release</em>. The corruption sloughs away and
-          the world-serpent, unbound at last, coils once around the galaxy and sleeps. The Coil hails you as
-          its Herald. The stars are quieter now. You tell yourself it was mercy.</p>
-         <p style="color:#c98adf;">🐍 "It is done, Herald. The old Game is over. What comes next is ours."</p>`
+      ? `<p>Your finisher struck true, but not to kill — to <em>release</em>. The World-Eater unwinds across
+          the sky, and the lights go out one by one, into a serene and perfect stillness. The Coil hails you
+          as its Herald as the last star gutters. The Universe is devoured. You tell yourself it was mercy.</p>
+         <p style="color:#b0e04f;">🐍 "It is done, Herald. The old Game is over. What comes next is rest — endless, perfect, still."</p>`
       : `<p>Your finisher found the serpent’s eye, and the world-eater came apart across the sky like a
           shattered constellation. The Great Game is won — the galaxy will spin on, and every world you
           crossed remembers the golfer who saved it.</p>
@@ -117,23 +117,35 @@ export function storyFinaleResultScreen(): string {
       </div>
       ${FIN_STYLE}`;
   }
-  const why =
-    r.failReason === 'firepower'
-      ? 'Your weapons couldn’t breach her hide — she barely felt them.'
-      : 'You couldn’t weather her coils — the strike sent you reeling into the dark.';
+  // GS-story-endings: a LOSS is path-specific too — the WARDEN who fails frees the World-Eater (the Crow's
+  // long game); the HERALD who fails is put down by the Wardens and flees. Both are dramatised by the ending
+  // cinematic (app.ts) — but the finale is never a dead-end: the Parrot's foresight (and, later, the
+  // pre-battle save) gives you the pass back to arm up and change this future.
+  const herald = state.story?.alignment === 'herald';
+  const title = herald ? '🦜 The Wardens Prevail' : '🐦‍⬛ The World-Eater is Free';
+  const tag = herald
+    ? 'The Parrot, Driver Dan and Penelope hold the root. Engines busted, you flee toward the dark zones.'
+    : 'The Crow let you win all along — you were to be the key. The maw opens on the unbroken hide.';
+  const body = herald
+    ? `<p>Dan plants his feet where your bag once hung. Penelope reads the line that stops you cold. The Parrot
+        bars the root, and your busted ship falls away into the unmapped dark. But a Herald is patient — go to
+        the shipyard, arm heavier, and come back for what you were promised.</p>
+       <p style="color:#8fb8ff;">🦜 "Run to the dark places on no one’s chart, then. …But it isn’t over. Arm up. Come back. We both know you will."</p>`
+    : `<p>The great black Crow spreads its wings and <em>laughs</em> — it never fought you; it let you win, every
+        round, so YOU would carry the Keystone to the root. The maw yawns. But the Parrot pulls you clear at
+        the last — this future can still be unwritten. Return to the shipyard, arm your ship, and take the
+        root again before the Crow's design completes.</p>
+       <p style="color:#7fe0a0;">🦜 "That thing PLAYED us — but we're not done. Get to the shipyard, arm up, and we go again. We change this."</p>`;
   return `
     <header class="gs-hero gs-storyres">
-      <h1 class="gs-hero-title">🐍 The Hide Held</h1>
-      <p class="gs-hero-tag">${why}</p>
+      <h1 class="gs-hero-title">${title}</h1>
+      <p class="gs-hero-tag">${tag}</p>
     </header>
     <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
-      <p>You pull back, engines screaming, the serpent’s eye burning behind you. This is not over — she is
-        still sealed, and you can still arm for the fight. Return to the shipyard, outfit your ship, and
-        take the rematch.</p>
-      <p style="color:#7fe0a0;">🦜 "We’re not done. Get to the shipyard, arm up, and we go again."</p>
+      ${body}
     </section>
     <div style="max-width:420px;margin:18px auto 0;">
-      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Back to the clubhouse ›</button>
+      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Back to the shipyard ›</button>
     </div>
     ${FIN_STYLE}`;
 }

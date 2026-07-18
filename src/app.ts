@@ -92,6 +92,7 @@ import { storyInterludeScreen } from './app/storyInterludeScreens';
 import { storyBarScreen } from './app/storyBarScreens';
 import { mountStoryFinale } from './render/storyFinale';
 import { mountSigilCeremony } from './render/sigilCeremony';
+import { mountStoryEnding, endingVariant } from './render/storyEnding';
 import { finaleResult } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
@@ -2473,9 +2474,16 @@ function render(): void {
       // colours the ending; a loss plays the old timed cinematic. The strike NEVER decides win/lose (the
       // arm-up gates already did) — so an armed player always wins, with a clean or scrappy finish.
       const won = state.story ? finaleResult(state.story).won : false;
-      const go = (strike: 'clean' | 'graze'): void => dispatch({ type: 'engageStoryFinale', strike });
+      // GS-story-endings: after the battle resolves, play the path+outcome ENDING cinematic (good/cult ×
+      // win/lose) over the recap. The alignment is read off the live story (unchanged by the resolution).
+      const alignment = state.story?.alignment;
+      const go = (strike: 'clean' | 'graze'): void => {
+        dispatch({ type: 'engageStoryFinale', strike }); // resolves → the recap screen mounts behind us
+        mountStoryEnding({ variant: endingVariant(alignment, won) });
+      };
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        go('clean');
+        // Reduced motion: skip both the battle cinematic AND the ending — straight to the recap.
+        dispatch({ type: 'engageStoryFinale', strike: 'clean' });
         return;
       }
       mountStoryFinale({ won, interactive: won, onDone: go });

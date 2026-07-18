@@ -73,6 +73,13 @@ tournaments to deny the Wardens' champion the Sigils, and to gather what they ne
 creed: *"All fairways end. We only hasten the green."* They are not cackling villains — they are calm,
 courteous, and utterly certain, which is worse.
 
+- **The Carrion Prophet — the Crow.** The Coil's TRUE master and the mind behind the whole design — a great
+  black crow with a bone-pale beak and a single burning eye, the **dark mirror of the Prognostic Parrot**
+  (both birds, both prophets: the Parrot foresees to *save*, the Crow foresees to *end*). It works in the
+  shadow behind Voss and Ouros, and it plays the longest game of all — on the GOOD-side LOSS it is revealed
+  to have *let the champion win every round* so they'd carry the Keystone to the root and free the World-Eater
+  themselves. It appears in the endings (GS-story-endings) and gloats: *"Caw — did you never wonder why it
+  was so EASY?"* The cult leader is, and always was, a crow.
 - **Malachai "Sable" Voss — The Apostate.** The World Tour champion *before* you — the last mortal to play
   a course perfectly true, decades ago. On that perfect round he heard the serpent whisper in the deep
   rough between 17 and 18, and it never left him. He vanished; he returned as the Coil's high priest,
@@ -344,8 +351,15 @@ gear hits harder but you're frailer.
   and the universe comes, gently and horribly, to **rest** — every ball, everywhere, still at last; a serene,
   final, green silence. A *victory* that is a grief. (Hidden falter-state: if you fail the last phase, it
   devours you first — the cult's reward for the unworthy.)
-- **LOSS (either path).** Fail the battle and the serpent **wakes hungry** — a grim montage of worlds
-  swallowed one by one. A retry scene, not a game-over wall (you keep progression, re-arm, try again).
+- **LOSS is path-specific too (GS-story-endings).** There are **four** ending cinematics — path × outcome:
+  - *good-win* → **The Universe is Saved** (the serpent shatters, dawn breaks across the worlds).
+  - *good-lose* → **The World-Eater is Free** — the **Crow** reveals it let you win all along so you'd carry
+    the Keystone and open the cage; the maw swallows the stars.
+  - *cult-win* → **Ragnarök** — the serpent uncoils, the lights go out one by one, the Universe devoured.
+  - *cult-lose* → **The Wardens Prevail** — the Parrot, Driver Dan and Penelope hold the root; you flee in a
+    busted ship into the dark unmapped zones.
+  A LOSS is dramatised but is **not a game-over wall**: the Parrot's foresight (and, later, the pre-battle
+  save) hands you the pass back to arm up and change the future.
 
 ---
 
