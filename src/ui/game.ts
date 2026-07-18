@@ -72,7 +72,7 @@ import {
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
-import { isStoryShipId, buyStoryShip, equipStoryShip } from '../sim/rpg/storyShips';
+import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
@@ -90,7 +90,7 @@ import {
   autoCommitScrambleBall,
 } from '../sim/rpg/play';
 import { Rng } from '../sim/rng';
-import type { Action, MatchUi, MetaProgress, UiState } from './gameState';
+import type { Action, MatchUi, MetaProgress, Screen, UiState } from './gameState';
 import {
   aceUpdates,
   applyTentReactions,
@@ -449,17 +449,21 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStoryShop': {
-      // GS-story-econ: open a CLEARED world's Pro Shop from its star-map dossier. Guarded to a campaign +
-      // a cleared, shoppable world (so a not-yet-played world offers no rack). Opens from the story map.
-      if (state.screen !== 'starTour' || !state.story) return state;
+      // GS-story-econ / GS-story-shop-access: open a CLEARED world's Pro Shop. Reachable ONLY from the world
+      // itself — the star-map dossier (travel back to a cleared world) and the world-clear RECAP (shop the
+      // world you just finished, before you leave). Deliberately NOT from the clubhouse: a per-world shop
+      // keeps the galaxy big — if you can't afford or skip an item, you fly back to that world for it.
+      // Guarded to a campaign + a cleared, shoppable world. Records the origin so exiting returns there.
+      if ((state.screen !== 'starTour' && state.screen !== 'storyResult') || !state.story) return state;
       if (!worldCleared(state.story, action.worldId) || !worldHasShop(action.worldId)) return state;
-      return { ...state, screen: 'storyShop', storyShopWorldId: action.worldId, storyItemInspectId: undefined };
+      const storyShopReturn: Screen = state.screen === 'starTour' ? 'starTour' : 'story';
+      return { ...state, screen: 'storyShop', storyShopWorldId: action.worldId, storyShopReturn, storyItemInspectId: undefined };
     }
 
     case 'exitStoryShop': {
-      // Close the Pro Shop back to the star map (where it was opened from).
+      // Close the Pro Shop back to wherever it was opened from (the star map, or the clubhouse).
       if (state.screen !== 'storyShop') return state;
-      return { ...state, screen: 'starTour', storyItemInspectId: undefined };
+      return { ...state, screen: state.storyShopReturn ?? 'starTour', storyShopReturn: undefined, storyItemInspectId: undefined };
     }
 
     case 'storyInspectItem': {
@@ -544,14 +548,24 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStoryShipyard': {
-      // GS-story-ships: open the spaceport shipyard from the clubhouse (post-recruitment).
+      // GS-story-ship-vendors: TWO modes. With a `worldId` → that cleared VENDOR world's shipyard (buy the
+      // ships/upgrades it stocks), reached from its dossier (travel back) or the world-clear recap — the
+      // per-world model, so the galaxy stays big. Without a worldId → the clubhouse HANGAR (fly an owned
+      // ship only, NO buying). Records the origin so exiting returns there.
+      const wid = action.worldId;
+      if (wid) {
+        if ((state.screen !== 'starTour' && state.screen !== 'storyResult') || !state.story) return state;
+        if (!worldCleared(state.story, wid) || !worldIsShipVendor(wid)) return state;
+        const back: Screen = state.screen === 'starTour' ? 'starTour' : 'story';
+        return { ...state, screen: 'storyShipyard', storyShipyardWorldId: wid, storyShipyardReturn: back, storyItemInspectId: undefined };
+      }
       if (state.screen !== 'story' || !state.story) return state;
-      return { ...state, screen: 'storyShipyard', storyItemInspectId: undefined };
+      return { ...state, screen: 'storyShipyard', storyShipyardWorldId: undefined, storyShipyardReturn: 'story', storyItemInspectId: undefined };
     }
 
     case 'exitStoryShipyard': {
       if (state.screen !== 'storyShipyard') return state;
-      return { ...state, screen: 'story', storyItemInspectId: undefined };
+      return { ...state, screen: state.storyShipyardReturn ?? 'story', storyShipyardWorldId: undefined, storyShipyardReturn: undefined, storyItemInspectId: undefined };
     }
 
     case 'storyBuyShip': {

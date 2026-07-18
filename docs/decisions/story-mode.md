@@ -188,6 +188,27 @@ Ordered so each ships something playable and nothing lands before its foundation
   the Ch.1 balance assertions hold. Pure model + reducer wiring — no save bump. Guarded by
   `tests/story-state.test.ts` (scaling + revisit + `storyWorldChapter`) and the revisit wiring in
   `tests/story-flow.test.ts`.
+- **GS-story-shop-access / GS-story-ship-vendors** — ✅ *shipped* (the shop-reachability fix; found by
+  DRIVING the real UI in a headless browser — the deep-link smokes force-mount each screen and even set
+  `starTourView.storyMode` by hand, so they never exercised the actual *navigation* to a shop). The bug: the
+  Pro Shop mechanics all worked, but it was **undiscoverable** — it only appeared on an already-cleared
+  world's star-map dossier after an ~8s ship flight, a fresh campaign has no cleared shoppable world (the
+  Earth prologue isn't stocked), and there was NO shop in the clubhouse. The fix keeps the deliberate
+  **per-world economy** (a shop belongs to a world; skip an item and you fly BACK for it — the galaxy stays
+  big) and just surfaces it where the player already is: the **world-clear RECAP** now offers "🛒 Visit the
+  Pro Shop" (and, at a vendor world, "🚀 Visit the Shipyard") for the world you just finished, and the map
+  dossier keeps the travel-back entry. Deliberately **NOT** a clubhouse buy-anything shop. Ships + upgrades
+  move the same way (per the design call): they're sold at **dedicated ship-vendor WORLDS** — `SHIP_VENDOR_STOCK`,
+  one vendor per chapter (`desert-18`/`frost-18`/`fungal-18`/`void2-18`/`cetus-18`), each stocking different
+  hulls/arms; every sellable ship + every upgrade sits at exactly one vendor and the finale arsenal is fully
+  reachable by travel (machine-checked). The clubhouse "Shipyard" became an equip-only **HANGAR** (fly an
+  owned ship + see combat rating, no buying); `storyShipyard` renders VENDOR mode (a world's stock, buy) when
+  `storyShipyardWorldId` is set, else HANGAR mode. `openStoryShop`/`openStoryShipyard` gained the recap/dossier
+  origins + a return-screen; buys stay reducer-permissive (the UI gates which items a world offers, exactly
+  like the Pro-Shop rack). No save bump. Guarded by the vendor-coverage test in `tests/story-ships.test.ts`,
+  the access-flow block in `tests/story-flow.test.ts`, and the `?screen=storyshipyard` smoke (now opens a
+  vendor shipyard). **Lesson:** a deep-link smoke that mounts a screen in isolation is NOT a substitute for
+  driving the real player path — verify reachability in a browser, not just that the screen renders.
 - **GS-story-lore-cards** — ✅ *foundation shipped* (`render/loreCard.ts`). The reusable tap-to-inspect
   overlay (own `.gs-lorecard*` prefix, self-contained `<style>`): art medallion + name + rarity/kind tag +
   mechanical DETAIL + composed LORE + a footer action (Buy / Owned / can't-afford). First consumer is the

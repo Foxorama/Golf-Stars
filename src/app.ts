@@ -264,11 +264,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       return reduce(hub1, { type: 'openStoryLocker' });
     }
     case 'storyshipyard': {
-      // GS-story-ships: reach the shipyard the honest way — prologue → Chapter 1 spaceport → open shipyard.
+      // GS-story-ship-vendors: reach a VENDOR world's shipyard the honest way — prologue → Chapter 1, clear
+      // the Ch.1 ship-vendor world (Vela Dunes / desert-18), then open its shipyard from the recap (buy mode,
+      // ships + upgrades). The clubhouse now opens the equip-only Hangar instead; buying lives at the worlds.
       const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
-      return reduce(hub1, { type: 'openStoryShipyard' });
+      const afterVendor = reduce(reduce(hub1, { type: 'storyPlayWorld', courseId: 'desert-18' }), { type: 'play' });
+      return reduce(afterVendor, { type: 'openStoryShipyard', worldId: 'desert-18' });
     }
     case 'storybar': {
       // GS-story-parrot-bar: reach the Crow's Nest the honest way — prologue → Chapter 1 spaceport → open bar.
