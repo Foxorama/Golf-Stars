@@ -472,6 +472,17 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   rng (hand-placed, byte-stable), own `.gs-sclub*` CSS prefix (never the play HUD's `.gs-hud`). No sim/save
   touch. Reached honestly via `?screen=storyclub` (prologue → Chapter 1 spaceport); guarded by the
   `.gs-sclub-scene` browser smoke in `tests/build.test.ts`.
+- **GS-story-locker-sections** — ✅ *shipped* (`app/storyLockerScreens.ts`). The locker was one long scroll
+  (Your bag → Bench → Gear → Your crew), so reaching the crew meant scrolling past the whole bag ("you have
+  to scroll all the way down past the bag to see caddies"). It's now COLLAPSIBLE ACCORDION panels — **Bag**
+  (open by default) / **Crew** / **Gear** / **Bench** — each a compact tappable header with a live summary
+  chip (bag count / active caddy / gear equipped / spares), so the crew + gear are one tap from the top
+  instead of a long scroll. Crew is promoted high (the "gather your friends" ask). Open-state lives in a
+  module `storyLockerView.open` Set (the `marketView`/`clubhouseView` pattern) so it survives the re-render
+  an equip/unequip triggers — a native `<details>` would snap shut on every dispatch; `[data-lockersec]` in
+  `app.ts` toggles it. A compact illustrated locker-room banner (locker bank + bench + bag, pure byte-stable
+  SVG) tops the screen. Pure render/view + one app handler — no sim/save/rng touch. Guarded by the existing
+  `?screen=storylocker` browser smoke (bag panel open ⇒ `.gs-lock-grid` + "Your bag").
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

@@ -83,7 +83,7 @@ import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeap
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
 import { storyShopScreen } from './app/storyShopScreens';
-import { storyLockerScreen } from './app/storyLockerScreens';
+import { storyLockerScreen, storyLockerView } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
@@ -2559,6 +2559,18 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-market-showowned]').forEach((el) => {
     el.addEventListener('click', () => {
       marketView.showOwned = !marketView.showOwned;
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // GS-story-locker-sections: tap a locker accordion header to expand/collapse that panel (view-state so the
+  // set survives the re-render an equip triggers).
+  app.querySelectorAll<HTMLElement>('[data-lockersec]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.lockersec!;
+      if (storyLockerView.open.has(id)) storyLockerView.open.delete(id);
+      else storyLockerView.open.add(id);
       sfx.click();
       haptic(HAPTICS.tap);
       render();

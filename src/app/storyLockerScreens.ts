@@ -29,6 +29,28 @@ const SLOT_LABEL: Record<GearSlot, string> = {
 // Gear slots the locker manages (the four effect-bearing ones; the cosmetic bag lands later).
 const LOCKER_SLOTS: GearSlot[] = ['glove', 'hat', 'shoes', 'ball'];
 
+// GS-story-locker-sections: which accordion panels are open. A module-level view object (the marketView /
+// clubhouseView pattern) so it survives the re-render an equip/unequip triggers — a native <details> would
+// snap shut on every dispatch. Defaults to the BAG open; the other headers sit compactly beneath it, so the
+// crew/gear are one tap away instead of a long scroll past the whole bag.
+export const storyLockerView = { open: new Set<string>(['bag']) };
+
+/** One collapsible accordion panel: a tappable header (icon + title + a live summary chip + chevron) and a
+ *  body shown only when open. `[data-lockersec]` toggles it (wired in app.ts, re-render preserves the set). */
+function accordion(id: string, icon: string, title: string, summary: string, body: string): string {
+  const open = storyLockerView.open.has(id);
+  return `
+    <section class="gs-lock-acc${open ? ' gs-lock-acc--open' : ''}">
+      <button class="gs-lock-acchdr" data-lockersec="${id}" aria-expanded="${open}">
+        <span class="gs-lock-accicon" aria-hidden="true">${icon}</span>
+        <span class="gs-lock-acctitle">${title}</span>
+        <span class="gs-lock-accsum">${summary}</span>
+        <span class="gs-lock-accchev" aria-hidden="true">${open ? '▾' : '▸'}</span>
+      </button>
+      ${open ? `<div class="gs-lock-accbody">${body}</div>` : ''}
+    </section>`;
+}
+
 /** The art id for a club: a themed id as-is, else the plain 'starter' skin so it draws a real club head. */
 function clubArtId(id: string): string {
   return id.startsWith('club:') ? id : `club:starter:${storyClubType(id)}`;
@@ -59,37 +81,74 @@ export function storyLockerScreen(): string {
 
   const bagCards = bagIds.length
     ? bagIds.map((id) => clubChip(id, 'bag')).join('')
-    : `<div class="gs-lock-empty">Your bag is empty — equip clubs from the bench below.</div>`;
+    : `<div class="gs-lock-empty">Your bag is empty — equip clubs from the bench.</div>`;
   const benchCards = benchIds.length
     ? benchIds.map((id) => clubChip(id, 'bench', full)).join('')
     : `<div class="gs-lock-empty">Nothing on the bench. Buy clubs at a world's Pro Shop to build up your set.</div>`;
 
   // ── Gear ──
   const gearRows = LOCKER_SLOTS.map((slot) => gearSlotRow(slot)).join('');
+  const gearCount = LOCKER_SLOTS.filter((s) => story.equippedGear[s]).length;
+
+  // ── Crew ──
+  const active = activeStoryCaddy(story);
+  const crewSummary = story.hiredCaddyIds.length
+    ? `${active ? `${shopItem(active)?.name?.split(' ')[0] ?? 'one'} ★` : 'benched'} · ${story.hiredCaddyIds.length} aboard`
+    : 'none yet';
 
   const overlay = state.storyItemInspectId ? inspectOverlay(state.storyItemInspectId) : '';
 
+  // GS-story-locker-sections: collapsible panels (Bag / Crew / Gear / Bench), so the crew + gear are one tap
+  // from the top instead of a long scroll past the whole bag. Crew is high (the "gather your friends" ask).
+  const sections =
+    accordion('bag', '🎒', 'Your bag', `${bagIds.length} / ${MAX_STORY_BAG}`, `<div class="gs-lock-grid">${bagCards}</div>`) +
+    accordion('crew', '🫂', 'Your crew', crewSummary, crewBodyHTML(story)) +
+    accordion('gear', '🧤', 'Gear', gearCount ? `${gearCount} equipped` : 'none', `<div class="gs-lock-gear">${gearRows}</div>`) +
+    accordion('bench', '📦', 'Bench', benchIds.length ? `${benchIds.length} spare` : 'empty', `<div class="gs-lock-grid">${benchCards}</div>`);
+
   return `
     <header class="gs-hero gs-storyhub">
-      <h1 class="gs-hero-title">🎒 Locker</h1>
-      <p class="gs-hero-tag">Build your bag · swap your gear</p>
+      <h1 class="gs-hero-title">🎒 Locker Room</h1>
+      <p class="gs-hero-tag">Build your bag · your crew · swap your gear</p>
     </header>
     <section style="max-width:600px;margin:2px auto 0;">
-      <h2 class="gs-lock-sec">Your bag <span class="gs-lock-count${full ? ' gs-lock-count--full' : ''}">${bagIds.length} / ${MAX_STORY_BAG}</span></h2>
-      <div class="gs-lock-grid">${bagCards}</div>
-
-      ${benchIds.length || !bagIds.length ? `<h2 class="gs-lock-sec">Bench <span class="gs-lock-hint">not in the bag</span></h2><div class="gs-lock-grid">${benchCards}</div>` : ''}
-
-      <h2 class="gs-lock-sec">Gear</h2>
-      <div class="gs-lock-gear">${gearRows}</div>
-
-      ${crewSectionHTML(story)}
+      ${lockerRoomHeaderSVG()}
+      ${sections}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryLocker' })}'>‹ Back to the clubhouse</button>
     </div>
     ${overlay}
     ${LOCKER_STYLE}`;
+}
+
+/** A compact illustrated locker-room banner (a bank of lockers + a bench + a bag) — a little scene so the
+ *  screen isn't a flat list. Pure SVG, byte-stable, purely decorative. */
+function lockerRoomHeaderSVG(): string {
+  return `<div class="gs-lock-scene" aria-hidden="true">
+    <svg viewBox="0 0 400 96" preserveAspectRatio="xMidYMid slice" width="100%" height="100%" style="display:block;">
+      <defs>
+        <linearGradient id="lk-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a2233"/><stop offset="100%" stop-color="#0f1522"/></linearGradient>
+        <linearGradient id="lk-door" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2a3448"/><stop offset="100%" stop-color="#1c2637"/></linearGradient>
+      </defs>
+      <rect width="400" height="96" fill="url(#lk-wall)"/>
+      <rect x="0" y="74" width="400" height="22" fill="#0c1220"/>
+      <line x1="0" y1="74" x2="400" y2="74" stroke="#05080f" stroke-width="2"/>
+      ${[8, 52, 96, 140].map((x) => `<g>
+        <rect x="${x}" y="12" width="38" height="62" rx="3" fill="url(#lk-door)" stroke="#3a4864" stroke-width="1.2"/>
+        <rect x="${x + 5}" y="17" width="28" height="10" rx="1.5" fill="#141c2b"/>
+        <circle cx="${x + 31}" cy="46" r="1.8" fill="#8a97ad"/>
+      </g>`).join('')}
+      <!-- a bench + a leaning bag on the right -->
+      <rect x="238" y="58" width="150" height="8" rx="3" fill="#3a2614"/>
+      <rect x="248" y="66" width="6" height="10" fill="#2a1a0e"/><rect x="372" y="66" width="6" height="10" fill="#2a1a0e"/>
+      <g transform="translate(330 22)">
+        <rect x="0" y="0" width="20" height="42" rx="7" fill="#2f7f5a"/>
+        <rect x="1" y="-8" width="18" height="12" rx="3" fill="#245f44"/>
+        ${[4, 8, 12].map((gx) => `<line x1="${gx}" y1="-8" x2="${gx - 2}" y2="-20" stroke="#ccd" stroke-width="1.4"/>`).join('')}
+      </g>
+    </svg>
+  </div>`;
 }
 
 /** A club chip in the bag or on the bench. Tap art → lore card; the ✕/＋ equips/unequips inline. */
@@ -117,12 +176,12 @@ function clubChip(id: string, where: 'bag' | 'bench', bagFull = false): string {
     </div>`;
 }
 
-/** GS-story-caddies: the caddy ROSTER — the friends you've gathered. One carries the bag (tap ＋ to make
- *  a friend active, ✕ to bench all). Empty until you recruit one out at the worlds where they wait. */
-function crewSectionHTML(story: StoryState): string {
+/** GS-story-caddies: the caddy ROSTER body — the friends you've gathered. One carries the bag (tap ＋ to make
+ *  a friend active, ✕ to bench all). Empty until you recruit one out at the worlds where they wait. Returns
+ *  just the panel body (the accordion supplies the header). */
+function crewBodyHTML(story: StoryState): string {
   if (!story.hiredCaddyIds.length) {
-    return `<h2 class="gs-lock-sec">Your crew <span class="gs-lock-hint">friends and allies</span></h2>
-      <div class="gs-lock-empty">No friends aboard yet — recruit them out in the galaxy, at the worlds where each one waits.</div>`;
+    return `<div class="gs-lock-empty">No friends aboard yet — recruit them out in the galaxy, at the worlds where each one waits.</div>`;
   }
   const active = activeStoryCaddy(story);
   const chips = story.hiredCaddyIds
@@ -138,8 +197,7 @@ function crewSectionHTML(story: StoryState): string {
         </div>`;
     })
     .join('');
-  return `<h2 class="gs-lock-sec">Your crew <span class="gs-lock-hint">one carries the bag</span></h2>
-    <div class="gs-lock-gitems">${chips}</div>`;
+  return `<div class="gs-lock-gitems">${chips}</div>`;
 }
 
 /** One gear slot: the equipped item (or empty) + owned alternatives to switch to, and a remove. */
@@ -236,6 +294,22 @@ function inspectOverlay(itemId: string): string {
 
 const LOCKER_STYLE = `
   <style>
+    .gs-lock-scene{width:100%;aspect-ratio:400/96;max-height:96px;border-radius:12px;overflow:hidden;
+      border:1px solid #2a3346;margin:0 0 12px;}
+    .gs-lock-acc{border:1px solid #262f42;border-radius:12px;background:linear-gradient(180deg,#12172200,#0f131c66);
+      margin:0 0 8px;overflow:hidden;}
+    .gs-lock-acc--open{border-color:#33405a;background:#0d111a;}
+    .gs-lock-acchdr{display:flex;align-items:center;gap:10px;width:100%;padding:11px 13px;cursor:pointer;
+      background:linear-gradient(180deg,#161d2c,#111623);border:0;color:var(--gs-ink,#eaf1fb);font:inherit;text-align:left;
+      transition:background .12s ease;}
+    .gs-lock-acchdr:hover{background:linear-gradient(180deg,#1b2436,#141a29);}
+    .gs-lock-acc--open .gs-lock-acchdr{border-bottom:1px solid #232b3b;}
+    .gs-lock-accicon{font-size:17px;flex:0 0 auto;}
+    .gs-lock-acctitle{font-size:14px;font-weight:800;letter-spacing:.02em;flex:0 0 auto;}
+    .gs-lock-accsum{flex:1 1 auto;text-align:right;font-size:11.5px;font-weight:700;color:#7fe0a0;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .gs-lock-accchev{flex:0 0 auto;color:#8a97ad;font-size:12px;width:1em;text-align:center;}
+    .gs-lock-accbody{padding:11px 12px 13px;}
     .gs-lock-sec{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--gs-ink,#eaf1fb);
       margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
     .gs-lock-count{font-size:12px;font-weight:800;color:#7fe0a0;background:#12211a;border:1px solid #244a37;border-radius:20px;padding:1px 9px;}
