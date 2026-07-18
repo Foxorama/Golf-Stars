@@ -44,7 +44,7 @@ import {
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
-import { tournamentForChapter, rivalTotal, winTournament } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, rivalTotal, winTournament, SIGIL_WIN_BONUS } from '../sim/rpg/storyTournaments';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
 
@@ -404,15 +404,17 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   const rivalGross = rivalTotal(t, String(run.seed), pars);
   const won = totals.gross <= rivalGross;
 
-  // Bank the round (credits + best) exactly like a world clear.
-  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base) * upgradeCreditMult(base));
+  // Bank the round (credits + best) exactly like a world clear, PLUS the Sigil milestone bonus on a first
+  // win (GS-story-balance): the majors fund the escalating bag/ship/finale spend.
+  const alreadyWon = base.trophyIds.includes(t.sigilId);
+  const winBonus = won && !alreadyWon ? SIGIL_WIN_BONUS : 0;
+  const credits = Math.round(storyRoundCredits(totals.toPar) * shipCreditMult(base) * upgradeCreditMult(base)) + winBonus;
   let story = recordWorldClear(
     base,
     t.venueId,
     { toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, seed: String(run.seed) },
     credits,
   );
-  const alreadyWon = story.trophyIds.includes(t.sigilId);
   if (won) {
     story = winTournament(story, t);
     // GS-story-route-rewards: a route major grants its signature ship (own + fly it).
