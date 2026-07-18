@@ -35,6 +35,34 @@ function rivalPortraitSVG(rivalId: string): string {
   }
 }
 
+/** GS-story-tournament-midpop: the halftime line — the rival BRAGS when they're ahead, or CURSES you when
+ *  you're beating them. Keyed by rival, generic fall-through. Content-as-data. */
+function rivalHalftimeLine(rivalId: string, brag: boolean): string {
+  const lines: Record<string, [brag: string, curse: string]> = {
+    venoma: [
+      '"Nine holes, and I already smell the fear on you. Save yourself the back nine, little Warden."',
+      '"You’re… ahead? No. NO. A lucky front nine. The Viper does not lose to a tourist. Watch me."',
+    ],
+    voss: [
+      '"You see? The true line comes so easily when you stop pretending it’s a game. Nine more, and you’ll understand."',
+      '"You play beautifully when you’re angry. Good. Hold onto that. It’s the first honest thing I’ve seen you do."',
+    ],
+    'driver-dan': [
+      '"…I taught you the front nine, kid. Don’t make me teach you the back nine too. Sit DOWN."',
+      '"Ha! There he is. THERE’s my golfer. Come on then — beat the old man. I dare you. Break my heart."',
+    ],
+    penelope: [
+      '"Your pace is frantic. Your reads are panicked. You already lost, dear — you just haven’t stopped moving yet."',
+      '"You’re still ahead. Still fighting. …I read putts for you once. I know you never could let go. It will cost you."',
+    ],
+  };
+  const pair = lines[rivalId] ?? [
+    '"Front nine to the champion. Do yourself a favour and concede the back."',
+    '"You’re up on the club champion? At MY course? …We’ll see how your nerve holds."',
+  ];
+  return brag ? pair[0] : pair[1];
+}
+
 /** A menacing / characterful pre-round taunt from the rival — hype for the tee-off. Keyed by rival, with a
  *  generic fall-through for the club champion. Content-as-data; a new rival is a row. */
 function rivalTaunt(rivalId: string): string {
@@ -108,6 +136,50 @@ export function storyTournamentScreen(): string {
     ${TOURN_STYLE}`;
 }
 
+/**
+ * GS-story-tournament-midpop: the HALFTIME pop of an 18-hole major — after nine holes, the rival struts
+ * on: BRAGGING if they're ahead, or CURSING you if you're beating them, with the standing through nine.
+ * A quick dramatic beat, then "Play on ›" resumes the back nine. Reads `state.storyTournamentMidPop`.
+ */
+export function storyTournamentPopScreen(): string {
+  const p = state.storyTournamentMidPop;
+  if (!p) {
+    return `<div style="max-width:420px;margin:24px auto 0;"><button class="gs-btn" data-action='${JSON.stringify({ type: 'tournamentPopContinue' })}'>Play on ›</button></div>`;
+  }
+  const portrait = rivalPortraitSVG(p.rivalId);
+  const diff = p.playerThru - p.rivalThru;
+  const standing = p.brag
+    ? `${p.rivalName.split(' ')[0]} leads you by ${diff} through nine.`
+    : diff === 0
+      ? `You’re level with ${p.rivalName.split(' ')[0]} through nine.`
+      : `You lead ${p.rivalName.split(' ')[0]} by ${-diff} through nine.`;
+  return `
+    <header class="gs-hero gs-storyres">
+      <h1 class="gs-hero-title gs-tourn-in gs-tourn-in1">⛳ The turn</h1>
+      <p class="gs-hero-tag gs-tourn-in gs-tourn-in1">Nine holes down, nine to play</p>
+    </header>
+    <section style="max-width:520px;margin:10px auto 0;">
+      <div class="gs-tourn-card gs-tourn-in gs-tourn-in2" style="${p.brag ? '' : 'border-left-color:#4fe08a;'}">
+        <div class="gs-tourn-portrait">${portrait || `<div class="gs-tourn-emblem">${rivalGlyph(p.rivalId)}</div>`}</div>
+        <div class="gs-tourn-cardbody">
+          <div class="gs-tourn-rivallabel" style="${p.brag ? '' : 'color:#7fe0a0;'}">${p.brag ? 'Your rival gloats' : 'Your rival seethes'}</div>
+          <div class="gs-tourn-rivalname">${p.rivalName}</div>
+          <p class="gs-tourn-taunt">${rivalHalftimeLine(p.rivalId, p.brag)}</p>
+        </div>
+      </div>
+      <div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3" style="text-align:center;">
+        <div class="gs-tourn-fieldlabel">Standing · through 9</div>
+        <div style="font-size:16px;font-weight:800;color:${p.brag ? '#e6a6d6' : '#9dffce'};">
+          You ${p.playerThru} · ${p.rivalName.split(' ')[0]} ${p.rivalThru} — <span style="color:var(--gs-ink,#eaf1fb);">${standing}</span>
+        </div>
+      </div>
+    </section>
+    <div style="max-width:420px;margin:16px auto 0;">
+      <button class="gs-btn gs-tourn-in gs-tourn-in4" data-action='${JSON.stringify({ type: 'tournamentPopContinue' })}'>⛳ Play on — the back nine ›</button>
+    </div>
+    ${TOURN_STYLE}`;
+}
+
 export function storyTournamentResultScreen(): string {
   const r = state.lastStoryTournament;
   if (!r) {
@@ -146,7 +218,13 @@ export function storyTournamentResultScreen(): string {
     </section>
     ${scoreboardHTML(r)}
     <div style="max-width:420px;margin:18px auto 0;">
-      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyTournamentContinue' })}'>${r.won ? 'Onward ›' : 'Back to the clubhouse ›'}</button>
+      ${
+        r.won
+          ? // GS-story-sigil-ceremony: a win plays the spectacular Sigil→Keystone→serpent cinematic
+            // before continuing (app.ts wires `data-sigil-ceremony`; reduced-motion skips straight on).
+            `<button class="gs-btn" data-sigil-ceremony="1">${r.finalSigil ? '🗝 Complete the Keystone ›' : '⟐ Set the Sigil into the Keystone ›'}</button>`
+          : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyTournamentContinue' })}'>Back to the clubhouse ›</button>`
+      }
     </div>
     ${TOURN_STYLE}`;
 }

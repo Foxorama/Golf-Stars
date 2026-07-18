@@ -470,6 +470,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       playerGross: totals.gross,
       rivalGross,
       won,
+      sigilId: t.sigilId,
       finalSigil,
       par: totals.totalPar,
       leaderboard,

@@ -85,12 +85,13 @@ import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/
 import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
-import { storyTournamentScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
+import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
 import { storyInterludeScreen } from './app/storyInterludeScreens';
 import { storyBarScreen } from './app/storyBarScreens';
 import { mountStoryFinale } from './render/storyFinale';
+import { mountSigilCeremony } from './render/sigilCeremony';
 import { finaleResult } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
@@ -294,6 +295,16 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const lobby = reduce(st3, { type: 'openStoryTournament' });
       if (screen === 'storytournament') return lobby;
       return reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'play' });
+    }
+    case 'storytournamentpop': {
+      // GS-story-tournament-midpop: the halftime rival pop. The honest path is nine interactive holes; for
+      // the render smoke, seed the pop payload directly on the pop screen.
+      const st0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      return {
+        ...st0,
+        screen: 'storyTournamentPop',
+        storyTournamentMidPop: { rivalId: 'venoma', rivalName: 'Venoma "the Viper" Krait', brag: true, playerThru: 38, rivalThru: 35 },
+      };
     }
     case 'storyfinale':
     case 'storyfinaleresult': {
@@ -2338,6 +2349,8 @@ function render(): void {
       ? storyShipyardScreen()
       : state.screen === 'storyTournament'
       ? storyTournamentScreen()
+      : state.screen === 'storyTournamentPop'
+      ? storyTournamentPopScreen()
       : state.screen === 'storyTournamentResult'
       ? storyTournamentResultScreen()
       : state.screen === 'storyFinale'
@@ -2466,6 +2479,25 @@ function render(): void {
         return;
       }
       mountStoryFinale({ won, interactive: won, onDone: go });
+    });
+  });
+  // GS-story-sigil-ceremony: winning a Galaxy Tournament plays the Sigil→Keystone→serpent cinematic (the
+  // new Sigil slots into the Keystone alongside the ones you already hold; a cut to Jörmungandr, waking a
+  // little more with every Sigil — the eye OPENS on the fifth), THEN continues to the recap routing.
+  // Reduced-motion skips straight on.
+  app.querySelectorAll<HTMLElement>('[data-sigil-ceremony]').forEach((el) => {
+    el.addEventListener('click', () => {
+      resumeAudio();
+      const r = state.lastStoryTournament;
+      const go = (): void => dispatch({ type: 'storyTournamentContinue' });
+      const sigilId = r?.sigilId;
+      if (!sigilId || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        go();
+        return;
+      }
+      // The Sigils held BEFORE this one (trophyIds already includes the new one at resolve).
+      const prior = (state.story?.trophyIds ?? []).filter((id) => id !== sigilId);
+      mountSigilCeremony({ newSigilId: sigilId, priorSigilIds: prior, sigilName: r?.sigilName ?? 'The Sigil', onDone: go });
     });
   });
   // Shop bag-inventory: tap an owned gear chip to pop its card (toggle), for comparison with the stock.

@@ -247,9 +247,16 @@ export function tournamentUnlocked(story: StoryState): boolean {
 
 /** The rival's ghost gross total over the venue's pars (deterministic from the round seed). */
 export function rivalTotal(t: StoryTournament, seed: string, pars: readonly number[]): number {
+  return rivalTotalThrough(t, seed, pars, pars.length);
+}
+
+/** The rival's ghost gross through the FIRST `upto` holes (deterministic; same per-hole draws as the full
+ *  total, so a partial standing is consistent with the finish). Used by the halftime pop (GS-story-tournament-midpop). */
+export function rivalTotalThrough(t: StoryTournament, seed: string, pars: readonly number[], upto: number): number {
   const form = golferForm(t.rivalId, `${seed}:form`);
+  const n = Math.max(0, Math.min(pars.length, upto));
   let total = 0;
-  for (let i = 0; i < pars.length; i++) total += ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
+  for (let i = 0; i < n; i++) total += ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
   return total;
 }
 
