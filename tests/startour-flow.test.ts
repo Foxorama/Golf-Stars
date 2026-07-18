@@ -6,6 +6,7 @@ import { STATIC_COURSES, buildStaticCourse } from '../src/sim/course/staticCours
 import { ASGARD_FORMAT } from '../src/sim/rpg/formats';
 import { starTourMapSVG, worldPos, EARTH_POS, YGGDRASIL_REALMS, hoverBank, HOVER_BANK_MAX, SHIP_DOCK_HEADING, type StarTourWorld } from '../src/render/starTourMap';
 import { SHIPS, shipById } from '../src/sim/rpg/ships';
+import { defaultStoryState } from '../src/sim/rpg/story';
 
 /** Drive a Star Tour round to the strokeResult recap (openStarTour → CHARACTER → star map → pick a
  *  course → intro → play 18 → holeComplete×18). Character select comes FIRST (GS-star-tour-2). */
@@ -146,6 +147,35 @@ describe('Star Tour reducer flow (GS-star-tour-2)', () => {
     expect(s.screen).toBe('starTour');
     s = reduce(s, { type: 'exitStarTour' });
     expect(s.screen).toBe('title');
+  });
+
+  it('a COMPLETED campaign plays free-roam as the developed champion (GS-story-startour-champion)', () => {
+    const champ = CHARACTERS[1]!.id;
+    // A finished campaign with a grown bag + a hired active caddy (the "developed character").
+    const story = {
+      ...defaultStoryState(champ),
+      completed: true,
+      credits: 500,
+      // grow the green start with an extra club so the bag differs from a plain default.
+      ownedClubIds: [...defaultStoryState(champ).ownedClubIds, 'club:tour:3W'],
+      equippedBagIds: [...defaultStoryState(champ).equippedBagIds, 'club:tour:3W'],
+      hiredCaddyIds: ['driver-dan'],
+      activeCaddyId: 'driver-dan',
+    };
+    const s0 = initState('champ-seed', {}, undefined, story);
+    // Star Tour skips the golfer pick and flies straight to the map AS the champion.
+    const map = reduce(s0, { type: 'openStarTour' });
+    expect(map.screen).toBe('starTour'); // no character-select step
+    expect(map.run.loadout.characterId).toBe(champ);
+    // The developed bag carried in (the extra 3W is there), and the active caddy folded its perk.
+    expect(map.run.loadout.bag.length).toBe(story.equippedBagIds.length);
+    expect(map.run.loadout.perks).toContain('driver-dan');
+    // Tee off a course — the developed loadout persists into the round.
+    const intro = reduce(map, { type: 'pickStarTourCourse', courseId: 'verdant-18', effect: 'none' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.staticCourseId).toBe('verdant-18');
+    expect(intro.run.loadout.characterId).toBe(champ);
+    expect(intro.run.loadout.bag.length).toBe(story.equippedBagIds.length);
   });
 });
 
