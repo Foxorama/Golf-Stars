@@ -10,15 +10,17 @@ import { state } from './ctx';
 import { rarCol } from '../sim/rpg/loot';
 import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
-import { clubSetById } from '../sim/rpg/economy';
+import { clubSetById, shopItem } from '../sim/rpg/economy';
 import {
   resolveStoryClub,
   storyClubType,
   storyBagFull,
   MAX_STORY_BAG,
   type GearSlot,
+  type StoryState,
 } from '../sim/rpg/story';
 import { storyGearById, ownedGearForSlot } from '../sim/rpg/storyGear';
+import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { storyCardFor, type StoryCard } from '../sim/rpg/storyShop';
 
 const SLOT_LABEL: Record<GearSlot, string> = {
@@ -80,6 +82,8 @@ export function storyLockerScreen(): string {
 
       <h2 class="gs-lock-sec">Gear</h2>
       <div class="gs-lock-gear">${gearRows}</div>
+
+      ${crewSectionHTML(story)}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryLocker' })}'>‹ Back to the clubhouse</button>
@@ -111,6 +115,31 @@ function clubChip(id: string, where: 'bag' | 'bench', bagFull = false): string {
       <span class="gs-lock-meta">${carry}</span>
       ${action}
     </div>`;
+}
+
+/** GS-story-caddies: the caddy ROSTER — the friends you've gathered. One carries the bag (tap ＋ to make
+ *  a friend active, ✕ to bench all). Empty until you recruit one out at the worlds where they wait. */
+function crewSectionHTML(story: StoryState): string {
+  if (!story.hiredCaddyIds.length) {
+    return `<h2 class="gs-lock-sec">Your crew <span class="gs-lock-hint">gather your friends</span></h2>
+      <div class="gs-lock-empty">No friends aboard yet — recruit them out in the galaxy, at the worlds where each one waits.</div>`;
+  }
+  const active = activeStoryCaddy(story);
+  const chips = story.hiredCaddyIds
+    .map((id) => {
+      const name = shopItem(id)?.name ?? id;
+      const on = id === active;
+      const btn = on
+        ? `<button class="gs-lock-btn gs-lock-btn--off" data-action='${JSON.stringify({ type: 'setStoryCaddy' })}' title="Bench (nobody carries the bag)">✕</button>`
+        : `<button class="gs-lock-btn gs-lock-btn--on" data-action='${JSON.stringify({ type: 'setStoryCaddy', caddyId: id })}' title="Carry my bag">＋</button>`;
+      return `<div class="gs-lock-gchip${on ? ' gs-lock-gchip--on' : ''}" style="--ac:#f0a8c8;">
+          <span class="gs-lock-gname">🎒 ${name}${on ? ' · on the bag' : ''}</span>
+          ${btn}
+        </div>`;
+    })
+    .join('');
+  return `<h2 class="gs-lock-sec">Your crew <span class="gs-lock-hint">one carries the bag</span></h2>
+    <div class="gs-lock-gitems">${chips}</div>`;
 }
 
 /** One gear slot: the equipped item (or empty) + owned alternatives to switch to, and a remove. */

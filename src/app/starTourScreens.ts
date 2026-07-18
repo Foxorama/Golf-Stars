@@ -26,6 +26,8 @@ import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
 import { storyWorldShoppable } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
+import { worldCaddy, storyCaddyHired, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
+import { shopItem } from '../sim/rpg/economy';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
 import { getCharacter } from '../sim/rpg/characters';
@@ -403,6 +405,13 @@ function dossier(w: StarTourWorld): string {
   const yardBtn = cleared && worldIsShipVendor(w.id)
     ? `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#161f2e,#0f1622);border-color:#2f5a7a;color:#7fd8ff;" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: w.id })}'>🚀 Shipyard</button>`
     : '';
+  // GS-story-caddies: a friend waits at this cleared world — recruit them (once, kept), or see they're aboard.
+  const caddyId = story ? worldCaddy(w.id) : undefined;
+  const caddyBtn = cleared && caddyId
+    ? storyCaddyHired(state.story!, caddyId)
+      ? `<div class="gs-st-rec" style="margin-top:8px;color:#7fe0a0;">🎒 ${shopItem(caddyId)?.name ?? 'A friend'} is in your crew</div>`
+      : `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#22161f,#170f16);border-color:#6a3a52;color:#f0a8c8;" data-action='${JSON.stringify({ type: 'hireStoryCaddy', worldId: w.id, caddyId })}'>🎒 Recruit ${shopItem(caddyId)?.name ?? 'a friend'} · ✦ ${STORY_CADDY_PRICE}</button>`
+    : '';
   return `
     <div class="gs-st-sheet" role="dialog" aria-label="${w.name}">
       <button class="gs-st-sheet__close" data-startour-close="1" aria-label="Close">✕</button>
@@ -416,6 +425,7 @@ function dossier(w: StarTourWorld): string {
       <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${playLabel}</button>
       ${shopBtn}
       ${yardBtn}
+      ${caddyBtn}
     </div>`;
 }
 

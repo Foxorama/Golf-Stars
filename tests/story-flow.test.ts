@@ -351,6 +351,29 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     expect(hangar.storyShipyardWorldId).toBeUndefined();
     expect(reduce(hangar, { type: 'exitStoryShipyard' }).screen).toBe('story');
   });
+
+  it('a friend is recruited at their world (recap), chosen active in the locker, and rides into the round', () => {
+    // Vela Dunes / desert-18 is where Sandy the Sand-Saver waits.
+    const recap = { ...afterClear('desert-18'), story: { ...defaultStoryState('feather-fade'), chapter: 2, credits: 2000, clearedWorldIds: ['standrews-18', 'desert-18'] } };
+    const hired = reduce(recap, { type: 'hireStoryCaddy', worldId: 'desert-18', caddyId: 'sandy-sandsaver' });
+    expect(hired.story!.hiredCaddyIds).toContain('sandy-sandsaver');
+    expect(hired.story!.activeCaddyId).toBe('sandy-sandsaver'); // first hire carries the bag
+    // Can't recruit the wrong friend at this world, and can't recruit from the clubhouse.
+    expect(reduce(recap, { type: 'hireStoryCaddy', worldId: 'desert-18', caddyId: 'driver-dan' }).story!.hiredCaddyIds).not.toContain('driver-dan');
+    expect(reduce({ ...hired, screen: 'story' as const }, { type: 'hireStoryCaddy', worldId: 'desert-18', caddyId: 'driver-dan' })).toEqual({ ...hired, screen: 'story' });
+
+    // Choose active in the locker.
+    const locker = reduce({ ...hired, screen: 'story' as const }, { type: 'openStoryLocker' });
+    expect(locker.screen).toBe('storyLocker');
+    const benched = reduce(locker, { type: 'setStoryCaddy' });
+    expect(benched.story!.activeCaddyId).toBeUndefined();
+    const reactivated = reduce(benched, { type: 'setStoryCaddy', caddyId: 'sandy-sandsaver' });
+    expect(reactivated.story!.activeCaddyId).toBe('sandy-sandsaver');
+
+    // Tee off a world → the active caddy's perk is folded into the round loadout (auto ≡ interactive).
+    const intro = reduce({ ...reactivated, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'desert-18' });
+    expect(intro.run.loadout.perks).toContain('sandy-sandsaver');
+  });
 });
 
 describe('Story locker flow (GS-story-locker)', () => {

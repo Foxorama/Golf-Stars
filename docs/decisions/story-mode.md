@@ -188,6 +188,23 @@ Ordered so each ships something playable and nothing lands before its foundation
   the Ch.1 balance assertions hold. Pure model + reducer wiring — no save bump. Guarded by
   `tests/story-state.test.ts` (scaling + revisit + `storyWorldChapter`) and the revisit wiring in
   `tests/story-flow.test.ts`.
+- **GS-story-caddies** — ✅ *shipped* ("gather your friends" — the caddy roster the review flagged as a
+  hole). The campaign's Warden allies are the existing NAMED caddies (Driver Dan, Penelope, Sandy, Dr
+  Chipinski, Mystic Mole, Suggestible Sam); you **recruit** them one at a time out in the galaxy — each
+  waits at a thematically-fitting world (`STORY_CADDY_STOCK`: Dan at the derelict that was his old ship,
+  Sandy in the dunes, Penelope on the crystal greens, …), hired for credits once that world is cleared —
+  the same **per-world, travel-back** economy as the Pro Shop / ship vendors (a friend belongs to a place,
+  so you go find them). Recruitment is once-and-KEPT (`hiredCaddyIds`, a permanent roster, no fire); you
+  **choose which one carries the bag** in the clubhouse **Locker** (`activeCaddyId`, an EQUIP not a
+  purchase — the "Your crew" section). The active caddy folds its REAL loadout effect into every Story
+  round via `applyStoryCaddy` (the `applyStoryGear` sibling — the caddy shop-item's own `apply`, which
+  adds its effect + perk id, so the shared engine AND the on-course render both see it: auto ≡ interactive,
+  a friend on the bag both helps and shows). Reducer: `hireStoryCaddy` (from a cleared world's dossier /
+  recap, gated to the world that hosts THAT caddy) + `setStoryCaddy` (from the Locker). `StoryState`
+  already had the fields → **no save bump**. Pure model in `sim/rpg/storyCaddies.ts`. Guarded by
+  `tests/story-caddies.test.ts` (recruit/keep/first-hire-active/equip/fold) + the recruit→active→rides-into-
+  the-round flow in `tests/story-flow.test.ts`. Verified end-to-end in a real browser (dossier recruit
+  button, clubhouse caddy chip, Locker crew section).
 - **GS-story-shop-access / GS-story-ship-vendors** — ✅ *shipped* (the shop-reachability fix; found by
   DRIVING the real UI in a headless browser — the deep-link smokes force-mount each screen and even set
   `starTourView.storyMode` by hand, so they never exercised the actual *navigation* to a shop). The bug: the

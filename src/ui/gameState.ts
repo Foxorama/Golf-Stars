@@ -335,6 +335,8 @@ export type Action =
   | { type: 'openStoryMap' } // GS-story-map: open the galaxy star-map navigator (the Star Tour screen, story context)
   | { type: 'exitStoryMap' } // GS-story-map: back to the clubhouse from the star map
   | { type: 'openStoryShop'; worldId: string } // GS-story-econ: open a cleared world's Pro Shop from its dossier
+  | { type: 'hireStoryCaddy'; worldId: string; caddyId: string } // GS-story-caddies: recruit the friend who waits at a cleared world
+  | { type: 'setStoryCaddy'; caddyId?: string } // GS-story-caddies: choose which owned caddy carries the bag (Locker)
   | { type: 'exitStoryShop' } // GS-story-econ: close the Pro Shop back to the star map
   | { type: 'storyInspectItem'; itemId: string } // GS-story-econ: tap a shop item → its lore card
   | { type: 'storyCloseItem' } // GS-story-econ: dismiss the item lore card
