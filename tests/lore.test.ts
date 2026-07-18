@@ -131,6 +131,14 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyRound: false }, {})).toBeUndefined();
   });
 
+  it('the Apostate appears in Chapter 3 after the Coilkeepers beat (GS-story-apostate)', () => {
+    // The gallery-dread beat leads on the first Ch.3 arrival; once seen, the Apostate himself appears.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3 }, { 'story-coilkeepers': true })?.id).toBe('story-apostate');
+    // Never on a non-story round, and never off Chapter 3.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyRound: false }, { 'story-coilkeepers': true })).toBeUndefined();
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4 }, { 'story-coilkeepers': true, 'story-apostate': true })).toBeUndefined();
+  });
+
   it('Venoma confronts you from Chapter 4, her beat branching on the chosen path', () => {
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
     expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
@@ -147,17 +155,20 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     }
   });
 
-  it('paints the two new story portraits (Venoma + the Coilkeeper)', () => {
+  it('paints the story portraits (Venoma, the Coilkeeper, the Apostate)', () => {
     const v = lorePortraitSVG('venoma');
     expect(v).toContain('<svg');
     expect(v).toContain('Venoma'); // aria-label
     const c = lorePortraitSVG('coilkeeper');
     expect(c).toContain('<svg');
     expect(c).toContain('Coilkeeper');
+    const a = lorePortraitSVG('voss');
+    expect(a).toContain('<svg');
+    expect(a).toContain('Voss'); // aria-label
   });
 
   it('every story beat names a portrait that lorePortraitSVG can paint', () => {
-    for (const id of ['story-coil-named', 'story-coilkeepers', 'story-venoma-warden', 'story-venoma-herald']) {
+    for (const id of ['story-coil-named', 'story-coilkeepers', 'story-apostate', 'story-venoma-warden', 'story-venoma-herald']) {
       const beat = loreEventById(id)!;
       expect(lorePortraitSVG(beat.portrait)).toContain('<svg');
     }

@@ -9,6 +9,7 @@
 
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
+import { lorePortraitSVG } from '../render/loreArt';
 
 export function storyChoiceScreen(): string {
   const who = state.story ? getCharacter(state.story.characterId)?.name ?? 'Champion' : 'Champion';
@@ -34,10 +35,19 @@ export function storyChoiceScreen(): string {
       <p class="gs-hero-tag">Three Sigils won · the serpent stirs · now you decide who you are</p>
     </header>
     <section style="max-width:640px;margin:6px auto 0;">
-      <p class="gs-choice-lore">The Storm Sigil is yours, ${who}, but the Coil has shown its face and the
-        galaxy has cracked down the middle. The Prognostic Parrot lands on your shoulder; across the bar,
-        a hooded Coilkeeper slides a mark of the serpent across the table toward you. Two roads. One golfer.
-        <span style="color:var(--gs-ink);">Choose.</span></p>
+      <div class="gs-choice-offer">
+        <div class="gs-choice-portrait" aria-hidden="true">${lorePortraitSVG('voss')}</div>
+        <div class="gs-choice-offertext">
+          <div class="gs-choice-offername">Malachai "Sable" Voss · The Apostate</div>
+          <p class="gs-choice-offerquote">"You've felt it too, ${who}. The whisper in the deep rough. You
+            know the Game is a cage. Lay down your clubs with us — or pick them up again for a galaxy that
+            will never once thank you. I've stood exactly where you're standing. Choose better than I did.
+            Or the same. It ends the same."</p>
+        </div>
+      </div>
+      <p class="gs-choice-lore">The Storm Sigil is yours, but the Coil has shown its face and the galaxy has
+        cracked down the middle. The Prognostic Parrot digs his claws into your shoulder, wordless for once.
+        The Apostate waits for your answer. Two roads. One golfer. <span style="color:var(--gs-ink);">Choose.</span></p>
       <div class="gs-choice-grid">
         ${card(
           'warden',
@@ -67,6 +77,12 @@ export function storyChoiceScreen(): string {
       <p class="gs-choice-warn">This choice sets the rest of your campaign — it cannot be undone this run.</p>
     </section>
     <style>
+      .gs-choice-offer{display:flex;gap:14px;align-items:center;background:linear-gradient(180deg,#161222,#0d0a16);
+        border:1px solid #2e2440;border-left:3px solid #8fbfa0;border-radius:14px;padding:12px 14px;margin:2px 0 12px;}
+      .gs-choice-portrait{flex:0 0 76px;width:76px;}
+      .gs-choice-offername{font-size:12px;font-weight:800;letter-spacing:.02em;color:#a7d8bd;margin-bottom:4px;}
+      .gs-choice-offerquote{font-size:13px;line-height:1.55;color:#cdd8ea;font-style:italic;margin:0;}
+      @media(max-width:440px){.gs-choice-offer{flex-direction:column;text-align:center;}.gs-choice-portrait{width:88px;flex-basis:88px;}}
       .gs-choice-lore{font-size:14px;line-height:1.6;color:var(--gs-dim,#9fb0c8);text-align:center;margin:2px 0 14px;}
       .gs-choice-grid{display:grid;grid-template-columns:1fr;gap:12px;}
       @media(min-width:560px){.gs-choice-grid{grid-template-columns:1fr 1fr;}}

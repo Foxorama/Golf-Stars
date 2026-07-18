@@ -150,14 +150,21 @@ DATA-driven is that a new story arc costs zero engine. Three additions:
   `run.storyRound` + the live `StoryState` (`next.story.chapter`/`.alignment`). Every story beat gates on
   `storyRound === true`, so they NEVER fire in Voyage/Unending (an ordinary arrival leaves the fields
   unset).
-- **Four escalation beats** (in `LORE_EVENTS`): `story-coil-named` (Ch.2, the Parrot names the Coil),
-  `story-coilkeepers` (Ch.3, cultists ring the tee), and Venoma's Ch.4+ confrontation branching on the
-  path — `story-venoma-warden` vs `story-venoma-herald`. Because story rounds arrive through the gate, a
-  qualifying arrival diverts to the `'lore'` screen first, then `dismissLore` continues to the intro.
-- **Two portraits** in `render/loreArt.ts`: `venoma` (viper-woman — amber slit-pupil eyes, fangs, a
-  Coil-sigil hood, a hissing snake at the collar) and `coilkeeper` (a faceless hooded cultist, an
-  acid-green void where a face should be, the serpent sigil burning on the chest). House SVG language,
-  Coil palette (venom-violet `#b060c0` / acid-green `#7fe0a0`).
+- **Five escalation beats** (in `LORE_EVENTS`): `story-coil-named` (Ch.2, the Parrot names the Coil),
+  `story-coilkeepers` (Ch.3, cultists ring the tee), `story-apostate` (Ch.3, AFTER the Coilkeepers beat —
+  Malachai "Sable" Voss, the fallen champion before you, holes an impossible shot and hands you the Coil's
+  argument; GS-story-apostate, the device that makes The Choice land), and Venoma's Ch.4+ confrontation
+  branching on the path — `story-venoma-warden` vs `story-venoma-herald`. Because story rounds arrive
+  through the gate, a qualifying arrival diverts to the `'lore'` screen first, then `dismissLore` continues
+  to the intro. (Voss is also the Ch.3 Storm Championship rival + the speaker who makes The Offer on the
+  `storyChoice` screen — all story rivals share the default ghost profile, so the rival swap is name-only.)
+- **Three portraits** in `render/loreArt.ts`: `venoma` (viper-woman — amber slit-pupil eyes, fangs, a
+  Coil-sigil hood, a hissing snake at the collar), `coilkeeper` (a faceless hooded cultist, an acid-green
+  void where a face should be, the serpent sigil burning on the chest), and `voss` (the Apostate — a
+  HUMAN face for the tragedy: gaunt, half-grey, a thin certain smile, an acid-green serpent-shine behind
+  hollow eyes, a coat of shed scale, and his motif the BLACK DRIVER THAT DRIPS at the shoulder — the dark
+  mirror of Driver Dan's honest slung driver). House SVG language, Coil palette (venom-violet `#b060c0` /
+  acid-green `#7fe0a0`).
 The one-off is recorded in the main-save `seenLore` like every other beat (no new save field). Pure DATA
 + render — zero sim rng, no `_gs*`/URL hook. Full campaign story: `docs/decisions/story-mode.md`.
 

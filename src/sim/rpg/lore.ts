@@ -214,6 +214,28 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       { kind: 'action', text: 'They do not blink. The wind moves everything on the course except them.' },
     ],
   },
+  // GS-story-apostate: Malachai "Sable" Voss — the champion BEFORE you, who played a course perfectly true,
+  // heard the serpent, and fell. He appears in Chapter 3 (the Storm Championship) not to beat you but to
+  // SHOW you: he holes a shot no mortal should, then hands you the Wardens' secret and the Coil's argument.
+  // He is the device that makes The Choice land. Placed AFTER `story-coilkeepers` so the gallery-dread beat
+  // fires on the first Ch.3 arrival and the Apostate on a later one (both once, so they never collide).
+  {
+    id: 'story-apostate',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 3,
+    speaker: 'Malachai "Sable" Voss',
+    portrait: 'voss',
+    kicker: 'The champion who fell',
+    title: 'The Apostate',
+    accent: '#8fbfa0',
+    cta: "I'll be seeing you →",
+    lines: [
+      { kind: 'action', text: 'A gaunt man in a coat of shed scale steps onto the tee, unhurried. He was the World Tour champion before you. He heard the serpent, once, in the deep rough between 17 and 18. He never stopped hearing it.' },
+      { kind: 'say', text: "They told you golf keeps the lights on. True enough. But they didn't tell you the other half: every course you play TRUE, you also bind. Re-consecration is a lock — and a cage. Order is just a prettier word for it." },
+      { kind: 'action', text: 'He drops a ball, and without a practice swing holes it from a place no mortal should — the ball curving through the gale like it agreed to go.' },
+      { kind: 'say', text: "I'm not here to beat you, champion. I'm here so that when the Coil makes their offer, you'll already know I'm right. The Long Rest isn't the end of the Game. It's mercy for everyone still trapped inside it." },
+      { kind: 'action', text: 'He turns to go, the smile of a man wholly at peace. A bead of something dark drips from the head of his black driver.' },
+    ],
+  },
   {
     id: 'story-venoma-warden',
     trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 4 && c.storyAlignment === 'warden',
