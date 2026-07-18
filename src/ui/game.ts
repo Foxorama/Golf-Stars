@@ -72,6 +72,7 @@ import {
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
+import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament } from '../sim/rpg/storyTournaments';
@@ -396,7 +397,8 @@ export function reduce(state: UiState, action: Action): UiState {
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const bag = storyBagClubs(state.story);
       // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
-      const loadout = applyStoryGear({ ...run0.loadout, bag }, state.story);
+      // GS-story-caddies: then the active caddy (a friend on the bag folds a real effect + shows on course).
+      const loadout = applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story);
       const run = {
         ...run0,
         loadout,
@@ -464,6 +466,25 @@ export function reduce(state: UiState, action: Action): UiState {
       // Close the Pro Shop back to wherever it was opened from (the star map, or the clubhouse).
       if (state.screen !== 'storyShop') return state;
       return { ...state, screen: state.storyShopReturn ?? 'starTour', storyShopReturn: undefined, storyItemInspectId: undefined };
+    }
+
+    case 'hireStoryCaddy': {
+      // GS-story-caddies: recruit the friend who waits at a CLEARED world (its dossier / recap / Pro Shop).
+      // Per-world + travel-back, like every other purchase — spend credits, keep them, first hire carries
+      // the bag by default. Guarded to the world actually hosting THIS caddy so a stray dispatch can't hire.
+      if (!state.story) return state;
+      if (state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop') return state;
+      const wid = action.worldId;
+      if (!worldCleared(state.story, wid) || worldCaddy(wid) !== action.caddyId) return state;
+      const story = hireStoryCaddy(state.story, action.caddyId);
+      return story === state.story ? state : { ...state, story };
+    }
+
+    case 'setStoryCaddy': {
+      // GS-story-caddies: choose which owned caddy carries your bag (an EQUIP, from the clubhouse Locker).
+      if (state.screen !== 'storyLocker' || !state.story) return state;
+      const story = setActiveStoryCaddy(state.story, action.caddyId);
+      return story === state.story ? state : { ...state, story };
     }
 
     case 'storyInspectItem': {
@@ -613,7 +634,8 @@ export function reduce(state: UiState, action: Action): UiState {
       if (!t) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const bag = storyBagClubs(state.story);
-      const loadout = applyStoryGear({ ...run0.loadout, bag }, state.story);
+      // GS-story-caddies: the active caddy folds into the tournament loadout too (auto ≡ interactive).
+      const loadout = applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story);
       const run = {
         ...run0,
         loadout,

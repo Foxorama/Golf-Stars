@@ -20,6 +20,8 @@ import { currentTournament } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked } from '../sim/rpg/storyFinale';
 import { worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
+import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
+import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 
 export function storyHubScreen(): string {
@@ -171,6 +173,7 @@ function spaceClubhouseHTML(story: StoryState): string {
         ${chip('Sigils won', `🏆 <b>${trophies}</b> / ${STORY_CHAPTER_COUNT}`)}
         ${chip('clubs in the bag', `🎒 <b>${story.equippedBagIds.length}</b>`, '#7fe0a0')}
         ${chip('your ship', `🚀 <b>${shipName}</b>`, '#7fd8ff')}
+        ${(() => { const c = activeStoryCaddy(story); const n = c ? shopItem(c)?.name : undefined; return n ? chip('your caddy', `🎒 <b>${n}</b>`, '#f0a8c8') : ''; })()}
       </div>
     </header>
 
@@ -196,6 +199,17 @@ function spaceClubhouseHTML(story: StoryState): string {
       <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
       ${hubFooterHTML()}
     </div>`;
+}
+
+/** GS-story-caddies: the recap's recruit-a-friend row for the world just cleared (a caddy waits here) —
+ *  recruit them, or note they're already aboard. Empty when no friend waits at this world. */
+function recapCaddyHTML(story: StoryState | undefined, courseId: string): string {
+  if (!story) return '';
+  const caddyId = worldCaddy(courseId);
+  if (!caddyId) return '';
+  const name = shopItem(caddyId)?.name ?? 'a friend';
+  if (storyCaddyHired(story, caddyId)) return `<div style="text-align:center;color:#7fe0a0;font-size:13px;">🎒 ${name} is already in your crew.</div>`;
+  return `<button class="gs-btn" style="background:linear-gradient(180deg,#22161f,#170f16);border-color:#6a3a52;color:#f0a8c8;" data-action='${JSON.stringify({ type: 'hireStoryCaddy', worldId: courseId, caddyId })}'>🎒 Recruit ${name} · ✦ ${STORY_CADDY_PRICE}</button>`;
 }
 
 /**
@@ -243,11 +257,13 @@ export function storyResultScreen(): string {
           ? // GS-story-intro: the prologue victory plays the recruitment cinematic before the clubhouse
             // (app.ts wires `data-story-intro`), so it does NOT use the plain continue action.
             `<button class="gs-btn" data-story-intro="1">Answer the call ›</button>`
-          : // GS-story-shop-access: shop the world you just cleared right here (Pro Shop always; the ship
-            // vendor worlds also open their shipyard) — no need to fly back for the first visit. Both are
-            // guarded to a cleared, stocking world, so they only show where there's something to buy.
+          : // GS-story-shop-access / GS-story-caddies: shop the world you just cleared right here (Pro Shop
+            // always; ship-vendor worlds open their shipyard; a friend who waits here can be recruited) —
+            // no need to fly back for the first visit. All guarded to a stocking world, so each only shows
+            // where there's actually something to do.
             `${worldHasShop(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: r.courseId })}'>🛒 Visit the Pro Shop</button>` : ''}
              ${worldIsShipVendor(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: r.courseId })}'>🚀 Visit the Shipyard</button>` : ''}
+             ${recapCaddyHTML(state.story, r.courseId)}
              <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>Back to the clubhouse ›</button>`
       }
     </div>`;
