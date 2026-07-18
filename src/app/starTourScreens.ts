@@ -140,14 +140,23 @@ const RARITY_SPEED_MULT: Record<CosmeticRarity, number> = {
 export function inStoryTour(): boolean {
   return !!starTourView.storyMode && !!state.story;
 }
+/** GS-story-startour-champion: free-roam Star Tour played as the DEVELOPED champion (a completed campaign
+ *  is playing its reward free-roam, NOT the campaign navigator). The champion + developed ship are fixed,
+ *  so the chart flies the earned Story ship and drops the records-chase "change golfer" swap. */
+export function championFreeRoam(): boolean {
+  return !inStoryTour() && !!state.story?.completed;
+}
 /** The active golfer id on the chart — the story protagonist in story mode, else the run's golfer. */
 function tourCharacterId(): string | undefined {
   return inStoryTour() ? state.story!.characterId : state.run.loadout.characterId;
 }
-/** The ship flown on the chart — the campaign's equipped ship in story mode (its own progression), else
- *  the character's cosmetic ride. Exported so app.ts's flight loop (weapon/hover) reads the same ship. */
+/** The ship flown on the chart — the campaign's equipped ship in story mode / the developed champion's
+ *  free-roam reward (its own progression), else the character's cosmetic ride. Exported so app.ts's flight
+ *  loop (weapon/hover) reads the same ship. */
 export function tourShipId(): string {
-  return inStoryTour() ? state.story!.equippedShipId : shipForCharacter(state, state.run.loadout.characterId);
+  return inStoryTour() || championFreeRoam()
+    ? state.story!.equippedShipId
+    : shipForCharacter(state, state.run.loadout.characterId);
 }
 
 /** The current golfer's ship-rarity cruise multiplier for the star-map flight (1.0 if no ship). */
@@ -329,9 +338,9 @@ function stHud(): string {
       <div class="gs-bhud__console gs-bhud__console--st">
         <div class="gs-bhud__slot gs-bhud__slot--exit">
           ${
-            story
-              ? // Story Mode: the protagonist is fixed for the campaign — the pod is a plain identity dot
-                // (tapping the top-left CLUBHOUSE pill is the way out), never the records-chase golfer swap.
+            story || championFreeRoam()
+              ? // Story Mode / the developed-champion free-roam reward: the protagonist is FIXED (you are
+                // your champion) — the pod is a plain identity dot, never the records-chase golfer swap.
                 `<div class="gs-sthud__pilot" title="${ch?.name ?? 'your golfer'}" aria-hidden="true">
             <span class="gs-sthud__pilot-dot" style="background:${accent};"></span>
           </div>`

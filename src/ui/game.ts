@@ -333,14 +333,30 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-star-tour-port: also reachable from the Clubhouse hall's "Depart to Star Tour" button (the
       // spaceport ↔ clubhouse loop), which re-enters character select before the map.
       if (!['title', 'gameover', 'strokeResult', 'starTour', 'character', 'clubhouseHall'].includes(state.screen)) return state;
+      // GS-story-startour-champion: Star Tour is the REWARD for completing the campaign, so a finished
+      // campaign plays free-roam AS the developed champion — the golfer who saved the galaxy, carrying the
+      // bag / gear / active caddy you built up (loaded from the separate `gs_story` save). We skip the
+      // golfer pick (you already ARE your champion) and fly straight to the map. When there's no completed
+      // campaign — only reachable in tests, since the title gates Star Tour on completion — the classic
+      // character-first flow is byte-for-byte unchanged.
+      const champion = state.story?.completed ? state.story : undefined;
       const keepGolfer = state.screen === 'strokeResult' && !!state.run.loadout.characterId;
-      const run = keepGolfer
-        ? startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, state.run.loadout.characterId, state.run.ascension, state.run.bagTier, state.run.unlockedClubs)
-        : startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades);
+      let run;
+      if (champion) {
+        // Build the champion's strokeplay run and fold in the developed Story loadout (the `storyPlayWorld`
+        // pattern): the equipped bag + gear + active caddy, so free-roam plays with everything you earned.
+        const base = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, champion.characterId, 0, DEFAULT_BAG_TIER, []);
+        const loadout = applyStoryCaddy(applyStoryGear({ ...base.loadout, bag: storyBagClubs(champion) }, champion), champion);
+        run = { ...base, loadout };
+      } else if (keepGolfer) {
+        run = startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, state.run.loadout.characterId, state.run.ascension, state.run.bagTier, state.run.unlockedClubs);
+      } else {
+        run = startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades);
+      }
       return {
         ...state,
         run,
-        screen: keepGolfer ? 'starTour' : 'character',
+        screen: champion || keepGolfer ? 'starTour' : 'character',
         starTourPick: undefined,
         played: undefined,
         lastResult: undefined,
