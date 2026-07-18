@@ -544,6 +544,13 @@ describe('Story tournament flow (GS-story-tournament)', () => {
     expect(r.chapter).toBe(1);
     // the recap is internally consistent: won iff the player's gross beat the rival's
     expect(r.won).toBe(r.playerGross <= r.rivalGross);
+    // GS-story-tournament-field: the recap carries the full "all competitors" leaderboard (rival + three
+    // friends + you), sorted low-gross-first with exactly one player row.
+    expect(r.leaderboard!.length).toBe(5);
+    expect(r.leaderboard!.filter((g) => g.kind === 'player')).toHaveLength(1);
+    for (let i = 1; i < r.leaderboard!.length; i++) {
+      expect(r.leaderboard![i]!.gross).toBeGreaterThanOrEqual(r.leaderboard![i - 1]!.gross);
+    }
     if (r.won) {
       expect(done.story!.trophyIds).toContain('sigil-emerald');
       expect(done.story!.chapter).toBe(2); // advanced

@@ -271,7 +271,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
     { screen: 'storylocker', sel: '.gs-lock-grid', text: 'Your bag', label: 'the Story locker (bag builder + gear)' },
     { screen: 'storyshipyard', sel: '.gs-yard-usec', text: 'Weapons & upgrades', label: 'the Story shipyard (ships + weapons/upgrades)' },
-    { screen: 'storytournament', sel: '.gs-tourn-rival', text: 'Emerald Invitational', label: 'the Story Galaxy Tournament lobby' },
+    { screen: 'storytournament', sel: '.gs-tourn-card', text: 'Emerald Invitational', label: 'the Story Galaxy Tournament lobby' },
     { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },
     { screen: 'storyfinale', sel: '.gs-fin-gate', text: 'Jörmungandr', label: 'the Story finale battle briefing' },
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },

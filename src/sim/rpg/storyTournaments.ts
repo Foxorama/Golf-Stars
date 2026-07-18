@@ -16,6 +16,7 @@
  */
 
 import { ghostHoleStrokes, golferForm } from './competition';
+import { CHARACTERS } from './characters';
 import {
   STORY_WORLDS,
   STORY_CHAPTER_COUNT,
@@ -250,6 +251,79 @@ export function rivalTotal(t: StoryTournament, seed: string, pars: readonly numb
   let total = 0;
   for (let i = 0; i < pars.length; i++) total += ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
   return total;
+}
+
+/** A competitor in the tournament FIELD (GS-story-tournament-field): the rival, your three friendly-rival
+ *  golfers, and — folded in at resolve — you. `gross` is the total over the venue's pars. */
+export interface FieldGolfer {
+  id: string;
+  name: string;
+  gross: number;
+  kind: 'rival' | 'friend' | 'player';
+}
+
+/** How sharply your three friends play (a MILD edge — they're beatable tour-mates, not the cult rival).
+ *  Per-golfer variation comes from `golferForm`, so the three don't post identical cards. */
+export const FRIEND_FIELD_EDGE = 0.05;
+
+/** A friend's deterministic ghost gross over the pars (their own seeded form + the mild friend edge). */
+function friendTotal(golferId: string, seed: string, pars: readonly number[]): number {
+  const form = golferForm(golferId, `${seed}:friend:${golferId}`);
+  let total = 0;
+  for (let i = 0; i < pars.length; i++) total += ghostHoleStrokes(golferId, `${seed}:friend:${golferId}:${i}`, pars[i]!, form, FRIEND_FIELD_EDGE);
+  return total;
+}
+
+/**
+ * The tournament FIELD you compete against (GS-story-tournament-field, pure + deterministic): the recurring
+ * RIVAL (the cult's champion / the club champion) plus your three FRIENDS — the other playable golfers, your
+ * Earth tour-mates who answered the Parrot's call (the bible's "friendly leaderboard"). Does NOT include you;
+ * the resolve folds in your real gross. Excludes the protagonist so a friend is never the golfer you're
+ * playing. Ordered rival-first, then friends. The WIN condition is unchanged (you vs the rival for the
+ * Sigil); this field is the DISPLAY (intro hype, mid-round standings, victory scoreboard).
+ */
+export function tournamentField(
+  t: StoryTournament,
+  seed: string,
+  pars: readonly number[],
+  protagonistId?: string,
+): FieldGolfer[] {
+  const out: FieldGolfer[] = [
+    { id: t.rivalId, name: t.rivalName, gross: rivalTotal(t, seed, pars), kind: 'rival' },
+  ];
+  for (const c of CHARACTERS) {
+    if (c.id === protagonistId) continue;
+    // Don't duplicate a friend who is also this tournament's named rival (rivals are cult NPCs, not the
+    // playable four — but guard anyway so the board never lists someone twice).
+    if (c.id === t.rivalId) continue;
+    out.push({ id: c.id, name: c.shortName, gross: friendTotal(c.id, seed, pars), kind: 'friend' });
+  }
+  return out;
+}
+
+/** The competitor IDENTITIES for the pre-round hype (GS-story-tournament-field) — the rival + your three
+ *  friends, WITHOUT grosses (no course needed yet). Used by the tournament intro/lobby to show who's in the
+ *  field before you tee off. */
+export function tournamentCompetitors(t: StoryTournament, protagonistId?: string): { id: string; name: string; kind: 'rival' | 'friend' }[] {
+  const out: { id: string; name: string; kind: 'rival' | 'friend' }[] = [
+    { id: t.rivalId, name: t.rivalName, kind: 'rival' },
+  ];
+  for (const c of CHARACTERS) {
+    if (c.id === protagonistId || c.id === t.rivalId) continue;
+    out.push({ id: c.id, name: c.shortName, kind: 'friend' });
+  }
+  return out;
+}
+
+/** The full FINISHED leaderboard: the field + you, sorted low gross first (ties keep the player ahead). A
+ *  pure display helper for the victory scoreboard. `playerName`/`playerGross` are your real round. */
+export function tournamentLeaderboard(
+  field: readonly FieldGolfer[],
+  playerName: string,
+  playerGross: number,
+): FieldGolfer[] {
+  const rows: FieldGolfer[] = [...field, { id: '__player__', name: playerName, gross: playerGross, kind: 'player' }];
+  return rows.sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
 }
 
 /**

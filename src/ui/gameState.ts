@@ -265,6 +265,11 @@ export interface UiState {
     won: boolean;
     /** True when this win took the fifth Sigil (the campaign is complete). */
     finalSigil: boolean;
+    /** The venue's total par (for the scoreboard's to-par column). */
+    par?: number;
+    /** GS-story-tournament-field: the FULL finished leaderboard (rival + your three friends + you), sorted
+     *  low-gross-first — the "all competitors" scoreboard for the victory recap. */
+    leaderboard?: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[];
   };
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence'; strike?: 'clean' | 'graze' };
