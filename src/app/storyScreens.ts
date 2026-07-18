@@ -23,6 +23,7 @@ import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
 import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
+import { crewWallHTML, allyInspectOverlayHTML } from '../render/storyCrew';
 
 export function storyHubScreen(): string {
   const story = state.story;
@@ -162,6 +163,11 @@ function spaceClubhouseHTML(story: StoryState): string {
   const chip = (title: string, body: string, color = 'var(--gs-gold)') =>
     `<span class="gs-chip" style="border-color:#3a3320;color:${color};font-size:13px;" title="${title}">${body}</span>`;
   const parrotLine = `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils. The Coil is not resting, ${who} — and neither is the serpent."`;
+  // GS-story-allies: the recruited crew stand in the clubhouse; tap one to talk (their portrait, faction,
+  // and rotating banter). Empty until you recruit a friend out in the galaxy.
+  const allyOverlay = state.storyAllyInspectId
+    ? allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
+    : '';
 
   return `
     <header class="gs-hero gs-storyhub">
@@ -190,6 +196,8 @@ function spaceClubhouseHTML(story: StoryState): string {
 
     ${tournamentBannerHTML(story)}
 
+    ${crewWallHTML(story)}
+
     <h2 class="gs-seclabel">The spaceport</h2>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto;">
       <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Set course — the star chart</button>
@@ -198,7 +206,8 @@ function spaceClubhouseHTML(story: StoryState): string {
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'openStoryBar' })}'>🍺 The Crow's Nest — talk to the captain</button>
       <div style="text-align:center;color:var(--gs-dim);font-size:12px;">Chart a course to a charted world, play it, and bank credits.</div>
       ${hubFooterHTML()}
-    </div>`;
+    </div>
+    ${allyOverlay}`;
 }
 
 /** GS-story-caddies: the recap's recruit-a-friend row for the world just cleared (a caddy waits here) —

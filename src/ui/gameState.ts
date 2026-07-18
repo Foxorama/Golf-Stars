@@ -283,6 +283,12 @@ export interface UiState {
   /** GS-story-parrot-bar: the Parrot's chatter tap-count at the bar (0 = greeting; each tap advances,
    *  wrapping through the eligible lines). Transient — reset to 0 each time the bar is opened, never saved. */
   storyBarTalk?: number;
+  /** GS-story-allies: the recruited crew ally whose talk card is open on the clubhouse (undefined ⇒ none).
+   *  Transient (never persisted). */
+  storyAllyInspectId?: string;
+  /** GS-story-allies: the open ally card's banter tap-count (0 = first line; each tap advances, wrapping).
+   *  Transient — reset to 0 when a card opens, never saved. */
+  storyAllyTalk?: number;
 }
 
 /** The matchplay duel a boss stop is played as (GS-100), incl. team duels (GS-team-duel). */
@@ -365,6 +371,9 @@ export type Action =
   | { type: 'openStoryBar' } // GS-story-parrot-bar: enter the Parrot's cantina from the clubhouse
   | { type: 'exitStoryBar' } // GS-story-parrot-bar: back to the clubhouse from the bar
   | { type: 'parrotBarNext' } // GS-story-parrot-bar: tap the Parrot for the next line (advance the chatter)
+  | { type: 'storyInspectAlly'; caddyId: string } // GS-story-allies: tap a recruited crew ally → their talk card
+  | { type: 'storyAllyTalk'; caddyId: string } // GS-story-allies: cycle the open ally's banter line
+  | { type: 'storyCloseAlly' } // GS-story-allies: dismiss the ally talk card
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss
