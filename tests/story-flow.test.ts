@@ -768,3 +768,40 @@ describe('storyStore persistence (GS-story-save wiring)', () => {
     expect(back).toEqual(story);
   });
 });
+
+describe('Ally side quests (GS-story-quests)', () => {
+  it('accept → play the quest world → recap → claim the unique reward into the bag', () => {
+    // Driver Dan recruited, chapter 3 → his quest (the derelict) is offerable.
+    const story = { ...defaultStoryState('feather-fade'), chapter: 3, hiredCaddyIds: ['driver-dan'], activeCaddyId: 'driver-dan' };
+    const hub = { ...initState('quest-seed', {}, undefined, story), screen: 'story' as const };
+
+    // accept it from the ally card → active
+    const accepted = reduce(hub, { type: 'acceptStoryQuest', questId: 'quest-dan' });
+    expect(accepted.story?.activeQuestId).toBe('quest-dan');
+
+    // play it → tees off Dan's home world (the derelict), marked as the quest. A Ch.3 derelict arrival may
+    // fire a lore beat first (withLoreGate) — dismiss it to reach the intro.
+    let intro = reduce(accepted, { type: 'playStoryQuest' });
+    if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.staticCourseId).toBe('derelict-18');
+    expect(intro.run.storyQuest).toBe('quest-dan');
+
+    // play the round → the quest recap carries the quest id
+    const done = reduce(intro, { type: 'play' });
+    expect(done.screen).toBe('storyResult');
+    expect(done.lastStoryRound?.questId).toBe('quest-dan');
+
+    // claim → the reward club is owned + equipped, the quest is done, back to the clubhouse
+    const claimed = reduce(done, { type: 'completeStoryQuest' });
+    expect(claimed.screen).toBe('story');
+    expect(claimed.story?.completedQuestIds).toContain('quest-dan');
+    expect(claimed.story?.activeQuestId).toBeUndefined();
+    expect(claimed.story?.equippedBagIds).toContain('club:solar:D');
+  });
+
+  it('a quest cannot be accepted before its chapter, and only one runs at a time', () => {
+    const early = { ...initState('s', {}, undefined, { ...defaultStoryState('feather-fade'), chapter: 1, hiredCaddyIds: ['driver-dan'] }), screen: 'story' as const };
+    expect(reduce(early, { type: 'acceptStoryQuest', questId: 'quest-dan' }).story?.activeQuestId).toBeUndefined();
+  });
+});

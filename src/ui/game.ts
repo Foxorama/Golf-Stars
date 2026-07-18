@@ -75,6 +75,7 @@ import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop'
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
 import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
 import { allyTalk } from '../sim/rpg/storyAllies';
+import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament, tournamentForChapter, rivalTotalThrough } from '../sim/rpg/storyTournaments';
@@ -524,6 +525,46 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'storyCloseAlly': {
       return state.storyAllyInspectId ? { ...state, storyAllyInspectId: undefined, storyAllyTalk: undefined } : state;
+    }
+
+    case 'acceptStoryQuest': {
+      // GS-story-quests: accept an ally's side quest from their clubhouse card. Guarded to the hub + an
+      // offerable quest (acceptQuest re-checks). Closes the ally card so the active-quest banner shows.
+      if (state.screen !== 'story' || !state.story) return state;
+      const story = acceptQuest(state.story, action.questId);
+      if (story === state.story) return state;
+      return { ...state, story, storyAllyInspectId: undefined, storyAllyTalk: undefined };
+    }
+
+    case 'playStoryQuest': {
+      // GS-story-quests: tee off the active quest's round — the ally's home world, marked as the quest so
+      // the recap can complete it. Mirrors `storyPlayWorld`'s loadout build (developed bag + gear + caddy).
+      if (state.screen !== 'story' || !state.story) return state;
+      const q = activeQuest(state.story);
+      const worldId = q ? questWorld(q) : undefined;
+      if (!q || !worldId) return state;
+      const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
+      const bag = storyBagClubs(state.story);
+      const loadout = applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story);
+      const run = {
+        ...run0,
+        loadout,
+        staticCourseId: worldId,
+        staticEffect: storyWorldEffect(worldId),
+        storyRound: true,
+        storyQuest: q.id,
+      };
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
+    }
+
+    case 'completeStoryQuest': {
+      // GS-story-quests: claim the reward on the quest round's recap (grants + equips the reward club,
+      // records the quest done), then back to the clubhouse. Guarded to the recap of an active quest round.
+      if (state.screen !== 'storyResult' || !state.story) return state;
+      const qid = state.lastStoryRound?.questId;
+      if (!qid) return state;
+      const story = completeQuest(state.story, qid);
+      return { ...state, story, screen: 'story', lastStoryRound: undefined };
     }
 
     case 'storyInspectItem': {

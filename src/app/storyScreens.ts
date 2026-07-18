@@ -24,6 +24,7 @@ import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from
 import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { crewWallHTML, allyInspectOverlayHTML } from '../render/storyCrew';
+import { activeQuest, questWorld, questById, questGiverName } from '../sim/rpg/storyQuests';
 
 export function storyHubScreen(): string {
   const story = state.story;
@@ -148,6 +149,23 @@ function tournamentBannerHTML(story: StoryState): string {
     </section>`;
 }
 
+/** GS-story-quests: the active ally-quest banner — a call to fly to the ally's world and play the quest.
+ *  Empty when no quest is accepted. */
+function questBannerHTML(story: StoryState): string {
+  const q = activeQuest(story);
+  if (!q) return '';
+  const world = q ? questWorld(q) : undefined;
+  const worldName = world ? staticCourseSpec(world)?.name ?? 'their world' : 'their world';
+  return `
+    <section style="max-width:520px;margin:12px auto 0;">
+      <button class="gs-btn" style="background:linear-gradient(180deg,#1e1630,#140e1e);border-color:#5a3f8a;color:#d6c2ff;text-align:left;padding:12px 16px;"
+        data-action='${JSON.stringify({ type: 'playStoryQuest' })}'>
+        <div style="font-size:15px;font-weight:800;">🗺 ${q.title} — with ${questGiverName(q).split(' ')[0]}</div>
+        <div style="font-size:12px;color:#b8a8e0;font-weight:600;margin-top:2px;">Fly to ${worldName} and play it together ›</div>
+      </button>
+    </section>`;
+}
+
 /**
  * The SPACEPORT clubhouse (post-recruitment, Chapter 1+): your ship parked, the Parrot in the bar, the star
  * chart ahead. The campaign has "opened up" to space. The forward "set course" star-map action lands with
@@ -196,6 +214,8 @@ function spaceClubhouseHTML(story: StoryState): string {
 
     ${tournamentBannerHTML(story)}
 
+    ${questBannerHTML(story)}
+
     ${crewWallHTML(story)}
 
     <h2 class="gs-seclabel">The spaceport</h2>
@@ -238,10 +258,14 @@ export function storyResultScreen(): string {
   const spec = staticCourseSpec(r.courseId);
   const courseName = spec?.name ?? 'the course';
   const toParStr = r.toPar === 0 ? 'Even par' : r.toPar > 0 ? `+${r.toPar}` : `${r.toPar}`;
-  const title = r.wasPrologue ? '🏆 Champion!' : '⛳ World cleared';
-  const kicker = r.wasPrologue
-    ? `You've won the final round of the World Tour on Earth — the best golfer on the planet.`
-    : `You played ${courseName} true.`;
+  // GS-story-quests: a quest round's recap is the QUEST completion — the ally's parting scene + the reward.
+  const quest = r.questId ? questById(r.questId) : undefined;
+  const title = quest ? '🎁 Quest complete!' : r.wasPrologue ? '🏆 Champion!' : '⛳ World cleared';
+  const kicker = quest
+    ? `${quest.title} — ${questGiverName(quest).split(' ')[0]} keeps their word.`
+    : r.wasPrologue
+      ? `You've won the final round of the World Tour on Earth — the best golfer on the planet.`
+      : `You played ${courseName} true.`;
   return `
     <header class="gs-hero gs-storyres">
       <h1 class="gs-hero-title">${title}</h1>
@@ -254,23 +278,32 @@ export function storyResultScreen(): string {
     </header>
     <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.5;">
       ${
-        r.wasPrologue
-          ? `<p><em>As the gallery roars, a shadow falls across the 18th green. Something vast is descending from the sky…</em></p>
+        quest
+          ? `${quest.complete.map((l) => `<p style="color:#e6ddf0;">${l}</p>`).join('')}
+             <div style="margin:10px auto 0;max-width:460px;background:#181322;border:1px solid #3a2f4a;border-left:3px solid #a97b25;border-radius:10px;padding:10px 14px;text-align:left;">
+               <div style="font-size:13px;font-weight:800;color:#f0c874;">🎁 ${quest.rewardName}</div>
+               <div style="font-size:12.5px;color:#c6bcd6;margin-top:2px;">${quest.rewardBlurb}</div>
+             </div>`
+          : r.wasPrologue
+            ? `<p><em>As the gallery roars, a shadow falls across the 18th green. Something vast is descending from the sky…</em></p>
              <p style="color:#7fe0a0;">🦜 "Golfer — the Universe needs you. Gather friends and allies, and follow me!"</p>`
-          : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`
+            : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`
       }
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:18px auto 0;">
       ${
-        r.wasPrologue
-          ? // GS-story-intro: the prologue victory plays the recruitment cinematic before the clubhouse
-            // (app.ts wires `data-story-intro`), so it does NOT use the plain continue action.
-            `<button class="gs-btn" data-story-intro="1">Answer the call ›</button>`
-          : // GS-story-shop-access / GS-story-caddies: shop the world you just cleared right here (Pro Shop
-            // always; ship-vendor worlds open their shipyard; a friend who waits here can be recruited) —
-            // no need to fly back for the first visit. All guarded to a stocking world, so each only shows
-            // where there's actually something to do.
-            `${worldHasShop(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: r.courseId })}'>🛒 Visit the Pro Shop</button>` : ''}
+        quest
+          ? // GS-story-quests: claim the reward (grants + equips the club, records the quest done) → clubhouse.
+            `<button class="gs-btn" data-action='${JSON.stringify({ type: 'completeStoryQuest' })}'>🎁 Take ${quest.rewardName} — back to the clubhouse ›</button>`
+          : r.wasPrologue
+            ? // GS-story-intro: the prologue victory plays the recruitment cinematic before the clubhouse
+              // (app.ts wires `data-story-intro`), so it does NOT use the plain continue action.
+              `<button class="gs-btn" data-story-intro="1">Answer the call ›</button>`
+            : // GS-story-shop-access / GS-story-caddies: shop the world you just cleared right here (Pro Shop
+              // always; ship-vendor worlds open their shipyard; a friend who waits here can be recruited) —
+              // no need to fly back for the first visit. All guarded to a stocking world, so each only shows
+              // where there's actually something to do.
+              `${worldHasShop(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: r.courseId })}'>🛒 Visit the Pro Shop</button>` : ''}
              ${worldIsShipVendor(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: r.courseId })}'>🚀 Visit the Shipyard</button>` : ''}
              ${recapCaddyHTML(state.story, r.courseId)}
              <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>Back to the clubhouse ›</button>`

@@ -254,6 +254,8 @@ export interface UiState {
     advancedChapter: boolean;
     /** This was the prologue (the Earth World Tour final). */
     wasPrologue: boolean;
+    /** GS-story-quests: the ally side quest this round fulfilled (its recap offers the reward), or absent. */
+    questId?: string;
   };
   /** GS-story-tournament: the just-finished Galaxy Tournament recap (the `storyTournamentResult` screen). */
   lastStoryTournament?: {
@@ -395,6 +397,9 @@ export type Action =
   | { type: 'storyInspectAlly'; caddyId: string } // GS-story-allies: tap a recruited crew ally → their talk card
   | { type: 'storyAllyTalk'; caddyId: string } // GS-story-allies: cycle the open ally's banter line
   | { type: 'storyCloseAlly' } // GS-story-allies: dismiss the ally talk card
+  | { type: 'acceptStoryQuest'; questId: string } // GS-story-quests: accept an ally's side quest (from their card)
+  | { type: 'playStoryQuest' } // GS-story-quests: tee off the active quest's round (the ally's home world)
+  | { type: 'completeStoryQuest' } // GS-story-quests: claim the quest reward on the round recap
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro
   | { type: 'pickBossReward'; index: number } // claim a talent / permanent reward after beating a boss

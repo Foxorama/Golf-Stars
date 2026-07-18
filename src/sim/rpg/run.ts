@@ -173,6 +173,10 @@ export interface Run {
    *  (beat the rival → Sigil + chapter advance) instead of the plain world-clear path. Run-lifetime, not
    *  snapshotted. */
   storyTournament?: number;
+  /** GS-story-quests: this story round is an ally SIDE QUEST (the quest id), played at the ally's home
+   *  world. Set alongside `storyRound`; the recap offers to complete the quest (grant the reward club).
+   *  Run-lifetime, not snapshotted. */
+  storyQuest?: string;
   /**
    * The route event applied to the CURRENT stop (GS-14) — set by `travel`, consumed (and
    * cleared) by `finishStop`. Absent at stop 0 / after scoring → the neutral DEFAULT_EVENT.
