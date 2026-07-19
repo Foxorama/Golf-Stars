@@ -68,6 +68,9 @@ export interface StarTourMapOpts {
   /** GS-story-ship-interior: in Story mode the ship is TAPPABLE — a hit target over the hull dispatches
    *  `openShipInterior` (board your ship). Absent/false ⇒ the ship is inert decor (Star Tour proper). */
   shipTappable?: boolean;
+  /** GS-story-quality: how many WEAPON upgrades are installed (0–3). The ship draws that many gun pods on
+   *  the hull, so arming up at the shipyard visibly changes your ship on the chart. Absent/0 ⇒ bare hull. */
+  shipWeaponLevel?: number;
 }
 
 /** The ship's docked heading (GS-star-tour): nose UP (−90° in the +x-facing art frame), poised toward
@@ -1479,6 +1482,25 @@ function hoverThrust(look: ShipLook): string {
  *                        and only `hoverBank()` — the disc never tumbles — and carry their own downward
  *                        `hoverThrust()` REPULSOR under the hull (GS-ship-hover-prop) instead of a jet.
  *  The ship art faces +x (right), so heading 0 = flying right; the app feeds `atan2(dy,dx)`. */
+/** GS-story-quality: mounted weapon pods that scale with installed WEAPON upgrades (0–3), drawn in the
+ *  ship's own unit frame (nose along +x) so they flank the hull, point their muzzles forward, and rotate +
+ *  flip with the body. More upgrades ⇒ more/bigger hardpoints, so arming up at the shipyard shows on the
+ *  chart. Pure geometry, no rng. `flame` tints the muzzle glow to the ship's exhaust colour. */
+function shipGunPods(level: number, flame: string): string {
+  const n = Math.max(0, Math.min(3, Math.round(level)));
+  if (n === 0) return '';
+  const pod = (px: number, py: number, len: number, r: number): string =>
+    `<g transform="translate(${px} ${py})">
+      <rect x="${(-len * 0.5).toFixed(1)}" y="${(-r).toFixed(1)}" width="${len.toFixed(1)}" height="${(r * 2).toFixed(1)}" rx="${r.toFixed(1)}" fill="#2b3340" stroke="#10151d" stroke-width="0.5"/>
+      <rect x="${(len * 0.5 - 1.2).toFixed(1)}" y="${(-r * 0.45).toFixed(1)}" width="2.2" height="${(r * 0.9).toFixed(1)}" rx="0.5" fill="${flame}"/>
+      <circle cx="${(len * 0.5 + 1).toFixed(1)}" cy="0" r="${(r * 0.5).toFixed(1)}" fill="${flame}" opacity="0.85"/>
+    </g>`;
+  let out = pod(2.5, -8, 8, 1.6) + pod(2.5, 8, 8, 1.6); // inner pair (level 1+)
+  if (n >= 2) out += pod(1, -12, 9, 1.8) + pod(1, 12, 9, 1.8); // outer pair
+  if (n >= 3) out += pod(6, -4.5, 12, 1.6) + pod(6, 4.5, 12, 1.6); // forward lances
+  return out;
+}
+
 function shipGroup(opts: StarTourMapOpts): string {
   const x = opts.shipX ?? SPACEPORT_POS.x;
   const y = opts.shipY ?? SPACEPORT_POS.y;
@@ -1500,10 +1522,13 @@ function shipGroup(opts: StarTourMapOpts): string {
         <circle r="30" fill="none" stroke="#7fe0ff" stroke-width="1.4" opacity="0.5"><animate attributeName="r" values="26;34;26" dur="2.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.55;0.1;0.55" dur="2.6s" repeatCount="indefinite"/></circle>
       </g>`
     : '';
+  // GS-story-quality: mounted weapon pods scale with installed WEAPON upgrades, drawn INSIDE the hull group
+  // so they rotate + flip with the ship (and read at any zoom). Under the hull so the nacelles flank it.
+  const guns = shipGunPods(opts.shipWeaponLevel ?? 0, look.flame ?? '#ff9a4a');
   return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" style="pointer-events:none;">
     <circle r="30" fill="#7fe0ff" opacity="0.08"/>
     <g id="gs-st-thrust-orient" transform="rotate(${h.toFixed(1)})"><g transform="scale(${SHIP_SCALE})">${jet}</g></g>
-    <g id="gs-st-body" transform="${bodyTransform}">${repulsor}${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}</g>
+    <g id="gs-st-body" transform="${bodyTransform}"><g transform="scale(${SHIP_SCALE})">${guns}</g>${repulsor}${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}</g>
     ${tap}
   </g>`;
 }

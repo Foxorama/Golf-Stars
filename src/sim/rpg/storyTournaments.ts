@@ -116,7 +116,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     unlockAfterClears: 2,
     sigilId: 'sigil-storm',
     sigilName: 'The Storm Sigil',
-    prize: 'The Galewarden Irons — control clubs that read the wind true.',
+    prize: 'The Galewarden Irons — a matched set (5·7·9) of control irons that read the wind true.',
     rewardClubId: 'major:storm',
     intro: [
       'The tour "postponed" it; the Coil runs a shadow tournament in the eye of the Dragon’s storm, and ' +

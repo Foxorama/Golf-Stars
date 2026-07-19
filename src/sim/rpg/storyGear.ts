@@ -304,13 +304,15 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
 /** Per-world gear stock (content-as-data) — a curated 1–2 items per world, tiered by chapter, so travel
  *  fills out the locker. Filtered to hide what you own (see `storyGearStock`). */
 export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
+  // GS-story-quality: EARLY worlds lean on gear (the shops trimmed a club slot for it) — gear is the spend
+  // the quest/tournament CLUB rewards never make redundant, so early credits go somewhere that lasts.
   // Chapter 1 — the rare Warden basics.
-  'verdant-18': ['gear:glove:tacky'],
-  'verdant2-18': ['gear:hat:visor'],
+  'verdant-18': ['gear:glove:tacky', 'gear:ball:soft'],
+  'verdant2-18': ['gear:hat:visor', 'gear:glove:tacky'],
   'desert-18': ['gear:shoes:spikes', 'gear:ball:soft'],
   // Chapter 2 — a first epic appears.
-  'inferno-18': ['gear:glove:vice'],
-  'inferno2-18': ['gear:ball:soft'],
+  'inferno-18': ['gear:glove:vice', 'gear:hat:visor'],
+  'inferno2-18': ['gear:ball:soft', 'gear:shoes:spikes'],
   'frost-18': ['gear:hat:visor', 'gear:shoes:spikes'],
   // Chapter 3 — the epic line fills in.
   'tempest-18': ['gear:glove:vice', 'gear:hat:focus'],

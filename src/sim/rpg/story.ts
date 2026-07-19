@@ -337,8 +337,26 @@ export const NAMED_STORY_CLUBS: Record<string, { base: string; name: string }> =
   // shove an ally's gift out of the bag.
   'major:emerald': { base: 'club:solar:5W', name: 'The Verdant Wood' },
   'major:ember': { base: 'club:solar:D', name: 'The Forgefire Driver' },
-  'major:storm': { base: 'club:solar:5i', name: 'The Galewarden Irons' },
+  // GS-story-quality: the Storm prize is a SET of irons (it always read "Irons" but landed as one club).
+  // The flagship 5-iron carries the wind-reading signature effect (`STORY_CLUB_EFFECTS['major:storm']`);
+  // the 7 + 9 are matched set members (solar irons, no extra effect, so the wind bonus never stacks). All
+  // three are granted together — see `storyRewardSetIds` / the tournament grant.
+  'major:storm': { base: 'club:solar:5i', name: 'The Galewarden Irons · 5' },
+  'major:storm:7i': { base: 'club:solar:7i', name: 'The Galewarden Irons · 7' },
+  'major:storm:9i': { base: 'club:solar:9i', name: 'The Galewarden Irons · 9' },
 };
+
+/** GS-story-quality: reward ids that grant a matched SET of clubs (not a single one). A set-reward's
+ *  primary id maps to the full list of member ids granted together; any other id grants just itself. Today
+ *  only the Storm major's Galewarden Irons is a set (a 5/7/9 iron trio). */
+export const STORY_REWARD_SETS: Record<string, readonly string[]> = {
+  'major:storm': ['major:storm', 'major:storm:7i', 'major:storm:9i'],
+};
+
+/** The full list of club ids a reward grants — a matched set for a set-reward, else just the id itself. */
+export function storyRewardSetIds(id: string): readonly string[] {
+  return STORY_REWARD_SETS[id] ?? [id];
+}
 
 /** The real `club:<set>:<type>` base id a Story-owned club id maps to — a `quest:<key>` reward resolves to
  *  its base; any other id is itself. Used wherever art/theme/type is derived off the id. */

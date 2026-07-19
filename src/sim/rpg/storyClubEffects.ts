@@ -60,6 +60,17 @@ export const STORY_CLUB_EFFECTS: Record<string, StoryClubEffect> = {
     label: 'Reads the wind true — strong wind resistance',
     apply: (m) => ({ ...m, windResist: (m.windResist ?? 0) + 0.5 }),
   },
+  // GS-story-quality: the Galewarden Irons are a matched SET (5·7·9). The flagship 5 carries the wind read;
+  // the 7 + 9 add a touch of CONTROL (tighter dispersion) rather than more wind, so the set never over-stacks
+  // the wind bonus but every member still earns its place.
+  'major:storm:7i': {
+    label: 'A matched Galewarden iron — a little extra control',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.95 }),
+  },
+  'major:storm:9i': {
+    label: 'A matched Galewarden iron — a little extra control',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.95 }),
+  },
 };
 
 /** The signature-effect label for a reward club id, or undefined if it has none. */

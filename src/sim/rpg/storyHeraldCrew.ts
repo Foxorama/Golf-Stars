@@ -11,6 +11,7 @@
  */
 
 import type { StoryState } from './story';
+import type { PlayerLoadout } from './economy';
 
 export type HeraldPortrait = 'voss' | 'venoma' | 'coilkeeper';
 
@@ -82,6 +83,62 @@ export const HERALD_CREW: readonly HeraldAgent[] = [
 ];
 
 const BY_ID: Record<string, HeraldAgent> = Object.fromEntries(HERALD_CREW.map((a) => [a.id, a]));
+
+/**
+ * GS-story-quality: the Coil inner circle VOLUNTEER as your caddies once you turn Herald — replacing the
+ * Warden friends who desert you (you can't hire the Warden caddies any more, so the Coil makes up the loss).
+ * Each folds a thematic `PlayerLoadout` effect (the `applyStoryCaddy` sibling, reusing existing fields), with
+ * a short player-facing label for the locker card. Venoma ("on this bag I don't miss") is the default bag.
+ */
+export interface HeraldCaddyEffect {
+  label: string;
+  apply: (m: PlayerLoadout) => PlayerLoadout;
+}
+export const HERALD_CADDY_EFFECTS: Record<string, HeraldCaddyEffect> = {
+  'coil-venoma': {
+    label: 'The Viper never misses — tighter dispersion, and the wind bends for her',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.8, windResist: (m.windResist ?? 0) + 0.15 }),
+  },
+  'coil-voss': {
+    label: 'The Apostate’s black driver — a raised distance floor from anywhere',
+    apply: (m) => ({ ...m, driverAnywhere: true, minCarryBoost: m.minCarryBoost + 0.08 }),
+  },
+  'coil-ouros': {
+    label: 'The Whisperer reads the green like scripture — putt boost + a longer read',
+    apply: (m) => ({ ...m, puttBoost: m.puttBoost + 0.18, puttReadBonus: (m.puttReadBonus ?? 0) + 10, greenRead: true }),
+  },
+  'coil-ecdysis': {
+    label: 'Serpent-scale relief — play clean from any lie',
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
+  },
+};
+
+/** The Coil volunteers' ids (the Herald caddy roster). */
+export const HERALD_CADDY_IDS: readonly string[] = HERALD_CREW.map((a) => a.id);
+/** Which volunteer carries the bag by default when you turn Herald — the Viper. */
+export const HERALD_DEFAULT_CADDY = 'coil-venoma';
+
+/** A Coil agent's caddy effect (undefined if not a herald agent). */
+export function heraldCaddyEffect(id: string | undefined): HeraldCaddyEffect | undefined {
+  return id ? HERALD_CADDY_EFFECTS[id] : undefined;
+}
+
+/** GS-story-quality: swap the caddy roster when the player turns Herald — the Warden friends they betrayed
+ *  DESERT them (cleared from the roster), and the Coil inner circle VOLUNTEER in their place (free), Venoma
+ *  on the bag by default. Pure; a no-op if not on the Herald path or already swapped. */
+export function applyHeraldCaddies(story: StoryState): StoryState {
+  if (story.alignment !== 'herald') return story;
+  // Already the Coil roster (any subset of the volunteers, no Warden leftovers)? Then respect the player's
+  // active choice (they may have benched or switched volunteers) — only the FIRST swap forces Venoma.
+  const rosterIsCoil =
+    story.hiredCaddyIds.length > 0 && story.hiredCaddyIds.every((id) => HERALD_CADDY_IDS.includes(id));
+  if (rosterIsCoil) return story;
+  return {
+    ...story,
+    hiredCaddyIds: [...HERALD_CADDY_IDS], // Warden caddies leave; the Coil takes the bag
+    activeCaddyId: HERALD_DEFAULT_CADDY,
+  };
+}
 
 /** Is this id one of the Coil agents (so the clubhouse/inspect can branch off the caddy roster)? */
 export function isHeraldAgent(id: string | undefined): boolean {

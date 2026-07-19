@@ -469,10 +469,11 @@ export function spaceportSceneHTML(story: StoryState): string {
   let crewStandees: string;
   if (herald) {
     const agents = heraldCrew(story);
-    // Voss (the mentor, index 0) stands at your side; the rest gather along the deck.
+    // GS-story-quality: the Coil circle VOLUNTEER as your caddies — the one on the bag (activeCaddyId) stands
+    // marked at your side; the rest gather along the deck.
     crewStandees = agents
       .slice(0, HERALD_SPOTS.length)
-      .map((a, i) => heraldStandee(a, HERALD_SPOTS[i]!, i === 0))
+      .map((a, i) => heraldStandee(a, HERALD_SPOTS[i]!, a.id === activeCaddyId))
       .join('');
   } else {
     const others = crewRoster(story).filter((id) => id !== activeCaddyId);
@@ -505,15 +506,15 @@ const HERALD_SPOTS: { left: number; top: number }[] = [
 ];
 
 /** One Coil agent as a feet-anchored standee (their lore portrait, tinted). Tap → their Herald talk card. */
-function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, mentor: boolean): string {
+function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, active: boolean): string {
   const name = agent.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') || agent.name.split(' ')[0];
   const short = agent.name.includes('"') ? name : agent.name.split(' ')[0];
-  return `<button class="gs-sclub-caddy gs-sclub-caddy--herald${mentor ? ' gs-sclub-caddy--on' : ''}"
+  return `<button class="gs-sclub-caddy gs-sclub-caddy--herald${active ? ' gs-sclub-caddy--on' : ''}"
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: agent.id })}'
-      aria-label="Speak with ${agent.name}"
+      aria-label="Speak with ${agent.name}${active ? ', on your bag' : ''}"
       style="left:${spot.left}%;top:${spot.top}%;">
       <span class="gs-sclub-cav"${agent.tint ? ` style="filter:${agent.tint};"` : ''}><canvas class="gs-caddycv" data-caddy="${agent.id}" width="260" height="260"></canvas></span>
-      <span class="gs-sclub-cplate">${short}</span>
+      <span class="gs-sclub-cplate">${active ? `🎒 ${short}` : short}</span>
     </button>`;
 }
 

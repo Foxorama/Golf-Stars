@@ -11,6 +11,7 @@ import {
   applyStoryCaddy,
 } from '../src/sim/rpg/storyCaddies';
 import { defaultStoryState, STORY_WORLDS } from '../src/sim/rpg/story';
+import { applyHeraldCaddies, HERALD_CADDY_IDS, HERALD_DEFAULT_CADDY } from '../src/sim/rpg/storyHeraldCrew';
 import { isNamedCaddy, startingLoadout } from '../src/sim/rpg/economy';
 
 describe('Story caddy roster — gather your friends (GS-story-caddies)', () => {
@@ -70,6 +71,28 @@ describe('Story caddy roster — gather your friends (GS-story-caddies)', () => 
     s = setActiveStoryCaddy(s, undefined); // bench everyone
     expect(activeStoryCaddy(s)).toBeUndefined();
     expect(setActiveStoryCaddy(s, 'stranger-caddy')).toBe(s); // not on the roster → no-op
+  });
+
+  it('turning Herald swaps the roster — Warden caddies leave, the Coil volunteers, the volunteer folds an effect (GS-story-quality)', () => {
+    const dan = worldCaddy('derelict-18')!;
+    const withDan = hireStoryCaddy({ ...defaultStoryState('feather-fade'), credits: 2000 }, dan);
+    expect(storyCaddyHired(withDan, dan)).toBe(true);
+    // Turn Herald → the Warden friend deserts, the Coil circle volunteers (Venoma on the bag).
+    const herald = applyHeraldCaddies({ ...withDan, alignment: 'herald' });
+    expect(herald.hiredCaddyIds).toEqual([...HERALD_CADDY_IDS]);
+    expect(storyCaddyHired(herald, dan)).toBe(false); // the paid Warden caddy is gone
+    expect(herald.activeCaddyId).toBe(HERALD_DEFAULT_CADDY);
+    expect(activeStoryCaddy(herald)).toBe(HERALD_DEFAULT_CADDY);
+    // The Coil volunteer folds a real effect (Venoma tightens dispersion).
+    const base = startingLoadout();
+    const out = applyStoryCaddy(base, herald);
+    expect(out.dispersionMult).toBeLessThan(base.dispersionMult);
+    // You can switch to another volunteer.
+    const s2 = setActiveStoryCaddy(herald, 'coil-ecdysis');
+    expect(activeStoryCaddy(s2)).toBe('coil-ecdysis');
+    expect((applyStoryCaddy(base, s2).lieRelief ?? 0)).toBeGreaterThan(0);
+    // Idempotent — re-applying doesn't churn the roster.
+    expect(applyHeraldCaddies(herald)).toBe(herald);
   });
 
   it('the active caddy folds its real effect + perk into a round loadout; no active is a no-op', () => {

@@ -56,14 +56,17 @@ const STORY_CLUB_PRICE: Record<string, number> = {
  * Earth prologue (`standrews-18`) has no rack — you shop only once the campaign opens up to space.
  */
 export const STORY_SHOP: Record<string, readonly string[]> = {
-  // Chapter 1 — the Planet line (rare staples that grow the lean green bag).
-  'verdant-18': ['club:tour:3W', 'club:pro:3i', 'club:pro:putter'],
-  'verdant2-18': ['club:tour:5W', 'club:tour:2H', 'club:pro:7i'],
-  'desert-18': ['club:tour:D', 'club:pro:4H', 'club:pro:9i'],
+  // GS-story-quality: EARLY racks are leaner on clubs (2, not 3) and lean on GEAR instead (see
+  // STORY_GEAR_STOCK) — the quests + Galaxy Tournaments already gift a lot of CLUBS, so a shelf stacked with
+  // clubs read as wasted money. Gear is the non-redundant early spend; the late Solar racks stay club-rich.
+  // Chapter 1 — the Planet line (a couple of rare staples that grow the lean green bag).
+  'verdant-18': ['club:tour:3W', 'club:pro:putter'],
+  'verdant2-18': ['club:tour:5W', 'club:pro:7i'],
+  'desert-18': ['club:tour:D', 'club:pro:9i'],
   // Chapter 2 — the first Phoenix Flames pieces sit beside Planet stock.
-  'inferno-18': ['club:masters:D', 'club:tour:3W', 'club:pro:5i'],
-  'inferno2-18': ['club:masters:3W', 'club:masters:putter', 'club:pro:3i'],
-  'frost-18': ['club:masters:5W', 'club:tour:2H', 'club:pro:7i'],
+  'inferno-18': ['club:masters:D', 'club:pro:5i'],
+  'inferno2-18': ['club:masters:3W', 'club:pro:3i'],
+  'frost-18': ['club:masters:5W', 'club:pro:7i'],
   // Chapter 3 — the full Phoenix Flames line.
   'tempest-18': ['club:masters:2H', 'club:masters:4H', 'club:masters:5i'],
   'crystal-18': ['club:masters:3i', 'club:masters:7i', 'club:masters:putter'],

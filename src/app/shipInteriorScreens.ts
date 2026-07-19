@@ -28,7 +28,6 @@ import { shipInspectOverlay } from './storyShipyardScreens';
 import {
   STORY_SHIP_UPGRADES,
   ownsUpgrade,
-  canBuyUpgrade,
   upgradeRevealed,
   combatRating,
   categoryRating,
@@ -140,9 +139,9 @@ function roomNav(current: ShipRoom, theme: { trim: string }): string {
 function roomPanel(room: ShipRoom, story: StoryState, theme: { trim: string }): string {
   switch (room) {
     case 'weapons':
-      return outfitPanel('weapon', '🔫 Weapons bay', 'Arm the hull. Every piece raises your combat rating for the day the serpent wakes.', story, theme);
+      return outfitPanel('weapon', '🔫 Weapons bay', 'Your installed arms. Every piece raises your combat rating for the day the serpent wakes — buy new ones at a ship-vendor world.', story, theme);
     case 'engine':
-      return outfitPanel('engine', '⚛ Engine core', 'Tune the drive — thrust, reactor, and the credit-siphons that pay for the voyage.', story, theme);
+      return outfitPanel('engine', '⚛ Engine core', 'Your installed drive — thrust, reactor, and the credit-siphons that pay for the voyage. New parts are traded at a ship-vendor world.', story, theme);
     case 'locker':
       return `<div class="si-panel">
         <p class="si-flavour">Your gear stands racked along the wall. Build your bag, swap your clubs, change who carries it.</p>
@@ -181,10 +180,11 @@ function outfitPanel(cat: UpgradeCategory, title: string, blurb: string, story: 
 function outfitCard(u: StoryShipUpgrade, story: StoryState): string {
   const owned = ownsUpgrade(story, u.id);
   const ac = rarCol(u.rarity);
-  let stateLine: string;
-  if (owned) stateLine = `<span class="si-card-state si-card-state--owned">✓ Installed</span>`;
-  else if (canBuyUpgrade(story, u)) stateLine = `<span class="si-card-state si-card-state--price">✦ ${u.price}</span>`;
-  else stateLine = `<span class="si-card-state si-card-state--no">✦ ${u.price}</span>`;
+  // GS-story-quality: aboard your ship you only see what's INSTALLED (owned). An unowned-but-revealed part
+  // reads as "at a vendor" — you buy it at a ship-vendor world, not here.
+  const stateLine = owned
+    ? `<span class="si-card-state si-card-state--owned">✓ Installed</span>`
+    : `<span class="si-card-state si-card-state--no">🚀 At a vendor · ✦ ${u.price}</span>`;
   return `<button class="si-card" style="--ac:${ac};" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: u.id })}'
       aria-label="${u.name}">
       <span class="si-card-badge">⚔ ${u.battle}</span>

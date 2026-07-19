@@ -26,6 +26,7 @@ import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
 import { storyWorldShoppable } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
+import { ownedCategoryCount } from '../sim/rpg/storyShipUpgrades';
 import { worldCaddy, storyCaddyHired, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
 import { shopItem } from '../sim/rpg/economy';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
@@ -525,6 +526,9 @@ export function starTourScreen(): string {
     // GS-story-ship-interior: in the Story campaign the ship is tappable → board it (manage the loadout on
     // the go). Star Tour proper leaves it inert decor.
     shipTappable: inStoryTour(),
+    // GS-story-quality: draw mounted gun pods for the campaign's installed WEAPON upgrades, so arming up at
+    // the shipyard visibly changes the ship on the chart (Star Tour proper has no upgrades → bare hull).
+    shipWeaponLevel: inStoryTour() && state.story ? ownedCategoryCount(state.story, 'weapon') : 0,
   });
   const sheet = sel
     ? dossier(sel)

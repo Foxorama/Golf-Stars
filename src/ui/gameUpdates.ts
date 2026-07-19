@@ -43,6 +43,7 @@ import {
   defaultStoryState,
   recordWorldClear,
   equipStoryClub,
+  storyRewardSetIds,
   STORY_CHAPTER_COUNT,
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
@@ -462,8 +463,13 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     // GS-story-tournament-reward: hand over the promised prize CLUB (the bug: majors named a prize club in
     // `prize` but never granted it — the Emerald Invitational report). Own + equip it via the shared club
     // machinery, once (guarded by alreadyWon so a replay can't re-award).
-    if (t.rewardClubId && !alreadyWon && !story.ownedClubIds.includes(t.rewardClubId)) {
-      story = equipStoryClub({ ...story, ownedClubIds: [...story.ownedClubIds, t.rewardClubId] }, t.rewardClubId);
+    if (t.rewardClubId && !alreadyWon) {
+      // GS-story-quality: a reward may grant a matched SET (the Galewarden Irons are a 5/7/9 trio), so grant
+      // every member id — own + equip each (equipStoryClub upgrades that iron slot in place or appends).
+      for (const clubId of storyRewardSetIds(t.rewardClubId)) {
+        if (story.ownedClubIds.includes(clubId)) continue;
+        story = equipStoryClub({ ...story, ownedClubIds: [...story.ownedClubIds, clubId] }, clubId);
+      }
     }
     // GS-story-route-rewards: a route major grants its signature ship (own + fly it).
     if (t.rewardShipId) story = grantStoryShip(story, t.rewardShipId);
