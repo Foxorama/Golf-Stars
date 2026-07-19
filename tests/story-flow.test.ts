@@ -771,8 +771,9 @@ describe('storyStore persistence (GS-story-save wiring)', () => {
 
 describe('Ally side quests (GS-story-quests)', () => {
   it('accept → play the quest world → recap → claim the unique reward into the bag', () => {
-    // Driver Dan recruited, chapter 3 → his quest (the derelict) is offerable.
-    const story = { ...defaultStoryState('feather-fade'), chapter: 3, hiredCaddyIds: ['driver-dan'], activeCaddyId: 'driver-dan' };
+    // Driver Dan recruited, chapter 3, and a world cleared ELSEWHERE (past the beat gate) → his quest
+    // (the derelict) is offerable.
+    const story = { ...defaultStoryState('feather-fade'), chapter: 3, hiredCaddyIds: ['driver-dan'], activeCaddyId: 'driver-dan', clearedWorldIds: ['standrews-18'] };
     const hub = { ...initState('quest-seed', {}, undefined, story), screen: 'story' as const };
 
     // accept it from the ally card → active
@@ -786,6 +787,8 @@ describe('Ally side quests (GS-story-quests)', () => {
     expect(intro.screen).toBe('intro');
     expect(intro.run.staticCourseId).toBe('derelict-18');
     expect(intro.run.storyQuest).toBe('quest-dan');
+    // GS-story-quest-9: a quest is a shorter NINE-hole round (not the world's full 18).
+    expect(intro.course.holes.length).toBe(9);
 
     // play the round → the quest recap carries the quest id
     const done = reduce(intro, { type: 'play' });

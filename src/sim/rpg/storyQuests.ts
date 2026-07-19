@@ -206,7 +206,32 @@ export function questOfferable(story: StoryState, caddyId: string): boolean {
   if (questDone(story, q.id)) return false;
   if (story.activeQuestId) return false; // one quest at a time
   if (story.chapter < q.minChapter) return false;
-  return !!questWorld(q);
+  const world = questWorld(q);
+  if (!world) return false;
+  // GS-story-quest-beat: don't shove the quest at the player the instant they recruit the ally on that
+  // ally's home world — wait a beat. The quest opens up only once they've cleared at least one OTHER world
+  // (they've flown on and come back), so it never reads as "you just played this world — now play it again".
+  if (!clearedElsewhere(story, world)) return false;
+  return true;
+}
+
+/** Has the player cleared at least one world OTHER than `world`? (The quest "beat" signal.) */
+function clearedElsewhere(story: StoryState, world: string): boolean {
+  return story.clearedWorldIds.some((w) => w !== world);
+}
+
+/**
+ * The ally is recruited + chapter-ready, but their quest is holding a BEAT until the player has played on
+ * elsewhere (GS-story-quest-beat). Distinguishes the "wait a beat" state from "the chapter's too early" so
+ * the crew card can say the right thing.
+ */
+export function questBeatPending(story: StoryState, caddyId: string): boolean {
+  const q = questForCaddy(caddyId);
+  if (!q || !storyCaddyHired(story, caddyId) || questDone(story, q.id)) return false;
+  if (story.activeQuestId) return false;
+  if (story.chapter < q.minChapter) return false;
+  const world = questWorld(q);
+  return !!world && !clearedElsewhere(story, world);
 }
 
 /** Accept a quest (pure): make it the active quest. No-op if not offerable. */

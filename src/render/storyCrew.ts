@@ -18,7 +18,7 @@ import {
   allyFactionBlurb,
 } from '../sim/rpg/storyAllies';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
-import { questForCaddy, questOfferable, questDone } from '../sim/rpg/storyQuests';
+import { questForCaddy, questOfferable, questDone, questBeatPending } from '../sim/rpg/storyQuests';
 import type { StoryState } from '../sim/rpg/story';
 
 /** The crew wall for the spaceport clubhouse: a labelled row of recruited allies, each a tappable avatar.
@@ -105,6 +105,10 @@ function questSlotHTML(caddyId: string, story: StoryState): string {
   }
   // has a quest, but not yet available (chapter too early, or another quest is active)
   if (story.activeQuestId) return '';
+  // GS-story-quest-beat: recruited + chapter-ready, but holding a beat until you've played on elsewhere.
+  if (questBeatPending(story, caddyId)) {
+    return `<div class="gs-crew-quest gs-crew-quest--soon">🗺 <b>${q.title}</b> — give it a beat. Play on, and they’ll have a quest for you when you’re back aboard.</div>`;
+  }
   return `<div class="gs-crew-quest gs-crew-quest--soon">🗺 <b>${q.title}</b> — they’ll have something for you deeper into the journey.</div>`;
 }
 
