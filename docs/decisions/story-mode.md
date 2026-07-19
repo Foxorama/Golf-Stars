@@ -528,6 +528,26 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   Reduced-motion resolves instantly (no overlay); every path is guarded so it can never strand the player.
   Guarded by a `tests/build.test.ts` browser smoke (beat mounts over the shop, then clears itself).
 
+- **GS-story-herald-clubhouse** — ✅ *shipped* (`sim/rpg/storyHeraldCrew.ts` + `render/storyHeraldOverlay.ts`
+  + the Coil scene in `storySpaceport.ts`). If the player takes the dark path at The Choice
+  (`alignment === 'herald'`), the Mothership clubhouse becomes the COIL's — an ALTERNATIVE clubhouse + crew,
+  grounded in the bible (which described Coil *agents* but no Herald base/roster; the gap this fills). Two
+  halves: (1) the SCENE re-themes — violet-dark walls, an acid-green wash, and an OUROBOROS sigil in the
+  viewport instead of a destination planet (the Warden palette is the default, byte-identical); the Parrot's
+  bar STAYS (canon has him loyal even if you turn). (2) the crew are the Coil INNER CIRCLE instead of the
+  Warden caddies — **Sable Voss** (the Apostate, your mentor, at your side), **Venoma** (the Viper, your
+  lieutenant), **Brother Ouros** (the Whisperer), **Sister Ecdysis** (the Shedmaker) — each a tappable
+  standee (their lore portraits, the two hooded cultists differentiated by a hue filter) → a Coil talk card
+  (own `.gs-herald*` prefix) with rotating Coil-flavoured banter. Deliberately ISOLATED: the Coil agents are
+  clubhouse NPCs (`HERALD_CREW`), NOT caddies — they never touch the `caddyEffects`/faction coverage tables,
+  so the Warden caddy system is entirely untouched. The talk card reuses the existing
+  `storyInspectAlly`/`storyAllyTalk`/`storyCloseAlly` actions (the reducer guard widened to accept a Coil
+  agent id, `isHeraldAgent`), so no new reducer plumbing/state; no new lore portraits (reuses voss/venoma/
+  coilkeeper); no save bump. Guarded by `tests/story-spaceport.test.ts` (Herald mode shows the Coil circle,
+  not caddies) + a `?screen=storyheraldclub` browser smoke (the `.gs-sclub-scene--herald` Coil scene).
+  Deferred: a dedicated Coil FACTION row + bespoke Ecdysis/Ouros portraits (the bible's fuller vision) — this
+  pass reuses existing art/factions to stay low-risk.
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are

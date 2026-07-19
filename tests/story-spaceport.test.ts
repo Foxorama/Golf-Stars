@@ -36,4 +36,23 @@ describe('spaceport clubhouse scene (GS-story-crew-scene)', () => {
     expect(html).toContain('gs-sclub-caddy--on');
     expect(html).toMatch(/storyInspectAlly/);
   });
+
+  it('the HERALD path shows the Coil inner circle instead of Warden caddies (GS-story-herald-clubhouse)', () => {
+    const story = {
+      ...defaultStoryState(),
+      chapter: 4,
+      alignment: 'herald' as const,
+      // even if a Warden caddy were somehow hired, the Herald clubhouse shows the Coil crew
+      hiredCaddyIds: ['driver-dan'],
+      activeCaddyId: 'driver-dan',
+    };
+    const html = spaceportSceneHTML(story);
+    expect(html).toContain('gs-sclub-scene--herald'); // Coil-themed scene
+    expect(html).toContain('"caddyId":"coil-voss"'); // the Apostate mentor
+    expect(html).toContain('"caddyId":"coil-venoma"');
+    expect(html).toContain('"caddyId":"coil-ecdysis"');
+    expect(html).toContain('gs-sclub-caddy--herald');
+    // the Warden caddy is NOT shown on the dark path
+    expect(html).not.toContain('"caddyId":"driver-dan"');
+  });
 });

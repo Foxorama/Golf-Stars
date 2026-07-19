@@ -295,6 +295,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       return reduce(afterProl, { type: 'storyRoundContinue' });
     }
+    case 'storyheraldclub': {
+      // GS-story-herald-clubhouse: the HERALD (Coil) clubhouse variant — seed a post-Choice dark-path campaign
+      // (alignment 'herald', mid-campaign) directly onto the spaceport clubhouse. Exercises the Coil-themed
+      // scene (ouroboros viewport, violet walls) + the Coil-agent crew standees.
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      if (!base.story) return base;
+      return { ...base, screen: 'story', story: { ...base.story, chapter: 4, alignment: 'herald', clearedWorldIds: ['standrews-18'], trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm'] } };
+    }
     case 'storytournament':
     case 'storytournamentresult': {
       // GS-story-tournament: reach the Galaxy Tournament the honest way — prologue → Chapter 1, clear two of
