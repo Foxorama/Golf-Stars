@@ -584,7 +584,13 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   forked TONGUE flicking from the mouth as it wakes, and a PROPORTIONATE slit-pupil eye (~0.42× the head
   unit) seated under a brow-ridge arc — no longer a disc bigger than the head. Head size tracks the body
   girth + a modest focus-reveal zoom (not the old runaway 26→118). Extracted to `paintSerpent` so
-  `scripts/serpent-preview.mjs` renders it eyes-on at any wake/focus. Pure Canvas2D, zero rng. **Deferred
+  `scripts/serpent-preview.mjs` renders it eyes-on at any wake/focus. Pure Canvas2D, zero rng.
+  The head was then rebuilt a THIRD time into a MYTHIC world-serpent (`drawSerpentHead`, "still half a head"):
+  a pair of back-swept HORNS from the cranium, an OPENING FANGED MAW (a separate dropping lower jaw + a dark
+  red throat + curved white fangs top & bottom, gaping wider as it wakes), a DEEP-SET reptilian eye (mottled
+  sclera, bloodshot veins, a slit pupil, a cold glint) under a shadowed brow (a cast-occlusion socket),
+  directionally-lit head SCALES, a nostril slit, and a green RIM-LIGHT along the top silhouette. The maw +
+  eye + horns all animate open with `wake`/`focusHead`. **Deferred
   (GS-story-serpent-beat):** moving the next-chapter Coil/parrot lore beat to fire IMMEDIATELY after the
   cutscene (instead of on the next world arrival) — the arrival beats are authored for the round-arrival lore
   gate, so relocating them cleanly is a lore-flow redesign, left for a focused follow-up rather than risking
