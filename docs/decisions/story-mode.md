@@ -691,6 +691,40 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   once. Own `.si-*` CSS prefix (never `.gs-hud`); pure render + reducer plumbing, no rng/save bump. Deep-link
   `?screen=shipinterior` + a `tests/build.test.ts` smoke row guard the render.
 
+## Phase I — the herald/sigil follow-up (player asks)
+- **GS-story-ragnarok** — ✅ *shipped* (`sim/rpg/lore.ts` + `render/sigilCeremony.ts` + tournament intros).
+  Player point: the impending-Ragnarök stakes only landed around the Storm Sigil (Ch.3); the other Sigils
+  felt storyless. Now EVERY Sigil chapter carries an escalation beat that tracks the sigil-ceremony's waking
+  serpent (chapter N = N−1 Sigils set = `wakefulness`): `story-omen-emerald` (Ch.1, the first tremor — gated
+  to the Emerald Invitational tee-off via a new `LoreContext.storyTournament` flag so the early practice
+  worlds still tee off clean, GS-story-pacing), `story-omen-abyss-{warden,herald}` (Ch.4, the eye half-opens),
+  `story-ragnarok-{warden,herald}` (Ch.5, Ragnarök at the door / the Long Rest). Back-half beats branch by
+  path (Warden → the Prognostic Parrot; Herald → the Carrion `crow` portrait, newly wired into
+  `lorePortraitSVG`). Every Galaxy-Tournament `intro` splash gained a Sigil-count Ragnarök line, and the sigil
+  ceremony captions ESCALATE with the count (`serpentStirCaption`/`keystoneSubtitle` → "one Sigil from
+  Ragnarök"). Content/render + a lore-ctx flag only: zero sim rng, no save bump, no `_gs*`/URL hook. Guarded
+  by `tests/lore.test.ts`; the tournament-flow + `storytournamentresult` smoke dismiss the new Emerald beat.
+- **GS-story-qualifiers** — ✅ *shipped* (`sim/rpg/storyQualifiers.ts` + `story.ts` + `storyTournaments.ts` +
+  reducer/screens). Player ask: make the qualifying rounds real tournaments with a field of competitors, and
+  gate each Sigil on finishing TOP-N in TWO events (10/8/6/4/4 by chapter). Each chapter's non-venue worlds
+  are now QUALIFYING EVENTS: playing one resolves a deterministic ghost FIELD (each rank plays a fixed to-par
+  so the qualifying bar is crisp + tunable — a mandatory gate must never wall a competent round; qualifier
+  worlds are revisitable to improve a finish) and records the best placement. `StoryState.qualifierResults`
+  (STORY_VERSION 3→4, additive migration); the gate (`currentTournament`, the objective guide) now reads
+  `chapterQualifiersMet` (two top-N finishes), not `worldsClearedInChapter`. The venue is never a qualifier
+  (it's the major). The world-clear recap shows the leaderboard with the top-N cut line + a qualified/missed
+  verdict + the running "n of 2" progress. Qualifiers ride the existing 18-hole world-round path (no new
+  format); `storyQualifiers` imports only `story` (the alignment-aware wrappers live in `storyTournaments` →
+  no cycle). Guarded by `tests/story-qualifiers.test.ts` + updated tournament/guide/state/flow tests + a
+  `?screen=storyqualresult` recap smoke.
+- **GS-story-gear-tiers** — ✅ *shipped* (`sim/rpg/storyGear.ts`). Player ask: gear should be ONE per slot
+  (like clubs — you already can't stack two gloves in `equippedGear`/`applyStoryGear`), with the higher tier
+  strong enough to make up for no stacking. Completed the ladder with a clean LEGENDARY apex per slot —
+  Master's Grip (glove ×0.72), Oracle's Circlet (hat +0.24 putt), Void-Anchor Boots (shoes 0.7 lie-relief),
+  joining the legendary Comet ball — each dearer and stocked only in deep worlds both paths visit. Existing
+  rare/epic values unchanged (their tests still hold). The locker gear panel now states the one-per-slot rule
+  outright. Guarded by a tier-ladder + no-stack test in `tests/story-shop.test.ts`.
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are

@@ -199,6 +199,60 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     }),
   },
 
+  // ── LEGENDARY apex gear (GS-story-gear-tiers) — the top CLEAN tier per slot. Story gear is ONE ITEM PER
+  // SLOT (like clubs — you can't stack two gloves), so the apex tier is deliberately strong enough to stand
+  // alone: a single legendary piece beats two lesser ones you could never wear at once. Dear, and stocked
+  // only in the deep worlds, so it caps a real rare → epic → legendary ladder in every slot.
+  {
+    id: 'gear:glove:master',
+    slot: 'glove',
+    name: 'Master’s Grip',
+    rarity: 'legendary',
+    price: 720,
+    blurb: 'The surest hand in the galaxy.',
+    detail: ['Dispersion ×0.72 — a tour-perfect pattern, tighter than any epic.'],
+    lore: [
+      'The last glove Custodian Pim ever stitched, cut from the hide of a beast that walked a world where ' +
+        'gravity itself ran heavy — every fibre remembers the weight and lends it back to your hands. There ' +
+        'is no tighter clean grip made anywhere; the Wardens keep only a handful, for champions who have ' +
+        'earned the right to never blame the equipment again.',
+      'One perfect glove beats two good ones you could only ever wear one at a time.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.72 }),
+  },
+  {
+    id: 'gear:hat:oracle',
+    slot: 'hat',
+    name: 'Oracle’s Circlet',
+    rarity: 'legendary',
+    price: 720,
+    blurb: 'Every line, laid bare.',
+    detail: ['Putt make-window +24% — the green keeps no secrets.'],
+    lore: [
+      'A crown of cold starlight that does in miniature what the Prognostic Parrot does whole: it shows you ' +
+        'the ball already resting in the cup, and the line it took to get there, a half-second before you ' +
+        'draw the putter back. Wearing it feels like remembering a putt you have not hit yet.',
+      'The green keeps no secrets from a golfer who can see the future of the roll.',
+    ],
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.24 }),
+  },
+  {
+    id: 'gear:shoes:anchor',
+    slot: 'shoes',
+    name: 'Void-Anchor Boots',
+    rarity: 'legendary',
+    price: 720,
+    blurb: 'Stand firm on nothing at all.',
+    detail: ['Immense lie relief — the worst lie in the galaxy plays nearly clean.'],
+    lore: [
+      'Boots soled with a sliver of neutron-star crust, so dense they anchor you to any surface at all — ' +
+        'dune, acid crust, drifting deck, the bare hull of a dead ship hung over the abyss. Nothing short of ' +
+        'the void itself can knock you off your stance, and even the void has to work at it.',
+      'A perfect stance from a terrible lie is worth more than a good lie you keep sliding off.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.7) }),
+  },
+
   // ── HERALD cursed sheddings (GS-story-route-rewards) — big power, a real curse; only on the Coil path.
   // Forged by Sister Ecdysis from what a broken thing sheds. Stronger AND cheaper than Warden grace, but
   // each takes something back. A shedding must be a CHOICE, never a strict upgrade.
@@ -320,12 +374,14 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   'fungal-18': ['gear:ball:zip'],
   // Chapter 4 — epics everywhere + the first ROUTE RELICS (alignment-gated: only your path sees its own).
   'ocean-18': ['gear:shoes:gravlock', 'gear:ball:zip', 'gear:glove:shed', 'gear:glove:grace'],
-  'void2-18': ['gear:shoes:gravlock'],
-  'crystal2-18': ['gear:glove:vice', 'gear:hat:focus', 'gear:ball:venom', 'gear:ball:blessed'],
-  // Chapter 5 — the legendary ball + the last route relics in the serpent's reaches.
-  'swamp-18': ['gear:ball:comet', 'gear:shoes:coil', 'gear:shoes:hallowed'],
-  'derelict-18': ['gear:shoes:gravlock', 'gear:ball:comet'],
-  'cetus-18': ['gear:ball:comet'],
+  'void2-18': ['gear:shoes:gravlock', 'gear:glove:master'],
+  // GS-story-gear-tiers: the legendary apex gloves/hats/shoes join the legendary ball in the deep worlds —
+  // placed on worlds BOTH paths visit (Ch.4 crystal2-18 is a qualifier for both; every Ch.5 world is too).
+  'crystal2-18': ['gear:glove:vice', 'gear:hat:oracle', 'gear:ball:venom', 'gear:ball:blessed'],
+  // Chapter 5 — the legendary apex gear + the last route relics in the serpent's reaches.
+  'swamp-18': ['gear:ball:comet', 'gear:shoes:anchor', 'gear:shoes:coil', 'gear:shoes:hallowed'],
+  'derelict-18': ['gear:shoes:gravlock', 'gear:ball:comet', 'gear:hat:oracle'],
+  'cetus-18': ['gear:ball:comet', 'gear:glove:master'],
 };
 
 /** Look up a gear item by id. */
