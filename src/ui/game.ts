@@ -483,7 +483,10 @@ export function reduce(state: UiState, action: Action): UiState {
       // Guarded to a campaign + a cleared, shoppable world. Records the origin so exiting returns there.
       if ((state.screen !== 'starTour' && state.screen !== 'storyResult') || !state.story) return state;
       if (!worldCleared(state.story, action.worldId) || !worldHasShop(action.worldId)) return state;
-      const storyShopReturn: Screen = state.screen === 'starTour' ? 'starTour' : 'story';
+      // GS-story-shop-routing: the Pro Shop always returns to the STAR MAP (fly on), whether opened from the
+      // star-map dossier (revisit) or the world-clear RECAP (first-time). Both entry screens are the map's
+      // orbit, so a first-time clear no longer dumps you back at the clubhouse (the reported bug).
+      const storyShopReturn: Screen = 'starTour';
       return { ...state, screen: 'storyShop', storyShopWorldId: action.worldId, storyShopReturn, storyItemInspectId: undefined };
     }
 
@@ -577,7 +580,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-econ / GS-story-lore-cards: tap an item → raise its lore card. Works on the Pro Shop
       // (buy footer), the locker (equip footer), and the shipyard (ship ids → buy/fly footer).
       if ((state.screen !== 'storyShop' && state.screen !== 'storyLocker' && state.screen !== 'storyShipyard') || !state.story) return state;
-      if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId) && !isShipUpgradeId(action.itemId)) return state;
+      // GS-story-locker-inspect: a hired CADDY is inspectable too (its effect + lore card in the locker).
+      const isHiredCaddy = state.story.hiredCaddyIds.includes(action.itemId);
+      if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId) && !isShipUpgradeId(action.itemId) && !isHiredCaddy) return state;
       return { ...state, storyItemInspectId: action.itemId };
     }
 

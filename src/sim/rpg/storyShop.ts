@@ -271,7 +271,7 @@ const GEAR_SLOT_WORD: Record<string, string> = {
 /** The everything-the-card-needs view of a rack item (club or gear), or undefined for a bad id. */
 export interface StoryCard {
   id: string;
-  kind: 'club' | 'gear';
+  kind: 'club' | 'gear' | 'caddy';
   name: string;
   rarity: Rarity;
   price: number;

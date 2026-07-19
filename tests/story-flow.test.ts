@@ -315,13 +315,15 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     };
   }
 
-  it('the Pro Shop opens from the world-clear RECAP and returns to the clubhouse', () => {
+  it('the Pro Shop opens from the world-clear RECAP and returns to the STAR MAP (GS-story-shop-routing)', () => {
+    // The first-time (post-clear) Pro Shop used to dump you back at the clubhouse; now it flies you on to
+    // the star map, matching the revisit Pro Shop.
     const recap = afterClear('verdant-18');
     const shop = reduce(recap, { type: 'openStoryShop', worldId: 'verdant-18' });
     expect(shop.screen).toBe('storyShop');
     expect(shop.storyShopWorldId).toBe('verdant-18');
-    expect(shop.storyShopReturn).toBe('story');
-    expect(reduce(shop, { type: 'exitStoryShop' }).screen).toBe('story');
+    expect(shop.storyShopReturn).toBe('starTour');
+    expect(reduce(shop, { type: 'exitStoryShop' }).screen).toBe('starTour');
   });
 
   it('the Pro Shop is NOT reachable from the clubhouse (a per-world shop keeps the galaxy big)', () => {

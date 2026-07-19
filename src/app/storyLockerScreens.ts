@@ -9,8 +9,10 @@
 import { state } from './ctx';
 import { rarCol } from '../sim/rpg/loot';
 import { itemArtSVG } from '../render/itemArt';
+import { caddyPortraitSVG } from '../render/caddyPortraits';
 import { loreCardHTML } from '../render/loreCard';
 import { clubSetById, shopItem } from '../sim/rpg/economy';
+import { allyFactionBlurb } from '../sim/rpg/storyAllies';
 import {
   resolveStoryClub,
   storyClubType,
@@ -196,7 +198,8 @@ function crewBodyHTML(story: StoryState): string {
         ? `<button class="gs-lock-btn gs-lock-btn--off" data-action='${JSON.stringify({ type: 'setStoryCaddy' })}' title="Bench (nobody carries the bag)">✕</button>`
         : `<button class="gs-lock-btn gs-lock-btn--on" data-action='${JSON.stringify({ type: 'setStoryCaddy', caddyId: id })}' title="Carry my bag">＋</button>`;
       return `<div class="gs-lock-gchip${on ? ' gs-lock-gchip--on' : ''}" style="--ac:#f0a8c8;">
-          <span class="gs-lock-gname">🎒 ${name}${on ? ' · on the bag' : ''}</span>
+          <span class="gs-lock-gart" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button" aria-label="${name} — view their effect">${caddyPortraitSVG(id)}</span>
+          <span class="gs-lock-gname" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button">🎒 ${name}${on ? ' · on the bag' : ''}</span>
           ${btn}
         </div>`;
     })
@@ -286,6 +289,22 @@ function lockerCard(id: string): StoryCard | undefined {
       ],
     };
   }
+  // GS-story-locker-inspect: a hired caddy — show their EFFECT (the shop-item desc) + faction lore.
+  const caddy = shopItem(id);
+  if (caddy?.caddy) {
+    const rar = caddy.rarity ?? 'legendary';
+    return {
+      id,
+      kind: 'caddy',
+      name: caddy.name,
+      rarity: rar,
+      price: 0,
+      tag: `Caddy · ${rar.charAt(0).toUpperCase()}${rar.slice(1)}`,
+      blurb: '',
+      detail: [caddy.desc ?? 'Carries your bag.'],
+      lore: [allyFactionBlurb(id) || 'A friend you gathered out in the galaxy — they carry a little of their world onto every bag.'],
+    };
+  }
   return storyCardFor(id);
 }
 
@@ -294,7 +313,7 @@ function inspectOverlay(itemId: string): string {
   const story = state.story;
   const card = lockerCard(itemId);
   if (!story || !card) return '';
-  // A gear card can be equipped from here too; clubs are managed on their chips.
+  // A gear card can be equipped from here too; a caddy can be put on the bag; clubs are managed on their chips.
   let footer = '';
   if (card.kind === 'gear') {
     const g = storyGearById(itemId);
@@ -304,12 +323,22 @@ function inspectOverlay(itemId: string): string {
         ? `<div class="gs-lock-eqnote">✓ Equipped</div>`
         : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyEquipGear', gearId: g.id })}'>Equip</button>`;
     }
+  } else if (card.kind === 'caddy') {
+    footer =
+      activeStoryCaddy(story) === itemId
+        ? `<div class="gs-lock-eqnote">🎒 Carrying your bag</div>`
+        : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'setStoryCaddy', caddyId: itemId })}'>🎒 Carry my bag</button>`;
   } else {
     footer = `<div class="gs-lock-eqnote">Manage this club from your bag / bench.</div>`;
   }
   return (
     loreCardHTML({
-      icon: card.kind === 'gear' ? itemArtSVG(itemId, card.rarity) : clubArt(itemId.startsWith('plain:') ? storyClubType(itemId.slice('plain:'.length)) : itemId),
+      icon:
+        card.kind === 'gear'
+          ? itemArtSVG(itemId, card.rarity)
+          : card.kind === 'caddy'
+            ? caddyPortraitSVG(itemId)
+            : clubArt(itemId.startsWith('plain:') ? storyClubType(itemId.slice('plain:'.length)) : itemId),
       name: card.name,
       tag: card.tag,
       accent: rarCol(card.rarity),

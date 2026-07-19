@@ -23,6 +23,7 @@ import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { crewRoster, allyName } from '../sim/rpg/storyAllies';
 import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { storyBarName, type StoryState } from '../sim/rpg/story';
+import { questOfferable } from '../sim/rpg/storyQuests';
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
  *  idiom) so the bird behind the bar is unmistakably the same character. */
@@ -475,11 +476,11 @@ export function spaceportSceneHTML(story: StoryState): string {
       .join('');
   } else {
     const others = crewRoster(story).filter((id) => id !== activeCaddyId);
-    const active = activeCaddyId ? crewStandee(activeCaddyId, { left: 58, top: 88 }, true) : '';
+    const active = activeCaddyId ? crewStandee(activeCaddyId, { left: 58, top: 88 }, true, questOfferable(story, activeCaddyId)) : '';
     crewStandees =
       others
         .slice(0, CREW_SPOTS.length)
-        .map((id, i) => crewStandee(id, CREW_SPOTS[i]!, false))
+        .map((id, i) => crewStandee(id, CREW_SPOTS[i]!, false, questOfferable(story, id)))
         .join('') + active;
   }
 
@@ -528,12 +529,15 @@ const CREW_SPOTS: { left: number; top: number }[] = [
 
 /** One crew ally as a feet-anchored portrait standee on the deck. Tap → their ally talk card. The active
  *  caddy (on the bag) gets a pink ring + a 🎒 plate; the rest get a plain name plate. */
-function crewStandee(caddyId: string, spot: { left: number; top: number }, active: boolean): string {
+function crewStandee(caddyId: string, spot: { left: number; top: number }, active: boolean, hasQuest = false): string {
   const name = allyName(caddyId).split(' ')[0];
+  // GS-story-quest-icon: a bobbing quest marker floats over a caddy who has an offerable quest right now.
+  const questMark = hasQuest ? `<span class="gs-sclub-questmark" aria-hidden="true">❗</span>` : '';
   return `<button class="gs-sclub-caddy${active ? ' gs-sclub-caddy--on' : ''}"
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId })}'
-      aria-label="Talk to ${allyName(caddyId)}${active ? ', on your bag' : ''}"
+      aria-label="Talk to ${allyName(caddyId)}${active ? ', on your bag' : ''}${hasQuest ? ' — they have a quest for you' : ''}"
       style="left:${spot.left}%;top:${spot.top}%;">
+      ${questMark}
       <span class="gs-sclub-cav"><canvas class="gs-caddycv" data-caddy="${caddyId}" width="260" height="260"></canvas></span>
       <span class="gs-sclub-cplate">${active ? `🎒 ${name}` : name}</span>
     </button>`;
@@ -577,6 +581,11 @@ const SPACEPORT_STYLE = `<style>
   .gs-sclub-cav{display:block;width:23cqw;max-width:132px;margin:0 auto -2cqw;filter:drop-shadow(0 4px 4px #000a);}
   .gs-sclub-cav canvas{width:100%;height:auto;display:block;}
   .gs-sclub-caddy--on .gs-sclub-cav{width:26cqw;max-width:150px;filter:drop-shadow(0 5px 5px #000b) drop-shadow(0 0 8px #f0a8c8aa);}
+  /* GS-story-quest-icon: a gold quest marker bobbing over a caddy who has a quest to offer. */
+  .gs-sclub-questmark{position:absolute;top:-3%;left:50%;font-size:clamp(13px,3.4cqw,20px);line-height:1;
+    filter:drop-shadow(0 0 5px #ffd23c) drop-shadow(0 1px 1px #000a);pointer-events:none;z-index:24;
+    animation:gs-sclub-qbob 1.25s ease-in-out infinite;}
+  @keyframes gs-sclub-qbob{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,-5px);}}
   .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141edd;
     border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;position:relative;z-index:1;}
   .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018ee;border-color:#6a3a52;color:#f0a8c8;}
