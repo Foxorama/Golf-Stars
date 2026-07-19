@@ -235,8 +235,12 @@ function inspectOverlay(id: string): string {
   if (isShipUpgradeId(id)) {
     const u = shipUpgradeById(id)!;
     const owned = ownsUpgrade(story, id);
+    // GS-story-quality: BUYING lives at the ship-vendor world's shipyard. Aboard the ship (the interior
+    // rooms) an unowned upgrade shows where to get it, not a buy button — you only equip/see what you own.
+    const aboard = state.screen === 'shipInterior';
     let footer: string;
     if (owned) footer = `<div class="gs-yard-owned">✓ Installed on your ship</div>`;
+    else if (aboard) footer = `<div class="gs-yard-cant">🚀 Not owned — buy this at a ship-vendor world's shipyard (✦ ${u.price}).</div>`;
     else if (canBuyUpgrade(story, u)) footer = `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyBuyUpgrade', upgradeId: id })}'>Install · ✦ ${u.price}</button>`;
     else footer = `<div class="gs-yard-cant">Not enough credits — ✦ ${u.price} (you have ✦ ${story.credits})</div>`;
     return loreCardHTML({

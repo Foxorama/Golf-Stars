@@ -26,6 +26,7 @@ import {
   storyWorldById,
   storyComplete,
   NAMED_STORY_CLUBS,
+  storyRewardSetIds,
   resolveStoryClub,
   storyClubType,
   type StoryState,
@@ -285,5 +286,17 @@ describe('named quest-reward clubs (GS-story-quest-club)', () => {
     expect(resolveStoryClub('quest:sandy')!.rarity).toBe(resolveStoryClub('quest:chipinski')!.rarity);
     expect(resolveStoryClub('quest:sandy')!.name).toBe("Sand-Saver's Second");
     expect(resolveStoryClub('quest:chipinski')!.name).toBe('The Phoenix Scalpel');
+  });
+
+  it('the Galewarden Irons is a matched SET of three irons (GS-story-quality) — single clubs grant just one', () => {
+    const set = storyRewardSetIds('major:storm');
+    expect(set).toEqual(['major:storm', 'major:storm:7i', 'major:storm:9i']);
+    // each resolves to a distinct iron TYPE (5/7/9), all legendary
+    const types = set.map((id) => storyClubType(id));
+    expect(new Set(types)).toEqual(new Set(['5i', '7i', '9i']));
+    for (const id of set) expect(resolveStoryClub(id)!.rarity).toBe('legendary');
+    // a non-set reward grants only itself
+    expect(storyRewardSetIds('major:emerald')).toEqual(['major:emerald']);
+    expect(storyRewardSetIds('quest:dan')).toEqual(['quest:dan']);
   });
 });

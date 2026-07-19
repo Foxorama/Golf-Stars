@@ -523,6 +523,16 @@ describe('Story shipyard flow (GS-story-ships)', () => {
     const earned = done.story!.credits - before;
     expect(earned).toBeGreaterThanOrEqual(Math.round(100 * 1.25 * 1.05));
   });
+
+  it('cannot BUY ship upgrades from the ship interior — only at a vendor shipyard (GS-story-quality)', () => {
+    const aboard = { ...shipyardReady(), screen: 'shipInterior' as const, shipRoom: 'weapons' as const };
+    const tried = reduce(aboard, { type: 'storyBuyUpgrade', upgradeId: 'upg:weapon:scatter' });
+    expect(tried).toBe(aboard); // no purchase aboard your own ship
+    // but the vendor shipyard still sells it
+    const yard = reduce(shipyardReady(), { type: 'openStoryShipyard' });
+    const bought = reduce(yard, { type: 'storyBuyUpgrade', upgradeId: 'upg:weapon:scatter' });
+    expect(bought.story!.ownedShipUpgradeIds).toContain('upg:weapon:scatter');
+  });
 });
 
 describe('Story tournament flow (GS-story-tournament)', () => {

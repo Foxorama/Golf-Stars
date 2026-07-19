@@ -13,6 +13,7 @@
  */
 
 import { shopItem, isNamedCaddy, type PlayerLoadout } from './economy';
+import { heraldCaddyEffect, isHeraldAgent } from './storyHeraldCrew';
 import type { StoryState } from './story';
 
 /** Which named caddy waits at which world (recruit them there once it's cleared). One friend per world,
@@ -77,6 +78,12 @@ export function setActiveStoryCaddy(story: StoryState, caddyId: string | undefin
 export function applyStoryCaddy(loadout: PlayerLoadout, story: StoryState): PlayerLoadout {
   const id = activeStoryCaddy(story);
   if (!id) return loadout;
+  // GS-story-quality: a Herald's Coil VOLUNTEER (an inner-circle agent, not a shop caddy) folds its own
+  // effect; a Warden named caddy folds its shop-item effect. Either way the active bag caddy HELPS the round.
+  if (isHeraldAgent(id)) {
+    const fx = heraldCaddyEffect(id);
+    return fx ? fx.apply(loadout) : loadout;
+  }
   const item = shopItem(id);
   return item?.apply ? item.apply(loadout) : loadout;
 }

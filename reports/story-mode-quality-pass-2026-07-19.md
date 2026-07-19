@@ -144,6 +144,35 @@ music/among-the-coils intensity as the serpent's HP drops. *(`storyBattle.ts`, r
 
 ---
 
+## 2b. Round 2 — player-reported fixes (also shipped in this pass)
+
+Six issues raised after the first round, all Story-only, all `npm run check`-green:
+
+1. **Locker lore cards for quest/starter clubs.** Tapping a quest/major REWARD club or a plain green STARTER
+   club in the locker did nothing — the `storyInspectItem` reducer only accepted `club:`/`gear:` ids. It now
+   accepts the `quest:` / `major:` / `plain:` ids the locker builds, so every club raises its card.
+   *(`game.ts`)*
+2. **Ship rooms equip, don't sell.** The weapons/engine bays aboard your ship let you BUY upgrades; buying is
+   now only at a ship-vendor world's shipyard. Aboard, the rooms show what's INSTALLED and point unowned
+   parts to a vendor. *(`game.ts` reducer, `shipInteriorScreens.ts`, `storyShipyardScreens.ts` overlay)*
+3. **Your ship visibly arms up on the star map.** The map ship now draws mounted gun pods that scale with
+   installed WEAPON upgrades (0→3 hardpoints), rotating/flipping with the hull — so buying weapons shows.
+   *(`starTourMap.ts` `shipGunPods` + `shipWeaponLevel`, `storyShipUpgrades.ts` `ownedCategoryCount`)*
+4. **Herald caddies — the friends leave, the Coil volunteers.** Turning Herald now DESERTS the Warden caddies
+   you paid for and the **Coil inner circle volunteers** as your caddies in their place (free, Venoma on the
+   bag by default). Each Coil volunteer folds a real round effect, is switchable in the locker, stands marked
+   in the clubhouse, and carries the bag on-course. *(`storyHeraldCrew.ts` effects + `applyHeraldCaddies`,
+   `storyCaddies.ts`, `game.ts`, `storyLockerScreens.ts`, `storySpaceport.ts`, `helpers.ts`)*
+5. **The Galewarden Irons are a real set.** The Storm-major prize read "Irons" but landed as one 5-iron; it's
+   now a matched 5·7·9 solar-iron set granted together (the flagship 5 carries the wind-reading effect so it
+   never stacks). *(`story.ts` `STORY_REWARD_SETS`/`storyRewardSetIds`, `gameUpdates.ts`, `storyTournaments.ts`)*
+6. **Early Pro Shops lean on gear, not a club glut.** Since quests + majors gift a lot of CLUBS, the early
+   racks trimmed a club slot each and lean on GEAR instead — the non-redundant early spend. *(`storyShop.ts`,
+   `storyGear.ts`)*
+
+Regression tests added for the Herald caddy swap + effect, the Galewarden set, and the ship-interior buy
+gate; the locker-inspect and shop-mix changes ride the existing `?screen=` smokes + shop tests.
+
 ## 3. What's strong (deprioritise)
 
 The endings cinematic (`storyEnding.ts`) is fully path×outcome branched and on-canon (the Crow's *"did you never

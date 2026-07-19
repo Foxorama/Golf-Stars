@@ -10,7 +10,9 @@ import { state } from './ctx';
 import { rarCol } from '../sim/rpg/loot';
 import { itemArtSVG } from '../render/itemArt';
 import { caddyPortraitSVG } from '../render/caddyPortraits';
+import { lorePortraitSVG } from '../render/loreArt';
 import { loreCardHTML } from '../render/loreCard';
+import { isHeraldAgent, heraldAgent, heraldCaddyEffect, COIL_FACTION_BLURB } from '../sim/rpg/storyHeraldCrew';
 import { clubSetById, shopItem } from '../sim/rpg/economy';
 import { allyFactionBlurb } from '../sim/rpg/storyAllies';
 import {
@@ -99,7 +101,7 @@ export function storyLockerScreen(): string {
   // ── Crew ──
   const active = activeStoryCaddy(story);
   const crewSummary = story.hiredCaddyIds.length
-    ? `${active ? `${shopItem(active)?.name?.split(' ')[0] ?? 'one'} ★` : 'benched'} · ${story.hiredCaddyIds.length} aboard`
+    ? `${active ? `${caddyDisplayName(active).split(' ')[0]} ★` : 'benched'} · ${story.hiredCaddyIds.length} aboard`
     : 'none yet';
 
   const overlay = state.storyItemInspectId ? inspectOverlay(state.storyItemInspectId) : '';
@@ -182,6 +184,17 @@ function clubChip(id: string, where: 'bag' | 'bench', bagFull = false): string {
     </div>`;
 }
 
+/** GS-story-quality: a caddy's display name — a Coil VOLUNTEER (Herald path) reads off the agent roster,
+ *  a Warden friend off the shop item. */
+function caddyDisplayName(id: string): string {
+  return (isHeraldAgent(id) ? heraldAgent(id)?.name : shopItem(id)?.name) ?? id;
+}
+/** A caddy's bust for the locker — the Coil agent's lore portrait, else the caddy portrait. */
+function caddyBustSVG(id: string): string {
+  const a = isHeraldAgent(id) ? heraldAgent(id) : undefined;
+  return a ? lorePortraitSVG(a.portrait) : caddyPortraitSVG(id);
+}
+
 /** GS-story-caddies: the caddy ROSTER body — the friends you've gathered. One carries the bag (tap ＋ to make
  *  a friend active, ✕ to bench all). Empty until you recruit one out at the worlds where they wait. Returns
  *  just the panel body (the accordion supplies the header). */
@@ -192,13 +205,13 @@ function crewBodyHTML(story: StoryState): string {
   const active = activeStoryCaddy(story);
   const chips = story.hiredCaddyIds
     .map((id) => {
-      const name = shopItem(id)?.name ?? id;
+      const name = caddyDisplayName(id);
       const on = id === active;
       const btn = on
         ? `<button class="gs-lock-btn gs-lock-btn--off" data-action='${JSON.stringify({ type: 'setStoryCaddy' })}' title="Bench (nobody carries the bag)">✕</button>`
         : `<button class="gs-lock-btn gs-lock-btn--on" data-action='${JSON.stringify({ type: 'setStoryCaddy', caddyId: id })}' title="Carry my bag">＋</button>`;
       return `<div class="gs-lock-gchip${on ? ' gs-lock-gchip--on' : ''}" style="--ac:#f0a8c8;">
-          <span class="gs-lock-gart" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button" aria-label="${name} — view their effect">${caddyPortraitSVG(id)}</span>
+          <span class="gs-lock-gart" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button" aria-label="${name} — view their effect">${caddyBustSVG(id)}</span>
           <span class="gs-lock-gname" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button">🎒 ${name}${on ? ' · on the bag' : ''}</span>
           ${btn}
         </div>`;
@@ -289,6 +302,21 @@ function lockerCard(id: string): StoryCard | undefined {
       ],
     };
   }
+  // GS-story-quality: a Coil VOLUNTEER caddy (Herald path) — their effect + Coil faction lore.
+  if (isHeraldAgent(id)) {
+    const a = heraldAgent(id)!;
+    return {
+      id,
+      kind: 'caddy',
+      name: a.name,
+      rarity: 'legendary',
+      price: 0,
+      tag: `Coil caddy · ${a.title}`,
+      blurb: '',
+      detail: [heraldCaddyEffect(id)?.label ?? 'Carries your bag for the Coil.'],
+      lore: [COIL_FACTION_BLURB],
+    };
+  }
   // GS-story-locker-inspect: a hired caddy — show their EFFECT (the shop-item desc) + faction lore.
   const caddy = shopItem(id);
   if (caddy?.caddy) {
@@ -337,7 +365,7 @@ function inspectOverlay(itemId: string): string {
         card.kind === 'gear'
           ? itemArtSVG(itemId, card.rarity)
           : card.kind === 'caddy'
-            ? caddyPortraitSVG(itemId)
+            ? caddyBustSVG(itemId)
             : clubArt(itemId.startsWith('plain:') ? storyClubType(itemId.slice('plain:'.length)) : itemId),
       name: card.name,
       tag: card.tag,

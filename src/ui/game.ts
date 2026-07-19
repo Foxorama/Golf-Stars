@@ -76,7 +76,7 @@ import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/sto
 import { applyStoryClubEffects } from '../sim/rpg/storyClubEffects';
 import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
 import { allyTalk } from '../sim/rpg/storyAllies';
-import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
+import { isHeraldAgent, applyHeraldCaddies } from '../sim/rpg/storyHeraldCrew';
 import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
@@ -398,7 +398,10 @@ export function reduce(state: UiState, action: Action): UiState {
         if (state.story.chapter >= 4 && !state.story.alignment && state.story.completed !== true) {
           return { ...state, screen: 'storyChoice', storyInspectId: undefined };
         }
-        return { ...state, screen: 'story', storyInspectId: undefined };
+        // GS-story-quality: normalise a Herald campaign's caddy roster on resume (a save from before the Coil
+        // volunteers shipped still carries Warden caddies) — the Warden friends leave, the Coil takes the bag.
+        const story = applyHeraldCaddies(state.story);
+        return { ...state, story, screen: 'story', storyInspectId: undefined };
       }
       return { ...state, screen: 'character', pendingStoryNew: true, storyInspectId: undefined, resumable: state.resumable };
     }
@@ -607,7 +610,19 @@ export function reduce(state: UiState, action: Action): UiState {
         return state;
       // GS-story-locker-inspect: a hired CADDY is inspectable too (its effect + lore card in the locker).
       const isHiredCaddy = state.story.hiredCaddyIds.includes(action.itemId);
-      if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId) && !isShipUpgradeId(action.itemId) && !isHiredCaddy) return state;
+      // GS-story-quality: quest/major REWARD clubs (`quest:`/`major:`) and PLAIN starter clubs (`plain:<type>`)
+      // carry lore cards too (the locker builds these ids via `lorableId`) — accept them so tapping a reward
+      // or a green starter club in the locker actually raises its card, not a dead tap.
+      const isLorableClub =
+        action.itemId.startsWith('quest:') || action.itemId.startsWith('major:') || action.itemId.startsWith('plain:');
+      if (
+        !storyItemKind(action.itemId) &&
+        !isStoryShipId(action.itemId) &&
+        !isShipUpgradeId(action.itemId) &&
+        !isHiredCaddy &&
+        !isLorableClub
+      )
+        return state;
       return { ...state, storyItemInspectId: action.itemId };
     }
 
@@ -723,9 +738,10 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'storyBuyUpgrade': {
       // GS-story-ship-upgrades: buy a ship weapon/engine/shield (spend credits, arm up). No-op if
-      // unaffordable/owned/locked (buyShipUpgrade gates). Reachable from the shipyard OR the ship interior's
-      // engine/weapons rooms (GS-story-ship-interior — outfit your ship on a long trip, no vendor flight).
-      if ((state.screen !== 'storyShipyard' && state.screen !== 'shipInterior') || !state.story) return state;
+      // unaffordable/owned/locked (buyShipUpgrade gates). GS-story-quality: BUYING is only at a ship-vendor
+      // WORLD's shipyard now — the ship-interior rooms EQUIP/display what you already own, they don't sell
+      // (a shop shouldn't live inside your own hull). The vendor is where the fleet's arms are traded.
+      if (state.screen !== 'storyShipyard' || !state.story) return state;
       const story = buyShipUpgrade(state.story, action.upgradeId);
       if (story === state.story) return state;
       return { ...state, story, storyItemInspectId: undefined };
@@ -832,7 +848,11 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-chapters: lock in the path at The Choice (Warden or Herald) → the clubhouse. Gated to the
       // choice screen with the path unchosen, so it fires exactly once.
       if (state.screen !== 'storyChoice' || !state.story || state.story.alignment) return state;
-      return { ...state, story: chooseAlignment(state.story, action.alignment), screen: 'story' };
+      // GS-story-quality: turning Herald swaps the caddy roster — the Warden friends you betrayed DESERT you,
+      // and the Coil inner circle VOLUNTEER as your caddies in their place (free, Venoma on the bag). A Warden
+      // choice keeps the roster untouched.
+      const chosen = applyHeraldCaddies(chooseAlignment(state.story, action.alignment));
+      return { ...state, story: chosen, screen: 'story' };
     }
 
     case 'openStoryFinale': {

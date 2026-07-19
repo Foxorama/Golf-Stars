@@ -200,6 +200,12 @@ export function ownsUpgrade(story: StoryState, id: string): boolean {
   return story.ownedShipUpgradeIds.includes(id);
 }
 
+/** GS-story-quality: how many upgrades of a category are owned (the star-map ship draws visible weapon
+ *  hardpoints scaled by the owned WEAPON count, so arming up shows on the hull). */
+export function ownedCategoryCount(story: StoryState, category: UpgradeCategory): number {
+  return STORY_SHIP_UPGRADES.filter((u) => u.category === category && ownsUpgrade(story, u.id)).length;
+}
+
 export function canBuyUpgrade(story: StoryState, u: StoryShipUpgrade): boolean {
   return !ownsUpgrade(story, u.id) && upgradeRevealed(story, u) && story.credits >= u.price;
 }

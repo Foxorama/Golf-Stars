@@ -82,6 +82,12 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   screens; "The Serpent's Fang" Sigil name; path-correct mission log; **re-present The Choice on resume** if
   it was skipped (was a silent railroad to Warden); **Herald can't recruit/quest the friends they must crush**;
   **quest 9-hole rounds no longer corrupt the 18-hole `worldBest`**.
+- ✅ *round 2 (player-reported) shipped this pass*: locker LORE cards now open for quest/major/starter clubs
+  (the inspect reducer accepted only `club:`/`gear:`); ship rooms EQUIP owned upgrades, buying moved to
+  ship-vendor worlds only; the star-map ship draws mounted GUN PODS scaling with installed weapons;
+  **Herald caddies** — the Warden friends DESERT you and the Coil inner circle VOLUNTEER as caddies (real
+  effects, switch in the locker, on the bag on-course); the **Galewarden Irons** are a matched 5·7·9 SET; and
+  early Pro Shops lean on GEAR instead of a redundant club glut.
 - **GS-story-world-routing** — per-alignment world unlock (`STORY_WORLDS` is flat/chapter-only; both paths
   chart the identical galaxy). The bible's core replay engine — Warden void/crystal/frost vs Herald ocean/
   derelict/cetus. Add `alignment?` to Ch.4–5 rows + thread `storyWorldUnlocked`; shared shrine on both.

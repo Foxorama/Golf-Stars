@@ -14,6 +14,7 @@ import { apparelById } from '../sim/rpg/apparel';
 import { driverForCharacter, golfBagForCharacter, hatForCharacter, pantsForCharacter, shirtForCharacter } from '../ui/game';
 import type { GolferLook } from '../render/playView';
 import { CADDY_LABEL, hasCaddyArt } from '../render/caddyArt';
+import { isHeraldAgent, heraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { getSettings } from '../settings';
 import type { Rarity } from '../sim/course/contract';
 
@@ -85,9 +86,15 @@ export function golferLook(): GolferLook | undefined {
   };
 }
 
-/** The hired named caddy's id (GS-caddy), or undefined — drawn in the play-view/putt-meter corner. */
+/** The hired named caddy's id (GS-caddy), or undefined — drawn in the play-view/putt-meter corner.
+ *  GS-story-quality: on a Herald Story round the active bag caddy is a Coil VOLUNTEER (not a "named caddy"
+ *  perk), so fall back to the story's active caddy when it's a Coil agent — they carry the bag on-course too. */
 export function caddyId(): string | undefined {
-  return namedCaddyOwned(state.run.loadout.perks);
+  const named = namedCaddyOwned(state.run.loadout.perks);
+  if (named) return named;
+  const active = state.story?.activeCaddyId;
+  if (state.run.storyRound && active && isHeraldAgent(active)) return active;
+  return undefined;
 }
 
 /** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A
@@ -100,9 +107,14 @@ export function puttCaddyId(): string | undefined {
 /** The framed gold caddy badge (the "cool outline") — shared by the decision and putting screens.
  *  The figure is drawn to the canvas in the render wiring (keyed off `data-caddy`). '' when none. */
 export function caddyBadgeHTML(id: string | undefined): string {
-  return hasCaddyArt(id)
-    ? `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`
-    : '';
+  if (hasCaddyArt(id))
+    return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`;
+  // GS-story-quality: a Coil VOLUNTEER (Herald caddy) has a story figure but no CADDY_LABEL entry.
+  if (id && isHeraldAgent(id)) {
+    const short = heraldAgent(id)?.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') ?? 'Coil';
+    return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${short}</span></div>`;
+  }
+  return '';
 }
 
 /** Left-handed mode (GS-lefty) — the live player setting. The sim reads it off `loadout.lefty`
