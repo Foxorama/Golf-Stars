@@ -20,8 +20,10 @@ import { shipSVG } from './shipArt';
 import { shipById } from '../sim/rpg/ships';
 import { prognosticParrotPortraitSVG } from './loreArt';
 import { caddyPortraitSVG } from './caddyPortraits';
+import { lorePortraitSVG } from './loreArt';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { crewRoster, allyName } from '../sim/rpg/storyAllies';
+import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import type { StoryState } from '../sim/rpg/story';
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
@@ -32,12 +34,25 @@ function embeddableParrotBust(): string {
     .replace(/ style="[^"]*"/, '');
 }
 
+/** The Coil's OUROBOROS — a serpent swallowing its tail around a dimpled world (the cult's sigil), shown in
+ *  the Herald clubhouse viewport where the Warden ship shows a destination planet. Acid-green + venom-violet. */
+function ouroborosSigil(): string {
+  return `<g transform="translate(180 78)">
+      <circle r="34" fill="none" stroke="#7fe0a0" stroke-width="5" opacity="0.85"/>
+      <circle r="34" fill="none" stroke="#b060c0" stroke-width="1.4" opacity="0.7"/>
+      <circle r="34" fill="none" stroke="#0d0714" stroke-width="5" stroke-dasharray="2 7" opacity="0.5"/>
+      <g transform="rotate(-40)"><path d="M34,-9 q14,3 14,9 q0,6 -14,9 q6,-9 0,-18 Z" fill="#7fe0a0"/><circle cx="42" cy="-2" r="1.6" fill="#0d0714"/></g>
+      <circle r="14" fill="#b060c0"/><circle cx="-4" cy="-4" r="14" fill="#c98ad8" opacity="0.5"/>
+      ${[[-5, -4], [3, -6], [6, 2], [-3, 4], [0, -1], [-7, 1]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3" fill="#5a1f6a" opacity="0.7"/>`).join('')}
+    </g>`;
+}
+
 /**
  * The illustrated Mothership interior (SVG backdrop). viewBox 0 0 400 300 (4:3). Hand-placed, byte-stable.
  * Left column: the hangar bay (top) + the locker bank (bottom). Centre-back: the star-chart viewport.
  * Right: the bar with the Parrot. A warm-lit deck across the foreground.
  */
-function spaceportArt(shipId: string): string {
+function spaceportArt(shipId: string, herald: boolean): string {
   const bust = embeddableParrotBust();
   const bottle = (x: number, col: string, h = 26) =>
     `<g transform="translate(${x} ${118 - h})">
@@ -45,14 +60,20 @@ function spaceportArt(shipId: string): string {
        <rect x="2" y="-4" width="3" height="5" fill="#2a2018"/>
        <rect x="1" y="3" width="1.6" height="${h - 8}" fill="#fff" opacity="0.35"/>
      </g>`;
+  // GS-story-herald-clubhouse: on the dark path the Mothership becomes the Coil's — violet-dark walls, an
+  // acid-green wash, and an OUROBOROS sigil in the viewport instead of a destination planet. (The Parrot's
+  // bar stays: canon has him loyal even if you turn.) The Warden palette is the default, byte-identical.
+  const p = herald
+    ? { wall1: '#241033', wall2: '#0c0714', floor1: '#241436', floor2: '#0f0818', glow: '#7fe0a0', frame: '#b060c0' }
+    : { wall1: '#20293c', wall2: '#121826', floor1: '#2a3346', floor2: '#141a26', glow: '#ffdca0', frame: '#7fd8ff' };
   return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" width="100%" height="100%"
     style="position:absolute;inset:0;">
     <defs>
       <linearGradient id="sc-wall" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#20293c"/><stop offset="100%" stop-color="#121826"/>
+        <stop offset="0%" stop-color="${p.wall1}"/><stop offset="100%" stop-color="${p.wall2}"/>
       </linearGradient>
       <linearGradient id="sc-floor" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#2a3346"/><stop offset="100%" stop-color="#141a26"/>
+        <stop offset="0%" stop-color="${p.floor1}"/><stop offset="100%" stop-color="${p.floor2}"/>
       </linearGradient>
       <linearGradient id="sc-sky" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#0a1030"/><stop offset="55%" stop-color="#1a1444"/><stop offset="100%" stop-color="#2a1050"/>
@@ -67,7 +88,7 @@ function spaceportArt(shipId: string): string {
         <stop offset="0%" stop-color="#6e4a2c"/><stop offset="100%" stop-color="#3a2614"/>
       </linearGradient>
       <radialGradient id="sc-lamp" cx="50%" cy="0%" r="90%">
-        <stop offset="0%" stop-color="#ffdca0" stop-opacity="0.42"/><stop offset="100%" stop-color="#ffdca0" stop-opacity="0"/>
+        <stop offset="0%" stop-color="${p.glow}" stop-opacity="0.42"/><stop offset="100%" stop-color="${p.glow}" stop-opacity="0"/>
       </radialGradient>
       <clipPath id="sc-port"><rect x="120" y="30" width="120" height="98" rx="7"/></clipPath>
       <clipPath id="sc-hangar"><rect x="8" y="42" width="92" height="96" rx="5"/></clipPath>
@@ -122,16 +143,20 @@ function spaceportArt(shipId: string): string {
           <circle cx="206" cy="98" r="1"/><circle cx="230" cy="76" r="1.1"/><circle cx="132" cy="110" r="1"/>
           <circle cx="196" cy="116" r="1.2"><animate attributeName="opacity" values="0.4;1;0.4" dur="2.9s" repeatCount="indefinite"/></circle>
         </g>
-        <!-- a ringed planet ahead: the destination -->
+        ${
+          herald
+            ? ouroborosSigil()
+            : `<!-- a ringed planet ahead: the destination -->
         <g transform="translate(210 108)">
           <circle r="18" fill="#d8a24a"/><circle cx="-6" cy="-6" r="18" fill="#e8bd6e" opacity="0.5"/>
           <ellipse rx="30" ry="8" fill="none" stroke="#ffe6a6" stroke-width="2.6" transform="rotate(-18)" opacity="0.85"/>
         </g>
         <!-- faint charted route line -->
-        <path d="M132,120 Q168,96 210,108" fill="none" stroke="#7fd8ff" stroke-width="1" opacity="0.55" stroke-dasharray="3 4"/>
+        <path d="M132,120 Q168,96 210,108" fill="none" stroke="#7fd8ff" stroke-width="1" opacity="0.55" stroke-dasharray="3 4"/>`
+        }
       </g>
       <rect x="116" y="26" width="128" height="106" rx="9" fill="none" stroke="#3a475f" stroke-width="4"/>
-      <rect x="118" y="28" width="124" height="102" rx="7" fill="none" stroke="#7fd8ff" stroke-width="1" opacity="0.35"/>
+      <rect x="118" y="28" width="124" height="102" rx="7" fill="none" stroke="${p.frame}" stroke-width="1" opacity="0.35"/>
     </g>
 
     <!-- ══ BAR + PARROT (right) ══ -->
@@ -199,6 +224,7 @@ export function spaceportSceneHTML(story: StoryState): string {
       })
     : '';
   const activeCaddyId = activeStoryCaddy(story);
+  const herald = story.alignment === 'herald';
 
   // Your golfer, feet-anchored on the deck, centre-front. Tap → your locker (change your bag & gear).
   const playerBtn = ch
@@ -212,30 +238,58 @@ export function spaceportSceneHTML(story: StoryState): string {
       </button>`
     : '';
 
-  // GS-story-crew-scene: your recruited allies stand around the clubhouse (not just a wall below). The ACTIVE
-  // caddy stands at your side ("on the bag"); the rest gather along the deck by the bar. Each is a tappable
-  // portrait standee → their ally talk card. Empty until you recruit someone out in the galaxy.
-  const crew = crewRoster(story);
-  const activeStandee = activeCaddyId
-    ? crewStandee(activeCaddyId, { left: 62, top: 85 }, true)
-    : '';
-  const others = crew.filter((id) => id !== activeCaddyId);
-  const crewStandees = others
-    .slice(0, CREW_SPOTS.length)
-    .map((id, i) => crewStandee(id, CREW_SPOTS[i]!, false))
-    .join('');
+  // GS-story-crew-scene / GS-story-herald-clubhouse: the crew stand around the clubhouse. On the WARDEN /
+  // undecided path that's your recruited caddies (the active one at your side, "on the bag"). On the HERALD
+  // path it's the Coil's inner circle instead (Voss, Venoma, Ouros, Ecdysis) — your dark-path "allies".
+  let crewStandees: string;
+  if (herald) {
+    const agents = heraldCrew(story);
+    // Voss (the mentor, index 0) stands at your side; the rest gather along the deck.
+    crewStandees = agents
+      .slice(0, HERALD_SPOTS.length)
+      .map((a, i) => heraldStandee(a, HERALD_SPOTS[i]!, i === 0))
+      .join('');
+  } else {
+    const others = crewRoster(story).filter((id) => id !== activeCaddyId);
+    const active = activeCaddyId ? crewStandee(activeCaddyId, { left: 62, top: 85 }, true) : '';
+    crewStandees =
+      others
+        .slice(0, CREW_SPOTS.length)
+        .map((id, i) => crewStandee(id, CREW_SPOTS[i]!, false))
+        .join('') + active;
+  }
 
   return `${SPACEPORT_STYLE}
-    <div class="gs-sclub-scene">
-      ${spaceportArt(story.equippedShipId)}
+    <div class="gs-sclub-scene${herald ? ' gs-sclub-scene--herald' : ''}">
+      ${spaceportArt(story.equippedShipId, herald)}
       ${hotspot({ type: 'openStoryMap' }, '🗺 Set course', { l: 28, t: 8, w: 34, h: 36 }, 'Set course — the star chart', 'top')}
       ${hotspot({ type: 'openStoryShipyard' }, `🚀 Hangar`, { l: 1, t: 12, w: 25, h: 36 }, `Hangar — fly your fleet (${shipName})`, 'top')}
       ${hotspot({ type: 'openStoryLocker' }, '🎒 Locker', { l: 1, t: 49, w: 25, h: 26 }, 'Locker — build your bag and gear', 'bottom')}
       ${hotspot({ type: 'openStoryBar' }, "🍺 The Crow's Nest", { l: 63, t: 10, w: 36, h: 40 }, "The Crow's Nest — talk to the Parrot", 'top')}
       ${crewStandees}
       ${playerBtn}
-      ${activeStandee}
     </div>`;
+}
+
+/** Herald crew deck spots — Voss (index 0) at your side, the rest gathered along the deck. */
+const HERALD_SPOTS: { left: number; top: number }[] = [
+  { left: 62, top: 85 }, // Voss — your mentor, at your side
+  { left: 31, top: 91 },
+  { left: 78, top: 82 },
+  { left: 90, top: 91 },
+];
+
+/** One Coil agent as a feet-anchored standee (their lore portrait, tinted). Tap → their Herald talk card. */
+function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, mentor: boolean): string {
+  const name = agent.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') || agent.name.split(' ')[0];
+  const short = agent.name.includes('"') ? name : agent.name.split(' ')[0];
+  return `<button class="gs-sclub-caddy gs-sclub-caddy--herald${mentor ? ' gs-sclub-caddy--on' : ''}"
+      data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: agent.id })}'
+      aria-label="Speak with ${agent.name}"
+      style="left:${spot.left}%;top:${spot.top}%;">
+      <span class="gs-sclub-cav"${agent.tint ? ` style="filter:${agent.tint};"` : ''}>${lorePortraitSVG(agent.portrait)}</span>
+      <span class="gs-sclub-cplate">${short}</span>
+    </button>`;
 }
 
 /** Deck spots (left%, top%) where non-active crew allies stand around the clubhouse — an arc across the deck
@@ -300,4 +354,11 @@ const SPACEPORT_STYLE = `<style>
   .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141ecc;
     border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;}
   .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018cc;border-color:#6a3a52;color:#f0a8c8;}
+  /* Herald (Coil) crew — venom-violet ring + plate; the mentor (Voss) gets the emphasised ring. */
+  .gs-sclub-caddy--herald .gs-sclub-cav{border-color:#b060c0cc;}
+  .gs-sclub-caddy--herald.gs-sclub-caddy--on .gs-sclub-cav{border-color:#c98ad8;box-shadow:0 4px 10px #000a,0 0 9px #b060c088;}
+  .gs-sclub-caddy--herald .gs-sclub-cplate{background:#1a0f24cc;border-color:#5a3a6a;color:#d6b8e8;}
+  /* Herald scene: tint the door labels toward the Coil palette. */
+  .gs-sclub-scene--herald .gs-sclub-hot:hover,.gs-sclub-scene--herald .gs-sclub-hot:focus-visible{background:#b060c018;border-color:#b060c066;box-shadow:inset 0 0 24px #7fe0a022;}
+  .gs-sclub-scene--herald .gs-sclub-hot:hover .gs-sclub-lab,.gs-sclub-scene--herald .gs-sclub-hot:focus-visible .gs-sclub-lab{background:#2a1236;border-color:#b060c0;color:#ecd8f4;}
 </style>`;

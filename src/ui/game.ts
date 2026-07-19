@@ -75,6 +75,7 @@ import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop'
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
 import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
 import { allyTalk } from '../sim/rpg/storyAllies';
+import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
@@ -510,10 +511,12 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyInspectAlly': {
-      // GS-story-allies: tap a recruited crew ally on the clubhouse → open their talk card (banter starts on
-      // the first line). Guarded to the hub + a real hired ally, so a stray tap can't open a mute card.
+      // GS-story-allies / GS-story-herald-clubhouse: tap a crew standee → open their talk card. On the Warden
+      // path that's a real hired caddy; on the Herald path it's a Coil agent (Voss/Venoma/Ouros/Ecdysis).
+      // Guarded to the hub + a genuine crew member, so a stray tap can't open a mute card.
       if (state.screen !== 'story' || !state.story) return state;
-      if (!state.story.hiredCaddyIds.includes(action.caddyId) || !allyTalk(action.caddyId)) return state;
+      const realCaddy = state.story.hiredCaddyIds.includes(action.caddyId) && !!allyTalk(action.caddyId);
+      if (!realCaddy && !isHeraldAgent(action.caddyId)) return state;
       return { ...state, storyAllyInspectId: action.caddyId, storyAllyTalk: 0 };
     }
 

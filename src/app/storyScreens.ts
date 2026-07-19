@@ -26,6 +26,8 @@ import { staticCourseSpec } from '../sim/course/staticCourses';
 import { allyInspectOverlayHTML } from '../render/storyCrew';
 import { activeQuest, questWorld, questById, questGiverName } from '../sim/rpg/storyQuests';
 import { storyObjective } from '../sim/rpg/storyGuide';
+import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
+import { heraldAgentOverlayHTML } from '../render/storyHeraldOverlay';
 
 export function storyHubScreen(): string {
   const story = state.story;
@@ -263,10 +265,12 @@ function spaceClubhouseHTML(story: StoryState): string {
   const chip = (title: string, body: string, color = 'var(--gs-gold)') =>
     `<span class="gs-chip" style="border-color:#3a3320;color:${color};font-size:13px;" title="${title}">${body}</span>`;
   const parrotLine = `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils. The Coil is not resting, ${who} — and neither is the serpent."`;
-  // GS-story-allies: the recruited crew stand in the clubhouse; tap one to talk (their portrait, faction,
-  // and rotating banter). Empty until you recruit a friend out in the galaxy.
+  // GS-story-allies / GS-story-herald-clubhouse: the crew stand in the clubhouse; tap one to talk. On the
+  // Herald path the standees are the Coil agents (their own talk card); otherwise the recruited caddies.
   const allyOverlay = state.storyAllyInspectId
-    ? allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
+    ? isHeraldAgent(state.storyAllyInspectId)
+      ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0)
+      : allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
     : '';
 
   return `
