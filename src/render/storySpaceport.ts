@@ -18,7 +18,7 @@ import { getCharacter } from '../sim/rpg/characters';
 import { golferPreviewSVG } from './apparelArt';
 import { shipSVG } from './shipArt';
 import { shipById } from '../sim/rpg/ships';
-import { prognosticParrotPortraitSVG } from './loreArt';
+import { prognosticParrotPortraitSVG, carrionCrowPortraitSVG } from './loreArt';
 import { caddyPortraitSVG } from './caddyPortraits';
 import { lorePortraitSVG } from './loreArt';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
@@ -30,6 +30,14 @@ import type { StoryState } from '../sim/rpg/story';
  *  idiom) so the bird behind the bar is unmistakably the same character. */
 function embeddableParrotBust(): string {
   return prognosticParrotPortraitSVG()
+    .replace('width="100%"', 'x="0" y="0" width="320" height="340"')
+    .replace(/ style="[^"]*"/, '');
+}
+
+/** The Carrion Crow bust made embeddable the same way — the Coil's bartender who takes the bar on the Herald
+ *  path (GS-story-herald-clubhouse), in place of the Parrot. */
+function embeddableCrowBust(): string {
+  return carrionCrowPortraitSVG()
     .replace('width="100%"', 'x="0" y="0" width="320" height="340"')
     .replace(/ style="[^"]*"/, '');
 }
@@ -53,7 +61,8 @@ function ouroborosSigil(): string {
  * Right: the bar with the Parrot. A warm-lit deck across the foreground.
  */
 function spaceportArt(shipId: string, herald: boolean): string {
-  const bust = embeddableParrotBust();
+  // On the dark path the Crow tends the bar in the Parrot's place (canon: the Carrion Prophet, his mirror).
+  const bust = herald ? embeddableCrowBust() : embeddableParrotBust();
   const bottle = (x: number, col: string, h = 26) =>
     `<g transform="translate(${x} ${118 - h})">
        <rect x="0" y="0" width="7" height="${h}" rx="2.4" fill="${col}"/>
@@ -265,7 +274,7 @@ export function spaceportSceneHTML(story: StoryState): string {
       ${hotspot({ type: 'openStoryMap' }, '🗺 Set course', { l: 28, t: 8, w: 34, h: 36 }, 'Set course — the star chart', 'top')}
       ${hotspot({ type: 'openStoryShipyard' }, `🚀 Hangar`, { l: 1, t: 12, w: 25, h: 36 }, `Hangar — fly your fleet (${shipName})`, 'top')}
       ${hotspot({ type: 'openStoryLocker' }, '🎒 Locker', { l: 1, t: 49, w: 25, h: 26 }, 'Locker — build your bag and gear', 'bottom')}
-      ${hotspot({ type: 'openStoryBar' }, "🍺 The Crow's Nest", { l: 63, t: 10, w: 36, h: 40 }, "The Crow's Nest — talk to the Parrot", 'top')}
+      ${hotspot({ type: 'openStoryBar' }, "🍺 The Crow's Nest", { l: 63, t: 10, w: 36, h: 40 }, herald ? "The Crow's Nest — talk to the Crow" : "The Crow's Nest — talk to the Parrot", 'top')}
       ${crewStandees}
       ${playerBtn}
     </div>`;

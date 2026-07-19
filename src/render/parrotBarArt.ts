@@ -9,22 +9,24 @@
  * innerHTML. The SMIL flickers/twinkles are cosmetic; the screen is a static between-worlds hangout.
  */
 
-import { prognosticParrotPortraitSVG } from './loreArt';
+import { prognosticParrotPortraitSVG, carrionCrowPortraitSVG } from './loreArt';
 
-/** The Parrot's lore bust, made embeddable: swap the outer `width="100%"` for an explicit 320×340 nested
- *  viewport and drop the block style, so it renders 1:1 inside a positioned `<g transform>`. */
-function embeddableParrotBust(): string {
-  return prognosticParrotPortraitSVG()
-    .replace('width="100%"', 'x="0" y="0" width="320" height="340"')
-    .replace(/ style="[^"]*"/, '');
+/** A lore bust made embeddable: swap the outer `width="100%"` for an explicit 320×340 nested viewport and
+ *  drop the block style, so it renders 1:1 inside a positioned `<g transform>`. */
+function embeddableBust(svg: string): string {
+  return svg.replace('width="100%"', 'x="0" y="0" width="320" height="340"').replace(/ style="[^"]*"/, '');
 }
 
 /**
  * The full cantina scene. `viewBox 0 0 720 440`, responsive width. A round porthole onto space (left), a
- * neon sign + a glowing back-bar of bottles (right), a lamp-lit counter, and the Parrot behind it.
+ * neon sign + a glowing back-bar of bottles (right), a lamp-lit counter, and the barkeep behind it. On the
+ * HERALD path (GS-story-herald-clubhouse) the Coil's CROW tends the bar in the Parrot's place, and the neon
+ * burns venom-violet instead of acid-green.
  */
-export function parrotBarSceneSVG(): string {
-  const bust = embeddableParrotBust();
+export function parrotBarSceneSVG(herald = false): string {
+  const bust = embeddableBust(herald ? carrionCrowPortraitSVG() : prognosticParrotPortraitSVG());
+  const signCol = herald ? '#b060c0' : '#7fe0a0';
+  const signInk = herald ? '#ecd8f4' : '#d6ffe6';
   // A glowing bottle on the back-bar shelf: body + a soft emissive halo + a highlight.
   const bottle = (x: number, col: string, h = 46) => `
     <g transform="translate(${x} ${226 - h})">
@@ -35,7 +37,7 @@ export function parrotBarSceneSVG(): string {
       <rect x="1.5" y="${h - 18}" width="11" height="10" rx="1.5" fill="#fff" opacity="0.14"/>
     </g>`;
 
-  return `<svg viewBox="0 0 720 440" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Crow's Nest — the Parrot's bar" style="display:block;">
+  return `<svg viewBox="0 0 720 440" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Crow's Nest — ${herald ? 'the Crow' : "the Parrot"}'s bar" style="display:block;">
   <defs>
     <linearGradient id="gs-pbar-wall" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#241a12"/>
@@ -104,15 +106,15 @@ export function parrotBarSceneSVG(): string {
     <path d="M100 96 Q140 70 190 78" stroke="#fff" stroke-width="4" opacity="0.06" fill="none" stroke-linecap="round"/>
   </g>
 
-  <!-- ══ neon sign ══ -->
+  <!-- ══ neon sign (venom-violet on the Herald path) ══ -->
   <g>
-    <ellipse cx="500" cy="60" rx="118" ry="26" fill="#7fe0a0" opacity="0.12">
+    <ellipse cx="500" cy="60" rx="118" ry="26" fill="${signCol}" opacity="0.12">
       <animate attributeName="opacity" values="0.12;0.2;0.12;0.16;0.12" dur="5s" repeatCount="indefinite"/>
     </ellipse>
     <rect x="392" y="38" width="216" height="42" rx="9" fill="#0d1512" stroke="#274a38" stroke-width="1.6"/>
     <g font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="800">
-      <text x="500" y="67" text-anchor="middle" font-size="24" fill="none" stroke="#7fe0a0" stroke-width="4" stroke-linejoin="round" opacity="0.4">The Crow's Nest</text>
-      <text x="500" y="67" text-anchor="middle" font-size="24" fill="#d6ffe6">The Crow's Nest
+      <text x="500" y="67" text-anchor="middle" font-size="24" fill="none" stroke="${signCol}" stroke-width="4" stroke-linejoin="round" opacity="0.4">The Crow's Nest</text>
+      <text x="500" y="67" text-anchor="middle" font-size="24" fill="${signInk}">The Crow's Nest
         <animate attributeName="opacity" values="1;1;0.7;1;0.9;1" dur="6s" repeatCount="indefinite"/>
       </text>
     </g>

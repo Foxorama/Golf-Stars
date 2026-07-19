@@ -533,8 +533,8 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   (`alignment === 'herald'`), the Mothership clubhouse becomes the COIL's — an ALTERNATIVE clubhouse + crew,
   grounded in the bible (which described Coil *agents* but no Herald base/roster; the gap this fills). Two
   halves: (1) the SCENE re-themes — violet-dark walls, an acid-green wash, and an OUROBOROS sigil in the
-  viewport instead of a destination planet (the Warden palette is the default, byte-identical); the Parrot's
-  bar STAYS (canon has him loyal even if you turn). (2) the crew are the Coil INNER CIRCLE instead of the
+  viewport instead of a destination planet (the Warden palette is the default, byte-identical); the bartender
+  is swapped for the Coil's CROW (GS-story-herald-bar, below). (2) the crew are the Coil INNER CIRCLE instead of the
   Warden caddies — **Sable Voss** (the Apostate, your mentor, at your side), **Venoma** (the Viper, your
   lieutenant), **Brother Ouros** (the Whisperer), **Sister Ecdysis** (the Shedmaker) — each a tappable
   standee (their lore portraits, the two hooded cultists differentiated by a hue filter) → a Coil talk card
@@ -547,6 +547,23 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   not caddies) + a `?screen=storyheraldclub` browser smoke (the `.gs-sclub-scene--herald` Coil scene).
   Deferred: a dedicated Coil FACTION row + bespoke Ecdysis/Ouros portraits (the bible's fuller vision) — this
   pass reuses existing art/factions to stay low-risk.
+- **GS-story-herald-bar** — ✅ *shipped* (`render/loreArt.ts` `carrionCrowPortraitSVG` + `sim/rpg/parrotBar.ts`
+  + the bar screen/scene). Player point: "why would the parrot stay loyal? that doesn't make sense — needs a
+  new bartender if you join the cult." Correct — and the bible has the answer: the **Carrion Prophet, the
+  Crow**, the Coil's true prophet and the Parrot's dark mirror. On the Herald path he takes the roost: (1) a
+  new **Crow bust** (a black hooded raven, bone-pale hooked beak, a single BURNING eye, tattered Coil cowl
+  with an ouroboros clasp) sized to the Parrot's 320×340 viewport so it drops into the exact same slots —
+  behind the clubhouse mini-bar (`storySpaceport`) AND the full Crow's-Nest scene (`parrotBarArt`, which also
+  burns its neon venom-violet). (2) the bar's **voice** switches: `ParrotBarLine.speaker` (`parrot`|`crow`)
+  splits the chatter table into two coherent pools — `parrotBarLines` serves only `crow` lines on the Herald
+  path, only `parrot` lines otherwise, so the Parrot's biography never comes out of the Crow's beak. A full
+  Crow pool (greeting/lore/coil/hint/path/complete) in his calm, certain, patient voice — the Coil's "mercy"
+  creed, the serpent's "rest", and the ironic hint to arm the ship ("the cage was always meant to open").
+  (3) the screen labels swap — "The Carrion Prophet", "tap the Crow", "Speak on, prophet" — and the
+  clubhouse quote line reads the Crow (violet 🐦‍⬛) not the Parrot. Content/render only; no save bump; the
+  Warden bar is byte-identical (default speaker `parrot`). Guarded by `tests/parrot-bar.test.ts` (the Herald
+  pool is crow-only, no Parrot lines leak; the Warden pool has no crow lines) + a `?screen=storyheraldbar`
+  browser smoke.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
