@@ -59,6 +59,27 @@ export function hasSigilLook(id: string): boolean {
   return id in SIGIL_LOOK;
 }
 
+/** The serpent-beat caption ESCALATES with how many Sigils are now set (GS-story-ragnarok) — the impending
+ *  Ragnarök made legible: a distant dream at one Sigil, the great eye opening and looking back at four. */
+export function serpentStirCaption(sigils: number): string {
+  return [
+    'Far below Yggdrasil, something turns over in its sleep.',
+    'Under the roots the sleeper stirs — and the Coil is smiling.',
+    "The World-Eater's eye cracks open in the dark.",
+    'It is awake now — and it is looking back up the roots, at you.',
+  ][Math.max(0, Math.min(3, sigils - 1))]!;
+}
+/** The Keystone-hold subtitle names the coming Ragnarök as the key nears completion (GS-story-ragnarok). */
+export function keystoneSubtitle(sigils: number, total: number): string {
+  const tail = [
+    'the key takes shape.',
+    'the seal weakens.',
+    'the root begins to give.',
+    'one Sigil from Ragnarök.',
+  ][Math.max(0, Math.min(3, sigils - 1))]!;
+  return `${sigils} of ${total} Sigils — ${tail}`;
+}
+
 /**
  * Paint the waking world-serpent (GS-story-serpent) into `ctx`, centred on (CX, CY) in the ceremony's
  * 1000×640 design space. A MASSIVE scaled serpent, not a string of beads: a continuous tapered body with
@@ -814,7 +835,7 @@ export function mountSigilCeremony(opts: {
       // a low caption during the serpent beat
       const capA = easeOut(clamp01((sp - 0.2) / 0.4)) * (sp > 0.85 ? clamp01((1 - sp) / 0.15) : 1);
       if (isFinal) caption('The World-Eater stirs…', '', capA * 0.9);
-      else caption('Far below Yggdrasil, something turns over in its sleep.', '', capA * 0.8);
+      else caption(serpentStirCaption(sigilCount), '', capA * 0.8);
     } else {
       // CAPTION hold
       const cp = clamp01((e - B.serpent) / P.caption);
@@ -823,8 +844,8 @@ export function mountSigilCeremony(opts: {
       const focusHead = isFinal ? 1 : 0;
       drawSerpent(t, wake, focusHead);
       const a = easeOut(clamp01(cp * 2)) * (cp > 0.8 ? clamp01((1 - cp) / 0.2) : 1);
-      if (isFinal) caption('The Keystone is complete.', 'The World-Eater wakes. Its eye is open.', a);
-      else caption(`${opts.sigilName} is set.`, `${sigilCount} of ${total} Sigils — the key takes shape.`, a);
+      if (isFinal) caption('The Keystone is complete.', 'The World-Eater wakes. Its eye is open. Ragnarök begins.', a);
+      else caption(`${opts.sigilName} is set.`, keystoneSubtitle(sigilCount, total), a);
     }
 
     ctx.restore();

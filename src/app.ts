@@ -325,7 +325,10 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const st3 = playWorld(st2, 'verdant2-18'); // clear 2 → tournament unlocks
       const lobby = reduce(st3, { type: 'openStoryTournament' });
       if (screen === 'storytournament') return lobby;
-      return reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'play' });
+      // GS-story-ragnarok: the Emerald Sigil match opens with the Parrot's stakes beat — dismiss it, then play.
+      const teed = reduce(lobby, { type: 'storyPlayTournament' });
+      const round = teed.screen === 'lore' ? reduce(teed, { type: 'dismissLore' }) : teed;
+      return reduce(round, { type: 'play' });
     }
     case 'storytournamentpop': {
       // GS-story-tournament-midpop: the halftime rival pop. The honest path is nine interactive holes; for

@@ -20,6 +20,8 @@ export function lorePortraitSVG(id: string): string {
       return coilkeeperPortraitSVG();
     case 'voss':
       return vossPortraitSVG();
+    case 'crow':
+      return carrionCrowPortraitSVG();
     default:
       return '';
   }

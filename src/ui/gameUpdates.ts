@@ -282,6 +282,7 @@ export function withLoreGate(next: UiState): UiState {
     storyRound: run.storyRound === true,
     storyChapter: next.story?.chapter,
     storyAlignment: next.story?.alignment,
+    storyTournament: run.storyTournament != null,
   };
   const event = pickLoreEvent(ctx, next.seenLore);
   return event ? { ...next, screen: 'lore', pendingLoreId: event.id } : next;

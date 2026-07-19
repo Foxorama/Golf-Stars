@@ -554,7 +554,11 @@ describe('Story tournament flow (GS-story-tournament)', () => {
     const hub = tournamentReady();
     const lobby = reduce(hub, { type: 'openStoryTournament' });
     expect(lobby.screen).toBe('storyTournament');
-    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    // GS-story-ragnarok: the Emerald Sigil match opens with the Parrot's opening-stakes beat — dismiss it.
+    const beat = reduce(lobby, { type: 'storyPlayTournament' });
+    expect(beat.screen).toBe('lore');
+    expect(beat.pendingLoreId).toBe('story-omen-emerald');
+    const intro = reduce(beat, { type: 'dismissLore' });
     expect(intro.screen).toBe('intro');
     expect(intro.run.storyTournament).toBe(1);
     expect(intro.run.storyRound).toBe(true);
@@ -563,7 +567,8 @@ describe('Story tournament flow (GS-story-tournament)', () => {
 
   it('playing the tournament resolves vs the rival and, on a win, banks the Sigil + advances the chapter', () => {
     const lobby = reduce(tournamentReady(), { type: 'openStoryTournament' });
-    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    // GS-story-ragnarok: dismiss the Emerald opening beat before teeing off.
+    const intro = reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'dismissLore' });
     const done = reduce(intro, { type: 'play' });
     expect(done.screen).toBe('storyTournamentResult');
     const r = done.lastStoryTournament!;
@@ -592,13 +597,15 @@ describe('Story tournament flow (GS-story-tournament)', () => {
 
   it('a Story tournament never touches the main-save Star Tour boards', () => {
     const hub = tournamentReady();
-    const done = reduce(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }), { type: 'play' });
+    const round = reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' });
+    const done = reduce(reduce(round, { type: 'dismissLore' }), { type: 'play' });
     expect(done.strokePlayBest).toEqual(hub.strokePlayBest);
   });
 
   it('the interactive tournament pops the halftime rival beat after hole 9, then plays on (GS-story-tournament-midpop)', () => {
     const lobby = reduce(tournamentReady(), { type: 'openStoryTournament' });
-    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    // GS-story-ragnarok: dismiss the Emerald opening beat before teeing off.
+    const intro = reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'dismissLore' });
     let s = reduce(intro, { type: 'playInteractive' });
     expect(s.screen).toBe('playing');
     // play the front nine, hole by hole (the interactive path — where the pop lives).
