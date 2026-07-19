@@ -139,8 +139,12 @@ export function completeStoryRound(
   courseId: string,
   result: StoryWorldBest,
   creditsEarned: number,
+  /** GS-story-quality (finding D): a QUEST round replays the ally's home world at 9 holes (par ~36), so it
+   *  must NOT overwrite the world's 18-hole `worldBest` (which the revisit chase + dossier read). Pass
+   *  `false` for a quest round — credits + cleared still bank, only the best-score write is skipped. */
+  recordBest = true,
 ): { story: StoryState; advancedChapter: boolean; wasPrologue: boolean } {
-  let next = recordWorldClear(story, courseId, result, creditsEarned);
+  let next = recordWorldClear(story, courseId, result, creditsEarned, recordBest);
   const wasPrologue = story.chapter === 0 && courseId === PROLOGUE_COURSE_ID;
   if (wasPrologue) next = { ...next, chapter: 1 };
   return { story: next, advancedChapter: wasPrologue, wasPrologue };
@@ -455,12 +459,15 @@ export function recordWorldClear(
   worldId: string,
   result: StoryWorldBest,
   creditsEarned: number,
+  /** Whether to update the stored best score. `false` (a quest round) banks credits + marks cleared but
+   *  leaves `worldBest` untouched, so a 9-hole quest can't clobber the 18-hole record. */
+  recordBest = true,
 ): StoryState {
   const cleared = story.clearedWorldIds.includes(worldId)
     ? story.clearedWorldIds
     : [...story.clearedWorldIds, worldId];
   const prev = story.worldBest[worldId];
-  const better = !prev || result.toPar < prev.toPar || (result.toPar === prev.toPar && result.strokes < prev.strokes);
+  const better = recordBest && (!prev || result.toPar < prev.toPar || (result.toPar === prev.toPar && result.strokes < prev.strokes));
   return {
     ...story,
     clearedWorldIds: cleared,

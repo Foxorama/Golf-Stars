@@ -416,10 +416,15 @@ function dossier(w: StarTourWorld): string {
     : '';
   // GS-story-caddies: a friend waits at this cleared world — recruit them (once, kept), or see they're aboard.
   const caddyId = story ? worldCaddy(w.id) : undefined;
+  // GS-story-quality (GAP1): on the Herald path the Warden friends are rivals to crush, not recruits — hide
+  // the recruit offer (an already-recruited pre-Choice friend still reads as "in your crew").
+  const canRecruit = state.story?.alignment !== 'herald';
   const caddyBtn = cleared && caddyId
     ? storyCaddyHired(state.story!, caddyId)
       ? `<div class="gs-st-rec" style="margin-top:8px;color:#7fe0a0;">🎒 ${shopItem(caddyId)?.name ?? 'A friend'} is in your crew</div>`
-      : `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#22161f,#170f16);border-color:#6a3a52;color:#f0a8c8;" data-action='${JSON.stringify({ type: 'hireStoryCaddy', worldId: w.id, caddyId })}'>🎒 Recruit ${shopItem(caddyId)?.name ?? 'a friend'} · ✦ ${STORY_CADDY_PRICE}</button>`
+      : canRecruit
+        ? `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#22161f,#170f16);border-color:#6a3a52;color:#f0a8c8;" data-action='${JSON.stringify({ type: 'hireStoryCaddy', worldId: w.id, caddyId })}'>🎒 Recruit ${shopItem(caddyId)?.name ?? 'a friend'} · ✦ ${STORY_CADDY_PRICE}</button>`
+        : ''
     : '';
   return `
     <div class="gs-st-sheet" role="dialog" aria-label="${w.name}">

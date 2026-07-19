@@ -45,10 +45,15 @@ export function mountStoryBattle(opts: {
   weaponRating: number;
   defenceRating: number;
   interactive?: boolean;
+  /** GS-story-quality: the path chosen at The Choice re-themes the captions/prompts (the mechanics are
+   *  identical). The WARDEN kills the serpent to save the worlds; the HERALD breaks the Warden blockade,
+   *  then strikes the seal to RELEASE it. Default (undefined) = the Warden framing. */
+  herald?: boolean;
   onDone?: (strike: FinaleStrike) => void;
 }): StoryBattleHandle {
   const won = opts.won;
   const interactive = opts.interactive !== false;
+  const herald = opts.herald === true;
 
   // Damage tuning from the gates. A breach-gated ship kills in ~8 hits; an under-weaponed one barely dents.
   const perShot = won || opts.weaponRating >= 26 ? SERPENT_HP / 7.5 : SERPENT_HP / 42;
@@ -414,8 +419,8 @@ export function mountStoryBattle(opts: {
         ctx.fillRect(b.x - 26, b.y - 1.5, 14, 3);
       }
       drawShip(t, lungeFlash);
-      // HUD
-      bar(560, 40, 380, serpentHp / SERPENT_HP, '#8fe0a0', 'JÖRMUNGANDR');
+      // HUD — the WARDEN whittles the serpent itself; the HERALD shatters the WARDS binding it (same bar).
+      bar(560, 40, 380, serpentHp / SERPENT_HP, '#8fe0a0', herald ? 'THE WARDS' : 'JÖRMUNGANDR');
       bar(60, 40, 300, shieldHp / SHIELD_HP, '#7fc8ff', 'SHIELDS');
       drawChargeMeter();
       caption('', '', 0);
@@ -447,7 +452,7 @@ export function mountStoryBattle(opts: {
       ctx.fillStyle = '#ffe6a0';
       ctx.font = '700 22px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(lash ? 'it lashes — steady…' : '🎯 TAP TO STRIKE THE EYE', DW / 2, DH - 40);
+      ctx.fillText(lash ? 'it lashes — steady…' : herald ? '🎯 TAP TO STRIKE THE SEAL' : '🎯 TAP TO STRIKE THE EYE', DW / 2, DH - 40);
       ctx.globalAlpha = 1;
     } else if (phase === 'climax-win') {
       const e = nowMs - climaxStart;
@@ -457,7 +462,11 @@ export function mountStoryBattle(opts: {
       // white nova
       ctx.fillStyle = `rgba(255,255,255,${(1 - Math.abs(p - 0.3) / 0.3) * 0.8})`;
       ctx.fillRect(0, 0, DW, DH);
-      caption(strike === 'clean' ? 'A perfect strike.' : 'A clipping blow — enough.', 'The serpent comes apart across the sky.', p);
+      caption(
+        strike === 'clean' ? 'A perfect strike.' : 'A clipping blow — enough.',
+        herald ? 'The last ward breaks — the serpent uncoils, and the galaxy goes still.' : 'The serpent comes apart across the sky.',
+        p,
+      );
       if (e > 1700) {
         finish();
         return;
@@ -470,7 +479,13 @@ export function mountStoryBattle(opts: {
       drawSerpent(t, 0.3, 0);
       // a coil sweeps the ship back
       drawShip(t, 0);
-      caption('Overwhelmed.', 'You pull back into the dark — but the campaign is saved. Arm up and return.', p);
+      caption(
+        'Overwhelmed.',
+        herald
+          ? 'The Wardens drive you back — but the root will keep. Arm up and return.'
+          : 'You pull back into the dark — but the campaign is saved. Arm up and return.',
+        p,
+      );
       if (e > 1800) {
         finish();
         return;

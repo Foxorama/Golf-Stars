@@ -330,6 +330,8 @@ function recapCaddyHTML(story: StoryState | undefined, courseId: string): string
   if (!caddyId) return '';
   const name = shopItem(caddyId)?.name ?? 'a friend';
   if (storyCaddyHired(story, caddyId)) return `<div style="text-align:center;color:#7fe0a0;font-size:13px;">🎒 ${name} is already in your crew.</div>`;
+  // GS-story-quality (GAP1): the Herald can't recruit the Warden friends they turned on.
+  if (story.alignment === 'herald') return '';
   return `<button class="gs-btn" style="background:linear-gradient(180deg,#22161f,#170f16);border-color:#6a3a52;color:#f0a8c8;" data-action='${JSON.stringify({ type: 'hireStoryCaddy', worldId: courseId, caddyId })}'>🎒 Recruit ${name} · ✦ ${STORY_CADDY_PRICE}</button>`;
 }
 

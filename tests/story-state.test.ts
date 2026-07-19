@@ -129,6 +129,18 @@ describe('story-state model (GS-story-save)', () => {
       expect(s.clearedWorldIds).toEqual(['w1']); // still just once
     });
 
+    it('recordWorldClear with recordBest=false banks credits + cleared but leaves worldBest (GS-story-quality D)', () => {
+      let s = defaultStoryState();
+      s = recordWorldClear(s, 'w1', { toPar: -2, strokes: 70, par: 72, seed: 'x' }, 200); // 18-hole best
+      // a 9-hole quest round on the same world would post a lower toPar over a par-36 course — but must NOT
+      // overwrite the stored 18-hole best; credits + cleared still apply.
+      s = recordWorldClear(s, 'w1', { toPar: -6, strokes: 30, par: 36, seed: 'q' }, 120, false);
+      expect(s.credits).toBe(320);
+      expect(worldCleared(s, 'w1')).toBe(true);
+      expect(s.worldBest['w1']?.toPar).toBe(-2); // unchanged — the 18-hole record stands
+      expect(s.worldBest['w1']?.par).toBe(72);
+    });
+
     it('storyRoundCredits pays more under par and floors at 100', () => {
       expect(storyRoundCredits(0)).toBe(200);
       expect(storyRoundCredits(-4)).toBe(260);

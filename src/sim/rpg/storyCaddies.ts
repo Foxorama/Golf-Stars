@@ -53,6 +53,9 @@ export function activeStoryCaddy(story: StoryState): string | undefined {
 export function hireStoryCaddy(story: StoryState, caddyId: string): StoryState {
   if (story.hiredCaddyIds.includes(caddyId)) return story;
   if (!isNamedCaddy(caddyId)) return story;
+  // GS-story-quality (GAP1): the Warden friends won't join the golfer who betrayed them — no recruiting on
+  // the Herald path (their Coil inner circle stands in the clubhouse instead).
+  if (story.alignment === 'herald') return story;
   if (story.credits < STORY_CADDY_PRICE) return story;
   const hiredCaddyIds = [...story.hiredCaddyIds, caddyId];
   const activeCaddyId = story.activeCaddyId ?? caddyId; // first hire carries the bag by default

@@ -45,14 +45,19 @@ export interface StoryObjective {
 export function storyObjective(story: StoryState): StoryObjective {
   const sigils = story.trophyIds.length;
   const total = STORY_CHAPTER_COUNT;
-  const goal = 'Win 5 Galaxy Tournaments to forge the Green Key — then face Jörmungandr at the root of Yggdrasil.';
+  // GS-story-quality: the overarching goal reads path-neutral ("reach", not "slay") — a Herald means to
+  // FREE Jörmungandr, not kill it — and the completion line reflects which ending you brought about.
+  const goal = 'Win 5 Galaxy Tournaments to forge the Green Key — then reach Jörmungandr at the root of Yggdrasil.';
   const base = { goal, sigils, total };
 
   if (storyComplete(story)) {
     return {
       ...base,
       stage: 'complete',
-      next: 'The Universe is saved. Free-roam Star Tour is now unlocked from the title.',
+      next:
+        story.alignment === 'herald'
+          ? 'The Long Rest has fallen — every fairway still at last. Free-roam Star Tour is now unlocked from the title.'
+          : 'The Universe is saved. Free-roam Star Tour is now unlocked from the title.',
     };
   }
   // Prologue: you haven't won Earth yet (the recruitment hasn't happened).
