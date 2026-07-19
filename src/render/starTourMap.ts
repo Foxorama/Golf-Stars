@@ -39,6 +39,11 @@ export interface StarTourWorld {
   hasRecord: boolean;
   /** The player's best to-par on this course, if any (shown on the planet). */
   bestToPar?: number;
+  /** GS-star-map-services (story mode): this world hosts a ship-vendor SHIPYARD (buy ships/weapons/upgrades)
+   *  — drawn with a 🚀 badge so you can see where to arm up straight off the chart. */
+  hasShipyard?: boolean;
+  /** GS-star-map-services (story mode): this world has a PRO SHOP (clubs/gear) — drawn with a 🛒 badge. */
+  hasProShop?: boolean;
 }
 
 export interface StarTourMapOpts {
@@ -1181,6 +1186,20 @@ function celestialBody(w: StarTourWorld, r: number, look: { col: string; hi: str
   }
 }
 
+/** GS-star-map-services: the destination SERVICE badges — a small labelled disc marking a world that has a
+ *  SHIPYARD (🚀 — buy ships/weapons/upgrades) and/or a PRO SHOP (🛒 — clubs/gear). Placed along the bottom
+ *  corners (mirroring the tier/record badges up top) so the player can read WHERE to go for gear straight
+ *  off the chart. Empty when a world offers neither (Star Tour records-chase worlds, the Earth prologue). */
+function serviceBadges(w: { hasShipyard?: boolean; hasProShop?: boolean }, r: number): string {
+  const rr = (v: number) => v.toFixed(1);
+  const badge = (dx: number, emoji: string, col: string) =>
+    `<g transform="translate(${rr(dx)},${rr(r * 0.92)})"><circle r="7.6" fill="#0a0d1c"/><circle r="7.6" fill="none" stroke="${col}" stroke-width="1.1" opacity="0.9"/><text x="0" y="3.1" font-size="8.5" text-anchor="middle">${emoji}</text></g>`;
+  let out = '';
+  if (w.hasShipyard) out += badge(-r * 0.92, '🚀', '#7fb4ff');
+  if (w.hasProShop) out += badge(w.hasShipyard ? r * 0.92 : -r * 0.92, '🛒', '#7fe0a0');
+  return out;
+}
+
 /** One tappable destination + label. The body EMITS its own glow so it blends into the star field — no
  *  hard tier ring or dark halo bubble. Tier is a small luminous BEACON dot top-left; a record ★ sits
  *  top-right; the name floats above. Diffuse bodies (galaxy/nebula/…) draw larger via the signature. */
@@ -1208,6 +1227,7 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
       ${celestialBody(w, r, look, sig)}
       ${tierDot}
       ${record}
+      ${serviceBadges(w, r)}
       <text x="0" y="${-r - 8}" font-size="13" text-anchor="middle" fill="#e6ecf5" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">${w.name}</text>
       ${best}
     </g>`;

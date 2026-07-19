@@ -81,7 +81,7 @@ import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } fr
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
 import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed, tourShipId } from './app/starTourScreens';
-import { shipWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
+import { tourWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
 import { storyShopScreen } from './app/storyShopScreens';
@@ -1850,7 +1850,7 @@ function fireStarTourWeapon(): void {
     haptic(HAPTICS.bad);
     return;
   }
-  const w = shipWeaponFor(tourShipId());
+  const w = tourWeaponFor(tourShipId(), state.story?.ownedShipUpgradeIds);
   const sx = v.shipX ?? SPACEPORT_POS.x;
   const sy = v.shipY ?? SPACEPORT_POS.y;
   const hRad = (v.heading * Math.PI) / 180;

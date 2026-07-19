@@ -89,6 +89,36 @@ export function shipWeaponFor(shipId: string | undefined): Weapon {
   return look ? WEAPON_BY_KIND[look.kind] : DEFAULT_WEAPON;
 }
 
+/**
+ * GS-star-tour-weapons-equipped: the Weapon fired by each ownable ship-weapon UPGRADE
+ * (`STORY_SHIP_UPGRADES`, category `weapon`). The upgrade variant ids (`scatter`/`railgun`/`nova`) already
+ * name `WeaponStyle`s, so each reuses the matching hull gun's config with the upgrade's own short label —
+ * the FIRE button then fires what you actually BOUGHT, not the ship hull's cosmetic default gun.
+ */
+const WEAPON_BY_UPGRADE: Record<string, Weapon> = {
+  'upg:weapon:scatter': { ...WEAPON_BY_KIND.wagon, name: 'SCATTER' },
+  'upg:weapon:railgun': { ...WEAPON_BY_KIND.racer, name: 'RAILGUN' },
+  'upg:weapon:nova': { ...WEAPON_BY_KIND.infinity, name: 'NOVA' },
+};
+
+/** Owned weapon upgrades from strongest to weakest — the FIRE button fires your best (nova › railgun › scatter). */
+const UPGRADE_WEAPON_PRIORITY: readonly string[] = ['upg:weapon:nova', 'upg:weapon:railgun', 'upg:weapon:scatter'];
+
+/**
+ * The weapon the star-map FIRE button should fire. In Story Tour the player buys real ship-weapon upgrades
+ * (`ownedUpgradeIds` from `StoryState.ownedShipUpgradeIds`), so fire the BEST owned one — the equipped
+ * weapon. With no owned weapon upgrades (Star Tour records-chase, or an unarmed campaign ship) it falls back
+ * to the ship hull's default gun, byte-identical to the old `shipWeaponFor(shipId)` behaviour.
+ */
+export function tourWeaponFor(shipId: string | undefined, ownedUpgradeIds?: readonly string[]): Weapon {
+  if (ownedUpgradeIds) {
+    for (const id of UPGRADE_WEAPON_PRIORITY) {
+      if (ownedUpgradeIds.includes(id)) return WEAPON_BY_UPGRADE[id]!;
+    }
+  }
+  return shipWeaponFor(shipId);
+}
+
 // ── projectile markup (authored facing +x = forward) ───────────────────────────────────────────────────
 // Each returns the INNER SVG of a shot `<g>`; the app wraps it in a per-frame `translate+rotate` transform
 // (identical to the ship group), so a projectile flies along the ship's heading. SMIL animates pulse/flicker

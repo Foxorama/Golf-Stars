@@ -24,7 +24,7 @@ import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
 import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
-import { storyWorldShoppable } from '../sim/rpg/storyShop';
+import { storyWorldShoppable, worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { ownedCategoryCount } from '../sim/rpg/storyShipUpgrades';
 import { worldCaddy, storyCaddyHired, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
@@ -37,7 +37,7 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
 import { hudChromeFor } from '../render/hudChrome';
 import { fuelGaugeHTML } from '../render/fuel';
-import { shipWeaponFor, weaponReticleSVG } from '../render/shipWeapons';
+import { tourWeaponFor, weaponReticleSVG } from '../render/shipWeapons';
 
 /** The star-map fuel tank (GS-star-tour-fuel): flying burns fuel by DISTANCE travelled; visiting any
  *  station (a world / Earth / the spaceport) tops it back to full; draining it in deep space calls the
@@ -228,6 +228,10 @@ export function starTourWorlds(): StarTourWorld[] {
         themeId: c.themeId,
         hasRecord: !!best,
         bestToPar: best?.toPar,
+        // GS-star-map-services: mark where the player can outfit — the 5 ship-vendor SHIPYARD worlds
+        // (🚀 buy ships/weapons — the key differentiator) and any world with a PRO SHOP (🛒 clubs/gear).
+        hasShipyard: worldIsShipVendor(w.courseId),
+        hasProShop: worldHasShop(w.courseId),
       }];
     });
   }
@@ -309,7 +313,7 @@ function stHud(): string {
   const fast = starTourView.speed === 'fast';
   // The dashboard weapon (GS-star-tour-weapons): a thematically-matched gun for the flown ship, fired from
   // the console. A couple of charges, refilled at any fuel stop. Icon + label tint to the weapon's colours.
-  const weapon = shipWeaponFor(shipId);
+  const weapon = tourWeaponFor(shipId, state.story?.ownedShipUpgradeIds);
   const empty = starTourView.ammo <= 0;
 
   return `
