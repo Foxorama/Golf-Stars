@@ -265,6 +265,17 @@ describe('story-state model (GS-story-save)', () => {
       expect(migrateStory({ alignment: 'herald' }).alignment).toBe('herald');
       expect(migrateStory({ alignment: 'nonsense' }).alignment).toBeUndefined();
     });
+
+    it('migrateStory backfills qualifierResults and keeps only well-formed entries (GS-story-qualifiers)', () => {
+      expect(migrateStory({}).qualifierResults).toEqual({});
+      const kept = migrateStory({
+        qualifierResults: { 'verdant2-18': { place: 3, field: 16 }, bad: { place: 'x' }, none: 5, 'no-field': { place: 2 } },
+      });
+      expect(kept.qualifierResults['verdant2-18']).toEqual({ place: 3, field: 16 });
+      expect(kept.qualifierResults['no-field']).toEqual({ place: 2, field: 0 }); // field defaults when missing
+      expect(kept.qualifierResults.bad).toBeUndefined(); // non-numeric place dropped
+      expect(kept.qualifierResults.none).toBeUndefined(); // non-object dropped
+    });
   });
 });
 

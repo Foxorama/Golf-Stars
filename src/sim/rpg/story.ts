@@ -23,7 +23,7 @@ import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 3;
+export const STORY_VERSION = 4;
 
 /** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
  *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
@@ -234,6 +234,11 @@ export interface StoryState {
   activeQuestId?: string;
   /** GS-story-quests: ally side quests already completed (their rewards granted). */
   completedQuestIds: string[];
+
+  /** GS-story-qualifiers: the player's BEST finish (place + field size) in each qualifying event, keyed by
+   *  the event's world/course id. Qualifying (top-N) in two of a chapter's events unlocks its Galaxy
+   *  Tournament. Empty = nothing qualified yet. */
+  qualifierResults: Record<string, { place: number; field: number }>;
 }
 
 /** A fresh campaign: the chosen golfer, the green bag, the station wagon, an empty purse, chapter 0. */
@@ -258,6 +263,7 @@ export function defaultStoryState(characterId: string = DEFAULT_CHARACTER_ID): S
     seenStoryBeats: {},
     completed: false,
     completedQuestIds: [],
+    qualifierResults: {},
   };
 }
 
@@ -295,6 +301,7 @@ export function migrateStory(raw: unknown): StoryState {
     ...(s.alignment === 'warden' || s.alignment === 'herald' ? { alignment: s.alignment } : {}),
     ...(typeof s.activeQuestId === 'string' ? { activeQuestId: s.activeQuestId } : {}),
     completedQuestIds: strList(s.completedQuestIds),
+    qualifierResults: qualifierMap(s.qualifierResults),
   };
 }
 
@@ -520,6 +527,21 @@ function gearMap(v: unknown): Partial<Record<GearSlot, string>> {
     for (const slot of GEAR_SLOTS) {
       const id = (v as Record<string, unknown>)[slot];
       if (typeof id === 'string') out[slot] = id;
+    }
+  }
+  return out;
+}
+function qualifierMap(v: unknown): Record<string, { place: number; field: number }> {
+  const out: Record<string, { place: number; field: number }> = {};
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(v as object)) {
+      const r = (v as Record<string, unknown>)[k];
+      if (r && typeof r === 'object') {
+        const o = r as { place?: unknown; field?: unknown };
+        if (typeof o.place === 'number' && Number.isFinite(o.place)) {
+          out[k] = { place: Math.max(1, Math.round(o.place)), field: typeof o.field === 'number' ? Math.max(1, Math.round(o.field)) : 0 };
+        }
+      }
     }
   }
   return out;

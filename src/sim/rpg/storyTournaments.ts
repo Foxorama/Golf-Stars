@@ -21,10 +21,12 @@ import {
   STORY_WORLDS,
   STORY_CHAPTER_COUNT,
   worldCleared,
+  storyWorldById,
   type StoryState,
   type StoryWorld,
   type StoryAlignment,
 } from './story';
+import { qualifierEventsForChapter, qualifiedCount, QUALIFY_EVENTS_NEEDED } from './storyQualifiers';
 
 /** A chapter's Galaxy Tournament (content-as-data). */
 export interface StoryTournament {
@@ -42,7 +44,9 @@ export interface StoryTournament {
   rivalName: string;
   /** How sharply the rival plays (per-hole stroke edge; scales up the deeper the chapter). */
   rivalEdge: number;
-  /** Clear this many of the chapter's worlds before the tournament opens. */
+  /** LEGACY (GS-story-qualifiers): the old "clear this many worlds" gate. The tournament now opens after
+   *  `QUALIFY_EVENTS_NEEDED` top-N qualifying-event finishes (`chapterQualifiersMet`); kept for save/row
+   *  shape stability but no longer the gate. */
   unlockAfterClears: number;
   /** The trophy id awarded on a win (a "Sigil of the Game"). */
   sigilId: string;
@@ -241,6 +245,28 @@ export function worldsClearedInChapter(story: StoryState, chapter: number): numb
   return chapterWorlds(chapter).filter((w) => worldCleared(story, w.courseId)).length;
 }
 
+/**
+ * GS-story-qualifiers: a chapter's QUALIFYING EVENTS — its worlds MINUS the Sigil venue (which is played as
+ * the major). The venue depends on the chosen path, so this resolves it via `tournamentForChapter`. Always
+ * two events (a chapter has three worlds).
+ */
+export function chapterQualifierEvents(chapter: number, alignment?: StoryAlignment): string[] {
+  return qualifierEventsForChapter(chapter, tournamentForChapter(chapter, alignment)?.venueId);
+}
+
+/** How many of THIS chapter's qualifying events the player has qualified in (top-N finish). */
+export function chapterQualifiersMet(story: StoryState, chapter: number): number {
+  return qualifiedCount(story, chapterQualifierEvents(chapter, story.alignment));
+}
+
+/** Is this world a QUALIFYING EVENT for the player's path (a chapter world that isn't its Sigil venue)?
+ *  Uses the world's OWN chapter, so it's stable regardless of the player's current chapter. */
+export function isStoryQualifier(courseId: string, alignment?: StoryAlignment): boolean {
+  const w = storyWorldById(courseId);
+  if (!w) return false;
+  return courseId !== tournamentForChapter(w.unlockChapter, alignment)?.venueId;
+}
+
 /** Has this tournament already been won (its Sigil banked)? */
 export function tournamentWon(story: StoryState, t: StoryTournament): boolean {
   return story.trophyIds.includes(t.sigilId);
@@ -251,7 +277,8 @@ export function tournamentWon(story: StoryState, t: StoryTournament): boolean {
 export function currentTournament(story: StoryState): StoryTournament | undefined {
   const t = tournamentForChapter(story.chapter, story.alignment);
   if (!t || tournamentWon(story, t)) return undefined;
-  return worldsClearedInChapter(story, story.chapter) >= t.unlockAfterClears ? t : undefined;
+  // GS-story-qualifiers: the gate is now two QUALIFYING-EVENT top-N finishes (not just clearing two worlds).
+  return chapterQualifiersMet(story, story.chapter) >= QUALIFY_EVENTS_NEEDED ? t : undefined;
 }
 
 /** Is a tournament ready to enter from the clubhouse? */

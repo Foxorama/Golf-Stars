@@ -48,7 +48,8 @@ import {
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
-import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents } from '../sim/rpg/storyTournaments';
+import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
@@ -386,7 +387,37 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   );
   // GS-story-ships: a hole-in-one on any Story round earns the secret Comet Rider (the ace ship).
   const aced = played.some((p) => p.record.strokes === 1);
-  const story = aced ? grantStoryAceShip(cleared) : cleared;
+  let story = aced ? grantStoryAceShip(cleared) : cleared;
+
+  // GS-story-qualifiers: a non-prologue, non-quest chapter world that ISN'T the Sigil venue is a QUALIFYING
+  // EVENT — play it against a field of competitors; a top-N finish qualifies, and two qualified events unlock
+  // the chapter's Galaxy Tournament. Records the best finish; the recap shows the board + progress.
+  let qualifier: NonNullable<UiState['lastStoryRound']>['qualifier'];
+  if (!run.storyQuest && isStoryQualifier(courseId, base.alignment)) {
+    const chapter = storyWorldChapter(courseId);
+    const field = qualifierField(courseId, totals.totalPar, chapter);
+    const place = qualifierPlacement(field, totals.gross);
+    const fieldSize = field.length + 1;
+    const need = qualifyTop(chapter);
+    story = recordQualifier(story, courseId, place, fieldSize);
+    const qualifiedNow = qualifiedCount(story, chapterQualifierEvents(chapter, base.alignment));
+    const playerName = getCharacter(base.characterId)?.shortName ?? 'You';
+    const board = [
+      ...field.map((g) => ({ name: g.name, gross: g.gross, kind: 'ghost' as const })),
+      { name: playerName, gross: totals.gross, kind: 'player' as const },
+    ].sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
+    qualifier = {
+      chapter,
+      place,
+      fieldSize,
+      need,
+      qualified: place <= need,
+      qualifiedCount: qualifiedNow,
+      neededCount: QUALIFY_EVENTS_NEEDED,
+      leaderboard: board,
+    };
+  }
+
   return {
     ...state,
     run: { ...run, status: 'ended', endedReason: 'banked' },
@@ -408,6 +439,7 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
       wasPrologue,
       // GS-story-quests: carry the ally quest id so the recap can offer the reward.
       ...(run.storyQuest ? { questId: run.storyQuest } : {}),
+      ...(qualifier ? { qualifier } : {}),
     },
   };
 }

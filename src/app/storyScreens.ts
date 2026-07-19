@@ -16,7 +16,7 @@ import { shipById } from '../sim/rpg/ships';
 import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
 import { spaceportSceneHTML } from '../render/storySpaceport';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
-import { currentTournament } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked } from '../sim/rpg/storyFinale';
 import { worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
@@ -340,6 +340,54 @@ function recapCaddyHTML(story: StoryState | undefined, courseId: string): string
  * prologue — the "you won the World Tour" beat. The Mothership landing + the Parrot's recruitment + the
  * story intro cinematic land in the next chunk, growing out of this screen.
  */
+/** Ordinal suffix for a finishing place (1st, 2nd, 3rd, 11th…). */
+function ordinal(n: number): string {
+  const v = n % 100;
+  const s = v >= 11 && v <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+  return `${n}${s}`;
+}
+
+/**
+ * GS-story-qualifiers: the QUALIFYING-EVENT recap — a leaderboard of the field with the top-N cut line and
+ * your row highlighted, a qualified/not verdict, and the running "n of 2 events" progress toward the
+ * chapter's Galaxy Tournament. Inline styles only (no new global class — CLAUDE.md).
+ */
+function qualifierRecapHTML(q: NonNullable<NonNullable<typeof state.lastStoryRound>>['qualifier']): string {
+  if (!q) return '';
+  const t = tournamentForChapter(q.chapter, state.story?.alignment);
+  const rows = q.leaderboard
+    .map((g, i) => {
+      const pos = i + 1;
+      const you = g.kind === 'player';
+      const cut = pos === q.need && q.leaderboard.length > q.need; // draw the qualifying cut under the N-th row
+      const rowBg = you ? (q.qualified ? 'linear-gradient(90deg,#12251a,#0d1a13)' : 'linear-gradient(90deg,#2a1618,#1a0f10)') : 'transparent';
+      const nameCol = you ? (q.qualified ? '#9dffce' : '#ffb0b0') : '#c7d2e2';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:${rowBg};${you ? 'font-weight:800;' : ''}border-radius:6px;">
+          <span style="width:24px;text-align:right;color:#7c8aa0;font-variant-numeric:tabular-nums;">${pos}</span>
+          <span style="flex:1 1 auto;min-width:0;color:${nameCol};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${you ? '🏌 ' : ''}${g.name}</span>
+          <span style="color:${nameCol};font-variant-numeric:tabular-nums;">${g.gross}</span>
+        </div>${cut ? `<div style="display:flex;align-items:center;gap:8px;margin:2px 0;"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#3a7a52,transparent);"></div><span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7fe0a0;">Top ${q.need} qualify</span><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#3a7a52,transparent);"></div></div>` : ''}`;
+    })
+    .join('');
+  const met = q.qualifiedCount >= q.neededCount;
+  const remaining = Math.max(0, q.neededCount - q.qualifiedCount);
+  const progress = met
+    ? `✅ ${q.qualifiedCount} / ${q.neededCount} events qualified — <b style="color:#f0c874;">${t?.name ?? 'the tournament'}</b> is open on the star chart!`
+    : `${q.qualifiedCount} / ${q.neededCount} events qualified — ${remaining} more top-${q.need} finish${remaining === 1 ? '' : 'es'} to earn a start in <b>${t?.name ?? 'the major'}</b>.`;
+  return `
+    <div style="max-width:460px;margin:12px auto 0;text-align:left;">
+      <div style="background:${q.qualified ? '#0f1f16' : '#1f1113'};border:1px solid ${q.qualified ? '#2f6a44' : '#6a2f34'};border-radius:12px;padding:12px 14px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:${q.qualified ? '#7fe0a0' : '#e69aa0'};">
+          ${q.qualified ? '✓ Qualified' : '✗ Missed the cut'} · finished ${ordinal(q.place)} of ${q.fieldSize}
+        </div>
+        <div style="margin-top:8px;background:#0b0f18;border:1px solid #232b3b;border-radius:8px;overflow:hidden;padding:4px;">
+          ${rows}
+        </div>
+        <div style="margin-top:10px;font-size:12.5px;color:#c6bcd6;line-height:1.45;">${progress}</div>
+      </div>
+    </div>`;
+}
+
 export function storyResultScreen(): string {
   const r = state.lastStoryRound;
   if (!r) {
@@ -354,12 +402,24 @@ export function storyResultScreen(): string {
   const toParStr = r.toPar === 0 ? 'Even par' : r.toPar > 0 ? `+${r.toPar}` : `${r.toPar}`;
   // GS-story-quests: a quest round's recap is the QUEST completion — the ally's parting scene + the reward.
   const quest = r.questId ? questById(r.questId) : undefined;
-  const title = quest ? '🎁 Quest complete!' : r.wasPrologue ? '🏆 Champion!' : '⛳ World cleared';
+  // GS-story-qualifiers: a qualifying-event round headlines its result (qualified / missed the cut).
+  const q = r.qualifier;
+  const title = quest
+    ? '🎁 Quest complete!'
+    : r.wasPrologue
+      ? '🏆 Champion!'
+      : q
+        ? q.qualified
+          ? '🏅 Qualified!'
+          : '⛳ Qualifying event'
+        : '⛳ World cleared';
   const kicker = quest
     ? `${quest.title} — ${questGiverName(quest).split(' ')[0]} keeps their word.`
     : r.wasPrologue
       ? `You've won the final round of the World Tour on Earth — the best golfer on the planet.`
-      : `You played ${courseName} true.`;
+      : q
+        ? `${courseName} · finished ${ordinal(q.place)} of ${q.fieldSize} — top ${q.need} qualifies.`
+        : `You played ${courseName} true.`;
   return `
     <header class="gs-hero gs-storyres">
       <h1 class="gs-hero-title">${title}</h1>
@@ -386,7 +446,9 @@ export function storyResultScreen(): string {
           : r.wasPrologue
             ? `<p><em>As the gallery roars, a shadow falls across the 18th green. Something vast is descending from the sky…</em></p>
              <p style="color:#7fe0a0;">🦜 "Golfer — the Universe needs you. Gather friends and allies, and follow me!"</p>`
-            : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`
+            : q
+              ? qualifierRecapHTML(q)
+              : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`
       }
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:18px auto 0;">
