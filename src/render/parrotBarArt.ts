@@ -10,6 +10,7 @@
  */
 
 import { prognosticParrotPortraitSVG, carrionCrowPortraitSVG } from './loreArt';
+import { storyBarName } from '../sim/rpg/story';
 
 /** A lore bust made embeddable: swap the outer `width="100%"` for an explicit 320×340 nested viewport and
  *  drop the block style, so it renders 1:1 inside a positioned `<g transform>`. */
@@ -27,6 +28,7 @@ export function parrotBarSceneSVG(herald = false): string {
   const bust = embeddableBust(herald ? carrionCrowPortraitSVG() : prognosticParrotPortraitSVG());
   const signCol = herald ? '#b060c0' : '#7fe0a0';
   const signInk = herald ? '#ecd8f4' : '#d6ffe6';
+  const barName = storyBarName(herald);
   // A glowing bottle on the back-bar shelf: body + a soft emissive halo + a highlight.
   const bottle = (x: number, col: string, h = 46) => `
     <g transform="translate(${x} ${226 - h})">
@@ -37,7 +39,7 @@ export function parrotBarSceneSVG(herald = false): string {
       <rect x="1.5" y="${h - 18}" width="11" height="10" rx="1.5" fill="#fff" opacity="0.14"/>
     </g>`;
 
-  return `<svg viewBox="0 0 720 440" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Crow's Nest — ${herald ? 'the Crow' : "the Parrot"}'s bar" style="display:block;">
+  return `<svg viewBox="0 0 720 440" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${barName} — ${herald ? 'the Crow' : "the Parrot"}'s bar" style="display:block;">
   <defs>
     <linearGradient id="gs-pbar-wall" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#241a12"/>
@@ -113,8 +115,8 @@ export function parrotBarSceneSVG(herald = false): string {
     </ellipse>
     <rect x="392" y="38" width="216" height="42" rx="9" fill="#0d1512" stroke="#274a38" stroke-width="1.6"/>
     <g font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="800">
-      <text x="500" y="67" text-anchor="middle" font-size="24" fill="none" stroke="${signCol}" stroke-width="4" stroke-linejoin="round" opacity="0.4">The Crow's Nest</text>
-      <text x="500" y="67" text-anchor="middle" font-size="24" fill="${signInk}">The Crow's Nest
+      <text x="500" y="67" text-anchor="middle" font-size="${barName.length > 15 ? 21 : 24}" fill="none" stroke="${signCol}" stroke-width="4" stroke-linejoin="round" opacity="0.4">${barName}</text>
+      <text x="500" y="67" text-anchor="middle" font-size="${barName.length > 15 ? 21 : 24}" fill="${signInk}">${barName}
         <animate attributeName="opacity" values="1;1;0.7;1;0.9;1" dur="6s" repeatCount="indefinite"/>
       </text>
     </g>

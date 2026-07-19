@@ -301,6 +301,13 @@ export function storyComplete(story: StoryState): boolean {
   return story.completed === true;
 }
 
+/** The Story-Tour bar's name by path (GS-story-bar-name): the Warden bar is the PARROT'S PERCH (the
+ *  Prognostic Parrot tends it); the Herald sanctum bar is THE CROW'S NEST (the Carrion Crow tends it). One
+ *  source so the clubhouse sign, the hotspot, the bar screen + scene all agree. */
+export function storyBarName(herald: boolean): string {
+  return herald ? "The Crow's Nest" : "The Parrot's Perch";
+}
+
 // ── Pure progression helpers (immutable: never mutate `story`, always return a new object) ──────────
 
 /**

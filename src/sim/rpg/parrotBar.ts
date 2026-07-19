@@ -73,7 +73,7 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
     id: 'greet-early',
     kind: 'greeting',
     when: (c) => !c.completed && c.chapter <= 2,
-    text: "Welcome back to the Crow's Nest, champion. Best little bar this side of the Bifröst. Sit — the Tour can wait while your captain talks.",
+    text: "Welcome back to the Parrot's Perch, champion. Best little bar this side of the Bifröst. Sit — the Tour can wait while your captain talks.",
   },
   {
     id: 'greet-mid',

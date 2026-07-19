@@ -281,7 +281,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
     { screen: 'storychoice', sel: '.gs-choice-grid', text: 'The Choice', label: 'the Story alignment fork (The Choice)' },
     { screen: 'storyinterlude', sel: '.gs-inter-dialogue', text: 'The Severing', label: 'the Story emotional interlude' },
-    { screen: 'storybar', sel: '.gs-pbar__scene', text: "The Crow's Nest", label: 'the Story Parrot Bar (the Crow\'s Nest)' },
+    { screen: 'storybar', sel: '.gs-pbar__scene', text: "The Parrot's Perch", label: "the Story Parrot Bar (the Parrot's Perch)" },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
     it.runIf(chromePath)(

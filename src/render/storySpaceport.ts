@@ -22,7 +22,7 @@ import { prognosticParrotPortraitSVG, carrionCrowPortraitSVG } from './loreArt';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { crewRoster, allyName } from '../sim/rpg/storyAllies';
 import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
-import type { StoryState } from '../sim/rpg/story';
+import { storyBarName, type StoryState } from '../sim/rpg/story';
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
  *  idiom) so the bird behind the bar is unmistakably the same character. */
@@ -59,6 +59,10 @@ function ouroborosSigil(): string {
  * Right: the bar with the Parrot. A warm-lit deck across the foreground.
  */
 function spaceportArt(shipId: string, herald: boolean): string {
+  // GS-story-herald-sanctum: on the dark path the room is not a tinted Mothership bar — it's the Coil's
+  // ritual SANCTUM (obsidian walls, serpent pillars, green-flame braziers, a shrine to the World-Eater, a
+  // ritual circle on the floor). A wholly separate backdrop; the Warden art below stays byte-identical.
+  if (herald) return coilSanctumArt(shipId);
   // On the dark path the Crow tends the bar in the Parrot's place (canon: the Carrion Prophet, his mirror).
   const bust = herald ? embeddableCrowBust() : embeddableParrotBust();
   const bottle = (x: number, col: string, h = 26) =>
@@ -171,7 +175,7 @@ function spaceportArt(shipId: string, herald: boolean): string {
       <!-- neon sign -->
       <ellipse cx="326" cy="46" rx="70" ry="15" fill="#7fe0a0" opacity="0.12"/>
       <rect x="266" y="34" width="120" height="26" rx="6" fill="#0d1512" stroke="#274a38" stroke-width="1.4"/>
-      <text x="326" y="52" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="800" font-size="14" fill="#d6ffe6">The Crow's Nest</text>
+      <text x="326" y="52" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="800" font-size="13" fill="#d6ffe6">The Parrot's Perch</text>
       <!-- back-bar shelf + glowing bottles -->
       <rect x="258" y="70" width="136" height="52" rx="3" fill="#241a12"/>
       <rect x="258" y="70" width="136" height="52" rx="3" fill="none" stroke="#3f2b18" stroke-width="1.6"/>
@@ -192,6 +196,219 @@ function spaceportArt(shipId: string, herald: boolean): string {
     <line x1="0" y1="222" x2="400" y2="222" stroke="#0c111c" stroke-width="3"/>
     ${[40, 110, 180, 250, 320, 390].map((x) => `<line x1="${x}" y1="222" x2="${x - 26}" y2="300" stroke="#00000033" stroke-width="1.3"/>`).join('')}
     <ellipse cx="200" cy="250" rx="150" ry="15" fill="#ffd98a" opacity="0.05"/>
+  </svg>`;
+}
+
+/** The Coil's coiled-serpent-in-a-ring SIGIL, `r` px, centred at (0,0). Reused on banners, the back wall,
+ *  and the floor ritual circle. `a` scales opacity. */
+function coilSigil(r: number, col = '#7fe0a0', a = 1): string {
+  return `<g opacity="${a}">
+    <circle r="${r}" fill="none" stroke="${col}" stroke-width="${r * 0.09}" opacity="0.8"/>
+    <path d="M0,${-r * 0.62} A ${r * 0.62} ${r * 0.62} 0 1 1 ${-r * 0.44},${r * 0.44}"
+      fill="none" stroke="${col}" stroke-width="${r * 0.13}" stroke-linecap="round"/>
+    <circle cx="${-r * 0.44}" cy="${r * 0.44}" r="${r * 0.11}" fill="${col}"/>
+    <circle cx="0" cy="${-r * 0.62}" r="${r * 0.16}" fill="${col}"/>
+    <circle cx="${r * 0.05}" cy="${-r * 0.62}" r="${r * 0.07}" fill="#0a0410"/>
+  </g>`;
+}
+
+/** A green ritual FLAME, `s` px tall, flickering (candle / brazier). */
+function greenFlame(x: number, y: number, s: number, seed = 0): string {
+  return `<g transform="translate(${x} ${y})">
+    <ellipse cx="0" cy="${s * 0.2}" rx="${s * 0.9}" ry="${s * 0.4}" fill="#7fe0a0" opacity="0.16">
+      <animate attributeName="opacity" values="0.1;0.24;0.1" dur="${2 + (seed % 3) * 0.4}s" repeatCount="indefinite"/></ellipse>
+    <path d="M0,${-s} C ${s * 0.5},${-s * 0.4} ${s * 0.35},${s * 0.2} 0,${s * 0.2} C ${-s * 0.35},${s * 0.2} ${-s * 0.5},${-s * 0.4} 0,${-s} Z" fill="#4fe08a">
+      <animate attributeName="d" dur="${0.7 + (seed % 4) * 0.13}s" repeatCount="indefinite"
+        values="M0,${-s} C ${s * 0.5},${-s * 0.4} ${s * 0.35},${s * 0.2} 0,${s * 0.2} C ${-s * 0.35},${s * 0.2} ${-s * 0.5},${-s * 0.4} 0,${-s} Z;M0,${-s * 0.82} C ${s * 0.42},${-s * 0.4} ${s * 0.3},${s * 0.2} 0,${s * 0.2} C ${-s * 0.3},${s * 0.2} ${-s * 0.46},${-s * 0.3} 0,${-s * 0.82} Z;M0,${-s} C ${s * 0.5},${-s * 0.4} ${s * 0.35},${s * 0.2} 0,${s * 0.2} C ${-s * 0.35},${s * 0.2} ${-s * 0.5},${-s * 0.4} 0,${-s} Z"/></path>
+    <path d="M0,${-s * 0.6} C ${s * 0.24},${-s * 0.28} ${s * 0.18},${s * 0.12} 0,${s * 0.12} C ${-s * 0.18},${s * 0.12} ${-s * 0.24},${-s * 0.28} 0,${-s * 0.6} Z" fill="#d6ffe6"/>
+  </g>`;
+}
+
+/**
+ * The COIL SANCTUM (GS-story-herald-sanctum) — the Herald-path clubhouse backdrop. Same zone geometry as the
+ * Mothership (so the hotspots + figures line up: hangar upper-left, reliquary lower-left, shrine centre, bar
+ * right, deck foreground) but dressed as a cult's ritual lair: obsidian walls carved with a great ouroboros,
+ * serpent pillars flanking a shrine to the World-Eater, green-flame braziers, cult banners, and a glowing
+ * ritual circle inlaid in the stone floor. Hand-placed, byte-stable; own `cs-*` gradient ids.
+ */
+function coilSanctumArt(shipId: string): string {
+  const bust = embeddableCrowBust();
+  const jar = (x: number, col: string, h = 24): string =>
+    `<g transform="translate(${x} ${116 - h})">
+       <rect x="0" y="0" width="9" height="${h}" rx="3" fill="${col}" opacity="0.5"/>
+       <rect x="0" y="0" width="9" height="${h}" rx="3" fill="none" stroke="#3a5a48" stroke-width="0.8"/>
+       <rect x="1.5" y="-3" width="6" height="4" rx="1" fill="#2a2018"/>
+       <circle cx="4.5" cy="${h * 0.55}" r="2.2" fill="#d6ffe6" opacity="0.7"/>
+     </g>`;
+  return `<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" width="100%" height="100%"
+    style="position:absolute;inset:0;">
+    <defs>
+      <linearGradient id="cs-wall" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1c0e2c"/><stop offset="60%" stop-color="#100720"/><stop offset="100%" stop-color="#05030a"/>
+      </linearGradient>
+      <linearGradient id="cs-floor" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#160c22"/><stop offset="100%" stop-color="#070410"/>
+      </linearGradient>
+      <radialGradient id="cs-ceil" cx="50%" cy="0%" r="95%">
+        <stop offset="0%" stop-color="#7fe0a0" stop-opacity="0.22"/><stop offset="100%" stop-color="#7fe0a0" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="cs-pillar" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#0a0614"/><stop offset="45%" stop-color="#2a1740"/><stop offset="100%" stop-color="#0a0614"/>
+      </linearGradient>
+      <radialGradient id="cs-sclera" cx="42%" cy="40%" r="72%">
+        <stop offset="0%" stop-color="#eafff0"/><stop offset="40%" stop-color="#b6e6a0"/>
+        <stop offset="78%" stop-color="#6a9a4a"/><stop offset="100%" stop-color="#2a3618"/>
+      </radialGradient>
+      <radialGradient id="cs-iris" cx="50%" cy="50%" r="55%">
+        <stop offset="0%" stop-color="#8fffbe"/><stop offset="55%" stop-color="#2fae6a"/>
+        <stop offset="88%" stop-color="#0c3a22"/><stop offset="100%" stop-color="#041a10"/>
+      </radialGradient>
+      <linearGradient id="cs-stone" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2a1a3a"/><stop offset="100%" stop-color="#140a20"/>
+      </linearGradient>
+      <clipPath id="cs-port"><rect x="120" y="30" width="120" height="98" rx="7"/></clipPath>
+      <clipPath id="cs-hangar"><rect x="8" y="42" width="92" height="96" rx="5"/></clipPath>
+    </defs>
+
+    <!-- obsidian back wall + carved vertical grooves -->
+    <rect width="400" height="228" fill="url(#cs-wall)"/>
+    ${[60, 140, 260, 340].map((x) => `<rect x="${x}" y="0" width="6" height="228" fill="#00000040"/><rect x="${x + 6}" y="0" width="1.5" height="228" fill="#3a2456" opacity="0.5"/>`).join('')}
+    <!-- a great ouroboros etched into the wall behind the shrine -->
+    <g transform="translate(180 96)">${coilSigil(84, '#5a3f7a', 0.4)}</g>
+    <ellipse cx="200" cy="120" rx="180" ry="110" fill="url(#cs-ceil)"/>
+
+    <!-- hanging cult banners -->
+    ${[
+      { x: 118, y: 8 },
+      { x: 274, y: 8 },
+    ]
+      .map(
+        (b) => `<g transform="translate(${b.x} ${b.y})">
+        <path d="M0,0 L26,0 L26,40 L13,34 L0,40 Z" fill="#1a0e2a" stroke="#4a2f6a" stroke-width="1"/>
+        <g transform="translate(13 18)">${coilSigil(8, '#7fe0a0', 0.85)}</g></g>`,
+      )
+      .join('')}
+
+    <!-- SERPENT PILLARS flanking the shrine -->
+    ${[104, 250].map(
+      (x) => `<g>
+      <rect x="${x}" y="20" width="18" height="208" fill="url(#cs-pillar)"/>
+      <rect x="${x}" y="20" width="18" height="6" fill="#3a2456"/>
+      <rect x="${x - 2}" y="18" width="22" height="6" rx="2" fill="#2a1740"/>
+      <path d="M${x + 9},30 q10,20 -3,40 q-13,20 3,40 q13,20 -3,40 q-10,18 3,36" fill="none" stroke="#4fe08a" stroke-width="2.4" opacity="0.55"/>
+      <circle cx="${x + 9}" cy="30" r="3.4" fill="#4fe08a" opacity="0.8"/>
+      <circle cx="${x + 8}" cy="29.5" r="1.1" fill="#0a0410"/>
+      ${greenFlame(x + 9, 16, 7, x)}</g>`,
+    ).join('')}
+
+    <!-- ══ HANGAR BAY (upper-left) — a dark launch maw ══ -->
+    <g>
+      <rect x="4" y="38" width="100" height="104" rx="7" fill="#07040e" stroke="#3a2456" stroke-width="3"/>
+      <g clip-path="url(#cs-hangar)">
+        <rect x="8" y="42" width="92" height="96" fill="#08040f"/>
+        <g fill="#9fe0c0"><circle cx="24" cy="60" r="1"/><circle cx="70" cy="54" r="1.2"/><circle cx="52" cy="78" r="0.9"/><circle cx="86" cy="88" r="1"/></g>
+        <ellipse cx="54" cy="122" rx="42" ry="9" fill="#7fe0a0" opacity="0.22"/>
+        <ellipse cx="54" cy="122" rx="30" ry="6" fill="none" stroke="#7fe0a0" stroke-width="1" opacity="0.6" stroke-dasharray="4 4"/>
+        ${shipSVG(shipId, 54, 108, 1.35)}
+      </g>
+      <!-- fanged bay frame -->
+      <path d="M4,38 L104,38 L98,48 L92,40 L84,50 L76,40 L68,50 L60,40 L52,50 L44,40 L36,50 L28,40 L20,50 L12,40 L4,50 Z" fill="#0a0614" opacity="0.85"/>
+    </g>
+
+    <!-- ══ RELIQUARY (lower-left) — stone niches with relics, not lockers ══ -->
+    <g>
+      <rect x="8" y="150" width="92" height="72" rx="4" fill="url(#cs-stone)" stroke="#3a2456" stroke-width="2"/>
+      ${[8, 39, 70].map((lx, i) => `<g>
+        <rect x="${lx + 3}" y="154" width="26" height="64" rx="12" fill="#0c0618" stroke="#4a2f6a" stroke-width="1.4"/>
+        <ellipse cx="${lx + 16}" cy="212" rx="11" ry="3" fill="#7fe0a0" opacity="0.12"/>
+        ${
+          i === 0
+            ? `<g transform="translate(${lx + 16} 190)"><circle r="7" fill="#d8d2c0"/><circle cx="-2.5" cy="-1" r="1.6" fill="#0a0410"/><circle cx="2.5" cy="-1" r="1.6" fill="#0a0410"/><rect x="-4" y="4" width="8" height="3" fill="#0a0410"/></g>` // a skull
+            : i === 1
+              ? `<g transform="translate(${lx + 16} 188)">${coilSigil(9, '#7fe0a0', 0.9)}</g>` // a coil idol
+              : `<g transform="translate(${lx + 16} 186)"><path d="M-4,16 q-3,-16 4,-24 q7,8 4,24 Z" fill="#3a5a48" opacity="0.7"/><circle cx="0" cy="0" r="2.4" fill="#d6ffe6" opacity="0.7"/></g>` // a specimen
+        }
+      </g>`).join('')}
+      <rect x="8" y="150" width="92" height="6" fill="#3a2456"/>
+    </g>
+
+    <!-- ══ SHRINE TO THE WORLD-EATER (centre) — a great serpent eye in a stone arch ══ -->
+    <g>
+      <path d="M112,132 L112,58 Q112,20 180,20 Q248,20 248,58 L248,132 Z" fill="#0c0618" stroke="#3a2456" stroke-width="4"/>
+      <path d="M118,130 L118,58 Q118,26 180,26 Q242,26 242,58 L242,130 Z" fill="none" stroke="#7a4aa0" stroke-width="1" opacity="0.5"/>
+      <g clip-path="url(#cs-port)">
+        <rect x="120" y="30" width="120" height="98" fill="#0a0416"/>
+        ${ouroborosSigil()}
+      </g>
+      <!-- the serpent eye at the shrine's heart (GS-story-herald-eye: a creepy, sunken, bloodshot,
+           blinking reptilian eye — the World-Eater watching through the shrine) -->
+      <g transform="translate(180 78)">
+        <!-- sunken bony socket + orbital ridge shadow -->
+        <ellipse rx="42" ry="27" fill="#050208"/>
+        <path d="M-40,-6 Q-30,-24 0,-25 Q30,-24 40,-6" fill="none" stroke="#2a1740" stroke-width="4" opacity="0.8"/>
+        <path d="M-38,7 Q-20,22 0,22 Q20,22 38,7" fill="none" stroke="#180c26" stroke-width="5"/>
+        <!-- sickly mottled sclera -->
+        <ellipse rx="33" ry="18.5" fill="url(#cs-sclera)"/>
+        <ellipse cx="10" cy="4" rx="7" ry="4" fill="#7a9a4a" opacity="0.4"/>
+        <ellipse cx="-14" cy="-3" rx="4" ry="3" fill="#5a7a3a" opacity="0.35"/>
+        <!-- bloodshot veins creeping from the corners -->
+        <g stroke="#a83848" stroke-width="0.9" fill="none" opacity="0.75" stroke-linecap="round">
+          <path d="M-33,0 q10,-3 16,-6 q4,-2 5,-5"/><path d="M-33,2 q12,2 18,1"/><path d="M-31,5 q9,4 15,3"/>
+          <path d="M33,0 q-10,-4 -16,-6"/><path d="M33,3 q-12,3 -18,2"/><path d="M31,6 q-9,4 -14,2"/>
+        </g>
+        <!-- iris + vertical slit pupil that dilates (unsettling) -->
+        <ellipse rx="16" ry="16" fill="url(#cs-iris)"/>
+        <ellipse rx="16" ry="16" fill="none" stroke="#0a2a18" stroke-width="1.2"/>
+        <ellipse rx="4.5" ry="15" fill="#020104">
+          <animate attributeName="rx" values="4.5;7;3.5;4.5" dur="7s" repeatCount="indefinite"/>
+          <animate attributeName="ry" values="15;12;15.5;15" dur="7s" repeatCount="indefinite"/>
+        </ellipse>
+        <ellipse rx="1.4" ry="10" fill="#7fe0a0" opacity="0.45"><animate attributeName="ry" values="10;7;10" dur="4s" repeatCount="indefinite"/></ellipse>
+        <!-- cold pinpoint glint -->
+        <circle cx="-6" cy="-7" r="1.6" fill="#eafff0" opacity="0.8"/>
+        <!-- an ichor tear creeping from the lower lid -->
+        <path d="M6,17 q1,10 -1,20 q-2,5 1,9" stroke="#4fe08a" stroke-width="1.6" fill="none" opacity="0.5" stroke-linecap="round">
+          <animate attributeName="opacity" values="0.2;0.6;0.2" dur="5s" repeatCount="indefinite"/></path>
+        <!-- upper + lower LIDS that snap shut in a slow blink -->
+        <ellipse rx="34" ry="19" fill="#0c0618">
+          <animate attributeName="ry" values="0;0;0;0;19;0" keyTimes="0;0.5;0.8;0.9;0.95;1" dur="7s" repeatCount="indefinite"/>
+        </ellipse>
+        <path d="M-40,-6 Q-30,-24 0,-25 Q30,-24 40,-6 Q20,-14 0,-14 Q-20,-14 -40,-6 Z" fill="#0c0618"/>
+      </g>
+      <!-- altar ledge with candles + wax drips -->
+      <rect x="120" y="128" width="120" height="9" fill="#241436"/>
+      <rect x="120" y="128" width="120" height="3" fill="#3a2456"/>
+      ${[134, 150, 210, 226].map((cx, i) => `<rect x="${cx}" y="120" width="4" height="9" fill="#e6dcc4" opacity="0.85"/>${greenFlame(cx + 2, 118, 5, i)}`).join('')}
+      ${[128, 168, 200, 236].map((cx) => `<path d="M${cx},137 q1.5,6 0,9" stroke="#3a2456" stroke-width="1.4" fill="none"/>`).join('')}
+    </g>
+
+    <!-- ══ THE CROW'S NEST (right) — a dark ritual bar ══ -->
+    <g>
+      <ellipse cx="326" cy="46" rx="70" ry="15" fill="#7fe0a0" opacity="0.14"/>
+      <rect x="266" y="34" width="120" height="26" rx="6" fill="#0a0512" stroke="#3a5a48" stroke-width="1.4"/>
+      <text x="326" y="52" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="800" font-size="14" fill="#a6ffcf">The Crow's Nest</text>
+      <!-- shelf of specimen jars -->
+      <rect x="258" y="70" width="136" height="52" rx="3" fill="#120a1e"/>
+      <rect x="258" y="70" width="136" height="52" rx="3" fill="none" stroke="#3a2456" stroke-width="1.6"/>
+      <rect x="262" y="99" width="128" height="3" fill="#2a1a3a"/>
+      ${jar(272, '#7fe0a0', 24)}${jar(288, '#9a6bd0', 20)}${jar(304, '#4fd8c8', 26)}${jar(356, '#c05a8a', 22)}${jar(372, '#6fe0a0', 24)}
+      <g transform="translate(300 78) scale(0.30)">${bust}</g>
+      <!-- obsidian counter -->
+      <rect x="252" y="150" width="146" height="12" rx="4" fill="#241436"/>
+      <rect x="252" y="150" width="146" height="4" rx="2" fill="#3a2456"/>
+      <rect x="256" y="162" width="140" height="30" fill="url(#cs-stone)"/>
+      <g transform="translate(300 150)"><path d="M-6 -14 L6 -14 L4 0 L-4 0 Z" fill="#7fe0a0" opacity="0.85"/><ellipse cx="0" cy="0" rx="5" ry="1.6" fill="#0c0906"/></g>
+    </g>
+
+    <!-- ══ DECK — dark stone flags + a glowing ritual circle ══ -->
+    <rect x="0" y="222" width="400" height="78" fill="url(#cs-floor)"/>
+    <line x1="0" y1="222" x2="400" y2="222" stroke="#050208" stroke-width="3"/>
+    ${[40, 110, 180, 250, 320, 390].map((x) => `<line x1="${x}" y1="222" x2="${x - 26}" y2="300" stroke="#00000040" stroke-width="1.3"/>`).join('')}
+    <g transform="translate(200 264)">
+      <ellipse rx="150" ry="26" fill="#7fe0a0" opacity="0.06"/>
+      ${coilSigil(30, '#7fe0a0', 0.5)}
+      <ellipse rx="46" ry="14" fill="none" stroke="#4fe08a" stroke-width="0.8" opacity="0.4"/>
+    </g>
   </svg>`;
 }
 
@@ -272,7 +489,7 @@ export function spaceportSceneHTML(story: StoryState): string {
       ${hotspot({ type: 'openStoryMap' }, '🗺 Set course', { l: 28, t: 8, w: 34, h: 36 }, 'Set course — the star chart', 'top')}
       ${hotspot({ type: 'openStoryShipyard' }, `🚀 Hangar`, { l: 1, t: 12, w: 25, h: 36 }, `Hangar — fly your fleet (${shipName})`, 'top')}
       ${hotspot({ type: 'openStoryLocker' }, '🎒 Locker', { l: 1, t: 49, w: 25, h: 26 }, 'Locker — build your bag and gear', 'bottom')}
-      ${hotspot({ type: 'openStoryBar' }, "🍺 The Crow's Nest", { l: 63, t: 10, w: 36, h: 40 }, herald ? "The Crow's Nest — talk to the Crow" : "The Crow's Nest — talk to the Parrot", 'top')}
+      ${hotspot({ type: 'openStoryBar' }, `🍺 ${storyBarName(herald)}`, { l: 63, t: 10, w: 36, h: 40 }, `${storyBarName(herald)} — talk to the ${herald ? 'Crow' : 'Parrot'}`, 'top')}
       ${crewStandees}
       ${playerBtn}
     </div>`;
