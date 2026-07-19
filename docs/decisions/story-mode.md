@@ -634,6 +634,23 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `node scripts/storyclub-preview.mjs`. Guarded by `tests/story-figure.test.ts` (every recruitable ally + every
   Coil agent resolves to a figure/look). Establishes the reference-first process in `art-style.md` so visuals
   stop getting revisited 6–7 times.
+- **GS-story-herald-sanctum** — ✅ *shipped* (`render/storySpaceport.ts coilSanctumArt`). The Herald clubhouse
+  was just the Mothership backdrop with a violet tint — not culty. It's now a wholly separate RITUAL SANCTUM
+  backdrop (same zone geometry so the hotspots + figures still line up): obsidian carved walls with a great
+  etched ouroboros, serpent PILLARS with green-flame braziers flanking a SHRINE built around a giant
+  slit-pupil serpent EYE (the "Set course" portal → the World-Eater's gaze), a candle ALTAR, a RELIQUARY
+  (skull / coil idol / specimen) in place of the lockers, specimen JARS behind the Crow's bar, hanging cult
+  BANNERS, and a glowing ritual CIRCLE inlaid in the stone floor. `coilSigil`/`greenFlame` helpers, own
+  `cs-*` gradient ids. Gated to `herald` → the Warden backdrop is byte-identical. The shrine EYE is a
+  deliberately CREEPY reptilian eye (GS-story-herald-eye): a sunken bony socket, sickly mottled sclera,
+  bloodshot veins creeping from the corners, a green iris with a vertical SLIT pupil that dilates, a cold
+  pinpoint glint, an ichor tear, and a slow menacing BLINK (all SMIL-animated). Preview:
+  `node scripts/storyclub-preview.mjs`.
+- **GS-story-bar-name** — ✅ *shipped* (`sim/rpg/story.ts storyBarName`). Both clubhouses were calling the bar
+  "The Crow's Nest". Now the Warden bar is **The Parrot's Perch** (the Prognostic Parrot tends it) and only the
+  Herald sanctum bar is **The Crow's Nest** (the Carrion Crow). One helper `storyBarName(herald)` is the single
+  source, used by the clubhouse neon sign + hotspot (`storySpaceport.ts`), the bar screen title
+  (`storyBarScreens.ts`), the bar scene sign (`parrotBarArt.ts`), and the Parrot's greeting (`parrotBar.ts`).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

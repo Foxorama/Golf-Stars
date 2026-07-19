@@ -10,6 +10,7 @@
 import { state } from './ctx';
 import { parrotBarLineAt, parrotBarLines, type ParrotBarContext } from '../sim/rpg/parrotBar';
 import { parrotBarSceneSVG } from '../render/parrotBarArt';
+import { storyBarName } from '../sim/rpg/story';
 
 /** Build the pure chatter context off the live campaign. */
 function barContext(): ParrotBarContext {
@@ -26,7 +27,7 @@ export function storyBarScreen(): string {
   const story = state.story;
   if (!story) {
     return `
-      <header class="gs-hero"><h1 class="gs-hero-title">🍺 The Crow's Nest</h1></header>
+      <header class="gs-hero"><h1 class="gs-hero-title">🍺 The Parrot's Perch</h1></header>
       <div style="max-width:420px;margin:24px auto 0;">
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'exitStoryBar' })}'>‹ Back</button>
       </div>`;
@@ -95,7 +96,7 @@ export function storyBarScreen(): string {
     </style>
 
     <header class="gs-hero gs-storyhub gs-hero--pbar">
-      <h1 class="gs-hero-title">🍺 The Crow's Nest</h1>
+      <h1 class="gs-hero-title">🍺 ${storyBarName(herald)}</h1>
       <p class="gs-hero-tag">${tagline} · Chapter ${story.chapter}</p>
     </header>
 
