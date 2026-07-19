@@ -48,6 +48,30 @@ focused tested auto-merged PR each:
 - **GS-story-parrot-bar** — ✅ *shipped* (the Parrot BAR interaction): "The Crow's Nest", a cosmetic Mothership hangout off the clubhouse — tap the Prognostic Parrot to cycle campaign-adaptive chatter (a state-appropriate greeting + rotating lore/Coil/path/hint lines gated on chapter/alignment/Sigils/completion). Content-as-data (`parrotBar.ts`) + a bespoke SVG cantina scene (porthole to space, neon sign, bottle shelf, the Parrot behind the bar reusing his lore bust). Transient tap counter, zero sim rng, no save bump.
 - **GS-story-balance** — ✅ *shipped* (the cross-chapter difficulty + economy pass): measured the rival ghost vs fixed to-par reference rounds → the late Sigils were a near-wall (a −6 round won ~13% by Ch5, a mandatory gate) with a Ch2→Ch3 cliff. Recalibrated the rival edges to a smooth ~1-stroke/chapter curve (0.07/0.12/0.18/0.23/0.29) so a grown −6 round wins ~77%→~38% Ch1→Ch5 (winnable-but-earned, growth matters, no cliffs), and added a Sigil-win milestone bonus (`SIGIL_WIN_BONUS` 250, first win only) so the majors fund the escalating spend (5 Sigils ≈ the ~1300cr finale floor). Guarded by `tests/story-balance.test.ts`. **Story Tour is feature-complete** (all chunks shipped).
 
+**GS-story-betrayal — the deep betrayal arc (design in `docs/decisions/story-betrayal-arc.md`)**
+Make the back half almost always DIFFERENT: the other three playable golfers become an aboard-ship CAST you
+partner with, and WHO betrays you is decided by your Sigil 1 & 2 partner picks. The five Sigils become
+distinct FORMATS (Scramble → Best-ball → Stableford → Strokeplay → 2v2 best-ball Matchplay). Reuses
+`match.ts`; content-as-data; Story-save only; determinism/auto≡interactive preserved (new levers no-op by
+default). One focused, tested, auto-merged PR each:
+- **GS-story-cast** — the 3 non-protagonist golfers travel aboard + stand in the clubhouse, tappable like
+  the Parrot; per-character talk adapting to chapter/alignment/partnered/betrayer. Shared `otherGolfers`
+  seam replaces the 3 ad-hoc "roster minus protagonist" computations.
+- **GS-story-team-format** — pure engine: `StoryTournament.format`, reuse `match.ts` best-ball/scramble/
+  matchplay + a multi-pair ghost-field builder (Asgard pattern + best-ball pairing). Tested, no UI yet.
+- **GS-story-partners** — `StoryState` v5 `sigil1Partner`/`sigil2Partner` + lobby partner-picker; wire
+  Sigil 1 (scramble) + Sigil 2 (best-ball) with opposing pairs + a team recap.
+- **GS-story-stableford** — Sigil 3 single Stableford.
+- **GS-story-charquests** — per-character quests unlocked once you partner that golfer; signature reward.
+- **GS-story-betrayer** — pure `storyBetrayal.ts` (betrayer = odd-one-out; finale team comps) +
+  `corruptedGolferLook` costume swap.
+- **GS-story-betrayal-warden** — Warden Ch.4/5 beats + the 2v2 best-ball matchplay finale (You + loyal
+  friend vs Betrayer + Coil champion).
+- **GS-story-betrayal-herald** — Herald Ch.4 beats keyed to your first completed caddy quest (+ whether you
+  still wield its reward club) + the 2v2 finale (You + top Coil champion-not-your-guide vs your two former
+  friends).
+- **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
+
 **GS-story-review — Story Tour polish backlog** (from `reports/story-mode-review-2026-07-18.md`, the
 designer/QA/story-editor pass). The systems all shipped; these close the gaps between the campaign and the
 bible. Story-only surfaces (separate save + gated rows) so none risk Voyage/Unending determinism.
