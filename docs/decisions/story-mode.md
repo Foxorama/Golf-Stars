@@ -657,6 +657,18 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   Herald sanctum bar is **The Crow's Nest** (the Carrion Crow). One helper `storyBarName(herald)` is the single
   source, used by the clubhouse neon sign + hotspot (`storySpaceport.ts`), the bar screen title
   (`storyBarScreens.ts`), the bar scene sign (`parrotBarArt.ts`), and the Parrot's greeting (`parrotBar.ts`).
+- **GS-story-shop-routing** — ✅ *shipped* (`game.ts openStoryShop`). The first-time (world-clear RECAP) Pro
+  Shop set `storyShopReturn: 'story'` and dumped you back at the clubhouse, while the revisit (star-map) shop
+  returned to the map. Both now return to the **star map** (`storyShopReturn: 'starTour'`) — a first-time clear
+  flies you on. Guarded by `story-flow.test.ts`.
+- **GS-story-locker-inspect** — ✅ *shipped* (`storyLockerScreens.ts`). Clubs + gear were tappable-to-inspect
+  in the locker; CADDIES were not. A hired caddy's chip now shows its portrait + is tappable → the same lore
+  overlay as everything else, via a new `StoryCard.kind: 'caddy'` branch in `lockerCard` (name + the shop-item
+  effect `desc` + faction lore) and a caddy branch in `inspectOverlay` (portrait icon + a "Carry my bag"
+  footer). `storyInspectItem` now accepts a hired-caddy id.
+- **GS-story-quest-icon** — ✅ *shipped* (`storySpaceport.ts crewStandee`). A gold ❗ marker bobs over a
+  clubhouse caddy who has an offerable quest right now (`questOfferable`), so you don't have to open each ally
+  to find who's waiting. Pure render (own `.gs-sclub-questmark` class).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
