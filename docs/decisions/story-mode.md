@@ -508,6 +508,16 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   unchanged below. No sim/save/rng touch. Covered by the existing `?screen=storyshop` smoke (the scene mounts
   in the same screen; a throw would trip the crash/bounce guard).
 
+- **GS-story-crew-scene** — ✅ *shipped* (`render/storySpaceport.ts`). Follow-up to GS-story-clubhouse-scene:
+  the recruited crew now physically STAND in the Mothership clubhouse scene, not just a wall row below it.
+  Each hired ally is a feet-anchored, tappable portrait STANDEE on the deck (→ their ally talk card); the
+  ACTIVE caddy stands at your side with a pink ring + a 🎒 plate ("on the bag"), the rest gather along the
+  deck in front of the bar (`CREW_SPOTS`, fixed byte-stable positions that clear the player + door hotspots +
+  the locker label). The old `crewWallHTML` row is dropped (the scene shows them). Reuses `caddyPortraitSVG`
+  + `crewRoster`/`allyName`; pure render, zero rng. Guarded by `tests/story-spaceport.test.ts` (the scene is
+  a pure string builder: four hotspots + player always; one standee per recruited ally, the active one
+  marked) + the `?screen=storyclub` smoke.
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are
