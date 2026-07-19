@@ -553,4 +553,37 @@ describe('build output (real browser)', () => {
     },
     60_000,
   );
+
+  // GS-story-shop-arrival: the first time a world's Pro Shop opens, a short arrival beat plays over it, then
+  // dissolves to reveal the shop. Guard: the beat mounts on first open, the shop is present beneath it, and
+  // the beat clears itself so it never strands the player on the overlay.
+  it.runIf(chromePath)(
+    'the Pro Shop plays a first-arrival beat that then dissolves to reveal the shop',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        await page.goto('file://' + dist + '?screen=storyshop&intro=0&seed=7', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        // The beat is present shortly after mount, over the shop that is already in the DOM beneath it.
+        await page.waitForTimeout(300);
+        const early = await page.evaluate(() => ({
+          beat: !!document.querySelector('.gs-arr'),
+          shop: !!document.querySelector('.gs-sshop-grid'),
+          err: (window as unknown as { __gsErr?: string }).__gsErr,
+        }));
+        expect(early.err, 'no recovered error').toBeFalsy();
+        expect(early.beat, 'arrival beat mounted over the shop').toBe(true);
+        expect(early.shop, 'shop rendered beneath the beat').toBe(true);
+        // It clears itself (auto-dissolve ~2.1s), leaving the shop usable.
+        await page.waitForFunction(() => !document.querySelector('.gs-arr'), { timeout: 4000 });
+        const gone = await page.$('.gs-arr');
+        expect(gone, 'arrival beat cleared itself').toBeNull();
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
 });

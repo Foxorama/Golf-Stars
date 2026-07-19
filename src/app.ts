@@ -45,6 +45,8 @@ import { loadStory } from './save/storyStore';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { mountStoryIntro } from './render/storyIntro';
+import { mountShopArrival } from './render/shopArrival';
+import { staticCourseSpec } from './sim/course/staticCourses';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import { getSettings, setSetting, toggleSetting, type Settings } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
@@ -112,6 +114,9 @@ let view: PlayViewHandle | null = null;
 /** The animated weather overlay over the aim/putt map (GS-journey-fx rework) — so the sky + air are
  *  alive while you line up, not only mid-flight. Torn down + remounted each render like `view`. */
 let weatherOverlay: { destroy(): void } | null = null;
+/** GS-story-shop-arrival: world ids whose Pro-Shop arrival beat has already played THIS session (a pure
+ *  feel layer — no save; it replays next session). Guards the once-per-world-per-session mount. */
+const shopArrivalsSeen = new Set<string>();
 
 
 /** Diagnostic breadcrumb the boot watchdog can read if the app never paints. */
@@ -2448,6 +2453,20 @@ function render(): void {
       wireStarTourGestures(vp);
       startStarTourAnim();
     }
+  }
+
+  // GS-story-shop-arrival: the FIRST time (per session) you reach a world's Pro Shop, play a short
+  // "you've touched down" beat over the just-rendered shop — your ship descends onto the world, a title
+  // forms, then it dissolves to reveal the rack. Once per world per session (a feel layer, no save); the
+  // beat mounts itself over the DOM and removes itself, so it never blocks the shop underneath.
+  if (state.screen === 'storyShop' && state.story && state.storyShopWorldId && !shopArrivalsSeen.has(state.storyShopWorldId)) {
+    shopArrivalsSeen.add(state.storyShopWorldId);
+    const spec = staticCourseSpec(state.storyShopWorldId);
+    mountShopArrival({
+      archetype: spec?.archetype ?? 'verdant',
+      worldName: spec?.name ?? 'this world',
+      shipId: state.story.equippedShipId,
+    });
   }
 
   // Wire actions.
