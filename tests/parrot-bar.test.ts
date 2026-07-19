@@ -39,7 +39,8 @@ describe('GS-story-parrot-bar — the chatter table is pure + well-formed', () =
   });
 
   it('the greeting adapts to the campaign state', () => {
-    expect(parrotBarLines(EARLY)[0]!.id).toBe('greet-early');
+    expect(parrotBarLines(EARLY)[0]!.id).toBe('greet-recruited'); // Ch.1: the quest briefing leads (GS-story-pacing)
+    expect(parrotBarLines({ chapter: 2, sigils: 1, completed: false })[0]!.id).toBe('greet-early');
     expect(parrotBarLines({ chapter: 3, sigils: 3, completed: false })[0]!.id).toBe('greet-mid');
     expect(parrotBarLines({ chapter: 4, sigils: 3, completed: false, alignment: 'warden' })[0]!.id).toBe('greet-warden');
     expect(parrotBarLines({ chapter: 4, sigils: 3, completed: false, alignment: 'herald' })[0]!.id).toBe('greet-herald');
