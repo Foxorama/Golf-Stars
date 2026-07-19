@@ -23,7 +23,7 @@ import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 4;
+export const STORY_VERSION = 5;
 
 /** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
  *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
@@ -230,6 +230,12 @@ export interface StoryState {
    *  shared trunk, Chapters 1–3). Drives the back-half tournament variants + the finale ending. */
   alignment?: StoryAlignment;
 
+  /** GS-story-partners: the PARTNER golfer chosen for each TEAM Sigil (Scramble Ch.1 / Best-ball Ch.2), a
+   *  playable-character id. Locked in when you tee off that major; drives the betrayal branch after The
+   *  Choice (`betrayerId` = the odd one out of these two picks). Absent until chosen. */
+  sigil1Partner?: string;
+  sigil2Partner?: string;
+
   /** GS-story-quests: the ally SIDE QUEST currently accepted (one at a time), or absent. */
   activeQuestId?: string;
   /** GS-story-quests: ally side quests already completed (their rewards granted). */
@@ -299,6 +305,8 @@ export function migrateStory(raw: unknown): StoryState {
     seenStoryBeats: boolMap(s.seenStoryBeats),
     completed: s.completed === true,
     ...(s.alignment === 'warden' || s.alignment === 'herald' ? { alignment: s.alignment } : {}),
+    ...(typeof s.sigil1Partner === 'string' ? { sigil1Partner: s.sigil1Partner } : {}),
+    ...(typeof s.sigil2Partner === 'string' ? { sigil2Partner: s.sigil2Partner } : {}),
     ...(typeof s.activeQuestId === 'string' ? { activeQuestId: s.activeQuestId } : {}),
     completedQuestIds: strList(s.completedQuestIds),
     qualifierResults: qualifierMap(s.qualifierResults),
@@ -468,6 +476,21 @@ export function unlockWorlds(story: StoryState, worldIds: readonly string[]): St
  *  practice (the reducer gates it to the unchosen post-Chapter-3 moment). */
 export function chooseAlignment(story: StoryState, alignment: StoryAlignment): StoryState {
   return story.alignment === alignment ? story : { ...story, alignment };
+}
+
+/** GS-story-partners: record the PARTNER chosen for a team Sigil (chapter 1 → `sigil1Partner`, chapter 2 →
+ *  `sigil2Partner`). Idempotent; a no-op for any other chapter. The pick is locked when the major tees off. */
+export function setSigilPartner(story: StoryState, chapter: number, charId: string): StoryState {
+  if (chapter === 1) return story.sigil1Partner === charId ? story : { ...story, sigil1Partner: charId };
+  if (chapter === 2) return story.sigil2Partner === charId ? story : { ...story, sigil2Partner: charId };
+  return story;
+}
+
+/** The partner locked in for a team Sigil (chapter 1 or 2), or undefined. */
+export function sigilPartner(story: StoryState, chapter: number): string | undefined {
+  if (chapter === 1) return story.sigil1Partner;
+  if (chapter === 2) return story.sigil2Partner;
+  return undefined;
 }
 
 /** Award credits (floored at 0). */

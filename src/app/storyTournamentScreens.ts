@@ -8,8 +8,9 @@
 
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
-import { STORY_CHAPTER_COUNT } from '../sim/rpg/story';
-import { currentTournament, sigilCount, tournamentCompetitors } from '../sim/rpg/storyTournaments';
+import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
+import { currentTournament, sigilCount, tournamentCompetitors, isTeamTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
+import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { venomaPortraitSVG, vossPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
 import { penelopePortraitSVG } from '../render/caddyPortraits';
@@ -81,6 +82,49 @@ function rivalTaunt(rivalId: string): string {
   }
 }
 
+/** GS-story-partners: the friend currently selected as your team-Sigil partner — the lobby tap, else (on
+ *  Sigil 2) your Sigil-1 partner for continuity, else your first tour-mate. */
+function selectedPartnerId(t: StoryTournament, story: StoryState): string {
+  const pool = teamPartnerPool(story);
+  const has = (id?: string) => !!id && pool.some((p) => p.id === id);
+  if (has(state.storyPartnerPick)) return state.storyPartnerPick!;
+  if (t.chapter === 2 && has(story.sigil1Partner)) return story.sigil1Partner!;
+  return pool[0]?.id ?? story.characterId;
+}
+
+/** GS-story-partners: the partner-picker for a TEAM Sigil (Scramble/Best-ball) — three friend cards, the
+ *  chosen one ringed. Tapping one sets the pick; tee-off carries it onto the run. */
+function partnerPickerHTML(t: StoryTournament, story: StoryState): string {
+  const pool = teamPartnerPool(story);
+  const selected = selectedPartnerId(t, story);
+  const fmtLabel = t.format === 'scramble' ? '🤝 Two-ball scramble — share a ball' : '🤝 Best-ball — each play your own';
+  const cards = pool
+    .map((p) => {
+      const ch = getCharacter(p.id);
+      if (!ch) return '';
+      const fig = golferPreviewSVG(undefined, undefined, undefined, {
+        skin: ch.style.skin,
+        shirtBase: ch.style.shirt,
+        capColor: ch.style.cap,
+        hair: ch.style.hair,
+        uid: `pp${p.id.replace(/[^a-z0-9]/gi, '')}`,
+        w: 56,
+        h: 150,
+      });
+      const on = p.id === selected;
+      return `<button class="gs-tourn-pp${on ? ' gs-tourn-pp--on' : ''}" aria-label="Partner with ${ch.name}"
+          data-action='${JSON.stringify({ type: 'selectStoryPartner', characterId: p.id })}'>
+          <span class="gs-tourn-ppfig">${fig}</span>
+          <span class="gs-tourn-ppname">${p.name}${on ? ' ✓' : ''}</span>
+        </button>`;
+    })
+    .join('');
+  return `<div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
+      <div class="gs-tourn-fieldlabel">${fmtLabel} · choose your partner</div>
+      <div class="gs-tourn-ppgrid">${cards}</div>
+    </div>`;
+}
+
 export function storyTournamentScreen(): string {
   const story = state.story;
   const t = story ? currentTournament(story) : undefined;
@@ -95,6 +139,10 @@ export function storyTournamentScreen(): string {
   const whoShort = getCharacter(story.characterId)?.shortName ?? 'You';
   const intro = t.intro.map((p) => `<p class="gs-tourn-lore">${p}</p>`).join('');
   const portrait = rivalPortraitSVG(t.rivalId);
+  // GS-story-partners: a TEAM Sigil shows the partner PICKER (and tees off WITH them); a solo major shows
+  // the friendly-rival field chips as before.
+  const team = isTeamTournament(t);
+  const partnerName = team ? getCharacter(selectedPartnerId(t, story))?.shortName ?? 'a friend' : '';
   // GS-story-tournament-field: the field you'll play — the rival, your three friends, and you.
   const competitors = tournamentCompetitors(t, story.characterId);
   const fieldChips = [
@@ -104,6 +152,13 @@ export function storyTournamentScreen(): string {
     ),
     `<span class="gs-tourn-fc gs-tourn-fc--you">🏌 ${whoShort}</span>`,
   ].join('');
+  const fieldOrPicker = team
+    ? partnerPickerHTML(t, story)
+    : `<div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
+        <div class="gs-tourn-fieldlabel">The field</div>
+        <div class="gs-tourn-field">${fieldChips}</div>
+      </div>`;
+  const teeLabel = team ? `⛳ Tee off with ${partnerName} — play for the Sigil` : '⛳ Tee off — play for the Sigil';
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title gs-tourn-in gs-tourn-in1">🏆 ${t.name}</h1>
@@ -122,10 +177,7 @@ export function storyTournamentScreen(): string {
           <p class="gs-tourn-taunt">${rivalTaunt(t.rivalId)}</p>
         </div>
       </div>
-      <div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
-        <div class="gs-tourn-fieldlabel">The field</div>
-        <div class="gs-tourn-field">${fieldChips}</div>
-      </div>
+      ${fieldOrPicker}
       <div class="gs-tourn-in gs-tourn-in3">${intro}</div>
       <div class="gs-tourn-prize gs-tourn-in gs-tourn-in4"><b>🎁 Prize:</b> ${t.prize}${
         t.rewardClubId && storyClubEffectLabel(t.rewardClubId)
@@ -135,7 +187,7 @@ export function storyTournamentScreen(): string {
       <div class="gs-tourn-stakes gs-tourn-in gs-tourn-in4">Beat ${t.rivalName.split(' ')[0]}’s round over 18 holes, ${who}, and the ${t.sigilName} is yours.</div>
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">
-      <button class="gs-btn gs-tourn-in gs-tourn-in5" data-action='${JSON.stringify({ type: 'storyPlayTournament' })}'>⛳ Tee off — play for the Sigil</button>
+      <button class="gs-btn gs-tourn-in gs-tourn-in5" data-action='${JSON.stringify({ type: 'storyPlayTournament' })}'>${teeLabel}</button>
       <button class="gs-btn gs-btn--ghost gs-tourn-in gs-tourn-in5" data-action='${JSON.stringify({ type: 'exitStoryTournament' })}'>‹ Not yet — back to the clubhouse</button>
     </div>
     ${TOURN_STYLE}`;
@@ -194,8 +246,13 @@ export function storyTournamentResultScreen(): string {
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyTournamentContinue' })}'>Continue ›</button>
       </div>`;
   }
+  // GS-story-stableford: on the Ch.3 Storm the values are POINTS (higher wins); the margin is the magnitude
+  // either way, with a "points"/"tied" wording for Stableford vs strokes.
   const diff = r.playerGross - r.rivalGross;
-  const margin = diff === 0 ? 'tied, and the tie goes to you' : diff < 0 ? `by ${-diff}` : `by ${diff}`;
+  const lead = Math.abs(diff);
+  const margin = diff === 0
+    ? (r.stableford ? 'level, and the tie goes to you' : 'tied, and the tie goes to you')
+    : `by ${lead}${r.stableford ? ' points' : ''}`;
   const title = r.won ? (r.finalSigil ? '🗝 The final Sigil!' : `🏅 ${r.sigilName} won!`) : '💔 So close';
   const kicker = r.won
     ? r.finalSigil
@@ -217,7 +274,8 @@ export function storyTournamentResultScreen(): string {
       <p class="gs-hero-tag">${kicker}</p>
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-ink);font-size:14px;">${r.name}</span>
-        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="your gross vs the rival">You ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}</span>
+        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.stableford ? 'your Stableford points vs the rival (higher wins)' : r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}${r.stableford ? ' pts' : ''}</span>
+        ${r.team ? `<span class="gs-chip" style="border-color:#2f6a44;color:#9dffce;font-size:13px;" title="your partner for this Sigil">🤝 You &amp; ${r.team.partnerName} · ${r.team.format}${r.team.partnerCountedHoles > 0 ? ` · their ball counted on ${r.team.partnerCountedHoles}` : ''}</span>` : ''}
       </div>
     </header>
     <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.55;">
@@ -242,10 +300,11 @@ export function storyTournamentResultScreen(): string {
 function scoreboardHTML(r: NonNullable<typeof state.lastStoryTournament>): string {
   const board = r.leaderboard;
   if (!board || board.length === 0) return '';
+  const sf = r.stableford === true; // GS-story-stableford: gross values are POINTS (higher wins), no to-par
   const par = r.par ?? 0;
   const rows = board
     .map((g, i) => {
-      const toPar = par ? g.gross - par : undefined;
+      const toPar = !sf && par ? g.gross - par : undefined;
       const toParStr = toPar === undefined ? '' : toPar === 0 ? 'E' : toPar > 0 ? `+${toPar}` : `${toPar}`;
       const glyph = g.kind === 'rival' ? '🐍' : g.kind === 'player' ? '🏌' : '🤝';
       return `<tr class="gs-tsb-row${g.kind === 'player' ? ' gs-tsb-row--you' : ''}${g.kind === 'rival' ? ' gs-tsb-row--rival' : ''}">
@@ -260,7 +319,7 @@ function scoreboardHTML(r: NonNullable<typeof state.lastStoryTournament>): strin
     <section style="max-width:520px;margin:14px auto 0;">
       <h2 class="gs-tsb-title">Final leaderboard</h2>
       <table class="gs-tsb">
-        <thead><tr><th></th><th style="text-align:left;">Competitor</th><th>To par</th><th>Gross</th></tr></thead>
+        <thead><tr><th></th><th style="text-align:left;">Competitor</th><th>${sf ? '' : 'To par'}</th><th>${sf ? 'Points' : 'Gross'}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </section>`;
@@ -301,6 +360,17 @@ const TOURN_STYLE = `
     .gs-tourn-fc{font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:#131926;border:1px solid #283040;color:#c7d2e2;white-space:nowrap;}
     .gs-tourn-fc--rival{background:#251426;border-color:#5a2f56;color:#e6a6d6;}
     .gs-tourn-fc--you{background:#132018;border-color:#2f6a44;color:#9dffce;}
+    /* GS-story-partners: the partner picker (three friend cards, chosen one ringed) */
+    .gs-tourn-ppgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+    .gs-tourn-pp{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 6px;border-radius:12px;
+      background:#0e1420;border:1px solid #283040;cursor:pointer;color:inherit;font:inherit;
+      transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;}
+    .gs-tourn-pp:hover,.gs-tourn-pp:focus-visible{outline:none;transform:translateY(-2px);border-color:#4a5566;box-shadow:0 6px 14px #0007;}
+    .gs-tourn-pp--on{border-color:#2f6a44;background:#122018;box-shadow:inset 0 0 0 1px #2f6a4488,0 0 12px #2f6a4433;}
+    .gs-tourn-ppfig{width:56px;height:auto;filter:drop-shadow(0 4px 5px #0009);}
+    .gs-tourn-ppfig svg{width:100%;height:auto;display:block;}
+    .gs-tourn-ppname{font-size:12px;font-weight:800;color:#c7d2e2;white-space:nowrap;}
+    .gs-tourn-pp--on .gs-tourn-ppname{color:#9dffce;}
     /* staggered entrance — the tournament "walks out" */
     .gs-tourn-in{opacity:0;transform:translateY(10px);animation:gs-tourn-rise .5s cubic-bezier(.2,.8,.2,1) forwards;}
     .gs-tourn-in1{animation-delay:.02s;} .gs-tourn-in2{animation-delay:.14s;} .gs-tourn-in3{animation-delay:.26s;}
