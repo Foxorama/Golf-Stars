@@ -19,9 +19,6 @@ import { golferPreviewSVG } from './apparelArt';
 import { shipSVG } from './shipArt';
 import { shipById } from '../sim/rpg/ships';
 import { prognosticParrotPortraitSVG, carrionCrowPortraitSVG } from './loreArt';
-import { caddyPortraitSVG } from './caddyPortraits';
-import { lorePortraitSVG } from './loreArt';
-import { fullBodyStandeeSVG, CADDY_STANDEE, HERALD_STANDEE } from './storyStandee';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { crewRoster, allyName } from '../sim/rpg/storyAllies';
 import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
@@ -261,7 +258,7 @@ export function spaceportSceneHTML(story: StoryState): string {
       .join('');
   } else {
     const others = crewRoster(story).filter((id) => id !== activeCaddyId);
-    const active = activeCaddyId ? crewStandee(activeCaddyId, { left: 62, top: 85 }, true) : '';
+    const active = activeCaddyId ? crewStandee(activeCaddyId, { left: 58, top: 88 }, true) : '';
     crewStandees =
       others
         .slice(0, CREW_SPOTS.length)
@@ -297,7 +294,7 @@ function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, 
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: agent.id })}'
       aria-label="Speak with ${agent.name}"
       style="left:${spot.left}%;top:${spot.top}%;">
-      <span class="gs-sclub-cav"${agent.tint ? ` style="filter:${agent.tint};"` : ''}>${fullBodyStandeeSVG(lorePortraitSVG(agent.portrait), HERALD_STANDEE)}</span>
+      <span class="gs-sclub-cav"${agent.tint ? ` style="filter:${agent.tint};"` : ''}><canvas class="gs-caddycv" data-caddy="${agent.id}" width="260" height="260"></canvas></span>
       <span class="gs-sclub-cplate">${short}</span>
     </button>`;
 }
@@ -305,11 +302,11 @@ function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, 
 /** Deck spots (left%, top%) where non-active crew allies stand around the clubhouse — an arc across the deck
  *  that avoids the centre-front player and the door hotspots. Fixed (byte-stable), so identity is stable. */
 const CREW_SPOTS: { left: number; top: number }[] = [
-  { left: 31, top: 91 }, // left-front, clear of the locker label + the far-left doors
-  { left: 56, top: 79 }, // mid, in front of the bar
-  { left: 72, top: 90 },
-  { left: 85, top: 81 },
-  { left: 93, top: 92 },
+  { left: 24, top: 93 }, // left-front, clear of the locker label + the far-left doors
+  { left: 42, top: 83 }, // mid-left
+  { left: 74, top: 93 }, // in front of the bar (right of the player + active)
+  { left: 87, top: 83 },
+  { left: 96, top: 94 },
 ];
 
 /** One crew ally as a feet-anchored portrait standee on the deck. Tap → their ally talk card. The active
@@ -320,7 +317,7 @@ function crewStandee(caddyId: string, spot: { left: number; top: number }, activ
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId })}'
       aria-label="Talk to ${allyName(caddyId)}${active ? ', on your bag' : ''}"
       style="left:${spot.left}%;top:${spot.top}%;">
-      <span class="gs-sclub-cav">${fullBodyStandeeSVG(caddyPortraitSVG(caddyId), CADDY_STANDEE[caddyId] ?? { legs: 'human' })}</span>
+      <span class="gs-sclub-cav"><canvas class="gs-caddycv" data-caddy="${caddyId}" width="260" height="260"></canvas></span>
       <span class="gs-sclub-cplate">${active ? `🎒 ${name}` : name}</span>
     </button>`;
 }
@@ -353,16 +350,16 @@ const SPACEPORT_STYLE = `<style>
   .gs-sclub-plate{display:inline-block;margin-top:2px;padding:2px 8px;border-radius:3px;
     background:linear-gradient(180deg,#e8c266,#a97b25);border:1px solid #5c3f12;box-shadow:inset 0 1px 0 #fff6cf,0 1px 2px #0008;
     font-family:Georgia,serif;font-size:clamp(8px,2.1cqw,11.5px);font-weight:800;color:#2a1a05;white-space:nowrap;}
-  /* Crew members stand on the deck as FULL-BODY figures (GS-story-fullbody) — their portrait bust as the
-     head+torso over a per-character lower body (legs+shoes / cult robe / bird legs / mole mound), feet-
-     anchored so the FEET meet the floor (not the chest). A drop-shadow sits them in the room. */
+  /* Crew members stand on the deck as FULL-BODY figures (GS-story-figures) — the game's OWN on-course caddy
+     art (drawCaddy) + matching robed Coil-agent art (drawCoilAgent), drawn into a per-standee <canvas> by
+     the app.ts mount pass (canvas.gs-caddycv[data-caddy]). Feet-anchored so the FEET meet the floor. */
   .gs-sclub-caddy{position:absolute;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
     transform:translate(-50%,-100%);z-index:16;transition:transform .15s ease;}
   .gs-sclub-caddy:hover,.gs-sclub-caddy:focus-visible{outline:none;transform:translate(-50%,-100%) scale(1.06);z-index:22;}
   .gs-sclub-caddy--on{z-index:19;}
-  .gs-sclub-cav{display:block;width:15cqw;max-width:84px;margin:0 auto;filter:drop-shadow(0 5px 5px #000a);}
-  .gs-sclub-cav svg{width:100%;height:auto;display:block;}
-  .gs-sclub-caddy--on .gs-sclub-cav{width:18cqw;max-width:98px;filter:drop-shadow(0 6px 6px #000b) drop-shadow(0 0 7px #f0a8c8aa);}
+  .gs-sclub-cav{display:block;width:23cqw;max-width:132px;margin:0 auto -2cqw;filter:drop-shadow(0 4px 4px #000a);}
+  .gs-sclub-cav canvas{width:100%;height:auto;display:block;}
+  .gs-sclub-caddy--on .gs-sclub-cav{width:26cqw;max-width:150px;filter:drop-shadow(0 5px 5px #000b) drop-shadow(0 0 8px #f0a8c8aa);}
   .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141edd;
     border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;position:relative;z-index:1;}
   .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018ee;border-color:#6a3a52;color:#f0a8c8;}

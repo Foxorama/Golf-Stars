@@ -1,5 +1,6 @@
-// Eyes-on preview for the Story-Tour clubhouse crew standees (GS-story-fullbody): the Warden spaceport
-// (full roster) and the Herald deck, so the full-body figures can be checked standing on the floor.
+// Eyes-on preview for the Story-Tour clubhouse crew (GS-story-figures): the Warden spaceport (full roster,
+// drawn with the on-course drawCaddy figures) and the Herald deck (robed drawCoilAgent figures). Renders
+// the REAL spaceportSceneHTML, then runs the same canvas mount pass app.ts uses, so figures appear.
 //   node scripts/storyclub-preview.mjs
 import { createServer } from 'vite';
 import http from 'node:http';
@@ -20,7 +21,7 @@ const rootVars = indexHtml.match(/:root\s*\{[\s\S]*?\}/)?.[0] ?? '';
 const html = `<!doctype html><meta charset="utf8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${styleBlock}
-<style>${rootVars} body{margin:0;background:#0a0d16;color:#eaf2ff;font-family:system-ui;} .row{display:flex;gap:18px;padding:18px;flex-wrap:wrap;} .col{flex:1;min-width:420px;} h3{margin:0 0 8px;}</style>
+<style>${rootVars} body{margin:0;background:#0a0d16;color:#eaf2ff;font-family:system-ui;} .row{display:flex;gap:18px;padding:18px;flex-wrap:wrap;} .col{flex:1;min-width:440px;} h3{margin:0 0 8px;}</style>
 <body>
 <div class="row">
   <div class="col"><h3>Warden clubhouse</h3><div id="warden"></div></div>
@@ -29,6 +30,7 @@ ${styleBlock}
 <script type="module">
   import { spaceportSceneHTML } from '/src/render/storySpaceport.ts';
   import { defaultStoryState } from '/src/sim/rpg/story.ts';
+  import { drawStoryFigure, hasStoryFigure } from '/src/render/storyFigure.ts';
   const warden = { ...defaultStoryState('feather-fade'), chapter: 3,
     hiredCaddyIds: ['driver-dan','auto-caddie','sandy-sandsaver','dr-chipinski','suggestible-sam','mystic-mole','prognostic-parrot'],
     activeCaddyId: 'sandy-sandsaver' };
@@ -36,6 +38,13 @@ ${styleBlock}
     hiredCaddyIds: ['driver-dan'], activeCaddyId: 'driver-dan' };
   document.getElementById('warden').innerHTML = spaceportSceneHTML(warden);
   document.getElementById('herald').innerHTML = spaceportSceneHTML(herald);
+  // mount pass (mirrors app.ts)
+  document.querySelectorAll('canvas.gs-caddycv[data-caddy]').forEach((cv) => {
+    const id = cv.dataset.caddy;
+    if (!hasStoryFigure(id)) return;
+    const ctx = cv.getContext('2d'); if (!ctx) return;
+    drawStoryFigure(ctx, id, cv.width / 2, cv.height - 8, cv.height * 0.92, 800, false);
+  });
   window.__done = true;
 </script></body>`;
 
