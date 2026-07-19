@@ -498,6 +498,15 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `finaleUnlocked`/`storyComplete`), so it's unit-tested (`tests/story-guide.test.ts`, every stage). Own
   `.gs-mission*`/`.gs-premise*` CSS prefixes. No sim/save/rng touch. Guarded by the guide unit test + the
   `?screen=storyclub` smoke (now asserts "Your mission").
+- **GS-story-shop-scene** — ✅ *shipped* (`app/storyShopScreens.ts`). The per-world Pro Shop was a flat rack
+  list; player feedback wanted "customised pro shop scenes and settings". It now opens with an illustrated
+  shop-interior banner (`proShopSceneHTML`): a world-tinted shelving wall, a "PRO SHOP" neon sign, a glass
+  club display case, a picture WINDOW onto the world's own ground/sky (tinted via `roughBaseFor(archetype)`),
+  and the world's CLUB PRO standing behind the counter — the archetype-themed `proAvatarSVG`, so a green
+  parkland pro, a desert pro, an ember pro etc. differ per world — with a "<world> pro" nameplate. Pure SVG
+  + one positioned bust, byte-stable, zero rng; own `.gs-sshop-scene*` scope. The rack grid + lore cards are
+  unchanged below. No sim/save/rng touch. Covered by the existing `?screen=storyshop` smoke (the scene mounts
+  in the same screen; a throw would trip the crash/bounce guard).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

@@ -12,6 +12,9 @@ import { rarCol } from '../sim/rpg/loot';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
+import { proAvatarSVG } from '../render/golferCards';
+import { roughBaseFor } from '../render/palette';
+import type { BiomeArchetype } from '../sim/course/themes';
 import {
   storyShopStock,
   storyGearStock,
@@ -21,6 +24,56 @@ import {
   canBuyStoryCard,
   WORLD_SHOP_INTRO,
 } from '../sim/rpg/storyShop';
+
+/**
+ * GS-story-shop-scene: the per-world PRO SHOP scene — an illustrated shop interior instead of a flat rack
+ * list. A world-tinted counter + glass club display, a picture window onto the world's own ground/sky, and
+ * the world's CLUB PRO (the archetype-themed `proAvatarSVG`) standing behind the till. Pure SVG + one
+ * positioned bust (byte-stable, zero rng), own `.gs-sshop-scene*` scope. Makes each world's shop feel like
+ * a place you've travelled to, not a generic grid.
+ */
+function proShopSceneHTML(archetype: BiomeArchetype, worldName: string): string {
+  const ground = roughBaseFor(archetype);
+  const ground2 = roughBaseFor(archetype, 1.3);
+  return `<div class="gs-sshop-scene" aria-hidden="true">
+    <svg viewBox="0 0 400 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%" style="display:block;">
+      <defs>
+        <linearGradient id="sshs-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2c2016"/><stop offset="100%" stop-color="#1a120b"/></linearGradient>
+        <linearGradient id="sshs-counter" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6e4a2c"/><stop offset="100%" stop-color="#3a2614"/></linearGradient>
+        <linearGradient id="sshs-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0c1330"/><stop offset="100%" stop-color="#20264a"/></linearGradient>
+      </defs>
+      <!-- shop wall + shelving -->
+      <rect width="400" height="150" fill="url(#sshs-wall)"/>
+      ${[26, 52].map((y) => `<rect x="8" y="${y}" width="150" height="4" fill="#3f2b18"/>`).join('')}
+      <!-- little boxed goods on the shelves -->
+      ${[[16, 12], [44, 14], [72, 12], [104, 13], [130, 12]].map(([x, y], i) => `<rect x="${x}" y="${28 - (y as number) + 16 - 16}" width="18" height="${y}" rx="2" fill="${['#7fe0a0', '#e8c25a', '#6ab6ff', '#ff8a6b', '#b58cff'][i]}" opacity="0.8"/>`).join('')}
+      <!-- picture window onto the world (right) -->
+      <g>
+        <rect x="250" y="16" width="130" height="74" rx="5" fill="#0a0d18"/>
+        <rect x="255" y="21" width="120" height="64" fill="url(#sshs-sky)"/>
+        <rect x="255" y="63" width="120" height="22" fill="${ground}"/>
+        <path d="M255,66 Q300,58 340,64 T375,62 L375,85 L255,85 Z" fill="${ground2}"/>
+        <circle cx="290" cy="38" r="1" fill="#fff"/><circle cx="330" cy="30" r="1.2" fill="#fff"/><circle cx="358" cy="44" r="1" fill="#fff"/>
+        <line x1="315" y1="21" x2="315" y2="85" stroke="#0a0d18" stroke-width="3"/>
+        <rect x="250" y="16" width="130" height="74" rx="5" fill="none" stroke="#5a4326" stroke-width="4"/>
+      </g>
+      <!-- neon PRO SHOP sign -->
+      <rect x="150" y="8" width="96" height="20" rx="5" fill="#0d1512" stroke="#274a38" stroke-width="1.2"/>
+      <text x="198" y="22" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="800" font-size="12" fill="#d6ffe6">PRO SHOP</text>
+      <!-- glass club display, front-left -->
+      <g>
+        <rect x="14" y="96" width="150" height="46" rx="4" fill="#12100a" stroke="#3a2a17" stroke-width="1.5"/>
+        <rect x="18" y="100" width="142" height="30" rx="3" fill="#1a2433" opacity="0.5"/>
+        ${[34, 62, 90, 118].map((x) => `<g transform="translate(${x},128)"><line x1="0" y1="0" x2="6" y2="-24" stroke="#cbd3e0" stroke-width="2"/><path d="M6,-24 l8,2 l-6,4 Z" fill="#8fa0b8"/></g>`).join('')}
+      </g>
+      <!-- counter across the front -->
+      <rect x="0" y="120" width="400" height="10" fill="#8a6034"/>
+      <rect x="0" y="130" width="400" height="20" fill="url(#sshs-counter)"/>
+    </svg>
+    <span class="gs-sshop-pro" title="${worldName}'s club pro">${proAvatarSVG(archetype, 66, 78)}</span>
+    <span class="gs-sshop-proplate">${worldName} pro</span>
+  </div>`;
+}
 
 /** The procedural art for any rack id — a themed club head, or the gear's kit (glove/cap/shoes/ball). */
 function cardArt(id: string): string {
@@ -42,6 +95,7 @@ export function storyShopScreen(): string {
   }
   const spec = staticCourseSpec(worldId);
   const courseName = spec?.name ?? 'this world';
+  const archetype: BiomeArchetype = spec?.archetype ?? 'verdant';
   const intro = WORLD_SHOP_INTRO[worldId] ?? 'The pro shop is open for business.';
   const clubIds = storyShopStock(story, worldId).map((it) => it.id);
   const gearIds = storyGearStock(story, worldId).map((it) => it.id);
@@ -66,7 +120,8 @@ export function storyShopScreen(): string {
       </div>
     </header>
     <section style="max-width:560px;margin:2px auto 0;">
-      <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:2px 0 10px;">
+      ${proShopSceneHTML(archetype, courseName)}
+      <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:8px 0 10px;">
         <em>${intro}</em>
       </p>
       ${body}
@@ -77,6 +132,12 @@ export function storyShopScreen(): string {
     </div>
     ${overlay}
     <style>
+      .gs-sshop-scene{position:relative;width:100%;aspect-ratio:400/150;max-height:160px;border-radius:14px;
+        overflow:hidden;border:1px solid #3a2f1f;margin:6px 0 2px;box-shadow:0 6px 20px -12px #000a;}
+      .gs-sshop-pro{position:absolute;right:14%;bottom:6px;width:20%;max-width:70px;filter:drop-shadow(0 4px 6px #000a);}
+      .gs-sshop-pro svg{width:100%;height:auto;display:block;}
+      .gs-sshop-proplate{position:absolute;right:8%;bottom:4px;font-size:10px;font-weight:700;color:#e8dcc0;
+        background:#2a1c10cc;border:1px solid #5a4326;border-radius:8px;padding:1px 6px;white-space:nowrap;}
       .gs-sshop-sec{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gs-dim,#9fb0c8);
         margin:12px 0 8px;padding-bottom:4px;border-bottom:1px solid #232b3b;}
       .gs-sshop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
