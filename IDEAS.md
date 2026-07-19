@@ -62,7 +62,8 @@ default). One focused, tested, auto-merged PR each:
 - **GS-story-partners** — ✅ *shipping*: `StoryState` v5 `sigil1Partner`/`sigil2Partner` + lobby
   partner-picker; Sigil 1 = scramble, Sigil 2 = best-ball, resolved vs opposing pairs; team recap; the pick
   is locked into the campaign (drives the betrayal branch).
-- **GS-story-stableford** — Sigil 3 single Stableford.
+- **GS-story-stableford** — ✅ *shipping*: Sigil 3 (Storm Championship) is single-person STABLEFORD (points,
+  higher wins; attack every flag). Points recap + leaderboard; The Choice still fires after the win.
 - **GS-story-charquests** — per-character quests unlocked once you partner that golfer; signature reward.
 - **GS-story-betrayer** — pure `storyBetrayal.ts` (betrayer = odd-one-out; finale team comps) +
   `corruptedGolferLook` costume swap.

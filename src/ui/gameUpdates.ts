@@ -49,7 +49,7 @@ import {
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
-import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE, isStablefordTournament, rivalStablefordTotal, stablefordLeaderboard } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { getCharacter } from '../sim/rpg/characters';
@@ -468,6 +468,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   let rivalGross: number;
   let rivalName = t.rivalName;
   let playerGross = totals.gross;
+  let stablefordFlag = false;
   let leaderboard: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[];
   let teamPayload: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number } | undefined;
 
@@ -497,6 +498,17 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     teamPayload = { partnerName, format: fmt, playerSolo: totals.gross, partnerCountedHoles: res.partnerCountedHoles };
     playerGross = res.playerTeamTotal;
     base = setSigilPartner(base, t.chapter, partnerId);
+  } else if (isStablefordTournament(t)) {
+    // GS-story-stableford: the Ch.3 Storm Championship is a single-person STABLEFORD — POINTS, higher wins
+    // (attack every flag; a blow-up hole only costs that hole). The rival's points ride the same strokes
+    // stream as `rivalTotal` (difficulty tracks `rivalEdge`), converted per hole. Deterministic.
+    const rivalPts = rivalStablefordTotal(t, String(run.seed), pars);
+    const playerPts = totals.stableford;
+    won = playerPts >= rivalPts; // higher points win, ties → you
+    rivalGross = rivalPts;
+    playerGross = playerPts;
+    stablefordFlag = true;
+    leaderboard = stablefordLeaderboard(t, String(run.seed), pars, base.characterId, 'You', playerPts);
   } else {
     rivalGross = rivalTotal(t, String(run.seed), pars);
     won = totals.gross <= rivalGross;
@@ -571,6 +583,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       par: totals.totalPar,
       leaderboard,
       ...(teamPayload ? { team: teamPayload } : {}),
+      ...(stablefordFlag ? { stableford: true } : {}),
     },
   };
 }

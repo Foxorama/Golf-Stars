@@ -299,6 +299,9 @@ export interface UiState {
     /** GS-story-partners: on a TEAM Sigil (Scramble/Best-ball), the partner + format for the recap copy —
      *  "You & Feather · scramble" and how many holes the partner's ball counted. Absent = a solo major. */
     team?: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number };
+    /** GS-story-stableford: the Ch.3 Storm Championship is STABLEFORD — `playerGross`/`rivalGross` are
+     *  POINTS (higher wins), and the recap/scoreboard read them as points, not strokes. Absent = strokes. */
+    stableford?: boolean;
   };
   /** GS-story-tournament-midpop: the halftime (after hole 9) rival pop payload — the rival BRAGS when
    *  ahead / CURSES you when behind, over the standings through nine. Transient (the `storyTournamentPop`

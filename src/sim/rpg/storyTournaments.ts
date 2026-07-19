@@ -16,6 +16,7 @@
  */
 
 import { ghostHoleStrokes, golferForm } from './competition';
+import { stablefordPoints } from '../score';
 import { CHARACTERS, getCharacter } from './characters';
 import { otherGolferIds } from './storyCast';
 import type { OpposingPair } from './storyTeams';
@@ -126,6 +127,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
   },
   {
     chapter: 3,
+    format: 'stableford',
     venueId: 'tempest-18',
     name: 'The Storm Championship',
     host: 'A shadow tournament — the Coil',
@@ -143,7 +145,8 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'The tour "postponed" it; the Coil runs a shadow tournament in the eye of the Dragon’s storm, and ' +
         'you crash it to take the Sigil before they can corrupt it. The rough itself seems to move.',
       'And he is here — the Apostate, Malachai Voss, the champion who fell. He will not try to beat you. ' +
-        'He will try to make you understand. Out-play him in the gale and the Storm Sigil is yours.',
+        'He will try to make you understand. It’s STABLEFORD now — points, not strokes: attack every flag, ' +
+        'because a blow-up hole only costs that hole. Out-score him in the gale and the Storm Sigil is yours.',
       'Three Sigils, and the Keystone is half-forged — but the sky is already fraying at the edges. When you walk off the eighteenth, the Coil will make you an offer. Win first. Choose after.',
     ],
   },
@@ -372,6 +375,28 @@ export function isTeamTournament(t: StoryTournament): boolean {
   return t.format === 'scramble' || t.format === 'bestball';
 }
 
+/** Is this Sigil a single-person STABLEFORD (Ch.3 — points, higher wins; attack every flag)? */
+export function isStablefordTournament(t: StoryTournament): boolean {
+  return t.format === 'stableford';
+}
+
+/** The rival's ghost STABLEFORD points over the venue (GS-story-stableford): the SAME deterministic strokes
+ *  stream as `rivalTotal` (so difficulty tracks `rivalEdge`), converted per hole to Stableford points —
+ *  higher is better. Used by the Ch.3 Storm Championship resolution + the halftime standing. */
+export function rivalStablefordThrough(t: StoryTournament, seed: string, pars: readonly number[], upto: number): number {
+  const form = golferForm(t.rivalId, `${seed}:form`);
+  const n = Math.max(0, Math.min(pars.length, upto));
+  let pts = 0;
+  for (let i = 0; i < n; i++) {
+    const strokes = ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
+    pts += stablefordPoints(pars[i]!, strokes);
+  }
+  return pts;
+}
+export function rivalStablefordTotal(t: StoryTournament, seed: string, pars: readonly number[]): number {
+  return rivalStablefordThrough(t, seed, pars, pars.length);
+}
+
 /** The partners you may pick for a team Sigil — your three friend golfers (id + short name). */
 export function teamPartnerPool(story: StoryState): { id: string; name: string }[] {
   return otherGolferIds(story).map((id) => ({ id, name: getCharacter(id)?.shortName ?? id }));
@@ -443,6 +468,30 @@ export function tournamentLeaderboard(
 ): FieldGolfer[] {
   const rows: FieldGolfer[] = [...field, { id: '__player__', name: playerName, gross: playerGross, kind: 'player' }];
   return rows.sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
+}
+
+/** GS-story-stableford: the Ch.3 Storm Championship's finished POINTS leaderboard (higher wins) — you, the
+ *  rival, and your three friends, each on their Stableford points, sorted HIGH→low (you break ties). */
+export function stablefordLeaderboard(
+  t: StoryTournament,
+  seed: string,
+  pars: readonly number[],
+  protagonistId: string,
+  playerName: string,
+  playerPts: number,
+): { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[] {
+  const rows: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[] = [
+    { name: playerName, gross: playerPts, kind: 'player' },
+    { name: t.rivalName, gross: rivalStablefordTotal(t, seed, pars), kind: 'rival' },
+  ];
+  for (const c of CHARACTERS) {
+    if (c.id === protagonistId || c.id === t.rivalId) continue;
+    const form = golferForm(c.id, `${seed}:friend:${c.id}`);
+    let pts = 0;
+    for (let i = 0; i < pars.length; i++) pts += stablefordPoints(pars[i]!, ghostHoleStrokes(c.id, `${seed}:friend:${c.id}:${i}`, pars[i]!, form, FRIEND_FIELD_EDGE));
+    rows.push({ name: c.shortName, gross: pts, kind: 'friend' });
+  }
+  return rows.sort((a, b) => b.gross - a.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
 }
 
 /**

@@ -246,8 +246,13 @@ export function storyTournamentResultScreen(): string {
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyTournamentContinue' })}'>Continue ›</button>
       </div>`;
   }
+  // GS-story-stableford: on the Ch.3 Storm the values are POINTS (higher wins); the margin is the magnitude
+  // either way, with a "points"/"tied" wording for Stableford vs strokes.
   const diff = r.playerGross - r.rivalGross;
-  const margin = diff === 0 ? 'tied, and the tie goes to you' : diff < 0 ? `by ${-diff}` : `by ${diff}`;
+  const lead = Math.abs(diff);
+  const margin = diff === 0
+    ? (r.stableford ? 'level, and the tie goes to you' : 'tied, and the tie goes to you')
+    : `by ${lead}${r.stableford ? ' points' : ''}`;
   const title = r.won ? (r.finalSigil ? '🗝 The final Sigil!' : `🏅 ${r.sigilName} won!`) : '💔 So close';
   const kicker = r.won
     ? r.finalSigil
@@ -269,7 +274,7 @@ export function storyTournamentResultScreen(): string {
       <p class="gs-hero-tag">${kicker}</p>
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-ink);font-size:14px;">${r.name}</span>
-        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}</span>
+        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.stableford ? 'your Stableford points vs the rival (higher wins)' : r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}${r.stableford ? ' pts' : ''}</span>
         ${r.team ? `<span class="gs-chip" style="border-color:#2f6a44;color:#9dffce;font-size:13px;" title="your partner for this Sigil">🤝 You &amp; ${r.team.partnerName} · ${r.team.format}${r.team.partnerCountedHoles > 0 ? ` · their ball counted on ${r.team.partnerCountedHoles}` : ''}</span>` : ''}
       </div>
     </header>
@@ -295,10 +300,11 @@ export function storyTournamentResultScreen(): string {
 function scoreboardHTML(r: NonNullable<typeof state.lastStoryTournament>): string {
   const board = r.leaderboard;
   if (!board || board.length === 0) return '';
+  const sf = r.stableford === true; // GS-story-stableford: gross values are POINTS (higher wins), no to-par
   const par = r.par ?? 0;
   const rows = board
     .map((g, i) => {
-      const toPar = par ? g.gross - par : undefined;
+      const toPar = !sf && par ? g.gross - par : undefined;
       const toParStr = toPar === undefined ? '' : toPar === 0 ? 'E' : toPar > 0 ? `+${toPar}` : `${toPar}`;
       const glyph = g.kind === 'rival' ? '🐍' : g.kind === 'player' ? '🏌' : '🤝';
       return `<tr class="gs-tsb-row${g.kind === 'player' ? ' gs-tsb-row--you' : ''}${g.kind === 'rival' ? ' gs-tsb-row--rival' : ''}">
@@ -313,7 +319,7 @@ function scoreboardHTML(r: NonNullable<typeof state.lastStoryTournament>): strin
     <section style="max-width:520px;margin:14px auto 0;">
       <h2 class="gs-tsb-title">Final leaderboard</h2>
       <table class="gs-tsb">
-        <thead><tr><th></th><th style="text-align:left;">Competitor</th><th>To par</th><th>Gross</th></tr></thead>
+        <thead><tr><th></th><th style="text-align:left;">Competitor</th><th>${sf ? '' : 'To par'}</th><th>${sf ? 'Points' : 'Gross'}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </section>`;
