@@ -201,7 +201,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     rivalEdge: 0.29,
     unlockAfterClears: 2,
     sigilId: 'sigil-ascension',
-    sigilName: 'The Herald’s Seal',
+    sigilName: 'The Serpent’s Fang',
     prize: 'The Coil anoints you its Herald. The fifth Sigil forges the key to the finale.',
     intro: [
       'The Ghost Wreck, where the Coil harvests the dead — and the last Wardens who might stop you make ' +

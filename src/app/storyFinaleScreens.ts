@@ -42,29 +42,56 @@ export function storyFinaleScreen(): string {
   }
   const who = getCharacter(story.characterId)?.name ?? 'Champion';
   const ready = r.won;
+  // GS-story-quality: the finale is re-themed by the path chosen at The Choice. The WARDEN comes to KILL
+  // the serpent and save the worlds (the Parrot at your side); the HERALD comes to UNSEAL it — first
+  // breaking the Warden blockade that arrives to stop you, then presenting the serpent its final release
+  // (the Crow, the Coil's true prophet, in the Parrot's place). The mechanics are identical; the framing,
+  // the speaker, and the meaning invert. (Jörmungandr is a genderless eldritch enormity — "it", never "she".)
+  const herald = story.alignment === 'herald';
+  const lore = herald
+    ? `The five Sigils burn together into the Green Key, and the root of the World-Tree splits open. Coiled
+        in the dark below waits the World-Eater, bound in the Wardens' old wards — and the Ark has come after
+        you, your friends at its helm, too late to close the root. Break the last wards that cage it, and
+        there is nothing left between the galaxy and its rest.`
+    : `The five Sigils burn together into a single key, and the root of the World-Tree splits open. Coiled
+        in the dark below sleeps the world-serpent — and something worse wears it now, a corruption from
+        beyond the stars. It is waking. Only your ship stands between it and every world you crossed to get here.`;
+  const guide = herald
+    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Two stages, Herald. First shatter the wards that
+        cage it — fire your guns, hold your shields as it thrashes awake. Then, when the final seal lies bare,
+        strike it and let the serpent rise. The cage was always meant to open."</p>`
+    : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Two stages: first we break the
+        serpent's guard — fire your guns, hold your shields — then, when it's reeling and bares its eye, you
+        take the shot. Don’t miss."</p>`;
+  const plan = herald
+    ? `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> Fire your weapon (it holds a few charges
+        and recharges) to shatter the wards binding the serpent while your shields weather its waking throes.<br>
+        🎯 <b>Stage 2 — the Final Strike.</b> When the final seal lies bare, strike the ball home and break it.</p>`
+    : `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> Fire your weapon (it holds a few charges and
+        recharges) to break the serpent's hide while your shields weather its lunges.<br>
+        🎯 <b>Stage 2 — the Final Strike.</b> When it's broken and its eye opens, strike the ball home.</p>`;
+  // GS-story-quality (finding C): weapons + engines outfit aboard your ship; SHIELDS are stocked at ship-vendor
+  // worlds you fly to — so the guidance names where the gap is actually filled, not the equip-only Hangar.
+  const breachHint = herald
+    ? 'Buy heavier WEAPONS — aboard your ship or at a ship-vendor world — your guns can’t break its wards yet.'
+    : 'Buy heavier WEAPONS — aboard your ship or at a ship-vendor world — your guns can’t crack its scales yet.';
+  const surviveHint = 'Buy ENGINES aboard your ship and SHIELDS at a ship-vendor world — you can’t weather the assault yet.';
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title">🐍 Jörmungandr</h1>
-      <p class="gs-hero-tag">The Dark Root of Yggdrasil · the final battle</p>
+      <p class="gs-hero-tag">The Dark Root of Yggdrasil · ${herald ? 'the final rite' : 'the final battle'}</p>
     </header>
     <section style="max-width:520px;margin:6px auto 0;">
-      <p class="gs-fin-lore">The five Sigils burn together into a single key, and the root of the World-Tree
-        splits open. Coiled in the dark below sleeps the world-serpent — and something worse wears it now,
-        a corruption from beyond the stars. It is waking. Only your ship stands between it and every world
-        you crossed to get here.</p>
-      <p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Two stages: first we FIGHT her ship
-        to ship — fire your guns, hold your shields — then, when she's reeling and bares her eye, you take the
-        shot. Don’t miss."</p>
+      <p class="gs-fin-lore">${lore}</p>
+      ${guide}
 
-      <p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> Fire your weapon (it holds a few charges and
-        recharges) to break the serpent's hide while your shields weather her lunges.<br>
-        🎯 <b>Stage 2 — the Final Strike.</b> When she's broken and her eye opens, strike the ball home.</p>
+      ${plan}
 
       <h2 class="gs-fin-sec">Battle readiness</h2>
-      ${gateRow('Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, 'Buy heavier WEAPONS at the shipyard — your guns can’t crack her scales yet.')}
-      ${gateRow('Defence — survive the coils', r.defenceRating, FINALE_SURVIVE_NEED, 'Buy ENGINES + SHIELDS at the shipyard — you can’t weather her strike yet.')}
+      ${gateRow(herald ? 'Firepower — shatter the wards' : 'Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, breachHint)}
+      ${gateRow('Defence — survive the assault', r.defenceRating, FINALE_SURVIVE_NEED, surviveHint)}
       <div class="gs-fin-verdict" style="color:${ready ? '#7fe0a0' : '#ff9a6a'};">
-        ${ready ? '🚀 Your ship is ready. Engage when you are.' : '🛠 Your ship isn’t ready — arm up at the shipyard, then return.'}
+        ${ready ? '🚀 Your ship is ready. Engage when you are.' : '🛠 Your ship isn’t ready — arm up, then return.'}
       </div>
       <p class="gs-fin-save">💾 Your campaign is <b>saved</b> right here at the root. Engaging risks nothing —
         lose, and you return to the clubhouse with everything intact to arm up and try again. The root will wait.</p>
@@ -92,10 +119,14 @@ export function storyFinaleResultScreen(): string {
     // GS-story-finisher: the interactive strike's quality colours the win — a dead-centre CLEAN kill vs a
     // GRAZE that clipped the eye (the serpent still falls; an armed champion always wins).
     const graze = r.strike === 'graze';
-    const strikeLine = graze
-      ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the killing blow you wanted, but enough. The serpent falls all the same, and you'll always know how close it was.</p>`
-      : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to. A perfect kill.</p>`;
-    const title = herald ? '🐍 Ragnarök — The Long Rest' : '🌌 The Universe is Saved';
+    const strikeLine = herald
+      ? graze
+        ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the seal — not the clean release you meant, but enough. The last ward cracks all the same, and you'll always know how close it was.</p>`
+        : `<p style="color:#c8e88a;">🎯 A <b>dead-centre</b> strike — the ball vanished into the seal like it was always meant to, and the cage sprang open clean.</p>`
+      : graze
+        ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the killing blow you wanted, but enough. The serpent falls all the same, and you'll always know how close it was.</p>`
+        : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to. A perfect kill.</p>`;
+    const title = herald ? '🐍 Ragnarök — The Long Rest' : '🌌 The Reseal — The Universe is Saved';
     const tag = herald
       ? 'The serpent uncoils around the galaxy. The lights go out, one by one, into a final green silence.'
       : 'Jörmungandr falls. The corruption scatters into harmless light.';
@@ -135,9 +166,10 @@ export function storyFinaleResultScreen(): string {
     : 'The Crow let you win all along — you were to be the key. The maw opens on the unbroken hide.';
   const body = herald
     ? `<p>Dan plants his feet where your bag once hung. Penelope reads the line that stops you cold. The Parrot
-        bars the root, and your busted ship falls away into the unmapped dark. But a Herald is patient — go to
-        the shipyard, arm heavier, and come back for what you were promised.</p>
-       <p style="color:#8fb8ff;">🦜 "Run to the dark places on no one’s chart, then. …But it isn’t over. Arm up. Come back. We both know you will."</p>`
+        bars the root, and your busted ship falls away into the unmapped dark. But a Herald is patient — arm
+        heavier at a ship-vendor world, and come back for what you were promised.</p>
+       <p style="color:#b0e04f;">🐦‍⬛ "Patience, Herald. A blockade is only a delay, and the cage was always
+        meant to open. Arm heavier. Return. The serpent keeps no calendar — and neither do we."</p>`
     : `<p>The great black Crow spreads its wings and <em>laughs</em> — it never fought you; it let you win, every
         round, so YOU would carry the Keystone to the root. The maw yawns. But the Parrot pulls you clear at
         the last — this future can still be unwritten. Return to the shipyard, arm your ship, and take the

@@ -389,7 +389,17 @@ export function reduce(state: UiState, action: Action): UiState {
       // CONTINUE it — straight to the hub. Otherwise begin a NEW campaign by picking a golfer (the
       // `pendingStoryNew` flag routes `selectCharacter` to create the `StoryState`).
       if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'story') return state;
-      if (state.story) return { ...state, screen: 'story', storyInspectId: undefined };
+      if (state.story) {
+        // GS-story-quality (finding A): The Choice is reached only via the transient tournament-result
+        // screen (neither it nor `lastStoryTournament` is persisted), so quitting mid-dismiss after the
+        // Chapter-3 win would silently railroad you onto the default Warden route AND skip the Chapter-4
+        // interlude. If a loaded campaign has advanced past the trunk (chapter ≥ 4) with no path chosen and
+        // the finale not yet won, re-present The Choice instead of dropping into the hub.
+        if (state.story.chapter >= 4 && !state.story.alignment && state.story.completed !== true) {
+          return { ...state, screen: 'storyChoice', storyInspectId: undefined };
+        }
+        return { ...state, screen: 'story', storyInspectId: undefined };
+      }
       return { ...state, screen: 'character', pendingStoryNew: true, storyInspectId: undefined, resumable: state.resumable };
     }
 
@@ -503,6 +513,10 @@ export function reduce(state: UiState, action: Action): UiState {
       // the bag by default. Guarded to the world actually hosting THIS caddy so a stray dispatch can't hire.
       if (!state.story) return state;
       if (state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop') return state;
+      // GS-story-quality (GAP1): a Herald can't recruit the Warden friends they turned against (Dan &
+      // Penelope are rivals to crush on the dark path) — the recruit UI is hidden, and a stray dispatch
+      // is refused here too.
+      if (state.story.alignment === 'herald') return state;
       const wid = action.worldId;
       if (!worldCleared(state.story, wid) || worldCaddy(wid) !== action.caddyId) return state;
       const story = hireStoryCaddy(state.story, action.caddyId);

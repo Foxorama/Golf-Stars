@@ -202,6 +202,9 @@ export function questWorld(quest: StoryQuest): string | undefined {
 export function questOfferable(story: StoryState, caddyId: string): boolean {
   const q = questForCaddy(caddyId);
   if (!q) return false;
+  // GS-story-quality (GAP2): once you turn Herald you've betrayed the Wardens — their loyal personal
+  // quests (Dan's last haul, Penelope's stillest green, …) are off the table on the dark path.
+  if (story.alignment === 'herald') return false;
   if (!storyCaddyHired(story, caddyId)) return false;
   if (questDone(story, q.id)) return false;
   if (story.activeQuestId) return false; // one quest at a time

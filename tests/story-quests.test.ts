@@ -60,6 +60,9 @@ describe('Story ally side quests (GS-story-quests)', () => {
     // once done, no re-offer
     const done = { ...ready, completedQuestIds: [q.id] };
     expect(questOfferable(done, 'driver-dan')).toBe(false);
+    // GS-story-quality (GAP2): a Herald has turned on the Warden friends — their loyal quests are gone
+    const herald = { ...ready, alignment: 'herald' as const };
+    expect(questOfferable(herald, 'driver-dan')).toBe(false);
   });
 
   it('accept → active; complete → grants + equips the reward, records done, clears active', () => {

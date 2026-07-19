@@ -2552,6 +2552,7 @@ function render(): void {
         weaponRating: fr?.weaponRating ?? 0,
         defenceRating: fr?.defenceRating ?? 0,
         interactive: true,
+        herald: alignment === 'herald', // GS-story-quality: re-theme the fight for the chosen path
         onDone: go,
       });
     });

@@ -205,7 +205,9 @@ export function storyTournamentResultScreen(): string {
   const body = r.won
     ? r.finalSigil
       ? `<p>The Sigils rise and lock together into a single burning key. Somewhere far below Yggdrasil, something vast stirs — and now you can reach it.</p>
-         <p style="color:#7fe0a0;">🦜 "You did it, champion. Five Sigils. The galaxy owes you everything — but it isn’t over. The serpent is awake, and it is coming."</p>`
+         ${state.story?.alignment === 'herald'
+           ? `<p style="color:#b0e04f;">🐦‍⬛ "Five Sigils, Herald. The key is forged, and the root is yours to open. Come — the serpent has waited so long for someone kind enough to let it rest."</p>`
+           : `<p style="color:#7fe0a0;">🦜 "You did it, champion. Five Sigils. The galaxy owes you everything — but it isn’t over. The serpent is awake, and it is coming."</p>`}`
       : `<p><b>🎁 ${r.prize}</b></p>
          <p>The next reaches of the galaxy open on your star chart.</p>`
     : `<p>A tournament is never lost for good — the venue will host you again. Sharpen your bag, arm your ship, and take the rematch.</p>`;

@@ -73,6 +73,30 @@ bible. Story-only surfaces (separate save + gated rows) so none risk Voyage/Unen
 - **GS-story-choice-cost** — surface the alignment trade-off at The Choice (the Herald interlude pays MORE
   credits with no visible downside today — cursed = a visible cost, not the greedy pick).
 
+**GS-story-quality — 2026-07-19 deep-dive quality pass** (report:
+`reports/story-mode-quality-pass-2026-07-19.md`; focus: does the Choice matter + is the final boss fun).
+Story-only, `npm run check`-green, no Voyage/Unending risk.
+- ✅ *shipped this pass*: fixed the finale serpent writing (misgendered "she"/"ship to ship" → "it");
+  re-themed the finale BRIEFING + battle CINEMATIC per alignment (Crow voice + unseal/wards framing for the
+  Herald, mechanics identical); "The Reseal" title payoff; Parrot→Crow on the Herald 5th-Sigil/shipyard/loss
+  screens; "The Serpent's Fang" Sigil name; path-correct mission log; **re-present The Choice on resume** if
+  it was skipped (was a silent railroad to Warden); **Herald can't recruit/quest the friends they must crush**;
+  **quest 9-hole rounds no longer corrupt the 18-hole `worldBest`**.
+- **GS-story-world-routing** — per-alignment world unlock (`STORY_WORLDS` is flat/chapter-only; both paths
+  chart the identical galaxy). The bible's core replay engine — Warden void/crystal/frost vs Herald ocean/
+  derelict/cetus. Add `alignment?` to Ch.4–5 rows + thread `storyWorldUnlocked`; shared shrine on both.
+- **GS-story-herald-finale** — the bible's Herald finale = fight the Ark + your former friends, then present
+  yourself (new battle art: Warden ships, the wyrm-ship as the player craft). This pass re-themed the copy as
+  the bridge; this is the full set-piece.
+- **GS-story-penelope-placement** — Ch.4H rival should be a real roster friend; stand Dan + Penelope TOGETHER
+  at the Ghost Harvest (the choice-screen "crush Dan & Penelope" promise is never delivered today; it also
+  doubles the interlude "Severing" beat).
+- **GS-story-boss-juice** — Stage 1 of the boss is shallow ("hold your shields" but no defensive input);
+  add a dodgeable lunge telegraph + hit-sparks/shake + rising intensity (render-only, outcome unchanged).
+- **GS-story-shield-bay** — a `'shield'` room in the ship interior (shields are only at vendor worlds today,
+  and one is mandatory for the survive gate — a forced detour). Plus the Ch.1 "Verdant Wood" prize is secretly
+  a legendary-tier base; two path-agnostic strings assume you're a Warden on the Herald path.
+
 **Run structure & meta**
 - **GS-encounters** — branching StS-style node map (elite / driving-range buff / treasure / shop / boss)
   over today's fixed voyage track. The format + boss layer is its foundation.

@@ -34,6 +34,20 @@ describe('Story Mode entry flow (GS-story-save wiring)', () => {
     expect(hub.story).toBe(story);
   });
 
+  it('Continue re-presents The Choice if it was skipped (chapter ≥ 4, no path) (GS-story-quality A)', () => {
+    // Won Ch.3 (chapter advanced to 4 + persisted) but quit before dismissing The Choice → alignment unset.
+    const skipped = { ...defaultStoryState('feather-fade'), chapter: 4, trophyIds: ['a', 'b', 'c'] };
+    const resumed = reduce(initState('seed', {}, undefined, skipped), { type: 'openStory' });
+    expect(resumed.screen).toBe('storyChoice');
+    // choosing there lands in the hub with the path locked in
+    const chosen = reduce(resumed, { type: 'chooseAlignment', alignment: 'herald' });
+    expect(chosen.screen).toBe('story');
+    expect(chosen.story?.alignment).toBe('herald');
+    // a campaign that HAS a path resumes straight to the hub (no spurious re-present)
+    const ok = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'warden' as const };
+    expect(reduce(initState('seed', {}, undefined, ok), { type: 'openStory' }).screen).toBe('story');
+  });
+
   it('exitStory returns to the title and keeps the campaign in state', () => {
     const story = defaultStoryState();
     const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };

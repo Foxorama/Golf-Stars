@@ -135,7 +135,9 @@ export function storyShipyardScreen(): string {
 
       ${upgradeSections ? `<h2 class="gs-yard-sec">Weapons &amp; upgrades</h2>
       <p style="text-align:center;color:var(--gs-dim);font-size:12px;line-height:1.5;margin:0 0 10px;">
-        <span style="color:#7fe0a0;">🦜 "Arm up, ${who(story)}."</span> Every piece raises your <b style="color:#ff8a8a;">combat rating</b> — you'll need it when the serpent wakes.
+        ${story.alignment === 'herald'
+          ? `<span style="color:#b0e04f;">🐦‍⬛ "Arm heavier, Herald."</span>`
+          : `<span style="color:#7fe0a0;">🦜 "Arm up, ${who(story)}."</span>`} Every piece raises your <b style="color:#ff8a8a;">combat rating</b> — you'll need it when the serpent wakes.
       </p>${upgradeSections}` : ''}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">

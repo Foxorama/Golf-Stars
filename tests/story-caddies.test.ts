@@ -51,6 +51,16 @@ describe('Story caddy roster — gather your friends (GS-story-caddies)', () => 
     expect(hireStoryCaddy({ ...defaultStoryState(), credits: 800 }, 'not-a-caddy')).toEqual({ ...defaultStoryState(), credits: 800 });
   });
 
+  it('a Herald cannot recruit the Warden friends they betrayed (GS-story-quality GAP1)', () => {
+    const dan = worldCaddy('derelict-18')!;
+    const herald = { ...defaultStoryState(), credits: 2000, alignment: 'herald' as const };
+    expect(hireStoryCaddy(herald, dan)).toBe(herald); // no-op on the dark path
+    expect(storyCaddyHired(hireStoryCaddy(herald, dan), dan)).toBe(false);
+    // a Warden (default undecided) still recruits fine
+    const warden = { ...defaultStoryState(), credits: 2000 };
+    expect(storyCaddyHired(hireStoryCaddy(warden, dan), dan)).toBe(true);
+  });
+
   it('setActiveStoryCaddy equips an owned friend, benches with undefined, refuses a stranger', () => {
     const dan = worldCaddy('derelict-18')!;
     const sandy = worldCaddy('desert-18')!;
