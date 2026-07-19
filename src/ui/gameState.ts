@@ -24,6 +24,10 @@ import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
 
+/** The rooms aboard your ship (GS-story-ship-interior), in walk order. `bridge` is the entry room. */
+export const SHIP_ROOMS = ['bridge', 'lounge', 'weapons', 'engine', 'locker'] as const;
+export type ShipRoom = (typeof SHIP_ROOMS)[number];
+
 export type Screen =
   | 'title'
   | 'character'
@@ -56,6 +60,9 @@ export type Screen =
   | 'storyLocker'
   // GS-story-ships: the spaceport shipyard — buy + fly ships.
   | 'storyShipyard'
+  // GS-story-ship-interior: step INSIDE your ship from the star map — rooms (bridge/engine/weapons/lounge/
+  // locker) with allies wandering, so you can manage the loadout on a long trip without flying home.
+  | 'shipInterior'
   // GS-story-tournament: a chapter's Galaxy Tournament — the lobby (host/rival/Sigil) and the win/lose recap.
   | 'storyTournament'
   | 'storyTournamentResult'
@@ -302,6 +309,18 @@ export interface UiState {
   storyShipyardReturn?: Screen;
   /** GS-story-econ: the shop item whose lore card is open (over the rack). Absent ⇒ no card. Transient. */
   storyItemInspectId?: string;
+  /** GS-story-ship-interior: the room you're in aboard the ship (bridge/engine/weapons/lounge/locker).
+   *  Transient. */
+  shipRoom?: string;
+  /** GS-story-ship-interior: the screen the ship interior was entered FROM (the star map), so exiting
+   *  returns there. Transient. */
+  shipInteriorReturn?: Screen;
+  /** GS-story-ship-interior: a bumped counter each time you board — reshuffles which room each ally is in,
+   *  so the crew appears to have moved about between visits. Transient. */
+  shipVisit?: number;
+  /** GS-story-locker: the screen the locker was opened FROM (clubhouse or the ship interior), so exiting
+   *  returns there. Transient. */
+  storyLockerReturn?: Screen;
   /** GS-story-parrot-bar: the Parrot's chatter tap-count at the bar (0 = greeting; each tap advances,
    *  wrapping through the eligible lines). Transient — reset to 0 each time the bar is opened, never saved. */
   storyBarTalk?: number;
@@ -380,6 +399,9 @@ export type Action =
   | { type: 'storyBuyShip'; shipId: string } // GS-story-ships: buy a ship (spend credits, fly it)
   | { type: 'storyEquipShip'; shipId: string } // GS-story-ships: fly an owned ship
   | { type: 'storyBuyUpgrade'; upgradeId: string } // GS-story-ship-upgrades: buy a ship weapon/engine/shield
+  | { type: 'openShipInterior' } // GS-story-ship-interior: board your ship from the star map
+  | { type: 'exitShipInterior' } // GS-story-ship-interior: leave the ship back to the star map
+  | { type: 'shipInteriorGoto'; room: string } // GS-story-ship-interior: walk to a room aboard the ship
   | { type: 'openStoryTournament' } // GS-story-tournament: open the chapter's Galaxy Tournament lobby
   | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)

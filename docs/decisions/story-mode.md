@@ -669,6 +669,27 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
 - **GS-story-quest-icon** — ✅ *shipped* (`storySpaceport.ts crewStandee`). A gold ❗ marker bobs over a
   clubhouse caddy who has an offerable quest right now (`questOfferable`), so you don't have to open each ally
   to find who's waiting. Pure render (own `.gs-sclub-questmark` class).
+- **GS-story-ship-interior** — ✅ *shipped* (`render/shipInteriorArt.ts` + `app/shipInteriorScreens.ts`).
+  The ship on the Story star chart is TAPPABLE (`shipTappable` opt on `starTourMap` → a transparent hit disc
+  over the hull, story-mode only; Star Tour proper leaves it inert). Tapping it BOARDS the ship
+  (`openShipInterior`, gated on `screen === 'starTour'` + a story) — a `shipInterior` screen with FIVE rooms
+  you walk between via a tab bar (bridge · lounge · weapons · engine · locker; `SHIP_ROOMS`/`ShipRoom` in
+  `gameState.ts`). Each room is an illustrated SVG backdrop tinted to the FLOWN ship's palette
+  (`shipInteriorTheme` reads hull/accent/flame/glass off `ShipLook`; gradient ids are per-theme suffixed so
+  co-mounted SVGs never cross-bleed) — so a woody wagon, a red racer, the teal Mothership and the near-black
+  gold-trimmed Firebird all feel like different vessels for free, no per-ship art. Your CREW wander aboard:
+  each boarding bumps `shipVisit`, a stable `id×visit` hash re-scatters them to new rooms, and whoever is in
+  the room you're in stands there as a tappable full-body standee (the SAME `<canvas class="gs-caddycv"
+  data-caddy>` the app.ts mount pass already draws — Warden caddies or the Herald Coil agents, via
+  `crewAboard`). The WEAPONS + ENGINE rooms OUTFIT the ship (buy `STORY_SHIP_UPGRADES` for that category
+  without flying back to a vendor — `storyBuyUpgrade` relaxed to allow `shipInterior`; combat rating rises);
+  the LOCKER room opens the campaign locker (`openStoryLocker` relaxed + `storyLockerReturn` so exiting
+  returns aboard); the BRIDGE is the helm. Exit → back to the star chart (`exitShipInterior`). The
+  ally/upgrade inspect cards reuse the existing overlays (`allyInspectOverlayHTML`/`heraldAgentOverlayHTML`
+  for crew, the exported `shipInspectOverlay` for upgrades). Changing the actual SHIP still happens at the
+  clubhouse Hangar; buying a new ship already auto-equips (`buyStoryShip`), so a fresh hull's rooms show at
+  once. Own `.si-*` CSS prefix (never `.gs-hud`); pure render + reducer plumbing, no rng/save bump. Deep-link
+  `?screen=shipinterior` + a `tests/build.test.ts` smoke row guard the render.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

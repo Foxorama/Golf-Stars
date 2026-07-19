@@ -274,6 +274,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
     { screen: 'storylocker', sel: '.gs-lock-grid', text: 'Your bag', label: 'the Story locker (bag builder + gear)' },
     { screen: 'storyshipyard', sel: '.gs-yard-usec', text: 'Weapons & upgrades', label: 'the Story shipyard (ships + weapons/upgrades)' },
+    { screen: 'shipinterior', sel: '.si-nav', text: 'aboard your ship', label: 'the ship interior (rooms + crew + outfitting)' },
     { screen: 'storytournament', sel: '.gs-tourn-card', text: 'Emerald Invitational', label: 'the Story Galaxy Tournament lobby' },
     { screen: 'storytournamentpop', sel: '.gs-tourn-card', text: 'The turn', label: 'the Story tournament halftime rival pop' },
     { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },

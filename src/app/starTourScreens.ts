@@ -517,6 +517,9 @@ export function starTourScreen(): string {
     zoom: starTourView.zoom,
     showYggdrasil: armed,
     yggdrasilSelected: starTourView.yggdrasilOpen,
+    // GS-story-ship-interior: in the Story campaign the ship is tappable → board it (manage the loadout on
+    // the go). Star Tour proper leaves it inert decor.
+    shipTappable: inStoryTour(),
   });
   const sheet = sel
     ? dossier(sel)
