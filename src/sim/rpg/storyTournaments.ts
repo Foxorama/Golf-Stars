@@ -28,10 +28,18 @@ import {
 } from './story';
 import { qualifierEventsForChapter, qualifiedCount, QUALIFY_EVENTS_NEEDED } from './storyQualifiers';
 
+/** The FORMAT a Sigil is played in (GS-story-team-format). Absent/`strokeplay` = the classic ghost
+ *  stroke-play major (byte-identical to before the betrayal rework). The team + Stableford + matchplay
+ *  variants are the betrayal arc's distinct Sigils (Scramble → Best-ball → Stableford → strokeplay →
+ *  2v2 best-ball matchplay). Resolution branches on this in `resolveStoryTournament`. */
+export type StoryTournamentFormat = 'strokeplay' | 'scramble' | 'bestball' | 'stableford' | 'bestball-match';
+
 /** A chapter's Galaxy Tournament (content-as-data). */
 export interface StoryTournament {
   /** The chapter this tournament closes (1..STORY_CHAPTER_COUNT). Winning it advances to `chapter + 1`. */
   chapter: number;
+  /** GS-story-team-format: how this Sigil is played. Absent = classic ghost stroke-play (byte-identical). */
+  format?: StoryTournamentFormat;
   /** GS-story-chapters: back-half tournaments (Ch.4–5) come in two ALIGNMENT variants (warden/herald);
    *  Ch.1–3 are the shared trunk (no alignment). `tournamentForChapter` picks the row for the path. */
   alignment?: StoryAlignment;
