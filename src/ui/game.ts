@@ -81,7 +81,7 @@ import { isOtherGolfer } from '../sim/rpg/storyCast';
 import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
-import { currentTournament, tournamentForChapter, rivalTotalThrough } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import type { GearSlot } from '../sim/rpg/story';
@@ -798,6 +798,13 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, screen: 'story' };
     }
 
+    case 'selectStoryPartner': {
+      // GS-story-partners: pick your partner for a team Sigil in the lobby (one of your three friends).
+      if (state.screen !== 'storyTournament' || !state.story) return state;
+      if (!isOtherGolfer(state.story, action.characterId)) return state;
+      return { ...state, storyPartnerPick: action.characterId };
+    }
+
     case 'storyPlayTournament': {
       // GS-story-tournament: tee off the tournament round at the venue vs the rival. Builds a story round
       // (campaign bag + gear) MARKED as the chapter's tournament so it resolves vs the rival for the Sigil.
@@ -808,6 +815,9 @@ export function reduce(state: UiState, action: Action): UiState {
       const bag = storyBagClubs(state.story);
       // GS-story-caddies: the active caddy folds into the tournament loadout too (auto ≡ interactive).
       const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
+      // GS-story-partners: a TEAM Sigil (Scramble/Best-ball) carries your chosen partner onto the run so the
+      // resolution folds their ghost in (defaulting to your first tour-mate if the picker was skipped).
+      const partner = isTeamTournament(t) ? teamPartnerOrDefault(state.story, state.storyPartnerPick) : undefined;
       const run = {
         ...run0,
         loadout,
@@ -816,6 +826,7 @@ export function reduce(state: UiState, action: Action): UiState {
         staticEffect: storyWorldEffect(t.venueId),
         storyRound: true,
         storyTournament: t.chapter,
+        ...(partner ? { storyTournamentPartner: partner } : {}),
       };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }

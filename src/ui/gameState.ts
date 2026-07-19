@@ -296,6 +296,9 @@ export interface UiState {
     /** GS-story-tournament-field: the FULL finished leaderboard (rival + your three friends + you), sorted
      *  low-gross-first — the "all competitors" scoreboard for the victory recap. */
     leaderboard?: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[];
+    /** GS-story-partners: on a TEAM Sigil (Scramble/Best-ball), the partner + format for the recap copy —
+     *  "You & Feather · scramble" and how many holes the partner's ball counted. Absent = a solo major. */
+    team?: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number };
   };
   /** GS-story-tournament-midpop: the halftime (after hole 9) rival pop payload — the rival BRAGS when
    *  ahead / CURSES you when behind, over the standings through nine. Transient (the `storyTournamentPop`
@@ -337,6 +340,10 @@ export interface UiState {
   /** GS-story-parrot-bar: the Parrot's chatter tap-count at the bar (0 = greeting; each tap advances,
    *  wrapping through the eligible lines). Transient — reset to 0 each time the bar is opened, never saved. */
   storyBarTalk?: number;
+  /** GS-story-partners: the friend chosen as your PARTNER in the team-Sigil lobby (Scramble/Best-ball),
+   *  before you tee off. Transient (carried onto the run at tee-off; the locked pick persists on StoryState).
+   *  Absent ⇒ default to your first tour-mate. */
+  storyPartnerPick?: string;
   /** GS-story-allies: the recruited crew ally whose talk card is open on the clubhouse (undefined ⇒ none).
    *  Transient (never persisted). */
   storyAllyInspectId?: string;
@@ -418,6 +425,7 @@ export type Action =
   | { type: 'openStoryTournament' } // GS-story-tournament: open the chapter's Galaxy Tournament lobby
   | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
+  | { type: 'selectStoryPartner'; characterId: string } // GS-story-partners: pick your team-Sigil partner in the lobby
   | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
   | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)

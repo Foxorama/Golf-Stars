@@ -16,7 +16,9 @@
  */
 
 import { ghostHoleStrokes, golferForm } from './competition';
-import { CHARACTERS } from './characters';
+import { CHARACTERS, getCharacter } from './characters';
+import { otherGolferIds } from './storyCast';
+import type { OpposingPair } from './storyTeams';
 import {
   STORY_WORLDS,
   STORY_CHAPTER_COUNT,
@@ -75,6 +77,7 @@ export interface StoryTournament {
 export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
   {
     chapter: 1,
+    format: 'scramble',
     venueId: 'verdant-18',
     name: 'The Emerald Invitational',
     host: 'Sir Aldous Greensward',
@@ -90,12 +93,15 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'The rookie major, hosted by Sir Aldous Greensward — genteel old-guard chair of the Galactic Tour, ' +
         'pompous and kind and utterly ignorant of the Game beneath his tournament. A warm twin-sun, and a ' +
         'gallery that still thinks this is just golf. It isn’t — but today you can pretend.',
-      'Beat the club’s champion, Birdie Bianchi, over eighteen and your first Sigil of the Game is yours.',
+      'It’s a TWO-BALL SCRAMBLE — pick one of your friends, share a ball, and take the best of every shot. ' +
+        'A gentle way to learn a partner. Beat the field (the club champion Birdie Bianchi leads a pair) and ' +
+        'your first Sigil of the Game is yours.',
       '🦜 "One Sigil in the Keystone, champion — one stone against the day the World-Eater wakes. It starts here. Play it true."',
     ],
   },
   {
     chapter: 2,
+    format: 'bestball',
     venueId: 'inferno-18',
     name: 'The Forge Masters',
     host: 'Magnus Cinder',
@@ -112,8 +118,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'anything for spectacle, and who took Coil money without ever knowing what he sold. Halfway ' +
         'through, an uninvited golfer strides onto the tee: Venoma "the Viper" Krait, the Coil’s prodigy, ' +
         'playing a ball that hisses as it flies.',
-      '🦜 "That’s the Coil, champion — a cult that wants the serpent awake. Beat her. This is where it ' +
-        'stops being a game."',
+      'BEST-BALL this time — you and a friend each play your own ball, and the team keeps the better score ' +
+        'on every hole. Pick the same partner or a new one. 🦜 "That’s the Coil, champion — a cult that ' +
+        'wants the serpent awake. Beat the Viper’s pair. This is where it stops being a game."',
       'Two Sigils would lock the root deeper. The Coil knows it too — which is why the Viper came to take this one from you.',
     ],
   },
@@ -356,6 +363,61 @@ export function tournamentField(
     out.push({ id: c.id, name: c.shortName, gross: friendTotal(c.id, seed, pars), kind: 'friend' });
   }
   return out;
+}
+
+// ── Team majors (GS-story-partners): Sigils 1 (scramble) & 2 (best-ball) — you + a chosen friend vs pairs ──
+
+/** Is this Sigil a TEAM major (you pick a partner and play a scramble / best-ball vs opposing pairs)? */
+export function isTeamTournament(t: StoryTournament): boolean {
+  return t.format === 'scramble' || t.format === 'bestball';
+}
+
+/** The partners you may pick for a team Sigil — your three friend golfers (id + short name). */
+export function teamPartnerPool(story: StoryState): { id: string; name: string }[] {
+  return otherGolferIds(story).map((id) => ({ id, name: getCharacter(id)?.shortName ?? id }));
+}
+
+/** The friend chosen for a team Sigil (from `run.storyTournamentPartner`), defaulting to your first
+ *  tour-mate so a tee-off always has a partner even if the picker was skipped. */
+export function teamPartnerOrDefault(story: StoryState, chosen?: string): string {
+  const pool = otherGolferIds(story);
+  return chosen && pool.includes(chosen) ? chosen : pool[0] ?? story.characterId;
+}
+
+/** Your partner's mild HELP edge in a team major (they're a friend on your side, not the cult rival). */
+export const TEAM_PARTNER_EDGE = 0.05;
+
+/** How sharply the rando also-ran pairs play (slightly UNDER the field — beatable filler). */
+const RANDO_PAIR_EDGE = -0.06;
+
+/** Low-tier "rando" pair ghosts — the team field's also-rans (flavour ids; the `edge` sets difficulty). */
+const RANDO_PAIRS: readonly { id: string; name: string; golferIds: readonly [string, string] }[] = [
+  { id: 'rando-a', name: 'The Weekend Pair', golferIds: ['tour-rook-a', 'tour-rook-b'] },
+  { id: 'rando-b', name: 'The Journeymen', golferIds: ['tour-jour-a', 'tour-jour-b'] },
+];
+
+/** The rival's first name/handle for a pair label ("Venoma …" from 'Venoma "the Viper" Krait'). */
+function rivalHandle(rivalName: string): string {
+  return rivalName.split(' ')[0] ?? rivalName;
+}
+
+/**
+ * The opposing PAIRS in a team Sigil (GS-story-partners): the RIVAL's pair (the chapter rival + a Coil
+ * partner, the sharpest), two low-tier rando pairs, and the two NON-chosen friends as a pair — so whoever
+ * you leave out still shows up across the tee (and, later, the one you never pick is the odd-one-out
+ * betrayer). `partnerId` is your chosen partner; the field excludes them (they're with you).
+ */
+export function teamFieldPairs(t: StoryTournament, story: StoryState, partnerId: string): OpposingPair[] {
+  const pairs: OpposingPair[] = [
+    { id: 'rival', name: `${rivalHandle(t.rivalName)} & Fang`, golferIds: [t.rivalId, 'coil-acolyte'], edge: t.rivalEdge },
+  ];
+  for (const r of RANDO_PAIRS) pairs.push({ id: r.id, name: r.name, golferIds: r.golferIds, edge: RANDO_PAIR_EDGE });
+  const nonChosen = otherGolferIds(story).filter((id) => id !== partnerId);
+  if (nonChosen.length >= 2) {
+    const names = nonChosen.map((id) => getCharacter(id)?.shortName ?? id);
+    pairs.push({ id: 'friends', name: `${names[0]} & ${names[1]}`, golferIds: [nonChosen[0]!, nonChosen[1]!], edge: FRIEND_FIELD_EDGE });
+  }
+  return pairs;
 }
 
 /** The competitor IDENTITIES for the pre-round hype (GS-story-tournament-field) — the rival + your three

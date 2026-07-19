@@ -44,11 +44,13 @@ import {
   recordWorldClear,
   equipStoryClub,
   storyRewardSetIds,
+  setSigilPartner,
   STORY_CHAPTER_COUNT,
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
-import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
+import { resolveStoryTeamStroke } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
@@ -454,24 +456,59 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   const run = state.run;
   const chapter = run.storyTournament ?? 1;
   const totals = playTotals(played.map((p) => p.record));
-  const base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
+  let base = state.story ?? defaultStoryState(run.loadout.characterId ?? undefined);
   const t = tournamentForChapter(chapter, base.alignment);
   // Defensive: an unknown chapter falls back to a plain clear so a round can never hang.
   if (!t) return resolveStoryRound({ ...state, run: { ...run, storyTournament: undefined } }, played);
 
   const pars = state.course.holes.map((h) => h.par);
-  const rivalGross = rivalTotal(t, String(run.seed), pars);
-  const won = totals.gross <= rivalGross;
-  // GS-story-tournament-field: the full "all competitors" leaderboard for the victory recap — the rival +
-  // your three friendly-rival golfers + you, sorted low-gross-first. Display only (the WIN is still you vs
-  // the rival for the Sigil, above); deterministic from the round seed.
-  const field = tournamentField(t, String(run.seed), pars, base.characterId);
   const playerName = getCharacter(base.characterId)?.shortName ?? 'You';
-  const leaderboard = tournamentLeaderboard(field, playerName, totals.gross).map((g) => ({
-    name: g.kind === 'player' ? 'You' : g.name,
-    gross: g.gross,
-    kind: g.kind,
-  }));
+
+  let won: boolean;
+  let rivalGross: number;
+  let rivalName = t.rivalName;
+  let playerGross = totals.gross;
+  let leaderboard: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[];
+  let teamPayload: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number } | undefined;
+
+  if (isTeamTournament(t)) {
+    // GS-story-partners: a TEAM Sigil (Scramble/Best-ball) — your REAL round + a chosen partner ghost make
+    // your team; you beat a field of opposing PAIRS (the rival's pair + randos + the two non-chosen
+    // friends). Deterministic (storyTeams). The pick is LOCKED into the campaign here (drives the betrayal).
+    const partnerId = teamPartnerOrDefault(base, run.storyTournamentPartner);
+    const fmt = (t.format === 'scramble' ? 'scramble' : 'bestball') as 'scramble' | 'bestball';
+    const res = resolveStoryTeamStroke(
+      played.map((p) => p.record.strokes),
+      partnerId,
+      TEAM_PARTNER_EDGE,
+      teamFieldPairs(t, base, partnerId),
+      String(run.seed),
+      pars,
+      fmt,
+    );
+    won = res.won;
+    rivalGross = res.bestOpponentTotal;
+    rivalName = res.field[0]?.name ?? t.rivalName;
+    const partnerName = getCharacter(partnerId)?.shortName ?? 'Partner';
+    leaderboard = [
+      { name: `You & ${partnerName}`, gross: res.playerTeamTotal, kind: 'player' as const },
+      ...res.field.map((p) => ({ name: p.name, gross: p.total, kind: 'rival' as const })),
+    ].sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
+    teamPayload = { partnerName, format: fmt, playerSolo: totals.gross, partnerCountedHoles: res.partnerCountedHoles };
+    playerGross = res.playerTeamTotal;
+    base = setSigilPartner(base, t.chapter, partnerId);
+  } else {
+    rivalGross = rivalTotal(t, String(run.seed), pars);
+    won = totals.gross <= rivalGross;
+    // GS-story-tournament-field: the full "all competitors" leaderboard for the victory recap — the rival +
+    // your three friendly-rival golfers + you, sorted low-gross-first. Display only; deterministic.
+    const field = tournamentField(t, String(run.seed), pars, base.characterId);
+    leaderboard = tournamentLeaderboard(field, playerName, totals.gross).map((g) => ({
+      name: g.kind === 'player' ? 'You' : g.name,
+      gross: g.gross,
+      kind: g.kind,
+    }));
+  }
 
   // Bank the round (credits + best) exactly like a world clear, PLUS the Sigil milestone bonus on a first
   // win (GS-story-balance): the majors fund the escalating bag/ship/finale spend.
@@ -525,14 +562,15 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       name: t.name,
       sigilName: t.sigilName,
       prize: t.prize,
-      rivalName: t.rivalName,
-      playerGross: totals.gross,
+      rivalName,
+      playerGross,
       rivalGross,
       won,
       sigilId: t.sigilId,
       finalSigil,
       par: totals.totalPar,
       leaderboard,
+      ...(teamPayload ? { team: teamPayload } : {}),
     },
   };
 }

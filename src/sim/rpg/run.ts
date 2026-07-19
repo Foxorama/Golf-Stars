@@ -173,6 +173,10 @@ export interface Run {
    *  (beat the rival → Sigil + chapter advance) instead of the plain world-clear path. Run-lifetime, not
    *  snapshotted. */
   storyTournament?: number;
+  /** GS-story-partners: the chosen PARTNER golfer id for a TEAM Sigil (Scramble/Best-ball). Set alongside
+   *  `storyTournament` when the major is a team format; resolved by `resolveStoryTournament` (your real round
+   *  + this partner's ghost = your team). Absent for a solo major. Run-lifetime, not snapshotted. */
+  storyTournamentPartner?: string;
   /** GS-story-quests: this story round is an ally SIDE QUEST (the quest id), played at the ally's home
    *  world. Set alongside `storyRound`; the recap offers to complete the quest (grant the reward club).
    *  Run-lifetime, not snapshotted. */

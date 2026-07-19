@@ -54,13 +54,14 @@ partner with, and WHO betrays you is decided by your Sigil 1 & 2 partner picks. 
 distinct FORMATS (Scramble → Best-ball → Stableford → Strokeplay → 2v2 best-ball Matchplay). Reuses
 `match.ts`; content-as-data; Story-save only; determinism/auto≡interactive preserved (new levers no-op by
 default). One focused, tested, auto-merged PR each:
-- **GS-story-cast** — the 3 non-protagonist golfers travel aboard + stand in the clubhouse, tappable like
-  the Parrot; per-character talk adapting to chapter/alignment/partnered/betrayer. Shared `otherGolfers`
-  seam replaces the 3 ad-hoc "roster minus protagonist" computations.
-- **GS-story-team-format** — pure engine: `StoryTournament.format`, reuse `match.ts` best-ball/scramble/
-  matchplay + a multi-pair ghost-field builder (Asgard pattern + best-ball pairing). Tested, no UI yet.
-- **GS-story-partners** — `StoryState` v5 `sigil1Partner`/`sigil2Partner` + lobby partner-picker; wire
-  Sigil 1 (scramble) + Sigil 2 (best-ball) with opposing pairs + a team recap.
+- **GS-story-cast** — ✅ *shipped* (#508): the 3 non-protagonist golfers travel aboard + stand in the
+  clubhouse, tappable like the Parrot; per-character state-aware talk (warm/wary after The Choice). Shared
+  `otherGolfers` seam (`storyCast.ts`) replaces the ad-hoc "roster minus protagonist" computations.
+- **GS-story-team-format** — ✅ *shipped* (#509): pure engine (`storyTeams.ts`) — scramble/best-ball vs
+  opposing ghost PAIRS + 2v2 best-ball matchplay (reusing `match.ts`); `StoryTournament.format` field.
+- **GS-story-partners** — ✅ *shipping*: `StoryState` v5 `sigil1Partner`/`sigil2Partner` + lobby
+  partner-picker; Sigil 1 = scramble, Sigil 2 = best-ball, resolved vs opposing pairs; team recap; the pick
+  is locked into the campaign (drives the betrayal branch).
 - **GS-story-stableford** — Sigil 3 single Stableford.
 - **GS-story-charquests** — per-character quests unlocked once you partner that golfer; signature reward.
 - **GS-story-betrayer** — pure `storyBetrayal.ts` (betrayer = odd-one-out; finale team comps) +
