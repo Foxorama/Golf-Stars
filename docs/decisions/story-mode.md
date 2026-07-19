@@ -575,14 +575,39 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   ONLY the World Tour final (no Coil/serpent/Sigils); the Parrot reveals the real quest at the Crow's Nest
   in a Chapter-1 briefing greeting (`parrotBar.ts` `greet-recruited`), and the recruitment cinematic bridges
   to it ("meet me at the bar — I'll tell you everything").
-- **GS-story-serpent** — ✅ *shipped* (`render/sigilCeremony.ts drawSerpent`). The post-Sigil cutscene serpent
-  was a string of gradient balls (a "worm"); it's now a MASSIVE scaled world-serpent — a continuous tapered
-  body (one filled ribbon), overlapping crescent SCALES, a lit dorsal ridge with spines, and a WEDGE HEAD
-  with a jaw + a forked tongue-flick when it stirs, keeping the great slit-pupil eye that blows up on the
-  final reveal. Pure Canvas2D, zero rng; verified eyes-on. **Deferred (GS-story-serpent-beat):** moving the
-  next-chapter Coil/parrot lore beat to fire IMMEDIATELY after the cutscene (instead of on the next world
-  arrival) — the arrival beats are authored for the round-arrival lore gate, so relocating them cleanly is a
-  lore-flow redesign, left for a focused follow-up rather than risking beat double-fires.
+- **GS-story-serpent** — ✅ *shipped* (`render/sigilCeremony.ts`, exported `paintSerpent`). The post-Sigil
+  cutscene serpent was a string of gradient balls (a "worm"); it's now a MASSIVE scaled world-serpent — a
+  continuous tapered body (one filled ribbon), overlapping crescent SCALES, and a lit dorsal ridge with
+  spines. The **HEAD** was reworked a second time (the body read well but the head was a flat blob with a
+  giant floating eyeball + a stray red thread): a proper wedge silhouette (neck → raised bony brow → snout →
+  tip → upper lip → mouth corner → jaw), scales continuing onto it, a dark mouth seam + nostril, a real
+  forked TONGUE flicking from the mouth as it wakes, and a PROPORTIONATE slit-pupil eye (~0.42× the head
+  unit) seated under a brow-ridge arc — no longer a disc bigger than the head. Head size tracks the body
+  girth + a modest focus-reveal zoom (not the old runaway 26→118). Extracted to `paintSerpent` so
+  `scripts/serpent-preview.mjs` renders it eyes-on at any wake/focus. Pure Canvas2D, zero rng. **Deferred
+  (GS-story-serpent-beat):** moving the next-chapter Coil/parrot lore beat to fire IMMEDIATELY after the
+  cutscene (instead of on the next world arrival) — the arrival beats are authored for the round-arrival lore
+  gate, so relocating them cleanly is a lore-flow redesign, left for a focused follow-up rather than risking
+  beat double-fires.
+- **GS-story-tournament-reward** — ✅ *shipped* (`storyTournaments.ts` + `gameUpdates.ts resolveStoryTournament`).
+  The Galaxy Tournaments named a prize CLUB in the `prize` blurb but never granted it — the reported "won the
+  Emerald Invitational, never got the club" bug (majors only banked the Sigil + any `rewardShipId`, no club
+  path). Added `StoryTournament.rewardClubId` (a NAMED `major:<key>` id → `NAMED_STORY_CLUBS`, solar/legendary
+  for parity with the ally gifts) on the three trunk majors (Emerald→`major:emerald` Verdant Wood,
+  Forge→`major:ember` Forgefire Driver, Storm→`major:storm` Galewarden Irons, distinct base TYPES from the
+  quest gifts) and grant it on a first win exactly like `completeQuest` (own + `equipStoryClub`, guarded by
+  `alreadyWon`). Locker inspect + lorable-id now handle `major:` ids too. Guarded in `story-balance.test.ts`
+  (win grants + equips, loss doesn't) + `story-tournament.test.ts` (each trunk prize resolves + has an effect).
+- **GS-story-club-effects** — ✅ *shipped* (`sim/rpg/storyClubEffects.ts`). A quest/tournament reward club is
+  no longer "just the next tier": each NAMED reward club folds a signature EFFECT onto the round loadout when
+  equipped (Sandy's wedge = strong `lieRelief`; Dan's driver = `driverAnywhere` + distance floor; Chipinski =
+  `chipInBoost`; Penelope = `puttBoost`+read+`greenRead`; Sam = tighter `dispersionMult`; Mole = `greenRead`+
+  spin read; Emerald = tighter dispersion; Ember = driver distance floor; Storm = strong `windResist`). Pure
+  loadout fold — the `applyStoryGear`/`applyStoryCaddy` sibling, reusing existing `PlayerLoadout` fields (no
+  shot-resolver change), folded at all four story loadout builds so auto ≡ interactive holds; story rounds
+  only, every effect only ever HELPS. Shown as "✦ Special: …" on the quest recap, the tournament lobby prize,
+  and the locker card. Guarded by `tests/story-club-effects.test.ts` (coverage: every named reward club has an
+  effect; fold is a no-op when none equipped; effects never hurt).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

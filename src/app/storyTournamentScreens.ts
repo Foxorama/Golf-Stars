@@ -10,6 +10,7 @@ import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT } from '../sim/rpg/story';
 import { currentTournament, sigilCount, tournamentCompetitors } from '../sim/rpg/storyTournaments';
+import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { venomaPortraitSVG, vossPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
 import { penelopePortraitSVG } from '../render/caddyPortraits';
 
@@ -126,7 +127,11 @@ export function storyTournamentScreen(): string {
         <div class="gs-tourn-field">${fieldChips}</div>
       </div>
       <div class="gs-tourn-in gs-tourn-in3">${intro}</div>
-      <div class="gs-tourn-prize gs-tourn-in gs-tourn-in4"><b>🎁 Prize:</b> ${t.prize}</div>
+      <div class="gs-tourn-prize gs-tourn-in gs-tourn-in4"><b>🎁 Prize:</b> ${t.prize}${
+        t.rewardClubId && storyClubEffectLabel(t.rewardClubId)
+          ? ` <span style="color:#7fe0a0;font-weight:700;">✦ ${storyClubEffectLabel(t.rewardClubId)}</span>`
+          : ''
+      }</div>
       <div class="gs-tourn-stakes gs-tourn-in gs-tourn-in4">Beat ${t.rivalName.split(' ')[0]}’s round over 18 holes, ${who}, and the ${t.sigilName} is yours.</div>
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">

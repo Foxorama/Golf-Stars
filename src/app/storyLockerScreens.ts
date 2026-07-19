@@ -21,6 +21,7 @@ import {
   type StoryState,
 } from '../sim/rpg/story';
 import { storyGearById, ownedGearForSlot } from '../sim/rpg/storyGear';
+import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { storyCardFor, type StoryCard } from '../sim/rpg/storyShop';
 
@@ -235,26 +236,34 @@ function gearSlotRow(slot: GearSlot): string {
 
 /** The id to inspect for a club: themed + quest ids carry lore directly; a plain club maps to its 'starter' card. */
 function lorableId(id: string): string {
-  return id.startsWith('club:') || id.startsWith('quest:') ? id : `plain:${storyClubType(id)}`;
+  return id.startsWith('club:') || id.startsWith('quest:') || id.startsWith('major:') ? id : `plain:${storyClubType(id)}`;
 }
 
-/** Resolve any locker id (themed / quest / `plain:<type>` / gear) to a display card for the lore overlay. */
+/** Resolve any locker id (themed / quest / major / `plain:<type>` / gear) to a display card for the lore overlay. */
 function lockerCard(id: string): StoryCard | undefined {
-  if (id.startsWith('quest:')) {
-    // A named ally-gift club (GS-story-quest-club) — its own signature name + legendary tier.
+  if (id.startsWith('quest:') || id.startsWith('major:')) {
+    // A named reward club — an ally's gift (GS-story-quest-club) or a Galaxy-Tournament prize
+    // (GS-story-tournament-reward): its own signature name, legendary tier, and its signature EFFECT.
     const club = resolveStoryClub(id);
     const type = storyClubType(id);
     if (!club) return undefined;
+    const isMajor = id.startsWith('major:');
+    const fx = storyClubEffectLabel(id);
+    const carryLine = type === 'putter' ? 'A solar-true putter — reads run honest and long.' : `Carries ~${club.carry} yd.`;
     return {
       id,
       kind: 'club',
       name: club.name,
       rarity: club.rarity ?? 'legendary',
       price: 0,
-      tag: "An ally's gift · Legendary",
+      tag: isMajor ? 'A major prize · Legendary' : "An ally's gift · Legendary",
       blurb: '',
-      detail: type === 'putter' ? ['A solar-true putter — reads run honest and long.'] : [`Carries ~${club.carry} yd.`],
-      lore: ["A friend's signature club, forged out in the galaxy and given to you when you played their story true. It carries a little of them on every swing."],
+      detail: fx ? [carryLine, `✦ Special: ${fx}`] : [carryLine],
+      lore: [
+        isMajor
+          ? 'A signature club won at a Galaxy Tournament — the prize the whole gallery came to see handed over. It plays like the major it was won at.'
+          : "A friend's signature club, forged out in the galaxy and given to you when you played their story true. It carries a little of them on every swing.",
+      ],
     };
   }
   if (id.startsWith('plain:')) {

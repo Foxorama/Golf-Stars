@@ -116,11 +116,16 @@ describe('GS-story-balance — the economy funds the campaign', () => {
     expect(win.lastStoryTournament!.won).toBe(true);
     expect(win.story!.credits).toBe(500 + storyRoundCredits(-1 * pars.length) + SIGIL_WIN_BONUS);
     expect(win.story!.trophyIds).toContain('sigil-emerald');
+    // GS-story-tournament-reward: the promised prize CLUB is actually GRANTED + equipped (the Emerald
+    // Invitational bug — it named a prize club and never handed it over).
+    expect(win.story!.ownedClubIds).toContain('major:emerald');
+    expect(win.story!.equippedBagIds).toContain('major:emerald');
 
-    // LOSS (+3/hole): round pay only, no bonus, no Sigil.
+    // LOSS (+3/hole): round pay only, no bonus, no Sigil — and no prize club.
     const loss = resolveStoryTournament(s, roundOf(3));
     expect(loss.lastStoryTournament!.won).toBe(false);
     expect(loss.story!.credits).toBe(500 + storyRoundCredits(3 * pars.length));
     expect(loss.story!.trophyIds).not.toContain('sigil-emerald');
+    expect(loss.story!.ownedClubIds).not.toContain('major:emerald');
   });
 });

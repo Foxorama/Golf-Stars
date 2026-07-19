@@ -313,12 +313,20 @@ export function storyComplete(story: StoryState): boolean {
  * from there).
  */
 export const NAMED_STORY_CLUBS: Record<string, { base: string; name: string }> = {
+  // Ally side-quest gifts (GS-story-quest-club).
   'quest:dan': { base: 'club:solar:D', name: "The Long Haul — Dan's Driver" },
   'quest:sandy': { base: 'club:solar:SW', name: "Sand-Saver's Second" },
   'quest:chipinski': { base: 'club:solar:PW', name: 'The Phoenix Scalpel' },
   'quest:penelope': { base: 'club:solar:putter', name: 'The Star-Reader' },
   'quest:sam': { base: 'club:solar:3W', name: 'Conviction' },
   'quest:mole': { base: 'club:solar:7i', name: 'The Dowser' },
+  // Galaxy-Tournament (major) prize clubs (GS-story-tournament-reward): the promised prize is a NAMED,
+  // solar-tier club that lands in the bag with its own name (the majors used to announce a club and never
+  // hand it over — the Emerald Invitational bug). Distinct base TYPES from the quest gifts so they don't
+  // shove an ally's gift out of the bag.
+  'major:emerald': { base: 'club:solar:5W', name: 'The Verdant Wood' },
+  'major:ember': { base: 'club:solar:D', name: 'The Forgefire Driver' },
+  'major:storm': { base: 'club:solar:5i', name: 'The Galewarden Irons' },
 };
 
 /** The real `club:<set>:<type>` base id a Story-owned club id maps to — a `quest:<key>` reward resolves to
