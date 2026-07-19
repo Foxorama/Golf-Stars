@@ -264,7 +264,13 @@ function spaceClubhouseHTML(story: StoryState): string {
 
   const chip = (title: string, body: string, color = 'var(--gs-gold)') =>
     `<span class="gs-chip" style="border-color:#3a3320;color:${color};font-size:13px;" title="${title}">${body}</span>`;
-  const parrotLine = `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils. The Coil is not resting, ${who} — and neither is the serpent."`;
+  // GS-story-herald-clubhouse: on the dark path the Crow speaks from the bar, not the Parrot.
+  const herald = story.alignment === 'herald';
+  const keeperGlyph = herald ? '🐦‍⬛' : '🦜';
+  const keeperColor = herald ? '#c98ad8' : '#7fe0a0';
+  const parrotLine = herald
+    ? `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils, Herald. Carry them to the root — the long, kind silence is close now."`
+    : `"${trophies} of ${STORY_CHAPTER_COUNT} Sigils. The Coil is not resting, ${who} — and neither is the serpent."`;
   // GS-story-allies / GS-story-herald-clubhouse: the crew stand in the clubhouse; tap one to talk. On the
   // Herald path the standees are the Coil agents (their own talk card); otherwise the recruited caddies.
   const allyOverlay = state.storyAllyInspectId
@@ -295,7 +301,7 @@ function spaceClubhouseHTML(story: StoryState): string {
     <section style="max-width:620px;margin:8px auto 0;">
       ${spaceportSceneHTML(story)}
       <p style="text-align:center;color:var(--gs-dim);font-size:12px;line-height:1.45;margin:8px 0 0;">
-        <span style="color:#7fe0a0;">🦜</span> <em>${parrotLine}</em>
+        <span style="color:${keeperColor};">${keeperGlyph}</span> <em>${parrotLine}</em>
       </p>
     </section>
 

@@ -242,6 +242,99 @@ export function prognosticParrotPortraitSVG(): string {
 }
 
 /**
+ * The Carrion Prophet — the CROW (GS-story-herald-clubhouse), up close: the Coil's true prophet and the
+ * dark mirror of the Prognostic Parrot. When you take the dark path he takes the Parrot's place behind the
+ * bar. A great black bird with a bone-pale hooked beak and a single BURNING eye, hooded in a tattered Coil
+ * cowl (venom-violet #b060c0 / acid-green #7fe0a0). Matches the Parrot bust's 320×340 viewport so it drops
+ * into the exact same bar/clubhouse slots. Pure string builder, no rng.
+ */
+export function carrionCrowPortraitSVG(): string {
+  return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The Carrion Prophet — the Crow" style="display:block;aspect-ratio:320/340;overflow:visible;">
+  <defs>
+    <radialGradient id="gs-lore-crow-spot" cx="50%" cy="40%" r="64%">
+      <stop offset="0%" stop-color="#3a1a4a" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#1a0f26" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#0a0710" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gs-lore-crow-cowl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a1236"/>
+      <stop offset="100%" stop-color="#120818"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-crow-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1622"/>
+      <stop offset="100%" stop-color="#0a0810"/>
+    </linearGradient>
+    <radialGradient id="gs-lore-crow-eye" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#fff0c0"/>
+      <stop offset="45%" stop-color="#ffb020"/>
+      <stop offset="100%" stop-color="#b04010"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft spotlight halo (Coil violet) -->
+  <ellipse cx="160" cy="148" rx="150" ry="162" fill="url(#gs-lore-crow-spot)"/>
+
+  <!-- a shed serpent-scale relic hanging at the far shoulder (the Coil, not a spyglass) -->
+  <g transform="translate(232 226) rotate(18)">
+    <path d="M0 -10 Q12 -6 12 6 Q12 16 0 18 Q6 6 0 -6 Z" fill="#7fe0a0" opacity="0.85"/>
+    <path d="M2 -4 Q9 0 8 8" fill="none" stroke="#0a0710" stroke-width="1.4"/>
+    <line x1="0" y1="-10" x2="0" y2="-22" stroke="#5a3a6a" stroke-width="1.6"/>
+  </g>
+
+  <!-- shoulders / tattered black cowl with a violet Coil trim -->
+  <path d="M30 340 Q36 248 96 234 Q160 220 224 234 Q284 248 290 340 Z" fill="url(#gs-lore-crow-cowl)"/>
+  <path d="M30 340 Q36 248 96 234 Q120 230 132 234 Q88 260 80 340 Z" fill="#000" opacity="0.22"/>
+  <!-- ragged hem points -->
+  <g fill="#120818"><path d="M96 320 l10 20 10 -20 Z"/><path d="M150 326 l10 14 10 -14 Z"/><path d="M204 320 l10 20 10 -20 Z"/></g>
+  <!-- violet Coil braid across the chest -->
+  <path d="M116 244 Q160 300 204 244" fill="none" stroke="#b060c0" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+  <path d="M124 258 Q160 306 196 258" fill="none" stroke="#7fe0a0" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- black-feathered neck ruff, spiky -->
+  <path d="M118 238 Q118 208 160 202 Q202 208 202 238 Q202 264 160 270 Q118 264 118 238 Z" fill="url(#gs-lore-crow-body)"/>
+  <g fill="#0a0810"><path d="M124 236 q-10 -4 -16 2 q9 1 14 8 Z"/><path d="M196 236 q10 -4 16 2 q-9 1 -14 8 Z"/><path d="M160 268 q-4 10 0 16 q4 -6 0 -16 Z"/></g>
+  <!-- glossy violet sheen flecks on the ruff -->
+  <g stroke="#6a3a7a" stroke-width="2.4" stroke-linecap="round" opacity="0.7"><line x1="146" y1="240" x2="149" y2="250"/><line x1="160" y1="242" x2="163" y2="252"/><line x1="174" y1="240" x2="177" y2="250"/></g>
+
+  <!-- head: sleek black crow skull -->
+  <path d="M110 150 Q110 94 160 90 Q210 94 210 150 Q210 202 160 212 Q110 202 110 150 Z" fill="url(#gs-lore-crow-body)"/>
+  <!-- crown sheen -->
+  <path d="M128 110 Q160 96 192 110 Q170 104 160 104 Q150 104 128 110 Z" fill="#3a2a4a" opacity="0.5"/>
+  <!-- nape hackles -->
+  <g fill="#0a0810"><path d="M110 138 q-12 -2 -18 6 q10 -1 16 5 Z"/><path d="M112 158 q-13 2 -18 11 q10 -4 17 1 Z"/></g>
+
+  <!-- long straight bone-pale beak, hooked at the tip -->
+  <path d="M200 150 Q252 148 258 162 Q252 172 214 172 Q220 162 210 156 Q206 152 200 154 Z" fill="#e6ddc8" stroke="#b7ad92" stroke-width="2"/>
+  <path d="M252 162 Q246 170 226 170" fill="none" stroke="#b7ad92" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- a nostril slit + the down-hooked point -->
+  <path d="M214 156 q6 0 10 2" fill="none" stroke="#9a9078" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M256 162 Q260 168 254 172" fill="#cfc6ad"/>
+
+  <!-- brow ridge — a hard hooded line -->
+  <path d="M128 130 Q152 120 174 130" fill="none" stroke="#000" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- the single BURNING eye, cold flame -->
+  <circle cx="154" cy="148" r="15" fill="#2a0e06"/>
+  <circle cx="154" cy="148" r="12" fill="url(#gs-lore-crow-eye)"/>
+  <circle cx="154" cy="148" r="4.4" fill="#1a0602"/>
+  <circle cx="151" cy="145" r="1.8" fill="#fff6d8"/>
+  <!-- ember glow leaking up from the eye -->
+  <g stroke="#ffb020" stroke-width="2" stroke-linecap="round" opacity="0.55"><line x1="150" y1="134" x2="147" y2="126"/><line x1="158" y1="134" x2="161" y2="126"/></g>
+
+  <!-- tattered cowl hood drawn over the crown, violet-lined -->
+  <path d="M96 120 Q104 66 160 62 Q216 66 224 120 Q188 92 160 92 Q132 92 96 120 Z" fill="url(#gs-lore-crow-cowl)"/>
+  <path d="M96 120 Q160 88 224 120" fill="none" stroke="#b060c0" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <!-- hood peak + a couple of ragged points -->
+  <path d="M150 62 Q160 40 170 62 Z" fill="#2a1236"/>
+  <path d="M100 118 Q94 100 84 104 Q94 110 98 124 Z" fill="#1a0f26"/>
+  <path d="M220 118 Q226 100 236 104 Q226 110 222 124 Z" fill="#1a0f26"/>
+  <!-- an ouroboros sigil clasp on the hood front -->
+  <circle cx="160" cy="104" r="7" fill="none" stroke="#7fe0a0" stroke-width="2.4"/>
+  <circle cx="160" cy="104" r="2.4" fill="#b060c0"/>
+</svg>`;
+}
+
+/**
  * Venoma "the Viper" Krait, up close (GS-story-beats) — the Story-Tour rival, a viper-woman pro. A cold
  * beauty with a serpent's poise: acid-violet skin under a scaled hood, slit-pupil amber eyes, and a
  * smile that's all teeth. Her palette is the Coil's — venom-violet #b060c0 / acid-green #7fe0a0 / deep

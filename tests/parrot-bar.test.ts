@@ -77,6 +77,23 @@ describe('GS-story-parrot-bar — chatter gates on chapter / path / Sigils / com
     expect(none.has('path-herald')).toBe(false);
   });
 
+  it('the Herald bar is the CROW\'s — only crow lines show, no Parrot lines (GS-story-herald-clubhouse)', () => {
+    const herald = idsFor({ chapter: 4, sigils: 3, completed: false, alignment: 'herald' });
+    // the Crow greets + speaks his own chatter
+    expect(parrotBarLines({ chapter: 4, sigils: 3, completed: false, alignment: 'herald' })[0]!.id).toBe('greet-herald');
+    expect(herald.has('crow-mercy')).toBe(true);
+    expect(herald.has('crow-parrot')).toBe(true);
+    expect(herald.has('path-herald')).toBe(true);
+    // the Parrot's personal lore + captain-voiced chatter NEVER appear on the dark path
+    for (const parrotId of ['lore-brother', 'lore-foresight', 'lore-recruit', 'coil-stir', 'hint-ship', 'path-warden']) {
+      expect(herald.has(parrotId)).toBe(false);
+    }
+    // and the Warden/undecided bar never leaks a crow line
+    const warden = idsFor({ chapter: 4, sigils: 3, completed: false, alignment: 'warden' });
+    expect(warden.has('crow-mercy')).toBe(false);
+    expect(warden.has('crow-serpent')).toBe(false);
+  });
+
   it('the finished-campaign reflection only shows once completed (and hint chatter retires)', () => {
     const done = idsFor({ chapter: 5, sigils: 5, completed: true, alignment: 'warden' });
     expect(done.has('lore-afterglow')).toBe(true);

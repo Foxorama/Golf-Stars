@@ -37,6 +37,13 @@ export function storyBarScreen(): string {
   const line = parrotBarLineAt(ctx, talk);
   const total = parrotBarLines(ctx).length;
   const idx = ((talk % total) + total) % total;
+  // GS-story-herald-clubhouse: on the dark path the Coil's Crow (the Carrion Prophet) tends the bar — the
+  // Parrot's dark mirror. The keeper's identity, glyph, and neon all switch; the lines come from parrotBar.ts.
+  const herald = story.alignment === 'herald';
+  const keeper = herald ? '🐦‍⬛ The Carrion Prophet' : '🦜 The Prognostic Parrot';
+  const tagline = herald ? "The Carrion Prophet's roost" : "The Prognostic Parrot's bar";
+  const tapHint = herald ? '🐦‍⬛ tap the Crow' : '🦜 tap the captain';
+  const another = herald ? 'Speak on, prophet ›' : 'Another, captain ›';
 
   const nextAttr = JSON.stringify({ type: 'parrotBarNext' });
   const exitAttr = JSON.stringify({ type: 'exitStoryBar' });
@@ -78,21 +85,28 @@ export function storyBarScreen(): string {
       .gs-pbar__dot--on { background: #7fe0a0; box-shadow: 0 0 6px rgba(127,224,160,0.6); }
       .gs-pbar__actions { display: flex; gap: 10px; max-width: 560px; margin: 16px auto 0; }
       .gs-pbar__actions .gs-btn { flex: 1; }
+      /* Herald (Coil) bar — the Crow's roost, venom-violet in place of the Parrot's acid-green. */
+      .gs-pbar--herald .gs-pbar__who { color: #c98ad8; }
+      .gs-pbar--herald .gs-pbar__bubble { border-color: #4a2f5a; background: linear-gradient(180deg, #1a1026, #120818); }
+      .gs-pbar--herald .gs-pbar__bubble::before { border-bottom-color: #4a2f5a; }
+      .gs-pbar--herald .gs-pbar__taphint { color: #ecd8f4; border-color: #5a3a6a; background: rgba(26,15,38,0.72); }
+      .gs-pbar--herald .gs-pbar__dot--on { background: #b060c0; box-shadow: 0 0 6px rgba(176,96,192,0.6); }
+      .gs-pbar--herald .gs-pbar__scene { border-color: #4a2f5a; }
     </style>
 
     <header class="gs-hero gs-storyhub gs-hero--pbar">
       <h1 class="gs-hero-title">🍺 The Crow's Nest</h1>
-      <p class="gs-hero-tag">The Prognostic Parrot's bar · Chapter ${story.chapter}</p>
+      <p class="gs-hero-tag">${tagline} · Chapter ${story.chapter}</p>
     </header>
 
-    <div class="gs-pbar">
-      <div class="gs-pbar__scene" role="button" tabindex="0" data-action='${nextAttr}' aria-label="Tap the Parrot for another line">
-        ${parrotBarSceneSVG()}
-        <span class="gs-pbar__taphint">🦜 tap the captain</span>
+    <div class="gs-pbar${herald ? ' gs-pbar--herald' : ''}">
+      <div class="gs-pbar__scene" role="button" tabindex="0" data-action='${nextAttr}' aria-label="Tap ${herald ? 'the Crow' : 'the Parrot'} for another line">
+        ${parrotBarSceneSVG(herald)}
+        <span class="gs-pbar__taphint">${tapHint}</span>
       </div>
 
       <div class="gs-pbar__bubble">
-        <p class="gs-pbar__who">🦜 The Prognostic Parrot</p>
+        <p class="gs-pbar__who">${keeper}</p>
         <p class="gs-pbar__say">${line.text}</p>
       </div>
 
@@ -102,7 +116,7 @@ export function storyBarScreen(): string {
 
       <div class="gs-pbar__actions">
         <button class="gs-btn gs-btn--ghost" data-action='${exitAttr}'>‹ Leave the bar</button>
-        <button class="gs-btn" data-action='${nextAttr}'>Another, captain ›</button>
+        <button class="gs-btn" data-action='${nextAttr}'>${another}</button>
       </div>
     </div>`;
 }

@@ -295,6 +295,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       return reduce(afterProl, { type: 'storyRoundContinue' });
     }
+    case 'storyheraldbar': {
+      // GS-story-herald-clubhouse: the Crow's roost — a Herald campaign, then open the bar (the Coil's Crow
+      // tends it in the Parrot's place). Exercises the crow bust + violet neon + the Crow's chatter.
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      if (!base.story) return base;
+      const herald: UiState = { ...base, screen: 'story', story: { ...base.story, chapter: 4, alignment: 'herald', clearedWorldIds: ['standrews-18'], trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm'] } };
+      return reduce(herald, { type: 'openStoryBar' });
+    }
     case 'storyheraldclub': {
       // GS-story-herald-clubhouse: the HERALD (Coil) clubhouse variant — seed a post-Choice dark-path campaign
       // (alignment 'herald', mid-campaign) directly onto the spaceport clubhouse. Exercises the Coil-themed

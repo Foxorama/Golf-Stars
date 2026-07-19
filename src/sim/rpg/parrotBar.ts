@@ -36,6 +36,10 @@ export interface ParrotBarLine {
   kind: 'greeting' | 'lore' | 'coil' | 'hint' | 'path';
   /** Optional gate over the campaign snapshot — absent = always eligible. */
   when?: (c: ParrotBarContext) => boolean;
+  /** Which barkeep speaks it (GS-story-herald-clubhouse). Default `parrot` (the Warden/undecided bar); a
+   *  `crow` line only shows on the Herald path, where the Carrion Prophet has taken the roost. The two never
+   *  mix, so each keeper's voice stays coherent. */
+  speaker?: 'parrot' | 'crow';
   /** The spoken line. */
   text: string;
 }
@@ -73,8 +77,11 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
   {
     id: 'greet-herald',
     kind: 'greeting',
+    speaker: 'crow',
     when: (c) => !c.completed && c.chapter >= 4 && c.alignment === 'herald',
-    text: "So. You chose the Coil. I won't pretend it doesn't sting, champion. But a captain doesn't jump ship on his crew. Sit. Drink. I'm still here.",
+    // GS-story-herald-clubhouse: the Parrot doesn't tend the Coil's bar — when you turn, the CROW takes the
+    // roost. The Carrion Prophet greets his new Herald (his voice: calm, certain, patient as the grave).
+    text: "The little green bird has flown, Herald. He could not stomach what you've become. I have no such weakness. Sit. The Crow keeps this nest now — and I have waited a very long time for you.",
   },
   {
     id: 'greet-choice',
@@ -141,8 +148,10 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
   {
     id: 'path-herald',
     kind: 'path',
+    speaker: 'crow',
     when: (c) => !c.completed && c.alignment === 'herald',
-    text: "I've flown for saints and I've flown for pirates, and I'll fly for a Herald if that's the course you've charted. Just know: when your old friends line up against us, I'll still be at your shoulder. Somebody has to be.",
+    // The Crow's voice — he wants the cage opened; every Sigil you carry brings the Long Rest closer.
+    text: "A Herald does not reseal the world — a Herald ends the striving, and calls it mercy. Carry the Sigils to the root, and let the last ball come to rest. I will be perched at your shoulder when it does.",
   },
 
   // ── Gameplay hints (in the Parrot's voice) ────────────────────────────────────────────────
@@ -170,6 +179,56 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
     when: (c) => c.completed,
     text: "The hum's gone from your teeth, eh? Took me a week to trust the quiet. Now the Star Tour's yours — go chase records with nobody trying to end the universe for once. You earned that.",
   },
+
+  // ══ THE CROW's roost (GS-story-herald-clubhouse) — the Coil bar. Only these show on the Herald path; the
+  //    Parrot's lines above never do. Calm, certain, patient — the Carrion Prophet, not a cheerful captain. ══
+  {
+    id: 'crow-complete',
+    kind: 'greeting',
+    speaker: 'crow',
+    when: (c) => c.completed,
+    text: "It is done. The last ball has come to rest, and the striving is over. You gave the universe the mercy it could not ask for. Perch a while, Herald. There is nothing left to hurry toward.",
+  },
+  {
+    id: 'crow-mercy',
+    kind: 'lore',
+    speaker: 'crow',
+    text: "The Wardens will tell you the Coil is cruelty. It is the opposite. Every fairway ends in the same cup; we merely spare the world the exhausting pretense of the walk. That is all mercy has ever been.",
+  },
+  {
+    id: 'crow-parrot',
+    kind: 'lore',
+    speaker: 'crow',
+    text: "You wonder where the little green bird went. He flew off cawing about loyalty — as if loyalty ever kept a single ball from rolling to a stop. He was never your prophet, Herald. I have always been.",
+  },
+  {
+    id: 'crow-serpent',
+    kind: 'coil',
+    speaker: 'crow',
+    when: (c) => !c.completed && c.chapter >= 3,
+    text: "Jörmungandr does not hunger, whatever the Wardens whisper. It rests. It dreams of a galaxy that has finally stopped trying. Bring it the Sigils and you do not wake a monster — you keep a promise.",
+  },
+  {
+    id: 'crow-friends',
+    kind: 'lore',
+    speaker: 'crow',
+    when: (c) => !c.completed && c.chapter >= 4,
+    text: "Your old friends will line up against you at the majors — the trucker, the putter, all of them. Beat them. Not from spite. From kindness. They are simply the last few who haven't yet understood the quiet.",
+  },
+  {
+    id: 'crow-arm',
+    kind: 'hint',
+    speaker: 'crow',
+    when: (c) => !c.completed && c.chapter >= 3,
+    text: "Down in the Shipyard they will sell you weapons to 'kill' the serpent. Buy them. Every gun that breaches that hull only widens the door. Arm well, Herald — the cage was always meant to open.",
+  },
+  {
+    id: 'crow-final',
+    kind: 'coil',
+    speaker: 'crow',
+    when: (c) => !c.completed && c.sigils >= 5,
+    text: "Five Sigils. The key is forged and it is yours. One last flight to the root, one last shot into the dark — and the long, kind silence begins. I have waited eons for a hand steady enough. Do not keep me waiting.",
+  },
 ];
 
 /**
@@ -177,8 +236,12 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
  * eligible chatter (lore / coil / path / hint) in table order. Always returns at least the greeting.
  */
 export function parrotBarLines(c: ParrotBarContext): ParrotBarLine[] {
-  const greet = PARROT_BAR_LINES.find((l) => l.kind === 'greeting' && (!l.when || l.when(c)));
-  const chatter = PARROT_BAR_LINES.filter((l) => l.kind !== 'greeting' && (!l.when || l.when(c)));
+  // GS-story-herald-clubhouse: the Herald bar is the Crow's — show only `crow` lines there, only `parrot`
+  // lines otherwise, so the barkeep's voice never mixes.
+  const keeper: 'parrot' | 'crow' = c.alignment === 'herald' ? 'crow' : 'parrot';
+  const eligible = PARROT_BAR_LINES.filter((l) => (l.speaker ?? 'parrot') === keeper && (!l.when || l.when(c)));
+  const greet = eligible.find((l) => l.kind === 'greeting');
+  const chatter = eligible.filter((l) => l.kind !== 'greeting');
   return greet ? [greet, ...chatter] : chatter;
 }
 
