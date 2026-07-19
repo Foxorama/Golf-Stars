@@ -57,10 +57,23 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
     text: "Well, if it isn't the golfer who put the world-serpent back to sleep. Pull up a stool. The galaxy owes you a round — first one's on me.",
   },
   {
+    id: 'greet-recruited',
+    kind: 'greeting',
+    // GS-story-pacing: the QUEST BRIEFING. The new game hypes only the World Tour; the Parrot lays out the
+    // real mission here, at the bar, once you've won Earth and come aboard (Chapter 1, no Sigils yet).
+    when: (c) => !c.completed && c.chapter <= 1 && c.alignment !== 'herald',
+    text: "Right — you're aboard, so let me lay it out plain. That calamity I foresaw? A snake-cult called the " +
+      "Coil means to WAKE Jörmungandr, the world-serpent coiled at the root of Yggdrasil. Wake it, and it " +
+      "swallows the planets one by one. The only soul who can stop them is the one holding the five Sigils of " +
+      "the Game — and that, champion, is you. Win a Galaxy Tournament on each of five worlds, claim its Sigil, " +
+      "and the five together forge a key to the serpent's realm, where you'll end this. Big job. Good thing " +
+      "you're the best there's ever been. Set a course when you're ready — I'll be right here on the bag.",
+  },
+  {
     id: 'greet-early',
     kind: 'greeting',
     when: (c) => !c.completed && c.chapter <= 2,
-    text: "Welcome to the Crow's Nest, champion. Best little bar this side of the Bifröst. Sit — the Tour can wait while your captain talks.",
+    text: "Welcome back to the Crow's Nest, champion. Best little bar this side of the Bifröst. Sit — the Tour can wait while your captain talks.",
   },
   {
     id: 'greet-mid',

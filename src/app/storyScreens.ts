@@ -93,34 +93,33 @@ function missionPanelHTML(story: StoryState): string {
 }
 
 /**
- * GS-story-objective: the NEW-GAME premise card — the "what is this / why am I playing?" the first-time
- * player was missing. A short, evocative brief shown on the golfer picker so the campaign's shape is clear
- * before you tee off: you're the champion, the Universe is in peril, and the road is five tournaments +
- * a final battle. Pure copy; own `.gs-premise*` scope.
+ * GS-story-pacing: the NEW-GAME premise card — hypes the WORLD TOUR final, and ONLY that. The larger
+ * universe quest (the Coil, the serpent, the five Sigils) is deliberately NOT spoiled here — that reveal
+ * belongs to the Parrot at the Crow's Nest, after you've won Earth and been recruited. At the start you're
+ * simply the planet's best golfer with one round left to be immortal. Pure copy; own `.gs-premise*` scope.
  */
 function premiseCardHTML(): string {
   return `
-    <section class="gs-premise" aria-label="Story Tour — the premise">
-      <div class="gs-premise-kicker">✦ STORY TOUR</div>
-      <p class="gs-premise-lede">You are <b>Earth's greatest golfer</b>, about to defend your World Tour crown
-        on the Old Course. But win, and a shadow will fall — the Universe needs a champion, and the
-        <span style="color:#7fe0a0;">Prognostic Parrot</span> has foreseen you.</p>
+    <section class="gs-premise" aria-label="The World Tour — the final round">
+      <div class="gs-premise-kicker">✦ THE WORLD TOUR · FINAL ROUND</div>
+      <p class="gs-premise-lede">You are <b>Earth's greatest golfer</b>, and one round stands between you and
+        the sport's highest honour: eighteen holes on the <b>Old Course at St Andrews</b>, the oldest and
+        sternest test in the game. Win here and the whole planet knows your name — <b>World Champion</b>.</p>
       <div class="gs-premise-road">
-        <span class="gs-premise-step">🌍 Win Earth</span><span class="gs-premise-arr">›</span>
-        <span class="gs-premise-step">🚀 Voyage the galaxy</span><span class="gs-premise-arr">›</span>
-        <span class="gs-premise-step">🏆 Win 5 Sigils</span><span class="gs-premise-arr">›</span>
-        <span class="gs-premise-step">🐍 Slay Jörmungandr</span>
+        <span class="gs-premise-step">⛳ 18 holes</span><span class="gs-premise-arr">·</span>
+        <span class="gs-premise-step">🏆 the crown</span><span class="gs-premise-arr">·</span>
+        <span class="gs-premise-step">🌍 immortality</span>
       </div>
       <style>
-        .gs-premise{max-width:560px;margin:10px auto 2px;background:linear-gradient(180deg,#101826,#0b1017);
-          border:1px solid #2a3346;border-left:3px solid #7fe0a0;border-radius:14px;padding:12px 16px;}
-        .gs-premise-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:#7fe0a0;}
+        .gs-premise{max-width:560px;margin:10px auto 2px;background:linear-gradient(180deg,#141a10,#0d1109);
+          border:1px solid #33402a;border-left:3px solid #e9c46a;border-radius:14px;padding:12px 16px;}
+        .gs-premise-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;color:#e9c46a;}
         .gs-premise-lede{margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--gs-dim,#aeb9c9);}
         .gs-premise-lede b{color:var(--gs-ink,#eaf1fb);}
         .gs-premise-road{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:10px;}
         .gs-premise-step{font-size:11.5px;font-weight:700;color:#dfe8f4;background:#0e1420;border:1px solid #273246;
           border-radius:20px;padding:3px 10px;white-space:nowrap;}
-        .gs-premise-arr{color:#4a5a72;font-weight:800;}
+        .gs-premise-arr{color:#6a5a3a;font-weight:800;}
       </style>
     </section>`;
 }
@@ -191,7 +190,7 @@ function earthClubhouseHTML(story: StoryState): string {
       <div style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin-bottom:8px;">
         Your rivals are here too — but today, the trophy is yours to take.
         <span style="color:var(--gs-ink);">Tap a golfer</span> to check their game.
-        <span style="display:block;margin-top:4px;color:#7fd8ff;font-size:12px;">Win this round to become World Champion — then answer the call to the stars.</span>
+        <span style="display:block;margin-top:4px;color:#e9c46a;font-size:12px;">Win this round to be crowned World Champion.</span>
       </div>
       ${earthClubhouseSceneHTML(story.characterId)}
     </section>

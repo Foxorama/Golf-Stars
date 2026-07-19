@@ -564,6 +564,25 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   Warden bar is byte-identical (default speaker `parrot`). Guarded by `tests/parrot-bar.test.ts` (the Herald
   pool is crow-only, no Parrot lines leak; the Warden pool has no crow lines) + a `?screen=storyheraldbar`
   browser smoke.
+- **GS-story-fixes** — ✅ *shipped* (reported-bug batch). Golfer-select overlay z-index (the clubhouse
+  figures painted over the stats card → `isolation:isolate` on the scene); crew avatars (floating-head
+  circles → the full portrait bust as a standee); star-map docking returns to the STORY clubhouse in story
+  mode (`exitStoryMap`), not the title Clubhouse; a world-clear recap leads to the star chart (`openStoryMap`
+  from `storyResult`) so you fly on / home; and NAMED quest-reward clubs (`NAMED_STORY_CLUBS` / `quest:<key>`
+  ids) carry the ally's signature name into the BAG + are all the same legendary tier (the Sandy-vs-Dr
+  parity bug).
+- **GS-story-pacing** — ✅ *shipped*. The opening no longer spoils the campaign: the new-game premise hypes
+  ONLY the World Tour final (no Coil/serpent/Sigils); the Parrot reveals the real quest at the Crow's Nest
+  in a Chapter-1 briefing greeting (`parrotBar.ts` `greet-recruited`), and the recruitment cinematic bridges
+  to it ("meet me at the bar — I'll tell you everything").
+- **GS-story-serpent** — ✅ *shipped* (`render/sigilCeremony.ts drawSerpent`). The post-Sigil cutscene serpent
+  was a string of gradient balls (a "worm"); it's now a MASSIVE scaled world-serpent — a continuous tapered
+  body (one filled ribbon), overlapping crescent SCALES, a lit dorsal ridge with spines, and a WEDGE HEAD
+  with a jaw + a forked tongue-flick when it stirs, keeping the great slit-pupil eye that blows up on the
+  final reveal. Pure Canvas2D, zero rng; verified eyes-on. **Deferred (GS-story-serpent-beat):** moving the
+  next-chapter Coil/parrot lore beat to fire IMMEDIATELY after the cutscene (instead of on the next world
+  arrival) — the arrival beats are authored for the round-arrival lore gate, so relocating them cleanly is a
+  lore-flow redesign, left for a focused follow-up rather than risking beat double-fires.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
