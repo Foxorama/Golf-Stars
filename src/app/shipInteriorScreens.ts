@@ -22,6 +22,10 @@ import { questOfferable } from '../sim/rpg/storyQuests';
 import { allyInspectOverlayHTML } from '../render/storyCrew';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { heraldAgentOverlayHTML } from '../render/storyHeraldOverlay';
+import { otherGolfers, isOtherGolfer } from '../sim/rpg/storyCast';
+import { friendInspectOverlayHTML } from '../render/storyCastOverlay';
+import { golferPreviewSVG } from '../render/apparelArt';
+import type { Character } from '../sim/rpg/characters';
 import { rarCol } from '../sim/rpg/loot';
 import { itemArtSVG } from '../render/itemArt';
 import { shipInspectOverlay } from './storyShipyardScreens';
@@ -80,14 +84,23 @@ export function shipInteriorScreen(): string {
   const here = crew.filter((c) => hashRoom(c.id, visit) === room);
   const standees = here.map((c, i) => crewStandee(c, here.length, i, c.id === active, questOfferable(story, c.id))).join('');
 
+  // GS-story-cast: your three friend golfers travel with you and relax in the LOUNGE (Warden/undecided path,
+  // past the prologue), each tappable → their friend talk card. On the Herald path they've left you.
+  const friendsHere =
+    room === 'lounge' && story.alignment !== 'herald' && story.chapter >= 1
+      ? otherGolfers(story).map((ch, i, arr) => friendStandeeSI(ch, arr.length, i)).join('')
+      : '';
+
   // The room's content panel (below the scene): outfitting in weapons/engine, the locker door, flavour.
   const panel = roomPanel(room, story, theme);
 
   // Overlays: an ally's talk card (crew tap) or an upgrade's lore card (outfitting tap).
   const overlay = state.storyAllyInspectId
-    ? isHeraldAgent(state.storyAllyInspectId)
-      ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0)
-      : allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
+    ? isOtherGolfer(story, state.storyAllyInspectId)
+      ? friendInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
+      : isHeraldAgent(state.storyAllyInspectId)
+        ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0)
+        : allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
     : state.storyItemInspectId
     ? shipInspectOverlay(state.storyItemInspectId)
     : '';
@@ -109,6 +122,7 @@ export function shipInteriorScreen(): string {
       <div class="si-scene">
         ${shipRoomArt(room, theme)}
         <div class="si-roomlabel">${meta.icon} ${meta.label}</div>
+        ${friendsHere}
         ${standees}
       </div>
       ${roomNav(room, theme)}
@@ -209,6 +223,28 @@ function crewStandee(c: Crewmate, count: number, i: number, active: boolean, has
     </button>`;
 }
 
+/** GS-story-cast: one of your friend golfers relaxing in the lounge — an inline `golferPreviewSVG` standee
+ *  (their signature look), fanned across the floor by index. Tap → their friend talk card. */
+function friendStandeeSI(ch: Character, count: number, i: number): string {
+  const left = count <= 1 ? 50 : 20 + (60 * i) / (count - 1);
+  const figure = golferPreviewSVG(undefined, undefined, undefined, {
+    skin: ch.style.skin,
+    shirtBase: ch.style.shirt,
+    capColor: ch.style.cap,
+    hair: ch.style.hair,
+    uid: `sifriend${ch.id.replace(/[^a-z0-9]/gi, '')}`,
+    w: 72,
+    h: 200,
+  });
+  return `<button class="si-friend"
+      data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: ch.id })}'
+      aria-label="Talk to ${ch.name}, your friend"
+      style="left:${left.toFixed(1)}%;">
+      ${figure}
+      <span class="si-cplate si-cplate--friend">${ch.shortName}</span>
+    </button>`;
+}
+
 const SI_STYLE = `<style>
   .si-scene{container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:620px;margin:0 auto;
     border:1px solid #2a3346;border-radius:16px;overflow:hidden;background:#0b0f18;box-shadow:0 8px 30px -12px #000a;}
@@ -229,6 +265,12 @@ const SI_STYLE = `<style>
   .si-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141edd;
     border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;position:relative;z-index:1;}
   .si-caddy--on .si-cplate{background:#231018ee;border-color:#6a3a52;color:#f0a8c8;}
+  /* GS-story-cast: friend golfers in the lounge — inline SVG standee, feet-anchored on the floor. */
+  .si-friend{position:absolute;bottom:2%;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
+    transform:translateX(-50%);z-index:15;transition:transform .15s ease,filter .15s ease;filter:drop-shadow(0 4px 4px #000a);}
+  .si-friend:hover,.si-friend:focus-visible{outline:none;transform:translateX(-50%) scale(1.06);z-index:22;filter:drop-shadow(0 7px 6px #000b) brightness(1.06);}
+  .si-friend svg{width:26cqw;max-width:150px;height:auto;display:block;margin:0 auto;}
+  .si-cplate--friend{background:linear-gradient(180deg,#5a7fb0,#2f4a6e);border-color:#1b2c42;color:#eaf2ff;}
   @media(prefers-reduced-motion:reduce){.si-questmark{animation:none;}}
   /* room nav */
   .si-nav{display:flex;gap:6px;max-width:620px;margin:10px auto 0;padding:5px;background:#0e131c;border:1px solid #232b3b;border-radius:14px;}

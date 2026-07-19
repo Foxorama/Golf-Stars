@@ -29,6 +29,8 @@ import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { storyObjective } from '../sim/rpg/storyGuide';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { heraldAgentOverlayHTML } from '../render/storyHeraldOverlay';
+import { isOtherGolfer } from '../sim/rpg/storyCast';
+import { friendInspectOverlayHTML } from '../render/storyCastOverlay';
 
 export function storyHubScreen(): string {
   const story = state.story;
@@ -281,9 +283,11 @@ function spaceClubhouseHTML(story: StoryState): string {
   // GS-story-allies / GS-story-herald-clubhouse: the crew stand in the clubhouse; tap one to talk. On the
   // Herald path the standees are the Coil agents (their own talk card); otherwise the recruited caddies.
   const allyOverlay = state.storyAllyInspectId
-    ? isHeraldAgent(state.storyAllyInspectId)
-      ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0)
-      : allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
+    ? isOtherGolfer(story, state.storyAllyInspectId)
+      ? friendInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
+      : isHeraldAgent(state.storyAllyInspectId)
+        ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0)
+        : allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
     : '';
 
   return `
