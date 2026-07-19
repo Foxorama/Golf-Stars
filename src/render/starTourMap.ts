@@ -65,6 +65,9 @@ export interface StarTourMapOpts {
   showYggdrasil?: boolean;
   /** The tree is the flight target / its realm overlay is open (draws the selection ring). */
   yggdrasilSelected?: boolean;
+  /** GS-story-ship-interior: in Story mode the ship is TAPPABLE — a hit target over the hull dispatches
+   *  `openShipInterior` (board your ship). Absent/false ⇒ the ship is inert decor (Star Tour proper). */
+  shipTappable?: boolean;
 }
 
 /** The ship's docked heading (GS-star-tour): nose UP (−90° in the +x-facing art frame), poised toward
@@ -1488,10 +1491,20 @@ function shipGroup(opts: StarTourMapOpts): string {
   // a downward repulsor UNDER the hull (drawn first, so the disc sits on it), banking with the body.
   const jet = hover ? '' : thrustTrail(look);
   const repulsor = hover ? `<g transform="scale(${SHIP_SCALE})">${hoverThrust(look)}</g>` : '';
+  // GS-story-ship-interior: in Story mode a transparent hit disc over the hull makes the ship tappable
+  // (→ board it). The parent group is pointer-events:none so it never blocks map taps; this child opts
+  // back IN so only the ship itself catches the tap. A gentle pulsing ring signals it's interactive.
+  const tap = opts.shipTappable
+    ? `<g style="pointer-events:auto;cursor:pointer;" data-startour-ship aria-label="Board your ship">
+        <circle r="34" fill="transparent"/>
+        <circle r="30" fill="none" stroke="#7fe0ff" stroke-width="1.4" opacity="0.5"><animate attributeName="r" values="26;34;26" dur="2.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.55;0.1;0.55" dur="2.6s" repeatCount="indefinite"/></circle>
+      </g>`
+    : '';
   return `<g id="gs-st-ship" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})" style="pointer-events:none;">
     <circle r="30" fill="#7fe0ff" opacity="0.08"/>
     <g id="gs-st-thrust-orient" transform="rotate(${h.toFixed(1)})"><g transform="scale(${SHIP_SCALE})">${jet}</g></g>
     <g id="gs-st-body" transform="${bodyTransform}">${repulsor}${shipSVG(opts.shipId, 0, 0, SHIP_SCALE)}</g>
+    ${tap}
   </g>`;
 }
 

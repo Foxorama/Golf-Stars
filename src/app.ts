@@ -87,6 +87,7 @@ import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/
 import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen, storyLockerView } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
+import { shipInteriorScreen } from './app/shipInteriorScreens';
 import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
@@ -156,7 +157,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -371,6 +372,17 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       if (!base.story) return base;
       return { ...base, story: { ...base.story, chapter: 5, alignment: 'herald', trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'] }, screen: 'storyInterlude' };
+    }
+    case 'shipinterior': {
+      // GS-story-ship-interior: board the ship the honest way — prologue → Chapter 1, open the star map,
+      // then dispatch openShipInterior (the ship-tap action) to land inside on the bridge. Exercises the
+      // room backdrop + crew standees + outfitting chrome.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
+      const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
+      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
+      const map = reduce(hub1, { type: 'openStoryMap' });
+      return reduce(map, { type: 'openShipInterior' });
     }
     case 'lore':
       // GS-lore: mount the story-beat popup with the real Driver Dan beat (the SAME shape the arrival
@@ -2378,6 +2390,8 @@ function render(): void {
       ? storyLockerScreen()
       : state.screen === 'storyShipyard'
       ? storyShipyardScreen()
+      : state.screen === 'shipInterior'
+      ? shipInteriorScreen()
       : state.screen === 'storyTournament'
       ? storyTournamentScreen()
       : state.screen === 'storyTournamentPop'
@@ -2672,6 +2686,12 @@ function render(): void {
         // Tapping the hidden YGGDRASIL (GS-star-tour-yggdrasil) flies to it and opens the realm overlay.
         if (target.closest('[data-startour-yggdrasil]')) {
           flyStarTourToYggdrasil();
+          return;
+        }
+        // GS-story-ship-interior: tapping your ship (Story mode only) boards it — the interior rooms.
+        if (target.closest('[data-startour-ship]')) {
+          sfx.click();
+          dispatch({ type: 'openShipInterior' });
           return;
         }
         // Free flight to the tapped chart point. The SVG renders at zoom×intrinsic and is offset by the

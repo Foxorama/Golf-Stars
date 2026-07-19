@@ -97,6 +97,7 @@ import {
 } from '../sim/rpg/play';
 import { Rng } from '../sim/rng';
 import type { Action, MatchUi, MetaProgress, Screen, UiState } from './gameState';
+import { SHIP_ROOMS } from './gameState';
 import {
   aceUpdates,
   applyTentReactions,
@@ -510,8 +511,9 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'setStoryCaddy': {
       // GS-story-caddies: choose which owned caddy carries your bag (an EQUIP). Reachable from the Locker
-      // AND from an ally's talk card on the clubhouse hub (GS-story-allies — "carry my bag").
-      if ((state.screen !== 'storyLocker' && state.screen !== 'story') || !state.story) return state;
+      // AND from an ally's talk card on the clubhouse hub (GS-story-allies — "carry my bag") or aboard the
+      // ship (GS-story-ship-interior).
+      if ((state.screen !== 'storyLocker' && state.screen !== 'story' && state.screen !== 'shipInterior') || !state.story) return state;
       const story = setActiveStoryCaddy(state.story, action.caddyId);
       return story === state.story ? state : { ...state, story };
     }
@@ -519,8 +521,9 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'storyInspectAlly': {
       // GS-story-allies / GS-story-herald-clubhouse: tap a crew standee → open their talk card. On the Warden
       // path that's a real hired caddy; on the Herald path it's a Coil agent (Voss/Venoma/Ouros/Ecdysis).
-      // Guarded to the hub + a genuine crew member, so a stray tap can't open a mute card.
-      if (state.screen !== 'story' || !state.story) return state;
+      // Guarded to the hub OR the ship interior (GS-story-ship-interior — the crew wander aboard too) + a
+      // genuine crew member, so a stray tap can't open a mute card.
+      if ((state.screen !== 'story' && state.screen !== 'shipInterior') || !state.story) return state;
       const realCaddy = state.story.hiredCaddyIds.includes(action.caddyId) && !!allyTalk(action.caddyId);
       if (!realCaddy && !isHeraldAgent(action.caddyId)) return state;
       return { ...state, storyAllyInspectId: action.caddyId, storyAllyTalk: 0 };
@@ -528,7 +531,7 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'storyAllyTalk': {
       // GS-story-allies: cycle the open ally's banter line (the Parrot-bar tap pattern). Purely cosmetic.
-      if (state.screen !== 'story' || state.storyAllyInspectId !== action.caddyId) return state;
+      if ((state.screen !== 'story' && state.screen !== 'shipInterior') || state.storyAllyInspectId !== action.caddyId) return state;
       return { ...state, storyAllyTalk: (state.storyAllyTalk ?? 0) + 1 };
     }
 
@@ -539,7 +542,8 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'acceptStoryQuest': {
       // GS-story-quests: accept an ally's side quest from their clubhouse card. Guarded to the hub + an
       // offerable quest (acceptQuest re-checks). Closes the ally card so the active-quest banner shows.
-      if (state.screen !== 'story' || !state.story) return state;
+      // Reachable from the hub OR aboard the ship (GS-story-ship-interior — the crew wander aboard too).
+      if ((state.screen !== 'story' && state.screen !== 'shipInterior') || !state.story) return state;
       const story = acceptQuest(state.story, action.questId);
       if (story === state.story) return state;
       return { ...state, story, storyAllyInspectId: undefined, storyAllyTalk: undefined };
@@ -579,7 +583,14 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'storyInspectItem': {
       // GS-story-econ / GS-story-lore-cards: tap an item → raise its lore card. Works on the Pro Shop
       // (buy footer), the locker (equip footer), and the shipyard (ship ids → buy/fly footer).
-      if ((state.screen !== 'storyShop' && state.screen !== 'storyLocker' && state.screen !== 'storyShipyard') || !state.story) return state;
+      if (
+        (state.screen !== 'storyShop' &&
+          state.screen !== 'storyLocker' &&
+          state.screen !== 'storyShipyard' &&
+          state.screen !== 'shipInterior') ||
+        !state.story
+      )
+        return state;
       // GS-story-locker-inspect: a hired CADDY is inspectable too (its effect + lore card in the locker).
       const isHiredCaddy = state.story.hiredCaddyIds.includes(action.itemId);
       if (!storyItemKind(action.itemId) && !isStoryShipId(action.itemId) && !isShipUpgradeId(action.itemId) && !isHiredCaddy) return state;
@@ -603,14 +614,15 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStoryLocker': {
-      // GS-story-locker: open the campaign locker from the spaceport clubhouse (post-recruitment).
-      if (state.screen !== 'story' || !state.story) return state;
-      return { ...state, screen: 'storyLocker', storyItemInspectId: undefined };
+      // GS-story-locker: open the campaign locker from the clubhouse OR the ship interior's locker room
+      // (GS-story-ship-interior). Records the origin so exiting returns there.
+      if ((state.screen !== 'story' && state.screen !== 'shipInterior') || !state.story) return state;
+      return { ...state, screen: 'storyLocker', storyLockerReturn: state.screen, storyItemInspectId: undefined };
     }
 
     case 'exitStoryLocker': {
       if (state.screen !== 'storyLocker') return state;
-      return { ...state, screen: 'story', storyItemInspectId: undefined };
+      return { ...state, screen: state.storyLockerReturn ?? 'story', storyLockerReturn: undefined, storyItemInspectId: undefined };
     }
 
     case 'openStoryBar': {
@@ -697,11 +709,38 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'storyBuyUpgrade': {
       // GS-story-ship-upgrades: buy a ship weapon/engine/shield (spend credits, arm up). No-op if
-      // unaffordable/owned/locked (buyShipUpgrade gates).
-      if (state.screen !== 'storyShipyard' || !state.story) return state;
+      // unaffordable/owned/locked (buyShipUpgrade gates). Reachable from the shipyard OR the ship interior's
+      // engine/weapons rooms (GS-story-ship-interior — outfit your ship on a long trip, no vendor flight).
+      if ((state.screen !== 'storyShipyard' && state.screen !== 'shipInterior') || !state.story) return state;
       const story = buyShipUpgrade(state.story, action.upgradeId);
       if (story === state.story) return state;
       return { ...state, story, storyItemInspectId: undefined };
+    }
+
+    case 'openShipInterior': {
+      // GS-story-ship-interior: step INSIDE your ship from the star map — the rooms, your crew wandering
+      // between them. Bumps `shipVisit` so the crew re-scatter to new rooms each time you board.
+      if (state.screen !== 'starTour' || !state.story) return state;
+      return {
+        ...state,
+        screen: 'shipInterior',
+        shipRoom: 'bridge',
+        shipInteriorReturn: 'starTour',
+        shipVisit: (state.shipVisit ?? 0) + 1,
+        storyItemInspectId: undefined,
+      };
+    }
+
+    case 'exitShipInterior': {
+      if (state.screen !== 'shipInterior') return state;
+      return { ...state, screen: state.shipInteriorReturn ?? 'starTour', storyItemInspectId: undefined };
+    }
+
+    case 'shipInteriorGoto': {
+      // Walk to a room aboard the ship (bridge/engine/weapons/lounge/locker).
+      if (state.screen !== 'shipInterior') return state;
+      if (!(SHIP_ROOMS as readonly string[]).includes(action.room)) return state;
+      return { ...state, shipRoom: action.room, storyItemInspectId: undefined };
     }
 
     case 'openStoryTournament': {

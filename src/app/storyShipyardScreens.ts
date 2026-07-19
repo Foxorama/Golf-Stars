@@ -221,7 +221,11 @@ function acquireBadge(row: StoryShip): string {
   return label ? `<span class="gs-yard-badge">${label}</span>` : '';
 }
 
-/** The tap-to-inspect lore card for a ship OR an upgrade, footer = the right buy/equip action. */
+/** The tap-to-inspect lore card for a ship OR an upgrade, footer = the right buy/equip action.
+ *  Exported so the ship interior's weapons/engine rooms (GS-story-ship-interior) reuse the same card. */
+export function shipInspectOverlay(id: string): string {
+  return inspectOverlay(id);
+}
 function inspectOverlay(id: string): string {
   const story = state.story;
   if (!story) return '';
